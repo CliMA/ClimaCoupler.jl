@@ -18,8 +18,14 @@ For this there are two big parts
      
  https://github.com/CliMA/ClimateMachine.jl/blob/83cb930177d27ad411611c1aaaad68aec38ce4ec/src/Ocean/SplitExplicit01/Communication.jl#L191
         
-     which shows some mapping between differnet dimension collections of DG fields.
+     which shows some mapping between differnet dimension collections of DG fields. Wrapping this type of code in an
+     API with some meta-data tuple would make a reaonable starting point for a boundary-fields abstraction.
        
      
 ## creating a driver and stepping recipe for advancing coupled components
+
+     In a coupled system we want to step components separately and periodically exchange fields between them. Some preliminary sketching
+     of ideas is in progress here
+     
+        
  

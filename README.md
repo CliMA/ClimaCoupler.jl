@@ -25,7 +25,7 @@ For this there are two big parts
 ## creating a driver and stepping recipe for advancing coupled components
 
      In a coupled system we want to step components separately and periodically exchange fields between them. Some preliminary sketching
-     of ideas is in progress here
+     of ideas in the context of coupled Balance Law entities is in progress here
      
-        
+ https://github.com/christophernhill/CouplerMachine/tree/main/experimentation/driver-experimenting       
  

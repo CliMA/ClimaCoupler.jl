@@ -18,6 +18,7 @@ using ClimateMachine.GenericCallbacks
 # To invoke timestepper
 using ClimateMachine.ODESolvers
 using ClimateMachine.ODESolvers: solve!
+using ClimateMachine.MPIStateArrays: weightedsum
 
 ClimateMachine.init()
 const FT = Float64;
@@ -139,7 +140,15 @@ function run(cpl_solver, numberofsteps, cbvector)
     )
 end
 
+function get_components(csolver)
+    mA = csolver.component_list.atmosphere.component_model
+    mO = csolver.component_list.ocean.component_model
+    return mA, mO
+end
+
 function preatmos(csolver)
+    mA, mO = get_components(csolver)
+    
     # Set boundary SST used in atmos to SST of ocean surface at start of coupling cycle.
     mA.discretization.state_auxiliary.θ_secondary[mA.boundary] .= 
         Coupling.get(csolver.coupler, :Ocean_SST, mA.grid, DateTime(0), u"°C")
@@ -158,6 +167,8 @@ function preatmos(csolver)
 end
 
 function postatmos(csolver)
+    mA, mO = get_components(csolver)
+
     # Pass atmos exports to "coupler" namespace
     # 1. Save mean θ flux at the Atmos boundary during the coupling period
     Coupling.put!(csolver.coupler, :Atmos_MeanAirSeaθFlux, mA.state.F_accum[mA.boundary] ./ csolver.dt,
@@ -181,6 +192,8 @@ function postatmos(csolver)
 end
 
 function preocean(csolver)
+    mA, mO = get_components(csolver)
+
     # Set mean air-sea theta flux
     mO.discretization.state_auxiliary.F_prescribed[mO.boundary] .= 
         Coupling.get(csolver.coupler, :Atmos_MeanAirSeaθFlux, mO.grid, DateTime(0), u"°C")
@@ -200,6 +213,7 @@ function preocean(csolver)
 end
 
 function postocean(csolver)
+    mA, mO = get_components(csolver)
     @info(
         "postocean",
         time = csolver.t + csolver.dt,

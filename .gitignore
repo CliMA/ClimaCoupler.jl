@@ -1,0 +1,33 @@
+# Temporary
+*.DS_Store
+*.swp
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+*.DS_Store
+*~
+TAGS
+
+# Deps
+Manifest.toml
+
+# Data
+*.vtk
+*.dat
+*.vtu
+*.pvtu
+*.nc
+*.jld2
+
+# Figs
+*.png
+*.jpg
+*.jpeg
+*.svg
+
+# Movies
+*.gif
+*.mp4
+
+# Julia System Images
+*.so

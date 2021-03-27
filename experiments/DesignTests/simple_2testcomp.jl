@@ -3,8 +3,7 @@ using MPI
 using Statistics
 
 # To couple
-using CouplerMachine.Coupling
-using CouplerMachine: CplSolver
+using CouplerMachine
 using Unitful, Dates
 
 # To create meshes & grids
@@ -85,7 +84,7 @@ function main(::Type{FT}) where {FT}
     # Collect spatial info, timestepping, balance law and DGmodel for the two components
 
     # 1. Atmos component
-    mA = Coupling.CplModel(;
+    mA = CplModel(;
         grid = gridA,
         equations = CplTestBL(
             bl_propA,
@@ -97,7 +96,7 @@ function main(::Type{FT}) where {FT}
     )
 
     # 2. Ocean component
-    mO = Coupling.CplModel(;
+    mO = CplModel(;
         grid = gridO,
         equations = CplTestBL(
             bl_propO,
@@ -151,7 +150,7 @@ function preatmos(csolver)
     
     # Set boundary SST used in atmos to SST of ocean surface at start of coupling cycle.
     mA.discretization.state_auxiliary.θ_secondary[mA.boundary] .= 
-        Coupling.get(csolver.coupler, :Ocean_SST, mA.grid, DateTime(0), u"°C")
+        CouplerMachine.get(csolver.coupler, :Ocean_SST, mA.grid, DateTime(0), u"°C")
     # Set atmos boundary flux accumulator to 0.
     mA.state.F_accum .= 0
 
@@ -171,7 +170,7 @@ function postatmos(csolver)
 
     # Pass atmos exports to "coupler" namespace
     # 1. Save mean θ flux at the Atmos boundary during the coupling period
-    Coupling.put!(csolver.coupler, :Atmos_MeanAirSeaθFlux, mA.state.F_accum[mA.boundary] ./ csolver.dt,
+    CouplerMachine.put!(csolver.coupler, :Atmos_MeanAirSeaθFlux, mA.state.F_accum[mA.boundary] ./ csolver.dt,
         mA.grid, DateTime(0), u"°C")
 
     @info(
@@ -196,7 +195,7 @@ function preocean(csolver)
 
     # Set mean air-sea theta flux
     mO.discretization.state_auxiliary.F_prescribed[mO.boundary] .= 
-        Coupling.get(csolver.coupler, :Atmos_MeanAirSeaθFlux, mO.grid, DateTime(0), u"°C")
+        CouplerMachine.get(csolver.coupler, :Atmos_MeanAirSeaθFlux, mO.grid, DateTime(0), u"°C")
     # Set ocean boundary flux accumulator to 0. (this isn't used)
     mO.state.F_accum .= 0
 
@@ -223,7 +222,7 @@ function postocean(csolver)
 
     # Pass ocean exports to "coupler" namespace
     #  1. Ocean SST (value of θ at z=0)
-    Coupling.put!(csolver.coupler, :Ocean_SST, mO.state.θ[mO.boundary], mO.grid, DateTime(0), u"°C")
+    CouplerMachine.put!(csolver.coupler, :Ocean_SST, mO.state.θ[mO.boundary], mO.grid, DateTime(0), u"°C")
 end
 
 ## Set atmosphere initial state function

@@ -1,7 +1,15 @@
+"""
+    CouplerMachine
+
+Primitive coupling module sufficient for initial atmos-ocean-land coupled simulation.
+"""
 module CouplerMachine
 
 using ClimateMachine
+using ClimateMachine.DGMethods
 
-include(joinpath("Coupling", "Coupling.jl"))
-include(joinpath("Coupling", "CplSolver.jl"))
+include("CplModel.jl")
+include("CplState.jl")
+include("CplSolver.jl")
+
 end

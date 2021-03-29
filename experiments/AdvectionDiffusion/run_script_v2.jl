@@ -280,7 +280,9 @@ bl_propA = (;bl_propA...,
             )
 
 ## Prop ocean functions (or delete to use defaults)
-tropical_heating(λ, ϕ, r) = 30.0 + 10.0 * cos(ϕ) * sin(5λ)
+tropical_heating_1(λ, ϕ, r) = 30.0 + 10.0 * cos(ϕ) * sin(5λ)
+tropical_heating_2(λ, ϕ, r) = 30.0 + 10.0 * cos(ϕ) + 1 * sin(5λ) * cos(ϕ)
+tropical_heating(λ, ϕ, r) = tropical_heating_2(λ, ϕ, r)
 ocean_θⁱⁿⁱᵗ(npt, el, x, y, z) = tropical_heating( lon(x,y,z), lat(x,y,z), rad(x,y,z) )                    # Set ocean initial state function
 ocean_calc_kappa_diff(_...) = κᵒʰ, κᵒʰ, κᵒᶻ               # Set ocean diffusion coeffs
 ocean_source_θ(θᵃ, npt, el, xc, yc, zc, θᵒ) = FT(0.0)     # Set ocean source!

@@ -9,7 +9,7 @@
 # source miniconda3/bin/activate
 # conda create --name vtk_env python=3.8
 # conda activate vtk_env
-# conda install nodejs
+# conda install nodejs matplotlib
 # pip install jupyter pyvista ipyvtk_simple
 # 
 # can be be run as a script e.g.

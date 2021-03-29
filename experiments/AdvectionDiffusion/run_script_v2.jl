@@ -1,3 +1,6 @@
+using Pkg
+Pkg.add(url="https://github.com/clima/climatemachine.jl",rev="master")
+
 using ClimateMachine, MPI
 using ClimateMachine.DGMethods.NumericalFluxes
 using ClimateMachine.DGMethods

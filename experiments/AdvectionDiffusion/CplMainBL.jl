@@ -262,6 +262,33 @@ function compute_gradient_flux!(
     κ¹, κ², κ³ =
         bl.bl_prop.calc_kappa_diff(G.∇θⁱⁿⁱᵗ, A.npt, A.elnum, A.xc, A.yc, A.zc)
     # Maybe I should pass both G.∇θ and G.∇θⁱⁿⁱᵗ?
+
+    # Messy diffusion tensor rotation - should find code for doing this succinctly!
+    # we want κ¹, κ² to act in lat and lon directions respectively i.e. tangential 
+    # to shell, we want κ³ to act normal to shell i.e. z or r direction.
+    ## don't use regular norm(), its not great on performance
+    mynorm(x::Float64,y::Float64,z::Float64)  = ( x^2 + y^2 + z^2 ) ^ 0.5
+    ## excessively type stable forms!
+    r̂ⁿᵒʳᵐ(x::Float64,y::Float64,z::Float64) = mynorm(x,y,z) ≈ 0 ? 1 : mynorm(x, y, z)^(-1)
+    ϕ̂ⁿᵒʳᵐ(x::Float64,y::Float64,z::Float64) = mynorm(x,y,Float64(0)) ≈ 0 ? 1 : ( mynorm(x, y, z) * mynorm(x, y, Float64(0)) )^(-1)
+    λ̂ⁿᵒʳᵐ(x::Float64,y::Float64,z::Float64) = mynorm(x,y,Float64(0)) ≈ 0 ? 1 :   mynorm(x, y, Float64(0))^(-1)
+    r̂(x::Float64,y::Float64,z::Float64) = r̂ⁿᵒʳᵐ(x,y,z) * @SVector([x, y, z])
+    ϕ̂(x::Float64,y::Float64,z::Float64) = ϕ̂ⁿᵒʳᵐ(x,y,z) * @SVector [x*z, y*z, -(x^2 + y^2)]
+    λ̂(x::Float64,y::Float64,z::Float64) = λ̂ⁿᵒʳᵐ(x,y,z) * @SVector [-y, x, 0]
+
+    # Sphere surface bits
+    x=A.xc
+    y=A.yc
+    z=A.zc
+    Gλ = G.∇θ'*λ̂(x,y,z)
+    Fλ = κ¹*Gλ*λ̂(x,y,z)
+    Gϕ = G.∇θ'*ϕ̂(x,y,z)
+    Fϕ = κ²*Gϕ*ϕ̂(x,y,z)
+    Gr = G.∇θ'*r̂(x,y,z)
+    Fr = κ³*Gr*r̂(x,y,z)
+    GF.κ∇θ = Diagonal(@SVector([1, 1, 1])) * (Fλ + Fϕ + Fr)
+
+    # Original cartesian form
     GF.κ∇θ = Diagonal(@SVector([κ¹, κ², κ³])) * G.∇θ
     nothing
 end

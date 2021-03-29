@@ -54,6 +54,7 @@ end
 function main(::Type{FT}) where {FT}
     
     # Domain
+    # confusing name - better might be to use something like DeepSphericalShellDomain directly?
     ΩO = AtmosDomain(radius = FT(planet_radius(param_set)) - FT(4e3), height = FT(4e3))
     ΩA = AtmosDomain(radius = FT(planet_radius(param_set)) , height = FT(4e3))
 
@@ -74,6 +75,11 @@ function main(::Type{FT}) where {FT}
     t_time, end_time = ( 0  , 2Δt_ )
 
     # Collect spatial info, timestepping, balance law and DGmodel for the two components
+    function boundary_mask( xc, yc, zc )
+             bndy_bit_mask = @. ( xc^2 + yc^2 + zc^2 )^0.5 ≈ planet_radius(param_set)
+            return bndy_bit_mask
+    end
+
 
     # 1. Atmos component
     mA = CplModel(;
@@ -83,6 +89,7 @@ function main(::Type{FT}) where {FT}
             (CoupledPrimaryBoundary(), ExteriorBoundary()),
             param_set,
         ),
+        boundary_z = boundary_mask,
         nsteps = nstepsA,
         dt = Δt_ / nstepsA,
         timestepper = LSRK54CarpenterKennedy,
@@ -97,6 +104,7 @@ function main(::Type{FT}) where {FT}
             (ExteriorBoundary(), CoupledSecondaryBoundary()),
             param_set,
         ),
+        boundary_z = boundary_mask,
         nsteps = nstepsO,
         dt = Δt_ / nstepsO,
         timestepper = LSRK54CarpenterKennedy,
@@ -241,7 +249,14 @@ end
 
 ## Prop atmos functions (or delete to use defaults)
 atmos_θⁱⁿⁱᵗ(npt, el, xc, yc, zc) = 30.0                   # Set atmosphere initial state function
-atmos_θ_shadowflux(θᵃ, θᵒ, npt, el, xc, yc, zc) = zc == 0.0 ? (1.0 / τ_airsea) * (θᵃ - θᵒ) : 0.0 # Set atmosphere shadow boundary flux function
+
+function is_surface(xc, yc, zc)
+ # Sphere case - could dispatch on domain type, maybe?
+ height_from_surface=(xc^2 + yc^2 + zc^2)^0.5 - planet_radius(param_set)
+ return height_from_surface ≈ 0
+end
+atmos_θ_shadowflux(θᵃ, θᵒ, npt, el, xc, yc, zc) = is_surface(xc,yc,zc) ? (1.0 / τ_airsea) * (θᵃ - θᵒ) : 0.0 # Set atmosphere shadow boundary flux function
+
 atmos_calc_kappa_diff(_...) = κᵃʰ, κᵃʰ, κᵃᶻ               # Set atmos diffusion coeffs
 atmos_source_θ(θᵃ, npt, el, xc, yc, zc, θᵒ) = FT(0.0)     # Set atmos source!
 atmos_get_penalty_tau(_...) = FT(3.0 * 0.0)               # Set penalty term tau (for debugging)

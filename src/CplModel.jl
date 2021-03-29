@@ -1,4 +1,4 @@
-using ClimateMachine.Mesh.Grids: _x3, VerticalDirection
+using ClimateMachine.Mesh.Grids: _x1, _x2, _x3, VerticalDirection
 using ClimateMachine.DGMethods.NumericalFluxes
 
 export CplModel
@@ -54,7 +54,7 @@ function CplModel(;
     grid,
     equations,
     nsteps::Int,
-    boundary_z = 0.0,
+    boundary_z = nothing,
     dt = 1.0,
     timestepper = LSRK54CarpenterKennedy,
     NFfirstorder = RusanovNumericalFlux(),
@@ -78,7 +78,17 @@ function CplModel(;
     )
 
     # Specify the coupling boundary
-    boundary = grid.vgeo[:, _x3:_x3, :] .== boundary_z
+    xc = grid.vgeo[:, _x1:_x1, :]
+    yc = grid.vgeo[:, _x2:_x2, :]
+    zc = grid.vgeo[:, _x3:_x3, :]
+    # I'm sure there is a more succinct way to write this default
+    if isnothing( boundary_z )
+      function boundary_z_func( xc, yc, zc )
+        return zc .== 0
+      end
+      boundary_z = boundary_z_func
+    end
+    boundary = boundary_z( xc, yc, zc )
 
     ###
     ### Invoke the spatial ODE initialization functions

@@ -8,9 +8,6 @@
 *~
 TAGS
 
-# Deps
-Manifest.toml
-
 # Data
 *.vtk
 *.dat

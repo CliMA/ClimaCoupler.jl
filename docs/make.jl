@@ -12,5 +12,6 @@ makedocs(
 # for more information.
 deploydocs(
     repo = "<github.com/CliMA/CouplerMachine.jl.git>",
+    devbranch = "main",
     push_preview = true,
 )

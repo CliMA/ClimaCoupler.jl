@@ -8,6 +8,9 @@
 *~
 TAGS
 
+# Docs
+docs/build/
+
 # Data
 *.vtk
 *.dat

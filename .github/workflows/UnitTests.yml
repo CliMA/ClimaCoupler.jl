@@ -52,8 +52,8 @@ jobs:
             ${{ runner.os }}-test-
             ${{ runner.os }}-
             
-      - uses: julia-actions/julia-buildpkg@main
+      - uses: julia-actions/julia-buildpkg@master
         if: steps.filter.outputs.run_test == 'true'
         
-      - uses: julia-actions/julia-runtest@main
+      - uses: julia-actions/julia-runtest@master
         if: steps.filter.outputs.run_test == 'true'

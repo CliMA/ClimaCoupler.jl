@@ -10,6 +10,8 @@ TAGS
 
 # Docs
 docs/build/
+!docs/src/assets/*.png
+!docs/src/assets/*.svg
 
 # Data
 *.vtk

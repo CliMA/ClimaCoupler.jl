@@ -3,6 +3,7 @@ using Dates
 using JLD2 
 using ClimateMachine.VTK: writevtk, writepvtu
 using ClimateMachine.Callbacks
+using ClimateMachine.GenericCallbacks
 
 abstract type AbstractCallback end
 
@@ -24,6 +25,8 @@ Base.@kwdef struct VTKOutput{T, V, B, S} <: AbstractCallback
     overwrite::B = true
     number_sample_points::S
 end
+
+struct ExponentialFiltering <: AbstractCallback end
 
 function create_callbacks(simulation, odesolver)
     callbacks = simulation.callbacks
@@ -134,9 +137,6 @@ function create_callback(output::JLD2State, simulation::Simulation, odesolver)
     end
 end
 
-
-
-
 function create_callback(output::JLD2State, simulation::Simulation, odesolver)
     # Initialize output
     output.overwrite &&
@@ -187,5 +187,20 @@ function create_callback(output::VTKOutput, simulation, odesolver)
 
     solver_config = SolverConfig(simulation.odesolver, mpicomm, simulation.state, simulation.dgmodel,simulation.name)
     vtkcallback = ClimateMachine.Callbacks.vtk(iteration, solver_config, output.outputdir, output.number_sample_points)
+end
+
+function create_callback(output::ExponentialFiltering, simulation, odesolver)
+    filterorder = 20
+    filter = ExponentialFilter(simulation.dgmodel.grid, 0, filterorder)
+    cbfilter = GenericCallbacks.EveryXSimulationSteps(1) do
+        Filters.apply!(
+            simulation.state,
+            (:θ,),
+            simulation.dgmodel.grid,
+            filter,
+            state_auxiliary =  simulation.dgmodel.state_auxiliary,
+        )
+        nothing
+    end
 end
 

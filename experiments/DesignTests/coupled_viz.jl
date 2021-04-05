@@ -1,10 +1,12 @@
 using Test
 using MPI
+using Pkg
 
+Pkg.add(url="https://github.com/clima/climatemachine.jl",rev="master")
 using ClimateMachine
 
 # To test coupling
-using CouplerMachine.Coupling
+#using CouplerMachine.Coupling
 
 # To create meshes (borrowed from Ocean for now!)
 using ClimateMachine.Ocean.Domains
@@ -15,6 +17,7 @@ using ClimateMachine.GenericCallbacks
 # To invoke timestepper
 using ClimateMachine.ODESolvers
 
+Pkg.add(url="https://github.com/sandreza/QuickVizExample.jl.git",rev="main" )
 using QuickVizExample
 using GLMakie
 
@@ -76,6 +79,6 @@ function coupledviz(modellist, plottime = 0.0, np_def = 100; title = "")
     return states
 end
 
-include("simple_2testcomp.jl")
-models = map(m -> m.component_model, cC.component_list)
+#include("simple_2testcomp.jl")
+models = map(m -> m.component_model, simulation.component_list)
 coupledviz(models, 10.0, 100; title = "Test Plot")

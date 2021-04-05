@@ -2,100 +2,6 @@
 # useful concepts for dispatch
 #######
 
-"""
-Advection terms
-
-right now really only non-linear or ::Nothing
-"""
-abstract type AdvectionTerm end
-struct NonLinearAdvectionTerm <: AdvectionTerm end
-
-"""
-Turbulence Closures
-
-ways to handle drag and diffusion and such
-"""
-abstract type TurbulenceClosure end
-
-struct LinearDrag{T} <: TurbulenceClosure
-    λ::T
-end
-
-struct ConstantViscosity{T} <: TurbulenceClosure
-    μ::T
-    ν::T
-    κ::T
-    function ConstantViscosity{T}(;
-        μ = T(1e-6),   # m²/s
-        ν = T(1e-6),   # m²/s
-        κ = T(1e-6),   # m²/s
-    ) where {T <: AbstractFloat}
-        return new{T}(μ, ν, κ)
-    end
-end
-
-"""
-Forcings
-
-ways to add body terms and sources
-"""
-abstract type Forcing end
-abstract type CoriolisForce <: Forcing end
-
-struct fPlaneCoriolis{T} <: CoriolisForce
-    fₒ::T
-    β::T
-    function fPlaneCoriolis{T}(;
-        fₒ = T(1e-4), # Hz
-        β = T(1e-11), # Hz/m
-    ) where {T <: AbstractFloat}
-        return new{T}(fₒ, β)
-    end
-end
-
-struct WindStress{T} <: Forcing
-    τₒ::T
-    function WindStress{T}(; τₒ = T(1e-4)) where {T <: AbstractFloat}
-        return new{T}(τₒ)
-    end
-end
-
-struct Buoyancy{T} <: Forcing
-    α::T # 1/K
-    g::T # m/s²
-    function Buoyancy{T}(; α = T(2e-4), g = T(10)) where {T <: AbstractFloat}
-        return new{T}(α, g)
-    end
-end
-
-"""
-Grouping structs
-"""
-abstract type AbstractModel end
-
-Base.@kwdef struct SpatialModel{𝒜, 𝒞, 𝒟, ℰ} <: AbstractModel
-    balance_law::𝒜
-    #physics::ℬ
-    numerics::𝒞
-    grid::𝒟
-    boundary_conditions::ℰ
-    #parameters::ℱ
-end
-
-polynomialorders(s::SpatialModel) = convention(
-    model.grid.resolution.polynomialorder,
-    Val(ndims(model.grid.domain)),
-)
-
-abstract type ModelPhysics end
-
-Base.@kwdef struct FluidPhysics{A, D, H, C, B} <: ModelPhysics
-    advection::A = NonLinearAdvectionTerm()
-    dissipation::D = nothing
-    hyperdiffusion::H = nothing
-    coriolis::C = nothing
-    buoyancy::B = nothing
-end
 
 abstract type AbstractSimulation end
 
@@ -148,16 +54,6 @@ function Simulation(;
     )
 end
 
-coordinates(s::Simulation) = coordinates(simulation.model.grid)
-polynomialorders(s::Simulation) = polynomialorders(simulation.model.grid)
-
-abstract type AbstractTimestepper end
-
-Base.@kwdef struct TimeStepper{S, T} <: AbstractTimestepper
-    method::S
-    timestep::T
-end
-
 """
 calculate_dt(grid, wavespeed = nothing, diffusivity = nothing, viscocity = nothing, cfl = 0.1)
 """
@@ -166,9 +62,9 @@ function calculate_dt(
     wavespeed = nothing,
     diffusivity = nothing,
     viscocity = nothing,
-    cfl = 1.0,
+    cfl = 0.1,
 )
-    Δx = min_node_distance(grid)
+    Δx = min_node_distance(grid, HorizontalDirection())
     Δts = []
     if wavespeed != nothing
         push!(Δts, Δx / wavespeed)
@@ -186,20 +82,4 @@ function calculate_dt(
     return cfl * minimum(Δts)
 end
 
-#=
-function calculate_dt(
-    grid::DiscretizedDomain;
-    wavespeed = nothing,
-    diffusivity = nothing,
-    viscocity = nothing,
-    cfl = 1.0,
-)
-    return calculate_dt(
-        grid.numerical;
-        wavespeed = wavespeed,
-        diffusivity = diffusivity,
-        viscocity = viscocity,
-        cfl = cfl,
-    )
-end
-=#
+

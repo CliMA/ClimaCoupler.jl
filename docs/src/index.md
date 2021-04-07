@@ -1,5 +1,10 @@
 # CouplerMachine.jl
 
+```@meta
+CurrentModule = CouplerMachine
+```
+
+
 CouplerMachine.jl provides means to couple climate model components from and within
 [ClimateMachine.jl](https://github.com/CliMA/ClimateMachine.jl) and [Oceananigans.jl](https://github.com/CliMA/Oceananigans.jl). Functionality includes:
 - coupled system time stepping control

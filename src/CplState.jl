@@ -1,4 +1,5 @@
 using Unitful, Dates
+using PrettyTables
 
 export CplState, put!, get, register_cpl_field!
 
@@ -127,4 +128,23 @@ end
 # set the time of the coupled field
 function settime!(cplfield::CplFieldInfo, newtime::DateTime)
     cplfield.datetime = newtime
+end
+
+# display table of registered fields & their info
+function Base.show(io::IO, coupler::CplState)
+    #=
+    ---------------------------------------------------------------------------
+    |  Field Name  |  Units  |  Field Time (Y-m-d H:M:S)   |     Grid Type    |
+    ---------------------------------------------------------------------------
+    |  :OceanSST   |   °C    |  2021-01-01T00:00:00        |  DG Cubed Sphere |
+    |  :Field2     |    m    |  2021-01-01T00:00:00        |  CG Cubed Sphere |
+    ---------------------------------------------------------------------------
+    =#
+    fields = coupler.CplStateBlob
+    data = Array{Any}(undef, length(fields), 4)
+    for (i,k) in enumerate( keys(coupler.CplStateBlob))
+        entry = coupler.CplStateBlob[k]
+        data[i,:] = [k entry.units entry.datetime entry.gridinfo.gridtype]
+    end
+    pretty_table(data, ["Field Name" "Units" "Field Time (Y-m-d H:M:S)" "Grid Type"])
 end

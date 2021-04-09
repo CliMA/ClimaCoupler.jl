@@ -3,7 +3,7 @@ using ClimateMachine.DGMethods.NumericalFluxes
 
 export CplModel
 
-include("overintegration_hook.jl")
+include("../temp_hooks/overintegration_hook.jl")
 
 struct CplModel{G, D, B, S, TS}
     grid::G

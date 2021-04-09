@@ -71,7 +71,7 @@ function main(::Type{FT}) where {FT}
     # Grid
     nelem = (;horizontal = 8, vertical = 4)
     polynomialorder = (;horizontal = 5, vertical = 5)
-    overintegrationorder = (;horizontal = 2, vertical = 2)
+    overintegrationorder = (;horizontal = 1, vertical = 1)
     
     gridA = DiscontinuousSpectralElementGrid(ΩA, nelem, polynomialorder)
     gridO = DiscontinuousSpectralElementGrid(ΩO, nelem, polynomialorder)

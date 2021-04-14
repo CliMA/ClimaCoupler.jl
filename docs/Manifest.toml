@@ -98,7 +98,7 @@ version = "0.9.34"
 
 [[ClimateMachine]]
 deps = ["Adapt", "ArgParse", "BenchmarkTools", "CLIMAParameters", "CUDA", "Combinatorics", "Coverage", "Dates", "DelimitedFiles", "Dierckx", "DiffEqBase", "DispatchedTuples", "Distributions", "DocStringExtensions", "DoubleFloats", "Downloads", "FFTW", "FileIO", "Formatting", "ForwardDiff", "GaussQuadrature", "InteractiveUtils", "JLD2", "KernelAbstractions", "LambertW", "LazyArrays", "LinearAlgebra", "Literate", "Logging", "MPI", "MacroTools", "NCDatasets", "NLsolve", "NonlinearSolvers", "OrderedCollections", "OrdinaryDiffEq", "PackageCompiler", "Pkg", "PrettyTables", "Printf", "Random", "RootSolvers", "SpecialFunctions", "StaticArrays", "StaticNumbers", "Statistics", "UnPack", "WriteVTK"]
-git-tree-sha1 = "edb060478b101204843571a7214cf910d842beaf"
+git-tree-sha1 = "9a932fb0660034d96083e294d76b64960dc18b4c"
 repo-rev = "master"
 repo-url = "https://github.com/CliMA/ClimateMachine.jl.git"
 uuid = "777c4786-024f-11e9-21a3-85d5d4106250"

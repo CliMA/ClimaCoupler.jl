@@ -98,7 +98,7 @@ version = "0.9.34"
 
 [[ClimateMachine]]
 deps = ["Adapt", "ArgParse", "BenchmarkTools", "CLIMAParameters", "CUDA", "Combinatorics", "Coverage", "Dates", "DelimitedFiles", "Dierckx", "DiffEqBase", "DispatchedTuples", "Distributions", "DocStringExtensions", "DoubleFloats", "Downloads", "FFTW", "FileIO", "Formatting", "ForwardDiff", "GaussQuadrature", "InteractiveUtils", "JLD2", "KernelAbstractions", "LambertW", "LazyArrays", "LinearAlgebra", "Literate", "Logging", "MPI", "MacroTools", "NCDatasets", "NLsolve", "NonlinearSolvers", "OrderedCollections", "OrdinaryDiffEq", "PackageCompiler", "Pkg", "PrettyTables", "Printf", "Random", "RootSolvers", "SpecialFunctions", "StaticArrays", "StaticNumbers", "Statistics", "UnPack", "WriteVTK"]
-git-tree-sha1 = "edb060478b101204843571a7214cf910d842beaf"
+git-tree-sha1 = "9a932fb0660034d96083e294d76b64960dc18b4c"
 repo-rev = "master"
 repo-url = "https://github.com/CliMA/ClimateMachine.jl.git"
 uuid = "777c4786-024f-11e9-21a3-85d5d4106250"
@@ -145,7 +145,7 @@ uuid = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
 version = "1.1.0"
 
 [[CouplerMachine]]
-deps = ["CLIMAParameters", "ClimateMachine", "Dates", "JLD2", "LinearAlgebra", "MPI", "Oceananigans", "PrettyTables", "Random", "StaticArrays", "Statistics", "Unitful"]
+deps = ["CLIMAParameters", "ClimateMachine", "Dates", "JLD2", "LinearAlgebra", "MPI", "Oceananigans", "PrettyTables", "StaticArrays", "Statistics", "Unitful"]
 path = ".."
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.1.0"
@@ -574,9 +574,9 @@ version = "2021.1.1+1"
 
 [[MPI]]
 deps = ["Distributed", "DocStringExtensions", "Libdl", "MPICH_jll", "MicrosoftMPI_jll", "OpenMPI_jll", "Pkg", "Random", "Requires", "Serialization", "Sockets"]
-git-tree-sha1 = "c6490dd65713ade59594223f3d498feef7b08f44"
+git-tree-sha1 = "6e8c30afdcbb6167cf5d470b6333f4db01cc366f"
 uuid = "da04e1cc-30fd-572f-bb4f-1f8673147195"
-version = "0.17.1"
+version = "0.17.2"
 
 [[MPICH_jll]]
 deps = ["CompilerSupportLibraries_jll", "Libdl", "Pkg"]
@@ -1060,10 +1060,10 @@ version = "1.0.2"
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 
 [[Unitful]]
-deps = ["ConstructionBase", "LinearAlgebra", "Random"]
-git-tree-sha1 = "fdfbea79b5b9a305bf226eb4730321f603281290"
+deps = ["ConstructionBase", "Dates", "LinearAlgebra", "Random"]
+git-tree-sha1 = "c6bbc170505c5ea36593a0072b61d3be8bf868ae"
 uuid = "1986cc42-f94f-5a68-af5c-568840ba703d"
-version = "1.6.0"
+version = "1.7.0"
 
 [[VertexSafeGraphs]]
 deps = ["LightGraphs"]

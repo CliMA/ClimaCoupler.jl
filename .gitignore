@@ -10,6 +10,7 @@ TAGS
 
 # Docs
 docs/build/
+docs/src/generated/
 !docs/src/assets/*.png
 !docs/src/assets/*.svg
 

@@ -1,20 +1,21 @@
+# # Import packages
 using ClimateMachine
 using MPI
 using Statistics
 
-# To couple
+## To couple
 using CouplerMachine
 using Unitful, Dates
 
-# To create meshes & grids
+## To create meshes & grids
 using ClimateMachine.Ocean.Domains
 using ClimateMachine.Grids
 import ClimateMachine.DGMethods.NumericalFluxes: NumericalFluxSecondOrder
 
-# To setup some callbacks
+## To setup some callbacks
 using ClimateMachine.GenericCallbacks
 
-# To invoke timestepper
+## To invoke timestepper
 using ClimateMachine.ODESolvers
 using ClimateMachine.ODESolvers: solve!
 using ClimateMachine.MPIStateArrays: weightedsum
@@ -22,36 +23,36 @@ using ClimateMachine.MPIStateArrays: weightedsum
 ClimateMachine.init()
 const FT = Float64;
 
-# Use toy balance law for now
 if !(:CplTestingBL in names(Main))
     include("CplTestingBL.jl") # allows re-run of script without restarting julia
 end
 using .CplTestingBL
 
+# # Set simulation parameters
+
 couple_dt = 3600.0 # timestep at which coupled components sync
 nstepsA = 10 # atmos steps per coupled timestep
 nstepsO = 5 # ocean steps per coupled timestep
 
-# Model Parameters
-
-#  Haney like relaxation time scale and a length scale
-#  (Haney, 1971).
-#  Air-sea exchange vigor is governed by length/time-scale.
+##  Haney like relaxation time scale and a length scale (Haney, 1971).
+##  Air-sea exchange vigor is governed by length/time-scale.
 const τ_airsea = FT(60 * 86400)
 const L_airsea = FT(500)
 const λ_airsea = FT(L_airsea / τ_airsea)
 function coupling_lambda()
     return (λ_airsea)
-end
+end;
 
-#  Background atmos and ocean diffusivities
+##  Background atmos and ocean diffusivities
 const κᵃʰ = FT(1e4) * 0.0
 const κᵃᶻ = FT(1e-1)
 const κᵒʰ = FT(1e3) * 0.0
 const κᵒᶻ = FT(1e-4)
 
+# # Set up coupled model
+
 function main(::Type{FT}) where {FT}
-    # Domain
+    ## Domain
     Np = 4
     ΩA = RectangularDomain(
         Ne = (10, 10, 5),
@@ -70,20 +71,20 @@ function main(::Type{FT}) where {FT}
         periodicity = (true, true, false),
     )
 
-    # Grid
+    ## Grid
     btags = ((0,0),(0,0),(1,2))
     gridA = DiscontinuousSpectralElementGrid(ΩA; boundary_tags = btags)
     gridO = DiscontinuousSpectralElementGrid(ΩO; boundary_tags = btags)
 
-    # Numerics-specific options
+    ## Numerics-specific options
     numerics = (NFsecondorder = CplTestingBL.PenaltyNumFluxDiffusive(),)
 
-    # Callbacks (TODO)
+    ## Callbacks (TODO)
     callbacks = ()
 
-    # Collect spatial info, timestepping, balance law and DGmodel for the two components
+    ## Collect spatial info, timestepping, balance law and DGmodel for the two components
 
-    # 1. Atmos component
+    ## 1. Atmos component
     mA = CplModel(;
         grid = gridA,
         equations = CplTestBL(
@@ -95,7 +96,7 @@ function main(::Type{FT}) where {FT}
         numerics...,
     )
 
-    # 2. Ocean component
+    ## 2. Ocean component
     mO = CplModel(;
         grid = gridO,
         equations = CplTestBL(
@@ -107,14 +108,14 @@ function main(::Type{FT}) where {FT}
         numerics...,
     )
 
-    # Create a Coupler State object for holding imort/export fields.
+    ## Create a Coupler State object for holding imort/export fields.
     coupler = CplState()
     register_cpl_field!(coupler, :Ocean_SST, deepcopy(mO.state.θ[mO.boundary]), mO.grid, DateTime(0), u"°C")
     register_cpl_field!(coupler, :Atmos_MeanAirSeaθFlux, deepcopy(mA.state.F_accum[mA.boundary]), mA.grid, DateTime(0), u"°C")
 
-    # Instantiate a coupled timestepper that steps forward the components and
-    # implements mapings between components export bondary states and
-    # other components imports.
+    ## Instantiate a coupled timestepper that steps forward the components and
+    ## implements mapings between components export bondary states and
+    ## other components imports.
 
     compA = (pre_step = preatmos, component_model = mA, post_step = postatmos)
     compO = (pre_step = preocean, component_model = mO, post_step = postocean)
@@ -130,7 +131,6 @@ function main(::Type{FT}) where {FT}
 end
 
 function run(cpl_solver, numberofsteps, cbvector)
-    # Run the model
     solve!(
         nothing,
         cpl_solver;
@@ -138,6 +138,8 @@ function run(cpl_solver, numberofsteps, cbvector)
         callbacks = cbvector,
     )
 end
+
+# # Define `pre_step` and `post_step` functions
 
 function get_components(csolver)
     mA = csolver.component_list.atmosphere.component_model
@@ -148,10 +150,10 @@ end
 function preatmos(csolver)
     mA, mO = get_components(csolver)
     
-    # Set boundary SST used in atmos to SST of ocean surface at start of coupling cycle.
+    ## Set boundary SST used in atmos to SST of ocean surface at start of coupling cycle.
     mA.discretization.state_auxiliary.θ_secondary[mA.boundary] .= 
         CouplerMachine.get(csolver.coupler, :Ocean_SST, mA.grid, DateTime(0), u"°C")
-    # Set atmos boundary flux accumulator to 0.
+    ## Set atmos boundary flux accumulator to 0.
     mA.state.F_accum .= 0
 
     @info(
@@ -168,8 +170,8 @@ end
 function postatmos(csolver)
     mA, mO = get_components(csolver)
 
-    # Pass atmos exports to "coupler" namespace
-    # 1. Save mean θ flux at the Atmos boundary during the coupling period
+    ## Pass atmos exports to "coupler" namespace
+    ## 1. Save mean θ flux at the Atmos boundary during the coupling period
     CouplerMachine.put!(csolver.coupler, :Atmos_MeanAirSeaθFlux, mA.state.F_accum[mA.boundary] ./ csolver.dt,
         mA.grid, DateTime(0), u"°C")
 
@@ -193,10 +195,10 @@ end
 function preocean(csolver)
     mA, mO = get_components(csolver)
 
-    # Set mean air-sea theta flux
+    ## Set mean air-sea theta flux
     mO.discretization.state_auxiliary.F_prescribed[mO.boundary] .= 
         CouplerMachine.get(csolver.coupler, :Atmos_MeanAirSeaθFlux, mO.grid, DateTime(0), u"°C")
-    # Set ocean boundary flux accumulator to 0. (this isn't used)
+    ## Set ocean boundary flux accumulator to 0. (this isn't used)
     mO.state.F_accum .= 0
 
     @info(
@@ -220,10 +222,12 @@ function postocean(csolver)
         ocean_θ_surface_min = maximum(mO.state.θ[mO.boundary]),
     )
 
-    # Pass ocean exports to "coupler" namespace
-    #  1. Ocean SST (value of θ at z=0)
+    ## Pass ocean exports to "coupler" namespace
+    ##  1. Ocean SST (value of θ at z=0)
     CouplerMachine.put!(csolver.coupler, :Ocean_SST, mO.state.θ[mO.boundary], mO.grid, DateTime(0), u"°C")
 end
+
+# # Specify balance law
 
 ## Set atmosphere initial state function
 function atmos_init_theta(xc, yc, zc, npt, el)
@@ -246,7 +250,7 @@ end
 function atmos_source_theta(θᵃ, npt, el, xc, yc, zc, θᵒ)
     tsource = 0.0
     if zc == 0.0
-        #tsource = -(1. / τ_airsea)*( θᵃ-θᵒ )
+        ## tsource = -(1. / τ_airsea)*( θᵃ-θᵒ )
     end
     return tsource
 end
@@ -275,13 +279,13 @@ end
 function ocean_source_theta(θ, npt, el, xc, yc, zc, air_sea_flux_import)
     sval = 0.0
     if zc == 0.0
-        #sval=air_sea_flux_import
+        ## sval=air_sea_flux_import
     end
     return sval
 end
 ## Set ocean diffusion coeffs
 function ocean_calc_kappa_diff(_...)
-    # return κᵒʰ,κᵒʰ,κᵒᶻ*FT(100.)
+    ## return κᵒʰ,κᵒʰ,κᵒᶻ*FT(100.)
     return κᵒʰ, κᵒʰ, κᵒᶻ # m^2 s^-1
 end
 ## Set penalty term tau (for debugging)
@@ -296,7 +300,7 @@ bl_propO = (bl_propO..., calc_kappa_diff = ocean_calc_kappa_diff)
 bl_propO = (bl_propO..., get_penalty_tau = ocean_get_penalty_tau)
 bl_propO = (bl_propO..., coupling_lambda = coupling_lambda)
 
-# Run the simulation
+# # Run simulation
 simulation, cbvector = main(Float64);
 nsteps = 10
 println("Initialized. Running...")

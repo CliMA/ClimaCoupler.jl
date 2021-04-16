@@ -3,6 +3,8 @@ using ClimateMachine.DGMethods.NumericalFluxes
 
 export CplModel
 
+include("../temp_hooks/overintegration_hook.jl")
+
 struct CplModel{G, D, B, S, TS}
     grid::G
     discretization::D
@@ -60,6 +62,7 @@ function CplModel(;
     NFfirstorder = RusanovNumericalFlux(),
     NFsecondorder = CentralNumericalFluxSecondOrder(),
     NFgradient = CentralNumericalFluxGradient(),
+    overint_params = nothing,
 )
 
     FT = eltype(grid.vgeo)
@@ -74,32 +77,45 @@ function CplModel(;
         NFfirstorder,
         NFsecondorder,
         NFgradient,
-        # direction = VerticalDirection(),
+        direction = EveryDirection(),
     )
 
     # Specify the coupling boundary
     xc = grid.vgeo[:, _x1:_x1, :]
     yc = grid.vgeo[:, _x2:_x2, :]
     zc = grid.vgeo[:, _x3:_x3, :]
-    # I'm sure there is a more succinct way to write this default
-    if isnothing( boundary_z )
-      function boundary_z_func( xc, yc, zc )
-        return zc .== 0
-      end
-      boundary_z = boundary_z_func
-    end
-    boundary = boundary_z( xc, yc, zc )
-
+    
+    # Default is to set the coupling boundary at z = 0m
+    boundary(boundary_z, xc, yc, zc) = isnothing(boundary_z) ? zc .== 0 : boundary_z( xc, yc, zc )
+    boundary = boundary(boundary_z, xc, yc, zc)
+    
     ###
     ### Invoke the spatial ODE initialization functions
     ###
     state = init_ode_state(discretization, FT(0); init_on_cpu = true)
 
     ###
+    ### Additional tendency hooks
+    ###
+    if overint_params != nothing
+        overintegrationorder, polynomialorder = overint_params
+        Ns = (polynomialorder.horizontal, polynomialorder.horizontal, polynomialorder.vertical)
+        No = (overintegrationorder.horizontal, overintegrationorder.horizontal, overintegrationorder.vertical)
+        overintegration_filter!(state, discretization, Ns, No) # only works if Nover > 0
+    end 
+    function custom_tendency(tendency, x...; kw...)
+        discretization(tendency, x...; kw...)
+        if overint_params != nothing
+            overintegration_filter!(tendency, discretization, Ns, No)
+            #"uisng Oi"
+        end
+    end
+
+    ###
     ### Create a timestepper of the sort needed for this component.
     ### Hard coded here - but can be configurable.
     ###
-    stepper = timestepper(discretization, state, dt = dt, t0 = 0.0)
+    stepper = timestepper(custom_tendency, state, dt = dt, t0 = 0.0)
 
     ###
     ### Return a CplModel entity that holds all the information
@@ -107,3 +123,4 @@ function CplModel(;
     ###
     return CplModel(grid, discretization, boundary, state, stepper, nsteps)
 end
+

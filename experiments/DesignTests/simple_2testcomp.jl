@@ -108,7 +108,7 @@ function main(::Type{FT}) where {FT}
         numerics...,
     )
 
-    ## Create a Coupler State object for holding imort/export fields.
+    ## Create a Coupler State object for holding import/export fields.
     coupler = CplState()
     register_cpl_field!(coupler, :Ocean_SST, deepcopy(mO.state.θ[mO.boundary]), mO.grid, DateTime(0), u"°C")
     register_cpl_field!(coupler, :Atmos_MeanAirSeaθFlux, deepcopy(mA.state.F_accum[mA.boundary]), mA.grid, DateTime(0), u"°C")

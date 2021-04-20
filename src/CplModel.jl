@@ -29,12 +29,12 @@ end
 
 Builds an instance of a coupler test model.  This is a toy model
 used for testing and designing coupling machinery. In a full-blown coupled
-experiment this model would be replaced by a full compnent model.
+experiment this model would be replaced by a full component model.
 
 -  `grid` the spectral element grid used by this model. 
 -  `equations` the Balance Law used by this model.
 -  `nsteps` number of component steps to run during each coupling step.
--  `boundary_z` height above or below air-sea interface of the coupled boundary.
+-  `boundary_z` height above or below the air-sea interface of the coupled boundary.
 -  `dt` component timestep to use on each component step.
 -  `timestepper` the ODE solver used to advance the system.
 -  `NFfirstorder` numerical flux to use for first order terms.

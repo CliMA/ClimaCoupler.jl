@@ -1,9 +1,12 @@
 # Coupler Object
 
-The CouplerMachine defines a type ```CplState``` for a _container_ variable that holds information about the field 
-values that are being used to couple between components. Components can use a ```put!``` operation to 
-export a set of field values to a ```CplState``` variable. A ```get``` operation is used to retrieve
-a set field values from a ```CplState``` variable.
+The CouplerMachine defines a type [`CplState`](@ref) for a _container_ variable
+that holds information about the field boundary values that are being used to
+couple components. Components can use a [`CouplerMachine.put!`](@ref) operation to 
+export a set of field values to a `CplState` variable. A [`CouplerMachine.get`](@ref)
+operation is used to retrieve a set field values from a `CplState` variable.
+During this exchange, the coupler manages ancillary operations such as 
+regridding, unit conversions, or filtering.
 
 ## Coupler Object API
 

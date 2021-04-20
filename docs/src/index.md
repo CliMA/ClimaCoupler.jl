@@ -21,6 +21,10 @@ Functionality includes:
 The CouplerMachine supports coupling components that are all within the same process or coupling components (using MPI) that
 are running on different processes.
 
+| ![Coupler Scheme](images/cplsetup.png) |
+|:--:|
+| *CouplerMachine allows for independent development of interchangeable component models.* |
+
 ```@docs
     CouplerMachine
 ```

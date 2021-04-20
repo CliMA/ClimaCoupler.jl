@@ -21,8 +21,7 @@ experiment_pages = [
 pages = Any[
     "Home" => "index.md",
     "Examples" => experiment_pages,
-    "Coupler Object" => "couplerstate.md",
-    "Coupled Timestepping" => "timestepping.md",
+    "Coupler Interface" => ["couplerstate.md", "timestepping.md"],
 ]
 
 

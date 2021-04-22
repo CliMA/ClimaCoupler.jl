@@ -1,3 +1,18 @@
+# # Diffusion Equation in a Vertical Column
+# ## Setup
+# - A vertical diffusive column split over two Cartesian components (atmos & ocean columns)
+# - Boundary conditions used to set diffusive flux in other components have different vertical discretizations and timesteps
+# - The coupler maps fields between the two components
+
+# ## Equations
+# The RHS evaluation follows:
+# ```math
+# \frac{\partial \theta}{\partial t} = - \nabla \cdot [\kappa(\phi_{init}) \nabla \phi]
+# ```
+# Where
+#  - `θ` is the tracer (e.g. potential temperature)
+#  - `κ` is the diffusivity tensor
+
 # # Import packages
 using ClimateMachine
 using MPI
@@ -50,6 +65,7 @@ const κᵒʰ = FT(1e3) * 0.0
 const κᵒᶻ = FT(1e-4)
 
 # # Set up coupled model
+# Define component models and initialize the coupler
 
 function main(::Type{FT}) where {FT}
     ## Domain
@@ -107,8 +123,8 @@ function main(::Type{FT}) where {FT}
         dt = couple_dt / nstepsO,
         numerics...,
     )
-
-    ## Create a Coupler State object for holding import/export fields.
+#+
+# Create a Coupler State object for holding import/export fields:
     coupler = CplState()
     register_cpl_field!(coupler, :Ocean_SST, deepcopy(mO.state.θ[mO.boundary]), mO.grid, DateTime(0), u"°C")
     register_cpl_field!(coupler, :Atmos_MeanAirSeaθFlux, deepcopy(mA.state.F_accum[mA.boundary]), mA.grid, DateTime(0), u"°C")
@@ -140,6 +156,9 @@ function run(cpl_solver, numberofsteps, cbvector)
 end
 
 # # Define `pre_step` and `post_step` functions
+# Each component model must define `pre_step` and `post_step` functions.
+# In the `pre_step`, a component imports necessary boundary state and flux data from the coupler.
+# In the `post_step`, a component exports boundary data to the coupler to be later received by other components.
 
 function get_components(csolver)
     mA = csolver.component_list.atmosphere.component_model
@@ -304,4 +323,4 @@ bl_propO = (bl_propO..., coupling_lambda = coupling_lambda)
 simulation, cbvector = main(Float64);
 nsteps = 10
 println("Initialized. Running...")
-@time run(simulation, nsteps, cbvector)
+run(simulation, nsteps, cbvector)

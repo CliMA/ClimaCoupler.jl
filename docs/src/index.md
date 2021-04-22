@@ -32,7 +32,9 @@ are running on different processes.
 ```@contents
 Pages = [
     "examples.md",
+    "couplerstate.md"
     "timestepping.md",
-    "couplerstate.md",
+    "coupledmodel.md"
 ]
+Depth = 2
 ```

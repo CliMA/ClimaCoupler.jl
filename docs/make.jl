@@ -18,10 +18,12 @@ experiment_pages = [
                     "Simple Two Component Test" => "generated/simple_2testcomp.md",
                    ]
 
+interface_pages = ["couplerstate.md", "timestepping.md", "coupledmodel.md"]
+
 pages = Any[
     "Home" => "index.md",
     "Examples" => experiment_pages,
-    "Coupler Interface" => ["couplerstate.md", "timestepping.md"],
+    "Coupler Interface" => interface_pages,
 ]
 
 

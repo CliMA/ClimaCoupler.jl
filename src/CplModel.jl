@@ -27,7 +27,7 @@ end
         NFgradient = CentralNumericalFluxGradient(),
     ) 
 
-Builds an instance of a coupler test model.  This is a toy model
+Builds an instance of a coupler test model. This is currently a toy model
 used for testing and designing coupling machinery. In a full-blown coupled
 experiment this model would be replaced by a full component model.
 
@@ -50,7 +50,6 @@ to use for real setups).
 A real model might have many more flags and/or may wrap the component creation
 very differently. Any component should allow itself to set a number of timesteps
 to execute with a certain timestep to synchronize with the coupling time scale.
-
 """
 function CplModel(;
     grid,

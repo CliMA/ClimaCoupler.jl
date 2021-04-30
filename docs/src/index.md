@@ -28,13 +28,3 @@ are running on different processes.
 ```@docs
     CouplerMachine
 ```
-
-```@contents
-Pages = [
-    "examples.md",
-    "couplerstate.md"
-    "timestepping.md",
-    "coupledmodel.md"
-]
-Depth = 2
-```

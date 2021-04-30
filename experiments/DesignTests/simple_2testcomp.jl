@@ -9,9 +9,9 @@
 # ```math
 # \frac{\partial \theta}{\partial t} = - \nabla \cdot [\kappa(\phi_{init}) \nabla \phi]
 # ```
-# Where
-#  - `θ` is the tracer (e.g. potential temperature)
-#  - `κ` is the diffusivity tensor
+# where
+#  -  $\theta$ is the tracer (e.g. potential temperature)
+#  -  $\kappa$ is the diffusivity tensor
 
 # # Import packages
 using ClimateMachine
@@ -124,14 +124,11 @@ function main(::Type{FT}) where {FT}
         numerics...,
     )
 #+
-# Create a Coupler State object for holding import/export fields:
+# Create the coupler object for holding import/export fields and performs mappings
+# and instantiate the coupled timestepper:
     coupler = CplState()
     register_cpl_field!(coupler, :Ocean_SST, deepcopy(mO.state.θ[mO.boundary]), mO.grid, DateTime(0), u"°C")
     register_cpl_field!(coupler, :Atmos_MeanAirSeaθFlux, deepcopy(mA.state.F_accum[mA.boundary]), mA.grid, DateTime(0), u"°C")
-
-    ## Instantiate a coupled timestepper that steps forward the components and
-    ## implements mapings between components export bondary states and
-    ## other components imports.
 
     compA = (pre_step = preatmos, component_model = mA, post_step = postatmos)
     compO = (pre_step = preocean, component_model = mO, post_step = postocean)

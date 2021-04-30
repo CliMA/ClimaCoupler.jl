@@ -7,6 +7,7 @@ const OUTPUT_DIR      = joinpath(@__DIR__, "..", "docs/src/generated")
 
 experiments = [
                "DesignTests/simple_2testcomp.jl",
+               "AdvectionDiffusion/run_script_v2.jl"
               ]
 
 for experiment in experiments
@@ -15,7 +16,8 @@ for experiment in experiments
 end
 
 experiment_pages = [
-                    "Simple Two Component Test" => "generated/simple_2testcomp.md",
+                    "Vertical Column Heat Diffusion" => "generated/simple_2testcomp.md",
+                    "Advection-diffusion on a Sphere" => "generated/run_script_v2.md",
                    ]
 
 interface_pages = ["couplerstate.md", "timestepping.md", "coupledmodel.md"]

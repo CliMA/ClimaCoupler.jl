@@ -47,8 +47,8 @@ include("callbacks.jl")
 # Main balance law and its components
 include("CplMainBL.jl")
 
-nstepsA = 10
-nstepsO = 5
+nstepsA = 1
+nstepsO = 1
 
 #  Background atmos and ocean diffusivities
 const κᵃʰ = FT(1e4) * 0.0
@@ -64,7 +64,6 @@ const u_max = FT(1e-5) # max. advective velocity in radians
 function main(::Type{FT}) where {FT}
     
     # Domain
-    # confusing name - better might be to use something like DeepSphericalShellDomain directly?
     ΩO = DeepSphericalShellDomain(radius = FT(planet_radius(param_set)) - FT(4e3), height = FT(4e3))
     ΩA = DeepSphericalShellDomain(radius = FT(planet_radius(param_set)) , height = FT(4e3))
 
@@ -82,7 +81,7 @@ function main(::Type{FT}) where {FT}
     # Timestepping
     Δt_ = calculate_dt(gridA, wavespeed = u_max*(ΩA.radius), diffusivity = maximum([κᵃʰ, κᵃᶻ]) ) 
     
-    t_time, end_time = ( 0  , 20Δt_ )
+    t_time, end_time = ( 0  , 8Δt_ )
 
     # Collect spatial info, timestepping, balance law and DGmodel for the two components
     boundary_mask( xc, yc, zc ) = @. ( xc^2 + yc^2 + zc^2 )^0.5 ≈ planet_radius(param_set)
@@ -90,13 +89,12 @@ function main(::Type{FT}) where {FT}
     # 1. Atmos component
     
     ## Prop atmos functions to override defaults
-    atmos_structure(λ, ϕ, r) = FT(30)#30.0 + 10.0 * cos(ϕ) * sin(5λ)
+    atmos_structure(λ, ϕ, r) = FT(30) #30.0 + 10.0 * cos(ϕ) * sin(5λ)
     atmos_θⁱⁿⁱᵗ(npt, el, x, y, z) = atmos_structure( lon(x,y,z), lat(x,y,z), rad(x,y,z) )                # Set atmosphere initial state function
-    #atmos_θ_shadowflux(θᵃ, θᵒ, npt, el, xc, yc, zc) = FT(0.0)
-    atmos_θ_shadowflux(θᵃ, θᵒ, npt, el, xc, yc, zc) = is_surface(xc,yc,zc) ? (1.0 / τ_airsea) * (θᵃ - θᵒ) : 0.0 # Set atmosphere shadow boundary flux function
     atmos_calc_kappa_diff(_...) = κᵃʰ, κᵃʰ, κᵃᶻ               # Set atmos diffusion coeffs
-    atmos_source_θ(θᵃ, npt, el, xc, yc, zc, θᵒ) = FT(0.0)     # Set atmos source!
     atmos_get_penalty_tau(_...) = FT(3.0 * 0.0)               # Set penalty term tau (for debugging)
+    #atmos_θ_shadowflux(θᵃ, θᵒ, npt, el, xc, yc, zc) = is_surface(xc,yc,zc) ? (1.0 / τ_airsea) * (θᵃ - θᵒ) : 0.0 # Set atmosphere shadow boundary flux function
+    #atmos_source_θ(θᵃ, npt, el, xc, yc, zc, θᵒ) = FT(0.0)     # Set atmos source!
 
     ## Set atmos advective velocity (constant in time) and convert to Cartesian
     uˡᵒⁿ(λ, ϕ, r) = u_max * r * cos(ϕ)
@@ -108,9 +106,7 @@ function main(::Type{FT}) where {FT}
     bl_propA = prop_defaults()
     bl_propA = (;bl_propA..., 
                 init_theta = atmos_θⁱⁿⁱᵗ, 
-                theta_shadow_boundary_flux = atmos_θ_shadowflux, 
                 calc_kappa_diff = atmos_calc_kappa_diff,
-                source_theta = atmos_source_θ,
                 get_penalty_tau = atmos_get_penalty_tau,
                 coupling_lambda = coupling_lambda,
                 init_u = atmos_uⁱⁿⁱᵗ
@@ -122,6 +118,7 @@ function main(::Type{FT}) where {FT}
             bl_propA,
             (CoupledPrimaryBoundary(), ExteriorBoundary()),
             param_set,
+            SphericalOrientation(),
         ),
         boundary_z = boundary_mask,
         nsteps = nstepsA,
@@ -132,21 +129,20 @@ function main(::Type{FT}) where {FT}
 
     # 2. Ocean component
     ## Prop ocean functions to override defaults
-    tropical_heating_1(λ, ϕ, r) = 30.0 + 10.0 * cos(ϕ) * sin(5λ)
+    tropical_heating_1(λ, ϕ, r) = FT(0.0) #+ FT(10.0) * cos(ϕ) * sin(5λ)
     tropical_heating_2(λ, ϕ, r) = 30.0 + 10.0 * cos(ϕ) + 1 * sin(5λ) * cos(ϕ)
     tropical_heating(λ, ϕ, r) = tropical_heating_1(λ, ϕ, r)
     ocean_θⁱⁿⁱᵗ(npt, el, x, y, z) = tropical_heating( lon(x,y,z), lat(x,y,z), rad(x,y,z) )                    # Set ocean initial state function
     ocean_calc_kappa_diff(_...) = κᵒʰ, κᵒʰ, κᵒᶻ               # Set ocean diffusion coeffs
-    ocean_source_θ(θᵃ, npt, el, xc, yc, zc, θᵒ) = FT(0.0)     # Set ocean source!
     ocean_get_penalty_tau(_...) = FT(0.15 * 0.0)               # Set penalty term tau (for debugging)
     ocean_uⁱⁿⁱᵗ(xc, yc, zc, npt, el) = SVector(FT(0.0), FT(0.0), FT(0.0)) # Set ocean advective velocity
-
+    #ocean_source_θ(θᵃ, npt, el, xc, yc, zc, θᵒ) = FT(0.0)     # Set ocean source!
+    
     ## Collect ocean props
     bl_propO = prop_defaults()
     bl_propO = (;bl_propO..., 
                 init_theta = ocean_θⁱⁿⁱᵗ, 
                 calc_kappa_diff = ocean_calc_kappa_diff,
-                source_theta = ocean_source_θ,
                 get_penalty_tau = ocean_get_penalty_tau,
                 coupling_lambda = coupling_lambda,
                 init_u = ocean_uⁱⁿⁱᵗ,
@@ -158,6 +154,7 @@ function main(::Type{FT}) where {FT}
             bl_propO,
             (ExteriorBoundary(), CoupledSecondaryBoundary()),
             param_set,
+            SphericalOrientation(),
         ),
         boundary_z = boundary_mask,
         nsteps = nstepsO,
@@ -189,9 +186,10 @@ function main(::Type{FT}) where {FT}
     
     # For now applying callbacks only to atmos.
     callbacks = (
-        ExponentialFiltering(),
+        #ExponentialFiltering(),
+        #ConservationTest(( ConsParams("θ", Int(1), FT(1), FT(0)), ConsParams("u", Int(1), FT(1), FT(0)) )),
         VTKOutput((
-            iteration = string(5Δt_)*"ssecs" ,
+            iteration = string(4Δt_)*"ssecs" ,
             overdir ="output",
             overwrite = true,
             number_sample_points = 0
@@ -205,12 +203,11 @@ function main(::Type{FT}) where {FT}
         dgmodel =  cpl_solver.component_list.atmosphere.component_model.discretization,
         callbacks = callbacks,
         simtime = (t_time, end_time),
-        name = "Coupler_UnitTest_ctrl",
+        name = "Coupler_SphereUnitTest_ctrl_consc",
         )
 
     return simulation
 end
-
 
 function run(cpl_solver, numberofsteps, cbvector)
     # Run the model

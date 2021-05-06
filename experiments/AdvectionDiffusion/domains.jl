@@ -96,9 +96,95 @@ function periodicityof(Ω::ProductDomain)
     return Tuple(periodicity)
 end
 
+```
+Box domain and grid
+```
+
+name_it(Ne::NamedTuple{(:x, :y, :z)}) = Ne
+name_it(Ne) = (x = Ne[1], y = Ne[2], z = Ne[3])
+struct RectangularDomain{FT} <: AbstractDomain
+    Np::Int
+    Ne::NamedTuple{(:x, :y, :z), NTuple{3, Int}}
+    L::NamedTuple{(:x, :y, :z), NTuple{3, FT}}
+    x::NTuple{2, FT}
+    y::NTuple{2, FT}
+    z::NTuple{2, FT}
+    periodicity::NamedTuple{(:x, :y, :z), NTuple{3, Bool}}
+end
+function RectangularDomain(
+    FT = Float64;
+    Ne,
+    Np,
+    x::Tuple{<:Number, <:Number},
+    y::Tuple{<:Number, <:Number},
+    z::Tuple{<:Number, <:Number},
+    periodicity = (true, true, false),
+)
+
+    Ne = name_it(Ne)
+    periodicity = name_it(periodicity)
+
+    west, east = FT.(x)
+    south, north = FT.(y)
+    bottom, top = FT.(z)
+
+    east > west || error("Domain x-limits must be increasing!")
+    north > south || error("Domain y-limits must be increasing!")
+    top > bottom || error("Domain z-limits must be increasing!")
+
+    L = (x = east - west, y = north - south, z = top - bottom)
+
+    return RectangularDomain(
+        Np,
+        Ne,
+        L,
+        (west, east),
+        (south, north),
+        (bottom, top),
+        periodicity,
+    )
+end
+
+
+Base.eltype(::RectangularDomain{FT}) where {FT} = FT
+
+function DiscontinuousSpectralElementGrid(
+    domain::RectangularDomain{FT};
+    boundary_tags = ((0, 0), (0, 0), (1, 2)),
+    array= Array,
+    mpicomm = MPI.COMM_WORLD,
+) where {FT}
+
+    west, east = domain.x
+    south, north = domain.y
+    bottom, top = domain.z
+
+    element_coordinates = (
+        range(west, east, length = domain.Ne.x + 1),
+        range(south, north, length = domain.Ne.y + 1),
+        range(bottom, top, length = domain.Ne.z + 1),
+    )
+
+    topology = StackedBrickTopology(
+        mpicomm,
+        element_coordinates;
+        periodicity = tuple(domain.periodicity...),
+        boundary = boundary_tags,
+    )
+
+    grid = DiscontinuousSpectralElementGrid(
+        topology,
+        FloatType = FT,
+        DeviceArray = array,
+        polynomialorder = domain.Np,
+    )
+
+    return grid
+end
+
 
 ```
-CubedSphere for GCM 
+CubedSphere domain and grid 
 ```
 
 struct DeepSphericalShellDomain{S} <: AbstractDomain
@@ -111,136 +197,6 @@ struct DeepSphericalShellDomain{S} <: AbstractDomain
         return new{typeof(radius)}(radius, height)
     end
 end
-
-struct OceanDomain{S} <: AbstractDomain
-    radius::S
-    depth::S
-
-    function OceanDomain(; radius = nothing, depth = nothing )
-        radius, height = promote(radius, depth)
-
-        return new{typeof(radius)}(radius, depth)
-    end
-end
-
-
-```
-Sphere helper functions for GCM 
-```
-rad(x,y,z) = sqrt(x^2 + y^2 + z^2)
-lat(x,y,z) = asin(z/rad(x,y,z)) # ϕ ∈ [-π/2, π/2] 
-lon(x,y,z) = atan(y,x) # λ ∈ [-π, π) 
-
-r̂ⁿᵒʳᵐ(x,y,z) = norm([x,y,z]) ≈ 0 ? 1 : norm([x, y, z])^(-1)
-ϕ̂ⁿᵒʳᵐ(x,y,z) = norm([x,y,0]) ≈ 0 ? 1 : (norm([x, y, z]) * norm([x, y, 0]))^(-1)
-λ̂ⁿᵒʳᵐ(x,y,z) = norm([x,y,0]) ≈ 0 ? 1 : norm([x, y, 0])^(-1)
-
-r̂(x,y,z) = r̂ⁿᵒʳᵐ(x,y,z) * @SVector([x, y, z])
-ϕ̂(x,y,z) = ϕ̂ⁿᵒʳᵐ(x,y,z) * @SVector [x*z, y*z, -(x^2 + y^2)]
-λ̂(x,y,z) = λ̂ⁿᵒʳᵐ(x,y,z) * @SVector [-y, x, 0] 
-
-
-"""
-function DiscontinuousSpectralElementGrid(Ω::ProductDomain; elements = nothing, polynomialorder = nothing)
-# Description 
-Computes a DiscontinuousSpectralElementGrid as specified by a product domain
-# Arguments
--`Ω`: A product domain object
-# Keyword Arguments TODO: Add brickrange and topology as keyword arguments
--`elements`: A tuple of integers ordered by (Nx, Ny, Nz) for number of elements
--`polynomialorder`: A tupe of integers ordered by (npx, npy, npz) for polynomial order
--`FT`: floattype, assumed Float64 unless otherwise specified
--`mpicomm`: default = MPI.COMM_WORLD
--`array`: default = Array, but should generally be ArrayType
-# Return 
-A DiscontinuousSpectralElementGrid object
-"""
-function DiscontinuousSpectralElementGrid(
-    Ω::ProductDomain{FT},
-    elements,
-    polynomialorder,
-    mpicomm = MPI.COMM_WORLD,
-    boundary = (1, 2),
-    array = Array,
-) where {FT}
-    if elements == nothing
-        error_message = "Please specify the number of elements as a tuple whose size is commensurate with the domain,"
-        error_message = "e.g., a 3 dimensional domain would need a specification like elements = (10,10,10)."
-        @error(error_message)
-        return nothing
-    end
-
-    if polynomialorder == nothing
-        error_message = "Please specify the polynomial order as a tuple whose size is commensurate with the domain,"
-        error_message = "e.g., a 3 dimensional domain would need a specification like polynomialorder = (3,3,3)."
-        @error(error_message)
-        return nothing
-    end
-
-    dimension = ndims(Ω)
-
-    if (dimension < 2) || (dimension > 3)
-        error_message = "SpectralElementGrid only works with dimensions 2 or 3. "
-        error_message *= "The current dimension is " * string(ndims(Ω))
-        println("The domain is ", Ω)
-        @error(error_message)
-        return nothing
-    end
-
-    if ndims(Ω) != length(elements)
-        @error("Specified too many elements for the dimension of the domain")
-        return nothing
-    end
-
-    if ndims(Ω) != length(polynomialorder)
-        @error("Specified too many polynomialorders for the dimension of the domain")
-        return nothing
-    end
-
-    periodicity = periodicityof(Ω)
-    tuple_ranges = []
-
-    for i in 1:dimension
-        push!(
-            tuple_ranges,
-            range(FT(Ω[i].min); length = elements[i] + 1, stop = FT(Ω[i].max)),
-        )
-    end
-
-    brickrange = Tuple(tuple_ranges)
-    if boundary == nothing
-        boundary = (ntuple(j -> (1, 2), dimension - 1)..., (3, 4))
-    end
-
-    topology = StackedBrickTopology(
-        mpicomm,
-        brickrange;
-        periodicity = periodicity,
-        boundary = boundary,
-    )
-
-    grid = DiscontinuousSpectralElementGrid(
-        topology,
-        FloatType = FT,
-        DeviceArray = array,
-        polynomialorder = polynomialorder,
-    )
-    return grid
-end
-
-```
-for CubedSphere
-```
-# using CLIMAParameters
-# using CLIMAParameters.Planet: MSLP, R_d, day, grav, Omega, planet_radius
-# struct EarthParameterSet <: AbstractEarthParameterSet end
-# const param_set = EarthParameterSet()
-# _a::Float64 = planet_radius(param_set)
-# atmos_height::Float64 = 30e3
-
-# ```
-# grid = DiscontinuousSpectralElementGrid(Ω=, elements=, polynomialorder=)
-# ```
 
 function DiscontinuousSpectralElementGrid(
     Ω::DeepSphericalShellDomain{FT},
@@ -268,32 +224,21 @@ function DiscontinuousSpectralElementGrid(
     )
     return grid
 end
-function DiscontinuousSpectralElementGrid(
-    Ω::OceanDomain{FT},
-    elements,
-    polynomialorder,
-    mpicomm = MPI.COMM_WORLD,
-    boundary = (1, 2),
-    array = Array,
-) where {FT}
-    Rrange = grid1d(Ω.radius + Ω.depth, Ω.radius, nelem = elements.vertical)
 
-    topl = StackedCubedSphereTopology(
-        mpicomm,
-        elements.horizontal,
-        Rrange,
-        boundary = boundary, 
-    )
+```
+Sphere helper functions
+```
+rad(x,y,z) = sqrt(x^2 + y^2 + z^2)
+lat(x,y,z) = asin(z/rad(x,y,z)) # ϕ ∈ [-π/2, π/2] 
+lon(x,y,z) = atan(y,x) # λ ∈ [-π, π) 
 
-    grid = DiscontinuousSpectralElementGrid(
-        topl,
-        FloatType = FT,
-        DeviceArray = array,
-        polynomialorder = (polynomialorder.horizontal, polynomialorder.vertical),
-        meshwarp = ClimateMachine.Mesh.Topologies.equiangular_cubed_sphere_warp,
-    )
-    return grid
-end
+r̂ⁿᵒʳᵐ(x,y,z) = norm([x,y,z]) ≈ 0 ? 1 : norm([x, y, z])^(-1)
+ϕ̂ⁿᵒʳᵐ(x,y,z) = norm([x,y,0]) ≈ 0 ? 1 : (norm([x, y, z]) * norm([x, y, 0]))^(-1)
+λ̂ⁿᵒʳᵐ(x,y,z) = norm([x,y,0]) ≈ 0 ? 1 : norm([x, y, 0])^(-1)
+
+r̂(x,y,z) = r̂ⁿᵒʳᵐ(x,y,z) * @SVector([x, y, z])
+ϕ̂(x,y,z) = ϕ̂ⁿᵒʳᵐ(x,y,z) * @SVector [x*z, y*z, -(x^2 + y^2)]
+λ̂(x,y,z) = λ̂ⁿᵒʳᵐ(x,y,z) * @SVector [-y, x, 0] 
 
 
 function is_surface(xc, yc, zc)

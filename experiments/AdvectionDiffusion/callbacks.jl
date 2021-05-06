@@ -26,6 +26,17 @@ Base.@kwdef struct VTKOutput{T, V, B, S} <: AbstractCallback
     number_sample_points::S
 end
 
+struct ConservationTest{C} <: AbstractCallback 
+    check_cons::C
+end
+
+mutable struct ConsParams{FT} <: AbstractCallback
+    varname::String
+    interval::Int
+    error_threshold::FT
+    Σvar₀::FT
+end
+
 struct ExponentialFiltering <: AbstractCallback end
 
 function create_callbacks(simulation, odesolver)
@@ -123,9 +134,7 @@ function create_callback(output::JLD2State, simulation::Simulation, odesolver)
     close(file)
 
 
-    jldcallback = ClimateMachine.GenericCallbacks.EveryXSimulationSteps(
-        iteration,
-    ) do (s = false)
+    jldcallback = ClimateMachine.GenericCallbacks.EveryXSimulationSteps(iteration) do (s = false)
         steps = ClimateMachine.ODESolvers.getsteps(odesolver)
         time = ClimateMachine.ODESolvers.gettime(odesolver)
         @info steps, time
@@ -203,4 +212,63 @@ function create_callback(output::ExponentialFiltering, simulation, odesolver)
         nothing
     end
 end
+
+function create_callback(ct::ConservationTest, simulation, odesolver)
+    bl = simulation.dgmodel.balance_law
+    Q = simulation.state
+    FT = eltype(Q)
+
+    cb = Any[]
+    for cc in ct.check_cons
+        varname = cc.varname
+        thold = FT(cc.error_threshold)
+        idx = varsindices(vars_state(bl, Prognostic(), FT), varname)
+        cc.Σvar₀ = weightedsum(Q, idx)
+        println("INIT")
+        println(ClimateMachine.ODESolvers.gettime(simulation.odesolver))
+        cons_test = ClimateMachine.GenericCallbacks.EveryXSimulationSteps(cc.interval) do
+            if simulation.simtime[1] == ClimateMachine.ODESolvers.gettime(simulation.odesolver) 
+                cc.Σvar₀ = weightedsum(Q, idx)
+                println("INIT0") # !!!
+            else
+                println("MAIN")
+                Q = simulation.state
+                #println(cc.Σvar₀[5,1,5])
+                Σvar = weightedsum(Q , idx)
+                println(sum(Q[:,1,:]))
+                δvar = (Σvar - cc.Σvar₀) / cc.Σvar₀    
+                @info @sprintf(
+                    """
+                    Conservation
+                        simtime = %s
+                        abs(δ%s) = %.5e""",
+                    ClimateMachine.ODESolvers.gettime(simulation.odesolver),
+                    varname,
+                    abs(δvar),
+                )
+                if abs(δvar) > thold
+                    error("abs(δ$(cc.varname)) > $(cc.error_threshold)")
+                end
+
+            end
+        end
+        
+        cb = (cb..., cons_test)
+    end 
+    
+    return cb
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
 

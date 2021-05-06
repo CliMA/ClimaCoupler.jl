@@ -63,16 +63,15 @@ using ClimateMachine.VariableTemplates
 
 using LinearAlgebra
 using StaticArrays
-using ClimateMachine.Orientations
+
 """
     CplMainBL <: BalanceLaw
     - used in both the atmos and ocean component models
 """
-struct CplMainBL{BLP, BCS, PS, O} <: BalanceLaw
+struct CplMainBL{BLP, BCS, PS} <: BalanceLaw
     bl_prop::BLP  # initial condition, ...
     boundaryconditions::BCS
     param_set::PS
-    orientation::O
 end
 
 l_type = CplMainBL
@@ -102,7 +101,7 @@ Declare Aaxiliary state variables
   - for array index and real world coordinates and for
   θ value at reference time used to compute κ.
 """
-function vars_state(bl::l_type, st::Auxiliary, FT)
+function vars_state(bl::l_type, ::Auxiliary, FT)
     @vars begin
         npt::Int    # no. nodes
         elnum::Int  # no. elems
@@ -114,11 +113,8 @@ function vars_state(bl::l_type, st::Auxiliary, FT)
         θⁱⁿⁱᵗ::FT   # unused in default setup
         θ_secondary::FT  # stores opposite face for primary (atmospheric import)
         F_prescribed::FT # stores prescribed flux for secondary (ocean import)
-        orientation::vars_state(bl.orientation, st, FT)
     end
 end
-
-vars_state(::Orientation, ::Auxiliary, FT) = @vars(Φ::FT, ∇Φ::SVector{3, FT})
 
 """
   Gradient computation stage input (and output) variable symbols
@@ -139,7 +135,6 @@ end
 """
   Initialize prognostic state variables
 """
-
 function init_state_prognostic!(
     bl::l_type,
     Q::Vars,
@@ -181,43 +176,7 @@ function nodal_init_state_auxiliary!(
     A.θⁱⁿⁱᵗ = 0
     A.θ_secondary = 0
     A.F_prescribed = 0
-
-    # test only:
-    # update the geopotential Φ in state_auxiliary.orientation.Φ
-    FT = eltype(A)
-    _grav::FT = grav(param_set)
-    _planet_radius::FT = planet_radius(param_set)
-    normcoord = norm(geom.coord)
-    A.orientation.Φ = _grav * (normcoord - _planet_radius)
-    
     nothing
-end
-
-function init_state_auxiliary!(
-    model::l_type,
-    state_auxiliary::MPIStateArray,
-    grid,
-    direction,
-)
-
-    init_state_auxiliary!(
-        bl,
-        (bl, A, tmp, geom) -> nodal_init_state_auxiliary!(bl,A,tmp,geom),
-        state_auxiliary,
-        grid,
-        direction,
-    )    
-
-    # update ∇Φ in state_auxiliary.orientation.∇Φ (necessary for the unit vector notmal to the vertical surfces of the reference element)
-    auxiliary_field_gradient!(
-        model,
-        state_auxiliary,
-        ("orientation.∇Φ",),
-        state_auxiliary,
-        ("orientation.Φ",),
-        grid,
-        direction,
-    )
 end
 
 
@@ -380,7 +339,7 @@ function numerical_boundary_flux_second_order!(
     aux1⁻::Vars{A},
 ) where {S, D, A, HD}
     
-    fluxᵀn.θ = 0
+    fluxᵀn.θ += 0
 end
 
 
@@ -551,14 +510,7 @@ function flux_first_order!(
     t::Real,
     directions,
 )
-    k̂ = vertical_unit_vector(bl, A)
-    if A.zc  < 0.00001
-        Q.u = (0.0, 0.0, 0.0) 
-    elseif A.zc > 3999.999
-        Q.u = (0.0, 0.0, 0.0)    
-    end
-    F.θ += Q.u * Q.θ 
-    #F.θ += (SDiagonal(1, 1, 1) - k̂ * k̂')*Q.u * Q.θ  
+    F.θ += Q.u * Q.θ  
     nothing
 end
 function boundary_state!(

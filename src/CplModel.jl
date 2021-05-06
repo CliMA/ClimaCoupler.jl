@@ -86,7 +86,7 @@ function CplModel(;
     zc = grid.vgeo[:, _x3:_x3, :]
     
     # Default is to set the coupling boundary at z = 0m
-    boundary(boundary_z, xc, yc, zc) = isnothing(boundary_z) ? zc .== 0 : boundary_z( xc, yc, zc )
+    boundary(boundary_z, xc, yc, zc) = isnothing(boundary_z) ? zc .^2 .< eps(FT) : boundary_z( xc, yc, zc )
     boundary = boundary(boundary_z, xc, yc, zc)
     
     ###

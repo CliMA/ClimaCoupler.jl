@@ -37,7 +37,6 @@ struct EarthParameterSet <: AbstractEarthParameterSet end
 const param_set = EarthParameterSet()
 
 ClimateMachine.init()
-FT = Float64
 
 # Shared functions
 include("domains.jl")
@@ -47,19 +46,29 @@ include("callbacks.jl")
 # Main balance law and its components
 include("CplMainBL.jl")
 
-nstepsA = 1
-nstepsO = 1
+FT = Float64
+nstepsA = 1 # steps per coupling cycle (atmos)
+nstepsO = 1 # steps per coupling cycle (ocean)
+totalsteps = 1000 # total simulation steps
 
-#  Background atmos and ocean diffusivities
-const κᵃʰ = FT(1e4) * 0.0
+# Background atmos and ocean horizontal and vertical diffusivities
+const κᵃʰ = FT(0.0) #FT(1e4) 
 const κᵃᶻ = FT(1e-1)
-const κᵒʰ = FT(1e3) * 0.0
+const κᵒʰ = FT(0.0)
 const κᵒᶻ = FT(1e-4)
-const τ_airsea = FT(60 * 86400)
-const L_airsea = FT(500)
-const λ_airsea = FT(L_airsea / τ_airsea)
-coupling_lambda() = (λ_airsea)
-const u_max = FT(1e-5) # max. advective velocity in radians
+
+# Collects tracer valus/fluxes for conservation checks
+mutable struct LogThatFlux{F}
+    A::F
+    O::F
+end
+
+# Coupling coefficient
+τ_airsea,  L_airsea = ( FT(60 * 86400), FT(500) )
+coupling_lambda() = (L_airsea / τ_airsea)
+
+# Max. advective velocity in radians
+const u_max = FT(1e-5) 
 
 function main(::Type{FT}) where {FT}
     
@@ -81,7 +90,7 @@ function main(::Type{FT}) where {FT}
     # Timestepping
     Δt_ = calculate_dt(gridA, wavespeed = u_max*(ΩA.radius), diffusivity = maximum([κᵃʰ, κᵃᶻ]) ) 
     
-    t_time, end_time = ( 0  , 8Δt_ )
+    t_time, end_time = ( 0  , totalsteps * Δt_ )
 
     # Collect spatial info, timestepping, balance law and DGmodel for the two components
     boundary_mask( xc, yc, zc ) = @. ( xc^2 + yc^2 + zc^2 )^0.5 ≈ planet_radius(param_set)
@@ -91,22 +100,30 @@ function main(::Type{FT}) where {FT}
     ## Prop atmos functions to override defaults
     atmos_structure(λ, ϕ, r) = FT(30) #30.0 + 10.0 * cos(ϕ) * sin(5λ)
     atmos_θⁱⁿⁱᵗ(npt, el, x, y, z) = atmos_structure( lon(x,y,z), lat(x,y,z), rad(x,y,z) )                # Set atmosphere initial state function
-    atmos_calc_kappa_diff(_...) = κᵃʰ, κᵃʰ, κᵃᶻ               # Set atmos diffusion coeffs
+    atmos_calc_diff_flux(∇θ, npt, el, x, y, z) = (
+                κᵃʰ * ∇θ'* λ̂_quick(x,y,z) * λ̂_quick(x,y,z) +  # zonal
+                κᵃʰ * ∇θ'* ϕ̂_quick(x,y,z) * ϕ̂_quick(x,y,z) +  # meridional
+                κᵃᶻ * ∇θ'* r̂_quick(x,y,z) * r̂_quick(x,y,z) ) # vertical
+
     atmos_get_penalty_tau(_...) = FT(3.0 * 0.0)               # Set penalty term tau (for debugging)
     #atmos_θ_shadowflux(θᵃ, θᵒ, npt, el, xc, yc, zc) = is_surface(xc,yc,zc) ? (1.0 / τ_airsea) * (θᵃ - θᵒ) : 0.0 # Set atmosphere shadow boundary flux function
     #atmos_source_θ(θᵃ, npt, el, xc, yc, zc, θᵒ) = FT(0.0)     # Set atmos source!
 
     ## Set atmos advective velocity (constant in time) and convert to Cartesian
     uˡᵒⁿ(λ, ϕ, r) = u_max * r * cos(ϕ)
-    atmos_uⁱⁿⁱᵗ(npt, el, x, y, z) = (     0 * r̂(x,y,z) 
+    atmos_uⁱⁿⁱᵗ_(npt, el, x, y, z) = (     0 * r̂(x,y,z) 
                                         + 0 * ϕ̂(x,y,z)
                                         + uˡᵒⁿ(lon(x,y,z), lat(x,y,z), rad(x,y,z)) * λ̂(x,y,z) ) 
+
+    epss = sqrt(eps(FT))
+    atmos_uⁱⁿⁱᵗ(npt, el, x, y, z) = (rad(x,y,z)  < ΩA.radius + epss) || (rad(x,y,z) > ΩA.radius + ΩA.height - epss) ? SVector(FT(0.0), FT(0.0), FT(0.0)) : atmos_uⁱⁿⁱᵗ_(npt, el, x, y, z) # constant (in rads) u, but 0 at boundaries
+    #atmos_uⁱⁿⁱᵗ(npt, el, x, y, z) = atmos_uⁱⁿⁱᵗ_(npt, el, x, y, z) # constant (in rads) u, but 0 at boundaries
 
     ## Collect atmos props
     bl_propA = prop_defaults()
     bl_propA = (;bl_propA..., 
                 init_theta = atmos_θⁱⁿⁱᵗ, 
-                calc_kappa_diff = atmos_calc_kappa_diff,
+                calc_diff_flux = atmos_calc_diff_flux,
                 get_penalty_tau = atmos_get_penalty_tau,
                 coupling_lambda = coupling_lambda,
                 init_u = atmos_uⁱⁿⁱᵗ
@@ -133,7 +150,10 @@ function main(::Type{FT}) where {FT}
     tropical_heating_2(λ, ϕ, r) = 30.0 + 10.0 * cos(ϕ) + 1 * sin(5λ) * cos(ϕ)
     tropical_heating(λ, ϕ, r) = tropical_heating_1(λ, ϕ, r)
     ocean_θⁱⁿⁱᵗ(npt, el, x, y, z) = tropical_heating( lon(x,y,z), lat(x,y,z), rad(x,y,z) )                    # Set ocean initial state function
-    ocean_calc_kappa_diff(_...) = κᵒʰ, κᵒʰ, κᵒᶻ               # Set ocean diffusion coeffs
+    ocean_calc_diff_flux(∇θ, npt, el, x, y, z) = (
+                κᵒʰ * ∇θ' * λ̂_quick(x,y,z) * λ̂_quick(x,y,z) +  # zonal
+                κᵒʰ * ∇θ' * ϕ̂_quick(x,y,z) * ϕ̂_quick(x,y,z) +  # meridional
+                κᵒᶻ * ∇θ' * r̂_quick(x,y,z) * r̂_quick(x,y,z) ) # vertical
     ocean_get_penalty_tau(_...) = FT(0.15 * 0.0)               # Set penalty term tau (for debugging)
     ocean_uⁱⁿⁱᵗ(xc, yc, zc, npt, el) = SVector(FT(0.0), FT(0.0), FT(0.0)) # Set ocean advective velocity
     #ocean_source_θ(θᵃ, npt, el, xc, yc, zc, θᵒ) = FT(0.0)     # Set ocean source!
@@ -142,7 +162,7 @@ function main(::Type{FT}) where {FT}
     bl_propO = prop_defaults()
     bl_propO = (;bl_propO..., 
                 init_theta = ocean_θⁱⁿⁱᵗ, 
-                calc_kappa_diff = ocean_calc_kappa_diff,
+                calc_diff_flux = ocean_calc_diff_flux,
                 get_penalty_tau = ocean_get_penalty_tau,
                 coupling_lambda = coupling_lambda,
                 init_u = ocean_uⁱⁿⁱᵗ,
@@ -168,7 +188,6 @@ function main(::Type{FT}) where {FT}
     coupler = CplState()
     register_cpl_field!(coupler, :Ocean_SST, deepcopy(mO.state.θ[mO.boundary]), mO.grid, DateTime(0), u"°C")
     register_cpl_field!(coupler, :Atmos_MeanAirSeaθFlux, deepcopy(mA.state.F_accum[mA.boundary]), mA.grid, DateTime(0), u"°C")
-    
 
     # Instantiate a coupled timestepper that steps forward the components and
     # implements mapings between components export bondary states and
@@ -182,14 +201,14 @@ function main(::Type{FT}) where {FT}
         coupler = coupler,
         coupling_dt = Δt_,
         t0 = 0.0,
+        fluxlog = LogThatFlux( zeros(totalsteps) , zeros(totalsteps) )
     )
     
     # For now applying callbacks only to atmos.
     callbacks = (
         #ExponentialFiltering(),
-        #ConservationTest(( ConsParams("θ", Int(1), FT(1), FT(0)), ConsParams("u", Int(1), FT(1), FT(0)) )),
         VTKOutput((
-            iteration = string(4Δt_)*"ssecs" ,
+            iteration = string(100Δt_)*"ssecs" ,
             overdir ="output",
             overwrite = true,
             number_sample_points = 0
@@ -203,7 +222,7 @@ function main(::Type{FT}) where {FT}
         dgmodel =  cpl_solver.component_list.atmosphere.component_model.discretization,
         callbacks = callbacks,
         simtime = (t_time, end_time),
-        name = "Coupler_SphereUnitTest_ctrl_consc",
+        name = "Coupler_SphereUnitTest_ctrl",
         )
 
     return simulation
@@ -220,7 +239,18 @@ function run(cpl_solver, numberofsteps, cbvector)
 end
 
 simulation = main(Float64);
-nsteps = Int(simulation.simtime[2] / simulation.coupled_odesolver.dt)
+nsteps = totalsteps
 cbvector = create_callbacks(simulation, simulation.odesolver)
 println("Initialized. Running...")
 @time run(simulation.coupled_odesolver, nsteps, cbvector)
+
+# 
+fluxA = simulation.coupled_odesolver.fluxlog.A
+fluxO = simulation.coupled_odesolver.fluxlog.O
+fluxT = fluxA .+ fluxO
+#plot(collect(1:1:totalsteps),[fluxA .- fluxA[1], fluxO .- fluxO[1], fluxT .- fluxT[1] ])
+
+using Plots
+time = collect(1:1:totalsteps)[1:10:end]
+rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1])[1:10:end] ]
+plot(time,rel_error)

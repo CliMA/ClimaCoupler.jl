@@ -246,4 +246,16 @@ function is_surface(xc, yc, zc)
     height_from_surface=(xc^2 + yc^2 + zc^2)^0.5 - planet_radius(param_set)
     return height_from_surface ≈ 0
 end
+
+## For calculations at every timestep don't use regular norm(), its not great on performance
+mynorm(x::Float64,y::Float64,z::Float64)  = ( x^2 + y^2 + z^2 ) ^ 0.5
+## excessively type stable forms!
+r̂ⁿᵒʳᵐ_(x::Float64,y::Float64,z::Float64) = mynorm(x,y,z) ≈ 0 ? 1 : mynorm(x, y, z)^(-1)
+ϕ̂ⁿᵒʳᵐ_(x::Float64,y::Float64,z::Float64) = mynorm(x,y,Float64(0)) ≈ 0 ? 1 : ( mynorm(x, y, z) * mynorm(x, y, Float64(0)) )^(-1)
+λ̂ⁿᵒʳᵐ_(x::Float64,y::Float64,z::Float64) = mynorm(x,y,Float64(0)) ≈ 0 ? 1 :   mynorm(x, y, Float64(0))^(-1)
+r̂_quick(x::Float64,y::Float64,z::Float64) = r̂ⁿᵒʳᵐ_(x,y,z) * @SVector([x, y, z])
+ϕ̂_quick(x::Float64,y::Float64,z::Float64) = ϕ̂ⁿᵒʳᵐ_(x,y,z) * @SVector [x*z, y*z, -(x^2 + y^2)]
+λ̂_quick(x::Float64,y::Float64,z::Float64) = λ̂ⁿᵒʳᵐ_(x,y,z) * @SVector [-y, x, 0]
+
+
 # end of module

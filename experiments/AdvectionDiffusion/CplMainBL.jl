@@ -21,6 +21,12 @@
  - [`CplMainBL`](@ref)
      balance law struct created by this module
 
+
+# θ: J / m^3
+# ∇θ: J / m^4
+# κ: (m^2/s)
+# κ∇θ: J/(m^2 s) = W/m^2 = J/m^3 * m/s
+
 """
 #module CplMainBL
 
@@ -78,16 +84,16 @@ end
 l_type = CplMainBL
 
 """
-Declare prognostic state variables
-    - θ
-    - F_accum: "Shadow" variable used to capture boundary fluxes that we want to accumulate over 
+function vars_state(bl::l_type, ::Prognostic, FT)
+- Declare prognostic state variables
+    - `θ`: tracer
+    - `F_accum`: "Shadow" variable used to capture boundary fluxes that we want to accumulate over 
     a single timestep and export to coupling as time integrals. We use a shadow variable
     because we want to integrate over whatever timestepper is being used.
     Eventually we should have the ability to potentially use a 2d field here.
     The shadow variable needs to be zeroed at the start of each
     coupling cycle for a component.
-    - u: advective velocity - currently constant, but kept in prognostic variables to enable
-    easier use of overintegration  
+    - `u`: advective velocity - currently constant, but kept in prognostic variables to enable easy overintegration  
 """
 function vars_state(bl::l_type, ::Prognostic, FT)
     @vars begin
@@ -98,9 +104,20 @@ function vars_state(bl::l_type, ::Prognostic, FT)
 end
 
 """
-Declare Aaxiliary state variables
-  - for array index and real world coordinates and for
-  θ value at reference time used to compute κ.
+function vars_state(bl::l_type, st::Auxiliary, FT)
+- Declare Aaxiliary state variables
+
+  `npt`::Int    # no. nodes
+  `elnum`::Int  # no. elems
+
+  `xc`::FT      # Cartesian x
+  `yc`::FT      # Cartesian y
+  `zc`::FT      # Cartesian z
+  
+  `θⁱⁿⁱᵗ`::FT   # unused in default setup
+  `θ_secondary`::FT  # stores opposite face for primary (atmospheric import)
+  `F_prescribed`::FT # stores prescribed flux for secondary (ocean import)
+  `orientation`::vars_state(bl.orientation, st, FT)
 """
 function vars_state(bl::l_type, st::Auxiliary, FT)
     @vars begin
@@ -121,7 +138,10 @@ end
 vars_state(::Orientation, ::Auxiliary, FT) = @vars(Φ::FT, ∇Φ::SVector{3, FT})
 
 """
-  Gradient computation stage input (and output) variable symbols
+function vars_state(bl::l_type, ::Gradient, FT)
+  - Pre-gradient computation variables 
+  `∇θ`::FT 
+  `∇θⁱⁿⁱᵗ`::FT # unused in default setup
 """
 function vars_state(bl::l_type, ::Gradient, FT)
     @vars begin
@@ -130,6 +150,11 @@ function vars_state(bl::l_type, ::Gradient, FT)
     end
 end
 
+"""
+function vars_state(bl::l_type, ::GradientFlux, FT)
+  - Post-gradient computation variable
+  `κ∇θ`::SVector{3, FT}
+"""
 function vars_state(bl::l_type, ::GradientFlux, FT)
     @vars begin
         κ∇θ::SVector{3, FT}
@@ -137,7 +162,13 @@ function vars_state(bl::l_type, ::GradientFlux, FT)
 end
 
 """
-  Initialize prognostic state variables
+function init_state_prognostic!
+  Point-wise initialization of prognostic state variables
+  `bl`::l_type, balance law
+  `Q`::Vars, state variables
+  `A`::Vars, auxilliary variables
+  `geom`::LocalGeometry, 
+  `FT`,
 """
 
 function init_state_prognostic!(
@@ -147,20 +178,27 @@ function init_state_prognostic!(
     geom::LocalGeometry,
     FT,
 )
-    npt = getproperty(geom, :n)
-    elnum = getproperty(geom, :e)
+    npt = A.npt
+    elnum = A.elnum
     x = A.xc 
     y = A.yc
     z = A.zc
 
     Q.θ = bl.bl_prop.init_theta(npt, elnum, x, y, z)
-    Q.F_accum = 0
     Q.u = bl.bl_prop.init_u(npt, elnum, x, y, z)
+        
+    Q.F_accum = 0
     nothing
 end
 
 """
-  Initialize auxiliary state variables
+function nodal_init_state_auxiliary!
+    Point-wise initialization of auxiliary state variables
+    `bl`::l_type, balance law
+    `A`::Vars, auxilliary variables
+    `tmp`::Vars,
+    `geom`::LocalGeometry,
+
 """
 function nodal_init_state_auxiliary!(
     bl::l_type,
@@ -182,17 +220,21 @@ function nodal_init_state_auxiliary!(
     A.θ_secondary = 0
     A.F_prescribed = 0
 
-    # test only:
-    # update the geopotential Φ in state_auxiliary.orientation.Φ
+    # This is necesary for ∇Φ, which is used to get the `vertical_unit_vector`
     FT = eltype(A)
-    _grav::FT = grav(param_set)
-    _planet_radius::FT = planet_radius(param_set)
-    normcoord = norm(geom.coord)
-    A.orientation.Φ = _grav * (normcoord - _planet_radius)
-    
+    A.orientation.Φ = grav(param_set) * (norm(geom.coord) - planet_radius(param_set))
+
     nothing
 end
 
+""""
+function init_state_auxiliary!
+    - array-wise initialization of auxiliary state variables
+    `model`::l_type, balance law
+    `state_auxiliary`::MPIStateArray,
+    `grid`,
+    `direction`,
+"""
 function init_state_auxiliary!(
     model::l_type,
     state_auxiliary::MPIStateArray,
@@ -220,27 +262,16 @@ function init_state_auxiliary!(
     )
 end
 
-
 """
-Compute Kernels:
-"""
-#====
-
-Atmos
-
-----
-
-Land
-
-
-====#
-
-
-"""
-  Set source terms 
+function source!
   - for prognostic state external sources
   - for recording boundary flux terms into shadow variables for export to coupler
-"""
+  bl::l_type, balance law
+  S::Vars, source variables
+  Q::Vars, prognostic variables
+  G::Vars, pre-gradient variables
+  A::Vars, auxiliary variables 
+  """
 function source!(bl::l_type, S::Vars, Q::Vars, G::Vars, A::Vars, _...)
     #S.θ=bl.bl_prop.source_theta(Q.θ,A.npt,A.elnum,A.xc,A.yc,A.zc,A.θ_secondary)
     # Record boundary condition fluxes as needed by adding to shadow
@@ -251,7 +282,13 @@ function source!(bl::l_type, S::Vars, Q::Vars, G::Vars, A::Vars, _...)
 end
 
 """
+function compute_gradient_argument!
   Set values to have gradients computed.
+  `bl`::l_type, balance law
+  `G`::Vars, pre-gradient variables
+  `Q`::Vars, prognostic variables 
+  `A`::Vars, auxiliary variables 
+  `t`, time
 """
 function compute_gradient_argument!(bl::l_type, G::Vars, Q::Vars, A::Vars, t)
     G.∇θ = Q.θ
@@ -260,7 +297,14 @@ function compute_gradient_argument!(bl::l_type, G::Vars, Q::Vars, A::Vars, t)
 end
 
 """
+function compute_gradient_flux!
   Compute diffusivity tensor times computed gradient to give net gradient flux.
+  bl::l_type, balance law
+  GF::Vars, post-gradient (gradient flux) variables
+  G::Grad, pre-gradient variables
+  Q::Vars, prognostic variables
+  A::Vars, auxiliary variables 
+  t,
 """
 function compute_gradient_flux!(
     bl::l_type,
@@ -273,42 +317,15 @@ function compute_gradient_flux!(
     # "Non-linear" form (for time stepped)
     ### κ¹,κ²,κ³=bl.bl_prop.calc_kappa_diff(G.∇θ,A.npt,A.elnum,A.xc,A.yc,A.zc)
     # "Linear" form (for implicit)
-    κ¹, κ², κ³ =
-        bl.bl_prop.calc_kappa_diff(G.∇θⁱⁿⁱᵗ, A.npt, A.elnum, A.xc, A.yc, A.zc)
-    # Maybe I should pass both G.∇θ and G.∇θⁱⁿⁱᵗ?
+    F =
+        bl.bl_prop.calc_diff_flux(G.∇θ, A.npt, A.elnum, A.xc, A.yc, A.zc)
 
-    # Messy diffusion tensor rotation - should find code for doing this succinctly!
-    # we want κ¹, κ² to act in lat and lon directions respectively i.e. tangential 
-    # to shell, we want κ³ to act normal to shell i.e. z or r direction.
-    ## don't use regular norm(), its not great on performance
-    mynorm(x::Float64,y::Float64,z::Float64)  = ( x^2 + y^2 + z^2 ) ^ 0.5
-    ## excessively type stable forms!
-    r̂ⁿᵒʳᵐ(x::Float64,y::Float64,z::Float64) = mynorm(x,y,z) ≈ 0 ? 1 : mynorm(x, y, z)^(-1)
-    ϕ̂ⁿᵒʳᵐ(x::Float64,y::Float64,z::Float64) = mynorm(x,y,Float64(0)) ≈ 0 ? 1 : ( mynorm(x, y, z) * mynorm(x, y, Float64(0)) )^(-1)
-    λ̂ⁿᵒʳᵐ(x::Float64,y::Float64,z::Float64) = mynorm(x,y,Float64(0)) ≈ 0 ? 1 :   mynorm(x, y, Float64(0))^(-1)
-    r̂(x::Float64,y::Float64,z::Float64) = r̂ⁿᵒʳᵐ(x,y,z) * @SVector([x, y, z])
-    ϕ̂(x::Float64,y::Float64,z::Float64) = ϕ̂ⁿᵒʳᵐ(x,y,z) * @SVector [x*z, y*z, -(x^2 + y^2)]
-    λ̂(x::Float64,y::Float64,z::Float64) = λ̂ⁿᵒʳᵐ(x,y,z) * @SVector [-y, x, 0]
-
-    # Sphere surface bits 
-    x=A.xc
-    y=A.yc
-    z=A.zc
-    Gλ = G.∇θ'*λ̂(x,y,z)
-    Fλ = κ¹*Gλ*λ̂(x,y,z)
-    Gϕ = G.∇θ'*ϕ̂(x,y,z)
-    Fϕ = κ²*Gϕ*ϕ̂(x,y,z)
-    Gr = G.∇θ'*r̂(x,y,z)
-    Fr = κ³*Gr*r̂(x,y,z)
-    GF.κ∇θ = Diagonal(@SVector([1, 1, 1])) * (Fλ + Fϕ + Fr)
-
-    # Original cartesian form
-    #GF.κ∇θ = Diagonal(@SVector([κ¹, κ², κ³])) * G.∇θ   
-    #GF.κ∇θ = Diagonal(@SVector([κ¹, κ¹, κ¹])) * G.∇θ   
+    GF.κ∇θ = F
     nothing
 end
 
 """
+function flux_second_order!(
   Pass flux components for second order term into update kernel.
 """
 function flux_second_order!(
@@ -325,25 +342,32 @@ function flux_second_order!(
 end
 
 # Boundary conditions
+
 """
+abstract type AbstractCouplerBoundary end
   Define boundary condition flags/types to iterate over, for now keep it simple.
 - 3 AbstractCouplerBoundary types:
     1. ExteriorBoundary
     2. CoupledPrimaryBoundary
     3. CoupledSecondaryBoundary
+
+"""
+abstract type AbstractCouplerBoundary end
+
+"""
+struct PenaltyNumFluxDiffusive <: NumericalFluxSecondOrder end
 - PenaltyNumFluxDiffusive: additional NumericalFluxSecondOrder to account for an additional penalty term
 """
 struct PenaltyNumFluxDiffusive <: NumericalFluxSecondOrder end
 
-abstract type AbstractCouplerBoundary end
 
 # ## 1. ExteriorBoundary
-# flux is 0 across the boundary
-struct ExteriorBoundary <: AbstractCouplerBoundary end
 
 """
+struct ExteriorBoundary <: AbstractCouplerBoundary end
   Zero normal gradient boundary condition.
 """
+struct ExteriorBoundary <: AbstractCouplerBoundary end
 
 function boundary_state!(
     nF::Union{CentralNumericalFluxGradient},
@@ -385,9 +409,13 @@ end
 
 
 # ## 2. CoupledPrimaryBoundary
+
+"""
+struct CoupledPrimaryBoundary <: AbstractCouplerBoundary end
 # # compute flux based on opposite face
 # # also need to accumulate net flux across boundary
- struct CoupledPrimaryBoundary <: AbstractCouplerBoundary end
+"""
+struct CoupledPrimaryBoundary <: AbstractCouplerBoundary end
 
 function boundary_state!(
     nF::Union{CentralNumericalFluxGradient},
@@ -426,6 +454,7 @@ function numerical_boundary_flux_second_order!(
     diff1⁻::Vars{D},
     aux1⁻::Vars{A},
 ) where {S, D, A, HD}
+
     fluxᵀn.θ =
         (state_prognostic⁻.θ - state_auxiliary⁺.θ_secondary) *
         balance_law.bl_prop.coupling_lambda() # W/m^2
@@ -433,10 +462,7 @@ function numerical_boundary_flux_second_order!(
 end
 
 
-# θ: J / m^3
-# ∇θ: J / m^4
-# κ: (m^2/s)
-# κ∇θ: J/(m^2 s) = W/m^2 = J/m^3 * m/s
+
 
 #  - clean up and write primer
 #  - imports and exports
@@ -462,7 +488,9 @@ function boundary_state!(
     t,
     _...,
 )
+
     Q⁺.θ = Q⁻.θ
+
     nothing
 end
 function numerical_boundary_flux_second_order!(
@@ -484,7 +512,9 @@ function numerical_boundary_flux_second_order!(
     diff1⁻::Vars{D},
     aux1⁻::Vars{A},
 ) where {S, D, A, HD}
+
     fluxᵀn.θ = -state_auxiliary⁺.F_prescribed
+
 end
 
 function wavespeed(bl::l_type, _...)
@@ -494,6 +524,7 @@ function wavespeed(bl::l_type, _...)
 end
 
 """
+function numerical_flux_second_order!(::PenaltyNumFluxDiffusive, 
   Penalty flux formulation of second order numerical flux. This formulation
   computes the CentralNumericalFluxSecondOrder term first (which is just the average
   of the + and - fluxes and an edge), and then adds a "penalty" flux that relaxes
@@ -551,13 +582,10 @@ function flux_first_order!(
     t::Real,
     directions,
 )
-    k̂ = vertical_unit_vector(bl, A)
-    if A.zc  < 0.00001
-        Q.u = (0.0, 0.0, 0.0) 
-    elseif A.zc > 3999.999
-        Q.u = (0.0, 0.0, 0.0)    
-    end
     F.θ += Q.u * Q.θ 
+
+    # Remove surplus flux normal to the reference element surface
+    #k̂ = vertical_unit_vector(bl, A)
     #F.θ += (SDiagonal(1, 1, 1) - k̂ * k̂')*Q.u * Q.θ  
     nothing
 end
@@ -582,36 +610,12 @@ function boundary_conditions(bl::l_type, _...)
     bl.boundaryconditions
 end
 
-# #this one is for the general adv only test
-# function boundary_state!(
-#     nF,
-#     bc,
-#     bl::l_type,
-#     Q⁺,
-#     state_gradient_flux⁺,
-#     state_hyperdiffusive⁺,
-#     state_auxiliary⁺,
-#     normal_vector,
-#     Q⁻,
-#     state_gradient_flux⁻,
-#     state_hyperdiffusive⁻,
-#     state_auxiliary⁻,
-#     t,
-#     state1⁻,
-#     diff1⁻,
-#     aux1⁻,
-# )
-#     Q⁺.θ = Q⁻.θ # Q⁺.θ=A⁺.θ_secondary
-    
-#     nothing
-# end
-
 """
   Set a default set of properties and their default values
   - init_aux_geom   :: function to initialize geometric terms stored in aux.
   - init_theta      :: function to set initial θ values.
   - source_theta    :: function to add a source term to θ.
-  - calc_kappa_diff :: function to set diffusion coeffiecient(s).
+  - calc_diff_flux  :: function to set calculation of diffusive fluxes
   - get_wavespeed   :: function to return a wavespeed for Rusanov computations (there aren't any in this model)
   - get_penalty_tau :: function to set timescale on which to bring state+ and state- together
   - theta_shadow_boundary_flux :: function to set boundary flux into shadow variable for passing to coupler
@@ -631,8 +635,8 @@ function prop_defaults()
     source_theta(_...) = (return 0.0)
     bl_prop = (bl_prop..., source_theta = source_theta)
 
-    calc_kappa_diff(_...) = (return 0.0, 0.0, 0.0)
-    bl_prop = (bl_prop..., calc_kappa_diff = calc_kappa_diff)
+    calc_diff_flux(_...) = (return 0.0, 0.0, 0.0)
+    bl_prop = (bl_prop..., calc_diff_flux = calc_diff_flux)
 
     get_wavespeed(_...) = (return 0.0)
     bl_prop = (bl_prop..., get_wavespeed = get_wavespeed)
@@ -653,14 +657,13 @@ function prop_defaults()
     bl_prop = (bl_prop..., LAW = CplMainBL)
 end
 
-"""
-  Helper functions to communicate between components before and after timestepping
-  - preatmos(csolver)
-  - postatmos(csolver)
-  - preocean(csolver)
-  - postocean(csolver)
-"""
+# Helper functions to communicate between components before and after timestepping
 
+"""
+function preatmos(csolver)
+    - saves and regrids the OceanSST field (mO.state.θ[mO.boundary]) to θ_secondary[mA.boundary] on the atmos grid
+    csolver::CplSolver
+"""
 function preatmos(csolver)
     mA = csolver.component_list.atmosphere.component_model
     mO = csolver.component_list.ocean.component_model
@@ -679,8 +682,16 @@ function preatmos(csolver)
         atmos_θ_surface_max = maximum(mA.state.θ[mA.boundary]),
         ocean_θ_surface_max = maximum(mO.state.θ[mO.boundary]),
     )
+
+    isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.A[csolver.steps] = weightedsum(mA.state, 1)
+    isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.O[csolver.steps] = weightedsum(mO.state, 1)
 end
 
+"""
+function preatmos(csolver)
+    - updates Atmos_MeanAirSeaθFlux with mA.state.F_accum[mA.boundary], and the coupler time
+    csolver::CplSolver
+"""
 function postatmos(csolver)
     mA = csolver.component_list.atmosphere.component_model
     mO = csolver.component_list.ocean.component_model
@@ -706,6 +717,11 @@ function postatmos(csolver)
     )
 end
 
+"""
+function preocean(csolver)
+    - saves and regrids the Atmos_MeanAirSeaθFlux field (mA.state.F_accum[mA.boundary]) to F_prescribed[mO.boundary] on the ocean grid
+    csolver::CplSolver
+"""
 function preocean(csolver)
     mA = csolver.component_list.atmosphere.component_model
     mO = csolver.component_list.ocean.component_model
@@ -727,6 +743,11 @@ function preocean(csolver)
     )
 end
 
+"""
+function postocean(csolver)
+    - updates Ocean_SST with mO.state.θ[mO.boundary], and the coupler time
+    csolver::CplSolver
+"""
 function postocean(csolver)
     mA = csolver.component_list.atmosphere.component_model
     mO = csolver.component_list.ocean.component_model

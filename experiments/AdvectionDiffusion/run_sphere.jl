@@ -49,13 +49,12 @@ include("CplMainBL.jl")
 FT = Float64
 nstepsA = 1 # steps per coupling cycle (atmos)
 nstepsO = 1 # steps per coupling cycle (ocean)
-totalsteps = 1000 # total simulation steps
+totalsteps = 1000 # total simulation coupled cycle steps
 
 # Background atmos and ocean horizontal and vertical diffusivities
-const κᵃʰ = FT(0.0) #FT(1e4) 
-const κᵃᶻ = FT(1e-1)
-const κᵒʰ = FT(0.0)
-const κᵒᶻ = FT(1e-4)
+const κᵃʰ, κᵃᶻ = ( FT(0.0) , FT(1e-1) )
+const κᵒʰ, κᵒᶻ = ( FT(0.0) , FT(1e-4) )
+
 
 # Collects tracer valus/fluxes for conservation checks
 mutable struct LogThatFlux{F}
@@ -64,12 +63,18 @@ mutable struct LogThatFlux{F}
 end
 
 # Coupling coefficient
-τ_airsea,  L_airsea = ( FT(60 * 86400), FT(500) )
+const τ_airsea,  L_airsea = ( FT(60 * 86400), FT(500) ) #( FT(1), FT(0) )#( FT(60 * 86400), FT(500) ) 
 coupling_lambda() = (L_airsea / τ_airsea)
 
 # Max. advective velocity in radians
 const u_max = FT(1e-5) 
 
+"""
+function main(::Type{FT}) where {FT}
+    sets up the experiment and initializes the run
+
+    FT: Float64
+"""
 function main(::Type{FT}) where {FT}
     
     # Domain
@@ -88,7 +93,7 @@ function main(::Type{FT}) where {FT}
     numerics = (NFfirstorder = CentralNumericalFluxFirstOrder(), NFsecondorder = PenaltyNumFluxDiffusive(), overint_params = (overintegrationorder, polynomialorder) ) #, NFsecondorder = CentralNumericalFluxSecondOrder() )#PenaltyNumFluxDiffusive() )#, overint_params = (overintegrationorder, polynomialorder) ) 
 
     # Timestepping
-    Δt_ = calculate_dt(gridA, wavespeed = u_max*(ΩA.radius), diffusivity = maximum([κᵃʰ, κᵃᶻ]) ) 
+    Δt_ = calculate_dt(gridA, wavespeed = u_max*(ΩA.radius), diffusivity = maximum([[κᵃʰ, κᵃᶻ, κᵒʰ, κᵒᶻ]]) ) 
     
     t_time, end_time = ( 0  , totalsteps * Δt_ )
 
@@ -98,9 +103,9 @@ function main(::Type{FT}) where {FT}
     # 1. Atmos component
     
     ## Prop atmos functions to override defaults
-    atmos_structure(λ, ϕ, r) = FT(30) #30.0 + 10.0 * cos(ϕ) * sin(5λ)
+    atmos_structure(λ, ϕ, r) = FT(30) + FT(10.0) * z / 4e3 + 10.0 * cos(ϕ) * sin(5λ)
     atmos_θⁱⁿⁱᵗ(npt, el, x, y, z) = atmos_structure( lon(x,y,z), lat(x,y,z), rad(x,y,z) )                # Set atmosphere initial state function
-    atmos_calc_diff_flux(∇θ, npt, el, x, y, z) = (
+    atmos_calc_diff_flux(∇θ, npt, el, x, y, z) = - (
                 κᵃʰ * ∇θ'* λ̂_quick(x,y,z) * λ̂_quick(x,y,z) +  # zonal
                 κᵃʰ * ∇θ'* ϕ̂_quick(x,y,z) * ϕ̂_quick(x,y,z) +  # meridional
                 κᵃᶻ * ∇θ'* r̂_quick(x,y,z) * r̂_quick(x,y,z) ) # vertical
@@ -150,7 +155,7 @@ function main(::Type{FT}) where {FT}
     tropical_heating_2(λ, ϕ, r) = 30.0 + 10.0 * cos(ϕ) + 1 * sin(5λ) * cos(ϕ)
     tropical_heating(λ, ϕ, r) = tropical_heating_1(λ, ϕ, r)
     ocean_θⁱⁿⁱᵗ(npt, el, x, y, z) = tropical_heating( lon(x,y,z), lat(x,y,z), rad(x,y,z) )                    # Set ocean initial state function
-    ocean_calc_diff_flux(∇θ, npt, el, x, y, z) = (
+    ocean_calc_diff_flux(∇θ, npt, el, x, y, z) = - (
                 κᵒʰ * ∇θ' * λ̂_quick(x,y,z) * λ̂_quick(x,y,z) +  # zonal
                 κᵒʰ * ∇θ' * ϕ̂_quick(x,y,z) * ϕ̂_quick(x,y,z) +  # meridional
                 κᵒᶻ * ∇θ' * r̂_quick(x,y,z) * r̂_quick(x,y,z) ) # vertical

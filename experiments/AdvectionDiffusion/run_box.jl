@@ -49,13 +49,11 @@ include("CplMainBL.jl")
 FT = Float64
 nstepsA = 1 # steps per coupling cycle (atmos)
 nstepsO = 1 # steps per coupling cycle (ocean)
-totalsteps = 1000 # total simulation steps
+totalsteps = 1000 # total simulation coupled cycle steps
 
 #  Background atmos and ocean horizontal and vertical diffusivities
-const κᵃʰ = FT(0.0) #FT(1e4) 
-const κᵃᶻ = FT(1e-1)
-const κᵒʰ = FT(0.0)
-const κᵒᶻ = FT(1e-4)
+const κᵃʰ, κᵃᶻ = ( FT(0.0) , FT(1e-1) )
+const κᵒʰ, κᵒᶻ = ( FT(0.0) , FT(1e-4) )
 
 # Collects tracer valus/fluxes for conservation checks
 mutable struct LogThatFlux{F}
@@ -64,12 +62,18 @@ mutable struct LogThatFlux{F}
 end
 
 # Coupling coefficient
-τ_airsea,  L_airsea = ( FT(60 * 86400), FT(500) )
-coupling_lambda() = (L_airsea / τ_airsea)
+const τ_airsea,  L_airsea = ( FT(60 * 86400), FT(500) ) #( FT(1), FT(0) )#( FT(60 * 86400), FT(500) ) 
+coupling_lambda() = (L_airsea / τ_airsea) 
 
 # Max. advective velocity in m/s
-const u_max = FT(1e-5 * 6371000) 
+const u_max = FT(1e-5 * 6371000 ) 
 
+"""
+function main(::Type{FT}) where {FT}
+    sets up the experiment and initializes the run
+
+    FT: Float64
+"""
 function main(::Type{FT}) where {FT}
     
     # Domain (approximately emulating the dimensions of one of the faces of the cubed sphere)
@@ -104,23 +108,23 @@ function main(::Type{FT}) where {FT}
     numerics = (NFfirstorder = CentralNumericalFluxFirstOrder(), NFsecondorder = PenaltyNumFluxDiffusive(), overint_params = (overintegrationorder, polynomialorder) ) #, NFsecondorder = CentralNumericalFluxSecondOrder() )#PenaltyNumFluxDiffusive() )#, overint_params = (overintegrationorder, polynomialorder) ) 
 
     # Time step 
-    Δt_ = calculate_dt(gridA, wavespeed = u_max, diffusivity = maximum([κᵃʰ, κᵃᶻ]) ) 
+    Δt_ = calculate_dt(gridA, wavespeed = u_max, diffusivity = maximum([κᵃʰ, κᵃᶻ, κᵒʰ, κᵒᶻ]) ) #* FT(0) + FT(3600)
     t_time, end_time = ( 0  , totalsteps * Δt_ )    
     
     # 1. Atmos component
     
     ## Prop atmos functions to override defaults
-    atmos_θⁱⁿⁱᵗ(npt, el, x, y, z) = FT(30)             # Set atmosphere initial state function
-    atmos_calc_diff_flux(∇θ, npt, el, x, y, z) = Diagonal(@SVector([κᵃʰ, κᵃʰ, κᵃᶻ])) * ∇θ               # Set atmos diffusion coeffs
+    atmos_θⁱⁿⁱᵗ(npt, el, x, y, z) = FT(30)  + FT(10.0) * z / 4e3         # Set atmosphere initial state function
+    atmos_calc_diff_flux(∇θ, npt, el, x, y, z) = - Diagonal(@SVector([κᵃʰ, κᵃʰ, κᵃᶻ])) * ∇θ               # Set atmos diffusion coeffs
     atmos_get_penalty_tau(_...) = FT(3.0 * 0.0)               # Set penalty term tau (for debugging)
     #atmos_θ_shadowflux(θᵃ, θᵒ, npt, el, xc, yc, zc) = is_surface(xc,yc,zc) ? (1.0 / τ_airsea) * (θᵃ - θᵒ) : 0.0 # Set atmosphere shadow boundary flux function
     #atmos_source_θ(θᵃ, npt, el, xc, yc, zc, θᵒ) = FT(0.0)     # Set atmos source!
 
     ## Set atmos advective velocity (constant in time) and convert to Cartesian
     epss = sqrt(eps(FT))
-    #atmos_uⁱⁿⁱᵗ(npt, el, x, y, z) = (z  < ΩA.z[1]+epss) || (z > ΩA.z[2]-epss) ? SVector(FT(0.0), FT(0.0), FT(0.0)) : SVector(u_max, FT(0.0), FT(0.0)) # constant u, but 0 at boundaries
-    atmos_uⁱⁿⁱᵗ(npt, el, x, y, z) = SVector(FT(0.0), FT(0.0), FT(0.0))  #(z  < 0.00001) || (z > 3999.999) ? SVector(FT(0.0), FT(0.0), FT(0.0)) : SVector(u_max, FT(0.0), FT(0.0)) # constant u, but 0 at boundaries
-    
+    atmos_uⁱⁿⁱᵗ(npt, el, x, y, z) = (z  < ΩA.z[1]+epss) || (z > ΩA.z[2]-epss) ? SVector(FT(0.0), FT(0.0), FT(0.0)) : SVector(u_max, FT(0.0), FT(0.0)) # constant u, but 0 at boundaries
+    #atmos_uⁱⁿⁱᵗ(npt, el, x, y, z) = SVector(FT(0.0), FT(0.0), FT(0.0))  #
+
     ## Collect atmos props
     bl_propA = prop_defaults()
     bl_propA = (;bl_propA..., 
@@ -148,7 +152,7 @@ function main(::Type{FT}) where {FT}
     # 2. Ocean component
     ## Prop ocean functions to override defaults
     ocean_θⁱⁿⁱᵗ(npt, el, x, y, z) =  FT(0.0) #+ FT(10.0) * cos(π*x/1e6)                # Set ocean initial state function
-    ocean_calc_diff_flux(∇θ, npt, el, x, y, z) = Diagonal(@SVector([κᵒʰ, κᵒʰ, κᵒᶻ])) * ∇θ              # Set ocean diffusion coeffs
+    ocean_calc_diff_flux(∇θ, npt, el, x, y, z) = - Diagonal(@SVector([κᵒʰ, κᵒʰ, κᵒᶻ])) * ∇θ              # Set ocean diffusion coeffs
     ocean_get_penalty_tau(_...) = FT(0.15 * 0.0)               # Set penalty term tau (for debugging)
     ocean_uⁱⁿⁱᵗ(xc, yc, zc, npt, el) = SVector(FT(0.0), FT(0.0), FT(0.0)) # Set ocean advective velocity
     #ocean_source_θ(θᵃ, npt, el, xc, yc, zc, θᵒ) = FT(0.0)     # Set ocean source!
@@ -201,12 +205,12 @@ function main(::Type{FT}) where {FT}
     # For now applying callbacks only to atmos.
     callbacks = (
         # ExponentialFiltering(),
-        # VTKOutput((
-        #     iteration = string(100Δt_)*"ssecs" ,
-        #     overdir ="output",
-        #     overwrite = true,
-        #     number_sample_points = 0
-        #     )...,),   
+        VTKOutput((
+            iteration = string(100Δt_)*"ssecs" ,
+            overdir ="output",
+            overwrite = true,
+            number_sample_points = 0
+            )...,),   
     )
 
     simulation = (;
@@ -222,7 +226,16 @@ function main(::Type{FT}) where {FT}
     return simulation
 end
 
+"""
 function run(cpl_solver, numberofsteps, cbvector)
+    runs the simulation
+
+    cpl_solver: CplSolver
+    numberofsteps: number of coupling cycles
+    cbvector: vector of callbacks
+
+"""
+function run(cpl_solver::CplSolver, numberofsteps, cbvector)
     # Run the model
     solve!(
         nothing,
@@ -239,12 +252,12 @@ println("Initialized. Running...")
 @time run(simulation.coupled_odesolver, nsteps, cbvector)
 
 # Check conservation
+using Plots
 fluxA = simulation.coupled_odesolver.fluxlog.A
 fluxO = simulation.coupled_odesolver.fluxlog.O
 fluxT = fluxA .+ fluxO
-#plot(collect(1:1:totalsteps),[fluxA .- fluxA[1], fluxO .- fluxO[1], fluxT .- fluxT[1] ])
+time = collect(1:1:totalsteps)
+rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1]) ]
+plot(time .* simulation.coupled_odesolver.dt,rel_error)
 
-using Plots
-time = collect(1:1:totalsteps)[1:10:end]
-rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1])[1:10:end] ]
-plot(time,rel_error)
+plot(time .* simulation.coupled_odesolver.dt,[fluxA .- fluxA[1],fluxO .- fluxO[1],fluxT .- fluxT[1]])

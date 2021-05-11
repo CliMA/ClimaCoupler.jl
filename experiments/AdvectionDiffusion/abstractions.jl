@@ -62,18 +62,21 @@ function calculate_dt(
     wavespeed = nothing,
     diffusivity = nothing,
     viscocity = nothing,
-    cfl = 0.1,
+    cfl = 0.001,
+    adv_direction = HorizontalDirection(),
+    dif_direction = VerticalDirection()
 )
-    Δx = min_node_distance(grid, HorizontalDirection())
+    Δx_adv = min_node_distance(grid, adv_direction)
+    Δx_dif = min_node_distance(grid, dif_direction)
     Δts = []
     if wavespeed != nothing
-        push!(Δts, Δx / wavespeed)
+        push!(Δts, Δx_adv / wavespeed)
     end
     if diffusivity != nothing
-        push!(Δts, Δx^2 / diffusivity)
+        push!(Δts, Δx_dif^2 / diffusivity)
     end
     if viscocity != nothing
-        push!(Δts, Δx^2 / viscocity)
+        push!(Δts, Δx_dif^2 / viscocity)
     end
     if Δts == []
         @error("Please provide characteristic speed or diffusivities")

@@ -360,18 +360,32 @@ struct PenaltyNumFluxDiffusive <: NumericalFluxSecondOrder end
 """
 struct PenaltyNumFluxDiffusive <: NumericalFluxSecondOrder end
 
-
 # ## 1. ExteriorBoundary
-
 """
 struct ExteriorBoundary <: AbstractCouplerBoundary end
   Zero normal gradient boundary condition.
 """
 struct ExteriorBoundary <: AbstractCouplerBoundary end
 
+# ## 2. CoupledPrimaryBoundary
+"""
+struct CoupledPrimaryBoundary <: AbstractCouplerBoundary end
+# # compute flux based on opposite face
+# # also need to accumulate net flux across boundary
+"""
+struct CoupledPrimaryBoundary <: AbstractCouplerBoundary end
+
+## 3. CoupledSecondaryBoundary
+"""
+struct CoupledSecondaryBoundary <: AbstractCouplerBoundary end
+# # use prescribed flux computed in primary
+"""
+struct CoupledSecondaryBoundary  <: AbstractCouplerBoundary end
+
+# first order BC (Neumann)
 function boundary_state!(
-    nF::Union{CentralNumericalFluxGradient},
-    bc::ExteriorBoundary,
+    nF, ##Union{CentralNumericalFluxGradient},
+    bc::Union{ExteriorBoundary,CoupledPrimaryBoundary,CoupledSecondaryBoundary},
     bl::l_type,
     Q⁺::Vars,
     A⁺::Vars,
@@ -381,11 +395,34 @@ function boundary_state!(
     t,
     _...,
 )
-    Q⁺.θ = Q⁻.θ
     nothing
 end
+
+# 2nd order BCs (Neumann) - not called if using customized numerical_boundary_flux_second_order! below
+# function boundary_state!(
+#     nf,
+#     bc::Union{ExteriorBoundary,CoupledPrimaryBoundary,CoupledSecondaryBoundary},
+#     m::l_type,
+#     state⁺::Vars,
+#     diff⁺::Vars,
+#     hyperdiff⁺::Vars,
+#     aux⁺::Vars,
+#     n⁻,
+#     state⁻::Vars,
+#     diff⁻::Vars,
+#     hyperdiff⁻::Vars,
+#     aux⁻::Vars,
+#     t,
+#     _...,
+# )
+#     # Apply Neumann BCs
+#     FT = eltype(state⁺)
+#     diff⁺.κ∇θ = n⁻ * FT(0.0)
+# end
+
+# customized flux for ExteriorBoundary
 function numerical_boundary_flux_second_order!(
-    numerical_flux::Union{NumericalFluxSecondOrder},
+    numerical_flux::Union{PenaltyNumFluxDiffusive},
     bctype::ExteriorBoundary,
     balance_law::l_type,
     fluxᵀn::Vars{S},
@@ -403,40 +440,14 @@ function numerical_boundary_flux_second_order!(
     diff1⁻::Vars{D},
     aux1⁻::Vars{A},
 ) where {S, D, A, HD}
-    
-    fluxᵀn.θ = 0
+
+    fluxᵀn.θ = 0.0
+
 end
 
-
-# ## 2. CoupledPrimaryBoundary
-
-"""
-struct CoupledPrimaryBoundary <: AbstractCouplerBoundary end
-# # compute flux based on opposite face
-# # also need to accumulate net flux across boundary
-"""
-struct CoupledPrimaryBoundary <: AbstractCouplerBoundary end
-
-function boundary_state!(
-    nF::Union{CentralNumericalFluxGradient},
-    bc::CoupledPrimaryBoundary,
-    bl::l_type,
-    Q⁺::Vars,
-    A⁺::Vars,
-    n,
-    Q⁻::Vars,
-    A⁻::Vars,
-    t,
-    _...,
-)
-    
-    Q⁺.θ = Q⁻.θ # Q⁺.θ=A⁺.θ_secondary
-    
-    nothing
-end
-
+# customized flux for CoupledPrimaryBoundary
 function numerical_boundary_flux_second_order!(
-    numerical_flux::Union{NumericalFluxSecondOrder},
+    numerical_flux::Union{PenaltyNumFluxDiffusive},
     bctype::CoupledPrimaryBoundary,
     balance_law::l_type,
     fluxᵀn::Vars{S},
@@ -461,40 +472,9 @@ function numerical_boundary_flux_second_order!(
 
 end
 
-
-
-
-#  - clean up and write primer
-#  - imports and exports
-#  - add boundary auxiliary interface
-#  - add boundary flux accumulation interface
-#  - vector quantity
-#  - run on sphere to check normal terms are all correct
-#  - single stack integration
-#  - Held-Suarez with wind stress and heat
-
-## 3. CoupledSecondaryBoundary
-# use prescribed flux computed in primary
-struct CoupledSecondaryBoundary  <: AbstractCouplerBoundary end
-function boundary_state!(
-    nF::Union{CentralNumericalFluxGradient},
-    bc::CoupledSecondaryBoundary,
-    bl::l_type,
-    Q⁺::Vars,
-    A⁺::Vars,
-    n,
-    Q⁻::Vars,
-    A⁻::Vars,
-    t,
-    _...,
-)
-
-    Q⁺.θ = Q⁻.θ
-
-    nothing
-end
+# customized flux for CoupledSecondaryBoundary
 function numerical_boundary_flux_second_order!(
-    numerical_flux::Union{NumericalFluxSecondOrder},
+    numerical_flux::Union{PenaltyNumFluxDiffusive},
     bctype::CoupledSecondaryBoundary,
     balance_law::l_type,
     fluxᵀn::Vars{S},
@@ -589,22 +569,7 @@ function flux_first_order!(
     #F.θ += (SDiagonal(1, 1, 1) - k̂ * k̂')*Q.u * Q.θ  
     nothing
 end
-function boundary_state!(
-    nf::Union{NumericalFluxFirstOrder},
-    bc::Union{CoupledPrimaryBoundary,CoupledSecondaryBoundary,ExteriorBoundary},
-    atmos::l_type,
-    Q⁺::Vars,
-    A⁺::Vars,
-    n,
-    Q⁻::Vars,
-    A⁻::Vars,
-    t,
-    state_int⁻,
-    aux_int⁻,
-)
-    Q⁺.θ = Q⁻.θ
-    nothing
-end
+
 
 function boundary_conditions(bl::l_type, _...)
     bl.boundaryconditions

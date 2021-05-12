@@ -49,7 +49,7 @@ include("CplMainBL.jl")
 FT = Float64
 nstepsA = 1 # steps per coupling cycle (atmos)
 nstepsO = 1 # steps per coupling cycle (ocean)
-totalsteps = 1000 # total simulation coupled cycle steps
+totalsteps = 10000 # total simulation coupled cycle steps
 
 #  Background atmos and ocean horizontal and vertical diffusivities
 const κᵃʰ, κᵃᶻ = ( FT(0.0) , FT(1e-1) )
@@ -259,5 +259,8 @@ fluxT = fluxA .+ fluxO
 time = collect(1:1:totalsteps)
 rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1]) ]
 plot(time .* simulation.coupled_odesolver.dt,rel_error)
+ylabel!("(θ - θ_init) / θ_init")
+xlabel!("sim seconds")
 
-plot(time .* simulation.coupled_odesolver.dt,[fluxA .- fluxA[1],fluxO .- fluxO[1],fluxT .- fluxT[1]])
+plot(time .* simulation.coupled_odesolver.dt,[fluxA .- fluxA[1],fluxO .- fluxO[1],fluxT .- fluxT[1]], label = ["θ_atm" "θ_ocn" "θ_tot"])
+xlabel!("sim seconds")

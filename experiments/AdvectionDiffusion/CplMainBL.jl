@@ -382,9 +382,9 @@ struct CoupledSecondaryBoundary <: AbstractCouplerBoundary end
 """
 struct CoupledSecondaryBoundary  <: AbstractCouplerBoundary end
 
-# first order BC (Neumann)
+# first order BC (Neumann, Insulating = no bdry flux)
 function boundary_state!(
-    nF, ##Union{CentralNumericalFluxGradient},
+    nF::Union{NumericalFluxFirstOrder,NumericalFluxGradient},
     bc::Union{ExteriorBoundary,CoupledPrimaryBoundary,CoupledSecondaryBoundary},
     bl::l_type,
     Q⁺::Vars,
@@ -395,10 +395,11 @@ function boundary_state!(
     t,
     _...,
 )
-    nothing
+    Q⁺.θ = Q⁻.θ
+    return nothing
 end
 
-# 2nd order BCs (Neumann) - not called if using customized numerical_boundary_flux_second_order! below
+# 2nd order BCs (Neumann, Insulating = no bdry flux) - not called if using customized numerical_boundary_flux_second_order! below
 # function boundary_state!(
 #     nf,
 #     bc::Union{ExteriorBoundary,CoupledPrimaryBoundary,CoupledSecondaryBoundary},
@@ -640,6 +641,7 @@ function preatmos(csolver)
 
     @info(
         "preatmos",
+        endtime = simulation.simtime[2],
         time = csolver.t,
         total_θ_atmos = weightedsum(mA.state, 1),
         total_θ_ocean = weightedsum(mO.state, 1),

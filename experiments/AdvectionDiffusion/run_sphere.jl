@@ -49,7 +49,7 @@ include("CplMainBL.jl")
 FT = Float64
 nstepsA = 1 # steps per coupling cycle (atmos)
 nstepsO = 1 # steps per coupling cycle (ocean)
-totalsteps = 1000 # total simulation coupled cycle steps
+totalsteps = 2000 # total simulation coupled cycle steps
 
 # Background atmos and ocean horizontal and vertical diffusivities
 const κᵃʰ, κᵃᶻ = ( FT(0.0) , FT(1e-1) )
@@ -93,17 +93,18 @@ function main(::Type{FT}) where {FT}
     numerics = (NFfirstorder = CentralNumericalFluxFirstOrder(), NFsecondorder = PenaltyNumFluxDiffusive(), overint_params = (overintegrationorder, polynomialorder) ) #, NFsecondorder = CentralNumericalFluxSecondOrder() )#PenaltyNumFluxDiffusive() )#, overint_params = (overintegrationorder, polynomialorder) ) 
 
     # Timestepping
-    Δt_ = calculate_dt(gridA, wavespeed = u_max*(ΩA.radius), diffusivity = maximum([[κᵃʰ, κᵃᶻ, κᵒʰ, κᵒᶻ]]) ) 
+    Δt_ = calculate_dt(gridA, wavespeed = u_max*(ΩA.radius), diffusivity = maximum([κᵃʰ, κᵃᶻ, κᵒʰ, κᵒᶻ]), dif_direction = VerticalDirection() ) #
     
     t_time, end_time = ( 0  , totalsteps * Δt_ )
 
     # Collect spatial info, timestepping, balance law and DGmodel for the two components
-    boundary_mask( xc, yc, zc ) = @. ( xc^2 + yc^2 + zc^2 )^0.5 ≈ planet_radius(param_set)
+    epss = sqrt(eps(FT))
+    boundary_mask( param_set, xc, yc, zc ) = @. abs(( xc^2 + yc^2 + zc^2 )^0.5 - planet_radius(param_set)) < epss
     
     # 1. Atmos component
     
     ## Prop atmos functions to override defaults
-    atmos_structure(λ, ϕ, r) = FT(30) + FT(10.0) * z / 4e3 + 10.0 * cos(ϕ) * sin(5λ)
+    atmos_structure(λ, ϕ, r) = FT(30) + FT(10.0) * r / ΩA.radius + 10.0 * cos(ϕ) * sin(5λ)
     atmos_θⁱⁿⁱᵗ(npt, el, x, y, z) = atmos_structure( lon(x,y,z), lat(x,y,z), rad(x,y,z) )                # Set atmosphere initial state function
     atmos_calc_diff_flux(∇θ, npt, el, x, y, z) = - (
                 κᵃʰ * ∇θ'* λ̂_quick(x,y,z) * λ̂_quick(x,y,z) +  # zonal
@@ -119,10 +120,11 @@ function main(::Type{FT}) where {FT}
     atmos_uⁱⁿⁱᵗ_(npt, el, x, y, z) = (     0 * r̂(x,y,z) 
                                         + 0 * ϕ̂(x,y,z)
                                         + uˡᵒⁿ(lon(x,y,z), lat(x,y,z), rad(x,y,z)) * λ̂(x,y,z) ) 
-
-    epss = sqrt(eps(FT))
+    # atmos_uⁱⁿⁱᵗ_(npt, el, x, y, z) = (    0 * r̂(x,y,z) 
+    #                                     + 0 * ϕ̂(x,y,z)
+    #                                     + 0* λ̂(x,y,z) ) 
+    
     atmos_uⁱⁿⁱᵗ(npt, el, x, y, z) = (rad(x,y,z)  < ΩA.radius + epss) || (rad(x,y,z) > ΩA.radius + ΩA.height - epss) ? SVector(FT(0.0), FT(0.0), FT(0.0)) : atmos_uⁱⁿⁱᵗ_(npt, el, x, y, z) # constant (in rads) u, but 0 at boundaries
-    #atmos_uⁱⁿⁱᵗ(npt, el, x, y, z) = atmos_uⁱⁿⁱᵗ_(npt, el, x, y, z) # constant (in rads) u, but 0 at boundaries
 
     ## Collect atmos props
     bl_propA = prop_defaults()
@@ -212,12 +214,12 @@ function main(::Type{FT}) where {FT}
     # For now applying callbacks only to atmos.
     callbacks = (
         #ExponentialFiltering(),
-        VTKOutput((
-            iteration = string(100Δt_)*"ssecs" ,
-            overdir ="output",
-            overwrite = true,
-            number_sample_points = 0
-            )...,),   
+        # VTKOutput((
+        #     iteration = string(100Δt_)*"ssecs" ,
+        #     overdir ="output",
+        #     overwrite = true,
+        #     number_sample_points = 0
+        #     )...,),   
     )
 
     simulation = (;
@@ -233,6 +235,15 @@ function main(::Type{FT}) where {FT}
     return simulation
 end
 
+"""
+function run(cpl_solver, numberofsteps, cbvector)
+    runs the simulation
+
+    cpl_solver: CplSolver
+    numberofsteps: number of coupling cycles
+    cbvector: vector of callbacks
+
+"""
 function run(cpl_solver, numberofsteps, cbvector)
     # Run the model
     solve!(
@@ -249,13 +260,13 @@ cbvector = create_callbacks(simulation, simulation.odesolver)
 println("Initialized. Running...")
 @time run(simulation.coupled_odesolver, nsteps, cbvector)
 
-# 
+# Check conservation
+using Plots
 fluxA = simulation.coupled_odesolver.fluxlog.A
 fluxO = simulation.coupled_odesolver.fluxlog.O
 fluxT = fluxA .+ fluxO
-#plot(collect(1:1:totalsteps),[fluxA .- fluxA[1], fluxO .- fluxO[1], fluxT .- fluxT[1] ])
+time = collect(1:1:totalsteps)
+rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1]) ]
+plot(time .* simulation.coupled_odesolver.dt,rel_error)
 
-using Plots
-time = collect(1:1:totalsteps)[1:10:end]
-rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1])[1:10:end] ]
-plot(time,rel_error)
+#plot(time .* simulation.coupled_odesolver.dt,[fluxA .- fluxA[1],fluxO .- fluxO[1],fluxT .- fluxT[1]])

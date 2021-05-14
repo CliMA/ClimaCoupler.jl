@@ -49,7 +49,7 @@ include("CplMainBL.jl")
 FT = Float64
 nstepsA = 1 # steps per coupling cycle (atmos)
 nstepsO = 1 # steps per coupling cycle (ocean)
-totalsteps = 500 # total simulation coupled cycle steps
+totalsteps = 400 # total simulation coupled cycle steps
 
 # Background atmos and ocean horizontal and vertical diffusivities
 const κᵃʰ, κᵃᶻ = ( FT(0.0) , FT(1e-1) )
@@ -94,7 +94,7 @@ function main(::Type{FT}) where {FT}
     numerics = (NFfirstorder = CentralNumericalFluxFirstOrder(), NFsecondorder = PenaltyNumFluxDiffusive(), overint_params = (overintegrationorder, polynomialorder) ) #, NFsecondorder = CentralNumericalFluxSecondOrder() )#PenaltyNumFluxDiffusive() )#, overint_params = (overintegrationorder, polynomialorder) ) 
 
     # Timestepping
-    Δt_ = calculate_dt(gridA, wavespeed = u_max*(ΩA.radius), diffusivity = maximum([κᵃʰ, κᵃᶻ, κᵒʰ, κᵒᶻ]), dif_direction = VerticalDirection() ) #
+    Δt_ = calculate_dt(gridA, wavespeed = u_max*(ΩA.radius), diffusivity = maximum([κᵃʰ, κᵃᶻ, κᵒʰ, κᵒᶻ]), dif_direction = VerticalDirection() ) # 
     
     t_time, end_time = ( 0  , totalsteps * Δt_ )
 
@@ -122,10 +122,15 @@ function main(::Type{FT}) where {FT}
 
     ## Set atmos advective velocity (constant in time) and convert to Cartesian
     uˡᵒⁿ(λ, ϕ, r) = u_max * r * cos(ϕ)
-    atmos_uⁱⁿⁱᵗ_(npt, el, x, y, z) = (    0 * r̂(x,y,z) 
-                                        + 0 * ϕ̂(x,y,z)
+
+    atmos_uⁱⁿⁱᵗ_(npt, el, x, y, z) = (    FT(0) * r̂(x,y,z) 
+                                        + FT(0) * ϕ̂(x,y,z)
                                         + uˡᵒⁿ(lon(x,y,z), lat(x,y,z), rad(x,y,z)) * λ̂(x,y,z) ) 
     
+    # atmos_uⁱⁿⁱᵗ_(npt, el, x, y, z) = (    FT(0) * r̂(x,y,z) 
+    #                                     + FT(0) * ϕ̂(x,y,z)
+    #                                     + FT(0) * λ̂(x,y,z) ) 
+
     atmos_uⁱⁿⁱᵗ(npt, el, x, y, z) = (rad(x,y,z)  < ΩA.radius + epss) || (rad(x,y,z) > ΩA.radius + ΩA.height - epss) ? SVector(FT(0.0), FT(0.0), FT(0.0)) : atmos_uⁱⁿⁱᵗ_(npt, el, x, y, z) # constant (in rads) u, but 0 at boundaries
 
     ## Collect atmos props
@@ -225,12 +230,12 @@ function main(::Type{FT}) where {FT}
     # For now applying callbacks only to atmos.
     callbacks = (
         #ExponentialFiltering(),
-        VTKOutput((
-            iteration = string(200Δt_)*"ssecs" ,
-            overdir ="output",
-            overwrite = true,
-            number_sample_points = 0
-            )...,),   
+        # VTKOutput((
+        #     iteration = string(200Δt_)*"ssecs" ,
+        #     overdir ="output",
+        #     overwrite = true,
+        #     number_sample_points = 0
+        #     )...,),   
     )
 
     simulation = (;
@@ -280,4 +285,4 @@ time = collect(1:1:totalsteps)
 rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1]) ]
 plot(time .* simulation.coupled_odesolver.dt,rel_error)
 
-#plot(time .* simulation.coupled_odesolver.dt,[fluxA .- fluxA[1],fluxO .- fluxO[1],fluxT .- fluxT[1]])
+plot(time .* simulation.coupled_odesolver.dt,[fluxA .- fluxA[1],fluxO .- fluxO[1],fluxT .- fluxT[1]])

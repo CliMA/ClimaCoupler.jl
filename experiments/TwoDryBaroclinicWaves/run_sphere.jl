@@ -23,14 +23,14 @@ domainB = SphericalShell(
 )
 
 gridA = DiscretizedDomain(
-    domain;
+    domainA;
     elements = (vertical = 5, horizontal = 6),
     polynomial_order = (vertical = 3, horizontal = 6),
     overintegration_order = (vertical = 0, horizontal = 0),
 )
 
 gridB = DiscretizedDomain(
-    domain;
+    domainB;
     elements = (vertical = 5, horizontal = 6),
     polynomial_order = (vertical = 3, horizontal = 6),
     overintegration_order = (vertical = 0, horizontal = 0),
@@ -76,23 +76,6 @@ linear_physics = Physics(
 # Set up model
 ########
 
-mA = CplModel(;
-grid = gridA,
-equations = CplMainBL(
-    bl_propA,
-    (CoupledPrimaryBoundary(), ExteriorBoundary()),
-    param_set,
-    SphericalOrientation(),
-),
-boundary_z = boundary_mask,
-nsteps = nstepsA,
-dt = Δt_/ nstepsA,
-timestepper = LSRK54CarpenterKennedy,
-numerics...,
-)
-
-
-
 model = DryAtmosModel(
     physics = physics,
     boundary_conditions = (5, 6),
@@ -125,7 +108,7 @@ cfl = 3
 Δt = cfl * dx / 330.0
 start_time = 0
 end_time = 30 * 24 * 3600
-method = 
+method = ARK2GiraldoKellyConstantinescu
 callbacks = (
   Info(),
   CFL(),
@@ -137,18 +120,48 @@ callbacks = (
 ########
 # Set up simulation
 ########
-simulation = Simulation(
+CplSimulation(model::Tuple;
+    grid,
+    timestepper,
+    time,
+    boundary_z = nothing,
+    nsteps,
+    callbacks)
+simA = CplSimulation(
     (model, linear_model,);
-    grid = grid,
+    grid = gridA,
+    timestepper = (method = method, timestep = Δt),
+    time        = (start = start_time, finish = end_time),
+    callbacks   = callbacks,
+)
+simB = CplSimulation(
+    (model, linear_model,);
+    grid = gridB,
     timestepper = (method = method, timestep = Δt),
     time        = (start = start_time, finish = end_time),
     callbacks   = callbacks,
 )
 
+## Create a Coupler State object for holding imort/export fields.
+coupler = CplState()
+register_cpl_field!(coupler, :EnergyFluxA, deepcopy(simA.state.ρe_accum[simA.boundary]), simA.grid, DateTime(0), u"J") # upward flux
+register_cpl_field!(coupler, :EnergyFluxB, deepcopy(simB.state.ρe_accum[simB.boundary]), simB.grid, DateTime(0), u"J") # downward flux
+
+compA = (pre_step = preA, component_model = simA, post_step = postA)
+compB = (pre_step = preB, component_model = simB, post_step = postB)
+component_list = (domainA = compA, domainB = compB)
+
+
+cpl_solver = CplSolver(
+    component_list = component_list,
+    coupler = coupler,
+    coupling_dt = couple_dt,
+    t0 = 0.0,
+)
+
 ########
 # Run the simulation
 ########
-initialize!(simulation)
 evolve!(simulation)
 
 nothing

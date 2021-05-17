@@ -70,6 +70,76 @@ function Simulation(model::Tuple; grid, timestepper, time, callbacks)
     return Simulation(model, grid, timestepper, time, callbacks, rhs, state)
 end
 
+struct CplSimulation{𝒯,𝒰,𝒱,𝒲,𝒳,𝒴,L,B, CBV} <: AbstractSimulation
+    model::𝒯
+    grid::L
+    odesolver::𝒰
+    time::𝒱
+    callbacks::𝒲
+    rhs::𝒳
+    state::𝒴
+    nsteps::Int
+    boundary::B
+    cbvector::CBV
+end
+
+function CplSimulation(model::Tuple; grid, timestepper, time, boundary_z = nothing, nsteps, callbacks)
+    rhs = []
+    for item in model
+        if typeof(item) <: DryAtmosModel
+            tmp = ESDGModel(
+                item,
+                grid.numerical,
+                surface_numerical_flux_first_order = item.numerics.flux,
+                volume_numerical_flux_first_order = KGVolumeFlux(),
+            )
+            push!(rhs, tmp)
+        elseif typeof(item) <: DryAtmosLinearModel
+            tmp = DGModel(
+                item,
+                grid.numerical,
+                item.numerics.flux,
+                CentralNumericalFluxSecondOrder(),
+                CentralNumericalFluxGradient();
+                direction = item.numerics.direction,
+            )
+            push!(rhs, tmp)
+        end
+    end
+    rhs = Tuple(rhs)
+
+    xc = grid.vgeo[:, _x1:_x1, :]
+    yc = grid.vgeo[:, _x2:_x2, :]
+    zc = grid.vgeo[:, _x3:_x3, :]
+
+    boundary(boundary_z, xc, yc, zc) = isnothing(boundary_z) ? zc .^2 .< eps(FT) : boundary_z( equations.param_set, xc, yc, zc )
+    boundary = boundary(boundary_z, xc, yc, zc)
+
+    FT = eltype(rhs[1].grid.vgeo)
+    state = init_ode_state(rhs[1], FT(0); init_on_cpu = true)
+
+    simulation = Simulation(model[1], grid, timestepper, time, callbacks, rhs, state)
+    t0            = simulation.time.start
+    tend          = simulation.time.finish
+    Δt            = timestepper.timestep
+
+    # Instantiate time stepping method    
+    odesolver = timestepper.method(
+        rhs[1],
+        rhs[2],
+        LinearBackwardEulerSolver(ManyColumnLU(); isadjustable = false),
+        state;
+        dt = Δt,
+        t0 = t0,
+        split_explicit_implicit = false,
+    )
+
+    # Make callbacks from callbacks tuple
+    cbvector = create_callbacks(simulation, odesolver)
+
+    return CplSimulation(model, grid, odesolver, time, callbacks, rhs, state, nsteps, boundary, cbvector)
+end
+
 function initialize!(simulation::Simulation; overwrite = false)
     if overwrite
         simulation = Simulation(
@@ -139,6 +209,32 @@ function evolve!(simulation::Simulation; refDat = ())
         @test ClimateMachine.StateCheck.scdocheck(cbvector[check_inds[1]], refDat)
       end
     end
+
+    return nothing
+end
+
+function evolve!(cpl_solver, numberofsteps; refDat = ())
+
+    # Perform evolution of simulations
+    solve!(
+        nothing,
+        cpl_solver;
+        numberofsteps = numberofsteps,
+        callbacks = cbvector,
+    )
+
+
+    # Check results against reference if StateCheck callback is used
+    # TODO: TB: I don't think this should live within this function
+    # if any(typeof.(simulation.callbacks) .<: StateCheck)
+    #   check_inds = findall(typeof.(simulation.callbacks) .<: StateCheck)
+    #   @assert length(check_inds) == 1 "Only use one StateCheck in callbacks!"
+
+    #   ClimateMachine.StateCheck.scprintref(cbvector[check_inds[1]])
+    #   if length(refDat) > 0
+    #     @test ClimateMachine.StateCheck.scdocheck(cbvector[check_inds[1]], refDat)
+    #   end
+    # end
 
     return nothing
 end

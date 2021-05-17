@@ -253,3 +253,109 @@ function altitude(::Union{DryAtmosModel,DryAtmosLinearModel}, ::FlatOrientation,
     @inbounds geom.coord[3]
 end
 
+# Helper functions to communicate between components before and after timestepping
+
+"""
+function preB(csolver)
+    - saves and regrids the EnergyFluxA field (mA.state.ρe[mA.boundary]) to mB.state.ρe_accum[mB.boundary] on the atmos grid
+    csolver::CplSolver
+"""
+function preB(csolver)
+    mA = csolver.component_list.domainA.component_model
+    mB = csolver.component_list.domainB.component_model
+    # Set boundary SST used in atmos to SST of ocean surface at start of coupling cycle.
+    mB.discretization.state_auxiliary.ρe_secondary[mB.boundary] .= 
+        CouplerMachine.get(csolver.coupler, :EnergyA, mB.grid, DateTime(0), u"J")
+    # Set atmos boundary flux accumulator to 0.
+    mB.state.ρe_accum .= 0
+
+    @info(
+        "preatmos",
+        endtime = simulation.simtime[2],
+        time = csolver.t,
+        total_θ_atmos = weightedsum(mA.state, 1),
+        total_θ_ocean = weightedsum(mA.state, 1),
+        total_θ = weightedsum(mA.state, 1) + weightedsum(mA.state, 1),
+        atmos_θ_surface_max = maximum(mA.state.ρe[mA.boundary]),
+        ocean_θ_surface_max = maximum(mA.state.ρe[mA.boundary]),
+    )
+
+    # isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.A[csolver.steps] = weightedsum(mA.state, 1)
+    # isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.B[csolver.steps] = weightedsum(mB.state, 1)
+end
+
+"""
+function preatmos(csolver)
+    - updates Atmos_MeanAirSeaθFlux with mA.state.F_accum[mA.boundary], and the coupler time
+    csolver::CplSolver
+"""
+function postB(csolver)
+    mA = csolver.component_list.domainA.component_model
+    mB = csolver.component_list.domainB.component_model
+    # Pass atmos exports to "coupler" namespace
+    # 1. Save mean θ flux at the Atmos boundary during the coupling period
+    CouplerMachine.put!(csolver.coupler, :EnergyFluxB, mB.state.ρe_accum[mB.boundary] ./ csolver.dt,
+        mB.grid, DateTime(0), u"J")
+
+    # @info(
+    #     "postatmos",
+    #     time = time = csolver.t + csolver.dt,
+    #     total_θ_atmos = weightedsum(mB.state, 1),
+    #     total_θ_ocean = weightedsum(mA.state, 1),
+    #     total_F_accum = mean(mB.state.F_accum[mB.boundary]) * 1e6 * 1e6,
+    #     total_θ =
+    #         weightedsum(mB.state, 1) +
+    #         weightedsum(mA.state, 1) +
+    #         mean(mB.state.ρe_accum[mB.boundary]) * 1e6 * 1e6,
+    #     F_accum_max = maximum(mB.state.F_accum[mB.boundary]),
+    #     F_avg_max = maximum(mB.state.F_accum[mB.boundary] ./ csolver.dt),
+    #     atmos_θ_surface_max = maximum(mB.state.θ[mB.boundary]),
+    #     ocean_θ_surface_max = maximum(mA.state.θ[mA.boundary]),
+    # )
+end
+
+"""
+function preocean(csolver)
+    - saves and regrids the EnergyFluxB field (mB.state.ρe_accum[mB.boundary]) to ρe_accum[mA.boundary] on the lower-domain grid
+    csolver::CplSolver
+"""
+function preA(csolver)
+    mA = csolver.component_list.domainA.component_model
+    mB = csolver.component_list.domainB.component_model
+    # Set mean air-sea theta flux
+    mA.discretization.state_auxiliary.ρe_accum[mA.boundary] .= 
+        CouplerMachine.get(csolver.coupler, :EnergyFluxB, mA.grid, DateTime(0), u"J")
+    # Set ocean boundary flux accumulator to 0. (this isn't used)
+    mA.state.ρe_accum .= 0
+
+    # @info(
+    #     "preocean",
+    #     time = csolver.t,
+    #     F_prescribed_max =
+    #         maximum(mA.discretization.state_auxiliary.F_prescribed[mA.boundary]),
+    #     F_prescribed_min =
+    #         maximum(mA.discretization.state_auxiliary.F_prescribed[mA.boundary]),
+    #     ocean_θ_surface_max = maximum(mA.state.θ[mA.boundary]),
+    #     ocean_θ_surface_min = maximum(mA.state.θ[mA.boundary]),
+    # )
+end
+
+"""
+function postocean(csolver)
+    - updates Ocean_SST with mA.state.θ[mA.boundary], and the coupler time
+    csolver::CplSolver
+"""
+function postA(csolver)
+    mA = csolver.component_list.domainA.component_model
+    mB = csolver.component_list.domainB.component_model
+    # @info(
+    #     "postocean",
+    #     time = csolver.t + csolver.dt,
+    #     ocean_θ_surface_max = maximum(mA.state.θ[mA.boundary]),
+    #     ocean_θ_surface_min = maximum(mA.state.θ[mA.boundary]),
+    # )
+
+    # Pass ocean exports to "coupler" namespace
+    #  1. Ocean SST (value of θ at z=0)
+    CouplerMachine.put!(csolver.coupler, :EnergyFluxA, mA.state.ρe[mA.boundary], mA.grid, DateTime(0), u"J")
+end

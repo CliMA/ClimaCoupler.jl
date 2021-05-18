@@ -8,6 +8,7 @@ using Printf
 using StaticArrays
 using Test
 
+#add https://github.com/CliMA/ClimateMachine.jl#tb/refactoring_ans_sphere
 using ClimateMachine
 using ClimateMachine.Atmos: NoReferenceState
 using ClimateMachine.MPIStateArrays
@@ -38,6 +39,7 @@ struct EarthParameterSet <: AbstractEarthParameterSet end
 const param_set = EarthParameterSet()
 
 import CLIMAParameters
+import CLIMAParameters.Planet.T_0
 CLIMAParameters.Planet.T_0(::EarthParameterSet) = 0.0
 
 const total_energy = true

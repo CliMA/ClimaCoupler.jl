@@ -67,6 +67,8 @@ end
 const τ_airsea,  L_airsea = ( FT(60 * 86400), FT(500) ) #( FT(1), FT(0) )#( FT(60 * 86400), FT(500) ) 
 coupling_lambda() = (L_airsea / τ_airsea)
 
+
+
 # Max. advective velocity in radians
 const u_max = FT(1e-5) 
 

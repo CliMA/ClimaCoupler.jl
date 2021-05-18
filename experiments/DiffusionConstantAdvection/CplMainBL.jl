@@ -277,7 +277,7 @@ function source!(bl::l_type, S::Vars, Q::Vars, G::Vars, A::Vars, _...)
     # Record boundary condition fluxes as needed by adding to shadow
     # prognostic variable
 
-    S.F_accum = (Q.θ - A.θ_secondary) * bl.bl_prop.coupling_lambda()
+    S.F_accum = (Q.θ - A.θ_secondary) * bl.bl_prop.coupling_lambda()     
     nothing
 end
 
@@ -469,7 +469,7 @@ function numerical_boundary_flux_second_order!(
 
     fluxᵀn.θ =
         (state_prognostic⁻.θ - state_auxiliary⁺.θ_secondary) *
-        balance_law.bl_prop.coupling_lambda() # W/m^2
+        balance_law.bl_prop.coupling_lambda() # W/m^2   # T / s
 
 end
 
@@ -494,7 +494,7 @@ function numerical_boundary_flux_second_order!(
     aux1⁻::Vars{A},
 ) where {S, D, A, HD}
 
-    fluxᵀn.θ = -state_auxiliary⁺.F_prescribed
+    fluxᵀn.θ = -state_auxiliary⁺.F_prescribed # T m /s^2 
 
 end
 
@@ -635,7 +635,7 @@ function preatmos(csolver)
     mO = csolver.component_list.ocean.component_model
     # Set boundary SST used in atmos to SST of ocean surface at start of coupling cycle.
     mA.discretization.state_auxiliary.θ_secondary[mA.boundary] .= 
-        CouplerMachine.get(csolver.coupler, :Ocean_SST, mA.grid, DateTime(0), u"°C")
+        CouplerMachine.coupler_get(csolver.coupler, :Ocean_SST, mA.grid, DateTime(0), u"°C")
     # Set atmos boundary flux accumulator to 0.
     mA.state.F_accum .= 0
 
@@ -664,7 +664,7 @@ function postatmos(csolver)
     mO = csolver.component_list.ocean.component_model
     # Pass atmos exports to "coupler" namespace
     # 1. Save mean θ flux at the Atmos boundary during the coupling period
-    CouplerMachine.put!(csolver.coupler, :Atmos_MeanAirSeaθFlux, mA.state.F_accum[mA.boundary] ./ csolver.dt,
+    CouplerMachine.coupler_put!(csolver.coupler, :Atmos_MeanAirSeaθFlux, mA.state.F_accum[mA.boundary] ./ csolver.dt,
         mA.grid, DateTime(0), u"°C")
 
     @info(
@@ -694,7 +694,7 @@ function preocean(csolver)
     mO = csolver.component_list.ocean.component_model
     # Set mean air-sea theta flux
     mO.discretization.state_auxiliary.F_prescribed[mO.boundary] .= 
-        CouplerMachine.get(csolver.coupler, :Atmos_MeanAirSeaθFlux, mO.grid, DateTime(0), u"°C")
+        CouplerMachine.coupler_get(csolver.coupler, :Atmos_MeanAirSeaθFlux, mO.grid, DateTime(0), u"°C")
     # Set ocean boundary flux accumulator to 0. (this isn't used)
     mO.state.F_accum .= 0
 
@@ -727,7 +727,7 @@ function postocean(csolver)
 
     # Pass ocean exports to "coupler" namespace
     #  1. Ocean SST (value of θ at z=0)
-    CouplerMachine.put!(csolver.coupler, :Ocean_SST, mO.state.θ[mO.boundary], mO.grid, DateTime(0), u"°C")
+    CouplerMachine.coupler_put!(csolver.coupler, :Ocean_SST, mO.state.θ[mO.boundary], mO.grid, DateTime(0), u"°C")
 end
 
 

@@ -18,7 +18,8 @@ parameters = (
     ϕ_c  = 2 * π / 9,
     V_p  = 1.0,
     κ    = 2/7,                 # R_d / c_p where c_p = specific heat capacity
-)
+    λ_coupler = ( 500 / 60 / 86400 ) #(L_airsea / τ_airsea)
+    )
 
 
 ########

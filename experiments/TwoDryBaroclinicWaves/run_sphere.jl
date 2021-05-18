@@ -1,5 +1,6 @@
 #!/usr/bin/env julia --project
-include("../interface/utilities/boilerplate.jl")
+include("utilities/boilerplate.jl")
+using CouplerMachine
 
 ########
 # Set up parameters and initial conditions
@@ -103,7 +104,7 @@ linear_model = DryAtmosLinearModel(
 # determine the time step construction
 # element_size = (domain_height / numelem_vert)
 # acoustic_speed = soundspeed_air(param_set, FT(330))
-dx = min_node_distance(grid.numerical)
+dx = minimum( [min_node_distance(gridA.numerical) , min_node_distance(gridB.numerical) ])
 cfl = 3
 Δt = cfl * dx / 330.0
 start_time = 0
@@ -120,32 +121,35 @@ callbacks = (
 ########
 # Set up simulation
 ########
-CplSimulation(model::Tuple;
-    grid,
-    timestepper,
-    time,
-    boundary_z = nothing,
-    nsteps,
-    callbacks)
+nstepsA = 1
+nstepsB = 1
+
+epss = sqrt(eps(FT))
+boundary_mask( param_set, xc, yc, zc ) = @. abs(( xc^2 + yc^2 + zc^2 )^0.5 - planet_radius(param_set) - FT(30e3)) < epss
+    
 simA = CplSimulation(
     (model, linear_model,);
     grid = gridA,
-    timestepper = (method = method, timestep = Δt),
+    timestepper = (method = method, timestep = Δt / nstepsA),
     time        = (start = start_time, finish = end_time),
+    nsteps      = nstepsA,
+    boundary_z = boundary_mask,
     callbacks   = callbacks,
 )
 simB = CplSimulation(
     (model, linear_model,);
     grid = gridB,
-    timestepper = (method = method, timestep = Δt),
+    timestepper = (method = method, timestep = Δt / nstepsB),
     time        = (start = start_time, finish = end_time),
+    nsteps      = nstepsB,
+    boundary_z = boundary_mask,
     callbacks   = callbacks,
 )
 
 ## Create a Coupler State object for holding imort/export fields.
 coupler = CplState()
-register_cpl_field!(coupler, :EnergyFluxA, deepcopy(simA.state.ρe_accum[simA.boundary]), simA.grid, DateTime(0), u"J") # upward flux
-register_cpl_field!(coupler, :EnergyFluxB, deepcopy(simB.state.ρe_accum[simB.boundary]), simB.grid, DateTime(0), u"J") # downward flux
+register_cpl_field!(coupler, :EnergyA, deepcopy(simA.state.ρe[simA.boundary]), simA.grid, DateTime(0), u"J") # value on top of domainA for calculating upward flux into domainB
+register_cpl_field!(coupler, :EnergyFluxB, deepcopy(simB.state.F_ρe_accum[simB.boundary]), simB.grid, DateTime(0), u"J") # downward flux
 
 compA = (pre_step = preA, component_model = simA, post_step = postA)
 compB = (pre_step = preB, component_model = simB, post_step = postB)
@@ -155,13 +159,14 @@ component_list = (domainA = compA, domainB = compB)
 cpl_solver = CplSolver(
     component_list = component_list,
     coupler = coupler,
-    coupling_dt = couple_dt,
-    t0 = 0.0,
+    coupling_dt = Δt,
+    t0 = FT(start_time),
 )
 
 ########
 # Run the simulation
 ########
-evolve!(simulation)
+numberofsteps = Int( round((end_time - start_time) / Δt))
+evolve!(cpl_solver, numberofsteps)
 
 nothing

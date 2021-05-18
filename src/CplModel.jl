@@ -10,7 +10,7 @@ struct CplModel{G, D, B, S, TS}
     discretization::D
     boundary::B
     state::S
-    stepper::TS
+    odesolver::TS
     nsteps::Int
 end
 
@@ -42,7 +42,7 @@ experiment this model would be replaced by a full compnent model.
 -  `NFgradient` numerical flux to use for gradient terms.
 
 Each returned model instance is independent and has its own grid,
-balance law, time stepper and other attributes.  For now the code
+balance law, time odesolver and other attributes.  For now the code
 keeps some of these things the same for initial testing, including
 component timestepper and initial time (both of which need tweaking
 to use for real setups).
@@ -115,12 +115,12 @@ function CplModel(;
     ### Create a timestepper of the sort needed for this component.
     ### Hard coded here - but can be configurable.
     ###
-    stepper = timestepper(custom_tendency, state, dt = dt, t0 = 0.0)
+    odesolver = timestepper(custom_tendency, state, dt = dt, t0 = 0.0)
 
     ###
     ### Return a CplModel entity that holds all the information
     ### for a component that can be driver from a coupled stepping layer.
     ###
-    return CplModel(grid, discretization, boundary, state, stepper, nsteps)
+    return CplModel(grid, discretization, boundary, state, odesolver, nsteps)
 end
 

@@ -1,3 +1,5 @@
+using ClimateMachine.Mesh.Grids: _x1, _x2, _x3, VerticalDirection
+
 abstract type AbstractSimulation end
 
 struct Simulation{𝒯,𝒰,𝒱,𝒲,𝒳,𝒴,L} <: AbstractSimulation
@@ -108,11 +110,11 @@ function CplSimulation(model::Tuple; grid, timestepper, time, boundary_z = nothi
     end
     rhs = Tuple(rhs)
 
-    xc = grid.vgeo[:, _x1:_x1, :]
-    yc = grid.vgeo[:, _x2:_x2, :]
-    zc = grid.vgeo[:, _x3:_x3, :]
+    xc = grid.numerical.vgeo[:, _x1:_x1, :]
+    yc = grid.numerical.vgeo[:, _x2:_x2, :]
+    zc = grid.numerical.vgeo[:, _x3:_x3, :]
 
-    boundary(boundary_z, xc, yc, zc) = isnothing(boundary_z) ? zc .^2 .< eps(FT) : boundary_z( equations.param_set, xc, yc, zc )
+    boundary(boundary_z, xc, yc, zc) = isnothing(boundary_z) ? zc .^2 .< eps(FT) : boundary_z( param_set, xc, yc, zc )
     boundary = boundary(boundary_z, xc, yc, zc)
 
     FT = eltype(rhs[1].grid.vgeo)
@@ -220,7 +222,7 @@ function evolve!(cpl_solver, numberofsteps; refDat = ())
         nothing,
         cpl_solver;
         numberofsteps = numberofsteps,
-        callbacks = cbvector,
+        callbacks = cpl_solver.component_list.domainB.component_model.cbvector,
     )
 
 

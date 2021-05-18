@@ -14,7 +14,7 @@ by a simulated time `coupling_dt`.
 
 Components are registered with pre_step() and post_step() functions. The pre_step()
 functions get fields for use in the component from the coupler name space.
-The post_step() functions put fields for use by other components into
+The post_step() functions  fields for use by other components into
 te coupler name space. 
 The CplSolver abstraction controls
  1. the outer time stepping sequencing of components
@@ -67,7 +67,7 @@ function ODESolvers.dostep!(Qtop, csolver::CplSolver, param, time::Real)
         component = cpl_component[:component_model]
         solve!(
             component.state,
-            component.stepper;
+            component.odesolver;
             numberofsteps = component.nsteps,
         )
         # post step pushing exports goes here

@@ -19,6 +19,72 @@ struct DryReferenceState{TP}
     temperature_profile::TP
 end
 
+using Unitful
+"""
+
+    Defines an equation set (balance law) for testing coupling
+
+ Defines kernels to evaluates RHS of
+
+    ```
+
+DryAtmosModel: 
+
+    ∂ρe
+    -- + ∇ • ( ρu * (ρe + p) / ρ ) = 0
+    ∂t    
+
+    ∂ρu
+    -- + ∇ • ( p * I + ρu ⊗ ρu / ρ) = - 2Ω × ρu
+    ∂t    
+
+    ∂ρ
+    -- + ∇ • ( ρu ) = 0
+    ∂t    
+
+
+DryAtmosLinearModel:
+
+    ∂ρe
+    -- + ∇ • ( (ρeᵣ + pᵣ) / ρᵣ * ρu ) = - state.ρu' * ∇Φ
+    ∂t    
+
+    ∂ρu
+    -- + ∇ • ( -0) = 0
+    ∂t    
+
+    ∂ρ
+    -- + ∇ • ( ρu ) = 0
+    ∂t    
+
+
+(NB: `split_explicit_implicit == false` by default)
+
+Boundary conditions:
+
+External:
+- first order:
+    state⁺.ρ = state⁻.ρ
+    state⁺.ρu -= 2 * dot(state⁻.ρu, n) .* SVector(n)
+    state⁺.ρe = state⁻.ρe ( ≡ fluxᵀn.ρe = 0)
+    aux⁺.Φ = aux⁻.Φ
+
+PrimaryCoupledBoundary:
+    - state⁺.ρ = state⁻.ρ
+    - state⁺.ρu -= 2 * dot(state⁻.ρu, n) .* SVector(n)
+    - fluxᵀn.ρe = (ρu * (ρe + p) / ρ )ᵀ ⋅ n = λ(ρe - ρe_secondary) 
+    - aux⁺.Φ = aux⁻.Φ
+
+SecondaryCoupledBoundary:
+    - state⁺.ρ = state⁻.ρ
+    - state⁺.ρu -= 2 * dot(state⁻.ρu, n) .* SVector(n)
+    - fluxᵀn.ρe = (ρu * (ρe + p) / ρ )ᵀ ⋅ n = F_prescribed = ∫ F_accum dt / Δt_coupler
+    - aux⁺.Φ = aux⁻.Φ
+
+
+"""
+
+
 """
     Declaration of state variables
 
@@ -32,6 +98,8 @@ function vars_state(m::Union{DryAtmosModel,DryAtmosLinearModel}, st::Auxiliary, 
         Φ::FT
         ∇Φ::SVector{3, FT} # TODO: only needed for the linear model
         ref_state::vars_state(m, m.physics.ref_state, st, FT)
+        ρe_secondary::FT  # stores opposite face for primary (atmospheric import)
+        F_ρe_prescribed::FT # stores prescribed flux for secondary (ocean import)
     end
 end
 
@@ -44,6 +112,7 @@ function vars_state(::Union{DryAtmosModel,DryAtmosLinearModel}, ::Prognostic, FT
         ρ::FT
         ρu::SVector{3, FT}
         ρe::FT
+        F_ρe_accum::FT
     end
 end
 
@@ -81,6 +150,7 @@ function init_state_prognostic!(
         state.ρ  = ic.ρ(parameters, x, y, z)
         state.ρu = ic.ρu(parameters, x, y, z)
         state.ρe = ic.ρe(parameters, x, y, z)
+        state.F_ρe_accum = 0
     end
 
     return nothing
@@ -94,6 +164,9 @@ function nodal_init_state_auxiliary!(
 )
     init_state_auxiliary!(m, m.physics.orientation, state_auxiliary, geom)
     init_state_auxiliary!(m, m.physics.ref_state, state_auxiliary, geom)
+
+    state_auxiliary.ρe_secondary = 0
+    state_auxiliary.F_ρe_prescribed = 0
 end
 
 function init_state_auxiliary!(
@@ -184,7 +257,10 @@ function source!(m::DryAtmosModel, source, state_prognostic, state_auxiliary, _.
     ntuple(Val(length(sources))) do s
         Base.@_inline_meta
         calc_force!(source, sources[s], state_prognostic, state_auxiliary)
+
     end
+
+    source.F_ρe_accum = (state_prognostic.ρe - state_auxiliary.ρe_secondary) * m.parameters.λ_coupler
 end
 
 function source!(
@@ -207,6 +283,46 @@ end
 """
     Boundary conditions
 """
+
+"""
+abstract type AbstractCouplerBoundary end
+  Define boundary condition flags/types to iterate over, for now keep it simple.
+- 3 AbstractCouplerBoundary types:
+    1. ExteriorBoundary
+    2. CoupledPrimaryBoundary
+    3. CoupledSecondaryBoundary
+
+"""
+abstract type AbstractCouplerBoundary end
+
+"""
+struct PenaltyNumFluxDiffusive <: NumericalFluxSecondOrder end
+- PenaltyNumFluxDiffusive: additional NumericalFluxSecondOrder to account for an additional penalty term
+"""
+struct PenaltyNumFluxDiffusive <: NumericalFluxSecondOrder end
+
+# ## 1. ExteriorBoundary
+"""
+struct ExteriorBoundary <: AbstractCouplerBoundary end
+  Zero normal gradient boundary condition.
+"""
+struct ExteriorBoundary <: AbstractCouplerBoundary end
+
+# ## 2. CoupledPrimaryBoundary
+"""
+struct CoupledPrimaryBoundary <: AbstractCouplerBoundary end
+# # compute flux based on opposite face
+# # also need to accumulate net flux across boundary
+"""
+struct CoupledPrimaryBoundary <: AbstractCouplerBoundary end
+
+## 3. CoupledSecondaryBoundary
+"""
+struct CoupledSecondaryBoundary <: AbstractCouplerBoundary end
+# # use prescribed flux computed in primary
+"""
+struct CoupledSecondaryBoundary  <: AbstractCouplerBoundary end
+
 boundary_conditions(model::Union{DryAtmosModel,DryAtmosLinearModel}) = model.boundary_conditions
 
 function boundary_state!(
@@ -257,22 +373,21 @@ end
 
 """
 function preB(csolver)
-    - saves and regrids the EnergyFluxA field (mA.state.ρe[mA.boundary]) to mB.state.ρe_accum[mB.boundary] on the atmos grid
+    - saves and regrids the EnergyA couplerfield (i.e. regridded mA.state.ρe[mA.boundary]) on coupler grid to mB.state.ρe_secondary[mB.boundary] on the domainB grid
     csolver::CplSolver
 """
 function preB(csolver)
     mA = csolver.component_list.domainA.component_model
     mB = csolver.component_list.domainB.component_model
     # Set boundary SST used in atmos to SST of ocean surface at start of coupling cycle.
-    mB.discretization.state_auxiliary.ρe_secondary[mB.boundary] .= 
-        CouplerMachine.get(csolver.coupler, :EnergyA, mB.grid, DateTime(0), u"J")
+    mB.odesolver.rhs!.state_auxiliary.ρe_secondary[mB.boundary] .= 
+        CouplerMachine.coupler_get(csolver.coupler, :EnergyA, mB.grid.numerical, DateTime(0), u"J")
     # Set atmos boundary flux accumulator to 0.
-    mB.state.ρe_accum .= 0
+    mB.state.F_ρe_accum .= 0
 
     @info(
         "preatmos",
-        endtime = simulation.simtime[2],
-        time = csolver.t,
+        time = csolver.t #* "/" * mB.time.finish ,
         total_θ_atmos = weightedsum(mA.state, 1),
         total_θ_ocean = weightedsum(mA.state, 1),
         total_θ = weightedsum(mA.state, 1) + weightedsum(mA.state, 1),
@@ -285,8 +400,8 @@ function preB(csolver)
 end
 
 """
-function preatmos(csolver)
-    - updates Atmos_MeanAirSeaθFlux with mA.state.F_accum[mA.boundary], and the coupler time
+function postB(csolver)
+    - updates couplerfield EnergyFluxB with mB.state.F_ρe_accum[mB.boundary] regridded to the coupler grid, and updates the coupler time
     csolver::CplSolver
 """
 function postB(csolver)
@@ -294,8 +409,8 @@ function postB(csolver)
     mB = csolver.component_list.domainB.component_model
     # Pass atmos exports to "coupler" namespace
     # 1. Save mean θ flux at the Atmos boundary during the coupling period
-    CouplerMachine.put!(csolver.coupler, :EnergyFluxB, mB.state.ρe_accum[mB.boundary] ./ csolver.dt,
-        mB.grid, DateTime(0), u"J")
+    CouplerMachine.coupler_put!(csolver.coupler, :EnergyFluxB, mB.state.F_ρe_accum[mB.boundary] ./ csolver.dt,
+        mB.grid.numerical, DateTime(0), u"J")
 
     # @info(
     #     "postatmos",
@@ -306,7 +421,7 @@ function postB(csolver)
     #     total_θ =
     #         weightedsum(mB.state, 1) +
     #         weightedsum(mA.state, 1) +
-    #         mean(mB.state.ρe_accum[mB.boundary]) * 1e6 * 1e6,
+    #         mean(mB.state.F_ρe_accum[mB.boundary]) * 1e6 * 1e6,
     #     F_accum_max = maximum(mB.state.F_accum[mB.boundary]),
     #     F_avg_max = maximum(mB.state.F_accum[mB.boundary] ./ csolver.dt),
     #     atmos_θ_surface_max = maximum(mB.state.θ[mB.boundary]),
@@ -315,18 +430,19 @@ function postB(csolver)
 end
 
 """
-function preocean(csolver)
-    - saves and regrids the EnergyFluxB field (mB.state.ρe_accum[mB.boundary]) to ρe_accum[mA.boundary] on the lower-domain grid
+function preA(csolver)
+    - saves and regrids the EnergyFluxB couplerfield (i.e. regridded mB.state.F_ρe_accum[mB.boundary]) to ρe_prescribed[mA.boundary] on the domainA grid
     csolver::CplSolver
 """
 function preA(csolver)
     mA = csolver.component_list.domainA.component_model
     mB = csolver.component_list.domainB.component_model
     # Set mean air-sea theta flux
-    mA.discretization.state_auxiliary.ρe_accum[mA.boundary] .= 
-        CouplerMachine.get(csolver.coupler, :EnergyFluxB, mA.grid, DateTime(0), u"J")
+
+    mA.odesolver.rhs!.state_auxiliary.F_ρe_prescribed[mA.boundary] .= 
+        CouplerMachine.coupler_get(csolver.coupler, :EnergyFluxB, mA.grid, DateTime(0), u"J")
     # Set ocean boundary flux accumulator to 0. (this isn't used)
-    mA.state.ρe_accum .= 0
+    mA.state.F_ρe_accum .= 0
 
     # @info(
     #     "preocean",
@@ -341,8 +457,9 @@ function preA(csolver)
 end
 
 """
-function postocean(csolver)
-    - updates Ocean_SST with mA.state.θ[mA.boundary], and the coupler time
+function postA(csolver)
+    - updates couplerfield EnergyA with mA.state.ρe[mA.boundary] regridded to the coupler grid, and updates the coupler time
+    - updates EnergyA with mA.state.ρe[mA.boundary], and the coupler time
     csolver::CplSolver
 """
 function postA(csolver)
@@ -357,5 +474,151 @@ function postA(csolver)
 
     # Pass ocean exports to "coupler" namespace
     #  1. Ocean SST (value of θ at z=0)
-    CouplerMachine.put!(csolver.coupler, :EnergyFluxA, mA.state.ρe[mA.boundary], mA.grid, DateTime(0), u"J")
+    CouplerMachine.coupler_put!(csolver.coupler, :EnergyA, mA.state.ρe[mA.boundary], mA.grid.numerical, DateTime(0), u"J")
 end
+
+
+
+
+
+#__________________
+
+function numerical_boundary_flux_first_order!(
+    numerical_flux::NumericalFluxFirstOrder,
+    bctype::ExteriorBoundary,
+    balance_law::BalanceLaw,
+    fluxᵀn::Vars{S},
+    normal_vector::SVector,
+    state_prognostic⁻::Vars{S},
+    state_auxiliary⁻::Vars{A},
+    state_prognostic⁺::Vars{S},
+    state_auxiliary⁺::Vars{A},
+    t,
+    direction,
+    state1⁻::Vars{S},
+    aux1⁻::Vars{A},
+) where {S, A}
+
+    boundary_state!(
+        numerical_flux,
+        bctype,
+        balance_law,
+        state_prognostic⁺,
+        state_auxiliary⁺,
+        normal_vector,
+        state_prognostic⁻,
+        state_auxiliary⁻,
+        t,
+        state1⁻,
+        aux1⁻,
+    )
+
+    numerical_flux_first_order!(
+        numerical_flux,
+        balance_law,
+        fluxᵀn,
+        normal_vector,
+        state_prognostic⁻,
+        state_auxiliary⁻,
+        state_prognostic⁺,
+        state_auxiliary⁺,
+        t,
+        direction,
+    )
+
+end
+
+function numerical_boundary_flux_first_order!(
+    numerical_flux::NumericalFluxFirstOrder,
+    bctype::CoupledPrimaryBoundary,
+    balance_law::BalanceLaw,
+    fluxᵀn::Vars{S},
+    normal_vector::SVector,
+    state_prognostic⁻::Vars{S},
+    state_auxiliary⁻::Vars{A},
+    state_prognostic⁺::Vars{S},
+    state_auxiliary⁺::Vars{A},
+    t,
+    direction,
+    state1⁻::Vars{S},
+    aux1⁻::Vars{A},
+) where {S, A}
+
+    boundary_state!(
+        numerical_flux,
+        bctype,
+        balance_law,
+        state_prognostic⁺,
+        state_auxiliary⁺,
+        normal_vector,
+        state_prognostic⁻,
+        state_auxiliary⁻,
+        t,
+        state1⁻,
+        aux1⁻,
+    )
+
+
+    numerical_flux_first_order!(
+        numerical_flux,
+        balance_law,
+        fluxᵀn,
+        normal_vector,
+        state_prognostic⁻,
+        state_auxiliary⁻,
+        state_prognostic⁺,
+        state_auxiliary⁺,
+        t,
+        direction,
+    )
+
+    fluxᵀn.ρe =
+        (state_prognostic⁻.ρe - state_auxiliary⁺.ρe_secondary) * balance_law.parameters.λ_coupler
+end
+function numerical_boundary_flux_first_order!(
+    numerical_flux::NumericalFluxFirstOrder,
+    bctype::CoupledPrimaryBoundary,
+    balance_law::BalanceLaw,
+    fluxᵀn::Vars{S},
+    normal_vector::SVector,
+    state_prognostic⁻::Vars{S},
+    state_auxiliary⁻::Vars{A},
+    state_prognostic⁺::Vars{S},
+    state_auxiliary⁺::Vars{A},
+    t,
+    direction,
+    state1⁻::Vars{S},
+    aux1⁻::Vars{A},
+) where {S, A}
+
+    boundary_state!(
+        numerical_flux,
+        bctype,
+        balance_law,
+        state_prognostic⁺,
+        state_auxiliary⁺,
+        normal_vector,
+        state_prognostic⁻,
+        state_auxiliary⁻,
+        t,
+        state1⁻,
+        aux1⁻,
+    )
+
+
+    numerical_flux_first_order!(
+        numerical_flux,
+        balance_law,
+        fluxᵀn,
+        normal_vector,
+        state_prognostic⁻,
+        state_auxiliary⁻,
+        state_prognostic⁺,
+        state_auxiliary⁺,
+        t,
+        direction,
+    )
+
+    fluxᵀn.ρe = -state_auxiliary⁺.F_ρe_prescribed
+end
+

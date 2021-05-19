@@ -402,11 +402,11 @@ function preB(csolver)
     @info(
         "preatmos",
         time = csolver.t, #* "/" * mB.time.finish ,
-        total_θ_atmos = weightedsum(mA.state, 1),
-        total_θ_ocean = weightedsum(mA.state, 1),
-        total_θ = weightedsum(mA.state, 1) + weightedsum(mA.state, 1),
-        atmos_θ_surface_max = maximum(mA.state.ρe[mA.boundary]),
-        ocean_θ_surface_max = maximum(mA.state.ρe[mA.boundary]),
+        total_ρeA_ = weightedsum(mA.state.ρe, 1),
+        total_ρeB = weightedsum(mB.state.ρe, 1),
+        total_ρe = weightedsum(mA.state, 1) + weightedsum(mB.state, 1),
+        atmos_ρe_surface_maxA = maximum(mA.state.ρe[mA.boundary]),
+        ocean_ρe_surface_maxB = maximum(mB.state.ρe[mB.boundary]),
     )
 
     # isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.A[csolver.steps] = weightedsum(mA.state, 1)

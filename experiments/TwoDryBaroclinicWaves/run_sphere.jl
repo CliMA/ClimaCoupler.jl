@@ -128,7 +128,7 @@ dx = minimum( [min_node_distance(gridA.numerical) , min_node_distance(gridB.nume
 cfl = 3
 Δt = cfl * dx / 330.0
 start_time = 0
-end_time = Δt*2#30 * 24 * 3600
+end_time = Δt*10#30 * 24 * 3600
 method = ARK2GiraldoKellyConstantinescu
 callbacks = (
   Info(),

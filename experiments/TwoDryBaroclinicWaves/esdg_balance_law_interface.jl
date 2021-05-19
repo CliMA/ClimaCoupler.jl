@@ -402,8 +402,8 @@ function preB(csolver)
     @info(
         "preatmos",
         time = csolver.t, #* "/" * mB.time.finish ,
-        total_ρeA_ = weightedsum(mA.state.ρe, 1),
-        total_ρeB = weightedsum(mB.state.ρe, 1),
+        total_ρeA_ = weightedsum(mA.state, 1),
+        total_ρeB = weightedsum(mB.state, 1),
         total_ρe = weightedsum(mA.state, 1) + weightedsum(mB.state, 1),
         atmos_ρe_surface_maxA = maximum(mA.state.ρe[mA.boundary]),
         ocean_ρe_surface_maxB = maximum(mB.state.ρe[mB.boundary]),
@@ -539,7 +539,7 @@ function numerical_boundary_flux_first_order!(
         t,
         direction,
     )
-
+    #@show "ext"
 end
 
 function numerical_boundary_flux_first_order!(
@@ -585,13 +585,13 @@ function numerical_boundary_flux_first_order!(
         t,
         direction,
     )
-
+    #@show "pri"
     fluxᵀn.ρe =
         (state_prognostic⁻.ρe - state_auxiliary⁺.ρe_secondary) * balance_law.parameters.λ_coupler
 end
 function numerical_boundary_flux_first_order!(
     numerical_flux::NumericalFluxFirstOrder,
-    bctype::CoupledPrimaryBoundary,
+    bctype::CoupledSecondaryBoundary,
     balance_law::BalanceLaw,
     fluxᵀn::Vars{S},
     normal_vector::SVector,
@@ -632,7 +632,7 @@ function numerical_boundary_flux_first_order!(
         t,
         direction,
     )
-    
+    @show "-state_auxiliary⁺.F_ρe_prescribed"
     fluxᵀn.ρe = -state_auxiliary⁺.F_ρe_prescribed
 end
 

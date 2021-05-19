@@ -59,10 +59,11 @@ using ClimateMachine.DGMethods.NumericalFluxes:
     CentralNumericalFluxSecondOrder,
     NumericalFluxFirstOrder,
     NumericalFluxSecondOrder,
-    RusanovNumericalFlux
-
-import ClimateMachine.DGMethods.NumericalFluxes:
-    numerical_boundary_flux_second_order!, numerical_flux_second_order!, numerical_boundary_flux_first_order!, numerical_flux_first_order!
+    RusanovNumericalFlux,
+    numerical_boundary_flux_second_order!, 
+    numerical_flux_second_order!, 
+    numerical_boundary_flux_first_order!, 
+    numerical_flux_first_order!
 
 
 using ClimateMachine.VariableTemplates

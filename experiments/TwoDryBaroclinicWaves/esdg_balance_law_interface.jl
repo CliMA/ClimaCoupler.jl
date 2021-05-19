@@ -15,6 +15,20 @@ import ClimateMachine.BalanceLaws:
     boundary_conditions,
     boundary_state!
 
+
+using ClimateMachine.DGMethods.NumericalFluxes:
+    CentralNumericalFluxGradient,
+    CentralNumericalFluxSecondOrder,
+    NumericalFluxFirstOrder,
+    NumericalFluxSecondOrder,
+    RusanovNumericalFlux,
+    numerical_boundary_flux_second_order!, 
+    numerical_flux_second_order!, 
+    numerical_boundary_flux_first_order!, 
+    numerical_flux_first_order!
+
+import ClimateMachine.DGMethods.NumericalFluxes.numerical_boundary_flux_first_order!
+
 struct DryReferenceState{TP}
     temperature_profile::TP
 end
@@ -387,7 +401,7 @@ function preB(csolver)
 
     @info(
         "preatmos",
-        time = csolver.t #* "/" * mB.time.finish ,
+        time = csolver.t, #* "/" * mB.time.finish ,
         total_θ_atmos = weightedsum(mA.state, 1),
         total_θ_ocean = weightedsum(mA.state, 1),
         total_θ = weightedsum(mA.state, 1) + weightedsum(mA.state, 1),
@@ -618,7 +632,7 @@ function numerical_boundary_flux_first_order!(
         t,
         direction,
     )
-
+    
     fluxᵀn.ρe = -state_auxiliary⁺.F_ρe_prescribed
 end
 

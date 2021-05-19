@@ -77,9 +77,9 @@ linear_physics = Physics(
 # Set up model
 ########
 
-model = DryAtmosModel(
+modelA = DryAtmosModel(
     physics = physics,
-    boundary_conditions = (5, 6),
+    boundary_conditions = (ExteriorBoundary(), CoupledSecondaryBoundary()),
     initial_conditions = (ρ = ρ₀ᶜᵃʳᵗ, ρu = ρu⃗₀ᶜᵃʳᵗ, ρe = ρeᶜᵃʳᵗ),
     numerics = (
         flux = RusanovNumericalFlux(),
@@ -87,17 +87,37 @@ model = DryAtmosModel(
     parameters = parameters,
 )
 
-linear_model = DryAtmosLinearModel(
+linear_modelA = DryAtmosLinearModel(
     physics = linear_physics,
-    boundary_conditions = model.boundary_conditions,
+    boundary_conditions = modelA.boundary_conditions,
     initial_conditions = nothing,
     numerics = (
-        flux = model.numerics.flux,
+        flux = modelA.numerics.flux,
         direction = VerticalDirection()
     ),
-    parameters = model.parameters,
+    parameters = modelA.parameters,
 )
 
+modelB = DryAtmosModel(
+    physics = physics,
+    boundary_conditions = (CoupledPrimaryBoundary(), ExteriorBoundary()),
+    initial_conditions = (ρ = ρ₀ᶜᵃʳᵗ, ρu = ρu⃗₀ᶜᵃʳᵗ, ρe = ρeᶜᵃʳᵗ),
+    numerics = (
+        flux = RusanovNumericalFlux(),
+    ),
+    parameters = parameters,
+)
+
+linear_modelB = DryAtmosLinearModel(
+    physics = linear_physics,
+    boundary_conditions = modelB.boundary_conditions,
+    initial_conditions = nothing,
+    numerics = (
+        flux = modelB.numerics.flux,
+        direction = VerticalDirection()
+    ),
+    parameters = modelB.parameters,
+)
 ########
 # Set up time steppers (could be done automatically in simulation)
 ########
@@ -108,7 +128,7 @@ dx = minimum( [min_node_distance(gridA.numerical) , min_node_distance(gridB.nume
 cfl = 3
 Δt = cfl * dx / 330.0
 start_time = 0
-end_time = 30 * 24 * 3600
+end_time = Δt*2#30 * 24 * 3600
 method = ARK2GiraldoKellyConstantinescu
 callbacks = (
   Info(),
@@ -128,7 +148,7 @@ epss = sqrt(eps(FT))
 boundary_mask( param_set, xc, yc, zc ) = @. abs(( xc^2 + yc^2 + zc^2 )^0.5 - planet_radius(param_set) - FT(30e3)) < epss
     
 simA = CplSimulation(
-    (model, linear_model,);
+    (modelA, linear_modelA,);
     grid = gridA,
     timestepper = (method = method, timestep = Δt / nstepsA),
     time        = (start = start_time, finish = end_time),
@@ -137,7 +157,7 @@ simA = CplSimulation(
     callbacks   = callbacks,
 )
 simB = CplSimulation(
-    (model, linear_model,);
+    (modelB, linear_modelB,);
     grid = gridB,
     timestepper = (method = method, timestep = Δt / nstepsB),
     time        = (start = start_time, finish = end_time),

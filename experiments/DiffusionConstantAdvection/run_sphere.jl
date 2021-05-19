@@ -221,7 +221,7 @@ function main(::Type{FT}) where {FT}
 
     simulation = (;
         coupled_odesolver = cpl_solver,
-        odesolver = cpl_solver.component_list.atmosphere.component_model.stepper,
+        odesolver = cpl_solver.component_list.atmosphere.component_model.odesolver,
         state = cpl_solver.component_list.atmosphere.component_model.state,
         dgmodel =  cpl_solver.component_list.atmosphere.component_model.discretization,
         callbacks = callbacks,

@@ -9,6 +9,13 @@ include("parameters_initialconditions.jl")
 
 FT = Float64
 
+
+# Collects tracer valus/fluxes for conservation checks
+mutable struct LogThatFlux{F}
+    A::F
+    B::F
+end
+
 ########
 # Set up domain
 ########
@@ -87,8 +94,9 @@ modelB = ModelSetup(
 # Set up time steppers (could be done automatically in simulation)
 ########
 Δt  = min_node_distance(gridA.numerical) / parameters.cₛ * 0.25
+total_steps = 200
 start_time = 0
-end_time = Δt*10#30 * 24 * 3600
+end_time = Δt * total_steps#30 * 24 * 3600
 method = SSPRK22Heuns
 callbacks = (
   Info(),
@@ -141,6 +149,7 @@ cpl_solver = CplSolver(
     coupler = coupler,
     coupling_dt = Δt,
     t0 = FT(start_time),
+    fluxlog = LogThatFlux( zeros(total_steps) , zeros(total_steps) )
 )
 
 ########
@@ -149,4 +158,13 @@ cpl_solver = CplSolver(
 numberofsteps = Int( round((end_time - start_time) / Δt))
 evolve!(cpl_solver, numberofsteps)
 
-nothing
+########
+# Check conservation
+########
+using Plots
+fluxA = cpl_solver.fluxlog.A
+fluxB = cpl_solver.fluxlog.B
+fluxT = fluxA .+ fluxB
+time = collect(1:1:total_steps)
+rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1]) ]
+plot(time .* cpl_solver.dt, rel_error)

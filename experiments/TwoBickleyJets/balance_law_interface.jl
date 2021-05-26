@@ -305,18 +305,19 @@ function preB(csolver)
     # Set atmos boundary flux accumulator to 0.
     mB.state.F_ρθ_accum .= 0
 
+    idx = varsindex(vars(mA.state), :ρθ)[1]
     @info(
         "preatmos",
         time = csolver.t, #* "/" * mB.time.finish ,
-        total_ρθA_ = weightedsum(mA.state, 1),
-        total_ρθB = weightedsum(mB.state, 1),
-        total_ρθ = weightedsum(mA.state, 1) + weightedsum(mB.state, 1),
+        total_ρθA_ = weightedsum(mA.state, idx),
+        total_ρθB = weightedsum(mB.state, idx),
+        total_ρθ = weightedsum(mA.state, idx) + weightedsum(mB.state, idx),
         atmos_ρθ_surface_maxA = maximum(mA.state.ρθ[mA.boundary]),
         ocean_ρθ_surface_maxB = maximum(mB.state.ρθ[mB.boundary]),
     )
 
-    # isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.A[csolver.steps] = weightedsum(mA.state, 1)
-    # isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.B[csolver.steps] = weightedsum(mB.state, 1)
+    isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.A[csolver.steps] = weightedsum(mA.state, idx)
+    isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.B[csolver.steps] = weightedsum(mB.state, idx)
 end
 
 """

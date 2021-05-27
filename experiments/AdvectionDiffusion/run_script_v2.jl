@@ -169,8 +169,8 @@ function main(::Type{FT}) where {FT}
     # Create a Coupler State object for holding import/export fields.
     # Try using Dict here - not sure if that will be OK with GPU
     coupler = CplState()
-    register_cpl_field!(coupler, :Ocean_SST, deepcopy(mO.state.θ[mO.boundary]), mO.grid, DateTime(0), u"°C")
-    register_cpl_field!(coupler, :Atmos_MeanAirSeaθFlux, deepcopy(mA.state.F_accum[mA.boundary]), mA.grid, DateTime(0), u"°C")
+    coupler_register!(coupler, :Ocean_SST, deepcopy(mO.state.θ[mO.boundary]), mO.grid, DateTime(0), u"°C")
+    coupler_register!(coupler, :Atmos_MeanAirSeaθFlux, deepcopy(mA.state.F_accum[mA.boundary]), mA.grid, DateTime(0), u"°C")
     
 
     # Instantiate a coupled timestepper that steps forward the components and

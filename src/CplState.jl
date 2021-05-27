@@ -91,7 +91,7 @@ function coupler_get(coupler::CplState, fieldname::Symbol, gridinfo, datetime::D
 end
 
 """
-    coupler_put!(coupler::CplState, fieldname::Symbol, fieldvalue, gridinfo, datetime::DateTime, units::Unitful.Units)
+coupler_put!(coupler::CplState, fieldname::Symbol, fieldvalue, gridinfo, datetime::DateTime, units::Unitful.Units)
 
 Updates coupler field `fieldname` with `fieldvalue`, the field's value at time `datetime`.
 

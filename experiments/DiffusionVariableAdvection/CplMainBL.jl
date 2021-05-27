@@ -20,22 +20,40 @@
      - `u` is the prognostic advection velocity 
      - `κ` is the diffusivity tensor
 
+     # θ: J / m^3
+     # ∇θ: J / m^4
+     # κ: (m^2/s)
+     # κ∇θ: J/(m^2 s) = W/m^2 = J/m^3 * m/s
+
  subject to specified prescribed gradient or flux bc's
 
  - [`CplMainBL`](@ref)
      balance law struct created by this module
 
+Boundary conditions 
+- ExteriorBoundary:
+    ```
+    Fᵀn.θ = 0                                                       (insulating; overwritten in `numerical_boundary_flux_second_order!`)
+    u⁺ = u⁻ - 2 * n⁻ ⋅ u⁻ * n⁻                                      (free slip: surface-tangential advective velocity same on exterior boundary, reflecting normal velocity; in `boundary_state!(::NumericalFluxFirstOrder,_...,)`)
+    u⁺ = u⁻ - n⁻ ⋅ u⁻ * n⁻                                          (free slip: gradients calculated only on the surface-tangential plane; in `boundary_state!(::NumericalFluxGradient,_...,)`)
+    u⁺ = u⁻                                                         (free slip: no diffusive flux; in `boundary_state!(::NumericalFluxSecondOrder,_...,)`)
 
-# θ: J / m^3
-# ∇θ: J / m^4
-# κ: (m^2/s)
-# κ∇θ: J/(m^2 s) = W/m^2 = J/m^3 * m/s
+    ```
+- CoupledPrimaryBoundary (belongs to the primary model, which calculates the surface fluxes):
+    ```
+    Fᵀn.θ = λ (θ⁻ - θ_secondary⁺)                                   (relaxation to the state of the secondary model; overwritten in `numerical_boundary_flux_second_order!`)
+    u⁺ = u⁻ - 2 * n⁻ ⋅ u⁻ * n⁻                                      (free slip: surface-tangential advective velocity same on exterior boundary, reflecting normal velocity; in `boundary_state!(::NumericalFluxFirstOrder,_...,)`)
+    u⁺ = u⁻ - n⁻ ⋅ u⁻ * n⁻                                          (free slip: gradients calculated only on the surface-tangential plane; in `boundary_state!(::NumericalFluxGradient,_...,)`)
+    u⁺ = u⁻                                                         (free slip: no diffusive flux; in `boundary_state!(::NumericalFluxSecondOrder,_...,)`)
+    ```
+- CoupledSecondaryBoundary (belongs to the secondary model, which receives fluxes from the primary model):
+    ```
+    Fᵀn.θ = F_prescribed = ∫_tau0^tau Fᵀn.θ(primary model) dt       (prescribed as accumulated fluxes from primary model; overwritten in `numerical_boundary_flux_second_order!`)
+    u⁺ = u⁻ - 2 * n⁻ ⋅ u⁻ * n⁻                                      (free slip: surface-tangential advective velocity same on exterior boundary, reflecting normal velocity; in `boundary_state!(::NumericalFluxFirstOrder,_...,)`)
+    u⁺ = u⁻ - n⁻ ⋅ u⁻ * n⁻                                          (free slip: gradients calculated only on the surface-tangential plane; in `boundary_state!(::NumericalFluxGradient,_...,)`)
+    u⁺ = u⁻                                                         (free slip: no diffusive flux; in `boundary_state!(::NumericalFluxSecondOrder,_...,)`)
+    ``` 
 
-BC = Neumann, free slip
-- for first order flux kernels:
-        - F_n = 0
-- for second order flux kernels:
-        - F_n = 0
 """
 #module CplMainBL
 
@@ -71,7 +89,7 @@ using ClimateMachine.DGMethods.NumericalFluxes:
     RusanovNumericalFlux
 
 import ClimateMachine.DGMethods.NumericalFluxes:
-    numerical_boundary_flux_second_order!, numerical_flux_second_order!, numerical_boundary_flux_first_order!, numerical_flux_first_order!
+    numerical_boundary_flux_second_order!, numerical_flux_second_order!, numerical_boundary_flux_first_order!, numerical_flux_first_order!, normal_boundary_flux_second_order!
 
 
 using ClimateMachine.VariableTemplates
@@ -401,9 +419,9 @@ struct CoupledSecondaryBoundary <: AbstractCouplerBoundary end
 """
 struct CoupledSecondaryBoundary  <: AbstractCouplerBoundary end
 
-# first order BC (Neumann, Insulating = no bdry flux)
+# Momentum BCs
 function boundary_state!(
-    nF::Union{NumericalFluxFirstOrder,NumericalFluxGradient},
+    nF::Union{NumericalFluxFirstOrder},
     bc::Union{ExteriorBoundary,CoupledPrimaryBoundary,CoupledSecondaryBoundary},
     bl::l_type,
     Q⁺::Vars,
@@ -414,36 +432,49 @@ function boundary_state!(
     t,
     _...,
 )
-    FT = eltype(Q⁺)
-    Q⁺.θ = Q⁻.θ
-    Q⁺.u = Q⁻.u - 2 * n⁻ ⋅ Q⁻.u .* SVector(n⁻) # FreeSlip
-    #Q.u = @SVector zeros(FT, 3) # NoSlip
+
+    Q⁺.u = Q⁻.u - 2 * n⁻ ⋅ Q⁻.u .* SVector(n⁻) 
+
     return nothing
 end
 
-# 2nd order BCs (Neumann, Insulating = no bdry flux) - not called if using customized numerical_boundary_flux_second_order! below
-# function boundary_state!(
-#     nf,
-#     bc::Union{ExteriorBoundary,CoupledPrimaryBoundary,CoupledSecondaryBoundary},
-#     m::l_type,
-#     state⁺::Vars,
-#     diff⁺::Vars,
-#     hyperdiff⁺::Vars,
-#     aux⁺::Vars,
-#     n⁻,
-#     state⁻::Vars,
-#     diff⁻::Vars,
-#     hyperdiff⁻::Vars,
-#     aux⁻::Vars,
-#     t,
-#     _...,
-# )
-#     # Apply Neumann BCs
-#     FT = eltype(state⁺)
-#     diff⁺.κ∇θ = n⁻ * FT(0.0)
-# end
+function boundary_state!(
+    nF::Union{NumericalFluxGradient},
+    bc::Union{ExteriorBoundary,CoupledPrimaryBoundary,CoupledSecondaryBoundary},
+    bl::l_type,
+    Q⁺::Vars,
+    A⁺::Vars,
+    n⁻,
+    Q⁻::Vars,
+    A⁻::Vars,
+    t,
+    _...,
+)
+    Q⁺.u = Q⁻.u - n⁻ ⋅ Q⁻.u .* SVector(n⁻) 
+end
 
-# customized flux for ExteriorBoundary
+function boundary_state!(
+    nF::Union{NumericalFluxSecondOrder},
+    bc::Union{ExteriorBoundary,CoupledPrimaryBoundary,CoupledSecondaryBoundary},
+    bl::l_type,
+    Q⁺,
+    GF⁺,
+    HF⁺,
+    A⁺,
+    n⁻,
+    Q⁻,
+    GF⁻,
+    HF⁻,
+    A⁻,
+    t,
+    _...,
+)
+    Q⁺.u = Q⁻.u
+
+    return nothing
+end
+
+# Tracer BCs
 function numerical_boundary_flux_second_order!(
     numerical_flux::Union{PenaltyNumFluxDiffusive},
     bctype::ExteriorBoundary,
@@ -464,12 +495,29 @@ function numerical_boundary_flux_second_order!(
     aux1⁻::Vars{A},
 ) where {S, D, A, HD}
 
-    fluxᵀn.θ = 0.0
-    fluxᵀn.u = @SVector [0.0, 0.0, 0.0]
+    normal_boundary_flux_second_order!( # this is to call the free slip momentum BCs
+        numerical_flux,
+        bctype,
+        balance_law,
+        fluxᵀn,
+        normal_vector,
+        state_prognostic⁻,
+        state_gradient_flux⁻,
+        state_hyperdiffusive⁻,
+        state_auxiliary⁻,
+        state_prognostic⁺,
+        state_gradient_flux⁺,
+        state_hyperdiffusive⁺,
+        state_auxiliary⁺,
+        t,
+        state1⁻,
+        diff1⁻,
+        aux1⁻,
+    )
+
+    fluxᵀn.θ = 0.0 # overwrite tracer normal flux
 
 end
-
-# customized flux for CoupledPrimaryBoundary
 function numerical_boundary_flux_second_order!(
     numerical_flux::Union{PenaltyNumFluxDiffusive},
     bctype::CoupledPrimaryBoundary,
@@ -490,13 +538,33 @@ function numerical_boundary_flux_second_order!(
     aux1⁻::Vars{A},
 ) where {S, D, A, HD}
 
+
+    normal_boundary_flux_second_order!( # this is to call the free slip momentum BCs
+        numerical_flux,
+        bctype,
+        balance_law,
+        fluxᵀn,
+        normal_vector,
+        state_prognostic⁻,
+        state_gradient_flux⁻,
+        state_hyperdiffusive⁻,
+        state_auxiliary⁻,
+        state_prognostic⁺,
+        state_gradient_flux⁺,
+        state_hyperdiffusive⁺,
+        state_auxiliary⁺,
+        t,
+        state1⁻,
+        diff1⁻,
+        aux1⁻,
+        )
+
     fluxᵀn.θ =
         (state_prognostic⁻.θ - state_auxiliary⁺.θ_secondary) *
-        balance_law.bl_prop.coupling_lambda() # W/m^2
+        balance_law.bl_prop.coupling_lambda() # overwrite tracer normal flux
 
 end
 
-# customized flux for CoupledSecondaryBoundary
 function numerical_boundary_flux_second_order!(
     numerical_flux::Union{PenaltyNumFluxDiffusive},
     bctype::CoupledSecondaryBoundary,
@@ -517,7 +585,27 @@ function numerical_boundary_flux_second_order!(
     aux1⁻::Vars{A},
 ) where {S, D, A, HD}
 
-    fluxᵀn.θ = -state_auxiliary⁺.F_prescribed
+    normal_boundary_flux_second_order!( # this is to call the free slip momentum BCs
+        numerical_flux,
+        bctype,
+        balance_law,
+        fluxᵀn,
+        normal_vector,
+        state_prognostic⁻,
+        state_gradient_flux⁻,
+        state_hyperdiffusive⁻,
+        state_auxiliary⁻,
+        state_prognostic⁺,
+        state_gradient_flux⁺,
+        state_hyperdiffusive⁺,
+        state_auxiliary⁺,
+        t,
+        state1⁻,
+        diff1⁻,
+        aux1⁻,
+        )
+
+    fluxᵀn.θ = -state_auxiliary⁺.F_prescribed # overwrite tracer normal flux
 
 end
 

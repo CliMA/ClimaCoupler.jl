@@ -49,7 +49,7 @@ include("CplMainBL.jl")
 FT = Float64
 nstepsA = 1 # steps per coupling cycle (atmos)
 nstepsO = 1 # steps per coupling cycle (ocean)
-totalsteps = 400 # total simulation coupled cycle steps
+totalsteps = 200 # total simulation coupled cycle steps
 
 # Background atmos and ocean horizontal and vertical diffusivities
 const κᵃʰ, κᵃᶻ = ( FT(0.0) , FT(1e-1) )

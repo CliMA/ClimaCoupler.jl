@@ -1,7 +1,7 @@
 using Unitful, Dates
 using PrettyTables
 
-export CplState, coupler_put!, coupler_get, coupler_register!
+export CplState, coupler_put!, coupler_get, register_cpl_field!
 
 # TODO: Build constructor that uses a model component's grid.
 struct CplGridInfo{GT, GP, GH, GE}
@@ -39,7 +39,7 @@ function CplState()
 end
 
 """
-    Coupling.coupler_register!(
+    Coupling.register_cpl_field!(
             coupler::CplState,
             fieldname::Symbol,
             fieldvalue,
@@ -58,7 +58,7 @@ Add a field to the coupler that is accessible with key `fieldname`.
 - `datetime`: time associated with the field state.
 - `units`: units associated with the field values. Dimensionless by default.
 """
-function coupler_register!(
+function register_cpl_field!(
         coupler::CplState,
         fieldname::Symbol,
         fieldvalue,

@@ -58,8 +58,6 @@ end
 
 function ODESolvers.dostep!(Qtop, csolver::CplSolver, param, time::Real)
 
-    println("Start coupled cycle")
-
     for cpl_component in csolver.component_list
 
         # pre_step fetching imports goes here

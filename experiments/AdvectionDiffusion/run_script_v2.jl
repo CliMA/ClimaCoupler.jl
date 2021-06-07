@@ -225,9 +225,12 @@ function main(::Type{FT}) where {FT}
 # Create the coupler object for holding import/export fields and performs mappings
 # and instantiate the coupled timestepper:
     coupler = CplState()
-    register_cpl_field!(coupler, :Ocean_SST, deepcopy(mO.state.θ[mO.boundary]), mO.grid, DateTime(0), u"°C")
-    register_cpl_field!(coupler, :Atmos_MeanAirSeaθFlux, deepcopy(mA.state.F_accum[mA.boundary]), mA.grid, DateTime(0), u"°C")
-
+    coupler_register!(coupler, :Ocean_SST, deepcopy(mO.state.θ[mO.boundary]), mO.grid, DateTime(0), u"°C")
+    coupler_register!(coupler, :Atmos_MeanAirSeaθFlux, deepcopy(mA.state.F_accum[mA.boundary]), mA.grid, DateTime(0), u"°C")
+    
+    # Instantiate a coupled timestepper that steps forward the components and
+    # implements mapings between components export bondary states and
+    # other components imports.
     compA = (pre_step = preatmos, component_model = mA, post_step = postatmos)
     compO = (pre_step = preocean, component_model = mO, post_step = postocean)
     component_list = (atmosphere = compA, ocean = compO)

@@ -28,23 +28,21 @@ import ClimateMachine.DGMethods.NumericalFluxes:
     normal_boundary_flux_second_order!
 
 using Unitful
-"""
-    Declaration of state variables
 
-    vars_state returns a NamedTuple of data types.
+##
+#     Declaration of variables
+##
+"""
+    vars_state 
+    - returns a NamedTuple of data types.
 """
 function vars_state(model::ModelSetup, aux::Auxiliary, T)
-    # orientation = model.physics.orientation
 
     @vars begin
         x::T
         y::T
         z::T
-        Φ::T
-        ∇Φ::SVector{3, T} # TODO: only needed for the linear model
-        # orientation::vars_state(orientation, aux, T)
-        T_sfc::T  # stores opposite face for primary (atmospheric import)
-        F_ρθ_prescribed::T # stores prescribed flux for secondary (ocean import)
+        T_sfc::T  # land surface temperature
     end
 end
 
@@ -73,10 +71,12 @@ function vars_state(::ModelSetup, ::GradientFlux, T)
     end
 end
 
+##
+#     Initialization of variables
+##
 """
-    Initialization of state variables
-
-    init_state_xyz! sets up the initial fields within our state variables
+    init_state_xyz! 
+    - sets up the initial fields within our state variables
     (e.g., prognostic, auxiliary, etc.), however it seems to not initialized
     the gradient flux variables by default.
 """
@@ -88,26 +88,8 @@ function nodal_init_state_auxiliary!(
     geom,
 )
     init_state_auxiliary!(m, m.physics.orientation, state_auxiliary, geom)
-    # init_state_auxiliary!(m, m.physics.ref_state, state_auxiliary, geom)
 
     state_auxiliary.T_sfc = 0
-    state_auxiliary.F_ρθ_prescribed = 0
-end
-
-function init_state_auxiliary!(
-    ::ModelSetup,
-    ::SphericalOrientation,
-    state_auxiliary,
-    geom,
-)
-    FT = eltype(state_auxiliary)
-    _grav = FT(grav(param_set))
-    r = norm(geom.coord)
-    state_auxiliary.x = geom.coord[1]
-    state_auxiliary.y = geom.coord[2]
-    state_auxiliary.z = geom.coord[3]
-    state_auxiliary.Φ = _grav * r
-    state_auxiliary.∇Φ = _grav * geom.coord / r
 end
 
 function init_state_auxiliary!(
@@ -122,51 +104,7 @@ function init_state_auxiliary!(
     state_auxiliary.x = geom.coord[1]
     state_auxiliary.y = geom.coord[2]
     state_auxiliary.z = geom.coord[3]
-    state_auxiliary.Φ = _grav * r
-    state_auxiliary.∇Φ = SVector{3, FT}(0, 0, _grav)
 end
-
-
-# function init_state_auxiliary!(
-#     model::ModelSetup,
-#     state_auxiliary::MPIStateArray,
-#     grid,
-#     direction,
-# )
-#     # domain = model.numerics.grid.domain
-#     orientation = model.physics.orientation
-
-#     # helper function for storing coordinates (used only once here)
-#     function init_coords!(::ModelSetup, aux, geom)
-#         aux.x = geom.coord[1]
-#         aux.y = geom.coord[2]
-#         aux.z = geom.coord[3]
-    
-#         return nothing
-#     end
-
-#     # store coordinates
-#     init_state_auxiliary!(
-#         model,
-#         (model, aux, tmp, geom) -> init_coords!(model, aux, geom),
-#         state_auxiliary,
-#         grid,
-#         direction,
-#     )
-
-#     # store orientation
-#     init_state_auxiliary!(
-#         model,
-#         # (model, aux, tmp, geom) -> orientation_nodal_init_aux!(orientation, domain, aux, geom),
-#         (model, aux, tmp, geom) -> orientation_nodal_init_aux!(orientation, aux, geom),
-#         state_auxiliary,
-#         grid,
-#         direction,
-#     )
-
-#     # store vertical unit vector
-#     orientation_gradient(model, orientation, state_auxiliary, grid, direction)
-# end
 
 function init_state_prognostic!(model::ModelSetup, state::Vars, aux::Vars, localgeo, t)
     x = aux.x
@@ -196,10 +134,6 @@ end
     t::Real,
     direction,
 )
-    flux.ρu += calc_pressure(model.physics.eos, state) * I
-
-    calc_advective_flux!(flux, model.physics.advection, state, aux, t)
-
     return nothing
 end
 
@@ -256,14 +190,7 @@ end
     t::Real,
     direction,
 )
-    coriolis = model.physics.coriolis
-    gravity = model.physics.gravity
-    orientation = model.physics.orientation
-
-    calc_force!(source, coriolis, state, aux, orientation, t)
-    calc_force!(source, gravity, state, aux, orientation, t)
-
-    source.F_ρθ_accum = calculate_land_sfc_fluxes(model, state, aux) / model.parameters.c_p
+    source.F_ρθ_accum = calculate_land_sfc_fluxes(model, state, aux) 
     
     return nothing
 end
@@ -285,13 +212,13 @@ function calculate_land_sfc_fluxes(model::ModelSetup, state, aux; MO_params = no
 
     R_SW = (FT(1)-p.α) * p.τ * p.F_sol
     R_LW = p.ϵ * (p.σ * θ_sfc - p.F_a)
-    SH   = p.c_p * p.g_a * (T_sfc - T_a) # g_a could be substituded by g_a=f(MO_params) (see Bonan P90), but first need to modify SurfaceFluxes.jl
+    SH   = state.ρ * p.c_p * p.g_a * (T_sfc - T_a) # g_a could be substituded by g_a=f(MO_params) (see Bonan P90), but first need to modify SurfaceFluxes.jl
       
     #LH   = p.lambda * p.g_w * (q_sat(T_sfc, p_sfc) - q_a) 
+    #F_tot = - (R_SW - R_LW - SH )#- LH 
 
-    F_tot = - (R_SW - R_LW - SH )#- LH 
+    F_tot = - (- SH )
 end
-
 
 """
     Boundary conditions
@@ -313,80 +240,13 @@ end
     calc_boundary_state!(numerical_flux, bc.ρθ, model, diffusion, args...)
 end
 
-@inline vertical_unit_vector(::Orientation, aux) = aux.∇Φ / grav(param_set)
-@inline vertical_unit_vector(::NoOrientation, aux) = @SVector [0, 0, 1]
-
-
-"""
-function preB(csolver)
-    - saves and regrids the EnergyA couplerfield (i.e. regridded mA.state.ρθ[mA.boundary]) on coupler grid to mB.state.ρθ_secondary[mB.boundary] on the domainB grid
-    csolver::CplSolver
-"""
-function preAtmos(csolver)
-    mA = csolver.component_list.domainLand.component_model
-    mB = csolver.component_list.domainAtmos.component_model
-    # Set boundary SST used in atmos to SST of ocean surface at start of coupling cycle.
-    mB.odesolver.rhs!.state_auxiliary.T_sfc[mB.boundary] .= 
-        coupler_get(csolver.coupler, :EnergyLand, mB.grid.numerical, DateTime(0), u"J")
-    # Set atmos boundary flux accumulator to 0.
-    mB.state.F_ρθ_accum .= 0
-
-    idx = varsindex(vars(mB.state), :ρθ)[1]
-    idx_rho = varsindex(vars(mB.state), :ρ)[1]
-    @info(
-        "preatmos",
-        time = csolver.t, #* "/" * mB.time.finish ,
-        total_ρθA_ = weightedsum(mA.state, 1),
-        total_ρθB = weightedsum(mB.state, idx) / weightedsum(mB.state, idx_rho),
-        total_ρθ = weightedsum(mA.state, 1) + weightedsum(mB.state, idx) / weightedsum(mB.state, idx_rho),
-        atmos_ρθ_surface_maxA = maximum(mA.state.T_sfc[mA.boundary]),
-        ocean_ρθ_surface_maxB = maximum(mB.state.ρθ[mB.boundary]),
-    )
-
-    isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.A[csolver.steps] = weightedsum(mA.state, 1)
-    isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.B[csolver.steps] = weightedsum(mB.state, idx) / weightedsum(mB.state, idx_rho)
-end
-
-"""
-function postB(csolver)
-    - updates couplerfield EnergyFluxB with mB.state.F_ρθ_accum[mB.boundary] regridded to the coupler grid, and updates the coupler time
-    csolver::CplSolver
-"""
-function postAtmos(csolver)
-    mA = csolver.component_list.domainLand.component_model
-    mB = csolver.component_list.domainAtmos.component_model
-    # Pass atmos exports to "coupler" namespace
-    # 1. Save mean θ flux at the Atmos boundary during the coupling period
-    coupler_put!(csolver.coupler, :EnergyFluxAtmos, mB.state.F_ρθ_accum[mB.boundary] ./ csolver.dt,
-        mB.grid.numerical, DateTime(0), u"J")
-
-    # @info(
-    #     "postatmos",
-    #     time = time = csolver.t + csolver.dt,
-    #     total_θ_atmos = weightedsum(mB.state, 1),
-    #     total_θ_ocean = weightedsum(mA.state, 1),
-    #     total_F_accum = mean(mB.state.F_accum[mB.boundary]) * 1e6 * 1e6,
-    #     total_θ =
-    #         weightedsum(mB.state, 1) +
-    #         weightedsum(mA.state, 1) +
-    #         mean(mB.state.F_ρθ_accum[mB.boundary]) * 1e6 * 1e6,
-    #     F_accum_max = maximum(mB.state.F_accum[mB.boundary]),
-    #     F_avg_max = maximum(mB.state.F_accum[mB.boundary] ./ csolver.dt),
-    #     atmos_θ_surface_max = maximum(mB.state.θ[mB.boundary]),
-    #     ocean_θ_surface_max = maximum(mA.state.θ[mA.boundary]),
-    # )
-end
-
-
-#FluidBC{Impenetrable{FreeSlip},Insulating}
-
 function numerical_boundary_flux_second_order!(
     numerical_flux::Union{PenaltyNumFluxDiffusive},
     bctype::FluidBC,
     balance_law::ModelSetup,
     args... 
 ) where {S, D, A, HD}
-    #@show "hellooo!"
+    
     normal_boundary_flux_second_order!( # for ρu BCs (to be implemented in boundary_state!)
         numerical_flux,
         bctype,
@@ -423,8 +283,9 @@ function numerical_boundary_flux_second_order!(
     diff1⁻::Vars{D},
     aux1⁻::Vars{A},
 ) where {S, D, A, HD}
-
-    fluxᵀn.ρθ = calculate_land_sfc_fluxes(balance_law, state_prognostic⁻, state_auxiliary⁻) / balance_law.parameters.c_p # W/m^2
+    
+    F_tot = calculate_land_sfc_fluxes(balance_law, state_prognostic⁻, state_auxiliary⁻)  # W/m^2
+    fluxᵀn.ρθ = - F_tot  / balance_law.parameters.c_p
 
 end
 
@@ -433,46 +294,6 @@ function numerical_boundary_flux_second_order!(
     FT = eltype(fluxᵀn)
     fluxᵀn.ρθ = FT(0)
 end
-
-
-# # customized flux for Insulating boundary
-# numerical_boundary_flux_second_order!(
-#     numerical_flux::Union{PenaltyNumFluxDiffusive},
-#     bctype::FluidBC{Impenetrable{FreeSlip},Insulating},
-#     balance_law::ModelSetup,
-#     fluxᵀn::Vars{S},
-#     normal_vector::SVector,
-#     state_prognostic⁻::Vars{S},
-#     state_gradient_flux⁻::Vars{D},
-#     state_hyperdiffusive⁻::Vars{HD},
-#     state_auxiliary⁻::Vars{A},
-#     state_prognostic⁺::Vars{S},
-#     state_gradient_flux⁺::Vars{D},
-#     state_hyperdiffusive⁺::Vars{HD},
-#     state_auxiliary⁺::Vars{A},
-#     t,
-#     state1⁻::Vars{S},
-#     diff1⁻::Vars{D},
-#     aux1⁻::Vars{A},
-# ) where {S, D, HD, A} = normal_boundary_flux_second_order!(
-#     numerical_flux,
-#     bctype,
-#     balance_law,
-#     fluxᵀn,
-#     normal_vector,
-#     state_prognostic⁻,
-#     state_gradient_flux⁻,
-#     state_hyperdiffusive⁻,
-#     state_auxiliary⁻,
-#     state_prognostic⁺,
-#     state_gradient_flux⁺,
-#     state_hyperdiffusive⁺,
-#     state_auxiliary⁺,
-#     t,
-#     state1⁻,
-#     diff1⁻,
-#     aux1⁻,
-# )
 
 """
 function numerical_flux_second_order!(::PenaltyNumFluxDiffusive, 
@@ -517,4 +338,61 @@ function numerical_flux_second_order!(
     FT = eltype(Fᵀn)
     tau = FT(0.0) # decide if want to use penalty
     Fᵀn .+= tau * (parent(state⁻) - parent(state⁺))
+end
+
+"""
+function preAtmos(csolver)
+    - saves and regrids the `LandSurfaceTemerature` couplerfield (i.e. regridded `mLand.state.T_sfc[mLand.boundary]``) on coupler grid to `mAtmos.aux.T_sfc[mAtmos.boundary]` on the `mAtmos` grid
+    - resets the accumulated flux `F_ρθ_accum` in `mAtmos` to 0
+    csolver::CplSolver
+"""
+function preAtmos(csolver)
+    mLand = csolver.component_list.domainLand.component_model
+    mAtmos = csolver.component_list.domainAtmos.component_model
+    # Set boundary T_sfc used in atmos at the start of the coupling cycle.
+    mAtmos.odesolver.rhs!.state_auxiliary.T_sfc[mAtmos.boundary] .= 
+        coupler_get(csolver.coupler, :LandSurfaceTemerature, mAtmos.grid.numerical, DateTime(0), u"K")
+    # Set atmos boundary flux accumulator to 0.
+    mAtmos.state.F_ρθ_accum .= 0
+
+    # get indicies of the required variables from the `mAtmos` MPIStateArray
+    idx = varsindex(vars(mAtmos.state), :ρθ)[1]
+    idx_rho = varsindex(vars(mAtmos.state), :ρ)[1]
+
+    # Calculate, print and log domain-averaged energy
+    FT = eltype(mAtmos.state)
+    p = cpl_solver.component_list.domainAtmos.component_model.model.parameters # maybe the parameter list could be saved in the coupler? (this would requre all the compute kernels below to import the coupler)
+    nel = mAtmos.grid.resolution.elements.vertical
+    po = mAtmos.grid.resolution.polynomial_order.vertical
+
+    E_Land = weightedsum(mLand.state, 1) .* p.ρ_s .* p.h_s .* p.c_s  # J / m^2
+    E_Atmos = weightedsum(mAtmos.state, idx) .* p.c_p .* p.zmax ./  nel ./ (po+1) ./ (po+2) # J / m^2 
+
+    @info(
+        "preatmos",
+        time = string(csolver.t) * "/" * string(mAtmos.time.finish),
+        total_energyA = E_Land,
+        total_energyB = E_Atmos,
+        total_energy = E_Atmos + E_Land,
+        land_T_sfc = maximum(mLand.state.T_sfc[mLand.boundary]),
+        atmos_ρθ_sfc = maximum(mAtmos.state.ρθ[mAtmos.boundary]),
+    )
+
+    isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.A[csolver.steps] = E_Land
+    isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.B[csolver.steps] = E_Atmos
+
+end
+
+"""
+function postAtmos(csolver)
+    - updates couplerfield `EnergyFluxAtmos` with mAtmos.state.F_ρθ_accum[mAtmos.boundary] regridded to the coupler grid, and updates the coupler time
+    csolver::CplSolver
+"""
+function postAtmos(csolver)
+    mLand = csolver.component_list.domainLand.component_model
+    mAtmos = csolver.component_list.domainAtmos.component_model
+    # Pass atmos exports to "coupler" namespace
+    # 1. Save mean θ flux at the Atmos boundary during the coupling period
+    coupler_put!(csolver.coupler, :EnergyFluxAtmos, mAtmos.state.F_ρθ_accum[mAtmos.boundary] ./ csolver.dt,
+        mAtmos.grid.numerical, DateTime(0), u"J")
 end

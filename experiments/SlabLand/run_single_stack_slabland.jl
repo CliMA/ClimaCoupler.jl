@@ -9,9 +9,7 @@ using CouplerMachine
 ########
 include("parameters_initialconditions_slabland.jl")
 
-
 FT = Float64
-
 
 # Collects tracer valus/fluxes for conservation checks
 mutable struct LogThatFlux{F}
@@ -40,23 +38,21 @@ domainAtmos = SingleStack(
 
 gridLand = DiscretizedDomain(
     domainLand;
-    elements = (vertical = 20, horizontal = 1),
-    polynomial_order = (vertical = 5, horizontal = 5),
+    elements = (vertical = 6, horizontal = 1),
+    polynomial_order = (vertical = 12, horizontal = 5),
     overintegration_order = (vertical = 1, horizontal = 1),
 )
 
 gridAtmos = DiscretizedDomain(
     domainAtmos;
-    elements = (vertical = 20, horizontal = 1),
-    polynomial_order = (vertical = 5, horizontal = 5),
+    elements = (vertical = 6, horizontal = 1),
+    polynomial_order = (vertical = 12, horizontal = 5),
     overintegration_order = (vertical = 1, horizontal = 1),
 )
 
 ########
 # Set up model physics
 ######## 
-
-
 
 physicsLand = Physics(
     orientation = FlatOrientation(),
@@ -66,12 +62,9 @@ physicsLand = Physics(
 
 physicsAtmos = Physics(
     orientation = FlatOrientation(),
-    diffusion   = ConstantViscosity( FT(0), FT(0), FT(1e-3) ),
+    diffusion   = ConstantViscosity( FT(0), FT(0), FT(1e-5) ),
     eos         = DryIdealGas{Float64}(R = parameters.R_d, pₒ = parameters.pₒ, γ = 1 / (1 - parameters.κ)),
 )
-
-
-
 
 ########
 # Set up boundary conditions
@@ -110,7 +103,7 @@ modelAtmos = ModelSetup(
 # Set up time steppers (could be done automatically in simulation)
 ########
 Δt  = min_node_distance(gridAtmos.numerical) / parameters.cₛ * 0.25
-total_steps = 50
+total_steps = 500
 start_time = 0
 end_time = Δt * total_steps#30 * 24 * 3600
 method = SSPRK22Heuns
@@ -152,13 +145,12 @@ simAtmos = CplSimulation(
 
 ## Create a Coupler State object for holding imort/export fields.
 coupler = CplState()
-register_cpl_field!(coupler, :EnergyLand, deepcopy(simLand.state.T_sfc[simLand.boundary]), simLand.grid, DateTime(0), u"J") # value on top of domainA for calculating upward flux into domainB
+register_cpl_field!(coupler, :LandSurfaceTemerature, deepcopy(simLand.state.T_sfc[simLand.boundary]), simLand.grid, DateTime(0), u"K") # value on top of domainA for calculating upward flux into domainB
 register_cpl_field!(coupler, :EnergyFluxAtmos, deepcopy(simAtmos.state.F_ρθ_accum[simAtmos.boundary]), simAtmos.grid, DateTime(0), u"J") # downward flux
 
 compLand = (pre_step = preLand, component_model = simLand, post_step = postLand)
 compAtmos = (pre_step = preAtmos, component_model = simAtmos, post_step = postAtmos)
 component_list = (domainLand = compLand, domainAtmos = compAtmos)
-
 
 cpl_solver = CplSolver(
     component_list = component_list,
@@ -180,10 +172,11 @@ evolve!(cpl_solver, numberofsteps)
 using Plots
 fluxA = cpl_solver.fluxlog.A
 fluxB = cpl_solver.fluxlog.B
-fluxT = fluxA .+ fluxB
+
+fluxT = fluxA .+ fluxB 
 time = collect(1:1:total_steps)
-rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1]) ]
+rel_error = [ ((fluxT .- fluxT[2]) / fluxT[2]) ]
 plot(time .* cpl_solver.dt, rel_error)
 
 using Statistics
-plot(time .* cpl_solver.dt, [fluxA .- fluxA[1] fluxB .- fluxB[1]] )
+plot(time .* cpl_solver.dt, [(fluxA .- fluxA[1]) (fluxB .- fluxB[1])] )

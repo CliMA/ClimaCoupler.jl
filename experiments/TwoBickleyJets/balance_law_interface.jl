@@ -126,48 +126,6 @@ function init_state_auxiliary!(
     state_auxiliary.∇Φ = SVector{3, FT}(0, 0, _grav)
 end
 
-
-# function init_state_auxiliary!(
-#     model::ModelSetup,
-#     state_auxiliary::MPIStateArray,
-#     grid,
-#     direction,
-# )
-#     # domain = model.numerics.grid.domain
-#     orientation = model.physics.orientation
-
-#     # helper function for storing coordinates (used only once here)
-#     function init_coords!(::ModelSetup, aux, geom)
-#         aux.x = geom.coord[1]
-#         aux.y = geom.coord[2]
-#         aux.z = geom.coord[3]
-    
-#         return nothing
-#     end
-
-#     # store coordinates
-#     init_state_auxiliary!(
-#         model,
-#         (model, aux, tmp, geom) -> init_coords!(model, aux, geom),
-#         state_auxiliary,
-#         grid,
-#         direction,
-#     )
-
-#     # store orientation
-#     init_state_auxiliary!(
-#         model,
-#         # (model, aux, tmp, geom) -> orientation_nodal_init_aux!(orientation, domain, aux, geom),
-#         (model, aux, tmp, geom) -> orientation_nodal_init_aux!(orientation, aux, geom),
-#         state_auxiliary,
-#         grid,
-#         direction,
-#     )
-
-#     # store vertical unit vector
-#     orientation_gradient(model, orientation, state_auxiliary, grid, direction)
-# end
-
 function init_state_prognostic!(model::ModelSetup, state::Vars, aux::Vars, localgeo, t)
     x = aux.x
     y = aux.y
@@ -287,9 +245,16 @@ end
     calc_boundary_state!(numerical_flux, bc.ρθ, model, diffusion, args...)
 end
 
+calc_boundary_state!(numerical_flux, bc, model, diffusion, args...) = nothing
+
 @inline vertical_unit_vector(::Orientation, aux) = aux.∇Φ / grav(param_set)
 @inline vertical_unit_vector(::NoOrientation, aux) = @SVector [0, 0, 1]
 
+function get_components(csolver)
+    mA = csolver.component_list.domainA.component_model
+    mB = csolver.component_list.domainB.component_model
+    return mA, mB
+end
 
 """
 function preB(csolver)
@@ -297,23 +262,23 @@ function preB(csolver)
     csolver::CplSolver
 """
 function preB(csolver)
-    mA = csolver.component_list.domainA.component_model
-    mB = csolver.component_list.domainB.component_model
-    # Set boundary SST used in atmos to SST of ocean surface at start of coupling cycle.
-    mB.odesolver.rhs!.state_auxiliary.ρθ_secondary[mB.boundary] .= 
+    mA, mB = get_components(csolver)
+    # Set boundary ρθ used in B to ρθ of A surface at start of coupling cycle.
+    mB.rhs.state_auxiliary.ρθ_secondary[mB.boundary] .= 
         coupler_get(csolver.coupler, :EnergyA, mB.grid.numerical, DateTime(0), u"J")
-    # Set atmos boundary flux accumulator to 0.
+    # Set boundary flux accumulator to 0.
     mB.state.F_ρθ_accum .= 0
 
     idx = varsindex(vars(mA.state), :ρθ)[1]
+    
     @info(
-        "preatmos",
+        "preB",
         time = csolver.t, #* "/" * mB.time.finish ,
-        total_ρθA_ = weightedsum(mA.state, idx),
+        total_ρθA = weightedsum(mA.state, idx),
         total_ρθB = weightedsum(mB.state, idx),
         total_ρθ = weightedsum(mA.state, idx) + weightedsum(mB.state, idx),
-        atmos_ρθ_surface_maxA = maximum(mA.state.ρθ[mA.boundary]),
-        ocean_ρθ_surface_maxB = maximum(mB.state.ρθ[mB.boundary]),
+        ρθ_surface_maxA = maximum(mA.state.ρθ[mA.boundary]),
+        ρθ_surface_maxB = maximum(mB.state.ρθ[mB.boundary]),
     )
 
     isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.A[csolver.steps] = weightedsum(mA.state, idx)
@@ -326,27 +291,28 @@ function postB(csolver)
     csolver::CplSolver
 """
 function postB(csolver)
-    mA = csolver.component_list.domainA.component_model
-    mB = csolver.component_list.domainB.component_model
-    # Pass atmos exports to "coupler" namespace
-    # 1. Save mean θ flux at the Atmos boundary during the coupling period
+    mA, mB = get_components(csolver)
+    # Pass exports to "coupler" namespace
+    # 1. Save mean θ flux at B boundary during the coupling period
     coupler_put!(csolver.coupler, :EnergyFluxB, mB.state.F_ρθ_accum[mB.boundary] ./ csolver.dt,
         mB.grid.numerical, DateTime(0), u"J")
+
+    # idx = varsindex(vars(mA.state), :ρθ)[1]
 
     # @info(
     #     "postatmos",
     #     time = time = csolver.t + csolver.dt,
-    #     total_θ_atmos = weightedsum(mB.state, 1),
-    #     total_θ_ocean = weightedsum(mA.state, 1),
+    #     total_ρθ_atmos = weightedsum(mB.state, idx),
+    #     total_ρθ_ocean = weightedsum(mA.state, idx),
     #     total_F_accum = mean(mB.state.F_accum[mB.boundary]) * 1e6 * 1e6,
-    #     total_θ =
-    #         weightedsum(mB.state, 1) +
-    #         weightedsum(mA.state, 1) +
+    #     total_ρθ =
+    #         weightedsum(mB.state, idx) +
+    #         weightedsum(mA.state, idx) +
     #         mean(mB.state.F_ρθ_accum[mB.boundary]) * 1e6 * 1e6,
     #     F_accum_max = maximum(mB.state.F_accum[mB.boundary]),
     #     F_avg_max = maximum(mB.state.F_accum[mB.boundary] ./ csolver.dt),
-    #     atmos_θ_surface_max = maximum(mB.state.θ[mB.boundary]),
-    #     ocean_θ_surface_max = maximum(mA.state.θ[mA.boundary]),
+    #     ρθ_surface_maxB = maximum(mB.state.ρθ[mB.boundary]),
+    #     ρθ_surface_maxA = maximum(mA.state.ρθ[mA.boundary]),
     # )
 end
 
@@ -356,24 +322,22 @@ function preA(csolver)
     csolver::CplSolver
 """
 function preA(csolver)
-    mA = csolver.component_list.domainA.component_model
-    mB = csolver.component_list.domainB.component_model
-    # Set mean air-sea theta flux
+    mA, mB = get_components(csolver)
 
-    mA.odesolver.rhs!.state_auxiliary.F_ρθ_prescribed[mA.boundary] .= 
+    mA.rhs.state_auxiliary.F_ρθ_prescribed[mA.boundary] .= 
         coupler_get(csolver.coupler, :EnergyFluxB, mA.grid, DateTime(0), u"J")
-    # Set ocean boundary flux accumulator to 0. (this isn't used)
+    # Set boundary flux accumulator to 0. (this isn't used)
     mA.state.F_ρθ_accum .= 0
 
     # @info(
-    #     "preocean",
+    #     "preA",
     #     time = csolver.t,
     #     F_prescribed_max =
     #         maximum(mA.discretization.state_auxiliary.F_prescribed[mA.boundary]),
     #     F_prescribed_min =
     #         maximum(mA.discretization.state_auxiliary.F_prescribed[mA.boundary]),
-    #     ocean_θ_surface_max = maximum(mA.state.θ[mA.boundary]),
-    #     ocean_θ_surface_min = maximum(mA.state.θ[mA.boundary]),
+    #     ρθ_surface_maxA = maximum(mA.state.ρθ[mA.boundary]),
+    #     ρθ_surface_minA = maximum(mA.state.ρθ[mA.boundary]),
     # )
 end
 
@@ -384,17 +348,16 @@ function postA(csolver)
     csolver::CplSolver
 """
 function postA(csolver)
-    mA = csolver.component_list.domainA.component_model
-    mB = csolver.component_list.domainB.component_model
+    mA, mB = get_components(csolver)
+
     # @info(
-    #     "postocean",
+    #     "postA",
     #     time = csolver.t + csolver.dt,
-    #     ocean_θ_surface_max = maximum(mA.state.θ[mA.boundary]),
-    #     ocean_θ_surface_min = maximum(mA.state.θ[mA.boundary]),
+    #     ρθ_surface_maxA = maximum(mA.state.ρθ[mA.boundary]),
+    #     ρθ_surface_minA = maximum(mA.state.ρθ[mA.boundary]),
     # )
 
-    # Pass ocean exports to "coupler" namespace
-    #  1. Ocean SST (value of θ at z=0)
+    # Pass exports to "coupler" namespace
     coupler_put!(csolver.coupler, :EnergyA, mA.state.ρθ[mA.boundary], mA.grid.numerical, DateTime(0), u"J")
 end
 
@@ -422,6 +385,28 @@ struct CoupledSecondaryBoundary <: AbstractCouplerBoundary end
 # # use prescribed flux computed in primary
 """
 struct CoupledSecondaryBoundary  <: AbstractCouplerBoundary end
+
+function numerical_boundary_flux_second_order!(
+    numerical_flux::Union{PenaltyNumFluxDiffusive},
+    bctype::FluidBC,
+    balance_law::ModelSetup,
+    args... 
+) where {S, D, A, HD}
+    normal_boundary_flux_second_order!( # for ρu BCs (to be implemented in boundary_state!)
+        numerical_flux,
+        bctype,
+        balance_law,
+        args...
+    )
+
+    numerical_boundary_flux_second_order!( # this overwrites the total flux for ρθ (using methods below)
+        numerical_flux,
+        bctype.ρθ,
+        balance_law,
+        args...
+    )
+
+end
 
 # customized flux for CoupledPrimaryBoundary
 function numerical_boundary_flux_second_order!(
@@ -476,9 +461,9 @@ function numerical_boundary_flux_second_order!(
 end
 
 # customized flux for CoupledSecondaryBoundary
-numerical_boundary_flux_second_order!(
+function numerical_boundary_flux_second_order!(
     numerical_flux::PenaltyNumFluxDiffusive,
-    bctype,
+    bctype::Insulating,
     balance_law,
     fluxᵀn::Vars{S},
     normal_vector::SVector,
@@ -494,25 +479,9 @@ numerical_boundary_flux_second_order!(
     state1⁻::Vars{S},
     diff1⁻::Vars{D},
     aux1⁻::Vars{A},
-) where {S, D, HD, A} = normal_boundary_flux_second_order!(
-    numerical_flux,
-    bctype,
-    balance_law,
-    fluxᵀn,
-    normal_vector,
-    state_prognostic⁻,
-    state_gradient_flux⁻,
-    state_hyperdiffusive⁻,
-    state_auxiliary⁻,
-    state_prognostic⁺,
-    state_gradient_flux⁺,
-    state_hyperdiffusive⁺,
-    state_auxiliary⁺,
-    t,
-    state1⁻,
-    diff1⁻,
-    aux1⁻,
-)
+) where {S, D, HD, A}
+    return nothing
+end
 
 """
 function numerical_flux_second_order!(::PenaltyNumFluxDiffusive, 

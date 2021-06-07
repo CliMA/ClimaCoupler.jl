@@ -63,10 +63,12 @@ physics = Physics(
 
 bcsA = (
     bottom = (ρu = Impenetrable(FreeSlip()), ρθ = Insulating()),
-    top =    (ρu = Impenetrable(FreeSlip()), ρθ = CoupledSecondaryBoundary()),
+    top = (ρu = Impenetrable(FreeSlip()), ρθ = Insulating()),
+    # top =    (ρu = Impenetrable(FreeSlip()), ρθ = CoupledSecondaryBoundary()),
 )
 bcsB = (
-    bottom = (ρu = Impenetrable(FreeSlip()), ρθ = CoupledPrimaryBoundary()),
+    # bottom = (ρu = Impenetrable(FreeSlip()), ρθ = CoupledPrimaryBoundary()),
+    bottom = (ρu = Impenetrable(FreeSlip()), ρθ = Insulating()),
     top =    (ρu = Impenetrable(FreeSlip()), ρθ = Insulating()),
 )
 
@@ -77,7 +79,7 @@ bcsB = (
 modelA = ModelSetup(
     physics = physics,
     boundary_conditions = bcsA,
-    initial_conditions = (ρ = ρ₀ᶜᵃʳᵗ, ρu = ρu⃗₀ᶜᵃʳᵗ, ρθ = ρθ₀ᶜᵃʳᵗ),
+    initial_conditions = (ρ = ρ₀ᶜᵃʳᵗ, ρu = ρu⃗₀ᶜᵃʳᵗ, ρθ = ρθ₀ᶜᵃʳᵗA),
     numerics = (flux = RoeNumericalFlux(),flux_second_order = PenaltyNumFluxDiffusive()),
     parameters = parameters,
 )
@@ -85,7 +87,7 @@ modelA = ModelSetup(
 modelB = ModelSetup(
     physics = physics,
     boundary_conditions = bcsB,
-    initial_conditions = (ρ = ρ₀ᶜᵃʳᵗ, ρu = ρu⃗₀ᶜᵃʳᵗ, ρθ = ρθ₀ᶜᵃʳᵗ),
+    initial_conditions = (ρ = ρ₀ᶜᵃʳᵗ, ρu = ρu⃗₀ᶜᵃʳᵗ, ρθ = ρθ₀ᶜᵃʳᵗB),
     numerics = (flux = RoeNumericalFlux(),flux_second_order = PenaltyNumFluxDiffusive()),
     parameters = parameters,
 )
@@ -94,16 +96,23 @@ modelB = ModelSetup(
 # Set up time steppers (could be done automatically in simulation)
 ########
 Δt  = min_node_distance(gridA.numerical) / parameters.cₛ * 0.25
-total_steps = 200
+total_steps = 10000
 start_time = 0
 end_time = Δt * total_steps#30 * 24 * 3600
 method = SSPRK22Heuns
-callbacks = (
+callbacksA = (
   Info(),
   CFL(),
-  VTKState(
-    iteration = Int(floor(6*3600/Δt)), 
-    filepath = "./out/"),
+#   VTKState(
+#     iteration = 250,#Int(floor(6*3600/Δt)), 
+#     filepath = "./out/A2/"),
+)
+callbacksB = (
+  Info(),
+  CFL(),
+#   VTKState(
+#     iteration = 250,#Int(floor(6*3600/Δt)), 
+#     filepath = "./out/B2/"),
 )
 
 ########
@@ -122,19 +131,19 @@ simA = CplSimulation(
     time        = (start = start_time, finish = end_time),
     nsteps      = nstepsA,
     boundary_z = boundary_mask,
-    callbacks   = callbacks,
+    callbacks   = callbacksA,
 )
 simB = CplSimulation(
-    modelA;
+    modelB;
     grid = gridB,
     timestepper = (method = method, timestep = Δt / nstepsB),
     time        = (start = start_time, finish = end_time),
     nsteps      = nstepsB,
     boundary_z = boundary_mask,
-    callbacks   = callbacks,
+    callbacks   = callbacksB,
 )
 
-## Create a Coupler State object for holding imort/export fields.
+## Create a Coupler State object for holding import/export fields.
 coupler = CplState()
 register_cpl_field!(coupler, :EnergyA, deepcopy(simA.state.ρθ[simA.boundary]), simA.grid, DateTime(0), u"J") # value on top of domainA for calculating upward flux into domainB
 register_cpl_field!(coupler, :EnergyFluxB, deepcopy(simB.state.F_ρθ_accum[simB.boundary]), simB.grid, DateTime(0), u"J") # downward flux
@@ -155,8 +164,7 @@ cpl_solver = CplSolver(
 ########
 # Run the simulation
 ########
-numberofsteps = Int( round((end_time - start_time) / Δt))
-evolve!(cpl_solver, numberofsteps)
+evolve!(cpl_solver, total_steps)
 
 ########
 # Check conservation
@@ -167,4 +175,6 @@ fluxB = cpl_solver.fluxlog.B
 fluxT = fluxA .+ fluxB
 time = collect(1:1:total_steps)
 rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1]) ]
-plot(time .* cpl_solver.dt, rel_error)
+# plot(time .* cpl_solver.dt, rel_error)
+plot(time .* cpl_solver.dt, fluxA)
+plot!(time .* cpl_solver.dt, fluxB)

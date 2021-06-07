@@ -108,8 +108,18 @@ function CplSimulation(model; grid, timestepper, time, boundary_z = nothing, nst
     t0            = simulation.time.start
     Δt            = timestepper.timestep
 
+    npoly = convention(grid.resolution.polynomial_order, Val(ndims(grid.domain)))
+    if haskey(grid.resolution, :overintegration_order)
+        nover = convention(grid.resolution.overintegration_order, Val(ndims(grid.domain)))
+    else
+        nover = (0, 0, 0)
+    end
+    staggering = get(model.numerics, :staggering, false)
+    overintegration_filter!(state, rhs, npoly, nover)
+    rhs_c = rhs_closure(rhs, npoly, nover, staggering = staggering)
+
     # Instantiate time stepping method    
-    odesolver = timestepper.method(rhs, state, dt = Δt, t0 = t0)
+    odesolver = timestepper.method(rhs_c, state, dt = Δt, t0 = t0)
 
     # Make callbacks from callbacks tuple
     cbvector = create_callbacks(simulation, odesolver)
@@ -254,7 +264,7 @@ function evolve!(cpl_solver, numberofsteps; refDat = ())
         nothing,
         cpl_solver;
         numberofsteps = numberofsteps,
-        callbacks = cpl_solver.component_list.domainB.component_model.cbvector,
+        callbacks = (cpl_solver.component_list.domainA.component_model.cbvector, cpl_solver.component_list.domainB.component_model.cbvector),
     )
 
 

@@ -34,11 +34,13 @@ hᵖ(p, λ, ϕ, r) =  0.0
 ρuʳᵃᵈ(p, λ, ϕ, r) = 0
 ρuˡᵃᵗ(p, λ, ϕ, r) = p.vˢ * ρ₀(p, λ, ϕ, r) * (p.ϵ * vᵖ(p, λ, ϕ, r))
 ρuˡᵒⁿ(p, λ, ϕ, r) = p.vˢ * ρ₀(p, λ, ϕ, r) * (uᵐ(p, λ, ϕ, r) + p.ϵ * uᵖ(p, λ, ϕ, r))
-ρθ₀(p, λ, ϕ, r) = ρ₀(p, λ, ϕ, r) * tanh(p.ℓᵐ * ϕ)
+ρθ₀B(p, λ, ϕ, r) = ρ₀(p, λ, ϕ, r) * tanh(p.ℓᵐ * ϕ)
+ρθ₀A(p, λ, ϕ, r) = 0
 
 # Cartesian Representation for initialization (boiler plate really)
 ρ₀ᶜᵃʳᵗ(p, x...)  = ρ₀(p, lon(x...), lat(x...), rad(x...))
 ρu⃗₀ᶜᵃʳᵗ(p, x...) = (   ρuʳᵃᵈ(p, lon(x...), lat(x...), rad(x...)) * r̂(x...) 
                      + ρuˡᵃᵗ(p, lon(x...), lat(x...), rad(x...)) * ϕ̂(x...)
                      + ρuˡᵒⁿ(p, lon(x...), lat(x...), rad(x...)) * λ̂(x...) ) 
-ρθ₀ᶜᵃʳᵗ(p, x...) = ρθ₀(p, lon(x...), lat(x...), rad(x...))
+ρθ₀ᶜᵃʳᵗA(p, x...) = ρθ₀A(p, lon(x...), lat(x...), rad(x...))
+ρθ₀ᶜᵃʳᵗB(p, x...) = ρθ₀B(p, lon(x...), lat(x...), rad(x...))

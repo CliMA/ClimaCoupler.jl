@@ -185,7 +185,8 @@ function DiscontinuousSpectralElementGrid(
     topl = StackedCubedSphereTopology(
         mpicomm,
         elements.horizontal,
-        Rrange,
+        Rrange;
+        boundary = boundary,
     )
 
     grid = DiscontinuousSpectralElementGrid(

@@ -27,14 +27,15 @@ end
         NFgradient = CentralNumericalFluxGradient(),
     ) 
 
-Builds an instance of a coupler test model.  This is a toy model
+Builds an instance of a coupler test model. This is currently a toy model
 used for testing and designing coupling machinery. In a full-blown coupled
-experiment this model would be replaced by a full compnent model.
+experiment this model would be replaced by a full component model that is
+wrapped to format it for coupler compatibility.
 
 -  `grid` the spectral element grid used by this model. 
 -  `equations` the Balance Law used by this model.
 -  `nsteps` number of component steps to run during each coupling step.
--  `boundary_z` height above or below air-sea interface of the coupled boundary.
+-  `boundary_z` height above or below the air-sea interface of the coupled boundary.
 -  `dt` component timestep to use on each component step.
 -  `timestepper` the ODE solver used to advance the system.
 -  `NFfirstorder` numerical flux to use for first order terms.
@@ -50,7 +51,6 @@ to use for real setups).
 A real model might have many more flags and/or may wrap the component creation
 very differently. Any component should allow itself to set a number of timesteps
 to execute with a certain timestep to synchronize with the coupling time scale.
-
 """
 function CplModel(;
     grid,
@@ -64,13 +64,10 @@ function CplModel(;
     NFgradient = CentralNumericalFluxGradient(),
     overint_params = nothing,
 )
-
     FT = eltype(grid.vgeo)
 
-    ###
-    ### Create a discretization that is the union of the spatial
-    ### grid and the equations, plus some numerical flux settings.
-    ###
+    # Create a discretization that is the union of the spatial
+    # grid and the equations, plus some numerical flux settings.
     discretization = DGModel(
         equations,
         grid,
@@ -89,14 +86,10 @@ function CplModel(;
     boundary(boundary_z, xc, yc, zc) = isnothing(boundary_z) ? zc .== 0 : boundary_z( xc, yc, zc )
     boundary = boundary(boundary_z, xc, yc, zc)
     
-    ###
-    ### Invoke the spatial ODE initialization functions
-    ###
+    # Invoke the spatial ODE initialization functions
     state = init_ode_state(discretization, FT(0); init_on_cpu = true)
 
-    ###
-    ### Additional tendency hooks
-    ###
+    # Additional tendency hooks
     if overint_params != nothing
         overintegrationorder, polynomialorder = overint_params
         Ns = (polynomialorder.horizontal, polynomialorder.horizontal, polynomialorder.vertical)
@@ -107,20 +100,15 @@ function CplModel(;
         discretization(tendency, x...; kw...)
         if overint_params != nothing
             overintegration_filter!(tendency, discretization, Ns, No)
-            #"uisng Oi"
         end
     end
 
-    ###
-    ### Create a timestepper of the sort needed for this component.
-    ### Hard coded here - but can be configurable.
-    ###
+    # Create a timestepper of the sort needed for this component.
+    # Hard coded here - but can be configurable.
     stepper = timestepper(custom_tendency, state, dt = dt, t0 = 0.0)
 
-    ###
-    ### Return a CplModel entity that holds all the information
-    ### for a component that can be driver from a coupled stepping layer.
-    ###
+    # Return a CplModel entity that holds all the information
+    # for a component that can be driver from a coupled stepping layer.
     return CplModel(grid, discretization, boundary, state, stepper, nsteps)
 end
 

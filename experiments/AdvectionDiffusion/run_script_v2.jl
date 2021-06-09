@@ -1,3 +1,54 @@
+# # Advection-diffusion on a Sphere
+# ## Setup
+# - Passive advection of an anomaly using non-divergent horizontal flow on the sphere (currently 300km/s but switching to Williamson stream function)
+# - Homogeneous tracer concentration of the outer shell couples to an inhomogeneous concentration of the inner shell
+
+# ## Equations
+# The RHS evaluation follows:
+# ```math
+# \frac{\partial \theta}{\partial t} = - \nabla \cdot (\vec{u} \theta + \kappa \nabla \theta) \qquad
+# ```
+# where
+#  -  $\theta$ is the tracer (e.g. potential temperature)
+#  -  $\vec{u}(u,0,0)$ is a constant zonal velocity
+#  -  $\kappa$ is the diffusivity tensor.
+# **Boundary Conditions**
+#  - External boundary conditions (Neumann):
+# ```math
+# \vec{n} \cdot \kappa \nabla \theta = 0 \qquad \text{at } z = 4\text{km}, -4\text{km}
+# ```
+# where $\vec{n}$ is the upward pointing unit normal vector at the boundary.
+#  - Primary coupled boundary condition (forced by secondary domain):
+# ```math
+# \vec{n} \cdot \kappa_a \nabla \theta =f_a= \lambda (\theta - \theta_{secondary}) \qquad \text{at atmos } z = 0
+# ```
+# where $\lambda$ is a constant but will be replaced by a roughness coefficient factor in more complex test cases.
+# $f_a$ and $\kappa_a$ are, respectively, the flux and diffusivity of the atmosphere component.
+#  - Secondary coupled boundary condition (accumulated flux by primary domain or prescribed flux):
+# If accumulated,
+# ```math
+# \vec{n} \cdot \kappa_o\nabla \theta = f_o \qquad \text{at ocean } z = 0 \text{ (or pseudo subsurface)}
+# and
+# ```
+# ```math
+# f_o = f_{accum} = \int_{\tau_0}^{\tau} f_a dt
+# ```
+# where $τ-τ_0$ gives the coupling cycle length.
+# $f_o$ and $\kappa_o$ are, respectively, the flux and diffusivity of the atmosphere component, with
+# $f_{accum}$ being the accumulated flux.
+
+# ```
+# ATMOS
+# ------------- θ @z=0 [lowest atmos level]
+#   A
+#  / \          f = n⋅κ_a ∇θ = λ(θ−θ_secondary​)    
+#   |
+# ------------- θ_secondary​ @z=0 [highest ocean level]
+# OCEAN
+# ```
+
+
+# # Import packages
 using ClimateMachine, MPI
 using ClimateMachine.DGMethods.NumericalFluxes
 using ClimateMachine.DGMethods
@@ -39,18 +90,19 @@ const param_set = EarthParameterSet()
 ClimateMachine.init()
 FT = Float64
 
-# Shared functions
+## Shared functions
 include("domains.jl")
 include("abstractions.jl")
 include("callbacks.jl")
 
-# Main balance law and its components
+## Main balance law and its components
 include("CplMainBL.jl")
 
+# # Set simulation parameters
 nstepsA = 10
 nstepsO = 5
 
-#  Background atmos and ocean diffusivities
+##  Background atmos and ocean diffusivities
 const κᵃʰ = FT(1e4) * 0.0
 const κᵃᶻ = FT(1e-1)
 const κᵒʰ = FT(1e3) * 0.0
@@ -61,14 +113,17 @@ const λ_airsea = FT(L_airsea / τ_airsea)
 coupling_lambda() = (λ_airsea)
 const u_max = FT(1e-5) # max. advective velocity in radians
 
+# # Set up coupled model
+# Define component models and initialize the coupler
+
 function main(::Type{FT}) where {FT}
     
-    # Domain
-    # confusing name - better might be to use something like DeepSphericalShellDomain directly?
+    ## Domain - Spherical Shells
+    ## confusing name - better might be to use something like DeepSphericalShellDomain directly?
     ΩO = DeepSphericalShellDomain(radius = FT(planet_radius(param_set)) - FT(4e3), height = FT(4e3))
     ΩA = DeepSphericalShellDomain(radius = FT(planet_radius(param_set)) , height = FT(4e3))
 
-    # Grid
+    ## Grid
     nelem = (;horizontal = 8, vertical = 4)
     polynomialorder = (;horizontal = 5, vertical = 5)
     overintegrationorder = (;horizontal = 1, vertical = 1)
@@ -76,23 +131,24 @@ function main(::Type{FT}) where {FT}
     gridA = DiscontinuousSpectralElementGrid(ΩA, nelem, polynomialorder)
     gridO = DiscontinuousSpectralElementGrid(ΩO, nelem, polynomialorder)
 
-    # Numerics-specific options
-    numerics = (NFfirstorder = CentralNumericalFluxFirstOrder(), NFsecondorder = PenaltyNumFluxDiffusive(), overint_params = (overintegrationorder, polynomialorder) ) #, NFsecondorder = CentralNumericalFluxSecondOrder() )#PenaltyNumFluxDiffusive() )#, overint_params = (overintegrationorder, polynomialorder) ) 
+    ## Numerics-specific options
+    numerics = (NFfirstorder = CentralNumericalFluxFirstOrder(), NFsecondorder = PenaltyNumFluxDiffusive(),
+                overint_params = (overintegrationorder, polynomialorder))
 
-    # Timestepping
+    ## Timestepping
     Δt_ = calculate_dt(gridA, wavespeed = u_max*(ΩA.radius), diffusivity = maximum([κᵃʰ, κᵃᶻ]) ) 
     
     t_time, end_time = ( 0  , 20Δt_ )
 
-    # Collect spatial info, timestepping, balance law and DGmodel for the two components
+    ## Collect spatial info, timestepping, balance law and DGmodel for the two components
     boundary_mask( xc, yc, zc ) = @. ( xc^2 + yc^2 + zc^2 )^0.5 ≈ planet_radius(param_set)
-    
-    # 1. Atmos component
+#+   
+# **1.** Atmos component
     
     ## Prop atmos functions to override defaults
     atmos_structure(λ, ϕ, r) = FT(30)#30.0 + 10.0 * cos(ϕ) * sin(5λ)
     atmos_θⁱⁿⁱᵗ(npt, el, x, y, z) = atmos_structure( lon(x,y,z), lat(x,y,z), rad(x,y,z) )                # Set atmosphere initial state function
-    #atmos_θ_shadowflux(θᵃ, θᵒ, npt, el, xc, yc, zc) = FT(0.0)
+    ##atmos_θ_shadowflux(θᵃ, θᵒ, npt, el, xc, yc, zc) = FT(0.0)
     atmos_θ_shadowflux(θᵃ, θᵒ, npt, el, xc, yc, zc) = is_surface(xc,yc,zc) ? (1.0 / τ_airsea) * (θᵃ - θᵒ) : 0.0 # Set atmosphere shadow boundary flux function
     atmos_calc_kappa_diff(_...) = κᵃʰ, κᵃʰ, κᵃᶻ               # Set atmos diffusion coeffs
     atmos_source_θ(θᵃ, npt, el, xc, yc, zc, θᵒ) = FT(0.0)     # Set atmos source!
@@ -129,8 +185,8 @@ function main(::Type{FT}) where {FT}
         timestepper = LSRK54CarpenterKennedy,
         numerics...,
     )
-
-    # 2. Ocean component
+#+
+# **2.** Ocean component
     ## Prop ocean functions to override defaults
     tropical_heating_1(λ, ϕ, r) = 30.0 + 10.0 * cos(ϕ) * sin(5λ)
     tropical_heating_2(λ, ϕ, r) = 30.0 + 10.0 * cos(ϕ) + 1 * sin(5λ) * cos(ϕ)
@@ -165,18 +221,16 @@ function main(::Type{FT}) where {FT}
         timestepper = LSRK54CarpenterKennedy,
         numerics...,
     )
-
-    # Create a Coupler State object for holding import/export fields.
-    # Try using Dict here - not sure if that will be OK with GPU
+#+
+# Create the coupler object for holding import/export fields and performs mappings
+# and instantiate the coupled timestepper:
     coupler = CplState()
     coupler_register!(coupler, :Ocean_SST, deepcopy(mO.state.θ[mO.boundary]), mO.grid, DateTime(0), u"°C")
     coupler_register!(coupler, :Atmos_MeanAirSeaθFlux, deepcopy(mA.state.F_accum[mA.boundary]), mA.grid, DateTime(0), u"°C")
     
-
     # Instantiate a coupled timestepper that steps forward the components and
     # implements mapings between components export bondary states and
     # other components imports.
-
     compA = (pre_step = preatmos, component_model = mA, post_step = postatmos)
     compO = (pre_step = preocean, component_model = mO, post_step = postocean)
     component_list = (atmosphere = compA, ocean = compO)
@@ -186,8 +240,10 @@ function main(::Type{FT}) where {FT}
         coupling_dt = Δt_,
         t0 = 0.0,
     )
-    
-    # For now applying callbacks only to atmos.
+
+#+
+# Creat callbacks and bundle the simulation:
+    ## For now applying callbacks only to atmos.
     callbacks = (
         ExponentialFiltering(),
         VTKOutput((
@@ -213,7 +269,7 @@ end
 
 
 function run(cpl_solver, numberofsteps, cbvector)
-    # Run the model
+    ## Run the model
     solve!(
         nothing,
         cpl_solver;
@@ -221,6 +277,8 @@ function run(cpl_solver, numberofsteps, cbvector)
         callbacks = cbvector,
     )
 end
+
+# # Run simulation
 
 simulation = main(Float64);
 nsteps = Int(simulation.simtime[2] / simulation.coupled_odesolver.dt)

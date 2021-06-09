@@ -1,4 +1,6 @@
-# Coupler Object
+# Coupler State
+
+The coupler provides a space to store information being passed between coupled model components at their boundaries. During this exchange, the coupler manages ancillary operations such as regridding, unit conversions, filtering, etc.
 
 The CouplerMachine defines a type [`CplState`](@ref) for a _container_ variable
 that holds information about the field boundary values that are being used to

@@ -6,10 +6,6 @@ component steps forward before passing its updated state to another. An outer
 with the coupler. Within this coupled timestep, components take an integer number
 of substeps, and evolve independently from each other.
 
-| ![Coupled Timestepping](images/cpltimestep.png) |
-|:--:|
-| *Sequential coupled timestepping with two component models.* |
-
 `CplSolver` extends the ODE solver API of
 [ClimateMachine.ODESolvers](https://clima.github.io/ClimateMachine.jl/latest/APIs/Numerics/ODESolvers/ODESolvers/).
 

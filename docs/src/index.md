@@ -1,12 +1,10 @@
 # CouplerMachine.jl
 
-![](favicon-32x32.png) *Coupling CliMA Models*
-
+*Coupling CliMA Models*
 
 ```@meta
 CurrentModule = CouplerMachine
 ```
-
 
 CouplerMachine.jl provides a means to couple climate model components from and within
 [ClimateMachine.jl](https://github.com/CliMA/ClimateMachine.jl) and [Oceananigans.jl](https://github.com/CliMA/Oceananigans.jl). 

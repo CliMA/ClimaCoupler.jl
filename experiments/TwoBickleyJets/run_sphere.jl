@@ -9,8 +9,7 @@ include("parameters_initialconditions.jl")
 
 FT = Float64
 
-
-# Collects tracer valus/fluxes for conservation checks
+# Collects tracer values/fluxes for conservation checks
 mutable struct LogThatFlux{F}
     A::F
     B::F
@@ -19,7 +18,6 @@ end
 ########
 # Set up domain
 ########
-
 # A: low atmos level (troposphere)
 domainA = SphericalShell(
     radius = FT(1), 
@@ -48,7 +46,6 @@ gridB = DiscretizedDomain(
 ########
 # Set up model physics
 ######## 
-
 physics = Physics(
     orientation = SphericalOrientation(),
     advection   = NonLinearAdvection(),
@@ -60,22 +57,20 @@ physics = Physics(
 ########
 # Set up boundary conditions
 ########
-
 bcsA = (
     bottom = (ρu = Impenetrable(FreeSlip()), ρθ = Insulating()),
-    top = (ρu = Impenetrable(FreeSlip()), ρθ = Insulating()),
-    # top =    (ρu = Impenetrable(FreeSlip()), ρθ = CoupledSecondaryBoundary()),
+    # top = (ρu = Impenetrable(FreeSlip()), ρθ = Insulating()), # for non-coupled testing
+    top =    (ρu = Impenetrable(FreeSlip()), ρθ = CoupledSecondaryBoundary()),
 )
 bcsB = (
-    # bottom = (ρu = Impenetrable(FreeSlip()), ρθ = CoupledPrimaryBoundary()),
-    bottom = (ρu = Impenetrable(FreeSlip()), ρθ = Insulating()),
+    bottom = (ρu = Impenetrable(FreeSlip()), ρθ = CoupledPrimaryBoundary()),
+    # bottom = (ρu = Impenetrable(FreeSlip()), ρθ = Insulating()), #for non-coupled testing
     top =    (ρu = Impenetrable(FreeSlip()), ρθ = Insulating()),
 )
 
 ########
 # Set up model
 ########
-
 modelA = ModelSetup(
     physics = physics,
     boundary_conditions = bcsA,
@@ -105,14 +100,14 @@ callbacksA = (
   CFL(),
 #   VTKState(
 #     iteration = 250,#Int(floor(6*3600/Δt)), 
-#     filepath = "./out/A2/"),
+#     filepath = "./out/A/"),
 )
 callbacksB = (
   Info(),
   CFL(),
 #   VTKState(
 #     iteration = 250,#Int(floor(6*3600/Δt)), 
-#     filepath = "./out/B2/"),
+#     filepath = "./out/B/"),
 )
 
 ########
@@ -145,14 +140,12 @@ simB = CplSimulation(
 
 ## Create a Coupler State object for holding import/export fields.
 coupler = CplState()
-register_cpl_field!(coupler, :EnergyA, deepcopy(simA.state.ρθ[simA.boundary]), simA.grid, DateTime(0), u"J") # value on top of domainA for calculating upward flux into domainB
-register_cpl_field!(coupler, :EnergyFluxB, deepcopy(simB.state.F_ρθ_accum[simB.boundary]), simB.grid, DateTime(0), u"J") # downward flux
+coupler_register!(coupler, :EnergyA, deepcopy(simA.state.ρθ[simA.boundary]), simA.grid, DateTime(0), u"J") # value on top of domainA for calculating upward flux into domainB
+coupler_register!(coupler, :EnergyFluxB, deepcopy(simB.state.F_ρθ_accum[simB.boundary]), simB.grid, DateTime(0), u"J") # downward flux
 
 compA = (pre_step = preA, component_model = simA, post_step = postA)
 compB = (pre_step = preB, component_model = simB, post_step = postB)
 component_list = (domainA = compA, domainB = compB)
-
-
 cpl_solver = CplSolver(
     component_list = component_list,
     coupler = coupler,

@@ -85,6 +85,11 @@ struct CplSimulation{𝒯,𝒰,𝒱,𝒲,𝒳,𝒴,L,B, CBV} <: AbstractSimulati
     cbvector::CBV
 end
 
+"""
+    CplSimulation(model; grid, timestepper, time, boundary_z = nothing, nsteps, callbacks)
+
+Creates a `Simulation`-like struct for coupled models, adding coupler-relevant info.
+"""
 function CplSimulation(model; grid, timestepper, time, boundary_z = nothing, nsteps, callbacks)
     rhs = DGModel(
         model, 
@@ -258,7 +263,6 @@ function evolve!(simulation::Simulation; refDat = ())
 end
 
 function evolve!(cpl_solver, numberofsteps; refDat = ())
-
     # Perform evolution of simulations
     solve!(
         nothing,
@@ -266,19 +270,6 @@ function evolve!(cpl_solver, numberofsteps; refDat = ())
         numberofsteps = numberofsteps,
         callbacks = (cpl_solver.component_list.domainA.component_model.cbvector, cpl_solver.component_list.domainB.component_model.cbvector),
     )
-
-
-    # Check results against reference if StateCheck callback is used
-    # TODO: TB: I don't think this should live within this function
-    # if any(typeof.(simulation.callbacks) .<: StateCheck)
-    #   check_inds = findall(typeof.(simulation.callbacks) .<: StateCheck)
-    #   @assert length(check_inds) == 1 "Only use one StateCheck in callbacks!"
-
-    #   ClimateMachine.StateCheck.scprintref(cbvector[check_inds[1]])
-    #   if length(refDat) > 0
-    #     @test ClimateMachine.StateCheck.scdocheck(cbvector[check_inds[1]], refDat)
-    #   end
-    # end
 
     return nothing
 end

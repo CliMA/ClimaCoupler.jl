@@ -56,7 +56,6 @@ gridAtmos = DiscretizedDomain(
 
 physicsLand = Physics(
     orientation = FlatOrientation(),
-    #diffusion   = ConstantViscosity( FT(0), FT(0), FT(1e3) ),
     eos         = DryIdealGas{Float64}(R = parameters.R_d, pₒ = parameters.pₒ, γ = 1 / (1 - parameters.κ)),
 )
 
@@ -75,8 +74,8 @@ bcsLand = (
     top =     (T_sfc = CoupledSecondaryBoundary(),),
 )
 bcsAtmos = (
-    bottom = (ρu = Impenetrable(FreeSlip()), ρθ = CoupledPrimaryBoundary()),
-    top =    (ρu = Impenetrable(FreeSlip()), ρθ = Insulating()),
+    bottom = (ρu = nothing, ρθ = CoupledPrimaryBoundary(),),
+    top =    (ρu = nothing, ρθ = Insulating(),),
 )
 
 ########
@@ -87,15 +86,15 @@ modelLand = SlabLandModelSetup(
     physics = physicsLand,
     boundary_conditions = bcsLand,
     initial_conditions = (T_sfc = T_sfc₀,),
-    numerics = (flux = RoeNumericalFlux(),flux_second_order = PenaltyNumFluxDiffusive(), direction = EveryDirection()),
+    numerics = (flux = CentralNumericalFluxFirstOrder(),flux_second_order = PenaltyNumFluxDiffusive(), direction = EveryDirection()),
     parameters = parameters,
 )
 
 modelAtmos = ModelSetup(
     physics = physicsAtmos,
     boundary_conditions = bcsAtmos,
-    initial_conditions =(ρ = ρ₀B, ρu = ρu⃗₀B, ρθ = ρθ₀B),
-    numerics = (flux = RoeNumericalFlux(),flux_second_order = PenaltyNumFluxDiffusive(), direction = EveryDirection()),
+    initial_conditions =(ρ = ρ₀Atmos, ρθ = ρθ₀Atmos,),
+    numerics = (flux = CentralNumericalFluxFirstOrder(),flux_second_order = PenaltyNumFluxDiffusive(), direction = EveryDirection()),
     parameters = parameters,
 )
 
@@ -103,7 +102,7 @@ modelAtmos = ModelSetup(
 # Set up time steppers (could be done automatically in simulation)
 ########
 Δt  = min_node_distance(gridAtmos.numerical) / parameters.cₛ * 0.25
-total_steps = 500
+total_steps = 1000
 start_time = 0
 end_time = Δt * total_steps#30 * 24 * 3600
 method = SSPRK22Heuns
@@ -175,8 +174,8 @@ fluxB = cpl_solver.fluxlog.B
 
 fluxT = fluxA .+ fluxB 
 time = collect(1:1:total_steps)
-rel_error = [ ((fluxT .- fluxT[2]) / fluxT[2]) ]
-plot(time .* cpl_solver.dt, rel_error)
+rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1]) ]
+plot(time .* cpl_solver.dt, rel_error, ylabel = "rel. error = (fluxT - fluxT[1]) / fluxT[1]", xlabel = "time (s)")
 
 using Statistics
-plot(time .* cpl_solver.dt, [(fluxA .- fluxA[1]) (fluxB .- fluxB[1])] )
+plot(time .* cpl_solver.dt, [(fluxA .- fluxA[1]) (fluxB .- fluxB[1])],  label = ["Land Energy" "Atmos Energy"], xlabel = "time (s)", ylabel = "J / m2")

@@ -115,7 +115,6 @@ function init_state_prognostic!(model::ModelSetup, state::Vars, aux::Vars, local
     ic = model.initial_conditions
 
     state.ρ = ic.ρ(parameters, x, y, z)
-    state.ρu = ic.ρu(parameters, x, y, z)
     state.ρθ = ic.ρθ(parameters, x, y, z)
 
     state.F_ρθ_accum = 0
@@ -172,7 +171,6 @@ end
     t::Real,
 )
     flux.ρ += gradflux.μ∇ρ
-    flux.ρu += gradflux.ν∇u
     flux.ρθ += gradflux.κ∇θ
 
     return nothing
@@ -190,34 +188,33 @@ end
     t::Real,
     direction,
 )
-    source.F_ρθ_accum = calculate_land_sfc_fluxes(model, state, aux) 
+    source.F_ρθ_accum = calculate_land_sfc_fluxes(model, state, aux, t) 
     
     return nothing
 end
 
 """
-    calculate_land_sfc_fluxes(model::ModelSetup, state, aux)
+    calculate_land_sfc_fluxes(model::ModelSetup, state, aux, t)
 - calculate furface fluxes using the bulk gradient diffusion theory
 """
-function calculate_land_sfc_fluxes(model::ModelSetup, state, aux; MO_params = nothing) # should pass in the coupler state (also move to coupler), so can access states of both models derectly -e.g. callback?
+function calculate_land_sfc_fluxes(model::ModelSetup, state, aux, t; MO_params = nothing) # should pass in the coupler state (also move to coupler), so can access states of both models derectly -e.g. callback?
     
     FT = eltype(state)
     p = model.parameters
 
-    p_sfc = FT(100000)
+    p_sfc = p.pₒ
     θ_a = state.ρθ / state.ρ 
     T_a = θ_a
     T_sfc = aux.T_sfc 
     θ_sfc = T_sfc  
 
-    R_SW = (FT(1)-p.α) * p.τ * p.F_sol
-    R_LW = p.ϵ * (p.σ * θ_sfc - p.F_a)
-    SH   = state.ρ * p.c_p * p.g_a * (T_sfc - T_a) # g_a could be substituded by g_a=f(MO_params) (see Bonan P90), but first need to modify SurfaceFluxes.jl
+    R_SW = (FT(1)-p.α) * p.τ * p.F_sol * (FT(1) .+ sin(t * 2π / p.diurnal_period) )
+    R_LW = p.ϵ * (p.σ * θ_sfc .^ 4 - p.F_a)
+    SH   = state.ρ * p.cp_d * p.g_a * (T_sfc - T_a) # g_a could be substituded by g_a=f(MO_params) (see Bonan P90), but first need to modify SurfaceFluxes.jl
       
     #LH   = p.lambda * p.g_w * (q_sat(T_sfc, p_sfc) - q_a) 
-    #F_tot = - (R_SW - R_LW - SH )#- LH 
+    F_tot = - (R_SW - R_LW - SH )#- LH 
 
-    F_tot = - (- SH )
 end
 
 """
@@ -236,7 +233,6 @@ end
     # operations, hence the diffusion model dependence.
     # TODO!: make work for higher-order diffusion
     diffusion = model.physics.diffusion # defaults to `nothing`
-    calc_boundary_state!(numerical_flux, bc.ρu, model, diffusion, args...)
     calc_boundary_state!(numerical_flux, bc.ρθ, model, diffusion, args...)
 end
 
@@ -246,13 +242,6 @@ function numerical_boundary_flux_second_order!(
     balance_law::ModelSetup,
     args... 
 ) where {S, D, A, HD}
-    
-    normal_boundary_flux_second_order!( # for ρu BCs (to be implemented in boundary_state!)
-        numerical_flux,
-        bctype,
-        balance_law,
-        args...
-    )
 
     numerical_boundary_flux_second_order!( # this overwrites the total flux for ρθ (using methods below)
         numerical_flux,
@@ -283,9 +272,8 @@ function numerical_boundary_flux_second_order!(
     diff1⁻::Vars{D},
     aux1⁻::Vars{A},
 ) where {S, D, A, HD}
-    
-    F_tot = calculate_land_sfc_fluxes(balance_law, state_prognostic⁻, state_auxiliary⁻)  # W/m^2
-    fluxᵀn.ρθ = - F_tot  / balance_law.parameters.c_p
+    F_tot = calculate_land_sfc_fluxes(balance_law, state_prognostic⁻, state_auxiliary⁻, t)  # W/m^2
+    fluxᵀn.ρθ = - F_tot  / balance_law.parameters.cp_d
 
 end
 
@@ -336,7 +324,7 @@ function numerical_flux_second_order!(
 
     Fᵀn = parent(fluxᵀn)
     FT = eltype(Fᵀn)
-    tau = FT(0.0) # decide if want to use penalty
+    tau = FT(0.0) # decide if want to use this penalty
     Fᵀn .+= tau * (parent(state⁻) - parent(state⁺))
 end
 
@@ -366,7 +354,7 @@ function preAtmos(csolver)
     po = mAtmos.grid.resolution.polynomial_order.vertical
 
     E_Land = weightedsum(mLand.state, 1) .* p.ρ_s .* p.h_s .* p.c_s  # J / m^2
-    E_Atmos = weightedsum(mAtmos.state, idx) .* p.c_p .* p.zmax ./  nel ./ (po+1) ./ (po+2) # J / m^2 
+    E_Atmos = weightedsum(mAtmos.state, idx) .* p.cp_d .* p.zmax ./  nel ./ (po+1) ./ (po+2) # J / m^2 
 
     @info(
         "preatmos",

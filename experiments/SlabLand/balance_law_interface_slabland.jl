@@ -42,9 +42,7 @@ function vars_state(model::SlabLandModelSetup, aux::Auxiliary, T)
         x::T
         y::T
         z::T
-        #Φ::T
-        #∇Φ::SVector{3, T} # TODO: only needed for the linear model
-        F_ρθ_prescribed::T # stores prescribed flux for secondary (ocean import)
+        F_ρθ_prescribed::T # stores prescribed flux for secondary (land import)
     end
 end
 

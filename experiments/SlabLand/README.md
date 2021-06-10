@@ -35,11 +35,11 @@ where
 
 - $F_{a} =0$ = choosing no incoming longwave radiation from the atmosphere
   
-- SHF = $c_p g_a (T_{sfc} - T_a) = c_p g_a (T_{sfc} - T_a)$
+- SHF = $cp_d g_a (T_{sfc} - T_a) = cp_d g_a (T_{sfc} - T_a)$
 
 - $g_a$ = aerodynamic conductance (in complex models dependent on both land and atmosphere parameters, but in the single stack it is assumed constant, 2 mol m$^{-2}$ s$^{-1} \approx$ 0.02 kg m$^{-2}$ s$^{-1}$ )
 
-- $c_p$ = specific heat capacity of the atmosphere at constant pressure (1004 J kg$^{–1}$ K$^{-1}$)
+- $cp_d$ = specific heat capacity of the atmosphere at constant pressure (1004 J kg$^{–1}$ K$^{-1}$)
 
   
 
@@ -75,7 +75,7 @@ For this simple implementation, we assume:
 
 1) Coupler sends its field `LandSurfaceTemperature` and transforms it into Atmos field `auxiliary.T_sfc`
 2) Atmos initializes its state according to the user-defined ICs
-3) Atmos performs all its timesteps pithing the coupling cycle, with the boundary conditions at the coupled boundary setting the total normal flux to be equal to the flux coming from the land (`fluxᵀn.ρθ = - F_tot / c_p`, so that $\partial_t \rho \theta = \nabla_z \sdot F_{tot}/c_p$)
+3) Atmos performs all its timesteps pithing the coupling cycle, with the boundary conditions at the coupled boundary setting the total normal flux to be equal to the flux coming from the land (`fluxᵀn.ρθ = - F_tot / cp_d`, so that $\partial_t \rho \theta = \nabla_z \sdot F_{tot}/cp_d$)
 4) The same flux `F_tot` is calculated in the `source!` function and saved as `state.F_ρθ_accum`, which ensures that the flux will be integrated and accumulated in time, consistent with the Atmos time stepping. 
 5) Coupler converts Atmos field `state.F_ρθ_accum` to the coupler field `EnergyFluxAtmos` 
 6) Coupler sends its field `EnergyFluxAtmos` and transforms it into Land field `auxiliary.F_ρθ_prescribed`

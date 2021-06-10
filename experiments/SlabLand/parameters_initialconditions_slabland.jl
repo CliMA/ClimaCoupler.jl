@@ -2,65 +2,41 @@
 # Set up parameters
 ########
 parameters = (
-        R_d  = 8.3144598 / 28.97e-3,
-        pₒ   = 1.01325e5,
-        κ    = 2.0/7.0,
-        g    = 9.81,
-        cp_d = (8.3144598 / 28.97e-3) / (2/7),
-        cv_d = (8.3144598 / 28.97e-3) / (2/7) - 8.3144598 / 28.97e-3,
-        xc   = 5000,
-        yc   = 1000,
-        zc   = 2000,
-        rc   = 2000,
-        xmax = 10000,
-        ymax = 500,
-        zmax = 10000,
-        θₐ   = 2.0,
-        cₛ   = 340,
-        κ_s  = 2,
-        T_h = 280,
-        h_s = 100,
-        F_sol = 1361,
-        τ = 0.9,
-        α = 0.5,
-        σ = 5.67e-8,
-        c_p = 1004,
-        g_a = 0.02,
-        ϵ = 0.98,
-        F_a = 0.0,
-        ρ_s = 1500,
-        c_s = 800
+        R_d  = 8.3144598 / 28.97e-3,    # gas constant for dry air [J / K / kg]
+        pₒ   = 1.01325e5,               # initial surface pressure [Pa]
+        κ    = 2.0/7.0, # R_d/cp_d
+        g    = 9.81,    # gravitation acceleration [m /s^2]
+        cp_d = (8.3144598 / 28.97e-3) / (2/7),                          # specific heat for ideal gas at constant pressure [J / K / kg]
+        cv_d = (8.3144598 / 28.97e-3) / (2/7) - 8.3144598 / 28.97e-3,   # specific heat for ideal gas at constant volume [J / K / kg]
+        c_s = 800,       # specific heat for land (soil)  [J / K / kg]
+        xmax = 10000,   # horizontal extent of the SingleStack in the x direction [m]
+        ymax = 500,     # horizontal extent of the SingleStack in the y direction [m]
+        zmax = 10000,   # vertical extent of the SingleStack [m]
+        cₛ   = 340,     # speed of sound [m / s]
+        κ_s  = 2,       # soil conductivity [W / m / K]
+        T_h = 280,      # initial temperature of surface soil layer [K]
+        h_s = 100,      # depth of the modelled soil model [m]
+        F_sol = 1361,   # incoming solar TOA radiation [W / m^2]
+        τ = 0.9,        # atmospheric transmissivity 
+        α = 0.5,        # surface albedo    
+        σ = 5.67e-8,    # Steffan Boltzmann constant [kg / s^3 / K^4]
+        g_a = 0.06,     # aerodynamic conductance for heat transfer [kg / m^2 / s]
+        ϵ = 0.98,       # broadband emissivity / absorptivity
+        F_a = 0.0,      # LW flux from the atmosphere [W / m^2]
+        ρ_s = 1500,     # density for land (soil) [kg / m^3]
+        diurnal_period = 10, # idealized daily cycle period [s]
     )
  
 ########
-# Set up inital condition
+# Set up inital conditions
 ########
 
-# land
+# Land (slab) initial condition
 T_sfc₀(p, x, y, z) = p.T_h
 
-
-
-# r(p, x, z)      = sqrt((x - p.xc)^2 + (z - p.zc)^2)
-# Δθ(p, x, y, z)  = (r(p, x, z) < p.rc) ? ( p.θₐ * (1.0 - r(p, x, z) / p.rc) ) : 0.0
-θ₀A(p, x, y, z)  = 250.0
-π_exnerA(p, x, y, z)   = 1.0 - p.g / (p.cp_d * θ₀A(p, x, y, z) ) * z  
-
-ρ₀A(p, x, y, z)  = p.pₒ / (p.R_d * θ₀A(p, x, y, z)) * (π_exnerA(p, x, y, z))^(p.cv_d/p.R_d)
-# ρ₀(p, x, y, z)  = 1.0
-ρθ₀A(p, x, y, z)     = ρ₀A(p, x, y, z) * θ₀A(p, x, y, z) 
-ρu⃗₀A(p, x, y, z)     = @SVector [0,0,0]
-
-
-
-
-
-
-# r(p, x, z)      = sqrt((x - p.xc)^2 + (z - p.zc)^2)
-# Δθ(p, x, y, z)  = (r(p, x, z) < p.rc) ? ( p.θₐ * (1.0 - r(p, x, z) / p.rc) ) : 0.0
-θ₀B(p, x, y, z)  = 300.0 + 10.0 * ( z /p.zmax ) 
-π_exnerB(p, x, y, z)   = 1.0 - p.g / (p.cp_d * θ₀B(p, x, y, z) ) * z  
-
-ρ₀B(p, x, y, z)  = p.pₒ / (p.R_d * θ₀B(p, x, y, z)) * (π_exnerB(p, x, y, z))^(p.cv_d/p.R_d)
-ρθ₀B(p, x, y, z)     = ρ₀B(p, x, y, z) * θ₀B(p, x, y, z) 
-ρu⃗₀B(p, x, y, z)     = @SVector [0,0,0]
+# Atmos (single stack) initial conditions
+θ₀Atmos(p, x, y, z)         = 300.0 + 10.0 * ( z /p.zmax ) 
+π_exnerAtmos(p, x, y, z)    = 1.0 - p.g / (p.cp_d * θ₀Atmos(p, x, y, z) ) * z  
+ρ₀Atmos(p, x, y, z)         = p.pₒ / (p.R_d * θ₀Atmos(p, x, y, z)) * (π_exnerAtmos(p, x, y, z))^(p.cv_d/p.R_d)
+ρθ₀Atmos(p, x, y, z)        = ρ₀Atmos(p, x, y, z) * θ₀Atmos(p, x, y, z) 
+ρu⃗₀Atmos(p, x, y, z)        = @SVector [0,0,0]

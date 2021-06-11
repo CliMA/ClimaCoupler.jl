@@ -142,9 +142,9 @@ flux_second_order!(model::SlabOceanModelSetup, _...,) = nothing
 )
 
     p = model.physics.parameters
-    #G    = p.κ_s * (state.T_sfc - p.T_h) / p.h_s # simple soil physics
+    #G    = p.κ_s * (state.T_sfc - p.T_h) / p.h_o # simple soil physics
     G = Float64(0)
-    source.T_sfc = - (aux.F_ρe_prescribed + G) / (p.ρ_s * p.c_s * p.h_s)
+    source.T_sfc = - (aux.F_ρe_prescribed + G) / (p.ρ_o * p.c_o * p.h_o)
 
     return nothing
 end

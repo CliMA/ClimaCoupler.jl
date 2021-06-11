@@ -353,7 +353,7 @@ function preAtmos(csolver)
     nel = mAtmos.grid.resolution.elements.vertical
     po = mAtmos.grid.resolution.polynomial_order.vertical
 
-    E_Land = weightedsum(mLand.state, 1) .* p.ρ_s .* p.h_s .* p.c_s  # J / m^2
+    E_Land = weightedsum(mLand.state, 1) .* p.ρ_o .* p.h_o .* p.c_o  # J / m^2
     E_Atmos = weightedsum(mAtmos.state, idx) .* p.cp_d .* p.zmax ./  nel ./ (po+1) ./ (po+2) # J / m^2 
 
     @info(

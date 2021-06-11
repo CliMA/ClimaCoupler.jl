@@ -57,10 +57,10 @@ Using explicit time stepping the formulation is implemented as follows:
 		- $F_s$ = solar flux
 		- $\tau$ = transmissivity
 		- $\alpha$ = albedo
-- SHF = $c_p c_s\rho_a |V_0|(T_{o,skin} - T)$
-	- $c_s = 1e-3 (1.2e-3)$ heat exchange coefficient (or over land) 
-- LHR =  $c_s\rho_a |V_0|(q_{sat}(T_o,p_{sfc}) - q)$
-	- $c_s= 1e-3$ heat exchange coeff over sea
+- SHF = $c_p c_o\rho_a |V_0|(T_{o,skin} - T)$
+	- $c_o = 1e-3 (1.2e-3)$ heat exchange coefficient (or over land) 
+- LHR =  $c_o\rho_a |V_0|(q_{sat}(T_o,p_{sfc}) - q)$
+	- $c_o= 1e-3$ heat exchange coeff over sea
 References:
 - https://www.cesm.ucar.edu/models/atm-cam/docs/description/node29.html
 

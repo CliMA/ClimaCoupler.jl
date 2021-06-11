@@ -253,7 +253,7 @@ function preAtmos(csolver)
     nel = mAtmos.grid.resolution.elements.vertical
     po = mAtmos.grid.resolution.polynomial_order.vertical
 
-    E_Ocean = weightedsum(mOcean.state, 1) .* p.ρ_s .* p.h_s .* p.c_s  # J / m^2
+    E_Ocean = weightedsum(mOcean.state, 1) .* p.ρ_o .* p.h_o .* p.c_o  # J / m^2
     E_Atmos = weightedsum(mAtmos.state, idx) .* p.cp_d .* p.H ./  nel ./ (po+1) ./ (po+2) # J / m^2 
 
     @info(
@@ -281,6 +281,14 @@ function postAtmos(csolver)
     mAtmos = csolver.component_list.domainAtmos.component_model
     # Pass atmos exports to "coupler" namespace
     # 1. Save mean θ flux at the Atmos boundary during the coupling period
+
+    @info(
+        "postatmos",
+        time = string(csolver.t) * "/" * string(mAtmos.time.finish),
+        Ocean_T_sfc = maximum(mOcean.state.T_sfc[mOcean.boundary]),
+        atmos_ρe_sfc = maximum(mAtmos.state.ρe[mAtmos.boundary]),
+    )
+
     coupler_put!(csolver.coupler, :EnergyFluxAtmos, mAtmos.state.F_ρe_accum[mAtmos.boundary] ./ csolver.dt,
         mAtmos.grid.numerical, DateTime(0), u"J")
 end

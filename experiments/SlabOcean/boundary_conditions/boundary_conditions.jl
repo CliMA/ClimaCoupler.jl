@@ -158,6 +158,10 @@ function numerical_boundary_flux_first_order!(
     LH_v0 = model.physics.parameters.LH_v0
 
     E, H = calc_ocean_sfc_fluxes(model.physics, state⁻, aux⁻) #[W/m^2]
+
+    # FT = eltype(state⁻)
+    # E  =FT(0)
+    # H = FT(0)
     fluxᵀn.ρ  = E / LH_v0 
     fluxᵀn.ρe = E + H
     fluxᵀn.ρq = E / LH_v0

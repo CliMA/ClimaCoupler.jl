@@ -99,11 +99,18 @@ linear_physicsAtmos = Physics(
 # # Set up boundary conditions
 # ########
 
-oceanBC = ( Insulating(), CoupledSecondaryAtmosModelBC() )
+# oceanBC = ( Insulating(), CoupledSecondaryAtmosModelBC() )
+
+# atmosBC = (
+#         DefaultBC() ,  # (Insulating, FreeSlip) 
+#         CoupledPrimarySlabOceanBC( parameters.Cₑ, parameters.Cₗ),
+#         )
+
+oceanBC = ( Insulating(), Insulating() )
 
 atmosBC = (
         DefaultBC() ,  # (Insulating, FreeSlip) 
-        CoupledPrimarySlabOceanBC( parameters.Cₑ, parameters.Cₗ),
+        DefaultBC(),
         )
 
 ########
@@ -118,9 +125,16 @@ modelOcean = SlabOceanModelSetup(
     #parameters = parameters,
 )
 
+T_sfc(𝒫, ϕ) = 𝒫.ΔT * exp(-ϕ^2 / 2 / 𝒫.Δϕ^2) + 𝒫.Tₘᵢₙ
+FixedSST = BulkFormulaTemperature(
+    drag_coef_temperature = (params, ϕ) -> params.Cₑ,
+    drag_coef_moisture = (params, ϕ) -> params.Cₗ,
+    surface_temperature = T_sfc,
+)
+
 modelAtmos = DryAtmosModel(
     physics = physicsAtmos,
-    boundary_conditions = atmosBC, 
+    boundary_conditions = (DefaultBC(), FixedSST), #atmosBC, 
     initial_conditions = (ρ = ρ₀ᶜᵃʳᵗ, ρu = ρu⃗₀ᶜᵃʳᵗ, ρe = ρeᶜᵃʳᵗ, ρq = ρqᶜᵃʳᵗ),
     numerics = (flux = LMARSNumericalFlux(),),
 )

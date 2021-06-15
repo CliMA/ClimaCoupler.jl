@@ -37,14 +37,16 @@ domainAtmos = SphericalShell(
 
 gridOcean = DiscretizedDomain(
     domainOcean;
-    elements = (vertical = 10, horizontal = 32),
+    #elements = (vertical = 10, horizontal = 32),
+    elements = (vertical = 4, horizontal = 4),
     polynomial_order = (vertical = 2, horizontal = 2),
     overintegration_order = (vertical = 0, horizontal = 0),
 )
 
 gridAtmos = DiscretizedDomain(
     domainAtmos;
-    elements = (vertical = 10, horizontal = 32),
+    #elements = (vertical = 10, horizontal = 32),
+    elements = (vertical = 4, horizontal = 4),
     polynomial_order = (vertical = 2, horizontal = 2),
     overintegration_order = (vertical = 0, horizontal = 0),
 )
@@ -72,10 +74,10 @@ physicsAtmos = Physics(
         PressureDivergence(),
     ),
     sources     = (
-        DeepShellCoriolis(),
+        #DeepShellCoriolis(),
         FluctuationGravity(),
-        ZeroMomentMicrophysics(),
-        HeldSuarezForcing(held_suarez_parameters),
+        #ZeroMomentMicrophysics(),
+        #HeldSuarezForcing(held_suarez_parameters),
         FluxAccumulator(),
     ),
     parameters = parameters,
@@ -99,14 +101,14 @@ linear_physicsAtmos = Physics(
 # # Set up boundary conditions
 # ########
 
-oceanBC = ( Insulating(), CoupledSecondaryAtmosModelBC() )
+# oceanBC = ( Insulating(), CoupledSecondaryAtmosModelBC() )
 
 # atmosBC = (
 #         DefaultBC() ,  # (Insulating, FreeSlip) 
 #         CoupledPrimarySlabOceanBC( parameters.Cₑ, parameters.Cₗ),
 #         )
 
-#oceanBC = ( Insulating(), Insulating() )
+oceanBC = ( Insulating(), Insulating() )
 
 #atmosBC = (
 #        DefaultBC() ,  # (Insulating, FreeSlip) 
@@ -136,6 +138,7 @@ modelAtmos = DryAtmosModel(
     physics = physicsAtmos,
     #boundary_conditions = ( DefaultBC(), FixedSST), #atmosBC, 
     boundary_conditions = ( DefaultBC(), CoupledPrimarySlabOceanBC( parameters.Cₑ, parameters.Cₗ) ), #atmosBC, 
+    #boundary_conditions = ( DefaultBC(), DefaultBC() ), #atmosBC, 
     initial_conditions = (ρ = ρ₀ᶜᵃʳᵗ, ρu = ρu⃗₀ᶜᵃʳᵗ, ρe = ρeᶜᵃʳᵗ, ρq = ρqᶜᵃʳᵗ),
     numerics = (flux = LMARSNumericalFlux(),),
 )
@@ -154,7 +157,7 @@ dx = min_node_distance(gridAtmos.numerical)
 cfl = 5 # 13 for 10 days, 7.5 for 200+ days
 Δt = cfl * dx / 330.0
 
-total_steps = 10
+total_steps = 100
 start_time = 0
 end_time = Δt * total_steps#30 * 24 * 3600
 
@@ -196,7 +199,7 @@ simAtmos = CplSimulation(
     boundary_z = boundary_mask,
     callbacks   = callbacks,
 )
-
+#dd=dd 
 ## Create a Coupler State object for holding import/export fields.
 coupler = CplState()
 register_cpl_field!(coupler, :SeaSurfaceTemerature, deepcopy(simOcean.state.T_sfc[simOcean.boundary]), simOcean.grid, DateTime(0), u"K") # value on top of domainA for calculating upward flux into domainB
@@ -237,4 +240,4 @@ plot(time .* cpl_solver.dt, [(fluxA .- fluxA[1]) (fluxB .- fluxB[1])],  label = 
 
 
 plot(time .* cpl_solver.dt, fluxA, ylabel = "rel. error = (fluxT - fluxT[1]) / fluxT[1]", xlabel = "time (s)")
-plot(time .* cpl_solver.dt, fluxB, ylabel = "rel. error = (fluxT - fluxT[1]) / fluxT[1]", xlabel = "time (s)")
+#plot(time .* cpl_solver.dt, fluxB, ylabel = "rel. error = (fluxT - fluxT[1]) / fluxT[1]", xlabel = "time (s)")

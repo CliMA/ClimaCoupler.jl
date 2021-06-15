@@ -48,6 +48,7 @@ function vars_state(::DryAtmosModel, ::Prognostic, FT)
         ρe::FT
         ρq::FT
         F_ρe_accum::FT # accumulated energy flux
+
     end
 end
 
@@ -93,7 +94,8 @@ function nodal_init_state_auxiliary!(
     init_state_auxiliary!(model, model.physics.orientation, state_auxiliary, geom)
     init_state_auxiliary!(model, model.physics.ref_state, state_auxiliary, geom)
 
-    state_auxiliary.T_sfc = model.physics.parameters.T_h
+    FT = eltype(state_auxiliary)
+    state_auxiliary.T_sfc = FT(0)
 end
 
 function init_state_auxiliary!(
@@ -250,11 +252,16 @@ function preAtmos(csolver)
 
     model_type = cpl_solver.component_list.domainAtmos.component_model.model[1] # TODO: bl should be more accessible
     p = model_type.model.physics.parameters # maybe the parameter list could be saved in the coupler? (this would requre all the compute kernels below to import the coupler)
-    nel = mAtmos.grid.resolution.elements.vertical
-    po = mAtmos.grid.resolution.polynomial_order.vertical
+    nel = mAtmos.grid.resolution.elements.horizontal
+    po = mAtmos.grid.resolution.polynomial_order.horizontal
+    nel_v = mAtmos.grid.resolution.elements.vertical
+    po_v = mAtmos.grid.resolution.polynomial_order.vertical
 
-    E_Ocean = weightedsum(mOcean.state, 1) .* p.ρ_o .* p.h_o .* p.c_o  # J / m^2
-    E_Atmos = weightedsum(mAtmos.state, idx) .* p.cp_d .* p.H ./  nel ./ (po+1) ./ (po+2) # J / m^2 
+    horz_points = nel ^2 * (po+1) ^2  * Float64(6.0)  
+    vert_points = nel_v * (po_v+1)
+    E_Ocean = weightedsum(mOcean.state, 1) .* p.ρ_o .* p.c_o .* p.h_o  ./  horz_points  # J / m^2
+    E_Atmos = weightedsum(mAtmos.state, idx) .* p.H ./  horz_points ./vert_points
+    # J / m^2 
 
     @info(
         "preatmos",
@@ -262,9 +269,9 @@ function preAtmos(csolver)
         total_energyA = E_Ocean,
         total_energyB = E_Atmos,
         total_energy = E_Atmos + E_Ocean,
-        Ocean_T_sfc = maximum(mOcean.state.T_sfc[mOcean.boundary]),
-        atmos_ρe_sfc = maximum(mAtmos.state.ρe[mAtmos.boundary]),
-    )
+        ocean_T_sfc_max = maximum(mOcean.state.T_sfc[mOcean.boundary]),
+        atmos_ρe_sfc_max = maximum(mAtmos.state.ρe[mAtmos.boundary]),
+    ) 
 
     isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.A[csolver.steps] = E_Ocean
     isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.B[csolver.steps] = E_Atmos

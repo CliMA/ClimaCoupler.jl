@@ -100,7 +100,7 @@ cond(𝒫,λ,ϕ)  = (0 < d(𝒫,λ,ϕ) < d_0(𝒫)) * (d(𝒫,λ,ϕ) != 𝒫.a *
 I_T(𝒫,ϕ,r)   = (cos(ϕ) * r / 𝒫.a)^𝒫.k - 𝒫.k / (𝒫.k + 2) * (cos(ϕ) * r / 𝒫.a)^(𝒫.k + 2)
 Tᵥ(𝒫,ϕ,r)    = (τ_1(𝒫,r) - τ_2(𝒫,r) * I_T(𝒫,ϕ,r))^(-1) * (𝒫.a/r)^2
 p(𝒫,ϕ,r)     = 𝒫.pₒ * exp(-𝒫.g / 𝒫.R_d * (τ_int_1(𝒫,r) - τ_int_2(𝒫,r) * I_T(𝒫,ϕ,r)))
-q(𝒫,ϕ,r)     = (p(𝒫,ϕ,r) > 𝒫.p_w) ? 𝒫.q₀ * exp(-(ϕ / 𝒫.ϕ_w)^4) * exp(-((p(𝒫,ϕ,r) - 𝒫.pₒ) / 𝒫.p_w)^2) : 𝒫.qₜ
+q(𝒫,ϕ,r)     = 0.0 #(p(𝒫,ϕ,r) > 𝒫.p_w) ? 𝒫.q₀ * exp(-(ϕ / 𝒫.ϕ_w)^4) * exp(-((p(𝒫,ϕ,r) - 𝒫.pₒ) / 𝒫.p_w)^2) : 𝒫.qₜ
 
 # base-state velocity variables
 U(𝒫,ϕ,r)  = 𝒫.g * 𝒫.k / 𝒫.a * τ_int_2(𝒫,r) * Tᵥ(𝒫,ϕ,r) * ((cos(ϕ) * r / 𝒫.a)^(𝒫.k - 1) - (cos(ϕ) * r / 𝒫.a)^(𝒫.k + 1))
@@ -252,7 +252,7 @@ function calc_component!(
     physics,)
     
     E, H = calc_ocean_sfc_fluxes(physics, state, aux) 
-    source.F_ρe_accum = E + H # latent + sensible heat fluxes [W/m^2]
+    source.F_ρe_accum = (E + H) # latent + sensible heat fluxes [W/m^2]
 end
 
 
@@ -290,7 +290,7 @@ function calc_ocean_sfc_fluxes(physics, state⁻, aux⁻; MO_params = nothing) #
     # latent heat flux
     q = ρq / ρ
     q_tot_sfc  = calc_saturation_specific_humidity(ρ, T_sfc, parameters) 
-    E = ρ * Cₑ * speed_tangential * LH_v0 * (q - q_tot_sfc)
+    E =  Float64(0.0) #ρ * Cₑ * speed_tangential * LH_v0 * (q - q_tot_sfc) 
 
     return E, H
 

@@ -68,7 +68,7 @@ parameters = (
 # Set up inital conditions
 ########
 
-# 1. Land (slab) initial condition
+# 1. Land (ocean) initial condition
 T_sfc₀(p, x, y, z) = p.T_h
 
 # 2. Atmos (single stack) initial conditions

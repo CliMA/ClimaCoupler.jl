@@ -99,19 +99,19 @@ linear_physicsAtmos = Physics(
 # # Set up boundary conditions
 # ########
 
-# oceanBC = ( Insulating(), CoupledSecondaryAtmosModelBC() )
+oceanBC = ( Insulating(), CoupledSecondaryAtmosModelBC() )
 
 # atmosBC = (
 #         DefaultBC() ,  # (Insulating, FreeSlip) 
 #         CoupledPrimarySlabOceanBC( parameters.Cₑ, parameters.Cₗ),
 #         )
 
-oceanBC = ( Insulating(), Insulating() )
+#oceanBC = ( Insulating(), Insulating() )
 
-atmosBC = (
-        DefaultBC() ,  # (Insulating, FreeSlip) 
-        DefaultBC(),
-        )
+#atmosBC = (
+#        DefaultBC() ,  # (Insulating, FreeSlip) 
+#        DefaultBC(),
+#        )
 
 ########
 # Set up model
@@ -125,16 +125,17 @@ modelOcean = SlabOceanModelSetup(
     #parameters = parameters,
 )
 
-T_sfc(𝒫, ϕ) = 𝒫.ΔT * exp(-ϕ^2 / 2 / 𝒫.Δϕ^2) + 𝒫.Tₘᵢₙ
-FixedSST = BulkFormulaTemperature(
-    drag_coef_temperature = (params, ϕ) -> params.Cₑ,
-    drag_coef_moisture = (params, ϕ) -> params.Cₗ,
-    surface_temperature = T_sfc,
-)
+# T_sfc(𝒫, ϕ) = 𝒫.ΔT * exp(-ϕ^2 / 2 / 𝒫.Δϕ^2) + 𝒫.Tₘᵢₙ
+# FixedSST = BulkFormulaTemperature(
+#     drag_coef_temperature = (params, ϕ) -> params.Cₑ,
+#     drag_coef_moisture = (params, ϕ) -> params.Cₗ,
+#     surface_temperature = T_sfc,
+# )
 
 modelAtmos = DryAtmosModel(
     physics = physicsAtmos,
-    boundary_conditions = (DefaultBC(), FixedSST), #atmosBC, 
+    #boundary_conditions = ( DefaultBC(), FixedSST), #atmosBC, 
+    boundary_conditions = ( DefaultBC(), CoupledPrimarySlabOceanBC( parameters.Cₑ, parameters.Cₗ) ), #atmosBC, 
     initial_conditions = (ρ = ρ₀ᶜᵃʳᵗ, ρu = ρu⃗₀ᶜᵃʳᵗ, ρe = ρeᶜᵃʳᵗ, ρq = ρqᶜᵃʳᵗ),
     numerics = (flux = LMARSNumericalFlux(),),
 )
@@ -153,7 +154,7 @@ dx = min_node_distance(gridAtmos.numerical)
 cfl = 5 # 13 for 10 days, 7.5 for 200+ days
 Δt = cfl * dx / 330.0
 
-total_steps = 1000
+total_steps = 10
 start_time = 0
 end_time = Δt * total_steps#30 * 24 * 3600
 
@@ -232,3 +233,8 @@ plot(time .* cpl_solver.dt, rel_error, ylabel = "rel. error = (fluxT - fluxT[1])
 
 using Statistics
 plot(time .* cpl_solver.dt, [(fluxA .- fluxA[1]) (fluxB .- fluxB[1])],  label = ["Ocean Energy" "Atmos Energy"], xlabel = "time (s)", ylabel = "J / m2")
+
+
+
+plot(time .* cpl_solver.dt, fluxA, ylabel = "rel. error = (fluxT - fluxT[1]) / fluxT[1]", xlabel = "time (s)")
+plot(time .* cpl_solver.dt, fluxB, ylabel = "rel. error = (fluxT - fluxT[1]) / fluxT[1]", xlabel = "time (s)")

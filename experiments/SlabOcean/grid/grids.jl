@@ -200,7 +200,7 @@ function DiscontinuousSpectralElementGrid(
     elements,
     polynomialorder,
     mpicomm = MPI.COMM_WORLD,
-    boundary = (5,6),
+    boundary = (1,2),
     FT = Float64,
     array = Array,
 )
@@ -213,8 +213,8 @@ function DiscontinuousSpectralElementGrid(
     topl = StackedCubedSphereTopology(
         mpicomm,
         elements.horizontal,
-        Rrange,#;
-        #boundary = (1, 2), check if need this
+        Rrange;
+        boundary = boundary,
     )
 
     grid = DiscontinuousSpectralElementGrid(

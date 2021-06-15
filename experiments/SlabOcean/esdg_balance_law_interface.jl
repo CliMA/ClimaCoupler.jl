@@ -93,7 +93,7 @@ function nodal_init_state_auxiliary!(
     init_state_auxiliary!(model, model.physics.orientation, state_auxiliary, geom)
     init_state_auxiliary!(model, model.physics.ref_state, state_auxiliary, geom)
 
-    state_auxiliary.T_sfc = 0
+    state_auxiliary.T_sfc = model.physics.parameters.T_h
 end
 
 function init_state_auxiliary!(
@@ -277,8 +277,10 @@ function postAtmos(csolver)
     csolver::CplSolver
 """
 function postAtmos(csolver)
+    
     mOcean = csolver.component_list.domainOcean.component_model
     mAtmos = csolver.component_list.domainAtmos.component_model
+    # @show mAtmos.state.ρe
     # Pass atmos exports to "coupler" namespace
     # 1. Save mean θ flux at the Atmos boundary during the coupling period
 
@@ -291,4 +293,5 @@ function postAtmos(csolver)
 
     coupler_put!(csolver.coupler, :EnergyFluxAtmos, mAtmos.state.F_ρe_accum[mAtmos.boundary] ./ csolver.dt,
         mAtmos.grid.numerical, DateTime(0), u"J")
-end
+    #@show mAtmos.state.F_ρe_accum[simAtmos.boundary]
+    end

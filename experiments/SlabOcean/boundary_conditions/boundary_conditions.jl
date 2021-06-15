@@ -35,7 +35,7 @@ function numerical_boundary_flux_first_order!(
     state⁺.ρ = state⁻.ρ
     state⁺.ρe = state⁻.ρe
     state⁺.ρq = state⁻.ρq
-
+    #@show "doing DefaultForm"
     ρu⁻ = state⁻.ρu
     
     # project and reflect for impenetrable condition, but 
@@ -74,7 +74,7 @@ function numerical_boundary_flux_first_order!(
     # at the boundary
     numerical_boundary_flux_first_order!(
         numerical_flux,
-        bctype::DefaultBC,
+        DefaultBC(),
         model,
         fluxᵀn,
         n̂,
@@ -88,6 +88,8 @@ function numerical_boundary_flux_first_order!(
         aux1⁻,
     )
     
+    #@show "doing BulkForm"
+
     # Apply bulks laws using the tangential velocity as energy flux
     ρ = state⁻.ρ
     ρu = state⁻.ρu
@@ -100,14 +102,14 @@ function numerical_boundary_flux_first_order!(
     ϕ = lat(aux⁻.x, aux⁻.y, aux⁻.z)
     Cₕ = bctype.drag_coef_temperature(parameters, ϕ)
     Cₑ = bctype.drag_coef_moisture(parameters, ϕ)
-    T_sfc = bctype.temperature(parameters, ϕ)
+    T_sfc = bctype.surface_temperature(parameters, ϕ)
 
     # magnitude of tangential velocity (usually called speed)
     u = ρu / ρ
     speed_tangential = norm((I - n̂ ⊗ n̂) * u)
        
     # sensible heat flux
-    cp = calc_cp(eos, state⁻, parameters)
+    cp = calc_heat_capacity_at_constant_pressure(eos, state⁻, parameters)
     T = calc_air_temperature(eos, state⁻, aux⁻, parameters)
     H = ρ * Cₕ * speed_tangential * cp * (T - T_sfc)
 
@@ -138,9 +140,12 @@ function numerical_boundary_flux_first_order!(
 ) where {S, A}
     # Impenetrable free-slip condition to reflect and project momentum 
     # at the boundary
+
+    #@show "coupled Pri"
+
     numerical_boundary_flux_first_order!(
         numerical_flux,
-        bctype::DefaultBC,
+        DefaultBC(),
         model,
         fluxᵀn,
         n̂,

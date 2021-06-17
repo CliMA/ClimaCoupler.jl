@@ -259,8 +259,12 @@ function preAtmos(csolver)
 
     horz_points = nel ^2 * (po+1) ^2  * Float64(6.0)  
     vert_points = nel_v * (po_v+1)
-    E_Ocean = weightedsum(mOcean.state, 1) .* p.ρ_o .* p.c_o .* p.h_o  ./  horz_points  # J / m^2
-    E_Atmos = weightedsum(mAtmos.state, idx) .* p.H ./  horz_points ./vert_points
+
+    Earth_sfc_area = 4π * 6371000.0 ^ 2 
+    # Ostflux = (mOcean.state .- 270.0) .* p.ρ_o .* p.c_o .* p.h_o 
+    # @show (Ostflux *Δt) # 56
+    E_Ocean = weightedsum(mOcean.state, 1) .* p.ρ_o .* p.c_o .* p.h_o  ./ p.H ./ Earth_sfc_area ./ csolver.dt # W / m^2
+    E_Atmos = weightedsum(mAtmos.state, idx) ./  Earth_sfc_area ./ csolver.dt
     # J / m^2 
 
     @info(
@@ -301,4 +305,6 @@ function postAtmos(csolver)
     coupler_put!(csolver.coupler, :EnergyFluxAtmos, mAtmos.state.F_ρe_accum[mAtmos.boundary] ./ csolver.dt,
         mAtmos.grid.numerical, DateTime(0), u"J")
     #@show mAtmos.state.F_ρe_accum[simAtmos.boundary]
+    # maxflux = maximum(abs.(mAtmos.state.F_ρe_accum[mAtmos.boundary] ./ csolver.dt)) 
+    # @show maxflux #15 W /m2
     end

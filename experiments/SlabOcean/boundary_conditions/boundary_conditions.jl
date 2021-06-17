@@ -167,8 +167,10 @@ function numerical_boundary_flux_first_order!(
     # FT = eltype(state⁻)
     # E  =FT(0)
     # H = FT(0)
+    
+    @show fluxᵀn.ρe # 1e-9 J / m2 
     fluxᵀn.ρ  = E / LH_v0 
     fluxᵀn.ρe = E + H
     fluxᵀn.ρq = E / LH_v0
-
+    @show fluxᵀn.ρe # 15 J / m2 
 end

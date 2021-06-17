@@ -37,8 +37,8 @@ parameters = (
     V_p      = 1.0,
     ϕ_w      = 2*π/9,
     p_w      = 3.4e4,
-    q₀       = 0.018,
-    qₜ       = 1e-12,
+    q₀       = 0.0, #0.018,
+    qₜ       = 0.0, #1e-12,
     ΔT       = 29.0,
     Tₘᵢₙ     = 271.0,
     Δϕ       = 26π/180.0,
@@ -46,8 +46,8 @@ parameters = (
     T_ref    = 255,
     τ_precip = 100.0,
     p0       = 1e5,
-    Cₑ       = 0.0015, # bulk transfer coefficient for sensible heat
-    Cₗ       = 0.0015, # bulk transfer coefficient for latent heat
+    Cₑ       = 0.0005, # bulk transfer coefficient for sensible heat
+    Cₗ       = 0.0, # bulk transfer coefficient for latent heat
     Mᵥ       = 0.608,
     c_o = 3.93e3,       # specific heat for ocean  [J / K / kg]
     T_h = 280,      # initial temperature of surface ocean layer [K]
@@ -63,13 +63,16 @@ parameters = (
     diurnal_period = 10, # idealized daily cycle period [s]
 )
 
- 
+# Mask to pick out the coupled boundary in the MPIStateArrays (here at altitude = 0 m)
+epss = sqrt(eps(Float64))
+boundary_mask( 𝒫, xc, yc, zc ) = @. abs(( xc^2 + yc^2 + zc^2 )^0.5 - 𝒫.a - 𝒫.H) < epss
+
 ########
 # Set up inital conditions
 ########
 
 # 1. Land (ocean) initial condition
-T_sfc₀(p, x, y, z) = p.T_h
+T_sfc₀(𝒫, xc, yc, zc) = 270.0 #T_sfc₀(𝒫, xc, yc, zc) = boundary_mask( 𝒫, xc, yc, zc ) * 𝒫.T_h
 
 # 2. Atmos (single stack) initial conditions
 # additional initial condition parameters
@@ -252,7 +255,7 @@ function calc_component!(
     physics,)
     
     E, H = calc_ocean_sfc_fluxes(physics, state, aux) 
-    source.F_ρe_accum = (E + H) # latent + sensible heat fluxes [W/m^2]
+    source.F_ρe_accum = - (E + H) # latent + sensible heat fluxes [W/m^2]
 end
 
 
@@ -273,25 +276,27 @@ function calc_ocean_sfc_fluxes(physics, state⁻, aux⁻; MO_params = nothing) #
     n̂ = aux⁻.∇Φ / parameters.g
 
     # obtain surface fields from bcs
-    Cₕ = parameters.Cₗ
-    Cₑ = parameters.Cₑ
+    Cₕ = parameters.Cₑ
+    Cₗ = parameters.Cₗ
     LH_v0 = parameters.LH_v0
-    T_sfc = aux⁻.T_sfc
+    T_sfc = Float64(280)#aux⁻.T_sfc
 
     # magnitude of tangential velocity (usually called speed)
     u = ρu / ρ
-    speed_tangential = norm((I - n̂ ⊗ n̂) * u)
+    speed_tangential =Float64(1)# norm((I - n̂ ⊗ n̂) * u)
         
     # sensible heat flux
     cp = calc_heat_capacity_at_constant_pressure(eos, state⁻, parameters)
     T = calc_air_temperature(eos, state⁻, aux⁻, parameters)
-    H = ρ * Cₕ * speed_tangential * cp * (T - T_sfc)
+    H = -  Cₕ * speed_tangential * cp * Float64(10)#(T - T_sfc)
+
+    #
 
     # latent heat flux
     q = ρq / ρ
     q_tot_sfc  = calc_saturation_specific_humidity(ρ, T_sfc, parameters) 
-    E =  Float64(0.0) #ρ * Cₑ * speed_tangential * LH_v0 * (q - q_tot_sfc) 
+    E =  Float64(0.0) #ρ * Cₗ * speed_tangential * LH_v0 * (q - q_tot_sfc) 
 
-    return E, H
+    return E, H # E = 0, H = constant
 
 end

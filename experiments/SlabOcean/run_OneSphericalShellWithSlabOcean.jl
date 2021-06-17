@@ -37,7 +37,6 @@ domainAtmos = SphericalShell(
 
 gridOcean = DiscretizedDomain(
     domainOcean;
-    #elements = (vertical = 10, horizontal = 32),
     elements = (vertical = 4, horizontal = 4),
     polynomial_order = (vertical = 2, horizontal = 2),
     overintegration_order = (vertical = 0, horizontal = 0),
@@ -45,7 +44,6 @@ gridOcean = DiscretizedDomain(
 
 gridAtmos = DiscretizedDomain(
     domainAtmos;
-    #elements = (vertical = 10, horizontal = 32),
     elements = (vertical = 4, horizontal = 4),
     polynomial_order = (vertical = 2, horizontal = 2),
     overintegration_order = (vertical = 0, horizontal = 0),
@@ -74,7 +72,7 @@ physicsAtmos = Physics(
         PressureDivergence(),
     ),
     sources     = (
-        #DeepShellCoriolis(),
+        DeepShellCoriolis(),
         FluctuationGravity(),
         #ZeroMomentMicrophysics(),
         #HeldSuarezForcing(held_suarez_parameters),
@@ -127,12 +125,6 @@ modelOcean = SlabOceanModelSetup(
     #parameters = parameters,
 )
 
-# T_sfc(𝒫, ϕ) = 𝒫.ΔT * exp(-ϕ^2 / 2 / 𝒫.Δϕ^2) + 𝒫.Tₘᵢₙ
-# FixedSST = BulkFormulaTemperature(
-#     drag_coef_temperature = (params, ϕ) -> params.Cₑ,
-#     drag_coef_moisture = (params, ϕ) -> params.Cₗ,
-#     surface_temperature = T_sfc,
-# )
 
 modelAtmos = DryAtmosModel(
     physics = physicsAtmos,
@@ -157,7 +149,7 @@ dx = min_node_distance(gridAtmos.numerical)
 cfl = 5 # 13 for 10 days, 7.5 for 200+ days
 Δt = cfl * dx / 330.0
 
-total_steps = 100
+total_steps = 2
 start_time = 0
 end_time = Δt * total_steps#30 * 24 * 3600
 
@@ -177,9 +169,6 @@ callbacks = (
 ########
 nstepsOcean = 1
 nstepsAtmos = 1
-
-epss = sqrt(eps(FT))
-boundary_mask( param_set, xc, yc, zc ) = @. abs(( xc^2 + yc^2 + zc^2 )^0.5 - param_set.a - param_set.H) < epss
     
 simOcean = CplSimulation(
     modelOcean;

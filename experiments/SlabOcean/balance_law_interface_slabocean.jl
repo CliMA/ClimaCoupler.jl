@@ -145,7 +145,7 @@ flux_second_order!(model::SlabOceanModelSetup, _...,) = nothing
     #G    = p.κ_s * (state.T_sfc - p.T_h) / p.h_o # simple soil physics
     G = Float64(0)
 
-    #@show aux.F_ρe_prescribed
+    #@show aux.F_ρe_prescribed 
     source.T_sfc = - (aux.F_ρe_prescribed + G) / (p.ρ_o * p.c_o * p.h_o)
 
     return nothing
@@ -261,8 +261,23 @@ function preOcean(csolver)
     mOcean = csolver.component_list.domainOcean.component_model
     mAtmos = csolver.component_list.domainAtmos.component_model
 
-    mOcean.odesolver.rhs!.state_auxiliary.F_ρe_prescribed[mOcean.boundary] .= 
-        coupler_get(csolver.coupler, :EnergyFluxAtmos, mOcean.grid, DateTime(0), u"J")
+    # mOcean.odesolver.rhs!.state_auxiliary.F_ρe_prescribed[mOcean.boundary] .= 
+    #      coupler_get(csolver.coupler, :EnergyFluxAtmos, mOcean.grid, DateTime(0), u"J")
+     
+    temp =  coupler_get(csolver.coupler, :EnergyFluxAtmos, mOcean.grid, DateTime(0), u"J")    
+
+    abs_temp = abs.(temp)
+
+    if sum(abs_temp) == 0
+        sign = temp .* 0.0 .+ 1.0
+    else
+        sign = temp ./ abs_temp
+    end
+    mOcean.odesolver.rhs!.state_auxiliary.F_ρe_prescribed[:,:,:] .= sign[1,1,1] .* maximum(abs_temp)
+    #@show mOcean.odesolver.rhs!.state_auxiliary.F_ρe_prescribed # 15
+    #@show mOcean.odesolver.rhs!.state_auxiliary.F_ρe_prescribed[mOcean.boundary]
+    #@show sign[1,1,1] * maximum(abs_temp)
+
 end
 
 """

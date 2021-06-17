@@ -236,7 +236,7 @@ end
         model::ModelSetup,
         args...
     )
-    # We need to apply boundary conditions for state variables. 
+    # We need to apply boundary conditions for state variables.
     # This depends on first, second, and high-order
     # operations, hence the diffusion model dependence.
     # TODO!: make work for higher-order diffusion
@@ -273,7 +273,7 @@ function preB(csolver)
     
     @info(
         "preB",
-        time = csolver.t, #* "/" * mB.time.finish ,
+        time = string(csolver.t) * " / " * string(mA.time.finish),
         total_ρθA = weightedsum(mA.state, idx),
         total_ρθB = weightedsum(mB.state, idx),
         total_ρθ = weightedsum(mA.state, idx) + weightedsum(mB.state, idx),
@@ -281,8 +281,9 @@ function preB(csolver)
         ρθ_surface_maxB = maximum(mB.state.ρθ[mB.boundary]),
     )
 
-    isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.A[csolver.steps] = weightedsum(mA.state, idx)
-    isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.B[csolver.steps] = weightedsum(mB.state, idx)
+    sphere_sfc_area = 4π * mA.grid.domain.radius ^ 2 
+    isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.A[csolver.steps] = weightedsum(mA.state, idx) ./ csolver.dt ./ sphere_sfc_area # tracer units / s / m^2
+    isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.B[csolver.steps] = weightedsum(mB.state, idx) ./ csolver.dt ./ sphere_sfc_area # tracer units / s / m^2
 end
 
 """
@@ -432,7 +433,7 @@ function numerical_boundary_flux_second_order!(
     fluxᵀn.ρθ =
         (state_prognostic⁻.ρθ - state_auxiliary⁺.ρθ_secondary) *
         balance_law.parameters.λ_coupler # W/m^2
-
+    
 end
 
 # customized flux for CoupledSecondaryBoundary
@@ -480,6 +481,7 @@ function numerical_boundary_flux_second_order!(
     diff1⁻::Vars{D},
     aux1⁻::Vars{A},
 ) where {S, D, HD, A}
+    fluxᵀn.ρθ = - Float64(0)
     return nothing
 end
 

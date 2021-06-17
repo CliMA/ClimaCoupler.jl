@@ -168,6 +168,5 @@ fluxB = cpl_solver.fluxlog.B
 fluxT = fluxA .+ fluxB
 time = collect(1:1:total_steps)
 rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1]) ]
-# plot(time .* cpl_solver.dt, rel_error)
-plot(time .* cpl_solver.dt, fluxA)
-plot!(time .* cpl_solver.dt, fluxB)
+plot(time .* cpl_solver.dt, rel_error)
+#plot(time .* cpl_solver.dt, [fluxA .- fluxA[1] fluxB .- fluxB[1]])

@@ -1,3 +1,4 @@
+using JLD2: __init__
 #!/usr/bin/env julia --project
 include("utilities/boilerplate.jl")
 
@@ -172,7 +173,7 @@ fluxA = cpl_solver.fluxlog.A
 fluxB = cpl_solver.fluxlog.B
 
 fluxT = fluxA .+ fluxB 
-time = collect(1:1:total_steps)
+tme = collect(1:1:total_steps)
 rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1]) ]
-plot(time .* cpl_solver.dt, rel_error, ylabel = "rel. error = (fluxT - fluxT[1]) / fluxT[1]", xlabel = "time (s)")
-# plot(time .* cpl_solver.dt, [(fluxA .- fluxA[1]) (fluxB .- fluxB[1])],  label = ["Land Energy Flux" "Atmos Energy Flux"], xlabel = "time (s)", ylabel = "W / m2")
+plot(tme .* cpl_solver.dt, rel_error, ylabel = "rel. error = (fluxT - fluxT[1]) / fluxT[1]", xlabel = "time (s)")
+# plot(tme .* cpl_solver.dt, [(fluxA .- fluxA[1]) (fluxB .- fluxB[1])],  label = ["Land Energy Flux" "Atmos Energy Flux"], xlabel = "time (s)", ylabel = "W / m2")

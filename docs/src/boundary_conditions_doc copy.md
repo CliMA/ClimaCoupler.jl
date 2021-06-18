@@ -46,52 +46,37 @@ This section is an attempt to bridge between mathematical considersations of BCs
                 - **Sponge layer**: an alternative to the above can be obtained by artificial (often linear or 2nd order) damping in the upper levels 
 
 ## Implementation in the ClimateMachine.jl
-
-    Boundaries in DG:
-                 -  bc +
-        element  |  |  |            - = internal state
-        in       |  |  |           bc = boundary state 
-        question |  |  |            + = ghost state
-                 \__ __/
-                    V
-        same location in space
 ### Mass
-- `Impenetrable()`: 
-    - no normal component of mass flux, which means $u$ at $bc$:
-        $u_{bc} = \vec{u}^- - (\hat{n} \cdot u^-) \hat{n}$
-    - Inconjunction with *CentralNumericalFlux* at the boundary, this can be imposed via the ghost state as:
+- `Impenetrable()`: $u_{bc} = \vec{u}^- - (\hat{n} \cdot u^-) \hat{n}$
 
-            # use CentralNumericalFlux with this reflective ghost state  ​
-            function atmos_momentum_boundary_state!(_...)
-                    ​state⁺.ρu = state⁻.ρu - 2 * dot(state⁻.ρu, n) .* SVector(n) 
-            ​end
+        # use CentralNumericalFlux with this reflective ghost state  ​
+        function atmos_momentum_boundary_state!(_...)
+                ​state⁺.ρu -= 2 * dot(state⁻.ρu, n) .* SVector(n)
+        ​end
 - `Penetrable()`: 
-    - this means no bounary condition (free surface)
 
-            # use the transmissive boundary flux: 
-            function atmos_momentum_boundary_state!(_...)
-                    ​state⁺.ρu = state⁻.ρu
-            ​end
+        # use the transmissive boundary flux: 
+        function atmos_momentum_boundary_state!(_...)
+                ​state.ρu^+ = ρu^-
+        ​end
 
 
 ### Momentum 
-- `NoSlip()`: 
-    - this means u vanishes are the boundary (i.e. Dirichlet BC), so that $u_{bc} = 0$
-    - Inconjunction with *CentralNumericalFlux* at the boundary, this can be imposed via the ghost state as:
+- `NoSlip()`: $u = 0$
 
-            function atmos_momentum_boundary_state!(
-                nf::NumericalFluxFirstOrder, _...)
-                state⁺.ρu = -state⁻.ρu
-            end
-            function atmos_momentum_boundary_state!(
-                nf::NumericalFluxGradient, _...)
-                state⁺.ρu = zero(state⁺.ρu) # DesignDocs say state⁺.ρu = -state⁻.ρu
-            end
-            
-            # this can be used for a stabilising penalty term:
-            numerical_boundary_flux_first_order!(_...) = ... end
+        function atmos_momentum_boundary_state!(
+            nf::NumericalFluxFirstOrder, _...)
+            state⁺.ρu = -state⁻.ρu
+        end
+        function atmos_momentum_boundary_state!(
+            nf::NumericalFluxGradient, _...)
+            state⁺.ρu = zero(state⁺.ρu) # DesignDocs say state⁺.ρu = -state⁻.ρu
+        end
+        
+        # this can be used for a stabilising penalty term:
+        numerical_boundary_flux_first_order!(_...) = ... end
 
-            atmos_momentum_normal_boundary_flux_second_order!(_...) = nothing
+        atmos_momentum_normal_boundary_flux_second_order!(_...) = nothing
 
 - `FreeSlip()`: $\nabla_h \cdot\vec{u} = 0$, $\hat{n} \cdot u = 0$
 

@@ -115,6 +115,7 @@ function init_state_prognostic!(model::ModelSetup, state::Vars, aux::Vars, local
     ic = model.initial_conditions
 
     state.ρ = ic.ρ(parameters, x, y, z)
+    state.ρu = ic.ρu(parameters, x, y, z)
     state.ρθ = ic.ρθ(parameters, x, y, z)
 
     state.F_ρθ_accum = 0
@@ -133,6 +134,9 @@ end
     t::Real,
     direction,
 )
+    flux.ρu += calc_pressure(model.physics.eos, state) * I
+    calc_advective_flux!(flux, model.physics.advection, state, aux, t)
+    
     return nothing
 end
 
@@ -171,6 +175,7 @@ end
     t::Real,
 )
     flux.ρ += gradflux.μ∇ρ
+    flux.ρu += gradflux.ν∇u
     flux.ρθ += gradflux.κ∇θ
 
     return nothing
@@ -211,6 +216,7 @@ end
     # TODO!: make work for higher-order diffusion
     diffusion = model.physics.diffusion # defaults to `nothing`
     calc_boundary_state!(numerical_flux, bc.ρθ, model, diffusion, args...)
+    calc_boundary_state!(numerical_flux, bc.ρu, model, diffusion, args...)
 end
 
 function numerical_boundary_flux_second_order!(
@@ -223,6 +229,13 @@ function numerical_boundary_flux_second_order!(
     numerical_boundary_flux_second_order!( # this overwrites the total flux for ρθ (using methods below)
         numerical_flux,
         bctype.ρθ,
+        balance_law,
+        args...
+    )
+
+    numerical_boundary_flux_second_order!( # this overwrites the total flux for ρu (using methods below)
+        numerical_flux,
+        bctype.ρu,
         balance_law,
         args...
     )
@@ -305,3 +318,23 @@ function numerical_flux_second_order!(
     Fᵀn .+= tau * (parent(state⁻) - parent(state⁺))
 end
 
+____
+
+@inline boundary_conditions(model::ModelSetup) = model.boundary_conditions
+
+@inline function boundary_state!(
+        numerical_flux,
+        bc::FluidBC,
+        model::ModelSetup,
+        args...
+    )
+    # We need to apply boundary conditions for state variables.
+    # This depends on first, second, and high-order
+    # operations, hence the diffusion model dependence.
+    # TODO!: make work for higher-order diffusion
+    diffusion = model.physics.diffusion # defaults to `nothing`
+    calc_boundary_state!(numerical_flux, bc.ρu, model, diffusion, args...)
+    calc_boundary_state!(numerical_flux, bc.ρθ, model, diffusion, args...)
+end
+
+calc_boundary_state!(numerical_flux, bc, model, diffusion, args...) = nothing

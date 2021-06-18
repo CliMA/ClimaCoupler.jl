@@ -193,32 +193,9 @@ end
     return nothing
 end
 
-"""
-    calculate_land_sfc_fluxes(model::ModelSetup, state, aux, t)
-- calculate furface fluxes using the bulk gradient diffusion theory
-"""
-function calculate_land_sfc_fluxes(model::ModelSetup, state, aux, t; MO_params = nothing) # should pass in the coupler state (also move to coupler), so can access states of both models derectly -e.g. callback?
-    
-    FT = eltype(state)
-    p = model.parameters
-
-    p_sfc = p.pₒ
-    θ_a = state.ρθ / state.ρ 
-    T_a = θ_a
-    T_sfc = aux.T_sfc 
-    θ_sfc = T_sfc  
-
-    R_SW = (FT(1)-p.α) * p.τ * p.F_sol * (FT(1) .+ sin(t * 2π / p.diurnal_period) )
-    R_LW = p.ϵ * (p.σ * θ_sfc .^ 4 - p.F_a)
-    SH   = state.ρ * p.cp_d * p.g_a * (T_sfc - T_a) # g_a could be substituded by g_a=f(MO_params) (see Bonan P90), but first need to modify SurfaceFluxes.jl
-      
-    #LH   = p.lambda * p.g_w * (q_sat(T_sfc, p_sfc) - q_a) 
-    F_tot = - (R_SW - R_LW - SH )#- LH 
-
-end
 
 """
-    Boundary conditions
+    Boundary condition modifications for the coupler
 """
 @inline boundary_conditions(model::ModelSetup) = model.boundary_conditions
 
@@ -328,59 +305,3 @@ function numerical_flux_second_order!(
     Fᵀn .+= tau * (parent(state⁻) - parent(state⁺))
 end
 
-"""
-function preAtmos(csolver)
-    - saves and regrids the `LandSurfaceTemerature` couplerfield (i.e. regridded `mLand.state.T_sfc[mLand.boundary]``) on coupler grid to `mAtmos.aux.T_sfc[mAtmos.boundary]` on the `mAtmos` grid
-    - resets the accumulated flux `F_ρθ_accum` in `mAtmos` to 0
-    csolver::CplSolver
-"""
-function preAtmos(csolver)
-    mLand = csolver.component_list.domainLand.component_model
-    mAtmos = csolver.component_list.domainAtmos.component_model
-    # Set boundary T_sfc used in atmos at the start of the coupling cycle.
-    mAtmos.odesolver.rhs!.state_auxiliary.T_sfc[mAtmos.boundary] .= 
-        coupler_get(csolver.coupler, :LandSurfaceTemerature, mAtmos.grid.numerical, DateTime(0), u"K")
-    # Set atmos boundary flux accumulator to 0.
-    mAtmos.state.F_ρθ_accum .= 0
-
-    # get indicies of the required variables from the `mAtmos` MPIStateArray
-    idx = varsindex(vars(mAtmos.state), :ρθ)[1]
-    idx_rho = varsindex(vars(mAtmos.state), :ρ)[1]
-
-    # Calculate, print and log domain-averaged energy
-    FT = eltype(mAtmos.state)
-    p = cpl_solver.component_list.domainAtmos.component_model.model.parameters # maybe the parameter list could be saved in the coupler? (this would requre all the compute kernels below to import the coupler)
-    nel = mAtmos.grid.resolution.elements.vertical
-    po = mAtmos.grid.resolution.polynomial_order.vertical
-
-    E_Land = weightedsum(mLand.state, 1) .* p.ρ_s .* p.h_s .* p.c_s  # J / m^2
-    E_Atmos = weightedsum(mAtmos.state, idx) .* p.cp_d .* p.zmax ./  nel ./ (po+1) ./ (po+2) # J / m^2 
-
-    @info(
-        "preatmos",
-        time = string(csolver.t) * "/" * string(mAtmos.time.finish),
-        total_energyA = E_Land,
-        total_energyB = E_Atmos,
-        total_energy = E_Atmos + E_Land,
-        land_T_sfc = maximum(mLand.state.T_sfc[mLand.boundary]),
-        atmos_ρθ_sfc = maximum(mAtmos.state.ρθ[mAtmos.boundary]),
-    )
-
-    isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.A[csolver.steps] = E_Land
-    isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.B[csolver.steps] = E_Atmos
-
-end
-
-"""
-function postAtmos(csolver)
-    - updates couplerfield `EnergyFluxAtmos` with mAtmos.state.F_ρθ_accum[mAtmos.boundary] regridded to the coupler grid, and updates the coupler time
-    csolver::CplSolver
-"""
-function postAtmos(csolver)
-    mLand = csolver.component_list.domainLand.component_model
-    mAtmos = csolver.component_list.domainAtmos.component_model
-    # Pass atmos exports to "coupler" namespace
-    # 1. Save mean θ flux at the Atmos boundary during the coupling period
-    coupler_put!(csolver.coupler, :EnergyFluxAtmos, mAtmos.state.F_ρθ_accum[mAtmos.boundary] ./ csolver.dt,
-        mAtmos.grid.numerical, DateTime(0), u"J")
-end

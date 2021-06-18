@@ -1,13 +1,11 @@
 #!/usr/bin/env julia --project
 include("utilities/boilerplate.jl")
-include("balance_law_interface_slabland.jl")
 
 using CouplerMachine
 
 ########
 # Set up parameters and initial conditions
 ########
-include("parameters_initialconditions_slabland.jl")
 
 FT = Float64
 
@@ -101,6 +99,7 @@ modelAtmos = ModelSetup(
 ########
 # Set up time steppers (could be done automatically in simulation)
 ########
+
 Δt  = min_node_distance(gridAtmos.numerical) / parameters.cₛ * 0.25
 total_steps = 1000
 start_time = 0
@@ -176,6 +175,4 @@ fluxT = fluxA .+ fluxB
 time = collect(1:1:total_steps)
 rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1]) ]
 plot(time .* cpl_solver.dt, rel_error, ylabel = "rel. error = (fluxT - fluxT[1]) / fluxT[1]", xlabel = "time (s)")
-
-using Statistics
-plot(time .* cpl_solver.dt, [(fluxA .- fluxA[1]) (fluxB .- fluxB[1])],  label = ["Land Energy" "Atmos Energy"], xlabel = "time (s)", ylabel = "J / m2")
+# plot(time .* cpl_solver.dt, [(fluxA .- fluxA[1]) (fluxB .- fluxB[1])],  label = ["Land Energy Flux" "Atmos Energy Flux"], xlabel = "time (s)", ylabel = "W / m2")

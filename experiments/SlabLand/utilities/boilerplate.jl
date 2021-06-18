@@ -7,6 +7,7 @@ using MPI
 using Printf
 using StaticArrays
 using Test
+using Unitful
 
 #add https://github.com/CliMA/ClimateMachine.jl#tb/refactoring_ans_sphere
 using ClimateMachine
@@ -68,8 +69,14 @@ include("../boundary_conditions/boundary_conditions.jl")
 include("../boundary_conditions/bc_first_order.jl")
 include("../boundary_conditions/bc_second_order.jl")
 include("../boundary_conditions/bc_gradient.jl")
+# parameters and initial conditions
+include("../parameters_initialconditions.jl")
+# coupler
+include("../coupler/surface_fluxes.jl")
+include("../coupler/put_get_calls.jl")
 # interface 
-include("../balance_law_interface.jl")
+include("../balance_law_interface_atmos.jl")
+include("../balance_law_interface_slabland.jl")
 include("../numerics/numerical_volume_fluxes.jl")
 include("../numerics/numerical_interface_fluxes.jl")
 include("../simulations.jl")

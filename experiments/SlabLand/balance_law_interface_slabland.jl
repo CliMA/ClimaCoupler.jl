@@ -227,27 +227,3 @@ function numerical_flux_second_order!(
 end
 
 numerical_flux_first_order!(::RoeNumericalFlux, model::Union{SlabLandModelSetup}, _...,) = nothing
-
-"""
-function preA(csolver)
-    - saves and regrids the `EnergyFluxAtmos` couplerfield (i.e. regridded `mAtmos.state.F_ρθ_accum[mAtmos.boundary]`) to `F_ρθ_prescribed[mLand.boundary]` on the `mLand` grid
-    csolver::CplSolver
-"""
-function preLand(csolver)
-    mLand = csolver.component_list.domainLand.component_model
-    mAtmos = csolver.component_list.domainAtmos.component_model
-
-    mLand.odesolver.rhs!.state_auxiliary.F_ρθ_prescribed[mLand.boundary] .= 
-        coupler_get(csolver.coupler, :EnergyFluxAtmos, mLand.grid, DateTime(0), u"J")
-end
-
-"""
-function postA(csolver)
-    - updates couplerfield `LandSurfaceTemerature` with `mLand.state.T_sfc[mLand.boundary]` regridded to the coupler grid, and updates the coupler time
-    csolver::CplSolver
-"""
-function postLand(csolver)
-    mLand = csolver.component_list.domainLand.component_model
-    mAtmos = csolver.component_list.domainAtmos.component_model
-    coupler_put!(csolver.coupler, :LandSurfaceTemerature, mLand.state.T_sfc[mLand.boundary], mLand.grid.numerical, DateTime(0), u"K")
-end

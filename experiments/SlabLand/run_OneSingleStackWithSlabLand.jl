@@ -60,6 +60,7 @@ physicsLand = Physics(
 
 physicsAtmos = Physics(
     orientation = FlatOrientation(),
+    advection   = NonLinearAdvection(),
     diffusion   = ConstantViscosity( FT(0), FT(0), FT(1e-5) ),
     eos         = DryIdealGas{Float64}(R = parameters.R_d, pₒ = parameters.pₒ, γ = 1 / (1 - parameters.κ)),
 )
@@ -73,8 +74,8 @@ bcsLand = (
     top =     (T_sfc = CoupledSecondaryBoundary(),),
 )
 bcsAtmos = (
-    bottom = (ρu = nothing, ρθ = CoupledPrimaryBoundary(),),
-    top =    (ρu = nothing, ρθ = Insulating(),),
+    bottom = (ρu = Impenetrable(FreeSlip()), ρθ = CoupledPrimaryBoundary(),),
+    top =    (ρu = Impenetrable(FreeSlip()), ρθ = Insulating(),),
 )
 
 ########
@@ -85,15 +86,15 @@ modelLand = SlabLandModelSetup(
     physics = physicsLand,
     boundary_conditions = bcsLand,
     initial_conditions = (T_sfc = T_sfc₀,),
-    numerics = (flux = CentralNumericalFluxFirstOrder(),flux_second_order = PenaltyNumFluxDiffusive(), direction = EveryDirection()),
+    numerics = (flux = RoeNumericalFlux(),flux_second_order = PenaltyNumFluxDiffusive(), direction = EveryDirection()),
     parameters = parameters,
 )
 
 modelAtmos = ModelSetup(
     physics = physicsAtmos,
     boundary_conditions = bcsAtmos,
-    initial_conditions =(ρ = ρ₀Atmos, ρθ = ρθ₀Atmos,),
-    numerics = (flux = CentralNumericalFluxFirstOrder(),flux_second_order = PenaltyNumFluxDiffusive(), direction = EveryDirection()),
+    initial_conditions =(ρ = ρ₀Atmos, ρu = ρu₀Atmos, ρθ = ρθ₀Atmos,),
+    numerics = (flux = RoeNumericalFlux(),flux_second_order = PenaltyNumFluxDiffusive(), direction = EveryDirection()),
     parameters = parameters,
 )
 
@@ -176,4 +177,4 @@ fluxT = fluxA .+ fluxB
 tme = collect(1:1:total_steps)
 rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1]) ]
 plot(tme .* cpl_solver.dt, rel_error, ylabel = "rel. error = (fluxT - fluxT[1]) / fluxT[1]", xlabel = "time (s)")
-# plot(tme .* cpl_solver.dt, [(fluxA .- fluxA[1]) (fluxB .- fluxB[1])],  label = ["Land Energy Flux" "Atmos Energy Flux"], xlabel = "time (s)", ylabel = "W / m2")
+plot(tme .* cpl_solver.dt, [(fluxA .- fluxA[1]) (fluxB .- fluxB[1])],  label = ["Land Energy Flux" "Atmos Energy Flux"], xlabel = "time (s)", ylabel = "W / m2")

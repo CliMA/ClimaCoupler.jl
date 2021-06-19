@@ -22,7 +22,7 @@
 ## **Atmos Component**
 
 ### 1. Formulation
-We're using the ClimateMachine.jl's Atmos SingleStack configuration. In this simplified case, we are solving the 5 diffusion equations, 1 for density, 3 for the velocity components, and 1 for a tracer. 
+We're using the ClimateMachine.jl's Atmos SingleStack configuration. In this simplified case, we are solving the 5 diffusion equations: 1 for density, 3 for the velocity components, and 1 for a tracer. 
 
 $$
 \frac{\partial ρ}{\partial t} = - ∇ \cdot (\vec{u} ρ + μ ∇ ρ) \qquad 
@@ -124,11 +124,16 @@ $$T_{sfc}^{n+1} = T_{sfc}^n +\frac{(F_{tot}^{n} + G^{n})}{\rho_s c_s h_s}\Delta 
     - Simplifications
         - $g_a$ is constant
         - (μ, ν, $\kappa$) = (0, 0, 1e-5)
-        - $\vec{u} = 0$
+        - $\vec{u} = (0,0,0)$
         - $G = 0$ and $F_a = 0$
     - [results](https://docs.google.com/document/d/1JKK8wFKPq3Jo3D4flXZiY3WAUPqYE19pXRvwJgpDwjw/edit)
-
- (constant conductances and ConstantViscosity( FT(0), FT(0), FT(1e-5), u = 0 )
+- Dry advection-diffusion
+    - Simplifications
+        - $g_a$ is constant
+        - (μ, ν, $\kappa$) = (0, 0, 1e-5)
+        - $\vec{u} = (1,0,0)$
+        - $G \neq 0$ and $F_a = 0$
+    - [results](https://docs.google.com/document/d/1JKK8wFKPq3Jo3D4flXZiY3WAUPqYE19pXRvwJgpDwjw/edit)
 
 ## **Pipeline** (probably delete)
 

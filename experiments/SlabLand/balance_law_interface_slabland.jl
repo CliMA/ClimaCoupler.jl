@@ -143,8 +143,7 @@ flux_second_order!(model::SlabLandModelSetup, _...,) = nothing
 )
 
     p = model.parameters
-    #G    = p.κ_s * (state.T_sfc - p.T_h) / p.h_s # simple soil physics
-    G = Float64(0)
+    G    = p.κ_s * (state.T_sfc - p.T_h) / p.h_s # simple soil physics
     source.T_sfc = - (aux.F_ρθ_prescribed + G) / (p.ρ_s * p.c_s * p.h_s)
 
     return nothing

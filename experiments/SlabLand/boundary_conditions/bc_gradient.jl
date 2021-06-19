@@ -55,8 +55,8 @@ apply insulating boundary condition for temperature
 sets transmissive ghost point
 """
 @inline function calc_boundary_state!(
-    ::NumericalFluxGradient,
-    ::Union{Insulating, CoupledSecondaryBoundary, CoupledPrimaryBoundary},
+    ::Union{NumericalFluxGradient},
+    ::Union{Insulating, CoupledPrimaryBoundary},
     ::Union{ModelSetup},
     ::Union{AbstractDiffusion, Nothing},
     state⁺,
@@ -72,70 +72,9 @@ sets transmissive ghost point
     return nothing
 end
 
-# """
-#     calc_boundary_state!(::NumericalFluxGradient, ::Penetrable{FreeSlip}, ::ModelSetup)
-# no mass boundary condition for penetrable
-# """
-# @inline calc_boundary_state!(
-#     ::NumericalFluxGradient,
-#     ::Penetrable{FreeSlip},
-#     ::ModelSetup,
-#     ::ConstantViscosity,
-#     _...,
-# ) = nothing
-# """
-#     calc_boundary_state!(::NumericalFluxGradient, ::Impenetrable{MomentumFlux}, ::HBModel)
-# apply kinematic stress boundary condition for velocity
-# applies free slip conditions for first-order and gradient fluxes
-# """
-# @inline function calc_boundary_state!(
-#     nf::NumericalFluxGradient,
-#     ::Impenetrable{<:MomentumFlux},
-#     model::ModelSetup,
-#     diff::AbstractDiffusion,
-#     args...,
-# )
-#     return calc_boundary_state!(
-#         nf,
-#         Impenetrable(FreeSlip()),
-#         model,
-#         diff,
-#         args...,
-#     )
-# end
+calc_boundary_state!(
+    ::Union{NumericalFluxGradient},
+    ::Union{Insulating, CoupledSecondaryBoundary},
+    ::Union{SlabLandModelSetup},
+    _...,) = nothing
 
-# """
-#     calc_boundary_state!(::NumericalFluxGradient, ::Penetrable{MomentumFlux}, ::HBModel)
-# apply kinematic stress boundary condition for velocity
-# applies free slip conditions for first-order and gradient fluxes
-# """
-# @inline function calc_boundary_state!(
-#     nf::NumericalFluxGradient,
-#     ::Penetrable{<:MomentumFlux},
-#     model::ModelSetup,
-#     diff::AbstractDiffusion,
-#     args...,
-# )
-#     return calc_boundary_state!(
-#         nf,
-#         Penetrable(FreeSlip()),
-#         model,
-#         diff,
-#         args...,
-#     )
-# end
-
-# """
-#     calc_boundary_state!(::NumericalFluxGradient, ::TemperatureFlux, ::HBModel)
-
-# apply temperature flux boundary condition for velocity
-# applies insulating conditions for first-order and gradient fluxes
-# """
-# @inline function calc_boundary_state!(
-#     nf::NumericalFluxGradient,
-#     ::TemperatureFlux,
-#     model::ModelSetup,
-#     args...,
-# )
-#     return calc_boundary_state!(nf, Insulating(), model, args...)
-# end

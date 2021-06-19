@@ -15,6 +15,7 @@ This section is an attempt to bridge mathematical considerations of BCs and thei
     - a mix of the above, each applied at a different part of the boundary
 
 ## Well-posedness and general context
+
 - Well-posedness, or the availability of a unique robust solution, is easier to prove in some problems than others. For example, for the heat diffusion equation, the next section shows that some combinations of the above boundary conditions do not produce a unique solution. The problem in climate models is, however, more complex, and we discuss it in the section after next.
 
     1. BCs for diffusion equation in steady state
@@ -123,10 +124,10 @@ This section is an attempt to bridge mathematical considerations of BCs and thei
     - same as Insulating(), but with a non-zero nF_diffusive
 
             atmos_energy_boundary_state!(_...,) = nothing
-
             function atmos_energy_normal_boundary_flux_second_order!(_...)
                 fluxᵀn.energy.ρe -= bc_energy.fn(state⁻, aux⁻, t)
             end
+
     where `bc_energy.fn` can be a flux value or a relaxation function to a surface temperature (e.g. see slab land/ocean, or bulk formulation, or the M-O flux-based NishizawaEnergyFlux function). NB: Dirichlet is not normally applied in this context.
 
 ## BC stability in DG for idealized problems (probably delete)

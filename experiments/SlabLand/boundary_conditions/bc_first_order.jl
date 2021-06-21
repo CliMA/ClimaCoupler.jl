@@ -55,8 +55,8 @@ apply insulating boundary condition for temperature
 sets transmissive ghost point
 """
 @inline function calc_boundary_state!(
-    ::NumericalFluxFirstOrder,
-    ::Union{CoupledSecondaryBoundary, CoupledPrimaryBoundary},
+    ::Union{NumericalFluxFirstOrder},
+    ::Union{Insulating, CoupledPrimaryBoundary},
     ::Union{ModelSetup},
     ::Union{AbstractDiffusion, Nothing},
     state⁺,
@@ -72,7 +72,11 @@ sets transmissive ghost point
     nothing
 end
 
-calc_boundary_state!(nf::NumericalFluxFirstOrder,bc,::Union{ModelSetup, SlabLandModelSetup}, _..., ) = nothing
+calc_boundary_state!(
+    ::Union{NumericalFluxFirstOrder},
+    ::Union{Insulating, CoupledSecondaryBoundary},
+    ::Union{SlabLandModelSetup},
+    _...,) = nothing
 
 # """
 #     calc_boundary_state!(::NumericalFluxFirstOrder, ::Penetrable{FreeSlip}, ::ModelSetup)

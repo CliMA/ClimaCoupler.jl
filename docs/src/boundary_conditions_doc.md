@@ -15,7 +15,8 @@ This section is an attempt to bridge mathematical considerations of BCs and thei
     - a mix of the above, each applied at a different part of the boundary
 
 ## Well-posedness and general context
-- well-posedness, or the availability of a unique robust solution, is easier to prove in some problems than others. For example, for the heat diffusion equation, the next section shows that some combinations of the above boundary conditions do not produce a unique solution. The problem in climate models is, however, more complex, and we discuss it in the section after next. 
+
+- Well-posedness, or the availability of a unique robust solution, is easier to prove in some problems than others. For example, for the heat diffusion equation, the next section shows that some combinations of the above boundary conditions do not produce a unique solution. The problem in climate models is, however, more complex, and we discuss it in the section after next.
 
     1. BCs for diffusion equation in steady state
         - The prognostic heat equation rewritten for temperature $θ$ is:
@@ -34,7 +35,7 @@ This section is an attempt to bridge mathematical considerations of BCs and thei
 
     3. Navier Stokes and Climate Models
         - well posedness of the NS equations is still unknown (after all it is one of the Clay Mathematics Institute's Millennium Problems)
-        - in climate modelling it is often considered sufficient to use the general rule of thumb and use as many BCs as we have derivatives, without explicitly showing that the problem is well posed. 
+        - in climate modelling it is often considered sufficient to use the general rule of thumb and use as many BCs as we have derivatives, without explicitly proving that the problem is well posed. 
         - we implicitly assume mass conservation and the divergence theorem like in the study above
         - in practice, for GCMs there are different constraints on the two boundaries
             - lower boundary of the atmosphere
@@ -48,12 +49,13 @@ This section is an attempt to bridge mathematical considerations of BCs and thei
 ## Implementation in the ClimateMachine.jl
 
     Boundaries in DG:
-                 -  bc +
-        element  |  |  |            - = internal state
-        in       |  |  |           bc = boundary state 
-        question |  |  |            + = ghost state
-                 \__ __/
-                    V
+        __________-  bc +
+       | element  |  |  |            - = internal state
+       | in       |  |  |           bc = boundary state 
+       | question |  |  |            + = ghost state
+       |__________|  |  |
+                  \__ __/
+                     V
         same location in space
 ### Mass
 - `Impenetrable()`: 
@@ -77,56 +79,55 @@ This section is an attempt to bridge mathematical considerations of BCs and thei
 ### Momentum 
 - `NoSlip()`: 
     - this means u vanishes are the boundary (i.e. Dirichlet BC), so that $u_{bc} = 0$
-    - Inconjunction with *CentralNumericalFlux* at the boundary, this can be imposed via the ghost state as:
+    - In conjunction with the *CentralNumericalFlux* at the boundary, this can be imposed via the ghost state as:
 
-            function atmos_momentum_boundary_state!(
-                nf::NumericalFluxFirstOrder, _...)
+            function atmos_momentum_boundary_state!(nf::Union{NumericalFluxFirstOrder, NumericalFluxGradient}, _...)
                 state⁺.ρu = -state⁻.ρu
             end
-            function atmos_momentum_boundary_state!(
-                nf::NumericalFluxGradient, _...)
-                state⁺.ρu = zero(state⁺.ρu) # DesignDocs say state⁺.ρu = -state⁻.ρu
-            end
             
-            # this can be used for a stabilising penalty term:
+            # a stabilising penalty term can ve used here:
             numerical_boundary_flux_first_order!(_...) = ... end
 
-            atmos_momentum_normal_boundary_flux_second_order!(_...) = nothing
+            atmos_momentum_normal_boundary_flux_second_order!(_...) = nothing # no contribution from nF_diffusive
 
 - `FreeSlip()`: $\nabla_h \cdot\vec{u} = 0$, $\hat{n} \cdot u = 0$
+    - no diffusive normal flux at the boundary and no drag on the tangential components
+    - $u_{bc}$ is determined by the mass flux BC above
 
-        function atmos_momentum_boundary_state!(
-            nf::NumericalFluxFirstOrder
-                state⁺.ρu -= 2 * dot(state⁻.ρu, n) .* SVector(n)
-        end
-        function atmos_momentum_boundary_state!(
-            nf::NumericalFluxGradient,
-                state⁺.ρu -= dot(state⁻.ρu, n) .* SVector(n)
-        end
-        atmos_momentum_normal_boundary_flux_second_order!(_...) = nothing
+
+            function atmos_momentum_boundary_state!(nf::NumericalFluxFirstOrder, _...)
+                    state⁺.ρu -= 2 * dot(state⁻.ρu, n) .* SVector(n) # reflective to impose no normal flux
+            end
+            function atmos_momentum_boundary_state!(nf::NumericalFluxGradient, _...)
+                    state⁺.ρu -= dot(state⁻.ρu, n) .* SVector(n) # non-reflective to capture the sign of the gradient
+            end
+            atmos_momentum_normal_boundary_flux_second_order!(_...) = nothing  # no contribution from nF_diffusive
 
 - `DragLaw()`:
+    - use momentum consaints on $u_{bc}$, just like FreeSlip(), but then make the F_diffusive 
 
-        function atmos_momentum_boundary_state!(
-            nf::Union{NumericalFluxFirstOrder, NumericalFluxGradient}, _...)
-            atmos_momentum_boundary_state!(nf, Impenetrable(FreeSlip()), _...)
-        end
-        function atmos_momentum_normal_boundary_flux_second_order!(_...)
-            fluxᵀn.ρu += C * state⁻.ρ * |u_h| * u_h
-        end
+            function atmos_momentum_boundary_state!(nf::Union{NumericalFluxFirstOrder, NumericalFluxGradient}, _...)
+                atmos_momentum_boundary_state!(nf, Impenetrable(FreeSlip()), _...)
+            end
+            function atmos_momentum_normal_boundary_flux_second_order!(_...)
+                fluxᵀn.ρu += C * state⁻.ρ * |u_h| * u_h # contribution from nF_diffusive
+            end
 
 ### Energy / Moisture / Tracers
 - `Insulating()`:
+    - no normal diffusive flux (nF_diffusive) across the boundary (homogenerous Neumann BC) imposed via the second order flux, with the first-order and gradient fluxes assuming $u_{bc}$ from the mass and momentum BCs for consistency
 
-        atmos_energy_boundary_state!(_...) = nothing
-        atmos_energy_normal_boundary_flux_second_order!( _...,) = nothing
+            atmos_energy_boundary_state!(_...) = nothing
+            atmos_energy_normal_boundary_flux_second_order!( _...,) = nothing
+
 - `Prescribed()`, `CoupledPrimary()`, `CoupledSecondary()`
+    - same as Insulating(), but with a non-zero nF_diffusive
 
-        atmos_energy_boundary_state!(_...,) = nothing
+            atmos_energy_boundary_state!(_...,) = nothing
+            function atmos_energy_normal_boundary_flux_second_order!(_...)
+                fluxᵀn.energy.ρe -= bc_energy.fn(state⁻, aux⁻, t)
+            end
 
-        function atmos_energy_normal_boundary_flux_second_order!(_...)
-            fluxᵀn.energy.ρe -= bc_energy.fn(state⁻, aux⁻, t)
-        end
     where `bc_energy.fn` can be a flux value or a relaxation function to a surface temperature (e.g. see slab land/ocean, or bulk formulation, or the M-O flux-based NishizawaEnergyFlux function). NB: Dirichlet is not normally applied in this context.
 
 ## BC stability in DG for idealized problems (probably delete)
@@ -159,9 +160,6 @@ This section is an attempt to bridge mathematical considerations of BCs and thei
 
 
 ## References:
-- [Bonan 2019 book](https://www.cambridge.org/us/academic/subjects/earth-and-environmental-science/climatology-and-climate-change/climate-change-and-terrestrial-ecosystem-modeling?format=HB&isbn=9781107043787)
-- https://www.cesm.ucar.edu/models/atm-cam/docs/description/node29.html
-- http://www.met.reading.ac.uk/~swrhgnrj/teaching/MT23E/mt23e_notes.pdf
-- useful Q&As: https://www.realclimate.org/index.php/archives/2009/01/faq-on-climate-models-part-ii/ 
-- https://climateextremes.org.au/wp-content/uploads/2019/06/Introduction-to-Atmospheic-Modelling-1-Todd-Lane.pdf
-- old clima numerics design docs
+- CliMA's numerics_old DesignDocs
+- [useful Q&As](https://www.realclimate.org/index.php/archives/2009/01/faq-on-climate-models-part-ii/) 
+- [Todd Lane's talk for climate modellling context](https://climateextremes.org.au/wp-content/uploads/2019/06/Introduction-to-Atmospheic-Modelling-1-Todd-Lane.pdf)

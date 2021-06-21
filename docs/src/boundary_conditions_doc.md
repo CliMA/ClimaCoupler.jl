@@ -68,7 +68,7 @@ This section is an attempt to bridge mathematical considerations of BCs and thei
                     ​state⁺.ρu = state⁻.ρu - 2 * dot(state⁻.ρu, n) .* SVector(n) 
             ​end
 - `Penetrable()`: 
-    - this means no bounary condition (free surface)
+    - this means no boundary condition (free surface)
 
             # use the transmissive boundary flux: 
             function atmos_momentum_boundary_state!(_...)
@@ -85,7 +85,7 @@ This section is an attempt to bridge mathematical considerations of BCs and thei
                 state⁺.ρu = -state⁻.ρu
             end
             
-            # a stabilising penalty term can ve used here:
+            # a stabilising penalty term can be used here:
             numerical_boundary_flux_first_order!(_...) = ... end
 
             atmos_momentum_normal_boundary_flux_second_order!(_...) = nothing # no contribution from nF_diffusive
@@ -104,7 +104,7 @@ This section is an attempt to bridge mathematical considerations of BCs and thei
             atmos_momentum_normal_boundary_flux_second_order!(_...) = nothing  # no contribution from nF_diffusive
 
 - `DragLaw()`:
-    - use momentum consaints on $u_{bc}$, just like FreeSlip(), but then make the F_diffusive 
+    - use momentum constraints on $u_{bc}$, just like FreeSlip(), but then make the F_diffusive 
 
             function atmos_momentum_boundary_state!(nf::Union{NumericalFluxFirstOrder, NumericalFluxGradient}, _...)
                 atmos_momentum_boundary_state!(nf, Impenetrable(FreeSlip()), _...)
@@ -115,7 +115,7 @@ This section is an attempt to bridge mathematical considerations of BCs and thei
 
 ### Energy / Moisture / Tracers
 - `Insulating()`:
-    - no normal diffusive flux (nF_diffusive) across the boundary (homogenerous Neumann BC) imposed via the second order flux, with the first-order and gradient fluxes assuming $u_{bc}$ from the mass and momentum BCs for consistency
+    - no normal diffusive flux (nF_diffusive) across the boundary (homogeneous Neumann BC) imposed via the second order flux, with the first-order and gradient fluxes assuming $u_{bc}$ from the mass and momentum BCs for consistency
 
             atmos_energy_boundary_state!(_...) = nothing
             atmos_energy_normal_boundary_flux_second_order!( _...,) = nothing
@@ -162,4 +162,4 @@ This section is an attempt to bridge mathematical considerations of BCs and thei
 ## References:
 - CliMA's numerics_old DesignDocs
 - [useful Q&As](https://www.realclimate.org/index.php/archives/2009/01/faq-on-climate-models-part-ii/) 
-- [Todd Lane's talk for climate modellling context](https://climateextremes.org.au/wp-content/uploads/2019/06/Introduction-to-Atmospheic-Modelling-1-Todd-Lane.pdf)
+- [Todd Lane's talk for climate modelling context](https://climateextremes.org.au/wp-content/uploads/2019/06/Introduction-to-Atmospheic-Modelling-1-Todd-Lane.pdf)

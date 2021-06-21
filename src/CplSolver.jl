@@ -20,7 +20,7 @@ later use by other components. The `CplSolver` abstraction controls
  2. the execution of actions mapping exports from one or more components to imports of
     other components through an intermediary coupler name space.
 """
-mutable struct CplSolver{CL, FT} <: AbstractODESolver
+mutable struct CplSolver{CL, FT, FL} <: AbstractODESolver
     "Named list of pre-defined components"
     component_list::CL
     "Coupler State"
@@ -33,6 +33,8 @@ mutable struct CplSolver{CL, FT} <: AbstractODESolver
     t::FT
     "elapsed number of steps"
     steps::Int
+    "Flux Log"
+    fluxlog::FL
 end
 
 function CplSolver(;
@@ -40,13 +42,12 @@ function CplSolver(;
     coupler::CplState = coupler,
     coupling_dt = coupling_dt,
     t0 = t0,
+    fluxlog = nothing,
 )
-    return CplSolver(component_list, coupler, coupling_dt, t0, t0, 0)
+    return CplSolver(component_list, coupler, coupling_dt, t0, t0, 0, fluxlog)
 end
 
 function ODESolvers.dostep!(Qtop, csolver::CplSolver, param, time::Real)
-
-    println("Start coupled cycle")
 
     for cpl_component in csolver.component_list
 
@@ -55,7 +56,7 @@ function ODESolvers.dostep!(Qtop, csolver::CplSolver, param, time::Real)
         component = cpl_component[:component_model]
         solve!(
             component.state,
-            component.stepper;
+            component.odesolver;
             numberofsteps = component.nsteps,
         )
         # post step pushing exports goes here

@@ -30,9 +30,7 @@ communicate. Its role is to provide a level of indirection so that components re
 and so that any data communication, interpolation, reindexing/unit conversions and filtering 
 etc... can be embeded in the intermdediate coupling layer.
 
-To start with we can just use a dictionary key and value table that holds labelled pointers to various fields.
-A field is exported by one component and imported by one or more other components. Components
-can select which fields are needed by using the Dict symbols.
+A field is exported by one component and imported by one or more other components.
 """
 function CplState()
     return CplState(Dict{Symbol, CplFieldInfo}())

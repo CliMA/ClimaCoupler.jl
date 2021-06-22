@@ -12,22 +12,13 @@ balance law, discretization and timestepper collection. The coupler will
 step them forward by a nsteps substeps to advance the coupled system
 by a simulated time `coupling_dt`.
 
-Components are registered with pre_step() and post_step() functions. The pre_step()
-functions get fields for use in the component from the coupler name space.
-The post_step() functions put fields for use by other components into
-te coupler name space. 
-The CplSolver abstraction controls
+Components interact with the coupler during `pre_step()` and `post_step()` functions.
+During a `pre_step()`, a component may get fields from the coupler name space.
+A component may put fields into the coupler name space during the `post_step()` for
+later use by other components. The `CplSolver` abstraction controls
  1. the outer time stepping sequencing of components
- 2. the excution of actions mapping exports from one or more components to imports of
+ 2. the execution of actions mapping exports from one or more components to imports of
     other components through an intermediary coupler name space.
-
-Some notes -
-
-For now components need to include slightly wasteful "shadow" variables for
-accumulating boundary flux terms they compute across RK stages and across
-timesteps. These are defined within the component balance law.
-The shadown variable is a full 3d array because of the way the current 
-infrastructure works. This can be tidied up later once design is settled.
 """
 mutable struct CplSolver{CL, FT, FL} <: AbstractODESolver
     "Named list of pre-defined components"
@@ -57,8 +48,6 @@ function CplSolver(;
 end
 
 function ODESolvers.dostep!(Qtop, csolver::CplSolver, param, time::Real)
-
-    println("Start coupled cycle")
 
     for cpl_component in csolver.component_list
 

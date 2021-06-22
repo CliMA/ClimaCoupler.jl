@@ -8,20 +8,6 @@
 *~
 TAGS
 
-# Docs
-docs/build/
-docs/src/generated/
-!docs/src/assets/*.png
-!docs/src/assets/*.svg
-
-# Data
-*.vtk
-*.dat
-*.vtu
-*.pvtu
-*.nc
-*.jld2
-
 # Figs
 *.png
 *.jpg
@@ -31,6 +17,21 @@ docs/src/generated/
 # Movies
 *.gif
 *.mp4
+
+# Docs
+docs/build/
+docs/src/generated/
+!docs/src/assets/*.png
+!docs/src/assets/*.svg
+!docs/src/images/*.png
+
+# Data
+*.vtk
+*.dat
+*.vtu
+*.pvtu
+*.nc
+*.jld2
 
 # Julia System Images
 *.so

@@ -27,14 +27,13 @@ import ClimateMachine.DGMethods.NumericalFluxes:
     numerical_flux_first_order!,
     normal_boundary_flux_second_order!
 
-using Unitful
-
 ##
 #     Declaration of variables
 ##
 """
     vars_state 
-    - returns a NamedTuple of data types.
+
+Returns a NamedTuple of data types.
 """
 function vars_state(model::SlabLandModelSetup, aux::Auxiliary, T)
 
@@ -61,10 +60,11 @@ vars_state(::SlabLandModelSetup, ::GradientFlux, T) = @vars()
 #     Initialization of variables
 ##
 """
-    init_state_xyz! 
-    - sets up the initial fields within our state variables
-    (e.g., prognostic, auxiliary, etc.), however it seems to not initialized
-    the gradient flux variables by default.
+    init_state_xyz!
+
+Sets up the initial fields within our state variables
+(e.g., prognostic, auxiliary, etc.), however it seems to not initialized
+the gradient flux variables by default.
 """
 
 function nodal_init_state_auxiliary!(
@@ -181,11 +181,12 @@ function numerical_boundary_flux_second_order!(
 end
 
 """
-function numerical_flux_second_order!(::PenaltyNumFluxDiffusive, 
-  Penalty flux formulation of second order numerical flux. This formulation
-  computes the CentralNumericalFluxSecondOrder term first (which is just the average
-  of the + and - fluxes and an edge), and then adds a "penalty" flux that relaxes
-  the edge state + and - toward each other.
+    numerical_flux_second_order!(::PenaltyNumFluxDiffusive, ...)
+
+Penalty flux formulation of second order numerical flux. This formulation
+computes the CentralNumericalFluxSecondOrder term first (which is just the average
+of the + and - fluxes and an edge), and then adds a "penalty" flux that relaxes
+the edge state + and - toward each other.
 """
 function numerical_flux_second_order!(
     ::PenaltyNumFluxDiffusive,

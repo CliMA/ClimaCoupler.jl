@@ -1,8 +1,6 @@
-using JLD2: __init__
-#!/usr/bin/env julia --project
-include("utilities/boilerplate.jl")
-
 using CouplerMachine
+
+include("utilities/boilerplate.jl")
 
 ########
 # Set up parameters and initial conditions

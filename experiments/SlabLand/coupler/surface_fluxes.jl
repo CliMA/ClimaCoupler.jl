@@ -1,8 +1,9 @@
 # Surface flux calculations
 
 """
-    calculate_land_sfc_fluxes(model::ModelSetup, state, aux, t)
-- calculate furface fluxes using the bulk gradient diffusion theory
+    calculate_land_sfc_fluxes(model::ModelSetup, state, aux, t; MO_params)
+
+Calculate surface fluxes using the bulk gradient diffusion theory.
 """
 function calculate_land_sfc_fluxes(model::ModelSetup, state, aux, t; MO_params = nothing) # should pass in the coupler state (also move to coupler), so can access states of both models derectly -e.g. callback?
     

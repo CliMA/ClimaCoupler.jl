@@ -1,9 +1,4 @@
-
 # Atmos Single Column & Slab Land
-
-
-
-
 
 
             |============================== z = 1e4 m  
@@ -82,7 +77,7 @@ where
 
 For description and values of the parameters above, please see [parameters_initialconditions.jl](parameters_initialconditions.jl). 
 
-### 2. Implemetation
+### 2. Implementation
 - for the slab land, we use an explicit time stepping:
 $$T_{sfc}^{n+1} = T_{sfc}^n +\frac{(F_{tot}^{n} + G^{n})}{\rho_s c_s h_s}\Delta t$$
 - this is implemented
@@ -119,7 +114,6 @@ $$T_{sfc}^{n+1} = T_{sfc}^n +\frac{(F_{tot}^{n} + G^{n})}{\rho_s c_s h_s}\Delta 
 
 
 ## **Tests**
-
 - Dry heat diffusion
     - Simplifications
         - $g_a$ is constant
@@ -135,7 +129,7 @@ $$T_{sfc}^{n+1} = T_{sfc}^n +\frac{(F_{tot}^{n} + G^{n})}{\rho_s c_s h_s}\Delta 
         - $G \neq 0$ and $F_a = 0$
     - [results](https://docs.google.com/document/d/1JKK8wFKPq3Jo3D4flXZiY3WAUPqYE19pXRvwJgpDwjw/edit)
 
-## **Pipeline** (probably delete)
+## **Pipeline**
 
 For this simple implementation, we assume:
 -  a dry setup 

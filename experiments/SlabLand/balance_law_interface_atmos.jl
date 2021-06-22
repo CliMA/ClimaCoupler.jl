@@ -27,8 +27,6 @@ import ClimateMachine.DGMethods.NumericalFluxes:
     numerical_flux_first_order!,
     normal_boundary_flux_second_order!
 
-using Unitful
-
 ##
 #     Declaration of variables
 ##
@@ -197,5 +195,3 @@ end
     
     return nothing
 end
-
-

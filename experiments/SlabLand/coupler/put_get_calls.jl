@@ -1,16 +1,15 @@
 # Land put and get calls
 """
-function preA(csolver)
-    - saves and regrids the `EnergyFluxAtmos` couplerfield (i.e. regridded `mAtmos.state.F_ρθ_accum[mAtmos.boundary]`) to `F_ρθ_prescribed[mLand.boundary]` on the `mLand` grid
-    csolver::CplSolver
+    preLand(csolver::CplSolver)
+
+Updates the Land model's prescribed boundary flux with `EnergyFluxAtmos`.
 """
-function preLand(csolver)
+function preLand(csolver::CplSolver)
     mLand = csolver.component_list.domainLand.component_model
     mAtmos = csolver.component_list.domainAtmos.component_model
 
     mLand.odesolver.rhs!.state_auxiliary.F_ρθ_prescribed[mLand.boundary] .= 
         coupler_get(csolver.coupler, :EnergyFluxAtmos, mLand.grid, DateTime(0), u"J")
-
 
     # For conservation checks (TODO: find a better way to do 2D domain integrals):
     # temp =  coupler_get(csolver.coupler, :EnergyFluxAtmos, mLand.grid, DateTime(0), u"J")    
@@ -25,11 +24,11 @@ function preLand(csolver)
 end
 
 """
-function postA(csolver)
-    - updates couplerfield `LandSurfaceTemerature` with `mLand.state.T_sfc[mLand.boundary]` regridded to the coupler grid, and updates the coupler time
-    csolver::CplSolver
+    postLand(csolver::CplSolver)
+
+Updates coupler field `LandSurfaceTemerature`.
 """
-function postLand(csolver)
+function postLand(csolver::CplSolver)
     mLand = csolver.component_list.domainLand.component_model
     mAtmos = csolver.component_list.domainAtmos.component_model
     coupler_put!(csolver.coupler, :LandSurfaceTemerature, mLand.state.T_sfc[mLand.boundary], mLand.grid.numerical, DateTime(0), u"K")
@@ -37,12 +36,11 @@ end
 
 # Atmos put and get calls
 """
-function preAtmos(csolver)
-    - saves and regrids the `LandSurfaceTemerature` couplerfield (i.e. regridded `mLand.state.T_sfc[mLand.boundary]``) on coupler grid to `mAtmos.aux.T_sfc[mAtmos.boundary]` on the `mAtmos` grid
-    - resets the accumulated flux `F_ρθ_accum` in `mAtmos` to 0
-    csolver::CplSolver
+    preAtmos(csolver::CplSolver)
+
+Gets the `LandSurfaceTemerature` field for the Atmos model and resets the accumulated flux.
 """
-function preAtmos(csolver)
+function preAtmos(csolver::CplSolver)
     mLand = csolver.component_list.domainLand.component_model
     mAtmos = csolver.component_list.domainAtmos.component_model
     # Set boundary T_sfc used in atmos at the start of the coupling cycle.
@@ -84,11 +82,11 @@ function preAtmos(csolver)
 end
 
 """
-function postAtmos(csolver)
-    - updates couplerfield `EnergyFluxAtmos` with mAtmos.state.F_ρθ_accum[mAtmos.boundary] regridded to the coupler grid, and updates the coupler time
-    csolver::CplSolver
+    postAtmos(csolver::CplSolver)
+
+Updates coupler field `EnergyFluxAtmos` with the average flux at the atmosphere's boundary.
 """
-function postAtmos(csolver)
+function postAtmos(csolver::CplSolver)
     mLand = csolver.component_list.domainLand.component_model
     mAtmos = csolver.component_list.domainAtmos.component_model
     # Pass atmos exports to "coupler" namespace

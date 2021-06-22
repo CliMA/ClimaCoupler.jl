@@ -101,7 +101,7 @@ modelAtmos = ModelSetup(
 ########
 
 Δt  = min_node_distance(gridAtmos.numerical) / parameters.cₛ * 0.25
-total_steps = 1000
+total_steps = 2
 start_time = 0
 end_time = Δt * total_steps#30 * 24 * 3600
 method = SSPRK22Heuns
@@ -143,8 +143,8 @@ simAtmos = CplSimulation(
 
 ## Create a Coupler State object for holding imort/export fields.
 coupler = CplState()
-register_cpl_field!(coupler, :LandSurfaceTemerature, deepcopy(simLand.state.T_sfc[simLand.boundary]), simLand.grid, DateTime(0), u"K") # value on top of domainA for calculating upward flux into domainB
-register_cpl_field!(coupler, :EnergyFluxAtmos, deepcopy(simAtmos.state.F_ρθ_accum[simAtmos.boundary]), simAtmos.grid, DateTime(0), u"J") # downward flux
+coupler_register!(coupler, :LandSurfaceTemerature, deepcopy(simLand.state.T_sfc[simLand.boundary]), simLand.grid, DateTime(0), u"K") # value on top of domainA for calculating upward flux into domainB
+coupler_register!(coupler, :EnergyFluxAtmos, deepcopy(simAtmos.state.F_ρθ_accum[simAtmos.boundary]), simAtmos.grid, DateTime(0), u"J") # downward flux
 
 compLand = (pre_step = preLand, component_model = simLand, post_step = postLand)
 compAtmos = (pre_step = preAtmos, component_model = simAtmos, post_step = postAtmos)

@@ -23,11 +23,6 @@ git-tree-sha1 = "bdf73eec6a88885256f282d48eafcad25d7de494"
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
 version = "1.1.1"
 
-[[ArgTools]]
-git-tree-sha1 = "bdf73eec6a88885256f282d48eafcad25d7de494"
-uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
-version = "1.1.1"
-
 [[ArnoldiMethod]]
 deps = ["LinearAlgebra", "Random", "StaticArrays"]
 git-tree-sha1 = "f87e559f87a45bece9c9ed97458d3afe98b1ebb9"
@@ -263,12 +258,6 @@ deps = ["ArgTools", "LibCURL", "NetworkOptions"]
 git-tree-sha1 = "135bf1896be424235eadb17474b2a78331567f08"
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 version = "1.5.1"
-
-[[Downloads]]
-deps = ["ArgTools", "LibCURL", "NetworkOptions"]
-git-tree-sha1 = "73be67e57517094c04078099e102d4ec39167327"
-uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
-version = "1.5.0"
 
 [[Elliptic]]
 git-tree-sha1 = "71c79e77221ab3a29918aaf6db4f217b89138608"

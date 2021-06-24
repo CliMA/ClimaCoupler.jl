@@ -68,8 +68,8 @@ physicsAtmos = Physics(
 ########
 
 bcsLand = (
-    bottom =  (T_sfc = Insulating(),),
-    top =     (T_sfc = CoupledSecondaryBoundary(),),
+    bottom =  nothing,
+    top =     nothing,
 )
 bcsAtmos = (
     bottom = (ρu = Impenetrable(FreeSlip()), ρθ = CoupledPrimaryBoundary(),),
@@ -84,7 +84,7 @@ modelLand = SlabLandModelSetup(
     physics = physicsLand,
     boundary_conditions = bcsLand,
     initial_conditions = (T_sfc = T_sfc₀,),
-    numerics = (flux = RoeNumericalFlux(),flux_second_order = PenaltyNumFluxDiffusive(), direction = EveryDirection()),
+    numerics = (flux = nothing, flux_second_order = nothing, direction = EveryDirection()),
     parameters = parameters,
 )
 
@@ -101,7 +101,7 @@ modelAtmos = ModelSetup(
 ########
 
 Δt  = min_node_distance(gridAtmos.numerical) / parameters.cₛ * 0.25
-total_steps = 2
+total_steps = 100
 start_time = 0
 end_time = Δt * total_steps#30 * 24 * 3600
 method = SSPRK22Heuns
@@ -144,7 +144,7 @@ simAtmos = CplSimulation(
 ## Create a Coupler State object for holding imort/export fields.
 coupler = CplState()
 coupler_register!(coupler, :LandSurfaceTemerature, deepcopy(simLand.state.T_sfc[simLand.boundary]), simLand.grid, DateTime(0), u"K") # value on top of domainA for calculating upward flux into domainB
-coupler_register!(coupler, :EnergyFluxAtmos, deepcopy(simAtmos.state.F_ρθ_accum[simAtmos.boundary]), simAtmos.grid, DateTime(0), u"J") # downward flux
+coupler_register!(coupler, :BoundaryEnergyFlux, deepcopy(simAtmos.state.F_ρθ_accum[simAtmos.boundary]), simAtmos.grid, DateTime(0), u"J") # downward flux
 
 compLand = (pre_step = preLand, component_model = simLand, post_step = postLand)
 compAtmos = (pre_step = preAtmos, component_model = simAtmos, post_step = postAtmos)
@@ -167,12 +167,12 @@ evolve!(cpl_solver, numberofsteps)
 ########
 # Check conservation
 ########
-using Plots
-fluxA = cpl_solver.fluxlog.A
-fluxB = cpl_solver.fluxlog.B
+#using Plots
+energyA = cpl_solver.fluxlog.A
+energyB = cpl_solver.fluxlog.B
 
-fluxT = fluxA .+ fluxB 
+energyT = energyA .+ energyB 
 tme = collect(1:1:total_steps)
-rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1]) ]
-plot(tme .* cpl_solver.dt, rel_error, ylabel = "rel. error = (fluxT - fluxT[1]) / fluxT[1]", xlabel = "time (s)")
-plot(tme .* cpl_solver.dt, [(fluxA .- fluxA[1]) (fluxB .- fluxB[1])],  label = ["Land Energy Flux" "Atmos Energy Flux"], xlabel = "time (s)", ylabel = "W / m2")
+rel_error = [ ((energyT .- energyT[1]) / energyT[1]) ]
+#plot(tme .* cpl_solver.dt, rel_error, ylabel = "rel. error = (energyT - energyT[1]) / energyT[1]", xlabel = "time (s)")
+#plot(tme .* cpl_solver.dt, [(energyA .- energyA[1]) (energyB .- energyB[1])],  label = ["Land energy change" "Atmos energy change"], xlabel = "time (s)", ylabel = "W / m2")

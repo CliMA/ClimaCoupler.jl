@@ -2,25 +2,15 @@
 """
     preLand(csolver::CplSolver)
 
-Updates the Land model's prescribed boundary flux with `EnergyFluxAtmos`.
+Updates the Land model's prescribed boundary flux with `BoundaryEnergyFlux`.
 """
 function preLand(csolver::CplSolver)
     mLand = csolver.component_list.domainLand.component_model
     mAtmos = csolver.component_list.domainAtmos.component_model
 
     mLand.odesolver.rhs!.state_auxiliary.F_ρθ_prescribed[mLand.boundary] .= 
-        coupler_get(csolver.coupler, :EnergyFluxAtmos, mLand.grid, DateTime(0), u"J")
+        coupler_get(csolver.coupler, :BoundaryEnergyFlux, mLand.grid, DateTime(0), u"J")
 
-    # For conservation checks (TODO: find a better way to do 2D domain integrals):
-    # temp =  coupler_get(csolver.coupler, :EnergyFluxAtmos, mLand.grid, DateTime(0), u"J")    
-    # abs_temp = abs.(temp)
-    # if sum(abs_temp) == 0
-    #     sign = temp .* 0.0 .+ 1.0
-    # else
-    #     sign = temp ./ abs_temp
-    # end
-
-    # mLand.odesolver.rhs!.state_auxiliary.F_ρθ_prescribed[:,:,:] .= sign[1,1,1] .* maximum(abs_temp)
 end
 
 """
@@ -61,10 +51,8 @@ function preAtmos(csolver::CplSolver)
 
     horiz_sfc_area = p.xmax * p.ymax
 
-    E_Land = weightedsum(mLand.state, 1) .* p.ρ_s .* p.h_s .* p.c_s ./ p.zmax ./ horiz_sfc_area ./ csolver.dt # W / m^2
-    E_Atmos = weightedsum(mAtmos.state, idx) .* p.cp_d ./ horiz_sfc_area ./ csolver.dt  ./  nel ./ (po+1) ./ (po+2)  # W / m^2 
-    #E_Land = weightedsum(mLand.state, 1) .* p.ρ_s .* p.h_s .* p.c_s  # J / m^2
-    #E_Atmos = weightedsum(mAtmos.state, idx) .* p.cp_d .* p.zmax ./  nel ./ (po+1) ./ (po+2) # J / m^2 
+    E_Land = weightedsum(mLand.state, 1) .* p.ρ_s .* p.h_s .* p.c_s ./ p.zmax ./ horiz_sfc_area # J / m^2
+    E_Atmos = weightedsum(mAtmos.state, idx) .* p.cp_d ./ horiz_sfc_area ./  nel ./ (po+1) ./ (po+2)  # J / m^2 
 
     @info(
         "preatmos",
@@ -84,13 +72,13 @@ end
 """
     postAtmos(csolver::CplSolver)
 
-Updates coupler field `EnergyFluxAtmos` with the average flux at the atmosphere's boundary.
+Updates coupler field `BoundaryEnergyFlux` with the average flux at the atmosphere's boundary.
 """
 function postAtmos(csolver::CplSolver)
     mLand = csolver.component_list.domainLand.component_model
     mAtmos = csolver.component_list.domainAtmos.component_model
     # Pass atmos exports to "coupler" namespace
     # 1. Save mean θ flux at the Atmos boundary during the coupling period
-    coupler_put!(csolver.coupler, :EnergyFluxAtmos, mAtmos.state.F_ρθ_accum[mAtmos.boundary] ./ csolver.dt,
+    coupler_put!(csolver.coupler, :BoundaryEnergyFlux, mAtmos.state.F_ρθ_accum[mAtmos.boundary] ./ csolver.dt,
         mAtmos.grid.numerical, DateTime(0), u"J")
 end

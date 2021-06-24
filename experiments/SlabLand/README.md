@@ -32,13 +32,13 @@ with μ, ν and κ representing the respective viscosity and diffusivity coeffic
 - Lower (coupled) boundary:
     - ρ: `Impenetrable()`  
     - u: `FreeSlip()`
-    - θ: `CoupledPrimary()`: $\frac{\partial θ}{\partial t} = - ∇ \cdot F_{tot}$ where $F_{tot}$ is the surface flux calculated by `calculate_land_sfc_fluxes(_...)` using Atmos and Land properties (see below) 
+    - θ: `CoupledPrimary()`: so that at the boundary $\frac{\partial θ}{\partial t} = ... - ∇ \cdot F_{tot}$ where $F_{tot}$ is the surface flux calculated by `calculate_land_sfc_fluxes(_...)` using Atmos and Land properties (see below) 
 
 
     NB: See the [boundary_conditions_doc.md](../../docs/src/boundary_conditions_doc.md) for more details on BCs and their implementation.
 
 ### 2. Implementation notes
-- We follow the Bickley jet the ClimateMachine.jl's RQA interface, except the boundary condition for ρθ. In this case, we impose the Robin boundary condition which overwrites the total normal flux, `fluxᵀn` (also referred to as `local_flux` in the code):
+- We followed the Bickley jet the ClimateMachine.jl's RQA interface, except the boundary condition for ρθ. In this case, we impose a non-zero normal diffusive flux, which is added to the total normal flux, `fluxᵀn` (also referred to as `local_flux` in the code):
 
         function numerical_boundary_flux_second_order!(
             numerical_flux::Union{PenaltyNumFluxDiffusive},
@@ -46,13 +46,13 @@ with μ, ν and κ representing the respective viscosity and diffusivity coeffic
             balance_law::ModelSetup,
             fluxᵀn::Vars, _...)
             F_tot = calculate_land_sfc_fluxes(balance_law, state_prognostic⁻, state_auxiliary⁻, t)  # W/m^2
-            fluxᵀn.ρθ = - F_tot  / balance_law.parameters.cp_d
+            fluxᵀn.ρθ += - F_tot  / balance_law.parameters.cp_d
 
         end
 
 ## **Slab Land Component**
 
-For prototyping of the coupler, we parameterize the land as a 0-dimensional slab covering the whole globe, analogous to the slab ocean with no water. 
+For prototyping the coupler, we parameterize the land as a 0-dimensional slab covering the whole globe, analogous to the slab ocean with no water. 
 
 ### 1. Formulation
 The evolution of the prognostic variable, surface soil temperature ($T_{sfc}$), can be written in the units of heat flux (W m$^{-2}$):
@@ -71,16 +71,16 @@ where
 - Downward-pointing short-wave radiative flux
     $$R_{SW} = F_{sfc}^d - F_{sfc}^u = (1-\alpha)\tau F_{sol} * (1 + \sin(2π τ_d^{-1} t))$$
 - Upward-pointing net long-wave flux
-    $$R_{LW} = F_{sfc}^u - F_{sfc}^d = \epsilon \sigma \theta_{sfc}^4 - \epsilon F_{a}$$
+    $$R_{LW} = F_{sfc}^u - F_{sfc}^d = \epsilon \sigma T_{sfc}^4 - \epsilon F_{a}$$
 - Soil storage
-    $$G = \kappa_s (\theta_{sfc}-\theta_h)/h_s$$
+    $$G = \kappa_s (T_{sfc}-T_h)/h_s$$
 
 For description and values of the parameters above, please see [parameters_initialconditions.jl](parameters_initialconditions.jl). 
 
 ### 2. Implementation
-- for the slab land, we use an explicit time stepping:
+- For the slab land, we use explicit time stepping:
 $$T_{sfc}^{n+1} = T_{sfc}^n +\frac{(F_{tot}^{n} + G^{n})}{\rho_s c_s h_s}\Delta t$$
-- this is implemented
+- This is implemented as:
 
         @inline function source!(
                 model::SlabLandModelSetup, source::Vars, state::Vars, gradflux::Vars, aux::Vars, _...)
@@ -92,25 +92,25 @@ $$T_{sfc}^{n+1} = T_{sfc}^n +\frac{(F_{tot}^{n} + G^{n})}{\rho_s c_s h_s}\Delta 
 ## **Coupler**
 
 ### 1. Formulation
-- we're using our sequential coupler, which is described here
+- we're using our sequential coupler, which is described [here](https://clima.github.io/CouplerMachine/dev/timestepping/)
 ### 2. Surface Flux Handling
 1. Flux calculation
     - function `calculate_land_sfc_fluxes(_...)` is defined in `coupler/surface_fluxes.jl`, and is used for:
-        - the Atmos Robin boundary condition calculation (see above)
+        - the Atmos boundary condition calculation (see above)
         - for surface flux accumulation (next point). 
     - it is called by Atmos, which is assumed to be the model with the shortest timestep. This means that the fluxes are only calculated once and are consistent with Atmos's time stepping.
 
 2. Flux accumulation
-    - In order to integrate fluxes in time consistently with the Atmos time stepper, we define a new prognostic variable `F_ρθ_accum` whose source function accumulates the fluxes, so that $F\_ρθ\_accum = \int F_{tot} dt$
+    - In order to integrate fluxes in time consistently with the Atmos time stepper, we define a new prognostic variable `F_ρθ_accum` whose source function accumulates the fluxes by integrating them in time, so that $F\_ρθ\_accum = \int F_{tot} dt$.
 
             @inline function source!(atmos_model::ModelSetup, _...)
                 source.F_ρθ_accum = calculate_land_sfc_fluxes(atmos_model, _...) 
             end
 
 3. Flux / state storage and communication
-    - the coupler stores 2 fields:
-        - `EnergyFluxAtmos` which collects `F_ρθ_accum / Δt` calculated and accumulated in Atmos (with $Δt$ denoting the period of the coupling cycle), and is called by land for its $T_{sfc}$ equation
-        - `LandSurfaceTemperature` which collects the state of the slab Land model, namely $T_{sfc}$ and is called by atmos when calculating surface fluxes
+    - the coupler stores fields:
+        - `BoundaryEnergyFlux` which collects `F_ρθ_accum / Δt` calculated and accumulated in Atmos during the Atmos part of the coupling cycle (with $Δt$ denoting the period of the coupling cycle), and is called by land for use in its $T_{sfc}$ equation
+        - `LandSurfaceTemperature` which collects the state of the slab Land model, namely $T_{sfc}$, and is called by atmos when calculating surface fluxes
 
 
 ## **Tests**
@@ -133,21 +133,23 @@ $$T_{sfc}^{n+1} = T_{sfc}^n +\frac{(F_{tot}^{n} + G^{n})}{\rho_s c_s h_s}\Delta 
 
 For this simple implementation, we assume:
 -  a dry setup 
-- atmosphere only governed by heat diffusion
-- aerodynamic conductance (i.e. $g_a = |u| c_D$, with $c_D$ representing the drag coefficient) is constant . Using explicit time stepping the formulation is implemented as follows:
+- atmosphere is only governed by the advection-diffusion
+- aerodynamic conductance (i.e. $g_a = |u| c_D$, with $c_D$ representing the drag coefficient) is constant. 
 
+Using explicit time stepping the formulation is implemented as follows:
 
-1) Coupler sends its field `LandSurfaceTemperature` and transforms it into Atmos field `auxiliary.T_sfc`
-2) Atmos initializes its state according to the user-defined ICs
-3) Atmos performs all its timesteps within the coupling cycle, with the boundary conditions at the coupled boundary setting the total normal flux to be equal to the flux coming from the land (`fluxᵀn.ρθ = - F_tot / cp_d`, so that $\partial_t \rho \theta = \nabla_z \sdot F_{tot}/cp_d$)
-4) The same flux `F_tot` is calculated in the `source!` function and saved as `state.F_ρθ_accum`, which ensures that the flux will be integrated and accumulated in time, consistent with the Atmos time stepping. 
-5) Coupler converts Atmos field `state.F_ρθ_accum` to the coupler field `EnergyFluxAtmos` 
-6) Coupler sends its field `EnergyFluxAtmos` and transforms it into Land field `auxiliary.F_ρθ_prescribed`
-5) Land performs its own initialization and physics (`G`), which is then added to the  `auxiliary.F_ρθ_prescribed` (corresponding to $F_{tot}$ above) in the `source!` function to solve:
+1) Both models' states are initiallised according to the user-defined ICs 
+2) Land model performs its first part of the coupling cycle, with zero surface fluxes and saves its state into the coupler field `LandSurfaceTemperature`
+3) Coupler transforms its field `LandSurfaceTemperature` into Atmos field `auxiliary.T_sfc`
+4) Atmos performs all its timesteps within the coupling cycle, with the boundary conditions at the coupled boundary contributing to the total normal flux with the surface flux coming from the land (`fluxᵀn.ρθ += - F_tot / cp_d`, so that $\partial_t \rho \theta = ... + \nabla_z \sdot F_{tot}/cp_d$)
+5) The same flux `F_tot` is calculated in the `source!` function and saved as `state.F_ρθ_accum`, which ensures that the flux will be integrated and accumulated in time, consistent with the Atmos time stepping. 
+6) Coupler converts Atmos field `state.F_ρθ_accum` to the coupler field `BoundaryEnergyFlux` 
+7) Coupler sends its field `BoundaryEnergyFlux` and transforms it into Land field `auxiliary.F_ρθ_prescribed`
+8) Land performs its own initialization and physics (`G`), which is then added to the  `auxiliary.F_ρθ_prescribed` (corresponding to $F_{tot}$ above) in the `source!` function to solve:
 $$T_s^{n+1} = T_s^n +\frac{F_{tot}^{n...}}{\rho_s c_s h_s}\Delta t$$
 The $^{n}$ fields correspond to the previous Land timestep.
-6) Coupler converts Land field `state.T_sfc` to the coupler field `LandSurfaceTemperature` 
-7) Atmos `state.F_ρθ_accum` is reset to 0 and the cycle repeats.
+9) Coupler converts Land field `state.T_sfc` to the coupler field `LandSurfaceTemperature` 
+10) Atmos `state.F_ρθ_accum` is reset to 0 and the cycle repeats.
 
 ## References:
 - [Bonan 2019 book](https://www.cambridge.org/us/academic/subjects/earth-and-environmental-science/climatology-and-climate-change/climate-change-and-terrestrial-ecosystem-modeling?format=HB&isbn=9781107043787)

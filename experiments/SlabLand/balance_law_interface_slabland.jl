@@ -150,80 +150,15 @@ flux_second_order!(model::SlabLandModelSetup, _...,) = nothing
 end
 
 """
-    Boundary conditions
+    Numerics and boundary conditions
+    - no interior / exterior interface fluxes needed for the slab
 """
 @inline boundary_conditions(model::SlabLandModelSetup) = model.boundary_conditions
 
-@inline function boundary_state!(
-        numerical_flux,
-        bc,
-        model::SlabLandModelSetup,
-        args...
-    )
-    # We need to apply boundary conditions for state variables. 
-    # This depends on first, second, and high-order
-    # operations, hence the diffusion model dependence.
-    # TODO!: make work for higher-order diffusion
-    diffusion = model.physics.diffusion # defaults to `nothing`
-    calc_boundary_state!(numerical_flux, bc.T_sfc, model, diffusion, args...)
-end
+numerical_flux_first_order!(::Nothing, model::Union{SlabLandModelSetup}, _...,) = nothing
+numerical_flux_gradient!(nf, bc,  model::Union{SlabLandModelSetup}, _...,) = nothing
+numerical_flux_second_order!(::Nothing, model::Union{SlabLandModelSetup}, _...,) = nothing
 
-@inline vertical_unit_vector(::Orientation, aux) = aux.∇Φ / grav(param_set)
-@inline vertical_unit_vector(::NoOrientation, aux) = @SVector [0, 0, 1]
-
-# customized methods form specifying total normal fluxes
-numerical_boundary_flux_second_order!(numerical_flux::Union{PenaltyNumFluxDiffusive}, bctype::NamedTuple{(:T_sfc,),Tuple{CoupledSecondaryBoundary}}, balance_law::SlabLandModelSetup, _...,) = nothing
-
-function numerical_boundary_flux_second_order!(
-    numerical_flux::Union{PenaltyNumFluxDiffusive}, bctype::NamedTuple{(:T_sfc,),Tuple{Insulating}}, balance_law::SlabLandModelSetup, fluxᵀn::Vars{S}, _...,) where {S}
-    FT = eltype(fluxᵀn)
-    fluxᵀn.T_sfc = FT(0)
-end
-
-"""
-    numerical_flux_second_order!(::PenaltyNumFluxDiffusive, ...)
-
-Penalty flux formulation of second order numerical flux. This formulation
-computes the CentralNumericalFluxSecondOrder term first (which is just the average
-of the + and - fluxes and an edge), and then adds a "penalty" flux that relaxes
-the edge state + and - toward each other.
-"""
-function numerical_flux_second_order!(
-    ::PenaltyNumFluxDiffusive,
-    bl::SlabLandModelSetup,
-    fluxᵀn::Vars{S},
-    n::SVector,
-    state⁻::Vars{S},
-    diff⁻::Vars{D},
-    hyperdiff⁻::Vars{HD},
-    aux⁻::Vars{A},
-    state⁺::Vars{S},
-    diff⁺::Vars{D},
-    hyperdiff⁺::Vars{HD},
-    aux⁺::Vars{A},
-    t,
-) where {S, HD, D, A}
-    
-    numerical_flux_second_order!(
-        CentralNumericalFluxSecondOrder(),
-        bl,
-        fluxᵀn,
-        n,
-        state⁻,
-        diff⁻,
-        hyperdiff⁻,
-        aux⁻,
-        state⁺,
-        diff⁺,
-        hyperdiff⁺,
-        aux⁺,
-        t,
-    )
-
-    Fᵀn = parent(fluxᵀn)
-    FT = eltype(Fᵀn)
-    tau = FT(0.0) # decide if want to use penalty
-    Fᵀn .+= tau * (parent(state⁻) - parent(state⁺))
-end
-
-numerical_flux_first_order!(::RoeNumericalFlux, model::Union{SlabLandModelSetup}, _...,) = nothing
+numerical_boundary_flux_first_order!(::Nothing, bc, model::Union{SlabLandModelSetup}, _...,) = nothing
+numerical_boundary_flux_gradient!(::Nothing, bc, model::Union{SlabLandModelSetup}, _...,) = nothing
+numerical_boundary_flux_second_order!(::Nothing, bc, model::Union{SlabLandModelSetup}, _...,) = nothing

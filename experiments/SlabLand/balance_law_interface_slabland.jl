@@ -157,8 +157,14 @@ end
 
 numerical_flux_first_order!(::Nothing, model::Union{SlabLandModelSetup}, _...,) = nothing
 numerical_flux_gradient!(nf, bc,  model::Union{SlabLandModelSetup}, _...,) = nothing
-numerical_flux_second_order!(::Nothing, model::Union{SlabLandModelSetup}, _...,) = nothing
+function numerical_flux_second_order!(::Nothing, model::Union{SlabLandModelSetup}, fluxᵀn, _...,)
+    FT = eltype(fluxᵀn)
+    fluxᵀn.T_sfc = fluxᵀn.T_sfc .* FT(0)
+end
 
 numerical_boundary_flux_first_order!(::Nothing, bc, model::Union{SlabLandModelSetup}, _...,) = nothing
 numerical_boundary_flux_gradient!(::Nothing, bc, model::Union{SlabLandModelSetup}, _...,) = nothing
-numerical_boundary_flux_second_order!(::Nothing, bc, model::Union{SlabLandModelSetup}, _...,) = nothing
+function numerical_boundary_flux_second_order!(::Nothing, bc, model::Union{SlabLandModelSetup},fluxᵀn, _...,)
+    FT = eltype(fluxᵀn)
+    fluxᵀn.T_sfc = fluxᵀn.T_sfc .* FT(0)
+end

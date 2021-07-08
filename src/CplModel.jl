@@ -10,7 +10,7 @@ struct CplModel{G, D, B, S, TS}
     discretization::D
     boundary::B
     state::S
-    stepper::TS
+    odesolver::TS
     nsteps::Int
 end
 
@@ -105,10 +105,10 @@ function CplModel(;
 
     # Create a timestepper of the sort needed for this component.
     # Hard coded here - but can be configurable.
-    stepper = timestepper(custom_tendency, state, dt = dt, t0 = 0.0)
+    odesolver = timestepper(custom_tendency, state, dt = dt, t0 = 0.0)
 
     # Return a CplModel entity that holds all the information
     # for a component that can be driver from a coupled stepping layer.
-    return CplModel(grid, discretization, boundary, state, stepper, nsteps)
+    return CplModel(grid, discretization, boundary, state, odesolver, nsteps)
 end
 

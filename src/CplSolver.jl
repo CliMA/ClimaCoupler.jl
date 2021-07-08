@@ -56,7 +56,8 @@ function ODESolvers.dostep!(Qtop, csolver::CplSolver, param, time::Real)
         component = cpl_component[:component_model]
         solve!(
             component.state,
-            component.odesolver;
+            component.odesolver,
+            param;
             numberofsteps = component.nsteps,
         )
         # post step pushing exports goes here

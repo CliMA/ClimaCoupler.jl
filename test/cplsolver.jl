@@ -6,6 +6,15 @@ using Dates, Unitful, LinearAlgebra
 #= Coupled Oscillators
 https://scholar.harvard.edu/files/schwartz/files/lecture3-coupled-oscillators.pdf
 
+Two coupled oscillators start from rest but with at least
+one perturbed from equilibrium (hence, motion). In our simulation set up,
+each individual mass is only aware of its own position, not that of the
+other. Through the coupler, the force each mass exerts on the other is passed
+to the other mass. A coupler is certainly not necessary to solve the problem,
+we could set up a simple matrix system and also have an analytical solution,
+however this is a good demonstration of the spectrum of coupling set ups:
+from tight monolithic coupling (matrix system) to the black box (our coupler).
+
 | k   κ   k |
 |~~~◯~~~◯~~~|
 |   m   m   |
@@ -18,6 +27,8 @@ F11 + F21 = m x1''
 F22 = -kx2 - κx2
 F12 = κx1 
 F22 + F12 = m x2''
+
+dx/dt = v; dv/dt = a = F/m
 =#
 @testset "Coupled Timestepping" begin
     FT = Float64

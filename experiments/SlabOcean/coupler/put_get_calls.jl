@@ -1,7 +1,7 @@
 # Ocean put and get calls
 
 """
-function preA(csolver)
+function preOcean(csolver)
     - saves and regrids the `BoundaryEnergyFlux` couplerfield (i.e. regridded `mAtmos.state.F_ρθ_accum[mAtmos.boundary]`) to `F_ρθ_prescribed[mOcean.boundary]` on the `mOcean` grid
     csolver::CplSolver
 """
@@ -14,7 +14,7 @@ function preOcean(csolver)
 end
 
 """
-function postA(csolver)
+function postOcean(csolver)
     - updates couplerfield `OceanSurfaceTemerature` with `mOcean.state.T_sfc[mOcean.boundary]` regridded to the coupler grid, and updates the coupler time
     csolver::CplSolver
 """
@@ -52,7 +52,6 @@ function preAtmos(csolver)
     nel = mAtmos.grid.resolution.elements.vertical
     po = mAtmos.grid.resolution.polynomial_order.vertical
 
-    
     Earth_sfc_area = FT(4π * 6371000.0 ^ 2)
     ocean_layer_volume = sum((mOcean.state.weights[:,:,mOcean.state.realelems])[mOcean.boundary])
     E_Ocean = weightedsum(mOcean.state, 1)  .* p.ρ_o .* p.c_o .* p.h_o ./ ocean_layer_volume # J / m^2
@@ -78,7 +77,6 @@ function postAtmos(csolver)
     csolver::CplSolver
 """
 function postAtmos(csolver)
-    
     mOcean = csolver.component_list.domainOcean.component_model
     mAtmos = csolver.component_list.domainAtmos.component_model
     

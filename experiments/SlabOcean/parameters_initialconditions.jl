@@ -195,9 +195,6 @@ function calc_component!(
     _cv_d = hsf.parameters.cv_d
     _p0   = hsf.parameters.MSLP  
 
-    # Parameters
-    T_ref = hsf.parameters.T_ref
-
     # Extract the state
     ρ = state.ρ
     ρu = state.ρu

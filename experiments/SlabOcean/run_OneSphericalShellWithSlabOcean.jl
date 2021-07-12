@@ -189,8 +189,8 @@ simAtmos = CplSimulation(
 
 ## Create a Coupler State object for holding import/export fields.
 coupler = CplState()
-register_cpl_field!(coupler, :SeaSurfaceTemerature, deepcopy(simOcean.state.T_sfc[simOcean.boundary]), simOcean.grid, DateTime(0), u"K") # value on top of domainA for calculating upward flux into domainB
-register_cpl_field!(coupler, :BoundaryEnergyFlux, deepcopy(simAtmos.state.F_ρe_accum[simAtmos.boundary]), simAtmos.grid, DateTime(0), u"J") # downward flux
+coupler_register!(coupler, :SeaSurfaceTemerature, deepcopy(simOcean.state.T_sfc[simOcean.boundary]), simOcean.grid, DateTime(0), u"K") # value on top of domainA for calculating upward flux into domainB
+coupler_register!(coupler, :BoundaryEnergyFlux, deepcopy(simAtmos.state.F_ρe_accum[simAtmos.boundary]), simAtmos.grid, DateTime(0), u"J") # downward flux
 
 compOcean = (pre_step = preOcean, component_model = simOcean, post_step = postOcean)
 compAtmos = (pre_step = preAtmos, component_model = simAtmos, post_step = postAtmos)

@@ -34,11 +34,11 @@ using CouplerMachine, Dates, Unitful
         coupler_put!(coupler, :test1, newdata, nothing, newdate, u"kg")
 
         @test newdata == coupler_get(coupler, :test1, nothing, newdate, u"kg")
-        # coupler_put! is in-place
-        @test newdata !== coupler_get(coupler, :test1, nothing, newdate, u"g")
-        # unit conversion
+        # coupler_put! is in-place; original data array has been modified
+        @test data === coupler_get(coupler, :test1, nothing, newdate, u"kg")
+        # unit conversion; data is converted from g -> kg when put in coupler
         coupler_put!(coupler, :test1, newdata, nothing, newdate, u"g")
-        @test newdata ≈ coupler_get(coupler, :test1, nothing, newdate, u"g")
+        @test newdata ≈ 1000 * data
 
         # coupler_put! must be to a previously registered field
         @test_throws KeyError coupler_put!(coupler, :idontexist, newdata, nothing, newdate, u"kg")

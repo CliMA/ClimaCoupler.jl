@@ -5,13 +5,14 @@ export CplModel
 
 include("../temp_hooks/overintegration_hook.jl")
 
-struct CplModel{G, D, B, S, TS}
+struct CplModel{G, D, B, S, TS, CB}
     grid::G
     discretization::D
     boundary::B
     state::S
-    stepper::TS
+    odesolver::TS
     nsteps::Int
+    callbacks::CB
 end
 
 """
@@ -25,6 +26,8 @@ end
         NFfirstorder = RusanovNumericalFlux(),
         NFsecondorder = CentralNumericalFluxSecondOrder(),
         NFgradient = CentralNumericalFluxGradient(),
+        overint_params = nothing,
+        callbacks = (),
     ) 
 
 Builds an instance of a coupler test model. This is currently a toy model
@@ -41,6 +44,8 @@ wrapped to format it for coupler compatibility.
 -  `NFfirstorder` numerical flux to use for first order terms.
 -  `NFsecondorder` numerical flux to use for second order terms.
 -  `NFgradient` numerical flux to use for gradient terms.
+-  `overint_params` overintegration parameters.
+-  `callbacks` component-specific callbacks executed at inner time steps.
 
 Each returned model instance is independent and has its own grid,
 balance law, time stepper and other attributes.  For now the code
@@ -63,6 +68,7 @@ function CplModel(;
     NFsecondorder = CentralNumericalFluxSecondOrder(),
     NFgradient = CentralNumericalFluxGradient(),
     overint_params = nothing,
+    callbacks = ()
 )
     FT = eltype(grid.vgeo)
 
@@ -105,10 +111,10 @@ function CplModel(;
 
     # Create a timestepper of the sort needed for this component.
     # Hard coded here - but can be configurable.
-    stepper = timestepper(custom_tendency, state, dt = dt, t0 = 0.0)
+    odesolver = timestepper(custom_tendency, state, dt = dt, t0 = 0.0)
 
     # Return a CplModel entity that holds all the information
     # for a component that can be driver from a coupled stepping layer.
-    return CplModel(grid, discretization, boundary, state, stepper, nsteps)
+    return CplModel(grid, discretization, boundary, state, odesolver, nsteps, callbacks)
 end
 

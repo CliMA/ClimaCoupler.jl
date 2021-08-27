@@ -58,7 +58,7 @@ parameters = (
         λ = FT(0.01),#FT(1e-5)    # coupling transfer coefficient for LinearRelaxation() SurfaceFluxType 
     )
 
-function atmos_simulation(land_simulation;
+function atmos_simulation(land_sim;
                           Lz,
                           Nz,
                           minimum_reference_temperature = 230.0, # K
@@ -111,7 +111,7 @@ function atmos_simulation(land_simulation;
     
     """ Initialize fields located at cell interfaces in the vertical. """
     function init_faces(zf, parameters)
-        return (; w = 0.0 .* zf)
+        return (w = 0.0 .* zf)
     end
     
     # Initialize the atmospheric states Yc and Yf
@@ -119,16 +119,32 @@ function atmos_simulation(land_simulation;
     z_faces = Fields.coordinate_field(face_space_atm)
     Yc = init_centers.(z_centers, Ref(parameters))
     Yf = init_faces.(z_faces, Ref(parameters))
-    T_atm_0 = (Yc = Yc, Yf = Yf)
+    #zero_boundary_field = init_BoundaryField() .* 0.0
+    #∫fluxes = (u = deepcopy(zero_boundary_field), v = deepcopy(zero_boundary_field), h = deepcopy(zero_boundary_field)) # something like this would be better
+    #∫fluxes = (u = [0.0], v = [0.0], h = [0.0]) # momentum and enthalpy (h = cp*T) fluxes 
+    zc_b = boundary_cspace()
+    ∫fluxes = init_BoudndaryField.(zc_b)
 
     # Put all prognostic variable arrays into a vector and ensure that solve can partition them
-    Y_atm = ArrayPartition((T_atm_0.Yc, T_atm_0.Yf, zeros(3)))
+    Y_atm = Fields.FieldVector(Yc = Yc, Yf = Yf,  ∫flux_u = ∫fluxes.u, ∫flux_v = ∫fluxes.v, ∫flux_h = ∫fluxes.h )
     prob_atm = ODEProblem(∑tendencies_atm!, Y_atm, (start_time, stop_time), (parameters, [land_surface_temperature]))
-    simulation = init(prob_atm, SSPRK33(), dt = Δt_min, saveat = 1 * Δt_min)
+    simulation = init(prob_atm, SSPRK33(), dt = Δt_min, saveat = Δt_min) # saveat does not work with FieldVector
     
     return simulation
 end
 
+function boundary_cspace(;bottom = 0.0, top = 1.0, nelem = 1)
+    domain = Domains.IntervalDomain(bottom, top, x3boundary = (:bottom, :top))
+    mesh = Meshes.IntervalMesh(domain; nelems = nelem)
+    cspace = Spaces.CenterFiniteDifferenceSpace(mesh)
+    zc = Fields.coordinate_field(cspace)
+end 
+function init_BoudndaryField(zc)
+    u = zc .* 0.0
+    v = zc .* 0.0
+    h = zc .* 0.0
+    return (u = u, v = v, h = h) 
+end
 
 # abstract type AtmosModel end
 

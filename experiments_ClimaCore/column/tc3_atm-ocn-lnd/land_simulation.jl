@@ -139,10 +139,10 @@ t0 = FT(0)
 tf = FT(60 * 60 * 72)
 dt = FT(0.02)
 
-n = 50
+n = land_n
 
-zmax = FT(0)
-zmin = FT(-1)
+zmax =land_zmax
+zmin =land_zmin
 domain = Domains.IntervalDomain(zmin, zmax, x3boundary = (:bottom, :top))
 mesh = Meshes.IntervalMesh(domain, nelems = n)
 

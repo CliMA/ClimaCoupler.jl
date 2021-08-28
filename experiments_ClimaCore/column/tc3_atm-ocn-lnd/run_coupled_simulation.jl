@@ -195,6 +195,7 @@ solve!(coupled_sim, coupling_Δt, stop_time)
 # - interface
 #   - add ClimaCore indexing functionality once implemented (Issue #66)
 #   - FieldVector - cannot add fluxes as a named tuple of Fields/arrays/floats
+#   - enable coupler_sim to contain all models' state vectors, which will need refactoring the interface so that all ODE problems are initiated with this coupled state vector, which will then be accessible to all.
 #   - step! will not save 
 #   - add back the new ClimaAtmos interface   
 

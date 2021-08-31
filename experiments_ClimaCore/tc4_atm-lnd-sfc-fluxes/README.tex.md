@@ -14,13 +14,15 @@ $$
 
 Where we parameterise:
 $$
-\overline{u'w'} = u*u* \approx - \tau / \rho = - <u> g_{am} / \rho = cd_m|<u>| <u>,
+\overline{u'w'} = u*u* \approx - \tau / \rho = - <u> g_{am} = cd_m|<u>| <u>,
 $$
 $$
-\overline{w'\theta'}= u*\theta* \approx - H / (\rho c_p) =g_{ac} (<\theta> - \theta_{sfc}) / \rho = cd_h  |<u>| (<\theta> - \theta_{sfc})
+\overline{w'\theta'}= u*\theta* \approx - H / (\rho c_p) =g_{ac} (<\theta> - \theta_{sfc}) = cd_h  |<u>| (<\theta> - \theta_{sfc}).
 $$
 
-where numerical iterations solve for 
+ Note that the units of $g$ are m/s; this is a slightly different $g$ definition compared with Bonan, Ch 7, where his $g$ is multiplied by a molar density. Figure 1.10 is helpful in clarifying the different representations of  turbulent fluxes across communities.   
+    
+Numerical iterations solve for 
 $$
 u* = \frac{\kappa}{\log(\Delta z/ z_{z0m}) - \Psi_m(\Delta z/ L) + \frac{z_{0m}}{\Delta z} \Psi_m (z_{0m}/L) + R_{z0m}[\Psi_m(z_{0m}/L) - 1]} <u> = \sqrt{cd_m} <u> = \sqrt{g_{am} <u> / \rho}
 $$
@@ -40,15 +42,15 @@ where $\overline{\theta}$ is the basic potential temperature (?)
 
 
 ## Variables supplied to SurfaceFluxes:
-- in dynamic atmos mode (for FD):
+- in dynamic atmos mode (for FD; coupled to land or not):
     - $<u>$: $u$ averaged over first atmos layer
     - $\Delta z$: thickness of first atmos layer
-- standalone land mode:
-    - prescribe $u(Z)$ (instead of $<u>$)
-    - $\Delta z = Z-d$, 
+- standalone land mode, driven by e.g. measurements of u at a given height $h$, $\theta$ at the same height $h$:
+    - replace $<u>$ with $u(h)$
+    - replace $\Delta z = h-d$, etc.
 
 ## Exchange variables 
-- from land: $\theta_{sfc}$, $z_{0h}$, $z_{0m}$,
+- from land: $\theta_{sfc}$ (determined via prognostic land variables); $z_{0h}$, $z_{0m}$, $d$ (parameters of surface, at most slowly varying in time)
 - from atmos: $<u>$, $<\theta>$, $<\rho>$, Pr 
 - from `SurfaceFLuxes.jl`: 
 $$cd_m (z)= \frac{u*^2}{  u(z)^2} \,\,\,\,\,\,\,\,\,\,\,\,\, cd_h(z) = \frac{u*\theta * }{ u(z) \Delta \theta (z)}$$
@@ -57,11 +59,11 @@ $$$$
  things depending on state, but can be assumed to be fixed over atmos step: T_land, relative_humidity land, for g_soil needs moisture in land
 
 ## Add to SurfaceFluxes.jl
-- $g_{ac}$ (and $g_{s}$) calculation
+- $g_{ac}$ (and $g_{s}$) calculation. $g_s$ needed only for evaporation and latent heat fluxes.
 
 ## Other notes
 - Land conductances added together for evaporation (this will be addresses later):
 $$
-g_{evap} = \frac{1}{ g_{ac}^{-1} + g_{sfc}^{-1}}
+g_{evap} = \frac{1}{ g_{ac}^{-1} + g_{s}^{-1}}
 $$
-
+- SHF also has a contribution due to evaporation (see Land Design Doc, Ch 2.8). So while the calculation of $u*$, etc, can be carried out as described, the total exchanged flux is not simply proportional to e.g. $u*\theta*$ for sensible heat. 

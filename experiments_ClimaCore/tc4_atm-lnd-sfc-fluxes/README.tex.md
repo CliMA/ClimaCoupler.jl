@@ -1,6 +1,6 @@
 # Atmos-Ocean-Soil Columns
 
-This is a prototype for testing the surface flux model, using the atmos and land models of Test Case 3 in the [Coupler Design Docs](https://www.overleaf.com/project/610c13492c7d0e8d459e72b8) for details. 
+This is a prototype for testing the surface flux model, using the atmos and land models of Test Case 3 in the [Coupler Design Docs](https://www.overleaf.com/project/610c13492c7d0e8d459e72b8) for details. We're using the Nishiwaza 2018 to formulate the flux calculations below, as in `SurfaceFluxes.jl`. 
 
 # Coupled boundary conditions
 
@@ -40,7 +40,7 @@ where $\overline{\theta}$ is the basic potential temperature (?)
 
 
 ## Variables supplied to SurfaceFluxes:
-- in dynamic atmos mode:
+- in dynamic atmos mode (for FD):
     - $<u>$: $u$ averaged over first atmos layer
     - $\Delta z$: thickness of first atmos layer
 - standalone land mode:
@@ -49,7 +49,10 @@ where $\overline{\theta}$ is the basic potential temperature (?)
 
 ## Exchange variables 
 - from land: $\theta_{sfc}$, $z_{0h}$, $z_{0m}$,
-- from atmos: $<u>$, $<\theta>$, $<\rho>$, Pr  
+- from atmos: $<u>$, $<\theta>$, $<\rho>$, Pr 
+- from `SurfaceFLuxes.jl`: 
+$$cd_m = \frac{u*^2}{  u(z)^2} \,\,\,\,\,\,\,\,\,\,\,\,\, cd_h = \frac{u*\theta * }{ u(z) \Delta \theta (z)}$$
+$$$$ 
 
  things depending on state, but can be assumed to be fixed over atmos step: T_land, relative_humidity land, for g_soil needs moisture in land
 

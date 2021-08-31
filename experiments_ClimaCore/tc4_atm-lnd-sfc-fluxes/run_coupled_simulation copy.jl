@@ -4,6 +4,14 @@ import SciMLBase: step!
 
 using Printf
 
+using CLIMAParameters
+using CLIMAParameters.Planet: cp_d, cv_d, grav, T_surf_ref
+using CLIMAParameters.Atmos.SubgridScale: C_smag, C_drag
+struct EarthParameterSet <: AbstractEarthParameterSet end
+const CLIMAparam_set = EarthParameterSet()
+import CLIMAParameters
+
+
 include("dummy_surface_fluxes.jl") # placeholder for SurfaceFluxes.jl
 
 include("land_simulation.jl") #refactoring of land interface to come
@@ -15,6 +23,65 @@ struct CoupledSimulation{A, L, C}
     clock :: C
 end
 
+mutable struct SensibleHeatFlux
+    Cd
+    T_land
+end
+
+
+#playback = les boundaries driving GCM (x,y,z,t), coupled = atmos accumulating flux, coupled to land
+Y_atmos = (Y_gcm, Y_playback)
+
+needed_value = model.prescribed_field(x,y,z,t) # prescribed clouds
+
+needed_value = Y.cloud
+Y.cloud (x,y,z,t, RHS = 0) Y.cloud from dY/dt
+
+Y = (Y_energy, Y_water)
+Y = (Y_energy, Y_water) 
+dY_energy = 0
+Y_energy = f(x,y,z,t)
+get_temperature(model::EnergyModel (prescribed or not), Y,z, t)
+
+Y_initial = ()
+push!(Y_initial, Y_atmos)
+push!(Y_inital, Y_coupled)
+
+dY_coupled/dt = flux
+
+
+∑sensible = ∑_layers a*(T_amos(layer)-T_leaf(layer))
+make_rhs!(atmos_model)
+    rhs_atmos! = make_rhs(intrinsic_atmos)
+    rhs_coupler! = make_rhs(flux_accum_model)
+    return rhs!
+end
+
+    (Y = rho, u, v, w, Y_coupler = flux_accum)
+
+
+function calc_flux_in_atmos(Y, Ya, t, bc::BoundaryCondition)
+    wind_speed = f(Y)
+    T_atm = f(Y)
+    T_sfc = bc.T_sfc
+
+    return bc.Cd * wind_speed * (T_atm - T_sfc)
+end
+
+# .. meanwhile in the rhs we need
+btm_flux = calc_flux_in_atmos(Y,D,t,model.bcs.ρθ.btm)
+
+#= TODO
+Interface
+- coupler function that overwrites T_sfc in SensibleHeatFlux
+- enable appending variables in Y (make_rhs!) for flux accumulation and prescribed/ dynamic flux comm; 
+
+SurfaceFluxes.jl 
+- 
+- 
+- 
+
+=#
 
 function step!(coupled_sim::CoupledSimulation, coupling_Δt)
 

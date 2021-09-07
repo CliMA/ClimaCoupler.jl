@@ -15,7 +15,13 @@ A simple outer timestepping loop for coupled system runs.
 This will be formalized when the run! functionality for component
 models is implemented so to have a consistent interface.
 """
-function run!(sim::CoupledSimulation) end
+function run!(sim::CoupledSimulation) 
+    clock = sim.clock
+    while !stop_time_exceeded(clock)
+        step!(sim, clock.dt)
+        tick!(clock)
+    end
+end
 
 """
     step!(::CoupledSimulation, dt)

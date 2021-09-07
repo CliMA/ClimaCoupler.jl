@@ -5,8 +5,7 @@ Coupling module sufficient for initial atmos-ocean-land coupled simulation.
 """
 module CouplerMachine
 
-include("CplSimulations/CoupledSimulation.jl")
-include("CplSimulations/AOLSimulation.jl")
-include("CplState/CouplerState.jl")
+include("CoupledSimulations/coupled_simulation.jl")
+include("CouplerState/coupler_state.jl")
 
 end

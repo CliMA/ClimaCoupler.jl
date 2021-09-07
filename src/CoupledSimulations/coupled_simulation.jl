@@ -5,7 +5,7 @@ export CoupledSimulation, step!, run!
 
 An abstract type representing a coupled simulation.
 """
-abstract type CouplerSimulation end
+abstract type CoupledSimulation end
 
 """
     run!(::CoupledSimulation)

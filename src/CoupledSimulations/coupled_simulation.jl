@@ -24,11 +24,11 @@ function run!(sim::CoupledSimulation)
 end
 
 """
-    step!(::CoupledSimulation, dt)
+    step!(sim, dt)
 
-Advances a simulation by the coupling period `dt`.
+Advances a simulation by `dt`.
 
-This can be custom-written for different implementations of the
-`CoupledSimulation` type. 
+Note that `dt` is not necessarily the simulation's timestep length;
+a simuation could take several shorter steps that total to `dt`.
 """
-function step!(sim::CoupledSimulation, dt) end
+function step!(sim, dt) end

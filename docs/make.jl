@@ -20,7 +20,7 @@ experiment_pages = [
                     "Advection-diffusion on a Sphere" => "generated/run_script_v2.md",
                    ]
 
-interface_pages = ["couplerstate.md", "timestepping.md", "coupledmodel.md"]
+interface_pages = ["couplerstate.md", "timestepping.md"]
 
 pages = Any[
     "Home" => "index.md",

@@ -1,7 +1,7 @@
 using Base: show_supertypes
 #push!(LOAD_PATH, joinpath(@__DIR__, "..", ".."))
-
 # add https://github.com/CliMA/ClimaCore.jl
+
 # import required modules
 import ClimaCore.Geometry, LinearAlgebra, UnPack
 import ClimaCore:
@@ -66,24 +66,36 @@ function ∑tendencies_atm!(du, u, (parameters, T_sfc), t)
     
     We also use this model to calculate and accumulate the downward surface fluxes, F_sfc:
         F_sfc = - λ * (T_sfc - T1) 
-        d(F_integrated)/dt  = F_sfc
+        d(F_integrated)/dt  = - F_sfc
         where
             F_integrated is reset to 0 at the beginning of each coupling cycle
             T1 = atm temperature near the surface (here assumed equal to the first model level)
     """
     
-    T = u.x[1] # u.x = vector of prognostic variables from DifferentialEquations
-    F_sfc = calculate_flux(T_sfc[1], parent(T)[1], parameters)
+    T = u.x[1] # u.x is an ArrayPartition vector of prognostic variables used in DifferentialEquations
+    F_sfc = calculate_flux(T_sfc[1], parent(T)[1], parameters) * 0.0 +1.0 # this is reset when should be
 
-    # set BCs
-    bcs_bottom = Operators.SetValue(F_sfc) 
+    # # set BCs
+    # bcs_bottom = Operators.SetValue(FT(F_sfc)) 
+    # bcs_top = Operators.SetValue(FT(0.0))
+
+    # gradc2f = Operators.GradientC2F()#top = bcs_top) # Dirichlet BC
+    # #gradf2c = Operators.GradientF2C(bottom = bcs_bottom) # Neumann BC
+    # gradf2c = Operators.GradientF2C(bottom = bcs_bottom, top = bcs_top) 
+
+    # # tendency calculations
+    # @. du.x[1] = gradf2c( parameters.μ * gradc2f(T)) # dT/dt
+    # du.x[2] .= - F_sfc[1] # d(F_integrated)/dt
+
+    
     bcs_top = Operators.SetValue(FT(parameters.T_top))
+    bcs_bottom = Operators.SetGradient(Geometry.Cartesian3Vector(FT(F_sfc / parameters.μ )))
 
-    gradc2f = Operators.GradientC2F(top = bcs_top) # Dirichlet BC
-    gradf2c = Operators.GradientF2C(bottom = bcs_bottom) # Neumann BC
+    gradc2f = Operators.GradientC2F(bottom = bcs_bottom, top = bcs_top)
+    divf2c = Operators.DivergenceF2C()
+    
 
-    # tendency calculations
-    @. du.x[1] = gradf2c( parameters.μ * gradc2f(T)) # dT/dt
+    @. du.x[1] = divf2c( parameters.μ .* gradc2f(T))
     du.x[2] .= - F_sfc[1] # d(F_integrated)/dt
 
 end
@@ -91,15 +103,15 @@ end
 function ∑tendencies_lnd!(dT_sfc, T_sfc, (parameters, F_accumulated), t)
     """
     Slab layer equation
-        lnd d(T_sfc)/dt = - F_accumulated + G
+        d(T_sfc)/dt = - (F_accumulated + G) / (h_lnd)
         where 
             F_accumulated = F_integrated / Δt_coupler
     """
     G = 0.0 # place holder for soil dynamics
-    @. dT_sfc = ( - F_accumulated + G) / parameters.h_lnd 
+    @. dT_sfc = ( - F_accumulated + G) / parameters.h_lnd
 end
 
-# initialize all variables and display models
+# initialize all prognostic variables
 T_atm_0 = Fields.ones(FT, center_space_atm) .* parameters.T_atm_ini # initiates a spatially uniform atm progostic var
 T_lnd_0 = [parameters.T_lnd_ini] # initiates lnd progostic var
 ics = (;
@@ -109,11 +121,11 @@ ics = (;
 
 # specify timestepping info
 stepping = (;
-        Δt_min = 0.02,
-        timerange = (0.0, 6.0),
-        Δt_coupler = 1.0,
+        Δt_min = 0.01,
+        timerange = (0.0, 0.5),
+        Δt_coupler = 0.1,
         odesolver = SSPRK33(),
-        nsteps_atm = 8, # number of timesteps of atm per coupling cycle
+        nsteps_atm = 1, # number of timesteps of atm per coupling cycle
         nsteps_lnd = 1, # number of timesteps of lnd per coupling cycle
         )
 
@@ -146,7 +158,7 @@ function coupler_solve!(stepping, ics, parameters)
                         prob_atm,
                         stepping.odesolver,
                         dt = Δt_min,
-                        saveat = 10 * Δt_min,)
+                        saveat = Δt_min,)
 
     # land copies of coupler variables
     T_lnd = ics.lnd
@@ -158,32 +170,33 @@ function coupler_solve!(stepping, ics, parameters)
                         prob_lnd,
                         stepping.odesolver,
                         dt = Δt_min,
-                        saveat = 10 * Δt_min,)
+                        saveat = Δt_min,)
 
     # coupler stepping
     for t in (t_start : Δt_coupler : t_end)
 
         ## Atmos
         # pre_atmos
-        integ_atm.p[2] .= coupler_get(coupler_T_lnd) # integ_atm.p is the parameter vector of an ODEProblem from DifferentialEquations
-        integ_atm.u.x[2] .= [0.0] # surface flux to be accumulated
-
+        integ_atm.p[2] .= coupler_get(coupler_T_lnd) # # update atm's T_sfc aux field (integ_atm.p is the parameter vector of an ODEProblem from DifferentialEquations)
+        integ_atm.u.x[2] .= [0.0] # reset atm's F_sfc prognostic field (i.e., surface flux to be accumulated during Δt_coupler)
+        
         # run atmos
         # NOTE: use (t - integ_atm.t) here instead of Δt_coupler to avoid accumulating roundoff error in our timestepping.
+        Δt_coupler_updated = t - integ_atm.t
         step!(integ_atm, t - integ_atm.t, true)
 
         # post_atmos
-        coupler_F_sfc .= coupler_put(integ_atm.u.x[2]) / Δt_coupler
+        coupler_F_sfc .= coupler_put(integ_atm.u.x[2]) / Δt_coupler_updated
 
         ## Land
         # pre_land
-        lnd_F_sfc .= coupler_get(coupler_F_sfc)
+        lnd_F_sfc .= coupler_get(coupler_F_sfc) # update lnd's F_sfc aux field
         
         # run land
         step!(integ_lnd, t - integ_lnd.t, true)
 
         # post land
-        coupler_T_lnd .= coupler_put(integ_lnd.u) # update T_sfc
+        coupler_T_lnd .= coupler_put(integ_lnd.u) # update coupler's T_sfc field
     end
 
     return integ_atm, integ_lnd
@@ -218,7 +231,7 @@ Plots.png(Plots.plot(sol_atm.t, atm_sfc_u_t), joinpath(path, "T_atmos_surface_ti
 lnd_sfc_u_t = [u[1] for u in sol_lnd.u]
 Plots.png(Plots.plot(sol_lnd.t, lnd_sfc_u_t), joinpath(path, "T_land_surface_time.png"))
 
-# convert to the same units (analogous to energy conservation, assuming that is both domains density=1 and thermal capacity=1)
+# convert to the same units (analogous to energy conservation, assuming that in both domains density=1 and thermal heat capacity=1)
 lnd_sfc_u_t = [u[1] for u in sol_lnd.u] .* parameters.h_lnd
 atm_sum_u_t = [sum(parent(u.x[1])[:]) for u in sol_atm.u] .* (parameters.zmax_atm - parameters.zmin_atm) ./ parameters.n
 
@@ -241,11 +254,6 @@ end
 
 linkfig("output/$(dirname)/heat_end.png", "Heat End Simulation")
 
-# Next steps
-# - extend atmos physics to Ekman Column
-# - use ClimaAtmos interface & optimise the coupler_solve! functions accordingly
-# - use coupler module functions 
-
 # Refs:
-# - ODEProblem(f,u0,tspan; _..) https://diffeq.sciml.ai/release-2.1/types/ode_types.html
-# - for options for solve, see: https://diffeq.sciml.ai/stable/basics/common_solver_opts/
+# - https://diffeq.sciml.ai/release-2.1/types/ode_types.html
+# - https://diffeq.sciml.ai/stable/basics/common_solver_opts/

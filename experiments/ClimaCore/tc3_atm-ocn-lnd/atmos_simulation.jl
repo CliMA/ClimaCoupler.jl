@@ -130,20 +130,3 @@ function atmos_simulation(land_simulation;
 end
 
 
-# abstract type AtmosModel end
-
-# struct AtmosModel <: AtmosModel
-#     integrator::A
-# end
-
-
-# function step!(model, Δt, land_surface_temp)
-
-#     model.integrator.u.x[3] .= [0.0, 0.0, 0.0] # surface flux to be accumulated    
-#     model.integrator.p[2] .= land_surface_temp # get land temperature and set on atmosphere (Tland is prognostic)
-#     OrdinaryDiffEq.step!(model.integrator, Δt, true) #Δt here does not need to be the land model step
-#     # the integrator contains the land model timestep dt. with [Δt, true] args the integrator will step by dt until it has
-#     # advanced exactly Δt. 
-
-# end
-

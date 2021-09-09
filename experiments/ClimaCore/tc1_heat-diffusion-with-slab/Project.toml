@@ -1,5 +1,4 @@
 [deps]
-ClimaAtmos = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
 ClimaCore = "d414da3d-4745-48bb-8d80-42e94e092884"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"

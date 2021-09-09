@@ -39,11 +39,6 @@ function step!(coupled_sim::CoupledSimulation, coupling_Δt)
     atmos_sim.u.x[3] .= [0.0, 0.0, 0.0] # reset surface flux to be accumulated during each coupling_Δt 
     atmos_sim.p[2] .= land_surface_T # get land temperature and set on atmosphere (Tland is prognostic)
 
-    # TODO: determine if this will be useful (init step not ran w/o this but same outcome)
-    # u_atmos = atmos_sim.u 
-    # u_atmos.x[3] .= u_atmos.x[3] .* -0.0
-    # set_u!(atmos_sim, u_atmos)
-
     step!(atmos_sim, next_time - atmos_sim.t, true)
 
     # Extract surface fluxes for ocean and land boundaries
@@ -60,7 +55,7 @@ function step!(coupled_sim::CoupledSimulation, coupling_Δt)
     @. surface_flux_T_ocean = 1 / (ocean_ρ * ocean_Cᴾ) * ∫surface_heat_flux / coupling_Δt 
 
     # We'll develop a new function step!(ocean_sim, coupling_Δt) :thumsup:
-    time_step!(ocean_sim.model, 0.02)#next_time - ocean_sim.model.clock.time)
+    time_step!(ocean_sim.model, 0.02)
     data = (T = deepcopy(ocean_sim.model.tracers.T), time = ocean_sim.model.clock.time)
     push!(ocean_data, data)
     
@@ -96,9 +91,9 @@ atmos_Nz = 30  # Number of vertical grid points
 atmos_Lz = 200 # Vertical extent of domain
 
 # land domain params (need to abstract)
-# n = 50
-# zmax = FT(0)
-# zmin = FT(-1)
+n = 50
+zmax = FT(0)
+zmin = FT(-1)
 land_Nz = n
 land_Lz = zmax - zmin # this needs abstraction
 
@@ -109,8 +104,6 @@ stop_time = 1#coupling_Δt*100#60*60
 land_sim = land_simulation()
 atmos_sim = atmos_simulation(land_sim, Nz=atmos_Nz, Lz=atmos_Lz, start_time = start_time, stop_time = stop_time,)
 ocean_sim, ocean_data = ocean_simulation(Nz=ocean_Nz, Lz=ocean_Lz, f=f, g=g)
-# data = deepcopy(ocean_sim.model.tracers.T)
-# push!(ocean_data, data)
 
 # Build a coupled simulation
 clock = Clock(time=0.0)
@@ -180,9 +173,3 @@ total = atm_sum_u_t + lnd_sfc_u_t
 rel_error = (total .- total[1]) / mean(total)
 Plots.png(Plots.plot(sol_lnd.t, rel_error, labels = ["tot"]), joinpath(path, "rel_error_surface_time.png"))
 
-# TODO
-# - add domain info, similar to aceananigans: coupled_sim.ocean.model.grid. ... 
-#       - like that oceananigans model prints out basic characteristics (nel, BCs etc)
-# - oceananigans doesn't store all times...?
-# - how would be do the accumulation in oceananigans?
-# - ekman column - dw equation looks odd

@@ -6,8 +6,8 @@ const EXPERIMENTS_DIR = joinpath(@__DIR__, "..", "experiments")
 const OUTPUT_DIR      = joinpath(@__DIR__, "..", "docs/src/generated")
 
 experiments = [
-               "DesignTests/simple_2testcomp.jl",
-               "AdvectionDiffusion/run_script_v2.jl"
+               "ClimateMachine/DesignTests/simple_2testcomp.jl",
+               "ClimateMachine/AdvectionDiffusion/run_script_v2.jl"
               ]
 
 for experiment in experiments

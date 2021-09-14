@@ -38,9 +38,12 @@ using Printf
 
 const FT = Float64
 
+import SurfaceFluxes
+const SF = SurfaceFluxes
+
 # define model equations:
 include("atmos_rhs_minimal_example.jl")
-include("SurfaceFluxes.jl")
+# include("SurfaceFluxes.jl")
 include("dummy_surface_fluxes.jl") 
 
 parameters = (

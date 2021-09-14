@@ -2,8 +2,7 @@ using ClimaAtmos
 using ClimaCore.Geometry
 
 using ClimaCore: DataLayouts, Operators, Geometry
-using ClimaAtmos.Interface: TimeStepper, Simulation
-using ClimaAtmos.Interface: PeriodicRectangle, BarotropicFluidModel
+using ClimaAtmos.Simulations: Simulation
 using ClimaCore: Fields, Domains, Topologies, Meshes, Spaces
 
 using IntervalSets
@@ -23,7 +22,7 @@ global_logger(TerminalLogger())
 const CI = !isnothing(get(ENV, "CI", nothing))
 
 # general parameters
-const FT = Float64
+
 
 # define model equations:
 include("atmos_rhs.jl")

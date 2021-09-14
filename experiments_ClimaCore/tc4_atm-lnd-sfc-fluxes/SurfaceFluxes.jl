@@ -13,26 +13,38 @@
  - [Nishizawa2018](@cite)
 
 """
-module SurfaceFluxes
 
-using NonlinearSolvers
-using KernelAbstractions: @print
-
-using Thermodynamics
-using DocStringExtensions
-using CLIMAParameters: AbstractEarthParameterSet
-using CLIMAParameters.Planet: molmass_ratio, grav
-using CLIMAParameters.SubgridScale: von_karman_const
-using StaticArrays
-
-include("UniversalFunctions.jl")
-using .UniversalFunctions
-const UF = UniversalFunctions
-
-abstract type SurfaceFluxesModel end
+abstract type SolutionType end
+struct CompactSolution <: SolutionType end
+export CompactSolution, SolutionType
 
 struct FVScheme end
 struct DGScheme end
+export FVScheme, DGScheme
+
+include("NewtonsMethodAD.jl")
+
+#module SurfaceFluxes
+
+
+#using NonlinearSolvers
+using KernelAbstractions: @print
+
+#using Thermodynamics
+#using DocStringExtensions
+using CLIMAParameters: AbstractEarthParameterSet
+using CLIMAParameters.Planet: molmass_ratio, grav
+using CLIMAParameters.SubgridScale: von_karman_const
+#using StaticArrays
+
+const FT = Float64
+
+include("UniversalFunctions.jl")
+using .UniversalFunctions
+UF = UniversalFunctions
+using DocStringExtensions
+
+abstract type SurfaceFluxesModel end
 
 export surface_conditions,
     exchange_coefficients, recover_profile, monin_obukhov_length
@@ -65,7 +77,7 @@ function Base.show(io::IO, sfc::SurfaceFluxConditions)
 end
 
 function surface_fluxes_f!(F, x, nt)
-    param_set = nt.param_set
+    param_set = nt.CLIMAparam_set
     wθ_flux_star = nt.wθ_flux_star
     z_in = nt.z_in
     z_0 = length(nt.z_0) > 1 ? Tuple(nt.z_0) : nt.z_0
@@ -77,6 +89,7 @@ function surface_fluxes_f!(F, x, nt)
     θ_scale = nt.θ_scale
 
     x_tup = Tuple(x)
+    @show x
 
     u_star, θ_star = x_tup[2], x_tup[3]
     if wθ_flux_star == nothing
@@ -84,8 +97,12 @@ function surface_fluxes_f!(F, x, nt)
     else
         wθ_surf_flux = wθ_flux_star
     end
+    @show "before"
+    @show u_star
     L_MO = monin_obukhov_length(param_set, u_star, θ_scale, wθ_surf_flux)
-    uf = universal_func(param_set, L_MO)
+    @show L_MO
+    L_MO_ = isdefined(L_MO, :value) ? L_MO.value : L_MO 
+    uf = universal_func(param_set, L_MO_)# L_MO)
     F_nt = ntuple(Val(n_vars + 1)) do i
         if i == 1
             F_i =
@@ -112,6 +129,7 @@ function surface_fluxes_f!(F, x, nt)
         F_i
     end
     F .= F_nt
+    @show "after"
 end
 
 """
@@ -132,7 +150,7 @@ If `wθ_flux_star` is not given, then it is computed by iteration
 of equations 3, 17, and 18 in Nishizawa2018.
 """
 function surface_conditions(
-    param_set::AbstractEarthParameterSet,
+    CLIMAparam_set::AbstractEarthParameterSet,
     MO_param_guess::AbstractVector,
     x_in::AbstractVector,
     x_s::AbstractVector,
@@ -151,7 +169,7 @@ function surface_conditions(
     local sol
 
     args = (;
-        param_set,
+        CLIMAparam_set,
         wθ_flux_star,
         z_in,
         z_0,
@@ -169,25 +187,28 @@ function surface_conditions(
 
     nls = NewtonsMethodAD(f!, MO_param_guess)
     # sol = solve!(nls, CompactSolution(), ResidualTolerance(FT(10)), 1)
+    @show args
+    @show "before sol"
     sol = solve!(nls, CompactSolution())
+    @show "after sol"
 
     root_tup = Tuple(sol.root)
     if sol.converged
-        L_MO, x_star = root_tup[1], SVector(root_tup[2:end])
+        L_MO, x_star = root_tup[1], root_tup[2:end]
         u_star, θ_star = x_star[1], x_star[2]
     else
         @print("Warning: Unconverged Surface Fluxes\n")
-        L_MO, x_star = root_tup[1], SVector(root_tup[2:end])
+        L_MO, x_star = root_tup[1], root_tup[2:end]
         u_star, θ_star = x_star[1], x_star[2]
     end
 
-    _grav::FT = grav(param_set)
-    _von_karman_const::FT = von_karman_const(param_set)
+    _grav::FT = grav(CLIMAparam_set)
+    _von_karman_const::FT = von_karman_const(CLIMAparam_set)
     wθ_flux_star = -u_star^3 * θ_scale / (_von_karman_const * _grav * L_MO)
-    flux = -u_star * x_star
+    flux = -u_star .* x_star
 
     C_exchange = get_flux_coefficients(
-        param_set,
+        CLIMAparam_set,
         z_in,
         x_star,
         x_s,
@@ -198,13 +219,21 @@ function surface_conditions(
     )
 
     VFT = typeof(flux)
+
+    @show L_MO
+    @show wθ_flux_star
+    @show flux
+    @show x_star
+    @show (i for i in C_exchange)
+    @show C_exchange
     return SurfaceFluxConditions{FT, VFT}(
         L_MO,
         wθ_flux_star,
         flux,
         x_star,
-        C_exchange,
+        Tuple(C_exchange),
     )
+    @show "end of surface_conditions"
 end
 
 """
@@ -244,9 +273,9 @@ function compute_physical_scale(
     x_s,
     transport,
     ::FVScheme,
-) where {FT}
+    ) where {FT}
     _von_karman_const::FT = von_karman_const(uf.param_set)
-    _π_group = FT(UF.π_group(uf, transport))
+    _π_group = FT(π_group(uf, transport))
     _π_group⁻¹ = (1 / _π_group)
     R_z0 = 1 - z_0 / z_in
     temp1 = log(z_in / z_0)
@@ -265,9 +294,9 @@ function compute_physical_scale(
     x_s,
     transport,
     ::DGScheme,
-) where {FT}
+    ) where {FT}
     _von_karman_const::FT = von_karman_const(uf.param_set)
-    _π_group = FT(UF.π_group(uf, transport))
+    _π_group = FT(π_group(uf, transport))
     _π_group⁻¹ = (1 / _π_group)
     temp1 = log(z_in / z_0)
     temp2 = -psi(uf, z_in / uf.L, transport)
@@ -302,10 +331,10 @@ function recover_profile(
     transport,
     ::DGScheme,
     universal_func = Businger,
-) where {FT}
+    ) where {FT}
     uf = universal_func(param_set, L_MO)
     _von_karman_const::FT = von_karman_const(param_set)
-    _π_group = FT(UF.π_group(uf, transport))
+    _π_group = FT(π_group(uf, transport))
     temp1 = log(z / z_0)
     temp2 = -psi(uf, z / uf.L, transport)
     temp3 = psi(uf, z_0 / uf.L, transport)
@@ -323,17 +352,17 @@ function recover_profile(
     transport,
     ::FVScheme,
     universal_func = Businger,
-) where {FT}
+    ) where {FT}
     uf = universal_func(param_set, L_MO)
     _von_karman_const::FT = von_karman_const(param_set)
-    _π_group = FT(UF.π_group(uf, transport))
+    _π_group = FT(π_group(uf, transport))
     R_z0 = 1 - z_0 / z
     temp1 = log(z / z_0)
     temp2 = -Psi(uf, z / uf.L, transport)
     temp3 = z_0 / z * Psi(uf, z_0 / uf.L, transport)
     temp4 = R_z0 * (psi(uf, z_0 / uf.L, transport) - 1)
     Σterms = temp1 + temp2 + temp3 + temp4
-    return _π_group * x_star * Σterms / _von_karman_const + x_s
+    return _π_group .* x_star .* Σterms ./ _von_karman_const .+ x_s
 end
 
 ### Generic terms
@@ -391,7 +420,7 @@ function exchange_coefficients(
     K_exchange .= ntuple(Val(length(x_star))) do i
         transport = i == 1 ? MomentumTransport() : HeatTransport()
         phi_t = phi(uf, z / L_MO, transport)
-        _π_group = FT(UF.π_group(uf, transport))
+        _π_group = FT(π_group(uf, transport))
         num = -F_exchange_tup[i] * _von_karman_const * z
         den = _π_group * (x_star_tup[i] * phi_t)
         K_exch = num / den # Eq. 19 in
@@ -426,8 +455,8 @@ function get_flux_coefficients(
 ) where {VFT, FT}
     N = length(x_star)
     z0_tup = Tuple(z0)
-    x_star_tup = Tuple(x_star)
-    x_s_tup = Tuple(x_s)
+    x_star_tup = x_star
+    x_s_tup = x_s
     u_in = recover_profile(
         param_set,
         z_in,
@@ -439,11 +468,20 @@ function get_flux_coefficients(
         scheme,
         universal_func,
     )
-    C = similar(x_star)
+    C = [i for i in x_star]
+    @show C
+    @show length(x_star)
+    @show Val(length(x_star))
     C .= ntuple(Val(length(x_star))) do i
         if i == 1
             C_i = x_star[i]^2 / (u_in - x_s_tup[i])^2
         else
+            @show i
+            @show x_star[i]
+            @show u_in
+            @show x_s_tup[i]
+            @show z0_tup[i]
+            @show x_star_tup[i]
             ϕ_in = recover_profile(
                 param_set,
                 z_in,
@@ -458,10 +496,15 @@ function get_flux_coefficients(
             C_i =
                 x_star[1] * x_star[i] / (u_in - x_s_tup[1]) /
                 (ϕ_in - x_s_tup[i])
+            @show ϕ_in
+            @show x_star
+            @show u_in
+            @show x_s_tup
+            @show C_i
         end
         C_i
     end
     return C
 end
 
-end # SurfaceFluxes module
+#end # SurfaceFluxes module

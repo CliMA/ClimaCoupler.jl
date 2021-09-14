@@ -1,6 +1,12 @@
-# Atmos-Soil Columns with SurfaceFluxes.jl
+# Columns with SurfaceFluxes.jl
 
 This is a prototype for testing the surface flux model, using the atmos and land models of Test Case 3 in the [Coupler Design Docs](https://www.overleaf.com/project/610c13492c7d0e8d459e72b8) for details. We're using the Nishiwaza 2018 to formulate the flux calculations below, as in `SurfaceFluxes.jl`. 
+
+There are two test cases:
+- Heat diffusion minimal example:
+    - this is an uncoupled integration test for surface fluxes (port to SurfaceFluxes when it's being revamped); test against bulk formula
+- Coupling example: Atmos Ekman column + land column exchanging more realistic fluxes/states; flux calculation / accumulation is done by the coupler. 
+
 
 # Coupled boundary conditions
 

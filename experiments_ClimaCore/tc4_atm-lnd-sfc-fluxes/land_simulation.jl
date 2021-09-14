@@ -1,3 +1,7 @@
+# add https://github.com/CliMA/ClimaCore.jl
+# add https://github.com/CliMA/ClimaAtmos.jl
+# add https://github.com/CliMA/LandHydrologyjl
+
 import ClimaCore.Geometry, LinearAlgebra, UnPack
 import ClimaCore:
     Fields,
@@ -19,10 +23,12 @@ using OrdinaryDiffEq: ODEProblem, solve, SSPRK33,Rosenbrock23, Tsit5,SSPRK432, F
 using DifferentialEquations
 using UnPack
 using LandHydrology
-using LandHydrology.SoilHeatParameterizations
-using LandHydrology.SoilWaterParameterizations
+using LandHydrology.Domains
+using LandHydrology.SoilInterface
+using LandHydrology.SoilInterface.SoilWaterParameterizations
+using LandHydrology.SoilInterface.SoilHeatParameterizations
 
-const FT = Float64
+
 
 abstract type BC{FT <: AbstractFloat} end
 
@@ -34,59 +40,56 @@ mutable struct FluxBC{FT} <: BC{FT}
 end
 
 function compute_soil_rhs!(dY, Y, t, p)
-
+    
     sp = p[1]
     param_set = p[2]
     zc = p[3]
     @unpack top_heat_flux, btm_heat_flux, top_water_flux, btm_water_flux = p[4]
     @unpack ν,vgn,vgα,vgm,ksat,θr,ρc_ds, κ_sat_unfrozen, κ_sat_frozen = sp
-    ϑ_l = Y.x[1]
-    θ_i = Y.x[2]
-    ρe_int = Y.x[3]
+    # ϑ_l = Y.x[1]
+    # θ_i = Y.x[2]
+    # ρe_int = Y.x[3]
 
-    dϑ_l = dY.x[1]
-    dθ_i = dY.x[2]
-    dρe_int = dY.x[3]
+    # dϑ_l = dY.x[1]
+    # dθ_i = dY.x[2]
+    # dρe_int = dY.x[3]
+    dθ_l = dY.θ_l
+    dθ_i = dY.θ_i
+    dρe_int = dY.ρe_int
+    θ_l = Y.θ_l
+    θ_i = Y.θ_i
+    ρe_int = Y.ρe_int
+
+    # update water content based on prescribed profiles, set RHS to zero.
+    # ϑ_l = hydrology.ϑ_l_profile.(zc, t)
+    # θ_i = hydrology.θ_i_profile.(zc, t)
+    # dθ_i = Fields.zeros(FT, cspace)
+    # dρe_int = Fields.zeros(FT, space)
 
     # Compute center values of everything
-    θ_l = ϑ_l
     ρc_s = volumetric_heat_capacity.(θ_l, θ_i, ρc_ds, Ref(param_set))
     T = temperature_from_ρe_int.(ρe_int, θ_i, ρc_s, Ref(param_set))
-    T_sfc = parent(T)[end]
-    p[5] = T_sfc
     κ_dry = k_dry(param_set, sp)
     S_r = relative_saturation.(θ_l, θ_i, ν)
     kersten = kersten_number.(θ_i, S_r, Ref(sp))
-    κ_sat = saturated_thermal_conductivity.(
-        θ_l,
-        θ_i,
-        κ_sat_unfrozen,
-        κ_sat_frozen,
-    )
+    κ_sat =
+        saturated_thermal_conductivity.(
+            θ_l,
+            θ_i,
+            κ_sat_unfrozen,
+            κ_sat_frozen,
+        )
     κ = thermal_conductivity.(κ_dry, kersten, κ_sat)
-    ρe_int_l = volumetric_internal_energy_liq.(T, Ref(param_set))
 
-    cs = axes(θ_i)
-
-    
-    S = effective_saturation.(θ_l; ν = ν, θr = θr)
-    K = hydraulic_conductivity.(S; vgm = vgm, ksat = ksat)
-    ψ = matric_potential.(S; vgn = vgn, vgα = vgα, vgm = vgm)
-    h = ψ .+ zc
-
+    # rhs operators
     interpc2f = Operators.InterpolateC2F()
     gradc2f_heat = Operators.GradientC2F()
-    gradf2c_heat = Operators.GradientF2C(top = Operators.SetValue(top_heat_flux), bottom = Operators.SetValue(btm_heat_flux))
-
-    gradc2f_water = Operators.GradientC2F()
-    gradf2c_water= Operators.GradientF2C(top = Operators.SetValue(top_water_flux), bottom = Operators.SetValue(btm_water_flux))
-
-    @. dϑ_l = -gradf2c_water( -interpc2f(K) * gradc2f_water(h)) #Richards equation
-    @. dρe_int = -gradf2c_heat(-interpc2f(κ) * gradc2f_heat(T) - interpc2f(ρe_int_l*K)*gradc2f_water(h))
-    dθ_i = Fields.zeros(eltype(θ_i),cs)
-
+    divf2c_heat = Operators.DivergenceF2C(
+        top = Operators.SetValue(Geometry.Cartesian3Vector(zero(FT))),
+        bottom = Operators.SetValue(Geometry.Cartesian3Vector(zero(FT))),
+    )
+    @. dρe_int = -divf2c_heat(-interpc2f(κ) * gradc2f_heat(T))
     return dY
-  
 end
 
 # General composition
@@ -178,7 +181,9 @@ theta_min = FT(ν * 0.4)
 ρc_s = volumetric_heat_capacity.(θ_l, θ_i, ρc_ds, Ref(param_set))
 ρe_int = volumetric_internal_energy.(θ_i, ρc_s, T, Ref(param_set))
 
-Y = ArrayPartition(θ_l, θ_i, ρe_int)
+#Y = ArrayPartition(θ_l, θ_i, ρe_int)
+
+Y = Fields.FieldVector(θ_l = θ_l, θ_i = θ_i, ρe_int = ρe_int)
 
 function ∑land_tendencies!(dY, Y, p, t)
     # Intermediate step to be added if needed

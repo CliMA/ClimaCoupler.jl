@@ -4,10 +4,19 @@ import SciMLBase: step!
 
 using Printf
 
-include("dummy_surface_fluxes.jl") # placeholder for SurfaceFluxes.jl
-
-include("land_simulation.jl") #refactoring of land interface to come
+const FT = Float64
+include("SurfaceFluxes.jl")
+include("dummy_surface_fluxes.jl") 
+include("land_simulation.jl") 
 include("atmos_simulation.jl")
+
+using CLIMAParameters
+using CLIMAParameters.Planet: cp_d, cv_d, grav, T_surf_ref
+using CLIMAParameters.Atmos.SubgridScale: C_smag, C_drag
+struct EarthParameterSet <: AbstractEarthParameterSet end
+const CLIMAparam_set = EarthParameterSet()
+import CLIMAParameters
+
 
 struct CoupledSimulation{A, L, C}
     atmos :: A
@@ -16,41 +25,43 @@ struct CoupledSimulation{A, L, C}
 end
 
 
+# abstract type BC{FT <: AbstractFloat} end
+# mutable struct FluxBC{FT} <: BC{FT}
+#     bottom_heat_flux::FT
+#     top_heat_flux::FT
+# end
+
 function step!(coupled_sim::CoupledSimulation, coupling_Δt)
 
     atmos_sim = coupled_sim.atmos
     land_sim = coupled_sim.land
-
     clock = coupled_sim.clock
     next_time = clock.time + coupling_Δt
     @info("Coupling cycle", time = clock.time)
 
-    # Extract states and parameters at coupled boundaries for flux calculations
+    # Coupler _pull: Extract states and parameters at coupled boundaries for flux calculations
     land_surface_T = land_sim.p[5]
 
-    # Step forward atmosphere
+    # Coupler_push: Update atmos variables for this coupling_Δt 
     atmos_sim.u.x[3] .= [0.0, 0.0, 0.0] # reset surface flux to be accumulated during each coupling_Δt 
-    atmos_sim.p[2] .= land_surface_T # get land temperature and set on atmosphere (Tland is prognostic)
+    atmos_sim.p[2] .= land_surface_T # update the T_sfc aux variable
 
-    # TODO: determine if this will be useful (init step not ran w/o this but same outcome)
-    # u_atmos = atmos_sim.u 
-    # u_atmos.x[3] .= u_atmos.x[3] .* -0.0
-    # set_u!(atmos_sim, u_atmos)
-
+    # Advance atmos
     step!(atmos_sim, next_time - atmos_sim.t, true)
 
-    # Extract surface fluxes for land boundaries
+    # Coupler_pull: Extract surface fluxes from atmos
     ∫surface_x_momentum_flux = atmos_sim.u.x[3][1] # kg / m s^2
     ∫surface_y_momentum_flux = atmos_sim.u.x[3][2] # kg / m s^2
     ∫surface_heat_flux = atmos_sim.u.x[3][3]       # W / m^2
         
+    # Coupler_push: Update land variables for this coupling_Δt 
+    land_sim.p[4].top_heat_flux = ∫surface_heat_flux / coupling_Δt # the F_accum aux variable 
+
     # Advance land
-    @show(∫surface_x_momentum_flux, ∫surface_y_momentum_flux, ∫surface_heat_flux)
-    land_sim.p[4].top_heat_flux = ∫surface_heat_flux / coupling_Δt # [W/m^2] same BC across land Δt
     step!(land_sim, next_time - land_sim.t, true)
 
     tick!(clock, coupling_Δt)
-
+    
     return nothing
 end
 
@@ -61,8 +72,8 @@ function solve!(coupled_sim::CoupledSimulation, coupling_Δt, stop_time)
     end
 end
 
-f = 1e-4 # Coriolis parameter
-g = 9.81 # Gravitational acceleration
+# f = 1e-4 # Coriolis parameter
+# g = 9.81 # Gravitational acceleration
 
 atmos_Nz = 30  # Number of vertical grid points
 atmos_Lz = 200 # Vertical extent of domain

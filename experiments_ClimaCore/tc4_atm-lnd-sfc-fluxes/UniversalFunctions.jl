@@ -4,7 +4,7 @@
 Universal stability and stability correction
 functions for `SurfaceFluxes` module.
 """
-module UniversalFunctions
+#module UniversalFunctions
 
 using DocStringExtensions
 using CLIMAParameters
@@ -19,8 +19,9 @@ export AbstractUniversalFunction, Gryanik, Grachev, Businger
 # Methods
 export phi, psi, Psi
 
-const FTypes = Union{Real, AbstractArray}
+#const FTypes = Union{Real, AbstractArray}
 
+# const FTypes = Union{Real, AbstractArray}
 abstract type AbstractUniversalFunction{FT <: FTypes} end
 const AUF = AbstractUniversalFunction
 const APS = AbstractParameterSet
@@ -109,6 +110,13 @@ struct Businger{FT, PS} <: AbstractUniversalFunction{FT}
     L::FT
     Businger(param_set::PS, L::FT) where {FT, PS} = new{FT, PS}(param_set, L)
 end
+
+# mutable struct Businger{FT, PS} <: AbstractUniversalFunction{FT}
+#     "Parameter set"
+#     param_set::PS
+#     "Monin-Obhukov Length"
+#     L::Number
+# end
 
 # CLIMAParameters wrapper
 Pr_0(param_set::APS, ::Businger) = Pr_0_Businger(param_set)
@@ -417,4 +425,4 @@ Grachev(uf::Gryanik) = Grachev(uf.param_set, uf.L)
 Gryanik(uf::Businger) = Gryanik(uf.param_set, uf.L)
 Gryanik(uf::Grachev) = Gryanik(uf.param_set, uf.L)
 
-end # module
+#end # module

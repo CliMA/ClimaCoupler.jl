@@ -111,13 +111,6 @@ struct Businger{FT, PS} <: AbstractUniversalFunction{FT}
     Businger(param_set::PS, L::FT) where {FT, PS} = new{FT, PS}(param_set, L)
 end
 
-# mutable struct Businger{FT, PS} <: AbstractUniversalFunction{FT}
-#     "Parameter set"
-#     param_set::PS
-#     "Monin-Obhukov Length"
-#     L::Number
-# end
-
 # CLIMAParameters wrapper
 Pr_0(param_set::APS, ::Businger) = Pr_0_Businger(param_set)
 a_m(param_set::APS, ::Businger) = a_m_Businger(param_set)

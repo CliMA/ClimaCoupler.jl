@@ -64,8 +64,17 @@ $$$$
 
  things depending on state, but can be assumed to be fixed over atmos step: T_land, relative_humidity land, for g_soil needs moisture in land
 
-## Add to SurfaceFluxes.jl
-- $g_{ac}$ (and $g_{s}$) calculation. $g_s$ needed only for evaporation and latent heat fluxes.
+## TODO minimal example (~TC1)
+- note changes in SF and NS
+- test: compare with bulk formula test
+- note if still conservation problems due to divergence operator
+- clean up @shows + document the SF functions (+ make README consistent)
+
+## TODO physical example (TC3 minus ocean)
+- add coupler flux calculation (also change this for TC3)
+- couple stress, moisture
+- add to SF: $g_{ac}$ (and $g_{s}$) calculation. $g_s$ needed only for evaporation and latent heat fluxes
+- hook up to CI
 
 ## Other notes
 - Land conductances added together for evaporation (this will be addresses later):
@@ -73,3 +82,4 @@ $$
 g_{evap} = \frac{1}{ g_{ac}^{-1} + g_{s}^{-1}}
 $$
 - SHF also has a contribution due to evaporation (see Land Design Doc, Ch 2.8). So while the calculation of $u*$, etc, can be carried out as described, the total exchanged flux is not simply proportional to e.g. $u*\theta*$ for sensible heat. 
+

@@ -5,13 +5,13 @@ using CouplerMachine, Dates, Unitful
 @testset "Coupler Interface" begin
     Random.seed!(26)
 
-    coupler = CplState()
+    coupler = CouplerState()
 
     data = rand(10,10)
     date = DateTime(2021)
-    coupler_register!(coupler, :test1, data, nothing, date, u"kg")
-    coupler_register!(coupler, :test2, data, nothing, date, u"km/hr")
-    coupler_register!(coupler, :test3, data, nothing, date, u"°C")
+    coupler_add_field!(coupler, :test1, data, nothing, date, u"kg")
+    coupler_add_field!(coupler, :test2, data, nothing, date, u"km/hr")
+    coupler_add_field!(coupler, :test3, data, nothing, date, u"°C")
 
     @testset "coupler_get" begin
         @test data === coupler_get(coupler, :test1, nothing, date, u"kg")
@@ -40,9 +40,9 @@ using CouplerMachine, Dates, Unitful
         coupler_put!(coupler, :test1, newdata, nothing, newdate, u"g")
         @test newdata ≈ 1000 * data
 
-        # coupler_put! must be to a previously registered field
+        # coupler_put! must be to a previously add_fielded field
         @test_throws KeyError coupler_put!(coupler, :idontexist, newdata, nothing, newdate, u"kg")
-        # incoming data must match dimensions of registered field
+        # incoming data must match dimensions of add_fielded field
         @test_throws DimensionMismatch coupler_put!(coupler, :test1, rand(10,5), nothing, newdate, u"kg")
         # incompatible units
         @test_throws Unitful.DimensionError coupler_put!(coupler, :test1, newdata, nothing, newdate, u"J/m")

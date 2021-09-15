@@ -6,8 +6,6 @@ const EXPERIMENTS_DIR = joinpath(@__DIR__, "..", "experiments")
 const OUTPUT_DIR      = joinpath(@__DIR__, "..", "docs/src/generated")
 
 experiments = [
-               "ClimateMachine/DesignTests/simple_2testcomp.jl",
-               "ClimateMachine/AdvectionDiffusion/run_script_v2.jl"
               ]
 
 for experiment in experiments
@@ -15,12 +13,11 @@ for experiment in experiments
     Literate.markdown(experiment_filepath, OUTPUT_DIR, documenter=true)
 end
 
+# "Page Name" => "path/to/generated_file.md"
 experiment_pages = [
-                    "Vertical Column Heat Diffusion" => "generated/simple_2testcomp.md",
-                    "Advection-diffusion on a Sphere" => "generated/run_script_v2.md",
                    ]
 
-interface_pages = ["couplerstate.md", "timestepping.md", "coupledmodel.md"]
+interface_pages = ["couplerstate.md", "timestepping.md"]
 
 pages = Any[
     "Home" => "index.md",

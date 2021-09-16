@@ -1,5 +1,9 @@
 # Atmos RHS
 
+"""
+These are minor modifications of the ClimaAtmos Ekman column model
+"""
+
 #=
 Ekman column:
     ∂_t ρ =  ∇ (μ ∇ ρ - w ρ) 
@@ -30,84 +34,133 @@ We also use this model to accumulate fluxes it calculates
 =#
 
 function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
+    @unpack Cd, f, ν, uvg, C_p, MSLP, R_d, R_m, C_v, grav = parameters
 
-    UnPack.@unpack Ch, Cd, f, ν, ug, vg, C_p, MSLP, R_d, R_m, C_v, grav = parameters
+    # unpack tendencies and state
 
-    #@show(t, Y.x[3]) 
     (Yc, Yf, F_sfc) = Y.x
     (dYc, dYf, dF_sfc) = dY.x
 
-    UnPack.@unpack ρ, u, v, ρθ = Yc
-    UnPack.@unpack w = Yf
+    UnPack.@unpack ρ, uv, ρθ = Yc
+    
+    w = Yf
     dρ = dYc.ρ
-    du = dYc.u
-    dv = dYc.v
+    duv = dYc.uv
     dρθ = dYc.ρθ
-    dw = dYf.w
+    dw = dYf
 
-    # Auxiliary calculations
-    u_1 = parent(u)[1]
-    v_1 = parent(v)[1]
+    # auxiliary calculations
     ρ_1 = parent(ρ)[1]
     ρθ_1 = parent(ρθ)[1]
-    u_wind = sqrt(u_1^2 + v_1^2)
+    uv_1 = Operators.getidx(uv, Operators.Interior(), 1)
+    u_wind = LinearAlgebra.norm(uv_1)
 
     # surface flux calculations 
-    #surface_flux_ρθ = - calculate_sfc_fluxes_energy(DryBulkFormulaWithRadiation(), parameters, T_sfc[1], parent(ρθ)[1] / parent(ρ)[1] , u_1, v_1, ρ_1, t ) ./ C_p
-    surface_flux_ρθ = - calculate_sfc_fluxes_energy(DryMonin(), parameters, T_sfc[1], parent(ρθ)[1] / parent(ρ)[1] , u_1, v_1, ρ_1, t ) ./ C_p
-    surface_flux_u =  - Cd * u_1 * sqrt(u_1^2 + v_1^2)
-    surface_flux_v =  - Cd * v_1 * sqrt(u_1^2 + v_1^2)
+    surface_flux_uv, surface_flux_ρθ  = calculate_sfc_fluxes_energy(DryMonin(), parameters, T_sfc[1], ρθ_1 / ρ_1, uv_1, ρ_1, t ) ./ C_p
+    @show surface_flux_ρθ
+  
+    # boundary conditions
+    bcs_bottom_uv_flux = Operators.SetValue(surface_flux_uv)
+    bcs_top_uv_value = Operators.SetValue(uvg)
+ 
+    bcs_bottom_ρθ_flux = Operators.SetValue(Geometry.Cartesian3Vector(surface_flux_ρθ))
+    bcs_top_ρθ_flux = Operators.SetValue(Geometry.Cartesian3Vector(zero(FT)))
 
-    # accumulate in the required right units
-    @inbounds begin
-        dY.x[3][1] = - ρ_1 * surface_flux_u  # 
-        dY.x[3][2] = - ρ_1 * surface_flux_v  # 
-        dY.x[3][3] = - C_p * surface_flux_ρθ # W / m^2
-    end
+    bcs_bottom_ρ_flux = Operators.SetValue(Geometry.Cartesian3Vector(zero(FT)))
+    bcs_top_ρ_flux = Operators.SetValue(Geometry.Cartesian3Vector(zero(FT)))
 
-    # @inbounds begin
-    #     dY.x[3][1] = - 10.0 
-    #     dY.x[3][2] = - 1.0  
-    #     dY.x[3][3] = - 1.0 
-    # end
+    # density
+    If = Operators.InterpolateC2F()
+    ∂f = Operators.GradientC2F()
+    ∂c = Operators.DivergenceF2C(
+        bottom = bcs_bottom_ρ_flux ,
+        top = bcs_top_ρ_flux ,
+    )
+    @. dρ = -∂c(w * If(ρ))
 
-    # Density tendency (located at cell centers)
-    gradc2f = Operators.GradientC2F()
-    gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(0.0), top = Operators.SetValue(0.0))
+    # potential temperature
+    If = Operators.InterpolateC2F()
+    ∂f = Operators.GradientC2F()
+    ∂c = Operators.DivergenceF2C(
+        bottom = bcs_bottom_ρθ_flux,
+        top = bcs_top_ρθ_flux,
+    )
+    # TODO!: Undesirable casting to vector required
+    @. dρθ =
+        -∂c(w * If(ρθ)) + ρ * ∂c(Geometry.CartesianVector(ν * ∂f(ρθ / ρ)))
 
-    If = Operators.InterpolateC2F(bottom = Operators.Extrapolate(), top = Operators.Extrapolate())
-    @. dρ = gradf2c( -w * If(ρ) ) # Eq. 4.11
+    A = Operators.AdvectionC2C(
+        bottom = Operators.SetValue(Geometry.Cartesian12Vector(0.0, 0.0)),
+        top = Operators.SetValue(Geometry.Cartesian12Vector(0.0, 0.0)),
+    )
 
-    # Potential temperature tendency (located at cell centers)
-    gradc2f = Operators.GradientC2F()
-    gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(surface_flux_ρθ), top = Operators.SetValue(0.0)) # Eq. 4.20, 4.21
+    # uv
+    ∂c = Operators.DivergenceF2C(bottom = bcs_bottom_uv_flux)
+    ∂f = Operators.GradientC2F(top = bcs_top_uv_value)
+    duv .= (uv .- Ref(uvg)) .× Ref(Geometry.Cartesian3Vector(f))
 
-    @. dρθ = gradf2c( -w * If(ρθ) + ν * gradc2f(ρθ/ρ) ) # Eq. 4.12
+    @. duv += ∂c(ν * ∂f(uv)) - A(w, uv)
 
-    # u velocity tendency (located at cell centers)
-    gradc2f = Operators.GradientC2F(top = Operators.SetValue(ug)) # Eq. 4.18
-    gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(Cd * u_wind * u_1)) # Eq. 4.16
-    
-    A = Operators.AdvectionC2C(bottom = Operators.SetValue(0.0), top = Operators.SetValue(0.0))
-    @. du = gradf2c(ν * gradc2f(u)) + f * (v - vg) - A(w, u) # Eq. 4.8
+    # w
+    If = Operators.InterpolateC2F(
+        bottom = Operators.Extrapolate(),
+        top = Operators.Extrapolate(),
+    )
+    ∂f = Operators.GradientC2F()
+    ∂c = Operators.GradientF2C()
+    Af = Operators.AdvectionF2F()
+    divf = Operators.DivergenceC2F()
+    B = Operators.SetBoundaryOperator(
+        bottom = Operators.SetValue(Geometry.Cartesian3Vector(zero(FT))),
+        top = Operators.SetValue(Geometry.Cartesian3Vector(zero(FT))),
+    )
+    Φ(z) = grav * z
+    Π(ρθ) = C_p * (R_d * ρθ / MSLP)^(R_m / C_v)
+    zc = Fields.coordinate_field(axes(ρ))
+    @. dw = B(
+        Geometry.CartesianVector(-(If(ρθ / ρ) * ∂f(Π(ρθ))) - ∂f(Φ(zc))) + divf(ν * ∂c(w)) - Af(w, w),
+    )
 
-    # v velocity (centers)
-    gradc2f = Operators.GradientC2F(top = Operators.SetValue(vg)) # Eq. 4.18
-    gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(Cd * u_wind * v_1)) # Eq. 4.16
-
-    A = Operators.AdvectionC2C(bottom = Operators.SetValue(0.0), top = Operators.SetValue(0.0))
-    @. dv = gradf2c(ν * gradc2f(v)) - f * (u - ug) - A(w, v) # Eq. 4.9
-
-    # w velocity (faces)
-    gradc2f = Operators.GradientC2F()
-    gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(0.0), top = Operators.SetValue(0.0))
-
-    B = Operators.SetBoundaryOperator(bottom = Operators.SetValue(0.0), top = Operators.SetValue(0.0))
-    If = Operators.InterpolateC2F(bottom = Operators.Extrapolate(), top = Operators.Extrapolate())
-    
-    Π(ρθ) = C_p .* (R_d .* ρθ ./ MSLP).^(R_m ./ C_v)
-    
-    @. dw = B( -(If(ρθ / ρ) * gradc2f(Π(ρθ))) - grav + gradc2f(ν * gradf2c(w)) - w * If(gradf2c(w))) # Eq. 4.10 # this makes everything unstable... use new ClimaAtmos rhs!
-    
     return dY
+end
+
+
+""" 
+Initialize fields located at cell centers in the vertical. 
+"""
+function init_ekman_column_1d_c(z, params)
+    @unpack grav, C_p, MSLP, R_d, T_surf_atm, T_min_ref, u0, v0, w0 = params
+
+    T_surf = T_surf_atm
+    Γ = grav / C_p
+    T = max(T_surf - Γ * z, T_min_ref)
+    p = MSLP * (T / T_surf)^(grav / (R_d * Γ))
+    if T == T_min_ref
+        z_top = (T_surf - T_min_ref) / Γ
+        H_min = R_d * T_min_ref / grav
+        p *= exp(-(z - z_top) / H_min)
+    end
+    θ = T_surf # potential temperature
+
+    ρ = p / (R_d * θ * (p / MSLP)^(R_d / C_p))
+
+    # velocity
+    uv= Geometry.Cartesian12Vector(u0, v0) # u, v components
+
+    # potential temperature
+    ρθ = ρ * T_surf
+
+    return (ρ = ρ, uv = uv, ρθ = ρθ)
+end
+
+
+""" 
+Initialize fields located at cell interfaces in the vertical. 
+"""
+function init_ekman_column_1d_f(z, params)
+    @unpack grav, C_p, MSLP, R_d, T_surf_atm, T_min_ref, u0, v0, w0 = params
+
+    w = Geometry.Cartesian3Vector(w0) # w component
+
+    return (w = w)
 end

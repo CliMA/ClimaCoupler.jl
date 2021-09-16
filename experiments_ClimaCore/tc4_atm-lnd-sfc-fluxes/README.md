@@ -42,8 +42,13 @@ $$
 and
 
 $$
-L  =  - \frac{u*^3 \overline{\theta}}{\kappa g \overline{w'\theta'|_s}} \,\,\,\,\,\,\,\,\,\,\,\,\, R_{z0m} = 1 - z_{0m} / \Delta z \,\,\,\,\,\,\,\,\,\,\,\,\, R_{z0h} = 1 - z_{0h} / \Delta z
+R_{z0m} = 1 - z_{0m} / \Delta z \,\,\,\,\,\,\,\,\,\,\,\,\, R_{z0h} = 1 - z_{0h} / \Delta z
 $$
+The Obukhov length is defined as:
+$$
+L  =  - \frac{u*^3 \overline{\theta}}{\kappa g \overline{w'\theta'|_s}} \,\,\,\,\,\,\,\,\,\,\,\,\, 
+$$
+
 where $\overline{\theta}$ is the basic potential temperature (?)
 
 
@@ -64,6 +69,92 @@ $$$$
 
  things depending on state, but can be assumed to be fixed over atmos step: T_land, relative_humidity land, for g_soil needs moisture in land
 
+## Algorithm 
+- this is called using the main `SurfaceFLuxes.jl` function
+```
+function surface_conditions(
+    param_set::AbstractEarthParameterSet,
+    MO_param_guess::AbstractVector,
+    x_in::AbstractVector,
+    x_s::AbstractVector,
+    z_0::Union{AbstractVector, FT},
+    θ_scale::FT,
+    z_in::FT,
+    scheme,
+    wθ_flux_star::Union{Nothing, FT} = nothing,
+    universal_func::Union{Nothing, F} = Businger,
+    sol_type::NS.SolutionType = NS.CompactSolution(),
+    tol::NS.AbstractTolerance = NS.ResidualTolerance{FT}(sqrt(eps(FT))),
+    maxiter::Int = 10_000,
+) where {FT <: AbstractFloat, AbstractEarthParameterSet, F}
+```
+- Define the function to calculate the `x - [monin_obukhov_length, u_star, theta_star]` that will be passed to the Newton solver
+```
+f!(F, x_all) = surface_fluxes_f!(F, x_all, args)
+```
+- Define Newton solver
+```
+nls = NS.NewtonsMethodAD(f!, MO_param_guess)
+```
+- Solve with the Newton solver from CliMA's `NonlinearSolvers.jl`
+```
+sol = NS.solve!(nls, sol_type, tol, maxiter)
+```
+using the general formula $x_{n+1} = x_n - \frac{f(x_n)}{\partial_x f(x_n)}$ 
+```
+function solve!(
+    ::NewtonsMethodAD,
+    x0::AT,
+    x1::AT,
+    f!::F!,
+    F::FA,
+    J::JA,
+    J⁻¹::J⁻¹A,
+    soltype::SolutionType,
+    tol::AbstractTolerance{FT},
+    maxiters::Int,
+) where {FA, J⁻¹A, JA, F! <: Function, AT, FT}
+
+    x_history = init_history(soltype, AT)
+    F_history = init_history(soltype, AT)
+    if soltype isa VerboseSolution
+        f!(F, x0)
+        ForwardDiff.jacobian!(J, f!, F, x0)
+        push_history!(x_history, x0, soltype)
+        push_history!(F_history, F, soltype)
+    end
+    for i in 1:maxiters
+        f!(F, x0)
+        ForwardDiff.jacobian!(J, f!, F, x0)
+        x1 .= x0 .- J \ F
+        push_history!(x_history, x1, soltype)
+        push_history!(F_history, F, soltype)
+        if tol(x0, x1, F)
+            return SolutionResults(
+                soltype,
+                x1,
+                true,
+                F,
+                i,
+                x_history,
+                F_history,
+            )
+        end
+        x0 = x1
+    end
+    return SolutionResults(
+        soltype,
+        x0,
+        false,
+        F,
+        maxiters,
+        x_history,
+        F_history,
+    )
+end
+```
+
+- 
 ## TODO minimal example (~TC1)
 - note changes in SF and NS
 - test: compare with bulk formula test

@@ -12,7 +12,7 @@
                 - to be maintained by CI
             - TC2: Ekman column + slab
                 - uses ClimaAtmos interface
-                - not maintained by CI (discontinued upon final clean up of TC3)     
+                - not maintained by CI (will be discontinued upon final clean up of TC3)     
             - TC4: Dry Ekman Column + slab + surface fluxes
                 - uses local ClimaAtmos hack
                 - Purpose:

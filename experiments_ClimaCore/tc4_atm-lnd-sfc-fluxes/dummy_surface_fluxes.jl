@@ -50,14 +50,10 @@ function calculate_sfc_fluxes(formulation::DryMonin, parameters, T_sfc, θ_1, uv
 
     domain_atm  = Domains.IntervalDomain(0, parameters.atmos_Lz, x3boundary = (:bottom, :top))
     mesh_atm = Meshes.IntervalMesh(domain_atm, nelems = parameters.atmos_Nz) 
-    # center_space_atm = Spaces.CenterFiniteDifferenceSpace(mesh_atm) 
-    # z_centers = Fields.coordinate_field(center_space_atm)
-    # z_in = parent(z_centers)[1]
-
-    face_space_atm = Spaces.FaceFiniteDifferenceSpace(center_space_atm)
-    z_faces = Fields.coordinate_field(face_space_atm)
-    z_in = 0.5*(parent(z_centers)[2] - parent(z_centers)[1])
-
+    center_space_atm = Spaces.CenterFiniteDifferenceSpace(mesh_atm) 
+    z_centers = Fields.coordinate_field(center_space_atm)
+    z_in = parent(z_centers)[1]
+    
     windspeed_1 = LinearAlgebra.norm(uv_1)
     p = parameters
 

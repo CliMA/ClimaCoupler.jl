@@ -46,6 +46,7 @@ import SurfaceFluxes
 const SF = SurfaceFluxes
 
 include("dummy_surface_fluxes.jl") 
+include("atmos_rhs.jl")
 
 parameters_ = (
         # timestepping parameters 
@@ -121,7 +122,7 @@ function exp_tc4(parameters::NamedTuple)
     ########
 
     # define model equations:
-    include("atmos_rhs.jl")
+    #include("atmos_rhs.jl")
 
     function ∑tendencies_lnd!(dT_sfc, T_sfc, (parameters, F_sfc), t)
         """

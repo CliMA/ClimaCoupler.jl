@@ -54,8 +54,8 @@ parameters = (
         saveat = 0.2, # interval at which to save diagnostics [s]
 
         # atmos domain
-        atmos_Lz = 200,
-        atmos_Nz = 30,
+        atmos_Lz = 300,
+        atmos_Nz = 10,
         
         # atmos physics (overwriting CliMAParameters-v2 defaults?)
         MSLP = FT(1e5), # mean sea level pressure
@@ -68,7 +68,7 @@ parameters = (
         ν = FT(0.01),
         uvg = Geometry.Cartesian12Vector(FT(1.0), FT(0.0)),
         T_min_ref = FT(230.0),
-        T_surf_atm = FT(305.0),
+        T_surf_atm = FT(268.0),
         u0 = FT(1.0),
         v0 = FT(0.0),
         w0 = FT(0.0),
@@ -79,7 +79,7 @@ parameters = (
         κ_s  = 0.0,     # soil conductivity [W / m / K] (set to 0 for energy conservation checks)
         T_h  = 280,     # temperature of soil at depth h [K]
         ρ_s  = 1500,    # density for land (soil) [kg / m^3]
-        T_surf_lnd = 300.0, # initial surface temperature [K]
+        T_surf_lnd = 270.0, # initial surface temperature [K]
 
         # radiation parameters for DryBulkFormulaWithRadiation() SurfaceFluxType
         τ    = 0.9,     # atmospheric transmissivity
@@ -93,8 +93,8 @@ parameters = (
 
         # surface fluxes
         λ = FT(0.01),#FT(1e-5)    # coupling transfer coefficient for LinearRelaxation() SurfaceFluxType 
-        Ch = 0.15, # bulk transfer coefficient for sensible heat
-        Cd = 0.15, # drag coefficient
+        Ch = 0.0015, # bulk transfer coefficient for sensible heat
+        Cd = 0.0015, # drag coefficient
     )
 
 
@@ -126,7 +126,7 @@ function ∑tendencies_lnd!(dT_sfc, T_sfc, (parameters, F_sfc), t)
     p = parameters
     G = 0.0 # place holder for soil dynamics
 
-    @. dT_sfc = (F_sfc[1] * p.C_p + G) / (p.h_s * p.ρ_s * p.c_s)
+    @. dT_sfc = (F_sfc * p.C_p + G) / (p.h_s * p.ρ_s * p.c_s)
 end
 
 ########
@@ -187,7 +187,7 @@ function coupler_solve!(stepping, ics, parameters)
     # land copies of coupler variables
     lnd_T_sfc = ics.lnd
     lnd_F_sfc = deepcopy(integ_atm.u.x[3] / Δt_cpl)
-
+    
     # SETUP LAND
     prob_lnd = ODEProblem(∑tendencies_lnd!, lnd_T_sfc, (t_start, t_end), (parameters, lnd_F_sfc))
     integ_lnd = init(
@@ -209,8 +209,8 @@ function coupler_solve!(stepping, ics, parameters)
 
         ## Land
         # pre_land
-        integ_lnd.p[2] .= integ_atm.u.x[3] / Δt_cpl
-
+        integ_lnd.p[2] .= integ_atm.u.x[3][1] / Δt_cpl
+        
         # run land
         step!(integ_lnd, t - integ_lnd.t, true)
 
@@ -282,7 +282,7 @@ function linkfig(figpath, alt = "")
     end
 end
 
-linkfig("output/$(dirname)/heat_end.png", "Heat End Simulation")
+linkfig("output/$(dirname)/TC4_end.png", "TC4 End Simulation")
 
 
 

@@ -1,7 +1,7 @@
 # Atmos RHS
 
 """
-These are minor modifications of the ClimaAtmos Ekman column model
+This is a slightly modified ClimaAtmos Ekman column model
 """
 
 #=
@@ -37,7 +37,6 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     @unpack Cd, f, ν, uvg, C_p, MSLP, R_d, R_m, C_v, grav = parameters
 
     # unpack tendencies and state
-
     (Yc, Yf, F_sfc) = Y.x
     (dYc, dYf, dF_sfc) = dY.x
 
@@ -56,9 +55,18 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     u_wind = LinearAlgebra.norm(uv_1)
 
     # surface flux calculations 
-    surface_flux_uv, surface_flux_ρθ  = calculate_sfc_fluxes_energy(DryMonin(), parameters, T_sfc[1], ρθ_1 / ρ_1, uv_1, ρ_1, t ) ./ C_p
-    @show surface_flux_ρθ
-  
+    fluxes = calculate_sfc_fluxes(DryMonin(), parameters, T_sfc[1], ρθ_1 / ρ_1, uv_1, ρ_1, t ) 
+
+    surface_flux_ρθ = fluxes.SH
+    surface_flux_uv = fluxes.τ
+    
+    # accumulate in the required right units
+    @inbounds begin
+        dY.x[3][1] = (surface_flux_ρθ)  
+        dY.x[3][2] = (surface_flux_uv)[1]
+        dY.x[3][2] = (surface_flux_uv)[2]   
+    end
+    
     # boundary conditions
     bcs_bottom_uv_flux = Operators.SetValue(surface_flux_uv)
     bcs_top_uv_value = Operators.SetValue(uvg)

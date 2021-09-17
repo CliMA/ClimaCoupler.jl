@@ -46,32 +46,34 @@ end
 
 - calculates momentum and sensible heat fluxes using drag/transfer coefficients calculated in CliMA's `SurfaceFluxes.jl` module. This uses the Monin Obukhov theory and Nishizawa and Kitamura (2018) method for the finite volume discretization
 """
-function calculate_sfc_fluxes_energy(formulation::DryMonin, parameters, T_sfc, θ_1, uv_1, ρ_1, t )
+function calculate_sfc_fluxes(formulation::DryMonin, parameters, T_sfc, θ_1, uv_1, ρ_1, t )
 
     domain_atm  = Domains.IntervalDomain(0, parameters.atmos_Lz, x3boundary = (:bottom, :top))
     mesh_atm = Meshes.IntervalMesh(domain_atm, nelems = parameters.atmos_Nz) 
-    center_space_atm = Spaces.CenterFiniteDifferenceSpace(mesh_atm) 
-    z_centers = Fields.coordinate_field(center_space_atm)
+    # center_space_atm = Spaces.CenterFiniteDifferenceSpace(mesh_atm) 
+    # z_centers = Fields.coordinate_field(center_space_atm)
+    # z_in = parent(z_centers)[1]
+
+    face_space_atm = Spaces.FaceFiniteDifferenceSpace(center_space_atm)
+    z_faces = Fields.coordinate_field(face_space_atm)
+    z_in = 0.5*(parent(z_centers)[2] - parent(z_centers)[1])
 
     windspeed_1 = LinearAlgebra.norm(uv_1)
     p = parameters
 
-    z_0m = 0.01 # eventually DryMonin.z_0m? (use cases: where atmos will get it with prescribed land, or vice versa, or coupled)
+    z_0m = 1e-5 # eventually DryMonin.z_0m? (use cases: where atmos will get it with prescribed land, or vice versa, or coupled)
     z_0c = z_0m # z_0c = function(z0m, ustar...) eventually
     z_0 = [z_0m, z_0c]
     x_in = [windspeed_1, θ_1] 
     
     x_s = [windspeed_1* 0.0 , T_sfc] # we are assuming T_sfc = T(-\Delta z).
-
     θ_basic = deepcopy(θ_1) # for buoyancy calculation
 
-    ## Initial guesses for MO parameters, these should be a function of state.
-    LMO_init = 100 # Initial value so that ξ_init<<1
+    # Initial guesses for MO parameters, these should be a function of state.
+    LMO_init = z_in * 100 # Initial value so that ξ_init<<1
     u_star_init = 0.1 * windspeed_1
-    th_star_init = 1.0 * T_sfc
+    th_star_init = 1.0 * θ_1
     MO_param_guess = [LMO_init, u_star_init, th_star_init] # guess based on current atmos state
-
-    z_in = parent(z_centers)[1]
 
     output = SF.surface_conditions(
         CLIMAparam_set,
@@ -82,17 +84,20 @@ function calculate_sfc_fluxes_energy(formulation::DryMonin, parameters, T_sfc, �
         θ_basic,
         z_in,
         SF.FVScheme(),
-        maxiter = 100, # often unconverged + coeffs v small, check with FMS (esp Mo_params_guess), update for conditional states
+        maxiter = 500, # often unconverged + coeffs v small, check with FMS (esp Mo_params_guess), update for conditional states
     )
 
     C_exchange = output.C_exchange
     Cd = C_exchange[1] # Cd
     Ch = C_exchange[2] # Ch
+    
+    # upward sensible potential temperature flux
+    SH   = Ch * ρ_1 * windspeed_1 * (T_sfc - θ_1) 
 
-    SH   = Ch * p.C_p * ρ_1 * windspeed_1 * (T_sfc - θ_1) 
+    # wind stress
     τ = Geometry.Cartesian3Vector(Cd * windspeed_1) ⊗ uv_1
 
-    return (τ, SH)
+    fluxes = (τ = τ, SH = SH, )
 end
 
 

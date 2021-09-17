@@ -1,11 +1,6 @@
-# Columns with SurfaceFluxes.jl
+# Ekman Column + Slab with SurfaceFluxes.jl
 
-This is a prototype for testing the surface flux model, using the atmos and land models of Test Case 3 in the [Coupler Design Docs](https://www.overleaf.com/project/610c13492c7d0e8d459e72b8) for details. We're using the Nishiwaza 2018 to formulate the flux calculations below, as in `SurfaceFluxes.jl`. 
-
-There are two test cases:
-- Heat diffusion minimal example:
-    - this is an uncoupled integration test for surface fluxes (port to SurfaceFluxes when it's being revamped); test against bulk formula
-- Coupling example: Atmos Ekman column + land column exchanging more realistic fluxes/states; flux calculation / accumulation is done by the coupler. 
+This is a prototype for testing the surface flux model, using the ClimaAtmos Ekamn column and a slab, similar to Test Case 2 in the(see [Coupler Design Docs](https://www.overleaf.com/project/610c13492c7d0e8d459e72b8) for details). We're using the Nishiwaza 2018 to formulate the flux calculations below, as in `SurfaceFluxes.jl`. 
 
 
 # Coupled boundary conditions
@@ -52,125 +47,10 @@ $$
 where $\overline{\theta}$ is the basic potential temperature (?)
 
 
-## Variables supplied to SurfaceFluxes:
-- in dynamic atmos mode (for FD; coupled to land or not):
-    - $<u>$: $u$ averaged over first atmos layer
-    - $\Delta z$: thickness of first atmos layer
-- standalone land mode, driven by e.g. measurements of u at a given height $h$, $\theta$ at the same height $h$:
-    - replace $<u>$ with $u(h)$
-    - replace $\Delta z = h-d$, etc.
-
-## Exchange variables 
-- from land: $\theta_{sfc}$ (determined via prognostic land variables); $z_{0h}$, $z_{0m}$, $d$ (parameters of surface, at most slowly varying in time)
-- from atmos: $<u>$, $<\theta>$, $<\rho>$, Pr 
-- from `SurfaceFLuxes.jl`: 
+## Adapter for `SurfaceFluxes.jl`
+- `dummy_surface_fluxes.jl` extracts the required drag/transfer coefficients from `SurfaceFluxes.jl`, i.e.:
 $$cd_m (z)= \frac{u*^2}{  u(z)^2} \,\,\,\,\,\,\,\,\,\,\,\,\, cd_h(z) = \frac{u*\theta * }{ u(z) \Delta \theta (z)}$$
-$$$$ 
+- the coefficients are then used to calculate the fluxes, similarly to the bulk formula (which assumes that the coefficients are constant) 
 
- things depending on state, but can be assumed to be fixed over atmos step: T_land, relative_humidity land, for g_soil needs moisture in land
-
-## Algorithm 
-- this is called using the main `SurfaceFLuxes.jl` function
-```
-function surface_conditions(
-    param_set::AbstractEarthParameterSet,
-    MO_param_guess::AbstractVector,
-    x_in::AbstractVector,
-    x_s::AbstractVector,
-    z_0::Union{AbstractVector, FT},
-    θ_scale::FT,
-    z_in::FT,
-    scheme,
-    wθ_flux_star::Union{Nothing, FT} = nothing,
-    universal_func::Union{Nothing, F} = Businger,
-    sol_type::NS.SolutionType = NS.CompactSolution(),
-    tol::NS.AbstractTolerance = NS.ResidualTolerance{FT}(sqrt(eps(FT))),
-    maxiter::Int = 10_000,
-) where {FT <: AbstractFloat, AbstractEarthParameterSet, F}
-```
-- Define the function to calculate the `x - [monin_obukhov_length, u_star, theta_star]` that will be passed to the Newton solver
-```
-f!(F, x_all) = surface_fluxes_f!(F, x_all, args)
-```
-- Define Newton solver
-```
-nls = NS.NewtonsMethodAD(f!, MO_param_guess)
-```
-- Solve with the Newton solver from CliMA's `NonlinearSolvers.jl`
-```
-sol = NS.solve!(nls, sol_type, tol, maxiter)
-```
-using the general formula $x_{n+1} = x_n - \frac{f(x_n)}{\partial_x f(x_n)}$ 
-```
-function solve!(
-    ::NewtonsMethodAD,
-    x0::AT,
-    x1::AT,
-    f!::F!,
-    F::FA,
-    J::JA,
-    J⁻¹::J⁻¹A,
-    soltype::SolutionType,
-    tol::AbstractTolerance{FT},
-    maxiters::Int,
-) where {FA, J⁻¹A, JA, F! <: Function, AT, FT}
-
-    x_history = init_history(soltype, AT)
-    F_history = init_history(soltype, AT)
-    if soltype isa VerboseSolution
-        f!(F, x0)
-        ForwardDiff.jacobian!(J, f!, F, x0)
-        push_history!(x_history, x0, soltype)
-        push_history!(F_history, F, soltype)
-    end
-    for i in 1:maxiters
-        f!(F, x0)
-        ForwardDiff.jacobian!(J, f!, F, x0)
-        x1 .= x0 .- J \ F
-        push_history!(x_history, x1, soltype)
-        push_history!(F_history, F, soltype)
-        if tol(x0, x1, F)
-            return SolutionResults(
-                soltype,
-                x1,
-                true,
-                F,
-                i,
-                x_history,
-                F_history,
-            )
-        end
-        x0 = x1
-    end
-    return SolutionResults(
-        soltype,
-        x0,
-        false,
-        F,
-        maxiters,
-        x_history,
-        F_history,
-    )
-end
-```
-
-- 
-## TODO minimal example (~TC1)
-- note changes in SF and NS
-- test: compare with bulk formula test
-- note if still conservation problems due to divergence operator
-- clean up @shows + document the SF functions (+ make README consistent)
-
-## TODO physical example (TC3 minus ocean)
-- add coupler flux calculation (also change this for TC3)
-- couple stress, moisture
-- add to SF: $g_{ac}$ (and $g_{s}$) calculation. $g_s$ needed only for evaporation and latent heat fluxes
-- hook up to CI
-
-## Other notes
-- Land conductances added together for evaporation (this will be addresses later):
-$$
-g_{evap} = \frac{1}{ g_{ac}^{-1} + g_{s}^{-1}}
-$$
-- SHF also has a contribution due to evaporation (see Land Design Doc, Ch 2.8). So while the calculation of $u*$, etc, can be carried out as described, the total exchanged flux is not simply proportional to e.g. $u*\theta*$ for sensible heat. 
-
+## Note 
+- TODO: long-term physically meaningful tests once Div Operator is fixed

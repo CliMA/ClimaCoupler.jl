@@ -1,4 +1,8 @@
 # Minimal Example for SurfaceFluxes
+
+# add https://github.com/CliMA/ClimaCore.jl/#main
+# add https://github.com/CliMA/ClimaAtmos.jl/#main
+
 using ClimaCore.Geometry
 
 using ClimaCore: DataLayouts, Operators, Geometry

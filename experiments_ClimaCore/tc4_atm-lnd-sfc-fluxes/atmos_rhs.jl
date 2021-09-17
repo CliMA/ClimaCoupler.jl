@@ -136,7 +136,7 @@ end
 """ 
 Initialize fields located at cell centers in the vertical. 
 """
-function init_ekman_column_1d_c(z, params)
+@inline function init_ekman_column_1d_c(z, params::NamedTuple)
     @unpack grav, C_p, MSLP, R_d, T_surf_atm, T_min_ref, u0, v0, w0 = params
 
     T_surf = T_surf_atm
@@ -165,7 +165,7 @@ end
 """ 
 Initialize fields located at cell interfaces in the vertical. 
 """
-function init_ekman_column_1d_f(z, params)
+@inline function init_ekman_column_1d_f(z, params::NamedTuple)
     @unpack grav, C_p, MSLP, R_d, T_surf_atm, T_min_ref, u0, v0, w0 = params
 
     w = Geometry.Cartesian3Vector(w0) # w component

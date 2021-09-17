@@ -293,9 +293,8 @@ function visualize(sol_atm, sol_lnd )
     linkfig("output/$(dirname)/TC4_end.png", "TC4 End Simulation")
 end
 
-
-sol_atm, sol_lnd = exp_tc4(parameters_)
 #= 
+sol_atm, sol_lnd = exp_tc4(parameters_)
 using Statistics
 import Plots
 visualize(sol_atm, sol_lnd );

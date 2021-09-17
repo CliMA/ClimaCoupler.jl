@@ -1,8 +1,6 @@
 # Experiments
 
 using Test
-using Random
-using CouplerMachine, Dates, Unitful
 
 parameters = (
         # timestepping parameters 
@@ -58,10 +56,13 @@ parameters = (
     )
 
 @testset "Coupler Interface" begin
-    include("../experiments_ClimaCore/tc4_atm-lnd-sfc-fluxes/experiment.jl")
+
+    PWD = pwd()
+    Pkg.activate(PWD*"/experiments_ClimaCore/tc4_atm-lnd-sfc-fluxes/")
+    include(PWD*"/experiments_ClimaCore/tc4_atm-lnd-sfc-fluxes/experiment.jl")
 
     # check if runs
-    sol_atm, sol_lnd = exp_tc4(parameters); 
+    sol_atm, sol_lnd = exp_tc4(parameters)
 
     # conservation checks - add when div operator fixed
 

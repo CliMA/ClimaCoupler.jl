@@ -1,8 +1,84 @@
-using Base: show_supertypes
-#push!(LOAD_PATH, joinpath(@__DIR__, "..", ".."))
+# # Heat Equation + Slab Tutorial
 
-# add https://github.com/CliMA/ClimaCore.jl
-# import required modules
+# In this tutorial, we demonstrate simple sequential coupling
+# of two PDE models using the `ClimaCore.jl` backends. 
+
+# # Model 1
+# Model 1 represents a simplified atmosphere (atm)
+# and solves the [heat
+# equation](https://en.wikipedia.org/wiki/Heat_equation) 
+# in a one-column domain:
+
+# ``
+# \frac{∂ T}{∂ t} + ∇ ⋅ (-α ∇T) = 0
+# ``
+
+#    with top and bottom boundary conditions set to fixed-temperature (non-zero Dirichlet) and fixed-flux (non-zero Neumann) conditions, respectively:
+# ``
+#    T_{top}  = 280 K                         
+#    \frac{∂ T_{bottom}}{∂ t} = - ∇ F_sfc   
+# ``
+
+# where
+#  - `t` is time
+#  - `α` is the thermal diffusivity
+#  - `T` is the temperature
+#  - `F_sfc` is the thermal boundary flux (see below for calculation)
+
+# # Model 2
+# Model 2 represents a simplified soil (lnd) domain as a slab, represented by the ODE:
+# ``
+#    \frac{dT_{sfc}}{dt} = - (F_{accumulated} + G ) / h_{lnd}
+# ``
+#    where 
+# ``
+#    F_{accumulated} = {F_integrated} / Δt_{coupler}
+# ``
+# where
+#  - `Δt_{coupler}` is the duration of the coupling cycle
+#  - `T_{sfc}` is the temperature
+#  - `h_{lnd}` is the slab thickness
+#  - `F_integrated` and `F_{accumulated}` thermal boundary fluxes, respectively (see below for calculation)
+
+# # Coupling and Flux Calculation
+
+# We use this Model 1 (usually this is done by the model with the shortest timestep) 
+# to calculate and accumulate the downward surface fluxes, F_sfc:
+# ``
+#    F_{sfc} = - λ * (T_{sfc} - T1) 
+#    d(F_{integrated})/dt  = F_sfc
+
+# where
+#  - `T1` is the atm temperature near the surface (here assumed equal to the first model level)
+#  - `λ` a constant relaxation timescale
+
+# Sequential coupling has the following steps:
+# 1) pre-Model 1: supply Model 1 with T_{sfc} for the F_{sfc} caclulation; reset `F_{integrated}` to zero
+# 2) run Model 1: step forward for all Model 1 timesteps within one coupling cycle using F_{sfc} as the bottom boundary condition; accumulate F_{integrated} at each (sub-)step
+# 3) post-Model 1: pass F_{integrated} into coupler and convert to F_{accumulated} for the correct units. 
+# 4) pre-Model 2: supply Model 2 with F_{accumulated} 
+# 5) run Model 2: step forward for all Model 2 timesteps within one coupling cycle;
+# 6) post-Model 2: state variable, `T_{sfc}` of Model 2 into coupler. 
+# 7) repeat steps 1-6 for all coupling timesteps.
+
+# Solving these equations is broken down into the following steps:
+# 1) Preliminary configuration
+# 2) PDEs
+# 3) Space discretization
+# 4) Time discretization / solver
+# 5) Solver hooks / callbacks
+# 6) Solve
+# 7) Post-processing
+
+# # Preliminary configuration
+
+# ## [Loading code](@id Loading-code-coupler)
+
+# First, we'll load our pre-requisites:
+#  - load CliMA packages under development: 
+# you may need to add unregistered packages in Pkg, e.g., `add https://github.com/CliMA/ClimaCore.jl`
+
+#  - load external packages:
 import ClimaCore.Geometry, LinearAlgebra, UnPack
 import ClimaCore:
     Fields,
@@ -14,6 +90,7 @@ import ClimaCore:
     Geometry,
     Spaces
 
+using Base: show_supertypes
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33
 
 using Logging: global_logger
@@ -25,13 +102,15 @@ using OrdinaryDiffEq, Test, Random
 
 using Statistics
 
+# ## Setup Logging Information
 global_logger(TerminalLogger())
-
 const CI = !isnothing(get(ENV, "CI", nothing))
 
-# general parameters
+# ## Define Parameters
+#  - Global Constants
 const FT = Float64
 
+#  - Experiment-specific Parameters
 parameters = (
     # atmos parameters
     zmin_atm = FT(0.0), # height of atm stack bottom [m]
@@ -47,15 +126,10 @@ parameters = (
     λ = FT(1e-5), # transfer coefficient 
 )
 
-# surface flux calculation (coarse bulk formula)
-calculate_flux(T_sfc, T1, parameters) = - parameters.λ * (T_sfc - T1)
+# ## Define Model Functions
 
-# initiate atm model domain and grid
-domain_atm  = Domains.IntervalDomain(parameters.zmin_atm, parameters.zmax_atm, x3boundary = (:bottom, :top)) # struct
-mesh_atm = Meshes.IntervalMesh(domain_atm, nelems = parameters.n) # struct, allocates face boundaries to 5,6: atmos
-center_space_atm = Spaces.CenterFiniteDifferenceSpace(mesh_atm) # collection of the above, discretises space into FD and provides coords
-
-# define model equations
+# - Model 1 (atm) Equations
+# Ensure that the correct operators 
 function ∑tendencies_atm!(du, u, (parameters, T_sfc), t)
     """
     Heat diffusion equation
@@ -76,11 +150,11 @@ function ∑tendencies_atm!(du, u, (parameters, T_sfc), t)
     F_sfc = calculate_flux(T_sfc[1], parent(T)[1], parameters)
 
     # set BCs
-    bcs_bottom = Operators.SetValue(Geometry.Cartesian3Vector(F_sfc)) 
+    bcs_bottom = Operators.SetValue(Geometry.Cartesian3Vector(F_sfc)) # F_sfc is converted to a Cartesian vector in direction 3 (vertical)
     bcs_top = Operators.SetValue(FT(parameters.T_top))
 
-    gradc2f = Operators.GradientC2F(top = bcs_top) # Dirichlet BC
-    gradf2c = Operators.DivergenceF2C(bottom = bcs_bottom) # Neumann BC
+    gradc2f = Operators.GradientC2F(top = bcs_top) # Dirichlet BC (center-to-face)
+    gradf2c = Operators.DivergenceF2C(bottom = bcs_bottom) # Neumann BC (face-to-center)
 
     # tendency calculations
     @. du.x[1] = gradf2c( parameters.μ * gradc2f(T)) # dT/dt
@@ -88,10 +162,11 @@ function ∑tendencies_atm!(du, u, (parameters, T_sfc), t)
 
 end
 
+# - Model 2 (lnd) Equations
 function ∑tendencies_lnd!(dT_sfc, T_sfc, (parameters, F_accumulated), t)
     """
     Slab layer equation
-        lnd d(T_sfc)/dt = - F_accumulated + G
+        lnd d(T_sfc)/dt = - (F_accumulated + G) / h_lnd
         where 
             F_accumulated = F_integrated / Δt_coupler
     """
@@ -99,7 +174,22 @@ function ∑tendencies_lnd!(dT_sfc, T_sfc, (parameters, F_accumulated), t)
     @. dT_sfc = ( - F_accumulated + G) / parameters.h_lnd 
 end
 
-# initialize all variables and display models
+# - Surface Flux Calculation (coarse bulk formula)
+calculate_flux(T_sfc, T1, parameters) = - parameters.λ * (T_sfc - T1)
+
+# - Coupler Communication Functions 
+# These functions export / import / transform variables 
+# These functions are now just place holders for coupler transformations (e.g. regridding, masking, etc)
+coupler_get(x) = x
+coupler_put(x) = x
+
+# ## Model Initialization
+# - initialize atm model domain and grid
+domain_atm  = Domains.IntervalDomain(parameters.zmin_atm, parameters.zmax_atm, x3boundary = (:bottom, :top)) # struct
+mesh_atm = Meshes.IntervalMesh(domain_atm, nelems = parameters.n) # struct, allocates face boundaries to 5,6: atmos
+center_space_atm = Spaces.CenterFiniteDifferenceSpace(mesh_atm) # collection of the above, discretises space into FD and provides coords
+
+# - initialize prognostic variables, either as ClimaCore's Field objects or as Arrays
 T_atm_0 = Fields.ones(FT, center_space_atm) .* parameters.T_atm_ini # initiates a spatially uniform atm progostic var
 T_lnd_0 = [parameters.T_lnd_ini] # initiates lnd progostic var
 ics = (;
@@ -107,7 +197,7 @@ ics = (;
         lnd = T_lnd_0
         )
 
-# specify timestepping info
+# - specify timestepping information
 stepping = (;
         Δt_min = 0.02,
         timerange = (0.0, 6.0),
@@ -116,10 +206,6 @@ stepping = (;
         nsteps_atm = 8, # number of timesteps of atm per coupling cycle
         nsteps_lnd = 1, # number of timesteps of lnd per coupling cycle
         )
-
-# coupler comm functions which export / import / transform variables (for now just place holders)
-coupler_get(x) = x
-coupler_put(x) = x
 
 # Solve the ODE operator
 function coupler_solve!(stepping, ics, parameters)
@@ -189,12 +275,18 @@ function coupler_solve!(stepping, ics, parameters)
     return integ_atm, integ_lnd
 end
 
-
-# run
+# ## Model Simulation
 integ_atm, integ_lnd = coupler_solve!(stepping, ics, parameters)
 sol_atm, sol_lnd = integ_atm.sol, integ_lnd.sol
 
-# plots and conservation check
+# ## Postprocessing and Visualization
+
+# Each integrator output (`sol_atm`, `sol_lnd`), contains the DifferentialEquations variable `.u` (the name is hard coded).
+# If `ArrayPartition` was used for combining multiple prognostic variables, `u` will include an additional variable `x` (also hard coded)
+# `parent()` accesses the `Field` values
+# So, for example, the structure of `u` from Model 1 is:
+# `parent(sol_atm.u[<time-index>].x[<ArrayPartition-index>])[<z-index>,<variable-index>]`
+
 ENV["GKSwstype"] = "nul"
 import Plots
 Plots.GRBackend()
@@ -203,21 +295,19 @@ dirname = "heat"
 path = joinpath(@__DIR__, "output", dirname)
 mkpath(path)
 
+# - Animation
 anim = Plots.@animate for u in sol_atm.u
     Plots.plot(u.x[1], xlim=(220,280))
 end
 Plots.mp4(anim, joinpath(path, "heat.mp4"), fps = 10)
+
+# - Vertical profile at start and end
 t0_ = parent(sol_atm.u[1].x[1])[:,1]
 tend_ = parent(sol_atm.u[end].x[1])[:,1]
 z_centers =  parent(Fields.coordinate_field(center_space_atm))[:,1]
 Plots.png(Plots.plot([t0_ tend_],z_centers, labels = ["t=0" "t=end"]), joinpath(path, "T_atm_height.png"))
 
-atm_sfc_u_t = [parent(u.x[1])[1] for u in sol_atm.u]
-Plots.png(Plots.plot(sol_atm.t, atm_sfc_u_t), joinpath(path, "T_atmos_surface_time.png"))
-
-lnd_sfc_u_t = [u[1] for u in sol_lnd.u]
-Plots.png(Plots.plot(sol_lnd.t, lnd_sfc_u_t), joinpath(path, "T_land_surface_time.png"))
-
+# - Conservation
 # convert to the same units (analogous to energy conservation, assuming that is both domains density=1 and thermal capacity=1)
 lnd_sfc_u_t = [u[1] for u in sol_lnd.u] .* parameters.h_lnd
 atm_sum_u_t = [sum(parent(u.x[1])[:]) for u in sol_atm.u] .* (parameters.zmax_atm - parameters.zmin_atm) ./ parameters.n
@@ -240,12 +330,3 @@ function linkfig(figpath, alt = "")
 end
 
 linkfig("output/$(dirname)/heat_end.png", "Heat End Simulation")
-
-# Next steps
-# - extend atmos physics to Ekman Column
-# - use ClimaAtmos interface & optimise the coupler_solve! functions accordingly
-# - use coupler module functions 
-
-# Refs:
-# - ODEProblem(f,u0,tspan; _..) https://diffeq.sciml.ai/release-2.1/types/ode_types.html
-# - for options for solve, see: https://diffeq.sciml.ai/stable/basics/common_solver_opts/

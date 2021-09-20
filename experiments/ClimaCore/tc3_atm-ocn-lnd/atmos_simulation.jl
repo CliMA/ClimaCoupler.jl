@@ -2,8 +2,7 @@ using ClimaAtmos
 using ClimaCore.Geometry
 
 using ClimaCore: DataLayouts, Operators, Geometry
-using ClimaAtmos.Interface: TimeStepper, Simulation
-using ClimaAtmos.Interface: PeriodicRectangle, BarotropicFluidModel
+using ClimaAtmos.Simulations
 using ClimaCore: Fields, Domains, Topologies, Meshes, Spaces
 
 using IntervalSets
@@ -58,7 +57,7 @@ parameters = (
         λ = FT(0.01),#FT(1e-5)    # coupling transfer coefficient for LinearRelaxation() SurfaceFluxType 
     )
 
-function atmos_simulation(land_simulation;
+function atmos_simulation(land_sim;
                           Lz,
                           Nz,
                           minimum_reference_temperature = 230.0, # K

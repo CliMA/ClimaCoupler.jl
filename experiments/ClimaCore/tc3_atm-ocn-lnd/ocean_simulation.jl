@@ -1,6 +1,7 @@
 using Oceananigans
 using Oceananigans.Units
-using Oceananigans.TurbulenceClosures: TKEBasedVerticalDiffusivity
+using Oceananigans.TurbulenceClosures: CATKEVerticalDiffusivity
+using Oceananigans.Fields: set!
 
 #####
 ##### Parameters
@@ -47,7 +48,7 @@ function ocean_simulation(; Nz = 64,  # Number of vertical grid points
                                         buoyancy = SeawaterBuoyancy(gravitational_acceleration=g, equation_of_state=eos),
                                         coriolis = FPlane(f=f),
                                         boundary_conditions = (T=T_bcs, S=S_bcs, u=u_bcs, v=v_bcs),
-                                        closure = TKEBasedVerticalDiffusivity(),)
+                                        closure = CATKEVerticalDiffusivity(),)
     
     simulation = Oceananigans.Simulation(model, Δt=0.02, stop_iteration=1)
     

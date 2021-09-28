@@ -3,8 +3,7 @@
 using Test
 using Pkg
 
-PWD = pwd()
-Pkg.activate("/home/runner/work/CouplerMachine/CouplerMachine/experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes/")
+Pkg.activate(joinpath(@__DIR__,"../experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes/"))
 
 Pkg.add(url="https://github.com/CliMA/ClimaAtmos.jl",rev="main" )
 Pkg.add(url="https://github.com/CliMA/SurfaceFluxes.jl",rev="sf_rc0.2" )
@@ -12,7 +11,7 @@ Pkg.add(url="https://github.com/CliMA/SurfaceFluxes.jl",rev="sf_rc0.2" )
 Pkg.instantiate()
 Pkg.precompile()
 
-include("../experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes/experiment.jl")
+include(joinpath(@__DIR__,"../experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes/experiment.jl"))
 
 
 FT = Float64

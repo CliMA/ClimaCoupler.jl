@@ -10,7 +10,7 @@ Pkg.add(url="https://github.com/CliMA/ClimaAtmos.jl",rev="main" )
 Pkg.add(url="https://github.com/CliMA/SurfaceFluxes.jl",rev="sf_rc0.2" )
 
 
-include(PWD*"/experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes/experiment.jl")
+include("../experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes/experiment.jl")
 
 
 FT = Float64

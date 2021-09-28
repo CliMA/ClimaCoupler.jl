@@ -4,11 +4,13 @@ using Test
 using Pkg
 
 PWD = pwd()
-Pkg.activate(PWD*"/experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes/")
-Pkg.instantiate()
+Pkg.activate("/home/runner/work/CouplerMachine/CouplerMachine/experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes/")
+
 Pkg.add(url="https://github.com/CliMA/ClimaAtmos.jl",rev="main" )
 Pkg.add(url="https://github.com/CliMA/SurfaceFluxes.jl",rev="sf_rc0.2" )
 
+Pkg.instantiate()
+Pkg.precompile()
 
 include("../experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes/experiment.jl")
 

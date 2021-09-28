@@ -1,7 +1,4 @@
 using Dates: include
-using Pkg
-
-Pkg.activate(".")
 
 include("CoupledSimulations/clock.jl")
 include("CouplerState/cplstate_interface.jl")

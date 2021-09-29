@@ -1,15 +1,8 @@
 # Experiments
 
+push!(LOAD_PATH, joinpath(@__DIR__, "../experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes"))
+
 using Test
-using Pkg
-
-Pkg.activate(joinpath(@__DIR__,"../experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes/"))
-
-Pkg.add(url="https://github.com/CliMA/ClimaAtmos.jl",rev="main" )
-Pkg.add(url="https://github.com/CliMA/SurfaceFluxes.jl",rev="sf_rc0.2" )
-
-Pkg.instantiate()
-Pkg.precompile()
 
 include(joinpath(@__DIR__,"../experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes/experiment.jl"))
 

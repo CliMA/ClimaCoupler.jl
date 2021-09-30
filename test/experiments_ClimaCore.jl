@@ -1,11 +1,17 @@
 # Experiments
 
+push!(LOAD_PATH, joinpath(@__DIR__, "../experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes"))
+
 using Test
 
+include(joinpath(@__DIR__,"../experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes/experiment.jl"))
+
+
+FT = Float64
 parameters = (
         # timestepping parameters 
         Δt_min = 0.01, # minimum model timestep [s]
-        timerange = (0.0, 10.0),  # start time and end time [s]
+        timerange = (0.0, 1.0),  # start time and end time [s]
         odesolver = SSPRK33(), # timestepping method from DifferentialEquations.jl (used in both models here)
         nsteps_atm = 1, # no. time steps of atm before coupling 
         nsteps_lnd = 1, # no. time steps of lnd before coupling 
@@ -55,15 +61,13 @@ parameters = (
         Cd = 0.0015, # drag coefficient
     )
 
-@testset "Coupler Interface" begin
-
-    PWD = pwd()
-    Pkg.activate(PWD*"/experiments_ClimaCore/tc4_atm-lnd-sfc-fluxes/")
-    include(PWD*"/experiments_ClimaCore/tc4_atm-lnd-sfc-fluxes/experiment.jl")
+@testset "TC4: Ekman Column + Slab + SurfaceFluxes.jl" begin
 
     # check if runs
     sol_atm, sol_lnd = exp_tc4(parameters)
 
     # conservation checks - add when div operator fixed
+    rel_error = postprocess(sol_atm, sol_lnd )
+    @test rel_error[end] < 1e-8
 
 end

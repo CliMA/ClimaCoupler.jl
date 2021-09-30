@@ -11,9 +11,7 @@ using ClimaCore: DataLayouts, Operators, Geometry
 using ClimaAtmos.Simulations: Simulation
 using ClimaCore: Fields, Domains, Topologies, Meshes, Spaces
 
-using IntervalSets
 using UnPack
-using OrdinaryDiffEq: SSPRK33
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33
 using Logging: global_logger
 using TerminalLoggers: TerminalLogger
@@ -29,7 +27,6 @@ using DocStringExtensions
 using CLIMAParameters
 struct EarthParameterSet <: AbstractEarthParameterSet end
 const CLIMAparam_set = EarthParameterSet()
-import CLIMAParameters
 
 abstract type AbstractNonlinearSolverMethod{FT} end
 abstract type  AbstractTolerance{FT} end
@@ -41,7 +38,6 @@ global_logger(TerminalLogger())
 const CI = !isnothing(get(ENV, "CI", nothing))
 
 import SciMLBase: step!
-using Printf
 
 const FT = Float64
 
@@ -104,6 +100,79 @@ parameters_ = (
         Cd = 0.0015, # drag coefficient
     )
 
+# define land model equations:
+function ∑tendencies_lnd!(dT_sfc, T_sfc, (parameters, F_sfc), t)
+    """
+    Slab ocean:
+    ∂_t T_sfc = F_sfc + G
+    """
+    p = parameters
+    G = 0.0 # place holder for soil dynamics
+
+    @. dT_sfc = (F_sfc[1] * p.C_p + G) / (p.h_s * p.ρ_s * p.c_s)
+end
+
+# Solve the ODE operator
+function coupler_solve!(stepping, ics, parameters)
+    t = 0.0
+    Δt_min  = stepping.Δt_min
+    Δt_cpl  = stepping.Δt_cpl
+    t_start = stepping.timerange[1]
+    t_end   = stepping.timerange[2]
+    nsteps_atm = stepping.nsteps_atm
+    nsteps_lnd = stepping.nsteps_lnd
+
+    # atmos copies of input vars (to be provided by coupler)
+    atm_T_sfc_0 = ics.lnd
+    atm_F_sfc_0 = [0.0, 0.0, 0.0]
+
+    # SETUP ATMOS
+    # put all prognostic variable arrays into a vector and ensure that solve can partition them
+    Y_atm = ArrayPartition(( ics.atm.x[1], ics.atm.x[2] , atm_F_sfc_0))
+    prob_atm = ODEProblem(∑tendencies_atm!, Y_atm, (t_start, t_end), (parameters, atm_T_sfc_0))
+    integ_atm = init(
+                        prob_atm,
+                        stepping.odesolver,
+                        dt = Δt_cpl / nsteps_atm,
+                        saveat = parameters.saveat,)
+
+    # land copies of coupler variables
+    lnd_T_sfc = ics.lnd
+    lnd_F_sfc = deepcopy(integ_atm.u.x[3] / Δt_cpl)
+    
+    # SETUP LAND
+    prob_lnd = ODEProblem(∑tendencies_lnd!, lnd_T_sfc, (t_start, t_end), (parameters, lnd_F_sfc))
+    integ_lnd = init(
+                        prob_lnd,
+                        stepping.odesolver,
+                        dt = Δt_cpl / nsteps_lnd,
+                        saveat = parameters.saveat,)
+
+    # coupler stepping
+    for t in (t_start : Δt_cpl : t_end)
+
+        ## Atmos
+        # pre_atmos
+        integ_atm.u.x[3] .= [0.0, 0.0, 0.0] # surface flux to be accumulated
+
+        # run atmos
+        # NOTE: use (t - integ_atm.t) here instead of Δt_cpl to avoid accumulating roundoff error in our timestepping.
+        step!(integ_atm, t - integ_atm.t, true)
+
+        ## Land
+        # pre_land
+        integ_lnd.p[2] .= integ_atm.u.x[3] / Δt_cpl
+        
+        # run land
+        step!(integ_lnd, t - integ_lnd.t, true)
+
+        # post land
+        integ_atm.p[2] .= integ_lnd.u # get lnd_T_sfc from lnd and setup as aux variable for atm
+    end
+
+    return integ_atm, integ_lnd
+end
+
 ########
 # Experiment TC4
 ########
@@ -113,24 +182,6 @@ function exp_tc4(parameters::NamedTuple)
     ########
 
     z_centers, z_faces = get_height_levels(parameters) # helper function defined below
-
-    ########
-    # Set up rhs! and BCs
-    ########
-
-    # define model equations:
-    #include("atmos_rhs.jl")
-
-    function ∑tendencies_lnd!(dT_sfc, T_sfc, (parameters, F_sfc), t)
-        """
-        Slab ocean:
-        ∂_t T_sfc = F_sfc + G
-        """
-        p = parameters
-        G = 0.0 # place holder for soil dynamics
-
-        @. dT_sfc = (F_sfc[1] * p.C_p + G) / (p.h_s * p.ρ_s * p.c_s)
-    end
 
     ########
     # Initiate prognostic variables
@@ -163,67 +214,6 @@ function exp_tc4(parameters::NamedTuple)
             nsteps_lnd = parameters.nsteps_lnd,
             )
 
-    # Solve the ODE operator
-    function coupler_solve!(stepping, ics, parameters)
-        t = 0.0
-        Δt_min  = stepping.Δt_min
-        Δt_cpl  = stepping.Δt_cpl
-        t_start = stepping.timerange[1]
-        t_end   = stepping.timerange[2]
-        nsteps_atm = stepping.nsteps_atm
-        nsteps_lnd = stepping.nsteps_lnd
-
-        # atmos copies of input vars (to be provided by coupler)
-        atm_T_sfc_0 = ics.lnd
-        atm_F_sfc_0 = [0.0, 0.0, 0.0]
-
-        # SETUP ATMOS
-        # put all prognostic variable arrays into a vector and ensure that solve can partition them
-        Y_atm = ArrayPartition(( ics.atm.x[1], ics.atm.x[2] , atm_F_sfc_0))
-        prob_atm = ODEProblem(∑tendencies_atm!, Y_atm, (t_start, t_end), (parameters, atm_T_sfc_0))
-        integ_atm = init(
-                            prob_atm,
-                            stepping.odesolver,
-                            dt = Δt_cpl / nsteps_atm,
-                            saveat = parameters.saveat,)
-
-        # land copies of coupler variables
-        lnd_T_sfc = ics.lnd
-        lnd_F_sfc = deepcopy(integ_atm.u.x[3] / Δt_cpl)
-        
-        # SETUP LAND
-        prob_lnd = ODEProblem(∑tendencies_lnd!, lnd_T_sfc, (t_start, t_end), (parameters, lnd_F_sfc))
-        integ_lnd = init(
-                            prob_lnd,
-                            stepping.odesolver,
-                            dt = Δt_cpl / nsteps_lnd,
-                            saveat = parameters.saveat,)
-
-        # coupler stepping
-        for t in (t_start : Δt_cpl : t_end)
-
-            ## Atmos
-            # pre_atmos
-            integ_atm.u.x[3] .= [0.0, 0.0, 0.0] # surface flux to be accumulated
-
-            # run atmos
-            # NOTE: use (t - integ_atm.t) here instead of Δt_cpl to avoid accumulating roundoff error in our timestepping.
-            step!(integ_atm, t - integ_atm.t, true)
-
-            ## Land
-            # pre_land
-            integ_lnd.p[2] .= integ_atm.u.x[3] / Δt_cpl
-            
-            # run land
-            step!(integ_lnd, t - integ_lnd.t, true)
-
-            # post land
-            integ_atm.p[2] .= deepcopy(integ_lnd.u) # get lnd_T_sfc from lnd and setup as aux variable for atm
-        end
-
-        return integ_atm, integ_lnd
-    end
-
     ########
     # Run simulation
     ########
@@ -240,8 +230,6 @@ end
 
 function postprocess(sol_atm, sol_lnd; visualize = false )
     ENV["GKSwstype"] = "nul"
-    
-   
 
     dirname = "heat"
     path = joinpath(@__DIR__, "output", dirname)

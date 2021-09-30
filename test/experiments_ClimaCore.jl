@@ -11,7 +11,7 @@ FT = Float64
 parameters = (
         # timestepping parameters 
         Δt_min = 0.01, # minimum model timestep [s]
-        timerange = (0.0, 10.0),  # start time and end time [s]
+        timerange = (0.0, 1.0),  # start time and end time [s]
         odesolver = SSPRK33(), # timestepping method from DifferentialEquations.jl (used in both models here)
         nsteps_atm = 1, # no. time steps of atm before coupling 
         nsteps_lnd = 1, # no. time steps of lnd before coupling 

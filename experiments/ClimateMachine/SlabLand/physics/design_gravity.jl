@@ -1,8 +1,8 @@
 abstract type AbstractTerm{𝒯} end
 abstract type AbstractGravity{𝒯} <: AbstractTerm{𝒯} end
 
-struct Gravity{𝒯} <: AbstractGravity{𝒯}
-struct Buoyancy{𝒯} <: AbstractGravity{𝒯}
+struct Gravity{𝒯} <: AbstractGravity{𝒯} end
+struct Buoyancy{𝒯} <: AbstractGravity{𝒯} end
 
 @inline calc_component!(source, ::Nothing, state, _...) = nothing
 

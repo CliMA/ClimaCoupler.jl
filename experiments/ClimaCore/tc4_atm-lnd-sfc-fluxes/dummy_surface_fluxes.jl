@@ -1,3 +1,6 @@
+import NonlinearSolvers
+const NS = NonlinearSolvers
+
 export calculate_sfc_fluxes_energy
 export DryBulkFormulaWithRadiation, DryBulkFormula, LinearRelaxation, DryMonin
 
@@ -10,6 +13,16 @@ struct LinearRelaxation <: SurfaceFluxType end
 struct DryBulkFormula <: SurfaceFluxType end
 struct DryBulkFormulaWithRadiation <: SurfaceFluxType end
 struct DryMonin <: SurfaceFluxType end
+
+
+SF.surface_conditions(
+    args...;
+    wθ_flux_star::Union{Nothing, FT} = nothing,
+    universal_func::Union{Nothing, F} = SF.UniversalFunctions.Businger,
+    sol_type::NS.SolutionType = NS.CompactSolution(),
+    tol::NS.AbstractTolerance = NS.ResidualTolerance{FT}(sqrt(eps(FT))),
+    maxiter::Int = 10_000,
+) where {FT <: AbstractFloat, APS, F} = SF.surface_conditions(args..., wθ_flux_star, universal_func, sol_type, tol, maxiter)
 
 calculate_sfc_fluxes_energy(formulation::LinearRelaxation, p, θ_sfc, θ_1) = p.λ .* (θ_sfc .- θ_1)
 

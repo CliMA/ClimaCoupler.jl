@@ -1,11 +1,13 @@
 # Experiments
 
-push!(LOAD_PATH, joinpath(@__DIR__, "../experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes"))
-
 using Test
+using Pkg
+
+Pkg.activate(joinpath(@__DIR__,"../experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes/"))
+Pkg.instantiate()
+Pkg.precompile()
 
 include(joinpath(@__DIR__,"../experiments/ClimaCore/tc4_atm-lnd-sfc-fluxes/experiment.jl"))
-
 
 FT = Float64
 parameters = (
@@ -71,3 +73,20 @@ parameters = (
     @test rel_error[end] < 1e-8
 
 end
+
+
+Pkg.activate(joinpath(@__DIR__,"../experiments/ClimaCore/tc1_heat-diffusion-with-slab/"))
+Pkg.instantiate()
+Pkg.precompile()
+
+show_plots = false
+@testset "TC1: Toy example tutorial" begin
+    # check if runs
+    include(joinpath(@__DIR__,"../experiments/ClimaCore/tc1_heat-diffusion-with-slab/run.jl"))
+
+    # conservation checks - add when div operator fixed
+    @test rel_error[end] < 1e-8
+
+end
+
+

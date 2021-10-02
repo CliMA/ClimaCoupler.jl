@@ -182,8 +182,8 @@ calculate_flux(T_sfc, T1, parameters) = - parameters.λ * (T_sfc - T1);
 # - Coupler Communication Functions 
 # These functions export / import / transform variables 
 # These functions are now just place holders for coupler transformations (e.g. regridding, masking, etc)
-coupler_get(x) = x;
-coupler_put(x) = x;
+coupler_get_(x) = x;
+coupler_put_(x) = x;
 
 # ## Model Initialization
 # - initialize atm model domain and grid
@@ -257,25 +257,25 @@ function coupler_solve!(stepping, ics, parameters)
 
         ## STEP ATMOS
         ## pre_atmos
-        integ_atm.p[2] .= coupler_get(coupler_T_lnd) # integ_atm.p is the parameter vector of an ODEProblem from DifferentialEquations
+        integ_atm.p[2] .= coupler_get_(coupler_T_lnd) # integ_atm.p is the parameter vector of an ODEProblem from DifferentialEquations
         integ_atm.u.x[2] .= [0.0] # surface flux to be accumulated
 
         ## run atmos
         ## NOTE: use (t - integ_atm.t) here instead of Δt_coupler to avoid accumulating roundoff error in our timestepping.
-        step!(integ_atm, t - integ_atm.t, true)
+        OrdinaryDiffEq.step!(integ_atm, t - integ_atm.t, true)
 
         ## post_atmos
-        coupler_F_sfc .= coupler_put(integ_atm.u.x[2]) / Δt_coupler
+        coupler_F_sfc .= coupler_put_(integ_atm.u.x[2]) / Δt_coupler
 
         ## STEP LAND
         ## pre_land
-        lnd_F_sfc .= coupler_get(coupler_F_sfc)
+        lnd_F_sfc .= coupler_get_(coupler_F_sfc)
         
         ## run land
-        step!(integ_lnd, t - integ_lnd.t, true)
+        OrdinaryDiffEq.step!(integ_lnd, t - integ_lnd.t, true)
 
         ## post land
-        coupler_T_lnd .= coupler_put(integ_lnd.u) # update T_sfc
+        coupler_T_lnd .= coupler_put_(integ_lnd.u) # update T_sfc
     end
 
     return integ_atm, integ_lnd
@@ -298,6 +298,8 @@ ENV["GKSwstype"] = "nul"
 import Plots
 Plots.GRBackend()
 
+show_plots = isdefined(Main,:SHOWPLOTS) ? SHOWPLOTS : true
+
 path = string(@__DIR__ , "/images/")
 mkpath(path);
 
@@ -305,7 +307,7 @@ mkpath(path);
 t0_ = parent(sol_atm.u[1].x[1])[:,1];
 tend_ = parent(sol_atm.u[end].x[1])[:,1];
 z_centers = parent(Fields.coordinate_field(center_space_atm))[:,1];
-Plots.png(Plots.plot([t0_ tend_], z_centers, title = "model 1: atm", labels = ["t=0" "t=end"], xlabel = "T (K)", ylabel = "z (m)" ), joinpath(path, "tc1_f1.png"))
+show_plots ? Plots.png(Plots.plot([t0_ tend_], z_centers, title = "model 1: atm", labels = ["t=0" "t=end"], xlabel = "T (K)", ylabel = "z (m)" ), joinpath(path, "tc1_f1.png")) : nothing
 # ![](images/tc1_f1.png)
 
 # - Conservation: absolute "energy" of both models with time
@@ -314,13 +316,13 @@ lnd_sfc_u_t = [u[1] for u in sol_lnd.u] .* parameters.h_lnd;
 atm_sum_u_t = [sum(parent(u.x[1])[:]) for u in sol_atm.u] .* (parameters.zmax_atm - parameters.zmin_atm) ./ parameters.n;
 v1 = lnd_sfc_u_t .- lnd_sfc_u_t[1] ;
 v2 = atm_sum_u_t .- atm_sum_u_t[1] ;
-Plots.png(Plots.plot(sol_lnd.t, [v1 v2 v1+v2], labels = ["lnd" "atm" "tot"], xlabel = "time (s)", ylabel = "pseudo-energy (J / m2)"), joinpath(path, "tc1_f2.png"))
+show_plots ? Plots.png(Plots.plot(sol_lnd.t, [v1 v2 v1+v2], labels = ["lnd" "atm" "tot"], xlabel = "time (s)", ylabel = "pseudo-energy (J / m2)"), joinpath(path, "tc1_f2.png")) : nothing
 # ![](images/tc1_f2.png)
 
 # - Conservation: relative error with time
 total = atm_sum_u_t + lnd_sfc_u_t;
 rel_error = (total .- total[1]) / mean(total);
-Plots.png(Plots.plot(sol_lnd.t, rel_error, labels = ["tot"], xlabel = "time (s)", ylabel = "relative error"), joinpath(path, "tc1_f3.png"))
+show_plots ? Plots.png(Plots.plot(sol_lnd.t, rel_error, labels = ["tot"], xlabel = "time (s)", ylabel = "relative error"), joinpath(path, "tc1_f3.png")) : nothing
 # ![](images/tc1_f3.png)
 
 ## # - Animation

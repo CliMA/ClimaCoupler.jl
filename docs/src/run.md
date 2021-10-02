@@ -75,9 +75,11 @@ Sequential coupling has the following steps:
 ## Loading Packages
 
 First, we'll load our pre-requisites:
- - load CliMA packages under development - you may need to add unregistered packages in Pkg, e.g.,
+ - load CliMA packages under development - you may need to add unregistered packages in Pkg, e.g.:
 
-``import Pkg; Pkg.add(url="https://github.com/CliMA/ClimaCore.jl",rev="main")``
+````julia
+# import Pkg; Pkg.add(url="https://github.com/CliMA/ClimaCore.jl",rev="main")
+````
 
  - load external packages:
 
@@ -338,13 +340,10 @@ ENV["GKSwstype"] = "nul"
 import Plots
 Plots.GRBackend()
 
+show_plots = isdefined(Main,:show_plots) ? show_plots : true
+
 path = string(@__DIR__ , "/images/")
 mkpath(path);
-````
-
-````
-[ Info: Precompiling Plots [91a5bcdd-55d7-5caf-9e0b-520d859cae80]
-
 ````
 
 - Vertical profile at start and end
@@ -353,7 +352,7 @@ mkpath(path);
 t0_ = parent(sol_atm.u[1].x[1])[:,1];
 tend_ = parent(sol_atm.u[end].x[1])[:,1];
 z_centers = parent(Fields.coordinate_field(center_space_atm))[:,1];
-Plots.png(Plots.plot([t0_ tend_], z_centers, title = "model 1: atm", labels = ["t=0" "t=end"], xlabel = "T (K)", ylabel = "z (m)" ), joinpath(path, "tc1_f1.png"))
+show_plots ? Plots.png(Plots.plot([t0_ tend_], z_centers, title = "model 1: atm", labels = ["t=0" "t=end"], xlabel = "T (K)", ylabel = "z (m)" ), joinpath(path, "tc1_f1.png")) : nothing
 ````
 
 ![](images/tc1_f1.png)
@@ -366,7 +365,7 @@ lnd_sfc_u_t = [u[1] for u in sol_lnd.u] .* parameters.h_lnd;
 atm_sum_u_t = [sum(parent(u.x[1])[:]) for u in sol_atm.u] .* (parameters.zmax_atm - parameters.zmin_atm) ./ parameters.n;
 v1 = lnd_sfc_u_t .- lnd_sfc_u_t[1] ;
 v2 = atm_sum_u_t .- atm_sum_u_t[1] ;
-Plots.png(Plots.plot(sol_lnd.t, [v1 v2 v1+v2], labels = ["lnd" "atm" "tot"], xlabel = "time (s)", ylabel = "pseudo-energy (J / m2)"), joinpath(path, "tc1_f2.png"))
+show_plots ? Plots.png(Plots.plot(sol_lnd.t, [v1 v2 v1+v2], labels = ["lnd" "atm" "tot"], xlabel = "time (s)", ylabel = "pseudo-energy (J / m2)"), joinpath(path, "tc1_f2.png")) : nothing
 ````
 
 ![](images/tc1_f2.png)
@@ -376,7 +375,7 @@ Plots.png(Plots.plot(sol_lnd.t, [v1 v2 v1+v2], labels = ["lnd" "atm" "tot"], xla
 ````julia
 total = atm_sum_u_t + lnd_sfc_u_t;
 rel_error = (total .- total[1]) / mean(total);
-Plots.png(Plots.plot(sol_lnd.t, rel_error, labels = ["tot"], xlabel = "time (s)", ylabel = "relative error"), joinpath(path, "tc1_f3.png"))
+show_plots ? Plots.png(Plots.plot(sol_lnd.t, rel_error, labels = ["tot"], xlabel = "time (s)", ylabel = "relative error"), joinpath(path, "tc1_f3.png")) : nothing
 ````
 
 ![](images/tc1_f3.png)

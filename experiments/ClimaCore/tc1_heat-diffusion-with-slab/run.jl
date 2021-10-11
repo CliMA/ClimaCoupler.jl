@@ -16,7 +16,7 @@
 #    with top and bottom boundary conditions set to fixed-temperature (non-zero Dirichlet) and fixed-flux (non-zero Neumann) conditions, respectively:
 
 # ``
-#    T_{top}  = 280 K \,\,\,\,\,\,\, \frac{∂ T_{bottom}}{∂ t} = - ∇ F_{sfc}   
+#    T_{top}  = 280 K, \,\,\,\,\,\,\, \frac{∂ T_{bottom}}{∂ t} = - ∇ F_{sfc}   
 # ``
 
 # where
@@ -62,7 +62,7 @@
 #  - `λ` a constant relaxation timescale
 
 # Sequential coupling has the following steps:
-# 1) pre-Model 1: supply Model 1 with `T_sfc` for the `F_sfc` caclulation; reset `F_integrated` to zero
+# 1) pre-Model 1: supply Model 1 with `T_sfc` for the `F_sfc` calculation; reset `F_integrated` to zero
 # 2) run Model 1: step forward for all Model 1 timesteps within one coupling cycle using `F_sfc` as the bottom boundary condition; accumulate `F_integrated` at each (sub-)step
 # 3) post-Model 1: pass `F_integrated` into coupler and convert to `F_accumulated` for the correct units. 
 # 4) pre-Model 2: supply Model 2 with `F_accumulated` 
@@ -98,7 +98,7 @@ using TerminalLoggers: TerminalLogger
 
 using RecursiveArrayTools
 
-using OrdinaryDiffEq, Test, Random
+using OrdinaryDiffEq
 
 using Statistics
 

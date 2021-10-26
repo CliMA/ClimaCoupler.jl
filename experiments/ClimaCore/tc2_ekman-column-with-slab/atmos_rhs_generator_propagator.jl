@@ -17,7 +17,7 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     # T = u.x[1]
 
     # F_sfc = - calculate_flux( T_sfc[1], parent(T)[1] )
-    
+
     # # set BCs
     # bcs_bottom = Operators.SetValue(F_sfc) # struct w bottom BCs
     # bcs_top = Operators.SetValue(FT(280.0))
@@ -49,18 +49,18 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(0.0), top = Operators.SetValue(0.0))
 
     If = Operators.InterpolateC2F(bottom = Operators.Extrapolate(), top = Operators.Extrapolate())
-    @. dρ = gradf2c( -w * If(ρ) ) # Eq. 4.11
+    @. dρ = gradf2c(-w * If(ρ)) # Eq. 4.11
 
     # potential temperature (centers)
     gradc2f = Operators.GradientC2F()
     gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(0.0), top = Operators.SetValue(0.0)) # Eq. 4.20, 4.21
 
-    @. dρθ = gradf2c( -w * If(ρθ) + ν * gradc2f(ρθ/ρ) ) # Eq. 4.12
+    @. dρθ = gradf2c(-w * If(ρθ) + ν * gradc2f(ρθ / ρ)) # Eq. 4.12
 
     # u velocity (centers)
     gradc2f = Operators.GradientC2F(top = Operators.SetValue(ug)) # Eq. 4.18
     gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(Cd * u_wind * u_1)) # Eq. 4.16
-    
+
     A = Operators.AdvectionC2C(bottom = Operators.SetValue(0.0), top = Operators.SetValue(0.0))
     @. du = gradf2c(ν * gradc2f(u)) + f * (v - vg) - A(w, u) # Eq. 4.8
 
@@ -77,9 +77,9 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
 
     B = Operators.SetBoundaryOperator(bottom = Operators.SetValue(0.0), top = Operators.SetValue(0.0))
     If = Operators.InterpolateC2F(bottom = Operators.Extrapolate(), top = Operators.Extrapolate())
-    Π(ρθ) = C_p .* (R_d .* ρθ ./ MSLP).^(R_m ./ C_v)
+    Π(ρθ) = C_p .* (R_d .* ρθ ./ MSLP) .^ (R_m ./ C_v)
     #dw = ρθ .* 0.0
-    @. dw = B( -(If(ρθ / ρ) * gradc2f(Π(ρθ))) - grav + gradc2f(ν * gradf2c(w)) - w * If(gradf2c(w))) # Eq. 4.10
+    @. dw = B(-(If(ρθ / ρ) * gradc2f(Π(ρθ))) - grav + gradc2f(ν * gradf2c(w)) - w * If(gradf2c(w))) # Eq. 4.10
 
     return dY
 
@@ -87,5 +87,5 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
 
 
 
-    
+
 end

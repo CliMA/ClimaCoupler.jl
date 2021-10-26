@@ -4,15 +4,7 @@ using Base: show_supertypes
 
 # import required modules
 import ClimaCore.Geometry, LinearAlgebra, UnPack
-import ClimaCore:
-    Fields,
-    Domains,
-    Topologies,
-    Meshes,
-    DataLayouts,
-    Operators,
-    Geometry,
-    Spaces
+import ClimaCore: Fields, Domains, Topologies, Meshes, DataLayouts, Operators, Geometry, Spaces
 
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33
 
@@ -48,10 +40,10 @@ parameters = (
 )
 
 # surface flux calculation (coarse bulk formula)
-calculate_flux(T_sfc, T1, parameters) = - parameters.λ * (T_sfc - T1)
+calculate_flux(T_sfc, T1, parameters) = -parameters.λ * (T_sfc - T1)
 
 # initiate atm model domain and grid
-domain_atm  = Domains.IntervalDomain(parameters.zmin_atm, parameters.zmax_atm, x3boundary = (:bottom, :top)) # struct
+domain_atm = Domains.IntervalDomain(parameters.zmin_atm, parameters.zmax_atm, x3boundary = (:bottom, :top)) # struct
 mesh_atm = Meshes.IntervalMesh(domain_atm, nelems = parameters.n) # struct, allocates face boundaries to 5,6: atmos
 center_space_atm = Spaces.CenterFiniteDifferenceSpace(mesh_atm) # collection of the above, discretises space into FD and provides coords
 
@@ -63,7 +55,7 @@ function ∑tendencies_atm!(du, u, (parameters, T_sfc), t)
         where
             T  = 280 K              at z = zmax_atm
             dT/dt = - ∇ F_sfc       at z = zmin_atm
-    
+
     We also use this model to calculate and accumulate the downward surface fluxes, F_sfc:
         F_sfc = - λ * (T_sfc - T1) 
         d(F_integrated)/dt  = - F_sfc
@@ -71,9 +63,9 @@ function ∑tendencies_atm!(du, u, (parameters, T_sfc), t)
             F_integrated is reset to 0 at the beginning of each coupling cycle
             T1 = atm temperature near the surface (here assumed equal to the first model level)
     """
-    
+
     T = u.x[1] # u.x is an ArrayPartition vector of prognostic variables used in DifferentialEquations
-    F_sfc = calculate_flux(T_sfc[1], parent(T)[1], parameters) * 0.0 +1.0 # this is reset when should be
+    F_sfc = calculate_flux(T_sfc[1], parent(T)[1], parameters) * 0.0 + 1.0 # this is reset when should be
 
     # # set BCs
     # bcs_bottom = Operators.SetValue(FT(F_sfc)) 
@@ -87,16 +79,16 @@ function ∑tendencies_atm!(du, u, (parameters, T_sfc), t)
     # @. du.x[1] = gradf2c( parameters.μ * gradc2f(T)) # dT/dt
     # du.x[2] .= - F_sfc[1] # d(F_integrated)/dt
 
-    
+
     bcs_top = Operators.SetValue(FT(parameters.T_top))
-    bcs_bottom = Operators.SetGradient(Geometry.Cartesian3Vector(FT(F_sfc / parameters.μ )))
+    bcs_bottom = Operators.SetGradient(Geometry.Cartesian3Vector(FT(F_sfc / parameters.μ)))
 
     gradc2f = Operators.GradientC2F(bottom = bcs_bottom, top = bcs_top)
     divf2c = Operators.DivergenceF2C()
-    
 
-    @. du.x[1] = divf2c( parameters.μ .* gradc2f(T))
-    du.x[2] .= - F_sfc[1] # d(F_integrated)/dt
+
+    @. du.x[1] = divf2c(parameters.μ .* gradc2f(T))
+    du.x[2] .= -F_sfc[1] # d(F_integrated)/dt
 
 end
 
@@ -108,26 +100,23 @@ function ∑tendencies_lnd!(dT_sfc, T_sfc, (parameters, F_accumulated), t)
             F_accumulated = F_integrated / Δt_coupler
     """
     G = 0.0 # place holder for soil dynamics
-    @. dT_sfc = ( - F_accumulated + G) / parameters.h_lnd
+    @. dT_sfc = (-F_accumulated + G) / parameters.h_lnd
 end
 
 # initialize all prognostic variables
 T_atm_0 = Fields.ones(FT, center_space_atm) .* parameters.T_atm_ini # initiates a spatially uniform atm progostic var
 T_lnd_0 = [parameters.T_lnd_ini] # initiates lnd progostic var
-ics = (;
-        atm = T_atm_0,
-        lnd = T_lnd_0
-        )
+ics = (; atm = T_atm_0, lnd = T_lnd_0)
 
 # specify timestepping info
 stepping = (;
-        Δt_min = 0.01,
-        timerange = (0.0, 0.5),
-        Δt_coupler = 0.1,
-        odesolver = SSPRK33(),
-        nsteps_atm = 1, # number of timesteps of atm per coupling cycle
-        nsteps_lnd = 1, # number of timesteps of lnd per coupling cycle
-        )
+    Δt_min = 0.01,
+    timerange = (0.0, 0.5),
+    Δt_coupler = 0.1,
+    odesolver = SSPRK33(),
+    nsteps_atm = 1, # number of timesteps of atm per coupling cycle
+    nsteps_lnd = 1, # number of timesteps of lnd per coupling cycle
+)
 
 # coupler comm functions which export / import / transform variables (for now just place holders)
 coupler_get(x) = x
@@ -136,10 +125,10 @@ coupler_put(x) = x
 # Solve the ODE operator
 function coupler_solve!(stepping, ics, parameters)
     t = 0.0
-    Δt_min  = stepping.Δt_min
-    Δt_coupler  = stepping.Δt_coupler
+    Δt_min = stepping.Δt_min
+    Δt_coupler = stepping.Δt_coupler
     t_start = stepping.timerange[1]
-    t_end   = stepping.timerange[2]
+    t_end = stepping.timerange[2]
 
     # init coupler fields
     coupler_F_sfc = [0.0]
@@ -154,11 +143,7 @@ function coupler_solve!(stepping, ics, parameters)
     T_atm = ics.atm
     Y_atm = ArrayPartition((T_atm, atm_F_sfc))
     prob_atm = ODEProblem(∑tendencies_atm!, Y_atm, (t_start, t_end), (parameters, atm_T_lnd))
-    integ_atm = init(
-                        prob_atm,
-                        stepping.odesolver,
-                        dt = Δt_min,
-                        saveat = Δt_min,)
+    integ_atm = init(prob_atm, stepping.odesolver, dt = Δt_min, saveat = Δt_min)
 
     # land copies of coupler variables
     T_lnd = ics.lnd
@@ -166,20 +151,16 @@ function coupler_solve!(stepping, ics, parameters)
 
     # SETUP LAND
     prob_lnd = ODEProblem(∑tendencies_lnd!, T_lnd, (t_start, t_end), (parameters, lnd_F_sfc))
-    integ_lnd = init(
-                        prob_lnd,
-                        stepping.odesolver,
-                        dt = Δt_min,
-                        saveat = Δt_min,)
+    integ_lnd = init(prob_lnd, stepping.odesolver, dt = Δt_min, saveat = Δt_min)
 
     # coupler stepping
-    for t in (t_start : Δt_coupler : t_end)
+    for t in (t_start:Δt_coupler:t_end)
 
         ## Atmos
         # pre_atmos
         integ_atm.p[2] .= coupler_get(coupler_T_lnd) # # update atm's T_sfc aux field (integ_atm.p is the parameter vector of an ODEProblem from DifferentialEquations)
         integ_atm.u.x[2] .= [0.0] # reset atm's F_sfc prognostic field (i.e., surface flux to be accumulated during Δt_coupler)
-        
+
         # run atmos
         # NOTE: use (t - integ_atm.t) here instead of Δt_coupler to avoid accumulating roundoff error in our timestepping.
         Δt_coupler_updated = t - integ_atm.t
@@ -191,7 +172,7 @@ function coupler_solve!(stepping, ics, parameters)
         ## Land
         # pre_land
         lnd_F_sfc .= coupler_get(coupler_F_sfc) # update lnd's F_sfc aux field
-        
+
         # run land
         step!(integ_lnd, t - integ_lnd.t, true)
 
@@ -217,13 +198,13 @@ path = joinpath(@__DIR__, "output", dirname)
 mkpath(path)
 
 anim = Plots.@animate for u in sol_atm.u
-    Plots.plot(u.x[1], xlim=(220,280))
+    Plots.plot(u.x[1], xlim = (220, 280))
 end
 Plots.mp4(anim, joinpath(path, "heat.mp4"), fps = 10)
-t0_ = parent(sol_atm.u[1].x[1])[:,1]
-tend_ = parent(sol_atm.u[end].x[1])[:,1]
-z_centers =  parent(Fields.coordinate_field(center_space_atm))[:,1]
-Plots.png(Plots.plot([t0_ tend_],z_centers, labels = ["t=0" "t=end"]), joinpath(path, "T_atm_height.png"))
+t0_ = parent(sol_atm.u[1].x[1])[:, 1]
+tend_ = parent(sol_atm.u[end].x[1])[:, 1]
+z_centers = parent(Fields.coordinate_field(center_space_atm))[:, 1]
+Plots.png(Plots.plot([t0_ tend_], z_centers, labels = ["t=0" "t=end"]), joinpath(path, "T_atm_height.png"))
 
 atm_sfc_u_t = [parent(u.x[1])[1] for u in sol_atm.u]
 Plots.png(Plots.plot(sol_atm.t, atm_sfc_u_t), joinpath(path, "T_atmos_surface_time.png"))
@@ -235,9 +216,12 @@ Plots.png(Plots.plot(sol_lnd.t, lnd_sfc_u_t), joinpath(path, "T_land_surface_tim
 lnd_sfc_u_t = [u[1] for u in sol_lnd.u] .* parameters.h_lnd
 atm_sum_u_t = [sum(parent(u.x[1])[:]) for u in sol_atm.u] .* (parameters.zmax_atm - parameters.zmin_atm) ./ parameters.n
 
-v1 = lnd_sfc_u_t .- lnd_sfc_u_t[1] 
-v2 = atm_sum_u_t .- atm_sum_u_t[1] 
-Plots.png(Plots.plot(sol_lnd.t, [v1 v2 v1+v2], labels = ["lnd" "atm" "tot"]), joinpath(path, "Δenergy_both_surface_time.png"))
+v1 = lnd_sfc_u_t .- lnd_sfc_u_t[1]
+v2 = atm_sum_u_t .- atm_sum_u_t[1]
+Plots.png(
+    Plots.plot(sol_lnd.t, [v1 v2 v1 + v2], labels = ["lnd" "atm" "tot"]),
+    joinpath(path, "Δenergy_both_surface_time.png"),
+)
 
 total = atm_sum_u_t + lnd_sfc_u_t
 rel_error = (total .- total[1]) / mean(total)

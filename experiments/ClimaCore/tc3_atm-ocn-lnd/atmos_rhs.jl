@@ -53,15 +53,25 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     u_wind = sqrt(u_1^2 + v_1^2)
 
     # surface flux calculations 
-    surface_flux_ρθ = - calculate_sfc_fluxes_energy(DryBulkFormulaWithRadiation(), parameters, T_sfc[1], parent(ρθ)[1] / parent(ρ)[1] , u_1, v_1, ρ_1, t ) ./ C_p
-    surface_flux_u =  - Cd * u_1 * sqrt(u_1^2 + v_1^2)
-    surface_flux_v =  - Cd * v_1 * sqrt(u_1^2 + v_1^2)
+    surface_flux_ρθ =
+        -calculate_sfc_fluxes_energy(
+            DryBulkFormulaWithRadiation(),
+            parameters,
+            T_sfc[1],
+            parent(ρθ)[1] / parent(ρ)[1],
+            u_1,
+            v_1,
+            ρ_1,
+            t,
+        ) ./ C_p
+    surface_flux_u = -Cd * u_1 * sqrt(u_1^2 + v_1^2)
+    surface_flux_v = -Cd * v_1 * sqrt(u_1^2 + v_1^2)
 
     # accumulate in the required right units
     @inbounds begin
-        dY.x[3][1] = - ρ_1 * surface_flux_u  # 
-        dY.x[3][2] = - ρ_1 * surface_flux_v  # 
-        dY.x[3][3] = - C_p * surface_flux_ρθ # W / m^2
+        dY.x[3][1] = -ρ_1 * surface_flux_u  # 
+        dY.x[3][2] = -ρ_1 * surface_flux_v  # 
+        dY.x[3][3] = -C_p * surface_flux_ρθ # W / m^2
     end
 
     # @inbounds begin
@@ -75,18 +85,18 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(0.0), top = Operators.SetValue(0.0))
 
     If = Operators.InterpolateC2F(bottom = Operators.Extrapolate(), top = Operators.Extrapolate())
-    @. dρ = gradf2c( -w * If(ρ) ) # Eq. 4.11
+    @. dρ = gradf2c(-w * If(ρ)) # Eq. 4.11
 
     # Potential temperature tendency (located at cell centers)
     gradc2f = Operators.GradientC2F()
     gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(surface_flux_ρθ), top = Operators.SetValue(0.0)) # Eq. 4.20, 4.21
 
-    @. dρθ = gradf2c( -w * If(ρθ) + ν * gradc2f(ρθ/ρ) ) # Eq. 4.12
+    @. dρθ = gradf2c(-w * If(ρθ) + ν * gradc2f(ρθ / ρ)) # Eq. 4.12
 
     # u velocity tendency (located at cell centers)
     gradc2f = Operators.GradientC2F(top = Operators.SetValue(ug)) # Eq. 4.18
     gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(Cd * u_wind * u_1)) # Eq. 4.16
-    
+
     A = Operators.AdvectionC2C(bottom = Operators.SetValue(0.0), top = Operators.SetValue(0.0))
     @. du = gradf2c(ν * gradc2f(u)) + f * (v - vg) - A(w, u) # Eq. 4.8
 
@@ -106,9 +116,9 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     println(R_d ./ C_p)
     println(ρθ)
     println(t)
-    Π(ρθ) = C_p .* (R_d .* ρθ ./ MSLP).^(R_m ./ C_v)
-    
-    @. dw = B( -(If(ρθ / ρ) * gradc2f(Π(ρθ))) - grav + gradc2f(ν * gradf2c(w)) - w * If(gradf2c(w))) # Eq. 4.10 # this makes everything unstable... use new ClimaAtmos rhs!
-    
+    Π(ρθ) = C_p .* (R_d .* ρθ ./ MSLP) .^ (R_m ./ C_v)
+
+    @. dw = B(-(If(ρθ / ρ) * gradc2f(Π(ρθ))) - grav + gradc2f(ν * gradf2c(w)) - w * If(gradf2c(w))) # Eq. 4.10 # this makes everything unstable... use new ClimaAtmos rhs!
+
     return dY
 end

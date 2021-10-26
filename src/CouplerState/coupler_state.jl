@@ -170,5 +170,7 @@ function Base.show(io::IO, coupler::CouplerState)
         entry = coupler.CplStateBlob[k]
         data[i,:] = [k entry.units entry.datetime entry.gridinfo.gridtype]
     end
-    pretty_table(data, ["Field Name" "Units" "Field Time (Y-m-d H:M:S)" "Grid Type"])
+    header = (["Field Name", "Units", "Field Time", "Grid Type"],
+                ["", "", "Y-m-d H:M:S", ""])
+    pretty_table(data, header = header)
 end

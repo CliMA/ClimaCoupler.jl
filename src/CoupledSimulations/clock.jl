@@ -3,7 +3,7 @@
 
 Manages a simulation's time information.
 """
-mutable struct Clock{T} 
+mutable struct Clock{T}
     time::T         # current simulation time
     dt::T           # simulation timestep
     stop_time::T    # simulation end time

@@ -29,8 +29,7 @@ export PenaltyNumFluxDiffusive
 export ExteriorBoundary
 export CoupledPrimaryBoundary, CoupledSecondaryBoundary
 
-using ClimateMachine.BalanceLaws:
-    Auxiliary, BalanceLaw, Gradient, GradientFlux, Prognostic
+using ClimateMachine.BalanceLaws: Auxiliary, BalanceLaw, Gradient, GradientFlux, Prognostic
 
 import ClimateMachine.BalanceLaws:
     boundary_conditions,
@@ -56,7 +55,10 @@ using ClimateMachine.DGMethods.NumericalFluxes:
     RusanovNumericalFlux
 
 import ClimateMachine.DGMethods.NumericalFluxes:
-    numerical_boundary_flux_second_order!, numerical_flux_second_order!, numerical_boundary_flux_first_order!, numerical_flux_first_order!
+    numerical_boundary_flux_second_order!,
+    numerical_flux_second_order!,
+    numerical_boundary_flux_first_order!,
+    numerical_flux_first_order!
 
 
 using ClimateMachine.VariableTemplates
@@ -91,7 +93,7 @@ Declare prognostic state variables
 function vars_state(bl::l_type, ::Prognostic, FT)
     @vars begin
         θ::FT
-        F_accum::FT 
+        F_accum::FT
         u::SVector{3, FT}
     end
 end
@@ -109,7 +111,7 @@ function vars_state(bl::l_type, ::Auxiliary, FT)
         xc::FT      # Cartesian x
         yc::FT      # Cartesian y
         zc::FT      # Cartesian z
-        
+
         θⁱⁿⁱᵗ::FT   # unused in default setup
         θ_secondary::FT  # stores opposite face for primary (atmospheric import)
         F_prescribed::FT # stores prescribed flux for secondary (ocean import)
@@ -121,7 +123,7 @@ end
 """
 function vars_state(bl::l_type, ::Gradient, FT)
     @vars begin
-        ∇θ::FT 
+        ∇θ::FT
         ∇θⁱⁿⁱᵗ::FT # unused in default setup
     end
 end
@@ -135,16 +137,10 @@ end
 """
   Initialize prognostic state variables
 """
-function init_state_prognostic!(
-    bl::l_type,
-    Q::Vars,
-    A::Vars,
-    geom::LocalGeometry,
-    FT,
-)
+function init_state_prognostic!(bl::l_type, Q::Vars, A::Vars, geom::LocalGeometry, FT)
     npt = getproperty(geom, :n)
     elnum = getproperty(geom, :e)
-    x = A.xc 
+    x = A.xc
     y = A.yc
     z = A.zc
 
@@ -157,22 +153,15 @@ end
 """
   Initialize auxiliary state variables
 """
-function nodal_init_state_auxiliary!(
-    bl::l_type,
-    A::Vars,
-    tmp::Vars,
-    geom::LocalGeometry,
-    _...,
-)
+function nodal_init_state_auxiliary!(bl::l_type, A::Vars, tmp::Vars, geom::LocalGeometry, _...)
     npt = getproperty(geom, :n)
     elnum = getproperty(geom, :e)
     x = geom.coord[1]
     y = geom.coord[2]
     z = geom.coord[3]
 
-    A.npt, A.elnum, A.xc, A.yc, A.zc =
-        bl.bl_prop.init_aux_geom(npt, elnum, x, y, z)
-    
+    A.npt, A.elnum, A.xc, A.yc, A.zc = bl.bl_prop.init_aux_geom(npt, elnum, x, y, z)
+
     A.θⁱⁿⁱᵗ = 0
     A.θ_secondary = 0
     A.F_prescribed = 0
@@ -221,44 +210,37 @@ end
 """
   Compute diffusivity tensor times computed gradient to give net gradient flux.
 """
-function compute_gradient_flux!(
-    bl::l_type,
-    GF::Vars,
-    G::Grad,
-    Q::Vars,
-    A::Vars,
-    t,
-)
+function compute_gradient_flux!(bl::l_type, GF::Vars, G::Grad, Q::Vars, A::Vars, t)
     # "Non-linear" form (for time stepped)
     ### κ¹,κ²,κ³=bl.bl_prop.calc_kappa_diff(G.∇θ,A.npt,A.elnum,A.xc,A.yc,A.zc)
     # "Linear" form (for implicit)
-    κ¹, κ², κ³ =
-        bl.bl_prop.calc_kappa_diff(G.∇θⁱⁿⁱᵗ, A.npt, A.elnum, A.xc, A.yc, A.zc)
+    κ¹, κ², κ³ = bl.bl_prop.calc_kappa_diff(G.∇θⁱⁿⁱᵗ, A.npt, A.elnum, A.xc, A.yc, A.zc)
     # Maybe I should pass both G.∇θ and G.∇θⁱⁿⁱᵗ?
 
     # Messy diffusion tensor rotation - should find code for doing this succinctly!
     # we want κ¹, κ² to act in lat and lon directions respectively i.e. tangential 
     # to shell, we want κ³ to act normal to shell i.e. z or r direction.
     ## don't use regular norm(), its not great on performance
-    mynorm(x::Float64,y::Float64,z::Float64)  = ( x^2 + y^2 + z^2 ) ^ 0.5
+    mynorm(x::Float64, y::Float64, z::Float64) = (x^2 + y^2 + z^2)^0.5
     ## excessively type stable forms!
-    r̂ⁿᵒʳᵐ(x::Float64,y::Float64,z::Float64) = mynorm(x,y,z) ≈ 0 ? 1 : mynorm(x, y, z)^(-1)
-    ϕ̂ⁿᵒʳᵐ(x::Float64,y::Float64,z::Float64) = mynorm(x,y,Float64(0)) ≈ 0 ? 1 : ( mynorm(x, y, z) * mynorm(x, y, Float64(0)) )^(-1)
-    λ̂ⁿᵒʳᵐ(x::Float64,y::Float64,z::Float64) = mynorm(x,y,Float64(0)) ≈ 0 ? 1 :   mynorm(x, y, Float64(0))^(-1)
-    r̂(x::Float64,y::Float64,z::Float64) = r̂ⁿᵒʳᵐ(x,y,z) * @SVector([x, y, z])
-    ϕ̂(x::Float64,y::Float64,z::Float64) = ϕ̂ⁿᵒʳᵐ(x,y,z) * @SVector [x*z, y*z, -(x^2 + y^2)]
-    λ̂(x::Float64,y::Float64,z::Float64) = λ̂ⁿᵒʳᵐ(x,y,z) * @SVector [-y, x, 0]
+    r̂ⁿᵒʳᵐ(x::Float64, y::Float64, z::Float64) = mynorm(x, y, z) ≈ 0 ? 1 : mynorm(x, y, z)^(-1)
+    ϕ̂ⁿᵒʳᵐ(x::Float64, y::Float64, z::Float64) =
+        mynorm(x, y, Float64(0)) ≈ 0 ? 1 : (mynorm(x, y, z) * mynorm(x, y, Float64(0)))^(-1)
+    λ̂ⁿᵒʳᵐ(x::Float64, y::Float64, z::Float64) = mynorm(x, y, Float64(0)) ≈ 0 ? 1 : mynorm(x, y, Float64(0))^(-1)
+    r̂(x::Float64, y::Float64, z::Float64) = r̂ⁿᵒʳᵐ(x, y, z) * @SVector([x, y, z])
+    ϕ̂(x::Float64, y::Float64, z::Float64) = ϕ̂ⁿᵒʳᵐ(x, y, z) * @SVector [x * z, y * z, -(x^2 + y^2)]
+    λ̂(x::Float64, y::Float64, z::Float64) = λ̂ⁿᵒʳᵐ(x, y, z) * @SVector [-y, x, 0]
 
     # Sphere surface bits 
-    x=A.xc
-    y=A.yc
-    z=A.zc
-    Gλ = G.∇θ'*λ̂(x,y,z)
-    Fλ = κ¹*Gλ*λ̂(x,y,z)
-    Gϕ = G.∇θ'*ϕ̂(x,y,z)
-    Fϕ = κ²*Gϕ*ϕ̂(x,y,z)
-    Gr = G.∇θ'*r̂(x,y,z)
-    Fr = κ³*Gr*r̂(x,y,z)
+    x = A.xc
+    y = A.yc
+    z = A.zc
+    Gλ = G.∇θ' * λ̂(x, y, z)
+    Fλ = κ¹ * Gλ * λ̂(x, y, z)
+    Gϕ = G.∇θ' * ϕ̂(x, y, z)
+    Fϕ = κ² * Gϕ * ϕ̂(x, y, z)
+    Gr = G.∇θ' * r̂(x, y, z)
+    Fr = κ³ * Gr * r̂(x, y, z)
     GF.κ∇θ = Diagonal(@SVector([1, 1, 1])) * (Fλ + Fϕ + Fr)
 
     # Original cartesian form
@@ -270,15 +252,7 @@ end
 """
   Pass flux components for second order term into update kernel.
 """
-function flux_second_order!(
-    bl::l_type,
-    F::Grad,
-    Q::Vars,
-    GF::Vars,
-    H::Vars,
-    A::Vars,
-    t,
-)
+function flux_second_order!(bl::l_type, F::Grad, Q::Vars, GF::Vars, H::Vars, A::Vars, t)
     F.θ += GF.κ∇θ
     nothing
 end
@@ -338,7 +312,7 @@ function numerical_boundary_flux_second_order!(
     diff1⁻::Vars{D},
     aux1⁻::Vars{A},
 ) where {S, D, A, HD}
-    
+
     fluxᵀn.θ += 0
 end
 
@@ -346,7 +320,7 @@ end
 # ## 2. CoupledPrimaryBoundary
 # # compute flux based on opposite face
 # # also need to accumulate net flux across boundary
- struct CoupledPrimaryBoundary <: AbstractCouplerBoundary end
+struct CoupledPrimaryBoundary <: AbstractCouplerBoundary end
 
 function boundary_state!(
     nF::Union{CentralNumericalFluxGradient},
@@ -360,9 +334,9 @@ function boundary_state!(
     t,
     _...,
 )
-    
+
     Q⁺.θ = Q⁻.θ # Q⁺.θ=A⁺.θ_secondary
-    
+
     nothing
 end
 
@@ -385,9 +359,7 @@ function numerical_boundary_flux_second_order!(
     diff1⁻::Vars{D},
     aux1⁻::Vars{A},
 ) where {S, D, A, HD}
-    fluxᵀn.θ =
-        (state_prognostic⁻.θ - state_auxiliary⁺.θ_secondary) *
-        balance_law.bl_prop.coupling_lambda() # W/m^2
+    fluxᵀn.θ = (state_prognostic⁻.θ - state_auxiliary⁺.θ_secondary) * balance_law.bl_prop.coupling_lambda() # W/m^2
 
 end
 
@@ -408,7 +380,7 @@ end
 
 ## 3. CoupledSecondaryBoundary
 # use prescribed flux computed in primary
-struct CoupledSecondaryBoundary  <: AbstractCouplerBoundary end
+struct CoupledSecondaryBoundary <: AbstractCouplerBoundary end
 function boundary_state!(
     nF::Union{CentralNumericalFluxGradient},
     bc::CoupledSecondaryBoundary,
@@ -473,7 +445,7 @@ function numerical_flux_second_order!(
     aux⁺::Vars{A},
     t,
 ) where {S, HD, D, A}
-    
+
     numerical_flux_second_order!(
         CentralNumericalFluxSecondOrder(),
         bl,
@@ -502,20 +474,13 @@ end
   NumericalFluxFirstOrder is an abstract type that currently generalizes
   RusanovNumericalFlux, CentralNumericalFluxFirstOrder, RoeNumericalFlux, HLLCNumericalFlux.
 """
-function flux_first_order!(
-    bl::l_type,
-    F::Grad,
-    Q::Vars,
-    A::Vars,
-    t::Real,
-    directions,
-)
-    F.θ += Q.u * Q.θ  
+function flux_first_order!(bl::l_type, F::Grad, Q::Vars, A::Vars, t::Real, directions)
+    F.θ += Q.u * Q.θ
     nothing
 end
 function boundary_state!(
     nf::Union{NumericalFluxFirstOrder},
-    bc::Union{CoupledPrimaryBoundary,CoupledSecondaryBoundary,ExteriorBoundary},
+    bc::Union{CoupledPrimaryBoundary, CoupledSecondaryBoundary, ExteriorBoundary},
     atmos::l_type,
     Q⁺::Vars,
     A⁺::Vars,
@@ -554,7 +519,7 @@ end
 #     aux1⁻,
 # )
 #     Q⁺.θ = Q⁻.θ # Q⁺.θ=A⁺.θ_secondary
-    
+
 #     nothing
 # end
 
@@ -593,8 +558,7 @@ function prop_defaults()
     bl_prop = (bl_prop..., get_penalty_tau = get_penalty_tau)
 
     theta_shadow_boundary_flux(_...) = (return 0.0)
-    bl_prop =
-        (bl_prop..., theta_shadow_boundary_flux = theta_shadow_boundary_flux)
+    bl_prop = (bl_prop..., theta_shadow_boundary_flux = theta_shadow_boundary_flux)
 
     coupling_lambda(_...) = (return 0.0)
     bl_prop = (bl_prop..., coupling_lambda = coupling_lambda)
@@ -617,7 +581,7 @@ function preatmos(csolver)
     mA = csolver.component_list.atmosphere.component_model
     mO = csolver.component_list.ocean.component_model
     # Set boundary SST used in atmos to SST of ocean surface at start of coupling cycle.
-    mA.discretization.state_auxiliary.θ_secondary[mA.boundary] .= 
+    mA.discretization.state_auxiliary.θ_secondary[mA.boundary] .=
         coupler_get(csolver.coupler, :Ocean_SST, mA.grid, DateTime(0), u"°C")
     # Set atmos boundary flux accumulator to 0.
     mA.state.F_accum .= 0
@@ -638,8 +602,14 @@ function postatmos(csolver)
     mO = csolver.component_list.ocean.component_model
     # Pass atmos exports to "coupler" namespace
     # 1. Save mean θ flux at the Atmos boundary during the coupling period
-    coupler_put!(csolver.coupler, :Atmos_MeanAirSeaθFlux, mA.state.F_accum[mA.boundary] ./ csolver.dt,
-        mA.grid, DateTime(0), u"°C")
+    coupler_put!(
+        csolver.coupler,
+        :Atmos_MeanAirSeaθFlux,
+        mA.state.F_accum[mA.boundary] ./ csolver.dt,
+        mA.grid,
+        DateTime(0),
+        u"°C",
+    )
 
     @info(
         "postatmos",
@@ -647,10 +617,7 @@ function postatmos(csolver)
         total_θ_atmos = weightedsum(mA.state, 1),
         total_θ_ocean = weightedsum(mO.state, 1),
         total_F_accum = mean(mA.state.F_accum[mA.boundary]) * 1e6 * 1e6,
-        total_θ =
-            weightedsum(mA.state, 1) +
-            weightedsum(mO.state, 1) +
-            mean(mA.state.F_accum[mA.boundary]) * 1e6 * 1e6,
+        total_θ = weightedsum(mA.state, 1) + weightedsum(mO.state, 1) + mean(mA.state.F_accum[mA.boundary]) * 1e6 * 1e6,
         F_accum_max = maximum(mA.state.F_accum[mA.boundary]),
         F_avg_max = maximum(mA.state.F_accum[mA.boundary] ./ csolver.dt),
         atmos_θ_surface_max = maximum(mA.state.θ[mA.boundary]),
@@ -662,7 +629,7 @@ function preocean(csolver)
     mA = csolver.component_list.atmosphere.component_model
     mO = csolver.component_list.ocean.component_model
     # Set mean air-sea theta flux
-    mO.discretization.state_auxiliary.F_prescribed[mO.boundary] .= 
+    mO.discretization.state_auxiliary.F_prescribed[mO.boundary] .=
         coupler_get(csolver.coupler, :Atmos_MeanAirSeaθFlux, mO.grid, DateTime(0), u"°C")
     # Set ocean boundary flux accumulator to 0. (this isn't used)
     mO.state.F_accum .= 0
@@ -670,10 +637,8 @@ function preocean(csolver)
     @info(
         "preocean",
         time = csolver.t,
-        F_prescribed_max =
-            maximum(mO.discretization.state_auxiliary.F_prescribed[mO.boundary]),
-        F_prescribed_min =
-            maximum(mO.discretization.state_auxiliary.F_prescribed[mO.boundary]),
+        F_prescribed_max = maximum(mO.discretization.state_auxiliary.F_prescribed[mO.boundary]),
+        F_prescribed_min = maximum(mO.discretization.state_auxiliary.F_prescribed[mO.boundary]),
         ocean_θ_surface_max = maximum(mO.state.θ[mO.boundary]),
         ocean_θ_surface_min = maximum(mO.state.θ[mO.boundary]),
     )

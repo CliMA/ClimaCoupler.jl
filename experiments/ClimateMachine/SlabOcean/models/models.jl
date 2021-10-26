@@ -5,28 +5,18 @@ abstract type AbstractFluidModel <: BalanceLaw end
 """
     ModelSetup <: AbstractFluidModel
 """
-struct ModelSetup{𝒯,𝒰,𝒱,𝒲} <: AbstractFluidModel
+struct ModelSetup{𝒯, 𝒰, 𝒱, 𝒲} <: AbstractFluidModel
     physics::𝒯
     boundary_conditions::𝒰
     initial_conditions::𝒱
     numerics::𝒲
 end
 
-function ModelSetup(;
-    physics,
-    boundary_conditions,
-    initial_conditions,
-    numerics,
-)
-    return ModelSetup(
-        physics,
-        unpack_boundary_conditions(boundary_conditions),
-        initial_conditions,
-        numerics,
-    )
+function ModelSetup(; physics, boundary_conditions, initial_conditions, numerics)
+    return ModelSetup(physics, unpack_boundary_conditions(boundary_conditions), initial_conditions, numerics)
 end
 
-struct SlabOceanModelSetup{𝒯,𝒰,𝒱,𝒲} <: AbstractFluidModel
+struct SlabOceanModelSetup{𝒯, 𝒰, 𝒱, 𝒲} <: AbstractFluidModel
     physics::𝒯
     boundary_conditions::𝒰
     initial_conditions::𝒱
@@ -41,11 +31,11 @@ function SlabOceanModelSetup(;
     numerics,
     #parameters,
 )
-    
+
 
     # boundaries = (:west, :east, :south, :north, :bottom, :top)
     # repackaged_bcs = []
-    
+
     # for boundary in boundaries
     #     fields = get(boundary_conditions, boundary, nothing)
     #     new_bc = isnothing(fields) ? Insulating() : fields
@@ -75,7 +65,7 @@ end
 
     temporarily use this struct
 """
-Base.@kwdef struct DryAtmosModel{𝒯,𝒰,𝒱,𝒲} <: AbstractFluidModel
+Base.@kwdef struct DryAtmosModel{𝒯, 𝒰, 𝒱, 𝒲} <: AbstractFluidModel
     physics::𝒯
     boundary_conditions::𝒰
     initial_conditions::𝒱

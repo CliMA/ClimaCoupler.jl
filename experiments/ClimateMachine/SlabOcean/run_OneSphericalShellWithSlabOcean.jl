@@ -24,27 +24,21 @@ end
 ########
 
 # A: low atmos level (ocean)
-domainOcean = SphericalShell(
-    radius = parameters.a - parameters.H,
-    height = parameters.H,
-)
+domainOcean = SphericalShell(radius = parameters.a - parameters.H, height = parameters.H)
 
 # B: high atmos level (atmosphere)
-domainAtmos = SphericalShell(
-    radius = parameters.a,
-    height = parameters.H,
-)
+domainAtmos = SphericalShell(radius = parameters.a, height = parameters.H)
 
 gridOcean = DiscretizedDomain(
     domainOcean;
-    elements = (vertical = 4, horizontal = 8), 
+    elements = (vertical = 4, horizontal = 8),
     polynomial_order = (vertical = 2, horizontal = 2),
     overintegration_order = (vertical = 0, horizontal = 0),
 )
 
 gridAtmos = DiscretizedDomain(
     domainAtmos;
-    elements = (vertical = 4, horizontal = 8), 
+    elements = (vertical = 4, horizontal = 8),
     polynomial_order = (vertical = 2, horizontal = 2),
     overintegration_order = (vertical = 0, horizontal = 0),
 )
@@ -53,7 +47,7 @@ gridAtmos = DiscretizedDomain(
 # # Set up boundary conditions
 # ########
 
-oceanBC = (nothing, nothing, )
+oceanBC = (nothing, nothing)
 
 # # Fixed SST:
 # T_sfc(𝒫, ϕ) = 𝒫.ΔT * exp(-ϕ^2 / 2 / 𝒫.Δϕ^2) + 𝒫.Tₘᵢₙ
@@ -62,8 +56,8 @@ oceanBC = (nothing, nothing, )
 #     drag_coef_moisture = (params, ϕ) -> params.Cₗ,
 #     surface_temperature = T_sfc,
 # )
-AtmosSfcBC = CoupledPrimarySlabOceanBC( parameters.Cₑ, parameters.Cₗ)
-atmosBC = ( AtmosSfcBC , DefaultBC(), )#DefaultBC(), ) inner, outer
+AtmosSfcBC = CoupledPrimarySlabOceanBC(parameters.Cₑ, parameters.Cₗ)
+atmosBC = (AtmosSfcBC, DefaultBC())#DefaultBC(), ) inner, outer
 
 ########
 # Set up model physics
@@ -71,24 +65,16 @@ atmosBC = ( AtmosSfcBC , DefaultBC(), )#DefaultBC(), ) inner, outer
 
 FT = Float64
 
-ref_state = DryReferenceState(
-  DecayingTemperatureProfile{FT}(parameters, FT(290), FT(220), FT(8e3))
-)
+ref_state = DryReferenceState(DecayingTemperatureProfile{FT}(parameters, FT(290), FT(220), FT(8e3)))
 
-physicsOcean = Physics(
-    orientation = SphericalOrientation(),
-    parameters = parameters,
-)
+physicsOcean = Physics(orientation = SphericalOrientation(), parameters = parameters)
 
 physicsAtmos = Physics(
     orientation = SphericalOrientation(),
-    ref_state   = ref_state,
-    eos         = MoistIdealGas(),
-    lhs         = (
-        NonlinearAdvection{(:ρ, :ρu, :ρe)}(),
-        PressureDivergence(),
-    ),
-    sources     = (
+    ref_state = ref_state,
+    eos = MoistIdealGas(),
+    lhs = (NonlinearAdvection{(:ρ, :ρu, :ρe)}(), PressureDivergence()),
+    sources = (
         DeepShellCoriolis(),
         FluctuationGravity(),
         ZeroMomentMicrophysics(),
@@ -100,15 +86,10 @@ physicsAtmos = Physics(
 
 linear_physicsAtmos = Physics(
     orientation = physicsAtmos.orientation,
-    ref_state   = physicsAtmos.ref_state,
-    eos         = physicsAtmos.eos,
-    lhs         = (
-        LinearAdvection{(:ρ, :ρu, :ρe)}(),
-        LinearPressureDivergence(),
-    ),
-    sources     = (
-        FluctuationGravity(),
-    ),
+    ref_state = physicsAtmos.ref_state,
+    eos = physicsAtmos.eos,
+    lhs = (LinearAdvection{(:ρ, :ρu, :ρe)}(), LinearPressureDivergence()),
+    sources = (FluctuationGravity(),),
     parameters = parameters,
 )
 
@@ -153,16 +134,12 @@ start_time = 0
 end_time = Δt * total_steps#30 * 24 * 3600
 
 methodOcean = SSPRK22Heuns
-methodAtmos = IMEX() 
+methodAtmos = IMEX()
 
-callbacks = (
-  Info(),
-  CFL(),
-  VTKState(
+callbacks = (Info(), CFL(), VTKState(
     iteration = 100, #Int(floor(24*3600/Δt)), 
-    filepath = "./output/SphereSlabOcean"),
-    TMARCallback(),
-)
+    filepath = "./output/SphereSlabOcean",
+), TMARCallback())
 
 ########
 # Set up simulation
@@ -172,25 +149,39 @@ simOcean = CplSimulation(
     modelOcean;
     grid = gridOcean,
     timestepper = (method = methodOcean, timestep = Δt / nstepsOcean),
-    time        = (start = start_time, finish = end_time),
-    nsteps      = nstepsOcean,
+    time = (start = start_time, finish = end_time),
+    nsteps = nstepsOcean,
     boundary_z = boundary_mask,
-    callbacks   = callbacks,
+    callbacks = callbacks,
 )
 simAtmos = CplSimulation(
-    (Explicit(modelAtmos), Implicit(linear_modelAtmos),);
+    (Explicit(modelAtmos), Implicit(linear_modelAtmos));
     grid = gridAtmos,
     timestepper = (method = methodAtmos, timestep = Δt / nstepsAtmos),
-    time        = (start = start_time, finish = end_time),
-    nsteps      = nstepsAtmos,
+    time = (start = start_time, finish = end_time),
+    nsteps = nstepsAtmos,
     boundary_z = boundary_mask,
-    callbacks   = callbacks,
+    callbacks = callbacks,
 )
 
 ## Create a Coupler State object for holding import/export fields.
 coupler = CplState()
-coupler_register!(coupler, :SeaSurfaceTemerature, deepcopy(simOcean.state.T_sfc[simOcean.boundary]), simOcean.grid, DateTime(0), u"K") # value on top of domainA for calculating upward flux into domainB
-coupler_register!(coupler, :BoundaryEnergyFlux, deepcopy(simAtmos.state.F_ρe_accum[simAtmos.boundary]), simAtmos.grid, DateTime(0), u"J") # downward flux
+coupler_register!(
+    coupler,
+    :SeaSurfaceTemerature,
+    deepcopy(simOcean.state.T_sfc[simOcean.boundary]),
+    simOcean.grid,
+    DateTime(0),
+    u"K",
+) # value on top of domainA for calculating upward flux into domainB
+coupler_register!(
+    coupler,
+    :BoundaryEnergyFlux,
+    deepcopy(simAtmos.state.F_ρe_accum[simAtmos.boundary]),
+    simAtmos.grid,
+    DateTime(0),
+    u"J",
+) # downward flux
 
 compOcean = (pre_step = preOcean, component_model = simOcean, post_step = postOcean)
 compAtmos = (pre_step = preAtmos, component_model = simAtmos, post_step = postAtmos)
@@ -201,7 +192,7 @@ cpl_solver = CplSolver(
     coupler = coupler,
     coupling_dt = Δt,
     t0 = FT(start_time),
-    fluxlog = LogThatFlux( zeros(total_steps) , zeros(total_steps) )
+    fluxlog = LogThatFlux(zeros(total_steps), zeros(total_steps)),
 )
 
 ########
@@ -218,8 +209,8 @@ evolve!(cpl_solver, total_steps)
 fluxA = cpl_solver.fluxlog.A
 fluxB = cpl_solver.fluxlog.B
 
-fluxT = abs.(fluxA) .+ abs.(fluxB) 
+fluxT = abs.(fluxA) .+ abs.(fluxB)
 tme = collect(1:1:total_steps)
-rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1]) ]
+rel_error = [((fluxT .- fluxT[1]) / fluxT[1])]
 # plot(tme .* cpl_solver.dt, rel_error, ylabel = "rel. error = (fluxT - fluxT[1]) / fluxT[1]", xlabel = "time (s)")
 # plot(tme .* cpl_solver.dt, [(fluxA .- fluxA[1])  (fluxB .- fluxB[1]) ],  label = ["Ocean Energy" "Atmos Energy"], xlabel = "time (s)", ylabel = "J / m2")

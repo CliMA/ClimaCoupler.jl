@@ -88,7 +88,7 @@ function main(::Type{FT}) where {FT}
     )
 
     ## Grid
-    btags = ((0,0),(0,0),(1,2))
+    btags = ((0, 0), (0, 0), (1, 2))
     gridA = DiscontinuousSpectralElementGrid(ΩA; boundary_tags = btags)
     gridO = DiscontinuousSpectralElementGrid(ΩO; boundary_tags = btags)
 
@@ -103,10 +103,7 @@ function main(::Type{FT}) where {FT}
     ## 1. Atmos component
     mA = CplModel(;
         grid = gridA,
-        equations = CplTestBL(
-            bl_propA,
-            (CoupledPrimaryBoundary(), ExteriorBoundary()),
-        ),
+        equations = CplTestBL(bl_propA, (CoupledPrimaryBoundary(), ExteriorBoundary())),
         nsteps = nstepsA,
         dt = couple_dt / nstepsA,
         numerics...,
@@ -115,41 +112,35 @@ function main(::Type{FT}) where {FT}
     ## 2. Ocean component
     mO = CplModel(;
         grid = gridO,
-        equations = CplTestBL(
-            bl_propO,
-            (ExteriorBoundary(), CoupledSecondaryBoundary()),
-        ),
+        equations = CplTestBL(bl_propO, (ExteriorBoundary(), CoupledSecondaryBoundary())),
         nsteps = nstepsO,
         dt = couple_dt / nstepsO,
         numerics...,
     )
-#+
-# Create the coupler object for holding import/export fields and performs mappings
-# and instantiate the coupled timestepper:
+    #+
+    # Create the coupler object for holding import/export fields and performs mappings
+    # and instantiate the coupled timestepper:
     coupler = CplState()
     coupler_register!(coupler, :Ocean_SST, deepcopy(mO.state.θ[mO.boundary]), mO.grid, DateTime(0), u"°C")
-    coupler_register!(coupler, :Atmos_MeanAirSeaθFlux, deepcopy(mA.state.F_accum[mA.boundary]), mA.grid, DateTime(0), u"°C")
+    coupler_register!(
+        coupler,
+        :Atmos_MeanAirSeaθFlux,
+        deepcopy(mA.state.F_accum[mA.boundary]),
+        mA.grid,
+        DateTime(0),
+        u"°C",
+    )
 
     compA = (pre_step = preatmos, component_model = mA, post_step = postatmos)
     compO = (pre_step = preocean, component_model = mO, post_step = postocean)
     component_list = (atmosphere = compA, ocean = compO)
-    cpl_solver = CplSolver(
-        component_list = component_list,
-        coupler = coupler,
-        coupling_dt = couple_dt,
-        t0 = 0.0,
-    )
+    cpl_solver = CplSolver(component_list = component_list, coupler = coupler, coupling_dt = couple_dt, t0 = 0.0)
 
     return cpl_solver, callbacks
 end
 
 function run(cpl_solver, numberofsteps, cbvector)
-    solve!(
-        nothing,
-        cpl_solver;
-        numberofsteps = numberofsteps,
-        callbacks = cbvector,
-    )
+    solve!(nothing, cpl_solver; numberofsteps = numberofsteps, callbacks = cbvector)
 end
 
 # # Define `pre_step` and `post_step` functions
@@ -165,9 +156,9 @@ end
 
 function preatmos(csolver)
     mA, mO = get_components(csolver)
-    
+
     ## Set boundary SST used in atmos to SST of ocean surface at start of coupling cycle.
-    mA.discretization.state_auxiliary.θ_secondary[mA.boundary] .= 
+    mA.discretization.state_auxiliary.θ_secondary[mA.boundary] .=
         coupler_get(csolver.coupler, :Ocean_SST, mA.grid, DateTime(0), u"°C")
     ## Set atmos boundary flux accumulator to 0.
     mA.state.F_accum .= 0
@@ -188,8 +179,14 @@ function postatmos(csolver)
 
     ## Pass atmos exports to "coupler" namespace
     ## 1. Save mean θ flux at the Atmos boundary during the coupling period
-    coupler_put!(csolver.coupler, :Atmos_MeanAirSeaθFlux, mA.state.F_accum[mA.boundary] ./ csolver.dt,
-        mA.grid, DateTime(0), u"°C")
+    coupler_put!(
+        csolver.coupler,
+        :Atmos_MeanAirSeaθFlux,
+        mA.state.F_accum[mA.boundary] ./ csolver.dt,
+        mA.grid,
+        DateTime(0),
+        u"°C",
+    )
 
     @info(
         "postatmos",
@@ -197,10 +194,7 @@ function postatmos(csolver)
         total_θ_atmos = weightedsum(mA.state, 1),
         total_θ_ocean = weightedsum(mO.state, 1),
         total_F_accum = mean(mA.state.F_accum[mA.boundary]) * 1e6 * 1e6,
-        total_θ =
-            weightedsum(mA.state, 1) +
-            weightedsum(mO.state, 1) +
-            mean(mA.state.F_accum[mA.boundary]) * 1e6 * 1e6,
+        total_θ = weightedsum(mA.state, 1) + weightedsum(mO.state, 1) + mean(mA.state.F_accum[mA.boundary]) * 1e6 * 1e6,
         F_accum_max = maximum(mA.state.F_accum[mA.boundary]),
         F_avg_max = maximum(mA.state.F_accum[mA.boundary] ./ csolver.dt),
         atmos_θ_surface_max = maximum(mA.state.θ[mA.boundary]),
@@ -212,7 +206,7 @@ function preocean(csolver)
     mA, mO = get_components(csolver)
 
     ## Set mean air-sea theta flux
-    mO.discretization.state_auxiliary.F_prescribed[mO.boundary] .= 
+    mO.discretization.state_auxiliary.F_prescribed[mO.boundary] .=
         coupler_get(csolver.coupler, :Atmos_MeanAirSeaθFlux, mO.grid, DateTime(0), u"°C")
     ## Set ocean boundary flux accumulator to 0. (this isn't used)
     mO.state.F_accum .= 0
@@ -220,10 +214,8 @@ function preocean(csolver)
     @info(
         "preocean",
         time = csolver.t,
-        F_prescribed_max =
-            maximum(mO.discretization.state_auxiliary.F_prescribed[mO.boundary]),
-        F_prescribed_min =
-            maximum(mO.discretization.state_auxiliary.F_prescribed[mO.boundary]),
+        F_prescribed_max = maximum(mO.discretization.state_auxiliary.F_prescribed[mO.boundary]),
+        F_prescribed_min = maximum(mO.discretization.state_auxiliary.F_prescribed[mO.boundary]),
         ocean_θ_surface_max = maximum(mO.state.θ[mO.boundary]),
         ocean_θ_surface_min = maximum(mO.state.θ[mO.boundary]),
     )
@@ -277,11 +269,9 @@ end
 ## Create atmos component
 bl_propA = CplTestingBL.prop_defaults()
 
-bl_propA = (;bl_propA..., init_theta = atmos_init_theta, 
-            theta_shadow_boundary_flux = atmos_theta_shadow_boundary_flux)
+bl_propA = (; bl_propA..., init_theta = atmos_init_theta, theta_shadow_boundary_flux = atmos_theta_shadow_boundary_flux)
 bl_propA = (bl_propA..., init_theta = atmos_init_theta)
-bl_propA =
-    (bl_propA..., theta_shadow_boundary_flux = atmos_theta_shadow_boundary_flux)
+bl_propA = (bl_propA..., theta_shadow_boundary_flux = atmos_theta_shadow_boundary_flux)
 bl_propA = (bl_propA..., calc_kappa_diff = atmos_calc_kappa_diff)
 bl_propA = (bl_propA..., source_theta = atmos_source_theta)
 bl_propA = (bl_propA..., get_penalty_tau = atmos_get_penalty_tau)

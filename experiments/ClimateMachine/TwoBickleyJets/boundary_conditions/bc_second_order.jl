@@ -130,7 +130,7 @@ end
     ::NumericalFluxSecondOrder,
     ::Insulating,
     ::ModelSetup,
-    ::ConstantViscosity,  
+    ::ConstantViscosity,
     state⁺,
     gradflux⁺,
     hyperflux⁺,

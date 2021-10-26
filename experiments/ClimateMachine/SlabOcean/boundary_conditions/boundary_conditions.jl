@@ -2,13 +2,13 @@ abstract type AbstractBoundaryCondition end
 
 struct DefaultBC <: AbstractBoundaryCondition end
 
-Base.@kwdef struct BulkFormulaTemperature{𝒯,𝒰,𝒱} <: AbstractBoundaryCondition 
-  drag_coef_temperature::𝒯
-  drag_coef_moisture::𝒰
-  surface_temperature::𝒱
+Base.@kwdef struct BulkFormulaTemperature{𝒯, 𝒰, 𝒱} <: AbstractBoundaryCondition
+    drag_coef_temperature::𝒯
+    drag_coef_moisture::𝒰
+    surface_temperature::𝒱
 end
 
-Base.@kwdef struct CoupledPrimarySlabOceanBC{𝒯,𝒰} <: AbstractBoundaryCondition 
+Base.@kwdef struct CoupledPrimarySlabOceanBC{𝒯, 𝒰} <: AbstractBoundaryCondition
     drag_coef_temperature::𝒯
     drag_coef_moisture::𝒰
 end
@@ -39,20 +39,9 @@ function numerical_boundary_flux_first_order!(
     # project and reflect for impenetrable condition, but 
     # leave tangential component untouched
     ρu⁻ = state⁻.ρu
-    state⁺.ρu = ρu⁻ - 2n̂ ⋅ ρu⁻ .* SVector(n̂) 
+    state⁺.ρu = ρu⁻ - 2n̂ ⋅ ρu⁻ .* SVector(n̂)
 
-    numerical_flux_first_order!(
-      numerical_flux,
-      balance_law,
-      fluxᵀn,
-      n̂,
-      state⁻,
-      aux⁻,
-      state⁺,
-      aux⁺,
-      t,
-      direction,
-    )
+    numerical_flux_first_order!(numerical_flux, balance_law, fluxᵀn, n̂, state⁻, aux⁻, state⁺, aux⁺, t, direction)
 end
 
 function numerical_boundary_flux_first_order!(
@@ -87,11 +76,11 @@ function numerical_boundary_flux_first_order!(
         state1⁻,
         aux1⁻,
     )
-    
+
     E, H = calc_ocean_sfc_fluxes(model.physics, bctype, state⁻, aux⁻)
     LH_v0 = model.physics.parameters.LH_v0
 
-    fluxᵀn.ρ  -= E / LH_v0 
+    fluxᵀn.ρ -= E / LH_v0
     fluxᵀn.ρe -= E + H
     fluxᵀn.ρq -= E / LH_v0
 end
@@ -129,16 +118,13 @@ function numerical_boundary_flux_first_order!(
         state1⁻,
         aux1⁻,
     )
-    
+
     # The following will be moved the the second-order kernel (as a Neumann BC) once available
     LH_v0 = model.physics.parameters.LH_v0
     E, H = calc_ocean_sfc_fluxes(model.physics, bctype, state⁻, aux⁻) #[W/m^2]
 
-    fluxᵀn.ρ  -= E / LH_v0 
+    fluxᵀn.ρ -= E / LH_v0
     fluxᵀn.ρe -= E + H
     fluxᵀn.ρq -= E / LH_v0
 
 end
-
-
-

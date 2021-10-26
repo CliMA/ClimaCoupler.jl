@@ -19,15 +19,9 @@ end
 # Set up domain
 ########
 # A: low atmos level (troposphere)
-domainA = SphericalShell(
-    radius = FT(1), 
-    height = FT(0.2),
-)
+domainA = SphericalShell(radius = FT(1), height = FT(0.2))
 # B: high atmos level (stratosphere)
-domainB = SphericalShell(
-    radius = domainA.radius + domainA.height,
-    height = domainA.height,
-)
+domainB = SphericalShell(radius = domainA.radius + domainA.height, height = domainA.height)
 
 gridA = DiscretizedDomain(
     domainA;
@@ -48,10 +42,10 @@ gridB = DiscretizedDomain(
 ######## 
 physics = Physics(
     orientation = SphericalOrientation(),
-    advection   = NonLinearAdvection(),
-    coriolis    = DeepShellCoriolis{Float64}(Ω = parameters.Ω),
-    gravity     = Buoyancy{Float64}(α = parameters.α, g = 0.0),
-    eos         = BarotropicFluid{Float64}(ρₒ = parameters.ρₒ, cₛ = parameters.cₛ),
+    advection = NonLinearAdvection(),
+    coriolis = DeepShellCoriolis{Float64}(Ω = parameters.Ω),
+    gravity = Buoyancy{Float64}(α = parameters.α, g = 0.0),
+    eos = BarotropicFluid{Float64}(ρₒ = parameters.ρₒ, cₛ = parameters.cₛ),
 )
 
 ########
@@ -60,12 +54,12 @@ physics = Physics(
 bcsA = (
     bottom = (ρu = Impenetrable(FreeSlip()), ρθ = Insulating()),
     # top = (ρu = Impenetrable(FreeSlip()), ρθ = Insulating()), # for non-coupled testing
-    top =    (ρu = Impenetrable(FreeSlip()), ρθ = CoupledSecondaryBoundary()),
+    top = (ρu = Impenetrable(FreeSlip()), ρθ = CoupledSecondaryBoundary()),
 )
 bcsB = (
     bottom = (ρu = Impenetrable(FreeSlip()), ρθ = CoupledPrimaryBoundary()),
     # bottom = (ρu = Impenetrable(FreeSlip()), ρθ = Insulating()), #for non-coupled testing
-    top =    (ρu = Impenetrable(FreeSlip()), ρθ = Insulating()),
+    top = (ρu = Impenetrable(FreeSlip()), ρθ = Insulating()),
 )
 
 ########
@@ -75,7 +69,7 @@ modelA = ModelSetup(
     physics = physics,
     boundary_conditions = bcsA,
     initial_conditions = (ρ = ρ₀ᶜᵃʳᵗ, ρu = ρu⃗₀ᶜᵃʳᵗ, ρθ = ρθ₀ᶜᵃʳᵗA),
-    numerics = (flux = RoeNumericalFlux(),flux_second_order = PenaltyNumFluxDiffusive()),
+    numerics = (flux = RoeNumericalFlux(), flux_second_order = PenaltyNumFluxDiffusive()),
     parameters = parameters,
 )
 
@@ -83,31 +77,31 @@ modelB = ModelSetup(
     physics = physics,
     boundary_conditions = bcsB,
     initial_conditions = (ρ = ρ₀ᶜᵃʳᵗ, ρu = ρu⃗₀ᶜᵃʳᵗ, ρθ = ρθ₀ᶜᵃʳᵗB),
-    numerics = (flux = RoeNumericalFlux(),flux_second_order = PenaltyNumFluxDiffusive()),
+    numerics = (flux = RoeNumericalFlux(), flux_second_order = PenaltyNumFluxDiffusive()),
     parameters = parameters,
 )
 
 ########
 # Set up time steppers (could be done automatically in simulation)
 ########
-Δt  = min_node_distance(gridA.numerical) / parameters.cₛ * 0.25
+Δt = min_node_distance(gridA.numerical) / parameters.cₛ * 0.25
 total_steps = 10000
 start_time = 0
 end_time = Δt * total_steps#30 * 24 * 3600
 method = SSPRK22Heuns
 callbacksA = (
-  Info(),
-  CFL(),
-#   VTKState(
-#     iteration = 250,#Int(floor(6*3600/Δt)), 
-#     filepath = "./out/A/"),
+    Info(),
+    CFL(),
+    #   VTKState(
+    #     iteration = 250,#Int(floor(6*3600/Δt)), 
+    #     filepath = "./out/A/"),
 )
 callbacksB = (
-  Info(),
-  CFL(),
-#   VTKState(
-#     iteration = 250,#Int(floor(6*3600/Δt)), 
-#     filepath = "./out/B/"),
+    Info(),
+    CFL(),
+    #   VTKState(
+    #     iteration = 250,#Int(floor(6*3600/Δt)), 
+    #     filepath = "./out/B/"),
 )
 
 ########
@@ -117,25 +111,25 @@ nstepsA = 1
 nstepsB = 1
 
 epss = sqrt(eps(FT))
-boundary_mask( param_set, xc, yc, zc ) = @. abs(( xc^2 + yc^2 + zc^2 )^0.5 - domainB.radius) < epss
-    
+boundary_mask(param_set, xc, yc, zc) = @. abs((xc^2 + yc^2 + zc^2)^0.5 - domainB.radius) < epss
+
 simA = CplSimulation(
     modelA;
     grid = gridA,
     timestepper = (method = method, timestep = Δt / nstepsA),
-    time        = (start = start_time, finish = end_time),
-    nsteps      = nstepsA,
+    time = (start = start_time, finish = end_time),
+    nsteps = nstepsA,
     boundary_z = boundary_mask,
-    callbacks   = callbacksA,
+    callbacks = callbacksA,
 )
 simB = CplSimulation(
     modelB;
     grid = gridB,
     timestepper = (method = method, timestep = Δt / nstepsB),
-    time        = (start = start_time, finish = end_time),
-    nsteps      = nstepsB,
+    time = (start = start_time, finish = end_time),
+    nsteps = nstepsB,
     boundary_z = boundary_mask,
-    callbacks   = callbacksB,
+    callbacks = callbacksB,
 )
 
 ## Create a Coupler State object for holding import/export fields.
@@ -151,7 +145,7 @@ cpl_solver = CplSolver(
     coupler = coupler,
     coupling_dt = Δt,
     t0 = FT(start_time),
-    fluxlog = LogThatFlux( zeros(total_steps) , zeros(total_steps) )
+    fluxlog = LogThatFlux(zeros(total_steps), zeros(total_steps)),
 )
 
 ########
@@ -167,6 +161,6 @@ fluxA = cpl_solver.fluxlog.A
 fluxB = cpl_solver.fluxlog.B
 fluxT = fluxA .+ fluxB
 time = collect(1:1:total_steps)
-rel_error = [ ((fluxT .- fluxT[1]) / fluxT[1]) ]
+rel_error = [((fluxT .- fluxT[1]) / fluxT[1])]
 plot(time .* cpl_solver.dt, rel_error)
 #plot(time .* cpl_solver.dt, [fluxA .- fluxA[1] fluxB .- fluxB[1]])

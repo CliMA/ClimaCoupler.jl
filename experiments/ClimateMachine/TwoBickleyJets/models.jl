@@ -5,7 +5,7 @@ abstract type AbstractFluidModel <: BalanceLaw end
 """
     ModelSetup <: AbstractFluidModel
 """
-struct ModelSetup{𝒯,𝒰,𝒱,𝒲,𝒳} <: AbstractFluidModel
+struct ModelSetup{𝒯, 𝒰, 𝒱, 𝒲, 𝒳} <: AbstractFluidModel
     physics::𝒯
     boundary_conditions::𝒰
     initial_conditions::𝒱
@@ -13,13 +13,7 @@ struct ModelSetup{𝒯,𝒰,𝒱,𝒲,𝒳} <: AbstractFluidModel
     parameters::𝒳
 end
 
-function ModelSetup(;
-    physics,
-    boundary_conditions,
-    initial_conditions,
-    numerics,
-    parameters,
-)
+function ModelSetup(; physics, boundary_conditions, initial_conditions, numerics, parameters)
     return ModelSetup(
         physics,
         unpack_boundary_conditions(boundary_conditions),
@@ -34,7 +28,7 @@ end
 
     temporarily use this struct
 """
-Base.@kwdef struct DryAtmosModel{𝒯,𝒰,𝒱,𝒲,𝒳} <: AbstractFluidModel
+Base.@kwdef struct DryAtmosModel{𝒯, 𝒰, 𝒱, 𝒲, 𝒳} <: AbstractFluidModel
     physics::𝒯
     boundary_conditions::𝒰
     initial_conditions::𝒱
@@ -47,7 +41,7 @@ end
 
     temporarily use this struct
 """
-Base.@kwdef struct DryAtmosLinearModel{𝒯,𝒰,𝒱,𝒲,𝒳} <: AbstractFluidModel
+Base.@kwdef struct DryAtmosLinearModel{𝒯, 𝒰, 𝒱, 𝒲, 𝒳} <: AbstractFluidModel
     physics::𝒯
     boundary_conditions::𝒰
     initial_conditions::𝒱

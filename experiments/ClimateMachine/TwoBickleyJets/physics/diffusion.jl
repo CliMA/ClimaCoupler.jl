@@ -1,4 +1,4 @@
-abstract type AbstractDiffusion  <: AbstractPhysicsComponent end
+abstract type AbstractDiffusion <: AbstractPhysicsComponent end
 
 Base.@kwdef struct ConstantViscosity{FT} <: AbstractDiffusion
     μ::FT
@@ -6,7 +6,7 @@ Base.@kwdef struct ConstantViscosity{FT} <: AbstractDiffusion
     κ::FT
 end
 
-@inline function calc_diffusive_flux_argument!(grad, ::Nothing, _...) 
+@inline function calc_diffusive_flux_argument!(grad, ::Nothing, _...)
     grad.∇ρ = 0
     grad.∇u = @SVector [0, 0, 0]
     grad.∇θ = 0
@@ -14,7 +14,7 @@ end
     return nothing
 end
 
-@inline function calc_diffusive_flux_argument!(grad, diff::ConstantViscosity, state::Vars, aux::Vars, t::Real)  
+@inline function calc_diffusive_flux_argument!(grad, diff::ConstantViscosity, state::Vars, aux::Vars, t::Real)
     ρ = state.ρ
     ρu = state.ρu
     ρθ = state.ρθ
@@ -31,13 +31,13 @@ end
 
 @inline function calc_diffusive_flux!(gradflux, ::Nothing, _...)
     gradflux.μ∇ρ = @SVector [0, 0, 0]
-    gradflux.ν∇u = @SMatrix zeros(3,3)
+    gradflux.ν∇u = @SMatrix zeros(3, 3)
     gradflux.κ∇θ = @SVector [0, 0, 0]
 
     return nothing
 end
 
-@inline function calc_diffusive_flux!(gradflux, diff::ConstantViscosity, grad::Grad, state::Vars, aux::Vars, t::Real)  
+@inline function calc_diffusive_flux!(gradflux, diff::ConstantViscosity, grad::Grad, state::Vars, aux::Vars, t::Real)
     μ = diff.μ * I
     ν = diff.ν * I
     κ = diff.κ * I

@@ -20,8 +20,7 @@ export ExteriorBoundary
 export CoupledPrimaryBoundary, CoupledSecondaryBoundary
 
 const τ = 60 * 86400
-using ClimateMachine.BalanceLaws:
-    Auxiliary, BalanceLaw, Gradient, GradientFlux, Prognostic
+using ClimateMachine.BalanceLaws: Auxiliary, BalanceLaw, Gradient, GradientFlux, Prognostic
 
 import ClimateMachine.BalanceLaws:
     boundary_conditions,
@@ -46,8 +45,7 @@ using ClimateMachine.DGMethods.NumericalFluxes:
     NumericalFluxSecondOrder,
     RusanovNumericalFlux
 
-import ClimateMachine.DGMethods.NumericalFluxes:
-    numerical_boundary_flux_second_order!, numerical_flux_second_order!
+import ClimateMachine.DGMethods.NumericalFluxes: numerical_boundary_flux_second_order!, numerical_flux_second_order!
 
 
 using ClimateMachine.VariableTemplates
@@ -107,8 +105,7 @@ function prop_defaults()
     bl_prop = (bl_prop..., get_penalty_tau = get_penalty_tau)
 
     theta_shadow_boundary_flux(_...) = (return 0.0)
-    bl_prop =
-        (bl_prop..., theta_shadow_boundary_flux = theta_shadow_boundary_flux)
+    bl_prop = (bl_prop..., theta_shadow_boundary_flux = theta_shadow_boundary_flux)
 
     coupling_lambda(_...) = (return 0.0)
     bl_prop = (bl_prop..., coupling_lambda = coupling_lambda)
@@ -174,13 +171,7 @@ end
 """
   Initialize prognostic state variables
 """
-function init_state_prognostic!(
-    bl::l_type,
-    Q::Vars,
-    A::Vars,
-    geom::LocalGeometry,
-    FT,
-)
+function init_state_prognostic!(bl::l_type, Q::Vars, A::Vars, geom::LocalGeometry, FT)
     npt = getproperty(geom, :n)
     elnum = getproperty(geom, :e)
     x = geom.coord[1]
@@ -194,20 +185,13 @@ end
 """
   Initialize auxiliary state variables
 """
-function nodal_init_state_auxiliary!(
-    bl::l_type,
-    A::Vars,
-    tmp::Vars,
-    geom::LocalGeometry,
-    _...,
-)
+function nodal_init_state_auxiliary!(bl::l_type, A::Vars, tmp::Vars, geom::LocalGeometry, _...)
     npt = getproperty(geom, :n)
     elnum = getproperty(geom, :e)
     x = geom.coord[1]
     y = geom.coord[2]
     z = geom.coord[3]
-    A.npt, A.elnum, A.xc, A.yc, A.zc =
-        bl.bl_prop.init_aux_geom(npt, elnum, x, y, z)
+    A.npt, A.elnum, A.xc, A.yc, A.zc = bl.bl_prop.init_aux_geom(npt, elnum, x, y, z)
     A.θⁱⁿⁱᵗ = 0
     A.θ_secondary = 0
     A.F_prescribed = 0
@@ -260,19 +244,11 @@ end
 """
   Compute diffusivity tensor times computed gradient to give net gradient flux.
 """
-function compute_gradient_flux!(
-    bl::l_type,
-    GF::Vars,
-    G::Grad,
-    Q::Vars,
-    A::Vars,
-    t,
-)
+function compute_gradient_flux!(bl::l_type, GF::Vars, G::Grad, Q::Vars, A::Vars, t)
     # "Non-linear" form (for time stepped)
     ### κ¹,κ²,κ³=bl.bl_prop.calc_kappa_diff(G.∇θ,A.npt,A.elnum,A.xc,A.yc,A.zc)
     # "Linear" form (for implicit)
-    κ¹, κ², κ³ =
-        bl.bl_prop.calc_kappa_diff(G.∇θⁱⁿⁱᵗ, A.npt, A.elnum, A.xc, A.yc, A.zc)
+    κ¹, κ², κ³ = bl.bl_prop.calc_kappa_diff(G.∇θⁱⁿⁱᵗ, A.npt, A.elnum, A.xc, A.yc, A.zc)
     # Maybe I should pass both G.∇θ and G.∇θⁱⁿⁱᵗ?
     GF.κ∇θ = Diagonal(@SVector([κ¹, κ², κ³])) * G.∇θ
     nothing
@@ -281,15 +257,7 @@ end
 """
   Pass flux components for second order term into update kernel.
 """
-function flux_second_order!(
-    bl::l_type,
-    F::Grad,
-    Q::Vars,
-    GF::Vars,
-    H::Vars,
-    A::Vars,
-    t,
-)
+function flux_second_order!(bl::l_type, F::Grad, Q::Vars, GF::Vars, H::Vars, A::Vars, t)
     F.θ += GF.κ∇θ
     nothing
 end
@@ -411,9 +379,7 @@ function numerical_boundary_flux_second_order!(
     aux1⁻::Vars{A},
 ) where {S, D, A, HD}
 
-    fluxᵀn.θ =
-        (state_prognostic⁻.θ - state_auxiliary⁺.θ_secondary) *
-        balance_law.bl_prop.coupling_lambda() # W/m^2
+    fluxᵀn.θ = (state_prognostic⁻.θ - state_auxiliary⁺.θ_secondary) * balance_law.bl_prop.coupling_lambda() # W/m^2
 end
 
 

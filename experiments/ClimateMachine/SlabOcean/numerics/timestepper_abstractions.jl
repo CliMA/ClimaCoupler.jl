@@ -14,11 +14,11 @@ Base.@kwdef struct Explicit{ℳ, ℛ} <: AbstractRate
     rate::ℛ = 1
 end
 
-function Explicit(model::BalanceLaw; rate = 1) 
+function Explicit(model::BalanceLaw; rate = 1)
     return Explicit(model = model, rate = rate)
 end
 
-function Explicit(model::SpaceDiscretization; rate = 1) 
+function Explicit(model::SpaceDiscretization; rate = 1)
     return Explicit(model = model, rate = rate)
 end
 
@@ -29,11 +29,21 @@ Base.@kwdef struct Implicit{ℳ, ℛ, 𝒜} <: AbstractRate
     method::𝒜 = LinearBackwardEulerSolver(ManyColumnLU(); isadjustable = false)
 end
 
-function Implicit(model::BalanceLaw; rate = 1, adjustable = false, method = LinearBackwardEulerSolver(ManyColumnLU(), isadjustable = false)) 
+function Implicit(
+    model::BalanceLaw;
+    rate = 1,
+    adjustable = false,
+    method = LinearBackwardEulerSolver(ManyColumnLU(), isadjustable = false),
+)
     return Implicit(model = model, rate = rate, method = method)
 end
 
-function Implicit(model::SpaceDiscretization; rate = 1, adjustable = false, method = LinearBackwardEulerSolver(ManyColumnLU(), isadjustable = false)) 
+function Implicit(
+    model::SpaceDiscretization;
+    rate = 1,
+    adjustable = false,
+    method = LinearBackwardEulerSolver(ManyColumnLU(), isadjustable = false),
+)
     return Implicit(model = model, rate = rate, method = method)
 end
 
@@ -41,7 +51,7 @@ end
 function explicit(models::Tuple)
     explicit_models = []
     for model in models
-        if model isa Explicit 
+        if model isa Explicit
             push!(explicit_models, model)
         end
     end
@@ -54,7 +64,7 @@ explicit(model::BalanceLaw) = explicit(Explicit(model))
 function implicit(models::Tuple)
     explicit_models = []
     for model in models
-        if model isa Implicit 
+        if model isa Implicit
             push!(explicit_models, model)
         end
     end
@@ -70,7 +80,7 @@ function construct_odesolver(method, rhs, state, Δt; t0 = 0, split_explicit_imp
     explicit_rhs = explicit(rhs)
     implicit_rhs = implicit(rhs)
     number_implicit = length(implicit_rhs)
-    number_explicit = length(explicit_rhs) 
+    number_explicit = length(explicit_rhs)
     if (number_implicit != 0) | (number_explicit != 1)
         error_string = "Explicit methods require one (and only one) explicit model"
         error_string *= "\n for example, a tuple of the form  (Explicit(model),) or just (model,)"
@@ -80,13 +90,7 @@ function construct_odesolver(method, rhs, state, Δt; t0 = 0, split_explicit_imp
     explicit_model = explicit_rhs[1]
 
     # Instantiate time stepping method    
-    odesolver = method(
-        explicit_rhs.model,
-        state;
-        dt = Δt,
-        t0 = t0,
-        split_explicit_implicit = split_explicit_implicit
-    )
+    odesolver = method(explicit_rhs.model, state; dt = Δt, t0 = t0, split_explicit_implicit = split_explicit_implicit)
     return odesolver
 end
 
@@ -96,7 +100,7 @@ function construct_odesolver(timestepper::IMEX, rhs, state, Δt; t0 = 0, split_e
     implicit_rhs = implicit(rhs)
     explicit_rhs = explicit(rhs)
     number_implicit = length(implicit_rhs)
-    number_explicit = length(explicit_rhs) 
+    number_explicit = length(explicit_rhs)
     if (number_implicit != 1) | (number_explicit != 1)
         error_string = "IMEX methods require 1 implicit model and one explicit model"
         error_string *= "\n for example, a tuple of the form  (Explicit(model), Implicit(linear_model),)"
@@ -113,7 +117,7 @@ function construct_odesolver(timestepper::IMEX, rhs, state, Δt; t0 = 0, split_e
         state;
         dt = Δt,
         t0 = t0,
-        split_explicit_implicit = split_explicit_implicit
+        split_explicit_implicit = split_explicit_implicit,
     )
     return odesolver
 end

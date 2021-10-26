@@ -20,11 +20,11 @@ Base.@kwdef struct VTKState{T, V, C, B} <: AbstractCallback
     overwrite::B = true
 end
 
-Base.@kwdef struct TMARCallback{ℱ} <: AbstractCallback 
+Base.@kwdef struct TMARCallback{ℱ} <: AbstractCallback
     filterstates::ℱ = 6:6
 end
 
-Base.@kwdef struct ReferenceStateUpdate{ℱ} <: AbstractCallback 
+Base.@kwdef struct ReferenceStateUpdate{ℱ} <: AbstractCallback
     recompute::ℱ = 20
 end
 
@@ -34,10 +34,7 @@ function create_callbacks(simulation::Simulation, odesolver)
     if isempty(callbacks)
         return ()
     else
-        cbvector = [
-            create_callback(callback, simulation, odesolver)
-            for callback in callbacks
-        ]
+        cbvector = [create_callback(callback, simulation, odesolver) for callback in callbacks]
         return tuple(cbvector...)
     end
 end
@@ -55,10 +52,7 @@ function create_callback(::Info, simulation::Simulation, odesolver)
     mpicomm = MPI.COMM_WORLD
 
     starttime = Ref(now())
-    cbinfo = ClimateMachine.GenericCallbacks.EveryXWallTimeSeconds(
-        60,
-        mpicomm,
-    ) do (s = false)
+    cbinfo = ClimateMachine.GenericCallbacks.EveryXWallTimeSeconds(60, mpicomm) do (s = false)
         if s
             starttime[] = now()
         else
@@ -70,10 +64,7 @@ function create_callback(::Info, simulation::Simulation, odesolver)
                 norm(Q) = %.16e""",
                 ClimateMachine.ODESolvers.gettime(odesolver),
                 timeend,
-                Dates.format(
-                    convert(Dates.DateTime, Dates.now() - starttime[]),
-                    Dates.dateformat"HH:MM:SS",
-                ),
+                Dates.format(convert(Dates.DateTime, Dates.now() - starttime[]), Dates.dateformat"HH:MM:SS"),
                 energy
             )
 
@@ -92,32 +83,32 @@ function create_callback(::CFL, simulation::Simulation, odesolver)
     # mpicomm = MPI.COMM_WORLD
     # starttime = Ref(now())
     cbcfl = EveryXSimulationSteps(100) do
-            simtime = gettime(odesolver)
+        simtime = gettime(odesolver)
 
-            @views begin
-                ρ = Array(Q.data[:, 1, :])
-                ρu = Array(Q.data[:, 2, :])
-                ρv = Array(Q.data[:, 3, :])
-                ρw = Array(Q.data[:, 4, :])
-            end
-
-            u = ρu ./ ρ
-            v = ρv ./ ρ
-            w = ρw ./ ρ
-
-            # TODO! transform onto sphere
-
-            ue = extrema(u)
-            ve = extrema(v)
-            we = extrema(w)
-
-            @info @sprintf """CFL
-                    simtime = %.16e
-                    u = (%.4e, %.4e)
-                    v = (%.4e, %.4e)
-                    w = (%.4e, %.4e)
-                    """ simtime ue... ve... we...
+        @views begin
+            ρ = Array(Q.data[:, 1, :])
+            ρu = Array(Q.data[:, 2, :])
+            ρv = Array(Q.data[:, 3, :])
+            ρw = Array(Q.data[:, 4, :])
         end
+
+        u = ρu ./ ρ
+        v = ρv ./ ρ
+        w = ρw ./ ρ
+
+        # TODO! transform onto sphere
+
+        ue = extrema(u)
+        ve = extrema(v)
+        we = extrema(w)
+
+        @info @sprintf """CFL
+                simtime = %.16e
+                u = (%.4e, %.4e)
+                v = (%.4e, %.4e)
+                w = (%.4e, %.4e)
+                """ simtime ue... ve... we...
+    end
 
     return cbcfl
 end
@@ -129,19 +120,14 @@ function create_callback(callback::StateCheck, simulation::Simulation, _...)
 
     nt_freq = floor(Int, sim_length / timestep / nChecks)
 
-    cbcs_dg = ClimateMachine.StateCheck.sccreate(
-        [(simulation.state, "state")],
-        nt_freq,
-    )
+    cbcs_dg = ClimateMachine.StateCheck.sccreate([(simulation.state, "state")], nt_freq)
 
     return cbcs_dg
 end
 
 function create_callback(output::JLD2State, simulation::Simulation, odesolver)
     # Initialize output
-    output.overwrite &&
-        isfile(output.filepath) &&
-        rm(output.filepath; force = output.overwrite)
+    output.overwrite && isfile(output.filepath) && rm(output.filepath; force = output.overwrite)
 
     Q = simulation.state
     mpicomm = MPI.COMM_WORLD
@@ -158,9 +144,7 @@ function create_callback(output::JLD2State, simulation::Simulation, odesolver)
     close(file)
 
 
-    jldcallback = ClimateMachine.GenericCallbacks.EveryXSimulationSteps(
-        iteration,
-    ) do (s = false)
+    jldcallback = ClimateMachine.GenericCallbacks.EveryXSimulationSteps(iteration) do (s = false)
         steps = ClimateMachine.ODESolvers.getsteps(odesolver)
         time = ClimateMachine.ODESolvers.gettime(odesolver)
         @info steps, time
@@ -176,14 +160,12 @@ end
 
 function create_callback(output::VTKState, simulation::Simulation, odesolver)
     # Initialize output
-    output.overwrite &&
-        isfile(output.filepath) &&
-        rm(output.filepath; force = output.overwrite)
+    output.overwrite && isfile(output.filepath) && rm(output.filepath; force = output.overwrite)
     mkpath(output.filepath)
 
     state = simulation.state
     if simulation.rhs isa Tuple
-        if simulation.rhs[1] isa AbstractRate 
+        if simulation.rhs[1] isa AbstractRate
             model = simulation.rhs[1].model
         else
             model = simulation.rhs[1]
@@ -198,19 +180,12 @@ function create_callback(output::VTKState, simulation::Simulation, odesolver)
         balance_law = model.balance_law
         aux_state = model.state_auxiliary
 
-        outprefix = @sprintf(
-            "%s/mpirank%04d_step%04d",
-            output.filepath,
-            MPI.Comm_rank(mpicomm),
-            counter[1],
-        )
+        outprefix = @sprintf("%s/mpirank%04d_step%04d", output.filepath, MPI.Comm_rank(mpicomm), counter[1],)
 
         @info "doing VTK output" outprefix
 
-        state_names =
-            flattenednames(vars_state(balance_law, Prognostic(), eltype(state)))
-        aux_names =
-            flattenednames(vars_state(balance_law, Auxiliary(), eltype(state)))
+        state_names = flattenednames(vars_state(balance_law, Prognostic(), eltype(state)))
+        aux_names = flattenednames(vars_state(balance_law, Auxiliary(), eltype(state)))
 
         writevtk(outprefix, state, model, state_names, aux_state, aux_names)
 
@@ -220,13 +195,10 @@ function create_callback(output::VTKState, simulation::Simulation, odesolver)
     end
 
     do_output(output.counter, model, state)
-    cbvtk =
-        ClimateMachine.GenericCallbacks.EveryXSimulationSteps(output.iteration) do (
-            init = false
-        )
-            do_output(output.counter, model, state)
-            return nothing
-        end
+    cbvtk = ClimateMachine.GenericCallbacks.EveryXSimulationSteps(output.iteration) do (init = false)
+        do_output(output.counter, model, state)
+        return nothing
+    end
 
     return cbvtk
 end
@@ -236,18 +208,13 @@ function create_callback(filter::TMARCallback, simulation::Simulation, odesolver
     grid = simulation.grid.numerical
     tmar_filter = EveryXSimulationSteps(1) do
         Filters.apply!(Q, filter.filterstates, grid, TMARFilter())
-        end
+    end
     return tmar_filter
 end
 
 # helper function 
 
-function update_ref_state!(
-    model::DryAtmosModel,
-    state::Vars,
-    aux::Vars,
-    t::Real,
-)
+function update_ref_state!(model::DryAtmosModel, state::Vars, aux::Vars, t::Real)
     eos = model.physics.eos
     parameters = model.physics.parameters
     ρ = state.ρ
@@ -263,13 +230,13 @@ end
 function create_callback(update_ref::ReferenceStateUpdate, simulation::Simulation, odesolver)
     Q = simulation.state
     grid = simulation.grid.numerical
-    step =  update_ref.recompute
+    step = update_ref.recompute
     dg = simulation.rhs[2].model
     balance_law = dg.balance_law
 
-    relinearize = EveryXSimulationSteps(step) do       
+    relinearize = EveryXSimulationSteps(step) do
         t = gettime(odesolver)
-        
+
         update_auxiliary_state!(update_ref_state!, dg, balance_law, Q, t)
 
         α = odesolver.dt * odesolver.RKA_implicit[2, 2]

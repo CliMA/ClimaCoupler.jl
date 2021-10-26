@@ -2,15 +2,14 @@ using ClimateMachine.NumericalFluxes
 
 import ClimateMachine.NumericalFluxes: numerical_flux_first_order!
 
-struct RefanovFlux <: NumericalFluxFirstOrder end 
+struct RefanovFlux <: NumericalFluxFirstOrder end
 
-Base.@kwdef struct RoesanovFlux{S,T} <: NumericalFluxFirstOrder
+Base.@kwdef struct RoesanovFlux{S, T} <: NumericalFluxFirstOrder
     ω_roe::S = 1.0
     ω_rusanov::T = 1.0
 end
 
-roe_average(ρ⁻, ρ⁺, var⁻, var⁺) =
-    (sqrt(ρ⁻) * var⁻ + sqrt(ρ⁺) * var⁺) / (sqrt(ρ⁻) + sqrt(ρ⁺))
+roe_average(ρ⁻, ρ⁺, var⁻, var⁺) = (sqrt(ρ⁻) * var⁻ + sqrt(ρ⁺) * var⁺) / (sqrt(ρ⁻) + sqrt(ρ⁺))
 
 function numerical_flux_first_order!(
     ::RoeNumericalFlux,
@@ -37,7 +36,7 @@ function numerical_flux_first_order!(
         direction,
     )
     eos = model.physics.eos
-    parameters = model.physics.parameters 
+    parameters = model.physics.parameters
 
     # - states
     ρ⁻ = state⁻.ρ
@@ -91,13 +90,7 @@ function numerical_flux_first_order!(
 
     # fluxes!!!
     fluxᵀn.ρ -= (w1 + w2 + w3) * 0.5
-    fluxᵀn.ρu -=
-        (
-            w1 * (u - c * n⁻) +
-            w2 * (u + c * n⁻) +
-            w3 * u +
-            w4 * (Δu - Δuₙ * n⁻)
-        ) * 0.5
+    fluxᵀn.ρu -= (w1 * (u - c * n⁻) + w2 * (u + c * n⁻) + w3 * u + w4 * (Δu - Δuₙ * n⁻)) * 0.5
     fluxᵀn.ρθ -= ((w1 + w2) * θ + w5) * 0.5
 
     return nothing
@@ -132,7 +125,7 @@ function numerical_flux_first_order!(
     parameters = balance_law.physics.parameters
 
     cv_d = parameters.cv_d
-    T_0  = parameters.T_0
+    T_0 = parameters.T_0
 
     Φ = state_auxiliary⁻.Φ #Φ⁻ and Φ⁺ have the same value
     ρ⁻ = state_prognostic⁻.ρ
@@ -170,12 +163,8 @@ function numerical_flux_first_order!(
 
     fluxᵀn.ρ -= (w1 + w2 + w3) / 2
     fluxᵀn.ρu -=
-        (
-            w1 * (ũ - c̃ * normal_vector) +
-            w2 * (ũ + c̃ * normal_vector) +
-            w3 * ũ +
-            w4 * (Δu - Δuᵀn * normal_vector)
-        ) / 2
+        (w1 * (ũ - c̃ * normal_vector) + w2 * (ũ + c̃ * normal_vector) + w3 * ũ + w4 * (Δu - Δuᵀn * normal_vector)) /
+        2
     fluxᵀn.ρe -=
         (
             w1 * (h̃ - c̃ * ũᵀn) +
@@ -264,22 +253,13 @@ function numerical_flux_first_order!(
     # fluxes!!!
     ω1 = ϕ.ω_roe
     fluxᵀn.ρ -= (w1 + w2 + w3) * 0.5 * ω1
-    fluxᵀn.ρu -=
-        (
-            w1 * (u - c * n⁻) +
-            w2 * (u + c * n⁻) +
-            w3 * u +
-            w4 * (Δu - Δuₙ * n⁻)
-        ) * 0.5 * ω1
+    fluxᵀn.ρu -= (w1 * (u - c * n⁻) + w2 * (u + c * n⁻) + w3 * u + w4 * (Δu - Δuₙ * n⁻)) * 0.5 * ω1
     fluxᵀn.ρθ -= ((w1 + w2) * θ + w5) * 0.5 * ω1
-    
+
     ω2 = ϕ.ω_rusanov
     max_wavespeed = max(c⁻, c⁺)
     Δρu = ρu⁺ - ρu⁻
-    fluxᵀn.ρu -=
-        (
-            max_wavespeed * Δρu
-        ) * 0.5 * ω2
+    fluxᵀn.ρu -= (max_wavespeed * Δρu) * 0.5 * ω2
 
     return nothing
 end
@@ -361,14 +341,7 @@ numerical_flux_first_order!(::Nothing, ::DryAtmosModel, _...) = nothing
 numerical_flux_second_order!(::Nothing, ::DryAtmosModel, _...) = nothing
 numerical_boundary_flux_second_order!(::Nothing, a, ::DryAtmosModel, _...) = nothing
 
-function wavespeed(
-    model::DryAtmosModel,
-    n⁻,
-    state::Vars,
-    aux::Vars,
-    t::Real,
-    direction,
-)
+function wavespeed(model::DryAtmosModel, n⁻, state::Vars, aux::Vars, t::Real, direction)
     eos = model.physics.eos
     parameters = model.physics.parameters
     ρ = state.ρ
@@ -407,7 +380,7 @@ function numerical_flux_first_order!(
 
     eos = model.physics.eos
     parameters = model.physics.parameters
-    
+
     c⁻ = calc_ref_sound_speed(eos, state⁻, aux⁻, parameters)
     c⁺ = calc_ref_sound_speed(eos, state⁺, aux⁺, parameters)
     c = max(c⁻, c⁺)
@@ -429,7 +402,7 @@ function numerical_flux_first_order!(
     Δρe = ρe⁺ - ρe⁻
     Δρq = ρq⁺ - ρq⁻
 
-    fluxᵀn.ρ  -= c * Δρ  * 0.5
+    fluxᵀn.ρ -= c * Δρ * 0.5
     fluxᵀn.ρu -= c * Δρu * 0.5
     fluxᵀn.ρe -= c * Δρe * 0.5
     #fluxᵀn.ρq -= c * Δρq * 0.5

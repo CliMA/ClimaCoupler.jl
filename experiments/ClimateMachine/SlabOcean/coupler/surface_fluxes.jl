@@ -1,15 +1,10 @@
 
-Base.@kwdef struct FluxAccumulator{B} <: AbstractPhysicsComponent 
+Base.@kwdef struct FluxAccumulator{B} <: AbstractPhysicsComponent
     bctype::B
 end
 
-function calc_component!(
-    source,
-    accumulator::FluxAccumulator,
-    state,
-    aux,
-    physics,)
-    
+function calc_component!(source, accumulator::FluxAccumulator, state, aux, physics)
+
     # save flux in atmos source for integration in time using atmos timestepping
     if boundary_mask(physics.parameters, aux.x, aux.y, aux.z)
         E, H = calc_ocean_sfc_fluxes(physics, accumulator.bctype, state, aux)
@@ -44,7 +39,7 @@ function calc_ocean_sfc_fluxes(physics, bctype::BulkFormulaTemperature, state⁻
     # magnitude of tangential velocity (usually called speed)
     u = ρu / ρ
     speed_tangential = norm((I - n̂ ⊗ n̂) * u)
-    
+
     # sensible heat flux
     cp = calc_heat_capacity_at_constant_pressure(eos, state⁻, parameters)
     T = calc_air_temperature(eos, state⁻, aux⁻, parameters)
@@ -52,13 +47,13 @@ function calc_ocean_sfc_fluxes(physics, bctype::BulkFormulaTemperature, state⁻
 
     # latent heat flux
     q = ρq / ρ
-    q_tot_sfc  = calc_saturation_specific_humidity(ρ, T_sfc, parameters) 
+    q_tot_sfc = calc_saturation_specific_humidity(ρ, T_sfc, parameters)
     E = ρ * Cₑ * speed_tangential * LH_v0 * (q_tot_sfc - q)
 
     return E, H
 end
 
-function calc_ocean_sfc_fluxes(physics,bctype::CoupledPrimarySlabOceanBC, state⁻, aux⁻; MO_params = nothing) # should pass in the coupler state (also move to coupler), so can access states of both models derectly -e.g. callback?
+function calc_ocean_sfc_fluxes(physics, bctype::CoupledPrimarySlabOceanBC, state⁻, aux⁻; MO_params = nothing) # should pass in the coupler state (also move to coupler), so can access states of both models derectly -e.g. callback?
 
     # Apply bulks laws using the tangential velocity as energy flux
     ρ = state⁻.ρ
@@ -79,7 +74,7 @@ function calc_ocean_sfc_fluxes(physics,bctype::CoupledPrimarySlabOceanBC, state�
     # magnitude of tangential velocity (usually called speed)
     u = ρu / ρ
     speed_tangential = norm((I - n̂ ⊗ n̂) * u)
-        
+
     # sensible heat flux
     cp = calc_heat_capacity_at_constant_pressure(eos, state⁻, parameters)
     T = calc_air_temperature(eos, state⁻, aux⁻, parameters)
@@ -87,7 +82,7 @@ function calc_ocean_sfc_fluxes(physics,bctype::CoupledPrimarySlabOceanBC, state�
 
     # latent heat flux
     q = ρq / ρ
-    q_tot_sfc  = calc_saturation_specific_humidity(ρ, T_sfc, parameters) 
+    q_tot_sfc = calc_saturation_specific_humidity(ρ, T_sfc, parameters)
     E = ρ * Cₑ * speed_tangential * LH_v0 * (q_tot_sfc - q)
 
     E = isnan(E) ? zero(E) : E # set the fluxes of the non-sfc layers to 0 (otherwise NaNs if moisture) TODO: if calc_component imports BL, then could apply the FluxAccumulator on the boundary only and this line won't be needed 

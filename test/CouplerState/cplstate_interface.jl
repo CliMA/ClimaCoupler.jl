@@ -7,7 +7,7 @@ using CouplerMachine, Dates, Unitful
 
     coupler = CouplerState()
 
-    data = rand(10,10)
+    data = rand(10, 10)
     date = DateTime(2021)
     coupler_add_field!(coupler, :test1, data, nothing, date, u"kg")
     coupler_add_field!(coupler, :test2, data, nothing, date, u"km/hr")
@@ -20,7 +20,7 @@ using CouplerMachine, Dates, Unitful
         # unit conversion
         @test data .* 1000 == coupler_get(coupler, :test1, nothing, date, u"g")
         @test data .* (5 / 18) == coupler_get(coupler, :test2, nothing, date, u"m/s")
-        @test ustrip.(u"°F", data*u"°C") == coupler_get(coupler, :test3, nothing, date, u"°F")
+        @test ustrip.(u"°F", data * u"°C") == coupler_get(coupler, :test3, nothing, date, u"°F")
 
         # key not in coupler dict
         @test_throws KeyError coupler_get(coupler, :idontexist, nothing, date, u"kg")
@@ -31,7 +31,7 @@ using CouplerMachine, Dates, Unitful
     end
 
     @testset "coupler_put!" begin
-        newdata = rand(10,10)
+        newdata = rand(10, 10)
         newdate = DateTime(2022)
         coupler_put!(coupler, :test1, newdata, nothing, newdate, u"kg")
 
@@ -45,7 +45,7 @@ using CouplerMachine, Dates, Unitful
         # coupler_put! must be to a previously add_fielded field
         @test_throws KeyError coupler_put!(coupler, :idontexist, newdata, nothing, newdate, u"kg")
         # incoming data must match dimensions of add_fielded field
-        @test_throws DimensionMismatch coupler_put!(coupler, :test1, rand(10,5), nothing, newdate, u"kg")
+        @test_throws DimensionMismatch coupler_put!(coupler, :test1, rand(10, 5), nothing, newdate, u"kg")
         # incompatible units
         @test_throws Unitful.DimensionError coupler_put!(coupler, :test1, newdata, nothing, newdate, u"J/m")
         # coupler_put! updates coupler timestamp

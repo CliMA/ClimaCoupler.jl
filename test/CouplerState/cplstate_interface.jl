@@ -13,6 +13,8 @@ using CouplerMachine, Dates, Unitful
     coupler_add_field!(coupler, :test2, data, nothing, date, u"km/hr")
     coupler_add_field!(coupler, :test3, data, nothing, date, u"°C")
 
+    @show coupler
+
     @testset "coupler_get" begin
         @test data === coupler_get(coupler, :test1, nothing, date, u"kg")
         # unit conversion

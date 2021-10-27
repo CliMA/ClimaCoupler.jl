@@ -3,13 +3,12 @@ using ClimateMachine.Thermodynamics
 
 import ClimateMachine.NumericalFluxes: numerical_flux_first_order!
 
-Base.@kwdef struct RoesanovFlux{S,T} <: NumericalFluxFirstOrder
+Base.@kwdef struct RoesanovFlux{S, T} <: NumericalFluxFirstOrder
     ω_roe::S = 1.0
     ω_rusanov::T = 1.0
 end
 
-roe_average(ρ⁻, ρ⁺, var⁻, var⁺) =
-    (sqrt(ρ⁻) * var⁻ + sqrt(ρ⁺) * var⁺) / (sqrt(ρ⁻) + sqrt(ρ⁺))
+roe_average(ρ⁻, ρ⁺, var⁻, var⁺) = (sqrt(ρ⁻) * var⁻ + sqrt(ρ⁺) * var⁺) / (sqrt(ρ⁻) + sqrt(ρ⁺))
 
 function numerical_flux_first_order!(
     ::RoeNumericalFlux,
@@ -92,15 +91,9 @@ function numerical_flux_first_order!(
     w5 = abs(uₙ) * (Δρθ - θ * Δp * c⁻²)
 
     # fluxes!!!
-    
+
     fluxᵀn.ρ -= (w1 + w2 + w3) * 0.5
-    fluxᵀn.ρu -=
-        (
-            w1 * (u - c * n⁻) +
-            w2 * (u + c * n⁻) +
-            w3 * u +
-            w4 * (Δu - Δuₙ * n⁻)
-        ) * 0.5
+    fluxᵀn.ρu -= (w1 * (u - c * n⁻) + w2 * (u + c * n⁻) + w3 * u + w4 * (Δu - Δuₙ * n⁻)) * 0.5
     fluxᵀn.ρθ -= ((w1 + w2) * θ + w5) * 0.5
 
     return nothing
@@ -145,7 +138,7 @@ function numerical_flux_first_order!(
     ρe⁻ = state_prognostic⁻.ρe
 
     # ts⁻ = recover_thermo_state(balance_law, state_prognostic⁻, state_auxiliary⁻)
-    ts⁻ = PhaseDry(param_set, internal_energy(ρ⁻,ρe⁻,ρu⁻,Φ), ρ⁻) 
+    ts⁻ = PhaseDry(param_set, internal_energy(ρ⁻, ρe⁻, ρu⁻, Φ), ρ⁻)
 
     u⁻ = ρu⁻ / ρ⁻
     uᵀn⁻ = u⁻' * normal_vector
@@ -162,7 +155,7 @@ function numerical_flux_first_order!(
     # TODO: state_auxiliary⁺ is not up-to-date
     # with state_prognostic⁺ on the boundaries
     # ts⁺ = recover_thermo_state(balance_law, state_prognostic⁺, state_auxiliary⁺)
-    ts⁺ = PhaseDry(param_set, internal_energy(ρ⁺,ρe⁺,ρu⁺,Φ⁺), ρ⁺) 
+    ts⁺ = PhaseDry(param_set, internal_energy(ρ⁺, ρe⁺, ρu⁺, Φ⁺), ρ⁺)
 
     u⁺ = ρu⁺ / ρ⁺
     uᵀn⁺ = u⁺' * normal_vector
@@ -190,12 +183,8 @@ function numerical_flux_first_order!(
 
     fluxᵀn.ρ -= (w1 + w2 + w3) / 2
     fluxᵀn.ρu -=
-        (
-            w1 * (ũ - c̃ * normal_vector) +
-            w2 * (ũ + c̃ * normal_vector) +
-            w3 * ũ +
-            w4 * (Δu - Δuᵀn * normal_vector)
-        ) / 2
+        (w1 * (ũ - c̃ * normal_vector) + w2 * (ũ + c̃ * normal_vector) + w3 * ũ + w4 * (Δu - Δuᵀn * normal_vector)) /
+        2
     fluxᵀn.ρe -=
         (
             w1 * (h̃ - c̃ * ũᵀn) +
@@ -289,22 +278,13 @@ function numerical_flux_first_order!(
     # fluxes!!!
     ω1 = ϕ.ω_roe
     fluxᵀn.ρ -= (w1 + w2 + w3) * 0.5 * ω1
-    fluxᵀn.ρu -=
-        (
-            w1 * (u - c * n⁻) +
-            w2 * (u + c * n⁻) +
-            w3 * u +
-            w4 * (Δu - Δuₙ * n⁻)
-        ) * 0.5 * ω1
+    fluxᵀn.ρu -= (w1 * (u - c * n⁻) + w2 * (u + c * n⁻) + w3 * u + w4 * (Δu - Δuₙ * n⁻)) * 0.5 * ω1
     fluxᵀn.ρθ -= ((w1 + w2) * θ + w5) * 0.5 * ω1
-    
+
     ω2 = ϕ.ω_rusanov
     max_wavespeed = max(c⁻, c⁺)
     Δρu = ρu⁺ - ρu⁻
-    fluxᵀn.ρu -=
-        (
-            max_wavespeed * Δρu
-        ) * 0.5 * ω2
+    fluxᵀn.ρu -= (max_wavespeed * Δρu) * 0.5 * ω2
 
 
     return nothing

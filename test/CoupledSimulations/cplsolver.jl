@@ -34,7 +34,7 @@ dx/dt = v; dv/dt = a = F/m
     FT = Float64
 
     function exact_sol(t, k, κ, m, x1_0, x2_0)
-        ωs, ωf = sqrt(k/m), sqrt((k + 2κ)/m)
+        ωs, ωf = sqrt(k / m), sqrt((k + 2κ) / m)
         As, Af = x1_0 + x2_0, x1_0 - x2_0
         x1 = 0.5 * (As * cos.(ωs .* t) + Af * cos.(ωf .* t))
         x2 = 0.5 * (As * cos.(ωs .* t) - Af * cos.(ωf .* t))
@@ -60,14 +60,10 @@ dx/dt = v; dv/dt = a = F/m
         du[2] = (-(p.k + p.κ) * f!.v[1] + f!.F_in[1]) / p.m .+ increment * du[2] # u[2] is velocity
     end
 
-    p = (
-        k = FT(4),
-        κ = FT(2),
-        m = FT(1),
-    )
-    cdt = FT(.01)
+    p = (k = FT(4), κ = FT(2), m = FT(1))
+    cdt = FT(0.01)
     endtime = 20
-    t = 0.0:cdt*10:endtime
+    t = 0.0:(cdt * 10):endtime
     nsteps1, nsteps2 = 2, 3
 
     timestepper(f, state, nsteps) = LSRK54CarpenterKennedy(f, state, dt = cdt / nsteps, t0 = 0.0)
@@ -95,12 +91,7 @@ dx/dt = v; dv/dt = a = F/m
         comp1 = (pre_step = prestep1, component_model = mass1, post_step = poststep1)
         comp2 = (pre_step = prestep2, component_model = mass2, post_step = poststep2)
         components = (mass1 = comp1, mass2 = comp2)
-        cpl_solver = CplSolver(
-            component_list = components,
-            coupler = coupler,
-            coupling_dt = cdt,
-            t0 = 0.0,
-        )
+        cpl_solver = CplSolver(component_list = components, coupler = coupler, coupling_dt = cdt, t0 = 0.0)
 
         # set up coupler callbacks
         # cb3, cb4: record state info with time.
@@ -140,13 +131,7 @@ dx/dt = v; dv/dt = a = F/m
     end
 
     function run(cpl_solver, params, numberofsteps, cbvector)
-        solve!(
-            nothing,
-            cpl_solver,
-            params;
-            numberofsteps = numberofsteps,
-            callbacks = cbvector,
-        )
+        solve!(nothing, cpl_solver, params; numberofsteps = numberofsteps, callbacks = cbvector)
     end
 
     simulation, cbvector = main(FT)

@@ -59,13 +59,13 @@ Add a field to the coupler that is accessible with key `fieldname`.
 - `units`: units associated with the field values. Dimensionless by default.
 """
 function coupler_add_field!(
-        coupler::CouplerState,
-        fieldname::Symbol,
-        fieldvalue,
-        grid,
-        datetime::DateTime,
-        units::Unitful.Units = Unitful.NoUnits, 
-    )
+    coupler::CouplerState,
+    fieldname::Symbol,
+    fieldvalue,
+    grid,
+    datetime::DateTime,
+    units::Unitful.Units = Unitful.NoUnits,
+)
     gridinfo = CplGridInfo(nothing, nothing, nothing, nothing)
     push!(coupler.CplStateBlob, fieldname => CplFieldInfo(fieldvalue, gridinfo, units, datetime))
 end
@@ -94,8 +94,8 @@ function coupler_get(coupler::CouplerState, fieldname::Symbol, gridinfo, datetim
     cplfield = coupler.CplStateBlob[fieldname]
 
     # check that retrieving component and coupler are at same time
-    datetime != cplfield.datetime && 
-        throw(ErrorException("Retrieval time ($datetime) != coupler field time ($(cplfield.datetime))"))
+    datetime != cplfield.datetime &&
+    throw(ErrorException("Retrieval time ($datetime) != coupler field time ($(cplfield.datetime))"))
 
     regriddata = regrid(cplfield.data, gridinfo, cplfield.gridinfo)
 
@@ -122,7 +122,14 @@ Updates coupler field `fieldname` with `fieldvalue`, the field's value at time `
 `gridinfo` and `units` inform the coupler of the format of the inputted data
 allowing conversion to match the grid and units of the coupler field.
 """
-function coupler_put!(coupler::CouplerState, fieldname::Symbol, fieldvalue, gridinfo, datetime::DateTime, units::Unitful.Units)
+function coupler_put!(
+    coupler::CouplerState,
+    fieldname::Symbol,
+    fieldvalue,
+    gridinfo,
+    datetime::DateTime,
+    units::Unitful.Units,
+)
     cplfield = coupler.CplStateBlob[fieldname]
 
     # map new data to grid of coupler field; new data -> coupler grid
@@ -166,11 +173,10 @@ function Base.show(io::IO, coupler::CouplerState)
     =#
     fields = coupler.CplStateBlob
     data = Array{Any}(undef, length(fields), 4)
-    for (i,k) in enumerate( keys(coupler.CplStateBlob))
+    for (i, k) in enumerate(keys(coupler.CplStateBlob))
         entry = coupler.CplStateBlob[k]
-        data[i,:] = [k entry.units entry.datetime entry.gridinfo.gridtype]
+        data[i, :] = [k entry.units entry.datetime entry.gridinfo.gridtype]
     end
-    header = (["Field Name", "Units", "Field Time", "Grid Type"],
-                ["", "", "Y-m-d H:M:S", ""])
+    header = (["Field Name", "Units", "Field Time", "Grid Type"], ["", "", "Y-m-d H:M:S", ""])
     pretty_table(data, header = header)
 end

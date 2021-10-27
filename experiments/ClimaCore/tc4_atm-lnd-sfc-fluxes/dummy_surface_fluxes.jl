@@ -22,7 +22,8 @@ SF.surface_conditions(
     sol_type::NS.SolutionType = NS.CompactSolution(),
     tol::NS.AbstractTolerance = NS.ResidualTolerance{FT}(sqrt(eps(FT))),
     maxiter::Int = 10_000,
-) where {FT <: AbstractFloat, APS, F} = SF.surface_conditions(args..., wθ_flux_star, universal_func, sol_type, tol, maxiter)
+) where {FT <: AbstractFloat, APS, F} =
+    SF.surface_conditions(args..., wθ_flux_star, universal_func, sol_type, tol, maxiter)
 
 calculate_sfc_fluxes_energy(formulation::LinearRelaxation, p, θ_sfc, θ_1) = p.λ .* (θ_sfc .- θ_1)
 
@@ -31,7 +32,8 @@ calculate_sfc_fluxes_energy(formulation::LinearRelaxation, p, θ_sfc, θ_1) = p.
 
 - calculates momentum and sensible heat fluxes using a bulk formula with constant drag/transfer coefficients
 """
-calculate_sfc_fluxes_energy(formulation::DryBulkFormula, p, θ_sfc, θ_1, u_1, v_1, ρ_1 ) = p.Ch * p.C_p * ρ_1 * sqrt(u_1^2 + v_1^2) * (θ_sfc .- θ_1)
+calculate_sfc_fluxes_energy(formulation::DryBulkFormula, p, θ_sfc, θ_1, u_1, v_1, ρ_1) =
+    p.Ch * p.C_p * ρ_1 * sqrt(u_1^2 + v_1^2) * (θ_sfc .- θ_1)
 
 
 """
@@ -40,17 +42,17 @@ calculate_sfc_fluxes_energy(formulation::DryBulkFormula, p, θ_sfc, θ_1, u_1, v
 - calculates momentum and sensible heat fluxes using a bulk formula with constant drag/transfer coefficients
 - includes a simple representation of surface radiative fluxes with a temporal dependency
 """
-function calculate_sfc_fluxes_energy(formulation::DryBulkFormulaWithRadiation, parameters, θ_sfc, θ_1, u_1, v_1, ρ_1, t )
+function calculate_sfc_fluxes_energy(formulation::DryBulkFormulaWithRadiation, parameters, θ_sfc, θ_1, u_1, v_1, ρ_1, t)
 
     R_LW_incoming = 0.0
     p = parameters
-    R_SW = (1-p.α) * p.τ * p.F_sol * (1 .+ sin(t * 2π / p.τ_d) )
-    R_LW = p.ϵ * (p.σ * θ_sfc .^ 4 ) - R_LW_incoming
-    SH   = p.Ch * p.C_p * ρ_1 * sqrt(u_1^2 + v_1^2) * (θ_sfc - θ_1) # convert to theta!!
+    R_SW = (1 - p.α) * p.τ * p.F_sol * (1 .+ sin(t * 2π / p.τ_d))
+    R_LW = p.ϵ * (p.σ * θ_sfc .^ 4) - R_LW_incoming
+    SH = p.Ch * p.C_p * ρ_1 * sqrt(u_1^2 + v_1^2) * (θ_sfc - θ_1) # convert to theta!!
     #p_sfc = p.pₒ
     #LH   = p.lambda * p.g_w * (q_sat(θ_sfc, p_sfc) - q_a)
 
-    F_tot = - (R_SW - R_LW - SH )#- LH
+    F_tot = -(R_SW - R_LW - SH)#- LH
 end
 
 
@@ -59,23 +61,23 @@ end
 
 - calculates momentum and sensible heat fluxes using drag/transfer coefficients calculated in CliMA's `SurfaceFluxes.jl` module. This uses the Monin Obukhov theory and Nishizawa and Kitamura (2018) method for the finite volume discretization
 """
-function calculate_sfc_fluxes(formulation::DryMonin, parameters, θ_sfc, θ_1, uv_1, ρ_1, t )
+function calculate_sfc_fluxes(formulation::DryMonin, parameters, θ_sfc, θ_1, uv_1, ρ_1, t)
 
-    domain_atm  = Domains.IntervalDomain(0, parameters.atmos_Lz, x3boundary = (:bottom, :top))
-    mesh_atm = Meshes.IntervalMesh(domain_atm, nelems = parameters.atmos_Nz) 
-    center_space_atm = Spaces.CenterFiniteDifferenceSpace(mesh_atm) 
+    domain_atm = Domains.IntervalDomain(0, parameters.atmos_Lz, x3boundary = (:bottom, :top))
+    mesh_atm = Meshes.IntervalMesh(domain_atm, nelems = parameters.atmos_Nz)
+    center_space_atm = Spaces.CenterFiniteDifferenceSpace(mesh_atm)
     z_centers = Fields.coordinate_field(center_space_atm)
     z_in = parent(z_centers)[1]
-    
+
     windspeed_1 = LinearAlgebra.norm(uv_1)
     p = parameters
 
     z_0m = 1e-5 # eventually DryMonin.z_0m? (use cases: where atmos will get it with prescribed land, or vice versa, or coupled)
     z_0c = z_0m # z_0c = function(z0m, ustar...) eventually
     z_0 = [z_0m, z_0c]
-    x_in = [windspeed_1, θ_1] 
-    
-    x_s = [windspeed_1* 0.0 , θ_sfc] # we are assuming θ_sfc = T(-\Delta z).
+    x_in = [windspeed_1, θ_1]
+
+    x_s = [windspeed_1 * 0.0, θ_sfc] # we are assuming θ_sfc = T(-\Delta z).
     θ_basic = deepcopy(θ_1) # for buoyancy calculation
 
     # Initial guesses for MO parameters, these should be a function of state.
@@ -99,14 +101,12 @@ function calculate_sfc_fluxes(formulation::DryMonin, parameters, θ_sfc, θ_1, u
     C_exchange = output.C_exchange
     Cd = C_exchange[1] # Cd
     Ch = C_exchange[2] # Ch
-    
+
     # upward sensible potential temperature flux
-    SH   = Ch * ρ_1 * windspeed_1 * (θ_1 - θ_sfc)
+    SH = Ch * ρ_1 * windspeed_1 * (θ_1 - θ_sfc)
 
     # wind stress
     τ = Geometry.Cartesian3Vector(Cd * windspeed_1) ⊗ uv_1
 
-    fluxes = (τ = τ, SH = SH, )
+    fluxes = (τ = τ, SH = SH)
 end
-
-

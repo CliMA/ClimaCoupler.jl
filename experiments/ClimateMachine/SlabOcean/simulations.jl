@@ -2,7 +2,7 @@ using ClimateMachine.Mesh.Grids: _x1, _x2, _x3, VerticalDirection
 
 abstract type AbstractSimulation end
 
-struct Simulation{𝒯,𝒰,𝒱,𝒲,𝒳,𝒴,L} <: AbstractSimulation
+struct Simulation{𝒯, 𝒰, 𝒱, 𝒲, 𝒳, 𝒴, L} <: AbstractSimulation
     model::𝒯
     grid::L
     timestepper::𝒰
@@ -14,30 +14,30 @@ end
 
 function Simulation(model::ModelSetup; grid, timestepper, time, callbacks)
     rhs = DGModel(
-        model, 
+        model,
         grid.numerical,
         model.numerics.flux,
         CentralNumericalFluxSecondOrder(),
         CentralNumericalFluxGradient(),
-    ) 
+    )
 
     FT = eltype(rhs.grid.vgeo)
     state = init_ode_state(rhs, FT(0); init_on_cpu = true)
-    
+
     return Simulation(model, grid, timestepper, time, callbacks, rhs, state)
 end
 
 function Simulation(model::DryAtmosModel; grid, timestepper, time, callbacks)
     rhs = ESDGModel(
-        model, 
+        model,
         grid.numerical,
         surface_numerical_flux_first_order = model.numerics.flux,
         volume_numerical_flux_first_order = KGVolumeFlux(),
-    ) 
+    )
 
     FT = eltype(rhs.grid.vgeo)
     state = init_ode_state(rhs, FT(0); init_on_cpu = true)
-    
+
     return Simulation(model, grid, timestepper, time, callbacks, rhs, state)
 end
 
@@ -68,11 +68,11 @@ function Simulation(model::Tuple; grid, timestepper, time, callbacks)
 
     FT = eltype(rhs[1].grid.vgeo)
     state = init_ode_state(rhs[1], FT(0); init_on_cpu = true)
-    
+
     return Simulation(model, grid, timestepper, time, callbacks, rhs, state)
 end
 
-struct CplSimulation{𝒯,𝒰,𝒱,𝒲,𝒳,𝒴,L,B, CBV} <: AbstractSimulation
+struct CplSimulation{𝒯, 𝒰, 𝒱, 𝒲, 𝒳, 𝒴, L, B, CBV} <: AbstractSimulation
     model::𝒯
     grid::L
     odesolver::𝒰
@@ -87,28 +87,28 @@ end
 
 function CplSimulation(model; grid, timestepper, time, boundary_z = nothing, nsteps, callbacks)
     rhs = DGModel(
-        model, 
+        model,
         grid.numerical,
         model.numerics.flux,
         model.numerics.flux_second_order,
         CentralNumericalFluxGradient(),
         direction = model.numerics.direction,
-    ) 
+    )
 
     FT = eltype(rhs.grid.vgeo)
     state = init_ode_state(rhs, FT(0); init_on_cpu = true)
     param_set = model.physics.parameters
-    
+
     xc = grid.numerical.vgeo[:, _x1:_x1, :]
     yc = grid.numerical.vgeo[:, _x2:_x2, :]
     zc = grid.numerical.vgeo[:, _x3:_x3, :]
 
-    boundary(boundary_z, xc, yc, zc) = isnothing(boundary_z) ? zc .^2 .< eps(FT) : boundary_z( parameters, xc, yc, zc )
+    boundary(boundary_z, xc, yc, zc) = isnothing(boundary_z) ? zc .^ 2 .< eps(FT) : boundary_z(parameters, xc, yc, zc)
     boundary = boundary(boundary_z, xc, yc, zc)
 
     simulation = Simulation(model, grid, timestepper, time, callbacks, rhs, state)
-    t0            = simulation.time.start
-    Δt            = timestepper.timestep
+    t0 = simulation.time.start
+    Δt = timestepper.timestep
 
     # Instantiate time stepping method    
     odesolver = timestepper.method(rhs, state, dt = Δt, t0 = t0)
@@ -123,7 +123,7 @@ function CplSimulation(model::Tuple; grid, timestepper, time, boundary_z = nothi
     rhs = []
     for item in model
         if item isa Explicit
-            println("constructing explicit model") 
+            println("constructing explicit model")
             if item.model isa DryAtmosModel
                 tmp = Explicit(ESDGModel(
                     item.model,
@@ -146,7 +146,7 @@ function CplSimulation(model::Tuple; grid, timestepper, time, boundary_z = nothi
             push!(rhs, tmp)
         elseif item isa Implicit
             println("constructing implicit models")
-            if item.model isa DryAtmosModel 
+            if item.model isa DryAtmosModel
                 tmp = Implicit(VESDGModel(
                     item.model,
                     grid.numerical,
@@ -174,16 +174,16 @@ function CplSimulation(model::Tuple; grid, timestepper, time, boundary_z = nothi
     yc = grid.numerical.vgeo[:, _x2:_x2, :]
     zc = grid.numerical.vgeo[:, _x3:_x3, :]
 
-    boundary(boundary_z, xc, yc, zc) = isnothing(boundary_z) ? zc .^2 .< eps(FT) : boundary_z( parameters, xc, yc, zc )
+    boundary(boundary_z, xc, yc, zc) = isnothing(boundary_z) ? zc .^ 2 .< eps(FT) : boundary_z(parameters, xc, yc, zc)
     boundary = boundary(boundary_z, xc, yc, zc)
 
     FT = eltype(grid.numerical.vgeo)
     state = init_ode_state(rhs[1].model, FT(0); init_on_cpu = true)
 
     simulation = Simulation(model[1].model, grid, timestepper, time, callbacks, rhs, state)
-    t0            = simulation.time.start
-    tend          = simulation.time.finish
-    Δt            = timestepper.timestep
+    t0 = simulation.time.start
+    tend = simulation.time.finish
+    Δt = timestepper.timestep
 
     # Instantiate time stepping method    
     odesolver = timestepper.method.method(
@@ -205,9 +205,9 @@ end
 function initialize!(simulation::Simulation; overwrite = false)
     if overwrite
         simulation = Simulation(
-            model = simulation.model, 
-            timestepper = simulation.timestepper, 
-            time = simulation.time, 
+            model = simulation.model,
+            timestepper = simulation.timestepper,
+            time = simulation.time,
             callbacks = simulation.callbacks,
         )
     end
@@ -219,8 +219,8 @@ function evolve!(simulation::Simulation; refDat = ())
     # Unpack everything we need in this routine here
     timestepper = simulation.timestepper
     state = simulation.state
-    rhs   = simulation.rhs
-    grid  = simulation.grid
+    rhs = simulation.rhs
+    grid = simulation.grid
 
     npoly = convention(grid.resolution.polynomial_order, Val(ndims(grid.domain)))
 
@@ -252,24 +252,19 @@ function evolve!(simulation::Simulation; refDat = ())
     if isempty(cbvector)
         solve!(state, odesolver; timeend = tend)
     else
-        solve!(
-            state,
-            odesolver;
-            timeend = tend,
-            callbacks = cbvector,
-        )
+        solve!(state, odesolver; timeend = tend, callbacks = cbvector)
     end
 
     # Check results against reference if StateCheck callback is used
     # TODO: TB: I don't think this should live within this function
     if any(typeof.(simulation.callbacks) .<: StateCheck)
-      check_inds = findall(typeof.(simulation.callbacks) .<: StateCheck)
-      @assert length(check_inds) == 1 "Only use one StateCheck in callbacks!"
+        check_inds = findall(typeof.(simulation.callbacks) .<: StateCheck)
+        @assert length(check_inds) == 1 "Only use one StateCheck in callbacks!"
 
-      ClimateMachine.StateCheck.scprintref(cbvector[check_inds[1]])
-      if length(refDat) > 0
-        @test ClimateMachine.StateCheck.scdocheck(cbvector[check_inds[1]], refDat)
-      end
+        ClimateMachine.StateCheck.scprintref(cbvector[check_inds[1]])
+        if length(refDat) > 0
+            @test ClimateMachine.StateCheck.scdocheck(cbvector[check_inds[1]], refDat)
+        end
     end
 
     return nothing
@@ -317,24 +312,24 @@ function rhs_closure(rhs, npoly, nover; staggering = false)
             overintegration_filter!(state_array, rhs, npoly, nover)
             return nothing
         end
-        
+
         rhs_filtered = rhs_unstaggered
     end
 
-    return rhs_filtered 
+    return rhs_filtered
 end # returns a closure
 
 function evolve!(simulation::Simulation{<:Tuple}; refDat = ())
     # Unpack everything we need in this routine here
-    model         = simulation.model[1]
-    state         = simulation.state
-    rhs           = simulation.rhs
-    grid          = simulation.grid.numerical
-    timestepper   = simulation.timestepper
-    t0            = simulation.time.start
-    tend          = simulation.time.finish
-    Δt            = timestepper.timestep
-    
+    model = simulation.model[1]
+    state = simulation.state
+    rhs = simulation.rhs
+    grid = simulation.grid.numerical
+    timestepper = simulation.timestepper
+    t0 = simulation.time.start
+    tend = simulation.time.finish
+    Δt = timestepper.timestep
+
     # Instantiate time stepping method    
     odesolver = timestepper.method(
         rhs[1],
@@ -353,25 +348,19 @@ function evolve!(simulation::Simulation{<:Tuple}; refDat = ())
     if isempty(cbvector)
         solve!(state, odesolver; timeend = tend, adjustfinalstep = false)
     else
-        solve!(
-            state,
-            odesolver;
-            timeend = tend,
-            callbacks = cbvector,
-            adjustfinalstep = false,
-        )
+        solve!(state, odesolver; timeend = tend, callbacks = cbvector, adjustfinalstep = false)
     end
 
     # Check results against reference if StateCheck callback is used
     # TODO: TB: I don't think this should live within this function
     if any(typeof.(simulation.callbacks) .<: StateCheck)
-      check_inds = findall(typeof.(simulation.callbacks) .<: StateCheck)
-      @assert length(check_inds) == 1 "Only use one StateCheck in callbacks!"
+        check_inds = findall(typeof.(simulation.callbacks) .<: StateCheck)
+        @assert length(check_inds) == 1 "Only use one StateCheck in callbacks!"
 
-      ClimateMachine.StateCheck.scprintref(cbvector[check_inds[1]])
-      if length(refDat) > 0
-        @test ClimateMachine.StateCheck.scdocheck(cbvector[check_inds[1]], refDat)
-      end
+        ClimateMachine.StateCheck.scprintref(cbvector[check_inds[1]])
+        if length(refDat) > 0
+            @test ClimateMachine.StateCheck.scdocheck(cbvector[check_inds[1]], refDat)
+        end
     end
 
     return nothing
@@ -383,12 +372,7 @@ function overintegration_filter!(state_array, rhs, npoly, nover)
         cutoff = MassPreservingCutoffFilter(rhs.grid, cutoff_order)
         num_state_prognostic = number_states(rhs.balance_law, Prognostic())
         filterstates = 1:num_state_prognostic
-        ClimateMachine.Mesh.Filters.apply!(
-            state_array,
-            filterstates,
-            rhs.grid,
-            cutoff,
-        ) 
+        ClimateMachine.Mesh.Filters.apply!(state_array, filterstates, rhs.grid, cutoff)
     end
 
     return nothing
@@ -400,13 +384,8 @@ function staggering_filter!(state_array, rhs, npoly, nover)
         cutoff = MassPreservingCutoffFilter(rhs.grid, cutoff_order)
         num_state_prognostic = number_states(rhs.balance_law, Prognostic())
         filterstates = 2:4
-        ClimateMachine.Mesh.Filters.apply!(
-            state_array,
-            filterstates,
-            rhs.grid,
-            cutoff,
-        )
-       
+        ClimateMachine.Mesh.Filters.apply!(state_array, filterstates, rhs.grid, cutoff)
+
     end
 
     return nothing

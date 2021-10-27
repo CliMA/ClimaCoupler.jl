@@ -1,4 +1,4 @@
-abstract type AbstractDiffusion  <: AbstractPhysicsComponent end
+abstract type AbstractDiffusion <: AbstractPhysicsComponent end
 
 struct ConstantViscosity{𝒯} <: AbstractDiffusion end
 

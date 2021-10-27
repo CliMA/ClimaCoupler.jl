@@ -24,8 +24,7 @@ using ClimateMachine.Orientations
 using ClimateMachine.VTK
 
 # to be removed
-using ClimateMachine.GenericCallbacks:
-    EveryXWallTimeSeconds, EveryXSimulationSteps
+using ClimateMachine.GenericCallbacks: EveryXWallTimeSeconds, EveryXSimulationSteps
 using ClimateMachine.Thermodynamics: soundspeed_air
 using ClimateMachine.VariableTemplates: flattenednames
 

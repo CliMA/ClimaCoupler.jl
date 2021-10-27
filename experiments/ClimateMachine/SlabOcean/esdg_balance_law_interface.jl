@@ -1,21 +1,20 @@
 import ClimateMachine.BalanceLaws:
-    # declaration
+# declaration
     vars_state,
-    # initialization
+# initialization
     nodal_init_state_auxiliary!,
     init_state_prognostic!,
     init_state_auxiliary!,
-    # rhs computation
+# rhs computation
     compute_gradient_argument!,
     compute_gradient_flux!,
     flux_first_order!,
     flux_second_order!,
     source!,
-    # boundary conditions
+# boundary conditions
     boundary_conditions,
     boundary_state!
-import ClimateMachine.NumericalFluxes:
-    numerical_boundary_flux_first_order!
+import ClimateMachine.NumericalFluxes: numerical_boundary_flux_first_order!
 
 struct DryReferenceState{TP}
     temperature_profile::TP
@@ -57,13 +56,7 @@ end
     (e.g., prognostic, auxiliary, etc.), however it seems to not initialized
     the gradient flux variables by default.
 """
-function init_state_prognostic!(
-        model::DryAtmosModel,
-        state::Vars,
-        aux::Vars,
-        localgeo,
-        t
-    )
+function init_state_prognostic!(model::DryAtmosModel, state::Vars, aux::Vars, localgeo, t)
     x = aux.x
     y = aux.y
     z = aux.z
@@ -73,23 +66,18 @@ function init_state_prognostic!(
 
     # TODO!: Set to 0 by default or assign IC
     if !isnothing(ic)
-        state.ρ  = ic.ρ(parameters, x, y, z)
+        state.ρ = ic.ρ(parameters, x, y, z)
         state.ρu = ic.ρu(parameters, x, y, z)
         state.ρe = ic.ρe(parameters, x, y, z)
         state.ρq = ic.ρq(parameters, x, y, z)
     end
 
-    state.F_ρe_accum = 0    
+    state.F_ρe_accum = 0
 
     return nothing
 end
 
-function nodal_init_state_auxiliary!(
-    model::DryAtmosModel,
-    state_auxiliary,
-    tmp,
-    geom,
-)
+function nodal_init_state_auxiliary!(model::DryAtmosModel, state_auxiliary, tmp, geom)
     init_state_auxiliary!(model, model.physics.orientation, state_auxiliary, geom)
     init_state_auxiliary!(model, model.physics.ref_state, state_auxiliary, geom)
 
@@ -97,12 +85,7 @@ function nodal_init_state_auxiliary!(
     state_auxiliary.T_sfc = FT(0) # otherwise can get NaNs if only the boundary of the MPIStateArray is allocated
 end
 
-function init_state_auxiliary!(
-    model::DryAtmosModel,
-    ::SphericalOrientation,
-    state_auxiliary,
-    geom,
-)
+function init_state_auxiliary!(model::DryAtmosModel, ::SphericalOrientation, state_auxiliary, geom)
     g = model.physics.parameters.g
 
     r = norm(geom.coord)
@@ -113,16 +96,11 @@ function init_state_auxiliary!(
     state_auxiliary.∇Φ = g * geom.coord / r
 end
 
-function init_state_auxiliary!(
-    model::DryAtmosModel,
-    ::FlatOrientation,
-    state_auxiliary,
-    geom,
-)
+function init_state_auxiliary!(model::DryAtmosModel, ::FlatOrientation, state_auxiliary, geom)
     g = model.physics.parameters.g
 
     FT = eltype(state_auxiliary)
-    
+
     r = geom.coord[3]
     state_auxiliary.x = geom.coord[1]
     state_auxiliary.y = geom.coord[2]
@@ -131,56 +109,39 @@ function init_state_auxiliary!(
     state_auxiliary.∇Φ = SVector{3, FT}(0, 0, g)
 end
 
-function init_state_auxiliary!(
-    ::DryAtmosModel,
-    ::NoReferenceState,
-    state_auxiliary,
-    geom,
-) end
+function init_state_auxiliary!(::DryAtmosModel, ::NoReferenceState, state_auxiliary, geom) end
 
-function init_state_auxiliary!(
-    model::DryAtmosModel,
-    ref_state::DryReferenceState,
-    state_auxiliary,
-    geom,
-)
-    orientation = model.physics.orientation   
-    R_d         = model.physics.parameters.R_d
-    γ           = model.physics.parameters.γ
-    Φ           = state_auxiliary.Φ
+function init_state_auxiliary!(model::DryAtmosModel, ref_state::DryReferenceState, state_auxiliary, geom)
+    orientation = model.physics.orientation
+    R_d = model.physics.parameters.R_d
+    γ = model.physics.parameters.γ
+    Φ = state_auxiliary.Φ
 
     FT = eltype(state_auxiliary)
 
     # Calculation of a dry reference state
     z = altitude(model, orientation, geom)
     T, p = ref_state.temperature_profile(model.physics.parameters, z)
-    ρ  = p / R_d / T
+    ρ = p / R_d / T
     ρu = SVector{3, FT}(0, 0, 0)
     ρe = p / (γ - 1) + dot(ρu, ρu) / 2ρ + ρ * Φ
     ρq = FT(0)
 
-    state_auxiliary.ref_state.T  = T
-    state_auxiliary.ref_state.p  = p
-    state_auxiliary.ref_state.ρ  = ρ
+    state_auxiliary.ref_state.T = T
+    state_auxiliary.ref_state.p = p
+    state_auxiliary.ref_state.ρ = ρ
     state_auxiliary.ref_state.ρu = ρu
     state_auxiliary.ref_state.ρe = ρe
-    state_auxiliary.ref_state.ρq = ρq    
+    state_auxiliary.ref_state.ρq = ρq
 end
 
 """
     LHS computations
 """
-@inline function flux_first_order!(
-    model::DryAtmosModel,
-    flux::Grad,
-    state::Vars,
-    aux::Vars,
-    t::Real,
-    direction,
-)
+@inline function flux_first_order!(model::DryAtmosModel, flux::Grad, state::Vars, aux::Vars, t::Real, direction)
     lhs = model.physics.lhs
     physics = model.physics
-    
+
     ntuple(Val(length(lhs))) do s
         Base.@_inline_meta
         calc_component!(flux, lhs[s], state, aux, physics)
@@ -190,13 +151,7 @@ end
 """
     RHS computations
 """
-function source!(
-    model::DryAtmosModel, 
-    source, 
-    state_prognostic, 
-    state_auxiliary, 
-    _...
-)
+function source!(model::DryAtmosModel, source, state_prognostic, state_auxiliary, _...)
     sources = model.physics.sources
     physics = model.physics
 
@@ -212,7 +167,7 @@ end
 """
 boundary_conditions(model::DryAtmosModel) = model.boundary_conditions
 
-function boundary_state!(::CentralNumericalFluxSecondOrder,_...)
+function boundary_state!(::CentralNumericalFluxSecondOrder, _...)
     nothing
 end
 

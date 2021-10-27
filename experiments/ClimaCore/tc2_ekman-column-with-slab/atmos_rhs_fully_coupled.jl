@@ -32,7 +32,7 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
 
     UnPack.@unpack Cd, f, ν, ug, vg, C_p, MSLP, R_d, R_m, C_v, grav = parameters
 
-    (Yc, Yf, _ ) = Y.x
+    (Yc, Yf, _) = Y.x
     (dYc, dYf, dF_sfc) = dY.x
     UnPack.@unpack ρ, u, v, ρθ = Yc
     UnPack.@unpack w = Yf
@@ -51,42 +51,42 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     u_wind = sqrt(u_1^2 + v_1^2)
 
     # surface flux calculations 
-    F_sfc = - calculate_sfc_fluxes_energy(DryBulkFormulaWithRadiation(), parameters, T_sfc[1], θ_1 , u_1, v_1, ρ_1, t ) # W / m2
-    dY.x[3] .= - F_sfc[1]
+    F_sfc = -calculate_sfc_fluxes_energy(DryBulkFormulaWithRadiation(), parameters, T_sfc[1], θ_1, u_1, v_1, ρ_1, t) # W / m2
+    dY.x[3] .= -F_sfc[1]
 
     # density (centers)
     gradc2f = Operators.GradientC2F()
     gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(0.0), top = Operators.SetValue(0.0))
 
     If = Operators.InterpolateC2F(bottom = Operators.Extrapolate(), top = Operators.Extrapolate())
-    @. dρ = gradf2c( -w * If(ρ) ) # Eq. 4.11
+    @. dρ = gradf2c(-w * If(ρ)) # Eq. 4.11
 
     # potential temperature (centers)
     gradc2f = Operators.GradientC2F()
-    gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(F_sfc), top = Operators.SetValue(0.0)) 
+    gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(F_sfc), top = Operators.SetValue(0.0))
 
-    @. dρθ = gradf2c( -w * If(ρθ) + ν * gradc2f(ρθ/ρ) ) 
+    @. dρθ = gradf2c(-w * If(ρθ) + ν * gradc2f(ρθ / ρ))
     # u velocity (centers)
-    gradc2f = Operators.GradientC2F(top = Operators.SetValue(ug)) 
+    gradc2f = Operators.GradientC2F(top = Operators.SetValue(ug))
     gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(Cd * u_wind * u_1))
-    
+
     A = Operators.AdvectionC2C(bottom = Operators.SetValue(0.0), top = Operators.SetValue(0.0))
-    @. du = gradf2c(ν * gradc2f(u)) + f * (v - vg) - A(w, u) 
+    @. du = gradf2c(ν * gradc2f(u)) + f * (v - vg) - A(w, u)
 
     # v velocity (centers)
-    gradc2f = Operators.GradientC2F(top = Operators.SetValue(vg)) 
-    gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(Cd * u_wind * v_1)) 
+    gradc2f = Operators.GradientC2F(top = Operators.SetValue(vg))
+    gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(Cd * u_wind * v_1))
 
     A = Operators.AdvectionC2C(bottom = Operators.SetValue(0.0), top = Operators.SetValue(0.0))
-    @. dv = gradf2c(ν * gradc2f(v)) - f * (u - ug) - A(w, v) 
+    @. dv = gradf2c(ν * gradc2f(v)) - f * (u - ug) - A(w, v)
 
     # w velocity (faces)
     gradc2f = Operators.GradientC2F()
     gradf2c = Operators.GradientF2C(bottom = Operators.SetValue(0.0), top = Operators.SetValue(0.0))
 
     B = Operators.SetBoundaryOperator(bottom = Operators.SetValue(0.0), top = Operators.SetValue(0.0))
-    Π(ρθ) = C_p .* (R_d .* ρθ ./ MSLP).^(R_m ./ C_v) ## This should be R_d/ C_p (but needs stabilising...reported to original developer)
-    @. dw = B( -(If(ρθ / ρ) * gradc2f(Π(ρθ))) - grav + gradc2f(ν * gradf2c(w)) - w * If(gradf2c(w))) 
+    Π(ρθ) = C_p .* (R_d .* ρθ ./ MSLP) .^ (R_m ./ C_v) ## This should be R_d/ C_p (but needs stabilising...reported to original developer)
+    @. dw = B(-(If(ρθ / ρ) * gradc2f(Π(ρθ))) - grav + gradc2f(ν * gradf2c(w)) - w * If(gradf2c(w)))
     return dY
 
 end

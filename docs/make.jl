@@ -12,6 +12,7 @@ const OUTPUT_DIR = joinpath(@__DIR__, "src/generated")
 tutorial_dir = joinpath(EXPERIMENTS_DIR, "ClimaCore/tc1_heat-diffusion-with-slab/")
 tutorial_name = "run.jl"
 Pkg.activate(tutorial_dir)
+Pkg.instantiate()
 include(joinpath(tutorial_dir, tutorial_name))
 Literate.markdown(joinpath(tutorial_dir, tutorial_name), OUTPUT_DIR; execute = true, documenter = false)
 

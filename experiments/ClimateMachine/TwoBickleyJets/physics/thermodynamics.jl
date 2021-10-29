@@ -1,32 +1,32 @@
-abstract type AbstractEquationOfState  <: AbstractPhysicsComponent end
+abstract type AbstractEquationOfState <: AbstractPhysicsComponent end
 
 Base.@kwdef struct BarotropicFluid{FT} <: AbstractEquationOfState
-    ρₒ :: FT
-    cₛ :: FT
+    ρₒ::FT
+    cₛ::FT
 end
 
 Base.@kwdef struct DryIdealGas{FT} <: AbstractEquationOfState
-    R  :: FT
-    pₒ :: FT
-    γ  :: FT
+    R::FT
+    pₒ::FT
+    γ::FT
 end
 
 # Energy Prognostic Cases, perhaps abstract type 
 
 Base.@kwdef struct TotalEnergy{FT} <: AbstractEquationOfState
-    γ  :: FT
+    γ::FT
 end
 
 Base.@kwdef struct DryEuler{FT} <: AbstractEquationOfState
-    γ  :: FT
+    γ::FT
 end
 
 Base.@kwdef struct LinearizedTotalEnergy{FT} <: AbstractEquationOfState
-    γ  :: FT
+    γ::FT
 end
 
 Base.@kwdef struct LinearizedDryEuler{FT} <: AbstractEquationOfState
-    γ  :: FT
+    γ::FT
 end
 
 # Linearized Equation of States
@@ -37,20 +37,20 @@ linearize(eos::DryEuler) = LinearizedDryEuler(eos.γ)
   Thermodynamic relationships
 """
 
-@inline function calc_pressure(eos::BarotropicFluid, state) 
-    cₛ = eos.cₛ 
+@inline function calc_pressure(eos::BarotropicFluid, state)
+    cₛ = eos.cₛ
     ρₒ = eos.ρₒ
     ρ = state.ρ
-    
+
     return (cₛ * ρ)^2 / (2 * ρₒ)
 end
 
 @inline function calc_sound_speed(eos::BarotropicFluid, state)
-    cₛ = eos.cₛ 
+    cₛ = eos.cₛ
     ρₒ = eos.ρₒ
     ρ = state.ρ
-    
-    return cₛ * sqrt(ρ / ρₒ) 
+
+    return cₛ * sqrt(ρ / ρₒ)
 end
 
 @inline function calc_pressure(eos::DryIdealGas, state)
@@ -75,9 +75,9 @@ end
 Modified Maciek's world
 """
 @inline function calc_pressure(eos::TotalEnergy, state, aux)
-    γ  = eos.γ
-    Φ  = aux.Φ
-    ρ  = state.ρ
+    γ = eos.γ
+    Φ = aux.Φ
+    ρ = state.ρ
     ρe = state.ρe
     ρu = state.ρu
     return (γ - 1) * (ρe - dot(ρu, ρu) / 2ρ - ρ * Φ)
@@ -90,9 +90,9 @@ end
 end
 
 @inline function calc_pressure(eos::LinearizedTotalEnergy, state, aux)
-    γ  = eos.γ
-    Φ  = aux.Φ
-    ρ  = state.ρ
+    γ = eos.γ
+    Φ = aux.Φ
+    ρ = state.ρ
     ρe = state.ρe
     return (γ - 1) * (ρe - ρ * Φ)
 end
@@ -104,8 +104,8 @@ end
 end
 
 @inline function calc_pressure(eos::DryEuler, state, aux)
-    γ  = eos.γ
-    ρ  = state.ρ
+    γ = eos.γ
+    ρ = state.ρ
     ρe = state.ρe
     ρu = state.ρu
     return (γ - 1) * (ρe - dot(ρu, ρu) / 2ρ)
@@ -118,7 +118,7 @@ end
 end
 
 @inline function calc_pressure(eos::LinearizedDryEuler, state, aux)
-    γ  = eos.γ
+    γ = eos.γ
     ρe = state.ρe
     return (γ - 1) * ρe
 end

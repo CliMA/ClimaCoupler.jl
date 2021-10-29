@@ -1,17 +1,17 @@
 import ClimateMachine.BalanceLaws:
-    # declaration
+# declaration
     vars_state,
-    # initialization
+# initialization
     init_state_prognostic!,
     init_state_auxiliary!,
     nodal_init_state_auxiliary!,
-    # rhs computation
+# rhs computation
     compute_gradient_argument!,
     compute_gradient_flux!,
     flux_first_order!,
     flux_second_order!,
     source!,
-    # boundary conditions
+# boundary conditions
     boundary_conditions,
     boundary_state!
 
@@ -21,9 +21,9 @@ import ClimateMachine.DGMethods.NumericalFluxes:
     NumericalFluxFirstOrder,
     NumericalFluxSecondOrder,
     RusanovNumericalFlux,
-    numerical_boundary_flux_second_order!, 
-    numerical_flux_second_order!, 
-    numerical_boundary_flux_first_order!, 
+    numerical_boundary_flux_second_order!,
+    numerical_flux_second_order!,
+    numerical_boundary_flux_first_order!,
     numerical_flux_first_order!,
     normal_boundary_flux_second_order!
 
@@ -67,23 +67,13 @@ Sets up the initial fields within our state variables
 the gradient flux variables by default.
 """
 
-function nodal_init_state_auxiliary!(
-    m::SlabLandModelSetup,
-    state_auxiliary,
-    tmp,
-    geom,
-)
+function nodal_init_state_auxiliary!(m::SlabLandModelSetup, state_auxiliary, tmp, geom)
     init_state_auxiliary!(m, m.physics.orientation, state_auxiliary, geom)
 
     state_auxiliary.F_ρθ_prescribed = 0
 end
 
-function init_state_auxiliary!(
-    ::SlabLandModelSetup,
-    ::SphericalOrientation,
-    state_auxiliary,
-    geom,
-)
+function init_state_auxiliary!(::SlabLandModelSetup, ::SphericalOrientation, state_auxiliary, geom)
     FT = eltype(state_auxiliary)
     _grav = FT(grav(param_set))
     r = norm(geom.coord)
@@ -94,12 +84,7 @@ function init_state_auxiliary!(
     state_auxiliary.∇Φ = _grav * geom.coord / r
 end
 
-function init_state_auxiliary!(
-    ::SlabLandModelSetup,
-    ::Union{NoOrientation,FlatOrientation},
-    state_auxiliary,
-    geom,
-)
+function init_state_auxiliary!(::SlabLandModelSetup, ::Union{NoOrientation, FlatOrientation}, state_auxiliary, geom)
     FT = eltype(state_auxiliary)
     _grav = FT(grav(param_set))
     @inbounds r = geom.coord[3]
@@ -124,10 +109,10 @@ end
 """
     LHS computations
 """
-flux_first_order!(model::SlabLandModelSetup, _...,) = nothing
-compute_gradient_argument!(model::SlabLandModelSetup, _...,) = nothing
-compute_gradient_flux!(model::SlabLandModelSetup, _...,) = nothing
-flux_second_order!(model::SlabLandModelSetup, _...,) = nothing
+flux_first_order!(model::SlabLandModelSetup, _...) = nothing
+compute_gradient_argument!(model::SlabLandModelSetup, _...) = nothing
+compute_gradient_flux!(model::SlabLandModelSetup, _...) = nothing
+flux_second_order!(model::SlabLandModelSetup, _...) = nothing
 
 """
     RHS computations
@@ -143,8 +128,8 @@ flux_second_order!(model::SlabLandModelSetup, _...,) = nothing
 )
 
     p = model.parameters
-    G    = p.κ_s * (state.T_sfc - p.T_h) / p.h_s # simple soil physics
-    source.T_sfc = - (aux.F_ρθ_prescribed + G) / (p.ρ_s * p.c_s * p.h_s)
+    G = p.κ_s * (state.T_sfc - p.T_h) / p.h_s # simple soil physics
+    source.T_sfc = -(aux.F_ρθ_prescribed + G) / (p.ρ_s * p.c_s * p.h_s)
 
     return nothing
 end
@@ -155,16 +140,16 @@ end
 """
 @inline boundary_conditions(model::SlabLandModelSetup) = model.boundary_conditions
 
-numerical_flux_first_order!(::Nothing, model::Union{SlabLandModelSetup}, _...,) = nothing
-numerical_flux_gradient!(nf, bc,  model::Union{SlabLandModelSetup}, _...,) = nothing
-function numerical_flux_second_order!(::Nothing, model::Union{SlabLandModelSetup}, fluxᵀn, _...,)
+numerical_flux_first_order!(::Nothing, model::Union{SlabLandModelSetup}, _...) = nothing
+numerical_flux_gradient!(nf, bc, model::Union{SlabLandModelSetup}, _...) = nothing
+function numerical_flux_second_order!(::Nothing, model::Union{SlabLandModelSetup}, fluxᵀn, _...)
     FT = eltype(fluxᵀn)
     fluxᵀn.T_sfc = fluxᵀn.T_sfc .* FT(0)
 end
 
-numerical_boundary_flux_first_order!(::Nothing, bc, model::Union{SlabLandModelSetup}, _...,) = nothing
-numerical_boundary_flux_gradient!(::Nothing, bc, model::Union{SlabLandModelSetup}, _...,) = nothing
-function numerical_boundary_flux_second_order!(::Nothing, bc, model::Union{SlabLandModelSetup},fluxᵀn, _...,)
+numerical_boundary_flux_first_order!(::Nothing, bc, model::Union{SlabLandModelSetup}, _...) = nothing
+numerical_boundary_flux_gradient!(::Nothing, bc, model::Union{SlabLandModelSetup}, _...) = nothing
+function numerical_boundary_flux_second_order!(::Nothing, bc, model::Union{SlabLandModelSetup}, fluxᵀn, _...)
     FT = eltype(fluxᵀn)
     fluxᵀn.T_sfc = fluxᵀn.T_sfc .* FT(0)
 end

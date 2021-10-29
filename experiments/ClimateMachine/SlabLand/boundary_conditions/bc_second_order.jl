@@ -131,7 +131,7 @@ end
     ::NumericalFluxSecondOrder,
     ::Union{Insulating, CoupledSecondaryBoundary, CoupledPrimaryBoundary},
     ::Union{ModelSetup},
-    ::ConstantViscosity,  
+    ::ConstantViscosity,
     state⁺,
     gradflux⁺,
     hyperflux⁺,

@@ -105,7 +105,7 @@ struct DeepSphericalShellDomain{S} <: AbstractDomain
     radius::S
     height::S
 
-    function DeepSphericalShellDomain(; radius = nothing, height = nothing )
+    function DeepSphericalShellDomain(; radius = nothing, height = nothing)
         radius, height = promote(radius, height)
 
         return new{typeof(radius)}(radius, height)
@@ -116,7 +116,7 @@ struct OceanDomain{S} <: AbstractDomain
     radius::S
     depth::S
 
-    function OceanDomain(; radius = nothing, depth = nothing )
+    function OceanDomain(; radius = nothing, depth = nothing)
         radius, height = promote(radius, depth)
 
         return new{typeof(radius)}(radius, depth)
@@ -127,17 +127,17 @@ end
 ```
 Sphere helper functions for GCM 
 ```
-rad(x,y,z) = sqrt(x^2 + y^2 + z^2)
-lat(x,y,z) = asin(z/rad(x,y,z)) # ϕ ∈ [-π/2, π/2] 
-lon(x,y,z) = atan(y,x) # λ ∈ [-π, π) 
+rad(x, y, z) = sqrt(x^2 + y^2 + z^2)
+lat(x, y, z) = asin(z / rad(x, y, z)) # ϕ ∈ [-π/2, π/2] 
+lon(x, y, z) = atan(y, x) # λ ∈ [-π, π) 
 
-r̂ⁿᵒʳᵐ(x,y,z) = norm([x,y,z]) ≈ 0 ? 1 : norm([x, y, z])^(-1)
-ϕ̂ⁿᵒʳᵐ(x,y,z) = norm([x,y,0]) ≈ 0 ? 1 : (norm([x, y, z]) * norm([x, y, 0]))^(-1)
-λ̂ⁿᵒʳᵐ(x,y,z) = norm([x,y,0]) ≈ 0 ? 1 : norm([x, y, 0])^(-1)
+r̂ⁿᵒʳᵐ(x, y, z) = norm([x, y, z]) ≈ 0 ? 1 : norm([x, y, z])^(-1)
+ϕ̂ⁿᵒʳᵐ(x, y, z) = norm([x, y, 0]) ≈ 0 ? 1 : (norm([x, y, z]) * norm([x, y, 0]))^(-1)
+λ̂ⁿᵒʳᵐ(x, y, z) = norm([x, y, 0]) ≈ 0 ? 1 : norm([x, y, 0])^(-1)
 
-r̂(x,y,z) = r̂ⁿᵒʳᵐ(x,y,z) * @SVector([x, y, z])
-ϕ̂(x,y,z) = ϕ̂ⁿᵒʳᵐ(x,y,z) * @SVector [x*z, y*z, -(x^2 + y^2)]
-λ̂(x,y,z) = λ̂ⁿᵒʳᵐ(x,y,z) * @SVector [-y, x, 0] 
+r̂(x, y, z) = r̂ⁿᵒʳᵐ(x, y, z) * @SVector([x, y, z])
+ϕ̂(x, y, z) = ϕ̂ⁿᵒʳᵐ(x, y, z) * @SVector [x * z, y * z, -(x^2 + y^2)]
+λ̂(x, y, z) = λ̂ⁿᵒʳᵐ(x, y, z) * @SVector [-y, x, 0]
 
 
 """
@@ -201,10 +201,7 @@ function DiscontinuousSpectralElementGrid(
     tuple_ranges = []
 
     for i in 1:dimension
-        push!(
-            tuple_ranges,
-            range(FT(Ω[i].min); length = elements[i] + 1, stop = FT(Ω[i].max)),
-        )
+        push!(tuple_ranges, range(FT(Ω[i].min); length = elements[i] + 1, stop = FT(Ω[i].max)))
     end
 
     brickrange = Tuple(tuple_ranges)
@@ -212,12 +209,7 @@ function DiscontinuousSpectralElementGrid(
         boundary = (ntuple(j -> (1, 2), dimension - 1)..., (3, 4))
     end
 
-    topology = StackedBrickTopology(
-        mpicomm,
-        brickrange;
-        periodicity = periodicity,
-        boundary = boundary,
-    )
+    topology = StackedBrickTopology(mpicomm, brickrange; periodicity = periodicity, boundary = boundary)
 
     grid = DiscontinuousSpectralElementGrid(
         topology,
@@ -252,12 +244,7 @@ function DiscontinuousSpectralElementGrid(
 ) where {FT}
     Rrange = grid1d(Ω.radius, Ω.radius + Ω.height, nelem = elements.vertical)
 
-    topl = StackedCubedSphereTopology(
-        mpicomm,
-        elements.horizontal,
-        Rrange,
-        boundary = boundary, 
-    )
+    topl = StackedCubedSphereTopology(mpicomm, elements.horizontal, Rrange, boundary = boundary)
 
     grid = DiscontinuousSpectralElementGrid(
         topl,
@@ -278,12 +265,7 @@ function DiscontinuousSpectralElementGrid(
 ) where {FT}
     Rrange = grid1d(Ω.radius + Ω.depth, Ω.radius, nelem = elements.vertical)
 
-    topl = StackedCubedSphereTopology(
-        mpicomm,
-        elements.horizontal,
-        Rrange,
-        boundary = boundary, 
-    )
+    topl = StackedCubedSphereTopology(mpicomm, elements.horizontal, Rrange, boundary = boundary)
 
     grid = DiscontinuousSpectralElementGrid(
         topl,
@@ -298,7 +280,7 @@ end
 
 function is_surface(xc, yc, zc)
     # Sphere case - could dispatch on domain type, maybe?
-    height_from_surface=(xc^2 + yc^2 + zc^2)^0.5 - planet_radius(param_set)
+    height_from_surface = (xc^2 + yc^2 + zc^2)^0.5 - planet_radius(param_set)
     return height_from_surface ≈ 0
 end
 # end of module

@@ -76,5 +76,5 @@ calc_boundary_state!(
     ::Union{NumericalFluxGradient},
     ::Union{Insulating, CoupledSecondaryBoundary},
     ::Union{SlabLandModelSetup},
-    _...,) = nothing
-
+    _...,
+) = nothing

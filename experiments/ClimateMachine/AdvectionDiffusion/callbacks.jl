@@ -1,6 +1,6 @@
 using Printf
 using Dates
-using JLD2 
+using JLD2
 using ClimateMachine.VTK: writevtk, writepvtu
 using ClimateMachine.Callbacks
 using ClimateMachine.GenericCallbacks
@@ -34,10 +34,7 @@ function create_callbacks(simulation, odesolver)
     if isempty(callbacks)
         return ()
     else
-        cbvector = [
-            create_callback(callback, simulation, odesolver)
-            for callback in callbacks
-        ]
+        cbvector = [create_callback(callback, simulation, odesolver) for callback in callbacks]
         return tuple(cbvector...)
     end
 end
@@ -55,10 +52,7 @@ function create_callback(::Info, simulation::Simulation, odesolver)
     mpicomm = MPI.COMM_WORLD
 
     starttime = Ref(now())
-    cbinfo = ClimateMachine.GenericCallbacks.EveryXWallTimeSeconds(
-        60,
-        mpicomm,
-    ) do (s = false)
+    cbinfo = ClimateMachine.GenericCallbacks.EveryXWallTimeSeconds(60, mpicomm) do (s = false)
         if s
             starttime[] = now()
         else
@@ -70,10 +64,7 @@ function create_callback(::Info, simulation::Simulation, odesolver)
                 norm(Q) = %.16e""",
                 ClimateMachine.ODESolvers.gettime(odesolver),
                 timeend,
-                Dates.format(
-                    convert(Dates.DateTime, Dates.now() - starttime[]),
-                    Dates.dateformat"HH:MM:SS",
-                ),
+                Dates.format(convert(Dates.DateTime, Dates.now() - starttime[]), Dates.dateformat"HH:MM:SS"),
                 energy
             )
 
@@ -94,19 +85,14 @@ function create_callback(callback::StateCheck, simulation::Simulation, _...)
 
     nt_freq = floor(Int, sim_length / timestep / nChecks)
 
-    cbcs_dg = ClimateMachine.StateCheck.sccreate(
-        [(simulation.state, "state")],
-        nt_freq,
-    )
+    cbcs_dg = ClimateMachine.StateCheck.sccreate([(simulation.state, "state")], nt_freq)
 
     return cbcs_dg
 end
 
 function create_callback(output::JLD2State, simulation::Simulation, odesolver)
     # Initialize output
-    output.overwrite &&
-        isfile(output.filepath) &&
-        rm(output.filepath; force = output.overwrite)
+    output.overwrite && isfile(output.filepath) && rm(output.filepath; force = output.overwrite)
 
     Q = simulation.state
     mpicomm = MPI.COMM_WORLD
@@ -123,9 +109,7 @@ function create_callback(output::JLD2State, simulation::Simulation, odesolver)
     close(file)
 
 
-    jldcallback = ClimateMachine.GenericCallbacks.EveryXSimulationSteps(
-        iteration,
-    ) do (s = false)
+    jldcallback = ClimateMachine.GenericCallbacks.EveryXSimulationSteps(iteration) do (s = false)
         steps = ClimateMachine.ODESolvers.getsteps(odesolver)
         time = ClimateMachine.ODESolvers.gettime(odesolver)
         @info steps, time
@@ -139,9 +123,7 @@ end
 
 function create_callback(output::JLD2State, simulation::Simulation, odesolver)
     # Initialize output
-    output.overwrite &&
-        isfile(output.filepath) &&
-        rm(output.filepath; force = output.overwrite)
+    output.overwrite && isfile(output.filepath) && rm(output.filepath; force = output.overwrite)
 
     Q = simulation.state
     mpicomm = MPI.COMM_WORLD
@@ -158,9 +140,7 @@ function create_callback(output::JLD2State, simulation::Simulation, odesolver)
     close(file)
 
 
-    jldcallback = ClimateMachine.GenericCallbacks.EveryXSimulationSteps(
-        iteration,
-    ) do (s = false)
+    jldcallback = ClimateMachine.GenericCallbacks.EveryXSimulationSteps(iteration) do (s = false)
         steps = ClimateMachine.ODESolvers.getsteps(odesolver)
         time = ClimateMachine.ODESolvers.gettime(odesolver)
         @info steps, time
@@ -172,7 +152,7 @@ function create_callback(output::JLD2State, simulation::Simulation, odesolver)
     end
 end
 
-struct SolverConfig{SO,MP,QQ,DG,NA}
+struct SolverConfig{SO, MP, QQ, DG, NA}
     solver::SO
     mpicomm::MP
     Q::QQ
@@ -185,7 +165,7 @@ function create_callback(output::VTKOutput, simulation, odesolver)
     mpicomm = MPI.COMM_WORLD
     iteration = output.iteration
 
-    solver_config = SolverConfig(simulation.odesolver, mpicomm, simulation.state, simulation.dgmodel,simulation.name)
+    solver_config = SolverConfig(simulation.odesolver, mpicomm, simulation.state, simulation.dgmodel, simulation.name)
     vtkcallback = ClimateMachine.Callbacks.vtk(iteration, solver_config, output.outputdir, output.number_sample_points)
 end
 
@@ -198,9 +178,8 @@ function create_callback(output::ExponentialFiltering, simulation, odesolver)
             (:θ,),
             simulation.dgmodel.grid,
             filter,
-            state_auxiliary =  simulation.dgmodel.state_auxiliary,
+            state_auxiliary = simulation.dgmodel.state_auxiliary,
         )
         nothing
     end
 end
-

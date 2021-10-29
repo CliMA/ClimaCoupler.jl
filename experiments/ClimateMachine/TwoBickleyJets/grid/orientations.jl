@@ -2,13 +2,7 @@ using ClimateMachine.Orientations
 
 import ClimateMachine.Orientations: vertical_unit_vector
 
-function orientation_gradient(
-    model::AbstractFluidModel,
-    ::Orientation,
-    state_auxiliary,
-    grid,
-    direction,
-)
+function orientation_gradient(model::AbstractFluidModel, ::Orientation, state_auxiliary, grid, direction)
     auxiliary_field_gradient!(
         model,
         state_auxiliary,
@@ -54,7 +48,7 @@ function orientation_nodal_init_aux!(
 )
     norm_R = norm(geom.coord)
     # @inbounds aux.orientation.Φ = norm_R - domain.radius
-    @inbounds aux.orientation.Φ = norm_R 
+    @inbounds aux.orientation.Φ = norm_R
 
     return nothing
 end

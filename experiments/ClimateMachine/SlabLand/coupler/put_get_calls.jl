@@ -8,7 +8,7 @@ function preLand(csolver::CplSolver)
     mLand = csolver.component_list.domainLand.component_model
     mAtmos = csolver.component_list.domainAtmos.component_model
 
-    mLand.odesolver.rhs!.state_auxiliary.F_ρθ_prescribed[mLand.boundary] .= 
+    mLand.odesolver.rhs!.state_auxiliary.F_ρθ_prescribed[mLand.boundary] .=
         coupler_get(csolver.coupler, :BoundaryEnergyFlux, mLand.grid, DateTime(0), u"J")
 
 end
@@ -21,7 +21,14 @@ Updates coupler field `LandSurfaceTemerature`.
 function postLand(csolver::CplSolver)
     mLand = csolver.component_list.domainLand.component_model
     mAtmos = csolver.component_list.domainAtmos.component_model
-    coupler_put!(csolver.coupler, :LandSurfaceTemerature, mLand.state.T_sfc[mLand.boundary], mLand.grid.numerical, DateTime(0), u"K")
+    coupler_put!(
+        csolver.coupler,
+        :LandSurfaceTemerature,
+        mLand.state.T_sfc[mLand.boundary],
+        mLand.grid.numerical,
+        DateTime(0),
+        u"K",
+    )
 end
 
 # Atmos put and get calls
@@ -34,7 +41,7 @@ function preAtmos(csolver::CplSolver)
     mLand = csolver.component_list.domainLand.component_model
     mAtmos = csolver.component_list.domainAtmos.component_model
     # Set boundary T_sfc used in atmos at the start of the coupling cycle.
-    mAtmos.odesolver.rhs!.state_auxiliary.T_sfc[mAtmos.boundary] .= 
+    mAtmos.odesolver.rhs!.state_auxiliary.T_sfc[mAtmos.boundary] .=
         coupler_get(csolver.coupler, :LandSurfaceTemerature, mAtmos.grid.numerical, DateTime(0), u"K")
     # Set atmos boundary flux accumulator to 0.
     mAtmos.state.F_ρθ_accum .= 0
@@ -52,7 +59,7 @@ function preAtmos(csolver::CplSolver)
     horiz_sfc_area = p.xmax * p.ymax
 
     E_Land = weightedsum(mLand.state, 1) .* p.ρ_s .* p.h_s .* p.c_s ./ p.zmax ./ horiz_sfc_area # J / m^2
-    E_Atmos = weightedsum(mAtmos.state, idx) .* p.cp_d ./ horiz_sfc_area ./  nel ./ (po+1) ./ (po+2)  # J / m^2 
+    E_Atmos = weightedsum(mAtmos.state, idx) .* p.cp_d ./ horiz_sfc_area ./ nel ./ (po + 1) ./ (po + 2)  # J / m^2 
 
     @info(
         "preatmos",
@@ -79,6 +86,12 @@ function postAtmos(csolver::CplSolver)
     mAtmos = csolver.component_list.domainAtmos.component_model
     # Pass atmos exports to "coupler" namespace
     # 1. Save mean θ flux at the Atmos boundary during the coupling period
-    coupler_put!(csolver.coupler, :BoundaryEnergyFlux, mAtmos.state.F_ρθ_accum[mAtmos.boundary] ./ csolver.dt,
-        mAtmos.grid.numerical, DateTime(0), u"J")
+    coupler_put!(
+        csolver.coupler,
+        :BoundaryEnergyFlux,
+        mAtmos.state.F_ρθ_accum[mAtmos.boundary] ./ csolver.dt,
+        mAtmos.grid.numerical,
+        DateTime(0),
+        u"J",
+    )
 end

@@ -2,7 +2,7 @@ using Test
 using MPI
 using Pkg
 
-Pkg.add(url="https://github.com/clima/climatemachine.jl",rev="master")
+Pkg.add(url = "https://github.com/clima/climatemachine.jl", rev = "master")
 using ClimateMachine
 
 # To test coupling
@@ -17,7 +17,7 @@ using ClimateMachine.GenericCallbacks
 # To invoke timestepper
 using ClimateMachine.ODESolvers
 
-Pkg.add(url="https://github.com/sandreza/QuickVizExample.jl.git",rev="main" )
+Pkg.add(url = "https://github.com/sandreza/QuickVizExample.jl.git", rev = "main")
 using QuickVizExample
 using GLMakie
 

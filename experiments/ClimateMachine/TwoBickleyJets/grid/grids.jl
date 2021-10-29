@@ -33,11 +33,7 @@ function DiscretizedDomain(
         topology = topology,
         brick_builder = brick_builder,
     )
-    return DiscretizedDomain(
-        domain,
-        (; elements, polynomial_order, overintegration_order),
-        grid,
-    )
+    return DiscretizedDomain(domain, (; elements, polynomial_order, overintegration_order), grid)
 end
 
 function DiscretizedDomain(
@@ -47,7 +43,7 @@ function DiscretizedDomain(
     overintegration_order = nothing,
     FT = Float64,
     mpicomm = MPI.COMM_WORLD,
-    array = ClimateMachine.array_type()
+    array = ClimateMachine.array_type(),
 )
     new_polynomial_order = convention(polynomial_order, Val(2))
     new_polynomial_order = new_polynomial_order .+ convention(overintegration_order, Val(2))
@@ -61,11 +57,7 @@ function DiscretizedDomain(
         mpicomm = mpicomm,
         array = array,
     )
-    return DiscretizedDomain(
-        domain,
-        (; elements, polynomial_order, overintegration_order),
-        grid,
-    )
+    return DiscretizedDomain(domain, (; elements, polynomial_order, overintegration_order), grid)
 end
 
 """
@@ -149,20 +141,10 @@ function DiscontinuousSpectralElementGrid(
     periodicity = domain.periodicity
     connectivity = dimension == 2 ? :face : :full
 
-    topl = topology(
-        mpicomm,
-        brickrange;
-        periodicity = periodicity,
-        boundary = boundary,
-        connectivity = connectivity,
-    )
+    topl = topology(mpicomm, brickrange; periodicity = periodicity, boundary = boundary, connectivity = connectivity)
 
-    grid = DiscontinuousSpectralElementGrid(
-        topl,
-        FloatType = FT,
-        DeviceArray = array,
-        polynomialorder = polynomialorder,
-    )
+    grid =
+        DiscontinuousSpectralElementGrid(topl, FloatType = FT, DeviceArray = array, polynomialorder = polynomialorder)
 
     return grid
 end
@@ -172,31 +154,19 @@ function DiscontinuousSpectralElementGrid(
     elements,
     polynomialorder,
     mpicomm = MPI.COMM_WORLD,
-    boundary = (5,6),
+    boundary = (5, 6),
     FT = Float64,
     array = Array,
 )
-    Rrange = grid1d(
-        domain.radius, 
-        domain.radius + domain.height, 
-        nelem = elements.vertical
-    )
+    Rrange = grid1d(domain.radius, domain.radius + domain.height, nelem = elements.vertical)
 
-    topl = StackedCubedSphereTopology(
-        mpicomm,
-        elements.horizontal,
-        Rrange;
-        boundary = boundary,
-    )
+    topl = StackedCubedSphereTopology(mpicomm, elements.horizontal, Rrange; boundary = boundary)
 
     grid = DiscontinuousSpectralElementGrid(
         topl,
         FloatType = FT,
         DeviceArray = array,
-        polynomialorder = (
-          polynomialorder.horizontal, 
-          polynomialorder.vertical
-       ),
+        polynomialorder = (polynomialorder.horizontal, polynomialorder.vertical),
         meshwarp = equiangular_cubed_sphere_warp,
     )
     return grid
@@ -210,14 +180,7 @@ function uniform_brick_builder(domain::ProductDomain, elements; FT = Float64)
 
     tuple_ranges = []
     for i in 1:dimension
-        push!(
-            tuple_ranges,
-            range(
-                FT(domain[i].min);
-                length = elements[i] + 1,
-                stop = FT(domain[i].max),
-            ),
-        )
+        push!(tuple_ranges, range(FT(domain[i].min); length = elements[i] + 1, stop = FT(domain[i].max)))
     end
 
     brickrange = Tuple(tuple_ranges)
@@ -227,10 +190,7 @@ end
 """
     Conventions for polynomial order and overintegration order 
 """
-function convention(
-    a::NamedTuple{(:vertical, :horizontal), T},
-    ::Val{3},
-) where {T}
+function convention(a::NamedTuple{(:vertical, :horizontal), T}, ::Val{3}) where {T}
     return (a.horizontal, a.horizontal, a.vertical)
 end
 
@@ -238,10 +198,7 @@ function convention(a::Number, ::Val{3})
     return (a, a, a)
 end
 
-function convention(
-    a::NamedTuple{(:vertical, :horizontal), T},
-    ::Val{2},
-) where {T}
+function convention(a::NamedTuple{(:vertical, :horizontal), T}, ::Val{2}) where {T}
     return (a.horizontal, a.vertical)
 end
 

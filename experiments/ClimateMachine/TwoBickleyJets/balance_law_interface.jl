@@ -1,17 +1,17 @@
 import ClimateMachine.BalanceLaws:
-    # declaration
+# declaration
     vars_state,
-    # initialization
+# initialization
     init_state_prognostic!,
     init_state_auxiliary!,
     nodal_init_state_auxiliary!,
-    # rhs computation
+# rhs computation
     compute_gradient_argument!,
     compute_gradient_flux!,
     flux_first_order!,
     flux_second_order!,
     source!,
-    # boundary conditions
+# boundary conditions
     boundary_conditions,
     boundary_state!
 
@@ -21,9 +21,9 @@ import ClimateMachine.DGMethods.NumericalFluxes:
     NumericalFluxFirstOrder,
     NumericalFluxSecondOrder,
     RusanovNumericalFlux,
-    numerical_boundary_flux_second_order!, 
-    numerical_flux_second_order!, 
-    numerical_boundary_flux_first_order!, 
+    numerical_boundary_flux_second_order!,
+    numerical_flux_second_order!,
+    numerical_boundary_flux_first_order!,
     numerical_flux_first_order!,
     normal_boundary_flux_second_order!
 
@@ -51,7 +51,7 @@ end
 function vars_state(::ModelSetup, ::Prognostic, T)
     @vars begin
         ρ::T
-        ρu::SVector{3,T}
+        ρu::SVector{3, T}
         ρθ::T
         F_ρθ_accum::T
     end
@@ -60,16 +60,16 @@ end
 function vars_state(::ModelSetup, ::Gradient, T)
     @vars begin
         ∇ρ::T
-        ∇u::SVector{3,T}
+        ∇u::SVector{3, T}
         ∇θ::T
     end
 end
 
 function vars_state(::ModelSetup, ::GradientFlux, T)
     @vars begin
-        μ∇ρ::SVector{3,T}
-        ν∇u::SMatrix{3,3,T,9}
-        κ∇θ::SVector{3,T}
+        μ∇ρ::SVector{3, T}
+        ν∇u::SMatrix{3, 3, T, 9}
+        κ∇θ::SVector{3, T}
     end
 end
 
@@ -81,12 +81,7 @@ end
     the gradient flux variables by default.
 """
 
-function nodal_init_state_auxiliary!(
-    m::ModelSetup,
-    state_auxiliary,
-    tmp,
-    geom,
-)
+function nodal_init_state_auxiliary!(m::ModelSetup, state_auxiliary, tmp, geom)
     init_state_auxiliary!(m, m.physics.orientation, state_auxiliary, geom)
     # init_state_auxiliary!(m, m.physics.ref_state, state_auxiliary, geom)
 
@@ -94,12 +89,7 @@ function nodal_init_state_auxiliary!(
     state_auxiliary.F_ρθ_prescribed = 0
 end
 
-function init_state_auxiliary!(
-    ::ModelSetup,
-    ::SphericalOrientation,
-    state_auxiliary,
-    geom,
-)
+function init_state_auxiliary!(::ModelSetup, ::SphericalOrientation, state_auxiliary, geom)
     FT = eltype(state_auxiliary)
     _grav = FT(grav(param_set))
     r = norm(geom.coord)
@@ -110,12 +100,7 @@ function init_state_auxiliary!(
     state_auxiliary.∇Φ = _grav * geom.coord / r
 end
 
-function init_state_auxiliary!(
-    ::ModelSetup,
-    ::FlatOrientation,
-    state_auxiliary,
-    geom,
-)
+function init_state_auxiliary!(::ModelSetup, ::FlatOrientation, state_auxiliary, geom)
     FT = eltype(state_auxiliary)
     _grav = FT(grav(param_set))
     @inbounds r = geom.coord[3]
@@ -146,14 +131,7 @@ end
 """
     LHS computations
 """
-@inline function flux_first_order!(
-    model::ModelSetup,
-    flux::Grad,
-    state::Vars,
-    aux::Vars,
-    t::Real,
-    direction,
-)
+@inline function flux_first_order!(model::ModelSetup, flux::Grad, state::Vars, aux::Vars, t::Real, direction)
     flux.ρu += calc_pressure(model.physics.eos, state) * I
 
     calc_advective_flux!(flux, model.physics.advection, state, aux, t)
@@ -161,26 +139,13 @@ end
     return nothing
 end
 
-@inline function compute_gradient_argument!(
-    model::ModelSetup,
-    grad::Vars,
-    state::Vars,
-    aux::Vars,
-    t::Real,
-)
+@inline function compute_gradient_argument!(model::ModelSetup, grad::Vars, state::Vars, aux::Vars, t::Real)
     calc_diffusive_flux_argument!(grad, model.physics.diffusion, state, aux, t)
 
     return nothing
 end
 
-@inline function compute_gradient_flux!(
-    model::ModelSetup,
-    gradflux::Vars,
-    grad::Grad,
-    state::Vars,
-    aux::Vars,
-    t::Real,
-)
+@inline function compute_gradient_flux!(model::ModelSetup, gradflux::Vars, grad::Grad, state::Vars, aux::Vars, t::Real)
     calc_diffusive_flux!(gradflux, model.physics.diffusion, grad, state, aux, t)
 
     return nothing
@@ -205,15 +170,7 @@ end
 """
     RHS computations
 """
-@inline function source!(
-    model::ModelSetup,
-    source::Vars,
-    state::Vars,
-    gradflux::Vars,
-    aux::Vars,
-    t::Real,
-    direction,
-)
+@inline function source!(model::ModelSetup, source::Vars, state::Vars, gradflux::Vars, aux::Vars, t::Real, direction)
     coriolis = model.physics.coriolis
     gravity = model.physics.gravity
     orientation = model.physics.orientation
@@ -230,12 +187,7 @@ end
 """
 @inline boundary_conditions(model::ModelSetup) = model.boundary_conditions
 
-@inline function boundary_state!(
-        numerical_flux,
-        bc::FluidBC,
-        model::ModelSetup,
-        args...
-    )
+@inline function boundary_state!(numerical_flux, bc::FluidBC, model::ModelSetup, args...)
     # We need to apply boundary conditions for state variables.
     # This depends on first, second, and high-order
     # operations, hence the diffusion model dependence.
@@ -264,13 +216,13 @@ function preB(csolver)
 function preB(csolver)
     mA, mB = get_components(csolver)
     # Set boundary ρθ used in B to ρθ of A surface at start of coupling cycle.
-    mB.rhs.state_auxiliary.ρθ_secondary[mB.boundary] .= 
+    mB.rhs.state_auxiliary.ρθ_secondary[mB.boundary] .=
         coupler_get(csolver.coupler, :EnergyA, mB.grid.numerical, DateTime(0), u"J")
     # Set boundary flux accumulator to 0.
     mB.state.F_ρθ_accum .= 0
 
     idx = varsindex(vars(mA.state), :ρθ)[1]
-    
+
     @info(
         "preB",
         time = string(csolver.t) * " / " * string(mA.time.finish),
@@ -281,9 +233,11 @@ function preB(csolver)
         ρθ_surface_maxB = maximum(mB.state.ρθ[mB.boundary]),
     )
 
-    sphere_sfc_area = 4π * mA.grid.domain.radius ^ 2 
-    isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.A[csolver.steps] = weightedsum(mA.state, idx) ./ csolver.dt ./ sphere_sfc_area # tracer units / s / m^2
-    isnothing(csolver.fluxlog) ? nothing : csolver.fluxlog.B[csolver.steps] = weightedsum(mB.state, idx) ./ csolver.dt ./ sphere_sfc_area # tracer units / s / m^2
+    sphere_sfc_area = 4π * mA.grid.domain.radius^2
+    isnothing(csolver.fluxlog) ? nothing :
+    csolver.fluxlog.A[csolver.steps] = weightedsum(mA.state, idx) ./ csolver.dt ./ sphere_sfc_area # tracer units / s / m^2
+    isnothing(csolver.fluxlog) ? nothing :
+    csolver.fluxlog.B[csolver.steps] = weightedsum(mB.state, idx) ./ csolver.dt ./ sphere_sfc_area # tracer units / s / m^2
 end
 
 """
@@ -295,8 +249,14 @@ function postB(csolver)
     mA, mB = get_components(csolver)
     # Pass exports to "coupler" namespace
     # 1. Save mean θ flux at B boundary during the coupling period
-    coupler_put!(csolver.coupler, :EnergyFluxB, mB.state.F_ρθ_accum[mB.boundary] ./ csolver.dt,
-        mB.grid.numerical, DateTime(0), u"J")
+    coupler_put!(
+        csolver.coupler,
+        :EnergyFluxB,
+        mB.state.F_ρθ_accum[mB.boundary] ./ csolver.dt,
+        mB.grid.numerical,
+        DateTime(0),
+        u"J",
+    )
 
     # idx = varsindex(vars(mA.state), :ρθ)[1]
 
@@ -325,7 +285,7 @@ function preA(csolver)
 function preA(csolver)
     mA, mB = get_components(csolver)
 
-    mA.rhs.state_auxiliary.F_ρθ_prescribed[mA.boundary] .= 
+    mA.rhs.state_auxiliary.F_ρθ_prescribed[mA.boundary] .=
         coupler_get(csolver.coupler, :EnergyFluxB, mA.grid, DateTime(0), u"J")
     # Set boundary flux accumulator to 0. (this isn't used)
     mA.state.F_ρθ_accum .= 0
@@ -385,26 +345,26 @@ struct CoupledPrimaryBoundary <: AbstractCouplerBoundary end
 struct CoupledSecondaryBoundary <: AbstractCouplerBoundary end
 # # use prescribed flux computed in primary
 """
-struct CoupledSecondaryBoundary  <: AbstractCouplerBoundary end
+struct CoupledSecondaryBoundary <: AbstractCouplerBoundary end
 
 function numerical_boundary_flux_second_order!(
     numerical_flux::Union{PenaltyNumFluxDiffusive},
     bctype::FluidBC,
     balance_law::ModelSetup,
-    args... 
+    args...,
 ) where {S, D, A, HD}
     normal_boundary_flux_second_order!( # for ρu BCs (to be implemented in boundary_state!)
         numerical_flux,
         bctype,
         balance_law,
-        args...
+        args...,
     )
 
     numerical_boundary_flux_second_order!( # this overwrites the total flux for ρθ (using methods below)
         numerical_flux,
         bctype.ρθ,
         balance_law,
-        args...
+        args...,
     )
 
 end
@@ -430,10 +390,8 @@ function numerical_boundary_flux_second_order!(
     aux1⁻::Vars{A},
 ) where {S, D, A, HD}
 
-    fluxᵀn.ρθ =
-        (state_prognostic⁻.ρθ - state_auxiliary⁺.ρθ_secondary) *
-        balance_law.parameters.λ_coupler # W/m^2
-    
+    fluxᵀn.ρθ = (state_prognostic⁻.ρθ - state_auxiliary⁺.ρθ_secondary) * balance_law.parameters.λ_coupler # W/m^2
+
 end
 
 # customized flux for CoupledSecondaryBoundary
@@ -481,7 +439,7 @@ function numerical_boundary_flux_second_order!(
     diff1⁻::Vars{D},
     aux1⁻::Vars{A},
 ) where {S, D, HD, A}
-    fluxᵀn.ρθ = - Float64(0)
+    fluxᵀn.ρθ = -Float64(0)
     return nothing
 end
 
@@ -507,7 +465,7 @@ function numerical_flux_second_order!(
     aux⁺::Vars{A},
     t,
 ) where {S, HD, D, A}
-    
+
     numerical_flux_second_order!(
         CentralNumericalFluxSecondOrder(),
         bl,

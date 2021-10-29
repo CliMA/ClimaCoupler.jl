@@ -80,15 +80,7 @@
 
 #  - load external packages:
 import LinearAlgebra, UnPack
-import ClimaCore:
-    Fields,
-    Domains,
-    Topologies,
-    Meshes,
-    DataLayouts,
-    Operators,
-    Geometry,
-    Spaces
+import ClimaCore: Fields, Domains, Topologies, Meshes, DataLayouts, Operators, Geometry, Spaces
 
 using Base: show_supertypes
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33
@@ -124,7 +116,7 @@ parameters = (
     T_lnd_ini = FT(260.0), # initial condition of at temperature (isothermal) [K]
     ## coupling parameters 
     λ = FT(1e-5), # transfer coefficient 
-    ); 
+    )
                 
 
 # ## Define Model Functions
@@ -159,7 +151,7 @@ function ∑tendencies_atm!(du, u, (parameters, T_sfc), t)
     ## tendency calculations
     @. du.x[1] = gradf2c( parameters.μ * gradc2f(T)) # dT/dt
     du.x[2] .= - F_sfc[1] # d(F_integrated)/dt
-end;
+end
 
 # - Model 2 (lnd) Equations
 """
@@ -173,7 +165,7 @@ Slab layer equation
 function ∑tendencies_lnd!(dT_sfc, T_sfc, (parameters, F_accumulated), t)
     G = 0.0 # place holder for soil dynamics
     @. dT_sfc = ( - F_accumulated + G) / parameters.h_lnd 
-end;
+end
 
 # - Surface Flux Calculation (coarse bulk formula)
 calculate_flux(T_sfc, T1, parameters) = - parameters.λ * (T_sfc - T1);
@@ -200,7 +192,7 @@ T_lnd_0 = [parameters.T_lnd_ini]; # initiates lnd progostic var
 ics = (;
         atm = T_atm_0,
         lnd = T_lnd_0
-        );
+        )
 
 # - specify timestepping information
 stepping = (;
@@ -215,10 +207,10 @@ stepping = (;
 # ## Define the sequential coupling loop
 function coupler_solve!(stepping, ics, parameters)
     t = 0.0
-    Δt_min  = stepping.Δt_min
-    Δt_coupler  = stepping.Δt_coupler
+    Δt_min = stepping.Δt_min
+    Δt_coupler = stepping.Δt_coupler
     t_start = stepping.timerange[1]
-    t_end   = stepping.timerange[2]
+    t_end = stepping.timerange[2]
 
     ## init coupler fields
     coupler_F_sfc = [0.0]

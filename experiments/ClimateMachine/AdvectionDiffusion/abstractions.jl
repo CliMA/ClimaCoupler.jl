@@ -5,7 +5,7 @@
 
 abstract type AbstractSimulation end
 
-struct Simulation{𝒜, ℬ, 𝒞, 𝒟, ℰ, ℱ, O, DG,N} <: AbstractSimulation
+struct Simulation{𝒜, ℬ, 𝒞, 𝒟, ℰ, ℱ, O, DG, N} <: AbstractSimulation
     model::𝒜
     state::ℬ
     timestepper::𝒞
@@ -39,7 +39,7 @@ function Simulation(;
     end
 
     # initialize timestepper
-    odesolver = timestepper.method( dgmodel, state; dt = timestepper.timestep, t0 = simulation_time[1] )
+    odesolver = timestepper.method(dgmodel, state; dt = timestepper.timestep, t0 = simulation_time[1])
 
     return Simulation(
         model,
@@ -57,13 +57,7 @@ end
 """
 calculate_dt(grid, wavespeed = nothing, diffusivity = nothing, viscocity = nothing, cfl = 0.1)
 """
-function calculate_dt(
-    grid;
-    wavespeed = nothing,
-    diffusivity = nothing,
-    viscocity = nothing,
-    cfl = 0.1,
-)
+function calculate_dt(grid; wavespeed = nothing, diffusivity = nothing, viscocity = nothing, cfl = 0.1)
     Δx = min_node_distance(grid, HorizontalDirection())
     Δts = []
     if wavespeed != nothing
@@ -81,5 +75,3 @@ function calculate_dt(
     end
     return cfl * minimum(Δts)
 end
-
-

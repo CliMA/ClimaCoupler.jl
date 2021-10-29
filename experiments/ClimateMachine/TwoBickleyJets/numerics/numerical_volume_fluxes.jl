@@ -8,10 +8,7 @@ import ClimateMachine.DGMethods.NumericalFluxes:
     numerical_flux_first_order!,
     numerical_flux_second_order!,
     numerical_boundary_flux_second_order!
-import ClimateMachine.BalanceLaws:
-    entropy_variables_to_state!,
-    state_to_entropy,
-    wavespeed
+import ClimateMachine.BalanceLaws: entropy_variables_to_state!, state_to_entropy, wavespeed
 
 @inline gamma(ps::EarthParameterSet) = cp_d(ps) / cv_d(ps)
 
@@ -51,8 +48,7 @@ function numerical_volume_conservative_flux_first_order!(
     Fρ = u_avg * ρ_log
     Fρu = u_avg * Fρ' + ρ_avg / 2b_avg * I
     if total_energy
-        Fρe =
-            (1 / (2 * (γ - 1) * b_log) - usq_avg / 2 + Φ_avg) * Fρ + Fρu * u_avg
+        Fρe = (1 / (2 * (γ - 1) * b_log) - usq_avg / 2 + Φ_avg) * Fρ + Fρu * u_avg
     else
         Fρe = (1 / (2 * (γ - 1) * b_log) - usq_avg / 2) * Fρ + Fρu * u_avg
     end
@@ -176,25 +172,10 @@ function numerical_flux_first_order!(
     )
     fluxᵀn = parent(fluxᵀn)
 
-    wavespeed⁻ = wavespeed(
-        balance_law,
-        normal_vector,
-        state_prognostic⁻,
-        state_auxiliary⁻,
-        t,
-        direction,
-    )
-    wavespeed⁺ = wavespeed(
-        balance_law,
-        normal_vector,
-        state_prognostic⁺,
-        state_auxiliary⁺,
-        t,
-        direction,
-    )
+    wavespeed⁻ = wavespeed(balance_law, normal_vector, state_prognostic⁻, state_auxiliary⁻, t, direction)
+    wavespeed⁺ = wavespeed(balance_law, normal_vector, state_prognostic⁺, state_auxiliary⁺, t, direction)
     max_wavespeed = max.(wavespeed⁻, wavespeed⁺)
-    penalty =
-        max_wavespeed .* (parent(state_prognostic⁻) - parent(state_prognostic⁺))
+    penalty = max_wavespeed .* (parent(state_prognostic⁻) - parent(state_prognostic⁺))
 
     fluxᵀn .+= penalty / 2
 end
@@ -272,7 +253,7 @@ function numerical_flux_first_order!(
         Φ_avg = 0
     end
     u_avg = ave.(u⁻, u⁺)
-    p_avg = ave(ρ⁻, ρ⁺) / 2ave(β⁻, β⁺)
+    p_avg = ave(ρ⁻, ρ⁺) / 2 * ave(β⁻, β⁺)
     u²_bar = 2 * sum(u_avg .^ 2) - sum(ave(u⁻ .^ 2, u⁺ .^ 2))
 
     h_bar = γ / (2 * β_log * (γ - 1)) + u²_bar / 2 + Φ_avg
@@ -339,12 +320,7 @@ end
 
 See [`BalanceLaws.state_to_entropy_variables!`](@ref)
 """
-function state_to_entropy_variables!(
-    ::DryAtmosModel,
-    entropy::Vars,
-    state::Vars,
-    aux::Vars,
-)
+function state_to_entropy_variables!(::DryAtmosModel, entropy::Vars, state::Vars, aux::Vars)
     ρ, ρu, ρe, Φ = state.ρ, state.ρu, state.ρe, aux.Φ
 
     FT = eltype(state)
@@ -375,12 +351,7 @@ end
 
 See [`BalanceLaws.entropy_variables_to_state!`](@ref)
 """
-function entropy_variables_to_state!(
-    ::DryAtmosModel,
-    state::Vars,
-    aux::Vars,
-    entropy::Vars,
-)
+function entropy_variables_to_state!(::DryAtmosModel, state::Vars, aux::Vars, entropy::Vars)
     FT = eltype(state)
     β = entropy
     γ = FT(gamma(param_set))
@@ -422,26 +393,12 @@ numerical_flux_first_order!(::Nothing, ::DryAtmosModel, _...) = nothing
 numerical_flux_second_order!(::Nothing, ::DryAtmosModel, _...) = nothing
 numerical_boundary_flux_second_order!(::Nothing, a, ::DryAtmosModel, _...) = nothing
 
-function wavespeed(
-    lm::DryAtmosLinearModel,
-    nM,
-    state::Vars,
-    aux::Vars,
-    t::Real,
-    direction,
-)
+function wavespeed(lm::DryAtmosLinearModel, nM, state::Vars, aux::Vars, t::Real, direction)
     ref = aux.ref_state
     return soundspeed(ref.ρ, ref.p)
 end
 
-function wavespeed(
-    ::DryAtmosModel,
-    nM,
-    state::Vars,
-    aux::Vars,
-    t::Real,
-    direction,
-)
+function wavespeed(::DryAtmosModel, nM, state::Vars, aux::Vars, t::Real, direction)
     ρ = state.ρ
     ρu = state.ρu
     ρe = state.ρe

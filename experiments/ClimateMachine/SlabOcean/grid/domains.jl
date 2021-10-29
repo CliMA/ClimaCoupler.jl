@@ -57,8 +57,8 @@ struct SingleStack{T} <: AbstractDomain
     zmax::T
 end
 
-function SingleStack(; zmin, xmax,ymax,zmax)
-    return SingleStack(zmin, xmax,ymax,zmax)
+function SingleStack(; zmin, xmax, ymax, zmax)
+    return SingleStack(zmin, xmax, ymax, zmax)
 end
 
 """
@@ -66,18 +66,18 @@ end
 """
 ×(domain1::AbstractDomain, domain2::AbstractDomain) = ProductDomain((domain1, domain2))
 ×(product::ProductDomain, domain::AbstractDomain) = ProductDomain((product.domains..., domain))
-×(domain::AbstractDomain, product::ProductDomain)  = ProductDomain((domain, product.domains...))
-×(product1::ProductDomain, product2::ProductDomain)  = ProductDomain((product1.domains..., product2.domains...))
+×(domain::AbstractDomain, product::ProductDomain) = ProductDomain((domain, product.domains...))
+×(product1::ProductDomain, product2::ProductDomain) = ProductDomain((product1.domains..., product2.domains...))
 
 """
     Extensions
 """
 Base.ndims(domain::IntervalDomain) = 1
-Base.ndims(domain::ProductDomain)  = +(ndims.(domain.domains)...)
+Base.ndims(domain::ProductDomain) = +(ndims.(domain.domains)...)
 Base.ndims(domain::SphericalShell) = 3
 
 Base.length(domain::IntervalDomain) = domain.max - domain.min
-Base.length(domain::ProductDomain)  = length.(domain.domains)
+Base.length(domain::ProductDomain) = length.(domain.domains)
 Base.length(domain::SphericalShell) = (domain.radius, domain.radius, domain.height)
 
 Base.getindex(domain::ProductDomain, i::Int) = domain.domains[i]
@@ -106,8 +106,7 @@ function Base.show(io::IO, domain::IntervalDomain)
     astring = @sprintf("%0.2f", min)
     bstring = @sprintf("%0.2f", max)
     printstyled(astring, ", ", bstring, color = 7)
-    domain.periodic ? printstyled(io, ")", color = 226) :
-    printstyled(io, "]", color = 226)
+    domain.periodic ? printstyled(io, ")", color = 226) : printstyled(io, "]", color = 226)
 end
 
 function Base.show(io::IO, product::ProductDomain)
@@ -126,11 +125,6 @@ function info(domain::ProductDomain)
     for (i, domain) in enumerate(domain.domains)
         domain_string = domain.periodic ? "periodic" : "wall-bounded"
         length = @sprintf("%.2f ", domain.max - domain.min)
-        println(
-            "The dimension $i domain is ",
-            domain_string,
-            " with length ≈ ",
-            length,
-        )
+        println("The dimension $i domain is ", domain_string, " with length ≈ ", length)
     end
 end

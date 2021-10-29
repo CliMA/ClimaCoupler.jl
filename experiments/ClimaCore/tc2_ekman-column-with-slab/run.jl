@@ -6,15 +6,7 @@ using Base: show_supertypes
 
 # import required modules
 import ClimaCore.Geometry, LinearAlgebra, UnPack
-import ClimaCore:
-    Fields,
-    Domains,
-    Topologies,
-    Meshes,
-    DataLayouts,
-    Operators,
-    Geometry,
-    Spaces
+import ClimaCore: Fields, Domains, Topologies, Meshes, DataLayouts, Operators, Geometry, Spaces
 
 using ClimaAtmos
 
@@ -42,65 +34,65 @@ include("dummy_surface_fluxes.jl") # placeholder for SurfaceFluxes.jl
 ########
 
 parameters = (
-        # timestepping parameters 
-        Δt_min = 0.02, # minimum model timestep [s]
-        timerange = (0.0, 100.0),  # start time and end time [s]
-        odesolver = SSPRK33(), # timestepping method from DifferentialEquations.jl (used in both models here)
-        nsteps_atm = 1, # no. time steps of atm before coupling 
-        nsteps_lnd = 1, # no. time steps of lnd before coupling 
-        saveat = 0.2, # interval at which to save diagnostics [s]
+    # timestepping parameters 
+    Δt_min = 0.02, # minimum model timestep [s]
+    timerange = (0.0, 100.0),  # start time and end time [s]
+    odesolver = SSPRK33(), # timestepping method from DifferentialEquations.jl (used in both models here)
+    nsteps_atm = 1, # no. time steps of atm before coupling 
+    nsteps_lnd = 1, # no. time steps of lnd before coupling 
+    saveat = 0.2, # interval at which to save diagnostics [s]
 
-        # atmos domain
-        zmin_atm = FT(0.0),     # height of atmos stack bottom
-        zmax_atm = FT(200.0), # height of atmos domain top
-        n = 30,                 # number of vertical levels
+    # atmos domain
+    zmin_atm = FT(0.0),     # height of atmos stack bottom
+    zmax_atm = FT(200.0), # height of atmos domain top
+    n = 30,                 # number of vertical levels
 
-        # atmos physics (eventually will be importing/overwriting CliMAParameters defaults?)
-        T_surf = 300.0, # K
-        T_min_ref = 230.0, #K
-        MSLP = 1e5, # mean sea level pressure [Pa]
-        grav = 9.8, # gravitational constant [m /s^2]
-        R_d = 287.058, # R dry (gas constant / mol mass dry air)  [J / K / kg]
-        C_p = 287.058 * 1.4 / (1.4 - 1), # heat capacity at constant pressure [J / K / kg]
-        C_v = 287.058 / (1.4 - 1), # heat capacity at constant volume [J / K / kg]
-        R_m = 87.058, # moist R, assumed to be dry [J / K / kg]
-        f = 7.29e-5,#5e-5,# Coriolis parameters [1/s]
-        ν = .1, #0.01,# viscosity, diffusivity
-        Cd = 0.01 / (2e2 / 30.0), #drag coeff
-        Ch = 0.01 / (2e2 / 30.0), #thermal transfer coefficient
-        ug = 1.0,
-        vg = 0.0,
-        d = sqrt(2.0 * 0.01 / 5e-5), #?
+    # atmos physics (eventually will be importing/overwriting CliMAParameters defaults?)
+    T_surf = 300.0, # K
+    T_min_ref = 230.0, #K
+    MSLP = 1e5, # mean sea level pressure [Pa]
+    grav = 9.8, # gravitational constant [m /s^2]
+    R_d = 287.058, # R dry (gas constant / mol mass dry air)  [J / K / kg]
+    C_p = 287.058 * 1.4 / (1.4 - 1), # heat capacity at constant pressure [J / K / kg]
+    C_v = 287.058 / (1.4 - 1), # heat capacity at constant volume [J / K / kg]
+    R_m = 87.058, # moist R, assumed to be dry [J / K / kg]
+    f = 7.29e-5,#5e-5,# Coriolis parameters [1/s]
+    ν = 0.1, #0.01,# viscosity, diffusivity
+    Cd = 0.01 / (2e2 / 30.0), #drag coeff
+    Ch = 0.01 / (2e2 / 30.0), #thermal transfer coefficient
+    ug = 1.0,
+    vg = 0.0,
+    d = sqrt(2.0 * 0.01 / 5e-5), #?
 
-        # soil slab
-        h_s  = 100,     # depth of the modelled soil model [m]
-        c_s  = 800,     # specific heat for land (soil)  [J / K / kg]
-        κ_s  = 0.0,     # soil conductivity [W / m / K] (set to 0 for energy conservation checks)
-        T_h  = 280,     # temperature of soil at depth h [K]
-        ρ_s  = 1500,    # density for land (soil) [kg / m^3]
+    # soil slab
+    h_s = 100,     # depth of the modelled soil model [m]
+    c_s = 800,     # specific heat for land (soil)  [J / K / kg]
+    κ_s = 0.0,     # soil conductivity [W / m / K] (set to 0 for energy conservation checks)
+    T_h = 280,     # temperature of soil at depth h [K]
+    ρ_s = 1500,    # density for land (soil) [kg / m^3]
 
-        # radiation
-        τ    = 0.9,     # atmospheric transmissivity
-        α    = 0.5,     # surface albedo
-        σ    = 5.67e-8, # Steffan Boltzmann constant [kg / s^3 / K^4]
-        g_a  = 0.06,    # aerodynamic conductance for heat transfer [kg / m^2 / s]
-        ϵ    = 0.98,    # broadband emissivity / absorptivity of the surface
-        F_a  = 0.0,     # downward LW flux from the atmosphere [W / m^2]
-        F_sol = 1361,   # incoming solar TOA radiation [W / m^2]
-        τ_d   = 10,     # idealized daily cycle period [s]
+    # radiation
+    τ = 0.9,     # atmospheric transmissivity
+    α = 0.5,     # surface albedo
+    σ = 5.67e-8, # Steffan Boltzmann constant [kg / s^3 / K^4]
+    g_a = 0.06,    # aerodynamic conductance for heat transfer [kg / m^2 / s]
+    ϵ = 0.98,    # broadband emissivity / absorptivity of the surface
+    F_a = 0.0,     # downward LW flux from the atmosphere [W / m^2]
+    F_sol = 1361,   # incoming solar TOA radiation [W / m^2]
+    τ_d = 10,     # idealized daily cycle period [s]
 
-        # surface fluxes
-        λ = FT(0.01),#FT(1e-5)    # coupling transfer coefficient (to be replaced by the bulk formula)
+    # surface fluxes
+    λ = FT(0.01),#FT(1e-5)    # coupling transfer coefficient (to be replaced by the bulk formula)
 
-        # Q: ML???
-    )
+    # Q: ML???
+)
 
 
 ########
 # Set up atmos domain
 ########
 
-domain_atm  = Domains.IntervalDomain(parameters.zmin_atm, parameters.zmax_atm, x3boundary = (:bottom, :top)) # struct
+domain_atm = Domains.IntervalDomain(parameters.zmin_atm, parameters.zmax_atm, x3boundary = (:bottom, :top)) # struct
 mesh_atm = Meshes.IntervalMesh(domain_atm, nelems = parameters.n) # struct, allocates face boundaries to 5,6
 center_space_atm = Spaces.CenterFiniteDifferenceSpace(mesh_atm) # collection of the above, discretises space into FD and provides coords
 face_space_atm = Spaces.FaceFiniteDifferenceSpace(center_space_atm)
@@ -114,7 +106,7 @@ function init_centers(zc, parameters)
 
     # temperature
     Γ = grav / C_p
-    T= max(T_surf - Γ * zc, T_min_ref)
+    T = max(T_surf - Γ * zc, T_min_ref)
 
     # pressure
     p = MSLP * (T / T_surf)^(grav / (R_d * Γ))
@@ -151,10 +143,7 @@ T_atm_0 = (; Yc = Yc, Yf = Yf)
 # land IC state
 T_lnd_0 = [260.0] # initiates lnd progostic var
 
-ics = (;
-        atm = T_atm_0,
-        lnd = T_lnd_0
-        )
+ics = (; atm = T_atm_0, lnd = T_lnd_0)
 
 
 ########
@@ -162,7 +151,7 @@ ics = (;
 ########
 
 # define model equations:
-include("atmos_rhs_fully_coupled.jl") 
+include("atmos_rhs_fully_coupled.jl")
 
 function ∑tendencies_lnd!(dT_sfc, T_sfc, (parameters, F_sfc), t)
     """
@@ -182,13 +171,13 @@ end
 
 # specify timestepping info
 stepping = (;
-        Δt_min = parameters.Δt_min,
-        timerange = parameters.timerange,
-        Δt_cpl = max(parameters.nsteps_atm, parameters.nsteps_lnd) * parameters.Δt_min, # period of coupling cycle [s]
-        odesolver = parameters.odesolver,
-        nsteps_atm = parameters.nsteps_atm,
-        nsteps_lnd = parameters.nsteps_lnd,
-        )
+    Δt_min = parameters.Δt_min,
+    timerange = parameters.timerange,
+    Δt_cpl = max(parameters.nsteps_atm, parameters.nsteps_lnd) * parameters.Δt_min, # period of coupling cycle [s]
+    odesolver = parameters.odesolver,
+    nsteps_atm = parameters.nsteps_atm,
+    nsteps_lnd = parameters.nsteps_lnd,
+)
 
 # coupler comm functions which export / import / transform variables
 coupler_get(x) = x
@@ -197,10 +186,10 @@ coupler_put(x) = x
 # Solve the ODE operator
 function coupler_solve!(stepping, ics, parameters)
     t = 0.0
-    Δt_min  = stepping.Δt_min
-    Δt_cpl  = stepping.Δt_cpl
+    Δt_min = stepping.Δt_min
+    Δt_cpl = stepping.Δt_cpl
     t_start = stepping.timerange[1]
-    t_end   = stepping.timerange[2]
+    t_end = stepping.timerange[2]
     nsteps_atm = stepping.nsteps_atm
     nsteps_lnd = stepping.nsteps_lnd
 
@@ -215,13 +204,9 @@ function coupler_solve!(stepping, ics, parameters)
     # SETUP ATMOS
     # put all prognostic variable arrays into a vector and ensure that solve can partition them
     T_atm = ics.atm
-    Y_atm = ArrayPartition(( T_atm_0.Yc, T_atm_0.Yf , atm_F_sfc))
+    Y_atm = ArrayPartition((T_atm_0.Yc, T_atm_0.Yf, atm_F_sfc))
     prob_atm = ODEProblem(∑tendencies_atm!, Y_atm, (t_start, t_end), (parameters, atm_T_lnd))
-    integ_atm = init(
-                        prob_atm,
-                        stepping.odesolver,
-                        dt = Δt_cpl / nsteps_atm,
-                        saveat = parameters.saveat,)
+    integ_atm = init(prob_atm, stepping.odesolver, dt = Δt_cpl / nsteps_atm, saveat = parameters.saveat)
 
     # land copies of coupler variables
     T_lnd = ics.lnd
@@ -229,14 +214,10 @@ function coupler_solve!(stepping, ics, parameters)
 
     # SETUP LAND
     prob_lnd = ODEProblem(∑tendencies_lnd!, T_lnd, (t_start, t_end), (parameters, lnd_F_sfc))
-    integ_lnd = init(
-                        prob_lnd,
-                        stepping.odesolver,
-                        dt = Δt_cpl / nsteps_lnd,
-                        saveat = parameters.saveat,)
+    integ_lnd = init(prob_lnd, stepping.odesolver, dt = Δt_cpl / nsteps_lnd, saveat = parameters.saveat)
 
     # coupler stepping
-    for t in (t_start : Δt_cpl : t_end)
+    for t in (t_start:Δt_cpl:t_end)
 
         ## Atmos
         # pre_atmos
@@ -259,7 +240,7 @@ function coupler_solve!(stepping, ics, parameters)
         #  3) store that in the coupler
 
         # negate sign
-        coupler_F_sfc .= - coupler_put(integ_atm.u.x[3]) / Δt_cpl
+        coupler_F_sfc .= -coupler_put(integ_atm.u.x[3]) / Δt_cpl
 
         ## Land
 
@@ -308,24 +289,27 @@ mkpath(path)
 # Plots.mp4(anim, joinpath(path, "heat.mp4"), fps = 10)
 
 # atmos vertical profile at t=0 and t=end
-t0_ρθ = parent(sol_atm.u[1].x[1])[:,4]
-tend_ρθ = parent(sol_atm.u[end].x[1])[:,4]
-t0_u = parent(sol_atm.u[1].x[1])[:,2]
-tend_u = parent(sol_atm.u[end].x[1])[:,2]
-t0_v = parent(sol_atm.u[1].x[1])[:,3]
-tend_v = parent(sol_atm.u[end].x[1])[:,3]
-z_centers =  collect(1:1:length(tend_u))#parent(Fields.coordinate_field(center_space_atm))[:,1]
-Plots.png(Plots.plot([t0_ρθ tend_ρθ],z_centers, labels = ["t=0" "t=end"]), joinpath(path, "T_atm_height.png"))
-Plots.png(Plots.plot([t0_u tend_u],z_centers, labels = ["t=0" "t=end"]), joinpath(path, "u_atm_height.png"))
-Plots.png(Plots.plot([t0_v tend_v],z_centers, labels = ["t=0" "t=end"]), joinpath(path, "v_atm_height.png"))
+t0_ρθ = parent(sol_atm.u[1].x[1])[:, 4]
+tend_ρθ = parent(sol_atm.u[end].x[1])[:, 4]
+t0_u = parent(sol_atm.u[1].x[1])[:, 2]
+tend_u = parent(sol_atm.u[end].x[1])[:, 2]
+t0_v = parent(sol_atm.u[1].x[1])[:, 3]
+tend_v = parent(sol_atm.u[end].x[1])[:, 3]
+z_centers = collect(1:1:length(tend_u))#parent(Fields.coordinate_field(center_space_atm))[:,1]
+Plots.png(Plots.plot([t0_ρθ tend_ρθ], z_centers, labels = ["t=0" "t=end"]), joinpath(path, "T_atm_height.png"))
+Plots.png(Plots.plot([t0_u tend_u], z_centers, labels = ["t=0" "t=end"]), joinpath(path, "u_atm_height.png"))
+Plots.png(Plots.plot([t0_v tend_v], z_centers, labels = ["t=0" "t=end"]), joinpath(path, "v_atm_height.png"))
 
 # time evolution
-atm_sum_u_t = [sum(parent(u.x[1])[:,4]) for u in sol_atm.u] ./ parameters.n .* parameters.zmax_atm * parameters.C_p # J / m2
+atm_sum_u_t = [sum(parent(u.x[1])[:, 4]) for u in sol_atm.u] ./ parameters.n .* parameters.zmax_atm * parameters.C_p # J / m2
 lnd_sfc_u_t = [u[1] for u in sol_lnd.u] * parameters.h_s * parameters.ρ_s * parameters.c_s # J / m2
 
 v1 = lnd_sfc_u_t .- lnd_sfc_u_t[1]
 v2 = atm_sum_u_t .- atm_sum_u_t[1]
-Plots.png(Plots.plot(sol_lnd.t, [v1 v2 v1+v2], labels = ["lnd" "atm" "tot"]), joinpath(path, "energy_both_surface_time.png"))
+Plots.png(
+    Plots.plot(sol_lnd.t, [v1 v2 v1 + v2], labels = ["lnd" "atm" "tot"]),
+    joinpath(path, "energy_both_surface_time.png"),
+)
 
 # relative error
 using Statistics
@@ -352,4 +336,3 @@ linkfig("output/$(dirname)/heat_end.png", "Heat End Simulation")
 
 # Questions / Comments
 # 
-

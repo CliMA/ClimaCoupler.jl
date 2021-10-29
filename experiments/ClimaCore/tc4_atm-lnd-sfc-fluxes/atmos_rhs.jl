@@ -41,7 +41,7 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     (dYc, dYf, dF_sfc) = dY.x
 
     UnPack.@unpack ρ, uv, ρθ = Yc
-    
+
     w = Yf
     dρ = dYc.ρ
     duv = dYc.uv
@@ -55,22 +55,22 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     u_wind = LinearAlgebra.norm(uv_1)
 
     # surface flux calculations 
-    fluxes = calculate_sfc_fluxes(DryMonin(), parameters, T_sfc[1], ρθ_1 / ρ_1, uv_1, ρ_1, t ) 
+    fluxes = calculate_sfc_fluxes(DryMonin(), parameters, T_sfc[1], ρθ_1 / ρ_1, uv_1, ρ_1, t)
 
     surface_flux_ρθ = fluxes.SH
     surface_flux_uv = fluxes.τ
-    
+
     # accumulate in the required right units
     @inbounds begin
-        dY.x[3][1] = (surface_flux_ρθ)  
+        dY.x[3][1] = (surface_flux_ρθ)
         dY.x[3][2] = (surface_flux_uv)[1]
-        dY.x[3][2] = (surface_flux_uv)[2]   
+        dY.x[3][2] = (surface_flux_uv)[2]
     end
-    
+
     # boundary conditions
     bcs_bottom_uv_flux = Operators.SetValue(surface_flux_uv)
     bcs_top_uv_value = Operators.SetValue(uvg)
- 
+
     bcs_bottom_ρθ_flux = Operators.SetValue(Geometry.Cartesian3Vector(surface_flux_ρθ))
     bcs_top_ρθ_flux = Operators.SetValue(Geometry.Cartesian3Vector(zero(FT)))
 
@@ -80,27 +80,20 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     # density
     If = Operators.InterpolateC2F()
     ∂f = Operators.GradientC2F()
-    ∂c = Operators.DivergenceF2C(
-        bottom = bcs_bottom_ρ_flux ,
-        top = bcs_top_ρ_flux ,
-    )
+    ∂c = Operators.DivergenceF2C(bottom = bcs_bottom_ρ_flux, top = bcs_top_ρ_flux)
     @. dρ = -∂c(w * If(ρ))
 
     # potential temperature
     If = Operators.InterpolateC2F()
     ∂f = Operators.GradientC2F()
-    ∂c_adv = Operators.DivergenceF2C( 
+    ∂c_adv = Operators.DivergenceF2C(
         bottom = Operators.SetValue(Geometry.Cartesian3Vector(zero(FT))),
         top = Operators.SetValue(Geometry.Cartesian3Vector(zero(FT))),
     )
-    ∂c_diff = Operators.DivergenceF2C(
-        bottom = bcs_bottom_ρθ_flux,
-        top = bcs_top_ρθ_flux,
-    )
+    ∂c_diff = Operators.DivergenceF2C(bottom = bcs_bottom_ρθ_flux, top = bcs_top_ρθ_flux)
     # TODO!: Undesirable casting to vector required
-    
-    @. dρθ =
-        -∂c_adv(w * If(ρθ)) + ρ * ∂c_diff(Geometry.CartesianVector(ν * ∂f(ρθ / ρ)))
+
+    @. dρθ = -∂c_adv(w * If(ρθ)) + ρ * ∂c_diff(Geometry.CartesianVector(ν * ∂f(ρθ / ρ)))
 
     A = Operators.AdvectionC2C(
         bottom = Operators.SetValue(Geometry.Cartesian12Vector(0.0, 0.0)),
@@ -115,10 +108,7 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     @. duv += ∂c(ν * ∂f(uv)) - A(w, uv)
 
     # w
-    If = Operators.InterpolateC2F(
-        bottom = Operators.Extrapolate(),
-        top = Operators.Extrapolate(),
-    )
+    If = Operators.InterpolateC2F(bottom = Operators.Extrapolate(), top = Operators.Extrapolate())
     ∂f = Operators.GradientC2F()
     ∂c = Operators.GradientF2C()
     Af = Operators.AdvectionF2F()
@@ -130,9 +120,7 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     Φ(z) = grav * z
     Π(ρθ) = C_p * (R_d * ρθ / MSLP)^(R_m / C_v)
     zc = Fields.coordinate_field(axes(ρ))
-    @. dw = B(
-        Geometry.CartesianVector(-(If(ρθ / ρ) * ∂f(Π(ρθ))) - ∂f(Φ(zc))) + divf(ν * ∂c(w)) - Af(w, w),
-    )
+    @. dw = B(Geometry.CartesianVector(-(If(ρθ / ρ) * ∂f(Π(ρθ))) - ∂f(Φ(zc))) + divf(ν * ∂c(w)) - Af(w, w))
 
     return dY
 end
@@ -158,7 +146,7 @@ Initialize fields located at cell centers in the vertical.
     ρ = p / (R_d * θ * (p / MSLP)^(R_d / C_p))
 
     # velocity
-    uv= Geometry.Cartesian12Vector(u0, v0) # u, v components
+    uv = Geometry.Cartesian12Vector(u0, v0) # u, v components
 
     # potential temperature
     ρθ = ρ * T_surf

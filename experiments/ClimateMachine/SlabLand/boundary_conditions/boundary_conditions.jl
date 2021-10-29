@@ -112,4 +112,4 @@ struct CoupledPrimaryBoundary <: AbstractCouplerBoundary end
 struct CoupledSecondaryBoundary <: AbstractCouplerBoundary end
 # # use prescribed flux computed in primary
 """
-struct CoupledSecondaryBoundary  <: AbstractCouplerBoundary end
+struct CoupledSecondaryBoundary <: AbstractCouplerBoundary end

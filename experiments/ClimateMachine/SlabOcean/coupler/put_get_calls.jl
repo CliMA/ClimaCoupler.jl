@@ -9,7 +9,7 @@ function preOcean(csolver)
     mOcean = csolver.component_list.domainOcean.component_model
     mAtmos = csolver.component_list.domainAtmos.component_model
 
-    mOcean.odesolver.rhs!.state_auxiliary.F_ρe_prescribed[mOcean.boundary] .= 
+    mOcean.odesolver.rhs!.state_auxiliary.F_ρe_prescribed[mOcean.boundary] .=
         coupler_get(csolver.coupler, :BoundaryEnergyFlux, mOcean.grid, DateTime(0), u"J")
 end
 
@@ -21,7 +21,14 @@ function postOcean(csolver)
 function postOcean(csolver)
     mOcean = csolver.component_list.domainOcean.component_model
     mAtmos = csolver.component_list.domainAtmos.component_model
-    coupler_put!(csolver.coupler, :SeaSurfaceTemerature, mOcean.state.T_sfc[mOcean.boundary], mOcean.grid.numerical, DateTime(0), u"K")
+    coupler_put!(
+        csolver.coupler,
+        :SeaSurfaceTemerature,
+        mOcean.state.T_sfc[mOcean.boundary],
+        mOcean.grid.numerical,
+        DateTime(0),
+        u"K",
+    )
 end
 
 # Atmos put and get calls
@@ -35,7 +42,7 @@ function preAtmos(csolver)
     mOcean = csolver.component_list.domainOcean.component_model
     mAtmos = csolver.component_list.domainAtmos.component_model
     # Set boundary T_sfc used in atmos at the start of the coupling cycle.
-    mAtmos.odesolver.rhs!.state_auxiliary.T_sfc[mAtmos.boundary] .= 
+    mAtmos.odesolver.rhs!.state_auxiliary.T_sfc[mAtmos.boundary] .=
         coupler_get(csolver.coupler, :SeaSurfaceTemerature, mAtmos.grid.numerical, DateTime(0), u"K")
     # Set atmos boundary flux accumulator to 0.
     mAtmos.state.F_ρe_accum .= 0
@@ -52,10 +59,10 @@ function preAtmos(csolver)
     nel = mAtmos.grid.resolution.elements.vertical
     po = mAtmos.grid.resolution.polynomial_order.vertical
 
-    Earth_sfc_area = FT(4π * 6371000.0 ^ 2)
-    ocean_layer_volume = sum((mOcean.state.weights[:,:,mOcean.state.realelems])[mOcean.boundary])
-    E_Ocean = weightedsum(mOcean.state, 1)  .* p.ρ_o .* p.c_o .* p.h_o ./ ocean_layer_volume # J / m^2
-    E_Atmos = weightedsum(mAtmos.state, idx)  ./  Earth_sfc_area  # J / m^2 
+    Earth_sfc_area = FT(4π * 6371000.0^2)
+    ocean_layer_volume = sum((mOcean.state.weights[:, :, mOcean.state.realelems])[mOcean.boundary])
+    E_Ocean = weightedsum(mOcean.state, 1) .* p.ρ_o .* p.c_o .* p.h_o ./ ocean_layer_volume # J / m^2
+    E_Atmos = weightedsum(mAtmos.state, idx) ./ Earth_sfc_area  # J / m^2 
 
     @info(
         "preatmos",
@@ -79,7 +86,7 @@ function postAtmos(csolver)
 function postAtmos(csolver)
     mOcean = csolver.component_list.domainOcean.component_model
     mAtmos = csolver.component_list.domainAtmos.component_model
-    
+
     # Pass atmos exports to "coupler" namespace
     # 1. Save mean θ flux at the Atmos boundary during the coupling period
 
@@ -90,6 +97,12 @@ function postAtmos(csolver)
         atmos_ρe_sfc = maximum(mAtmos.state.ρe[mAtmos.boundary]),
     )
 
-    coupler_put!(csolver.coupler, :BoundaryEnergyFlux, mAtmos.state.F_ρe_accum[mAtmos.boundary] ./ csolver.dt,
-        mAtmos.grid.numerical, DateTime(0), u"J")
+    coupler_put!(
+        csolver.coupler,
+        :BoundaryEnergyFlux,
+        mAtmos.state.F_ρe_accum[mAtmos.boundary] ./ csolver.dt,
+        mAtmos.grid.numerical,
+        DateTime(0),
+        u"J",
+    )
 end

@@ -19,8 +19,8 @@ end
 
 function (profile::DecayingTemperatureProfile)(params::NamedTuple, z::FT) where {FT}
     R_d = params.R_d
-    g   = params.g
-    p₀  = params.pₒ
+    g = params.g
+    p₀ = params.pₒ
 
     # Scale height for surface temperature
     H_sfc = R_d * profile.T_virt_surf / g
@@ -29,7 +29,7 @@ function (profile::DecayingTemperatureProfile)(params::NamedTuple, z::FT) where 
     tanh_z′ = tanh(z′)
 
     ΔTv = profile.T_virt_surf - profile.T_min_ref
-    Tv  = profile.T_virt_surf - ΔTv * tanh_z′
+    Tv = profile.T_virt_surf - ΔTv * tanh_z′
 
     ΔTv′ = ΔTv / profile.T_virt_surf
     p = -H_t * (z′ + ΔTv′ * (log(1 - ΔTv′ * tanh_z′) - log(1 + tanh_z′) + z′))

@@ -76,7 +76,8 @@ calc_boundary_state!(
     ::Union{NumericalFluxFirstOrder},
     ::Union{Insulating, CoupledSecondaryBoundary},
     ::Union{SlabLandModelSetup},
-    _...,) = nothing
+    _...,
+) = nothing
 
 # """
 #     calc_boundary_state!(::NumericalFluxFirstOrder, ::Penetrable{FreeSlip}, ::ModelSetup)

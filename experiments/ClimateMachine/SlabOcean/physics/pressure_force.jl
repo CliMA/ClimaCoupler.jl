@@ -7,7 +7,7 @@ struct LinearPressureDivergence <: AbstractTerm end
 @inline function calc_component!(flux, ::PressureDivergence, state, aux, physics)
     eos = physics.eos
     parameters = physics.parameters
-    
+
     p = calc_pressure(eos, state, aux, parameters)
 
     flux.ρu += p * I

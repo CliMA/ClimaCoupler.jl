@@ -76,14 +76,14 @@ parameters = (
 end
 
 
-Pkg.activate(joinpath(@__DIR__,"../experiments/ClimaCore/tc1_heat-diffusion-with-slab/"))
+Pkg.activate(joinpath(@__DIR__, "../experiments/ClimaCore/tc1_heat-diffusion-with-slab/"))
 Pkg.instantiate()
 Pkg.precompile()
 
 show_plots = false
 @testset "TC1: Toy example tutorial" begin
     # check if runs
-    include(joinpath(@__DIR__,"../experiments/ClimaCore/tc1_heat-diffusion-with-slab/run.jl"))
+    include(joinpath(@__DIR__, "../experiments/ClimaCore/tc1_heat-diffusion-with-slab/run.jl"))
 
     # conservation checks - add when div operator fixed
     @test rel_error[end] < 1e-8

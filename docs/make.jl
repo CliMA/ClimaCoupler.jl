@@ -3,8 +3,9 @@ using CouplerMachine
 using Literate
 using Pkg
 
+const COUPLER_DIR     = joinpath(@__DIR__, "..")
 const EXPERIMENTS_DIR = joinpath(@__DIR__, "..", "experiments")
-const OUTPUT_DIR      = joinpath(@__DIR__, "..", "docs/src/generated")
+const OUTPUT_DIR      = joinpath(@__DIR__, "src/generated")
 
 # experiments = [
 #               ]
@@ -16,29 +17,29 @@ const OUTPUT_DIR      = joinpath(@__DIR__, "..", "docs/src/generated")
 
 # "Page Name" => "path/to/generated_file.md"
 
-# tutorial
+# tutorials & experiments
 # - generate tutorial files
-coupler_dir =  dirname(dirname(pathof(CouplerMachine)));
-tutorial_dir = string(coupler_dir,"/experiments/ClimaCore/tc1_heat-diffusion-with-slab/")
-tutorial_name = "run"
-Pkg.activate(string(tutorial_dir,"/Project.toml"))
+tutorial_dir = joinpath(EXPERIMENTS_DIR, "ClimaCore/tc1_heat-diffusion-with-slab/")
+tutorial_name = "run.jl"
+Pkg.activate(tutorial_dir)
+include(joinpath(tutorial_dir, tutorial_name))
 Literate.markdown(
-                string(tutorial_dir, tutorial_name, ".jl");
+                joinpath(tutorial_dir, tutorial_name), OUTPUT_DIR;
                 execute = true,
                 documenter = false,
                 )
 
-# - move tutorial files in src
-mv(string(coupler_dir, "/docs/", tutorial_name, ".md"), string(coupler_dir,"/docs/src/",tutorial_name, ".md"), force = true)
-files = readdir(string(coupler_dir,"/docs/images/"))
+# - move tutorial files to docs/src
+IMAGE_DIR = joinpath(tutorial_dir,"images/")
+files = readdir(IMAGE_DIR)
 png_files = filter(endswith(".png"),files)
-for (i,file) in enumerate(png_files)
-    mv(string(coupler_dir, "/docs/images/", file), string(coupler_dir,"/docs/src/images/",file), force = true)
+for file in png_files
+    mkpath(joinpath(OUTPUT_DIR, "images/"))
+    cp(joinpath(IMAGE_DIR, file), joinpath(OUTPUT_DIR, "images/",file), force = true)
 end
-rm(string(coupler_dir, "/docs/images/"), force = true)
 
 # pages layout
-experiment_pages = [ "run.md" ]
+experiment_pages = [ "generated/run.md" ]
 interface_pages = ["couplerstate.md", "timestepping.md"]
 
 pages = Any[

@@ -79,7 +79,7 @@
 ## import Pkg; Pkg.add(url="https://github.com/CliMA/ClimaCore.jl",rev="main")
 
 #  - load external packages:
-import ClimaCore.Geometry, LinearAlgebra, UnPack
+import LinearAlgebra, UnPack
 import ClimaCore:
     Fields,
     Domains,
@@ -102,10 +102,9 @@ using OrdinaryDiffEq
 
 using Statistics
 
-# ## Setup Logging Information
-## comment out for tutorial generation
-## global_logger(TerminalLogger())
-## const CI = !isnothing(get(ENV, "CI", nothing))
+#src ## Setup Logging Information
+global_logger(TerminalLogger()) #src
+const CI = !isnothing(get(ENV, "CI", nothing)) #src
 
 # ## Define Parameters
 #  - Global Constants
@@ -140,12 +139,12 @@ Heat diffusion equation
         T  = 280 K              at z = zmax_atm
         dT/dt = - ∇ F_sfc       at z = zmin_atm
 
-    We also use this model to calculate and accumulate the downward surface fluxes, F_sfc:
-        F_sfc = - λ * (T_sfc - T1) 
-        d(F_integrated)/dt  = F_sfc
-        where
-            F_integrated is reset to 0 at the beginning of each coupling cycle
-            T1 = atm temperature near the surface (here assumed equal to the first model level)
+We also use this model to calculate and accumulate the downward surface fluxes, F_sfc:
+    F_sfc = - λ * (T_sfc - T1) 
+    d(F_integrated)/dt  = F_sfc
+    where
+        F_integrated is reset to 0 at the beginning of each coupling cycle
+        T1 = atm temperature near the surface (here assumed equal to the first model level)
 """
 function ∑tendencies_atm!(du, u, (parameters, T_sfc), t)
     T = u.x[1] # u.x = vector of prognostic variables from DifferentialEquations
@@ -300,7 +299,7 @@ Plots.GRBackend()
 
 show_plots = isdefined(Main,:SHOWPLOTS) ? SHOWPLOTS : true
 
-path = string(@__DIR__ , "/images/")
+path = joinpath(dirname(@__FILE__), "images/")
 mkpath(path);
 
 # - Vertical profile at start and end
@@ -325,20 +324,20 @@ rel_error = (total .- total[1]) / mean(total);
 show_plots ? Plots.png(Plots.plot(sol_lnd.t, rel_error, labels = ["tot"], xlabel = "time (s)", ylabel = "relative error"), joinpath(path, "tc1_f3.png")) : nothing
 # ![](images/tc1_f3.png)
 
-## # - Animation
-## anim = Plots.@animate for u in sol_atm.u
-##     Plots.plot(u.x[1], xlim=(220,280))
-## end
-## Plots.mp4(anim, joinpath(path, "heat.mp4"), fps = 10)
-##
-## function linkfig(figpath, alt = "")
-##     # buildkite-agent upload figpath
-##     # link figure in logs if we are running on CI
-##     if get(ENV, "BUILDKITE", "") == "true"
-##         artifact_url = "artifact://$figpath"
-##         print("\033]1338;url='$(artifact_url)';alt='$(alt)'\a\n")
-##     end
-## end
-##
-## dirname = "heat"
-## linkfig("output/$(dirname)/heat_end.png", "Heat End Simulation")
+#src # - Animation
+#src anim = Plots.@animate for u in sol_atm.u
+#src     Plots.plot(u.x[1], xlim=(220,280))
+#src end
+#src Plots.mp4(anim, joinpath(path, "heat.mp4"), fps = 10)
+#src
+#src function linkfig(figpath, alt = "")
+#src     # buildkite-agent upload figpath
+#src     # link figure in logs if we are running on CI
+#src     if get(ENV, "BUILDKITE", "") == "true"
+#src         artifact_url = "artifact://$figpath"
+#src         print("\033]1338;url='$(artifact_url)';alt='$(alt)'\a\n")
+#src     end
+#src end
+#src
+#src dirname = "heat"
+#src linkfig("output/$(dirname)/heat_end.png", "Heat End Simulation")

@@ -1,20 +1,32 @@
 using Documenter
 using CouplerMachine
 using Literate
+using Pkg
 
+const COUPLER_DIR = joinpath(@__DIR__, "..")
 const EXPERIMENTS_DIR = joinpath(@__DIR__, "..", "experiments")
-const OUTPUT_DIR = joinpath(@__DIR__, "..", "docs/src/generated")
+const OUTPUT_DIR = joinpath(@__DIR__, "src/generated")
 
-experiments = []
+# tutorials & experiments
+# - generate tutorial files
+tutorial_dir = joinpath(EXPERIMENTS_DIR, "ClimaCore/tc1_heat-diffusion-with-slab/")
+tutorial_name = "run.jl"
+Pkg.activate(tutorial_dir)
+Pkg.instantiate()
+include(joinpath(tutorial_dir, tutorial_name))
+Literate.markdown(joinpath(tutorial_dir, tutorial_name), OUTPUT_DIR; execute = true, documenter = false)
 
-for experiment in experiments
-    experiment_filepath = joinpath(EXPERIMENTS_DIR, experiment)
-    Literate.markdown(experiment_filepath, OUTPUT_DIR, documenter = true)
+# - move tutorial files to docs/src
+IMAGE_DIR = joinpath(tutorial_dir, "images/")
+files = readdir(IMAGE_DIR)
+png_files = filter(endswith(".png"), files)
+for file in png_files
+    mkpath(joinpath(OUTPUT_DIR, "images/"))
+    cp(joinpath(IMAGE_DIR, file), joinpath(OUTPUT_DIR, "images/", file), force = true)
 end
 
-# "Page Name" => "path/to/generated_file.md"
-experiment_pages = []
-
+# pages layout
+experiment_pages = ["generated/run.md"]
 interface_pages = ["couplerstate.md", "timestepping.md"]
 
 pages = Any["Home" => "index.md", "Examples" => experiment_pages, "Coupler Interface" => interface_pages]

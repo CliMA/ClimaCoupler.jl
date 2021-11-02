@@ -26,7 +26,7 @@
 #  - `F_sfc` is the thermal boundary flux (see below for calculation)
 
 # # Model 2
-# Model 2 represents a simplified soil (lnd) domain as a slab, represented by the ODE:
+# Model 2 assumes a simplified soil (lnd) domain to be a slab, represented by an ODE for its surface temperature:
 
 # ``
 #    \frac{dT_{sfc}}{dt} = - (F_{accumulated} + G ) / h_{lnd}
@@ -43,6 +43,7 @@
 #  - `T_sfc` is the temperature
 #  - `h_lnd` is the slab thickness
 #  - `F_integrated` and `F_accumulated` thermal boundary fluxes, respectively (see below for calculation)
+#  - `G` represents soil physics, which we assume to be 0 for now
 
 # # Coupling and Flux Calculation
 
@@ -50,7 +51,7 @@
 # to calculate and accumulate the downward surface fluxes, `F_sfc`:
 
 # ``
-#    F_{sfc} = - λ * (T_{sfc} - T1) 
+#    F_{sfc} = - λ (T_{sfc} - T1) 
 # ``
 
 # ``
@@ -60,6 +61,9 @@
 # where
 #  - `T1` is the atm temperature near the surface (here assumed equal to the first model level)
 #  - `λ` a constant relaxation timescale
+
+# Note that in a more realistic setup the above equations would be weighted by their domains' densities and thermal heat capacities, so that the thermal flux would have the units of W m$^{-2}$. 
+# Here we assume these are unity for both domains.
 
 # Sequential coupling has the following steps:
 # 1) pre-Model 1: supply Model 1 with `T_sfc` for the `F_sfc` calculation; reset `F_integrated` to zero

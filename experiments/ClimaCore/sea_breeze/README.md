@@ -13,6 +13,12 @@ $$ \frac{\partial \rho \vec{u}}{\partial t} + \nabla \cdot ({\rho \vec{u} \otime
 Potential temperature:
 $$ \frac{\partial \rho \theta}{\partial t} + \nabla \cdot (\rho \theta \vec{u}) = \nabla \cdot (\kappa \rho \nabla \theta) $$
 
+
+Total Energy (possibly replace potential temperature equation with total energy conservation):
+$$ \frac{\partial \rho e_{tot}}{\partial t} + \nabla \cdot ((\rho e_{tot} + p )\vec{u}) = \nabla \cdot (\kappa \rho \nabla h_{tot}), $$
+ 
+where $h_{tot}$ is the total specific enthalpy given by internal and potential energy contributions. 
+
 Tracer transport: 
 $$ \frac{\partial \rho \chi}{\partial t} + \nabla \cdot (\rho \chi \vec{u}) = \nabla \cdot (\kappa \rho \nabla \chi) + S(\chi, ...)$$
 

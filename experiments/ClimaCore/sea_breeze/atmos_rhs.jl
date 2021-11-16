@@ -1,6 +1,5 @@
-push!(LOAD_PATH, joinpath(@__DIR__, "..", ".."))
+# push!(LOAD_PATH, joinpath(@__DIR__, "..", ".."))
 
-using Test
 using StaticArrays, IntervalSets, LinearAlgebra, UnPack
 
 import ClimaCore:
@@ -153,16 +152,30 @@ function rhs!(dY, Y, _, t)
     # spectral horizontal operators
     hdiv = Operators.Divergence()
     hgrad = Operators.Gradient()
-    hwdiv = Operators.WeakDivergence()
-    hwgrad = Operators.WeakGradient()
 
     # vertical FD operators with BC's
     ## vertical gradient of a vertical vector 
+    vdiv_mass = Operators.DivergenceF2C(
+        bottom = Operators.SetValue(Geometry.WVector(0.0)),
+        top = Operators.SetValue(Geometry.WVector(0.0)),
+    )
+
     vdivf2c = Operators.DivergenceF2C(
         bottom = Operators.SetValue(Geometry.WVector(0.0)),
         top = Operators.SetValue(Geometry.WVector(0.0)),
     )
+    vdivc2f = Operators.DivergenceC2F(
+        bottom = Operators.SetDivergence(Geometry.WVector(0.0)),
+        top = Operators.SetDivergence(Geometry.WVector(0.0)),
+    )
     
+    vvdivf2c = Operators.DivergenceC2F(
+        bottom = Operators.SetValue(
+            Geometry.WVector(0.0) ⊗ Geometry.WVector(0.0),
+        ),
+        top = Operators.SetValue(Geometry.WVector(0.0) ⊗ Geometry.WVector(0.0)),
+    )
+
     ## vertical gradient of a horizontal vector 
     uvdivf2c = Operators.DivergenceF2C(
         bottom = Operators.SetValue(
@@ -232,11 +245,17 @@ function rhs!(dY, Y, _, t)
     @. dρw = -κ₄ * hdiv(Yfρ * hgrad(dρw))
 
     # density
-    @. dYc.ρ = -∂(ρw)
+    @. dYc.ρ = -vdiv_mass(ρw)
     @. dYc.ρ -= hdiv(Yc.ρuₕ)
 
-    # potential temperature
-    @. dYc.ρuₕ += -uvdivf2c(ρw ⊗ If_bc(uₕ))
+    # horizontal velocity
+    @. dYc.ρuₕ -= uvdivf2c(ρw ⊗ If(uₕ))
+    Ih = Ref(
+        Geometry.Axis2Tensor(
+            (Geometry.UAxis(), Geometry.UAxis()),
+            @SMatrix [1.0]
+        ),
+    )
     @. dYc.ρuₕ -= hdiv(Yc.ρuₕ ⊗ uₕ + p * Ih)
 
     # vertical momentum
@@ -244,9 +263,9 @@ function rhs!(dY, Y, _, t)
         Geometry.transform(
             Geometry.WAxis(),
             -(∂f(p)) - If(Yc.ρ) * ∂f(Φ(coords.z)),
-        ) - vvdivc2f(Ic(ρw ⊗ w)),
+        ) - vvdivf2c(Ic(ρw ⊗ w)),
     )
-    uₕf = @. If_bc(Yc.ρuₕ / Yc.ρ) # requires boundary conditions
+    uₕf = @. If(Yc.ρuₕ / Yc.ρ) # requires boundary conditions
     @. dρw -= hdiv(uₕf ⊗ ρw)
 
     ### UPWIND FLUX CORRECTION 
@@ -268,12 +287,14 @@ function rhs!(dY, Y, _, t)
     #  1c) horizontal div of horizontal grad of vert momentum
     @. dρw += hdiv(κ₂ * (Yfρ * hgrad(ρw / Yfρ)))
     #  1d) vertical div of vertical grad of vert momentun
-    @. dρw += vvdivc2f(κ₂ * (Yc.ρ * ∂c(ρw / Yfρ)))
+    @. dρw += vdivc2f(κ₂ * (Yc.ρ * ∂c(ρw / Yfρ)))
 
     #  2a) horizontal div of horizontal grad of potential temperature
     @. dYc.ρθ += hdiv(κ₂ * (Yc.ρ * hgrad(Yc.ρθ / Yc.ρ)))
     #  2b) vertical div of vertial grad of potential temperature
-    @. dYc.ρθ += ∂(κ₂ * (Yfρ * ∂f(Yc.ρθ / Yc.ρ)))
+    # TODO Fix Bounds error ?? 
+    # BoundsError: attempt to access 10×1 view(::Array{Float64, 4}, :, 1, 2:2, 1) with eltype Float64 at index [0, 1:1]
+    @. dYc.ρθ += ∂c(κ₂ * (Yfρ * ∂f(Yc.ρθ / Yc.ρ)))
 
     Spaces.weighted_dss!(dYc)
     Spaces.weighted_dss!(dρw)
@@ -287,7 +308,7 @@ rhs!(dYdt, Y, nothing, 0.0);
 # run!
 using OrdinaryDiffEq
 Δt = 0.025
-prob = ODEProblem(rhs!, Y, (0.0, 700.0))
+prob = ODEProblem(rhs!, Y, (0.0, 1.0))
 sol = solve(
     prob,
     SSPRK33(),

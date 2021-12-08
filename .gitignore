@@ -21,6 +21,7 @@ TAGS
 *.mp4
 
 # Docs
+docs/Manifest.toml
 docs/build/
 docs/src/generated/
 !docs/src/assets/*.png

@@ -1,5 +1,5 @@
 #!/usr/bin/env julia --project
-using CouplerMachine
+using ClimaCoupler
 using Unitful
 
 include("utilities/boilerplate.jl")

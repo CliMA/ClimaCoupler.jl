@@ -2,7 +2,7 @@
 
 # add https://github.com/CliMA/ClimaCore.jl/#main
 # add https://github.com/CliMA/ClimaAtmos.jl/#main
-# add https://github.com/CliMA/CouplerMachine.jl/#main
+# add https://github.com/CliMA/ClimaCoupler.jl/#main
 # import Plots
 
 using ClimaCore.Geometry

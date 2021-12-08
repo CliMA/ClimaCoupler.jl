@@ -1,9 +1,9 @@
 """
-    CouplerMachine
+    ClimaCoupler
 
 Coupling module sufficient for initial atmos-ocean-land coupled simulation.
 """
-module CouplerMachine
+module ClimaCoupler
 
 include("CoupledSimulations/clock.jl")
 include("CoupledSimulations/coupled_simulation.jl")

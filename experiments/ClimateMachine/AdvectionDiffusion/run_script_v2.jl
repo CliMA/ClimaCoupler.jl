@@ -77,7 +77,7 @@ using ClimateMachine.BalanceLaws:
     vars_state,
     number_states
 
-using CouplerMachine
+using ClimaCoupler
 
 using Unitful
 using Dates: DateTime

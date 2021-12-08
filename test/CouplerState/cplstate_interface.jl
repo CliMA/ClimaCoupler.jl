@@ -1,6 +1,6 @@
 using Test
 using Random
-using CouplerMachine, Dates, Unitful
+using ClimaCoupler, Dates, Unitful
 
 @testset "Coupler Interface" begin
     Random.seed!(26)

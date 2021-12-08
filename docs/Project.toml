@@ -1,5 +1,5 @@
 [deps]
-CouplerMachine = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
+ClimaCoupler = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"

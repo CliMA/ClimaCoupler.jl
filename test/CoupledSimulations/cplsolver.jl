@@ -1,5 +1,5 @@
 using Test
-using CouplerMachine
+using ClimaCoupler
 using ClimateMachine.GenericCallbacks, ClimateMachine.ODESolvers
 using Dates, Unitful, LinearAlgebra
 

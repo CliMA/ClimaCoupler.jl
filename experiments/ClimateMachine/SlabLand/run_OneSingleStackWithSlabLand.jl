@@ -1,4 +1,4 @@
-using CouplerMachine
+using ClimaCoupler
 
 include("utilities/boilerplate.jl")
 

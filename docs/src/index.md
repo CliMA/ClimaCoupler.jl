@@ -1,12 +1,12 @@
-# CouplerMachine.jl
+# ClimaCoupler.jl
 
 *Coupling CliMA Models*
 
 ```@meta
-CurrentModule = CouplerMachine
+CurrentModule = ClimaCoupler
 ```
 
-CouplerMachine.jl provides a means to couple [CliMA](https://github.com/CliMA) 
+ClimaCoupler.jl provides a means to couple [CliMA](https://github.com/CliMA) 
 model components. It is designed to provide a flexible way to map boundary fluxes
 of quantities, like moisture and heat, that leave one component model
 (for example the atmosphere) to boundary fluxes of another component model
@@ -17,13 +17,13 @@ Functionality includes:
 - support for mapping import and export boundary information between components
   so that fluxes of properties transferred between components are conserved.
 
-The CouplerMachine supports coupling components that are all within the same process
+The ClimaCoupler supports coupling components that are all within the same process
 or coupling components (using MPI) that are running on different processes.
 
 | ![Coupler Scheme](images/cplsetup.png) |
 |:--:|
-| *CouplerMachine allows for independent development of interchangeable component models.* |
+| *ClimaCoupler allows for independent development of interchangeable component models.* |
 
 ```@docs
-    CouplerMachine
+    ClimaCoupler
 ```

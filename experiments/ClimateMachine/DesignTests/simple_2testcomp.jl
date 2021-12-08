@@ -19,7 +19,7 @@ using MPI
 using Statistics
 
 ## To couple
-using CouplerMachine
+using ClimaCoupler
 using Unitful, Dates
 
 ## To create meshes & grids

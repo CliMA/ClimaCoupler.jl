@@ -1,6 +1,6 @@
 #!/usr/bin/env julia --project
 include("utilities/boilerplate.jl")
-using CouplerMachine
+using ClimaCoupler
 
 ########
 # Set up parameters and initial conditions

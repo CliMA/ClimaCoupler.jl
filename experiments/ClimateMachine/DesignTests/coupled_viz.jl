@@ -6,7 +6,7 @@ Pkg.add(url = "https://github.com/clima/climatemachine.jl", rev = "master")
 using ClimateMachine
 
 # To test coupling
-#using CouplerMachine.Coupling
+#using ClimaCoupler.Coupling
 
 # To create meshes (borrowed from Ocean for now!)
 using ClimateMachine.Ocean.Domains

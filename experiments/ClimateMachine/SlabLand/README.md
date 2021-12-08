@@ -92,7 +92,7 @@ $$T_{sfc}^{n+1} = T_{sfc}^n +\frac{(F_{tot}^{n} + G^{n})}{\rho_s c_s h_s}\Delta 
 ## **Coupler**
 
 ### 1. Formulation
-- we're using our sequential coupler, which is described [here](https://clima.github.io/CouplerMachine/dev/timestepping/)
+- we're using our sequential coupler, which is described [here](https://clima.github.io/ClimaCoupler/dev/timestepping/)
 ### 2. Surface Flux Handling
 1. Flux calculation
     - function `calculate_land_sfc_fluxes(_...)` is defined in `coupler/surface_fluxes.jl`, and is used for:

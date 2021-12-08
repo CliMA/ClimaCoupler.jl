@@ -1,4 +1,4 @@
-name = "CouplerMachine"
+name = "ClimaCoupler"
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 authors = ["jbmackay <jbmackay@caltech.edu>"]
 version = "0.1.0"

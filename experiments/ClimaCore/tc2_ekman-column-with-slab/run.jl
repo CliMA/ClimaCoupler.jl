@@ -329,7 +329,7 @@ end
 linkfig("output/$(dirname)/heat_end.png", "Heat End Simulation")
 
 # TODO here
-# - integrate CouplerMachine.jl
+# - integrate ClimaCoupler.jl
 # - revamp for 2D 
 # - integrate SurfaceFluxes.jl
 # - revamp for 2D 

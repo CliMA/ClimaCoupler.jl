@@ -1,5 +1,5 @@
 using Test
-using CouplerMachine: Clock, tick!, stop_time_exceeded
+using ClimaCoupler: Clock, tick!, stop_time_exceeded
 
 @testset "Clock" begin
     time_info = (start = 0.0, dt = 0.5, stop = 2.0)

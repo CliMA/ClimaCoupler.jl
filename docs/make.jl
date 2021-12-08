@@ -1,7 +1,5 @@
-using Documenter
-using CouplerMachine
-using Literate
-using Pkg
+using ClimaCoupler
+using Documenter, Literate, Pkg
 
 const COUPLER_DIR = joinpath(@__DIR__, "..")
 const EXPERIMENTS_DIR = joinpath(@__DIR__, "..", "experiments")
@@ -32,9 +30,9 @@ interface_pages = ["couplerstate.md", "timestepping.md"]
 pages = Any["Home" => "index.md", "Examples" => experiment_pages, "Coupler Interface" => interface_pages]
 
 
-makedocs(sitename = "CouplerMachine", format = Documenter.HTML(), modules = [CouplerMachine], pages = pages)
+makedocs(sitename = "ClimaCoupler", format = Documenter.HTML(), modules = [ClimaCoupler], pages = pages)
 
 # Documenter can also automatically deploy documentation to gh-pages.
 # See "Hosting Documentation" and deploydocs() in the Documenter manual
 # for more information.
-deploydocs(repo = "<github.com/CliMA/CouplerMachine.jl.git>", push_preview = true, devbranch = "main", forcepush = true)
+deploydocs(repo = "<github.com/CliMA/ClimaCoupler.jl.git>", push_preview = true, devbranch = "main", forcepush = true)

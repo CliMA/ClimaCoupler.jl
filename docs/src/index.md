@@ -22,7 +22,7 @@ or coupling components (using MPI) that are running on different processes.
 
 | ![Coupler Scheme](images/cplsetup.png) |
 |:--:|
-| *ClimaCoupler allows for independent development of interchangeable component models.* |
+| *ClimaCoupler.jl allows for independent development of interchangeable component models.* |
 
 ```@docs
     ClimaCoupler

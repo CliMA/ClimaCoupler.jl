@@ -1,6 +1,6 @@
 # Coupled Simulations & Timestepping
 
-`ClimaCoupler` organizes coupled models and their execution
+`ClimaCoupler.jl` organizes coupled models and their execution
 via the [`CoupledSimulation`](@ref) interface. An implementation
 of a [`CoupledSimulation`](@ref), like any CliMA simulation, must 
 implement a [`ClimaCoupler.step!`](@ref) method, which in this context specifies

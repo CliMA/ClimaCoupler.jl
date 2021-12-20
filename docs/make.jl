@@ -30,7 +30,7 @@ interface_pages = ["couplerstate.md", "timestepping.md"]
 pages = Any["Home" => "index.md", "Examples" => experiment_pages, "Coupler Interface" => interface_pages]
 
 
-makedocs(sitename = "ClimaCoupler", format = Documenter.HTML(), modules = [ClimaCoupler], pages = pages)
+makedocs(sitename = "ClimaCoupler.jl", format = Documenter.HTML(), modules = [ClimaCoupler], pages = pages)
 
 # Documenter can also automatically deploy documentation to gh-pages.
 # See "Hosting Documentation" and deploydocs() in the Documenter manual

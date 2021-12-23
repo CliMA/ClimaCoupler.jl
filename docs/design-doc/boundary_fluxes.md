@@ -17,6 +17,9 @@
 - the above should be consistent with the [CliMA Airspace plan](https://www.overleaf.com/project/6169b2b29040a9c1d73e2e38). 
 
 *Currently, we are using the first approach as it facilitates prototyping (since all flux calculations are contained within the custom BC), but when optimising for performance we will compare both approaches.* 
-    
+
+## State passinbg for flux calculation
+- last timestep or some average ofer the last coupling timestep?
+
 ## Domain partition
 - this is done via regridding onto an exchange grid - see [regrigging](regridding.md)

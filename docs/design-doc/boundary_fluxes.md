@@ -1,6 +1,6 @@
-# Boundary fluxes
+# **Boundary flux and state exchanges**
 
-## Calculation & accumulation
+# Calculation & accumulation
 - fluxes are calculated using SurfaceFluxes.jl or a custom calculation, which can be called from:
     - the atmos model BC
         - can be specified as a coupled BC (e.g. [sea breeze example](https://github.com/CliMA/ClimaCoupler.jl/blob/as/agu-seabreeze/experiments/ClimaCore/sea_breeze/coupledbc.jl))
@@ -18,8 +18,11 @@
 
 *Currently, we are using the first approach as it facilitates prototyping (since all flux calculations are contained within the custom BC), but when optimising for performance we will compare both approaches.* 
 
-## State passinbg for flux calculation
-- last timestep or some average ofer the last coupling timestep?
+## State passing for flux calculation
+- should we pass last timestep or some average of the last coupling timestep? TBD
 
 ## Domain partition
 - this is done via regridding onto an exchange grid - see [regrigging](regridding.md)
+
+# Plan
+- example for optimally estimating atmos state (average or interpolation) for land state calculation (not fluxes) *[not high priority]*

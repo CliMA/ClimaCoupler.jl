@@ -18,11 +18,11 @@
 
 *Currently, we are using the first approach as it facilitates prototyping (since all flux calculations are contained within the custom BC), but when optimising for performance we will compare both approaches.* 
 
-## State passing for flux calculation
+## State passing for full SVAT scheme flux calculation
 - should we pass last timestep or some average of the last coupling timestep? TBD
 
 ## Domain partition
-- this is done via regridding onto an exchange grid - see [regrigging](regridding.md)
+- this is done via regridding onto an overlaping mesh - see [regrigging](regridding.md)
 
 # Plan
 - example for optimally estimating atmos state (average or interpolation) for land state calculation (not fluxes) *[not high priority]*

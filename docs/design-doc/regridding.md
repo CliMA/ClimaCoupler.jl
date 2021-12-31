@@ -61,7 +61,7 @@ Q: SE{1} in CG caused instability, correct?
     - finish off the current test cases
     - 2D SE cases
 - Spherical [Lenka,Valeria,Ben-Jan/Feb]
-    - read TempestRemap documentation + familiarise with code
-    - get familiar with mesh differences
-    - adapter design + implementation
+    - read TempestRemap documentation + familiarise with code [2d]
+    - get familiar with mesh differences [3d]
+    - adapter design + implementation [5d]
     - prototype julia version [long-term]

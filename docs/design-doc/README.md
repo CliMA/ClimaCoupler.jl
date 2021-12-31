@@ -10,7 +10,7 @@ The `CliMACoupler` is designed primarily to support communication between differ
 - [terminology](terminology.md)
 - [interface](interface.md)
 - [coupler timestepping](timestepping.md)
-- [regridding & masking](regridding.md)
+- [regridding & redistribution](regridding.md)
 - [coupled boundary fluxes](boundary_fluxes.md)
 - [diagnostics accumulation](diagnostics.md)
 - [quality control](quality_control.md)

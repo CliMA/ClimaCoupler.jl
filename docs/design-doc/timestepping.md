@@ -41,5 +41,10 @@ There are two modes in which we can run the coupler:
 - multi-node parallel prototype (??)
     - dependency on MPI implementation
 
+- future research - [time parallelisation](https://computing.llnl.gov/projects/sundials)
+
 # Ref:
 - https://earthsystemmodeling.org/nuopc/
+- OASIS: 
+    - [craig et al 17](https://gmd.copernicus.org/articles/10/3297/2017/)
+    - [OASIS User guide](https://gitlab.com/cerfacs/oasis3-mct/-/blob/OASIS3-MCT_5.0/doc/oasis3mct_UserGuide.pdf)

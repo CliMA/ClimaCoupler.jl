@@ -37,24 +37,22 @@ Note:
         - overlap_weights (lengths or areas), depending on source and target:
             - 1D: SE{1} > SE{1}
             - 2D: SE{1} > SE{1}
-
             - 1D: SE{N} > SE{1}
             - 1D: SE{1} > SE{N}
+
+            - 2D: SE{N} > SE{1}
+            - 2D: SE{1} > SE{N}
+
             - where SE{1} ~ FV
         - local_weights
             - wj = space.local_geometry.WJ
 - remap!
     - `mul!(vec(parent(target_field)), R.map, vec(parent(source_field)))`
 
-## TempestRemap
+# TempestRemap
 - TempestRemap uses a quadrature-based approach to produce a “first guess” operator that is then projected onto the space of conservative and consistent solutions using a novel least-squares formulation. The resulting method **avoids the need for line integrals and can be used to guarantee conservation and consistency** (and, if desired, monotonicity) of the linear map.
+- see here for more details on usage with clima core. 
 
-# Refs 
-- [Ullrich & Taylor 15](https://journals.ametsoc.org/view/journals/mwre/143/6/mwr-d-14-00343.1.xml )
-- [Ullrich et al. 16](https://journals.ametsoc.org/view/journals/mwre/144/4/mwr-d-15-0301.1.xml)
-
-Q: in CG cartesian do not need to do the projection to conserative and consistent space because integration is exact, right? What about spherical?
-Q: SE{1} in CG caused instability, correct?
 
 # Plan
 - Cartesian [Ben,Valeria,Lenka-Jan/Feb] 

@@ -21,38 +21,29 @@ Note:
 - monotone linear maps can be at most 2nd order if face size of target ~ face size of source. Otherwise 1st order. 
 
 # General steps
-- Example: 1D FV > SE
-    - 1st order monotone FV map: $R_{ij} = J^{ov}_{ij} / J^t_i$, where $\Omega_{ij}^{ov} = \Omega_i^t \cap \Omega_i^t$ is a local overlapping region which belongs to a set of $\Omega^{ov}$ so that $\Omega_{j,i}^{s,t} = \sum_{i=1}^{f^{s,t}} \Omega_{ij}^{ov}$
-    1. define continuous function of target and source dofs ($\tilde{J}^s_j(x)$ and $\tilde{J}^t_i(x)$)
-        - for FV $\tilde{J}$ = 1 within face and 0 elsewhere
-        - for SE - continuous function associated with each dof are computed using a tensor product of polynomials
-    2. Enforce that $\sum \tilde{J} = J$
-    3. define $R_{ij} = \frac{1}{J^t_i}\int \tilde{J}^s_j(x) \tilde{J}^t_i(x) dx$ (numerical integration can be non-conservative. In that case, we can project coefficients into the space of consrevative maps to recover conservation)
-    - see [Ullrich & Taylor 15 Appendix](https://journals.ametsoc.org/view/journals/mwre/143/6/mwr-d-14-00343.1.xml ) for a more concrete example
-
-# ClimaCore
-- for cartesian regridding
-- R = LinearRemap 
-    - `linear_remap_op = overlap_weights / local_weights(target)`
-        - overlap_weights (lengths or areas), depending on source and target:
-            - 1D: SE{1} > SE{1}
-            - 2D: SE{1} > SE{1}
-            - 1D: SE{N} > SE{1}
-            - 1D: SE{1} > SE{N}
-
-            - 2D: SE{N} > SE{1}
-            - 2D: SE{1} > SE{N}
-
-            - where SE{1} ~ FV
-        - local_weights
-            - wj = space.local_geometry.WJ
-- remap!
-    - `mul!(vec(parent(target_field)), R.map, vec(parent(source_field)))`
-
-# TempestRemap
-- TempestRemap uses a quadrature-based approach to produce a “first guess” operator that is then projected onto the space of conservative and consistent solutions using a novel least-squares formulation. The resulting method **avoids the need for line integrals and can be used to guarantee conservation and consistency** (and, if desired, monotonicity) of the linear map.
-- see here for more details on usage with clima core. 
-
+1. obtain source and target meshes: $\Omega_j^s$ and $\Omega_i^t$
+2. generate the overlap mesh: $\Omega_{ij}^{ov} = \Omega_j^s \cap \Omega_i^t$
+3. define continuous function of target and source dofs ($\tilde{J}^s_j(x)$ and $\tilde{J}^t_i(x)$)
+    - FV: $\tilde{J}$ = 1 within face and 0 elsewhere
+    - SE: continuous function associated with each dof are computed using a tensor product of polynomials
+4. define $R_{ij} = \frac{1}{J^t_i}\int \tilde{J}^s_j(x) \tilde{J}^t_i(x) dx$ 
+    - if numerical integration non-conservative, project coefficients into the space of conservative maps to recover conservation)
+    
+# ClimaCore usage
+- in the intermediate term, we develop our own regridding for cartesian domains, and for regridding on a sphere we use the published TempestRemap (which does not fully support Cartesian regridding):
+    - Cartesian: [ClimaCore regridding](https://github.com/CliMA/ClimaCore.jl/blob/main/src/Operators/remapping.jl) 
+        - remap operator generation
+            - `local_weights = space.local_geometry.WJ`
+            - `linear_remap_op = overlap_weights / local_weights(target)`
+        -  remap! operator application
+            - `mul!(vec(parent(target_field)), R.map, vec(parent(source_field)))`
+    - Spherical: [ClimaCoreTempestRemap](https://github.com/CliMA/ClimaCore.jl/tree/ln/exodus/lib/ClimaCoreTempestRemap)
+        - this helps write and read files formatted in TempestRemap format
+        - we use the TempestRemap_jll helper to call TempestRemap directly from Julia to generate the mapping weights from source and target meshes, and the map application can be done within the ClimaCoupler
+        - refs:
+            - see TempestRemap repo
+            - [Ullrich & Taylor 15](https://journals.ametsoc.org/view/journals/mwre/143/6/mwr-d-14-00343.1.xml ) 
+            - our notes on Tempest summarizing relevant info
 
 # Plan
 - Cartesian [Ben,Valeria,Lenka-Jan/Feb] 

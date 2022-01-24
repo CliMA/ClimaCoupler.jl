@@ -40,10 +40,10 @@ Note:
     - Spherical: [ClimaCoreTempestRemap](https://github.com/CliMA/ClimaCore.jl/tree/ln/exodus/lib/ClimaCoreTempestRemap)
         - this helps write and read files formatted in TempestRemap format
         - we use the TempestRemap_jll helper to call TempestRemap directly from Julia to generate the mapping weights from source and target meshes, and the map application can be done within the ClimaCoupler
-        - refs:
-            - see TempestRemap repo
-            - [Ullrich & Taylor 15](https://journals.ametsoc.org/view/journals/mwre/143/6/mwr-d-14-00343.1.xml ) 
-            - our notes on Tempest summarizing relevant info
+        - Links:
+            - [TempestRemap](https://github.com/ClimateGlobalChange/tempestremap) repo
+            - [TempestRemap_jll](https://github.com/JuliaPackaging/Yggdrasil/tree/master/T/TempestRemap) - package that automatically configures TempestRemap and allows calls directly from Julia
+            - [our notes](tempestremap_notes.md) on Tempest summarizing relevant info
 
 # Plan
 - Cartesian [Ben,Valeria,Lenka-Jan/Feb] 

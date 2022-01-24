@@ -1,7 +1,7 @@
 # TempestRemap Notes
 - TempestRemap uses a quadrature-based approach to produce a “first guess” operator that is then projected onto the space of conservative and consistent solutions using a novel least-squares formulation. The resulting method **avoids the need for line integrals and can be used to guarantee conservation and consistency** (and, if desired, monotonicity) of the linear map.
 
-# TempestRemap_jll
+# [TempestRemap_jll](https://github.com/JuliaPackaging/Yggdrasil/tree/master/T/TempestRemap)
 - normally would have to install TempestRemap and configure, the generate meshes / overlap meshes / weights
 	- e.g.: `./GenerateCSMesh --res 6 --alt --file gravitySam.000000.3d.cubedSphere_6.netcdf --out_format Netcdf4`
 	- TempestRemap_jll simplifies this, so no need to download / configure the original tempest remap 

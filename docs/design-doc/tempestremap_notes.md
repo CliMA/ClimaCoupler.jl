@@ -1,5 +1,7 @@
 # TempestRemap Notes
 - TempestRemap uses a quadrature-based approach to produce a “first guess” operator that is then projected onto the space of conservative and consistent solutions using a novel least-squares formulation. The resulting method **avoids the need for line integrals and can be used to guarantee conservation and consistency** (and, if desired, monotonicity) of the linear map.
+- CliMA will use TempestRemap as an intermediate solution for producing an overlap mesh and mapping from one input mesh to another
+![](figures/tempest_cc_pipeline.png)
 
 # [TempestRemap_jll](https://github.com/JuliaPackaging/Yggdrasil/tree/master/T/TempestRemap)
 - normally would have to install TempestRemap and configure, the generate meshes / overlap meshes / weights
@@ -69,6 +71,9 @@ variables:
 ## Exodus
 - all files written for Tempest should be in the Exodus format
 - Exodus is built upon either NetCDF or HDF5 (your choice). It can be used by native interpreters - i.e. it can be treated as a NetCDF file with [specific requirements](https://www.osti.gov/servlets/purl/6902151) for variables and metadata. It is supported by ParaView. It can store scalars, vectors, or matrices at nodes or cell centers.
+
+## Tempest Cubed Sphere Mesh
+![](figures/tempest_mesh.png)
 
 ## Regridding stages
 ### 1. Mesh generation

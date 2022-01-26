@@ -1,57 +1,63 @@
-
 # demo of FE > FE regridding using CC meshes and Fields
 
-import ClimaCore
+#import ClimaCore
+import Pkg; Pkg.add(url="https://github.com/CliMA/ClimaCore.jl",rev="main")
+
+using ClimaCore
 using ClimaCore: Geometry, Meshes, Domains, Topologies, Spaces
 using NCDatasets
 using TempestRemap_jll
 using Test
-using ClimaCoreTempestRemap
 
-nq = 3
+#using ClimaCore: ClimaCoreTempestRemap
+#import Pkg; Pkg.add(url="https://raw.githubusercontent.com/CliMA/ClimaCore.jl/main/lib/ClimaCoreTempestRemap/src/ClimaCoreTempestRemap.jl")
+using Downloads
+Downloads.download("https://raw.githubusercontent.com/CliMA/ClimaCore.jl/main/lib/ClimaCoreTempestRemap/src/ClimaCoreTempestRemap.jl","ClimaCoreTempestRemap.jl")
+include("ClimaCoreTempestRemap.jl")
+write_exodus = ClimaCoreTempestRemap.write_exodus
 
-#OUTPUT_DIR = mkdir("output_fe_u_ccidx")
+nq = 3 # polynomial order (here using same nq for source and target data)
+
+# setup output dir
+OUTPUT_DIR = "output_fv"
+isdir(OUTPUT_DIR) ? nothing : mkdir(OUTPUT_DIR)
 
 # input mesh
-ne_i = 20
+ne_i = 20 # #elements
 R = 1.0 # unit sphere 
 domain = ClimaCore.Domains.SphereDomain(R)
-mesh_in = ClimaCore.Meshes.EquiangularCubedSphere(domain, ne_i) # ne×ne×6 
+mesh_in = ClimaCore.Meshes.EquiangularCubedSphere(domain, ne_i) 
 grid_topology_in = ClimaCore.Topologies.Topology2D(mesh_in)
 nc_name_in = joinpath(OUTPUT_DIR, "test_in.nc")
 write_exodus(nc_name_in, grid_topology_in)
-#run(`$(TempestRemap_jll.GenerateCSMesh_exe()) --res $ne_i --alt --file $nc_name_in`,)
+#run(`$(TempestRemap_jll.GenerateCSMesh_exe()) --res $ne_i --alt --file $nc_name_in`,) # if want to generate the same mesh (with different ordering) with TempestRemap
 
 # output mesh
 ne_o = 5
 R = 1.0 
 domain = ClimaCore.Domains.SphereDomain(R)
-mesh_out = ClimaCore.Meshes.EquiangularCubedSphere(domain, ne_o) # ne×ne×6 
+mesh_out = ClimaCore.Meshes.EquiangularCubedSphere(domain, ne_o) 
 grid_topology_out = ClimaCore.Topologies.Topology2D(mesh_out)
 nc_name_out = joinpath(OUTPUT_DIR, "test_out.nc")
 write_exodus(nc_name_out, grid_topology_out)
 #run(`$(TempestRemap_jll.GenerateCSMesh_exe()) --res $ne_o --alt --file $nc_name_out`,)
 
-
 # overlap mesh
 nc_name_ol = joinpath(OUTPUT_DIR, "test_ol.g")
 run(`$(TempestRemap_jll.GenerateOverlapMesh_exe()) --a $nc_name_in --b $nc_name_out --out $nc_name_ol`)
 
-# map weights 
+# map weights - TempestRemap splits mesh into GLL nodes (so these are not passed from CC)
 nc_name_wgt = joinpath(OUTPUT_DIR, "test_wgt.g")
 run(`$(TempestRemap_jll.GenerateOfflineMap_exe()) --in_mesh $nc_name_in --out_mesh $nc_name_out --ov_mesh $nc_name_ol --in_type cgll --out_type cgll --in_np $nq --out_np $nq --out_map $nc_name_wgt`) # GLL > GLL - crashing 
 
-# generate fake input data (replace with CC variable; NB this requires write_exodus_identical() above)
+# generate fake input data in exodus format (NB: data overwritten below using CC Field data)
 nc_name_data_in = joinpath(OUTPUT_DIR, "Psi_in.nc")
-run(`$(GenerateTestData_exe()) --mesh $nc_name_in --test 1 --out $nc_name_data_in --gllint --np $nq`) # var: Psi
+run(`$(GenerateTestData_exe()) --mesh $nc_name_in --test 1 --out $nc_name_data_in --gllint --np $nq`) # default var name = "Psi" ; "a": src Dims, "b": dst dim
 
-### Reset with u values
-# try FEM
-no_unique_mesh_nodes = (ne_i^2 * 6 * 4 - 8*3) / 4 + 8 # = gll nodes if np = 2
+# Reset with u values from a CC Field
+no_unique_mesh_nodes = (ne_i^2 * 6 * 4 - 8*3) / 4 + 8 
 no_unique_gll_nodes = (ne_i^2 * 6 * (nq-1)*(nq-1))  - (8*3 ) / 4 + 8
 num_elem = ne_i^2 * 6 
-#a > src Dims
-#b > dst dim
 
 FT = Float64
 quad = Spaces.Quadratures.GLL{nq}()
@@ -59,23 +65,16 @@ space = ClimaCore.Spaces.SpectralElementSpace2D(grid_topology_in, quad) #float_t
 
 coords = ClimaCore.Fields.coordinate_field(space)
 u = map(coords) do coord
-    # u0 = 20.0
-    # α0 = 45.0
-    # ϕ = coord.lat
-    # λ = coord.long
-
-    # uu = u0 * (cosd(α0) * cosd(ϕ) + sind(α0) * cosd(λ) * sind(ϕ))
-    # uv = -u0 * sind(α0) * sind(λ)
     ϕ = coord.lat
     uu = cosd(ϕ)
     ClimaCore.Geometry.UVVector(uu, uu)
 end
 
 u = u.components.data.:1
-u_vals=getfield(u, :values) #IJFH : 4,4,1,1,216
+u_vals=getfield(u, :values) #IJFH : nq,nq,1,1,nelem
 
 # loop through CC GLL points and generate GLL connectivity matrix
-function idx(ne_i, nq)
+function get_cc_gll_connect(ne_i, nq)
 
     ntot = ne_i*(nq-1)
     face1 = collect(-ntot/2:1:ntot/2) * collect(-ntot/2:1:ntot/2)'
@@ -199,7 +198,7 @@ function idx(ne_i, nq)
 end
 
 # generate connectivity for source gll points
-coords, elem_ct, conn = idx(ne_i, nq)
+coords, elem_ct, conn = get_cc_gll_connect(ne_i, nq)
 
 unwrap_cc_coord2(coord) = [coord[1] , coord[2], coord[3]]
 
@@ -221,7 +220,7 @@ num_elem_o = Int(ne_o^2 * 6)
 ds_outdata = NCDataset(nc_name_data_out,"r")
 
 # generate connectivity for target gll points
-coords_o, elem_ct_o, conn_o = idx(ne_o, nq)
+coords_o, elem_ct_o, conn_o = get_cc_gll_connect(ne_o, nq)
 
 u_vals_out = Array{Float64}(undef, nq, nq, 1,num_elem_o) 
 for e in collect(1:1:num_elem_o)
@@ -236,12 +235,24 @@ end
 
 close(ds_outdata)
 
+using Plots
+function plot_flatmesh(Psi,nelem)
+    plots = []
+    tiltes = ["Eq1" "Eq2" "Eq3" "Eq4" "Po1" "Po2"]
+    for f in collect(1:1:6)
+        Psi_reshape = reshape(Psi[(f-1)*nelem^2+1:f*nelem^2],(nelem,nelem))
+
+        push!(plots, contourf(Psi_reshape))
+    end
+    plot(plots..., layout = (6), title = tiltes )
+end
+
 plot_flatmesh(parent(u_vals)[1,1,1,:],ne_i)
 png(joinpath(OUTPUT_DIR,"in.png"))
 
 plot_flatmesh(parent(u_vals_out)[1,1,1,:],ne_o)
 png(joinpath(OUTPUT_DIR,"out.png"))
-
+# NB: plots will be offset if only plotting the 1st GLL node of each elem
 
 
 

@@ -1,15 +1,25 @@
 
 # demo of FV > FV regridding using CC meshes and TempestRemap test data
 
-import ClimaCore
+#import ClimaCore
+import Pkg; Pkg.add(url="https://github.com/CliMA/ClimaCore.jl",rev="main")
+
+using ClimaCore
 using ClimaCore: Geometry, Meshes, Domains, Topologies, Spaces
 using NCDatasets
 using TempestRemap_jll
 using Test
-using ClimaCoreTempestRemap
 
+#using ClimaCore: ClimaCoreTempestRemap
+#import Pkg; Pkg.add(url="https://raw.githubusercontent.com/CliMA/ClimaCore.jl/main/lib/ClimaCoreTempestRemap/src/ClimaCoreTempestRemap.jl")
+using Downloads
+Downloads.download("https://raw.githubusercontent.com/CliMA/ClimaCore.jl/main/lib/ClimaCoreTempestRemap/src/ClimaCoreTempestRemap.jl","ClimaCoreTempestRemap.jl")
+include("ClimaCoreTempestRemap.jl")
+write_exodus = ClimaCoreTempestRemap.write_exodus
 
-OUTPUT_DIR = mkdir("output_fv")
+# setup output dir
+OUTPUT_DIR = "output_fe"
+isdir(OUTPUT_DIR) ? nothing : mkdir(OUTPUT_DIR)
 
 # input mesh
 ne_i = 20

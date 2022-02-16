@@ -37,7 +37,7 @@ Note:
             - `linear_remap_op = overlap_weights / local_weights(target)`
         -  remap! operator application
             - `mul!(vec(parent(target_field)), R.map, vec(parent(source_field)))`
-    - Spherical: [ClimaCoreTempestRemap](https://github.com/CliMA/ClimaCore.jl/tree/ln/exodus/lib/ClimaCoreTempestRemap)
+    - Spherical: [ClimaCoreTempestRemap](https://github.com/CliMA/ClimaCore.jl/tree/main/lib/ClimaCoreTempestRemap)
         - this helps write and read files formatted in TempestRemap format
         - we use the TempestRemap_jll helper to call TempestRemap directly from Julia to generate the mapping weights from source and target meshes, and the map application can be done within the ClimaCoupler
         - Links:
@@ -47,10 +47,10 @@ Note:
 
 # Plan
 - Cartesian [Ben,Valeria,Lenka-Jan/Feb] 
-    - finish off the current test cases
-    - 2D SE cases
+    - test for vector regridding
+    - implement in sea breeze TC
 - Spherical [Lenka,Valeria,Ben-Jan/Feb]
-    - read TempestRemap documentation + familiarise with code [2d]
-    - get familiar with mesh differences [3d]
-    - adapter design + implementation [5d]
+    - do matrix multiply in CC
+    - extend to vector regridding
+    - implement in HS TC
     - prototype julia version [long-term]

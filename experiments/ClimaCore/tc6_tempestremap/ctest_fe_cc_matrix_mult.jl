@@ -9,14 +9,9 @@ using NCDatasets
 using TempestRemap_jll
 using Test
 
-#using ClimaCore: ClimaCoreTempestRemap
-#import Pkg; Pkg.add(url="https://raw.githubusercontent.com/CliMA/ClimaCore.jl/main/lib/ClimaCoreTempestRemap/src/ClimaCoreTempestRemap.jl")
-using Downloads
-Downloads.download("https://raw.githubusercontent.com/CliMA/ClimaCore.jl/main/lib/ClimaCoreTempestRemap/src/netcdf.jl","netcdf.jl")
-Downloads.download("https://raw.githubusercontent.com/CliMA/ClimaCore.jl/main/lib/ClimaCoreTempestRemap/src/exodus.jl","exodus.jl")
-Downloads.download("https://raw.githubusercontent.com/CliMA/ClimaCore.jl/main/lib/ClimaCoreTempestRemap/src/ClimaCoreTempestRemap.jl","wrappers.jl")
+import Pkg; Pkg.add(url="https://github.com/CliMA/ClimaCore.jl.git", subdir="lib/ClimaCoreTempestRemap")
+using ClimaCoreTempestRemap
 
-include("ClimaCoreTempestRemap.jl")
 write_exodus = ClimaCoreTempestRemap.write_exodus
 
 nq = 3 # polynomial order (here using same nq for source and target data)
@@ -25,9 +20,21 @@ nq = 3 # polynomial order (here using same nq for source and target data)
 OUTPUT_DIR = "output_fv"
 isdir(OUTPUT_DIR) ? nothing : mkdir(OUTPUT_DIR)
 
-# input mesh
+# source grid params
 ne_i = 20 # #elements
 R = 1.0 # unit sphere 
+no_unique_mesh_nodes = (ne_i^2 * 6 * 4 - 8*3) / 4 + 8 
+no_unique_gll_nodes = (ne_i^2 * 6 * (nq-1)*(nq-1))  - (8*3 ) / 4 + 8
+num_elem = ne_i^2 * 6 
+
+# target grid params
+ne_o = 5
+R = 1.0 
+no_unique_mesh_nodes_o = (ne_o^2 * 6 * 4 - 8*3) / 4 + 8 # = gll nodes if np = 2
+no_unique_gll_nodes_o = (ne_o^2 * 6 * (nq-1)*(nq-1))  - (8*3 ) / 4 + 8
+num_elem_o = Int(ne_o^2 * 6)
+
+# construct source mesh
 domain = ClimaCore.Domains.SphereDomain(R)
 mesh_in = ClimaCore.Meshes.EquiangularCubedSphere(domain, ne_i) 
 grid_topology_in = ClimaCore.Topologies.Topology2D(mesh_in)
@@ -35,9 +42,7 @@ nc_name_in = joinpath(OUTPUT_DIR, "test_in.nc")
 write_exodus(nc_name_in, grid_topology_in)
 #run(`$(TempestRemap_jll.GenerateCSMesh_exe()) --res $ne_i --alt --file $nc_name_in`,) # if want to generate the same mesh (with different ordering) with TempestRemap
 
-# output mesh
-ne_o = 5
-R = 1.0 
+# construct target mesh
 domain = ClimaCore.Domains.SphereDomain(R)
 mesh_out = ClimaCore.Meshes.EquiangularCubedSphere(domain, ne_o) 
 grid_topology_out = ClimaCore.Topologies.Topology2D(mesh_out)
@@ -58,10 +63,6 @@ nc_name_data_in = joinpath(OUTPUT_DIR, "Psi_in.nc")
 run(`$(GenerateTestData_exe()) --mesh $nc_name_in --test 1 --out $nc_name_data_in --gllint --np $nq`) # default var name = "Psi" ; "a": src Dims, "b": dst dim
 
 # Reset with u values from a CC Field
-no_unique_mesh_nodes = (ne_i^2 * 6 * 4 - 8*3) / 4 + 8 
-no_unique_gll_nodes = (ne_i^2 * 6 * (nq-1)*(nq-1))  - (8*3 ) / 4 + 8
-num_elem = ne_i^2 * 6 
-
 FT = Float64
 quad = Spaces.Quadratures.GLL{nq}()
 space = ClimaCore.Spaces.SpectralElementSpace2D(grid_topology_in, quad) #float_type(::AbstractPoint{FT}) where {FT} = FT
@@ -88,7 +89,6 @@ function get_cc_gll_connect(ne_i, nq)
     
     face5 = collect(ntot/2:-1:-ntot/2) * collect(-ntot/2:1:ntot/2)' 
     face6 = collect(-ntot/2:1:ntot/2) * collect(-ntot/2:1:ntot/2)' 
-    
     
     face1_c = [ones(ntot+1)*ntot/2,  collect(-ntot/2:1:ntot/2), collect(-ntot/2:1:ntot/2)]
     face2_c = [collect(ntot/2:-1:-ntot/2),  ones(ntot+1)*ntot/2 , collect(-ntot/2:1:ntot/2)]
@@ -212,15 +212,18 @@ ds_indata = NCDataset(nc_name_data_in,"a")
 ds_indata["Psi"][:] = u_vals_uq[:] 
 close(ds_indata)
 
-# apply map (this to be done by CC at each timestep)
-nc_name_data_out = joinpath(OUTPUT_DIR, "Psi_out.nc")
-run(`$(TempestRemap_jll.ApplyOfflineMap_exe()) --map $nc_name_wgt --var Psi --in_data $nc_name_data_in --out_data $nc_name_data_out`)
+# load map
+ds_wt = NCDataset("output_fv/test_wgt.g","r")
+S = ds_wt["S"][:]
+row = ds_wt["row"][:]
+col = ds_wt["col"][:]
+close(ds_wt)
 
-# load and convert output
-no_unique_mesh_nodes_o = (ne_o^2 * 6 * 4 - 8*3) / 4 + 8 # = gll nodes if np = 2
-no_unique_gll_nodes_o = (ne_o^2 * 6 * (nq-1)*(nq-1))  - (8*3 ) / 4 + 8
-num_elem_o = Int(ne_o^2 * 6)
-ds_outdata = NCDataset(nc_name_data_out,"r")
+# apply map, S
+u_vals_uq_out = zeros(Int(no_unique_gll_nodes_o))
+for (i, val) in enumerate(S)
+    u_vals_uq_out[row[i]] += S[i]* u_vals_uq[col[i]]
+end
 
 # generate connectivity for target gll points
 coords_o, elem_ct_o, conn_o = get_cc_gll_connect(ne_o, nq)
@@ -231,12 +234,10 @@ for e in collect(1:1:num_elem_o)
         for nq_x in collect(1:1:nq) 
             uv_conn = conn_o[nq_y, nq_x, e]
             println(uv_conn)
-            u_vals_out[nq_x,nq_y,1,e] = ds_outdata["Psi"][:][Int(uv_conn)]
+            u_vals_out[nq_x,nq_y,1,e] = u_vals_uq_out[Int(uv_conn)]
         end
     end
 end
-
-close(ds_outdata)
 
 using Plots
 function plot_flatmesh(Psi,nelem)

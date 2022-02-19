@@ -206,7 +206,7 @@ coords, elem_ct, conn = get_cc_gll_connect(ne_i, nq)
 unwrap_cc_coord2(coord) = [coord[1] , coord[2], coord[3]]
 
 # convert to unique indices as expected by TR
-u_vals_uq = map(x ->  getindex(parent(u_vals)[:,:,1,:],unwrap_cc_coord2(findfirst(isequal(x), conn))...), collect(1:1:elem_ct))
+u_vals_uq = map(x ->  getindex(parent(u_vals)[:,:,1,:],unwrap_cc_coord2(findfirst(isequal(x), conn))...), collect(1:1:elem_ct)) #IJFH : nq,nq,1,nelem
 
 ds_indata = NCDataset(nc_name_data_in,"a")
 ds_indata["Psi"][:] = u_vals_uq[:] 
@@ -233,7 +233,6 @@ for e in collect(1:1:num_elem_o)
     for nq_y in collect(1:1:nq) 
         for nq_x in collect(1:1:nq) 
             uv_conn = conn_o[nq_y, nq_x, e]
-            println(uv_conn)
             u_vals_out[nq_x,nq_y,1,e] = u_vals_uq_out[Int(uv_conn)]
         end
     end

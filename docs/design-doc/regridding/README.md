@@ -81,8 +81,13 @@ The interpolation methods:
 
 ## Supporting test cases
 - implement in sea breeze LES [in_progress]
+    - cartesian regridding (FE <-> FV)
+    - ClimaCore + ClimaAtmos + ClimaSim interface (+ Land)
 - implement in convection 2D LES [not_started]
+    - direct comparison with literature
 - implement in HS GCM [pending]
+    - spherical regridding
+    - ClimaCore + ClimaAtmos + ClimaSim interface
 
 # Misc Notes
 - other higher than 2nd order regridding may be possible, but for climate modelling unlikely needed, since much larger errors come from elsewhere

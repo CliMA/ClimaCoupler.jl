@@ -48,3 +48,4 @@ There are two modes in which we can run the coupler:
 - OASIS: 
     - [craig et al 17](https://gmd.copernicus.org/articles/10/3297/2017/)
     - [OASIS User guide](https://gitlab.com/cerfacs/oasis3-mct/-/blob/OASIS3-MCT_5.0/doc/oasis3mct_UserGuide.pdf)
+- [Kang et al 2022](https://arxiv.org/pdf/2202.11890.pdf) - multirate partitioned RK method

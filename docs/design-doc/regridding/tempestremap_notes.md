@@ -66,16 +66,17 @@ variables:
 }
 ```
 
-# TempestRemap
-
-## Exodus
-- all files written for Tempest should be in the Exodus format
+# Tempest file format
+- all files written for Tempest should be in the `Exodus` format
 - Exodus is built upon either NetCDF or HDF5 (your choice). It can be used by native interpreters - i.e. it can be treated as a NetCDF file with [specific requirements](https://www.osti.gov/servlets/purl/6902151) for variables and metadata. It is supported by ParaView. It can store scalars, vectors, or matrices at nodes or cell centers.
 
-## Tempest Cubed Sphere Mesh
-![](figures/tempest_mesh.png)
+# Tempest Cubed Sphere Connectivity
+![](../figures/tempest_mesh.png)
+- (compare with CC - add test)
 
-## Regridding stages
+
+
+# TempestRemap implementation stages
 ### 1. Mesh generation
 - Source/target meshes
 	- cubed sphere: equiangular
@@ -90,15 +91,15 @@ variables:
 	- continuous FE
 	- discontinuous FE
 
-### 3. Offline map application
+### 3.a Offline map application
 - to be done within ClimaCore
 - use Tempest to check with ClimaCore application
 - Tempest 
     - load sparse matrix `m_mapRemap`
-        - mapIn.m_dTargetAreas[dataRows[s]]
-        - mapIn.m_dSourceAreas[dataCols[s]]
+        - `mapIn.m_dTargetAreas[dataRows[s]]`
+        - `mapIn.m_dSourceAreas[dataCols[s]]`
 
-        - where
+        - where in `SparseMatrix.h` collect map pairs:
         ```
                     m_mapEntries.insert(
                         SparseMapPair(
@@ -106,7 +107,7 @@ variables:
                             dataEntries[i]));
         ```
 
-    - do a sparse matrix multiply:
+    - and do a sparse matrix multiply:
         ```
                 dataVectorOut.Zero();
 
@@ -116,12 +117,14 @@ variables:
                         iter->second * dataVectorIn[iter->first.second];
                 }
         ```
+### 3.b Online map application
+- ClimaCore can now do the sparse matrix multiply during the model run (faster than using TempestRemap for application)
 
 ## Alternatives
 - [Conduit](https://llnl-conduit.readthedocs.io/en/latest/blueprint_mesh.html) - JSON + binary
 - OASIS regridding - but quite clunky
 
-## Refs 
+# Refs 
 - [TempestRemap docs](https://github.com/ClimateGlobalChange/tempestremap)
 - [Ullrich & Taylor 15](https://journals.ametsoc.org/view/journals/mwre/143/6/mwr-d-14-00343.1.xml )
 - [Ullrich et al. 16](https://journals.ametsoc.org/view/journals/mwre/144/4/mwr-d-15-0301.1.xml)

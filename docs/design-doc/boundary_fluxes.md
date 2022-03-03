@@ -22,7 +22,7 @@
 - should we pass last timestep or some average of the last coupling timestep? TBD
 
 ## Domain partition
-- this is done via regridding onto an overlaping mesh - see [regrigging](regridding.md)
+- this is done via regridding onto an overlaping mesh - see [regrigging](regridding/README.md)
 
 # Plan
 - example for optimally estimating atmos state (average or interpolation) for land state calculation (not fluxes) *[not high priority]*

@@ -61,20 +61,24 @@ The interpolation methods:
 ## 2D Boundary Regrid
 
 ### AMIP + LES
-- fields to exchange (TBC):
-    - atmos > land: heat/moisture fluxes, T
-    - land > atmos: roughness lengths, T_sfc, q_sfc,...
+- conservative remapping sufficient for exchage of fields /states:
+    - atmos > land: heat/moisture fluxes, wind, momentum fluxes (?)
+    - land > atmos: roughness lengths, T_sfc, q_sfc, roughness
     - prescribed ice and ocean > atmos: T_sfc, q_sfc, roughness, albedo
-- for all conservative remapping sufficient
+- grid box partition done automatically in Cartesian
+- topography
 
-#### Optimization
+### Optimization
+- more efficient storage of the sparse matrix [in progress]
+- grid box splitting
 - better treatment of polar vector values (now arbitrarily selected)
 - develop divergence-free regridding for vectors
 - calculate wind stress curl in (higher order) atmos before sending to ocean (CMIP)
 - test best methods for discontinuous output (precip)
+- more unit tests (e.g. CC>TR meshes w precision errors)
 
 ## 3D Boundary Regrid
-#### Optimization
+### Optimization
 - staggering (1d) (climacore)
 - staggering (3d) (oceananigans)
 - develop 3D wind transform 
@@ -83,9 +87,10 @@ The interpolation methods:
 - implement in sea breeze LES [in_progress]
     - cartesian regridding (FE <-> FV)
     - ClimaCore + ClimaAtmos + ClimaSim interface (+ Land)
+    - topography
 - implement in convection 2D LES [not_started]
     - direct comparison with literature
-- implement in HS GCM [pending]
+- implement in HS/BCwave GCM w diffusion [in_progress]
     - spherical regridding
     - ClimaCore + ClimaAtmos + ClimaSim interface
 

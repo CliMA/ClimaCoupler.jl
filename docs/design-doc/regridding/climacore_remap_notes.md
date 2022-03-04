@@ -1,6 +1,6 @@
 # **ClimaCore Regridding**
 
-# Conservative regridding 
+# Conservative linear remap 
 - we follow TempestRemap for linear conservative regridding
 
 - we use linear remapping, so that:

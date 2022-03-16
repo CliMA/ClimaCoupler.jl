@@ -1,7 +1,5 @@
 # **ClimaCoupler Design Doc**
 
-
-
 The `CliMACoupler` is designed primarily to support communication between different model components of the CliMA ESM, using a unified interface of `ClimaSimulations.jl`. However, the design is such that any Julia-based models should plug in relatively easily, assuming that they are physically compatible. As well as providing the most optimal coupling functionality for the current CliMA needs, our goal is to achieve optimal software interface modularity/generality, simplicity, performance and robustness, backed with test cases that demonstrate its use for prototyping, debugging and running model simulations.
 
 #### Code: https://github.com/CliMA/ClimaCoupler.jl
@@ -14,5 +12,5 @@ The `CliMACoupler` is designed primarily to support communication between differ
 - [coupled boundary fluxes](boundary_fluxes/README.md)
 - [diagnostics accumulation](diagnostics.md)
 - [quality control](quality_control.md)
-- [test cases](test_cases.md)
+- [test cases](test_cases/README.md)
 

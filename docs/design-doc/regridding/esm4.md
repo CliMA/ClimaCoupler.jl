@@ -1,4 +1,4 @@
-# **FMS Coupler**
+# **ESM4 (FMS) Coupler**
 
 -  https://github.com/NOAA-GFDL/FMScoupler
 - [architecture intro](https://extranet.gfdl.noaa.gov/~vb/talks/coupler.pdf)
@@ -9,7 +9,6 @@
     - `full` (CMIP) - concurrent - regridding possible
 
 ## Implementation
-
 
 1. calculate areas using [mosaic](https://data1.gfdl.noaa.gov/~arl/pubrel/r/mom4p1/src/mom4p1/doc/mosaic_tool.html) or regular grid
     - vectors are transformed onto an [A grid](http://indico.ictp.it/event/a12235/material/0/2.pdf)

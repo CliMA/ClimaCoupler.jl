@@ -1,4 +1,4 @@
-# **ClimaCore Regridding**
+# **Cartesian Regridding**
 
 # Conservative linear remap 
 - we follow TempestRemap for linear conservative regridding

@@ -5,7 +5,7 @@
     - irradiance, orbital forcings
     - CO2 (1 global value), ozone (and other GHG) monthly climatology (spatially varying
     - aerosols (optional)
-- topography + land-sea mask
+- topography + land-sea mask (impl details)
 
 # AMIP Cases
 - historical
@@ -25,8 +25,18 @@
 
 # Our Test Case Hierarchy
 - SCM
+    - boundary fluxes (moisture)
+    - soil: (hydro +) energy 
+        - bucket (water store)
+        - full soil + hydro 
 - sea breeze
-- 
+    - spatial coupling, topography (no canopy)
+- gcm
+    - slab
+    - full land + hydro
+
+
+
 
 # Refs
 - [PCMDI requirements](https://pcmdi.github.io/mips/amip/requirements.html) (incl. output diagnostics) 

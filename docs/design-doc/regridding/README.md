@@ -1,5 +1,7 @@
 # **Regridding & redistribution**
-Regridding (or remapping or interpolation) in the coupler ensures that different component models can communicate fields with each other with a minimal loss of information or field properties. These properties include:
+Regridding (or remapping or interpolation) in the coupler ensures that different component models can communicate information (fluxes, states, parameters) with each other with a minimal loss of accuracy at the highest possible speed. 
+
+Depending on the regridded variable, several properties may need to be satisfied:
 - conservation = no loss of field mass (e.g. mass, energy)
 - consistency = no spurious maxima/minima in data (e.g. mass, energy)
 - monotonicity = no spurious sign changes (e.g. mass, energy)
@@ -7,9 +9,7 @@ Regridding (or remapping or interpolation) in the coupler ensures that different
 - high-order derivatives (e.g. wind stress curl, $\nabla \times (c_D U|U|)$ ) - e.g. capitalize on high-order atmos grid, so calculate there
 - discontinuous structure (e.g. precipitation)
 
-Depending on which variable is being regridded, different properties, and thus interpolation methods, may be desirable. 
-
-The interpolation methods:
+Different interpolation methods can be applied to achieve the above properties, for example:
 - bilinear and bicubic
     - easy to implement
     - not always conservative
@@ -22,41 +22,65 @@ The interpolation methods:
     - divergence-free preserving
     - BUT global potential function is required 
 
-# Methods in other climate models
-## [ESM4 (FMS)](https://github.com/NOAA-GFDL/ESM4)
+# Methods in Other Climate Models
+##  NOAA-GFDL / ESM4 (FMS)
+- [code](https://github.com/NOAA-GFDL/ESM4)
 - simple (AMIP): all fluxes are regridded as scalar using first order conservative interpolation 
-    - [more details](fms_coupler.md)
+    - [our notes](esm4.md)
     - also offers second order conservative and bilinear interpolation
 - full (CMIP)
 
-## [ICON](https://code.mpimet.mpg.de/projects/iconpublic/wiki/How%20to%20obtain%20the%20model%20code)
+## DWD / ICON
+- [code](https://code.mpimet.mpg.de/projects/iconpublic/wiki/How%20to%20obtain%20the%20model%20code)
 - need licence
 
-## [CESM](https://github.com/ESCOMP/CESM)
+## NCAR / CESM
+- [code](https://github.com/ESCOMP/CESM)
 - [grids](http://esmci.github.io/cime/versions/master/html/index.html)
-- [MCT toolkit](https://www.mcs.anl.gov/research/projects/mct/mct_APIs/index.html)
-- (need more investigation)
+- [MCT toolkit](https://www.mcs.anl.gov/research/projects/mct/mct_APIs/index.html) -> replaced by [CMEPS](https://github.com/ESCOMP/CMEPS) general mediator
+- [our notes](cesm.md)
 
 ## mitGCM
-- conservative (line integrals < Gauss theorem) 
-- bicubic
+- [code](https://github.com/MITgcm/MITgcm)
+- conservative (line integrals < Gauss theorem), bicubic
+
+# General Regridding Packages
+
 
 ## OASIS (SPOC)
-- [code](https://gitlab.com/cerfacs/oasis3-mct/-/tree/OASIS3-MCT_4.0/examples/spoc/spoc_regridding)
-- [docs](documentation)
-- [SCRIP doc](https://oasis.cerfacs.fr/wp-content/uploads/sites/114/2021/03/GLOBC_SCRIPusers_1998.pdf)
+- [code](https://gitlab.com/cerfacs/oasis3-mct/-/tree/OASIS3-MCT_4.0/examples/spoc/spoc_regridding), [SCRIP doc](https://oasis.cerfacs.fr/wp-content/uploads/sites/114/2021/03/GLOBC_SCRIPusers_1998.pdf)
+- interpolation methods
     - second order conservative (weights from line integrals < Gauss theorem)
     - bilinear
     - bicubic
     - nearest-neighbor (e.g. for categorical data)
 
-## [TempestRemap](https://github.com/ClimateGlobalChange/tempestremap)
-- conservative remap (default) without the need for line integrals - mixture of patching and projection to conservative+consistent solutions
-- inverse distance waving and bilinear - less visible in code (per comm)
+## TempestRemap
+- [code](https://github.com/ClimateGlobalChange/tempestremap)
+- [our notes](tempestremap.md)
+- interpolation types
+    - conservative remap (default) without the need for line integrals - mixture of patching and projection to conservative+consistent solutions
+    - inverse distance waving and bilinear - less visible in code (per comm)
 
 # CliMA strategy
+- for the initial AMIP milestone, it is sufficient to apply a first order conservative linear remap (e.g. as in TempestRemap or FMS). We thus use TempestRemap for generation of spherical map weights. Since TempestRemap does not directly support Cartesian domains, we develop an additional Cartesian functionality in ClimaCore mimicking methods used in TempestRemap.
 
-- [current implementation docs](climacore_remap_notes.md)
+## Implementation
+- Cartesian
+    - [cartesian regridding design](cartesian.md)
+    - [ClimaCore regridding implementation ](https://github.com/CliMA/ClimaCore.jl/blob/main/src/Operators/remapping.jl) 
+        - remap operator generation
+            - `local_weights = space.local_geometry.WJ`
+            - `linear_remap_op = overlap_weights / local_weights(target)`
+        -  remap! operator application
+            - `mul!(vec(parent(target_field)), R.map, vec(parent(source_field)))`
+- Spherical
+    - [spherical regridding design](spherical.md)
+    - [ClimaCoreTempestRemap implementation](https://github.com/CliMA/ClimaCore.jl/tree/main/lib/ClimaCoreTempestRemap) (provides wrappers for [TempestRemap](https://github.com/ClimateGlobalChange/tempestremap) )
+
+ 
+
+# CliMA Test Case Plan
 
 ## 2D Boundary Regrid
 
@@ -67,6 +91,11 @@ The interpolation methods:
     - prescribed ice and ocean > atmos: T_sfc, q_sfc, roughness, albedo
 - grid box partition done automatically in Cartesian
 - topography
+
+### Dynamic Aquaplanet
+- conservative remapping sufficient for exchage of fields /states:
+    - atmos > oceananigans 
+        - need to map weights to oceananigans grid (need ordering of the nodes)
 
 ### Optimization
 - more efficient storage of the sparse matrix [in progress]
@@ -83,7 +112,7 @@ The interpolation methods:
 - staggering (3d) (oceananigans)
 - develop 3D wind transform 
 
-## Supporting test cases
+# Supporting test cases
 - implement in sea breeze LES [in_progress]
     - cartesian regridding (FE <-> FV)
     - ClimaCore + ClimaAtmos + ClimaSim interface (+ Land)

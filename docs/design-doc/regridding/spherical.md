@@ -103,7 +103,7 @@ variables:
 		- [example](https://github.com/CliMA/ClimaCore.jl/blob/main/lib/ClimaCoreTempestRemap/test/netcdf.jl#L62)
 	- 3.b Online map application
 		- ClimaCore can now do the sparse matrix multiply during the model run (it's faster than using TempestRemap for application)
-		- [example](XXX)
+		- [example](https://github.com/CliMA/ClimaCore.jl/blob/sb/online-sphere-remap/lib/ClimaCoreTempestRemap/test/online_remap.jl)
 
 ## Alternatives
 - [Conduit](https://llnl-conduit.readthedocs.io/en/latest/blueprint_mesh.html) - JSON + binary

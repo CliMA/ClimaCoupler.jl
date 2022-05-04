@@ -1,6 +1,6 @@
 abstract type AbstractMicrophysics <: AbstractPhysicsComponent end
 
-@Base.kwdef struct ZeroMomentMicrophysics <: AbstractMicrophysics end
+Base.@kwdef struct ZeroMomentMicrophysics <: AbstractMicrophysics end
 
 @inline calc_component!(source, ::Nothing, state, _...) = nothing
 

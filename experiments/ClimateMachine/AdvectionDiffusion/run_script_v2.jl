@@ -244,12 +244,9 @@ function main(::Type{FT}) where {FT}
     ## For now applying callbacks only to atmos.
     callbacks = (
         ExponentialFiltering(),
-        VTKOutput((
-            iteration = string(5Δt_) * "ssecs",
-            overdir = "output",
-            overwrite = true,
-            number_sample_points = 0,
-        )...,),
+        VTKOutput(
+            (iteration = string(5Δt_) * "ssecs", overdir = "output", overwrite = true, number_sample_points = 0)...,
+        ),
     )
 
     simulation = (;

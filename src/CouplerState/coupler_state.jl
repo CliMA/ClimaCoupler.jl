@@ -95,7 +95,7 @@ function coupler_get(coupler::CouplerState, fieldname::Symbol, gridinfo, datetim
 
     # check that retrieving component and coupler are at same time
     datetime != cplfield.datetime &&
-    throw(ErrorException("Retrieval time ($datetime) != coupler field time ($(cplfield.datetime))"))
+        throw(ErrorException("Retrieval time ($datetime) != coupler field time ($(cplfield.datetime))"))
 
     regriddata = regrid(cplfield.data, gridinfo, cplfield.gridinfo)
 

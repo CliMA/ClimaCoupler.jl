@@ -302,8 +302,7 @@ Plots.png(
         ylabel = "z (m)",
     ),
     joinpath(path, "tc1_f1.png"),
-) :
-nothing
+) : nothing
 # ![](images/tc1_f1.png)
 
 # - Conservation: absolute "energy" of both models with time
@@ -322,8 +321,7 @@ Plots.png(
         ylabel = "pseudo-energy (J / m2)",
     ),
     joinpath(path, "tc1_f2.png"),
-) :
-nothing
+) : nothing
 # ![](images/tc1_f2.png)
 
 # - Conservation: relative error with time
@@ -333,8 +331,7 @@ show_plots ?
 Plots.png(
     Plots.plot(sol_lnd.t, rel_error, labels = ["tot"], xlabel = "time (s)", ylabel = "relative error"),
     joinpath(path, "tc1_f3.png"),
-) :
-nothing
+) : nothing
 # ![](images/tc1_f3.png)
 
 #src # - Animation

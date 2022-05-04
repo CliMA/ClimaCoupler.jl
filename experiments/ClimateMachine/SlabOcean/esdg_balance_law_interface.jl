@@ -1,17 +1,17 @@
 import ClimateMachine.BalanceLaws:
-# declaration
+    # declaration
     vars_state,
-# initialization
+    # initialization
     nodal_init_state_auxiliary!,
     init_state_prognostic!,
     init_state_auxiliary!,
-# rhs computation
+    # rhs computation
     compute_gradient_argument!,
     compute_gradient_flux!,
     flux_first_order!,
     flux_second_order!,
     source!,
-# boundary conditions
+    # boundary conditions
     boundary_conditions,
     boundary_state!
 import ClimateMachine.NumericalFluxes: numerical_boundary_flux_first_order!

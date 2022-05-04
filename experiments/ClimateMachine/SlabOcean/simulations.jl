@@ -125,21 +125,25 @@ function CplSimulation(model::Tuple; grid, timestepper, time, boundary_z = nothi
         if item isa Explicit
             println("constructing explicit model")
             if item.model isa DryAtmosModel
-                tmp = Explicit(ESDGModel(
-                    item.model,
-                    grid.numerical,
-                    surface_numerical_flux_first_order = item.model.numerics.flux,
-                    volume_numerical_flux_first_order = KGVolumeFlux(),
-                ))
+                tmp = Explicit(
+                    ESDGModel(
+                        item.model,
+                        grid.numerical,
+                        surface_numerical_flux_first_order = item.model.numerics.flux,
+                        volume_numerical_flux_first_order = KGVolumeFlux(),
+                    ),
+                )
             elseif item.model isa ModelSetup
-                tmp = Explicit(DGModel(
-                    item.model,
-                    grid.numerical,
-                    item.model.numerics.flux,
-                    CentralNumericalFluxSecondOrder(),
-                    CentralNumericalFluxGradient();
-                    direction = item.model.numerics.direction,
-                ))
+                tmp = Explicit(
+                    DGModel(
+                        item.model,
+                        grid.numerical,
+                        item.model.numerics.flux,
+                        CentralNumericalFluxSecondOrder(),
+                        CentralNumericalFluxGradient();
+                        direction = item.model.numerics.direction,
+                    ),
+                )
             else
                 println("what are you doing!?!??!")
             end
@@ -147,21 +151,25 @@ function CplSimulation(model::Tuple; grid, timestepper, time, boundary_z = nothi
         elseif item isa Implicit
             println("constructing implicit models")
             if item.model isa DryAtmosModel
-                tmp = Implicit(VESDGModel(
-                    item.model,
-                    grid.numerical,
-                    surface_numerical_flux_first_order = item.model.numerics.flux,
-                    volume_numerical_flux_first_order = LinearKGVolumeFlux(),
-                ))
+                tmp = Implicit(
+                    VESDGModel(
+                        item.model,
+                        grid.numerical,
+                        surface_numerical_flux_first_order = item.model.numerics.flux,
+                        volume_numerical_flux_first_order = LinearKGVolumeFlux(),
+                    ),
+                )
             elseif item.model isa ModelSetup
-                tmp = Implicit(DGModel(
-                    item.model,
-                    grid.numerical,
-                    item.model.numerics.flux,
-                    CentralNumericalFluxSecondOrder(),
-                    CentralNumericalFluxGradient();
-                    direction = item.model.numerics.direction,
-                ))
+                tmp = Implicit(
+                    DGModel(
+                        item.model,
+                        grid.numerical,
+                        item.model.numerics.flux,
+                        CentralNumericalFluxSecondOrder(),
+                        CentralNumericalFluxGradient();
+                        direction = item.model.numerics.direction,
+                    ),
+                )
             else
                 println("what are you doing!?!??!")
             end

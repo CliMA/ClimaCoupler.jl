@@ -3,16 +3,16 @@ abstract type AbstractGravity <: AbstractPhysicsComponent end
 struct ThinShellGravityFromPotential <: AbstractGravity end
 struct TotalEnergyGravityFromPotential <: AbstractGravity end
 
-@Base.kwdef struct DeepShellGravity{FT} <: AbstractGravity
+Base.@kwdef struct DeepShellGravity{FT} <: AbstractGravity
     g::FT # ms⁻²
     a::FT # m
 end
 
-@Base.kwdef struct ThinShellGravity{FT} <: AbstractGravity
+Base.@kwdef struct ThinShellGravity{FT} <: AbstractGravity
     g::FT # ms⁻²
 end
 
-@Base.kwdef struct Buoyancy{FT} <: AbstractGravity
+Base.@kwdef struct Buoyancy{FT} <: AbstractGravity
     α::FT # K⁻¹
     g::FT # ms⁻²
 end

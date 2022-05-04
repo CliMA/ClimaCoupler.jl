@@ -1,14 +1,14 @@
 abstract type AbstractCoriolis <: AbstractPhysicsComponent end
 
-@Base.kwdef struct DeepShellCoriolis{FT} <: AbstractCoriolis
+Base.@kwdef struct DeepShellCoriolis{FT} <: AbstractCoriolis
     Ω::FT # s⁻¹
 end
 
-@Base.kwdef struct ThinShellCoriolis{FT} <: AbstractCoriolis
+Base.@kwdef struct ThinShellCoriolis{FT} <: AbstractCoriolis
     Ω::FT # s⁻¹
 end
 
-@Base.kwdef struct BetaPlaneCoriolis{FT} <: AbstractCoriolis
+Base.@kwdef struct BetaPlaneCoriolis{FT} <: AbstractCoriolis
     f₀::FT # s⁻¹
     β::FT # s⁻¹m⁻¹
 end

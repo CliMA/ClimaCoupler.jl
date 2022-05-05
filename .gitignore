@@ -38,3 +38,6 @@ docs/src/generated/
 
 # Julia System Images
 *.so
+
+# internal tests
+testdel.jl

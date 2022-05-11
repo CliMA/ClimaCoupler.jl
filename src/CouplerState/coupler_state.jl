@@ -1,27 +1,18 @@
 using Unitful, Dates
 using PrettyTables
+using ClimaCore
 
 export CouplerState
 export coupler_push!, coupler_pull!, coupler_put!, coupler_get
 export coupler_add_field!
 
-# TODO: Build constructor that uses a model component's grid.
-struct CplGridInfo{GT, GP, GH, GE}
-    gridtype::GT
-    gridparams::GP
-    gridhandle::GH
-    gridencoding::GE
-end
-
 mutable struct CplFieldInfo{AT, GT <: CplGridInfo, UT <: Unitful.Units}
     data::AT
     gridinfo::GT
-    units::UT
-    datetime::DateTime
 end
 
 mutable struct CouplerState{DT}
-    CplStateBlob::DT
+    CplStateDict::DT
 end
 
 """
@@ -63,11 +54,9 @@ function coupler_add_field!(
     fieldname::Symbol,
     fieldvalue,
     grid,
-    datetime::DateTime,
-    units::Unitful.Units = Unitful.NoUnits,
 )
     gridinfo = CplGridInfo(nothing, nothing, nothing, nothing)
-    push!(coupler.CplStateBlob, fieldname => CplFieldInfo(fieldvalue, gridinfo, units, datetime))
+    push!(coupler.CplStateDict, fieldname => CplFieldInfo(fieldvalue, gridinfo))
 end
 
 """
@@ -90,16 +79,24 @@ Retrieve data array corresponding to `fieldname`.
 Returns data on the grid specified by `gridinfo` and in the units of `units`. Checks that
 the coupler data field is the state at time `datetime`.
 """
-function coupler_get(coupler::CouplerState, fieldname::Symbol, gridinfo, datetime::DateTime, units::Unitful.Units)
-    cplfield = coupler.CplStateBlob[fieldname]
+# function coupler_get(coupler::CouplerState, fieldname::Symbol, gridinfo, datetime::DateTime, units::Unitful.Units)
+#     cplfield = coupler.CplStateDict[fieldname]
 
-    # check that retrieving component and coupler are at same time
-    datetime != cplfield.datetime &&
-        throw(ErrorException("Retrieval time ($datetime) != coupler field time ($(cplfield.datetime))"))
+#     # check that retrieving component and coupler are at same time
+#     datetime != cplfield.datetime &&
+#         throw(ErrorException("Retrieval time ($datetime) != coupler field time ($(cplfield.datetime))"))
 
-    regriddata = regrid(cplfield.data, gridinfo, cplfield.gridinfo)
+#     regriddata = regrid(cplfield.data, gridinfo, cplfield.gridinfo)
 
-    return uconvert(regriddata, units, cplfield.units)
+#     return uconvert(regriddata, units, cplfield.units)
+# end
+function coupler_get(coupler::CouplerState, fieldname::Symbol)
+    cplfield = coupler.CplStateDict[fieldname]
+    
+    # call to climacore remap utils
+    # regriddata = regrid(cplfield.data, ___)
+
+    return cplfield.data
 end
 
 """
@@ -126,20 +123,13 @@ function coupler_put!(
     coupler::CouplerState,
     fieldname::Symbol,
     fieldvalue,
-    gridinfo,
-    datetime::DateTime,
-    units::Unitful.Units,
 )
-    cplfield = coupler.CplStateBlob[fieldname]
+    cplfield = coupler.CplStateDict[fieldname]
 
     # map new data to grid of coupler field; new data -> coupler grid
-    regriddata = regrid(fieldvalue, cplfield.gridinfo, gridinfo)
+    # regriddata = regrid(fieldvalue, cplfield.gridinfo)
 
-    # store new regridded data in correct units
-    cplfield.data .= uconvert(regriddata, cplfield.units, units)
-
-    # update timestamp of coupler field
-    settime!(cplfield, datetime)
+    cplfield.data .= fieldvalue
 
     return nothing
 end
@@ -171,10 +161,10 @@ function Base.show(io::IO, coupler::CouplerState)
     |  :Field2     |    m    |  2021-01-01T00:00:00        |  CG Cubed Sphere |
     ---------------------------------------------------------------------------
     =#
-    fields = coupler.CplStateBlob
+    fields = coupler.CplStateDict
     data = Array{Any}(undef, length(fields), 4)
-    for (i, k) in enumerate(keys(coupler.CplStateBlob))
-        entry = coupler.CplStateBlob[k]
+    for (i, k) in enumerate(keys(coupler.CplStateDict))
+        entry = coupler.CplStateDict[k]
         data[i, :] = [k entry.units entry.datetime entry.gridinfo.gridtype]
     end
     header = (["Field Name", "Units", "Field Time", "Grid Type"], ["", "", "Y-m-d H:M:S", ""])

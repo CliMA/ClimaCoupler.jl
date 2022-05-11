@@ -6,9 +6,8 @@ export CouplerState
 export coupler_push!, coupler_pull!, coupler_put!, coupler_get
 export coupler_add_field!
 
-mutable struct CplFieldInfo{AT, GT <: CplGridInfo, UT <: Unitful.Units}
+mutable struct CplFieldInfo{AT}
     data::AT
-    gridinfo::GT
 end
 
 mutable struct CouplerState{DT}
@@ -53,10 +52,8 @@ function coupler_add_field!(
     coupler::CouplerState,
     fieldname::Symbol,
     fieldvalue,
-    grid,
 )
-    gridinfo = CplGridInfo(nothing, nothing, nothing, nothing)
-    push!(coupler.CplStateDict, fieldname => CplFieldInfo(fieldvalue, gridinfo))
+    push!(coupler.CplStateDict, fieldname => CplFieldInfo(fieldvalue))
 end
 
 """

@@ -4,6 +4,9 @@
 import LinearAlgebra, UnPack
 import ClimaCore: Fields, Domains, Topologies, Meshes, DataLayouts, Operators, Geometry, Spaces
 
+push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", ".."))
+using ClimaCoupler
+
 using Base: show_supertypes
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33
 
@@ -174,12 +177,6 @@ end
 # - Surface Flux Calculation (coarse bulk formula)
 calculate_flux(T_sfc, T1, parameters) = -parameters.λ * (T_sfc - T1);
 
-# - Coupler Communication Functions 
-# These functions export / import / transform variables 
-# These functions are now just place holders for coupler transformations (e.g. regridding, masking, etc)
-coupler_get(x) = copy(x);
-coupler_put(x) = copy(x);
-
 # ## Model Initialization
 # - initialize atm model domain and grid
 domain_atm = Domains.IntervalDomain(
@@ -226,13 +223,19 @@ function coupler_solve!(stepping, ics_aux, parameters)
         ODEProblem(∑tendencies_ice_stub, Y_ice, (t_start, t_end), (; p = parameters, Ya = ics_aux.ice, Δt = Δt_coupler))
     integ_ice = init(prob_ice, Euler(), dt = Δt_coupler, saveat = 1 * Δt_coupler)
 
+    ## SETUP COUPLER
+    coupler = CouplerState()
+    # pointers to the coupled fields are passed to the coupler:
+    coupler_add_field!(coupler, :T_sfc_ice, integ_ice.u.T_sfc)
+    coupler_add_field!(coupler, :F_atm, integ_atm.u.F)
+
     ## coupler stepping
     for t in (t_start:Δt_coupler:t_end)
 
         ## STEP ATMOS
         ## pre_atmos
-        integ_atm.u.F .= [0.0] # surface flux to be accumulated
-        integ_atm.p.Ya.T_sfc .= coupler_get(integ_ice.u.T_sfc) # integ_atm.p is the parameter vector of an ODEProblem from DifferentialEquations
+        integ_atm.u.F .= [0.0] # reset surface flux to be accumulated
+        integ_atm.p.Ya.T_sfc .= coupler_get(coupler, :T_sfc_ice) # integ_atm.p is the parameter vector of an ODEProblem from DifferentialEquations
 
         ## run atmos
         ## NOTE: use (t - integ_atm.t) here instead of Δt_coupler to avoid accumulating roundoff error in our timestepping.
@@ -243,7 +246,7 @@ function coupler_solve!(stepping, ics_aux, parameters)
         ## STEP ICE
         ## pre_ice
 
-        integ_ice.p.Ya.F_atm .= coupler_get(integ_atm.u.F) / Δt_coupler
+        integ_ice.p.Ya.F_atm .= coupler_get(coupler, :F_atm) / Δt_coupler
         Δt_coupler_ice = Δt_coupler
 
         ## run ice

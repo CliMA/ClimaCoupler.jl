@@ -52,6 +52,7 @@ function coupler_add_field!(
     coupler::CouplerState,
     fieldname::Symbol,
     fieldvalue,
+    # grid = nothing, # by default, the coupler grid is the grid of the registering model. Can otherwise specify the CC.space the field should live on
 )
     push!(coupler.CplStateDict, fieldname => CplFieldInfo(fieldvalue))
 end
@@ -87,11 +88,14 @@ the coupler data field is the state at time `datetime`.
 
 #     return uconvert(regriddata, units, cplfield.units)
 # end
-function coupler_get(coupler::CouplerState, fieldname::Symbol)
+function coupler_get(coupler::CouplerState, fieldname::Symbol, regrid_space = nothing)
     cplfield = coupler.CplStateDict[fieldname]
     
+    # don't regrid by default
+    regrid_space = (regrid_space === nothing) ? axes(cplfield.data) : regrid_space
+
     # call to climacore remap utils
-    # regriddata = regrid(cplfield.data, ___)
+    regriddata = regrid(cplfield.data, regrid_space, axes(cplfield.data))
 
     return cplfield.data
 end
@@ -124,14 +128,19 @@ function coupler_put!(
     cplfield = coupler.CplStateDict[fieldname]
 
     # map new data to grid of coupler field; new data -> coupler grid
-    # regriddata = regrid(fieldvalue, cplfield.gridinfo)
+    regriddata = regrid(fieldvalue, axes(cplfield.data), axes(fieldvalue))
 
-    cplfield.data .= fieldvalue
+    cplfield.data .= regriddata
 
     return nothing
 end
 
 # TODO: maps cplfield data from `fromgrid` to `togrid`
+# Would like a way to use the togrid and fromgrid to access the right remapping operator
+# We only really (currently, and is cleanest) have space info via axes(fields) to use here.
+# perhaps, a put regrids from :component to :coupler while a get regrids from :coupler to component.
+# Operators need ordered keys to be accessed?
+# Operators are auto-constructed during registration phase?
 function regrid(data, togrid, fromgrid)
     return data
 end

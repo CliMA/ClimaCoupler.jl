@@ -233,26 +233,27 @@ function coupler_solve!(stepping, ics_aux, parameters)
     for t in (t_start:Δt_coupler:t_end)
 
         ## STEP ATMOS
-        ## pre_atmos
-        integ_atm.u.F .= [0.0] # reset surface flux to be accumulated
+        ## atmos pull!
+        integ_atm.u.F .= [0.0] # reset surface flux to be accumulated; need to do this AFTER ice pulls from coupler
         integ_atm.p.Ya.T_sfc .= coupler_get(coupler, :T_sfc_ice) # integ_atm.p is the parameter vector of an ODEProblem from DifferentialEquations
 
         ## run atmos
         ## NOTE: use (t - integ_atm.t) here instead of Δt_coupler to avoid accumulating roundoff error in our timestepping.
         OrdinaryDiffEq.step!(integ_atm, Δt_coupler, true)
 
-        # ## no post_atmos
+        # ## atmos push! (not strictly necessary since this is a pointer)
+        coupler_put!(coupler, :F_atm, integ_atm.u.F)
 
         ## STEP ICE
-        ## pre_ice
-
+        ## ice pull!
         integ_ice.p.Ya.F_atm .= coupler_get(coupler, :F_atm) / Δt_coupler
         Δt_coupler_ice = Δt_coupler
 
         ## run ice
         OrdinaryDiffEq.step!(integ_ice, Δt_coupler_ice, true)
 
-        # ## no post ice
+        # ## ice push!
+        coupler_put!(coupler, :T_sfc_ice, integ_ice.u.T_sfc)
 
     end
 

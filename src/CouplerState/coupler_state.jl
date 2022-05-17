@@ -77,27 +77,23 @@ Retrieve data array corresponding to `fieldname`.
 Returns data on the grid specified by `gridinfo` and in the units of `units`. Checks that
 the coupler data field is the state at time `datetime`.
 """
-# function coupler_get(coupler::CouplerState, fieldname::Symbol, gridinfo, datetime::DateTime, units::Unitful.Units)
-#     cplfield = coupler.CplStateDict[fieldname]
-
-#     # check that retrieving component and coupler are at same time
-#     datetime != cplfield.datetime &&
-#         throw(ErrorException("Retrieval time ($datetime) != coupler field time ($(cplfield.datetime))"))
-
-#     regriddata = regrid(cplfield.data, gridinfo, cplfield.gridinfo)
-
-#     return uconvert(regriddata, units, cplfield.units)
-# end
-function coupler_get(coupler::CouplerState, fieldname::Symbol, regrid_space = nothing)
+function coupler_get(coupler::CouplerState, fieldname::Symbol, target_space = nothing)
     cplfield = coupler.CplStateDict[fieldname]
-    
-    # don't regrid by default
-    regrid_space = (regrid_space === nothing) ? axes(cplfield.data) : regrid_space
 
     # call to climacore remap utils
-    regriddata = regrid(cplfield.data, regrid_space, axes(cplfield.data))
+    if target_space isa ClimaCore.Spaces.AbstractSpace
+        regriddata = regrid(target_space, cplfield.data, coupler)
+        return regriddata
+    else
+        return cplfield.data
+    end
+end
 
-    return cplfield.data
+function coupler_get!(fieldto::ClimaCore.Fields.Field, coupler::CouplerState, fieldname::Symbol)
+    cplfield = coupler.CplStateDict[fieldname]
+
+    # call to climacore remap utils - modify fieldto.
+    regrid!(fieldto, cplfield.data, coupler)
 end
 
 """
@@ -120,19 +116,11 @@ Updates coupler field `fieldname` with `fieldvalue`, the field's value at time `
 `gridinfo` and `units` inform the coupler of the format of the inputted data
 allowing conversion to match the grid and units of the coupler field.
 """
-function coupler_put!(
-    coupler::CouplerState,
-    fieldname::Symbol,
-    fieldvalue,
-)
+function coupler_put!(coupler::CouplerState, fieldname::Symbol, fieldvalue)
     cplfield = coupler.CplStateDict[fieldname]
 
     # map new data to grid of coupler field; new data -> coupler grid
-    regriddata = regrid(fieldvalue, axes(cplfield.data), axes(fieldvalue))
-
-    cplfield.data .= regriddata
-
-    return nothing
+    regrid!(cplfield.data, fieldvalue, coupler)
 end
 
 # TODO: maps cplfield data from `fromgrid` to `togrid`
@@ -141,8 +129,15 @@ end
 # perhaps, a put regrids from :component to :coupler while a get regrids from :coupler to component.
 # Operators need ordered keys to be accessed?
 # Operators are auto-constructed during registration phase?
-function regrid(data, togrid, fromgrid)
-    return data
+function regrid(target_space, source_field, coupler)
+    # R = get_remap_op_from_coupler...
+    # return remap(R, source_field)
+    return source_field
+end
+
+function regrid!(target_field, source_field, coupler)
+    # R = get_remap_op_from_coupler...
+    # remap!(target_field, R, source_field)
 end
 
 # convert from `fromunits` to `tounits`

@@ -18,10 +18,10 @@ include("coupler_utils/masker.jl")
 include("coupler_utils/general_helper.jl")
 
 # # initiate spatial and temporal info
-t_end = 2592000 * 2 # 100e2 # 100e2 # 2592000 # 100e2 
+t_end =  2592000 * 3 # 100e2 # 2592000 # 100e2 #2592000 * 2 #
 tspan = (0, t_end) # 172800.0)
 Δt_cpl = 2e2
-saveat = Δt_cpl * 1000
+saveat = Δt_cpl * 100
 
 # init MPI
 include("mpi/mpi_init.jl")
@@ -136,7 +136,7 @@ end
 
 # animations
 plot_anim = nothing
-if plot_anim
+if plot_anim !== nothing
     
     using ClimaCorePlots
 
@@ -156,7 +156,7 @@ if plot_anim
     Plots.mp4(anim, "anim_rhoe.mp4", fps = 10)
 
     anim = Plots.@animate for u in sol_slab.u
-        Plots.plot(u.T_sfc)
+        Plots.plot(u.T_sfc,  clims = (240, 330))
     end
     Plots.mp4(anim, "slab_T.mp4", fps = 10)
 
@@ -181,10 +181,10 @@ if plot_anim
     end
     Plots.mp4(anim, "anim_rhoqt_1km.mp4", fps = 10)
 
-    anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(Geometry.WVector.(u.f.w),half) )#.- Fields.level(sol_atm.u[1].c.ρt_tot,1),  clims = (-5000, 50000) )
-    end
-    Plots.mp4(anim, "anim_w.mp4", fps = 10)
+    # anim = Plots.@animate for u in sol_atm.u
+    #     Plots.plot(Fields.level(Geometry.WVector.(u.f.w),half) )#.- Fields.level(sol_atm.u[1].c.ρt_tot,1),  clims = (-5000, 50000) )
+    # end
+    # Plots.mp4(anim, "anim_w.mp4", fps = 10)
 end
 
 # TODO:

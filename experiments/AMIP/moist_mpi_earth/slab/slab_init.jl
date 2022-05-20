@@ -75,7 +75,7 @@ function slab_init(
     mask = nothing,
 ) where {FT}
 
-    params = ThermalSlabParameters(FT(1), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5)) # T_init close to the average of T_1 in atmos
+    params = ThermalSlabParameters(FT(1), FT(1500.0), FT(800.0), FT(300.0), FT(1e-3), FT(1e-5)) # T_init close to the average of T_1 in atmos
 
     Y, space = slab_space_init(FT, space, params)
     Ya = (params = params, F_aero = ClimaCore.Fields.zeros(space), F_rad = ClimaCore.Fields.zeros(space), mask = mask) #auxiliary

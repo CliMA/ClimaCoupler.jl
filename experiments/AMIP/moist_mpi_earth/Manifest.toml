@@ -129,12 +129,6 @@ git-tree-sha1 = "1e315e3f4b0b7ce40feded39c73049692126cf53"
 uuid = "9e997f8a-9a97-42d5-a9f1-ce6bfc15e2c0"
 version = "0.1.3"
 
-[[deps.ClimaAtmos]]
-deps = ["CLIMAParameters", "ClimaCore", "ClimaCorePlots", "ClimaCoreVTK", "CloudMicrophysics", "DiffEqCallbacks", "IntervalSets", "JLD2", "LinearAlgebra", "OrdinaryDiffEq", "Pkg", "Printf", "StaticArrays", "Test", "Thermodynamics", "UnPack"]
-path = "/Users/lenkanovak/ClimaCoupler.jl/experiments/AMIP/moist_mpi_earth/../../../../ClimaAtmos.jl_cpl/"
-uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.1.0"
-
 [[deps.ClimaComms]]
 deps = ["CUDA", "KernelAbstractions", "StaticArrays"]
 git-tree-sha1 = "50fbb76557f11e28ec21ad2fbe5e7547f1b1f432"

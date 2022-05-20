@@ -27,6 +27,17 @@ function hspace_1D(xlim = (-π, π), npoly = 0, helem = 10)
     return space
 end
 
+# Ocean Simulation - Later to live in Oceananigans
+struct OceanSimulation <: ClimaCoupler.AbstractOceanSimulation
+    integrator
+end
+
+function OceanSimulation(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = ())
+    ocn_prob = ODEProblem(ocn_rhs!, Y_init, (t_start, t_end), p)
+    ocn_integ = init(ocn_prob, timestepper, dt = dt, saveat = saveat, callback = callbacks)
+    return OceanSimulation(ocn_integ)
+end
+
 # init simulation
 function ocn_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
 

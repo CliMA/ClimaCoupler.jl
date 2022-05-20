@@ -101,8 +101,7 @@ function atm_rhs!(dY, Y, params, t)
     dYc = dY.Yc
     dρw = dY.ρw
 
-    center_coords = Fields.coordinate_field(params.domain.hv_center_space)
-    face_coords = Fields.coordinate_field(params.domain.hv_face_space)
+    center_coords = Fields.coordinate_field(axes(Yc))
 
     # spectral horizontal operators
     hdiv = Operators.Divergence()
@@ -211,6 +210,32 @@ function atm_rhs!(dY, Y, params, t)
     Spaces.weighted_dss!(dYc)
     Spaces.weighted_dss!(dρw)
     return dY
+end
+
+# Atmos Simulation - later to live in ClimaAtmos
+struct AtmosSimulation <: ClimaCoupler.AbstractAtmosSimulation
+    integrator
+end
+
+function AtmosSimulation(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = ())
+    atm_prob = ODEProblem(
+        atm_rhs!,
+        Y_init,
+        (t_start, t_end),
+        p,
+    )
+
+    atm_integ = init(
+        atm_prob,
+        timestepper,
+        dt = dt,
+        saveat = saveat,
+        progress = true,
+        progress_message = (dt, u, params, t) -> t,
+        callback = callbacks,
+    )
+
+    return AtmosSimulation(atm_integ)
 end
 
 # init simulation

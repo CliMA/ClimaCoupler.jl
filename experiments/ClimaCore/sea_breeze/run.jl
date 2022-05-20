@@ -4,6 +4,9 @@ using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!
 import ClimaCore.Utilities: PlusHalf
 using DiffEqCallbacks
 
+push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", ".."))
+using ClimaCoupler
+
 include("atmos_rhs.jl")
 include("ocean_rhs.jl")
 include("land_rhs.jl")
@@ -44,8 +47,29 @@ cpl_parameters = (
     C_H = FT(0.0015),
 )
 
+function make_dss_func()
+    function _dss!(x::Fields.Field)
+        Spaces.weighted_dss!(x)
+    end
+    function _dss!(::Any)
+        nothing
+    end
+    dss_func(Y, t, integrator) = foreach(_dss!, Fields._values(Y))
+    return dss_func
+end
+dss_func = make_dss_func()
+dss_callback = FunctionCallingCallback(dss_func, func_start = true)
+
 @info "Init Models and Maps"
 
+# timestepping
+t_start, t_end = (0.0, 1e4)
+cpl_Δt = 0.1
+saveat = 1e2
+atm_nsteps, ocn_nsteps, lnd_nsteps = (5, 1, 1)
+
+
+# init states
 atm_Y_default, atm_bc, atm_domain = atm_init(
     xmin = -500,
     xmax = 500,
@@ -61,115 +85,96 @@ ocn_Y_default, ocn_domain = ocn_init(xmin = -500, xmax = 0, helem = 10, npoly = 
 
 lnd_Y_default, lnd_domain = lnd_init(xmin = 0, xmax = 500, helem = 10, npoly = 0)
 
+# Build remapping operators
 atm_boundary = Spaces.level(atm_domain.hv_face_space, PlusHalf(0))
 
-# Build remapping operators
 atm_to_ocn = Operators.LinearRemap(ocn_domain, atm_boundary)
 atm_to_lnd = Operators.LinearRemap(lnd_domain, atm_boundary)
 ocn_to_atm = Operators.LinearRemap(atm_boundary, ocn_domain)
 lnd_to_atm = Operators.LinearRemap(atm_boundary, lnd_domain)
 
-function make_dss_func()
-    function _dss!(x::Fields.Field)
-        Spaces.weighted_dss!(x)
-    end
-    function _dss!(::Any)
-        nothing
-    end
-    dss_func(Y, t, integrator) = foreach(_dss!, Fields._values(Y))
-    return dss_func
+# initialize coupling fields
+atm_T_sfc = Operators.remap(ocn_to_atm, ocn_Y_default.T_sfc) .+ Operators.remap(lnd_to_atm, lnd_Y_default.T_sfc) # masked arrays; regrid to atm grid
+atm_F_sfc = Fields.zeros(atm_boundary)
+ocn_F_sfc = Fields.zeros(ocn_domain)
+lnd_F_sfc = Fields.zeros(lnd_domain)
+
+atm_Y = Fields.FieldVector(Yc = atm_Y_default.Yc, ρw = atm_Y_default.ρw, F_sfc = atm_F_sfc)
+atm_p = (cpl_p = cpl_parameters, T_sfc = atm_T_sfc, bc = atm_bc)
+atmos = AtmosSimulation(atm_Y, t_start, cpl_Δt / atm_nsteps, t_end, SSPRK33(), atm_p, saveat, dss_callback)
+
+ocn_Y = Fields.FieldVector(T_sfc = ocn_Y_default.T_sfc)
+ocn_p = (cpl_parameters, F_sfc = ocn_F_sfc)
+ocean = OceanSimulation(ocn_Y, t_start, cpl_Δt / ocn_nsteps, t_end, SSPRK33(), ocn_p, saveat)
+
+lnd_Y = Fields.FieldVector(T_sfc = lnd_Y_default.T_sfc)
+lnd_p = (cpl_parameters, F_sfc = lnd_F_sfc)
+land = LandSimulation(lnd_Y, t_start, cpl_Δt / lnd_nsteps, t_end, SSPRK33(), lnd_p, saveat)
+
+struct AOLCoupledSimulation{FT, A, O, L} <: ClimaCoupler.AbstractCoupledSimulation
+    atmos::A
+    ocean::O
+    land::L
+    Δt::FT
 end
-dss_func = make_dss_func()
-dss_callback = FunctionCallingCallback(dss_func, func_start = true)
 
-function cpl_run()
+sim = AOLCoupledSimulation(atmos, ocean, land, cpl_Δt)
 
-    # timestepping
-    t_start, t_end = (0.0, 1e4)
-    cpl_Δt = 0.1
-    saveat = 1e2
-    atm_nsteps, ocn_nsteps, lnd_nsteps = (5, 1, 1)
+# step for sims built on OrdinaryDiffEq
+function step!(sim::ClimaCoupler.AbstractSimulation, t_stop)
+    Δt = t_stop - sim.integrator.t
+    step!(sim.integrator, Δt, true)
+end
 
-    # initialize
-    atm_T_sfc = Operators.remap(ocn_to_atm, ocn_Y_default.T_sfc) .+ Operators.remap(lnd_to_atm, lnd_Y_default.T_sfc) # masked arrays; regrid to atm grid
-    atm_F_sfc = Fields.zeros(atm_boundary)
-
-    atm_Y = Fields.FieldVector(Yc = atm_Y_default.Yc, ρw = atm_Y_default.ρw, F_sfc = atm_F_sfc)
-    atm_prob = ODEProblem(
-        atm_rhs!,
-        atm_Y,
-        (t_start, t_end),
-        (cpl_p = cpl_parameters, T_sfc = atm_T_sfc, bc = atm_bc, domain = atm_domain),
-    )
-    atm_integ = init(
-        atm_prob,
-        SSPRK33(),
-        dt = cpl_Δt / atm_nsteps,
-        saveat = saveat,
-        progress = true,
-        progress_message = (dt, u, params, t) -> t,
-        callback = dss_callback,
-    )
-
-    ocn_F_sfc = Fields.zeros(ocn_domain)
-
-    ocn_Y = Fields.FieldVector(T_sfc = ocn_Y_default.T_sfc)
-    ocn_prob = ODEProblem(ocn_rhs!, ocn_Y, (t_start, t_end), (cpl_parameters, F_sfc = ocn_F_sfc))
-    ocn_integ = init(ocn_prob, SSPRK33(), dt = cpl_Δt / ocn_nsteps, saveat = saveat)
-
-    lnd_F_sfc = Fields.zeros(lnd_domain)
-
-    lnd_Y = Fields.FieldVector(T_sfc = lnd_Y_default.T_sfc)
-    lnd_prob = ODEProblem(lnd_rhs!, lnd_Y, (t_start, t_end), (cpl_parameters, F_sfc = lnd_F_sfc))
-    lnd_integ = init(lnd_prob, SSPRK33(), dt = cpl_Δt / lnd_nsteps, saveat = saveat)
-
+function cpl_run(simulation::AOLCoupledSimulation)
     @info "Run model"
+    @unpack atmos, ocean, land, Δt = simulation
+    cpl_Δt = Δt
     # coupler stepping
-    for t in (t_start:cpl_Δt:t_end)
+    for t in ((t_start + cpl_Δt):cpl_Δt:t_end)
 
         ## Atmos
         # pre: reset flux accumulator
-        atm_F_sfc = atm_integ.u.F_sfc
+        atm_F_sfc = atmos.integrator.u.F_sfc
         atm_F_sfc .= atm_F_sfc .* 0.0    # reset surface flux to be accumulated
 
         # run 
         # NOTE: use (t - integ_atm.t) here instead of Δt_cpl to avoid accumulating roundoff error in our timestepping.
-        step!(atm_integ, t - atm_integ.t, true)
+        step!(atmos, t)
 
         ## Ocean
         # pre: get accumulated flux from atmos
-        ocn_F_sfc = ocn_integ.p.F_sfc
-        Operators.remap!(ocn_F_sfc, atm_to_ocn, atm_integ.u.F_sfc ./ cpl_Δt)
+        ocn_F_sfc = ocean.integrator.p.F_sfc
+        Operators.remap!(ocn_F_sfc, atm_to_ocn, atmos.integrator.u.F_sfc ./ cpl_Δt)
 
         # run
-        step!(ocn_integ, t - ocn_integ.t, true)
+        step!(ocean, t)
         # post: send ocean surface temp to atmos
-        Operators.remap!(atm_integ.p.T_sfc, ocn_to_atm, ocn_integ.u.T_sfc)
+        Operators.remap!(atmos.integrator.p.T_sfc, ocn_to_atm, ocean.integrator.u.T_sfc)
 
         ## Land
         # pre: get accumulated flux from atmos
-        lnd_F_sfc = lnd_integ.p.F_sfc
-        Operators.remap!(lnd_F_sfc, atm_to_lnd, atm_integ.u.F_sfc ./ cpl_Δt)
+        lnd_F_sfc = land.integrator.p.F_sfc
+        Operators.remap!(lnd_F_sfc, atm_to_lnd, atmos.integrator.u.F_sfc ./ cpl_Δt)
 
         # run
-        step!(lnd_integ, t - lnd_integ.t, true)
+        step!(land, t)
         # post: send ocean surface temp to atmos
-        atm_integ.p.T_sfc .+= Operators.remap(lnd_to_atm, lnd_integ.u.T_sfc)
+        atmos.integrator.p.T_sfc .+= Operators.remap(lnd_to_atm, land.integrator.u.T_sfc)
     end
     @info "Simulation Complete"
-    return atm_integ, ocn_integ, lnd_integ
 end
 
-atm_integ, ocn_integ, lnd_integ = cpl_run()
+# cpl_run(sim)
 
-sol = atm_integ.sol
+# sol = sim.atmos.integrator.sol
 
-dirname = "sea_breeze_2d"
-path = joinpath(@__DIR__, "output", dirname)
-mkpath(path)
+# dirname = "sea_breeze_2d"
+# path = joinpath(@__DIR__, "output", dirname)
+# mkpath(path)
 
-using JLD2
-save(joinpath(path, "last_sim.jld2"), "atm_integ", atm_integ, "ocn_integ", ocn_integ, "lnd_integ", lnd_integ)
+# using JLD2
+# save(joinpath(path, "last_sim.jld2"), "atm_integ", atm_integ, "ocn_integ", ocn_integ, "lnd_integ", lnd_integ)
 
 # post-processing
 # import Plots, ClimaCorePlots

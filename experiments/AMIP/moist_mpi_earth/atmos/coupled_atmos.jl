@@ -1,5 +1,6 @@
 using ClimaCore.Geometry: ⊗
 
+# These functions are copied from the ClimaAtmos driver and modified for the coupler (TODO: update when interface is stable)
 function vertical_diffusion_boundary_layer_coupled_tendency!(Yₜ, Y, p, t)
     ᶜρ = Y.c.ρ
     (; ᶜp, ᶠv_a, ᶠz_a, ᶠK_E) = p # assume ᶜts and ᶜp have been updated
@@ -40,19 +41,18 @@ function vertical_diffusion_boundary_layer_coupled_tendency!(Yₜ, Y, p, t)
 
 end
 
-function vertical_diffusion_boundary_layer_coupled_cache(Y; Cd = FT(0.0044), Ch = FT(0.0044))
+function vertical_diffusion_boundary_layer_coupled_cache(Y; Cd = FT(0.0014), Ch = FT(0.0014))
     ᶠz_a = similar(Y.f, FT)
     z_bottom = Spaces.level(Fields.coordinate_field(Y.c).z, 1)
     Fields.field_values(ᶠz_a) .= Fields.field_values(z_bottom) .* one.(Fields.field_values(ᶠz_a))
     # TODO: fix VIJFH copyto! to remove the one.(...)
 
     if :ρq_tot in propertynames(Y.c)
-        dif_flux_ρq_tot = similar(z_bottom, Geometry.WVector{FT})
+        dif_flux_ρq_tot = similar(z_bottom, Geometry.WVector{FT}) #ones(axes(z_bottom))
     else
         dif_flux_ρq_tot = Ref(Geometry.WVector(FT(0)))
     end
 
-    #dif_flux_uₕ = similar(z_bottom, Geometry.Contravariant3Vector{FT}) .⊗ similar(z_bottom, Geometry.Covariant12Vector{FT}) # this breaks
     dif_flux_uₕ =
         Geometry.Contravariant3Vector.(zeros(axes(z_bottom))) .⊗
         Geometry.Covariant12Vector.(zeros(axes(z_bottom)), zeros(axes(z_bottom)))

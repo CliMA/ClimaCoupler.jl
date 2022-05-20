@@ -29,7 +29,7 @@ function calculate_surface_fluxes_atmos_grid!(integrator, T_sfc)
 
     # Total energy flux
     if :ρe in propertynames(Y.c)
-        @. dif_flux_energy = #Geometry.WVector(FT(10))
+        @. dif_flux_energy =
             Geometry.WVector(tsf.shf + tsf.shf + Rn)
     end
 

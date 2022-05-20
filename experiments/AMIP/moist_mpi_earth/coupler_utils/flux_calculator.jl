@@ -6,10 +6,11 @@ calculate_surface_fluxes_atmos_grid!(integrator)
 
 - TODO: generalize interface for regridding and take land state out of atmos's integrator.p
 """
-function calculate_surface_fluxes_atmos_grid!(integrator, T_sfc)
+function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc )
     p = integrator.p
-    (; ᶜts, dif_flux_energy, dif_flux_ρq_tot, dif_flux_uₕ, params) = p
+    (; ᶜts, dif_flux_energy, dif_flux_ρq_tot, dif_flux_uₕ, params, Cd, Ch) = p
 
+    (; T_sfc, z0m, z0b) = info_sfc 
     Y = integrator.u;
 
     # Turbulent surface flux calculation
@@ -19,22 +20,20 @@ function calculate_surface_fluxes_atmos_grid!(integrator, T_sfc)
             Geometry.UVVector.(Spaces.level(Y.c.uₕ, 1)),
             Spaces.level(Fields.coordinate_field(Y.c).z, 1),
             FT(0), # TODO: get actual value of z_sfc
-            Fields.Field(Fields.field_values(T_sfc), axes(Spaces.level(Y.c, 1))), # remove when same instance issue is resolved
+            swap_space!(T_sfc, axes(Spaces.level(Y.c, 1))), # remove when same instance issue is resolved
             params,
-            FT(0.001), # TODO: get these roughness lengths from land
-            FT(0.001),
+            swap_space!(z0m, axes(Spaces.level(Y.c, 1))), # TODO: get these roughness lengths from land
+            swap_space!(z0b, axes(Spaces.level(Y.c, 1))),
+            Cd,
+            Ch
         )
-
-    # Idealized radiation fluxes 
-    # t = integrator.t
-    #Rn = FT(10 * sin(t / 2π * 1000)) # TODO: link to the SW and LW fluxes from atmos
 
     # Total energy flux
     if :ρe in propertynames(Y.c)
 
-        flux_energy = ones(axes(dif_flux_energy))
-        parent(flux_energy) .= apply_mask.(parent(mask), parent(tsf.shf), parent((tsf.shf .+ tsf.lhf)))
-        @. dif_flux_energy = Geometry.WVector(flux_energy)
+        flux_energy = ones(axes(dif_flux_energy)) 
+        parent(flux_energy) .= parent(tsf.shf .+ tsf.lhf )  # apply_mask.(parent(mask), > , parent(tsf.shf), parent((tsf.shf .+ tsf.lhf)))
+        @. dif_flux_energy = Geometry.WVector(flux_energy) #Geometry.WVector.(swap_space!(tsf.shf .+ tsf.lhf, axes(dif_flux_energy)) )
     end
 
     # Moisture mass flux
@@ -43,7 +42,6 @@ function calculate_surface_fluxes_atmos_grid!(integrator, T_sfc)
     end
 
     # Momentum flux
-
     u_space = axes(tsf.ρτxz) # TODO: delete when "space not the same instance" error is dealt with 
     normal = Geometry.WVector.(ones(u_space)) # TODO: this will need to change for topography
     ρ_1 = Fields.Field(Fields.field_values(Fields.level(Y.c.ρ, 1)), u_space) # TODO: delete when "space not the same instance" error is dealt with 
@@ -84,7 +82,7 @@ function variable_T_saturated_surface_coefs(ts_int, uₕ_int, z_int, z_sfc, T_sf
     return (; shf = tsf.shf, lhf = tsf.lhf, E = E, ρτxz = tsf.ρτxz, ρτyz = tsf.ρτyz)
 end
 
-function constant_T_saturated_surface_coefs_coupled(ts_int, uₕ_int, z_int, z_sfc, T_sfc, params, z0m, z0b)
+function constant_T_saturated_surface_coefs_coupled(ts_int, uₕ_int, z_int, z_sfc, T_sfc, params, z0m, z0b, Cd, Ch)
 
     # get the near-surface thermal state
     T_int = TD.air_temperature(params, ts_int)
@@ -98,14 +96,14 @@ function constant_T_saturated_surface_coefs_coupled(ts_int, uₕ_int, z_int, z_s
     sc = SF.Coefficients{FT}(;
         state_in = SF.InteriorValues(z_int, (uₕ_int.u, uₕ_int.v), ts_int),
         state_sfc = SF.SurfaceValues(z_sfc, (FT(0), FT(0)), ts_sfc),
-        z0m = FT(1e-3),
-        z0b = FT(1e-5),
-        Cd = FT(0.004),
-        Ch = FT(0.004),
+        z0m = z0m, #FT(1e-3),
+        z0b = z0b, #FT(1e-5),
+        Cd = Cd, #FT(0.001),
+        Ch = Ch, #FT(0.0001),
     )
 
     # calculate all fluxes
-    tsf = SF.surface_conditions(params, sc, SF.UniversalFunctions.Businger())
+    tsf = SF.surface_conditions(params, sc, SF.UniversalFunctions.Businger()) # here can specify tol, maxiter
 
     _ρ_liq = FT(1e3)# TODO: use CLIMAParameters
     E = SF.evaporation(sc, params, tsf.Ch) / _ρ_liq

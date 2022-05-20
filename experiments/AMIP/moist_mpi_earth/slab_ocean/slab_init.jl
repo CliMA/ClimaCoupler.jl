@@ -1,39 +1,14 @@
 # slab_rhs!
 using ClimaCore
 
-struct ThermalSlabParameters# <: CLIMAParameters.AbstractEarthParameterSet{F} 
-    h::FT
-    ρ::FT
-    c::FT
-    T_init::FT
-    z0m::FT
-    z0b::FT
-end
-
-# domain
-function ShellDomain(; radius = 6371e3, Nel = 8, Nq = 2)
-    domain = ClimaCore.Domains.SphereDomain(radius)
-    mesh = ClimaCore.Meshes.EquiangularCubedSphere(domain, Nel)
-    topology = ClimaCore.Topologies.Topology2D(mesh)
-    quad = ClimaCore.Spaces.Quadratures.GLL{Nq}()
-    space = ClimaCore.Spaces.SpectralElementSpace2D(topology, quad)
-end
-
-struct SlabSimulation{P, Y, D, I}
-    params::P
-    Y_init::Y
-    domain::D
-    integrator::I
-end
-
 # init simulation
-function slab_space_init(::Type{FT}, space, p) where {FT}
+function slab_ocean_space_init(::Type{FT}, space, p) where {FT}
 
     coords = ClimaCore.Fields.coordinate_field(space)
 
     # initial condition
     T_sfc = map(coords) do coord
-        T_sfc_0 = FT(p.T_init) 
+        T_sfc_0 = FT(p.T_init) #- FT(275) # close to the average of T_1 in atmos
         anom_ampl = FT(0)
         radlat = coord.lat / FT(180) * pi
         lat_0 = FT(60) / FT(180) * pi
@@ -50,20 +25,19 @@ function slab_space_init(::Type{FT}, space, p) where {FT}
     return Y, space
 end
 
-get_slab_energy(slab_sim, T_sfc) = slab_sim.params.ρ .* slab_sim.params.c .* T_sfc .* slab_sim.params.h
-
-function slab_rhs!(dY, Y, Ya, t)
+# ode
+function slab_ocean_rhs!(dY, Y, Ya, t)
     """
-    Slab:
+    Slab ocean:
     ∂_t T_sfc = F_aero + G
     """
     p, F_aero, F_rad, mask = Ya
 
     rhs = @. (F_aero + F_rad) / (p.h * p.ρ * p.c)
-    parent(dY.T_sfc) .= apply_mask.(parent(mask), > , parent(rhs), FT(0)) 
+    parent(dY.T_sfc) .= apply_mask.(parent(mask), < , parent(rhs), FT(0)) 
 end
 
-function slab_init(
+function slab_ocean_init(
     ::Type{FT},
     tspan;
     stepper = Euler(),
@@ -75,11 +49,11 @@ function slab_init(
     mask = nothing,
 ) where {FT}
 
-    params = ThermalSlabParameters(FT(1), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5)) # T_init close to the average of T_1 in atmos
+    params = ThermalSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(275.0), FT(1e-3), FT(1e-5))
 
     Y, space = slab_space_init(FT, space, params)
     Ya = (params = params, F_aero = ClimaCore.Fields.zeros(space), F_rad = ClimaCore.Fields.zeros(space), mask = mask) #auxiliary
-    problem = OrdinaryDiffEq.ODEProblem(slab_rhs!, Y, tspan, Ya)
+    problem = OrdinaryDiffEq.ODEProblem(slab_ocean_rhs!, Y, tspan, Ya)
     integrator = OrdinaryDiffEq.init(problem, stepper, dt = dt, saveat = saveat)
 
     SlabSimulation(params, Y, space, integrator)

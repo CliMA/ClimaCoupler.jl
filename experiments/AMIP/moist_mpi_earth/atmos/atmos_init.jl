@@ -7,7 +7,6 @@ ATMOS_DIR = CWD * "/../../../../ClimaAtmos.jl_cpl/"
 run(`rm -rf $ATMOS_DIR`)
 ClimaComms.barrier(comms_ctx)
 
-
 if !is_distributed || (is_distributed && ClimaComms.iamroot(comms_ctx))
     run(`git clone https://github.com/CliMA/ClimaAtmos.jl.git $ATMOS_DIR`)
     run(`chmod 775 checkout_ClimaAtmos.sh`)
@@ -71,6 +70,8 @@ end
 
 # init model using the modified driver
 ClimaComms.barrier(comms_ctx)
+Pkg.add(PackageSpec(name = "ClimaCore", version = "0.10.3"))
+Pkg.pin("ClimaCore")
 include(driver_new) # this stops just before `solve!`
 
 spaces = (; center_space = center_space, face_space = face_space)

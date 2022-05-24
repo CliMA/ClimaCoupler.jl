@@ -203,10 +203,13 @@ if plot_anim !== nothing
     # end
     # Plots.mp4(anim, "anim_w.mp4", fps = 10)
 
-    anim = Plots.@animate for u in sol_slab.u
+    times = 0:saveat:t_end
+    anim = Plots.@animate for t_i in 1:1:length(times)
+        t = t_i /24/60/60
+        u = sol_slab.u[t_i]
         combined_field = similar(u.T_sfc)
         parent(combined_field) .= combine_surface.(parent(mask), parent(u.T_sfc), parent(SST) )
-        Plots.plot(combined_field, clims = (265, 310))
+        Plots.plot(combined_field, clims = (265, 310), title = ("day: $t") )
     end
     Plots.mp4(anim, "slab_T_combo.mp4", fps = 10)
 

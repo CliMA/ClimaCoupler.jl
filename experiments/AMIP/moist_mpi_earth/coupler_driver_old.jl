@@ -18,7 +18,7 @@ include("coupler_utils/masker.jl")
 include("coupler_utils/general_helper.jl")
 
 # # initiate spatial and temporal info
-t_end =  2592000 * 2 # 100e2 # 2592000 # 100e2 #2592000 * 2 #
+t_end =  2592000 * 3 # 100e2 # 2592000 # 100e2 #2592000 * 2 #
 tspan = (0, t_end) # 172800.0)
 Δt_cpl = 2e2
 saveat = Δt_cpl * 100
@@ -30,24 +30,16 @@ include("mpi/mpi_init.jl")
 include("atmos/atmos_init.jl")
 atmos_sim = atmos_init(FT, Y, spaces, integrator, params = params);
 
-# init a 2D bounary space at the surface, assuming the same instance (and MPI distribution if applicable) as the atmos domain above
-boundary_space = ClimaCore.Fields.level(atmos_sim.domain.face_space, half) # global surface grid
-
 # init land-sea mask
 infile = "data/seamask.nc"
-mask = LandSeaMask(FT, infile, "LSMASK", boundary_space) 
+boundary_space = ClimaCore.Fields.level(atmos_sim.domain.face_space, half) # global surface grid
+mask = LandSeaMask(FT, infile, "LSMASK", boundary_space)
 
 # init surface (slab) model components
 include("slab/slab_init.jl")
 slab_sim = slab_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask);
 
 include("slab_ocean/slab_init.jl")
-prescribed_ssts = true
-if prescribed_ssts == true
-    # sample SST field
-    SST = ncreader_rll_to_cgll_from_space(FT, "data/sst.nc",  "SST", boundary_space)    
-    SST = swap_space!(SST,axes(mask)) .* ( .- (mask .-1) ) .+ FT(273.15)
-end
 slab_ocean_sim = slab_ocean_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask);
 
 # init coupler's boundary fields for regridding (TODO: technically this can be bypassed by directly rigridding on model grids)
@@ -61,6 +53,10 @@ F_R = ClimaCore.Fields.zeros(boundary_space) # radiative fluxes
 # init conservation info collector
 CS = ConservationCheck([], [])
 
+# sample SST field
+# SST = ncreader_rll_to_cgll_from_space(FT, "data/sst.nc",  "SST", boundary_space)    
+# SST = swap_space!(SST,axes(mask)) .* ( .- (mask .-1) ) .+ FT(273.15)
+
 # coupling loop
 @show "Starting coupling loop"
 walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
@@ -70,12 +66,9 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     ## Turbulent surface fluxes
 
     # coupler_get: T_sfc, z0m, z0b
-    combined_field = zeros( boundary_space )
-    if prescribed_ssts == true
-        parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.u.T_sfc), parent(SST) ) # prescribed SSTs
-    else
-        parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.u.T_sfc), parent(slab_ocean_sim.integrator.u.T_sfc)) 
-    end    
+    combined_field = zeros( boundary_space )    
+    parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.u.T_sfc), parent(slab_ocean_sim.integrator.u.T_sfc)) 
+    # parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.u.T_sfc), parent(SST) ) # prescribed SSTs
     dummmy_remap!(T_S, combined_field)
 
     parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.p.params.z0m .* mask), parent(slab_ocean_sim.integrator.p.params.z0m .* ( .- (mask .-1) )) ) 
@@ -163,7 +156,7 @@ if plot_anim !== nothing
     Plots.mp4(anim, "anim_rhoe.mp4", fps = 10)
 
     anim = Plots.@animate for u in sol_slab.u
-        Plots.plot(u.T_sfc)#,  clims = (240, 330))
+        Plots.plot(u.T_sfc,  clims = (240, 330))
     end
     Plots.mp4(anim, "slab_T.mp4", fps = 10)
 
@@ -174,7 +167,7 @@ if plot_anim !== nothing
     Plots.mp4(anim, "anim_rhoe_anom.mp4", fps = 10)
 
     anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(u.c.ρe,5) .- Fields.level(sol_atm.u[1].c.ρe,5),  clims = (-1000, 3000) )
+        Plots.plot(Fields.level(u.c.ρe,7) .- Fields.level(sol_atm.u[1].c.ρe,7),  clims = (-1000, 3000) )
     end
     Plots.mp4(anim, "anim_rhoe_anom_7km.mp4", fps = 10)
 
@@ -184,35 +177,15 @@ if plot_anim !== nothing
     Plots.mp4(anim, "anim_rhoqt.mp4", fps = 10)
 
     anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(u.c.ρq_tot,2), clims = (0, 0.005)  )#.- Fields.level(sol_atm.u[1].c.ρt_tot,1),  clims = (-5000, 50000) )
+        Plots.plot(Fields.level(u.c.ρq_tot,2), clims = (0, 0.02)  )#.- Fields.level(sol_atm.u[1].c.ρt_tot,1),  clims = (-5000, 50000) )
     end
-    Plots.mp4(anim, "anim_rhoqt_1km_v2.mp4", fps = 10)
-
-    anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(u.c.ρq_tot,5), clims = (0, 0.001)  )#.- Fields.level(sol_atm.u[1].c.ρt_tot,1),  clims = (-5000, 50000) )
-    end
-    Plots.mp4(anim, "anim_rhoqt_7km_v2.mp4", fps = 10)
-
-    anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(mask )#.- Fields.level(sol_atm.u[1].c.ρt_tot,1),  clims = (-5000, 50000) )
-    end
-    Plots.mp4(anim, "mask.mp4", fps = 10)
+    Plots.mp4(anim, "anim_rhoqt_1km.mp4", fps = 10)
 
     # anim = Plots.@animate for u in sol_atm.u
     #     Plots.plot(Fields.level(Geometry.WVector.(u.f.w),half) )#.- Fields.level(sol_atm.u[1].c.ρt_tot,1),  clims = (-5000, 50000) )
     # end
     # Plots.mp4(anim, "anim_w.mp4", fps = 10)
-
-    anim = Plots.@animate for u in sol_slab.u
-        combined_field = similar(u.T_sfc)
-        parent(combined_field) .= combine_surface.(parent(mask), parent(u.T_sfc), parent(SST) )
-        Plots.plot(combined_field, clims = (265, 310))
-    end
-    Plots.mp4(anim, "slab_T_combo.mp4", fps = 10)
-
 end
 
 # TODO:
 # - update MPI, conservation plots 
-# - performance checks, incl threading (--threads=8)
-

@@ -57,6 +57,7 @@ end
 
 #=
 # for land-sea-atmos
+times = 0:saveat:t_end
 solu_atm = sol_atm.u
 h_space = make_horizontal_space(horizontal_mesh, quad, nothing) #TODO move this to the beginning (once same the instance error sorted)
 solu_slab = Fields.FieldVector(T_sfc = [Fields.Field(Fields.field_values(u.T_sfc), h_space) for u in sol_slab.u])
@@ -74,10 +75,12 @@ slab_ocean_e = [sum(get_slab_energy(slab_ocean_sim, u)) for u in solu_slab_ocean
 diff_ρe_tot_atmos = atmos_e .- atmos_e[3]
 diff_ρe_tot_slab = (slab_e .- slab_e[3])
 diff_ρe_tot_slab_ocean = (slab_ocean_e .- slab_ocean_e[3])
+
 Plots.plot(diff_ρe_tot_atmos, label = "atmos")
 Plots.plot!(diff_ρe_tot_slab, label = "slab")
 Plots.plot!(diff_ρe_tot_slab_ocean, label = "slab_ocean")
 tot = atmos_e .+ slab_ocean_e .+ slab_e
-Plots.plot!(tot .- tot[1], label = "tot", xlabel = "time [s]", ylabel = "energy(t) - energy(t=0) [s]")
+times_days = floor.(times ./ (24*60*60))
+Plots.plot!(tot .- tot[1], label = "tot", xlabel = "time [days]", ylabel = "energy(t) - energy(t=0) [J]", xticks = ( collect(1:length(times))[1:50:end], times_days[1:50:end]) )
 Plots.savefig(figname)
 =#

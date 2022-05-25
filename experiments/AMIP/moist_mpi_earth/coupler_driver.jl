@@ -1,4 +1,5 @@
 # coupler_driver
+# don't forget to run with threading: julia --project --threads 8 (MPI not that useful for debugging coarse runs)
 
 # import packages
 using Pkg
@@ -18,10 +19,13 @@ include("coupler_utils/masker.jl")
 include("coupler_utils/general_helper.jl")
 
 # # initiate spatial and temporal info
-t_end =  2592000 * 2 # 100e2 # 2592000 # 100e2 #2592000 * 2 #
-tspan = (0, t_end) # 172800.0)
+debug_mode = true
+t_end =  debug_mode ? 100e2 : 2592000 * 3
+tspan = (0, t_end) 
 Δt_cpl = 2e2
-saveat = Δt_cpl * 100
+saveat = debug_mode ? Δt_cpl * 1 : Δt_cpl * 100
+
+@show debug_mode 
 
 # init MPI
 include("mpi/mpi_init.jl")
@@ -44,9 +48,8 @@ slab_sim = slab_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = s
 include("slab_ocean/slab_init.jl")
 prescribed_sst = true
 if prescribed_sst == true
-    # sample SST field
-    SST = ncreader_rll_to_cgll_from_space(FT, "data/sst.nc",  "SST", boundary_space)    
-    SST = swap_space!(SST, axes(mask)) .* ( .- (mask .-1) ) .+ FT(273.15) # ensure consistent spaces - TODO: hide this
+    SST = ncreader_rll_to_cgll_from_space(FT, "data/sst.nc",  "SST", boundary_space)  # a sample SST field from https://gdex.ucar.edu/dataset/158_asphilli.html
+    SST = swap_space!(SST, axes(mask)) .* ( abs.(mask .-1) ) .+ FT(273.15) # TODO: avoids the "space not the same instance" error
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5))
 else
     slab_ocean_sim = slab_ocean_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask)
@@ -57,7 +60,7 @@ prescribed_sic = true
 if prescribed_sic == true
     # sample SST field
     SIC = ncreader_rll_to_cgll_from_space(FT, "data/sic.nc",  "SEAICE", boundary_space)      
-    SIC = swap_space!(SIC,axes(mask)) .* ( .- (mask .-1) ) 
+    SIC = swap_space!(SIC,axes(mask)) .* ( abs.(mask .- 1) ) 
     slab_ice_sim = slab_ice_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, prescribed_sic = SIC)
 else
     slab_ice_sim = slab_ice_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat)
@@ -85,25 +88,25 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
 
     # coupler_get: T_sfc, z0m, z0b
     combined_field = zeros( boundary_space )
-    if prescribed_ssts == true
-        parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.u.T_sfc), parent(SST), parent(slab_ice_sim.integrator.u.T_sfc) ) # prescribed SSTs
+    if prescribed_sst == true
+        parent(combined_field) .= combine_surface.(parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2)) , parent(slab_sim.integrator.u.T_sfc), parent(SST), parent(slab_ice_sim.integrator.u.T_sfc) ) # prescribed SSTs
         dummmy_remap!(T_S, combined_field)
-        parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.p.params.z0m .* mask), parent( ocean_params.z0m .* ( .- (mask .-1) )) ) 
+        parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.p.params.z0m .* mask), parent( ocean_params.z0m .* ( abs.(mask .-1) )) ) 
         dummmy_remap!(z0m_S, combined_field)
-        parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.p.params.z0b .* mask), parent( ocean_params.z0b .* ( .- (mask .-1) )) ) 
+        parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.p.params.z0b .* mask), parent( ocean_params.z0b .* ( abs.(mask .-1) )) ) 
         dummmy_remap!(z0b_S, combined_field) 
     else
-        parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.u.T_sfc), parent(slab_ocean_sim.integrator.u.T_sfc), parent(slab_ice_sim.integrator.u.T_sfc) ) 
+        parent(combined_field) .= combine_surface.(parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2)), parent(slab_sim.integrator.u.T_sfc), parent(slab_ocean_sim.integrator.u.T_sfc), parent(slab_ice_sim.integrator.u.T_sfc) ) 
         dummmy_remap!(T_S, combined_field)
-        parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.p.params.z0m .* mask), parent(slab_ocean_sim.integrator.p.params.z0m .* ( .- (mask .-1) )) ) 
+        parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.p.params.z0m .* mask), parent(slab_ocean_sim.integrator.p.params.z0m .* ( abs.(mask .-1) )) ) 
         dummmy_remap!(z0m_S, combined_field)
-        parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.p.params.z0b .* mask), parent(slab_ocean_sim.integrator.p.params.z0b .* ( .- (mask .-1) )) ) 
+        parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.p.params.z0b .* mask), parent(slab_ocean_sim.integrator.p.params.z0b .* ( abs.(mask .-1) )) ) 
         dummmy_remap!(z0b_S, combined_field) 
     end    
      
     # calculate turbulent fluxes on atmos grid and save in atmos cache
-    info_sfc = (; T_sfc = T_S, z0m = z0m_S, z0b = z0b_S)
-    calculate_surface_fluxes_atmos_grid!(atmos_sim.integrator, info_sfc)
+    info_sfc = (; T_sfc = T_S, z0m = z0m_S, z0b = z0b_S, ice_mask = slab_ice_sim.integrator.p.ice_mask)
+    calculate_surface_fluxes_atmos_grid!(atmos_sim.integrator, info_sfc )
 
     # run 
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
@@ -149,7 +152,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     slab_ice_F_rad = slab_ice_sim.integrator.p.F_rad
     @. slab_ice_F_rad = - F_R 
     slab_ice_∂F_aero∂T_sfc = slab_ice_sim.integrator.p.∂F_aero∂T_sfc
-    @. slab_ice_∂F_aero∂T_sfc = - dF_A 
+    @. slab_ice_∂F_aero∂T_sfc = dF_A 
 
     # run
     step!(slab_ice_sim.integrator, t - slab_ice_sim.integrator.t, true)
@@ -166,7 +169,8 @@ end
 # collect solutions
 sol_atm = atmos_sim.integrator.sol
 sol_slab = slab_sim.integrator.sol
-sol_slab_ocean = slab_ocean_sim.integrator.sol
+sol_slab_ice = slab_ice_sim.integrator.sol
+sol_slab_ocean = prescribed_sst !== true ? slab_ocean_sim.integrator.sol : nothing
 
 include("mpi/mpi_postprocess.jl")
 
@@ -184,7 +188,7 @@ plot_anim !== nothing
 # TODO:
 # - update MPI, conservation plots 
 # - performance checks, incl threading (--threads=8)
-
-
-
- 
+# - add prescribable albedo to RRTMGP + ClimaAtmos
+# - add in interface
+# - prescribed sea ice 
+# - replace heavisides with smooth functions

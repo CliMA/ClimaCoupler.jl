@@ -54,13 +54,28 @@ function plot_anim() # TODO: uses global defs
     Plots.mp4(anim, "mask.mp4", fps = 10)
 
     times = 0:saveat:t_end
-    anim = Plots.@animate for t_i in 1:1:length(times)
+    anim = Plots.@animate for t_i in 1:1:length(sol_slab.u)
         t = t_i /24/60/60
         u = sol_slab.u[t_i]
+        u_i = sol_slab_ice.u[t_i]
         combined_field = similar(u.T_sfc)
-        parent(combined_field) .= combine_surface.(parent(mask), parent(u.T_sfc), parent(SST) )
+        #parent(combined_field) .= combine_surface.(parent(mask), parent(u.T_sfc), parent(SST) )
+        parent(combined_field) .= combine_surface.(parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2)) , parent(u.T_sfc), parent(SST), parent(u_i.T_sfc) )
         Plots.plot(combined_field, clims = (265, 310), title = ("day: $t") )
     end
     Plots.mp4(anim, "slab_T_combo.mp4", fps = 10)
 
+    u1 = sol_slab.u[1]
+    u_i1 = sol_slab_ice.u[1]
+    combined_field1 = similar(sol_slab.u[1].T_sfc)
+    parent(combined_field1) .= combine_surface.(parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2)) , parent(u1.T_sfc), parent(SST), parent(u_i1.T_sfc) )
+    anim = Plots.@animate for t_i in 1:1:length(sol_slab.u)
+        t = t_i /24/60/60
+        u = sol_slab.u[t_i]
+        u_i = sol_slab_ice.u[t_i]
+        combined_field = similar(u.T_sfc)
+        parent(combined_field) .= combine_surface.(parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2)) , parent(u.T_sfc), parent(SST), parent(u_i.T_sfc) )
+        Plots.plot(combined_field .- swap_space!(combined_field1, axes(combined_field)), title = ("day: $t") )
+    end
+    Plots.mp4(anim, "slab_T_combo_anom.mp4", fps = 10)
 end

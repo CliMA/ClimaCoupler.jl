@@ -89,7 +89,7 @@ $$
 
 # Distribution
 ## Julia multithreading
-- we can run using multiple threads if the command line argument `enable_threading` is true. 
+- we can run using multiple threads if the command line argument `enable_threading` is true (e.g., run with `julia --project --threads 8`). 
 
 ## MPI via ClimaComms.jl 
 - for AMIP we want the surface columns to be on the same processors as the atmos columns. Since all all surface domains will be on masked spheres, all of them can inherit the same distributed horizontal space from the atmos model.
@@ -122,8 +122,15 @@ $$
 - run the default for 20 days
 
 # Prescribed SST and Sea Ice
-- for the option to use prescribed SSTs and sea ice. For sea ice, we will follow GFDL's [AMIP setup](https://pcmdi.llnl.gov/mips/amip/home/Documentation/20gfdl.html#RTFToC31) and use prescribed sea ice concentrations, assume a 2m thickness, while solving for $T_{sfc}$ 
-
+- We simply prescribe SSTs from a file as `T_sfc`. As for sea ice, we will follow GFDL's [AMIP setup](https://pcmdi.llnl.gov/mips/amip/home/Documentation/20gfdl.html#RTFToC31) and use prescribed sea ice concentrations and a constant ice thickness, $h_{i} = 2m$ ice thickness, while solving for $T_{sfc}$:
+$$
+\frac{dT_{sfc}}{dt} = - frac{h_i(F_{atm} - F_{conductive}) / k_i}
+$$ 
+where
+$$
+F_{conductive} = \frac{k_i (T_{base} - {T_sfc})}{h_{i}}
+$$
+with the thermal conductivity of ice, $k_i = 2$ W m$^{-2}$ K$^{-1}$, and $T_{base} = 273.16$ K. For now we use an Euler timestepper (and use $T_{sfc}$ of the previous timestep), though this may be solved implicitly in the future. 
 
 ## Data source
 - https://gdex.ucar.edu/dataset/158_asphilli.html

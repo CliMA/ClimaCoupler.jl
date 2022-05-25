@@ -110,6 +110,8 @@ function ∑tendencies_ice_stub(du, u, p, t)
     FT = eltype(dY)
 
     if p.prescribed_sic !== nothing # Prognostic eqn for T_sfc
+
+        @show "pres SIC"
         p, F_aero, F_rad, ice_mask = Ya
 
         F_conductive = p.k_ice / (p.h_ice) * (p.T_base - Y.T_sfc)
@@ -142,7 +144,7 @@ function slab_ice_init(
     ice_mask =  prescribed_sic !== nothing ? get_ice_mask.(prescribed_sic .- FT(25)) : ClimaCore.Fields.zeros(space) # here 25% and lower is considered ice free # TODO: generalize to a smaoot function of ice fraction
 
     Y, space = slab_ice_space_init(FT, space, params)
-    Ya = (params = params, F_aero = ClimaCore.Fields.zeros(space), ∂F_aero∂T_sfc = ClimaCore.Fields.zeros(space), F_rad = ClimaCore.Fields.zeros(space), mask = mask, ice_mask =  ClimaCore.Fields.zeros(space), Δt = dt, prescribed_sic = prescribed_sic) #auxiliary
+    Ya = (params = params, F_aero = ClimaCore.Fields.zeros(space), ∂F_aero∂T_sfc = ClimaCore.Fields.zeros(space), F_rad = ClimaCore.Fields.zeros(space), mask = mask, ice_mask =  ice_mask, Δt = dt, prescribed_sic = prescribed_sic) #auxiliary
     problem = OrdinaryDiffEq.ODEProblem(slab_ocean_rhs!, Y, tspan, Ya)
     integrator = OrdinaryDiffEq.init(problem, stepper, dt = dt, saveat = saveat)
 

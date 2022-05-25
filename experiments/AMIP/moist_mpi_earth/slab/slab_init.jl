@@ -33,7 +33,7 @@ function slab_space_init(::Type{FT}, space, p; anomaly = false, hs_sfc = false) 
 
     # initial condition
     T_sfc = map(coords) do coord
-        T_sfc_0 = FT(p.T_init) 
+        T_sfc_0 = FT(p.T_init)
         radlat = coord.lat / FT(180) * pi
         ΔT = FT(0)
         if anomaly == true
@@ -44,8 +44,8 @@ function slab_space_init(::Type{FT}, space, p; anomaly = false, hs_sfc = false) 
             stdev = FT(5) / FT(180) * pi
             ΔT = anom_ampl * exp(-((radlat - lat_0)^2 / 2stdev^2 + (radlon - lon_0)^2 / 2stdev^2))
         elseif hs_sfc == true
-            ΔT = - FT(60) * sin(radlat)^2
-        end 
+            ΔT = -FT(60) * sin(radlat)^2
+        end
         T_sfc_0 + ΔT
     end
 
@@ -65,7 +65,7 @@ function slab_rhs!(dY, Y, Ya, t)
     p, F_aero, F_rad, mask = Ya
 
     rhs = @. (F_aero + F_rad) / (p.h * p.ρ * p.c)
-    parent(dY.T_sfc) .= apply_mask.(parent(mask), > , parent(rhs), FT(0)) 
+    parent(dY.T_sfc) .= apply_mask.(parent(mask), >, parent(rhs), FT(0))
 end
 
 function slab_init(

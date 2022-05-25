@@ -11,7 +11,7 @@ function R_ne_Nq_from_space(h_space)
     ne = h_space.topology.mesh.nev
     Nq = Spaces.Quadratures.polynomial_degree(h_space.quadrature_style) + 1
     return R, ne, Nq
-end 
+end
 function convert_to_type(TT, h_space, Sol_qt)
     _, ne, Nq = R_ne_Nq_from_space(h_space)
     horizontal_mesh64 = cubed_sphere_mesh(; radius = TT(Planet.planet_radius(params)), h_elem = ne)
@@ -45,7 +45,7 @@ function convert_to_type_T_sfc(TT, h_space, slab_u, slab_ocean_u)
     return Sol_qt64
 end
 
-Sol_Tsfc = map(i ->  convert_to_type_T_sfc(Float64, h_space, sol_slab.u[i], sol_slab_ocean.u[i]), 1:length(times))
+Sol_Tsfc = map(i -> convert_to_type_T_sfc(Float64, h_space, sol_slab.u[i], sol_slab_ocean.u[i]), 1:length(times))
 
 function convert_to_type_mask(TT, h_space, mask)
     _, ne, Nq = R_ne_Nq_from_space(h_space)
@@ -64,9 +64,14 @@ con_nans(mask64) = (mask64 < 0.3 ? NaN : mask64)
 
 mask64 = clean_mask.(Float64, convert_to_type_mask(Float64, h_space, mask))
 # parent(mask64) .= con_nans.(parent(mask64)) # TODO: writepvd doesnt deal well with nans or Float32
-mask_tsrs = map(i -> mask64 , 1:length(times))
+mask_tsrs = map(i -> mask64, 1:length(times))
 
-ClimaCoreVTK.writepvd(joinpath("data", "tt_5"), times, (qt = Sol_qt_5, T_sfc = Sol_Tsfc, mask = mask_tsrs) , basis = :lagrange)
+ClimaCoreVTK.writepvd(
+    joinpath("data", "tt_5"),
+    times,
+    (qt = Sol_qt_5, T_sfc = Sol_Tsfc, mask = mask_tsrs),
+    basis = :lagrange,
+)
 
 
 
@@ -83,10 +88,4 @@ space = Spaces.SpectralElementSpace2D(grid_topology, quad)
 
 
 ## Plot on a lat-long grid
-ClimaCoreVTK.writepvd(
-    joinpath(path, "humidity_lat_long"),
-    times,
-    (ω = Sol_vort,);
-    latlong = true,
-    basis = :point,
-)
+ClimaCoreVTK.writepvd(joinpath(path, "humidity_lat_long"), times, (ω = Sol_vort,); latlong = true, basis = :point)

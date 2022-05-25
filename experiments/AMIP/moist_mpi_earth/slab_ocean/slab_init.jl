@@ -44,7 +44,7 @@ function slab_ocean_rhs!(dY, Y, Ya, t)
     p, F_aero, F_rad, mask = Ya
 
     rhs = @. (F_aero + F_rad) / (p.h * p.ρ * p.c)
-    parent(dY.T_sfc) .= apply_mask.(parent(mask), < , parent(rhs), FT(0)) 
+    parent(dY.T_sfc) .= apply_mask.(parent(mask), <, parent(rhs), FT(0))
 end
 
 function slab_ocean_init(
@@ -60,7 +60,7 @@ function slab_ocean_init(
 ) where {FT}
 
     params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5))
-    
+
     Y, space = slab_ocean_space_init(FT, space, params)
     Ya = (params = params, F_aero = ClimaCore.Fields.zeros(space), F_rad = ClimaCore.Fields.zeros(space), mask = mask) #auxiliary
     problem = OrdinaryDiffEq.ODEProblem(slab_ocean_rhs!, Y, tspan, Ya)

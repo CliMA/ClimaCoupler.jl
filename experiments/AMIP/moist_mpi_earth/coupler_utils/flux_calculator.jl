@@ -6,12 +6,12 @@ calculate_surface_fluxes_atmos_grid!(integrator)
 
 - TODO: generalize interface for regridding and take land state out of atmos's integrator.p
 """
-function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc )
+function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     p = integrator.p
     (; ᶜts, dif_flux_energy, dif_flux_ρq_tot, dif_flux_uₕ, ∂F_aero∂T_sfc, params, Cd, Ch) = p
 
-    (; T_sfc, z0m, z0b, ice_mask) = info_sfc 
-    Y = integrator.u;
+    (; T_sfc, z0m, z0b, ice_mask) = info_sfc
+    Y = integrator.u
 
     # Turbulent surface flux calculation
     tsf =
@@ -25,20 +25,20 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc )
             swap_space!(z0m, axes(Spaces.level(Y.c, 1))), # TODO: get these roughness lengths from land
             swap_space!(z0b, axes(Spaces.level(Y.c, 1))),
             Cd,
-            Ch
+            Ch,
         )
 
     # Total energy flux
     if :ρe in propertynames(Y.c)
 
-        flux_energy = ones(axes(dif_flux_energy)) 
-        parent(flux_energy) .= parent(tsf.shf .+ tsf.lhf .* swap_space!(abs.(ice_mask .- FT(1)), axes(tsf.shf)) )  # only SHF above sea ice
+        flux_energy = ones(axes(dif_flux_energy))
+        parent(flux_energy) .= parent(tsf.shf .+ tsf.lhf .* swap_space!(abs.(ice_mask .- FT(1)), axes(tsf.shf)))  # only SHF above sea ice
         @. dif_flux_energy = Geometry.WVector(flux_energy) #Geometry.WVector.(swap_space!(tsf.shf .+ tsf.lhf, axes(dif_flux_energy)) )
     end
 
     # Moisture mass flux
     if :ρq_tot in propertynames(Y.c)
-        @. dif_flux_ρq_tot = Geometry.WVector(tsf.E .* swap_space!(abs.(ice_mask .- FT(1)), axes(tsf.E)) ) # no E above sea ice
+        @. dif_flux_ρq_tot = Geometry.WVector(tsf.E .* swap_space!(abs.(ice_mask .- FT(1)), axes(tsf.E))) # no E above sea ice
     end
 
     # Momentum flux
@@ -66,11 +66,11 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc )
             swap_space!(z0m, axes(Spaces.level(Y.c, 1))), # TODO: get these roughness lengths from land
             swap_space!(z0b, axes(Spaces.level(Y.c, 1))),
             Cd,
-            Ch
+            Ch,
         )
 
-    p.∂F_aero∂T_sfc .=  ( (tsf1.shf .+ tsf1.lhf) .- (tsf.shf .+ tsf.lhf) ) ./ ΔT_sfc
-    
+    p.∂F_aero∂T_sfc .= ((tsf1.shf .+ tsf1.lhf) .- (tsf.shf .+ tsf.lhf)) ./ ΔT_sfc
+
     return nothing
 end
 
@@ -126,7 +126,6 @@ function constant_T_saturated_surface_coefs_coupled(ts_int, uₕ_int, z_int, z_s
 
     _ρ_liq = FT(1e3)# TODO: use CLIMAParameters
     E = SF.evaporation(sc, params, tsf.Ch) / _ρ_liq
- 
+
     return (; shf = tsf.shf, lhf = tsf.lhf, E = E, ρτxz = tsf.ρτxz, ρτyz = tsf.ρτyz)
 end
-

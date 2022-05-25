@@ -121,22 +121,31 @@ $$
 ## Physical correctness
 - run the default for 20 days
 
+# Prescribed SST and Sea Ice
+- for the option to use prescribed SSTs and sea ice. For sea ice, we will follow GFDL's [AMIP setup](https://pcmdi.llnl.gov/mips/amip/home/Documentation/20gfdl.html#RTFToC31) and use prescribed sea ice concentrations, assume a 2m thickness, while solving for $T_{sfc}$ 
+
+
+## Data source
+- https://gdex.ucar.edu/dataset/158_asphilli.html
+    - MODEL.SST.HAD187001-198110.OI198111-202203.nc
+    - MODEL.ICE.HAD187001-198110.OI198111-202203.nc
+- N.B.: the [pcmdi link](https://pcmdi.llnl.gov/mips/amip/details/amipbc_dwnld.php), used in most AMIP papers, is broken
+
+
 # NB:
 - first coupled iteration does not call rhs!
 - slab `T_sfc` gets huge numbers when using `SSPRK33`. ok with `Euler`
 - do not init global fields with mpi context
 
 # TODO
-- implement drag law, mass flux, moisture flux
 - ClimaAtmos: sub in newest CA interface
 - interface: 
-    - clean the way we sum over the boundary field (now need to divide by dz)
     - add coupler specific abstractions
 - fluxes: re-enable different ways to calculate / accumulate fluxes (at overy coupler timestep; at every atmos timestep via callback; via specification of an additional variable) 
-- conservation tests: add error threshold and exception, interval, show option, and make a general interface for it
-- physical test
-- performance check: 
+- formalize conservation/physocal/performance tests: add error threshold and exception, interval, show option, and make a general interface for it
 - SurfaceFluxes: combine LHF and SHF into enthalpy flux formulation to avoid division by zero
+- Temporally varying SSTs/sea ice: https://pcmdi.llnl.gov/mips/amip/details/
+
 
 # References
 - [Kang et al 2021](https://arxiv.org/abs/2101.09263)

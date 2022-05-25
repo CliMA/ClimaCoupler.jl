@@ -78,6 +78,7 @@ function vertical_diffusion_boundary_layer_coupled_cache(Y; Cd = FT(0.0014), Ch 
         dif_flux_energy = similar(z_bottom, Geometry.WVector{FT}),
         dif_flux_ρq_tot,
         dif_flux_uₕ,
+        ∂F_aero∂T_sfc = zeros(axes(z_bottom)),
         Cd,
         Ch,
     )

@@ -1,6 +1,16 @@
 # slab_rhs!
 using ClimaCore
 
+# ocean parameters
+struct OceanSlabParameters# <: CLIMAParameters.AbstractEarthParameterSet{F} 
+    h::FT
+    ρ::FT
+    c::FT
+    T_init::FT
+    z0m::FT
+    z0b::FT
+end
+
 # init simulation
 function slab_ocean_space_init(::Type{FT}, space, p) where {FT}
 
@@ -49,9 +59,9 @@ function slab_ocean_init(
     mask = nothing,
 ) where {FT}
 
-    params = ThermalSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5))
+    params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5))
     
-    Y, space = slab_space_init(FT, space, params)
+    Y, space = slab_ocean_space_init(FT, space, params)
     Ya = (params = params, F_aero = ClimaCore.Fields.zeros(space), F_rad = ClimaCore.Fields.zeros(space), mask = mask) #auxiliary
     problem = OrdinaryDiffEq.ODEProblem(slab_ocean_rhs!, Y, tspan, Ya)
     integrator = OrdinaryDiffEq.init(problem, stepper, dt = dt, saveat = saveat)

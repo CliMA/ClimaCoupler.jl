@@ -8,7 +8,7 @@ calculate_surface_fluxes_atmos_grid!(integrator)
 """
 function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc )
     p = integrator.p
-    (; ᶜts, dif_flux_energy, dif_flux_ρq_tot, dif_flux_uₕ, params, Cd, Ch) = p
+    (; ᶜts, dif_flux_energy, dif_flux_ρq_tot, dif_flux_uₕ, ∂F_aero∂T_sfc, params, Cd, Ch) = p
 
     (; T_sfc, z0m, z0b) = info_sfc 
     Y = integrator.u;
@@ -53,6 +53,24 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc )
             )
     end
 
+    # calculate gradient - TODO: make this just optional (only required by stub sea ice model)
+    ΔT_sfc = FT(0.1) # following FMS
+    tsf1 =
+        constant_T_saturated_surface_coefs_coupled.(
+            Spaces.level(ᶜts, 1),
+            Geometry.UVVector.(Spaces.level(Y.c.uₕ, 1)),
+            Spaces.level(Fields.coordinate_field(Y.c).z, 1),
+            FT(0), # TODO: get actual value of z_sfc
+            swap_space!(T_sfc .+ ΔT_sfc, axes(Spaces.level(Y.c, 1))), # remove when same instance issue is resolved
+            params,
+            swap_space!(z0m, axes(Spaces.level(Y.c, 1))), # TODO: get these roughness lengths from land
+            swap_space!(z0b, axes(Spaces.level(Y.c, 1))),
+            Cd,
+            Ch
+        )
+
+    p.∂F_aero∂T_sfc .=  ( (tsf1.shf .+ tsf1.lhf) .- (tsf.shf .+ tsf.lhf) ) ./ ΔT_sfc
+    
     return nothing
 end
 
@@ -79,6 +97,7 @@ function variable_T_saturated_surface_coefs(ts_int, uₕ_int, z_int, z_sfc, T_sf
 
     _ρ_liq = FT(1e3)# TODO: use CLIMAParameters
     E = SF.evaporation(sc, params, tsf.Ch) / _ρ_liq
+
     return (; shf = tsf.shf, lhf = tsf.lhf, E = E, ρτxz = tsf.ρτxz, ρτyz = tsf.ρτyz)
 end
 
@@ -107,6 +126,7 @@ function constant_T_saturated_surface_coefs_coupled(ts_int, uₕ_int, z_int, z_s
 
     _ρ_liq = FT(1e3)# TODO: use CLIMAParameters
     E = SF.evaporation(sc, params, tsf.Ch) / _ρ_liq
+ 
     return (; shf = tsf.shf, lhf = tsf.lhf, E = E, ρτxz = tsf.ρτxz, ρτyz = tsf.ρτyz)
 end
 

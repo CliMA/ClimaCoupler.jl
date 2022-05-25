@@ -32,7 +32,6 @@ parameters = (
     n = 15,  # number of elements in atm stack 
     μ = FT(0.0001), # diffusion coefficient [m^2 / s]
     T_top = FT(280.0), # fixed temperature at the top of the domain_atm [K]
-    ## slab ice parameters
     ρc_ml = FT(4e6), # density times heat transfer coefficient for mixed layer [J / m2 / K ]
     F0_base = FT(120), # ice base transfer coefficient [W / m2 / K]
     T_base = FT(273.16), # ice base temperature [K] 
@@ -156,7 +155,7 @@ function solve_ice!(integ, Δt)
 
     @. Ya.ice_mask = h_ice[1] > 0 ? h_ice[1] * FT(1) : h_ice[1] * FT(0)
 
-    return
+    return nothing
 end
 
 function ∑tendencies_ice_stub(du, u, p, t)

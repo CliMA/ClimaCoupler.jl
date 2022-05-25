@@ -29,6 +29,7 @@ combine_surface(mask, sfc_1, sfc_2)
 - combine two masked surfaces on the same horizontal topology (TODO: generalize to more surfaces and different resolutions)
 """
 combine_surface(mask, sfc_1, sfc_2, value = 0.5) = (mask > FT(value) ? sfc_1 : FT(0)) + (mask <= FT(value) ? sfc_2 : FT(0)) 
+combine_surface(mask, sfc_1, sfc_2, sfc_3, value1 = -0.5, value2 = 0.5) = (mask < FT(value1) ? sfc_3 : FT(0)) + ((mask >= FT(value1) && (mask <= FT(value2))) ? sfc_2 : FT(0)) + (mask > FT(value2) ? sfc_1 : FT(0)) 
 
 """
 apply_mask(mask, condition, yes, no, value = 0.5) 

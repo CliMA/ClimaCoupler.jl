@@ -38,7 +38,7 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc )
 
     # Moisture mass flux
     if :ρq_tot in propertynames(Y.c)
-        @. dif_flux_ρq_tot = Geometry.WVector(tsf.E .* swap_space!(abs.(ice_mask .- FT(1)), axes(tsf.shf)) ) # no E above sea ice
+        @. dif_flux_ρq_tot = Geometry.WVector(tsf.E .* swap_space!(abs.(ice_mask .- FT(1)), axes(tsf.E)) ) # no E above sea ice
     end
 
     # Momentum flux

@@ -51,7 +51,7 @@ struct CoupledAtmosphere{FT} <: AbstractAtmosphericDrivers{FT} end
                     t::FT,
                     parameters::P,
                     atmos::PA,
-                    radiation::PR,
+                    radiation::PR, p,
                     ) where {FT <: AbstractFloat, P <: BucketModelParameters{FT},  PA <: CoupledAtmosphere{FT}, PR <: CoupledRadiativeFluxes{FT}}
 
 Computes the surface flux terms at the ground for a coupled simulation:
@@ -62,12 +62,14 @@ Positive fluxes indicate flow from the ground to the atmosphere.
 Currently, we only support soil covered surfaces.
 """
 function ClimaLSM.Bucket.surface_fluxes(
-    Y,
-    p,
+    T_sfc::FT,
+    q_sfc::FT,
+    S::FT,
     t::FT,
     parameters::P,
     atmos::CoupledAtmosphere{FT},
     radiation::CoupledRadiativeFluxes{FT},
+    p,
 ) where {
     FT <: AbstractFloat,
     P

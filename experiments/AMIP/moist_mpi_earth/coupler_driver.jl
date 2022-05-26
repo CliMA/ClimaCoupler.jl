@@ -2,8 +2,6 @@
 # don't forget to run with threading: julia --project --threads 8 (MPI not that useful for debugging coarse runs)
 
 # import packages
-# ClimaLSM unregistered:
-# add https://github.com/CliMA/ClimaLSM.jl#move_coupled_types
 
 using Pkg
 import SciMLBase: step!
@@ -45,6 +43,9 @@ infile = "data/seamask.nc"
 mask = LandSeaMask(FT, infile, "LSMASK", boundary_space) # TODO: split up the nc file to individual times for faster computation
 
 # init surface (slab) model components
+# ClimaLSM unregistered:
+# add https://github.com/CliMA/ClimaLSM.jl#move_coupled_types
+
 include("bucket/bucket_init.jl") # stub for ClimaLSM's Bucket
 bucket_sim = bucket_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask);
 

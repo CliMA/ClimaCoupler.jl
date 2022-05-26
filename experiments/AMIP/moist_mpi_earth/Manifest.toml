@@ -171,14 +171,6 @@ git-tree-sha1 = "2a0f6f12ccdf50089e708b68e73b1fe08fb53cd8"
 uuid = "c8b6d40d-e815-466f-95ae-c48aefa668fa"
 version = "0.7.1"
 
-[[deps.ClimaLSM]]
-deps = ["CLIMAParameters", "ClimaCore", "DocStringExtensions", "IntervalSets", "StaticArrays", "SurfaceFluxes", "Thermodynamics", "UnPack"]
-git-tree-sha1 = "bce605841e4a935b3da68085f61a3636393864d1"
-repo-rev = "move_coupled_types"
-repo-url = "https://github.com/CliMA/ClimaLSM.jl"
-uuid = "7884a58f-fab6-4fd0-82bb-ecfedb2d8430"
-version = "0.1.0"
-
 [[deps.CloseOpenIntervals]]
 deps = ["ArrayInterface", "Static"]
 git-tree-sha1 = "f576084239e6bdf801007c80e27e2cc2cd963fe0"
@@ -1323,12 +1315,6 @@ version = "0.6.7"
 [[deps.SuiteSparse]]
 deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
 uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
-
-[[deps.SurfaceFluxes]]
-deps = ["CLIMAParameters", "DocStringExtensions", "KernelAbstractions", "RootSolvers", "StaticArrays", "Thermodynamics"]
-git-tree-sha1 = "247b54b48c6ec8b68a6c1a6ca5ba014ea979522b"
-uuid = "49b00bb7-8bd4-4f2b-b78c-51cd0450215f"
-version = "0.3.0"
 
 [[deps.TOML]]
 deps = ["Dates"]

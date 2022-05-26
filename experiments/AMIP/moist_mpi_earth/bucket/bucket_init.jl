@@ -45,9 +45,7 @@ multiple dispatch on `surface_fluxes`.
 struct CoupledAtmosphere{FT} <: AbstractAtmosphericDrivers{FT} end
 
 """
-    surface_fluxes( T_sfc::FT,
-                    q_sfc::FT,
-                    S::FT
+    surface_fluxes(Y, p, 
                     t::FT,
                     parameters::P,
                     atmos::PA,
@@ -62,14 +60,12 @@ Positive fluxes indicate flow from the ground to the atmosphere.
 Currently, we only support soil covered surfaces.
 """
 function ClimaLSM.Bucket.surface_fluxes(
-    T_sfc::FT,
-    q_sfc::FT,
-    S::FT,
+    Y::ClimaCore.Fields.FieldVector,
+    p::ClimaCore.Fields.FieldVector,
     t::FT,
-    parameters::P,
+    parameters::BucketModelParameters{FT,P},
     atmos::CoupledAtmosphere{FT},
-    radiation::CoupledRadiativeFluxes{FT},
-    p,
+    radiation::CoupledRadiativeFluxes{FT}
 ) where {
     FT <: AbstractFloat,
     P
@@ -147,10 +143,10 @@ function bucket_init(
     # add ρ_sfc to cache
     # this needs to be initialized!!!
     ρ_sfc = similar(p.bucket.E) .+ FT(1.1) 
-    names = (propertynames(p.bucket)..., :ρ_sfc)
+    variable_names = (propertynames(p.bucket)..., :ρ_sfc)
     orig_fields = map(x -> getproperty(p.bucket,x), propertynames(p.bucket))
     fields = (orig_fields..., ρ_sfc)
-    p_new = ClimaCore.Fields.FieldVector(; :bucket => (;zip(names, fields)...))
+    p_new = ClimaCore.Fields.FieldVector(; :bucket => (;zip(variable_names, fields)...))
     ode_function! = make_ode_function(model)
     
     prob = ODEProblem(ode_function!, Y, tspan, p_new)

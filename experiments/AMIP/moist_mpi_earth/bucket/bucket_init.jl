@@ -2,11 +2,10 @@
 using ClimaCore
 using CLIMAParameters: AbstractEarthParameterSet
 using ClimaLSM
-using ClimaLSM.Bucket:
-    BucketModel,
-    BucketModelParameters,
-    CoupledAtmosphere,
-    CoupledRadiativeFluxes
+using ClimaLSM.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers
+
+import ClimaLSM.Bucket: surface_fluxes, surface_air_density
+
 using ClimaLSM: make_ode_function, initialize_prognostic, initialize_auxiliary
 
 import ClimaLSM: initialize
@@ -28,7 +27,71 @@ function initialize(model::BucketModel, space::ClimaCore.Spaces.AbstractSpace)
     return Y, p, coords
 end
 
-get_slab_energy(slab_sim, T_sfc) = slab_sim.params.ρ .* slab_sim.params.c .* T_sfc .* slab_sim.params.h
+
+"""
+    CoupledRadiativeFluxes{FT} <: AbstractRadiativeDrivers{FT}
+
+To be used when coupling to an atmosphere model; internally, used for
+multiple dispatch on `surface_fluxes`.
+"""
+struct CoupledRadiativeFluxes{FT} <: AbstractRadiativeDrivers{FT} end
+
+"""
+    CoupledAtmosphere{FT} <: AbstractAtmosphericDrivers{FT}
+
+To be used when coupling to an atmosphere model; internally, used for
+multiple dispatch on `surface_fluxes`.
+"""
+struct CoupledAtmosphere{FT} <: AbstractAtmosphericDrivers{FT} end
+
+"""
+    surface_fluxes( T_sfc::FT,
+                    q_sfc::FT,
+                    S::FT
+                    t::FT,
+                    parameters::P,
+                    atmos::PA,
+                    radiation::PR,
+                    ) where {FT <: AbstractFloat, P <: BucketModelParameters{FT},  PA <: CoupledAtmosphere{FT}, PR <: CoupledRadiativeFluxes{FT}}
+
+Computes the surface flux terms at the ground for a coupled simulation:
+net radiation,  SHF,  LHF,
+as well as the water vapor flux (in units of m^3/m^2/s of water).
+Positive fluxes indicate flow from the ground to the atmosphere.
+
+Currently, we only support soil covered surfaces.
+"""
+function surface_fluxes(
+    T_sfc::FT,
+    q_sfc::FT,
+    S::FT,
+    t::FT,
+    parameters::P,
+    atmos::PA,
+    radiation::PR,
+) where {
+    FT <: AbstractFloat,
+    P <: BucketModelParameters{FT},
+    PA <: CoupledAtmosphere{FT},
+    PR <: CoupledRadiativeFluxes{FT},
+}
+    # coupler has done its thing behind the scenes already
+    return (
+        R_n = p.bucket.R_n,
+        LHF = p.bucket.LHF,
+        SHF = p.bucket.SHF,
+        E = p.bucket.E,
+    )
+end
+
+
+function surface_air_density(Y,p, atmos::CoupledAtmosphere)
+    # coupler has filled this in
+    return p.bucket.ρ_sfc
+end
+
+
+#get_slab_energy(slab_sim, T_sfc) = slab_sim.params.ρ .* slab_sim.params.c .* T_sfc .* slab_sim.params.h
 
 function bucket_init(
     ::Type{FT},
@@ -83,7 +146,8 @@ function bucket_init(
     Y.bucket.Ws .= 0.0 
     Y.bucket.S .= 0.0 # no snow
     # add ρ_sfc to cache
-    ρ_sfc = similar(p.bucket.E)
+    # this needs to be initialized!!!
+    ρ_sfc = similar(p.bucket.E) .+ FT(1.1) 
     names = (propertynames(p.bucket)..., :ρ_sfc)
     orig_fields = map(x -> getproperty(p.bucket,x), propertynames(p.bucket))
     fields = (orig_fields..., ρ_sfc)

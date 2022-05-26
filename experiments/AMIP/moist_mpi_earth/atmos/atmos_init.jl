@@ -2,7 +2,7 @@
 
 # clone locally ClimaAtmos and checkout the checkpoint branch (this is necessary because the driver is currently not a module, and the checkpoint branch avoids the necessity for frequent updates)
 CWD = pwd()
-ATMOS_DIR = CWD * "/../../../../ClimaAtmos.jl_cpl/"
+ATMOS_DIR = CWD * "../ClimaAtmos.jl_cpl/"
 
 run(`rm -rf $ATMOS_DIR`)
 ClimaComms.barrier(comms_ctx)

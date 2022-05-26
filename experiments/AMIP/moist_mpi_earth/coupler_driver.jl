@@ -42,8 +42,8 @@ infile = "data/seamask.nc"
 mask = LandSeaMask(FT, infile, "LSMASK", boundary_space) # TODO: split up the nc file to individual times for faster computation
 
 # init surface (slab) model components
-include("slab/slab_init.jl") # stub for ClimaLSM's Bucket
-slab_sim = slab_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask);
+include("bucket/bucket_init.jl") # stub for ClimaLSM's Bucket
+bucket_sim = bucket_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask);
 
 include("slab_ocean/slab_init.jl")
 prescribed_sst = true
@@ -72,6 +72,7 @@ z0m_S = ClimaCore.Fields.zeros(boundary_space)
 z0b_S = ClimaCore.Fields.zeros(boundary_space)
 
 F_A = ClimaCore.Fields.zeros(boundary_space) # aerodynamic turbulent fluxes
+F_E = ClimaCore.Fields.zeros(boundary_space) # evaporation due to turbulent fluxes
 F_R = ClimaCore.Fields.zeros(boundary_space) # radiative fluxes
 dF_A = ClimaCore.Fields.zeros(boundary_space) # aerodynamic turbulent fluxes
 
@@ -86,13 +87,13 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     ## Atmos
     ## Turbulent surface fluxes
 
-    # coupler_get: T_sfc, z0m, z0b
+    # coupler_get: T_sfc, z_0m, z_0b
     combined_field = zeros(boundary_space)
     if prescribed_sst == true
         parent(combined_field) .=
             combine_surface.(
                 parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2)),
-                parent(slab_sim.integrator.u.T_sfc),
+                parent(bucket_sim.integrator.u.bucket.T_sfc),
                 parent(SST),
                 parent(slab_ice_sim.integrator.u.T_sfc),
             ) # prescribed SSTs
@@ -100,14 +101,14 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
         parent(combined_field) .=
             combine_surface.(
                 parent(mask),
-                parent(slab_sim.integrator.p.params.z0m .* mask),
+                parent(bucket_sim.integrator.p.params.z_0m .* mask),
                 parent(ocean_params.z0m .* (abs.(mask .- 1))),
             )
         dummmy_remap!(z0m_S, combined_field)
         parent(combined_field) .=
             combine_surface.(
                 parent(mask),
-                parent(slab_sim.integrator.p.params.z0b .* mask),
+                parent(bucket_sim.integrator.p.params.z_0b .* mask),
                 parent(ocean_params.z0b .* (abs.(mask .- 1))),
             )
         dummmy_remap!(z0b_S, combined_field)
@@ -115,7 +116,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
         parent(combined_field) .=
             combine_surface.(
                 parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2)),
-                parent(slab_sim.integrator.u.T_sfc),
+                parent(bucket_sim.integrator.u.bucket.T_sfc),
                 parent(slab_ocean_sim.integrator.u.T_sfc),
                 parent(slab_ice_sim.integrator.u.T_sfc),
             )
@@ -123,14 +124,14 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
         parent(combined_field) .=
             combine_surface.(
                 parent(mask),
-                parent(slab_sim.integrator.p.params.z0m .* mask),
+                parent(bucket_sim.integrator.p.params.z_0m .* mask),
                 parent(slab_ocean_sim.integrator.p.params.z0m .* (abs.(mask .- 1))),
             )
         dummmy_remap!(z0m_S, combined_field)
         parent(combined_field) .=
             combine_surface.(
                 parent(mask),
-                parent(slab_sim.integrator.p.params.z0b .* mask),
+                parent(bucket_sim.integrator.p.params.z_0b .* mask),
                 parent(slab_ocean_sim.integrator.p.params.z0b .* (abs.(mask .- 1))),
             )
         dummmy_remap!(z0b_S, combined_field)
@@ -149,20 +150,26 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     # coupler_push!: get accumulated fluxes from atmos in the surface fields
     F_A .= ClimaCore.Fields.zeros(boundary_space)
     dummmy_remap!(F_A, atmos_sim.integrator.p.dif_flux_energy)
+    F_E .= ClimaCore.Fields.zeros(boundary_space)
+    dummmy_remap!(F_E, atmos_sim.integrator.p.dif_flux_ρq_tot)
     F_R .= ClimaCore.Fields.zeros(boundary_space)
     parsed_args["rad"] == "gray" ? dummmy_remap!(F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) : nothing # TODO: albedo hard coded...
     dF_A .= ClimaCore.Fields.zeros(boundary_space)
     dummmy_remap!(dF_A, atmos_sim.integrator.p.∂F_aero∂T_sfc)
 
-    ## Slab land
+    ## Bucket Land
     # coupler_get: F_aero, F_rad
-    slab_F_aero = slab_sim.integrator.p.F_aero
-    @. slab_F_aero = -F_A
-    slab_F_rad = slab_sim.integrator.p.F_rad
-    @. slab_F_rad = -F_R
+    # Sign question
+    slab_F_aero = bucket_sim.integrator.p.bucket.SHF # only ever use sum of LHF + SHF so this is ok for now.
+    @. slab_F_aero = F_A
+    @. bucket_sim.integrator.p.bucket.LHF = 0.0
+    slab_F_E = bucket_sim.integrator.p.bucket.E
+    @. slab_F_E = F_E
+    slab_F_rad = bucket_sim.integrator.p.R_n
+    @. slab_F_rad = F_R
 
     # run
-    step!(slab_sim.integrator, t - slab_sim.integrator.t, true)
+    step!(bucket_sim.integrator, t - bucket_sim.integrator.t, true)
 
     ## Slab ocean
     # coupler_get: F_aero, F_rad
@@ -190,7 +197,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     step!(slab_ice_sim.integrator, t - slab_ice_sim.integrator.t, true)
 
     if !is_distributed
-        check_conservation_callback(CS, atmos_sim, slab_sim)
+        check_conservation_callback(CS, atmos_sim, bucket_sim)
     end
 
 end
@@ -200,7 +207,7 @@ end
 @show "Postprocessing"
 # collect solutions
 sol_atm = atmos_sim.integrator.sol
-sol_slab = slab_sim.integrator.sol
+sol_slab = bucket_sim.integrator.sol
 sol_slab_ice = slab_ice_sim.integrator.sol
 sol_slab_ocean = prescribed_sst !== true ? slab_ocean_sim.integrator.sol : nothing
 
@@ -208,7 +215,7 @@ include("mpi/mpi_postprocess.jl")
 
 # conservation  check
 if !is_distributed || (is_distributed && ClimaComms.iamroot(comms_ctx))
-    conservation_plot(atmos_sim, slab_sim, solu_atm, solu_slab, "conservation.png")
+    conservation_plot(atmos_sim, bucket_sim, solu_atm, solu_slab, "conservation.png")
 end
 
 # animations

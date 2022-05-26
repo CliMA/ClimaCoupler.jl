@@ -36,7 +36,7 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
         @. dif_flux_energy = Geometry.WVector(flux_energy) #Geometry.WVector.(swap_space!(tsf.shf .+ tsf.lhf, axes(dif_flux_energy)) )
     end
 
-    # Moisture mass flux
+    # Moisture mass flux # Is this a mass flux? E is divided by \rho prior to this.
     if :ρq_tot in propertynames(Y.c)
         flux_mass = ones(axes(dif_flux_ρq_tot))
         parent(flux_mass) .= parent(tsf.E .* swap_space!(abs.(ice_mask .- FT(1)), axes(tsf.E)))

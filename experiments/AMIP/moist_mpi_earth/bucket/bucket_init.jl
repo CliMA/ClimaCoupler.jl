@@ -61,19 +61,16 @@ Positive fluxes indicate flow from the ground to the atmosphere.
 
 Currently, we only support soil covered surfaces.
 """
-function surface_fluxes(
-    T_sfc::FT,
-    q_sfc::FT,
-    S::FT,
+function ClimaLSM.Bucket.surface_fluxes(
+    Y,
+    p,
     t::FT,
     parameters::P,
-    atmos::PA,
-    radiation::PR,
+    atmos::CoupledAtmosphere{FT},
+    radiation::CoupledRadiativeFluxes{FT},
 ) where {
     FT <: AbstractFloat,
-    P <: BucketModelParameters{FT},
-    PA <: CoupledAtmosphere{FT},
-    PR <: CoupledRadiativeFluxes{FT},
+    P
 }
     # coupler has done its thing behind the scenes already
     return (
@@ -85,7 +82,7 @@ function surface_fluxes(
 end
 
 
-function surface_air_density(Y,p, atmos::CoupledAtmosphere)
+function surface_air_density(p, atmos::CoupledAtmosphere)
     # coupler has filled this in
     return p.bucket.ρ_sfc
 end

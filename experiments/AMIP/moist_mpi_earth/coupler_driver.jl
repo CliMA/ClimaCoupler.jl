@@ -2,6 +2,9 @@
 # don't forget to run with threading: julia --project --threads 8 (MPI not that useful for debugging coarse runs)
 
 # import packages
+# ClimaLSM unregistered:
+# add https://github.com/CliMA/ClimaLSM.jl#move_coupled_types
+
 using Pkg
 import SciMLBase: step!
 using OrdinaryDiffEq
@@ -159,7 +162,8 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
 
     ## Bucket Land
     # coupler_get: F_aero, F_rad
-    # Sign question
+    # standin for ρsfc computation
+    bucket_sim.integrator.p.bucket.ρ_sfc = FT(1.1)
     slab_F_aero = bucket_sim.integrator.p.bucket.SHF # only ever use sum of LHF + SHF so this is ok for now.
     @. slab_F_aero = F_A
     @. bucket_sim.integrator.p.bucket.LHF = 0.0

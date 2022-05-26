@@ -173,8 +173,8 @@ version = "0.7.1"
 
 [[deps.ClimaLSM]]
 deps = ["CLIMAParameters", "ClimaCore", "DocStringExtensions", "IntervalSets", "StaticArrays", "SurfaceFluxes", "Thermodynamics", "UnPack"]
-git-tree-sha1 = "2a1774e590256cd0798b79a712a356aededc7bf3"
-repo-rev = "main"
+git-tree-sha1 = "bce605841e4a935b3da68085f61a3636393864d1"
+repo-rev = "move_coupled_types"
 repo-url = "https://github.com/CliMA/ClimaLSM.jl"
 uuid = "7884a58f-fab6-4fd0-82bb-ecfedb2d8430"
 version = "0.1.0"

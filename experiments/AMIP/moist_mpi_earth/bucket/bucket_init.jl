@@ -42,7 +42,7 @@ function bucket_init(
     mask = nothing,
 ) where {FT}
 
-    const earth_param_set = EarthParameterSet()
+    earth_param_set = EarthParameterSet()
     α_soil = FT(0.2) # soil albedo
     α_snow = FT(0.8) # snow albedo
     S_c = FT(0.2)
@@ -55,12 +55,13 @@ function bucket_init(
     ρc_soil = FT(2e6)
     params = BucketModelParameters(d_soil,T0,κ_soil,ρc_soil,α_soil,α_snow,S_c,W_f,z_0m,z_0b,earth_param_set)
 
-    args  = (bucket_parameters, nothing, CoupledAtmosphere{FT}(), CoupledRadiativeFluxes{FT}())
+    args  = (params, CoupledAtmosphere{FT}(), CoupledRadiativeFluxes{FT}(), nothing)
     model= BucketModel{FT, typeof.(args)...}(args...)
 
     # Initial conditions with no moisture
     Y, p, coords = initialize(model, space)
-
+    anomaly = false
+    hs_sfc = false
     Y.bucket.T_sfc = map(coords) do coord
         T_sfc_0 = FT(280.0)
         radlat = coord.lat / FT(180) * pi
@@ -81,9 +82,15 @@ function bucket_init(
     Y.bucket.W .= 0.14 
     Y.bucket.Ws .= 0.0 
     Y.bucket.S .= 0.0 # no snow
+    # add ρ_sfc to cache
+    ρ_sfc = similar(p.bucket.E)
+    names = (propertynames(p.bucket)..., :ρ_sfc)
+    orig_fields = map(x -> getproperty(p.bucket,x), propertynames(p.bucket))
+    fields = (orig_fields..., ρ_sfc)
+    p_new = ClimaCore.Fields.FieldVector(; :bucket => (;zip(names, fields)...))
     ode_function! = make_ode_function(model)
     
-    prob = ODEProblem(ode_function!, Y, tspan, p)
+    prob = ODEProblem(ode_function!, Y, tspan, p_new)
     integrator = init(prob, stepper; dt = dt, saveat = saveat)
 
     BucketSimulation(params, Y, space, integrator)

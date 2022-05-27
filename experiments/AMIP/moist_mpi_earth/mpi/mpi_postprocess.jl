@@ -9,7 +9,7 @@ if is_distributed # replace sol.u on the root processor with the global sol.u
         global_Y_f_type = Fields.Field{typeof(Fields.field_values(Y.f)), typeof(global_face_space)}
         global_Y_type = Fields.FieldVector{FT, NamedTuple{(:c, :f), Tuple{global_Y_c_type, global_Y_f_type}}}
         global_Y_slab_type =
-            Fields.Field{typeof(Fields.field_values(slab_sim.integrator.u.T_sfc)), typeof(global_h_space)}
+            Fields.Field{typeof(Fields.field_values(bucket_sim.integrator.u.bucket.T_sfc)), typeof(global_h_space)}
         global_sol_u_atmos = similar(sol_atm.u, global_Y_type)
         global_sol_u_slab = similar(sol_slab.u, global_Y_slab_type)
     end
@@ -33,5 +33,5 @@ if is_distributed # replace sol.u on the root processor with the global sol.u
 else
     solu_atm = sol_atm.u
     h_space = make_horizontal_space(horizontal_mesh, quad, nothing) #TODO move this to the beginning (once same the instance error sorted)
-    solu_slab = Fields.FieldVector(T_sfc = [Fields.Field(Fields.field_values(u.T_sfc), h_space) for u in sol_slab.u])
+    solu_slab = Fields.FieldVector(T_sfc = [Fields.Field(Fields.field_values(u.bucket.T_sfc), h_space) for u in sol_slab.u])
 end

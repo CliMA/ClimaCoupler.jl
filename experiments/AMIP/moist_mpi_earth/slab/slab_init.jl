@@ -19,12 +19,6 @@ function ShellDomain(; radius = 6371e3, Nel = 8, Nq = 2)
     space = ClimaCore.Spaces.SpectralElementSpace2D(topology, quad)
 end
 
-struct SlabSimulation{P, Y, D, I}
-    params::P
-    Y_init::Y
-    domain::D
-    integrator::I
-end
 
 # init simulation
 function slab_space_init(::Type{FT}, space, p; anomaly = false, hs_sfc = false) where {FT}

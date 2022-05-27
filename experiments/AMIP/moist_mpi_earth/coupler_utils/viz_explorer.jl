@@ -1,6 +1,7 @@
+using ClimaCorePlots
 function plot_anim() # TODO: uses global defs
 
-    using ClimaCorePlots
+
 
     anim = Plots.@animate for u in sol_atm.u
         Plots.plot(Fields.level(Geometry.UVVector.(u.c.uₕ).components.data.:1, 1))
@@ -18,7 +19,7 @@ function plot_anim() # TODO: uses global defs
     Plots.mp4(anim, "anim_rhoe.mp4", fps = 10)
 
     anim = Plots.@animate for u in sol_slab.u
-        Plots.plot(u.T_sfc)#,  clims = (240, 330))
+        Plots.plot(u.bucket.T_sfc)#,  clims = (240, 330))
     end
     Plots.mp4(anim, "slab_T.mp4", fps = 10)
 
@@ -56,7 +57,7 @@ function plot_anim() # TODO: uses global defs
     times = 0:saveat:t_end
     anim = Plots.@animate for t_i in 1:1:length(sol_slab.u)
         t = t_i / 24 / 60 / 60
-        u = sol_slab.u[t_i]
+        u = sol_slab.u[t_i].bucket
         u_i = sol_slab_ice.u[t_i]
         combined_field = similar(u.T_sfc)
         #parent(combined_field) .= combine_surface.(parent(mask), parent(u.T_sfc), parent(SST) )
@@ -71,9 +72,9 @@ function plot_anim() # TODO: uses global defs
     end
     Plots.mp4(anim, "slab_T_combo.mp4", fps = 10)
 
-    u1 = sol_slab.u[1]
+    u1 = sol_slab.u[1].bucket
     u_i1 = sol_slab_ice.u[1]
-    combined_field1 = similar(sol_slab.u[1].T_sfc)
+    combined_field1 = similar(sol_slab.u[1].bucket.T_sfc)
     parent(combined_field1) .=
         combine_surface.(
             parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2)),
@@ -83,7 +84,7 @@ function plot_anim() # TODO: uses global defs
         )
     anim = Plots.@animate for t_i in 1:1:length(sol_slab.u)
         t = t_i / 24 / 60 / 60
-        u = sol_slab.u[t_i]
+        u = sol_slab.u[t_i].bucket
         u_i = sol_slab_ice.u[t_i]
         combined_field = similar(u.T_sfc)
         parent(combined_field) .=

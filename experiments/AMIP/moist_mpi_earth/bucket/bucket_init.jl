@@ -90,7 +90,7 @@ function liquid_precipitation(p, atmos::CoupledAtmosphere, t)
     return p.bucket.P_liq
 end
 
-#get_slab_energy(slab_sim, T_sfc) = slab_sim.params.ρ .* slab_sim.params.c .* T_sfc .* slab_sim.params.h
+get_bucket_energy(bucket_sim, T_sfc) = bucket_sim.params.ρc_soil .* T_sfc .* bucket_sim.params.d_soil
 
 function bucket_init(
     ::Type{FT},
@@ -110,7 +110,7 @@ function bucket_init(
     T0 = FT(280.0)
     z_0m = FT(1e-2)
     z_0b = FT(1e-3)
-    κ_soil = FT(1.5)
+    κ_soil = FT(0.0)# setting this to zero allows us to test energy conservation
     ρc_soil = FT(2e6)
     params = BucketModelParameters(d_soil,T0,κ_soil,ρc_soil,α_soil,α_snow,S_c,W_f,z_0m,z_0b,earth_param_set)
 

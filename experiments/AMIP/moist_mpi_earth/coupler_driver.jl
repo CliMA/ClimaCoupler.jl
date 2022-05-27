@@ -43,13 +43,14 @@ boundary_space = ClimaCore.Fields.level(atmos_sim.domain.face_space, half) # glo
 # init land-sea mask
 infile = "data/seamask.nc"
 mask = LandSeaMask(FT, infile, "LSMASK", boundary_space) # TODO: split up the nc file to individual times for faster computation
-
+mask .= FT(1.0)
 # init surface (slab) model components
 # ClimaLSM unregistered:
-# add https://github.com/CliMA/ClimaLSM.jl#move_coupled_types
-
+Pkg.add( url = "https://github.com/CliMA/ClimaLSM.jl", rev = "move_coupled_types")
 include("bucket/bucket_init.jl")
 bucket_sim = bucket_init(FT, FT.(tspan); dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat));
+
+include("slab/slab_utils.jl")
 
 include("slab_ocean/slab_init.jl")
 prescribed_sst = true
@@ -107,14 +108,14 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
         parent(combined_field) .=
             combine_surface.(
                 parent(mask),
-                parent(bucket_sim.integrator.p.params.z_0m .* mask),
+                parent(bucket_sim.params.z_0m .* mask),
                 parent(ocean_params.z0m .* (abs.(mask .- 1))),
             )
         dummmy_remap!(z0m_S, combined_field)
         parent(combined_field) .=
             combine_surface.(
                 parent(mask),
-                parent(bucket_sim.integrator.p.params.z_0b .* mask),
+                parent(bucket_sim.params.z_0b .* mask),
                 parent(ocean_params.z0b .* (abs.(mask .- 1))),
             )
         dummmy_remap!(z0b_S, combined_field)
@@ -130,14 +131,14 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
         parent(combined_field) .=
             combine_surface.(
                 parent(mask),
-                parent(bucket_sim.integrator.p.params.z_0m .* mask),
+                parent(bucket_sim.params.z_0m .* mask),
                 parent(slab_ocean_sim.integrator.p.params.z0m .* (abs.(mask .- 1))),
             )
         dummmy_remap!(z0m_S, combined_field)
         parent(combined_field) .=
             combine_surface.(
                 parent(mask),
-                parent(bucket_sim.integrator.p.params.z_0b .* mask),
+                parent(bucket_sim.params.z_0b .* mask),
                 parent(slab_ocean_sim.integrator.p.params.z0b .* (abs.(mask .- 1))),
             )
         dummmy_remap!(z0b_S, combined_field)
@@ -172,7 +173,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     @. bucket_sim.integrator.p.bucket.LHF = 0.0
     slab_F_E = bucket_sim.integrator.p.bucket.E
     @. slab_F_E = F_E
-    slab_F_rad = bucket_sim.integrator.p.R_n
+    slab_F_rad = bucket_sim.integrator.p.bucket.R_n
     @. slab_F_rad = F_R
 
     # run
@@ -227,8 +228,6 @@ end
 
 # animations
 include("coupler_utils/viz_explorer.jl")
-plot_anim = nothing
-plot_anim !== nothing
 plot_anim()
 
 # TODO:

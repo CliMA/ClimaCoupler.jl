@@ -22,11 +22,10 @@ include("coupler_utils/general_helper.jl")
 # # initiate spatial and temporal info
 debug_mode = true
 t_end = debug_mode ? 100e2 : 2592000 * 3
-tspan = (0, t_end)
 Δt_cpl = 2e2
 saveat = debug_mode ? Δt_cpl * 1 : Δt_cpl * 100
 
-@show debug_mode
+tspan = (0, t_end)
 
 # init MPI
 include("mpi/mpi_init.jl")
@@ -34,6 +33,9 @@ include("mpi/mpi_init.jl")
 # init atmos model component
 include("atmos/atmos_init.jl")
 atmos_sim = atmos_init(FT, Y, spaces, integrator, params = params);
+
+
+@show debug_mode
 
 # init a 2D bounary space at the surface, assuming the same instance (and MPI distribution if applicable) as the atmos domain above
 boundary_space = ClimaCore.Fields.level(atmos_sim.domain.face_space, half) # global surface grid
@@ -46,8 +48,8 @@ mask = LandSeaMask(FT, infile, "LSMASK", boundary_space) # TODO: split up the nc
 # ClimaLSM unregistered:
 # add https://github.com/CliMA/ClimaLSM.jl#move_coupled_types
 
-include("bucket/bucket_init.jl") # stub for ClimaLSM's Bucket
-bucket_sim = bucket_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask);
+include("bucket/bucket_init.jl")
+bucket_sim = bucket_init(FT, FT.(tspan); dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat));
 
 include("slab_ocean/slab_init.jl")
 prescribed_sst = true

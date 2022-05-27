@@ -4,7 +4,7 @@ using CLIMAParameters: AbstractEarthParameterSet
 using ClimaLSM
 using ClimaLSM.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers
 
-import ClimaLSM.Bucket: surface_fluxes, surface_air_density
+import ClimaLSM.Bucket: surface_fluxes, surface_air_density, liquid_precipitation
 
 using ClimaLSM: make_ode_function, initialize_prognostic, initialize_auxiliary
 
@@ -85,19 +85,20 @@ function surface_air_density(p, atmos::CoupledAtmosphere)
     return p.bucket.ρ_sfc
 end
 
+function liquid_precipitation(p, atmos::CoupledAtmosphere, t)
+    # coupler has filled this in
+    return p.bucket.P_liq
+end
 
 #get_slab_energy(slab_sim, T_sfc) = slab_sim.params.ρ .* slab_sim.params.c .* T_sfc .* slab_sim.params.h
 
 function bucket_init(
     ::Type{FT},
-    tspan;
+    tspan::Tuple{FT,FT};
+    space,
+    dt::FT,
+    saveat::FT,
     stepper = Euler(),
-    nelements = 6,
-    npolynomial = 4,
-    dt = 0.02,
-    saveat = 1.0e10,
-    space = nothing,
-    mask = nothing,
 ) where {FT}
 
     earth_param_set = EarthParameterSet()
@@ -142,10 +143,11 @@ function bucket_init(
     Y.bucket.S .= 0.0 # no snow
     # add ρ_sfc to cache
     # this needs to be initialized!!!
-    ρ_sfc = similar(p.bucket.E) .+ FT(1.1) 
-    variable_names = (propertynames(p.bucket)..., :ρ_sfc)
+    ρ_sfc = zeros(space) .+ FT(1.1)
+    P_liq = zeros(space) .+ FT(0.0)
+    variable_names = (propertynames(p.bucket)..., :ρ_sfc, :P_liq)
     orig_fields = map(x -> getproperty(p.bucket,x), propertynames(p.bucket))
-    fields = (orig_fields..., ρ_sfc)
+    fields = (orig_fields..., ρ_sfc, P_liq)
     p_new = ClimaCore.Fields.FieldVector(; :bucket => (;zip(variable_names, fields)...))
     ode_function! = make_ode_function(model)
     

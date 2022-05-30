@@ -48,7 +48,7 @@ function plot_anim() # TODO: uses global defs
         Plots.plot(Fields.level(u.c.ρq_tot, 5), clims = (0, 0.001))#.- Fields.level(sol_atm.u[1].c.ρt_tot,1),  clims = (-5000, 50000) )
     end
     Plots.mp4(anim, "anim_rhoqt_7km_v2.mp4", fps = 10)
-
+#=
     anim = Plots.@animate for u in sol_atm.u
         Plots.plot(mask)#.- Fields.level(sol_atm.u[1].c.ρt_tot,1),  clims = (-5000, 50000) )
     end
@@ -97,4 +97,5 @@ function plot_anim() # TODO: uses global defs
         Plots.plot(combined_field .- swap_space!(combined_field1, axes(combined_field)), title = ("day: $t"))
     end
     Plots.mp4(anim, "slab_T_combo_anom.mp4", fps = 10)
+=#
 end

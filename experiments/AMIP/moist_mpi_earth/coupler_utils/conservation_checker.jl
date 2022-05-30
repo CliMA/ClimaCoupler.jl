@@ -5,52 +5,39 @@ abstract type AbstractCheck end
 struct ConservationCheck{A} <: AbstractCheck
     ρe_tot_atmos::A
     ρe_tot_bucket::A
+    dE_expected::A
 end
 
-function check_conservation_callback(cs, atmos_sim, bucket_sim)
+function check_conservation_callback(cs, atmos_sim, bucket_sim, energy_flux)
 
-    atmos_sim.domain.center_space.vertical_topology.mesh.domain
     Δz_1 =
-        parent(ClimaCore.Fields.coordinate_field(atmos_sim.domain.face_space).z)[2] -
-        parent(ClimaCore.Fields.coordinate_field(atmos_sim.domain.face_space).z)[1]
+        (parent(ClimaCore.Fields.coordinate_field(atmos_sim.domain.face_space).z)[2] -
+        parent(ClimaCore.Fields.coordinate_field(atmos_sim.domain.face_space).z)[1]) ./ FT(2.0)
 
     atmos_field = atmos_sim.integrator.u.c.ρe  # J 
     bucket_field = get_bucket_energy(bucket_sim, bucket_sim.integrator.u.bucket.T_sfc) ./ Δz_1  # J  [NB: sum of the boundary field inherits the depth from the first atmospheric layer, which ≂̸ bucket depth]
 
-    ρe_tot_atmos = sum(atmos_field)
-    ρe_tot_bucket = sum(bucket_field)
-
+    ρe_tot_atmos = sum(atmos_field) # ∫ ρe dV
+    ρe_tot_bucket = sum(bucket_field) # ∫ ρc T*d_soil dz / Δz_1
+    dE_expected = sum(energy_flux .* FT(200.0) ./ Δz_1)
+    
     push!(cs.ρe_tot_atmos, ρe_tot_atmos)
     push!(cs.ρe_tot_bucket, ρe_tot_bucket)
+    push!(cs.dE_expected, dE_expected)
 end
 
 using ClimaCorePlots
-function plot(CS::ConservationCheck)
-    diff_ρe_tot_atmos = CS.ρe_tot_atmos .- CS.ρe_tot_atmos[3]
-    diff_ρe_tot_bucket = (CS.ρe_tot_bucket .- CS.ρe_tot_bucket[3])
+function conservation_plot(CS::ConservationCheck, figname)
+    diff_ρe_tot_atmos = CS.ρe_tot_atmos .- CS.ρe_tot_atmos[1]
+    diff_ρe_tot_bucket = (CS.ρe_tot_bucket .- CS.ρe_tot_bucket[1])
     Plots.plot(diff_ρe_tot_atmos, label = "atmos")
     Plots.plot!(diff_ρe_tot_bucket, label = "bucket")
     tot = diff_ρe_tot_atmos .+ diff_ρe_tot_bucket
+    dE = CS.dE_expected
     Plots.plot!(tot .- tot[1], label = "tot")
-end
-
-function conservation_plot(atmos_sim, bucket_sim, solu_atm, solu_bucket, figname = "tst_c.png")
-    z = parent(ClimaCore.Fields.coordinate_field(atmos_sim.domain.face_space).z);
-    Δz_1 = (z[2] - z[1])./2.0
-    
-    atmos_e = [sum(u.c.ρe) for u in solu_atm] # J 
-
-
-    bucket_e = [sum(get_bucket_energy(bucket_sim, u)) for u in solu_bucket]  # J  [NB: sum of the boundary field inherits the depth from the first atmospheric layer, which ≂̸ bucket depth]
-
-    diff_ρe_tot_atmos = atmos_e .- atmos_e[3]
-    diff_ρe_tot_bucket = (bucket_e .- bucket_e[3])
-    Plots.plot(diff_ρe_tot_atmos, label = "atmos")
-    Plots.plot!(diff_ρe_tot_bucket, label = "bucket")
-    tot = diff_ρe_tot_atmos .+ diff_ρe_tot_bucket
-    Plots.plot!(tot .- tot[1], label = "tot", xlabel = "time [s]", ylabel = "energy(t) - energy(t=0) [s]")
+    #Plots.plot!(cumsum(dE), label= "Cumulative sum of ∑F*A*Δt")
     Plots.savefig(figname)
-
+    
 end
 
 

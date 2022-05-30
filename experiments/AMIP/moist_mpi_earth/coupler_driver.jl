@@ -11,7 +11,7 @@ using LinearAlgebra
 import Test: @test
 using ClimaCore.Utilities: half, PlusHalf
 Pkg.add(PackageSpec(name = "ClimaCore", version = "0.10.3"))
-
+## When is FT set? It is already being used (as a global) in flux_calculator
 # import coupler utils
 include("coupler_utils/flux_calculator.jl")
 include("coupler_utils/conservation_checker.jl")
@@ -20,7 +20,7 @@ include("coupler_utils/masker.jl")
 include("coupler_utils/general_helper.jl")
 
 # # initiate spatial and temporal info
-debug_mode = true
+debug_mode = false
 t_end = debug_mode ? 100e2 : 2592000 * 3
 Δt_cpl = 2e2
 saveat = debug_mode ? Δt_cpl * 1 : Δt_cpl * 100
@@ -53,7 +53,7 @@ bucket_sim = bucket_init(FT, FT.(tspan); dt = FT(Δt_cpl), space = boundary_spac
 include("slab/slab_utils.jl")
 
 include("slab_ocean/slab_init.jl")
-prescribed_sst = true
+prescribed_sst = false
 if prescribed_sst == true
     SST = ncreader_rll_to_cgll_from_space(FT, "data/sst.nc", "SST", boundary_space)  # a sample SST field from https://gdex.ucar.edu/dataset/158_asphilli.html
     SST = swap_space!(SST, axes(mask)) .* (abs.(mask .- 1)) .+ FT(273.15) # TODO: avoids the "space not the same instance" error
@@ -63,7 +63,7 @@ else
 end
 
 include("slab_ice/slab_init.jl")
-prescribed_sic = true
+prescribed_sic = false
 if prescribed_sic == true
     # sample SST field
     SIC = ncreader_rll_to_cgll_from_space(FT, "data/sic.nc", "SEAICE", boundary_space)
@@ -84,7 +84,7 @@ F_R = ClimaCore.Fields.zeros(boundary_space) # radiative fluxes
 dF_A = ClimaCore.Fields.zeros(boundary_space) # aerodynamic turbulent fluxes
 
 # init conservation info collector
-CS = ConservationCheck([], [])
+CS = ConservationCheck([], [],[])
 
 # coupling loop
 @show "Starting coupling loop"
@@ -205,7 +205,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     step!(slab_ice_sim.integrator, t - slab_ice_sim.integrator.t, true)
 
     if !is_distributed
-        check_conservation_callback(CS, atmos_sim, bucket_sim)
+        check_conservation_callback(CS, atmos_sim, bucket_sim, F_A .+ F_R)
     end
 
 end
@@ -223,7 +223,7 @@ include("mpi/mpi_postprocess.jl")
 
 # conservation  check
 if !is_distributed || (is_distributed && ClimaComms.iamroot(comms_ctx))
-    conservation_plot(atmos_sim, bucket_sim, solu_atm, solu_slab, "conservation.png")
+    conservation_plot(CS, "conservation.png")
 end
 
 # animations

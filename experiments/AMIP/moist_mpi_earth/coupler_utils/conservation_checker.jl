@@ -35,7 +35,7 @@ function conservation_plot(CS::ConservationCheck, figname)
     tot = diff_ρe_tot_atmos .+ diff_ρe_tot_bucket
     dE = CS.dE_expected
     Plots.plot!(tot .- tot[1], label = "tot")
-    #Plots.plot!(cumsum(dE), label= "Cumulative sum of ∑F*A*Δt")
+    #Plots.plot!(cumsum(dE), label= "Cumulative sum of ∫F*dA*dt")
     Plots.savefig(figname)
     
 end

@@ -20,7 +20,7 @@ include("coupler_utils/masker.jl")
 include("coupler_utils/general_helper.jl")
 
 # # initiate spatial and temporal info
-debug_mode = false
+debug_mode = true
 t_end = debug_mode ? 100e2 : 2592000 * 3
 Δt_cpl = 2e2
 saveat = debug_mode ? Δt_cpl * 1 : Δt_cpl * 100
@@ -46,7 +46,9 @@ mask = LandSeaMask(FT, infile, "LSMASK", boundary_space) # TODO: split up the nc
 mask .= FT(1.0)
 # init surface (slab) model components
 # ClimaLSM unregistered:
-Pkg.add( url = "https://github.com/CliMA/ClimaLSM.jl", rev = "move_coupled_types")
+#Pkg.add( url = "https://github.com/CliMA/ClimaLSM.jl", rev = "move_coupled_types")
+Pkg.develop(path="../../../../ClimaLSM.jl")
+
 include("bucket/bucket_init.jl")
 bucket_sim = bucket_init(FT, FT.(tspan); dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat));
 
@@ -146,6 +148,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
 
     # calculate turbulent fluxes on atmos grid and save in atmos cache
     info_sfc = (; T_sfc = T_S, z0m = z0m_S, z0b = z0b_S, ice_mask = slab_ice_sim.integrator.p.ice_mask)
+    # This should also need q_sfc - currently it assumes q_sfc = q_sat
     calculate_surface_fluxes_atmos_grid!(atmos_sim.integrator, info_sfc)
 
     # run 
@@ -167,16 +170,16 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     ## Bucket Land
     # coupler_get: F_aero, F_rad
     # standin for ρsfc computation
-    bucket_sim.integrator.p.bucket.ρ_sfc = FT(1.1)
-    slab_F_aero = bucket_sim.integrator.p.bucket.SHF # only ever use sum of LHF + SHF so this is ok for now.
-    @. slab_F_aero = F_A
-    @. bucket_sim.integrator.p.bucket.LHF = 0.0
-    slab_F_E = bucket_sim.integrator.p.bucket.E
-    @. slab_F_E = F_E
-    slab_F_rad = bucket_sim.integrator.p.bucket.R_n
-    @. slab_F_rad = F_R
+    @. bucket_sim.integrator.p.bucket.ρ_sfc = FT(1.1)
+    @. bucket_sim.integrator.p.bucket.SHF = F_A
+    @. bucket_sim.integrator.p.bucket.LHF = FT(0.0)
+    @. bucket_sim.integrator.p.bucket.E = F_E
+    @. bucket_sim.integrator.p.bucket.R_n = F_R
 
     # run
+    #step!(bucket_sim.integrator, FT(0.0), true) #???? do we need this each step? why?
+    # Why is print t = t+dt rather than t?
+    # Why is printed dY.T_sfc NE 0 but bucket_sim.u(t+dt) = bucket_sim.u(t)
     step!(bucket_sim.integrator, t - bucket_sim.integrator.t, true)
 
     ## Slab ocean

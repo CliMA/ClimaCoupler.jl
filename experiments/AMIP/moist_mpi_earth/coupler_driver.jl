@@ -48,8 +48,8 @@ mask = LandSeaMask(FT, infile, "LSMASK", boundary_space) # TODO: split up the nc
 mask .= FT(1.0)
 # init surface (slab) model components
 # ClimaLSM unregistered:
-#Pkg.add( url = "https://github.com/CliMA/ClimaLSM.jl", rev = "move_coupled_types")
-Pkg.develop(path="../../../../ClimaLSM.jl")
+Pkg.add( url = "https://github.com/CliMA/ClimaLSM.jl", rev = "move_coupled_types")
+#Pkg.develop(path="../../../../ClimaLSM.jl")
 
 include("bucket/bucket_init.jl")
 bucket_sim = bucket_init(FT, FT.(tspan); dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat));
@@ -92,17 +92,43 @@ CS = ConservationCheck([], [],[])
 if !is_distributed
     check_conservation_callback(CS, atmos_sim, bucket_sim, F_A .+ F_R)
 end
-# coupling loop
 
-@show "Starting coupling loop"
-walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
-    @show t
+# coupling methods
+function atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args)
+    F_A .= ClimaCore.Fields.zeros(boundary_space)
+    dummmy_remap!(F_A, atmos_sim.integrator.p.dif_flux_energy)
+    F_E .= ClimaCore.Fields.zeros(boundary_space)
+    dummmy_remap!(F_E, atmos_sim.integrator.p.dif_flux_ρq_tot)
+    F_R .= ClimaCore.Fields.zeros(boundary_space)
+    parsed_args["rad"] == "gray" ? dummmy_remap!(F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) : nothing # TODO: albedo hard coded...
+    dF_A .= ClimaCore.Fields.zeros(boundary_space)
+    dummmy_remap!(dF_A, atmos_sim.integrator.p.∂F_aero∂T_sfc)
+    return F_A, F_E, F_R, dF_A
+end
 
-    ## Atmos
-    ## Turbulent surface fluxes
+function bucket_pull!(bucket_sim, F_A, F_E, F_R)
+    # stand in for \rho sfc computation
+    @. bucket_sim.integrator.p.bucket.ρ_sfc = FT(1.1)
+    @. bucket_sim.integrator.p.bucket.SHF = F_A
+    @. bucket_sim.integrator.p.bucket.LHF = FT(0.0)
+    @. bucket_sim.integrator.p.bucket.E = F_E
+    @. bucket_sim.integrator.p.bucket.R_n = F_R
+end
 
-    # coupler_get: T_sfc, z_0m, z_0b
+function ocean_pull!(slab_ocean_sim, F_A, F_R)
+    @. slab_ocean_sim.integrator.p.F_aero = -F_A
+    @. slab_ocean_sim.integrator.p.F_rad = -F_R
+end
+
+function ice_pull!(slab_ice_sim, F_A, F_R, dF_A)
+    @. slab_ice_sim.integrator.p.F_aero = -F_A
+    @. slab_ice_sim.integrator.p.F_rad = -F_R
+    @. slab_ice_sim.integrator.p.∂F_aero∂T_sfc = dF_A
+end
+
+function atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S, SST, ocean_params, z0b_S, T_S)
     combined_field = zeros(boundary_space)
+    # coupler_get: T_sfc, z_0m, z_0b
     if prescribed_sst == true
         parent(combined_field) .=
             combine_surface.(
@@ -155,68 +181,44 @@ walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     info_sfc = (; T_sfc = T_S, z0m = z0m_S, z0b = z0b_S, ice_mask = slab_ice_sim.integrator.p.ice_mask)
     # This should also need q_sfc - currently it assumes q_sfc = q_sat
     calculate_surface_fluxes_atmos_grid!(atmos_sim.integrator, info_sfc)
+end
 
-    # run
-    if t ≈ tspan[1]+Δt_cpl
-        reinit!(atmos_sim.integrator)
-    end
-    
+# init coupling
+atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S, SST, ocean_params, z0b_S, T_S)
+F_A, F_E, F_R, dF_A = atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args)
+bucket_pull!(bucket_sim, F_A, F_E, F_R)
+reinit!(atmos_sim)
+reinit!(bucket_sim)
+if (prescribed_sst !== true) && (prescribed_sic == true)
+    ocean_pull!(slab_ocean_sim, F_A, F_R)
+    reinit!(slab_ocean_sim)
+end
+ice_pull!(slab_ice_sim, F_A, F_R, dF_A)
+reinit!(slab_ice_sim)
+
+@show "Starting coupling loop"
+walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
+    @show t
+    ## Atmos
+    atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S, SST, ocean_params, z0b_S, T_S)
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
 
     #clip TODO: this is bad!! > limiters
     parent(atmos_sim.integrator.u.c.ρq_tot) .= heaviside.(parent(atmos_sim.integrator.u.c.ρq_tot)) # negligible for total energy cons
 
     # coupler_push!: get accumulated fluxes from atmos in the surface fields
-    F_A .= ClimaCore.Fields.zeros(boundary_space)
-    dummmy_remap!(F_A, atmos_sim.integrator.p.dif_flux_energy)
-    F_E .= ClimaCore.Fields.zeros(boundary_space)
-    dummmy_remap!(F_E, atmos_sim.integrator.p.dif_flux_ρq_tot)
-    F_R .= ClimaCore.Fields.zeros(boundary_space)
-    parsed_args["rad"] == "gray" ? dummmy_remap!(F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) : nothing # TODO: albedo hard coded...
-    dF_A .= ClimaCore.Fields.zeros(boundary_space)
-    dummmy_remap!(dF_A, atmos_sim.integrator.p.∂F_aero∂T_sfc)
+    F_A, F_E, F_R, dF_A = atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args)
 
     ## Bucket Land
-    # coupler_get: F_aero, F_rad
-    # standin for ρsfc computation
-    @. bucket_sim.integrator.p.bucket.ρ_sfc = FT(1.1)
-    @. bucket_sim.integrator.p.bucket.SHF = F_A
-    @. bucket_sim.integrator.p.bucket.LHF = FT(0.0)
-    @. bucket_sim.integrator.p.bucket.E = F_E
-    @. bucket_sim.integrator.p.bucket.R_n = F_R
-
-    # run
-    #step!(bucket_sim.integrator, FT(0.0), true) #???? do we need this each step? why?
-    # Why is print t = t+dt rather than t?
-    # Why is printed dY.T_sfc NE 0 but bucket_sim.u(t+dt) = bucket_sim.u(t)
-     if t ≈ tspan[1]+Δt_cpl
-        reinit!(bucket_sim.integrator)
-    end
+    bucket_pull!(bucket_sim, F_A, F_E, F_R)
     step!(bucket_sim.integrator, t - bucket_sim.integrator.t, true)
 
     ## Slab ocean
-    # coupler_get: F_aero, F_rad
     if (prescribed_sst !== true) && (prescribed_sic == true)
-        slab_ocean_F_aero = slab_ocean_sim.integrator.p.F_aero
-        @. slab_ocean_F_aero = -F_A
-        slab_ocean_F_rad = slab_ocean_sim.integrator.p.F_rad
-        @. slab_ocean_F_rad = -F_R
-
-        # run
+        ocean_pull!(slab_ocean_sim, F_A, F_R)
         step!(slab_ocean_sim.integrator, t - slab_ocean_sim.integrator.t, true)
     end
-    # conservation info "callback" logging at every Δt_cpl
-
     ## Slab ice
-    # coupler_get: F_aero, F_rad
-    slab_ice_F_aero = slab_ice_sim.integrator.p.F_aero
-    @. slab_ice_F_aero = -F_A
-    slab_ice_F_rad = slab_ice_sim.integrator.p.F_rad
-    @. slab_ice_F_rad = -F_R
-    slab_ice_∂F_aero∂T_sfc = slab_ice_sim.integrator.p.∂F_aero∂T_sfc
-    @. slab_ice_∂F_aero∂T_sfc = dF_A
-
-    # run
     step!(slab_ice_sim.integrator, t - slab_ice_sim.integrator.t, true)
 
     if !is_distributed

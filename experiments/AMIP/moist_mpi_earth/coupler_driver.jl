@@ -93,8 +93,9 @@ if !is_distributed
     check_conservation_callback(CS, atmos_sim, bucket_sim, F_A .+ F_R)
 end
 # coupling loop
+
 @show "Starting coupling loop"
-walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
+walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     @show t
 
     ## Atmos
@@ -155,7 +156,11 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     # This should also need q_sfc - currently it assumes q_sfc = q_sat
     calculate_surface_fluxes_atmos_grid!(atmos_sim.integrator, info_sfc)
 
-    # run 
+    # run
+    if t ≈ tspan[1]+Δt_cpl
+        reinit!(atmos_sim.integrator)
+    end
+    
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
 
     #clip TODO: this is bad!! > limiters
@@ -184,6 +189,9 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     #step!(bucket_sim.integrator, FT(0.0), true) #???? do we need this each step? why?
     # Why is print t = t+dt rather than t?
     # Why is printed dY.T_sfc NE 0 but bucket_sim.u(t+dt) = bucket_sim.u(t)
+     if t ≈ tspan[1]+Δt_cpl
+        reinit!(bucket_sim.integrator)
+    end
     step!(bucket_sim.integrator, t - bucket_sim.integrator.t, true)
 
     ## Slab ocean

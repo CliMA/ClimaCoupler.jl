@@ -1,28 +1,19 @@
-using Unitful, Dates
 using PrettyTables
 
 export CouplerState
 export coupler_push!, coupler_pull!, coupler_put!, coupler_get
 export coupler_add_field!
 
-# TODO: Build constructor that uses a model component's grid.
-struct CplGridInfo{GT, GP, GH, GE}
-    gridtype::GT
-    gridparams::GP
-    gridhandle::GH
-    gridencoding::GE
-end
-
-mutable struct CplFieldInfo{AT, GT <: CplGridInfo, UT <: Unitful.Units}
+mutable struct CplFieldInfo{AT, MD}
     data::AT
-    gridinfo::GT
-    units::UT
-    datetime::DateTime
+    metadata::MD
 end
 
 mutable struct CouplerState{DT}
-    CplStateBlob::DT
+    coupled_fields::DT
 end
+
+_fields(coupler::CouplerState) = getfield(coupler, :coupled_fields)
 
 """
     CouplerState()
@@ -43,9 +34,6 @@ end
             coupler::CouplerState,
             fieldname::Symbol,
             fieldvalue,
-            grid,
-            datetime::DateTime,
-            units::Unitful.Units = Unitful.NoUnits, 
         )
 
 Add a field to the coupler that is accessible with key `fieldname`. 
@@ -54,52 +42,22 @@ Add a field to the coupler that is accessible with key `fieldname`.
 - `coupler`: coupler object the field is added to.
 - `fieldname`: key to access the field in the coupler.
 - `fieldvalue`: data array of field values.
-- `grid`: grid the field is stored on.
-- `datetime`: time associated with the field state.
-- `units`: units associated with the field values. Dimensionless by default.
 """
-function coupler_add_field!(
-    coupler::CouplerState,
-    fieldname::Symbol,
-    fieldvalue,
-    grid,
-    datetime::DateTime,
-    units::Unitful.Units = Unitful.NoUnits,
-)
-    gridinfo = CplGridInfo(nothing, nothing, nothing, nothing)
-    push!(coupler.CplStateBlob, fieldname => CplFieldInfo(fieldvalue, gridinfo, units, datetime))
+function coupler_add_field!(coupler::CouplerState, fieldname::Symbol, fieldvalue, metadata = nothing)
+    push!(coupler.coupled_fields, fieldname => CplFieldInfo(fieldvalue, metadata))
 end
 
 """
-    coupler_pull!(model, coupler::CouplerState)
+    coupler_put!(coupler::CouplerState, fieldname::Symbol, fieldvalue)
 
-Update model with fields retrieved from the coupler.
-
-`coupler_pull!` is an adapter function to be implemented for each
-model component using the coupler. It should get coupling fields via
-`coupler_get` calls and perform any operations on these fields to prepare
-them for use in the component model.
+Sets coupler field `fieldname` to `fieldvalue`.
 """
-function coupler_pull!(model, coupler::CouplerState) end
+function coupler_put!(coupler::CouplerState, fieldname::Symbol, fieldvalue)
+    cplfield = coupler.coupled_fields[fieldname]
 
-"""
-    coupler_get(coupler::CouplerState, fieldname::Symbol, gridinfo, datetime::DateTime, units::Unitful.Units)
+    cplfield.data .= fieldvalue
 
-Retrieve data array corresponding to `fieldname`.
-
-Returns data on the grid specified by `gridinfo` and in the units of `units`. Checks that
-the coupler data field is the state at time `datetime`.
-"""
-function coupler_get(coupler::CouplerState, fieldname::Symbol, gridinfo, datetime::DateTime, units::Unitful.Units)
-    cplfield = coupler.CplStateBlob[fieldname]
-
-    # check that retrieving component and coupler are at same time
-    datetime != cplfield.datetime &&
-        throw(ErrorException("Retrieval time ($datetime) != coupler field time ($(cplfield.datetime))"))
-
-    regriddata = regrid(cplfield.data, gridinfo, cplfield.gridinfo)
-
-    return uconvert(regriddata, units, cplfield.units)
+    return nothing
 end
 
 """
@@ -115,68 +73,47 @@ them for the coupler.
 function coupler_push!(coupler::CouplerState, model) end
 
 """
-    coupler_put!(coupler::CouplerState, fieldname::Symbol, fieldvalue, gridinfo, datetime::DateTime, units::Unitful.Units)
+    coupler_get(coupler::CouplerState, fieldname::Symbol)
 
-Updates coupler field `fieldname` with `fieldvalue`, the field's value at time `datetime`.
+Retrieve data array corresponding to `fieldname`.
 
-`gridinfo` and `units` inform the coupler of the format of the inputted data
-allowing conversion to match the grid and units of the coupler field.
+Returns data on the grid specified by `gridinfo` and in the units of `units`. Checks that
+the coupler data field is the state at time `datetime`.
 """
-function coupler_put!(
-    coupler::CouplerState,
-    fieldname::Symbol,
-    fieldvalue,
-    gridinfo,
-    datetime::DateTime,
-    units::Unitful.Units,
-)
-    cplfield = coupler.CplStateBlob[fieldname]
+function coupler_get(coupler::CouplerState, fieldname::Symbol)
+    cplfield = coupler.coupled_fields[fieldname]
 
-    # map new data to grid of coupler field; new data -> coupler grid
-    regriddata = regrid(fieldvalue, cplfield.gridinfo, gridinfo)
-
-    # store new regridded data in correct units
-    cplfield.data .= uconvert(regriddata, cplfield.units, units)
-
-    # update timestamp of coupler field
-    settime!(cplfield, datetime)
-
-    return nothing
+    return cplfield.data
 end
 
-# TODO: maps cplfield data from `fromgrid` to `togrid`
-function regrid(data, togrid, fromgrid)
-    return data
-end
+"""
+    coupler_pull!(model, coupler::CouplerState)
 
-# convert from `fromunits` to `tounits`
-# ustrip throws error if the units aren't dimensionally compatible
-function uconvert(data, tounits::Unitful.Units, fromunits::Unitful.Units)
-    tounits == fromunits && return data
-    return ustrip.(tounits, data .* fromunits)
-end
+Update model with fields retrieved from the coupler.
 
-# set the time of the coupled field
-function settime!(cplfield::CplFieldInfo, newtime::DateTime)
-    cplfield.datetime = newtime
-end
+`coupler_pull!` is an adapter function to be implemented for each
+model component using the coupler. It should get coupling fields via
+`coupler_get` calls and perform any operations on these fields to prepare
+them for use in the component model.
+"""
+function coupler_pull!(model, coupler::CouplerState) end
 
 # display table of registered fields & their info
 function Base.show(io::IO, coupler::CouplerState)
     #=
-    ---------------------------------------------------------------------------
-    |  Field Name  |  Units  |  Field Time (Y-m-d H:M:S)   |     Grid Type    |
-    ---------------------------------------------------------------------------
-    |  :OceanSST   |   °C    |  2021-01-01T00:00:00        |  DG Cubed Sphere |
-    |  :Field2     |    m    |  2021-01-01T00:00:00        |  CG Cubed Sphere |
-    ---------------------------------------------------------------------------
+    ----------------
+    |  Field Name  |
+    ----------------
+    |  :OceanSST   |
+    |  :Field2     |
+    ----------------
     =#
-    fields = coupler.CplStateBlob
-    data = Array{Any}(undef, length(fields), 4)
-    for (i, k) in enumerate(keys(coupler.CplStateBlob))
-        entry = coupler.CplStateBlob[k]
-        data[i, :] = [k entry.units entry.datetime entry.gridinfo.gridtype]
+    fields = _fields(coupler)
+    data = Array{Any}(undef, length(fields), 1)
+    for (i, k) in enumerate(keys(fields))
+        entry = fields[k]
+        data[i, :] = [k]
     end
-    header = (["Field Name", "Units", "Field Time", "Grid Type"], ["", "", "Y-m-d H:M:S", ""])
+    header = (["Field Name"], [""])
     pretty_table(data, header = header)
 end

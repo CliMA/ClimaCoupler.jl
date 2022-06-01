@@ -64,6 +64,8 @@ if prescribed_sst == true
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5))
 else
     slab_ocean_sim = slab_ocean_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask)
+    SST = nothing
+    ocean_params = nothing
 end
 
 include("slab_ice/slab_init.jl")
@@ -88,11 +90,7 @@ F_R = ClimaCore.Fields.zeros(boundary_space) # radiative fluxes
 dF_A = ClimaCore.Fields.zeros(boundary_space) # aerodynamic turbulent fluxes
 
 # init conservation info collector
-CS = ConservationCheck([], [],[])
-if !is_distributed
-    check_conservation_callback(CS, atmos_sim, bucket_sim, F_A .+ F_R)
-end
-
+CS = ConservationCheck([], [],[],[],[])
 # coupling methods
 function atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args)
     F_A .= ClimaCore.Fields.zeros(boundary_space)
@@ -103,7 +101,7 @@ function atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args
     parsed_args["rad"] == "gray" ? dummmy_remap!(F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) : nothing # TODO: albedo hard coded...
     dF_A .= ClimaCore.Fields.zeros(boundary_space)
     dummmy_remap!(dF_A, atmos_sim.integrator.p.∂F_aero∂T_sfc)
-    return F_A, F_E, F_R, dF_A
+    return F_A, F_E ./ FT(1000.0), F_R, dF_A # Land needs a volume flux
 end
 
 function bucket_pull!(bucket_sim, F_A, F_E, F_R)
@@ -126,7 +124,7 @@ function ice_pull!(slab_ice_sim, F_A, F_R, dF_A)
     @. slab_ice_sim.integrator.p.∂F_aero∂T_sfc = dF_A
 end
 
-function atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S, SST, ocean_params, z0b_S, T_S)
+function atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst,  z0m_S,  z0b_S, T_S, ocean_params, SST)
     combined_field = zeros(boundary_space)
     # coupler_get: T_sfc, z_0m, z_0b
     if prescribed_sst == true
@@ -175,6 +173,7 @@ function atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, 
                 parent(slab_ocean_sim.integrator.p.params.z0b .* (abs.(mask .- 1))),
             )
         dummmy_remap!(z0b_S, combined_field)
+        
     end
 
     # calculate turbulent fluxes on atmos grid and save in atmos cache
@@ -182,25 +181,34 @@ function atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, 
     # This should also need q_sfc - currently it assumes q_sfc = q_sat
     calculate_surface_fluxes_atmos_grid!(atmos_sim.integrator, info_sfc)
 end
-
+########
 # init coupling
-atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S, SST, ocean_params, z0b_S, T_S)
+atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST)
 F_A, F_E, F_R, dF_A = atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args)
 bucket_pull!(bucket_sim, F_A, F_E, F_R)
-reinit!(atmos_sim)
-reinit!(bucket_sim)
+reinit!(atmos_sim.integrator)
+reinit!(bucket_sim.integrator)
 if (prescribed_sst !== true) && (prescribed_sic == true)
     ocean_pull!(slab_ocean_sim, F_A, F_R)
-    reinit!(slab_ocean_sim)
+    reinit!(slab_ocean_sim.integrator)
 end
 ice_pull!(slab_ice_sim, F_A, F_R, dF_A)
-reinit!(slab_ice_sim)
+reinit!(slab_ice_sim.integrator)
 
+if !is_distributed
+    check_conservation_callback(CS, atmos_sim, bucket_sim, F_A .+ F_R, F_E)
+end
+
+# At this stage, the integrators all have dY(0) computed based on stuff stored in aux, Y0, etc. - dE is up to date
+# Then we need to update aux to t1, because in the next step!, Y(1) will be computed based on Y0 and dY(0), and then
+# dY(1) will be computed using aux(1), Y(1), t(1)
+# But how to update aux to t(1) without Y(1)??
 @show "Starting coupling loop"
-walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
+walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     @show t
     ## Atmos
-    atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S, SST, ocean_params, z0b_S, T_S)
+    atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST)
+    # Updates to Y(t+dt), t+dt, computes dY(t+dt)
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
 
     #clip TODO: this is bad!! > limiters
@@ -208,7 +216,6 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
 
     # coupler_push!: get accumulated fluxes from atmos in the surface fields
     F_A, F_E, F_R, dF_A = atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args)
-
     ## Bucket Land
     bucket_pull!(bucket_sim, F_A, F_E, F_R)
     step!(bucket_sim.integrator, t - bucket_sim.integrator.t, true)
@@ -222,7 +229,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     step!(slab_ice_sim.integrator, t - slab_ice_sim.integrator.t, true)
 
     if !is_distributed
-        check_conservation_callback(CS, atmos_sim, bucket_sim, F_A .+ F_R)
+        check_conservation_callback(CS, atmos_sim, bucket_sim, F_A .+ F_R, F_E)
     end
 
 end
@@ -240,7 +247,8 @@ include("mpi/mpi_postprocess.jl")
 
 # conservation  check
 if !is_distributed || (is_distributed && ClimaComms.iamroot(comms_ctx))
-    conservation_plot(CS, "conservation.png")
+    times = Array(tspan[1]:Δt_cpl:tspan[2])
+    conservation_plot(CS, times, "conservation")
 end
 
 # animations

@@ -31,7 +31,9 @@ tspan = (0, t_end)
 include("mpi/mpi_init.jl")
 
 # init atmos model component
-include("atmos/atmos_init.jl")
+include("atmos/atmos_init1.jl")
+# To change FT - go to driver_new.jl and change it by hand, then continue on!
+include("atmos/atmos_init2.jl")
 atmos_sim = atmos_init(FT, Y, spaces, integrator, params = params);
 
 
@@ -87,7 +89,9 @@ dF_A = ClimaCore.Fields.zeros(boundary_space) # aerodynamic turbulent fluxes
 
 # init conservation info collector
 CS = ConservationCheck([], [],[])
-
+if !is_distributed
+    check_conservation_callback(CS, atmos_sim, bucket_sim, F_A .+ F_R)
+end
 # coupling loop
 @show "Starting coupling loop"
 walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])

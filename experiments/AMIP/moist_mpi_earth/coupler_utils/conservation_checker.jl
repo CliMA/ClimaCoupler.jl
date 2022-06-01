@@ -28,14 +28,16 @@ end
 
 using ClimaCorePlots
 function conservation_plot(CS::ConservationCheck, figname)
-    diff_ρe_tot_atmos = CS.ρe_tot_atmos .- CS.ρe_tot_atmos[1]
-    diff_ρe_tot_bucket = (CS.ρe_tot_bucket .- CS.ρe_tot_bucket[1])
-    Plots.plot(diff_ρe_tot_atmos, label = "atmos")
-    Plots.plot!(diff_ρe_tot_bucket, label = "bucket")
+    # Hardcoded
+    t = Array(0.0:200:10000)
+    diff_ρe_tot_atmos = CS.ρe_tot_atmos .- CS.ρe_tot_atmos[2]
+    diff_ρe_tot_bucket = (CS.ρe_tot_bucket .- CS.ρe_tot_bucket[2])
+    Plots.plot(t,diff_ρe_tot_atmos[2:end], label = "atmos")
+    Plots.plot!(t,diff_ρe_tot_bucket[2:end], label = "bucket")
     tot = diff_ρe_tot_atmos .+ diff_ρe_tot_bucket
     dE = CS.dE_expected
-    Plots.plot!(tot .- tot[1], label = "tot")
-    #Plots.plot!(cumsum(dE), label= "Cumulative sum of ∫F*dA*dt")
+    Plots.plot!(t,tot[2:end], label = "tot")
+    Plots.plot!(t,cumsum(dE[2:end]), label= "Cumulative sum of ∫F*dA*dt")
     Plots.savefig(figname)
     
 end

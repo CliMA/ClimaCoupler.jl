@@ -46,7 +46,7 @@ include("slab/slab_init.jl") # stub for ClimaLSM's Bucket
 slab_sim = slab_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask);
 
 include("slab_ocean/slab_init.jl")
-prescribed_sst = true
+prescribed_sst = false
 if prescribed_sst == true
     SST = ncreader_rll_to_cgll_from_space(FT, "data/sst.nc", "SST", boundary_space)  # a sample SST field from https://gdex.ucar.edu/dataset/158_asphilli.html
     SST = swap_space!(SST, axes(mask)) .* (abs.(mask .- 1)) .+ FT(273.15) # TODO: avoids the "space not the same instance" error

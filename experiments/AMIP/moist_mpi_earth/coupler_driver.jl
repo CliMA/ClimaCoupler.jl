@@ -9,6 +9,7 @@ using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
 using LinearAlgebra
 import Test: @test
 using ClimaCore.Utilities: half, PlusHalf
+using RRTMGP
 Pkg.add(PackageSpec(name = "ClimaCore", version = "0.10.3"))
 
 # import coupler utils
@@ -140,6 +141,8 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     info_sfc = (; T_sfc = T_S, z0m = z0m_S, z0b = z0b_S, ice_mask = slab_ice_sim.integrator.p.ice_mask)
     calculate_surface_fluxes_atmos_grid!(atmos_sim.integrator, info_sfc)
 
+    atmos_sim.integrator.p.rrtmgp_model.surface_temperature .= field2array(T_S) # supplied to atmos for radiation
+    
     # run 
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
 

@@ -54,3 +54,19 @@ coupler_atmos_file = CWD * "/atmos/" * TEST_NAME * ".jl"
 
 ClimaComms.barrier(comms_ctx)
 include(coupler_atmos_file)
+
+parsed_args["dt"] = string(Δt_cpl) * "secs"
+parsed_args["t_end"] = string(t_end) * "secs"
+parsed_args["enable_threading"] = true
+parsed_args["dt_save_to_sol"] = string(saveat) * "secs"
+
+atoms_setup_dir = joinpath(ATMOS_DIR, "examples/hybrid/sphere/")
+
+if !is_distributed || (is_distributed && ClimaComms.iamroot(comms_ctx))
+    run(`cp $coupler_atmos_file $atoms_setup_dir`)
+end
+
+# init model using the modified driver
+ClimaComms.barrier(comms_ctx)
+Pkg.add(PackageSpec(name = "ClimaCore", version = "0.10.3"))
+Pkg.pin("ClimaCore")

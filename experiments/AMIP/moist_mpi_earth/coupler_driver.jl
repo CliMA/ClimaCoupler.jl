@@ -208,7 +208,8 @@ walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     @show t
     ## Atmos
     atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST)
-    # Updates to Y(t+dt), t+dt, computes dY(t+dt)
+    #ClimaCore.Fields.coordinate_field(atmos_sim.integrator.p.dif_flux_energy).z # Lives on centers
+    #sum(ones(axes(atmos_sim.integrator.p.dif_flux_energy)))
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
 
     #clip TODO: this is bad!! > limiters
@@ -216,6 +217,9 @@ walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
 
     # coupler_push!: get accumulated fluxes from atmos in the surface fields
     F_A, F_E, F_R, dF_A = atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args)
+    # ClimaCore.Fields.coordinate_field(F_A).z #lives on faces
+    # sum(ones(boundary_space))
+    # Total amount of energy  = ∫ F_A dA dt will be different than ∫dif_flux_energy dA dt
     ## Bucket Land
     bucket_pull!(bucket_sim, F_A, F_E, F_R)
     step!(bucket_sim.integrator, t - bucket_sim.integrator.t, true)

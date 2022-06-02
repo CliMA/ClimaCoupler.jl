@@ -62,3 +62,23 @@ sol = solve(prob2, Euler(); dt = dt)
 
 
 =#
+post_reinit_FA = sum(F_A)
+post_reinit_FE = sum(F_E)
+Cd_post_renit = sum(p_atmos_0.flux_coefficients.Cd)
+Ch_post_reinit= sum(p_atmos_0.flux_coefficients.Ch)
+post_reinit_FE = sum(p_atmos_0.dif_flux_energy)
+post_reinit_FW = sum(p_atmos_0.dif_flux_ρq_tot)
+
+Cd_pre_step = sum(atmos_sim.integrator.p.flux_coefficients.Cd)
+Ch_pre_step = sum(atmos_sim.integrator.p.flux_coefficients.Ch)
+prestep_FE = sum(atmos_sim.integrator.p.dif_flux_energy)
+prestep_FW = sum(atmos_sim.integrator.p.dif_flux_ρq_tot)
+
+
+Cd_post_step = sum(atmos_sim.integrator.p.flux_coefficients.Cd)
+Ch_post_step = sum(atmos_sim.integrator.p.flux_coefficients.Ch)
+poststep_FE = sum(atmos_sim.integrator.p.dif_flux_energy)
+poststep_FW = sum(atmos_sim.integrator.p.dif_flux_ρq_tot)
+
+post_push_FE = sum(F_A)
+post_push_FW = sum(F_E)

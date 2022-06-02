@@ -101,7 +101,6 @@ function atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args
     parsed_args["rad"] == "gray" ? dummmy_remap!(F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) : nothing # TODO: albedo hard coded...
     dF_A .= ClimaCore.Fields.zeros(boundary_space)
     dummmy_remap!(dF_A, atmos_sim.integrator.p.∂F_aero∂T_sfc)
-    return F_A, F_E ./ FT(1000.0), F_R, dF_A # Land needs a volume flux
 end
 
 function bucket_pull!(bucket_sim, F_A, F_E, F_R)
@@ -184,7 +183,7 @@ end
 ########
 # init coupling
 atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST)
-F_A, F_E, F_R, dF_A = atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args)
+atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args)
 bucket_pull!(bucket_sim, F_A, F_E, F_R)
 reinit!(atmos_sim.integrator)
 reinit!(bucket_sim.integrator)
@@ -198,7 +197,7 @@ reinit!(slab_ice_sim.integrator)
 if !is_distributed
     check_conservation_callback(CS, atmos_sim, bucket_sim, F_A .+ F_R, F_E)
 end
-
+dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil
 # At this stage, the integrators all have dY(0) computed based on stuff stored in aux, Y0, etc. - dE is up to date
 # Then we need to update aux to t1, because in the next step!, Y(1) will be computed based on Y0 and dY(0), and then
 # dY(1) will be computed using aux(1), Y(1), t(1)
@@ -207,30 +206,37 @@ end
 walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     @show t
     ## Atmos
-    atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST)
+    atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST);
+    dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil;
+    @info "pull!:", bucket_sim.integrator.t, atmos_sim.integrator.t, sum(parent(F_A)), sum(parent(atmos_sim.integrator.p.dif_flux_energy)), sum(parent(dY))
     #ClimaCore.Fields.coordinate_field(atmos_sim.integrator.p.dif_flux_energy).z # Lives on centers
     #sum(ones(axes(atmos_sim.integrator.p.dif_flux_energy)))
-    step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
+    step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true); # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
+    dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil; # = Flux
 
+    @info "step!:", bucket_sim.integrator.t, atmos_sim.integrator.t, sum(parent(F_A)), sum(parent(atmos_sim.integrator.p.dif_flux_energy)), sum(parent(dY))
     #clip TODO: this is bad!! > limiters
-    parent(atmos_sim.integrator.u.c.ρq_tot) .= heaviside.(parent(atmos_sim.integrator.u.c.ρq_tot)) # negligible for total energy cons
+    parent(atmos_sim.integrator.u.c.ρq_tot) .= heaviside.(parent(atmos_sim.integrator.u.c.ρq_tot)); # negligible for total energy cons
 
     # coupler_push!: get accumulated fluxes from atmos in the surface fields
-    F_A, F_E, F_R, dF_A = atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args)
+    atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args);
+    dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil;
+    @info "push:", bucket_sim.integrator.t, atmos_sim.integrator.t, sum(parent(F_A)), sum(parent(atmos_sim.integrator.p.dif_flux_energy)), sum(parent(dY))
     # ClimaCore.Fields.coordinate_field(F_A).z #lives on faces
     # sum(ones(boundary_space))
     # Total amount of energy  = ∫ F_A dA dt will be different than ∫dif_flux_energy dA dt
     ## Bucket Land
-    bucket_pull!(bucket_sim, F_A, F_E, F_R)
-    step!(bucket_sim.integrator, t - bucket_sim.integrator.t, true)
-
-    ## Slab ocean
-    if (prescribed_sst !== true) && (prescribed_sic == true)
-        ocean_pull!(slab_ocean_sim, F_A, F_R)
-        step!(slab_ocean_sim.integrator, t - slab_ocean_sim.integrator.t, true)
-    end
-    ## Slab ice
-    step!(slab_ice_sim.integrator, t - slab_ice_sim.integrator.t, true)
+    bucket_pull!(bucket_sim, F_A, F_E, F_R);
+    step!(bucket_sim.integrator, t - bucket_sim.integrator.t, true);
+    dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil;
+    @info "post land step:", bucket_sim.integrator.t, atmos_sim.integrator.t, sum(parent(F_A)), sum(parent(atmos_sim.integrator.p.dif_flux_energy)), sum(parent(dY))
+    # ## Slab ocean
+    # if (prescribed_sst !== true) && (prescribed_sic == true)
+    #     ocean_pull!(slab_ocean_sim, F_A, F_R)
+    #     step!(slab_ocean_sim.integrator, t - slab_ocean_sim.integrator.t, true)
+    # end
+    # ## Slab ice
+    # step!(slab_ice_sim.integrator, t - slab_ice_sim.integrator.t, true)
 
     if !is_distributed
         check_conservation_callback(CS, atmos_sim, bucket_sim, F_A .+ F_R, F_E)

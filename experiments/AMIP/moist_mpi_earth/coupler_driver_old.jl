@@ -18,7 +18,7 @@ include("coupler_utils/masker.jl")
 include("coupler_utils/general_helper.jl")
 
 # # initiate spatial and temporal info
-t_end =  2592000 * 3 # 100e2 # 2592000 # 100e2 #2592000 * 2 #
+t_end = 2592000 * 3 # 100e2 # 2592000 # 100e2 #2592000 * 2 #
 tspan = (0, t_end) # 172800.0)
 Δt_cpl = 2e2
 saveat = Δt_cpl * 100
@@ -44,8 +44,8 @@ slab_ocean_sim = slab_ocean_init(FT, tspan, dt = Δt_cpl, space = boundary_space
 
 # init coupler's boundary fields for regridding (TODO: technically this can be bypassed by directly rigridding on model grids)
 T_S = ClimaCore.Fields.zeros(boundary_space) # temperature
-z0m_S = ClimaCore.Fields.zeros(boundary_space) 
-z0b_S = ClimaCore.Fields.zeros(boundary_space) 
+z0m_S = ClimaCore.Fields.zeros(boundary_space)
+z0b_S = ClimaCore.Fields.zeros(boundary_space)
 
 F_A = ClimaCore.Fields.zeros(boundary_space) # aerodynamic turbulent fluxes
 F_R = ClimaCore.Fields.zeros(boundary_space) # radiative fluxes
@@ -55,7 +55,7 @@ CS = ConservationCheck([], [])
 
 # sample SST field
 # SST = ncreader_rll_to_cgll_from_space(FT, "data/sst.nc",  "SST", boundary_space)    
-# SST = swap_space!(SST,axes(mask)) .* ( .- (mask .-1) ) .+ FT(273.15)
+# SST = swap_space!(SST,axes(mask)) .* (  abs.(mask .-1) ) .+ FT(273.15)
 
 # coupling loop
 @show "Starting coupling loop"
@@ -66,15 +66,26 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     ## Turbulent surface fluxes
 
     # coupler_get: T_sfc, z0m, z0b
-    combined_field = zeros( boundary_space )    
-    parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.u.T_sfc), parent(slab_ocean_sim.integrator.u.T_sfc)) 
+    combined_field = zeros(boundary_space)
+    parent(combined_field) .=
+        combine_surface.(parent(mask), parent(slab_sim.integrator.u.T_sfc), parent(slab_ocean_sim.integrator.u.T_sfc))
     # parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.u.T_sfc), parent(SST) ) # prescribed SSTs
     dummmy_remap!(T_S, combined_field)
 
-    parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.p.params.z0m .* mask), parent(slab_ocean_sim.integrator.p.params.z0m .* ( .- (mask .-1) )) ) 
+    parent(combined_field) .=
+        combine_surface.(
+            parent(mask),
+            parent(slab_sim.integrator.p.params.z0m .* mask),
+            parent(slab_ocean_sim.integrator.p.params.z0m .* (abs.(mask .- 1))),
+        )
     dummmy_remap!(z0m_S, combined_field)
-    parent(combined_field) .= combine_surface.(parent(mask), parent(slab_sim.integrator.p.params.z0b .* mask), parent(slab_ocean_sim.integrator.p.params.z0b .* ( .- (mask .-1) )) ) 
-    dummmy_remap!(z0b_S, combined_field)  
+    parent(combined_field) .=
+        combine_surface.(
+            parent(mask),
+            parent(slab_sim.integrator.p.params.z0b .* mask),
+            parent(slab_ocean_sim.integrator.p.params.z0b .* (abs.(mask .- 1))),
+        )
+    dummmy_remap!(z0b_S, combined_field)
 
     # calculate turbulent fluxes on atmos grid and save in atmos cache
     info_sfc = (; T_sfc = T_S, z0m = z0m_S, z0b = z0b_S)
@@ -95,19 +106,19 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     ## Slab land
     # coupler_get: F_aero, F_rad
     slab_F_aero = slab_sim.integrator.p.F_aero
-    @. slab_F_aero = - F_A 
+    @. slab_F_aero = -F_A
     slab_F_rad = slab_sim.integrator.p.F_rad
-    @. slab_F_rad = - F_R 
+    @. slab_F_rad = -F_R
 
     # run
     step!(slab_sim.integrator, t - slab_sim.integrator.t, true)
 
     ## Slab ocean
     # coupler_get: F_aero, F_rad
-    slab_ocean_F_aero = slab_ocean_sim.integrator.p.F_aero 
-    @. slab_ocean_F_aero = - F_A 
+    slab_ocean_F_aero = slab_ocean_sim.integrator.p.F_aero
+    @. slab_ocean_F_aero = -F_A
     slab_ocean_F_rad = slab_ocean_sim.integrator.p.F_rad
-    @. slab_ocean_F_rad = - F_R 
+    @. slab_ocean_F_rad = -F_R
 
     # run
     step!(slab_ocean_sim.integrator, t - slab_ocean_sim.integrator.t, true)
@@ -137,47 +148,47 @@ end
 # animations
 plot_anim = nothing
 if plot_anim !== nothing
-    
+
     using ClimaCorePlots
 
     anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(Geometry.UVVector.(u.c.uₕ).components.data.:1,1))
+        Plots.plot(Fields.level(Geometry.UVVector.(u.c.uₕ).components.data.:1, 1))
     end
     Plots.mp4(anim, "anim_u.mp4", fps = 10)
 
     anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(Geometry.UVVector.(u.c.uₕ).components.data.:1,5))
+        Plots.plot(Fields.level(Geometry.UVVector.(u.c.uₕ).components.data.:1, 5))
     end
     Plots.mp4(anim, "anim_u_7km.mp4", fps = 10)
 
     anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(u.c.ρe,1))
+        Plots.plot(Fields.level(u.c.ρe, 1))
     end
     Plots.mp4(anim, "anim_rhoe.mp4", fps = 10)
 
     anim = Plots.@animate for u in sol_slab.u
-        Plots.plot(u.T_sfc,  clims = (240, 330))
+        Plots.plot(u.T_sfc, clims = (240, 330))
     end
     Plots.mp4(anim, "slab_T.mp4", fps = 10)
 
     anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(u.c.ρe,1) .- Fields.level(sol_atm.u[1].c.ρe,1),  clims = (-5000, 50000) )
-        println(parent(Fields.level(u.c.ρe,1) .- Fields.level(sol_atm.u[1].c.ρe,1))[1])
+        Plots.plot(Fields.level(u.c.ρe, 1) .- Fields.level(sol_atm.u[1].c.ρe, 1), clims = (-5000, 50000))
+        println(parent(Fields.level(u.c.ρe, 1) .- Fields.level(sol_atm.u[1].c.ρe, 1))[1])
     end
     Plots.mp4(anim, "anim_rhoe_anom.mp4", fps = 10)
 
     anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(u.c.ρe,7) .- Fields.level(sol_atm.u[1].c.ρe,7),  clims = (-1000, 3000) )
+        Plots.plot(Fields.level(u.c.ρe, 7) .- Fields.level(sol_atm.u[1].c.ρe, 7), clims = (-1000, 3000))
     end
     Plots.mp4(anim, "anim_rhoe_anom_7km.mp4", fps = 10)
 
     anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(u.c.ρq_tot,1) )#.- Fields.level(sol_atm.u[1].c.ρt_tot,1),  clims = (-5000, 50000) )
+        Plots.plot(Fields.level(u.c.ρq_tot, 1))#.- Fields.level(sol_atm.u[1].c.ρt_tot,1),  clims = (-5000, 50000) )
     end
     Plots.mp4(anim, "anim_rhoqt.mp4", fps = 10)
 
     anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(u.c.ρq_tot,2), clims = (0, 0.02)  )#.- Fields.level(sol_atm.u[1].c.ρt_tot,1),  clims = (-5000, 50000) )
+        Plots.plot(Fields.level(u.c.ρq_tot, 2), clims = (0, 0.02))#.- Fields.level(sol_atm.u[1].c.ρt_tot,1),  clims = (-5000, 50000) )
     end
     Plots.mp4(anim, "anim_rhoqt_1km.mp4", fps = 10)
 

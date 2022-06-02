@@ -35,7 +35,7 @@ function vertical_diffusion_boundary_layer_coupled_tendency!(Yₜ, Y, p, t)
             bottom = Operators.SetValue(.-dif_flux_uₕ),
         )
 
-        @. Yₜ.c.uₕ += ᶜdivᵥ(ᶠK_E * ᶠinterp(ᶜρ) * ᶠgradᵥ(Y.c.uₕ / ᶜρ))
+        @. Yₜ.c.uₕ += ᶜdivᵥ(ᶠK_E * ᶠgradᵥ(Y.c.uₕ))
     end
 
 end

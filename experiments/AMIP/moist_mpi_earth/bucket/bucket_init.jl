@@ -119,7 +119,7 @@ function bucket_init(
 
     # Initial conditions with no moisture
     Y, p, coords = initialize(model, space)
-    anomaly = false
+    anomaly = true
     hs_sfc = false
     Y.bucket.T_sfc = map(coords) do coord
         T_sfc_0 = FT(280.0)

@@ -1,4 +1,5 @@
 using ClimaCorePlots
+
 function plot_anim() # TODO: uses global defs
 
 
@@ -17,11 +18,21 @@ function plot_anim() # TODO: uses global defs
         Plots.plot(Fields.level(u.c.ρe, 1))
     end
     Plots.mp4(anim, "anim_rhoe.mp4", fps = 10)
-
-    anim = Plots.@animate for u in sol_slab.u
-        Plots.plot(u.bucket.T_sfc)#,  clims = (240, 330))
+    combined_field = zeros(boundary_space)
+    
+    anim = Plots.@animate for (bucketu,iceu) in zip(sol_slab.u,sol_slab_ice.u)
+        parent(combined_field) .=
+            combine_surface.(
+                parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2)),
+                parent(bucketu.bucket.T_sfc),
+                parent(slab_ocean_sim.integrator.sol.u[1].T_sfc),
+                parent(iceu.T_sfc),
+            )
+        dummmy_remap!(T_S, combined_field)
+        
+        Plots.plot(T_S)#,  clims = (240, 330))
     end
-    Plots.mp4(anim, "slab_T.mp4", fps = 10)
+    Plots.mp4(anim, "earth_T.mp4", fps = 10)
 
     anim = Plots.@animate for u in sol_atm.u
         Plots.plot(Fields.level(u.c.ρe, 1) .- Fields.level(sol_atm.u[1].c.ρe, 1), clims = (-5000, 50000))

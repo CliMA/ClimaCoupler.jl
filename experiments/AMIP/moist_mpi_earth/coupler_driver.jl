@@ -21,7 +21,7 @@ include("coupler_utils/general_helper.jl")
 
 # # initiate spatial and temporal info
 debug_mode = true
-t_end = debug_mode ? 100e2 : 2592000 * 3
+t_end = debug_mode ? 100e2 : 2592000 * 1
 Δt_cpl = 2e2
 saveat = debug_mode ? Δt_cpl * 1 : Δt_cpl * 100
 
@@ -33,6 +33,7 @@ include("mpi/mpi_init.jl")
 # init atmos model component
 include("atmos/atmos_init1.jl")
 # To change FT - go to driver_new.jl and change it by hand, then continue on!
+# To turn radiation to gray - coupler_atmos and in driver_new
 include("atmos/atmos_init2.jl")
 atmos_sim = atmos_init(FT, Y, spaces, integrator, params = params);
 
@@ -45,10 +46,11 @@ boundary_space = ClimaCore.Fields.level(atmos_sim.domain.face_space, half) # glo
 # init land-sea mask
 infile = "data/seamask.nc"
 mask = LandSeaMask(FT, infile, "LSMASK", boundary_space) # TODO: split up the nc file to individual times for faster computation
-mask .= FT(1.0)
+
+
 # init surface (slab) model components
 # ClimaLSM unregistered:
-Pkg.add( url = "https://github.com/CliMA/ClimaLSM.jl", rev = "move_coupled_types")
+Pkg.add( url = "https://github.com/CliMA/ClimaLSM.jl")#, rev = "move_coupled_types")
 #Pkg.develop(path="../../../../ClimaLSM.jl")
 
 include("bucket/bucket_init.jl")
@@ -197,7 +199,6 @@ reinit!(slab_ice_sim.integrator)
 if !is_distributed
     check_conservation_callback(CS, atmos_sim, bucket_sim, F_A .+ F_R, F_E)
 end
-dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil
 # At this stage, the integrators all have dY(0) computed based on stuff stored in aux, Y0, etc. - dE is up to date
 # Then we need to update aux to t1, because in the next step!, Y(1) will be computed based on Y0 and dY(0), and then
 # dY(1) will be computed using aux(1), Y(1), t(1)
@@ -207,36 +208,38 @@ walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     @show t
     ## Atmos
     atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST);
-    dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil;
-    @info "pull!:", bucket_sim.integrator.t, atmos_sim.integrator.t, sum(parent(F_A)), sum(parent(atmos_sim.integrator.p.dif_flux_energy)), sum(parent(dY))
+    #dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil;
+    #@info "pull!:", bucket_sim.integrator.t, atmos_sim.integrator.t, sum(parent(F_A)), sum(parent(atmos_sim.integrator.p.dif_flux_energy)), sum(parent(dY))
     #ClimaCore.Fields.coordinate_field(atmos_sim.integrator.p.dif_flux_energy).z # Lives on centers
     #sum(ones(axes(atmos_sim.integrator.p.dif_flux_energy)))
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true); # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
-    dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil; # = Flux
+    #dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil; # = Flux
 
-    @info "step!:", bucket_sim.integrator.t, atmos_sim.integrator.t, sum(parent(F_A)), sum(parent(atmos_sim.integrator.p.dif_flux_energy)), sum(parent(dY))
+    #@info "step!:", bucket_sim.integrator.t, atmos_sim.integrator.t, sum(parent(F_A)), sum(parent(atmos_sim.integrator.p.dif_flux_energy)), sum(parent(dY))
     #clip TODO: this is bad!! > limiters
     parent(atmos_sim.integrator.u.c.ρq_tot) .= heaviside.(parent(atmos_sim.integrator.u.c.ρq_tot)); # negligible for total energy cons
 
     # coupler_push!: get accumulated fluxes from atmos in the surface fields
     atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args);
-    dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil;
-    @info "push:", bucket_sim.integrator.t, atmos_sim.integrator.t, sum(parent(F_A)), sum(parent(atmos_sim.integrator.p.dif_flux_energy)), sum(parent(dY))
+    #dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil;
+    #@info "push:", bucket_sim.integrator.t, atmos_sim.integrator.t, sum(parent(F_A)), sum(parent(atmos_sim.integrator.p.dif_flux_energy)), sum(parent(dY))
     # ClimaCore.Fields.coordinate_field(F_A).z #lives on faces
     # sum(ones(boundary_space))
     # Total amount of energy  = ∫ F_A dA dt will be different than ∫dif_flux_energy dA dt
     ## Bucket Land
     bucket_pull!(bucket_sim, F_A, F_E, F_R);
     step!(bucket_sim.integrator, t - bucket_sim.integrator.t, true);
-    dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil;
-    @info "post land step:", bucket_sim.integrator.t, atmos_sim.integrator.t, sum(parent(F_A)), sum(parent(atmos_sim.integrator.p.dif_flux_energy)), sum(parent(dY))
-    # ## Slab ocean
-    # if (prescribed_sst !== true) && (prescribed_sic == true)
-    #     ocean_pull!(slab_ocean_sim, F_A, F_R)
-    #     step!(slab_ocean_sim.integrator, t - slab_ocean_sim.integrator.t, true)
-    # end
-    # ## Slab ice
-    # step!(slab_ice_sim.integrator, t - slab_ice_sim.integrator.t, true)
+ #   dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil;
+#    @info "post land step:", bucket_sim.integrator.t, atmos_sim.integrator.t, sum(parent(F_A)), sum(parent(atmos_sim.integrator.p.dif_flux_energy)), sum(parent(dY))
+
+    
+    ## Slab ocean
+    if (prescribed_sst !== true) && (prescribed_sic == true)
+        ocean_pull!(slab_ocean_sim, F_A, F_R)
+        step!(slab_ocean_sim.integrator, t - slab_ocean_sim.integrator.t, true)
+     end
+    ## Slab ice
+    step!(slab_ice_sim.integrator, t - slab_ice_sim.integrator.t, true)
 
     if !is_distributed
         check_conservation_callback(CS, atmos_sim, bucket_sim, F_A .+ F_R, F_E)
@@ -256,10 +259,10 @@ sol_slab_ocean = prescribed_sst !== true ? slab_ocean_sim.integrator.sol : nothi
 include("mpi/mpi_postprocess.jl")
 
 # conservation  check
-if !is_distributed || (is_distributed && ClimaComms.iamroot(comms_ctx))
-    times = Array(tspan[1]:Δt_cpl:tspan[2])
-    conservation_plot(CS, times, "conservation")
-end
+#if !is_distributed || (is_distributed && ClimaComms.iamroot(comms_ctx))
+#    times = Array(tspan[1]:Δt_cpl:tspan[2])
+#    conservation_plot(CS, times, "conservation")
+#end
 
 # animations
 include("coupler_utils/viz_explorer.jl")

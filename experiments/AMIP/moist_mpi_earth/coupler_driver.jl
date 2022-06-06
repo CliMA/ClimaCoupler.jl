@@ -46,7 +46,7 @@ boundary_space = ClimaCore.Fields.level(atmos_sim.domain.face_space, half) # glo
 # init land-sea mask
 infile = "data/seamask.nc"
 mask = LandSeaMask(FT, infile, "LSMASK", boundary_space) # TODO: split up the nc file to individual times for faster computation
-
+mask .= FT(1.0)
 
 # init surface (slab) model components
 # ClimaLSM unregistered:
@@ -111,7 +111,7 @@ function bucket_pull!(bucket_sim, F_A, F_E, F_R, ρ_sfc)
     @. bucket_sim.integrator.p.bucket.ρ_sfc = ρ_sfc
     @. bucket_sim.integrator.p.bucket.SHF = F_A
     @. bucket_sim.integrator.p.bucket.LHF = FT(0.0)
-    @. bucket_sim.integrator.p.bucket.E = F_E
+    @. bucket_sim.integrator.p.bucket.E = F_E ./ ρ_cloud_liq(bucket_sim.params.earth_param_set)
     @. bucket_sim.integrator.p.bucket.R_n = F_R
 end
 
@@ -223,31 +223,19 @@ walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     @show t
     ## Atmos
     atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST);
-    #dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil;
-    #@info "pull!:", bucket_sim.integrator.t, atmos_sim.integrator.t, sum(parent(F_A)), sum(parent(atmos_sim.integrator.p.dif_flux_energy)), sum(parent(dY))
-    #ClimaCore.Fields.coordinate_field(atmos_sim.integrator.p.dif_flux_energy).z # Lives on centers
-    #sum(ones(axes(atmos_sim.integrator.p.dif_flux_energy)))
-    step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true); # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
-    #dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil; # = Flux
 
-    #@info "step!:", bucket_sim.integrator.t, atmos_sim.integrator.t, sum(parent(F_A)), sum(parent(atmos_sim.integrator.p.dif_flux_energy)), sum(parent(dY))
+    step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true); # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
+ 
     #clip TODO: this is bad!! > limiters
     parent(atmos_sim.integrator.u.c.ρq_tot) .= heaviside.(parent(atmos_sim.integrator.u.c.ρq_tot)); # negligible for total energy cons
 
     # coupler_push!: get accumulated fluxes from atmos in the surface fields
     atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args);
-    #dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil;
-    #@info "push:", bucket_sim.integrator.t, atmos_sim.integrator.t, sum(parent(F_A)), sum(parent(atmos_sim.integrator.p.dif_flux_energy)), sum(parent(dY))
-    # ClimaCore.Fields.coordinate_field(F_A).z #lives on faces
-    # sum(ones(boundary_space))
-    # Total amount of energy  = ∫ F_A dA dt will be different than ∫dif_flux_energy dA dt
+
     ## Bucket Land
     bucket_pull!(bucket_sim, F_A, F_E, F_R);
     step!(bucket_sim.integrator, t - bucket_sim.integrator.t, true);
- #   dY = -1.0 .* get_du(bucket_sim.integrator).bucket.T_sfc .*bucket_sim.params.ρc_soil .* bucket_sim.params.d_soil;
-#    @info "post land step:", bucket_sim.integrator.t, atmos_sim.integrator.t, sum(parent(F_A)), sum(parent(atmos_sim.integrator.p.dif_flux_energy)), sum(parent(dY))
 
-    
     ## Slab ocean
     if (prescribed_sst !== true) && (prescribed_sic == true)
         ocean_pull!(slab_ocean_sim, F_A, F_R)

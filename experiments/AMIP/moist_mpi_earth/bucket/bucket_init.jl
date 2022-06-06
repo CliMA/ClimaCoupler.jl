@@ -1,6 +1,7 @@
 # slab_rhs!
 using ClimaCore
 using CLIMAParameters: AbstractEarthParameterSet
+using CLIMAParameters.Planet: ρ_cloud_liq
 using ClimaLSM
 using ClimaLSM.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers
 
@@ -102,7 +103,11 @@ function bucket_init(
 ) where {FT}
 
     earth_param_set = EarthParameterSet()
-    α_soil = FT(0.2) # soil albedo
+    function α_soil(coordinate_point)
+        (; lat, long) = coordinate_point
+        return typeof(lat)(0.2)
+    end
+    
     α_snow = FT(0.8) # snow albedo
     albedo = BulkAlbedo{FT}(α_snow, α_soil)
     S_c = FT(0.2)
@@ -146,7 +151,7 @@ function bucket_init(
     # this needs to be initialized!!! Turbulent surface fluxes need this set to be computed.
     ρ_sfc = zeros(space) .+ FT(1.1)
     P_liq = zeros(space) .+ FT(0.0)
-    α = surface_albedo.(Ref(albedo), Y.bucket.S, model.parameters.S_c)
+    α = surface_albedo.(Ref(albedo), coords, Y.bucket.S, model.parameters.S_c)
     variable_names = (propertynames(p.bucket)..., :ρ_sfc, :P_liq, :α)
     orig_fields = map(x -> getproperty(p.bucket,x), propertynames(p.bucket))
     fields = (orig_fields..., ρ_sfc, P_liq, α)

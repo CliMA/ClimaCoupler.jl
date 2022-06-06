@@ -4,7 +4,7 @@ using CLIMAParameters: AbstractEarthParameterSet
 using ClimaLSM
 using ClimaLSM.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers
 
-import ClimaLSM.Bucket: surface_fluxes, surface_air_density, liquid_precipitation
+import ClimaLSM.Bucket: surface_fluxes, surface_air_density, liquid_precipitation, BulkAlbedo, surface_albedo
 
 using ClimaLSM: make_ode_function, initialize_prognostic, initialize_auxiliary
 
@@ -104,6 +104,7 @@ function bucket_init(
     earth_param_set = EarthParameterSet()
     α_soil = FT(0.2) # soil albedo
     α_snow = FT(0.8) # snow albedo
+    albedo = BulkAlbedo{FT}(α_snow, α_soil)
     S_c = FT(0.2)
     W_f = FT(0.15)
     d_soil = FT(3.5) # soil depth
@@ -112,7 +113,7 @@ function bucket_init(
     z_0b = FT(1e-3)
     κ_soil = FT(0.0)# setting this to zero allows us to test energy conservation; zero flux in soil column at bottom
     ρc_soil = FT(2e6)
-    params = BucketModelParameters(d_soil,T0,κ_soil,ρc_soil,α_soil,α_snow,S_c,W_f,z_0m,z_0b,earth_param_set)
+    params = BucketModelParameters(d_soil,T0,κ_soil,ρc_soil,albedo,S_c,W_f,z_0m,z_0b,earth_param_set)
 
     args  = (params, CoupledAtmosphere{FT}(), CoupledRadiativeFluxes{FT}(), nothing)
     model= BucketModel{FT, typeof.(args)...}(args...)
@@ -145,9 +146,10 @@ function bucket_init(
     # this needs to be initialized!!! Turbulent surface fluxes need this set to be computed.
     ρ_sfc = zeros(space) .+ FT(1.1)
     P_liq = zeros(space) .+ FT(0.0)
-    variable_names = (propertynames(p.bucket)..., :ρ_sfc, :P_liq)
+    α = surface_albedo.(Ref(albedo), Y.bucket.S, model.parameters.S_c)
+    variable_names = (propertynames(p.bucket)..., :ρ_sfc, :P_liq, :α)
     orig_fields = map(x -> getproperty(p.bucket,x), propertynames(p.bucket))
-    fields = (orig_fields..., ρ_sfc, P_liq)
+    fields = (orig_fields..., ρ_sfc, P_liq, α)
     p_new = ClimaCore.Fields.FieldVector(; :bucket => (;zip(variable_names, fields)...))
    # p_new.bucket.SHF .= FT(-12.0)
     ode_function! = make_ode_function(model)

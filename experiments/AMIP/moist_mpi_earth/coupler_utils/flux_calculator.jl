@@ -1,6 +1,23 @@
 using ClimaCore.Geometry: ⊗
 using ClimaCore.Utilities: half, PlusHalf
 
+function set_ρ_sfc!(ρ_sfc, T_S, integrator)
+    ts = integrator.p.ᶜts
+    params = integrator.p.params
+    
+    ts_int = Spaces.level(ts, 1)
+    parent(ρ_sfc) .= parent(ρ_sfc_at_point.(params, ts_int, swap_space!(T_S, axes(ts_int))))
+end
+
+function ρ_sfc_at_point(params, ts_int, T_sfc)
+    T_int = TD.air_temperature(params, ts_int)
+    Rm_int = TD.gas_constant_air(params, ts_int)
+    ρ_air = TD.air_density(params, ts_int)
+    ρ_sfc = ρ_air * (T_sfc / T_int)^(TD.cv_m(params, ts_int) / Rm_int)  # use ideal gas law and hydrostatic balance to extrapolate for surface density
+    return ρ_sfc
+end
+
+    
 """
 calculate_surface_fluxes_atmos_grid!(integrator)
 
@@ -10,7 +27,7 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     p = integrator.p
     (; ᶜts, dif_flux_energy, dif_flux_ρq_tot, dif_flux_uₕ, ∂F_aero∂T_sfc, params, Cd, Ch) = p
 
-    (; T_sfc, z0m, z0b, ice_mask) = info_sfc
+    (; T_sfc, ρ_sfc, q_sfc, z0m, z0b, ice_mask) = info_sfc
     Y = integrator.u
 
     # Turbulent surface flux calculation
@@ -21,6 +38,8 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
             Spaces.level(Fields.coordinate_field(Y.c).z, 1),
             FT(0), # TODO: get actual value of z_sfc
             swap_space!(T_sfc, axes(Spaces.level(Y.c, 1))), # remove when same instance issue is resolved
+            swap_space!(ρ_sfc, axes(Spaces.level(Y.c, 1))), # remove when same instance issue is resolved
+            swap_space!(q_sfc, axes(Spaces.level(Y.c, 1))), # remove when same instance issue is resolved
             params,
             swap_space!(z0m, axes(Spaces.level(Y.c, 1))), # TODO: get these roughness lengths from land
             swap_space!(z0b, axes(Spaces.level(Y.c, 1))),
@@ -64,6 +83,8 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
             Spaces.level(Fields.coordinate_field(Y.c).z, 1),
             FT(0), # TODO: get actual value of z_sfc
             swap_space!(T_sfc .+ ΔT_sfc, axes(Spaces.level(Y.c, 1))), # remove when same instance issue is resolved
+            swap_space!(ρ_sfc, axes(Spaces.level(Y.c, 1))), # This is an approximation as it does not count for dρ/dT
+            swap_space!(q_sfc, axes(Spaces.level(Y.c, 1))), # This is an approximation as it does not count for dq/dT
             params,
             swap_space!(z0m, axes(Spaces.level(Y.c, 1))), # TODO: get these roughness lengths from land
             swap_space!(z0b, axes(Spaces.level(Y.c, 1))),
@@ -76,14 +97,7 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     return nothing
 end
 
-function variable_T_saturated_surface_coefs(ts_int, uₕ_int, z_int, z_sfc, T_sfc, params, z0m, z0b)
-
-    # get the near-surface thermal state
-    T_int = TD.air_temperature(params, ts_int)
-    Rm_int = TD.gas_constant_air(params, ts_int)
-    ρ_sfc = TD.air_density(params, ts_int) * (T_sfc / T_int)^(TD.cv_m(params, ts_int) / Rm_int) # use ideal gas law and hydrostatic balance to extrapolate for surface density
-
-    q_sfc = TD.q_vap_saturation_generic(params, T_sfc, ρ_sfc, TD.Liquid()) # TODO: assumes all surface is water covered. Generalize!
+function variable_T_saturated_surface_coefs(ts_int, uₕ_int, z_int, z_sfc, T_sfc, ρ_sfc, q_sfc, params, z0m, z0b)
     ts_sfc = TD.PhaseEquil_ρTq(params, ρ_sfc, T_sfc, q_sfc)
 
     # wrap state values
@@ -102,14 +116,7 @@ function variable_T_saturated_surface_coefs(ts_int, uₕ_int, z_int, z_sfc, T_sf
     return (; shf = tsf.shf, lhf = tsf.lhf, E = E, ρτxz = tsf.ρτxz, ρτyz = tsf.ρτyz)
 end
 
-function constant_T_saturated_surface_coefs_coupled(ts_int, uₕ_int, z_int, z_sfc, T_sfc, params, z0m, z0b, Cd, Ch)
-
-    # get the near-surface thermal state
-    T_int = TD.air_temperature(params, ts_int)
-    Rm_int = TD.gas_constant_air(params, ts_int)
-    ρ_sfc = TD.air_density(params, ts_int) * (T_sfc / T_int)^(TD.cv_m(params, ts_int) / Rm_int) # use ideal gas law and hydrostatic balance to extrapolate for surface density
-
-    q_sfc = TD.q_vap_saturation_generic(params, T_sfc, ρ_sfc, TD.Liquid()) # TODO: assumes all surface is water covered. Generalize!
+function constant_T_saturated_surface_coefs_coupled(ts_int, uₕ_int, z_int, z_sfc, T_sfc, ρ_sfc, q_sfc, params, z0m, z0b, Cd, Ch)
     ts_sfc = TD.PhaseEquil_ρTq(params, ρ_sfc, T_sfc, q_sfc)
 
     # wrap state values

@@ -50,7 +50,7 @@ mask = LandSeaMask(FT, infile, "LSMASK", boundary_space) # TODO: split up the nc
 
 # init surface (slab) model components
 # ClimaLSM unregistered:
-Pkg.add( url = "https://github.com/CliMA/ClimaLSM.jl")#, rev = "move_coupled_types")
+Pkg.add( url = "https://github.com/CliMA/ClimaLSM.jl", rev = "albedo_models")
 #Pkg.develop(path="../../../../ClimaLSM.jl")
 
 include("bucket/bucket_init.jl")
@@ -59,7 +59,7 @@ bucket_sim = bucket_init(FT, FT.(tspan); dt = FT(Δt_cpl), space = boundary_spac
 include("slab/slab_utils.jl")
 
 include("slab_ocean/slab_init.jl")
-prescribed_sst = false
+prescribed_sst = true
 if prescribed_sst == true
     SST = ncreader_rll_to_cgll_from_space(FT, "data/sst.nc", "SST", boundary_space)  # a sample SST field from https://gdex.ucar.edu/dataset/158_asphilli.html
     SST = swap_space!(SST, axes(mask)) .* (abs.(mask .- 1)) .+ FT(273.15) # TODO: avoids the "space not the same instance" error
@@ -71,7 +71,7 @@ else
 end
 
 include("slab_ice/slab_init.jl")
-prescribed_sic = false
+prescribed_sic = true
 if prescribed_sic == true
     # sample SST field
     SIC = ncreader_rll_to_cgll_from_space(FT, "data/sic.nc", "SEAICE", boundary_space)
@@ -85,6 +85,8 @@ end
 T_S = ClimaCore.Fields.zeros(boundary_space) # temperature
 z0m_S = ClimaCore.Fields.zeros(boundary_space)
 z0b_S = ClimaCore.Fields.zeros(boundary_space)
+ρ_sfc = ClimaCore.Fields.zeros(boundary_space)
+q_sfc = ClimaCore.Fields.zeros(boundary_space)
 
 F_A = ClimaCore.Fields.zeros(boundary_space) # aerodynamic turbulent fluxes
 F_E = ClimaCore.Fields.zeros(boundary_space) # evaporation due to turbulent fluxes
@@ -105,9 +107,8 @@ function atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args
     dummmy_remap!(dF_A, atmos_sim.integrator.p.∂F_aero∂T_sfc)
 end
 
-function bucket_pull!(bucket_sim, F_A, F_E, F_R)
-    # stand in for \rho sfc computation
-    @. bucket_sim.integrator.p.bucket.ρ_sfc = FT(1.1)
+function bucket_pull!(bucket_sim, F_A, F_E, F_R, ρ_sfc)
+    @. bucket_sim.integrator.p.bucket.ρ_sfc = ρ_sfc
     @. bucket_sim.integrator.p.bucket.SHF = F_A
     @. bucket_sim.integrator.p.bucket.LHF = FT(0.0)
     @. bucket_sim.integrator.p.bucket.E = F_E
@@ -176,9 +177,23 @@ function atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, 
         dummmy_remap!(z0b_S, combined_field)
         
     end
-
+    # Compute ρ_sfc based atmos properties at lowest level
+    set_ρ_sfc!(ρ_sfc, T_S, atmos_sim.integrator)
+    # Now compute ocean and sea ice q_sat
+    ocean_q_sfc = TD.q_vap_saturation_generic.(atmos_sim.integrator.p.params, slab_ocean_sim.integrator.u.T_sfc, ρ_sfc, TD.Liquid())
+    sea_ice_q_sfc = TD.q_vap_saturation_generic.(atmos_sim.integrator.p.params, slab_ice_sim.integrator.u.T_sfc, ρ_sfc, TD.Ice())
+    # Pull q_sfc from land, and compute q_sfc on surface with it and the above computed values.
+    parent(combined_field) .=
+        combine_surface.(
+            parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2)),
+            parent(bucket_sim.integrator.p.bucket.q_sfc),
+            parent(ocean_q_sfc),
+            parent(sea_ice_q_sfc),
+        )
+    dummmy_remap!(q_sfc, combined_field)
+    
     # calculate turbulent fluxes on atmos grid and save in atmos cache
-    info_sfc = (; T_sfc = T_S, z0m = z0m_S, z0b = z0b_S, ice_mask = slab_ice_sim.integrator.p.ice_mask)
+    info_sfc = (; T_sfc = T_S, ρ_sfc = ρ_sfc, q_sfc = q_sfc, z0m = z0m_S, z0b = z0b_S, ice_mask = slab_ice_sim.integrator.p.ice_mask)
     # This should also need q_sfc - currently it assumes q_sfc = q_sat
     calculate_surface_fluxes_atmos_grid!(atmos_sim.integrator, info_sfc)
 end
@@ -186,7 +201,7 @@ end
 # init coupling
 atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST)
 atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args)
-bucket_pull!(bucket_sim, F_A, F_E, F_R)
+bucket_pull!(bucket_sim, F_A, F_E, F_R, ρ_sfc)
 reinit!(atmos_sim.integrator)
 reinit!(bucket_sim.integrator)
 if (prescribed_sst !== true) && (prescribed_sic == true)

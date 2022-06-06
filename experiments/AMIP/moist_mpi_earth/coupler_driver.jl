@@ -214,26 +214,26 @@ reinit!(slab_ice_sim.integrator)
 if !is_distributed
     check_conservation_callback(CS, atmos_sim, bucket_sim, F_A .+ F_R, F_E)
 end
-# At this stage, the integrators all have dY(0) computed based on stuff stored in aux, Y0, etc. - dE is up to date
-# Then we need to update aux to t1, because in the next step!, Y(1) will be computed based on Y0 and dY(0), and then
-# dY(1) will be computed using aux(1), Y(1), t(1)
-# But how to update aux to t(1) without Y(1)??
+# At this stage, the integrators all have dY(0) computed based p(0), Y(0), t(0)
 @show "Starting coupling loop"
 walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     @show t
     ## Atmos
     atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST);
-
+    # set ρ_sfc(T_sfc(i-1)). Get fluxes based on T_sfc(i-1), q_sfc(i)
+    # Compute Y(i) from dY(i-1). comute dY(i) from Y(i) and p(i-1).
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true); # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
  
     #clip TODO: this is bad!! > limiters
     parent(atmos_sim.integrator.u.c.ρq_tot) .= heaviside.(parent(atmos_sim.integrator.u.c.ρq_tot)); # negligible for total energy cons
 
-    # coupler_push!: get accumulated fluxes from atmos in the surface fields
+    # coupler_push!: eventually, atmos.p will have accumulate energy and water fluxes, which will be pushed to F_a, F_E, etc.
+    # Right now, these are the same as atmos.p from before the atmos step!
     atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args);
 
     ## Bucket Land
     bucket_pull!(bucket_sim, F_A, F_E, F_R);
+    # Compute Y(i) from dY(i-1). q_sfc computed based on T_sfc(i), ρ_sfc(i-1). compute dY(i) from Y(i) and mixed p(i-1) and p(i) 
     step!(bucket_sim.integrator, t - bucket_sim.integrator.t, true);
 
     ## Slab ocean

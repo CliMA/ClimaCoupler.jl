@@ -85,7 +85,7 @@ dss_callback = FunctionCallingCallback(dss_func, func_start = true)
 function cpl_run()
 
     # timestepping
-    t_start, t_end = (0.0, 1e4)
+    t_start, t_end = (0.0, 5e2)
     cpl_Δt = 0.1
     saveat = 1e2
     atm_nsteps, ocn_nsteps, lnd_nsteps = (5, 1, 1)
@@ -164,12 +164,12 @@ atm_integ, ocn_integ, lnd_integ = cpl_run()
 
 sol = atm_integ.sol
 
-dirname = "sea_breeze_2d"
-path = joinpath(@__DIR__, "output", dirname)
-mkpath(path)
+# dirname = "sea_breeze_2d"
+# path = joinpath(@__DIR__, "output", dirname)
+# mkpath(path)
 
-using JLD2
-save(joinpath(path, "last_sim.jld2"), "atm_integ", atm_integ, "ocn_integ", ocn_integ, "lnd_integ", lnd_integ)
+# using JLD2
+# save(joinpath(path, "last_sim.jld2"), "atm_integ", atm_integ, "ocn_integ", ocn_integ, "lnd_integ", lnd_integ)
 
 # post-processing
 # import Plots, ClimaCorePlots

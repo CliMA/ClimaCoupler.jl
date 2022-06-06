@@ -1,0 +1,39 @@
+env:
+  JULIA_VERSION: "1.7.2"
+  OPENMPI_VERSION: "4.0.4"
+  CUDA_VERSION: "11.2"
+  OPENBLAS_NUM_THREADS: 1
+  BUILDKITE_COMMIT: "${BUILDKITE_COMMIT}"
+  BUILDKITE_BRANCH: "${BUILDKITE_BRANCH}"
+  JULIA_DEPOT_PATH: "${BUILDKITE_BUILD_PATH}/${BUILDKITE_PIPELINE_SLUG}/depot/cpu"
+
+agents:
+  config: cpu
+  queue: central
+  slurm_ntasks: 1
+
+steps:
+  - label: "init environment :computer:"
+    key: "init_cpu_env"
+    command:
+      - "echo $$JULIA_DEPOT_PATH"
+      - "julia --project -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project -e 'using Pkg; Pkg.status()'"
+
+      - "julia --project=experiments/ClimaCore/sea_breeze -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=experiments/ClimaCore/sea_breeze -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=experiments/ClimaCore/sea_breeze -e 'using Pkg; Pkg.status()'"
+
+  - wait
+
+  - group: "Integration Tests"
+    steps:
+
+      # - label: "Unit tests"
+      #   command: "julia --color=yes --project=test test/runtests.jl"
+      #   artifact_paths: "test/*"
+
+      - label: "sea_breeze"
+        command: "julia --color=yes --project=experiments/ClimaCore/sea_breeze experiments/ClimaCore/sea_breeze/run.jl"
+        artifact_paths: "sea_breeze/"

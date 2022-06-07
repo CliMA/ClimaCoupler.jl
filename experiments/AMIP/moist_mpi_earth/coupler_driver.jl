@@ -9,7 +9,7 @@ using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
 using LinearAlgebra
 import Test: @test
 using ClimaCore.Utilities: half, PlusHalf
-#using RRTMGP
+
 Pkg.add(PackageSpec(name = "ClimaCore", version = "0.10.3"))
 
 # import coupler utils
@@ -57,7 +57,7 @@ else
 end
 
 include("slab_ice/slab_init.jl")
-prescribed_sic = false
+prescribed_sic = true
 if prescribed_sic == true
     # sample SST field
     SIC = ncreader_rll_to_cgll_from_space(FT, "data/sic.nc", "SEAICE", boundary_space)
@@ -68,7 +68,7 @@ else
 end
 
 # init coupler
-coupler_sim = CouplerSimulation(Δt_cpl, integrator.t, boundary_space, FT)
+coupler_sim = CouplerSimulation(Δt_cpl, integrator.t, boundary_space, FT, mask)
 
 # init coupler's boundary fields for regridding (TODO: technically this can be bypassed by directly rigridding on model grids)
 T_S = ClimaCore.Fields.zeros(boundary_space) # temperature
@@ -80,7 +80,7 @@ F_R = ClimaCore.Fields.zeros(boundary_space) # radiative fluxes
 dF_A = ClimaCore.Fields.zeros(boundary_space) # aerodynamic turbulent fluxes
 
 # init conservation info collector
-CS = OnlineConservationCheck([], [], [])
+CS = OnlineConservationCheck([], [], [], [])
 
 # coupling loop
 @show "Starting coupling loop"
@@ -196,7 +196,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     step!(slab_ice_sim.integrator, t - slab_ice_sim.integrator.t, true)
 
     if !is_distributed && (@isdefined CS)
-        check_conservation(CS, coupler_sim, atmos_sim, slab_sim, slab_ocean_sim)
+        check_conservation(CS, coupler_sim, atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim)
     end
 end
 
@@ -213,14 +213,14 @@ include("mpi/mpi_postprocess.jl")
 
 # conservation  check
 if (!is_distributed || (is_distributed && ClimaComms.iamroot(comms_ctx))) && (@isdefined CSoffline)
-    check_conservation(CSoffline, coupler_sim, atmos_sim, slab_sim, slab_ocean_sim, nothing, "conservation.png")
+    check_conservation(CSoffline, coupler_sim, atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim, "conservation.png")
 end
 
-# animations
-include("coupler_utils/viz_explorer.jl")
-plot_anim = nothing
-plot_anim !== nothing
-plot_anim()
+# # animations
+# include("coupler_utils/viz_explorer.jl")
+# plot_anim = nothing
+# plot_anim !== nothing
+# plot_anim()
 
 # TODO:
 # - update MPI, conservation plots 

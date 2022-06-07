@@ -1,11 +1,12 @@
 # most of these functions are temporary helpers until upstream issues are resolved
 
 # TODO: unify with coupler interface
-struct CouplerSimulation{I, F, B, T}
+struct CouplerSimulation{I, F, B, T, M}
     Δt::I
     t::F
     boundary_space::B
     FT::T
+    mask::M
 end
 
 get_u(sim, t) = Geometry.UVVector.(sim.integrator.sol.u[t].c.uₕ).components.data.:1

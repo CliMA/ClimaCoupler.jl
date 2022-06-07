@@ -137,6 +137,7 @@ function slab_ice_init(
     space = nothing,
     mask = nothing,
     prescribed_sic = nothing,
+    ocean_params = (; ρ = FT(1e3), c = FT(4e3), h = FT(1) )
 ) where {FT}
 
     params = IceSlabParameters(
@@ -146,11 +147,11 @@ function slab_ice_init(
         FT(280.0),
         FT(1e-3),
         FT(1e-5),
-        FT(4e6),
+        FT(ocean_params.ρ * ocean_params.c), #rho c
         FT(120),
         FT(273.16),
         FT(3e8),
-        FT(1),
+        FT(ocean_params.h), # h_ml
         FT(273.16),
         FT(2),
         FT(0.38),

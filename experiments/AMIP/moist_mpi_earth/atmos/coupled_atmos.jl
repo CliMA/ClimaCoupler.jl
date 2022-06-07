@@ -84,7 +84,6 @@ function vertical_diffusion_boundary_layer_coupled_cache(Y; Cd = FT(0.0014), Ch 
     )
 end
 
-# TODO: flip order so that NamedTuple() is fallback.
 additional_cache(Y, params, dt; use_tempest_mode = false) = merge(
     hyperdiffusion_cache(Y; κ₄ = FT(2e17), use_tempest_mode),
     sponge ? rayleigh_sponge_cache(Y, dt) : NamedTuple(),
@@ -114,6 +113,7 @@ additional_tendency!(Yₜ, Y, p, t) = begin
     rad_flux && rrtmgp_model_tendency!(Yₜ, Y, p, t)
 end
 
+# switch on required additional tendencies / parameterizations
 parsed_args["microphy"] = "0M"
 parsed_args["forcing"] = nothing
 parsed_args["idealized_h2o"] = false
@@ -123,66 +123,9 @@ parsed_args["hyperdiff"] = true
 parsed_args["config"] = "sphere"
 parsed_args["moist"] = "equil"
 
-function array2field(array, space) # reversing the RRTMGP function field2array
+function array2field(array, space) # reversing the RRTMGP function field2array (TODO: this now exists in ClimaAtmos)
     FT = eltype(array)
     Nq = Spaces.Quadratures.polynomial_degree(space.horizontal_space.quadrature_style) + 1
     ne = space.horizontal_space.topology.mesh.ne
     return Fields.Field(VIJFH{FT, Nq}(reshape(array, size(array, 1), Nq, Nq, 1, ne*ne*6)), space)
 end
-
-# TODO:
-# cannot plot on face sfc
-# cannot do .+ of faces
-
-#= this checks out
-f_field = similar(integrator.u.f.w)
-parent(f_field) .= FT(1)
-
-c_field = similar(integrator.u.c.ρ)
-parent(c_field) .= FT(1)
-
-##### CONSERVATION check
-times = 0:saveat:t_end
-solu_atm = sol_atm.u
-h_space = make_horizontal_space(horizontal_mesh, quad, nothing) #TODO move this to the beginning (once same the instance error sorted)
-solu_slab = Fields.FieldVector(T_sfc = [Fields.Field(Fields.field_values(u.T_sfc), h_space) for u in sol_slab.u])
-solu_slab_ocean = Fields.FieldVector(T_sfc = [Fields.Field(Fields.field_values(u.T_sfc), h_space) for u in sol_slab_ocean.u])
-
-
-LWu_TOA = Fields.level(array2field(FT.(integrator.p.rrtmgp_model.face_lw_flux_up), face_space), 10+half)
-SWd_TOA = Fields.level(array2field(FT.(integrator.p.rrtmgp_model.face_sw_flux_dn), face_space), 10+half)
-SWu_TOA = Fields.level(array2field(FT.(integrator.p.rrtmgp_model.face_sw_flux_up), face_space), 10+half)
-
-coord = Fields.coordinate_field(sp)
-
-z = Fields.coordinate_field(face_space).z
-
-radiation_sources = - sum(SWd_TOA .- LWu_TOA .- SWu_TOA) ./ 2.5e3
-radiation_sources_tsrs = radiation_sources * times
-
-atmos_e = [sum(u.c.ρe) for u in solu_atm] .+ radiation_sources_tsrs # J 
-z = parent(ClimaCore.Fields.coordinate_field(atmos_sim.domain.face_space).z)
-Δz_1 = z[2] - z[1]
-slab_e = [sum(get_slab_energy(slab_sim, u)) for u in solu_slab] 
-slab_ocean_e = [sum(get_slab_energy(slab_ocean_sim, u)) for u in solu_slab_ocean] 
-
-
-
-diff_ρe_tot_atmos = atmos_e .- atmos_e[3]
-diff_ρe_tot_slab = (slab_e .- slab_e[3])
-diff_ρe_tot_slab_ocean = (slab_ocean_e .- slab_ocean_e[3])
-
-Plots.plot(diff_ρe_tot_atmos, label = "atmos")
-Plots.plot!(diff_ρe_tot_slab, label = "slab")
-Plots.plot!(diff_ρe_tot_slab_ocean, label = "slab_ocean")
-tot = atmos_e .+ slab_ocean_e .+ slab_e
-times_days = floor.(times ./ (24*60*60))
-Plots.plot!(tot .- tot[1], label = "tot", xlabel = "time [days]", ylabel = "energy(t) - energy(t=0) [J]", xticks = ( collect(1:length(times))[1:50:end], times_days[1:50:end]) )
-Plots.savefig(figname)
-
-# NB
-sp= axes(SWu_TOA)
-4π*6.371229f6^2 == sum(ones(sp)) / 2.5e3
-
-
-=#

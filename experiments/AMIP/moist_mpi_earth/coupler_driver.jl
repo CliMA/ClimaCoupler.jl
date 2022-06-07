@@ -9,7 +9,7 @@ using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
 using LinearAlgebra
 import Test: @test
 using ClimaCore.Utilities: half, PlusHalf
-using RRTMGP
+#using RRTMGP
 Pkg.add(PackageSpec(name = "ClimaCore", version = "0.10.3"))
 
 # import coupler utils
@@ -57,15 +57,18 @@ else
 end
 
 include("slab_ice/slab_init.jl")
-prescribed_sic = true
+prescribed_sic = false
 if prescribed_sic == true
     # sample SST field
     SIC = ncreader_rll_to_cgll_from_space(FT, "data/sic.nc", "SEAICE", boundary_space)
     SIC = swap_space!(SIC, axes(mask)) .* (abs.(mask .- 1))
     slab_ice_sim = slab_ice_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, prescribed_sic = SIC)
 else
-    slab_ice_sim = slab_ice_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat)
+    slab_ice_sim = slab_ice_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ocean_params = slab_ocean_sim.integrator.p.params)
 end
+
+# init coupler
+coupler_sim = CouplerSimulation(Δt_cpl, integrator.t, boundary_space, FT)
 
 # init coupler's boundary fields for regridding (TODO: technically this can be bypassed by directly rigridding on model grids)
 T_S = ClimaCore.Fields.zeros(boundary_space) # temperature
@@ -77,7 +80,7 @@ F_R = ClimaCore.Fields.zeros(boundary_space) # radiative fluxes
 dF_A = ClimaCore.Fields.zeros(boundary_space) # aerodynamic turbulent fluxes
 
 # init conservation info collector
-CS = ConservationCheck([], [])
+CS = OnlineConservationCheck([], [], [])
 
 # coupling loop
 @show "Starting coupling loop"
@@ -142,7 +145,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     calculate_surface_fluxes_atmos_grid!(atmos_sim.integrator, info_sfc)
 
     atmos_sim.integrator.p.rrtmgp_model.surface_temperature .= field2array(T_S) # supplied to atmos for radiation
-    
+
     # run 
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
 
@@ -192,10 +195,9 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     # run
     step!(slab_ice_sim.integrator, t - slab_ice_sim.integrator.t, true)
 
-    if !is_distributed
-        check_conservation_callback(CS, atmos_sim, slab_sim)
+    if !is_distributed && (@isdefined CS)
+        check_conservation(CS, coupler_sim, atmos_sim, slab_sim, slab_ocean_sim)
     end
-
 end
 
 @show walltime
@@ -210,8 +212,8 @@ sol_slab_ocean = prescribed_sst !== true ? slab_ocean_sim.integrator.sol : nothi
 include("mpi/mpi_postprocess.jl")
 
 # conservation  check
-if !is_distributed || (is_distributed && ClimaComms.iamroot(comms_ctx))
-    conservation_plot(atmos_sim, slab_sim, solu_atm, solu_slab, "conservation.png")
+if (!is_distributed || (is_distributed && ClimaComms.iamroot(comms_ctx))) && (@isdefined CSoffline)
+    check_conservation(CSoffline, coupler_sim, atmos_sim, slab_sim, slab_ocean_sim, nothing, "conservation.png")
 end
 
 # animations
@@ -228,6 +230,9 @@ plot_anim()
 # - replace heavisides with smooth functions
 # - test dynamical ea ice model 
 # - test sea ice for conservation with slab ocean
+# cannot plot on face sfc
+# cannot do .+ of faces
+# double check precise posiiton of the boundary space
 
 # Next PR
 # - keep adding coupler specific interface

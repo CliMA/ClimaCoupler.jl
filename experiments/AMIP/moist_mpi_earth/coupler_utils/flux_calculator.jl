@@ -96,7 +96,7 @@ function variable_T_saturated_surface_coefs(ts_int, uₕ_int, z_int, z_sfc, T_sf
 
     # calculate all fluxes
     tsf = SF.surface_conditions(params, sc, SF.UniversalFunctions.Businger())
-    
+
     E = SF.evaporation(sc, params, tsf.Ch)
 
     return (; shf = tsf.shf, lhf = tsf.lhf, E = E, ρτxz = tsf.ρτxz, ρτyz = tsf.ρτyz)
@@ -125,7 +125,7 @@ function constant_T_saturated_surface_coefs_coupled(ts_int, uₕ_int, z_int, z_s
     # calculate all fluxes
     tsf = SF.surface_conditions(params, sc, SF.UniversalFunctions.Businger()) # here can specify tol, maxiter
 
-    E = SF.evaporation(sc, params, tsf.Ch) 
+    E = SF.evaporation(sc, params, tsf.Ch)
 
     return (; shf = tsf.shf, lhf = tsf.lhf, E = E, ρτxz = tsf.ρτxz, ρτyz = tsf.ρτyz)
 end

@@ -18,4 +18,3 @@ function swap_space!(field, new_space)
 end
 
 heaviside(var) = var < 0 ? 0 : var
-

@@ -127,5 +127,5 @@ function array2field(array, space) # reversing the RRTMGP function field2array (
     FT = eltype(array)
     Nq = Spaces.Quadratures.polynomial_degree(space.horizontal_space.quadrature_style) + 1
     ne = space.horizontal_space.topology.mesh.ne
-    return Fields.Field(VIJFH{FT, Nq}(reshape(array, size(array, 1), Nq, Nq, 1, ne*ne*6)), space)
+    return Fields.Field(VIJFH{FT, Nq}(reshape(array, size(array, 1), Nq, Nq, 1, ne * ne * 6)), space)
 end

@@ -64,7 +64,14 @@ if prescribed_sic == true
     SIC = swap_space!(SIC, axes(mask)) .* (abs.(mask .- 1))
     slab_ice_sim = slab_ice_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, prescribed_sic = SIC)
 else
-    slab_ice_sim = slab_ice_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ocean_params = slab_ocean_sim.integrator.p.params)
+    slab_ice_sim = slab_ice_init(
+        FT,
+        tspan,
+        dt = Δt_cpl,
+        space = boundary_space,
+        saveat = saveat,
+        ocean_params = slab_ocean_sim.integrator.p.params,
+    )
 end
 
 # init coupler

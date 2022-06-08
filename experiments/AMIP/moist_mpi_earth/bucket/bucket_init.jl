@@ -151,10 +151,9 @@ function bucket_init(
     # this needs to be initialized!!! Turbulent surface fluxes need this set to be computed.
     ρ_sfc = zeros(space) .+ FT(1.1)
     P_liq = zeros(space) .+ FT(0.0)
-    α = surface_albedo.(Ref(albedo), coords, Y.bucket.S, model.parameters.S_c)
-    variable_names = (propertynames(p.bucket)..., :ρ_sfc, :P_liq, :α)
+    variable_names = (propertynames(p.bucket)..., :ρ_sfc, :P_liq)
     orig_fields = map(x -> getproperty(p.bucket,x), propertynames(p.bucket))
-    fields = (orig_fields..., ρ_sfc, P_liq, α)
+    fields = (orig_fields..., ρ_sfc, P_liq)
     p_new = ClimaCore.Fields.FieldVector(; :bucket => (;zip(variable_names, fields)...))
    # p_new.bucket.SHF .= FT(-12.0)
     ode_function! = make_ode_function(model)

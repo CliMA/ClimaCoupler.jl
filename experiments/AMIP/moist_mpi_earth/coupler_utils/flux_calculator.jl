@@ -16,6 +16,7 @@ function ρ_sfc_at_point(params, ts_int, T_sfc)
     ρ_sfc = ρ_air * (T_sfc / T_int)^(TD.cv_m(params, ts_int) / Rm_int)  # use ideal gas law and hydrostatic balance to extrapolate for surface density
     return ρ_sfc
 end
+#sea_ice_q_sfc = TD.q_vap_saturation_generic.(atmos_sim.integrator.p.params, T_sfc1, ρ_sfc1, TD.Ice())
 
     
 """
@@ -75,7 +76,8 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     end
 
     # calculate gradient - TODO: make this just optional (only required by stub sea ice model)
-    ΔT_sfc = FT(0.1) # following FMS
+    ΔT_sfc = FT(0.1) # following FMS    
+    # needed for non SIC prescribed ice
     tsf1 =
         constant_T_saturated_surface_coefs_coupled.(
             Spaces.level(ᶜts, 1),

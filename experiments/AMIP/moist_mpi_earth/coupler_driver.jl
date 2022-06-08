@@ -2,7 +2,7 @@
 # don't forget to run with threading: julia --project --threads 8 (MPI not that useful for debugging coarse runs)
 
 # import packages
-
+# Note we are setting SIC = 0 because we get energy errors when it is not.
 using Pkg
 import SciMLBase: step!
 using OrdinaryDiffEq
@@ -32,7 +32,7 @@ include("mpi/mpi_init.jl")
 
 # init atmos model component
 include("atmos/atmos_init1.jl")
-# To change FT - go to driver_new.jl and change it by hand, then continue on!
+# To change FT - we think, go to driver_new.jl and change it by hand, then continue on!
 # To turn radiation to gray - coupler_atmos and in driver_new
 include("atmos/atmos_init2.jl")
 atmos_sim = atmos_init(FT, Y, spaces, integrator, params = params);
@@ -46,8 +46,7 @@ boundary_space = ClimaCore.Fields.level(atmos_sim.domain.face_space, half) # glo
 # init land-sea mask
 infile = "data/seamask.nc"
 mask = LandSeaMask(FT, infile, "LSMASK", boundary_space) # TODO: split up the nc file to individual times for faster computation
-mask .= FT(1.0)
-
+#mask = ones(boundary_space)
 # init surface (slab) model components
 # ClimaLSM unregistered:
 Pkg.add( url = "https://github.com/CliMA/ClimaLSM.jl", rev = "albedo_models")
@@ -59,7 +58,7 @@ bucket_sim = bucket_init(FT, FT.(tspan); dt = FT(Δt_cpl), space = boundary_spac
 include("slab/slab_utils.jl")
 
 include("slab_ocean/slab_init.jl")
-prescribed_sst = true
+prescribed_sst = false
 if prescribed_sst == true
     SST = ncreader_rll_to_cgll_from_space(FT, "data/sst.nc", "SST", boundary_space)  # a sample SST field from https://gdex.ucar.edu/dataset/158_asphilli.html
     SST = swap_space!(SST, axes(mask)) .* (abs.(mask .- 1)) .+ FT(273.15) # TODO: avoids the "space not the same instance" error
@@ -73,12 +72,19 @@ end
 include("slab_ice/slab_init.jl")
 prescribed_sic = true
 if prescribed_sic == true
-    # sample SST field
-    SIC = ncreader_rll_to_cgll_from_space(FT, "data/sic.nc", "SEAICE", boundary_space)
-    SIC = swap_space!(SIC, axes(mask)) .* (abs.(mask .- 1))
-    slab_ice_sim = slab_ice_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, prescribed_sic = SIC)
+    SIC = zeros(boundary_space)
+    # SIC = ncreader_rll_to_cgll_from_space(FT, "data/sic.nc", "SEAICE", boundary_space)
+#    SIC = swap_space!(SIC, axes(mask)) .* (abs.(mask .- 1)) # zero over land, -# over ocean
+     slab_ice_sim = slab_ice_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, prescribed_sic = SIC)
 else
-    slab_ice_sim = slab_ice_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat)
+    slab_ice_sim = slab_ice_init(
+        FT,
+        tspan,
+        dt = Δt_cpl,
+        space = boundary_space,
+        saveat = saveat,
+        ocean_params = slab_ocean_sim.integrator.p.params,
+    )
 end
 
 # init coupler's boundary fields for regridding (TODO: technically this can be bypassed by directly rigridding on model grids)
@@ -94,7 +100,7 @@ F_R = ClimaCore.Fields.zeros(boundary_space) # radiative fluxes
 dF_A = ClimaCore.Fields.zeros(boundary_space) # aerodynamic turbulent fluxes
 
 # init conservation info collector
-CS = ConservationCheck([], [],[],[],[])
+CS = OnlineConservationCheck([], [],[],[])
 # coupling methods
 function atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args)
     F_A .= ClimaCore.Fields.zeros(boundary_space)
@@ -191,7 +197,12 @@ function atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, 
             parent(sea_ice_q_sfc),
         )
     dummmy_remap!(q_sfc, combined_field)
-    
+
+    atmos_sim.integrator.p.rrtmgp_model.surface_temperature .= field2array(T_S) # supplied to atmos for radiation
+    # add albedo here
+    coords = ClimaCore.Fields.coordinate_field(axes(bucket_sim.integrator.u.bucket.S))
+    α_land = surface_albedo.(Ref(bucket_sim.params.albedo), coords, bucket_sim.integrator.u.bucket.S, bucket_sim.params.S_c)
+
     # calculate turbulent fluxes on atmos grid and save in atmos cache
     info_sfc = (; T_sfc = T_S, ρ_sfc = ρ_sfc, q_sfc = q_sfc, z0m = z0m_S, z0b = z0b_S, ice_mask = slab_ice_sim.integrator.p.ice_mask)
     # This should also need q_sfc - currently it assumes q_sfc = q_sat
@@ -199,6 +210,7 @@ function atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, 
 end
 ########
 # init coupling
+coupler_sim = CouplerSimulation(Δt_cpl, integrator.t, boundary_space, FT, mask)
 atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST)
 atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args)
 bucket_pull!(bucket_sim, F_A, F_E, F_R, ρ_sfc)
@@ -211,8 +223,8 @@ end
 ice_pull!(slab_ice_sim, F_A, F_R, dF_A)
 reinit!(slab_ice_sim.integrator)
 
-if !is_distributed
-    check_conservation_callback(CS, atmos_sim, bucket_sim, F_A .+ F_R, F_E)
+if !is_distributed && (@isdefined CS)
+        check_conservation(CS, coupler_sim, atmos_sim, bucket_sim, slab_ocean_sim, slab_ice_sim)
 end
 # At this stage, the integrators all have dY(0) computed based p(0), Y(0), t(0)
 @show "Starting coupling loop"
@@ -232,7 +244,7 @@ walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args);
 
     ## Bucket Land
-    bucket_pull!(bucket_sim, F_A, F_E, F_R);
+    bucket_pull!(bucket_sim, F_A, F_E, F_R, ρ_sfc);
     # Compute Y(i) from dY(i-1). q_sfc computed based on T_sfc(i), ρ_sfc(i-1). compute dY(i) from Y(i) and mixed p(i-1) and p(i) 
     step!(bucket_sim.integrator, t - bucket_sim.integrator.t, true);
 
@@ -244,14 +256,34 @@ walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     ## Slab ice
     step!(slab_ice_sim.integrator, t - slab_ice_sim.integrator.t, true)
 
-    if !is_distributed
-        check_conservation_callback(CS, atmos_sim, bucket_sim, F_A .+ F_R, F_E)
+    if !is_distributed && (@isdefined CS)
+        check_conservation(CS, coupler_sim, atmos_sim, bucket_sim, slab_ocean_sim, slab_ice_sim)
     end
 
 end
 
 @show walltime
+diff_ρe_tot_atmos = CS.ρe_tot_atmos .- CS.ρe_tot_atmos[1]
+diff_ρe_tot_slab = (CS.ρe_tot_land .- CS.ρe_tot_land[1])
+diff_ρe_tot_slab_ocean = (CS.ρe_tot_ocean .- CS.ρe_tot_ocean[1])
+diff_ρe_tot_slab_seaice = (CS.ρe_tot_seaice .- CS.ρe_tot_seaice[1])
+times = tspan[1]:coupler_sim.Δt:tspan[end]
+plot1 = Plots.plot(times,diff_ρe_tot_atmos, label = "atmos")
+Plots.plot!(times,diff_ρe_tot_slab, label = "land")
+Plots.plot!(times,diff_ρe_tot_slab_ocean, label = "ocean")
+Plots.plot!(times,diff_ρe_tot_slab_seaice, label = "seaice")
+tot = CS.ρe_tot_atmos .+ CS.ρe_tot_ocean .+ CS.ρe_tot_land .+ CS.ρe_tot_seaice
 
+Plots.plot!(times, 
+    tot .- tot[1],
+    label = "tot",
+    xlabel = "time [s]",
+    ylabel = "energy(t) - energy(t=0) [J]",
+        xticks = (collect(1:length(times))[1:50:end], times[1:50:end]),
+            )
+plot2 = Plots.plot(times, (tot .- tot[1]) ./ tot[1], ylabel = "Fractional Energy Error", label = "",xlabel = "time [s]")
+plot(plot1,plot2)
+savefig("conservation_land_ocean_atmos.png")
 @show "Postprocessing"
 # collect solutions
 sol_atm = atmos_sim.integrator.sol
@@ -261,15 +293,13 @@ sol_slab_ocean = prescribed_sst !== true ? slab_ocean_sim.integrator.sol : nothi
 
 include("mpi/mpi_postprocess.jl")
 
-# conservation  check
-#if !is_distributed || (is_distributed && ClimaComms.iamroot(comms_ctx))
-#    times = Array(tspan[1]:Δt_cpl:tspan[2])
-#    conservation_plot(CS, times, "conservation")
-#end
 
 # animations
-include("coupler_utils/viz_explorer.jl")
-plot_anim()
+if debug == false
+    include("coupler_utils/viz_explorer.jl")
+    plot_anim()
+end
+
 
 # TODO:
 # - update MPI, conservation plots 

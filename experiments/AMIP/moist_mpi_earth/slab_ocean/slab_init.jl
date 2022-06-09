@@ -9,6 +9,7 @@ struct OceanSlabParameters# <: CLIMAParameters.AbstractEarthParameterSet{F}
     T_init::FT
     z0m::FT
     z0b::FT
+    α::FT
 end
 
 # init simulation
@@ -41,10 +42,8 @@ function slab_ocean_rhs!(dY, Y, Ya, t)
     Slab ocean:
     ∂_t T_sfc = F_aero + G
     """
-    p, F_aero, F_rad, mask = Ya
-
-    rhs = @. (F_aero + F_rad) / (p.h * p.ρ * p.c)
-    parent(dY.T_sfc) .= apply_mask.(parent(mask), <, parent(rhs), FT(0))
+    p, F_aero, F_rad = Ya
+    dY.T_sfc .= @. (F_aero + F_rad) / (p.h * p.ρ * p.c)
 end
 
 function slab_ocean_init(
@@ -56,13 +55,12 @@ function slab_ocean_init(
     dt = 0.02,
     saveat = 1.0e10,
     space = nothing,
-    mask = nothing,
 ) where {FT}
 
-    params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5))
+    params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
 
     Y, space = slab_ocean_space_init(FT, space, params)
-    Ya = (params = params, F_aero = ClimaCore.Fields.zeros(space), F_rad = ClimaCore.Fields.zeros(space), mask = mask) #auxiliary
+    Ya = (params = params, F_aero = ClimaCore.Fields.zeros(space), F_rad = ClimaCore.Fields.zeros(space))
     problem = OrdinaryDiffEq.ODEProblem(slab_ocean_rhs!, Y, tspan, Ya)
     integrator = OrdinaryDiffEq.init(problem, stepper, dt = dt, saveat = saveat)
 

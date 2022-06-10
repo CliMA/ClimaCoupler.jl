@@ -21,7 +21,7 @@ include("coupler_utils/masker.jl")
 include("coupler_utils/general_helper.jl")
 
 # initiate spatial and temporal info
-debug_mode = true
+debug_mode = false
 t_end = debug_mode ? 100e2 : 2592000 * 1
 Δt_cpl = 2e2
 saveat = debug_mode ? Δt_cpl * 1 : Δt_cpl * 100
@@ -76,7 +76,7 @@ include("./push_pull.jl")
 CS = OnlineConservationCheck([], [],[],[], [],[],[],[])
 # init coupling
 coupler_sim = CouplerSimulation(Δt_cpl, integrator.t, boundary_space, FT, mask)
-atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST)
+atmos_pull!(coupler_sim, atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST, univ_mask)
 atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, parsed_args)
 bucket_pull!(bucket_sim, F_A, F_E, F_R, ρ_sfc)
 reinit!(atmos_sim.integrator)
@@ -89,7 +89,7 @@ ice_pull!(slab_ice_sim, F_A, F_R)
 reinit!(slab_ice_sim.integrator)
 
 if !is_distributed && (@isdefined CS)
-        check_conservation(CS, coupler_sim, atmos_sim, bucket_sim, slab_ocean_sim, slab_ice_sim, F_A .+ F_R)
+        check_conservation(CS, coupler_sim, atmos_sim, bucket_sim, slab_ocean_sim, slab_ice_sim, F_A .+ F_R, univ_mask)
 end
 # At this stage, the integrators all have dY(0) computed based p(0), Y(0), t(0)
 # Y(1) - Y(0) = dY(0) *dt
@@ -98,7 +98,7 @@ walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     @show t
     ## Atmos
     # sets p = p(0)
-    atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST);
+    atmos_pull!(coupler_sim, atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST, univ_mask);
 
     #Y(0) -> Y(1) and then computes dY(1) from Y(1) it would be using p(0) still
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true); # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
@@ -123,7 +123,7 @@ walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     step!(slab_ice_sim.integrator, t - slab_ice_sim.integrator.t, true)
 
     if !is_distributed && (@isdefined CS)
-        check_conservation(CS, coupler_sim, atmos_sim, bucket_sim, slab_ocean_sim, slab_ice_sim, F_A .+ F_R)
+        check_conservation(CS, coupler_sim, atmos_sim, bucket_sim, slab_ocean_sim, slab_ice_sim, F_A .+ F_R, univ_mask)
     end
 
 end

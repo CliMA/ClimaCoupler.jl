@@ -15,11 +15,12 @@ end
 function check_conservation(
     cs::OnlineConservationCheck,
     coupler_sim,
-    atmos_sim = nothing,
-    land_sim = nothing,
-    ocean_sim = nothing,
-    seaice_sim = nothing,
-    F_energy_surf = nothing,
+    atmos_sim,
+    land_sim,
+    ocean_sim,
+    seaice_sim,
+    F_energy_surf,
+    univ_mask, 
     radiation = true,
 )
     #R_earth = 6.371229e6
@@ -62,8 +63,8 @@ function check_conservation(
         end
     end
     
-    mask = coupler_sim.mask
-    univ_mask = parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2))
+#    mask = coupler_sim.mask
+ #   univ_mask = parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2))
     ice_mask(u_ice_1, univ_mask) = (univ_mask ≈ FT(-2) ? u_ice_1 : FT(0))
     parent(u_ice) .= ice_mask.(parent(u_ice), univ_mask)
 

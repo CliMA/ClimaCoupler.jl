@@ -9,6 +9,7 @@ albedo = ClimaCore.Fields.zeros(boundary_space)
 F_A = ClimaCore.Fields.zeros(boundary_space) # aerodynamic turbulent fluxes
 F_E = ClimaCore.Fields.zeros(boundary_space) # evaporation due to turbulent fluxes
 F_R = ClimaCore.Fields.zeros(boundary_space) # radiative fluxes
+univ_mask = parent(ClimaCore.Fields.zeros(boundary_space))
 
 # coupling methods
 function atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, parsed_args)
@@ -41,7 +42,7 @@ function ice_pull!(slab_ice_sim, F_A, F_R)
 end
 
 
-function atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst,  z0m_S,  z0b_S, T_S, ocean_params, SST)
+function atmos_pull!(coupler_sim, atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, boundary_space, prescribed_sst,  z0m_S,  z0b_S, T_S, ocean_params, SST, univ_mask)
     combined_field = zeros(boundary_space)
     if prescribed_sst == true
         ocean_p = ocean_params
@@ -50,9 +51,8 @@ function atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, 
         ocean_p = slab_ocean_sim.integrator.p.params
         sst = slab_ocean_sim.integrator.u.T_sfc
     end
-
-    univ_mask = parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2))
-    
+    mask = coupler_sim.mask
+    univ_mask .= parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2))
     parent(combined_field) .=
         combine_surface.(
             univ_mask,

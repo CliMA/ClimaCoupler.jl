@@ -1,3 +1,6 @@
+experiments/AMIP/moist_mpi_earth/Manifest.toml
+experiments/AMIP/moist_mpi_earth/regrid_tmp/*.g
+experiements/AMIP/moist_mpi_earth../*
 
 # Temporary
 *.DS_Store

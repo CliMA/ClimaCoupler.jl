@@ -132,7 +132,7 @@ function bucket_init(
         radlat = coord.lat / FT(180) * pi
         ΔT = FT(0)
         if anomaly == true
-            anom_ampl = FT(0)
+            anom_ampl = FT(0)# this is zero, no anomaly
             lat_0 = FT(60) / FT(180) * pi
             lon_0 = FT(-90) / FT(180) * pi
             radlon = coord.long / FT(180) * pi
@@ -155,7 +155,7 @@ function bucket_init(
     orig_fields = map(x -> getproperty(p.bucket,x), propertynames(p.bucket))
     fields = (orig_fields..., ρ_sfc, P_liq)
     p_new = ClimaCore.Fields.FieldVector(; :bucket => (;zip(variable_names, fields)...))
-   # p_new.bucket.SHF .= FT(-12.0)
+
     ode_function! = make_ode_function(model)
     
     prob = ODEProblem(ode_function!, Y, tspan, p_new)
@@ -163,17 +163,3 @@ function bucket_init(
 
     BucketSimulation(params, Y, space, integrator)
 end
-
-#=
-julia> CS.ρe_tot_bucket[3] .- CS.ρe_tot_bucket[2]
-1.159695886863827e18
-
-julia> CS.ρe_tot_atmos[3] .- CS.ρe_tot_atmos[2]
--1.320762070215426e18
-
-julia> CS.dE_expected[2]
--1.159695884554722e18
-
-julia> CS.dE_expected[3]
--1.320762070886601e18  
-=#

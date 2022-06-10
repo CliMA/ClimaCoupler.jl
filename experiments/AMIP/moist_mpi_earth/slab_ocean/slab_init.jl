@@ -42,19 +42,17 @@ function slab_ocean_rhs!(dY, Y, Ya, t)
     Slab ocean:
     ∂_t T_sfc = F_aero + G
     """
-    p, F_aero, F_rad = Ya
-    dY.T_sfc .= @. (F_aero + F_rad) / (p.h * p.ρ * p.c)
+    (; params, F_aero, F_rad) = Ya
+    dY.T_sfc .= @. (F_aero + F_rad) / (params.h * params.ρ * params.c)
 end
 
 function slab_ocean_init(
     ::Type{FT},
     tspan;
     stepper = Euler(),
-    nelements = 6,
-    npolynomial = 4,
-    dt = 0.02,
-    saveat = 1.0e10,
-    space = nothing,
+    dt,
+    saveat,
+    space,
 ) where {FT}
 
     params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))

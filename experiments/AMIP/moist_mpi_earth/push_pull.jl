@@ -17,7 +17,7 @@ function atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, parsed_args)
     F_E .= ClimaCore.Fields.zeros(boundary_space)
     dummmy_remap!(F_E, atmos_sim.integrator.p.dif_flux_ρq_tot)
     F_R .= ClimaCore.Fields.zeros(boundary_space)
-    parsed_args["rad"] == "gray" ? dummmy_remap!(F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) : nothing # TODO: albedo hard coded...
+    parsed_args["rad"] == "gray" ? dummmy_remap!(F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) : nothing
 end
 
 function bucket_pull!(bucket_sim, F_A, F_E, F_R, ρ_sfc)
@@ -28,10 +28,18 @@ function bucket_pull!(bucket_sim, F_A, F_E, F_R, ρ_sfc)
     @. bucket_sim.integrator.p.bucket.R_n = F_R
 end
 
+# Ocean does not apply water flux boundary conditions, does not need F_E
 function ocean_pull!(slab_ocean_sim, F_A, F_R)
     @. slab_ocean_sim.integrator.p.F_aero = -F_A
     @. slab_ocean_sim.integrator.p.F_rad = -F_R
 end
+
+# We assume ice is not sublimating, and have zeroed out that contributed to the atmos fluxes.
+function ice_pull!(slab_ice_sim, F_A, F_R)
+    @. slab_ice_sim.integrator.p.F_aero = -F_A
+    @. slab_ice_sim.integrator.p.F_rad = -F_R
+end
+
 
 function atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, boundary_space, prescribed_sst,  z0m_S,  z0b_S, T_S, ocean_params, SST)
     combined_field = zeros(boundary_space)
@@ -42,8 +50,9 @@ function atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, 
         ocean_p = slab_ocean_sim.integrator.p.params
         sst = slab_ocean_sim.integrator.u.T_sfc
     end
-    # coupler_get: T_sfc, z_0m, z_0b
+
     univ_mask = parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2))
+    
     parent(combined_field) .=
         combine_surface.(
             univ_mask,
@@ -52,6 +61,7 @@ function atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, 
             parent(slab_ice_sim.integrator.u.T_sfc),
         ) # prescribed SSTs
     dummmy_remap!(T_S, combined_field)
+    
     # Assume ice and ocean have the same roughness lengths
     parent(combined_field) .=
         combine_surface.(
@@ -67,12 +77,13 @@ function atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, 
             ocean_p.z0b
         )
     dummmy_remap!(z0b_S, combined_field)
+    
     # Compute ρ_sfc based atmos properties at lowest level
     set_ρ_sfc!(ρ_sfc, T_S, atmos_sim.integrator)
     # Now compute ocean and sea ice q_sat
-    ocean_q_sfc = TD.q_vap_saturation_generic.(atmos_sim.integrator.p.params, slab_ocean_sim.integrator.u.T_sfc, ρ_sfc, TD.Liquid())
+    ocean_q_sfc = TD.q_vap_saturation_generic.(atmos_sim.integrator.p.params, sst, ρ_sfc, TD.Liquid())
     sea_ice_q_sfc = TD.q_vap_saturation_generic.(atmos_sim.integrator.p.params, slab_ice_sim.integrator.u.T_sfc, ρ_sfc, TD.Ice())
-    # Pull q_sfc from land, and compute q_sfc on surface with it and the above computed values.
+    # Pull q_sfc from land, and set q_sfc on surface with it and the above computed values.
     parent(combined_field) .=
         combine_surface.(
             univ_mask,
@@ -83,7 +94,7 @@ function atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, 
     dummmy_remap!(q_sfc, combined_field)
 
     atmos_sim.integrator.p.rrtmgp_model.surface_temperature .= field2array(T_S) # supplied to atmos for radiation
-    # add albedo here
+
     coords = ClimaCore.Fields.coordinate_field(axes(bucket_sim.integrator.u.bucket.S))
     α_land = surface_albedo.(Ref(bucket_sim.params.albedo), coords, bucket_sim.integrator.u.bucket.S, bucket_sim.params.S_c)
     parent(combined_field) .=
@@ -96,13 +107,8 @@ function atmos_pull!(atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, mask, 
     dummmy_remap!(albedo, combined_field)
     atmos_sim.integrator.p.rrtmgp_model.diffuse_sw_surface_albedo .=reshape(field2array(albedo), 1, length(parent(albedo)))
     atmos_sim.integrator.p.rrtmgp_model.direct_sw_surface_albedo .=reshape(field2array(albedo), 1, length(parent(albedo)))
+    
     # calculate turbulent fluxes on atmos grid and save in atmos cache
     info_sfc = (; T_sfc = T_S, ρ_sfc = ρ_sfc, q_sfc = q_sfc, z0m = z0m_S, z0b = z0b_S, ice_mask = slab_ice_sim.integrator.p.ice_mask)
-    # This should also need q_sfc - currently it assumes q_sfc = q_sat
     calculate_surface_fluxes_atmos_grid!(atmos_sim.integrator, info_sfc)
-end
-
-function ice_pull!(slab_ice_sim, F_A, F_R)
-    @. slab_ice_sim.integrator.p.F_aero = -F_A
-    @. slab_ice_sim.integrator.p.F_rad = -F_R
 end

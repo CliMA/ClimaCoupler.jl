@@ -16,13 +16,11 @@ function ρ_sfc_at_point(params, ts_int, T_sfc)
     ρ_sfc = ρ_air * (T_sfc / T_int)^(TD.cv_m(params, ts_int) / Rm_int)  # use ideal gas law and hydrostatic balance to extrapolate for surface density
     return ρ_sfc
 end
-#sea_ice_q_sfc = TD.q_vap_saturation_generic.(atmos_sim.integrator.p.params, T_sfc1, ρ_sfc1, TD.Ice())
-
     
 """
 calculate_surface_fluxes_atmos_grid!(integrator)
 
-- TODO: generalize interface for regridding and take land state out of atmos's integrator.p
+- TODO: generalize interface for regridding
 """
 function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     p = integrator.p
@@ -104,10 +102,10 @@ function constant_T_saturated_surface_coefs_coupled(ts_int, uₕ_int, z_int, z_s
     sc = SF.Coefficients{FT}(;
         state_in = SF.InteriorValues(z_int, (uₕ_int.u, uₕ_int.v), ts_int),
         state_sfc = SF.SurfaceValues(z_sfc, (FT(0), FT(0)), ts_sfc),
-        z0m = z0m, #FT(1e-3),
-        z0b = z0b, #FT(1e-5),
-        Cd = Cd, #FT(0.001),
-        Ch = Ch, #FT(0.0001),
+        z0m = z0m,
+        z0b = z0b,
+        Cd = Cd,
+        Ch = Ch,
     )
 
     # calculate all fluxes

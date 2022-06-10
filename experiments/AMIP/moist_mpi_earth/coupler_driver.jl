@@ -1,7 +1,7 @@
 # coupler_driver
 # don't forget to run with threading: julia --project --threads 8 (MPI not that useful for debugging coarse runs)
-# to do: make the mask functions once, and reuse - but we need to compute the univ_mask at each step as ice_mask could change in the future
 using Pkg
+Pkg.rm("ClimaAtmos")
 import SciMLBase: step!
 using OrdinaryDiffEq
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
@@ -10,7 +10,7 @@ import Test: @test
 using ClimaCore.Utilities: half, PlusHalf
 Pkg.add(PackageSpec(name = "ClimaCore", version = "0.10.3"))
 
-# Get the paths to the necessary data files
+# Get the paths to the necessary data files - land sea mask, sst map, sea ice concentration
 include("artifacts.jl")
 
 # Load up a bunch of utils
@@ -38,10 +38,18 @@ atmos_sim = atmos_init(FT, Y, spaces, integrator, params = params);
 # init a 2D bounary space at the surface, assuming the same instance (and MPI distribution if applicable) as the atmos domain above
 boundary_space = ClimaCore.Fields.level(atmos_sim.domain.face_space, half) # global surface grid
 
-# init land-sea mask
+# read in the land sea mask
 mask = LandSeaMask(FT, mask_data, "LSMASK", boundary_space) # TODO: split up the nc file to individual times for faster computation
+
+# Currently, land, sea, and ice all solve their equations everywhere on the globe, and we apply a mask
+# to handle boundary conditions correctly, and to handle plotting surface quantities correctly and to
+# track conservation quantities.
+
+# This is fine as long as their computations are cheap compared to atmos and as long as there is no
+# horizontal flow.
+
 # init land model components
-Pkg.add( url = "https://github.com/CliMA/ClimaLSM.jl", rev = "albedo_models")
+Pkg.add(url = "https://github.com/CliMA/ClimaLSM.jl")
 include("bucket/bucket_init.jl")
 bucket_sim = bucket_init(FT, FT.(tspan); dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat));
 
@@ -62,6 +70,8 @@ end
 
 include("slab_ice/slab_init.jl")
 
+# read in sea ice concentration and turn into map of where sea ice is present vs not, based on a
+# threshold.
 SIC = ncreader_rll_to_cgll_from_space(FT, sic_data, "SEAICE", boundary_space)
 SIC = swap_space!(SIC, axes(mask)) .* (abs.(mask .- 1))
 ice_mask = get_ice_mask.(SIC .- FT(25))# here 25% and lower is considered ice free # TODO: generalize to a smaoot function of ice fraction
@@ -74,7 +84,7 @@ include("./push_pull.jl")
 
 # init conservation info collector
 CS = OnlineConservationCheck([], [],[],[], [],[],[],[])
-# init coupling
+# Reinit after computing the fluxes at t=0.
 coupler_sim = CouplerSimulation(Δt_cpl, integrator.t, boundary_space, FT, mask)
 atmos_pull!(coupler_sim, atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST, univ_mask)
 atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, parsed_args)
@@ -91,8 +101,7 @@ reinit!(slab_ice_sim.integrator)
 if !is_distributed && (@isdefined CS)
         check_conservation(CS, coupler_sim, atmos_sim, bucket_sim, slab_ocean_sim, slab_ice_sim, F_A .+ F_R, univ_mask)
 end
-# At this stage, the integrators all have dY(0) computed based p(0), Y(0), t(0)
-# Y(1) - Y(0) = dY(0) *dt
+# At this stage, the integrators all have dY(0) computed based cache(0), Y(0), t(0)
 @show "Starting coupling loop"
 walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     @show t
@@ -100,10 +109,12 @@ walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     # sets p = p(0)
     atmos_pull!(coupler_sim, atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST, univ_mask);
 
-    #Y(0) -> Y(1) and then computes dY(1) from Y(1) it would be using p(0) still
+    #Y(0) -> Y(1):  Y(1) - Y(0) = dY(0) *dt, then computes dY(1) from Y(1).
+    # Note, this would be using p(0) still
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true); # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
  
     #clip TODO: this is bad!! > limiters
+    # Why does this not happen in atmos already?
     parent(atmos_sim.integrator.u.c.ρq_tot) .= heaviside.(parent(atmos_sim.integrator.u.c.ρq_tot)); # negligible for total energy cons
 
     atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, parsed_args);

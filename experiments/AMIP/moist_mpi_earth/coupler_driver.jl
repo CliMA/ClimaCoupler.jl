@@ -33,7 +33,7 @@ include("mpi/mpi_init.jl")
 # init atmos model component
 include("atmos/atmos_init1.jl")
 # To change FT - we think, go to driver_new.jl and change it by hand, then continue on!
-# To turn radiation to gray - coupler_atmos and in driver_new
+# To turn radiation to gray - coupler_atmos and in driver_new?
 include("atmos/atmos_init2.jl")
 atmos_sim = atmos_init(FT, Y, spaces, integrator, params = params);
 
@@ -106,7 +106,7 @@ walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     #clip TODO: this is bad!! > limiters
     parent(atmos_sim.integrator.u.c.ρq_tot) .= heaviside.(parent(atmos_sim.integrator.u.c.ρq_tot)); # negligible for total energy cons
 
-    atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, dF_A, parsed_args);
+    atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, parsed_args);
 
     ## Bucket Land
     bucket_pull!(bucket_sim, F_A, F_E, F_R, ρ_sfc);
@@ -145,9 +145,7 @@ Plots.plot!(times,
     tot .- tot[1],
     label = "tot",
     xlabel = "time [s]",
-    ylabel = "energy(t) - energy(t=0) [J]",
-        xticks = (collect(1:length(times))[1:50:end], times[1:50:end]),
-            )
+    ylabel = "energy(t) - energy(t=0) [J]")
 plot2 = Plots.plot(times, (tot .- tot[1]) ./ tot[1], ylabel = "|dE_earth|/E_earth", label = "",xlabel = "time [s]")
 
 plot3 =Plots.plot(times[1:end-1], abs.((CS.ρe_tot_atmos[2:end] .- CS.ρe_tot_atmos[1:end-1]) ./ Δt_cpl .- (CS.F_energy_ocean[1:end-1] .+ CS.F_energy_land[1:end-1].+ CS.F_energy_ice[1:end-1])), label = "atmos")

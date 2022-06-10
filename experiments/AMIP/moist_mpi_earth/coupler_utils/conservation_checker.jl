@@ -22,7 +22,11 @@ function check_conservation(
     F_energy_surf = nothing,
     radiation = true,
 )
-
+    #R_earth = 6.371229e6
+    #R_top = 30e3+R_earth
+    #A_top = 4π*R_top^2.0
+    #A_bottom = 4π*R_earth^2.0
+    
     z = parent(Fields.coordinate_field(face_space).z)
     Δz_bot = FT(0.5) * (z[2, 1, 1, 1, 1] - z[1, 1, 1, 1, 1])
     Δz_top = FT(0.5) * (z[end, 1, 1, 1, 1] - z[end - 1, 1, 1, 1, 1])

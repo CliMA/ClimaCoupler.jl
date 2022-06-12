@@ -20,8 +20,8 @@ include("coupler_utils/masker.jl")
 include("coupler_utils/general_helper.jl")
 
 # # initiate spatial and temporal info
-debug_mode = true
-t_end = debug_mode ? 100e2 : 2592000 * 3
+debug_mode = false
+t_end = debug_mode ? 100e2 : 2592000 #* 3
 tspan = (0, t_end)
 Δt_cpl = 2e2
 saveat = debug_mode ? Δt_cpl * 1 : Δt_cpl * 100
@@ -62,7 +62,7 @@ if prescribed_sic == true
     # sample SST field
     SIC = ncreader_rll_to_cgll_from_space(FT, "data/sic.nc", "SEAICE", boundary_space)
     SIC = swap_space!(SIC, axes(mask)) .* (abs.(mask .- 1))
-    slab_ice_sim = slab_ice_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, prescribed_sic = SIC)
+    slab_ice_sim = slab_ice_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, prescribed_sic_data = SIC)
 else
     slab_ice_sim = slab_ice_init(
         FT,
@@ -75,7 +75,7 @@ else
 end
 
 # init coupler
-coupler_sim = CouplerSimulation(Δt_cpl, integrator.t, boundary_space, FT, mask)
+coupler_sim = CouplerSimulation(FT(Δt_cpl), integrator.t, boundary_space, FT, mask)
 
 # init coupler's boundary fields for regridding (TODO: technically this can be bypassed by directly rigridding on model grids)
 T_S = ClimaCore.Fields.zeros(boundary_space) # temperature
@@ -87,7 +87,7 @@ F_R = ClimaCore.Fields.zeros(boundary_space) # radiative fluxes
 dF_A = ClimaCore.Fields.zeros(boundary_space) # aerodynamic turbulent fluxes
 
 # init conservation info collector
-CS = OnlineConservationCheck([], [], [], [])
+CS = OnlineConservationCheck([], [], [], [], [], [])
 
 # coupling loop
 @show "Starting coupling loop"
@@ -102,7 +102,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     if prescribed_sst == true
         parent(combined_field) .=
             combine_surface.(
-                parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2)),
+                parent(mask) .- parent(slab_ice_sim.integrator.p.Ya.ice_mask .* FT(2)),
                 parent(slab_sim.integrator.u.T_sfc),
                 parent(SST),
                 parent(slab_ice_sim.integrator.u.T_sfc),
@@ -123,32 +123,56 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
             )
         dummmy_remap!(z0b_S, combined_field)
     else
-        parent(combined_field) .=
+        if prescribed_sic == true
+            parent(combined_field) .=
+                combine_surface.(
+                    parent(mask) .- parent(slab_ice_sim.integrator.p.Ya.ice_mask .* FT(2)),
+                    parent(slab_sim.integrator.u.T_sfc),
+                    parent(slab_ocean_sim.integrator.u.T_sfc),
+                    parent(slab_ice_sim.integrator.u.T_sfc),
+                )
+            dummmy_remap!(T_S, combined_field)
+            parent(combined_field) .=
+                combine_surface.(
+                    parent(mask),
+                    parent(slab_sim.integrator.p.params.z0m .* mask),
+                    parent(slab_ocean_sim.integrator.p.params.z0m .* (abs.(mask .- 1))),
+                )
+            dummmy_remap!(z0m_S, combined_field)
+            parent(combined_field) .=
+                combine_surface.(
+                    parent(mask),
+                    parent(slab_sim.integrator.p.params.z0b .* mask),
+                    parent(slab_ocean_sim.integrator.p.params.z0b .* (abs.(mask .- 1))),
+                )
+            dummmy_remap!(z0b_S, combined_field)
+        else            parent(combined_field) .=
             combine_surface.(
-                parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2)),
+                parent(mask) .- parent(slab_ice_sim.integrator.p.Ya.ice_mask .* FT(2)),
                 parent(slab_sim.integrator.u.T_sfc),
-                parent(slab_ocean_sim.integrator.u.T_sfc),
+                parent(slab_ice_sim.integrator.u.T_sfc),
                 parent(slab_ice_sim.integrator.u.T_sfc),
             )
-        dummmy_remap!(T_S, combined_field)
-        parent(combined_field) .=
-            combine_surface.(
-                parent(mask),
-                parent(slab_sim.integrator.p.params.z0m .* mask),
-                parent(slab_ocean_sim.integrator.p.params.z0m .* (abs.(mask .- 1))),
-            )
-        dummmy_remap!(z0m_S, combined_field)
-        parent(combined_field) .=
-            combine_surface.(
-                parent(mask),
-                parent(slab_sim.integrator.p.params.z0b .* mask),
-                parent(slab_ocean_sim.integrator.p.params.z0b .* (abs.(mask .- 1))),
-            )
-        dummmy_remap!(z0b_S, combined_field)
+            dummmy_remap!(T_S, combined_field)
+            parent(combined_field) .=
+                combine_surface.(
+                    parent(mask),
+                    parent(slab_sim.integrator.p.params.z0m .* mask),
+                    parent(slab_ocean_sim.integrator.p.params.z0m .* (abs.(mask .- 1))),
+                )
+            dummmy_remap!(z0m_S, combined_field)
+            parent(combined_field) .=
+                combine_surface.(
+                    parent(mask),
+                    parent(slab_sim.integrator.p.params.z0b .* mask),
+                    parent(slab_ocean_sim.integrator.p.params.z0b .* (abs.(mask .- 1))),
+                )
+            dummmy_remap!(z0b_S, combined_field)
+        end
     end
 
     # calculate turbulent fluxes on atmos grid and save in atmos cache
-    info_sfc = (; T_sfc = T_S, z0m = z0m_S, z0b = z0b_S, ice_mask = slab_ice_sim.integrator.p.ice_mask)
+    info_sfc = (; T_sfc = T_S, z0m = z0m_S, z0b = z0b_S, ice_mask = slab_ice_sim.integrator.p.Ya.ice_mask)
     calculate_surface_fluxes_atmos_grid!(atmos_sim.integrator, info_sfc)
 
     atmos_sim.integrator.p.rrtmgp_model.surface_temperature .= field2array(T_S) # supplied to atmos for radiation
@@ -170,9 +194,9 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     ## Slab land
     # coupler_get: F_aero, F_rad
     slab_F_aero = slab_sim.integrator.p.F_aero
-    @. slab_F_aero = -F_A
+    @. slab_F_aero = F_A
     slab_F_rad = slab_sim.integrator.p.F_rad
-    @. slab_F_rad = -F_R
+    @. slab_F_rad = F_R
 
     # run
     step!(slab_sim.integrator, t - slab_sim.integrator.t, true)
@@ -181,9 +205,9 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     # coupler_get: F_aero, F_rad
     if (prescribed_sst !== true) && (prescribed_sic == true)
         slab_ocean_F_aero = slab_ocean_sim.integrator.p.F_aero
-        @. slab_ocean_F_aero = -F_A
+        @. slab_ocean_F_aero = F_A
         slab_ocean_F_rad = slab_ocean_sim.integrator.p.F_rad
-        @. slab_ocean_F_rad = -F_R
+        @. slab_ocean_F_rad = F_R
 
         # run
         step!(slab_ocean_sim.integrator, t - slab_ocean_sim.integrator.t, true)
@@ -192,11 +216,11 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
 
     ## Slab ice
     # coupler_get: F_aero, F_rad
-    slab_ice_F_aero = slab_ice_sim.integrator.p.F_aero
-    @. slab_ice_F_aero = -F_A
-    slab_ice_F_rad = slab_ice_sim.integrator.p.F_rad
-    @. slab_ice_F_rad = -F_R
-    slab_ice_∂F_aero∂T_sfc = slab_ice_sim.integrator.p.∂F_aero∂T_sfc
+    slab_ice_F_aero = slab_ice_sim.integrator.p.Ya.F_aero
+    @. slab_ice_F_aero = F_A
+    slab_ice_F_rad = slab_ice_sim.integrator.p.Ya.F_rad
+    @. slab_ice_F_rad = F_R
+    slab_ice_∂F_aero∂T_sfc = slab_ice_sim.integrator.p.Ya.∂F_aero∂T_sfc
     @. slab_ice_∂F_aero∂T_sfc = dF_A
 
     # run
@@ -235,11 +259,14 @@ end
 # - add prescribable albedo to RRTMGP + ClimaAtmos
 # - add in oupler specific abstractions
 # - replace heavisides with smooth functions
-# - test dynamical ea ice model 
+# - test dynamical sea ice model 
 # - test sea ice for conservation with slab ocean
 # cannot plot on face sfc
 # cannot do .+ of faces
 # double check precise posiiton of the boundary space
+# clean up params partition
+# add conductive flux to conservation check
+# investigate the %age error that grows with BC wave (friction??) 
 
 # Next PR
 # - keep adding coupler specific interface

@@ -57,6 +57,8 @@ end
 
 get_slab_energy(slab_sim, T_sfc) = slab_sim.params.ρ .* slab_sim.params.c .* T_sfc .* slab_sim.params.h
 
+get_ice_energy(slab_sim, T_sfc) =  T_sfc  ./ slab_sim.params.h .* slab_sim.params.k_ice
+
 function slab_rhs!(dY, Y, Ya, t)
     """
     Slab:
@@ -64,8 +66,8 @@ function slab_rhs!(dY, Y, Ya, t)
     """
     p, F_aero, F_rad, mask = Ya
 
-    rhs = @. (F_aero + F_rad) / (p.h * p.ρ * p.c)
-    parent(dY.T_sfc) .= apply_mask.(parent(mask), >, parent(rhs), FT(0))
+    rhs = @. - (F_aero + F_rad) / (p.h * p.ρ * p.c)
+    parent(dY.T_sfc) .= apply_mask.(parent(mask), >, parent(rhs), FT(0), FT(0.5))
 end
 
 function slab_init(

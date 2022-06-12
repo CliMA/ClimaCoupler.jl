@@ -43,8 +43,8 @@ function slab_ocean_rhs!(dY, Y, Ya, t)
     """
     p, F_aero, F_rad, mask = Ya
 
-    rhs = @. (F_aero + F_rad) / (p.h * p.ρ * p.c)
-    parent(dY.T_sfc) .= apply_mask.(parent(mask), <, parent(rhs), FT(0))
+    rhs = @. - (F_aero + F_rad) / (p.h * p.ρ * p.c)
+    parent(dY.T_sfc) .= apply_mask.(parent(mask), <, parent(rhs), FT(0), FT(0.5))
 end
 
 function slab_ocean_init(

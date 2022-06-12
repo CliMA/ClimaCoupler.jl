@@ -106,6 +106,12 @@ $$
         field_of_ones = ones(center_space)
         sum(field_of_ones) ≈ (4*pi*domain_radius^2) * domain_height 
         ```
+- Radiation
+    - By default radiation is a `PeriodicCallback` applied in `ClimaAtmos` every 6h. This updates the radiation fluxes field, `ᶠradiation_flux`, which itself is applied at every timestep via:
+    ```
+    @. Yₜ.c.ρe -= ᶜdivᵥ(ᶠradiation_flux)
+    ```
+    - The TOA fluxes can be accessed via `level(ᶠradiation_flux, end - half)`. Their net sum (or imbalance) represents sources and sinks to the earth system and these need to balance the net energy change. Ideally the TOA fluxes will balance to near zero. 
 
 ## Performance
 - using `@elapsed` to measure the walltime of the coupling loop

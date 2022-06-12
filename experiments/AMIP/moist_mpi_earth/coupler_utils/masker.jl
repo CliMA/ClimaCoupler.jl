@@ -39,4 +39,4 @@ combine_surface(mask, sfc_1, sfc_2, sfc_3, value1 = -0.5, value2 = 0.5) =
 apply_mask(mask, condition, yes, no, value = 0.5) 
 - apply mask mased on a threshold value in the mask
 """
-apply_mask(mask, condition, yes, no, value = 0.5) = condition(mask, value) ? yes : no
+apply_mask(mask, condition, yes, no, value) = condition(mask, value) ? yes : no

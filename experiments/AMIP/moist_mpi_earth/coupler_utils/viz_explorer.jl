@@ -30,7 +30,7 @@ function plot_anim() # TODO: uses global defs
             )
         dummmy_remap!(T_S, combined_field)
         
-        Plots.plot(T_S, clims = (240, 330))
+        Plots.plot(T_S)
     end
     Plots.mp4(anim, "earth_T.mp4", fps = 10)
 

@@ -1,7 +1,7 @@
 # coupler_driver
 # don't forget to run with threading: julia --project --threads 8 (MPI not that useful for debugging coarse runs)
 using Pkg
-Pkg.rm("ClimaAtmos")
+#Pkg.rm("ClimaAtmos")
 import SciMLBase: step!
 using OrdinaryDiffEq
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
@@ -21,9 +21,9 @@ include("coupler_utils/masker.jl")
 include("coupler_utils/general_helper.jl")
 
 # initiate spatial and temporal info
-debug_mode = false
+debug_mode = true
 t_end = debug_mode ? 100e2 : 2592000 * 1
-Δt_cpl = 2e2
+Δt_cpl = 2e2 # should divide dt_rad with no remainder?
 saveat = debug_mode ? Δt_cpl * 1 : Δt_cpl * 100
 
 tspan = (0, t_end)
@@ -86,6 +86,7 @@ include("./push_pull.jl")
 CS = OnlineConservationCheck([], [],[],[], [],[],[],[])
 # Reinit after computing the fluxes at t=0.
 coupler_sim = CouplerSimulation(Δt_cpl, integrator.t, boundary_space, FT, mask)
+#=
 atmos_pull!(coupler_sim, atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST, univ_mask)
 atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, parsed_args)
 bucket_pull!(bucket_sim, F_A, F_E, F_R, ρ_sfc)
@@ -97,13 +98,10 @@ if prescribed_sst !== true
 end
 ice_pull!(slab_ice_sim, F_A, F_R)
 reinit!(slab_ice_sim.integrator)
-
-if !is_distributed && (@isdefined CS)
-        check_conservation(CS, coupler_sim, atmos_sim, bucket_sim, slab_ocean_sim, slab_ice_sim, F_A .+ F_R, univ_mask)
-end
+=#
 # At this stage, the integrators all have dY(0) computed based cache(0), Y(0), t(0)
 @show "Starting coupling loop"
-walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
+walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     @show t
     ## Atmos
     # sets p = p(0)
@@ -114,7 +112,7 @@ walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true); # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
  
     #clip TODO: this is bad!! > limiters
-    # Why does this not happen in atmos already?
+    # Maybe we can remove - atmos does not include
     parent(atmos_sim.integrator.u.c.ρq_tot) .= heaviside.(parent(atmos_sim.integrator.u.c.ρq_tot)); # negligible for total energy cons
 
     atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, parsed_args);
@@ -141,34 +139,38 @@ end
 
 @show walltime
 @show "Postprocessing"
-diff_ρe_tot_atmos = CS.ρe_tot_atmos .- CS.ρe_tot_atmos[1]
-diff_ρe_tot_slab = (CS.ρe_tot_land .- CS.ρe_tot_land[1])
-diff_ρe_tot_slab_ocean = (CS.ρe_tot_ocean .- CS.ρe_tot_ocean[1])
-diff_ρe_tot_slab_seaice = (CS.ρe_tot_seaice .- CS.ρe_tot_seaice[1])
-times = tspan[1]:coupler_sim.Δt:tspan[end]
-plot1 = Plots.plot(times,diff_ρe_tot_atmos, label = "atmos")
-Plots.plot!(times,diff_ρe_tot_slab, label = "land")
-Plots.plot!(times,diff_ρe_tot_slab_ocean, label = "ocean")
-Plots.plot!(times,diff_ρe_tot_slab_seaice, label = "seaice")
-tot = CS.ρe_tot_atmos .+ CS.ρe_tot_ocean .+ CS.ρe_tot_land .+ CS.ρe_tot_seaice
+plot_global_energy(CS, coupler_sim)
 
-Plots.plot!(times, 
-    tot .- tot[1],
-    label = "tot",
-    xlabel = "time [s]",
-    ylabel = "energy(t) - energy(t=0) [J]")
-savefig("conservation_land_ocean_atmos_ice1_long.png")
-plot2 = Plots.plot(times, (tot .- tot[1]) ./ tot[1], ylabel = "|dE_earth|/E_earth", label = "",xlabel = "time [s]")
+#diff_ρe_tot_atmos = CS.ρe_tot_atmos .- CS.ρe_tot_atmos[1]
+#diff_ρe_tot_slab = (CS.ρe_tot_land .- CS.ρe_tot_land[1])
+#diff_ρe_tot_slab_ocean = (CS.ρe_tot_ocean .- CS.ρe_tot_ocean[1])
+#diff_ρe_tot_slab_seaice = (CS.ρe_tot_seaice .- CS.ρe_tot_seaice[1])
+#diff_toa_net_source = (CS.toa_net_source .- CS.toa_net_source[1])
+#times = tspan[1]+coupler_sim.Δt:coupler_sim.Δt:tspan[end]
+#plot1 = Plots.plot(times,diff_ρe_tot_atmos, label = "atmos")
+#Plots.plot!(times,diff_ρe_tot_slab, label = "land")
+#Plots.plot!(times,diff_ρe_tot_slab_ocean, label = "ocean")
+#Plots.plot!(times,diff_ρe_tot_slab_seaice, label = "seaice")
+#Plots.plot!(times, diff_toa_net_source, label = "toa")
+#tot = CS.ρe_tot_atmos .+ CS.ρe_tot_ocean .+ CS.ρe_tot_land .+ CS.ρe_tot_seaice .+ CS.toa_net_source
 
-savefig("conservation_land_ocean_atmos_ice2_long.png")
-plot3 =Plots.plot(times[1:end-1], abs.((CS.ρe_tot_atmos[2:end] .- CS.ρe_tot_atmos[1:end-1]) ./ Δt_cpl .- (CS.F_energy_ocean[1:end-1] .+ CS.F_energy_land[1:end-1].+ CS.F_energy_ice[1:end-1])), label = "atmos")
-Plots.plot!(times[1:end-1], abs.((CS.ρe_tot_land[2:end] .- CS.ρe_tot_land[1:end-1]) ./ Δt_cpl .+ CS.F_energy_land[1:end-1]), label = "land")
-Plots.plot!(times[1:end-1], abs.((CS.ρe_tot_ocean[2:end] .- CS.ρe_tot_ocean[1:end-1]) ./ Δt_cpl .+ CS.F_energy_ocean[1:end-1]), label = "ocean")
-Plots.plot!(times[1:end-1], abs.((CS.ρe_tot_seaice[2:end] .- CS.ρe_tot_seaice[1:end-1]) ./ Δt_cpl .+ CS.F_energy_ice[1:end-1]), label = "ice")
+#Plots.plot!(times, 
+#    tot .- tot[1],
+#    label = "tot",
+#    xlabel = "time [s]",
+#    ylabel = "energy(t) - energy(t=0) [J]")
+#savefig("conservation_land_ocean_atmos_ice1_dt.png")
+#plot2 = Plots.plot(times, (tot .- tot[1]) ./ tot[1], ylabel = "|dE_earth|/E_earth", label = "",xlabel = "time [s]")
 
-plot!(yaxis = :log)
-plot!(title = "abs{[E(t+dt) - E(t)]/dt + ∑FdA}")
-savefig("conservation_land_ocean_atmos_ice3_long.png")
+#savefig("conservation_land_ocean_atmos_ice2_dt.png")
+#plot3 =Plots.plot(times[1:end-1], abs.((CS.ρe_tot_atmos[2:end] .- CS.ρe_tot_atmos[1:end-1]) ./ Δt_cpl .- (CS.F_energy_ocean[1:end-1] .+ CS.F_energy_land[1:end-1].+ CS.F_energy_ice[1:end-1])), label = "atmos")
+#plot3 = Plots.plot(times[1:end-1], abs.((CS.ρe_tot_land[2:end] .- CS.ρe_tot_land[1:end-1]) ./ Δt_cpl .+ CS.dE_energy_#land[1:end-1]), label = "land")
+#Plots.plot!(times[1:end-1], abs.((CS.ρe_tot_ocean[2:end] .- CS.ρe_tot_ocean[1:end-1]) ./ Δt_cpl .+ CS.dE_energy_ocean#[1:end-1]), label = "ocean")
+#Plots.plot!(times[1:end-1], abs.((CS.ρe_tot_seaice[2:end] .- CS.ρe_tot_seaice[1:end-1]) ./ Δt_cpl .+ CS.dE_energy_ice#[1:end-1]), label = "ice")
+
+#plot!(yaxis = :log, yticks = [1e8,1e10,1e12,1e14, 1e16, 1e18,1e20])
+#plot!(title = "abs{[E(t+dt) - E(t)]/dt + ∑FdA}")
+#savefig("conservation_land_ocean_atmos_ice3_dt.png")
 
 
 

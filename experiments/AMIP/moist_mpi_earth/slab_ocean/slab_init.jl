@@ -43,7 +43,7 @@ function slab_ocean_rhs!(dY, Y, Ya, t)
     ∂_t T_sfc = F_aero + G
     """
     (; params, F_aero, F_rad) = Ya
-    dY.T_sfc .= @. (F_aero + F_rad) / (params.h * params.ρ * params.c)
+    dY.T_sfc .= @. -(F_aero + F_rad) / (params.h * params.ρ * params.c)
 end
 
 function slab_ocean_init(

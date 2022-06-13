@@ -39,8 +39,8 @@ atmos_sim = atmos_init(FT, Y, spaces, integrator, params = params);
 boundary_space = ClimaCore.Fields.level(atmos_sim.domain.face_space, half) # global surface grid
 
 # read in the land sea mask
-mask = LandSeaMask(FT, mask_data, "LSMASK", boundary_space) # TODO: split up the nc file to individual times for faster computation
-
+#mask = LandSeaMask(FT, mask_data, "LSMASK", boundary_space) # TODO: split up the nc file to individual times for faster computation
+mask = zeros(boundary_space)
 # Currently, land, sea, and ice all solve their equations everywhere on the globe, and we apply a mask
 # to handle boundary conditions correctly, and to handle plotting surface quantities correctly and to
 # track conservation quantities.
@@ -72,8 +72,9 @@ include("slab_ice/slab_init.jl")
 
 # read in sea ice concentration and turn into map of where sea ice is present vs not, based on a
 # threshold.
-SIC = ncreader_rll_to_cgll_from_space(FT, sic_data, "SEAICE", boundary_space)
-SIC = swap_space!(SIC, axes(mask)) .* (abs.(mask .- 1))
+#SIC = ncreader_rll_to_cgll_from_space(FT, sic_data, "SEAICE", boundary_space)
+#SIC = swap_space!(SIC, axes(mask)) .* (abs.(mask .- 1))
+SIC = zeros(boundary_space)
 ice_mask = get_ice_mask.(SIC .- FT(25))# here 25% and lower is considered ice free # TODO: generalize to a smaoot function of ice fraction
 slab_ice_sim = slab_ice_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
 

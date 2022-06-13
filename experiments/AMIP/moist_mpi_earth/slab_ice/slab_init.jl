@@ -19,7 +19,7 @@ function slab_ice_space_init(::Type{FT}, space, p) where {FT}
 end
 function slab_ice_rhs!(dY, Y, Ya, t)
     (; params, F_aero, F_rad) = Ya
-    dY.T_sfc .= @. (F_aero + F_rad) / (params.h * params.ρ * params.c)
+    dY.T_sfc .= @. -(F_aero + F_rad) / (params.h * params.ρ * params.c)
 end
 
 function slab_ice_init(

@@ -31,14 +31,14 @@ end
 
 # Ocean does not apply water flux boundary conditions, does not need F_E
 function ocean_pull!(slab_ocean_sim, F_A, F_R)
-    @. slab_ocean_sim.integrator.p.F_aero = -F_A
-    @. slab_ocean_sim.integrator.p.F_rad = -F_R
+    @. slab_ocean_sim.integrator.p.F_aero = F_A
+    @. slab_ocean_sim.integrator.p.F_rad = F_R
 end
 
 # We assume ice is not sublimating, and have zeroed out that contributed to the atmos fluxes.
 function ice_pull!(slab_ice_sim, F_A, F_R)
-    @. slab_ice_sim.integrator.p.F_aero = -F_A
-    @. slab_ice_sim.integrator.p.F_rad = -F_R
+    @. slab_ice_sim.integrator.p.F_aero = F_A
+    @. slab_ice_sim.integrator.p.F_rad = F_R
 end
 
 

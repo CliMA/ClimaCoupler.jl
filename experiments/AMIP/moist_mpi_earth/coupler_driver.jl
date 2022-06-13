@@ -87,7 +87,7 @@ include("./push_pull.jl")
 CS = OnlineConservationCheck([], [],[],[], [],[],[],[])
 # Reinit after computing the fluxes at t=0.
 coupler_sim = CouplerSimulation(Δt_cpl, integrator.t, boundary_space, FT, mask)
-#=
+
 atmos_pull!(coupler_sim, atmos_sim, slab_ice_sim, bucket_sim, slab_ocean_sim, boundary_space, prescribed_sst, z0m_S,  z0b_S, T_S, ocean_params, SST, univ_mask)
 atmos_push!(atmos_sim, boundary_space, F_A, F_E, F_R, parsed_args)
 bucket_pull!(bucket_sim, F_A, F_E, F_R, ρ_sfc)
@@ -99,10 +99,13 @@ if prescribed_sst !== true
 end
 ice_pull!(slab_ice_sim, F_A, F_R)
 reinit!(slab_ice_sim.integrator)
-=#
+if !is_distributed && (@isdefined CS)
+    check_conservation(CS, coupler_sim, atmos_sim, bucket_sim, slab_ocean_sim, slab_ice_sim, F_A .+ F_R, univ_mask)
+end
+
 # At this stage, the integrators all have dY(0) computed based cache(0), Y(0), t(0)
 @show "Starting coupling loop"
-walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
+walltime = @elapsed for t in (tspan[1]+Δt_cpl:Δt_cpl:tspan[end])
     @show t
     ## Atmos
     # sets p = p(0)
@@ -142,18 +145,18 @@ end
 @show "Postprocessing"
 plot_global_energy(CS, coupler_sim)
 
-#diff_ρe_tot_atmos = CS.ρe_tot_atmos .- CS.ρe_tot_atmos[1]
-#diff_ρe_tot_slab = (CS.ρe_tot_land .- CS.ρe_tot_land[1])
-#diff_ρe_tot_slab_ocean = (CS.ρe_tot_ocean .- CS.ρe_tot_ocean[1])
-#diff_ρe_tot_slab_seaice = (CS.ρe_tot_seaice .- CS.ρe_tot_seaice[1])
-#diff_toa_net_source = (CS.toa_net_source .- CS.toa_net_source[1])
+diff_ρe_tot_atmos = CS.ρe_tot_atmos .- CS.ρe_tot_atmos[1]
+diff_ρe_tot_slab = (CS.ρe_tot_land .- CS.ρe_tot_land[1])
+diff_ρe_tot_slab_ocean = (CS.ρe_tot_ocean .- CS.ρe_tot_ocean[1])
+diff_ρe_tot_slab_seaice = (CS.ρe_tot_seaice .- CS.ρe_tot_seaice[1])
+diff_toa_net_source = (CS.toa_net_source .- CS.toa_net_source[1])
 #times = tspan[1]+coupler_sim.Δt:coupler_sim.Δt:tspan[end]
 #plot1 = Plots.plot(times,diff_ρe_tot_atmos, label = "atmos")
 #Plots.plot!(times,diff_ρe_tot_slab, label = "land")
 #Plots.plot!(times,diff_ρe_tot_slab_ocean, label = "ocean")
 #Plots.plot!(times,diff_ρe_tot_slab_seaice, label = "seaice")
 #Plots.plot!(times, diff_toa_net_source, label = "toa")
-#tot = CS.ρe_tot_atmos .+ CS.ρe_tot_ocean .+ CS.ρe_tot_land .+ CS.ρe_tot_seaice .+ CS.toa_net_source
+tot = CS.ρe_tot_atmos .+ CS.ρe_tot_ocean .+ CS.ρe_tot_land .+ CS.ρe_tot_seaice .+ CS.toa_net_source
 
 #Plots.plot!(times, 
 #    tot .- tot[1],

@@ -51,6 +51,7 @@ function atmos_pull!(coupler_sim, atmos_sim, slab_ice_sim, bucket_sim, slab_ocea
         ocean_p = slab_ocean_sim.integrator.p.params
         sst = slab_ocean_sim.integrator.u.T_sfc
     end
+    # This needs to be updated if the ice mask has changed in the past step
     mask = coupler_sim.mask
     univ_mask .= parent(mask) .- parent(slab_ice_sim.integrator.p.ice_mask .* FT(2))
     parent(combined_field) .=

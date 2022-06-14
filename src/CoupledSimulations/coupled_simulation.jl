@@ -1,11 +1,38 @@
-export CoupledSimulation, step!, run!
+export CoupledSimulation, step!, run!, name
 
 """
-    CoupledSimulation
+    AbstractSimulation
 
-An abstract type representing a coupled simulation.
+An abstract type representing a model simulation.
 """
-abstract type CoupledSimulation end
+abstract type AbstractSimulation end
+
+abstract type AbstractAtmosSimulation <: AbstractSimulation end
+name(::AbstractAtmosSimulation) = :atmos
+
+abstract type AbstractOceanSimulation <: AbstractSimulation end
+name(::AbstractOceanSimulation) = :ocean
+
+abstract type AbstractLandSimulation <: AbstractSimulation end
+name(::AbstractLandSimulation) = :land
+
+abstract type AbstractCoupledSimulation <: AbstractSimulation end
+name(::AbstractCoupledSimulation) = :coupled
+
+struct CoupledSimulation{CS, S, CPL, L, C} <: AbstractCoupledSimulation
+    "The coupled time-stepping scheme"
+    coupler_solver::CS
+    "The component simulations"
+    simulations::S
+    "The coupler"
+    coupler::CPL
+    "Diagnostic logger"
+    logger::L
+    "Clock"
+    clock::C
+end
+
+
 
 """
     run!(::CoupledSimulation)
@@ -31,4 +58,4 @@ Advances a simulation by `dt`.
 Note that `dt` is not necessarily the simulation's timestep length;
 a simuation could take several shorter steps that total to `dt`.
 """
-function step!(sim, dt) end
+function step!(sim::AbstractSimulation, dt) end

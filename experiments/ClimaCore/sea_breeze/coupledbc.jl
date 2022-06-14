@@ -4,9 +4,6 @@ using ClimaCore.Utilities: PlusHalf
 struct CoupledFlux <: BCtag end
 function bc_divF2C_bottom!(::CoupledFlux, dY, Y, p, t)
     # flux calculation
-    coords = Fields.coordinate_field(p.domain.hv_center_space)
-
-    z = coords.z
     Yc = Y.Yc
 
     uₕ = Yc.ρuₕ ./ Yc.ρ

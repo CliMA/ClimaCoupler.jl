@@ -94,6 +94,12 @@ the coupler data field is the state at time `datetime`.
 function coupler_get(coupler::CouplerState, fieldname::Symbol, target_sim::AbstractSimulation)
     cplfield = coupler.coupled_fields[fieldname]
 
+    map = get_remap_operator(coupler, name(target_sim), cplfield.write_sim)
+    return Operators.remap(map, cplfield.data)
+end
+
+function coupler_get(coupler::CouplerState, fieldname::Symbol)
+    cplfield = coupler.coupled_fields[fieldname]
     return cplfield.data
 end
 
@@ -108,6 +114,11 @@ model component using the coupler. It should get coupling fields via
 them for use in the component model.
 """
 function coupler_pull!(model, coupler::CouplerState) end
+
+function get_remap_operator(coupler, target_sim_name::Symbol, source_sim_name::Symbol)
+    op_name = Symbol(source_sim_name, "_to_", target_sim_name)
+    return coupler.remap_operators[op_name]
+end
 
 # display table of registered fields & their info
 function Base.show(io::IO, coupler::CouplerState)

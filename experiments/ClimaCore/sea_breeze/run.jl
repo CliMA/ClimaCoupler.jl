@@ -156,9 +156,7 @@ function cpl_run(simulation::AOLCoupledSimulation)
         atmos.integrator.u.F_sfc .= 0.0 # reset surface flux to be accumulated
         # don't want to alloc here..
         T_sfc_ocean = coupler_get(coupler, :T_sfc_ocean, atmos)
-        T_sfc_ocean = Operators.remap(maps.ocean_to_atmos, T_sfc_ocean)
         T_sfc_land = coupler_get(coupler, :T_sfc_land, atmos)
-        T_sfc_land = Operators.remap(maps.land_to_atmos, T_sfc_land)
         atmos.integrator.p.T_sfc .= T_sfc_land .+ T_sfc_ocean
 
         # run
@@ -169,8 +167,7 @@ function cpl_run(simulation::AOLCoupledSimulation)
         ## Ocean
         # pre: get accumulated flux from atmos
         ocn_F_sfc = ocean.integrator.p.F_sfc
-        atm_F_sfc = coupler_get(coupler, :F_sfc, ocean) ./ cpl_Δt
-        Operators.remap!(ocn_F_sfc, maps.atmos_to_ocean, atm_F_sfc)
+        ocn_F_sfc .= coupler_get(coupler, :F_sfc, ocean) ./ cpl_Δt
 
         # run
         step!(ocean, t)
@@ -180,8 +177,7 @@ function cpl_run(simulation::AOLCoupledSimulation)
         ## Land
         # pre: get accumulated flux from atmos
         lnd_F_sfc = land.integrator.p.F_sfc
-        atm_F_sfc = coupler_get(coupler, :F_sfc, land) ./ cpl_Δt
-        Operators.remap!(lnd_F_sfc, maps.atmos_to_land, atm_F_sfc)
+        lnd_F_sfc .= coupler_get(coupler, :F_sfc, land) ./ cpl_Δt
 
         # run
         step!(land, t)
@@ -191,7 +187,7 @@ function cpl_run(simulation::AOLCoupledSimulation)
     @info "Simulation Complete"
 end
 
-# cpl_run(sim)
+cpl_run(sim)
 
 # sol = sim.atmos.integrator.sol
 

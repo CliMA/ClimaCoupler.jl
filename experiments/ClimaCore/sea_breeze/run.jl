@@ -94,7 +94,9 @@ maps = (
 )
 
 # initialize coupling fields
-atm_T_sfc = Operators.remap(maps.ocean_to_atmos, ocn_Y_default.T_sfc) .+ Operators.remap(maps.land_to_atmos, lnd_Y_default.T_sfc) # masked arrays; regrid to atm grid
+atm_T_sfc =
+    Operators.remap(maps.ocean_to_atmos, ocn_Y_default.T_sfc) .+
+    Operators.remap(maps.land_to_atmos, lnd_Y_default.T_sfc) # masked arrays; regrid to atm grid
 atm_F_sfc = Fields.zeros(atm_boundary)
 ocn_F_sfc = Fields.zeros(ocn_domain)
 lnd_F_sfc = Fields.zeros(lnd_domain)
@@ -113,8 +115,13 @@ lnd_p = (cpl_parameters, F_sfc = lnd_F_sfc)
 land = LandSimulation(lnd_Y, t_start, cpl_Δt / lnd_nsteps, t_end, SSPRK33(), lnd_p, saveat)
 
 # coupled simulation
-struct AOLCoupledSimulation{FT, A <: AtmosSimulation, O <: OceanSimulation, L <: LandSimulation, C <: ClimaCoupler.CouplerState} <:
-       ClimaCoupler.AbstractCoupledSimulation
+struct AOLCoupledSimulation{
+    FT,
+    A <: AtmosSimulation,
+    O <: OceanSimulation,
+    L <: LandSimulation,
+    C <: ClimaCoupler.CouplerState,
+} <: ClimaCoupler.AbstractCoupledSimulation
     # Atmosphere Simulation
     atmos::A
     # Ocean Simulation
@@ -136,7 +143,7 @@ for (name, map) in pairs(maps)
     coupler_add_map!(coupler, name, map)
 end
 
-sim = AOLCoupledSimulation(atmos, ocean, land,coupler, cpl_Δt)
+sim = AOLCoupledSimulation(atmos, ocean, land, coupler, cpl_Δt)
 
 # step for sims built on OrdinaryDiffEq
 function step!(sim::ClimaCoupler.AbstractSimulation, t_stop)

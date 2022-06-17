@@ -4,12 +4,12 @@ using ClimaCoupler, Dates, Unitful
 using IntervalSets
 using ClimaCore: Domains, Meshes, Geometry, Topologies, Spaces, Fields, Operators
 
-struct SimulationA{T} <: ClimaCoupler.AbstractSimulation 
+struct SimulationA{T} <: ClimaCoupler.AbstractSimulation
     data::T
 end
 ClimaCoupler.name(::SimulationA) = :simA
 
-struct SimulationB{T} <: ClimaCoupler.AbstractSimulation 
+struct SimulationB{T} <: ClimaCoupler.AbstractSimulation
     data::T
 end
 ClimaCoupler.name(::SimulationB) = :simB
@@ -32,7 +32,6 @@ function spectral_space_2D(; n1 = 1, n2 = 1, Nij = 4)
 end
 
 @testset "Coupler Interface" begin
-    Random.seed!(26)
 
     spaceA = spectral_space_2D()
     spaceB = spectral_space_2D(n1 = 2, n2 = 2)
@@ -41,9 +40,7 @@ end
     simB = SimulationB(zeros(spaceB))
     coupler = CouplerState()
 
-    # data = rand(10, 10)
     coupler_add_field!(coupler, :test1, simA.data; write_sim = simA)
-    # coupler_add_field!(coupler, :test2, data; write_sim = simB)
 
     map = Operators.LinearRemap(spaceB, spaceA)
     coupler_add_map!(coupler, :simA_to_simB, map)

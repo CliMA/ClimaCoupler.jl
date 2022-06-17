@@ -5,18 +5,18 @@ export CouplerState
 export coupler_push!, coupler_pull!, coupler_put!, coupler_get
 export coupler_add_field!, coupler_add_map!
 
-mutable struct CplFieldInfo{AT, MD}
+mutable struct CplFieldInfo{DT, MD}
     # the coupled data
-    data::AT
+    data::DT
     # the name of the model that has permission to write to data
     write_sim::Symbol
     # catch-all metadata container
     metadata::MD
 end
 
-mutable struct CouplerState{DT, RT}
-    coupled_fields::DT
-    remap_operators::RT
+mutable struct CouplerState{CF, RO}
+    coupled_fields::CF
+    remap_operators::RO
 end
 
 _fields(coupler::CouplerState) = getfield(coupler, :coupled_fields)
@@ -49,7 +49,13 @@ Add a field to the coupler that is accessible with key `fieldname`.
 - `fieldname`: key to access the field in the coupler.
 - `fieldvalue`: data array of field values.
 """
-function coupler_add_field!(coupler::CouplerState, fieldname::Symbol, fieldvalue; write_sim::AbstractSimulation, metadata = nothing)
+function coupler_add_field!(
+    coupler::CouplerState,
+    fieldname::Symbol,
+    fieldvalue;
+    write_sim::AbstractSimulation,
+    metadata = nothing,
+)
     push!(coupler.coupled_fields, fieldname => CplFieldInfo(fieldvalue, name(write_sim), metadata))
 end
 

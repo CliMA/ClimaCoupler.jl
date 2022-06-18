@@ -59,6 +59,20 @@ function coupler_add_field!(
     push!(coupler.coupled_fields, fieldname => CplFieldInfo(fieldvalue, name(write_sim), metadata))
 end
 
+"""
+    coupler_add_map!(
+            coupler::CouplerState,
+            map_name::Symbol,
+            map::Operators.LinearRemap
+        )
+
+Add a map to the coupler that is accessible with key `mapname`. 
+
+# Arguments
+- `coupler`: coupler object the field is added to.
+- `mapname`: key to access the map in the coupler's map list.
+- `map`: a remap operator.
+"""
 function coupler_add_map!(coupler::CouplerState, map_name::Symbol, map::Operators.LinearRemap)
     push!(coupler.remap_operators, map_name => map)
 end

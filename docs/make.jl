@@ -7,24 +7,24 @@ const OUTPUT_DIR = joinpath(@__DIR__, "src/generated")
 
 # tutorials & experiments
 # - generate tutorial files
-tutorial_dir = joinpath(EXPERIMENTS_DIR, "ClimaCore/tc1_heat-diffusion-with-slab/")
-tutorial_name = "run.jl"
-Pkg.activate(tutorial_dir)
-Pkg.instantiate()
-include(joinpath(tutorial_dir, tutorial_name))
-Literate.markdown(joinpath(tutorial_dir, tutorial_name), OUTPUT_DIR; execute = true, documenter = false)
+# tutorial_dir = joinpath(EXPERIMENTS_DIR, "ClimaCore/tc1_heat-diffusion-with-slab/")
+# tutorial_name = "run.jl"
+# Pkg.activate(tutorial_dir)
+# Pkg.instantiate()
+# include(joinpath(tutorial_dir, tutorial_name))
+# Literate.markdown(joinpath(tutorial_dir, tutorial_name), OUTPUT_DIR; execute = true, documenter = false)
 
 # - move tutorial files to docs/src
-IMAGE_DIR = joinpath(tutorial_dir, "images/")
-files = readdir(IMAGE_DIR)
-png_files = filter(endswith(".png"), files)
-for file in png_files
-    mkpath(joinpath(OUTPUT_DIR, "images/"))
-    cp(joinpath(IMAGE_DIR, file), joinpath(OUTPUT_DIR, "images/", file), force = true)
-end
+# IMAGE_DIR = joinpath(tutorial_dir, "images/")
+# files = readdir(IMAGE_DIR)
+# png_files = filter(endswith(".png"), files)
+# for file in png_files
+#     mkpath(joinpath(OUTPUT_DIR, "images/"))
+#     cp(joinpath(IMAGE_DIR, file), joinpath(OUTPUT_DIR, "images/", file), force = true)
+# end
 
 # pages layout
-experiment_pages = ["generated/run.md"]
+experiment_pages = []
 interface_pages = ["couplerstate.md", "timestepping.md"]
 
 pages = Any["Home" => "index.md", "Examples" => experiment_pages, "Coupler Interface" => interface_pages]

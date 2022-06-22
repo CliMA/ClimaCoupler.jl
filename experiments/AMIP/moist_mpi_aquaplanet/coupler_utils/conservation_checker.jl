@@ -14,7 +14,7 @@ function check_conservation_callback(cs, atmos_sim, slab_sim)
         parent(ClimaCore.Fields.coordinate_field(atmos_sim.domain.face_space).z)[2] -
         parent(ClimaCore.Fields.coordinate_field(atmos_sim.domain.face_space).z)[1]
 
-    atmos_field = atmos_sim.integrator.u.c.ρe  # J 
+    atmos_field = atmos_sim.integrator.u.c.ρe_tot  # J 
     slab_field = get_slab_energy(slab_sim, slab_sim.integrator.u.T_sfc) ./ Δz_1  # J  [NB: sum of the boundary field inherits the depth from the first atmospheric layer, which ≂̸ slab depth]
 
     ρe_tot_atmos = sum(atmos_field)
@@ -38,7 +38,7 @@ end
 
 function conservation_plot(atmos_sim, slab_sim, solu_atm, solu_slab, figname = "tst_c.png")
 
-    atmos_e = [sum(u.c.ρe) for u in solu_atm] # J 
+    atmos_e = [sum(u.c.ρe_tot) for u in solu_atm] # J 
 
     z = parent(ClimaCore.Fields.coordinate_field(atmos_sim.domain.face_space).z)
     Δz_1 = z[2] - z[1]

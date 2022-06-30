@@ -1,16 +1,22 @@
+using ClimaCore.Operators
 using PrettyTables
 
 export CouplerState
 export coupler_push!, coupler_pull!, coupler_put!, coupler_get
-export coupler_add_field!
+export coupler_add_field!, coupler_add_map!
 
-mutable struct CplFieldInfo{AT, MD}
-    data::AT
+mutable struct CplFieldInfo{DT, MD}
+    # the coupled data
+    data::DT
+    # the name of the model that has permission to write to data
+    write_sim::Symbol
+    # catch-all metadata container
     metadata::MD
 end
 
-mutable struct CouplerState{DT}
-    coupled_fields::DT
+mutable struct CouplerState{CF, RO}
+    coupled_fields::CF
+    remap_operators::RO
 end
 
 _fields(coupler::CouplerState) = getfield(coupler, :coupled_fields)
@@ -26,7 +32,7 @@ etc... can be embeded in the intermdediate coupling layer.
 A field is exported by one component and imported by one or more other components.
 """
 function CouplerState()
-    return CouplerState(Dict{Symbol, CplFieldInfo}())
+    return CouplerState(Dict{Symbol, CplFieldInfo}(), Dict{Symbol, Operators.LinearRemap}())
 end
 
 """
@@ -43,8 +49,32 @@ Add a field to the coupler that is accessible with key `fieldname`.
 - `fieldname`: key to access the field in the coupler.
 - `fieldvalue`: data array of field values.
 """
-function coupler_add_field!(coupler::CouplerState, fieldname::Symbol, fieldvalue, metadata = nothing)
-    push!(coupler.coupled_fields, fieldname => CplFieldInfo(fieldvalue, metadata))
+function coupler_add_field!(
+    coupler::CouplerState,
+    fieldname::Symbol,
+    fieldvalue;
+    write_sim::AbstractSimulation,
+    metadata = nothing,
+)
+    push!(coupler.coupled_fields, fieldname => CplFieldInfo(fieldvalue, name(write_sim), metadata))
+end
+
+"""
+    coupler_add_map!(
+            coupler::CouplerState,
+            map_name::Symbol,
+            map::Operators.LinearRemap
+        )
+
+Add a map to the coupler that is accessible with key `mapname`. 
+
+# Arguments
+- `coupler`: coupler object the field is added to.
+- `mapname`: key to access the map in the coupler's map list.
+- `map`: a remap operator.
+"""
+function coupler_add_map!(coupler::CouplerState, map_name::Symbol, map::Operators.LinearRemap)
+    push!(coupler.remap_operators, map_name => map)
 end
 
 """
@@ -52,8 +82,9 @@ end
 
 Sets coupler field `fieldname` to `fieldvalue`.
 """
-function coupler_put!(coupler::CouplerState, fieldname::Symbol, fieldvalue)
+function coupler_put!(coupler::CouplerState, fieldname::Symbol, fieldvalue, source_sim::AbstractSimulation)
     cplfield = coupler.coupled_fields[fieldname]
+    @assert cplfield.write_sim == name(source_sim) "$fieldname can only be written to by $(cplfield.write_sim)."
 
     cplfield.data .= fieldvalue
 
@@ -80,9 +111,15 @@ Retrieve data array corresponding to `fieldname`.
 Returns data on the grid specified by `gridinfo` and in the units of `units`. Checks that
 the coupler data field is the state at time `datetime`.
 """
-function coupler_get(coupler::CouplerState, fieldname::Symbol)
+function coupler_get(coupler::CouplerState, fieldname::Symbol, target_sim::AbstractSimulation)
     cplfield = coupler.coupled_fields[fieldname]
 
+    map = get_remap_operator(coupler, name(target_sim), cplfield.write_sim)
+    return Operators.remap(map, cplfield.data)
+end
+
+function coupler_get(coupler::CouplerState, fieldname::Symbol)
+    cplfield = coupler.coupled_fields[fieldname]
     return cplfield.data
 end
 
@@ -97,6 +134,11 @@ model component using the coupler. It should get coupling fields via
 them for use in the component model.
 """
 function coupler_pull!(model, coupler::CouplerState) end
+
+function get_remap_operator(coupler, target_sim_name::Symbol, source_sim_name::Symbol)
+    op_name = Symbol(source_sim_name, "_to_", target_sim_name)
+    return coupler.remap_operators[op_name]
+end
 
 # display table of registered fields & their info
 function Base.show(io::IO, coupler::CouplerState)

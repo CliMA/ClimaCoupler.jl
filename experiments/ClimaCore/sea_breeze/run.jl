@@ -86,13 +86,17 @@ lnd_Y_default, lnd_domain = lnd_init(xmin = 0, xmax = 500, helem = 10, npoly = 0
 # Build remapping operators
 atm_boundary = Spaces.level(atm_domain.hv_face_space, PlusHalf(0))
 
-atm_to_ocn = Operators.LinearRemap(ocn_domain, atm_boundary)
-atm_to_lnd = Operators.LinearRemap(lnd_domain, atm_boundary)
-ocn_to_atm = Operators.LinearRemap(atm_boundary, ocn_domain)
-lnd_to_atm = Operators.LinearRemap(atm_boundary, lnd_domain)
+maps = (
+    atmos_to_ocean = Operators.LinearRemap(ocn_domain, atm_boundary),
+    atmos_to_land = Operators.LinearRemap(lnd_domain, atm_boundary),
+    ocean_to_atmos = Operators.LinearRemap(atm_boundary, ocn_domain),
+    land_to_atmos = Operators.LinearRemap(atm_boundary, lnd_domain),
+)
 
 # initialize coupling fields
-atm_T_sfc = Operators.remap(ocn_to_atm, ocn_Y_default.T_sfc) .+ Operators.remap(lnd_to_atm, lnd_Y_default.T_sfc) # masked arrays; regrid to atm grid
+atm_T_sfc =
+    Operators.remap(maps.ocean_to_atmos, ocn_Y_default.T_sfc) .+
+    Operators.remap(maps.land_to_atmos, lnd_Y_default.T_sfc) # masked arrays; regrid to atm grid
 atm_F_sfc = Fields.zeros(atm_boundary)
 ocn_F_sfc = Fields.zeros(ocn_domain)
 lnd_F_sfc = Fields.zeros(lnd_domain)
@@ -111,18 +115,35 @@ lnd_p = (cpl_parameters, F_sfc = lnd_F_sfc)
 land = LandSimulation(lnd_Y, t_start, cpl_Δt / lnd_nsteps, t_end, SSPRK33(), lnd_p, saveat)
 
 # coupled simulation
-struct AOLCoupledSimulation{FT, A <: AtmosSimulation, O <: OceanSimulation, L <: LandSimulation} <:
-       ClimaCoupler.AbstractCoupledSimulation
+struct AOLCoupledSimulation{
+    FT,
+    A <: AtmosSimulation,
+    O <: OceanSimulation,
+    L <: LandSimulation,
+    C <: ClimaCoupler.CouplerState,
+} <: ClimaCoupler.AbstractCoupledSimulation
     # Atmosphere Simulation
     atmos::A
     # Ocean Simulation
     ocean::O
     # Land Simulation
     land::L
+    # Coupler storage
+    coupler::C
     # The coupled time step size
     Δt::FT
 end
-sim = AOLCoupledSimulation(atmos, ocean, land, cpl_Δt)
+
+# init coupler fields and maps
+coupler = CouplerState()
+coupler_add_field!(coupler, :T_sfc_ocean, ocean.integrator.u.T_sfc; write_sim = ocean)
+coupler_add_field!(coupler, :T_sfc_land, land.integrator.u.T_sfc; write_sim = land)
+coupler_add_field!(coupler, :F_sfc, atmos.integrator.u.F_sfc; write_sim = atmos)
+for (name, map) in pairs(maps)
+    coupler_add_map!(coupler, name, map)
+end
+
+sim = AOLCoupledSimulation(atmos, ocean, land, coupler, cpl_Δt)
 
 # step for sims built on OrdinaryDiffEq
 function step!(sim::ClimaCoupler.AbstractSimulation, t_stop)
@@ -140,30 +161,35 @@ function cpl_run(simulation::AOLCoupledSimulation)
         ## Atmos
         # pre: reset flux accumulator
         atmos.integrator.u.F_sfc .= 0.0 # reset surface flux to be accumulated
+        # don't want to alloc here..
+        T_sfc_ocean = coupler_get(coupler, :T_sfc_ocean, atmos)
+        T_sfc_land = coupler_get(coupler, :T_sfc_land, atmos)
+        atmos.integrator.p.T_sfc .= T_sfc_land .+ T_sfc_ocean
 
-        # run 
+        # run
         # NOTE: use (t - integ_atm.t) here instead of Δt_cpl to avoid accumulating roundoff error in our timestepping.
         step!(atmos, t)
+        coupler_put!(coupler, :F_sfc, atmos.integrator.u.F_sfc, atmos)
 
         ## Ocean
         # pre: get accumulated flux from atmos
         ocn_F_sfc = ocean.integrator.p.F_sfc
-        Operators.remap!(ocn_F_sfc, atm_to_ocn, atmos.integrator.u.F_sfc ./ cpl_Δt)
+        ocn_F_sfc .= coupler_get(coupler, :F_sfc, ocean) ./ cpl_Δt
 
         # run
         step!(ocean, t)
         # post: send ocean surface temp to atmos
-        Operators.remap!(atmos.integrator.p.T_sfc, ocn_to_atm, ocean.integrator.u.T_sfc)
+        coupler_put!(coupler, :T_sfc_ocean, ocean.integrator.u.T_sfc, ocean)
 
         ## Land
         # pre: get accumulated flux from atmos
         lnd_F_sfc = land.integrator.p.F_sfc
-        Operators.remap!(lnd_F_sfc, atm_to_lnd, atmos.integrator.u.F_sfc ./ cpl_Δt)
+        lnd_F_sfc .= coupler_get(coupler, :F_sfc, land) ./ cpl_Δt
 
         # run
         step!(land, t)
-        # post: send ocean surface temp to atmos
-        atmos.integrator.p.T_sfc .+= Operators.remap(lnd_to_atm, land.integrator.u.T_sfc)
+        # post: send land surface temp to atmos
+        coupler_put!(coupler, :T_sfc_land, land.integrator.u.T_sfc, land)
     end
     @info "Simulation Complete"
 end

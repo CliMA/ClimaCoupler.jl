@@ -10,10 +10,11 @@ using ClimaCore.Utilities: half, PlusHalf
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
 # Read in some parsed args
-prescribed_sst = parsed_args["prescribed_sst"]
-energy_check = parsed_args["energy_check"]
+prescribed_sst = true #parsed_args["prescribed_sst"]
+energy_check = true #parsed_args["energy_check"]
 const FT = parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim = "bucket"
+parsed_args["t_end"] = "1hours"
 t_end = FT(time_to_seconds(parsed_args["t_end"]))
 tspan = (0, t_end)
 Δt_cpl = FT(parsed_args["dt_cpl"])
@@ -56,6 +57,7 @@ boundary_space = ClimaCore.Fields.level(atmos_sim.domain.face_space, half) # glo
 
 mask = LandSeaMask(FT, mask_data, "LSMASK", boundary_space)
 mask = swap_space!(mask, boundary_space) # needed if we are reading from previous run
+mask .= FT(0)
 
 # init surface (slab) model components
 # we need some types that are defined in these files
@@ -78,6 +80,7 @@ if prescribed_sst
         ncreader_rll_to_cgll_from_space(FT, time_slice_ncfile(sst_data), "SST", boundary_space, outfile = "sst_cgll.nc")  # a sample SST field
 
     SST = swap_space!(SST, axes(mask)) .* (abs.(mask .- 1)) .+ FT(273.15)
+    parent(SST) .= parent(atmos_sim.integrator.p.T_sfc)
 
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
     slab_ocean_sim = nothing
@@ -94,6 +97,7 @@ SIC =
     ncreader_rll_to_cgll_from_space(FT, time_slice_ncfile(sic_data), "SEAICE", boundary_space, outfile = "sic_cgll.nc")
 SIC = swap_space!(SIC, axes(mask)) .* (abs.(mask .- 1))
 ice_mask = get_ice_mask.(SIC .- FT(25), FT) # here 25% and lower is considered ice free
+ice_mask .= FT(0)
 
 slab_ice_sim =
     slab_ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)

@@ -1,3 +1,9 @@
+# # Coupling in Practice: Sea Breeze
+
+# In this tutorial we demonstrate the coupling of three component models
+# (atmosphere, ocean, and land) to drive the sea breeze. The primary parts
+# of the ClimaCoupler interface are used and discussed.
+
 const FT = Float64
 import SciMLBase: step!
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!
@@ -6,6 +12,14 @@ using DiffEqCallbacks
 
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", ".."))
 using ClimaCoupler
+
+# ## Component Models
+# Coupled simulations can re-use tendency methods developed for standalone simulations.
+# This is achieved by multiple dispatch, where methods that deal with boundaries
+# dispatch off of a coupled boundary type. This minimizes the necessary code that
+# must be specialized for a coupled run as only special boundary conditions must
+# be written. Here, the atmosphere has special boundary conditions for coupling,
+# while the ocean and land tendencies are unaltered.
 
 include("atmos_rhs.jl")
 include("ocean_rhs.jl")
@@ -47,6 +61,7 @@ cpl_parameters = (
     C_H = FT(0.0015),
 )
 
+# DSS callback
 function make_dss_func()
     function _dss!(x::Fields.Field)
         Spaces.weighted_dss!(x)
@@ -62,12 +77,16 @@ dss_callback = FunctionCallingCallback(dss_func, func_start = true)
 
 @info "Init Models and Maps"
 
-# timestepping
+# ## Timestepping
+# The coupled simulation synchronizes the component models at a coupling time step,
+# `Δt_cpl`. Within that step, components may substep - each component specifies a
+# number of substeps to take within `Δt_cpl`: `atm_nsteps, ocn_nsteps, lnd_nsteps`.
 t_start, t_end = (0.0, 1.0)
-cpl_Δt = 0.1
+Δt_cpl = 0.1
 saveat = 1e2
 atm_nsteps, ocn_nsteps, lnd_nsteps = (5, 1, 1)
 
+# Initialize Fields
 atm_Y_default, atm_bc, atm_domain = atm_init(
     xmin = -500,
     xmax = 500,
@@ -83,7 +102,9 @@ ocn_Y_default, ocn_domain = ocn_init(xmin = -500, xmax = 0, helem = 10, npoly = 
 
 lnd_Y_default, lnd_domain = lnd_init(xmin = 0, xmax = 500, helem = 10, npoly = 0)
 
-# Build remapping operators
+# ## Remapping
+# Because models may live on different grids, remapping is necessary at the boundaries.
+# Maps between coupled components must be constructed for each interacting pair.
 atm_boundary = Spaces.level(atm_domain.hv_face_space, PlusHalf(0))
 
 maps = (
@@ -101,20 +122,25 @@ atm_F_sfc = Fields.zeros(atm_boundary)
 ocn_F_sfc = Fields.zeros(ocn_domain)
 lnd_F_sfc = Fields.zeros(lnd_domain)
 
-# init models
+# ## Simulations
+# Each component is wrapped as a Simulation, which contains both the model (tendency)
+# and the time-stepping information (solver, step size, etc). Simulations are the standard
+# structures that the coupler works with, enabling dispatch. Here, we create three simulations:
+# `AtmosSimulation`, `OceanSimulation`, and `LandSimulation`.
 atm_Y = Fields.FieldVector(Yc = atm_Y_default.Yc, ρw = atm_Y_default.ρw, F_sfc = atm_F_sfc)
 atm_p = (cpl_p = cpl_parameters, T_sfc = atm_T_sfc, bc = atm_bc)
-atmos = AtmosSimulation(atm_Y, t_start, cpl_Δt / atm_nsteps, t_end, SSPRK33(), atm_p, saveat, dss_callback)
+atmos = AtmosSimulation(atm_Y, t_start, Δt_cpl / atm_nsteps, t_end, SSPRK33(), atm_p, saveat, dss_callback)
 
 ocn_Y = Fields.FieldVector(T_sfc = ocn_Y_default.T_sfc)
 ocn_p = (cpl_parameters, F_sfc = ocn_F_sfc)
-ocean = OceanSimulation(ocn_Y, t_start, cpl_Δt / ocn_nsteps, t_end, SSPRK33(), ocn_p, saveat)
+ocean = OceanSimulation(ocn_Y, t_start, Δt_cpl / ocn_nsteps, t_end, SSPRK33(), ocn_p, saveat)
 
 lnd_Y = Fields.FieldVector(T_sfc = lnd_Y_default.T_sfc)
 lnd_p = (cpl_parameters, F_sfc = lnd_F_sfc)
-land = LandSimulation(lnd_Y, t_start, cpl_Δt / lnd_nsteps, t_end, SSPRK33(), lnd_p, saveat)
+land = LandSimulation(lnd_Y, t_start, Δt_cpl / lnd_nsteps, t_end, SSPRK33(), lnd_p, saveat)
 
-# coupled simulation
+# Additionally, we create a coupled simulation that contains the component simulations
+# and the coupled time-stepping information.
 struct AOLCoupledSimulation{
     FT,
     A <: AtmosSimulation,
@@ -134,7 +160,11 @@ struct AOLCoupledSimulation{
     Δt::FT
 end
 
-# init coupler fields and maps
+# ## The Coupler
+# The `CouplerState` is a coupling struct used to store pointers or copies of the
+# shared boundary information. All components are coupled by updating or accessing
+# data in this `CouplerState`; component models do not directly interface with one another,
+# only through the coupler.
 coupler = CouplerState()
 coupler_add_field!(coupler, :T_sfc_ocean, ocean.integrator.u.T_sfc; write_sim = ocean)
 coupler_add_field!(coupler, :T_sfc_land, land.integrator.u.T_sfc; write_sim = land)
@@ -143,7 +173,7 @@ for (name, map) in pairs(maps)
     coupler_add_map!(coupler, name, map)
 end
 
-sim = AOLCoupledSimulation(atmos, ocean, land, coupler, cpl_Δt)
+sim = AOLCoupledSimulation(atmos, ocean, land, coupler, Δt_cpl)
 
 # step for sims built on OrdinaryDiffEq
 function step!(sim::ClimaCoupler.AbstractSimulation, t_stop)
@@ -154,9 +184,9 @@ end
 function cpl_run(simulation::AOLCoupledSimulation)
     @info "Run model"
     @unpack atmos, ocean, land, Δt = simulation
-    cpl_Δt = Δt
+    Δt_cpl = Δt
     # coupler stepping
-    for t in ((t_start + cpl_Δt):cpl_Δt:t_end)
+    for t in ((t_start + Δt_cpl):Δt_cpl:t_end)
 
         ## Atmos
         # pre: reset flux accumulator
@@ -174,7 +204,7 @@ function cpl_run(simulation::AOLCoupledSimulation)
         ## Ocean
         # pre: get accumulated flux from atmos
         ocn_F_sfc = ocean.integrator.p.F_sfc
-        ocn_F_sfc .= coupler_get(coupler, :F_sfc, ocean) ./ cpl_Δt
+        ocn_F_sfc .= coupler_get(coupler, :F_sfc, ocean) ./ Δt_cpl
 
         # run
         step!(ocean, t)
@@ -184,7 +214,7 @@ function cpl_run(simulation::AOLCoupledSimulation)
         ## Land
         # pre: get accumulated flux from atmos
         lnd_F_sfc = land.integrator.p.F_sfc
-        lnd_F_sfc .= coupler_get(coupler, :F_sfc, land) ./ cpl_Δt
+        lnd_F_sfc .= coupler_get(coupler, :F_sfc, land) ./ Δt_cpl
 
         # run
         step!(land, t)

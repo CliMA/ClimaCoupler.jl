@@ -53,9 +53,14 @@ end
         # test remapping
         @test map === ClimaCoupler.get_remap_operator(coupler, ClimaCoupler.name(simB), ClimaCoupler.name(simA))
         @test ones(spaceB) ≈ coupler_get(coupler, :test1, simB)
+        target_field = zeros(spaceB)
+        coupler_get!(target_field, coupler, :test1, simB)
+        @test ones(spaceB) ≈ target_field
 
         # key not in coupler dict
         @test_throws KeyError coupler_get(coupler, :idontexist)
+        @test_throws KeyError coupler_get(coupler, :idontexist, simB)
+        @test_throws KeyError coupler_get!(target_field, coupler, :idontexist, simB)
     end
 
     @testset "coupler_put!" begin

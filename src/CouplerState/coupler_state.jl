@@ -1,8 +1,9 @@
-using ClimaCore.Operators
+using ClimaCore
+using ClimaCore: Operators, Fields
 using PrettyTables
 
 export CouplerState
-export coupler_push!, coupler_pull!, coupler_put!, coupler_get
+export coupler_push!, coupler_pull!, coupler_put!, coupler_get, coupler_get!
 export coupler_add_field!, coupler_add_map!
 
 mutable struct CplFieldInfo{DT, MD}
@@ -104,23 +105,37 @@ them for the coupler.
 function coupler_push!(coupler::CouplerState, model) end
 
 """
-    coupler_get(coupler::CouplerState, fieldname::Symbol)
+    coupler_get!(target_field::ClimaCore.Fields.Field, coupler::CouplerState, fieldname::Symbol, target_sim::AbstractSimulation)
+
+Retrieve data array corresponding to `fieldname`, remap and store in `target_field`.
+"""
+function coupler_get!(
+    target_field::ClimaCore.Fields.Field,
+    coupler::CouplerState,
+    fieldname::Symbol,
+    target_sim::AbstractSimulation,
+)
+    cplfield = coupler.coupled_fields[fieldname]
+    map = get_remap_operator(coupler, name(target_sim), cplfield.write_sim)
+    Operators.remap!(target_field, map, cplfield.data)
+end
+
+"""
+    coupler_get(coupler::CouplerState, fieldname::Symbol [, target_sim::AbstractSimulation])
 
 Retrieve data array corresponding to `fieldname`.
 
-Returns data on the grid specified by `gridinfo` and in the units of `units`. Checks that
-the coupler data field is the state at time `datetime`.
+If a `target_sim` is passed, the field is remapped to that simulation's boundary space.
 """
-function coupler_get(coupler::CouplerState, fieldname::Symbol, target_sim::AbstractSimulation)
-    cplfield = coupler.coupled_fields[fieldname]
-
-    map = get_remap_operator(coupler, name(target_sim), cplfield.write_sim)
-    return Operators.remap(map, cplfield.data)
-end
-
 function coupler_get(coupler::CouplerState, fieldname::Symbol)
     cplfield = coupler.coupled_fields[fieldname]
     return cplfield.data
+end
+
+function coupler_get(coupler::CouplerState, fieldname::Symbol, target_sim::AbstractSimulation)
+    cplfield = coupler.coupled_fields[fieldname]
+    map = get_remap_operator(coupler, name(target_sim), cplfield.write_sim)
+    return Operators.remap(map, cplfield.data)
 end
 
 """

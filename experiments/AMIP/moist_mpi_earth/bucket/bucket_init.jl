@@ -5,12 +5,13 @@ import ClimaLSM
 include(joinpath(pkgdir(ClimaLSM), "parameters", "create_parameters.jl"))
 using ClimaLSM.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers
 
-import ClimaLSM.Bucket: surface_fluxes, surface_air_density, liquid_precipitation, BulkAlbedo, surface_albedo
+import ClimaLSM.Bucket: surface_fluxes, surface_air_density, liquid_precipitation, BulkAlbedo, surface_albedo, snow_precipitation
 
 using ClimaLSM: make_ode_function, initialize_prognostic, initialize_auxiliary
 
 import ClimaLSM: initialize
-
+import ClimaLSM.Parameters as LSMP
+include(joinpath(pkgdir(ClimaLSM), "parameters", "create_parameters.jl"))
 """
     BucketSimulation{P, Y, D, I}
 
@@ -102,13 +103,13 @@ function liquid_precipitation(p, atmos::CoupledAtmosphere, t)
 end
 
 """
-    get_land_energy(slab_sim::BucketSimulation, T_sfc)
+    ClimaLSM.Bucket.snow_precipitation(p, atmos::CoupledAtmosphere, t)
 
-Returns the volumetric internal energy of the bucket; a method for the 
-bucket model when used as the land model.
+an extension of the bucket model method which returns the precipitation
+(m/s) in the case of a coupled simulation.
 """
-function get_land_energy(slab_sim::BucketSimulation, T_sfc)
-    return get_bucket_energy(slab_sim, T_sfc)
+function snow_precipitation(p, atmos::CoupledAtmosphere, t)
+    return p.bucket.P_snow
 end
 
 """
@@ -141,8 +142,8 @@ a method for the bucket model
 when used as the land model.
 """
 function land_albedo(slab_sim::BucketSimulation)
-    coords = ClimaCore.Fields.coordinate_field(axes(slab_sim.integrator.u.bucket.S))
-    α_land = surface_albedo.(Ref(slab_sim.params.albedo), coords, slab_sim.integrator.u.bucket.S, slab_sim.params.S_c)
+    coords = ClimaCore.Fields.coordinate_field(axes(slab_sim.integrator.u.bucket.σS))
+    α_land = surface_albedo.(Ref(slab_sim.params.albedo), coords, slab_sim.integrator.u.bucket.σS, slab_sim.params.σS_c)
     return parent(α_land)
 end
 
@@ -158,17 +159,23 @@ function get_land_q(slab_sim::BucketSimulation, _...)
 end
 
 """
-    get_bucket_energy(bucket_sim, T_sfc)
+    get_land_energy(bucket_sim::BucketSimulation, boundary_space)
 
-Returns the volumetric internal energy of the bucket land model.
+Returns the internal energy per unit area of the bucket land model.
 """
-get_bucket_energy(bucket_sim, T_sfc) = bucket_sim.params.ρc_soil .* T_sfc .* bucket_sim.params.d_soil
+function get_land_energy(bucket_sim::BucketSimulation, boundary_space)
+    σS = swap_space!(bucket_sim.integrator.u.bucket.σS, boundary_space)
+    T_sfc = swap_space!(bucket_sim.integrator.u.bucket.T_sfc, boundary_space)
+    return bucket_sim.params.ρc_soil .* T_sfc .* bucket_sim.params.d_soil -
+        LSMP.LH_f0(bucket_sim.params.earth_param_set)* σS
+end
+
 
 
 """
     bucket_init
 
-Initizliaes the bucket model variables.
+Initializes the bucket model variables.
 """
 function bucket_init(::Type{FT}, tspan::Tuple{FT, FT}; space, dt::FT, saveat::FT, stepper = Euler()) where {FT}
 
@@ -180,7 +187,7 @@ function bucket_init(::Type{FT}, tspan::Tuple{FT, FT}; space, dt::FT, saveat::FT
 
     α_snow = FT(0.8) # snow albedo
     albedo = BulkAlbedo{FT}(α_snow, α_soil)
-    S_c = FT(0.2)
+    σS_c = FT(0.2)
     W_f = FT(0.15)
     d_soil = FT(3.5) # soil depth
     T0 = FT(280.0)
@@ -188,7 +195,8 @@ function bucket_init(::Type{FT}, tspan::Tuple{FT, FT}; space, dt::FT, saveat::FT
     z_0b = FT(1e-3)
     κ_soil = FT(0.0)# setting this to zero allows us to test energy conservation; zero flux in soil column at bottom
     ρc_soil = FT(2e6)
-    params = BucketModelParameters(d_soil, T0, κ_soil, ρc_soil, albedo, S_c, W_f, z_0m, z_0b, earth_param_set)
+    τc = FT(5)*dt
+    params = BucketModelParameters(d_soil, T0, κ_soil, ρc_soil, albedo, σS_c, W_f, z_0m, z_0b, τc, earth_param_set)
 
     args = (params, CoupledAtmosphere{FT}(), CoupledRadiativeFluxes{FT}(), nothing)
     model = BucketModel{FT, typeof.(args)...}(args...)
@@ -216,14 +224,15 @@ function bucket_init(::Type{FT}, tspan::Tuple{FT, FT}; space, dt::FT, saveat::FT
 
     Y.bucket.W .= 0.14
     Y.bucket.Ws .= 0.0
-    Y.bucket.S .= 0.0 # no snow
+    Y.bucket.σS .= 0.0
     # add ρ_sfc to cache
     # this needs to be initialized!!! Turbulent surface fluxes need this set to be computed.
     ρ_sfc = zeros(space) .+ FT(1.1)
     P_liq = zeros(space) .+ FT(0.0)
-    variable_names = (propertynames(p.bucket)..., :ρ_sfc, :P_liq)
+    P_snow = zeros(space) .+ FT(0.0)
+    variable_names = (propertynames(p.bucket)..., :ρ_sfc, :P_liq, :P_snow)
     orig_fields = map(x -> getproperty(p.bucket, x), propertynames(p.bucket))
-    fields = (orig_fields..., ρ_sfc, P_liq)
+    fields = (orig_fields..., ρ_sfc, P_liq, P_snow)
     p_new = ClimaCore.Fields.FieldVector(; :bucket => (; zip(variable_names, fields)...))
 
     ode_function! = make_ode_function(model)

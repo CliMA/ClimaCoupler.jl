@@ -50,14 +50,8 @@ function check_conservation(
     z = parent(Fields.coordinate_field(face_space).z)
     Δz_bot = FT(0.5) * (z[2, 1, 1, 1, 1] - z[1, 1, 1, 1, 1])
 
-    u_atm = atmos_sim.integrator.u.c.ρe_tot
-    T_land = land_sim !== nothing ? get_land_temp(slab_sim) : nothing
-    u_lnd = land_sim !== nothing ? swap_space!(T_land, coupler_sim.boundary_space) : nothing
-    u_ocn = ocean_sim !== nothing ? swap_space!(ocean_sim.integrator.u.T_sfc, coupler_sim.boundary_space) : nothing
-    u_ice = seaice_sim !== nothing ? swap_space!(seaice_sim.integrator.u.T_sfc, coupler_sim.boundary_space) : nothing
-
     # global sums
-    atmos_e = sum(u_atm)
+    atmos_e = sum(atmos_sim.integrator.u.c.ρe_tot)
 
     if radiation
 
@@ -90,22 +84,27 @@ function check_conservation(
 
     # Surface masks
     univ_mask = parent(coupler_sim.mask) .- parent(seaice_sim.integrator.p.Ya.ice_mask .* FT(2))
-    land_mask(u_lnd_1, univ_mask) = (univ_mask ≈ FT(1) ? u_lnd_1 : FT(0))
-    ice_mask(u_ice_1, univ_mask) = (univ_mask ≈ FT(-2) ? u_ice_1 : FT(0))
-    ocean_mask(u_ocn_1, univ_mask) = (univ_mask ≈ FT(0) ? u_ocn_1 : FT(0))
+    land_mask(u, univ_mask) = (univ_mask ≈ FT(1) ? u : FT(0))
+    ice_mask(u, univ_mask) = (univ_mask ≈ FT(-2) ? u : FT(0))
+    ocean_mask(u, univ_mask) = (univ_mask ≈ FT(0) ? u : FT(0))
+
+    e_lnd = land_sim !== nothing ?  get_land_energy(slab_sim, coupler_sim.boundary_space) : nothing
+    e_ocn = ocean_sim !== nothing ? get_slab_energy(ocean_sim, coupler_sim.boundary_space) : nothing
+    e_ice = seaice_sim !== nothing ? get_slab_energy(seaice_sim, coupler_sim.boundary_space)  : nothing
+
 
     # Save land
-    parent(u_lnd) .= land_mask.(parent(u_lnd), univ_mask)
-    land_e = land_sim !== nothing ? sum(get_land_energy(land_sim, u_lnd)) ./ Δz_bot : FT(0)
+    parent(e_lnd) .= land_mask.(parent(e_lnd), univ_mask)
+    land_e = land_sim !== nothing ? sum(e_lnd) ./ Δz_bot : FT(0)
     push!(cs.ρe_tot_land, land_e)
 
-    parent(u_ice) .= ice_mask.(parent(u_ice), univ_mask)
-    seaice_e = seaice_sim !== nothing ? sum(get_slab_energy(seaice_sim, u_ice)) ./ Δz_bot : FT(0)
+    parent(e_ice) .= ice_mask.(parent(e_ice), univ_mask)
+    seaice_e = seaice_sim !== nothing ? sum(e_ice) ./ Δz_bot : FT(0)
     push!(cs.ρe_tot_seaice, seaice_e)
 
     if ocean_sim != nothing
-        parent(u_ocn) .= ocean_mask.(parent(u_ocn), univ_mask)
-        ocean_e = sum(get_slab_energy(ocean_sim, u_ocn)) ./ Δz_bot
+        parent(e_ocn) .= ocean_mask.(parent(e_ocn), univ_mask)
+        ocean_e = sum(e_ocn) ./ Δz_bot
     else
         ocean_e = FT(0)
     end

@@ -120,8 +120,8 @@ atmos_pull!(
     mask,
 )
 
-atmos_push!(atmos_sim, boundary_space, F_A, F_R, F_E, P_liq, parsed_args)
-land_pull!(slab_sim, F_A, F_R, F_E, P_liq, ρ_sfc)
+atmos_push!(atmos_sim, boundary_space, F_A, F_R, F_E, P_liq, P_snow,parsed_args)
+land_pull!(slab_sim, F_A, F_R, F_E, P_liq, P_snow,ρ_sfc)
 ice_pull!(slab_ice_sim, F_A, F_R)
 if !prescribed_sst
     ocean_pull!(slab_ocean_sim, F_A, F_R)
@@ -158,10 +158,10 @@ walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
     )
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
 
-    atmos_push!(atmos_sim, boundary_space, F_A, F_R, F_E, P_liq, parsed_args)
+    atmos_push!(atmos_sim, boundary_space, F_A, F_R, F_E, P_liq, P_snow, parsed_args)
 
     ## Slab land
-    land_pull!(slab_sim, F_A, F_R, F_E, P_liq, ρ_sfc)
+    land_pull!(slab_sim, F_A, F_R, F_E, P_liq, P_snow, ρ_sfc)
     step!(slab_sim.integrator, t - slab_sim.integrator.t, true)
 
     ## Slab ocean
@@ -187,8 +187,6 @@ if energy_check && !prescribed_sst
     plot_global_energy(CS, coupler_sim, "total_energy_bucket.png", "total_energy_log_bucket.png")
 end
 
-
-@show P_liq
 # # animations
 if (land_sim == "bucket") && parsed_args["anim"]
     #make it so this works with slab land?

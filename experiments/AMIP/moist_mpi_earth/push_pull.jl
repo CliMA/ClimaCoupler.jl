@@ -9,18 +9,21 @@ F_A = ClimaCore.Fields.zeros(boundary_space) # aerodynamic turbulent fluxes
 F_E = ClimaCore.Fields.zeros(boundary_space) # aerodynamic turbulent fluxes
 F_R = ClimaCore.Fields.zeros(boundary_space) # radiative fluxes
 P_liq = ClimaCore.Fields.zeros(boundary_space) # m/s precip
+P_snow = ClimaCore.Fields.zeros(boundary_space) # m/s precip
 """
    atmos_push!(atmos_sim, boundary_space, F_A, F_R, F_E, P_liq, parsed_args)
 
 updates F_A, F_R, P_liq, and F_E in place based on values used in the atmos_sim for the current step.
 """
-function atmos_push!(atmos_sim, boundary_space, F_A, F_R, F_E, P_liq, parsed_args)
+function atmos_push!(atmos_sim, boundary_space, F_A, F_R, F_E, P_liq, P_snow,parsed_args)
     F_A .= ClimaCore.Fields.zeros(boundary_space)
     dummmy_remap!(F_A, atmos_sim.integrator.p.dif_flux_energy)
     F_E .= ClimaCore.Fields.zeros(boundary_space)
     dummmy_remap!(F_E, atmos_sim.integrator.p.dif_flux_ρq_tot)
     P_liq .= ClimaCore.Fields.zeros(boundary_space)
     dummmy_remap!(P_liq, atmos_sim.integrator.p.col_integrated_precip)
+    P_snow .= ClimaCore.Fields.zeros(boundary_space)
+#    dummmy_remap!(P_liq, atmos_sim.integrator.p.col_integrated_precip)
     F_R .= ClimaCore.Fields.zeros(boundary_space)
     parsed_args["rad"] == "gray" ? dummmy_remap!(F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) : nothing
 end
@@ -44,7 +47,7 @@ The surface air density is computed using the atmospheric state at the first lev
 and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
 a reasonable stand-in.
 """
-function land_pull!(slab_sim::BucketSimulation, F_A, F_R, F_E, P_liq, ρ_sfc)
+function land_pull!(slab_sim::BucketSimulation, F_A, F_R, F_E, P_liq, P_snow,ρ_sfc)
     FT = eltype(F_A)
     @. slab_sim.integrator.p.bucket.ρ_sfc = ρ_sfc
     @. slab_sim.integrator.p.bucket.SHF = F_A
@@ -53,6 +56,7 @@ function land_pull!(slab_sim::BucketSimulation, F_A, F_R, F_E, P_liq, ρ_sfc)
     @. slab_sim.integrator.p.bucket.E = F_E / ρ_liq
     @. slab_sim.integrator.p.bucket.R_n = F_R
     @. slab_sim.integrator.p.bucket.P_liq = FT(-1.0) .* P_liq # land expects this to be positive
+    @. slab_sim.integrator.p.bucket.P_snow = FT(-1.0) .* P_snow # land expects this to be positive
 end
 
 """

@@ -1,6 +1,9 @@
 # coupler_driver
 # don't forget to run with threading: julia --project --threads 8 (MPI not that useful for debugging coarse runs)
 
+import Random
+Random.seed!(1234)
+
 import SciMLBase: step!
 using OrdinaryDiffEq
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
@@ -14,7 +17,7 @@ prescribed_sst = true #parsed_args["prescribed_sst"]
 energy_check = true #parsed_args["energy_check"]
 const FT = parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim = "bucket"
-parsed_args["t_end"] = "1hours"
+parsed_args["t_end"] = "2400secs"
 t_end = FT(time_to_seconds(parsed_args["t_end"]))
 tspan = (0, t_end)
 Δt_cpl = FT(parsed_args["dt_cpl"])
@@ -32,6 +35,8 @@ parsed_args["rad"] = "gray"
 parsed_args["hyperdiff"] = true
 parsed_args["config"] = "sphere"
 parsed_args["moist"] = "equil"
+
+parsed_args["dt_save_to_disk"] = "200secs"
 
 # Get the paths to the necessary data files - land sea mask, sst map, sea ice concentration
 include("artifacts.jl")

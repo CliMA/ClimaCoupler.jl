@@ -40,8 +40,5 @@ Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 TurbulenceConvection = "8e072fc4-01f8-44fb-b9dc-f9336c367e6b"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
-[compat]
-ClimaCore = "0.10.3"
-
 [extras]
 CPUSummary = "2a0fbf3d-bb9c-48f3-b0a9-814d99fd7ab9"

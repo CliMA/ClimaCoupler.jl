@@ -201,11 +201,9 @@ version = "0.1.3"
 
 [[deps.ClimaAtmos]]
 deps = ["ClimaCore", "ClimaCorePlots", "ClimaCoreVTK", "CloudMicrophysics", "DiffEqCallbacks", "Insolation", "IntervalSets", "JLD2", "LinearAlgebra", "OrdinaryDiffEq", "Pkg", "Printf", "StaticArrays", "Test", "Thermodynamics", "UnPack"]
-git-tree-sha1 = "2b6cb31664dd63cd49c17822ae62b1a9fb8e97f9"
-repo-rev = "1bbdf48d768fde7c80a30b90bf7560c9d5b75686"
-repo-url = "https://github.com/CliMA/ClimaAtmos.jl"
+git-tree-sha1 = "1320c07f32a675fc4b83a81bf9d3c5add955f4df"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.1.0"
+version = "0.2.0"
 
 [[deps.ClimaComms]]
 deps = ["CUDA", "KernelAbstractions", "StaticArrays"]

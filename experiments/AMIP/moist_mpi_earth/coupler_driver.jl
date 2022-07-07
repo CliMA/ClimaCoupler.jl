@@ -184,7 +184,7 @@ end
 
 @show "Postprocessing"
 if energy_check && !prescribed_sst
-    plot_global_energy(CS, coupler_sim, "total_energy_bucket.png", "total_energy_log_bucket.png")
+    plot_global_energy(CS, coupler_sim, "total_energy_bucket_snow.png", "total_energy_log_bucket_snow.png")
 end
 
 # # animations

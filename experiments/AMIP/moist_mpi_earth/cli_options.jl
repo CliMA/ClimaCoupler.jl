@@ -168,6 +168,14 @@ function parse_commandline()
         help = "Viscous sponge coefficient"
         arg_type = Float64
         default = Float64(1e6)
+        "--apply_moisture_filter"
+        help = "Apply filter to moisture"
+        arg_type = Bool
+        default = false
+        "--disable_qt_hyperdiffusion"
+        help = "Disable the hyperdiffusion of specific humidity [`true`, `false` (default)] (TODO: reconcile this with ρe_tot or remove if instability fixed with limiters)"
+        arg_type = Bool
+        default = false
     end
     parsed_args = ArgParse.parse_args(ARGS, s)
     return (s, parsed_args)

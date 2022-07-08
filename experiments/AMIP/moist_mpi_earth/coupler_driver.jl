@@ -32,6 +32,11 @@ parsed_args["hyperdiff"] = true
 parsed_args["config"] = "sphere"
 parsed_args["moist"] = "equil"
 
+import ClimaCoupler
+pkg_dir = pkgdir(ClimaCoupler)
+coupler_output_dir = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth")
+
+
 # Get the paths to the necessary data files - land sea mask, sst map, sea ice concentration
 include("artifacts.jl")
 
@@ -184,7 +189,12 @@ end
 
 @show "Postprocessing"
 if energy_check && !prescribed_sst
-    plot_global_energy(CS, coupler_sim, "total_energy_bucket.png", "total_energy_log_bucket.png")
+    plot_global_energy(
+        CS,
+        coupler_sim,
+        joinpath(coupler_output_dir, "total_energy_bucket.png"),
+        joinpath(coupler_output_dir, "total_energy_log_bucket.png"),
+    )
 end
 
 

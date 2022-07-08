@@ -7,7 +7,9 @@ using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
 using LinearAlgebra
 import Test: @test
 using ClimaCore.Utilities: half, PlusHalf
-include("cli_options.jl")
+using Dates
+
+include("cli_options_io.jl")
 (s, parsed_args) = parse_commandline()
 # Read in some parsed args
 prescribed_sst = parsed_args["prescribed_sst"]
@@ -32,6 +34,10 @@ parsed_args["hyperdiff"] = true
 parsed_args["config"] = "sphere"
 parsed_args["moist"] = "equil"
 
+# atmos diagnostics
+parsed_args["dt_save_to_disk"] = "1hours" # saves jld2 at this frequency, can be used as a restart also
+# ENV["RESTART_FILE"] = ".jld2"
+
 # Get the paths to the necessary data files - land sea mask, sst map, sea ice concentration
 include("artifacts.jl")
 
@@ -54,8 +60,8 @@ boundary_space = ClimaCore.Fields.level(atmos_sim.domain.face_space, half) # glo
 
 # init land-sea mask
 
-mask = LandSeaMask(FT, mask_data, "LSMASK", boundary_space)
-mask = swap_space!(mask, boundary_space) # needed if we are reading from previous run
+landmask = LandSeaMask(FT, mask_data, "LSMASK", boundary_space)
+landmask = swap_space!(landmask, boundary_space) # needed if we are reading from previous run
 
 # init surface (slab) model components
 # we need some types that are defined in these files
@@ -66,7 +72,7 @@ include("slab_ocean/slab_init.jl")
 include("slab_ice/slab_init.jl")
 
 if land_sim == "slab"
-    slab_sim = slab_init(FT; tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask)
+    slab_sim = slab_init(FT; tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = landmask)
 end
 if land_sim == "bucket"
     slab_sim = bucket_init(FT, FT.(tspan); dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat))
@@ -74,30 +80,31 @@ end
 
 if prescribed_sst
     println("No ocean sim - do not expect energy conservation")
-    SST =
-        ncreader_rll_to_cgll_from_space(FT, time_slice_ncfile(sst_data), "SST", boundary_space, outfile = "sst_cgll.nc")  # a sample SST field
+    SST_info = bcfile_info_init(datafile_rll, varname, boundary_space)
 
-    SST = swap_space!(SST, axes(mask)) .* (abs.(mask .- 1)) .+ FT(273.15)
+    update_midmonth_data!(SST_info)
+    SST = interpolate_midmonth_to_daily(date, SST_info, FT(273.15)) 
+
+    #SST = swap_space!(SST, axes(landmask)) .* (abs.(landmask .- 1)) .+ FT(273.15)
 
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
     slab_ocean_sim = nothing
+
+    # Currently, we only support a slab ice model with fixed area and depth.
+
+    SIC =
+    ncreader_rll_to_cgll_from_space(FT, time_slice_ncfile(sic_data), "SEAICE", boundary_space, outfile = "sic_cgll.nc")
+    SIC = swap_space!(SIC, axes(landmask)) .* (abs.(landmask .- 1))
+    ice_mask = get_ice_mask.(SIC .- FT(25), FT) # here 25% and lower is considered ice free
+
+    slab_ice_sim =
+    slab_ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
 else
     slab_ocean_sim =
-        slab_ocean_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask)
+        slab_ocean_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = landmask)
     SST = nothing
     ocean_params = nothing
 end
-
-# Currently, we only support a slab ice model with fixed area and depth.
-
-SIC =
-    ncreader_rll_to_cgll_from_space(FT, time_slice_ncfile(sic_data), "SEAICE", boundary_space, outfile = "sic_cgll.nc")
-SIC = swap_space!(SIC, axes(mask)) .* (abs.(mask .- 1))
-ice_mask = get_ice_mask.(SIC .- FT(25), FT) # here 25% and lower is considered ice free
-
-slab_ice_sim =
-    slab_ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
-
 
 # init coupler
 coupler_sim = CouplerSimulation(FT(Δt_cpl), integrator.t, boundary_space, FT, mask)
@@ -135,10 +142,27 @@ if !is_distributed && energy_check && !prescribed_sst
     CS = OnlineConservationCheck([], [], [], [], [], [])
     check_conservation(CS, coupler_sim, atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim)
 end
+
+# first date
+date0 = Date(2014,1,29)
+
+SST = bc_input_init()
+
+Dates.daysinmonth(t)
 # coupling loop
 @show "Starting coupling loop"
 walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
     @show t
+
+    date = current_date(date0, t, FT)
+    # ## BC load
+
+    # load monthly files if needed 
+    Dates.days(date - SST_info.all_dates[SST_info.data_month + Int(1)]) < FT(0) ? update_midmonth_data!(SST_info) : nothing
+
+    # load monthly files if needed
+    SST = interpolate_midmonth_to_daily(date, bc_input_array)
+
     ## Atmos
     atmos_pull!(
         atmos_sim,

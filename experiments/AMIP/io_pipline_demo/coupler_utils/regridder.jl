@@ -29,8 +29,9 @@ function reshape_sparse_to_field!(field::Fields.Field, in_array::Array, R)
 end
 
 """
-ncreader_rll_to_cgll()
-- nc file needs to be in the exodus format
+    ncreader_rll_to_cgll()
+- reads and regrids a variable from input nc file and saves it as another nc file 
+- nc file needs to be in the exodus format and it can handle files with multiple times
 """
 function ncreader_rll_to_cgll(
     FT,
@@ -79,23 +80,29 @@ function ncreader_rll_to_cgll(
         @warn "Using the existing $datafile_cgll"
     end
 
+    return weightfile, datafile_cgll
+
+"""
+    bcfields_from_file
+- given time indices, 
+- nc file needs to be of the exodus format and havea time dimension
+"""
+function bcfields_from_file(datafile_cgll, weightfile, t_i_tple, boundary_space, clean_exodus = false)
     # read the remapped file
-    offline_outarray = NCDataset(datafile_cgll, "r") do ds_wt
-        ds_wt[varname][:][:, 1]
+    offline_outvector = NCDataset(datafile_cgll, "r") do ds_wt
+        ds_wt[varname][:][:, [t_i_tple...]] # ncol, times
     end
 
-    offline_outarray = FT.(offline_outarray)
+    offline_outvector = FT.(offline_outvector)
 
-    field_o = Fields.zeros(FT, space)
-
-    # need to populate all nodes
+    # weightfile info needed to populate all nodes and save into fields
     weights, col_indices, row_indices = NCDataset(weightfile, "r") do ds_wt
         (Array(ds_wt["S"]), Array(ds_wt["col"]), Array(ds_wt["row"]))
     end
 
     out_type = "cgll"
 
-    target_unique_idxs = out_type == "cgll" ? collect(Spaces.unique_nodes(space)) : collect(Spaces.all_nodes(space))
+    target_unique_idxs = out_type == "cgll" ? collect(Spaces.unique_nodes(boundary_space)) : collect(boundary_Spaces.all_nodes(boundary_space))
 
     target_unique_idxs_i = map(row -> target_unique_idxs[row][1][1], row_indices)
     target_unique_idxs_j = map(row -> target_unique_idxs[row][1][2], row_indices)
@@ -105,13 +112,16 @@ function ncreader_rll_to_cgll(
 
     R = (; target_idxs = target_unique_idxs, row_indices = row_indices)
 
-    offline_field = similar(field_o)
+    # this could be taken out for fewer dynamic allocations? 
+    offline_field = Fields.zeros(FT, boundary_space)
+
+    offline_fields = ntuple(x -> similar(offline_field), length(t_i_tple))
 
     clean_exodus ? run(`mkdir -p $REGRID_DIR`) : nothing
 
-    reshape_sparse_to_field!(offline_field, offline_outarray, R)
-
+    ntuple( x -> reshape_sparse_to_field!(offline_fields[x], offline_outvector[:,x] , R), length(t_i_tple))
 end
+
 
 function ncreader_rll_to_cgll_from_space(FT, infile, varname, h_space; outfile = "outfile_cgll.nc")
     R = h_space.topology.mesh.domain.radius
@@ -125,3 +135,6 @@ end
 function dummmy_remap!(target, source)  # TODO: bring back Tempest regrid
     parent(target) .= parent(source)
 end
+
+
+

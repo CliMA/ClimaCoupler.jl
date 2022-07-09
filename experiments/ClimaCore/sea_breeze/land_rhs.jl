@@ -37,6 +37,15 @@ function LandSimulation(Y_init, t_start, dt, t_end, timestepper, p, saveat, call
     return LandSimulation(lnd_integ)
 end
 
+function ClimaCoupler.coupler_push!(coupler::ClimaCoupler.CouplerState, land::LandSimulation)
+    coupler_put!(coupler, :T_sfc_land, land.integrator.u.T_sfc, land)
+end
+
+function ClimaCoupler.coupler_pull!(land::LandSimulation, coupler::ClimaCoupler.CouplerState)
+    coupler_get!(land.integrator.p.F_sfc, coupler, :F_sfc, land)
+    land.integrator.p.F_sfc ./= coupler.Δt_coupled
+end
+
 # init simulation
 function lnd_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
 

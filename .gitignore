@@ -28,7 +28,7 @@ docs/src/generated/
 !docs/src/images/*.png
 
 # Experiments
-!experiments/AMIP/*/Manifest.toml
+!experiments/AMIP/**/Manifest.toml
 
 # Data
 *.vtk

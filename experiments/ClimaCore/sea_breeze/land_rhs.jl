@@ -26,17 +26,6 @@ function hspace_1D(xlim = (-π, π), npoly = 0, helem = 10)
     return space
 end
 
-# Land Simulation - later to live in ClimaLSM
-struct LandSimulation <: ClimaCoupler.AbstractLandSimulation
-    integrator::Any
-end
-
-function LandSimulation(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
-    lnd_prob = ODEProblem(lnd_rhs!, Y_init, (t_start, t_end), p)
-    lnd_integ = init(lnd_prob, timestepper, dt = dt, saveat = saveat, callback = callbacks)
-    return LandSimulation(lnd_integ)
-end
-
 # init simulation
 function lnd_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
 
@@ -54,4 +43,16 @@ function lnd_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
     Y = Fields.FieldVector(T_sfc = T_sfc)
 
     return Y, domain
+end
+
+## Coupled Land Wrappers
+# Land Simulation - later to live in ClimaLSM
+struct LandSimulation <: ClimaCoupler.AbstractLandSimulation
+    integrator::Any
+end
+
+function LandSimulation(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
+    lnd_prob = ODEProblem(lnd_rhs!, Y_init, (t_start, t_end), p)
+    lnd_integ = init(lnd_prob, timestepper, dt = dt, saveat = saveat, callback = callbacks)
+    return LandSimulation(lnd_integ)
 end

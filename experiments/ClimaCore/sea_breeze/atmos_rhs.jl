@@ -5,6 +5,7 @@ using StaticArrays, IntervalSets, LinearAlgebra, UnPack
 
 import ClimaCore: ClimaCore, slab, Spaces, Domains, Meshes, Geometry, Topologies, Spaces, Fields, Operators
 using ClimaCore.Geometry
+using ClimaCore.Utilities: PlusHalf
 
 using Logging: global_logger
 using TerminalLoggers: TerminalLogger
@@ -212,27 +213,6 @@ function atm_rhs!(dY, Y, params, t)
     return dY
 end
 
-# Atmos Simulation - later to live in ClimaAtmos
-struct AtmosSimulation <: ClimaCoupler.AbstractAtmosSimulation
-    integrator::Any
-end
-
-function AtmosSimulation(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
-    atm_prob = ODEProblem(atm_rhs!, Y_init, (t_start, t_end), p)
-
-    atm_integ = init(
-        atm_prob,
-        timestepper,
-        dt = dt,
-        saveat = saveat,
-        progress = true,
-        progress_message = (dt, u, params, t) -> t,
-        callback = callbacks,
-    )
-
-    return AtmosSimulation(atm_integ)
-end
-
 # init simulation
 function atm_init(; xmin = -500, xmax = 500, zmin = 0, zmax = 1000, npoly = 3, helem = 20, velem = 20, bc = nothing)
 
@@ -273,4 +253,59 @@ function atm_run!(Y, bc, domain)
     prob = ODEProblem(atm_rhs!, Y, (0.0, 250.0), params)
     Δt = 0.025
     sol = solve(prob, SSPRK33(), dt = Δt, saveat = 1.0, progress = true, progress_message = (dt, u, params, t) -> t)
+end
+
+## Coupled Atmos Wrappers
+# Atmos Simulation - later to live in ClimaAtmos
+struct AtmosSimulation <: ClimaCoupler.AbstractAtmosSimulation
+    integrator::Any
+end
+
+function AtmosSimulation(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
+    atm_prob = ODEProblem(atm_rhs!, Y_init, (t_start, t_end), p)
+
+    atm_integ = init(
+        atm_prob,
+        timestepper,
+        dt = dt,
+        saveat = saveat,
+        progress = true,
+        progress_message = (dt, u, params, t) -> t,
+        callback = callbacks,
+    )
+
+    return AtmosSimulation(atm_integ)
+end
+
+# Atmos boundary condition for a coupled simulation, which calculates and accumulates the boundary flux
+struct CoupledFlux <: BCtag end
+function bc_divF2C_bottom!(::CoupledFlux, dY, Y, p, t)
+    # flux calculation
+    Yc = Y.Yc
+
+    uₕ = Yc.ρuₕ ./ Yc.ρ
+    ρw = Y.ρw
+    If2c = Operators.InterpolateF2C()
+    Ic2f = Operators.InterpolateC2F(bottom = Operators.Extrapolate(), top = Operators.Extrapolate())
+    w = If2c.(ρw) ./ Yc.ρ
+    cuv = @. Geometry.UWVector(uₕ)
+    windspeed = @. norm(cuv)
+    windspeed_f = @. Ic2f(windspeed)
+    windspeed_boundary = Fields.level(windspeed_f, PlusHalf(1))
+    θ = Yc.ρθ ./ Yc.ρ
+    θ_boundary = Fields.level(Ic2f.(θ), PlusHalf(1))
+    ρ_f = @. Ic2f(Yc.ρ)
+    ρ_boundary = Fields.level(ρ_f, PlusHalf(1))
+
+    # build atmos face fields on surface boundary space to enable broadcasting
+    windspeed_boundary = Fields.Field(Fields.field_values(windspeed_boundary), axes(p.T_sfc))
+    θ_boundary = Fields.Field(Fields.field_values(θ_boundary), axes(p.T_sfc))
+    ρ_boundary = Fields.Field(Fields.field_values(ρ_boundary), axes(p.T_sfc))
+
+    λ = @. p.cpl_p.C_p * p.cpl_p.C_H * ρ_boundary * windspeed_boundary
+    dθ = @. θ_boundary - p.T_sfc
+    heat_flux = @. -λ * dθ
+    @. dY.F_sfc += heat_flux # accumulation
+
+    return Operators.SetValue(Geometry.WVector.(heat_flux))
 end

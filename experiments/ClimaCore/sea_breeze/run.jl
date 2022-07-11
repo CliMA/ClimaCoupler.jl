@@ -11,7 +11,7 @@ import ClimaCore.Utilities: PlusHalf
 using DiffEqCallbacks
 
 # enable broadcasting with mismatched spaces
-import ClimaCore: Operators, Fields
+import ClimaCore: Fields, Operators
 Fields.allow_mismatched_diagonalized_spaces() = true
 Operators.allow_mismatched_fd_spaces() = true
 
@@ -29,7 +29,6 @@ using ClimaCoupler
 include("atmos_rhs.jl")
 include("ocean_rhs.jl")
 include("land_rhs.jl")
-include("coupledbc.jl")
 
 # model parameters that the coupler overwrites 
 const atm_T_ini = FT(270.0)

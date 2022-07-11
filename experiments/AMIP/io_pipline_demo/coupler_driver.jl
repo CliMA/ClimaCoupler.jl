@@ -47,6 +47,8 @@ include("coupler_utils/conservation_checker.jl")
 include("coupler_utils/regridder.jl")
 include("coupler_utils/masker.jl")
 include("coupler_utils/general_helper.jl")
+include("coupler_utils/timer.jl")
+include("coupler_utils/bcfile_reader.jl")
 
 # init MPI
 include("mpi/mpi_init.jl")
@@ -90,8 +92,6 @@ if prescribed_sst
 
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
     slab_ocean_sim = nothing
-
-    # Currently, we only support a slab ice model with fixed area and depth.
 
     SIC_info = bcfile_info_init(sic_data, "SEAICE", boundary_space )
     SIC_info.segment_idx .= Int(1729) 

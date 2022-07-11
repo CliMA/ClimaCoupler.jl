@@ -10,6 +10,11 @@ using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!
 import ClimaCore.Utilities: PlusHalf
 using DiffEqCallbacks
 
+# enable broadcasting with mismatched spaces
+import ClimaCore: Operators, Fields
+Fields.allow_mismatched_diagonalized_spaces() = true
+Operators.allow_mismatched_fd_spaces() = true
+
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", ".."))
 using ClimaCoupler
 

@@ -20,10 +20,10 @@ function bc_divF2C_bottom!(::CoupledFlux, dY, Y, p, t)
     ρ_f = @. Ic2f(Yc.ρ)
     ρ_boundary = Fields.level(ρ_f, PlusHalf(1))
 
-    # build atmos face fields on surface  boundary space to enable broadcasting
-    windspeed_boundary = Fields.Field(Fields.field_values(windspeed_boundary), axes(p.T_sfc))
-    θ_boundary = Fields.Field(Fields.field_values(θ_boundary), axes(p.T_sfc))
-    ρ_boundary = Fields.Field(Fields.field_values(ρ_boundary), axes(p.T_sfc))
+    # build atmos face fields on surface boundary space to enable broadcasting
+    # windspeed_boundary = Fields.Field(Fields.field_values(windspeed_boundary), axes(p.T_sfc))
+    # θ_boundary = Fields.Field(Fields.field_values(θ_boundary), axes(p.T_sfc))
+    # ρ_boundary = Fields.Field(Fields.field_values(ρ_boundary), axes(p.T_sfc))
 
     λ = @. p.cpl_p.C_p * p.cpl_p.C_H * ρ_boundary * windspeed_boundary
     dθ = @. θ_boundary - p.T_sfc

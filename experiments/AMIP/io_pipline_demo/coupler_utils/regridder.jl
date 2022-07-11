@@ -81,7 +81,7 @@ function ncreader_rll_to_cgll(
     end
 
     return weightfile, datafile_cgll
-
+end
 """
     bcfields_from_file
 - given time indices, 
@@ -128,7 +128,7 @@ function ncreader_rll_to_cgll_from_space(FT, infile, varname, h_space; outfile =
     ne = h_space.topology.mesh.ne
     Nq = Spaces.Quadratures.polynomial_degree(h_space.quadrature_style) + 1
 
-    mask = ncreader_rll_to_cgll(FT, infile, varname, ne = ne, R = R, Nq = Nq, outfile = outfile)
+    weightfile, datafile_cgll = ncreader_rll_to_cgll(FT, infile, varname, ne = ne, R = R, Nq = Nq, outfile = outfile)
 end
 
 # for AMIP we don't need regridding. WHen we do we re-introduce the ClimaCoreTempestRemap 

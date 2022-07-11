@@ -80,10 +80,11 @@ end
 
 if prescribed_sst
     println("No ocean sim - do not expect energy conservation")
-    SST_info = bcfile_info_init(datafile_rll, varname, boundary_space)
-
-    update_midmonth_data!(SST_info)
-    SST = interpolate_midmonth_to_daily(date, SST_info, FT(273.15)) 
+    SST_info = bcfile_info_init(sst_data, "SST", boundary_space)
+    SST_info.segment_idx .= Int(1729) 
+    update_midmonth_data!(SST_info, Int(1729))
+    
+    SST = interpolate_midmonth_to_daily(date, SST_info) 
 
     #SST = swap_space!(SST, axes(landmask)) .* (abs.(landmask .- 1)) .+ FT(273.15)
 
@@ -92,9 +93,16 @@ if prescribed_sst
 
     # Currently, we only support a slab ice model with fixed area and depth.
 
+    SIC_info = bcfile_info_init(sic_data, "SEAICE", boundary_space )
+    SIC_info.segment_idx .= Int(1729) 
+    update_midmonth_data!(SIC_info, Int(1729))
+    
+    SIC = interpolate_midmonth_to_daily(date, SIC_info) 
+
     SIC =
     ncreader_rll_to_cgll_from_space(FT, time_slice_ncfile(sic_data), "SEAICE", boundary_space, outfile = "sic_cgll.nc")
     SIC = swap_space!(SIC, axes(landmask)) .* (abs.(landmask .- 1))
+    
     ice_mask = get_ice_mask.(SIC .- FT(25), FT) # here 25% and lower is considered ice free
 
     slab_ice_sim =

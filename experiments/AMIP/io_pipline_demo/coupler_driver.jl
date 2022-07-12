@@ -21,6 +21,8 @@ tspan = (0, t_end)
 Δt_cpl = FT(parsed_args["dt_cpl"])
 saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
 
+date0 = Date(2014,1,29) # first date
+
 # overwrite some parsed args :P
 parsed_args["coupled"] = true
 parsed_args["dt"] = string(Δt_cpl) * "secs"
@@ -35,7 +37,7 @@ parsed_args["config"] = "sphere"
 parsed_args["moist"] = "equil"
 
 # atmos diagnostics
-parsed_args["dt_save_to_disk"] = "1hours" # saves jld2 at this frequency, can be used as a restart also
+# parsed_args["dt_save_to_disk"] = "1hours" # saves jld2 at this frequency, can be used as a restart also # this crashed upon atmos init (thermo_params)
 # ENV["RESTART_FILE"] = ".jld2"
 
 # Get the paths to the necessary data files - land sea mask, sst map, sea ice concentration
@@ -61,7 +63,6 @@ atmos_sim = atmos_init(FT, Y, integrator, params = params);
 boundary_space = ClimaCore.Fields.level(atmos_sim.domain.face_space, half) # global surface grid
 
 # init land-sea mask
-
 landmask = LandSeaMask(FT, mask_data, "LSMASK", boundary_space)
 landmask = swap_space!(landmask, boundary_space) # needed if we are reading from previous run
 
@@ -73,6 +74,7 @@ include("slab/slab_init.jl")
 include("slab_ocean/slab_init.jl")
 include("slab_ice/slab_init.jl")
 
+# land
 if land_sim == "slab"
     slab_sim = slab_init(FT; tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = landmask)
 end
@@ -82,29 +84,19 @@ end
 
 if prescribed_sst
     println("No ocean sim - do not expect energy conservation")
-    SST_info = bcfile_info_init(sst_data, "SST", boundary_space)
-    SST_info.segment_idx .= Int(1729) 
-    update_midmonth_data!(SST_info, Int(1729))
     
-    SST = interpolate_midmonth_to_daily(date, SST_info) 
-
-    #SST = swap_space!(SST, axes(landmask)) .* (abs.(landmask .- 1)) .+ FT(273.15)
-
+    # ocean
+    SST_info = bcfile_info_init(sst_data, "SST", boundary_space, segment_idx0 = [Int(1729)],interpolate_monthly = true, scaling_function = clean_sst)
+    update_midmonth_data!(date0, SST_info)
+    SST = interpolate_midmonth_to_daily(date0, SST_info) 
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
     slab_ocean_sim = nothing
-
-    SIC_info = bcfile_info_init(sic_data, "SEAICE", boundary_space )
-    SIC_info.segment_idx .= Int(1729) 
-    update_midmonth_data!(SIC_info, Int(1729))
     
-    SIC = interpolate_midmonth_to_daily(date, SIC_info) 
-
-    SIC =
-    ncreader_rll_to_cgll_from_space(FT, time_slice_ncfile(sic_data), "SEAICE", boundary_space, outfile = "sic_cgll.nc")
-    SIC = swap_space!(SIC, axes(landmask)) .* (abs.(landmask .- 1))
-    
-    ice_mask = get_ice_mask.(SIC .- FT(25), FT) # here 25% and lower is considered ice free
-
+    # sea ice
+    SIC_info = bcfile_info_init(sic_data, "SEAICE", boundary_space, segment_idx0 = [Int(1729)] ,interpolate_monthly = true, scaling_function = clean_sic)
+    update_midmonth_data!(date0, SIC_info)
+    SIC = interpolate_midmonth_to_daily(date0, SIC_info) 
+    ice_mask = get_ice_mask.(SIC .- FT(50), FT) # here 50% and lower is considered ice free
     slab_ice_sim =
     slab_ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
 else
@@ -115,7 +107,7 @@ else
 end
 
 # init coupler
-coupler_sim = CouplerSimulation(FT(Δt_cpl), integrator.t, boundary_space, FT, mask)
+coupler_sim = CouplerSimulation(FT(Δt_cpl), integrator.t, boundary_space, FT, landmask)
 include("./push_pull.jl")
 # init conservation info collector
 atmos_pull!(
@@ -132,7 +124,7 @@ atmos_pull!(
     q_sfc,
     ocean_params,
     SST,
-    mask,
+    landmask,
 )
 
 atmos_push!(atmos_sim, boundary_space, F_A, F_R, F_E, P_liq, parsed_args)
@@ -151,25 +143,24 @@ if !is_distributed && energy_check && !prescribed_sst
     check_conservation(CS, coupler_sim, atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim)
 end
 
-# first date
-date0 = Date(2014,1,29)
-
-SST = bc_input_init()
-
-Dates.daysinmonth(t)
 # coupling loop
 @show "Starting coupling loop"
 walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
-    @show t
+    #@show t
 
-    date = current_date(date0, t, FT)
+    date = current_date(date0, t, FT) # TODO: turn into macro
+
     # ## BC load
 
     # load monthly files if needed 
-    Dates.days(date - SST_info.all_dates[SST_info.data_month + Int(1)]) < FT(0) ? update_midmonth_data!(SST_info) : nothing
+    Dates.days(date - SST_info.all_dates[SST_info.segment_idx[1] + Int(1)]) < FT(1) ? nothing : (update_midmonth_data!(date, SST_info) , @show ("yes:$(date) vs $(SST_info.all_dates[SST_info.segment_idx[1] + Int(1)])"))
+    Dates.days(date - SIC_info.all_dates[SIC_info.segment_idx[1] + Int(1)]) < FT(1) ? nothing : update_midmonth_data!(date, SIC_info) 
 
     # load monthly files if needed
-    SST = interpolate_midmonth_to_daily(date, bc_input_array)
+    SST = interpolate_midmonth_to_daily(date, SST_info)
+    SIC = interpolate_midmonth_to_daily(date, SIC_info)
+    
+    slab_ice_sim.integrator.p.Ya.ice_mask .= get_ice_mask.(SIC .- FT(50), FT) 
 
     ## Atmos
     atmos_pull!(
@@ -186,7 +177,7 @@ walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
         q_sfc,
         ocean_params,
         SST,
-        mask,
+        landmask,
     )
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
 
@@ -225,9 +216,13 @@ end
 if (land_sim == "bucket") && parsed_args["anim"]
     #make it so this works with slab land?
     include("coupler_utils/viz_explorer.jl")
-    plot_anim(atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim, mask, prescribed_sst, SST)
+    plot_anim(atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim, landmask, prescribed_sst, SST)
 end
 
 # Cleanup temporary files
 # TODO: Where should this live?
 rm(REGRID_DIR; recursive = true, force = true)
+
+
+
+

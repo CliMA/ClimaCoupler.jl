@@ -19,7 +19,6 @@ function slab_ice_space_init(::Type{FT}, space, p) where {FT}
     return Y
 end
 
-
 function ice_rhs!(du, u, p, t)
     dY = du
     Y = u
@@ -65,3 +64,6 @@ function slab_ice_init(::Type{FT}; tspan, saveat, dt, space, ice_mask, stepper =
 end
 
 get_ice_mask(h_ice, FT) = h_ice > FT(0) ? FT(1) : FT(0)
+
+# file-specific
+clean_sic(SIC) = SIC .* FT.(abs.(landmask .- 1))

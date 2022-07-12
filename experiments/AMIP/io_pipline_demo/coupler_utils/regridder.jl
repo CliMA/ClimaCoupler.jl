@@ -87,13 +87,11 @@ end
 - given time indices, 
 - nc file needs to be of the exodus format and havea time dimension
 """
-function bcfields_from_file(datafile_cgll, weightfile, t_i_tple, boundary_space, clean_exodus = false)
+function bcfields_from_file(datafile_cgll, varname, weightfile, t_i_tple, boundary_space; scaling_function = false, clean_exodus = false)
     # read the remapped file
     offline_outvector = NCDataset(datafile_cgll, "r") do ds_wt
         ds_wt[varname][:][:, [t_i_tple...]] # ncol, times
     end
-
-    offline_outvector = FT.(offline_outvector)
 
     # weightfile info needed to populate all nodes and save into fields
     weights, col_indices, row_indices = NCDataset(weightfile, "r") do ds_wt
@@ -119,7 +117,11 @@ function bcfields_from_file(datafile_cgll, weightfile, t_i_tple, boundary_space,
 
     clean_exodus ? run(`mkdir -p $REGRID_DIR`) : nothing
 
-    ntuple( x -> reshape_sparse_to_field!(offline_fields[x], offline_outvector[:,x] , R), length(t_i_tple))
+    if scaling_function == false
+        ntuple( x -> reshape_sparse_to_field!(offline_fields[x], FT.(offline_outvector[:,x]) , R), length(t_i_tple))
+    else
+        ntuple( x -> scaling_function(reshape_sparse_to_field!(offline_fields[x], FT.(offline_outvector)[:,x] , R)), length(t_i_tple))
+    end
 end
 
 

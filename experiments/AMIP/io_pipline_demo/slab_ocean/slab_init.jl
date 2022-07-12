@@ -55,3 +55,6 @@ function slab_ocean_init(::Type{FT}; tspan, dt, saveat, space, mask, stepper = E
 
     SlabSimulation(params, Y, space, integrator)
 end
+
+# file-specific
+clean_sst(SST) = SST .* FT.(abs.(landmask .- 1)) .+ FT(273.15)

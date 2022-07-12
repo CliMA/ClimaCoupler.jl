@@ -1,17 +1,20 @@
-function LandSeaMask(FT, infile, varname, h_space; outfile = "land_sea_cgll.nc", threshold = 0.7)
-    R = h_space.topology.mesh.domain.radius
-    ne = h_space.topology.mesh.ne
-    Nq = Spaces.Quadratures.polynomial_degree(h_space.quadrature_style) + 1
+function LandSeaMask(FT, mask_data, varname, h_space; outfile = "land_sea_cgll.nc", threshold = 0.7)
+    # R = h_space.topology.mesh.domain.radius
+    # ne = h_space.topology.mesh.ne
+    # Nq = Spaces.Quadratures.polynomial_degree(h_space.quadrature_style) + 1
 
-    mask = ncreader_rll_to_cgll(FT, infile, varname, ne = ne, R = R, Nq = Nq, outfile = outfile)
-    mask = clean_mask.(FT, mask, threshold)
+    # mask = ncreader_rll_to_cgll(FT, infile, varname, ne = ne, R = R, Nq = Nq, outfile = outfile)
+    # mask = clean_mask.(FT, mask, threshold)
+    LSMASK_info = bcfile_info_init(mask_data, "LSMASK", boundary_space, segment_idx0 = [Int(1)], scaling_function = clean_mask)
+    update_midmonth_data!(date0, LSMASK_info)
 end
 
 """
 clean_mask(FT, mask)
-- convert to integer values after interpolation (but keep type as floats foe easier calculation (TODO))
+- convert to integer values after interpolation (but keep type as floats for easier calculation (TODO))
 """
-clean_mask(FT, mask, threshold) = mask > FT(threshold) ? FT(1) : FT(0)
+clean_mask(mask) = clean_mask.(mask, FT(0.5))
+clean_mask(mask, threshold) = mask > FT(threshold) ? FT(1) : FT(0)
 
 combine_surface(FT, mask, sfc_1, sfc_2, sfc_3, value1 = -0.5, value2 = 0.5) =
     (mask < FT(value1) ? sfc_3 : FT(0)) +

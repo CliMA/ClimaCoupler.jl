@@ -5,7 +5,7 @@ function parse_commandline()
         "--dt_cpl"
         help = " Coupling time step in seconds"
         arg_type = Int
-        default = 400
+        default = 200
         "--anim"
         help = "Boolean flag indicating whether to make animations"
         arg_type = Bool
@@ -17,7 +17,7 @@ function parse_commandline()
         "--prescribed_sst"
         help = "Boolean flag indicating whether to run with a prescribed sea surface temperature"
         arg_type = Bool
-        default = false
+        default = true
         "--FLOAT_TYPE"
         help = "Float type"
         arg_type = String
@@ -25,7 +25,7 @@ function parse_commandline()
         "--t_end"
         help = "Simulation end time. Examples: [`1200days`, `40secs`]"
         arg_type = String
-        default = "1days"
+        default = "40days"
         "--dt"
         help = "Simulation time step. Examples: [`10secs`, `1hours`]"
         arg_type = String

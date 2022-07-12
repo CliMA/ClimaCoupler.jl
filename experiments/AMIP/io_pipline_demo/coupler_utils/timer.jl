@@ -9,10 +9,21 @@
 function current_date(date0, t, FT)
     day_secs = FT(86400)
     sim_day = (t - mod(t, day_secs )) / day_secs
-
     date = date0 + Dates.Day(sim_day)
     return date
 end
+# @btime current_date(date0, 86400, FT)
+# >> 137.226 ns (1 allocation: 16 bytes)
+
+macro current_date(t)
+    quote
+        day_secs = FT(86400)
+        sim_day = ($t - mod($t, day_secs )) / day_secs
+        date = date0 + Dates.Day(sim_day)
+    end 
+end
+# @btime @current_date(86400)
+# >> 17.093 ns (1 allocation: 16 bytes
 
 strdate_to_datetime(strdate) = Dates.Date(parse(Int,strdate[1:4]), parse(Int,strdate[5:6]), parse(Int,strdate[7:8])) # required by the official AMIP input files
 

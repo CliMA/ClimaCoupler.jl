@@ -145,10 +145,11 @@ end
 
 # coupling loop
 @show "Starting coupling loop"
+t = 0
 walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
     #@show t
 
-    global date = current_date(date0, t, FT) # TODO: turn into macro?
+    global date = @current_date t 
 
     ## BC load # not a noticeable slowdown with @elapsed
 

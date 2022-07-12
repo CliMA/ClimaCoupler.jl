@@ -40,28 +40,28 @@ const C_p = FT(R_d * γ / (γ - 1))
 const C_v = FT(R_d / (γ - 1))
 const R_m = R_d
 cpl_parameters = (
-    # atmos parameters
-    atm_μ = FT(0.0001), # diffusion coefficient
-    atm_T_top = FT(280.0), # fixed temperature at the top of the domain_atm
-    atm_T_ini = atm_T_ini, # initial condition of at temperature (isothermal) [K]
-    MSLP = MSLP, # mean sea level pressure
-    grav = grav, # gravitational constant
-    R_d = R_d, # R dry (gas constant / mol mass dry air)
-    γ = γ, # heat capacity ratio
-    C_p = C_p, # heat capacity at constant pressure
-    C_v = C_v, # heat capacity at constant volume
-    R_m = R_m, # moist R, assumed to be dry
-    # land slab parameters
-    lnd_h = FT(0.5), # depth of slab layer [m]
-    lnd_ρ = FT(1500), # density [kg m^-3]
-    lnd_c = FT(800), # specific heat [J K^-1 kg^-1]
-    lnd_T_ini = FT(260.0), # initial condition of at temperature (isothermal) [K]
-    # ocean slab parameters
-    ocn_h = FT(0.5), # depth of slab layer [m]
-    ocn_ρ = FT(1025), # density [kg m^-3]
-    ocn_c = FT(3850), # specific heat [J K^-1 kg^-1]
-    ocn_T_ini = FT(260.0), # initial condition of at temperature (isothermal) [K]
-    # coupling parameters
+    ## atmos parameters
+    atm_μ = FT(0.0001), ## diffusion coefficient
+    atm_T_top = FT(280.0), ## fixed temperature at the top of the domain_atm
+    atm_T_ini = atm_T_ini, ## initial condition of at temperature (isothermal) [K]
+    MSLP = MSLP, ## mean sea level pressure
+    grav = grav, ## gravitational constant
+    R_d = R_d, ## R dry (gas constant / mol mass dry air)
+    γ = γ, ## heat capacity ratio
+    C_p = C_p, ## heat capacity at constant pressure
+    C_v = C_v, ## heat capacity at constant volume
+    R_m = R_m, ## moist R, assumed to be dry
+    ## land slab parameters
+    lnd_h = FT(0.5), ## depth of slab layer [m]
+    lnd_ρ = FT(1500), ## density [kg m^-3]
+    lnd_c = FT(800), ## specific heat [J K^-1 kg^-1]
+    lnd_T_ini = FT(260.0), ## initial condition of at temperature (isothermal) [K]
+    ## ocean slab parameters
+    ocn_h = FT(0.5), ## depth of slab layer [m]
+    ocn_ρ = FT(1025), ## density [kg m^-3]
+    ocn_c = FT(3850), ## specific heat [J K^-1 kg^-1]
+    ocn_T_ini = FT(260.0), ## initial condition of at temperature (isothermal) [K]
+    ## coupling parameters
     C_H = FT(0.0015),
 )
 
@@ -121,7 +121,7 @@ maps = (
 # initialize coupling fields
 atm_T_sfc =
     Operators.remap(maps.ocean_to_atmos, ocn_Y_default.T_sfc) .+
-    Operators.remap(maps.land_to_atmos, lnd_Y_default.T_sfc) # masked arrays; regrid to atm grid
+    Operators.remap(maps.land_to_atmos, lnd_Y_default.T_sfc) ## masked arrays; regrid to atm grid
 atm_F_sfc = Fields.zeros(atm_boundary)
 ocn_F_sfc = Fields.zeros(ocn_domain)
 lnd_F_sfc = Fields.zeros(lnd_domain)
@@ -152,15 +152,15 @@ struct AOLCoupledSimulation{
     L <: LandSimulation,
     C <: ClimaCoupler.CouplerState,
 } <: ClimaCoupler.AbstractCoupledSimulation
-    # Atmosphere Simulation
+    ## Atmosphere Simulation
     atmos::A
-    # Ocean Simulation
+    ## Ocean Simulation
     ocean::O
-    # Land Simulation
+    ## Land Simulation
     land::L
-    # Coupler storage
+    ## Coupler storage
     coupler::C
-    # The coupled time step size
+    ## The coupled time step size
     Δt::FT
 end
 
@@ -189,11 +189,11 @@ function cpl_run(simulation::AOLCoupledSimulation)
     @info "Run model"
     @unpack atmos, ocean, land, Δt = simulation
     Δt_cpl = Δt
-    # coupler stepping
+    ## coupler stepping
     for t in ((t_start + Δt_cpl):Δt_cpl:t_end)
 
         ## Atmos
-        # pre: reset flux accumulator
+        ## pre: reset flux accumulator
         atmos.integrator.u.F_sfc .= 0.0 # reset surface flux to be accumulated
         # don't want to alloc here..
         T_sfc_ocean = coupler_get(coupler, :T_sfc_ocean, atmos)

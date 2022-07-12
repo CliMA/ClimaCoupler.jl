@@ -1,4 +1,4 @@
-push!(LOAD_PATH, joinpath(@__DIR__, "..", ".."))
+push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", ".."))
 
 using Test
 using StaticArrays, IntervalSets, LinearAlgebra, UnPack
@@ -10,6 +10,8 @@ using ClimaCore.Utilities: PlusHalf
 using Logging: global_logger
 using TerminalLoggers: TerminalLogger
 global_logger(TerminalLogger())
+
+using ClimaCoupler
 
 # set up function space
 function hvspace_2D(xlim = (-π, π), zlim = (0, 4π), helem = 20, velem = 20, npoly = 1)
@@ -63,16 +65,16 @@ function init_bubble_2d(x, z)
     θ_b = atm_T_ini
     θ_c = 0.5
 
-    # auxiliary quantities
+    ## auxiliary quantities
     r = sqrt((x - x_c)^2 + (z - z_c)^2)
-    θ_p = r < r_c ? 0.5 * θ_c * (1.0 + cospi(r / r_c)) : 0.0 # potential temperature perturbation
+    θ_p = r < r_c ? 0.5 * θ_c * (1.0 + cospi(r / r_c)) : 0.0 ## potential temperature perturbation
 
-    θ = θ_b + θ_p # potential temperature
-    π_exn = 1.0 - g * z / cp_d / θ # exner function
-    T = π_exn * θ # temperature
-    p = p₀ * π_exn^(cp_d / R_d) # pressure
-    ρ = p / R_d / T # density
-    ρθ = ρ * θ # potential temperature density
+    θ = θ_b + θ_p ## potential temperature
+    π_exn = 1.0 - g * z / cp_d / θ ## exner function
+    T = π_exn * θ ## temperature
+    p = p₀ * π_exn^(cp_d / R_d) ## pressure
+    ρ = p / R_d / T ## density
+    ρθ = ρ * θ ## potential temperature density
 
     return (ρ = ρ, ρθ = ρθ, ρuₕ = ρ * Geometry.UVector(0.0))
 end
@@ -86,13 +88,13 @@ function init_sea_breeze_2d(x, z)
     γ = cp_d / cv_d
     z_c = 100.0
     θ_b = atm_T_ini
-    θ_p = z < z_c ? rand() - 0.5 : 0.0 # potential temperature perturbation
-    θ = θ_b + θ_p # potential temperature
-    π_exn = 1.0 - g * z / cp_d / θ # exner function
-    T = π_exn * θ # temperature
-    p = p₀ * π_exn^(cp_d / R_d) # pressure
-    ρ = p / R_d / T # density
-    ρθ = ρ * θ # potential temperature density
+    θ_p = z < z_c ? rand() - 0.5 : 0.0 ## potential temperature perturbation
+    θ = θ_b + θ_p ## potential temperature
+    π_exn = 1.0 - g * z / cp_d / θ ## exner function
+    T = π_exn * θ ## temperature
+    p = p₀ * π_exn^(cp_d / R_d) ## pressure
+    ρ = p / R_d / T ## density
+    ρθ = ρ * θ ## potential temperature density
     return (ρ = ρ, ρθ = ρθ, ρuₕ = ρ * Geometry.UVector(0.0))
 end
 
@@ -104,13 +106,13 @@ function atm_rhs!(dY, Y, params, t)
 
     center_coords = Fields.coordinate_field(axes(Yc))
 
-    # spectral horizontal operators
+    ## spectral horizontal operators
     hdiv = Operators.Divergence()
     hgrad = Operators.Gradient()
     hwdiv = Operators.WeakDivergence()
     hwgrad = Operators.WeakGradient()
 
-    # vertical FD operators with BC's
+    ## vertical FD operators with BC's
     vdivf2c = Operators.DivergenceF2C(
         bottom = Operators.SetValue(Geometry.WVector(0.0)),
         top = Operators.SetValue(Geometry.WVector(0.0)),
@@ -151,35 +153,35 @@ function atm_rhs!(dY, Y, params, t)
     Yfρ = @. If(Yc.ρ)
 
     ### HYPERVISCOSITY
-    # 1) compute hyperviscosity coefficients
+    ## 1) compute hyperviscosity coefficients
     @. dYc.ρθ = hwdiv(hgrad(θ))
     @. dYc.ρuₕ = hwdiv(hgrad(uₕ))
     @. dρw = hwdiv(hgrad(w))
     Spaces.weighted_dss!(dYc)
     Spaces.weighted_dss!(dρw)
 
-    κ₄ = 0.0 # m^4/s
+    κ₄ = 0.0 ## m^4/s
     @. dYc.ρθ = -κ₄ * hwdiv(Yc.ρ * hgrad(dYc.ρθ))
     @. dYc.ρuₕ = -κ₄ * hwdiv(Yc.ρ * hgrad(dYc.ρuₕ))
     @. dρw = -κ₄ * hwdiv(Yfρ * hgrad(dρw))
 
-    # density
+    ## density
     @. dYc.ρ = -∂(ρw)
     @. dYc.ρ -= hdiv(Yc.ρuₕ)
 
-    # potential temperature
+    ## potential temperature
     @. dYc.ρθ += -(∇_z_ρθ(ρw * If(Yc.ρθ / Yc.ρ)))
     @. dYc.ρθ -= hdiv(uₕ * Yc.ρθ)
 
-    # horizontal momentum
+    ## horizontal momentum
     Ih = Ref(Geometry.Axis2Tensor((Geometry.UAxis(), Geometry.UAxis()), @SMatrix [1.0]))
     @. dYc.ρuₕ += -uvdivf2c(ρw ⊗ If(uₕ))
     @. dYc.ρuₕ -= hdiv(Yc.ρuₕ ⊗ uₕ + p * Ih)
 
-    # vertical momentum
+    ## vertical momentum
     @. dρw +=
         B(Geometry.transform(Geometry.WAxis(), -(∂f(p)) - If(Yc.ρ) * ∂f(Φ(center_coords.z))) - vvdivc2f(Ic(ρw ⊗ w)))
-    uₕf = @. If(Yc.ρuₕ / Yc.ρ) # requires boundary conditions
+    uₕf = @. If(Yc.ρuₕ / Yc.ρ) ## requires boundary conditions
     @. dρw -= hdiv(uₕf ⊗ ρw)
 
     ### UPWIND FLUX CORRECTION
@@ -192,20 +194,20 @@ function atm_rhs!(dY, Y, params, t)
     end
 
     ### DIFFUSION
-    κ₂ = 5.0 # m^2/s
-    #  1a) horizontal div of horizontal grad of horiz momentun
+    κ₂ = 5.0 ## m^2/s
+    ##  1a) horizontal div of horizontal grad of horiz momentun
     @. dYc.ρuₕ += hwdiv(κ₂ * (Yc.ρ * hgrad(Yc.ρuₕ / Yc.ρ)))
-    #  1b) vertical div of vertical grad of horiz momentun
+    ##  1b) vertical div of vertical grad of horiz momentun
     @. dYc.ρuₕ += uvdivf2c(κ₂ * (Yfρ * ∂f(Yc.ρuₕ / Yc.ρ)))
 
-    #  1c) horizontal div of horizontal grad of vert momentum
+    ##  1c) horizontal div of horizontal grad of vert momentum
     @. dρw += hwdiv(κ₂ * (Yfρ * hgrad(ρw / Yfρ)))
-    #  1d) vertical div of vertical grad of vert momentun
+    ##  1d) vertical div of vertical grad of vert momentun
     @. dρw += vvdivc2f(κ₂ * (Yc.ρ * ∂c(ρw / Yfρ)))
 
-    #  2a) horizontal div of horizontal grad of potential temperature
+    ##  2a) horizontal div of horizontal grad of potential temperature
     @. dYc.ρθ += hwdiv(κ₂ * (Yc.ρ * hgrad(Yc.ρθ / Yc.ρ)))
-    #  2b) vertical div of vertial grad of potential temperature
+    ##  2b) vertical div of vertial grad of potential temperature
     @. dYc.ρθ += ∇_z_ρθ(κ₂ * (Yfρ * ∂f(Yc.ρθ / Yc.ρ)))
 
     Spaces.weighted_dss!(dYc)
@@ -216,13 +218,13 @@ end
 # init simulation
 function atm_init(; xmin = -500, xmax = 500, zmin = 0, zmax = 1000, npoly = 3, helem = 20, velem = 20, bc = nothing)
 
-    # construct domain spaces
-    hv_center_space, hv_face_space = hvspace_2D((xmin, xmax), (zmin, zmax), helem, velem, npoly) # [m]
+    ## construct domain spaces
+    hv_center_space, hv_face_space = hvspace_2D((xmin, xmax), (zmin, zmax), helem, velem, npoly) ## [m]
     center_coords = Fields.coordinate_field(hv_center_space)
     face_coords = Fields.coordinate_field(hv_face_space)
     domain = (hv_center_space = hv_center_space, hv_face_space = hv_face_space)
 
-    # initialize prognostic variables
+    ## initialize prognostic variables
     Yc = map(center_coords) do coord
         sea_breeze = init_sea_breeze_2d(coord.x, coord.z)
         sea_breeze
@@ -234,11 +236,11 @@ function atm_init(; xmin = -500, xmax = 500, zmin = 0, zmax = 1000, npoly = 3, h
 
     Y = Fields.FieldVector(Yc = Yc, ρw = ρw)
 
-    # select boundary conditions
+    ## select boundary conditions
     if bc === nothing
         bc = (
             ρθ = (bottom = CoupledFlux(), top = ZeroFlux()),
-            ρu = nothing, # for now BCs are hard coded, except for ρθ
+            ρu = nothing, ## for now BCs are hard coded, except for ρθ
         )
     end
 
@@ -280,7 +282,7 @@ end
 # Atmos boundary condition for a coupled simulation, which calculates and accumulates the boundary flux
 struct CoupledFlux <: BCtag end
 function bc_divF2C_bottom!(::CoupledFlux, dY, Y, p, t)
-    # flux calculation
+    ## flux calculation
     Yc = Y.Yc
 
     uₕ = Yc.ρuₕ ./ Yc.ρ
@@ -297,7 +299,7 @@ function bc_divF2C_bottom!(::CoupledFlux, dY, Y, p, t)
     ρ_f = @. Ic2f(Yc.ρ)
     ρ_boundary = Fields.level(ρ_f, PlusHalf(1))
 
-    # build atmos face fields on surface boundary space to enable broadcasting
+    ## build atmos face fields on surface boundary space to enable broadcasting
     windspeed_boundary = Fields.Field(Fields.field_values(windspeed_boundary), axes(p.T_sfc))
     θ_boundary = Fields.Field(Fields.field_values(θ_boundary), axes(p.T_sfc))
     ρ_boundary = Fields.Field(Fields.field_values(ρ_boundary), axes(p.T_sfc))
@@ -305,7 +307,7 @@ function bc_divF2C_bottom!(::CoupledFlux, dY, Y, p, t)
     λ = @. p.cpl_p.C_p * p.cpl_p.C_H * ρ_boundary * windspeed_boundary
     dθ = @. θ_boundary - p.T_sfc
     heat_flux = @. -λ * dθ
-    @. dY.F_sfc += heat_flux # accumulation
+    @. dY.F_sfc += heat_flux ## accumulation
 
     return Operators.SetValue(Geometry.WVector.(heat_flux))
 end

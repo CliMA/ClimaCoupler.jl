@@ -9,18 +9,19 @@ const OUTPUT_DIR = joinpath(@__DIR__, "src/generated")
 # - generate tutorial files:
 
 # sea breeze tutorial
-tutorial_dir = joinpath(EXPERIMENTS_DIR, "ClimaCore/sea_breeze/")
+TUTORIAL_DIR = joinpath(EXPERIMENTS_DIR, "ClimaCore/sea_breeze/")
 tutorial_name = "run.jl"
-Pkg.activate(tutorial_dir)
-Pkg.instantiate()
-include(joinpath(tutorial_dir, "run.jl"))
-# Literate.markdown(joinpath(tutorial_dir, tutorial_name), OUTPUT_DIR; execute = true, documenter = false)
+# Pkg.activate(TUTORIAL_DIR)
+# Pkg.instantiate()
+# include(joinpath(TUTORIAL_DIR, "run.jl"))
+# Literate.markdown(joinpath(TUTORIAL_DIR, tutorial_name), OUTPUT_DIR; execute = true, documenter = false)
 # execute Literate on all julia files
-tutorial_files = filter(x -> last(x, 3) == ".jl", readdir(tutorial_dir))
-map(x -> Literate.markdown(joinpath(tutorial_dir, x), OUTPUT_DIR; execute = true, documenter = false), tutorial_files)
+tutorial_files = filter(x -> last(x, 3) == ".jl" || last(x, 3) == ".md", readdir(TUTORIAL_DIR))
+# Literate generates markdown files and stores them in docs/src/generated/sea_breeze
+map(x -> Literate.markdown(joinpath(TUTORIAL_DIR, x), joinpath(OUTPUT_DIR, "sea_breeze"); execute = false, documenter = false), tutorial_files)
 
 # - move tutorial files to docs/src
-# IMAGE_DIR = joinpath(tutorial_dir, "images/")
+# IMAGE_DIR = joinpath(TUTORIAL_DIR, "images/")
 # files = readdir(IMAGE_DIR)
 # png_files = filter(endswith(".png"), files)
 # for file in png_files
@@ -29,15 +30,15 @@ map(x -> Literate.markdown(joinpath(tutorial_dir, x), OUTPUT_DIR; execute = true
 # end
 
 # pages layout
-# experiment_pages = ["Sea Breeze" => ["Overview" => README.md, "Atmosphere" => ]]
-# interface_pages = ["couplerstate.md", "timestepping.md"]
+experiment_pages = ["Sea Breeze" => map(s -> "generated/sea_breeze/$(s)", readdir(joinpath(@__DIR__, "src/generated/sea_breeze")))]
+interface_pages = ["couplerstate.md", "timestepping.md"]
 
-# pages = Any["Home" => "index.md", "Examples" => experiment_pages, "Coupler Interface" => interface_pages]
+pages = Any["Home" => "index.md", "Examples" => experiment_pages, "Coupler Interface" => interface_pages]
 
 
-# makedocs(sitename = "ClimaCoupler.jl", format = Documenter.HTML(), modules = [ClimaCoupler], pages = pages)
+makedocs(sitename = "ClimaCoupler.jl", format = Documenter.HTML(), modules = [ClimaCoupler], pages = pages)
 
-# # Documenter can also automatically deploy documentation to gh-pages.
-# # See "Hosting Documentation" and deploydocs() in the Documenter manual
-# # for more information.
+# Documenter can also automatically deploy documentation to gh-pages.
+# See "Hosting Documentation" and deploydocs() in the Documenter manual
+# for more information.
 # deploydocs(repo = "<github.com/CliMA/ClimaCoupler.jl.git>", push_preview = true, devbranch = "main", forcepush = true)

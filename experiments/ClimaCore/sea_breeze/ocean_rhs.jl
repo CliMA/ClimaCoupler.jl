@@ -1,4 +1,4 @@
-# slab ocean ODE
+# # Slab Ocean ODE
 function ocn_rhs!(du, u, (parameters, F_accumulated), t)
     """
     Slab layer equation
@@ -12,7 +12,7 @@ function ocn_rhs!(du, u, (parameters, F_accumulated), t)
     @. T_sfc = (-F_accumulated) / (ocn_h * ocn_ρ * ocn_c)
 end
 
-# set up domain
+## set up domain
 function hspace_1D(xlim = (-π, π), npoly = 0, helem = 10)
     FT = Float64
 
@@ -27,7 +27,7 @@ function hspace_1D(xlim = (-π, π), npoly = 0, helem = 10)
     return space
 end
 
-# init simulation
+## init simulation
 function ocn_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
 
     ## construct domain spaces - get only surface layer (NB: z should be zero, not z = first central height)
@@ -46,8 +46,8 @@ function ocn_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
     return Y, domain
 end
 
-## Coupled Ocean Wrappers
-# Ocean Simulation - Later to live in Oceananigans
+# Coupled Ocean Wrappers
+## Ocean Simulation - Later to live in Oceananigans
 struct OceanSimulation <: ClimaCoupler.AbstractOceanSimulation
     integrator::Any
 end

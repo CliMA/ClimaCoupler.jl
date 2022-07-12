@@ -1,4 +1,5 @@
-# Model Descriptions
+#=
+# Overview
 
 This sea breeze simulation consists of an atmosphere above ocean and land slabs. The difference in heating between the land and ocean components drives circulation: cool ocean air flows towards the land at the surface while warm air over land rises and flows over the ocean. The physical models are described below.
 
@@ -155,3 +156,4 @@ $$
 
 # References
 - [Antonelli & Rotunno 2007](https://journals.ametsoc.org/view/journals/atsc/64/12/2007jas2261.1.xml?tab_body=pdf)
+=#

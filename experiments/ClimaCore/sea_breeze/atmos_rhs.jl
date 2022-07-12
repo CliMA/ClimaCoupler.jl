@@ -1,3 +1,5 @@
+# # Atmospheric Model
+
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", ".."))
 
 using Test
@@ -67,14 +69,14 @@ function init_bubble_2d(x, z)
 
     ## auxiliary quantities
     r = sqrt((x - x_c)^2 + (z - z_c)^2)
-    θ_p = r < r_c ? 0.5 * θ_c * (1.0 + cospi(r / r_c)) : 0.0 ## potential temperature perturbation
+    θ_p = r < r_c ? 0.5 * θ_c * (1.0 + cospi(r / r_c)) : 0.0 # potential temperature perturbation
 
-    θ = θ_b + θ_p ## potential temperature
-    π_exn = 1.0 - g * z / cp_d / θ ## exner function
-    T = π_exn * θ ## temperature
-    p = p₀ * π_exn^(cp_d / R_d) ## pressure
-    ρ = p / R_d / T ## density
-    ρθ = ρ * θ ## potential temperature density
+    θ = θ_b + θ_p # potential temperature
+    π_exn = 1.0 - g * z / cp_d / θ # exner function
+    T = π_exn * θ # temperature
+    p = p₀ * π_exn^(cp_d / R_d) # pressure
+    ρ = p / R_d / T # density
+    ρθ = ρ * θ # potential temperature density
 
     return (ρ = ρ, ρθ = ρθ, ρuₕ = ρ * Geometry.UVector(0.0))
 end
@@ -88,13 +90,13 @@ function init_sea_breeze_2d(x, z)
     γ = cp_d / cv_d
     z_c = 100.0
     θ_b = atm_T_ini
-    θ_p = z < z_c ? rand() - 0.5 : 0.0 ## potential temperature perturbation
-    θ = θ_b + θ_p ## potential temperature
-    π_exn = 1.0 - g * z / cp_d / θ ## exner function
-    T = π_exn * θ ## temperature
-    p = p₀ * π_exn^(cp_d / R_d) ## pressure
-    ρ = p / R_d / T ## density
-    ρθ = ρ * θ ## potential temperature density
+    θ_p = z < z_c ? rand() - 0.5 : 0.0 # potential temperature perturbation
+    θ = θ_b + θ_p # potential temperature
+    π_exn = 1.0 - g * z / cp_d / θ # exner function
+    T = π_exn * θ # temperature
+    p = p₀ * π_exn^(cp_d / R_d) # pressure
+    ρ = p / R_d / T # density
+    ρθ = ρ * θ # potential temperature density
     return (ρ = ρ, ρθ = ρθ, ρuₕ = ρ * Geometry.UVector(0.0))
 end
 
@@ -160,7 +162,7 @@ function atm_rhs!(dY, Y, params, t)
     Spaces.weighted_dss!(dYc)
     Spaces.weighted_dss!(dρw)
 
-    κ₄ = 0.0 ## m^4/s
+    κ₄ = 0.0 # m^4/s
     @. dYc.ρθ = -κ₄ * hwdiv(Yc.ρ * hgrad(dYc.ρθ))
     @. dYc.ρuₕ = -κ₄ * hwdiv(Yc.ρ * hgrad(dYc.ρuₕ))
     @. dρw = -κ₄ * hwdiv(Yfρ * hgrad(dρw))
@@ -181,10 +183,10 @@ function atm_rhs!(dY, Y, params, t)
     ## vertical momentum
     @. dρw +=
         B(Geometry.transform(Geometry.WAxis(), -(∂f(p)) - If(Yc.ρ) * ∂f(Φ(center_coords.z))) - vvdivc2f(Ic(ρw ⊗ w)))
-    uₕf = @. If(Yc.ρuₕ / Yc.ρ) ## requires boundary conditions
+    uₕf = @. If(Yc.ρuₕ / Yc.ρ) # requires boundary conditions
     @. dρw -= hdiv(uₕf ⊗ ρw)
 
-    ### UPWIND FLUX CORRECTION
+    ## UPWIND FLUX CORRECTION
     upwind_correction = false
     if upwind_correction
         @. dYc.ρ += fcc(w, Yc.ρ)
@@ -193,8 +195,8 @@ function atm_rhs!(dY, Y, params, t)
         @. dρw += fcf(wc, ρw)
     end
 
-    ### DIFFUSION
-    κ₂ = 5.0 ## m^2/s
+    ## DIFFUSION
+    κ₂ = 5.0 # m^2/s
     ##  1a) horizontal div of horizontal grad of horiz momentun
     @. dYc.ρuₕ += hwdiv(κ₂ * (Yc.ρ * hgrad(Yc.ρuₕ / Yc.ρ)))
     ##  1b) vertical div of vertical grad of horiz momentun
@@ -215,11 +217,11 @@ function atm_rhs!(dY, Y, params, t)
     return dY
 end
 
-# init simulation
+## init simulation
 function atm_init(; xmin = -500, xmax = 500, zmin = 0, zmax = 1000, npoly = 3, helem = 20, velem = 20, bc = nothing)
 
     ## construct domain spaces
-    hv_center_space, hv_face_space = hvspace_2D((xmin, xmax), (zmin, zmax), helem, velem, npoly) ## [m]
+    hv_center_space, hv_face_space = hvspace_2D((xmin, xmax), (zmin, zmax), helem, velem, npoly) # [m]
     center_coords = Fields.coordinate_field(hv_center_space)
     face_coords = Fields.coordinate_field(hv_face_space)
     domain = (hv_center_space = hv_center_space, hv_face_space = hv_face_space)
@@ -240,7 +242,7 @@ function atm_init(; xmin = -500, xmax = 500, zmin = 0, zmax = 1000, npoly = 3, h
     if bc === nothing
         bc = (
             ρθ = (bottom = CoupledFlux(), top = ZeroFlux()),
-            ρu = nothing, ## for now BCs are hard coded, except for ρθ
+            ρu = nothing, # for now BCs are hard coded, except for ρθ
         )
     end
 
@@ -257,8 +259,8 @@ function atm_run!(Y, bc, domain)
     sol = solve(prob, SSPRK33(), dt = Δt, saveat = 1.0, progress = true, progress_message = (dt, u, params, t) -> t)
 end
 
-## Coupled Atmos Wrappers
-# Atmos Simulation - later to live in ClimaAtmos
+# Coupled Atmos Wrappers
+## Atmos Simulation - later to live in ClimaAtmos
 struct AtmosSimulation <: ClimaCoupler.AbstractAtmosSimulation
     integrator::Any
 end
@@ -307,7 +309,7 @@ function bc_divF2C_bottom!(::CoupledFlux, dY, Y, p, t)
     λ = @. p.cpl_p.C_p * p.cpl_p.C_H * ρ_boundary * windspeed_boundary
     dθ = @. θ_boundary - p.T_sfc
     heat_flux = @. -λ * dθ
-    @. dY.F_sfc += heat_flux ## accumulation
+    @. dY.F_sfc += heat_flux # accumulation
 
     return Operators.SetValue(Geometry.WVector.(heat_flux))
 end

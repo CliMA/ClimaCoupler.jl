@@ -1,3 +1,4 @@
+# # Slab Land ODE
 function lnd_rhs!(du, u, (parameters, F_accumulated), t)
     """
     Slab layer equation
@@ -11,7 +12,7 @@ function lnd_rhs!(du, u, (parameters, F_accumulated), t)
     @. T_sfc = (-F_accumulated) / (lnd_h * lnd_ρ * lnd_c)
 end
 
-# set up domain
+## set up domain
 function hspace_1D(xlim = (-π, π), npoly = 0, helem = 10)
     FT = Float64
 
@@ -26,7 +27,7 @@ function hspace_1D(xlim = (-π, π), npoly = 0, helem = 10)
     return space
 end
 
-# init simulation
+## init simulation
 function lnd_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
 
     ## construct domain spaces - get only surface layer (NB: z should be zero, not z = first central height)
@@ -45,8 +46,8 @@ function lnd_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
     return Y, domain
 end
 
-## Coupled Land Wrappers
-# Land Simulation - later to live in ClimaLSM
+# Coupled Land Wrappers
+## Land Simulation - later to live in ClimaLSM
 struct LandSimulation <: ClimaCoupler.AbstractLandSimulation
     integrator::Any
 end

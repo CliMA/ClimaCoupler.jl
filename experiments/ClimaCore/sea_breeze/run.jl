@@ -1,4 +1,4 @@
-# # Coupling in Practice: Sea Breeze
+# # Coupled Sea Breeze Driver
 
 # In this tutorial we demonstrate the coupling of three component models
 # (atmosphere, ocean, and land) to drive the sea breeze. The primary parts
@@ -18,13 +18,15 @@ Operators.allow_mismatched_fd_spaces() = true
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", ".."))
 using ClimaCoupler
 
-# ## Component Models
-# Coupled simulations can re-use tendency methods developed for standalone simulations.
-# This is achieved by multiple dispatch, where methods that deal with boundaries
-# dispatch off of a coupled boundary type. This minimizes the necessary code that
-# must be specialized for a coupled run as only special boundary conditions must
-# be written. Here, the atmosphere has special boundary conditions for coupling,
-# while the ocean and land tendencies are unaltered.
+#=
+## Component Models
+Coupled simulations can re-use tendency methods developed for standalone simulations.
+This is achieved by multiple dispatch, where methods that deal with boundaries
+dispatch off of a coupled boundary type. This minimizes the necessary code that
+must be specialized for a coupled run as only special boundary conditions must
+be written. Here, the atmosphere has special boundary conditions for coupling,
+while the ocean and land tendencies are unaltered.
+=#
 
 include("atmos_rhs.jl")
 include("ocean_rhs.jl")

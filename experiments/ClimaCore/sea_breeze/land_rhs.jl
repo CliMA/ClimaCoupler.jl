@@ -1,4 +1,14 @@
-# # Slab Land ODE
+# # Land Model
+
+#=
+## Slab Land ODE
+For our land component, we solve a simple slab land ODE:
+
+$$\rho_l c_l H_l \partial_t T_{lnd} = - F_{integ} / \Delta t_{coupler}$$
+- where $\rho_l = 1500$ kg m $^{-3}$, $c_l=800$ J K $^{-1}$ kg $^{-1}$, $H_l=1$ m are the density, specific heat and depth of the land slab,
+- and $F_{integ}$ is the integrated surface fluxes in time.
+=#
+
 function lnd_rhs!(du, u, (parameters, F_accumulated), t)
     """
     Slab layer equation
@@ -46,7 +56,7 @@ function lnd_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
     return Y, domain
 end
 
-# Coupled Land Wrappers
+# ## Coupled Land Wrappers
 ## Land Simulation - later to live in ClimaLSM
 struct LandSimulation <: ClimaCoupler.AbstractLandSimulation
     integrator::Any

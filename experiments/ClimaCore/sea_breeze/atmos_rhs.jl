@@ -1,5 +1,45 @@
 # # Atmospheric Model
 
+#=
+## Atmosphere Conservation Equations
+
+Density:
+$$ \frac{\partial \rho}{\partial t} + \nabla \cdot ({\rho \vec{u}})= S(\chi, ...) $$
+
+Momentum (flux form):
+$$ \frac{\partial \rho \vec{u}}{\partial t} + \nabla \cdot ({\rho \vec{u} \otimes \vec{u} + pI})= \nabla \cdot (\rho \tau) - \rho g + F_{B}(...)$$
+
+
+Potential temperature:
+$$ \frac{\partial \rho \theta}{\partial t} + \nabla \cdot (\rho \theta \vec{u}) = \nabla \cdot (\kappa \rho \nabla \theta) $$
+
+
+Total Energy (possibly replace potential temperature equation with total energy conservation):
+$$ \frac{\partial \rho e_{tot}}{\partial t} + \nabla \cdot ((\rho e_{tot} + p )\vec{u}) = \nabla \cdot (\kappa \rho \nabla h_{tot}), $$
+ 
+where $h_{tot}$ is the total specific enthalpy given by internal and potential energy contributions. 
+
+Tracer transport: 
+$$ \frac{\partial \rho \chi}{\partial t} + \nabla \cdot (\rho \chi \vec{u}) = \nabla \cdot (\kappa \rho \nabla \chi) + S(\chi, ...)$$
+
+Smagorinsky Closure:
+$$ 
+\rho\tau = -2\rho\nu\vec{S} 
+$$
+$$ 
+\vec{S} = \frac{1}{2}((\nabla u) + (\nabla u)^{T})
+$$
+and 
+$$ 
+\nu = (C_{s}\Delta_{x,y,z})^2\sqrt{2S_{ij}S_{ij}}
+$$
+
+with $\Delta_{x,y,z}$ the grid lengthscale (sometimes approximated as a geometric average
+$\Delta = (\Delta_x\Delta_y\Delta_z)^{1/3}$), $\nu$ is the kinematic viscosity 
+(calculated here with the Smagorinsky model), $\vec{S}$ the symmetric rate-of-strain tensor, 
+$\tau$ the diffusive momentum flux tensor. 
+=#
+
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", ".."))
 
 using Test

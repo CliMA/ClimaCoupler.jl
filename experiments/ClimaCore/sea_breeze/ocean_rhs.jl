@@ -1,4 +1,14 @@
-# # Slab Ocean ODE
+# # Ocean Model
+
+#=
+## Slab Ocean ODE
+For our ocean component, we solve a simple slab ocean ODE just as we did for the land:
+
+$$\rho_o c_o H_o \partial_t T_{ocn} = - F_{integ} / \Delta t_{coupler}$$
+- where $\rho_o = 1025$ kg m $^{-3}$, $c_o=3850$ J K $^{-1}$ kg $^{-1}$, $H_o = 100$ m are the density, specific heat and depth of the ocean,
+- and $F_{integ}$ is the integrated surface fluxes in time.
+=#
+
 function ocn_rhs!(du, u, (parameters, F_accumulated), t)
     """
     Slab layer equation
@@ -46,7 +56,7 @@ function ocn_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
     return Y, domain
 end
 
-# Coupled Ocean Wrappers
+# ## Coupled Ocean Wrappers
 ## Ocean Simulation - Later to live in Oceananigans
 struct OceanSimulation <: ClimaCoupler.AbstractOceanSimulation
     integrator::Any

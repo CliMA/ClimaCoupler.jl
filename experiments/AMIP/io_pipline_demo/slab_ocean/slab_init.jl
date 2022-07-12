@@ -57,4 +57,4 @@ function slab_ocean_init(::Type{FT}; tspan, dt, saveat, space, mask, stepper = E
 end
 
 # file-specific
-clean_sst(SST) = SST .* FT.(abs.(landmask .- 1)) .+ FT(273.15)
+clean_sst(SST) = SST .* FT.(abs.(landmask .- 1)) .+ FT(273.15) # TODO: turn into macro to avoid global landmask

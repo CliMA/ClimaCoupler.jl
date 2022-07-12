@@ -82,12 +82,13 @@ function ncreader_rll_to_cgll(
 
     return weightfile, datafile_cgll
 end
+
 """
-    bcfields_from_file
-- given time indices, 
+    ncreader_cgll_sparse_to_field
+- given time indices of the NetCDF file data, this reads in the data of the specified variable and converts the sparse vector to a Field object
 - nc file needs to be of the exodus format and havea time dimension
 """
-function bcfields_from_file(datafile_cgll, varname, weightfile, t_i_tple, boundary_space; scaling_function = false, clean_exodus = false)
+function ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, t_i_tple, boundary_space; scaling_function = FT.(), clean_exodus = false)
     # read the remapped file
     offline_outvector = NCDataset(datafile_cgll, "r") do ds_wt
         ds_wt[varname][:][:, [t_i_tple...]] # ncol, times
@@ -110,20 +111,15 @@ function bcfields_from_file(datafile_cgll, varname, weightfile, t_i_tple, bounda
 
     R = (; target_idxs = target_unique_idxs, row_indices = row_indices)
 
-    # this could be taken out for fewer dynamic allocations? 
+    # this could be taken out for fewer allocations? 
     offline_field = Fields.zeros(FT, boundary_space)
 
     offline_fields = ntuple(x -> similar(offline_field), length(t_i_tple))
 
     clean_exodus ? run(`mkdir -p $REGRID_DIR`) : nothing
 
-    if scaling_function == false
-        ntuple( x -> reshape_sparse_to_field!(offline_fields[x], FT.(offline_outvector[:,x]) , R), length(t_i_tple))
-    else
-        ntuple( x -> scaling_function(reshape_sparse_to_field!(offline_fields[x], FT.(offline_outvector)[:,x] , R)), length(t_i_tple))
-    end
+    ntuple( x -> scaling_function(reshape_sparse_to_field!(offline_fields[x], offline_outvector[:,x] , R)), length(t_i_tple))
 end
-
 
 function ncreader_rll_to_cgll_from_space(FT, infile, varname, h_space; outfile = "outfile_cgll.nc")
     R = h_space.topology.mesh.domain.radius

@@ -9,7 +9,7 @@ import Test: @test
 using ClimaCore.Utilities: half, PlusHalf
 using Dates
 
-include("cli_options_io.jl")
+include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
 # Read in some parsed args
 prescribed_sst = parsed_args["prescribed_sst"]
@@ -81,7 +81,7 @@ end
 if land_sim == "bucket"
     slab_sim = bucket_init(FT, FT.(tspan); dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat))
 end
-
+prescribed_sst = true
 if prescribed_sst
     println("No ocean sim - do not expect energy conservation")
     
@@ -148,15 +148,19 @@ end
 walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
     #@show t
 
-    date = current_date(date0, t, FT) # TODO: turn into macro
+    global date = current_date(date0, t, FT) # TODO: turn into macro?
 
-    # ## BC load
+    ## BC load # not a noticeable slowdown with @elapsed
 
-    # load monthly files if needed 
-    Dates.days(date - SST_info.all_dates[SST_info.segment_idx[1] + Int(1)]) < FT(1) ? nothing : (update_midmonth_data!(date, SST_info) , @show ("yes:$(date) vs $(SST_info.all_dates[SST_info.segment_idx[1] + Int(1)])"))
-    Dates.days(date - SIC_info.all_dates[SIC_info.segment_idx[1] + Int(1)]) < FT(1) ? nothing : update_midmonth_data!(date, SIC_info) 
+    # load monthly data from files if needed 
+    @calendar_callback :(update_midmonth_data!(date, SST_info)) date next_month_date(SST_info)
+    @calendar_callback :(update_midmonth_data!(date, SIC_info)) date next_month_date(SIC_info)
 
-    # load monthly files if needed
+    # old approach
+    # Dates.days(date - SST_info.all_dates[SST_info.segment_idx[1] + Int(1)]) < FT(0) ? nothing : (update_midmonth_data!(date, SST_info) , @show ("yes:$(date) vs $(SST_info.all_dates[SST_info.segment_idx[1] + Int(1)])")) # TODO: abstract: calendar_callback
+    # Dates.days(date - SIC_info.all_dates[SIC_info.segment_idx[1] + Int(1)]) < FT(0) ? nothing : update_midmonth_data!(date, SIC_info) 
+
+    # daily interpolation from monthly data
     SST = interpolate_midmonth_to_daily(date, SST_info)
     SIC = interpolate_midmonth_to_daily(date, SIC_info)
     

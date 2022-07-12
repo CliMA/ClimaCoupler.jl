@@ -66,4 +66,4 @@ end
 get_ice_mask(h_ice, FT) = h_ice > FT(0) ? FT(1) : FT(0)
 
 # file-specific
-clean_sic(SIC) = SIC .* FT.(abs.(landmask .- 1))
+clean_sic(SIC) = SIC .* FT.(abs.(landmask .- 1)) # TODO: turn into macro to avoid global landmask

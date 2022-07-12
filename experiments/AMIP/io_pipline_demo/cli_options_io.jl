@@ -5,7 +5,7 @@ function parse_commandline()
         "--dt_cpl"
         help = " Coupling time step in seconds"
         arg_type = Int
-        default = 200
+        default = 400
         "--anim"
         help = "Boolean flag indicating whether to make animations"
         arg_type = Bool
@@ -25,7 +25,7 @@ function parse_commandline()
         "--t_end"
         help = "Simulation end time. Examples: [`1200days`, `40secs`]"
         arg_type = String
-        default = "40days"
+        default = "1hours"
         "--dt"
         help = "Simulation time step. Examples: [`10secs`, `1hours`]"
         arg_type = String

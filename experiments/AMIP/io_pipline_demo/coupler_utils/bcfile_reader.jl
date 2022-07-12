@@ -63,22 +63,22 @@ function update_midmonth_data!(date, bcf_info)
 
     if (all_dates == nothing)
         @warn "no temporally varying data, all months using the same field"
-        bcf_info.monthly_fields[1] .= bcfields_from_file(datafile_cgll, varname, weightfile, (Int(midmonth_idx),), axes(monthly_fields[1]), scaling_function = scaling_function)[1]
+        bcf_info.monthly_fields[1] .= ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(midmonth_idx),), axes(monthly_fields[1]), scaling_function = scaling_function)[1]
         bcf_info.interpolate_monthly .= false
     elseif (midmonth_idx == midmonth_idx0) && (Dates.days(date - all_dates[midmonth_idx])  < 0)
         @warn "no BC data for this time period - using file from $(all_dates[1])"
-        bcf_info.monthly_fields[1] .= bcfields_from_file(datafile_cgll, varname, weightfile, (Int(midmonth_idx),), axes(monthly_fields[1]), scaling_function = scaling_function)[1]
+        bcf_info.monthly_fields[1] .= ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(midmonth_idx),), axes(monthly_fields[1]), scaling_function = scaling_function)[1]
         bcf_info.interpolate_monthly .= false
     elseif Dates.days(date - all_dates[end - 1]) > 0
         @warn "no BC data for this time period - using file from $(all_dates[end - 1])"
-        bcf_info. monthly_fields[1] .= bcfields_from_file(datafile_cgll, varname, weightfile, (Int(length(all_dates)),), axes(monthly_fields[1]), scaling_function = scaling_function)[1]  
+        bcf_info. monthly_fields[1] .= ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(length(all_dates)),), axes(monthly_fields[1]), scaling_function = scaling_function)[1]  
         bcf_info.interpolate_monthly .= false
     elseif Dates.days(date - all_dates[Int(midmonth_idx + 1)]) > 20
         nearest_idx = argmin(abs.(parse(FT,datetime_to_strdate(date)) .- parse.(FT, datetime_to_strdate.(all_dates[:]))))
         @error "init data does not correspond to start date. Try initializing with `SIC_info.segment_idx = midmonth_idx = midmonth_idx0 = $nearest_idx` for this start date" # TODO: do this automatically w a warning
     elseif Dates.days(date - all_dates[Int(midmonth_idx)]) > 0
         bcf_info.segment_length .= Dates.days(all_dates[Int(midmonth_idx + 1)] - all_dates[Int(midmonth_idx)])
-        map(x -> bcf_info.monthly_fields[x] .= bcfields_from_file(datafile_cgll, varname, weightfile, (Int(midmonth_idx), Int(midmonth_idx + 1)), axes(monthly_fields[1]), scaling_function = scaling_function)[x], (1,2)) 
+        map(x -> bcf_info.monthly_fields[x] .= ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(midmonth_idx), Int(midmonth_idx + 1)), axes(monthly_fields[1]), scaling_function = scaling_function)[x], (1,2)) 
         bcf_info.interpolate_monthly .= true
     else
         nothing
@@ -96,11 +96,13 @@ function interpolate_midmonth_to_daily(date, bcf_info)
         @assert abs(month_fraction) <= FT(1) "time interpolation weights must be <= 1, but month_fraction = $month_fraction"
         return intepol.(bcf_info.monthly_fields[1], bcf_info.monthly_fields[2], month_fraction, FT) 
     else
-        return bcf_info.monthly_fields 
+        return bcf_info.monthly_fields[1] 
     end 
 end
 
 intepol(ftuple1, ftuple2, month_fraction, FT) = ftuple1 * month_fraction + ftuple2 * (FT(1) - month_fraction)
+
+next_month_date(bcfile_info) = bcfile_info.all_dates[bcfile_info.segment_idx[1] + Int(1)] 
 
 # TODO:
 # - Dates.epochdays2date

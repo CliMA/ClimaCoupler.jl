@@ -1,11 +1,5 @@
 function LandSeaMask(FT, mask_data, varname, h_space; outfile = "land_sea_cgll.nc", threshold = 0.7)
-    # R = h_space.topology.mesh.domain.radius
-    # ne = h_space.topology.mesh.ne
-    # Nq = Spaces.Quadratures.polynomial_degree(h_space.quadrature_style) + 1
-
-    # mask = ncreader_rll_to_cgll(FT, infile, varname, ne = ne, R = R, Nq = Nq, outfile = outfile)
-    # mask = clean_mask.(FT, mask, threshold)
-    LSMASK_info = bcfile_info_init(mask_data, "LSMASK", boundary_space, segment_idx0 = [Int(1)], scaling_function = clean_mask)
+    LSMASK_info = bcfile_info_init(mask_data, "LSMASK", boundary_space, segment_idx0 = [Int(1)], scaling_function = clean_mask) # TODO: dispatch
     update_midmonth_data!(date0, LSMASK_info)
 end
 

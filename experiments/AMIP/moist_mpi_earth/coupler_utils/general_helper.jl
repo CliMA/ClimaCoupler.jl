@@ -1,13 +1,14 @@
 # most of these functions are temporary helpers until upstream issues are resolved
 
 # TODO: unify with coupler interface
-struct CouplerSimulation{I, F, D, B, T, M, P}
-    Δt::I
+struct CouplerSimulation{I, F, S, D, B, T, M, P}
+    Δt_cpl::I
     t::F
+    tspan::S
     dates::D
     boundary_space::B
     FT::T
-    mask::M
+    land_mask::M
     fields::NamedTuple
     model_sims::NamedTuple
     mode::NamedTuple

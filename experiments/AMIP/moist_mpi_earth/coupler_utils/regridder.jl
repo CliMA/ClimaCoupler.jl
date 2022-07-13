@@ -40,12 +40,7 @@ Reads and regrids data of the `varname` variable from an input NetCDF file and s
 The input NetCDF file needs to be `Exodus` formatted, and can contain time-dependent data. 
 
 """
-function ncreader_rll_to_cgll_from_space(
-    datafile_rll,
-    varname,
-    space;
-    outfile = "data_cgll.nc"
-)
+function ncreader_rll_to_cgll_from_space(datafile_rll, varname, space; outfile = "data_cgll.nc")
 
     outfile_root = outfile[1:(end - 3)]
     datafile_cgll = joinpath(REGRID_DIR, outfile)
@@ -89,15 +84,23 @@ function ncreader_rll_to_cgll_from_space(
 end
 
 """
-    ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, t_i_tple, space; scaling_function = FT_dot, clean_exodus = false)
+    ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, t_i_tuple, space; scaling_function = FT_dot, clean_exodus = false)
 
-Given time `t_i_tple` indices of the NetCDF file data, this reads in the required data of the specified `varname` variable and converts the sparse vector to a `Field` object
+Given time `t_i_tuple` indices of the NetCDF file data, this reads in the required data of the specified `varname` variable and converts the sparse vector to a `Field` object
 The NetCDF file needs to be of the Exodus format and have a time dimension.
 """
-function ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, t_i_tple, space; scaling_function = FT_dot, clean_exodus = false)
+function ncreader_cgll_sparse_to_field(
+    datafile_cgll,
+    varname,
+    weightfile,
+    t_i_tuple,
+    space;
+    scaling_function = FT_dot,
+    clean_exodus = false,
+)
     # read the remapped file
     offline_outvector = NCDataset(datafile_cgll, "r") do ds_wt
-        ds_wt[varname][:][:, [t_i_tple...]] # ncol, times
+        ds_wt[varname][:][:, [t_i_tuple...]] # ncol, times
     end
 
     # weightfile info needed to populate all nodes and save into fields
@@ -120,21 +123,22 @@ function ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, t_i_t
     # TODO: this could be taken out for fewer allocations? 
     offline_field = Fields.zeros(FT, space)
 
-    offline_fields = ntuple(x -> similar(offline_field), length(t_i_tple))
+    offline_fields = ntuple(x -> similar(offline_field), length(t_i_tuple))
 
     clean_exodus ? run(`mkdir -p $REGRID_DIR`) : nothing
 
-    ntuple( x -> scaling_function(reshape_cgll_sparse_to_field!(offline_fields[x], offline_outvector[:,x] , R)), length(t_i_tple))
+    ntuple(
+        x -> scaling_function(reshape_cgll_sparse_to_field!(offline_fields[x], offline_outvector[:, x], R)),
+        length(t_i_tuple),
+    )
 end
 
-FT_dot(x) = FT.(x) 
+FT_dot(x) = FT.(x)
 
 # for AMIP we don't need regridding of surface model fields. When we do, we re-introduce the ClimaCoreTempestRemap 
-function dummmy_remap!(target, source)  
+function dummmy_remap!(target, source)
     parent(target) .= parent(source)
 end
 
 # TODO:
 # - add unit tests 
-
-

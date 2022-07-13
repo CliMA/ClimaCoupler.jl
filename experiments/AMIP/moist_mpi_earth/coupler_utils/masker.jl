@@ -1,6 +1,7 @@
 function LandSeaMask(FT, infile, varname, boundary_space; outfile = "land_sea_cgll.nc", threshold = 0.7)
-    weightfile, datafile_cgll, regrid_space = ncreader_rll_to_cgll_from_space(infile, varname, boundary_space, outfile = outfile)
-    mask = ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(1),), regrid_space)[1]    
+    weightfile, datafile_cgll, regrid_space =
+        ncreader_rll_to_cgll_from_space(infile, varname, boundary_space, outfile = outfile)
+    mask = ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(1),), regrid_space)[1]
     mask = clean_mask.(FT, mask, threshold)
 end
 

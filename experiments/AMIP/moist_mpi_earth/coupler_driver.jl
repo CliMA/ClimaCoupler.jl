@@ -82,7 +82,6 @@ if land_sim == "bucket"
     slab_sim = bucket_init(FT, FT.(tspan); dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat))
 end
 
-prescribed_sst = true
 if prescribed_sst
     println("No ocean sim - do not expect energy conservation")
 

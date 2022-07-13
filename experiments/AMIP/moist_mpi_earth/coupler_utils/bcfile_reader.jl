@@ -3,8 +3,9 @@
 
 # IO - init
 """
-BCDataInfo
-- specific to each boundary condition from a file, per variable
+    BCDataInfo
+
+Stores information specific to each boundary condition from a file and each variable.
 """
 struct BCFileInfo{S,V,R,D,C,O,I}
     datafile_cgll::S  
@@ -21,8 +22,9 @@ struct BCFileInfo{S,V,R,D,C,O,I}
 end
 
 """
-bcfile_info_init
-- regrids from lat-lon grid to cgll grid, saving the output in a new file, and returns info relevant for temporal interpolation 
+    Bcfile_info_init(datafile_rll, varname, boundary_space; interpolate_monthly = false, segment_idx0 = [Int(1)], scaling_function = false)
+
+Regrids from lat-lon grid to cgll grid, saving the output in a new file, and returns the info packaged in a single struct
 """
 function bcfile_info_init(datafile_rll, varname, boundary_space; interpolate_monthly = false, segment_idx0 = [Int(1)], scaling_function = false)
 
@@ -46,13 +48,12 @@ function bcfile_info_init(datafile_rll, varname, boundary_space; interpolate_mon
     return BCFileInfo(datafile_cgll, varname, weightfile, regrid_space, data_dates, segment_idx0 .- Int(1), segment_idx0, current_fields, segment_length, scaling_function,[interpolate_monthly]) # TODO: generalize to DateTime (only dialy resol now)
  
 end
-# strdate_to_datetime.(string.( ds["time"][:])) # if string "date"
-
 
 # IO - monthly
 """
-update_midmonth_data!(bcf_info)
-- 
+    update_midmonth_data!(bcf_info)
+
+Extracts boundary condition data from regridded (to model grid) NetCDF files (which times, depends on the specifications in the `bcf_info` struct).
 """
 function update_midmonth_data!(date, bcf_info)
 
@@ -62,35 +63,35 @@ function update_midmonth_data!(date, bcf_info)
     all_dates = bcf_info.all_dates
     midmonth_idx = bcf_info.segment_idx[1]
     midmonth_idx0 = bcf_info.segment_idx0[1]
+    monthly_fields = bcf_info.monthly_fields
     datafile_cgll = bcf_info.datafile_cgll
     weightfile = bcf_info.weightfile
-    monthly_fields = bcf_info.monthly_fields
     scaling_function = bcf_info.scaling_function
     varname = bcf_info.varname
     regrid_space = bcf_info.regrid_space
 
-    if (all_dates == nothing)
+    if (all_dates == nothing) # temporally invariant BCs
         @warn "no temporally varying data, all months using the same field"
-        bcf_info.monthly_fields[1] .= ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(midmonth_idx),), regrid_space, scaling_function = scaling_function)[1]
-        bcf_info.interpolate_monthly .= false
-    elseif (midmonth_idx == midmonth_idx0) && (Dates.days(date - all_dates[midmonth_idx])  < 0)
-        @warn "no BC data for this time period - using file from $(all_dates[1])"
-        bcf_info.monthly_fields[1] .= ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(midmonth_idx),), regrid_space, scaling_function = scaling_function)[1]
-        bcf_info.interpolate_monthly .= false
-    elseif Dates.days(date - all_dates[end - 1]) > 0
-        @warn "no BC data for this time period - using file from $(all_dates[end - 1])"
-        bcf_info. monthly_fields[1] .= ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(length(all_dates)),), regrid_space, scaling_function = scaling_function)[1]  
-        bcf_info.interpolate_monthly .= false
-    elseif Dates.days(date - all_dates[Int(midmonth_idx + 1)]) > 20
+        map(x -> bcf_info.monthly_fields[x] .= ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(midmonth_idx),), regrid_space, scaling_function = scaling_function)[1], Tuple(1:length(monthly_fields))) 
+    elseif (midmonth_idx == midmonth_idx0) && (Dates.days(date - all_dates[midmonth_idx])  < 0) # for init
+        @warn "this time period is before BC data - using file from $(all_dates[midmonth_idx0])"
+        map(x -> bcf_info.monthly_fields[x] .= ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(midmonth_idx0),), regrid_space, scaling_function = scaling_function)[1], Tuple(1:length(monthly_fields))) 
+    elseif Dates.days(date - all_dates[end - 1]) > 0 # for fini
+        @warn "this time period is after BC data - using file from $(all_dates[end - 1])"
+        map(x -> bcf_info.monthly_fields[x] .= ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(length(all_dates)),), regrid_space, scaling_function = scaling_function)[1]  , Tuple(1:length(monthly_fields))) 
+    elseif Dates.days(date - all_dates[Int(midmonth_idx)]) > 2 # throw error when there are closer initial indices for the bc file data that matches this date0
         nearest_idx = argmin(abs.(parse(FT,datetime_to_strdate(date)) .- parse.(FT, datetime_to_strdate.(all_dates[:]))))
         @error "init data does not correspond to start date. Try initializing with `SIC_info.segment_idx = midmonth_idx = midmonth_idx0 = $nearest_idx` for this start date" # TODO: do this automatically w a warning
-    elseif Dates.days(date - all_dates[Int(midmonth_idx)]) > 0
+    elseif Dates.days(date - all_dates[Int(midmonth_idx - 1)]) > 0 # date crosses to the next month
         bcf_info.segment_length .= Dates.days(all_dates[Int(midmonth_idx + 1)] - all_dates[Int(midmonth_idx)])
-        map(x -> bcf_info.monthly_fields[x] .= ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(midmonth_idx), Int(midmonth_idx + 1)), regrid_space, scaling_function = scaling_function)[x], (1,2)) 
-        bcf_info.interpolate_monthly .= true
+        map(x -> bcf_info.monthly_fields[x] .= ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(midmonth_idx), Int(midmonth_idx + 1)), regrid_space, scaling_function = scaling_function)[x], Tuple(1:length(monthly_fields))) 
     else
-        nothing
+        @error "Check boundary file specification"
     end
 end
 
 next_month_date(bcfile_info) = bcfile_info.all_dates[bcfile_info.segment_idx[1] + Int(1)] 
+
+# TODO:
+# - design unit test for `update_midmonth_data!`
+# - replace if statements with dipatches, write better abstractions

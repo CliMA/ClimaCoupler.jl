@@ -3,12 +3,14 @@
 
 """
     current_date(t)
+
 Return the model date
 """
 current_date(t) = date0 + Dates.Second(t)
 
 """
     strdate_to_datetime(strdate)
+
 Convert from String ("YYYYMMDD") to Date format  
 """
 strdate_to_datetime(strdate::String) =
@@ -16,13 +18,15 @@ strdate_to_datetime(strdate::String) =
 
 """
     datetime_to_strdate(datetime)
+
 Convert from Date to String ("YYYYMMDD") format  
 """
-datetime_to_strdate(datetime::Date) =
-    string(Dates.year(datetime)) * string(Dates.month(datetime)) * string(Dates.day(datetime))
+datetime_to_strdate(datetime::DateTime) =
+    string(Dates.year(datetime)) * string(string(lpad(Dates.month(datetime),2,"0"))) * string(lpad(Dates.day(datetime),2,"0")) 
 
 """
     calendar_callback(ex, model_date, callback_date)
+
 Evaluate `ex` when `model_date` is on/after `callback_date` and do nothing otherwise
 """
 macro calendar_callback(ex::Expr, model_date::Symbol, callback_date::Union{Symbol,Expr})
@@ -34,6 +38,9 @@ macro calendar_callback(ex::Expr, model_date::Symbol, callback_date::Union{Symbo
         end
     end
 end
+
+# TODO
+# - unit test for @calendar_callback
 
 # # test for @calendar_callback (TODO: modify and use when move to `src/`)
 # Δt_cpl = 0.5 * 86400

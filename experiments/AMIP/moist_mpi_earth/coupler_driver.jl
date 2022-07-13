@@ -81,19 +81,19 @@ end
 if land_sim == "bucket"
     slab_sim = bucket_init(FT, FT.(tspan); dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat))
 end
-prescribed_sst = true
+
 if prescribed_sst
     println("No ocean sim - do not expect energy conservation")
     
     # ocean
-    SST_info = bcfile_info_init(sst_data, "SST", boundary_space, segment_idx0 = [Int(1729)],interpolate_monthly = false, scaling_function = clean_sst)
+    SST_info = bcfile_info_init(sst_data, "SST", boundary_space, segment_idx0 = [Int(1309)],interpolate_monthly = false, scaling_function = clean_sst)
     update_midmonth_data!(date0, SST_info)
     SST = SST_info.monthly_fields[1] 
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
     slab_ocean_sim = nothing
     
     # sea ice
-    SIC_info = bcfile_info_init(sic_data, "SEAICE", boundary_space, segment_idx0 = [Int(1729)] ,interpolate_monthly = false, scaling_function = clean_sic)
+    SIC_info = bcfile_info_init(sic_data, "SEAICE", boundary_space, segment_idx0 = [Int(1309)] ,interpolate_monthly = false, scaling_function = clean_sic)
     update_midmonth_data!(date0, SIC_info)
     SIC =  SIC_info.monthly_fields[1] 
     ice_mask = get_ice_mask.(SIC .- FT(50), FT) # here 50% and lower is considered ice free
@@ -106,7 +106,7 @@ else
     ocean_params = nothing
 
     # sea ice - TODO: port in the dynamic sea-ice after AMIP
-    SIC_info = bcfile_info_init(sic_data, "SEAICE", boundary_space, segment_idx0 = [Int(1729)] ,interpolate_monthly = false, scaling_function = clean_sic)
+    SIC_info = bcfile_info_init(sic_data, "SEAICE", boundary_space, segment_idx0 = [Int(1309)] ,interpolate_monthly = false, scaling_function = clean_sic)
     update_midmonth_data!(date0, SIC_info)
     SIC =  SIC_info.monthly_fields[1] 
     ice_mask = get_ice_mask.(SIC .- FT(50), FT) # here 50% and lower is considered ice free
@@ -114,7 +114,6 @@ else
     slab_ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
     
 end
-
 
 # init coupler
 coupler_sim = CouplerSimulation(FT(Δt_cpl), integrator.t, boundary_space, FT, mask)
@@ -160,7 +159,9 @@ end
 
 walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
 
-    date = current_date(t)
+    global date = current_date(t) # if not global, `date`` is not updated. Check that this still runs when distributed. 
+
+    # print date on the first of month 
     @calendar_callback :(@show(date), date1 += Dates.Month(1)) date date1
 
     # monthly read of boundary condition data
@@ -222,7 +223,6 @@ if energy_check && !prescribed_sst
         joinpath(coupler_output_dir, "total_energy_log_bucket.png"),
     )
 end
-
 
 @show P_liq
 # # animations

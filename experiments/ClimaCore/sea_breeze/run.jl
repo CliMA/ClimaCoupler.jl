@@ -1,10 +1,11 @@
 # # Coupled Sea Breeze Driver
 
-# In this tutorial we demonstrate the coupling of three component models
-# (atmosphere, ocean, and land) to drive the sea breeze. The primary parts
-# of the ClimaCoupler interface are used and discussed.
+#=
+In this tutorial we demonstrate the coupling of three component models
+(atmosphere, ocean, and land) to drive the sea breeze. The primary parts
+of the ClimaCoupler interface are used and discussed.
+=#
 
-const FT = Float64
 import SciMLBase: step!
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!
 import ClimaCore.Utilities: PlusHalf
@@ -18,6 +19,8 @@ Operators.allow_mismatched_fd_spaces() = true
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", ".."))
 using ClimaCoupler
 
+const FT = Float64
+
 #=
 ## Component Models
 Coupled simulations can re-use tendency methods developed for standalone simulations.
@@ -26,13 +29,15 @@ dispatch off of a coupled boundary type. This minimizes the necessary code that
 must be specialized for a coupled run as only special boundary conditions must
 be written. Here, the atmosphere has special boundary conditions for coupling,
 while the ocean and land tendencies are unaltered.
-=#
 
+In a more mature CliMA ecosystem, the following include statements would be replaced
+by `using` statements for the relevant component packages.
+=#
 include("atmos_rhs.jl")
 include("ocean_rhs.jl")
 include("land_rhs.jl")
 
-# model parameters that the coupler overwrites 
+## model parameters
 const atm_T_ini = FT(270.0)
 const MSLP = FT(1e5)
 const grav = FT(9.8)
@@ -43,26 +48,26 @@ const C_v = FT(R_d / (γ - 1))
 const R_m = R_d
 cpl_parameters = (
     ## atmos parameters
-    atm_μ = FT(0.0001), ## diffusion coefficient
-    atm_T_top = FT(280.0), ## fixed temperature at the top of the domain_atm
-    atm_T_ini = atm_T_ini, ## initial condition of at temperature (isothermal) [K]
-    MSLP = MSLP, ## mean sea level pressure
-    grav = grav, ## gravitational constant
-    R_d = R_d, ## R dry (gas constant / mol mass dry air)
-    γ = γ, ## heat capacity ratio
-    C_p = C_p, ## heat capacity at constant pressure
-    C_v = C_v, ## heat capacity at constant volume
-    R_m = R_m, ## moist R, assumed to be dry
+    atm_μ = FT(0.0001), # diffusion coefficient
+    atm_T_top = FT(280.0), # fixed temperature at the top of the domain_atm
+    atm_T_ini = atm_T_ini, # initial condition of at temperature (isothermal) [K]
+    MSLP = MSLP, # mean sea level pressure
+    grav = grav, # gravitational constant
+    R_d = R_d, # R dry (gas constant / mol mass dry air)
+    γ = γ, # heat capacity ratio
+    C_p = C_p, # heat capacity at constant pressure
+    C_v = C_v, # heat capacity at constant volume
+    R_m = R_m, # moist R, assumed to be dry
     ## land slab parameters
-    lnd_h = FT(0.5), ## depth of slab layer [m]
-    lnd_ρ = FT(1500), ## density [kg m^-3]
-    lnd_c = FT(800), ## specific heat [J K^-1 kg^-1]
-    lnd_T_ini = FT(260.0), ## initial condition of at temperature (isothermal) [K]
+    lnd_h = FT(0.5), # depth of slab layer [m]
+    lnd_ρ = FT(1500), # density [kg m^-3]
+    lnd_c = FT(800), # specific heat [J K^-1 kg^-1]
+    lnd_T_ini = FT(260.0), # initial condition of at temperature (isothermal) [K]
     ## ocean slab parameters
-    ocn_h = FT(0.5), ## depth of slab layer [m]
-    ocn_ρ = FT(1025), ## density [kg m^-3]
-    ocn_c = FT(3850), ## specific heat [J K^-1 kg^-1]
-    ocn_T_ini = FT(260.0), ## initial condition of at temperature (isothermal) [K]
+    ocn_h = FT(0.5), # depth of slab layer [m]
+    ocn_ρ = FT(1025), # density [kg m^-3]
+    ocn_c = FT(3850), # specific heat [J K^-1 kg^-1]
+    ocn_T_ini = FT(260.0), # initial condition of at temperature (isothermal) [K]
     ## coupling parameters
     C_H = FT(0.0015),
 )
@@ -83,16 +88,18 @@ dss_callback = FunctionCallingCallback(dss_func, func_start = true)
 
 @info "Init Models and Maps"
 
-# ## Timestepping
-# The coupled simulation synchronizes the component models at a coupling time step,
-# `Δt_cpl`. Within that step, components may substep - each component specifies a
-# number of substeps to take within `Δt_cpl`: `atm_nsteps, ocn_nsteps, lnd_nsteps`.
+#=
+## Timestepping
+The coupled simulation synchronizes the component models at a coupling time step,
+`Δt_cpl`. Within that step, components may substep - each component specifies a
+number of substeps to take within `Δt_cpl`: `atm_nsteps, ocn_nsteps, lnd_nsteps`.
+=#
 t_start, t_end = (0.0, 1.0)
 Δt_cpl = 0.1
 saveat = 1e2
 atm_nsteps, ocn_nsteps, lnd_nsteps = (5, 1, 1)
 
-# Initialize Fields
+## Initialize Models
 atm_Y_default, atm_bc, atm_domain = atm_init(
     xmin = -500,
     xmax = 500,
@@ -108,9 +115,11 @@ ocn_Y_default, ocn_domain = ocn_init(xmin = -500, xmax = 0, helem = 10, npoly = 
 
 lnd_Y_default, lnd_domain = lnd_init(xmin = 0, xmax = 500, helem = 10, npoly = 0)
 
-# ## Remapping
-# Because models may live on different grids, remapping is necessary at the boundaries.
-# Maps between coupled components must be constructed for each interacting pair.
+#=
+## Remapping
+Because models may live on different grids, remapping is necessary at the boundaries.
+Maps between coupled components must be constructed for each interacting pair.
+=#
 atm_boundary = Spaces.level(atm_domain.hv_face_space, PlusHalf(0))
 
 maps = (
@@ -120,19 +129,21 @@ maps = (
     land_to_atmos = Operators.LinearRemap(atm_boundary, lnd_domain),
 )
 
-# initialize coupling fields
+## initialize coupling fields
 atm_T_sfc =
     Operators.remap(maps.ocean_to_atmos, ocn_Y_default.T_sfc) .+
-    Operators.remap(maps.land_to_atmos, lnd_Y_default.T_sfc) ## masked arrays; regrid to atm grid
+    Operators.remap(maps.land_to_atmos, lnd_Y_default.T_sfc) # masked arrays; regrid to atm grid
 atm_F_sfc = Fields.zeros(atm_boundary)
 ocn_F_sfc = Fields.zeros(ocn_domain)
 lnd_F_sfc = Fields.zeros(lnd_domain)
 
-# ## Simulations
-# Each component is wrapped as a Simulation, which contains both the model (tendency)
-# and the time-stepping information (solver, step size, etc). Simulations are the standard
-# structures that the coupler works with, enabling dispatch. Here, we create three simulations:
-# `AtmosSimulation`, `OceanSimulation`, and `LandSimulation`.
+#=
+## Simulations
+Each component is wrapped as a `Simulation`, which contains both the model (tendency)
+and the time-stepping information (solver, step size, etc). Simulations are the standard
+structures that the coupler works with, enabling dispatch of coupler methods.
+Here, we create three simulations: `AtmosSimulation`, `OceanSimulation`, and `LandSimulation`.
+=#
 atm_Y = Fields.FieldVector(Yc = atm_Y_default.Yc, ρw = atm_Y_default.ρw, F_sfc = atm_F_sfc)
 atm_p = (cpl_p = cpl_parameters, T_sfc = atm_T_sfc, bc = atm_bc)
 atmos = AtmosSimulation(atm_Y, t_start, Δt_cpl / atm_nsteps, t_end, SSPRK33(), atm_p, saveat, dss_callback)
@@ -166,11 +177,34 @@ struct AOLCoupledSimulation{
     Δt::FT
 end
 
-# ## The Coupler
-# The `CouplerState` is a coupling struct used to store pointers or copies of the
-# shared boundary information. All components are coupled by updating or accessing
-# data in this `CouplerState`; component models do not directly interface with one another,
-# only through the coupler.
+#=
+`step!` is a key method within the Simulations interface. It advances a simulation
+to the specified `t_stop`, with that simulation advancing by its own internal step
+size to reach the specified time. Each simulation type should specify its own step
+method, allowing components to have different time integration backends. Here, all
+components are using OrdinaryDiffEq integrators and can share the same `step!` method.
+=#
+function step!(sim::ClimaCoupler.AbstractSimulation, t_stop)
+    Δt = t_stop - sim.integrator.t
+    step!(sim.integrator, Δt, true)
+end
+
+#=
+## The Coupler
+The `CouplerState` is a coupling struct used to store pointers or copies of the
+shared boundary information. All components are coupled by updating or accessing
+data in this `CouplerState`; component models do not directly interface with one another,
+only through the coupler.
+
+After creating the `CouplerState` object, coupled fields can be registered index the
+coupler via the `coupler_add_field!` method. This field is then accessible by `coupler_get`
+methods and can be updated via the `coupler_put!` methods.
+
+Similarly, the `coupler_add_map!` method registers remapping operators in the coupler. To
+provide automatic remapping, there is a strict name convention for remap operators: a map
+from SimulationA to SimulationB (where `ClimaCoupler.name` returns `:simA` and `:simB`,
+respectively) must be named `simA_to_simB` so that the correct operator can be used.
+=#
 coupler = CouplerState()
 coupler_add_field!(coupler, :T_sfc_ocean, ocean.integrator.u.T_sfc; write_sim = ocean)
 coupler_add_field!(coupler, :T_sfc_land, land.integrator.u.T_sfc; write_sim = land)
@@ -180,12 +214,6 @@ for (name, map) in pairs(maps)
 end
 
 sim = AOLCoupledSimulation(atmos, ocean, land, coupler, Δt_cpl)
-
-# step for sims built on OrdinaryDiffEq
-function step!(sim::ClimaCoupler.AbstractSimulation, t_stop)
-    Δt = t_stop - sim.integrator.t
-    step!(sim.integrator, Δt, true)
-end
 
 function cpl_run(simulation::AOLCoupledSimulation)
     @info "Run model"
@@ -208,11 +236,11 @@ function cpl_run(simulation::AOLCoupledSimulation)
         coupler_put!(coupler, :F_sfc, atmos.integrator.u.F_sfc, atmos)
 
         ## Ocean
-        # pre: get accumulated flux from atmos
+        ## pre: get accumulated flux from atmos
         ocn_F_sfc = ocean.integrator.p.F_sfc
         ocn_F_sfc .= coupler_get(coupler, :F_sfc, ocean) ./ Δt_cpl
 
-        # run
+        ## run
         step!(ocean, t)
         # post: send ocean surface temp to atmos
         coupler_put!(coupler, :T_sfc_ocean, ocean.integrator.u.T_sfc, ocean)

@@ -10,7 +10,6 @@ const OUTPUT_DIR = joinpath(@__DIR__, "src/generated")
 
 # sea breeze tutorial
 TUTORIAL_DIR = joinpath(EXPERIMENTS_DIR, "ClimaCore/sea_breeze/")
-tutorial_name = "run.jl"
 # Pkg.activate(TUTORIAL_DIR)
 # Pkg.instantiate()
 # include(joinpath(TUTORIAL_DIR, "run.jl"))

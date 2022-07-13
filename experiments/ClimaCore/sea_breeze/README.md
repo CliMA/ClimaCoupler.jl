@@ -9,16 +9,8 @@ $$F_{integ} = \int_{\Delta t_{coupler}} F_{sfc}  dt$$
 where $c_p$ is the specific heat, $C_H = 0.0015$ is the bulk transfer coefficient for sensible heat, $|u_1|$ is the near-surface atmospheric wind speed. $F_{integ}$ has units of $J m^{-2}$. $\theta_{sfc}$ represents the potential temperature at the land or ocean surface.
 
 We assume that the potential temperature is defined with respect to the surface pressure, so that $\theta_{sfc} = T_{sfc}$. 
+
 ## Problem Domain 
-
-3D, 
-$$
-L_{x}, L_{y}, L_{z} = (50km , 5km, 4km)
-$$
-$$
-\Delta_{x}, \Delta_{y}, \Delta_{z} = (100m , 100m, 100m)
-$$
-
 
 ## Initial, Forcing and Boundary Conditions
 
@@ -28,26 +20,6 @@ $$
     - Coupled vertical: $F_{sfc}$ boundary flux
 
 - Initial conditions
-
-<!-- 
-Stably stratified initial conditions with given buoyancy frequency $$N = \sqrt{2} \times 10^{-2} s^{-1}$$ for the control simulation.
-
-Heat flux:
-$$HF = \frac{1}{2}Q_L^*(\tanh((x - x_{0})/\lambda)+1)$$ 
-Drag coefficient:
-$$C_{D} = \frac{1}{2}C_D^*(\tanh(x - x_{0}/\lambda)+1)$$ 
-$$\lambda = 100 ~\mathrm{m}$$
-Geostrophic Wind forcing (momentum terms): 
-$$
-\vec{GW} = 
-\rho f( \vec{u}- \vec{u_{g}})
-$$
-
-via equations (8), (9) in Antonelli and Rotunno. Control simulation with $$C_D^* = 0.007,$$  
-$$Q_L^* = 0.078 \mathrm{~mKs^{-1}}.$$ 
-
-$x_{0}$ is some offset coordinate based on the domain construction.  -->
-
 
 ##  Smagorinsky
 

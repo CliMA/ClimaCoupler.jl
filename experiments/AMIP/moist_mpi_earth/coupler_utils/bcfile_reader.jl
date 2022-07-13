@@ -159,6 +159,24 @@ end
 
 next_month_date(bcfile_info) = bcfile_info.all_dates[bcfile_info.segment_idx[1] + Int(1)]
 
+# IO - daily
+"""
+    interpolate_midmonth_to_daily(date, bcf_info)
+
+Interpolates linearly between two `Fields` in the `bcf_info` struct, or returns the first Field if interpolation is switched off. 
+"""
+function interpolate_midmonth_to_daily(date, bcf_info)
+    if bcf_info.interpolate_monthly[1]
+        month_fraction = FT(Dates.days(date - bcf_info.all_dates[Int(bcf_info.segment_idx[1])]) / bcf_info.segment_length[1])
+        @assert abs(month_fraction) <= FT(1) "time interpolation weights must be <= 1, but month_fraction = $month_fraction"
+        return intepol.(bcf_info.monthly_fields[1], bcf_info.monthly_fields[2], month_fraction, FT) 
+    else
+        return bcf_info.monthly_fields[1] 
+    end 
+end
+
+intepol(ftuple1, ftuple2, month_fraction, FT) = ftuple1 * month_fraction + ftuple2 * (FT(1) - month_fraction)
+
 # TODO:
-# - design unit test for `update_midmonth_data!`
+# - design unit test for `update_midmonth_data!` and `interpolate_midmonth_to_daily`
 # - replace if statements with dipatches, write better abstractions

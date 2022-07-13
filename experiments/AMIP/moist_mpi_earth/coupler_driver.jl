@@ -21,7 +21,7 @@ tspan = (0, t_end)
 Δt_cpl = FT(parsed_args["dt_cpl"])
 saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
 date0 = date = DateTime(1979, 01, 01)
-date1 = Dates.firstdayofmonth(date0) # first date #TODO: t_g will be replaced by CoupledSimulation.time
+date1 = Dates.firstdayofmonth(date0) # first date
 
 # overwrite some parsed args :P
 parsed_args["coupled"] = true

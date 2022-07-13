@@ -83,9 +83,9 @@ end
 
 if prescribed_sst
     println("No ocean sim - do not expect energy conservation")
-    SST =
-        ncreader_rll_to_cgll_from_space(FT, time_slice_ncfile(sst_data), "SST", boundary_space, outfile = "sst_cgll.nc")  # a sample SST field
-
+    weightfile, datafile_cgll, regrid_space =
+        ncreader_rll_to_cgll_from_space(sst_data, "SST", boundary_space, outfile = "sst_cgll.nc")
+    SST = ncreader_cgll_sparse_to_field(datafile_cgll, "SST", weightfile, (Int(1),), regrid_space)[1]
     SST = swap_space!(SST, axes(mask)) .* (abs.(mask .- 1)) .+ FT(273.15)
 
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
@@ -98,9 +98,9 @@ else
 end
 
 # Currently, we only support a slab ice model with fixed area and depth.
-
-SIC =
-    ncreader_rll_to_cgll_from_space(FT, time_slice_ncfile(sic_data), "SEAICE", boundary_space, outfile = "sic_cgll.nc")
+weightfile, datafile_cgll, regrid_space =
+    ncreader_rll_to_cgll_from_space(sic_data, "SEAICE", boundary_space, outfile = "sic_cgll.nc")
+SIC = ncreader_cgll_sparse_to_field(datafile_cgll, "SEAICE", weightfile, (Int(1),), regrid_space)[1]
 SIC = swap_space!(SIC, axes(mask)) .* (abs.(mask .- 1))
 ice_mask = get_ice_mask.(SIC .- FT(25), FT) # here 25% and lower is considered ice free
 

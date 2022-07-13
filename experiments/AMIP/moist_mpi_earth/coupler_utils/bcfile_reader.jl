@@ -167,12 +167,13 @@ Interpolates linearly between two `Fields` in the `bcf_info` struct, or returns 
 """
 function interpolate_midmonth_to_daily(date, bcf_info)
     if bcf_info.interpolate_monthly[1]
-        month_fraction = FT(Dates.days(date - bcf_info.all_dates[Int(bcf_info.segment_idx[1])]) / bcf_info.segment_length[1])
+        month_fraction =
+            FT(Dates.days(date - bcf_info.all_dates[Int(bcf_info.segment_idx[1])]) / bcf_info.segment_length[1])
         @assert abs(month_fraction) <= FT(1) "time interpolation weights must be <= 1, but month_fraction = $month_fraction"
-        return intepol.(bcf_info.monthly_fields[1], bcf_info.monthly_fields[2], month_fraction, FT) 
+        return intepol.(bcf_info.monthly_fields[1], bcf_info.monthly_fields[2], month_fraction, FT)
     else
-        return bcf_info.monthly_fields[1] 
-    end 
+        return bcf_info.monthly_fields[1]
+    end
 end
 
 intepol(ftuple1, ftuple2, month_fraction, FT) = ftuple1 * month_fraction + ftuple2 * (FT(1) - month_fraction)

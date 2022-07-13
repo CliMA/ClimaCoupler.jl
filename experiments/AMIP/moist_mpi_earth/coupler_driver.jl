@@ -95,7 +95,7 @@ if prescribed_sst
         scaling_function = clean_sst,
     )
     update_midmonth_data!(date0, SST_info)
-    SST = interpolate_midmonth_to_daily(date0, SST_info) 
+    SST = interpolate_midmonth_to_daily(date0, SST_info)
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
     slab_ocean_sim = nothing
 
@@ -109,7 +109,7 @@ if prescribed_sst
         scaling_function = clean_sic,
     )
     update_midmonth_data!(date0, SIC_info)
-    SIC = interpolate_midmonth_to_daily(date0, SIC_info) 
+    SIC = interpolate_midmonth_to_daily(date0, SIC_info)
     ice_mask = get_ice_mask.(SIC .- FT(50), FT) # here 50% and lower is considered ice free
     slab_ice_sim =
         slab_ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
@@ -187,9 +187,9 @@ walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
 
     # monthly read of boundary condition data
     @calendar_callback :(update_midmonth_data!(date, SST_info)) date next_month_date(SST_info)
-    SST = interpolate_midmonth_to_daily(date0, SST_info) 
+    SST = interpolate_midmonth_to_daily(date0, SST_info)
     @calendar_callback :(update_midmonth_data!(date, SIC_info)) date next_month_date(SIC_info)
-    SIC = interpolate_midmonth_to_daily(date0, SIC_info) 
+    SIC = interpolate_midmonth_to_daily(date0, SIC_info)
 
     ## Atmos
     atmos_pull!(

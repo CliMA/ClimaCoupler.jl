@@ -233,6 +233,19 @@ function AtmosSimulation(Y_init, t_start, dt, t_end, timestepper, p, saveat, cal
     return AtmosSimulation(atm_integ)
 end
 
+function ClimaCoupler.coupler_push!(coupler::ClimaCoupler.CouplerState, atmos::AtmosSimulation)
+    coupler_put!(coupler, :F_sfc, atmos.integrator.u.F_sfc, atmos)
+end
+
+function ClimaCoupler.coupler_pull!(atmos::AtmosSimulation, coupler::ClimaCoupler.CouplerState)
+    # pre: reset flux accumulator
+    atmos.integrator.u.F_sfc .= 0.0 # reset surface flux to be accumulated
+
+    T_sfc_ocean = coupler_get(coupler, :T_sfc_ocean, atmos)
+    T_sfc_land = coupler_get(coupler, :T_sfc_land, atmos)
+    atmos.integrator.p.T_sfc .= T_sfc_land .+ T_sfc_ocean
+end
+
 # init simulation
 function atm_init(; xmin = -500, xmax = 500, zmin = 0, zmax = 1000, npoly = 3, helem = 20, velem = 20, bc = nothing)
 

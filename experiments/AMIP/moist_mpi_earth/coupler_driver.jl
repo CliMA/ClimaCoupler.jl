@@ -50,6 +50,7 @@ include("coupler_utils/regridder.jl")
 include("coupler_utils/masker.jl")
 include("coupler_utils/calendar_timer.jl")
 include("coupler_utils/general_helper.jl")
+include("coupler_utils/bcfile_reader.jl")
 
 # init MPI
 include("mpi/mpi_init.jl")

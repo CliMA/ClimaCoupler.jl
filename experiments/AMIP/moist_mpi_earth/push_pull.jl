@@ -127,7 +127,7 @@ function atmos_pull!(
         z0m_ocean = ocean_params.z0m
         z0b_ocean = ocean_params.z0b
         α_ocean = ocean_params.α
-        slab_ice_sim.integrator.p.Ya.ice_mask .= get_ice_mask.(SIC .- FT(50), FT) 
+        slab_ice_sim.integrator.p.Ya.ice_mask .= get_ice_mask.(SIC .- FT(50), FT)
     else
         T_ocean = slab_ocean_sim.integrator.u.T_sfc
         z0m_ocean = slab_ocean_sim.integrator.p.params.z0m

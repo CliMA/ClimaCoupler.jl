@@ -84,21 +84,35 @@ end
 
 if prescribed_sst
     println("No ocean sim - do not expect energy conservation")
-    
+
     # ocean
-    SST_info = bcfile_info_init(sst_data, "SST", boundary_space, segment_idx0 = [Int(1309)],interpolate_monthly = false, scaling_function = clean_sst)
+    SST_info = bcfile_info_init(
+        sst_data,
+        "SST",
+        boundary_space,
+        segment_idx0 = [Int(1309)],
+        interpolate_monthly = false,
+        scaling_function = clean_sst,
+    )
     update_midmonth_data!(date0, SST_info)
-    SST = SST_info.monthly_fields[1] 
+    SST = SST_info.monthly_fields[1]
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
     slab_ocean_sim = nothing
-    
+
     # sea ice
-    SIC_info = bcfile_info_init(sic_data, "SEAICE", boundary_space, segment_idx0 = [Int(1309)] ,interpolate_monthly = false, scaling_function = clean_sic)
+    SIC_info = bcfile_info_init(
+        sic_data,
+        "SEAICE",
+        boundary_space,
+        segment_idx0 = [Int(1309)],
+        interpolate_monthly = false,
+        scaling_function = clean_sic,
+    )
     update_midmonth_data!(date0, SIC_info)
-    SIC =  SIC_info.monthly_fields[1] 
+    SIC = SIC_info.monthly_fields[1]
     ice_mask = get_ice_mask.(SIC .- FT(50), FT) # here 50% and lower is considered ice free
     slab_ice_sim =
-    slab_ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
+        slab_ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
 else
     slab_ocean_sim =
         slab_ocean_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask)
@@ -106,13 +120,20 @@ else
     ocean_params = nothing
 
     # sea ice - TODO: port in the dynamic sea-ice after AMIP
-    SIC_info = bcfile_info_init(sic_data, "SEAICE", boundary_space, segment_idx0 = [Int(1309)] ,interpolate_monthly = false, scaling_function = clean_sic)
+    SIC_info = bcfile_info_init(
+        sic_data,
+        "SEAICE",
+        boundary_space,
+        segment_idx0 = [Int(1309)],
+        interpolate_monthly = false,
+        scaling_function = clean_sic,
+    )
     update_midmonth_data!(date0, SIC_info)
-    SIC =  SIC_info.monthly_fields[1] 
+    SIC = SIC_info.monthly_fields[1]
     ice_mask = get_ice_mask.(SIC .- FT(50), FT) # here 50% and lower is considered ice free
     slab_ice_sim =
-    slab_ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
-    
+        slab_ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
+
 end
 
 # init coupler
@@ -166,10 +187,10 @@ walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
 
     # monthly read of boundary condition data
     @calendar_callback :(update_midmonth_data!(date, SST_info)) date next_month_date(SST_info)
-    SST =  SST_info.monthly_fields[1] 
+    SST = SST_info.monthly_fields[1]
     @calendar_callback :(update_midmonth_data!(date, SIC_info)) date next_month_date(SIC_info)
-    SIC =  SIC_info.monthly_fields[1] 
-    
+    SIC = SIC_info.monthly_fields[1]
+
     ## Atmos
     atmos_pull!(
         atmos_sim,

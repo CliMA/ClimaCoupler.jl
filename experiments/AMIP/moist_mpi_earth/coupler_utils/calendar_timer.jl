@@ -22,14 +22,16 @@ strdate_to_datetime(strdate::String) =
 Convert from Date to String ("YYYYMMDD") format  
 """
 datetime_to_strdate(datetime::DateTime) =
-    string(Dates.year(datetime)) * string(string(lpad(Dates.month(datetime),2,"0"))) * string(lpad(Dates.day(datetime),2,"0")) 
+    string(Dates.year(datetime)) *
+    string(string(lpad(Dates.month(datetime), 2, "0"))) *
+    string(lpad(Dates.day(datetime), 2, "0"))
 
 """
     calendar_callback(ex, model_date, callback_date)
 
 Evaluate `ex` when `model_date` is on/after `callback_date` and do nothing otherwise
 """
-macro calendar_callback(ex::Expr, model_date::Symbol, callback_date::Union{Symbol,Expr})
+macro calendar_callback(ex::Expr, model_date::Symbol, callback_date::Union{Symbol, Expr})
     quote
         if Dates.days($model_date - $callback_date) < FT(0)
             nothing

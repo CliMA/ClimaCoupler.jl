@@ -11,9 +11,11 @@ current_date(t) = date0 + Dates.Second(t)
     strdate_to_datetime(strdate), datetime_to_strdate(datetime)
 - convert between String ("YYYYMMDD") and Date formats  
 """
-strdate_to_datetime(strdate::String) = Dates.Date(parse(Int,strdate[1:4]), parse(Int,strdate[5:6]), parse(Int,strdate[7:8])) # required by the official AMIP input files
+strdate_to_datetime(strdate::String) =
+    Dates.Date(parse(Int, strdate[1:4]), parse(Int, strdate[5:6]), parse(Int, strdate[7:8])) # required by the official AMIP input files
 
-datetime_to_strdate(datetime::Date) = string(Dates.year(datetime))*string(Dates.month(datetime))*string(Dates.day(datetime))
+datetime_to_strdate(datetime::Date) =
+    string(Dates.year(datetime)) * string(Dates.month(datetime)) * string(Dates.day(datetime))
 
 """
     calendar_callback(ex, model_date, callback_date)
@@ -23,7 +25,7 @@ macro calendar_callback(ex::Expr, model_date::Symbol, callback_date::Symbol)
     quote
         if Dates.days($model_date - $callback_date) < FT(0)
             nothing
-        else 
+        else
             eval($ex)
         end
     end

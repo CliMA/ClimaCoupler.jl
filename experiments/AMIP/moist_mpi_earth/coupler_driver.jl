@@ -20,7 +20,7 @@ t_end = FT(time_to_seconds(parsed_args["t_end"]))
 tspan = (0, t_end)
 Δt_cpl = FT(parsed_args["dt_cpl"])
 saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
-date0 = date = DateTime(1979,01,01) 
+date0 = date = DateTime(1979, 01, 01)
 date1 = Dates.firstdayofmonth(date0) # first date #TODO: t_g will be replaced by CoupledSimulation.time
 
 # overwrite some parsed args :P
@@ -150,10 +150,10 @@ end
 @show "Starting coupling loop"
 
 walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
-    
+
     date = current_date(t)
 
-    @calendar_callback :(@show(date), date1 += Dates.Month(1) ) date date1 
+    @calendar_callback :(@show(date), date1 += Dates.Month(1)) date date1
 
     ## Atmos
     atmos_pull!(

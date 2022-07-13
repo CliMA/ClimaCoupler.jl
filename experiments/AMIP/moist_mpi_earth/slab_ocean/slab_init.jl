@@ -55,3 +55,6 @@ function slab_ocean_init(::Type{FT}; tspan, dt, saveat, space, mask, stepper = E
 
     SlabSimulation(params, Y, space, integrator)
 end
+
+# file specific
+clean_sst(SST) = swap_space!(SST, axes(mask)) .* FT.(abs.(mask .- 1)) .+ FT(273.15) # TODO: turn into macro to avoid global landmask

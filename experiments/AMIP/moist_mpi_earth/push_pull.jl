@@ -114,19 +114,20 @@ function atmos_pull!(
     q_sfc,
     ocean_params,
     SST,
+    SIC,
     land_sea_mask,
 )
     thermo_params = CAP.thermodynamics_params(atmos_sim.integrator.p.params)
 
-    univ_mask = parent(land_sea_mask) .- parent(slab_ice_sim.integrator.p.Ya.ice_mask .* FT(2))
     T_land = get_land_temp(slab_sim)
     z0m_land, z0b_land = get_land_roughness(slab_sim)
-    combined_field = zeros(boundary_space)
+
     if prescribed_sst
         T_ocean = SST
         z0m_ocean = ocean_params.z0m
         z0b_ocean = ocean_params.z0b
         α_ocean = ocean_params.α
+        slab_ice_sim.integrator.p.Ya.ice_mask .= get_ice_mask.(SIC .- FT(50), FT) 
     else
         T_ocean = slab_ocean_sim.integrator.u.T_sfc
         z0m_ocean = slab_ocean_sim.integrator.p.params.z0m
@@ -134,6 +135,10 @@ function atmos_pull!(
         α_ocean = slab_ocean_sim.integrator.p.params.α
     end
 
+    univ_mask = parent(land_sea_mask) .- parent(slab_ice_sim.integrator.p.Ya.ice_mask .* FT(2))
+
+    # combine surface models
+    combined_field = zeros(boundary_space)
     parent(combined_field) .=
         combine_surface.(FT, univ_mask, parent(T_land), parent(T_ocean), parent(slab_ice_sim.integrator.u.T_sfc))
     dummmy_remap!(T_S, combined_field)

@@ -65,3 +65,6 @@ function slab_ice_init(::Type{FT}; tspan, saveat, dt, space, ice_mask, stepper =
 end
 
 get_ice_mask(h_ice, FT) = h_ice > FT(0) ? FT(1) : FT(0)
+
+# file-specific
+clean_sic(SIC) = swap_space!(SIC, axes(mask)) .* FT.(abs.(mask .- 1)) # TODO: turn into macro to avoid global landmask

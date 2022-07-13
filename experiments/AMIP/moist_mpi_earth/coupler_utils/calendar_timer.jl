@@ -12,7 +12,7 @@ current_date(t) = date0 + Dates.Second(t)
 Convert from String ("YYYYMMDD") to Date format  
 """
 strdate_to_datetime(strdate::String) =
-    Dates.Date(parse(Int, strdate[1:4]), parse(Int, strdate[5:6]), parse(Int, strdate[7:8])) # required by the official AMIP input files
+    Dates.DateTime(parse(Int, strdate[1:4]), parse(Int, strdate[5:6]), parse(Int, strdate[7:8])) # required by the official AMIP input files
 
 """
     datetime_to_strdate(datetime)
@@ -25,7 +25,7 @@ datetime_to_strdate(datetime::Date) =
     calendar_callback(ex, model_date, callback_date)
 Evaluate `ex` when `model_date` is on/after `callback_date` and do nothing otherwise
 """
-macro calendar_callback(ex::Expr, model_date::Symbol, callback_date::Symbol)
+macro calendar_callback(ex::Expr, model_date::Symbol, callback_date::Union{Symbol,Expr})
     quote
         if Dates.days($model_date - $callback_date) < FT(0)
             nothing

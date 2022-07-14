@@ -16,7 +16,7 @@ $$ \frac{\partial \rho \theta}{\partial t} + \nabla \cdot (\rho \theta \vec{u}) 
 
 Total Energy (possibly replace potential temperature equation with total energy conservation):
 $$ \frac{\partial \rho e_{tot}}{\partial t} + \nabla \cdot ((\rho e_{tot} + p )\vec{u}) = \nabla \cdot (\kappa \rho \nabla h_{tot}), $$
- 
+
 where $h_{tot}$ is the total specific enthalpy given by internal and potential energy contributions. 
 
 Tracer transport: 

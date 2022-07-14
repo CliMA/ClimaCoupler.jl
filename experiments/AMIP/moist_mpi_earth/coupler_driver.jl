@@ -51,7 +51,7 @@ atmos_sim = atmos_init(FT, Y, integrator, params = params);
 
 
 # write field vector to hdf5 file
-write!("clima_atmos_.hdf5", "Y" => Y) # write field vector from hdf5 file
+write!("clima_atmos.hdf5", "Y" => Y) # write field vector from hdf5 file
 restart_Y = ClimaCore.IO.read("clima_atmos.hdf5", "Y") # read fieldvector from hdf5 file
 @test restart_Y == Y # test if restart is e
 

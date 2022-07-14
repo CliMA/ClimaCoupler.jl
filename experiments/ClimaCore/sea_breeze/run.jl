@@ -214,13 +214,22 @@ end
 
 sim = AOLCoupledSimulation(atmos, ocean, land, coupler)
 
-# step for sims built on OrdinaryDiffEq
-# NOTE: use (t - integ_atm.t) here instead of Δt_cpl to avoid accumulating roundoff error in our timestepping.
-function step!(sim::ClimaCoupler.AbstractSimulation, t_stop)
-    Δt = t_stop - sim.integrator.t
-    step!(sim.integrator, Δt, true)
-end
 
+#=
+## Coupled Time Integration
+
+Finally, the execution sequence of the component models must be specified.
+This is currently done explicitly with a combination of `step!`, `coupler_pull!`,
+and `coupler_push!` methods. The `coupler_pull!` and `coupler_push!` methods
+receive and send coupled field info from the coupler, respectively. They must
+be written for each component simulation, and are simply collections of
+`coupler_get` and `coupler_put!` methods for each component.
+
+Here, the atmosphere steps forward first and then sends updated fields to
+the coupler. The ocean and land (which are not coupled to each other) then
+retreive the updated coupled information, advance and send their own updates
+to the coupler.
+=#
 function cpl_run(simulation::AOLCoupledSimulation)
     @info "Run model"
     @unpack atmos, ocean, land, coupler = simulation

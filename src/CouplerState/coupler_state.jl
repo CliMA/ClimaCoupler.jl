@@ -15,9 +15,13 @@ mutable struct CplFieldInfo{DT, MD}
     metadata::MD
 end
 
-mutable struct CouplerState{CF, RO}
+mutable struct CouplerState{FT, CF, RO}
+    # A dictionary of fields added to the coupler
     coupled_fields::CF
+    # A dictionary of remap operators between components
     remap_operators::RO
+    # The coupled timestep size
+    Δt_coupled::FT
 end
 
 _fields(coupler::CouplerState) = getfield(coupler, :coupled_fields)
@@ -32,8 +36,8 @@ etc... can be embeded in the intermdediate coupling layer.
 
 A field is exported by one component and imported by one or more other components.
 """
-function CouplerState()
-    return CouplerState(Dict{Symbol, CplFieldInfo}(), Dict{Symbol, Operators.LinearRemap}())
+function CouplerState(Δt_coupled)
+    return CouplerState(Dict{Symbol, CplFieldInfo}(), Dict{Symbol, Operators.LinearRemap}(), Δt_coupled)
 end
 
 """

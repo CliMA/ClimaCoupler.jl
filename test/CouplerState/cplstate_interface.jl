@@ -38,7 +38,7 @@ end
 
     simA = SimulationA(ones(spaceA))
     simB = SimulationB(zeros(spaceB))
-    coupler = CouplerState()
+    coupler = CouplerState(1.0)
 
     coupler_add_field!(coupler, :test1, simA.data; write_sim = simA)
 

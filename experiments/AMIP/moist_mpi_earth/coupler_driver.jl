@@ -7,6 +7,8 @@ using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
 using LinearAlgebra
 import Test: @test
 using ClimaCore.Utilities: half, PlusHalf
+using Dates
+
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
 # Read in some parsed args
@@ -18,6 +20,8 @@ t_end = FT(time_to_seconds(parsed_args["t_end"]))
 tspan = (0, t_end)
 Δt_cpl = FT(parsed_args["dt_cpl"])
 saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
+date0 = date = DateTime(1979, 01, 01)
+date1 = Dates.firstdayofmonth(date0) # first date
 
 # overwrite some parsed args :P
 parsed_args["coupled"] = true
@@ -36,7 +40,6 @@ import ClimaCoupler
 pkg_dir = pkgdir(ClimaCoupler)
 coupler_output_dir = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth")
 
-
 # Get the paths to the necessary data files - land sea mask, sst map, sea ice concentration
 include("artifacts.jl")
 
@@ -45,6 +48,7 @@ include("coupler_utils/flux_calculator.jl")
 include("coupler_utils/conservation_checker.jl")
 include("coupler_utils/regridder.jl")
 include("coupler_utils/masker.jl")
+include("coupler_utils/calendar_timer.jl")
 include("coupler_utils/general_helper.jl")
 
 # init MPI
@@ -107,6 +111,7 @@ slab_ice_sim =
 # init coupler
 coupler_sim = CouplerSimulation(FT(Δt_cpl), integrator.t, boundary_space, FT, mask)
 include("./push_pull.jl")
+
 # init conservation info collector
 atmos_pull!(
     atmos_sim,
@@ -140,10 +145,16 @@ if !is_distributed && energy_check && !prescribed_sst
     CS = OnlineConservationCheck([], [], [], [], [], [])
     check_conservation(CS, coupler_sim, atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim)
 end
+
 # coupling loop
 @show "Starting coupling loop"
+
 walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
-    @show t
+
+    date = current_date(t)
+
+    @calendar_callback :(@show(date), date1 += Dates.Month(1)) date date1
+
     ## Atmos
     atmos_pull!(
         atmos_sim,

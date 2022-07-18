@@ -38,6 +38,15 @@ function OceanSimulation(Y_init, t_start, dt, t_end, timestepper, p, saveat, cal
     return OceanSimulation(ocn_integ)
 end
 
+function ClimaCoupler.coupler_push!(coupler::ClimaCoupler.CouplerState, ocean::OceanSimulation)
+    coupler_put!(coupler, :T_sfc_ocean, ocean.integrator.u.T_sfc, ocean)
+end
+
+function ClimaCoupler.coupler_pull!(ocean::OceanSimulation, coupler::ClimaCoupler.CouplerState)
+    coupler_get!(ocean.integrator.p.F_sfc, coupler, :F_sfc, ocean)
+    ocean.integrator.p.F_sfc ./= coupler.Δt_coupled
+end
+
 # init simulation
 function ocn_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
 

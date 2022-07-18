@@ -1,9 +1,7 @@
-function LandSeaMask(FT, infile, varname, h_space; outfile = "land_sea_cgll.nc", threshold = 0.7)
-    R = h_space.topology.mesh.domain.radius
-    ne = h_space.topology.mesh.ne
-    Nq = Spaces.Quadratures.polynomial_degree(h_space.quadrature_style) + 1
-
-    mask = ncreader_rll_to_cgll(FT, infile, varname, ne = ne, R = R, Nq = Nq, outfile = outfile)
+function LandSeaMask(FT, infile, varname, boundary_space; outfile = "land_sea_cgll.nc", threshold = 0.7)
+    weightfile, datafile_cgll, regrid_space =
+        ncreader_rll_to_cgll_from_space(infile, varname, boundary_space, outfile = outfile)
+    mask = ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(1),), regrid_space)[1]
     mask = clean_mask.(FT, mask, threshold)
 end
 

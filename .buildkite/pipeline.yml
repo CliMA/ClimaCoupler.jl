@@ -47,4 +47,4 @@ steps:
 
       - label: "Moist earth"
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --energy_check=true --prescribed_sst=false --t_end=10000secs --dt_save_to_sol=200secs --dt_cpl=200"
-        artifact_paths: "moist_earth/"
+        artifact_paths: "experiments/AMIP/moist_mpi_earth/total_energy*.png"

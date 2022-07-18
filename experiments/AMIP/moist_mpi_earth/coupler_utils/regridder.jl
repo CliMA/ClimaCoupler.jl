@@ -7,8 +7,13 @@ using Test
 using ClimaCoreTempestRemap
 
 REGRID_DIR = "regrid_tmp/"
+"""
+    reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R)
 
-function reshape_sparse_to_field!(field::Fields.Field, in_array::Array, R)
+Reshapes a sparse vector array (raw output of the TempestRemap) to a Field object. 
+Redundant nodes are populated using `dss` operations. 
+"""
+function reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R)
     field_array = parent(field)
 
     fill!(field_array, zero(eltype(field_array)))
@@ -29,19 +34,13 @@ function reshape_sparse_to_field!(field::Fields.Field, in_array::Array, R)
 end
 
 """
-ncreader_rll_to_cgll()
-- nc file needs to be in the exodus format
+    ncreader_rll_to_cgll(datafile_rll, varname [; outfile = "data_cgll.nc", ne = 4, R = 5.0, Nq = 5])
+
+Reads and regrids data of the `varname` variable from an input NetCDF file and saves it as another NetCDF file. 
+The input NetCDF file needs to be `Exodus` formatted, and can contain time-dependent data. 
+
 """
-function ncreader_rll_to_cgll(
-    FT,
-    datafile_rll,
-    varname;
-    outfile = "data_cgll.nc",
-    ne = 4,
-    R = 5.0,
-    Nq = 5,
-    clean_exodus = true,
-)
+function ncreader_rll_to_cgll_from_space(datafile_rll, varname, space; outfile = "data_cgll.nc")
 
     outfile_root = outfile[1:(end - 3)]
     datafile_cgll = joinpath(REGRID_DIR, outfile)
@@ -51,13 +50,15 @@ function ncreader_rll_to_cgll(
     meshfile_overlap = joinpath(REGRID_DIR, outfile_root * "_mesh_overlap.g")
     weightfile = joinpath(REGRID_DIR, outfile_root * "_remap_weights.nc")
 
+    # topology = space.topology # TODO: would be better to do this - currently wrong ordering following CA changes
+    R = space.topology.mesh.domain.radius
+    ne = space.topology.mesh.ne
+    Nq = Spaces.Quadratures.polynomial_degree(space.quadrature_style) + 1
     domain = Domains.SphereDomain(R)
     mesh = Meshes.EquiangularCubedSphere(domain, ne)
     topology = Topologies.Topology2D(mesh)
     quad = Spaces.Quadratures.GLL{Nq}()
-    space = Spaces.SpectralElementSpace2D(topology, quad)
-    coords = Fields.coordinate_field(space)
-
+    regrid_space = Spaces.SpectralElementSpace2D(topology, quad)
 
     if isfile(datafile_cgll) == false
         run(`mkdir -p $REGRID_DIR`)
@@ -79,17 +80,31 @@ function ncreader_rll_to_cgll(
         @warn "Using the existing $datafile_cgll"
     end
 
+    return weightfile, datafile_cgll, regrid_space
+end
+
+"""
+    ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, t_i_tuple, space; scaling_function = FT_dot, clean_exodus = false)
+
+Given time `t_i_tuple` indices of the NetCDF file data, this reads in the required data of the specified `varname` variable and converts the sparse vector to a `Field` object
+The NetCDF file needs to be of the Exodus format and have a time dimension.
+"""
+function ncreader_cgll_sparse_to_field(
+    datafile_cgll,
+    varname,
+    weightfile,
+    t_i_tuple,
+    space;
+    scaling_function = FT_dot,
+    clean_exodus = false,
+)
     # read the remapped file
-    offline_outarray = NCDataset(datafile_cgll, "r") do ds_wt
-        ds_wt[varname][:][:, 1]
+    offline_outvector = NCDataset(datafile_cgll, "r") do ds_wt
+        ds_wt[varname][:][:, [t_i_tuple...]] # ncol, times
     end
 
-    offline_outarray = FT.(offline_outarray)
-
-    field_o = Fields.zeros(FT, space)
-
-    # need to populate all nodes
-    weights, col_indices, row_indices = NCDataset(weightfile, "r") do ds_wt
+    # weightfile info needed to populate all nodes and save into fields
+    _, _, row_indices = NCDataset(weightfile, "r") do ds_wt
         (Array(ds_wt["S"]), Array(ds_wt["col"]), Array(ds_wt["row"]))
     end
 
@@ -105,23 +120,25 @@ function ncreader_rll_to_cgll(
 
     R = (; target_idxs = target_unique_idxs, row_indices = row_indices)
 
-    offline_field = similar(field_o)
+    # TODO: this could be taken out for fewer allocations? 
+    offline_field = Fields.zeros(FT, space)
+
+    offline_fields = ntuple(x -> similar(offline_field), length(t_i_tuple))
 
     clean_exodus ? run(`mkdir -p $REGRID_DIR`) : nothing
 
-    reshape_sparse_to_field!(offline_field, offline_outarray, R)
-
+    ntuple(
+        x -> scaling_function(reshape_cgll_sparse_to_field!(offline_fields[x], offline_outvector[:, x], R)),
+        length(t_i_tuple),
+    )
 end
 
-function ncreader_rll_to_cgll_from_space(FT, infile, varname, h_space; outfile = "outfile_cgll.nc")
-    R = h_space.topology.mesh.domain.radius
-    ne = h_space.topology.mesh.ne
-    Nq = Spaces.Quadratures.polynomial_degree(h_space.quadrature_style) + 1
+FT_dot(x) = FT.(x)
 
-    mask = ncreader_rll_to_cgll(FT, infile, varname, ne = ne, R = R, Nq = Nq, outfile = outfile)
-end
-
-# for AMIP we don't need regridding. WHen we do we re-introduce the ClimaCoreTempestRemap 
-function dummmy_remap!(target, source)  # TODO: bring back Tempest regrid
+# for AMIP we don't need regridding of surface model fields. When we do, we re-introduce the ClimaCoreTempestRemap 
+function dummmy_remap!(target, source)
     parent(target) .= parent(source)
 end
+
+# TODO:
+# - add unit tests 

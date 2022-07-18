@@ -7,6 +7,8 @@ using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
 using LinearAlgebra
 import Test: @test
 using ClimaCore.Utilities: half, PlusHalf
+using Dates
+
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
 # Read in some parsed args
@@ -19,6 +21,8 @@ tspan = (0, t_end)
 Δt_cpl = FT(parsed_args["dt_cpl"])
 saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
 saveat = 200
+date0 = date = DateTime(1979, 01, 01)
+date1 = Dates.firstdayofmonth(date0) # first date
 # overwrite some parsed args :P
 parsed_args["coupled"] = true
 parsed_args["dt"] = string(Δt_cpl) * "secs"
@@ -36,6 +40,10 @@ prescribed_sst=false
 t_end=10000
 
 Δt_cpl=200
+import ClimaCoupler
+pkg_dir = pkgdir(ClimaCoupler)
+coupler_output_dir = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth")
+
 # Get the paths to the necessary data files - land sea mask, sst map, sea ice concentration
 include("artifacts.jl")
 
@@ -44,6 +52,7 @@ include("coupler_utils/flux_calculator.jl")
 include("coupler_utils/conservation_checker.jl")
 include("coupler_utils/regridder.jl")
 include("coupler_utils/masker.jl")
+include("coupler_utils/calendar_timer.jl")
 include("coupler_utils/general_helper.jl")
 
 # init MPI
@@ -78,9 +87,9 @@ end
 
 if prescribed_sst
     println("No ocean sim - do not expect energy conservation")
-    SST =
-        ncreader_rll_to_cgll_from_space(FT, time_slice_ncfile(sst_data), "SST", boundary_space, outfile = "sst_cgll.nc")  # a sample SST field
-
+    weightfile, datafile_cgll, regrid_space =
+        ncreader_rll_to_cgll_from_space(sst_data, "SST", boundary_space, outfile = "sst_cgll.nc")
+    SST = ncreader_cgll_sparse_to_field(datafile_cgll, "SST", weightfile, (Int(1),), regrid_space)[1]
     SST = swap_space!(SST, axes(mask)) .* (abs.(mask .- 1)) .+ FT(273.15)
 
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
@@ -93,9 +102,9 @@ else
 end
 
 # Currently, we only support a slab ice model with fixed area and depth.
-
-SIC =
-    ncreader_rll_to_cgll_from_space(FT, time_slice_ncfile(sic_data), "SEAICE", boundary_space, outfile = "sic_cgll.nc")
+weightfile, datafile_cgll, regrid_space =
+    ncreader_rll_to_cgll_from_space(sic_data, "SEAICE", boundary_space, outfile = "sic_cgll.nc")
+SIC = ncreader_cgll_sparse_to_field(datafile_cgll, "SEAICE", weightfile, (Int(1),), regrid_space)[1]
 SIC = swap_space!(SIC, axes(mask)) .* (abs.(mask .- 1))
 ice_mask = get_ice_mask.(SIC .- FT(25), FT) # here 25% and lower is considered ice free
 
@@ -106,6 +115,7 @@ slab_ice_sim =
 # init coupler
 coupler_sim = CouplerSimulation(FT(Δt_cpl), integrator.t, boundary_space, FT, mask)
 include("./push_pull.jl")
+
 # init conservation info collector
 atmos_pull!(
     atmos_sim,
@@ -139,10 +149,16 @@ if !is_distributed && energy_check && !prescribed_sst
     CS = OnlineConservationCheck([], [], [], [], [], [])
     check_conservation(CS, coupler_sim, atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim)
 end
+
 # coupling loop
 @show "Starting coupling loop"
+
 walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
-    @show t
+
+    date = current_date(t)
+
+    @calendar_callback :(@show(date), date1 += Dates.Month(1)) date date1
+
     ## Atmos
     atmos_pull!(
         atmos_sim,

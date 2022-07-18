@@ -12,13 +12,12 @@ using Dates
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
 # Read in some parsed args
-prescribed_sst = parsed_args["prescribed_sst"]
-energy_check = parsed_args["energy_check"]
+prescribed_sst = false
+energy_check = true
 const FT = parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim = "bucket"
-t_end = FT(time_to_seconds(parsed_args["t_end"]))
+t_end = FT(10000)#time_to_seconds(parsed_args["t_end"]))
 tspan = (0, t_end)
-Δt_cpl = FT(parsed_args["dt_cpl"])
 saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
 saveat = 200
 date0 = date = DateTime(1979, 01, 01)
@@ -37,9 +36,8 @@ parsed_args["config"] = "sphere"
 parsed_args["moist"] = "equil"
 energy_check=true
 prescribed_sst=false
-t_end=10000
-
-Δt_cpl=200
+anim = false
+Δt_cpl=FT(200)
 import ClimaCoupler
 pkg_dir = pkgdir(ClimaCoupler)
 coupler_output_dir = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth")

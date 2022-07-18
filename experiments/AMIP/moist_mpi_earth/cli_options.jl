@@ -2,22 +2,6 @@ import ArgParse
 function parse_commandline()
     s = ArgParse.ArgParseSettings()
     ArgParse.@add_arg_table s begin
-        "--dt_cpl"
-        help = " Coupling time step in seconds"
-        arg_type = Int
-        default = 200
-        "--anim"
-        help = "Boolean flag indicating whether to make animations"
-        arg_type = Bool
-        default = false
-        "--energy_check"
-        help = "Boolean flag indicating whether to check energy conservation"
-        arg_type = Bool
-        default = false
-        "--prescribed_sst"
-        help = "Boolean flag indicating whether to run with a prescribed sea surface temperature"
-        arg_type = Bool
-        default = false
         "--FLOAT_TYPE"
         help = "Float type"
         arg_type = String
@@ -63,6 +47,9 @@ function parse_commandline()
         "--turbconv"
         help = "Turbulence convection scheme [`nothing` (default), `edmf`]"
         arg_type = String
+        "--turbconv_case"
+        help = "The case run by Turbulence convection scheme [`Bomex` (default), `Bomex`, `DYCOMS_RF01`, `TRMM_LBA`, `GABLS`]"
+        arg_type = String
         "--hyperdiff"
         help = "Hyperdiffusion [`true` (default), `false`]"
         arg_type = Bool
@@ -80,7 +67,7 @@ function parse_commandline()
         arg_type = Bool
         default = false
         "--rad"
-        help = "Radiation model [`clearsky`, `gray`, `allsky`] (default: no radiation)"
+        help = "Radiation model [`nothing` (default), `gray`, `clearsky`, `allsky`, `allskywithclear`]"
         arg_type = String
         "--energy_name"
         help = "Energy variable name [`rhoe` (default), `rhoe_int` , `rhotheta`]"
@@ -120,6 +107,10 @@ function parse_commandline()
         help = "Frames per second for animations"
         arg_type = Int
         default = 5
+        "--post_process"
+        help = "Post process [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
         "--h_elem"
         help = "number of elements per edge on a cubed sphere"
         arg_type = Int
@@ -264,7 +255,7 @@ function parsed_args_from_command_line_flags(str, parsed_args = Dict())
     parsed_args_list = split(s, " ")
     @assert iseven(length(parsed_args_list))
     parsed_arg_pairs = map(1:2:(length(parsed_args_list) - 1)) do i
-        Pair(parsed_args_list[i], parsed_args_list[i + 1])
+        Pair(parsed_args_list[i], strip(parsed_args_list[i + 1], '\"'))
     end
     function parse_arg(val)
         for T in (Bool, Int, Float32, Float64)
@@ -273,7 +264,7 @@ function parsed_args_from_command_line_flags(str, parsed_args = Dict())
             catch
             end
         end
-        return val # string
+        return String(val) # string
     end
     for (flag, val) in parsed_arg_pairs
         parsed_args[replace(flag, "--" => "")] = parse_arg(val)
@@ -281,11 +272,57 @@ function parsed_args_from_command_line_flags(str, parsed_args = Dict())
     return parsed_args
 end
 
+"""
+    parsed_args_per_job_id()
+    parsed_args_per_job_id(buildkite_yaml)
+A dict of `parsed_args` to run the ClimaAtmos driver
+whose keys are the `job_id`s from buildkite yaml.
+# Example
+To run the `sphere_aquaplanet_rhoe_equilmoist_allsky`
+buildkite job from the standard buildkite pipeline, use:
+```
+using Revise; include("examples/hybrid/cli_options.jl");
+dict = parsed_args_per_job_id();
+parsed_args = dict["sphere_aquaplanet_rhoe_equilmoist_allsky"];
+include("examples/hybrid/driver.jl")
+```
+"""
+function parsed_args_per_job_id(; trigger = "driver.jl")
+    ca_dir = joinpath(@__DIR__, "..", "..")
+    buildkite_yaml = joinpath(ca_dir, ".buildkite", "pipeline.yml")
+    parsed_args_per_job_id(buildkite_yaml; trigger)
+end
+
+function parsed_args_per_job_id(buildkite_yaml; trigger = "driver.jl")
+    buildkite_commands = readlines(buildkite_yaml)
+    filter!(x -> occursin(trigger, x), buildkite_commands)
+
+    @assert length(buildkite_commands) > 0 # sanity check
+    result = Dict()
+    for bkcs in buildkite_commands
+        (s, default_parsed_args) = parse_commandline()
+        job_id = first(split(last(split(bkcs, "--job_id ")), " "))
+        job_id = strip(job_id, '\"')
+        result[job_id] =
+            parsed_args_from_command_line_flags(bkcs, default_parsed_args)
+    end
+    return result
+end
+time_to_seconds(t::Number) =
+    t == Inf ? t : error("Uncaught case in computing time from given string.")
+
 function time_to_seconds(s::String)
-    factor = Dict("secs" => 1, "mins" => 60, "hours" => 60 * 60, "days" => 60 * 60 * 24)
+    factor = Dict(
+        "secs" => 1,
+        "mins" => 60,
+        "hours" => 60 * 60,
+        "days" => 60 * 60 * 24,
+    )
     s == "Inf" && return Inf
     if count(occursin.(keys(factor), Ref(s))) != 1
-        error("Bad format for flag $s. Examples: [`10secs`, `20mins`, `30hours`, `40days`]")
+        error(
+            "Bad format for flag $s. Examples: [`10secs`, `20mins`, `30hours`, `40days`]",
+        )
     end
     for match in keys(factor)
         occursin(match, s) || continue

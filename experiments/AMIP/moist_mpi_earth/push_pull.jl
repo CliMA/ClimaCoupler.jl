@@ -21,9 +21,9 @@ function atmos_push!(atmos_sim, boundary_space, F_A, F_R, F_E, P_liq, P_snow,par
     F_E .= ClimaCore.Fields.zeros(boundary_space)
     dummmy_remap!(F_E, atmos_sim.integrator.p.dif_flux_ρq_tot)
     P_liq .= ClimaCore.Fields.zeros(boundary_space)
-    dummmy_remap!(P_liq, atmos_sim.integrator.p.col_integrated_precip)
+    dummmy_remap!(P_liq, atmos_sim.integrator.p.col_integrated_rain)
     P_snow .= ClimaCore.Fields.zeros(boundary_space)
-#    dummmy_remap!(P_liq, atmos_sim.integrator.p.col_integrated_precip)
+    dummmy_remap!(P_liq, atmos_sim.integrator.p.col_integrated_snow)
     F_R .= ClimaCore.Fields.zeros(boundary_space)
     parsed_args["rad"] == "gray" ? dummmy_remap!(F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) : nothing
 end

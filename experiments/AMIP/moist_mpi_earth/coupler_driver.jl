@@ -18,7 +18,7 @@ t_end = FT(time_to_seconds(parsed_args["t_end"]))
 tspan = (0, t_end)
 Δt_cpl = FT(parsed_args["dt_cpl"])
 saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
-
+saveat = 200
 # overwrite some parsed args :P
 parsed_args["coupled"] = true
 parsed_args["dt"] = string(Δt_cpl) * "secs"
@@ -31,7 +31,11 @@ parsed_args["rad"] = "gray"
 parsed_args["hyperdiff"] = true
 parsed_args["config"] = "sphere"
 parsed_args["moist"] = "equil"
+energy_check=true
+prescribed_sst=false
+t_end=10000
 
+Δt_cpl=200
 # Get the paths to the necessary data files - land sea mask, sst map, sea ice concentration
 include("artifacts.jl")
 

@@ -15,4 +15,5 @@ end
 
 Returns the volumetric internal energy of the slab.
 """
-get_slab_energy(slab_sim, T_sfc) = slab_sim.params.ρ .* slab_sim.params.c .* T_sfc .* slab_sim.params.h
+get_slab_energy(slab_sim, T_sfc) =
+    slab_sim.integrator.p.params.ρ .* slab_sim.integrator.p.params.c .* T_sfc .* slab_sim.integrator.p.params.h

@@ -37,7 +37,45 @@ $$
 with $\Delta_{x,y,z}$ the grid lengthscale (sometimes approximated as a geometric average
 $\Delta = (\Delta_x\Delta_y\Delta_z)^{1/3}$), $\nu$ is the kinematic viscosity 
 (calculated here with the Smagorinsky model), $\vec{S}$ the symmetric rate-of-strain tensor, 
-$\tau$ the diffusive momentum flux tensor. 
+$\tau$ the diffusive momentum flux tensor.
+
+Consider components of the viscous stress tensor in three dimensions
+$$
+\tau_{xx} = 2\nu \frac{\partial u}{\partial x},
+$$
+$$
+\tau_{yy} = 2\nu \frac{\partial v}{\partial y},
+$$
+$$
+\tau_{zz} = 2\nu \frac{\partial w}{\partial z} ,
+$$
+$$
+\tau_{xy} = \nu \Big(\frac{\partial u}{\partial y} +  \frac{\partial v}{\partial x}\Big),
+$$
+$$
+\tau_{xz} = \nu \Big(\frac{\partial u}{\partial z} +  \frac{\partial w}{\partial x}\Big),
+$$
+$$
+\tau_{yz} = \nu \Big(\frac{\partial v}{\partial z} +  \frac{\partial w}{\partial y}\Big).
+$$
+Assume terms in the $y$-direction are neglected (2-dimensional simplicfication). The contributions to the momentum equation are then given by: 
+$$
+(\rho u):  \partial_{x} (\rho \tau_{xx}) + \partial_{z}(\rho\tau_{xz})  = \partial_x  \Big(2\nu \frac{\partial u}{\partial x}\Big) + \partial_z\Big(\nu \frac{\partial u}{\partial z}\Big) + \partial_z\Big(\nu \frac{\partial w}{\partial x}\Big),
+$$
+$$
+(\rho w): \partial_{x} (\rho \tau_{zx})+ \partial_{z}(\rho\tau_{zz})  = \partial_x\Big(\nu \frac{\partial u}{\partial z}\Big) +  \partial_x\Big(\nu \frac{\partial w}{\partial x}\Big) + \partial_z\Big(2\nu\frac{\partial w}{\partial z} \Big). \\
+$$
+Which can be interpreted as, for horizontal-momentum:
+1) Horizontal divergence of vertical gradients of cell-centered variables $u$
+2) Vertical divergence of vertical gradients of cell-centered variables $u$
+3) Vertical divergence of horizontal gradients of cell-face variables $w$
+
+and for vertical-momentum, as:
+1) Horizontal divergence of vertical gradients of cell-centered variables $u$ $TODO: Check Geometry.transform construction ???$
+2) Horizontal divergence of horizontal gradients of cell-face variables $w$
+3) Vertical divergence of vertical gradients of cell-face variables $w$
+
+Thermal diffusivities are related to the modelled eddy viscosity through the turbulent Prandtl number which takes a typical value of $Pr_{t}= 1/3$ such that $\kappa = \nu/Pr_{t}$
 =#
 
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", ".."))
@@ -93,33 +131,6 @@ struct ZeroFlux <: BCtag end
 
 bc_divF2C_bottom!(::ZeroFlux, dY, Y, p, t) = Operators.SetValue(Geometry.WVector(0.0))
 bc_divF2C_top!(::ZeroFlux, dY, Y, p, t) = Operators.SetValue(Geometry.WVector(0.0))
-
-function init_bubble_2d(x, z)
-    θ₀ = atm_T_ini
-    cp_d = C_p
-    cv_d = C_v
-    p₀ = MSLP
-    g = grav
-    γ = cp_d / cv_d
-    x_c = 0.0
-    z_c = 350.0
-    r_c = 250.0
-    θ_b = atm_T_ini
-    θ_c = 0.5
-
-    ## auxiliary quantities
-    r = sqrt((x - x_c)^2 + (z - z_c)^2)
-    θ_p = r < r_c ? 0.5 * θ_c * (1.0 + cospi(r / r_c)) : 0.0 # potential temperature perturbation
-
-    θ = θ_b + θ_p # potential temperature
-    π_exn = 1.0 - g * z / cp_d / θ # exner function
-    T = π_exn * θ # temperature
-    p = p₀ * π_exn^(cp_d / R_d) # pressure
-    ρ = p / R_d / T # density
-    ρθ = ρ * θ # potential temperature density
-
-    return (ρ = ρ, ρθ = ρθ, ρuₕ = ρ * Geometry.UVector(0.0))
-end
 
 function init_sea_breeze_2d(x, z)
     θ₀ = atm_T_ini
@@ -299,7 +310,7 @@ function atm_run!(Y, bc, domain)
     sol = solve(prob, SSPRK33(), dt = Δt, saveat = 1.0, progress = true, progress_message = (dt, u, params, t) -> t)
 end
 
-# Coupled Atmos Wrappers
+# ## Coupled Atmos Wrappers
 ## Atmos Simulation - later to live in ClimaAtmos
 struct AtmosSimulation <: ClimaCoupler.AbstractAtmosSimulation
     integrator::Any
@@ -334,7 +345,18 @@ function ClimaCoupler.coupler_pull!(atmos::AtmosSimulation, coupler::ClimaCouple
     atmos.integrator.p.T_sfc .= T_sfc_land .+ T_sfc_ocean
 end
 
-# Atmos boundary condition for a coupled simulation, which calculates and accumulates the boundary flux
+#=
+## Coupled Boundary Conditions
+
+The standalone atmosphere model uses two boundary condition methods in its tendency:
+`bc_divF2C_bottom!` and `bc_divF2C_top!`. Since the bottom boundary is coupled, `bc_divF2C_bottom!`
+must be altered when running in coupled mode to properly calculate and accumulate the boundary flux
+from the ocean and land components.
+
+To solve this, a `CoupledFlux` boundary tag is set for the bottom boundary during initialization.
+Then, a new method of `bc_divF2C_bottom!` is written to dispatch on the `CoupledFlux` boundary tag.
+This method can then compute the flux appropriately.
+=#
 struct CoupledFlux <: BCtag end
 function bc_divF2C_bottom!(::CoupledFlux, dY, Y, p, t)
     ## flux calculation

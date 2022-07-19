@@ -1,9 +1,19 @@
-# # Coupled Sea Breeze Driver
+# # Coupled Sea Breeze
 
 #=
+## Overview
+
+This sea breeze simulation consists of an atmosphere above ocean and land thermal slabs. 
+The difference in heating between the land and ocean components drives circulation: 
+cool ocean air flows towards the land at the surface while warm air over land rises 
+and flows over the ocean.
+
 In this tutorial we demonstrate the coupling of three component models
 (atmosphere, ocean, and land) to drive the sea breeze. The primary parts
 of the ClimaCoupler interface are used and discussed.
+
+### References
+- [Antonelli & Rotunno 2007](https://journals.ametsoc.org/view/journals/atsc/64/12/2007jas2261.1.xml?tab_body=pdf)
 =#
 
 import SciMLBase: step!
@@ -28,7 +38,8 @@ This is achieved by multiple dispatch, where methods that deal with boundaries
 dispatch off of a coupled boundary type. This minimizes the necessary code that
 must be specialized for a coupled run as only special boundary conditions must
 be written. Here, the atmosphere has special boundary conditions for coupling,
-while the ocean and land tendencies are unaltered.
+while the ocean and land tendencies are unaltered. See the atmospheric model page
+for more details.
 
 In a more mature CliMA ecosystem, the following include statements would be replaced
 by `using` statements for the relevant component packages.
@@ -172,8 +183,6 @@ struct AOLCoupledSimulation{
     land::L
     ## Coupler storage
     coupler::C
-    ## The coupled time step size
-    Δt::FT
 end
 
 #=
@@ -203,6 +212,17 @@ Similarly, the `coupler_add_map!` method registers remapping operators in the co
 provide automatic remapping, there is a strict name convention for remap operators: a map
 from SimulationA to SimulationB (where `ClimaCoupler.name` returns `:simA` and `:simB`,
 respectively) must be named `simA_to_simB` so that the correct operator can be used.
+
+Here, the models are coupled through heat transfer at the surface. This heat flux is
+computed by a bulk formula:
+
+$$F_{sfc} = c_p \rho_1 C_H |u_1| (\theta_{sfc} - \theta_{atm1})$$
+where $\theta_{sfc}$ is the potential temperature at the land or ocean surface,
+$\theta_{atm1}$ is the potential temperature at the lowest atmospheric level,
+$c_p$ is the specific heat, $C_H = 0.0015$ is the bulk transfer coefficient for
+sensible heat, and $|u_1|$ is the near-surface atmospheric wind speed.
+We assume that the potential temperature is defined with respect to the surface pressure,
+so that $\theta_{sfc} = T_{sfc}$.
 =#
 coupler = CouplerState(Δt_coupled)
 coupler_add_field!(coupler, :T_sfc_ocean, ocean.integrator.u.T_sfc; write_sim = ocean)
@@ -229,6 +249,14 @@ Here, the atmosphere steps forward first and then sends updated fields to
 the coupler. The ocean and land (which are not coupled to each other) then
 retreive the updated coupled information, advance and send their own updates
 to the coupler.
+
+Because the models exchange fluxes only at the coupled timestep, the surface flux
+is accumulated over the coupled time-step
+coupling time step,
+`Δt_cpl`
+
+$$F_{integ} = \int_{\Delta t_{coupler}} F_{sfc}  dt$$
+where  $F_{integ}$ has units of $J m^{-2}$.
 =#
 function cpl_run(simulation::AOLCoupledSimulation)
     @info "Run model"

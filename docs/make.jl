@@ -15,7 +15,7 @@ TUTORIAL_DIR = joinpath(EXPERIMENTS_DIR, "ClimaCore/sea_breeze/")
 # include(joinpath(TUTORIAL_DIR, "run.jl"))
 # Literate.markdown(joinpath(TUTORIAL_DIR, tutorial_name), OUTPUT_DIR; execute = true, documenter = false)
 # execute Literate on all julia files
-tutorial_files = filter(x -> last(x, 3) == ".jl" || last(x, 3) == ".md", readdir(TUTORIAL_DIR))
+tutorial_files = filter(x -> last(x, 3) == ".jl", readdir(TUTORIAL_DIR))
 # Literate generates markdown files and stores them in docs/src/generated/sea_breeze
 map(
     x -> Literate.markdown(

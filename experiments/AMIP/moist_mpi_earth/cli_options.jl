@@ -14,10 +14,10 @@ function parse_commandline()
         help = "Boolean flag indicating whether to check energy conservation"
         arg_type = Bool
         default = false
-        "--prescribed_sst"
-        help = "Boolean flag indicating whether to run with a prescribed sea surface temperature"
-        arg_type = Bool
-        default = false
+        "--mode_name"
+        help = "Mode of coupled simulation. [`amip`, `aquaplanet`]"
+        arg_type = String
+        default = "aquaplanet"
         "--FLOAT_TYPE"
         help = "Float type"
         arg_type = String

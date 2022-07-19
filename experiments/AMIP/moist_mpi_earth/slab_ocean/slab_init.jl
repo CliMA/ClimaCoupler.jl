@@ -44,7 +44,7 @@ function slab_ocean_rhs!(dY, Y, Ya, t)
     parent(dY.T_sfc) .= apply_mask.(parent(mask), <, parent(rhs), FT(0.5))
 end
 
-function slab_ocean_init(::Type{FT}; tspan, dt, saveat, space, mask, stepper = Euler()) where {FT}
+function ocean_init(::Type{FT}; tspan, dt, saveat, space, mask, stepper = Euler()) where {FT}
 
     params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
 

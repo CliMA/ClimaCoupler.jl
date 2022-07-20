@@ -75,4 +75,13 @@ function plot_anim(atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim, land_sea_m
     end
     Plots.mp4(anim, "bucket_W.mp4", fps = 10)
 
+    combined_field = zeros(boundary_space)
+    anim = Plots.@animate for bucketu in sol_slab.u
+        parent(combined_field) .= combine_surface.(FT, univ_mask, parent(bucketu.bucket.σS), 0.0, 0.0)
+        dummmy_remap!(T_S, combined_field)
+
+        Plots.plot(T_S)
+    end
+    Plots.mp4(anim, "bucket_σS.mp4", fps = 10)
+
 end

@@ -16,14 +16,16 @@ prescribed_sst = false
 energy_check = true
 const FT = parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim = "bucket"
-t_end = FT(10000)#time_to_seconds(parsed_args["t_end"]))
+t_end = FT(86400*20)#time_to_seconds(parsed_args["t_end"]))
 tspan = (0, t_end)
 saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
-saveat = 200
+saveat = 3600
 date0 = date = DateTime(1979, 01, 01)
 date1 = Dates.firstdayofmonth(date0) # first date
 # overwrite some parsed args :P
+parsed_args["t_end"] = "20days"
 parsed_args["coupled"] = true
+Δt_cpl=FT(200)
 parsed_args["dt"] = string(Δt_cpl) * "secs"
 parsed_args["enable_threading"] = true
 parsed_args["microphy"] = "0M"
@@ -36,8 +38,7 @@ parsed_args["config"] = "sphere"
 parsed_args["moist"] = "equil"
 energy_check=true
 prescribed_sst=false
-anim = false
-Δt_cpl=FT(200)
+anim = true
 import ClimaCoupler
 pkg_dir = pkgdir(ClimaCoupler)
 coupler_output_dir = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth")
@@ -206,7 +207,7 @@ if energy_check && !prescribed_sst
 end
 
 # # animations
-if (land_sim == "bucket") && parsed_args["anim"]
+if (land_sim == "bucket") && anim
     #make it so this works with slab land?
     include("coupler_utils/viz_explorer.jl")
     plot_anim(atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim, mask, prescribed_sst, SST)

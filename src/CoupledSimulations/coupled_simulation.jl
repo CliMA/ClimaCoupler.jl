@@ -19,6 +19,9 @@ name(::AbstractLandSimulation) = :land
 abstract type AbstractCoupledSimulation <: AbstractSimulation end
 name(::AbstractCoupledSimulation) = :coupled
 
+"""
+A collection of coupled component simulations.
+"""
 struct CoupledSimulation{CS, S, CPL, L, C} <: AbstractCoupledSimulation
     "The coupled time-stepping scheme"
     coupler_solver::CS

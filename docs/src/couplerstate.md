@@ -15,6 +15,8 @@ regridding, unit conversions, or filtering.
 ```@docs
     ClimaCoupler.CouplerState
     ClimaCoupler.coupler_add_field!
+    ClimaCoupler.coupler_add_map!
     ClimaCoupler.coupler_put!
     ClimaCoupler.coupler_get
+    ClimaCoupler.coupler_get!
 ```

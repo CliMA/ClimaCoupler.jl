@@ -43,7 +43,7 @@ end
     coupler_add_field!(coupler, :test1, simA.data; write_sim = simA)
 
     map = Operators.LinearRemap(spaceB, spaceA)
-    coupler_add_map!(coupler, :simA_to_simB, map)
+    coupler_add_map!(coupler, map)
 
     @show coupler
 
@@ -51,16 +51,16 @@ end
         @test simA.data === coupler_get(coupler, :test1)
 
         # test remapping
-        @test map === ClimaCoupler.get_remap_operator(coupler, ClimaCoupler.name(simB), ClimaCoupler.name(simA))
-        @test ones(spaceB) ≈ coupler_get(coupler, :test1, simB)
+        @test map === ClimaCoupler.get_remap_operator(coupler, axes(simB.data), axes(simA.data))
+        @test ones(spaceB) ≈ coupler_get(coupler, :test1, axes(simB.data))
         target_field = zeros(spaceB)
-        coupler_get!(target_field, coupler, :test1, simB)
+        coupler_get!(target_field, coupler, :test1)
         @test ones(spaceB) ≈ target_field
 
         # key not in coupler dict
         @test_throws KeyError coupler_get(coupler, :idontexist)
-        @test_throws KeyError coupler_get(coupler, :idontexist, simB)
-        @test_throws KeyError coupler_get!(target_field, coupler, :idontexist, simB)
+        @test_throws KeyError coupler_get(coupler, :idontexist, axes(simB.data))
+        @test_throws KeyError coupler_get!(target_field, coupler, :idontexist)
     end
 
     @testset "coupler_put!" begin

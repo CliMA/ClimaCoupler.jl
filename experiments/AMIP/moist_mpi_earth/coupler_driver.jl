@@ -11,12 +11,13 @@ using Dates
 
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
+
 # Read in some parsed args
-prescribed_sst = false
-energy_check = true
+mode_name = parsed_args["mode_name"]
+energy_check = parsed_args["energy_check"]
 const FT = parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
-land_sim = "bucket"
-t_end = FT(86400*20)#time_to_seconds(parsed_args["t_end"]))
+land_sim_name = "bucket"
+t_end = FT(time_to_seconds(parsed_args["t_end"]))
 tspan = (0, t_end)
 saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
 saveat = 3600
@@ -65,7 +66,6 @@ atmos_sim = atmos_init(FT, Y, integrator, params = params);
 boundary_space = ClimaCore.Fields.level(atmos_sim.domain.face_space, half) # global surface grid
 
 # init land-sea mask
-
 mask = LandSeaMask(FT, mask_data, "LSMASK", boundary_space)
 mask = swap_space!(mask, boundary_space) # needed if we are reading from previous run
 
@@ -77,140 +77,153 @@ include("slab/slab_init.jl")
 include("slab_ocean/slab_init.jl")
 include("slab_ice/slab_init.jl")
 
-if land_sim == "slab"
-    slab_sim = slab_init(FT; tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask)
+if land_sim_name == "slab"
+    land_sim = slab_init(FT; tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask)
 end
-if land_sim == "bucket"
-    slab_sim = bucket_init(FT, FT.(tspan); dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat))
+if land_sim_name == "bucket"
+    land_sim = bucket_init(FT, FT.(tspan); dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat))
 end
 
-if prescribed_sst
+if mode_name == "amip"
     println("No ocean sim - do not expect energy conservation")
+
+    # ocean
     weightfile, datafile_cgll, regrid_space =
         ncreader_rll_to_cgll_from_space(sst_data, "SST", boundary_space, outfile = "sst_cgll.nc")
-    SST = ncreader_cgll_sparse_to_field(datafile_cgll, "SST", weightfile, (Int(1),), regrid_space)[1]
-    SST = swap_space!(SST, axes(mask)) .* (abs.(mask .- 1)) .+ FT(273.15)
+    SST_init = ncreader_cgll_sparse_to_field(datafile_cgll, "SST", weightfile, (Int(1),), regrid_space)[1]
+    SST_init = swap_space!(SST_init, axes(mask)) .* (abs.(mask .- 1)) .+ FT(273.15)
 
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
-    slab_ocean_sim = nothing
+    ocean_sim = (; integrator = (; u = (; T_sfc = SST_init), p = (; params = ocean_params)))
+    mode_specifics = (; name = mode_name)
+
+    # sea ice
+    # (Currently, we only support a slab ice model with fixed area and depth.)
+    weightfile, datafile_cgll, regrid_space =
+        ncreader_rll_to_cgll_from_space(sic_data, "SEAICE", boundary_space, outfile = "sic_cgll.nc")
+    SIC = ncreader_cgll_sparse_to_field(datafile_cgll, "SEAICE", weightfile, (Int(1),), regrid_space)[1]
+    SIC = swap_space!(SIC, axes(mask)) .* (abs.(mask .- 1))
+    ice_mask = get_ice_mask.(SIC .- FT(25), FT) # here 25% and lower is considered ice free
+
+    ice_sim = ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
+
 else
-    slab_ocean_sim =
-        slab_ocean_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask)
-    SST = nothing
-    ocean_params = nothing
+    # ocean
+    ocean_sim = ocean_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask)
+
+    # sea ice
+    ice_sim = (;
+        integrator = (;
+            u = (; T_sfc = ClimaCore.Fields.zeros(boundary_space)),
+            p = (; params = ocean_sim.params, Ya = (; ice_mask = ClimaCore.Fields.zeros(boundary_space))),
+        )
+    )
+    mode_specifics = (; name = mode_name)
 end
 
-# Currently, we only support a slab ice model with fixed area and depth.
-weightfile, datafile_cgll, regrid_space =
-    ncreader_rll_to_cgll_from_space(sic_data, "SEAICE", boundary_space, outfile = "sic_cgll.nc")
-SIC = ncreader_cgll_sparse_to_field(datafile_cgll, "SEAICE", weightfile, (Int(1),), regrid_space)[1]
-SIC = swap_space!(SIC, axes(mask)) .* (abs.(mask .- 1))
-ice_mask = get_ice_mask.(SIC .- FT(25), FT) # here 25% and lower is considered ice free
-
-slab_ice_sim =
-    slab_ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
-
-
 # init coupler
-coupler_sim = CouplerSimulation(FT(Δt_cpl), integrator.t, boundary_space, FT, mask)
+coupler_field_names = (:T_S, :z0m_S, :z0b_S, :ρ_sfc, :q_sfc, :albedo, :F_A, :F_E, :F_R, :P_liq, :P_snow)
+coupler_fields =
+    NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
+model_sims = (atm = atmos_sim, ice = ice_sim, lnd = land_sim, ocn = ocean_sim)
+dates = (; date = [date], date0 = [date0], date1 = [date1])
+
+coupler_sim = CouplerSimulation(
+    FT(Δt_cpl),
+    integrator.t,
+    dates,
+    boundary_space,
+    FT,
+    mask,
+    coupler_fields,
+    model_sims,
+    mode_specifics,
+    parsed_args,
+);
+
 include("./push_pull.jl")
 
 # init conservation info collector
-atmos_pull!(
-    atmos_sim,
-    slab_ice_sim,
-    slab_sim,
-    slab_ocean_sim,
-    boundary_space,
-    prescribed_sst,
-    z0m_S,
-    z0b_S,
-    T_S,
-    ρ_sfc,
-    q_sfc,
-    ocean_params,
-    SST,
-    mask,
-)
-
-atmos_push!(atmos_sim, boundary_space, F_A, F_R, F_E, P_liq, P_snow,parsed_args)
-land_pull!(slab_sim, F_A, F_R, F_E, P_liq, P_snow,ρ_sfc)
-ice_pull!(slab_ice_sim, F_A, F_R)
-if !prescribed_sst
-    ocean_pull!(slab_ocean_sim, F_A, F_R)
-    reinit!(slab_ocean_sim.integrator)
-end
-
+atmos_pull!(coupler_sim)
+atmos_push!(coupler_sim)
+land_pull!(coupler_sim)
 reinit!(atmos_sim.integrator)
-reinit!(slab_sim.integrator)
-reinit!(slab_ice_sim.integrator)
-if !is_distributed && energy_check && !prescribed_sst
-    CS = OnlineConservationCheck([], [], [], [], [], [])
-    check_conservation(CS, coupler_sim, atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim)
+reinit!(land_sim.integrator)
+
+mode_name == "amip" ? (ice_pull!(coupler_sim), reinit!(ice_sim.integrator)) :
+(ocean_pull!(coupler_sim), reinit!(ocean_sim.integrator))
+
+if !is_distributed && energy_check && mode_name == "aquaplanet"
+    conservation_check = OnlineConservationCheck([], [], [], [], [], [])
+    check_conservation(conservation_check, coupler_sim, atmos_sim, land_sim, ocean_sim, ice_sim) # TODO: check this still works for aquaplanet after AMIP
 end
 
 # coupling loop
 @show "Starting coupling loop"
 
+# step in time
 walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
+    cs = coupler_sim
 
     date = current_date(t)
 
     @calendar_callback :(@show(date), date1 += Dates.Month(1)) date date1
 
     ## Atmos
-    atmos_pull!(
-        atmos_sim,
-        slab_ice_sim,
-        slab_sim,
-        slab_ocean_sim,
-        boundary_space,
-        prescribed_sst,
-        z0m_S,
-        z0b_S,
-        T_S,
-        ρ_sfc,
-        q_sfc,
-        ocean_params,
-        SST,
-        mask,
-    )
+    atmos_pull!(cs)
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
-
-    atmos_push!(atmos_sim, boundary_space, F_A, F_R, F_E, P_liq, P_snow, parsed_args)
+    atmos_push!(cs)
 
     ## Slab land
-    land_pull!(slab_sim, F_A, F_R, F_E, P_liq, P_snow, ρ_sfc)
-    step!(slab_sim.integrator, t - slab_sim.integrator.t, true)
+    land_pull!(cs)
+    step!(land_sim.integrator, t - land_sim.integrator.t, true)
 
     ## Slab ocean
-    if !prescribed_sst
-        ocean_pull!(slab_ocean_sim, F_A, F_R)
-        step!(slab_ocean_sim.integrator, t - slab_ocean_sim.integrator.t, true)
+    if cs.mode.name == "aquaplanet"
+        ocean_pull!(cs)
+        step!(ocean_sim.integrator, t - ocean_sim.integrator.t, true)
     end
 
     ## Slab ice
-    ice_pull!(slab_ice_sim, F_A, F_R)
-    step!(slab_ice_sim.integrator, t - slab_ice_sim.integrator.t, true)
+    if cs.mode.name == "amip"
+        ice_pull!(cs)
+        step!(ice_sim.integrator, t - ice_sim.integrator.t, true)
+    end
 
     ## Compute energy
-    if !is_distributed && energy_check && !prescribed_sst
-        check_conservation(CS, coupler_sim, atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim)
+    if !is_distributed && energy_check && cs.mode.name == "aquaplanet"
+        check_conservation(conservation_check, cs, atmos_sim, land_sim, ocean_sim, ice_sim)
     end
+
 end
 
 @show walltime
 
 @show "Postprocessing"
-if energy_check && !prescribed_sst
-    plot_global_energy(CS, coupler_sim, "total_energy_bucket_snow.png", "total_energy_log_bucket_snow.png")
+
+if energy_check && coupler_sim.mode.name == "aquaplanet"
+    plot_global_energy(
+        conservation_check,
+        coupler_sim,
+        joinpath(coupler_output_dir, "total_energy_bucket.png"),
+        joinpath(coupler_output_dir, "total_energy_log_bucket.png"),
+    )
 end
 
+@show coupler_sim.fields.P_liq
 # # animations
-if (land_sim == "bucket") && anim
+if (land_sim_name == "bucket") && parsed_args["anim"]
     #make it so this works with slab land?
     include("coupler_utils/viz_explorer.jl")
-    plot_anim(atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim, mask, prescribed_sst, SST)
+    plot_anim(
+        coupler_sim.model_sims.atm,
+        coupler_sim.model_sims.lnd,
+        coupler_sim.model_sims.ocn,
+        coupler_sim.model_sims.ice,
+        coupler_sim.mask,
+        coupler_sim.mode.name,
+        coupler_sim.fields.T_S,
+    )
 end
 
 # Cleanup temporary files

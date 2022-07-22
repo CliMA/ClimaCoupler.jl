@@ -19,4 +19,3 @@ function get_slab_energy(slab_sim::SlabSimulation, boundary_space)
     T_sfc = swap_space!(slab_sim.integrator.u.T_sfc, boundary_space)
     return slab_sim.params.ρ .* slab_sim.params.c .* T_sfc.* slab_sim.params.h
 end
-

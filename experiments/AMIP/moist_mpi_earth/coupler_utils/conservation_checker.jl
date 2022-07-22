@@ -35,7 +35,7 @@ of the coupled simulations, and updates cs with the values.
 Note: in the future this should not use ``push!``.
 """
 function check_conservation(
-    cs::OnlineConservationCheck,
+    cc::OnlineConservationCheck,
     coupler_sim,
     atmos_sim,
     land_sim = nothing,
@@ -73,14 +73,14 @@ function check_conservation(
 
         radiation_sources = -sum(SWd_TOA .- LWu_TOA .- SWu_TOA) ./ Δz_top
         radiation_sources_accum =
-            size(cs.toa_net_source)[1] > 0 ? cs.toa_net_source[end] + radiation_sources .* coupler_sim.Δt :
+            size(cc.toa_net_source)[1] > 0 ? cc.toa_net_source[end] + radiation_sources .* coupler_sim.Δt :
             radiation_sources .* coupler_sim.Δt# accumulated radiation sources + sinks
-        push!(cs.toa_net_source, radiation_sources_accum)
+        push!(cc.toa_net_source, radiation_sources_accum)
     end
 
 
     # Save atmos
-    push!(cs.ρe_tot_atmos, atmos_e)
+    push!(cc.ρe_tot_atmos, atmos_e)
 
     # Surface masks
     univ_mask = parent(coupler_sim.mask) .- parent(seaice_sim.integrator.p.Ya.ice_mask .* FT(2))
@@ -93,14 +93,13 @@ function check_conservation(
     e_ice = seaice_sim !== nothing ? get_slab_energy(seaice_sim, coupler_sim.boundary_space)  : nothing
 
 
-    # Save land
     parent(e_lnd) .= land_mask.(parent(e_lnd), univ_mask)
     land_e = land_sim !== nothing ? sum(e_lnd) ./ Δz_bot : FT(0)
-    push!(cs.ρe_tot_land, land_e)
+    push!(cc.ρe_tot_land, land_e)
 
     parent(e_ice) .= ice_mask.(parent(e_ice), univ_mask)
     seaice_e = seaice_sim !== nothing ? sum(e_ice) ./ Δz_bot : FT(0)
-    push!(cs.ρe_tot_seaice, seaice_e)
+    push!(cc.ρe_tot_seaice, seaice_e)
 
     if ocean_sim != nothing
         parent(e_ocn) .= ocean_mask.(parent(e_ocn), univ_mask)
@@ -109,7 +108,7 @@ function check_conservation(
         ocean_e = FT(0)
     end
 
-    push!(cs.ρe_tot_ocean, ocean_e)
+    push!(cc.ρe_tot_ocean, ocean_e)
 
 
 end
@@ -139,11 +138,11 @@ function plot_global_energy(CS, coupler_sim, figname1 = "total_energy.png", fign
     diff_ρe_tot_slab_ocean = (CS.ρe_tot_ocean .- CS.ρe_tot_ocean[1])
 
     times_days = times ./ (24 * 60 * 60)
-    Plots.plot(times_days, diff_ρe_tot_atmos, label = "atmos")
-    Plots.plot!(times_days, diff_ρe_tot_slab, label = "land")
-    Plots.plot!(times_days, diff_ρe_tot_slab_seaice, label = "seaice")
-    Plots.plot!(times_days, diff_toa_net_source, label = "toa")
-    Plots.plot!(times_days, diff_ρe_tot_slab_ocean, label = "ocean")
+    Plots.plot(times_days, diff_ρe_tot_atmos[1:length(times_days)], label = "atmos")
+    Plots.plot!(times_days, diff_ρe_tot_slab[1:length(times_days)], label = "land")
+    Plots.plot!(times_days, diff_ρe_tot_slab_seaice[1:length(times_days)], label = "seaice")
+    Plots.plot!(times_days, diff_toa_net_source[1:length(times_days)], label = "toa")
+    Plots.plot!(times_days, diff_ρe_tot_slab_ocean[1:length(times_days)], label = "ocean")
 
     tot = CS.ρe_tot_atmos .+ CS.ρe_tot_ocean .+ CS.ρe_tot_land .+ CS.ρe_tot_seaice .+ CS.toa_net_source
 

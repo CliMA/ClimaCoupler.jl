@@ -2,6 +2,22 @@ import ArgParse
 function parse_commandline()
     s = ArgParse.ArgParseSettings()
     ArgParse.@add_arg_table s begin
+        "--dt_cpl"
+        help = " Coupling time step in seconds"
+        arg_type = Int
+        default = 200
+        "--anim"
+        help = "Boolean flag indicating whether to make animations"
+        arg_type = Bool
+        default = false
+        "--energy_check"
+        help = "Boolean flag indicating whether to check energy conservation"
+        arg_type = Bool
+        default = false
+        "--mode_name"
+        help = "Mode of coupled simulation. [`amip`, `aquaplanet`]"
+        arg_type = String
+        default = "aquaplanet"
         "--FLOAT_TYPE"
         help = "Float type"
         arg_type = String

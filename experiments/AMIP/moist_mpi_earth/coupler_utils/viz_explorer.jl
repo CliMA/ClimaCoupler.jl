@@ -1,6 +1,6 @@
 using ClimaCorePlots
 
-function plot_anim(atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim, land_sea_mask, prescribed_sst, SST)
+function plot_anim(atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim, land_sea_mask, mode_name, SST)
     sol_atm = atmos_sim.integrator.sol
 
     anim = Plots.@animate for u in sol_atm.u
@@ -44,7 +44,7 @@ function plot_anim(atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim, land_sea_m
     FT = eltype(land_sea_mask)
     univ_mask = parent(land_sea_mask) .- parent(slab_ice_sim.integrator.p.Ya.ice_mask .* FT(2))
 
-    if !prescribed_sst
+    if mode_name == "aquaplanet"
         sol_slab_ocean = slab_ocean_sim.integrator.sol
 
         anim = Plots.@animate for (bucketu, oceanu, iceu) in zip(sol_slab.u, sol_slab_ocean.u, sol_slab_ice.u)
@@ -54,7 +54,7 @@ function plot_anim(atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim, land_sea_m
 
             Plots.plot(T_S)
         end
-    else
+    elseif mode_name == "amip"
         anim = Plots.@animate for (bucketu, iceu) in zip(sol_slab.u, sol_slab_ice.u)
             parent(combined_field) .=
                 combine_surface.(FT, univ_mask, parent(bucketu.bucket.T_sfc), parent(SST), parent(iceu.T_sfc))

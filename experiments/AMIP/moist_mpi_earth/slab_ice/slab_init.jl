@@ -25,7 +25,7 @@ function ice_rhs!(du, u, p, t)
     Y = u
     FT = eltype(dY)
 
-    params = p.Ya.params
+    params = p.params
     F_aero = p.Ya.F_aero
     F_rad = p.Ya.F_rad
     ice_mask = p.Ya.ice_mask
@@ -35,7 +35,7 @@ function ice_rhs!(du, u, p, t)
     parent(dY.T_sfc) .= apply_mask.(parent(ice_mask), >, parent(rhs), FT(0))
 end
 
-function slab_ice_init(::Type{FT}; tspan, saveat, dt, space, ice_mask, stepper = Euler()) where {FT}
+function ice_init(::Type{FT}; tspan, saveat, dt, space, ice_mask, stepper = Euler()) where {FT}
 
     params = IceSlabParameters(
         FT(2),
@@ -50,14 +50,9 @@ function slab_ice_init(::Type{FT}; tspan, saveat, dt, space, ice_mask, stepper =
     )
 
     Y = slab_ice_space_init(FT, space, params)
-    Ya = (;
-        params = params,
-        F_aero = ClimaCore.Fields.zeros(space),
-        F_rad = ClimaCore.Fields.zeros(space),
-        ice_mask = ice_mask,
-    )
+    Ya = (; F_aero = ClimaCore.Fields.zeros(space), F_rad = ClimaCore.Fields.zeros(space), ice_mask = ice_mask)
 
-    problem = OrdinaryDiffEq.ODEProblem(ice_rhs!, Y, tspan, (; Ya = Ya))
+    problem = OrdinaryDiffEq.ODEProblem(ice_rhs!, Y, tspan, (; Ya = Ya, params = params))
     integrator = OrdinaryDiffEq.init(problem, stepper, dt = dt, saveat = saveat)
 
 

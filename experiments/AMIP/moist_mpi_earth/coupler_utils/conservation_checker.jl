@@ -22,25 +22,26 @@ end
      check_conservation(
         cs::OnlineConservationCheck,
         coupler_sim,
+        atmos_sim,
+        land_sim = nothing,
+        ocean_sim = nothing,
+        seaice_sim = nothing,
         radiation = true,
         )
-
 computes the total energy ∫ ρe dV of the various components
 of the coupled simulations, and updates cs with the values.
-
 Note: in the future this should not use ``push!``.
 """
 function check_conservation(
     cc::OnlineConservationCheck,
     coupler_sim,
+    atmos_sim,
+    land_sim = nothing,
+    ocean_sim = nothing,
+    seaice_sim = nothing,
     radiation = true,
 )
-    seaice_sim = coupler_sim.model_sims.ice
-    atmos_sim = coupler_sim.model_sims.atm
-    ocean_sim = coupler_sim.model_sims.ocn
-    land_sim =  coupler_sim.model_sims.lnd
-    
-  @assert seaice_sim != nothing
+    @assert seaice_sim != nothing
     @assert atmos_sim != nothing
     face_space = axes(atmos_sim.integrator.u.f)
     FT = eltype(coupler_sim.mask)
@@ -48,6 +49,8 @@ function check_conservation(
     Δz_bot = FT(0.5) * (z[2, 1, 1, 1, 1] - z[1, 1, 1, 1, 1])
 
     u_atm = atmos_sim.integrator.u.c.ρe_tot
+    T_land = land_sim !== nothing ? get_land_temp(land_sim) : nothing
+    u_lnd = land_sim !== nothing ? swap_space!(T_land, coupler_sim.boundary_space) : nothing
     u_ocn = ocean_sim !== nothing ? swap_space!(ocean_sim.integrator.u.T_sfc, coupler_sim.boundary_space) : nothing
     u_ice = seaice_sim !== nothing ? swap_space!(seaice_sim.integrator.u.T_sfc, coupler_sim.boundary_space) : nothing
 
@@ -85,9 +88,12 @@ function check_conservation(
 
     # Surface masks
     univ_mask = parent(coupler_sim.mask) .- parent(seaice_sim.integrator.p.Ya.ice_mask .* FT(2))
-    land_mask(u, univ_mask) = (univ_mask ≈ FT(1) ? u : FT(0))
-    ice_mask(u, univ_mask) = (univ_mask ≈ FT(-2) ? u : FT(0))
-    ocean_mask(u, univ_mask) = (univ_mask ≈ FT(0) ? u : FT(0))
+    land_mask(u_lnd_1, univ_mask) = (univ_mask ≈ FT(1) ? u_lnd_1 : FT(0))
+    ice_mask(u_ice_1, univ_mask) = (univ_mask ≈ FT(-2) ? u_ice_1 : FT(0))
+    ocean_mask(u_ocn_1, univ_mask) = (univ_mask ≈ FT(0) ? u_ocn_1 : FT(0))
+
+
+    
 
     # Save land
     e_lnd = land_sim !== nothing ?  get_land_energy(land_sim, coupler_sim.boundary_space) : nothing
@@ -109,7 +115,6 @@ function check_conservation(
     push!(cc.ρe_tot_ocean, ocean_e)
 
 
-
 end
 
 import Plots
@@ -121,7 +126,6 @@ ENV["GKSwstype"] = "nul"
                         coupler_sim,
                         figname1 = "total_energy.png",
                         figname2 = "total_energy_log.png")
-
 Creates two plots: one showing fractional total energy change
  over time on a log scale,
 and the other showing the energy of each component as a function of time,

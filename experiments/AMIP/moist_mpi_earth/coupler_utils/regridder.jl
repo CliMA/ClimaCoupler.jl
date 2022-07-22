@@ -56,7 +56,7 @@ function ncreader_rll_to_cgll_from_space(datafile_rll, varname, space; outfile =
     Nq = Spaces.Quadratures.polynomial_degree(space.quadrature_style) + 1
     domain = Domains.SphereDomain(R)
     mesh = Meshes.EquiangularCubedSphere(domain, ne)
-    topology = Topologies.Topology2D(mesh)
+    topology = Topologies.Topology2D(mesh, Topologies.spacefillingcurve(mesh))
     quad = Spaces.Quadratures.GLL{Nq}()
     regrid_space = Spaces.SpectralElementSpace2D(topology, quad)
 

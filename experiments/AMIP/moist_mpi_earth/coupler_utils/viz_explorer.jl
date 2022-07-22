@@ -40,27 +40,27 @@ function plot_anim(atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim, land_sea_m
     Plots.mp4(anim, "anim_qt_7km.mp4", fps = 10)
     combined_field = zeros(boundary_space)
     sol_slab = slab_sim.integrator.sol
-    sol_slab_ice = slab_ice_sim.integrator.sol
     FT = eltype(land_sea_mask)
     univ_mask = parent(land_sea_mask) .- parent(slab_ice_sim.integrator.p.Ya.ice_mask .* FT(2))
 
     if mode_name == "aquaplanet"
+        
         sol_slab_ocean = slab_ocean_sim.integrator.sol
+        T_ice = ice_sim.integrator.u.T_sfc
 
-        anim = Plots.@animate for (bucketu, oceanu, iceu) in zip(sol_slab.u, sol_slab_ocean.u, sol_slab_ice.u)
+        anim = Plots.@animate for (bucketu, oceanu) in zip(sol_slab.u, sol_slab_ocean.u)
             parent(combined_field) .=
-                combine_surface.(FT, univ_mask, parent(bucketu.bucket.T_sfc), parent(oceanu.T_sfc), parent(iceu.T_sfc))
-            dummmy_remap!(T_S, combined_field)
+                combine_surface.(FT, univ_mask, parent(bucketu.bucket.T_sfc), parent(oceanu.T_sfc), parent(T_ice))
+           
 
-            Plots.plot(T_S)
+            Plots.plot(combined_field)
         end
     elseif mode_name == "amip"
+         sol_slab_ice = slab_ice_sim.integrator.sol
         anim = Plots.@animate for (bucketu, iceu) in zip(sol_slab.u, sol_slab_ice.u)
             parent(combined_field) .=
                 combine_surface.(FT, univ_mask, parent(bucketu.bucket.T_sfc), parent(SST), parent(iceu.T_sfc))
-            dummmy_remap!(T_S, combined_field)
-
-            Plots.plot(T_S)
+            Plots.plot(combined_field)
         end
     end
 
@@ -69,18 +69,14 @@ function plot_anim(atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim, land_sea_m
     combined_field = zeros(boundary_space)
     anim = Plots.@animate for bucketu in sol_slab.u
         parent(combined_field) .= combine_surface.(FT, univ_mask, parent(bucketu.bucket.W), 0.0, 0.0)
-        dummmy_remap!(T_S, combined_field)
-
-        Plots.plot(T_S)
+        Plots.plot(combined_field)
     end
     Plots.mp4(anim, "bucket_W.mp4", fps = 10)
 
     combined_field = zeros(boundary_space)
     anim = Plots.@animate for bucketu in sol_slab.u
         parent(combined_field) .= combine_surface.(FT, univ_mask, parent(bucketu.bucket.σS), 0.0, 0.0)
-        dummmy_remap!(T_S, combined_field)
-
-        Plots.plot(T_S)
+        Plots.plot(combined_field)
     end
     Plots.mp4(anim, "bucket_σS.mp4", fps = 10)
 

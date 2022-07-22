@@ -17,9 +17,9 @@ mode_name = "aquaplanet"
 energy_check = true
 anim = true
 
-energy_check = parsed_args["energy_check"]
 const FT = parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim_name = "bucket"
+parsed_args["t_end"] = "10000secs"
 t_end = FT(time_to_seconds(parsed_args["t_end"]))
 tspan = (0, t_end)
 saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
@@ -27,7 +27,6 @@ saveat = 3600
 date0 = date = DateTime(1979, 01, 01)
 date1 = Dates.firstdayofmonth(date0) # first date
 # overwrite some parsed args :P
-parsed_args["t_end"] = "20days"
 parsed_args["coupled"] = true
 Δt_cpl=FT(200)
 parsed_args["dt"] = string(Δt_cpl) * "secs"
@@ -154,7 +153,7 @@ mode_name == "amip" ? (ice_pull!(coupler_sim), reinit!(ice_sim.integrator)) :
 
 if !is_distributed && energy_check && mode_name == "aquaplanet"
     conservation_check = OnlineConservationCheck([], [], [], [], [], [])
-    check_conservation(conservation_check, coupler_sim)
+    check_conservation(conservation_check, coupler_sim, atmos_sim, land_sim, ocean_sim, ice_sim)
 end
 
 # coupling loop
@@ -211,7 +210,7 @@ end
 
 @show coupler_sim.fields.P_liq
 # # animations
-if (land_sim_name == "bucket") && parsed_args["anim"]
+if (land_sim_name == "bucket") && anim
     #make it so this works with slab land?
     include("coupler_utils/viz_explorer.jl")
     plot_anim(

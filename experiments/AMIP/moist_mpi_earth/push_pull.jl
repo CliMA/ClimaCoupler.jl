@@ -7,8 +7,8 @@ function atmos_push!(cs)
     csf = cs.fields
     dummmy_remap!(csf.F_A, atmos_sim.integrator.p.dif_flux_energy)
     dummmy_remap!(csf.F_E, atmos_sim.integrator.p.dif_flux_ρq_tot)
-    dummmy_remap!(csf.P_liq, atmos_sim.integrator.p.col_integrated_precip)
-    dummmy_remap!(P_snow, atmos_sim.integrator.p.col_integrated_snow)
+    dummmy_remap!(csf.P_liq, atmos_sim.integrator.p.col_integrated_rain)
+    dummmy_remap!(csf.P_snow, atmos_sim.integrator.p.col_integrated_snow)
     cs.parsed_args["rad"] == "gray" ? dummmy_remap!(csf.F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) :
     nothing
 end
@@ -31,7 +31,7 @@ function land_pull!(cs)
     @. slab_sim.integrator.p.bucket.E = csf.F_E / ρ_liq
     @. slab_sim.integrator.p.bucket.R_n = csf.F_R
     @. slab_sim.integrator.p.bucket.P_liq = FT(-1.0) .* csf.P_liq # land expects this to be positive
-    @. slab_sim.integrator.p.bucket.P_snow = FT(-1.0) .* P_snow # land expects this to be positive
+    @. slab_sim.integrator.p.bucket.P_snow = FT(-1.0) .* csf.P_snow # land expects this to be positive
 end
 
 """

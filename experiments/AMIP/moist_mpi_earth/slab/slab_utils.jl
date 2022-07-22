@@ -11,11 +11,8 @@ struct SlabSimulation{P, Y, D, I}
 end
 
 """
-    get_slab_energy(slab_sim, boundary_space)
-
-Returns the internal energy per unit area of the slab.
+    get_slab_energy(slab_sim, T_sfc)
+Returns the volumetric internal energy of the slab per unit area.
 """
-function get_slab_energy(slab_sim::SlabSimulation, boundary_space)
-    T_sfc = swap_space!(slab_sim.integrator.u.T_sfc, boundary_space)
-    return slab_sim.params.ρ .* slab_sim.params.c .* T_sfc.* slab_sim.params.h
-end
+get_slab_energy(slab_sim, T_sfc) =
+    slab_sim.integrator.p.params.ρ .* slab_sim.integrator.p.params.c .* T_sfc .* slab_sim.integrator.p.params.h

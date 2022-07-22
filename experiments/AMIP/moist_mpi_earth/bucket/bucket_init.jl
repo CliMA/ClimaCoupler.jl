@@ -169,7 +169,6 @@ function get_land_energy(bucket_sim::BucketSimulation, boundary_space)
     return bucket_sim.params.ρc_soil .* T_sfc .* bucket_sim.params.d_soil .-
         LSMP.LH_f0(bucket_sim.params.earth_param_set) .* σS
 end
-get_land_energy(bucket_sim::SlabSimulation, boundary_space) = get_slab_energy(bucket_sim, boundary_space)
 
 
 

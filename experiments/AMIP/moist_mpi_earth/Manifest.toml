@@ -201,11 +201,9 @@ version = "0.1.3"
 
 [[deps.ClimaAtmos]]
 deps = ["ClimaCore", "ClimaCorePlots", "ClimaCoreVTK", "CloudMicrophysics", "Dierckx", "DiffEqCallbacks", "Distributions", "DocStringExtensions", "FastGaussQuadrature", "Flux", "Insolation", "IntervalSets", "JLD2", "LambertW", "LinearAlgebra", "OperatorFlux", "OrdinaryDiffEq", "Pkg", "Printf", "Random", "StaticArrays", "StatsBase", "StochasticDiffEq", "SurfaceFluxes", "Test", "Thermodynamics", "UnPack"]
-git-tree-sha1 = "5f8d73c0fac9a4e316e0b6fb6163b41e5cc1a793"
-repo-rev = "d5ccca1ecf8d05c2cd5614797b0ea4fb507a4f3d"
-repo-url = "https://github.com/CliMA/ClimaAtmos.jl.git"
+git-tree-sha1 = "0dd2f37d1d4b0d1a3c545b043f405b262f88128c"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.2.0"
+version = "0.3.0"
 
 [[deps.ClimaComms]]
 deps = ["CUDA", "KernelAbstractions", "StaticArrays"]
@@ -221,9 +219,9 @@ version = "0.3.2"
 
 [[deps.ClimaCore]]
 deps = ["Adapt", "BlockArrays", "CUDA", "ClimaComms", "CubedSphere", "DataStructures", "DiffEqBase", "DocStringExtensions", "ForwardDiff", "GaussQuadrature", "GilbertCurves", "InteractiveUtils", "IntervalSets", "LinearAlgebra", "RecursiveArrayTools", "RootSolvers", "Rotations", "SparseArrays", "Static", "StaticArrays", "Statistics", "UnPack"]
-git-tree-sha1 = "e73007e7dabe872d90819d7e0a0e78eedbeb2e53"
+git-tree-sha1 = "39b0b723ff68c0a718653aebaa672aee5556c09f"
 uuid = "d414da3d-4745-48bb-8d80-42e94e092884"
-version = "0.10.6"
+version = "0.10.7"
 
 [[deps.ClimaCorePlots]]
 deps = ["ClimaCore", "RecipesBase", "StaticArrays", "TriplotBase"]
@@ -1232,9 +1230,9 @@ uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
 
 [[deps.OpenMPI_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "Pkg", "TOML"]
-git-tree-sha1 = "6198c6dc3b5c3dc01854879197a5f382a60f947d"
+git-tree-sha1 = "f603a060218ca6818055be3608d4969e937d81bb"
 uuid = "fe0851c0-eecd-5654-98d4-656369965a5c"
-version = "4.1.3+1"
+version = "4.1.3+2"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]

@@ -13,7 +13,10 @@ include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
 
 # Read in some parsed args
-mode_name = parsed_args["mode_name"]
+mode_name = "aquaplanet"
+energy_check = true
+anim = true
+
 energy_check = parsed_args["energy_check"]
 const FT = parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim_name = "bucket"
@@ -37,9 +40,8 @@ parsed_args["rad"] = "gray"
 parsed_args["hyperdiff"] = true
 parsed_args["config"] = "sphere"
 parsed_args["moist"] = "equil"
-energy_check=true
-prescribed_sst=false
-anim = true
+
+
 import ClimaCoupler
 pkg_dir = pkgdir(ClimaCoupler)
 coupler_output_dir = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth")
@@ -77,9 +79,6 @@ include("slab/slab_init.jl")
 include("slab_ocean/slab_init.jl")
 include("slab_ice/slab_init.jl")
 
-if land_sim_name == "slab"
-    land_sim = slab_init(FT; tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask)
-end
 if land_sim_name == "bucket"
     land_sim = bucket_init(FT, FT.(tspan); dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat))
 end
@@ -155,7 +154,7 @@ mode_name == "amip" ? (ice_pull!(coupler_sim), reinit!(ice_sim.integrator)) :
 
 if !is_distributed && energy_check && mode_name == "aquaplanet"
     conservation_check = OnlineConservationCheck([], [], [], [], [], [])
-    check_conservation(conservation_check, coupler_sim, atmos_sim, land_sim, ocean_sim, ice_sim) # TODO: check this still works for aquaplanet after AMIP
+    check_conservation(conservation_check, coupler_sim)
 end
 
 # coupling loop

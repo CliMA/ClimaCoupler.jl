@@ -51,7 +51,7 @@ end
         @test simA.data === coupler_get(coupler, :test1)
 
         # test remapping
-        @test map === ClimaCoupler.get_remap_operator(coupler, axes(simB.data), axes(simA.data))
+        @test map === ClimaCoupler.coupler_get_map(coupler, axes(simB.data), axes(simA.data))
         @test ones(spaceB) ≈ coupler_get(coupler, :test1, axes(simB.data))
         target_field = zeros(spaceB)
         coupler_get!(target_field, coupler, :test1)
@@ -76,7 +76,5 @@ end
 
         # coupler_put! must be to a previously added field
         @test_throws KeyError coupler_put!(coupler, :idontexist, newdata, simA)
-        # incoming data must match dimensions/space of added field
-        @test_throws ErrorException coupler_put!(coupler, :test1, ones(spaceB), simA)
     end
 end

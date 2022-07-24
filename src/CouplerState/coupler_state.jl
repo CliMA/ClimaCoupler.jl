@@ -37,7 +37,11 @@ etc... can be embeded in the intermdediate coupling layer.
 A field is exported by one component and imported by one or more other components.
 """
 function CouplerState(Δt_coupled)
-    return CouplerState(Dict{Symbol, CplFieldInfo}(), Dict{Tuple{ClimaCore.Spaces.AbstractSpace, ClimaCore.Spaces.AbstractSpace}, Operators.LinearRemap}(), Δt_coupled)
+    return CouplerState(
+        Dict{Symbol, CplFieldInfo}(),
+        Dict{Tuple{ClimaCore.Spaces.AbstractSpace, ClimaCore.Spaces.AbstractSpace}, Operators.LinearRemap}(),
+        Δt_coupled,
+    )
 end
 
 """
@@ -62,12 +66,14 @@ function coupler_add_field!(
     exchange_space = nothing,
     metadata = nothing,
 )
-    if exchange_space === nothing
-        exchange_space = axes(fieldvalue) # will (eventually) build ClimaCore.Operators.IdentityRemap
+    if exchange_space !== nothing
+        # LinearRemap will (eventually) build ClimaCore.Operators.IdentityRemap
+        # and then the following lines will be common. Can then switch to:
+        # `if exchange_space === nothing; exchange_space = axes(fieldvalue); end`
+        map = ClimaCore.Operators.LinearRemap(exchange_space, axes(fieldvalue))
+        coupler_add_map!(coupler, map)
+        fieldvalue = Operators.remap(map, fieldvalue)
     end
-    map = ClimaCore.Operators.LinearRemap(exchange_space, axes(fieldvalue))
-    coupler_add_map!(coupler, map)
-    fieldvalue = Operators.remap(map, fieldvalue)
 
     push!(coupler.coupled_fields, fieldname => CplFieldInfo(fieldvalue, name(write_sim), metadata))
 end
@@ -98,8 +104,12 @@ function coupler_put!(coupler::CouplerState, fieldname::Symbol, fieldvalue, sour
     cplfield = coupler.coupled_fields[fieldname]
     @assert cplfield.write_sim == name(source_sim) "$fieldname can only be written to by $(cplfield.write_sim)."
 
-    map = coupler_get_map(coupler, axes(cplfield.data), axes(fieldvalue))
-    Operators.remap!(cplfield.data, map, fieldvalue)
+    if !(axes(cplfield.data) == axes(fieldvalue))
+        map = coupler_get_map(coupler, axes(cplfield.data), axes(fieldvalue))
+        Operators.remap!(cplfield.data, map, fieldvalue)
+    else
+        cplfield.data .= fieldvalue
+    end
 
     return nothing
 end
@@ -121,11 +131,7 @@ function coupler_push!(coupler::CouplerState, model) end
 
 Retrieve data array corresponding to `fieldname`, remap and store in `target_field`.
 """
-function coupler_get!(
-    target_field::ClimaCore.Fields.Field,
-    coupler::CouplerState,
-    fieldname::Symbol,
-)
+function coupler_get!(target_field::ClimaCore.Fields.Field, coupler::CouplerState, fieldname::Symbol)
     cplfield = coupler.coupled_fields[fieldname]
     map = coupler_get_map(coupler, axes(target_field), axes(cplfield.data))
     Operators.remap!(target_field, map, cplfield.data)
@@ -161,7 +167,11 @@ them for use in the component model.
 """
 function coupler_pull!(model, coupler::CouplerState) end
 
-function coupler_get_map(coupler, target_space::ClimaCore.Spaces.AbstractSpace, source_space::ClimaCore.Spaces.AbstractSpace)
+function coupler_get_map(
+    coupler,
+    target_space::ClimaCore.Spaces.AbstractSpace,
+    source_space::ClimaCore.Spaces.AbstractSpace,
+)
     return coupler.remap_operators[target_space, source_space]
 end
 

@@ -20,7 +20,7 @@ end
 
 """
      check_conservation(
-        cs::OnlineConservationCheck,
+        cc::OnlineConservationCheck,
         coupler_sim,
         atmos_sim,
         land_sim = nothing,
@@ -30,7 +30,7 @@ end
         )
 
 computes the total energy ∫ ρe dV of the various components
-of the coupled simulations, and updates cs with the values.
+of the coupled simulations, and updates cc with the values.
 
 Note: in the future this should not use ``push!``.
 """
@@ -46,7 +46,7 @@ function check_conservation(
     @assert seaice_sim != nothing
     @assert atmos_sim != nothing
     face_space = axes(atmos_sim.integrator.u.f)
-    FT = eltype(coupler_sim.mask)
+    FT = eltype(coupler_sim.land_mask)
     z = parent(Fields.coordinate_field(face_space).z)
     Δz_bot = FT(0.5) * (z[2, 1, 1, 1, 1] - z[1, 1, 1, 1, 1])
 
@@ -79,8 +79,8 @@ function check_conservation(
 
         radiation_sources = -sum(SWd_TOA .- LWu_TOA .- SWu_TOA) ./ Δz_top
         radiation_sources_accum =
-            size(cc.toa_net_source)[1] > 0 ? cc.toa_net_source[end] + radiation_sources .* coupler_sim.Δt :
-            radiation_sources .* coupler_sim.Δt# accumulated radiation sources + sinks
+            size(cc.toa_net_source)[1] > 0 ? cc.toa_net_source[end] + radiation_sources .* coupler_sim.Δt_cpl :
+            radiation_sources .* coupler_sim.Δt_cpl# accumulated radiation sources + sinks
         push!(cc.toa_net_source, radiation_sources_accum)
     end
 
@@ -89,7 +89,7 @@ function check_conservation(
     push!(cc.ρe_tot_atmos, atmos_e)
 
     # Surface masks
-    univ_mask = parent(coupler_sim.mask) .- parent(seaice_sim.integrator.p.Ya.ice_mask .* FT(2))
+    univ_mask = parent(coupler_sim.land_mask) .- parent(seaice_sim.integrator.p.Ya.ice_mask .* FT(2))
     land_mask(u_lnd_1, univ_mask) = (univ_mask ≈ FT(1) ? u_lnd_1 : FT(0))
     ice_mask(u_ice_1, univ_mask) = (univ_mask ≈ FT(-2) ? u_ice_1 : FT(0))
     ocean_mask(u_ocn_1, univ_mask) = (univ_mask ≈ FT(0) ? u_ocn_1 : FT(0))
@@ -120,7 +120,7 @@ import Plots
 ENV["GKSwstype"] = "nul"
 
 """
-     plot_global_energy(CS,
+     plot_global_energy(cc,
                         coupler_sim,
                         figname1 = "total_energy.png",
                         figname2 = "total_energy_log.png")
@@ -130,14 +130,14 @@ Creates two plots: one showing fractional total energy change
 and the other showing the energy of each component as a function of time,
 relative to the initial value.
 """
-function plot_global_energy(CS, coupler_sim, figname1 = "total_energy.png", figname2 = "total_energy_log.png")
+function plot_global_energy(cc, coupler_sim, figname1 = "total_energy.png", figname2 = "total_energy_log.png")
 
-    times = 0:(coupler_sim.Δt):(atmos_sim.integrator.t)
-    diff_ρe_tot_atmos = (CS.ρe_tot_atmos .- CS.ρe_tot_atmos[1])
-    diff_ρe_tot_slab = (CS.ρe_tot_land .- CS.ρe_tot_land[1])
-    diff_ρe_tot_slab_seaice = (CS.ρe_tot_seaice .- CS.ρe_tot_seaice[1])
-    diff_toa_net_source = (CS.toa_net_source .- CS.toa_net_source[1])
-    diff_ρe_tot_slab_ocean = (CS.ρe_tot_ocean .- CS.ρe_tot_ocean[1])
+    times = 0:(coupler_sim.Δt_cpl):(atmos_sim.integrator.t)
+    diff_ρe_tot_atmos = (cc.ρe_tot_atmos .- cc.ρe_tot_atmos[1])
+    diff_ρe_tot_slab = (cc.ρe_tot_land .- cc.ρe_tot_land[1])
+    diff_ρe_tot_slab_seaice = (cc.ρe_tot_seaice .- cc.ρe_tot_seaice[1])
+    diff_toa_net_source = (cc.toa_net_source .- cc.toa_net_source[1])
+    diff_ρe_tot_slab_ocean = (cc.ρe_tot_ocean .- cc.ρe_tot_ocean[1])
 
     times_days = times ./ (24 * 60 * 60)
     Plots.plot(times_days, diff_ρe_tot_atmos[1:length(times_days)], label = "atmos")
@@ -146,7 +146,7 @@ function plot_global_energy(CS, coupler_sim, figname1 = "total_energy.png", fign
     Plots.plot!(times_days, diff_toa_net_source[1:length(times_days)], label = "toa")
     Plots.plot!(times_days, diff_ρe_tot_slab_ocean[1:length(times_days)], label = "ocean")
 
-    tot = CS.ρe_tot_atmos .+ CS.ρe_tot_ocean .+ CS.ρe_tot_land .+ CS.ρe_tot_seaice .+ CS.toa_net_source
+    tot = cc.ρe_tot_atmos .+ cc.ρe_tot_ocean .+ cc.ρe_tot_land .+ cc.ρe_tot_seaice .+ cc.toa_net_source
 
     Plots.plot!(
         times_days,

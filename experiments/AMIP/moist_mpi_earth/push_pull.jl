@@ -1,9 +1,10 @@
 """
    atmos_push!(cs)
+   
 updates F_A, F_R, P_liq, and F_E in place based on values used in the atmos_sim for the current step.
 """
 function atmos_push!(cs)
-    atmos_sim = cs.model_sims.atm
+    atmos_sim = cs.model_sims.atmos_sim
     csf = cs.fields
     dummmy_remap!(csf.F_A, atmos_sim.integrator.p.dif_flux_energy)
     dummmy_remap!(csf.F_E, atmos_sim.integrator.p.dif_flux_ρq_tot)
@@ -14,42 +15,45 @@ end
 
 """
    land_pull!(cs)
-Updates the slab_sim cache state in place with the current values of F_A and F_R.
+
+Updates the land_sim cache state in place with the current values of F_A and F_R.
 """
 function land_pull!(cs)
-    slab_sim = cs.model_sims.lnd
+    land_sim = cs.model_sims.land_sim
     csf = cs.fields
-    @. slab_sim.integrator.p.F_aero = csf.F_A
-    @. slab_sim.integrator.p.F_rad = csf.F_R
+    @. land_sim.integrator.p.F_aero = csf.F_A
+    @. land_sim.integrator.p.F_rad = csf.F_R
 end
 
 """
    land_pull!(cs)
-Updates the slab_sim cache state in place with the current values of F_A, F_R, F_E, P_liq, and ρ_sfc.
+
+Updates the land_sim cache state in place with the current values of F_A, F_R, F_E, P_liq, and ρ_sfc.
 The surface air density is computed using the atmospheric state at the first level and making ideal gas
 and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
 a reasonable stand-in.
 """
 function land_pull!(cs)
-    slab_sim = cs.model_sims.lnd
+    land_sim = cs.model_sims.land_sim
     csf = cs.fields
     FT = cs.FT
-    @. slab_sim.integrator.p.bucket.ρ_sfc = csf.ρ_sfc
-    @. slab_sim.integrator.p.bucket.SHF = csf.F_A
-    @. slab_sim.integrator.p.bucket.LHF = FT(0.0)
-    ρ_liq = (LSMP.ρ_cloud_liq(slab_sim.params.earth_param_set))
-    @. slab_sim.integrator.p.bucket.E = csf.F_E / ρ_liq
-    @. slab_sim.integrator.p.bucket.R_n = csf.F_R
-    @. slab_sim.integrator.p.bucket.P_liq = FT(-1.0) .* csf.P_liq # land expects this to be positive
+    @. land_sim.integrator.p.bucket.ρ_sfc = csf.ρ_sfc
+    @. land_sim.integrator.p.bucket.SHF = csf.F_A
+    @. land_sim.integrator.p.bucket.LHF = FT(0.0)
+    ρ_liq = (LSMP.ρ_cloud_liq(land_sim.params.earth_param_set))
+    @. land_sim.integrator.p.bucket.E = csf.F_E / ρ_liq
+    @. land_sim.integrator.p.bucket.R_n = csf.F_R
+    @. land_sim.integrator.p.bucket.P_liq = FT(-1.0) .* csf.P_liq # land expects this to be positive
 end
 
 """
    ocean_pull!(cs)
+
 Updates the ocean_sim cache state in place with the current values of F_A and F_R.
 The ocean model does not require moisture fluxes at the surface, so F_E is not returned.
 """
 function ocean_pull!(cs)
-    ocean_sim = cs.model_sims.ocn
+    ocean_sim = cs.model_sims.ocean_sim
     csf = cs.fields
     @. ocean_sim.integrator.p.F_aero = csf.F_A
     @. ocean_sim.integrator.p.F_rad = csf.F_R
@@ -57,12 +61,13 @@ end
 
 """
    ice_pull!(cs)
+
 Updates the ice_sim cache state in place with the current values of F_A and F_R.
 In the current version, the sea ice has a prescribed thickness, and we assume that it is not
 sublimating. That contribution has been zeroed out in the atmos fluxes.
 """
 function ice_pull!(cs)
-    ice_sim = cs.model_sims.ice
+    ice_sim = cs.model_sims.ice_sim
     csf = cs.fields
     @. ice_sim.integrator.p.Ya.F_aero = csf.F_A
     @. ice_sim.integrator.p.Ya.F_rad = csf.F_R
@@ -77,10 +82,8 @@ RRTMGP cache variables in place.
 """
 function atmos_pull!(cs)
 
-    atmos_sim = cs.model_sims.atm
-    slab_sim = cs.model_sims.lnd
-    ocean_sim = cs.model_sims.ocn
-    ice_sim = cs.model_sims.ice
+    @unpack model_sims = cs
+    @unpack atmos_sim, land_sim, ocean_sim, ice_sim = model_sims
 
     csf = cs.fields
     T_sfc_cpl = csf.T_S
@@ -92,8 +95,8 @@ function atmos_pull!(cs)
 
     thermo_params = CAP.thermodynamics_params(atmos_sim.integrator.p.params)
 
-    T_land = get_land_temp(slab_sim)
-    z0m_land, z0b_land = get_land_roughness(slab_sim)
+    T_land = get_land_temp(land_sim)
+    z0m_land, z0b_land = get_land_roughness(land_sim)
     T_ocean = ocean_sim.integrator.u.T_sfc
     z0m_ocean = ocean_sim.integrator.p.params.z0m
     z0b_ocean = ocean_sim.integrator.p.params.z0b
@@ -103,7 +106,7 @@ function atmos_pull!(cs)
     z0m_ice = ice_sim.integrator.p.params.z0m
     z0b_ice = ice_sim.integrator.p.params.z0b
 
-    land_mask = cs.mask
+    land_mask = cs.land_mask
 
     # mask of all models (1 = land, 0 = ocean, -2 = sea ice)
     univ_mask = parent(land_mask) .- parent(ice_mask .* FT(2))
@@ -128,13 +131,13 @@ function atmos_pull!(cs)
     # surface specific humidity
     ocean_q_sfc = TD.q_vap_saturation_generic.(thermo_params, T_ocean, ρ_sfc_cpl, TD.Liquid())
     sea_ice_q_sfc = TD.q_vap_saturation_generic.(thermo_params, T_ice, ρ_sfc_cpl, TD.Ice())
-    land_q_sfc = get_land_q(slab_sim, atmos_sim, T_land, ρ_sfc_cpl)
+    land_q_sfc = get_land_q(land_sim, atmos_sim, T_land, ρ_sfc_cpl)
     parent(combined_field) .=
         combine_surface.(FT, univ_mask, parent(land_q_sfc), parent(ocean_q_sfc), parent(sea_ice_q_sfc))
     dummmy_remap!(q_sfc_cpl, combined_field)
 
     # albedo
-    α_land = land_albedo(slab_sim)
+    α_land = land_albedo(land_sim)
     α_ice = ice_sim.integrator.p.params.α
     parent(combined_field) .= combine_surface.(FT, univ_mask, α_land, α_ocean, α_ice)
     dummmy_remap!(albedo_sfc_cpl, combined_field)

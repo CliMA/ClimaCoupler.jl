@@ -9,6 +9,9 @@ import Test: @test
 using ClimaCore.Utilities: half, PlusHalf
 using Dates
 
+using Pkg
+Pkg.add(PackageSpec(name = "ClimaAtmos", rev = "cli_options")) # remove when ClimaAtmos@0.4.0 is released
+
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
 

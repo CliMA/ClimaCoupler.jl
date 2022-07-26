@@ -1,6 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.7.0"
+julia_version = "1.7.1"
 manifest_format = "2.0"
 
 [[deps.AbstractFFTs]]
@@ -200,10 +200,12 @@ uuid = "9e997f8a-9a97-42d5-a9f1-ce6bfc15e2c0"
 version = "0.1.3"
 
 [[deps.ClimaAtmos]]
-deps = ["ClimaCore", "ClimaCorePlots", "ClimaCoreVTK", "CloudMicrophysics", "DiffEqCallbacks", "Insolation", "IntervalSets", "JLD2", "LinearAlgebra", "OrdinaryDiffEq", "Pkg", "Printf", "StaticArrays", "Test", "Thermodynamics", "UnPack"]
-git-tree-sha1 = "1320c07f32a675fc4b83a81bf9d3c5add955f4df"
+deps = ["ClimaCore", "ClimaCorePlots", "ClimaCoreVTK", "CloudMicrophysics", "Dierckx", "DiffEqCallbacks", "Distributions", "DocStringExtensions", "FastGaussQuadrature", "Flux", "Insolation", "IntervalSets", "JLD2", "LambertW", "LinearAlgebra", "OperatorFlux", "OrdinaryDiffEq", "Pkg", "Printf", "Random", "StaticArrays", "StatsBase", "StochasticDiffEq", "SurfaceFluxes", "Test", "Thermodynamics", "UnPack"]
+git-tree-sha1 = "39a53bae0ca2cfdb2e15fe0ce8e1a80d9e3b460b"
+repo-rev = "cli_options"
+repo-url = "https://github.com/CliMA/ClimaAtmos.jl.git"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.2.0"
+version = "0.3.0"
 
 [[deps.ClimaComms]]
 deps = ["CUDA", "KernelAbstractions", "StaticArrays"]
@@ -242,7 +244,7 @@ uuid = "c8b6d40d-e815-466f-95ae-c48aefa668fa"
 version = "0.7.1"
 
 [[deps.ClimaCoupler]]
-deps = ["ClimaCore", "PrettyTables", "SciMLBase"]
+deps = ["ClimaCore", "DocStringExtensions", "PrettyTables"]
 path = "../../.."
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.1.0"
@@ -1231,9 +1233,9 @@ uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
 
 [[deps.OpenMPI_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "Pkg", "TOML"]
-git-tree-sha1 = "6198c6dc3b5c3dc01854879197a5f382a60f947d"
+git-tree-sha1 = "f603a060218ca6818055be3608d4969e937d81bb"
 uuid = "fe0851c0-eecd-5654-98d4-656369965a5c"
-version = "4.1.3+1"
+version = "4.1.3+2"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]

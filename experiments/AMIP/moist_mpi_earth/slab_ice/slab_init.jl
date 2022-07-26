@@ -25,17 +25,22 @@ function ice_rhs!(du, u, p, t)
     Y = u
     FT = eltype(dY)
 
-    params = p.Ya.params
+    params = p.params
     F_aero = p.Ya.F_aero
     F_rad = p.Ya.F_rad
     ice_mask = p.Ya.ice_mask
 
     F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc)
     rhs = @. (-F_aero - F_rad + F_conductive) / (params.h * params.ρ * params.c)
-    parent(dY.T_sfc) .= apply_mask.(parent(ice_mask), >, parent(rhs), FT(0))
+    parent(dY.T_sfc) .= apply_mask.(FT, parent(ice_mask), >, parent(rhs))
 end
 
-function slab_ice_init(::Type{FT}; tspan, saveat, dt, space, ice_mask, stepper = Euler()) where {FT}
+"""
+ice_init(::Type{FT}; tspan, dt, saveat, space, ice_mask, stepper = Euler()) where {FT}
+
+Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `step!` in the coupling loop. 
+"""
+function ice_init(::Type{FT}; tspan, saveat, dt, space, ice_mask, stepper = Euler()) where {FT}
 
     params = IceSlabParameters(
         FT(2),
@@ -50,18 +55,17 @@ function slab_ice_init(::Type{FT}; tspan, saveat, dt, space, ice_mask, stepper =
     )
 
     Y = slab_ice_space_init(FT, space, params)
-    Ya = (;
-        params = params,
-        F_aero = ClimaCore.Fields.zeros(space),
-        F_rad = ClimaCore.Fields.zeros(space),
-        ice_mask = ice_mask,
-    )
+    Ya = (; F_aero = ClimaCore.Fields.zeros(space), F_rad = ClimaCore.Fields.zeros(space), ice_mask = ice_mask)
 
-    problem = OrdinaryDiffEq.ODEProblem(ice_rhs!, Y, tspan, (; Ya = Ya))
+    problem = OrdinaryDiffEq.ODEProblem(ice_rhs!, Y, tspan, (; Ya = Ya, params = params))
     integrator = OrdinaryDiffEq.init(problem, stepper, dt = dt, saveat = saveat)
 
 
     SlabSimulation(params, Y, space, integrator)
 end
 
-get_ice_mask(h_ice, FT) = h_ice > FT(0) ? FT(1) : FT(0)
+get_ice_mask(h_ice, FT, threshold = 50) = (h_ice - FT(threshold)) > FT(0) ? FT(1) : FT(0)
+
+# file-specific
+clean_sic(SIC, _info) =
+    swap_space!(SIC, axes(_info.land_mask)) .* convert.(eltype(_info.land_mask), abs.(_info.land_mask .- 1))

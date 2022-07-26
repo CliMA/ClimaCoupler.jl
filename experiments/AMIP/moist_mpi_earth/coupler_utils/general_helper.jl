@@ -1,14 +1,19 @@
 # most of these functions are temporary helpers until upstream issues are resolved
 
 # TODO: unify with coupler interface
-struct CouplerSimulation{I, F, B, T, M}
-    Δt::I
+struct CouplerSimulation{I, F, S, D, B, T, M, P}
+    Δt_cpl::I
     t::F
+    tspan::S
+    dates::D
     boundary_space::B
     FT::T
-    mask::M
+    land_mask::M
+    fields::NamedTuple
+    model_sims::NamedTuple
+    mode::NamedTuple
+    parsed_args::P
 end
-
 
 function swap_space!(field, new_space)
     field_out = zeros(new_space)

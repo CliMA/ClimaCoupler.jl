@@ -33,7 +33,7 @@ function mask_dataset_path()
     mask_dataset = AW.ArtifactWrapper(
         @__DIR__,
         isempty(get(ENV, "CI", "")),
-        "mask",
+        "land_mask",
         AW.ArtifactFile[AW.ArtifactFile(
             url = "https://caltech.box.com/shared/static/vubmq84nhvbgdqayezguf3i1w6nqtwvu.ncc",
             filename = "seamask.nc",

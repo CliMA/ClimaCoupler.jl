@@ -38,20 +38,40 @@ end
 
 # ode
 function slab_ocean_rhs!(dY, Y, Ya, t)
-    p, F_aero, F_rad, mask = Ya
+    p, F_aero, F_rad, land_mask = Ya
     FT = eltype(Y.T_sfc)
     rhs = @. -(F_aero + F_rad) / (p.h * p.ρ * p.c)
-    parent(dY.T_sfc) .= apply_mask.(parent(mask), <, parent(rhs), FT(0.5))
+    parent(dY.T_sfc) .= apply_mask.(FT, parent(land_mask), <, parent(rhs))
 end
 
-function slab_ocean_init(::Type{FT}; tspan, dt, saveat, space, mask, stepper = Euler()) where {FT}
+
+"""
+    ocean_init(::Type{FT}; tspan, dt, saveat, space, land_mask, stepper = Euler()) where {FT}
+
+Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `step!` in the coupling loop. 
+"""
+function ocean_init(::Type{FT}; tspan, dt, saveat, space, land_mask, stepper = Euler()) where {FT}
 
     params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
 
     Y, space = slab_ocean_space_init(FT, space, params)
-    Ya = (params = params, F_aero = ClimaCore.Fields.zeros(space), F_rad = ClimaCore.Fields.zeros(space), mask = mask) #auxiliary
+    Ya = (
+        params = params,
+        F_aero = ClimaCore.Fields.zeros(space),
+        F_rad = ClimaCore.Fields.zeros(space),
+        land_mask = land_mask,
+    ) #auxiliary
     problem = OrdinaryDiffEq.ODEProblem(slab_ocean_rhs!, Y, tspan, Ya)
     integrator = OrdinaryDiffEq.init(problem, stepper, dt = dt, saveat = saveat)
 
     SlabSimulation(params, Y, space, integrator)
 end
+
+# file specific
+"""
+    clean_sst(SST, _info) 
+Ensures that the space of the SST struct matches that of the mask, and converts the units to Kelvin (N.B.: this is dataset specific)
+"""
+clean_sst(SST, _info) =
+    swap_space!(SST, axes(_info.land_mask)) .* convert.(eltype(_info.land_mask), abs.(_info.land_mask .- 1)) .+
+    convert.(eltype(_info.land_mask), 273.15) # TODO: turn into macro to avoid global land_mask

@@ -46,5 +46,5 @@ steps:
         artifact_paths: "sea_breeze/"
 
       - label: "Moist earth"
-        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --energy_check=true --prescribed_sst=false --t_end=10000secs --dt_save_to_sol=200secs --dt_cpl=200"
+        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --energy_check=true --mode_name=slabplanet --t_end=10000secs --dt_save_to_sol=200secs --dt_cpl=200"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/total_energy*.png"

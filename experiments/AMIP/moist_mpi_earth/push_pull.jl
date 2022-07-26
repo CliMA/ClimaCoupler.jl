@@ -8,7 +8,7 @@ function atmos_push!(cs)
     csf = cs.fields
     dummmy_remap!(csf.F_A, atmos_sim.integrator.p.dif_flux_energy)
     dummmy_remap!(csf.F_E, atmos_sim.integrator.p.dif_flux_ρq_tot)
-    dummmy_remap!(csf.P_liq, atmos_sim.integrator.p.col_integrated_precip)
+    dummmy_remap!(csf.P_liq, atmos_sim.integrator.p.col_integrated_rain)
     cs.parsed_args["rad"] == "gray" ? dummmy_remap!(csf.F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) :
     nothing
 end

@@ -259,7 +259,7 @@ include("coupler_utils/unit_tester.jl")
 
 # Cleanup temporary files
 # TODO: Where should this live?
-# rm(REGRID_DIR; recursive = true, force = true)
+rm(REGRID_DIR; recursive = true, force = true)
 # - cs needs to be global for the monthly macro - explote other solutions
 # - SST_init is modified with SST_info even with deepcopy...
 # - replace if statements with dipatches, write better abstractions

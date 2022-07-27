@@ -27,40 +27,40 @@ domain = Domains.SphereDomain(FT(6731e3))
 mesh = Meshes.EquiangularCubedSphere(domain, 4)
 topology = Topologies.Topology2D(mesh)
 quad = Spaces.Quadratures.GLL{5}()
-boundary_space = Spaces.SpectralElementSpace2D(topology, quad)
+boundary_space_t = Spaces.SpectralElementSpace2D(topology, quad)
 
-land_mask = ClimaCore.Fields.zeros(boundary_space)
+land_mask_t = ClimaCore.Fields.zeros(boundary_space_t)
 
 _info = bcfile_info_init(
     FT,
     sst_data,
     "SST",
-    boundary_space,
+    boundary_space_t,
     segment_idx0 = [Int(1309)],
     interpolate_daily = false,
-    land_mask = land_mask,
+    land_mask = land_mask_t,
 )
 
-cs = (; _info = _info, date = [date], SST_all = [], updating_dates = [])
+cs_t = (; _info = _info, date = [date], SST_all = [], updating_dates = [])
 
 @show "Starting coupling loop"
 function test_update_midmonth_callback()
     # step in time
     ct = 0
     walltime = @elapsed for t in ((tspan[1] + Δt):Δt:tspan[end])
-        cs.date[1] = current_date(t) # if not global, `date`` is not updated. Check that this still runs when distributed.
+        cs_t.date[1] = current_date(t) # if not global, `date`` is not updated. Check that this still runs when distributed.
 
         # monthly read of boundary condition data
         @calendar_callback :(
-            update_midmonth_data!(cs.date[1], cs._info),
-            push!(cs.SST_all, deepcopy(cs._info.monthly_fields[1])),
-            push!(cs.updating_dates, deepcopy(cs.date[1])),
-        ) cs.date[1] next_date_in_file(cs._info)
+            update_midmonth_data!(cs_t.date[1], cs_t._info),
+            push!(cs_t.SST_all, deepcopy(cs_t._info.monthly_fields[1])),
+            push!(cs_t.updating_dates, deepcopy(cs_t.date[1])),
+        ) cs_t.date[1] next_date_in_file(cs_t._info)
 
     end
     @show walltime
-    @test cs.SST_all[end] !== cs.SST_all[end - 1] # test if the SST field was modified 
-    @test Date(cs.updating_dates[end]) == Date(1979, 03, 16) # check that the final file date is as expected
+    @test cs_t.SST_all[end] !== cs_t.SST_all[end - 1] # test if the SST field was modified 
+    @test Date(cs_t.updating_dates[end]) == Date(1979, 03, 16) # check that the final file date is as expected
 end
 
 test_update_midmonth_callback()

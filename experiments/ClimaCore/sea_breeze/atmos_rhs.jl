@@ -22,7 +22,16 @@ where $h_{tot}$ is the total specific enthalpy given by internal and potential e
 Tracer transport: 
 $$ \frac{\partial \rho \chi}{\partial t} + \nabla \cdot (\rho \chi \vec{u}) = \nabla \cdot (\kappa \rho \nabla \chi) + S(\chi, ...)$$
 
+Diffusion (Constant Viscosity):
+The simplest model to represent diffusive processes is a constant-viscosity model, with 
+prescribed kinematic viscosity \nu such that the stress tensor can be modelled by
+$$ 
+\rho\tau = -2\rho\nu\nabla u, 
+$$
+
 Smagorinsky Closure:
+The Smagorinsky closure is an eddy-viscosity model that captures the effect of energy 
+transfer to the smallest scales of motion in the flow. 
 $$ 
 \rho\tau = -2\rho\nu\vec{S} 
 $$
@@ -35,9 +44,16 @@ $$
 $$
 
 with $\Delta_{x,y,z}$ the grid lengthscale (sometimes approximated as a geometric average
-$\Delta = (\Delta_x\Delta_y\Delta_z)^{1/3}$), $\nu$ is the kinematic viscosity 
-(calculated here with the Smagorinsky model), $\vec{S}$ the symmetric rate-of-strain tensor, 
-$\tau$ the diffusive momentum flux tensor.
+$\Delta = (\Delta_x\Delta_y\Delta_z)^{1/3}$), $\nu$ is a spatially varying kinematic viscosity
+that depends on the local shear, $\vec{S}$ the symmetric rate-of-strain tensor, 
+$\tau$ the diffusive momentum flux tensor. In stratified flows, we can apply a correction 
+to the eddy viscosity to account for buoyancy effects. Thermal diffusivities are related to the modelled eddy-viscosity 
+through the turbulent Prandtl number which takes a typical value of $Pr_{t}= 1/3$ such that $\kappa_{2} = \nu/Pr_{t}$
+
+Tendencies for fourth-order hyperdiffusion are included in the `rhs!` construction, but the 
+coefficient $\kappa_{4}$ is $0$ in this demonstrative case. Hyperdiffusive 
+tendencies are typically included as a scale-selective diffusion mechanism for high-frequency noise 
+(e.g. stabilization in GCMs).
 
 Consider components of the viscous stress tensor in three dimensions
 $$
@@ -71,11 +87,10 @@ Which can be interpreted as, for horizontal-momentum:
 3) Vertical divergence of horizontal gradients of cell-face variables $w$
 
 and for vertical-momentum, as:
-1) Horizontal divergence of vertical gradients of cell-centered variables $u$ $TODO: Check Geometry.transform construction ???$
+1) Horizontal divergence of vertical gradients of cell-centered variables $u$
 2) Horizontal divergence of horizontal gradients of cell-face variables $w$
 3) Vertical divergence of vertical gradients of cell-face variables $w$
 
-Thermal diffusivities are related to the modelled eddy viscosity through the turbulent Prandtl number which takes a typical value of $Pr_{t}= 1/3$ such that $\kappa = \nu/Pr_{t}$
 =#
 
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", ".."))
@@ -191,8 +206,6 @@ function atm_rhs!(dY, Y, params, t)
         top = Operators.SetValue(Geometry.WVector(0.0)),
     )
 
-    fcc = Operators.FluxCorrectionC2C(bottom = Operators.Extrapolate(), top = Operators.Extrapolate())
-    fcf = Operators.FluxCorrectionF2F(bottom = Operators.Extrapolate(), top = Operators.Extrapolate())
     ∇_z_ρθ = Operators.DivergenceF2C(
         bottom = bc_divF2C_bottom!(params.bc.ρθ.bottom, dY, Y, params, t),
         top = bc_divF2C_top!(params.bc.ρθ.top, dY, Y, params, t),
@@ -236,15 +249,6 @@ function atm_rhs!(dY, Y, params, t)
         B(Geometry.transform(Geometry.WAxis(), -(∂f(p)) - If(Yc.ρ) * ∂f(Φ(center_coords.z))) - vvdivc2f(Ic(ρw ⊗ w)))
     uₕf = @. If(Yc.ρuₕ / Yc.ρ) # requires boundary conditions
     @. dρw -= hdiv(uₕf ⊗ ρw)
-
-    ## UPWIND FLUX CORRECTION
-    upwind_correction = false
-    if upwind_correction
-        @. dYc.ρ += fcc(w, Yc.ρ)
-        @. dYc.ρθ += fcc(w, Yc.ρθ)
-        @. dYc.ρuₕ += fcc(w, Yc.ρuₕ)
-        @. dρw += fcf(wc, ρw)
-    end
 
     ## DIFFUSION
     κ₂ = 5.0 # m^2/s

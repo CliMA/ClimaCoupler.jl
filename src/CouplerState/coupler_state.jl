@@ -16,9 +16,11 @@ mutable struct CplFieldInfo{DT, MD}
 end
 
 """
-Type for holding coupler "state". This is the namespace through which coupled components
-communicate. Its role is to provide a level of indirection so that components remain modular
-and so that any data communication, interpolation, reindexing/unit conversions and filtering 
+Type for holding coupled fields. 
+    
+This is the namespace through which coupled components communicate. Its role is
+to provide a level of indirection so that components remain modular and so that
+any data communication, interpolation, reindexing/unit conversions and filtering 
 etc... can be embeded in the intermdediate coupling layer.
 
 A field is exported by one component and imported by one or more other components.

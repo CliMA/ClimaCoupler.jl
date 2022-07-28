@@ -7,12 +7,6 @@ module ClimaCoupler
 
 using DocStringExtensions
 
-@template DEFAULT =
-    """
-    (DEFAULT)
-    $(TYPEDEF)
-    $(DOCSTRING)
-    """
 @template FUNCTIONS =
     """
     $(SIGNATURES)
@@ -28,15 +22,11 @@ using DocStringExtensions
     """
     $(TYPEDEF)
     $(DOCSTRING)
+    Fields:
+    $(FIELDS)
+    Contructors:
+    $(METHODLIST)
     """
-
-"test dummy struct"
-mutable struct Bongo end
-
-"test struct 2"
-mutable struct Alpha{S} end
-
-
 
 include("CoupledSimulations/clock.jl")
 include("CoupledSimulations/coupled_simulation.jl")

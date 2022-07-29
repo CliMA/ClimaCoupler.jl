@@ -1,7 +1,5 @@
 # unit_tester - contains temporaty unit tests that will be moved to the `/test` folder
 
-# unit test for update_midmonth_data! (move during interface revamp)
-
 import Test: @test
 using Pkg
 using Dates
@@ -16,18 +14,21 @@ using Dates
 # include("general_helper.jl")
 # include("bcfile_reader.jl")
 
-# 1. update_midmonth_data! loop
+# test setup
 FT = Float32
 
 date = date0 = DateTime(1979, 01, 01)
 tspan = (1, 90 * 86400) # Jan-Mar
-Δt = 1 * 86400
+Δt = 1 * 3600
 
 domain = Domains.SphereDomain(FT(6731e3))
 mesh = Meshes.EquiangularCubedSphere(domain, 4)
 topology = Topologies.Topology2D(mesh)
 quad = Spaces.Quadratures.GLL{5}()
 boundary_space_t = Spaces.SpectralElementSpace2D(topology, quad)
+
+# IO monthly
+# unit test for update_midmonth_data!
 
 land_mask_t = ClimaCore.Fields.zeros(boundary_space_t)
 
@@ -46,7 +47,6 @@ cs_t = (; _info = _info, date = [date], SST_all = [], updating_dates = [])
 @show "Starting coupling loop"
 function test_update_midmonth_callback()
     # step in time
-    ct = 0
     walltime = @elapsed for t in ((tspan[1] + Δt):Δt:tspan[end])
         cs_t.date[1] = current_date(t) # if not global, `date`` is not updated. Check that this still runs when distributed.
 
@@ -64,3 +64,13 @@ function test_update_midmonth_callback()
 end
 
 test_update_midmonth_callback()
+
+# IO daily
+function test_interpol(boundary_space)
+    f1 = zeros(boundary_space)
+    f2 = ones(boundary_space)
+    out = interpol.(f1, f2, FT(15), FT(30))
+    @test parent(out)[1] ≈ FT(0.5)
+end
+
+test_interpol(boundary_space_t)

@@ -202,7 +202,7 @@ version = "0.1.4"
 [[deps.ClimaAtmos]]
 deps = ["ClimaCore", "ClimaCorePlots", "ClimaCoreVTK", "CloudMicrophysics", "Dierckx", "DiffEqCallbacks", "Distributions", "DocStringExtensions", "FastGaussQuadrature", "Flux", "Insolation", "IntervalSets", "JLD2", "LambertW", "LinearAlgebra", "OperatorFlux", "OrdinaryDiffEq", "Pkg", "Printf", "Random", "StaticArrays", "StatsBase", "StochasticDiffEq", "SurfaceFluxes", "Test", "Thermodynamics", "UnPack"]
 git-tree-sha1 = "39a53bae0ca2cfdb2e15fe0ce8e1a80d9e3b460b"
-repo-rev = "0b7106608be52322a8324ab7ee71d7fec7dbe3ac"
+repo-rev = "cli_options"
 repo-url = "https://github.com/CliMA/ClimaAtmos.jl.git"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
 version = "0.3.0"

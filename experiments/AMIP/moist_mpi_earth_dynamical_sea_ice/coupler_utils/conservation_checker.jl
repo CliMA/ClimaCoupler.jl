@@ -19,7 +19,7 @@ function check_conservation(
     seaice_sim = nothing,
     radiation = true,
 )
-    mask = coupler_sim.mask
+    mask = coupler_sim.land_mask
 
     z = parent(Fields.coordinate_field(face_space).z)
     Δz_bot = FT(0.5) * (z[2, 1, 1, 1, 1] - z[1, 1, 1, 1, 1])

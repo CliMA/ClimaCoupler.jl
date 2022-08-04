@@ -43,8 +43,7 @@ function plot_anim(atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim, land_sea_m
     FT = eltype(land_sea_mask)
     univ_mask = parent(land_sea_mask) .- parent(slab_ice_sim.integrator.p.Ya.ice_mask .* FT(2))
 
-    if mode_name == "aquaplanet"
-        
+    if mode_name == "slabplanet"
         sol_slab_ocean = slab_ocean_sim.integrator.sol
         T_ice = ice_sim.integrator.u.T_sfc
 

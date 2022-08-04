@@ -50,15 +50,8 @@ function ncreader_rll_to_cgll_from_space(datafile_rll, varname, space; outfile =
     meshfile_overlap = joinpath(REGRID_DIR, outfile_root * "_mesh_overlap.g")
     weightfile = joinpath(REGRID_DIR, outfile_root * "_remap_weights.nc")
 
-    # topology = space.topology # TODO: would be better to do this - currently wrong ordering following CA changes
-    R = space.topology.mesh.domain.radius
-    ne = space.topology.mesh.ne
+    topology = space.topology
     Nq = Spaces.Quadratures.polynomial_degree(space.quadrature_style) + 1
-    domain = Domains.SphereDomain(R)
-    mesh = Meshes.EquiangularCubedSphere(domain, ne)
-    topology = Topologies.Topology2D(mesh, Topologies.spacefillingcurve(mesh))
-    quad = Spaces.Quadratures.GLL{Nq}()
-    regrid_space = Spaces.SpectralElementSpace2D(topology, quad)
 
     if isfile(datafile_cgll) == false
         run(`mkdir -p $REGRID_DIR`)
@@ -77,10 +70,10 @@ function ncreader_rll_to_cgll_from_space(datafile_rll, varname, space; outfile =
         # remap
         apply_remap(datafile_cgll, datafile_rll, weightfile, [varname])
     else
-        @warn "Using the existing $datafile_cgll"
+        @warn "Using the existing $datafile_cgll : check topology is consistent"
     end
 
-    return weightfile, datafile_cgll, regrid_space
+    return weightfile, datafile_cgll
 end
 
 """

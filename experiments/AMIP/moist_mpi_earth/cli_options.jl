@@ -2,6 +2,22 @@ import ArgParse
 function parse_commandline()
     s = ArgParse.ArgParseSettings()
     ArgParse.@add_arg_table s begin
+        "--dt_cpl"
+        help = " Coupling time step in seconds"
+        arg_type = Int
+        default = 200
+        "--anim"
+        help = "Boolean flag indicating whether to make animations"
+        arg_type = Bool
+        default = false
+        "--energy_check"
+        help = "Boolean flag indicating whether to check energy conservation"
+        arg_type = Bool
+        default = false
+        "--mode_name"
+        help = "Mode of coupled simulation. [`amip`, `slabplanet`]"
+        arg_type = String
+        default = "slabplanet"
         "--FLOAT_TYPE"
         help = "Float type"
         arg_type = String
@@ -40,6 +56,10 @@ function parse_commandline()
         help = "Vertical diffusion [`false` (default), `true`]"
         arg_type = Bool
         default = false
+        "--surface_scheme"
+        help = "Surface flux scheme [`bulk` (default), `monin_obukhov`]"
+        arg_type = String
+        default = "bulk"
         "--coupled"
         help = "Coupled simulation [`false` (default), `true`]"
         arg_type = Bool
@@ -47,7 +67,7 @@ function parse_commandline()
         "--turbconv"
         help = "Turbulence convection scheme [`nothing` (default), `edmf`]"
         arg_type = String
-         "--turbconv_case"
+        "--turbconv_case"
         help = "The case run by Turbulence convection scheme [`Bomex` (default), `Bomex`, `DYCOMS_RF01`, `TRMM_LBA`, `GABLS`]"
         arg_type = String
         "--anelastic_dycore"
@@ -71,7 +91,7 @@ function parse_commandline()
         arg_type = Bool
         default = false
         "--rad"
-        help = "Radiation model [`clearsky`, `gray`, `allsky`] (default: no radiation)"
+        help = "Radiation model [`nothing` (default), `gray`, `clearsky`, `allsky`, `allskywithclear`]"
         arg_type = String
         "--energy_name"
         help = "Energy variable name [`rhoe` (default), `rhoe_int` , `rhotheta`]"
@@ -106,11 +126,15 @@ function parse_commandline()
         "--trunc_stack_traces"
         help = "Set to `true` to truncate printing of ClimaCore `Field`s"
         arg_type = Bool
-        default = true
+        default = false
         "--fps"
         help = "Frames per second for animations"
         arg_type = Int
         default = 5
+        "--post_process"
+        help = "Post process [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
         "--h_elem"
         help = "number of elements per edge on a cubed sphere"
         arg_type = Int

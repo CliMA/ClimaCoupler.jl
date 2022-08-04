@@ -7,4 +7,8 @@ version = "0.1.0"
 ClimaCore = "d414da3d-4745-48bb-8d80-42e94e092884"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
-SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
+
+[compat]
+ClimaCore = "0.10"
+DocStringExtensions = "0.8, 0.9"
+PrettyTables = "1.3"

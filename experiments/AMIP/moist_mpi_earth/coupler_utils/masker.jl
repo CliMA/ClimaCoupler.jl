@@ -1,8 +1,8 @@
 function LandSeaMask(FT, infile, varname, boundary_space; outfile = "land_sea_cgll.nc", threshold = 0.7)
-    weightfile, datafile_cgll, regrid_space =
-        ncreader_rll_to_cgll_from_space(infile, varname, boundary_space, outfile = outfile)
-    mask = ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(1),), regrid_space)[1]
+    weightfile, datafile_cgll = ncreader_rll_to_cgll_from_space(infile, varname, boundary_space, outfile = outfile)
+    mask = ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(1),), boundary_space)[1]
     mask = clean_mask.(FT, mask, threshold)
+    mask = swap_space!(mask, boundary_space) # needed if we are reading from previous run
 end
 
 """
@@ -17,10 +17,10 @@ combine_surface(FT, mask, sfc_1, sfc_2, sfc_3, value1 = -0.5, value2 = 0.5) =
     (mask > FT(value2) ? sfc_1 : FT(0))
 
 """
-apply_mask(mask, condition, field, value = 0.5) 
+apply_mask(T, mask, condition, field; value = 0.5) 
 
 """
-apply_mask(mask, condition, field, value) = condition(mask, value) ? field : 0.0
+apply_mask(T, mask, condition, field; value = 0.5) = condition(mask, value) ? field : T(0.0)
 
 """
     time_slice_ncfile(sic_data, time_idx = 1)

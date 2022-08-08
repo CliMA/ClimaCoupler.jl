@@ -15,44 +15,43 @@ mutable struct CplFieldInfo{DT, MD}
     metadata::MD
 end
 
+"""
+Type for holding coupled fields. 
+    
+This is the namespace through which coupled components communicate. Its role is
+to provide a level of indirection so that components remain modular and so that
+any data communication, interpolation, reindexing/unit conversions and filtering 
+etc... can be embeded in the intermdediate coupling layer.
+
+A field is exported by one component and imported by one or more other components.
+"""
 mutable struct CouplerState{FT, CF, RO}
-    # A dictionary of fields added to the coupler
+    "A dictionary of fields added to the coupler"
     coupled_fields::CF
-    # A dictionary of remap operators between components
+    "A dictionary of remap operators between components"
     remap_operators::RO
-    # The coupled timestep size
+    "The coupled timestep size"
     Δt_coupled::FT
 end
 
 _fields(coupler::CouplerState) = getfield(coupler, :coupled_fields)
 
 """
-    CouplerState()
-
-Type for holding coupler "state". This is the namespace through which coupled components
-communicate. Its role is to provide a level of indirection so that components remain modular
-and so that any data communication, interpolation, reindexing/unit conversions and filtering 
-etc... can be embeded in the intermdediate coupling layer.
-
-A field is exported by one component and imported by one or more other components.
+Constructs an empty `CouplerState` struct.
 """
 function CouplerState(Δt_coupled)
     return CouplerState(Dict{Symbol, CplFieldInfo}(), Dict{Symbol, Operators.LinearRemap}(), Δt_coupled)
 end
 
 """
-    coupler_add_field!(
-            coupler::CouplerState,
-            fieldname::Symbol,
-            fieldvalue,
-        )
-
 Add a field to the coupler that is accessible with key `fieldname`. 
 
 # Arguments
 - `coupler`: coupler object the field is added to.
 - `fieldname`: key to access the field in the coupler.
 - `fieldvalue`: data array of field values.
+- `write_sim`: the simulation can write to this field in the coupler.
+- `metadata`: a catch-all storage for any metadata associated with the field.
 """
 function coupler_add_field!(
     coupler::CouplerState,
@@ -65,12 +64,6 @@ function coupler_add_field!(
 end
 
 """
-    coupler_add_map!(
-            coupler::CouplerState,
-            map_name::Symbol,
-            map::Operators.LinearRemap
-        )
-
 Add a map to the coupler that is accessible with key `mapname`. 
 
 # Arguments
@@ -83,9 +76,13 @@ function coupler_add_map!(coupler::CouplerState, map_name::Symbol, map::Operator
 end
 
 """
-    coupler_put!(coupler::CouplerState, fieldname::Symbol, fieldvalue)
-
 Sets coupler field `fieldname` to `fieldvalue`.
+
+# Arguments
+- `coupler`: coupler object the field is added to.
+- `fieldname`:  key to access the field in the coupler.
+- `fieldvalue`: the field being stored.
+- `source_sim`: the simulation that `fieldvalue` belongs to.
 """
 function coupler_put!(coupler::CouplerState, fieldname::Symbol, fieldvalue, source_sim::AbstractSimulation)
     cplfield = coupler.coupled_fields[fieldname]
@@ -97,8 +94,6 @@ function coupler_put!(coupler::CouplerState, fieldname::Symbol, fieldvalue, sour
 end
 
 """
-    coupler_push!(coupler::CouplerState, model)
-
 Update coupler with fields retrieved from the coupler.
 
 `coupler_push!` is an adapter function to be implemented for each
@@ -106,12 +101,16 @@ model component using the coupler. It should send coupling fields via
 `coupler_put!` calls and perform any operations on these fields to prepare
 them for the coupler.
 """
-function coupler_push!(coupler::CouplerState, model) end
+function coupler_push!(coupler::CouplerState, sim::AbstractSimulation) end
 
 """
-    coupler_get!(target_field::ClimaCore.Fields.Field, coupler::CouplerState, fieldname::Symbol, target_sim::AbstractSimulation)
+Retrieve coupler field `fieldname`, remap and store in `target_field`.
 
-Retrieve data array corresponding to `fieldname`, remap and store in `target_field`.
+# Arguments
+- `target_field`: the field to be updated by the coupler.
+- `coupler`: coupler object being accessed.
+- `fieldname`:  key to access the field in the coupler.
+- `target_sim`: the simulation that `target_field` belongs to.
 """
 function coupler_get!(
     target_field::ClimaCore.Fields.Field,
@@ -125,17 +124,25 @@ function coupler_get!(
 end
 
 """
-    coupler_get(coupler::CouplerState, fieldname::Symbol [, target_sim::AbstractSimulation])
+Retrieve coupler field `fieldname` without remapping.
 
-Retrieve data array corresponding to `fieldname`.
-
-If a `target_sim` is passed, the field is remapped to that simulation's boundary space.
+# Arguments
+- `coupler`: coupler object being accessed.
+- `fieldname`:  key to access the field in the coupler.
 """
 function coupler_get(coupler::CouplerState, fieldname::Symbol)
     cplfield = coupler.coupled_fields[fieldname]
     return cplfield.data
 end
 
+"""
+Retrieve coupler field `fieldname` and remap to `target_sim`'s boundary space.
+
+# Arguments
+- `coupler`: coupler object being accessed.
+- `fieldname`:  key to access the field in the coupler.
+- `target_sim`: the simulation that `target_field` belongs to.
+"""
 function coupler_get(coupler::CouplerState, fieldname::Symbol, target_sim::AbstractSimulation)
     cplfield = coupler.coupled_fields[fieldname]
     map = get_remap_operator(coupler, name(target_sim), cplfield.write_sim)
@@ -143,8 +150,6 @@ function coupler_get(coupler::CouplerState, fieldname::Symbol, target_sim::Abstr
 end
 
 """
-    coupler_pull!(model, coupler::CouplerState)
-
 Update model with fields retrieved from the coupler.
 
 `coupler_pull!` is an adapter function to be implemented for each
@@ -152,7 +157,7 @@ model component using the coupler. It should get coupling fields via
 `coupler_get` calls and perform any operations on these fields to prepare
 them for use in the component model.
 """
-function coupler_pull!(model, coupler::CouplerState) end
+function coupler_pull!(sim::AbstractSimulation, coupler::CouplerState) end
 
 function get_remap_operator(coupler, target_sim_name::Symbol, source_sim_name::Symbol)
     op_name = Symbol(source_sim_name, "_to_", target_sim_name)

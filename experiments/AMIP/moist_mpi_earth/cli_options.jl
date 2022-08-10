@@ -38,6 +38,10 @@ function parse_commandline()
         help = "Time between saving to disk. Examples: [`10secs`, `1hours`, `Inf` (do not save)]"
         arg_type = String
         default = "Inf"
+        "--dt_rad"
+        help = "Time between calling radiation callback for sphere configurations"
+        arg_type = String
+        default = "6hours"
         "--config" # TODO: add box
         help = "Spatial configuration [`sphere` (default), `column`]"
         arg_type = String
@@ -143,6 +147,10 @@ function parse_commandline()
         help = "number of vertical elements"
         arg_type = Int
         default = 10
+        "--nh_poly"
+        help = "Horizontal polynomial order"
+        arg_type = Int
+        default = 5
         "--z_max"
         help = "Model top height. Default: 30km"
         arg_type = Float64
@@ -195,6 +203,10 @@ function parse_commandline()
         help = "Start date of the simulation"
         arg_type = String
         default = "19790101"
+        "--topography"
+        help = "Define the surface elevation profile [`NoWarp`,`Earth`,`DCMIP200`]"
+        arg_type = String
+        default = "NoWarp"
     end
     parsed_args = ArgParse.parse_args(ARGS, s)
     return (s, parsed_args)

@@ -10,7 +10,7 @@ using ClimaCore.Utilities: half, PlusHalf
 using Dates
 
 using Pkg
-Pkg.add(PackageSpec(name = "ClimaAtmos", rev = "cli_options")) # remove when ClimaAtmos@0.4.0 is released
+#Pkg.add(PackageSpec(name = "ClimaAtmos", rev = "ln/checkpoint_v030")) # remove when ClimaAtmos@0.4.0 is released
 
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
@@ -238,20 +238,10 @@ if energy_check && cs.mode.name == "slabplanet"
     )
 end
 
-@show cs.fields.P_liq
 # # animations
 if parsed_args["anim"]
-    #make it so this works with slab land?
     include("coupler_utils/viz_explorer.jl")
-    plot_anim(
-        cs.model_sims.atmos_sim,
-        cs.model_sims.land_sim,
-        cs.model_sims.ocean_sim,
-        cs.model_sims.ice_sim,
-        cs.land_mask,
-        cs.mode.name,
-        cs.fields.T_S,
-    )
+    plot_anim(cs, coupler_output_dir)
 end
 
 # unit tests (to be moved to `test/`)

@@ -6,7 +6,9 @@ using TempestRemap_jll
 using Test
 using ClimaCoreTempestRemap
 
-REGRID_DIR = "regrid_tmp/"
+REGRID_DIR = "regrid_tmp/" * mode_name * "/"
+rm(REGRID_DIR; recursive = true, force = true)
+
 """
     reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R)
 

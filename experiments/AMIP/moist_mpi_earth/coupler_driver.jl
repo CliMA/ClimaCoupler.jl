@@ -9,6 +9,9 @@ import Test: @test
 using ClimaCore.Utilities: half, PlusHalf
 using Dates
 
+using Pkg
+#Pkg.add(PackageSpec(name = "ClimaAtmos", rev = "ln/checkpoint_v030")) # remove when ClimaAtmos@0.4.0 is released
+
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
 
@@ -84,13 +87,13 @@ if mode_name == "amip"
         sst_data,
         "SST",
         boundary_space,
-        interpolate_daily = false,
+        interpolate_daily = true,
         scaling_function = clean_sst,
         land_mask = land_mask,
         date0 = date0,
     )
     update_midmonth_data!(date0, SST_info)
-    SST_init = deepcopy(SST_info.monthly_fields[1])
+    SST_init = interpolate_midmonth_to_daily(date0, SST_info)
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
     ocean_sim = (; integrator = (; u = (; T_sfc = SST_init), p = (; params = ocean_params), SST_info = SST_info))
 
@@ -106,7 +109,7 @@ if mode_name == "amip"
         date0 = date0,
     )
     update_midmonth_data!(date0, SIC_info)
-    SIC_init = deepcopy(SIC_info.monthly_fields[1])
+    SIC_init = interpolate_midmonth_to_daily(date0, SIC_info)
     ice_mask = get_ice_mask.(SIC_init, FT) # here 50% and lower is considered ice free
     ice_sim = ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info)
@@ -183,11 +186,11 @@ function solve_coupler!(cs, energy_check)
             @calendar_callback :(update_midmonth_data!(cs.dates.date[1], cs.mode.SST_info)) cs.dates.date[1] next_date_in_file(
                 cs.mode.SST_info,
             )
-            SST = ocean_sim.integrator.u.T_sfc .= cs.mode.SST_info.monthly_fields[1]
+            SST = ocean_sim.integrator.u.T_sfc .= interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SST_info)
             @calendar_callback :(update_midmonth_data!(cs.dates.date[1], cs.mode.SIC_info)) cs.dates.date[1] next_date_in_file(
                 cs.mode.SIC_info,
             )
-            SIC = cs.mode.SIC_info.monthly_fields[1]
+            SIC = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info)
             ice_mask = ice_sim.integrator.p.Ya.ice_mask .= get_ice_mask.(SIC, FT)
 
         end
@@ -235,20 +238,10 @@ if energy_check && cs.mode.name == "slabplanet"
     )
 end
 
-@show cs.fields.P_liq
 # # animations
 if parsed_args["anim"]
-    #make it so this works with slab land?
     include("coupler_utils/viz_explorer.jl")
-    plot_anim(
-        cs.model_sims.atmos_sim,
-        cs.model_sims.land_sim,
-        cs.model_sims.ocean_sim,
-        cs.model_sims.ice_sim,
-        cs.land_mask,
-        cs.mode.name,
-        cs.fields.T_S,
-    )
+    plot_anim(cs, coupler_output_dir)
 end
 
 # unit tests (to be moved to `test/`)
@@ -256,8 +249,7 @@ include("coupler_utils/unit_tester.jl")
 
 # Cleanup temporary files
 # TODO: Where should this live?
-# rm(REGRID_DIR; recursive = true, force = true)
+rm(REGRID_DIR; recursive = true, force = true)
 # - cs needs to be global for the monthly macro - explote other solutions
 # - SST_init is modified with SST_info even with deepcopy...
 # - replace if statements with dipatches, write better abstractions
-# - unit test for monthly file update 

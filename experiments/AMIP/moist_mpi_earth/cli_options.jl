@@ -15,9 +15,9 @@ function parse_commandline()
         arg_type = Bool
         default = false
         "--mode_name"
-        help = "Mode of coupled simulation. [`amip`, `aquaplanet`]"
+        help = "Mode of coupled simulation. [`amip`, `slabplanet`]"
         arg_type = String
-        default = "aquaplanet"
+        default = "slabplanet"
         "--FLOAT_TYPE"
         help = "Float type"
         arg_type = String
@@ -38,6 +38,10 @@ function parse_commandline()
         help = "Time between saving to disk. Examples: [`10secs`, `1hours`, `Inf` (do not save)]"
         arg_type = String
         default = "Inf"
+        "--dt_rad"
+        help = "Time between calling radiation callback for sphere configurations"
+        arg_type = String
+        default = "6hours"
         "--config" # TODO: add box
         help = "Spatial configuration [`sphere` (default), `column`]"
         arg_type = String
@@ -56,6 +60,10 @@ function parse_commandline()
         help = "Vertical diffusion [`false` (default), `true`]"
         arg_type = Bool
         default = false
+        "--surface_scheme"
+        help = "Surface flux scheme [`bulk` (default), `monin_obukhov`]"
+        arg_type = String
+        default = "bulk"
         "--coupled"
         help = "Coupled simulation [`false` (default), `true`]"
         arg_type = Bool
@@ -63,6 +71,13 @@ function parse_commandline()
         "--turbconv"
         help = "Turbulence convection scheme [`nothing` (default), `edmf`]"
         arg_type = String
+        "--turbconv_case"
+        help = "The case run by Turbulence convection scheme [`Bomex` (default), `Bomex`, `DYCOMS_RF01`, `TRMM_LBA`, `GABLS`]"
+        arg_type = String
+        "--anelastic_dycore"
+        help = "false enables defualt remaining tendency which produces a compressible model, the true option allow the EDMF to use an anelastic dycore (temporary)"
+        arg_type = Bool
+        default = false
         "--hyperdiff"
         help = "Hyperdiffusion [`true` (default), `false`]"
         arg_type = Bool
@@ -80,7 +95,7 @@ function parse_commandline()
         arg_type = Bool
         default = false
         "--rad"
-        help = "Radiation model [`clearsky`, `gray`, `allsky`] (default: no radiation)"
+        help = "Radiation model [`nothing` (default), `gray`, `clearsky`, `allsky`, `allskywithclear`]"
         arg_type = String
         "--energy_name"
         help = "Energy variable name [`rhoe` (default), `rhoe_int` , `rhotheta`]"
@@ -115,11 +130,15 @@ function parse_commandline()
         "--trunc_stack_traces"
         help = "Set to `true` to truncate printing of ClimaCore `Field`s"
         arg_type = Bool
-        default = true
+        default = false
         "--fps"
         help = "Frames per second for animations"
         arg_type = Int
         default = 5
+        "--post_process"
+        help = "Post process [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
         "--h_elem"
         help = "number of elements per edge on a cubed sphere"
         arg_type = Int
@@ -128,6 +147,10 @@ function parse_commandline()
         help = "number of vertical elements"
         arg_type = Int
         default = 10
+        "--nh_poly"
+        help = "Horizontal polynomial order"
+        arg_type = Int
+        default = 5
         "--z_max"
         help = "Model top height. Default: 30km"
         arg_type = Float64
@@ -176,6 +199,14 @@ function parse_commandline()
         help = "Disable the hyperdiffusion of specific humidity [`true`, `false` (default)] (TODO: reconcile this with ρe_tot or remove if instability fixed with limiters)"
         arg_type = Bool
         default = false
+        "--start_date"
+        help = "Start date of the simulation"
+        arg_type = String
+        default = "19790101"
+        "--topography"
+        help = "Define the surface elevation profile [`NoWarp`,`Earth`,`DCMIP200`]"
+        arg_type = String
+        default = "NoWarp"
     end
     parsed_args = ArgParse.parse_args(ARGS, s)
     return (s, parsed_args)

@@ -33,7 +33,7 @@ Evaluate `ex` when `model_date` is on/after `callback_date` and do nothing other
 """
 macro calendar_callback(ex::Expr, model_date::Union{Symbol, Expr}, callback_date::Union{Symbol, Expr})
     quote
-        if Dates.days($model_date - $callback_date) < FT(0)
+        if ($model_date - $callback_date).value < FT(0)
             nothing
         else
             eval($ex)

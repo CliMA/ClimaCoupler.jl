@@ -6,7 +6,9 @@ using TempestRemap_jll
 using Test
 using ClimaCoreTempestRemap
 
-REGRID_DIR = "regrid_tmp/"
+REGRID_DIR = "regrid_tmp/" * mode_name * "/"
+rm(REGRID_DIR; recursive = true, force = true)
+
 """
     reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R)
 
@@ -50,15 +52,8 @@ function ncreader_rll_to_cgll_from_space(datafile_rll, varname, space; outfile =
     meshfile_overlap = joinpath(REGRID_DIR, outfile_root * "_mesh_overlap.g")
     weightfile = joinpath(REGRID_DIR, outfile_root * "_remap_weights.nc")
 
-    # topology = space.topology # TODO: would be better to do this - currently wrong ordering following CA changes
-    R = space.topology.mesh.domain.radius
-    ne = space.topology.mesh.ne
+    topology = space.topology
     Nq = Spaces.Quadratures.polynomial_degree(space.quadrature_style) + 1
-    domain = Domains.SphereDomain(R)
-    mesh = Meshes.EquiangularCubedSphere(domain, ne)
-    topology = Topologies.Topology2D(mesh)
-    quad = Spaces.Quadratures.GLL{Nq}()
-    regrid_space = Spaces.SpectralElementSpace2D(topology, quad)
 
     if isfile(datafile_cgll) == false
         run(`mkdir -p $REGRID_DIR`)
@@ -77,10 +72,10 @@ function ncreader_rll_to_cgll_from_space(datafile_rll, varname, space; outfile =
         # remap
         apply_remap(datafile_cgll, datafile_rll, weightfile, [varname])
     else
-        @warn "Using the existing $datafile_cgll"
+        @warn "Using the existing $datafile_cgll : check topology is consistent"
     end
 
-    return weightfile, datafile_cgll, regrid_space
+    return weightfile, datafile_cgll
 end
 
 """

@@ -10,7 +10,7 @@ using ClimaCore.Utilities: half, PlusHalf
 using Dates
 
 using Pkg
-#Pkg.add(PackageSpec(name = "ClimaAtmos", rev = "ln/checkpoint_v030")) # remove when ClimaAtmos@0.4.0 is released
+#Pkg.add(PackageSpec(name = "ClimaAtmos", rev = "0fc027be4e10efee6eecc3467216132f43dae97b")) # remove when ClimaAtmos@0.4.0 is released
 
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
@@ -56,7 +56,7 @@ include("coupler_utils/general_helper.jl")
 include("coupler_utils/bcfile_reader.jl")
 
 # init MPI
-include("mpi/mpi_init.jl")
+# include("mpi/mpi_init.jl") ## TODO: fix MPI specification in ClimaAtmos and enable it here
 
 # init atmos model component
 include("atmos/atmos_init.jl")
@@ -161,7 +161,7 @@ reinit!(land_sim.integrator)
 mode_name == "amip" ? (ice_pull!(cs), reinit!(ice_sim.integrator)) : nothing
 mode_name == "slabplanet" ? (ocean_pull!(cs), reinit!(ocean_sim.integrator)) : nothing
 
-if !is_distributed && energy_check && mode_name == "slabplanet"
+if !simulation.is_distributed && energy_check && mode_name == "slabplanet"
     conservation_check = OnlineConservationCheck([], [], [], [], [], [])
     check_conservation(conservation_check, cs, atmos_sim, land_sim, ocean_sim, ice_sim)
 end
@@ -218,7 +218,7 @@ function solve_coupler!(cs, energy_check)
         end
 
         ## Compute energy
-        if !is_distributed && energy_check && cs.mode.name == "slabplanet"
+        if !simulation.is_distributed && energy_check && cs.mode.name == "slabplanet"
             check_conservation(conservation_check, cs, atmos_sim, land_sim, ocean_sim, ice_sim)
         end
     end

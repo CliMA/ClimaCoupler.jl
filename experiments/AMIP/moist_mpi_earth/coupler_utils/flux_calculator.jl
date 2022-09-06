@@ -48,10 +48,14 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     thermo_params = CAP.thermodynamics_params(integrator.p.params)
     surface_flux_params = CAP.surface_fluxes_params(integrator.p.params)
     # Turbulent surface flux calculation
+    
+    u_int = Geometry.UVVector.(Spaces.level(Y.c.uₕ, 1)).components.data.:1
+    v_int = Geometry.UVVector.(Spaces.level(Y.c.uₕ, 1)).components.data.:2
     tsf =
         constant_T_saturated_surface_coefs_coupled.(
             Spaces.level(ᶜts, 1),
-            Geometry.UVVector.(Spaces.level(Y.c.uₕ, 1)),
+            u_int,
+            v_int,
             Spaces.level(Fields.coordinate_field(Y.c).z, 1),
             FT(0), # TODO: get actual value of z_sfc
             swap_space!(T_sfc, axes(Spaces.level(Y.c, 1))), # remove when same instance issue is resolved
@@ -98,7 +102,8 @@ end
 
 function constant_T_saturated_surface_coefs_coupled(
     ts_int,
-    uₕ_int,
+    u_int,
+    v_int,
     z_int::FT,
     z_sfc::FT,
     T_sfc::FT,
@@ -115,8 +120,9 @@ function constant_T_saturated_surface_coefs_coupled(
     ts_sfc = TD.PhaseEquil_ρTq(thermo_params, ρ_sfc, T_sfc, q_sfc)
 
     # wrap state values
+    
     sc = SF.Coefficients{FT}(;
-        state_in = SF.InteriorValues(z_int, (uₕ_int.u, uₕ_int.v), ts_int),
+        state_in = SF.InteriorValues(z_int, (u_int, v_int), ts_int),
         state_sfc = SF.SurfaceValues(z_sfc, (FT(0), FT(0)), ts_sfc),
         z0m = z0m,
         z0b = z0b,
@@ -127,7 +133,7 @@ function constant_T_saturated_surface_coefs_coupled(
     # calculate all fluxes
     tsf = SF.surface_conditions(surface_flux_params, sc)
 
-    E = SF.evaporation(sc, surface_flux_params, tsf.Ch)
+    E = SF.evaporation(surface_flux_params, sc, tsf.Ch)
 
     return (; shf = tsf.shf, lhf = tsf.lhf, E = E, ρτxz = tsf.ρτxz, ρτyz = tsf.ρτyz)
 end

@@ -1,15 +1,9 @@
 function LandSeaMask(FT, infile, varname, boundary_space; outfile = "land_sea_cgll.nc", threshold = 0.7)
     weightfile, datafile_cgll = ncreader_rll_to_cgll_from_space(infile, varname, boundary_space, outfile = outfile)
     mask = ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(1),), boundary_space)[1]
-    mask = clean_mask.(FT, mask, threshold)
     mask = swap_space!(mask, boundary_space) # needed if we are reading from previous run
+    return mask
 end
-
-"""
-clean_mask(FT, mask)
-- convert to integer values after interpolation (but keep type as floats foe easier calculation (TODO))
-"""
-clean_mask(FT, mask, threshold) = mask > FT(threshold) ? FT(1) : FT(0)
 
 combine_surface(FT, mask, sfc_1, sfc_2, sfc_3, value1 = -0.5, value2 = 0.5) =
     (mask < FT(value1) ? sfc_3 : FT(0)) +

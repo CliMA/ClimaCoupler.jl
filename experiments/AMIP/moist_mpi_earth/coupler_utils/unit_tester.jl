@@ -8,23 +8,28 @@ using Dates
 # include("../artifacts.jl")
 
 # import coupler utils
-# include("regridder.jl")
-# include("masker.jl")
+include("regridder.jl")
+include("masker.jl")
+include("../artifacts.jl")
+include("../atmos/atmos_init.jl")
+include("general_helper.jl")
 # include("calendar_timer.jl")
-# include("general_helper.jl")
 # include("bcfile_reader.jl")
 
 # test setup
-FT = Float32
+REGRID_DIR = "regrid_tmp/"
 
 date = date0 = DateTime(1979, 01, 01)
 tspan = (1, 90 * 86400) # Jan-Mar
 Δt = 1 * 3600
 
-domain = Domains.SphereDomain(FT(6731e3))
+radius = FT(6731e3)
+Nq = 4
+
+domain = Domains.SphereDomain(radius)
 mesh = Meshes.EquiangularCubedSphere(domain, 4)
 topology = Topologies.Topology2D(mesh)
-quad = Spaces.Quadratures.GLL{5}()
+quad = Spaces.Quadratures.GLL{Nq}()
 boundary_space_t = Spaces.SpectralElementSpace2D(topology, quad)
 
 # IO monthly
@@ -74,3 +79,51 @@ function test_interpol(boundary_space)
 end
 
 test_interpol(boundary_space_t)
+
+
+# Create dataset of all ones with lat/lon dimensions based on seamask.nc
+function gen_data_all_ones!(path, varname)
+    # Create dataset of all ones
+    ds = NCDataset(path, "c")
+
+    # Define the dimensions "lon" and "lat"
+    defDim(ds, "lon", 64)
+    defDim(ds, "lat", 32)
+
+    # Define a global attribute
+    ds.attrib["title"] = "this is an NCDataset file containing all 1s"
+
+    # Define variables
+    lon = defVar(ds, "lon", Float64, ("lon",))
+    lat = defVar(ds, "lat", Float64, ("lat",))
+    v = defVar(ds, varname, Int64, ("lon", "lat"))
+
+    # Populate lon and lat
+    lon[:] = [i for i in 0.0:(360 / 64):(360 - (360 / 64))]
+    lat[:] = [i for i in (-90 + (180 / 64)):(180 / 32):(90 - (180 / 64))]
+
+    # Generate some example data and write it to v
+    v[:, :] = [1 for i in 1:ds.dim["lon"], j in 1:ds.dim["lat"]]
+
+    # write attributes
+    v.attrib["comments"] = "arbitrary variable with all values 1"
+
+    close(ds)
+end
+
+# Test that remapping a dataset of all ones conserves surface area
+function test_surfacearea_ones()
+    varname = "surfacevar"
+
+    mask_data = joinpath(REGRID_DIR, "all_ones_.nc")
+    gen_data_all_ones!(mask_data, varname)
+
+    # init land-sea mask
+    land_mask = LandSeaMask(FT, mask_data, varname, boundary_space_t)
+
+    @test sum(land_mask) ≈ 4 * π * (radius^2)
+
+    rm(REGRID_DIR; recursive = true)
+end
+
+test_surfacearea_ones()

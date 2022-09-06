@@ -67,7 +67,20 @@ function ncreader_rll_to_cgll_from_space(datafile_rll, varname, space; outfile =
         # write cgll mesh, overlap mesh and weight file 
         write_exodus(meshfile_cgll, topology)
         overlap_mesh(meshfile_overlap, meshfile_rll, meshfile_cgll)
-        remap_weights(weightfile, meshfile_rll, meshfile_cgll, meshfile_overlap; out_type = "cgll", out_np = Nq)
+
+        # 'in_np = 1' and 'mono = true' arguments ensure mapping is conservative and monotone
+        # Note: for a kwarg not followed by a value, set it to true here (i.e. pass 'mono = true' to produce '--mono')
+        # Note: out_np = degrees of freedom = polynomial degree + 1
+        remap_weights(
+            weightfile,
+            meshfile_rll,
+            meshfile_cgll,
+            meshfile_overlap;
+            out_type = "cgll",
+            out_np = Nq,
+            in_np = 1,
+            mono = true,
+        )
 
         # remap
         apply_remap(datafile_cgll, datafile_rll, weightfile, [varname])

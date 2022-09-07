@@ -43,8 +43,8 @@ function ncreader_rll_to_cgll(
     Nq = 5,
     clean_exodus = true,
 )
+    isdir(REGRID_DIR) ? nothing : mkpath(REGRID_DIR)
 
-    run(`mkdir -p $REGRID_DIR`)
     ds = NCDataset(datafile_rll)
     nlat = ds.dim["lat"]
     nlon = ds.dim["lon"]

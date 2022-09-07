@@ -1,8 +1,8 @@
 status = [
   "buildkite/climacoupler-ci",
-  "ci 1.7 - ubuntu-latest",
-  "ci 1.7 - windows-latest",
-  "ci 1.7 - macOS-latest",
+  "ci 1.8 - ubuntu-latest",
+  "ci 1.8 - windows-latest",
+  "ci 1.8 - macOS-latest",
   "docbuild",
   "format",
 ]

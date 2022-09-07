@@ -17,7 +17,7 @@ function parse_commandline()
         "--mode_name"
         help = "Mode of coupled simulation. [`amip`, `slabplanet`]"
         arg_type = String
-        default = "slabplanet"
+        default = "amip"
         "--FLOAT_TYPE"
         help = "Float type"
         arg_type = String
@@ -36,6 +36,10 @@ function parse_commandline()
         default = "1days"
         "--dt_save_to_disk"
         help = "Time between saving to disk. Examples: [`10secs`, `1hours`, `Inf` (do not save)]"
+        arg_type = String
+        default = "Inf"
+        "--dt_save_restart"
+        help = "Time between saving restart files to disk. Examples: [`10secs`, `1hours`, `Inf` (do not save)]"
         arg_type = String
         default = "Inf"
         "--dt_rad"
@@ -64,6 +68,10 @@ function parse_commandline()
         help = "Surface flux scheme [`bulk` (default), `monin_obukhov`]"
         arg_type = String
         default = "bulk"
+        "--C_E"
+        help = "Buld transfer coefficient"
+        arg_type = Float64
+        default = Float64(0.0044)
         "--coupled"
         help = "Coupled simulation [`false` (default), `true`]"
         arg_type = Bool
@@ -101,14 +109,22 @@ function parse_commandline()
         help = "Energy variable name [`rhoe` (default), `rhoe_int` , `rhotheta`]"
         arg_type = String
         default = "rhoe"
-        "--upwinding"
-        help = "Upwinding mode [`none` (default), `first_order` , `third_order`]"
-        arg_type = String
-        default = "none"
+        "--energy_upwinding"
+        help = "Energy upwinding mode [`none` (default), `first_order` , `third_order`, `boris_book`, `zalesak`]"
+        arg_type = Symbol
+        default = :none
+        "--tracer_upwinding"
+        help = "Tracer upwinding mode [`none` (default), `first_order` , `third_order`, `boris_book`, `zalesak`]"
+        arg_type = Symbol
+        default = :none # TODO: change to :zalesak
         "--ode_algo"
-        help = "ODE algorithm [`Rosenbrock23` (default), `Euler`]"
+        help = "ODE algorithm [`ARS343`, `IMKG343a`, `ODE.Euler`, `ODE.IMEXEuler`, `ODE.Rosenbrock23` (default), etc.]"
         arg_type = String
-        default = "Rosenbrock23"
+        default = "ODE.Rosenbrock23"
+        "--max_newton_iters"
+        help = "Maximum number of Newton's method iterations (only for ODE algorithms that use Newton's method)"
+        arg_type = Int
+        default = 3
         "--split_ode"
         help = "Use split of ODE problem. Examples: [`true` (implicit, default), `false` (explicit)]"
         arg_type = Bool
@@ -150,7 +166,7 @@ function parse_commandline()
         "--nh_poly"
         help = "Horizontal polynomial order"
         arg_type = Int
-        default = 5
+        default = 3
         "--z_max"
         help = "Model top height. Default: 30km"
         arg_type = Float64
@@ -183,6 +199,14 @@ function parse_commandline()
         help = "Rayleigh sponge height"
         arg_type = Float64
         default = Float64(15e3)
+        "--alpha_rayleigh_uh"
+        help = "Rayleigh sponge coefficient for horizontal velocity"
+        arg_type = Float64
+        default = Float64(1e-4)
+        "--alpha_rayleigh_w"
+        help = "Rayleigh sponge coefficient for vertical velocity"
+        arg_type = Float64
+        default = Float64(1)
         "--zd_viscous"
         help = "Viscous sponge height"
         arg_type = Float64
@@ -207,6 +231,14 @@ function parse_commandline()
         help = "Define the surface elevation profile [`NoWarp`,`Earth`,`DCMIP200`]"
         arg_type = String
         default = "NoWarp"
+        "--apply_limiter"
+        help = "Apply a horizontal limiter to every tracer [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
+        "--debugging_tc"
+        help = "Save most of the tc aux state to HDF5 file [`false` (default), `true`]"
+        arg_type = Bool
+        default = false
     end
     parsed_args = ArgParse.parse_args(ARGS, s)
     return (s, parsed_args)

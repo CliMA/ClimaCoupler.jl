@@ -127,7 +127,7 @@ function constant_T_saturated_surface_coefs_coupled(
     # calculate all fluxes
     tsf = SF.surface_conditions(surface_flux_params, sc)
 
-    E = SF.evaporation(sc, surface_flux_params, tsf.Ch)
+    E = SF.evaporation(surface_flux_params, sc, tsf.Ch)
 
     return (; shf = tsf.shf, lhf = tsf.lhf, E = E, ρτxz = tsf.ρτxz, ρτyz = tsf.ρτyz)
 end

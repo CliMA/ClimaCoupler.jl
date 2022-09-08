@@ -21,7 +21,6 @@ include("cli_options.jl")
 mode_name = parsed_args["mode_name"]
 energy_check = parsed_args["energy_check"]
 const FT = parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
-land_sim_name = "bucket"
 t_end = FT(time_to_seconds(parsed_args["t_end"]))
 tspan = (0, t_end)
 Δt_cpl = FT(parsed_args["dt_cpl"])
@@ -41,6 +40,7 @@ parsed_args["hyperdiff"] = true
 parsed_args["config"] = "sphere"
 parsed_args["moist"] = "equil"
 parsed_args["nh_poly"] = 4
+
 
 import ClimaCoupler
 pkg_dir = pkgdir(ClimaCoupler)
@@ -66,7 +66,7 @@ include("atmos/atmos_init.jl")
 atmos_sim = atmos_init(FT, Y, integrator, params = params);
 
 # init a 2D bounary space at the surface, assuming the same instance (and MPI distribution if applicable) as the atmos domain above
-boundary_space = ClimaCore.Fields.level(atmos_sim.domain.face_space, half) # global surface grid
+boundary_space = atmos_sim.domain.face_space.horizontal_space
 
 # init land-sea mask
 land_mask = LandSeaMask(FT, mask_data, "LSMASK", boundary_space)
@@ -79,7 +79,8 @@ include("slab/slab_init.jl")
 include("slab_ocean/slab_init.jl")
 include("slab_ice/slab_init.jl")
 
-land_sim = bucket_init(FT, FT.(tspan); dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat))
+land_sim =
+    bucket_init(FT, FT.(tspan), parsed_args["config"]; dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat))
 
 if mode_name == "amip"
     println("No ocean sim - do not expect energy conservation")
@@ -132,7 +133,7 @@ elseif mode_name == "slabplanet"
 end
 
 # init coupler
-coupler_field_names = (:T_S, :z0m_S, :z0b_S, :ρ_sfc, :q_sfc, :albedo, :F_A, :F_E, :F_R, :P_liq)
+coupler_field_names = (:T_S, :z0m_S, :z0b_S, :ρ_sfc, :q_sfc, :albedo, :F_A, :F_E, :F_R, :P_liq, :P_snow)
 coupler_fields =
     NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
 model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim)

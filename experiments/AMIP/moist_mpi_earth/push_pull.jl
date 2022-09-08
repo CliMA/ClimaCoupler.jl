@@ -8,21 +8,9 @@ function atmos_push!(cs)
     csf = cs.fields
     dummmy_remap!(csf.F_A, atmos_sim.integrator.p.dif_flux_energy)
     dummmy_remap!(csf.F_E, atmos_sim.integrator.p.dif_flux_ρq_tot)
-    dummmy_remap!(csf.P_liq, atmos_sim.integrator.p.col_integrated_rain)
+    dummmy_remap!(csf.P_liq, atmos_sim.integrator.p.col_integrated_rain .+ atmos_sim.integrator.p.col_integrated_snow)
     cs.parsed_args["rad"] == "gray" ? dummmy_remap!(csf.F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) :
     nothing
-end
-
-"""
-   land_pull!(cs)
-
-Updates the land_sim cache state in place with the current values of F_A and F_R.
-"""
-function land_pull!(cs)
-    land_sim = cs.model_sims.land_sim
-    csf = cs.fields
-    @. land_sim.integrator.p.F_aero = csf.F_A
-    @. land_sim.integrator.p.F_rad = csf.F_R
 end
 
 """
@@ -37,13 +25,14 @@ function land_pull!(cs)
     land_sim = cs.model_sims.land_sim
     csf = cs.fields
     FT = cs.FT
-    @. land_sim.integrator.p.bucket.ρ_sfc = csf.ρ_sfc
-    @. land_sim.integrator.p.bucket.SHF = csf.F_A
-    @. land_sim.integrator.p.bucket.LHF = FT(0.0)
+    parent(land_sim.integrator.p.bucket.ρ_sfc) .= parent(csf.ρ_sfc)
+    parent(land_sim.integrator.p.bucket.turbulent_energy_flux) .= parent(csf.F_A)
     ρ_liq = (LSMP.ρ_cloud_liq(land_sim.params.earth_param_set))
-    @. land_sim.integrator.p.bucket.E = csf.F_E / ρ_liq
-    @. land_sim.integrator.p.bucket.R_n = csf.F_R
-    @. land_sim.integrator.p.bucket.P_liq = FT(-1.0) .* csf.P_liq # land expects this to be positive
+    parent(land_sim.integrator.p.bucket.evaporation) .= parent(csf.F_E) ./ ρ_liq
+    parent(land_sim.integrator.p.bucket.R_n) .= parent(csf.F_R)
+    parent(land_sim.integrator.p.bucket.P_liq) .= FT(-1.0) .* parent(csf.P_liq) # land expects this to be positive
+    parent(land_sim.integrator.p.bucket.P_snow) .= FT(0.0) .* parent(csf.P_snow)
+
 end
 
 """

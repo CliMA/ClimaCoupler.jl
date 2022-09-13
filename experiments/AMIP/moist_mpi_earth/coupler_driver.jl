@@ -11,6 +11,8 @@ using Dates
 
 using Pkg
 #Pkg.add(PackageSpec(name = "ClimaAtmos", rev = "ln/checkpoint_v030")) # remove when ClimaAtmos@0.4.0 is released
+# Pkg.add(PackageSpec(name = "ClimaCore", rev="6a2baa1fa6b2422691786986eecd77909c8f136b"))# remove when ClimaCore@0.10.12 is released
+# Pkg.add(PackageSpec(name = "ClimaCoreTempestRemap", rev = "6a2baa1fa6b2422691786986eecd77909c8f136b")) # remove when ClimaCore@0.10.12 is released
 
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
@@ -38,6 +40,7 @@ parsed_args["rad"] = "gray"
 parsed_args["hyperdiff"] = true
 parsed_args["config"] = "sphere"
 parsed_args["moist"] = "equil"
+parsed_args["nh_poly"] = 4
 
 import ClimaCoupler
 pkg_dir = pkgdir(ClimaCoupler)

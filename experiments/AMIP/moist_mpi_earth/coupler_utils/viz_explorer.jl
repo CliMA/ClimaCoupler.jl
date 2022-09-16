@@ -41,15 +41,17 @@ function plot_anim(cs, out_dir = ".")
         sol_slab_ocean = slab_ocean_sim.integrator.sol
 
         anim = Plots.@animate for (bucketu, oceanu, iceu) in zip(sol_slab.u, sol_slab_ocean.u, sol_slab_ice.u)
+            land_T_sfc = get_land_temp_from_state(cs.model_sims.land_sim, bucketu)
             parent(combined_field) .=
-                combine_surface.(FT, univ_mask, parent(bucketu.bucket.T_sfc), parent(oceanu.T_sfc), parent(iceu.T_sfc))
+                combine_surface.(FT, univ_mask, parent(land_T_sfc), parent(oceanu.T_sfc), parent(iceu.T_sfc))
 
             Plots.plot(combined_field)
         end
     elseif mode_name == "amip"
         anim = Plots.@animate for (bucketu, iceu) in zip(sol_slab.u, sol_slab_ice.u)
+            land_T_sfc = get_land_temp_from_state(cs.model_sims.land_sim, bucketu)
             parent(combined_field) .=
-                combine_surface.(FT, univ_mask, parent(bucketu.bucket.T_sfc), parent(SST), parent(iceu.T_sfc))
+                combine_surface.(FT, univ_mask, parent(land_T_sfc), parent(SST), parent(iceu.T_sfc))
 
             Plots.plot(combined_field)
         end
@@ -63,6 +65,14 @@ function plot_anim(cs, out_dir = ".")
         Plots.plot(combined_field)
     end
     Plots.mp4(anim, joinpath(out_dir, "bucket_W.mp4"), fps = 10)
+
+    combined_field = zeros(boundary_space)
+    anim = Plots.@animate for bucketu in sol_slab.u
+        parent(combined_field) .= combine_surface.(FT, univ_mask, parent(bucketu.bucket.σS), 0.0, 0.0)
+
+        Plots.plot(combined_field)
+    end
+    Plots.mp4(anim, joinpath(out_dir, "bucket_snow.mp4"), fps = 10)
 
     # plot surface fluxes
     # TODO as part of the flux accumulation PR

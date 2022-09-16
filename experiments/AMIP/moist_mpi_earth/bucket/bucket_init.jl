@@ -5,11 +5,16 @@ import ClimaLSM
 include(joinpath(pkgdir(ClimaLSM), "parameters", "create_parameters.jl"))
 using ClimaLSM.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers
 
-import ClimaLSM.Bucket: surface_fluxes, surface_air_density, liquid_precipitation, BulkAlbedo, surface_albedo
+import ClimaLSM.Bucket:
+    surface_fluxes,
+    net_radiation,
+    surface_air_density,
+    liquid_precipitation,
+    BulkAlbedo,
+    surface_albedo,
+    snow_precipitation
 
-using ClimaLSM: make_ode_function, initialize_prognostic, initialize_auxiliary
-
-import ClimaLSM: initialize
+using ClimaLSM: make_ode_function, initialize, obtain_surface_space
 
 """
     BucketSimulation{P, Y, D, I}
@@ -23,19 +28,7 @@ struct BucketSimulation{P, Y, D, I}
     integrator::I
 end
 
-
-"""
-    initialize(model::BucketModel, space::ClimaCore.Spaces.AbstractSpace)
-
-A method for initializing land model variables from a predefined space.
-"""
-function initialize(model::BucketModel, space::ClimaCore.Spaces.AbstractSpace)
-    coords = ClimaCore.Fields.coordinate_field(space)
-    Y = initialize_prognostic(model, coords)
-    p = initialize_auxiliary(model, coords)
-    return Y, p, coords
-end
-
+include("./bucket_utils.jl")
 
 """
     CoupledRadiativeFluxes{FT} <: AbstractRadiativeDrivers{FT}
@@ -58,14 +51,9 @@ struct CoupledAtmosphere{FT} <: AbstractAtmosphericDrivers{FT} end
                     t::FT,
                     parameters::P,
                     atmos::PA,
-                    radiation::PR, p,
-                    ) where {FT <: AbstractFloat, P <: BucketModelParameters{FT},  PA <: CoupledAtmosphere{FT}, PR <: CoupledRadiativeFluxes{FT}}
+                    ) where {FT <: AbstractFloat, P <: BucketModelParameters{FT},  PA <: CoupledAtmosphere{FT}}
 
-Computes the surface flux terms at the ground for a coupled simulation:
-net radiation,  SHF,  LHF,
-as well as the water vapor flux (in units of m^3/m^2/s of water).
-Positive fluxes indicate flow from the ground to the atmosphere.
-Currently, we only support soil covered surfaces.
+Computes the turbulent surface fluxes terms at the ground for a coupled simulation.
 """
 function ClimaLSM.Bucket.surface_fluxes(
     Y::ClimaCore.Fields.FieldVector,
@@ -73,11 +61,33 @@ function ClimaLSM.Bucket.surface_fluxes(
     t::FT,
     parameters::BucketModelParameters{FT, P},
     atmos::CoupledAtmosphere{FT},
+) where {FT <: AbstractFloat, P}
+    # coupler has done its thing behind the scenes already
+    return (turbulent_energy_flux = p.bucket.turbulent_energy_flux, evaporation = p.bucket.evaporation)
+end
+
+
+
+"""
+    net_radiation(Y, p, 
+                    t::FT,
+                    parameters::P,
+                    radiation::PR, p,
+                    ) where {FT <: AbstractFloat, P <: BucketModelParameters{FT}, PR <: CoupledRadiativeFluxes{FT}}
+
+Computes the net radiative flux at the ground for a coupled simulation.
+"""
+function ClimaLSM.Bucket.net_radiation(
+    Y::ClimaCore.Fields.FieldVector,
+    p::ClimaCore.Fields.FieldVector,
+    t::FT,
+    parameters::BucketModelParameters{FT, P},
     radiation::CoupledRadiativeFluxes{FT},
 ) where {FT <: AbstractFloat, P}
     # coupler has done its thing behind the scenes already
-    return (R_n = p.bucket.R_n, LHF = p.bucket.LHF, SHF = p.bucket.SHF, E = p.bucket.E)
+    return p.bucket.R_n
 end
+
 
 """
     ClimaLSM.Bucket.surface_air_density(p, atmos::CoupledAtmosphere)
@@ -102,75 +112,36 @@ function liquid_precipitation(p, atmos::CoupledAtmosphere, t)
 end
 
 """
-    get_land_energy(slab_sim::BucketSimulation, T_sfc)
+    ClimaLSM.Bucket.snow_precipitation(p, atmos::CoupledAtmosphere, t)
 
-Returns the volumetric internal energy of the bucket; a method for the 
-bucket model when used as the land model.
+an extension of the bucket model method which returns the precipitation
+(m/s) in the case of a coupled simulation.
 """
-function get_land_energy(slab_sim::BucketSimulation, T_sfc)
-    return get_bucket_energy(slab_sim, T_sfc)
+function snow_precipitation(p, atmos::CoupledAtmosphere, t)
+    # coupler has filled this in
+    return p.bucket.P_snow
 end
-
-"""
-    get_land_temp(slab_sim::BucketSimulation)
-
-Returns the surface temperature of the earth; 
-a method for the bucket model 
-when used as the land model.
-"""
-function get_land_temp(slab_sim::BucketSimulation)
-    return slab_sim.integrator.u.bucket.T_sfc
-end
-
-"""
-    get_land_roughness(slab_sim::BucketSimulation)
-
-Returns the roughness length parameters of the bucket; 
-a method for the bucket model 
-when used as the land model.
-"""
-function get_land_roughness(slab_sim::BucketSimulation)
-    return slab_sim.params.z_0m, slab_sim.params.z_0b
-end
-
-"""
-   land_albedo(slab_sim::BucketSimulation)
-
-Returns the surface albedo of the earth; 
-a method for the bucket model 
-when used as the land model.
-"""
-function land_albedo(slab_sim::BucketSimulation)
-    coords = ClimaCore.Fields.coordinate_field(axes(slab_sim.integrator.u.bucket.S))
-    α_land = surface_albedo.(Ref(slab_sim.params.albedo), coords, slab_sim.integrator.u.bucket.S, slab_sim.params.S_c)
-    return parent(α_land)
-end
-
-"""
-    get_land_q(slab_sim::Bucketimulation, _...)
-
-Returns the surface specific humidity of the earth; 
-a method for the bucket 
-when used as the land model.
-"""
-function get_land_q(slab_sim::BucketSimulation, _...)
-    return slab_sim.integrator.p.bucket.q_sfc
-end
-
-"""
-    get_bucket_energy(bucket_sim, T_sfc)
-
-Returns the volumetric internal energy of the bucket land model.
-"""
-get_bucket_energy(bucket_sim, T_sfc) = bucket_sim.params.ρc_soil .* T_sfc .* bucket_sim.params.d_soil
-
 
 """
     bucket_init
 
-Initizliaes the bucket model variables.
+Initializes the bucket model variables.
 """
-function bucket_init(::Type{FT}, tspan::Tuple{FT, FT}; space, dt::FT, saveat::FT, stepper = Euler()) where {FT}
+function bucket_init(
+    ::Type{FT},
+    tspan::Tuple{FT, FT},
+    config::String;
+    space,
+    dt::FT,
+    saveat::FT,
+    stepper = Euler(),
+) where {FT}
+    if config != "sphere"
+        println(
+            "Currently only spherical shell domains are supported; single column set-up will be addressed in future PR.",
+        )
+        @assert config == "sphere"
+    end
 
     earth_param_set = create_lsm_parameters(FT)
     function α_soil(coordinate_point)
@@ -180,24 +151,29 @@ function bucket_init(::Type{FT}, tspan::Tuple{FT, FT}; space, dt::FT, saveat::FT
 
     α_snow = FT(0.8) # snow albedo
     albedo = BulkAlbedo{FT}(α_snow, α_soil)
-    S_c = FT(0.2)
+    σS_c = FT(0.2)
     W_f = FT(0.15)
     d_soil = FT(3.5) # soil depth
-    T0 = FT(280.0)
     z_0m = FT(1e-2)
     z_0b = FT(1e-3)
-    κ_soil = FT(0.0)# setting this to zero allows us to test energy conservation; zero flux in soil column at bottom
+    κ_soil = FT(0.7)
     ρc_soil = FT(2e6)
-    params = BucketModelParameters(d_soil, T0, κ_soil, ρc_soil, albedo, S_c, W_f, z_0m, z_0b, earth_param_set)
-
-    args = (params, CoupledAtmosphere{FT}(), CoupledRadiativeFluxes{FT}(), nothing)
+    t_crit = dt # This is the timescale on which snow exponentially damps to zero, in the case where all 
+    # the snow would melt in time t_crit. It prevents us from having to specially time step in cases where
+    # all the snow melts in a single timestep.
+    params = BucketModelParameters(κ_soil, ρc_soil, albedo, σS_c, W_f, z_0m, z_0b, t_crit, earth_param_set)
+    n_vertical_elements = 7
+    # Note that this does not take into account topography of the surface, which is OK for this land model.
+    # But it must be taken into account when computing surface fluxes, for Δz.
+    domain = make_lsm_domain(space, (-d_soil, FT(0.0)), n_vertical_elements)
+    args = (params, CoupledAtmosphere{FT}(), CoupledRadiativeFluxes{FT}(), domain)
     model = BucketModel{FT, typeof.(args)...}(args...)
 
     # Initial conditions with no moisture
-    Y, p, coords = initialize(model, space)
+    Y, p, coords = initialize(model)
     anomaly = true
     hs_sfc = false
-    Y.bucket.T_sfc = map(coords) do coord
+    Y.bucket.T = map(coords.subsurface) do coord
         T_sfc_0 = FT(280.0)
         radlat = coord.lat / FT(180) * pi
         ΔT = FT(0)
@@ -216,14 +192,13 @@ function bucket_init(::Type{FT}, tspan::Tuple{FT, FT}; space, dt::FT, saveat::FT
 
     Y.bucket.W .= 0.14
     Y.bucket.Ws .= 0.0
-    Y.bucket.S .= 0.0 # no snow
-    # add ρ_sfc to cache
-    # this needs to be initialized!!! Turbulent surface fluxes need this set to be computed.
-    ρ_sfc = zeros(space) .+ FT(1.1)
-    P_liq = zeros(space) .+ FT(0.0)
-    variable_names = (propertynames(p.bucket)..., :ρ_sfc, :P_liq)
+    Y.bucket.σS .= 0.0
+    ρ_sfc = zeros(axes(Y.bucket.W)) .+ FT(1.1)
+    P_liq = zeros(axes(Y.bucket.W)) .+ FT(0.0)
+    P_snow = zeros(axes(Y.bucket.W)) .+ FT(0.0)
+    variable_names = (propertynames(p.bucket)..., :ρ_sfc, :P_liq, :P_snow)
     orig_fields = map(x -> getproperty(p.bucket, x), propertynames(p.bucket))
-    fields = (orig_fields..., ρ_sfc, P_liq)
+    fields = (orig_fields..., ρ_sfc, P_liq, P_snow)
     p_new = ClimaCore.Fields.FieldVector(; :bucket => (; zip(variable_names, fields)...))
 
     ode_function! = make_ode_function(model)
@@ -231,5 +206,5 @@ function bucket_init(::Type{FT}, tspan::Tuple{FT, FT}; space, dt::FT, saveat::FT
     prob = ODEProblem(ode_function!, Y, tspan, p_new)
     integrator = init(prob, stepper; dt = dt, saveat = saveat)
 
-    BucketSimulation(params, Y, space, integrator)
+    BucketSimulation(params, Y, (; domain = domain, soil_depth = d_soil), integrator)
 end

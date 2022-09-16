@@ -1,3 +1,4 @@
+# TODO: const comms_ctx cannot be overwritten in ClimaAtmos - add if statement to clima atmos
 using ClimaComms
 using ClimaCommsMPI
 is_distributed = get(ENV, "CLIMACORE_DISTRIBUTED", "") == "MPI"
@@ -17,7 +18,7 @@ if is_distributed
     @info "Setting up distributed run on $nprocs \
         processor$(nprocs == 1 ? "" : "s")"
 else
-    const comms_ctx = nothing
+    comms_ctx = ClimaComms.SingletonCommsContext()
     using TerminalLoggers: TerminalLogger
     prev_logger = global_logger(TerminalLogger())
 end

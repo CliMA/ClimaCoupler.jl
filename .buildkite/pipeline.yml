@@ -1,5 +1,5 @@
 env:
-  JULIA_VERSION: "1.7.2"
+  JULIA_VERSION: "1.8.1"
   OPENMPI_VERSION: "4.0.4"
   CUDA_VERSION: "11.2"
   OPENBLAS_NUM_THREADS: 1
@@ -43,11 +43,11 @@ steps:
 
       - label: "Moist earth with slab surface"
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --energy_check=true --mode_name=slabplanet --t_end=10000secs --dt_save_to_sol=200secs --dt_cpl=200"
-        artifact_paths: "experiments/AMIP/moist_mpi_earth/total_energy*.png"
+        artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet_artifacts/total_energy*.png"
 
       - label: "AMIP"
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --energy_check=false --mode_name=amip --anim=true --t_end=10000secs --dt_save_to_sol=200secs --dt_cpl=200"
-        artifact_paths: "experiments/AMIP/moist_mpi_earth/*.mp4"
+        artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip_artifacts/*.mp4"
 
       - label: "sea_breeze"
         command: "julia --color=yes --project=experiments/ClimaCore/sea_breeze experiments/ClimaCore/sea_breeze/run.jl"

@@ -48,6 +48,7 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     thermo_params = CAP.thermodynamics_params(integrator.p.params)
     surface_flux_params = CAP.surface_fluxes_params(integrator.p.params)
     # Turbulent surface flux calculation
+
     tsf =
         constant_T_saturated_surface_coefs_coupled.(
             Spaces.level(ᶜts, 1),
@@ -115,6 +116,7 @@ function constant_T_saturated_surface_coefs_coupled(
     ts_sfc = TD.PhaseEquil_ρTq(thermo_params, ρ_sfc, T_sfc, q_sfc)
 
     # wrap state values
+
     sc = SF.Coefficients{FT}(;
         state_in = SF.InteriorValues(z_int, (uₕ_int.u, uₕ_int.v), ts_int),
         state_sfc = SF.SurfaceValues(z_sfc, (FT(0), FT(0)), ts_sfc),

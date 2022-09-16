@@ -6,7 +6,7 @@ using TempestRemap_jll
 using Test
 using ClimaCoreTempestRemap
 
-REGRID_DIR = "regrid_tmp/" * mode_name * "/"
+REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp/")
 rm(REGRID_DIR; recursive = true, force = true)
 
 """
@@ -56,7 +56,8 @@ function ncreader_rll_to_cgll_from_space(datafile_rll, varname, space; outfile =
     Nq = Spaces.Quadratures.polynomial_degree(space.quadrature_style) + 1
 
     if isfile(datafile_cgll) == false
-        run(`mkdir -p $REGRID_DIR`)
+        isdir(REGRID_DIR) ? nothing : mkpath(REGRID_DIR)
+
         ds = NCDataset(datafile_rll)
         nlat = ds.dim["lat"]
         nlon = ds.dim["lon"]

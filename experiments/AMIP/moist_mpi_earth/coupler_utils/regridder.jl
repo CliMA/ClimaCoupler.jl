@@ -142,5 +142,63 @@ function dummmy_remap!(target, source)
     parent(target) .= parent(source)
 end
 
+"""
+    remap_field_cgll2rll(name::Symbol, field::Fields.Field, remap_tmpdir, datafile_latlon)
+Remap individual Field from model (CGLL) nodes to a lat-lon (RLL) grid using TempestRemap
+"""
+
+function remap_field_cgll2rll(name::Symbol, field::Fields.Field, remap_tmpdir, datafile_latlon; nlat = 90, nlon = 180)
+
+    space = axes(field)
+    hspace = :topology in propertynames(space) ? space : space.horizontal_space
+    topology = hspace.topology
+    Nq = Spaces.Quadratures.polynomial_degree(hspace.quadrature_style) + 1
+
+    # write out our cubed sphere mesh
+    meshfile_cc = remap_tmpdir * "/mesh_cubedsphere.g"
+    write_exodus(meshfile_cc, hspace.topology)
+
+    meshfile_rll = remap_tmpdir * "/mesh_rll.g"
+    rll_mesh(meshfile_rll; nlat = nlat, nlon = nlon)
+
+    meshfile_overlap = remap_tmpdir * "/mesh_overlap.g"
+    overlap_mesh(meshfile_overlap, meshfile_cc, meshfile_rll)
+
+    weightfile = remap_tmpdir * "/remap_weights.nc"
+    remap_weights(weightfile, meshfile_cc, meshfile_rll, meshfile_overlap; in_type = "cgll", in_np = Nq)
+
+    datafile_cc = remap_tmpdir * "/datafile_cc.nc"
+    write_datafile_cc(datafile_cc, field, name)
+
+    apply_remap( # TODO: this can be done online
+        datafile_latlon,
+        datafile_cc,
+        weightfile,
+        [string(name)],
+    )
+end
+
+function write_datafile_cc(datafile_cc, field, name)
+    space = axes(field)
+    # write data
+    NCDataset(datafile_cc, "c") do nc
+        def_space_coord(nc, space; type = "cgll")
+        # nc_time = def_time_coord(nc)
+        nc_field = defVar(nc, name, Float64, space)
+        nc_field[:, 1] = field
+
+        nothing
+    end
+end
+
+function create_space(; R = FT(6371e3), ne = 4, polynomial_degree = 3)
+    domain = Domains.SphereDomain(R)
+    mesh = Meshes.EquiangularCubedSphere(domain, ne)
+    topology = Topologies.Topology2D(mesh)
+    Nq = polynomial_degree + 1
+    quad = Spaces.Quadratures.GLL{Nq}()
+    space = Spaces.SpectralElementSpace2D(topology, quad)
+end # debugging tool, also to be used in tests
+
 # TODO:
 # - add unit tests 

@@ -1,20 +1,56 @@
-function LandSeaMask(FT, infile, varname, boundary_space; outfile = "land_sea_cgll.nc", threshold = 0.7)
-    weightfile, datafile_cgll = ncreader_rll_to_cgll_from_space(infile, varname, boundary_space, outfile = outfile)
+function LandSeaMask(FT, infile, varname, boundary_space; outfile = "land_sea_cgll.nc", mono = false, threshold = 0.7)
+    weightfile, datafile_cgll =
+        ncreader_rll_to_cgll_from_space(infile, varname, boundary_space, outfile = outfile, mono = mono)
     mask = ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(1),), boundary_space)[1]
     mask = swap_space!(mask, boundary_space) # needed if we are reading from previous run
-    return mask
+    return mono ? mask : binary_mask.(mask, threshold = threshold)
 end
 
-combine_surface(FT, mask, sfc_1, sfc_2, sfc_3, value1 = -0.5, value2 = 0.5) =
-    (mask < FT(value1) ? sfc_3 : FT(0)) +
-    ((mask >= FT(value1) && (mask <= FT(value2))) ? sfc_2 : FT(0)) +
-    (mask > FT(value2) ? sfc_1 : FT(0))
+"""
+    binary_mask(var::FT; threshold = 0.5)
+
+Converts a number to 1 or 0 of the same type, based on a threashold. 
+"""
+
+binary_mask(var::FT; threshold = 0.5) where {FT} = (var - FT(threshold)) > FT(0) ? FT(1) : FT(0)
 
 """
-apply_mask(T, mask, condition, field; value = 0.5) 
+    combine_surfaces!(combined_field::Fields.Field, masks::NamedTuple, fields::NamedTuple)
+
+Sums Field objects in `fields` weighted by the respective masks.
+"""
+function combine_surfaces!(combined_field::Fields.Field, masks::NamedTuple, fields::NamedTuple)
+    combined_field .= eltype(combined_field)(0)
+    for surface_name in propertynames(fields) # could use dot here?
+        field_no_nans = nans_to_zero.(getproperty(fields, surface_name))  # TODO: performance analysis / alternatives
+        combined_field .+= getproperty(masks, surface_name) .* field_no_nans
+    end
+
+end
+nans_to_zero(v) = isnan(v) ? FT(0) : v
 
 """
-apply_mask(T, mask, condition, field; value = 0.5) = condition(mask, value) ? field : T(0.0)
+    update_masks(cs)
+
+Updates dynamically changing masks. 
+"""
+function update_masks(cs)
+
+    # dynamic masks
+    ice_d = cs.model_sims.ice_sim.integrator.p.ice_mask
+    FT = eltype(ice_d)
+
+    # static mask
+    land_s = cs.surface_masks.land
+
+    cs.surface_masks.ice .= min.(ice_d .+ land_s, FT(1)) .- land_s
+    cs.surface_masks.ocean .= (FT(1) .- cs.surface_masks.ice .- land_s)
+
+    @assert minimum(cs.surface_masks.ice) >= FT(0)
+    @assert minimum(cs.surface_masks.land) >= FT(0)
+    @assert minimum(cs.surface_masks.ocean) >= FT(0)
+
+end
 
 """
     time_slice_ncfile(sic_data, time_idx = 1)

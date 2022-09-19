@@ -18,14 +18,12 @@ include("general_helper.jl")
 
 # test setup
 TEST_DATA_DIR = "tmp_test_data/"
-
-isdir(TEST_DATA_DIR) ? nothing : mkpath(TEST_DATA_DIR)
-
+isdir(TEST_DATA_DIR) ? rm(TEST_DATA_DIR; recursive = true, force = true) : nothing
+REGRID_DIR = joinpath(TEST_DATA_DIR, "regrid_tmp/")
 
 FT = Float32
 
-
-date1 = DateTime(1979, 01, 01, 00, 00, 00)
+date1 = DateTime(1979, 01, 01, 01, 00, 00)
 date = DateTime(1979, 01, 01, 00, 00, 00)
 tspan = (1, 90 * 86400) # Jan-Mar
 Δt = 1 * 3600
@@ -160,7 +158,7 @@ end
 function test_surfacearea_ones()
     varname = "surfacevar"
 
-    mask_data = joinpath(REGRID_DIR, "all_ones_.nc")
+    mask_data = joinpath(TEST_DATA_DIR, "all_ones_.nc")
     gen_data_all_ones!(mask_data, varname)
 
     # init land-sea mask
@@ -168,7 +166,6 @@ function test_surfacearea_ones()
 
     @test sum(land_mask) ≈ 4 * π * (radius^2)
 
-    rm(REGRID_DIR; recursive = true)
 end
 test_surfacearea_ones()
 

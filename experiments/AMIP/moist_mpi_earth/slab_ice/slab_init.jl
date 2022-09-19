@@ -26,13 +26,13 @@ function ice_rhs!(du, u, p, t)
     FT = eltype(dY)
 
     params = p.params
-    F_aero = p.Ya.F_aero
-    F_rad = p.Ya.F_rad
-    ice_mask = p.Ya.ice_mask
+    F_aero = p.F_aero
+    F_rad = p.F_rad
+    ice_mask = p.ice_mask
 
     F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc)
     rhs = @. (-F_aero - F_rad + F_conductive) / (params.h * params.ρ * params.c)
-    parent(dY.T_sfc) .= apply_mask.(FT, parent(ice_mask), >, parent(rhs))
+    parent(dY.T_sfc) .= parent(rhs) # apply_mask.(FT, parent(ice_mask), parent(rhs))
 end
 
 """
@@ -55,17 +55,22 @@ function ice_init(::Type{FT}; tspan, saveat, dt, space, ice_mask, stepper = Eule
     )
 
     Y = slab_ice_space_init(FT, space, params)
-    Ya = (; F_aero = ClimaCore.Fields.zeros(space), F_rad = ClimaCore.Fields.zeros(space), ice_mask = ice_mask)
+    cache = (; F_aero = ClimaCore.Fields.zeros(space), F_rad = ClimaCore.Fields.zeros(space), ice_mask = ice_mask)
 
-    problem = OrdinaryDiffEq.ODEProblem(ice_rhs!, Y, tspan, (; Ya = Ya, params = params))
+    problem = OrdinaryDiffEq.ODEProblem(ice_rhs!, Y, tspan, (; cache..., params = params))
     integrator = OrdinaryDiffEq.init(problem, stepper, dt = dt, saveat = saveat)
 
 
     SlabSimulation(params, Y, space, integrator)
 end
 
-get_ice_mask(h_ice, FT, threshold = 50) = (h_ice - FT(threshold)) > FT(0) ? FT(1) : FT(0)
-
 # file-specific
-clean_sic(SIC, _info) =
-    swap_space!(SIC, axes(_info.land_mask)) .* convert.(eltype(_info.land_mask), abs.(_info.land_mask .- 1))
+"""
+    clean_sst(SIC, _info) 
+Ensures that the space of the SIC struct matches that of the mask, and converts the units from area % to area fraction. 
+"""
+
+clean_sic(SIC, _info) = swap_space!(SIC, axes(_info.land_mask)) ./ _info.FT(100.0)
+
+# setting that SIC < 0.5 os counted as ocean if binary remapping of landsea mask. 
+get_ice_mask(h_ice::FT, mono, threshold = 0.5) where {FT} = mono ? h_ice : binary_mask.(h_ice, threshold = threshold)

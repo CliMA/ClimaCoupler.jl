@@ -6,7 +6,7 @@ using TempestRemap_jll
 using Test
 using ClimaCoreTempestRemap
 
-REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp/")
+REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath(".", "regrid_tmp/")
 rm(REGRID_DIR; recursive = true, force = true)
 
 """
@@ -42,10 +42,10 @@ Reads and regrids data of the `varname` variable from an input NetCDF file and s
 The input NetCDF file needs to be `Exodus` formatted, and can contain time-dependent data. 
 
 """
-function ncreader_rll_to_cgll_from_space(datafile_rll, varname, space; outfile = "data_cgll.nc")
+function ncreader_rll_to_cgll_from_space(datafile_rll, varname, space; outfile = "data_cgll.nc", mono = false)
 
-    outfile_root = outfile[1:(end - 3)]
-    datafile_cgll = joinpath(REGRID_DIR, outfile)
+    outfile_root = mono ? outfile[1:(end - 3)] * "_mono" : outfile[1:(end - 3)]
+    datafile_cgll = joinpath(REGRID_DIR, outfile_root * ".g")
 
     meshfile_rll = joinpath(REGRID_DIR, outfile_root * "_mesh_rll.g")
     meshfile_cgll = joinpath(REGRID_DIR, outfile_root * "_mesh_cgll.g")
@@ -72,17 +72,10 @@ function ncreader_rll_to_cgll_from_space(datafile_rll, varname, space; outfile =
         # 'in_np = 1' and 'mono = true' arguments ensure mapping is conservative and monotone
         # Note: for a kwarg not followed by a value, set it to true here (i.e. pass 'mono = true' to produce '--mono')
         # Note: out_np = degrees of freedom = polynomial degree + 1
-        remap_weights(
-            weightfile,
-            meshfile_rll,
-            meshfile_cgll,
-            meshfile_overlap;
-            out_type = "cgll",
-            out_np = Nq,
-            in_np = 1,
-            mono = true,
-        )
 
+        kwargs = (; out_type = "cgll", out_np = Nq)
+        kwargs = mono ? (; (kwargs)..., in_np = mono ? 1 : false, mono = mono) : kwargs
+        remap_weights(weightfile, meshfile_rll, meshfile_cgll, meshfile_overlap; kwargs...)
         # remap
         apply_remap(datafile_cgll, datafile_rll, weightfile, [varname])
     else

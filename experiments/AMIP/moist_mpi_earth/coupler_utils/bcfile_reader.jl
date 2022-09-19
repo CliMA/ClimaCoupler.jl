@@ -50,11 +50,17 @@ function bcfile_info_init(
     scaling_function = no_scaling,
     land_mask = nothing,
     date0 = nothing,
+    mono = true,
 )
 
     # regrid all times and save to file
-    weightfile, datafile_cgll =
-        ncreader_rll_to_cgll_from_space(datafile_rll, varname, boundary_space, outfile = varname * "_cgll.g")
+    weightfile, datafile_cgll = ncreader_rll_to_cgll_from_space(
+        datafile_rll,
+        varname,
+        boundary_space,
+        outfile = varname * "_cgll.g",
+        mono = mono,
+    )
     ds = Dataset(datafile_cgll, "r")
 
     # init time tracking info
@@ -115,6 +121,7 @@ function update_midmonth_data!(date, bcf_info)
     scaling_function = bcf_info.scaling_function
     varname = bcf_info.varname
     FT = bcf_info.FT
+    boundary_space = axes(monthly_fields[1])
 
     if (all_dates == nothing) # temporally invariant BCs
         @warn "no temporally varying data, all months using the same field"

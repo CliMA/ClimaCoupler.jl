@@ -42,7 +42,7 @@ steps:
       #   artifact_paths: "test/*"
 
       - label: "Moist earth with slab surface"
-        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --energy_check=true --mode_name=slabplanet --t_end=10days --dt_save_to_sol=3600secs --dt_cpl=200 --mono_surface=true"
+        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --energy_check=true --mode_name=slabplanet --t_end=10days --dt_save_to_sol=3600secs --dt_cpl=200 --mono_surface=true --h_elem=4"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet_artifacts/total_energy*.png"
 
       - label: "AMIP"

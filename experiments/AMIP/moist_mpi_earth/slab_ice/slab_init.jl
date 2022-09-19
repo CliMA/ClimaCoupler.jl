@@ -66,7 +66,7 @@ end
 
 # file-specific
 """
-    clean_sst(SIC, _info) 
+    clean_sic(SIC, _info) 
 Ensures that the space of the SIC struct matches that of the mask, and converts the units from area % to area fraction. 
 """
 

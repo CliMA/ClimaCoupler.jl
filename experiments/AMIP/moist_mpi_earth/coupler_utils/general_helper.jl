@@ -13,7 +13,8 @@ struct CouplerSimulation{I, F, S, D, B, T, P}
     model_sims::NamedTuple
     mode::NamedTuple
     parsed_args::P
-    monthly_state_diags::NamedTuple
+    monthly_3d_diags::NamedTuple
+    monthly_2d_diags::NamedTuple
 end
 
 function swap_space!(field, new_space)

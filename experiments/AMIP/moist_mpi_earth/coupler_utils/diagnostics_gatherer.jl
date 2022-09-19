@@ -7,7 +7,7 @@
 Saves all entries in `diags` in separate HDF5 files in `output_dir`. 
 It can be callled by @calendar_callback to dump snapshots at a particular time frequency
 """
-function save_hdf5(diags::NamedTuple, date::DateTime, output_dir::String)
+function save_hdf5(diags::NamedTuple, date::DateTime, output_dir::String; name_tag = "")
     diags_names = propertynames(diags)
     diags_values = map(x -> getproperty(diags, x), diags_names)
 
@@ -18,7 +18,7 @@ function save_hdf5(diags::NamedTuple, date::DateTime, output_dir::String)
     year_month = Dates.DateTime(Dates.yearmonth(date_m1)[1], Dates.yearmonth(date_m1)[2])
 
     for (name, values) in zip(diags_names, diags_values)
-        output_file = joinpath(output_dir, "$name.monthly_" * string(year_month) * ".hdf5")
+        output_file = joinpath(output_dir, name_tag * "$name.monthly_" * string(year_month) * ".hdf5")
         hdfwriter = InputOutput.HDF5Writer(output_file)#, comms_ctx) # TODO: add MPI hdf5 after update to CA@0.4.0 
         InputOutput.HDF5.write_attribute(hdfwriter.file, "unix time", Dates.datetime2unix(year_month)) # TODO: a better way to write metadata, CMIP convention
         InputOutput.write!(hdfwriter, values, string(name))
@@ -41,4 +41,20 @@ function accumulate_diags(diags::Union{NamedTuple, Fields.Field}, diags_cache::N
     diags_cache.ct[1] += FT(1)
 
     return nothing
+end
+
+"""
+    collect_diags(cs, diags_names)
+
+collect diagnostics in diags names
+"""
+function collect_diags(cs, diags_names)
+
+    diags = (;)
+
+    for name in diags_names
+        diags = (; diags..., zip((name,), (get_var(cs, Val(name)),))...)
+    end
+
+    return diags
 end

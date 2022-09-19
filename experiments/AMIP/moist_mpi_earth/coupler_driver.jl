@@ -58,7 +58,9 @@ include("coupler_utils/masker.jl")
 include("coupler_utils/calendar_timer.jl")
 include("coupler_utils/general_helper.jl")
 include("coupler_utils/bcfile_reader.jl")
-include("coupler_utils/output_dumper.jl")
+include("coupler_utils/variable_definer.jl")
+include("coupler_utils/diagnostics_gatherer.jl")
+include("coupler_utils/offline_postprocessor.jl")
 
 # init MPI
 # include("mpi/mpi_init.jl") # rTODO: requires disabling MPI spec in ClimaAtmos 
@@ -158,10 +160,17 @@ model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, oce
 dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)])
 
 # online diagnostics
-monthly_state_diags_names = (:ρ, :ρe_tot, :ρq_tot) # TODO: extend for :uₕ and cache variables
-monthly_state_diags = (;
-    fields = NamedTuple{monthly_state_diags_names}(
-        ntuple(i -> ClimaCore.Fields.zeros(atmos_sim.domain.center_space), length(monthly_state_diags_names)),
+monthly_3d_diags_names = (:T, :u, :ρq_tot) # TODO: extend for :uₕ and cache variables
+monthly_3d_diags = (;
+    fields = NamedTuple{monthly_3d_diags_names}(
+        ntuple(i -> ClimaCore.Fields.zeros(atmos_sim.domain.center_space), length(monthly_3d_diags_names)),
+    ),
+    ct = [0],
+)
+monthly_2d_diags_names = (:precipitation, :toa, :T_sfc) # TODO: extend for :uₕ and cache variables
+monthly_2d_diags = (;
+    fields = NamedTuple{monthly_2d_diags_names}(
+        ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(monthly_2d_diags_names)),
     ),
     ct = [0],
 )
@@ -178,7 +187,8 @@ cs = CouplerSimulation(
     model_sims,
     mode_specifics,
     parsed_args,
-    monthly_state_diags,
+    monthly_3d_diags,
+    monthly_2d_diags,
 );
 
 include("./push_pull.jl")
@@ -229,14 +239,21 @@ function solve_coupler!(cs, energy_check)
 
 
             # accumulate data at each timestep
-            accumulate_diags(atmos_sim.integrator.u.c, cs.monthly_state_diags)
+            accumulate_diags(collect_diags(cs, propertynames(cs.monthly_3d_diags.fields)), cs.monthly_3d_diags)
+            accumulate_diags(collect_diags(cs, propertynames(cs.monthly_2d_diags.fields)), cs.monthly_2d_diags)
 
             # save and reset monthly averages
             @calendar_callback :(
-                map(x -> x ./= cs.monthly_state_diags.ct[1], cs.monthly_state_diags.fields),
-                save_hdf5(cs.monthly_state_diags.fields, cs.dates.date[1], COUPLER_OUTPUT_DIR),
-                map(x -> x .= FT(0), cs.monthly_state_diags.fields),
-                cs.monthly_state_diags.ct .= FT(0),
+                map(x -> x ./= cs.monthly_3d_diags.ct[1], cs.monthly_3d_diags.fields),
+                save_hdf5(cs.monthly_3d_diags.fields, cs.dates.date[1], COUPLER_OUTPUT_DIR, name_tag = "3d_"),
+                map(x -> x .= FT(0), cs.monthly_3d_diags.fields),
+                cs.monthly_3d_diags.ct .= FT(0),
+            ) cs.dates.date[1] cs.dates.date1[1]
+            @calendar_callback :(
+                map(x -> x ./= cs.monthly_2d_diags.ct[1], cs.monthly_2d_diags.fields),
+                save_hdf5(cs.monthly_2d_diags.fields, cs.dates.date[1], COUPLER_OUTPUT_DIR, name_tag = "2d_"),
+                map(x -> x .= FT(0), cs.monthly_2d_diags.fields),
+                cs.monthly_2d_diags.ct .= FT(0),
             ) cs.dates.date[1] cs.dates.date1[1]
 
         end
@@ -300,15 +317,36 @@ if parsed_args["anim"]
     plot_anim(cs, COUPLER_OUTPUT_DIR * "_artifacts")
 end
 
-# unit tests (to be moved to `test/`)
+# # unit tests (to be moved to `test/`)
 if cs.mode.name == "amip"
     @info "Unit Tests"
     include("coupler_utils/unit_tester.jl")
 end
 
+# # plotting AMIP results
+if cs.mode.name == "amip"
+    include("coupler_utils/amip_visualizer.jl")
+    plot_spec = (;
+        T = (:regridded_3d, :zonal_mean),
+        u = (:regridded_3d, :zonal_mean),
+        ρq_tot = (:regridded_3d, :zonal_mean),
+        toa = (:regridded_2d, :horizontal_2d),
+        precipitation = (:regridded_2d, :horizontal_2d),
+        T_sfc = (:regridded_2d, :horizontal_2d),
+    )
+    amip_paperplots(
+        plot_spec,
+        COUPLER_OUTPUT_DIR,
+        files_root = ".monthly",
+        output_dir = COUPLER_OUTPUT_DIR * "_artifacts",
+    )
+end
+
 # Cleanup temporary files
 # TODO: Where should this live?
+
 rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
+
 # - cs needs to be global for the monthly macro - explote other solutions
 # - SST_init is modified with SST_info even with deepcopy...
 # - replace if statements with dipatches, write better abstractions

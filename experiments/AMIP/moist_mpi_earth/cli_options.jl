@@ -162,7 +162,7 @@ function parse_commandline()
         "--h_elem"
         help = "number of elements per edge on a cubed sphere"
         arg_type = Int
-        default = 4
+        default = 6
         "--z_elem"
         help = "number of vertical elements"
         arg_type = Int

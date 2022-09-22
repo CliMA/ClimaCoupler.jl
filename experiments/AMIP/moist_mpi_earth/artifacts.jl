@@ -6,7 +6,6 @@ import ClimaCoupler
 function sst_dataset_path()
     sst_dataset = AW.ArtifactWrapper(
         @__DIR__,
-        isempty(get(ENV, "CI", "")),
         "sst",
         AW.ArtifactFile[AW.ArtifactFile(
             url = "https://caltech.box.com/shared/static/8gd3wjq2dbrnzuv8pd5ww3a54h0kkcz8.nc",
@@ -19,7 +18,6 @@ end
 function sic_dataset_path()
     sic_dataset = AW.ArtifactWrapper(
         @__DIR__,
-        isempty(get(ENV, "CI", "")),
         "sic",
         AW.ArtifactFile[AW.ArtifactFile(
             url = "https://caltech.box.com/shared/static/n0omgqkmnwpr9gylhixew8ywb4psgvj4.nc",
@@ -32,7 +30,6 @@ end
 function mask_dataset_path()
     mask_dataset = AW.ArtifactWrapper(
         @__DIR__,
-        isempty(get(ENV, "CI", "")),
         "land_mask",
         AW.ArtifactFile[AW.ArtifactFile(
             url = "https://caltech.box.com/shared/static/vubmq84nhvbgdqayezguf3i1w6nqtwvu.ncc",

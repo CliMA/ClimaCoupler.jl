@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.8.1"
+julia_version = "1.8.0"
 manifest_format = "2.0"
-project_hash = "0e3d78e6afdaf29cf5d4fcab95e81d9caac2ce19"
+project_hash = "297acf91c05d05cf24519686dc180a37624c0d69"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -279,6 +279,12 @@ deps = ["DocStringExtensions", "SpecialFunctions", "Thermodynamics"]
 git-tree-sha1 = "94f59648aba35a011e94670efc9cb6b7c7bb28fb"
 uuid = "6a9e3e04-43cd-43ba-94b9-e8782df3c71b"
 version = "0.8.2"
+
+[[deps.CodeTracking]]
+deps = ["InteractiveUtils", "UUIDs"]
+git-tree-sha1 = "1833bda4a027f4b2a1c984baddcf755d77266818"
+uuid = "da1fd8a2-8d9e-5ec2-8556-3022fb5608a2"
+version = "1.1.0"
 
 [[deps.CodecZlib]]
 deps = ["TranscodingStreams", "Zlib_jll"]
@@ -876,6 +882,12 @@ git-tree-sha1 = "b53380851c6e6664204efb2e62cd24fa5c47e4ba"
 uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
 version = "2.1.2+0"
 
+[[deps.JuliaInterpreter]]
+deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
+git-tree-sha1 = "0f960b1404abb0b244c1ece579a0ec78d056a5d1"
+uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
+version = "0.9.15"
+
 [[deps.JuliaVariables]]
 deps = ["MLStyle", "NameResolution"]
 git-tree-sha1 = "49fb3cb53362ddadb4415e9b73926d6b40709e70"
@@ -1062,6 +1074,12 @@ deps = ["ArrayInterface", "CPUSummary", "ChainRulesCore", "CloseOpenIntervals", 
 git-tree-sha1 = "4392c19f0203df81512b6790a0a67446650bdce0"
 uuid = "bdcacae8-1622-11e9-2a5c-532679323890"
 version = "0.12.110"
+
+[[deps.LoweredCodeUtils]]
+deps = ["JuliaInterpreter"]
+git-tree-sha1 = "dedbebe234e06e1ddad435f5c6f4b85cd8ce55f7"
+uuid = "6f1432cf-f94c-5a45-995e-cdbf5db27b0b"
+version = "2.2.2"
 
 [[deps.MKL_jll]]
 deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "Pkg"]
@@ -1534,6 +1552,12 @@ git-tree-sha1 = "256eeeec186fa7f26f2801732774ccf277f05db9"
 uuid = "ae5879a3-cd67-5da8-be7f-38c6eb64a37b"
 version = "1.1.1"
 
+[[deps.Revise]]
+deps = ["CodeTracking", "Distributed", "FileWatching", "JuliaInterpreter", "LibGit2", "LoweredCodeUtils", "OrderedCollections", "Pkg", "REPL", "Requires", "UUIDs", "Unicode"]
+git-tree-sha1 = "dad726963ecea2d8a81e26286f625aee09a91b7c"
+uuid = "295af30f-e4ad-537b-8983-00126c2a3abe"
+version = "3.4.0"
+
 [[deps.Richardson]]
 deps = ["LinearAlgebra"]
 git-tree-sha1 = "e03ca566bec93f8a3aeb059c8ef102f268a38949"
@@ -1828,9 +1852,9 @@ version = "0.3.0"
 
 [[deps.TriangularSolve]]
 deps = ["CloseOpenIntervals", "IfElse", "LayoutPointers", "LinearAlgebra", "LoopVectorization", "Polyester", "SnoopPrecompile", "Static", "VectorizationBase"]
-git-tree-sha1 = "8987cf4a0f8d6c375e4ab1438a048e0a185151e4"
+git-tree-sha1 = "fdddcf6b2c7751cd97de69c18157aacc18fbc660"
 uuid = "d5829a12-d9aa-46ab-831f-fb7c9ab06edf"
-version = "0.1.13"
+version = "0.1.14"
 
 [[deps.TriplotBase]]
 git-tree-sha1 = "4d4ed7f294cda19382ff7de4c137d24d16adc89b"
@@ -1839,9 +1863,9 @@ version = "0.1.0"
 
 [[deps.Tullio]]
 deps = ["ChainRulesCore", "DiffRules", "LinearAlgebra", "Requires"]
-git-tree-sha1 = "859e2e9a7222553a0c052e423557cedb49376da9"
+git-tree-sha1 = "7871a39eac745697ee512a87eeff06a048a7905b"
 uuid = "bc48ee85-29a4-5162-ae0b-a64e1601d4bc"
-version = "0.3.4"
+version = "0.3.5"
 
 [[deps.TurbulenceConvection]]
 deps = ["ClimaCore", "CloudMicrophysics", "Dierckx", "Distributions", "DocStringExtensions", "FastGaussQuadrature", "Flux", "LambertW", "LinearAlgebra", "OperatorFlux", "Random", "SciMLBase", "StaticArrays", "StatsBase", "StochasticDiffEq", "SurfaceFluxes", "Thermodynamics", "UnPack"]

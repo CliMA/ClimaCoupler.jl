@@ -22,10 +22,6 @@ end
      check_conservation(
         cc::OnlineConservationCheck,
         coupler_sim,
-        atmos_sim,
-        land_sim = nothing,
-        ocean_sim = nothing,
-        seaice_sim = nothing,
         radiation = true,
         )
 
@@ -34,37 +30,39 @@ of the coupled simulations, and updates cc with the values.
 
 Note: in the future this should not use ``push!``.
 """
-function check_conservation(
-    cc::OnlineConservationCheck,
-    coupler_sim,
-    atmos_sim,
-    land_sim = nothing,
-    ocean_sim = nothing,
-    seaice_sim = nothing,
-    radiation = true,
-)
-    @assert seaice_sim != nothing
+function check_conservation(cc::OnlineConservationCheck, coupler_sim)
+    @unpack model_sims, surface_masks = cs
+    @unpack atmos_sim, land_sim, ocean_sim, ice_sim = model_sims
+    radiation = model_spec.radiation_model # TODO: take out of global scope in ClimaAtmos
+
+    @assert ice_sim != nothing
     @assert atmos_sim != nothing
-    FT = eltype(coupler_sim.land_mask)
+
+    FT = eltype(coupler_sim.surface_masks.land)
 
     u_atm = atmos_sim.integrator.u.c.ρe_tot
+
     if land_sim !== nothing
         e_per_area_land = zeros(axes(land_sim.integrator.u.bucket.W))
         get_land_energy(land_sim, e_per_area_land)
     end
 
     u_ocn = ocean_sim !== nothing ? swap_space!(ocean_sim.integrator.u.T_sfc, coupler_sim.boundary_space) : nothing
-    u_ice = seaice_sim !== nothing ? swap_space!(seaice_sim.integrator.u.T_sfc, coupler_sim.boundary_space) : nothing
+    u_ice = ice_sim !== nothing ? swap_space!(ice_sim.integrator.u.T_sfc, coupler_sim.boundary_space) : nothing
 
     # global sums
     atmos_e = sum(u_atm)
 
-    if radiation
+    if radiation != nothing
         face_space = axes(atmos_sim.integrator.u.f)
         z = parent(Fields.coordinate_field(face_space).z)
-        Δz_top = FT(0.5) * (z[end, 1, 1, 1, 1] - z[end - 1, 1, 1, 1, 1])
+        Δz_top = round(FT(0.5) * (z[end, 1, 1, 1, 1] - z[end - 1, 1, 1, 1, 1]))
         n_faces = length(z[:, 1, 1, 1, 1])
 
+        LWd_TOA = Fields.level(
+            array2field(FT.(atmos_sim.integrator.p.rrtmgp_model.face_lw_flux_dn), face_space),
+            n_faces - half,
+        )
         LWu_TOA = Fields.level(
             array2field(FT.(atmos_sim.integrator.p.rrtmgp_model.face_lw_flux_up), face_space),
             n_faces - half,
@@ -78,41 +76,34 @@ function check_conservation(
             n_faces - half,
         )
 
-        radiation_sources = -sum(SWd_TOA .- LWu_TOA .- SWu_TOA) ./ Δz_top
+        radiation_sources = -sum(LWd_TOA .+ SWd_TOA .- LWu_TOA .- SWu_TOA) ./ Δz_top
         radiation_sources_accum =
             size(cc.toa_net_source)[1] > 0 ? cc.toa_net_source[end] + radiation_sources .* coupler_sim.Δt_cpl :
             radiation_sources .* coupler_sim.Δt_cpl# accumulated radiation sources + sinks
         push!(cc.toa_net_source, radiation_sources_accum)
     end
 
-
     # Save atmos
     push!(cc.ρe_tot_atmos, atmos_e)
 
-    # Surface masks
-    univ_mask = parent(coupler_sim.land_mask) .- parent(seaice_sim.integrator.p.Ya.ice_mask .* FT(2))
-    land_mask(u_lnd_1, univ_mask) = (univ_mask ≈ FT(1) ? u_lnd_1 : FT(0))
-    ice_mask(u_ice_1, univ_mask) = (univ_mask ≈ FT(-2) ? u_ice_1 : FT(0))
-    ocean_mask(u_ocn_1, univ_mask) = (univ_mask ≈ FT(0) ? u_ocn_1 : FT(0))
-
     # Save land
-    parent(e_per_area_land) .= land_mask.(parent(e_per_area_land), univ_mask)
+    parent(e_per_area_land) .= parent(e_per_area_land .* surface_masks.land)
     land_e = land_sim !== nothing ? sum(e_per_area_land) : FT(0)
     push!(cc.ρe_tot_land, land_e)
 
-    parent(u_ice) .= ice_mask.(parent(u_ice), univ_mask)
-    seaice_e = seaice_sim !== nothing ? sum(get_slab_energy(seaice_sim, u_ice)) : FT(0)
+    # Save sea ice
+    parent(u_ice) .= parent(u_ice .* surface_masks.ice)
+    seaice_e = ice_sim !== nothing ? sum(get_slab_energy(ice_sim, u_ice)) : FT(0)
     push!(cc.ρe_tot_seaice, seaice_e)
 
+    # Save ocean
     if ocean_sim != nothing
-        parent(u_ocn) .= ocean_mask.(parent(u_ocn), univ_mask)
+        parent(u_ocn) .= parent(u_ocn .* surface_masks.ocean)
         ocean_e = sum(get_slab_energy(ocean_sim, u_ocn))
     else
         ocean_e = FT(0)
     end
-
     push!(cc.ρe_tot_ocean, ocean_e)
-
 
 end
 
@@ -165,4 +156,6 @@ function plot_global_energy(cc, coupler_sim, figname1 = "total_energy.png", fign
         ylabel = "log( | e(t) - e(t=0)| / e(t=0))",
     )
     Plots.savefig(figname2)
+
+    @assert abs(tot[end] - tot[1]) < tot[end] * 1e-4 # TODO make this more stringent once small errors resolved
 end

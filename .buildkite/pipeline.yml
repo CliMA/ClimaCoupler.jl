@@ -42,11 +42,11 @@ steps:
       #   artifact_paths: "test/*"
 
       - label: "Moist earth with slab surface"
-        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --energy_check=true --mode_name=slabplanet --t_end=10000secs --dt_save_to_sol=200secs --dt_cpl=200"
+        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --energy_check=true --mode_name=slabplanet --t_end=10days --dt_save_to_sol=3600secs --dt_cpl=200 --mono_surface=true"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet_artifacts/total_energy*.png"
 
       - label: "AMIP"
-        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --energy_check=false --mode_name=amip --anim=true --t_end=10000secs --dt_save_to_sol=200secs --dt_cpl=200"
+        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --energy_check=false --mode_name=amip --anim=true --t_end=32days --dt_save_to_sol=1days --dt_cpl=200 --mono_surface=false --h_elem=6"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip_artifacts/*.mp4"
 
       - label: "sea_breeze"

@@ -58,8 +58,8 @@ sublimating. That contribution has been zeroed out in the atmos fluxes.
 function ice_pull!(cs)
     ice_sim = cs.model_sims.ice_sim
     csf = cs.fields
-    @. ice_sim.integrator.p.Ya.F_aero = csf.F_A
-    @. ice_sim.integrator.p.Ya.F_rad = csf.F_R
+    @. ice_sim.integrator.p.F_aero = csf.F_A
+    @. ice_sim.integrator.p.F_rad = csf.F_R
 end
 
 """
@@ -73,6 +73,7 @@ function atmos_pull!(cs)
 
     @unpack model_sims = cs
     @unpack atmos_sim, land_sim, ocean_sim, ice_sim = model_sims
+    radiation = model_spec.radiation_model # TODO: take out of global scope in ClimaAtmos
 
     csf = cs.fields
     T_sfc_cpl = csf.T_S
@@ -91,27 +92,25 @@ function atmos_pull!(cs)
     z0b_ocean = ocean_sim.integrator.p.params.z0b
     α_ocean = ocean_sim.integrator.p.params.α
     T_ice = ice_sim.integrator.u.T_sfc
-    ice_mask = ice_sim.integrator.p.Ya.ice_mask
+    ice_mask = ice_sim.integrator.p.ice_mask
     z0m_ice = ice_sim.integrator.p.params.z0m
     z0b_ice = ice_sim.integrator.p.params.z0b
 
-    land_mask = cs.land_mask
-
-    # mask of all models (1 = land, 0 = ocean, -2 = sea ice)
-    univ_mask = parent(land_mask) .- parent(ice_mask .* FT(2))
+    update_masks(cs)
 
     # combine models' surfaces onlo one coupler field 
-    # surface temperature
     combined_field = zeros(boundary_space)
-    parent(combined_field) .= combine_surface.(FT, univ_mask, parent(T_land), parent(T_ocean), parent(T_ice))
+
+    # surface temperature
+    combine_surfaces!(combined_field, cs.surface_masks, (; land = T_land, ocean = T_ocean, ice = T_ice))
     dummmy_remap!(T_sfc_cpl, combined_field)
 
     # roughness length for momentum
-    parent(combined_field) .= combine_surface.(FT, univ_mask, z0m_land, z0m_ocean, z0m_ice)
+    combine_surfaces!(combined_field, cs.surface_masks, (; land = z0m_land, ocean = z0m_ocean, ice = z0m_ice))
     dummmy_remap!(z0m_cpl, combined_field)
 
     # roughness length for tracers
-    parent(combined_field) .= combine_surface.(FT, univ_mask, z0b_land, z0b_ocean, z0b_ice)
+    combine_surfaces!(combined_field, cs.surface_masks, (; land = z0b_land, ocean = z0b_ocean, ice = z0b_ice))
     dummmy_remap!(z0b_cpl, combined_field)
 
     # calculate atmospheric surface density 
@@ -121,24 +120,32 @@ function atmos_pull!(cs)
     ocean_q_sfc = TD.q_vap_saturation_generic.(thermo_params, T_ocean, ρ_sfc_cpl, TD.Liquid())
     sea_ice_q_sfc = TD.q_vap_saturation_generic.(thermo_params, T_ice, ρ_sfc_cpl, TD.Ice())
     land_q_sfc = get_land_q(land_sim, atmos_sim, T_land, ρ_sfc_cpl)
-    parent(combined_field) .=
-        combine_surface.(FT, univ_mask, parent(land_q_sfc), parent(ocean_q_sfc), parent(sea_ice_q_sfc))
+    combine_surfaces!(combined_field, cs.surface_masks, (; land = land_q_sfc, ocean = ocean_q_sfc, ice = sea_ice_q_sfc))
     dummmy_remap!(q_sfc_cpl, combined_field)
 
     # albedo
-    α_land = land_albedo(land_sim)
+    α_land = similar(combined_field)
+    parent(α_land) .= (land_albedo(land_sim))
+
     α_ice = ice_sim.integrator.p.params.α
-    parent(combined_field) .= combine_surface.(FT, univ_mask, α_land, α_ocean, α_ice)
+    combine_surfaces!(combined_field, cs.surface_masks, (; land = α_land, ocean = α_ocean, ice = α_ice))
     dummmy_remap!(albedo_sfc_cpl, combined_field)
-    atmos_sim.integrator.p.rrtmgp_model.diffuse_sw_surface_albedo .=
-        reshape(RRTMGPI.field2array(albedo_sfc_cpl), 1, length(parent(albedo_sfc_cpl)))
-    atmos_sim.integrator.p.rrtmgp_model.direct_sw_surface_albedo .=
-        reshape(RRTMGPI.field2array(albedo_sfc_cpl), 1, length(parent(albedo_sfc_cpl)))
+
+    if radiation != nothing
+        atmos_sim.integrator.p.rrtmgp_model.diffuse_sw_surface_albedo .=
+            reshape(RRTMGPI.field2array(albedo_sfc_cpl), 1, length(parent(albedo_sfc_cpl)))
+        atmos_sim.integrator.p.rrtmgp_model.direct_sw_surface_albedo .=
+            reshape(RRTMGPI.field2array(albedo_sfc_cpl), 1, length(parent(albedo_sfc_cpl)))
+        atmos_sim.integrator.p.rrtmgp_model.surface_temperature .= RRTMGPI.field2array(T_sfc_cpl)
+    end
 
     # calculate turbulent fluxes on atmos grid and save in atmos cache
     info_sfc =
         (; T_sfc = T_sfc_cpl, ρ_sfc = ρ_sfc_cpl, q_sfc = q_sfc_cpl, z0m = z0m_cpl, z0b = z0b_cpl, ice_mask = ice_mask)
     calculate_surface_fluxes_atmos_grid!(atmos_sim.integrator, info_sfc)
 
-    atmos_sim.integrator.p.rrtmgp_model.surface_temperature .= RRTMGPI.field2array(T_sfc_cpl)
+end
+
+function atmos_pull!(cs, surfces)
+    # placehoolder: add method to calculate fluxes above individual surfaces and then split fluxes (separate PR)
 end

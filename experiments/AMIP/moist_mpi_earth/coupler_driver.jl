@@ -9,10 +9,9 @@ import Test: @test
 using ClimaCore.Utilities: half, PlusHalf
 using ClimaCore: InputOutput
 using Dates
+using UnPack
 
 using Pkg
-#Pkg.add(PackageSpec(name = "ClimaAtmos", rev = "ln/checkpoint_v030")) # remove when ClimaAtmos@0.4.0 is released
-#Pkg.add(PackageSpec(name = "ClimaCore", rev = "6a2baa1fa6b2422691786986eecd77909c8f136b")) # remove when ClimaAtmos@0.4.0 is released
 
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
@@ -27,6 +26,7 @@ tspan = (0, t_end)
 Δt_cpl = FT(parsed_args["dt_cpl"])
 saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
 date0 = date = DateTime(1979, 01, 01)
+mono_surface = parsed_args["mono_surface"]
 
 # overwrite some parsed args
 parsed_args["coupled"] = true
@@ -45,6 +45,7 @@ import ClimaCoupler
 pkg_dir = pkgdir(ClimaCoupler)
 COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth/output", mode_name)
 isdir(COUPLER_OUTPUT_DIR) ? nothing : mkpath(COUPLER_OUTPUT_DIR)
+REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp/")
 
 # get the paths to the necessary data files - land sea mask, sst map, sea ice concentration
 include("artifacts.jl")
@@ -60,7 +61,7 @@ include("coupler_utils/bcfile_reader.jl")
 include("coupler_utils/output_dumper.jl")
 
 # init MPI
-# include("mpi/mpi_init.jl")
+# include("mpi/mpi_init.jl") # rTODO: requires disabling MPI spec in ClimaAtmos 
 
 # init atmos model component
 include("atmos/atmos_init.jl")
@@ -70,10 +71,10 @@ atmos_sim = atmos_init(FT, Y, integrator, params = params);
 boundary_space = atmos_sim.domain.face_space.horizontal_space # global surface grid
 
 # init land-sea mask
-land_mask = LandSeaMask(FT, mask_data, "LSMASK", boundary_space)
+
+land_mask = LandSeaMask(FT, mask_data, "LSMASK", boundary_space, mono = mono_surface)
 
 # init surface (slab) model components
-# we need some types that are defined in these files
 include("slab/slab_utils.jl")
 include("bucket/bucket_init.jl")
 include("slab/slab_init.jl")
@@ -83,6 +84,7 @@ include("slab_ice/slab_init.jl")
 land_sim =
     bucket_init(FT, FT.(tspan), parsed_args["config"]; dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat))
 
+@info mode_name
 if mode_name == "amip"
     println("No ocean sim - do not expect energy conservation")
 
@@ -93,14 +95,21 @@ if mode_name == "amip"
         "SST",
         boundary_space,
         interpolate_daily = true,
-        scaling_function = clean_sst,
+        scaling_function = clean_sst, # convert to K
         land_mask = land_mask,
         date0 = date0,
+        mono = mono_surface,
     )
     update_midmonth_data!(date0, SST_info)
     SST_init = interpolate_midmonth_to_daily(date0, SST_info)
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
-    ocean_sim = (; integrator = (; u = (; T_sfc = SST_init), p = (; params = ocean_params), SST_info = SST_info))
+    ocean_sim = (;
+        integrator = (;
+            u = (; T_sfc = SST_init),
+            p = (; params = ocean_params, ocean_mask = (FT(1) .- land_mask)),
+            SST_info = SST_info,
+        )
+    )
 
     # sea ice
     SIC_info = bcfile_info_init(
@@ -109,25 +118,33 @@ if mode_name == "amip"
         "SEAICE",
         boundary_space,
         interpolate_daily = false,
-        scaling_function = clean_sic,
+        scaling_function = clean_sic, # convert to fractions
         land_mask = land_mask,
         date0 = date0,
+        mono = mono_surface,
     )
     update_midmonth_data!(date0, SIC_info)
     SIC_init = interpolate_midmonth_to_daily(date0, SIC_info)
-    ice_mask = get_ice_mask.(SIC_init, FT) # here 50% and lower is considered ice free
+    ice_mask = get_ice_mask.(SIC_init, mono_surface)
     ice_sim = ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info)
 
 elseif mode_name == "slabplanet"
     # slab ocean for slabplanet runs
-    ocean_sim =
-        ocean_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, land_mask = land_mask)
+    # NB: ocean mask includes areas covered by sea ice
+    ocean_sim = ocean_init(
+        FT;
+        tspan = tspan,
+        dt = Δt_cpl,
+        space = boundary_space,
+        saveat = saveat,
+        ocean_mask = (FT(1) .- land_mask),
+    )
 
     ice_sim = (;
         integrator = (;
-            u = (; T_sfc = ClimaCore.Fields.zeros(boundary_space)),
-            p = (; params = ocean_sim.params, Ya = (; ice_mask = ClimaCore.Fields.zeros(boundary_space))),
+            u = (; T_sfc = ClimaCore.Fields.ones(boundary_space)),
+            p = (; params = ocean_sim.params, ice_mask = ClimaCore.Fields.zeros(boundary_space)),
         )
     )
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
@@ -137,7 +154,7 @@ end
 coupler_field_names = (:T_S, :z0m_S, :z0b_S, :ρ_sfc, :q_sfc, :albedo, :F_A, :F_E, :F_R, :P_liq, :P_snow)
 coupler_fields =
     NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
-model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim)
+model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim);
 dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)])
 
 # online diagnostics
@@ -156,7 +173,7 @@ cs = CouplerSimulation(
     dates,
     boundary_space,
     FT,
-    land_mask,
+    (; land = land_mask, ocean = zeros(boundary_space), ice = zeros(boundary_space)),
     coupler_fields,
     model_sims,
     mode_specifics,
@@ -178,7 +195,7 @@ mode_name == "slabplanet" ? (ocean_pull!(cs), reinit!(ocean_sim.integrator)) : n
 
 if !simulation.is_distributed && energy_check && mode_name == "slabplanet"
     conservation_check = OnlineConservationCheck([], [], [], [], [], [])
-    check_conservation(conservation_check, cs, atmos_sim, land_sim, ocean_sim, ice_sim)
+    check_conservation(conservation_check, cs)
 end
 
 # coupling loop
@@ -207,7 +224,9 @@ function solve_coupler!(cs, energy_check)
                 cs.mode.SIC_info,
             )
             SIC = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info)
-            ice_mask = ice_sim.integrator.p.Ya.ice_mask .= get_ice_mask.(SIC, FT)
+
+            ice_mask = ice_sim.integrator.p.ice_mask .= get_ice_mask.(SIC_init, mono_surface)
+
 
             # accumulate data at each timestep
             accumulate_diags(atmos_sim.integrator.u.c, cs.monthly_state_diags)
@@ -246,7 +265,7 @@ function solve_coupler!(cs, energy_check)
 
         ## compute energy
         if !simulation.is_distributed && energy_check && cs.mode.name == "slabplanet"
-            check_conservation(conservation_check, cs, atmos_sim, land_sim, ocean_sim, ice_sim)
+            check_conservation(conservation_check, cs)
         end
 
         ## step to next calendar month
@@ -265,6 +284,7 @@ solve_coupler!(cs, energy_check);
 isdir(COUPLER_OUTPUT_DIR * "_artifacts") ? nothing : mkpath(COUPLER_OUTPUT_DIR * "_artifacts")
 
 if energy_check && cs.mode.name == "slabplanet"
+    @info "Energy Check"
     plot_global_energy(
         conservation_check,
         cs,
@@ -275,12 +295,14 @@ end
 
 # # animations
 if parsed_args["anim"]
+    @info "Animations"
     include("coupler_utils/viz_explorer.jl")
     plot_anim(cs, COUPLER_OUTPUT_DIR * "_artifacts")
 end
 
 # unit tests (to be moved to `test/`)
 if cs.mode.name == "amip"
+    @info "Unit Tests"
     include("coupler_utils/unit_tester.jl")
 end
 
@@ -290,3 +312,5 @@ rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
 # - cs needs to be global for the monthly macro - explote other solutions
 # - SST_init is modified with SST_info even with deepcopy...
 # - replace if statements with dipatches, write better abstractions
+# - add spin up for AMIP
+# - do nothing for the parts of the domain that are masked out - aware of MPI and fracitonal surfaces  

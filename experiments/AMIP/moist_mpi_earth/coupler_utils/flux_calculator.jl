@@ -70,7 +70,7 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     if :ρe_tot in propertynames(Y.c)
 
         flux_energy = ones(axes(dif_flux_energy))
-        parent(flux_energy) .= parent(tsf.shf .+ tsf.lhf .* swap_space!(abs.(ice_mask .- FT(1)), axes(tsf.shf)))  # only SHF above sea ice
+        parent(flux_energy) .= parent(tsf.shf .+ tsf.lhf .* swap_space!(FT(1) .- ice_mask, axes(tsf.shf)))  # only SHF above sea ice
         @. dif_flux_energy = Geometry.WVector(flux_energy) #Geometry.WVector.(swap_space!(tsf.shf .+ tsf.lhf, axes(dif_flux_energy)) )
     end
 
@@ -78,7 +78,7 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     # Moisture mass flux
     if :ρq_tot in propertynames(Y.c)
         flux_mass = ones(axes(dif_flux_ρq_tot))
-        parent(flux_mass) .= parent(tsf.E .* swap_space!(abs.(ice_mask .- FT(1)), axes(tsf.E)))
+        parent(flux_mass) .= parent(tsf.E .* swap_space!(FT(1) .- ice_mask, axes(tsf.E)))
         @. dif_flux_ρq_tot = Geometry.WVector(flux_mass) # no E above sea ice
     end
 

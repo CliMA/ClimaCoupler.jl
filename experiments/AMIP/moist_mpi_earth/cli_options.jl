@@ -18,6 +18,10 @@ function parse_commandline()
         help = "Mode of coupled simulation. [`amip`, `slabplanet`]"
         arg_type = String
         default = "amip"
+        "--mono_surface"
+        help = "Boolean flag indicating whether (1st order) monotone and conservative remapping is applied."
+        arg_type = Bool
+        default = false
         "--FLOAT_TYPE"
         help = "Float type"
         arg_type = String

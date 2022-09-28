@@ -2,6 +2,7 @@ import ArgParse
 function parse_commandline()
     s = ArgParse.ArgParseSettings()
     ArgParse.@add_arg_table s begin
+        # ClimaCoupler flags
         "--dt_cpl"
         help = " Coupling time step in seconds"
         arg_type = Int
@@ -22,6 +23,7 @@ function parse_commandline()
         help = "Boolean flag indicating whether (1st order) monotone and conservative remapping is applied."
         arg_type = Bool
         default = false
+        # ClimaAtmos flags
         "--FLOAT_TYPE"
         help = "Float type"
         arg_type = String
@@ -33,7 +35,7 @@ function parse_commandline()
         "--dt"
         help = "Simulation time step. Examples: [`10secs`, `1hours`]"
         arg_type = String
-        default = "400secs"
+        default = "600secs"
         "--dt_save_to_sol"
         help = "Time between saving solution. Examples: [`10days`, `1hours`, `Inf` (do not save)]"
         arg_type = String
@@ -69,11 +71,11 @@ function parse_commandline()
         arg_type = Bool
         default = false
         "--surface_scheme"
-        help = "Surface flux scheme [`bulk` (default), `monin_obukhov`]"
+        help = "Surface flux scheme [`nothing` (default), `bulk`, `monin_obukhov`]"
         arg_type = String
         default = "bulk"
         "--C_E"
-        help = "Buld transfer coefficient"
+        help = "Bulk transfer coefficient"
         arg_type = Float64
         default = Float64(0.0044)
         "--coupled"
@@ -113,6 +115,10 @@ function parse_commandline()
         help = "Energy variable name [`rhoe` (default), `rhoe_int` , `rhotheta`]"
         arg_type = String
         default = "rhoe"
+        "--perturb_initstate"
+        help = "Add a perturbation to the initial condition [`false`, `true` (default)]"
+        arg_type = Bool
+        default = true
         "--energy_upwinding"
         help = "Energy upwinding mode [`none` (default), `first_order` , `third_order`, `boris_book`, `zalesak`]"
         arg_type = Symbol
@@ -122,13 +128,13 @@ function parse_commandline()
         arg_type = Symbol
         default = :none # TODO: change to :zalesak
         "--ode_algo"
-        help = "ODE algorithm [`ARS343`, `IMKG343a`, `ODE.Euler`, `ODE.IMEXEuler`, `ODE.Rosenbrock23` (default), etc.]"
+        help = "ODE algorithm [`ARS343` (default), `IMKG343a`, `ODE.Euler`, `ODE.IMEXEuler`, `ODE.Rosenbrock23`, etc.]"
         arg_type = String
-        default = "ODE.Rosenbrock23"
+        default = "ARS343"
         "--max_newton_iters"
         help = "Maximum number of Newton's method iterations (only for ODE algorithms that use Newton's method)"
         arg_type = Int
-        default = 3
+        default = 1
         "--split_ode"
         help = "Use split of ODE problem. Examples: [`true` (implicit, default), `false` (explicit)]"
         arg_type = Bool
@@ -150,7 +156,7 @@ function parse_commandline()
         "--trunc_stack_traces"
         help = "Set to `true` to truncate printing of ClimaCore `Field`s"
         arg_type = Bool
-        default = false
+        default = true
         "--fps"
         help = "Frames per second for animations"
         arg_type = Int
@@ -168,7 +174,7 @@ function parse_commandline()
         arg_type = Int
         default = 10
         "--nh_poly"
-        help = "Horizontal polynomial order"
+        help = "Horizontal polynomial degree. Note: The number of quadrature points in 1D within each horizontal element is then Nq = <--nh_poly> + 1"
         arg_type = Int
         default = 3
         "--z_max"

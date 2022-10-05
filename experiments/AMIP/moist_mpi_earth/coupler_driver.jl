@@ -13,6 +13,8 @@ using UnPack
 
 using Pkg
 
+Pkg.add(PackageSpec(name = "ClimaTimeSteppers", rev = "557670a90fb1505e9490b0c49e75f419bae8f915"))
+
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
 
@@ -205,10 +207,10 @@ atmos_push!(cs)
 land_pull!(cs)
 
 # reinitialize (TODO: avoid with interfaces)
-reinit!(atmos_sim.integrator)
-reinit!(land_sim.integrator)
-mode_name == "amip" ? (ice_pull!(cs), reinit!(ice_sim.integrator)) : nothing
-mode_name == "slabplanet" ? (ocean_pull!(cs), reinit!(ocean_sim.integrator)) : nothing
+# reinit!(atmos_sim.integrator)
+# reinit!(land_sim.integrator)
+# mode_name == "amip" ? (ice_pull!(cs), reinit!(ice_sim.integrator)) : nothing
+# mode_name == "slabplanet" ? (ocean_pull!(cs), reinit!(ocean_sim.integrator)) : nothing
 
 # init conservation info collector
 if !simulation.is_distributed && energy_check && mode_name == "slabplanet"

@@ -130,7 +130,7 @@ function parse_commandline()
         "--ode_algo"
         help = "ODE algorithm [`ARS343` (default), `IMKG343a`, `ODE.Euler`, `ODE.IMEXEuler`, `ODE.Rosenbrock23`, etc.]"
         arg_type = String
-        default = "ODE.Rosenbrock23"
+        default = "ARS343"
         "--max_newton_iters"
         help = "Maximum number of Newton's method iterations (only for ODE algorithms that use Newton's method)"
         arg_type = Int

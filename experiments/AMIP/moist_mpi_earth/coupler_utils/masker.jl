@@ -7,6 +7,28 @@ function LandSeaMask(FT, infile, varname, boundary_space; outfile = "land_sea_cg
 end
 
 """
+    update_masks(cs)
+
+Updates dynamically changing masks. 
+"""
+function update_masks(cs)
+
+    # dynamic masks
+    ice_d = cs.model_sims.ice_sim.integrator.p.ice_mask
+    FT = eltype(ice_d)
+
+    # static mask
+    land_s = cs.surface_masks.land
+
+    cs.surface_masks.ice .= min.(ice_d .+ land_s, FT(1)) .- land_s
+    cs.surface_masks.ocean .= (FT(1) .- cs.surface_masks.ice .- land_s)
+
+    @assert minimum(cs.surface_masks.ice) >= FT(0)
+    @assert minimum(cs.surface_masks.land) >= FT(0)
+    @assert minimum(cs.surface_masks.ocean) >= FT(0)
+end
+
+"""
     binary_mask(var::FT; threshold = 0.5)
 
 Converts a number to 1 or 0 of the same type, based on a threashold. 

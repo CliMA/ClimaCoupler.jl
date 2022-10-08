@@ -9,6 +9,7 @@ struct OnlineConservationCheck{A} <: AbstractCheck
     ρe_tot_seaice::A
     toa_net_source::A
     ice_base_source::A
+    friction_sink::A
 end
 
 function array2field(array, space) # reversing the RRTMGP function field2array (TODO: this now exists in ClimaAtmos)
@@ -53,6 +54,7 @@ function check_conservation(cc::OnlineConservationCheck, coupler_sim)
     # global sums
     atmos_e = sum(u_atm)
 
+    # save radiation source
     if radiation != nothing
         face_space = axes(atmos_sim.integrator.u.f)
         z = parent(Fields.coordinate_field(face_space).z)
@@ -83,20 +85,20 @@ function check_conservation(cc::OnlineConservationCheck, coupler_sim)
         push!(cc.toa_net_source, radiation_sources_accum)
     end
 
-    # Save atmos
+    # save atmos
     push!(cc.ρe_tot_atmos, atmos_e)
 
-    # Save land
+    # save land
     parent(e_per_area_land) .= parent(e_per_area_land .* surface_masks.land)
     land_e = land_sim !== nothing ? sum(e_per_area_land) : FT(0)
     push!(cc.ρe_tot_land, land_e)
 
-    # Save sea ice
+    # save sea ice
     parent(u_ice) .= parent(u_ice .* surface_masks.ice)
     seaice_e = ice_sim !== nothing ? sum(get_slab_energy(ice_sim, u_ice)) : FT(0)
     push!(cc.ρe_tot_seaice, seaice_e)
 
-    # Save ocean
+    # save ocean
     if ocean_sim != nothing
         parent(u_ocn) .= parent(u_ocn .* surface_masks.ocean)
         ocean_e = sum(get_slab_energy(ocean_sim, u_ocn))
@@ -105,6 +107,19 @@ function check_conservation(cc::OnlineConservationCheck, coupler_sim)
     end
     push!(cc.ρe_tot_ocean, ocean_e)
 
+    # save surface friction sink
+    push!(cc.friction_sink, sum((ke_dissipation(atmos_sim)) .* coupler_sim.Δt_cpl)) # ρ d ke_friction / dt 
+
+end
+function ke_dissipation(sim)
+    drag_uv =
+        .-Geometry.UVVector.(
+            Geometry.Covariant12Vector.(
+                sim.integrator.p.dif_flux_uₕ_bc.components.data.:1,
+                sim.integrator.p.dif_flux_uₕ_bc.components.data.:2,
+            )
+        )
+    dot.(Geometry.UVVector.(level(sim.integrator.u.c.uₕ, 1)), drag_uv) .* level(sim.integrator.u.c.ρ, 1)
 end
 
 import Plots
@@ -129,6 +144,7 @@ function plot_global_energy(cc, coupler_sim, figname1 = "total_energy.png", fign
     diff_ρe_tot_slab = (cc.ρe_tot_land .- cc.ρe_tot_land[1])
     diff_ρe_tot_slab_seaice = (cc.ρe_tot_seaice .- cc.ρe_tot_seaice[1])
     diff_toa_net_source = (cc.toa_net_source .- cc.toa_net_source[1])
+    # diff_friction_sink = (cc.friction_sink .- cc.friction_sink[1]) # currently, kinetic energy dissipation is neglected in total energy tendency
     diff_ρe_tot_slab_ocean = (cc.ρe_tot_ocean .- cc.ρe_tot_ocean[1])
 
     times_days = times ./ (24 * 60 * 60)
@@ -136,9 +152,10 @@ function plot_global_energy(cc, coupler_sim, figname1 = "total_energy.png", fign
     Plots.plot!(times_days, diff_ρe_tot_slab[1:length(times_days)], label = "land")
     Plots.plot!(times_days, diff_ρe_tot_slab_seaice[1:length(times_days)], label = "seaice")
     Plots.plot!(times_days, diff_toa_net_source[1:length(times_days)], label = "toa")
+    # Plots.plot!(times_days, diff_friction_sink[1:length(times_days)], label = "friction")
     Plots.plot!(times_days, diff_ρe_tot_slab_ocean[1:length(times_days)], label = "ocean")
 
-    tot = cc.ρe_tot_atmos .+ cc.ρe_tot_ocean .+ cc.ρe_tot_land .+ cc.ρe_tot_seaice .+ cc.toa_net_source
+    tot = cc.ρe_tot_atmos .+ cc.ρe_tot_ocean .+ cc.ρe_tot_land .+ cc.ρe_tot_seaice .+ cc.toa_net_source #.+ cc.friction_sink
 
     Plots.plot!(
         times_days,
@@ -157,5 +174,5 @@ function plot_global_energy(cc, coupler_sim, figname1 = "total_energy.png", fign
     )
     Plots.savefig(figname2)
 
-    @assert abs(tot[end] - tot[1]) < tot[end] * 1e-4 # TODO make this more stringent once small errors resolved
+    @assert abs(tot[end] - tot[1]) < tot[end] * 1e-3 # TODO make this more stringent once small errors resolved
 end

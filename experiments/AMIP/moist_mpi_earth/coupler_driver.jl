@@ -11,8 +11,6 @@ using ClimaCore: InputOutput
 using Dates
 using UnPack
 
-using Pkg
-
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
 
@@ -212,7 +210,7 @@ mode_name == "slabplanet" ? (ocean_pull!(cs), reinit!(ocean_sim.integrator)) : n
 
 # init conservation info collector
 if !simulation.is_distributed && energy_check && mode_name == "slabplanet"
-    conservation_check = OnlineConservationCheck([], [], [], [], [], [])
+    conservation_check = OnlineConservationCheck([], [], [], [], [], [], [])
     check_conservation(conservation_check, cs)
 end
 

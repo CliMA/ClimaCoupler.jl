@@ -6,8 +6,8 @@ updates F_A, F_R, P_liq, and F_E in place based on values used in the atmos_sim 
 function atmos_push!(cs)
     atmos_sim = cs.model_sims.atmos_sim
     csf = cs.fields
-    dummmy_remap!(csf.F_A, atmos_sim.integrator.p.dif_flux_energy)
-    dummmy_remap!(csf.F_E, atmos_sim.integrator.p.dif_flux_ρq_tot)
+    dummmy_remap!(csf.F_A, .-atmos_sim.integrator.p.dif_flux_energy_bc)
+    dummmy_remap!(csf.F_E, .-atmos_sim.integrator.p.dif_flux_ρq_tot_bc)
     dummmy_remap!(csf.P_liq, atmos_sim.integrator.p.col_integrated_rain .+ atmos_sim.integrator.p.col_integrated_snow)
     cs.parsed_args["rad"] == "gray" ? dummmy_remap!(csf.F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) :
     nothing
@@ -140,8 +140,15 @@ function atmos_pull!(cs)
     end
 
     # calculate turbulent fluxes on atmos grid and save in atmos cache
-    info_sfc =
-        (; T_sfc = T_sfc_cpl, ρ_sfc = ρ_sfc_cpl, q_sfc = q_sfc_cpl, z0m = z0m_cpl, z0b = z0b_cpl, ice_mask = ice_mask)
+    info_sfc = (; ice_mask = ice_mask)
+    parent(atmos_sim.integrator.p.T_sfc) .= parent(T_sfc_cpl)
+    parent(atmos_sim.integrator.p.ρ_sfc) .= parent(ρ_sfc_cpl)
+    parent(atmos_sim.integrator.p.q_sfc) .= parent(q_sfc_cpl)
+    if :z0b in propertynames(integrator.p.surface_scheme)
+        parent(atmos_sim.integrator.p.z0b) .= parent(z0b_cpl)
+        parent(atmos_sim.integrator.p.z0m) .= parent(z0m_cpl)
+    end
+
     calculate_surface_fluxes_atmos_grid!(atmos_sim.integrator, info_sfc)
 
 end

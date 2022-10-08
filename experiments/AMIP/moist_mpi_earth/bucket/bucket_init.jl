@@ -171,10 +171,11 @@ function bucket_init(
 
     # Initial conditions with no moisture
     Y, p, coords = initialize(model)
-    anomaly = true
+    anomaly = false
+    anomaly_tropics = true
     hs_sfc = false
     Y.bucket.T = map(coords.subsurface) do coord
-        T_sfc_0 = FT(280.0)
+        T_sfc_0 = FT(270.0)
         radlat = coord.lat / FT(180) * pi
         ΔT = FT(0)
         if anomaly == true
@@ -186,6 +187,8 @@ function bucket_init(
             ΔT = anom_ampl * exp(-((radlat - lat_0)^2 / 2stdev^2 + (radlon - lon_0)^2 / 2stdev^2))
         elseif hs_sfc == true
             ΔT = -FT(60) * sin(radlat)^2
+        elseif anomaly_tropics == true
+            ΔT = FT(40 * cos(radlat)^4)
         end
         T_sfc_0 + ΔT
     end

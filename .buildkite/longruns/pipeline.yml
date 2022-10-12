@@ -1,0 +1,44 @@
+env:
+  JULIA_VERSION: "1.8.1"
+  MPI_IMPL: "openmpi"
+  OPENMPI_VERSION: "4.1.1"
+  CUDA_VERSION: "11.2"
+  OPENBLAS_NUM_THREADS: 1
+  BUILDKITE_COMMIT: "${BUILDKITE_COMMIT}"
+  BUILDKITE_BRANCH: "${BUILDKITE_BRANCH}"
+
+agents:
+  config: cpu
+  queue: central
+  slurm_ntasks: 1
+  slurm_time: 24:00:00
+
+timeout_in_minutes: 1440
+
+steps:
+  - label: "init :computer:"
+    key: "init_cpu_env"
+    command:
+      - "julia --project=examples -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=examples -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=examples -e 'using Pkg; Pkg.status()'"
+
+    agents:
+      slurm_cpus_per_task: 8
+    env:
+      JULIA_NUM_PRECOMPILE_TASKS: 8
+
+  - wait
+
+  - group: "Targeted resolution coupled AMIP long runs"
+
+    steps:
+
+      - label: "AMIP"
+        command: "mpiexec julia --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --energy_check=false --mode_name=amip --anim=true --t_end=100days --dt_save_to_sol=1days --dt_cpl=200 --mono_surface=false --z_elem 45 --dz_bottom 30 --h_elem 16 --kappa_4 1e16 --dt 400secs --t_end 100days--z_elem 45 --dz_bottom 30 --h_elem 16 --kappa_4 1e16 --dt 400secs --t_end 100days --dt_save_restart=10days --job_id longrun_bw_rhoe_highres"
+        artifact_paths: "longrun_bw_rhoe_highres/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+        agents:
+          slurm_ntasks: 32
+

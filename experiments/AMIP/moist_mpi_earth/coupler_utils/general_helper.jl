@@ -1,7 +1,8 @@
 # most of these functions are temporary helpers until upstream issues are resolved
 
 # TODO: unify with coupler interface
-struct CouplerSimulation{I, F, S, D, B, T, P}
+struct CouplerSimulation{C, I, F, S, D, B, T, P}
+    comms_ctx::C
     Δt_cpl::I
     t::F
     tspan::S

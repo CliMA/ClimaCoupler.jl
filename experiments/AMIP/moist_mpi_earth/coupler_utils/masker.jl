@@ -1,7 +1,27 @@
-function LandSeaMask(FT, infile, varname, boundary_space; outfile = "land_sea_cgll.nc", mono = false, threshold = 0.7)
-    weightfile, datafile_cgll =
-        ncreader_rll_to_cgll_from_space(infile, varname, boundary_space, outfile = outfile, mono = mono)
-    mask = ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, (Int(1),), boundary_space)[1]
+function LandSeaMask(
+    FT,
+    comms_ctx,
+    infile,
+    varname,
+    boundary_space;
+    outfile_root = "land_sea_cgll",
+    mono = false,
+    threshold = 0.7,
+)
+
+    if ClimaComms.iamroot(comms_ctx)
+        hdwrite_regridfile_rll_to_cgll(
+            comms_ctx,
+            infile,
+            varname,
+            boundary_space;
+            hd_outfile_root = outfile_root,
+            mono = mono,
+        )
+    end
+    ClimaComms.barrier(comms_ctx)
+    file_dates = load(joinpath(REGRID_DIR, outfile_root * "_times.jld2"), "times")
+    mask = hdread_regridfile(comms_ctx, outfile_root, file_dates[1], varname)
     mask = swap_space!(mask, boundary_space) # needed if we are reading from previous run
     return mono ? mask : binary_mask.(mask, threshold = threshold)
 end

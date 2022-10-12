@@ -1,13 +1,15 @@
-import ClimaCore
-using ClimaCore: Geometry, Meshes, Domains, Topologies, Spaces, Fields
-using NCDatasets
 
-using TempestRemap_jll
-using Test
+using ClimaCore
+using ClimaCore: Domains, Topologies, Meshes, Spaces, Fields, InputOutput
+using NCDatasets
 using ClimaCoreTempestRemap
+using Dates
 
 REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath(".", "regrid_tmp/")
-rm(REGRID_DIR; recursive = true, force = true)
+if ClimaComms.iamroot(comms_ctx)
+    rm(REGRID_DIR; recursive = true, force = true)
+end
+ClimaComms.barrier(comms_ctx)
 
 """
     reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R)
@@ -36,14 +38,25 @@ function reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R)
 end
 
 """
-    ncreader_rll_to_cgll(datafile_rll, varname [; outfile = "data_cgll.nc", ne = 4, R = 5.0, Nq = 5])
+hdwrite_regridfile_rll_to_cgll(comms_ctx, datafile_rll, varname, space; hd_outfile_root = "data_cgll", mono = false)
 
-Reads and regrids data of the `varname` variable from an input NetCDF file and saves it as another NetCDF file. 
-The input NetCDF file needs to be `Exodus` formatted, and can contain time-dependent data. 
+Reads and regrids data of the `varname` variable from an input NetCDF file and saves it as another NetCDF file using Tempest Remap. 
+The input NetCDF file needs to be `Exodus` formatted, and can contain time-dependent data. The output NetCDF file
+is then read back, the output arrays converted into Fields and saved as HDF5 files (one per time slice). This function should 
+be called by the root process. The regridded HDF5 output is readable by multiple MPI processes. 
 
 """
-function ncreader_rll_to_cgll_from_space(datafile_rll, varname, space; outfile = "data_cgll.nc", mono = false)
+function hdwrite_regridfile_rll_to_cgll(
+    comms_ctx,
+    datafile_rll,
+    varname,
+    space;
+    hd_outfile_root = "data_cgll",
+    mono = false,
+)
+    out_type = "cgll"
 
+    outfile = hd_outfile_root * ".nc"
     outfile_root = mono ? outfile[1:(end - 3)] * "_mono" : outfile[1:(end - 3)]
     datafile_cgll = joinpath(REGRID_DIR, outfile_root * ".g")
 
@@ -52,16 +65,16 @@ function ncreader_rll_to_cgll_from_space(datafile_rll, varname, space; outfile =
     meshfile_overlap = joinpath(REGRID_DIR, outfile_root * "_mesh_overlap.g")
     weightfile = joinpath(REGRID_DIR, outfile_root * "_remap_weights.nc")
 
-    topology = space.topology
+    topology = Topologies.Topology2D(space.topology.mesh, Topologies.spacefillingcurve(space.topology.mesh))
     Nq = Spaces.Quadratures.polynomial_degree(space.quadrature_style) + 1
+    space_undistributed = ClimaCore.Spaces.SpectralElementSpace2D(topology, ClimaCore.Spaces.Quadratures.GLL{Nq}())
 
     if isfile(datafile_cgll) == false
         isdir(REGRID_DIR) ? nothing : mkpath(REGRID_DIR)
 
-        ds = NCDataset(datafile_rll)
-        nlat = ds.dim["lat"]
-        nlon = ds.dim["lon"]
-
+        nlat, nlon = NCDataset(datafile_rll) do ds
+            (ds.dim["lat"], ds.dim["lon"])
+        end
         # write lat-lon mesh
         rll_mesh(meshfile_rll; nlat = nlat, nlon = nlon)
 
@@ -73,7 +86,7 @@ function ncreader_rll_to_cgll_from_space(datafile_rll, varname, space; outfile =
         # Note: for a kwarg not followed by a value, set it to true here (i.e. pass 'mono = true' to produce '--mono')
         # Note: out_np = degrees of freedom = polynomial degree + 1
 
-        kwargs = (; out_type = "cgll", out_np = Nq)
+        kwargs = (; out_type = out_type, out_np = Nq)
         kwargs = mono ? (; (kwargs)..., in_np = mono ? 1 : false, mono = mono) : kwargs
         remap_weights(weightfile, meshfile_rll, meshfile_cgll, meshfile_overlap; kwargs...)
         # remap
@@ -82,62 +95,74 @@ function ncreader_rll_to_cgll_from_space(datafile_rll, varname, space; outfile =
         @warn "Using the existing $datafile_cgll : check topology is consistent"
     end
 
-    return weightfile, datafile_cgll
-end
-
-"""
-    ncreader_cgll_sparse_to_field(datafile_cgll, varname, weightfile, t_i_tuple, space; scaling_function = FT_dot, clean_exodus = false)
-
-Given time `t_i_tuple` indices of the NetCDF file data, this reads in the required data of the specified `varname` variable and converts the sparse vector to a `Field` object
-The NetCDF file needs to be of the Exodus format and have a time dimension.
-"""
-function ncreader_cgll_sparse_to_field(
-    datafile_cgll,
-    varname,
-    weightfile,
-    t_i_tuple,
-    space;
-    scaling_function = FT_dot,
-    clean_exodus = false,
-)
-    # read the remapped file
-    offline_outvector = NCDataset(datafile_cgll, "r") do ds_wt
-        ds_wt[varname][:][:, [t_i_tuple...]] # ncol, times
+    function get_time(ds)
+        if "time" in ds
+            data_dates = Dates.DateTime.(ds["time"][:])
+        elseif "date" in ds
+            data_dates = strdate_to_datetime.(string.(ds["date"][:]))
+        else
+            @warn "No dates available in file $datafile_rll"
+            data_dates = [Dates.DateTime(0)]
+        end
     end
 
-    # weightfile info needed to populate all nodes and save into fields
+    # read the remapped file with sparse matrices
+    offline_outvector, times = NCDataset(datafile_cgll, "r") do ds_wt
+        (
+            offline_outvector = ds_wt[varname][:][:, :], # ncol, times
+            times = get_time(ds_wt),
+        )
+    end
+
+    # weightfile info needed to populate all nodes and save into fields with sparse matrices
     _, _, row_indices = NCDataset(weightfile, "r") do ds_wt
         (Array(ds_wt["S"]), Array(ds_wt["col"]), Array(ds_wt["row"]))
     end
 
-    out_type = "cgll"
-
-    target_unique_idxs = out_type == "cgll" ? collect(Spaces.unique_nodes(space)) : collect(Spaces.all_nodes(space))
-
+    target_unique_idxs =
+        out_type == "cgll" ? collect(Spaces.unique_nodes(space_undistributed)) :
+        collect(Spaces.all_nodes(space_undistributed))
     target_unique_idxs_i = map(row -> target_unique_idxs[row][1][1], row_indices)
     target_unique_idxs_j = map(row -> target_unique_idxs[row][1][2], row_indices)
     target_unique_idxs_e = map(row -> target_unique_idxs[row][2], row_indices)
-
     target_unique_idxs = (target_unique_idxs_i, target_unique_idxs_j, target_unique_idxs_e)
 
     R = (; target_idxs = target_unique_idxs, row_indices = row_indices)
 
-    # TODO: this could be taken out for fewer allocations? 
-    offline_field = Fields.zeros(FT, space)
+    offline_field = Fields.zeros(FT, space_undistributed)
 
-    offline_fields = ntuple(x -> similar(offline_field), length(t_i_tuple))
+    offline_fields = ntuple(x -> similar(offline_field), length(times))
 
-    clean_exodus ? run(`mkdir -p $REGRID_DIR`) : nothing
+    ntuple(x -> reshape_cgll_sparse_to_field!(offline_fields[x], offline_outvector[:, x], R), length(times))
 
-    ntuple(
-        x -> scaling_function(reshape_cgll_sparse_to_field!(offline_fields[x], offline_outvector[:, x], R)),
-        length(t_i_tuple),
-    )
+    # save save_hdf5 # TODO: extend write! to handle time-dependent fields
+    map(x -> save_remap_hdf5(hd_outfile_root, times[x], offline_fields[x], varname), 1:length(times))
+    jldsave(joinpath(REGRID_DIR, hd_outfile_root * "_times.jld2"); times = times)
+
+    return times
 end
 
-FT_dot(x) = FT.(x)
+"""
+    save_remap_hdf5(hd_outfile_root, tx, field, varname)
 
-# for AMIP we don't need regridding of surface model fields. When we do, we re-introduce the ClimaCoreTempestRemap 
+Helper to save individual hdf5 files after remapping.
+"""
+function save_remap_hdf5(hd_outfile_root, tx, field, varname)
+    t = Dates.datetime2unix.(tx)
+    hdfwriter = InputOutput.HDF5Writer(joinpath(REGRID_DIR, hd_outfile_root * "_" * string(tx) * ".hdf5"))
+
+    InputOutput.HDF5.write_attribute(hdfwriter.file, "unix time", t) # TODO: a better way to write metadata, CMIP convention
+    InputOutput.write!(hdfwriter, field, string(varname))
+    Base.close(hdfwriter)
+end
+
+function hdread_regridfile(comms_ctx, hd_outfile_root, time, varname)
+    hdfreader = InputOutput.HDF5Reader(joinpath(REGRID_DIR, hd_outfile_root * "_" * string(time) * ".hdf5"), comms_ctx)
+    field = InputOutput.read_field(hdfreader, varname)
+    Base.close(hdfreader)
+    return field
+end
+
 function dummmy_remap!(target, source)
     parent(target) .= parent(source)
 end
@@ -146,7 +171,6 @@ end
     remap_field_cgll2rll(name::Symbol, field::Fields.Field, remap_tmpdir, datafile_latlon)
 Remap individual Field from model (CGLL) nodes to a lat-lon (RLL) grid using TempestRemap
 """
-
 function remap_field_cgll2rll(name::Symbol, field::Fields.Field, remap_tmpdir, datafile_latlon; nlat = 90, nlon = 180)
 
     space = axes(field)
@@ -177,7 +201,6 @@ function remap_field_cgll2rll(name::Symbol, field::Fields.Field, remap_tmpdir, d
         [string(name)],
     )
 end
-
 function write_datafile_cc(datafile_cc, field, name)
     space = axes(field)
     # write data
@@ -191,6 +214,7 @@ function write_datafile_cc(datafile_cc, field, name)
     end
 end
 
+
 function create_space(; R = FT(6371e3), ne = 4, polynomial_degree = 3)
     domain = Domains.SphereDomain(R)
     mesh = Meshes.EquiangularCubedSphere(domain, ne)
@@ -199,6 +223,3 @@ function create_space(; R = FT(6371e3), ne = 4, polynomial_degree = 3)
     quad = Spaces.Quadratures.GLL{Nq}()
     space = Spaces.SpectralElementSpace2D(topology, quad)
 end # debugging tool, also to be used in tests
-
-# TODO:
-# - add unit tests 

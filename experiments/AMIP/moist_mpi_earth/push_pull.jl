@@ -9,8 +9,7 @@ function atmos_push!(cs)
     dummmy_remap!(csf.F_A, .-atmos_sim.integrator.p.dif_flux_energy_bc)
     dummmy_remap!(csf.F_E, .-atmos_sim.integrator.p.dif_flux_ρq_tot_bc)
     dummmy_remap!(csf.P_liq, atmos_sim.integrator.p.col_integrated_rain .+ atmos_sim.integrator.p.col_integrated_snow)
-    cs.parsed_args["rad"] == "gray" ? dummmy_remap!(csf.F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) :
-    nothing
+    dummmy_remap!(csf.F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half))
 end
 
 """
@@ -25,11 +24,15 @@ function land_pull!(cs)
     land_sim = cs.model_sims.land_sim
     csf = cs.fields
     FT = cs.FT
+    land_mask = cs.surface_masks.land
     parent(land_sim.integrator.p.bucket.ρ_sfc) .= parent(csf.ρ_sfc)
-    parent(land_sim.integrator.p.bucket.turbulent_energy_flux) .= parent(csf.F_A)
+    parent(land_sim.integrator.p.bucket.turbulent_energy_flux) .=
+        apply_mask.(parent(land_mask), >, parent(csf.F_A), parent(csf.F_A) .* FT(0), FT(0))
     ρ_liq = (LSMP.ρ_cloud_liq(land_sim.params.earth_param_set))
-    parent(land_sim.integrator.p.bucket.evaporation) .= parent(csf.F_E) ./ ρ_liq
-    parent(land_sim.integrator.p.bucket.R_n) .= parent(csf.F_R)
+    parent(land_sim.integrator.p.bucket.evaporation) .=
+        apply_mask.(parent(land_mask), >, parent(csf.F_E) ./ ρ_liq, parent(csf.F_E) .* FT(0), FT(0))
+    parent(land_sim.integrator.p.bucket.R_n) .=
+        apply_mask.(parent(land_mask), >, parent(csf.F_R), parent(csf.F_R) .* FT(0), FT(0))
     parent(land_sim.integrator.p.bucket.P_liq) .= FT(-1.0) .* parent(csf.P_liq) # land expects this to be positive
     parent(land_sim.integrator.p.bucket.P_snow) .= FT(0.0) .* parent(csf.P_snow)
 
@@ -58,8 +61,11 @@ sublimating. That contribution has been zeroed out in the atmos fluxes.
 function ice_pull!(cs)
     ice_sim = cs.model_sims.ice_sim
     csf = cs.fields
-    @. ice_sim.integrator.p.F_aero = csf.F_A
-    @. ice_sim.integrator.p.F_rad = csf.F_R
+    ice_mask = cs.surface_masks.ice
+    parent(ice_sim.integrator.p.F_rad) .=
+        apply_mask.(parent(ice_mask), >, parent(csf.F_R), parent(csf.F_R) .* FT(0), FT(0))
+    parent(ice_sim.integrator.p.F_aero) .=
+        apply_mask.(parent(ice_mask), >, parent(csf.F_A), parent(csf.F_A) .* FT(0), FT(0))
 end
 
 """
@@ -73,7 +79,7 @@ function atmos_pull!(cs)
 
     @unpack model_sims = cs
     @unpack atmos_sim, land_sim, ocean_sim, ice_sim = model_sims
-    radiation = model_spec.radiation_model # TODO: take out of global scope in ClimaAtmos
+    radiation = atmos_sim.integrator.p.radiation_model
 
     csf = cs.fields
     T_sfc_cpl = csf.T_S
@@ -118,8 +124,15 @@ function atmos_pull!(cs)
 
     # surface specific humidity
     ocean_q_sfc = TD.q_vap_saturation_generic.(thermo_params, T_ocean, ρ_sfc_cpl, TD.Liquid())
-    sea_ice_q_sfc = TD.q_vap_saturation_generic.(thermo_params, T_ice, ρ_sfc_cpl, TD.Ice())
-    land_q_sfc = get_land_q(land_sim, atmos_sim, T_land, ρ_sfc_cpl)
+    sea_ice_q_sfc =
+        swap_space!(Spaces.level(atmos_sim.integrator.u.c.ρq_tot ./ atmos_sim.integrator.u.c.ρ, 1), boundary_space) #ρ_sfc_cpl .* FT(0) #D.q_vap_saturation_generic.(thermo_params, T_ice, ρ_sfc_cpl, TD.Ice())
+
+    q_atmos =
+        swap_space!(Spaces.level(atmos_sim.integrator.u.c.ρq_tot ./ atmos_sim.integrator.u.c.ρ, 1), boundary_space)
+    q_land_s = swap_space!(get_land_q(land_sim, atmos_sim, T_land, ρ_sfc_cpl), boundary_space)
+    land_q_sfc = maximumfield.(q_land_s, q_atmos) # TODO: bring back the beta factor
+
+
     combine_surfaces!(combined_field, cs.surface_masks, (; land = land_q_sfc, ocean = ocean_q_sfc, ice = sea_ice_q_sfc))
     dummmy_remap!(q_sfc_cpl, combined_field)
 
@@ -132,11 +145,11 @@ function atmos_pull!(cs)
     dummmy_remap!(albedo_sfc_cpl, combined_field)
 
     if radiation != nothing
-        atmos_sim.integrator.p.rrtmgp_model.diffuse_sw_surface_albedo .=
+        atmos_sim.integrator.p.radiation_model.diffuse_sw_surface_albedo .=
             reshape(RRTMGPI.field2array(albedo_sfc_cpl), 1, length(parent(albedo_sfc_cpl)))
-        atmos_sim.integrator.p.rrtmgp_model.direct_sw_surface_albedo .=
+        atmos_sim.integrator.p.radiation_model.direct_sw_surface_albedo .=
             reshape(RRTMGPI.field2array(albedo_sfc_cpl), 1, length(parent(albedo_sfc_cpl)))
-        atmos_sim.integrator.p.rrtmgp_model.surface_temperature .= RRTMGPI.field2array(T_sfc_cpl)
+        atmos_sim.integrator.p.radiation_model.surface_temperature .= RRTMGPI.field2array(T_sfc_cpl)
     end
 
     # calculate turbulent fluxes on atmos grid and save in atmos cache
@@ -156,3 +169,5 @@ end
 function atmos_pull!(cs, surfces)
     # placehoolder: add method to calculate fluxes above individual surfaces and then split fluxes (separate PR)
 end
+
+maximumfield(el1, el2) = maximum([el1, el2])

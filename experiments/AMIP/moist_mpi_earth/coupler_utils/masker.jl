@@ -72,29 +72,6 @@ end
 nans_to_zero(v) = isnan(v) ? FT(0) : v
 
 """
-    update_masks(cs)
-
-Updates dynamically changing masks. 
-"""
-function update_masks(cs)
-
-    # dynamic masks
-    ice_d = cs.model_sims.ice_sim.integrator.p.ice_mask
-    FT = eltype(ice_d)
-
-    # static mask
-    land_s = cs.surface_masks.land
-
-    cs.surface_masks.ice .= min.(ice_d .+ land_s, FT(1)) .- land_s
-    cs.surface_masks.ocean .= (FT(1) .- cs.surface_masks.ice .- land_s)
-
-    @assert minimum(cs.surface_masks.ice) >= FT(0)
-    @assert minimum(cs.surface_masks.land) >= FT(0)
-    @assert minimum(cs.surface_masks.ocean) >= FT(0)
-
-end
-
-"""
     time_slice_ncfile(sic_data, time_idx = 1)
 - slices a dataset at time index `time_idx` and saves it under `sic_data_slice`. Used for more efficient regridding of mask, SST and SIC files. 
 """

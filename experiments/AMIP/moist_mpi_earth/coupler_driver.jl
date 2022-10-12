@@ -1,8 +1,27 @@
-# coupler_driver
-# don't forget to run with threading: julia --project --threads 8 (MPI not that useful for debugging coarse runs)
+include("mpi/mpi_init.jl") # setup MPI context for distributed runs #hide
 
-# setup MPI context if distributed
-include("mpi/mpi_init.jl")
+# # AMIP Driver
+# don't forget to run with threading: julia --project --threads 8 (MPI not that useful for debugging coarse runs) #hide
+
+#=
+## Overview
+
+AMIP is a standard experimental protocol of the Program for Climate Model Diagnosis & Intercomparison (PCMDI). 
+It is used as a model benchmark for the atmospheric and land model components, while sea-surface temperatures (SST) and sea-ice concentration (SIC)
+are prescribed using time-interpolations between monthly observed data. We use standard datafiles with original sources:
+- SST and SIC: https://gdex.ucar.edu/dataset/158_asphilli.html 
+- land-sea mask: https://www.ncl.ucar.edu/Applications/Data/#cdf
+
+For more information, see the PCMDI's specificarions for [AMIP I](https://pcmdi.github.io/mips/amip/) and [AMIP II](https://pcmdi.github.io/mips/amip2/). 
+
+This driver contains two modes. The full `AMIP` mode and a `SlabPlanet` (all surfaces are thermal slabs) mode. Since `AMIP` is not a closed system, the 
+`SlabPlanet` mode is useful for checking conservation properties of the coupling. 
+
+=#
+
+#=
+## Initialization
+=#
 
 import SciMLBase: step!
 using OrdinaryDiffEq
@@ -17,7 +36,7 @@ using UnPack
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
 
-# read in some parsed args
+## read in some parsed command line arguments 
 mode_name = parsed_args["mode_name"]
 run_name = parsed_args["run_name"]
 energy_check = parsed_args["energy_check"]
@@ -27,21 +46,11 @@ t_end = FT(time_to_seconds(parsed_args["t_end"]))
 tspan = (0, t_end)
 Δt_cpl = FT(parsed_args["dt_cpl"])
 saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
-date0 = date = DateTime(1979, 01, 01)
+date0 = date = DateTime(parsed_args["start_date"], dateformat"yyyymmdd")
 mono_surface = parsed_args["mono_surface"]
 
-# overwrite some parsed args
-parsed_args["coupled"] = true
+## enforce coupling at every timestep
 parsed_args["dt"] = string(Δt_cpl) * "secs"
-parsed_args["enable_threading"] = true
-parsed_args["microphy"] = "0M"
-parsed_args["forcing"] = nothing
-parsed_args["idealized_h2o"] = false
-parsed_args["vert_diff"] = true
-parsed_args["rad"] = "gray"
-parsed_args["hyperdiff"] = true
-parsed_args["config"] = "sphere"
-parsed_args["moist"] = "equil"
 
 import ClimaCoupler
 pkg_dir = pkgdir(ClimaCoupler)
@@ -49,6 +58,8 @@ COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth/output"
 !isdir(COUPLER_OUTPUT_DIR) && mkpath(COUPLER_OUTPUT_DIR)
 REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp/")
 mkpath(REGRID_DIR)
+@info COUPLER_OUTPUT_DIR
+@info parsed_args
 
 # get the paths to the necessary data files - land sea mask, sst map, sea ice concentration
 include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
@@ -56,7 +67,7 @@ sst_data = joinpath(sst_dataset_path(), "sst.nc")
 sic_data = joinpath(sic_dataset_path(), "sic.nc")
 mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 
-# import coupler utils
+## import coupler unitilies
 include("coupler_utils/flux_calculator.jl")
 include("coupler_utils/conservation_checker.jl")
 include("coupler_utils/regridder.jl")
@@ -68,32 +79,57 @@ include("coupler_utils/variable_definer.jl")
 include("coupler_utils/diagnostics_gatherer.jl")
 include("coupler_utils/offline_postprocessor.jl")
 
-# init atmos model component
+#=
+## Component Model Initialization
+Here we set initial and boundary conditions for each component model.
+=#
+
+#=
+### Atmosphere
+This used the `ClimaAtmos.jl` driver, with parameterization options specified in the command line arguments.
+=#
+## init atmos model component
 include("atmos/atmos_init.jl")
 atmos_sim = atmos_init(FT, Y, integrator, params = params);
 
-# init a 2D bounary space at the surface, assuming the same instance (and MPI distribution if applicable) as the atmos domain above
-boundary_space = atmos_sim.domain.face_space.horizontal_space # global surface grid
+#=
+We use a common Space for all global surfaces. This enables the MPI processes to operate on the same columns in both 
+the atmospheric and surface components, so exchanges are parallelized. Note this is only possible when the 
+atmosphere and surface are of the same horizontal resolution. 
+=#
+## init a 2D bounary space at the surface
+boundary_space = atmos_sim.domain.face_space.horizontal_space
 
-# init land-sea mask
+## init land-sea mask
 land_mask = LandSeaMask(FT, comms_ctx, mask_data, "LSMASK", boundary_space, mono = mono_surface)
 
-# init surface (slab) model components
+## init surface (slab) model components
 include("slab/slab_utils.jl")
 include("bucket/bucket_init.jl")
 include("slab/slab_init.jl")
 include("slab_ocean/slab_init.jl")
 include("slab_ice/slab_init.jl")
 
-# 1. land
+#=
+### Land
+We use `ClimaLSM.jl`'s bucket model.
+=#
 land_sim =
     bucket_init(FT, FT.(tspan), parsed_args["config"]; dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat))
 
+#=
+### Ocean and Sea Ice
+In the `AMIP` mode, all ocean properties are prescribed from a file, while sea-ice temperatures are calculated using observed
+SIC and assuming a 2m thickness of the ice. 
+
+In the `SlabPlanet` mode, all ocean and sea ice are dynamical models, namely thermal slabs, with different parameters. 
+=#
+
 @info mode_name
 if mode_name == "amip"
-    println("AMIP boundary conditions - do not expect energy conservation")
+    @info "AMIP boundary conditions - do not expect energy conservation"
 
-    # 2. ocean
+    ## ocean
     SST_info = bcfile_info_init(
         FT,
         comms_ctx,
@@ -101,7 +137,7 @@ if mode_name == "amip"
         "SST",
         boundary_space,
         interpolate_daily = true,
-        scaling_function = clean_sst, # convert to K
+        scaling_function = clean_sst, ## convert to Kelvin
         land_mask = land_mask,
         date0 = date0,
         mono = mono_surface,
@@ -117,7 +153,7 @@ if mode_name == "amip"
             SST_info = SST_info,
         )
     )
-    # 3. sea ice
+    ## sea ice
     SIC_info = bcfile_info_init(
         FT,
         comms_ctx,
@@ -125,7 +161,7 @@ if mode_name == "amip"
         "SEAICE",
         boundary_space,
         interpolate_daily = true,
-        scaling_function = clean_sic, # convert to fractions
+        scaling_function = clean_sic, ## convert to fractions
         land_mask = land_mask,
         date0 = date0,
         mono = mono_surface,
@@ -137,17 +173,17 @@ if mode_name == "amip"
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info)
 
 elseif mode_name == "slabplanet"
-    # 2. ocean
+    ## ocean
     ocean_sim = ocean_init(
         FT;
         tspan = tspan,
         dt = Δt_cpl,
         space = boundary_space,
         saveat = saveat,
-        ocean_mask = (FT(1) .- land_mask), # NB: ocean mask includes areas covered by sea ice
+        ocean_mask = (FT(1) .- land_mask), ## NB: this ocean mask includes areas covered by sea ice (unlike the one contained in the cs)
     )
 
-    # 3. sea ice
+    ## sea ice
     ice_sim = (;
         integrator = (;
             u = (; T_sfc = ClimaCore.Fields.ones(boundary_space)),
@@ -157,28 +193,37 @@ elseif mode_name == "slabplanet"
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
 end
 
-# init coupler 
+#=
+## Coupler Initialization
+The coupler needs to contain exchange information, manage the calendar and be able to access all component models. It can also optionally
+save online diagnostics. These are all initialized here and saved in a global `CouplerSimulation` struct, `cs`. 
+=#
 
-# 1. coupler fields
+## coupler exchange fields
 coupler_field_names = (:T_S, :z0m_S, :z0b_S, :ρ_sfc, :q_sfc, :albedo, :F_A, :F_E, :F_R, :P_liq, :P_snow)
 coupler_fields =
     NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
 
-# 2. model simulations
+## model simulations
 model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim);
 
-# 3. dates
+## dates
 dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)])
 
-# 4. online diagnostics
-monthly_3d_diags_names = (:T, :u, :q_tot) # need to be specified in coupler_utils/variable_definer.jl
+#=
+### Online Diagnostics
+User can write custom diagnostics in the `coupler_utils/variable_definer.jl`.`
+=#
+## 3d diagnostics
+monthly_3d_diags_names = (:T, :u, :q_tot)
 monthly_3d_diags = (;
     fields = NamedTuple{monthly_3d_diags_names}(
         ntuple(i -> ClimaCore.Fields.zeros(atmos_sim.domain.center_space), length(monthly_3d_diags_names)),
     ),
     ct = [0],
 )
-monthly_2d_diags_names = (:precipitation, :toa, :T_sfc) # need to be specified in coupler_utils/variable_definer.jl
+## 2d diagnostics
+monthly_2d_diags_names = (:precipitation, :toa, :T_sfc)
 monthly_2d_diags = (;
     fields = NamedTuple{monthly_2d_diags_names}(
         ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(monthly_2d_diags_names)),
@@ -186,7 +231,7 @@ monthly_2d_diags = (;
     ct = [0],
 )
 
-# 5. coupler simulation
+## coupler simulation
 cs = CouplerSimulation(
     comms_ctx,
     FT(Δt_cpl),
@@ -204,45 +249,51 @@ cs = CouplerSimulation(
     monthly_2d_diags,
 );
 
-# share states between models
+#=
+## Initial States Exchange 
+=#
+## share states between models
 include("./push_pull.jl")
 atmos_pull!(cs)
-if parsed_args["ode_algo"] == "ARS343"
-    step!(atmos_sim.integrator, Δt_cpl, true) # this is necessary to set values to the unitialized cache. In `ODE.jl` this is done as part of `reinit!``
-end
+parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim.integrator, Δt_cpl, true) : nothing
 atmos_push!(cs)
 land_pull!(cs)
 
-# reinitialize (TODO: avoid with interfaces)
+## reinitialize (TODO: avoid with interfaces)
 reinit!(atmos_sim.integrator)
 reinit!(land_sim.integrator)
 mode_name == "amip" ? (ice_pull!(cs), reinit!(ice_sim.integrator)) : nothing
 mode_name == "slabplanet" ? (ocean_pull!(cs), reinit!(ocean_sim.integrator)) : nothing
 
-# init conservation info collector
+#=
+## Initialize Conservation Checks
+=#
+## init conservation info collector
 if !is_distributed && energy_check && mode_name == "slabplanet"
     conservation_check = OnlineConservationCheck([], [], [], [], [], [], [])
     check_conservation(conservation_check, cs)
 end
 
-# coupling loop
+#=
+## Coupling Loop
+=#
 function solve_coupler!(cs, energy_check)
     @info "Starting coupling loop"
 
     @unpack model_sims, Δt_cpl, tspan = cs
     @unpack atmos_sim, land_sim, ocean_sim, ice_sim = model_sims
 
-    # step in time
+    ## step in time
     walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
 
-        cs.dates.date[1] = current_date(t) # if not global, `date` is not updated.
+        cs.dates.date[1] = current_date(cs, t) # if not global, `date` is not updated.
 
-        # print date on the first of month 
+        ## print date on the first of month 
         @calendar_callback :(@show(cs.dates.date[1])) cs.dates.date[1] cs.dates.date1[1]
 
         if cs.mode.name == "amip"
 
-            # monthly read of boundary condition data for sea surface temperature (SST) and sea ice concentration (SIC)
+            ## monthly read of boundary condition data for sea surface temperature (SST) and sea ice concentration (SIC)
             @calendar_callback :(update_midmonth_data!(cs.dates.date[1], cs.mode.SST_info)) cs.dates.date[1] next_date_in_file(
                 cs.mode.SST_info,
             )
@@ -254,11 +305,11 @@ function solve_coupler!(cs, energy_check)
 
             ice_mask = ice_sim.integrator.p.ice_mask .= get_ice_mask.(SIC_init, mono_surface)
 
-            # accumulate diagnostics at each timestep
+            ## accumulate diagnostics at each timestep
             accumulate_diags(collect_diags(cs, propertynames(cs.monthly_3d_diags.fields)), cs.monthly_3d_diags)
             accumulate_diags(collect_diags(cs, propertynames(cs.monthly_2d_diags.fields)), cs.monthly_2d_diags)
 
-            # save and reset monthly averages
+            ## save and reset monthly averages
             @calendar_callback :(
                 map(x -> x ./= cs.monthly_3d_diags.ct[1], cs.monthly_3d_diags.fields),
                 save_hdf5(
@@ -286,36 +337,36 @@ function solve_coupler!(cs, energy_check)
 
         end
 
-        # run component models sequentially for one coupling timestep (Δt_cpl)
-        # 1. atmos
+        ## run component models sequentially for one coupling timestep (Δt_cpl)
+        ## 1. atmos
         ClimaComms.barrier(comms_ctx)
 
         atmos_pull!(cs)
         step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
         atmos_push!(cs)
 
-        # 2. land
+        ## 2. land
         land_pull!(cs)
         step!(land_sim.integrator, t - land_sim.integrator.t, true)
 
-        # 3. ocean
+        ## 3. ocean
         if cs.mode.name == "slabplanet"
             ocean_pull!(cs)
             step!(ocean_sim.integrator, t - ocean_sim.integrator.t, true)
         end
 
-        # 4. sea ice
+        ## 4. sea ice
         if cs.mode.name == "amip"
             ice_pull!(cs)
             step!(ice_sim.integrator, t - ice_sim.integrator.t, true)
         end
 
-        # compute global energy
+        ## compute global energy
         if !simulation.is_distributed && energy_check && cs.mode.name == "slabplanet"
             check_conservation(conservation_check, cs)
         end
 
-        # step to the next calendar month
+        ## step to the next calendar month
         @calendar_callback :(cs.dates.date1[1] += Dates.Month(1)) cs.dates.date[1] cs.dates.date1[1]
 
     end
@@ -324,14 +375,18 @@ function solve_coupler!(cs, energy_check)
     return cs
 end
 
-# run the coupled simulation
+## run the coupled simulation
 solve_coupler!(cs, energy_check);
 
-# postprocessing
+#=
+## Postprocessing 
+Currently all postprocessing is performed using the root process only. 
+=#
+
 if ClimaComms.iamroot(comms_ctx)
     isdir(COUPLER_OUTPUT_DIR * "_artifacts") ? nothing : mkpath(COUPLER_OUTPUT_DIR * "_artifacts")
 
-    # 1. energy check plots
+    ## energy check plots
     if !is_distributed && energy_check && cs.mode.name == "slabplanet"
         @info "Energy Check"
         plot_global_energy(
@@ -342,20 +397,20 @@ if ClimaComms.iamroot(comms_ctx)
         )
     end
 
-    # 2. animations
+    ## sample animations
     if !is_distributed && parsed_args["anim"]
         @info "Animations"
         include("coupler_utils/viz_explorer.jl")
         plot_anim(cs, COUPLER_OUTPUT_DIR * "_artifacts")
     end
 
-    # 3. plotting AMIP results
+    ## plotting AMIP results
     if cs.mode.name == "amip"
         @info "AMIP plots"
 
         include("coupler_utils/plotter.jl")
 
-        # ClimaESM
+        ## ClimaESM
         include("coupler_utils/amip_visualizer.jl")
         post_spec = (;
             T = (:regridded_3d, :zonal_mean),
@@ -366,7 +421,7 @@ if ClimaComms.iamroot(comms_ctx)
             T_sfc = (:regridded_2d, :horizontal_2d),
         )
 
-        plot_spec = (; # optional plotting args
+        plot_spec = (;
             T = (; clims = (190, 320), units = "K"),
             u = (; clims = (-50, 50), units = "m/s"),
             q_tot = (; clims = (0, 50), units = "g/kg"),
@@ -382,7 +437,7 @@ if ClimaComms.iamroot(comms_ctx)
             output_dir = COUPLER_OUTPUT_DIR * "_artifacts",
         )
 
-        # NCEP reanalysis
+        ## NCEP reanalysis
         @info "NCEP plots"
         include("coupler_utils/ncep_visualizer.jl")
         ncep_post_spec = (;
@@ -399,23 +454,19 @@ if ClimaComms.iamroot(comms_ctx)
             ncep_plot_spec,
             COUPLER_OUTPUT_DIR,
             output_dir = COUPLER_OUTPUT_DIR * "_artifacts",
-        ) # plot data that correspond to the model's last save_hdf5 call (i.e., last month)
+            month_date = cs.dates.date[1],
+        ) ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
     end
 
-    rm(COUPLER_OUTPUT_DIR; recursive = true, force = true) # TODO: Where should this live?
+    ## clean up
+    rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
 end
 
-# unit tests (to be moved to `test/`)
+#=
+## Temporary Unit Tests 
+To be moved to `test/`
+=#
 if !is_distributed && cs.mode.name == "amip"
     @info "Unit Tests"
     include("coupler_utils/unit_tester.jl")
 end
-
-# Cleanup temporary files
-# TODO:
-# - cs needs to be global for the monthly macro - explore other solutions
-# - SST_init is modified with SST_info even with deepcopy...
-# - replace if statements with dipatches, write better abstractions
-# - add spin up for AMIP
-# - do nothing for the parts of the domain that are masked out - aware of MPI and fracitonal surfaces  
-# - add an energy check for MPI runs

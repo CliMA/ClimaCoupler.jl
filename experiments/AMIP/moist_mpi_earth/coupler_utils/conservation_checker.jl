@@ -28,7 +28,7 @@ Note: in the future this should not use ``push!``.
 function check_conservation(cc::OnlineConservationCheck, coupler_sim)
     @unpack model_sims, surface_masks = cs
     @unpack atmos_sim, land_sim, ocean_sim, ice_sim = model_sims
-    radiation = model_spec.radiation_model # TODO: take out of global scope in ClimaAtmos
+    radiation = integrator.p.radiation_model
 
     @assert ice_sim != nothing
     @assert atmos_sim != nothing
@@ -56,19 +56,19 @@ function check_conservation(cc::OnlineConservationCheck, coupler_sim)
         n_faces = length(z[:, 1, 1, 1, 1])
 
         LWd_TOA = Fields.level(
-            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.rrtmgp_model.face_lw_flux_dn), face_space),
+            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_lw_flux_dn), face_space),
             n_faces - half,
         )
         LWu_TOA = Fields.level(
-            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.rrtmgp_model.face_lw_flux_up), face_space),
+            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_lw_flux_up), face_space),
             n_faces - half,
         )
         SWd_TOA = Fields.level(
-            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.rrtmgp_model.face_sw_flux_dn), face_space),
+            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_sw_flux_dn), face_space),
             n_faces - half,
         )
         SWu_TOA = Fields.level(
-            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.rrtmgp_model.face_sw_flux_up), face_space),
+            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_sw_flux_up), face_space),
             n_faces - half,
         )
 

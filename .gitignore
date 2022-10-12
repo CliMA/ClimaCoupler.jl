@@ -38,6 +38,8 @@ docs/src/generated/
 *.pvtu
 *.nc
 *.jld2
+*.g
+*.hdf5
 
 # Julia System Images
 *.so

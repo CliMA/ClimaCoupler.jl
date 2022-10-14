@@ -199,6 +199,9 @@ cs = CouplerSimulation(
 # share states between models
 include("./push_pull.jl")
 atmos_pull!(cs)
+if parsed_args["ode_algo"] == "ARS343"
+    step!(atmos_sim.integrator, Δt_cpl, true) # this is necessary to set values to the unitialized cache. In `ODE.jl` this is done as part of `reinit!``
+end
 atmos_push!(cs)
 land_pull!(cs)
 
@@ -216,7 +219,7 @@ end
 
 # coupling loop
 function solve_coupler!(cs, energy_check)
-    @show "Starting coupling loop"
+    @info "Starting coupling loop"
 
     @unpack model_sims, Δt_cpl, tspan = cs
     @unpack atmos_sim, land_sim, ocean_sim, ice_sim = model_sims

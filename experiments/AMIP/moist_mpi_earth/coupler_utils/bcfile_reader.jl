@@ -10,7 +10,6 @@ The inputs are:
     FT::F                           # float type
     datafile_cgll::S                # file containing all regridded fields
     varname::V                      # name of the variable
-    weightfile::S                   # file containing regridding weights
     all_dates::D                    # all dates contained in the original data file
     segment_idx::Vector{Int}        # index of the monthly data in the file
     segment_idx0::Vector{Int}       # `segment_idx` of the file data that is closest to date0
@@ -20,11 +19,11 @@ The inputs are:
     interpolate_daily::Bool         # switch to trigger daily interpolation
     land_mask::M                    # mask with 1 = land, 0 = ocean / sea-ice
 """
-struct BCFileInfo{F, S, V, D, C, O, M}
+struct BCFileInfo{F, X, S, V, D, C, O, M}
     FT::F
-    datafile_cgll::S
+    comms_ctx::X
+    hd_outfile_root::S
     varname::V
-    weightfile::S
     all_dates::D
     segment_idx::Vector{Int}
     segment_idx0::Vector{Int}
@@ -36,12 +35,16 @@ struct BCFileInfo{F, S, V, D, C, O, M}
 end
 
 """
-    Bcfile_info_init(datafile_rll, varname, boundary_space; interpolate_daily = false, segment_idx0 = [Int(1)], scaling_function = false)
+    Bcfile_info_init(FT, comms_ctx, datafile_rll, varname, boundary_space; interpolate_daily = false, segment_idx0 = [Int(1)], scaling_function = false)
 
 Regrids from lat-lon grid to cgll grid, saving the output in a new file, and returns the info packaged in a single struct
 """
+#FT, datafile_rll, varname,boundary_space, interpolate_daily, segment_idx0, scaling_function, land_mask, date0, mono = (FT, sst_data, "SST", boundary_space, true, nothing, clean_sst, land_mask, date0, true)
+
+
 function bcfile_info_init(
     FT,
+    comms_ctx,
     datafile_rll,
     varname,
     boundary_space;
@@ -53,30 +56,24 @@ function bcfile_info_init(
     mono = true,
 )
 
-    # regrid all times and save to file
-    weightfile, datafile_cgll = ncreader_rll_to_cgll_from_space(
-        datafile_rll,
-        varname,
-        boundary_space,
-        outfile = varname * "_cgll.g",
-        mono = mono,
-    )
-    ds = Dataset(datafile_cgll, "r")
+    # regrid all times and save to hdf5 files
+    hd_outfile_root = varname * "_cgll"
+    if ClimaComms.iamroot(comms_ctx)
+        hdwrite_regridfile_rll_to_cgll(
+            comms_ctx,
+            datafile_rll,
+            varname,
+            boundary_space;
+            hd_outfile_root = hd_outfile_root,
+            mono = mono,
+        )
+    end
+    ClimaComms.barrier(comms_ctx)
+    data_dates = load(joinpath(REGRID_DIR, hd_outfile_root * "_times.jld2"), "times")
 
     # init time tracking info
-    current_fields =
-        interpolate_daily ? (Fields.zeros(FT, boundary_space), Fields.zeros(FT, boundary_space)) :
-        (Fields.zeros(FT, boundary_space),)
+    current_fields = Fields.zeros(FT, boundary_space), Fields.zeros(FT, boundary_space)
     segment_length = [Int(0)]
-
-    if "time" in ds
-        data_dates = Dates.DateTime.(ds["time"][:])
-    elseif "date" in ds
-        data_dates = strdate_to_datetime.(string.(ds["date"][:]))
-    else
-        @warn "No dates availabe in file $datafile_rll"
-        data_dates = nothing
-    end
 
     # unless the start file date is specified, find the closest one to the start date
     segment_idx0 =
@@ -85,9 +82,9 @@ function bcfile_info_init(
 
     return BCFileInfo(
         FT,
-        datafile_cgll,
+        comms_ctx,
+        hd_outfile_root,
         varname,
-        weightfile,
         data_dates,
         deepcopy(segment_idx0),
         segment_idx0,
@@ -116,65 +113,33 @@ function update_midmonth_data!(date, bcf_info)
     midmonth_idx = bcf_info.segment_idx[1]
     midmonth_idx0 = bcf_info.segment_idx0[1]
     monthly_fields = bcf_info.monthly_fields
-    datafile_cgll = bcf_info.datafile_cgll
-    weightfile = bcf_info.weightfile
+    outfile_root = bcf_info.hd_outfile_root
     scaling_function = bcf_info.scaling_function
     varname = bcf_info.varname
+    interpolate_daily = bcf_info.interpolate_daily
+    comms_ctx = bcf_info.comms_ctx
     FT = bcf_info.FT
-    boundary_space = axes(monthly_fields[1])
 
-    if (all_dates == nothing) # temporally invariant BCs
-        @warn "no temporally varying data, all months using the same field"
-        map(
-            x ->
-                bcf_info.monthly_fields[x] .= scaling_function(
-                    ncreader_cgll_sparse_to_field(
-                        datafile_cgll,
-                        varname,
-                        weightfile,
-                        (Int(midmonth_idx),),
-                        boundary_space,
-                    )[1],
-                    bcf_info,
-                ),
-            Tuple(1:length(monthly_fields)),
-        )
-        bcf_info.segment_length .= FT(0)
-    elseif (midmonth_idx == midmonth_idx0) && (Dates.days(date - all_dates[midmonth_idx]) < 0) # for init
+    ClimaComms.barrier(comms_ctx)
+
+
+    if (midmonth_idx == midmonth_idx0) && (Dates.days(date - all_dates[midmonth_idx]) < 0) # for init
         midmonth_idx = bcf_info.segment_idx[1] -= Int(1)
         midmonth_idx = midmonth_idx < Int(1) ? midmonth_idx + Int(1) : midmonth_idx
         @warn "this time period is before BC data - using file from $(all_dates[midmonth_idx0])"
-        map(
-            x ->
-                bcf_info.monthly_fields[x] .= scaling_function(
-                    ncreader_cgll_sparse_to_field(
-                        datafile_cgll,
-                        varname,
-                        weightfile,
-                        (Int(midmonth_idx0),),
-                        boundary_space,
-                    )[1],
-                    bcf_info,
-                ),
-            Tuple(1:length(monthly_fields)),
+        bcf_info.monthly_fields[1] .= scaling_function(
+            hdread_regridfile(comms_ctx, outfile_root, all_dates[Int(midmonth_idx0)], varname),
+            bcf_info,
         )
+        bcf_info.monthly_fields[2] .= deepcopy(bcf_info.monthly_fields[1])
         bcf_info.segment_length .= FT(0)
     elseif Dates.days(date - all_dates[end - 1]) > 0 # for fini
         @warn "this time period is after BC data - using file from $(all_dates[end - 1])"
-        map(
-            x ->
-                bcf_info.monthly_fields[x] .= scaling_function(
-                    ncreader_cgll_sparse_to_field(
-                        datafile_cgll,
-                        varname,
-                        weightfile,
-                        (Int(length(all_dates)),),
-                        boundary_space,
-                    )[1],
-                    bcf_info,
-                ),
-            Tuple(1:length(monthly_fields)),
+        bcf_info.monthly_fields[1] .= scaling_function(
+            hdread_regridfile(comms_ctx, outfile_root, all_dates[Int(length(all_dates))], varname),
+            bcf_info,
         )
+        bcf_info.monthly_fields[2] .= deepcopy(bcf_info.monthly_fields[1])
         bcf_info.segment_length .= FT(0)
     elseif Dates.days(date - all_dates[Int(midmonth_idx + 1)]) > 2 # throw error when there are closer initial indices for the bc file data that matches this date0
         nearest_idx =
@@ -184,19 +149,13 @@ function update_midmonth_data!(date, bcf_info)
         midmonth_idx = bcf_info.segment_idx[1] += Int(1)
         @warn "On $date updating monthly data files: mid-month dates = [ $(all_dates[Int(midmonth_idx)]) , $(all_dates[Int(midmonth_idx+1)]) ]"
         bcf_info.segment_length .= (all_dates[Int(midmonth_idx + 1)] - all_dates[Int(midmonth_idx)]).value
-        map(
-            x ->
-                bcf_info.monthly_fields[x] .= scaling_function(
-                    ncreader_cgll_sparse_to_field(
-                        datafile_cgll,
-                        varname,
-                        weightfile,
-                        (Int(midmonth_idx), Int(midmonth_idx + 1)),
-                        boundary_space,
-                    )[x],
-                    bcf_info,
-                ),
-            Tuple(1:length(monthly_fields)),
+        bcf_info.monthly_fields[1] .= scaling_function(
+            hdread_regridfile(comms_ctx, outfile_root, all_dates[Int(midmonth_idx)], varname),
+            bcf_info,
+        )
+        bcf_info.monthly_fields[2] .= scaling_function(
+            hdread_regridfile(comms_ctx, outfile_root, all_dates[Int(midmonth_idx + 1)], varname),
+            bcf_info,
         )
     else
         @error "Check boundary file specification"

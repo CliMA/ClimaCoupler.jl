@@ -12,12 +12,6 @@ struct OnlineConservationCheck{A} <: AbstractCheck
     friction_sink::A
 end
 
-function array2field(array, space) # reversing the RRTMGP function field2array (TODO: this now exists in ClimaAtmos)
-    FT = eltype(array)
-    Nq = Spaces.Quadratures.polynomial_degree(space.horizontal_space.quadrature_style) + 1
-    ne = space.horizontal_space.topology.mesh.ne
-    return Fields.Field(VIJFH{FT, Nq}(reshape(array, size(array, 1), Nq, Nq, 1, ne * ne * 6)), space)
-end
 
 """
      check_conservation(
@@ -62,19 +56,19 @@ function check_conservation(cc::OnlineConservationCheck, coupler_sim)
         n_faces = length(z[:, 1, 1, 1, 1])
 
         LWd_TOA = Fields.level(
-            array2field(FT.(atmos_sim.integrator.p.rrtmgp_model.face_lw_flux_dn), face_space),
+            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.rrtmgp_model.face_lw_flux_dn), face_space),
             n_faces - half,
         )
         LWu_TOA = Fields.level(
-            array2field(FT.(atmos_sim.integrator.p.rrtmgp_model.face_lw_flux_up), face_space),
+            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.rrtmgp_model.face_lw_flux_up), face_space),
             n_faces - half,
         )
         SWd_TOA = Fields.level(
-            array2field(FT.(atmos_sim.integrator.p.rrtmgp_model.face_sw_flux_dn), face_space),
+            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.rrtmgp_model.face_sw_flux_dn), face_space),
             n_faces - half,
         )
         SWu_TOA = Fields.level(
-            array2field(FT.(atmos_sim.integrator.p.rrtmgp_model.face_sw_flux_up), face_space),
+            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.rrtmgp_model.face_sw_flux_up), face_space),
             n_faces - half,
         )
 

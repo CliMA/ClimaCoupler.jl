@@ -13,8 +13,7 @@ include("masker.jl")
 include("../artifacts.jl")
 include("../atmos/atmos_init.jl")
 include("general_helper.jl")
-# include("calendar_timer.jl")
-# include("bcfile_reader.jl")
+include("bcfile_reader.jl")
 
 # test setup
 TEST_DATA_DIR = "tmp_test_data/"
@@ -45,6 +44,7 @@ dummy_data = (; test_data = zeros(axes(land_mask_t)))
 
 _info = bcfile_info_init(
     FT,
+    ClimaComms.SingletonCommsContext(),
     sst_data,
     "SST",
     boundary_space_t,
@@ -107,7 +107,7 @@ function test_monthly_accumulation()
         # monthly averages
         @calendar_callback :(
             map(x -> x ./= cs_t.monthly_state_diags.ct[1], cs_t.monthly_state_diags.fields),
-            save_hdf5(cs_t.monthly_state_diags.fields, cs_t.date[1], TEST_DATA_DIR),
+            save_hdf5(cs.comms_ctx, cs_t.monthly_state_diags.fields, cs_t.date[1], TEST_DATA_DIR),
             map(x -> x .= FT(0), cs_t.monthly_state_diags.fields),
             cs_t.monthly_state_diags.ct .= FT(0),
         ) cs_t.date[1] cs_t.date1[1]
@@ -162,7 +162,7 @@ function test_surfacearea_ones()
     gen_data_all_ones!(mask_data, varname)
 
     # init land-sea mask
-    land_mask = LandSeaMask(FT, mask_data, varname, boundary_space_t)
+    land_mask = LandSeaMask(FT, ClimaComms.SingletonCommsContext(), mask_data, varname, boundary_space_t)
 
     @test sum(land_mask) ≈ 4 * π * (radius^2)
 

@@ -1,6 +1,9 @@
 # coupler_driver
 # don't forget to run with threading: julia --project --threads 8 (MPI not that useful for debugging coarse runs)
 
+# setup MPI context if distributed
+include("mpi/mpi_init.jl")
+
 import SciMLBase: step!
 using OrdinaryDiffEq
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
@@ -16,6 +19,7 @@ include("cli_options.jl")
 
 # read in some parsed args
 mode_name = parsed_args["mode_name"]
+run_name = parsed_args["run_name"]
 energy_check = parsed_args["energy_check"]
 const FT = parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim_name = "bucket"
@@ -41,9 +45,10 @@ parsed_args["moist"] = "equil"
 
 import ClimaCoupler
 pkg_dir = pkgdir(ClimaCoupler)
-COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth/output", mode_name)
-isdir(COUPLER_OUTPUT_DIR) ? nothing : mkpath(COUPLER_OUTPUT_DIR)
+COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth/output", joinpath(mode_name, run_name))
+!isdir(COUPLER_OUTPUT_DIR) && mkpath(COUPLER_OUTPUT_DIR)
 REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp/")
+mkpath(REGRID_DIR)
 
 # get the paths to the necessary data files - land sea mask, sst map, sea ice concentration
 include("artifacts.jl")
@@ -60,9 +65,6 @@ include("coupler_utils/variable_definer.jl")
 include("coupler_utils/diagnostics_gatherer.jl")
 include("coupler_utils/offline_postprocessor.jl")
 
-# init MPI
-# include("mpi/mpi_init.jl") # TODO: requires disabling MPI spec in ClimaAtmos 
-
 # init atmos model component
 include("atmos/atmos_init.jl")
 atmos_sim = atmos_init(FT, Y, integrator, params = params);
@@ -71,7 +73,7 @@ atmos_sim = atmos_init(FT, Y, integrator, params = params);
 boundary_space = atmos_sim.domain.face_space.horizontal_space # global surface grid
 
 # init land-sea mask
-land_mask = LandSeaMask(FT, mask_data, "LSMASK", boundary_space, mono = mono_surface)
+land_mask = LandSeaMask(FT, comms_ctx, mask_data, "LSMASK", boundary_space, mono = mono_surface)
 
 # init surface (slab) model components
 include("slab/slab_utils.jl")
@@ -86,11 +88,12 @@ land_sim =
 
 @info mode_name
 if mode_name == "amip"
-    println("No ocean sim - do not expect energy conservation")
+    println("AMIP boundary conditions - do not expect energy conservation")
 
     # 2. ocean
     SST_info = bcfile_info_init(
         FT,
+        comms_ctx,
         sst_data,
         "SST",
         boundary_space,
@@ -100,6 +103,7 @@ if mode_name == "amip"
         date0 = date0,
         mono = mono_surface,
     )
+
     update_midmonth_data!(date0, SST_info)
     SST_init = interpolate_midmonth_to_daily(date0, SST_info)
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
@@ -110,14 +114,14 @@ if mode_name == "amip"
             SST_info = SST_info,
         )
     )
-
     # 3. sea ice
     SIC_info = bcfile_info_init(
         FT,
+        comms_ctx,
         sic_data,
         "SEAICE",
         boundary_space,
-        interpolate_daily = false,
+        interpolate_daily = true,
         scaling_function = clean_sic, # convert to fractions
         land_mask = land_mask,
         date0 = date0,
@@ -181,6 +185,7 @@ monthly_2d_diags = (;
 
 # 5. coupler simulation
 cs = CouplerSimulation(
+    comms_ctx,
     FT(Δt_cpl),
     integrator.t,
     tspan,
@@ -212,7 +217,7 @@ mode_name == "amip" ? (ice_pull!(cs), reinit!(ice_sim.integrator)) : nothing
 mode_name == "slabplanet" ? (ocean_pull!(cs), reinit!(ocean_sim.integrator)) : nothing
 
 # init conservation info collector
-if !simulation.is_distributed && energy_check && mode_name == "slabplanet"
+if !is_distributed && energy_check && mode_name == "slabplanet"
     conservation_check = OnlineConservationCheck([], [], [], [], [], [], [])
     check_conservation(conservation_check, cs)
 end
@@ -253,13 +258,25 @@ function solve_coupler!(cs, energy_check)
             # save and reset monthly averages
             @calendar_callback :(
                 map(x -> x ./= cs.monthly_3d_diags.ct[1], cs.monthly_3d_diags.fields),
-                save_hdf5(cs.monthly_3d_diags.fields, cs.dates.date[1], COUPLER_OUTPUT_DIR, name_tag = "3d_"),
+                save_hdf5(
+                    cs.comms_ctx,
+                    cs.monthly_3d_diags.fields,
+                    cs.dates.date[1],
+                    COUPLER_OUTPUT_DIR,
+                    name_tag = "3d_",
+                ),
                 map(x -> x .= FT(0), cs.monthly_3d_diags.fields),
                 cs.monthly_3d_diags.ct .= FT(0),
             ) cs.dates.date[1] cs.dates.date1[1]
             @calendar_callback :(
                 map(x -> x ./= cs.monthly_2d_diags.ct[1], cs.monthly_2d_diags.fields),
-                save_hdf5(cs.monthly_2d_diags.fields, cs.dates.date[1], COUPLER_OUTPUT_DIR, name_tag = "2d_"),
+                save_hdf5(
+                    cs.comms_ctx,
+                    cs.monthly_2d_diags.fields,
+                    cs.dates.date[1],
+                    COUPLER_OUTPUT_DIR,
+                    name_tag = "2d_",
+                ),
                 map(x -> x .= FT(0), cs.monthly_2d_diags.fields),
                 cs.monthly_2d_diags.ct .= FT(0),
             ) cs.dates.date[1] cs.dates.date1[1]
@@ -268,6 +285,8 @@ function solve_coupler!(cs, energy_check)
 
         # run component models sequentially for one coupling timestep (Δt_cpl)
         # 1. atmos
+        ClimaComms.barrier(comms_ctx)
+
         atmos_pull!(cs)
         step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
         atmos_push!(cs)
@@ -306,85 +325,94 @@ end
 solve_coupler!(cs, energy_check);
 
 # postprocessing
-isdir(COUPLER_OUTPUT_DIR * "_artifacts") ? nothing : mkpath(COUPLER_OUTPUT_DIR * "_artifacts")
+if ClimaComms.iamroot(comms_ctx)
+    isdir(COUPLER_OUTPUT_DIR * "_artifacts") ? nothing : mkpath(COUPLER_OUTPUT_DIR * "_artifacts")
 
-# 1. energy check plots
-if energy_check && cs.mode.name == "slabplanet"
-    @info "Energy Check"
-    plot_global_energy(
-        conservation_check,
-        cs,
-        joinpath(COUPLER_OUTPUT_DIR * "_artifacts", "total_energy_bucket.png"),
-        joinpath(COUPLER_OUTPUT_DIR * "_artifacts", "total_energy_log_bucket.png"),
-    )
-end
+    # 1. energy check plots
+    if !is_distributed && energy_check && cs.mode.name == "slabplanet"
+        @info "Energy Check"
+        plot_global_energy(
+            conservation_check,
+            cs,
+            joinpath(COUPLER_OUTPUT_DIR * "_artifacts", "total_energy_bucket.png"),
+            joinpath(COUPLER_OUTPUT_DIR * "_artifacts", "total_energy_log_bucket.png"),
+        )
+    end
 
-# 2. animations
-if parsed_args["anim"]
-    @info "Animations"
-    include("coupler_utils/viz_explorer.jl")
-    plot_anim(cs, COUPLER_OUTPUT_DIR * "_artifacts")
-end
+    # 2. animations
+    if !is_distributed && parsed_args["anim"]
+        @info "Animations"
+        include("coupler_utils/viz_explorer.jl")
+        plot_anim(cs, COUPLER_OUTPUT_DIR * "_artifacts")
+    end
 
-# 3. plotting AMIP results
-if cs.mode.name == "amip"
-    @info "AMIP plots"
-    include("coupler_utils/plotter.jl")
+    # 3. plotting AMIP results
+    if cs.mode.name == "amip"
+        @info "AMIP plots"
 
-    # ClimaESM
-    include("coupler_utils/amip_visualizer.jl")
-    post_spec = (;
-        T = (:regridded_3d, :zonal_mean),
-        u = (:regridded_3d, :zonal_mean),
-        q_tot = (:regridded_3d, :zonal_mean),
-        toa = (:regridded_2d, :horizontal_2d),
-        precipitation = (:regridded_2d, :horizontal_2d),
-        T_sfc = (:regridded_2d, :horizontal_2d),
-    )
-    plot_spec = (; # optional plotting args
-        T = (; clims = (190, 320), units = "K"),
-        u = (; clims = (-50, 50), units = "m/s"),
-        q_tot = (; clims = (0, 50), units = "g/kg"),
-        toa = (; clims = (-250, 210), units = "W/m^2"),
-        precipitation = (clims = (0, 1e-6), units = "kg/m^2/s"),
-        T_sfc = (clims = (225, 310), units = "K"),
-    )
-    amip_paperplots(
-        post_spec,
-        plot_spec,
-        COUPLER_OUTPUT_DIR,
-        files_root = ".monthly",
-        output_dir = COUPLER_OUTPUT_DIR * "_artifacts",
-    )
+        include("coupler_utils/plotter.jl")
 
-    # NCEP reanalysis
-    @info "NCEP plots"
-    include("coupler_utils/ncep_visualizer.jl")
-    ncep_post_spec = (;
-        T = (:zonal_mean,),
-        u = (:zonal_mean,),
-        q_tot = (:zonal_mean,),
-        toa = (:horizontal_2d,),
-        precipitation = (:horizontal_2d,),
-        T_sfc = (:horizontal_2d,),
-    )
-    ncep_plot_spec = plot_spec
-    ncep_paperplots(ncep_post_spec, ncep_plot_spec, COUPLER_OUTPUT_DIR, output_dir = COUPLER_OUTPUT_DIR * "_artifacts") # plot data that correspond to the model's last save_hdf5 call (i.e., last month)
+        # ClimaESM
+        include("coupler_utils/amip_visualizer.jl")
+        post_spec = (;
+            T = (:regridded_3d, :zonal_mean),
+            u = (:regridded_3d, :zonal_mean),
+            q_tot = (:regridded_3d, :zonal_mean),
+            toa = (:regridded_2d, :horizontal_2d),
+            precipitation = (:regridded_2d, :horizontal_2d),
+            T_sfc = (:regridded_2d, :horizontal_2d),
+        )
+
+        plot_spec = (; # optional plotting args
+            T = (; clims = (190, 320), units = "K"),
+            u = (; clims = (-50, 50), units = "m/s"),
+            q_tot = (; clims = (0, 50), units = "g/kg"),
+            toa = (; clims = (-250, 210), units = "W/m^2"),
+            precipitation = (clims = (0, 1e-6), units = "kg/m^2/s"),
+            T_sfc = (clims = (225, 310), units = "K"),
+        )
+        amip_paperplots(
+            post_spec,
+            plot_spec,
+            COUPLER_OUTPUT_DIR,
+            files_root = ".monthly",
+            output_dir = COUPLER_OUTPUT_DIR * "_artifacts",
+        )
+
+        # NCEP reanalysis
+        @info "NCEP plots"
+        include("coupler_utils/ncep_visualizer.jl")
+        ncep_post_spec = (;
+            T = (:zonal_mean,),
+            u = (:zonal_mean,),
+            q_tot = (:zonal_mean,),
+            toa = (:horizontal_2d,),
+            precipitation = (:horizontal_2d,),
+            T_sfc = (:horizontal_2d,),
+        )
+        ncep_plot_spec = plot_spec
+        ncep_paperplots(
+            ncep_post_spec,
+            ncep_plot_spec,
+            COUPLER_OUTPUT_DIR,
+            output_dir = COUPLER_OUTPUT_DIR * "_artifacts",
+        ) # plot data that correspond to the model's last save_hdf5 call (i.e., last month)
+    end
+
+    rm(COUPLER_OUTPUT_DIR; recursive = true, force = true) # TODO: Where should this live?
 end
 
 # unit tests (to be moved to `test/`)
-if cs.mode.name == "amip"
+if !is_distributed && cs.mode.name == "amip"
     @info "Unit Tests"
     include("coupler_utils/unit_tester.jl")
 end
 
-
 # Cleanup temporary files
-rm(COUPLER_OUTPUT_DIR; recursive = true, force = true) # TODO: Where should this live?
-
 # TODO:
 # - cs needs to be global for the monthly macro - explore other solutions
 # - SST_init is modified with SST_info even with deepcopy...
 # - replace if statements with dipatches, write better abstractions
 # - add spin up for AMIP
 # - do nothing for the parts of the domain that are masked out - aware of MPI and fracitonal surfaces  
+# - add an energy check for MPI runs

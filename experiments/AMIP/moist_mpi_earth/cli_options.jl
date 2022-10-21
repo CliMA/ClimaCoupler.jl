@@ -3,6 +3,10 @@ function parse_commandline()
     s = ArgParse.ArgParseSettings()
     ArgParse.@add_arg_table s begin
         # ClimaCoupler flags
+        "--run_name"
+        help = "Name of this run."
+        arg_type = String
+        default = "run"
         "--dt_cpl"
         help = " Coupling time step in seconds"
         arg_type = Int

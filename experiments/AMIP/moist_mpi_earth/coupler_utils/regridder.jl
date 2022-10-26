@@ -168,10 +168,17 @@ function dummmy_remap!(target, source)
 end
 
 """
-    remap_field_cgll2rll(name::Symbol, field::Fields.Field, remap_tmpdir, datafile_latlon)
+    remap_field_cgll_to_rll(name::Symbol, field::Fields.Field, remap_tmpdir, datafile_latlon)
 Remap individual Field from model (CGLL) nodes to a lat-lon (RLL) grid using TempestRemap
 """
-function remap_field_cgll2rll(name::Symbol, field::Fields.Field, remap_tmpdir, datafile_latlon; nlat = 90, nlon = 180)
+function remap_field_cgll_to_rll(
+    name::Symbol,
+    field::Fields.Field,
+    remap_tmpdir,
+    datafile_latlon;
+    nlat = 90,
+    nlon = 180,
+)
 
     space = axes(field)
     hspace = :topology in propertynames(space) ? space : space.horizontal_space

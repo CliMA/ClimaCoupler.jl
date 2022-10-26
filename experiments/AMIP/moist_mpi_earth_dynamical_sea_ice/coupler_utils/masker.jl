@@ -1,6 +1,6 @@
 # TODO: build abstraction
 # abstract type AbstractMaskType end
-# struct LandSeaMask{I, FT, D} <: AbstractMaskType
+# struct land_sea_mask{I, FT, D} <: AbstractMaskType
 #     infile:: String
 #     ne:: I 
 #     Nq:: I 
@@ -8,14 +8,14 @@
 #     data:: D
 # end
 
-function LandSeaMask(FT, infile, varname, h_space; outfile = "data_cc.nc")
+function land_sea_mask(FT, infile, varname, h_space; outfile = "data_cc.nc")
     R = h_space.topology.mesh.domain.radius
     ne = h_space.topology.mesh.ne
     Nq = Spaces.Quadratures.polynomial_degree(h_space.quadrature_style) + 1
 
     mask = ncreader_rll_to_cgll(FT, infile, varname, ne = ne, R = R, Nq = Nq)
     mask = clean_mask.(FT, mask)
-    # LandSeaMask(infile, ne, Nq, R, mask)
+    # land_sea_mask(infile, ne, Nq, R, mask)
 end
 
 """

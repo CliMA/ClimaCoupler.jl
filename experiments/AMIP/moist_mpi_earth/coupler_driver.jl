@@ -64,6 +64,18 @@ using ClimaCore: InputOutput
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
 
+# modify parsed args for fast testing from REPL #hide
+if isinteractive()
+    parsed_args["coupled"] = true #hide
+    parsed_args["moist"] = "equil" #hide
+    parsed_args["vert_diff"] = true #hide
+    parsed_args["rad"] = "gray" #hide
+    parsed_args["microphy"] = "0M" #hide
+    parsed_args["energy_check"] = true
+    parsed_args["precip_model"] = "0M" #hide
+    parsed_args["mode_name"] = "slabplanet" #hide
+end
+
 ## read in some parsed command line arguments 
 mode_name = parsed_args["mode_name"]
 run_name = parsed_args["run_name"]
@@ -125,8 +137,8 @@ atmosphere and surface are of the same horizontal resolution.
 ## init a 2D bounary space at the surface
 boundary_space = atmos_sim.domain.face_space.horizontal_space
 
-## init land-sea mask
-land_mask = LandSeaMask(FT, comms_ctx, mask_data, "LSMASK", boundary_space, mono = mono_surface)
+# init land-sea mask
+land_mask = land_sea_mask(FT, REGRID_DIR, comms_ctx, mask_data, "LSMASK", boundary_space, mono = mono_surface)
 
 ## init surface (slab) model components
 include("slab/slab_utils.jl")

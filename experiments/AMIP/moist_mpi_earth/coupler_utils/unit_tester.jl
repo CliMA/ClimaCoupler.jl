@@ -167,7 +167,7 @@ function test_surfacearea_ones()
     gen_data_all_ones!(mask_data, varname)
 
     # init land-sea mask
-    land_mask = LandSeaMask(FT, ClimaComms.SingletonCommsContext(), mask_data, varname, boundary_space_t)
+    land_mask = land_sea_mask(FT, REGRID_DIR, ClimaComms.SingletonCommsContext(), mask_data, varname, boundary_space_t)
 
     @test sum(land_mask) ≈ 4 * π * (radius^2)
 

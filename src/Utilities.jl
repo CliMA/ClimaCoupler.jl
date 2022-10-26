@@ -6,14 +6,15 @@ modules in the coupler.
 =#
 module Utilities
 
-using ClimaCore: ClimaCore, Fields, Spaces
+using ClimaCore: ClimaCore, Fields, Spaces, Domains, Meshes, Topologies
+using ClimaComms
 
-export CouplerSimulation, heaviside, swap_space!
+export CoupledSimulation, heaviside, swap_space!, create_space
 
 """
 Stores information needed to run a simulation with the coupler. 
 """
-struct CouplerSimulation{I, F, S, D, B, T, P}
+struct CoupledSimulation{I, F, S, D, B, T, FV, P, E}
     Δt_cpl::I
     t::F
     tspan::S
@@ -21,19 +22,20 @@ struct CouplerSimulation{I, F, S, D, B, T, P}
     boundary_space::B
     FT::T
     surface_masks::NamedTuple
-    fields::NamedTuple
+    fields::FV
     model_sims::NamedTuple
     mode::NamedTuple
     parsed_args::P
     monthly_3d_diags::NamedTuple
     monthly_2d_diags::NamedTuple
+    conservation_checks::E
 end
 
 """
     heaviside(var)
 
-Implements the heaviside step function, returning 0 for negative inputs
-and the input value itself for non-negative inputs.
+Implements the heaviside step function multiplied by `var`, returning 0 for negative inputs
+or the input value itself for non-negative inputs.
 
 # Arguments
 - `var`: [Integer or Float] value to apply heaviside to.

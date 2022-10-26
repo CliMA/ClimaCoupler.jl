@@ -19,7 +19,7 @@ export write_to_hdf5,
     read_from_hdf5, dummmy_remap!, remap_field_cgll_to_rll, land_sea_mask, update_masks!, combine_surfaces!
 
 FT_dot(x) = FT.(x)
-nans_to_zero(v) = isnan(v) ? FT(0) : v
+nans_to_zero(v) = isnan(v) ? typeof(v)(0) : v
 
 """
     reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R)
@@ -382,15 +382,15 @@ function land_sea_mask(
 end
 
 """
-    update_masks!(cs::CouplerSimulation)
+    update_masks!(cs::CoupledSimulation)
 
 Updates dynamically changing masks.
 Maintains the invariant that the sum of masks is 1 at all points.
 
 # Arguments
-- `cs`: [CouplerSimulation] containing mask information.
+- `cs`: [CoupledSimulation] containing mask information.
 """
-function update_masks!(cs::CouplerSimulation)
+function update_masks!(cs::CoupledSimulation)
     # dynamic masks
     ice_d = cs.model_sims.ice_sim.integrator.p.ice_mask
     FT = eltype(ice_d)

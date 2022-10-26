@@ -6,10 +6,10 @@ modules in the coupler.
 =#
 module Utilities
 
-using ClimaCore: ClimaCore, Fields, Spaces, Domains, Meshes, Topologies
-using ClimaComms
+using ClimaCore: Fields, Spaces
 
 export CoupledSimulation, float_type, heaviside, swap_space!, create_space
+
 
 """
 Stores information needed to run a simulation with the coupler. 

@@ -11,21 +11,21 @@ implementation, and information about them is located [here](https://github.com/
 ## Regridder API
 
 ```@docs
-    ClimaCoupler.Regridder.write_to_hdf5
-    ClimaCoupler.Regridder.read_from_hdf5
-    ClimaCoupler.Regridder.dummmy_remap!
-    ClimaCoupler.Regridder.remap_field_cgll_to_rll
-    ClimaCoupler.Regridder.land_sea_mask
-    ClimaCoupler.Regridder.update_masks!
-    ClimaCoupler.Regridder.combine_surfaces!
+ClimaCoupler.Regridder.write_to_hdf5
+ClimaCoupler.Regridder.read_from_hdf5
+ClimaCoupler.Regridder.dummmy_remap!
+ClimaCoupler.Regridder.remap_field_cgll_to_rll
+ClimaCoupler.Regridder.land_sea_mask
+ClimaCoupler.Regridder.update_masks!
+ClimaCoupler.Regridder.combine_surfaces!
 ```
 
 
 ## Regridder Internal Functions
 
 ```@docs
-    ClimaCoupler.Regridder.reshape_cgll_sparse_to_field!
-    ClimaCoupler.Regridder.hdwrite_regridfile_rll_to_cgll
-    ClimaCoupler.Regridder.write_datafile_cc
-    ClimaCoupler.Regridder.binary_mask
+ClimaCoupler.Regridder.reshape_cgll_sparse_to_field!
+ClimaCoupler.Regridder.hdwrite_regridfile_rll_to_cgll
+ClimaCoupler.Regridder.write_datafile_cc
+ClimaCoupler.Regridder.binary_mask
 ```

@@ -13,8 +13,8 @@ regridding, unit conversions, or filtering.
 ## Coupler Object API
 
 ```@docs
-    ClimaCoupler.CouplerState
-    ClimaCoupler.coupler_add_field!
-    ClimaCoupler.coupler_put!
-    ClimaCoupler.coupler_get
+ClimaCoupler.CouplerState
+ClimaCoupler.coupler_add_field!
+ClimaCoupler.coupler_put!
+ClimaCoupler.coupler_get
 ```

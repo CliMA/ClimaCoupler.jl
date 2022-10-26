@@ -7,7 +7,7 @@ modules in the coupler.
 ## Utilities API
 
 ```@docs
-    ClimaCoupler.Utilities.CouplerSimulation
-    ClimaCoupler.Utilities.heaviside
-    ClimaCoupler.Utilities.swap_space!
+ClimaCoupler.Utilities.CouplerSimulation
+ClimaCoupler.Utilities.heaviside
+ClimaCoupler.Utilities.swap_space!
 ```

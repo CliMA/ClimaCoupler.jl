@@ -34,7 +34,7 @@ struct BCFileInfo{FT, X, S, V, D, C, O, M}
     interpolate_daily::Bool
 end
 
-BCFileInfo{FT}(args...) = BCFileInfo{FT, typeof.(args[1:7])...}(args...)
+BCFileInfo{FT}(args...) where {FT} = BCFileInfo{FT, typeof.(args[1:7])...}(args...)
 
 float_type(::BCFileInfo{FT}) where {FT} = FT
 

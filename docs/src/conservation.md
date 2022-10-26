@@ -9,8 +9,8 @@ Note that kinetic energy is not included in the calculation of the global energy
 ## Coupler Object API
 
 ```@docs
-    ClimaCoupler.ConservationChecker.EnergyConservationCheck
-    ClimaCoupler.ConservationChecker.WaterConservationCheck
-    ClimaCoupler.ConservationChecker.check_conservation!
-    ClimaCoupler.ConservationChecker.plot_global_conservation
+ClimaCoupler.ConservationChecker.EnergyConservationCheck
+ClimaCoupler.ConservationChecker.WaterConservationCheck
+ClimaCoupler.ConservationChecker.check_conservation!
+ClimaCoupler.ConservationChecker.plot_global_conservation
 ```

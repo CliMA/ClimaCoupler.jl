@@ -19,9 +19,16 @@ steps:
   - label: "init :computer:"
     key: "init_cpu_env"
     command:
+      - echo "--- Instantiate examples env"
       - "julia --project=examples -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=examples -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=examples -e 'using Pkg; Pkg.status()'"
+
+      - echo "--- Download artifacts"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.status()'"
+      - "julia --project=artifacts artifacts/download_artifacts.jl"
 
     agents:
       slurm_cpus_per_task: 8

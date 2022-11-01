@@ -35,6 +35,12 @@ steps:
       - "julia --project=experiments/AMIP/moist_mpi_earth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/AMIP/moist_mpi_earth/ -e 'using Pkg; Pkg.status()'"
 
+      - echo "--- Download artifacts"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.status()'"
+      - "julia --project=artifacts artifacts/download_artifacts.jl"
+
   - wait
 
   - group: "Integration Tests"

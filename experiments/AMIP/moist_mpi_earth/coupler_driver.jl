@@ -51,7 +51,10 @@ REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp/")
 mkpath(REGRID_DIR)
 
 # get the paths to the necessary data files - land sea mask, sst map, sea ice concentration
-include("artifacts.jl")
+include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
+sst_data = joinpath(sst_dataset_path(), "sst.nc")
+sic_data = joinpath(sic_dataset_path(), "sic.nc")
+mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 
 # import coupler utils
 include("coupler_utils/flux_calculator.jl")

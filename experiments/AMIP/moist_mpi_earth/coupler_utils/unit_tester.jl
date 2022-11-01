@@ -5,12 +5,16 @@ using Pkg
 using Dates
 
 # Pkg.activate("../")
-# include("../artifacts.jl")
 
 # import coupler utils
 include("regridder.jl")
 include("masker.jl")
-include("../artifacts.jl")
+cc_dir = dirname(dirname(dirname(dirname(@__DIR__))))
+include(joinpath(cc_dir, "artifacts", "artifact_funcs.jl"))
+sst_data = joinpath(sst_dataset_path(), "sst.nc")
+sic_data = joinpath(sic_dataset_path(), "sic.nc")
+mask_data = joinpath(mask_dataset_path(), "seamask.nc")
+
 include("../atmos/atmos_init.jl")
 include("general_helper.jl")
 include("bcfile_reader.jl")

@@ -1,7 +1,4 @@
-using Pkg.Artifacts
 import ArtifactWrappers as AW
-
-import ClimaCoupler
 
 function sst_dataset_path()
     sst_dataset = AW.ArtifactWrapper(
@@ -38,7 +35,3 @@ function mask_dataset_path()
     )
     return AW.get_data_folder(mask_dataset)
 end
-
-sst_data = joinpath(sst_dataset_path(), "sst.nc")
-sic_data = joinpath(sic_dataset_path(), "sic.nc")
-mask_data = joinpath(mask_dataset_path(), "seamask.nc")

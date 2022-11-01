@@ -146,13 +146,13 @@ function bucket_init(
     earth_param_set = create_lsm_parameters(FT)
     function α_soil(coordinate_point)
         (; lat, long) = coordinate_point
-        return typeof(lat)(0.2)
+        return typeof(lat)(0.4)
     end
 
     α_snow = FT(0.8) # snow albedo
     albedo = BulkAlbedo{FT}(α_snow, α_soil)
     σS_c = FT(0.2)
-    W_f = FT(0.15)
+    W_f = FT(0.5)
     d_soil = FT(3.5) # soil depth
     z_0m = FT(1e-2)
     z_0b = FT(1e-3)
@@ -193,7 +193,7 @@ function bucket_init(
         T_sfc_0 + ΔT
     end
 
-    Y.bucket.W .= 0.14
+    Y.bucket.W .= 0.5#0.14
     Y.bucket.Ws .= 0.0
     Y.bucket.σS .= 0.0
     ρ_sfc = zeros(axes(Y.bucket.W)) .+ FT(1.1)

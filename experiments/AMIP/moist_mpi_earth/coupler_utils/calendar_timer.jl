@@ -2,11 +2,11 @@
 #  - facilitates calendar functions and temporal interpolations
 
 """
-    current_date(t)
+    current_date(cs, t)
 
 Return the model date
 """
-current_date(t) = date0 + Dates.Second(t)
+current_date(cs, t) = cs.dates.date0[1] + Dates.Second(t)
 
 """
     strdate_to_datetime(strdate)
@@ -40,8 +40,6 @@ macro calendar_callback(ex::Expr, model_date::Union{Symbol, Expr}, callback_date
         end
     end
 end
-
-current_date(t) = date0 + Dates.Second(t)
 
 # TODO
 # - unit test for @calendar_callback

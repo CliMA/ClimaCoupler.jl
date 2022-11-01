@@ -24,4 +24,4 @@ function swap_space!(field, new_space)
     return field_out
 end
 
-heaviside(var) = var < 0 ? 0 : var
+heaviside(var, FT) = var < FT(0) ? FT(0) : var

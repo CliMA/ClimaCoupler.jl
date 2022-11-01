@@ -32,7 +32,7 @@ function ice_rhs!(du, u, p, t)
 
     F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc)
     rhs = @. (-F_aero - F_rad + F_conductive) / (params.h * params.ρ * params.c)
-    parent(dY.T_sfc) .= parent(rhs) # apply_mask.(FT, parent(ice_mask), parent(rhs))
+    parent(dY.T_sfc) .= parent(rhs) # apply_mask.(parent(ice_mask), >, parent(rhs), parent(rhs) .* FT(0), FT(0) )
 end
 
 """
@@ -50,8 +50,8 @@ function ice_init(::Type{FT}; tspan, saveat, dt, space, ice_mask, stepper = Eule
         FT(1e-3),
         FT(1e-5),
         FT(273.15),
-        FT(0.0),# k_ice
-        FT(0.38), # albedo
+        FT(2.0),# k_ice
+        FT(0.8), # albedo
     )
 
     Y = slab_ice_space_init(FT, space, params)
@@ -74,3 +74,9 @@ clean_sic(SIC, _info) = swap_space!(SIC, axes(_info.land_mask)) ./ _info.FT(100.
 
 # setting that SIC < 0.5 os counted as ocean if binary remapping of landsea mask. 
 get_ice_mask(h_ice::FT, mono, threshold = 0.5) where {FT} = mono ? h_ice : binary_mask.(h_ice, threshold = threshold)
+
+"""
+apply_mask(mask, condition, yes, no, value = 0.5) 
+- apply mask mased on a threshold value in the mask
+"""
+apply_mask(mask, condition, yes, no, value) = condition(mask, value) ? yes : no

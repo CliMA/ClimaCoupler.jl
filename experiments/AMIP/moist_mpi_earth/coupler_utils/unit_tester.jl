@@ -26,7 +26,7 @@ REGRID_DIR = joinpath(TEST_DATA_DIR, "regrid_tmp/")
 
 FT = Float32
 
-date1 = DateTime(1979, 01, 01, 01, 00, 00)
+date0 = date1 = DateTime(1979, 01, 01, 01, 00, 00)
 date = DateTime(1979, 01, 01, 00, 00, 00)
 tspan = (1, 90 * 86400) # Jan-Mar
 Δt = 1 * 3600
@@ -57,10 +57,10 @@ _info = bcfile_info_init(
     land_mask = land_mask_t,
 )
 
+dates = (; date = [date], date0 = [date0], date1 = [date1])
 cs_t = (;
     _info = _info,
-    date = [date],
-    date1 = [date1],
+    dates = dates,
     SST_all = [],
     updating_dates = [],
     monthly_state_diags = (; fields = deepcopy(dummy_data), ct = [0]),
@@ -70,14 +70,14 @@ cs_t = (;
 function test_update_midmonth_callback()
     # step in time
     walltime = @elapsed for t in ((tspan[1] + Δt):Δt:tspan[end])
-        cs_t.date[1] = current_date(t) # if not global, `date`` is not updated. Check that this still runs when distributed.
+        cs_t.dates.date[1] = current_date(cs_t, t) # if not global, `date`` is not updated. Check that this still runs when distributed.
 
         # monthly read of boundary condition data
         @calendar_callback :(
-            update_midmonth_data!(cs_t.date[1], cs_t._info),
+            update_midmonth_data!(cs_t.dates.date[1], cs_t._info),
             push!(cs_t.SST_all, deepcopy(cs_t._info.monthly_fields[1])),
-            push!(cs_t.updating_dates, deepcopy(cs_t.date[1])),
-        ) cs_t.date[1] next_date_in_file(cs_t._info)
+            push!(cs_t.updating_dates, deepcopy(cs_t.dates.date[1])),
+        ) cs_t.dates.date[1] next_date_in_file(cs_t._info)
 
     end
     @show walltime
@@ -101,7 +101,7 @@ test_interpol(boundary_space_t)
 function test_monthly_accumulation()
 
     walltime = @elapsed for t in ((tspan[1] + Δt):Δt:tspan[end])
-        cs_t.date[1] = current_date(t) # if n
+        cs_t.dates.date[1] = current_date(cs_t, t) # if n
 
         dummy_data.test_data .= 1
 
@@ -111,18 +111,19 @@ function test_monthly_accumulation()
         # monthly averages
         @calendar_callback :(
             map(x -> x ./= cs_t.monthly_state_diags.ct[1], cs_t.monthly_state_diags.fields),
-            save_hdf5(cs.comms_ctx, cs_t.monthly_state_diags.fields, cs_t.date[1], TEST_DATA_DIR),
+            save_hdf5(cs.comms_ctx, cs_t.monthly_state_diags.fields, cs_t.dates.date[1], TEST_DATA_DIR),
             map(x -> x .= FT(0), cs_t.monthly_state_diags.fields),
             cs_t.monthly_state_diags.ct .= FT(0),
-        ) cs_t.date[1] cs_t.date1[1]
+        ) cs_t.dates.date[1] cs_t.dates.date1[1]
         ## step to next calendar month
-        @calendar_callback :(cs_t.date1[1] += Dates.Month(1)) cs_t.date[1] cs_t.date1[1]
+        @calendar_callback :(cs_t.dates.date1[1] += Dates.Month(1)) cs_t.dates.date[1] cs_t.dates.date1[1]
 
     end
 
     # read Feb data
     hdfreader = InputOutput.HDF5Reader(joinpath(TEST_DATA_DIR, "test_data.monthly_1979-02-01T00:00:00.hdf5"))
     hdf5_data = InputOutput.read_field(hdfreader, "test_data")
+    close(hdfreader)
     @test parent(hdf5_data)[1] ≈ 1 # no hours in March 
 
 end

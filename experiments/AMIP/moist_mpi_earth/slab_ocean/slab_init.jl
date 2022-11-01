@@ -41,7 +41,7 @@ function slab_ocean_rhs!(dY, Y, cache, t)
     p, F_aero, F_rad, ocean_mask = cache
     FT = eltype(Y.T_sfc)
     rhs = @. -(F_aero + F_rad) / (p.h * p.ρ * p.c)
-    parent(dY.T_sfc) .= parent(rhs) # apply_mask.(FT, parent(ocean_mask), parent(rhs))
+    parent(dY.T_sfc) .= parent(rhs) .* parent(ocean_mask)# apply_mask.(FT, parent(ocean_mask), parent(rhs))
 end
 
 

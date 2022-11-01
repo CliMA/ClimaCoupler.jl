@@ -1,5 +1,6 @@
 using ClimaCore.Geometry: ⊗
 using ClimaCore.Utilities: half, PlusHalf
+import ClimaAtmos: get_surface_fluxes!
 
 """
     set_ρ_sfc!(ρ_sfc, T_S, integrator)
@@ -52,10 +53,11 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     Fields.bycolumn(axes(Y.c.uₕ)) do colidx
         get_surface_fluxes!(Y, p, colidx)
         # corrections (accounting for inhomogeneous surfaces)
-        @. p.dif_flux_energy_bc[colidx] =
+        @. p.dif_flux_energy_bc[colidx] = # todo: get rid - shouldn't make any difference anyway
             Geometry.WVector(correct_e_over_ice(p.surface_conditions[colidx], ice_mask[colidx]))
         @. p.dif_flux_ρq_tot_bc[colidx] =
             Geometry.WVector(correct_q_over_ice(p.surface_conditions[colidx], ice_mask[colidx]))
+
     end
 end
 correct_e_over_ice(surface_conditions, ice_mask) =

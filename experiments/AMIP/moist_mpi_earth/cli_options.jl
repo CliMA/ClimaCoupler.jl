@@ -70,6 +70,15 @@ function parse_commandline()
         "--forcing"
         help = "Forcing [`nothing` (default), `held_suarez`]"
         arg_type = String
+        "--subsidence"
+        help = "Subsidence [`nothing` (default), `Bomex`, `LifeCycleTan2018`, `Rico`, `DYCOMS`]"
+        arg_type = String
+        "--ls_adv"
+        help = "Large-scale advection [`nothing` (default), `Bomex`, `LifeCycleTan2018`, `Rico`, `ARM_SGP`, `GATE_III`]"
+        arg_type = String
+        "--edmf_coriolis"
+        help = "EDMF coriolis [`nothing` (default), `Bomex`,`LifeCycleTan2018`,`Rico`,`ARM_SGP`,`DYCOMS_RF01`,`DYCOMS_RF02`,`GABLS`]"
+        arg_type = String
         "--vert_diff"
         help = "Vertical diffusion [`false` (default), `true`]"
         arg_type = Bool
@@ -240,7 +249,7 @@ function parse_commandline()
         "--start_date"
         help = "Start date of the simulation"
         arg_type = String
-        default = "19790101"
+        default = "19790321"
         "--topography"
         help = "Define the surface elevation profile [`NoWarp`,`Earth`,`DCMIP200`]"
         arg_type = String

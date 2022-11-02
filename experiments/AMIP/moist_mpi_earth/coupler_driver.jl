@@ -49,9 +49,6 @@ saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
 date0 = date = DateTime(parsed_args["start_date"], dateformat"yyyymmdd")
 mono_surface = parsed_args["mono_surface"]
 
-## enforce coupling at every timestep
-parsed_args["dt"] = string(Δt_cpl) * "secs"
-
 import ClimaCoupler
 pkg_dir = pkgdir(ClimaCoupler)
 COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth/output", joinpath(mode_name, run_name))

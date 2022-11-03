@@ -1,18 +1,17 @@
 include("mpi/mpi_init.jl") # setup MPI context for distributed runs #hide
 
 # # AMIP Driver
-# don't forget to run with threading: julia --project --threads 8 (MPI not that useful for debugging coarse runs) #hide
 
 #=
 ## Overview
 
 AMIP is a standard experimental protocol of the Program for Climate Model Diagnosis & Intercomparison (PCMDI). 
 It is used as a model benchmark for the atmospheric and land model components, while sea-surface temperatures (SST) and sea-ice concentration (SIC)
-are prescribed using time-interpolations between monthly observed data. We use standard datafiles with original sources:
+are prescribed using time-interpolations between monthly observed data. We use standard data files with original sources:
 - SST and SIC: https://gdex.ucar.edu/dataset/158_asphilli.html 
 - land-sea mask: https://www.ncl.ucar.edu/Applications/Data/#cdf
 
-For more information, see the PCMDI's specificarions for [AMIP I](https://pcmdi.github.io/mips/amip/) and [AMIP II](https://pcmdi.github.io/mips/amip2/). 
+For more information, see the PCMDI's specifications for [AMIP I](https://pcmdi.github.io/mips/amip/) and [AMIP II](https://pcmdi.github.io/mips/amip2/). 
 
 This driver contains two modes. The full `AMIP` mode and a `SlabPlanet` (all surfaces are thermal slabs) mode. Since `AMIP` is not a closed system, the 
 `SlabPlanet` mode is useful for checking conservation properties of the coupling. 
@@ -20,7 +19,35 @@ This driver contains two modes. The full `AMIP` mode and a `SlabPlanet` (all sur
 =#
 
 #=
+## Start Up
+Before starting Julia, ensure your environment is properly set up:
+```julia
+module purge
+module load julia/1.8.1 openmpi/4.1.1 hdf5/1.12.1-ompi411 #netcdf-c/4.6.1
+
+export CLIMACORE_DISTRIBUTED="MPI" #include if using MPI, otherwise leave empty
+export JUlIA_MPI_BINARY="system"
+export JULIA_HDF5_PATH=""
+```
+
+Next instantiate/build all packages listed in `Manifest.toml`:
+```julia
+julia --project -e 'using Pkg; Pkg.instantiate(); Pkg.build()'
+julia --project -e 'using Pkg; Pkg.build("MPI"); Pkg.build("HDF5")'
+```
+
+The `coupler_driver.jl` is now ready to be run. You can run a SLURM job (e.g., run `sbatch sbatch_job.sh` from the terminal), or
+you can run directly from the Julia REPL. The latter is recommended for debugging of lightweight simulations, and should be run
+with threading enabled:
+```julia
+julia --project --threads 8
+``` 
+=#
+
+#=
 ## Initialization
+Here we import standard Julia packages, ClimaESM packages, parse in command-line arguments (if none are specified then the defaults in `cli_options.jl` apply).
+We then specify the input data file names. If these are not already downloaded, include `artifacts/download_artifacts.jl`.
 =#
 
 import SciMLBase: step!
@@ -28,10 +55,11 @@ using OrdinaryDiffEq
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
 using LinearAlgebra
 import Test: @test
-using ClimaCore.Utilities: half, PlusHalf
-using ClimaCore: InputOutput
 using Dates
 using UnPack
+
+using ClimaCore.Utilities: half, PlusHalf
+using ClimaCore: InputOutput
 
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
@@ -58,7 +86,7 @@ mkpath(REGRID_DIR)
 @info COUPLER_OUTPUT_DIR
 @info parsed_args
 
-# get the paths to the necessary data files - land sea mask, sst map, sea ice concentration
+## get the paths to the necessary data files - land sea mask, sst map, sea ice concentration
 include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
 sst_data = joinpath(sst_dataset_path(), "sst.nc")
 sic_data = joinpath(sic_dataset_path(), "sic.nc")
@@ -83,14 +111,14 @@ Here we set initial and boundary conditions for each component model.
 
 #=
 ### Atmosphere
-This used the `ClimaAtmos.jl` driver, with parameterization options specified in the command line arguments.
+This uses the `ClimaAtmos.jl` driver, with parameterization options specified in the command line arguments.
 =#
 ## init atmos model component
 include("atmos/atmos_init.jl")
 atmos_sim = atmos_init(FT, Y, integrator, params = params);
 
 #=
-We use a common Space for all global surfaces. This enables the MPI processes to operate on the same columns in both 
+We use a common `Space` for all global surfaces. This enables the MPI processes to operate on the same columns in both 
 the atmospheric and surface components, so exchanges are parallelized. Note this is only possible when the 
 atmosphere and surface are of the same horizontal resolution. 
 =#
@@ -209,7 +237,7 @@ dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)
 
 #=
 ### Online Diagnostics
-User can write custom diagnostics in the `coupler_utils/variable_definer.jl`.`
+User can write custom diagnostics in the `coupler_utils/variable_definer.jl`.
 =#
 ## 3d diagnostics
 monthly_3d_diags_names = (:T, :u, :q_tot)
@@ -290,7 +318,7 @@ function solve_coupler!(cs, energy_check)
 
         if cs.mode.name == "amip"
 
-            ## monthly read of boundary condition data for sea surface temperature (SST) and sea ice concentration (SIC)
+            ## monthly read of boundary condition data for SST and SIC
             @calendar_callback :(update_midmonth_data!(cs.dates.date[1], cs.mode.SST_info)) cs.dates.date[1] next_date_in_file(
                 cs.mode.SST_info,
             )

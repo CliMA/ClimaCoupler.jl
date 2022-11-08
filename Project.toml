@@ -17,6 +17,7 @@ TerminalLoggers = "5d786b92-1e48-4d6f-9151-6b4477ca9bed"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
 [compat]
+ClimaCommsMPI = "0.3"
 ClimaCore = "0.10"
 DocStringExtensions = "0.8, 0.9"
 NCDatasets = "0.12"

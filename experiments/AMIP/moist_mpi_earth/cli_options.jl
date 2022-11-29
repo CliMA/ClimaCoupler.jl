@@ -64,6 +64,9 @@ function parse_commandline()
         help = "Moisture model [`dry` (default), `equil`, `non_equil`]"
         arg_type = String
         default = "dry"
+        "--precip_model"
+        help = "Precipitation model [`nothing` (default), `0M`]"
+        arg_type = String
         "--microphy"
         help = "Microphysics model [`nothing` (default), `0M`]"
         arg_type = String
@@ -148,6 +151,18 @@ function parse_commandline()
         help = "Maximum number of Newton's method iterations (only for ODE algorithms that use Newton's method)"
         arg_type = Int
         default = 1
+        "--use_krylov_method"
+        help = "Whether to use a Krylov method to solve the linear system in Newton's method (only for ODE algorithms from ClimaTimeSteppers.jl)"
+        arg_type = Bool
+        default = false
+        "--krylov_forcing"
+        help = "Relative tolerance for the Krylov method (only used if `use_krylov_method` is `true`)"
+        arg_type = Float64
+        default = Float64(0.1)
+        "--jvp_step_adjustment"
+        help = "Amount by which the step size of the forward difference approximation of the Jacobian-vector product in the Krylov method should be scaled (only used if `use_krylov_method` is `true`)"
+        arg_type = Float64
+        default = Float64(1)
         "--split_ode"
         help = "Use split of ODE problem. Examples: [`true` (implicit, default), `false` (explicit)]"
         arg_type = Bool

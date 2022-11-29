@@ -8,8 +8,8 @@ function atmos_push!(cs)
     csf = cs.fields
     dummmy_remap!(csf.F_A, .-atmos_sim.integrator.p.dif_flux_energy_bc)
     dummmy_remap!(csf.F_E, .-atmos_sim.integrator.p.dif_flux_ρq_tot_bc)
-    dummmy_remap!(csf.P_liq, atmos_sim.integrator.p.col_integrated_rain .+ atmos_sim.integrator.p.col_integrated_snow)
     dummmy_remap!(csf.F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half))
+    dummmy_remap!(csf.P_liq, atmos_sim.integrator.p.col_integrated_rain .+ atmos_sim.integrator.p.col_integrated_snow)
 end
 
 """
@@ -102,7 +102,7 @@ function atmos_pull!(cs)
     z0m_ice = ice_sim.integrator.p.params.z0m
     z0b_ice = ice_sim.integrator.p.params.z0b
 
-    update_masks(cs)
+    update_masks!(cs)
 
     # combine models' surfaces onlo one coupler field 
     combined_field = zeros(boundary_space)

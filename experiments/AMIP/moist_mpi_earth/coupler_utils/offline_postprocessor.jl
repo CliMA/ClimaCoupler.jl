@@ -56,7 +56,7 @@ function postprocess(
         isdir(DIR) ? nothing : mkpath(DIR)
         datafile_latlon =
             (datafile_latlon == nothing) ? datafile_latlon = DIR * "/remapped_" * string(name) * ".nc" : datafile_latlon
-        remap_field_cgll2rll(name, raw_data, DIR, datafile_latlon)
+        remap_field_cgll_to_rll(name, raw_data, DIR, datafile_latlon)
         grid_data = read_remapped_field(name, datafile_latlon)
     else
         @info "No regridding required."

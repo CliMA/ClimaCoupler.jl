@@ -39,7 +39,7 @@ boundary_space = ClimaCore.Fields.level(atmos_sim.domain.face_space, half) # glo
 
 # init land-sea mask
 infile = "data/seamask.nc"
-mask = LandSeaMask(FT, infile, "LSMASK", boundary_space) # TODO: split up the nc file to individual times for faster computation
+mask = land_sea_mask(FT, infile, "LSMASK", boundary_space) # TODO: split up the nc file to individual times for faster computation
 
 # init surface (slab) model components
 include("slab/slab_init.jl") # stub for ClimaLSM's Bucket

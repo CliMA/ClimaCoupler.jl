@@ -22,6 +22,7 @@ UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 [compat]
 ClimaCommsMPI = "0.3"
 ClimaCore = "0.10"
+ClimaCoreTempestRemap = "0.3"
 DocStringExtensions = "0.8, 0.9"
 NCDatasets = "0.11, 0.12"
 PrettyTables = "1.3"

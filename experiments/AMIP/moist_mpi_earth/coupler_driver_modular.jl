@@ -59,7 +59,7 @@ using Dates
 using UnPack
 
 using ClimaCore.Utilities: half, PlusHalf
-using ClimaCore: InputOutput
+using ClimaCore: InputOutput, Fields
 
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
@@ -90,6 +90,11 @@ date0 = date = DateTime(parsed_args["start_date"], dateformat"yyyymmdd")
 mono_surface = parsed_args["mono_surface"]
 
 import ClimaCoupler
+import ClimaCoupler.Regridder: land_sea_mask, update_masks!, combine_surfaces!
+import ClimaCoupler.ConservationChecker:
+    EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
+import ClimaCoupler.Utilities: CoupledSimulation
+
 pkg_dir = pkgdir(ClimaCoupler)
 COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth/output", joinpath(mode_name, run_name))
 !isdir(COUPLER_OUTPUT_DIR) && mkpath(COUPLER_OUTPUT_DIR)
@@ -104,11 +109,9 @@ sst_data = joinpath(sst_dataset_path(), "sst.nc")
 sic_data = joinpath(sic_dataset_path(), "sic.nc")
 mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 
-## import coupler unitilies
+# import coupler utils
 include("coupler_utils/flux_calculator.jl")
-include("coupler_utils/conservation_checker.jl")
-include("coupler_utils/regridder.jl")
-include("coupler_utils/masker.jl")
+include("coupler_utils/regridder.jl") # update_midmonth_data!
 include("coupler_utils/calendar_timer.jl")
 include("coupler_utils/general_helper.jl")
 include("coupler_utils/bcfile_reader.jl")
@@ -237,7 +240,8 @@ save online diagnostics. These are all initialized here and saved in a global `C
 =#
 
 ## coupler exchange fields
-coupler_field_names = (:T_S, :z0m_S, :z0b_S, :ρ_sfc, :q_sfc, :albedo, :F_A, :F_E, :F_R, :P_liq, :P_snow)
+coupler_field_names =
+    (:T_S, :z0m_S, :z0b_S, :ρ_sfc, :q_sfc, :albedo, :F_A, :F_E, :F_R, :P_liq, :P_snow, :F_R_TOA, :P_net)
 coupler_fields =
     NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
 
@@ -268,9 +272,22 @@ monthly_2d_diags = (;
     ct = [0],
 )
 
+#=
+## Initialize Conservation Checks
+=#
+## init conservation info collector
+conservation_checks = nothing
+if energy_check
+    @assert(
+        mode_name == "slabplanet" && !simulation.is_distributed,
+        "Only non-distributed slabplanet allowable for energy_check"
+    )
+    conservation_checks =
+        (; energy = EnergyConservationCheck([], [], [], [], [], []), water = WaterConservationCheck([], [], [], []))
+end
+
 ## coupler simulation
-cs = CouplerSimulation(
-    comms_ctx,
+cs = CoupledSimulation(
     FT(Δt_cpl),
     integrator.t,
     tspan,
@@ -284,7 +301,9 @@ cs = CouplerSimulation(
     parsed_args,
     monthly_3d_diags,
     monthly_2d_diags,
+    conservation_checks,
 );
+
 
 #=
 ## Initial States Exchange 
@@ -303,18 +322,9 @@ mode_name == "amip" ? (ice_pull!(cs), reinit!(ice_sim.integrator)) : nothing
 mode_name == "slabplanet" ? (ocean_pull!(cs), reinit!(ocean_sim.integrator)) : nothing
 
 #=
-## Initialize Conservation Checks
-=#
-## init conservation info collector
-if !is_distributed && energy_check && mode_name == "slabplanet"
-    conservation_check = OnlineConservationCheck([], [], [], [], [], [], [])
-    check_conservation(conservation_check, cs)
-end
-
-#=
 ## Coupling Loop
 =#
-function solve_coupler!(cs, energy_check)
+function solve_coupler!(cs)
     @info "Starting coupling loop"
 
     @unpack model_sims, Δt_cpl, tspan = cs
@@ -374,6 +384,9 @@ function solve_coupler!(cs, energy_check)
 
         end
 
+        ## compute global energy
+        !isnothing(cs.conservation_checks) ? check_conservation!(cs, get_slab_energy, get_land_energy) : nothing
+
         ## run component models sequentially for one coupling timestep (Δt_cpl)
         ## 1. atmos
         ClimaComms.barrier(comms_ctx)
@@ -398,11 +411,6 @@ function solve_coupler!(cs, energy_check)
             step!(ice_sim.integrator, t - ice_sim.integrator.t, true)
         end
 
-        ## compute global energy
-        if !simulation.is_distributed && energy_check && cs.mode.name == "slabplanet"
-            check_conservation(conservation_check, cs)
-        end
-
         ## step to the next calendar month
         @calendar_callback :(cs.dates.date1[1] += Dates.Month(1)) cs.dates.date[1] cs.dates.date1[1]
 
@@ -413,7 +421,7 @@ function solve_coupler!(cs, energy_check)
 end
 
 ## run the coupled simulation
-solve_coupler!(cs, energy_check);
+solve_coupler!(cs);
 
 #=
 ## Postprocessing 
@@ -424,13 +432,19 @@ if ClimaComms.iamroot(comms_ctx)
     isdir(COUPLER_OUTPUT_DIR * "_artifacts") ? nothing : mkpath(COUPLER_OUTPUT_DIR * "_artifacts")
 
     ## energy check plots
-    if !is_distributed && energy_check && cs.mode.name == "slabplanet"
-        @info "Energy Check"
-        plot_global_energy(
-            conservation_check,
+    if !isnothing(cs.conservation_checks) && cs.mode.name == "slabplanet"
+        @info "Conservation Check Plots"
+        plot_global_conservation(
+            cs.conservation_checks.energy,
             cs,
-            joinpath(COUPLER_OUTPUT_DIR * "_artifacts", "total_energy_bucket.png"),
-            joinpath(COUPLER_OUTPUT_DIR * "_artifacts", "total_energy_log_bucket.png"),
+            figname1 = joinpath(COUPLER_OUTPUT_DIR * "_artifacts", "total_energy_bucket.png"),
+            figname2 = joinpath(COUPLER_OUTPUT_DIR * "_artifacts", "total_energy_log_bucket.png"),
+        )
+        plot_global_conservation(
+            cs.conservation_checks.water,
+            cs,
+            figname1 = joinpath(COUPLER_OUTPUT_DIR * "_artifacts", "total_water_bucket.png"),
+            figname2 = joinpath(COUPLER_OUTPUT_DIR * "_artifacts", "total_water_log_bucket.png"),
         )
     end
 
@@ -497,13 +511,4 @@ if ClimaComms.iamroot(comms_ctx)
 
     ## clean up
     rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
-end
-
-#=
-## Temporary Unit Tests 
-To be moved to `test/`
-=#
-if !is_distributed && cs.mode.name == "amip"
-    @info "Unit Tests"
-    include("coupler_utils/unit_tester.jl")
 end

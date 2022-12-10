@@ -2,7 +2,7 @@
     Unit tests for ClimaCoupler Regridder module
 =#
 
-using ClimaCoupler, ClimaCoupler.Utilities, ClimaCoupler.Regridder, ClimaCoupler.TestHelper
+using ClimaCoupler: Utilities, Regridder, TestHelper
 using ClimaCore: ClimaCore, Geometry, Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 using ClimaComms
 using Test
@@ -13,16 +13,16 @@ REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regrid_tmp/")
 FT = Float64
 
 @testset "test dummmy_remap!" begin
-    test_space = create_space(FT)
+    test_space = TestHelper.create_space(FT)
     test_field_ones = Fields.ones(test_space)
     target_field = Fields.zeros(test_space)
 
-    dummmy_remap!(target_field, test_field_ones)
+    Regridder.dummmy_remap!(target_field, test_field_ones)
     @test parent(target_field) == parent(test_field_ones)
 end
 
 @testset "test update_masks!" begin
-    test_space = create_space(FT)
+    test_space = TestHelper.create_space(FT)
     # Construct land mask of 0s in top half, 1s in bottom half
     land_mask = Fields.ones(test_space)
     dims = size(parent(land_mask))
@@ -35,7 +35,7 @@ end
     parent(ice_d)[:, (n ÷ 2 + 1):n, :, :] .= FT(0.5)
 
     # Fill in only the necessary parts of the simulation
-    cs = CouplerSimulation(
+    cs = Utilities.CoupledSimulation(
         nothing,
         nothing,
         nothing,
@@ -49,23 +49,24 @@ end
         nothing,
         (;),
         (;),
+        (;),
     )
 
-    update_masks!(cs)
+    Regridder.update_masks!(cs)
 
     # Test that sum of masks is 1 everywhere
     @test all(parent(cs.surface_masks.ice .+ cs.surface_masks.land .+ cs.surface_masks.ocean) .== FT(1))
 end
 
 @testset "test combine_surfaces!" begin
-    test_space = create_space(FT)
+    test_space = TestHelper.create_space(FT)
     combined_field = Fields.ones(test_space)
 
     # Initialize weights (masks) and initial values (fields)
     masks = (a = 0.0, b = 0.5, c = 2.0, d = -10.0)
     fields = (a = 1.0, b = 1.0, c = 1.0, d = 1.0)
 
-    combine_surfaces!(combined_field::Fields.Field, masks::NamedTuple, fields::NamedTuple)
+    Regridder.combine_surfaces!(combined_field::Fields.Field, masks::NamedTuple, fields::NamedTuple)
     @test all(parent(combined_field) .== FT(sum(masks) * sum(fields) / length(fields)))
 end
 
@@ -79,14 +80,14 @@ if !Sys.iswindows()
 
         hd_outfile_root = "hdf5_out_test"
         tx = Dates.DateTime(1979, 01, 01, 01, 00, 00)
-        test_space = create_space(FT)
+        test_space = TestHelper.create_space(FT)
         input_field = Fields.ones(test_space)
         varname = "testdata"
         comms_ctx = ClimaComms.SingletonCommsContext()
 
-        write_to_hdf5(REGRID_DIR, hd_outfile_root, tx, input_field, varname, comms_ctx)
+        Regridder.write_to_hdf5(REGRID_DIR, hd_outfile_root, tx, input_field, varname, comms_ctx)
 
-        output_field = read_from_hdf5(REGRID_DIR, hd_outfile_root, tx, varname, comms_ctx)
+        output_field = Regridder.read_from_hdf5(REGRID_DIR, hd_outfile_root, tx, varname, comms_ctx)
         @test parent(input_field) == parent(output_field)
 
         # Delete testing directory and files
@@ -101,10 +102,10 @@ if !Sys.iswindows()
         name = "testdata"
         datafile_rll = remap_tmpdir * "/" * name * "_rll.nc"
 
-        test_space = create_space(FT)
+        test_space = TestHelper.create_space(FT)
         field = Fields.ones(test_space)
 
-        remap_field_cgll_to_rll(name, field, remap_tmpdir, datafile_rll)
+        Regridder.remap_field_cgll_to_rll(name, field, remap_tmpdir, datafile_rll)
 
         ncdataset_rll = NCDataset(datafile_rll)
         @test maximum(ncdataset_rll[name]) == maximum(field)
@@ -117,7 +118,7 @@ if !Sys.iswindows()
     @testset "test land_sea_mask" begin
         # Test setup
         R = FT(6371e3)
-        test_space = create_space(FT, R = R)
+        test_space = TestHelper.create_space(FT, R = R)
         comms_ctx = ClimaComms.SingletonCommsContext()
         ispath(REGRID_DIR) ? rm(REGRID_DIR; recursive = true, force = true) : nothing
         mkpath(REGRID_DIR)
@@ -125,10 +126,10 @@ if !Sys.iswindows()
         # Initialize dataset of all ones
         data_path = joinpath(REGRID_DIR, "ls_mask_data.nc")
         varname = "test_data"
-        gen_ncdata(FT, data_path, varname, FT(1))
+        TestHelper.gen_ncdata(FT, data_path, varname, FT(1))
 
         # Test monotone masking
-        land_mask_mono = land_sea_mask(FT, REGRID_DIR, comms_ctx, data_path, varname, test_space, mono = true)
+        land_mask_mono = Regridder.land_sea_mask(FT, REGRID_DIR, comms_ctx, data_path, varname, test_space, mono = true)
 
         # Test no new extrema are introduced in monotone remapping
         dataset = NCDataset(data_path)
@@ -147,10 +148,11 @@ if !Sys.iswindows()
         # Initialize dataset of all 0.5s
         data_path = joinpath(REGRID_DIR, "ls_mask_data.nc")
         varname = "test_data_halves"
-        gen_ncdata(FT, data_path, varname, FT(0.5))
+        TestHelper.gen_ncdata(FT, data_path, varname, FT(0.5))
 
         # Test non-monotone masking
-        land_mask_halves = land_sea_mask(FT, REGRID_DIR, comms_ctx, data_path, varname, test_space, mono = false)
+        land_mask_halves =
+            Regridder.land_sea_mask(FT, REGRID_DIR, comms_ctx, data_path, varname, test_space, mono = false)
         dataset = NCDataset(data_path)
 
         # Masking of values below threshold should result in 0

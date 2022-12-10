@@ -12,7 +12,6 @@ struct OnlineConservationCheck{A} <: AbstractCheck
     friction_sink::A
 end
 
-
 """
      check_conservation(
         cc::OnlineConservationCheck,

@@ -89,9 +89,13 @@ steps:
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --enable_threading true --coupled true  --moist equil --vert_diff true --rad gray --microphy 0M --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface true --h_elem 4 --precip_model 0M"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/run_artifacts/total_energy*.png"
 
-      - label: "Moist earth with slab surface - default: bulk gray no_sponge idealinsol freq_dt_cpl notmono"
+      - label: "Moist earth with slab surface - notmono: bulk gray no_sponge idealinsol freq_dt_cpl notmono"
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --enable_threading true --coupled true  --moist equil --vert_diff true --rad gray --microphy 0M --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface false --h_elem 4 --run_name default_notmono --precip_model 0M"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/default_notmono_artifacts/total_energy*.png"
+
+      - label: "Moist earth with slab surface - notmono + modular: bulk gray no_sponge idealinsol freq_dt_cpl"
+        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --enable_threading true --coupled true  --moist equil --vert_diff true --rad gray --microphy 0M --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface false --h_elem 4 --run_name default_modular --precip_model 0M"
+        artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/default_modular_artifacts/total_energy*.png"
 
       - label: "Moist earth with slab surface - target: monin allsky sponge realinsol infreq_dt_cpl"
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --enable_threading true --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad allskywithclear --microphy 0M --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 3600 --dt 200secs --dt_rad 6hours --idealized_insolation false --mono_surface true --h_elem 6 --run_name target_params_in_slab --precip_model 0M"

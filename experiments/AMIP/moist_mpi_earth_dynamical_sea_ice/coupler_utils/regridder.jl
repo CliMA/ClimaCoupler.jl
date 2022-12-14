@@ -45,9 +45,9 @@ function ncreader_rll_to_cgll(
 )
     isdir(REGRID_DIR) ? nothing : mkpath(REGRID_DIR)
 
-    ds = NCDataset(datafile_rll)
-    nlat = ds.dim["lat"]
-    nlon = ds.dim["lon"]
+    nlat, nlon = NCDataset(datafile_rll) do ds
+        (ds.dim["lat"], ds.dim["lon"])
+    end
 
     meshfile_rll = joinpath(REGRID_DIR, "mesh_rll.g")
     rll_mesh(meshfile_rll; nlat = nlat, nlon = nlon)

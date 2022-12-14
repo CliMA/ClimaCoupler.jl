@@ -107,9 +107,16 @@ if !Sys.iswindows()
 
         Regridder.remap_field_cgll_to_rll(name, field, remap_tmpdir, datafile_rll)
 
-        ncdataset_rll = NCDataset(datafile_rll)
-        @test maximum(ncdataset_rll[name]) == maximum(field)
-        @test minimum(ncdataset_rll[name]) == minimum(field)
+        # Test no new extrema are introduced in monotone remapping
+        nt = NCDataset(datafile_rll) do ds
+            max_remapped = maximum(ds[name])
+            min_remapped = minimum(ds[name])
+            (; max_remapped, min_remapped)
+        end
+        (; max_remapped, min_remapped) = nt
+
+        @test max_remapped <= maximum(field)
+        @test min_remapped >= minimum(field)
 
         # Delete testing directory and files
         rm(REGRID_DIR; recursive = true, force = true)
@@ -132,9 +139,16 @@ if !Sys.iswindows()
         land_mask_mono = Regridder.land_sea_mask(FT, REGRID_DIR, comms_ctx, data_path, varname, test_space, mono = true)
 
         # Test no new extrema are introduced in monotone remapping
-        dataset = NCDataset(data_path)
-        @test maximum(dataset[varname]) >= maximum(land_mask_mono) &&
-              minimum(dataset[varname]) <= minimum(land_mask_mono)
+        nt = NCDataset(data_path) do ds
+            max_val = maximum(ds[varname])
+            min_val = minimum(ds[varname])
+            (; max_val, min_val)
+        end
+        (; max_val, min_val) = nt
+
+        @test maximum(land_mask_mono) <= max_val
+        @test minimum(land_mask_mono) >= min_val
+
         # Test that monotone remapping a dataset of all ones conserves surface area
         @test sum(land_mask_mono) - 4 * π * (R^2) < 10e-14
 
@@ -153,7 +167,6 @@ if !Sys.iswindows()
         # Test non-monotone masking
         land_mask_halves =
             Regridder.land_sea_mask(FT, REGRID_DIR, comms_ctx, data_path, varname, test_space, mono = false)
-        dataset = NCDataset(data_path)
 
         # Masking of values below threshold should result in 0
         @test all(parent(land_mask_halves) .== FT(0))

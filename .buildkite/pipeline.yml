@@ -74,8 +74,8 @@ steps:
         agents:
           config: cpu
           queue: central
-          slurm_nodes: 3
-          slurm_tasks_per_node: 1
+          slurm_nodes: 1
+          slurm_tasks_per_node: 3
 
 
   - group: "Integration Tests"
@@ -134,7 +134,8 @@ steps:
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
         agents:
-          slurm_ntasks: 2
+          slurm_nodes: 1
+          slurm_tasks_per_node: 2
 
       - label: "MPI AMIP FINE"
         key: "mpi_amip_fine"
@@ -143,4 +144,5 @@ steps:
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
         agents:
-          slurm_ntasks: 32
+          slurm_nodes: 1
+          slurm_tasks_per_node: 32

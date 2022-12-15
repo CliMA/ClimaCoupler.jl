@@ -281,6 +281,10 @@ function parse_commandline()
         help = "Apply parameterization for convective gravity wave forcing on horizontal mean flow"
         arg_type = Bool
         default = false
+        "--albedo_from_file"
+        help = "Access land surface albedo information from data file"
+        arg_type = Bool
+        default = true
     end
     parsed_args = ArgParse.parse_args(ARGS, s)
     return (s, parsed_args)

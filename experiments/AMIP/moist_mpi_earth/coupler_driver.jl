@@ -152,7 +152,7 @@ include("slab_ice/slab_init.jl")
 We use `ClimaLSM.jl`'s bucket model.
 =#
 land_sim =
-    bucket_init(FT, FT.(tspan), parsed_args["config"]; dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat))
+    bucket_init(FT, FT.(tspan), parsed_args["config"], parsed_args["albedo_from_file"]; dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat))
 
 #=
 ### Ocean and Sea Ice

@@ -10,11 +10,16 @@ import ClimaLSM.Bucket:
     net_radiation,
     surface_air_density,
     liquid_precipitation,
-    BulkAlbedo,
+    BulkAlbedoMap,
+    BulkAlbedoFunction,
     surface_albedo,
-    snow_precipitation
+    snow_precipitation,
+    # TODO add MapInfo constructor to ClimaLSM so fewer internals exposed
+    cesm2_land_albedo_dataset_path
+import ClimaLSM.Regridder:
+    MapInfo
 
-using ClimaLSM: make_ode_function, initialize, obtain_surface_space
+using ClimaLSM: make_ode_function, initialize, obtain_surface_space, make_set_initial_aux_state
 
 """
     BucketSimulation{P, Y, D, I}
@@ -130,7 +135,8 @@ Initializes the bucket model variables.
 function bucket_init(
     ::Type{FT},
     tspan::Tuple{FT, FT},
-    config::String;
+    config::String,
+    albedo_from_map::Bool;
     space,
     dt::FT,
     saveat::FT,
@@ -144,13 +150,23 @@ function bucket_init(
     end
 
     earth_param_set = create_lsm_parameters(FT)
-    function α_soil(coordinate_point)
-        (; lat, long) = coordinate_point
-        return typeof(lat)(0.4)
-    end
 
     α_snow = FT(0.8) # snow albedo
-    albedo = BulkAlbedo{FT}(α_snow, α_soil)
+    if albedo_from_map # Read in albedo from data file (default)
+        path = cesm2_land_albedo_dataset_path()
+        regrid_dirpath = joinpath(pkgdir(ClimaLSM), "test/Bucket/regridder_tmpfiles")
+        varname = "sw_alb"
+        comms = ClimaComms.SingletonCommsContext()
+        albedo_info = MapInfo(path, varname, regrid_dirpath, comms)
+        albedo = BulkAlbedoMap{FT}(α_snow, albedo_info)
+    else # Pass in spatially-varying function for albedo
+        function α_sfc(coordinate_point)
+            (; lat, long) = coordinate_point
+            return typeof(lat)(0.4)
+        end
+        albedo = BulkAlbedoFunction{FT}(α_snow, α_sfc)
+    end
+    
     σS_c = FT(0.2)
     W_f = FT(0.5)
     d_soil = FT(3.5) # soil depth
@@ -203,6 +219,10 @@ function bucket_init(
     orig_fields = map(x -> getproperty(p.bucket, x), propertynames(p.bucket))
     fields = (orig_fields..., ρ_sfc, P_liq, P_snow)
     p_new = ClimaCore.Fields.FieldVector(; :bucket => (; zip(variable_names, fields)...))
+
+    # Set initial aux variable values
+    set_initial_aux_state! = make_set_initial_aux_state(model)
+    set_initial_aux_state!(p_new, Y, tspan[1])
 
     ode_function! = make_ode_function(model)
 

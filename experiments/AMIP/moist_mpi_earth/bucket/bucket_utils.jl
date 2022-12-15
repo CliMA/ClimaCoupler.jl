@@ -51,7 +51,13 @@ a method for the bucket model
 when used as the land model.
 """
 function land_albedo(slab_sim::BucketSimulation)
-    α_land = surface_albedo.(slab_sim.integrator.p.bucket.α_sfc, slab_sim.params.albedo.α_snow, slab_sim.integrator.u.bucket.σS, slab_sim.params.σS_c)
+    α_land =
+        surface_albedo.(
+            slab_sim.integrator.p.bucket.α_sfc,
+            slab_sim.params.albedo.α_snow,
+            slab_sim.integrator.u.bucket.σS,
+            slab_sim.params.σS_c,
+        )
     return parent(α_land)
 end
 

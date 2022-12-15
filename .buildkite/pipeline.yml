@@ -116,7 +116,12 @@ steps:
       # breaking: 
       # - label: "Moist earth with slab surface - monin allsky no_sponge idealinsol infreq_dt_cpl"
       #   command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --enable_threading true --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad allskywithclear --microphy 0M --rayleigh_sponge false --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 21600 --dt 200secs --dt_rad 6hours --idealized_insolation true --mono_surface true --h_elem 4 --run_name target_params_in_slab1 --precip_model 0M"
-      #   artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/target_params_in_slab1_artifacts/total_energy*.png"       
+      #   artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/target_params_in_slab1_artifacts/total_energy*.png"
+      
+      - label: "Moist earth with slab surface - default: bulk gray no_sponge idealinsol freq_dt_cpl - bucket using BulkAlbedoFunction"
+        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --enable_threading true --coupled true  --moist equil --vert_diff true --rad gray --microphy 0M --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface true --h_elem 4 --precip_model 0M --albedo_from_file false"
+        artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/run_artifacts/total_energy*.png"     
+
 
       - label: "AMIP"
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --enable_threading true --coupled true  --moist equil --vert_diff true --rad gray --microphy 0M --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface false --h_elem 6 --dt_save_restart 10days --run_name coarse_single --precip_model 0M"

@@ -16,8 +16,7 @@ import ClimaLSM.Bucket:
     snow_precipitation,
     # TODO add MapInfo constructor to ClimaLSM so fewer internals exposed
     cesm2_land_albedo_dataset_path
-import ClimaLSM.Regridder:
-    MapInfo
+import ClimaLSM.Regridder: MapInfo
 
 using ClimaLSM: make_ode_function, initialize, obtain_surface_space, make_set_initial_aux_state
 
@@ -166,7 +165,7 @@ function bucket_init(
         end
         albedo = BulkAlbedoFunction{FT}(α_snow, α_sfc)
     end
-    
+
     σS_c = FT(0.2)
     W_f = FT(0.5)
     d_soil = FT(3.5) # soil depth

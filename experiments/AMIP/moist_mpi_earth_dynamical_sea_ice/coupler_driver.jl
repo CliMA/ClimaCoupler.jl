@@ -76,7 +76,7 @@ else
 end
 
 # init coupler
-coupler_sim = CouplerSimulation(FT(Δt_cpl), integrator.t, boundary_space, FT, mask)
+coupler_sim = CouplerSimulation{FT}(boundary_space, mask, integrator.t, FT(Δt_cpl))
 
 # init coupler's boundary fields for regridding (TODO: technically this can be bypassed by directly rigridding on model grids)
 T_S = ClimaCore.Fields.zeros(boundary_space) # temperature

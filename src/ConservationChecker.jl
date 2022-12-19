@@ -273,11 +273,10 @@ end
 
 function plot_global_conservation(
     cc::WaterConservationCheck,
-    coupler_sim::CoupledSimulation;
+    coupler_sim::CoupledSimulation{FT};
     figname1 = "total_water.png",
     figname2 = "total_water_log.png",
-)
-    FT = coupler_sim.FT
+) where {FT}
     times = collect(1:length(cc.ρq_tot_atmos)) * coupler_sim.Δt_cpl
     diff_ρe_tot_atmos = (cc.ρq_tot_atmos .- cc.ρq_tot_atmos[1])
     diff_ρe_tot_slab = (cc.ρq_tot_land .- cc.ρq_tot_land[1]) * FT(1e3)

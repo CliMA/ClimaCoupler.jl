@@ -63,21 +63,20 @@ function coupler_sim_from_file(
     boundary_space = axes(land_mask)
     FT = eltype(land_mask)
 
-    Utilities.CoupledSimulation(
-        Δt_cpl,
-        t,
+    Utilities.CoupledSimulation{FT}(
         tspan,
         dates,
         boundary_space,
-        FT,
-        (; land = land_mask, ocean = FT(1) .- land_mask, ice = land_mask .* FT(0)),
         coupler_fields,
+        parsed_args,
+        conservation_checks,
+        t,
+        Δt_cpl,
+        (; land = land_mask, ocean = FT(1) .- land_mask, ice = land_mask .* FT(0)),
         model_sims,
         mode_specifics,
-        parsed_args,
         monthly_3d_diags,
         monthly_2d_diags,
-        conservation_checks,
     )
 end
 

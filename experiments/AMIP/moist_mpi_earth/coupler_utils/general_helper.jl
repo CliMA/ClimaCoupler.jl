@@ -1,22 +1,24 @@
 # most of these functions are temporary helpers until upstream issues are resolved
 
 # TODO: unify with coupler interface
-struct CouplerSimulation{C, I, F, S, D, B, T, P}
+struct CouplerSimulation{FT, C, S, D, B, P}
     comms_ctx::C
-    Δt_cpl::I
-    t::F
     tspan::S
     dates::D
     boundary_space::B
-    FT::T
+    parsed_args::P
+    t::FT
+    Δt_cpl::FT
     surface_masks::NamedTuple
     fields::NamedTuple
     model_sims::NamedTuple
     mode::NamedTuple
-    parsed_args::P
     monthly_3d_diags::NamedTuple
     monthly_2d_diags::NamedTuple
 end
+
+CouplerSimulation{FT}(args...) where {FT} = CouplerSimulation{FT, typeof.(args[1:5])...}(args...)
+float_type(::CouplerSimulation{FT}) where {FT} = FT
 
 function swap_space!(field, new_space)
     field_out = zeros(new_space)

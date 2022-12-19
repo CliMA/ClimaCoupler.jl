@@ -90,10 +90,10 @@ date0 = date = DateTime(parsed_args["start_date"], dateformat"yyyymmdd")
 mono_surface = parsed_args["mono_surface"]
 
 import ClimaCoupler
-import ClimaCoupler.Regridder: land_sea_mask, update_masks!, combine_surfaces!
+import ClimaCoupler.Regridder: land_sea_mask, update_masks!, combine_surfaces!, dummmy_remap!
 import ClimaCoupler.ConservationChecker:
     EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
-import ClimaCoupler.Utilities: CoupledSimulation
+import ClimaCoupler.Utilities: CoupledSimulation, float_type, swap_space!
 
 pkg_dir = pkgdir(ClimaCoupler)
 COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth/output", joinpath(mode_name, run_name))
@@ -111,9 +111,7 @@ mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 
 # import coupler utils
 include("coupler_utils/flux_calculator.jl")
-include("coupler_utils/regridder.jl") # update_midmonth_data!
 include("coupler_utils/calendar_timer.jl")
-include("coupler_utils/general_helper.jl")
 include("coupler_utils/bcfile_reader.jl")
 include("coupler_utils/variable_definer.jl")
 include("coupler_utils/diagnostics_gatherer.jl")
@@ -287,21 +285,20 @@ if energy_check
 end
 
 ## coupler simulation
-cs = CoupledSimulation(
-    FT(Δt_cpl),
-    integrator.t,
+cs = CoupledSimulation{FT}(
     tspan,
     dates,
     boundary_space,
-    FT,
-    (; land = land_mask, ocean = zeros(boundary_space), ice = zeros(boundary_space)),
     coupler_fields,
+    parsed_args,
+    conservation_checks,
+    integrator.t,
+    FT(Δt_cpl),
+    (; land = land_mask, ocean = zeros(boundary_space), ice = zeros(boundary_space)),
     model_sims,
     mode_specifics,
-    parsed_args,
     monthly_3d_diags,
     monthly_2d_diags,
-    conservation_checks,
 );
 
 

@@ -7,41 +7,42 @@
 
 Stores information specific to each boundary condition from a file and each variable.
 The inputs are:
-    FT::F                           # float type
+    comms_ctx::X                    # communications context used for MPI
     datafile_cgll::S                # file containing all regridded fields
     varname::V                      # name of the variable
     all_dates::D                    # all dates contained in the original data file
+    monthly_fields::C               # Tuple of the two monthly fields, that will be used for the daily interpolation
+    scaling_function::O             # function that scales, offsets or transforms the raw variable
+    land_mask::M                    # mask with 1 = land, 0 = ocean / sea-ice
     segment_idx::Vector{Int}        # index of the monthly data in the file
     segment_idx0::Vector{Int}       # `segment_idx` of the file data that is closest to date0
-    monthly_fields::C               # Tuple of the two monthly fields, that will be used for the daily interpolation
     segment_length::Vector{Int}     # length of each month segment (used in the daily interpolation)
-    scaling_function::O             # function that scales, offsets or transforms the raw variable
     interpolate_daily::Bool         # switch to trigger daily interpolation
-    land_mask::M                    # mask with 1 = land, 0 = ocean / sea-ice
+
 """
-struct BCFileInfo{F, X, S, V, D, C, O, M}
-    FT::F
+struct BCFileInfo{FT, X, S, V, D, C, O, M}
     comms_ctx::X
     hd_outfile_root::S
     varname::V
     all_dates::D
+    monthly_fields::C
+    scaling_function::O
+    land_mask::M
     segment_idx::Vector{Int}
     segment_idx0::Vector{Int}
-    monthly_fields::C
     segment_length::Vector{Int}
-    scaling_function::O
     interpolate_daily::Bool
-    land_mask::M
 end
 
+BCFileInfo{FT}(args...) = BCFileInfo{FT, typeof.(args[1:7])...}(args...)
+
+float_type(::BCFileInfo{FT}) where {FT} = FT
+
 """
-    Bcfile_info_init(FT, comms_ctx, datafile_rll, varname, boundary_space; interpolate_daily = false, segment_idx0 = [Int(1)], scaling_function = false)
+    bcfile_info_init(FT, comms_ctx, datafile_rll, varname, boundary_space; interpolate_daily = false, segment_idx0 = [Int(1)], scaling_function = false)
 
 Regrids from lat-lon grid to cgll grid, saving the output in a new file, and returns the info packaged in a single struct
 """
-#FT, datafile_rll, varname,boundary_space, interpolate_daily, segment_idx0, scaling_function, land_mask, date0, mono = (FT, sst_data, "SST", boundary_space, true, nothing, clean_sst, land_mask, date0, true)
-
-
 function bcfile_info_init(
     FT,
     comms_ctx,
@@ -80,19 +81,18 @@ function bcfile_info_init(
         segment_idx0 != nothing ? segment_idx0 :
         [argmin(abs.(parse(FT, datetime_to_strdate(date0)) .- parse.(FT, datetime_to_strdate.(data_dates[:]))))]
 
-    return BCFileInfo(
-        FT,
+    return BCFileInfo{FT}(
         comms_ctx,
         hd_outfile_root,
         varname,
         data_dates,
+        current_fields,
+        scaling_function,
+        land_mask,
         deepcopy(segment_idx0),
         segment_idx0,
-        current_fields,
         segment_length,
-        scaling_function,
         interpolate_daily,
-        land_mask,
     )
 
 end
@@ -101,14 +101,13 @@ no_scaling(x, _info) = swap_space!(x, axes(_info.land_mask))
 
 # IO - monthly
 """
-    update_midmonth_data!(bcf_info)
+    update_midmonth_data!(date, bcf_info)
 
 Extracts boundary condition data from regridded (to model grid) NetCDF files (which times, depends on the specifications in the `bcf_info` struct).
 """
 function update_midmonth_data!(date, bcf_info)
-
     # monthly count
-
+    FT = float_type(bcf_info)
     all_dates = bcf_info.all_dates
     midmonth_idx = bcf_info.segment_idx[1]
     midmonth_idx0 = bcf_info.segment_idx0[1]
@@ -118,7 +117,6 @@ function update_midmonth_data!(date, bcf_info)
     varname = bcf_info.varname
     interpolate_daily = bcf_info.interpolate_daily
     comms_ctx = bcf_info.comms_ctx
-    FT = bcf_info.FT
 
     ClimaComms.barrier(comms_ctx)
 

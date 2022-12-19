@@ -35,21 +35,20 @@ end
     parent(ice_d)[:, (n ÷ 2 + 1):n, :, :] .= FT(0.5)
 
     # Fill in only the necessary parts of the simulation
-    cs = Utilities.CoupledSimulation(
-        nothing,
-        nothing,
-        nothing,
-        nothing,
-        nothing,
-        FT,
-        (; land = land_mask, ice = Fields.zeros(test_space), ocean = Fields.zeros(test_space)),
-        (;),
-        (; ice_sim = (; integrator = (; p = (; ice_mask = ice_d)))),
-        (;),
-        nothing,
-        (;),
-        (;),
-        (;),
+    cs = Utilities.CoupledSimulation{FT}(
+        nothing, # tspan
+        nothing, # dates
+        nothing, # boundary_space
+        nothing, # fields
+        nothing, # parsed_args
+        nothing, # conservation_checks
+        FT(100), # t
+        FT(100), # Δt_cpl
+        (; land = land_mask, ice = Fields.zeros(test_space), ocean = Fields.zeros(test_space)), # surface_masks
+        (; ice_sim = (; integrator = (; p = (; ice_mask = ice_d)))), # model_sims
+        (;), # mode
+        (;), # monthly_3d_diags
+        (;), # monthly_2d_diags
     )
 
     Regridder.update_masks!(cs)

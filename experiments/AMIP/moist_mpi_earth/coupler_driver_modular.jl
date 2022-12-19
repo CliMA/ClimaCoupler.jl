@@ -57,6 +57,7 @@ using LinearAlgebra
 import Test: @test
 using Dates
 using UnPack
+using Plots
 
 using ClimaCore.Utilities: half, PlusHalf
 using ClimaCore: InputOutput, Fields
@@ -68,13 +69,20 @@ include("cli_options.jl")
 ## modify parsed args for fast testing from REPL #hide
 if isinteractive()
     parsed_args["coupled"] = true #hide
+    parsed_args["surface_scheme"] = "monin_obukhov" #hide
     parsed_args["moist"] = "equil" #hide
     parsed_args["vert_diff"] = true #hide
     parsed_args["rad"] = "gray" #hide
-    parsed_args["microphy"] = "0M" #hide
-    parsed_args["energy_check"] = false #hide
+    parsed_args["energy_check"] = true #hide
+    parsed_args["mode_name"] = "slabplanet" #hide
+    parsed_args["t_end"] = "10days" #hide
+    parsed_args["dt_save_to_sol"] = "3600secs" #hide
+    parsed_args["dt_cpl"] = 200 #hide
+    parsed_args["dt"] = "200secs" #hide
+    parsed_args["mono_surface"] = true #hide
+    parsed_args["h_elem"] = 4 #hide
+    # parsed_args["dt_save_restart"] = "5days" #hide
     parsed_args["precip_model"] = "0M" #hide
-    parsed_args["mode_name"] = "amip" #hide
 end
 
 ## read in some parsed command line arguments
@@ -103,9 +111,11 @@ import ClimaCoupler.PostProcessor: postprocess
 
 pkg_dir = pkgdir(ClimaCoupler)
 COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth/output", joinpath(mode_name, run_name))
-!isdir(COUPLER_OUTPUT_DIR) && mkpath(COUPLER_OUTPUT_DIR)
+mkpath(COUPLER_OUTPUT_DIR)
+
 REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp/")
 mkpath(REGRID_DIR)
+
 @info COUPLER_OUTPUT_DIR
 @info parsed_args
 
@@ -156,8 +166,17 @@ include("slab_ice/slab_init.jl")
 ### Land
 We use `ClimaLSM.jl`'s bucket model.
 =#
-land_sim =
-    bucket_init(FT, FT.(tspan), parsed_args["config"]; dt = FT(Δt_cpl), space = boundary_space, saveat = FT(saveat))
+land_sim = bucket_init(
+    FT,
+    FT.(tspan),
+    parsed_args["config"],
+    parsed_args["albedo_from_file"],
+    comms_ctx,
+    REGRID_DIR;
+    dt = FT(Δt_cpl),
+    space = boundary_space,
+    saveat = FT(saveat),
+)
 
 #=
 ### Ocean and Sea Ice

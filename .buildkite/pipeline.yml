@@ -133,6 +133,10 @@ steps:
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --enable_threading true --coupled true  --moist equil --vert_diff true --rad gray --microphy 0M --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface false --h_elem 6 --dt_save_restart 10days --run_name coarse_single --precip_model 0M"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/coarse_single_artifacts/*"
 
+      - label: "AMIP - modular"
+        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --enable_threading true --coupled true  --moist equil --vert_diff true --rad gray --microphy 0M --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface false --h_elem 6 --dt_save_restart 10days --run_name coarse_single_modular --precip_model 0M"
+        artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/coarse_single_artifacts/*"
+
       - label: "sea_breeze"
         command: "julia --color=yes --project=experiments/ClimaCore/sea_breeze experiments/ClimaCore/sea_breeze/run.jl"
         artifact_paths: "sea_breeze/"
@@ -155,4 +159,4 @@ steps:
           CLIMACORE_DISTRIBUTED: "MPI"
         agents:
           slurm_ntasks: 32
-          slurm_mem: 80GB
+          slurm_mem_per_cpu: 16G

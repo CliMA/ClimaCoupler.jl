@@ -8,6 +8,6 @@ modules in the coupler.
 
 ```@docs
 ClimaCoupler.Utilities.CouplerSimulation
-ClimaCoupler.Utilities.heaviside
+ClimaCoupler.Utilities.float_type
 ClimaCoupler.Utilities.swap_space!
 ```

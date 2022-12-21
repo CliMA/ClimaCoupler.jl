@@ -11,6 +11,9 @@ using Dates
 
 REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regrid_tmp/")
 
+const comms_ctx = ClimaComms.SingletonCommsContext()
+const pid, nprocs = ClimaComms.init(comms_ctx)
+
 for FT in (Float32, Float64)
     @testset "test dummmy_remap!" begin
         test_space = TestHelper.create_space(FT)
@@ -35,7 +38,8 @@ for FT in (Float32, Float64)
         parent(ice_d)[:, (n ÷ 2 + 1):n, :, :] .= FT(0.5)
 
         # Fill in only the necessary parts of the simulation
-        cs = Utilities.CoupledSimulation(
+        cs = Utilities.CoupledSimulation{FT}(
+            comms_ctx, # comms_ctx
             nothing, # tspan
             nothing, # dates
             nothing, # boundary_space
@@ -82,7 +86,6 @@ for FT in (Float32, Float64)
             test_space = TestHelper.create_space(FT)
             input_field = Fields.ones(test_space)
             varname = "testdata"
-            comms_ctx = ClimaComms.SingletonCommsContext()
 
             Regridder.write_to_hdf5(REGRID_DIR, hd_outfile_root, tx, input_field, varname, comms_ctx)
 
@@ -125,7 +128,6 @@ for FT in (Float32, Float64)
             # Test setup
             R = FT(6371e3)
             test_space = TestHelper.create_space(FT, R = R)
-            comms_ctx = ClimaComms.SingletonCommsContext()
             ispath(REGRID_DIR) ? rm(REGRID_DIR; recursive = true, force = true) : nothing
             mkpath(REGRID_DIR)
 

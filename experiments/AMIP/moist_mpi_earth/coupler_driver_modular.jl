@@ -73,10 +73,10 @@ if isinteractive()
     parsed_args["microphy"] = "0M" #hide
     parsed_args["energy_check"] = true
     parsed_args["precip_model"] = "0M" #hide
-    parsed_args["mode_name"] = "slabplanet" #hide
+    parsed_args["mode_name"] = "amip" #hide
 end
 
-## read in some parsed command line arguments 
+## read in some parsed command line arguments
 mode_name = parsed_args["mode_name"]
 run_name = parsed_args["run_name"]
 energy_check = parsed_args["energy_check"]
@@ -90,10 +90,12 @@ date0 = date = DateTime(parsed_args["start_date"], dateformat"yyyymmdd")
 mono_surface = parsed_args["mono_surface"]
 
 import ClimaCoupler
-import ClimaCoupler.Regridder: land_sea_mask, update_masks!, combine_surfaces!, dummmy_remap!
+import ClimaCoupler.Regridder: land_sea_mask, update_masks!, combine_surfaces!, dummmy_remap!, binary_mask
 import ClimaCoupler.ConservationChecker:
     EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
-import ClimaCoupler.Utilities: CoupledSimulation, float_type, swap_space!
+import ClimaCoupler.Utilities: CoupledSimulation, float_type_cs, swap_space!
+import ClimaCoupler.BCReader:
+    bcfile_info_init, float_type_bcf, update_midmonth_data!, next_date_in_file, interpolate_midmonth_to_daily
 
 pkg_dir = pkgdir(ClimaCoupler)
 COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth/output", joinpath(mode_name, run_name))
@@ -112,7 +114,6 @@ mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 # import coupler utils
 include("coupler_utils/flux_calculator.jl")
 include("coupler_utils/calendar_timer.jl")
-include("coupler_utils/bcfile_reader.jl")
 include("coupler_utils/variable_definer.jl")
 include("coupler_utils/diagnostics_gatherer.jl")
 include("coupler_utils/offline_postprocessor.jl")
@@ -170,10 +171,11 @@ if mode_name == "amip"
     ## ocean
     SST_info = bcfile_info_init(
         FT,
-        comms_ctx,
+        REGRID_DIR,
         sst_data,
         "SST",
         boundary_space,
+        comms_ctx,
         interpolate_daily = true,
         scaling_function = clean_sst, ## convert to Kelvin
         land_mask = land_mask,
@@ -182,7 +184,7 @@ if mode_name == "amip"
     )
 
     update_midmonth_data!(date0, SST_info)
-    SST_init = interpolate_midmonth_to_daily(date0, SST_info)
+    SST_init = interpolate_midmonth_to_daily(FT, date0, SST_info)
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
     ocean_sim = (;
         integrator = (;
@@ -194,10 +196,11 @@ if mode_name == "amip"
     ## sea ice
     SIC_info = bcfile_info_init(
         FT,
-        comms_ctx,
+        REGRID_DIR,
         sic_data,
         "SEAICE",
         boundary_space,
+        comms_ctx,
         interpolate_daily = true,
         scaling_function = clean_sic, ## convert to fractions
         land_mask = land_mask,
@@ -205,7 +208,7 @@ if mode_name == "amip"
         mono = mono_surface,
     )
     update_midmonth_data!(date0, SIC_info)
-    SIC_init = interpolate_midmonth_to_daily(date0, SIC_info)
+    SIC_init = interpolate_midmonth_to_daily(FT, date0, SIC_info)
     ice_mask = get_ice_mask.(SIC_init, mono_surface)
     ice_sim = ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info)
@@ -286,6 +289,7 @@ end
 
 ## coupler simulation
 cs = CoupledSimulation{FT}(
+    comms_ctx,
     tspan,
     dates,
     boundary_space,
@@ -341,11 +345,13 @@ function solve_coupler!(cs)
             @calendar_callback :(update_midmonth_data!(cs.dates.date[1], cs.mode.SST_info)) cs.dates.date[1] next_date_in_file(
                 cs.mode.SST_info,
             )
-            SST = ocean_sim.integrator.u.T_sfc .= interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SST_info)
+            SST =
+                ocean_sim.integrator.u.T_sfc .=
+                    interpolate_midmonth_to_daily(FT, cs.dates.date[1], cs.mode.SST_info)
             @calendar_callback :(update_midmonth_data!(cs.dates.date[1], cs.mode.SIC_info)) cs.dates.date[1] next_date_in_file(
                 cs.mode.SIC_info,
             )
-            SIC = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info)
+            SIC = interpolate_midmonth_to_daily(FT, cs.dates.date[1], cs.mode.SIC_info)
 
             ice_mask = ice_sim.integrator.p.ice_mask .= get_ice_mask.(SIC_init, mono_surface)
 

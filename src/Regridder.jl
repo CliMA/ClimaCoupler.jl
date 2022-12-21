@@ -16,7 +16,7 @@ using Dates
 using JLD2
 
 export write_to_hdf5,
-    read_from_hdf5, dummmy_remap!, remap_field_cgll_to_rll, land_sea_mask, update_masks!, combine_surfaces!
+    read_from_hdf5, dummmy_remap!, remap_field_cgll_to_rll, land_sea_mask, update_masks!, combine_surfaces!, binary_mask
 
 FT_dot(x) = FT.(x)
 nans_to_zero(v) = isnan(v) ? typeof(v)(0) : v

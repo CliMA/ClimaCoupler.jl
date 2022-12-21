@@ -36,7 +36,7 @@ end
 
 BCFileInfo{FT}(args...) where {FT} = BCFileInfo{FT, typeof.(args[1:7])...}(args...)
 
-float_type(::BCFileInfo{FT}) where {FT} = FT
+float_type_bcf(::BCFileInfo{FT}) where {FT} = FT
 
 """
     bcfile_info_init(FT, comms_ctx, datafile_rll, varname, boundary_space; interpolate_daily = false, segment_idx0 = [Int(1)], scaling_function = false)
@@ -107,7 +107,7 @@ Extracts boundary condition data from regridded (to model grid) NetCDF files (wh
 """
 function update_midmonth_data!(date, bcf_info)
     # monthly count
-    FT = float_type(bcf_info)
+    FT = float_type_bcf(bcf_info)
     all_dates = bcf_info.all_dates
     midmonth_idx = bcf_info.segment_idx[1]
     midmonth_idx0 = bcf_info.segment_idx0[1]

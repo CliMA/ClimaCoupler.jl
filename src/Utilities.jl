@@ -8,13 +8,14 @@ module Utilities
 
 using ClimaCore: Fields, Spaces
 
-export CoupledSimulation, float_type, heaviside, swap_space!, create_space
+export CoupledSimulation, float_type_cs, swap_space!
 
 
 """
 Stores information needed to run a simulation with the coupler. 
 """
-struct CoupledSimulation{FT, S, D, B, FV, P, E}
+struct CoupledSimulation{FT, X, S, D, B, FV, P, E}
+    comms_ctx::X
     tspan::S
     dates::D
     boundary_space::B
@@ -30,20 +31,8 @@ struct CoupledSimulation{FT, S, D, B, FV, P, E}
     monthly_2d_diags::NamedTuple
 end
 
-CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args[1:6])...}(args...)
-float_type(::CoupledSimulation{FT}) where {FT} = FT
-
-"""
-    heaviside(var)
-
-Implements the heaviside step function multiplied by `var`, returning 0 for negative inputs
-or the input value itself for non-negative inputs.
-
-# Arguments
-- `var`: [Integer or Float] value to apply heaviside to.
-"""
-
-heaviside(var) = var < 0 ? 0 : var
+CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args[1:7])...}(args...)
+float_type_cs(::CoupledSimulation{FT}) where {FT} = FT
 
 """
     swap_space!(field::Fields.Field, new_space)

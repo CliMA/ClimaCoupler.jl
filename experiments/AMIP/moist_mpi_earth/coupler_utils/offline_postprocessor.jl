@@ -1,5 +1,6 @@
 
 using Statistics
+using ClimaCoupler.Regridder: remap_field_cgll_to_rll
 
 # data types for postprocessing
 abstract type PostProcessedData end

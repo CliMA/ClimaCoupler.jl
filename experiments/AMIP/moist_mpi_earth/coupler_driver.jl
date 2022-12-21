@@ -71,9 +71,15 @@ if isinteractive()
     parsed_args["vert_diff"] = true #hide
     parsed_args["rad"] = "gray" #hide
     parsed_args["microphy"] = "0M" #hide
-    parsed_args["energy_check"] = true
-    parsed_args["precip_model"] = "0M" #hide
+    parsed_args["energy_check"] = true #hide
     parsed_args["mode_name"] = "slabplanet" #hide
+    parsed_args["t_end"] = "10days" #hide
+    parsed_args["dt_save_to_sol"] = "3600secs" #hide
+    parsed_args["dt_cpl"] = 200 #hide
+    parsed_args["dt"] = "200secs" #hide
+    parsed_args["mono_surface"] = true #hide
+    parsed_args["h_elem"] = 4 #hide
+    parsed_args["precip_model"] = "0M" #hide
 end
 
 ## read in some parsed command line arguments 
@@ -269,19 +275,18 @@ monthly_2d_diags = (;
 )
 
 ## coupler simulation
-cs = CouplerSimulation(
+cs = CouplerSimulation{FT}(
     comms_ctx,
-    FT(Δt_cpl),
-    integrator.t,
     tspan,
     dates,
     boundary_space,
-    FT,
+    parsed_args,
+    integrator.t,
+    FT(Δt_cpl),
     (; land = land_mask, ocean = zeros(boundary_space), ice = zeros(boundary_space)),
     coupler_fields,
     model_sims,
     mode_specifics,
-    parsed_args,
     monthly_3d_diags,
     monthly_2d_diags,
 );

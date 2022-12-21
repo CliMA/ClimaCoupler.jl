@@ -9,27 +9,29 @@ module Utilities
 using ClimaCore: ClimaCore, Fields, Spaces, Domains, Meshes, Topologies
 using ClimaComms
 
-export CoupledSimulation, heaviside, swap_space!, create_space
+export CoupledSimulation, float_type, heaviside, swap_space!, create_space
 
 """
 Stores information needed to run a simulation with the coupler. 
 """
-struct CoupledSimulation{I, F, S, D, B, T, FV, P, E}
-    Δt_cpl::I
-    t::F
+struct CoupledSimulation{FT, S, D, B, FV, P, E}
     tspan::S
     dates::D
     boundary_space::B
-    FT::T
-    surface_masks::NamedTuple
     fields::FV
+    parsed_args::P
+    conservation_checks::E
+    t::FT
+    Δt_cpl::FT
+    surface_masks::NamedTuple
     model_sims::NamedTuple
     mode::NamedTuple
-    parsed_args::P
     monthly_3d_diags::NamedTuple
     monthly_2d_diags::NamedTuple
-    conservation_checks::E
 end
+
+CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args[1:6])...}(args...)
+float_type(::CoupledSimulation{FT}) where {FT} = FT
 
 """
     heaviside(var)

@@ -72,4 +72,4 @@ end
     clean_sst(SST::FT, _info) 
 Ensures that the space of the SST struct matches that of the mask, and converts the units to Kelvin (N.B.: this is dataset specific)
 """
-clean_sst(SST, _info) = (swap_space!(SST, axes(_info.land_mask)) .+ _info.FT(273.15))
+clean_sst(SST, _info) = (swap_space!(SST, axes(_info.land_mask)) .+ float_type(_info)(273.15))

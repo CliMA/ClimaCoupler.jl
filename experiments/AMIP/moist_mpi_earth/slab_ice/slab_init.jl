@@ -70,7 +70,7 @@ end
 Ensures that the space of the SIC struct matches that of the mask, and converts the units from area % to area fraction. 
 """
 
-clean_sic(SIC, _info) = swap_space!(SIC, axes(_info.land_mask)) ./ _info.FT(100.0)
+clean_sic(SIC, _info) = swap_space!(SIC, axes(_info.land_mask)) ./ float_type(_info)(100.0)
 
 # setting that SIC < 0.5 os counted as ocean if binary remapping of landsea mask. 
 get_ice_mask(h_ice::FT, mono, threshold = 0.5) where {FT} = mono ? h_ice : binary_mask.(h_ice, threshold = threshold)

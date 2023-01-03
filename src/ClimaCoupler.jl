@@ -12,5 +12,8 @@ include("../test/TestHelper.jl")
 include("Utilities.jl")
 include("Regridder.jl")
 include("ConservationChecker.jl")
+include("CallbackManager.jl")
+include("BCReader.jl")
+
 
 end

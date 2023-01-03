@@ -25,5 +25,5 @@ or coupling components (using MPI) that are running on different processes.
 | *ClimaCoupler.jl allows for independent development of interchangeable component models.* |
 
 ```@docs
-    ClimaCoupler
+ClimaCoupler
 ```

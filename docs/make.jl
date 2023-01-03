@@ -56,8 +56,15 @@ experiment_pages = [
     "Sea Breeze" => map(s -> "generated/sea_breeze/$(s)", readdir(joinpath(@__DIR__, "src/generated/sea_breeze"))),
     "AMIP" => map(s -> "generated/amip/$(s)", readdir(joinpath(@__DIR__, "src/generated/amip"))),
 ]
-interface_pages =
-    ["couplerstate.md", "timestepping.md", "regridder.md", "conservation.md", "utilities.md", "testhelper.md"]
+interface_pages = [
+    "couplerstate.md",
+    "timestepping.md",
+    "regridder.md",
+    "conservation.md",
+    "utilities.md",
+    "bcreader.md",
+    "testhelper.md",
+]
 
 pages = Any["Home" => "index.md", "Examples" => experiment_pages, "Coupler Interface" => interface_pages]
 

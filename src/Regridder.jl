@@ -8,7 +8,7 @@ via ClimaCoreTempestRemap wrappers.
 module Regridder
 
 using ClimaCoupler.Utilities
-using ClimaCore: ClimaCore, Meshes, Domains, Topologies, Spaces, Fields, InputOutput
+using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 using ClimaComms
 using NCDatasets
 using ClimaCoreTempestRemap
@@ -102,7 +102,7 @@ function hdwrite_regridfile_rll_to_cgll(
 
     topology = Topologies.Topology2D(space.topology.mesh, Topologies.spacefillingcurve(space.topology.mesh))
     Nq = Spaces.Quadratures.polynomial_degree(space.quadrature_style) + 1
-    space_undistributed = ClimaCore.Spaces.SpectralElementSpace2D(topology, ClimaCore.Spaces.Quadratures.GLL{Nq}())
+    space_undistributed = Spaces.SpectralElementSpace2D(topology, Spaces.Quadratures.GLL{Nq}())
 
     if isfile(datafile_cgll) == false
         isdir(REGRID_DIR) ? nothing : mkpath(REGRID_DIR)
@@ -375,7 +375,7 @@ function land_sea_mask(
         )
     end
     ClimaComms.barrier(comms_ctx)
-    file_dates = load(joinpath(REGRID_DIR, outfile_root * "_times.jld2"), "times")
+    file_dates = JLD2.load(joinpath(REGRID_DIR, outfile_root * "_times.jld2"), "times")
     mask = read_from_hdf5(REGRID_DIR, outfile_root, file_dates[1], varname, comms_ctx)
     mask = swap_space!(mask, boundary_space) # needed if we are reading from previous run
     return mono ? mask : binary_mask.(mask, threshold = threshold)

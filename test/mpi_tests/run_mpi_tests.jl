@@ -12,4 +12,5 @@ end
 
 if !Sys.iswindows()
     runmpi(joinpath(@__DIR__, "regridder_mpi_tests.jl"), ntasks = 2)
+    runmpi(joinpath(@__DIR__, "bcreader_mpi_tests.jl"), ntasks = 2)
 end

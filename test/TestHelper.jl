@@ -6,7 +6,7 @@ various files in the test folder.
 =#
 module TestHelper
 
-using ClimaCore: ClimaCore, Geometry, Meshes, Domains, Topologies, Spaces, Fields, InputOutput
+using ClimaCore: Geometry, Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 using ClimaComms
 using NCDatasets
 

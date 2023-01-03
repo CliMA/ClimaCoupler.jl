@@ -77,6 +77,17 @@ steps:
           slurm_nodes: 3
           slurm_tasks_per_node: 1
 
+      - label: "MPI BCReader unit tests"
+        key: "bcreader_mpi_tests"
+        command: "mpiexec julia --color=yes --project=test/ test/mpi_tests/bcreader_mpi_tests.jl"
+        timeout_in_minutes: 20
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+        agents:
+          config: cpu
+          queue: central
+          slurm_nodes: 3
+          slurm_tasks_per_node: 1
 
   - group: "Integration Tests"
     steps:

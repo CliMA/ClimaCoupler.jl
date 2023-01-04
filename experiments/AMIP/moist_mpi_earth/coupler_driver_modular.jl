@@ -96,6 +96,7 @@ import ClimaCoupler.ConservationChecker:
     EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
 import ClimaCoupler.Utilities: CoupledSimulation, float_type, swap_space!, Monthly, EveryTimestep
 import ClimaCoupler.Diagnostics: get_var, init_diagnostics, accumulate_diagnostics!, save_diagnostics, TimeMean
+import ClimaCoupler.PostProcessor: postprocess
 
 pkg_dir = pkgdir(ClimaCoupler)
 COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth/output", joinpath(mode_name, run_name))
@@ -115,7 +116,6 @@ mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 include("coupler_utils/flux_calculator.jl")
 include("coupler_utils/calendar_timer.jl")
 include("coupler_utils/bcfile_reader.jl")
-include("coupler_utils/offline_postprocessor.jl")
 
 ## user-specified diagnostics
 include("user_diagnostics.jl")

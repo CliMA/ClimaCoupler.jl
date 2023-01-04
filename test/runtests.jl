@@ -18,4 +18,7 @@ end
 @safetestset "Diagnostics tests" begin
     include("diagnostics_tests.jl")
 end
+@safetestset "PostProcessor tests" begin
+    include("postprocessor_tests.jl")
+end
 # include("CoupledSimulations/cplsolver.jl")

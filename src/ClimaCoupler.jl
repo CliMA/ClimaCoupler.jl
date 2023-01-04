@@ -14,6 +14,7 @@ include("Regridder.jl")
 include("ConservationChecker.jl")
 include("CallbackManager.jl")
 include("BCReader.jl")
+include("Diagnostics.jl")
 
 
 end

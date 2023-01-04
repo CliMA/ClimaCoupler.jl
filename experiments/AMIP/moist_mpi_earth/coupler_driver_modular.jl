@@ -61,6 +61,7 @@ using UnPack
 using ClimaCore.Utilities: half, PlusHalf
 using ClimaCore: InputOutput, Fields
 
+
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
 
@@ -93,7 +94,8 @@ import ClimaCoupler
 import ClimaCoupler.Regridder: land_sea_mask, update_masks!, combine_surfaces!, dummmy_remap!
 import ClimaCoupler.ConservationChecker:
     EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
-import ClimaCoupler.Utilities: CoupledSimulation, float_type, swap_space!
+import ClimaCoupler.Utilities: CoupledSimulation, float_type, swap_space!, Monthly, EveryTimestep
+import ClimaCoupler.Diagnostics: get_var, init_diagnostics, accumulate_diagnostics!, save_diagnostics, TimeMean
 
 pkg_dir = pkgdir(ClimaCoupler)
 COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth/output", joinpath(mode_name, run_name))
@@ -109,13 +111,14 @@ sst_data = joinpath(sst_dataset_path(), "sst.nc")
 sic_data = joinpath(sic_dataset_path(), "sic.nc")
 mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 
-# import coupler utils
+## import coupler utils
 include("coupler_utils/flux_calculator.jl")
 include("coupler_utils/calendar_timer.jl")
 include("coupler_utils/bcfile_reader.jl")
-include("coupler_utils/variable_definer.jl")
-include("coupler_utils/diagnostics_gatherer.jl")
 include("coupler_utils/offline_postprocessor.jl")
+
+## user-specified diagnostics
+include("user_diagnostics.jl")
 
 #=
 ## Component Model Initialization
@@ -247,28 +250,31 @@ coupler_fields =
 model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim);
 
 ## dates
-dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)])
+dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)], new_month = [false])
 
 #=
 ### Online Diagnostics
-User can write custom diagnostics in the `coupler_utils/variable_definer.jl`.
+User can write custom diagnostics in the `user_diagnostics.jl`.
 =#
-## 3d diagnostics
-monthly_3d_diags_names = (:T, :u, :q_tot)
-monthly_3d_diags = (;
-    fields = NamedTuple{monthly_3d_diags_names}(
-        ntuple(i -> ClimaCore.Fields.zeros(atmos_sim.domain.center_space), length(monthly_3d_diags_names)),
-    ),
-    ct = [0],
+monthly_3d_diags = init_diagnostics(
+    (:T, :u, :q_tot),
+    atmos_sim.domain.center_space;
+    save = Monthly(),
+    operations = (; accumulate = TimeMean([Int(0)])),
+    output_dir = COUPLER_OUTPUT_DIR,
+    name_tag = "monthly_mean_3d_",
 )
-## 2d diagnostics
-monthly_2d_diags_names = (:precipitation, :toa, :T_sfc)
-monthly_2d_diags = (;
-    fields = NamedTuple{monthly_2d_diags_names}(
-        ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(monthly_2d_diags_names)),
-    ),
-    ct = [0],
+
+monthly_2d_diags = init_diagnostics(
+    (:precipitation, :toa, :T_sfc),
+    boundary_space;
+    save = Monthly(),
+    operations = (; accumulate = TimeMean([Int(0)])),
+    output_dir = COUPLER_OUTPUT_DIR,
+    name_tag = "monthly_mean_2d_",
 )
+
+diagnostics = (monthly_3d_diags, monthly_2d_diags)
 
 #=
 ## Initialize Conservation Checks
@@ -285,7 +291,8 @@ if energy_check
 end
 
 ## coupler simulation
-cs = CoupledSimulation{FT}(
+cs = CoupledSimulation(
+    comms_ctx,
     tspan,
     dates,
     boundary_space,
@@ -297,8 +304,7 @@ cs = CoupledSimulation{FT}(
     (; land = land_mask, ocean = zeros(boundary_space), ice = zeros(boundary_space)),
     model_sims,
     mode_specifics,
-    monthly_3d_diags,
-    monthly_2d_diags,
+    diagnostics,
 );
 
 
@@ -349,35 +355,11 @@ function solve_coupler!(cs)
 
             ice_mask = ice_sim.integrator.p.ice_mask .= get_ice_mask.(SIC_init, mono_surface)
 
-            ## accumulate diagnostics at each timestep
-            accumulate_diags(collect_diags(cs, propertynames(cs.monthly_3d_diags.fields)), cs.monthly_3d_diags)
-            accumulate_diags(collect_diags(cs, propertynames(cs.monthly_2d_diags.fields)), cs.monthly_2d_diags)
+            ## calculate and accumulate diagnostics at each timestep
+            accumulate_diagnostics!(cs)
 
             ## save and reset monthly averages
-            @calendar_callback :(
-                map(x -> x ./= cs.monthly_3d_diags.ct[1], cs.monthly_3d_diags.fields),
-                save_hdf5(
-                    cs.comms_ctx,
-                    cs.monthly_3d_diags.fields,
-                    cs.dates.date[1],
-                    COUPLER_OUTPUT_DIR,
-                    name_tag = "3d_",
-                ),
-                map(x -> x .= FT(0), cs.monthly_3d_diags.fields),
-                cs.monthly_3d_diags.ct .= FT(0),
-            ) cs.dates.date[1] cs.dates.date1[1]
-            @calendar_callback :(
-                map(x -> x ./= cs.monthly_2d_diags.ct[1], cs.monthly_2d_diags.fields),
-                save_hdf5(
-                    cs.comms_ctx,
-                    cs.monthly_2d_diags.fields,
-                    cs.dates.date[1],
-                    COUPLER_OUTPUT_DIR,
-                    name_tag = "2d_",
-                ),
-                map(x -> x .= FT(0), cs.monthly_2d_diags.fields),
-                cs.monthly_2d_diags.ct .= FT(0),
-            ) cs.dates.date[1] cs.dates.date1[1]
+            save_diagnostics(cs)
 
         end
 

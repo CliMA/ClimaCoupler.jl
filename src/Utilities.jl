@@ -8,13 +8,14 @@ module Utilities
 
 using ClimaCore: Fields, Spaces
 
-export CoupledSimulation, float_type, heaviside, swap_space!, create_space
+export CoupledSimulation, float_type, heaviside, swap_space!, create_space, Monthly, EveryTimestep
 
 
 """
 Stores information needed to run a simulation with the coupler. 
 """
-struct CoupledSimulation{FT, S, D, B, FV, P, E}
+struct CoupledSimulation{FT, M, S, D, B, FV, P, E}
+    comms_ctx::M
     tspan::S
     dates::D
     boundary_space::B
@@ -26,8 +27,7 @@ struct CoupledSimulation{FT, S, D, B, FV, P, E}
     surface_masks::NamedTuple
     model_sims::NamedTuple
     mode::NamedTuple
-    monthly_3d_diags::NamedTuple
-    monthly_2d_diags::NamedTuple
+    diagnostics::Tuple
 end
 
 CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args[1:6])...}(args...)
@@ -60,4 +60,16 @@ function swap_space!(field::Fields.Field, new_space)
     return field_out
 end
 
-end
+abstract type AbstractFrequency end
+struct Monthly <: AbstractFrequency end
+struct EveryTimestep <: AbstractFrequency end
+
+"""
+    trigger_callback(cs, ::Monthly)
+    
+Returns `true` if the current date exceeds the first of the month at time of 00:00:00. 
+"""
+trigger_callback(cs::CoupledSimulation, ::Monthly) = cs.dates.date[1] > cs.dates.date1[1] ? true : false
+
+
+end # module

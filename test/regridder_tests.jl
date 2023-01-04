@@ -36,6 +36,7 @@ for FT in (Float32, Float64)
 
         # Fill in only the necessary parts of the simulation
         cs = Utilities.CoupledSimulation(
+            nothing, # comms_ctx
             nothing, # tspan
             nothing, # dates
             nothing, # boundary_space

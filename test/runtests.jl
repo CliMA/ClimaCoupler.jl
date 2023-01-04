@@ -15,4 +15,7 @@ end
 @safetestset "BCReader tests" begin
     include("bcreader_tests.jl")
 end
+@safetestset "Diagnostics tests" begin
+    include("diagnostics_tests.jl")
+end
 # include("CoupledSimulations/cplsolver.jl")

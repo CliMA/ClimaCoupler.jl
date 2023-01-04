@@ -10,4 +10,5 @@ modules in the coupler.
 ClimaCoupler.Utilities.CouplerSimulation
 ClimaCoupler.Utilities.heaviside
 ClimaCoupler.Utilities.swap_space!
+ClimaCoupler.Utilities.trigger_callback
 ```

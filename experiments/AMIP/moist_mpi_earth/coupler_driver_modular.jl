@@ -99,7 +99,7 @@ import ClimaCoupler.BCReader:
     bcfile_info_init, float_type_bcf, update_midmonth_data!, next_date_in_file, interpolate_midmonth_to_daily
 import ClimaCoupler.TimeManager: current_date, datetime_to_strdate, trigger_callback, Monthly, EveryTimestep
 import ClimaCoupler.Diagnostics: get_var, init_diagnostics, accumulate_diagnostics!, save_diagnostics, TimeMean
-
+import ClimaCoupler.PostProcessor: postprocess
 
 pkg_dir = pkgdir(ClimaCoupler)
 COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth/output", joinpath(mode_name, run_name))
@@ -117,7 +117,6 @@ mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 
 ## import coupler utils
 include("coupler_utils/flux_calculator.jl")
-include("coupler_utils/offline_postprocessor.jl")
 
 ## user-specified diagnostics
 include("user_diagnostics.jl")
@@ -447,17 +446,15 @@ if ClimaComms.iamroot(comms_ctx)
     if cs.mode.name == "amip"
         @info "AMIP plots"
 
-        include("coupler_utils/plotter.jl")
-
         ## ClimaESM
-        include("coupler_utils/amip_visualizer.jl")
+        include("user_plots/amip_visualizer.jl")
         post_spec = (;
-            T = (:regridded_3d, :zonal_mean),
-            u = (:regridded_3d, :zonal_mean),
-            q_tot = (:regridded_3d, :zonal_mean),
-            toa = (:regridded_2d, :horizontal_2d),
-            precipitation = (:regridded_2d, :horizontal_2d),
-            T_sfc = (:regridded_2d, :horizontal_2d),
+            T = (:regrid, :zonal_mean),
+            u = (:regrid, :zonal_mean),
+            q_tot = (:regrid, :zonal_mean),
+            toa = (:regrid, :horizontal_slice),
+            precipitation = (:regrid, :horizontal_slice),
+            T_sfc = (:regrid, :horizontal_slice),
         )
 
         plot_spec = (;
@@ -478,14 +475,14 @@ if ClimaComms.iamroot(comms_ctx)
 
         ## NCEP reanalysis
         @info "NCEP plots"
-        include("coupler_utils/ncep_visualizer.jl")
+        include("user_plots/ncep_visualizer.jl")
         ncep_post_spec = (;
             T = (:zonal_mean,),
             u = (:zonal_mean,),
             q_tot = (:zonal_mean,),
-            toa = (:horizontal_2d,),
-            precipitation = (:horizontal_2d,),
-            T_sfc = (:horizontal_2d,),
+            toa = (:horizontal_slice,),
+            precipitation = (:horizontal_slice,),
+            T_sfc = (:horizontal_slice,),
         )
         ncep_plot_spec = plot_spec
         ncep_paperplots(

@@ -10,4 +10,7 @@ functions from Julia's [Dates](https://docs.julialang.org/en/v1/stdlib/Dates/) m
 ClimaCoupler.TimeManager.current_date
 ClimaCoupler.TimeManager.strdate_to_datetime
 ClimaCoupler.TimeManager.datetime_to_strdate
+ClimaCoupler.TimeManager.trigger_callback
+ClimaCoupler.TimeManager.Monthly
+ClimaCoupler.TimeManager.EveryTimestep
 ```

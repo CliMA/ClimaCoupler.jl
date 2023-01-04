@@ -3,9 +3,6 @@ using SafeTestsets
 @safetestset "Clock tests" begin
     include("CoupledSimulations/clock.jl")
 end
-@safetestset "CouplerState tests" begin
-    include("CouplerState/cplstate_interface.jl")
-end
 @safetestset "Regridder tests" begin
     include("regridder_tests.jl")
 end
@@ -20,5 +17,11 @@ end
 end
 @safetestset "TimeManager tests" begin
     include("time_manager_tests.jl")
+end
+@safetestset "Diagnostics tests" begin
+    include("diagnostics_tests.jl")
+end
+@safetestset "CouplerState tests" begin
+    include("CouplerState/cplstate_interface.jl")
 end
 # include("CoupledSimulations/cplsolver.jl")

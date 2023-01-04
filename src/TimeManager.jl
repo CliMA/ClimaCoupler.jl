@@ -9,7 +9,8 @@ module TimeManager
 using ..Utilities
 using Dates
 
-export current_date, strdate_to_datetime, datetime_to_strdate
+export current_date,
+    strdate_to_datetime, datetime_to_strdate, AbstractFrequency, Monthly, EveryTimestep, trigger_callback
 
 
 """
@@ -47,5 +48,19 @@ datetime_to_strdate(datetime::DateTime) =
     string(lpad(Dates.year(datetime), 4, "0")) *
     string(string(lpad(Dates.month(datetime), 2, "0"))) *
     string(lpad(Dates.day(datetime), 2, "0"))
+
+abstract type AbstractFrequency end
+struct Monthly <: AbstractFrequency end
+struct EveryTimestep <: AbstractFrequency end
+
+"""
+    trigger_callback(cs, ::Monthly)
+    
+Returns `true` if the current date is equal to or exceeds the saved first of the month at time of 00:00:00. 
+
+# Arguments
+- `cs`: [CoupledSimulation] containing info about the simulation
+"""
+trigger_callback(cs::CoupledSimulation, ::Monthly) = cs.dates.date[1] >= cs.dates.date1[1] ? true : false
 
 end

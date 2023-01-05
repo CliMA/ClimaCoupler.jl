@@ -14,16 +14,16 @@ export CoupledSimulation, float_type_cs, swap_space!
 """
 Stores information needed to run a simulation with the coupler. 
 """
-struct CoupledSimulation{FT, X, S, D, B, FV, P, E}
+struct CoupledSimulation{FT, X, D, B, FV, P, E}
     comms_ctx::X
-    tspan::S
     dates::D
     boundary_space::B
     fields::FV
     parsed_args::P
     conservation_checks::E
-    t::FT
-    Δt_cpl::FT
+    tspan::Tuple{Int, Int}
+    t::Int
+    Δt_cpl::Int
     surface_masks::NamedTuple
     model_sims::NamedTuple
     mode::NamedTuple
@@ -31,7 +31,7 @@ struct CoupledSimulation{FT, X, S, D, B, FV, P, E}
     monthly_2d_diags::NamedTuple
 end
 
-CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args[1:7])...}(args...)
+CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args[1:6])...}(args...)
 float_type_cs(::CoupledSimulation{FT}) where {FT} = FT
 
 """

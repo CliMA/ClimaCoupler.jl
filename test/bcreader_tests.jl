@@ -2,7 +2,7 @@
     Unit tests for ClimaCoupler BCReader module
 =#
 
-using ClimaCoupler: Regridder, BCReader, CallbackManager
+using ClimaCoupler: Regridder, BCReader, TimeManager, Utilities
 using ClimaCore: Fields, Meshes, Domains, Topologies, Spaces
 using ClimaComms
 using Test
@@ -25,8 +25,8 @@ for FT in (Float32, Float64)
         segment_idx0 = [
             argmin(
                 abs.(
-                    parse(FT, CallbackManager.datetime_to_strdate(date0)) .-
-                    parse.(FT, CallbackManager.datetime_to_strdate.(dummy_dates[:]))
+                    parse(FT, TimeManager.datetime_to_strdate(date0)) .-
+                    parse.(FT, TimeManager.datetime_to_strdate.(dummy_dates[:]))
                 ),
             ),
         ]
@@ -93,7 +93,7 @@ for FT in (Float32, Float64)
             segment_length,                     # segment_length
             interpolate_daily,                  # interpolate_daily
         )
-        @test BCReader.interpolate_midmonth_to_daily(FT, date0, bcf_info_interp) == ones(boundary_space_t) .* FT(0.5)
+        @test BCReader.interpolate_midmonth_to_daily(date0, bcf_info_interp) == ones(boundary_space_t) .* FT(0.5)
 
         # test interpolate_midmonth_to_daily without interpolation
         interpolate_daily = false
@@ -112,7 +112,7 @@ for FT in (Float32, Float64)
             segment_length,                     # segment_length
             interpolate_daily,                  # interpolate_daily
         )
-        @test BCReader.interpolate_midmonth_to_daily(FT, date0, bcf_info_no_interp) == monthly_fields[1]
+        @test BCReader.interpolate_midmonth_to_daily(date0, bcf_info_no_interp) == monthly_fields[1]
     end
 
     # Add tests which use TempestRemap here -
@@ -123,8 +123,8 @@ for FT in (Float32, Float64)
             # setup for test
             date0 = date1 = DateTime(1979, 01, 01, 01, 00, 00)
             date = DateTime(1979, 01, 01, 00, 00, 00)
-            tspan = (1, 90 * 86400) # Jan-Mar
-            Δt = 1 * 3600
+            tspan = (Int(1), Int(90 * 86400)) # Jan-Mar
+            Δt = Int(1 * 3600)
 
             radius = FT(6731e3)
             Nq = 4
@@ -156,34 +156,46 @@ for FT in (Float32, Float64)
             )
 
             dates = (; date = [date], date0 = [date0], date1 = [date1])
-            cs_t = (;
-                _info = bcf_info,
-                dates = dates,
-                SST_all = [],
-                updating_dates = [],
-                monthly_state_diags = (; fields = deepcopy(dummy_data), ct = [0]),
+            SST_all = []
+            updating_dates = []
+
+            cs_t = Utilities.CoupledSimulation{FT}(
+                comms_ctx, # comms_ctx
+                dates, # dates
+                nothing, # boundary_space
+                nothing, # fields
+                nothing, # parsed_args
+                nothing, # conservation_checks
+                tspan, # tspan
+                Int(0), # t
+                Δt, # Δt_cpl
+                (;), # surface_masks
+                (;), # model_sims
+                (;), # mode
+                (;), # monthly_3d_diags
+                (;), # monthly_2d_diags
             )
 
             # step in time
             walltime = @elapsed for t in ((tspan[1] + Δt):Δt:tspan[end])
-                cs_t.dates.date[1] = CallbackManager.current_date(cs_t, t) # if not global, `date`` is not updated. Check that this still runs when distributed.
+                cs_t.dates.date[1] = TimeManager.current_date(cs_t, t) # if not global, `date`` is not updated. Check that this still runs when distributed.
 
                 model_date = cs_t.dates.date[1]
-                callback_date = BCReader.next_date_in_file(cs_t._info)
+                callback_date = BCReader.next_date_in_file(bcf_info)
 
                 # TODO investigate if macro would be faster here
                 if (model_date >= callback_date)
-                    BCReader.update_midmonth_data!(model_date, cs_t._info)
-                    push!(cs_t.SST_all, deepcopy(cs_t._info.monthly_fields[1]))
-                    push!(cs_t.updating_dates, deepcopy(model_date))
+                    BCReader.update_midmonth_data!(model_date, bcf_info)
+                    push!(SST_all, deepcopy(bcf_info.monthly_fields[1]))
+                    push!(updating_dates, deepcopy(model_date))
                 end
 
             end
 
             # test if the SST field was modified
-            @test cs_t.SST_all[end] !== cs_t.SST_all[end - 1]
+            @test SST_all[end] !== SST_all[end - 1]
             # check that the final file date is as expected
-            @test Date(cs_t.updating_dates[end]) == Date(1979, 03, 16)
+            @test Date(updating_dates[end]) == Date(1979, 03, 16)
 
             # test warning/error cases
             current_fields = Fields.zeros(FT, boundary_space_t), Fields.zeros(FT, boundary_space_t)
@@ -240,8 +252,8 @@ for FT in (Float32, Float64)
 
             nearest_idx = argmin(
                 abs.(
-                    parse(FT, CallbackManager.datetime_to_strdate(date)) .-
-                    parse.(FT, CallbackManager.datetime_to_strdate.(bcf_info.all_dates[:]))
+                    parse(FT, TimeManager.datetime_to_strdate(date)) .-
+                    parse.(FT, TimeManager.datetime_to_strdate.(bcf_info.all_dates[:]))
                 ),
             )
             @test bcf_info.segment_idx[1] == bcf_info.segment_idx0[1] == nearest_idx

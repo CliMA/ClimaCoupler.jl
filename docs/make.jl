@@ -64,6 +64,7 @@ interface_pages = [
     "utilities.md",
     "bcreader.md",
     "testhelper.md",
+    "timemanager.md",
 ]
 
 pages = Any["Home" => "index.md", "Examples" => experiment_pages, "Coupler Interface" => interface_pages]

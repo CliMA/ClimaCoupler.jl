@@ -40,14 +40,14 @@ for FT in (Float32, Float64)
         # Fill in only the necessary parts of the simulation
         cs = Utilities.CoupledSimulation{FT}(
             comms_ctx, # comms_ctx
-            nothing, # tspan
             nothing, # dates
             nothing, # boundary_space
             nothing, # fields
             nothing, # parsed_args
             nothing, # conservation_checks
-            FT(200), # t
-            FT(200), # Δt_cpl
+            (Int(0), Int(1000)), # tspan
+            Int(200), # t
+            Int(200), # Δt_cpl
             (; land = land_mask, ice = Fields.zeros(test_space), ocean = Fields.zeros(test_space)), # surface_masks
             (; ice_sim = (; integrator = (; p = (; ice_mask = ice_d)))), # model_sims
             (;), # mode

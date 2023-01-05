@@ -5,7 +5,7 @@ These are in a separate testing file from the other BCReader unit tests so
 that MPI can be enabled for testing of these functions.
 =#
 
-using ClimaCoupler: BCReader, CallbackManager, Regridder
+using ClimaCoupler: Regridder, BCReader, TimeManager, Utilities
 using ClimaCore: Fields, Meshes, Domains, Topologies, Spaces
 using ClimaComms
 using Test
@@ -120,37 +120,49 @@ end
         )
 
         dates = (; date = [date], date0 = [date0], date1 = [date1])
-        cs_t = (;
-            _info = bcf_info,
-            dates = dates,
-            SST_all = [],
-            updating_dates = [],
-            monthly_state_diags = (; fields = deepcopy(dummy_data), ct = [0]),
+        SST_all = []
+        updating_dates = []
+
+        cs_t = Utilities.CoupledSimulation{FT}(
+            comms_ctx, # comms_ctx
+            dates, # dates
+            nothing, # boundary_space
+            nothing, # fields
+            nothing, # parsed_args
+            nothing, # conservation_checks
+            tspan, # tspan
+            Int(0), # t
+            Δt, # Δt_cpl
+            (;), # surface_masks
+            (;), # model_sims
+            (;), # mode
+            (;), # monthly_3d_diags
+            (;), # monthly_2d_diags
         )
 
         ClimaComms.barrier(comms_ctx)
 
         # step in time
         walltime = @elapsed for t in ((tspan[1] + Δt):Δt:tspan[end])
-            cs_t.dates.date[1] = CallbackManager.current_date(cs_t, t) # if not global, `date`` is not updated. Check that this still runs when distributed.
+            cs_t.dates.date[1] = TimeManager.current_date(cs_t, t) # if not global, `date`` is not updated. Check that this still runs when distributed.
 
             model_date = cs_t.dates.date[1]
-            callback_date = BCReader.next_date_in_file(cs_t._info)
+            callback_date = BCReader.next_date_in_file(bcf_info)
 
             # TODO investigate if macro would be faster here
             if (model_date >= callback_date)
-                BCReader.update_midmonth_data!(model_date, cs_t._info)
-                push!(cs_t.SST_all, deepcopy(cs_t._info.monthly_fields[1]))
-                push!(cs_t.updating_dates, deepcopy(model_date))
+                BCReader.update_midmonth_data!(model_date, bcf_info)
+                push!(SST_all, deepcopy(bcf_info.monthly_fields[1]))
+                push!(updating_dates, deepcopy(model_date))
             end
 
         end
 
         ClimaComms.barrier(comms_ctx)
         # test if the SST field was modified
-        @test cs_t.SST_all[end] !== cs_t.SST_all[end - 1]
+        @test SST_all[end] !== SST_all[end - 1]
         # check that the final file date is as expected
-        @test Date(cs_t.updating_dates[end]) == Date(1979, 03, 16)
+        @test Date(updating_dates[end]) == Date(1979, 03, 16)
 
         # test warning/error cases
         current_fields = Fields.zeros(FT, boundary_space_t), Fields.zeros(FT, boundary_space_t)
@@ -210,8 +222,8 @@ end
 
         nearest_idx = argmin(
             abs.(
-                parse(FT, CallbackManager.datetime_to_strdate(date)) .-
-                parse.(FT, CallbackManager.datetime_to_strdate.(bcf_info.all_dates[:]))
+                parse(FT, TimeManager.datetime_to_strdate(date)) .-
+                parse.(FT, TimeManager.datetime_to_strdate.(bcf_info.all_dates[:]))
             ),
         )
 

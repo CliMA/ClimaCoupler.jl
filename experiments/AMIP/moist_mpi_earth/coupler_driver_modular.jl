@@ -82,9 +82,9 @@ run_name = parsed_args["run_name"]
 energy_check = parsed_args["energy_check"]
 const FT = parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim_name = "bucket"
-t_end = FT(time_to_seconds(parsed_args["t_end"]))
-tspan = (0, t_end)
-Δt_cpl = FT(parsed_args["dt_cpl"])
+t_end = Int(time_to_seconds(parsed_args["t_end"]))
+tspan = (Int(0), t_end)
+Δt_cpl = Int(parsed_args["dt_cpl"])
 saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
 date0 = date = DateTime(parsed_args["start_date"], dateformat"yyyymmdd")
 mono_surface = parsed_args["mono_surface"]
@@ -96,6 +96,7 @@ import ClimaCoupler.ConservationChecker:
 import ClimaCoupler.Utilities: CoupledSimulation, float_type_cs, swap_space!
 import ClimaCoupler.BCReader:
     bcfile_info_init, float_type_bcf, update_midmonth_data!, next_date_in_file, interpolate_midmonth_to_daily
+import ClimaCoupler.TimeManager: current_date, datetime_to_strdate
 
 pkg_dir = pkgdir(ClimaCoupler)
 COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth/output", joinpath(mode_name, run_name))
@@ -113,7 +114,6 @@ mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 
 # import coupler utils
 include("coupler_utils/flux_calculator.jl")
-include("coupler_utils/calendar_timer.jl")
 include("coupler_utils/variable_definer.jl")
 include("coupler_utils/diagnostics_gatherer.jl")
 include("coupler_utils/offline_postprocessor.jl")
@@ -184,7 +184,7 @@ if mode_name == "amip"
     )
 
     update_midmonth_data!(date0, SST_info)
-    SST_init = interpolate_midmonth_to_daily(FT, date0, SST_info)
+    SST_init = interpolate_midmonth_to_daily(date0, SST_info)
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
     ocean_sim = (;
         integrator = (;
@@ -208,7 +208,7 @@ if mode_name == "amip"
         mono = mono_surface,
     )
     update_midmonth_data!(date0, SIC_info)
-    SIC_init = interpolate_midmonth_to_daily(FT, date0, SIC_info)
+    SIC_init = interpolate_midmonth_to_daily(date0, SIC_info)
     ice_mask = get_ice_mask.(SIC_init, mono_surface)
     ice_sim = ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info)
@@ -290,14 +290,14 @@ end
 ## coupler simulation
 cs = CoupledSimulation{FT}(
     comms_ctx,
-    tspan,
     dates,
     boundary_space,
     coupler_fields,
     parsed_args,
     conservation_checks,
+    tspan,
     integrator.t,
-    FT(Δt_cpl),
+    Δt_cpl,
     (; land = land_mask, ocean = zeros(boundary_space), ice = zeros(boundary_space)),
     model_sims,
     mode_specifics,
@@ -336,22 +336,23 @@ function solve_coupler!(cs)
 
         cs.dates.date[1] = current_date(cs, t) # if not global, `date` is not updated.
 
-        ## print date on the first of month 
-        @calendar_callback :(@show(cs.dates.date[1])) cs.dates.date[1] cs.dates.date1[1]
+        ## print date on the first of month
+        if cs.dates.date[1] >= cs.dates.date1[1]
+            @show(cs.dates.date[1])
+        end
 
         if cs.mode.name == "amip"
 
             ## monthly read of boundary condition data for SST and SIC
-            @calendar_callback :(update_midmonth_data!(cs.dates.date[1], cs.mode.SST_info)) cs.dates.date[1] next_date_in_file(
-                cs.mode.SST_info,
-            )
-            SST =
-                ocean_sim.integrator.u.T_sfc .=
-                    interpolate_midmonth_to_daily(FT, cs.dates.date[1], cs.mode.SST_info)
-            @calendar_callback :(update_midmonth_data!(cs.dates.date[1], cs.mode.SIC_info)) cs.dates.date[1] next_date_in_file(
-                cs.mode.SIC_info,
-            )
-            SIC = interpolate_midmonth_to_daily(FT, cs.dates.date[1], cs.mode.SIC_info)
+            if cs.dates.date[1] >= next_date_in_file(cs.mode.SST_info)
+                update_midmonth_data!(cs.dates.date[1], cs.mode.SST_info)
+            end
+            SST = ocean_sim.integrator.u.T_sfc .= interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SST_info)
+
+            if cs.dates.date[1] >= next_date_in_file(cs.mode.SIC_info)
+                update_midmonth_data!(cs.dates.date[1], cs.mode.SIC_info)
+            end
+            SIC = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info)
 
             ice_mask = ice_sim.integrator.p.ice_mask .= get_ice_mask.(SIC_init, mono_surface)
 
@@ -360,30 +361,31 @@ function solve_coupler!(cs)
             accumulate_diags(collect_diags(cs, propertynames(cs.monthly_2d_diags.fields)), cs.monthly_2d_diags)
 
             ## save and reset monthly averages
-            @calendar_callback :(
-                map(x -> x ./= cs.monthly_3d_diags.ct[1], cs.monthly_3d_diags.fields),
+            if cs.dates.date[1] >= cs.dates.date1[1]
+                map(x -> x ./= cs.monthly_3d_diags.ct[1], cs.monthly_3d_diags.fields)
                 save_hdf5(
                     cs.comms_ctx,
                     cs.monthly_3d_diags.fields,
                     cs.dates.date[1],
                     COUPLER_OUTPUT_DIR,
                     name_tag = "3d_",
-                ),
-                map(x -> x .= FT(0), cs.monthly_3d_diags.fields),
-                cs.monthly_3d_diags.ct .= FT(0),
-            ) cs.dates.date[1] cs.dates.date1[1]
-            @calendar_callback :(
-                map(x -> x ./= cs.monthly_2d_diags.ct[1], cs.monthly_2d_diags.fields),
+                )
+                map(x -> x .= FT(0), cs.monthly_3d_diags.fields)
+                cs.monthly_3d_diags.ct .= FT(0)
+            end
+
+            if cs.dates.date[1] >= cs.dates.date1[1]
+                map(x -> x ./= cs.monthly_2d_diags.ct[1], cs.monthly_2d_diags.fields)
                 save_hdf5(
                     cs.comms_ctx,
                     cs.monthly_2d_diags.fields,
                     cs.dates.date[1],
                     COUPLER_OUTPUT_DIR,
                     name_tag = "2d_",
-                ),
-                map(x -> x .= FT(0), cs.monthly_2d_diags.fields),
-                cs.monthly_2d_diags.ct .= FT(0),
-            ) cs.dates.date[1] cs.dates.date1[1]
+                )
+                map(x -> x .= FT(0), cs.monthly_2d_diags.fields)
+                cs.monthly_2d_diags.ct .= FT(0)
+            end
 
         end
 
@@ -415,7 +417,9 @@ function solve_coupler!(cs)
         end
 
         ## step to the next calendar month
-        @calendar_callback :(cs.dates.date1[1] += Dates.Month(1)) cs.dates.date[1] cs.dates.date1[1]
+        if cs.dates.date[1] >= cs.dates.date1[1]
+            cs.dates.date1[1] += Dates.Month(1)
+        end
 
     end
     @show walltime

@@ -7,7 +7,7 @@ monthly to daily intervals.
 =#
 module BCReader
 
-using ..Utilities, ..Regridder, ..CallbackManager
+using ..Utilities, ..Regridder, ..TimeManager
 using ClimaCore: Fields
 using ClimaComms
 using Dates
@@ -65,7 +65,8 @@ BCFileInfo's land_mask without scaling.
 - `field`: [Fields.Field] contains the values to be remapped.
 - `bcf_info`: [BCFileInfo] contains a land_mask to remap onto the space of.
 """
-no_scaling(field::Fields.Field, bcf_info::BCFileInfo) = Utilities.swap_space!(field, axes(bcf_info.land_mask))
+no_scaling(field::Fields.Field, bcf_info::BCFileInfo{FT}) where {FT} =
+    Utilities.swap_space!(field, axes(bcf_info.land_mask))
 
 """
     bcfile_info_init(
@@ -144,8 +145,8 @@ function bcfile_info_init(
         [
             argmin(
                 abs.(
-                    parse(FT, CallbackManager.datetime_to_strdate(date0)) .-
-                    parse.(FT, CallbackManager.datetime_to_strdate.(data_dates[:]))
+                    parse(FT, TimeManager.datetime_to_strdate(date0)) .-
+                    parse.(FT, TimeManager.datetime_to_strdate.(data_dates[:]))
                 ),
             ),
         ]
@@ -168,7 +169,7 @@ end
 
 # IO - monthly
 """
-    update_midmonth_data!(date, bcf_info)
+    update_midmonth_data!(date, bcf_info::BCFileInfo{FT}) where {FT}
 
 Extracts boundary condition data from regridded (to model grid) NetCDF files.
 The times for which data is extracted depends on the specifications in the
@@ -178,10 +179,9 @@ The times for which data is extracted depends on the specifications in the
 - `date`: [Dates.DateTime] start date for data.
 - `bcf_info`: [BCFileInfo] containing boundary condition data.
 """
-function update_midmonth_data!(date, bcf_info::BCFileInfo)
+function update_midmonth_data!(date, bcf_info::BCFileInfo{FT}) where {FT}
     # monthly count
     (; bcfile_dir, comms_ctx, hd_outfile_root, varname, all_dates, scaling_function) = bcf_info
-    FT = float_type_bcf(bcf_info)
     midmonth_idx = bcf_info.segment_idx[1]
     midmonth_idx0 = bcf_info.segment_idx0[1]
 
@@ -215,8 +215,8 @@ function update_midmonth_data!(date, bcf_info::BCFileInfo)
     elseif Dates.days(date - all_dates[Int(midmonth_idx + 1)]) > 2
         nearest_idx = argmin(
             abs.(
-                parse(FT, CallbackManager.datetime_to_strdate(date)) .-
-                parse.(FT, CallbackManager.datetime_to_strdate.(all_dates[:]))
+                parse(FT, TimeManager.datetime_to_strdate(date)) .-
+                parse.(FT, TimeManager.datetime_to_strdate.(all_dates[:]))
             ),
         )
         # TODO test this
@@ -256,24 +256,23 @@ return the same value unless `segment_idx` is modified elsewhere in between.
 # Returns
 - Dates.DateTime
 """
-next_date_in_file(bcf_info::BCFileInfo) = bcf_info.all_dates[bcf_info.segment_idx[1] + Int(1)]
+next_date_in_file(bcf_info::BCFileInfo{FT}) where {FT} = bcf_info.all_dates[bcf_info.segment_idx[1] + Int(1)]
 
 # IO - daily
 """
-    interpolate_midmonth_to_daily(FT, date, bcf_info::BCFileInfo)
+    interpolate_midmonth_to_daily(date, bcf_info::BCFileInfo{FT}) where {FT}
 
 Interpolates linearly between two `Fields` in the `bcf_info` struct,
 or returns the first Field if interpolation is switched off.
 
 # Arguments
-- `FT`: [DataType] Float type.
 - `date`: [Dates.DateTime] start date for data.
 - `bcf_info`: [BCFileInfo] contains fields to be interpolated.
 
 # Returns
 - Fields.field
 """
-function interpolate_midmonth_to_daily(FT, date, bcf_info::BCFileInfo)
+function interpolate_midmonth_to_daily(date, bcf_info::BCFileInfo{FT}) where {FT}
     if bcf_info.interpolate_daily && bcf_info.segment_length[1] > FT(0)
         (; segment_length, segment_idx, all_dates, monthly_fields) = bcf_info
 

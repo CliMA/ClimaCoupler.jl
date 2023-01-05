@@ -65,12 +65,12 @@ function coupler_sim_from_file(
 
     Utilities.CoupledSimulation{FT}(
         ClimaComms.SingletonCommsContext(),
-        tspan,
         dates,
         boundary_space,
         coupler_fields,
         parsed_args,
         conservation_checks,
+        tspan,
         t,
         Δt_cpl,
         (; land = land_mask, ocean = FT(1) .- land_mask, ice = land_mask .* FT(0)),

@@ -49,7 +49,7 @@ for FT in (Float32, Float64)
             (; ice_sim = (; integrator = (; p = (; ice_mask = ice_d)))), # model_sims
             (;), # mode
             (;), # monthly_3d_diags
-            (;), # monthly_2d_diags
+            (), # monthly_2d_diags
         )
 
         Regridder.update_masks!(cs)

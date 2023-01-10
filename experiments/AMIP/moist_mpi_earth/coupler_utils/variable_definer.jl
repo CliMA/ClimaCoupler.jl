@@ -10,7 +10,7 @@ get_var(cs, ::Val{:T}) = air_temperature(cs)
 get_var(cs, ::Val{:u}) = ClimaCore.Geometry.UVVector.(cs.model_sims.atmos_sim.integrator.u.c.uₕ).components.data.:1
 
 get_var(cs, ::Val{:q_tot}) =
-    cs.model_sims.atmos_sim.integrator.u.c.ρq_tot ./ cs.model_sims.atmos_sim.integrator.u.c.ρ .* float_type(cs)(1000)
+    cs.model_sims.atmos_sim.integrator.u.c.ρq_tot ./ cs.model_sims.atmos_sim.integrator.u.c.ρ .* float_type_cs(cs)(1000)
 
 get_var(cs, ::Val{:toa}) = swap_space!(toa_fluxes(cs), cs.boundary_space)
 

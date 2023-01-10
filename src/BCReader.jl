@@ -13,7 +13,8 @@ using ClimaComms
 using Dates
 using JLD2
 
-export BCFileInfo, bcfile_info_init, update_midmonth_data!, next_date_in_file, interpolate_midmonth_to_daily
+export BCFileInfo,
+    float_type_bcf, bcfile_info_init, update_midmonth_data!, next_date_in_file, interpolate_midmonth_to_daily
 
 
 """
@@ -52,7 +53,7 @@ end
 
 BCFileInfo{FT}(args...) where {FT} = BCFileInfo{FT, typeof.(args[1:8])...}(args...)
 
-float_type(::BCFileInfo{FT}) where {FT} = FT
+float_type_bcf(::BCFileInfo{FT}) where {FT} = FT
 
 """
     no_scaling(field, bcf_info)
@@ -180,7 +181,7 @@ The times for which data is extracted depends on the specifications in the
 function update_midmonth_data!(date, bcf_info::BCFileInfo)
     # monthly count
     (; bcfile_dir, comms_ctx, hd_outfile_root, varname, all_dates, scaling_function) = bcf_info
-    FT = float_type(bcf_info)
+    FT = float_type_bcf(bcf_info)
     midmonth_idx = bcf_info.segment_idx[1]
     midmonth_idx0 = bcf_info.segment_idx0[1]
 

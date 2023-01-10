@@ -64,6 +64,7 @@ function coupler_sim_from_file(
     FT = eltype(land_mask)
 
     Utilities.CoupledSimulation{FT}(
+        ClimaComms.SingletonCommsContext(),
         tspan,
         dates,
         boundary_space,

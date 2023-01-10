@@ -21,7 +21,7 @@ and hydrostatic balance assumptions. The land model does not compute the surface
 a reasonable stand-in.
 """
 function land_pull!(cs)
-    FT = float_type(cs)
+    FT = float_type_cs(cs)
     land_sim = cs.model_sims.land_sim
     csf = cs.fields
     land_mask = cs.surface_masks.land
@@ -59,7 +59,7 @@ In the current version, the sea ice has a prescribed thickness, and we assume th
 sublimating. That contribution has been zeroed out in the atmos fluxes.
 """
 function ice_pull!(cs)
-    FT = float_type(cs)
+    FT = float_type_cs(cs)
     ice_sim = cs.model_sims.ice_sim
     csf = cs.fields
     ice_mask = cs.surface_masks.ice

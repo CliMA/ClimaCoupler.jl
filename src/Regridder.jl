@@ -8,6 +8,7 @@ via ClimaCoreTempestRemap wrappers.
 module Regridder
 
 using ClimaCoupler.Utilities
+using ClimaCoupler.TimeManager
 using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 using ClimaComms
 using NCDatasets
@@ -132,7 +133,7 @@ function hdwrite_regridfile_rll_to_cgll(
         if "time" in ds
             data_dates = Dates.DateTime.(ds["time"][:])
         elseif "date" in ds
-            data_dates = strdate_to_datetime.(string.(ds["date"][:]))
+            data_dates = TimeManager.strdate_to_datetime.(string.(ds["date"][:]))
         else
             @warn "No dates available in file $datafile_rll"
             data_dates = [Dates.DateTime(0)]

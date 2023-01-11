@@ -8,22 +8,23 @@ using ClimaCore: Fields
 
 for FT in (Float32, Float64)
     @testset "test float_type_cs for FT=$FT" begin
-        cs = Utilities.CoupledSimulation(
+        cs = Utilities.CoupledSimulation{FT}(
             nothing, # comms_ctx
-            nothing, # tspan
             nothing, # dates
             nothing, # boundary_space
             nothing, # fields
             nothing, # parsed_args
             nothing, # conservation_checks
-            FT(200), # t
-            FT(1 * 24 * 3600), # Δt_cpl
+            (Int(0), Int(1000)), # tspan
+            Int(200), # t
+            Int(200), # Δt_cpl
             (;), # surface_masks
             (;), # model_sims
             (;), # mode
             (;), # monthly_3d_diags
             (;), # monthly_2d_diags
         )
+
         @test Utilities.float_type_cs(cs) == FT
     end
 

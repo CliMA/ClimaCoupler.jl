@@ -1,10 +1,10 @@
-#=
+"""
     Regridder
 
 This module contains functions to regrid information between spaces.
 Many of the functions used in this module call TempestRemap functions
 via ClimaCoreTempestRemap wrappers.
-=#
+"""
 module Regridder
 
 using ClimaCoupler.Utilities
@@ -54,7 +54,7 @@ function reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R)
 end
 
 """
-    function hdwrite_regridfile_rll_to_cgll(
+    hdwrite_regridfile_rll_to_cgll(
         FT,
         REGRID_DIR,
         datafile_rll,
@@ -65,11 +65,11 @@ end
     )
 
 Reads and regrids data of the `varname` variable from an input NetCDF file and
-saves it as another NetCDF file using Tempest Remap. 
-The input NetCDF fileneeds to be `Exodus` formatted, and can contain 
-time-dependent data. The output NetCDF file is then read back, the output 
-arrays converted into Fields and saved as HDF5 files (one per time slice). 
-This function should be called by the root process. 
+saves it as another NetCDF file using Tempest Remap.
+The input NetCDF fileneeds to be `Exodus` formatted, and can contain
+time-dependent data. The output NetCDF file is then read back, the output
+arrays converted into Fields and saved as HDF5 files (one per time slice).
+This function should be called by the root process.
 The saved regridded HDF5 output is readable by multiple MPI processes.
 
 # Arguments
@@ -114,7 +114,7 @@ function hdwrite_regridfile_rll_to_cgll(
         # write lat-lon mesh
         rll_mesh(meshfile_rll; nlat = nlat, nlon = nlon)
 
-        # write cgll mesh, overlap mesh and weight file 
+        # write cgll mesh, overlap mesh and weight file
         write_exodus(meshfile_cgll, topology)
         overlap_mesh(meshfile_overlap, meshfile_rll, meshfile_cgll)
 
@@ -176,11 +176,11 @@ function hdwrite_regridfile_rll_to_cgll(
 end
 
 """
-    write_to_hdf5(REGRID_DIR, hd_outfile_root, time, field, varname, 
+    write_to_hdf5(REGRID_DIR, hd_outfile_root, time, field, varname,
         comms_ctx = ClimaComms.SingletonCommsContext())
 
 Function to save individual HDF5 files after remapping.
-If a CommsContext other than SingletonCommsContext is used for `comms_ctx`,
+If a CommsContext other than `SingletonCommsContext` is used for `comms_ctx`,
 the HDF5 output is readable by multiple MPI processes.
 
 # Arguments
@@ -212,7 +212,7 @@ end
         comms_ctx = ClimaComms.SingletonCommsContext())
 
 Read in a variable `varname` from an HDF5 file.
-If a CommsContext other than SingletonCommsContext is used for `comms_ctx`,
+If a CommsContext other than `SingletonCommsContext` is used for `comms_ctx`,
 the input HDF5 file must be readable by multiple MPI processes.
 
 # Arguments
@@ -272,9 +272,9 @@ end
 
 """
     remap_field_cgll_to_rll(
-        name, 
-        field::Fields.Field, 
-        remap_tmpdir, 
+        name,
+        field::Fields.Field,
+        remap_tmpdir,
         datafile_rll;
         nlat = 90,
         nlon = 180
@@ -332,8 +332,8 @@ end
     )
 
 Initialize a mask for land/sea classification of grid squares over the space.
-With mono = true, remappings are monotone and conservative, (slower).
-With mono = false, values outside of `threshold` are cutoff (faster).
+With `mono` = `true`, remappings are monotone and conservative, (slower).
+With `mono` = `false`, values outside of `threshold` are cutoff (faster).
 
 See https://github.com/CliMA/ClimaCoupler.jl/wiki/ClimaCoupler-Lessons-Learned
     for a detailed comparison of remapping approaches.
@@ -410,7 +410,7 @@ end
 """
     binary_mask(var::FT; threshold = 0.5)
 
-Converts a number to 1 or 0 of the same type, based on a threshold.
+Converts a number `var` to 1, if `var` is greater than a given `threshold` value, or 0 otherwise, keeping the same type.
 
 # Arguments
 - `var`: [FT] value to be converted.

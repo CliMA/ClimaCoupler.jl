@@ -1,9 +1,9 @@
-#=
+"""
     Utilities
 
 This module contains functions, objects, and constants used by various
 modules in the coupler.
-=#
+"""
 module Utilities
 
 using ClimaCore: Fields, Spaces
@@ -12,7 +12,8 @@ export CoupledSimulation, float_type_cs, swap_space!
 
 
 """
-Stores information needed to run a simulation with the coupler. 
+    CoupledSimulation
+Stores information needed to run a simulation with the coupler.
 """
 struct CoupledSimulation{FT, X, D, B, FV, P, E}
     comms_ctx::X

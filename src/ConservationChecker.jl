@@ -1,8 +1,8 @@
-#=
+"""
     ConservationChecker
 
-This module contains functions that check global conservation of energy and water (and momentum - TODO).  
-=#
+This module contains functions that check global conservation of energy and water (and momentum - TODO).
+"""
 module ConservationChecker
 
 using ClimaCore: ClimaCore, Geometry, Meshes, Domains, Topologies, Spaces, Fields, InputOutput
@@ -64,10 +64,10 @@ check_conservation!(coupler_sim::CoupledSimulation, get_slab_energy, get_land_en
         get_land_energy,
         )
 
-computes the total energy ∫ ρe dV of the various components
-of the coupled simulations, and updates cc with the values.
+computes the total energy, ``\\int \\rho e dV``, of the various components
+of the coupled simulations, and updates `cc` with the values.
 
-TODO: move `get_slab_energy` and `get_land_energy` to their respective sims upon optimization refactor
+TODO: move `get_slab_energy` and `get_land_energy` to their respective sims upon optimization refactor.
 """
 function check_conservation!(
     cc::EnergyConservationCheck,
@@ -147,15 +147,15 @@ function check_conservation!(
 end
 
 """
-        check_conservation!(
-        cc::WaterConservationCheck,
-        coupler_sim,
-        get_slab_energy,
-        get_land_energy,
-        )
+    check_conservation!(
+    cc::WaterConservationCheck,
+    coupler_sim,
+    get_slab_energy,
+    get_land_energy,
+    )
 
-computes the total water ∫ ρq_tot dV of the various components
-of the coupled simulations, and updates cc with the values.
+computes the total water, ``\\int \\rho q_{tot} dV``, of the various components
+of the coupled simulations, and updates `cc` with the values.
 
 Note: in the future this should not use `push!`.
 """
@@ -186,7 +186,7 @@ function check_conservation!(
     end
 
     # save sea ice
-    coupler_sim.fields.P_net .-= swap_space!(surface_water_gain_from_rates(coupler_sim), boundary_space) # accumulated surface water gain 
+    coupler_sim.fields.P_net .-= swap_space!(surface_water_gain_from_rates(coupler_sim), boundary_space) # accumulated surface water gain
     if ice_sim !== nothing
         push!(cc.ρq_tot_seaice, sum(coupler_sim.fields.P_net .* surface_masks.ice)) # kg (∫ P_net dV)
     else
@@ -207,7 +207,7 @@ end
 """
     surface_water_gain_from_rates(cs)
 
-Determines the total water content gain/loss of a surface from the begining of the simulation based on evaporation and precipitation rates. 
+Determines the total water content gain/loss of a surface from the begining of the simulation based on evaporation and precipitation rates.
 """
 function surface_water_gain_from_rates(cs::CoupledSimulation)
     evaporation = cs.fields.F_E # kg / m^2 / s / layer depth
@@ -216,16 +216,18 @@ function surface_water_gain_from_rates(cs::CoupledSimulation)
     @. (evaporation + precipitation_l + precipitation_s) * cs.Δt_cpl # kg / m^2 / layer depth
 end
 
-# setup the GKS socket application environment as nul for better performance and to avoid GKS connection errors 
+# setup the GKS socket application environment as nul for better performance and to avoid GKS connection errors while plotting
 ENV["GKSwstype"] = "nul"
 
 """
-    plot_global_conservation(cc::AbstractCheck,
-                    coupler_sim,
-                    figname1 = "total_energy.png",
-                    figname2 = "total_energy_log.png")
+    plot_global_conservation(
+        cc::EnergyConservationCheck,
+        coupler_sim::CoupledSimulation;
+        figname1 = "total_energy.png",
+        figname2 = "total_energy_log.png",
+    )
 
-Creates two plots of a globally integrated quantity: 
+Creates two plots of the globally integrated quantity (energy, ``\\rho e``):
 1. global quantity of each model component as a function of time,
 relative to the initial value;
 2. fractional change in the sum of all components over time on a log scale.
@@ -271,6 +273,19 @@ function plot_global_conservation(
     Plots.savefig(figname2)
 end
 
+"""
+    plot_global_conservation(
+        cc::WaterConservationCheck,
+        coupler_sim::CoupledSimulation;
+        figname1 = "total_energy.png",
+        figname2 = "total_energy_log.png",
+    )
+
+Creates two plots of the globally integrated quantity (water, ``\\rho q_{tot}``):
+1. global quantity of each model component as a function of time,
+relative to the initial value;
+2. fractional change in the sum of all components over time on a log scale.
+"""
 function plot_global_conservation(
     cc::WaterConservationCheck,
     coupler_sim::CoupledSimulation{FT};

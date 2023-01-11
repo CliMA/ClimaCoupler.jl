@@ -19,6 +19,11 @@ name(::AbstractLandSimulation) = :land
 abstract type AbstractCoupledSimulation <: AbstractSimulation end
 name(::AbstractCoupledSimulation) = :coupled
 
+"""
+    CoupledSimulation
+
+A subtype of the abstract type `AbstractCoupledSimulation` representing a model simulation.
+"""
 struct CoupledSimulation{CS, S, CPL, L, C} <: AbstractCoupledSimulation
     "The coupled time-stepping scheme"
     coupler_solver::CS
@@ -32,14 +37,12 @@ struct CoupledSimulation{CS, S, CPL, L, C} <: AbstractCoupledSimulation
     clock::C
 end
 
-
-
 """
     run!(::CoupledSimulation)
 
 A simple outer timestepping loop for coupled system runs.
 
-This will be formalized when the run! functionality for component
+This will be formalized when the `run!` functionality for component
 models is implemented so to have a consistent interface.
 """
 function run!(sim::CoupledSimulation)
@@ -53,7 +56,7 @@ end
 """
     step!(sim, dt)
 
-Advances a simulation by `dt`.
+Advances a simulation `sim` by `dt`.
 
 Note that `dt` is not necessarily the simulation's timestep length;
 a simuation could take several shorter steps that total to `dt`.

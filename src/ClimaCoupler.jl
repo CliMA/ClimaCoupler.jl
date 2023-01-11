@@ -1,7 +1,7 @@
 """
     ClimaCoupler
 
-Coupling module sufficient for initial atmos-ocean-land coupled simulation.
+Module for atmos-ocean-land coupled simulations.
 """
 module ClimaCoupler
 

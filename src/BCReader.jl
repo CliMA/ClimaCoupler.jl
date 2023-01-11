@@ -1,10 +1,10 @@
-#=
+"""
     BCReader
 
 This module coordinates reading of boundary conditions from NetCDF files,
 as well as regridding calls and temporal interpolations from
 monthly to daily intervals.
-=#
+"""
 module BCReader
 
 using ..Utilities, ..Regridder, ..TimeManager
@@ -22,19 +22,19 @@ export BCFileInfo,
 
 Stores information specific to each boundary condition from a file and each variable.
 
-# Inputs
-    bcfile_dir::b                   # directory of the BC file
-    comms_ctx::X                    # communication context used for MPI
-    hd_outfile_root::S              # filename root for regridded data 
-    varname::V                      # name of the variable
-    all_dates::D                    # vector of all dates contained in the original data file
-    monthly_fields::C               # tuple of the two monthly fields, that will be used for the daily interpolation
-    scaling_function::O             # function that scales, offsets or transforms the raw variable
-    land_mask::M                    # mask with 1 = land, 0 = ocean / sea-ice
-    segment_idx::Vector{Int}        # index of the monthly data in the file
-    segment_idx0::Vector{Int}       # `segment_idx` of the file data that is closest to date0
-    segment_length::Vector{Int}     # length of each month segment (used in the daily interpolation)
-    interpolate_daily::Bool         # switch to trigger daily interpolation
+# Inputs:
+- bcfile_dir::b                   # directory of the BC file
+- comms_ctx::X                    # communication context used for MPI
+- hd_outfile_root::S              # filename root for regridded data
+- varname::V                      # name of the variable
+- all_dates::D                    # vector of all dates contained in the original data file
+- monthly_fields::C               # tuple of the two monthly fields, that will be used for the daily interpolation
+- scaling_function::O             # function that scales, offsets or transforms the raw variable
+- land_mask::M                    # mask with 1 = land, 0 = ocean / sea-ice
+- segment_idx::Vector{Int}        # index of the monthly data in the file
+- segment_idx0::Vector{Int}       # `segment_idx` of the file data that is closest to date0
+- segment_length::Vector{Int}     # length of each month segment (used in the daily interpolation)
+- interpolate_daily::Bool         # switch to trigger daily interpolation
 """
 struct BCFileInfo{FT, B, X, S, V, D, C, O, M}
     bcfile_dir::B
@@ -58,8 +58,8 @@ float_type_bcf(::BCFileInfo{FT}) where {FT} = FT
 """
     no_scaling(field, bcf_info)
 
-Remap the values of a field onto the space of the
-BCFileInfo's land_mask without scaling.
+Remap the values of a `field` onto the space of the
+`bcf_info`'s land_mask without scaling.
 
 # Arguments
 - `field`: [Fields.Field] contains the values to be remapped.
@@ -102,7 +102,7 @@ and returns the info packaged in a single struct.
 - `mono`: [Bool] flag for monotone remapping of `datafile_rll`.
 
 # Returns
-- BCFileInfo
+- `BCFileInfo`
 """
 function bcfile_info_init(
     FT,

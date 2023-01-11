@@ -1,10 +1,9 @@
-#=
+"""
     TimeManager
 
 This module facilitates calendar functions and temporal interpolations
 of data.
-=#
-
+"""
 module TimeManager
 
 using ..Utilities
@@ -16,7 +15,7 @@ export current_date, strdate_to_datetime, datetime_to_strdate
 """
     current_date(cs::CoupledSimulation, t::Int)
 
-Return the model date at the current timestep
+Return the model date at the current timestep.
 
 # Arguments
 - `cs`: [CoupledSimulation] containing info about the simulation
@@ -28,10 +27,10 @@ current_date(cs::CoupledSimulation, t::Int) = cs.dates.date0[1] + Dates.Second(t
     strdate_to_datetime(strdate::String)
 
 Convert from String ("YYYYMMDD") to Date format,
-required by the official AMIP input files
+required by the official AMIP input files.
 
 # Arguments
-- `strdate`: [String] to be converted to Date type 
+- `strdate`: [String] to be converted to Date type
 """
 strdate_to_datetime(strdate::String) =
     Dates.DateTime(parse(Int, strdate[1:4]), parse(Int, strdate[5:6]), parse(Int, strdate[7:8]))
@@ -39,7 +38,7 @@ strdate_to_datetime(strdate::String) =
 """
     datetime_to_strdate(datetime::DateTime)
 
-Convert from Date to String ("YYYYMMDD") format
+Convert from Date to String ("YYYYMMDD") format.
 
 # Arguments
 - `datetime`: [DateTime] object to be converted to string

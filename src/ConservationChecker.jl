@@ -64,7 +64,7 @@ check_conservation!(coupler_sim::CoupledSimulation, get_slab_energy, get_land_en
         get_land_energy,
         )
 
-computes the total energy, ``\\int \\rho e dV``, of the various components
+computes the total energy, ∫ ρe dV, of the various components
 of the coupled simulations, and updates `cc` with the values.
 
 TODO: move `get_slab_energy` and `get_land_energy` to their respective sims upon optimization refactor.
@@ -154,7 +154,7 @@ end
     get_land_energy,
     )
 
-computes the total water, ``\\int \\rho q_{tot} dV``, of the various components
+computes the total water, ∫ ρq_tot dV, of the various components
 of the coupled simulations, and updates `cc` with the values.
 
 Note: in the future this should not use `push!`.

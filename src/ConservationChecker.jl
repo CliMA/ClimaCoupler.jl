@@ -16,7 +16,7 @@ using UnPack
 using Plots
 using ClimaAtmos: RRTMGPI
 using ClimaLSM
-using ClimaCoupler.Utilities: CoupledSimulation, swap_space!
+using ..Utilities: CoupledSimulation, swap_space!
 
 export AbstractCheck, EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
 

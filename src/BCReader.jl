@@ -36,7 +36,7 @@ Stores information specific to each boundary condition from a file and each vari
 - segment_length::Vector{Int}     # length of each month segment (used in the daily interpolation)
 - interpolate_daily::Bool         # switch to trigger daily interpolation
 """
-struct BCFileInfo{FT, B, X, S, V, D, C, O, M}
+struct BCFileInfo{FT <: Real, B, X, S, V, D, C, O, M}
     bcfile_dir::B
     comms_ctx::X
     hd_outfile_root::S

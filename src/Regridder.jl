@@ -7,8 +7,8 @@ via ClimaCoreTempestRemap wrappers.
 """
 module Regridder
 
-using ClimaCoupler.Utilities
-using ClimaCoupler.TimeManager
+using ..Utilities
+using ..TimeManager
 using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 using ClimaComms
 using NCDatasets

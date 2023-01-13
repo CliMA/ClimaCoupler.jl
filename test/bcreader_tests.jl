@@ -172,8 +172,7 @@ for FT in (Float32, Float64)
                 (;), # surface_masks
                 (;), # model_sims
                 (;), # mode
-                (;), # monthly_3d_diags
-                (;), # monthly_2d_diags
+                (), # diagnostics
             )
 
             # step in time

@@ -28,8 +28,7 @@ for FT in (Float32, Float64)
             (;), # surface_masks
             (;), # model_sims
             (;), # mode
-            (;), # monthly_3d_diags
-            (;), # monthly_2d_diags
+            (), # diagnostics
         )
 
         for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
@@ -46,4 +45,26 @@ end
 @testset "test datetime_to_strdate" begin
     @test TimeManager.datetime_to_strdate(Dates.DateTime(1900, 1, 1)) == "19000101"
     @test TimeManager.datetime_to_strdate(Dates.DateTime(0, 1, 1)) == "00000101"
+end
+
+@testset "trigger_callback" begin
+    date0 = date = DateTime("19790321", dateformat"yyyymmdd")
+    dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)])
+
+    cs = Utilities.CoupledSimulation{Float64}(
+        nothing, # comms_ctx
+        dates, # dates
+        nothing, # boundary_space
+        nothing, # fields
+        nothing, # parsed_args
+        nothing, # conservation_checks
+        (Int(0), Int(1000)), # tspan
+        Int(200), # t
+        Int(200), # Δt_cpl
+        (;), # surface_masks
+        (;), # model_sims
+        (;), # mode
+        (), # diagnostics
+    )
+    @test TimeManager.trigger_callback(cs, TimeManager.Monthly()) == true
 end

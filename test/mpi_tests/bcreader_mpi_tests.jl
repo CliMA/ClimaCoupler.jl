@@ -14,6 +14,8 @@ using NCDatasets
 import ArtifactWrappers as AW
 using ClimaCommsMPI
 
+
+
 # Get the path to the necessary data file - sst map
 include(joinpath(@__DIR__, "..", "..", "artifacts", "artifact_funcs.jl"))
 const sst_data = joinpath(sst_dataset_path(), "sst.nc")
@@ -136,8 +138,7 @@ end
             (;), # surface_masks
             (;), # model_sims
             (;), # mode
-            (;), # monthly_3d_diags
-            (;), # monthly_2d_diags
+            (), # diagnostics
         )
 
         ClimaComms.barrier(comms_ctx)

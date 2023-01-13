@@ -42,8 +42,7 @@ function coupler_sim_from_file(
     model_sims = (;),
     mode_specifics = (;),
     parsed_args = (;),
-    monthly_3d_diags = (;),
-    monthly_2d_diags = (;),
+    diagnostics = (),
     conservation_checks = (;),
 )
 
@@ -76,8 +75,7 @@ function coupler_sim_from_file(
         (; land = land_mask, ocean = FT(1) .- land_mask, ice = land_mask .* FT(0)),
         model_sims,
         mode_specifics,
-        monthly_3d_diags,
-        monthly_2d_diags,
+        diagnostics,
     )
 end
 

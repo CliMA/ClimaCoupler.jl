@@ -39,7 +39,7 @@ for FT in (Float32, Float64)
 
         # Fill in only the necessary parts of the simulation
         cs = Utilities.CoupledSimulation{FT}(
-            comms_ctx, # comms_ctx
+            nothing, # comms_ctx
             nothing, # dates
             nothing, # boundary_space
             nothing, # fields
@@ -51,8 +51,7 @@ for FT in (Float32, Float64)
             (; land = land_mask, ice = Fields.zeros(test_space), ocean = Fields.zeros(test_space)), # surface_masks
             (; ice_sim = (; integrator = (; p = (; ice_mask = ice_d)))), # model_sims
             (;), # mode
-            (;), # monthly_3d_diags
-            (;), # monthly_2d_diags
+            (), # diagnostics
         )
 
         Regridder.update_masks!(cs)

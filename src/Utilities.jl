@@ -10,7 +10,6 @@ using ClimaCore: Fields, Spaces
 
 export CoupledSimulation, float_type_cs, swap_space!
 
-
 """
     CoupledSimulation
 Stores information needed to run a simulation with the coupler.
@@ -28,8 +27,7 @@ struct CoupledSimulation{FT, X, D, B, FV, P, E}
     surface_masks::NamedTuple
     model_sims::NamedTuple
     mode::NamedTuple
-    monthly_3d_diags::NamedTuple
-    monthly_2d_diags::NamedTuple
+    diagnostics::Tuple
 end
 
 CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args[1:6])...}(args...)
@@ -50,4 +48,4 @@ function swap_space!(field::Fields.Field, new_space)
     return field_out
 end
 
-end
+end # module

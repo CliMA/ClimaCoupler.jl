@@ -18,7 +18,7 @@ struct CouplerSimulation{FT, C, S, D, B, P}
 end
 
 CouplerSimulation{FT}(args...) where {FT} = CouplerSimulation{FT, typeof.(args[1:5])...}(args...)
-float_type_cs(::CouplerSimulation{FT}) where {FT} = FT
+float_type(::CouplerSimulation{FT}) where {FT} = FT
 
 function swap_space!(field, new_space)
     field_out = zeros(new_space)

@@ -216,7 +216,7 @@ uuid = "c8b6d40d-e815-466f-95ae-c48aefa668fa"
 version = "0.7.1"
 
 [[deps.ClimaCoupler]]
-deps = ["ClimaAtmos", "ClimaComms", "ClimaCore", "ClimaCoreTempestRemap", "ClimaLSM", "Dates", "DocStringExtensions", "JLD2", "NCDatasets", "OrdinaryDiffEq", "Plots", "PrettyTables", "SciMLBase", "TerminalLoggers", "UnPack"]
+deps = ["ClimaAtmos", "ClimaComms", "ClimaCore", "ClimaCoreTempestRemap", "ClimaLSM", "Dates", "DocStringExtensions", "JLD2", "NCDatasets", "OrdinaryDiffEq", "Plots", "PrettyTables", "SciMLBase", "Statistics", "TempestRemap_jll", "TerminalLoggers", "UnPack"]
 path = "../../.."
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.1.0"

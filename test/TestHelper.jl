@@ -14,7 +14,7 @@ export create_space, gen_ncdata
 
 """
     create_space(FT; comms_ctx = ClimaComms.SingletonCommsContext(), 
-        R = FT(6371e3), ne = 4, polynomial_degree = 3)
+        R = FT(6371e3), ne = 4, polynomial_degree = 3, nz = 1)
 
 Initialize a space on a sphere with the given parameters.
 Used for debugging and testing.
@@ -26,8 +26,16 @@ Used for debugging and testing.
 - `ne`: [Integer] number of elements used in the space's mesh.
 - `polynomial_degree`: [Integer] degree of the polynomial used to represent
     the space (number of GLL nodes - 1).
+- `nz`: [Integer] number of vertical elements
 """
-function create_space(FT; comms_ctx = ClimaComms.SingletonCommsContext(), R = FT(6371e3), ne = 4, polynomial_degree = 3)
+function create_space(
+    FT;
+    comms_ctx = ClimaComms.SingletonCommsContext(),
+    R = FT(6371e3),
+    ne = 4,
+    polynomial_degree = 3,
+    nz = 1,
+)
     domain = Domains.SphereDomain(R)
     mesh = Meshes.EquiangularCubedSphere(domain, ne)
 
@@ -39,8 +47,17 @@ function create_space(FT; comms_ctx = ClimaComms.SingletonCommsContext(), R = FT
 
     Nq = polynomial_degree + 1
     quad = Spaces.Quadratures.GLL{Nq}()
-    space = Spaces.SpectralElementSpace2D(topology, quad)
-    return space
+    sphere_space = Spaces.SpectralElementSpace2D(topology, quad)
+
+    if nz > 1
+        vertdomain =
+            Domains.IntervalDomain(Geometry.ZPoint{FT}(0), Geometry.ZPoint{FT}(100); boundary_tags = (:bottom, :top))
+        vertmesh = Meshes.IntervalMesh(vertdomain, nelems = nz)
+        vert_center_space = Spaces.CenterFiniteDifferenceSpace(vertmesh)
+        return Spaces.ExtrudedFiniteDifferenceSpace(sphere_space, vert_center_space)
+    else
+        return sphere_space
+    end
 end
 
 """

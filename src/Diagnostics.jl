@@ -1,7 +1,7 @@
 """
     Diagnostics
 
-This module contains functions for defining, gathering and outputting online model diagnostics from the Coupler.  
+This module contains functions for defining, gathering and outputting online model diagnostics from the Coupler.
 """
 module Diagnostics
 
@@ -15,9 +15,9 @@ export get_var, init_diagnostics, accumulate_diagnostics!, save_diagnostics, Tim
 
 abstract type AbstractOutputGroup end
 
-struct DiagnosticsGroup{S} <: AbstractOutputGroup
+struct DiagnosticsGroup{S, NTO <: NamedTuple} <: AbstractOutputGroup
     field_vector::Fields.FieldVector
-    operations::NamedTuple
+    operations::NTO
     save::S
     output_dir::String
     name_tag::String
@@ -33,7 +33,7 @@ end
 """
     init_diagnostics(names::Tuple, space::Spaces.Space; save = EveryTimestep(), operations = (;), output_dir = "", name_tag = "" )
 
-Initializes diagnostics groups. 
+Initializes diagnostics groups.
 """
 function init_diagnostics(
     names::Tuple,
@@ -67,7 +67,7 @@ Accumulates user-defined diagnostics listed in the in the `field_vector` of each
 function accumulate_diagnostics!(cs::CoupledSimulation)
     for dg in cs.diagnostics
         if dg.operations.accumulate !== nothing
-            iterate_operations(cs, dg, collect_diags(cs, dg)) # TODO: avoid collecting at each timestep where not needed                       
+            iterate_operations(cs, dg, collect_diags(cs, dg)) # TODO: avoid collecting at each timestep where not needed
         end
     end
 end
@@ -92,7 +92,7 @@ end
 """
     iterate_operations(cs::CoupledSimulation, dg::DiagnosticsGroup, diags::Fields.FieldVector)
 
-Applies iteratively all specified diagnostics operations. 
+Applies iteratively all specified diagnostics operations.
 """
 
 function iterate_operations(cs::CoupledSimulation, dg::DiagnosticsGroup, new_diags::Fields.FieldVector)
@@ -104,7 +104,7 @@ end
 """
     operation(cs::CoupledSimulation, dg::DiagnosticsGroup, new_diags::Fields.FieldVector, ::TimeMean)
 
-Accumulates in time all entries in `new_diags` and saves the result in `dg.field_vector`, while increasing the `dg.ct` counter. 
+Accumulates in time all entries in `new_diags` and saves the result in `dg.field_vector`, while increasing the `dg.ct` counter.
 """
 function operation(::CoupledSimulation, dg::DiagnosticsGroup, new_diags::Fields.FieldVector, ::TimeMean)
     dg.field_vector .+= new_diags
@@ -116,7 +116,7 @@ end
 """
     operation(cs::CoupledSimulation, dg::DiagnosticsGroup, new_diags::Fields.FieldVector, ::Nothing)
 
-Accumulates in time all entries in `new_diags` and saves the result in `dg.field_vector`, while increasing the `dg.ct` counter. 
+Accumulates in time all entries in `new_diags` and saves the result in `dg.field_vector`, while increasing the `dg.ct` counter.
 """
 function operation(::CoupledSimulation, dg::DiagnosticsGroup, new_diags::Fields.FieldVector, ::Nothing)
     dg.field_vector .= new_diags
@@ -128,7 +128,7 @@ end
 
     save_diagnostics(cs::CoupledSimulation, dg::DiagnosticsGroup, output_dir::String)
 
-Saves all entries in `dg` in separate HDF5 files per variable in `output_dir`. 
+Saves all entries in `dg` in separate HDF5 files per variable in `output_dir`.
 """
 function save_diagnostics(cs::CoupledSimulation)
     for dg in cs.diagnostics
@@ -181,7 +181,7 @@ save_time_format(date::Dates.DateTime, ::EveryTimestep) = Dates.datetime2unix(da
 """
     pre_save(::TimeMean, cs::CoupledSimulation, dg::DiagnosticsGroup)
 
-Divides the accumulated sum by 'ct' to form the mean, before saving the diagnostics.  
+Divides the accumulated sum by 'ct' to form the mean, before saving the diagnostics.
 """
 function pre_save(::TimeMean, cs::CoupledSimulation, dg::DiagnosticsGroup)
     dg.field_vector .= dg.field_vector / dg.operations.accumulate.ct[1]
@@ -197,7 +197,7 @@ pre_save(::Nothing, cs::CoupledSimulation, dg::DiagnosticsGroup) = iterate_opera
 """
     post_save(::TimeMean, cs::CoupledSimulation, dg::DiagnosticsGroup)
 
-Resets accumulating fields and counts after saving the diagnostics. 
+Resets accumulating fields and counts after saving the diagnostics.
 """
 function post_save(::TimeMean, cs::CoupledSimulation, dg::DiagnosticsGroup)
     FT = eltype(dg.field_vector)

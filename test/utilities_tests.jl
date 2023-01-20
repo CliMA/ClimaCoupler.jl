@@ -1,4 +1,4 @@
-#= 
+#=
     Unit tests for ClimaCoupler Utilities module
 =#
 
@@ -7,7 +7,7 @@ using ClimaCoupler: Utilities, TestHelper
 using ClimaCore: Fields
 
 for FT in (Float32, Float64)
-    @testset "test float_type_cs for FT=$FT" begin
+    @testset "test float_type for FT=$FT" begin
         cs = Utilities.CoupledSimulation{FT}(
             nothing, # comms_ctx
             nothing, # dates
@@ -24,7 +24,7 @@ for FT in (Float32, Float64)
             (), # diagnostics
         )
 
-        @test Utilities.float_type_cs(cs) == FT
+        @test Utilities.float_type(cs) == FT
     end
 
     @testset "test swap_space!" begin

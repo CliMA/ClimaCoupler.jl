@@ -1,6 +1,6 @@
 """
    atmos_push!(cs)
-   
+
 updates F_A, F_R, P_liq, and F_E in place based on values used in the atmos_sim for the current step.
 """
 function atmos_push!(cs)
@@ -21,7 +21,7 @@ and hydrostatic balance assumptions. The land model does not compute the surface
 a reasonable stand-in.
 """
 function land_pull!(cs)
-    FT = float_type_cs(cs)
+    FT = float_type(cs)
     land_sim = cs.model_sims.land_sim
     csf = cs.fields
     land_mask = cs.surface_masks.land
@@ -59,7 +59,7 @@ In the current version, the sea ice has a prescribed thickness, and we assume th
 sublimating. That contribution has been zeroed out in the atmos fluxes.
 """
 function ice_pull!(cs)
-    FT = float_type_cs(cs)
+    FT = float_type(cs)
     ice_sim = cs.model_sims.ice_sim
     csf = cs.fields
     ice_mask = cs.surface_masks.ice
@@ -71,7 +71,7 @@ end
 
 """
    atmos_pull!(cs)
-              
+
 Creates the surface fields for temperature, roughness length, albedo, and specific humidity; computes
 turbulent surface fluxes; updates the atmosphere boundary flux cache variables in place; updates the
 RRTMGP cache variables in place.
@@ -105,7 +105,7 @@ function atmos_pull!(cs)
 
     update_masks!(cs)
 
-    # combine models' surfaces onlo one coupler field 
+    # combine models' surfaces onlo one coupler field
     combined_field = zeros(boundary_space)
 
     # surface temperature
@@ -120,7 +120,7 @@ function atmos_pull!(cs)
     combine_surfaces!(combined_field, cs.surface_masks, (; land = z0b_land, ocean = z0b_ocean, ice = z0b_ice))
     dummmy_remap!(z0b_cpl, combined_field)
 
-    # calculate atmospheric surface density 
+    # calculate atmospheric surface density
     set_ρ_sfc!(ρ_sfc_cpl, T_sfc_cpl, atmos_sim.integrator)
 
     # surface specific humidity

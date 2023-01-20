@@ -20,9 +20,9 @@ Return the model date at the current timestep.
 
 # Arguments
 - `cs`: [CoupledSimulation] containing info about the simulation
-- `t`: [Int] number of seconds since simulation began
+- `t`: [Real] number of seconds since simulation began
 """
-current_date(cs::CoupledSimulation, t::Int) = cs.dates.date0[1] + Dates.Second(t)
+current_date(cs::CoupledSimulation, t::Real) = cs.dates.date0[1] + Dates.Second(t)
 
 """
     strdate_to_datetime(strdate::String)
@@ -55,8 +55,8 @@ struct EveryTimestep <: AbstractFrequency end
 
 """
     trigger_callback(cs, ::Monthly)
-    
-Returns `true` if the current date is equal to or exceeds the saved first of the month at time of 00:00:00. 
+
+Returns `true` if the current date is equal to or exceeds the saved first of the month at time of 00:00:00.
 
 # Arguments
 - `cs`: [CoupledSimulation] containing info about the simulation

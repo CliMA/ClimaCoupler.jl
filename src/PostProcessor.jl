@@ -1,7 +1,7 @@
 """
     PostProcessor
 
-This module contains functions for postprocessing model data (saved during the simulation by `Diagnostics.jl`) after the simulation is complete. 
+This module contains functions for postprocessing model data (saved during the simulation by `Diagnostics.jl`) after the simulation is complete.
 """
 module PostProcessor
 
@@ -25,13 +25,13 @@ struct RawData <: PostProcessedData end
 """
     DataPackage(tag::PostProcessedData, name::Symbol, data::Union{Array, Field}; coords = coords)
 
-A container for storing the tyoe, name, data and coordinates of a variable. 
+A container for storing the tyoe, name, data and coordinates of a variable.
 """
-struct DataPackage # TODO: add long name (ppp info) and units
-    tag::PostProcessedData
+struct DataPackage{PPD <: PostProcessedData, NTC <: NamedTuple} # TODO: add long name (ppp info) and units
+    tag::PPD
     name::String
     data::Union{Fields.Field, Array}
-    coords::NamedTuple
+    coords::NTC
 end
 function DataPackage(tag::ZLatLonData, name::Symbol, data::Array; coords = coords)
     DataPackage(tag, string(name), data, (; lev = coords.lev, lat = coords.lat, lon = coords.lon))
@@ -58,9 +58,9 @@ end
         datafile_latlon = nothing,
         nlat = 90,
         nlon = 180,
-    ) 
+    )
 
-Coordinates regridding, averaging or slicing of variable `name` corresponding 
+Coordinates regridding, averaging or slicing of variable `name` corresponding
 to `raw_data`. Postprocessing methods are specified in `p_methods`. `raw_data` is
 assumed to be a `Field` (dimensions corresponding to the model's CGLL grid), a 2D
 Array with [longitude, latitude] or a 3D Array [longitude, latitude, level].
@@ -69,8 +69,8 @@ Array with [longitude, latitude] or a 3D Array [longitude, latitude, level].
 - `name`: [Symbol] variable name
 - `raw_data`: [Union{Fields.Field, Array}] variable data
 - `p_methods`: [Tuple] postproessing methods (`:regrid`, `:horizontal_slice`, `:zonal_mean`)
-- `lev_slice`: [Int] level index along which the `:horizontal_slice` is applied 
-- `datafile_latlon`: [String] name of the regrid file 
+- `lev_slice`: [Int] level index along which the `:horizontal_slice` is applied
+- `datafile_latlon`: [String] name of the regrid file
 - `nlat`: [Int] number of latitudes of the regridded array
 - `nlon`: [Symbol] number of longitudes of the regridded array
 

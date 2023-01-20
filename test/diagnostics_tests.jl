@@ -1,4 +1,4 @@
-#= 
+#=
     Unit tests for ClimaCoupler Diagnostics module
 =#
 using Test
@@ -27,7 +27,7 @@ get_var(cs::Utilities.CoupledSimulation, ::Val{:x}) = FT(1)
     names = (:x, :y)
     space = create_space(FT)
     dg = init_diagnostics(names, space)
-    @test typeof(dg) == DiagnosticsGroup{EveryTimestep}
+    @test typeof(dg) == DiagnosticsGroup{EveryTimestep, NamedTuple{(), Tuple{}}}
 end
 
 @testset "accumulate_diagnostics!, collect_diags, iterate_operations, operation{accumulation{TimeMean, Nothing}}, get_var" begin

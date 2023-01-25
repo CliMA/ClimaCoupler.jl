@@ -6,11 +6,12 @@
 
 ## Flame Graph Interpretation
 - use for single-process (un)threaded performance CPU profiling of individual stack traces. It provides a tree representation of a set of backtraces, showing the dependence and CPU cost of each function. 
-- here is an example of a flame graph of ClimaCoupler's AMIP run:
+- here is an example of a flame graph of ClimaCoupler's AMIP run, produced by Buildkite running the `perf/flame.jl` script:
 
 ![canvas](images/canvas_coupler.png)
 
 - each row along the y-axis represents a level of backtraces. In this case the lowermost level is at the top, and the top level represents what is directly being run on the CPU. The stacks in each level are sorted alphabetically (not chronologically, like flame _charts_). The column width is proportional to the presence in samples (related to allocations). The colors are grouped into runtime-dispatch, gc, compilation and default. The intensity is random. 
+- we also have a local beta version of flame graphs (in `perf/ProfileCanvasDiff.jl` and `perf/ProfileViewerDiff.js`), triggered by the `perf/flame_diff.jl` script, which plots the same flame graphs as above but with the color corresponding to whether the stack allocation has been reduced (blue) or increased (red) compared to the last staged runs. The color intensity is proportional to the fractional change, and black signifies untracked traces. 
 
 ## References
 - [Description of flame graphs and their interpretation](https://github.com/CliMA/slurm-buildkite/wiki/Flame-Graphs)

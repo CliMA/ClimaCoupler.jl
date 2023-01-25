@@ -66,8 +66,14 @@ interface_pages = [
     "testhelper.md",
     "timemanager.md",
 ]
+performance_pages = ["performance.md"]
 
-pages = Any["Home" => "index.md", "Examples" => experiment_pages, "Coupler Interface" => interface_pages]
+pages = Any[
+    "Home" => "index.md",
+    "Examples" => experiment_pages,
+    "Coupler Interface" => interface_pages,
+    "Performance" => performance_pages,
+]
 
 
 makedocs(sitename = "ClimaCoupler.jl", format = Documenter.HTML(), modules = [ClimaCoupler], pages = pages)

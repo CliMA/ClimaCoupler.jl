@@ -63,8 +63,10 @@ using ClimaCore.Utilities: half, PlusHalf
 using ClimaCore: InputOutput, Fields
 
 
-include("cli_options.jl")
-(s, parsed_args) = parse_commandline()
+if !(@isdefined parsed_args)
+    include("cli_options.jl")
+    (s, parsed_args) = parse_commandline()
+end
 
 ## modify parsed args for fast testing from REPL #hide
 if isinteractive()
@@ -89,7 +91,9 @@ end
 mode_name = parsed_args["mode_name"]
 run_name = parsed_args["run_name"]
 energy_check = parsed_args["energy_check"]
-const FT = parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
+if !(@isdefined FT)
+    const FT = parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
+end
 land_sim_name = "bucket"
 t_end = Int(time_to_seconds(parsed_args["t_end"]))
 tspan = (Int(0), t_end)
@@ -320,7 +324,7 @@ cs = CoupledSimulation{FT}(
     coupler_fields,
     parsed_args,
     conservation_checks,
-    tspan,
+    [tspan[1], tspan[2]],
     integrator.t,
     Δt_cpl,
     (; land = land_mask, ocean = zeros(boundary_space), ice = zeros(boundary_space)),
@@ -425,6 +429,11 @@ function solve_coupler!(cs)
 
     return cs
 end
+
+## exit if running performance anaysis #hide
+if haskey(ENV, "CI_PERF_SKIP_COUPLED_RUN") #hide
+    throw(:exit_profile_init) #hide
+end #hide
 
 ## run the coupled simulation
 solve_coupler!(cs);

@@ -441,30 +441,6 @@ function print_repl_script(str)
     println(ib)
 end
 
-function parsed_args_from_command_line_flags(str, parsed_args = Dict())
-    s = str
-    s = last(split(s, ".jl"))
-    s = strip(s)
-    parsed_args_list = split(s, " ")
-    @assert iseven(length(parsed_args_list))
-    parsed_arg_pairs = map(1:2:(length(parsed_args_list) - 1)) do i
-        Pair(parsed_args_list[i], parsed_args_list[i + 1])
-    end
-    function parse_arg(val)
-        for T in (Bool, Int, Float32, Float64)
-            try
-                return parse(T, val)
-            catch
-            end
-        end
-        return val # string
-    end
-    for (flag, val) in parsed_arg_pairs
-        parsed_args[replace(flag, "--" => "")] = parse_arg(val)
-    end
-    return parsed_args
-end
-
 function time_to_seconds(s::String)
     factor = Dict("secs" => 1, "mins" => 60, "hours" => 60 * 60, "days" => 60 * 60 * 24)
     s == "Inf" && return Inf
@@ -476,4 +452,81 @@ function time_to_seconds(s::String)
         return parse(Float64, first(split(s, match))) * factor[match]
     end
     error("Uncaught case in computing time from given string.")
+end
+
+parsed_args_from_ARGS(ARGS, parsed_args = Dict()) = parsed_args_from_ARGS_string(strip(join(ARGS, " ")), parsed_args)
+
+parsed_args_from_command_line_flags(str, parsed_args = Dict()) =
+    parsed_args_from_ARGS_string(strip(last(split(str, ".jl"))), parsed_args)
+
+function parsed_args_from_ARGS_string(str, parsed_args = Dict())
+    str = replace(str, "    " => " ", "   " => " ", "  " => " ")
+    parsed_args_list = split(str, " ")
+    parsed_args_list == [""] && return parsed_args
+    @assert iseven(length(parsed_args_list))
+    parsed_arg_pairs = map(1:2:(length(parsed_args_list) - 1)) do i
+        Pair(parsed_args_list[i], strip(parsed_args_list[i + 1], '\"'))
+    end
+    function parse_arg(val)
+        for T in (Bool, Int, Float32, Float64)
+            try
+                return parse(T, val)
+            catch
+            end
+        end
+        return String(val) # string
+    end
+    for (flag, val) in parsed_arg_pairs
+        parsed_args[replace(flag, "--" => "")] = parse_arg(val)
+    end
+    return parsed_args
+end
+
+"""
+    parsed_args_per_job_id()
+    parsed_args_per_job_id(buildkite_yaml)
+
+A dict of `parsed_args` to run the ClimaAtmos driver
+whose keys are the `job_id`s from buildkite yaml.
+
+# Example
+
+To run the `sphere_aquaplanet_rhoe_equilmoist_allsky`
+buildkite job from the standard buildkite pipeline, use:
+```
+using Revise; include("examples/hybrid/cli_options.jl");
+dict = parsed_args_per_job_id();
+parsed_args = dict["sphere_aquaplanet_rhoe_equilmoist_allsky"];
+include("examples/hybrid/driver.jl")
+```
+"""
+function parsed_args_per_job_id(; trigger = "driver.jl")
+    cc_dir = joinpath(@__DIR__, "..", "..", "..")
+    buildkite_yaml = joinpath(cc_dir, ".buildkite", "pipeline.yml")
+    parsed_args_per_job_id(buildkite_yaml; trigger)
+end
+
+function parsed_args_per_job_id(buildkite_yaml; trigger = "driver.jl")
+    buildkite_commands = readlines(buildkite_yaml)
+    filter!(x -> occursin(trigger, x), buildkite_commands)
+
+    @assert length(buildkite_commands) > 0 # sanity check
+    result = Dict()
+    for bkcs in buildkite_commands
+        (s, default_parsed_args) = parse_commandline()
+        job_id = first(split(last(split(bkcs, "--run_name ")), " "))
+        job_id = strip(job_id, '\"')
+        result[job_id] = parsed_args_from_command_line_flags(bkcs, default_parsed_args)
+    end
+    return result
+end
+
+function non_default_command_line_flags_parsed_args(parsed_args)
+    (s, default_parsed_args) = parse_commandline()
+    s = ""
+    for k in keys(parsed_args)
+        default_parsed_args[k] == parsed_args[k] && continue
+        s *= "--$k $(parsed_args[k]) "
+    end
+    return rstrip(s)
 end

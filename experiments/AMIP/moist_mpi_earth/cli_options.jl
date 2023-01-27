@@ -27,6 +27,10 @@ function parse_commandline()
         help = "Boolean flag indicating whether (1st order) monotone and conservative remapping is applied."
         arg_type = Bool
         default = false
+        "--albedo_from_file"
+        help = "Access land surface albedo information from data file"
+        arg_type = Bool
+        default = true
         # ClimaAtmos flags
         "--FLOAT_TYPE"
         help = "Float type"
@@ -57,7 +61,7 @@ function parse_commandline()
         arg_type = String
         default = "6hours"
         "--config" # TODO: add box
-        help = "Spatial configuration [`sphere` (default), `column`]"
+        help = "Spatial configuration [`sphere` (default), `column`, `box`]"
         arg_type = String
         default = "sphere"
         "--moist"
@@ -66,9 +70,6 @@ function parse_commandline()
         default = "dry"
         "--precip_model"
         help = "Precipitation model [`nothing` (default), `0M`]"
-        arg_type = String
-        "--microphy"
-        help = "Microphysics model [`nothing` (default), `0M`]"
         arg_type = String
         "--forcing"
         help = "Forcing [`nothing` (default), `held_suarez`]"
@@ -83,13 +84,16 @@ function parse_commandline()
         help = "EDMF coriolis [`nothing` (default), `Bomex`,`LifeCycleTan2018`,`Rico`,`ARM_SGP`,`DYCOMS_RF01`,`DYCOMS_RF02`,`GABLS`]"
         arg_type = String
         "--vert_diff"
-        help = "Vertical diffusion [`false` (default), `true`]"
-        arg_type = Bool
-        default = false
+        help = "Vertical diffusion [`false` (default), `VerticalDiffusion`, `true` (defaults to `VerticalDiffusion`)]"
+        arg_type = String
+        default = "false"
         "--surface_scheme"
         help = "Surface flux scheme [`nothing` (default), `bulk`, `monin_obukhov`]"
         arg_type = String
-        default = "bulk"
+        "--surface_thermo_state_type"
+        help = "Surface thermo state type [`GCMSurfaceThermoState` (default), `PrescribedThermoState`]"
+        arg_type = String
+        default = "GCMSurfaceThermoState"
         "--C_E"
         help = "Bulk transfer coefficient"
         arg_type = Float64
@@ -109,7 +113,11 @@ function parse_commandline()
         arg_type = Bool
         default = false
         "--hyperdiff"
-        help = "Hyperdiffusion [`true` (default), `false`]"
+        help = "Hyperdiffusion [`ClimaHyperdiffusion` (default), `TempestHyperdiffusion`, `none` (or `false`)]"
+        arg_type = String
+        default = "ClimaHyperdiffusion"
+        "--enable_qt_hyperdiffusion"
+        help = "Enable the hyperdiffusion of specific humidity [`true` (default), `false`] (TODO: reconcile this with `ρe_tot` or remove if instability fixed with limiters)"
         arg_type = Bool
         default = true
         "--idealized_insolation"
@@ -135,6 +143,10 @@ function parse_commandline()
         help = "Add a perturbation to the initial condition [`false`, `true` (default)]"
         arg_type = Bool
         default = true
+        "--discrete_hydrostatic_balance"
+        help = "Set the initial state to discrete hydrostatic balance"
+        arg_type = Bool
+        default = false
         "--energy_upwinding"
         help = "Energy upwinding mode [`none` (default), `first_order` , `third_order`, `boris_book`, `zalesak`]"
         arg_type = Symbol
@@ -151,14 +163,30 @@ function parse_commandline()
         help = "Maximum number of Newton's method iterations (only for ODE algorithms that use Newton's method)"
         arg_type = Int
         default = 1
-        "--use_krylov_method"
-        help = "Whether to use a Krylov method to solve the linear system in Newton's method (only for ODE algorithms from ClimaTimeSteppers.jl)"
+        "--use_newton_rtol"
+        help = "Whether to check if the current iteration of Newton's method has an error within a relative tolerance, instead of always taking the maximum number of iterations (only for ClimaTimeSteppers.jl)"
         arg_type = Bool
         default = false
-        "--krylov_forcing"
-        help = "Relative tolerance for the Krylov method (only used if `use_krylov_method` is `true`)"
+        "--newton_rtol"
+        help = "Relative tolerance of Newton's method (only for ClimaTimeSteppers.jl; only used when `use_newton_rtol` is `true`)"
+        arg_type = Float64
+        default = Float64(1e-5)
+        "--use_krylov_method"
+        help = "Whether to use a Krylov method to solve the linear system in Newton's method (only for ClimaTimeSteppers.jl)"
+        arg_type = Bool
+        default = false
+        "--krylov_rtol"
+        help = "Relative tolerance of the Krylov method (only for ClimaTimeSteppers.jl; only used if `use_krylov_method` is `true`)"
         arg_type = Float64
         default = Float64(0.1)
+        "--use_dynamic_krylov_rtol"
+        help = "Whether to use Eisenstat-Walker forcing instead of a constant relative tolerance in the Krylov method (only for ClimaTimeSteppers.jl)"
+        arg_type = Bool
+        default = false
+        "--eisenstat_walker_forcing_alpha"
+        help = "Value of alpha to use for Eisenstat-Walker forcing (only for ClimaTimeSteppers.jl; only used if `use_krylov_method` and `use_dynamic_krylov_rtol` are `true`)"
+        arg_type = Float64
+        default = Float64(2)
         "--jvp_step_adjustment"
         help = "Amount by which the step size of the forward difference approximation of the Jacobian-vector product in the Krylov method should be scaled (only used if `use_krylov_method` is `true`)"
         arg_type = Float64
@@ -181,6 +209,9 @@ function parse_commandline()
         "--job_id"
         help = "Uniquely identifying string for a particular job"
         arg_type = String
+        "--quicklook_reference_job_id"
+        help = "Identifier of job to use as the \"reference\" solution in the quicklook plot; the current job's results get compared to the results of the quicklook job on the main branch (only used if `debugging_tc` is `true`)"
+        arg_type = String
         "--trunc_stack_traces"
         help = "Set to `true` to truncate printing of ClimaCore `Field`s"
         arg_type = Bool
@@ -197,6 +228,14 @@ function parse_commandline()
         help = "number of elements per edge on a cubed sphere"
         arg_type = Int
         default = 6
+        "--x_elem"
+        help = "number of horizontal elements in the x-direction"
+        arg_type = Int
+        default = 6
+        "--y_elem"
+        help = "number of horizontal elements in the y-direction"
+        arg_type = Int
+        default = 6
         "--z_elem"
         help = "number of vertical elements"
         arg_type = Int
@@ -205,6 +244,14 @@ function parse_commandline()
         help = "Horizontal polynomial degree. Note: The number of quadrature points in 1D within each horizontal element is then Nq = <--nh_poly> + 1"
         arg_type = Int
         default = 3
+        "--x_max"
+        help = "Model domain size, x direction. Default: 300km"
+        arg_type = Float64
+        default = Float64(300e3)
+        "--y_max"
+        help = "Model domain size, y direction. Default: 300km"
+        arg_type = Float64
+        default = Float64(300e3)
         "--z_max"
         help = "Model top height. Default: 30km"
         arg_type = Float64
@@ -253,18 +300,10 @@ function parse_commandline()
         help = "Viscous sponge coefficient"
         arg_type = Float64
         default = Float64(1e6)
-        "--apply_moisture_filter"
-        help = "Apply filter to moisture"
-        arg_type = Bool
-        default = false
-        "--disable_qt_hyperdiffusion"
-        help = "Disable the hyperdiffusion of specific humidity [`true`, `false` (default)] (TODO: reconcile this with ρe_tot or remove if instability fixed with limiters)"
-        arg_type = Bool
-        default = false
         "--start_date"
         help = "Start date of the simulation"
         arg_type = String
-        default = "19790321"
+        default = "19790101"
         "--topography"
         help = "Define the surface elevation profile [`NoWarp`,`Earth`,`DCMIP200`]"
         arg_type = String
@@ -273,14 +312,54 @@ function parse_commandline()
         help = "Apply a horizontal limiter to every tracer [`true` (default), `false`]"
         arg_type = Bool
         default = true
+        "--imex_edmf_turbconv"
+        help = "Whether to split EDMF's `compute_turbconv_tendencies!` into implicit and explicit components"
+        arg_type = Bool
+        default = false
+        "--imex_edmf_gm"
+        help = "Whether to split EDMF's `compute_gm_tendencies!` into implicit and explicit components"
+        arg_type = Bool
+        default = false
         "--debugging_tc"
         help = "Save most of the tc aux state to HDF5 file [`false` (default), `true`]"
         arg_type = Bool
         default = false
-        "--non_orographic_gravity_wave"
-        help = "Apply parameterization for convective gravity wave forcing on horizontal mean flow"
+        "--test_edmf_consistency"
+        help = "Test edmf equation consistency [`false` (default), `true`]"
         arg_type = Bool
         default = false
+        "--test_dycore_consistency"
+        help = "Test dycore consistency [`false` (default), `true`]"
+        arg_type = Bool
+        default = false
+        "--use_reference_state"
+        help = "Subtract a reference state from the dycore equations [`false`, `true` (default)]"
+        arg_type = Bool
+        default = true
+        "--check_conservation"
+        help = "Check conservation of mass and energy [`false` (default), `true`]"
+        arg_type = Bool
+        default = false
+        "--non_orographic_gravity_wave"
+        help = "Apply parameterization for convective gravity wave forcing on horizontal mean flow [`false` (default), `true`]"
+        arg_type = Bool
+        default = false
+        "--orographic_gravity_wave"
+        help = "Apply parameterization for orographic drag on horizontal mean flow"
+        arg_type = Bool
+        default = false
+        "--apply_remap"
+        help = "Apply remap script to output directory"
+        arg_type = Bool
+        default = false
+        "--perf_summary"
+        help = "Flag for collecting performance summary information"
+        arg_type = Bool
+        default = false
+        "--perf_mode"
+        help = "A flag for analyzing performance [`PerfStandard` (default), `PerfExperimental`]"
+        arg_type = String
+        default = "PerfStandard"
     end
     parsed_args = ArgParse.parse_args(ARGS, s)
     return (s, parsed_args)

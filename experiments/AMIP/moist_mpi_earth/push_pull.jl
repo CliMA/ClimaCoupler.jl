@@ -86,8 +86,6 @@ function atmos_pull!(cs)
     T_sfc_cpl = csf.T_S
     z0m_cpl = csf.z0m_S
     z0b_cpl = csf.z0b_S
-    ρ_sfc_cpl = csf.ρ_sfc
-    q_sfc_cpl = csf.q_sfc
     albedo_sfc_cpl = csf.albedo
 
     thermo_params = CAP.thermodynamics_params(atmos_sim.integrator.p.params)
@@ -120,22 +118,7 @@ function atmos_pull!(cs)
     combine_surfaces!(combined_field, cs.surface_masks, (; land = z0b_land, ocean = z0b_ocean, ice = z0b_ice))
     dummmy_remap!(z0b_cpl, combined_field)
 
-    # calculate atmospheric surface density
-    set_ρ_sfc!(ρ_sfc_cpl, T_sfc_cpl, atmos_sim.integrator)
-
-    # surface specific humidity
-    ocean_q_sfc = TD.q_vap_saturation_generic.(thermo_params, T_ocean, ρ_sfc_cpl, TD.Liquid())
-    sea_ice_q_sfc =
-        swap_space!(Spaces.level(atmos_sim.integrator.u.c.ρq_tot ./ atmos_sim.integrator.u.c.ρ, 1), boundary_space) #ρ_sfc_cpl .* FT(0) #D.q_vap_saturation_generic.(thermo_params, T_ice, ρ_sfc_cpl, TD.Ice())
-
-    q_atmos =
-        swap_space!(Spaces.level(atmos_sim.integrator.u.c.ρq_tot ./ atmos_sim.integrator.u.c.ρ, 1), boundary_space)
-    q_land_s = swap_space!(get_land_q(land_sim, atmos_sim, T_land, ρ_sfc_cpl), boundary_space)
-    land_q_sfc = maximumfield.(q_land_s, q_atmos) # TODO: bring back the beta factor
-
-
-    combine_surfaces!(combined_field, cs.surface_masks, (; land = land_q_sfc, ocean = ocean_q_sfc, ice = sea_ice_q_sfc))
-    dummmy_remap!(q_sfc_cpl, combined_field)
+    # TODO replace functions that used ρ_sfc and q_sfc from atmos
 
     # albedo
     α_land = similar(combined_field)
@@ -154,17 +137,33 @@ function atmos_pull!(cs)
     end
 
     # calculate turbulent fluxes on atmos grid and save in atmos cache
-    info_sfc = (; ice_mask = ice_mask)
     parent(atmos_sim.integrator.p.T_sfc) .= parent(T_sfc_cpl)
-    parent(atmos_sim.integrator.p.ρ_sfc) .= parent(ρ_sfc_cpl)
-    parent(atmos_sim.integrator.p.q_sfc) .= parent(q_sfc_cpl)
-    if :z0b in propertynames(integrator.p.surface_scheme)
-        parent(atmos_sim.integrator.p.z0b) .= parent(z0b_cpl)
-        parent(atmos_sim.integrator.p.z0m) .= parent(z0m_cpl)
+    if :z0b in propertynames(atmos_sim.integrator.p.surface_scheme)
+        parent(atmos_sim.integrator.p.sfc_inputs.z0b) .= parent(z0b_cpl)
+        parent(atmos_sim.integrator.p.sfc_inputs.z0m) .= parent(z0m_cpl)
     end
 
-    calculate_surface_fluxes_atmos_grid!(atmos_sim.integrator, info_sfc)
+    Fields.bycolumn(axes(atmos_sim.integrator.p.ts_sfc)) do colidx
+        ClimaAtmos.set_surface_thermo_state!(
+            ClimaAtmos.Decoupled(),
+            atmos_sim.integrator.p.surface_scheme.sfc_thermo_state_type,
+            atmos_sim.integrator.p.ts_sfc[colidx],
+            atmos_sim.integrator.p.T_sfc[colidx],
+            Spaces.level(atmos_sim.integrator.p.ᶜts[colidx], 1),
+            thermo_params,
+            atmos_sim.integrator.t,
+        )
 
+        get_surface_fluxes!(
+            atmos_sim.integrator.u,
+            atmos_sim.integrator.p,
+            atmos_sim.integrator.t,
+            colidx,
+            atmos_sim.integrator.p.atmos.vert_diff,
+        )
+    end
+
+    # TODO correct for ice coverage
 end
 
 function atmos_pull!(cs, surfces)

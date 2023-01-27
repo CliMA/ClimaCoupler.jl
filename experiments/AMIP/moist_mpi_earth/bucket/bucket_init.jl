@@ -4,17 +4,19 @@ using ClimaLSM
 import ClimaLSM
 include(joinpath(pkgdir(ClimaLSM), "parameters", "create_parameters.jl"))
 using ClimaLSM.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers
+using ClimaComms: AbstractCommsContext
 
 import ClimaLSM.Bucket:
     surface_fluxes,
     net_radiation,
     surface_air_density,
     liquid_precipitation,
-    BulkAlbedo,
+    BulkAlbedoMap,
+    BulkAlbedoFunction,
     surface_albedo,
     snow_precipitation
 
-using ClimaLSM: make_ode_function, initialize, obtain_surface_space
+using ClimaLSM: make_ode_function, initialize, obtain_surface_space, make_set_initial_aux_state
 
 """
     BucketSimulation{P, Y, D, I}
@@ -130,7 +132,10 @@ Initializes the bucket model variables.
 function bucket_init(
     ::Type{FT},
     tspan::Tuple{FT, FT},
-    config::String;
+    config::String,
+    albedo_from_file::Bool,
+    comms_ctx::AbstractCommsContext,
+    regrid_dirpath::String;
     space,
     dt::FT,
     saveat::FT,
@@ -144,13 +149,18 @@ function bucket_init(
     end
 
     earth_param_set = create_lsm_parameters(FT)
-    function α_soil(coordinate_point)
-        (; lat, long) = coordinate_point
-        return typeof(lat)(0.4)
-    end
 
     α_snow = FT(0.8) # snow albedo
-    albedo = BulkAlbedo{FT}(α_snow, α_soil)
+    if albedo_from_file # Read in albedo from data file (default)
+        albedo = BulkAlbedoMap{FT}(regrid_dirpath, α_snow = α_snow, comms = comms_ctx)
+    else # Use spatially-varying function for surface albedo
+        function α_sfc(coordinate_point)
+            (; lat, long) = coordinate_point
+            return typeof(lat)(0.4)
+        end
+        albedo = BulkAlbedoFunction{FT}(α_snow, α_sfc)
+    end
+
     σS_c = FT(0.2)
     W_f = FT(0.5)
     d_soil = FT(3.5) # soil depth
@@ -203,6 +213,10 @@ function bucket_init(
     orig_fields = map(x -> getproperty(p.bucket, x), propertynames(p.bucket))
     fields = (orig_fields..., ρ_sfc, P_liq, P_snow)
     p_new = ClimaCore.Fields.FieldVector(; :bucket => (; zip(variable_names, fields)...))
+
+    # Set initial aux variable values
+    set_initial_aux_state! = make_set_initial_aux_state(model)
+    set_initial_aux_state!(p_new, Y, tspan[1])
 
     ode_function! = make_ode_function(model)
 

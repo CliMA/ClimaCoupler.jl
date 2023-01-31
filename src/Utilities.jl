@@ -29,7 +29,7 @@ struct CoupledSimulation{
     FV,
     P,
     E,
-    TSI <: Tuple{Real, Real},
+    TS,
     TI <: Real,
     DTI <: Real,
     NTSM <: NamedTuple,
@@ -42,7 +42,7 @@ struct CoupledSimulation{
     fields::FV
     parsed_args::P
     conservation_checks::E
-    tspan::TSI
+    tspan::TS
     t::TI
     Δt_cpl::DTI
     surface_masks::NTSM

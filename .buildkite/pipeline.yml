@@ -42,6 +42,11 @@ steps:
       - "julia --project=experiments/AMIP/moist_mpi_earth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/AMIP/moist_mpi_earth/ -e 'using Pkg; Pkg.status()'"
 
+      - echo "--- Instantiate perf env"
+      - "julia --project=perf/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=perf/ -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=perf/ -e 'using Pkg; Pkg.status()'"
+
       - echo "--- Instantiate test env"
       - "julia --project=test/ -e 'using Pkg; Pkg.develop(path=\".\")'"
       - "julia --project=test/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
@@ -109,7 +114,7 @@ steps:
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/default_notmono_artifacts/total_energy*.png"
 
       - label: "Moist earth with slab surface - notmono + modular: bulk gray no_sponge idealinsol freq_dt_cpl"
-        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --enable_threading true --coupled true  --surface_scheme monin_obukhov --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface false --h_elem 4 --precip_model 0M --run_name default_modular"
+        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --run_name default_modular --enable_threading true --coupled true --surface_scheme bulk  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface false --h_elem 4 --precip_model 0M"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/default_modular_artifacts/total_energy*.png"
 
       # Note: this test fails when run with the more realistic albedo from file
@@ -139,14 +144,13 @@ steps:
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/coarse_single_artifacts/*"
 
       - label: "AMIP - modular"
-        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --enable_threading true --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad gray --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface false --h_elem 6 --dt_save_restart 10days --precip_model 0M --run_name coarse_single_modular"
+        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --run_name coarse_single_modular --enable_threading true --coupled true  --surface_scheme bulk --moist equil --vert_diff true --rad gray --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface false --h_elem 6 --dt_save_restart 10days --precip_model 0M"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/coarse_single_artifacts/*"
 
       - label: "sea_breeze"
         command: "julia --color=yes --project=experiments/ClimaCore/sea_breeze experiments/ClimaCore/sea_breeze/run.jl"
         artifact_paths: "sea_breeze/"
 
-    
       - label: "MPI AMIP"
         key: "mpi_amip"
         command: "mpiexec julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad gray --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface false --h_elem 6 --dt_save_restart 5days --precip_model 0M --run_name coarse_mpi_n2"
@@ -158,10 +162,29 @@ steps:
 
       - label: "MPI AMIP FINE"
         key: "mpi_amip_fine"
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl  --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad allskywithclear --z_elem 50 --dz_top 3000 --dz_bottom 30 --h_elem 16 --kappa_4 1e16 --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --dt_cpl 150 --dt 150secs --dt_rad 1hours --idealized_insolation false --FLOAT_TYPE Float64 --energy_check false --mode_name amip --t_end 5days --dt_save_to_sol 10days --mono_surface false --precip_model 0M --run_name target_amip_n32_shortrun"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --run_name target_amip_n32_shortrun --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad allskywithclear --z_elem 50 --dz_top 3000 --dz_bottom 30 --h_elem 16 --kappa_4 1e16 --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --dt_cpl 150 --dt 150secs --dt_rad 1hours --idealized_insolation false --FLOAT_TYPE Float64 --energy_check false --mode_name amip --t_end 5days --dt_save_to_sol 10days --mono_surface false --precip_model 0M"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/target_amip_n32_shortrun_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
         agents:
           slurm_ntasks: 32
           slurm_mem_per_cpu: 16G
+
+      # performance tests
+      - label: ":rocket: flame graph and allocation tests: default_modular"
+        command: "julia --color=yes --project=perf perf/flame.jl --run_name 1"
+        artifact_paths: "perf/output/default_modular/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: ":rocket: flame graph and allocation tests: perf_coarse_single_modular"
+        command: "julia --color=yes --project=perf perf/flame.jl --run_name 2"
+        artifact_paths: "perf/output/perf_coarse_single_modular/*"
+        agents:
+
+          slurm_mem: 20GB
+      - label: ":rocket: flame graph and allocation tests: target_amip_n32_shortrun"
+        command: "julia --color=yes --project=perf perf/flame.jl --run_name 3"
+        artifact_paths: "perf/output/target_amip_n32_shortrun/*"
+        agents:
+          slurm_mem: 20GB

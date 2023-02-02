@@ -23,9 +23,10 @@ function reshape_sparse_to_field!(field::Fields.Field, in_array::Array, R)
         end
     end
     # broadcast to the redundant nodes using unweighted dss
-    topology = Spaces.topology(axes(field))
-    Spaces.dss_interior_faces!(topology, Fields.field_values(field))
-    Spaces.dss_local_vertices!(topology, Fields.field_values(field))
+    space = axes(field)
+    topology = Spaces.topology(space)
+    hspace = Spaces.horizontal_space(space)
+    Spaces.dss2!(Fields.field_values(field), topology, hspace.quadrature_style)
     return field
 end
 

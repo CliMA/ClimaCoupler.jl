@@ -114,8 +114,14 @@ steps:
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/default_notmono_artifacts/total_energy*.png"
 
       - label: "Moist earth with slab surface - notmono + modular: bulk gray no_sponge idealinsol freq_dt_cpl"
+        key: "modular_slabplanet"
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --run_name default_modular --enable_threading true --coupled true --surface_scheme bulk  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface false --h_elem 4 --precip_model 0M"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/default_modular_artifacts/total_energy*.png"
+        env:
+          FLAME_PLOT: ""
+        agents:
+          slurm_ntasks: 1
+          slurm_mem_per_cpu: 16G
 
       # Note: this test fails when run with the more realistic albedo from file
       - label: "Moist earth with slab surface - target: monin allsky sponge realinsol infreq_dt_cpl - bucket using BulkAlbedoFunction"
@@ -144,15 +150,20 @@ steps:
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/coarse_single_artifacts/*"
 
       - label: "AMIP - modular"
+        key: "modular_amip"
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --run_name coarse_single_modular --enable_threading true --coupled true  --surface_scheme bulk --moist equil --vert_diff true --rad gray --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface false --h_elem 6 --dt_save_restart 10days --precip_model 0M"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/coarse_single_artifacts/*"
+        env:
+          FLAME_PLOT: ""
+        agents:
+          slurm_ntasks: 1
+          slurm_mem_per_cpu: 16G
 
       - label: "sea_breeze"
         command: "julia --color=yes --project=experiments/ClimaCore/sea_breeze experiments/ClimaCore/sea_breeze/run.jl"
         artifact_paths: "sea_breeze/"
 
       - label: "MPI AMIP"
-        key: "mpi_amip"
         command: "mpiexec julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad gray --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface false --h_elem 6 --dt_save_restart 5days --precip_model 0M --run_name coarse_mpi_n2"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/coarse_mpi_n2_artifacts/*"
         env:
@@ -166,14 +177,15 @@ steps:
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/target_amip_n32_shortrun_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
+          FLAME_PLOT: ""
         agents:
           slurm_ntasks: 32
           slurm_mem_per_cpu: 16G
 
       # performance tests
-      - label: ":rocket: flame graph and allocation tests: default_modular"
+      - label: ":rocket: flame graph and allocation tests: perf_default_modular"
         command: "julia --color=yes --project=perf perf/flame.jl --run_name 1"
-        artifact_paths: "perf/output/default_modular/*"
+        artifact_paths: "perf/output/perf_default_modular/*"
         agents:
           slurm_mem: 20GB
 
@@ -183,8 +195,17 @@ steps:
         agents:
 
           slurm_mem: 20GB
-      - label: ":rocket: flame graph and allocation tests: target_amip_n32_shortrun"
+      - label: ":rocket: flame graph and allocation tests: perf_target_amip_n32_shortrun"
         command: "julia --color=yes --project=perf perf/flame.jl --run_name 3"
-        artifact_paths: "perf/output/target_amip_n32_shortrun/*"
+        artifact_paths: "perf/output/perf_target_amip_n32_shortrun/*"
         agents:
           slurm_mem: 20GB
+
+      - wait
+
+      # plot job performance history
+      - label: ":chart_with_downwards_trend: build history"
+        command:
+          - build_history staging # name of branch to plot
+        artifact_paths:
+          - "build_history.html"

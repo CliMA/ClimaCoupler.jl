@@ -66,10 +66,10 @@ steps:
       JULIA_MAX_NUM_PRECOMPILE_FILES: 50
 
   - wait
-  
+
   - group: "Unit Tests"
     steps:
-    
+
       - label: "MPI Regridder unit tests"
         key: "regridder_mpi_tests"
         command: "mpiexec julia --color=yes --project=test/ test/mpi_tests/regridder_mpi_tests.jl --run_name regridder_mpi"
@@ -130,7 +130,7 @@ steps:
 
       - label: "Moist earth with slab surface - test: monin allsky sponge idealinsol infreq_dt_cpl"
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --enable_threading true --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad allskywithclear --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 21600 --dt 200secs --dt_rad 6hours --idealized_insolation true --mono_surface true --h_elem 4 --precip_model 0M --run_name target_params_in_slab_test1"
-        artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/target_params_in_slab_test1_artifacts/total_energy*.png"       
+        artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/target_params_in_slab_test1_artifacts/total_energy*.png"
 
       - label: "Moist earth with slab surface - test: bulk allsky sponge realinsol infreq_dt_cpl"
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --enable_threading true --coupled true --surface_scheme bulk --moist equil --vert_diff true --rad allskywithclear --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 3600 --dt 200secs --dt_rad 6hours --idealized_insolation false --mono_surface true --h_elem 6 --precip_model 0M --run_name target_params_in_slab_test2"
@@ -140,10 +140,10 @@ steps:
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --enable_threading true --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad gray --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 3600 --dt 200secs --dt_rad 6hours --idealized_insolation false --mono_surface true --h_elem 6 --precip_model 0M --run_name target_params_in_slab_test3"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/target_params_in_slab_test3_artifacts/total_energy*.png"
 
-      # breaking: 
+      # breaking:
       # - label: "Moist earth with slab surface - monin allsky no_sponge idealinsol infreq_dt_cpl"
       #   command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --enable_threading true --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad allskywithclear --rayleigh_sponge false --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 21600 --dt 200secs --dt_rad 6hours --idealized_insolation true --mono_surface true --h_elem 4 --precip_model 0M --run_name target_params_in_slab1"
-      #   artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/target_params_in_slab1_artifacts/total_energy*.png"       
+      #   artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/target_params_in_slab1_artifacts/total_energy*.png"
 
       - label: "AMIP"
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --enable_threading true --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad gray --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface false --h_elem 6 --dt_save_restart 10days --precip_model 0M --run_name coarse_single"
@@ -200,7 +200,7 @@ steps:
         artifact_paths: "perf/output/perf_target_amip_n32_shortrun/*"
         agents:
           slurm_mem: 20GB
-      
+
       - label: ":rocket: performance: flame graph diff: perf_default_modular"
         command: "julia --color=yes --project=perf perf/flame_diff.jl --run_name 1"
         artifact_paths: "perf/output/perf_diff_default_modular/*"
@@ -227,4 +227,4 @@ steps:
           - build_history staging # name of branch to plot
         artifact_paths:
           - "build_history.html"
-      
+

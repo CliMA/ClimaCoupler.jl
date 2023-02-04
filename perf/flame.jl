@@ -1,6 +1,6 @@
-# flame.jl: provides allocation brakdown for individual backtraces for single-process unthredded runs 
+# flame.jl: provides allocation breakdown for individual backtraces for single-process unthredded runs 
 # and check for overall allocation limits based on previous runs
-# copied and modified from ClimaAtmos/perf
+# copied and modified from `ClimaAtmos/perf`
 
 import Profile
 import ProfileCanvas

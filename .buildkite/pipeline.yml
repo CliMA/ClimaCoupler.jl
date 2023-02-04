@@ -193,11 +193,29 @@ steps:
         command: "julia --color=yes --project=perf perf/flame.jl --run_name 2"
         artifact_paths: "perf/output/perf_coarse_single_modular/*"
         agents:
-
           slurm_mem: 20GB
+
       - label: ":rocket: flame graph and allocation tests: perf_target_amip_n32_shortrun"
         command: "julia --color=yes --project=perf perf/flame.jl --run_name 3"
         artifact_paths: "perf/output/perf_target_amip_n32_shortrun/*"
+        agents:
+          slurm_mem: 20GB
+      
+      - label: ":rocket: performance: flame graph diff: perf_default_modular"
+        command: "julia --color=yes --project=perf perf/flame_diff.jl --run_name 1"
+        artifact_paths: "perf/output/perf_diff_default_modular/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: ":rocket: performance: flame graph diff: perf_coarse_single_modular"
+        command: "julia --color=yes --project=perf perf/flame_diff.jl --run_name 2"
+        artifact_paths: "perf/output/perf_diff_coarse_single_modular/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: ":rocket: performance: flame graph diff: perf_target_amip_n32_shortrun"
+        command: "julia --color=yes --project=perf perf/flame_diff.jl --run_name 3"
+        artifact_paths: "perf/output/perf_diff_target_amip_n32_shortrun/*"
         agents:
           slurm_mem: 20GB
 
@@ -209,3 +227,4 @@ steps:
           - build_history staging # name of branch to plot
         artifact_paths:
           - "build_history.html"
+      

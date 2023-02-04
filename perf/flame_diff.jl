@@ -8,7 +8,7 @@ buildkite_cc_dir = "/groups/esm/slurm-buildkite/climacoupler-ci/"
 
 build_path = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/$buildkite_bnumber/climacoupler-ci/perf/"
 cwd = pwd()
-@info "build_path is: $build_path; cwd is $cwd"
+@info "build_path is: $build_path"
 
 import Profile
 using Test
@@ -90,7 +90,7 @@ end
 
 # obtain the stacktree from the last saved file in `buildkite_cc_dir`
 ref_file = joinpath(buildkite_cc_dir, "$run_name.jld2")
-tracked_list = isfile(ref_file) ? load("$run_name.jld2") : Dict{String, Float64}()
+tracked_list = isfile(ref_file) ? load(ref_file) : Dict{String, Float64}()
 
 # compile coupling loop first
 step_coupler!(cs, n_samples)
@@ -116,6 +116,7 @@ flame_tree = profile_data.data["all"]
 my_dict = iterate_children(flame_tree)
 @info "This branch is: $buildkite_branch, commit $buildkite_commit"
 if buildkite_branch == "staging"
-    isfile(ref_file) ? mv(ref_file, "ref_file.$ref_file.$buildkite_commit") : nothing
+    isfile(ref_file) ?
+    mv(ref_file, joinpath(buildkite_cc_dir, "flame_diff_ref_file.$run_name.$buildkite_commit.jld2")) : nothing
     save(ref_file, my_dict) # reset ref_file upon staging
 end

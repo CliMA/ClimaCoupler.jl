@@ -17,8 +17,17 @@ using Dates
 using JLD2
 
 export write_to_hdf5,
-    read_from_hdf5, dummmy_remap!, remap_field_cgll_to_rll, land_sea_mask, update_masks!, combine_surfaces!, binary_mask
+    read_from_hdf5,
+    dummmy_remap!,
+    remap_field_cgll_to_rll,
+    land_sea_mask,
+    update_masks!,
+    combine_surfaces!,
+    binary_mask,
+    nans_to_zero
 
+
+#= Converts NaNs to zeros of the same type. =#
 nans_to_zero(v) = isnan(v) ? typeof(v)(0) : v
 
 """
@@ -431,10 +440,14 @@ NamedTuples `fields` and `masks` must have matching field names.
 """
 function combine_surfaces!(combined_field::Fields.Field, masks::NamedTuple, fields::NamedTuple)
     combined_field .= eltype(combined_field)(0)
-    for surface_name in propertynames(fields) # TODO could use dot here?
-        field_no_nans = nans_to_zero.(getproperty(fields, surface_name))  # TODO: performance analysis / alternatives
-        combined_field .+= getproperty(masks, surface_name) .* field_no_nans
+    warn_nans = false
+    for surface_name in propertynames(fields) # could use dot here?
+        if any(x -> isnan(x), getproperty(fields, surface_name))
+            warn_nans = true
+        end
+        combined_field .+= getproperty(masks, surface_name) .* nans_to_zero.(getproperty(fields, surface_name))
     end
+    warn_nans && @warn "NaNs were detected and converted to zeros."
 end
 
-end
+end # Module

@@ -5,16 +5,16 @@ include("mpi/mpi_init.jl") # setup MPI context for distributed runs #hide
 #=
 ## Overview
 
-AMIP is a standard experimental protocol of the Program for Climate Model Diagnosis & Intercomparison (PCMDI). 
+AMIP is a standard experimental protocol of the Program for Climate Model Diagnosis & Intercomparison (PCMDI).
 It is used as a model benchmark for the atmospheric and land model components, while sea-surface temperatures (SST) and sea-ice concentration (SIC)
 are prescribed using time-interpolations between monthly observed data. We use standard data files with original sources:
-- SST and SIC: https://gdex.ucar.edu/dataset/158_asphilli.html 
+- SST and SIC: https://gdex.ucar.edu/dataset/158_asphilli.html
 - land-sea mask: https://www.ncl.ucar.edu/Applications/Data/#cdf
 
-For more information, see the PCMDI's specifications for [AMIP I](https://pcmdi.github.io/mips/amip/) and [AMIP II](https://pcmdi.github.io/mips/amip2/). 
+For more information, see the PCMDI's specifications for [AMIP I](https://pcmdi.github.io/mips/amip/) and [AMIP II](https://pcmdi.github.io/mips/amip2/).
 
-This driver contains two modes. The full `AMIP` mode and a `SlabPlanet` (all surfaces are thermal slabs) mode. Since `AMIP` is not a closed system, the 
-`SlabPlanet` mode is useful for checking conservation properties of the coupling. 
+This driver contains two modes. The full `AMIP` mode and a `SlabPlanet` (all surfaces are thermal slabs) mode. Since `AMIP` is not a closed system, the
+`SlabPlanet` mode is useful for checking conservation properties of the coupling.
 
 =#
 
@@ -41,7 +41,7 @@ you can run directly from the Julia REPL. The latter is recommended for debuggin
 with threading enabled:
 ```julia
 julia --project --threads 8
-``` 
+```
 =#
 
 #=
@@ -84,7 +84,7 @@ if isinteractive()
     parsed_args["albedo_from_file"] = true #hide
 end
 
-## read in some parsed command line arguments 
+## read in some parsed command line arguments
 mode_name = parsed_args["mode_name"]
 run_name = parsed_args["run_name"]
 energy_check = parsed_args["energy_check"]
@@ -140,9 +140,9 @@ include("atmos/atmos_init.jl")
 atmos_sim = atmos_init(FT, Y, integrator, params = params);
 
 #=
-We use a common `Space` for all global surfaces. This enables the MPI processes to operate on the same columns in both 
-the atmospheric and surface components, so exchanges are parallelized. Note this is only possible when the 
-atmosphere and surface are of the same horizontal resolution. 
+We use a common `Space` for all global surfaces. This enables the MPI processes to operate on the same columns in both
+the atmospheric and surface components, so exchanges are parallelized. Note this is only possible when the
+atmosphere and surface are of the same horizontal resolution.
 =#
 ## init a 2D bounary space at the surface
 boundary_space = atmos_sim.domain.face_space.horizontal_space
@@ -176,9 +176,9 @@ land_sim = bucket_init(
 #=
 ### Ocean and Sea Ice
 In the `AMIP` mode, all ocean properties are prescribed from a file, while sea-ice temperatures are calculated using observed
-SIC and assuming a 2m thickness of the ice. 
+SIC and assuming a 2m thickness of the ice.
 
-In the `SlabPlanet` mode, all ocean and sea ice are dynamical models, namely thermal slabs, with different parameters. 
+In the `SlabPlanet` mode, all ocean and sea ice are dynamical models, namely thermal slabs, with different parameters.
 =#
 
 @info mode_name
@@ -252,7 +252,7 @@ end
 #=
 ## Coupler Initialization
 The coupler needs to contain exchange information, manage the calendar and be able to access all component models. It can also optionally
-save online diagnostics. These are all initialized here and saved in a global `CouplerSimulation` struct, `cs`. 
+save online diagnostics. These are all initialized here and saved in a global `CouplerSimulation` struct, `cs`.
 =#
 
 ## coupler exchange fields
@@ -305,7 +305,7 @@ cs = CouplerSimulation{FT}(
 );
 
 #=
-## Initial States Exchange 
+## Initial States Exchange
 =#
 ## share states between models
 include("./push_pull.jl")
@@ -343,7 +343,7 @@ function solve_coupler!(cs, energy_check)
 
         cs.dates.date[1] = current_date(cs, t) # if not global, `date` is not updated.
 
-        ## print date on the first of month 
+        ## print date on the first of month
         @calendar_callback :(@show(cs.dates.date[1])) cs.dates.date[1] cs.dates.date1[1]
 
         if cs.mode.name == "amip"
@@ -434,8 +434,8 @@ end
 solve_coupler!(cs, energy_check);
 
 #=
-## Postprocessing 
-Currently all postprocessing is performed using the root process only. 
+## Postprocessing
+Currently all postprocessing is performed using the root process only.
 =#
 
 if ClimaComms.iamroot(comms_ctx)
@@ -518,7 +518,7 @@ if ClimaComms.iamroot(comms_ctx)
 end
 
 #=
-## Temporary Unit Tests 
+## Temporary Unit Tests
 To be moved to `test/`
 =#
 if !is_distributed && cs.mode.name == "amip"

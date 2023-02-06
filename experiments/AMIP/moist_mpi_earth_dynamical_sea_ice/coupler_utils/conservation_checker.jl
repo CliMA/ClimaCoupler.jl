@@ -24,10 +24,14 @@ function check_conservation(
     z = parent(Fields.coordinate_field(face_space).z)
     Δz_bot = FT(0.5) * (z[2, 1, 1, 1, 1] - z[1, 1, 1, 1, 1])
 
+    boundary_space_field = zeros(coupler_sim.boundary_space)
+
     u_atm = atmos_sim !== nothing ? atmos_sim.integrator.u.c.ρe : nothing
-    u_lnd = land_sim !== nothing ? swap_space!(land_sim.integrator.u.T_sfc, coupler_sim.boundary_space) : nothing
-    u_ocn = ocean_sim !== nothing ? swap_space!(ocean_sim.integrator.u.T_sfc, coupler_sim.boundary_space) : nothing
-    u_ice = seaice_sim !== nothing ? swap_space!(seaice_sim.integrator.u.T_sfc, coupler_sim.boundary_space) : nothing
+    u_lnd = land_sim !== nothing ? swap_space!(zeros(coupler_sim.boundary_space), land_sim.integrator.u.T_sfc) : nothing
+    u_ocn =
+        ocean_sim !== nothing ? swap_space!(zeros(coupler_sim.boundary_space), ocean_sim.integrator.u.T_sfc) : nothing
+    u_ice =
+        seaice_sim !== nothing ? swap_space!(zeros(coupler_sim.boundary_space), seaice_sim.integrator.u.T_sfc) : nothing
 
     # global sums
     land_e = land_sim !== nothing ? sum(get_slab_energy(land_sim, u_lnd)) ./ Δz_bot : FT(0)
@@ -89,13 +93,16 @@ function check_conservation(
     if (prescribed_sic == false)
 
         # ocean (from T_ml)
-        u_ocn = seaice_sim !== nothing ? swap_space!(seaice_sim.integrator.u.T_ml, coupler_sim.boundary_space) : nothing
+        u_ocn =
+            seaice_sim !== nothing ? swap_space!(zeros(coupler_sim.boundary_space), seaice_sim.integrator.u.T_ml) :
+            nothing
         parent(u_ocn) .= abs.(parent(mask) .- FT(1)) .* parent(u_ocn)
         ocean_e = ocean_sim !== nothing ? sum(get_ml_energy(seaice_sim, u_ocn)) ./ Δz_bot : FT(0)
 
         # ice (from h_ice)
         u_ice =
-            seaice_sim !== nothing ? swap_space!(seaice_sim.integrator.u.h_ice, coupler_sim.boundary_space) : nothing
+            seaice_sim !== nothing ? swap_space!(zeros(coupler_sim.boundary_space), seaice_sim.integrator.u.h_ice) :
+            nothing
         parent(u_ice) .= abs.(parent(mask) .- FT(1)) .* parent(u_ice)
         seaice_e = ocean_sim !== nothing ? sum(get_dyn_ice_energy(seaice_sim, u_ice)) ./ Δz_bot : FT(0)
 

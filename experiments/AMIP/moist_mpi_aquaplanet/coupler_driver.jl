@@ -14,7 +14,7 @@ include("coupler_utils/conservation_checker.jl")
 include("coupler_utils/regridder.jl")
 
 # initiate spatial and temporal info
-t_end = 2592000 # 100e2 
+t_end = 2592000 # 100e2
 tspan = (0, t_end)
 Δt_cpl = 2e2
 saveat = Δt_cpl * 1000
@@ -51,7 +51,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     parent(atmos_sim.integrator.p.dif_flux_energy) .= FT(0)
     calculate_surface_fluxes_atmos_grid!(atmos_sim.integrator, T_S)
 
-    # run 
+    # run
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: use (t - integ_atm.t) here instead of Δt_cpl to avoid accumulating roundoff error in our timestepping.
 
     ## Slab

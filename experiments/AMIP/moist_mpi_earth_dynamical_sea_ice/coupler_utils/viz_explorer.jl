@@ -80,7 +80,7 @@ function plot_anim(atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim) # TODO: us
             u = slab_ice_sim.integrator.sol.u[t_i]
             t = t_i / 24 / 60 / 60
             Plots.plot(
-                u.h_ice .* swap_space!(abs.(mask .- FT(1)), axes(u.h_ice)),
+                u.h_ice .* swap_space!(zeros(axes(u.h_ice)), abs.(mask .- FT(1))),
                 clims = (0, 0.35),
                 title = ("day: $t"),
             )#.- Fields.level(sol_atm.u[1].c.ρt_tot,1),  clims = (-5000, 50000) )

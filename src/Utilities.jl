@@ -61,17 +61,16 @@ Return the floating point type backing `T`: `T` can either be an object or a typ
 float_type(::CoupledSimulation{FT}) where {FT} = FT
 
 """
-    swap_space!(field::Fields.Field, new_space)
+    swap_space!(field_out::Fields.Field, field_in::Fields.Field)
 
 Remap the values of a field onto a new space.
 
 # Arguments
-- `field`: [Fields.Field] to be remapped to new space.
-- `new_space`: [Spaces.Space] to remap `field` to.
+- `field_in`: [Fields.Field] to be remapped to new space.
+- `field_out`: [Fields.Field] to remap `field_in` to.
 """
-function swap_space!(field::Fields.Field, new_space)
-    field_out = zeros(new_space)
-    parent(field_out) .= parent(field)
+function swap_space!(field_out, field_in::Fields.Field)
+    parent(field_out) .= parent(field_in)
     return field_out
 end
 

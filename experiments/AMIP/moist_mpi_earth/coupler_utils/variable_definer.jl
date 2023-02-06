@@ -12,16 +12,16 @@ get_var(cs, ::Val{:u}) = ClimaCore.Geometry.UVVector.(cs.model_sims.atmos_sim.in
 get_var(cs, ::Val{:q_tot}) =
     cs.model_sims.atmos_sim.integrator.u.c.ρq_tot ./ cs.model_sims.atmos_sim.integrator.u.c.ρ .* float_type(cs)(1000)
 
-get_var(cs, ::Val{:toa}) = swap_space!(toa_fluxes(cs), cs.boundary_space)
+get_var(cs, ::Val{:toa}) = swap_space!(zeros(cs.boundary_space), toa_fluxes(cs))
 
 get_var(cs, ::Val{:precipitation}) =
     .-swap_space!(
+        zeros(cs.boundary_space),
         cs.model_sims.atmos_sim.integrator.p.col_integrated_rain .+
         cs.model_sims.atmos_sim.integrator.p.col_integrated_snow,
-        cs.boundary_space,
     )
 
-get_var(cs, ::Val{:T_sfc}) = swap_space!(cs.fields.T_S, cs.boundary_space)
+get_var(cs, ::Val{:T_sfc}) = swap_space!(zeros(cs.boundary_space), cs.fields.T_S)
 
 # more complex calculations
 function zonal_wind(cs)

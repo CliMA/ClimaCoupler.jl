@@ -41,8 +41,9 @@ function check_conservation(cc::OnlineConservationCheck, coupler_sim)
         get_land_energy(land_sim, e_per_area_land)
     end
 
-    u_ocn = ocean_sim !== nothing ? swap_space!(ocean_sim.integrator.u.T_sfc, coupler_sim.boundary_space) : nothing
-    u_ice = ice_sim !== nothing ? swap_space!(ice_sim.integrator.u.T_sfc, coupler_sim.boundary_space) : nothing
+    u_ocn =
+        ocean_sim !== nothing ? swap_space!(zeros(coupler_sim.boundary_space), ocean_sim.integrator.u.T_sfc) : nothing
+    u_ice = ice_sim !== nothing ? swap_space!(zeros(coupler_sim.boundary_space), ice_sim.integrator.u.T_sfc) : nothing
 
     # global sums
     atmos_e = sum(u_atm)
@@ -101,7 +102,7 @@ function check_conservation(cc::OnlineConservationCheck, coupler_sim)
     push!(cc.ρe_tot_ocean, ocean_e)
 
     # save surface friction sink
-    push!(cc.friction_sink, sum((ke_dissipation(atmos_sim)) .* coupler_sim.Δt_cpl)) # ρ d ke_friction / dt 
+    push!(cc.friction_sink, sum((ke_dissipation(atmos_sim)) .* coupler_sim.Δt_cpl)) # ρ d ke_friction / dt
 
 end
 function ke_dissipation(sim)

@@ -48,7 +48,7 @@ end
 """
     ocean_init(::Type{FT}; tspan, dt, saveat, space, land_mask, stepper = Euler()) where {FT}
 
-Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `step!` in the coupling loop. 
+Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `step!` in the coupling loop.
 """
 function ocean_init(::Type{FT}; tspan, dt, saveat, space, ocean_mask, stepper = Euler()) where {FT}
 
@@ -69,7 +69,7 @@ end
 
 # file specific
 """
-    clean_sst(SST::FT, _info) 
+    clean_sst(SST::FT, _info)
 Ensures that the space of the SST struct matches that of the mask, and converts the units to Kelvin (N.B.: this is dataset specific)
 """
-clean_sst(SST, _info) = (swap_space!(SST, axes(_info.land_mask)) .+ float_type_bcf(_info)(273.15))
+clean_sst(SST, _info) = (swap_space!(zeros(axes(_info.land_mask)), SST) .+ float_type_bcf(_info)(273.15))

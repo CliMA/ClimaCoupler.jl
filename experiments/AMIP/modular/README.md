@@ -89,7 +89,7 @@ $$
 
 # Distribution
 ## Julia multithreading
-- we can run using multiple threads if the command line argument `enable_threading` is true. 
+- we can run using multiple threads if the command line argument `enable_threading` is true (e.g., run with `julia --project --threads 8`). 
 
 ## MPI via ClimaComms.jl 
 - for AMIP we want the surface columns to be on the same processors as the atmos columns. Since all all surface domains will be on masked spheres, all of them can inherit the same distributed horizontal space from the atmos model.
@@ -106,6 +106,12 @@ $$
         field_of_ones = ones(center_space)
         sum(field_of_ones) ≈ (4*pi*domain_radius^2) * domain_height 
         ```
+- Radiation
+    - By default radiation is a `PeriodicCallback` applied in `ClimaAtmos` every 6h. This updates the radiation fluxes field, `ᶠradiation_flux`, which itself is applied at every timestep via:
+    ```
+    @. Yₜ.c.ρe -= ᶜdivᵥ(ᶠradiation_flux)
+    ```
+    - The TOA fluxes can be accessed via `level(ᶠradiation_flux, end - half)`. Their net sum (or imbalance) represents sources and sinks to the earth system and these need to balance the net energy change. Ideally the TOA fluxes will balance to near zero. 
 
 ## Performance
 - using `@elapsed` to measure the walltime of the coupling loop
@@ -121,22 +127,28 @@ $$
 ## Physical correctness
 - run the default for 20 days
 
+# Prescribed SST and Sea Ice
+- We simply prescribe SSTs from a file as `T_sfc`. As for sea ice, we will follow GFDL's [AMIP setup](https://pcmdi.llnl.gov/mips/amip/home/Documentation/20gfdl.html#RTFToC31) and use prescribed sea ice concentrations and a constant ice thickness, $h_{i} = 2m$ ice thickness, while solving for $T_{sfc}$:
+$$
+\frac{dT_{sfc}}{dt} = - \frac{h_i(F_{atm} - F_{conductive})}{k_i}
+$$ 
+where
+$$
+F_{conductive} = \frac{k_i (T_{base} - {T_{sfc}})}{h_{i}}
+$$
+with the thermal conductivity of ice, $k_i = 2$ W m$^{-2}$ K$^{-1}$, and $T_{base} = 273.16$ K. For now we use an Euler timestepper (and use $T_{sfc}$ of the previous timestep), though this may be solved implicitly in the future. 
+
+## Data source
+- https://gdex.ucar.edu/dataset/158_asphilli.html
+    - MODEL.SST.HAD187001-198110.OI198111-202203.nc
+    - MODEL.ICE.HAD187001-198110.OI198111-202203.nc
+- N.B.: the [pcmdi link](https://pcmdi.llnl.gov/mips/amip/details/amipbc_dwnld.php), used in most AMIP papers, is broken
+
+
 # NB:
 - first coupled iteration does not call rhs!
 - slab `T_sfc` gets huge numbers when using `SSPRK33`. ok with `Euler`
 - do not init global fields with mpi context
-
-# TODO
-- implement drag law, mass flux, moisture flux
-- ClimaAtmos: sub in newest CA interface
-- interface: 
-    - clean the way we sum over the boundary field (now need to divide by dz)
-    - add coupler specific abstractions
-- fluxes: re-enable different ways to calculate / accumulate fluxes (at overy coupler timestep; at every atmos timestep via callback; via specification of an additional variable) 
-- conservation tests: add error threshold and exception, interval, show option, and make a general interface for it
-- physical test
-- performance check: 
-- SurfaceFluxes: combine LHF and SHF into enthalpy flux formulation to avoid division by zero
 
 # References
 - [Kang et al 2021](https://arxiv.org/abs/2101.09263)

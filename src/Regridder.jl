@@ -170,13 +170,22 @@ function hdwrite_regridfile_rll_to_cgll(
     ntuple(x -> reshape_cgll_sparse_to_field!(offline_fields[x], offline_outvector[:, x], R), length(times))
 
     # TODO: extend write! to handle time-dependent fields
-    map(x -> write_to_hdf5(REGRID_DIR, hd_outfile_root, times[x], offline_fields[x], varname), 1:length(times))
+    map(
+        x -> write_to_hdf5(
+            REGRID_DIR,
+            hd_outfile_root,
+            times[x],
+            offline_fields[x],
+            varname,
+            ClimaComms.SingletonCommsContext(),
+        ),
+        1:length(times),
+    )
     jldsave(joinpath(REGRID_DIR, hd_outfile_root * "_times.jld2"); times = times)
 end
 
 """
-    write_to_hdf5(REGRID_DIR, hd_outfile_root, time, field, varname,
-        comms_ctx = ClimaComms.SingletonCommsContext())
+    write_to_hdf5(REGRID_DIR, hd_outfile_root, time, field, varname, comms_ctx)
 
 Function to save individual HDF5 files after remapping.
 If a CommsContext other than `SingletonCommsContext` is used for `comms_ctx`,
@@ -190,14 +199,7 @@ the HDF5 output is readable by multiple MPI processes.
 - `varname`: [String] variable name of data.
 - `comms_ctx`: [ClimaComms.AbstractCommsContext] context used for this operation.
 """
-function write_to_hdf5(
-    REGRID_DIR,
-    hd_outfile_root,
-    time,
-    field,
-    varname,
-    comms_ctx = ClimaComms.SingletonCommsContext(),
-)
+function write_to_hdf5(REGRID_DIR, hd_outfile_root, time, field, varname, comms_ctx)
     t = Dates.datetime2unix.(time)
     hdfwriter = InputOutput.HDF5Writer(joinpath(REGRID_DIR, hd_outfile_root * "_" * string(time) * ".hdf5"), comms_ctx)
 
@@ -207,8 +209,7 @@ function write_to_hdf5(
 end
 
 """
-    read_from_hdf5(REGIRD_DIR, hd_outfile_root, time, varname,
-        comms_ctx = ClimaComms.SingletonCommsContext())
+    read_from_hdf5(REGIRD_DIR, hd_outfile_root, time, varname, comms_ctx)
 
 Read in a variable `varname` from an HDF5 file.
 If a CommsContext other than `SingletonCommsContext` is used for `comms_ctx`,
@@ -224,7 +225,7 @@ the input HDF5 file must be readable by multiple MPI processes.
 # Returns
 - Field or FieldVector
 """
-function read_from_hdf5(REGRID_DIR, hd_outfile_root, time, varname, comms_ctx = ClimaComms.SingletonCommsContext())
+function read_from_hdf5(REGRID_DIR, hd_outfile_root, time, varname, comms_ctx)
     hdfreader = InputOutput.HDF5Reader(joinpath(REGRID_DIR, hd_outfile_root * "_" * string(time) * ".hdf5"), comms_ctx)
 
     field = InputOutput.read_field(hdfreader, varname)

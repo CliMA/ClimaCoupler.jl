@@ -114,7 +114,7 @@ import ClimaCoupler.Diagnostics: get_var, init_diagnostics, accumulate_diagnosti
 import ClimaCoupler.PostProcessor: postprocess
 
 pkg_dir = pkgdir(ClimaCoupler)
-COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/moist_mpi_earth/output", joinpath(mode_name, run_name))
+COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/modular/output", joinpath(mode_name, run_name))
 mkpath(COUPLER_OUTPUT_DIR)
 
 REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp/")
@@ -129,11 +129,8 @@ sst_data = joinpath(sst_dataset_path(), "sst.nc")
 sic_data = joinpath(sic_dataset_path(), "sic.nc")
 mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 
-## import coupler utils
-include("coupler_utils/flux_calculator.jl")
-
 ## user-specified diagnostics
-include("user_diagnostics.jl")
+include("user_io/user_diagnostics.jl")
 
 #=
 ## Component Model Initialization
@@ -145,7 +142,7 @@ Here we set initial and boundary conditions for each component model.
 This uses the `ClimaAtmos.jl` driver, with parameterization options specified in the command line arguments.
 =#
 ## init atmos model component
-include("atmos/atmos_init.jl")
+include("components/atmos/climaatmos_init.jl")
 atmos_sim = atmos_init(FT, Y, integrator, params = params);
 
 #=
@@ -160,11 +157,11 @@ boundary_space = atmos_sim.domain.face_space.horizontal_space
 land_mask = land_sea_mask(FT, REGRID_DIR, comms_ctx, mask_data, "LSMASK", boundary_space, mono = mono_surface)
 
 ## init surface (slab) model components
-include("slab/slab_utils.jl")
-include("bucket/bucket_init.jl")
-include("slab/slab_init.jl")
-include("slab_ocean/slab_init.jl")
-include("slab_ice/slab_init.jl")
+include("components/land/bucket_init.jl")
+include("components/land/bucket_utils.jl")
+include("components/slab_utils.jl")
+include("components/ocean/slab_init.jl")
+include("components/seaice/slab_init.jl")
 
 #=
 ### Land
@@ -338,7 +335,7 @@ cs = CoupledSimulation{FT}(
 ## Initial States Exchange
 =#
 ## share states between models
-include("./push_pull.jl")
+include("components/push_pull.jl")
 atmos_pull!(cs)
 parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim.integrator, Δt_cpl, true) : nothing
 atmos_push!(cs)
@@ -466,7 +463,7 @@ if ClimaComms.iamroot(comms_ctx)
     ## sample animations
     if !is_distributed && parsed_args["anim"]
         @info "Animations"
-        include("coupler_utils/viz_explorer.jl")
+        include("user_io/plots/viz_explorer.jl")
         plot_anim(cs, COUPLER_OUTPUT_DIR * "_artifacts")
     end
 
@@ -475,7 +472,7 @@ if ClimaComms.iamroot(comms_ctx)
         @info "AMIP plots"
 
         ## ClimaESM
-        include("user_plots/amip_visualizer.jl")
+        include("user_io/plots/amip_visualizer.jl")
         post_spec = (;
             T = (:regrid, :zonal_mean),
             u = (:regrid, :zonal_mean),
@@ -503,7 +500,7 @@ if ClimaComms.iamroot(comms_ctx)
 
         ## NCEP reanalysis
         @info "NCEP plots"
-        include("user_plots/ncep_visualizer.jl")
+        include("user_io/plots/ncep_visualizer.jl")
         ncep_post_spec = (;
             T = (:zonal_mean,),
             u = (:zonal_mean,),

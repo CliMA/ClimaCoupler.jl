@@ -1,3 +1,5 @@
+import ClimaAtmos: get_surface_fluxes!
+
 """
    atmos_push!(cs)
 

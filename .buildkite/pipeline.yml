@@ -120,13 +120,13 @@ steps:
           slurm_ntasks: 1
           slurm_mem_per_cpu: 16G
 
-      - label: "Slabplanet: monotonous remap, monin, allsky, sponge, ideal insol, dt_rad = dt_cpl = 6h"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver.jl --enable_threading true --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad allskywithclear --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 21600 --dt 200secs --dt_rad 6hours --idealized_insolation true --mono_surface true --h_elem 4 --precip_model 0M --run_name target_params_in_slab_test1"
+      - label: "Slabplanet: monotonous remap, monin, allsky, sponge, real insol, dt_rad = dt_cpl = 6h"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver.jl --enable_threading true --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad allskywithclear --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 21600 --dt 200secs --dt_rad 6hours --idealized_insolation false --mono_surface true --h_elem 4 --precip_model 0M --run_name target_params_in_slab_test1"
         artifact_paths: "experiments/AMIP/modular/output/slabplanet/target_params_in_slab_test1_artifacts/total_energy*.png"
 
-      - label: "AMIP: non-monotonous remap, bulk, gray, ideal insol"
+      - label: "AMIP: monotonous remap, bulk, gray, ideal insol"
         key: "modular_amip"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name coarse_single_modular --enable_threading true --coupled true --surface_scheme bulk --moist equil --vert_diff true --rad gray --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface false --h_elem 6 --dt_save_restart 10days --precip_model 0M"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name coarse_single_modular --enable_threading true --coupled true --surface_scheme bulk --moist equil --vert_diff true --rad gray --dt_rad 1hours --idealized_insolation true --FLOAT_TYPE Float64 --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface true --h_elem 6 --dt_save_restart 10days --precip_model 0M"
         artifact_paths: "experiments/AMIP/modular/output/amip/coarse_single_artifacts/*"
         env:
           FLAME_PLOT: ""
@@ -135,7 +135,7 @@ steps:
           slurm_mem_per_cpu: 16G
 
       - label: "MPI AMIP: monotonous remap, monin, allsky, sponge, real insol, dt_rad = 1h"
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver.jl --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad allskywithclear --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --dt_rad 1hours --idealized_insolation false --FLOAT_TYPE Float64 --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface true --h_elem 6 --dt_save_restart 5days --precip_model 0M --run_name coarse_mpi_n2"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver.jl --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad allskywithclear --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --dt_rad 1hours --idealized_insolation false --FLOAT_TYPE Float64 --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 5days --dt_cpl 400 --dt 400secs --mono_surface true --h_elem 6 --dt_save_restart 50days --precip_model 0M --run_name coarse_mpi_n2"
         artifact_paths: "experiments/AMIP/modular/output/amip/coarse_mpi_n2_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
@@ -144,7 +144,7 @@ steps:
 
       - label: "MPI AMIP FINE: monotonous remap, monin, allsky, sponge, real insol, dt_rad = 1h"
         key: "mpi_amip_fine"
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver.jl --run_name target_amip_n32_shortrun --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad allskywithclear --z_elem 50 --dz_top 3000 --dz_bottom 30 --h_elem 16 --kappa_4 1e16 --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --dt_cpl 150 --dt 150secs --dt_rad 1hours --idealized_insolation false --FLOAT_TYPE Float64 --energy_check false --mode_name amip --t_end 5days --dt_save_to_sol 10days --mono_surface true --precip_model 0M"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver.jl --run_name target_amip_n32_shortrun --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad allskywithclear --z_elem 50 --dz_top 3000 --dz_bottom 30 --h_elem 16 --kappa_4 1e16 --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --dt_cpl 150 --dt 150secs --dt_rad 1hours --idealized_insolation false --FLOAT_TYPE Float64 --energy_check false --mode_name amip --t_end 5days --dt_save_to_sol 5days --mono_surface true --precip_model 0M"
         artifact_paths: "experiments/AMIP/modular/output/amip/target_amip_n32_shortrun_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"

@@ -166,7 +166,7 @@ next_date_in_file(bcfile_info) = bcfile_info.all_dates[bcfile_info.segment_idx[1
 """
     interpolate_midmonth_to_daily(date, bcf_info)
 
-Interpolates linearly between two `Fields` in the `bcf_info` struct, or returns the first Field if interpolation is switched off. 
+Interpolates linearly between two `Fields` in the `bcf_info` struct, or returns the first Field if interpolation is switched off.
 """
 function interpolate_midmonth_to_daily(date, bcf_info)
 
@@ -190,7 +190,7 @@ end
 """
     interpol(f1::FT, f2::FT, Δt_tt1::FT, Δt_t2t1::FT) where {FT}
 
-Performs linear interpolation of `f` at time `t` within a segment `Δt_t2t1 = (t2 - t1)`, of fields `f1` and `f2`, with `t2 > t1`. 
+Performs linear interpolation of `f` at time `t` within a segment `Δt_t2t1 = (t2 - t1)`, of fields `f1` and `f2`, with `t2 > t1`.
 
 `Δt_tt1 = (t - t1)`
 `f(t1) = f1`

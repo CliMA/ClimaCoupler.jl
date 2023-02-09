@@ -14,8 +14,8 @@ ClimaComms.barrier(comms_ctx)
 """
     reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R)
 
-Reshapes a sparse vector array (raw output of the TempestRemap) to a Field object. 
-Redundant nodes are populated using `dss` operations. 
+Reshapes a sparse vector array (raw output of the TempestRemap) to a Field object.
+Redundant nodes are populated using `dss` operations.
 """
 function reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R)
     field_array = parent(field)
@@ -38,13 +38,12 @@ function reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R)
 end
 
 """
-hdwrite_regridfile_rll_to_cgll(comms_ctx, datafile_rll, varname, space; hd_outfile_root = "data_cgll", mono = false)
+    hdwrite_regridfile_rll_to_cgll(comms_ctx, datafile_rll, varname, space; hd_outfile_root = "data_cgll", mono = false)
 
-Reads and regrids data of the `varname` variable from an input NetCDF file and saves it as another NetCDF file using Tempest Remap. 
+Reads and regrids data of the `varname` variable from an input NetCDF file and saves it as another NetCDF file using Tempest Remap.
 The input NetCDF file needs to be `Exodus` formatted, and can contain time-dependent data. The output NetCDF file
-is then read back, the output arrays converted into Fields and saved as HDF5 files (one per time slice). This function should 
-be called by the root process. The regridded HDF5 output is readable by multiple MPI processes. 
-
+is then read back, the output arrays converted into Fields and saved as HDF5 files (one per time slice). This function should
+be called by the root process. The regridded HDF5 output is readable by multiple MPI processes.
 """
 function hdwrite_regridfile_rll_to_cgll(
     comms_ctx,
@@ -78,7 +77,7 @@ function hdwrite_regridfile_rll_to_cgll(
         # write lat-lon mesh
         rll_mesh(meshfile_rll; nlat = nlat, nlon = nlon)
 
-        # write cgll mesh, overlap mesh and weight file 
+        # write cgll mesh, overlap mesh and weight file
         write_exodus(meshfile_cgll, topology)
         overlap_mesh(meshfile_overlap, meshfile_rll, meshfile_cgll)
 

@@ -1,4 +1,4 @@
-# flame.jl: provides allocation breakdown for individual backtraces for single-process unthredded runs 
+# flame.jl: provides allocation breakdown for individual backtraces for single-process unthredded runs
 # and check for overall allocation limits based on previous runs
 # copied and modified from `ClimaAtmos/perf`
 
@@ -16,14 +16,14 @@ filename = joinpath(cc_dir, "experiments", "AMIP", "moist_mpi_earth", "coupler_d
 run_name_list = ["default_modular", "coarse_single_modular", "target_amip_n32_shortrun"]
 run_name = run_name_list[parse(Int, ARGS[2])]
 allocs_limit = Dict()
-allocs_limit["perf_default_modular"] = 6639776
-allocs_limit["perf_coarse_single_modular"] = 6639776
-allocs_limit["perf_target_amip_n32_shortrun"] = 428396688
+allocs_limit["perf_default_modular"] = 2685440
+allocs_limit["perf_coarse_single_modular"] = 3864320
+allocs_limit["perf_target_amip_n32_shortrun"] = 172134848
 
 # number of time steps used for profiling
 const n_samples = 2
 
-# flag to split coupler init from its solve 
+# flag to split coupler init from its solve
 ENV["CI_PERF_SKIP_COUPLED_RUN"] = true
 
 # pass in the correct arguments, overriding defaults with those specific to each run_name (in `pipeline.yaml`)

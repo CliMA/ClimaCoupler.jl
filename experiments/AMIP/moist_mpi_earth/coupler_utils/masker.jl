@@ -30,7 +30,7 @@ end
 """
     update_masks!(cs)
 
-Updates dynamically changing masks. 
+Updates dynamically changing masks.
 """
 function update_masks!(cs)
 
@@ -52,7 +52,7 @@ end
 """
     binary_mask(var::FT; threshold = 0.5)
 
-Converts a number to 1 or 0 of the same type, based on a threashold. 
+Converts a number to 1 or 0 of the same type, based on a threashold.
 """
 
 binary_mask(var::FT; threshold = 0.5) where {FT} = (var - FT(threshold)) > FT(0) ? FT(1) : FT(0)
@@ -64,18 +64,23 @@ Sums Field objects in `fields` weighted by the respective masks.
 """
 function combine_surfaces!(combined_field::Fields.Field, masks::NamedTuple, fields::NamedTuple)
     combined_field .= eltype(combined_field)(0)
+    warn_nans = false
     for surface_name in propertynames(fields) # could use dot here?
-        field_no_nans = nans_to_zero.(getproperty(fields, surface_name))  # TODO: performance analysis / alternatives
-        combined_field .+= getproperty(masks, surface_name) .* field_no_nans
+        if any(x -> isnan(x), getproperty(fields, surface_name))
+            warn_nans = true
+        end
+        combined_field .+= getproperty(masks, surface_name) .* nans_to_zero.(getproperty(fields, surface_name))
     end
-
+    warn_nans && @warn "NaNs were detected and converted to zeros."
 end
-nans_to_zero(v) = isnan(v) ? FT(0) : v
+
+#= Converts NaNs to zeros of the same type. =#
+nans_to_zero(v) = isnan(v) ? typeof(v)(0) : v
 
 """
     update_masks!(cs)
 
-Updates dynamically changing masks. 
+Updates dynamically changing masks.
 """
 function update_masks!(cs)
 
@@ -97,7 +102,7 @@ end
 
 """
     time_slice_ncfile(sic_data, time_idx = 1)
-- slices a dataset at time index `time_idx` and saves it under `sic_data_slice`. Used for more efficient regridding of mask, SST and SIC files. 
+- slices a dataset at time index `time_idx` and saves it under `sic_data_slice`. Used for more efficient regridding of mask, SST and SIC files.
 """
 function time_slice_ncfile(sic_data, time_idx = 1)
     sic_data_slice = sic_data[1:(end - 3)] * "_one_time.nc"

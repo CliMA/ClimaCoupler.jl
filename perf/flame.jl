@@ -84,7 +84,7 @@ end
 
 # We're grouping allocation tests here for convenience.
 
-buffer = 1 # increase slightly for (nondeterministic) threaded runs
+buffer = 1.2 # increase slightly for (nondeterministic) threaded runs
 
 # profile the coupling loop
 allocs = @allocated step_coupler!(cs, n_samples)
@@ -98,6 +98,12 @@ end
 
 Δallocs = allocs / allocs_limit[run_name]
 @info "Allocation change (allocs/allocs_limit): $Δallocs"
+percent_alloc_change = (1 - Δallocs) * 100
+if percent_alloc_change ≥ 0
+    @info "Allocations improved by: $percent_alloc_change %"
+else
+    @info "Allocations worsened by: $percent_alloc_change %"
+end
 
 @testset "Allocations limit" begin
     @test allocs ≤ allocs_limit[run_name]

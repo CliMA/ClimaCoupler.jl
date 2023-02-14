@@ -103,7 +103,7 @@ steps:
 
       - label: "Slabplanet: non-monotonous remap"
         key: "modular_slabplanet"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name default_modular --enable_threading true --coupled true --surface_scheme bulk  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface false --h_elem 4 --precip_model 0M --albedo_from_file false"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver.jl --run_name default_modular --enable_threading true --coupled true --surface_scheme bulk  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface false --h_elem 4 --precip_model 0M --albedo_from_file false"
         artifact_paths: "experiments/AMIP/modular/output/slabplanet/default_modular_artifacts/total_energy*.png"
         env:
           FLAME_PLOT: ""
@@ -112,7 +112,7 @@ steps:
           slurm_mem_per_cpu: 16G
 
       - label: "Slabplanet: monotonous remap"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name default_modular --enable_threading true --coupled true --surface_scheme bulk  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface true --h_elem 4 --precip_model 0M --albedo_from_file false"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver.jl --run_name default_modular --enable_threading true --coupled true --surface_scheme bulk  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface true --h_elem 4 --precip_model 0M --albedo_from_file false"
         artifact_paths: "experiments/AMIP/modular/output/slabplanet/default_modular_artifacts/total_energy*.png"
         env:
           FLAME_PLOT: ""
@@ -126,7 +126,7 @@ steps:
 
       - label: "AMIP: monotonous remap, bulk, gray, ideal insol, real albedo"
         key: "modular_amip"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name coarse_single_modular --enable_threading true --coupled true --surface_scheme bulk --moist equil --vert_diff true --rad gray --dt_rad 1hours --idealized_insolation true --FLOAT_TYPE Float64 --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface true --h_elem 6 --dt_save_restart 10days --precip_model 0M"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver.jl --run_name coarse_single_modular --enable_threading true --coupled true --surface_scheme bulk --moist equil --vert_diff true --rad gray --dt_rad 1hours --idealized_insolation true --FLOAT_TYPE Float64 --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface true --h_elem 6 --dt_save_restart 10days --precip_model 0M"
         artifact_paths: "experiments/AMIP/modular/output/amip/coarse_single_artifacts/*"
         env:
           FLAME_PLOT: ""

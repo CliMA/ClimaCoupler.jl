@@ -74,6 +74,6 @@ steps:
       - label: ":envelope: Slack report"
         command:
           - slack-upload -c "#coupler-reports" -f build_history.html -m html -n amip_fine -x "AMIP Longrun"
-          - experiments/AMIP/moist_mpi_earth/output/amip/current_amip_n32_longrun_artifacts/amip_paperplots.png
+          - experiments/AMIP/moist_mpi_earth/output/amip/target_amip_n32_longrun_artifacts/amip_paperplots.png
 
 

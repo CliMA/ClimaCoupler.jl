@@ -21,7 +21,7 @@ mutable struct ProfileFrame
     flags::UInt8 # any or all of ProfileFrameFlag
     taskId::Union{Missing, UInt}
     children::Vector{ProfileFrame}
-    count_change::Float64 # fractional change in count: (new - old) / old 
+    count_change::Float64 # fractional change in count: (new - old) / old
 end
 
 struct ProfileDisplay <: Base.Multimedia.AbstractDisplay end
@@ -130,7 +130,13 @@ const ProfileFrameFlag = (
     TaskEvent = UInt8(2^4),
 )
 
-function view(data = Profile.fetch(); C = false, tracked_list = Dict{String, Int}(;), build_path = "", kwargs...)
+function view(
+    data = Profile.fetch();
+    C = false,
+    tracked_list = Dict{String, Int}(;),
+    independent_count = nothing,
+    kwargs...,
+)
     d = Dict{String, ProfileFrame}()
 
     if VERSION >= v"1.8.0-DEV.460"
@@ -153,6 +159,7 @@ function view(data = Profile.fetch(); C = false, tracked_list = Dict{String, Int
             graph;
             C = C,
             tracked_list = tracked_list,
+            independent_count = independent_count,
             kwargs...,
         )
     end
@@ -206,7 +213,7 @@ function status(node::Profile.StackFrameTree, C::Bool)
     return st
 end
 
-function add_child(graph::ProfileFrame, node, C::Bool; tracked_list = Dict{String, Int}(;))
+function add_child(graph::ProfileFrame, node, C::Bool; tracked_list = Dict{String, Int}(;), independent_count = nothing)
     name = string(node.frame.file)
     func = String(node.frame.func)
     line = node.frame.line
@@ -216,7 +223,15 @@ function add_child(graph::ProfileFrame, node, C::Bool; tracked_list = Dict{Strin
         func = "unknown"
     end
 
-    count_old = func in keys(tracked_list) ? tracked_list["$func.$file.$line"] : 999
+    old_count = func in keys(tracked_list) ? tracked_list["$func.$file.$line"] : 999
+    current_count = Float64(node.count)
+
+
+    if independent_count !== nothing
+        old_count = func in keys(tracked_list) ? tracked_list["independent_count_$func.$file.$line"] : 999
+        current_count = sum(map(x -> x.count, node.children))
+    end
+
     frame = ProfileFrame(
         func,
         basename(name),
@@ -227,7 +242,7 @@ function add_child(graph::ProfileFrame, node, C::Bool; tracked_list = Dict{Strin
         status(node, C),
         missing,
         ProfileFrame[],
-        (Float64(node.count) - Float64(count_old)) / Float64(count_old),
+        (current_count - Float64(old_count)) / Float64(old_count),
     )
 
     push!(graph.children, frame)
@@ -235,14 +250,20 @@ function add_child(graph::ProfileFrame, node, C::Bool; tracked_list = Dict{Strin
     return frame
 end
 
-function make_tree(graph, node::Profile.StackFrameTree; C = false, tracked_list = Dict{String, Int}(;))
+function make_tree(
+    graph,
+    node::Profile.StackFrameTree;
+    C = false,
+    tracked_list = Dict{String, Int}(;),
+    independent_count = nothing,
+)
     for child_node in sort!(collect(values(node.down)); rev = true, by = node -> node.count)
         # child not a hidden frame
         if C || !child_node.frame.from_c
-            child = add_child(graph, child_node, C, tracked_list = tracked_list)
-            make_tree(child, child_node; C = C, tracked_list = tracked_list)
+            child = add_child(graph, child_node, C, tracked_list = tracked_list, independent_count = independent_count)
+            make_tree(child, child_node; C = C, tracked_list = tracked_list, independent_count = independent_count)
         else
-            make_tree(graph, child_node, tracked_list = tracked_list)
+            make_tree(graph, child_node, tracked_list = tracked_list, independent_count = independent_count)
         end
     end
 

@@ -1,12 +1,18 @@
-# flame_diff.jl: provides allocation breakdown for individual backtraces for single-process unthredded runs 
+# flame_diff.jl: provides allocation breakdown for individual backtraces for single-process unthredded runs
 # and check for fractional change in allocation compared to the last staged run
+if isinteractive()
+    buildkite_branch = buildkite_commit = buildkite_bnumber = "none"
+    buildkite_cc_dir = build_path = "."
+    perf_run_no = "1"
+else
+    buildkite_branch = ENV["BUILDKITE_BRANCH"]
+    buildkite_commit = ENV["BUILDKITE_COMMIT"]
+    buildkite_bnumber = ENV["BUILDKITE_BUILD_NUMBER"]
+    buildkite_cc_dir = "/groups/esm/slurm-buildkite/climacoupler-ci/"
+    build_path = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/$buildkite_bnumber/climacoupler-ci/perf/"
+    perf_run_no = ARGS[2]
+end
 
-buildkite_branch = ENV["BUILDKITE_BRANCH"]
-buildkite_commit = ENV["BUILDKITE_COMMIT"]
-buildkite_bnumber = ENV["BUILDKITE_BUILD_NUMBER"]
-buildkite_cc_dir = "/groups/esm/slurm-buildkite/climacoupler-ci/"
-
-build_path = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/$buildkite_bnumber/climacoupler-ci/perf/"
 cwd = pwd()
 @info "build_path is: $build_path"
 
@@ -27,12 +33,12 @@ filename = joinpath(cc_dir, "experiments", "AMIP", "moist_mpi_earth", "coupler_d
 
 # selected runs for performance analysis and their expected allocations (based on previous runs)
 run_name_list = ["default_modular", "coarse_single_modular", "target_amip_n32_shortrun"]
-run_name = run_name_list[parse(Int, ARGS[2])]
+run_name = run_name_list[parse(Int, perf_run_no)]
 
 # number of time steps used for profiling
 const n_samples = 2
 
-# flag to split coupler init from its solve 
+# flag to split coupler init from its solve
 ENV["CI_PERF_SKIP_COUPLED_RUN"] = true
 
 # pass in the correct arguments, overriding defaults with those specific to each run_name (in `pipeline.yaml`)
@@ -68,9 +74,26 @@ end
 """
     iterate_children(flame_tree, ct = 0, dict = Dict{String, Float64}())
 
-Iterate over all children of a stack tree and save their names ("\$func.\$file.\$line") and 
-corresponding count values in a Dict. 
+Iterate over all children of a stack tree and save their names ("\$func.\$file.\$line") and
+corresponding count values in a Dict.
 """
+# function iterate_children(flame_tree, ct = 0, dict = Dict{String, Float64}())
+#     ct += 1
+#     line = flame_tree.line
+#     file = flame_tree.file
+#     func = flame_tree.func
+#     push!(dict, "$func.$file.$line" => flame_tree.count)
+
+#     if isempty(flame_tree.children)
+#         nothing
+#     else
+#         for sf in flame_tree.children
+#             iterate_children(sf, ct, dict)
+#         end
+#     end
+#     return dict
+# end
+
 function iterate_children(flame_tree, ct = 0, dict = Dict{String, Float64}())
     ct += 1
     line = flame_tree.line
@@ -79,8 +102,12 @@ function iterate_children(flame_tree, ct = 0, dict = Dict{String, Float64}())
     push!(dict, "$func.$file.$line" => flame_tree.count)
 
     if isempty(flame_tree.children)
-        nothing
+        # 0 upstream contribution if end child
+        push!(dict_cc, "$func.$file.$line" => 0)
+
     else
+        child_sum = sum(map(x -> x.count, flame_tree.children))
+        push!(dict, "independent_count_$func.$file.$line" => flame_tree.count - child_sum)
         for sf in flame_tree.children
             iterate_children(sf, ct, dict)
         end
@@ -99,24 +126,52 @@ Profile.clear()
 
 # profile the coupling loop
 prof = Profile.@profile begin
-    step_coupler!(cs, n_samples)
+    step_coupler!(cs, n_samples + 10000000)
 end
 
 # produce flamegraph with colors highlighting the allocation differences relative to the last saved run
-# profile_data 
+# profile_data
 if haskey(ENV, "BUILDKITE_COMMIT") || haskey(ENV, "BUILDKITE_BRANCH")
     output_dir = "perf/output/$run_name"
     mkpath(output_dir)
     ProfileCanvasDiff.html_file(joinpath(output_dir, "flame_diff.html"), build_path = build_path)
+    ProfileCanvasDiff.html_file(
+        joinpath(output_dir, "flame_diff_independent_count.html"),
+        build_path = build_path,
+        independent_count = true,
+    )
 end
 
 # save (and reset) the stack tree if this is running on the `staging` branch
-profile_data = ProfileCanvasDiff.view(Profile.fetch(), tracked_list = tracked_list);
+profile_data = ProfileCanvasDiff.view(Profile.fetch(), tracked_list = tracked_list, independent_count = true);
 flame_tree = profile_data.data["all"]
 my_dict = iterate_children(flame_tree)
 @info "This branch is: $buildkite_branch, commit $buildkite_commit"
-if buildkite_branch == "staging"
-    isfile(ref_file) ?
-    mv(ref_file, joinpath(buildkite_cc_dir, "flame_diff_ref_file.$run_name.$buildkite_commit.jld2")) : nothing
-    save(ref_file, my_dict) # reset ref_file upon staging
-end
+#if buildkite_branch == "staging"
+isfile(ref_file) ?
+mv(ref_file, joinpath(buildkite_cc_dir, "flame_diff_reference_file.$run_name.$buildkite_commit.jld2")) : nothing
+save(ref_file, my_dict) # reset ref_file upon staging
+#end
+
+
+
+# tesr
+
+
+# rr.data["all"].children[1].children[1].children[1].children[1].children[1].children[1].children[1].children[1].children[1].children[1].children[1].children[1].children[2].children
+
+# function step_coupler!(cs, n)
+#     m = add_n!(n)
+#     times_minus_n!(m)
+
+# end
+
+# function add_n!(n)
+#     n + n
+# end
+
+# function times_minus_n!(n)
+#     b = n * n - n
+#     sqrt(b)
+# end
+# cs = []

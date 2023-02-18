@@ -510,15 +510,15 @@ export class ProfileViewer {
         // if (node.count > 0) {
         // better performance
         ;
-        if (node.count_change > 100) {
-            ({ r, g, b } = this.modifyNodeColorByCount(0, 0, 0, node.count_change ));
+        if (node.count_change / node.count > 100) {
+            ({ r, g, b } = this.modifyNodeColorByCount(0, 0, 0, node.count_change / node.count ));
         }
-        else if (node.count_change < 0) {
-            ({ r, g, b } = this.modifyNodeColorByCount(255, 255, 255, - node.count_change ));
+        else if (node.count_change/ node.count < 0) {
+            ({ r, g, b } = this.modifyNodeColorByCount(255, 255, 255, - node.count_change / node.count ));
             r = 255;
         }
         else {
-            ({ r, g, b } = this.modifyNodeColorByCount(255, 255, 255, node.count_change ));
+            ({ r, g, b } = this.modifyNodeColorByCount(255, 255, 255, node.count_change / node.count ));
             b = 255;
         }
 

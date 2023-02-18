@@ -203,8 +203,7 @@ function log_independent_change!(flame_tree, child_sum, tracked_list)
     func_sign = "independent_count_$func.$file.$line"
     current_indeppendent_count = flame_tree.count - child_sum
 
-
-    old_independent_count = func_sign in keys(tracked_list) ? tracked_list[func_sign] : -999 #TODO delete
+    old_independent_count = func_sign in keys(tracked_list) ? tracked_list[func_sign] : -999 * flame_tree.count  #TODO delete
     overall_count_change = deepcopy(flame_tree.count_change)  #TDO: do %ages
     flame_tree.count_change = (current_indeppendent_count - old_independent_count)
 

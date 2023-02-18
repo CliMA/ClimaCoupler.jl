@@ -513,7 +513,7 @@ export class ProfileViewer {
         if (node.count_change / node.count > 100) {
             ({ r, g, b } = this.modifyNodeColorByCount(0, 0, 0, node.count_change / node.count ));
         }
-        else if (node.count_change/ node.count < 0) {
+        else if (node.count_change/ node.count > 0) {
             ({ r, g, b } = this.modifyNodeColorByCount(255, 255, 255, - node.count_change / node.count ));
             r = 255;
         }

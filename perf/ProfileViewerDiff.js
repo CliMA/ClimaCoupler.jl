@@ -451,15 +451,15 @@ export class ProfileViewer {
     }
     // modifies the normal color by three stable random values drawn from a
     // PRNG seeded by the node hash
-    modifyNodeColorByHash(r, g, b, hash, range = 70) {
+    modifyNodeColorByHash(r, g, b, hash, range = 255) {
         const rng = this.mulberry32(hash);
         if (r === g && g === b) {
             r = g = b = Math.min(255, Math.max(0, r + (rng() - 0.5) * range));
         }
         else {
-            r = Math.min(255, Math.max(0, r + (rng() - 0.5) * range));
-            g = Math.min(255, Math.max(0, g + (rng() - 0.5) * range));
-            b = Math.min(255, Math.max(0, b + (rng() - 0.5) * range));
+            r = Math.min(range, Math.max(0, r + (rng() - 0.5) * range));
+            g = Math.min(range, Math.max(0, g + (rng() - 0.5) * range));
+            b = Math.min(range, Math.max(0, b + (rng() - 0.5) * range));
         }
         return {
             r,

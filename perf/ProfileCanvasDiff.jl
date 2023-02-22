@@ -130,13 +130,7 @@ const ProfileFrameFlag = (
     TaskEvent = UInt8(2^4),
 )
 
-function view(
-    data = Profile.fetch();
-    C = false,
-    tracked_list = Dict{String, Int}(;),
-    independent_count = false,
-    kwargs...,
-)
+function view(data = Profile.fetch(); C = false, tracked_list = Dict{String, Int}(;), self_count = false, kwargs...)
 
     d = Dict{String, ProfileFrame}()
 
@@ -162,13 +156,13 @@ function view(
             graph;
             C = C,
             tracked_list = tracked_list,
-            independent_count = independent_count,
+            self_count = self_count,
             kwargs...,
         )
 
-        curr_tree = independent_count ? iterate_independent_change!(curr_tree, tracked_list) : curr_tree
+        curr_tree = self_count ? iterate_self_change!(curr_tree, tracked_list) : curr_tree
 
-        new_tracked_list = collect_child_counts(curr_tree)
+        new_tracked_list = log_counts(curr_tree)
 
         d[string(thread)] = curr_tree
 
@@ -178,52 +172,62 @@ function view(
     return (ProfileData(d, "Thread"), new_tracked_list)
 end
 
-function iterate_independent_change!(flame_tree, tracked_list)
+"""
+    iterate_self_change!(flame_tree, tracked_list)
+
+Iterates over all child nodes of the flame_tree, calling `collect_self_change!`.
+"""
+function iterate_self_change!(flame_tree, tracked_list)
 
     if isempty(flame_tree.children)
         child_sum = 0
-        log_independent_change!(flame_tree, child_sum, tracked_list)
+        collect_self_change!(flame_tree, child_sum, tracked_list)
     else
         child_sum = sum(map(x -> x.count, flame_tree.children))
-        log_independent_change!(flame_tree, child_sum, tracked_list)
+        collect_self_change!(flame_tree, child_sum, tracked_list)
         #@show flame_tree.countLabel
         for sf in flame_tree.children
-            iterate_independent_change!(sf, tracked_list)
+            iterate_self_change!(sf, tracked_list)
 
         end
     end
     return flame_tree
 end
 
-function log_independent_change!(flame_tree, child_sum, tracked_list)
-    name = string(flame_tree.file)
+"""
+    collect_self_change!(flame_tree, child_sum, tracked_list)
+
+
+"""
+function collect_self_change!(flame_tree, child_sum, tracked_list)
     func = string(flame_tree.func)
     line = string(flame_tree.line)
     file = string(flame_tree.file)
-    func_sign = "independent_count_$func.$file.$line"
-    current_indeppendent_count = flame_tree.count - child_sum
 
-    old_independent_count = func_sign in keys(tracked_list) ? tracked_list[func_sign] : -999 * flame_tree.count  #TODO delete
-    overall_count_change = deepcopy(flame_tree.count_change)  #TDO: do %ages
-    flame_tree.count_change = (current_indeppendent_count - old_independent_count)
+    func_sign = "self_count_$func.$file.$line"
+    current_self_count = flame_tree.count - child_sum
+    old_self_count = func_sign in keys(tracked_list) ? tracked_list[func_sign] : -999 * flame_tree.count # if not found, this will be marked untracked
 
-    ct = flame_tree.count
+    overall_count_change = deepcopy(flame_tree.count_change)
+    flame_tree.count_change = (current_self_count - old_self_count)
+
+    (overall_count_change, old_self_count) =
+        old_self_count < 0 ? ("untracked", "untracked") : (overall_count_change, old_self_count)
+
     flame_tree.countLabel =
-        func_sign *
-        "," *
         string(flame_tree.count) *
-        " samples \n csum = $child_sum \n ct = $ct \n Δ_ref = $overall_count_change \n Δ_ref_i = $current_indeppendent_count - $old_independent_count =" *
+        " samples \n ∑child_count = $child_sum counts \n Δcount = $overall_count_change counts \n Δself_count = $current_self_count - $old_self_count =" *
         string(flame_tree.count_change) *
-        " counts"
+        " counts \n "
 end
 
 """
-    collect_child_counts(flame_tree, ct = 0, dict = Dict{String, Float64}())
+    log_counts(flame_tree, ct = 0, dict = Dict{String, Float64}())
 
 Iterate over all children of a stack tree and save their names ("\$func.\$file.\$line") and
 corresponding count values in a Dict.
 """
-function collect_child_counts(flame_tree, ct = 0, dict = Dict{String, Float64}())
+function log_counts(flame_tree, ct = 0, dict = Dict{String, Float64}())
     ct += 1
     line = flame_tree.line
     file = flame_tree.file
@@ -232,13 +236,13 @@ function collect_child_counts(flame_tree, ct = 0, dict = Dict{String, Float64}()
 
     if isempty(flame_tree.children)
         # 0 upstream contribution if end child
-        push!(dict, "independent_count_$func.$file.$line" => flame_tree.count)
+        push!(dict, "self_count_$func.$file.$line" => flame_tree.count)
 
     else
         child_sum = sum(map(x -> x.count, flame_tree.children))
-        push!(dict, "independent_count_$func.$file.$line" => flame_tree.count - child_sum)
+        push!(dict, "self_count_$func.$file.$line" => flame_tree.count - child_sum)
         for sf in flame_tree.children
-            collect_child_counts(sf, ct, dict)
+            log_counts(sf, ct, dict)
         end
     end
     return dict
@@ -290,7 +294,7 @@ function status(node::Profile.StackFrameTree, C::Bool)
     return st
 end
 
-function add_child(graph::ProfileFrame, node, C::Bool; tracked_list = Dict{String, Int}(;), independent_count = false)
+function add_child(graph::ProfileFrame, node, C::Bool; tracked_list = Dict{String, Int}(;), self_count = false)
     name = string(node.frame.file)
     func = string(node.frame.func)
     line = string(node.frame.line)
@@ -327,15 +331,15 @@ function make_tree(
     node::Profile.StackFrameTree;
     C = false,
     tracked_list = Dict{String, Int}(;),
-    independent_count = false,
+    self_count = false,
 )
     for child_node in sort!(collect(values(node.down)); rev = true, by = node -> node.count)
         # child not a hidden frame
         if C || !child_node.frame.from_c
-            child = add_child(graph, child_node, C, tracked_list = tracked_list, independent_count = independent_count)
-            make_tree(child, child_node; C = C, tracked_list = tracked_list, independent_count = independent_count)
+            child = add_child(graph, child_node, C, tracked_list = tracked_list, self_count = self_count)
+            make_tree(child, child_node; C = C, tracked_list = tracked_list, self_count = self_count)
         else
-            make_tree(graph, child_node, tracked_list = tracked_list, independent_count = independent_count)
+            make_tree(graph, child_node, tracked_list = tracked_list, self_count = self_count)
         end
     end
 

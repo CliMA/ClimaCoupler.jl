@@ -23,7 +23,7 @@ end
 function step_coupler!(n, y_all = [])
     for i in collect(1:1:n)
         y = get_y(i)
-        push!(y_all,y)
+        push!(y_all, y)
     end
     return y_all
 end
@@ -62,8 +62,3 @@ save(ref_file, new_tracked_list) # reset ref_file upon staging
 # end
 # profile_data_2, new_tracked_list_2 =
 #     ProfileCanvasDiff.view(Profile.fetch(), tracked_list = tracked_list, independent_count = true);
-
-
-
-
-

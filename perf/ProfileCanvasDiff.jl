@@ -209,7 +209,8 @@ function log_independent_change!(flame_tree, child_sum, tracked_list)
 
     ct = flame_tree.count
     flame_tree.countLabel =
-        func_sign * "," *
+        func_sign *
+        "," *
         string(flame_tree.count) *
         " samples \n csum = $child_sum \n ct = $ct \n Δ_ref = $overall_count_change \n Δ_ref_i = $current_indeppendent_count - $old_independent_count =" *
         string(flame_tree.count_change) *

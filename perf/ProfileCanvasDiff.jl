@@ -76,7 +76,7 @@ function Base.display(_::ProfileDisplay, canvas::ProfileData)
 end
 
 html_file(filename, data = Profile.fetch(); build_path = "", kwargs...) =
-    html_file(filename, build_path = build_path, view(data; kwargs...))
+    html_file(filename, build_path = build_path, view(data; kwargs...)[1])
 
 function html_file(file::AbstractString, canvas::ProfileData; build_path = "")
     @assert endswith(file, ".html")
@@ -209,7 +209,7 @@ function log_independent_change!(flame_tree, child_sum, tracked_list)
 
     ct = flame_tree.count
     flame_tree.countLabel =
-        func_sign *
+        func_sign * "," *
         string(flame_tree.count) *
         " samples \n csum = $child_sum \n ct = $ct \n Δ_ref = $overall_count_change \n Δ_ref_i = $current_indeppendent_count - $old_independent_count =" *
         string(flame_tree.count_change) *
@@ -217,7 +217,7 @@ function log_independent_change!(flame_tree, child_sum, tracked_list)
 end
 
 """
-    iterate_children(flame_tree, ct = 0, dict = Dict{String, Float64}())
+    collect_child_counts(flame_tree, ct = 0, dict = Dict{String, Float64}())
 
 Iterate over all children of a stack tree and save their names ("\$func.\$file.\$line") and
 corresponding count values in a Dict.
@@ -231,7 +231,7 @@ function collect_child_counts(flame_tree, ct = 0, dict = Dict{String, Float64}()
 
     if isempty(flame_tree.children)
         # 0 upstream contribution if end child
-        push!(dict, "independent_count_$func.$file.$line" => 0)
+        push!(dict, "independent_count_$func.$file.$line" => flame_tree.count)
 
     else
         child_sum = sum(map(x -> x.count, flame_tree.children))

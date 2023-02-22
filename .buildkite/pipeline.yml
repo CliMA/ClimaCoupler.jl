@@ -94,6 +94,16 @@ steps:
           slurm_nodes: 3
           slurm_tasks_per_node: 1
 
+      - label: "Perf flame graph diff tests"
+        command: "julia --color=yes --project=perf/ perf/flame_test.jl --run_name flame_test"
+        timeout_in_minutes: 5
+        agents:
+          config: cpu
+          queue: central
+          slurm_nodes: 3
+          slurm_tasks_per_node: 1
+
+
   - group: "Integration Tests"
     steps:
 

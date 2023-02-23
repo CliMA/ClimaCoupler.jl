@@ -20,9 +20,8 @@ end
 CouplerSimulation{FT}(args...) where {FT} = CouplerSimulation{FT, typeof.(args[1:5])...}(args...)
 float_type(::CouplerSimulation{FT}) where {FT} = FT
 
-function swap_space!(field, new_space)
-    field_out = zeros(new_space)
-    parent(field_out) .= parent(field)
+function swap_space!(field_out, field_in)
+    parent(field_out) .= parent(field_in)
     return field_out
 end
 

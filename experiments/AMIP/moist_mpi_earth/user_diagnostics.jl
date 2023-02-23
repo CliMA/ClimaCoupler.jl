@@ -60,7 +60,7 @@ function get_var(cs::CoupledSimulation, ::Val{:toa})
     )
 
     radiation_sources = @. -(LWd_TOA + SWd_TOA - LWu_TOA - SWu_TOA)
-    swap_space!(radiation_sources, cs.boundary_space)
+    swap_space!(zeros(cs.boundary_space), radiation_sources)
 end
 
 """
@@ -70,9 +70,9 @@ Precipitation (m m⁻²).
 """
 get_var(cs::CoupledSimulation, ::Val{:precipitation}) =
     .-swap_space!(
+        zeros(cs.boundary_space),
         cs.model_sims.atmos_sim.integrator.p.col_integrated_rain .+
         cs.model_sims.atmos_sim.integrator.p.col_integrated_snow,
-        cs.boundary_space,
     )
 
 # coupler diagnotics
@@ -81,6 +81,6 @@ get_var(cs::CoupledSimulation, ::Val{:precipitation}) =
 
 Combined surface temperature (K).
 """
-get_var(cs::CoupledSimulation, ::Val{:T_sfc}) = swap_space!(cs.fields.T_S, cs.boundary_space)
+get_var(cs::CoupledSimulation, ::Val{:T_sfc}) = swap_space!(zeros(cs.boundary_space), cs.fields.T_S)
 
 # land diagnotics

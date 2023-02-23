@@ -107,7 +107,7 @@ function check_conservation!(
         )
 
         coupler_sim.fields.F_R_TOA .-=
-            swap_space!(LWd_TOA .+ SWd_TOA .- LWu_TOA .- SWu_TOA, boundary_space) .* coupler_sim.Δt_cpl
+            swap_space!(zeros(boundary_space), LWd_TOA .+ SWd_TOA .- LWu_TOA .- SWu_TOA) .* coupler_sim.Δt_cpl
         radiation_sources_accum = sum(coupler_sim.fields.F_R_TOA) # accumulated radiation sources + sinks [J]
         push!(cc.toa_net_source, radiation_sources_accum)
     else
@@ -186,7 +186,7 @@ function check_conservation!(
     end
 
     # save sea ice
-    coupler_sim.fields.P_net .-= swap_space!(surface_water_gain_from_rates(coupler_sim), boundary_space) # accumulated surface water gain
+    coupler_sim.fields.P_net .-= swap_space!(zeros(boundary_space), surface_water_gain_from_rates(coupler_sim)) # accumulated surface water gain
     if ice_sim !== nothing
         push!(cc.ρq_tot_seaice, sum(coupler_sim.fields.P_net .* surface_masks.ice)) # kg (∫ P_net dV)
     else

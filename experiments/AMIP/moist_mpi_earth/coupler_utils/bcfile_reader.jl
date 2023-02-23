@@ -97,7 +97,7 @@ function bcfile_info_init(
 
 end
 
-no_scaling(x, _info) = swap_space!(x, axes(_info.land_mask))
+no_scaling(x, _info) = swap_space!(zeros(axes(_info.land_mask)), x)
 
 # IO - monthly
 """

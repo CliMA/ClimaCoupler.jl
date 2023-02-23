@@ -13,9 +13,8 @@ float_type(::CouplerSimulation{FT}) where {FT} = FT
 
 get_u(sim, t) = Geometry.UVVector.(sim.integrator.sol.u[t].c.uₕ).components.data.:1
 
-function swap_space!(field, new_space)
-    field_out = zeros(new_space)
-    parent(field_out) .= parent(field)
+function swap_space!(field_out, field_in)
+    parent(field_out) .= parent(field_in)
     return field_out
 end
 

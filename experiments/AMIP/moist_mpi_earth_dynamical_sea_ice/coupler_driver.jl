@@ -49,7 +49,7 @@ include("slab_ocean/slab_init.jl")
 prescribed_sst = false
 if prescribed_sst == true
     SST = ncreader_rll_to_cgll_from_space(FT, "data/sst.nc", "SST", boundary_space)  # a sample SST field from https://gdex.ucar.edu/dataset/158_asphilli.html
-    SST = swap_space!(SST, axes(mask)) .* (abs.(mask .- 1)) .+ FT(273.15) # TODO: avoids the "space not the same instance" error
+    SST = swap_space!(zeros(axes(mask)), SST) .* (abs.(mask .- 1)) .+ FT(273.15) # TODO: avoids the "space not the same instance" error
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5))
 else
     slab_ocean_sim = slab_ocean_init(FT, tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, mask = mask)
@@ -60,7 +60,7 @@ prescribed_sic = false
 if prescribed_sic == true
     # sample SST field
     SIC = ncreader_rll_to_cgll_from_space(FT, "data/sic.nc", "SEAICE", boundary_space)
-    SIC = swap_space!(SIC, axes(mask)) .* (abs.(mask .- 1))
+    SIC = swap_space!(zeros(axes(mask)), SIC) .* (abs.(mask .- 1))
     slab_ice_sim = slab_ice_init(
         FT,
         tspan,
@@ -179,7 +179,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
 
     atmos_sim.integrator.p.rrtmgp_model.surface_temperature .= field2array(T_S) # supplied to atmos for radiation
 
-    # run 
+    # run
     step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
 
     #clip TODO: this is bad!! > limiters

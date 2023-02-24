@@ -109,7 +109,7 @@ end
 
 
     # html_file test
-    ProfileCanvasDiff.html_file(joinpath(output_dir, "flame_diff.html"), build_path = ".")
+    ProfileCanvasDiff.html_file(joinpath(output_dir, "flame_diff.html"), build_path = build_path)
 
     @test isfile(joinpath(output_dir, "flame_diff.html"))
     rm(output_dir; recursive = true, force = true)

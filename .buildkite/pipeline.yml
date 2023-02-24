@@ -129,6 +129,7 @@ steps:
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/default_modular_artifacts/total_energy*.png"
         env:
           FLAME_PLOT: ""
+          BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks: 1
           slurm_mem_per_cpu: 16G
@@ -165,6 +166,7 @@ steps:
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/coarse_single_artifacts/*"
         env:
           FLAME_PLOT: ""
+          BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks: 1
           slurm_mem_per_cpu: 16G
@@ -187,7 +189,7 @@ steps:
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/target_amip_n32_shortrun_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
-          FLAME_PLOT: ""
+          BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks: 32
           slurm_mem_per_cpu: 16G
@@ -220,12 +222,6 @@ steps:
       - label: ":rocket: performance: flame graph diff: perf_coarse_single_modular"
         command: "julia --color=yes --project=perf perf/flame_diff.jl --run_name 2"
         artifact_paths: "perf/output/perf_diff_coarse_single_modular/*"
-        agents:
-          slurm_mem: 20GB
-
-      - label: ":rocket: performance: flame graph diff: perf_target_amip_n32_shortrun"
-        command: "julia --color=yes --project=perf perf/flame_diff.jl --run_name 3"
-        artifact_paths: "perf/output/perf_diff_target_amip_n32_shortrun/*"
         agents:
           slurm_mem: 20GB
 

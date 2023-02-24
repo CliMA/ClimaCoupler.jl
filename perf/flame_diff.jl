@@ -1,15 +1,15 @@
 # flame_diff.jl: provides allocation breakdown for individual backtraces for single-process unthredded runs
 # and check for fractional change in allocation compared to the last staged run
 if isinteractive()
-    buildkite_branch = buildkite_commit = buildkite_bnumber = "none"
+    buildkite_branch = buildkite_commit = buildkite_number = "none"
     buildkite_cc_dir = build_path = "."
     perf_run_no = "1"
 else
     buildkite_branch = ENV["BUILDKITE_BRANCH"]
     buildkite_commit = ENV["BUILDKITE_COMMIT"]
-    buildkite_bnumber = ENV["BUILDKITE_BUILD_NUMBER"]
+    buildkite_number = ENV["BUILDKITE_BUILD_NUMBER"]
     buildkite_cc_dir = "/groups/esm/slurm-buildkite/climacoupler-ci/"
-    build_path = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/$buildkite_bnumber/climacoupler-ci/perf/"
+    build_path = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/$buildkite_number/climacoupler-ci/perf/"
     perf_run_no = ARGS[2]
 end
 

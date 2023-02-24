@@ -30,7 +30,7 @@ include(joinpath(cc_dir, "experiments", "AMIP", "moist_mpi_earth", "cli_options.
 filename = joinpath(cc_dir, "experiments", "AMIP", "moist_mpi_earth", "coupler_driver_modular.jl")
 
 # selected runs for performance analysis and their expected allocations (based on previous runs)
-run_name_list = ["default_modular", "coarse_single_modular", "target_amip_n32_shortrun"]
+run_name_list = ["default_modular", "coarse_single_modular", "target_amip_n32_shortrun", "target_amip_n1_shortrun"]
 run_name = run_name_list[parse(Int, perf_run_no)]
 
 # number of time steps used for profiling
@@ -96,16 +96,15 @@ if haskey(ENV, "BUILDKITE_COMMIT") || haskey(ENV, "BUILDKITE_BRANCH")
     mkpath(output_dir)
     ProfileCanvasDiff.html_file(joinpath(output_dir, "flame_diff.html"), build_path = build_path)
     ProfileCanvasDiff.html_file(
-        joinpath(output_dir, "flame_diff_independent_count.html"),
+        joinpath(output_dir, "flame_diff_self_count.html"),
         build_path = build_path,
-        independent_count = true,
+        self_count = true,
     )
 end
 
 # save (and reset) the stack tree if this is running on the `staging` branch
 @info "This branch is: $buildkite_branch, commit $buildkite_commit"
-profile_data, new_tracked_list =
-    ProfileCanvasDiff.view(Profile.fetch(), tracked_list = tracked_list, independent_count = true);
+profile_data, new_tracked_list = ProfileCanvasDiff.view(Profile.fetch(), tracked_list = tracked_list, self_count = true);
 #if buildkite_branch == "staging"
 isfile(ref_file) ?
 mv(ref_file, joinpath(buildkite_cc_dir, "flame_reference_file.$run_name.$buildkite_commit.jld2"), force = true) :

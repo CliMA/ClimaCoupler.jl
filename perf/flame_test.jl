@@ -5,7 +5,15 @@ include("ProfileCanvasDiff.jl")
 import .ProfileCanvasDiff
 using JLD2
 
-output_dir = "test/"
+if isinteractive()
+    buildkite_cc_dir = build_path = "."
+    perf_run_no = "1"
+else
+    buildkite_cc_dir = "/groups/esm/slurm-buildkite/climacoupler-ci/"
+    build_path = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/$buildkite_bnumber/climacoupler-ci/perf/"
+end
+
+output_dir = joinpath(buildkite_cc_dir, "test/")
 mkpath(output_dir)
 
 # dummy functions to analyse

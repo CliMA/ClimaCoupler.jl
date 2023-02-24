@@ -108,7 +108,8 @@ steps:
 
       - label: ":envelope: Slack report: Slabplanet"
         command:
-          - slack-upload -c "#coupler-reports" -f experiments/AMIP/moist_mpi_earth/output/slabplanet/default_modular_artifacts/total_energy_log_bucket.png -m png -n slab_coarse -x "Slabplanet conservation"
+          - slack-upload -c "#coupler-reports" -f experiments/AMIP/moist_mpi_earth/output/slabplanet/default_modular_artifacts/total_energy_log_bucket.png -m png -n slab_coarse_log -x "Slabplanet energy conservation (log error)"
+          - slack-upload -c "#coupler-reports" -f experiments/AMIP/moist_mpi_earth/output/slabplanet/default_modular_artifacts/total_energy_bucket.png -m png -n slab_coarse -x "Slabplanet energy conservation"
 
       - label: ":envelope: Slack report: target AMIP"
         command:

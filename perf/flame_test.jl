@@ -88,7 +88,7 @@ end
     # load thr disctionary of tracked counts from the reference file
     tracked_list = isfile(ref_file) ? load(ref_file) : Dict{String, Float64}()
 
-    test_func_name = "get_y.flame_test.jl.18"
+    test_func_name = "get_y.flame_test.jl.28"
 
     # test flame diff
     tracked_list["$test_func_name"] = 100

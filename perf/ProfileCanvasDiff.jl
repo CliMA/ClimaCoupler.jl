@@ -75,8 +75,18 @@ function Base.display(_::ProfileDisplay, canvas::ProfileData)
     end
 end
 
-html_file(filename, data = Profile.fetch(); build_path = "", kwargs...) =
-    html_file(filename, build_path = build_path, view(data; kwargs...)[1])
+html_file(
+    filename,
+    data = Profile.fetch();
+    build_path = "",
+    tracked_list = Dict{String, Int}(;),
+    self_count = false,
+    kwargs...,
+) = html_file(
+    filename,
+    build_path = build_path,
+    view(data; tracked_list = tracked_list, self_count = self_count, kwargs...)[1],
+)
 
 function html_file(file::AbstractString, canvas::ProfileData; build_path = "")
     @assert endswith(file, ".html")

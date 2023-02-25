@@ -4,11 +4,13 @@ if isinteractive()
     buildkite_branch = buildkite_commit = buildkite_number = "none"
     buildkite_cc_dir = build_path = "."
     perf_run_no = "1"
+    scratch_cc_dir = "."
 else
     buildkite_branch = ENV["BUILDKITE_BRANCH"]
     buildkite_commit = ENV["BUILDKITE_COMMIT"]
     buildkite_number = ENV["BUILDKITE_BUILD_NUMBER"]
     buildkite_cc_dir = "/groups/esm/slurm-buildkite/climacoupler-ci/"
+    scratch_cc_dir = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/"
     build_path = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/$buildkite_number/climacoupler-ci/perf/"
     perf_run_no = ARGS[2]
 end
@@ -98,6 +100,7 @@ if haskey(ENV, "BUILDKITE_COMMIT") || haskey(ENV, "BUILDKITE_BRANCH")
     ProfileCanvasDiff.html_file(
         joinpath(output_dir, "flame_diff_self_count.html"),
         build_path = build_path,
+        tracked_list = tracked_list,
         self_count = true,
     )
 end
@@ -107,8 +110,7 @@ end
 profile_data, new_tracked_list = ProfileCanvasDiff.view(Profile.fetch(), tracked_list = tracked_list, self_count = true);
 #if buildkite_branch == "staging"
 isfile(ref_file) ?
-mv(ref_file, joinpath(buildkite_cc_dir, "flame_reference_file.$run_name.$buildkite_commit.jld2"), force = true) :
-nothing
+mv(ref_file, joinpath(scratch_cc_dir, "flame_reference_file.$run_name.$buildkite_commit.jld2"), force = true) : nothing
 save(ref_file, new_tracked_list) # reset ref_file upon staging
 #end
 

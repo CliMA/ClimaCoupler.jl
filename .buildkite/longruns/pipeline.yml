@@ -37,6 +37,11 @@ steps:
       - "julia --project=artifacts -e 'using Pkg; Pkg.status()'"
       - "julia --project=artifacts artifacts/download_artifacts.jl"
 
+      - echo "--- Instantiate perf env"
+      - "julia --project=perf/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=perf/ -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=perf/ -e 'using Pkg; Pkg.status()'"
+
     agents:
       slurm_cpus_per_task: 8
     env:
@@ -72,7 +77,7 @@ steps:
 
       - label: "AMIP: perf"
         key: "target_amip_n1_shortrun"
-        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --run_name target_amip_n1_shortrun --enable_threading false --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad allskywithclear --z_elem 50 --dz_top 3000 --dz_bottom 30 --h_elem 16 --kappa_4 1e16 --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --dt_cpl 150 --dt 150secs --dt_rad 1hours --idealized_insolation false --FLOAT_TYPE Float64 --energy_check false --mode_name amip --t_end 0.01days --dt_save_to_sol 10days --mono_surface false --precip_model 0M"
+        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --run_name target_amip_n1_shortrun --enable_threading true --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad allskywithclear --z_elem 50 --dz_top 3000 --dz_bottom 30 --h_elem 16 --kappa_4 1e16 --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --dt_cpl 150 --dt 150secs --dt_rad 1hours --idealized_insolation false --FLOAT_TYPE Float64 --energy_check false --mode_name amip --t_end 0.01days --dt_save_to_sol 10days --mono_surface false --precip_model 0M"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/target_amip_n1_shortrun_artifacts/*"
         env:
           FLAME_PLOT: ""
@@ -85,6 +90,18 @@ steps:
         key: "modular_amip"
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --run_name coarse_single_modular --enable_threading true --coupled true  --surface_scheme bulk --moist equil --vert_diff true --rad gray --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface false --h_elem 6 --dt_save_restart 10days --precip_model 0M"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/coarse_single_artifacts/*"
+        env:
+          FLAME_PLOT: ""
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks: 1
+          slurm_mem_per_cpu: 16G
+
+      - label: "AMIP: perf"
+        key: "test"
+        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --run_name target_amip_n1_shortrun2  --enable_threading true --coupled true  --surface_scheme bulk --moist equil --vert_diff true --rad gray --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface false --h_elem 6 --dt_save_restart 10days --precip_model 0M"
+        artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/coarse_single_artifacts/*"
+        artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/target_amip_n1_shortrun2_artifacts/*"
         env:
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""

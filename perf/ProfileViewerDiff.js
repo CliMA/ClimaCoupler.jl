@@ -451,15 +451,15 @@ export class ProfileViewer {
     }
     // modifies the normal color by three stable random values drawn from a
     // PRNG seeded by the node hash
-    modifyNodeColorByHash(r, g, b, hash, range = 70) {
+    modifyNodeColorByHash(r, g, b, hash, range = 255) {
         const rng = this.mulberry32(hash);
         if (r === g && g === b) {
             r = g = b = Math.min(255, Math.max(0, r + (rng() - 0.5) * range));
         }
         else {
-            r = Math.min(255, Math.max(0, r + (rng() - 0.5) * range));
-            g = Math.min(255, Math.max(0, g + (rng() - 0.5) * range));
-            b = Math.min(255, Math.max(0, b + (rng() - 0.5) * range));
+            r = Math.min(range, Math.max(0, r + (rng() - 0.5) * range));
+            g = Math.min(range, Math.max(0, g + (rng() - 0.5) * range));
+            b = Math.min(range, Math.max(0, b + (rng() - 0.5) * range));
         }
         return {
             r,
@@ -510,16 +510,21 @@ export class ProfileViewer {
         // if (node.count > 0) {
         // better performance
         ;
-        if (node.count_change > 100) {
-            ({ r, g, b } = this.modifyNodeColorByCount(0, 0, 0, node.count_change ));
+        if (node.count_change / node.count > 100) {
+            ({ r, g, b } = this.modifyNodeColorByCount(0, 0, 0, node.count_change / node.count ));
         }
-        else if (node.count_change < 0) {
-            ({ r, g, b } = this.modifyNodeColorByCount(255, 255, 255, - node.count_change ));
-            r = 255;
+        else if (node.count_change/ node.count > 0) {
+            ({ r, g, b } = this.modifyNodeColorByCount(255, 255, 255, node.count_change / node.count ));
+            r = 255 - 20;
+            g = g - 20;
+            b = b - 20;
+
         }
         else {
-            ({ r, g, b } = this.modifyNodeColorByCount(255, 255, 255, node.count_change ));
-            b = 255;
+            ({ r, g, b } = this.modifyNodeColorByCount(255, 255, 255, - node.count_change / node.count ));
+            b = 255 - 20;
+            g = g - 20;
+            r = r - 20;
         }
 
         return {

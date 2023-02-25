@@ -108,32 +108,9 @@ end
 # save (and reset) the stack tree if this is running on the `staging` branch
 @info "This branch is: $buildkite_branch, commit $buildkite_commit"
 profile_data, new_tracked_list = ProfileCanvasDiff.view(Profile.fetch(), tracked_list = tracked_list, self_count = true);
-#if buildkite_branch == "staging"
-isfile(ref_file) ?
-mv(ref_file, joinpath(scratch_cc_dir, "flame_reference_file.$run_name.$buildkite_commit.jld2"), force = true) : nothing
-save(ref_file, new_tracked_list) # reset ref_file upon staging
-#end
-
-
-
-# tesr
-
-
-# rr.data["all"].children[1].children[1].children[1].children[1].children[1].children[1].children[1].children[1].children[1].children[1].children[1].children[1].children[2].children
-
-# function step_coupler!(cs, n)
-#     m = add_n!(n)
-#     times_minus_n!(m)
-
-# end
-
-# function add_n!(n)
-#     n + n
-# end
-
-# function times_minus_n!(n)
-#     f = 300 * zeros(3000)
-#     b = (n * n - n) .+ f
-#     sqrt.(b)
-# end
-# cs = []
+if buildkite_branch == "staging"
+    isfile(ref_file) ?
+    mv(ref_file, joinpath(scratch_cc_dir, "flame_reference_file.$run_name.$buildkite_commit.jld2"), force = true) :
+    nothing
+    save(ref_file, new_tracked_list) # reset ref_file upon staging
+end

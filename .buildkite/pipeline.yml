@@ -163,7 +163,7 @@ steps:
       - label: "AMIP - modular"
         key: "modular_amip"
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --run_name coarse_single_modular --enable_threading true --coupled true  --surface_scheme bulk --moist equil --vert_diff true --rad gray --energy_check false --mode_name amip --anim true --t_end 32days --dt_save_to_sol 1days --dt_cpl 400 --dt 400secs --mono_surface false --h_elem 6 --dt_save_restart 10days --precip_model 0M"
-        artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/coarse_single_artifacts/*"
+        artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/coarse_single_modular_artifacts/*"
         env:
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""

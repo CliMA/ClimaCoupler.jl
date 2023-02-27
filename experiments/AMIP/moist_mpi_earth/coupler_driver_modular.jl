@@ -75,8 +75,8 @@ if isinteractive()
     parsed_args["moist"] = "equil" #hide
     parsed_args["vert_diff"] = true #hide
     parsed_args["rad"] = "gray" #hide
-    # parsed_args["energy_check"] = true #hide
-    parsed_args["mode_name"] = "amip" #hide
+    parsed_args["energy_check"] = true #hide
+    parsed_args["mode_name"] = "slabplanet" #hide
     parsed_args["t_end"] = "10days" #hide
     parsed_args["dt_save_to_sol"] = "3600secs" #hide
     parsed_args["dt_cpl"] = 200 #hide

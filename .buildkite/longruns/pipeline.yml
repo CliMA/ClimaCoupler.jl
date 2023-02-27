@@ -77,7 +77,7 @@ steps:
 
       - label: "AMIP: perf"
         key: "amip_shortrun"
-        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --run_name target_amip_n1_shortrun --enable_threading false --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad gray --z_elem 50 --dz_top 3000 --dz_bottom 30 --h_elem 16 --kappa_4 1e16 --z_stretch false --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --dt_cpl 150 --dt 150secs --dt_rad 1hours --FLOAT_TYPE Float64 --energy_check false --mode_name amip --t_end 5days --dt_save_to_sol 0.01days --mono_surface false --precip_model 0M"
+        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --run_name target_amip_n1_shortrun --enable_threading false --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad gray --z_elem 50 --dz_top 3000 --dz_bottom 30 --h_elem 16 --kappa_4 1e16 --z_stretch false --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --dt_cpl 150 --dt 150secs --dt_rad 1hours --FLOAT_TYPE Float64 --energy_check false --mode_name amip --t_end 0.01days --dt_save_to_sol 1days --mono_surface false --precip_model 0M"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/target_amip_n1_shortrun_artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""

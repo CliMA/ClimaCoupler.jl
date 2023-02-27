@@ -1,10 +1,18 @@
 # flame_diff.jl: provides allocation breakdown for individual backtraces for single-process unthredded runs
 # and check for fractional change in allocation compared to the last staged run
+
+import Profile
+using Test
+import Base: view
+include("ProfileCanvasDiff.jl")
+import .ProfileCanvasDiff
+using JLD2
+
 if isinteractive()
     buildkite_branch = buildkite_commit = buildkite_number = "none"
     buildkite_cc_dir = build_path = "."
-    perf_run_no = "1"
     scratch_cc_dir = "."
+    perf_run_no = "1"
 else
     buildkite_branch = ENV["BUILDKITE_BRANCH"]
     buildkite_commit = ENV["BUILDKITE_COMMIT"]
@@ -14,25 +22,11 @@ else
     buildkite_cc_dir = "/groups/esm/slurm-buildkite/climacoupler-ci/"
     scratch_cc_dir = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/"
     build_path = joinpath(buildkite_build_path, buildkite_pipeline_slug, buildkite_number, buildkite_pipeline_slug, "perf/")
-    #build_path = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/$buildkite_number/climacoupler-ci/perf/"
-
     perf_run_no = ARGS[2]
 end
 
-@info build_path
-@info BUILDKITE_BUILD_PATH
-@info buildkite_pipeline_slug
-
-
 cwd = pwd()
 @info "build_path is: $build_path"
-
-import Profile
-using Test
-import Base: view
-include("ProfileCanvasDiff.jl")
-import .ProfileCanvasDiff
-using JLD2
 
 cc_dir = joinpath(dirname(@__DIR__));
 include(joinpath(cc_dir, "experiments", "AMIP", "moist_mpi_earth", "cli_options.jl"));

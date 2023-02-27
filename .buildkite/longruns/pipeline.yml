@@ -82,7 +82,6 @@ steps:
         env:
           BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks: 1
           slurm_mem_per_cpu: 16G
 
       - wait
@@ -93,7 +92,6 @@ steps:
         agents:
           slurm_mem: 20GB
 
-
       - wait
 
       # plot job performance history
@@ -102,7 +100,6 @@ steps:
           - build_history staging # name of branch to plot
         artifact_paths:
           - "build_history.html"
-
 
       - wait
 

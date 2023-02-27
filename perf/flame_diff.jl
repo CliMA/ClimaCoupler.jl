@@ -9,14 +9,20 @@ else
     buildkite_branch = ENV["BUILDKITE_BRANCH"]
     buildkite_commit = ENV["BUILDKITE_COMMIT"]
     buildkite_number = ENV["BUILDKITE_BUILD_NUMBER"]
-    BUILDKITE_BUILD_PATH = ENV["BUILDKITE_BUILD_PATH"]
+    buildkite_build_path = ENV["BUILDKITE_BUILD_PATH"]
+    buildkite_pipeline_slug = ENV["BUILDKITE_PIPELINE_SLUG"]
     buildkite_cc_dir = "/groups/esm/slurm-buildkite/climacoupler-ci/"
     scratch_cc_dir = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/"
-    build_path = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/$buildkite_number/climacoupler-ci/perf/"
+    build_path = joinpaths(buildkite_build_path, buildkite_pipeline_slug, buildkite_number, buildkite_pipeline_slug, "perf/")
+    #build_path = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/$buildkite_number/climacoupler-ci/perf/"
+
     perf_run_no = ARGS[2]
 end
 
+@info build_path
 @info BUILDKITE_BUILD_PATH
+@info buildkite_pipeline_slug
+
 
 cwd = pwd()
 @info "build_path is: $build_path"

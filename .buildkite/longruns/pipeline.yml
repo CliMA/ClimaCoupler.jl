@@ -54,15 +54,15 @@ steps:
 
     steps:
 
-      # - label: "Moist earth with slab surface - notmono + modular: bulk gray no_sponge idealinsol freq_dt_cpl"
-      #   key: "modular slabplanet"
-      #   command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --run_name default_modular --enable_threading true --coupled true --surface_scheme bulk  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface false --h_elem 4 --precip_model 0M"
-      #   artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/default_modular_artifacts/total_energy*.png"
-      #   env:
-      #     BUILD_HISTORY_HANDLE: ""
-      #   agents:
-      #     slurm_ntasks: 1
-      #     slurm_mem_per_cpu: 16G
+      - label: "Moist earth with slab surface - notmono + modular: bulk gray no_sponge idealinsol freq_dt_cpl"
+        key: "modular slabplanet"
+        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --run_name default_modular --enable_threading true --coupled true --surface_scheme bulk  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface false --h_elem 4 --precip_model 0M"
+        artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/default_modular_artifacts/total_energy*.png"
+        env:
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks: 1
+          slurm_mem_per_cpu: 16G
 
       # - label: "AMIP"
       #   key: "target amip n32 longrun"

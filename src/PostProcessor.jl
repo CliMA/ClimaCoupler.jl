@@ -27,25 +27,25 @@ struct RawData <: PostProcessedData end
 
 A container for storing the tyoe, name, data and coordinates of a variable.
 """
-struct DataPackage{PPD <: PostProcessedData, NTC <: NamedTuple} # TODO: add long name (ppp info) and units
+struct DataPackage{PPD <: PostProcessedData, NTC <: NamedTuple, A <: Union{Fields.Field, AbstractArray}} # TODO: add long name (ppp info) and units
     tag::PPD
     name::String
-    data::Union{Fields.Field, Array}
+    data::A
     coords::NTC
 end
-function DataPackage(tag::ZLatLonData, name::Symbol, data::Array; coords = coords)
+function DataPackage(tag::ZLatLonData, name::Symbol, data::AbstractArray; coords = coords)
     DataPackage(tag, string(name), data, (; lev = coords.lev, lat = coords.lat, lon = coords.lon))
 end
-function DataPackage(tag::ZLatData, name::Symbol, data::Array; coords = coords)
+function DataPackage(tag::ZLatData, name::Symbol, data::AbstractArray; coords = coords)
     DataPackage(tag, string(name), data, (; lev = coords.lev, lat = coords.lat))
 end
-function DataPackage(tag::LatLonData, name::Symbol, data::Array; coords = coords)
+function DataPackage(tag::LatLonData, name::Symbol, data::AbstractArray; coords = coords)
     DataPackage(tag, string(name), data, (; lat = coords.lat, lon = coords.lon))
 end
-function DataPackage(tag::LatData, name::Symbol, data::Array; coords = coords)
+function DataPackage(tag::LatData, name::Symbol, data::AbstractArray; coords = coords)
     DataPackage(tag, string(name), data, (; lat = coords.lat))
 end
-function DataPackage(tag::RawData, name::Symbol, data::Union{Array, Fields.Field}; coords = nothing)
+function DataPackage(tag::RawData, name::Symbol, data::Union{AbstractArray, Fields.Field}; coords = nothing)
     DataPackage(tag, string(name), data, (;))
 end
 
@@ -83,7 +83,7 @@ function postprocess(
     datafile_latlon = nothing,
     nlat = 90,
     nlon = 180,
-    REGRID_DIR = "posrprocess_regrid_tmp/",
+    REGRID_DIR = "postprocess_regrid_tmp/",
     coords = (;),
     raw_tag = RawData(),
 )

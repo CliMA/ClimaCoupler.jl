@@ -86,7 +86,7 @@ steps:
 
       # - wait
 
-      - label: ":rocket: performance: flame graph diff: target_amip_n1_shortrun"
+      - label: ":rocket: performance: flame graph diff: perf_target_amip_n1_shortrun"
         command: "julia --color=yes --project=perf perf/flame_diff.jl --run_name 4"
         artifact_paths: "perf/output/perf_diff_target_amip_n1_shortrun/*"
         agents:

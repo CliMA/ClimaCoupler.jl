@@ -8,22 +8,15 @@ include("ProfileCanvasDiff.jl")
 import .ProfileCanvasDiff
 using JLD2
 
-if isinteractive()
-    buildkite_branch = buildkite_commit = buildkite_number = "none"
-    buildkite_cc_dir = build_path = "."
-    scratch_cc_dir = "."
-    perf_run_no = "1"
-else
-    buildkite_branch = ENV["BUILDKITE_BRANCH"]
-    buildkite_commit = ENV["BUILDKITE_COMMIT"]
-    buildkite_number = ENV["BUILDKITE_BUILD_NUMBER"]
-    buildkite_build_path = ENV["BUILDKITE_BUILD_PATH"]
-    buildkite_pipeline_slug = ENV["BUILDKITE_PIPELINE_SLUG"]
-    buildkite_cc_dir = "/groups/esm/slurm-buildkite/climacoupler-ci/"
-    scratch_cc_dir = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/"
-    build_path = joinpath(buildkite_build_path, buildkite_pipeline_slug, buildkite_number, buildkite_pipeline_slug, "perf/")
-    perf_run_no = ARGS[2]
-end
+buildkite_branch = ENV["BUILDKITE_BRANCH"]
+buildkite_commit = ENV["BUILDKITE_COMMIT"]
+buildkite_number = ENV["BUILDKITE_BUILD_NUMBER"]
+buildkite_build_path = ENV["BUILDKITE_BUILD_PATH"]
+buildkite_pipeline_slug = ENV["BUILDKITE_PIPELINE_SLUG"]
+buildkite_cc_dir = "/groups/esm/slurm-buildkite/climacoupler-ci/"
+scratch_cc_dir = joinpath(buildkite_build_path, buildkite_pipeline_slug)
+build_path = joinpath(buildkite_build_path, buildkite_pipeline_slug, buildkite_number, buildkite_pipeline_slug, "perf/")
+perf_run_no = ARGS[2]
 
 cwd = pwd()
 @info "build_path is: $build_path"
@@ -55,23 +48,15 @@ parsed_args["run_name"] = run_name
 parsed_args["enable_threading"] = false
 
 @info run_name
-
-if !isinteractive()
-    function step_coupler!(cs, n_samples)
-        cs.tspan[1] = cs.model_sims.atmos_sim.integrator.t
-        cs.tspan[2] = cs.tspan[1] + n_samples * cs.Δt_cpl
-        solve_coupler!(cs)
-    end
-
-    try # initialize the coupler
-        ENV["CI_PERF_SKIP_COUPLED_RUN"] = true
-        include(filename)
-    catch err
-        if err.error !== :exit_profile_init
-            rethrow(err.error)
-        end
+try # initialize the coupler
+    ENV["CI_PERF_SKIP_COUPLED_RUN"] = true
+    include(filename)
+catch err
+    if err.error !== :exit_profile_init
+        rethrow(err.error)
     end
 end
+
 #####
 ##### Profiling
 #####
@@ -83,11 +68,9 @@ tracked_list = isfile(ref_file) ? load(ref_file) : Dict{String, Float64}()
 # compile coupling loop first
 step_coupler!(cs, n_samples)
 
-if !isinteractive()
-    # clear compiler allocs
-    Profile.clear_malloc_data()
-    Profile.clear()
-end
+# clear compiler allocs
+Profile.clear_malloc_data()
+Profile.clear()
 
 # profile the coupling loop
 prof = Profile.@profile begin

@@ -49,7 +49,6 @@ parsed_args["enable_threading"] = false
 
 @info run_name
 try # initialize the coupler
-    ENV["CI_PERF_SKIP_COUPLED_RUN"] = true
     include(filename)
 catch err
     if err.error !== :exit_profile_init

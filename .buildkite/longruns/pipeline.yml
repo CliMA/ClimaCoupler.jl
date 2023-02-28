@@ -75,8 +75,6 @@ steps:
           slurm_ntasks: 32
           slurm_mem_per_cpu: 16G
 
-      # - wait
-
       # Arguments passed from the ci pipeline.yml
       - label: ":rocket: performance: flame graph diff: perf_target_amip_n1_shortrun"
         command: "julia --color=yes --project=perf perf/flame_diff.jl --run_name 4"

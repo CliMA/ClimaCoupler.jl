@@ -99,9 +99,9 @@ end
 # save (and reset) the stack tree if this is running on the `staging` branch
 @info "This branch is: $buildkite_branch, commit $buildkite_commit"
 profile_data, new_tracked_list = ProfileCanvasDiff.view(Profile.fetch(), tracked_list = tracked_list, self_count = true);
-if buildkite_branch == "staging"
-    isfile(ref_file) ?
-    mv(ref_file, joinpath(scratch_cc_dir, "flame_reference_file.$run_name.$buildkite_commit.jld2"), force = true) :
-    nothing
-    save(ref_file, new_tracked_list) # reset ref_file upon staging
-end
+# if buildkite_branch == "staging"
+isfile(ref_file) ?
+mv(ref_file, joinpath(scratch_cc_dir, "flame_reference_file.$run_name.$buildkite_commit.jld2"), force = true) :
+nothing
+save(ref_file, new_tracked_list) # reset ref_file upon staging
+# end

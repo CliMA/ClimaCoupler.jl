@@ -21,7 +21,7 @@ mutable struct ProfileFrame
     flags::UInt8 # any or all of ProfileFrameFlag
     taskId::Union{Missing, UInt}
     children::Vector{ProfileFrame}
-    count_change::Float64 # fractional change in count: (new - old) / old 
+    count_change::Float64 # change in count or self_count: (new - old)
 end
 
 struct ProfileDisplay <: Base.Multimedia.AbstractDisplay end
@@ -75,8 +75,18 @@ function Base.display(_::ProfileDisplay, canvas::ProfileData)
     end
 end
 
-html_file(filename, data = Profile.fetch(); build_path = "", kwargs...) =
-    html_file(filename, build_path = build_path, view(data; kwargs...))
+html_file(
+    filename,
+    data = Profile.fetch();
+    build_path = "",
+    tracked_list = Dict{String, Int}(;),
+    self_count = false,
+    kwargs...,
+) = html_file(
+    filename,
+    build_path = build_path,
+    view(data; tracked_list = tracked_list, self_count = self_count, kwargs...)[1],
+)
 
 function html_file(file::AbstractString, canvas::ProfileData; build_path = "")
     @assert endswith(file, ".html")
@@ -130,8 +140,11 @@ const ProfileFrameFlag = (
     TaskEvent = UInt8(2^4),
 )
 
-function view(data = Profile.fetch(); C = false, tracked_list = Dict{String, Int}(;), build_path = "", kwargs...)
+function view(data = Profile.fetch(); C = false, tracked_list = Dict{String, Int}(;), self_count = false, kwargs...)
+
     d = Dict{String, ProfileFrame}()
+
+    new_tracked_list = Dict{String, Int}(;)
 
     if VERSION >= v"1.8.0-DEV.460"
         threads = ["all", 1:Threads.nthreads()...]
@@ -148,16 +161,102 @@ function view(data = Profile.fetch(); C = false, tracked_list = Dict{String, Int
     data_u64 = convert(Vector{UInt64}, data)
     for thread in threads
         graph = stackframetree(data_u64, lidict; thread = thread, kwargs...)
-        d[string(thread)] = make_tree(
+        curr_tree = make_tree(
             ProfileFrame("root", "", "", 0, graph.count, missing, 0x0, missing, ProfileFrame[], 999), #root process
             graph;
             C = C,
             tracked_list = tracked_list,
             kwargs...,
         )
+
+        # if self_count, convert counts (current function + children) to self_counts (current function only)
+        curr_tree = self_count ? iterate_self_change!(curr_tree, tracked_list) : curr_tree
+
+        # create a new Dict with the counts of the current job
+        new_tracked_list = log_counts(curr_tree)
+
+        d[string(thread)] = curr_tree
+
     end
 
-    return ProfileData(d, "Thread")
+
+    return (ProfileData(d, "Thread"), new_tracked_list)
+end
+
+"""
+    iterate_self_change!(flame_tree::Main.ProfileCanvasDiff.ProfileFrame, tracked_list::Dict)
+
+Iterates over all child nodes of the flame_tree, calling `collect_self_change!`.
+"""
+function iterate_self_change!(flame_tree::Main.ProfileCanvasDiff.ProfileFrame, tracked_list::Dict)
+
+    if isempty(flame_tree.children)
+        child_sum = 0
+        collect_self_change!(flame_tree, child_sum, tracked_list)
+    else
+        child_sum = sum(map(x -> x.count, flame_tree.children))
+        collect_self_change!(flame_tree, child_sum, tracked_list)
+        for sf in flame_tree.children
+            iterate_self_change!(sf, tracked_list)
+
+        end
+    end
+    return flame_tree
+end
+
+"""
+    collect_self_change!(flame_tree::Main.ProfileCanvasDiff.ProfileFrame, child_sum::Int, tracked_list::Dict)
+
+Collects information on the change in allocation by individual functions
+(minus the allocation of their children) between the current and the reference jobs.
+"""
+function collect_self_change!(flame_tree::Main.ProfileCanvasDiff.ProfileFrame, child_sum::Int, tracked_list::Dict)
+    func = string(flame_tree.func)
+    line = string(flame_tree.line)
+    file = string(flame_tree.file)
+
+    func_sign = "self_count_$func.$file.$line"
+    current_self_count = flame_tree.count - child_sum
+    old_self_count = func_sign in keys(tracked_list) ? tracked_list[func_sign] : -999 * flame_tree.count # if not found, this will be marked untracked
+
+    overall_count_change = deepcopy(flame_tree.count_change)
+    flame_tree.count_change = (current_self_count - old_self_count)
+
+    (overall_count_change, old_self_count) =
+        old_self_count < 0 ? ("untracked", "untracked") : (overall_count_change, old_self_count)
+
+    flame_tree.countLabel =
+        string(flame_tree.count) *
+        " samples \n ∑child_count = $child_sum counts \n Δcount = $overall_count_change counts \n Δself_count = $current_self_count - $old_self_count =" *
+        string(flame_tree.count_change) *
+        " counts \n "
+end
+
+"""
+    log_counts(flame_tree::Main.ProfileCanvasDiff.ProfileFrame, ct = 0, dict = Dict{String, Float64}())
+
+Iterate over all children of a stack tree and save their names ("\$func.\$file.\$line") and
+corresponding count values in a Dict.
+"""
+function log_counts(flame_tree::Main.ProfileCanvasDiff.ProfileFrame, ct = 0, dict = Dict{String, Float64}())
+    ct += 1
+    line = flame_tree.line
+    file = flame_tree.file
+    func = flame_tree.func
+    push!(dict, "$func.$file.$line" => flame_tree.count)
+
+    if isempty(flame_tree.children)
+        # 0 upstream contribution if end child
+        push!(dict, "self_count_$func.$file.$line" => flame_tree.count)
+
+    else
+        child_sum = sum(map(x -> x.count, flame_tree.children))
+        push!(dict, "self_count_$func.$file.$line" => flame_tree.count - child_sum)
+        for sf in flame_tree.children
+            log_counts(sf, ct, dict)
+        end
+    end
+    return dict
 end
 
 function stackframetree(data_u64, lidict; thread = nothing, combine = true, recur = :off)
@@ -208,15 +307,18 @@ end
 
 function add_child(graph::ProfileFrame, node, C::Bool; tracked_list = Dict{String, Int}(;))
     name = string(node.frame.file)
-    func = String(node.frame.func)
-    line = node.frame.line
-    file = node.frame.file
+    func = string(node.frame.func)
+    line = string(node.frame.line)
+    file = basename(string(node.frame.file))
+    func_sign = "$func.$file.$line"
 
     if func == ""
         func = "unknown"
     end
 
-    count_old = func in keys(tracked_list) ? tracked_list["$func.$file.$line"] : 999
+    old_count = func_sign in keys(tracked_list) ? tracked_list[func_sign] : 999
+    current_count = Float64(node.count)
+
     frame = ProfileFrame(
         func,
         basename(name),
@@ -227,7 +329,7 @@ function add_child(graph::ProfileFrame, node, C::Bool; tracked_list = Dict{Strin
         status(node, C),
         missing,
         ProfileFrame[],
-        (Float64(node.count) - Float64(count_old)) / Float64(count_old),
+        current_count - Float64(old_count),
     )
 
     push!(graph.children, frame)

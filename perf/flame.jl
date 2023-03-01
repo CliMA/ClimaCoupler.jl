@@ -13,10 +13,11 @@ include(joinpath(cc_dir, "experiments", "AMIP", "moist_mpi_earth", "cli_options.
 filename = joinpath(cc_dir, "experiments", "AMIP", "moist_mpi_earth", "coupler_driver_modular.jl")
 
 # selected runs for performance analysis and their expected allocations (based on previous runs)
-run_name_list = ["default_modular", "coarse_single_modular", "target_amip_n32_shortrun"]
+run_name_list =
+    ["default_modular_unthreaded", "coarse_single_modular", "target_amip_n32_shortrun", "target_amip_n1_shortrun"]
 run_name = run_name_list[parse(Int, ARGS[2])]
 allocs_limit = Dict()
-allocs_limit["perf_default_modular"] = 2685744
+allocs_limit["perf_default_modular_unthreaded"] = 2685744
 allocs_limit["perf_coarse_single_modular"] = 3864624
 allocs_limit["perf_target_amip_n32_shortrun"] = 172134848
 

@@ -11,9 +11,11 @@ using JLD2
 buildkite_branch = ENV["BUILDKITE_BRANCH"]
 buildkite_commit = ENV["BUILDKITE_COMMIT"]
 buildkite_number = ENV["BUILDKITE_BUILD_NUMBER"]
+buildkite_build_path = ENV["BUILDKITE_BUILD_PATH"]
+buildkite_pipeline_slug = ENV["BUILDKITE_PIPELINE_SLUG"]
 buildkite_cc_dir = "/groups/esm/slurm-buildkite/climacoupler-ci/"
-scratch_cc_dir = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/"
-build_path = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/$buildkite_number/climacoupler-ci/perf/"
+scratch_cc_dir = joinpath(buildkite_build_path, buildkite_pipeline_slug)
+build_path = joinpath(buildkite_build_path, buildkite_pipeline_slug, buildkite_number, buildkite_pipeline_slug, "perf/")
 perf_run_no = ARGS[2]
 
 cwd = pwd()
@@ -26,7 +28,8 @@ include(joinpath(cc_dir, "experiments", "AMIP", "moist_mpi_earth", "cli_options.
 filename = joinpath(cc_dir, "experiments", "AMIP", "moist_mpi_earth", "coupler_driver_modular.jl")
 
 # selected runs for performance analysis and their expected allocations (based on previous runs)
-run_name_list = ["default_modular", "coarse_single_modular", "target_amip_n32_shortrun", "target_amip_n1_shortrun"]
+run_name_list =
+    ["default_modular_unthreaded", "coarse_single_modular", "target_amip_n32_shortrun", "target_amip_n1_shortrun"]
 run_name = run_name_list[parse(Int, perf_run_no)]
 
 # number of time steps used for profiling
@@ -74,7 +77,6 @@ else
     tracked_list = Dict{String, Float64}()
     @warn "FlameGraphDiff: No reference file: $ref_file found"
 end
-
 
 # compile coupling loop first
 step_coupler!(cs, n_samples)

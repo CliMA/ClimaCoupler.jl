@@ -9,8 +9,8 @@ include("plot_helper.jl")
         files_root = ".hdf5",
         fig_name = "amip_paperplots",
     )
-Coordinates the postprocessing and plotting of sample fields (specified in `post_spec`) 
-of the last monthly mean file. Any specific plot customization should be done here. 
+Coordinates the postprocessing and plotting of sample fields (specified in `post_spec`)
+of the last monthly mean file. Any specific plot customization should be done here.
 """
 function amip_paperplots(
     post_spec::NamedTuple,
@@ -32,6 +32,7 @@ function amip_paperplots(
 
         # postprocess
         post_data = postprocess(name, diag_data, getproperty(post_spec, name))
+        post_data.data[1] = sum(post_data.data) == 0 ? post_data.data[1] + eps() : post_data.data[1] # avoids InexactError
 
         # create individual plots
         p = plot(
@@ -61,7 +62,7 @@ end
 """
     read_latest_model_data(name::Symbol, filedir::String, root::String)
 
-Reads in a variable from a HDF5 file, as outputted by `ClimaCoupler.Dignostics`. 
+Reads in a variable from a HDF5 file, as outputted by `ClimaCoupler.Dignostics`.
 """
 function read_latest_model_data(name::Symbol, filedir::String, root::String)
 

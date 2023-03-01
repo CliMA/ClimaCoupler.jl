@@ -7,7 +7,6 @@ using JLD2
 
 if isinteractive()
     buildkite_cc_dir = build_path = "."
-    perf_run_no = "1"
 else
     buildkite_number = ENV["BUILDKITE_BUILD_NUMBER"]
     buildkite_cc_dir = "/groups/esm/slurm-buildkite/climacoupler-ci/"
@@ -88,7 +87,7 @@ end
     # load the dictionary of tracked counts from the reference file
     tracked_list = isfile(ref_file) ? load(ref_file) : Dict{String, Float64}()
 
-    test_func_name = "get_y.flame_test.jl.28"
+    test_func_name = "get_y.flame_test.jl.26"
 
     # test flame diff
     tracked_list["$test_func_name"] = 100  # reference value for node count with child sum

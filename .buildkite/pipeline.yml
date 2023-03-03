@@ -128,6 +128,16 @@ steps:
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --run_name default_modular --enable_threading true --coupled true --surface_scheme bulk  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface false --h_elem 4 --precip_model 0M"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/default_modular_artifacts/total_energy*.png"
         env:
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks: 1
+          slurm_mem_per_cpu: 16G
+
+      - label: "Moist earth with slab surface (unthreaded) - notmono + modular: bulk gray no_sponge idealinsol freq_dt_cpl"
+        key: "modular_slabplanet_unthreaded"
+        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --run_name default_modular_unthreaded --enable_threading true --coupled true --surface_scheme bulk  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface false --h_elem 4 --precip_model 0M"
+        artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/default_modular_unthreaded_artifacts/total_energy*.png"
+        env:
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""
         agents:
@@ -183,21 +193,20 @@ steps:
         agents:
           slurm_ntasks: 2
 
-      - label: "MPI AMIP FINE"
-        key: "mpi_amip_fine"
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --run_name target_amip_n32_shortrun --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad allskywithclear --z_elem 50 --dz_top 3000 --dz_bottom 30 --h_elem 16 --kappa_4 1e16 --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --dt_cpl 150 --dt 150secs --dt_rad 1hours --idealized_insolation false --FLOAT_TYPE Float64 --energy_check false --mode_name amip --t_end 5days --dt_save_to_sol 10days --mono_surface false --precip_model 0M"
-        artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/target_amip_n32_shortrun_artifacts/*"
+      # short high-res performance test
+      - label: "Unthreaded AMIP FINE" # also reported by longruns with a flame graph
+        key: "unthreaded_amip_fine"
+        command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver_modular.jl --run_name target_amip_n1_shortrun --enable_threading false --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad gray --z_elem 50 --dz_top 3000 --dz_bottom 30 --h_elem 16 --kappa_4 1e16 --z_stretch false --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --dt_cpl 150 --dt 150secs --dt_rad 1hours --FLOAT_TYPE Float64 --energy_check false --mode_name amip --t_end 0.01days --dt_save_to_sol 1days --mono_surface false --precip_model 0M"
+        artifact_paths: "experiments/AMIP/moist_mpi_earth/output/amip/target_amip_n1_shortrun_artifacts/*"
         env:
-          CLIMACORE_DISTRIBUTED: "MPI"
           BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks: 32
           slurm_mem_per_cpu: 16G
 
-      # performance tests
-      - label: ":rocket: flame graph and allocation tests: perf_default_modular"
+      # flame graphs + allocation tests
+      - label: ":rocket: flame graph and allocation tests: perf_default_modular_unthreaded"
         command: "julia --color=yes --project=perf perf/flame.jl --run_name 1"
-        artifact_paths: "perf/output/perf_default_modular/*"
+        artifact_paths: "perf/output/perf_default_modular_unthreaded/*"
         agents:
           slurm_mem: 20GB
 
@@ -207,15 +216,9 @@ steps:
         agents:
           slurm_mem: 20GB
 
-      - label: ":rocket: flame graph and allocation tests: perf_target_amip_n32_shortrun"
-        command: "julia --color=yes --project=perf perf/flame.jl --run_name 3"
-        artifact_paths: "perf/output/perf_target_amip_n32_shortrun/*"
-        agents:
-          slurm_mem: 20GB
-
-      - label: ":rocket: performance: flame graph diff: perf_default_modular"
+      - label: ":rocket: performance: flame graph diff: perf_default_modular_unthreaded"
         command: "julia --color=yes --project=perf perf/flame_diff.jl --run_name 1"
-        artifact_paths: "perf/output/perf_diff_default_modular/*"
+        artifact_paths: "perf/output/perf_diff_default_modular_unthreaded/*"
         agents:
           slurm_mem: 20GB
 

@@ -181,6 +181,10 @@ steps:
           slurm_ntasks: 1
           slurm_mem_per_cpu: 16G
 
+      - label: "AMIP - modular, Float32 test" # Issue #271
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name coarse_single_modular_ft32 --enable_threading true --coupled true  --surface_scheme monin_obukhov --moist equil --vert_diff true --rad gray --energy_check false --mode_name amip --anim true --t_end 10days --dt_save_to_sol 100days --dt_cpl 200 --dt 200secs --mono_surface true --h_elem 6 --dt_save_restart 10days --precip_model 0M"
+        artifact_paths: "experiments/AMIP/modular/output/amip/coarse_single_modular_ft32_artifacts/*"
+
       - label: "sea_breeze"
         command: "julia --color=yes --project=experiments/ClimaCore/sea_breeze experiments/ClimaCore/sea_breeze/run.jl"
         artifact_paths: "sea_breeze/"

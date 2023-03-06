@@ -409,13 +409,15 @@ function update_masks!(cs::CoupledSimulation)
     # static mask
     land_s = cs.surface_masks.land
 
-    cs.surface_masks.ice .= min.(ice_d .+ land_s, FT(1)) .- land_s
-    cs.surface_masks.ocean .= (FT(1) .- cs.surface_masks.ice .- land_s)
+    # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
+    cs.surface_masks.ice .= max.(min.(ice_d, FT(1) .- land_s), FT(0))
+    cs.surface_masks.ocean .= max.(FT(1) .- (cs.surface_masks.ice .+ land_s), FT(0))
 
-    @assert minimum(cs.surface_masks.ice) >= FT(0)
-    @assert minimum(cs.surface_masks.land) >= FT(0)
-    @assert minimum(cs.surface_masks.ocean) >= FT(0)
+    @assert minimum(cs.surface_masks.ice .+ cs.surface_masks.land .+ cs.surface_masks.ocean) ≈ FT(1)
+    @assert maximum(cs.surface_masks.ice .+ cs.surface_masks.land .+ cs.surface_masks.ocean) ≈ FT(1)
+
 end
+
 
 """
     binary_mask(var::FT; threshold = 0.5)

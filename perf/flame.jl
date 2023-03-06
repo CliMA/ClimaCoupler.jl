@@ -7,10 +7,10 @@ import ProfileCanvas
 using Test
 
 cc_dir = joinpath(dirname(@__DIR__));
-include(joinpath(cc_dir, "experiments", "AMIP", "moist_mpi_earth", "cli_options.jl"));
+include(joinpath(cc_dir, "experiments", "AMIP", "modular", "cli_options.jl"));
 
 # assuming a common driver for all tested runs
-filename = joinpath(cc_dir, "experiments", "AMIP", "moist_mpi_earth", "coupler_driver_modular.jl")
+filename = joinpath(cc_dir, "experiments", "AMIP", "modular", "coupler_driver_modular.jl")
 
 # selected runs for performance analysis and their expected allocations (based on previous runs)
 run_name_list =

@@ -49,7 +49,7 @@ multiple dispatch on `surface_fluxes`.
 struct CoupledAtmosphere{FT} <: AbstractAtmosphericDrivers{FT} end
 
 """
-    surface_fluxes(Y, p,
+    surface_fluxes(Y, p, 
                     t::FT,
                     parameters::P,
                     atmos::PA,
@@ -71,7 +71,7 @@ end
 
 
 """
-    net_radiation(Y, p,
+    net_radiation(Y, p, 
                     t::FT,
                     parameters::P,
                     radiation::PR, p,
@@ -94,7 +94,7 @@ end
 """
     ClimaLSM.Bucket.surface_air_density(p, atmos::CoupledAtmosphere)
 
-an extension of the bucket model method which returns the surface air
+an extension of the bucket model method which returns the surface air 
 density in the case of a coupled simulation.
 """
 function ClimaLSM.Bucket.surface_air_density(p, atmos::CoupledAtmosphere)
@@ -168,7 +168,7 @@ function bucket_init(
     z_0b = FT(1e-3)
     κ_soil = FT(0.7)
     ρc_soil = FT(2e6)
-    t_crit = dt # This is the timescale on which snow exponentially damps to zero, in the case where all
+    t_crit = dt # This is the timescale on which snow exponentially damps to zero, in the case where all 
     # the snow would melt in time t_crit. It prevents us from having to specially time step in cases where
     # all the snow melts in a single timestep.
     params = BucketModelParameters(κ_soil, ρc_soil, albedo, σS_c, W_f, z_0m, z_0b, t_crit, earth_param_set)

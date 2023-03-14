@@ -6,14 +6,26 @@ export CouplerState
 export coupler_push!, coupler_pull!, coupler_put!, coupler_get, coupler_get!
 export coupler_add_field!, coupler_add_map!
 
-mutable struct CplFieldInfo{DT, MD}
-    # the coupled data
-    data::DT
-    # the name of the model that has permission to write to data
-    write_sim::Symbol
-    # catch-all metadata container
-    metadata::MD
+mutable struct CplFieldInfo{DT, A}
+    # coupler-specific name
+    name::Symbol
+    # the coupled data (if fields stored in the coupler, or path to stored data)
+    field_info::DT
+    # field data if needed
+    field_data::A
+    # where the coupler reads/stores info
+    coupler_path::Function
+    # writer model
+    writer_path::Function
+    # reader model
+    reader_path::Function
+    # # if using an exchange grid
+    # exchange_grid::Bool
+    # map to use for regridding or Nothing (if not needed)
+    regrid_map::Symbol
 end
+
+CplFieldInfo(::Nothing) = nothing
 
 mutable struct CouplerState{FT, CF, RO}
     # A dictionary of fields added to the coupler
@@ -31,7 +43,7 @@ _fields(coupler::CouplerState) = getfield(coupler, :coupled_fields)
 
 Type for holding coupler "state". This is the namespace through which coupled components
 communicate. Its role is to provide a level of indirection so that components remain modular
-and so that any data communication, interpolation, reindexing/unit conversions and filtering 
+and so that any data communication, interpolation, reindexing/unit conversions and filtering
 etc... can be embeded in the intermdediate coupling layer.
 
 A field is exported by one component and imported by one or more other components.
@@ -47,7 +59,7 @@ end
             fieldvalue,
         )
 
-Add a field to the coupler that is accessible with key `fieldname`. 
+Add a field to the coupler that is accessible with key `fieldname`.
 
 # Arguments
 - `coupler`: coupler object the field is added to.
@@ -71,7 +83,7 @@ end
             map::Operators.LinearRemap
         )
 
-Add a map to the coupler that is accessible with key `mapname`. 
+Add a map to the coupler that is accessible with key `mapname`.
 
 # Arguments
 - `coupler`: coupler object the field is added to.

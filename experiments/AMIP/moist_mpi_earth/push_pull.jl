@@ -87,6 +87,7 @@ function atmos_pull!(cs)
     z0m_cpl = csf.z0m_S
     z0b_cpl = csf.z0b_S
     albedo_sfc_cpl = csf.albedo
+    beta_sfc_cpl = csf.beta
 
     thermo_params = CAP.thermodynamics_params(atmos_sim.integrator.p.params)
 
@@ -121,9 +122,7 @@ function atmos_pull!(cs)
     # TODO replace functions that used ρ_sfc and q_sfc from atmos
 
     # albedo
-    α_land = similar(combined_field)
-    parent(α_land) .= (land_albedo(land_sim))
-
+    α_land = land_albedo(land_sim)
     α_ice = ice_sim.integrator.p.params.α
     combine_surfaces!(combined_field, cs.surface_masks, (; land = α_land, ocean = α_ocean, ice = α_ice))
     dummmy_remap!(albedo_sfc_cpl, combined_field)
@@ -135,6 +134,15 @@ function atmos_pull!(cs)
             reshape(RRTMGPI.field2array(albedo_sfc_cpl), 1, length(parent(albedo_sfc_cpl)))
         atmos_sim.integrator.p.radiation_model.surface_temperature .= RRTMGPI.field2array(T_sfc_cpl)
     end
+
+    # beta factor for evaporation - should be 1 over ocean and ice
+    β_ocean = ones(axes(combined_field))
+    β_ice = ones(axes(combined_field))
+    β_land = land_beta(land_sim)
+
+    combine_surfaces!(combined_field, cs.surface_masks, (; land = β_land, ocean = β_ocean, ice = β_ice))
+    dummmy_remap!(beta_sfc_cpl, combined_field)
+    @assert all(i -> parent(beta_sfc_cpl)[i] == 1, findall(==(1), parent(ice_mask)))
 
     # calculate turbulent fluxes on atmos grid and save in atmos cache
     parent(atmos_sim.integrator.p.T_sfc) .= parent(T_sfc_cpl)

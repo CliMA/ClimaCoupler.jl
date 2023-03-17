@@ -268,7 +268,7 @@ save online diagnostics. These are all initialized here and saved in a global `C
 
 ## coupler exchange fields
 coupler_field_names =
-    (:T_S, :z0m_S, :z0b_S, :ρ_sfc, :q_sfc, :albedo, :F_A, :F_E, :F_R, :P_liq, :P_snow, :F_R_TOA, :P_net)
+    (:T_S, :z0m_S, :z0b_S, :ρ_sfc, :q_sfc, :albedo, :beta, :F_A, :F_E, :F_R, :P_liq, :P_snow, :F_R_TOA, :P_net)
 coupler_fields =
     NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
 

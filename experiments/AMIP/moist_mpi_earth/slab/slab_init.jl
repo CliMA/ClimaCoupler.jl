@@ -87,7 +87,7 @@ end
 """
     get_land_energy(slab_sim::SlabSimulation, T_sfc)
 
-Returns the energy of the slab; a method for the slab 
+Returns the energy of the slab; a method for the slab
 when used as the land model.
 """
 function get_land_energy(slab_sim::SlabSimulation, T_sfc)
@@ -97,8 +97,8 @@ end
 """
     get_land_temp(slab_sim::SlabSimulation)
 
-Returns the surface temperature of the slab; 
-a method for the slab 
+Returns the surface temperature of the slab;
+a method for the slab
 when used as the land model.
 """
 function get_land_temp(slab_sim)
@@ -108,8 +108,8 @@ end
 """
     get_land_roughness(slab_sim::SlabSimulation)
 
-Returns the roughness length parameters of the slab; 
-a method for the slab 
+Returns the roughness length parameters of the slab;
+a method for the slab
 when used as the land model.
 """
 function get_land_roughness(slab_sim::SlabSimulation)
@@ -119,17 +119,26 @@ end
 """
    land_albedo(slab_sim::SlabSimulation)
 
-Returns the surface albedo of the slab; 
-a method for the slab 
+Returns the surface albedo of the slab;
+a method for the slab
 when used as the land model.
 """
 land_albedo(slab_sim::SlabSimulation) = slab_sim.params.α
 
 """
+   land_beta(slab_sim::SlabSimulation)
+
+Returns the beta factor of the slab;
+a method for the slab
+when used as the land model.
+"""
+land_beta(slab_sim::SlabSimulation) = slab_sim.params.β
+
+"""
     get_land_q(slab_sim::SlabSimulation, atmos_sim, T_land, ρ_sfc)
 
-Returns the surface specific humidity of the slab; 
-a method for the slab 
+Returns the surface specific humidity of the slab;
+a method for the slab
 when used as the land model.
 """
 function get_land_q(slab_sim::SlabSimulation, atmos_sim, T_land, ρ_sfc)

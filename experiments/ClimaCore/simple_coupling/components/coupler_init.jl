@@ -1,14 +1,14 @@
 #### move to general:
-abstract type AbstractComponentModel end # tag upon which to dispatch
+# abstract type AbstractComponentModel end # tag upon which to dispatch
 
-abstract type AbstractSimulation end  # Simulation struct containing all sim info
+# abstract type AbstractSimulation end  # Simulation struct containing all sim info
 
-struct ComponentSimulation{T, Y, I, A} <: AbstractSimulation
-    tag::T
-    Y_init::Y
-    integrator::I
-    area_fraction::A
-end
+# struct ComponentSimulation{T, Y, I, A} <: AbstractSimulation
+#     tag::T
+#     Y_init::Y
+#     integrator::I
+#     area_fraction::A
+# end
 
 # function ComponentSimulation(tag; Y_init = nothing, integrator = nothing, area_fraction = nothing)
 #     ComponentSimulation(tag, Y_init, integrator, area_fraction)

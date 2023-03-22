@@ -1,12 +1,17 @@
 """
     get_land_temp(slab_sim::BucketSimulation)
 
-Returns the surface temperature of the earth; 
-a method for the bucket model 
+Returns the surface temperature of the earth;
+a method for the bucket model
 when used as the land model.
 """
 function get_land_temp(slab_sim::BucketSimulation)
-    return slab_sim.integrator.p.bucket.T_sfc
+    return ClimaLSM.surface_temperature(
+        slab_sim.model,
+        slab_sim.integrator.u,
+        slab_sim.integrator.p,
+        slab_sim.integrator.t,
+    )
 end
 
 
@@ -17,26 +22,14 @@ Returns the surface temperature of the earth, computed
 from the state u.
 """
 function get_land_temp_from_state(land_sim, u)
-    face_space = ClimaLSM.Domains.obtain_face_space(land_sim.domain.domain.subsurface.space)
-    N = ClimaCore.Spaces.nlevels(face_space)
-    interp_c2f = ClimaCore.Operators.InterpolateC2F(
-        top = ClimaCore.Operators.Extrapolate(),
-        bottom = ClimaCore.Operators.Extrapolate(),
-    )
-    surface_space = land_sim.domain.domain.surface.space
-    return ClimaCore.Fields.Field(
-        ClimaCore.Fields.field_values(
-            ClimaCore.Fields.level(interp_c2f.(u.bucket.T), ClimaCore.Utilities.PlusHalf(N - 1)),
-        ),
-        surface_space,
-    )
+    return ClimaLSM.surface_temperature(land_sim.model, u, land_sim.integrator.p, land_sim.integrator.t)
 end
 
 """
     get_land_roughness(slab_sim::BucketSimulation)
 
-Returns the roughness length parameters of the bucket; 
-a method for the bucket model 
+Returns the roughness length parameters of the bucket;
+a method for the bucket model
 when used as the land model.
 """
 function get_land_roughness(slab_sim::BucketSimulation)
@@ -46,31 +39,36 @@ end
 """
    land_albedo(slab_sim::BucketSimulation)
 
-Returns the surface albedo of the earth; 
-a method for the bucket model 
+Returns the surface albedo of the earth;
+a method for the bucket model
 when used as the land model.
 """
 function land_albedo(slab_sim::BucketSimulation)
-    α_land =
-        surface_albedo.(
-            slab_sim.integrator.p.bucket.α_sfc,
-            slab_sim.params.albedo.α_snow,
-            slab_sim.integrator.u.bucket.σS,
-            slab_sim.params.σS_c,
-        )
-    return parent(α_land)
+    return ClimaLSM.surface_albedo(slab_sim.model, slab_sim.integrator.u, slab_sim.integrator.p)
+end
+
+"""
+   land_beta(slab_sim::BucketSimulation)
+
+Returns the surface evaporative scaling factor over land;
+a method for the bucket model when used as the land model.
+Note that this is slightly different from the coupler's β,
+which includes the scaling factor over non-land surfaces.
+"""
+function land_beta(slab_sim::BucketSimulation)
+    return ClimaLSM.surface_evaporative_scaling(slab_sim.model, slab_sim.integrator.u, slab_sim.integrator.p)
 end
 
 
 """
     get_land_q(slab_sim::Bucketimulation, _...)
 
-Returns the surface specific humidity of the earth; 
-a method for the bucket 
+Returns the surface specific humidity of the earth;
+a method for the bucket
 when used as the land model.
 """
 function get_land_q(slab_sim::BucketSimulation, _...)
-    return slab_sim.integrator.p.bucket.q_sfc
+    return ClimaLSM.surface_specific_humidity(slab_sim.model, slab_sim.integrator.u, slab_sim.integrator.p)
 end
 
 """

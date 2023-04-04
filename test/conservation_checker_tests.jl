@@ -1,4 +1,4 @@
-#= 
+#=
     Unit tests for ClimaCoupler ConservationChecker, with parsed objects mimicking those in the full coupled system
 =#
 
@@ -7,6 +7,7 @@ using ClimaCoupler.ConservationChecker:
     EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
 using ClimaCore: ClimaCore, Geometry, Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 import ClimaCore.InputOutput: read_field
+using ClimaLSM
 using ClimaComms
 using Test
 using NCDatasets
@@ -79,7 +80,7 @@ function coupler_sim_from_file(
     )
 end
 
-@testset "test check_conservation" begin
+@testset "test check_conservation for conservation" begin
 
     tmp_dir = "cons_tmp"
     mkpath(tmp_dir)
@@ -112,6 +113,88 @@ end
     rm(tmp_dir, recursive = true)
 end
 
+@testset "test check_conservation for land field update" begin
+
+    tmp_dir = "cons_tmp2"
+    mkpath(tmp_dir)
+
+    conservation_checks =
+        (; energy = EnergyConservationCheck([], [], [], [], [], []), water = WaterConservationCheck([], [], [], []))
+
+    # set up model simulations
+    TP = SFP = FT
+    earth_param_set = ClimaLSM.Parameters.LSMParameters{FT, TP, SFP}(
+        FT(0),
+        FT(0),
+        FT(0),
+        FT(0),
+        FT(0),
+        FT(0),
+        FT(0),
+        FT(0),
+        FT(0),
+        FT(0),
+        FT(0),
+        FT(0),
+        FT(0),
+        TP(0),
+        SFP(0),
+    )
+
+    model = (; parameters = (; earth_param_set = earth_param_set))
+    space = TestHelper.create_space(FT)
+    integrator = (;
+        p = (; params = (; ρ = FT(1), c = FT(1), h = FT(1))),
+        u = (; bucket = (; σS = ones(space), W = ones(space), Ws = ones(space))),
+    )
+    ls = (; model = model, integrator = integrator)
+    as = (; integrator = (; p = (; radiation_model = nothing), u = (; c = (; ρe_tot = [0], ρq_tot = [0]))))
+    os = (; integrator = (; p = (; params = (; ρ = FT(1), c = FT(1), h = FT(1))), u = (; T_sfc = FT(1))))
+    model_sims = (; atmos_sim = as, land_sim = ls, ocean_sim = os, ice_sim = nothing)
+
+    # construct land mask of 0s in top half, 1s in bottom half
+    land_mask = Fields.ones(space)
+    dims = size(parent(land_mask))
+    parent(land_mask)[1:(dims[1] ÷ 2), :, :, :] .= FT(0)
+    surface_masks = (; land = land_mask, ocean = FT(1) .- land_mask, ice = land_mask .* FT(0))
+
+    coupler_sim = Utilities.CoupledSimulation{FT}(
+        ClimaComms.SingletonCommsContext(),
+        nothing,
+        space,
+        (;
+            P_net = Fields.zeros(space),
+            F_E = Fields.zeros(space),
+            P_liq = Fields.zeros(space),
+            P_snow = Fields.zeros(space),
+        ),
+        nothing,
+        conservation_checks,
+        nothing,
+        FT(0),
+        FT(1),
+        surface_masks,
+        model_sims,
+        (;),
+        (),
+    )
+    check_conservation!(coupler_sim, get_slab_energy, get_slab_energy)
+
+    # perform calculations
+    ρ_cloud_liq = ClimaLSM.Parameters.ρ_cloud_liq(ls.model.parameters.earth_param_set)
+    water_content = @. (ls.integrator.u.bucket.σS + ls.integrator.u.bucket.W + ls.integrator.u.bucket.Ws) # m^3 water / land area / layer height
+    parent(water_content) .= parent(water_content .* surface_masks.land) * ρ_cloud_liq
+
+    e_per_area_land = zeros(axes(ls.integrator.u.bucket.W))
+    get_slab_energy(ls, e_per_area_land)
+
+    # check that fields are updated correctly
+    @test conservation_checks.energy.ρe_tot_land[end] == sum(e_per_area_land .* surface_masks.land)
+    @test conservation_checks.water.ρq_tot_land[end] == sum(water_content)
+
+    rm(tmp_dir, recursive = true)
+end
+
 @testset "test plot_global_conservation" begin
 
     tmp_dir = "cons_tmp"
@@ -124,7 +207,7 @@ end
     coupler_sim = coupler_sim_from_file(local_file_0, conservation_checks = conservation_checks)
     check_conservation!(coupler_sim, get_slab_energy, get_slab_energy)
 
-    # check that plot files are being generated 
+    # check that plot files are being generated
     tmpname1 = joinpath(tmp_dir, tempname(".") * ".png")
     tmpname2 = joinpath(tmp_dir, tempname(".") * ".png")
     plot_global_conservation(conservation_checks.energy, coupler_sim, figname1 = tmpname1, figname2 = tmpname2)

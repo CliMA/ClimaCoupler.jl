@@ -33,7 +33,7 @@ a method for the bucket model
 when used as the land model.
 """
 function get_land_roughness(slab_sim::BucketSimulation)
-    return slab_sim.params.z_0m, slab_sim.params.z_0b
+    return slab_sim.model.parameters.z_0m, slab_sim.model.parameters.z_0b
 end
 
 """
@@ -82,12 +82,13 @@ function get_land_energy(bucket_sim::BucketSimulation, e_per_area)
     soil_depth = FT = eltype(bucket_sim.integrator.u.bucket.W)
     ClimaCore.Fields.bycolumn(axes(bucket_sim.integrator.u.bucket.T)) do colidx
         e_per_area[colidx] .=
-            bucket_sim.params.ρc_soil .* mean(bucket_sim.integrator.u.bucket.T[colidx]) .* bucket_sim.domain.soil_depth
+            bucket_sim.model.parameters.ρc_soil .* mean(bucket_sim.integrator.u.bucket.T[colidx]) .*
+            bucket_sim.domain.soil_depth
     end
 
     e_per_area .+=
-        -LSMP.LH_f0(bucket_sim.params.earth_param_set) .* LSMP.ρ_cloud_liq(bucket_sim.params.earth_param_set) .*
-        bucket_sim.integrator.u.bucket.σS
+        -LSMP.LH_f0(bucket_sim.model.parameters.earth_param_set) .*
+        LSMP.ρ_cloud_liq(bucket_sim.model.parameters.earth_param_set) .* bucket_sim.integrator.u.bucket.σS
     return e_per_area
 end
 

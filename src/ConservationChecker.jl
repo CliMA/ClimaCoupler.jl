@@ -176,7 +176,7 @@ function check_conservation!(
 
     # save land
     if land_sim !== nothing
-        ρ_cloud_liq = ClimaLSM.LSMP.ρ_cloud_liq(land_sim.params.earth_param_set)
+        ρ_cloud_liq = ClimaLSM.LSMP.ρ_cloud_liq(land_sim.model.parameters.earth_param_set)
         water_content =
             @. (land_sim.integrator.u.bucket.σS + land_sim.integrator.u.bucket.W + land_sim.integrator.u.bucket.Ws) # m^3 water / land area / layer height
         parent(water_content) .= parent(water_content .* surface_masks.land) * ρ_cloud_liq # kg / land area / layer height

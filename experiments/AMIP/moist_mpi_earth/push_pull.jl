@@ -28,7 +28,7 @@ function land_pull!(cs)
     parent(land_sim.integrator.p.bucket.ρ_sfc) .= parent(csf.ρ_sfc)
     parent(land_sim.integrator.p.bucket.turbulent_energy_flux) .=
         apply_mask.(parent(land_mask), >, parent(csf.F_A), parent(csf.F_A) .* FT(0), FT(0))
-    ρ_liq = (LSMP.ρ_cloud_liq(land_sim.params.earth_param_set))
+    ρ_liq = (LSMP.ρ_cloud_liq(land_sim.model.parameters.earth_param_set))
     parent(land_sim.integrator.p.bucket.evaporation) .=
         apply_mask.(parent(land_mask), >, parent(csf.F_E) ./ ρ_liq, parent(csf.F_E) .* FT(0), FT(0))
     parent(land_sim.integrator.p.bucket.R_n) .=

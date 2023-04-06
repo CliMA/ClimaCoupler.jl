@@ -20,13 +20,12 @@ using ClimaLSM:
     make_ode_function, initialize, obtain_surface_space, make_set_initial_aux_state, surface_evaporative_scaling
 
 """
-    BucketSimulation{M, P, Y, D, I}
+    BucketSimulation{M, Y, D, I}
 
 The bucket model simulation object.
 """
-struct BucketSimulation{M, P, Y, D, I}
+struct BucketSimulation{M, Y, D, I}
     model::M
-    params::P
     Y_init::Y
     domain::D
     integrator::I
@@ -246,5 +245,5 @@ function bucket_init(
     prob = ODEProblem(ode_function!, Y, tspan, p_new)
     integrator = init(prob, stepper; dt = dt, saveat = saveat)
 
-    BucketSimulation(model, params, Y, (; domain = domain, soil_depth = d_soil), integrator)
+    BucketSimulation(model, Y, (; domain = domain, soil_depth = d_soil), integrator)
 end

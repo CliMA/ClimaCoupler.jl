@@ -403,7 +403,7 @@ Maintains the invariant that the sum of masks is 1 at all points.
 """
 function update_masks!(cs::CoupledSimulation)
     # dynamic masks
-    ice_d = cs.model_sims.ice_sim.integrator.p.ice_mask
+    ice_d = cs.model_sims.ice_sim.integrator.p.ice_fraction
     FT = eltype(ice_d)
 
     # static mask
@@ -422,13 +422,13 @@ end
 """
     binary_mask(var::FT; threshold = 0.5)
 
-Converts a number `var` to 1, if `var` is greater than a given `threshold` value, or 0 otherwise, keeping the same type.
+Converts a number `var` to 1, if `var` is greater or equal than a given `threshold` value, or 0 otherwise, keeping the same type.
 
 # Arguments
 - `var`: [FT] value to be converted.
 - `threshold`: [Float] cutoff value for conversions.
 """
-binary_mask(var::FT; threshold = 0.5) where {FT} = var > FT(threshold) ? FT(1) : FT(0)
+binary_mask(var::FT; threshold = FT(0.5)) where {FT} = var < FT(threshold) ? FT(0) : FT(1)
 
 """
     combine_surfaces!(combined_field::Fields.Field, masks::NamedTuple, fields::NamedTuple)

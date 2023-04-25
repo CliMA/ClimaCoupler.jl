@@ -103,6 +103,7 @@ date0 = date = DateTime(parsed_args["start_date"], dateformat"yyyymmdd")
 mono_surface = parsed_args["mono_surface"]
 
 import ClimaCoupler
+import ClimaCoupler.Regridder
 import ClimaCoupler.Regridder: land_sea_mask, update_masks!, combine_surfaces!, dummmy_remap!, binary_mask
 import ClimaCoupler.ConservationChecker:
     EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
@@ -235,8 +236,9 @@ if mode_name == "amip"
     )
     update_midmonth_data!(date0, SIC_info)
     SIC_init = interpolate_midmonth_to_daily(date0, SIC_info)
-    ice_mask = get_ice_mask.(SIC_init, mono_surface)
-    ice_sim = ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_mask = ice_mask)
+    ice_fraction = get_ice_fraction.(SIC_init, mono_surface)
+    ice_sim =
+        ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_fraction = ice_fraction)
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info)
 
 elseif mode_name == "slabplanet"
@@ -254,7 +256,7 @@ elseif mode_name == "slabplanet"
     ice_sim = (;
         integrator = (;
             u = (; T_sfc = ClimaCore.Fields.ones(boundary_space)),
-            p = (; params = ocean_sim.params, ice_mask = ClimaCore.Fields.zeros(boundary_space)),
+            p = (; params = ocean_sim.params, ice_fraction = ClimaCore.Fields.zeros(boundary_space)),
         )
     )
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
@@ -382,7 +384,7 @@ function solve_coupler!(cs)
             end
             SIC = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info)
 
-            ice_mask = ice_sim.integrator.p.ice_mask .= get_ice_mask.(SIC_init, mono_surface)
+            ice_fraction = ice_sim.integrator.p.ice_fraction .= get_ice_fraction.(SIC_init, mono_surface)
 
             ## calculate and accumulate diagnostics at each timestep
             accumulate_diagnostics!(cs)

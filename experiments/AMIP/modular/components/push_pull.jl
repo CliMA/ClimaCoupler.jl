@@ -27,12 +27,11 @@ function land_pull!(cs)
     land_mask = cs.surface_masks.land
     parent(land_sim.integrator.p.bucket.ρ_sfc) .= parent(csf.ρ_sfc)
     parent(land_sim.integrator.p.bucket.turbulent_energy_flux) .=
-        apply_mask.(parent(land_mask), >, parent(csf.F_A), parent(csf.F_A) .* FT(0), FT(0))
+        parent(Regridder.binary_mask.(land_mask, threshold = eps()) .* csf.F_A)
     ρ_liq = (LSMP.ρ_cloud_liq(land_sim.model.parameters.earth_param_set))
     parent(land_sim.integrator.p.bucket.evaporation) .=
-        apply_mask.(parent(land_mask), >, parent(csf.F_E) ./ ρ_liq, parent(csf.F_E) .* FT(0), FT(0))
-    parent(land_sim.integrator.p.bucket.R_n) .=
-        apply_mask.(parent(land_mask), >, parent(csf.F_R), parent(csf.F_R) .* FT(0), FT(0))
+        parent(Regridder.binary_mask.(land_mask, threshold = eps()) .* csf.F_E ./ ρ_liq)
+    parent(land_sim.integrator.p.bucket.R_n) .= parent(Regridder.binary_mask.(land_mask, threshold = eps()) .* csf.F_R)
     parent(land_sim.integrator.p.bucket.P_liq) .= FT(-1.0) .* parent(csf.P_liq) # land expects this to be positive
     parent(land_sim.integrator.p.bucket.P_snow) .= FT(0.0) .* parent(csf.P_snow)
 
@@ -62,11 +61,9 @@ function ice_pull!(cs)
     FT = float_type(cs)
     ice_sim = cs.model_sims.ice_sim
     csf = cs.fields
-    ice_mask = cs.surface_masks.ice
-    parent(ice_sim.integrator.p.F_rad) .=
-        apply_mask.(parent(ice_mask), >, parent(csf.F_R), parent(csf.F_R) .* FT(0), FT(0))
-    parent(ice_sim.integrator.p.F_aero) .=
-        apply_mask.(parent(ice_mask), >, parent(csf.F_A), parent(csf.F_A) .* FT(0), FT(0))
+    ice_fraction = cs.surface_masks.ice
+    parent(ice_sim.integrator.p.F_rad) .= parent(Regridder.binary_mask.(ice_fraction, threshold = eps()) .* csf.F_R)
+    parent(ice_sim.integrator.p.F_aero) .= parent(Regridder.binary_mask.(ice_fraction, threshold = eps()) .* csf.F_A)
 end
 
 """
@@ -98,7 +95,7 @@ function atmos_pull!(cs)
     z0b_ocean = ocean_sim.integrator.p.params.z0b
     α_ocean = ocean_sim.integrator.p.params.α
     T_ice = ice_sim.integrator.u.T_sfc
-    ice_mask = ice_sim.integrator.p.ice_mask
+    ice_fraction = ice_sim.integrator.p.ice_fraction
     z0m_ice = ice_sim.integrator.p.params.z0m
     z0b_ice = ice_sim.integrator.p.params.z0b
 
@@ -143,7 +140,7 @@ function atmos_pull!(cs)
 
     combine_surfaces!(combined_field, cs.surface_masks, (; land = β_land, ocean = β_ocean, ice = β_ice))
     dummmy_remap!(beta_sfc_cpl, combined_field)
-    @assert all(i -> parent(beta_sfc_cpl)[i] == 1, findall(==(1), parent(ice_mask)))
+    @assert all(i -> parent(beta_sfc_cpl)[i] == 1, findall(==(1), parent(ice_fraction)))
 
     # calculate turbulent fluxes on atmos grid and save in atmos cache
     parent(atmos_sim.integrator.p.T_sfc) .= parent(T_sfc_cpl)
@@ -174,9 +171,3 @@ function atmos_pull!(cs)
 
     # TODO correct for ice coverage
 end
-
-function atmos_pull!(cs, surfces)
-    # placehoolder: add method to calculate fluxes above individual surfaces and then split fluxes (separate PR)
-end
-
-maximumfield(el1, el2) = maximum([el1, el2])

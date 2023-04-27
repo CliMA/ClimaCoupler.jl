@@ -43,6 +43,11 @@ steps:
       - "julia --project=experiments/AMIP/moist_mpi_earth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/AMIP/moist_mpi_earth/ -e 'using Pkg; Pkg.status()'"
 
+      - echo "--- Instantiate amip modular"
+      - "julia --project=experiments/AMIP/modular/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=experiments/AMIP/modular/ -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=experiments/AMIP/modular/ -e 'using Pkg; Pkg.status()'"
+
       - echo "--- Instantiate perf env"
       - "julia --project=perf/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=perf/ -e 'using Pkg; Pkg.precompile()'"

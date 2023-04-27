@@ -103,6 +103,9 @@ steps:
           slurm_nodes: 3
           slurm_tasks_per_node: 1
 
+      - label: "Component model tests"
+        command: "julia --color=yes --project=test/ test/component_model_tests.jl  --run_name component_test"
+        timeout_in_minutes: 5
 
   - group: "Integration Tests"
     steps:

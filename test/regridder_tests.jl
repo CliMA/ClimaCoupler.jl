@@ -49,7 +49,7 @@ for FT in (Float32, Float64)
             Int(200), # t
             Int(200), # Δt_cpl
             (; land = land_mask, ice = Fields.zeros(test_space), ocean = Fields.zeros(test_space)), # surface_masks
-            (; ice_sim = (; integrator = (; p = (; ice_mask = ice_d)))), # model_sims
+            (; ice_sim = (; integrator = (; p = (; ice_fraction = ice_d)))), # model_sims
             (;), # mode
             (), # diagnostics
         )

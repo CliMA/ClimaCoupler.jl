@@ -1,16 +1,16 @@
-# slab_ice
+# energy equation for sea ice
 
 # sea-ice parameters
 struct IceSlabParameters{FT <: AbstractFloat}
-    h::FT # sea ice height
-    ρ::FT
-    c::FT
-    T_base::FT
-    z0m::FT
-    z0b::FT
-    T_freeze::FT # temperature at freezing point [K]
-    k_ice::FT   # thermal conductivity of ice [W / m / K]
-    α::FT # albedo
+    h::FT # ice thickness [m]
+    ρ::FT # density of sea ice [kg / m3]
+    c::FT # specific heat of sea ice [J / kg / K]
+    T_base::FT # temperature of sea water at the ice base
+    z0m::FT # roughness length for momentum [m]
+    z0b::FT # roughness length for tracers [m]
+    T_freeze::FT # freezing point of sea water [K]
+    k_ice::FT # thermal condictivity of ice [W / m / K] (less in HM71)
+    α::FT # sea ice albedo
 end
 
 # init simulation
@@ -19,8 +19,16 @@ function slab_ice_space_init(::Type{FT}, space, p) where {FT}
     return Y
 end
 
+"""
+    ice_rhs!(du, u, p, _)
 
-function ice_rhs!(du, u, p, t)
+Rhs method in the form as required by `ClimeTimeSteppers`, with the tendency vector `du`,
+the state vector `u` and the parameter vector, `p`, as input arguments.
+
+This sea-ice energy formulation follows [Holloway and Manabe 1971](https://journals.ametsoc.org/view/journals/mwre/99/5/1520-0493_1971_099_0335_socbag_2_3_co_2.xml?tab_body=pdf),
+where sea-ice concentrations and thicknes are prescribed, and the model solves for temperature (curbed at the freezing point).
+"""
+function ice_rhs!(du, u, p, _)
     dY = du
     Y = u
     FT = eltype(dY)
@@ -28,36 +36,36 @@ function ice_rhs!(du, u, p, t)
     params = p.params
     F_aero = p.F_aero
     F_rad = p.F_rad
-    ice_mask = p.ice_mask
+    ice_fraction = p.ice_fraction
+    T_freeze = params.T_freeze
 
-    F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc)
+    F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc) # fluxes are defined to be positive when upward
     rhs = @. (-F_aero - F_rad + F_conductive) / (params.h * params.ρ * params.c)
-    parent(dY.T_sfc) .= parent(rhs) # apply_mask.(parent(ice_mask), >, parent(rhs), parent(rhs) .* FT(0), FT(0) )
+
+    # do not count tendencies that lead to temperatures above freezing, and mask out no-ice areas
+    unphysical = @. Regridder.binary_mask.(T_freeze - (Y.T_sfc + FT(rhs) * p.dt), threshold = FT(0)) .*
+       Regridder.binary_mask.(ice_fraction, threshold = eps())
+    parent(dY.T_sfc) .= parent(rhs .* unphysical)
 end
 
 """
-ice_init(::Type{FT}; tspan, dt, saveat, space, ice_mask, stepper = Euler()) where {FT}
+    ice_init(::Type{FT}; tspan, dt, saveat, space, ice_fraction, stepper = Euler()) where {FT}
 
 Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `step!` in the coupling loop.
 """
-function ice_init(::Type{FT}; tspan, saveat, dt, space, ice_mask, stepper = Euler()) where {FT}
+function ice_init(::Type{FT}; tspan, saveat, dt, space, ice_fraction, stepper = Euler()) where {FT}
 
-    params = IceSlabParameters(
-        FT(2),
-        FT(1500.0),
-        FT(800.0),
-        FT(280.0),
-        FT(1e-3),
-        FT(1e-5),
-        FT(273.15),
-        FT(2.0),# k_ice
-        FT(0.8), # albedo
-    )
+    params = IceSlabParameters(FT(2), FT(900.0), FT(2100.0), FT(271.2), FT(1e-3), FT(1e-5), FT(271.2), FT(2.0), FT(0.8))
 
     Y = slab_ice_space_init(FT, space, params)
-    cache = (; F_aero = ClimaCore.Fields.zeros(space), F_rad = ClimaCore.Fields.zeros(space), ice_mask = ice_mask)
+    additional_cache = (;
+        F_aero = ClimaCore.Fields.zeros(space),
+        F_rad = ClimaCore.Fields.zeros(space),
+        ice_fraction = ice_fraction,
+        dt = dt,
+    )
 
-    problem = OrdinaryDiffEq.ODEProblem(ice_rhs!, Y, tspan, (; cache..., params = params))
+    problem = OrdinaryDiffEq.ODEProblem(ice_rhs!, Y, tspan, (; additional_cache..., params = params))
     integrator = OrdinaryDiffEq.init(problem, stepper, dt = dt, saveat = saveat)
 
 
@@ -72,10 +80,5 @@ Ensures that the space of the SIC struct matches that of the mask, and converts 
 clean_sic(SIC, _info) = swap_space!(zeros(axes(_info.land_mask)), SIC) ./ float_type_bcf(_info)(100.0)
 
 # setting that SIC < 0.5 os counted as ocean if binary remapping of landsea mask.
-get_ice_mask(h_ice::FT, mono, threshold = 0.5) where {FT} = mono ? h_ice : binary_mask.(h_ice, threshold = threshold)
-
-"""
-apply_mask(mask, condition, yes, no, value = 0.5)
-- apply mask mased on a threshold value in the mask
-"""
-apply_mask(mask, condition, yes, no, value) = condition(mask, value) ? yes : no
+get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
+    mono ? h_ice : Regridder.binary_mask(h_ice, threshold = FT(threshold))

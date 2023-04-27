@@ -56,10 +56,10 @@ end
 Computes the rhs of the slab model.
 """
 function slab_rhs!(dY, Y, cache, t)
-    p, F_aero, F_rad, land_mask = cache
+    p, F_aero, F_rad = cache
     FT = eltype(Y.T_sfc)
     rhs = @. -(F_aero + F_rad) / (p.h * p.ρ * p.c)
-    parent(dY.T_sfc) .= parent(rhs) # apply_mask.(FT, parent(land_mask), parent(rhs))
+    parent(dY.T_sfc) .= parent(rhs)
 end
 
 """
@@ -67,7 +67,7 @@ end
 
 Initializes the slab simulation.
 """
-function slab_init(::Type{FT}; tspan, dt, saveat, space, land_mask, stepper = Euler()) where {FT}
+function slab_init(::Type{FT}; tspan, dt, saveat, space, land_fraction, stepper = Euler()) where {FT}
 
     params = ThermalSlabParameters(FT(1), FT(1500.0), FT(800.0), FT(1e-3), FT(1e-5), FT(0.2))
     T_init = FT(315)
@@ -76,7 +76,7 @@ function slab_init(::Type{FT}; tspan, dt, saveat, space, land_mask, stepper = Eu
         params = params,
         F_aero = ClimaCore.Fields.zeros(space),
         F_rad = ClimaCore.Fields.zeros(space),
-        land_mask = land_mask,
+        land_fraction = land_fraction,
     )
     problem = OrdinaryDiffEq.ODEProblem(slab_rhs!, Y, tspan, cache)
     integrator = OrdinaryDiffEq.init(problem, stepper, dt = dt, saveat = saveat)

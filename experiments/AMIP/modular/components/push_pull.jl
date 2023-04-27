@@ -87,8 +87,6 @@ function atmos_pull!(cs)
     albedo_sfc_cpl = csf.albedo
     beta_sfc_cpl = csf.beta
 
-    thermo_params = CAP.thermodynamics_params(atmos_sim.integrator.p.params)
-
     T_land = get_land_temp(land_sim)
     z0m_land, z0b_land = get_land_roughness(land_sim)
     T_ocean = ocean_sim.integrator.u.T_sfc
@@ -150,25 +148,6 @@ function atmos_pull!(cs)
         parent(atmos_sim.integrator.p.sfc_inputs.z0m) .= parent(z0m_cpl)
     end
 
-    Fields.bycolumn(axes(atmos_sim.integrator.p.ts_sfc)) do colidx
-        ClimaAtmos.set_surface_thermo_state!(
-            ClimaAtmos.Decoupled(),
-            atmos_sim.integrator.p.surface_scheme.sfc_thermo_state_type,
-            atmos_sim.integrator.p.ts_sfc[colidx],
-            atmos_sim.integrator.p.T_sfc[colidx],
-            Spaces.level(atmos_sim.integrator.p.ᶜts[colidx], 1),
-            thermo_params,
-            atmos_sim.integrator.t,
-        )
+    calculate_surface_fluxes_in_atmos!(atmos_sim.integrator, cs.surface_fractions)
 
-        get_surface_fluxes!(
-            atmos_sim.integrator.u,
-            atmos_sim.integrator.p,
-            atmos_sim.integrator.t,
-            colidx,
-            atmos_sim.integrator.p.atmos.vert_diff,
-        )
-    end
-
-    # TODO correct for ice coverage
 end

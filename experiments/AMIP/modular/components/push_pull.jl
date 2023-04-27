@@ -24,14 +24,15 @@ function land_pull!(cs)
     FT = float_type(cs)
     land_sim = cs.model_sims.land_sim
     csf = cs.fields
-    land_mask = cs.surface_masks.land
+    land_fraction = cs.surface_fractions.land
     parent(land_sim.integrator.p.bucket.ρ_sfc) .= parent(csf.ρ_sfc)
     parent(land_sim.integrator.p.bucket.turbulent_energy_flux) .=
-        parent(Regridder.binary_mask.(land_mask, threshold = eps()) .* csf.F_A)
+        parent(Regridder.binary_mask.(land_fraction, threshold = eps()) .* csf.F_A)
     ρ_liq = (LSMP.ρ_cloud_liq(land_sim.model.parameters.earth_param_set))
     parent(land_sim.integrator.p.bucket.evaporation) .=
-        parent(Regridder.binary_mask.(land_mask, threshold = eps()) .* csf.F_E ./ ρ_liq)
-    parent(land_sim.integrator.p.bucket.R_n) .= parent(Regridder.binary_mask.(land_mask, threshold = eps()) .* csf.F_R)
+        parent(Regridder.binary_mask.(land_fraction, threshold = eps()) .* csf.F_E ./ ρ_liq)
+    parent(land_sim.integrator.p.bucket.R_n) .=
+        parent(Regridder.binary_mask.(land_fraction, threshold = eps()) .* csf.F_R)
     parent(land_sim.integrator.p.bucket.P_liq) .= FT(-1.0) .* parent(csf.P_liq) # land expects this to be positive
     parent(land_sim.integrator.p.bucket.P_snow) .= FT(0.0) .* parent(csf.P_snow)
 
@@ -61,7 +62,7 @@ function ice_pull!(cs)
     FT = float_type(cs)
     ice_sim = cs.model_sims.ice_sim
     csf = cs.fields
-    ice_fraction = cs.surface_masks.ice
+    ice_fraction = cs.surface_fractions.ice
     parent(ice_sim.integrator.p.F_rad) .= parent(Regridder.binary_mask.(ice_fraction, threshold = eps()) .* csf.F_R)
     parent(ice_sim.integrator.p.F_aero) .= parent(Regridder.binary_mask.(ice_fraction, threshold = eps()) .* csf.F_A)
 end
@@ -99,21 +100,21 @@ function atmos_pull!(cs)
     z0m_ice = ice_sim.integrator.p.params.z0m
     z0b_ice = ice_sim.integrator.p.params.z0b
 
-    update_masks!(cs)
+    update_surface_fractions!(cs)
 
     # combine models' surfaces onlo one coupler field
     combined_field = zeros(boundary_space)
 
     # surface temperature
-    combine_surfaces!(combined_field, cs.surface_masks, (; land = T_land, ocean = T_ocean, ice = T_ice))
+    combine_surfaces!(combined_field, cs.surface_fractions, (; land = T_land, ocean = T_ocean, ice = T_ice))
     dummmy_remap!(T_sfc_cpl, combined_field)
 
     # roughness length for momentum
-    combine_surfaces!(combined_field, cs.surface_masks, (; land = z0m_land, ocean = z0m_ocean, ice = z0m_ice))
+    combine_surfaces!(combined_field, cs.surface_fractions, (; land = z0m_land, ocean = z0m_ocean, ice = z0m_ice))
     dummmy_remap!(z0m_cpl, combined_field)
 
     # roughness length for tracers
-    combine_surfaces!(combined_field, cs.surface_masks, (; land = z0b_land, ocean = z0b_ocean, ice = z0b_ice))
+    combine_surfaces!(combined_field, cs.surface_fractions, (; land = z0b_land, ocean = z0b_ocean, ice = z0b_ice))
     dummmy_remap!(z0b_cpl, combined_field)
 
     # TODO replace functions that used ρ_sfc and q_sfc from atmos
@@ -122,7 +123,7 @@ function atmos_pull!(cs)
     α_land = land_albedo(land_sim)
 
     α_ice = ice_sim.integrator.p.params.α
-    combine_surfaces!(combined_field, cs.surface_masks, (; land = α_land, ocean = α_ocean, ice = α_ice))
+    combine_surfaces!(combined_field, cs.surface_fractions, (; land = α_land, ocean = α_ocean, ice = α_ice))
     dummmy_remap!(albedo_sfc_cpl, combined_field)
 
     if radiation != nothing
@@ -138,7 +139,7 @@ function atmos_pull!(cs)
     β_ice = ones(axes(combined_field))
     β_land = land_beta(land_sim)
 
-    combine_surfaces!(combined_field, cs.surface_masks, (; land = β_land, ocean = β_ocean, ice = β_ice))
+    combine_surfaces!(combined_field, cs.surface_fractions, (; land = β_land, ocean = β_ocean, ice = β_ice))
     dummmy_remap!(beta_sfc_cpl, combined_field)
     @assert all(i -> parent(beta_sfc_cpl)[i] == 1, findall(==(1), parent(ice_fraction)))
 

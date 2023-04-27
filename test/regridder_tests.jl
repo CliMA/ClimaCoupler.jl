@@ -24,16 +24,16 @@ for FT in (Float32, Float64)
         @test parent(target_field) == parent(test_field_ones)
     end
 
-    @testset "test update_masks!" begin
+    @testset "test update_surface_fractions!" begin
         test_space = TestHelper.create_space(FT)
-        # Construct land mask of 0s in top half, 1s in bottom half
-        land_mask = Fields.ones(test_space)
-        dims = size(parent(land_mask))
+        # Construct land fraction of 0s in top half, 1s in bottom half
+        land_fraction = Fields.ones(test_space)
+        dims = size(parent(land_fraction))
         m = dims[1]
         n = dims[2]
-        parent(land_mask)[1:(m ÷ 2), :, :, :] .= FT(0)
+        parent(land_fraction)[1:(m ÷ 2), :, :, :] .= FT(0)
 
-        # Construct ice mask of 0s on left, 0.5s on right
+        # Construct ice fraction of 0s on left, 0.5s on right
         ice_d = Fields.zeros(test_space)
         parent(ice_d)[:, (n ÷ 2 + 1):n, :, :] .= FT(0.5)
 
@@ -48,28 +48,28 @@ for FT in (Float32, Float64)
             (Int(0), Int(1000)), # tspan
             Int(200), # t
             Int(200), # Δt_cpl
-            (; land = land_mask, ice = Fields.zeros(test_space), ocean = Fields.zeros(test_space)), # surface_masks
+            (; land = land_fraction, ice = Fields.zeros(test_space), ocean = Fields.zeros(test_space)), # surface_fractions
             (; ice_sim = (; integrator = (; p = (; ice_fraction = ice_d)))), # model_sims
             (;), # mode
             (), # diagnostics
         )
 
-        Regridder.update_masks!(cs)
+        Regridder.update_surface_fractions!(cs)
 
-        # Test that sum of masks is 1 everywhere
-        @test all(parent(cs.surface_masks.ice .+ cs.surface_masks.land .+ cs.surface_masks.ocean) .== FT(1))
+        # Test that sum of fractions is 1 everywhere
+        @test all(parent(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) .== FT(1))
     end
 
     @testset "test combine_surfaces!" begin
         test_space = TestHelper.create_space(FT)
         combined_field = Fields.ones(test_space)
 
-        # Initialize weights (masks) and initial values (fields)
-        masks = (a = 0.0, b = 0.5, c = 2.0, d = -10.0)
+        # Initialize weights (fractions) and initial values (fields)
+        fractions = (a = 0.0, b = 0.5, c = 2.0, d = -10.0)
         fields = (a = 1.0, b = 1.0, c = 1.0, d = 1.0)
 
-        Regridder.combine_surfaces!(combined_field::Fields.Field, masks::NamedTuple, fields::NamedTuple)
-        @test all(parent(combined_field) .== FT(sum(masks) * sum(fields) / length(fields)))
+        Regridder.combine_surfaces!(combined_field::Fields.Field, fractions::NamedTuple, fields::NamedTuple)
+        @test all(parent(combined_field) .== FT(sum(fractions) * sum(fields) / length(fields)))
     end
 
     # Add tests which use TempestRemap here -
@@ -123,7 +123,7 @@ for FT in (Float32, Float64)
             rm(REGRID_DIR; recursive = true, force = true)
         end
 
-        @testset "test land_sea_mask for FT=$FT" begin
+        @testset "test land_fraction for FT=$FT" begin
             # Test setup
             R = FT(6371e3)
             test_space = TestHelper.create_space(FT, R = R)
@@ -136,8 +136,8 @@ for FT in (Float32, Float64)
             TestHelper.gen_ncdata(FT, data_path, varname, FT(1))
 
             # Test monotone masking
-            land_mask_mono =
-                Regridder.land_sea_mask(FT, REGRID_DIR, comms_ctx, data_path, varname, test_space, mono = true)
+            land_fraction_mono =
+                Regridder.land_fraction(FT, REGRID_DIR, comms_ctx, data_path, varname, test_space, mono = true)
 
             # Test no new extrema are introduced in monotone remapping
             nt = NCDataset(data_path) do ds
@@ -147,11 +147,11 @@ for FT in (Float32, Float64)
             end
             (; max_val, min_val) = nt
 
-            @test maximum(land_mask_mono) <= max_val
-            @test minimum(land_mask_mono) >= min_val
+            @test maximum(land_fraction_mono) <= max_val
+            @test minimum(land_fraction_mono) >= min_val
 
             # Test that monotone remapping a dataset of all ones conserves surface area
-            @test sum(land_mask_mono) - 4 * π * (R^2) < 10e-14
+            @test sum(land_fraction_mono) - 4 * π * (R^2) < 10e-14
 
             # Delete testing directory and files
             rm(REGRID_DIR; recursive = true, force = true)
@@ -166,11 +166,11 @@ for FT in (Float32, Float64)
             TestHelper.gen_ncdata(FT, data_path, varname, FT(0.5))
 
             # Test non-monotone masking
-            land_mask_halves =
-                Regridder.land_sea_mask(FT, REGRID_DIR, comms_ctx, data_path, varname, test_space, mono = false)
+            land_fraction_halves =
+                Regridder.land_fraction(FT, REGRID_DIR, comms_ctx, data_path, varname, test_space, mono = false)
 
-            # Masking of values below threshold should result in 0
-            @test all(parent(land_mask_halves) .== FT(0))
+            # fractioning of values below threshold should result in 0
+            @test all(parent(land_fraction_halves) .== FT(0))
 
             # Delete testing directory and files
             rm(REGRID_DIR; recursive = true, force = true)

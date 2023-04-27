@@ -39,7 +39,7 @@ function plot_anim(cs, out_dir = ".")
             land_T_sfc = get_land_temp_from_state(cs.model_sims.land_sim, bucketu)
             combine_surfaces!(
                 combined_field,
-                cs.surface_masks,
+                cs.surface_fractions,
                 (; land = land_T_sfc, ocean = oceanu.T_sfc, ice = FT(0)),
             )
             Plots.plot(combined_field)
@@ -49,7 +49,11 @@ function plot_anim(cs, out_dir = ".")
         sol_slab_ice = slab_ice_sim.integrator.sol
         anim = Plots.@animate for (bucketu, iceu) in zip(sol_slab.u, sol_slab_ice.u)
             land_T_sfc = get_land_temp_from_state(cs.model_sims.land_sim, bucketu)
-            combine_surfaces!(combined_field, cs.surface_masks, (; land = land_T_sfc, ocean = SST, ice = iceu.T_sfc))
+            combine_surfaces!(
+                combined_field,
+                cs.surface_fractions,
+                (; land = land_T_sfc, ocean = SST, ice = iceu.T_sfc),
+            )
             Plots.plot(combined_field)
         end
     end
@@ -57,14 +61,14 @@ function plot_anim(cs, out_dir = ".")
 
     combined_field = zeros(boundary_space)
     anim = Plots.@animate for bucketu in sol_slab.u
-        combine_surfaces!(combined_field, cs.surface_masks, (; land = bucketu.bucket.W, ocean = 0.0, ice = 0.0))
+        combine_surfaces!(combined_field, cs.surface_fractions, (; land = bucketu.bucket.W, ocean = 0.0, ice = 0.0))
         Plots.plot(combined_field)
     end
     Plots.mp4(anim, joinpath(out_dir, "bucket_W.mp4"), fps = 10)
 
     combined_field = zeros(boundary_space)
     anim = Plots.@animate for bucketu in sol_slab.u
-        combine_surfaces!(combined_field, cs.surface_masks, (; land = bucketu.bucket.σS, ocean = 0.0, ice = 0.0))
+        combine_surfaces!(combined_field, cs.surface_fractions, (; land = bucketu.bucket.σS, ocean = 0.0, ice = 0.0))
         Plots.plot(combined_field)
     end
     Plots.mp4(anim, joinpath(out_dir, "bucket_snow.mp4"), fps = 10)

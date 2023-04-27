@@ -38,19 +38,18 @@ end
 
 # ode
 function slab_ocean_rhs!(dY, Y, cache, t)
-    p, F_aero, F_rad, ocean_mask = cache
+    p, F_aero, F_rad, ocean_fraction = cache
     FT = eltype(Y.T_sfc)
     rhs = @. -(F_aero + F_rad) / (p.h * p.ρ * p.c)
-    parent(dY.T_sfc) .= parent(rhs) # apply_mask.(FT, parent(ocean_mask), parent(rhs))
+    parent(dY.T_sfc) .= parent(rhs .* Regridder.binary_mask.(ocean_fraction, threshold = eps()))
 end
 
-
 """
-    ocean_init(::Type{FT}; tspan, dt, saveat, space, land_mask, stepper = Euler()) where {FT}
+    ocean_init(::Type{FT}; tspan, dt, saveat, space, ocean_fraction, stepper = Euler()) where {FT}
 
 Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `step!` in the coupling loop.
 """
-function ocean_init(::Type{FT}; tspan, dt, saveat, space, ocean_mask, stepper = Euler()) where {FT}
+function ocean_init(::Type{FT}; tspan, dt, saveat, space, ocean_fraction, stepper = Euler()) where {FT}
 
     params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
 
@@ -59,7 +58,7 @@ function ocean_init(::Type{FT}; tspan, dt, saveat, space, ocean_mask, stepper = 
         params = params,
         F_aero = ClimaCore.Fields.zeros(space),
         F_rad = ClimaCore.Fields.zeros(space),
-        ocean_mask = ocean_mask,
+        ocean_fraction = ocean_fraction,
     )
     problem = OrdinaryDiffEq.ODEProblem(slab_ocean_rhs!, Y, tspan, cache)
     integrator = OrdinaryDiffEq.init(problem, stepper, dt = dt, saveat = saveat)
@@ -70,6 +69,6 @@ end
 # file specific
 """
     clean_sst(SST::FT, _info)
-Ensures that the space of the SST struct matches that of the mask, and converts the units to Kelvin (N.B.: this is dataset specific)
+Ensures that the space of the SST struct matches that of the land_fraction, and converts the units to Kelvin (N.B.: this is dataset specific)
 """
-clean_sst(SST, _info) = (swap_space!(zeros(axes(_info.land_mask)), SST) .+ float_type_bcf(_info)(273.15))
+clean_sst(SST, _info) = (swap_space!(zeros(axes(_info.land_fraction)), SST) .+ float_type_bcf(_info)(273.15))

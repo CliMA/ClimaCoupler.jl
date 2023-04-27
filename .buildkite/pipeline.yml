@@ -110,6 +110,38 @@ steps:
   - group: "Integration Tests"
     steps:
 
+      # Drivers for release >
+
+      # Slabplanet default:
+      # - this is the most lightweight example with conservation and visual checks, with CLI specification as follows
+      #   - numerics: dt = dt_cpl = 200s, nelem = 4
+      #   - physics: bulk aerodynamic surface fluxes, gray radiation, idealized insolation, equil moisture model, 0-moment microphysics
+      #   - input data: monotonous remapping (land mask, SST, SIC)
+      #   - slurm: unthreaded, 1 ntask
+
+
+      - label: "Slabplanet: default"
+        key: "slabplanet_default"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name slabplanet_default --enable_threading true --coupled true --surface_scheme bulk  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface true --h_elem 4 --precip_model 0M"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_default_artifacts/total_energy*.png"
+
+      - label: "Slabplanet: non-monotonous surface remap"
+        key: "slabplanet_non-monotonous"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name slabplanet_nonmono --enable_threading true --coupled true --surface_scheme bulk  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface false --h_elem 4 --precip_model 0M"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_nonmono_artifacts/total_energy*.png"
+
+      - label: "Slabplanet: unthreaded"
+        key: "modular_slabplanet_unthreaded"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name default_modular_unthreaded --enable_threading false --coupled true --surface_scheme bulk  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface true --h_elem 4 --precip_model 0M"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet/default_modular_unthreaded_artifacts/total_energy*.png"
+        env:
+          FLAME_PLOT: ""
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks: 1
+
+      # < end Drivers for release
+
       # - label: "Unit tests"
       #   command: "julia --color=yes --project=test test/runtests.jl"
       #   artifact_paths: "test/*"
@@ -125,25 +157,6 @@ steps:
       - label: "Moist earth with slab surface - notmono: bulk gray no_sponge idealinsol freq_dt_cpl notmono"
         command: "julia --color=yes --project=experiments/AMIP/moist_mpi_earth/ experiments/AMIP/moist_mpi_earth/coupler_driver.jl --enable_threading true --coupled true --surface_scheme monin_obukhov --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface false --h_elem 4 --precip_model 0M --run_name default_notmono"
         artifact_paths: "experiments/AMIP/moist_mpi_earth/output/slabplanet/default_notmono_artifacts/total_energy*.png"
-
-      - label: "Moist earth with slab surface - notmono + modular: bulk gray no_sponge idealinsol freq_dt_cpl"
-        key: "modular_slabplanet"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name default_modular --enable_threading true --coupled true --surface_scheme bulk  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface false --h_elem 4 --precip_model 0M"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/default_modular_artifacts/total_energy*.png"
-        env:
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_ntasks: 1
-
-      - label: "Moist earth with slab surface (unthreaded) - notmono + modular: bulk gray no_sponge idealinsol freq_dt_cpl"
-        key: "modular_slabplanet_unthreaded"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name default_modular_unthreaded --enable_threading true --coupled true --surface_scheme bulk  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface false --h_elem 4 --precip_model 0M"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/default_modular_unthreaded_artifacts/total_energy*.png"
-        env:
-          FLAME_PLOT: ""
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_ntasks: 1
 
       # Note: this test fails when run with the more realistic albedo from file
       - label: "Moist earth with slab surface - target: monin allsky sponge realinsol infreq_dt_cpl - bucket using BulkAlbedoFunction"

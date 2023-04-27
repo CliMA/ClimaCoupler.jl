@@ -35,7 +35,7 @@ ClimaComms.barrier(comms_ctx)
         topology = Topologies.DistributedTopology2D(comms_ctx, mesh, Topologies.spacefillingcurve(mesh))
         quad = Spaces.Quadratures.GLL{Nq}()
         boundary_space_t = Spaces.SpectralElementSpace2D(topology, quad)
-        land_mask_t = Fields.zeros(boundary_space_t)
+        land_fraction_t = Fields.zeros(boundary_space_t)
 
         datafile_rll = sst_data
         varname = "SST"
@@ -52,13 +52,13 @@ ClimaComms.barrier(comms_ctx)
             boundary_space_t,
             comms_ctx,
             segment_idx0 = [Int(1309)],
-            land_mask = land_mask_t,
+            land_fraction = land_fraction_t,
             mono = mono,
         )
 
         # test that created object exists and has correct components
         @test @isdefined(bcf_info)
-        @test all(parent(bcf_info.land_mask) .== 0)
+        @test all(parent(bcf_info.land_fraction) .== 0)
 
         # construct weightfile name to test values
         hd_outfile_root = varname * "_cgll"
@@ -98,8 +98,8 @@ end
         quad = Spaces.Quadratures.GLL{Nq}()
         boundary_space_t = Spaces.SpectralElementSpace2D(topology, quad)
 
-        land_mask_t = Fields.zeros(boundary_space_t)
-        dummy_data = (; test_data = zeros(axes(land_mask_t)))
+        land_fraction_t = Fields.zeros(boundary_space_t)
+        dummy_data = (; test_data = zeros(axes(land_fraction_t)))
 
         datafile_rll = sst_data
         varname = "SST"
@@ -118,7 +118,7 @@ end
             comms_ctx,
             segment_idx0 = [Int(1309)],
             interpolate_daily = false,
-            land_mask = land_mask_t,
+            land_fraction = land_fraction_t,
         )
 
         dates = (; date = [date], date0 = [date0], date1 = [date1])
@@ -135,7 +135,7 @@ end
             tspan, # tspan
             Int(0), # t
             Δt, # Δt_cpl
-            (;), # surface_masks
+            (;), # surface_fractions
             (;), # model_sims
             (;), # mode
             (), # diagnostics

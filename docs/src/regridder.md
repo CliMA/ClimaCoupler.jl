@@ -15,8 +15,8 @@ ClimaCoupler.Regridder.write_to_hdf5
 ClimaCoupler.Regridder.read_from_hdf5
 ClimaCoupler.Regridder.dummmy_remap!
 ClimaCoupler.Regridder.remap_field_cgll_to_rll
-ClimaCoupler.Regridder.land_sea_mask
-ClimaCoupler.Regridder.update_masks!
+ClimaCoupler.Regridder.land_fraction
+ClimaCoupler.Regridder.update_surface_fractions!
 ClimaCoupler.Regridder.combine_surfaces!
 ```
 

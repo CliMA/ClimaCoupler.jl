@@ -50,7 +50,7 @@ function coupler_sim_from_file(
     reader = InputOutput.HDF5Reader(hdf5_filename)
     atmos_u = InputOutput.read_field(reader, "atmos_u")
     ocean_u = InputOutput.read_field(reader, "ocean_u")
-    land_mask = InputOutput.read_field(reader, "land_mask")
+    land_fraction = InputOutput.read_field(reader, "land_mask")
     ocean_params = InputOutput.read_field(reader, "ocean_params", true)
     coupler_fields = InputOutput.read_field(reader, "coupler_fields")
     close(reader)
@@ -60,8 +60,8 @@ function coupler_sim_from_file(
     os = (; integrator = (; p = (; params = ocean_params), u = ocean_u))
     model_sims = (; atmos_sim = as, land_sim = ls, ocean_sim = os, ice_sim = nothing)
 
-    boundary_space = axes(land_mask)
-    FT = eltype(land_mask)
+    boundary_space = axes(land_fraction)
+    FT = eltype(land_fraction)
 
     Utilities.CoupledSimulation{FT}(
         ClimaComms.SingletonCommsContext(),
@@ -73,7 +73,7 @@ function coupler_sim_from_file(
         tspan,
         t,
         Δt_cpl,
-        (; land = land_mask, ocean = FT(1) .- land_mask, ice = land_mask .* FT(0)),
+        (; land = land_fraction, ocean = FT(1) .- land_fraction, ice = land_fraction .* FT(0)),
         model_sims,
         mode_specifics,
         diagnostics,
@@ -152,11 +152,11 @@ end
     os = (; integrator = (; p = (; params = (; ρ = FT(1), c = FT(1), h = FT(1))), u = (; T_sfc = FT(1))))
     model_sims = (; atmos_sim = as, land_sim = ls, ocean_sim = os, ice_sim = nothing)
 
-    # construct land mask of 0s in top half, 1s in bottom half
-    land_mask = Fields.ones(space)
-    dims = size(parent(land_mask))
-    parent(land_mask)[1:(dims[1] ÷ 2), :, :, :] .= FT(0)
-    surface_masks = (; land = land_mask, ocean = FT(1) .- land_mask, ice = land_mask .* FT(0))
+    # construct land fraction of 0s in top half, 1s in bottom half
+    land_fraction = Fields.ones(space)
+    dims = size(parent(land_fraction))
+    parent(land_fraction)[1:(dims[1] ÷ 2), :, :, :] .= FT(0)
+    surface_fractions = (; land = land_fraction, ocean = FT(1) .- land_fraction, ice = land_fraction .* FT(0))
 
     coupler_sim = Utilities.CoupledSimulation{FT}(
         ClimaComms.SingletonCommsContext(),
@@ -173,7 +173,7 @@ end
         nothing,
         FT(0),
         FT(1),
-        surface_masks,
+        surface_fractions,
         model_sims,
         (;),
         (),
@@ -183,13 +183,13 @@ end
     # perform calculations
     ρ_cloud_liq = ClimaLSM.Parameters.ρ_cloud_liq(ls.model.parameters.earth_param_set)
     water_content = @. (ls.integrator.u.bucket.σS + ls.integrator.u.bucket.W + ls.integrator.u.bucket.Ws) # m^3 water / land area / layer height
-    parent(water_content) .= parent(water_content .* surface_masks.land) * ρ_cloud_liq
+    parent(water_content) .= parent(water_content .* surface_fractions.land) * ρ_cloud_liq
 
     e_per_area_land = zeros(axes(ls.integrator.u.bucket.W))
     get_slab_energy(ls, e_per_area_land)
 
     # check that fields are updated correctly
-    @test conservation_checks.energy.ρe_tot_land[end] == sum(e_per_area_land .* surface_masks.land)
+    @test conservation_checks.energy.ρe_tot_land[end] == sum(e_per_area_land .* surface_fractions.land)
     @test conservation_checks.water.ρq_tot_land[end] == sum(water_content)
 
     rm(tmp_dir, recursive = true)

@@ -77,8 +77,8 @@ end
     clean_sic(SIC, _info)
 Ensures that the space of the SIC struct matches that of the mask, and converts the units from area % to area fraction.
 """
-clean_sic(SIC, _info) = swap_space!(zeros(axes(_info.land_mask)), SIC) ./ float_type_bcf(_info)(100.0)
+clean_sic(SIC, _info) = swap_space!(zeros(axes(_info.land_fraction)), SIC) ./ float_type_bcf(_info)(100.0)
 
-# setting that SIC < 0.5 os counted as ocean if binary remapping of landsea mask.
+# setting that SIC < 0.5 is counted as ocean if binary remapping.
 get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
     mono ? h_ice : Regridder.binary_mask(h_ice, threshold = FT(threshold))

@@ -104,7 +104,7 @@ mono_surface = parsed_args["mono_surface"]
 
 import ClimaCoupler
 import ClimaCoupler.Regridder
-import ClimaCoupler.Regridder: land_sea_mask, update_masks!, combine_surfaces!, dummmy_remap!, binary_mask
+import ClimaCoupler.Regridder: update_surface_fractions!, combine_surfaces!, dummmy_remap!, binary_mask
 import ClimaCoupler.ConservationChecker:
     EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
 import ClimaCoupler.Utilities: CoupledSimulation, float_type, swap_space!
@@ -124,11 +124,11 @@ mkpath(REGRID_DIR)
 @info COUPLER_OUTPUT_DIR
 @info parsed_args
 
-## get the paths to the necessary data files - land sea mask, sst map, sea ice concentration
+## get the paths to the necessary data files: land-sea mask, sst map, sea ice concentration
 include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
 sst_data = joinpath(sst_dataset_path(), "sst.nc")
 sic_data = joinpath(sic_dataset_path(), "sic.nc")
-mask_data = joinpath(mask_dataset_path(), "seamask.nc")
+land_mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 
 ## import coupler utils
 include("components/flux_calculator.jl")
@@ -157,8 +157,9 @@ atmosphere and surface are of the same horizontal resolution.
 ## init a 2D bounary space at the surface
 boundary_space = atmos_sim.domain.face_space.horizontal_space
 
-# init land-sea mask
-land_mask = land_sea_mask(FT, REGRID_DIR, comms_ctx, mask_data, "LSMASK", boundary_space, mono = mono_surface)
+# init land-sea fraction
+land_fraction =
+    Regridder.land_fraction(FT, REGRID_DIR, comms_ctx, land_mask_data, "LSMASK", boundary_space, mono = mono_surface)
 
 ## init surface (slab) model components
 include("components/slab_utils.jl")
@@ -205,7 +206,7 @@ if mode_name == "amip"
         comms_ctx,
         interpolate_daily = true,
         scaling_function = clean_sst, ## convert to Kelvin
-        land_mask = land_mask,
+        land_fraction = land_fraction,
         date0 = date0,
         mono = mono_surface,
     )
@@ -216,7 +217,7 @@ if mode_name == "amip"
     ocean_sim = (;
         integrator = (;
             u = (; T_sfc = SST_init),
-            p = (; params = ocean_params, ocean_mask = (FT(1) .- land_mask)),
+            p = (; params = ocean_params, ocean_fraction = (FT(1) .- land_fraction)),
             SST_info = SST_info,
         )
     )
@@ -229,8 +230,8 @@ if mode_name == "amip"
         boundary_space,
         comms_ctx,
         interpolate_daily = true,
-        scaling_function = clean_sic, ## convert to fractions
-        land_mask = land_mask,
+        scaling_function = clean_sic, ## convert to fraction
+        land_fraction = land_fraction,
         date0 = date0,
         mono = mono_surface,
     )
@@ -249,7 +250,7 @@ elseif mode_name == "slabplanet"
         dt = Δt_cpl,
         space = boundary_space,
         saveat = saveat,
-        ocean_mask = (FT(1) .- land_mask), ## NB: this ocean mask includes areas covered by sea ice (unlike the one contained in the cs)
+        ocean_fraction = (FT(1) .- land_fraction), ## NB: this ocean fraction includes areas covered by sea ice (unlike the one contained in the cs)
     )
 
     ## sea ice
@@ -329,7 +330,7 @@ cs = CoupledSimulation{FT}(
     [tspan[1], tspan[2]],
     integrator.t,
     Δt_cpl,
-    (; land = land_mask, ocean = zeros(boundary_space), ice = zeros(boundary_space)),
+    (; land = land_fraction, ocean = zeros(boundary_space), ice = zeros(boundary_space)),
     model_sims,
     mode_specifics,
     diagnostics,

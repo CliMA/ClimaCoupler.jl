@@ -20,8 +20,8 @@ export write_to_hdf5,
     read_from_hdf5,
     dummmy_remap!,
     remap_field_cgll_to_rll,
-    land_sea_mask,
-    update_masks!,
+    land_fraction,
+    update_surface_fractions!,
     combine_surfaces!,
     binary_mask,
     nans_to_zero
@@ -329,7 +329,7 @@ function remap_field_cgll_to_rll(name, field::Fields.Field, remap_tmpdir, datafi
 end
 
 """
-    function land_sea_mask(
+    function land_fraction(
         FT,
         REGRID_DIR,
         comms_ctx::ClimaComms.AbstractCommsContext,
@@ -341,7 +341,7 @@ end
         threshold = 0.7,
     )
 
-Initialize a mask for land/sea classification of grid squares over the space.
+Initialize a fraction for land/sea classification of grid squares over the space.
 With `mono` = `true`, remappings are monotone and conservative, (slower).
 With `mono` = `false`, values outside of `threshold` are cutoff (faster).
 
@@ -362,7 +362,7 @@ See https://github.com/CliMA/ClimaCoupler.jl/wiki/ClimaCoupler-Lessons-Learned
 # Returns
 - Fields.Field
 """
-function land_sea_mask(
+function land_fraction(
     FT,
     REGRID_DIR,
     comms_ctx::ClimaComms.AbstractCommsContext,
@@ -387,34 +387,34 @@ function land_sea_mask(
     end
     ClimaComms.barrier(comms_ctx)
     file_dates = JLD2.load(joinpath(REGRID_DIR, outfile_root * "_times.jld2"), "times")
-    mask = read_from_hdf5(REGRID_DIR, outfile_root, file_dates[1], varname, comms_ctx)
-    mask = swap_space!(zeros(boundary_space), mask) # needed if we are reading from previous run
-    return mono ? mask : binary_mask.(mask, threshold = threshold)
+    fraction = read_from_hdf5(REGRID_DIR, outfile_root, file_dates[1], varname, comms_ctx)
+    fraction = swap_space!(zeros(boundary_space), fraction) # needed if we are reading from previous run
+    return mono ? fraction : binary_mask.(fraction, threshold = threshold)
 end
 
 """
-    update_masks!(cs::CoupledSimulation)
+    update_surface_fractions!(cs::CoupledSimulation)
 
-Updates dynamically changing masks.
-Maintains the invariant that the sum of masks is 1 at all points.
+Updates dynamically changing area fractions.
+Maintains the invariant that the sum of area fractions is 1 at all points.
 
 # Arguments
-- `cs`: [CoupledSimulation] containing mask information.
+- `cs`: [CoupledSimulation] containing area fraction information.
 """
-function update_masks!(cs::CoupledSimulation)
-    # dynamic masks
+function update_surface_fractions!(cs::CoupledSimulation)
+    # dynamic fractions
     ice_d = cs.model_sims.ice_sim.integrator.p.ice_fraction
     FT = eltype(ice_d)
 
-    # static mask
-    land_s = cs.surface_masks.land
+    # static fraction
+    land_s = cs.surface_fractions.land
 
     # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-    cs.surface_masks.ice .= max.(min.(ice_d, FT(1) .- land_s), FT(0))
-    cs.surface_masks.ocean .= max.(FT(1) .- (cs.surface_masks.ice .+ land_s), FT(0))
+    cs.surface_fractions.ice .= max.(min.(ice_d, FT(1) .- land_s), FT(0))
+    cs.surface_fractions.ocean .= max.(FT(1) .- (cs.surface_fractions.ice .+ land_s), FT(0))
 
-    @assert minimum(cs.surface_masks.ice .+ cs.surface_masks.land .+ cs.surface_masks.ocean) ≈ FT(1)
-    @assert maximum(cs.surface_masks.ice .+ cs.surface_masks.land .+ cs.surface_masks.ocean) ≈ FT(1)
+    @assert minimum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) ≈ FT(1)
+    @assert maximum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) ≈ FT(1)
 
 end
 
@@ -431,25 +431,25 @@ Converts a number `var` to 1, if `var` is greater or equal than a given `thresho
 binary_mask(var::FT; threshold = FT(0.5)) where {FT} = var < FT(threshold) ? FT(0) : FT(1)
 
 """
-    combine_surfaces!(combined_field::Fields.Field, masks::NamedTuple, fields::NamedTuple)
+    combine_surfaces!(combined_field::Fields.Field, fractions::NamedTuple, fields::NamedTuple)
 
-Sums Field objects in `fields` weighted by the respective masks, and updates
+Sums Field objects in `fields` weighted by the respective area fractions, and updates
 these values in `combined_field`.
-NamedTuples `fields` and `masks` must have matching field names.
+NamedTuples `fields` and `fractions` must have matching field names.
 
 # Arguments
 - `combined_field`: [Fields.Field] output object containing weighted values.
-- `masks`: [NamedTuple] containing weights used on values in `fields`.
-- `fields`: [NamedTuple] containing values to be weighted by `masks`.
+- `fractions`: [NamedTuple] containing weights used on values in `fields`.
+- `fields`: [NamedTuple] containing values to be weighted by `fractions`.
 """
-function combine_surfaces!(combined_field::Fields.Field, masks::NamedTuple, fields::NamedTuple)
+function combine_surfaces!(combined_field::Fields.Field, fractions::NamedTuple, fields::NamedTuple)
     combined_field .= eltype(combined_field)(0)
     warn_nans = false
     for surface_name in propertynames(fields) # could use dot here?
         if any(x -> isnan(x), getproperty(fields, surface_name))
             warn_nans = true
         end
-        combined_field .+= getproperty(masks, surface_name) .* nans_to_zero.(getproperty(fields, surface_name))
+        combined_field .+= getproperty(fractions, surface_name) .* nans_to_zero.(getproperty(fields, surface_name))
     end
     warn_nans && @warn "NaNs were detected and converted to zeros."
 end

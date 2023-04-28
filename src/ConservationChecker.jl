@@ -75,12 +75,12 @@ function check_conservation!(
     get_slab_energy,
     get_land_energy,
 )
-    @unpack model_sims, surface_masks = coupler_sim
+    @unpack model_sims, surface_fractions = coupler_sim
     @unpack atmos_sim, land_sim, ocean_sim, ice_sim = model_sims
     radiation = atmos_sim.integrator.p.radiation_model # TODO: take out of global scope in ClimaAtmos
     boundary_space = coupler_sim.boundary_space # thin shell approx (boundary_space[z=0] = boundary_space[z_top])
 
-    FT = eltype(coupler_sim.surface_masks.land)
+    FT = eltype(coupler_sim.surface_fractions.land)
 
     # save radiation source
     if radiation != nothing
@@ -121,21 +121,21 @@ function check_conservation!(
     if land_sim !== nothing
         e_per_area_land = zeros(axes(land_sim.integrator.u.bucket.W))
         get_land_energy(land_sim, e_per_area_land)
-        push!(cc.ρe_tot_land, sum(e_per_area_land .* surface_masks.land))
+        push!(cc.ρe_tot_land, sum(e_per_area_land .* surface_fractions.land))
     else
         push!(cc.ρe_tot_land, FT(0))
     end
 
     # save sea ice
     if ice_sim !== nothing
-        push!(cc.ρe_tot_seaice, sum(get_slab_energy(ice_sim, ice_sim.integrator.u.T_sfc) .* surface_masks.ice))
+        push!(cc.ρe_tot_seaice, sum(get_slab_energy(ice_sim, ice_sim.integrator.u.T_sfc) .* surface_fractions.ice))
     else
         push!(cc.ρe_tot_seaice, FT(0))
     end
 
     # save ocean
     if ocean_sim !== nothing
-        push!(cc.ρe_tot_ocean, sum(get_slab_energy(ocean_sim, ocean_sim.integrator.u.T_sfc) .* surface_masks.ocean))
+        push!(cc.ρe_tot_ocean, sum(get_slab_energy(ocean_sim, ocean_sim.integrator.u.T_sfc) .* surface_fractions.ocean))
     else
         push!(cc.ρe_tot_ocean, FT(0))
     end
@@ -165,11 +165,11 @@ function check_conservation!(
     get_slab_energy,
     get_land_energy,
 )
-    @unpack model_sims, surface_masks = coupler_sim
+    @unpack model_sims, surface_fractions = coupler_sim
     @unpack atmos_sim, land_sim, ocean_sim, ice_sim = model_sims
 
     boundary_space = coupler_sim.boundary_space
-    FT = eltype(coupler_sim.surface_masks.land)
+    FT = eltype(coupler_sim.surface_fractions.land)
 
     # save atmos
     push!(cc.ρq_tot_atmos, sum(atmos_sim.integrator.u.c.ρq_tot))
@@ -179,7 +179,7 @@ function check_conservation!(
         ρ_cloud_liq = ClimaLSM.LSMP.ρ_cloud_liq(land_sim.model.parameters.earth_param_set)
         water_content =
             @. (land_sim.integrator.u.bucket.σS + land_sim.integrator.u.bucket.W + land_sim.integrator.u.bucket.Ws) # m^3 water / land area / layer height
-        parent(water_content) .= parent(water_content .* surface_masks.land) * ρ_cloud_liq # kg / land area / layer height
+        parent(water_content) .= parent(water_content .* surface_fractions.land) * ρ_cloud_liq # kg / land area / layer height
         push!(cc.ρq_tot_land, sum(water_content)) # kg (∫ water_content dV)
     else
         push!(cc.ρq_tot_land, FT(0))
@@ -188,14 +188,14 @@ function check_conservation!(
     # save sea ice
     coupler_sim.fields.P_net .-= swap_space!(zeros(boundary_space), surface_water_gain_from_rates(coupler_sim)) # accumulated surface water gain
     if ice_sim !== nothing
-        push!(cc.ρq_tot_seaice, sum(coupler_sim.fields.P_net .* surface_masks.ice)) # kg (∫ P_net dV)
+        push!(cc.ρq_tot_seaice, sum(coupler_sim.fields.P_net .* surface_fractions.ice)) # kg (∫ P_net dV)
     else
         push!(cc.ρq_tot_seaice, FT(0))
     end
 
     # save ocean
     if ocean_sim !== nothing
-        push!(cc.ρq_tot_ocean, sum(coupler_sim.fields.P_net .* surface_masks.ocean))  # kg (∫ P_net dV)
+        push!(cc.ρq_tot_ocean, sum(coupler_sim.fields.P_net .* surface_fractions.ocean))  # kg (∫ P_net dV)
     else
         push!(cc.ρq_tot_ocean, FT(0))
     end

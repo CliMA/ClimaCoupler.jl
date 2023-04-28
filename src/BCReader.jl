@@ -30,7 +30,7 @@ Stores information specific to each boundary condition from a file and each vari
 - all_dates::D                    # vector of all dates contained in the original data file
 - monthly_fields::C               # tuple of the two monthly fields, that will be used for the daily interpolation
 - scaling_function::O             # function that scales, offsets or transforms the raw variable
-- land_mask::M                    # mask with 1 = land, 0 = ocean / sea-ice
+- land_fraction::M                # fraction with 1 = 100% land, 0 = 100% ocean and/or sea-ice
 - segment_idx::Vector{Int}        # index of the monthly data in the file
 - segment_idx0::Vector{Int}       # `segment_idx` of the file data that is closest to date0
 - segment_length::Vector{Int}     # length of each month segment (used in the daily interpolation)
@@ -44,7 +44,7 @@ struct BCFileInfo{FT <: Real, B, X, S, V, D, C, O, M, VI}
     all_dates::D
     monthly_fields::C
     scaling_function::O
-    land_mask::M
+    land_fraction::M
     segment_idx::VI
     segment_idx0::VI
     segment_length::VI
@@ -59,14 +59,14 @@ float_type_bcf(::BCFileInfo{FT}) where {FT} = FT
     no_scaling(field, bcf_info)
 
 Remap the values of a `field` onto the space of the
-`bcf_info`'s land_mask without scaling.
+`bcf_info`'s land_fraction without scaling.
 
 # Arguments
 - `field`: [Fields.Field] contains the values to be remapped.
-- `bcf_info`: [BCFileInfo] contains a land_mask to remap onto the space of.
+- `bcf_info`: [BCFileInfo] contains a land_fraction to remap onto the space of.
 """
 no_scaling(field::Fields.Field, bcf_info::BCFileInfo{FT}) where {FT} =
-    Utilities.swap_space!(zeros(axes(bcf_info.land_mask)), field)
+    Utilities.swap_space!(zeros(axes(bcf_info.land_fraction)), field)
 
 """
     bcfile_info_init(
@@ -79,7 +79,7 @@ no_scaling(field::Fields.Field, bcf_info::BCFileInfo{FT}) where {FT} =
         interpolate_daily = false,
         segment_idx0 = nothing,
         scaling_function = no_scaling,
-        land_mask = nothing,
+        land_fraction = nothing,
         date0 = nothing,
         mono = true,
     )
@@ -97,7 +97,7 @@ and returns the info packaged in a single struct.
 - `interpolate_daily`: [Bool] switch to trigger daily interpolation.
 - `segment_idx0`: [Vector{Int}] index of the file data that is closest to date0.
 - `scaling function`: [Function] scales, offsets or transforms `varname`.
-- `land_mask`: [Fields.field] mask with 1 = land, 0 = ocean / sea-ice.
+- `land_fraction`: [Fields.field] fraction with 1 = land, 0 = ocean / sea-ice.
 - `date0`: [Dates.DateTime] start date of the file data.
 - `mono`: [Bool] flag for monotone remapping of `datafile_rll`.
 
@@ -114,7 +114,7 @@ function bcfile_info_init(
     interpolate_daily = false,
     segment_idx0 = nothing,
     scaling_function = no_scaling,
-    land_mask = nothing,
+    land_fraction = nothing,
     date0 = nothing,
     mono = true,
 )
@@ -159,7 +159,7 @@ function bcfile_info_init(
         data_dates,
         current_fields,
         scaling_function,
-        land_mask,
+        land_fraction,
         deepcopy(segment_idx0),
         segment_idx0,
         segment_length,

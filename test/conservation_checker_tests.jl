@@ -45,23 +45,27 @@ function coupler_sim_from_file(
     parsed_args = (;),
     diagnostics = (),
     conservation_checks = (;),
+    land_fraction = (),
 )
 
-    reader = InputOutput.HDF5Reader(hdf5_filename)
-    atmos_u = InputOutput.read_field(reader, "atmos_u")
-    ocean_u = InputOutput.read_field(reader, "ocean_u")
-    land_mask = InputOutput.read_field(reader, "land_mask")
-    ocean_params = InputOutput.read_field(reader, "ocean_params", true)
-    coupler_fields = InputOutput.read_field(reader, "coupler_fields")
-    close(reader)
+    if isempty(model_sims)
 
-    as = (; integrator = (; p = (; radiation_model = nothing), u = atmos_u))
-    ls = nothing
-    os = (; integrator = (; p = (; params = ocean_params), u = ocean_u))
-    model_sims = (; atmos_sim = as, land_sim = ls, ocean_sim = os, ice_sim = nothing)
+        reader = InputOutput.HDF5Reader(hdf5_filename)
+        atmos_u = InputOutput.read_field(reader, "atmos_u")
+        ocean_u = InputOutput.read_field(reader, "ocean_u")
+        land_fraction = InputOutput.read_field(reader, "land_mask")
+        ocean_params = InputOutput.read_field(reader, "ocean_params", true)
+        coupler_fields = InputOutput.read_field(reader, "coupler_fields")
+        close(reader)
 
-    boundary_space = axes(land_mask)
-    FT = eltype(land_mask)
+        as = (; integrator = (; p = (; radiation_model = nothing), u = atmos_u))
+        ls = nothing
+        os = (; integrator = (; p = (; params = ocean_params), u = ocean_u))
+        model_sims = (; atmos_sim = as, land_sim = ls, ocean_sim = os, ice_sim = nothing)
+    end
+
+    boundary_space = axes(land_fraction)
+    FT = eltype(land_fraction)
 
     Utilities.CoupledSimulation{FT}(
         ClimaComms.SingletonCommsContext(),
@@ -73,7 +77,7 @@ function coupler_sim_from_file(
         tspan,
         t,
         Δt_cpl,
-        (; land = land_mask, ocean = FT(1) .- land_mask, ice = land_mask .* FT(0)),
+        (; land = land_fraction, ocean = FT(1) .- land_fraction, ice = land_fraction .* FT(0)),
         model_sims,
         mode_specifics,
         diagnostics,
@@ -152,11 +156,11 @@ end
     os = (; integrator = (; p = (; params = (; ρ = FT(1), c = FT(1), h = FT(1))), u = (; T_sfc = FT(1))))
     model_sims = (; atmos_sim = as, land_sim = ls, ocean_sim = os, ice_sim = nothing)
 
-    # construct land mask of 0s in top half, 1s in bottom half
-    land_mask = Fields.ones(space)
-    dims = size(parent(land_mask))
-    parent(land_mask)[1:(dims[1] ÷ 2), :, :, :] .= FT(0)
-    surface_masks = (; land = land_mask, ocean = FT(1) .- land_mask, ice = land_mask .* FT(0))
+    # construct land fraction of 0s in top half, 1s in bottom half
+    land_fraction = Fields.ones(space)
+    dims = size(parent(land_fraction))
+    parent(land_fraction)[1:(dims[1] ÷ 2), :, :, :] .= FT(0)
+    surface_fractions = (; land = land_fraction, ocean = FT(1) .- land_fraction, ice = land_fraction .* FT(0))
 
     coupler_sim = Utilities.CoupledSimulation{FT}(
         ClimaComms.SingletonCommsContext(),
@@ -173,7 +177,7 @@ end
         nothing,
         FT(0),
         FT(1),
-        surface_masks,
+        surface_fractions,
         model_sims,
         (;),
         (),
@@ -183,13 +187,13 @@ end
     # perform calculations
     ρ_cloud_liq = ClimaLSM.Parameters.ρ_cloud_liq(ls.model.parameters.earth_param_set)
     water_content = @. (ls.integrator.u.bucket.σS + ls.integrator.u.bucket.W + ls.integrator.u.bucket.Ws) # m^3 water / land area / layer height
-    parent(water_content) .= parent(water_content .* surface_masks.land) * ρ_cloud_liq
+    parent(water_content) .= parent(water_content .* surface_fractions.land) * ρ_cloud_liq
 
     e_per_area_land = zeros(axes(ls.integrator.u.bucket.W))
     get_slab_energy(ls, e_per_area_land)
 
     # check that fields are updated correctly
-    @test conservation_checks.energy.ρe_tot_land[end] == sum(e_per_area_land .* surface_masks.land)
+    @test conservation_checks.energy.ρe_tot_land[end] == sum(e_per_area_land .* surface_fractions.land)
     @test conservation_checks.water.ρq_tot_land[end] == sum(water_content)
 
     rm(tmp_dir, recursive = true)
@@ -217,4 +221,70 @@ end
     plot_global_conservation(conservation_checks.water, coupler_sim, figname1 = tmpname1, figname2 = tmpname2)
     @test (isfile(tmpname1) & isfile(tmpname2))
     rm(tmp_dir, recursive = true)
+end
+
+@testset "test plot_global_conservation with dummy zero models" begin
+
+    center_3d_space = TestHelper.create_space(FT, nz = 2)
+    face_3d_space = Spaces.FaceExtrudedFiniteDifferenceSpace(center_3d_space)
+    face_var = zeros(face_3d_space)
+    face_array = reshape(parent(face_var), size(parent(face_var), 1), :)
+
+    land_fraction = Fields.level(zeros(center_3d_space), 1)
+    coupler_fields = (; F_R_TOA = land_fraction)
+    ls = nothing
+    ice_u = (; T_sfc = Fields.level(zeros(center_3d_space), 1))
+    is = (; integrator = (; p = (; params = (; h = FT(0), c = FT(0), ρ = FT(0))), u = ice_u))
+
+    # radiative fluxes balancing
+    radiation_model = (;
+        face_lw_flux_dn = face_array .+ FT(1),
+        face_lw_flux_up = face_array,
+        face_sw_flux_dn = face_array .- FT(1),
+        face_sw_flux_up = face_array,
+    )
+    as = (;
+        integrator = (;
+            p = (; radiation_model = radiation_model),
+            u = (; c = (; ρe_tot = zeros(center_3d_space)), f = face_var),
+        )
+    )
+    model_sims = (; atmos_sim = as, land_sim = ls, ocean_sim = nothing, ice_sim = is)
+
+    conservation_checks = (; energy = EnergyConservationCheck([], [], [], [], [], []))
+    coupler_sim = coupler_sim_from_file(
+        nothing,
+        conservation_checks = conservation_checks,
+        model_sims = model_sims,
+        land_fraction = land_fraction,
+        coupler_fields = coupler_fields,
+    )
+    tot = check_conservation!(coupler_sim, get_slab_energy, get_slab_energy)
+    @test tot.energy[1] ≈ 0.0
+
+    # radiative fluxes not balancing
+    radiation_model = (;
+        face_lw_flux_dn = face_array .+ FT(2),
+        face_lw_flux_up = face_array,
+        face_sw_flux_dn = face_array .- FT(1),
+        face_sw_flux_up = face_array,
+    )
+    as = (;
+        integrator = (;
+            p = (; radiation_model = radiation_model),
+            u = (; c = (; ρe_tot = zeros(center_3d_space)), f = face_var),
+        )
+    )
+    model_sims = (; atmos_sim = as, land_sim = ls, ocean_sim = nothing, ice_sim = is)
+
+    conservation_checks = (; energy = EnergyConservationCheck([], [], [], [], [], []))
+    coupler_sim = coupler_sim_from_file(
+        nothing,
+        conservation_checks = conservation_checks,
+        model_sims = model_sims,
+        land_fraction = land_fraction,
+        coupler_fields = coupler_fields,
+    )
+    tot = check_conservation!(coupler_sim, get_slab_energy, get_slab_energy)
+    @test tot.energy[1] !== 0.0
 end

@@ -45,7 +45,7 @@ struct CoupledSimulation{
     tspan::TS
     t::TI
     Δt_cpl::DTI
-    surface_masks::NTSM
+    surface_fractions::NTSM
     model_sims::NTMS
     mode::NTM
     diagnostics::Tuple

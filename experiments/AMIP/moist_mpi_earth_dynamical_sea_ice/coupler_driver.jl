@@ -9,6 +9,7 @@ using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
 using LinearAlgebra
 import Test: @test
 using ClimaCore.Utilities: half, PlusHalf
+import ClimaCore.Spaces as Spaces
 
 Pkg.add(PackageSpec(name = "ClimaCore", version = "0.10.3"))
 

@@ -3,9 +3,9 @@
 #=
 ## Overview
 
-This sea breeze simulation consists of an atmosphere above ocean and land thermal slabs. 
-The difference in heating between the land and ocean components drives circulation: 
-cool ocean air flows towards the land at the surface while warm air over land rises 
+This sea breeze simulation consists of an atmosphere above ocean and land thermal slabs.
+The difference in heating between the land and ocean components drives circulation:
+cool ocean air flows towards the land at the surface while warm air over land rises
 and flows over the ocean.
 
 In this tutorial we demonstrate the coupling of three component models
@@ -16,6 +16,7 @@ of the ClimaCoupler interface are used and discussed.
 import SciMLBase: step! #hide
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues! #hide
 import ClimaCore.Utilities: PlusHalf #hide
+import ClimaCore.Spaces as Spaces
 using DiffEqCallbacks #hide
 #hide
 ## enable broadcasting with mismatched spaces #hide

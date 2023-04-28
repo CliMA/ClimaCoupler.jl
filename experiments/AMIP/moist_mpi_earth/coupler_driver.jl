@@ -60,7 +60,7 @@ using UnPack
 import MPI
 
 using ClimaCore.Utilities: half, PlusHalf
-using ClimaCore: InputOutput
+using ClimaCore: InputOutput, Geometry
 
 include("cli_options.jl")
 (s, parsed_args) = parse_commandline()

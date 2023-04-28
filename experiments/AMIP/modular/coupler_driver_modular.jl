@@ -61,6 +61,7 @@ using Plots
 
 using ClimaCore.Utilities: half, PlusHalf
 using ClimaCore: InputOutput, Fields
+import ClimaCore.Spaces as Spaces
 
 
 if !(@isdefined parsed_args)

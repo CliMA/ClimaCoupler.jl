@@ -1,5 +1,6 @@
 using ClimaCore.Geometry: ⊗
 using ClimaCore.Utilities: half, PlusHalf
+import ClimaCore.Spaces as Spaces
 import ClimaAtmos: get_surface_fluxes!
 
 """

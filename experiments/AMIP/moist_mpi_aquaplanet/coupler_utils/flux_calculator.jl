@@ -26,7 +26,7 @@ function calculate_surface_fluxes_atmos_grid!(integrator, T_sfc)
             Ch,
         )
 
-    # Radiation fluxes 
+    # Radiation fluxes
     t = integrator.t
     Rn = FT(10 * sin(t / 2π * 1000)) # TODO: link to the SW and LW fluxes from atmos
 
@@ -42,11 +42,11 @@ function calculate_surface_fluxes_atmos_grid!(integrator, T_sfc)
 
     # Momentum flux
 
-    u_space = axes(tsf.ρτxz) # TODO: delete when "space not the same instance" error is dealt with 
+    u_space = axes(tsf.ρτxz) # TODO: delete when "space not the same instance" error is dealt with
     normal = Geometry.WVector.(ones(u_space)) # TODO: this will need to change for topography
-    ρ_1 = Fields.Field(Fields.field_values(Fields.level(Y.c.ρ, 1)), u_space) # TODO: delete when "space not the same instance" error is dealt with 
+    ρ_1 = Fields.Field(Fields.field_values(Fields.level(Y.c.ρ, 1)), u_space) # TODO: delete when "space not the same instance" error is dealt with
     if :uₕ in propertynames(Y.c)
-        parent(dif_flux_uₕ) .=  # TODO: remove parent when "space not the same instance" error is dealt with 
+        parent(dif_flux_uₕ) .=  # TODO: remove parent when "space not the same instance" error is dealt with
             parent(
                 Geometry.Contravariant3Vector.(normal) .⊗
                 Geometry.Covariant12Vector.(Geometry.UVVector.(tsf.ρτxz ./ ρ_1, tsf.ρτyz ./ ρ_1)),

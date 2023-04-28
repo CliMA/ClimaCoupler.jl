@@ -7,6 +7,7 @@ using OrdinaryDiffEq
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
 using LinearAlgebra
 import Test: @test
+import ClimaCore.Spaces as Spaces
 
 # import coupler utils
 include("coupler_utils/flux_calculator.jl")

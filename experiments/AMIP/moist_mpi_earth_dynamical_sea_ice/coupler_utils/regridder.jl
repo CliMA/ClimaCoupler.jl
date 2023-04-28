@@ -26,7 +26,7 @@ function reshape_sparse_to_field!(field::Fields.Field, in_array::Array, R)
     space = axes(field)
     topology = Spaces.topology(space)
     hspace = Spaces.horizontal_space(space)
-    Spaces.dss2!(Fields.field_values(field), topology, hspace.quadrature_style)
+    Spaces.dss!(Fields.field_values(field), topology, hspace.quadrature_style)
     return field
 end
 
@@ -117,7 +117,7 @@ function ncreader_rll_to_cgll_from_space(FT, infile, varname, h_space)
     mask = ncreader_rll_to_cgll(FT, infile, varname, ne = ne, R = R, Nq = Nq)
 end
 
-# for AMIP we don't need regridding. When we do we re-introduce the ClimaCoreTempestRemap 
+# for AMIP we don't need regridding. When we do we re-introduce the ClimaCoreTempestRemap
 function dummmy_remap!(target, source)  # TODO: bring back Tempest regrid
     parent(target) .= parent(source)
 end

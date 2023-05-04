@@ -65,7 +65,7 @@ using ClimaCore: InputOutput, Fields
 
 if !(@isdefined parsed_args)
     include("cli_options.jl")
-    (s, parsed_args) = parse_commandline()
+    parsed_args = parse_commandline(argparse_settings())
 end
 
 ## modify parsed args for fast testing from REPL #hide

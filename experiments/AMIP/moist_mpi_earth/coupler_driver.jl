@@ -63,7 +63,7 @@ using ClimaCore.Utilities: half, PlusHalf
 using ClimaCore: InputOutput, Geometry
 
 include("cli_options.jl")
-(s, parsed_args) = parse_commandline()
+parsed_args = parse_commandline(argparse_settings())
 
 ## modify parsed args for fast testing from REPL #hide
 if isinteractive()

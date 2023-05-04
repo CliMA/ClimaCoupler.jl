@@ -1,5 +1,5 @@
 import ArgParse
-function parse_commandline()
+function argparse_settings()
     s = ArgParse.ArgParseSettings()
     ArgParse.@add_arg_table s begin
         # ClimaCoupler flags
@@ -379,9 +379,10 @@ function parse_commandline()
         help = "A toml file used to override model parameters and configurations. In the case of conflicts, CLI arguments take priority over the toml"
         arg_type = String
     end
-    parsed_args = ArgParse.parse_args(ARGS, s)
-    return (s, parsed_args)
+    return s
 end
+
+parse_commandline(s) = ArgParse.parse_args(ARGS, s)
 
 function cli_defaults(s::ArgParse.ArgParseSettings)
     defaults = Dict()
@@ -443,9 +444,9 @@ Example:
 function print_repl_script(str)
     ib = """"""
     ib *= """\n"""
-    ib *= """using Revise; include("examples/hybrid/cli_options.jl");\n"""
+    ib *= """using Revise; include("src/utils/cli_options.jl");\n"""
     ib *= """\n"""
-    ib *= """(s, parsed_args) = parse_commandline();\n"""
+    ib *= """parsed_args = parse_commandline(argparse_settings());\n"""
     parsed_args = parsed_args_from_command_line_flags(str)
     for (flag, val) in parsed_args
         if val isa AbstractString
@@ -531,7 +532,7 @@ function parsed_args_per_job_id(buildkite_yaml; trigger = "driver.jl")
     @assert length(buildkite_commands) > 0 # sanity check
     result = Dict()
     for bkcs in buildkite_commands
-        (s, default_parsed_args) = parse_commandline()
+        default_parsed_args = parse_commandline(argparse_settings())
         job_id = first(split(last(split(bkcs, "--run_name ")), " "))
         job_id = strip(job_id, '\"')
         result[job_id] = parsed_args_from_command_line_flags(bkcs, default_parsed_args)
@@ -540,7 +541,7 @@ function parsed_args_per_job_id(buildkite_yaml; trigger = "driver.jl")
 end
 
 function non_default_command_line_flags_parsed_args(parsed_args)
-    (s, default_parsed_args) = parse_commandline()
+    default_parsed_args = parse_commandline(argparse_settings())
     s = ""
     for k in keys(parsed_args)
         default_parsed_args[k] == parsed_args[k] && continue

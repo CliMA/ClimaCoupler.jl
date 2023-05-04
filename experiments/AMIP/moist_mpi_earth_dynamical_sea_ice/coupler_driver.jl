@@ -188,7 +188,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
 
     # coupler_push!: get accumulated fluxes from atmos in the surface fields
     F_A .= ClimaCore.Fields.zeros(boundary_space)
-    dummmy_remap!(F_A, atmos_sim.integrator.p.dif_flux_energy)
+    dummmy_remap!(F_A, atmos_sim.integrator.p.ρ_dif_flux_h_tot)
     F_R .= ClimaCore.Fields.zeros(boundary_space)
     parsed_args["rad"] == "gray" ? dummmy_remap!(F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) : nothing # TODO: albedo hard coded...
     dF_A .= ClimaCore.Fields.zeros(boundary_space)

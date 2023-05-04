@@ -6,8 +6,7 @@ updates F_A, F_R, P_liq, and F_E in place based on values used in the atmos_sim 
 function atmos_push!(cs)
     atmos_sim = cs.model_sims.atmos_sim
     csf = cs.fields
-    dummmy_remap!(csf.F_A, .-atmos_sim.integrator.p.dif_flux_energy_bc)
-    dummmy_remap!(csf.F_E, .-atmos_sim.integrator.p.dif_flux_ρq_tot_bc)
+    dummmy_remap!(csf.F_E, atmos_sim.integrator.p.ρ_dif_flux_q_tot)
     dummmy_remap!(csf.F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half))
     dummmy_remap!(csf.P_liq, atmos_sim.integrator.p.col_integrated_rain .+ atmos_sim.integrator.p.col_integrated_snow)
 end

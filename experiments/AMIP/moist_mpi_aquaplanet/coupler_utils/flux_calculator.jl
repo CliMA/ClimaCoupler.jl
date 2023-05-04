@@ -6,7 +6,7 @@ calculate_surface_fluxes_atmos_grid!(integrator)
 """
 function calculate_surface_fluxes_atmos_grid!(integrator, T_sfc)
     p = integrator.p
-    (; ᶜts, dif_flux_energy, dif_flux_ρq_tot, dif_flux_uₕ, params, Cd, Ch) = p
+    (; ᶜts, ρ_dif_flux_h_tot, dif_flux_ρq_tot, ρ_dif_flux_uₕ, params, Cd, Ch) = p
 
     Y = integrator.u
 
@@ -32,7 +32,7 @@ function calculate_surface_fluxes_atmos_grid!(integrator, T_sfc)
 
     # Total energy flux
     if :ρe in propertynames(Y.c)
-        @. dif_flux_energy = Geometry.WVector(tsf.shf + tsf.shf + Rn)
+        @. ρ_dif_flux_h_tot = Geometry.WVector(tsf.shf + tsf.shf + Rn)
     end
 
     # Moisture mass flux
@@ -46,7 +46,7 @@ function calculate_surface_fluxes_atmos_grid!(integrator, T_sfc)
     normal = Geometry.WVector.(ones(u_space)) # TODO: this will need to change for topography
     ρ_1 = Fields.Field(Fields.field_values(Fields.level(Y.c.ρ, 1)), u_space) # TODO: delete when "space not the same instance" error is dealt with
     if :uₕ in propertynames(Y.c)
-        parent(dif_flux_uₕ) .=  # TODO: remove parent when "space not the same instance" error is dealt with
+        parent(ρ_dif_flux_uₕ) .=  # TODO: remove parent when "space not the same instance" error is dealt with
             parent(
                 Geometry.Contravariant3Vector.(normal) .⊗
                 Geometry.Covariant12Vector.(Geometry.UVVector.(tsf.ρτxz ./ ρ_1, tsf.ρτyz ./ ρ_1)),

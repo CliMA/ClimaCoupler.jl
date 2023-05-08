@@ -8,7 +8,7 @@ calculate_surface_fluxes_atmos_grid!(integrator)
 """
 function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     p = integrator.p
-    (; ᶜts, ρ_dif_flux_h_tot, dif_flux_ρq_tot, ρ_dif_flux_uₕ, ∂F_aero∂T_sfc, params, Cd, Ch) = p
+    (; ᶜts, ρ_dif_flux_h_tot, ρ_dif_flux_q_tot, ρ_dif_flux_uₕ, ∂F_aero∂T_sfc, params, Cd, Ch) = p
 
     (; T_sfc, z0m, z0b, ice_mask) = info_sfc
     Y = integrator.u
@@ -38,9 +38,9 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
 
     # Moisture mass flux
     if :ρq_tot in propertynames(Y.c)
-        flux_mass = ones(axes(dif_flux_ρq_tot))
+        flux_mass = ones(axes(ρ_dif_flux_q_tot))
         parent(flux_mass) .= parent(tsf.E .* swap_space!(zeros(axes(tsf.E)), abs.(ice_mask .- FT(1))))
-        @. dif_flux_ρq_tot = Geometry.WVector(flux_mass) # no E above sea ice
+        @. ρ_dif_flux_q_tot = Geometry.WVector(flux_mass) # no E above sea ice
     end
 
     # Momentum flux

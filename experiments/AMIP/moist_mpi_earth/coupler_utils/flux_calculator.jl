@@ -53,9 +53,9 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
         get_surface_fluxes!(Y, p, colidx)
         # corrections (accounting for inhomogeneous surfaces)
         @. p.ρ_dif_flux_h_tot[colidx] = # checking right quantity in ClimaAtmos v0.11.0
-            Geometry.WVector(correct_e_over_ice(p.surface_conditions[colidx], ice_mask[colidx]))
+            -Geometry.WVector(correct_e_over_ice(p.surface_conditions[colidx], ice_mask[colidx]))
         @. p.ρ_dif_flux_q_tot[colidx] =
-            Geometry.WVector(correct_q_over_ice(p.surface_conditions[colidx], ice_mask[colidx]))
+            -Geometry.WVector(correct_q_over_ice(p.surface_conditions[colidx], ice_mask[colidx]))
     end
 end
 correct_e_over_ice(surface_conditions, ice_fraction) =

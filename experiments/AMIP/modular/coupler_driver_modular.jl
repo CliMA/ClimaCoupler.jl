@@ -85,6 +85,7 @@ if isinteractive()
     parsed_args["h_elem"] = 4 #hide
     # parsed_args["dt_save_restart"] = "5days" #hide
     parsed_args["precip_model"] = "0M" #hide
+    parsed_args["job_id"] = "interactive_debug_run"
 end
 
 ## read in some parsed command line arguments

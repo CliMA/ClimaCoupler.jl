@@ -48,7 +48,7 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     Y = integrator.u
     p = integrator.p
     t = integrator.t
-    ice_fraction = info_sfc.ice_fraction
+    ice_mask = info_sfc.ice_mask
     Fields.bycolumn(axes(Y.c.uₕ)) do colidx
         get_surface_fluxes!(Y, p, colidx)
         # corrections (accounting for inhomogeneous surfaces)
@@ -58,6 +58,6 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
             -Geometry.WVector(correct_q_over_ice(p.surface_conditions[colidx], ice_mask[colidx]))
     end
 end
-correct_e_over_ice(surface_conditions, ice_fraction) =
-    .-surface_conditions.shf .- surface_conditions.lhf .* (FT(1) .- ice_fraction)
-correct_q_over_ice(surface_conditions, ice_fraction) = .-surface_conditions.E .* (FT(1) .- ice_fraction)
+correct_e_over_ice(surface_conditions, ice_mask) =
+    .-surface_conditions.shf .- surface_conditions.lhf .* (FT(1) .- ice_mask)
+correct_q_over_ice(surface_conditions, ice_mask) = .-surface_conditions.E .* (FT(1) .- ice_mask)

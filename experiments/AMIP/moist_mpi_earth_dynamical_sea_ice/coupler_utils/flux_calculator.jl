@@ -8,7 +8,7 @@ calculate_surface_fluxes_atmos_grid!(integrator)
 """
 function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     p = integrator.p
-    (; ᶜts, dif_flux_energy, dif_flux_ρq_tot, dif_flux_uₕ, ∂F_aero∂T_sfc, params, Cd, Ch) = p
+    (; ᶜts, ρ_dif_flux_h_tot, ρ_dif_flux_q_tot, ρ_dif_flux_uₕ, ∂F_aero∂T_sfc, params, Cd, Ch) = p
 
     (; T_sfc, z0m, z0b, ice_mask) = info_sfc
     Y = integrator.u
@@ -31,16 +31,16 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     # Total energy flux
     if :ρe in propertynames(Y.c)
 
-        flux_energy = ones(axes(dif_flux_energy))
+        flux_energy = ones(axes(ρ_dif_flux_h_tot))
         parent(flux_energy) .= parent(tsf.shf .+ tsf.lhf .* swap_space!(zeros(axes(tsf.shf)), abs.(ice_mask .- FT(1))))  # only SHF above sea ice
-        @. dif_flux_energy = Geometry.WVector(flux_energy) #Geometry.WVector.(swap_space!(zeros(axes(dif_flux_energy)), tsf.shf .+ tsf.lhf) )
+        @. ρ_dif_flux_h_tot = Geometry.WVector(flux_energy) #Geometry.WVector.(swap_space!(zeros(axes(ρ_dif_flux_h_tot)), tsf.shf .+ tsf.lhf) )
     end
 
     # Moisture mass flux
     if :ρq_tot in propertynames(Y.c)
-        flux_mass = ones(axes(dif_flux_ρq_tot))
+        flux_mass = ones(axes(ρ_dif_flux_q_tot))
         parent(flux_mass) .= parent(tsf.E .* swap_space!(zeros(axes(tsf.E)), abs.(ice_mask .- FT(1))))
-        @. dif_flux_ρq_tot = Geometry.WVector(flux_mass) # no E above sea ice
+        @. ρ_dif_flux_q_tot = Geometry.WVector(flux_mass) # no E above sea ice
     end
 
     # Momentum flux
@@ -48,7 +48,7 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     normal = Geometry.WVector.(ones(u_space)) # TODO: this will need to change for topography
     ρ_1 = Fields.Field(Fields.field_values(Fields.level(Y.c.ρ, 1)), u_space) # TODO: delete when "space not the same instance" error is dealt with
     if :uₕ in propertynames(Y.c)
-        parent(dif_flux_uₕ) .=  # TODO: remove parent when "space not the same instance" error is dealt with
+        parent(ρ_dif_flux_uₕ) .=  # TODO: remove parent when "space not the same instance" error is dealt with
             parent(
                 Geometry.Contravariant3Vector.(normal) .⊗
                 Geometry.Covariant12Vector.(Geometry.UVVector.(tsf.ρτxz ./ ρ_1, tsf.ρτyz ./ ρ_1)),

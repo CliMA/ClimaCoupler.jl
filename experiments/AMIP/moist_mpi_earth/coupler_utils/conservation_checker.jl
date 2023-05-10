@@ -107,10 +107,10 @@ function check_conservation(cc::OnlineConservationCheck, coupler_sim)
 end
 function ke_dissipation(sim)
     drag_uv =
-        .-Geometry.UVVector.(
+        Geometry.UVVector.(
             Geometry.Covariant12Vector.(
-                sim.integrator.p.dif_flux_uₕ_bc.components.data.:1,
-                sim.integrator.p.dif_flux_uₕ_bc.components.data.:2,
+                sim.integrator.p.ρ_dif_flux_uₕ.components.data.:1,
+                sim.integrator.p.ρ_dif_flux_uₕ.components.data.:2,
             )
         )
     dot.(Geometry.UVVector.(level(sim.integrator.u.c.uₕ, 1)), drag_uv) .* level(sim.integrator.u.c.ρ, 1)

@@ -3,7 +3,7 @@ using ClimaCore.Geometry: ⊗
 function vertical_diffusion_boundary_layer_coupled_tendency!(Yₜ, Y, p, t)
     ᶜρ = Y.c.ρ
     (; ᶜp, ᶠv_a, ᶠz_a, ᶠK_E) = p # assume ᶜts and ᶜp have been updated
-    (; dif_flux_energy, dif_flux_ρq_tot, dif_flux_uₕ) = p
+    (; ρ_dif_flux_h_tot, dif_flux_ρq_tot, ρ_dif_flux_uₕ) = p
     ᶠgradᵥ = Operators.GradientC2F() # apply BCs to ᶜdivᵥ, which wraps ᶠgradᵥ
 
     Fields.field_values(ᶠv_a) .= Fields.field_values(Spaces.level(Y.c.uₕ, 1)) .* one.(Fields.field_values(ᶠz_a)) # TODO: fix VIJFH copyto! to remove this
@@ -13,7 +13,7 @@ function vertical_diffusion_boundary_layer_coupled_tendency!(Yₜ, Y, p, t)
     if :ρe in propertynames(Y.c)
         ᶜdivᵥ = Operators.DivergenceF2C(
             top = Operators.SetValue(Geometry.WVector(FT(0))),
-            bottom = Operators.SetValue(.-dif_flux_energy),
+            bottom = Operators.SetValue(.-ρ_dif_flux_h_tot),
         )
         @. Yₜ.c.ρe += ᶜdivᵥ(ᶠK_E * ᶠinterp(ᶜρ) * ᶠgradᵥ((Y.c.ρe + ᶜp) / ᶜρ))
     end
@@ -32,7 +32,7 @@ function vertical_diffusion_boundary_layer_coupled_tendency!(Yₜ, Y, p, t)
     if :uₕ in propertynames(Y.c)
         ᶜdivᵥ = Operators.DivergenceF2C(
             top = Operators.SetValue(Geometry.Contravariant3Vector(FT(0)) ⊗ Geometry.Covariant12Vector(FT(0), FT(0))),
-            bottom = Operators.SetValue(.-dif_flux_uₕ),
+            bottom = Operators.SetValue(.-ρ_dif_flux_uₕ),
         )
 
         @. Yₜ.c.uₕ += ᶜdivᵥ(ᶠK_E * ᶠgradᵥ(Y.c.uₕ))
@@ -52,8 +52,8 @@ function vertical_diffusion_boundary_layer_coupled_cache(Y; Cd = FT(0.0044), Ch 
         dif_flux_ρq_tot = Ref(Geometry.WVector(FT(0)))
     end
 
-    #dif_flux_uₕ = similar(z_bottom, Geometry.Contravariant3Vector{FT}) .⊗ similar(z_bottom, Geometry.Covariant12Vector{FT}) # this breaks
-    dif_flux_uₕ =
+    #ρ_dif_flux_uₕ = similar(z_bottom, Geometry.Contravariant3Vector{FT}) .⊗ similar(z_bottom, Geometry.Covariant12Vector{FT}) # this breaks
+    ρ_dif_flux_uₕ =
         Geometry.Contravariant3Vector.(zeros(axes(z_bottom))) .⊗
         Geometry.Covariant12Vector.(zeros(axes(z_bottom)), zeros(axes(z_bottom)))
 
@@ -75,9 +75,9 @@ function vertical_diffusion_boundary_layer_coupled_cache(Y; Cd = FT(0.0044), Ch 
         ᶠz_a,
         ᶠK_E = similar(Y.f, FT),
         flux_coefficients = similar(z_bottom, coef_type),
-        dif_flux_energy = similar(z_bottom, Geometry.WVector{FT}),
+        ρ_dif_flux_h_tot = similar(z_bottom, Geometry.WVector{FT}),
         dif_flux_ρq_tot,
-        dif_flux_uₕ,
+        ρ_dif_flux_uₕ,
         Cd,
         Ch,
     )

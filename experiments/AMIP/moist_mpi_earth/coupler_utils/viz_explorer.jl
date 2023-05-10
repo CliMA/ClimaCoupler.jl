@@ -1,5 +1,6 @@
 using Plots
 using ClimaCorePlots
+using ClimaCore: Geometry
 
 function plot_anim(cs, out_dir = ".")
 

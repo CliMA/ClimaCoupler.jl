@@ -1,4 +1,6 @@
 using ClimaCorePlots
+using ClimaCore: Geomtry
+
 function plot_anim(atmos_sim, slab_sim, slab_ocean_sim, slab_ice_sim) # TODO: uses global defs
 
     sol_atm = atmos_sim.integrator.sol

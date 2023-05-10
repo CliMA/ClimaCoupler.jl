@@ -7,6 +7,7 @@ using OrdinaryDiffEq
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
 using LinearAlgebra
 import Test: @test
+import ClimaCore.Spaces as Spaces
 
 # import coupler utils
 include("coupler_utils/flux_calculator.jl")
@@ -47,8 +48,8 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     T_S .= FT(0)
     dummmy_remap!(T_S, slab_sim.integrator.u.T_sfc)
 
-    #atmos_sim.integrator.p.dif_flux_energy .= ClimaCore.Geometry.WVector.(ClimaCore.Fields.zeros(axes(atmos_sim.integrator.p.dif_flux_energy)))
-    parent(atmos_sim.integrator.p.dif_flux_energy) .= FT(0)
+    #atmos_sim.integrator.p.ρ_dif_flux_h_tot .= ClimaCore.Geometry.WVector.(ClimaCore.Fields.zeros(axes(atmos_sim.integrator.p.ρ_dif_flux_h_tot)))
+    parent(atmos_sim.integrator.p.ρ_dif_flux_h_tot) .= FT(0)
     calculate_surface_fluxes_atmos_grid!(atmos_sim.integrator, T_S)
 
     # run
@@ -57,7 +58,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     ## Slab
     # pre: get accumulated flux from atmos
     F_S .= ClimaCore.Fields.zeros(boundary_space)
-    dummmy_remap!(F_S, atmos_sim.integrator.p.dif_flux_energy)
+    dummmy_remap!(F_S, atmos_sim.integrator.p.ρ_dif_flux_h_tot)
 
     # save the accumulated flux
     slab_F_sfc = slab_sim.integrator.p.F_sfc

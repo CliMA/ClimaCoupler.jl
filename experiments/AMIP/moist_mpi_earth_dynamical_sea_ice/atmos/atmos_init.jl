@@ -36,7 +36,7 @@ if !is_distributed || (is_distributed && ClimaComms.iamroot(comms_ctx))
     )
 
     # remove the hard coded tendency specifications (so that we can define a diffusion tendency that allows for the correct coupled boundary conditions)
-    run(`sed -i.bak -e '94,123d' $driver_new`) # yep!  
+    run(`sed -i.bak -e '94,123d' $driver_new`) # yep!
 
     # remove hard coded MPI init (optional but neater)
     run(`sed -i.bak -e '98,119d' $driver_new`) # yep!
@@ -45,7 +45,7 @@ end
 # init model using the modified driver
 include(joinpath(ATMOS_DIR, "examples/hybrid/cli_options.jl"))
 
-(s, parsed_args) = parse_commandline()
+parsed_args = parse_commandline(argparse_settings())
 
 # add coupler-taylored CA functions
 TEST_NAME = "coupled_atmos"

@@ -59,7 +59,7 @@ function reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R)
     space = axes(field)
     topology = Spaces.topology(space)
     hspace = Spaces.horizontal_space(space)
-    Spaces.dss2!(Fields.field_values(field), topology, hspace.quadrature_style)
+    Spaces.dss!(Fields.field_values(field), topology, hspace.quadrature_style)
 end
 
 """

@@ -1,5 +1,5 @@
 import ArgParse
-function parse_commandline()
+function argparse_settings()
     s = ArgParse.ArgParseSettings()
     ArgParse.@add_arg_table s begin
         # ClimaCoupler flags
@@ -60,10 +60,14 @@ function parse_commandline()
         help = "Time between calling radiation callback for sphere configurations"
         arg_type = String
         default = "6hours"
-        "--config" # TODO: add box
-        help = "Spatial configuration [`sphere` (default), `column`, `box`]"
+        "--config"
+        help = "Spatial configuration [`sphere` (default), `column`, `box`, `plane`]"
         arg_type = String
         default = "sphere"
+        "--initial_condition"
+        help = "Initial condition [`DryBaroclinicWave`, `MoistBaroclinicWave`, `DecayingProfile`, `IsothermalProfile`, `Bomex`, `DryDensityCurrentProfile`, `AgnesiHProfile`, `ScharProfile`]"
+        arg_type = String
+        default = "DecayingProfile"
         "--moist"
         help = "Moisture model [`dry` (default), `equil`, `non_equil`]"
         arg_type = String
@@ -83,6 +87,10 @@ function parse_commandline()
         "--edmf_coriolis"
         help = "EDMF coriolis [`nothing` (default), `Bomex`,`LifeCycleTan2018`,`Rico`,`ARM_SGP`,`DYCOMS_RF01`,`DYCOMS_RF02`,`GABLS`]"
         arg_type = String
+        "--edmfx_adv_test"
+        help = "EDMFX advection test switches off all velocity tendencies in GM and turbconc [`false` (default), `true`]"
+        arg_type = Bool
+        default = false
         "--vert_diff"
         help = "Vertical diffusion [`false` (default), `VerticalDiffusion`, `true` (defaults to `VerticalDiffusion`)]"
         arg_type = String
@@ -108,18 +116,10 @@ function parse_commandline()
         "--turbconv_case"
         help = "The case run by Turbulence convection scheme [`Bomex` (default), `Bomex`, `DYCOMS_RF01`, `TRMM_LBA`, `GABLS`]"
         arg_type = String
-        "--anelastic_dycore"
-        help = "false enables defualt remaining tendency which produces a compressible model, the true option allow the EDMF to use an anelastic dycore (temporary)"
-        arg_type = Bool
-        default = false
         "--hyperdiff"
-        help = "Hyperdiffusion [`ClimaHyperdiffusion` (default), `TempestHyperdiffusion`, `none` (or `false`)]"
+        help = "Hyperdiffusion [`ClimaHyperdiffusion` (or `true`; default), `none` (or `false`)]"
         arg_type = String
         default = "ClimaHyperdiffusion"
-        "--enable_qt_hyperdiffusion"
-        help = "Enable the hyperdiffusion of specific humidity [`true` (default), `false`] (TODO: reconcile this with `ρe_tot` or remove if instability fixed with limiters)"
-        arg_type = Bool
-        default = true
         "--idealized_insolation"
         help = "Use idealized insolation in radiation model [`false`, `true` (default)]"
         arg_type = Bool
@@ -136,7 +136,7 @@ function parse_commandline()
         help = "Radiation model [`nothing` (default), `gray`, `clearsky`, `allsky`, `allskywithclear`]"
         arg_type = String
         "--energy_name"
-        help = "Energy variable name [`rhoe` (default), `rhoe_int` , `rhotheta`]"
+        help = "Energy variable name [`rhoe` (default), `rhotheta`]"
         arg_type = String
         default = "rhoe"
         "--perturb_initstate"
@@ -154,9 +154,17 @@ function parse_commandline()
         "--tracer_upwinding"
         help = "Tracer upwinding mode [`none` (default), `first_order` , `third_order`, `boris_book`, `zalesak`]"
         arg_type = Symbol
-        default = :none # TODO: change to :zalesak
+        default = :none
+        "--density_upwinding"
+        help = "Denisity upwinding mode [`none` (default), `first_order` , `third_order`, `boris_book`, `zalesak`]"
+        arg_type = Symbol
+        default = :none
+        "--edmfx_upwinding"
+        help = "EDMFX upwinding mode [`none` (default), `first_order` , `third_order`, `boris_book`, `zalesak`]"
+        arg_type = Symbol
+        default = :none # TODO: change to :first_order (or higher?)
         "--ode_algo"
-        help = "ODE algorithm [`ARS343` (default), `IMKG343a`, `ODE.Euler`, `ODE.IMEXEuler`, `ODE.Rosenbrock23`, etc.]"
+        help = "ODE algorithm [`ARS343` (default), `SSP333`, `IMKG343a`, `ODE.Euler`, `ODE.IMEXEuler`, `ODE.Rosenbrock23`, etc.]"
         arg_type = String
         default = "ARS343"
         "--max_newton_iters"
@@ -209,7 +217,7 @@ function parse_commandline()
         "--job_id"
         help = "Uniquely identifying string for a particular job"
         arg_type = String
-        "--quicklook_reference_job_id"
+        "--reference_job_id"
         help = "Identifier of job to use as the \"reference\" solution in the quicklook plot; the current job's results get compared to the results of the quicklook job on the main branch (only used if `debugging_tc` is `true`)"
         arg_type = String
         "--trunc_stack_traces"
@@ -244,6 +252,10 @@ function parse_commandline()
         help = "Horizontal polynomial degree. Note: The number of quadrature points in 1D within each horizontal element is then Nq = <--nh_poly> + 1"
         arg_type = Int
         default = 3
+        "--bubble"
+        help = "Enable bubble correction for more accurate surface areas"
+        arg_type = Bool
+        default = true
         "--x_max"
         help = "Model domain size, x direction. Default: 300km"
         arg_type = Float64
@@ -272,6 +284,10 @@ function parse_commandline()
         help = "Hyperdiffusion parameter"
         arg_type = Float64
         default = Float64(2e17)
+        "--divergence_damping_factor"
+        help = "Divergence damping factor"
+        arg_type = Float64
+        default = Float64(1)
         "--rayleigh_sponge"
         help = "Rayleigh sponge [`true`, `false` (default)]"
         arg_type = Bool
@@ -305,7 +321,7 @@ function parse_commandline()
         arg_type = String
         default = "19790101"
         "--topography"
-        help = "Define the surface elevation profile [`NoWarp`,`Earth`,`DCMIP200`]"
+        help = "Define the surface elevation profile [`NoWarp`,`Earth`,`DCMIP200`,`Agnesi`]"
         arg_type = String
         default = "NoWarp"
         "--apply_limiter"
@@ -348,10 +364,6 @@ function parse_commandline()
         help = "Apply parameterization for orographic drag on horizontal mean flow"
         arg_type = Bool
         default = false
-        "--apply_remap"
-        help = "Apply remap script to output directory"
-        arg_type = Bool
-        default = false
         "--perf_summary"
         help = "Flag for collecting performance summary information"
         arg_type = Bool
@@ -360,10 +372,17 @@ function parse_commandline()
         help = "A flag for analyzing performance [`PerfStandard` (default), `PerfExperimental`]"
         arg_type = String
         default = "PerfStandard"
+        "--target_job"
+        help = "An (optional) job to target for analyzing performance"
+        arg_type = String
+        "--toml"
+        help = "A toml file used to override model parameters and configurations. In the case of conflicts, CLI arguments take priority over the toml"
+        arg_type = String
     end
-    parsed_args = ArgParse.parse_args(ARGS, s)
-    return (s, parsed_args)
+    return s
 end
+
+parse_commandline(s) = ArgParse.parse_args(ARGS, s)
 
 function cli_defaults(s::ArgParse.ArgParseSettings)
     defaults = Dict()
@@ -425,9 +444,9 @@ Example:
 function print_repl_script(str)
     ib = """"""
     ib *= """\n"""
-    ib *= """using Revise; include("examples/hybrid/cli_options.jl");\n"""
+    ib *= """using Revise; include("src/utils/cli_options.jl");\n"""
     ib *= """\n"""
-    ib *= """(s, parsed_args) = parse_commandline();\n"""
+    ib *= """parsed_args = parse_commandline(argparse_settings());\n"""
     parsed_args = parsed_args_from_command_line_flags(str)
     for (flag, val) in parsed_args
         if val isa AbstractString
@@ -513,7 +532,7 @@ function parsed_args_per_job_id(buildkite_yaml; trigger = "driver.jl")
     @assert length(buildkite_commands) > 0 # sanity check
     result = Dict()
     for bkcs in buildkite_commands
-        (s, default_parsed_args) = parse_commandline()
+        default_parsed_args = parse_commandline(argparse_settings())
         job_id = first(split(last(split(bkcs, "--run_name ")), " "))
         job_id = strip(job_id, '\"')
         result[job_id] = parsed_args_from_command_line_flags(bkcs, default_parsed_args)
@@ -522,7 +541,7 @@ function parsed_args_per_job_id(buildkite_yaml; trigger = "driver.jl")
 end
 
 function non_default_command_line_flags_parsed_args(parsed_args)
-    (s, default_parsed_args) = parse_commandline()
+    default_parsed_args = parse_commandline(argparse_settings())
     s = ""
     for k in keys(parsed_args)
         default_parsed_args[k] == parsed_args[k] && continue

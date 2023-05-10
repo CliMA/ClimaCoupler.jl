@@ -126,8 +126,12 @@ end
         (; energy = EnergyConservationCheck([], [], [], [], [], []), water = WaterConservationCheck([], [], [], []))
 
     # set up model simulations
-    TP = SFP = FT
-    earth_param_set = ClimaLSM.Parameters.LSMParameters{FT, TP, SFP}(
+    TP = SFP = IPT = FT
+    earth_param_set = ClimaLSM.Parameters.LSMParameters{FT, TP, SFP, IPT}(
+        FT(0),
+        FT(0),
+        FT(0),
+        FT(0),
         FT(0),
         FT(0),
         FT(0),
@@ -143,6 +147,7 @@ end
         FT(0),
         TP(0),
         SFP(0),
+        IPT(0),
     )
 
     model = (; parameters = (; earth_param_set = earth_param_set))

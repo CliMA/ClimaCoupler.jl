@@ -61,11 +61,11 @@ using Plots
 
 using ClimaCore.Utilities: half, PlusHalf
 using ClimaCore: InputOutput, Fields
-
+import ClimaCore.Spaces as Spaces
 
 if !(@isdefined parsed_args)
     include("cli_options.jl")
-    (s, parsed_args) = parse_commandline()
+    parsed_args = parse_commandline(argparse_settings())
 end
 
 ## modify parsed args for fast testing from REPL #hide
@@ -85,6 +85,7 @@ if isinteractive()
     parsed_args["h_elem"] = 4 #hide
     # parsed_args["dt_save_restart"] = "5days" #hide
     parsed_args["precip_model"] = "0M" #hide
+    parsed_args["job_id"] = "interactive_debug_run"
 end
 
 ## read in some parsed command line arguments

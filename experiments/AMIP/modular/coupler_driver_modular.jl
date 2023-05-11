@@ -382,16 +382,24 @@ cs = CoupledSimulation{FT}(
 =#
 
 ## share states and fluxes between models
+# 1) import states into the coupler
 turbulent_fluxes = CombinedAtmosGrid()
 update_surface_fractions!(cs)
-import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
-update_sim!(cs.model_sims.atmos_sim, cs.fields, turbulent_fluxes) # would be good to rm dep in cs
-parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim, Δt_cpl) : nothing
-compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # here computed using atmos functions
+import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta
+# 2) import states into the atmos model
+update_sim!(cs.model_sims.atmos_sim, cs.fields, turbulent_fluxes)
+# 3) initiate atmos states
+parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim, Δt_cpl) : nothing # TODO: this should be in the integrator init
+# 4) calculate fluxes and update `sfc_conditions` (needed for radiation) and save in atmos cache
+compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes)
+# 5) reset atmos model's states and step with the correct `sfc_conditions` to caclucate radiative fluxes
+reinit!(atmos_sim)
+parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim, Δt_cpl) : nothing # calcualte F_rad from surface conditions
+# 6) export fluxes from atmos model
 import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
+# 7) update surface models
 update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
-
-## reinitialize (TODO: avoid with interfaces)
+# 8) reinitialize all models
 reinit_model_sims!(cs.model_sims)
 
 #=

@@ -3,6 +3,7 @@ import ClimaAtmos
 using ClimaAtmos: RRTMGPI
 import ClimaCoupler.FluxCalculator: compute_atmos_turbulent_fluxes!
 using ClimaCore: Fields.level, Geometry
+import ClimaCoupler.FieldExchanger: get_thermo_params
 
 # the clima atmos `integrator` is now defined
 struct ClimaAtmosSimulation{P, Y, D, I} <: AtmosModelSimulation
@@ -81,22 +82,23 @@ https://clima.github.io/SurfaceFluxes.jl/dev/SurfaceFluxes/#Monin-Obukhov-Simila
 """
 struct CoupledMoninObukhov end
 """
-    coupler_surface_setup(::CoupledMoninObukhov, p, csf_sfc = (; T = nothing, z0m = nothing, z0b = nothing, beta = nothing))
+    coupler_surface_setup(::CoupledMoninObukhov, p, csf_sfc = (; T = nothing, z0m = nothing, z0b = nothing, beta = nothing, q_vap = nothing))
 
 Sets up `surface_setup` as a `Fields.Field` of `SurfaceState`s.
 """
 function coupler_surface_setup(
     ::CoupledMoninObukhov,
     p;
-    csf_sfc = (; T = nothing, z0m = nothing, z0b = nothing, beta = nothing),
+    csf_sfc = (; T = nothing, z0m = nothing, z0b = nothing, beta = nothing, q_vap = nothing),
 )
 
-    surface_state(z0m, z0b, T, beta) = ClimaAtmos.SurfaceConditions.SurfaceState(;
+    surface_state(z0m, z0b, T, beta, q_vap) = ClimaAtmos.SurfaceConditions.SurfaceState(;
         parameterization = ClimaAtmos.SurfaceConditions.MoninObukhov(; z0m, z0b),
         T,
         beta,
+        q_vap,
     )
-    surface_state_field = @. surface_state(csf_sfc.z0m, csf_sfc.z0b, csf_sfc.T, csf_sfc.beta)
+    surface_state_field = @. surface_state(csf_sfc.z0m, csf_sfc.z0b, csf_sfc.T, csf_sfc.beta, csf_sfc.q_vap)
     return surface_state_field
 end
 
@@ -113,10 +115,24 @@ function compute_atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
 
     p = atmos_sim.integrator.p
 
+    thermo_params = get_thermo_params(atmos_sim)
+    ts_int = get_field(atmos_sim, Val(:thermo_state_int))
+
+    # surface density is needed for q_sat and requires atmos and sfc states, so it is calculated and saved in the coupler
+    parent(csf.ρ_sfc) .=
+        parent(extrapolate_ρ_to_sfc.(Ref(thermo_params), ts_int, swap_space!(ones(axes(ts_int.ρ)), csf.T_S)))
+
+    # Surface-specific vapor specific humidity, q_sfc, is calculated as a bulk quantity here, assuming a saturated liquid surface.
+    # (atmos has been doing this until this PR, so here we're moving that calculation to the coupler)
+    # The current method is ok for the time being because q_sfc is a passive variable in Land and nonexistent in the slab components
+    # TODO (next PR) - use land's q_sfc
+    # To approximately account for undersaturation of the surface, we can use beta to adjust evaporation to appoximate undersaturation.
+    q_sfc = TD.q_vap_saturation_generic.(thermo_params, csf.T_S, csf.ρ_sfc, TD.Liquid())
+
     coupler_sfc_setup = coupler_surface_setup(
         CoupledMoninObukhov(),
         p;
-        csf_sfc = (; T = csf.T_S, z0m = csf.z0m_S, z0b = csf.z0b_S, beta = csf.beta),
+        csf_sfc = (; T = csf.T_S, z0m = csf.z0m_S, z0b = csf.z0b_S, beta = csf.beta, q_vap = q_sfc),
     )
 
     p_names = propertynames(p)
@@ -126,13 +142,21 @@ function compute_atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
 
     ClimaAtmos.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t)
 
-    # p.sfc_conditions.ρ_flux_h_tot .= new_p.sfc_conditions.ρ_flux_h_tot
-    # p.sfc_conditions.ρ_flux_q_tot .= new_p.sfc_conditions.ρ_flux_q_tot
-    # p.sfc_conditions.ρ_flux_uₕ .= new_p.sfc_conditions.ρ_flux_uₕ
-    # p.sfc_conditions.ts .= new_p.sfc_conditions.ts
-    # p.sfc_conditions.buoyancy_flux .= new_p.sfc_conditions.buoyancy_flux
-    # p.sfc_conditions.obukhov_length .= new_p.sfc_conditions.obukhov_length
-
     p.sfc_conditions .= new_p.sfc_conditions
 
+end
+
+get_thermo_params(sim::ClimaAtmosSimulation) = CAP.thermodynamics_params(sim.integrator.p.params)
+get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_state_int}) = Spaces.level(sim.integrator.p.ᶜts, 1)
+
+"""
+    extrapolate_ρ_to_sfc(thermo_params, ts_int, T_sfc)
+
+Uses the ideal gas law and hydrostatic balance to extrapolate for surface density.
+"""
+function extrapolate_ρ_to_sfc(thermo_params, ts_in, T_sfc)
+    T_int = TD.air_temperature(thermo_params, ts_in)
+    Rm_int = TD.gas_constant_air(thermo_params, ts_in)
+    ρ_air = TD.air_density(thermo_params, ts_in)
+    ρ_air * (T_sfc / T_int)^(TD.cv_m(thermo_params, ts_in) / Rm_int)
 end

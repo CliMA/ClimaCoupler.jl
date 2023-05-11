@@ -1,11 +1,10 @@
 # TODO: const comms_ctx cannot be overwritten in ClimaAtmos - add if statement to clima atmos
 using ClimaComms
-using ClimaCommsMPI
 using Logging
 
 const is_distributed = get(ENV, "CLIMACORE_DISTRIBUTED", "") == "MPI"
 if is_distributed
-    const comms_ctx = ClimaCommsMPI.MPICommsContext()
+    const comms_ctx = ClimaComms.context(ClimaComms.CPUDevice())
     const pid, nprocs = ClimaComms.init(comms_ctx)
 
     if ClimaComms.iamroot(comms_ctx)

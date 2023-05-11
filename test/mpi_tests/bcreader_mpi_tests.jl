@@ -12,16 +12,13 @@ using Test
 using Dates
 using NCDatasets
 import ArtifactWrappers as AW
-using ClimaCommsMPI
-
-
 
 # Get the path to the necessary data file - sst map
 include(joinpath(@__DIR__, "..", "..", "artifacts", "artifact_funcs.jl"))
 const sst_data = joinpath(sst_dataset_path(), "sst.nc")
 
 # set up MPI communications context
-const comms_ctx = ClimaCommsMPI.MPICommsContext()
+const comms_ctx = ClimaComms.SingletonCommsContext(ClimaComms.CPUDevice())
 const pid, nprocs = ClimaComms.init(comms_ctx)
 ClimaComms.barrier(comms_ctx)
 

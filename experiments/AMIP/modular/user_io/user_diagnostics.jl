@@ -1,6 +1,8 @@
 #import Diagnostics: get_var
 
 # Atmos diagnostics
+import ClimaAtmos.Parameters as CAP
+import Thermodynamics as TD
 
 """
     get_var(cs::CoupledSimulation, ::Val{:T})

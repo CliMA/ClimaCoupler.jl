@@ -384,10 +384,12 @@ cs = CoupledSimulation{FT}(
 ## share states and fluxes between models
 turbulent_fluxes = CombinedAtmosGrid()
 update_surface_fractions!(cs)
-import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
-update_sim!(cs.model_sims.atmos_sim, cs.fields, turbulent_fluxes) # would be good to rm dep in cs
-parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim, Δt_cpl) : nothing
-compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # here computed using atmos functions
+import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta
+update_sim!(cs.model_sims.atmos_sim, cs.fields, turbulent_fluxes) # needs t_s, albedo for rad
+parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim, Δt_cpl) : nothing # initiate state (this should be in the integrator init)
+compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # update surface_conditions
+reinit_model_sims!(cs.model_sims)
+parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim, Δt_cpl) : nothing # calcualte F_rad from surface conditions
 import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
 update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 

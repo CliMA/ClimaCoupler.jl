@@ -93,13 +93,13 @@ end
 
     # init
     coupler_sim = coupler_sim_from_file(local_file_0, conservation_checks = conservation_checks)
-    rad_source = deepcopy(coupler_sim.fields.F_R_TOA)
+    rad_source = deepcopy(coupler_sim.fields.F_R_toa)
     surface_water = deepcopy(coupler_sim.fields.P_net)
     check_conservation!(coupler_sim, get_slab_energy, get_slab_energy)
     # 1 day later
     coupler_sim = coupler_sim_from_file(local_file_end, conservation_checks = conservation_checks)
     check_conservation!(coupler_sim, get_slab_energy, get_slab_energy)
-    parent(rad_source) .-= parent(deepcopy(coupler_sim.fields.F_R_TOA))
+    parent(rad_source) .-= parent(deepcopy(coupler_sim.fields.F_R_toa))
     parent(surface_water) .+= parent(deepcopy(coupler_sim.fields.P_net))
 
     cc = conservation_checks.energy
@@ -164,7 +164,7 @@ end
         space,
         (;
             P_net = Fields.zeros(space),
-            F_E = Fields.zeros(space),
+            F_evap = Fields.zeros(space),
             P_liq = Fields.zeros(space),
             P_snow = Fields.zeros(space),
         ),

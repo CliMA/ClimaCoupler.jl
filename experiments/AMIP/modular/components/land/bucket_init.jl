@@ -24,11 +24,13 @@ using ClimaLSM:
 
 The bucket model simulation object.
 """
-struct BucketSimulation{M, Y, D, I}
+struct BucketSimulation{F, M, Y, D, I, A} <: SurfaceModelSimulation
+    FT::F
     model::M
     Y_init::Y
     domain::D
     integrator::I
+    area_fraction::A
 end
 
 include("./bucket_utils.jl")
@@ -61,7 +63,7 @@ Note that `Ch` is not used with the current implementation of the bucket model,
 but will be used once the canopy is incorporated.
 
 The turbulent energy flux is currently not split up between latent and sensible
-heat fluxes. This will be fixed once `lhf` and `shf` are added to the bucket's
+heat fluxes. This will be fixed once `F_lhf` and `F_shf` are added to the bucket's
 cache.
 """
 function ClimaLSM.Bucket.surface_fluxes(
@@ -162,6 +164,7 @@ function bucket_init(
     space,
     dt::FT,
     saveat::FT,
+    land_fraction,
     stepper = Euler(),
 ) where {FT}
     if config != "sphere"
@@ -245,5 +248,5 @@ function bucket_init(
     prob = ODEProblem(ode_function!, Y, tspan, p_new)
     integrator = init(prob, stepper; dt = dt, saveat = saveat)
 
-    BucketSimulation(model, Y, (; domain = domain, soil_depth = d_soil), integrator)
+    BucketSimulation(FT, model, Y, (; domain = domain, soil_depth = d_soil), integrator, land_fraction)
 end

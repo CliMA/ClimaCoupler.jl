@@ -26,13 +26,13 @@ function calculate_surface_fluxes_atmos_grid!(integrator, T_sfc)
             Ch,
         )
 
-    # Radiation fluxes 
+    # Radiation fluxes
     t = integrator.t
     Rn = FT(10 * sin(t / 2π * 1000)) # TODO: link to the SW and LW fluxes from atmos
 
     # Total energy flux
     if :ρe in propertynames(Y.c)
-        @. dif_flux_energy = Geometry.WVector(tsf.shf + tsf.shf + Rn)
+        @. dif_flux_energy = Geometry.WVector(tsf.F_shf + tsf.F_shf + Rn)
     end
 
     # Moisture mass flux
@@ -42,14 +42,14 @@ function calculate_surface_fluxes_atmos_grid!(integrator, T_sfc)
 
     # Momentum flux
 
-    u_space = axes(tsf.ρτxz) # TODO: delete when "space not the same instance" error is dealt with 
+    u_space = axes(tsf.F_ρτxz) # TODO: delete when "space not the same instance" error is dealt with
     normal = Geometry.WVector.(ones(u_space)) # TODO: this will need to change for topography
-    ρ_1 = Fields.Field(Fields.field_values(Fields.level(Y.c.ρ, 1)), u_space) # TODO: delete when "space not the same instance" error is dealt with 
+    ρ_1 = Fields.Field(Fields.field_values(Fields.level(Y.c.ρ, 1)), u_space) # TODO: delete when "space not the same instance" error is dealt with
     if :uₕ in propertynames(Y.c)
-        parent(dif_flux_uₕ) .=  # TODO: remove parent when "space not the same instance" error is dealt with 
+        parent(dif_flux_uₕ) .=  # TODO: remove parent when "space not the same instance" error is dealt with
             parent(
                 Geometry.Contravariant3Vector.(normal) .⊗
-                Geometry.Covariant12Vector.(Geometry.UVVector.(tsf.ρτxz ./ ρ_1, tsf.ρτyz ./ ρ_1)),
+                Geometry.Covariant12Vector.(Geometry.UVVector.(tsf.F_ρτxz ./ ρ_1, tsf.F_ρτyz ./ ρ_1)),
             )
     end
 
@@ -79,7 +79,7 @@ function variable_T_saturated_surface_coefs(ts_int, uₕ_int, z_int, z_sfc, T_sf
 
     _ρ_liq = FT(1e3)# TODO: use CLIMAParameters
     E = SF.evaporation(sc, params, tsf.Ch) / _ρ_liq
-    return (; shf = tsf.shf, lhf = tsf.lhf, E = E, ρτxz = tsf.ρτxz, ρτyz = tsf.ρτyz)
+    return (; F_shf = tsf.F_shf, F_lhf = tsf.F_lhf, E = E, F_ρτxz = tsf.F_ρτxz, F_ρτyz = tsf.F_ρτyz)
 end
 
 function constant_T_saturated_surface_coefs_coupled(ts_int, uₕ_int, z_int, z_sfc, T_sfc, params, z0m, z0b, Cd, Ch)
@@ -107,5 +107,5 @@ function constant_T_saturated_surface_coefs_coupled(ts_int, uₕ_int, z_int, z_s
 
     _ρ_liq = FT(1e3)# TODO: use CLIMAParameters
     E = SF.evaporation(sc, params, tsf.Ch) / _ρ_liq
-    return (; shf = tsf.shf, lhf = tsf.lhf, E = E, ρτxz = tsf.ρτxz, ρτyz = tsf.ρτyz)
+    return (; F_shf = tsf.F_shf, F_lhf = tsf.F_lhf, E = E, F_ρτxz = tsf.F_ρτxz, F_ρτyz = tsf.F_ρτyz)
 end

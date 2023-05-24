@@ -403,7 +403,7 @@ Maintains the invariant that the sum of area fractions is 1 at all points.
 """
 function update_surface_fractions!(cs::CoupledSimulation)
     # dynamic fractions
-    ice_d = cs.model_sims.ice_sim.integrator.p.ice_fraction
+    ice_d = cs.model_sims.ice_sim.integrator.p.area_fraction
     FT = eltype(ice_d)
 
     # static fraction
@@ -442,10 +442,14 @@ NamedTuples `fields` and `fractions` must have matching field names.
 - `fractions`: [NamedTuple] containing weights used on values in `fields`.
 - `fields`: [NamedTuple] containing values to be weighted by `fractions`.
 """
+# TODO: check if still performant pass if sims passed instead
 function combine_surfaces!(combined_field::Fields.Field, fractions::NamedTuple, fields::NamedTuple)
     combined_field .= eltype(combined_field)(0)
     warn_nans = false
     for surface_name in propertynames(fields) # could use dot here?
+        if isnothing(getproperty(fractions, surface_name))
+            continue
+        end
         if any(x -> isnan(x), getproperty(fields, surface_name))
             warn_nans = true
         end

@@ -101,6 +101,7 @@ tspan = (Int(0), t_end)
 saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
 date0 = date = DateTime(parsed_args["start_date"], dateformat"yyyymmdd")
 mono_surface = parsed_args["mono_surface"]
+surface_scheme = parsed_args["surface_scheme"]
 
 import ClimaCoupler
 import ClimaCoupler.Regridder
@@ -124,17 +125,14 @@ mkpath(REGRID_DIR)
 @info COUPLER_OUTPUT_DIR
 @info parsed_args
 
+## import coupler utils
+include("components/flux_calculator.jl")
+
 ## get the paths to the necessary data files: land-sea mask, sst map, sea ice concentration
 include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
 sst_data = joinpath(sst_dataset_path(), "sst.nc")
 sic_data = joinpath(sic_dataset_path(), "sic.nc")
 land_mask_data = joinpath(mask_dataset_path(), "seamask.nc")
-
-## import coupler utils
-include("components/flux_calculator.jl")
-
-## user-specified diagnostics
-include("user_io/user_diagnostics.jl")
 
 #=
 ## Component Model Initialization
@@ -168,6 +166,10 @@ include("components/land/bucket_utils.jl")
 include("components/ocean/slab_ocean_init.jl")
 include("components/ocean/slab_seaice_init.jl")
 
+## user-specified diagnostics
+include("user_io/user_diagnostics.jl")
+
+
 #=
 ### Land
 We use `ClimaLSM.jl`'s bucket model.
@@ -182,6 +184,7 @@ land_sim = bucket_init(
     dt = FT(Δt_cpl),
     space = boundary_space,
     saveat = FT(saveat),
+    land_fraction
 )
 
 #=
@@ -255,9 +258,10 @@ elseif mode_name == "slabplanet"
 
     ## sea ice
     ice_sim = (;
+        FT = FT,
         integrator = (;
             u = (; T_sfc = ClimaCore.Fields.ones(boundary_space)),
-            p = (; params = ocean_sim.params, ice_fraction = ClimaCore.Fields.zeros(boundary_space)),
+            p = (; params = ocean_sim.params, area_fraction = ClimaCore.Fields.zeros(boundary_space)),
         )
     )
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
@@ -269,11 +273,9 @@ The coupler needs to contain exchange information, manage the calendar and be ab
 save online diagnostics. These are all initialized here and saved in a global `CouplerSimulation` struct, `cs`.
 =#
 
-## coupler exchange fields
-coupler_field_names =
-    (:T_S, :z0m_S, :z0b_S, :ρ_sfc, :q_sfc, :albedo, :beta, :F_A, :F_E, :F_R, :P_liq, :P_snow, :F_R_TOA, :P_net)
-coupler_fields =
-    NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
+## coupler exchange fields (all fluxes, and information for flux calculation within models)
+coupler_cache_names = (:T_S, :albedo, :F_R_sfc, :F_R_toa, :P_liq, :P_snow, :P_net, :F_lhf, :F_shf, :F_ρτxz, :F_ρτyz,  :F_evap)
+coupler_fields = NamedTuple{coupler_cache_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_cache_names)))
 
 ## model simulations
 model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim);
@@ -342,25 +344,51 @@ cs = CoupledSimulation{FT}(
 =#
 ## share states between models
 include("components/push_pull.jl")
-atmos_pull!(cs)
-parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim.integrator, Δt_cpl, true) : nothing
-atmos_push!(cs)
-land_pull!(cs)
+#parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim.integrator, Δt_cpl, true) : nothing
 
-## reinitialize (TODO: avoid with interfaces)
-reinit!(atmos_sim.integrator)
-reinit!(land_sim.integrator)
-mode_name == "amip" ? (ice_pull!(cs), reinit!(ice_sim.integrator)) : nothing
-mode_name == "slabplanet" ? (ocean_pull!(cs), reinit!(ocean_sim.integrator)) : nothing
+## initialize the coupled system
+function init_esm(cs)
+    if cs.mode.name == "amip" # read in prescribed states
+        if cs.dates.date[1] >= next_date_in_file(cs.mode.SST_info)
+            update_midmonth_data!(cs.dates.date[1], cs.mode.SST_info)
+        end
+        ocean_sim.integrator.u.T_sfc .= interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SST_info)
+
+        if cs.dates.date[1] >= next_date_in_file(cs.mode.SIC_info)
+            update_midmonth_data!(cs.dates.date[1], cs.mode.SIC_info)
+        end
+        interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info)
+
+        ice_sim.integrator.p.area_fraction .= get_ice_fraction.(SIC_init, mono_surface)
+    end
+
+    collect_surface_state!(cs.fields, cs.model_sims)
+    update_surface_fractions!(cs)
+
+    # calculate turbulent fluxes in the coupler
+    calculate_and_send_turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space)
+
+    # calculate radiation and precipitation fluxes in the atmosphere for the given initial combined surface state
+    push_surface_state!(atmos_sim, cs.fields)
+    reinit!(cs.model_sims.atmos_sim)
+    collect_atmos_fluxes!(cs.fields, cs.model_sims.atmos_sim)
+
+    # initialize surface models with the radiative and precipitation fluxes
+    push_atmos_fluxes!(cs.model_sims, cs.fields)
+    reinit!(cs.model_sims.land_sim)
+    reinit!(cs.model_sims.ice_sim)
+    reinit!(cs.model_sims.ocean_sim)
+end
+
 
 #=
 ## Coupling Loop
 =#
-function solve_coupler!(cs)
+function solve_esm!(cs)
     @info "Starting coupling loop"
 
-    @unpack model_sims, Δt_cpl, tspan = cs
-    @unpack atmos_sim, land_sim, ocean_sim, ice_sim = model_sims
+    (; model_sims, Δt_cpl, tspan) = cs
+    (; atmos_sim, land_sim, ocean_sim, ice_sim) = model_sims
 
     ## step in time
     walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
@@ -385,7 +413,7 @@ function solve_coupler!(cs)
             end
             SIC = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info)
 
-            ice_fraction = ice_sim.integrator.p.ice_fraction .= get_ice_fraction.(SIC_init, mono_surface)
+            ice_fraction = ice_sim.integrator.p.area_fraction .= get_ice_fraction.(SIC_init, mono_surface)
 
             ## calculate and accumulate diagnostics at each timestep
             accumulate_diagnostics!(cs)
@@ -395,32 +423,37 @@ function solve_coupler!(cs)
 
         end
 
-        ## compute global energy
+        ClimaComms.barrier(comms_ctx)
+
+        ## coupler computes global energy
         !isnothing(cs.conservation_checks) ? check_conservation!(cs, get_slab_energy, get_land_energy) : nothing
 
         ## run component models sequentially for one coupling timestep (Δt_cpl)
-        ## 1. atmos
-        ClimaComms.barrier(comms_ctx)
-
-        atmos_pull!(cs)
-        step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
-        atmos_push!(cs)
-
-        ## 2. land
-        land_pull!(cs)
+        ## 1. land
         step!(land_sim.integrator, t - land_sim.integrator.t, true)
 
-        ## 3. ocean
+        ## 2. ocean
         if cs.mode.name == "slabplanet"
-            ocean_pull!(cs)
             step!(ocean_sim.integrator, t - ocean_sim.integrator.t, true)
         end
 
-        ## 4. sea ice
+        ## 3. sea ice
         if cs.mode.name == "amip"
-            ice_pull!(cs)
             step!(ice_sim.integrator, t - ice_sim.integrator.t, true)
         end
+
+        ## 4. atmos
+        step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
+
+        ## update fluxes
+        # Note that rad fluxes always based on the previous T_sfc(n) and T(n+1), whereas turbulent fluxes are based on T_sfc(n+1) and T(n+1)
+        collect_atmos_fluxes!(cs.fields, atmos_sim)
+        push_atmos_fluxes!(cs.model_sims, cs.fields)
+
+        ## update turbulent flux based on the new states
+        collect_surface_state!(cs.fields, cs.model_sims)
+        update_surface_fractions!(cs)
+        calculate_and_send_turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space)
 
         ## step to the next calendar month
         if trigger_callback(cs, Monthly())
@@ -439,7 +472,8 @@ if haskey(ENV, "CI_PERF_SKIP_COUPLED_RUN") #hide
 end #hide
 
 ## run the coupled simulation
-solve_coupler!(cs);
+init_esm(cs);
+solve_esm!(cs);
 
 #=
 ## Postprocessing

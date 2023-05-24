@@ -84,7 +84,7 @@ z0m_S = ClimaCore.Fields.zeros(boundary_space)
 z0b_S = ClimaCore.Fields.zeros(boundary_space)
 
 F_A = ClimaCore.Fields.zeros(boundary_space) # aerodynamic turbulent fluxes
-F_R = ClimaCore.Fields.zeros(boundary_space) # radiative fluxes
+F_R_sfc = ClimaCore.Fields.zeros(boundary_space) # radiative fluxes
 dF_A = ClimaCore.Fields.zeros(boundary_space) # aerodynamic turbulent fluxes
 
 # init conservation info collector
@@ -188,8 +188,8 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     # coupler_push!: get accumulated fluxes from atmos in the surface fields
     F_A .= ClimaCore.Fields.zeros(boundary_space)
     dummmy_remap!(F_A, atmos_sim.integrator.p.dif_flux_energy)
-    F_R .= ClimaCore.Fields.zeros(boundary_space)
-    parsed_args["rad"] == "gray" ? dummmy_remap!(F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) : nothing # TODO: albedo hard coded...
+    F_R_sfc .= ClimaCore.Fields.zeros(boundary_space)
+    parsed_args["rad"] == "gray" ? dummmy_remap!(F_R_sfc, level(atmos_sim.integrator.p.ᶠradiation_flux, half)) : nothing # TODO: albedo hard coded...
     dF_A .= ClimaCore.Fields.zeros(boundary_space)
     dummmy_remap!(dF_A, atmos_sim.integrator.p.∂F_aero∂T_sfc)
 
@@ -198,7 +198,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     slab_F_aero = slab_sim.integrator.p.F_aero
     @. slab_F_aero = F_A
     slab_F_rad = slab_sim.integrator.p.F_rad
-    @. slab_F_rad = F_R
+    @. slab_F_rad = F_R_sfc
 
     # run
     step!(slab_sim.integrator, t - slab_sim.integrator.t, true)
@@ -209,7 +209,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
         slab_ocean_F_aero = slab_ocean_sim.integrator.p.F_aero
         @. slab_ocean_F_aero = F_A
         slab_ocean_F_rad = slab_ocean_sim.integrator.p.F_rad
-        @. slab_ocean_F_rad = F_R
+        @. slab_ocean_F_rad = F_R_sfc
 
         # run
         step!(slab_ocean_sim.integrator, t - slab_ocean_sim.integrator.t, true)
@@ -221,7 +221,7 @@ walltime = @elapsed for t in (tspan[1]:Δt_cpl:tspan[end])
     slab_ice_F_aero = slab_ice_sim.integrator.p.Ya.F_aero
     @. slab_ice_F_aero = F_A
     slab_ice_F_rad = slab_ice_sim.integrator.p.Ya.F_rad
-    @. slab_ice_F_rad = F_R
+    @. slab_ice_F_rad = F_R_sfc
     slab_ice_∂F_aero∂T_sfc = slab_ice_sim.integrator.p.Ya.∂F_aero∂T_sfc
     @. slab_ice_∂F_aero∂T_sfc = dF_A
 

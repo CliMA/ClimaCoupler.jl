@@ -61,7 +61,7 @@ Note that `Ch` is not used with the current implementation of the bucket model,
 but will be used once the canopy is incorporated.
 
 The turbulent energy flux is currently not split up between latent and sensible
-heat fluxes. This will be fixed once `lhf` and `shf` are added to the bucket's
+heat fluxes. This will be fixed once `F_lhf` and `F_shf` are added to the bucket's
 cache.
 """
 function ClimaLSM.Bucket.surface_fluxes(
@@ -73,8 +73,8 @@ function ClimaLSM.Bucket.surface_fluxes(
 ) where {FT <: AbstractFloat}
     space = model.domain.surface.space
     return (
-        lhf = ClimaCore.Fields.zeros(space),
-        shf = p.bucket.turbulent_energy_flux,
+        F_lhf = ClimaCore.Fields.zeros(space),
+        F_shf = p.bucket.turbulent_energy_flux,
         vapor_flux = p.bucket.evaporation,
         Ch = ClimaCore.Fields.similar(p.bucket.evaporation),
     )

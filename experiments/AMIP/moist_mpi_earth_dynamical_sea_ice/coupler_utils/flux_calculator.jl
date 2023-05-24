@@ -32,8 +32,8 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     if :ρe in propertynames(Y.c)
 
         flux_energy = ones(axes(dif_flux_energy))
-        parent(flux_energy) .= parent(tsf.shf .+ tsf.lhf .* swap_space!(zeros(axes(tsf.shf)), abs.(ice_mask .- FT(1))))  # only SHF above sea ice
-        @. dif_flux_energy = Geometry.WVector(flux_energy) #Geometry.WVector.(swap_space!(zeros(axes(dif_flux_energy)), tsf.shf .+ tsf.lhf) )
+        parent(flux_energy) .= parent(tsf.F_shf .+ tsf.F_lhf .* swap_space!(zeros(axes(tsf.F_shf)), abs.(ice_mask .- FT(1))))  # only F_shf above sea ice
+        @. dif_flux_energy = Geometry.WVector(flux_energy) #Geometry.WVector.(swap_space!(zeros(axes(dif_flux_energy)), tsf.F_shf .+ tsf.F_lhf) )
     end
 
     # Moisture mass flux
@@ -44,14 +44,14 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     end
 
     # Momentum flux
-    u_space = axes(tsf.ρτxz) # TODO: delete when "space not the same instance" error is dealt with
+    u_space = axes(tsf.F_ρτxz) # TODO: delete when "space not the same instance" error is dealt with
     normal = Geometry.WVector.(ones(u_space)) # TODO: this will need to change for topography
     ρ_1 = Fields.Field(Fields.field_values(Fields.level(Y.c.ρ, 1)), u_space) # TODO: delete when "space not the same instance" error is dealt with
     if :uₕ in propertynames(Y.c)
         parent(dif_flux_uₕ) .=  # TODO: remove parent when "space not the same instance" error is dealt with
             parent(
                 Geometry.Contravariant3Vector.(normal) .⊗
-                Geometry.Covariant12Vector.(Geometry.UVVector.(tsf.ρτxz ./ ρ_1, tsf.ρτyz ./ ρ_1)),
+                Geometry.Covariant12Vector.(Geometry.UVVector.(tsf.F_ρτxz ./ ρ_1, tsf.F_ρτyz ./ ρ_1)),
             )
     end
 
@@ -71,7 +71,7 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
             Ch,
         )
 
-    p.∂F_aero∂T_sfc .= ((tsf1.shf .+ tsf1.lhf) .- (tsf.shf .+ tsf.lhf)) ./ ΔT_sfc
+    p.∂F_aero∂T_sfc .= ((tsf1.F_shf .+ tsf1.F_lhf) .- (tsf.F_shf .+ tsf.F_lhf)) ./ ΔT_sfc
 
     return nothing
 end
@@ -99,7 +99,7 @@ function variable_T_saturated_surface_coefs(ts_int, uₕ_int, z_int, z_sfc, T_sf
 
     E = SF.evaporation(sc, params, tsf.Ch)
 
-    return (; shf = tsf.shf, lhf = tsf.lhf, E = E, ρτxz = tsf.ρτxz, ρτyz = tsf.ρτyz)
+    return (; F_shf = tsf.F_shf, F_lhf = tsf.F_lhf, E = E, F_ρτxz = tsf.F_ρτxz, F_ρτyz = tsf.F_ρτyz)
 end
 
 function constant_T_saturated_surface_coefs_coupled(ts_int, uₕ_int, z_int, z_sfc, T_sfc, params, z0m, z0b, Cd, Ch)
@@ -127,5 +127,5 @@ function constant_T_saturated_surface_coefs_coupled(ts_int, uₕ_int, z_int, z_s
 
     E = SF.evaporation(sc, params, tsf.Ch)
 
-    return (; shf = tsf.shf, lhf = tsf.lhf, E = E, ρτxz = tsf.ρτxz, ρτyz = tsf.ρτyz)
+    return (; F_shf = tsf.F_shf, F_lhf = tsf.F_lhf, E = E, F_ρτxz = tsf.F_ρτxz, F_ρτyz = tsf.F_ρτyz)
 end

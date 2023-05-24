@@ -61,5 +61,5 @@ function calculate_surface_fluxes_atmos_grid!(integrator, info_sfc)
     end
 end
 correct_e_over_ice(surface_conditions, ice_mask) =
-    .-surface_conditions.shf .- surface_conditions.lhf .* (FT(1) .- ice_mask)
+    .-surface_conditions.F_shf .- surface_conditions.F_lhf .* (FT(1) .- ice_mask)
 correct_q_over_ice(surface_conditions, ice_mask) = .-surface_conditions.E .* (FT(1) .- ice_mask)

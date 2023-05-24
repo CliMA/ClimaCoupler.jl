@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --ntasks=64          
+#SBATCH --ntasks=64
 #SBATCH --time=30:00:00     # walltime
 
 set -euo pipefail # kill the job if anything fails

@@ -1,4 +1,19 @@
-# energy equation for sea ice
+"""
+    PrescribedIceSimulation{P, Y, D, I}
+
+Ice concentration is prescribed, and solving the following energy equation:
+
+    F_conductive = k_ice (T_base - T_sfc) / (h)
+    (h * ρ * c) dTdt = -(F_aero + F_rad) + F_conductive
+
+"""
+struct PrescribedIceSimulation{F, P, Y, D, I} <: SurfaceModelSimulation
+    FT::F
+    params::P
+    Y_init::Y
+    domain::D
+    integrator::I
+end
 
 # sea-ice parameters
 struct IceSlabParameters{FT <: AbstractFloat}
@@ -36,7 +51,7 @@ function ice_rhs!(du, u, p, _)
     params = p.params
     F_aero = p.F_aero
     F_rad = p.F_rad
-    ice_fraction = p.ice_fraction
+    ice_fraction = p.area_fraction
     T_freeze = params.T_freeze
 
     F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc) # fluxes are defined to be positive when upward
@@ -61,24 +76,54 @@ function ice_init(::Type{FT}; tspan, saveat, dt, space, ice_fraction, stepper = 
     additional_cache = (;
         F_aero = ClimaCore.Fields.zeros(space),
         F_rad = ClimaCore.Fields.zeros(space),
-        ice_fraction = ice_fraction,
         dt = dt,
+        area_fraction = ice_fraction,
     )
 
     problem = OrdinaryDiffEq.ODEProblem(ice_rhs!, Y, tspan, (; additional_cache..., params = params))
     integrator = OrdinaryDiffEq.init(problem, stepper, dt = dt, saveat = saveat)
 
 
-    SlabSimulation(params, Y, space, integrator)
+    PrescribedIceSimulation(FT, params, Y, space, integrator)
 end
 
-# file-specific
+# setting that SIC < 0.5 is counted as ocean if binary remapping.
+get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
+    mono ? h_ice : Regridder.binary_mask(h_ice, threshold = FT(threshold))
+
+function update_calculated_fluxes_point!(sim::PrescribedIceSimulation, fields, colidx)
+    (; F_shf, F_lhf) = fields
+    @. sim.integrator.p.F_aero[colidx] = F_shf + F_lhf
+end
+
+function update!(sim::PrescribedIceSimulation, ::Val{:net_radiation}, field)
+    @. sim.integrator.p.F_rad .= field
+end
+update!(sim::PrescribedIceSimulation, ::Val{:precipitation_liquid}, field) = nothing
+update!(sim::PrescribedIceSimulation, ::Val{:precipitation_snow}, field) = nothing
+
+
+get_temperature(sim::PrescribedIceSimulation) = sim.integrator.u.T_sfc
+get_humidity(sim::PrescribedIceSimulation) = nothing
+get_z0m(sim::PrescribedIceSimulation) = sim.integrator.p.params.z0m
+get_z0b(sim::PrescribedIceSimulation) = sim.integrator.p.params.z0b
+get_beta(sim::PrescribedIceSimulation) = convert(eltype(sim.integrator.u), 1.0)
+get_albedo(sim::PrescribedIceSimulation) = sim.integrator.p.params.α
+get_area_fraction(sim::PrescribedIceSimulation) = sim.integrator.p.area_fraction
+
+get_temperature_point(sim::PrescribedIceSimulation, colidx) = get_temperature(sim)[colidx]
+get_humidity_point(::PrescribedIceSimulation, colidx) = nothing
+get_z0m_point(sim::PrescribedIceSimulation, colidx) = get_z0m(sim)
+get_z0b_point(sim::PrescribedIceSimulation, colidx) = get_z0b(sim)
+get_beta_point(sim::PrescribedIceSimulation, colidx) = get_beta(sim)
+get_albedo_point(sim::PrescribedIceSimulation, colidx) = get_albedo(sim)[colidx]
+# file-specific (move!)
 """
     clean_sic(SIC, _info)
 Ensures that the space of the SIC struct matches that of the mask, and converts the units from area % to area fraction.
 """
 clean_sic(SIC, _info) = swap_space!(zeros(axes(_info.land_fraction)), SIC) ./ float_type_bcf(_info)(100.0)
 
-# setting that SIC < 0.5 is counted as ocean if binary remapping.
-get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
-    mono ? h_ice : Regridder.binary_mask(h_ice, threshold = FT(threshold))
+issaturated(::PrescribedIceSimulation, q) = isnothing(q)
+
+reinit!(sim::PrescribedIceSimulation) = reinit!(sim.integrator)

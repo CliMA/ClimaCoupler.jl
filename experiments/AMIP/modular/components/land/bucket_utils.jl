@@ -1,21 +1,4 @@
 """
-    get_land_temp(slab_sim::BucketSimulation)
-
-Returns the surface temperature of the earth;
-a method for the bucket model
-when used as the land model.
-"""
-function get_land_temp(slab_sim::BucketSimulation)
-    return ClimaLSM.surface_temperature(
-        slab_sim.model,
-        slab_sim.integrator.u,
-        slab_sim.integrator.p,
-        slab_sim.integrator.t,
-    )
-end
-
-
-"""
     get_land_temp_from_state(land_sim, u)
 
 Returns the surface temperature of the earth, computed
@@ -23,52 +6,6 @@ from the state u.
 """
 function get_land_temp_from_state(land_sim, u)
     return ClimaLSM.surface_temperature(land_sim.model, u, land_sim.integrator.p, land_sim.integrator.t)
-end
-
-"""
-    get_land_roughness(slab_sim::BucketSimulation)
-
-Returns the roughness length parameters of the bucket;
-a method for the bucket model
-when used as the land model.
-"""
-function get_land_roughness(slab_sim::BucketSimulation)
-    return slab_sim.model.parameters.z_0m, slab_sim.model.parameters.z_0b
-end
-
-"""
-   land_albedo(slab_sim::BucketSimulation)
-
-Returns the surface albedo of the earth;
-a method for the bucket model
-when used as the land model.
-"""
-function land_albedo(slab_sim::BucketSimulation)
-    return ClimaLSM.surface_albedo(slab_sim.model, slab_sim.integrator.u, slab_sim.integrator.p)
-end
-
-"""
-   land_beta(slab_sim::BucketSimulation)
-
-Returns the surface evaporative scaling factor over land;
-a method for the bucket model when used as the land model.
-Note that this is slightly different from the coupler's β,
-which includes the scaling factor over non-land surfaces.
-"""
-function land_beta(slab_sim::BucketSimulation)
-    return ClimaLSM.surface_evaporative_scaling(slab_sim.model, slab_sim.integrator.u, slab_sim.integrator.p)
-end
-
-
-"""
-    get_land_q(slab_sim::Bucketimulation, _...)
-
-Returns the surface specific humidity of the earth;
-a method for the bucket
-when used as the land model.
-"""
-function get_land_q(slab_sim::BucketSimulation, _...)
-    return ClimaLSM.surface_specific_humidity(slab_sim.model, slab_sim.integrator.u, slab_sim.integrator.p)
 end
 
 """
@@ -142,3 +79,48 @@ function make_lsm_domain(
         surface_domain,
     )
 end
+
+function update_calculated_fluxes_point!(sim::BucketSimulation, fields, colidx)
+    (; ρ_sfc, F_shf, F_lhf, F_evap) = fields
+    ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
+    @. sim.integrator.p.bucket.ρ_sfc[colidx] = ρ_sfc
+    @. sim.integrator.p.bucket.turbulent_energy_flux[colidx] = F_shf + F_lhf
+    @. sim.integrator.p.bucket.evaporation[colidx] = F_evap / ρ_liq
+    return nothing
+end
+
+function update!(sim::BucketSimulation, ::Val{:net_radiation}, field)
+    @. sim.integrator.p.bucket.R_n .= field
+end
+function update!(sim::BucketSimulation, ::Val{:precipitation_liquid}, field)
+    @. sim.integrator.p.bucket.P_liq .= field
+end
+function update!(sim::BucketSimulation, ::Val{:precipitation_snow}, field)
+    @. sim.integrator.p.bucket.P_snow .= field
+end
+
+"""
+    get_...(sim::BucketSimulation, colidx)
+
+Returns the surface the respective variables of the earth at column index `colidx`;
+a method for the bucket when used as the land model.
+"""
+
+get_temperature(sim::BucketSimulation) = ClimaLSM.surface_temperature( sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
+get_humidity(sim::BucketSimulation) = ClimaLSM.surface_specific_humidity(sim.model, sim.integrator.u, sim.integrator.p)
+get_z0m(sim::BucketSimulation) = sim.model.parameters.z_0m
+get_z0b(sim::BucketSimulation) = sim.model.parameters.z_0b
+get_beta(sim::BucketSimulation) = ClimaLSM.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
+get_albedo(sim::BucketSimulation) = ClimaLSM.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
+get_area_fraction(sim::BucketSimulation) = sim.area_fraction
+
+get_temperature_point(sim::BucketSimulation, colidx) = get_temperature(sim)[colidx]
+get_humidity_point(sim::BucketSimulation, colidx) = get_humidity(sim)[colidx]
+get_z0m_point(sim::BucketSimulation, colidx) = get_z0m(sim)
+get_z0b_point(sim::BucketSimulation, colidx) = get_z0b(sim)
+get_beta_point(sim::BucketSimulation, colidx) = get_beta(sim)[colidx]
+get_albedo_point(sim::BucketSimulation, colidx) = get_albedo(sim)[colidx]
+
+issaturated(::BucketSimulation, q) = isnan(parent(q)[1])
+
+reinit!(sim::BucketSimulation) = reinit!(sim.integrator)

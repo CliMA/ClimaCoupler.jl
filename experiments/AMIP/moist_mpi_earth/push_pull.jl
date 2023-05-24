@@ -1,21 +1,21 @@
 """
    atmos_push!(cs)
 
-updates F_A, F_R, P_liq, and F_E in place based on values used in the atmos_sim for the current step.
+updates F_A, F_R_sfc, P_liq, and F_evap in place based on values used in the atmos_sim for the current step.
 """
 function atmos_push!(cs)
     atmos_sim = cs.model_sims.atmos_sim
     csf = cs.fields
     dummmy_remap!(csf.F_A, .-atmos_sim.integrator.p.dif_flux_energy_bc)
-    dummmy_remap!(csf.F_E, .-atmos_sim.integrator.p.dif_flux_ρq_tot_bc)
-    dummmy_remap!(csf.F_R, level(atmos_sim.integrator.p.ᶠradiation_flux, half))
+    dummmy_remap!(csf.F_evap, .-atmos_sim.integrator.p.dif_flux_ρq_tot_bc)
+    dummmy_remap!(csf.F_R_sfc, level(atmos_sim.integrator.p.ᶠradiation_flux, half))
     dummmy_remap!(csf.P_liq, atmos_sim.integrator.p.col_integrated_rain .+ atmos_sim.integrator.p.col_integrated_snow)
 end
 
 """
    land_pull!(cs)
 
-Updates the land_sim cache state in place with the current values of F_A, F_R, F_E, P_liq, and ρ_sfc.
+Updates the land_sim cache state in place with the current values of F_A, F_R_sfc, F_evap, P_liq, and ρ_sfc.
 The surface air density is computed using the atmospheric state at the first level and making ideal gas
 and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
 a reasonable stand-in.
@@ -30,9 +30,9 @@ function land_pull!(cs)
         apply_mask.(parent(land_mask), >, parent(csf.F_A), parent(csf.F_A) .* FT(0), FT(0))
     ρ_liq = (LSMP.ρ_cloud_liq(land_sim.model.parameters.earth_param_set))
     parent(land_sim.integrator.p.bucket.evaporation) .=
-        apply_mask.(parent(land_mask), >, parent(csf.F_E) ./ ρ_liq, parent(csf.F_E) .* FT(0), FT(0))
+        apply_mask.(parent(land_mask), >, parent(csf.F_evap) ./ ρ_liq, parent(csf.F_evap) .* FT(0), FT(0))
     parent(land_sim.integrator.p.bucket.R_n) .=
-        apply_mask.(parent(land_mask), >, parent(csf.F_R), parent(csf.F_R) .* FT(0), FT(0))
+        apply_mask.(parent(land_mask), >, parent(csf.F_R_sfc), parent(csf.F_R_sfc) .* FT(0), FT(0))
     parent(land_sim.integrator.p.bucket.P_liq) .= FT(-1.0) .* parent(csf.P_liq) # land expects this to be positive
     parent(land_sim.integrator.p.bucket.P_snow) .= FT(0.0) .* parent(csf.P_snow)
 
@@ -41,20 +41,20 @@ end
 """
    ocean_pull!(cs)
 
-Updates the ocean_sim cache state in place with the current values of F_A and F_R.
-The ocean model does not require moisture fluxes at the surface, so F_E is not returned.
+Updates the ocean_sim cache state in place with the current values of F_A and F_R_sfc.
+The ocean model does not require moisture fluxes at the surface, so F_evap is not returned.
 """
 function ocean_pull!(cs)
     ocean_sim = cs.model_sims.ocean_sim
     csf = cs.fields
     @. ocean_sim.integrator.p.F_aero = csf.F_A
-    @. ocean_sim.integrator.p.F_rad = csf.F_R
+    @. ocean_sim.integrator.p.F_rad = csf.F_R_sfc
 end
 
 """
    ice_pull!(cs)
 
-Updates the ice_sim cache state in place with the current values of F_A and F_R.
+Updates the ice_sim cache state in place with the current values of F_A and F_R_sfc.
 In the current version, the sea ice has a prescribed thickness, and we assume that it is not
 sublimating. That contribution has been zeroed out in the atmos fluxes.
 """
@@ -64,7 +64,7 @@ function ice_pull!(cs)
     csf = cs.fields
     ice_mask = cs.surface_masks.ice
     parent(ice_sim.integrator.p.F_rad) .=
-        apply_mask.(parent(ice_mask), >, parent(csf.F_R), parent(csf.F_R) .* FT(0), FT(0))
+        apply_mask.(parent(ice_mask), >, parent(csf.F_R_sfc), parent(csf.F_R_sfc) .* FT(0), FT(0))
     parent(ice_sim.integrator.p.F_aero) .=
         apply_mask.(parent(ice_mask), >, parent(csf.F_A), parent(csf.F_A) .* FT(0), FT(0))
 end

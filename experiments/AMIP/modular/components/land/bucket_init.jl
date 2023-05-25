@@ -237,7 +237,7 @@ function bucket_init(
     variable_names = (propertynames(p.bucket)..., :P_liq, :P_snow)
     orig_fields = map(x -> getproperty(p.bucket, x), propertynames(p.bucket))
     fields = (orig_fields..., P_liq, P_snow)
-    p_new = ClimaCore.Fields.FieldVector(; :bucket => (; zip(variable_names, fields)...))
+    p_new = ClimaCore.Fields.FieldVector(; :bucket => (; zip(variable_names, fields)...), Ch = FT(0.001), Cd = FT(0.001))
 
     # Set initial aux variable values
     set_initial_aux_state! = make_set_initial_aux_state(model)

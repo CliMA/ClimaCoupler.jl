@@ -107,6 +107,8 @@ get_z0m_point(sim::SlabOceanSimulation, colidx) = get_z0m(sim)
 get_z0b_point(sim::SlabOceanSimulation, colidx) = get_z0b(sim)
 get_beta_point(sim::SlabOceanSimulation, colidx) = get_beta(sim)
 get_albedo_point(sim::SlabOceanSimulation, colidx) = get_albedo(sim)[colidx]
+get_heat_transfer_coefficient_point(sim::SlabOceanSimulation, colidx) = sim.integrator.p.params.Ch
+get_drag_transfer_coefficient_point(sim::SlabOceanSimulation, colidx) = sim.integrator.p.params.Cd
 
 issaturated(::SlabOceanSimulation, q) = isnothing(q)
 

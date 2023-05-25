@@ -14,6 +14,8 @@ get_z0m_point(sim, colidx) = nothing
 get_z0b_point(sim, colidx) = nothing
 get_beta_point(sim, colidx) = nothing
 get_albedo_point(sim, colidx) = nothing
+get_heat_transfer_coefficient_point(sim, colidx) = nothing
+get_drag_transfer_coefficient_point(sim, colidx) = nothing
 
 get_temperature(sim) = nothing
 get_humidity(sim) = nothing
@@ -22,6 +24,7 @@ get_z0b(sim) = nothing
 get_beta(sim) = nothing
 get_albedo(sim) = nothing
 get_area_fraction(sim) = nothing
+
 
 abstract type AtmosModelSimulation end
 abstract type SurfaceModelSimulation end
@@ -50,11 +53,12 @@ The current setup calculates the aerodynamic fluxes in the coupler and assumes n
 
 function calculate_and_send_turbulent_fluxes!(model_sims, fields, boundary_space)
 
-    surface_scheme = get_surface_scheme(model_sims.atmos_sim)
+    atmos_sim = model_sims.atmos_sim
+    surface_scheme = get_surface_scheme(atmos_sim)
     csf = fields
     FT = eltype(csf[1])
 
-    thermo_params = get_thermo_params(model_sims.atmos_sim)
+    thermo_params = get_thermo_params(atmos_sim)
 
     # reset coupler fields (TODO: add flux accumulation)
     csf.F_ρτxz .*= FT(0)
@@ -77,9 +81,6 @@ function calculate_and_send_turbulent_fluxes!(model_sims, fields, boundary_space
             if sim isa SurfaceModelSimulation && !iszero(parent(get_area_fraction(sim)[colidx])[1])
                 T_sfc = get_temperature_point(sim, colidx)
                 q_sfc = get_humidity_point(sim, colidx)
-                z0m = get_z0m_point(sim, colidx)
-                z0b = get_z0b_point(sim, colidx)
-                beta = get_beta_point(sim, colidx)
 
                 # get the thermal state of the macroscopic layer above the surface
                 thermo_state_sfc = surface_thermo_state(
@@ -91,7 +92,6 @@ function calculate_and_send_turbulent_fluxes!(model_sims, fields, boundary_space
                     thermo_state_int,
                 )
 
-
                 # set inputs based on whether MOST or bulk
                 inputs = surface_inputs(
                     surface_scheme,
@@ -100,10 +100,11 @@ function calculate_and_send_turbulent_fluxes!(model_sims, fields, boundary_space
                     uₕ_int,
                     z_int,
                     z_sfc,
-                    z0m,
-                    z0b,
-                    beta
-                )
+                    get_scheme_specific_properties(surface_scheme, sim, colidx)...,
+                    )
+
+
+
 
                 # update fluxes in the coupler
                 surface_params = get_surface_params(atmos_sim)
@@ -169,7 +170,6 @@ function push_atmos_fluxes!(sims, csf)
             update!(sfc_sim, Val(:net_radiation), csf.F_R_sfc .* frac)
             update!(sfc_sim, Val(:precipitation_liquid), csf.P_liq .* frac)
             update!(sfc_sim, Val(:precipitation_snow), csf.P_snow .* frac)
-            # @show typeof(sfc_sim)
         end
     end
 end
@@ -255,6 +255,13 @@ function surface_thermo_state(
     return TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
 end
 
+function get_scheme_specific_properties(::BulkScheme, sim, colidx)
+    Ch = get_heat_transfer_coefficient_point(sim, colidx)
+    Cd = get_drag_transfer_coefficient_point(sim, colidx)
+    beta = get_beta_point(sim, colidx)
+    FT = eltype(Ch)
+    return (; z0b = FT(0), z0m = FT(0), Ch = Ch, Cd = Cd, beta = beta, gustiness = FT(1))
+end
 function surface_inputs(
     ::BulkScheme,
     thermo_state_sfc,
@@ -262,19 +269,19 @@ function surface_inputs(
     uₕ_int,
     z_int,
     z_sfc,
-    z0m,
-    z0b,
+    z0b = FT(0),
+    z0m = FT(0),
+    Ch = FT(0),
+    Cd = FT(0),
     beta = FT(1),
     gustiness = FT(1),
-    Cd = FT(0),
-    Ch = FT(0),
 )
     FT = Spaces.undertype(axes(z_sfc))
 
     # wrap state values
-    return SF.Coefficients(
-        SF.InteriorValues(parent(z_int)[1], StaticArrays.SVector(parent(uₕ_int)[1], parent(uₕ_int)[2]) , thermo_state_int), # state_in
-        SF.SurfaceValues.(                                  # state_sfc
+    return @. SF.Coefficients(
+        SF.InteriorValues(z_int, uₕ_int, thermo_state_int), # state_in                              # state_sfc
+        SF.SurfaceValues(                                  # state_sfc
             z_sfc,
             StaticArrays.SVector(FT(0), FT(0)),
             thermo_state_sfc,
@@ -288,6 +295,12 @@ function surface_inputs(
     )
 end
 
+function get_scheme_specific_properties(::MoninObukhovScheme, sim, colidx)
+    z0m = get_z0m_point(sim, colidx)
+    z0b = get_z0b_point(sim, colidx)
+    beta = get_beta_point(sim, colidx)
+    return (; z0m = z0m, z0b = z0b, beta= beta)
+end
 function surface_inputs(
     ::MoninObukhovScheme,
     thermo_state_sfc,

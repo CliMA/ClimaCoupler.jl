@@ -117,6 +117,9 @@ get_z0m_point(sim::PrescribedIceSimulation, colidx) = get_z0m(sim)
 get_z0b_point(sim::PrescribedIceSimulation, colidx) = get_z0b(sim)
 get_beta_point(sim::PrescribedIceSimulation, colidx) = get_beta(sim)
 get_albedo_point(sim::PrescribedIceSimulation, colidx) = get_albedo(sim)[colidx]
+get_heat_transfer_coefficient_point(sim::PrescribedIceSimulation, colidx) = sim.integrator.p.params.Ch
+get_drag_transfer_coefficient_point(sim::PrescribedIceSimulation, colidx) = sim.integrator.p.params.Cd
+
 # file-specific (move!)
 """
     clean_sic(SIC, _info)

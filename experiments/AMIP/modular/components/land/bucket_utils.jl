@@ -120,6 +120,8 @@ get_z0m_point(sim::BucketSimulation, colidx) = get_z0m(sim)
 get_z0b_point(sim::BucketSimulation, colidx) = get_z0b(sim)
 get_beta_point(sim::BucketSimulation, colidx) = get_beta(sim)[colidx]
 get_albedo_point(sim::BucketSimulation, colidx) = get_albedo(sim)[colidx]
+get_heat_transfer_coefficient_point(sim::BucketSimulation, colidx) = sim.integrator.p.Ch
+get_drag_transfer_coefficient_point(sim::BucketSimulation, colidx) = sim.integrator.p.Cd
 
 issaturated(::BucketSimulation, q) = isnan(parent(q)[1])
 

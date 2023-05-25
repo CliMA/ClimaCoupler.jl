@@ -99,6 +99,31 @@ function update!(sim::BucketSimulation, ::Val{:precipitation_snow}, field)
     @. sim.integrator.p.bucket.P_snow .= field
 end
 
+function update!(sim::BucketSimulation, ::Val{:ρ_sfc}, field)
+    parent(land_sim.integrator.p.bucket.ρ_sfc) .= parent(field)
+end
+
+#  combining means atmos needs to know about the coupler interface.
+# function update_sim!(sim::BucketSimulation, csf, fraction)
+
+#     @. sim.integrator.p.bucket.R_n .= csf.F_R_sfc * fraction
+#     @. sim.integrator.p.bucket.P_liq .= csf.P_liq * fraction
+#     @. sim.integrator.p.bucket.P_snow .= csf.P_snow * fraction
+#     @. land_sim.integrator.p.bucket.ρ_sfc .= csf.ρ_sfc * fraction
+# end
+
+# parent(land_sim.integrator.p.bucket.ρ_sfc) .= parent(csf.ρ_sfc)
+# parent(land_sim.integrator.p.bucket.turbulent_energy_flux) .=
+#     parent(Regridder.binary_mask.(land_fraction, threshold = eps()) .* csf.F_A)
+# ρ_liq = (LSMP.ρ_cloud_liq(land_sim.model.parameters.earth_param_set))
+# parent(land_sim.integrator.p.bucket.evaporation) .=
+#     parent(Regridder.binary_mask.(land_fraction, threshold = eps()) .* csf.F_evap ./ ρ_liq)
+# parent(land_sim.integrator.p.bucket.R_n) .=
+#     parent(Regridder.binary_mask.(land_fraction, threshold = eps()) .* csf.F_R_sfc)
+# parent(land_sim.integrator.p.bucket.P_liq) .= FT(-1.0) .* parent(csf.P_liq) # land expects this to be positive
+# parent(land_sim.integrator.p.bucket.P_snow) .= FT(0.0) .* parent(csf.P_snow)
+
+
 """
     get_...(sim::BucketSimulation, colidx)
 

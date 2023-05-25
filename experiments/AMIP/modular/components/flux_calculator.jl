@@ -25,16 +25,32 @@ get_beta(sim) = nothing
 get_albedo(sim) = nothing
 get_area_fraction(sim) = nothing
 
-
-abstract type AtmosModelSimulation end
-abstract type SurfaceModelSimulation end
+abstract type ComponentModelSimulation end
+abstract type AtmosModelSimulation <: ComponentModelSimulation end
+abstract type SurfaceModelSimulation <: ComponentModelSimulation end
 
 abstract type AbstractSurfaceFluxScheme end
 struct BulkScheme <: AbstractSurfaceFluxScheme end
 struct MoninObukhovScheme <: AbstractSurfaceFluxScheme end
 get_surface_scheme(_) = MoninObukhovScheme()
 
-reinit!(sim) = nothing
+reinit!(sim) = @warn("undefined reinit! for " * name(sim) * ": skipping", maxlog=10)
+update!(sim, val::Val, _...) = @warn("undefined update! for $val in " * name(sim) * ": skipping", maxlog=10)
+name(sim) = " "
+
+# struct StubSimulation{F, P, Y, D, I, A} <: ComponentModelSimulation
+#     FT::F
+#     params::P
+#     Y_init::Y
+#     domain::D
+#     integrator::I
+#     area_fraction::A
+# end
+# function StubSimulation(FT; params= (;), Y_init = (;), domain = (;), integrator = (;), area_fraction = (;))
+#     StubSimulation(FT, params, Y_init, domain,integratorm, area_fraction)
+# end
+
+# name(::SlabOceanSimulation) = "StubSimulation"
 
 # end intrface
 """
@@ -53,7 +69,7 @@ The current setup calculates the aerodynamic fluxes in the coupler and assumes n
 
 function calculate_and_send_turbulent_fluxes!(model_sims, fields, boundary_space)
 
-    atmos_sim = model_sims.atmos_sim
+    atmos_sim = model_sims.atmos_sim;
     surface_scheme = get_surface_scheme(atmos_sim)
     csf = fields
     FT = eltype(csf[1])
@@ -103,9 +119,6 @@ function calculate_and_send_turbulent_fluxes!(model_sims, fields, boundary_space
                     get_scheme_specific_properties(surface_scheme, sim, colidx)...,
                     )
 
-
-
-
                 # update fluxes in the coupler
                 surface_params = get_surface_params(atmos_sim)
                 F_ρτxz, F_ρτyz, F_shf, F_lhf, F_evap = get_surface_fluxes_point!(inputs, surface_params)
@@ -119,11 +132,13 @@ function calculate_and_send_turbulent_fluxes!(model_sims, fields, boundary_space
 
                 # add the flux contributing from this surface
                 area_fraction = get_area_fraction(sim)[colidx]
-                @. csf.F_ρτxz[colidx] += F_ρτxz * area_fraction
-                @. csf.F_ρτyz[colidx] += F_ρτyz * area_fraction
-                @. csf.F_shf[colidx] += F_shf * area_fraction
-                @. csf.F_lhf[colidx] += F_lhf * area_fraction
-                @. csf.F_evap[colidx] += F_evap * area_fraction
+                mask = Regridder.binary_mask.(area_fraction, threshold = eps()) # only include flux calculations of unmasked surfaces
+                @. csf.F_ρτxz[colidx] += F_ρτxz * area_fraction * mask
+                @. csf.F_ρτyz[colidx] += F_ρτyz * area_fraction * mask
+                @. csf.F_shf[colidx] += F_shf * area_fraction * mask
+                @. csf.F_lhf[colidx] += F_lhf * area_fraction * mask
+                @. csf.F_evap[colidx] += F_evap * area_fraction * mask
+                # @. csf.ρ_sfc[colidx] += ρ_sfc
 
             end
 
@@ -135,11 +150,21 @@ function calculate_and_send_turbulent_fluxes!(model_sims, fields, boundary_space
     for sim in model_sims
         if sim isa AtmosModelSimulation
             Fields.bycolumn(boundary_space) do colidx
-                fields = (; F_ρτxz = csf.F_ρτxz[colidx], F_ρτyz = csf.F_ρτyz[colidx], F_shf = csf.F_shf[colidx], F_lhf = csf.F_lhf[colidx], F_evap = csf.F_evap[colidx])
-                update_calculated_fluxes_point!(sim, fields, colidx)
+                coupler_fields = (; F_ρτxz = csf.F_ρτxz[colidx], F_ρτyz = csf.F_ρτyz[colidx], F_shf = csf.F_shf[colidx], F_lhf = csf.F_lhf[colidx], F_evap = csf.F_evap[colidx])
+                update_calculated_fluxes_point!(sim, coupler_fields, colidx)
             end
         end
     end
+    # # check
+
+    # check_field = zeros(boundary_space)
+    # for sim in model_sims
+    #     if sim isa SurfaceModelSimulation
+    #         check_field .+= get_sensible_heat_flux(sim)
+    #     end
+    # end
+    # @assert(extrema(check_field .- get_sensible_heat_flux(atmos_sim)) ≈ (0.0, 0.0))
+
 end
 
 # test
@@ -155,24 +180,25 @@ Calculated in the atmosphere and collected after the atmos coupling timestep.
 function collect_atmos_fluxes!(csf, atmos_sim::AtmosModelSimulation)
     parent(csf.F_R_sfc) .= parent(get_net_surface_radiation(atmos_sim))
     parent(csf.P_liq) .= parent(get_liquid_precipitation(atmos_sim))
-    parent(csf.P_snow) .= parent(get_snow_precipitation(atmos_sim))
-    parent(csf.P_net) .= csf.P_liq + csf.P_snow
+    parent(csf.P_snow) .= FT(0.0) # parent(get_snow_precipitation(atmos_sim))
+    parent(csf.P_net) .= parent(csf.P_liq .+ csf.P_snow)
 end
 
-
 function push_atmos_fluxes!(sims, csf)
-    atmos_sim = sims.atmos_sim
-    FT = eltype(csf[1])
     for sfc_sim in sims
         if !(sfc_sim isa AtmosModelSimulation)
             frac = get_area_fraction(sfc_sim)
             isnothing(frac) ? continue : nothing
-            update!(sfc_sim, Val(:net_radiation), csf.F_R_sfc .* frac)
-            update!(sfc_sim, Val(:precipitation_liquid), csf.P_liq .* frac)
-            update!(sfc_sim, Val(:precipitation_snow), csf.P_snow .* frac)
+            mask = Regridder.binary_mask.(frac, threshold = eps()) # only include flux calculations of unmasked surfaces
+
+            update!(sfc_sim, Val(:net_radiation), csf.F_R_sfc .* frac .* mask)
+            update!(sfc_sim, Val(:precipitation_liquid), csf.P_liq .* frac .* mask)
+            update!(sfc_sim, Val(:precipitation_snow), csf.P_snow .* frac .* mask)
         end
     end
 end
+
+
 
 """
     inform_boundary_fluxes!(csf)
@@ -269,12 +295,12 @@ function surface_inputs(
     uₕ_int,
     z_int,
     z_sfc,
-    z0b = FT(0),
-    z0m = FT(0),
-    Ch = FT(0),
-    Cd = FT(0),
-    beta = FT(1),
-    gustiness = FT(1),
+    z0b,
+    z0m,
+    Ch,
+    Cd,
+    beta,
+    gustiness,
 )
     FT = Spaces.undertype(axes(z_sfc))
 
@@ -299,8 +325,9 @@ function get_scheme_specific_properties(::MoninObukhovScheme, sim, colidx)
     z0m = get_z0m_point(sim, colidx)
     z0b = get_z0b_point(sim, colidx)
     beta = get_beta_point(sim, colidx)
-    return (; z0m = z0m, z0b = z0b, beta= beta)
+    return (; z0b = z0b, z0m = z0m, Ch = FT(0), Cd = FT(0), beta= beta, gustiness = FT(1))
 end
+
 function surface_inputs(
     ::MoninObukhovScheme,
     thermo_state_sfc,
@@ -308,10 +335,12 @@ function surface_inputs(
     uₕ_int,
     z_int,
     z_sfc,
-    z0m,
     z0b,
-    beta = FT(1),
-    gustiness = FT(1)
+    z0m,
+    Ch,
+    Cd,
+    beta,
+    gustiness,
 )
     FT = Spaces.undertype(axes(z_sfc))
 

@@ -27,6 +27,7 @@ struct IceSlabParameters{FT <: AbstractFloat}
     k_ice::FT # thermal condictivity of ice [W / m / K] (less in HM71)
     α::FT # sea ice albedo
 end
+name(::IceSlabParameters) = "IceSlabParameters"
 
 # init simulation
 function slab_ice_space_init(::Type{FT}, space, p) where {FT}
@@ -99,8 +100,7 @@ end
 function update!(sim::PrescribedIceSimulation, ::Val{:net_radiation}, field)
     @. sim.integrator.p.F_rad .= field
 end
-update!(sim::PrescribedIceSimulation, ::Val{:precipitation_liquid}, field) = nothing
-update!(sim::PrescribedIceSimulation, ::Val{:precipitation_snow}, field) = nothing
+
 
 
 get_temperature(sim::PrescribedIceSimulation) = sim.integrator.u.T_sfc

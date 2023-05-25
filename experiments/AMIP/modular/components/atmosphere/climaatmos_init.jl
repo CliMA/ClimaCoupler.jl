@@ -19,6 +19,7 @@ struct ClimaAtmosSimulation{F, P, Y, D, I} <: AtmosModelSimulation
     domain::D
     integrator::I
 end
+name(::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
 
 function atmos_init(::Type{FT}, Y, integrator; params = nothing) where {FT}
     center_space = axes(Y.c.ρe_tot)
@@ -46,37 +47,46 @@ function update_calculated_fluxes_point!(sim::ClimaAtmosSimulation, fields, coli
 
 end
 
-function update!(sim::ClimaAtmosSimulation, ::Val{:F_evapnergy}, field)
-    @. sim.integrator.p.dif_flux_energy_bc = - Geometry.WVector(field)
-end
+# function update!(sim::ClimaAtmosSimulation, ::Val{:F_evapnergy}, field)
+#     @. sim.integrator.p.dif_flux_energy_bc = - Geometry.WVector(field)
+# end
 
-function update!(sim::ClimaAtmosSimulation, ::Val{:F_evapvaporation}, field)
-    @. sim.integrator.p.dif_flux_ρq_tot_bc  = - Geometry.WVector(field)
-end
+# function update!(sim::ClimaAtmosSimulation, ::Val{:F_evapvaporation}, field)
+#     @. sim.integrator.p.dif_flux_ρq_tot_bc  = - Geometry.WVector(field)
+# end
 
-function update!(sim::ClimaAtmosSimulation, ::Val{:F_drag}, (F_ρτxz, F_ρτyz))
-    ρ_int = Spaces.level(sim.integrator.u.c.ρ , 1)
-    surface_normal = Geometry.WVector.(ones(axes(Fields.level(sim.integrator.u.c, 1))))
+# function update!(sim::ClimaAtmosSimulation, ::Val{:F_drag}, (F_ρτxz, F_ρτyz))
+#     ρ_int = Spaces.level(sim.integrator.u.c.ρ , 1)
+#     surface_normal = Geometry.WVector.(ones(axes(Fields.level(sim.integrator.u.c, 1))))
 
-    @. sim.integrator.p.dif_flux_uₕ_bc  = - Geometry.Contravariant3Vector(sim.integrator.p.surface_normal[colidx]) ⊗ Geometry.Covariant12Vector(Geometry.UVVector(F_ρτxz / ρ_int, F_ρτyz / ρ_int),)
-end
+#     @. sim.integrator.p.dif_flux_uₕ_bc  = - Geometry.Contravariant3Vector(sim.integrator.p.surface_normal[colidx]) ⊗ Geometry.Covariant12Vector(Geometry.UVVector(F_ρτxz / ρ_int, F_ρτyz / ρ_int),)
+# end
 
 function update!(sim::ClimaAtmosSimulation, ::Val{:T_sfc}, field)
     sim.integrator.p.radiation_model.surface_temperature .= RRTMGPI.field2array(field)
 end
 
 function update!(sim::ClimaAtmosSimulation, ::Val{:albedo}, field)
-
     sim.integrator.p.radiation_model.diffuse_sw_surface_albedo .=
         reshape(RRTMGPI.field2array(field), 1, length(parent(field)))
     sim.integrator.p.radiation_model.direct_sw_surface_albedo .=
         reshape(RRTMGPI.field2array(field), 1, length(parent(field)))
 end
 
+#  combining means atmos needs to know about the coupler interface.
+# function update_sim!(sim::ClimaAtmosSimulation, csf)
+
+#     sim.integrator.p.radiation_model.diffuse_sw_surface_albedo .=
+#         reshape(RRTMGPI.field2array(csf.albedo), 1, length(parent(csf.albedo)))
+#     sim.integrator.p.radiation_model.direct_sw_surface_albedo .=
+#         reshape(RRTMGPI.field2array(csf.albedo), 1, length(parent(csf.albedo)))
+#     sim.integrator.p.radiation_model.surface_temperature .= RRTMGPI.field2array(csf.T_S)
+# end
+
 
 get_net_surface_radiation(sim::ClimaAtmosSimulation) = level(sim.integrator.p.ᶠradiation_flux, half)
 get_liquid_precipitation(sim::ClimaAtmosSimulation) = sim.integrator.p.col_integrated_rain
-get_snow_precipitation(sim::ClimaAtmosSimulation) = sim.integrator.p.col_integrated_snow
+get_snow_precipitation(sim::ClimaAtmosSimulation) = sim.integrator.p.col_integrated_snow .* FT(0) # for now
 
 get_height_int_point(sim::ClimaAtmosSimulation, colidx) = Spaces.level(Fields.coordinate_field(sim.integrator.u.c).z, 1)[colidx]
 get_height_sfc_point(sim::ClimaAtmosSimulation, colidx) = Spaces.level(Fields.coordinate_field(sim.integrator.u.f).z, half)[colidx]
@@ -93,7 +103,7 @@ get_air_density(::ClimaAtmosSimulation, thermo_params, thermo_state) = TD.air_de
 get_air_temperature(::ClimaAtmosSimulation, thermo_params, thermo_state_int) = TD.air_temperature.(thermo_params, thermo_state_int)
 get_cv_m(::ClimaAtmosSimulation, thermo_params, thermo_state_int) = TD.cv_m.(thermo_params, thermo_state_int)
 get_gas_constant_air(::ClimaAtmosSimulation, thermo_params, thermo_state_int)  = TD.gas_constant_air.(thermo_params, thermo_state_int)
-get_q_vap_saturation_generic(::ClimaAtmosSimulation, thermo_params, thermo_state_int) = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid())
+# get_q_vap_saturation_generic(::ClimaAtmosSimulation, thermo_params, thermo_state_int) = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid())
 
 get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxes_params(sim.integrator.p.params)
 function get_surface_scheme(sim::ClimaAtmosSimulation)

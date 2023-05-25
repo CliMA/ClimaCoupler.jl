@@ -32,6 +32,7 @@ struct BucketSimulation{F, M, Y, D, I, A} <: SurfaceModelSimulation
     integrator::I
     area_fraction::A
 end
+name(::BucketSimulation) = "BucketSimulation"
 
 include("./bucket_utils.jl")
 

@@ -52,6 +52,7 @@ We then specify the input data file names. If these are not already downloaded, 
 
 import SciMLBase: step!
 using OrdinaryDiffEq
+import OrdinaryDiffEq: reinit! # doesn't exist in ClimaTimeSteppers
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
 using LinearAlgebra
 import Test: @test
@@ -158,6 +159,7 @@ boundary_space = atmos_sim.domain.face_space.horizontal_space
 # init land-sea fraction
 land_fraction =
     Regridder.land_fraction(FT, REGRID_DIR, comms_ctx, land_mask_data, "LSMASK", boundary_space, mono = mono_surface)
+
 
 ## init surface (slab) model components
 include("components/slab_utils.jl")
@@ -274,7 +276,7 @@ save online diagnostics. These are all initialized here and saved in a global `C
 =#
 
 ## coupler exchange fields (all fluxes, and information for flux calculation within models)
-coupler_cache_names = (:T_S, :albedo, :F_R_sfc, :F_R_toa, :P_liq, :P_snow, :P_net, :F_lhf, :F_shf, :F_ρτxz, :F_ρτyz,  :F_evap)
+coupler_cache_names = (:T_S, :albedo, :ρ_sfc, :F_R_sfc, :F_R_toa, :P_liq, :P_snow, :P_net, :F_lhf, :F_shf, :F_ρτxz, :F_ρτyz,  :F_evap)
 coupler_fields = NamedTuple{coupler_cache_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_cache_names)))
 
 ## model simulations

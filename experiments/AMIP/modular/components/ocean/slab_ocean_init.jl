@@ -14,6 +14,7 @@ struct SlabOceanSimulation{F, P, Y, D, I, A} <: SurfaceModelSimulation
     integrator::I
     area_fraction::A
 end
+name(::SlabOceanSimulation) = "SlabOceanSimulation"
 
 # ocean parameters
 struct OceanSlabParameters{FT <: AbstractFloat}
@@ -88,8 +89,6 @@ end
 function update!(sim::SlabOceanSimulation, ::Val{:net_radiation}, field)
     @. sim.integrator.p.F_rad .= field
 end
-update!(sim::SlabOceanSimulation, ::Val{:precipitation_liquid}, field) = nothing
-update!(sim::SlabOceanSimulation, ::Val{:precipitation_snow}, field) = nothing
 
 
 

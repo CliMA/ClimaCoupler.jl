@@ -36,7 +36,17 @@ struct BulkScheme <: AbstractSurfaceFluxScheme end
 struct MoninObukhovScheme <: AbstractSurfaceFluxScheme end
 # get_surface_scheme(_) = MoninObukhovScheme()
 
-get_field(sim::ComponentModelSimulation, val::Val, colidx::Fields.ColumnIndex) = get_field(sim, val)[colidx]
+function get_field(sim::ComponentModelSimulation, val::Val)
+    error("undefined field $val for " * name(sim))
+end
+
+function get_field(sim::ComponentModelSimulation, val::Val, colidx::Fields.ColumnIndex)
+    if get_field(sim, val) isa AbstractFloat
+        get_field(sim, val)
+    else
+        get_field(sim, val)[colidx]
+    end
+end
 
 struct Warning
     message::String
@@ -53,7 +63,7 @@ function update!(sim, val::Val, _...)
     @warn(warning.message, maxlog=10)
     return warning
 end
-name(sim) = "stub  simulation"
+name(sim) = "stub simulation"
 
 # struct StubSimulation{F, P, Y, D, I, A} <: ComponentModelSimulation
 #     FT::F
@@ -137,21 +147,17 @@ function calculate_and_send_turbulent_fluxes!(model_sims, fields, boundary_space
                     surface_params = get_surface_params(atmos_sim)
                     F_ρτxz, F_ρτyz, F_shf, F_lhf, F_evap = get_surface_fluxes_point!(inputs, surface_params)
 
-                    ρ_sfc = get_air_density(atmos_sim, thermo_params, thermo_state_sfc)
-
-                    fields = (; F_ρτxz = F_ρτxz, F_ρτyz = F_ρτyz, F_shf = F_shf, F_lhf = F_lhf, F_evap = F_evap, ρ_sfc = ρ_sfc)
+                    fields = (; F_ρτxz = F_ρτxz, F_ρτyz = F_ρτyz, F_shf = F_shf, F_lhf = F_lhf, F_evap = F_evap)
 
                     # update the fluxes of this surface model
                     update_turbulent_fluxes_point!(sim, fields, colidx)
 
                     # add the flux contributing from this surface
-                    area_fraction = get_area_fraction(sim)[colidx]
-                    mask = Regridder.binary_mask.(area_fraction, threshold = eps()) # only include flux calculations of unmasked surfaces
-                    @. csf.F_ρτxz[colidx] += F_ρτxz * area_fraction * mask
-                    @. csf.F_ρτyz[colidx] += F_ρτyz * area_fraction * mask
-                    @. csf.F_shf[colidx] += F_shf * area_fraction * mask
-                    @. csf.F_lhf[colidx] += F_lhf * area_fraction * mask
-                    @. csf.F_evap[colidx] += F_evap * area_fraction * mask
+                    @. csf.F_ρτxz[colidx] += F_ρτxz * area_fraction * area_mask
+                    @. csf.F_ρτyz[colidx] += F_ρτyz * area_fraction * area_mask
+                    @. csf.F_shf[colidx] += F_shf * area_fraction * area_mask
+                    @. csf.F_lhf[colidx] += F_lhf * area_fraction * area_mask
+                    @. csf.F_evap[colidx] += F_evap * area_fraction * area_mask
                     # @. csf.ρ_sfc[colidx] += ρ_sfc
                     # @. csf.q_sfc[colidx] += q_sfc
 
@@ -205,22 +211,23 @@ end
 Calculated in the atmosphere and collected after the atmos coupling timestep.
 """
 function collect_atmos_fluxes!(csf, atmos_sim::AtmosModelSimulation)
-    parent(csf.F_R_sfc) .= parent(get_net_surface_radiation(atmos_sim))
-    parent(csf.P_liq) .= parent(get_liquid_precipitation(atmos_sim))
-    parent(csf.P_snow) .= FT(0.0) # parent(get_snow_precipitation(atmos_sim))
-    parent(csf.P_net) .= parent(csf.P_liq .+ csf.P_snow)
+    parent(csf.F_R_sfc) .= parent(get_field(atmos_sim, Val(:net_surface_radiation)))
+    parent(csf.P_liq) .= parent(get_field(atmos_sim, Val(:liquid_precipitation)))
+    parent(csf.P_snow) .= parent(get_field(atmos_sim, Val(:snow_precipitation)))
+    parent(csf.P_net) .= parent(csf.P_liq .+ csf.P_snow) # TODO: remove this and its dependendies
 end
 
 function push_atmos_fluxes!(sims, csf)
     for sfc_sim in sims
         if !(sfc_sim isa AtmosModelSimulation)
-            frac = get_area_fraction(sfc_sim)
+            frac = get_field(sfc_sim, Val(:area_fraction))
             isnothing(frac) ? continue : nothing
             mask = Regridder.binary_mask.(frac, threshold = eps()) # only include flux calculations of unmasked surfaces
 
-            update!(sfc_sim, Val(:net_radiation), csf.F_R_sfc .* frac .* mask)
-            update!(sfc_sim, Val(:precipitation_liquid), csf.P_liq .* frac .* mask)
-            update!(sfc_sim, Val(:precipitation_snow), csf.P_snow .* frac .* mask)
+            # pass fluxes (in W/m2) to the surfaces
+            update!(sfc_sim, Val(:net_radiation), csf.F_R_sfc .* mask)
+            update!(sfc_sim, Val(:precipitation_liquid), csf.P_liq .* mask)
+            update!(sfc_sim, Val(:precipitation_snow), csf.P_snow .* mask)
 
         end
     end
@@ -234,13 +241,18 @@ end
 Informs calculations that occur in the atmosphere before atmos coupling time step.
 """
 
+
+"""
+Coupler combines surface states that need to be passed to the atmosphere ()
+TODO: revamp this iterating only over SurfaceModelSimulations and remove hard coded 3-model spec
+"""
 function collect_surface_state!(csf, sims)
     FT = eltype(csf[1])
     (; land_sim, ocean_sim, ice_sim) = sims
 
-    # combine models' surfaces onlo one coupler field
-    combine_surfaces!(csf.T_S, (; land = get_area_fraction(land_sim), ocean = get_area_fraction(ocean_sim), ice = get_area_fraction(ice_sim)), (; land = get_temperature(land_sim), ocean = get_temperature(ocean_sim), ice = get_temperature(ice_sim)))
-    combine_surfaces!(csf.albedo, (; land = get_area_fraction(land_sim), ocean = get_area_fraction(ocean_sim), ice = get_area_fraction(ice_sim)), (; land = get_albedo(land_sim), ocean = get_albedo(ocean_sim), ice = get_albedo(ice_sim)))
+    # combine models' surfaces onlo a mean coupler field
+    Regridder.combine_surfaces!(csf.T_S, (; land = get_field(land_sim, Val(:area_fraction)), ocean = get_field(ocean_sim, Val(:area_fraction)), ice = get_field(ice_sim, Val(:area_fraction))), (; land = get_field(land_sim, Val(:air_temperature)), ocean = get_field(ocean_sim, Val(:air_temperature)), ice = get_field(ice_sim, Val(:air_temperature))))
+    Regridder.combine_surfaces!(csf.albedo, (; land = get_field(land_sim, Val(:area_fraction)), ocean = get_field(ocean_sim, Val(:area_fraction)), ice = get_field(ice_sim, Val(:area_fraction))), (; land = get_field(land_sim, Val(:albedo)), ocean = get_field(ocean_sim, Val(:albedo)), ice = get_field(ice_sim, Val(:albedo))))
 
 end
 
@@ -318,9 +330,9 @@ function surface_thermo_state(
 end
 
 function get_scheme_specific_properties(::BulkScheme, sim, colidx)
-    Ch = get_heat_transfer_coefficient_point(sim, colidx)
-    Cd = get_drag_transfer_coefficient_point(sim, colidx)
-    beta = get_beta_point(sim, colidx)
+    Ch = get_field(sim, Val(:heat_transfer_coefficient), colidx)
+    Cd = get_field(sim, Val(:beta), colidx)
+    beta = get_field(sim, Val(:drag_coefficient), colidx)
     FT = eltype(Ch)
     return (; z0b = FT(0), z0m = FT(0), Ch = Ch, Cd = Cd, beta = beta, gustiness = FT(1))
 end
@@ -358,9 +370,9 @@ function surface_inputs(
 end
 
 function get_scheme_specific_properties(::MoninObukhovScheme, sim, colidx)
-    z0m = get_z0m_point(sim, colidx)
-    z0b = get_z0b_point(sim, colidx)
-    beta = get_beta_point(sim, colidx)
+    z0m = get_field(sim, Val(:z0m), colidx)
+    z0b = get_field(sim, Val(:z0b), colidx)
+    beta = get_field(sim, Val(:drag_coefficient), colidx)
     return (; z0b = z0b, z0m = z0m, Ch = FT(0), Cd = FT(0), beta= beta, gustiness = FT(1))
 end
 

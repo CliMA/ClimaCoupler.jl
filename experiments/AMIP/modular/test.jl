@@ -95,9 +95,9 @@ get_field(sim::TestOcean, ::Val{:z0b}) = sim.integrator.p.z0b
 get_field(sim::TestOcean, ::Val{:beta}) = sim.integrator.p.beta
 get_field(sim::TestOcean, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 get_field(sim::TestOcean, ::Val{:area_mask}, colidx) = Regridder.binary_mask.(get_field(sim, Val{:area_fraction})[colidx], threshold = eps())
-
 get_field(sim::TestOcean, ::Val{:heat_transfer_coefficient}) = sim.integrator.p.Ch
 get_field(sim::TestOcean, ::Val{:drag_coefficient}) = sim.integrator.p.Cd
+get_field(sim::TestOcean, ::Val{:albedo}) = sim.integrator.p.α
 
 # overriding the default here
 function surface_thermo_state(sim::TestOcean, thermo_params, thermo_state_int, colidx)
@@ -107,13 +107,10 @@ function surface_thermo_state(sim::TestOcean, thermo_params, thermo_state_int, c
     @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
 end
 
-
 function update_turbulent_fluxes_point!(sim::TestOcean, fields, colidx)
     (; F_shf, F_lhf) = fields
     @. sim.integrator.p.F_aero[colidx] = F_shf + F_lhf
 end
-
-# issaturated(::TestOcean, q) = isnothing(q)
 
 @testset "calculate correct fluxes: dry" begin
     surface_scheme_list = (MoninObukhovScheme(), BulkScheme())
@@ -129,12 +126,15 @@ end
         atmos_sim = TestAtmos(params, Y_init, nothing, integrator);
 
         # ocean
-        p = (; F_aero = zeros(boundary_space), z0m = FT(0.01), z0b = FT(0.01), beta = ones(boundary_space), q = zeros(boundary_space), Cd = FT(0.01), Ch = FT(0.01), area_fraction = ones(boundary_space));
+        p = (; F_aero = zeros(boundary_space), z0m = FT(0.01), z0b = FT(0.01), beta = ones(boundary_space), α = ones(boundary_space) .* 0.5, q = zeros(boundary_space), Cd = FT(0.01), Ch = FT(0.01), area_fraction = ones(boundary_space) .* 0.5 );
         Y_init = (; T = ones(boundary_space) .* 300.0,);
         integrator = (; Y_init... , p = p, );
         ocean_sim = TestOcean(nothing, Y_init, nothing, integrator);
 
-        model_sims = (; atmos_sim, ocean_sim);
+        # ocean
+        ocean_sim2 = TestOcean(nothing, Y_init, nothing, integrator);
+
+        model_sims = (; atmos_sim, ocean_sim, ocean_sim2);
 
         coupler_cache_names = (:T_S, :albedo, :F_R_sfc, :F_R_toa, :P_liq, :P_snow, :P_net, :F_lhf, :F_shf, :F_ρτxz, :F_ρτyz,  :F_evap)
         fields = NamedTuple{coupler_cache_names}(ntuple(i -> Fields.zeros(boundary_space), length(coupler_cache_names)));
@@ -167,18 +167,31 @@ end
             shf_analytical = @. (cpm * (ocean_sim.integrator.T - atmos_sim.integrator.T) - gz) * ocean_sim.integrator.p.Ch * ρ_sfc * windspeed #-ρ_sfc * Ch * windspeed(sc) * (cp_m * ΔT + ΔΦ)
 
             colidx = Fields.ColumnIndex{2}((1, 1), 73)
+            # check the coupler field update
             @test isapprox(parent(shf_analytical[colidx]), parent(fields.F_shf[colidx]), rtol = 1e-6)
+
+            # test the surface field update
+            @test parent(fields.F_shf[colidx]) == parent(ocean_sim.integrator.p.F_aero[colidx])
+
+            # test the atmos field update
+            @test parent(fields.F_shf[colidx]) == - parent(atmos_sim.integrator.p.energy_bc[colidx])
+
         end
         @test parent(fields.F_evap)[1] ≈ FT(0)
         @test parent(fields.F_lhf)[1] ≈ FT(0)
     end
 
-    # TODO: add test for the moist case
+    # TODO: before the release, add a test for the moist case
 
 end
 
 # more granular unit tests
 struct DummySimulation <: SurfaceModelSimulation end
+boundary_space = TestHelper.create_space(FT);
+get_field(::DummySimulation, ::Val{:var}) = ones(boundary_space)
+get_field(::DummySimulation, ::Val{:var_float}) = Float64(2)
+get_field(::DummySimulation, ::Val{:air_temperature}) = ones(boundary_space) .* FT(300)
+
 @testset "extra_aux_update" begin
     sim = DummySimulation()
     @test extra_aux_update(sim) == nothing
@@ -186,11 +199,18 @@ end
 
 @testset "get_field" begin
     sim = DummySimulation()
-    boundary_space = TestHelper.create_space(FT);
+    #field
     colidx = Fields.ColumnIndex{2}((1, 1), 73)
-    get_field(::DummySimulation, ::Val{:var}) = ones(boundary_space)
-    @test parent(get_field(sim, Val(:var0), colidx))[1] == FT(1)
+    @test parent(get_field(sim, Val(:var), colidx))[1] == FT(1)
+    # float
+    @test get_field(sim, Val(:var_float), colidx) == FT(2)
 
+end
+
+@testset "undefined get_field" begin
+    sim = DummySimulation()
+    val = Val(:v)
+    @test_throws ErrorException("undefined field $val for " * name(sim)) get_field(sim, val)
 end
 
 @testset "reinit!" begin
@@ -202,18 +222,13 @@ end
 end
 
 @testset "name" begin
-    @test name(:sim) == "stub  simulation"
+    @test name(:sim) == "stub simulation"
 end
 
-struct DummySurfaceSimulation <: SurfaceModelSimulation end
-dummy_sim = DummySurfaceSimulation()
-get_field(::DummySurfaceSimulation, ::Val{:air_temperature}) = ones(boundary_space) .* FT(300)
 @testset "surface_thermo_state" begin
 
     options = (; T = [FT(300), FT(300), FT(310)], q = [FT(0.001), FT(0.01), FT(0.01)], )
     results = (; q_sfc =[FT(0.02550593313501068), FT(0.02550593313501068), FT(0.02769252063578527)], ρ_sfc = [FT(1), FT(1), FT(0.9210405029743302)] )
-
-    # dummy surface
 
     for i in [1,2]
 
@@ -222,12 +237,10 @@ get_field(::DummySurfaceSimulation, ::Val{:air_temperature}) = ones(boundary_spa
 
         boundary_space = TestHelper.create_space(FT);
 
-        params = (; surface_scheme = scheme, FT = FT);
+        params = (; surface_scheme = MoninObukhovScheme(), FT = FT);
         colidx = Fields.ColumnIndex{2}((1, 1), 73)
 
         # atmos
-
-
         p = (; energy_bc = zeros(boundary_space), ρq_tot_bc = zeros(boundary_space), uₕ_bc = ones(boundary_space), z = ones(boundary_space), z_sfc = zeros(boundary_space), u = ones(boundary_space), v = ones(boundary_space));
         Y_init = (; ρ = ones(boundary_space) , T = ones(boundary_space) .* T, q = ones(boundary_space) .* q );
         integrator = (; Y_init... , p = p, );
@@ -235,14 +248,15 @@ get_field(::DummySurfaceSimulation, ::Val{:air_temperature}) = ones(boundary_spa
         thermo_state_int = get_field(atmos_sim, Val(:thermo_state_int))[colidx]
         thermo_params = get_thermo_params(atmos_sim)
 
+        # ocean
+        dummy_sim = DummySimulation()
+
         # default thermo state from atmos
         surface_state = surface_thermo_state(dummy_sim, thermo_params, thermo_state_int, colidx)
         @test parent(surface_state.q_tot)[1] ≈ results.q_sfc[i]
         @test parent(surface_state.ρ)[1] ≈ results.ρ_sfc[i]
     end
 end
-
-
 
 # tests for combined fluxes
 
@@ -253,9 +267,136 @@ collect_surface_state!
 push_surface_state!
 
 
+
 extra_aux_update(sim, thermo_params, get_thermo_state(atmos_sim)) == nothing
 
 
 =#
+@testset "collect_surface_state!" begin
+    boundary_space = TestHelper.create_space(FT);
+
+    # ocean
+    p = (;  area_fraction = ones(boundary_space) .* 0.5, α = ones(boundary_space) .* 0.2 );
+    Y_init = (; T = ones(boundary_space) .* 200.0);
+    integrator = (; Y_init... , p = p, );
+    ocean_sim = TestOcean(nothing, Y_init, nothing, integrator);
+
+    # land
+    p = (; area_fraction = ones(boundary_space) .* 0.25, α = ones(boundary_space) .* 0.3 );
+    Y_init = (; T = ones(boundary_space) .* 300.0);
+    integrator = (; Y_init... , p = p, );
+
+    ocean_sim1 = TestOcean(nothing, Y_init, nothing, integrator);
+
+    # sea ice
+    p = (; area_fraction = ones(boundary_space) .* 0.25, α = ones(boundary_space) .* 0.3 );
+    Y_init = (; T = ones(boundary_space) .* 300.0);
+    integrator = (; Y_init... , p = p, );
+    ocean_sim2 = TestOcean(nothing, Y_init, nothing, integrator);
+
+    model_sims = (; land_sim = ocean_sim, ocean_sim = ocean_sim1, ice_sim = ocean_sim2);
+
+    coupler_cache_names = (:T_S, :albedo,)
+    coupler_fields = NamedTuple{coupler_cache_names}(ntuple(i -> Fields.zeros(boundary_space), length(coupler_cache_names)));
+
+    collect_surface_state!(coupler_fields, model_sims)
+
+    @test parent(coupler_fields.T_S)[1] == FT(250)
+    @test parent(coupler_fields.albedo)[1] == FT(0.25)
+end
 
 
+function update!(sim::TestAtmos, ::Val{:T_sfc}, field)
+    parent(sim.integrator.p.surface_temperature) .= parent(field)
+end
+function update!(sim::TestAtmos, ::Val{:albedo}, field)
+    parent(sim.integrator.p.albedo) .= parent(field)
+end
+@testset "push_surface_state!" begin
+
+    boundary_space = TestHelper.create_space(FT);
+
+    params = (; FT = FT);
+
+    # atmos
+    p = (; surface_temperature = zeros(boundary_space), albedo = zeros(boundary_space));
+    Y_init = (; );
+    integrator = (; Y_init... , p = p, );
+    atmos_sim = TestAtmos(params, Y_init, nothing, integrator);
+
+    coupler_cache_names = (:T_S, :albedo,)
+    coupler_fields = NamedTuple{coupler_cache_names}(ntuple(i -> Fields.zeros(boundary_space), length(coupler_cache_names)));
+    coupler_fields.T_S .= 200
+    coupler_fields.albedo .= 0.2
+
+    push_surface_state!(atmos_sim, coupler_fields)
+    @test parent(atmos_sim.integrator.p.surface_temperature)[1] == FT(200)
+    @test parent(atmos_sim.integrator.p.albedo)[1] == FT(0.2)
+
+end
+
+
+function update!(sim::TestOcean, ::Val{:net_radiation}, field)
+    parent(sim.integrator.p.F_net) .= parent(field)
+end
+function update!(sim::TestOcean, ::Val{:precipitation_liquid}, field)
+    parent(sim.integrator.p.P_l) .= parent(field)
+end
+function update!(sim::TestOcean, ::Val{:precipitation_snow}, field)
+    parent(sim.integrator.p.P_s) .= parent(field)
+end
+@testset "push_atmos_fluxes!(sims, csf)" begin
+    boundary_space = TestHelper.create_space(FT);
+
+    # ocean
+    p = (;  area_fraction = ones(boundary_space) .* 0.5, F_net = zeros(boundary_space), P_l = zeros(boundary_space), P_s = zeros(boundary_space) );
+    Y_init = (; );
+    integrator = (; Y_init... , p = p, );
+    ocean_sim = TestOcean(nothing, Y_init, nothing, integrator);
+
+    # land
+    p = (;  area_fraction = ones(boundary_space) .* 0.5, F_net = zeros(boundary_space), P_l = zeros(boundary_space), P_s = zeros(boundary_space) );
+    Y_init = (; );
+    integrator = (; Y_init... , p = p, );
+
+    ocean_sim1 = TestOcean(nothing, Y_init, nothing, integrator);
+
+    model_sims = (; land_sim = ocean_sim, ocean_sim = ocean_sim1);
+
+    coupler_cache_names = (:F_R_sfc, :P_liq, :P_snow)
+    coupler_fields = NamedTuple{coupler_cache_names}(ntuple(i -> Fields.ones(boundary_space), length(coupler_cache_names)));
+    coupler_fields.F_R_sfc .*= 20
+    coupler_fields.P_liq .*= 0.1
+    coupler_fields.P_snow .*= 0.2
+
+    push_atmos_fluxes!(model_sims, coupler_fields)
+
+    @test parent(ocean_sim.integrator.p.F_net)[1] == FT(20) # since in W / m2
+    @test parent(ocean_sim.integrator.p.P_l)[1] == FT(0.1)
+    @test parent(ocean_sim.integrator.p.P_s)[1] == FT(0.2)
+
+end
+
+get_field(sim::TestAtmos, ::Val{:net_surface_radiation}) = sim.integrator.p.F_R
+get_field(sim::TestAtmos, ::Val{:liquid_precipitation}) = sim.integrator.p.P_l
+get_field(sim::TestAtmos, ::Val{:snow_precipitation}) = sim.integrator.p.P_s
+@testset "collect_atmos_fluxes!" begin
+    boundary_space = TestHelper.create_space(FT);
+
+    params = (; FT = FT);
+
+    # atmos
+    p = (; F_R = ones(boundary_space) .*20 , P_l = ones(boundary_space) .* 0.1, P_s = ones(boundary_space) .* 0.2);
+    Y_init = (; );
+    integrator = (; Y_init... , p = p, );
+    atmos_sim = TestAtmos(params, Y_init, nothing, integrator);
+
+    coupler_cache_names = (:F_R_sfc, :P_liq, :P_snow, :P_net,)
+    coupler_fields = NamedTuple{coupler_cache_names}(ntuple(i -> Fields.zeros(boundary_space), length(coupler_cache_names)));
+
+    collect_atmos_fluxes!(coupler_fields, atmos_sim)
+
+    @test parent(coupler_fields.F_R_sfc)[1] == FT(20)
+    @test parent(coupler_fields.P_liq)[1] == FT(0.1)
+    @test parent(coupler_fields.P_snow)[1] == FT(0.2)
+end

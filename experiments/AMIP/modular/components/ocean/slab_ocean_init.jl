@@ -81,7 +81,7 @@ function ocean_init(::Type{FT}; tspan, dt, saveat, space, ocean_fraction, steppe
     SlabOceanSimulation(FT, params, Y, space, integrator, ocean_fraction)
 end
 
-function update_calculated_fluxes_point!(sim::SlabOceanSimulation, fields, colidx)
+function update_turbulent_fluxes_point!(sim::SlabOceanSimulation, fields, colidx)
     (; F_shf, F_lhf) = fields
     @. sim.integrator.p.F_aero[colidx] = F_shf + F_lhf
 end
@@ -93,7 +93,8 @@ end
 
 
 get_temperature(sim::SlabOceanSimulation) = sim.integrator.u.T_sfc
-get_humidity(sim::SlabOceanSimulation) = nothing
+get_humidity(sim::SlabOceanSimulation, thermo_params, T_sfc, ρ_sfc) = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid()) # this assumes a saturated surface!!!
+
 get_z0m(sim::SlabOceanSimulation) = sim.integrator.p.params.z0m
 get_z0b(sim::SlabOceanSimulation) = sim.integrator.p.params.z0b
 get_beta(sim::SlabOceanSimulation) = convert(eltype(sim.integrator.u), 1.0)
@@ -101,7 +102,7 @@ get_albedo(sim::SlabOceanSimulation) = sim.integrator.p.params.α
 get_area_fraction(sim::SlabOceanSimulation) = sim.integrator.p.area_fraction
 
 get_temperature_point(sim::SlabOceanSimulation, colidx) = get_temperature(sim)[colidx]
-get_humidity_point(sim::SlabOceanSimulation, colidx) = nothing
+get_humidity_point(sim::SlabOceanSimulation, colidx, thermo_params, T_sfc, ρ_sfc) = get_humidity[colidx]
 get_z0m_point(sim::SlabOceanSimulation, colidx) = get_z0m(sim)
 get_z0b_point(sim::SlabOceanSimulation, colidx) = get_z0b(sim)
 get_beta_point(sim::SlabOceanSimulation, colidx) = get_beta(sim)

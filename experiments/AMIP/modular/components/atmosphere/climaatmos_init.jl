@@ -36,7 +36,7 @@ function atmos_init(::Type{FT}, Y, integrator; params = nothing) where {FT}
     ClimaAtmosSimulation(FT, params, Y, spaces, integrator)
 end
 
-function update_calculated_fluxes_point!(sim::ClimaAtmosSimulation, fields, colidx)
+function update_turbulent_fluxes_point!(sim::ClimaAtmosSimulation, fields, colidx)
     (; F_ρτxz , F_ρτyz , F_shf , F_lhf , F_evap ) = fields
 
     ρ_int = Spaces.level(sim.integrator.u.c.ρ , 1)
@@ -64,7 +64,10 @@ end
 
 function update!(sim::ClimaAtmosSimulation, ::Val{:T_sfc}, field)
     sim.integrator.p.radiation_model.surface_temperature .= RRTMGPI.field2array(field)
+    parent(sim.integrator.p.T_sfc) .= parent(field)
+
 end
+
 
 function update!(sim::ClimaAtmosSimulation, ::Val{:albedo}, field)
     sim.integrator.p.radiation_model.diffuse_sw_surface_albedo .=
@@ -96,7 +99,8 @@ function get_uv_int_point(sim::ClimaAtmosSimulation, colidx)
     return @. StaticArrays.SVector(uₕ_int.components.data.:1, uₕ_int.components.data.:2)
 end
 
-get_thermo_state_point(sim::ClimaAtmosSimulation, colidx)  = Spaces.level(sim.integrator.p.ᶜts[colidx], 1)
+get_thermo_state_point(sim::ClimaAtmosSimulation, colidx)  = get_thermo_state(sim)[colidx]
+get_thermo_state(sim::ClimaAtmosSimulation)  = Spaces.level(sim.integrator.p.ᶜts, 1)
 get_thermo_params(sim::ClimaAtmosSimulation) = CAP.thermodynamics_params(sim.integrator.p.params)
 
 get_air_density(::ClimaAtmosSimulation, thermo_params, thermo_state) = TD.air_density.(thermo_params, thermo_state)
@@ -106,14 +110,6 @@ get_gas_constant_air(::ClimaAtmosSimulation, thermo_params, thermo_state_int)  =
 # get_q_vap_saturation_generic(::ClimaAtmosSimulation, thermo_params, thermo_state_int) = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid())
 
 get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxes_params(sim.integrator.p.params)
-function get_surface_scheme(sim::ClimaAtmosSimulation)
-    if sim.integrator.p.surface_scheme isa CA.MoninObukhovSurface
-        return MoninObukhovScheme()
-    elseif sim.integrator.p.surface_scheme isa CA.BulkSurface
-        return BulkScheme()
-    else
-        return nothing
-    end
-end
+
 
 reinit!(sim::ClimaAtmosSimulation) = reinit!(sim.integrator)

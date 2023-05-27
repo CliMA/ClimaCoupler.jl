@@ -92,7 +92,7 @@ end
 get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
     mono ? h_ice : Regridder.binary_mask(h_ice, threshold = FT(threshold))
 
-function update_calculated_fluxes_point!(sim::PrescribedIceSimulation, fields, colidx)
+function update_turbulent_fluxes_point!(sim::PrescribedIceSimulation, fields, colidx)
     (; F_shf, F_lhf) = fields
     @. sim.integrator.p.F_aero[colidx] = F_shf + F_lhf
 end
@@ -104,15 +104,14 @@ end
 
 
 get_temperature(sim::PrescribedIceSimulation) = sim.integrator.u.T_sfc
-get_humidity(sim::PrescribedIceSimulation) = nothing
 get_z0m(sim::PrescribedIceSimulation) = sim.integrator.p.params.z0m
 get_z0b(sim::PrescribedIceSimulation) = sim.integrator.p.params.z0b
 get_beta(sim::PrescribedIceSimulation) = convert(eltype(sim.integrator.u), 1.0)
 get_albedo(sim::PrescribedIceSimulation) = sim.integrator.p.params.α
 get_area_fraction(sim::PrescribedIceSimulation) = sim.integrator.p.area_fraction
+get_humidity_point(sim::PrescribedIceSimulation, thermo_params, T_sfc, ρ_sfc) = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid()) # this assumes a saturated surface!!!
 
 get_temperature_point(sim::PrescribedIceSimulation, colidx) = get_temperature(sim)[colidx]
-get_humidity_point(::PrescribedIceSimulation, colidx) = nothing
 get_z0m_point(sim::PrescribedIceSimulation, colidx) = get_z0m(sim)
 get_z0b_point(sim::PrescribedIceSimulation, colidx) = get_z0b(sim)
 get_beta_point(sim::PrescribedIceSimulation, colidx) = get_beta(sim)

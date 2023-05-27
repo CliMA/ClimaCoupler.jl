@@ -158,8 +158,7 @@ boundary_space = atmos_sim.domain.face_space.horizontal_space
 
 # init land-sea fraction
 land_fraction =
-    Regridder.land_fraction(FT, REGRID_DIR, comms_ctx, land_mask_data, "LSMASK", boundary_space, mono = mono_surface)
-
+    Regridder.land_fraction(FT, REGRID_DIR, comms_ctx, land_mask_data, "LSMASK", boundary_space, mono = mono_surface) #.* FT(0) #.+ FT(1)
 
 ## init surface (slab) model components
 include("components/slab_utils.jl")
@@ -346,6 +345,17 @@ cs = CoupledSimulation{FT}(
 =#
 ## share states between models
 include("components/push_pull.jl")
+function get_surface_scheme(cs)
+    if cs.model_sims.atmos_sim.integrator.p.surface_scheme isa CA.MoninObukhovSurface
+        return MoninObukhovScheme()
+    elseif cs.model_sims.atmos_sim.integrator.p.surface_scheme isa CA.BulkSurface
+        return BulkScheme()
+    else
+        return nothing
+    end
+end
+
+thermo_params = get_thermo_params(atmos_sim)
 #parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim.integrator, Δt_cpl, true) : nothing
 
 ## initialize the coupled system
@@ -364,19 +374,22 @@ function init_esm(cs)
         ice_sim.integrator.p.area_fraction .= get_ice_fraction.(SIC_init, mono_surface)
     end
 
-    collect_surface_state!(cs.fields, cs.model_sims)
     update_surface_fractions!(cs)
 
+    # calculate q_sat  and reitit surfaces
     # calculate turbulent fluxes in the coupler
-    calculate_and_send_turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space)
+    calculate_and_send_turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, get_surface_scheme(cs), get_thermo_params(atmos_sim)) # based on initial states
 
-    # calculate radiation and precipitation fluxes in the atmosphere for the given initial combined surface state
+
+    # init atmos
+    collect_surface_state!(cs.fields, cs.model_sims)
     push_surface_state!(atmos_sim, cs.fields)
-    reinit!(cs.model_sims.atmos_sim)
+    parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim.integrator, Δt_cpl, true) : nothing # first instance of radiative + precipitation fluxes
+    reinit!(cs.model_sims.atmos_sim) # collect calculated unpartitioned fluxes (radiation, precipitation)
     collect_atmos_fluxes!(cs.fields, cs.model_sims.atmos_sim)
+    push_atmos_fluxes!(cs.model_sims, cs.fields)
 
     # initialize surface models with the radiative and precipitation fluxes
-    push_atmos_fluxes!(cs.model_sims, cs.fields)
     reinit!(cs.model_sims.land_sim)
     reinit!(cs.model_sims.ice_sim)
     reinit!(cs.model_sims.ocean_sim)
@@ -389,8 +402,8 @@ end
 function solve_esm!(cs)
     @info "Starting coupling loop"
 
-    (; model_sims, Δt_cpl, tspan) = cs
-    (; atmos_sim, land_sim, ocean_sim, ice_sim) = model_sims
+    (; model_sims, Δt_cpl, tspan) = cs;
+    (; atmos_sim, land_sim, ocean_sim, ice_sim) = model_sims;
 
     ## step in time
     walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
@@ -455,7 +468,7 @@ function solve_esm!(cs)
         ## update turbulent flux based on the new states
         collect_surface_state!(cs.fields, cs.model_sims)
         update_surface_fractions!(cs)
-        calculate_and_send_turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space)
+        calculate_and_send_turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, get_surface_scheme(cs), get_thermo_params(atmos_sim))
 
         ## step to the next calendar month
         if trigger_callback(cs, Monthly())
@@ -473,6 +486,7 @@ if haskey(ENV, "CI_PERF_SKIP_COUPLED_RUN") #hide
     throw(:exit_profile_init) #hide
 end #hide
 
+# dd=dd
 ## run the coupled simulation
 init_esm(cs);
 solve_esm!(cs);
@@ -562,5 +576,5 @@ if ClimaComms.iamroot(comms_ctx)
     end
 
     ## clean up
-    rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
+    # rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
 end

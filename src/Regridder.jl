@@ -403,7 +403,7 @@ Maintains the invariant that the sum of area fractions is 1 at all points.
 """
 function update_surface_fractions!(cs::CoupledSimulation)
     # dynamic fractions
-    ice_d = cs.model_sims.ice_sim.integrator.p.area_fraction
+    ice_d = cs.model_sims.ice_sim.integrator.p.area_fraction # TODO: use higher level object
     FT = eltype(ice_d)
 
     # static fraction

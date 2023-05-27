@@ -108,6 +108,6 @@
 # get_beta_point(sim::TestOcean, colidx)
 
 
-# update_calculated_fluxes_point!(sim::TestLand, fields, colidx)
-# update_calculated_fluxes_point!(sim::TestOcean, fields, colidx)
+# update_turbulent_fluxes_point!(sim::TestLand, fields, colidx)
+# update_turbulent_fluxes_point!(sim::TestOcean, fields, colidx)
 

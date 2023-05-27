@@ -225,7 +225,7 @@ function bucket_init(
         elseif hs_sfc == true
             ΔT = -FT(60) * sin(radlat)^2
         elseif anomaly_tropics == true
-            ΔT = FT(40 * cos(radlat)^4)
+            ΔT = FT(20 * cos(radlat)^4)
         end
         T_sfc_0 + ΔT
     end

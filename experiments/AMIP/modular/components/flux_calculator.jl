@@ -63,6 +63,14 @@ function update!(sim, val::Val, _...)
     @warn(warning.message, maxlog=10)
     return warning
 end
+struct NoSimulationStub{F, I}
+    FT::F
+    integrator::I
+end
+# TODO: remove once generalize combine_surfaces in Regridder:
+get_field(sim::NoSimulationStub, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
+get_field(sim::NoSimulationStub, ::Val{:air_temperature}) = sim.integrator.u.T_sfc
+get_field(sim::NoSimulationStub, ::Val{:albedo}) = sim.integrator.p.params.α
 name(sim) = "stub simulation"
 
 # struct StubSimulation{F, P, Y, D, I, A} <: ComponentModelSimulation
@@ -109,6 +117,8 @@ function calculate_and_send_turbulent_fluxes!(model_sims, fields, boundary_space
 
     for sim in model_sims
         if sim isa SurfaceModelSimulation
+            # primarily to allow rho_sfc calculation
+            # TODO: absorb in to colidx once aux_update in ClimaLSM allows this
             extra_aux_update(sim, thermo_params, get_field(atmos_sim, Val(:thermo_state_int)) )
         end
     end
@@ -117,7 +127,7 @@ function calculate_and_send_turbulent_fluxes!(model_sims, fields, boundary_space
     Fields.bycolumn(boundary_space) do colidx
         # atmos state of center level 1
         z_int = get_field(atmos_sim, Val(:height_int), colidx)
-        uₕ_int = get_field(atmos_sim, Val(:uv_int_point), colidx)
+        uₕ_int = get_field(atmos_sim, Val(:uv_int), colidx)
         thermo_state_int = get_field(atmos_sim, Val(:thermo_state_int), colidx)
 
         z_sfc = get_field(atmos_sim, Val(:height_sfc), colidx)
@@ -192,6 +202,7 @@ extra_aux_update(sim::SurfaceModelSimulation, _...) = nothing
 
 
 function surface_thermo_state(sim::SurfaceModelSimulation, thermo_params, thermo_state_int, colidx)
+    @warn("Simulation " * name(sim) * " uses the default thermo (saturated) surface state", maxlog = 10)
     T_sfc = get_field(sim, Val(:air_temperature), colidx) #
     ρ_sfc = extrapolate_ρ_to_sfc.(thermo_params, thermo_state_int, T_sfc) # ideally the # calculate elsewhere, here just getter...
     q_sfc = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid()) # default = saturated

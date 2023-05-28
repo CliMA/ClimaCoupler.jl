@@ -218,8 +218,9 @@ if mode_name == "amip"
     update_midmonth_data!(date0, SST_info)
     SST_init = interpolate_midmonth_to_daily(date0, SST_info)
     ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
-    ocean_sim = (;
-        integrator = (;
+    ocean_sim = NoSimulationStub(
+        FT,
+        (;
             u = (; T_sfc = SST_init),
             p = (; params = ocean_params, ocean_fraction = (FT(1) .- land_fraction)),
             SST_info = SST_info,
@@ -257,14 +258,13 @@ elseif mode_name == "slabplanet"
         ocean_fraction = (FT(1) .- land_fraction), ## NB: this ocean fraction includes areas covered by sea ice (unlike the one contained in the cs)
     )
 
-    ## sea ice
-    ice_sim = (;
-        FT = FT,
-        integrator = (;
+    ## sea ice (here set to zero area coverage)
+    ice_sim = NoSimulationStub(
+        FT,
+        (;
             u = (; T_sfc = ClimaCore.Fields.ones(boundary_space)),
-            p = (; params = ocean_sim.params, area_fraction = ClimaCore.Fields.zeros(boundary_space)),
+            p = (; params = ocean_sim.params, area_fraction = ClimaCore.Fields.zeros(boundary_space))),
         )
-    )
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
 end
 

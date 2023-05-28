@@ -81,9 +81,8 @@ function make_lsm_domain(
 end
 
 function update_turbulent_fluxes_point!(sim::BucketSimulation, fields, colidx)
-    (; ρ_sfc, F_shf, F_lhf, F_evap) = fields
+    (; F_shf, F_lhf, F_evap) = fields
     ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
-    @. sim.integrator.p.bucket.ρ_sfc[colidx] = ρ_sfc
     @. sim.integrator.p.bucket.turbulent_energy_flux[colidx] = F_shf + F_lhf
     @. sim.integrator.p.bucket.evaporation[colidx] = F_evap / ρ_liq
     return nothing
@@ -131,47 +130,39 @@ Returns the surface the respective variables of the earth at column index `colid
 a method for the bucket when used as the land model.
 """
 
-get_temperature(sim::BucketSimulation) = ClimaLSM.surface_temperature( sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
-get_air_density_sfc(sim::BucketSimulation, thermo_params, ts_in, T_sfc) = sim.integrator.p.bucket.ρ_sfc # needs to be calculated in coupler
-get_humidity(sim::BucketSimulation, _...) = sim.integrator.p.bucket.q_sfc # calculated upon aux_update in LSM (based on a center-to-surface interpolation of Y.bucket.T), assumes a saturated surface, but accounts for snow.
-
-get_z0m(sim::BucketSimulation) = sim.model.parameters.z_0m
-get_z0b(sim::BucketSimulation) = sim.model.parameters.z_0b
-get_beta(sim::BucketSimulation) = ClimaLSM.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
-get_albedo(sim::BucketSimulation) = ClimaLSM.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
-get_area_fraction(sim::BucketSimulation) = sim.area_fraction
-
-get_temperature_point(sim::BucketSimulation, colidx) = get_temperature(sim)[colidx]
-get_humidity_point(sim::BucketSimulation, colidx) = get_humidity(sim)[colidx]
-get_z0m_point(sim::BucketSimulation, colidx) = get_z0m(sim)
-get_z0b_point(sim::BucketSimulation, colidx) = get_z0b(sim)
-get_beta_point(sim::BucketSimulation, colidx) = get_beta(sim)[colidx]
-get_albedo_point(sim::BucketSimulation, colidx) = get_albedo(sim)[colidx]
-get_heat_transfer_coefficient_point(sim::BucketSimulation, colidx) = sim.integrator.p.Ch
-get_drag_transfer_coefficient_point(sim::BucketSimulation, colidx) = sim.integrator.p.Cd
+get_field(sim::BucketSimulation, ::Val{:air_temperature}) = sim.integrator.p.bucket.T_sfc # check if T or T_sfc
+get_field(sim::BucketSimulation, ::Val{:air_density}) = sim.integrator.p.bucket.ρ_sfc
+get_field(sim::BucketSimulation, ::Val{:air_humidity}) = sim.integrator.p.bucket.q_sfc
+get_field(sim::BucketSimulation, ::Val{:z0m}) = sim.model.parameters.z_0m
+get_field(sim::BucketSimulation, ::Val{:z0b}) = sim.model.parameters.z_0b
+get_field(sim::BucketSimulation, ::Val{:beta}) = ClimaLSM.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
+get_field(sim::BucketSimulation, ::Val{:albedo}) = ClimaLSM.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
+get_field(sim::BucketSimulation, ::Val{:area_fraction}) = sim.area_fraction
+get_field(sim::BucketSimulation, ::Val{:heat_transfer_coefficient}) = sim.integrator.p.Ch
+get_field(sim::BucketSimulation, ::Val{:drag_coefficient}) = sim.integrator.p.Cd
 
 #issaturated(::BucketSimulation, q) = isnan(parent(q)[1])
-issaturated(::BucketSimulation, q) = true # TODO: implement and use q_sat from bucket
+#issaturated(::BucketSimulation, q) = true # TODO: implement and use q_sat from bucket
 
 reinit!(sim::BucketSimulation) = reinit!(sim.integrator)
 
 
 # because the Bucket needs atmos state to calculate q_sfc, we define a specific method
 
-# this needs to be fieldwise!
+# ocerride the default
 function surface_thermo_state(sim::BucketSimulation, thermo_params, thermo_state_int, colidx)
 
-    T_sfc = get_temperature_point(sim, colidx) # get from the state
+    T_sfc = get_field(sim, Val(:air_temperature), colidx)  # get from the state
 
-    ρ_sfc = get_air_density_sfc(sim, thermo_params, thermo_state_int, T_sfc)[colidx] # ideally the # calculate elsewhere, here just getter...
-    q_sfc = get_humidity(sim, thermo_params, T_sfc, ρ_sfc)[colidx]
+    ρ_sfc = get_field(sim, Val(:air_density), colidx) # already calculated in extra_aux_update
+    q_sfc = get_field(sim, Val(:air_humidity), colidx)
     @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
 end
 
 function extra_aux_update(sim::BucketSimulation, thermo_params, thermo_state_int)
     update_aux! = make_update_aux(sim.model) # need to revamp land
     Fields.bycolumn(boundary_space) do colidx
-        T_sfc = get_temperature_point(sim, colidx) # get from the state
+        T_sfc = get_field(sim, Val(:air_temperature), colidx) # get from the state
         sim.integrator.p.bucket.ρ_sfc[colidx] .= extrapolate_ρ_to_sfc.(thermo_params, thermo_state_int[colidx], T_sfc) # this is required from the coupler
     end
     update_aux!(sim.integrator.p, sim.integrator.u, sim.integrator.t) # this calculates q_sfc in Bucket
@@ -180,11 +171,8 @@ end
 function surface_thermo_state(sim::BucketSimulation, thermo_params, thermo_state_int, colidx)
     T_sfc = get_field(sim, Val(:air_temperature), colidx) #
     ρ_sfc = get_field(sim, Val(:air_density), colidx)
-    q_sfc = get_field(sim, Val(:humidity), colidx) # calculated in land during extra_aux_update
+    q_sfc = get_field(sim, Val(:air_humidity), colidx) # calculated in land during extra_aux_update
     @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
 end
-get_field(sim::BucketSimulation, ::Val{:air_temperature}) = sim.integrator.p.bucket.T_sfc # check if T or T_sfc
-get_field(sim::BucketSimulation, ::Val{:air_density}) = sim.integrator.p.bucket.ρ_sfc
-get_field(sim::BucketSimulation, ::Val{:humidity}) = sim.integrator.p.bucket.q_sfc
 
 

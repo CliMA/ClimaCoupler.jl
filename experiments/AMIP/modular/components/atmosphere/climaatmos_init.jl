@@ -47,27 +47,11 @@ function update_turbulent_fluxes_point!(sim::ClimaAtmosSimulation, fields, colid
 
 end
 
-# function update!(sim::ClimaAtmosSimulation, ::Val{:F_evapnergy}, field)
-#     @. sim.integrator.p.dif_flux_energy_bc = - Geometry.WVector(field)
-# end
-
-# function update!(sim::ClimaAtmosSimulation, ::Val{:F_evapvaporation}, field)
-#     @. sim.integrator.p.dif_flux_ρq_tot_bc  = - Geometry.WVector(field)
-# end
-
-# function update!(sim::ClimaAtmosSimulation, ::Val{:F_drag}, (F_ρτxz, F_ρτyz))
-#     ρ_int = Spaces.level(sim.integrator.u.c.ρ , 1)
-#     surface_normal = Geometry.WVector.(ones(axes(Fields.level(sim.integrator.u.c, 1))))
-
-#     @. sim.integrator.p.dif_flux_uₕ_bc  = - Geometry.Contravariant3Vector(sim.integrator.p.surface_normal[colidx]) ⊗ Geometry.Covariant12Vector(Geometry.UVVector(F_ρτxz / ρ_int, F_ρτyz / ρ_int),)
-# end
-
 function update!(sim::ClimaAtmosSimulation, ::Val{:T_sfc}, field)
     sim.integrator.p.radiation_model.surface_temperature .= RRTMGPI.field2array(field)
     parent(sim.integrator.p.T_sfc) .= parent(field)
 
 end
-
 
 function update!(sim::ClimaAtmosSimulation, ::Val{:albedo}, field)
     sim.integrator.p.radiation_model.diffuse_sw_surface_albedo .=
@@ -87,6 +71,35 @@ end
 # end
 
 
+get_field(sim::ClimaAtmosSimulation, ::Val{:net_surface_radiation}) =  level(sim.integrator.p.ᶠradiation_flux, half)
+get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) =  sim.integrator.p.col_integrated_rain
+get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =  sim.integrator.p.col_integrated_snow .* FT(0) # for now
+
+get_field(sim::ClimaAtmosSimulation, ::Val{:height_int})  = Spaces.level(Fields.coordinate_field(sim.integrator.u.c).z, 1)
+get_field(sim::ClimaAtmosSimulation, ::Val{:height_sfc})  = Spaces.level(Fields.coordinate_field(sim.integrator.u.f).z, half)
+
+function get_field(sim::ClimaAtmosSimulation, ::Val{:uv_int})
+    uₕ_int = Geometry.UVVector.(Spaces.level(sim.integrator.u.c.uₕ, 1))
+    return @. StaticArrays.SVector(uₕ_int.components.data.:1, uₕ_int.components.data.:2)
+end
+
+get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_state_int}) =  Spaces.level(sim.integrator.p.ᶜts, 1)
+get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_params}) =  CAP.thermodynamics_params(sim.integrator.p.params)
+
+get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) = TD.air_density.(thermo_params, sim.integrator.p.ᶜts)
+get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) = TD.air_temperature.(thermo_params, sim.integrator.p.ᶜts)
+get_field(sim::ClimaAtmosSimulation, ::Val{:cv_m}) = TD.cv_m.(thermo_params, sim.integrator.p.ᶜts)
+get_field(sim::ClimaAtmosSimulation, ::Val{:gas_constant_air}) = TD.gas_constant_air.(thermo_params, sim.integrator.p.ᶜts)
+# get_field(sim::ClimaAtmosSimulation, ::Val{:q_vap_saturation_generic}) = thermo_state_int) = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid())
+
+get_field(sim::ClimaAtmosSimulation, ::Val{:surface_params}) =  CAP.surface_fluxes_params(sim.integrator.p.params)
+
+
+reinit!(sim::ClimaAtmosSimulation) = reinit!(sim.integrator)
+
+
+#=
+
 get_net_surface_radiation(sim::ClimaAtmosSimulation) = level(sim.integrator.p.ᶠradiation_flux, half)
 get_liquid_precipitation(sim::ClimaAtmosSimulation) = sim.integrator.p.col_integrated_rain
 get_snow_precipitation(sim::ClimaAtmosSimulation) = sim.integrator.p.col_integrated_snow .* FT(0) # for now
@@ -101,7 +114,6 @@ end
 
 get_thermo_state_point(sim::ClimaAtmosSimulation, colidx)  = get_thermo_state(sim)[colidx]
 get_thermo_state(sim::ClimaAtmosSimulation)  = Spaces.level(sim.integrator.p.ᶜts, 1)
-get_thermo_params(sim::ClimaAtmosSimulation) = CAP.thermodynamics_params(sim.integrator.p.params)
 
 get_air_density(::ClimaAtmosSimulation, thermo_params, thermo_state) = TD.air_density.(thermo_params, thermo_state)
 get_air_temperature(::ClimaAtmosSimulation, thermo_params, thermo_state_int) = TD.air_temperature.(thermo_params, thermo_state_int)
@@ -109,7 +121,9 @@ get_cv_m(::ClimaAtmosSimulation, thermo_params, thermo_state_int) = TD.cv_m.(the
 get_gas_constant_air(::ClimaAtmosSimulation, thermo_params, thermo_state_int)  = TD.gas_constant_air.(thermo_params, thermo_state_int)
 # get_q_vap_saturation_generic(::ClimaAtmosSimulation, thermo_params, thermo_state_int) = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid())
 
+=#
 get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxes_params(sim.integrator.p.params)
-
+get_thermo_params(sim::ClimaAtmosSimulation) = CAP.thermodynamics_params(sim.integrator.p.params)
 
 reinit!(sim::ClimaAtmosSimulation) = reinit!(sim.integrator)
+

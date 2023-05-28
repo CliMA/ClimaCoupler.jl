@@ -25,6 +25,8 @@ struct OceanSlabParameters{FT <: AbstractFloat}
     z0m::FT
     z0b::FT
     α::FT
+    Cd::FT
+    Ch::FT
 end
 
 # init simulation
@@ -66,7 +68,7 @@ Initializes the `DiffEq` problem, and creates a Simulation-type object containin
 """
 function ocean_init(::Type{FT}; tspan, dt, saveat, space, ocean_fraction, stepper = Euler()) where {FT}
 
-    params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
+    params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06), FT(0.001), FT(0.001))
 
     Y, space = slab_ocean_space_init(FT, space, params)
     cache = (
@@ -92,23 +94,14 @@ end
 
 
 
-get_temperature(sim::SlabOceanSimulation) = sim.integrator.u.T_sfc
-get_humidity(sim::SlabOceanSimulation, thermo_params, T_sfc, ρ_sfc) = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid()) # this assumes a saturated surface!!!
-
-get_z0m(sim::SlabOceanSimulation) = sim.integrator.p.params.z0m
-get_z0b(sim::SlabOceanSimulation) = sim.integrator.p.params.z0b
-get_beta(sim::SlabOceanSimulation) = convert(eltype(sim.integrator.u), 1.0)
-get_albedo(sim::SlabOceanSimulation) = sim.integrator.p.params.α
-get_area_fraction(sim::SlabOceanSimulation) = sim.integrator.p.area_fraction
-
-get_temperature_point(sim::SlabOceanSimulation, colidx) = get_temperature(sim)[colidx]
-get_humidity_point(sim::SlabOceanSimulation, colidx, thermo_params, T_sfc, ρ_sfc) = get_humidity[colidx]
-get_z0m_point(sim::SlabOceanSimulation, colidx) = get_z0m(sim)
-get_z0b_point(sim::SlabOceanSimulation, colidx) = get_z0b(sim)
-get_beta_point(sim::SlabOceanSimulation, colidx) = get_beta(sim)
-get_albedo_point(sim::SlabOceanSimulation, colidx) = get_albedo(sim)[colidx]
-get_heat_transfer_coefficient_point(sim::SlabOceanSimulation, colidx) = sim.integrator.p.params.Ch
-get_drag_transfer_coefficient_point(sim::SlabOceanSimulation, colidx) = sim.integrator.p.params.Cd
+get_field(sim::SlabOceanSimulation, ::Val{:air_temperature}) = sim.integrator.u.T_sfc
+get_field(sim::SlabOceanSimulation, ::Val{:z0m}) = sim.integrator.p.params.z0m
+get_field(sim::SlabOceanSimulation, ::Val{:z0b}) = sim.integrator.p.params.z0b
+get_field(sim::SlabOceanSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
+get_field(sim::SlabOceanSimulation, ::Val{:albedo}) = sim.integrator.p.params.α
+get_field(sim::SlabOceanSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
+get_field(sim::SlabOceanSimulation, ::Val{:heat_transfer_coefficient})  = sim.integrator.p.params.Ch
+get_field(sim::SlabOceanSimulation, ::Val{:drag_coefficient})  = sim.integrator.p.params.Cd
 
 issaturated(::SlabOceanSimulation, q) = isnothing(q)
 

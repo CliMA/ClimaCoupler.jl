@@ -26,6 +26,8 @@ struct IceSlabParameters{FT <: AbstractFloat}
     T_freeze::FT # freezing point of sea water [K]
     k_ice::FT # thermal condictivity of ice [W / m / K] (less in HM71)
     α::FT # sea ice albedo
+    Cd::FT # drag coefficient
+    Ch::FT # heat transfer coefficient
 end
 name(::IceSlabParameters) = "IceSlabParameters"
 
@@ -71,8 +73,7 @@ Initializes the `DiffEq` problem, and creates a Simulation-type object containin
 """
 function ice_init(::Type{FT}; tspan, saveat, dt, space, ice_fraction, stepper = Euler()) where {FT}
 
-    params = IceSlabParameters(FT(2), FT(900.0), FT(2100.0), FT(271.2), FT(1e-3), FT(1e-5), FT(271.2), FT(2.0), FT(0.8))
-
+    params = SeaIceParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06), FT(0.001), FT(0.001))
     Y = slab_ice_space_init(FT, space, params)
     additional_cache = (;
         F_aero = ClimaCore.Fields.zeros(space),
@@ -102,22 +103,14 @@ function update!(sim::PrescribedIceSimulation, ::Val{:net_radiation}, field)
 end
 
 
-
-get_temperature(sim::PrescribedIceSimulation) = sim.integrator.u.T_sfc
-get_z0m(sim::PrescribedIceSimulation) = sim.integrator.p.params.z0m
-get_z0b(sim::PrescribedIceSimulation) = sim.integrator.p.params.z0b
-get_beta(sim::PrescribedIceSimulation) = convert(eltype(sim.integrator.u), 1.0)
-get_albedo(sim::PrescribedIceSimulation) = sim.integrator.p.params.α
-get_area_fraction(sim::PrescribedIceSimulation) = sim.integrator.p.area_fraction
-get_humidity_point(sim::PrescribedIceSimulation, thermo_params, T_sfc, ρ_sfc) = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid()) # this assumes a saturated surface!!!
-
-get_temperature_point(sim::PrescribedIceSimulation, colidx) = get_temperature(sim)[colidx]
-get_z0m_point(sim::PrescribedIceSimulation, colidx) = get_z0m(sim)
-get_z0b_point(sim::PrescribedIceSimulation, colidx) = get_z0b(sim)
-get_beta_point(sim::PrescribedIceSimulation, colidx) = get_beta(sim)
-get_albedo_point(sim::PrescribedIceSimulation, colidx) = get_albedo(sim)[colidx]
-get_heat_transfer_coefficient_point(sim::PrescribedIceSimulation, colidx) = sim.integrator.p.params.Ch
-get_drag_transfer_coefficient_point(sim::PrescribedIceSimulation, colidx) = sim.integrator.p.params.Cd
+get_field(sim::PrescribedIceSimulation, ::Val{:air_temperature}) = sim.integrator.u.T_sfc
+get_field(sim::PrescribedIceSimulation, ::Val{:z0m}) = sim.integrator.p.params.z0m
+get_field(sim::PrescribedIceSimulation, ::Val{:z0b}) = sim.integrator.p.params.z0b
+get_field(sim::PrescribedIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
+get_field(sim::PrescribedIceSimulation, ::Val{:albedo}) = sim.integrator.p.params.α
+get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
+get_field(sim::PrescribedIceSimulation, ::Val{:heat_transfer_coefficient})  = sim.integrator.p.params.Ch
+get_field(sim::PrescribedIceSimulation, ::Val{:drag_coefficient})  = sim.integrator.p.params.Cd
 
 # file-specific (move!)
 """

@@ -67,7 +67,7 @@ end
 
 get_field(sim::TestAtmos, ::Val{:height_int}) = sim.integrator.p.z
 get_field(sim::TestAtmos, ::Val{:height_sfc}) = sim.integrator.p.z_sfc
-get_field(sim::TestAtmos, ::Val{:uv_int_point}) = @. StaticArrays.SVector(sim.integrator.p.u, sim.integrator.p.v)
+get_field(sim::TestAtmos, ::Val{:uv_int}) = @. StaticArrays.SVector(sim.integrator.p.u, sim.integrator.p.v)
 get_field(sim::TestAtmos, ::Val{:thermo_state_int}) = TD.PhaseEquil_ρTq.(get_thermo_params(sim), sim.integrator.ρ, sim.integrator.T, sim.integrator.q)
 get_field(sim::TestAtmos, ::Val{:air_density}) = sim.integrator.ρ
 get_field(sim::TestAtmos, ::Val{:air_temperature}) = sim.integrator.T
@@ -94,7 +94,6 @@ get_field(sim::TestOcean, ::Val{:z0m}) = sim.integrator.p.z0m
 get_field(sim::TestOcean, ::Val{:z0b}) = sim.integrator.p.z0b
 get_field(sim::TestOcean, ::Val{:beta}) = sim.integrator.p.beta
 get_field(sim::TestOcean, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
-get_field(sim::TestOcean, ::Val{:area_mask}, colidx) = Regridder.binary_mask.(get_field(sim, Val{:area_fraction})[colidx], threshold = eps())
 get_field(sim::TestOcean, ::Val{:heat_transfer_coefficient}) = sim.integrator.p.Ch
 get_field(sim::TestOcean, ::Val{:drag_coefficient}) = sim.integrator.p.Cd
 get_field(sim::TestOcean, ::Val{:albedo}) = sim.integrator.p.α
@@ -259,19 +258,6 @@ end
 end
 
 # tests for combined fluxes
-
-#=
-collect_atmos_fluxes!
-push_atmos_fluxes!
-collect_surface_state!
-push_surface_state!
-
-
-
-extra_aux_update(sim, thermo_params, get_thermo_state(atmos_sim)) == nothing
-
-
-=#
 @testset "collect_surface_state!" begin
     boundary_space = TestHelper.create_space(FT);
 

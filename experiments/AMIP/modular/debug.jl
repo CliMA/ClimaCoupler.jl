@@ -1,6 +1,8 @@
 using Plots
 using ClimaCorePlots
-function debug(sim::SlabOceanSimulation)
+
+
+function debug(sim::Union{SlabOceanSimulation,PrescribedIceSimulation})
     @info "debug" * name(sim)
     map(x -> println(zip(x, getproperty(sim.integrator.u, x))), propertynames(sim.integrator.u))
     @info "    -> state extrema"
@@ -56,6 +58,7 @@ function debug(cs)
     push!(all_plots, plot(cs.fields.F_lhf, title = "F_lhf"))
     push!(all_plots, plot(cs.fields.F_shf, title = "F_shf"))
     push!(all_plots, plot(cs.fields.P_liq, title = "P_liq"))
+    push!(all_plots, plot(cs.fields.T_S, title = "T_S"))
     push!(all_plots, plot(cs.surface_fractions.land, title = "fractions.land"))
     push!(all_plots, plot(cs.surface_fractions.ocean, title = "cs.surface_fractions.ocean"))
     push!(all_plots, plot(cs.surface_fractions.ice, title = "cs.surface_fractions.ice"))
@@ -72,8 +75,23 @@ function debug(sim::BucketSimulation)
     @info "    -> cache extrema"
     map(x -> println(zip(x, extrema(getproperty(sim.integrator.p.bucket, x)))), propertynames(sim.integrator.p.bucket))
 
+    all_plots = []
+    push!(all_plots, plot(sim.integrator.u.bucket.T, title = "T"))
+    push!(all_plots, plot(sim.integrator.u.bucket.W, title = "W"))
+    push!(all_plots, plot(sim.integrator.u.bucket.σS, title = "σS"))
+    push!(all_plots, plot(sim.integrator.u.bucket.Ws, title = "Ws"))
+    push!(all_plots, plot(sim.integrator.p.bucket.q_sfc, title = "q_sfc"))
+    push!(all_plots, plot(sim.integrator.p.bucket.T_sfc, title = "T_sfc"))
+    push!(all_plots, plot(sim.integrator.p.bucket.α_sfc, title = "α_sfc"))
+    push!(all_plots, plot(sim.integrator.p.bucket.ρ_sfc, title = "ρ_sfc"))
+    push!(all_plots, plot(sim.integrator.p.bucket.P_snow, title = "P_snow"))
+    push!(all_plots, plot(sim.integrator.p.bucket.P_liq, title = "P_liq"))
+    fig = plot(all_plots..., size = (1500, 800))
+    Plots.png("debug_" * name(sim))
 end
 
 debug(atmos_sim)
-debug(ocean_sim)
+debug(land_sim)
+cs.mode.name == "amip" ? debug(ice_sim) : nothing
+cs.mode.name == "slabplanet" ? debug(ocean_sim) : nothing
 debug(cs)

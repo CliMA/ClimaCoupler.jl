@@ -29,7 +29,7 @@ struct IceSlabParameters{FT <: AbstractFloat}
     Cd::FT # drag coefficient
     Ch::FT # heat transfer coefficient
 end
-name(::IceSlabParameters) = "IceSlabParameters"
+name(::PrescribedIceSimulation) = "IceSlabParameters"
 
 # init simulation
 function slab_ice_space_init(::Type{FT}, space, p) where {FT}
@@ -73,7 +73,7 @@ Initializes the `DiffEq` problem, and creates a Simulation-type object containin
 """
 function ice_init(::Type{FT}; tspan, saveat, dt, space, ice_fraction, stepper = Euler()) where {FT}
 
-    params = SeaIceParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06), FT(0.001), FT(0.001))
+    params = IceSlabParameters(FT(2), FT(900.0), FT(2100.0), FT(271.2), FT(1e-3), FT(1e-5), FT(271.2), FT(2.0), FT(0.8),  FT(0.001), FT(0.001))
     Y = slab_ice_space_init(FT, space, params)
     additional_cache = (;
         F_aero = ClimaCore.Fields.zeros(space),

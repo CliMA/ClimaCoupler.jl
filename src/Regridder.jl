@@ -403,7 +403,7 @@ Maintains the invariant that the sum of area fractions is 1 at all points.
 """
 function update_surface_fractions!(cs::CoupledSimulation)
     # dynamic fractions
-    ice_d = cs.model_sims.ice_sim.integrator.p.area_fraction # TODO: use higher level object
+    ice_d = cs.model_sims.ice_sim.integrator.p.area_fraction # TODO: use higher level object (temporary until combine_surfaces! is revamped)
     FT = eltype(ice_d)
 
     # static fraction
@@ -415,6 +415,9 @@ function update_surface_fractions!(cs::CoupledSimulation)
 
     @assert minimum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) ≈ FT(1)
     @assert maximum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) ≈ FT(1)
+
+    cs.model_sims.ice_sim.integrator.p.area_fraction .= cs.surface_fractions.ice # TODO: use higher level object (temporary until combine_surfaces! is revamped)
+    cs.model_sims.ocean_sim.integrator.p.area_fraction .= cs.surface_fractions.ocean # TODO: use higher level object (temporary until combine_surfaces! is revamped)
 
 end
 

@@ -70,20 +70,38 @@ if !(@isdefined parsed_args)
 end
 
 ## modify parsed args for fast testing from REPL #hide
+# if isinteractive()
+#     parsed_args["coupled"] = true #hide
+#     parsed_args["surface_scheme"] = "monin_obukhov" #hide
+#     parsed_args["moist"] = "equil" #hide
+#     parsed_args["vert_diff"] = true #hide
+#     parsed_args["rad"] = "gray" #hide
+#     parsed_args["energy_check"] = true #hide
+#     parsed_args["mode_name"] = "slabplanet" #hide
+#     parsed_args["t_end"] = "10days" #hide
+#     parsed_args["dt_save_to_sol"] = "3600secs" #hide
+#     parsed_args["dt_cpl"] = 200 #hide
+#     parsed_args["dt"] = "200secs" #hide
+#     parsed_args["mono_surface"] = true #hide
+#     parsed_args["h_elem"] = 4 #hide
+#     # parsed_args["dt_save_restart"] = "5days" #hide
+#     parsed_args["precip_model"] = "0M" #hide
+# end
+
 if isinteractive()
     parsed_args["coupled"] = true #hide
     parsed_args["surface_scheme"] = "monin_obukhov" #hide
     parsed_args["moist"] = "equil" #hide
     parsed_args["vert_diff"] = true #hide
     parsed_args["rad"] = "gray" #hide
-    parsed_args["energy_check"] = true #hide
-    parsed_args["mode_name"] = "slabplanet" #hide
+    parsed_args["energy_check"] = false #hide
+    parsed_args["mode_name"] = "amip" #hide
     parsed_args["t_end"] = "10days" #hide
-    parsed_args["dt_save_to_sol"] = "3600secs" #hide
+    parsed_args["dt_save_to_sol"] = "1days" #hide
     parsed_args["dt_cpl"] = 200 #hide
     parsed_args["dt"] = "200secs" #hide
     parsed_args["mono_surface"] = true #hide
-    parsed_args["h_elem"] = 4 #hide
+    parsed_args["h_elem"] = 6 #hide
     # parsed_args["dt_save_restart"] = "5days" #hide
     parsed_args["precip_model"] = "0M" #hide
 end
@@ -217,12 +235,12 @@ if mode_name == "amip"
 
     update_midmonth_data!(date0, SST_info)
     SST_init = interpolate_midmonth_to_daily(date0, SST_info)
-    ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
+    ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06), FT(0.001), FT(0.001))
     ocean_sim = NoSimulationStub(
         FT,
         (;
             u = (; T_sfc = SST_init),
-            p = (; params = ocean_params, ocean_fraction = (FT(1) .- land_fraction)),
+            p = (; params = ocean_params, area_fraction = (FT(1) .- land_fraction)),
             SST_info = SST_info,
         )
     )

@@ -366,7 +366,7 @@ include("components/push_pull.jl")
 function get_surface_scheme(cs)
     if cs.model_sims.atmos_sim.integrator.p.surface_scheme isa CA.MoninObukhovSurface
         return MoninObukhovScheme()
-    elseif cs.model_sims.atmos_sim.integrator.p.surface_scheme isa CA.BulkSurface
+    elseif cs.model_sims.atmos_sim.integrator.p.surface_scheme isa CA.BulkSurfaceScheme
         return BulkScheme()
     else
         return nothing

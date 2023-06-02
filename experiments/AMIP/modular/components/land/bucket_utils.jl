@@ -130,7 +130,7 @@ Returns the surface the respective variables of the earth at column index `colid
 a method for the bucket when used as the land model.
 """
 
-get_field(sim::BucketSimulation, ::Val{:air_temperature}) = sim.integrator.p.bucket.T_sfc # check if T or T_sfc
+get_field(sim::BucketSimulation, ::Val{:air_temperature}) = sim.integrator.p.bucket.T_sfc # T_sfc
 get_field(sim::BucketSimulation, ::Val{:air_density}) = sim.integrator.p.bucket.ρ_sfc
 get_field(sim::BucketSimulation, ::Val{:air_humidity}) = sim.integrator.p.bucket.q_sfc
 get_field(sim::BucketSimulation, ::Val{:z0m}) = sim.model.parameters.z_0m

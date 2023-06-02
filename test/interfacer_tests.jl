@@ -1,24 +1,35 @@
-
 using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 using ClimaCoupler: Utilities, Regridder, TestHelper
 using Test
-import ClimaCoupler.Interfacer: get_field, name, SurfaceModelSimulation, SurfaceStub, update_field!
+import ClimaCoupler.Interfacer:
+    get_field,
+    name,
+    SurfaceModelSimulation,
+    LandModelSimulation,
+    OceanModelSimulation,
+    SeaIceModelSimulation,
+    SurfaceStub,
+    update_field!
 FT = Float64
 
 # test for a simple generic surface model
-struct DummySimulation <: SurfaceModelSimulation end
+struct DummySimulation <: SeaIceModelSimulation end
+struct DummySimulation2 <: OceanModelSimulation end
+struct DummySimulation3 <: LandModelSimulation end
+
 boundary_space = TestHelper.create_space(FT);
-get_field(::DummySimulation, ::Val{:var}) = ones(boundary_space)
-get_field(::DummySimulation, ::Val{:var_float}) = Float64(2)
-get_field(::DummySimulation, ::Val{:surface_temperature}) = ones(boundary_space) .* FT(300)
+get_field(::SurfaceModelSimulation, ::Val{:var}) = ones(boundary_space)
+get_field(::SurfaceModelSimulation, ::Val{:var_float}) = FT(2)
+get_field(::SurfaceModelSimulation, ::Val{:surface_temperature}) = ones(boundary_space) .* FT(300)
 
 @testset "get_field indexing" begin
-    sim = DummySimulation()
-    # field
-    colidx = Fields.ColumnIndex{2}((1, 1), 73)
-    @test parent(get_field(sim, Val(:var), colidx))[1] == FT(1)
-    # float
-    @test get_field(sim, Val(:var_float), colidx) == FT(2)
+    for sim in (DummySimulation(), DummySimulation2(), DummySimulation3())
+        # field
+        colidx = Fields.ColumnIndex{2}((1, 1), 73)
+        @test parent(get_field(sim, Val(:var), colidx))[1] == FT(1)
+        # float
+        @test get_field(sim, Val(:var_float), colidx) == FT(2)
+    end
 end
 
 @testset "undefined get_field" begin

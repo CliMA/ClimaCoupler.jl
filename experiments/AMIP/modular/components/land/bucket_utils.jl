@@ -152,3 +152,32 @@ get_field(sim::BucketSimulation, ::Val{:beta}) =
 get_field(sim::BucketSimulation, ::Val{:albedo}) =
     ClimaLSM.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 get_field(sim::BucketSimulation, ::Val{:area_fraction}) = sim.area_fraction
+
+
+# The surface air density is computed using the atmospheric state at the first level and making ideal gas
+# and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
+# a reasonable stand-in.
+function update_field!(sim::BucketSimulation, ::Val{:air_density}, field)
+    parent(sim.integrator.p.bucket.ρ_sfc) .= parent(field)
+end
+
+function update_field!(sim::BucketSimulation, ::Val{:turbulent_energy_flux}, field)
+    parent(sim.integrator.p.bucket.turbulent_energy_flux) .= parent(field)
+end
+function update_field!(sim::BucketSimulation, ::Val{:turbulent_moisture_flux}, field)
+    ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
+    parent(sim.integrator.p.bucket.evaporation) .= parent(field ./ ρ_liq)
+end
+function update_field!(sim::BucketSimulation, ::Val{:radiative_energy_flux}, field)
+    parent(sim.integrator.p.bucket.R_n) .= parent(field)
+end
+function update_field!(sim::BucketSimulation, ::Val{:liquid_precipitation}, field)
+    parent(sim.integrator.p.bucket.P_liq) .= parent(field)
+end
+function update_field!(sim::BucketSimulation, ::Val{:snow_precipitation}, field)
+    parent(sim.integrator.p.bucket.P_snow) .= parent(field)
+end
+
+step!(sim::BucketSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
+
+reinit!(sim::BucketSimulation) = reinit!(sim.integrator)

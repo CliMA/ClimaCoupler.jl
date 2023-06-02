@@ -7,7 +7,15 @@ module Interfacer
 
 using ClimaCore: Fields
 export ComponentModelSimulation,
-    AtmosModelSimulation, SurfaceModelSimulation, SurfaceStub, name, get_field, update_field!
+    AtmosModelSimulation,
+    SurfaceModelSimulation,
+    SurfaceStub,
+    SeaIceModelSimulation,
+    LandModelSimulation,
+    OceanModelSimulation,
+    name,
+    get_field,
+    update_field!
 
 """
     ComponentModelSimulation
@@ -29,6 +37,11 @@ abstract type AtmosModelSimulation <: ComponentModelSimulation end
 An abstract type for surface model simulations.
 """
 abstract type SurfaceModelSimulation <: ComponentModelSimulation end
+
+abstract type SeaIceModelSimulation <: SurfaceModelSimulation end
+abstract type LandModelSimulation <: SurfaceModelSimulation end
+abstract type OceanModelSimulation <: SurfaceModelSimulation end
+
 
 """
     SurfaceStub
@@ -68,7 +81,24 @@ function get_field(sim::ComponentModelSimulation, val::Val, colidx::Fields.Colum
 end
 
 """
-    update_field!(::SurfaceStub, ::Val)
+    update_field!(::ComponentModelSimulation, ::Val, _...)
+
+No update in unspecified in the particular component model simulation.
+"""
+update_field!(sim::ComponentModelSimulation, val::Val, _...) = nothing
+
+# TODO:
+# function update_field!(sim::ComponentModelSimulation, val::Val, _...)
+#     warning = Warning("undefined `update!` for $val in " * name(sim) * ": skipping")
+#     @warn(warning.message, maxlog=10)
+#     return warning
+# end
+# struct Warning
+#     message::String
+# end
+
+"""
+    update_field!(sim::SurfaceStub, ::Val{:area_fraction}, field::Fields.Field)
 
 Updates the specified value in the cache of `SurfaceStub`.
 """

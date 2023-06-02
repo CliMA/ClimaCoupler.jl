@@ -56,9 +56,9 @@ end
 Computes the rhs of the slab model.
 """
 function slab_rhs!(dY, Y, cache, t)
-    p, F_aero, F_rad = cache
+    p, F_turb_energy, F_radiative = cache
     FT = eltype(Y.T_sfc)
-    rhs = @. -(F_aero + F_rad) / (p.h * p.ρ * p.c)
+    rhs = @. -(F_turb_energy + F_radiative) / (p.h * p.ρ * p.c)
     parent(dY.T_sfc) .= parent(rhs)
 end
 
@@ -74,8 +74,8 @@ function slab_init(::Type{FT}; tspan, dt, saveat, space, land_fraction, stepper 
     Y, space = slab_space_init(FT, space, T_init, hs_sfc = true)
     cache = (
         params = params,
-        F_aero = ClimaCore.Fields.zeros(space),
-        F_rad = ClimaCore.Fields.zeros(space),
+        F_turb_energy = ClimaCore.Fields.zeros(space),
+        F_radiative = ClimaCore.Fields.zeros(space),
         land_fraction = land_fraction,
     )
     problem = OrdinaryDiffEq.ODEProblem(slab_rhs!, Y, tspan, cache)

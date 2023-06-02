@@ -1,14 +1,17 @@
 using ClimaCore
 
+import ClimaCoupler.Interfacer: OceanModelSimulation, get_field, update_field!
+import ClimaCoupler.FieldExchanger: step!, reinit!
+
 """
     SlabOceanSimulation{P, Y, D, I}
 
 Equation:
 
-    (h * ρ * c) dTdt = -(F_aero + F_rad)
+    (h * ρ * c) dTdt = -(F_turb_energy + F_radiative)
 
 """
-struct SlabOceanSimulation{P, Y, D, I} <: SurfaceModelSimulation
+struct SlabOceanSimulation{P, Y, D, I} <: OceanModelSimulation
     params::P
     Y_init::Y
     domain::D
@@ -52,9 +55,9 @@ end
 
 # ode
 function slab_ocean_rhs!(dY, Y, cache, t)
-    p, F_aero, F_rad, area_fraction = cache
+    p, F_turb_energy, F_radiative, area_fraction = cache
     FT = eltype(Y.T_sfc)
-    rhs = @. -(F_aero + F_rad) / (p.h * p.ρ * p.c)
+    rhs = @. -(F_turb_energy + F_radiative) / (p.h * p.ρ * p.c)
     parent(dY.T_sfc) .= parent(rhs .* Regridder.binary_mask.(area_fraction, threshold = eps()))
 end
 
@@ -70,8 +73,8 @@ function ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, stepper
     Y, space = slab_ocean_space_init(FT, space, params)
     cache = (
         params = params,
-        F_aero = ClimaCore.Fields.zeros(space),
-        F_rad = ClimaCore.Fields.zeros(space),
+        F_turb_energy = ClimaCore.Fields.zeros(space),
+        F_radiative = ClimaCore.Fields.zeros(space),
         area_fraction = area_fraction,
     )
     problem = OrdinaryDiffEq.ODEProblem(slab_ocean_rhs!, Y, tspan, cache)
@@ -98,3 +101,14 @@ get_field(sim::SlabOceanSimulation, ::Val{:area_fraction}) = sim.integrator.p.ar
 function update_field!(sim::SlabOceanSimulation, ::Val{:area_fraction}, field::Fields.Field)
     sim.integrator.p.area_fraction .= field
 end
+
+function update_field!(sim::SlabOceanSimulation, ::Val{:turbulent_energy_flux}, field)
+    parent(sim.integrator.p.F_turb_energy) .= parent(field)
+end
+function update_field!(sim::SlabOceanSimulation, ::Val{:radiative_energy_flux}, field)
+    parent(sim.integrator.p.F_radiative) .= parent(field)
+end
+
+step!(sim::SlabOceanSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
+
+reinit!(sim::SlabOceanSimulation) = reinit!(sim.integrator)

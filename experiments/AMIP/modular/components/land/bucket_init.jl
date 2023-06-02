@@ -19,12 +19,15 @@ import ClimaLSM.Bucket:
 using ClimaLSM:
     make_ode_function, initialize, obtain_surface_space, make_set_initial_aux_state, surface_evaporative_scaling
 
+import ClimaCoupler.Interfacer: LandModelSimulation, get_field, update_field!
+import ClimaCoupler.FieldExchanger: step!, reinit!
+
 """
     BucketSimulation{M, Y, D, I}
 
 The bucket model simulation object.
 """
-struct BucketSimulation{M, Y, D, I, A} <: SurfaceModelSimulation
+struct BucketSimulation{M, Y, D, I, A} <: LandModelSimulation
     model::M
     Y_init::Y
     domain::D

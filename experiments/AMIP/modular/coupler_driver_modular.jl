@@ -50,7 +50,7 @@ Here we import standard Julia packages, ClimaESM packages, parse in command-line
 We then specify the input data file names. If these are not already downloaded, include `artifacts/download_artifacts.jl`.
 =#
 
-import SciMLBase: step!
+import SciMLBase: step!, reinit!
 using OrdinaryDiffEq
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
 using LinearAlgebra
@@ -116,7 +116,23 @@ import ClimaCoupler.TimeManager: current_date, datetime_to_strdate, trigger_call
 import ClimaCoupler.Diagnostics: get_var, init_diagnostics, accumulate_diagnostics!, save_diagnostics, TimeMean
 import ClimaCoupler.PostProcessor: postprocess
 
-import ClimaCoupler.Interfacer: AtmosModelSimulation, SurfaceModelSimulation, SurfaceStub, get_field, update_field!
+import ClimaCoupler.Interfacer:
+    AtmosModelSimulation,
+    SurfaceModelSimulation,
+    SurfaceStub,
+    SeaIceModelSimulation,
+    LandModelSimulation,
+    OceanModelSimulation,
+    get_field,
+    update_field!
+import ClimaCoupler.FluxCalculator: PartitionedComponentModelGrid, CombinedAtmosGrid, compute_combined_turbulent_fluxes!
+import ClimaCoupler.FieldExchanger:
+    import_atmos_fields!,
+    import_combined_surface_fields!,
+    update_sim!,
+    update_model_sims!,
+    reinit_model_sims!,
+    step_model_sims!
 
 pkg_dir = pkgdir(ClimaCoupler)
 COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/modular/output", joinpath(mode_name, run_name))
@@ -278,8 +294,22 @@ save online diagnostics. These are all initialized here and saved in a global `C
 =#
 
 ## coupler exchange fields
-coupler_field_names =
-    (:T_S, :z0m_S, :z0b_S, :ρ_sfc, :q_sfc, :albedo, :beta, :F_A, :F_E, :F_R, :P_liq, :P_snow, :F_R_TOA, :P_net)
+coupler_field_names = (
+    :T_S,
+    :z0m_S,
+    :z0b_S,
+    :ρ_sfc,
+    :q_sfc,
+    :albedo,
+    :beta,
+    :F_turb_energy,
+    :F_turb_moisture,
+    :F_radiative,
+    :P_liq,
+    :P_snow,
+    :F_radiative_TOA,
+    :P_net,
+)
 coupler_fields =
     NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
 
@@ -346,20 +376,21 @@ cs = CoupledSimulation{FT}(
 
 
 #=
-## Initial States Exchange
+## Initial Component Model Exchange
 =#
-## share states between models
-include("components/push_pull.jl")
-atmos_pull!(cs)
-parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim.integrator, Δt_cpl, true) : nothing
-atmos_push!(cs)
-land_pull!(cs)
+
+## share states and fluxes between models
+turbulent_fluxes = CombinedAtmosGrid()
+update_surface_fractions!(cs)
+import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
+update_sim!(cs.model_sims.atmos_sim, cs.fields, turbulent_fluxes) # would be good to rm dep in cs
+compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # here computed using atmos functions
+parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim, Δt_cpl) : nothing
+import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
+update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 
 ## reinitialize (TODO: avoid with interfaces)
-reinit!(atmos_sim.integrator)
-reinit!(land_sim.integrator)
-mode_name == "amip" ? (ice_pull!(cs), reinit!(ice_sim.integrator)) : nothing
-mode_name == "slabplanet" ? (ocean_pull!(cs), reinit!(ocean_sim.integrator)) : nothing
+reinit_model_sims!(cs.model_sims)
 
 #=
 ## Coupling Loop
@@ -410,28 +441,20 @@ function solve_coupler!(cs)
         !isnothing(cs.conservation_checks) ? check_conservation!(cs, get_slab_energy, get_land_energy) : nothing
 
         ## run component models sequentially for one coupling timestep (Δt_cpl)
-        ## 1. atmos
         ClimaComms.barrier(comms_ctx)
 
-        atmos_pull!(cs)
-        step!(atmos_sim.integrator, t - atmos_sim.integrator.t, true) # NOTE: instead of Δt_cpl, to avoid accumulating roundoff error
-        atmos_push!(cs)
+        update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 
-        ## 2. land
-        land_pull!(cs)
-        step!(land_sim.integrator, t - land_sim.integrator.t, true)
+        ## step sims
+        step_model_sims!(cs.model_sims, t)
 
-        ## 3. ocean
-        if cs.mode.name == "slabplanet"
-            ocean_pull!(cs)
-            step!(ocean_sim.integrator, t - ocean_sim.integrator.t, true)
-        end
+        # exchange combined fields and (if specified) calculate fluxes using combined states
+        update_surface_fractions!(cs)
+        import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
+        compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes)
+        import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # radiative and/or turbulent
 
-        ## 4. sea ice
-        if cs.mode.name == "amip"
-            ice_pull!(cs)
-            step!(ice_sim.integrator, t - ice_sim.integrator.t, true)
-        end
+        # TODO: compute_and_send_partitioned_turbulent_fluxes!(cs)
 
         ## step to the next calendar month
         if trigger_callback(cs, Monthly())

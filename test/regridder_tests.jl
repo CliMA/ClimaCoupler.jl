@@ -2,17 +2,43 @@
     Unit tests for ClimaCoupler Regridder module
 =#
 
-using ClimaCoupler: Utilities, Regridder, TestHelper
 using ClimaCore: Geometry, Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 using ClimaComms
 using Test
 using NCDatasets
 using Dates
 
+using ClimaCoupler: Utilities, Regridder, TestHelper
+import ClimaCoupler.Interfacer: get_field, name, SurfaceModelSimulation, SurfaceStub, update_field!
+
 REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regrid_tmp/")
 
 const comms_ctx = ClimaComms.SingletonCommsContext()
 const pid, nprocs = ClimaComms.init(comms_ctx)
+
+struct TestSurfaceSimulationA <: SurfaceModelSimulation end
+struct TestSurfaceSimulationB <: SurfaceModelSimulation end
+struct TestSurfaceSimulationC <: SurfaceModelSimulation end
+struct TestSurfaceSimulationD <: SurfaceModelSimulation end
+
+# Initialize weights (fractions) and initial values (fields)
+get_field(::TestSurfaceSimulationA, ::Val{:random}) = 1.0
+get_field(::TestSurfaceSimulationB, ::Val{:random}) = 1.0
+get_field(::TestSurfaceSimulationC, ::Val{:random}) = 1.0
+get_field(::TestSurfaceSimulationD, ::Val{:random}) = 1.0
+
+get_field(::TestSurfaceSimulationA, ::Val{:area_fraction}) = 0.0
+get_field(::TestSurfaceSimulationB, ::Val{:area_fraction}) = 0.5
+get_field(::TestSurfaceSimulationC, ::Val{:area_fraction}) = 2.0
+get_field(::TestSurfaceSimulationD, ::Val{:area_fraction}) = -10.0
+
+struct DummyStub{C} <: SurfaceModelSimulation
+    cache::C
+end
+get_field(sim::DummyStub, ::Val{:area_fraction}) = sim.cache.area_fraction
+function update_field!(sim::DummyStub, ::Val{:area_fraction}, field::Fields.Field)
+    sim.cache.area_fraction .= field
+end
 
 for FT in (Float32, Float64)
     @testset "test dummmy_remap!" begin
@@ -37,6 +63,9 @@ for FT in (Float32, Float64)
         ice_d = Fields.zeros(test_space)
         parent(ice_d)[:, (n ÷ 2 + 1):n, :, :] .= FT(0.5)
 
+        # Construct ice fraction of 0s on left, 0.5s on right
+        ocean_d = Fields.zeros(test_space)
+
         # Fill in only the necessary parts of the simulation
         cs = Utilities.CoupledSimulation{FT}(
             nothing, # comms_ctx
@@ -49,7 +78,7 @@ for FT in (Float32, Float64)
             Int(200), # t
             Int(200), # Δt_cpl
             (; land = land_fraction, ice = Fields.zeros(test_space), ocean = Fields.zeros(test_space)), # surface_fractions
-            (; ice_sim = (; integrator = (; p = (; ice_fraction = ice_d)))), # model_sims
+            (; ice_sim = DummyStub((; area_fraction = ice_d)), ocean_sim = SurfaceStub((; area_fraction = ocean_d))), # model_sims
             (;), # mode
             (), # diagnostics
         )
@@ -60,7 +89,7 @@ for FT in (Float32, Float64)
         @test all(parent(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) .== FT(1))
     end
 
-    @testset "test combine_surfaces!" begin
+    @testset "test combine_surfaces_from_sol!" begin
         test_space = TestHelper.create_space(FT)
         combined_field = Fields.ones(test_space)
 
@@ -68,9 +97,39 @@ for FT in (Float32, Float64)
         fractions = (a = 0.0, b = 0.5, c = 2.0, d = -10.0)
         fields = (a = 1.0, b = 1.0, c = 1.0, d = 1.0)
 
-        Regridder.combine_surfaces!(combined_field::Fields.Field, fractions::NamedTuple, fields::NamedTuple)
+        Regridder.combine_surfaces_from_sol!(combined_field::Fields.Field, fractions::NamedTuple, fields::NamedTuple)
         @test all(parent(combined_field) .== FT(sum(fractions) * sum(fields) / length(fields)))
     end
+
+    @testset "test combine_surfaces" begin
+        test_space = TestHelper.create_space(FT)
+        combined_field = Fields.ones(test_space)
+
+        var_name = Val(:random)
+        sims = (;
+            a = TestSurfaceSimulationA(),
+            b = TestSurfaceSimulationB(),
+            c = TestSurfaceSimulationC(),
+            d = TestSurfaceSimulationD(),
+        )
+
+        fractions = (
+            a = get_field(sims.a, Val(:area_fraction)),
+            b = get_field(sims.b, Val(:area_fraction)),
+            c = get_field(sims.c, Val(:area_fraction)),
+            d = get_field(sims.d, Val(:area_fraction)),
+        )
+        fields = (
+            a = get_field(sims.a, var_name),
+            b = get_field(sims.b, var_name),
+            c = get_field(sims.c, var_name),
+            d = get_field(sims.d, var_name),
+        )
+
+        Regridder.combine_surfaces!(combined_field, sims, var_name)
+        @test all(parent(combined_field) .== FT(sum(fractions) * sum(fields) / length(fields)))
+    end
+
 
     # Add tests which use TempestRemap here -
     # TempestRemap is not built on Windows because of NetCDF support limitations

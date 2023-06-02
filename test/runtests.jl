@@ -3,6 +3,9 @@ using SafeTestsets
 @safetestset "Clock tests" begin
     include("CoupledSimulations/clock.jl")
 end
+@safetestset "Interfacer tests" begin
+    include("interfacer_tests.jl")
+end
 @safetestset "Regridder tests" begin
     include("regridder_tests.jl")
 end

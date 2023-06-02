@@ -9,6 +9,7 @@ module Regridder
 
 using ..Utilities
 using ..TimeManager
+using ..Interfacer
 using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 using ClimaComms
 using NCDatasets
@@ -23,6 +24,7 @@ export write_to_hdf5,
     land_fraction,
     update_surface_fractions!,
     combine_surfaces!,
+    combine_surfaces_from_sol!,
     binary_mask,
     nans_to_zero
 
@@ -402,13 +404,15 @@ Maintains the invariant that the sum of area fractions is 1 at all points.
 - `cs`: [CoupledSimulation] containing area fraction information.
 """
 function update_surface_fractions!(cs::CoupledSimulation)
-    # dynamic fractions
-    ice_d = cs.model_sims.ice_sim.integrator.p.ice_fraction
-    FT = eltype(ice_d)
+
+    FT = Utilities.float_type(cs)
+
+    ice_d = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction))
 
     # static fraction
     land_s = cs.surface_fractions.land
 
+    # update dynamic area fractions
     # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
     cs.surface_fractions.ice .= max.(min.(ice_d, FT(1) .- land_s), FT(0))
     cs.surface_fractions.ocean .= max.(FT(1) .- (cs.surface_fractions.ice .+ land_s), FT(0))
@@ -416,8 +420,12 @@ function update_surface_fractions!(cs::CoupledSimulation)
     @assert minimum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) ≈ FT(1)
     @assert maximum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) ≈ FT(1)
 
-end
+    # update component models
+    Interfacer.update_field!(cs.model_sims.ocean_sim, Val(:area_fraction), cs.surface_fractions.ocean)
+    Interfacer.update_field!(cs.model_sims.ice_sim, Val(:area_fraction), cs.surface_fractions.ice)
 
+
+end
 
 """
     binary_mask(var::FT; threshold = 0.5)
@@ -431,18 +439,43 @@ Converts a number `var` to 1, if `var` is greater or equal than a given `thresho
 binary_mask(var::FT; threshold = FT(0.5)) where {FT} = var < FT(threshold) ? FT(0) : FT(1)
 
 """
-    combine_surfaces!(combined_field::Fields.Field, fractions::NamedTuple, fields::NamedTuple)
+    combine_surfaces!(combined_field::Fields.Field, sims, field_name::Val)
+
+Sums the fields, specified by `field_name`, weighted by the respective area fractions of all
+surface simulations. THe result is saved in `combined_field`.
+
+# Arguments
+- `combined_field`: [Fields.Field] output object containing weighted values.
+- `sims`: [NamedTuple] containing simulations .
+- `field_name`: [Val] containing the name Symbol of the field t be extracted by the `get_field` functions.
+
+# Example
+- `combine_surfaces!(zeros(boundary_space), cs.model_sims, Val(:surface_temperature))`
+"""
+function combine_surfaces!(combined_field::Fields.Field, sims::NamedTuple, field_name::Val)
+    combined_field .= eltype(combined_field)(0)
+    for sim in sims
+        if sim isa Interfacer.SurfaceModelSimulation
+            combined_field .+=
+                Interfacer.get_field(sim, Val(:area_fraction)) .* nans_to_zero.(Interfacer.get_field(sim, field_name)) # this ensures that unitialized (masked) areas do not affect (TODO: move to mask / remove)
+        end
+    end
+end
+
+"""
+    combine_surfaces_from_sol!(combined_field::Fields.Field, fractions::NamedTuple, fields::NamedTuple)
 
 Sums Field objects in `fields` weighted by the respective area fractions, and updates
 these values in `combined_field`.
 NamedTuples `fields` and `fractions` must have matching field names.
+This method can be used to combine fields that were saved in the solution history.
 
 # Arguments
 - `combined_field`: [Fields.Field] output object containing weighted values.
 - `fractions`: [NamedTuple] containing weights used on values in `fields`.
 - `fields`: [NamedTuple] containing values to be weighted by `fractions`.
 """
-function combine_surfaces!(combined_field::Fields.Field, fractions::NamedTuple, fields::NamedTuple)
+function combine_surfaces_from_sol!(combined_field::Fields.Field, fractions::NamedTuple, fields::NamedTuple)
     combined_field .= eltype(combined_field)(0)
     warn_nans = false
     for surface_name in propertynames(fields) # could use dot here?

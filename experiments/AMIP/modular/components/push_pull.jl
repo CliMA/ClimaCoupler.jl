@@ -89,16 +89,8 @@ function atmos_pull!(cs)
 
     thermo_params = CAP.thermodynamics_params(atmos_sim.integrator.p.params)
 
-    T_land = get_land_temp(land_sim)
-    z0m_land, z0b_land = get_land_roughness(land_sim)
-    T_ocean = ocean_sim.integrator.u.T_sfc
-    z0m_ocean = ocean_sim.integrator.p.params.z0m
-    z0b_ocean = ocean_sim.integrator.p.params.z0b
-    α_ocean = ocean_sim.integrator.p.params.α
-    T_ice = ice_sim.integrator.u.T_sfc
-    ice_fraction = ice_sim.integrator.p.ice_fraction
-    z0m_ice = ice_sim.integrator.p.params.z0m
-    z0b_ice = ice_sim.integrator.p.params.z0b
+    ice_fraction = get_field(ice_sim, Val(:area_fraction))
+
 
     update_surface_fractions!(cs)
 
@@ -106,24 +98,20 @@ function atmos_pull!(cs)
     combined_field = zeros(boundary_space)
 
     # surface temperature
-    combine_surfaces!(combined_field, cs.surface_fractions, (; land = T_land, ocean = T_ocean, ice = T_ice))
+    combine_surfaces!(combined_field, cs.model_sims, Val(:surface_temperature))
     dummmy_remap!(T_sfc_cpl, combined_field)
 
     # roughness length for momentum
-    combine_surfaces!(combined_field, cs.surface_fractions, (; land = z0m_land, ocean = z0m_ocean, ice = z0m_ice))
+    combine_surfaces!(combined_field, cs.model_sims, Val(:roughness_momentum))
     dummmy_remap!(z0m_cpl, combined_field)
 
     # roughness length for tracers
-    combine_surfaces!(combined_field, cs.surface_fractions, (; land = z0b_land, ocean = z0b_ocean, ice = z0b_ice))
+    combine_surfaces!(combined_field, cs.model_sims, Val(:roughness_buoyancy))
     dummmy_remap!(z0b_cpl, combined_field)
 
-    # TODO replace functions that used ρ_sfc and q_sfc from atmos
 
     # albedo
-    α_land = land_albedo(land_sim)
-
-    α_ice = ice_sim.integrator.p.params.α
-    combine_surfaces!(combined_field, cs.surface_fractions, (; land = α_land, ocean = α_ocean, ice = α_ice))
+    combine_surfaces!(combined_field, cs.model_sims, Val(:albedo))
     dummmy_remap!(albedo_sfc_cpl, combined_field)
 
     if radiation != nothing
@@ -135,11 +123,7 @@ function atmos_pull!(cs)
     end
 
     # beta factor for evaporation - should be 1 over ocean and ice
-    β_ocean = ones(axes(combined_field))
-    β_ice = ones(axes(combined_field))
-    β_land = land_beta(land_sim)
-
-    combine_surfaces!(combined_field, cs.surface_fractions, (; land = β_land, ocean = β_ocean, ice = β_ice))
+    combine_surfaces!(combined_field, cs.model_sims, Val(:beta))
     dummmy_remap!(beta_sfc_cpl, combined_field)
     @assert all(i -> parent(beta_sfc_cpl)[i] == 1, findall(==(1), parent(ice_fraction)))
 

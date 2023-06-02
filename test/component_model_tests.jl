@@ -4,6 +4,7 @@ using ClimaCore
 using ClimaCore: Fields
 using ClimaCoupler.Regridder
 import ClimaCoupler.Regridder: binary_mask
+import ClimaCoupler.Interfacer: AtmosModelSimulation, SurfaceModelSimulation, SurfaceStub, get_field
 
 include("TestHelper.jl")
 
@@ -35,7 +36,7 @@ for FT in (Float32, Float64)
             additional_cache = (;
                 F_aero = ClimaCore.Fields.zeros(space),
                 F_rad = ClimaCore.Fields.zeros(space) .+ FT(F_rad),
-                ice_fraction = ice_fraction,
+                area_fraction = ice_fraction,
                 dt = dt,
             )
 

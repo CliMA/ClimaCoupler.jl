@@ -1,4 +1,25 @@
-# energy equation for sea ice
+"""
+    PrescribedIceSimulation{P, Y, D, I}
+
+Ice concentration is prescribed, and we solve the following energy equation:
+
+    (h * ρ * c) d T_sfc dt = -(F_aero + F_rad) + F_conductive
+
+    with
+    F_conductive = k_ice (T_base - T_sfc) / (h)
+
+    The surface temperature (`T_sfc`) is the prognostic variable which is being
+    modified by turbulent aerodynamic (`F_aero`) and radiative (`F_rad`) fluxes,
+    as well as a conductive flux that depends on the temperature difference
+    across the ice layer (with `T_base` being prescribed).
+
+"""
+struct PrescribedIceSimulation{P, Y, D, I} <: SurfaceModelSimulation
+    params::P
+    Y_init::Y
+    domain::D
+    integrator::I
+end
 
 # sea-ice parameters
 struct IceSlabParameters{FT <: AbstractFloat}
@@ -36,7 +57,7 @@ function ice_rhs!(du, u, p, _)
     params = p.params
     F_aero = p.F_aero
     F_rad = p.F_rad
-    ice_fraction = p.ice_fraction
+    area_fraction = p.area_fraction
     T_freeze = params.T_freeze
 
     F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc) # fluxes are defined to be positive when upward
@@ -44,7 +65,7 @@ function ice_rhs!(du, u, p, _)
 
     # do not count tendencies that lead to temperatures above freezing, and mask out no-ice areas
     unphysical = @. Regridder.binary_mask.(T_freeze - (Y.T_sfc + FT(rhs) * p.dt), threshold = FT(0)) .*
-       Regridder.binary_mask.(ice_fraction, threshold = eps())
+       Regridder.binary_mask.(area_fraction, threshold = eps())
     parent(dY.T_sfc) .= parent(rhs .* unphysical)
 end
 
@@ -53,7 +74,7 @@ end
 
 Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `step!` in the coupling loop.
 """
-function ice_init(::Type{FT}; tspan, saveat, dt, space, ice_fraction, stepper = Euler()) where {FT}
+function ice_init(::Type{FT}; tspan, saveat, dt, space, area_fraction, stepper = Euler()) where {FT}
 
     params = IceSlabParameters(FT(2), FT(900.0), FT(2100.0), FT(271.2), FT(1e-3), FT(1e-5), FT(271.2), FT(2.0), FT(0.8))
 
@@ -61,7 +82,7 @@ function ice_init(::Type{FT}; tspan, saveat, dt, space, ice_fraction, stepper = 
     additional_cache = (;
         F_aero = ClimaCore.Fields.zeros(space),
         F_rad = ClimaCore.Fields.zeros(space),
-        ice_fraction = ice_fraction,
+        area_fraction = area_fraction,
         dt = dt,
     )
 
@@ -69,7 +90,7 @@ function ice_init(::Type{FT}; tspan, saveat, dt, space, ice_fraction, stepper = 
     integrator = OrdinaryDiffEq.init(problem, stepper, dt = dt, saveat = saveat)
 
 
-    SlabSimulation(params, Y, space, integrator)
+    PrescribedIceSimulation(params, Y, space, integrator)
 end
 
 # file-specific
@@ -82,3 +103,15 @@ clean_sic(SIC, _info) = swap_space!(zeros(axes(_info.land_fraction)), SIC) ./ fl
 # setting that SIC < 0.5 is counted as ocean if binary remapping.
 get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
     mono ? h_ice : Regridder.binary_mask(h_ice, threshold = FT(threshold))
+
+# required by Interfacer
+get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
+get_field(sim::PrescribedIceSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
+get_field(sim::PrescribedIceSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
+get_field(sim::PrescribedIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
+get_field(sim::PrescribedIceSimulation, ::Val{:albedo}) = sim.integrator.p.params.α
+get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
+
+function update_field!(sim::PrescribedIceSimulation, ::Val{:area_fraction}, field::Fields.Field)
+    sim.integrator.p.area_fraction .= field
+end

@@ -105,7 +105,8 @@ mono_surface = parsed_args["mono_surface"]
 
 import ClimaCoupler
 import ClimaCoupler.Regridder
-import ClimaCoupler.Regridder: update_surface_fractions!, combine_surfaces!, dummmy_remap!, binary_mask
+import ClimaCoupler.Regridder:
+    update_surface_fractions!, combine_surfaces!, combine_surfaces_from_sol!, dummmy_remap!, binary_mask
 import ClimaCoupler.ConservationChecker:
     EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
 import ClimaCoupler.Utilities: CoupledSimulation, float_type, swap_space!
@@ -114,6 +115,8 @@ import ClimaCoupler.BCReader:
 import ClimaCoupler.TimeManager: current_date, datetime_to_strdate, trigger_callback, Monthly, EveryTimestep
 import ClimaCoupler.Diagnostics: get_var, init_diagnostics, accumulate_diagnostics!, save_diagnostics, TimeMean
 import ClimaCoupler.PostProcessor: postprocess
+
+import ClimaCoupler.Interfacer: AtmosModelSimulation, SurfaceModelSimulation, SurfaceStub, get_field, update_field!
 
 pkg_dir = pkgdir(ClimaCoupler)
 COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/modular/output", joinpath(mode_name, run_name))
@@ -183,6 +186,7 @@ land_sim = bucket_init(
     dt = FT(Δt_cpl),
     space = boundary_space,
     saveat = FT(saveat),
+    area_fraction = land_fraction,
 )
 
 #=
@@ -214,14 +218,14 @@ if mode_name == "amip"
 
     update_midmonth_data!(date0, SST_info)
     SST_init = interpolate_midmonth_to_daily(date0, SST_info)
-    ocean_params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
-    ocean_sim = (;
-        integrator = (;
-            u = (; T_sfc = SST_init),
-            p = (; params = ocean_params, ocean_fraction = (FT(1) .- land_fraction)),
-            SST_info = SST_info,
-        )
-    )
+    ocean_sim = SurfaceStub((;
+        T_sfc = SST_init,
+        z0m = FT(1e-3),
+        z0b = FT(1e-3),
+        beta = FT(1),
+        α = FT(0.06),
+        area_fraction = (FT(1) .- land_fraction),
+    ))
     ## sea ice
     SIC_info = bcfile_info_init(
         FT,
@@ -240,7 +244,7 @@ if mode_name == "amip"
     SIC_init = interpolate_midmonth_to_daily(date0, SIC_info)
     ice_fraction = get_ice_fraction.(SIC_init, mono_surface)
     ice_sim =
-        ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, ice_fraction = ice_fraction)
+        ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, area_fraction = ice_fraction)
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info)
 
 elseif mode_name == "slabplanet"
@@ -251,16 +255,19 @@ elseif mode_name == "slabplanet"
         dt = Δt_cpl,
         space = boundary_space,
         saveat = saveat,
-        ocean_fraction = (FT(1) .- land_fraction), ## NB: this ocean fraction includes areas covered by sea ice (unlike the one contained in the cs)
+        area_fraction = (FT(1) .- land_fraction), ## NB: this ocean fraction includes areas covered by sea ice (unlike the one contained in the cs)
     )
 
-    ## sea ice
-    ice_sim = (;
-        integrator = (;
-            u = (; T_sfc = ClimaCore.Fields.ones(boundary_space)),
-            p = (; params = ocean_sim.params, ice_fraction = ClimaCore.Fields.zeros(boundary_space)),
-        )
-    )
+    ## sea ice (here set to zero area coverage)
+    ice_sim = SurfaceStub((;
+        T_sfc = ClimaCore.Fields.ones(boundary_space),
+        z0m = FT(0),
+        z0b = FT(0),
+        beta = FT(1),
+        α = FT(1),
+        area_fraction = ClimaCore.Fields.zeros(boundary_space),
+    ))
+
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
 end
 
@@ -379,14 +386,17 @@ function solve_coupler!(cs)
             if cs.dates.date[1] >= next_date_in_file(cs.mode.SST_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.SST_info)
             end
-            SST = ocean_sim.integrator.u.T_sfc .= interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SST_info)
+            update_field!(
+                ocean_sim,
+                Val(:surface_temperature),
+                interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SST_info),
+            )
 
             if cs.dates.date[1] >= next_date_in_file(cs.mode.SIC_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.SIC_info)
             end
-            SIC = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info)
-
-            ice_fraction = ice_sim.integrator.p.ice_fraction .= get_ice_fraction.(SIC_init, mono_surface)
+            interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info)
+            update_field!(ice_sim, Val(:area_fraction), get_ice_fraction.(SIC_init, mono_surface))  # TODO: change to SIC
 
             ## calculate and accumulate diagnostics at each timestep
             accumulate_diagnostics!(cs)

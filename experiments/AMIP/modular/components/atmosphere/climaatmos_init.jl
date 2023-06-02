@@ -11,7 +11,7 @@ catch err
     end
 end
 # the clima atmos `integrator` is now defined
-struct AtmosSimulation{P, Y, D, I}
+struct AtmosSimulation{P, Y, D, I} <: AtmosModelSimulation
     params::P
     Y_init::Y
     domain::D

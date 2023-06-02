@@ -17,6 +17,7 @@ using Plots
 using ClimaAtmos: RRTMGPI
 using ClimaLSM
 using ..Utilities: CoupledSimulation, swap_space!
+using ..Interfacer: SurfaceStub
 
 export AbstractCheck, EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
 
@@ -127,17 +128,17 @@ function check_conservation!(
     end
 
     # save sea ice
-    if ice_sim !== nothing
-        push!(cc.ρe_tot_seaice, sum(get_slab_energy(ice_sim, ice_sim.integrator.u.T_sfc) .* surface_fractions.ice))
-    else
+    if (ice_sim == nothing) || (ice_sim isa SurfaceStub)
         push!(cc.ρe_tot_seaice, FT(0))
+    else
+        push!(cc.ρe_tot_seaice, sum(get_slab_energy(ice_sim, ice_sim.integrator.u.T_sfc) .* surface_fractions.ice))
     end
 
     # save ocean
-    if ocean_sim !== nothing
-        push!(cc.ρe_tot_ocean, sum(get_slab_energy(ocean_sim, ocean_sim.integrator.u.T_sfc) .* surface_fractions.ocean))
-    else
+    if (ocean_sim == nothing) || (ocean_sim isa SurfaceStub)
         push!(cc.ρe_tot_ocean, FT(0))
+    else
+        push!(cc.ρe_tot_ocean, sum(get_slab_energy(ocean_sim, ocean_sim.integrator.u.T_sfc) .* surface_fractions.ocean))
     end
 
     push!(cc.ice_base_source, FT(0))

@@ -8,6 +8,7 @@ import ClimaCoupler.Regridder: binary_mask
 include("TestHelper.jl")
 
 # sea ice
+include("../experiments/AMIP/modular/components/flux_calculator.jl")
 include("../experiments/AMIP/modular/components/ocean/slab_seaice_init.jl")
 
 for FT in (Float32, Float64)

@@ -55,7 +55,7 @@ end
 function step_coupler!(cs, n_samples)
     cs.tspan[1] = cs.model_sims.atmos_sim.integrator.t
     cs.tspan[2] = cs.tspan[1] + n_samples * cs.Δt_cpl
-    solve_coupler!(cs)
+    solve_esm!(cs)
 end
 
 # compile coupling loop first

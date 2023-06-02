@@ -92,7 +92,7 @@ function update!(sim::BucketSimulation, ::Val{:net_radiation}, field)
     @. sim.integrator.p.bucket.R_n .= field
 end
 function update!(sim::BucketSimulation, ::Val{:precipitation_liquid}, field)
-    @. sim.integrator.p.bucket.P_liq .= field
+    @. sim.integrator.p.bucket.P_liq .= .- field # land expect this to be positive
 end
 function update!(sim::BucketSimulation, ::Val{:precipitation_snow}, field)
     @. sim.integrator.p.bucket.P_snow .= field

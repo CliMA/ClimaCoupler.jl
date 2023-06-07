@@ -18,6 +18,7 @@ using ClimaCoupler: Regridder
 # get_heat_transfer_coefficient_point(sim, colidx) = nothing
 # get_drag_transfer_coefficient_point(sim, colidx) = nothing
 
+
 # get_temperature(sim) = nothing
 # get_humidity(sim) = nothing
 # get_z0m(sim) = nothing

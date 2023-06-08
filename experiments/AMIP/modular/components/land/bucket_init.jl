@@ -24,11 +24,12 @@ using ClimaLSM:
 
 The bucket model simulation object.
 """
-struct BucketSimulation{M, Y, D, I}
+struct BucketSimulation{M, Y, D, I, A} <: SurfaceModelSimulation
     model::M
     Y_init::Y
     domain::D
     integrator::I
+    area_fraction::A
 end
 
 include("./bucket_utils.jl")
@@ -162,6 +163,7 @@ function bucket_init(
     space,
     dt::FT,
     saveat::FT,
+    area_fraction,
     stepper = Euler(),
 ) where {FT}
     if config != "sphere"
@@ -245,5 +247,5 @@ function bucket_init(
     prob = ODEProblem(ode_function!, Y, tspan, p_new)
     integrator = init(prob, stepper; dt = dt, saveat = saveat)
 
-    BucketSimulation(model, Y, (; domain = domain, soil_depth = d_soil), integrator)
+    BucketSimulation(model, Y, (; domain = domain, soil_depth = d_soil), integrator, area_fraction)
 end

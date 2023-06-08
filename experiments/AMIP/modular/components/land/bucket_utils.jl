@@ -142,3 +142,13 @@ function make_lsm_domain(
         surface_domain,
     )
 end
+
+# required by Interfacer
+get_field(sim::BucketSimulation, ::Val{:surface_temperature}) = sim.integrator.p.bucket.T_sfc
+get_field(sim::BucketSimulation, ::Val{:roughness_momentum}) = sim.model.parameters.z_0m
+get_field(sim::BucketSimulation, ::Val{:roughness_buoyancy}) = sim.model.parameters.z_0b
+get_field(sim::BucketSimulation, ::Val{:beta}) =
+    ClimaLSM.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
+get_field(sim::BucketSimulation, ::Val{:albedo}) =
+    ClimaLSM.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
+get_field(sim::BucketSimulation, ::Val{:area_fraction}) = sim.area_fraction

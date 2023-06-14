@@ -13,7 +13,7 @@ include("../experiments/AMIP/modular/components/ocean/slab_seaice_init.jl")
 
 for FT in (Float32, Float64)
     @testset "test sea-ice energy slab for FT=$FT" begin
-        function test_sea_ice_rhs(; F_rad = 0.0, T_base = 271.2, global_mask = 1.0)
+        function test_sea_ice_rhs(; F_radiative = 0.0, T_base = 271.2, global_mask = 1.0)
             space = TestHelper.create_space(FT)
             params = IceSlabParameters(
                 FT(2),  # ice thickness
@@ -34,8 +34,8 @@ for FT in (Float32, Float64)
             dt = FT(1.0)
 
             additional_cache = (;
-                F_aero = ClimaCore.Fields.zeros(space),
-                F_rad = ClimaCore.Fields.zeros(space) .+ FT(F_rad),
+                F_turb_energy = ClimaCore.Fields.zeros(space),
+                F_radiative = ClimaCore.Fields.zeros(space) .+ FT(F_radiative),
                 area_fraction = ice_fraction,
                 dt = dt,
             )
@@ -52,21 +52,21 @@ for FT in (Float32, Float64)
         @test sum([i for i in extrema(dY)] .≈ [FT(0.0), FT(0.0)]) == 2
 
         # check that extracting expected T due to input atmopsheric fluxes
-        dY, Y, p = test_sea_ice_rhs(F_rad = 1.0)
+        dY, Y, p = test_sea_ice_rhs(F_radiative = 1.0)
         dT_expected = -1.0 / (p.params.h * p.params.ρ * p.params.c)
         @test sum([i for i in extrema(dY)] .≈ [FT(dT_expected), FT(dT_expected)]) == 2
 
         # check that tendency not added if T of ice would have done above freezing
-        dY, Y, p = test_sea_ice_rhs(F_rad = 0.0, T_base = 330.0) # Float32 requires a large number here!
+        dY, Y, p = test_sea_ice_rhs(F_radiative = 0.0, T_base = 330.0) # Float32 requires a large number here!
         @test sum([i for i in extrema(dY)] .≈ [FT(0.0), FT(0.0)]) == 2
 
         # check that the correct tendency was added due to basal flux
-        dY, Y, p = test_sea_ice_rhs(F_rad = 0.0, T_base = 269.2, global_mask = 1.0)
+        dY, Y, p = test_sea_ice_rhs(F_radiative = 0.0, T_base = 269.2, global_mask = 1.0)
         dT_expected = -2.0 * p.params.k_ice / (p.params.h * p.params.h * p.params.ρ * p.params.c)
         @test sum([i for i in extrema(dY)] .≈ [FT(dT_expected), FT(dT_expected)]) == 2
 
         # check that no tendency is applied in a masked case
-        dY, Y, p = test_sea_ice_rhs(F_rad = 0.0, T_base = 269.2, global_mask = 0.0)
+        dY, Y, p = test_sea_ice_rhs(F_radiative = 0.0, T_base = 269.2, global_mask = 0.0)
         @test sum([i for i in extrema(dY)] .≈ [FT(0.0), FT(0.0)]) == 2
     end
 end

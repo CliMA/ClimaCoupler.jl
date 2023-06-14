@@ -55,7 +55,24 @@ function coupler_sim_from_file(
         ocean_u = InputOutput.read_field(reader, "ocean_u")
         land_fraction = InputOutput.read_field(reader, "land_mask")
         ocean_params = InputOutput.read_field(reader, "ocean_params", true)
-        coupler_fields = InputOutput.read_field(reader, "coupler_fields")
+        orig_coupler_fields = InputOutput.read_field(reader, "coupler_fields")
+        orig_names = (propertynames(orig_coupler_fields)...,)
+        orig_data = map(x -> getproperty(orig_coupler_fields, x), orig_names)
+
+        new_coupler_fields = (;
+            F_turb_energy = orig_coupler_fields.F_A,
+            F_turb_moisture = orig_coupler_fields.F_E,
+            F_radiative = orig_coupler_fields.F_R,
+            F_radiative_TOA = orig_coupler_fields.F_R_TOA,
+        )
+        new_names = (propertynames(new_coupler_fields)...,)
+        new_data = map(x -> getproperty(new_coupler_fields, x), new_names)
+
+        all_names = (orig_names..., new_names...)
+        all_data = (orig_data..., new_data...)
+
+        coupler_fields = ClimaCore.Fields.FieldVector(; zip(all_names, all_data)...)
+
         close(reader)
 
         as = (; integrator = (; p = (; radiation_model = nothing), u = atmos_u))
@@ -97,13 +114,13 @@ end
 
     # init
     coupler_sim = coupler_sim_from_file(local_file_0, conservation_checks = conservation_checks)
-    rad_source = deepcopy(coupler_sim.fields.F_R_TOA)
+    rad_source = deepcopy(coupler_sim.fields.F_radiative_TOA)
     surface_water = deepcopy(coupler_sim.fields.P_net)
     check_conservation!(coupler_sim, get_slab_energy, get_slab_energy)
     # 1 day later
     coupler_sim = coupler_sim_from_file(local_file_end, conservation_checks = conservation_checks)
     check_conservation!(coupler_sim, get_slab_energy, get_slab_energy)
-    parent(rad_source) .-= parent(deepcopy(coupler_sim.fields.F_R_TOA))
+    parent(rad_source) .-= parent(deepcopy(coupler_sim.fields.F_radiative_TOA))
     parent(surface_water) .+= parent(deepcopy(coupler_sim.fields.P_net))
 
     cc = conservation_checks.energy
@@ -173,7 +190,7 @@ end
         space,
         (;
             P_net = Fields.zeros(space),
-            F_E = Fields.zeros(space),
+            F_turb_moisture = Fields.zeros(space),
             P_liq = Fields.zeros(space),
             P_snow = Fields.zeros(space),
         ),
@@ -236,7 +253,7 @@ end
     face_array = reshape(parent(face_var), size(parent(face_var), 1), :)
 
     land_fraction = Fields.level(zeros(center_3d_space), 1)
-    coupler_fields = (; F_R_TOA = land_fraction)
+    coupler_fields = (; F_radiative_TOA = land_fraction)
     ls = nothing
     ice_u = (; T_sfc = Fields.level(zeros(center_3d_space), 1))
     is = (; integrator = (; p = (; params = (; h = FT(0), c = FT(0), ρ = FT(0))), u = ice_u))

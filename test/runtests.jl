@@ -21,6 +21,12 @@ end
 @safetestset "TimeManager tests" begin
     include("time_manager_tests.jl")
 end
+@safetestset "FieldExchanger tests" begin
+    include("field_exchanger_tests.jl")
+end
+@safetestset "FluxCalculator tests" begin
+    include("flux_calculator_tests.jl")
+end
 @safetestset "Diagnostics tests" begin
     include("diagnostics_tests.jl")
 end

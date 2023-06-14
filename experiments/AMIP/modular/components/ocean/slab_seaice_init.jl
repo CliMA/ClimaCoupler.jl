@@ -1,20 +1,26 @@
+import ClimaCoupler.Interfacer: SeaIceModelSimulation, get_field, update_field!
+import ClimaCoupler.FieldExchanger: step!, reinit!
+
 """
     PrescribedIceSimulation{P, Y, D, I}
 
 Ice concentration is prescribed, and we solve the following energy equation:
 
-    (h * ρ * c) d T_sfc dt = -(F_aero + F_rad) + F_conductive
+    (h * ρ * c) d T_sfc dt = -(F_turb_energy + F_radiativead) + F_conductive
 
     with
     F_conductive = k_ice (T_base - T_sfc) / (h)
 
     The surface temperature (`T_sfc`) is the prognostic variable which is being
-    modified by turbulent aerodynamic (`F_aero`) and radiative (`F_rad`) fluxes,
+    modified by turbulent aerodynamic (`F_turb_energy`) and radiative (`F_turb_energy`) fluxes,
     as well as a conductive flux that depends on the temperature difference
     across the ice layer (with `T_base` being prescribed).
 
+In the current version, the sea ice has a prescribed thickness, and we assume that it is not
+sublimating. That contribution has been zeroed out in the atmos fluxes.
+
 """
-struct PrescribedIceSimulation{P, Y, D, I} <: SurfaceModelSimulation
+struct PrescribedIceSimulation{P, Y, D, I} <: SeaIceModelSimulation
     params::P
     Y_init::Y
     domain::D
@@ -55,13 +61,13 @@ function ice_rhs!(du, u, p, _)
     FT = eltype(dY)
 
     params = p.params
-    F_aero = p.F_aero
-    F_rad = p.F_rad
+    F_turb_energy = p.F_turb_energy
+    F_radiative = p.F_radiative
     area_fraction = p.area_fraction
     T_freeze = params.T_freeze
 
     F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc) # fluxes are defined to be positive when upward
-    rhs = @. (-F_aero - F_rad + F_conductive) / (params.h * params.ρ * params.c)
+    rhs = @. (-F_turb_energy - F_radiative + F_conductive) / (params.h * params.ρ * params.c)
 
     # do not count tendencies that lead to temperatures above freezing, and mask out no-ice areas
     unphysical = @. Regridder.binary_mask.(T_freeze - (Y.T_sfc + FT(rhs) * p.dt), threshold = FT(0)) .*
@@ -80,8 +86,8 @@ function ice_init(::Type{FT}; tspan, saveat, dt, space, area_fraction, stepper =
 
     Y = slab_ice_space_init(FT, space, params)
     additional_cache = (;
-        F_aero = ClimaCore.Fields.zeros(space),
-        F_rad = ClimaCore.Fields.zeros(space),
+        F_turb_energy = ClimaCore.Fields.zeros(space),
+        F_radiative = ClimaCore.Fields.zeros(space),
         area_fraction = area_fraction,
         dt = dt,
     )
@@ -115,3 +121,13 @@ get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) = sim.integrator.
 function update_field!(sim::PrescribedIceSimulation, ::Val{:area_fraction}, field::Fields.Field)
     sim.integrator.p.area_fraction .= field
 end
+
+function update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_energy_flux}, field)
+    parent(sim.integrator.p.F_turb_energy) .= parent(field)
+end
+function update_field!(sim::PrescribedIceSimulation, ::Val{:radiative_energy_flux}, field)
+    parent(sim.integrator.p.F_radiative) .= parent(field)
+end
+
+step!(sim::PrescribedIceSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
+reinit!(sim::PrescribedIceSimulation) = reinit!(sim.integrator)

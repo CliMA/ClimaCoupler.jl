@@ -107,9 +107,9 @@ function check_conservation!(
             n_faces - half,
         )
 
-        coupler_sim.fields.F_R_TOA .-=
+        coupler_sim.fields.F_radiative_TOA .-=
             swap_space!(zeros(boundary_space), LWd_TOA .+ SWd_TOA .- LWu_TOA .- SWu_TOA) .* coupler_sim.Δt_cpl
-        radiation_sources_accum = sum(coupler_sim.fields.F_R_TOA) # accumulated radiation sources + sinks [J]
+        radiation_sources_accum = sum(coupler_sim.fields.F_radiative_TOA) # accumulated radiation sources + sinks [J]
         push!(cc.toa_net_source, radiation_sources_accum)
     else
         push!(cc.toa_net_source, FT(0))
@@ -211,7 +211,7 @@ end
 Determines the total water content gain/loss of a surface from the begining of the simulation based on evaporation and precipitation rates.
 """
 function surface_water_gain_from_rates(cs::CoupledSimulation)
-    evaporation = cs.fields.F_E # kg / m^2 / s / layer depth
+    evaporation = cs.fields.F_turb_moisture # kg / m^2 / s / layer depth
     precipitation_l = cs.fields.P_liq
     precipitation_s = cs.fields.P_snow
     @. (evaporation + precipitation_l + precipitation_s) * cs.Δt_cpl # kg / m^2 / layer depth

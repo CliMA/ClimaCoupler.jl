@@ -47,3 +47,7 @@ docs/src/generated/
 
 # internal tests
 testdel.jl
+
+# ignore vscode artifacts
+*.vscode
+*.DS

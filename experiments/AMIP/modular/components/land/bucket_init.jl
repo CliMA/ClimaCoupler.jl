@@ -17,7 +17,7 @@ import ClimaLSM.Bucket:
     snow_precipitation
 
 using ClimaLSM:
-    make_ode_function, initialize, obtain_surface_space, make_set_initial_aux_state, surface_evaporative_scaling
+    make_exp_tendency, initialize, obtain_surface_space, make_set_initial_aux_state, surface_evaporative_scaling
 
 import ClimaCoupler.Interfacer: LandModelSimulation, get_field, update_field!
 import ClimaCoupler.FieldExchanger: step!, reinit!
@@ -245,9 +245,9 @@ function bucket_init(
     set_initial_aux_state! = make_set_initial_aux_state(model)
     set_initial_aux_state!(p_new, Y, tspan[1])
 
-    ode_function! = make_ode_function(model)
+    exp_tendency! = make_exp_tendency(model)
 
-    prob = ODEProblem(ode_function!, Y, tspan, p_new)
+    prob = ODEProblem(exp_tendency!, Y, tspan, p_new)
     integrator = init(prob, stepper; dt = dt, saveat = saveat)
 
     BucketSimulation(model, Y, (; domain = domain, soil_depth = d_soil), integrator, area_fraction)

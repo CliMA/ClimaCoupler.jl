@@ -71,7 +71,7 @@ function ice_rhs!(du, u, p, _)
 
     # do not count tendencies that lead to temperatures above freezing, and mask out no-ice areas
     unphysical = @. Regridder.binary_mask.(T_freeze - (Y.T_sfc + FT(rhs) * p.dt), threshold = FT(0)) .*
-       Regridder.binary_mask.(area_fraction, threshold = eps())
+       Regridder.binary_mask.(area_fraction, threshold = eps(FT))
     parent(dY.T_sfc) .= parent(rhs .* unphysical)
 end
 

@@ -58,6 +58,7 @@ import Test: @test
 using Dates
 using UnPack
 using Plots
+using Statistics: mean
 
 using ClimaCore.Utilities: half, PlusHalf
 using ClimaCore: InputOutput, Fields
@@ -71,7 +72,7 @@ end
 ## modify parsed args for fast testing from REPL #hide
 if isinteractive()
     parsed_args["coupled"] = true #hide
-    parsed_args["surface_scheme"] = "monin_obukhov" #hide
+    parsed_args["surface_setup"] = "PrescribedSurface" #hide # necessary to stop Atmos from calculating its own surface fluxes
     parsed_args["moist"] = "equil" #hide
     parsed_args["vert_diff"] = true #hide
     parsed_args["rad"] = "gray" #hide
@@ -124,7 +125,8 @@ import ClimaCoupler.Interfacer:
     LandModelSimulation,
     OceanModelSimulation,
     get_field,
-    update_field!
+    update_field!,
+    update_sim!
 import ClimaCoupler.FluxCalculator: PartitionedComponentModelGrid, CombinedAtmosGrid, compute_combined_turbulent_fluxes!
 import ClimaCoupler.FieldExchanger:
     import_atmos_fields!,
@@ -167,7 +169,7 @@ This uses the `ClimaAtmos.jl` driver, with parameterization options specified in
 =#
 ## init atmos model component
 include("components/atmosphere/climaatmos_init.jl")
-atmos_sim = atmos_init(FT, Y, integrator, params = params);
+atmos_sim = atmos_init(FT, parsed_args);
 
 #=
 We use a common `Space` for all global surfaces. This enables the MPI processes to operate on the same columns in both
@@ -350,7 +352,7 @@ diagnostics = (monthly_3d_diags, monthly_2d_diags)
 conservation_checks = nothing
 if energy_check
     @assert(
-        mode_name == "slabplanet" && !simulation.is_distributed,
+        mode_name == "slabplanet" && !ClimaAtmos.is_distributed(ClimaComms.context(boundary_space)),
         "Only non-distributed slabplanet allowable for energy_check"
     )
     conservation_checks =
@@ -366,7 +368,7 @@ cs = CoupledSimulation{FT}(
     parsed_args,
     conservation_checks,
     [tspan[1], tspan[2]],
-    integrator.t,
+    atmos_sim.integrator.t,
     Δt_cpl,
     (; land = land_fraction, ocean = zeros(boundary_space), ice = zeros(boundary_space)),
     model_sims,
@@ -384,8 +386,8 @@ turbulent_fluxes = CombinedAtmosGrid()
 update_surface_fractions!(cs)
 import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
 update_sim!(cs.model_sims.atmos_sim, cs.fields, turbulent_fluxes) # would be good to rm dep in cs
-compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # here computed using atmos functions
 parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim, Δt_cpl) : nothing
+compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # here computed using atmos functions
 import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
 update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 
@@ -430,6 +432,7 @@ function solve_coupler!(cs)
             update_field!(ice_sim, Val(:area_fraction), get_ice_fraction.(SIC_init, mono_surface))  # TODO: change to SIC
 
             ## calculate and accumulate diagnostics at each timestep
+            ClimaComms.barrier(comms_ctx)
             accumulate_diagnostics!(cs)
 
             ## save and reset monthly averages
@@ -442,7 +445,6 @@ function solve_coupler!(cs)
 
         ## run component models sequentially for one coupling timestep (Δt_cpl)
         ClimaComms.barrier(comms_ctx)
-
         update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 
         ## step sims

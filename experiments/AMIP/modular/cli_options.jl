@@ -31,6 +31,10 @@ function argparse_settings()
         help = "Access land surface albedo information from data file"
         arg_type = Bool
         default = true
+        "--coupled" # TODO - remove from Atmos
+        help = "Coupled simulation [`false` (default), `true`]"
+        arg_type = Bool
+        default = true
         # ClimaAtmos flags
         "--FLOAT_TYPE"
         help = "Float type"
@@ -65,7 +69,7 @@ function argparse_settings()
         arg_type = String
         default = "sphere"
         "--initial_condition"
-        help = "Initial condition [`DryBaroclinicWave`, `MoistBaroclinicWave`, `DecayingProfile`, `IsothermalProfile`, `Bomex`, `DryDensityCurrentProfile`, `AgnesiHProfile`, `ScharProfile`]"
+        help = "Initial condition [`DryBaroclinicWave`, `MoistBaroclinicWave`, `DecayingProfile`, `IsothermalProfile`, `Bomex`, `DryDensityCurrentProfile`, `AgnesiHProfile`, `ScharProfile`, `RisingThermalBubbleProfile`]"
         arg_type = String
         default = "DecayingProfile"
         "--moist"
@@ -91,13 +95,26 @@ function argparse_settings()
         help = "EDMFX advection test switches off all velocity tendencies in GM and turbconc [`false` (default), `true`]"
         arg_type = Bool
         default = false
+        "--edmfx_entr_detr"
+        help = "If set to true, it switches on EDMFX entrainment/detrainment closure.  [`true`, `false` (default)]"
+        arg_type = Bool
+        default = false
+        "--edmfx_sgs_flux"
+        help = "If set to true, it switches on EDMFX SGS flux.  [`true`, `false` (default)]"
+        arg_type = Bool
+        default = false
+        "--edmfx_nh_pressure"
+        help = "If set to true, it switches on EDMFX pressure drag closure.  [`true`, `false` (default)]"
+        arg_type = Bool
+        default = false
         "--vert_diff"
         help = "Vertical diffusion [`false` (default), `VerticalDiffusion`, `true` (defaults to `VerticalDiffusion`)]"
         arg_type = String
         default = "false"
-        "--surface_scheme"
-        help = "Surface flux scheme [`nothing` (default), `bulk`, `monin_obukhov`]"
+        "--surface_setup"
+        help = "Surface flux scheme [`DefaultExchangeCoefficients` (default), `DefaultMoninObukhov`]"
         arg_type = String
+        default = "DefaultExchangeCoefficients"
         "--surface_thermo_state_type"
         help = "Surface thermo state type [`GCMSurfaceThermoState` (default), `PrescribedThermoState`]"
         arg_type = String
@@ -106,10 +123,6 @@ function argparse_settings()
         help = "Bulk transfer coefficient"
         arg_type = Float64
         default = Float64(0.0044)
-        "--coupled"
-        help = "Coupled simulation [`false` (default), `true`]"
-        arg_type = Bool
-        default = false
         "--turbconv"
         help = "Turbulence convection scheme [`nothing` (default), `edmf`]"
         arg_type = String
@@ -324,6 +337,14 @@ function argparse_settings()
         help = "Define the surface elevation profile [`NoWarp`,`Earth`,`DCMIP200`,`Agnesi`]"
         arg_type = String
         default = "NoWarp"
+        "--topo_smoothing"
+        help = "Choose whether to order-2 smoothing on the LGL mesh"
+        arg_type = Bool
+        default = false
+        "--smoothing_order"
+        help = "Define the surface smoothing kernel factor (integer) [`3 (default)`]"
+        arg_type = Int
+        default = 3
         "--apply_limiter"
         help = "Apply a horizontal limiter to every tracer [`true` (default), `false`]"
         arg_type = Bool
@@ -361,9 +382,12 @@ function argparse_settings()
         arg_type = Bool
         default = false
         "--orographic_gravity_wave"
-        help = "Apply parameterization for orographic drag on horizontal mean flow"
-        arg_type = Bool
-        default = false
+        help = "Orographic drag on horizontal mean flow [`nothing` (default), `gfdl_restart`, `raw_topo`]"
+        arg_type = String
+        "--device"
+        help = "Device type to use [`CPUDevice` (default), `CUDADevice`]"
+        arg_type = String
+        default = "CPUDevice"
         "--perf_summary"
         help = "Flag for collecting performance summary information"
         arg_type = Bool

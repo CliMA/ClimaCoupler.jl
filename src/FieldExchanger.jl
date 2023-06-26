@@ -110,24 +110,25 @@ Updates the surface component model cache with the current coupler fields of F_t
 """
 function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, area_fraction = nothing)
 
+    FT = eltype(area_fraction)
     Interfacer.update_field!(sim, Val(:air_density), csf.ρ_sfc)
 
     Interfacer.update_field!(
         sim,
         Val(:turbulent_energy_flux),
-        Regridder.binary_mask.(area_fraction, threshold = eps()) .* csf.F_turb_energy,
+        Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_turb_energy,
     )
 
     Interfacer.update_field!(
         sim,
         Val(:turbulent_moisture_flux),
-        Regridder.binary_mask.(area_fraction, threshold = eps()) .* csf.F_turb_moisture,
+        Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_turb_moisture,
     )
 
     Interfacer.update_field!(
         sim,
         Val(:radiative_energy_flux),
-        Regridder.binary_mask.(area_fraction, threshold = eps()) .* csf.F_radiative,
+        Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_radiative,
     )
 
     Interfacer.update_field!(sim, Val(:liquid_precipitation), .-csf.P_liq)

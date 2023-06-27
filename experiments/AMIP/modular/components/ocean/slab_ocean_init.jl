@@ -59,14 +59,17 @@ function slab_ocean_rhs!(dY, Y, cache, t)
     FT = eltype(Y.T_sfc)
     rhs = @. -(F_turb_energy + F_radiative) / (p.h * p.ρ * p.c)
     parent(dY.T_sfc) .= parent(rhs .* Regridder.binary_mask.(area_fraction, threshold = eps(FT)))
+
+    @. cache.q_sfc = TD.q_vap_saturation_generic.(cache.thermo_params, Y.T_sfc, cache.ρ_sfc, TD.Liquid())
 end
+
 
 """
     ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, stepper = Euler()) where {FT}
 
 Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `step!` in the coupling loop.
 """
-function ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, stepper = Euler()) where {FT}
+function ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, thermo_params, stepper = Euler()) where {FT}
 
     params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
 
@@ -75,7 +78,10 @@ function ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, stepper
         params = params,
         F_turb_energy = ClimaCore.Fields.zeros(space),
         F_radiative = ClimaCore.Fields.zeros(space),
+        q_sfc = ClimaCore.Fields.zeros(space),
+        ρ_sfc = ClimaCore.Fields.zeros(space),
         area_fraction = area_fraction,
+        thermo_params = thermo_params,
     )
     problem = OrdinaryDiffEq.ODEProblem(slab_ocean_rhs!, Y, tspan, cache)
     integrator = OrdinaryDiffEq.init(problem, stepper, dt = dt, saveat = saveat)
@@ -92,6 +98,7 @@ clean_sst(SST, _info) = (swap_space!(zeros(axes(_info.land_fraction)), SST) .+ f
 
 # required by Interfacer
 get_field(sim::SlabOceanSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
+get_field(sim::SlabOceanSimulation, ::Val{:surface_humidity}) = sim.integrator.p.q_sfc
 get_field(sim::SlabOceanSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
 get_field(sim::SlabOceanSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
 get_field(sim::SlabOceanSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
@@ -107,6 +114,9 @@ function update_field!(sim::SlabOceanSimulation, ::Val{:turbulent_energy_flux}, 
 end
 function update_field!(sim::SlabOceanSimulation, ::Val{:radiative_energy_flux}, field)
     parent(sim.integrator.p.F_radiative) .= parent(field)
+end
+function update_field!(sim::SlabOceanSimulation, ::Val{:air_density}, field)
+    parent(sim.integrator.p.ρ_sfc) .= parent(field)
 end
 
 step!(sim::SlabOceanSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)

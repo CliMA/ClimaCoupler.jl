@@ -4,6 +4,8 @@
 This modules contains abstract types, interface templates and model stubs for coupling component models.
 """
 module Interfacer
+import Thermodynamics as TD
+
 
 using ClimaCore: Fields
 export ComponentModelSimulation,
@@ -63,6 +65,9 @@ get_field(sim::SurfaceStub, ::Val{:albedo}) = sim.cache.α
 get_field(sim::SurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m
 get_field(sim::SurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
 get_field(sim::SurfaceStub, ::Val{:beta}) = sim.cache.beta
+get_field(sim::SurfaceStub, ::Val{:surface_humidity}) =
+    TD.q_vap_saturation_generic.(sim.cache.thermo_params, sim.cache.T_sfc, sim.cache.ρ_sfc, sim.cache.phase)
+
 function get_field(sim::ComponentModelSimulation, val::Val)
     error("undefined field $val for " * name(sim))
 end
@@ -107,6 +112,12 @@ function update_field!(sim::SurfaceStub, ::Val{:area_fraction}, field::Fields.Fi
 end
 function update_field!(sim::SurfaceStub, ::Val{:surface_temperature}, field::Fields.Field)
     sim.cache.T_sfc .= field
+end
+function update_field!(sim::SurfaceStub, ::Val{:surface_temperature}, field::Fields.Field)
+    sim.cache.T_sfc .= field
+end
+function update_field!(sim::SurfaceStub, ::Val{:air_density}, field)
+    parent(sim.cache.ρ_sfc) .= parent(field)
 end
 
 """

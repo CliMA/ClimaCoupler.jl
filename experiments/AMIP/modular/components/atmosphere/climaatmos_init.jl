@@ -1,7 +1,7 @@
 # atmos_init: for ClimaAtmos pre-AMIP interface
 import ClimaAtmos
 using ClimaAtmos: RRTMGPI
-import ClimaCoupler.FluxCalculator: compute_atmos_turbulent_fluxes!
+import ClimaCoupler.FluxCalculator: compute_atmos_turbulent_fluxes!, calculate_surface_air_density
 using ClimaCore: Fields.level, Geometry
 import ClimaCoupler.FieldExchanger: get_thermo_params
 
@@ -149,9 +149,20 @@ get_thermo_params(sim::ClimaAtmosSimulation) = CAP.thermodynamics_params(sim.int
 get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_state_int}) = Spaces.level(sim.integrator.p.ᶜts, 1)
 
 """
+    calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::Fields.Field)
+
+Extension for this  to to calculate surface density.
+"""
+function calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::Fields.Field)
+    thermo_params = get_thermo_params(atmos_sim)
+    ts_int = get_field(atmos_sim, Val(:thermo_state_int))
+    extrapolate_ρ_to_sfc.(Ref(thermo_params), ts_int, swap_space!(ones(axes(ts_int.ρ)), T_S))
+end
+
+"""
     extrapolate_ρ_to_sfc(thermo_params, ts_int, T_sfc)
 
-Uses the ideal gas law and hydrostatic balance to extrapolate for surface density.
+Uses the ideal gas law and hydrostatic balance to extrapolate for surface density pointwise.
 """
 function extrapolate_ρ_to_sfc(thermo_params, ts_in, T_sfc)
     T_int = TD.air_temperature(thermo_params, ts_in)

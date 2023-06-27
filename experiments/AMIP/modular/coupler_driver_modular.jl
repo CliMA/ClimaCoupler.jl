@@ -170,6 +170,7 @@ This uses the `ClimaAtmos.jl` driver, with parameterization options specified in
 ## init atmos model component
 include("components/atmosphere/climaatmos_init.jl")
 atmos_sim = atmos_init(FT, parsed_args);
+thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models
 
 #=
 We use a common `Space` for all global surfaces. This enables the MPI processes to operate on the same columns in both
@@ -238,11 +239,14 @@ if mode_name == "amip"
     SST_init = interpolate_midmonth_to_daily(date0, SST_info)
     ocean_sim = SurfaceStub((;
         T_sfc = SST_init,
+        ρ_sfc = ClimaCore.Fields.zeros(boundary_space),
         z0m = FT(1e-3),
         z0b = FT(1e-3),
         beta = FT(1),
         α = FT(0.06),
         area_fraction = (FT(1) .- land_fraction),
+        phase = TD.Liquid(),
+        thermo_params = thermo_params,
     ))
     ## sea ice
     SIC_info = bcfile_info_init(
@@ -261,8 +265,15 @@ if mode_name == "amip"
     update_midmonth_data!(date0, SIC_info)
     SIC_init = interpolate_midmonth_to_daily(date0, SIC_info)
     ice_fraction = get_ice_fraction.(SIC_init, mono_surface)
-    ice_sim =
-        ice_init(FT; tspan = tspan, dt = Δt_cpl, space = boundary_space, saveat = saveat, area_fraction = ice_fraction)
+    ice_sim = ice_init(
+        FT;
+        tspan = tspan,
+        dt = Δt_cpl,
+        space = boundary_space,
+        saveat = saveat,
+        area_fraction = ice_fraction,
+        thermo_params = thermo_params,
+    )
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info)
 
 elseif mode_name == "slabplanet"
@@ -274,16 +285,20 @@ elseif mode_name == "slabplanet"
         space = boundary_space,
         saveat = saveat,
         area_fraction = (FT(1) .- land_fraction), ## NB: this ocean fraction includes areas covered by sea ice (unlike the one contained in the cs)
+        thermo_params = thermo_params,
     )
 
     ## sea ice (here set to zero area coverage)
     ice_sim = SurfaceStub((;
         T_sfc = ClimaCore.Fields.ones(boundary_space),
+        ρ_sfc = ClimaCore.Fields.zeros(boundary_space),
         z0m = FT(0),
         z0b = FT(0),
         beta = FT(1),
         α = FT(1),
         area_fraction = ClimaCore.Fields.zeros(boundary_space),
+        phase = phase = TD.Ice(),
+        thermo_params = thermo_params,
     ))
 
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
@@ -380,18 +395,28 @@ cs = CoupledSimulation{FT}(
 #=
 ## Initial Component Model Exchange
 =#
-
-## share states and fluxes between models
+# dd=dd
+## share and update model caches
 turbulent_fluxes = CombinedAtmosGrid()
 update_surface_fractions!(cs)
+# 1) atmos: calculate F_radiative, ts_atmos and ρ_sfc (using T_sfc, albedo)
 import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta
-update_sim!(cs.model_sims.atmos_sim, cs.fields, turbulent_fluxes) # needs t_s, albedo for rad
-parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim, Δt_cpl) : nothing # initiate state (this should be in the integrator init)
-compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # update surface_conditions
-reinit_model_sims!(cs.model_sims)
-parsed_args["ode_algo"] == "ARS343" ? step!(atmos_sim, Δt_cpl) : nothing # calcualte F_rad from surface conditions
-import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
+update_sim!(cs.model_sims.atmos_sim, cs.fields, turbulent_fluxes) # Atmos needs T_sfc (in ts), albedo for rad TDOD do we need this?
+step!(atmos_sim, Δt_cpl) # initiate state (TODO: this should be in the integrator init)
+import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # update for ts and ρ_sfc
+# 2) calculate q_sfc in surface models
 update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
+step!(land_sim, Δt_cpl)
+step!(ocean_sim, Δt_cpl)
+step!(ice_sim, Δt_cpl)
+# 3) calculate F_turb_energy and F_turb_moisture (and F_turb_momentum) on atmos grid
+compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # update surface_conditions
+# 4) calculate F_radiative on atmos grid
+reinit!(atmos_sim)
+step!(atmos_sim, Δt_cpl)
+# 5) update coupler and surface models for radiative fluxes, turbulent fluxes and precipitation
+import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # update for correct F_radiative
+update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes) # update for correct F_radiative and F_turb
 
 ## reinitialize (TODO: avoid with interfaces)
 reinit_model_sims!(cs.model_sims)

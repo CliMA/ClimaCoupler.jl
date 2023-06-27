@@ -8,8 +8,13 @@ or to call flux calculating functions from the component models.
 module FluxCalculator
 
 using ClimaCoupler.Interfacer
+using ClimaCore.Fields
 export PartitionedComponentModelGrid,
-    CombinedAtmosGrid, compute_combined_turbulent_fluxes!, TurbulentFluxPartition, compute_atmos_turbulent_fluxes!
+    CombinedAtmosGrid,
+    compute_combined_turbulent_fluxes!,
+    TurbulentFluxPartition,
+    compute_atmos_turbulent_fluxes!,
+    calculate_surface_air_density
 
 """
     TurbulentFluxPartition
@@ -75,5 +80,15 @@ end
 """
 compute_atmos_turbulent_fluxes!(sim::Interfacer.ComponentModelSimulation, _) =
     error("calling flux calculation in " * Interfacer.name(sim) * " but no method defined")
+
+
+"""
+    calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::Fields.Field)
+
+Extension for this  to to calculate surface density.
+"""
+function calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_S::Fields.Field)
+    error("this function is required to be dispatched on" * Interfacer.name(sim) * ", but no method defined")
+end
 
 end # module

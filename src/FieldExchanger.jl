@@ -12,6 +12,7 @@ export import_atmos_fields!,
 
 using ClimaCoupler: Interfacer, FluxCalculator, Regridder, Utilities
 
+
 """
     import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
 
@@ -32,6 +33,9 @@ function import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
     if turbulent_fluxes == FluxCalculator.CombinedAtmosGrid()
         Regridder.dummmy_remap!(csf.F_turb_energy, Interfacer.get_field(atmos_sim, Val(:turbulent_energy_flux)))
         Regridder.dummmy_remap!(csf.F_turb_moisture, Interfacer.get_field(atmos_sim, Val(:turbulent_moisture_flux)))
+
+        # surface density is needed for q_sat and requires atmos and sfc states, so it is calculated and saved in the coupler
+        Regridder.dummmy_remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_S))
     end
 
     Regridder.dummmy_remap!(csf.F_radiative, Interfacer.get_field(atmos_sim, Val(:radiative_energy_flux)))
@@ -73,6 +77,9 @@ function import_combined_surface_fields!(csf, model_sims, boundary_space, turbul
 
         Regridder.combine_surfaces!(combined_field, model_sims, Val(:beta))
         Regridder.dummmy_remap!(csf.beta, combined_field)
+
+        Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_humidity))
+        Regridder.dummmy_remap!(csf.ρ_sfc, combined_field)
     end
 
 end
@@ -95,6 +102,7 @@ function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf, turbulent_
         Interfacer.update_field!(atmos_sim, Val(:roughness_momentum), csf.z0m_S)
         Interfacer.update_field!(atmos_sim, Val(:roughness_buoyancy), csf.z0b_S)
         Interfacer.update_field!(atmos_sim, Val(:beta), csf.beta) # not in this version of atmos
+
     end
 
 end
@@ -111,6 +119,7 @@ Updates the surface component model cache with the current coupler fields of F_t
 function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, area_fraction = nothing)
 
     FT = eltype(area_fraction)
+
     Interfacer.update_field!(sim, Val(:air_density), csf.ρ_sfc)
 
     Interfacer.update_field!(
@@ -133,6 +142,8 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, area_fraction 
 
     Interfacer.update_field!(sim, Val(:liquid_precipitation), .-csf.P_liq)
     Interfacer.update_field!(sim, Val(:snow_precipitation), .-csf.P_snow)
+
+    update_auxiliary_calculations!(sim)
 end
 
 """
@@ -206,6 +217,14 @@ end
 The stub surface simulation is not updated by this function. Extends `SciMLBase.step!`.
 """
 step!(::Interfacer.SurfaceStub, _) = nothing
+
+
+"""
+    update_auxiliary_calculations!(sim::Interfacer.ComponentModelSimulation)
+
+Stub for updating axilliary calculations.
+"""
+update_auxiliary_calculations!(sim::Interfacer.ComponentModelSimulation) = nothing
 
 
 end # module

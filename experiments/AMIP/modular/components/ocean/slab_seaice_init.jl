@@ -73,6 +73,8 @@ function ice_rhs!(du, u, p, _)
     unphysical = @. Regridder.binary_mask.(T_freeze - (Y.T_sfc + FT(rhs) * p.dt), threshold = FT(0)) .*
        Regridder.binary_mask.(area_fraction, threshold = eps(FT))
     parent(dY.T_sfc) .= parent(rhs .* unphysical)
+
+    @. cache.q_sfc = TD.q_vap_saturation_generic.(cache.thermo_params, Y.T_sfc, cache.ρ_sfc, TD.Ice())
 end
 
 """
@@ -80,7 +82,7 @@ end
 
 Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `step!` in the coupling loop.
 """
-function ice_init(::Type{FT}; tspan, saveat, dt, space, area_fraction, stepper = Euler()) where {FT}
+function ice_init(::Type{FT}; tspan, saveat, dt, space, area_fraction, thermo_params, stepper = Euler()) where {FT}
 
     params = IceSlabParameters(FT(2), FT(900.0), FT(2100.0), FT(271.2), FT(1e-3), FT(1e-5), FT(271.2), FT(2.0), FT(0.8))
 
@@ -88,8 +90,11 @@ function ice_init(::Type{FT}; tspan, saveat, dt, space, area_fraction, stepper =
     additional_cache = (;
         F_turb_energy = ClimaCore.Fields.zeros(space),
         F_radiative = ClimaCore.Fields.zeros(space),
+        q_sfc = ClimaCore.Fields.zeros(space),
+        ρ_sfc = ClimaCore.Fields.zeros(space),
         area_fraction = area_fraction,
         dt = dt,
+        thermo_params = thermo_params,
     )
 
     problem = OrdinaryDiffEq.ODEProblem(ice_rhs!, Y, tspan, (; additional_cache..., params = params))
@@ -112,6 +117,7 @@ get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
 
 # required by Interfacer
 get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
+get_field(sim::PrescribedIceSimulation, ::Val{:surface_humidity}) = sim.integrator.p.q_sfc
 get_field(sim::PrescribedIceSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
 get_field(sim::PrescribedIceSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
 get_field(sim::PrescribedIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
@@ -127,6 +133,9 @@ function update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_energy_flu
 end
 function update_field!(sim::PrescribedIceSimulation, ::Val{:radiative_energy_flux}, field)
     parent(sim.integrator.p.F_radiative) .= parent(field)
+end
+function update_field!(sim::PrescribedIceSimulation, ::Val{:air_density}, field)
+    parent(sim.integrator.p.ρ_sfc) .= parent(field)
 end
 
 step!(sim::PrescribedIceSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)

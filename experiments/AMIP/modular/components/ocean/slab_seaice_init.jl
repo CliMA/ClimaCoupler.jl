@@ -38,6 +38,8 @@ struct IceSlabParameters{FT <: AbstractFloat}
     T_freeze::FT # freezing point of sea water [K]
     k_ice::FT # thermal condictivity of ice [W / m / K] (less in HM71)
     α::FT # sea ice albedo
+    Cd::FT # drag coefficient
+    Ch::FT # heat transfer coefficient
 end
 
 # init simulation
@@ -84,7 +86,7 @@ Initializes the `DiffEq` problem, and creates a Simulation-type object containin
 """
 function ice_init(::Type{FT}; tspan, saveat, dt, space, area_fraction, thermo_params, stepper = Euler()) where {FT}
 
-    params = IceSlabParameters(FT(2), FT(900.0), FT(2100.0), FT(271.2), FT(1e-3), FT(1e-5), FT(271.2), FT(2.0), FT(0.8))
+    params = IceSlabParameters(FT(2), FT(900.0), FT(2100.0), FT(271.2), FT(1e-3), FT(1e-5), FT(271.2), FT(2.0), FT(0.8), FT(0.001), FT(0.001))
 
     Y = slab_ice_space_init(FT, space, params)
     additional_cache = (;
@@ -123,6 +125,8 @@ get_field(sim::PrescribedIceSimulation, ::Val{:roughness_buoyancy}) = sim.integr
 get_field(sim::PrescribedIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
 get_field(sim::PrescribedIceSimulation, ::Val{:albedo}) = sim.integrator.p.params.α
 get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
+get_field(sim::PrescribedIceSimulation, ::Val{:heat_transfer_coefficient})  = sim.integrator.p.params.Ch
+get_field(sim::PrescribedIceSimulation, ::Val{:drag_coefficient})  = sim.integrator.p.params.Cd
 
 function update_field!(sim::PrescribedIceSimulation, ::Val{:area_fraction}, field::Fields.Field)
     sim.integrator.p.area_fraction .= field
@@ -140,3 +144,13 @@ end
 
 step!(sim::PrescribedIceSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
 reinit!(sim::PrescribedIceSimulation) = reinit!(sim.integrator)
+
+"""
+    update_turbulent_fluxes_point!(sim::PrescribedIceSimulation, fields, colidx)
+
+Updates the turbulent fluxes in the sea-ice model from the fields in the coupler.
+"""
+function update_turbulent_fluxes_point!(sim::PrescribedIceSimulation, fields, colidx)
+    (; F_shf, F_lhf) = fields
+    @. sim.integrator.p.F_aero[colidx] = F_shf + F_lhf
+end

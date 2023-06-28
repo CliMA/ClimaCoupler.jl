@@ -71,6 +71,24 @@ Updates the surface fields for temperature and albedo.
 function update_sim!(atmos_sim::ClimaAtmosSimulation, csf, turbulent_fluxes)
     update_field!(atmos_sim, Val(:albedo), csf.albedo)
     update_field!(atmos_sim, Val(:surface_temperature), csf.T_S)
+
+    if turbulent_fluxes !== FluxCalculator.CombinedAtmosGrid()
+        Fields.bycolumn(axes(csf.T_S)) do colidx
+            coupler_fields = (; F_ρτxz = csf.F_ρτxz[colidx], F_ρτyz = csf.F_ρτyz[colidx], F_shf = csf.F_shf[colidx], F_lhf = csf.F_lhf[colidx], F_evap = csf.F_evap[colidx])
+            update_turbulent_fluxes_point!(atmos_sim, coupler_fields, colidx)
+        end
+    end
+end
+
+function update_turbulent_fluxes_point!(sim::ClimaAtmosSimulation, fields, colidx)
+    (; F_ρτxz , F_ρτyz , F_shf , F_lhf , F_evap ) = fields
+
+    ρ_int = Spaces.level(sim.integrator.u.c.ρ , 1)
+
+    @. sim.integrator.p.dif_flux_energy_bc[colidx] = - Geometry.WVector(F_shf[colidx] + F_lhf[colidx]) # Geometry.WVector(outputs[colidx].F_shf + outputs[colidx].F_lhf,)
+    @. sim.integrator.p.dif_flux_ρq_tot_bc[colidx] = - Geometry.WVector(F_evap[colidx])
+    @. sim.integrator.p.dif_flux_uₕ_bc[colidx] = - Geometry.Contravariant3Vector(sim.integrator.p.surface_normal[colidx]) ⊗ Geometry.Covariant12Vector(Geometry.UVVector(F_ρτxz / ρ_int, F_ρτyz / ρ_int)[colidx],)
+
 end
 
 
@@ -149,6 +167,13 @@ end
 
 get_thermo_params(sim::ClimaAtmosSimulation) = CAP.thermodynamics_params(sim.integrator.p.params)
 get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_state_int}) = Spaces.level(sim.integrator.p.ᶜts, 1)
+get_field(sim::ClimaAtmosSimulation, ::Val{:height_int})  = Spaces.level(Fields.coordinate_field(sim.integrator.u.c).z, 1)
+get_field(sim::ClimaAtmosSimulation, ::Val{:height_sfc})  = Spaces.level(Fields.coordinate_field(sim.integrator.u.f).z, half)
+function get_field(sim::ClimaAtmosSimulation, ::Val{:uv_int})
+    uₕ_int = Geometry.UVVector.(Spaces.level(sim.integrator.u.c.uₕ, 1))
+    return @. StaticArrays.SVector(uₕ_int.components.data.:1, uₕ_int.components.data.:2)
+end
+
 
 """
     calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::Fields.Field)
@@ -171,4 +196,20 @@ function extrapolate_ρ_to_sfc(thermo_params, ts_in, T_sfc)
     Rm_int = TD.gas_constant_air(thermo_params, ts_in)
     ρ_air = TD.air_density(thermo_params, ts_in)
     ρ_air * (T_sfc / T_int)^(TD.cv_m(thermo_params, ts_in) / Rm_int)
+end
+
+"""
+    update_turbulent_fluxes_point!(sim::ClimaAtmosSimulation, fields, colidx)
+
+Updates the turbulent fluxes in the `integrator` of `sim` using the fields in `fields` at the column index `colidx`.
+"""
+function update_turbulent_fluxes_point!(sim::ClimaAtmosSimulation, fields, colidx)
+    (; F_ρτxz , F_ρτyz , F_shf , F_lhf , F_evap ) = fields
+
+    ρ_int = Spaces.level(sim.integrator.u.c.ρ , 1)
+
+    @. sim.integrator.p.dif_flux_energy_bc[colidx] = - Geometry.WVector(F_shf[colidx] + F_lhf[colidx]) # Geometry.WVector(outputs[colidx].F_shf + outputs[colidx].F_lhf,)
+    @. sim.integrator.p.dif_flux_ρq_tot_bc[colidx] = - Geometry.WVector(F_evap[colidx])
+    @. sim.integrator.p.dif_flux_uₕ_bc[colidx] = - Geometry.Contravariant3Vector(sim.integrator.p.surface_normal[colidx]) ⊗ Geometry.Covariant12Vector(Geometry.UVVector(F_ρτxz / ρ_int, F_ρτyz / ρ_int)[colidx],)
+
 end

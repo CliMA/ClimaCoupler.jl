@@ -122,3 +122,16 @@ end
 step!(sim::BucketSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
 
 reinit!(sim::BucketSimulation) = reinit!(sim.integrator)
+
+"""
+    update_turbulent_fluxes_point!(sim::BucketSimulation, fields, colidx)
+
+Updates the turbulent fluxes in the bucket model from the fields in the coupler.
+"""
+function update_turbulent_fluxes_point!(sim::BucketSimulation, fields, colidx)
+    (; F_shf, F_lhf, F_evap) = fields
+    ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
+    @. sim.integrator.p.bucket.turbulent_energy_flux[colidx] = F_shf + F_lhf
+    @. sim.integrator.p.bucket.evaporation[colidx] = F_evap / ρ_liq
+    return nothing
+end

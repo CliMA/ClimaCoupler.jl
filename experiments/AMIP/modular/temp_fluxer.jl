@@ -1,37 +1,31 @@
 """
     calculate_and_send_turbulent_fluxes!(cs::)
 
-Calculates surface fluxes using adapter function `get_surface_fluxes_point!`
-from ClimaAtmos that calls `SurfaceFluxes.jl`. The coupler updates in
-atmos model cache fluxes at each coupling timestep.
+The current setup calculates the aerodynamic fluxes in the coupler (assuming no regridding is needed)
+using adapter function `get_surface_fluxes_point!`, which calls `SurfaceFluxes.jl`. The coupler saves
+the area-weighted sums of the fluxes.
 
-- TODO: generalize interface for regridding and take land state out of atmos's integrator.p
+TODO:
+- generalize interface for regridding and take land state out of atmos's integrator.p
+- add flux accumulation
+- add flux bounds
 
-The current setup calculates the aerodynamic fluxes in the coupler and assumes no regridding is needed.
 (NB: Radiation surface fluxes are calculated by the atmosphere.)
 
 """
 
-function calculate_and_send_turbulent_fluxes!(model_sims, fields, boundary_space, surface_scheme, thermo_params)
+function partition_turbulent_fluxes!(model_sims, fields, boundary_space, surface_scheme, thermo_params)
 
     atmos_sim = model_sims.atmos_sim;
     csf = fields
     FT = eltype(csf[1])
 
-    # reset coupler fields (TODO: add flux accumulation)
+    # reset coupler fields
     csf.F_ρτxz .*= FT(0)
     csf.F_ρτyz .*= FT(0)
     csf.F_shf .*= FT(0)
     csf.F_lhf .*= FT(0)
     csf.F_evap .*= FT(0)
-
-    # for sim in model_sims
-    #     if sim isa SurfaceModelSimulation
-    #         # primarily to allow rho_sfc calculation
-    #         # TODO: absorb in to colidx once aux_update in ClimaLSM allows this
-    #         extra_aux_update(sim, thermo_params, get_field(atmos_sim, Val(:thermo_state_int)) )
-    #     end
-    # end
 
     # iterate over all columns (when regridding, this will need to change)
     Fields.bycolumn(boundary_space) do colidx
@@ -39,7 +33,6 @@ function calculate_and_send_turbulent_fluxes!(model_sims, fields, boundary_space
         z_int = get_field(atmos_sim, Val(:height_int), colidx)
         uₕ_int = get_field(atmos_sim, Val(:uv_int), colidx)
         thermo_state_int = get_field(atmos_sim, Val(:thermo_state_int), colidx)
-
         z_sfc = get_field(atmos_sim, Val(:height_sfc), colidx)
 
         for sim in model_sims
@@ -78,8 +71,6 @@ function calculate_and_send_turbulent_fluxes!(model_sims, fields, boundary_space
                     @. csf.F_shf[colidx] += F_shf * area_fraction * area_mask
                     @. csf.F_lhf[colidx] += F_lhf * area_fraction * area_mask
                     @. csf.F_evap[colidx] += F_evap * area_fraction * area_mask
-                    # @. csf.ρ_sfc[colidx] += ρ_sfc
-                    # @. csf.q_sfc[colidx] += q_sfc
 
                 end
             end
@@ -88,14 +79,14 @@ function calculate_and_send_turbulent_fluxes!(model_sims, fields, boundary_space
     end
 
     # update atmos fluxes (TODO: include to the above loop, with atmos_flux_reset)
-    for sim in model_sims
-        if sim isa AtmosModelSimulation
-            Fields.bycolumn(boundary_space) do colidx
-                coupler_fields = (; F_ρτxz = csf.F_ρτxz[colidx], F_ρτyz = csf.F_ρτyz[colidx], F_shf = csf.F_shf[colidx], F_lhf = csf.F_lhf[colidx], F_evap = csf.F_evap[colidx])
-                update_turbulent_fluxes_point!(sim, coupler_fields, colidx)
-            end
-        end
-    end
+    # for sim in model_sims
+    #     if sim isa AtmosModelSimulation
+    #         Fields.bycolumn(boundary_space) do colidx
+    #             coupler_fields = (; F_ρτxz = csf.F_ρτxz[colidx], F_ρτyz = csf.F_ρτyz[colidx], F_shf = csf.F_shf[colidx], F_lhf = csf.F_lhf[colidx], F_evap = csf.F_evap[colidx])
+    #             update_turbulent_fluxes_point!(sim, coupler_fields, colidx)
+    #         end
+    #     end
+    # end
     # TODO: add allowable bounds here, check explicitly that all fluxes are equal
 
     # check_field = zeros(boundary_space)
@@ -107,6 +98,10 @@ function calculate_and_send_turbulent_fluxes!(model_sims, fields, boundary_space
     # @assert(extrema(check_field .- get_sensible_heat_flux(atmos_sim)) ≈ (0.0, 0.0))
 
 end
+
+abstract type AbstractSurfaceFluxScheme end
+struct BulkScheme <: AbstractSurfaceFluxScheme end
+struct MoninObukhovScheme <: AbstractSurfaceFluxScheme end
 
 function get_scheme_specific_properties(::BulkScheme, sim, colidx)
     Ch = get_field(sim, Val(:heat_transfer_coefficient), colidx)
@@ -189,12 +184,44 @@ function surface_inputs(
 
 end
 
+"""
+    surface_thermo_state(sim::SurfaceModelSimulation, thermo_params, thermo_state_int, colidx)
 
+Returns the surface parameters for the surface model simulation `sim`.
+"""
 function surface_thermo_state(sim::SurfaceModelSimulation, thermo_params, thermo_state_int, colidx)
     @warn("Simulation " * name(sim) * " uses the default thermo (saturated) surface state", maxlog = 10)
-    T_sfc = get_field(sim, Val(:air_temperature), colidx) #
+    T_sfc = get_field(sim, Val(:surface_temperature), colidx) #
     ρ_sfc = extrapolate_ρ_to_sfc.(thermo_params, thermo_state_int, T_sfc) # ideally the # calculate elsewhere, here just getter...
-    q_sfc = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid()) # default = saturated
+    q_sfc = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid()) # default: saturated liquid surface
     @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
+end
+
+"""
+    get_surface_fluxes_point!(inputs, surface_params)
+
+Uses SurfaceFluxes.jl to calculate turbulent surface fluxes. It should be atmos model agnostic, and columnwise.
+"""
+function get_surface_fluxes_point!(inputs, surface_params)
+
+    # calculate all fluxes (saturated surface conditions)
+    outputs = @. SF.surface_conditions(surface_params, inputs)
+
+    # drag
+    F_ρτxz = outputs.ρτxz
+    F_ρτyz = outputs.ρτyz
+
+    # energy fluxes
+    F_shf = outputs.shf
+    F_lhf = outputs.lhf
+
+    # moisture
+    F_evap = @. SF.evaporation(
+        surface_params,
+        inputs,
+        outputs.Ch,
+    )
+
+    return F_ρτxz, F_ρτyz, F_shf, F_lhf, F_evap
 end
 

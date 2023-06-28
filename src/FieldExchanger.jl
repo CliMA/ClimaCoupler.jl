@@ -108,7 +108,7 @@ function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf, turbulent_
 end
 
 """
-    update_sim!(sim::SurfaceModelSimulation, csf, area_fraction = nothing)
+    update_sim!(sim::SurfaceModelSimulation, csf, area_fraction = nothing, turbulent_fluxes = FluxCalculator.CombinedAtmosGrid())
 
 Updates the surface component model cache with the current coupler fields of F_turb_energy, F_radiative, F_turb_moisture, P_liq, and ρ_sfc.
 
@@ -116,11 +116,11 @@ Updates the surface component model cache with the current coupler fields of F_t
 - `sim`: [Interfacer.SurfaceModelSimulation] containing a surface model simulation object.
 - `csf`: [NamedTuple] containing coupler fields.
 """
-function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, area_fraction = nothing)
+function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, area_fraction = nothing, turbulent_fluxes = FluxCalculator.CombinedAtmosGrid())
 
     FT = eltype(area_fraction)
 
-    if turbulent_fluxes == CombinedAtmosGrid()
+    if turbulent_fluxes == FluxCalculator.CombinedAtmosGrid()
         Interfacer.update_field!(sim, Val(:air_density), csf.ρ_sfc)
     else
         Interfacer.update_field!(sim, Val(:air_density), calculate_surface_air_density(sim, get_field(sim, Val(:surface_temperature))))
@@ -168,10 +168,10 @@ Iterates `update_sim!` over all component model simulations saved in `cs.model_s
 - `turbulent_fluxes`: [TurbulentFluxPartition] denotes a flag for turbulent flux calculation.
 
 """
-function update_model_sims!(model_sims, csf, turbulent_fluxes)
+function update_model_sims!(model_sims, csf, turbulent_fluxes = FluxCalculator.CombinedAtmosGrid())
     for sim in model_sims
         if sim isa Interfacer.SurfaceModelSimulation
-            update_sim!(sim, csf, Interfacer.get_field(sim, Val(:area_fraction)))
+            update_sim!(sim, csf, Interfacer.get_field(sim, Val(:area_fraction)), turbulent_fluxes)
         else
             update_sim!(sim, csf, turbulent_fluxes)
         end

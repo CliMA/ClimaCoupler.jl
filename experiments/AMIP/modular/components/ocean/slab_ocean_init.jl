@@ -27,6 +27,8 @@ struct OceanSlabParameters{FT <: AbstractFloat}
     z0m::FT
     z0b::FT
     α::FT
+    Cd::FT # drag coefficient
+    Ch::FT # heat transfer coefficient
 end
 
 # init simulation
@@ -71,7 +73,7 @@ Initializes the `DiffEq` problem, and creates a Simulation-type object containin
 """
 function ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, thermo_params, stepper = Euler()) where {FT}
 
-    params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
+    params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06), FT(0.001), FT(0.001))
 
     Y, space = slab_ocean_space_init(FT, space, params)
     cache = (
@@ -104,6 +106,8 @@ get_field(sim::SlabOceanSimulation, ::Val{:roughness_buoyancy}) = sim.integrator
 get_field(sim::SlabOceanSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
 get_field(sim::SlabOceanSimulation, ::Val{:albedo}) = sim.integrator.p.params.α
 get_field(sim::SlabOceanSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
+get_field(sim::SlabOceanSimulation, ::Val{:heat_transfer_coefficient})  = sim.integrator.p.params.Ch
+get_field(sim::SlabOceanSimulation, ::Val{:drag_coefficient})  = sim.integrator.p.params.Cd
 
 function update_field!(sim::SlabOceanSimulation, ::Val{:area_fraction}, field::Fields.Field)
     sim.integrator.p.area_fraction .= field
@@ -122,3 +126,13 @@ end
 step!(sim::SlabOceanSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
 
 reinit!(sim::SlabOceanSimulation) = reinit!(sim.integrator)
+
+"""
+    update_turbulent_fluxes_point!(sim::SlabOceanSimulation, fields, colidx)
+
+Updates the turbulent fluxes in the slab ocean model from the fields in the coupler.
+"""
+function update_turbulent_fluxes_point!(sim::SlabOceanSimulation, fields, colidx)
+    (; F_shf, F_lhf) = fields
+    @. sim.integrator.p.F_aero[colidx] = F_shf + F_lhf
+end

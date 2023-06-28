@@ -395,7 +395,7 @@ cs = CoupledSimulation{FT}(
 #=
 ## Initial Component Model Exchange
 =#
-# dd=dd
+include("temp_fluxer.jl")
 ## share and update model caches
 turbulent_fluxes = CombinedAtmosGrid()
 update_surface_fractions!(cs)
@@ -405,14 +405,20 @@ import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, tur
 update_sim!(cs.model_sims.atmos_sim, cs.fields, turbulent_fluxes) # Atmos needs T_sfc (in ts), albedo for rad TODO do we need this?
 step!(atmos_sim, Δt_cpl) # initiate state (TODO: this should be in the integrator init)
 import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # update for ts (, ρ_sfc)
-# 2) calculate q_sfc in surface models
+# 2) calculate q_sfc (and rho_sfc if PartitionedComponentModelGrid) in surface models
 update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 step!(land_sim, Δt_cpl)
 step!(ocean_sim, Δt_cpl)
 step!(ice_sim, Δt_cpl)
-import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta
 # 3) calculate F_turb_energy and F_turb_moisture (and F_turb_momentum) on atmos grid
-compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # update surface_conditions
+if turbulent_fluxes == CombinedAtmosGrid()
+    import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta
+    compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # update surface_conditions
+else
+    partition_turbulent_fluxes!(model_sims, fields, boundary_space, surface_scheme, thermo_params)
+    import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, fluxes
+    import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
+end
 # 4) calculate F_radiative on atmos grid
 reinit!(atmos_sim)
 step!(atmos_sim, Δt_cpl)

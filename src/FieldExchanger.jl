@@ -120,7 +120,11 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, area_fraction 
 
     FT = eltype(area_fraction)
 
-    Interfacer.update_field!(sim, Val(:air_density), csf.ρ_sfc)
+    if turbulent_fluxes == CombinedAtmosGrid()
+        Interfacer.update_field!(sim, Val(:air_density), csf.ρ_sfc)
+    else
+        Interfacer.update_field!(sim, Val(:air_density), calculate_surface_air_density(sim, get_field(sim, Val(:surface_temperature))))
+    end
 
     Interfacer.update_field!(
         sim,

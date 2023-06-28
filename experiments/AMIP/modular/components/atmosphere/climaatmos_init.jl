@@ -89,15 +89,16 @@ Sets up `surface_setup` as a `Fields.Field` of `SurfaceState`s.
 function coupler_surface_setup(
     ::CoupledMoninObukhov,
     p;
-    csf_sfc = (; T = nothing, z0m = nothing, z0b = nothing, beta = nothing),
+    csf_sfc = (; T = nothing, z0m = nothing, z0b = nothing, beta = nothing, q_vap = nothing),
 )
 
-    surface_state(z0m, z0b, T, beta) = ClimaAtmos.SurfaceConditions.SurfaceState(;
+    surface_state(z0m, z0b, T, beta, q_vap) = ClimaAtmos.SurfaceConditions.SurfaceState(;
         parameterization = ClimaAtmos.SurfaceConditions.MoninObukhov(; z0m, z0b),
         T,
         beta,
+        q_vap,
     )
-    surface_state_field = @. surface_state(csf_sfc.z0m, csf_sfc.z0b, csf_sfc.T, csf_sfc.beta)
+    surface_state_field = @. surface_state(csf_sfc.z0m, csf_sfc.z0b, csf_sfc.T, csf_sfc.beta, csf_sfc.q_vap)
     return surface_state_field
 end
 
@@ -116,7 +117,7 @@ function compute_atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
 
     thermo_params = get_thermo_params(atmos_sim)
     ts_int = get_field(atmos_sim, Val(:thermo_state_int))
-    # FT = eltype(csf.T_S)
+    FT = eltype(csf.T_S)
 
     # surface density is needed for q_sat and requires atmos and sfc states, so it is calculated and saved in the coupler
     # parent(csf.ρ_sfc) .=
@@ -132,7 +133,7 @@ function compute_atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
     coupler_sfc_setup = coupler_surface_setup(
         CoupledMoninObukhov(),
         p;
-        csf_sfc = (; T = csf.T_S, z0m = csf.z0m_S, z0b = csf.z0b_S, beta = csf.beta, q_vap = csf.q_sfc),
+        csf_sfc = (; T = csf.T_S, z0m = csf.z0m_S, z0b = csf.z0b_S, beta = csf.beta, q_vap = csf.q_sfc .* FT(1.0)),
     )
 
     p_names = propertynames(p)

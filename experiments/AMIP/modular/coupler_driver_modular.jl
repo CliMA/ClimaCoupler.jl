@@ -399,11 +399,12 @@ cs = CoupledSimulation{FT}(
 ## share and update model caches
 turbulent_fluxes = CombinedAtmosGrid()
 update_surface_fractions!(cs)
-# 1) atmos: calculate F_radiative, ts_atmos and ρ_sfc (using T_sfc, albedo)
+# 0) import using T_sfc, albedo
 import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta
-update_sim!(cs.model_sims.atmos_sim, cs.fields, turbulent_fluxes) # Atmos needs T_sfc (in ts), albedo for rad TDOD do we need this?
+# 1) atmos: calculate F_radiative, ts_atmos (, ρ_sfc - if CombinedAtmosGrid())
+update_sim!(cs.model_sims.atmos_sim, cs.fields, turbulent_fluxes) # Atmos needs T_sfc (in ts), albedo for rad TODO do we need this?
 step!(atmos_sim, Δt_cpl) # initiate state (TODO: this should be in the integrator init)
-import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # update for ts and ρ_sfc
+import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # update for ts (, ρ_sfc)
 # 2) calculate q_sfc in surface models
 update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 step!(land_sim, Δt_cpl)

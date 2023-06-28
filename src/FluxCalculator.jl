@@ -88,7 +88,7 @@ compute_atmos_turbulent_fluxes!(sim::Interfacer.ComponentModelSimulation, _) =
 Extension for this  to to calculate surface density.
 """
 function calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_S::Fields.Field)
-    error("this function is required to be dispatched on" * Interfacer.name(sim) * ", but no method defined")
+    error("this function is required to be dispatched on" * Interfacer.name(atmos_sim) * ", but no method defined")
 end
 
 end # module

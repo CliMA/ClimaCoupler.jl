@@ -79,7 +79,7 @@ function import_combined_surface_fields!(csf, model_sims, boundary_space, turbul
         Regridder.dummmy_remap!(csf.beta, combined_field)
 
         Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_humidity))
-        Regridder.dummmy_remap!(csf.ρ_sfc, combined_field)
+        Regridder.dummmy_remap!(csf.q_sfc, combined_field)
     end
 
 end

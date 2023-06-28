@@ -116,22 +116,23 @@ function compute_atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
 
     thermo_params = get_thermo_params(atmos_sim)
     ts_int = get_field(atmos_sim, Val(:thermo_state_int))
+    # FT = eltype(csf.T_S)
 
     # surface density is needed for q_sat and requires atmos and sfc states, so it is calculated and saved in the coupler
-    parent(csf.ρ_sfc) .=
-        parent(extrapolate_ρ_to_sfc.(Ref(thermo_params), ts_int, swap_space!(ones(axes(ts_int.ρ)), csf.T_S)))
+    # parent(csf.ρ_sfc) .=
+    #     parent(extrapolate_ρ_to_sfc.(Ref(thermo_params), ts_int, swap_space!(ones(axes(ts_int.ρ)), csf.T_S)))
 
-    # surface specific q_vap is calculated as a bulk quantity here, assuming a saturated surface.
-    # TODO - use land's q_sfc, but ClimaLSM need to be modified to ingest model type
-    # NB: q_sfc (q_sfc is actually saturated!) is a passive variable in Land and nonexistent in the slabs, so this is ok for testing,
-    # though this q_sfc does not account for `q_vap_saturation_generic(..., TD.Ice())`. To approximately account for undersaturation of the surface,
-    # we can use beta to adjust evaporation to appoximate undersaturation.
-    q_vap_sfc = TD.q_vap_saturation_generic.(thermo_params, csf.T_S, csf.ρ_sfc, TD.Liquid())
+    # # surface specific q_vap is calculated as a bulk quantity here, assuming a saturated surface.
+    # # TODO - use land's q_sfc, but ClimaLSM need to be modified to ingest model type
+    # # NB: q_sfc (q_sfc is actually saturated!) is a passive variable in Land and nonexistent in the slabs, so this is ok for testing,
+    # # though this q_sfc does not account for `q_vap_saturation_generic(..., TD.Ice())`. To approximately account for undersaturation of the surface,
+    # # we can use beta to adjust evaporation to appoximate undersaturation.
+    # q_vap_sfc = TD.q_vap_saturation_generic.(thermo_params, csf.T_S, csf.ρ_sfc, TD.Liquid())
 
     coupler_sfc_setup = coupler_surface_setup(
         CoupledMoninObukhov(),
         p;
-        csf_sfc = (; T = csf.T_S, z0m = csf.z0m_S, z0b = csf.z0b_S, beta = csf.beta, q_vap = q_vap_sfc),
+        csf_sfc = (; T = csf.T_S, z0m = csf.z0m_S, z0b = csf.z0b_S, beta = csf.beta, q_vap = csf.q_sfc),
     )
 
     p_names = propertynames(p)

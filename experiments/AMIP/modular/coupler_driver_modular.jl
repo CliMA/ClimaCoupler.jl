@@ -409,6 +409,7 @@ update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 step!(land_sim, Δt_cpl)
 step!(ocean_sim, Δt_cpl)
 step!(ice_sim, Δt_cpl)
+import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta
 # 3) calculate F_turb_energy and F_turb_moisture (and F_turb_momentum) on atmos grid
 compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # update surface_conditions
 # 4) calculate F_radiative on atmos grid

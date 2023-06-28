@@ -1,75 +1,3 @@
-"""
-    get_land_temp(slab_sim::BucketSimulation)
-
-Returns the surface temperature of the earth;
-a method for the bucket model
-when used as the land model.
-"""
-function get_land_temp(slab_sim::BucketSimulation)
-    return ClimaLSM.surface_temperature(
-        slab_sim.model,
-        slab_sim.integrator.u,
-        slab_sim.integrator.p,
-        slab_sim.integrator.t,
-    )
-end
-
-
-"""
-    get_land_temp_from_state(land_sim, u)
-
-Returns the surface temperature of the earth, computed
-from the state u.
-"""
-function get_land_temp_from_state(land_sim, u)
-    return ClimaLSM.surface_temperature(land_sim.model, u, land_sim.integrator.p, land_sim.integrator.t)
-end
-
-"""
-    get_land_roughness(slab_sim::BucketSimulation)
-
-Returns the roughness length parameters of the bucket;
-a method for the bucket model
-when used as the land model.
-"""
-function get_land_roughness(slab_sim::BucketSimulation)
-    return slab_sim.model.parameters.z_0m, slab_sim.model.parameters.z_0b
-end
-
-"""
-   land_albedo(slab_sim::BucketSimulation)
-
-Returns the surface albedo of the earth;
-a method for the bucket model
-when used as the land model.
-"""
-function land_albedo(slab_sim::BucketSimulation)
-    return ClimaLSM.surface_albedo(slab_sim.model, slab_sim.integrator.u, slab_sim.integrator.p)
-end
-
-"""
-   land_beta(slab_sim::BucketSimulation)
-
-Returns the surface evaporative scaling factor over land;
-a method for the bucket model when used as the land model.
-Note that this is slightly different from the coupler's β,
-which includes the scaling factor over non-land surfaces.
-"""
-function land_beta(slab_sim::BucketSimulation)
-    return ClimaLSM.surface_evaporative_scaling(slab_sim.model, slab_sim.integrator.u, slab_sim.integrator.p)
-end
-
-
-"""
-    get_land_q(slab_sim::Bucketimulation, _...)
-
-Returns the surface specific humidity of the earth;
-a method for the bucket
-when used as the land model.
-"""
-function get_land_q(slab_sim::BucketSimulation, _...)
-    return ClimaLSM.surface_specific_humidity(slab_sim.model, slab_sim.integrator.u, slab_sim.integrator.p)
-end
 
 """
     get_bucket_energy(bucket_sim)
@@ -77,7 +5,7 @@ end
 Returns the volumetric internal energy of the bucket land model.
 """
 function get_land_energy(bucket_sim::BucketSimulation, e_per_area)
-
+    # required by ConservationChecker
     e_per_area .= zeros(axes(bucket_sim.integrator.u.bucket.W))
     soil_depth = FT = eltype(bucket_sim.integrator.u.bucket.W)
     ClimaCore.Fields.bycolumn(axes(bucket_sim.integrator.u.bucket.T)) do colidx
@@ -92,6 +20,15 @@ function get_land_energy(bucket_sim::BucketSimulation, e_per_area)
     return e_per_area
 end
 
+"""
+    get_land_temp_from_state(land_sim, u)
+Returns the surface temperature of the earth, computed
+from the state u.
+"""
+function get_land_temp_from_state(land_sim, u)
+    # required by viz_explorer.jl
+    return ClimaLSM.surface_temperature(land_sim.model, u, land_sim.integrator.p, land_sim.integrator.t)
+end
 
 """
     make_lsm_domain(
@@ -144,7 +81,8 @@ function make_lsm_domain(
 end
 
 # required by Interfacer
-get_field(sim::BucketSimulation, ::Val{:surface_temperature}) = sim.integrator.p.bucket.T_sfc
+get_field(sim::BucketSimulation, ::Val{:surface_temperature}) =
+    ClimaLSM.surface_temperature(sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
 get_field(sim::BucketSimulation, ::Val{:roughness_momentum}) = sim.model.parameters.z_0m
 get_field(sim::BucketSimulation, ::Val{:roughness_buoyancy}) = sim.model.parameters.z_0b
 get_field(sim::BucketSimulation, ::Val{:beta}) =
@@ -157,9 +95,6 @@ get_field(sim::BucketSimulation, ::Val{:area_fraction}) = sim.area_fraction
 # The surface air density is computed using the atmospheric state at the first level and making ideal gas
 # and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
 # a reasonable stand-in.
-function update_field!(sim::BucketSimulation, ::Val{:air_density}, field)
-    parent(sim.integrator.p.bucket.ρ_sfc) .= parent(field)
-end
 
 function update_field!(sim::BucketSimulation, ::Val{:turbulent_energy_flux}, field)
     parent(sim.integrator.p.bucket.turbulent_energy_flux) .= parent(field)

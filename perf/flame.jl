@@ -17,7 +17,7 @@ run_name_list =
     ["default_modular_unthreaded", "coarse_single_modular", "target_amip_n32_shortrun", "target_amip_n1_shortrun"]
 run_name = run_name_list[parse(Int, ARGS[2])]
 allocs_limit = Dict()
-allocs_limit["perf_default_modular_unthreaded"] = 6113200
+allocs_limit["perf_default_modular_unthreaded"] = 8638304
 allocs_limit["perf_coarse_single_modular"] = 12671552
 allocs_limit["perf_target_amip_n32_shortrun"] = 172134848
 

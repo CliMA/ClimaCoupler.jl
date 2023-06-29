@@ -5,6 +5,9 @@ using ClimaCore: Fields
 using ClimaCoupler.Regridder
 import ClimaCoupler.Regridder: binary_mask
 import ClimaCoupler.Interfacer: AtmosModelSimulation, SurfaceModelSimulation, SurfaceStub, get_field
+import Thermodynamics as TD
+import CLIMAParameters as CP
+import Thermodynamics.Parameters as TDP
 
 include("TestHelper.jl")
 
@@ -33,10 +36,18 @@ for FT in (Float32, Float64)
             ice_fraction = Fields.ones(space) .* FT(global_mask)
             dt = FT(1.0)
 
+            toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
+            aliases = string.(fieldnames(TDP.ThermodynamicsParameters))
+            param_pairs = CP.get_parameter_values!(toml_dict, aliases, "Thermodynamics")
+            thermo_params = TDP.ThermodynamicsParameters{FT}(; param_pairs...)
+
             additional_cache = (;
                 F_turb_energy = ClimaCore.Fields.zeros(space),
                 F_radiative = ClimaCore.Fields.zeros(space) .+ FT(F_radiative),
                 area_fraction = ice_fraction,
+                q_sfc = ClimaCore.Fields.zeros(space),
+                ρ_sfc = ClimaCore.Fields.ones(space),
+                thermo_params = thermo_params,
                 dt = dt,
             )
 

@@ -22,6 +22,7 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 SurfaceFluxes = "49b00bb7-8bd4-4f2b-b78c-51cd0450215f"
 TempestRemap_jll = "8573a8c5-1df0-515e-a024-abad257ee284"
 TerminalLoggers = "5d786b92-1e48-4d6f-9151-6b4477ca9bed"
+Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
 [compat]

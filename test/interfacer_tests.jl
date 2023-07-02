@@ -1,6 +1,9 @@
 using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 using ClimaCoupler: Utilities, Regridder, TestHelper
 using Test
+import Thermodynamics as TD
+import CLIMAParameters as CP
+import Thermodynamics.Parameters as TDP
 import ClimaCoupler.Interfacer:
     get_field,
     name,
@@ -40,13 +43,35 @@ end
 
 # test for a simple generic surface model
 @testset "get_field for a SurfaceStub" begin
-    stub = SurfaceStub((; area_fraction = 1, T_sfc = 2, α = 3, z0m = 4, z0b = 5, beta = 6))
-    @test get_field(stub, Val(:area_fraction)) == 1
-    @test get_field(stub, Val(:surface_temperature)) == 2
+
+    toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
+    aliases = string.(fieldnames(TDP.ThermodynamicsParameters))
+    param_pairs = CP.get_parameter_values!(toml_dict, aliases, "Thermodynamics")
+    thermo_params = TDP.ThermodynamicsParameters{FT}(; param_pairs...)
+
+    stub = SurfaceStub((;
+        area_fraction = FT(1),
+        T_sfc = FT(280),
+        α = 3,
+        z0m = 4,
+        z0b = 5,
+        beta = 6,
+        ρ_sfc = FT(1),
+        phase = TD.Liquid(),
+        thermo_params = thermo_params,
+    ))
+    @test get_field(stub, Val(:area_fraction)) == FT(1)
+    @test get_field(stub, Val(:surface_temperature)) == FT(280)
     @test get_field(stub, Val(:albedo)) == 3
     @test get_field(stub, Val(:roughness_momentum)) == 4
     @test get_field(stub, Val(:roughness_buoyancy)) == 5
     @test get_field(stub, Val(:beta)) == 6
+    @test ≈(get_field(stub, Val(:surface_humidity))[1], FT(0.0076), atol = FT(1e-4))
+end
+
+@testset "name(::SurfaceStub)" begin
+    stub = SurfaceStub((;))
+    @test name(stub) == "SurfaceStub"
 end
 
 @testset "update_field! the SurfaceStub area_fraction" begin

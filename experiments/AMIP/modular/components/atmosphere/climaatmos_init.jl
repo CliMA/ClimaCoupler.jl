@@ -1,7 +1,7 @@
 # atmos_init: for ClimaAtmos pre-AMIP interface
 import ClimaAtmos
 using ClimaAtmos: RRTMGPI
-import ClimaCoupler.FluxCalculator: compute_atmos_turbulent_fluxes!
+import ClimaCoupler.FluxCalculator: compute_atmos_turbulent_fluxes!, calculate_surface_air_density
 using ClimaCore: Fields.level, Geometry
 import ClimaCoupler.FieldExchanger: get_thermo_params
 
@@ -29,6 +29,9 @@ function atmos_init(::Type{FT}, parsed_args::Dict) where {FT}
     @. integrator.p.sfc_conditions.ρ_flux_q_tot = Geometry.Covariant3Vector(FT(0.0))
     @. integrator.p.sfc_conditions.ρ_flux_uₕ.components = zeros(axes(integrator.p.sfc_conditions.ρ_flux_uₕ.components))
     parent(integrator.p.ᶠradiation_flux) .= parent(zeros(axes(integrator.p.ᶠradiation_flux)))
+    integrator.p.col_integrated_rain .= FT(0)
+    integrator.p.col_integrated_snow .= FT(0)
+
 
     ClimaAtmosSimulation(integrator.p.params, Y, spaces, integrator)
 end
@@ -44,6 +47,9 @@ get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_energy_flux}) =
     Geometry.WVector.(sim.integrator.p.sfc_conditions.ρ_flux_h_tot)
 get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_moisture_flux}) =
     Geometry.WVector.(sim.integrator.p.sfc_conditions.ρ_flux_q_tot)
+
+get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_state_int}) = Spaces.level(sim.integrator.p.ᶜts, 1)
+
 
 function update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temperature}, field)
     sim.integrator.p.radiation_model.surface_temperature .= RRTMGPI.field2array(field)
@@ -111,48 +117,51 @@ in it. We do not want `new_p` to live in the atmospheric model permanently, beca
 trigger flux calculation during Atmos `step!`. We only want to trigger this once per coupling
 timestep from ClimaCoupler.
 """
+
 function compute_atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
+
+    function modified_atmos_p(atmos_sim, csf_sfc)
+
+        p = atmos_sim.integrator.p
+
+        coupler_sfc_setup = coupler_surface_setup(CoupledMoninObukhov(), p; csf_sfc = csf_sfc)
+
+        p_names = propertynames(p)
+        p_values = map(x -> x == :sfc_setup ? coupler_sfc_setup : getproperty(p, x), p_names) # TODO: use merge here
+
+        (; zip(p_names, p_values)...)
+    end
 
     p = atmos_sim.integrator.p
 
-    thermo_params = get_thermo_params(atmos_sim)
-    ts_int = get_field(atmos_sim, Val(:thermo_state_int))
-
-    # surface density is needed for q_sat and requires atmos and sfc states, so it is calculated and saved in the coupler
-    parent(csf.ρ_sfc) .=
-        parent(extrapolate_ρ_to_sfc.(Ref(thermo_params), ts_int, swap_space!(ones(axes(ts_int.ρ)), csf.T_S)))
-
-    # Surface-specific vapor specific humidity, q_sfc, is calculated as a bulk quantity here, assuming a saturated liquid surface.
-    # (atmos has been doing this until this PR, so here we're moving that calculation to the coupler)
-    # The current method is ok for the time being because q_sfc is a passive variable in Land and nonexistent in the slab components
-    # TODO (next PR) - use land's q_sfc
-    # To approximately account for undersaturation of the surface, we can use beta to adjust evaporation to appoximate undersaturation.
-    q_sfc = TD.q_vap_saturation_generic.(thermo_params, csf.T_S, csf.ρ_sfc, TD.Liquid())
-
-    coupler_sfc_setup = coupler_surface_setup(
-        CoupledMoninObukhov(),
-        p;
-        csf_sfc = (; T = csf.T_S, z0m = csf.z0m_S, z0b = csf.z0b_S, beta = csf.beta, q_vap = q_sfc),
-    )
-
-    p_names = propertynames(p)
-    p_values = map(x -> x == :sfc_setup ? coupler_sfc_setup : getproperty(p, x), p_names)
-
-    new_p = (; zip(p_names, p_values)...)
-
+    csf_sfc = (; T = csf.T_S, z0m = csf.z0m_S, z0b = csf.z0b_S, beta = csf.beta, q_vap = csf.q_sfc)
+    new_p = modified_atmos_p(atmos_sim, csf_sfc)
     ClimaAtmos.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t)
-
     p.sfc_conditions .= new_p.sfc_conditions
-
 end
 
+"""
+    get_thermo_params(sim::ClimaAtmosSimulation)
+
+Returns the thermodynamic parameters from the atmospheric model simulation object.
+"""
 get_thermo_params(sim::ClimaAtmosSimulation) = CAP.thermodynamics_params(sim.integrator.p.params)
-get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_state_int}) = Spaces.level(sim.integrator.p.ᶜts, 1)
+
+"""
+    calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::Fields.Field)
+
+Extension for this  to to calculate surface density.
+"""
+function calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::Fields.Field)
+    thermo_params = get_thermo_params(atmos_sim)
+    ts_int = get_field(atmos_sim, Val(:thermo_state_int))
+    extrapolate_ρ_to_sfc.(Ref(thermo_params), ts_int, swap_space!(ones(axes(ts_int.ρ)), T_S))
+end
 
 """
     extrapolate_ρ_to_sfc(thermo_params, ts_int, T_sfc)
 
-Uses the ideal gas law and hydrostatic balance to extrapolate for surface density.
+Uses the ideal gas law and hydrostatic balance to extrapolate for surface density pointwise.
 """
 function extrapolate_ρ_to_sfc(thermo_params, ts_in, T_sfc)
     T_int = TD.air_temperature(thermo_params, ts_in)

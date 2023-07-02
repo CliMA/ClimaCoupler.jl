@@ -83,6 +83,8 @@ end
 # required by Interfacer
 get_field(sim::BucketSimulation, ::Val{:surface_temperature}) =
     ClimaLSM.surface_temperature(sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
+get_field(sim::BucketSimulation, ::Val{:surface_humidity}) =
+    ClimaLSM.surface_specific_humidity(sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
 get_field(sim::BucketSimulation, ::Val{:roughness_momentum}) = sim.model.parameters.z_0m
 get_field(sim::BucketSimulation, ::Val{:roughness_buoyancy}) = sim.model.parameters.z_0b
 get_field(sim::BucketSimulation, ::Val{:beta}) =
@@ -111,6 +113,10 @@ function update_field!(sim::BucketSimulation, ::Val{:liquid_precipitation}, fiel
 end
 function update_field!(sim::BucketSimulation, ::Val{:snow_precipitation}, field)
     parent(sim.integrator.p.bucket.P_snow) .= parent(field)
+end
+
+function update_field!(sim::BucketSimulation, ::Val{:air_density}, field)
+    parent(sim.integrator.p.bucket.ρ_sfc) .= parent(field)
 end
 
 step!(sim::BucketSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)

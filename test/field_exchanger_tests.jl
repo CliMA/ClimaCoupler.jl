@@ -3,7 +3,7 @@ using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 using ClimaCoupler: Utilities, Regridder, TestHelper
 import ClimaCoupler.Interfacer:
     update_field!, AtmosModelSimulation, SurfaceModelSimulation, SurfaceStub, get_field, update_field!
-import ClimaCoupler.FluxCalculator: CombinedAtmosGrid, PartitionedComponentModelGrid
+import ClimaCoupler.FluxCalculator: CombinedAtmosGrid, PartitionedComponentModelGrid, calculate_surface_air_density
 import ClimaCoupler.FieldExchanger:
     import_atmos_fields!,
     import_combined_surface_fields!,
@@ -26,10 +26,15 @@ get_field(sim::DummySimulation, ::Val{:radiative_energy_flux}) = sim.cache.radia
 get_field(sim::DummySimulation, ::Val{:liquid_precipitation}) = sim.cache.liquid_precipitation
 get_field(sim::DummySimulation, ::Val{:snow_precipitation}) = sim.cache.snow_precipitation
 
+function calculate_surface_air_density(atmos_sim::DummySimulation, T_S::Fields.Field)
+    FT = eltype(T_S)
+    return T_S .* FT(0.0) .+ FT(1.0)
+end
+
 @testset "import_atmos_fields!" begin
 
     boundary_space = TestHelper.create_space(FT)
-    coupler_names = (:F_turb_energy, :F_turb_moisture, :F_radiative, :P_liq, :P_snow)
+    coupler_names = (:F_turb_energy, :F_turb_moisture, :F_radiative, :P_liq, :P_snow, :ρ_sfc, :T_S)
     atmos_names = (
         :turbulent_energy_flux,
         :turbulent_moisture_flux,
@@ -37,7 +42,7 @@ get_field(sim::DummySimulation, ::Val{:snow_precipitation}) = sim.cache.snow_pre
         :liquid_precipitation,
         :snow_precipitation,
     )
-    atmos_fields = NamedTuple{atmos_names}(ntuple(i -> Fields.ones(boundary_space), length(coupler_names)))
+    atmos_fields = NamedTuple{atmos_names}(ntuple(i -> Fields.ones(boundary_space), length(atmos_names)))
 
     model_sims = (; atmos_sim = DummySimulation(atmos_fields))
 
@@ -74,10 +79,14 @@ get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:bet
 get_field(sim::TestSurfaceSimulation1, ::Val{:area_fraction}) = sim.cache_field .* 0.0
 get_field(sim::TestSurfaceSimulation2, ::Val{:area_fraction}) = sim.cache_field .* 0.5
 
+get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:surface_humidity}) = sim.cache_field .* 0.0
+get_field(sim::Union{TestSurfaceSimulation2, TestSurfaceSimulation2}, ::Val{:surface_humidity}) = sim.cache_field .* 0.0
+
+
 @testset "import_combined_surface_fields!" begin
     # coupler cache setup
     boundary_space = TestHelper.create_space(FT)
-    coupler_names = (:T_S, :z0m_S, :z0b_S, :albedo, :beta)
+    coupler_names = (:T_S, :z0m_S, :z0b_S, :albedo, :beta, :q_sfc)
 
     # coupler cache setup
     exchanged_fields = (:surface_temperature, :albedo, :roughness_momentum, :roughness_buoyancy, :beta)
@@ -140,13 +149,14 @@ end
         :radiative_energy_flux,
         :liquid_precipitation,
         :snow_precipitation,
+        :ρ_sfc,
     )
     land_fields = NamedTuple{land_names}(ntuple(i -> Fields.zeros(boundary_space), length(land_names)))
 
     model_sims = (;
         atmos_sim = TestAtmosSimulation(atmos_fields),
         land_sim = TestSurfaceSimulationLand(land_fields),
-        stub_sim = SurfaceStub((; area_fraction = Fields.ones(boundary_space))),
+        stub_sim = SurfaceStub((; area_fraction = Fields.ones(boundary_space), ρ_sfc = Fields.ones(boundary_space))),
     )
 
     # test the sim update under CombinedAtmosGrid (update all) and PartitionedComponentModelGrid (update all except turbulent fluxes)

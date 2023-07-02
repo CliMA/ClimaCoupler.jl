@@ -32,6 +32,9 @@ function import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
     if turbulent_fluxes == FluxCalculator.CombinedAtmosGrid()
         Regridder.dummmy_remap!(csf.F_turb_energy, Interfacer.get_field(atmos_sim, Val(:turbulent_energy_flux)))
         Regridder.dummmy_remap!(csf.F_turb_moisture, Interfacer.get_field(atmos_sim, Val(:turbulent_moisture_flux)))
+
+        # surface density is needed for q_sat and requires atmos and sfc states, so it is calculated and saved in the coupler
+        Regridder.dummmy_remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_S))
     end
 
     Regridder.dummmy_remap!(csf.F_radiative, Interfacer.get_field(atmos_sim, Val(:radiative_energy_flux)))
@@ -73,6 +76,9 @@ function import_combined_surface_fields!(csf, model_sims, boundary_space, turbul
 
         Regridder.combine_surfaces!(combined_field, model_sims, Val(:beta))
         Regridder.dummmy_remap!(csf.beta, combined_field)
+
+        Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_humidity))
+        Regridder.dummmy_remap!(csf.q_sfc, combined_field)
     end
 
 end
@@ -138,10 +144,11 @@ end
 """
     update_sim!(::SurfaceStub, csf, area_fraction)
 
-The stub surface simulation is not updated by this function.
+The stub surface simulation only updates the air density (needed for the turbulent flux calculation).
 """
-update_sim!(::Interfacer.SurfaceStub, csf, area_fraction) = nothing
-
+function update_sim!(sim::Interfacer.SurfaceStub, csf, area_fraction)
+    Interfacer.update_field!(sim, Val(:air_density), csf.ρ_sfc)
+end
 """
     update_model_sims!(model_sims, csf, turbulent_fluxes)
 
@@ -206,6 +213,5 @@ end
 The stub surface simulation is not updated by this function. Extends `SciMLBase.step!`.
 """
 step!(::Interfacer.SurfaceStub, _) = nothing
-
 
 end # module

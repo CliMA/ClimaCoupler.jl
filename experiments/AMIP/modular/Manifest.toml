@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "fcf142f7db31edf6d14176a318e75e653d1a7ab7"
+project_hash = "6450a469b8b81ae10b8bee0bf984f08dba4cd63e"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "dcfdf328328f2645531c4ddebf841228aef74130"
@@ -235,7 +235,7 @@ uuid = "d934ef94-cdd4-4710-83d6-720549644b70"
 version = "0.3.9"
 
 [[deps.ClimaCoupler]]
-deps = ["ClimaAtmos", "ClimaComms", "ClimaCore", "ClimaCoreTempestRemap", "ClimaLSM", "Dates", "DocStringExtensions", "Insolation", "JLD2", "NCDatasets", "OrdinaryDiffEq", "Plots", "PrettyTables", "SciMLBase", "Statistics", "SurfaceFluxes", "TempestRemap_jll", "TerminalLoggers", "UnPack"]
+deps = ["ClimaAtmos", "ClimaComms", "ClimaCore", "ClimaCoreTempestRemap", "ClimaLSM", "Dates", "DocStringExtensions", "Insolation", "JLD2", "NCDatasets", "OrdinaryDiffEq", "Plots", "PrettyTables", "SciMLBase", "Statistics", "SurfaceFluxes", "TempestRemap_jll", "TerminalLoggers", "Thermodynamics", "UnPack"]
 path = "../../.."
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.1.0"

@@ -18,7 +18,7 @@ include(joinpath(@__DIR__, "..", "..", "artifacts", "artifact_funcs.jl"))
 const sst_data = joinpath(sst_dataset_path(), "sst.nc")
 
 # set up MPI communications context
-const comms_ctx = ClimaComms.SingletonCommsContext(ClimaComms.CPUDevice())
+const comms_ctx = ClimaComms.SingletonCommsContext(ClimaComms.device())
 const pid, nprocs = ClimaComms.init(comms_ctx)
 ClimaComms.barrier(comms_ctx)
 

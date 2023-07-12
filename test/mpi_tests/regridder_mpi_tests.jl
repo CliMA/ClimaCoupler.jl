@@ -16,7 +16,7 @@ REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regrid_tmp/")
 # Set up MPI communications context
 # Note that runs will hang if a context is initialized twice in the same file,
 # so this context should be shared among all tests in this file.
-comms_ctx = ClimaComms.SingletonCommsContext(ClimaComms.CPUDevice())
+comms_ctx = ClimaComms.SingletonCommsContext(ClimaComms.device())
 pid, nprocs = ClimaComms.init(comms_ctx)
 
 @testset "test write_to_hdf5 and read_from_hdf5 with MPI" begin

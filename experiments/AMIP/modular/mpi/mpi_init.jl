@@ -4,7 +4,7 @@ using Logging
 
 const is_distributed = get(ENV, "CLIMACORE_DISTRIBUTED", "") == "MPI"
 if is_distributed
-    const comms_ctx = ClimaComms.context(ClimaComms.CPUDevice())
+    const comms_ctx = ClimaComms.context(ClimaComms.CPUSingleThreaded())
     const pid, nprocs = ClimaComms.init(comms_ctx)
 
     if ClimaComms.iamroot(comms_ctx)

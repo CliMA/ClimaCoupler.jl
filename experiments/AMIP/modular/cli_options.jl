@@ -99,6 +99,14 @@ function argparse_settings()
         help = "If set to true, it switches on EDMFX entrainment/detrainment closure.  [`true`, `false` (default)]"
         arg_type = Bool
         default = false
+        "--entr_coeff"
+        help = "Entrainment coefficient"
+        arg_type = Float64
+        default = Float64(1.0)
+        "--detr_coeff"
+        help = "Detrainment coefficient"
+        arg_type = Float64
+        default = Float64(0.001)
         "--edmfx_sgs_flux"
         help = "If set to true, it switches on EDMFX SGS flux.  [`true`, `false` (default)]"
         arg_type = Bool
@@ -220,10 +228,6 @@ function argparse_settings()
         help = "(Bool) perform regression test"
         arg_type = Bool
         default = false
-        "--enable_threading"
-        help = "Enable multi-threading. Note: Julia must be launched with (e.g.,) `--threads=8`"
-        arg_type = Bool
-        default = true
         "--output_dir"
         help = "Output directory"
         arg_type = String
@@ -385,9 +389,9 @@ function argparse_settings()
         help = "Orographic drag on horizontal mean flow [`nothing` (default), `gfdl_restart`, `raw_topo`]"
         arg_type = String
         "--device"
-        help = "Device type to use [`CPUDevice` (default), `CUDADevice`]"
+        help = "Device type to use [`CPUSingleThreaded` (default), `CPUMultiThreaded`, `CUDADevice`]"
         arg_type = String
-        default = "CPUDevice"
+        default = "CPUSingleThreaded"
         "--perf_summary"
         help = "Flag for collecting performance summary information"
         arg_type = Bool

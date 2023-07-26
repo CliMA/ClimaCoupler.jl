@@ -139,6 +139,13 @@ steps:
         agents:
           slurm_mem: 20GB
 
+      - label: "Slabplanet: partitioned turbulent fluxes"
+        key: "slabplanet_partitioned_fluxes"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name slabplanet_partitioned_fluxes --FLOAT_TYPE Float64 --coupled true --turb_flux_partition PartitionedStateFluxes --surface_setup PrescribedSurface  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 9days --dt_cpl 200 --dt 200secs --mono_surface true --h_elem 4 --precip_model 0M --anim true --job_id slabplanet_partitioned_fluxes"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_partitioned_fluxes_artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
       # Test: non-monotonous remapping for land mask
       - label: "Slabplanet: non-monotonous surface remap"
         key: "slabplanet_non-monotonous"

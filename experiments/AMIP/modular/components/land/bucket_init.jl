@@ -21,6 +21,7 @@ using ClimaLSM:
 
 import ClimaCoupler.Interfacer: LandModelSimulation, get_field, update_field!, name
 import ClimaCoupler.FieldExchanger: step!, reinit!
+import ClimaCoupler.FluxCalculator: update_turbulent_fluxes_point!, surface_thermo_state
 
 """
     BucketSimulation{M, Y, D, I}
@@ -84,8 +85,6 @@ function ClimaLSM.Bucket.surface_fluxes(
         Ch = ClimaCore.Fields.similar(p.bucket.evaporation),
     )
 end
-
-
 
 """
     net_radiation(radiation::CoupledRadiativeFluxes{FT},

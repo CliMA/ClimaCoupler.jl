@@ -3,7 +3,7 @@ using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 using ClimaCoupler: Utilities, Regridder, TestHelper
 import ClimaCoupler.Interfacer:
     update_field!, AtmosModelSimulation, SurfaceModelSimulation, SurfaceStub, get_field, update_field!
-import ClimaCoupler.FluxCalculator: CombinedAtmosGrid, PartitionedComponentModelGrid, calculate_surface_air_density
+import ClimaCoupler.FluxCalculator: CombinedStateFluxes, PartitionedStateFluxes, calculate_surface_air_density
 import ClimaCoupler.FieldExchanger:
     import_atmos_fields!,
     import_combined_surface_fields!,
@@ -46,7 +46,7 @@ end
 
     model_sims = (; atmos_sim = DummySimulation(atmos_fields))
 
-    flux_types = (CombinedAtmosGrid(), PartitionedComponentModelGrid())
+    flux_types = (CombinedStateFluxes(), PartitionedStateFluxes())
     results = [FT(1), FT(0)]
     for (i, t) in enumerate(flux_types)
         coupler_fields = NamedTuple{coupler_names}(ntuple(i -> Fields.zeros(boundary_space), length(coupler_names)))
@@ -93,9 +93,9 @@ get_field(sim::Union{TestSurfaceSimulation2, TestSurfaceSimulation2}, ::Val{:sur
 
     sims = (; a = TestSurfaceSimulation1(ones(boundary_space)), b = TestSurfaceSimulation2(ones(boundary_space)))
 
-    # test the coupler update under CombinedAtmosGrid (update all) and PartitionedComponentModelGrid (update all except
+    # test the coupler update under CombinedStateFluxes (update all) and PartitionedStateFluxes (update all except
     # surface info needed for the calculation of turbulent fluxes)
-    flux_types = (CombinedAtmosGrid(), PartitionedComponentModelGrid())
+    flux_types = (CombinedStateFluxes(), PartitionedStateFluxes())
     results = [FT(0.5), FT(0)] # 0.5 due to the area fraction weighting
     for (i, t) in enumerate(flux_types)
         coupler_fields = NamedTuple{coupler_names}(ntuple(i -> Fields.zeros(boundary_space), length(coupler_names)))
@@ -159,8 +159,8 @@ end
         stub_sim = SurfaceStub((; area_fraction = Fields.ones(boundary_space), ρ_sfc = Fields.ones(boundary_space))),
     )
 
-    # test the sim update under CombinedAtmosGrid (update all) and PartitionedComponentModelGrid (update all except turbulent fluxes)
-    flux_types = (CombinedAtmosGrid(), PartitionedComponentModelGrid())
+    # test the sim update under CombinedStateFluxes (update all) and PartitionedStateFluxes (update all except turbulent fluxes)
+    flux_types = (CombinedStateFluxes(), PartitionedStateFluxes())
     results = [FT(0), FT(1)]
     for (i, t) in enumerate(flux_types)
         model_sims.atmos_sim.cache.roughness_momentum .= FT(0)
@@ -168,7 +168,7 @@ end
 
         # test atmos
         @test parent(model_sims.atmos_sim.cache.albedo)[1] == results[2]
-        if t == CombinedAtmosGrid()
+        if t isa CombinedStateFluxes
             @test parent(model_sims.atmos_sim.cache.roughness_momentum)[1] == results[2]
         else
             @test parent(model_sims.atmos_sim.cache.roughness_momentum)[1] == results[1]

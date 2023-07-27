@@ -204,8 +204,8 @@ version = "0.1.8"
 
 [[deps.ClimaAtmos]]
 deps = ["ArgParse", "ArtifactWrappers", "Artifacts", "AtmosphericProfilesLibrary", "CLIMAParameters", "CUDA", "ClimaComms", "ClimaCore", "ClimaTimeSteppers", "CloudMicrophysics", "Colors", "Dates", "Dierckx", "DiffEqBase", "DiffEqCallbacks", "Distributions", "DocStringExtensions", "FastGaussQuadrature", "ImageFiltering", "Insolation", "Interpolations", "IntervalSets", "JLD2", "LambertW", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "OrdinaryDiffEq", "Pkg", "Printf", "RRTMGP", "Random", "RootSolvers", "StaticArrays", "Statistics", "StatsBase", "SurfaceFluxes", "TerminalLoggers", "Test", "Thermodynamics", "YAML"]
-git-tree-sha1 = "4f15961734cf68e3765c5cdb6df44810f9b7ed86"
-repo-rev = "zs/diagedmf_hack_coupler"
+git-tree-sha1 = "6bdb281daa40cf1acf97777bccb8553811ed9e76"
+repo-rev = "f2f35b472715a9b5b243f86e8a1ea6c102dd3a18"
 repo-url = "https://github.com/CliMA/ClimaAtmos.jl.git"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
 version = "0.15.3"

@@ -122,3 +122,12 @@ end
 step!(sim::BucketSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
 
 reinit!(sim::BucketSimulation) = reinit!(sim.integrator)
+
+"""
+    get_model_state_vector(sim::BucketSimulation)
+
+Extension of Checkpointer.get_model_state_vector to get the model state.
+"""
+function get_model_state_vector(sim::BucketSimulation)
+    return sim.integrator.u.bucket
+end

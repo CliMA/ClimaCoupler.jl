@@ -35,6 +35,18 @@ function argparse_settings()
         help = "Coupled simulation [`false` (default), `true`]"
         arg_type = Bool
         default = true
+        "--monthly_checkpoint" # TODO generalize to any frequency
+        help = "Boolean flag indicating whether to checkpoint monthly"
+        arg_type = Bool
+        default = false
+        "--restart_dir"
+        help = "Directory containing restart files"
+        arg_type = String
+        default = "unspecified"
+        "--restart_t"
+        help = "Restart time"
+        arg_type = Int
+        default = 0
         # ClimaAtmos flags
         "--FLOAT_TYPE"
         help = "Float type"

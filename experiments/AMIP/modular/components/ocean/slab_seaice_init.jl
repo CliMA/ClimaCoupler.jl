@@ -1,4 +1,4 @@
-import ClimaCoupler.Interfacer: SeaIceModelSimulation, get_field, update_field!
+import ClimaCoupler.Interfacer: SeaIceModelSimulation, get_field, update_field!, name
 import ClimaCoupler.FieldExchanger: step!, reinit!
 
 """
@@ -39,6 +39,7 @@ struct IceSlabParameters{FT <: AbstractFloat}
     k_ice::FT # thermal condictivity of ice [W / m / K] (less in HM71)
     α::FT # sea ice albedo
 end
+name(::IceSlabParameters) = "IceSlabParameters"
 
 # init simulation
 function slab_ice_space_init(::Type{FT}, space, p) where {FT}
@@ -140,3 +141,12 @@ end
 
 step!(sim::PrescribedIceSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
 reinit!(sim::PrescribedIceSimulation) = reinit!(sim.integrator)
+
+"""
+    get_model_state_vector(sim::PrescribedIceSimulation)
+
+Extension of Checkpointer.get_model_state_vector to get the model state.
+"""
+function get_model_state_vector(sim::PrescribedIceSimulation)
+    return sim.integrator.u
+end

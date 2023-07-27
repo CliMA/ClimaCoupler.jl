@@ -19,5 +19,6 @@ include("FluxCalculator.jl")
 include("FieldExchanger.jl")
 include("Diagnostics.jl")
 include("PostProcessor.jl")
+include("Checkpointer.jl")
 
 end

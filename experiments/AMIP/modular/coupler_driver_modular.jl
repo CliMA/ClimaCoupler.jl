@@ -87,6 +87,7 @@ if isinteractive()
     # parsed_args["dt_save_restart"] = "5days" #hide
     parsed_args["precip_model"] = "0M" #hide
     parsed_args["job_id"] = "interactive_debug_run"
+    parsed_args["monthly_checkpoint"] = true
 end
 
 ## read in some parsed command line arguments
@@ -103,6 +104,9 @@ tspan = (Int(0), t_end)
 saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
 date0 = date = DateTime(parsed_args["start_date"], dateformat"yyyymmdd")
 mono_surface = parsed_args["mono_surface"]
+monthly_checkpoint = parsed_args["monthly_checkpoint"]
+restart_dir = parsed_args["restart_dir"]
+restart_t = Int(parsed_args["restart_t"])
 
 import ClimaCoupler
 import ClimaCoupler.Regridder
@@ -135,6 +139,7 @@ import ClimaCoupler.FieldExchanger:
     update_model_sims!,
     reinit_model_sims!,
     step_model_sims!
+import ClimaCoupler.Checkpointer: checkpoint_model_state, get_model_state_vector, restart_model_state!
 
 pkg_dir = pkgdir(ClimaCoupler)
 COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/modular/output", joinpath(mode_name, run_name))
@@ -142,6 +147,9 @@ mkpath(COUPLER_OUTPUT_DIR)
 
 REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp/")
 mkpath(REGRID_DIR)
+
+COUPLER_ARTIFACTS_DIR = COUPLER_OUTPUT_DIR * "_artifacts"
+isdir(COUPLER_ARTIFACTS_DIR) ? nothing : mkpath(COUPLER_ARTIFACTS_DIR)
 
 @info COUPLER_OUTPUT_DIR
 @info parsed_args
@@ -388,6 +396,16 @@ cs = CoupledSimulation{FT}(
     diagnostics,
 );
 
+#=
+## Restart component model states if specified
+=#
+if restart_dir !== "unspecified"
+    for sim in cs.model_sims
+        if get_model_state_vector(sim) !== nothing
+            restart_model_state!(sim, restart_t; input_dir = restart_dir)
+        end
+    end
+end
 
 #=
 ## Initialize Component Model Exchange
@@ -474,7 +492,7 @@ function solve_coupler!(cs)
         ## step sims
         step_model_sims!(cs.model_sims, t)
 
-        # exchange combined fields and (if specified) calculate fluxes using combined states
+        ## exchange combined fields and (if specified) calculate fluxes using combined states
         update_surface_fractions!(cs)
         import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
         compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes)
@@ -482,9 +500,18 @@ function solve_coupler!(cs)
 
         # TODO: compute_and_send_partitioned_turbulent_fluxes!(cs)
 
-        ## step to the next calendar month
+        ## monthly callbacks
         if trigger_callback(cs, Monthly())
+            ## step to the next calendar month
             cs.dates.date1[1] += Dates.Month(1)
+            ## checkpoint model state
+            if monthly_checkpoint
+                for sim in cs.model_sims
+                    if get_model_state_vector(sim) !== nothing
+                        checkpoint_model_state(sim, comms_ctx, Int(t), output_dir = COUPLER_ARTIFACTS_DIR)
+                    end
+                end
+            end
         end
 
     end
@@ -507,7 +534,6 @@ Currently all postprocessing is performed using the root process only.
 =#
 
 if ClimaComms.iamroot(comms_ctx)
-    isdir(COUPLER_OUTPUT_DIR * "_artifacts") ? nothing : mkpath(COUPLER_OUTPUT_DIR * "_artifacts")
 
     ## energy check plots
     if !isnothing(cs.conservation_checks) && cs.mode.name == "slabplanet"
@@ -515,14 +541,14 @@ if ClimaComms.iamroot(comms_ctx)
         plot_global_conservation(
             cs.conservation_checks.energy,
             cs,
-            figname1 = joinpath(COUPLER_OUTPUT_DIR * "_artifacts", "total_energy_bucket.png"),
-            figname2 = joinpath(COUPLER_OUTPUT_DIR * "_artifacts", "total_energy_log_bucket.png"),
+            figname1 = joinpath(COUPLER_ARTIFACTS_DIR, "total_energy_bucket.png"),
+            figname2 = joinpath(COUPLER_ARTIFACTS_DIR, "total_energy_log_bucket.png"),
         )
         plot_global_conservation(
             cs.conservation_checks.water,
             cs,
-            figname1 = joinpath(COUPLER_OUTPUT_DIR * "_artifacts", "total_water_bucket.png"),
-            figname2 = joinpath(COUPLER_OUTPUT_DIR * "_artifacts", "total_water_log_bucket.png"),
+            figname1 = joinpath(COUPLER_ARTIFACTS_DIR, "total_water_bucket.png"),
+            figname2 = joinpath(COUPLER_ARTIFACTS_DIR, "total_water_log_bucket.png"),
         )
     end
 
@@ -530,7 +556,7 @@ if ClimaComms.iamroot(comms_ctx)
     if !is_distributed && parsed_args["anim"]
         @info "Animations"
         include("user_io/viz_explorer.jl")
-        plot_anim(cs, COUPLER_OUTPUT_DIR * "_artifacts")
+        plot_anim(cs, COUPLER_ARTIFACTS_DIR)
     end
 
     ## plotting AMIP results
@@ -561,7 +587,7 @@ if ClimaComms.iamroot(comms_ctx)
             plot_spec,
             COUPLER_OUTPUT_DIR,
             files_root = ".monthly",
-            output_dir = COUPLER_OUTPUT_DIR * "_artifacts",
+            output_dir = COUPLER_ARTIFACTS_DIR,
         )
 
         ## NCEP reanalysis
@@ -580,7 +606,7 @@ if ClimaComms.iamroot(comms_ctx)
             ncep_post_spec,
             ncep_plot_spec,
             COUPLER_OUTPUT_DIR,
-            output_dir = COUPLER_OUTPUT_DIR * "_artifacts",
+            output_dir = COUPLER_ARTIFACTS_DIR,
             month_date = cs.dates.date[1],
         ) ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
     end

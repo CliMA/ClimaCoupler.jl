@@ -19,7 +19,7 @@ import ClimaLSM.Bucket:
 using ClimaLSM:
     make_exp_tendency, initialize, obtain_surface_space, make_set_initial_aux_state, surface_evaporative_scaling
 
-import ClimaCoupler.Interfacer: LandModelSimulation, get_field, update_field!
+import ClimaCoupler.Interfacer: LandModelSimulation, get_field, update_field!, name
 import ClimaCoupler.FieldExchanger: step!, reinit!
 
 """
@@ -34,6 +34,7 @@ struct BucketSimulation{M, Y, D, I, A} <: LandModelSimulation
     integrator::I
     area_fraction::A
 end
+name(::BucketSimulation) = "BucketSimulation"
 
 include("./bucket_utils.jl")
 

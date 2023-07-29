@@ -1,6 +1,6 @@
 using ClimaCore
 
-import ClimaCoupler.Interfacer: OceanModelSimulation, get_field, update_field!
+import ClimaCoupler.Interfacer: OceanModelSimulation, get_field, update_field!, name
 import ClimaCoupler.FieldExchanger: step!, reinit!
 
 """
@@ -28,6 +28,7 @@ struct OceanSlabParameters{FT <: AbstractFloat}
     z0b::FT
     α::FT
 end
+name(::SlabOceanSimulation) = "SlabOceanSimulation"
 
 # init simulation
 function slab_ocean_space_init(::Type{FT}, space, p) where {FT}
@@ -128,3 +129,12 @@ end
 step!(sim::SlabOceanSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
 
 reinit!(sim::SlabOceanSimulation) = reinit!(sim.integrator)
+
+"""
+    get_model_state_vector(sim::SlabOceanSimulation)
+
+Extension of Checkpointer.get_model_state_vector to get the model state.
+"""
+function get_model_state_vector(sim::SlabOceanSimulation)
+    return sim.integrator.u
+end

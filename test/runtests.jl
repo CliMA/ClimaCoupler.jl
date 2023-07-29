@@ -33,6 +33,9 @@ end
 @safetestset "PostProcessor tests" begin
     include("postprocessor_tests.jl")
 end
+@safetestset "Checkpointer tests" begin
+    include("checkpointer_tests.jl")
+end
 @safetestset "CouplerState tests" begin
     include("CouplerState/cplstate_interface.jl")
 end

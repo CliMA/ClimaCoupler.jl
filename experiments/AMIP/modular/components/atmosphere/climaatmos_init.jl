@@ -4,6 +4,7 @@ using ClimaAtmos: RRTMGPI
 import ClimaCoupler.FluxCalculator: compute_atmos_turbulent_fluxes!, calculate_surface_air_density
 using ClimaCore: Fields.level, Geometry
 import ClimaCoupler.FieldExchanger: get_thermo_params
+import ClimaCoupler.Interfacer: get_field, update_field!, name, get_model_state_vector
 
 # the clima atmos `integrator` is now defined
 struct ClimaAtmosSimulation{P, Y, D, I} <: AtmosModelSimulation
@@ -12,6 +13,8 @@ struct ClimaAtmosSimulation{P, Y, D, I} <: AtmosModelSimulation
     domain::D
     integrator::I
 end
+name(::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
+
 function atmos_init(::Type{FT}, parsed_args::Dict) where {FT}
 
     atmos_config = ClimaAtmos.AtmosConfig(argparse_settings(); parsed_args)
@@ -168,4 +171,13 @@ function extrapolate_ρ_to_sfc(thermo_params, ts_in, T_sfc)
     Rm_int = TD.gas_constant_air(thermo_params, ts_in)
     ρ_air = TD.air_density(thermo_params, ts_in)
     ρ_air * (T_sfc / T_int)^(TD.cv_m(thermo_params, ts_in) / Rm_int)
+end
+
+"""
+    get_model_state_vector(sim::ClimaAtmosSimulation)
+
+Extension of Checkpointer.get_model_state_vector to get the model state.
+"""
+function get_model_state_vector(sim::ClimaAtmosSimulation)
+    return sim.integrator.u
 end

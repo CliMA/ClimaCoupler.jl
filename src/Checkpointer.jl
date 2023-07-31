@@ -46,11 +46,11 @@ function checkpoint_model_state(
 end
 
 """
-    restart_model_state!(sim::Interfacer.ComponentModelSimulation, t::Int; input_dir = "input")
+    restart_model_state!(sim::Interfacer.ComponentModelSimulation, comms_ctx, t::Int; input_dir = "input")
 
 Sets the model state of a simulation from a HDF5 file from a given time, t (in seconds).
 """
-function restart_model_state!(sim::Interfacer.ComponentModelSimulation, t::Int; input_dir = "input")
+function restart_model_state!(sim::Interfacer.ComponentModelSimulation, comms_ctx, t::Int; input_dir = "input")
     Y = get_model_state_vector(sim)
     day = floor(Int, t / (60 * 60 * 24))
     sec = floor(Int, t % (60 * 60 * 24))
@@ -59,7 +59,7 @@ function restart_model_state!(sim::Interfacer.ComponentModelSimulation, t::Int; 
     @info "Setting " Interfacer.name(sim) " state to checkpoint: $input_file, corresponding to day $day second $sec"
 
     # open file and read
-    hdfreader = InputOutput.HDF5Reader(input_file)
+    hdfreader = InputOutput.HDF5Reader(input_file, comms_ctx)
     Y_new = InputOutput.read_field(hdfreader, "model_state")
     Base.close(hdfreader)
 

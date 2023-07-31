@@ -70,26 +70,51 @@ if !(@isdefined parsed_args)
 end
 
 ## modify parsed args for fast testing from REPL #hide
+# if isinteractive()
+#     parsed_args["coupled"] = true #hide
+#     parsed_args["surface_setup"] = "PrescribedSurface" #hide # necessary to stop Atmos from calculating its own surface fluxes
+#     parsed_args["moist"] = "equil" #hide
+#     parsed_args["vert_diff"] = true #hide
+#     parsed_args["rad"] = "gray" #hide
+#     parsed_args["energy_check"] = true #hide
+#     parsed_args["mode_name"] = "slabplanet" #hide
+#     parsed_args["t_end"] = "10days" #hide
+#     parsed_args["dt_save_to_sol"] = "3600secs" #hide
+#     parsed_args["dt_cpl"] = 200 #hide
+#     parsed_args["dt"] = "200secs" #hide
+#     parsed_args["mono_surface"] = true #hide
+#     parsed_args["h_elem"] = 4 #hide
+#     # parsed_args["dt_save_restart"] = "5days" #hide
+#     parsed_args["precip_model"] = "0M" #hide
+#     parsed_args["job_id"] = "interactive_debug_run"
+#     parsed_args["monthly_checkpoint"] = true
+# end
 if isinteractive()
-    parsed_args["coupled"] = true #hide
-    parsed_args["surface_setup"] = "PrescribedSurface" #hide # necessary to stop Atmos from calculating its own surface fluxes
-    parsed_args["moist"] = "equil" #hide
-    parsed_args["vert_diff"] = true #hide
-    parsed_args["rad"] = "gray" #hide
-    parsed_args["energy_check"] = true #hide
-    parsed_args["mode_name"] = "slabplanet" #hide
-    parsed_args["t_end"] = "10days" #hide
-    parsed_args["dt_save_to_sol"] = "3600secs" #hide
-    parsed_args["dt_cpl"] = 200 #hide
-    parsed_args["dt"] = "200secs" #hide
-    parsed_args["mono_surface"] = true #hide
-    parsed_args["h_elem"] = 4 #hide
-    # parsed_args["dt_save_restart"] = "5days" #hide
-    parsed_args["precip_model"] = "0M" #hide
-    parsed_args["job_id"] = "interactive_debug_run"
+    parsed_args["coupled"] = true
+    parsed_args["restart_dir"] = "data/edmf_cache_hack/"
+    parsed_args["restart_t"] = 2678400
+    parsed_args["FLOAT_TYPE"] = "Float64"
+    parsed_args["start_date"] = "19790202"
     parsed_args["monthly_checkpoint"] = true
+    parsed_args["surface_setup"] = "PrescribedSurface"
+    parsed_args["moist"] = "equil"
+    parsed_args["vert_diff"] = true
+    parsed_args["rad"] = "gray"
+    parsed_args["energy_check"] = false
+    parsed_args["mode_name"] = "amip"
+    parsed_args["anim"] = true
+    parsed_args["t_end"] = "32days"
+    parsed_args["dt_save_to_sol"] = "1days"
+    parsed_args["dt_cpl"] = 400
+    parsed_args["dt"] = "400secs"
+    parsed_args["mono_surface"] = false
+    parsed_args["h_elem"] = 6
+    parsed_args["dt_save_restart"] = "10days"
+    parsed_args["precip_model"] = "0M"
+    parsed_args["job_id"] = "coarse_single_modular"
+    parsed_args["turbconv"] = "diagnostic_edmfx"
+    parsed_args["edmfx_entr_detr"] =  true
 end
-
 ## read in some parsed command line arguments
 mode_name = parsed_args["mode_name"]
 run_name = parsed_args["run_name"]
@@ -402,11 +427,11 @@ cs = CoupledSimulation{FT}(
 if restart_dir !== "unspecified"
     for sim in cs.model_sims
         if get_model_state_vector(sim) !== nothing
-            restart_model_state!(sim, restart_t; input_dir = restart_dir)
+            restart_model_state!(sim, comms_ctx, restart_t; input_dir = restart_dir)
         end
     end
 end
-
+ClimaComms.barrier(comms_ctx)
 #=
 ## Initialize Component Model Exchange
 =#
@@ -475,10 +500,10 @@ function solve_coupler!(cs)
 
             ## calculate and accumulate diagnostics at each timestep
             ClimaComms.barrier(comms_ctx)
-            accumulate_diagnostics!(cs)
+            # accumulate_diagnostics!(cs)
 
             ## save and reset monthly averages
-            save_diagnostics(cs)
+            # save_diagnostics(cs)
 
         end
 
@@ -535,81 +560,81 @@ Currently all postprocessing is performed using the root process only.
 
 if ClimaComms.iamroot(comms_ctx)
 
-    ## energy check plots
-    if !isnothing(cs.conservation_checks) && cs.mode.name == "slabplanet"
-        @info "Conservation Check Plots"
-        plot_global_conservation(
-            cs.conservation_checks.energy,
-            cs,
-            figname1 = joinpath(COUPLER_ARTIFACTS_DIR, "total_energy_bucket.png"),
-            figname2 = joinpath(COUPLER_ARTIFACTS_DIR, "total_energy_log_bucket.png"),
-        )
-        plot_global_conservation(
-            cs.conservation_checks.water,
-            cs,
-            figname1 = joinpath(COUPLER_ARTIFACTS_DIR, "total_water_bucket.png"),
-            figname2 = joinpath(COUPLER_ARTIFACTS_DIR, "total_water_log_bucket.png"),
-        )
-    end
+    # ## energy check plots
+    # if !isnothing(cs.conservation_checks) && cs.mode.name == "slabplanet"
+    #     @info "Conservation Check Plots"
+    #     plot_global_conservation(
+    #         cs.conservation_checks.energy,
+    #         cs,
+    #         figname1 = joinpath(COUPLER_ARTIFACTS_DIR, "total_energy_bucket.png"),
+    #         figname2 = joinpath(COUPLER_ARTIFACTS_DIR, "total_energy_log_bucket.png"),
+    #     )
+    #     plot_global_conservation(
+    #         cs.conservation_checks.water,
+    #         cs,
+    #         figname1 = joinpath(COUPLER_ARTIFACTS_DIR, "total_water_bucket.png"),
+    #         figname2 = joinpath(COUPLER_ARTIFACTS_DIR, "total_water_log_bucket.png"),
+    #     )
+    # end
 
-    ## sample animations
-    if !is_distributed && parsed_args["anim"]
-        @info "Animations"
-        include("user_io/viz_explorer.jl")
-        plot_anim(cs, COUPLER_ARTIFACTS_DIR)
-    end
+    # ## sample animations
+    # if !is_distributed && parsed_args["anim"]
+    #     @info "Animations"
+    #     include("user_io/viz_explorer.jl")
+    #     plot_anim(cs, COUPLER_ARTIFACTS_DIR)
+    # end
 
-    ## plotting AMIP results
-    if cs.mode.name == "amip"
-        @info "AMIP plots"
+    # ## plotting AMIP results
+    # if cs.mode.name == "amip"
+    #     @info "AMIP plots"
 
-        ## ClimaESM
-        include("user_io/amip_visualizer.jl")
-        post_spec = (;
-            T = (:regrid, :zonal_mean),
-            u = (:regrid, :zonal_mean),
-            q_tot = (:regrid, :zonal_mean),
-            toa = (:regrid, :horizontal_slice),
-            precipitation = (:regrid, :horizontal_slice),
-            T_sfc = (:regrid, :horizontal_slice),
-        )
+    #     ## ClimaESM
+    #     include("user_io/amip_visualizer.jl")
+    #     post_spec = (;
+    #         T = (:regrid, :zonal_mean),
+    #         u = (:regrid, :zonal_mean),
+    #         q_tot = (:regrid, :zonal_mean),
+    #         toa = (:regrid, :horizontal_slice),
+    #         precipitation = (:regrid, :horizontal_slice),
+    #         T_sfc = (:regrid, :horizontal_slice),
+    #     )
 
-        plot_spec = (;
-            T = (; clims = (190, 320), units = "K"),
-            u = (; clims = (-50, 50), units = "m/s"),
-            q_tot = (; clims = (0, 50), units = "g/kg"),
-            toa = (; clims = (-250, 210), units = "W/m^2"),
-            precipitation = (clims = (0, 1e-6), units = "kg/m^2/s"),
-            T_sfc = (clims = (225, 310), units = "K"),
-        )
-        amip_paperplots(
-            post_spec,
-            plot_spec,
-            COUPLER_OUTPUT_DIR,
-            files_root = ".monthly",
-            output_dir = COUPLER_ARTIFACTS_DIR,
-        )
+    #     plot_spec = (;
+    #         T = (; clims = (190, 320), units = "K"),
+    #         u = (; clims = (-50, 50), units = "m/s"),
+    #         q_tot = (; clims = (0, 50), units = "g/kg"),
+    #         toa = (; clims = (-250, 210), units = "W/m^2"),
+    #         precipitation = (clims = (0, 1e-6), units = "kg/m^2/s"),
+    #         T_sfc = (clims = (225, 310), units = "K"),
+    #     )
+    #     amip_paperplots(
+    #         post_spec,
+    #         plot_spec,
+    #         COUPLER_OUTPUT_DIR,
+    #         files_root = ".monthly",
+    #         output_dir = COUPLER_ARTIFACTS_DIR,
+    #     )
 
-        ## NCEP reanalysis
-        @info "NCEP plots"
-        include("user_io/ncep_visualizer.jl")
-        ncep_post_spec = (;
-            T = (:zonal_mean,),
-            u = (:zonal_mean,),
-            q_tot = (:zonal_mean,),
-            toa = (:horizontal_slice,),
-            precipitation = (:horizontal_slice,),
-            T_sfc = (:horizontal_slice,),
-        )
-        ncep_plot_spec = plot_spec
-        ncep_paperplots(
-            ncep_post_spec,
-            ncep_plot_spec,
-            COUPLER_OUTPUT_DIR,
-            output_dir = COUPLER_ARTIFACTS_DIR,
-            month_date = cs.dates.date[1],
-        ) ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
-    end
+    #     ## NCEP reanalysis
+    #     @info "NCEP plots"
+    #     include("user_io/ncep_visualizer.jl")
+    #     ncep_post_spec = (;
+    #         T = (:zonal_mean,),
+    #         u = (:zonal_mean,),
+    #         q_tot = (:zonal_mean,),
+    #         toa = (:horizontal_slice,),
+    #         precipitation = (:horizontal_slice,),
+    #         T_sfc = (:horizontal_slice,),
+    #     )
+    #     ncep_plot_spec = plot_spec
+    #     ncep_paperplots(
+    #         ncep_post_spec,
+    #         ncep_plot_spec,
+    #         COUPLER_OUTPUT_DIR,
+    #         output_dir = COUPLER_ARTIFACTS_DIR,
+    #         month_date = cs.dates.date[1],
+    #     ) ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
+    # end
 
     ## clean up
     rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)

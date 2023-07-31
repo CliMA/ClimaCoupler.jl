@@ -70,26 +70,49 @@ if !(@isdefined parsed_args)
 end
 
 ## modify parsed args for fast testing from REPL #hide
+# if isinteractive()
+#     parsed_args["coupled"] = true #hide
+#     parsed_args["surface_setup"] = "PrescribedSurface" #hide # necessary to stop Atmos from calculating its own surface fluxes
+#     parsed_args["moist"] = "equil" #hide
+#     parsed_args["vert_diff"] = true #hide
+#     parsed_args["rad"] = "gray" #hide
+#     parsed_args["energy_check"] = true #hide
+#     parsed_args["mode_name"] = "slabplanet" #hide
+#     parsed_args["t_end"] = "10days" #hide
+#     parsed_args["dt_save_to_sol"] = "3600secs" #hide
+#     parsed_args["dt_cpl"] = 200 #hide
+#     parsed_args["dt"] = "200secs" #hide
+#     parsed_args["mono_surface"] = true #hide
+#     parsed_args["h_elem"] = 4 #hide
+#     # parsed_args["dt_save_restart"] = "5days" #hide
+#     parsed_args["precip_model"] = "0M" #hide
+#     parsed_args["job_id"] = "interactive_debug_run"
+#     parsed_args["monthly_checkpoint"] = true
+# end
 if isinteractive()
-    parsed_args["coupled"] = true #hide
-    parsed_args["surface_setup"] = "PrescribedSurface" #hide # necessary to stop Atmos from calculating its own surface fluxes
-    parsed_args["moist"] = "equil" #hide
-    parsed_args["vert_diff"] = true #hide
-    parsed_args["rad"] = "gray" #hide
-    parsed_args["energy_check"] = true #hide
-    parsed_args["mode_name"] = "slabplanet" #hide
-    parsed_args["t_end"] = "10days" #hide
-    parsed_args["dt_save_to_sol"] = "3600secs" #hide
-    parsed_args["dt_cpl"] = 200 #hide
-    parsed_args["dt"] = "200secs" #hide
-    parsed_args["mono_surface"] = true #hide
-    parsed_args["h_elem"] = 4 #hide
-    # parsed_args["dt_save_restart"] = "5days" #hide
-    parsed_args["precip_model"] = "0M" #hide
-    parsed_args["job_id"] = "interactive_debug_run"
+    parsed_args["coupled"] = true
+    parsed_args["restart_dir"] = "data/"
+    parsed_args["restart_t"] = 2678400
+    parsed_args["FLOAT_TYPE"] = "Float64"
+    parsed_args["start_date"] = "19790202"
     parsed_args["monthly_checkpoint"] = true
+    parsed_args["surface_setup"] = "PrescribedSurface"
+    parsed_args["moist"] = "equil"
+    parsed_args["vert_diff"] = true
+    parsed_args["rad"] = "gray"
+    parsed_args["energy_check"] = false
+    parsed_args["mode_name"] = "amip"
+    parsed_args["anim"] = true
+    parsed_args["t_end"] = "32days"
+    parsed_args["dt_save_to_sol"] = "1days"
+    parsed_args["dt_cpl"] = 400
+    parsed_args["dt"] = "400secs"
+    parsed_args["mono_surface"] = false
+    parsed_args["h_elem"] = 6
+    parsed_args["dt_save_restart"] = "10days"
+    parsed_args["precip_model"] = "0M"
+    parsed_args["job_id"] = "coarse_single_modular"
 end
-
 ## read in some parsed command line arguments
 mode_name = parsed_args["mode_name"]
 run_name = parsed_args["run_name"]
@@ -399,6 +422,7 @@ cs = CoupledSimulation{FT}(
 #=
 ## Restart component model states if specified
 =#
+ClimaComms.barrier(comms_ctx)
 if restart_dir !== "unspecified"
     for sim in cs.model_sims
         if get_model_state_vector(sim) !== nothing
@@ -406,7 +430,7 @@ if restart_dir !== "unspecified"
         end
     end
 end
-
+ClimaComms.barrier(comms_ctx)
 #=
 ## Initialize Component Model Exchange
 =#

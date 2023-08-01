@@ -31,7 +31,7 @@ end
 
     # new sim run
     sim_new = DummySimulation(Fields.FieldVector(T = zeros(boundary_space)))
-    restart_model_state!(sim_new, t, input_dir = "test_checkpoint")
+    restart_model_state!(sim_new, comms_ctx, t, input_dir = "test_checkpoint")
     @test sim_new.state.T == sim.state.T
 
     # remove checkpoint directory

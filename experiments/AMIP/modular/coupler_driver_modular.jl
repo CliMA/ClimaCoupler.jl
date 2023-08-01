@@ -402,7 +402,7 @@ cs = CoupledSimulation{FT}(
 if restart_dir !== "unspecified"
     for sim in cs.model_sims
         if get_model_state_vector(sim) !== nothing
-            restart_model_state!(sim, restart_t; input_dir = restart_dir)
+            restart_model_state!(sim, comms_ctx, restart_t; input_dir = restart_dir)
         end
     end
 end

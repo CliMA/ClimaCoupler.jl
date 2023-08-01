@@ -37,20 +37,25 @@ function checkpoint_model_state(
     @info "Saving checkpoint " * Interfacer.name(sim) * " model state to HDF5 on day $day second $sec"
     mkpath(joinpath(output_dir, "checkpoint"))
     output_file = joinpath(output_dir, "checkpoint", "checkpoint_" * Interfacer.name(sim) * "_$t.hdf5")
-    hdfwriter = InputOutput.HDF5Writer(output_file, comms_ctx)
-    InputOutput.HDF5.write_attribute(hdfwriter.file, "time", t)
-    InputOutput.write!(hdfwriter, Y, "model_state")
-    Base.close(hdfwriter)
+    checkpoint_writer = InputOutput.HDF5Writer(output_file, comms_ctx)
+    InputOutput.HDF5.write_attribute(checkpoint_writer.file, "time", t)
+    InputOutput.write!(checkpoint_writer, Y, "model_state")
+    Base.close(checkpoint_writer)
     return nothing
 
 end
 
 """
-    restart_model_state!(sim::Interfacer.ComponentModelSimulation, t::Int; input_dir = "input")
+    restart_model_state!(sim::Interfacer.ComponentModelSimulation, comms_ctx::ClimaComms.AbstractCommsContext, t::Int; input_dir = "input")
 
 Sets the model state of a simulation from a HDF5 file from a given time, t (in seconds).
 """
-function restart_model_state!(sim::Interfacer.ComponentModelSimulation, t::Int; input_dir = "input")
+function restart_model_state!(
+    sim::Interfacer.ComponentModelSimulation,
+    comms_ctx::ClimaComms.AbstractCommsContext,
+    t::Int;
+    input_dir = "input",
+)
     Y = get_model_state_vector(sim)
     day = floor(Int, t / (60 * 60 * 24))
     sec = floor(Int, t % (60 * 60 * 24))
@@ -59,9 +64,9 @@ function restart_model_state!(sim::Interfacer.ComponentModelSimulation, t::Int; 
     @info "Setting " Interfacer.name(sim) " state to checkpoint: $input_file, corresponding to day $day second $sec"
 
     # open file and read
-    hdfreader = InputOutput.HDF5Reader(input_file)
-    Y_new = InputOutput.read_field(hdfreader, "model_state")
-    Base.close(hdfreader)
+    restart_reader = InputOutput.HDF5Reader(input_file, comms_ctx)
+    Y_new = InputOutput.read_field(restart_reader, "model_state")
+    Base.close(restart_reader)
 
     # set new state
     Y .= Y_new

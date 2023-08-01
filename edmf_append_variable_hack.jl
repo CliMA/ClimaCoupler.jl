@@ -1,7 +1,7 @@
 
-function add_atmos_cache(sim, input_dir = "data/", t = 2678400)
+function add_atmos_cache(;sim_name = "ClimaAtmosSimulation", input_dir = "data/", t = 2678400)
 
-    input_file = joinpath(input_dir, "checkpoint", "checkpoint_" * Interfacer.name(sim) * "_$t.hdf5")
+    input_file = joinpath(input_dir, "checkpoint", "checkpoint_" * sim_name * "_$t.hdf5")
 
     hdfreader = InputOutput.HDF5Reader(input_file)
     Y = InputOutput.read_field(hdfreader, "model_state")
@@ -12,7 +12,7 @@ function add_atmos_cache(sim, input_dir = "data/", t = 2678400)
     Y = Fields.FieldVector(; c=Yc_new, f=Y.f)
     # This has to be a new file that doesn't exist yet
     output_dir = mkpath(joinpath(input_dir, "edmf_cache_hack"))
-    output_file = joinpath(output_dir, "checkpoint", "checkpoint_" * Interfacer.name(sim) * "_$t.hdf5")
+    output_file = joinpath(output_dir, "checkpoint", "checkpoint_" * sim_name * "_$t.hdf5")
     if @isdefined(hdfwriter)
         Base.close(hdfwriter)
     end
@@ -21,9 +21,13 @@ function add_atmos_cache(sim, input_dir = "data/", t = 2678400)
     InputOutput.write!(hdfwriter, Y, "model_state")
     @info "Added sgs⁰ to Atmos restart. New file is $output_file"
     Base.close(hdfwriter)
+
 end
 
-add_atmos_cache(atmos_sim, input_dir, t)
+input_dir = ENV["RESTART_DIR"]
+t = ENV["RESTART_T"]
+add_atmos_cache(input_dir = input_dir, t = t)
+
 
 
 # orinput_dir = "data/"

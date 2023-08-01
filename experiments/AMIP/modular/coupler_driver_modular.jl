@@ -91,7 +91,7 @@ end
 # end
 if isinteractive()
     parsed_args["coupled"] = true
-    parsed_args["restart_dir"] = "data/"
+    parsed_args["restart_dir"] = "data/edmf_cache_hack/"
     parsed_args["restart_t"] = 2678400
     parsed_args["FLOAT_TYPE"] = "Float64"
     parsed_args["start_date"] = "19790202"
@@ -112,6 +112,8 @@ if isinteractive()
     parsed_args["dt_save_restart"] = "10days"
     parsed_args["precip_model"] = "0M"
     parsed_args["job_id"] = "coarse_single_modular"
+    parsed_args["turbconv"] = "diagnostic_edmfx"
+    parsed_args["edmfx_entr_detr"] =  true
 end
 ## read in some parsed command line arguments
 mode_name = parsed_args["mode_name"]

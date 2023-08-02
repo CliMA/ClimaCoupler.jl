@@ -60,6 +60,27 @@ for FT in (Float32, Float64)
         end
     end
 
+    @testset "test interpol for FT=$FT" begin
+        # Setup
+        t1 = FT(0)
+        t2 = FT(10)
+
+        f1 = FT(-1)
+        f2 = FT(1)
+
+        # Case 1: t1 < t < t2 --> should return average (0)
+        t = FT(5)
+        @test BCReader.interpol(f1, f2, t - t1, t2 - t1) == 0
+
+        # Case 2: t1 = t < t2 --> should return val at t1 (f1)
+        t = FT(0)
+        @test BCReader.interpol(f1, f2, t - t1, t2 - t1) == f1
+
+        # Case 3: t1 < t = t2 --> should return val at t2 (f2)
+        t = FT(10)
+        @test BCReader.interpol(f1, f2, t - t1, t2 - t1) == f2
+    end
+
     @testset "test interpolate_midmonth_to_daily for FT=$FT" begin
         # test interpolate_midmonth_to_daily with interpolation
         interpolate_daily = true

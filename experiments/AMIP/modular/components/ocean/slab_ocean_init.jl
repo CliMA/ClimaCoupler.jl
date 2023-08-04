@@ -78,7 +78,7 @@ Initializes the `DiffEq` problem, and creates a Simulation-type object containin
 """
 function ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, thermo_params, stepper = Euler()) where {FT}
 
-    params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
+    params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.1))
 
     Y, space = slab_ocean_space_init(FT, space, params)
     cache = (

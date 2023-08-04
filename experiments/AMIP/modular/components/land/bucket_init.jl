@@ -185,7 +185,7 @@ function bucket_init(
     else # Use spatially-varying function for surface albedo
         function α_sfc(coordinate_point)
             (; lat, long) = coordinate_point
-            return typeof(lat)(0.4)
+            return typeof(lat)(0.3)
         end
         albedo = BulkAlbedoFunction{FT}(α_snow, α_sfc)
     end

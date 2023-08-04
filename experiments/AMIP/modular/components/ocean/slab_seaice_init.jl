@@ -113,7 +113,7 @@ Ensures that the space of the SIC struct matches that of the mask, and converts 
 clean_sic(SIC, _info) = swap_space!(zeros(axes(_info.land_fraction)), SIC) ./ float_type_bcf(_info)(100.0)
 
 # setting that SIC < 0.5 is counted as ocean if binary remapping.
-get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
+get_ice_fraction(h_ice::FT, mono::Bool, threshold = -0.5) where {FT} =
     mono ? h_ice : Regridder.binary_mask(h_ice, threshold = FT(threshold))
 
 # required by Interfacer

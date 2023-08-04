@@ -71,7 +71,7 @@ steps:
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
           RESTART_T: 18316800
-          RUN_NAME: "n32_amip_restart_from_18316800"
+          RUN_NAME: "n64_amip_noice_topo_noedmf_spinup"
           NEW_RESTART_DIR: "/groups/esm/lenka/couplerdel/ClimaCoupler.jl/experiments/AMIP/modular/output/amip/amip_restart_from_topo-noice_artifacts/edmf_cache_hack/"
           BUILD_HISTORY_HANDLE: ""
         agents:

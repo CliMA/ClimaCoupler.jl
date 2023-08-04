@@ -170,7 +170,7 @@ function bucket_init(
     dt::FT,
     saveat::FT,
     area_fraction,
-    stepper = CTS.ARS111(), # Equivalent to forward euler when no implicit tendency is present
+    stepper = CTS.RK4(), 
 ) where {FT}
     if config != "sphere"
         println(

@@ -250,8 +250,7 @@ function bucket_init(
 
     exp_tendency! = make_exp_tendency(model)
     ode_algo = CTS.ExplicitAlgorithm(stepper)
-    bucket_ode_function = CTS.ClimaODEFunction(T_exp! = exp_tendency!,
-                                               dss! = ClimaLSM.dss!)
+    bucket_ode_function = CTS.ClimaODEFunction(T_exp! = exp_tendency!, dss! = ClimaLSM.dss!)
     prob = ODEProblem(bucket_ode_function, Y, tspan, p_new)
     integrator = init(prob, ode_algo; dt = dt, saveat = saveat)
 

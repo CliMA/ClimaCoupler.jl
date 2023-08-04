@@ -2,7 +2,7 @@
 using ClimaCore
 using ClimaLSM
 import ClimaLSM
-using ClimaTimesteppers as CTS
+import ClimaTimesteppers as CTS
 
 include(joinpath(pkgdir(ClimaLSM), "parameters", "create_parameters.jl"))
 using ClimaLSM.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers

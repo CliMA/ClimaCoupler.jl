@@ -252,7 +252,7 @@ function bucket_init(
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     bucket_ode_function = CTS.ClimaODEFunction(T_exp! = exp_tendency!, dss! = ClimaLSM.dss!)
     prob = ODEProblem(bucket_ode_function, Y, tspan, p_new)
-    integrator = init(prob, ode_algo; dt = dt, saveat = saveat)
+    integrator = init(prob, ode_algo; dt = dt, saveat = saveat, adaptive = false)
 
     BucketSimulation(model, Y, (; domain = domain, soil_depth = d_soil), integrator, area_fraction)
 end

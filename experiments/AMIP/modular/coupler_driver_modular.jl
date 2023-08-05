@@ -522,6 +522,7 @@ function solve_coupler!(cs)
         import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
         compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes)
         import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # radiative and/or turbulent
+        Spaces.weighted_dss!(cs.fields)
 
         # TODO: compute_and_send_partitioned_turbulent_fluxes!(cs)
 

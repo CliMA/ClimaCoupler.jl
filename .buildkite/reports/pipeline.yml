@@ -58,7 +58,7 @@ steps:
           CLIMACORE_DISTRIBUTED: "MPI"
           BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks: 32
+          slurm_ntasks: 64
           slurm_mem: 16GB
 
       # with topo smoothing order 5
@@ -70,7 +70,7 @@ steps:
           CLIMACORE_DISTRIBUTED: "MPI"
           BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks: 32
+          slurm_ntasks: 64
           slurm_mem: 16GB
 
       # with topo smoothing order 6
@@ -82,6 +82,6 @@ steps:
           CLIMACORE_DISTRIBUTED: "MPI"
           BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks: 32
+          slurm_ntasks: 64
           slurm_mem: 16GB
 

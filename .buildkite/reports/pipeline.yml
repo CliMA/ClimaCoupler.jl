@@ -75,5 +75,5 @@ steps:
           NEW_RESTART_DIR: "/groups/esm/lenka/couplerdel/ClimaCoupler.jl/experiments/AMIP/modular/output/amip/amip_restart_from_topo-noice_artifacts/edmf_cache_hack/"
           BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks: 32
+          slurm_ntasks: 64
           slurm_mem_per_cpu: 0GB

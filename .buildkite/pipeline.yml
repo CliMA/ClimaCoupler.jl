@@ -94,6 +94,17 @@ steps:
           slurm_nodes: 3
           slurm_tasks_per_node: 1
 
+      - label: "MPI Checkpointer unit tests"
+        key: "checkpointer_mpi_tests"
+        command: "mpiexec julia --color=yes --project=test/ test/mpi_tests/checkpointer_mpi_tests.jl --run_name checkpointer_mpi --job_id checkpointer_mpi"
+        timeout_in_minutes: 20
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+        agents:
+          config: cpu
+          queue: central
+          slurm_ntasks: 2
+
       - label: "Perf flame graph diff tests"
         command: "julia --color=yes --project=perf/ perf/flame_test.jl --run_name flame_test --job_id flame_perf_target"
         timeout_in_minutes: 5
@@ -253,6 +264,9 @@ steps:
           slurm_ntasks: 2
           slurm_mem: 20GB
 
+      - label: "batch script"
+        command: "sbatch test/mpi_tests/local_checks.sh"
+
       # short high-res performance test
       - label: "Unthreaded AMIP FINE" # also reported by longruns with a flame graph
         key: "unthreaded_amip_fine"
@@ -285,3 +299,5 @@ steps:
           - build_history staging # name of branch to plot
         artifact_paths:
           - "build_history.html"
+
+

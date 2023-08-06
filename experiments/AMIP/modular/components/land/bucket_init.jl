@@ -193,7 +193,7 @@ function bucket_init(
     end
 
     σS_c = FT(0.2)
-    W_f = FT(0.5)
+    W_f = FT(5)
     d_soil = FT(3.5) # soil depth
     z_0m = FT(1e-2)
     z_0b = FT(1e-3)

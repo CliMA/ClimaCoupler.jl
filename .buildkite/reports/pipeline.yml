@@ -59,7 +59,7 @@ steps:
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks: 64
-          slurm_mem: 16GB
+          slurm_mem: 20GB
 
       # with topo smoothing order 5
       - label: "MPI AMIP FINE: target longrun topo output"
@@ -71,7 +71,7 @@ steps:
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks: 64
-          slurm_mem: 16GB
+          slurm_mem: 20GB
 
       # with topo smoothing order 6
       - label: "MPI AMIP FINE: target longrun topo output"
@@ -83,5 +83,5 @@ steps:
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks: 64
-          slurm_mem: 16GB
+          slurm_mem: 20GB
 

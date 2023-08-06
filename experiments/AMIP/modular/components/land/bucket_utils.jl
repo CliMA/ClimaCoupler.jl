@@ -119,7 +119,7 @@ function update_field!(sim::BucketSimulation, ::Val{:air_density}, field)
     parent(sim.integrator.p.bucket.ρ_sfc) .= parent(field)
 end
 
-step!(sim::BucketSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
+step!(sim::BucketSimulation, t) = t - sim.integrator.t > 0 ? step!(sim.integrator, t - sim.integrator.t, true) : nothing
 
 reinit!(sim::BucketSimulation) = reinit!(sim.integrator)
 

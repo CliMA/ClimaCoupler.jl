@@ -2,6 +2,7 @@
 using ClimaCore
 using ClimaLSM
 import ClimaLSM
+import ClimaTimeSteppers as CTS
 include(joinpath(pkgdir(ClimaLSM), "parameters", "create_parameters.jl"))
 using ClimaLSM.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers
 using ClimaComms: AbstractCommsContext
@@ -168,7 +169,7 @@ function bucket_init(
     dt::FT,
     saveat::FT,
     area_fraction,
-    stepper = Euler(),
+    stepper = CTS.RK4(),
 ) where {FT}
     if config != "sphere"
         println(
@@ -247,9 +248,10 @@ function bucket_init(
     set_initial_aux_state!(p_new, Y, tspan[1])
 
     exp_tendency! = make_exp_tendency(model)
-
-    prob = ODEProblem(exp_tendency!, Y, tspan, p_new)
-    integrator = init(prob, stepper; dt = dt, saveat = saveat)
+    ode_algo = CTS.ExplicitAlgorithm(stepper)
+    bucket_ode_function = CTS.ClimaODEFunction(T_exp! = exp_tendency!, dss! = ClimaLSM.dss!)
+    prob = ODEProblem(bucket_ode_function, Y, tspan, p_new)
+    integrator = init(prob, ode_algo; dt = dt, saveat = saveat, adaptive = false)
 
     BucketSimulation(model, Y, (; domain = domain, soil_depth = d_soil), integrator, area_fraction)
 end

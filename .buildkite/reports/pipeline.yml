@@ -51,8 +51,8 @@ steps:
 
       # with topo smoothing order 4
       - label: "MPI AMIP FINE: target longrun topo output"
-        key: "amip_longrun_target_topo"
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name amip_longrun_target_topo --coupled true --monthly_checkpoint true --surface_setup PrescribedSurface --dt_cpl 100 --energy_check false --mode_name amip --mono_surface false --vert_diff true --moist equil --rad clearsky --precip_model 0M --topography Earth --topo_smoothing true --smoothing_order 4 --use_reference_state false --z_elem 35 --dz_bottom 50 --h_elem 12 --kappa_4 4e16 --rayleigh_sponge true --alpha_rayleigh_uh 0 --dt 100secs --t_end 200days --job_id amip_longrun_target_topo_smooth4 --dt_save_to_sol 1000days --dt_save_to_disk 10days --apply_limiter false --FLOAT_TYPE Float64 --post_process false"
+        key: "amip_longrun_target_topo_smooth4"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name amip_longrun_target_topo_smooth4 --coupled true --monthly_checkpoint true --surface_setup PrescribedSurface --dt_cpl 100 --energy_check false --mode_name amip --mono_surface false --vert_diff true --moist equil --rad clearsky --precip_model 0M --topography Earth --topo_smoothing true --smoothing_order 4 --use_reference_state false --z_elem 35 --dz_bottom 50 --h_elem 12 --kappa_4 4e16 --rayleigh_sponge true --alpha_rayleigh_uh 0 --dt 100secs --t_end 200days --job_id amip_longrun_target_topo_smooth4 --dt_save_to_sol 1000days --dt_save_to_disk 10days --apply_limiter false --FLOAT_TYPE Float64 --post_process false"
         artifact_paths: "experiments/AMIP/modular/output/amip/amip_longrun_target_topo_smooth4_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
@@ -63,8 +63,8 @@ steps:
 
       # with topo smoothing order 5
       - label: "MPI AMIP FINE: target longrun topo output"
-        key: "amip_longrun_target_topo"
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name amip_longrun_target_topo --coupled true --monthly_checkpoint true --surface_setup PrescribedSurface --dt_cpl 100 --energy_check false --mode_name amip --mono_surface false --vert_diff true --moist equil --rad clearsky --precip_model 0M --topography Earth --topo_smoothing true --smoothing_order 5 --use_reference_state false --z_elem 35 --dz_bottom 50 --h_elem 12 --kappa_4 4e16 --rayleigh_sponge true --alpha_rayleigh_uh 0 --dt 100secs --t_end 200days --job_id amip_longrun_target_topo_smooth5 --dt_save_to_sol 1000days --dt_save_to_disk 10days --apply_limiter false --FLOAT_TYPE Float64 --post_process false"
+        key: "amip_longrun_target_topo_smooth5"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name amip_longrun_target_topo_smooth5 --coupled true --monthly_checkpoint true --surface_setup PrescribedSurface --dt_cpl 100 --energy_check false --mode_name amip --mono_surface false --vert_diff true --moist equil --rad clearsky --precip_model 0M --topography Earth --topo_smoothing true --smoothing_order 5 --use_reference_state false --z_elem 35 --dz_bottom 50 --h_elem 12 --kappa_4 4e16 --rayleigh_sponge true --alpha_rayleigh_uh 0 --dt 100secs --t_end 200days --job_id amip_longrun_target_topo_smooth5 --dt_save_to_sol 1000days --dt_save_to_disk 10days --apply_limiter false --FLOAT_TYPE Float64 --post_process false"
         artifact_paths: "experiments/AMIP/modular/output/amip/amip_longrun_target_topo_smooth5_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
@@ -75,8 +75,8 @@ steps:
 
       # with topo smoothing order 6
       - label: "MPI AMIP FINE: target longrun topo output"
-        key: "amip_longrun_target_topo"
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name amip_longrun_target_topo --coupled true --monthly_checkpoint true --surface_setup PrescribedSurface --dt_cpl 100 --energy_check false --mode_name amip --mono_surface false --vert_diff true --moist equil --rad clearsky --precip_model 0M --topography Earth --topo_smoothing true --smoothing_order 6 --use_reference_state false --z_elem 35 --dz_bottom 50 --h_elem 12 --kappa_4 4e16 --rayleigh_sponge true --alpha_rayleigh_uh 0 --dt 100secs --t_end 200days --job_id amip_longrun_target_topo --dt_save_to_sol 1000days --dt_save_to_disk 10days --apply_limiter false --FLOAT_TYPE Float64 --post_process false"
+        key: "amip_longrun_target_topo_smooth6"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name amip_longrun_target_topo_smooth6 --coupled true --monthly_checkpoint true --surface_setup PrescribedSurface --dt_cpl 100 --energy_check false --mode_name amip --mono_surface false --vert_diff true --moist equil --rad clearsky --precip_model 0M --topography Earth --topo_smoothing true --smoothing_order 6 --use_reference_state false --z_elem 35 --dz_bottom 50 --h_elem 12 --kappa_4 4e16 --rayleigh_sponge true --alpha_rayleigh_uh 0 --dt 100secs --t_end 200days --job_id amip_longrun_target_topo_smooth6 --dt_save_to_sol 1000days --dt_save_to_disk 10days --apply_limiter false --FLOAT_TYPE Float64 --post_process false"
         artifact_paths: "experiments/AMIP/modular/output/amip/amip_longrun_target_topo_smooth6_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"

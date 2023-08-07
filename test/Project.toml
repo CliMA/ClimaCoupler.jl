@@ -26,6 +26,7 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 [compat]
 ArtifactWrappers = "0.2"
 ClimaCoupler = "0.1"
+ClimaLSM = "0.2"
 Downloads = "1"
 IntervalSets = "0.7"
 MPI = "0.20"

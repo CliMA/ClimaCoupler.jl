@@ -11,12 +11,13 @@ using ClimaComms
 using Dates
 using Test
 
-REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regrid_tmp/")
+REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regridder_test_tmp/")
 
 # Set up MPI communications context
 # Note that runs will hang if a context is initialized twice in the same file,
 # so this context should be shared among all tests in this file.
-comms_ctx = ClimaComms.SingletonCommsContext(ClimaComms.device())
+device = ClimaComms.CPUSingleThreaded()
+const comms_ctx = ClimaComms.context(device)
 pid, nprocs = ClimaComms.init(comms_ctx)
 
 @testset "test write_to_hdf5 and read_from_hdf5 with MPI" begin
@@ -33,7 +34,12 @@ pid, nprocs = ClimaComms.init(comms_ctx)
         ClimaComms.barrier(comms_ctx)
         Regridder.write_to_hdf5(REGRID_DIR, hd_outfile_root, tx, input_field, varname, comms_ctx)
 
+        ClimaComms.barrier(comms_ctx)
         output_field = Regridder.read_from_hdf5(REGRID_DIR, hd_outfile_root, tx, varname, comms_ctx)
         @test parent(input_field) == parent(output_field)
+
+        ClimaComms.barrier(comms_ctx)
+        ClimaComms.iamroot(comms_ctx) ? rm(REGRID_DIR; recursive = true, force = true) : nothing
+        ClimaComms.barrier(comms_ctx)
     end
 end

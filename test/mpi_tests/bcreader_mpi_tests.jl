@@ -18,7 +18,8 @@ include(joinpath(@__DIR__, "..", "..", "artifacts", "artifact_funcs.jl"))
 const sst_data = joinpath(sst_dataset_path(), "sst.nc")
 
 # set up MPI communications context
-const comms_ctx = ClimaComms.SingletonCommsContext(ClimaComms.device())
+device = ClimaComms.CPUSingleThreaded()
+const comms_ctx = ClimaComms.context(device)
 const pid, nprocs = ClimaComms.init(comms_ctx)
 ClimaComms.barrier(comms_ctx)
 
@@ -39,7 +40,7 @@ ClimaComms.barrier(comms_ctx)
         mono = true
 
         regrid_dir = "bcreader_regrid_dir"
-        isdir(regrid_dir) ? nothing : mkpath(regrid_dir)
+        mkpath(regrid_dir)
 
         bcf_info = BCReader.bcfile_info_init(
             FT,
@@ -52,6 +53,7 @@ ClimaComms.barrier(comms_ctx)
             land_fraction = land_fraction_t,
             mono = mono,
         )
+        ClimaComms.barrier(comms_ctx)
 
         # test that created object exists and has correct components
         @test @isdefined(bcf_info)
@@ -75,7 +77,9 @@ ClimaComms.barrier(comms_ctx)
         @test min_weight >= FT(0.0) || isapprox(min_weight, FT(0.0), atol = 1e-16)
 
         # delete testing directory and files
-        rm(regrid_dir; recursive = true, force = true)
+        ClimaComms.barrier(comms_ctx)
+        ClimaComms.iamroot(comms_ctx) ? rm(regrid_dir; recursive = true, force = true) : nothing
+        ClimaComms.barrier(comms_ctx)
     end
 end
 
@@ -102,7 +106,7 @@ end
         varname = "SST"
 
         regrid_dir = "bcreader_regrid_dir"
-        isdir(regrid_dir) ? nothing : mkpath(regrid_dir)
+        mkpath(regrid_dir)
 
         ClimaComms.barrier(comms_ctx)
 
@@ -236,6 +240,8 @@ end
         ClimaComms.barrier(comms_ctx)
         @test_throws ErrorException BCReader.update_midmonth_data!(date, bcf_info)
 
-        rm(regrid_dir; recursive = true, force = true)
+        ClimaComms.barrier(comms_ctx)
+        ClimaComms.iamroot(comms_ctx) ? rm(regrid_dir; recursive = true, force = true) : nothing
+        ClimaComms.barrier(comms_ctx)
     end
 end

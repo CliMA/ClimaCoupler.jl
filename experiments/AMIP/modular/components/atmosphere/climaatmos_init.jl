@@ -1,5 +1,4 @@
 # atmos_init: for ClimaAtmos pre-AMIP interface
-import ClimaAtmos
 using ClimaAtmos: RRTMGPI
 import ClimaAtmos: CT1, CT2, CT12, CT3, C3, C12, unit_basis_vector_data, ⊗
 import ClimaCoupler.FluxCalculator:
@@ -24,8 +23,9 @@ name(::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
 
 function atmos_init(::Type{FT}, parsed_args::Dict) where {FT}
 
-    atmos_config = ClimaAtmos.AtmosConfig(argparse_settings(); parsed_args)
-    integrator = ClimaAtmos.get_integrator(atmos_config)
+    # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
+    atmos_config = CA.AtmosConfig(; config_dict = parsed_args)
+    integrator = CA.get_integrator(atmos_config)
     Y = integrator.u
     center_space = axes(Y.c.ρe_tot)
     face_space = axes(Y.f.u₃)
@@ -149,8 +149,8 @@ function coupler_surface_setup(
     csf_sfc = (; T = nothing, z0m = nothing, z0b = nothing, beta = nothing, q_vap = nothing),
 )
 
-    surface_state(z0m, z0b, T, beta, q_vap) = ClimaAtmos.SurfaceConditions.SurfaceState(;
-        parameterization = ClimaAtmos.SurfaceConditions.MoninObukhov(; z0m, z0b),
+    surface_state(z0m, z0b, T, beta, q_vap) = CA.SurfaceConditions.SurfaceState(;
+        parameterization = CA.SurfaceConditions.MoninObukhov(; z0m, z0b),
         T,
         beta,
         q_vap,
@@ -200,7 +200,7 @@ timestep from ClimaCoupler.
 """
 function atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
     new_p = get_new_cache(atmos_sim, csf)
-    ClimaAtmos.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t)
+    CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t)
     atmos_sim.integrator.p.sfc_conditions .= new_p.sfc_conditions
 end
 

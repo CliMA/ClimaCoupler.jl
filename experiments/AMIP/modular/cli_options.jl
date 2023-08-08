@@ -27,6 +27,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether (1st order) monotone and conservative remapping is applied."
         arg_type = Bool
         default = false
+        "--turb_flux_partition"
+        help = "Method to partition turbulent fluxes. [`PartitionedStateFluxes`, `CombinedStateFluxes`]"
+        arg_type = String
+        default = "CombinedStateFluxes"
         "--albedo_from_file"
         help = "Access land surface albedo information from data file"
         arg_type = Bool

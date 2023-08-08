@@ -35,7 +35,7 @@ include("mpi/mpi_init.jl")
 include("atmos/atmos_init.jl")
 atmos_sim = atmos_init(FT, Y, spaces, integrator, params = params);
 
-# init a 2D bounary space at the surface, assuming the same instance (and MPI distribution if applicable) as the atmos domain above
+# init a 2D boundary space at the surface, assuming the same instance (and MPI distribution if applicable) as the atmos domain above
 boundary_space = ClimaCore.Fields.level(atmos_sim.domain.face_space, half) # global surface grid
 
 # init land-sea mask

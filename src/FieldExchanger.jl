@@ -28,18 +28,21 @@ have to be defined for the amtospheric component model type.
 function import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
     (; atmos_sim) = model_sims
 
-    # from atmos
-    if turbulent_fluxes == FluxCalculator.CombinedAtmosGrid()
+    # turbulent fluxes
+    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
         Regridder.dummmy_remap!(csf.F_turb_energy, Interfacer.get_field(atmos_sim, Val(:turbulent_energy_flux)))
         Regridder.dummmy_remap!(csf.F_turb_moisture, Interfacer.get_field(atmos_sim, Val(:turbulent_moisture_flux)))
-
-        # surface density is needed for q_sat and requires atmos and sfc states, so it is calculated and saved in the coupler
-        Regridder.dummmy_remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_S))
     end
 
+    # surface density - needed for q_sat and requires atmos and sfc states, so it is calculated and saved in the coupler
+    Regridder.dummmy_remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_S))
+
+    # radiative fluxes
     Regridder.dummmy_remap!(csf.F_radiative, Interfacer.get_field(atmos_sim, Val(:radiative_energy_flux)))
+
+    # precipitation
     Regridder.dummmy_remap!(csf.P_liq, Interfacer.get_field(atmos_sim, Val(:liquid_precipitation)))
-    Regridder.dummmy_remap!(csf.P_snow, Interfacer.get_field(atmos_sim, Val(:snow_precipitation))) # generalize
+    Regridder.dummmy_remap!(csf.P_snow, Interfacer.get_field(atmos_sim, Val(:snow_precipitation)))
 end
 
 """
@@ -67,7 +70,7 @@ function import_combined_surface_fields!(csf, model_sims, boundary_space, turbul
     Regridder.combine_surfaces!(combined_field, model_sims, Val(:albedo))
     Regridder.dummmy_remap!(csf.albedo, combined_field)
 
-    if turbulent_fluxes !== FluxCalculator.PartitionedComponentModelGrid()
+    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
         Regridder.combine_surfaces!(combined_field, model_sims, Val(:roughness_momentum))
         Regridder.dummmy_remap!(csf.z0m_S, combined_field)
 
@@ -97,12 +100,15 @@ function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf, turbulent_
     Interfacer.update_field!(atmos_sim, Val(:albedo), csf.albedo)
     Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf.T_S)
 
-    if turbulent_fluxes == FluxCalculator.CombinedAtmosGrid()
+    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
         Interfacer.update_field!(atmos_sim, Val(:roughness_momentum), csf.z0m_S)
         Interfacer.update_field!(atmos_sim, Val(:roughness_buoyancy), csf.z0b_S)
         Interfacer.update_field!(atmos_sim, Val(:beta), csf.beta) # not in this version of atmos
     end
 
+    if turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
+        Interfacer.update_field!(atmos_sim, Val(:turbulent_fluxes), csf)
+    end
 end
 
 """
@@ -114,29 +120,37 @@ Updates the surface component model cache with the current coupler fields of F_t
 - `sim`: [Interfacer.SurfaceModelSimulation] containing a surface model simulation object.
 - `csf`: [NamedTuple] containing coupler fields.
 """
-function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, area_fraction = nothing)
+function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, turbulent_fluxes, area_fraction = nothing)
 
     FT = eltype(area_fraction)
+
+    # atmospheric surface density
     Interfacer.update_field!(sim, Val(:air_density), csf.ρ_sfc)
 
-    Interfacer.update_field!(
-        sim,
-        Val(:turbulent_energy_flux),
-        Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_turb_energy,
-    )
+    # turbulent fluxes
+    # when PartitionedStateFluxes, turbulent fluxes are updated during the flux calculation
+    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
 
-    Interfacer.update_field!(
-        sim,
-        Val(:turbulent_moisture_flux),
-        Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_turb_moisture,
-    )
+        Interfacer.update_field!(
+            sim,
+            Val(:turbulent_energy_flux),
+            Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_turb_energy,
+        )
+        Interfacer.update_field!(
+            sim,
+            Val(:turbulent_moisture_flux),
+            Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_turb_moisture,
+        )
+    end
 
+    # radiative fluxes
     Interfacer.update_field!(
         sim,
         Val(:radiative_energy_flux),
         Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_radiative,
     )
 
+    # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), .-csf.P_liq)
     Interfacer.update_field!(sim, Val(:snow_precipitation), .-csf.P_snow)
 end
@@ -163,7 +177,7 @@ Iterates `update_sim!` over all component model simulations saved in `cs.model_s
 function update_model_sims!(model_sims, csf, turbulent_fluxes)
     for sim in model_sims
         if sim isa Interfacer.SurfaceModelSimulation
-            update_sim!(sim, csf, Interfacer.get_field(sim, Val(:area_fraction)))
+            update_sim!(sim, csf, turbulent_fluxes, Interfacer.get_field(sim, Val(:area_fraction)))
         else
             update_sim!(sim, csf, turbulent_fluxes)
         end

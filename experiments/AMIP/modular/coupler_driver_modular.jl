@@ -83,6 +83,7 @@ if isinteractive()
     parsed_args["dt_cpl"] = 200 #hide
     parsed_args["dt"] = "200secs" #hide
     parsed_args["mono_surface"] = true #hide
+    parsed_args["turb_flux_partition"] = "PartitionedStateFluxes" #hide
     parsed_args["h_elem"] = 4 #hide
     # parsed_args["dt_save_restart"] = "5days" #hide
     parsed_args["precip_model"] = "0M" #hide
@@ -131,7 +132,12 @@ import ClimaCoupler.Interfacer:
     get_field,
     update_field!,
     update_sim!
-import ClimaCoupler.FluxCalculator: PartitionedComponentModelGrid, CombinedAtmosGrid, compute_combined_turbulent_fluxes!
+import ClimaCoupler.FluxCalculator:
+    PartitionedStateFluxes,
+    CombinedStateFluxes,
+    combined_turbulent_fluxes!,
+    MoninObukhovScheme,
+    partitioned_turbulent_fluxes!
 import ClimaCoupler.FieldExchanger:
     import_atmos_fields!,
     import_combined_surface_fields!,
@@ -182,7 +188,7 @@ We use a common `Space` for all global surfaces. This enables the MPI processes 
 the atmospheric and surface components, so exchanges are parallelized. Note this is only possible when the
 atmosphere and surface are of the same horizontal resolution.
 =#
-## init a 2D bounary space at the surface
+## init a 2D boundary space at the surface
 boundary_space = atmos_sim.domain.face_space.horizontal_space
 
 # init land-sea fraction
@@ -326,6 +332,8 @@ coupler_field_names = (
     :beta,
     :F_turb_energy,
     :F_turb_moisture,
+    :F_turb_ρτxz,
+    :F_turb_ρτyz,
     :F_radiative,
     :P_liq,
     :P_snow,
@@ -410,8 +418,14 @@ end
 #=
 ## Initialize Component Model Exchange
 =#
-
-turbulent_fluxes = CombinedAtmosGrid()
+turbulent_fluxes = nothing
+if parsed_args["turb_flux_partition"] == "PartitionedStateFluxes"
+    turbulent_fluxes = PartitionedStateFluxes()
+elseif parsed_args["turb_flux_partition"] == "CombinedStateFluxes"
+    turbulent_fluxes = CombinedStateFluxes()
+else
+    error("turb_flux_partition must be either PartitionedStateFluxes or CombinedStateFluxes")
+end
 
 # 1) coupler combines surface states and calculates rho_sfc using surface and atmos variables
 update_surface_fractions!(cs)
@@ -419,20 +433,35 @@ import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, tur
 import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
 update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 
-# 2) each component model calculates its own vapor specific humidity (q_sfc)
+# 2) each surface component model calculates its own vapor specific humidity (q_sfc)
 # TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step!
 step!(land_sim, Δt_cpl)
 step!(ocean_sim, Δt_cpl)
 step!(ice_sim, Δt_cpl)
 
-# 3) coupler re-imports updated surface fields and calculates turbulent fluxes on the atmos grid, while updating atmos sfc_conditions
-import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta
-compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes)
+# 3) coupler re-imports updated surface fields and calculates turbulent fluxes, while updating atmos sfc_conditions
+if turbulent_fluxes isa CombinedStateFluxes
+    # calculate fluxes using combined surface states on the atmos grid
+    import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta, q_sfc
+    combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # this updates the atmos thermo state, sfc_ts
+elseif turbulent_fluxes isa PartitionedStateFluxes
+    # calculate turbulent fluxes in surface models and save the weighted average in coupler fields
+    partitioned_turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, MoninObukhovScheme(), thermo_params)
+
+    # update atmos sfc_conditions for surface temperature
+    # TODO: this is hard coded and needs to be simplified (need CA modification)
+    new_p = get_new_cache(atmos_sim, cs.fields)
+    ClimaAtmos.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) # sets T_sfc (but SF calculation not necessary - CA)
+    atmos_sim.integrator.p.sfc_conditions .= new_p.sfc_conditions
+end
 
 # 4) given the new sfc_conditions, atmos calls the radiative flux callback
 reinit!(atmos_sim) # sets a nonzero radiation flux
 
-# 5) coupler re-imports updated atmos fluxes, and sends them to surface models
+# 5) coupler re-imports updated atmos fluxes (radiative fluxes for both `turbulent_fluxes` types
+# and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxes`,
+# and sends them to the surface component models. If `turbulent_fluxes isa PartitionedStateFluxes`
+# atmos receives the turbulent fluxes from the coupler.
 import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
 update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 
@@ -494,11 +523,24 @@ function solve_coupler!(cs)
 
         ## exchange combined fields and (if specified) calculate fluxes using combined states
         update_surface_fractions!(cs)
-        import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
-        compute_combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes)
-        import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # radiative and/or turbulent
+        import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta
+        if turbulent_fluxes isa CombinedStateFluxes
+            combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # this updates the surface thermo state, sfc_ts, in ClimaAtmos (but also unnecessarily calculates fluxes)
+        elseif turbulent_fluxes isa PartitionedStateFluxes
+            # calculate turbulent fluxes in surfaces and save the weighted average in coupler fields
+            partitioned_turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, MoninObukhovScheme(), thermo_params)
 
-        # TODO: compute_and_send_partitioned_turbulent_fluxes!(cs)
+            # update atmos sfc_conditions for surface temperature - TODO: this needs to be simplified (need CA modification)
+            new_p = get_new_cache(atmos_sim, cs.fields)
+            ClimaAtmos.SurfaceConditions.update_surface_conditions!(
+                atmos_sim.integrator.u,
+                new_p,
+                atmos_sim.integrator.t,
+            ) # to set T_sfc (but SF calculation not necessary - CA modification)
+            atmos_sim.integrator.p.sfc_conditions .= new_p.sfc_conditions
+        end
+
+        import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # radiative and/or turbulent
 
         ## monthly callbacks
         if trigger_callback(cs, Monthly())

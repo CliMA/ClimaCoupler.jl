@@ -1,5 +1,6 @@
 import ClimaCoupler.Interfacer: SeaIceModelSimulation, get_field, update_field!, name
 import ClimaCoupler.FieldExchanger: step!, reinit!
+import ClimaCoupler.FluxCalculator: update_turbulent_fluxes_point!
 
 """
     PrescribedIceSimulation{P, Y, D, I}
@@ -26,6 +27,7 @@ struct PrescribedIceSimulation{P, Y, D, I} <: SeaIceModelSimulation
     domain::D
     integrator::I
 end
+name(::PrescribedIceSimulation) = "PrescribedIceSimulation"
 
 # sea-ice parameters
 struct IceSlabParameters{FT <: AbstractFloat}
@@ -116,7 +118,7 @@ clean_sic(SIC, _info) = swap_space!(zeros(axes(_info.land_fraction)), SIC) ./ fl
 get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
     mono ? h_ice : Regridder.binary_mask(h_ice, threshold = FT(threshold))
 
-# required by Interfacer
+# extensions required by Interfacer
 get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
 get_field(sim::PrescribedIceSimulation, ::Val{:surface_humidity}) = sim.integrator.p.q_sfc
 get_field(sim::PrescribedIceSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
@@ -124,6 +126,7 @@ get_field(sim::PrescribedIceSimulation, ::Val{:roughness_buoyancy}) = sim.integr
 get_field(sim::PrescribedIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
 get_field(sim::PrescribedIceSimulation, ::Val{:albedo}) = sim.integrator.p.params.α
 get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
+get_field(sim::PrescribedIceSimulation, ::Val{:air_density}) = sim.integrator.p.ρ_sfc
 
 function update_field!(sim::PrescribedIceSimulation, ::Val{:area_fraction}, field::Fields.Field)
     sim.integrator.p.area_fraction .= field
@@ -139,8 +142,15 @@ function update_field!(sim::PrescribedIceSimulation, ::Val{:air_density}, field)
     parent(sim.integrator.p.ρ_sfc) .= parent(field)
 end
 
+# extensions required by FieldExchanger
 step!(sim::PrescribedIceSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
 reinit!(sim::PrescribedIceSimulation) = reinit!(sim.integrator)
+
+# extensions required by FluxCalculator (partitioned fluxes)
+function update_turbulent_fluxes_point!(sim::PrescribedIceSimulation, fields::NamedTuple, colidx::Fields.ColumnIndex)
+    (; F_turb_energy) = fields
+    @. sim.integrator.p.F_turb_energy[colidx] = F_turb_energy
+end
 
 """
     get_model_state_vector(sim::PrescribedIceSimulation)

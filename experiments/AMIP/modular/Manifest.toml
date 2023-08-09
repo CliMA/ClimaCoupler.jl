@@ -210,11 +210,11 @@ version = "0.1.8"
 
 [[deps.ClimaAtmos]]
 deps = ["ArgParse", "ArtifactWrappers", "Artifacts", "AtmosphericProfilesLibrary", "CLIMAParameters", "CUDA", "ClimaComms", "ClimaCore", "ClimaTimeSteppers", "CloudMicrophysics", "Colors", "Dates", "Dierckx", "DiffEqBase", "DiffEqCallbacks", "Distributions", "DocStringExtensions", "FastGaussQuadrature", "ImageFiltering", "Insolation", "Interpolations", "IntervalSets", "JLD2", "LambertW", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "OrdinaryDiffEq", "Pkg", "Printf", "RRTMGP", "Random", "RootSolvers", "StaticArrays", "Statistics", "StatsBase", "SurfaceFluxes", "TerminalLoggers", "Test", "Thermodynamics", "YAML"]
-git-tree-sha1 = "043768da8eb337e08d4b70325ec78323a7c8ef3b"
+git-tree-sha1 = "5f2d0d0c553d7107d05ccd3132de430f80571950"
 repo-rev = "zs/diagedmf_test"
 repo-url = "https://github.com/CliMA/ClimaAtmos.jl.git"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.15.6"
+version = "0.15.7"
 
 [[deps.ClimaComms]]
 deps = ["CUDA", "MPI"]

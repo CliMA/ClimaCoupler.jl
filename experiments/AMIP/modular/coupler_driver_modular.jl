@@ -83,12 +83,13 @@ if isinteractive()
     parsed_args["dt_cpl"] = 200 #hide
     parsed_args["dt"] = "200secs" #hide
     parsed_args["mono_surface"] = true #hide
-    parsed_args["turb_flux_partition"] = "PartitionedStateFluxes" #hide
+    parsed_args["turb_flux_partition"] = "CombinedStateFluxes" #hide
     parsed_args["h_elem"] = 4 #hide
     # parsed_args["dt_save_restart"] = "5days" #hide
     parsed_args["precip_model"] = "0M" #hide
-    parsed_args["job_id"] = "interactive_debug_run"
-    parsed_args["monthly_checkpoint"] = true
+    parsed_args["job_id"] = "interactive_debug_run" #hide
+    parsed_args["monthly_checkpoint"] = true #hide
+    parsed_args["uft"] = "Gryanik" #hide
 end
 
 ## read in some parsed command line arguments

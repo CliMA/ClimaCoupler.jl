@@ -230,3 +230,12 @@ Extension of Checkpointer.get_model_state_vector to get the model state.
 function get_model_state_vector(sim::ClimaAtmosSimulation)
     return sim.integrator.u
 end
+
+# ClimaAtmos parameter overwrites (temporary)
+if parsed_args["uft"] == "Businger"
+    include("param_init_businger.jl")
+elseif parsed_args["uft"] == "Gryanik"
+    include("param_init_gryanik.jl")
+else
+    error("Unknown uft: $(parsed_args["uft"])")
+end

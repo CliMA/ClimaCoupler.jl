@@ -51,6 +51,10 @@ function argparse_settings()
         help = "Restart time"
         arg_type = Int
         default = 0
+        "--uft"
+        help = "Universal function type [`Businger` (default), `Gryanik`]"
+        arg_type = String
+        default = "Businger"
         # ClimaAtmos flags
         "--FLOAT_TYPE"
         help = "Float type"

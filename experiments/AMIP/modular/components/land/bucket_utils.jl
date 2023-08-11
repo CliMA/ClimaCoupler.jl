@@ -80,7 +80,7 @@ function make_lsm_domain(
     )
 end
 
-# required by Interfacer
+# extensions required by Interfacer
 get_field(sim::BucketSimulation, ::Val{:surface_temperature}) =
     ClimaLSM.surface_temperature(sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
 get_field(sim::BucketSimulation, ::Val{:surface_humidity}) =
@@ -92,11 +92,7 @@ get_field(sim::BucketSimulation, ::Val{:beta}) =
 get_field(sim::BucketSimulation, ::Val{:albedo}) =
     ClimaLSM.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 get_field(sim::BucketSimulation, ::Val{:area_fraction}) = sim.area_fraction
-
-
-# The surface air density is computed using the atmospheric state at the first level and making ideal gas
-# and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
-# a reasonable stand-in.
+get_field(sim::BucketSimulation, ::Val{:air_density}) = sim.integrator.p.bucket.ρ_sfc
 
 function update_field!(sim::BucketSimulation, ::Val{:turbulent_energy_flux}, field)
     parent(sim.integrator.p.bucket.turbulent_energy_flux) .= parent(field)
@@ -122,6 +118,32 @@ end
 step!(sim::BucketSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
 
 reinit!(sim::BucketSimulation) = reinit!(sim.integrator)
+
+# extensions required by FluxCalculator (partitioned fluxes)
+function update_turbulent_fluxes_point!(sim::BucketSimulation, fields::NamedTuple, colidx::Fields.ColumnIndex)
+    (; F_turb_energy, F_turb_moisture) = fields
+    sim.integrator.p.bucket.turbulent_energy_flux[colidx] .= F_turb_energy
+    sim.integrator.p.bucket.evaporation[colidx] .=
+        F_turb_moisture ./ LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
+    return nothing
+end
+
+# extension of FluxCalculator.surface_thermo_state, overriding the saturated-surface default
+function surface_thermo_state(
+    sim::BucketSimulation,
+    thermo_params::TD.Parameters.ThermodynamicsParameters,
+    thermo_state_int,
+    colidx::ClimaCore.Fields.ColumnIndex,
+)
+
+    T_sfc = get_field(sim, Val(:surface_temperature), colidx)
+    # Note that the surface air density, ρ_sfc, is computed using the atmospheric state at the first level and making ideal gas
+    # and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
+    # a reasonable stand-in.
+    ρ_sfc = get_field(sim, Val(:air_density), colidx)
+    q_sfc = get_field(sim, Val(:surface_humidity), colidx) # already calculated in rhs! (cache)
+    @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
+end
 
 """
     get_model_state_vector(sim::BucketSimulation)

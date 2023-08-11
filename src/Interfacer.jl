@@ -6,7 +6,6 @@ This modules contains abstract types, interface templates and model stubs for co
 module Interfacer
 import Thermodynamics as TD
 
-
 using ClimaCore: Fields
 export ComponentModelSimulation,
     AtmosModelSimulation,

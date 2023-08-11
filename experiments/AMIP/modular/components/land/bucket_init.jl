@@ -2,6 +2,8 @@
 using ClimaCore
 using ClimaLSM
 import ClimaLSM
+import ClimaTimeSteppers as CTS
+
 include(joinpath(pkgdir(ClimaLSM), "parameters", "create_parameters.jl"))
 using ClimaLSM.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers
 using ClimaComms: AbstractCommsContext
@@ -21,6 +23,7 @@ using ClimaLSM:
 
 import ClimaCoupler.Interfacer: LandModelSimulation, get_field, update_field!, name
 import ClimaCoupler.FieldExchanger: step!, reinit!
+import ClimaCoupler.FluxCalculator: update_turbulent_fluxes_point!, surface_thermo_state
 
 """
     BucketSimulation{M, Y, D, I}
@@ -85,8 +88,6 @@ function ClimaLSM.Bucket.surface_fluxes(
     )
 end
 
-
-
 """
     net_radiation(radiation::CoupledRadiativeFluxes{FT},
                     model::BucketModel{FT},
@@ -101,7 +102,7 @@ function ClimaLSM.Bucket.net_radiation(
     radiation::CoupledRadiativeFluxes{FT},
     model::BucketModel{FT},
     Y::ClimaCore.Fields.FieldVector,
-    p::ClimaCore.Fields.FieldVector,
+    p::NamedTuple,
     _...,
 ) where {FT <: AbstractFloat}
     # coupler has done its thing behind the scenes already
@@ -168,7 +169,7 @@ function bucket_init(
     dt::FT,
     saveat::FT,
     area_fraction,
-    stepper = Euler(),
+    stepper = CTS.RK4(),
 ) where {FT}
     if config != "sphere"
         println(
@@ -240,16 +241,21 @@ function bucket_init(
     variable_names = (propertynames(p.bucket)..., :P_liq, :P_snow)
     orig_fields = map(x -> getproperty(p.bucket, x), propertynames(p.bucket))
     fields = (orig_fields..., P_liq, P_snow)
-    p_new = ClimaCore.Fields.FieldVector(; :bucket => (; zip(variable_names, fields)...))
+    p_new = (;
+        :bucket => (; zip(variable_names, fields)...),
+        :dss_buffer_2d => p.dss_buffer_2d,
+        :dss_buffer_3d => p.dss_buffer_3d,
+    )
 
     # Set initial aux variable values
     set_initial_aux_state! = make_set_initial_aux_state(model)
     set_initial_aux_state!(p_new, Y, tspan[1])
 
     exp_tendency! = make_exp_tendency(model)
-
-    prob = ODEProblem(exp_tendency!, Y, tspan, p_new)
-    integrator = init(prob, stepper; dt = dt, saveat = saveat)
+    ode_algo = CTS.ExplicitAlgorithm(stepper)
+    bucket_ode_function = CTS.ClimaODEFunction(T_exp! = exp_tendency!, dss! = ClimaLSM.dss!)
+    prob = ODEProblem(bucket_ode_function, Y, tspan, p_new)
+    integrator = init(prob, ode_algo; dt = dt, saveat = saveat, adaptive = false)
 
     BucketSimulation(model, Y, (; domain = domain, soil_depth = d_soil), integrator, area_fraction)
 end

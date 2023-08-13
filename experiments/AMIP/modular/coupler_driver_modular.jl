@@ -457,7 +457,7 @@ elseif turbulent_fluxes isa PartitionedStateFluxes
 end
 
 # 4) given the new sfc_conditions, atmos calls the radiative flux callback
-reinit!(atmos_sim) # sets a nonzero radiation flux
+reinit_model_sims!(cs.model_sims) # NB: for atmos this sets a nonzero radiation flux
 
 # 5) coupler re-imports updated atmos fluxes (radiative fluxes for both `turbulent_fluxes` types
 # and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxes`,

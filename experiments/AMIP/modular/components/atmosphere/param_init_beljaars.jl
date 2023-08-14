@@ -40,32 +40,65 @@ function create_climaatmos_parameter_set(
     aliases = setdiff(aliases, ["thermo_params"])
     pairs = CP.get_parameter_values!(toml_dict, aliases, "CloudMicrophysics")
     pairs = CA.override_climaatmos_defaults((; pairs...), overrides)
-    microphys_params = CM.Parameters.CloudMicrophysicsParameters{FTD, TP}(; pairs..., thermo_params)
+    microphys_params = CM.Parameters.CloudMicrophysicsParameters{FTD, TP}(;
+        pairs...,
+        thermo_params,
+    )
     MP = typeof(microphys_params)
 
-    aliases = ["Pr_0_Businger", "a_m_Businger", "a_h_Businger", "ζ_a_Businger", "γ_Businger"]
+    aliases = [
+        "Pr_0_Beljaars",
+        "a_m_Beljaars",
+        "a_h_Beljaars",
+        "b_m_Beljaars",
+        "b_h_Beljaars",
+        "c_m_Beljaars",
+        "c_h_Beljaars",
+        "d_m_Beljaars",
+        "d_h_Beljaars",
+        "ζ_a_Beljaars",
+        "γ_Beljaars",
+    ]
     pairs = CP.get_parameter_values!(toml_dict, aliases, "UniversalFunctions")
     pairs = (; pairs...) # convert to NamedTuple
     pairs = (;
-        Pr_0 = pairs.Pr_0_Businger,
-        a_m = pairs.a_m_Businger,
-        a_h = pairs.a_h_Businger,
-        ζ_a = pairs.ζ_a_Businger,
-        γ = pairs.γ_Businger,
+        Pr_0 = pairs.Pr_0_Beljaars,
+        a_m = pairs.a_m_Beljaars,
+        a_h = pairs.a_h_Beljaars,
+        b_m = pairs.a_m_Beljaars,
+        b_h = pairs.a_h_Beljaars,
+        c_m = pairs.b_m_Beljaars,
+        c_h = pairs.c_h_Beljaars,
+        d_m = pairs.b_m_Beljaars,
+        d_h = pairs.b_h_Beljaars,
+        ζ_a = pairs.ζ_a_Beljaars,
+        γ = pairs.γ_Beljaars,
     )
     pairs = CA.override_climaatmos_defaults((; pairs...), overrides)
-    ufp = UF.BusingerParams{FTD}(; pairs...)
+    ufp = UF.BeljaarsParams{FTD}(; pairs...)
     UFP = typeof(ufp)
 
-    pairs = CP.get_parameter_values!(toml_dict, ["von_karman_const"], "SurfaceFluxesParameters")
+    pairs = CP.get_parameter_values!(
+        toml_dict,
+        ["von_karman_const"],
+        "SurfaceFluxesParameters",
+    )
     pairs = CA.override_climaatmos_defaults((; pairs...), overrides)
-    surf_flux_params = SF.Parameters.SurfaceFluxesParameters{FTD, UFP, TP}(; pairs..., ufp, thermo_params)
+    surf_flux_params = SF.Parameters.SurfaceFluxesParameters{FTD, UFP, TP}(;
+        pairs...,
+        ufp,
+        thermo_params,
+    )
     SFP = typeof(surf_flux_params)
 
     aliases = string.(fieldnames(TCP.TurbulenceConvectionParameters))
     pairs = CP.get_parameter_values!(toml_dict, aliases, "EDMF")
     pairs = CA.override_climaatmos_defaults((; pairs...), overrides)
-    tc_params = TCP.TurbulenceConvectionParameters{FTD, MP, SFP}(; pairs..., microphys_params, surf_flux_params)
+    tc_params = TCP.TurbulenceConvectionParameters{FTD, MP, SFP}(;
+        pairs...,
+        microphys_params,
+        surf_flux_params,
+    )
 
     aliases = string.(fieldnames(RP.RRTMGPParameters))
     pairs = CP.get_parameter_values!(toml_dict, aliases, "RRTMGP")

@@ -236,6 +236,14 @@ if parsed_args["uft"] == "Businger"
     include("param_init_businger.jl")
 elseif parsed_args["uft"] == "Gryanik"
     include("param_init_gryanik.jl")
+elseif parsed_args["uft"] == "Grachev"
+    include("param_init_grachev.jl")
+elseif parsed_args["uft"] == "Cheng"
+    include("param_init_cheng.jl")
+elseif parsed_args["uft"] == "Beljaars"
+    include("param_init_beljaars.jl")
+elseif parsed_args["uft"] == "Holtslag"
+    include("param_init_holtslag.jl")
 else
     error("Unknown uft: $(parsed_args["uft"])")
 end

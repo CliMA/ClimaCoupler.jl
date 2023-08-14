@@ -40,21 +40,10 @@ function create_climaatmos_parameter_set(
     aliases = setdiff(aliases, ["thermo_params"])
     pairs = CP.get_parameter_values!(toml_dict, aliases, "CloudMicrophysics")
     pairs = CA.override_climaatmos_defaults((; pairs...), overrides)
-    microphys_params = CM.Parameters.CloudMicrophysicsParameters{FTD, TP}(;
-        pairs...,
-        thermo_params,
-    )
+    microphys_params = CM.Parameters.CloudMicrophysicsParameters{FTD, TP}(; pairs..., thermo_params)
     MP = typeof(microphys_params)
 
-    aliases = [
-        "Pr_0_Gryanik",
-        "a_m_Gryanik",
-        "a_h_Gryanik",
-        "b_m_Gryanik",
-        "b_h_Gryanik",
-        "ζ_a_Gryanik",
-        "γ_Gryanik",
-    ]
+    aliases = ["Pr_0_Gryanik", "a_m_Gryanik", "a_h_Gryanik", "b_m_Gryanik", "b_h_Gryanik", "ζ_a_Gryanik", "γ_Gryanik"]
     pairs = CP.get_parameter_values!(toml_dict, aliases, "UniversalFunctions")
     pairs = (; pairs...) # convert to NamedTuple
     pairs = (;
@@ -70,27 +59,15 @@ function create_climaatmos_parameter_set(
     ufp = UF.GryanikParams{FTD}(; pairs...)
     UFP = typeof(ufp)
 
-    pairs = CP.get_parameter_values!(
-        toml_dict,
-        ["von_karman_const"],
-        "SurfaceFluxesParameters",
-    )
+    pairs = CP.get_parameter_values!(toml_dict, ["von_karman_const"], "SurfaceFluxesParameters")
     pairs = CA.override_climaatmos_defaults((; pairs...), overrides)
-    surf_flux_params = SF.Parameters.SurfaceFluxesParameters{FTD, UFP, TP}(;
-        pairs...,
-        ufp,
-        thermo_params,
-    )
+    surf_flux_params = SF.Parameters.SurfaceFluxesParameters{FTD, UFP, TP}(; pairs..., ufp, thermo_params)
     SFP = typeof(surf_flux_params)
 
     aliases = string.(fieldnames(TCP.TurbulenceConvectionParameters))
     pairs = CP.get_parameter_values!(toml_dict, aliases, "EDMF")
     pairs = CA.override_climaatmos_defaults((; pairs...), overrides)
-    tc_params = TCP.TurbulenceConvectionParameters{FTD, MP, SFP}(;
-        pairs...,
-        microphys_params,
-        surf_flux_params,
-    )
+    tc_params = TCP.TurbulenceConvectionParameters{FTD, MP, SFP}(; pairs..., microphys_params, surf_flux_params)
 
     aliases = string.(fieldnames(RP.RRTMGPParameters))
     pairs = CP.get_parameter_values!(toml_dict, aliases, "RRTMGP")

@@ -52,7 +52,7 @@ function argparse_settings()
         arg_type = Int
         default = 0
         "--uft"
-        help = "Universal function type [`Businger` (default), `Gryanik`]"
+        help = "Universal function type [`Businger` (default), `Gryanik`, `Grachev`, `Cheng`, `Beljaars`, `Holtslag`]"
         arg_type = String
         default = "Businger"
         # ClimaAtmos flags

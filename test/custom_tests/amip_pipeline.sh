@@ -25,7 +25,7 @@ export JULIA_NUM_THREADS=${SLURM_CPUS_PER_TASK:=1}
 export CLIMACORE_DISTRIBUTED="MPI"
 export JULIA_HDF5_PATH=""
 
-export RUN_NAME=AMIP_modular_Float64+monthly_checkpoint
+export RUN_NAME=AMIP_modular+monthly_checkpoint
 export RESTART_DIR=experiments/AMIP/modular/output/amip/${RUN_NAME}_artifacts/
 export RESTART_T=200
 

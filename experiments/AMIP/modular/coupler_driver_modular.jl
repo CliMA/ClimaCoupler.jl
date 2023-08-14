@@ -89,7 +89,8 @@ if isinteractive()
     parsed_args["precip_model"] = "0M" #hide
     parsed_args["job_id"] = "interactive_debug_run" #hide
     parsed_args["monthly_checkpoint"] = true #hide
-    parsed_args["uft"] = "Gryanik" #hide
+    parsed_args["uft"] = "Businger" #hide
+    parsed_args["anim"] = true #hide
 end
 
 ## read in some parsed command line arguments

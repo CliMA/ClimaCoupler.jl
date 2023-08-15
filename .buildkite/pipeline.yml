@@ -154,6 +154,13 @@ steps:
         agents:
           slurm_mem: 20GB
 
+      - label: "Slabplanet: albedo from temporal map"
+        key: "slabplanet_albedo_maptemporal"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name slabplanet_albedo_maptemporal --FLOAT_TYPE Float64 --coupled true --surface_setup PrescribedSurface  --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 9days --dt_cpl 200 --dt 200secs --mono_surface true --h_elem 4 --precip_model 0M --anim true --albedo_type map_temporal --job_id slabplanet_albedo_maptemporal"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_albedo_maptemporal_artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
 
       # AMIP
 
@@ -199,8 +206,8 @@ steps:
           slurm_mem: 20GB
 
       - label: "Moist earth with slab surface - default: monin gray no_sponge idealinsol freq_dt_cpl - bucket using BulkAlbedoFunction"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --FLOAT_TYPE Float64 --coupled true --surface_setup PrescribedSurface --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface true --h_elem 4 --precip_model 0M --albedo_from_file false --run_name default_albedo_prescribed --job_id default_albedo_from_file"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/default_albedo_from_file_artifacts/total_energy*.png"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --FLOAT_TYPE Float64 --coupled true --surface_setup PrescribedSurface --moist equil --vert_diff true --rad gray --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 200 --dt 200secs --mono_surface true --h_elem 4 --precip_model 0M --albedo_type function --run_name default_albedo_prescribed --job_id default_albedo_function"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet/default_albedo_function_artifacts/total_energy*.png"
         agents:
           slurm_mem: 20GB
 
@@ -212,7 +219,7 @@ steps:
 
       # Note: this test fails when run with the more realistic albedo from file
       - label: "Moist earth with slab surface - target: monin allsky sponge realinsol infreq_dt_cpl - bucket using BulkAlbedoFunction"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --FLOAT_TYPE Float64  --run_name target_params_in_slab --coupled true --surface_setup PrescribedSurface --moist equil --vert_diff true --rad allskywithclear --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 3600 --dt 200secs --dt_rad 6hours --idealized_insolation false --mono_surface true --h_elem 6 --precip_model 0M --albedo_from_file false --job_id target_params_in_slab" # idealized albedo breaks
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --FLOAT_TYPE Float64  --run_name target_params_in_slab --coupled true --surface_setup PrescribedSurface --moist equil --vert_diff true --rad allskywithclear --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 3600 --dt 200secs --dt_rad 6hours --idealized_insolation false --mono_surface true --h_elem 6 --precip_model 0M --albedo_type function --job_id target_params_in_slab" # idealized albedo breaks
         artifact_paths: "experiments/AMIP/modular/output/slabplanet/target_params_in_slab_artifacts/total_energy*.png"
         agents:
           slurm_mem: 20GB
@@ -306,5 +313,3 @@ steps:
           - build_history staging # name of branch to plot
         artifact_paths:
           - "build_history.html"
-
-

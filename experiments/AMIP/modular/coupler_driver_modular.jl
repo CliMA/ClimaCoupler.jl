@@ -209,13 +209,15 @@ land_sim = bucket_init(
     FT,
     FT.(tspan),
     parsed_args["config"],
-    parsed_args["albedo_from_file"],
+    parsed_args["albedo_type"],
     comms_ctx,
     REGRID_DIR;
     dt = FT(Δt_cpl),
     space = boundary_space,
     saveat = FT(saveat),
     area_fraction = land_fraction,
+    date_ref = date0,
+    t_start = FT(0),
 )
 
 #=

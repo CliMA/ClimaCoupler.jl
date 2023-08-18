@@ -111,6 +111,7 @@ include("components/land/bucket_init.jl")
 include("components/land/bucket_utils.jl")
 include("components/ocean/slab_ocean_init.jl")
 include("components/ocean/prescr_seaice_init.jl")
+include("components/ocean/eisenman_seaice_init.jl")
 
 ## helpers for user-specified IO
 include("user_io/user_diagnostics.jl")
@@ -317,6 +318,31 @@ elseif mode_name == "slabplanet"
     ))
 
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
+
+elseif mode_name == "slabplanet_eisenman"
+    ## ocean
+    ocean_sim = ocean_init(
+        FT;
+        tspan = tspan,
+        dt = Δt_cpl,
+        space = boundary_space,
+        saveat = saveat,
+        area_fraction = ClimaCore.Fields.zeros(boundary_space), # zero, since ML is calculated below
+        thermo_params = thermo_params,
+    )
+
+    ## sea ice (here set to zero area coverage)
+    ice_sim = eisenman_seaice_init(
+        FT,
+        tspan,
+        space = boundary_space,
+        area_fraction = (FT(1) .- land_fraction),
+        dt = Δt_cpl,
+        saveat = saveat,
+        thermo_params = thermo_params,
+    )
+
+    mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
 end
 
 #=
@@ -384,7 +410,7 @@ diagnostics = (monthly_3d_diags, monthly_2d_diags)
 conservation_checks = nothing
 if energy_check
     @assert(
-        mode_name == "slabplanet" && !CA.is_distributed(ClimaComms.context(boundary_space)),
+        mode_name[1:10] == "slabplanet" && !CA.is_distributed(ClimaComms.context(boundary_space)),
         "Only non-distributed slabplanet allowable for energy_check"
     )
     conservation_checks = (; energy = EnergyConservationCheck(model_sims), water = WaterConservationCheck(model_sims))
@@ -577,7 +603,7 @@ Currently all postprocessing is performed using the root process only.
 if ClimaComms.iamroot(comms_ctx)
 
     ## energy check plots
-    if !isnothing(cs.conservation_checks) && cs.mode.name == "slabplanet"
+    if !isnothing(cs.conservation_checks) && cs.mode.name[1:10] == "slabplanet"
         @info "Conservation Check Plots"
         plot_global_conservation(
             cs.conservation_checks.energy,

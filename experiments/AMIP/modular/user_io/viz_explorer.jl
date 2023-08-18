@@ -21,7 +21,6 @@ function plot_anim(cs, out_dir = ".")
 
     anim = Plots.@animate for u in sol_atm.u
         Plots.plot(Fields.level(u.c.ρe_tot, 1) .- Fields.level(sol_atm.u[1].c.ρe_tot, 1), clims = (-5000, 50000))
-        println(parent(Fields.level(u.c.ρe_tot, 1) .- Fields.level(sol_atm.u[1].c.ρe_tot, 1))[1])
     end
     Plots.mp4(anim, joinpath(out_dir, "anim_rhoe_anom.mp4"), fps = 10)
 
@@ -42,6 +41,17 @@ function plot_anim(cs, out_dir = ".")
                 combined_field,
                 cs.surface_fractions,
                 (; land = land_T_sfc, ocean = oceanu.T_sfc, ice = FT(0)),
+            )
+            Plots.plot(combined_field)
+        end
+    elseif mode_name == "slabplanet_eisenman"
+        slab_ice_sim = slab_ice_sim.integrator.sol
+        anim = Plots.@animate for (bucketu, iceu) in zip(sol_slab.u, slab_ice_sim.u)
+            land_T_sfc = get_land_temp_from_state(cs.model_sims.land_sim, bucketu)
+            combine_surfaces_from_sol!(
+                combined_field,
+                cs.surface_fractions,
+                (; land = land_T_sfc, ocean = FT(0), ice = iceu.T_sfc),
             )
             Plots.plot(combined_field)
         end
@@ -82,6 +92,19 @@ function plot_anim(cs, out_dir = ".")
     end
     Plots.mp4(anim, joinpath(out_dir, "bucket_snow.mp4"), fps = 10)
 
+    if mode_name == "slabplanet_eisenman"
+        sol_ice = cs.model_sims.ice_sim.integrator.sol
+        combined_field = zeros(boundary_space)
+        anim = Plots.@animate for sol_iceu in sol_ice.u
+            combine_surfaces_from_sol!(
+                combined_field,
+                cs.surface_fractions,
+                (; land = 0.0, ocean = 0.0, ice = sol_iceu.h_ice),
+            )
+            Plots.plot(combined_field)
+        end
+        Plots.mp4(anim, joinpath(out_dir, "eisenman_seaice.mp4"), fps = 10)
+    end
     # plot surface fluxes
     # TODO as part of the flux accumulation PR
 end

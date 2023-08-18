@@ -186,7 +186,7 @@ function bucket_init(
     else # Use spatially-varying function for surface albedo
         function α_sfc(coordinate_point)
             (; lat, long) = coordinate_point
-            return typeof(lat)(0.4)
+            return typeof(lat)(FT(0.4))
         end
         albedo = BulkAlbedoFunction{FT}(α_snow, α_sfc)
     end
@@ -230,12 +230,12 @@ function bucket_init(
         elseif anomaly_tropics == true
             ΔT = FT(40 * cos(radlat)^4)
         end
-        T_sfc_0 + ΔT
+        FT(T_sfc_0 + ΔT)
     end
 
-    Y.bucket.W .= 0.5#0.14
-    Y.bucket.Ws .= 0.0
-    Y.bucket.σS .= 0.0
+    Y.bucket.W .= FT(0.5)#0.14
+    Y.bucket.Ws .= FT(0.0)
+    Y.bucket.σS .= FT(0.0)
     P_liq = zeros(axes(Y.bucket.W)) .+ FT(0.0)
     P_snow = zeros(axes(Y.bucket.W)) .+ FT(0.0)
     variable_names = (propertynames(p.bucket)..., :P_liq, :P_snow)
@@ -255,7 +255,7 @@ function bucket_init(
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     bucket_ode_function = CTS.ClimaODEFunction(T_exp! = exp_tendency!, dss! = ClimaLSM.dss!)
     prob = ODEProblem(bucket_ode_function, Y, tspan, p_new)
-    integrator = init(prob, ode_algo; dt = dt, saveat = saveat, adaptive = false)
+    integrator = init(prob, ode_algo; dt = FT(dt), saveat = FT(saveat), adaptive = false)
 
     BucketSimulation(model, Y, (; domain = domain, soil_depth = d_soil), integrator, area_fraction)
 end

@@ -76,9 +76,9 @@ if isinteractive()
     parsed_args["moist"] = "equil" #hide
     parsed_args["vert_diff"] = true #hide
     parsed_args["rad"] = "gray" #hide
-    parsed_args["energy_check"] = true #hide
-    parsed_args["mode_name"] = "slabplanet" #hide
-    parsed_args["t_end"] = "10days" #hide
+    parsed_args["energy_check"] = false #hide
+    parsed_args["mode_name"] = "amip" #hide
+    parsed_args["t_end"] = "32days" #hide
     parsed_args["dt_save_to_sol"] = "3600secs" #hide
     parsed_args["dt_cpl"] = 200 #hide
     parsed_args["dt"] = "200secs" #hide
@@ -89,6 +89,8 @@ if isinteractive()
     parsed_args["precip_model"] = "0M" #hide
     parsed_args["job_id"] = "interactive_debug_run"
     parsed_args["monthly_checkpoint"] = true
+    parsed_args["anim"] = true
+    parsed_args["run_name"] = "amip_test"
 end
 
 ## read in some parsed command line arguments
@@ -653,5 +655,5 @@ if ClimaComms.iamroot(comms_ctx)
     end
 
     ## clean up
-    rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
+    # rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
 end

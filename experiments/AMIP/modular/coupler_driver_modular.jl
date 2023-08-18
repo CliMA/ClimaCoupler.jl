@@ -196,7 +196,6 @@ land_fraction =
     Regridder.land_fraction(FT, REGRID_DIR, comms_ctx, land_mask_data, "LSMASK", boundary_space, mono = mono_surface)
 
 ## init surface (slab) model components
-include("components/slab_utils.jl")
 include("components/land/bucket_init.jl")
 include("components/land/bucket_utils.jl")
 include("components/ocean/slab_ocean_init.jl")

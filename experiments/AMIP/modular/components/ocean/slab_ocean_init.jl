@@ -1,8 +1,11 @@
 using ClimaCore
 
+import ClimaTimeSteppers as CTS
 import ClimaCoupler.Interfacer: OceanModelSimulation, get_field, update_field!, name
 import ClimaCoupler.FieldExchanger: step!, reinit!
 import ClimaCoupler.FluxCalculator: update_turbulent_fluxes_point!
+
+include("../slab_utils.jl")
 
 """
     SlabOceanSimulation{P, Y, D, I}
@@ -74,11 +77,11 @@ function slab_ocean_rhs!(dY, Y, cache, t)
 end
 
 """
-    ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, stepper = Euler()) where {FT}
+    ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, stepper = CTS.RK4()) where {FT}
 
 Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `step!` in the coupling loop.
 """
-function ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, thermo_params, stepper = Euler()) where {FT}
+function ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, thermo_params, stepper = CTS.RK4()) where {FT}
 
     params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
 
@@ -91,9 +94,15 @@ function ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, thermo_
         ρ_sfc = ClimaCore.Fields.zeros(space),
         area_fraction = area_fraction,
         thermo_params = thermo_params,
+        # add dss_buffer to cache to avoid runtime dss allocation
+        dss_buffer = ClimaCore.Spaces.create_dss_buffer(ClimaCore.Fields.zeros(space)),
     )
-    problem = OrdinaryDiffEq.ODEProblem(slab_ocean_rhs!, Y, tspan, cache)
-    integrator = OrdinaryDiffEq.init(problem, stepper, dt = dt, saveat = saveat)
+
+    ode_algo = CTS.ExplicitAlgorithm(stepper)
+    ode_function = CTS.ClimaODEFunction(T_exp! = slab_ocean_rhs!, dss! = weighted_dss_slab!)
+
+    problem = ODEProblem(ode_function, Y, FT.(tspan), cache)
+    integrator = init(problem, ode_algo, dt = FT(dt), saveat = FT(saveat), adaptive = false)
 
     SlabOceanSimulation(params, Y, space, integrator)
 end

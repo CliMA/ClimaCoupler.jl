@@ -13,9 +13,9 @@ include("plot_helper.jl")
         fig_name = "ncep_paperplots",
     )
 
-Coordinates the postprocessing and plotting of sample fields (specified in `post_spec`) 
+Coordinates the postprocessing and plotting of sample fields (specified in `post_spec`)
 of a particular monthly mean dataset (specified by `month_date`). Any plot NCEP- specific
-customization should be done here. 
+customization should be done here.
 """
 function ncep_paperplots(
     post_spec::NamedTuple,
@@ -35,6 +35,7 @@ function ncep_paperplots(
     diags_vnames = propertynames(post_spec)
 
     all_plots = []
+    all_data = (;)
     for vname in diags_vnames
         @info vname
 
@@ -50,21 +51,25 @@ function ncep_paperplots(
         p = plot(post_data, zmd_params = zonal_mean_params, hsd_params = (; getproperty(plot_spec, vname)...))
 
         push!(all_plots, p)
+
+        # create a named tuple with data
+        data = post_data.data
+        all_data = merge(all_data, [vname => data])
     end
 
     # combine plots and save figure
     save_fig = Plots.plot(
         all_plots...,
-        size = (1500, 800),
-        right_margin = 12Plots.mm,
-        left_margin = 12Plots.mm,
-        bottom_margin = 12Plots.mm,
-        top_margin = 12Plots.mm,
+        size = (1500, 1200),
+        right_margin = 3Plots.mm,
+        left_margin = 3Plots.mm,
+        bottom_margin = 3Plots.mm,
+        top_margin = 3Plots.mm,
     )
 
     Plots.png(save_fig, joinpath(output_dir, fig_name * ".png"))
 
-    return all_plots
+    return all_data
 end
 
 abstract type DataSource end
@@ -116,7 +121,7 @@ function get_var(data_source::NCEPMonthlyDataSource, ::Val{:q_tot})
     download_read_nc(data_source, https, ncep_vname)
 end
 
-function get_var(data_source::NCEPMonthlyDataSource, ::Val{:toa})
+function get_var(data_source::NCEPMonthlyDataSource, ::Val{:toa_fluxes})
     https_root = "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis2/Monthlies/gaussian_grid/"
     https_suffix = ".ntat.mon.mean.nc"
 
@@ -132,7 +137,7 @@ function get_var(data_source::NCEPMonthlyDataSource, ::Val{:toa})
     return (data_uswrf .- data_dswrf .+ data_ulwrf, coords)
 end
 
-function get_var(data_source::NCEPMonthlyDataSource, ::Val{:precipitation})
+function get_var(data_source::NCEPMonthlyDataSource, ::Val{:precipitation_rate})
     https = "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis2/Monthlies/gaussian_grid/prate.sfc.mon.mean.nc"
     ncep_vname = "prate"
     download_read_nc(data_source, https, ncep_vname)
@@ -143,4 +148,14 @@ function get_var(data_source::NCEPMonthlyDataSource, ::Val{:T_sfc})
     ncep_vname = "air"
     t_celsius, coords = download_read_nc(data_source, https, ncep_vname)
     return (t_celsius .+ 273.15, coords)
+end
+
+function get_var(data_source::NCEPMonthlyDataSource, ::Val{:tubulent_energy_fluxes})
+    https = "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis2/Monthlies/gaussian_grid/lhtfl.sfc.mon.mean.nc"
+    ncep_vname = "lhtfl"
+    lhtfl, coords = download_read_nc(data_source, https, ncep_vname)
+    https = "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis2/Monthlies/gaussian_grid/shtfl.sfc.mon.mean.nc"
+    ncep_vname = "shtfl"
+    shtfl, coords = download_read_nc(data_source, https, ncep_vname)
+    return (shtfl .+ lhtfl, coords)
 end

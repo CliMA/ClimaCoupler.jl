@@ -353,7 +353,7 @@ dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)
 User can write custom diagnostics in the `user_diagnostics.jl`.
 =#
 monthly_3d_diags = init_diagnostics(
-    (:T, :u, :q_tot),
+    (:T, :u, :q_tot, :q_liq_ice),
     atmos_sim.domain.center_space;
     save = Monthly(),
     operations = (; accumulate = TimeMean([Int(0)])),
@@ -362,7 +362,7 @@ monthly_3d_diags = init_diagnostics(
 )
 
 monthly_2d_diags = init_diagnostics(
-    (:precipitation, :toa, :T_sfc),
+    (:precipitation_rate, :toa_fluxes, :T_sfc, :tubulent_energy_fluxes),
     boundary_space;
     save = Monthly(),
     operations = (; accumulate = TimeMean([Int(0)])),
@@ -610,20 +610,24 @@ if ClimaComms.iamroot(comms_ctx)
             T = (:regrid, :zonal_mean),
             u = (:regrid, :zonal_mean),
             q_tot = (:regrid, :zonal_mean),
-            toa = (:regrid, :horizontal_slice),
-            precipitation = (:regrid, :horizontal_slice),
+            toa_fluxes = (:regrid, :horizontal_slice),
+            precipitation_rate = (:regrid, :horizontal_slice),
             T_sfc = (:regrid, :horizontal_slice),
+            tubulent_energy_fluxes = (:regrid, :horizontal_slice),
+            q_liq_ice = (:regrid, :zonal_mean),
         )
 
         plot_spec = (;
             T = (; clims = (190, 320), units = "K"),
             u = (; clims = (-50, 50), units = "m/s"),
-            q_tot = (; clims = (0, 50), units = "g/kg"),
-            toa = (; clims = (-250, 210), units = "W/m^2"),
-            precipitation = (clims = (0, 1e-6), units = "kg/m^2/s"),
+            q_tot = (; clims = (0, 30), units = "g/kg"),
+            toa_fluxes = (; clims = (-250, 250), units = "W/m^2"),
+            precipitation_rate = (clims = (0, 1e-4), units = "kg/m^2/s"),
             T_sfc = (clims = (225, 310), units = "K"),
+            tubulent_energy_fluxes = (; clims = (-250, 250), units = "W/m^2"),
+            q_liq_ice = (; clims = (0, 10), units = "g/kg"),
         )
-        amip_paperplots(
+        amip_data = amip_paperplots(
             post_spec,
             plot_spec,
             COUPLER_OUTPUT_DIR,
@@ -638,12 +642,13 @@ if ClimaComms.iamroot(comms_ctx)
             T = (:zonal_mean,),
             u = (:zonal_mean,),
             q_tot = (:zonal_mean,),
-            toa = (:horizontal_slice,),
-            precipitation = (:horizontal_slice,),
+            toa_fluxes = (:horizontal_slice,),
+            precipitation_rate = (:horizontal_slice,),
             T_sfc = (:horizontal_slice,),
+            tubulent_energy_fluxes = (:horizontal_slice,),
         )
         ncep_plot_spec = plot_spec
-        ncep_paperplots(
+        ncep_data = ncep_paperplots(
             ncep_post_spec,
             ncep_plot_spec,
             COUPLER_OUTPUT_DIR,

@@ -1,5 +1,8 @@
 using SafeTestsets
 
+@safetestset "Aqua tests" begin
+    include("aqua.jl")
+end
 @safetestset "Clock tests" begin
     include("CoupledSimulations/clock.jl")
 end

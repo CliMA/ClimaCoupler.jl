@@ -142,39 +142,36 @@ function diff_paperplots(;
 
     all_plots = []
     all_data = (;)
-    for name in diags_names, vname in diags_vnames
+    for (name, vname) in zip(diags_names, diags_vnames)
 
         @info name
         @info vname
 
         # AMIP: extract data from files
-        diag_data = read_latest_model_data(name, files_dir, files_root)
+        amip_data = read_latest_model_data(name, files_dir, files_root)
 
         # NCEP: download and read data of this month
-        data, coords = get_var(ncep_src, Val(vname))
-        raw_tag = length(size(data)) == 3 ? ZLatLonData() : LatLonData()
+        ncep_data, coords = get_var(ncep_src, Val(vname))
+        raw_tag = length(size(ncep_data)) == 3 ? ZLatLonData() : LatLonData()
 
-        # AMIP: post processes data
-        amip_post_data = postprocess(name, diag_data, getproperty(amip_post_spec, name), nlat = nlat, nlon = nlon)
-        amip_post_data.data[1] = sum(amip_post_data.data) == 0 ? amip_post_data.data[1] + eps() : amip_post_data.data[1] # avoids InexactError
-
-        # NCEP: post processes data
-        ncep_post_data = postprocess(vname, data, getproperty(ncep_post_spec, vname), coords = coords, raw_tag = raw_tag)
-
-        # Take difference between NCEP and AMIP data (NCEP - AMIP)
-        min_length = min(length(ncep_post_data.data), length(amip_post_data.data))
-        post_data_values = Array{Float64}(undef, min_length)
+        # NCEP-AMIP: Take difference between NCEP and AMIP raw data
+        min_length = min(length(amip_data), length(ncep_data))
+        diff_data = similar(ncep_data, Float64)
 
         for i in 1:(min_length - 1)
-            post_data_values[i] = ncep_post_data.data[i] - amip_post_data.data[i]
+            diff_data[i] = ncep_data[i] - amip_data[i]
         end
 
-        # Construct new data package using differences
-        post_data = DataPackage(raw_tag, name, post_data_values, coords = coords)
+        # Option 1: Post process the difference data using amip_post_spec
+        # diff_data = postprocess(name, diff_data, getproperty(amip_post_spec, name), nlat = nlat, nlon = nlon)
+        # diff_data.data[1] = sum(diff_data.data) == 0 ? diff_data.data[1] + eps() : diff_data.data[1] # avoids InexactError
 
-        # AMIP/NCEP: plot difference
+        # Option 2: Post process the difference data using ncep_post_spec
+        diff_data = postprocess(vname, diff_data, getproperty(ncep_post_spec, vname), coords = coords, raw_tag = raw_tag)
+
+        # AMIP/NCEP: plot difference data
         p = plot(
-            post_data,
+            diff_data,
             zmd_params = (; getproperty(plot_spec, vname)...),
             hsd_params = (; getproperty(plot_spec, vname)...),
         )
@@ -182,7 +179,7 @@ function diff_paperplots(;
         push!(all_plots, p)
 
         # create a named tuple with data
-        data = post_data_values
+        data = diff_data.data
         all_data = merge(all_data, [name => data])
     end
 

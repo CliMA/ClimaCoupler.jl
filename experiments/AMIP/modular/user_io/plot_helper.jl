@@ -10,9 +10,9 @@ Coordinates plotting based on parsed data types.
 """
 function plot(post_data::DataPackage; zmd_params = (;), hsd_params = (;))
 
-    if post_data isa ZLatData
+    if post_data.tag isa ZLatData
         plot_params = zmd_params
-    elseif post_data isa LatLonData
+    elseif post_data.tag isa LatLonData
         plot_params = hsd_params
     else
         plot_params = (;)
@@ -45,7 +45,7 @@ function contourf(
     units = " ",
 )
     clims = clims == nothing ? extrema(p.data) : clims
-    plot_p = Plots.contourf(
+    Plots.contourf(
         p.coords.lat,
         p.coords.lev,
         p.data',

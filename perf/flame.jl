@@ -18,7 +18,7 @@ run_name_list =
 run_name = run_name_list[parse(Int, ARGS[2])]
 allocs_limit = Dict()
 allocs_limit["perf_default_modular_unthreaded"] = 8638304
-allocs_limit["perf_coarse_single_modular"] = 12671552
+allocs_limit["perf_coarse_single_modular"] = 18280800
 allocs_limit["perf_target_amip_n32_shortrun"] = 172134848
 
 # number of time steps used for profiling

@@ -27,17 +27,30 @@ get_var(cs::CoupledSimulation, ::Val{:u}) =
 """
     get_var(cs::CoupledSimulation, ::Val{:q_tot})
 
-Total specific humidity (kg kg⁻¹).
+Total specific humidity (g kg⁻¹).
 """
 get_var(cs::CoupledSimulation, ::Val{:q_tot}) =
     cs.model_sims.atmos_sim.integrator.u.c.ρq_tot ./ cs.model_sims.atmos_sim.integrator.u.c.ρ .* float_type(cs)(1000)
 
+
 """
-    get_var(cs::CoupledSimulation, ::Val{:toa})
+    get_var(cs::CoupledSimulation, ::Val{:q_liq_ice})
+
+Cloud specific humidity (g kg⁻¹).
+"""
+function get_var(cs::CoupledSimulation, ::Val{:q_liq_ice})
+    p = cs.model_sims.atmos_sim.integrator.p
+    (; ᶜts, params) = p
+    thermo_params = CAP.thermodynamics_params(params)
+    TD.liquid_specific_humidity.(thermo_params, ᶜts) .* float_type(cs)(1000)
+end
+
+"""
+    get_var(cs::CoupledSimulation, ::Val{:toa_fluxes})
 
 Top of the atmosphere radiation fluxes (W m⁻²).
 """
-function get_var(cs::CoupledSimulation, ::Val{:toa})
+function get_var(cs::CoupledSimulation, ::Val{:toa_fluxes})
     atmos_sim = cs.model_sims.atmos_sim
     face_space = axes(atmos_sim.integrator.u.f)
     z = parent(Fields.coordinate_field(face_space).z)
@@ -66,11 +79,11 @@ function get_var(cs::CoupledSimulation, ::Val{:toa})
 end
 
 """
-    get_var(cs::CoupledSimulation, ::Val{:precipitation})
+    get_var(cs::CoupledSimulation, ::Val{:precipitation_rate})
 
-Precipitation (m m⁻²).
+Precipitation rate (Kg m⁻² s⁻¹).
 """
-get_var(cs::CoupledSimulation, ::Val{:precipitation}) =
+get_var(cs::CoupledSimulation, ::Val{:precipitation_rate}) =
     .-swap_space!(
         zeros(cs.boundary_space),
         cs.model_sims.atmos_sim.integrator.p.col_integrated_rain .+
@@ -84,5 +97,13 @@ get_var(cs::CoupledSimulation, ::Val{:precipitation}) =
 Combined surface temperature (K).
 """
 get_var(cs::CoupledSimulation, ::Val{:T_sfc}) = swap_space!(zeros(cs.boundary_space), cs.fields.T_S)
+
+"""
+    get_var(cs::CoupledSimulation, ::Val{:tubulent_energy_fluxes})
+
+Combined aerodynamic turbulent energy surface fluxes (W m⁻²).
+"""
+get_var(cs::CoupledSimulation, ::Val{:tubulent_energy_fluxes}) =
+    swap_space!(zeros(cs.boundary_space), cs.fields.F_turb_energy)
 
 # land diagnotics

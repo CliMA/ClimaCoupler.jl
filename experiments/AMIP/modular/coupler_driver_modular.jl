@@ -656,5 +656,5 @@ if ClimaComms.iamroot(comms_ctx)
     end
 
     ## clean up
-    rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
+    # rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
 end

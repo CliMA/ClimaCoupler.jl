@@ -121,7 +121,7 @@ function get_var(data_source::NCEPMonthlyDataSource, ::Val{:q_tot})
     download_read_nc(data_source, https, ncep_vname)
 end
 
-function get_var(data_source::NCEPMonthlyDataSource, ::Val{:toa_fluxes})
+function get_var(data_source::NCEPMonthlyDataSource, ::Val{:toa})
     https_root = "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis2/Monthlies/gaussian_grid/"
     https_suffix = ".ntat.mon.mean.nc"
 
@@ -137,7 +137,7 @@ function get_var(data_source::NCEPMonthlyDataSource, ::Val{:toa_fluxes})
     return (data_uswrf .- data_dswrf .+ data_ulwrf, coords)
 end
 
-function get_var(data_source::NCEPMonthlyDataSource, ::Val{:precipitation_rate})
+function get_var(data_source::NCEPMonthlyDataSource, ::Val{:precipitation})
     https = "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis2/Monthlies/gaussian_grid/prate.sfc.mon.mean.nc"
     ncep_vname = "prate"
     download_read_nc(data_source, https, ncep_vname)

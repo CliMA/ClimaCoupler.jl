@@ -46,11 +46,11 @@ function get_var(cs::CoupledSimulation, ::Val{:q_liq_ice})
 end
 
 """
-    get_var(cs::CoupledSimulation, ::Val{:toa_fluxes})
+    get_var(cs::CoupledSimulation, ::Val{:toa})
 
 Top of the atmosphere radiation fluxes (W m⁻²).
 """
-function get_var(cs::CoupledSimulation, ::Val{:toa_fluxes})
+function get_var(cs::CoupledSimulation, ::Val{:toa})
     atmos_sim = cs.model_sims.atmos_sim
     face_space = axes(atmos_sim.integrator.u.f)
     z = parent(Fields.coordinate_field(face_space).z)
@@ -79,11 +79,11 @@ function get_var(cs::CoupledSimulation, ::Val{:toa_fluxes})
 end
 
 """
-    get_var(cs::CoupledSimulation, ::Val{:precipitation_rate})
+    get_var(cs::CoupledSimulation, ::Val{:precipitation})
 
 Precipitation rate (Kg m⁻² s⁻¹).
 """
-get_var(cs::CoupledSimulation, ::Val{:precipitation_rate}) =
+get_var(cs::CoupledSimulation, ::Val{:precipitation}) =
     .-swap_space!(
         zeros(cs.boundary_space),
         cs.model_sims.atmos_sim.integrator.p.col_integrated_rain .+

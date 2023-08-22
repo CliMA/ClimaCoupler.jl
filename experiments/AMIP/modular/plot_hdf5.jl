@@ -1,5 +1,4 @@
-# This is a custom script
-
+# This is an in progress custom script to plot the difference between AMIP and NCEP paperplots
 
 import SciMLBase: step!, reinit!
 using OrdinaryDiffEq
@@ -63,6 +62,7 @@ COUPLER_ARTIFACTS_DIR = COUPLER_OUTPUT_DIR*"_artifacts"
 @info COUPLER_ARTIFACTS_DIR
 
 include("user_io/plot_helper.jl")
+
 ## ClimaESM
 @info "AMIP plots"
 include("user_io/amip_visualizer.jl")
@@ -75,7 +75,7 @@ amip_post_spec = (;
     T_sfc = (:regrid, :horizontal_slice),
     )
 
-amip_plot_spec = (;
+plot_spec = (;
     T = (; clims = (190, 320), units = "K"),
     u = (; clims = (-50, 50), units = "m/s"),
     q_tot = (; clims = (0, 30), units = "g/kg"),
@@ -86,7 +86,7 @@ amip_plot_spec = (;
 
 # amip_data = amip_paperplots(
 #     amip_post_spec,
-#     amip_plot_spec,
+#     plot_spec,
 #     COUPLER_OUTPUT_DIR,
 #     files_root = ".monthly",
 #     output_dir = COUPLER_ARTIFACTS_DIR,
@@ -106,9 +106,10 @@ ncep_post_spec = (;
 )
 
 ncep_plot_spec = plot_spec
+
 # ncep_data = ncep_paperplots(
 #     ncep_post_spec,
-#     ncep_plot_spec,
+#     plot_spec,
 #     COUPLER_OUTPUT_DIR,
 #     output_dir = COUPLER_ARTIFACTS_DIR,
 #     month_date = Dates.DateTime(1979, 01, 01),
@@ -118,11 +119,10 @@ ncep_plot_spec = plot_spec
 
 function diff_paperplots(;
     files_dir = COUPLER_OUTPUT_DIR,
+    plot_spec = plot_spec,
     ncep_post_spec = ncep_post_spec,
-    ncep_plot_spec = ncep_plot_spec,
     ncep_month_date = Dates.DateTime(1979, 02, 01),
     amip_post_spec = amip_post_spec,
-    amip_plot_spec = amip_plot_spec,
     output_dir = COUPLER_ARTIFACTS_DIR,
     files_root = ".monthly",
     nlat = 180,
@@ -130,14 +130,14 @@ function diff_paperplots(;
     fig_name = "diff_paperplots",
     )
 
-    # NCEP Data extraction
+    # NCEP: Data extraction
     tmp_dir = joinpath(files_dir, "ncep_tmp")
     isdir(tmp_dir) ? nothing : mkpath(tmp_dir)
 
     ncep_src = NCEPMonthlyDataSource(tmp_dir, [ncep_month_date])
     diags_vnames = propertynames(ncep_post_spec)
 
-    # AMIP Data extraction
+    # AMIP: Data extraction
     diags_names = propertynames(amip_post_spec)
 
     all_plots = []
@@ -147,36 +147,42 @@ function diff_paperplots(;
         @info name
         @info vname
 
-        # AMIP: extract data
+        # AMIP: extract data from files
         diag_data = read_latest_model_data(name, files_dir, files_root)
 
         # NCEP: download and read data of this month
         data, coords = get_var(ncep_src, Val(vname))
         raw_tag = length(size(data)) == 3 ? ZLatLonData() : LatLonData()
 
-        # AMIP: post processes
+        # AMIP: post processes data
         amip_post_data = postprocess(name, diag_data, getproperty(amip_post_spec, name), nlat = nlat, nlon = nlon)
         amip_post_data.data[1] = sum(amip_post_data.data) == 0 ? amip_post_data.data[1] + eps() : amip_post_data.data[1] # avoids InexactError
 
-        # NCEP: post processes
+        # NCEP: post processes data
         ncep_post_data = postprocess(vname, data, getproperty(ncep_post_spec, vname), coords = coords, raw_tag = raw_tag)
-        # @show ncep_post_data
-        # @show amip_post_data
 
-        # NCEP - AMIP Difference
-        post_data = @. ncep_post_data.data - amip_post_data.data
+        # Take difference between NCEP and AMIP data (NCEP - AMIP)
+        min_length = min(length(ncep_post_data.data), length(amip_post_data.data))
+        post_data_values = Array{Float64}(undef, min_length)
 
-        # AMIP/NCEP create individual plots
+        for i in 1:(min_length - 1)
+            post_data_values[i] = ncep_post_data.data[i] - amip_post_data.data[i]
+        end
+
+        # Construct new data package using differences
+        post_data = DataPackage(raw_tag, name, post_data_values, coords = coords)
+
+        # AMIP/NCEP: plot difference
         p = plot(
             post_data,
-            zmd_params = (; getproperty(amip_plot_spec, name)...),
-            hsd_params = (; getproperty(amip_plot_spec, name)...),
+            zmd_params = (; getproperty(plot_spec, vname)...),
+            hsd_params = (; getproperty(plot_spec, vname)...),
         )
 
         push!(all_plots, p)
 
         # create a named tuple with data
-        data = post_data.data
+        data = post_data_values
         all_data = merge(all_data, [name => data])
     end
 

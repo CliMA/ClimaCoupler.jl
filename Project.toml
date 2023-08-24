@@ -29,7 +29,7 @@ UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
 [compat]
 CLIMAParameters = "0.7"
-ClimaAtmos = "0.15"
+ClimaAtmos = "0.15, 0.16"
 ClimaComms = "0.5"
 ClimaCore = "0.10"
 ClimaCoreTempestRemap = "0.3"

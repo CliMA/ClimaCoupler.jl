@@ -91,20 +91,23 @@ if isinteractive()
     parsed_args["precip_model"] = "0M" #hide
     parsed_args["job_id"] = "interactive_debug_run"
     parsed_args["monthly_checkpoint"] = true
+    parsed_args["config_file"] = "config/model_configs/slabplanet_default.yml"
 end
 
 config_dict = YAML.load_file(parsed_args["config_file"])
+
+# Merge dictionaries. If there are common keys, the last dictorionary in the `merge` arguments takes precedence:
+config_dict = merge(config_dict, parsed_args)
+
 atmos_config = if !isnothing(config_dict)
     CA.override_default_config(config_dict)
 elseif !isnothing(parsed_args["config_file"])
     CA.override_default_config(parsed_args["config_file"])
-else
+else # If no config file is specified, we use the Atmos default config dict as `atmos_config`
     @info "Using Atmos default configuration"
     CA.default_config_dict()
 end
-
-config_dict = merge(config_dict, atmos_config)
-parsed_args = merge(parsed_args, config_dict)
+parsed_args = merge(config_dict, atmos_config)
 
 ## read in some parsed command line arguments
 mode_name = parsed_args["mode_name"]

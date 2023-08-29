@@ -23,6 +23,7 @@ name(::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
 
 function atmos_init(::Type{FT}, parsed_args::Dict) where {FT}
 
+    # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
     atmos_config = CA.AtmosConfig(; config_dict = parsed_args)
     integrator = CA.get_integrator(atmos_config)
     Y = integrator.u

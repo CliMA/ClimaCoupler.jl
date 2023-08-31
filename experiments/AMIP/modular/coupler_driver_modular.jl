@@ -94,10 +94,14 @@ if isinteractive()
     parsed_args["config_file"] = "config/model_configs/slabplanet_default.yml"
 end
 
+# read in config dictionary from file
 config_dict = YAML.load_file(parsed_args["config_file"])
 
-# Merge dictionaries. If there are common keys, the last dictorionary in the `merge` arguments takes precedence:
-config_dict = merge(config_dict, parsed_args)
+if isinteractive() # merge dictionaries. If there are common keys, the last dictorionary in the `merge` arguments takes precedence:
+    config_dict = merge(config_dict, parsed_args)
+else
+    config_dict = merge(parsed_args, config_dict)
+end
 
 atmos_config = if !isnothing(config_dict)
     CA.override_default_config(config_dict)

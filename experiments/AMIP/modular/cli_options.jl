@@ -31,10 +31,10 @@ function argparse_settings()
         help = "Method to partition turbulent fluxes. [`PartitionedStateFluxes`, `CombinedStateFluxes`]"
         arg_type = String
         default = "CombinedStateFluxes"
-        "--albedo_from_file"
-        help = "Access land surface albedo information from data file"
-        arg_type = Bool
-        default = true
+        "--albedo_type"
+        help = "Access land surface albedo information from data file. [`function`, `map_static`, `map_temporal`]"
+        arg_type = String
+        default = "map_static"
         "--coupled" # TODO - remove from Atmos
         help = "Coupled simulation [`false` (default), `true`]"
         arg_type = Bool

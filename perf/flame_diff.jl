@@ -10,14 +10,21 @@ import .ProfileCanvasDiff
 using JLD2
 using YAML
 
-buildkite_branch = ENV["BUILDKITE_BRANCH"]
-buildkite_commit = ENV["BUILDKITE_COMMIT"]
-buildkite_number = ENV["BUILDKITE_BUILD_NUMBER"]
-buildkite_build_path = ENV["BUILDKITE_BUILD_PATH"]
-buildkite_pipeline_slug = ENV["BUILDKITE_PIPELINE_SLUG"]
-buildkite_cc_dir = "/groups/esm/slurm-buildkite/climacoupler-ci/"
-scratch_cc_dir = joinpath(buildkite_build_path, buildkite_pipeline_slug)
-build_path = joinpath(buildkite_build_path, buildkite_pipeline_slug, buildkite_number, buildkite_pipeline_slug, "perf/")
+if isinteractive()
+    buildkite_cc_dir = "."
+    scratch_cc_dir = "."
+    build_path = "0"
+else
+    buildkite_branch = ENV["BUILDKITE_BRANCH"]
+    buildkite_commit = ENV["BUILDKITE_COMMIT"]
+    buildkite_number = ENV["BUILDKITE_BUILD_NUMBER"]
+    buildkite_build_path = ENV["BUILDKITE_BUILD_PATH"]
+    buildkite_pipeline_slug = ENV["BUILDKITE_PIPELINE_SLUG"]
+    buildkite_cc_dir = "/groups/esm/slurm-buildkite/climacoupler-ci/"
+    scratch_cc_dir = joinpath(buildkite_build_path, buildkite_pipeline_slug)
+    build_path =
+        joinpath(buildkite_build_path, buildkite_pipeline_slug, buildkite_number, buildkite_pipeline_slug, "perf/")
+end
 
 cwd = pwd()
 @info "build_path is: $build_path"
@@ -29,28 +36,32 @@ include(joinpath(cc_dir, "experiments", "AMIP", "modular", "cli_options.jl"));
 # assuming a common driver for all tested runs
 filename = joinpath(cc_dir, "experiments", "AMIP", "modular", "coupler_driver_modular.jl")
 
-# selected runs for performance analysis and their expected allocations (based on previous runs)
-run_name_list =
-    ["default_modular_unthreaded", "coarse_single_modular_ft64_monthly_checkpoints", "target_amip_n1_shortrun"]
-parsed_args = parse_commandline(argparse_settings())
-config_dict = YAML.load_file(parsed_args["config_file"])
-run_name = run_name_list[parse(Int, config_dict["run_name"])]
-
 # number of time steps used for profiling
 n_samples = 2
 
+# import parsed command line arguments
+parsed_args = parse_commandline(argparse_settings())
+
+# select the configuration file and extract the run-name
+config_file =
+    parsed_args["config_file"] =
+        isinteractive() ? "../config/model_configs/default_modular_unthreaded.yml" : parsed_args["config_file"]
+run_name = parsed_args["run_name"] = split(basename(config_file), ".")[1]
+
+# import config setup
+config_dict = YAML.load_file(config_file)
+
+# modify names for performance testing
+perf_run_name = "perf_" * run_name
+parsed_args["job_id"] = perf_run_name
+parsed_args["run_name"] = perf_run_name
+parsed_args = merge(config_dict, parsed_args) # global scope needed to recognize this definition in the coupler driver
+
+# disable threading
+parsed_args["enable_threading"] = false
+
 # flag to split coupler init from its solve
 ENV["CI_PERF_SKIP_COUPLED_RUN"] = true
-
-# pass in the correct arguments, overriding defaults with those specific to each run_name (in `pipeline.yaml`)
-target_job_config_dict = get(CA.configs_per_job_id(config_dir), run_name, "run_name")
-global parsed_args = merge(parsed_args, target_job_config_dict, config_dict) # global scope needed to recognize this definition in the coupler driver
-parsed_args["config_file"] = joinpath(config_dir, run_name * ".yml")
-run_name = "perf_diff_" * run_name
-perf_run_name = run_name
-parsed_args["job_id"] = run_name
-parsed_args["run_name"] = run_name
-parsed_args["enable_threading"] = false
 
 @info run_name
 

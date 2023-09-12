@@ -91,17 +91,16 @@ if isinteractive()
     parsed_args["precip_model"] = "0M" #hide
     parsed_args["job_id"] = "interactive_debug_run"
     parsed_args["monthly_checkpoint"] = true
-    parsed_args["config_file"] = "config/model_configs/slabplanet_default.yml"
+    parsed_args["config_file"] =
+        isnothing(parsed_args["config_file"]) ? "../../../config/model_configs/slabplanet_default.yml" :
+        parsed_args["config_file"]
 end
 
 # read in config dictionary from file
 config_dict = YAML.load_file(parsed_args["config_file"])
 
-if isinteractive() # merge dictionaries. If there are common keys, the last dictorionary in the `merge` arguments takes precedence:
-    config_dict = merge(config_dict, parsed_args)
-else
-    config_dict = merge(parsed_args, config_dict)
-end
+# merge dictionaries. If there are common keys, the last dictorionary in the `merge` arguments takes precedence:
+config_dict = merge(config_dict, parsed_args)
 
 atmos_config = if !isnothing(config_dict)
     CA.override_default_config(config_dict)
@@ -170,7 +169,11 @@ import ClimaCoupler.FieldExchanger:
 import ClimaCoupler.Checkpointer: checkpoint_model_state, get_model_state_vector, restart_model_state!
 
 pkg_dir = pkgdir(ClimaCoupler)
-COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/modular/output", joinpath(mode_name, run_name))
+if isinteractive()
+    COUPLER_OUTPUT_DIR = joinpath("output", joinpath(mode_name, run_name)) # TempestRemap fails if interactive and paths are too long
+else
+    COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/modular/output", joinpath(mode_name, run_name))
+end
 mkpath(COUPLER_OUTPUT_DIR)
 
 REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp/")

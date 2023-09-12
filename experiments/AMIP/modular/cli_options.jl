@@ -51,9 +51,14 @@ function argparse_settings()
         help = "Restart time"
         arg_type = Int
         default = 0
-        # ClimaAtmos flag
         "--config_file"
-        help = "A yaml file used to set model configurations"
+        help = "A yaml file used to set the configuration of the coupled model"
+        "--atmos_config_file"
+        help = "A yaml file used to set the atmospheric model configuration"
+        "--FLOAT_TYPE"
+        help = "Floating point precision  [`Float64` (default), `Float32`]"
+        arg_type = String
+        default = "Float64"
     end
     return s
 end

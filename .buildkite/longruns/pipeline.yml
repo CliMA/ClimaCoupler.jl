@@ -9,7 +9,6 @@ env:
   BUILDKITE_BRANCH: "${BUILDKITE_BRANCH}"
   JULIA_MAX_NUM_PRECOMPILE_FILES: 100
   CONFIG_PATH: "config/longrun_configs"
-  PERF_CONFIG_PATH: "config/perf_configs"
   # JULIA_DEPOT_PATH: "${BUILDKITE_BUILD_PATH}/${BUILDKITE_PIPELINE_SLUG}/depot/cpu"
 
 agents:
@@ -148,7 +147,7 @@ steps:
 
       # mpi_amip_fine_n1 flame graph report (NB: arguments passed from the ci pipeline.yml)
       - label: ":rocket: performance: flame graph diff: perf_target_amip_n1_shortrun"
-        command: "julia --color=yes --project=perf perf/flame_diff.jl --config_file $PERF_CONFIG_PATH/perf_diff_target_amip_n1_shortrun.yml"
+        command: "julia --color=yes --project=perf perf/flame_diff.jl --config_file $CONFIG_PATH/target_amip_n1_shortrun.yml"
         artifact_paths: "perf/output/perf_diff_target_amip_n1_shortrun/*"
         agents:
           slurm_mem: 20GB

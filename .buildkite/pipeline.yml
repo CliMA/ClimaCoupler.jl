@@ -10,7 +10,6 @@ env:
   JULIA_MAX_NUM_PRECOMPILE_FILES: 100
   GKSwstype: 100
   CONFIG_PATH: "config/model_configs"
-  PERF_CONFIG_PATH: "config/perf_configs"
   MPI_CONFIG_PATH: "config/mpi_configs"
   # JULIA_DEPOT_PATH: "${BUILDKITE_BUILD_PATH}/${BUILDKITE_PIPELINE_SLUG}/depot/cpu"
 
@@ -178,13 +177,13 @@ steps:
           slurm_mem: 20GB
 
       - label: ":rocket: Slabplanet: default (unthreaded) - flame graph and allocation tests"
-        command: "julia --color=yes --project=perf perf/flame.jl --config_file $PERF_CONFIG_PATH/perf_default_modular_unthreaded.yml"
+        command: "julia --color=yes --project=perf perf/flame.jl --config_file $CONFIG_PATH/default_modular_unthreaded.yml"
         artifact_paths: "perf/output/perf_default_modular_unthreaded/*"
         agents:
           slurm_mem: 20GB
 
       - label: ":rocket: Slabplanet: default (unthreaded) - flame graph diff"
-        command: "julia --color=yes --project=perf perf/flame_diff.jl --config_file $PERF_CONFIG_PATH/perf_diff_default_modular_unthreaded.yml"
+        command: "julia --color=yes --project=perf perf/flame_diff.jl --config_file $CONFIG_PATH/default_modular_unthreaded.yml"
         artifact_paths: "perf/output/perf_diff_default_modular_unthreaded/*"
         agents:
           slurm_mem: 20GB
@@ -289,15 +288,15 @@ steps:
 
       # flame graphs + allocation tests
 
-      - label: ":rocket: flame graph and allocation tests: perf_coarse_single_modular"
-        command: "julia --color=yes --project=perf perf/flame.jl --config_file $PERF_CONFIG_PATH/perf_coarse_single_modular.yml"
-        artifact_paths: "perf/output/perf_coarse_single_modular/*"
+      - label: ":rocket: flame graph and allocation tests: perf_coarse_single_modular_ft64"
+        command: "julia --color=yes --project=perf perf/flame.jl --config_file $CONFIG_PATH/coarse_single_modular_ft64.yml"
+        artifact_paths: "perf/output/perf_coarse_single_modular_ft64/*"
         agents:
           slurm_mem: 20GB
 
-      - label: ":rocket: performance: flame graph diff: perf_diff_coarse_single_modular"
-        command: "julia --color=yes --project=perf perf/flame_diff.jl --config_file $PERF_CONFIG_PATH/perf_diff_coarse_single_modular.yml"
-        artifact_paths: "perf/output/perf_diff_coarse_single_modular/*"
+      - label: ":rocket: performance: flame graph diff: perf_diff_coarse_single_modular_ft64"
+        command: "julia --color=yes --project=perf perf/flame_diff.jl --config_file $CONFIG_PATH/coarse_single_modular_ft64.yml"
+        artifact_paths: "perf/output/perf_diff_coarse_single_modular_ft64/*"
         agents:
           slurm_mem: 20GB
 

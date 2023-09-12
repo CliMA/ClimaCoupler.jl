@@ -112,8 +112,9 @@ include("components/land/bucket_utils.jl")
 include("components/ocean/slab_ocean_init.jl")
 include("components/ocean/slab_seaice_init.jl")
 
-## ## helpers for user-specified diagnostics
+## helpers for user-specified IO
 include("user_io/user_diagnostics.jl")
+include("user_io/user_logging.jl")
 
 if !(@isdefined parsed_args)
     include("cli_options.jl")

@@ -24,13 +24,14 @@ name(::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
 
 function get_atmos_config(coupler_dict)
     atmos_file = coupler_dict["atmos_config_file"]
+    # override default or specified configs with coupler arguments, and set the correct atmos config_file
     if isnothing(atmos_file)
         @info "Using Atmos default configuration"
+        merge(CA.override_default_config(atmos_file), coupler_dict, Dict("config_file" => atmos_file))
     else
         @info "Using Atmos configuration from $atmos_file"
+        merge(CA.override_default_config(joinpath(pkgdir(CA), atmos_file)), coupler_dict, Dict("config_file" => atmos_file))
     end
-    # override default or specified configs with coupler arguments, and set the correct atmos config_file
-    merge(CA.override_default_config(atmos_file), coupler_dict, Dict("config_file" => atmos_file))
 end
 
 function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}

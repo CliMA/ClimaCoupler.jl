@@ -173,14 +173,15 @@ function check_conservation!(
     FT = eltype(coupler_sim.surface_fractions.land)
 
     # save atmos
-    push!(cc.ρq_tot_atmos, sum(atmos_sim.integrator.u.c.ρq_tot))
+    push!(cc.ρq_tot_atmos, sum(atmos_sim.integrator.u.c.ρq_tot)) # kg (∫kg of water per m^3 dV)
+
 
     # save land
     if land_sim !== nothing
         ρ_cloud_liq = ClimaLSM.LSMP.ρ_cloud_liq(land_sim.model.parameters.earth_param_set)
         water_content =
-            @. (land_sim.integrator.u.bucket.σS + land_sim.integrator.u.bucket.W + land_sim.integrator.u.bucket.Ws) # m^3 water / land area / layer height
-        parent(water_content) .= parent(water_content .* surface_fractions.land) * ρ_cloud_liq # kg / land area / layer height
+            @. (land_sim.integrator.u.bucket.σS + land_sim.integrator.u.bucket.W + land_sim.integrator.u.bucket.Ws) # m^3 water / land area
+        parent(water_content) .= parent(water_content .* surface_fractions.land) * ρ_cloud_liq # kg / land area
         push!(cc.ρq_tot_land, sum(water_content)) # kg (∫ water_content dV)
     else
         push!(cc.ρq_tot_land, FT(0))
@@ -294,10 +295,10 @@ function plot_global_conservation(
     figname2 = "total_water_log.png",
 ) where {FT}
     times = collect(1:length(cc.ρq_tot_atmos)) * coupler_sim.Δt_cpl
-    diff_ρe_tot_atmos = (cc.ρq_tot_atmos .- cc.ρq_tot_atmos[1])
-    diff_ρe_tot_slab = (cc.ρq_tot_land .- cc.ρq_tot_land[1]) * FT(1e3)
-    diff_ρe_tot_slab_seaice = (cc.ρq_tot_seaice .- cc.ρq_tot_seaice[1])
-    diff_ρe_tot_slab_ocean = (cc.ρq_tot_ocean .- cc.ρq_tot_ocean[1])
+    diff_ρe_tot_atmos = (cc.ρq_tot_atmos .- cc.ρq_tot_atmos[2])
+    diff_ρe_tot_slab = (cc.ρq_tot_land .- cc.ρq_tot_land[2])
+    diff_ρe_tot_slab_seaice = (cc.ρq_tot_seaice .- cc.ρq_tot_seaice[2])
+    diff_ρe_tot_slab_ocean = (cc.ρq_tot_ocean .- cc.ρq_tot_ocean[2])
 
     times_days = times ./ (24 * 60 * 60)
     Plots.plot(times_days, diff_ρe_tot_atmos[1:length(times_days)], label = "atmos")
@@ -305,7 +306,7 @@ function plot_global_conservation(
     Plots.plot!(times_days, diff_ρe_tot_slab_seaice[1:length(times_days)], label = "seaice")
     Plots.plot!(times_days, diff_ρe_tot_slab_ocean[1:length(times_days)], label = "ocean")
 
-    tot = @. cc.ρq_tot_atmos + cc.ρq_tot_land * FT(1e3) + cc.ρq_tot_seaice + cc.ρq_tot_ocean
+    tot = @. cc.ρq_tot_atmos + cc.ρq_tot_land + cc.ρq_tot_seaice + cc.ρq_tot_ocean
 
     Plots.plot!(times_days, tot .- tot[1], label = "tot", xlabel = "time [days]", ylabel = "water(t) - water(t=0) [kg]")
     Plots.savefig(figname1)

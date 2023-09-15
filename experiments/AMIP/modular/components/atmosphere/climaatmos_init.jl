@@ -51,12 +51,12 @@ get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux}) =
     Fields.level(sim.integrator.p.ᶠradiation_flux, half)
 get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) =
     sim.integrator.p.col_integrated_rain #.+ sim.integrator.p.col_integrated_snow # all fallen snow melts for now
-get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) = sim.integrator.p.col_integrated_snow #.* FT(0)
+get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) = sim.integrator.p.col_integrated_snow #.* FT(0) # kg/m^2/s
 
 get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_energy_flux}) =
     Geometry.WVector.(sim.integrator.p.sfc_conditions.ρ_flux_h_tot)
 get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_moisture_flux}) =
-    Geometry.WVector.(sim.integrator.p.sfc_conditions.ρ_flux_q_tot)
+    Geometry.WVector.(sim.integrator.p.sfc_conditions.ρ_flux_q_tot) # kg/m^2/s
 
 get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_state_int}) = Spaces.level(sim.integrator.p.ᶜts, 1)
 

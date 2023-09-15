@@ -102,15 +102,15 @@ function update_field!(sim::BucketSimulation, ::Val{:turbulent_moisture_flux}, f
     parent(sim.integrator.p.bucket.evaporation) .= parent(field ./ ρ_liq) # m^3/m^2/s
 end
 function update_field!(sim::BucketSimulation, ::Val{:radiative_energy_flux}, field)
-    ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
-    parent(sim.integrator.p.bucket.R_n) .= parent(field ./ ρ_liq)
+    parent(sim.integrator.p.bucket.R_n) .= parent(field)
 end
 function update_field!(sim::BucketSimulation, ::Val{:liquid_precipitation}, field)
     ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
     parent(sim.integrator.p.bucket.P_liq) .= parent(field ./ ρ_liq)
 end
 function update_field!(sim::BucketSimulation, ::Val{:snow_precipitation}, field)
-    parent(sim.integrator.p.bucket.P_snow) .= parent(field)
+    ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
+    parent(sim.integrator.p.bucket.P_snow) .= parent(field ./ ρ_liq)
 end
 
 function update_field!(sim::BucketSimulation, ::Val{:air_density}, field)
@@ -126,7 +126,7 @@ function update_turbulent_fluxes_point!(sim::BucketSimulation, fields::NamedTupl
     (; F_turb_energy, F_turb_moisture) = fields
     sim.integrator.p.bucket.turbulent_energy_flux[colidx] .= F_turb_energy
     sim.integrator.p.bucket.evaporation[colidx] .=
-        F_turb_moisture ./ LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
+        F_turb_moisture ./ LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set) # m^3 / m^2 / s
     return nothing
 end
 

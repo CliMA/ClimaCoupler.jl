@@ -295,10 +295,10 @@ function plot_global_conservation(
     figname2 = "total_water_log.png",
 ) where {FT}
     times = collect(1:length(cc.ρq_tot_atmos)) * coupler_sim.Δt_cpl
-    diff_ρe_tot_atmos = (cc.ρq_tot_atmos .- cc.ρq_tot_atmos[2])
-    diff_ρe_tot_slab = (cc.ρq_tot_land .- cc.ρq_tot_land[2])
-    diff_ρe_tot_slab_seaice = (cc.ρq_tot_seaice .- cc.ρq_tot_seaice[2])
-    diff_ρe_tot_slab_ocean = (cc.ρq_tot_ocean .- cc.ρq_tot_ocean[2])
+    diff_ρe_tot_atmos = (cc.ρq_tot_atmos .- cc.ρq_tot_atmos[1])
+    diff_ρe_tot_slab = (cc.ρq_tot_land .- cc.ρq_tot_land[1])
+    diff_ρe_tot_slab_seaice = (cc.ρq_tot_seaice .- cc.ρq_tot_seaice[1])
+    diff_ρe_tot_slab_ocean = (cc.ρq_tot_ocean .- cc.ρq_tot_ocean[1])
 
     times_days = times ./ (24 * 60 * 60)
     Plots.plot(times_days, diff_ρe_tot_atmos[1:length(times_days)], label = "atmos")
@@ -321,3 +321,7 @@ function plot_global_conservation(
 end
 
 end # module
+
+
+
+

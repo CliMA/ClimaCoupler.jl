@@ -224,7 +224,7 @@ function bucket_init(
     anomaly_tropics = false
     hs_sfc = false
     Y.bucket.T = map(coords.subsurface) do coord
-        T_sfc_0 = FT(285.0)
+        T_sfc_0 = FT(275.0)
         radlat = coord.lat / FT(180) * pi
         ΔT = FT(0)
         if anomaly == true

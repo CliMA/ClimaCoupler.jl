@@ -78,7 +78,7 @@ if isinteractive()
     parsed_args["rad"] = "gray" #hide
     parsed_args["energy_check"] = true #hide
     parsed_args["mode_name"] = "slabplanet" #hide
-    parsed_args["t_end"] = "10days" #hide
+    parsed_args["t_end"] = "20days" #hide
     parsed_args["dt_save_to_sol"] = "3600secs" #hide
     parsed_args["dt_cpl"] = 200 #hide
     parsed_args["dt"] = "200secs" #hide
@@ -89,6 +89,7 @@ if isinteractive()
     parsed_args["precip_model"] = "0M" #hide
     parsed_args["job_id"] = "interactive_debug_run"
     parsed_args["monthly_checkpoint"] = true
+    parsed_args["FLOAT_TYPE"] = "Float64"
 end
 
 ## read in some parsed command line arguments
@@ -520,6 +521,16 @@ function solve_coupler!(cs)
         update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 
         ## step sims
+        # buffer = land_sim.integrator.p.dss_buffer_2d
+        # land_ρ_sfc = land_sim.integrator.p.bucket.ρ_sfc # get_field(land_sim, Val(:ρ_sfc))
+        # ClimaCore.Spaces.weighted_dss!(land_ρ_sfc, buffer)
+
+        # land_T_sfc = land_sim.integrator.p.bucket.T_sfc
+        # ClimaCore.Spaces.weighted_dss!(land_T_sfc, buffer)
+
+        # land_q_sfc = land_sim.integrator.p.bucket.q_sfc
+        # ClimaCore.Spaces.weighted_dss!(land_q_sfc, buffer)
+
         step_model_sims!(cs.model_sims, t)
 
         ## exchange combined fields and (if specified) calculate fluxes using combined states

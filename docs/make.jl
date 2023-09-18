@@ -64,7 +64,6 @@ interface_pages = [
     "utilities.md",
     "bcreader.md",
     "testhelper.md",
-    "timemanager.md",
 ]
 performance_pages = ["performance.md"]
 

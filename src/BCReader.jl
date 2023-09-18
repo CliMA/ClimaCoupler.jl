@@ -7,9 +7,10 @@ monthly to daily intervals.
 """
 module BCReader
 
-using ..Utilities, ..Regridder, ..TimeManager
+using ..Utilities, ..Regridder
 using ClimaCore: Fields
 using ClimaComms
+import ClimaUtilities: TimeManager
 using Dates
 using JLD2
 

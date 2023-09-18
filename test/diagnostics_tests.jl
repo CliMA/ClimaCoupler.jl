@@ -5,8 +5,8 @@ using Test
 using Dates
 using ClimaCore: InputOutput
 using ClimaComms
+using ClimaUtilities.TimeManager: Monthly, EveryTimestep
 using ClimaCoupler: Utilities
-using ClimaCoupler.TimeManager: EveryTimestep, Monthly
 using ClimaCoupler.TestHelper: create_space
 import ClimaCoupler.Diagnostics:
     get_var,

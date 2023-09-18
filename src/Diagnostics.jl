@@ -8,7 +8,7 @@ module Diagnostics
 using ClimaCore: Spaces, Fields, InputOutput
 using ClimaCoupler.Utilities: CoupledSimulation
 using Dates
-using ClimaCoupler.TimeManager: AbstractFrequency, Monthly, EveryTimestep, trigger_callback
+using ClimaUtilities.TimeManager: Monthly, EveryTimestep, trigger_callback
 using ClimaComms
 
 export get_var, init_diagnostics, accumulate_diagnostics!, save_diagnostics, TimeMean
@@ -131,13 +131,20 @@ end
 Saves all entries in `dg` in separate HDF5 files per variable in `output_dir`.
 """
 function save_diagnostics(cs::CoupledSimulation)
-    for dg in cs.diagnostics
+    # extract dates for callback condition check
+    date_cutoff = cs.dates.date1[1]
+    date_current = cs.dates.date[1]
+    # define function to perform diagnostic saving if callback is triggered
+    save_func = (cs) -> for dg in cs.diagnostics
         if trigger_callback(cs, dg.save)
             pre_save(dg.operations.accumulate, cs, dg)
             save_diagnostics(cs, dg)
             post_save(dg.operations.accumulate, cs, dg)
         end
     end
+    func_args = (cs,)
+    # perform monthly callback and increment `cs.dates.date1` if `date_current` passes to next month
+    trigger_callback(date_cutoff, date_current, Monthly(), save_func, func_args)
 end
 function save_diagnostics(cs::CoupledSimulation, dg::DiagnosticsGroup)
 

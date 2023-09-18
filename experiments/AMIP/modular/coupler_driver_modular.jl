@@ -65,6 +65,7 @@ import YAML
 using ClimaCore.Utilities: half, PlusHalf
 using ClimaCore: InputOutput, Fields
 import ClimaCore.Spaces as Spaces
+import ClimaUtilities: TimeManager
 
 if !(@isdefined parsed_args) # coupler defaults
     include("cli_options.jl")
@@ -138,10 +139,9 @@ import ClimaCoupler.Regridder:
     update_surface_fractions!, combine_surfaces!, combine_surfaces_from_sol!, dummmy_remap!, binary_mask
 import ClimaCoupler.ConservationChecker:
     EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
-import ClimaCoupler.Utilities: CoupledSimulation, float_type, swap_space!
+import ClimaCoupler.Utilities: CoupledSimulation, float_type, swap_space!, current_date
 import ClimaCoupler.BCReader:
     bcfile_info_init, float_type_bcf, update_midmonth_data!, next_date_in_file, interpolate_midmonth_to_daily
-import ClimaCoupler.TimeManager: current_date, datetime_to_strdate, trigger_callback, Monthly, EveryTimestep
 import ClimaCoupler.Diagnostics: get_var, init_diagnostics, accumulate_diagnostics!, save_diagnostics, TimeMean
 import ClimaCoupler.PostProcessor: postprocess
 
@@ -384,7 +384,7 @@ User can write custom diagnostics in the `user_diagnostics.jl`.
 monthly_3d_diags = init_diagnostics(
     (:T, :u, :q_tot, :q_liq_ice),
     atmos_sim.domain.center_space;
-    save = Monthly(),
+    save = TimeManager.Monthly(),
     operations = (; accumulate = TimeMean([Int(0)])),
     output_dir = COUPLER_OUTPUT_DIR,
     name_tag = "monthly_mean_3d_",
@@ -393,7 +393,7 @@ monthly_3d_diags = init_diagnostics(
 monthly_2d_diags = init_diagnostics(
     (:precipitation_rate, :toa_fluxes, :T_sfc, :tubulent_energy_fluxes),
     boundary_space;
-    save = Monthly(),
+    save = TimeManager.Monthly(),
     operations = (; accumulate = TimeMean([Int(0)])),
     output_dir = COUPLER_OUTPUT_DIR,
     name_tag = "monthly_mean_2d_",
@@ -567,18 +567,24 @@ function solve_coupler!(cs)
         import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # radiative and/or turbulent
 
         ## monthly callbacks
-        if trigger_callback(cs, Monthly())
-            ## step to the next calendar month
-            cs.dates.date1[1] += Dates.Month(1)
-            ## checkpoint model state
-            if monthly_checkpoint
+        ## function to checkpoint model state
+        checkpoint_func =
+            (monthly_checkpoint, cs, comms_ctx, t, COUPLER_ARTIFACTS_DIR) -> if monthly_checkpoint
                 for sim in cs.model_sims
                     if get_model_state_vector(sim) !== nothing
                         checkpoint_model_state(sim, comms_ctx, Int(t), output_dir = COUPLER_ARTIFACTS_DIR)
                     end
                 end
             end
-        end
+        func_args = (monthly_checkpoint, cs, comms_ctx, t, COUPLER_ARTIFACTS_DIR)
+        ## perform monthly callback and increment `cs.dates.date1` if `cs.dates.date` passes to next month
+        TimeManager.trigger_callback(
+            cs.dates.date1[1],
+            cs.dates.date[1],
+            TimeManager.Monthly(),
+            checkpoint_func,
+            func_args,
+        )
 
     end
     @show walltime

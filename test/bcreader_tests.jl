@@ -2,9 +2,10 @@
     Unit tests for ClimaCoupler BCReader module
 =#
 
-using ClimaCoupler: Regridder, BCReader, TimeManager, Utilities
+using ClimaCoupler: Regridder, BCReader, Utilities
 using ClimaCore: Fields, Meshes, Domains, Topologies, Spaces
 using ClimaComms
+using ClimaUtilities: TimeManager
 using Test
 using Dates
 using NCDatasets
@@ -198,7 +199,7 @@ for FT in (Float32, Float64)
 
             # step in time
             walltime = @elapsed for t in ((tspan[1] + Δt):Δt:tspan[end])
-                cs_t.dates.date[1] = TimeManager.current_date(cs_t, t) # if not global, `date`` is not updated. Check that this still runs when distributed.
+                cs_t.dates.date[1] = Utilities.current_date(cs_t, t) # if not global, `date`` is not updated. Check that this still runs when distributed.
 
                 model_date = cs_t.dates.date[1]
                 callback_date = BCReader.next_date_in_file(bcf_info)

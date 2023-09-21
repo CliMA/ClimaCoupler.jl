@@ -1,7 +1,4 @@
 run_name: "perf_diff_default_modular_unthreaded"
-FLOAT_TYPE: "Float64"
-coupled: true
-surface_setup: "PrescribedSurface"
 moist: "equil"
 vert_diff: "true"
 rad: "gray"

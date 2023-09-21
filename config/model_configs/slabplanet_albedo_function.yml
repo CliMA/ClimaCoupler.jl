@@ -1,6 +1,3 @@
-FLOAT_TYPE: "Float64"
-coupled: true
-surface_setup: "PrescribedSurface"
 moist: "equil"
 vert_diff: "true"
 rad: "gray"
@@ -13,7 +10,7 @@ dt: "200secs"
 mono_surface: true
 h_elem: 4
 precip_model: "0M"
-albedo_type: "map_static"
+land_albedo_type: "map_static"
 run_name: "slabplanet_albedo_function"
 apply_limiter: true
 job_id: "slabplanet_albedo_function"

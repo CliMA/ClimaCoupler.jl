@@ -1,6 +1,4 @@
 run_name: "coarse_single_modular_ft64"
-coupled: true
-surface_setup: "PrescribedSurface"
 moist: "equil"
 vert_diff: "true"
 rad: "gray"
@@ -11,7 +9,6 @@ t_end: "10days"
 dt_save_to_sol: "100days"
 dt_cpl: 200
 dt: "200secs"
-FLOAT_TYPE: "Float64"
 mono_surface: true
 h_elem: 6
 dt_save_restart: "10days"

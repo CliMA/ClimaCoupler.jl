@@ -13,8 +13,8 @@ In this tutorial we demonstrate the coupling of three component models
 of the ClimaCoupler interface are used and discussed.
 =#
 
-import SciMLBase: step! #hide
-using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues! #hide
+import SciMLBase: step!, solve, ODEProblem, init #hide
+import ClimaTimeSteppers as CTS #hide
 import ClimaCore.Utilities: PlusHalf #hide
 import ClimaCore.Spaces as Spaces
 using DiffEqCallbacks #hide
@@ -164,15 +164,15 @@ Here, we create three simulations: `AtmosSimulation`, `OceanSimulation`, and `La
 =#
 atm_Y = Fields.FieldVector(Yc = atm_Y_default.Yc, ρw = atm_Y_default.ρw, F_sfc = atm_F_sfc)
 atm_p = (cpl_p = cpl_parameters, T_sfc = atm_T_sfc, bc = atm_bc)
-atmos = AtmosSimulation(atm_Y, t_start, Δt_coupled / atm_nsteps, t_end, SSPRK33(), atm_p, saveat, dss_callback)
+atmos = AtmosSimulation(atm_Y, t_start, Δt_coupled / atm_nsteps, t_end, CTS.SSPRK33(), atm_p, saveat, dss_callback)
 
 ocn_Y = Fields.FieldVector(T_sfc = ocn_Y_default.T_sfc)
 ocn_p = (cpl_parameters, F_sfc = ocn_F_sfc)
-ocean = OceanSimulation(ocn_Y, t_start, Δt_coupled / ocn_nsteps, t_end, SSPRK33(), ocn_p, saveat)
+ocean = OceanSimulation(ocn_Y, t_start, Δt_coupled / ocn_nsteps, t_end, CTS.SSPRK33(), ocn_p, saveat)
 
 lnd_Y = Fields.FieldVector(T_sfc = lnd_Y_default.T_sfc)
 lnd_p = (cpl_parameters, F_sfc = lnd_F_sfc)
-land = LandSimulation(lnd_Y, t_start, Δt_coupled / lnd_nsteps, t_end, SSPRK33(), lnd_p, saveat)
+land = LandSimulation(lnd_Y, t_start, Δt_coupled / lnd_nsteps, t_end, CTS.SSPRK33(), lnd_p, saveat)
 
 # Additionally, we create a coupled simulation that contains the component simulations
 # and the coupled time-stepping information.
@@ -197,7 +197,7 @@ end
 to the specified `t_stop`, with that simulation advancing by its own internal step
 size to reach the specified time. Each simulation type should specify its own step
 method, allowing components to have different time integration backends. Here, all
-components are using OrdinaryDiffEq integrators and can share the same `step!` method.
+components are using SciMLBase integrators and can share the same `step!` method.
 =#
 function step!(sim::ClimaCoupler.AbstractSimulation, t_stop)
     Δt = t_stop - sim.integrator.t

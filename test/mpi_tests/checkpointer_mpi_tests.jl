@@ -30,6 +30,7 @@ get_model_state_vector(sim::DummySimulation) = sim.state
     # old sim run
     sim = DummySimulation(Fields.FieldVector(T = ones(boundary_space)))
     checkpoint_model_state(sim, comms_ctx, t, output_dir = "test_checkpoint")
+    ClimaComms.barrier(comms_ctx)
 
     # new sim run
     sim_new = DummySimulation(Fields.FieldVector(T = zeros(boundary_space)))

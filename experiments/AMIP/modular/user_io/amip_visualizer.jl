@@ -34,7 +34,8 @@ function amip_paperplots(
         diag_data = read_latest_model_data(name, files_dir, files_root)
 
         # postprocess
-        post_data = postprocess(name, diag_data, getproperty(post_spec, name), nlat = nlat, nlon = nlon)
+        post_data =
+            postprocess(name, diag_data, getproperty(post_spec, name), REGRID_DIR = files_dir, nlat = nlat, nlon = nlon)
         post_data.data[1] = sum(post_data.data) == 0 ? post_data.data[1] + eps() : post_data.data[1] # avoids InexactError
 
         # create individual plots

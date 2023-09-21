@@ -59,12 +59,14 @@ using Dates
 using UnPack
 using Plots
 using Statistics: mean
+import ClimaAtmos as CA
+import YAML
 
 using ClimaCore.Utilities: half, PlusHalf
 using ClimaCore: InputOutput, Fields
 import ClimaCore.Spaces as Spaces
 
-if !(@isdefined parsed_args)
+if !(@isdefined parsed_args) # coupler defaults
     include("cli_options.jl")
     parsed_args = parse_commandline(argparse_settings())
 end
@@ -74,7 +76,7 @@ if isinteractive()
     parsed_args["coupled"] = true #hide
     parsed_args["surface_setup"] = "PrescribedSurface" #hide # necessary to stop Atmos from calculating its own surface fluxes
     parsed_args["moist"] = "equil" #hide
-    parsed_args["vert_diff"] = true #hide
+    parsed_args["vert_diff"] = "true" #hide
     parsed_args["rad"] = "gray" #hide
     parsed_args["energy_check"] = true #hide
     parsed_args["mode_name"] = "slabplanet" #hide
@@ -88,8 +90,29 @@ if isinteractive()
     # parsed_args["dt_save_restart"] = "5days" #hide
     parsed_args["precip_model"] = "0M" #hide
     parsed_args["job_id"] = "interactive_debug_run"
+    parsed_args["run_name"] = "interactive_debug_run"
     parsed_args["monthly_checkpoint"] = true
+    parsed_args["config_file"] =
+        isnothing(parsed_args["config_file"]) ? "../../../config/model_configs/slabplanet_default.yml" :
+        parsed_args["config_file"]
 end
+
+# read in config dictionary from file
+config_dict = YAML.load_file(parsed_args["config_file"])
+
+atmos_config = if !isnothing(config_dict)
+    CA.override_default_config(config_dict)
+elseif !isnothing(parsed_args["config_file"])
+    CA.override_default_config(parsed_args["config_file"])
+else # If no config file is specified, we use the Atmos default config dict as `atmos_config`
+    @info "Using Atmos default configuration"
+    CA.default_config_dict()
+end
+
+# merge dictionaries. If there are common keys, the last dictorionary in the `merge` arguments takes precedence:
+parsed_args =
+    isinteractive() ? merge(config_dict, atmos_config, parsed_args) : merge(parsed_args, config_dict, atmos_config)
+parsed_args["run_name"] = isnothing(parsed_args["run_name"]) ? config_dict["run_name"] : parsed_args["run_name"]
 
 ## read in some parsed command line arguments
 mode_name = parsed_args["mode_name"]
@@ -148,7 +171,11 @@ import ClimaCoupler.FieldExchanger:
 import ClimaCoupler.Checkpointer: checkpoint_model_state, get_model_state_vector, restart_model_state!
 
 pkg_dir = pkgdir(ClimaCoupler)
-COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/modular/output", joinpath(mode_name, run_name))
+if isinteractive()
+    COUPLER_OUTPUT_DIR = joinpath("output", joinpath(mode_name, run_name)) # TempestRemap fails if interactive and paths are too long
+else
+    COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/modular/output", joinpath(mode_name, run_name))
+end
 mkpath(COUPLER_OUTPUT_DIR)
 
 REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp/")
@@ -381,7 +408,7 @@ diagnostics = (monthly_3d_diags, monthly_2d_diags)
 conservation_checks = nothing
 if energy_check
     @assert(
-        mode_name == "slabplanet" && !ClimaAtmos.is_distributed(ClimaComms.context(boundary_space)),
+        mode_name == "slabplanet" && !CA.is_distributed(ClimaComms.context(boundary_space)),
         "Only non-distributed slabplanet allowable for energy_check"
     )
     conservation_checks =
@@ -452,7 +479,7 @@ elseif turbulent_fluxes isa PartitionedStateFluxes
     # update atmos sfc_conditions for surface temperature
     # TODO: this is hard coded and needs to be simplified (need CA modification)
     new_p = get_new_cache(atmos_sim, cs.fields)
-    ClimaAtmos.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) # sets T_sfc (but SF calculation not necessary - CA)
+    CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) # sets T_sfc (but SF calculation not necessary - CA)
     atmos_sim.integrator.p.sfc_conditions .= new_p.sfc_conditions
 end
 
@@ -533,11 +560,7 @@ function solve_coupler!(cs)
 
             # update atmos sfc_conditions for surface temperature - TODO: this needs to be simplified (need CA modification)
             new_p = get_new_cache(atmos_sim, cs.fields)
-            ClimaAtmos.SurfaceConditions.update_surface_conditions!(
-                atmos_sim.integrator.u,
-                new_p,
-                atmos_sim.integrator.t,
-            ) # to set T_sfc (but SF calculation not necessary - CA modification)
+            CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) # to set T_sfc (but SF calculation not necessary - CA modification)
             atmos_sim.integrator.p.sfc_conditions .= new_p.sfc_conditions
         end
 

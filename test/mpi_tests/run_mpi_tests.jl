@@ -3,7 +3,7 @@ using MPI
 # if running locally:
 module purge
 # module load julia/1.9.3 cuda/11.8 ucx/1.14.1_cuda-11.8 openmpi/4.1.5_cuda-11.8 hdf5/1.12.2-ompi415 nsight-systems/2023.2.1
-module load julia/1.8.5 cuda/11.8 ucx/1.14.1_cuda-11.8 openmpi/4.1.5_cuda-11.8 hdf5/1.12.2-ompi415 nsight-systems/2023.2.1
+module load julia/1.9.3 cuda/11.8 ucx/1.14.1_cuda-11.8 openmpi/4.1.5_cuda-11.8 hdf5/1.12.2-ompi415 nsight-systems/2023.2.1
 export OPENBLAS_NUM_THREADS=1
 export JULIA_NVTX_CALLBACKS=gc
 export OMPI_MCA_opal_warn_on_missing_libcuda=0

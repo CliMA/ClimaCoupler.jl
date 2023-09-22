@@ -23,7 +23,7 @@ This driver contains two modes. The full `AMIP` mode and a `SlabPlanet` (all sur
 Before starting Julia, ensure your environment is properly set up:
 ```julia
 module purge
-module load julia/1.8.1 openmpi/4.1.1 hdf5/1.12.1-ompi411 #netcdf-c/4.6.1
+module load julia/1.9.3 openmpi/4.1.1 hdf5/1.12.1-ompi411 #netcdf-c/4.6.1
 
 export CLIMACORE_DISTRIBUTED="MPI" #include if using MPI, otherwise leave empty
 export JUlIA_MPI_BINARY="system"

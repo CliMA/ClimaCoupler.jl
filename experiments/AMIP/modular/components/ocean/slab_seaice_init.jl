@@ -167,3 +167,6 @@ Extension of Checkpointer.get_model_state_vector to get the model state.
 function get_model_state_vector(sim::PrescribedIceSimulation)
     return sim.integrator.u
 end
+
+get_field(sim::PrescribedIceSimulation, ::Val{:energy}) =
+    sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h

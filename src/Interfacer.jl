@@ -68,8 +68,11 @@ get_field(sim::SurfaceStub, ::Val{:surface_humidity}) =
     TD.q_vap_saturation_generic.(sim.cache.thermo_params, sim.cache.T_sfc, sim.cache.ρ_sfc, sim.cache.phase)
 
 function get_field(sim::ComponentModelSimulation, val::Val)
-    error("undefined field $val for " * name(sim))
+    error("undefined get_field for $val for " * name(sim))
 end
+
+get_field(sim::SurfaceStub, ::Val{:energy}) = nothing
+get_field(sim::SurfaceStub, ::Val{:water}) = nothing
 
 """
     get_field(::ComponentModelSimulation, ::Val, colidx::Fields.ColumnIndex)
@@ -121,7 +124,7 @@ end
 
 Returns simulation name, if defined, or `Unnamed` if not.
 """
-name(::ComponentModelSimulation) = "Unnamed"
+name(::ComponentModelSimulation) = @error("undefined name for name(sim)")
 name(::SurfaceStub) = "SurfaceStub"
 
 end # module

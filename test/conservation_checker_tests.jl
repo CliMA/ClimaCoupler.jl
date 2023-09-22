@@ -125,11 +125,11 @@ end
 
     cc = conservation_checks.energy
     tot_energy = @. cc.ρe_tot_atmos + cc.ρe_tot_ocean + cc.ρe_tot_land + cc.ρe_tot_seaice + cc.toa_net_source
-    err = ((tot_energy[2] - tot_energy[1]) - sum(rad_source)) / (tot_energy[2])
+    err = ((tot_energy[1] - tot_energy[1]) - sum(rad_source)) / (tot_energy[1])
     @test abs(err) < 1e-5
 
     tot_water = conservation_checks.water.ρq_tot_atmos
-    err = ((tot_water[2] - tot_water[1]) - sum(surface_water)) / (tot_water[2])
+    err = ((tot_water[1] - tot_water[1]) - sum(surface_water)) / (tot_water[1])
     @test abs(err) < 1e-1 # TODO: this could be due to limiters. Need more testing to reduce this error.
     rm(tmp_dir, recursive = true)
 end

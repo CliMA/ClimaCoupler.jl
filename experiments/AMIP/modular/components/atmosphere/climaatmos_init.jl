@@ -234,3 +234,41 @@ Extension of Checkpointer.get_model_state_vector to get the model state.
 function get_model_state_vector(sim::ClimaAtmosSimulation)
     return sim.integrator.u
 end
+
+
+function get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:F_radiative_TOA})
+    radiation = atmos_sim.integrator.p.radiation_model
+    FT = eltype(atmos_sim.integrator.u)
+    # save radiation source
+    if radiation != nothing
+        face_space = axes(atmos_sim.integrator.u.f)
+        z = parent(Fields.coordinate_field(face_space).z)
+        Δz_top = round(FT(0.5) * (z[end, 1, 1, 1, 1] - z[end - 1, 1, 1, 1, 1]))
+        n_faces = length(z[:, 1, 1, 1, 1])
+
+        LWd_TOA = Fields.level(
+            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_lw_flux_dn), face_space),
+            n_faces - half,
+        )
+        LWu_TOA = Fields.level(
+            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_lw_flux_up), face_space),
+            n_faces - half,
+        )
+        SWd_TOA = Fields.level(
+            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_sw_flux_dn), face_space),
+            n_faces - half,
+        )
+        SWu_TOA = Fields.level(
+            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_sw_flux_up), face_space),
+            n_faces - half,
+        )
+
+        return LWd_TOA .+ SWd_TOA .- LWu_TOA .- SWu_TOA # [W/m^2]
+    else
+        return FT(0)
+    end
+end
+
+get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:energy}) = sum(atmos_sim.integrator.u.c.ρe_tot)
+
+get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:water}) = sum(atmos_sim.integrator.u.c.ρq_tot)

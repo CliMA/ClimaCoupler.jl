@@ -4,7 +4,7 @@
 
 Returns the volumetric internal energy of the bucket land model.
 """
-function get_land_energy(bucket_sim::BucketSimulation, e_per_area)
+function get_field(bucket_sim::BucketSimulation, ::Val{:energy})
     # required by ConservationChecker
     e_per_area .= zeros(axes(bucket_sim.integrator.u.bucket.W))
     soil_depth = FT = eltype(bucket_sim.integrator.u.bucket.W)
@@ -20,14 +20,20 @@ function get_land_energy(bucket_sim::BucketSimulation, e_per_area)
     return e_per_area
 end
 
+function get_field(bucket_sim::BucketSimulation, ::Val{:water})
+    ρ_cloud_liq = ClimaLSM.LSMP.ρ_cloud_liq(bucket_sim.model.parameters.earth_param_set)
+    return
+        @. (bucket_sim.integrator.u.bucket.σS + bucket_sim.integrator.u.bucket.W + bucket_sim.integrator.u.bucket.Ws) * ρ_cloud_liq  # kg water / m2
+end
+
 """
-    get_land_temp_from_state(land_sim, u)
+    get_land_temp_from_state(bucket_sim, u)
 Returns the surface temperature of the earth, computed
 from the state u.
 """
-function get_land_temp_from_state(land_sim, u)
+function get_land_temp_from_state(bucket_sim, u)
     # required by viz_explorer.jl
-    return ClimaLSM.surface_temperature(land_sim.model, u, land_sim.integrator.p, land_sim.integrator.t)
+    return ClimaLSM.surface_temperature(bucket_sim.model, u, bucket_sim.integrator.p, bucket_sim.integrator.t)
 end
 
 """

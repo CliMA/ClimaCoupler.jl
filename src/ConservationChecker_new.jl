@@ -3,7 +3,7 @@
 
 This module contains functions that check global conservation of energy and water (and momentum - TODO).
 """
-module ConservationChecker
+# module ConservationChecker
 
 using ClimaCore: ClimaCore, Geometry, Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 using ClimaCore.Utilities: half
@@ -16,10 +16,10 @@ using UnPack
 using Plots
 using ClimaAtmos: RRTMGPI
 using ClimaLSM
-using ..Utilities: CoupledSimulation, swap_space!
-using ..Interfacer: SurfaceStub
+using ClimaCoupler.Utilities: CoupledSimulation, swap_space!
+import ClimaCoupler.Interfacer: SurfaceStub, ComponentModelSimulation, name
 
-export AbstractCheck, EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
+#export AbstractCheck, EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
 
 abstract type AbstractCheck end
 
@@ -28,41 +28,49 @@ abstract type AbstractCheck end
 
 Struct of type `AbstractCheck` containing global energy conservation logs.
 """
-struct EnergyConservationCheck{A} <: AbstractCheck
-    ρe_tot_atmos::A
-    ρe_tot_land::A
-    ρe_tot_ocean::A
-    ρe_tot_seaice::A
-    toa_net_source::A
-    ice_base_source::A
+mutable struct EnergyConservationCheck <: AbstractCheck
+    x::NamedTuple
+    function EnergyConservationCheck(x)
+        all_sims = (;)
+        for sim in x
+            all_sims = merge(all_sims, [Symbol(name(sim)) => []])
+        end
+        all_sims = (all_sims..., toa_net_source = [], total = [])
+        return new(all_sims)
+    end
 end
+
 
 """
     WaterConservationCheck{A} <: AbstractCheck
 
 Struct of type `AbstractCheck` containing global water mass conservation logs.
 """
-struct WaterConservationCheck{A} <: AbstractCheck
-    ρq_tot_atmos::A
-    ρq_tot_ocean::A
-    ρq_tot_land::A
-    ρq_tot_seaice::A
+mutable struct WaterConservationCheck <: AbstractCheck
+    x::NamedTuple
+    function WaterConservationCheck(x)
+        all_sims = (;)
+        for sim in x
+            all_sims = merge(all_sims, [Symbol(name(sim)) => []])
+        end
+        all_sims = (all_sims..., total = [])
+        return new(all_sims)
+    end
 end
 
+
 """
-    check_conservation!(coupler_sim::CoupledSimulation, get_slab_energy, get_land_energy)
+    check_conservation!(coupler_sim::CoupledSimulation)
 
 itertes over all specified conservation checks.
 """
-check_conservation!(coupler_sim::CoupledSimulation, get_slab_energy, get_land_energy) =
-    map(x -> check_conservation!(x, coupler_sim, get_slab_energy, get_land_energy), coupler_sim.conservation_checks)
+check_conservation!(coupler_sim::CoupledSimulation) =
+    map(x -> check_conservation!(x, coupler_sim), coupler_sim.conservation_checks)
 
 """
         check_conservation!(
         cc::EnergyConservationCheck,
         coupler_sim,
-        get_slab_energy,
-        get_land_energy,
         )
 
 computes the total energy, ∫ ρe dV, of the various components
@@ -73,77 +81,50 @@ TODO: move `get_slab_energy` and `get_land_energy` to their respective sims upon
 function check_conservation!(
     cc::EnergyConservationCheck,
     coupler_sim::CoupledSimulation,
-    get_slab_energy,
-    get_land_energy,
 )
-    @unpack model_sims, surface_fractions = coupler_sim
-    @unpack atmos_sim, land_sim, ocean_sim, ice_sim = model_sims
-    radiation = atmos_sim.integrator.p.radiation_model # TODO: take out of global scope in ClimaAtmos
+
+    ccx = cc.x
+    @unpack model_sims = coupler_sim
+
     boundary_space = coupler_sim.boundary_space # thin shell approx (boundary_space[z=0] = boundary_space[z_top])
 
-    FT = eltype(coupler_sim.surface_fractions.land)
+    FT = eltype(coupler_sim.fields[1])
 
-    # save radiation source
-    if radiation != nothing
-        face_space = axes(atmos_sim.integrator.u.f)
-        z = parent(Fields.coordinate_field(face_space).z)
-        Δz_top = round(FT(0.5) * (z[end, 1, 1, 1, 1] - z[end - 1, 1, 1, 1, 1]))
-        n_faces = length(z[:, 1, 1, 1, 1])
+    total = 0
 
-        LWd_TOA = Fields.level(
-            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_lw_flux_dn), face_space),
-            n_faces - half,
-        )
-        LWu_TOA = Fields.level(
-            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_lw_flux_up), face_space),
-            n_faces - half,
-        )
-        SWd_TOA = Fields.level(
-            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_sw_flux_dn), face_space),
-            n_faces - half,
-        )
-        SWu_TOA = Fields.level(
-            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_sw_flux_up), face_space),
-            n_faces - half,
-        )
+    # save surfaces
+    for sim in model_sims
+        sim_name = Symbol(name(sim))
+        if sim isa Interfacer.AtmosModelSimulation
+            # save radiation source
+            parent(coupler_sim.fields.F_radiative_TOA) .= parent(get_field(sim, Val(:F_radiative_TOA)))
+            radiation_sources_accum = sum(coupler_sim.fields.F_radiative_TOA) .* coupler_sim.Δt_cpl # ∫ J / m^2 dA
+            push!(ccx.toa_net_source, radiation_sources_accum)
 
-        coupler_sim.fields.F_radiative_TOA .-=
-            swap_space!(zeros(boundary_space), LWd_TOA .+ SWd_TOA .- LWu_TOA .- SWu_TOA) .* coupler_sim.Δt_cpl
-        radiation_sources_accum = sum(coupler_sim.fields.F_radiative_TOA) # accumulated radiation sources + sinks [J]
-        push!(cc.toa_net_source, radiation_sources_accum)
-    else
-        push!(cc.toa_net_source, FT(0))
+            # save atmos
+            previous = getproperty(ccx, sim_name)
+            current = sum(get_field(sim, Val(:energy))) # # ∫ J / m^3 dV
+
+            push!(previous, current)
+            total += current  + radiation_sources_accum
+
+        elseif sim isa Interfacer.SurfaceModelSimulation || sim isa Interfacer.SurfaceStub
+            # save surfaces
+            area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
+            if isnothing(get_field(sim, Val(:energy)))
+                previous = getproperty(ccx, sim_name)
+                current = FT(0)
+            else
+                previous = getproperty(ccx, sim_name)
+                current =  sum(get_field(sim, Val(:energy)) .* area_fraction) # # ∫ J / m^3 dV
+            end
+            total += current
+        end
+        push!(ccx.total, total)
+
     end
 
-    # save atmos
-    push!(cc.ρe_tot_atmos, sum(atmos_sim.integrator.u.c.ρe_tot))
-
-    # save land
-    if land_sim !== nothing
-        e_per_area_land = zeros(axes(land_sim.integrator.u.bucket.W))
-        get_land_energy(land_sim, e_per_area_land)
-        push!(cc.ρe_tot_land, sum(e_per_area_land .* surface_fractions.land))
-    else
-        push!(cc.ρe_tot_land, FT(0))
-    end
-
-    # save sea ice
-    if (ice_sim == nothing) || (ice_sim isa SurfaceStub)
-        push!(cc.ρe_tot_seaice, FT(0))
-    else
-        push!(cc.ρe_tot_seaice, sum(get_slab_energy(ice_sim, ice_sim.integrator.u.T_sfc) .* surface_fractions.ice))
-    end
-
-    # save ocean
-    if (ocean_sim == nothing) || (ocean_sim isa SurfaceStub)
-        push!(cc.ρe_tot_ocean, FT(0))
-    else
-        push!(cc.ρe_tot_ocean, sum(get_slab_energy(ocean_sim, ocean_sim.integrator.u.T_sfc) .* surface_fractions.ocean))
-    end
-
-    push!(cc.ice_base_source, FT(0))
-
-    tot = @. cc.ρe_tot_atmos + cc.ρe_tot_ocean + cc.ρe_tot_land + cc.ρe_tot_seaice + cc.toa_net_source
+    return total
     # @assert abs((tot[end] - tot[1]) / tot[end]) < 1e-4
 end
 
@@ -163,46 +144,49 @@ Note: in the future this should not use `push!`.
 function check_conservation!(
     cc::WaterConservationCheck,
     coupler_sim::CoupledSimulation,
-    get_slab_energy,
-    get_land_energy,
 )
-    @unpack model_sims, surface_fractions = coupler_sim
-    @unpack atmos_sim, land_sim, ocean_sim, ice_sim = model_sims
 
-    boundary_space = coupler_sim.boundary_space
-    FT = eltype(coupler_sim.surface_fractions.land)
+    ccx = cc.x
+    @unpack model_sims = coupler_sim
 
-    # save atmos
-    push!(cc.ρq_tot_atmos, sum(atmos_sim.integrator.u.c.ρq_tot)) # kg (∫kg of water per m^3 dV)
+    boundary_space = coupler_sim.boundary_space # thin shell approx (boundary_space[z=0] = boundary_space[z_top])
 
+    FT = eltype(coupler_sim.fields[1])
 
-    # save land
-    if land_sim !== nothing
-        ρ_cloud_liq = ClimaLSM.LSMP.ρ_cloud_liq(land_sim.model.parameters.earth_param_set)
-        water_content =
-            @. (land_sim.integrator.u.bucket.σS + land_sim.integrator.u.bucket.W + land_sim.integrator.u.bucket.Ws) # m^3 water / land area
-        parent(water_content) .= parent(water_content .* surface_fractions.land) * ρ_cloud_liq # kg / land area
-        push!(cc.ρq_tot_land, sum(water_content)) # kg (∫ water_content dV)
-    else
-        push!(cc.ρq_tot_land, FT(0))
+    total = 0
+
+    # net precipitation (for surfaces that don't collect water)
+    PE_net = coupler_sim.fields.P_net .+= swap_space!(zeros(boundary_space), surface_water_gain_from_rates(coupler_sim))
+
+    # save surfaces
+    for sim in model_sims
+        sim_name = Symbol(name(sim))
+        if sim isa Interfacer.AtmosModelSimulation
+
+            # save atmos
+            previous = getproperty(ccx, sim_name)
+            current = sum(get_field(sim, Val(:water))) # kg (∫kg of water / m^3 dV)
+            push!(previous, current)
+
+        elseif sim isa Interfacer.SurfaceModelSimulation || sim isa Interfacer.SurfaceStub
+            # save surfaces
+            area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
+            if isnothing(get_field(sim, Val(:water)))
+                previous = getproperty(ccx, sim_name)
+                current = sum(PE_net .* area_fraction) # kg (∫kg of water / m^3 dV)
+                push!(previous, current)
+            else
+                previous = getproperty(ccx, sim_name)
+                current =  sum(get_field(sim, Val(:water)) .* area_fraction) # kg (∫kg of water / m^3 dV)
+                push!(previous, current)
+            end
+        end
+        total += current
+        push!(ccx.total, total)
+
     end
 
-    # save sea ice
-    coupler_sim.fields.P_net .-= swap_space!(zeros(boundary_space), surface_water_gain_from_rates(coupler_sim)) # accumulated surface water gain
-    if ice_sim !== nothing
-        push!(cc.ρq_tot_seaice, sum(coupler_sim.fields.P_net .* surface_fractions.ice)) # kg (∫ P_net dV)
-    else
-        push!(cc.ρq_tot_seaice, FT(0))
-    end
-
-    # save ocean
-    if ocean_sim !== nothing
-        push!(cc.ρq_tot_ocean, sum(coupler_sim.fields.P_net .* surface_fractions.ocean))  # kg (∫ P_net dV)
-    else
-        push!(cc.ρq_tot_ocean, FT(0))
-    end
-
-    tot = @. cc.ρq_tot_atmos + cc.ρq_tot_land + cc.ρq_tot_seaice + cc.ρq_tot_ocean
+    return total
     # @assert abs((tot[end] - tot[1]) / tot[end]) < 1e-2
 end
 
@@ -215,7 +199,7 @@ function surface_water_gain_from_rates(cs::CoupledSimulation)
     evaporation = cs.fields.F_turb_moisture # kg / m^2 / s / layer depth
     precipitation_l = cs.fields.P_liq
     precipitation_s = cs.fields.P_snow
-    @. (evaporation + precipitation_l + precipitation_s) * cs.Δt_cpl # kg / m^2 / layer depth
+    @. - (evaporation + precipitation_l + precipitation_s) * cs.Δt_cpl # kg / m^2 / layer depth
 end
 
 # setup the GKS socket application environment as nul for better performance and to avoid GKS connection errors while plotting
@@ -320,4 +304,4 @@ function plot_global_conservation(
     Plots.savefig(figname2)
 end
 
-end # module
+# end # module

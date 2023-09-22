@@ -30,14 +30,6 @@ function argparse_settings()
         help = "Method to partition turbulent fluxes. [`PartitionedStateFluxes`, `CombinedStateFluxes`]"
         arg_type = String
         default = "CombinedStateFluxes"
-        "--albedo_type"
-        help = "Access land surface albedo information from data file. [`function`, `map_static`, `map_temporal`]"
-        arg_type = String
-        default = "map_static"
-        "--coupled" # TODO - remove from Atmos
-        help = "Coupled simulation [`false` (default), `true`]"
-        arg_type = Bool
-        default = true
         "--monthly_checkpoint" # TODO generalize to any frequency
         help = "Boolean flag indicating whether to checkpoint monthly"
         arg_type = Bool
@@ -50,9 +42,32 @@ function argparse_settings()
         help = "Restart time"
         arg_type = Int
         default = 0
-        # ClimaAtmos flag
         "--config_file"
-        help = "A yaml file used to set model configurations"
+        help = "A yaml file used to set the configuration of the coupled model"
+        "--print_config_dict"
+        help = "Boolean flag indicating whether to print the final configuration dictionary"
+        arg_type = Bool
+        default = true
+        "--FLOAT_TYPE"
+        help = "Floating point precision  [`Float64` (default), `Float32`]"
+        arg_type = String
+        default = "Float64"
+        # ClimaAtmos specific
+        "--surface_setup"
+        help = "Triggers ClimaAtmos into the coupled mode [`PrescribedSurface` (default)]" # retained here for standalone Atmos benchmarks
+        arg_type = String
+        default = "PrescribedSurface"
+        "--atmos_config_file"
+        help = "A yaml file used to set the atmospheric model configuration. If nothing is specified, the default configuration is used."
+        # ClimaLSM specific
+        "--land_albedo_type"
+        help = "Access land surface albedo information from data file. [`function`, `map_static`, `map_temporal`]"
+        arg_type = String
+        default = "map_static" # to be replaced by land config file, when available
+        "--land_domain_type"
+        help = "Type of land domain. [`sphere` (default), `single_column`]"
+        arg_type = String
+        default = "sphere"
     end
     return s
 end

@@ -1,7 +1,5 @@
 run_name: "amip_longrun_target"
-coupled: true
 anim: true
-surface_setup: "PrescribedSurface"
 dt_cpl: 150
 energy_check: false
 mode_name: "amip"
@@ -22,4 +20,3 @@ job_id: "amip_longrun_target"
 dt_save_to_sol: "5days"
 dt_save_to_disk: "1days"
 apply_limiter: true
-FLOAT_TYPE: "Float64"

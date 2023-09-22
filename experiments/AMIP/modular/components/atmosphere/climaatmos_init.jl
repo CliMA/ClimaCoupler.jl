@@ -21,10 +21,32 @@ struct ClimaAtmosSimulation{P, Y, D, I} <: AtmosModelSimulation
 end
 name(::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
 
-function atmos_init(::Type{FT}, parsed_args::Dict) where {FT}
+"""
+    get_atmos_config(coupler_dict::Dict)
+
+Returns the specified atmospheric configuration (`atmos_config_dict`) overwitten by arguments
+in the coupler dictionary (`config_dict`).
+"""
+function get_atmos_config(coupler_dict)
+    atmos_file = coupler_dict["atmos_config_file"]
+    # override default or specified configs with coupler arguments, and set the correct atmos config_file
+    if isnothing(atmos_file)
+        @info "Using Atmos default configuration"
+        merge(CA.default_config_dict(), coupler_dict, Dict("config_file" => atmos_file))
+    else
+        @info "Using Atmos configuration from $atmos_file"
+        merge(
+            CA.override_default_config(joinpath(pkgdir(CA), atmos_file)),
+            coupler_dict,
+            Dict("config_file" => atmos_file),
+        )
+    end
+end
+
+function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
 
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
-    atmos_config = CA.AtmosConfig(; config_dict = parsed_args)
+    atmos_config = CA.AtmosConfig(; config_dict = atmos_config_dict)
     integrator = CA.get_integrator(atmos_config)
     Y = integrator.u
     center_space = axes(Y.c.ρe_tot)

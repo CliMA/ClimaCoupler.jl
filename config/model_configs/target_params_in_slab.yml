@@ -1,7 +1,4 @@
-FLOAT_TYPE: "Float64"
 run_name: "target_params_in_slab"
-coupled: true
-surface_setup: "PrescribedSurface"
 moist: "equil"
 vert_diff: "true"
 rad: "allskywithclear"

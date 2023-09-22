@@ -3,6 +3,7 @@ using ClimaCore
 using ClimaLSM
 import ClimaLSM
 import ClimaTimeSteppers as CTS
+import Thermodynamics as TD
 
 include(joinpath(pkgdir(ClimaLSM), "parameters", "create_parameters.jl"))
 using ClimaLSM.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers

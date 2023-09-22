@@ -1,7 +1,5 @@
 job_id: "amip_n64_shortrun"
 run_name: "amip_n64_shortrun"
-coupled: true
-surface_setup: "PrescribedSurface"
 moist: "equil"
 vert_diff: "true"
 rad: "gray"
@@ -17,7 +15,6 @@ alpha_rayleigh_w: 10
 dt_cpl: 150
 dt: "150secs"
 dt_rad: "1hours"
-FLOAT_TYPE: "Float64"
 energy_check: false
 mode_name: "amip"
 t_end: "10days"

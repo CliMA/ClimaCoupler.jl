@@ -1,7 +1,4 @@
 run_name: "slabplanet_default_longrun"
-FLOAT_TYPE: "Float64"
-coupled: true
-surface_setup: "PrescribedSurface"
 moist: "equil"
 vert_diff: "true"
 rad: "gray"

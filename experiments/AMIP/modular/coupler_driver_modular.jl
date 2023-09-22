@@ -66,72 +66,7 @@ using ClimaCore.Utilities: half, PlusHalf
 using ClimaCore: InputOutput, Fields
 import ClimaCore.Spaces as Spaces
 
-if !(@isdefined parsed_args) # coupler defaults
-    include("cli_options.jl")
-    parsed_args = parse_commandline(argparse_settings())
-end
-
-## modify parsed args for fast testing from REPL #hide
-if isinteractive()
-    parsed_args["coupled"] = true #hide
-    parsed_args["surface_setup"] = "PrescribedSurface" #hide # necessary to stop Atmos from calculating its own surface fluxes
-    parsed_args["moist"] = "equil" #hide
-    parsed_args["vert_diff"] = "true" #hide
-    parsed_args["rad"] = "gray" #hide
-    parsed_args["energy_check"] = true #hide
-    parsed_args["mode_name"] = "slabplanet" #hide
-    parsed_args["t_end"] = "10days" #hide
-    parsed_args["dt_save_to_sol"] = "3600secs" #hide
-    parsed_args["dt_cpl"] = 200 #hide
-    parsed_args["dt"] = "200secs" #hide
-    parsed_args["mono_surface"] = true #hide
-    parsed_args["turb_flux_partition"] = "CombinedStateFluxes" #hide
-    parsed_args["h_elem"] = 4 #hide
-    # parsed_args["dt_save_restart"] = "5days" #hide
-    parsed_args["precip_model"] = "0M" #hide
-    parsed_args["job_id"] = "interactive_debug_run"
-    parsed_args["run_name"] = "interactive_debug_run"
-    parsed_args["monthly_checkpoint"] = true
-    parsed_args["config_file"] =
-        isnothing(parsed_args["config_file"]) ? "../../../config/model_configs/slabplanet_default.yml" :
-        parsed_args["config_file"]
-end
-
-# read in config dictionary from file
-config_dict = YAML.load_file(parsed_args["config_file"])
-
-atmos_config = if !isnothing(config_dict)
-    CA.override_default_config(config_dict)
-elseif !isnothing(parsed_args["config_file"])
-    CA.override_default_config(parsed_args["config_file"])
-else # If no config file is specified, we use the Atmos default config dict as `atmos_config`
-    @info "Using Atmos default configuration"
-    CA.default_config_dict()
-end
-
-# merge dictionaries. If there are common keys, the last dictorionary in the `merge` arguments takes precedence:
-parsed_args =
-    isinteractive() ? merge(config_dict, atmos_config, parsed_args) : merge(parsed_args, config_dict, atmos_config)
-parsed_args["run_name"] = isnothing(parsed_args["run_name"]) ? config_dict["run_name"] : parsed_args["run_name"]
-
-## read in some parsed command line arguments
-mode_name = parsed_args["mode_name"]
-run_name = parsed_args["run_name"]
-energy_check = parsed_args["energy_check"]
-if !(@isdefined FT)
-    const FT = parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
-end
-land_sim_name = "bucket"
-t_end = Int(time_to_seconds(parsed_args["t_end"]))
-tspan = (Int(0), t_end)
-Δt_cpl = Int(parsed_args["dt_cpl"])
-saveat = time_to_seconds(parsed_args["dt_save_to_sol"])
-date0 = date = DateTime(parsed_args["start_date"], dateformat"yyyymmdd")
-mono_surface = parsed_args["mono_surface"]
-monthly_checkpoint = parsed_args["monthly_checkpoint"]
-restart_dir = parsed_args["restart_dir"]
-restart_t = Int(parsed_args["restart_t"])
-
+## coupler specific imports
 import ClimaCoupler
 import ClimaCoupler.Regridder
 import ClimaCoupler.Regridder:
@@ -170,6 +105,57 @@ import ClimaCoupler.FieldExchanger:
     step_model_sims!
 import ClimaCoupler.Checkpointer: checkpoint_model_state, get_model_state_vector, restart_model_state!
 
+## helpers for component models
+include("components/atmosphere/climaatmos_init.jl")
+include("components/land/bucket_init.jl")
+include("components/land/bucket_utils.jl")
+include("components/ocean/slab_ocean_init.jl")
+include("components/ocean/slab_seaice_init.jl")
+
+## helpers for user-specified IO
+include("user_io/user_diagnostics.jl")
+include("user_io/user_logging.jl")
+
+## coupler defaults
+include("cli_options.jl")
+parsed_args = parse_commandline(argparse_settings())
+
+## setup coupler and model configurations
+# modify parsed args for fast testing from REPL #hide
+if isinteractive()
+    parsed_args["config_file"] =
+        isnothing(parsed_args["config_file"]) ? "../../../config/model_configs/interactive_debug.yml" :
+        parsed_args["config_file"]
+end
+
+# read in config dictionary from file, overriding the coupler defaults
+config_dict = YAML.load_file(parsed_args["config_file"])
+config_dict = merge(parsed_args, config_dict)
+
+# get component model dictionaries
+config_dict_atmos = get_atmos_config(config_dict)
+
+# merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
+# (if there are common keys, the last dictorionary in the `merge` arguments takes precedence)
+config_dict = merge(config_dict_atmos, config_dict)
+
+## read in some parsed command line arguments
+mode_name = config_dict["mode_name"]
+run_name = config_dict["run_name"]
+energy_check = config_dict["energy_check"]
+const FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
+land_sim_name = "bucket"
+t_end = Int(time_to_seconds(config_dict["t_end"]))
+tspan = (Int(0), t_end)
+Δt_cpl = Int(config_dict["dt_cpl"])
+saveat = time_to_seconds(config_dict["dt_save_to_sol"])
+date0 = date = DateTime(config_dict["start_date"], dateformat"yyyymmdd")
+mono_surface = config_dict["mono_surface"]
+monthly_checkpoint = config_dict["monthly_checkpoint"]
+restart_dir = config_dict["restart_dir"]
+restart_t = Int(config_dict["restart_t"])
+
+## I/O directory setup
 pkg_dir = pkgdir(ClimaCoupler)
 if isinteractive()
     COUPLER_OUTPUT_DIR = joinpath("output", joinpath(mode_name, run_name)) # TempestRemap fails if interactive and paths are too long
@@ -185,16 +171,13 @@ COUPLER_ARTIFACTS_DIR = COUPLER_OUTPUT_DIR * "_artifacts"
 isdir(COUPLER_ARTIFACTS_DIR) ? nothing : mkpath(COUPLER_ARTIFACTS_DIR)
 
 @info COUPLER_OUTPUT_DIR
-@info parsed_args
+config_dict["print_config_dict"] ? @info(config_dict) : nothing
 
-## get the paths to the necessary data files: land-sea mask, sst map, sea ice concentration
+# get the paths to the necessary data files: land-sea mask, sst map, sea ice concentration
 include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
 sst_data = joinpath(sst_dataset_path(), "sst.nc")
 sic_data = joinpath(sic_dataset_path(), "sic.nc")
 land_mask_data = joinpath(mask_dataset_path(), "seamask.nc")
-
-## user-specified diagnostics
-include("user_io/user_diagnostics.jl")
 
 #=
 ## Component Model Initialization
@@ -206,8 +189,7 @@ Here we set initial and boundary conditions for each component model.
 This uses the `ClimaAtmos.jl` driver, with parameterization options specified in the command line arguments.
 =#
 ## init atmos model component
-include("components/atmosphere/climaatmos_init.jl")
-atmos_sim = atmos_init(FT, parsed_args);
+atmos_sim = atmos_init(FT, config_dict_atmos);
 thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models
 
 #=
@@ -222,12 +204,6 @@ boundary_space = atmos_sim.domain.face_space.horizontal_space
 land_fraction =
     Regridder.land_fraction(FT, REGRID_DIR, comms_ctx, land_mask_data, "LSMASK", boundary_space, mono = mono_surface)
 
-## init surface (slab) model components
-include("components/land/bucket_init.jl")
-include("components/land/bucket_utils.jl")
-include("components/ocean/slab_ocean_init.jl")
-include("components/ocean/slab_seaice_init.jl")
-
 #=
 ### Land
 We use `ClimaLSM.jl`'s bucket model.
@@ -235,8 +211,8 @@ We use `ClimaLSM.jl`'s bucket model.
 land_sim = bucket_init(
     FT,
     FT.(tspan),
-    parsed_args["config"],
-    parsed_args["albedo_type"],
+    config_dict["land_domain_type"],
+    config_dict["land_albedo_type"],
     comms_ctx,
     REGRID_DIR;
     dt = FT(Δt_cpl),
@@ -421,7 +397,7 @@ cs = CoupledSimulation{FT}(
     dates,
     boundary_space,
     coupler_fields,
-    parsed_args,
+    config_dict,
     conservation_checks,
     [tspan[1], tspan[2]],
     atmos_sim.integrator.t,
@@ -447,9 +423,9 @@ end
 ## Initialize Component Model Exchange
 =#
 turbulent_fluxes = nothing
-if parsed_args["turb_flux_partition"] == "PartitionedStateFluxes"
+if config_dict["turb_flux_partition"] == "PartitionedStateFluxes"
     turbulent_fluxes = PartitionedStateFluxes()
-elseif parsed_args["turb_flux_partition"] == "CombinedStateFluxes"
+elseif config_dict["turb_flux_partition"] == "CombinedStateFluxes"
     turbulent_fluxes = CombinedStateFluxes()
 else
     error("turb_flux_partition must be either PartitionedStateFluxes or CombinedStateFluxes")
@@ -619,7 +595,7 @@ if ClimaComms.iamroot(comms_ctx)
     end
 
     ## sample animations
-    if !is_distributed && parsed_args["anim"]
+    if !is_distributed && config_dict["anim"]
         @info "Animations"
         include("user_io/viz_explorer.jl")
         plot_anim(cs, COUPLER_ARTIFACTS_DIR)

@@ -1,7 +1,4 @@
 run_name: "target_amip_n1_shortrun"
-FLOAT_TYPE: "Float64"
-coupled: true
-surface_setup: "PrescribedSurface"
 moist: "equil"
 vert_diff: "true"
 rad: "gray"
@@ -17,7 +14,6 @@ alpha_rayleigh_w: 10
 dt_cpl: 150
 dt: "150secs"
 dt_rad: "1hours"
-FLOAT_TYPE: "Float64"
 energy_check: false
 mode_name: "amip"
 t_end: "0.01days"

@@ -1,8 +1,5 @@
 run_name: "slabplanet_partitioned_fluxes"
-FLOAT_TYPE: "Float64"
-coupled: true
 turb_flux_partition: "PartitionedStateFluxes"
-surface_setup: "PrescribedSurface"
 moist: "equil"
 vert_diff: "true"
 rad: "gray"

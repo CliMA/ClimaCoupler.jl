@@ -192,6 +192,65 @@ get_field(s::TestLand, ::Val{:area_fraction}) = ones(s.i.space) .* 0.25
 end
 
 @testset "test plot_global_conservation with dummy zero models" begin
+
+    space = TestHelper.create_space(FT)
+    # tmp_dir = "cons_tmp"
+    # mkpath(tmp_dir)
+    # local_file_0 = joinpath(tmp_dir, "coupler_conservation_0.hdf5")
+    # local_file_end = joinpath(tmp_dir, "coupler_conservation_end.hdf5")
+    # Downloads.download("https://caltech.box.com/shared/static/2oaft4v7elhmzlyk571vy8h0cbhzff7h.hdf5", local_file_0)
+    # Downloads.download("https://caltech.box.com/shared/static/zyh0u00q9ldlr03ue2m8u25hou4p2pdn.hdf5", local_file_end)
+
+    # set up model simulations
+    atmos = TestAtmos( (; space = space))
+    land = TestOcean( (; space = space))
+    ocean = TestLand( (; space = space))
+    ice = SurfaceStub((; area_fraction = Fields.ones(space) .* 0.5 ) )
+    model_sims = (; atmos_sim = atmos, land_sim = land, ocean_sim = ocean, ice_sim = ice)
+
+    # conservation checkers
+    cc =
+        (; energy = EnergyConservationCheck(model_sims), water = WaterConservationCheck(model_sims))
+
+    # coupler fields
+    cf = (;
+        F_radiative_TOA = Fields.ones(space),
+        P_net = Fields.zeros(space),
+        P_liq = Fields.zeros(space),
+        P_snow = Fields.zeros(space),
+        F_turb_moisture = Fields.zeros(space),
+    )
+    @. cf.F_radiative_TOA = 200
+    @. cf.P_liq = - 100
+
+    # init
+    cs = Utilities.CoupledSimulation{FT}(
+        nothing, # comms_ctx
+        nothing, # dates
+        space, # boundary_space
+        cf, # fields
+        nothing, # parsed_args
+        cc, # conservation_checks
+        (Int(0), Int(1000)), # tspan
+        Int(200), # t
+        Int(200), # Δt_cpl
+        (;), # surface_masks
+        model_sims, # model_sims
+        (;), # mode
+        (), # diagnostics
+    );
+
+    tot_energy, tot_water = check_conservation!(cs )
+
+    plot_global_conservation(cs.conservation_checks.energy, cs, figname1 = "energy.png", figname2 = "energy_log.png")
+    plot_global_conservation(cs.conservation_checks.water, cs, figname1 = "water.png", figname2 = "water_log.png")
+
+    # test that files exist
+    @test isfile("energy.png")
+    @test isfile("energy_log.png")
+    @test isfile("water.png")
+    @test isfile("water_log.png")
+
 end
 
 # @testset "test plot_global_conservation with dummy zero models" begin

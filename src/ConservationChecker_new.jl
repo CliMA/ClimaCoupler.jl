@@ -19,16 +19,16 @@ using ClimaLSM
 using ClimaCoupler.Utilities: CoupledSimulation, swap_space!
 import ClimaCoupler.Interfacer: SurfaceStub, ComponentModelSimulation, name
 
-#export AbstractCheck, EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
+#export AbstractConservationCheck, EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
 
-abstract type AbstractCheck end
+abstract type AbstractConservationCheck end
 
 """
-    EnergyConservationCheck{A} <: AbstractCheck
+    EnergyConservationCheck{A} <: AbstractConservationCheck
 
-Struct of type `AbstractCheck` containing global energy conservation logs.
+Struct of type `AbstractConservationCheck` containing global energy conservation logs.
 """
-mutable struct EnergyConservationCheck <: AbstractCheck
+mutable struct EnergyConservationCheck <: AbstractConservationCheck
     x::NamedTuple
     function EnergyConservationCheck(x)
         all_sims = (;)
@@ -39,14 +39,14 @@ mutable struct EnergyConservationCheck <: AbstractCheck
         return new(all_sims)
     end
 end
-
+name(::EnergyConservationCheck) = "energy [J]"
 
 """
-    WaterConservationCheck{A} <: AbstractCheck
+    WaterConservationCheck{A} <: AbstractConservationCheck
 
-Struct of type `AbstractCheck` containing global water mass conservation logs.
+Struct of type `AbstractConservationCheck` containing global water mass conservation logs.
 """
-mutable struct WaterConservationCheck <: AbstractCheck
+mutable struct WaterConservationCheck <: AbstractConservationCheck
     x::NamedTuple
     function WaterConservationCheck(x)
         all_sims = (;)
@@ -57,7 +57,7 @@ mutable struct WaterConservationCheck <: AbstractCheck
         return new(all_sims)
     end
 end
-
+name(::WaterConservationCheck) = "water [kg]"
 
 """
     check_conservation!(coupler_sim::CoupledSimulation)
@@ -118,6 +118,7 @@ function check_conservation!(
                 previous = getproperty(ccx, sim_name)
                 current =  sum(get_field(sim, Val(:energy)) .* area_fraction) # # ∫ J / m^3 dV
             end
+            push!(previous, current)
             total += current
         end
         push!(ccx.total, total)
@@ -150,8 +151,6 @@ function check_conservation!(
     @unpack model_sims = coupler_sim
 
     boundary_space = coupler_sim.boundary_space # thin shell approx (boundary_space[z=0] = boundary_space[z_top])
-
-    FT = eltype(coupler_sim.fields[1])
 
     total = 0
 
@@ -219,39 +218,34 @@ relative to the initial value;
 2. fractional change in the sum of all components over time on a log scale.
 """
 function plot_global_conservation(
-    cc::EnergyConservationCheck,
+    cc::AbstractConservationCheck,
     coupler_sim::CoupledSimulation;
-    figname1 = "total_energy.png",
-    figname2 = "total_energy_log.png",
+    figname1 = "total.png",
+    figname2 = "total_log.png",
 )
 
-    times = collect(1:length(cc.ρe_tot_atmos)) * coupler_sim.Δt_cpl
-    diff_ρe_tot_atmos = (cc.ρe_tot_atmos .- cc.ρe_tot_atmos[1])
-    diff_ρe_tot_slab = (cc.ρe_tot_land .- cc.ρe_tot_land[1])
-    diff_ρe_tot_slab_seaice = (cc.ρe_tot_seaice .- cc.ρe_tot_seaice[1])
-    diff_toa_net_source = (cc.toa_net_source .- cc.toa_net_source[1])
-    diff_ρe_tot_slab_ocean = (cc.ρe_tot_ocean .- cc.ρe_tot_ocean[1])
+    model_sims = coupler_sim.model_sims;
+    ccx = cc.x
 
-    times_days = times ./ (24 * 60 * 60)
-    Plots.plot(times_days, diff_ρe_tot_atmos[1:length(times_days)], label = "atmos")
-    Plots.plot!(times_days, diff_ρe_tot_slab[1:length(times_days)], label = "land")
-    Plots.plot!(times_days, diff_ρe_tot_slab_seaice[1:length(times_days)], label = "seaice")
-    Plots.plot!(times_days, diff_toa_net_source[1:length(times_days)], label = "toa")
-    Plots.plot!(times_days, diff_ρe_tot_slab_ocean[1:length(times_days)], label = "ocean")
+    days = collect(1:length(ccx[1])) * coupler_sim.Δt_cpl / 86400
 
-    tot = @. cc.ρe_tot_atmos + cc.ρe_tot_ocean + cc.ρe_tot_land + cc.ρe_tot_seaice + cc.toa_net_source
+    # evolution of energy of each component relative to initial value
+    total = ccx.total  # total
 
-    Plots.plot!(
-        times_days,
-        tot .- tot[1],
-        label = "tot",
-        xlabel = "time [days]",
-        ylabel = "energy(t) - energy(t=0) [J]",
-    )
+    var_name = name(cc)
+    Plots.plot(days, total .- total[1] , label = "total", xlabel = "time [days]", ylabel = "$var_name: (t) - (t=0)")
+    for sim in model_sims
+        sim_name = name(sim)
+        global_field = getproperty(ccx, Symbol(sim_name))
+        diff_global_field = (global_field .- global_field[1])
+        Plots.plot!(days, diff_global_field[1:length(days)], label = sim_name)
+    end
     Plots.savefig(figname1)
+
+    # evolution of log error of total
     Plots.plot(
-        times_days,
-        log.(abs.(tot .- tot[1]) / tot[1]),
+        days,
+        log.(abs.(total .- total[1]) / total[1]),
         label = "tot",
         xlabel = "time [days]",
         ylabel = "log( | e(t) - e(t=0)| / e(t=0))",
@@ -259,49 +253,7 @@ function plot_global_conservation(
     Plots.savefig(figname2)
 end
 
-"""
-    plot_global_conservation(
-        cc::WaterConservationCheck,
-        coupler_sim::CoupledSimulation;
-        figname1 = "total_energy.png",
-        figname2 = "total_energy_log.png",
-    )
 
-Creates two plots of the globally integrated quantity (water, ``\\rho q_{tot}``):
-1. global quantity of each model component as a function of time,
-relative to the initial value;
-2. fractional change in the sum of all components over time on a log scale.
-"""
-function plot_global_conservation(
-    cc::WaterConservationCheck,
-    coupler_sim::CoupledSimulation{FT};
-    figname1 = "total_water.png",
-    figname2 = "total_water_log.png",
-) where {FT}
-    times = collect(1:length(cc.ρq_tot_atmos)) * coupler_sim.Δt_cpl
-    diff_ρe_tot_atmos = (cc.ρq_tot_atmos .- cc.ρq_tot_atmos[1])
-    diff_ρe_tot_slab = (cc.ρq_tot_land .- cc.ρq_tot_land[1])
-    diff_ρe_tot_slab_seaice = (cc.ρq_tot_seaice .- cc.ρq_tot_seaice[1])
-    diff_ρe_tot_slab_ocean = (cc.ρq_tot_ocean .- cc.ρq_tot_ocean[1])
 
-    times_days = times ./ (24 * 60 * 60)
-    Plots.plot(times_days, diff_ρe_tot_atmos[1:length(times_days)], label = "atmos")
-    Plots.plot!(times_days, diff_ρe_tot_slab[1:length(times_days)], label = "land")
-    Plots.plot!(times_days, diff_ρe_tot_slab_seaice[1:length(times_days)], label = "seaice")
-    Plots.plot!(times_days, diff_ρe_tot_slab_ocean[1:length(times_days)], label = "ocean")
-
-    tot = @. cc.ρq_tot_atmos + cc.ρq_tot_land + cc.ρq_tot_seaice + cc.ρq_tot_ocean
-
-    Plots.plot!(times_days, tot .- tot[1], label = "tot", xlabel = "time [days]", ylabel = "water(t) - water(t=0) [kg]")
-    Plots.savefig(figname1)
-    Plots.plot(
-        times_days,
-        log.(abs.(tot .- tot[1]) / tot[1]),
-        label = "tot",
-        xlabel = "time [days]",
-        ylabel = "log( | w(t) - w(t=0)| / w(t=0))",
-    )
-    Plots.savefig(figname2)
-end
 
 # end # module

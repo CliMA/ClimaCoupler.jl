@@ -13,5 +13,5 @@ h_elem: 6
 dt_save_restart: "5days"
 precip_model: "0M"
 run_name: "coarse_mpi_n2"
-apply_limiter: true
+apply_limiter: false
 job_id: "coarse_mpi_n2"

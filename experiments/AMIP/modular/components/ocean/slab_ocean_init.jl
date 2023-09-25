@@ -157,3 +157,14 @@ Extension of Checkpointer.get_model_state_vector to get the model state.
 function get_model_state_vector(sim::SlabOceanSimulation)
     return sim.integrator.u
 end
+
+"""
+    get_field(sim::SlabOceanSimulation, ::Val{:energy})
+
+Extension of Interfacer.get_field to get the energy of the ocean.
+It multiplies the the slab temperature by the heat capacity, density, and depth.
+"""
+get_field(sim::SlabOceanSimulation, ::Val{:energy}) =
+    sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h
+
+get_field(sim::SlabOceanSimulation, ::Val{:water}) = nothing

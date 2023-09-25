@@ -1,35 +1,3 @@
-
-"""
-    get_bucket_energy(bucket_sim)
-
-Returns the volumetric internal energy of the bucket land model.
-"""
-function get_land_energy(bucket_sim::BucketSimulation, e_per_area)
-    # required by ConservationChecker
-    e_per_area .= zeros(axes(bucket_sim.integrator.u.bucket.W))
-    soil_depth = FT = eltype(bucket_sim.integrator.u.bucket.W)
-    ClimaCore.Fields.bycolumn(axes(bucket_sim.integrator.u.bucket.T)) do colidx
-        e_per_area[colidx] .=
-            bucket_sim.model.parameters.ρc_soil .* mean(bucket_sim.integrator.u.bucket.T[colidx]) .*
-            bucket_sim.domain.soil_depth
-    end
-
-    e_per_area .+=
-        -LSMP.LH_f0(bucket_sim.model.parameters.earth_param_set) .*
-        LSMP.ρ_cloud_liq(bucket_sim.model.parameters.earth_param_set) .* bucket_sim.integrator.u.bucket.σS
-    return e_per_area
-end
-
-"""
-    get_land_temp_from_state(land_sim, u)
-Returns the surface temperature of the earth, computed
-from the state u.
-"""
-function get_land_temp_from_state(land_sim, u)
-    # required by viz_explorer.jl
-    return ClimaLSM.surface_temperature(land_sim.model, u, land_sim.integrator.p, land_sim.integrator.t)
-end
-
 """
     make_lsm_domain(
         atmos_boundary_space::ClimaCore.Spaces.SpectralElementSpace2D,
@@ -105,10 +73,12 @@ function update_field!(sim::BucketSimulation, ::Val{:radiative_energy_flux}, fie
     parent(sim.integrator.p.bucket.R_n) .= parent(field)
 end
 function update_field!(sim::BucketSimulation, ::Val{:liquid_precipitation}, field)
-    parent(sim.integrator.p.bucket.P_liq) .= parent(field)
+    ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
+    parent(sim.integrator.p.bucket.P_liq) .= parent(field ./ ρ_liq)
 end
 function update_field!(sim::BucketSimulation, ::Val{:snow_precipitation}, field)
-    parent(sim.integrator.p.bucket.P_snow) .= parent(field)
+    ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
+    parent(sim.integrator.p.bucket.P_snow) .= parent(field ./ ρ_liq)
 end
 
 function update_field!(sim::BucketSimulation, ::Val{:air_density}, field)
@@ -152,4 +122,45 @@ Extension of Checkpointer.get_model_state_vector to get the model state.
 """
 function get_model_state_vector(sim::BucketSimulation)
     return sim.integrator.u.bucket
+end
+
+"""
+    get_field(bucket_sim::BucketSimulation, ::Val{:energy})
+
+Extension of Interfacer.get_field that provides the total energy contained in the bucket, including the latent heat due to snow melt.
+"""
+function get_field(bucket_sim::BucketSimulation, ::Val{:energy})
+    # required by ConservationChecker
+    e_per_area = zeros(axes(bucket_sim.integrator.u.bucket.W))
+    ClimaCore.Fields.bycolumn(axes(bucket_sim.integrator.u.bucket.T)) do colidx
+        e_per_area[colidx] .=
+            bucket_sim.model.parameters.ρc_soil .* mean(bucket_sim.integrator.u.bucket.T[colidx]) .*
+            bucket_sim.domain.soil_depth
+    end
+
+    e_per_area .+=
+        -LSMP.LH_f0(bucket_sim.model.parameters.earth_param_set) .*
+        LSMP.ρ_cloud_liq(bucket_sim.model.parameters.earth_param_set) .* bucket_sim.integrator.u.bucket.σS
+    return e_per_area
+end
+
+"""
+    get_field(bucket_sim::BucketSimulation, ::Val{:water})
+
+Extension of Interfacer.get_field that provides the total water contained in the bucket, including the liquid water in snow.
+"""
+function get_field(bucket_sim::BucketSimulation, ::Val{:water})
+    ρ_cloud_liq = ClimaLSM.LSMP.ρ_cloud_liq(bucket_sim.model.parameters.earth_param_set)
+    return
+    @. (bucket_sim.integrator.u.bucket.σS + bucket_sim.integrator.u.bucket.W + bucket_sim.integrator.u.bucket.Ws) *
+       ρ_cloud_liq  # kg water / m2
+end
+
+"""
+    get_land_temp_from_state(land_sim, u)
+Returns the surface temperature of the earth, computed from the state u.
+"""
+function get_land_temp_from_state(land_sim, u)
+    # required by viz_explorer.jl
+    return ClimaLSM.surface_temperature(land_sim.model, u, land_sim.integrator.p, land_sim.integrator.t)
 end

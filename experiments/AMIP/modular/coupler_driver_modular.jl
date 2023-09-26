@@ -578,7 +578,7 @@ function solve_coupler!(cs)
             end
         func_args = (monthly_checkpoint, cs, comms_ctx, t, COUPLER_ARTIFACTS_DIR)
         ## perform monthly callback and increment `cs.dates.date1` if `cs.dates.date` passes to next month
-        TimeManager.trigger_callback(
+        cs.dates.date1[1] = TimeManager.trigger_callback(
             cs.dates.date1[1],
             cs.dates.date[1],
             TimeManager.Monthly(),

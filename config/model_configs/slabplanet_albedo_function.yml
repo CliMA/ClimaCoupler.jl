@@ -12,5 +12,5 @@ h_elem: 4
 precip_model: "0M"
 land_albedo_type: "map_static"
 run_name: "slabplanet_albedo_function"
-apply_limiter: true
+apply_limiter: false
 job_id: "slabplanet_albedo_function"

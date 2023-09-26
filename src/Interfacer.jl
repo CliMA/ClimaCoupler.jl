@@ -71,6 +71,9 @@ function get_field(sim::ComponentModelSimulation, val::Val)
     error("undefined field $val for " * name(sim))
 end
 
+get_field(sim::SurfaceStub, ::Val{:energy}) = nothing
+get_field(sim::SurfaceStub, ::Val{:water}) = nothing
+
 """
     get_field(::ComponentModelSimulation, ::Val, colidx::Fields.ColumnIndex)
 

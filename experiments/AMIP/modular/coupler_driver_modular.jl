@@ -387,8 +387,7 @@ if energy_check
         mode_name == "slabplanet" && !CA.is_distributed(ClimaComms.context(boundary_space)),
         "Only non-distributed slabplanet allowable for energy_check"
     )
-    conservation_checks =
-        (; energy = EnergyConservationCheck([], [], [], [], [], []), water = WaterConservationCheck([], [], [], []))
+    conservation_checks = (; energy = EnergyConservationCheck(model_sims), water = WaterConservationCheck(model_sims))
 end
 
 ## coupler simulation
@@ -516,7 +515,7 @@ function solve_coupler!(cs)
         end
 
         ## compute global energy
-        !isnothing(cs.conservation_checks) ? check_conservation!(cs, get_slab_energy, get_land_energy) : nothing
+        !isnothing(cs.conservation_checks) ? check_conservation!(cs) : nothing
 
         ## run component models sequentially for one coupling timestep (Δt_cpl)
         ClimaComms.barrier(comms_ctx)

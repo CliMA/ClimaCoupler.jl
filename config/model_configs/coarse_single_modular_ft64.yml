@@ -13,6 +13,6 @@ mono_surface: true
 h_elem: 6
 dt_save_restart: "10days"
 precip_model: "0M"
-apply_limiter: true
+apply_limiter: false
 job_id: "coarse_single_modular_ft64"
 

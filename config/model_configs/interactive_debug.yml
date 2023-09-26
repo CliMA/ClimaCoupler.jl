@@ -4,9 +4,9 @@ rad: "gray"
 energy_check: true
 mode_name: "slabplanet"
 t_end: "10days"
-dt_save_to_sol: "3600secs"
-dt_cpl: 200
-dt: "200secs"
+dt_save_to_sol: "2days"
+dt_cpl: 400
+dt: "400secs"
 mono_surface: true
 turb_flux_partition: "CombinedStateFluxes"
 h_elem: 4

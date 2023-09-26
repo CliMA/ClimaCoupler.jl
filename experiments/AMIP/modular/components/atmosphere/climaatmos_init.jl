@@ -71,9 +71,14 @@ end
 # extensions required by the Interfacer
 get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux}) =
     Fields.level(sim.integrator.p.ᶠradiation_flux, half)
-get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) =
-    sim.integrator.p.col_integrated_rain .+ sim.integrator.p.col_integrated_snow # all fallen snow melts for now
-get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) = sim.integrator.p.col_integrated_snow .* FT(0)
+function get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation})
+    ρ_liq = CAP.ρ_cloud_liq(sim.integrator.p.params)
+    sim.integrator.p.col_integrated_rain .* ρ_liq # kg/m^2/s
+end
+function get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation})
+    ρ_liq = CAP.ρ_cloud_liq(sim.integrator.p.params)
+    sim.integrator.p.col_integrated_snow .* ρ_liq  # kg/m^2/s
+end
 
 get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_energy_flux}) =
     Geometry.WVector.(sim.integrator.p.sfc_conditions.ρ_flux_h_tot)
@@ -252,3 +257,46 @@ Extension of Checkpointer.get_model_state_vector to get the model state.
 function get_model_state_vector(sim::ClimaAtmosSimulation)
     return sim.integrator.u
 end
+
+"""
+    get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:F_radiative_TOA})
+
+Extension of Interfacer.get_field to get the net TOA radiation, which is a sum of the
+upward and downward longwave and shortwave radiation.
+"""
+function get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:F_radiative_TOA})
+    radiation = atmos_sim.integrator.p.radiation_model
+    FT = eltype(atmos_sim.integrator.u)
+    # save radiation source
+    if radiation != nothing
+        face_space = axes(atmos_sim.integrator.u.f)
+        z = parent(Fields.coordinate_field(face_space).z)
+        Δz_top = round(FT(0.5) * (z[end, 1, 1, 1, 1] - z[end - 1, 1, 1, 1, 1]))
+        n_faces = length(z[:, 1, 1, 1, 1])
+
+        LWd_TOA = Fields.level(
+            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_lw_flux_dn), face_space),
+            n_faces - half,
+        )
+        LWu_TOA = Fields.level(
+            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_lw_flux_up), face_space),
+            n_faces - half,
+        )
+        SWd_TOA = Fields.level(
+            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_sw_flux_dn), face_space),
+            n_faces - half,
+        )
+        SWu_TOA = Fields.level(
+            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_sw_flux_up), face_space),
+            n_faces - half,
+        )
+
+        return @. -(LWd_TOA + SWd_TOA - LWu_TOA - SWu_TOA) # [W/m^2]
+    else
+        return FT(0)
+    end
+end
+
+get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:energy}) = atmos_sim.integrator.u.c.ρe_tot
+
+get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:water}) = atmos_sim.integrator.u.c.ρq_tot

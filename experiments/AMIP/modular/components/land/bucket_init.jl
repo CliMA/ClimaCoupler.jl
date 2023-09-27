@@ -81,7 +81,7 @@ function ClimaLSM.Bucket.surface_fluxes(
     p,
     _...,
 ) where {FT <: AbstractFloat}
-    space = model.domain.surface.space
+    space = model.domain.space.surface
     return (
         lhf = ClimaCore.Fields.zeros(space),
         shf = p.bucket.turbulent_energy_flux,

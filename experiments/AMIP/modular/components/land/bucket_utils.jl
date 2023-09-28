@@ -13,7 +13,7 @@ function make_lsm_domain(
     nelements_vert::Int,
 ) where {FT}
     @assert zlim[1] < zlim[2]
-    height = zlim[2] - zlim[1]
+    depth = zlim[2] - zlim[1]
     radius = atmos_boundary_space.topology.mesh.domain.radius
     npolynomial = ClimaCore.Spaces.Quadratures.polynomial_degree(atmos_boundary_space.quadrature_style)
     nelements_horz = atmos_boundary_space.topology.mesh.ne
@@ -28,24 +28,9 @@ function make_lsm_domain(
     verttopology = ClimaCore.Topologies.IntervalTopology(vertmesh)
     vert_center_space = ClimaCore.Spaces.CenterFiniteDifferenceSpace(verttopology)
     subsurface_space = ClimaCore.Spaces.ExtrudedFiniteDifferenceSpace(atmos_boundary_space, vert_center_space)
+    space = (; surface = atmos_boundary_space, subsurface = subsurface_space)
 
-    surface_domain = ClimaLSM.Domains.SphericalSurface{FT, typeof(atmos_boundary_space)}(
-        radius,
-        nelements[1],
-        npolynomial,
-        atmos_boundary_space,
-    )
-    subsurface_domain = ClimaLSM.Domains.SphericalShell{FT, typeof(subsurface_space)}(
-        radius,
-        height,
-        nelements,
-        npolynomial,
-        subsurface_space,
-    )
-    return ClimaLSM.Domains.LSMSphericalShellDomain{FT, typeof(subsurface_space), typeof(atmos_boundary_space)}(
-        subsurface_domain,
-        surface_domain,
-    )
+    return ClimaLSM.Domains.SphericalShell{FT}(radius, depth, nothing, nelements, npolynomial, space)
 end
 
 # extensions required by Interfacer

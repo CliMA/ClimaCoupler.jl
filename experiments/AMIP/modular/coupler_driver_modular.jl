@@ -122,9 +122,10 @@ parsed_args = parse_commandline(argparse_settings())
 
 ## setup coupler and model configurations
 # modify parsed args for fast testing from REPL #hide
+pkg_dir = pkgdir(ClimaCoupler)
 if isinteractive()
     parsed_args["config_file"] =
-        isnothing(parsed_args["config_file"]) ? "../../../config/model_configs/interactive_debug.yml" :
+        isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/model_configs/interactive_debug.yml") :
         parsed_args["config_file"]
 end
 
@@ -156,7 +157,6 @@ restart_dir = config_dict["restart_dir"]
 restart_t = Int(config_dict["restart_t"])
 
 ## I/O directory setup
-pkg_dir = pkgdir(ClimaCoupler)
 if isinteractive()
     COUPLER_OUTPUT_DIR = joinpath("output", joinpath(mode_name, run_name)) # TempestRemap fails if interactive and paths are too long
 else

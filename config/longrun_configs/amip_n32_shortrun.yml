@@ -1,4 +1,4 @@
-job_ide: "amip_n32_shortrun"
+job_id: "amip_n32_shortrun"
 run_name: "amip_n32_shortrun"
 moist: "equil"
 vert_diff: "true"

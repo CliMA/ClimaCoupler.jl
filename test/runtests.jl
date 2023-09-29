@@ -42,4 +42,17 @@ end
 @safetestset "CouplerState tests" begin
     include("CouplerState/cplstate_interface.jl")
 end
+@safetestset "component test: bucket" begin
+    include("component_model_tests/bucket_tests.jl")
+end
+@safetestset "component model test: ClimaAtmos" begin
+    include("component_model_tests/climaatmos_tests.jl")
+end
+@safetestset "component model test: prescr. sea ice" begin
+    include("component_model_tests/prescr_seaice_tests.jl")
+end
+@safetestset "component model test: slab ocean" begin
+    include("component_model_tests/slab_ocean_tests.jl")
+end
+
 # include("CoupledSimulations/cplsolver.jl")

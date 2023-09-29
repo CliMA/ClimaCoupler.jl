@@ -4,6 +4,7 @@ using ClimaLSM
 import ClimaLSM
 import ClimaTimeSteppers as CTS
 import Thermodynamics as TD
+using Dates: DateTime
 
 include(joinpath(pkgdir(ClimaLSM), "parameters", "create_parameters.jl"))
 using ClimaLSM.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers
@@ -267,5 +268,9 @@ function bucket_init(
     prob = ODEProblem(bucket_ode_function, Y, tspan, p_new)
     integrator = init(prob, ode_algo; dt = dt, saveat = saveat, adaptive = false)
 
-    BucketSimulation(model, Y, (; domain = domain, soil_depth = d_soil), integrator, area_fraction)
+    sim = BucketSimulation(model, Y, (; domain = domain, soil_depth = d_soil), integrator, area_fraction)
+
+    # DSS state to ensure we have continuous fields
+    dss_state!(sim)
+    return sim
 end

@@ -1,23 +1,18 @@
-# this folder contains temporary tests for component code that has not been moved to any src code (location TBD)
 using Test
+import ClimaCoupler
+using ClimaCoupler.Interfacer: SeaIceModelSimulation
+using ClimaCoupler.TestHelper: create_space
 using ClimaCore
-using ClimaCore: Fields
-using ClimaCoupler.Regridder
-import ClimaCoupler.Regridder: binary_mask
-import ClimaCoupler.Interfacer: AtmosModelSimulation, SurfaceModelSimulation, SurfaceStub, get_field
-import Thermodynamics as TD
+using ClimaCore: Fields, Spaces
 import CLIMAParameters as CP
 import Thermodynamics.Parameters as TDP
 
-include("TestHelper.jl")
-
-# sea ice
-include("../experiments/AMIP/modular/components/ocean/slab_seaice_init.jl")
+include(pkgdir(ClimaCoupler, "experiments/AMIP/modular/components/ocean/prescr_seaice_init.jl"))
 
 for FT in (Float32, Float64)
     @testset "test sea-ice energy slab for FT=$FT" begin
         function test_sea_ice_rhs(; F_radiative = 0.0, T_base = 271.2, global_mask = 1.0)
-            space = TestHelper.create_space(FT)
+            space = create_space(FT)
             params = IceSlabParameters(
                 FT(2),  # ice thickness
                 FT(900.0), # density of sea ice
@@ -79,5 +74,35 @@ for FT in (Float32, Float64)
         # check that no tendency is applied in a masked case
         dY, Y, p = test_sea_ice_rhs(F_radiative = 0.0, T_base = 269.2, global_mask = 0.0)
         @test sum([i for i in extrema(dY)] .≈ [FT(0.0), FT(0.0)]) == 2
+    end
+
+    @testset "dss_state! SeaIceModelSimulation for FT=$FT" begin
+        # use TestHelper to create space
+        boundary_space = create_space(FT)
+
+        # construct dss buffer to put in cache
+        dss_buffer = Spaces.create_dss_buffer(Fields.zeros(boundary_space))
+
+        # set up objects for test
+        integrator = (;
+            u = (; state_field1 = FT.(Fields.ones(boundary_space)), state_field2 = FT.(Fields.zeros(boundary_space))),
+            p = (; cache_field = FT.(Fields.zeros(boundary_space)), dss_buffer = dss_buffer),
+        )
+        integrator_copy = deepcopy(integrator)
+        sim = PrescribedIceSimulation(nothing, nothing, nothing, integrator)
+
+        # make field non-constant to check the impact of the dss step
+        for i in eachindex(parent(sim.integrator.u.state_field2))
+            parent(sim.integrator.u.state_field2)[i] = FT(sin(i))
+        end
+
+        # apply DSS
+        dss_state!(sim)
+
+        # test that uniform field and cache are unchanged, non-constant is changed
+        # note: uniform field is changed slightly by dss
+        @test sim.integrator.u.state_field1 ≈ integrator_copy.u.state_field1
+        @test sim.integrator.u.state_field2 != integrator_copy.u.state_field2
+        @test sim.integrator.p.cache_field == integrator_copy.p.cache_field
     end
 end

@@ -112,10 +112,6 @@ steps:
         agents:
           slurm_mem: 16GB
 
-      - label: "Component model tests"
-        command: "julia --color=yes --project=test/ test/component_model_tests.jl  --run_name component_test --job_id component_test"
-        timeout_in_minutes: 5
-
   - group: "Integration Tests"
     steps:
 

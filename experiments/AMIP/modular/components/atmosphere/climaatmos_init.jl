@@ -64,8 +64,11 @@ function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
     integrator.p.col_integrated_rain .= FT(0)
     integrator.p.col_integrated_snow .= FT(0)
 
+    sim = ClimaAtmosSimulation(integrator.p.params, Y, spaces, integrator)
 
-    ClimaAtmosSimulation(integrator.p.params, Y, spaces, integrator)
+    # DSS state to ensure we have continuous fields
+    dss_state!(sim)
+    return sim
 end
 
 # extensions required by the Interfacer
@@ -300,3 +303,20 @@ end
 get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:energy}) = atmos_sim.integrator.u.c.ρe_tot
 
 get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:water}) = atmos_sim.integrator.u.c.ρq_tot
+
+"""
+    dss_state!(sim::ClimaAtmosSimulation)
+
+Perform DSS on the state of a component simulation, intended to be used
+before the initial step of a run. This method acts on atmosphere simulations.
+These sims don't store a dss buffer in their cache, so we must allocate
+one here.
+"""
+function dss_state!(sim::ClimaAtmosSimulation)
+    Y = sim.integrator.u
+    for key in propertynames(Y)
+        field = getproperty(Y, key)
+        buffer = Spaces.create_dss_buffer(field)
+        Spaces.weighted_dss!(field, buffer)
+    end
+end

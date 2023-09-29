@@ -2,6 +2,8 @@ import ClimaTimeSteppers as CTS
 import ClimaCoupler.Interfacer: SeaIceModelSimulation, get_field, update_field!, name
 import ClimaCoupler.FieldExchanger: step!, reinit!
 import ClimaCoupler.FluxCalculator: update_turbulent_fluxes_point!
+using ClimaCoupler: Regridder
+import Thermodynamics as TD
 
 include("../slab_utils.jl")
 
@@ -111,7 +113,11 @@ function ice_init(::Type{FT}; tspan, saveat, dt, space, area_fraction, thermo_pa
     problem = ODEProblem(ode_function, Y, FT.(tspan), (; additional_cache..., params = params))
     integrator = init(problem, ode_algo, dt = FT(dt), saveat = FT(saveat), adaptive = false)
 
-    PrescribedIceSimulation(params, Y, space, integrator)
+    sim = PrescribedIceSimulation(params, Y, space, integrator)
+
+    # DSS state to ensure we have continuous fields
+    dss_state!(sim)
+    return sim
 end
 
 # file-specific
@@ -178,3 +184,19 @@ get_field(sim::PrescribedIceSimulation, ::Val{:energy}) =
     sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h
 
 get_field(sim::PrescribedIceSimulation, ::Val{:water}) = nothing
+
+"""
+    dss_state!(sim::PrescribedIceSimulation)
+
+Perform DSS on the state of a component simulation, intended to be used
+before the initial step of a run. This method acts on prescribed ice simulations.
+"""
+function dss_state!(sim::PrescribedIceSimulation)
+    Y = sim.integrator.u
+    p = sim.integrator.p
+    for key in propertynames(Y)
+        field = getproperty(Y, key)
+        buffer = get_dss_buffer(axes(field), p)
+        Spaces.weighted_dss!(field, buffer)
+    end
+end

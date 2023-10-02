@@ -3,7 +3,7 @@
 This module contains functions for defining the interface for coupling component models, as well as stub objects that contain prescribed fields.
 
 ## Coupled Simulation
-- `CoupledSimulation` (`cs`, currently in Utilities - TODO) stores info for ESM run. We require that each `cs` contains four (`atmos_sim`, `land_sim`, `ocean_sim` and `ice_sim`) components. While this requirement will not be eventually needed, for the time being, if a simulation surface type is not needed for a given run, it should be initialized with `SurfaceStub` with a zero `area_fracion`. The `atmos_sim` should always be specified.
+- `CoupledSimulation` (`cs`) stores info for ESM run. We require that each `cs` contains four (`atmos_sim`, `land_sim`, `ocean_sim` and `ice_sim`) components. While this requirement will not be eventually needed, for the time being, if a simulation surface type is not needed for a given run, it should be initialized with `SurfaceStub` with a zero `area_fracion`. The `atmos_sim` should always be specified.
 
 ## Component model simulations
 - all Simulations that are not the `CoupledSimulation` fall under `ComponentModelSimulation`

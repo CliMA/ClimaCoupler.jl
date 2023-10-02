@@ -8,7 +8,7 @@ using Test
 using NCDatasets
 using Dates
 
-using ClimaCoupler: Utilities, Regridder, TestHelper
+using ClimaCoupler: Interfacer, Regridder, TestHelper
 import ClimaCoupler.Interfacer: get_field, name, SurfaceModelSimulation, SurfaceStub, update_field!
 
 REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regrid_tmp/")
@@ -67,7 +67,7 @@ for FT in (Float32, Float64)
         ocean_d = Fields.zeros(test_space)
 
         # Fill in only the necessary parts of the simulation
-        cs = Utilities.CoupledSimulation{FT}(
+        cs = Interfacer.CoupledSimulation{FT}(
             nothing, # comms_ctx
             nothing, # dates
             nothing, # boundary_space

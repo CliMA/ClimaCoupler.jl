@@ -1,10 +1,10 @@
-#= 
+#=
     Unit tests for ClimaCoupler TimeManager module
 =#
 
 using Test
 using Dates
-using ClimaCoupler: Utilities, TimeManager
+using ClimaCoupler: Interfacer, TimeManager
 using ClimaComms
 
 for FT in (Float32, Float64)
@@ -15,7 +15,7 @@ for FT in (Float32, Float64)
         Δt_cpl = 1 * 24 * 3600
 
         # Fill in only the necessary parts of the simulation
-        cs = Utilities.CoupledSimulation{FT}(
+        cs = Interfacer.CoupledSimulation{FT}(
             ClimaComms.SingletonCommsContext(), # comms_ctx
             dates, # dates
             nothing, # boundary_space
@@ -51,7 +51,7 @@ end
     date0 = date = DateTime("19790321", dateformat"yyyymmdd")
     dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)])
 
-    cs = Utilities.CoupledSimulation{Float64}(
+    cs = Interfacer.CoupledSimulation{Float64}(
         nothing, # comms_ctx
         dates, # dates
         nothing, # boundary_space

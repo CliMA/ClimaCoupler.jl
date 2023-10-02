@@ -5,7 +5,7 @@ These are in a separate testing file from the other BCReader unit tests so
 that MPI can be enabled for testing of these functions.
 =#
 
-using ClimaCoupler: Regridder, BCReader, TimeManager, Utilities
+using ClimaCoupler: Regridder, BCReader, TimeManager, Interfacer
 using ClimaCore: Fields, Meshes, Domains, Topologies, Spaces
 using ClimaComms
 using Test
@@ -126,7 +126,7 @@ end
         SST_all = []
         updating_dates = []
 
-        cs_t = Utilities.CoupledSimulation{FT}(
+        cs_t = Interfacer.CoupledSimulation{FT}(
             comms_ctx, # comms_ctx
             dates, # dates
             nothing, # boundary_space

@@ -2,7 +2,7 @@
     Unit tests for ClimaCoupler ConservationChecker, with parsed objects mimicking those in the full coupled system
 =#
 
-using ClimaCoupler: Utilities, Regridder, TestHelper, Interfacer
+using ClimaCoupler: Regridder, TestHelper, Interfacer
 using ClimaCoupler.ConservationChecker:
     EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
 using ClimaCore: ClimaCore, Geometry, Meshes, Domains, Topologies, Spaces, Fields, InputOutput
@@ -72,7 +72,7 @@ get_field(s::TestLand, ::Val{:area_fraction}) = ones(s.i.space) .* 0.25
     @. cf.P_liq = -100
 
     # init
-    cs = Utilities.CoupledSimulation{FT}(
+    cs = Interfacer.CoupledSimulation{FT}(
         nothing, # comms_ctx
         nothing, # dates
         space, # boundary_space
@@ -149,7 +149,7 @@ end
     @. cf.P_liq = -100
 
     # init
-    cs = Utilities.CoupledSimulation{FT}(
+    cs = Interfacer.CoupledSimulation{FT}(
         nothing, # comms_ctx
         nothing, # dates
         space, # boundary_space

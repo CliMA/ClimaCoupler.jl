@@ -4,8 +4,14 @@ using Test
 using ClimaCore
 using ClimaCoupler: TestHelper
 import ClimaCoupler.Interfacer:
-    update_field!, AtmosModelSimulation, SurfaceModelSimulation, SurfaceStub, get_field, update_field!, name
-using ClimaCoupler.Utilities: CoupledSimulation, CoupledSimulation
+    CoupledSimulation,
+    update_field!,
+    AtmosModelSimulation,
+    SurfaceModelSimulation,
+    SurfaceStub,
+    get_field,
+    update_field!,
+    name
 
 FT = Float64
 

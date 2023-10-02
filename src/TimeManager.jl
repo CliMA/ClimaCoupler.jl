@@ -6,7 +6,7 @@ of data.
 """
 module TimeManager
 
-using ..Utilities
+using ..Interfacer: CoupledSimulation
 using Dates
 
 export current_date,

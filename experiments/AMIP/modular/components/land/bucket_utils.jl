@@ -149,3 +149,16 @@ function get_land_temp_from_state(land_sim, u)
     # required by viz_explorer.jl
     return ClimaLSM.surface_temperature(land_sim.model, u, land_sim.integrator.p, land_sim.integrator.t)
 end
+
+"""
+    dss_state!(sim::BucketSimulation)
+
+Perform DSS on the state of a component simulation, intended to be used
+before the initial step of a run. This method acts on bucket land simulations.
+The `dss!` function of ClimaLSM must be called because it uses either the 2D
+or 3D dss buffer stored in the cache depending on space of each variable in
+`sim.integrator.u`.
+"""
+function dss_state!(sim::BucketSimulation)
+    ClimaLSM.dss!(sim.integrator.u, sim.integrator.p, sim.integrator.t)
+end

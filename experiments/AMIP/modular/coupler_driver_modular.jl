@@ -110,7 +110,7 @@ include("components/atmosphere/climaatmos_init.jl")
 include("components/land/bucket_init.jl")
 include("components/land/bucket_utils.jl")
 include("components/ocean/slab_ocean_init.jl")
-include("components/ocean/slab_seaice_init.jl")
+include("components/ocean/prescr_seaice_init.jl")
 
 ## helpers for user-specified IO
 include("user_io/user_diagnostics.jl")

@@ -75,8 +75,6 @@ end
 end
 
 @testset "update_field! the SurfaceStub area_fraction" begin
-    boundary_space = TestHelper.create_space(FT)
-
     stub = SurfaceStub((; area_fraction = zeros(boundary_space), T_sfc = zeros(boundary_space)))
 
     update_field!(stub, Val(:area_fraction), ones(boundary_space))

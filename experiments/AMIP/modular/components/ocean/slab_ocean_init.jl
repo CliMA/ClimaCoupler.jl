@@ -104,7 +104,11 @@ function ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, thermo_
     problem = ODEProblem(ode_function, Y, FT.(tspan), cache)
     integrator = init(problem, ode_algo, dt = FT(dt), saveat = FT(saveat), adaptive = false)
 
-    SlabOceanSimulation(params, Y, space, integrator)
+    sim = SlabOceanSimulation(params, Y, space, integrator)
+
+    # DSS state to ensure we have continuous fields
+    dss_state!(sim)
+    return sim
 end
 
 # file specific
@@ -168,3 +172,19 @@ get_field(sim::SlabOceanSimulation, ::Val{:energy}) =
     sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h
 
 get_field(sim::SlabOceanSimulation, ::Val{:water}) = nothing
+
+"""
+    dss_state!(sim::SlabOceanSimulation)
+
+Perform DSS on the state of a component simulation, intended to be used
+before the initial step of a run. This method acts on slab ocean model sims.
+"""
+function dss_state!(sim::SlabOceanSimulation)
+    Y = sim.integrator.u
+    p = sim.integrator.p
+    for key in propertynames(Y)
+        field = getproperty(Y, key)
+        buffer = get_dss_buffer(axes(field), p)
+        Spaces.weighted_dss!(field, buffer)
+    end
+end

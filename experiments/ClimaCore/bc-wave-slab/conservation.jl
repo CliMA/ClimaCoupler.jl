@@ -7,7 +7,7 @@ end
 
 function check_conservation(cs, atmos_sim, slab_sim)
     atmos_field = atmos_sim.integrator.u.thermodynamics.ρe_tot
-    slab_field = get_slab_energy(slab_sim)
+    slab_field = get_total_energy(slab_sim)
 
     ρe_tot_atmos = sum(atmos_field)
     ρe_tot_slab = sum(slab_field)
@@ -16,7 +16,7 @@ function check_conservation(cs, atmos_sim, slab_sim)
     push!(cs.ρe_tot_slab, ρe_tot_slab)
 end
 
-function get_slab_energy(slab_sim)
+function get_total_energy(slab_sim)
     ρe_tot = slab_sim.params.ρ .* slab_sim.params.c .* slab_sim.integrator.u.T_sfc .* slab_sim.params.h
 end
 

@@ -1,5 +1,5 @@
 
-using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput
+using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput, Geometry
 using ClimaCoupler: Utilities, Regridder, TestHelper
 using Test
 import ClimaCoupler.FluxCalculator:
@@ -13,7 +13,12 @@ import ClimaCoupler.FluxCalculator:
     partitioned_turbulent_fluxes!,
     get_surface_params,
     update_turbulent_fluxes_point!,
-    surface_thermo_state
+    surface_thermo_state,
+    surface_inputs,
+    get_surface_fluxes_point!,
+    get_scheme_properties,
+    surface_thermo_state,
+    differentiate_turbulent_fluxes!
 import ClimaCoupler: Interfacer
 FT = Float64
 
@@ -291,6 +296,26 @@ struct DummySurfaceSimulation3{M, Y, D, I} <: Interfacer.SurfaceModelSimulation
     integrator::I
 end
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:surface_temperature}) = sim.integrator.T
+Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
+Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:heat_transfer_coefficient}) = sim.integrator.p.Ch
+Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:drag_coefficient}) = sim.integrator.p.Cd
+Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:beta}) = sim.integrator.p.beta
+
+function Interfacer.update_field!(sim::DummySurfaceSimulation3, ::Val{:∂F_turb_energy∂T_sfc}, field, colidx)
+    sim.integrator.p.∂F_turb_energy∂T_sfc[colidx] .= field
+end
+function surface_thermo_state(
+    sim::DummySurfaceSimulation3,
+    thermo_params::TD.Parameters.ThermodynamicsParameters,
+    thermo_state_int,
+    colidx::Fields.ColumnIndex,
+)
+
+    T_sfc = Interfacer.get_field(sim, Val(:surface_temperature), colidx)
+    ρ_sfc = @. T_sfc * 0.0 .+ 1.2 # arbitrary
+    q_sfc = @. T_sfc * 0.0 # dry surface
+    @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
+end
 
 @testset "update_turbulent_fluxes_point!" begin
     sim = Interfacer.SurfaceStub([])
@@ -307,7 +332,7 @@ end
 @testset "surface_thermo_state" begin
     boundary_space = TestHelper.create_space(FT)
     _ones = Fields.ones(boundary_space)
-    sim = DummySurfaceSimulation3(
+    surface_sim = DummySurfaceSimulation3(
         [],
         [],
         [],
@@ -317,5 +342,64 @@ end
     thermo_params = get_thermo_params(atmos_sim)
     thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
     colidx = Fields.ColumnIndex{2}((1, 1), 73) # arbitrary index
-    @test surface_thermo_state(sim, thermo_params, thermo_state_int[colidx], colidx).ρ == thermo_state_int[colidx].ρ
+    @test surface_thermo_state(surface_sim, thermo_params, thermo_state_int[colidx], colidx).ρ ==
+          thermo_state_int[colidx].ρ
+end
+
+@testset "differentiate_turbulent_fluxes!" begin
+    boundary_space = TestHelper.create_space(FT)
+    _ones = Fields.ones(boundary_space)
+    surface_sim = DummySurfaceSimulation3(
+        [],
+        [],
+        [],
+        (;
+            T = _ones .* FT(300),
+            ρ = _ones .* FT(1.2),
+            p = (;
+                q = _ones .* FT(0.00),
+                area_fraction = _ones,
+                Ch = FT(0.001),
+                Cd = FT(0.001),
+                beta = _ones,
+                ∂F_turb_energy∂T_sfc = _ones .* 0,
+                q_sfc = _ones .* 0,
+            ),
+        ),
+    )
+    atmos_sim = TestAtmos((; FT = FT), [], [], (; T = _ones .* FT(300), ρ = _ones .* FT(1.2), q = _ones .* FT(0.00)))
+    thermo_params = get_thermo_params(atmos_sim)
+    colidx = Fields.ColumnIndex{2}((1, 1), 73) # arbitrary index
+
+    thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))[colidx]
+    surface_scheme = BulkScheme()
+    surface_params = get_surface_params(atmos_sim)
+    uₕ_int = Geometry.UVVector.(Geometry.Covariant12Vector.(_ones .* 1.0, _ones .* 1.0))[colidx]
+    z_int = _ones[colidx]
+    z_sfc = (_ones .* 0.0)[colidx]
+    thermo_state_sfc = surface_thermo_state(surface_sim, thermo_params, thermo_state_int[colidx], colidx)
+    scheme_properties = get_scheme_properties(surface_scheme, surface_sim, colidx)
+    input_args = (;
+        thermo_state_sfc,
+        thermo_state_int,
+        uₕ_int,
+        z_int,
+        z_sfc,
+        surface_params,
+        surface_scheme,
+        scheme_properties,
+        colidx,
+    )
+
+    inputs = surface_inputs(surface_scheme, input_args)
+    fluxes = get_surface_fluxes_point!(inputs, surface_params)
+
+    dFdTs = differentiate_turbulent_fluxes!(surface_sim, thermo_params, input_args, fluxes, δT_sfc = 1)
+
+    sf_out = SF.surface_conditions.(surface_params, inputs)
+
+    cp_m = TD.cp_m.(thermo_params, thermo_state_int)
+    dFdTs_analytical = @. thermo_state_sfc.ρ * sf_out.Ch * SF.windspeed.(inputs) * cp_m
+
+    @test all(isapprox(parent(dFdTs), parent(dFdTs_analytical), atol = 0.1))
 end

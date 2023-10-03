@@ -28,19 +28,25 @@ Returns the specified atmospheric configuration (`atmos_config_dict`) overwitten
 in the coupler dictionary (`config_dict`).
 """
 function get_atmos_config(coupler_dict)
-    atmos_file = coupler_dict["atmos_config_file"]
+    atmos_config_file = coupler_dict["atmos_config_file"]
     # override default or specified configs with coupler arguments, and set the correct atmos config_file
-    if isnothing(atmos_file)
+    if isnothing(atmos_config_file)
         @info "Using Atmos default configuration"
-        merge(CA.default_config_dict(), coupler_dict, Dict("config_file" => atmos_file))
+        atmos_config = merge(CA.default_config_dict(), coupler_dict, Dict("config_file" => atmos_config_file))
     else
-        @info "Using Atmos configuration from $atmos_file"
-        merge(
-            CA.override_default_config(joinpath(pkgdir(CA), atmos_file)),
+        @info "Using Atmos configuration from $atmos_config_file"
+        atmos_config = merge(
+            CA.override_default_config(joinpath(pkgdir(CA), atmos_config_file)),
             coupler_dict,
-            Dict("config_file" => atmos_file),
+            Dict("config_file" => atmos_config_file),
         )
     end
+    atmos_toml_file = coupler_dict["atmos_toml_file"]
+    if !isnothing(atmos_toml_file)
+        @info "Overwriting Atmos parameters from $atmos_toml_file"
+        atmos_config = merge(atmos_config, Dict("toml" => [joinpath(pkgdir(CA), atmos_toml_file)]))
+    end
+    return atmos_config
 end
 
 function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
@@ -53,7 +59,7 @@ function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
     face_space = axes(Y.f.u₃)
     spaces = (; center_space = center_space, face_space = face_space)
     if :ρe_int in propertynames(Y.c)
-        @warn("Running with ρe_int in coupled mode is not tested yet.")
+        @warn("Running with ρe_int in coupled mode is not tested yet.", maxlog = 1)
     end
 
     # set initial fluxes to zero
@@ -109,7 +115,7 @@ get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxes_params(sim.in
 
 function update_field!(atmos_sim::ClimaAtmosSimulation, ::Val{:co2_gm}, field)
     if atmos_sim.integrator.p.radiation_model.radiation_mode isa CA.RRTMGPI.GrayRadiation
-        @warn "Gray radiation model initialized, skipping CO2 update"
+        @warn("Gray radiation model initialized, skipping CO2 update", maxlog = 1)
         return
     else
         atmos_sim.integrator.p.radiation_model.volume_mixing_ratio_co2 .= parent(field)[1]

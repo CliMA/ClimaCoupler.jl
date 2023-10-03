@@ -140,7 +140,6 @@ steps:
         agents:
           slurm_mem: 20GB
 
-      # Test: non-monotonous remapping for land mask
       - label: "Slabplanet: non-monotonous surface remap"
         key: "slabplanet_non-monotonous"
         command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_nonmono.yml"
@@ -165,6 +164,13 @@ steps:
         key: "slabplanet_albedo_function"
         command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_albedo_function.yml"
         artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_albedo_function_artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "Slabplanet: eisenman sea ice"
+        key: "slabplanet_eisenman"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_eisenman.yml"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet_eisenman/slabplanet_eisenman_artifacts/*"
         agents:
           slurm_mem: 20GB
 

@@ -161,21 +161,29 @@ function partitioned_turbulent_fluxes!(
                     thermo_state_sfc = surface_thermo_state(sim, thermo_params, thermo_state_int, colidx)
 
                     # set inputs based on whether the surface_scheme is `MoninObukhovScheme` or `BulkScheme`
-                    inputs = surface_inputs(
-                        surface_scheme,
+                    surface_params = get_surface_params(atmos_sim)
+                    scheme_properties = get_scheme_properties(surface_scheme, sim, colidx)
+                    input_args = (;
                         thermo_state_sfc,
                         thermo_state_int,
                         uₕ_int,
                         z_int,
                         z_sfc,
-                        get_scheme_properties(surface_scheme, sim, colidx),
+                        scheme_properties,
+                        surface_params,
+                        surface_scheme,
+                        colidx,
                     )
+                    inputs = surface_inputs(surface_scheme, input_args)
+
+                    # calculate the surface fluxes
+                    fluxes = get_surface_fluxes_point!(inputs, surface_params)
+                    (; F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture) = fluxes
+
+                    # perform additional diagnostics if required
+                    differentiate_turbulent_fluxes!(sim, (thermo_params, input_args, fluxes))
 
                     # update fluxes in the coupler
-                    surface_params = get_surface_params(atmos_sim)
-                    F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture =
-                        get_surface_fluxes_point!(inputs, surface_params)
-
                     fields = (;
                         F_turb_ρτxz = F_turb_ρτxz,
                         F_turb_ρτyz = F_turb_ρτyz,
@@ -186,7 +194,7 @@ function partitioned_turbulent_fluxes!(
                     # update the fluxes of this surface model
                     update_turbulent_fluxes_point!(sim, fields, colidx)
 
-                    # add the flux contributing from this surface
+                    # add the flux contributing from this surface to the coupler field
                     @. csf.F_turb_ρτxz[colidx] += F_turb_ρτxz * area_fraction * area_mask
                     @. csf.F_turb_ρτyz[colidx] += F_turb_ρτyz * area_fraction * area_mask
                     @. csf.F_turb_energy[colidx] += (F_shf .+ F_lhf) * area_fraction * area_mask
@@ -231,10 +239,12 @@ end
 
 Returns the inputs for the surface model simulation `sim`.
 """
-function surface_inputs(::BulkScheme, thermo_state_sfc, thermo_state_int, uₕ_int, z_int, z_sfc, surface_properties)
+function surface_inputs(::BulkScheme, input_args::NamedTuple)
+
+    (; thermo_state_sfc, thermo_state_int, uₕ_int, z_int, z_sfc, scheme_properties) = input_args
     FT = Spaces.undertype(axes(z_sfc))
 
-    (; z0b, z0m, Ch, Cd, beta, gustiness) = surface_properties
+    (; z0b, z0m, Ch, Cd, beta, gustiness) = scheme_properties
     # wrap state values
     return @. SF.Coefficients(
         SF.InteriorValues(z_int, uₕ_int, thermo_state_int), # state_in
@@ -251,18 +261,10 @@ function surface_inputs(::BulkScheme, thermo_state_sfc, thermo_state_int, uₕ_i
         beta,                                   # beta
     )
 end
-function surface_inputs(
-    ::MoninObukhovScheme,
-    thermo_state_sfc,
-    thermo_state_int,
-    uₕ_int,
-    z_int,
-    z_sfc,
-    surface_properties,
-)
+function surface_inputs(::MoninObukhovScheme, input_args::NamedTuple)
+    (; thermo_state_sfc, thermo_state_int, uₕ_int, z_int, z_sfc, scheme_properties) = input_args
     FT = Spaces.undertype(axes(z_sfc))
-
-    (; z0b, z0m, Ch, Cd, beta, gustiness) = surface_properties
+    (; z0b, z0m, Ch, Cd, beta, gustiness) = scheme_properties
 
     # wrap state values
     return @. SF.ValuesOnly(
@@ -289,14 +291,18 @@ function surface_thermo_state(
     sim::Interfacer.SurfaceModelSimulation,
     thermo_params::TD.Parameters.ThermodynamicsParameters,
     thermo_state_int,
-    colidx::Fields.ColumnIndex,
+    colidx::Fields.ColumnIndex;
+    δT_sfc = 0,
 )
+    FT = eltype(parent(thermo_state_int))
     @warn("Simulation " * Interfacer.name(sim) * " uses the default thermo (saturated) surface state", maxlog = 10)
-    T_sfc = Interfacer.get_field(sim, Val(:surface_temperature), colidx) #
+    # get surface temperature (or perturbed surface temperature for differentiation)
+    T_sfc = Interfacer.get_field(sim, Val(:surface_temperature), colidx) .+ FT(δT_sfc)
     ρ_sfc = extrapolate_ρ_to_sfc.(thermo_params, thermo_state_int, T_sfc) # ideally the # calculate elsewhere, here just getter...
     q_sfc = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid()) # default: saturated liquid surface
     @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
 end
+
 
 # TODO: (an equivalent of) this function also lives in Atmos and Land - should move to general utilities
 """
@@ -332,7 +338,13 @@ function get_surface_fluxes_point!(inputs, surface_params::SF.Parameters.Surface
     # moisture
     F_turb_moisture = @. SF.evaporation(surface_params, inputs, outputs.Ch)
 
-    return F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture
+    return (;
+        F_turb_ρτxz = F_turb_ρτxz,
+        F_turb_ρτyz = F_turb_ρτyz,
+        F_shf = F_shf,
+        F_lhf = F_lhf,
+        F_turb_moisture = F_turb_moisture,
+    )
 end
 
 """
@@ -368,5 +380,39 @@ function update_turbulent_fluxes_point!(
 end
 
 update_turbulent_fluxes_point!(sim::Interfacer.SurfaceStub, fields::NamedTuple, colidx::Fields.ColumnIndex) = nothing
+
+differentiate_turbulent_fluxes!(::Interfacer.SurfaceModelSimulation, args) = nothing
+
+"""
+    differentiate_turbulent_fluxes(sim::Interfacer.SurfaceModelSimulation, thermo_params, input_args, fluxes, δT_sfc = 0.1)
+
+Differentiates the turbulent fluxes in the surface model simulation `sim` with respect to the surface temperature,
+using δT_sfc as the perturbation.
+"""
+function differentiate_turbulent_fluxes!(
+    sim::Interfacer.SurfaceModelSimulation,
+    thermo_params,
+    input_args,
+    fluxes;
+    δT_sfc = 0.1,
+)
+    (; thermo_state_int, surface_params, surface_scheme, colidx) = input_args
+    thermo_state_sfc_dT = surface_thermo_state(sim, thermo_params, thermo_state_int, colidx, δT_sfc = δT_sfc)
+    input_args = merge(input_args, (; thermo_state_sfc = thermo_state_sfc_dT))
+
+    # set inputs based on whether the surface_scheme is `MoninObukhovScheme` or `BulkScheme`
+    inputs = surface_inputs(surface_scheme, input_args)
+
+    # calculate the surface fluxes
+    _, _, F_shf_δT_sfc, F_lhf_δT_sfc, _ = get_surface_fluxes_point!(inputs, surface_params)
+
+    (; F_shf, F_lhf) = fluxes
+
+    # calculate the derivative
+    ∂F_turb_energy∂T_sfc = @. (F_shf_δT_sfc + F_lhf_δT_sfc - F_shf - F_lhf) / δT_sfc
+
+    Interfacer.update_field!(sim, Val(:∂F_turb_energy∂T_sfc), ∂F_turb_energy∂T_sfc, colidx)
+
+end
 
 end # module

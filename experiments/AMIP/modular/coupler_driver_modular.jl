@@ -125,6 +125,7 @@ parsed_args = parse_commandline(argparse_settings())
 # modify parsed args for fast testing from REPL #hide
 pkg_dir = pkgdir(ClimaCoupler)
 if isinteractive()
+    include("user_io/debug_plots.jl")
     parsed_args["config_file"] =
         isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/model_configs/interactive_debug.yml") :
         parsed_args["config_file"]

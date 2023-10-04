@@ -57,6 +57,8 @@ end
 @safetestset "component model test: slab ocean" begin
     include("component_model_tests/slab_ocean_tests.jl")
 end
-
+@safetestset "debug diagnostics: amip plots" begin
+    include("debug/debug_amip_plots.jl")
+end
 
 # include("CoupledSimulations/cplsolver.jl")

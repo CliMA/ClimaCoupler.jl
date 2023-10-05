@@ -6,7 +6,6 @@ This module contains functions that check global conservation of energy and wate
 module ConservationChecker
 
 using ClimaCore: ClimaCore, Geometry, Meshes, Domains, Topologies, Spaces, Fields, InputOutput
-using ClimaCore.Utilities: half
 using ClimaComms
 using NCDatasets
 using ClimaCoreTempestRemap
@@ -16,7 +15,7 @@ using UnPack
 using Plots
 using ClimaAtmos: RRTMGPI
 using ClimaLSM
-using ClimaCoupler.Utilities: CoupledSimulation, swap_space!
+using ClimaCoupler.Utilities: swap_space!
 import ClimaCoupler: Interfacer
 
 export AbstractConservationCheck,
@@ -61,17 +60,17 @@ end
 Interfacer.name(::WaterConservationCheck) = "water [kg]"
 
 """
-    check_conservation!(coupler_sim::CoupledSimulation; runtime_check = false)
+    check_conservation!(coupler_sim::Interfacer.CoupledSimulation; runtime_check = false)
 
 itertes over all specified conservation checks.
 """
-check_conservation!(coupler_sim::CoupledSimulation; runtime_check = false) =
+check_conservation!(coupler_sim::Interfacer.CoupledSimulation; runtime_check = false) =
     map(x -> check_conservation!(x, coupler_sim, runtime_check), coupler_sim.conservation_checks)
 
 """
         check_conservation!(
         cc::EnergyConservationCheck,
-        coupler_sim,
+        coupler_sim::Interfacer.CoupledSimulation,
         runtime_check = false,
         )
 
@@ -79,7 +78,11 @@ computes the total energy, ∫ ρe dV, of the model components
 of the coupled simulations and the TOA radiation, and updates
 `cc` with these values.
 """
-function check_conservation!(cc::EnergyConservationCheck, coupler_sim::CoupledSimulation, runtime_check = false)
+function check_conservation!(
+    cc::EnergyConservationCheck,
+    coupler_sim::Interfacer.CoupledSimulation,
+    runtime_check = false,
+)
 
     ccs = cc.sums
     @unpack model_sims = coupler_sim
@@ -139,7 +142,7 @@ end
 """
     check_conservation!(
     cc::WaterConservationCheck,
-    coupler_sim,
+    coupler_sim::Interfacer.CoupledSimulation,
     runtime_check = false,
     )
 
@@ -148,7 +151,11 @@ of the coupled simulations, and updates `cc` with the values.
 
 Note: in the future this should not use `push!`.
 """
-function check_conservation!(cc::WaterConservationCheck, coupler_sim::CoupledSimulation, runtime_check = false)
+function check_conservation!(
+    cc::WaterConservationCheck,
+    coupler_sim::Interfacer.CoupledSimulation,
+    runtime_check = false,
+)
 
     ccs = cc.sums
     @unpack model_sims = coupler_sim
@@ -197,11 +204,11 @@ function check_conservation!(cc::WaterConservationCheck, coupler_sim::CoupledSim
 end
 
 """
-    surface_water_gain_from_rates(cs)
+    surface_water_gain_from_rates(cs::Interfacer.CoupledSimulation)
 
 Determines the total water content gain/loss of a surface from the begining of the simulation based on evaporation and precipitation rates.
 """
-function surface_water_gain_from_rates(cs::CoupledSimulation)
+function surface_water_gain_from_rates(cs::Interfacer.CoupledSimulation)
     evaporation = cs.fields.F_turb_moisture # kg / m^2 / s / layer depth
     precipitation_l = cs.fields.P_liq
     precipitation_s = cs.fields.P_snow
@@ -214,7 +221,7 @@ ENV["GKSwstype"] = "nul"
 """
     plot_global_conservation(
         cc::EnergyConservationCheck,
-        coupler_sim::CoupledSimulation;
+        coupler_sim::Interfacer.CoupledSimulation;
         figname1 = "total_energy.png",
         figname2 = "total_energy_log.png",
     )
@@ -226,7 +233,7 @@ relative to the initial value;
 """
 function plot_global_conservation(
     cc::AbstractConservationCheck,
-    coupler_sim::CoupledSimulation;
+    coupler_sim::Interfacer.CoupledSimulation;
     figname1 = "total.png",
     figname2 = "total_log.png",
 )

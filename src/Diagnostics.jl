@@ -6,7 +6,7 @@ This module contains functions for defining, gathering and outputting online mod
 module Diagnostics
 
 using ClimaCore: Spaces, Fields, InputOutput
-using ClimaCoupler.Utilities: CoupledSimulation
+using ClimaCoupler.Interfacer: CoupledSimulation
 using Dates
 using ClimaCoupler.TimeManager: AbstractFrequency, Monthly, EveryTimestep, trigger_callback
 using ClimaComms

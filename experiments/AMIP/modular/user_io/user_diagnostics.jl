@@ -3,6 +3,7 @@
 # Atmos diagnostics
 import ClimaAtmos.Parameters as CAP
 import Thermodynamics as TD
+using ClimaCoupler.Interfacer: CoupledSimulation, float_type
 
 """
     get_var(cs::CoupledSimulation, ::Val{:T})

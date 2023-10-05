@@ -5,7 +5,7 @@ using Test
 using Dates
 using ClimaCore: InputOutput
 using ClimaComms
-using ClimaCoupler: Utilities
+using ClimaCoupler: Interfacer
 using ClimaCoupler.TimeManager: EveryTimestep, Monthly
 using ClimaCoupler.TestHelper: create_space
 import ClimaCoupler.Diagnostics:
@@ -21,7 +21,7 @@ import ClimaCoupler.Diagnostics:
 
 
 FT = Float64
-get_var(cs::Utilities.CoupledSimulation, ::Val{:x}) = FT(1)
+get_var(cs::Interfacer.CoupledSimulation, ::Val{:x}) = FT(1)
 
 @testset "init_diagnostics" begin
     names = (:x, :y)
@@ -38,7 +38,7 @@ end
         space = create_space(FT)
         dg_2d = init_diagnostics(names, space, save = EveryTimestep(), operations = (; accumulate = case))
         dg_2d.field_vector .= FT(2)
-        cs = Utilities.CoupledSimulation{FT}(
+        cs = Interfacer.CoupledSimulation{FT}(
             nothing, # comms_ctx
             nothing, # dates
             nothing, # boundary_space
@@ -72,7 +72,7 @@ if !Sys.iswindows() # Windows has NetCDF / HDF5 support limitations
             operations = (; accumulate = TimeMean([Int(0)])),
             output_dir = test_dir,
         ) # or use accumulate = nothing for snapshop save
-        cs = Utilities.CoupledSimulation{FT}(
+        cs = Interfacer.CoupledSimulation{FT}(
             ClimaComms.SingletonCommsContext(), # comms_ctx
             (date = [DateTime(0, 2)], date1 = [DateTime(0, 1)]), # dates
             nothing, # boundary_space
@@ -110,7 +110,7 @@ end
         space = create_space(FT)
         dg_2d = init_diagnostics(names, space, save = EveryTimestep(), operations = (; accumulate = case))
         dg_2d.field_vector .= FT(3)
-        cs = Utilities.CoupledSimulation{FT}(
+        cs = Interfacer.CoupledSimulation{FT}(
             nothing, # comms_ctx
             nothing, # dates
             nothing, # boundary_space

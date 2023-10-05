@@ -2,7 +2,7 @@
     Unit tests for ClimaCoupler BCReader module
 =#
 
-using ClimaCoupler: Regridder, BCReader, TimeManager, Utilities
+using ClimaCoupler: Regridder, BCReader, TimeManager, Interfacer
 using ClimaCore: Fields, Meshes, Domains, Topologies, Spaces
 using ClimaComms
 using Test
@@ -180,7 +180,7 @@ for FT in (Float32, Float64)
             SST_all = []
             updating_dates = []
 
-            cs_t = Utilities.CoupledSimulation{FT}(
+            cs_t = Interfacer.CoupledSimulation{FT}(
                 comms_ctx, # comms_ctx
                 dates, # dates
                 nothing, # boundary_space

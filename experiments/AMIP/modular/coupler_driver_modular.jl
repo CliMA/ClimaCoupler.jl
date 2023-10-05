@@ -73,7 +73,7 @@ import ClimaCoupler.Regridder:
     update_surface_fractions!, combine_surfaces!, combine_surfaces_from_sol!, dummmy_remap!, binary_mask
 import ClimaCoupler.ConservationChecker:
     EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
-import ClimaCoupler.Utilities: CoupledSimulation, float_type, swap_space!
+import ClimaCoupler.Utilities: swap_space!
 import ClimaCoupler.BCReader:
     bcfile_info_init, float_type_bcf, update_midmonth_data!, next_date_in_file, interpolate_midmonth_to_daily
 import ClimaCoupler.TimeManager: current_date, datetime_to_strdate, trigger_callback, Monthly, EveryTimestep
@@ -81,6 +81,8 @@ import ClimaCoupler.Diagnostics: get_var, init_diagnostics, accumulate_diagnosti
 import ClimaCoupler.PostProcessor: postprocess
 
 import ClimaCoupler.Interfacer:
+    CoupledSimulation,
+    float_type,
     AtmosModelSimulation,
     SurfaceModelSimulation,
     SurfaceStub,

@@ -9,7 +9,7 @@ module Regridder
 
 using ..Utilities
 using ..TimeManager
-using ..Interfacer
+using ..Interfacer: CoupledSimulation, float_type, SurfaceModelSimulation, get_field, update_field!
 using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 using ClimaComms
 using NCDatasets
@@ -405,9 +405,9 @@ Maintains the invariant that the sum of area fractions is 1 at all points.
 """
 function update_surface_fractions!(cs::CoupledSimulation)
 
-    FT = Utilities.float_type(cs)
+    FT = float_type(cs)
 
-    ice_d = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction))
+    ice_d = get_field(cs.model_sims.ice_sim, Val(:area_fraction))
 
     # static fraction
     land_s = cs.surface_fractions.land
@@ -421,8 +421,8 @@ function update_surface_fractions!(cs::CoupledSimulation)
     @assert maximum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) ≈ FT(1)
 
     # update component models
-    Interfacer.update_field!(cs.model_sims.ocean_sim, Val(:area_fraction), cs.surface_fractions.ocean)
-    Interfacer.update_field!(cs.model_sims.ice_sim, Val(:area_fraction), cs.surface_fractions.ice)
+    update_field!(cs.model_sims.ocean_sim, Val(:area_fraction), cs.surface_fractions.ocean)
+    update_field!(cs.model_sims.ice_sim, Val(:area_fraction), cs.surface_fractions.ice)
 
 
 end
@@ -455,9 +455,8 @@ surface simulations. THe result is saved in `combined_field`.
 function combine_surfaces!(combined_field::Fields.Field, sims::NamedTuple, field_name::Val)
     combined_field .= eltype(combined_field)(0)
     for sim in sims
-        if sim isa Interfacer.SurfaceModelSimulation
-            combined_field .+=
-                Interfacer.get_field(sim, Val(:area_fraction)) .* nans_to_zero.(Interfacer.get_field(sim, field_name)) # this ensures that unitialized (masked) areas do not affect (TODO: move to mask / remove)
+        if sim isa SurfaceModelSimulation
+            combined_field .+= get_field(sim, Val(:area_fraction)) .* nans_to_zero.(get_field(sim, field_name)) # this ensures that unitialized (masked) areas do not affect (TODO: move to mask / remove)
         end
     end
 end

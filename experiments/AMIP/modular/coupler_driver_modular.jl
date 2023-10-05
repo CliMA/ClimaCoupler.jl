@@ -520,17 +520,15 @@ function solve_coupler!(cs)
             if cs.dates.date[1] >= next_date_in_file(cs.mode.SST_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.SST_info)
             end
-            update_field!(
-                ocean_sim,
-                Val(:surface_temperature),
-                interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SST_info),
-            )
+            SST_current = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SST_info)
+            update_field!(ocean_sim, Val(:surface_temperature), SST_current)
 
             if cs.dates.date[1] >= next_date_in_file(cs.mode.SIC_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.SIC_info)
             end
-            interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info)
-            update_field!(ice_sim, Val(:area_fraction), get_ice_fraction.(SIC_init, mono_surface))  # TODO: change to SIC
+            SIC_current =
+                get_ice_fraction.(interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info), mono_surface)
+            update_field!(ice_sim, Val(:area_fraction), SIC_current)
 
             ## calculate and accumulate diagnostics at each timestep
             ClimaComms.barrier(comms_ctx)

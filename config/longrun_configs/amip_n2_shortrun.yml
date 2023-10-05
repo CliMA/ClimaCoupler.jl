@@ -19,6 +19,6 @@ energy_check: false
 mode_name: "amip"
 t_end: "1days"
 dt_save_to_sol: "100days"
-mono_surface: "false"
+mono_surface: false
 apply_limiter: true
 precip_model: "0M"

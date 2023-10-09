@@ -1,6 +1,6 @@
 moist: "equil"
 vert_diff: "true"
-rad: "gray"
+rad: "allskywithclear"
 energy_check: true
 mode_name: "slabplanet"
 t_end: "10days"

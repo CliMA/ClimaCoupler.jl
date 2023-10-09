@@ -251,6 +251,17 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 20GB
 
+      - label: "AMIP - modular Float64 + monthly checkpoint + co2"
+        key: "coarse_single_modular_ft64_monthly_checkpoints_co2"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/coarse_single_modular_ft64_monthly_checkpoints_co2.yml"
+        artifact_paths: "experiments/AMIP/modular/output/amip/coarse_single_modular_ft64_monthly_checkpoints_co2_artifacts/*"
+        env:
+          FLAME_PLOT: ""
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks: 1
+          slurm_mem: 20GB
+
       - label: "AMIP - modular, Float64 test"
         command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/coarse_single_modular_ft64.yml"
         artifact_paths: "experiments/AMIP/modular/output/amip/coarse_single_modular_ft64_artifacts/*"

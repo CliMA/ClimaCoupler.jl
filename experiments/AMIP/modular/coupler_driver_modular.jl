@@ -181,6 +181,7 @@ config_dict["print_config_dict"] ? @info(config_dict) : nothing
 include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
 sst_data = joinpath(sst_dataset_path(), "sst.nc")
 sic_data = joinpath(sic_dataset_path(), "sic.nc")
+co2_data = joinpath(co2_dataset_path(), "mauna_loa_co2.nc")
 land_mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 
 #=
@@ -293,7 +294,26 @@ if mode_name == "amip"
         area_fraction = ice_fraction,
         thermo_params = thermo_params,
     )
-    mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info)
+
+    ## CO2 concentration
+    CO2_info = bcfile_info_init(
+        FT,
+        REGRID_DIR,
+        co2_data,
+        "co2",
+        boundary_space,
+        comms_ctx,
+        interpolate_daily = true,
+        land_fraction = ones(boundary_space),
+        date0 = date0,
+        mono = mono_surface,
+    )
+
+    update_midmonth_data!(date0, CO2_info)
+    CO2_init = interpolate_midmonth_to_daily(date0, CO2_info)
+    update_field!(atmos_sim, Val(:co2_gm), CO2_init)
+
+    mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
 
 elseif mode_name == "slabplanet"
     ## ocean
@@ -518,7 +538,7 @@ function solve_coupler!(cs)
 
         if cs.mode.name == "amip"
 
-            ## monthly read of boundary condition data for SST and SIC
+            ## monthly read of boundary condition data for SST and SIC and CO2
             if cs.dates.date[1] >= next_date_in_file(cs.mode.SST_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.SST_info)
             end
@@ -531,6 +551,12 @@ function solve_coupler!(cs)
             SIC_current =
                 get_ice_fraction.(interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info), mono_surface)
             update_field!(ice_sim, Val(:area_fraction), SIC_current)
+
+            if cs.dates.date[1] >= next_date_in_file(cs.mode.CO2_info)
+                update_midmonth_data!(cs.dates.date[1], cs.mode.CO2_info)
+            end
+            CO2_current = interpolate_midmonth_to_daily(date0, CO2_info)
+            update_field!(atmos_sim, Val(:co2_gm), CO2_current)
 
             ## calculate and accumulate diagnostics at each timestep
             ClimaComms.barrier(comms_ctx)

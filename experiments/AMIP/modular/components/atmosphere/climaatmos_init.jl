@@ -107,6 +107,14 @@ get_field(sim::ClimaAtmosSimulation, ::Val{:gas_constant_air}) =
 
 get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxes_params(sim.integrator.p.params)
 
+function update_field!(atmos_sim::ClimaAtmosSimulation, ::Val{:co2_gm}, field)
+    if atmos_sim.integrator.p.radiation_model.radiation_mode isa CA.RRTMGPI.GrayRadiation
+        @warn "Gray radiation model initialized, skipping CO2 update"
+        return
+    else
+        atmos_sim.integrator.p.radiation_model.volume_mixing_ratio_co2 .= parent(field)[1]
+    end
+end
 # extensions required by the Interfacer
 function update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temperature}, csf)
     sim.integrator.p.radiation_model.surface_temperature .= RRTMGPI.field2array(csf.T_S)

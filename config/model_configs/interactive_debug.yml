@@ -12,6 +12,7 @@ turb_flux_partition: "CombinedStateFluxes"
 h_elem: 4
 dt_save_restart: "5days"
 precip_model: "0M"
-run_name: "interactive_debug_run"
-job_id: "interactive_debug_run"
+run_name: "interactive_debug_run_bus"
+job_id: "interactive_debug_run_bus"
 monthly_checkpoint: true
+universal_function: "Businger" # "Businger" or "Gryanik"

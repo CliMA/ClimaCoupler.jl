@@ -12,6 +12,8 @@ import ClimaCoupler.FieldExchanger: get_thermo_params
 import ClimaCoupler.Interfacer: get_field, update_field!, name, get_model_state_vector
 using StaticArrays
 
+include("climaatmos_param_init.jl")
+
 # the clima atmos `integrator` is now defined
 struct ClimaAtmosSimulation{P, Y, D, I} <: AtmosModelSimulation
     params::P

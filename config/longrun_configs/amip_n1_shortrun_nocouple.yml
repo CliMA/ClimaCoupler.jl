@@ -1,5 +1,5 @@
-job_id: "amip_n64_shortrun"
-run_name: "amip_n64_shortrun"
+job_id: "amip_n1_shortrun_nocouple"
+run_name: "amip_n1_shortrun_nocouple"
 moist: "equil"
 vert_diff: "true"
 rad: "gray"
@@ -12,12 +12,12 @@ z_stretch: false
 rayleigh_sponge: true
 alpha_rayleigh_uh: 0
 alpha_rayleigh_w: 10
-dt_cpl: 150
+dt_cpl: 86200
 dt: "150secs"
 dt_rad: "1hours"
 energy_check: false
 mode_name: "amip"
-t_end: "10days"
+t_end: "1days"
 dt_save_to_sol: "100days"
 mono_surface: false
 apply_limiter: false

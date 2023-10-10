@@ -1,0 +1,14 @@
+run_name: "dyamond_target"
+anim: true
+dt_cpl: 50
+energy_check: false
+mode_name: "amip"
+mono_surface: false
+t_end: "1days"
+job_id: "dyamond_target"
+dt_save_to_sol: "0.5days"
+dt_save_to_disk: "0.5days"
+turb_flux_partition: "CombinedStateFluxes"
+atmos_config_file: "config/longrun_configs/longrun_aquaplanet_dyamond.yml"
+atmos_toml_file: "toml/longrun_aquaplanet_dyamond.toml"
+monthly_checkpoint: false

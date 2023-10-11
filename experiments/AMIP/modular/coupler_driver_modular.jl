@@ -142,7 +142,7 @@ config_dict_atmos = get_atmos_config(config_dict)
 
 # merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
 # (if there are common keys, the last dictorionary in the `merge` arguments takes precedence)
-config_dict = merge(config_dict_atmos, config_dict)
+global config_dict = merge(config_dict_atmos, config_dict)
 
 ## read in some parsed command line arguments
 mode_name = config_dict["mode_name"]

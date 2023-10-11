@@ -48,7 +48,7 @@ end
 function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
 
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
-    atmos_config = CA.AtmosConfig(; config_dict = atmos_config_dict)
+    atmos_config = CA.AtmosConfig(atmos_config_dict)
     integrator = CA.get_integrator(atmos_config)
     Y = integrator.u
     center_space = axes(Y.c.ρe_tot)

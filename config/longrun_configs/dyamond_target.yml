@@ -12,3 +12,6 @@ turb_flux_partition: "CombinedStateFluxes"
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_dyamond.yml"
 atmos_toml_file: "toml/longrun_aquaplanet_dyamond.toml"
 monthly_checkpoint: false
+topography: "Earth"
+topo_smoothing: true
+use_reference_state: false

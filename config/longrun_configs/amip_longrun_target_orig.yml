@@ -20,6 +20,3 @@ job_id: "amip_longrun_target"
 dt_save_to_sol: "5days"
 dt_save_to_disk: "1days"
 apply_limiter: false
-topography: "Earth"
-topo_smoothing: true
-use_reference_state: false

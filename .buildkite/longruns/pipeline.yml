@@ -90,113 +90,113 @@ steps:
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
 
-      # mid-resolution AMIP: MPI performance scaling (10 days)
-      - label: "MPI AMIP FINE: n64"
-        key: "mpi_amip_fine_n64"
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_n64_shortrun.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/amip_n64_shortrun_artifacts/*"
-        env:
-          CLIMACORE_DISTRIBUTED: "MPI"
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_ntasks_per_node: 16
-          slurm_nodes: 4
-          slurm_mem_per_cpu: 16G
+      # # mid-resolution AMIP: MPI performance scaling (10 days)
+      # - label: "MPI AMIP FINE: n64"
+      #   key: "mpi_amip_fine_n64"
+      #   command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_n64_shortrun.yml"
+      #   artifact_paths: "experiments/AMIP/modular/output/amip/amip_n64_shortrun_artifacts/*"
+      #   env:
+      #     CLIMACORE_DISTRIBUTED: "MPI"
+      #     BUILD_HISTORY_HANDLE: ""
+      #   agents:
+      #     slurm_ntasks_per_node: 16
+      #     slurm_nodes: 4
+      #     slurm_mem_per_cpu: 16G
 
-      - label: "MPI AMIP FINE: n32"
-        key: "mpi_amip_fine_n32"
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_n32_shortrun.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/amip_n32_shortrun_artifacts/*"
-        env:
-          CLIMACORE_DISTRIBUTED: "MPI"
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_ntasks_per_node: 8
-          slurm_nodes: 4
-          slurm_mem_per_cpu: 16G
+      # - label: "MPI AMIP FINE: n32"
+      #   key: "mpi_amip_fine_n32"
+      #   command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_n32_shortrun.yml"
+      #   artifact_paths: "experiments/AMIP/modular/output/amip/amip_n32_shortrun_artifacts/*"
+      #   env:
+      #     CLIMACORE_DISTRIBUTED: "MPI"
+      #     BUILD_HISTORY_HANDLE: ""
+      #   agents:
+      #     slurm_ntasks_per_node: 8
+      #     slurm_nodes: 4
+      #     slurm_mem_per_cpu: 16G
 
-      - label: "MPI AMIP FINE: n8"
-        key: "mpi_amip_fine_n8"
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_n8_shortrun.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/amip_n8_shortrun_artifacts/*"
-        env:
-          CLIMACORE_DISTRIBUTED: "MPI"
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_ntasks_per_node: 8
-          slurm_nodes: 1
-          slurm_mem_per_cpu: 16G
+      # - label: "MPI AMIP FINE: n8"
+      #   key: "mpi_amip_fine_n8"
+      #   command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_n8_shortrun.yml"
+      #   artifact_paths: "experiments/AMIP/modular/output/amip/amip_n8_shortrun_artifacts/*"
+      #   env:
+      #     CLIMACORE_DISTRIBUTED: "MPI"
+      #     BUILD_HISTORY_HANDLE: ""
+      #   agents:
+      #     slurm_ntasks_per_node: 8
+      #     slurm_nodes: 1
+      #     slurm_mem_per_cpu: 16G
 
-      - label: "MPI AMIP FINE: n2" # 10d take 21h, so reducing to 1d
-        key: "mpi_amip_fine_n2"
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_n2_shortrun.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/amip_n2_shortrun_artifacts/*"
-        env:
-          CLIMACORE_DISTRIBUTED: "MPI"
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_ntasks_per_node: 2
-          slurm_nodes: 1
-          slurm_mem_per_cpu: 16G
+      # - label: "MPI AMIP FINE: n2" # 10d take 21h, so reducing to 1d
+      #   key: "mpi_amip_fine_n2"
+      #   command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_n2_shortrun.yml"
+      #   artifact_paths: "experiments/AMIP/modular/output/amip/amip_n2_shortrun_artifacts/*"
+      #   env:
+      #     CLIMACORE_DISTRIBUTED: "MPI"
+      #     BUILD_HISTORY_HANDLE: ""
+      #   agents:
+      #     slurm_ntasks_per_node: 2
+      #     slurm_nodes: 1
+      #     slurm_mem_per_cpu: 16G
 
-      - label: "MPI AMIP FINE: n1" # also reported by longruns with a flame graph; 10d take 21h, so reducing to 1d
-        key: "mpi_amip_fine_n1"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_n1_shortrun.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/amip_n1_shortrun_artifacts/*"
-        env:
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_ntasks_per_node: 1
-          slurm_nodes: 1
-          slurm_mem_per_cpu: 16G
+      # - label: "MPI AMIP FINE: n1" # also reported by longruns with a flame graph; 10d take 21h, so reducing to 1d
+      #   key: "mpi_amip_fine_n1"
+      #   command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_n1_shortrun.yml"
+      #   artifact_paths: "experiments/AMIP/modular/output/amip/amip_n1_shortrun_artifacts/*"
+      #   env:
+      #     BUILD_HISTORY_HANDLE: ""
+      #   agents:
+      #     slurm_ntasks_per_node: 1
+      #     slurm_nodes: 1
+      #     slurm_mem_per_cpu: 16G
 
-      - label: "MPI AMIP FINE: n1 no couple" # sim time = Δt_cpl (~ benchmarking with standalone models)
-        key: "mpi_amip_fine_n1_nocouple"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_n1_shortrun_nocouple.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/amip_n1_shortrun_nocouple_artifacts/*"
-        env:
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_ntasks_per_node: 1
-          slurm_nodes: 1
-          slurm_mem_per_cpu: 16G
+      # - label: "MPI AMIP FINE: n1 no couple" # sim time = Δt_cpl (~ benchmarking with standalone models)
+      #   key: "mpi_amip_fine_n1_nocouple"
+      #   command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_n1_shortrun_nocouple.yml"
+      #   artifact_paths: "experiments/AMIP/modular/output/amip/amip_n1_shortrun_nocouple_artifacts/*"
+      #   env:
+      #     BUILD_HISTORY_HANDLE: ""
+      #   agents:
+      #     slurm_ntasks_per_node: 1
+      #     slurm_nodes: 1
+      #     slurm_mem_per_cpu: 16G
 
-      # mpi_amip_fine_n1 flame graph report (NB: arguments passed from the ci pipeline.yml)
-      - label: ":rocket: performance: flame graph diff: perf_target_amip_n1_shortrun"
-        command: "julia --color=yes --project=perf perf/flame_diff.jl --config_file $PERF_CONFIG_PATH/perf_diff_target_amip_n1_shortrun.yml"
-        artifact_paths: "perf/output/perf_diff_target_amip_n1_shortrun/*"
-        agents:
-          slurm_ntasks_per_node: 1
-          slurm_nodes: 1
-          slurm_mem_per_cpu: 16G
+      # # mpi_amip_fine_n1 flame graph report (NB: arguments passed from the ci pipeline.yml)
+      # - label: ":rocket: performance: flame graph diff: perf_target_amip_n1_shortrun"
+      #   command: "julia --color=yes --project=perf perf/flame_diff.jl --config_file $PERF_CONFIG_PATH/perf_diff_target_amip_n1_shortrun.yml"
+      #   artifact_paths: "perf/output/perf_diff_target_amip_n1_shortrun/*"
+      #   agents:
+      #     slurm_ntasks_per_node: 1
+      #     slurm_nodes: 1
+      #     slurm_mem_per_cpu: 16G
 
-      - wait
+      # - wait
 
-      # plot job performance history
-      - label: ":chart_with_downwards_trend: build history"
-        command:
-          - build_history main # name of branch to plot
-        artifact_paths:
-          - "build_history.html"
+      # # plot job performance history
+      # - label: ":chart_with_downwards_trend: build history"
+      #   command:
+      #     - build_history main # name of branch to plot
+      #   artifact_paths:
+      #     - "build_history.html"
 
-      - wait
+      # - wait
 
-      - label: ":envelope: Slack report: build_history"
-        command:
-          - slack-upload -c "#coupler-report" -f build_history.html -m html -n build_history -x "Overall job performance"
+      # - label: ":envelope: Slack report: build_history"
+      #   command:
+      #     - slack-upload -c "#coupler-report" -f build_history.html -m html -n build_history -x "Overall job performance"
 
-      - label: ":envelope: Slack report: Slabplanet"
-        command:
-          - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/total_energy_log_bucket.png -m png -n slab_coarse_log -x "Slabplanet energy conservation (log error)"
-          - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/total_energy_bucket.png -m png -n slab_coarse -x "Slabplanet energy conservation"
-          - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/total_water_log_bucket.png -m png -n slab_coarse_w_log -x "Slabplanet water conservation (log error)"
-          - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/total_water_bucket.png -m png -n slab_coarse_w -x "Slabplanet water conservation"
+      # - label: ":envelope: Slack report: Slabplanet"
+      #   command:
+      #     - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/total_energy_log_bucket.png -m png -n slab_coarse_log -x "Slabplanet energy conservation (log error)"
+      #     - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/total_energy_bucket.png -m png -n slab_coarse -x "Slabplanet energy conservation"
+      #     - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/total_water_log_bucket.png -m png -n slab_coarse_w_log -x "Slabplanet water conservation (log error)"
+      #     - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/total_water_bucket.png -m png -n slab_coarse_w -x "Slabplanet water conservation"
 
-      - label: ":envelope: Slack report: target AMIP"
-        command:
-          - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/amip/amip_longrun_target_artifacts/amip_paperplots.png -m png -n amip_fine -x "AMIP Target Longrun"
+      # - label: ":envelope: Slack report: target AMIP"
+      #   command:
+      #     - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/amip/amip_longrun_target_artifacts/amip_paperplots.png -m png -n amip_fine -x "AMIP Target Longrun"
 
-      - label: ":envelope: Slack report: Flame Diff"
-        command:
-          - slack-upload -c "#coupler-report" -f perf/output/perf_diff_target_amip_n1_shortrun/flame_diff.html -m png -n amip_fine_flamegraphdiff -x "AMIP Longrun FlameGraphDiff"
-          - slack-upload -c "#coupler-report" -f perf/output/perf_diff_target_amip_n1_shortrun/flame_diff_self_count.html -m png -n amip_fine_flamegraphdiffself -x "AMIP Longrun FlameGraphDiffSelf"
+      # - label: ":envelope: Slack report: Flame Diff"
+      #   command:
+      #     - slack-upload -c "#coupler-report" -f perf/output/perf_diff_target_amip_n1_shortrun/flame_diff.html -m png -n amip_fine_flamegraphdiff -x "AMIP Longrun FlameGraphDiff"
+      #     - slack-upload -c "#coupler-report" -f perf/output/perf_diff_target_amip_n1_shortrun/flame_diff_self_count.html -m png -n amip_fine_flamegraphdiffself -x "AMIP Longrun FlameGraphDiffSelf"

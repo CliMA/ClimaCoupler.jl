@@ -227,7 +227,6 @@ function create_parameter_set(config::CA.AtmosConfig)
     end
 
     ufp = get_uf_params(universal_function, toml_dict)
-    ufp = UF.BusingerParams{FT}(; pairs...)
 
     surf_flux_params = create_parameter_struct(
         SF.Parameters.SurfaceFluxesParameters;

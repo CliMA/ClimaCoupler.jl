@@ -59,9 +59,10 @@ steps:
 
       - label: "AMIP Businger"
         key: "amip_Businger_long"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_businger_long.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/interactive_debug_run_Businger_artifacts/*"
+        command: "srun julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_businger_long.yml"
+        artifact_paths: "experiments/AMIP/modular/output/amip/interactive_debug_run_Businger_long_artifacts/*"
         env:
+          CLIMACORE_DISTRIBUTED: "MPI"
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""
         agents:
@@ -70,10 +71,9 @@ steps:
 
       - label: "AMIP Businger"
         key: "amip_Businger"
-        command: "srun --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_businger.yml"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_businger.yml"
         artifact_paths: "experiments/AMIP/modular/output/amip/interactive_debug_run_Businger_artifacts/*"
         env:
-          CLIMACORE_DISTRIBUTED: "MPI"
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""
         agents:

@@ -15,3 +15,4 @@ monthly_checkpoint: false
 topography: "Earth"
 topo_smoothing: true
 use_reference_state: false
+surface_setup: PrescribedSurface

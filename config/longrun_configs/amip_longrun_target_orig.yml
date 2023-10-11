@@ -20,3 +20,4 @@ job_id: "amip_longrun_target"
 dt_save_to_sol: "5days"
 dt_save_to_disk: "1days"
 apply_limiter: false
+surface_setup: PrescribedSurface

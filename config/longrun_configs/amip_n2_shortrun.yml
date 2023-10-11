@@ -22,3 +22,4 @@ dt_save_to_sol: "100days"
 mono_surface: false
 apply_limiter: false
 precip_model: "0M"
+surface_setup: PrescribedSurface

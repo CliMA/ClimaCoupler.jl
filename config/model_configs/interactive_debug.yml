@@ -12,7 +12,7 @@ turb_flux_partition: "CombinedStateFluxes"
 h_elem: 4
 dt_save_restart: "5days"
 precip_model: "0M"
-run_name: "interactive_debug_run_bus"
-job_id: "interactive_debug_run_bus"
+run_name: "interactive_debug_run_Grachev"
+job_id: "interactive_debug_run_Grachev"
 monthly_checkpoint: true
-universal_function: "Businger" # "Businger" or "Gryanik"
+universal_function: "Grachev" # "Businger", "Gryanik", "Beljaars", "Grachev", "Holtslag", "Cheng"

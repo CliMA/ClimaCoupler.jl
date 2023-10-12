@@ -555,7 +555,7 @@ function solve_coupler!(cs)
             if cs.dates.date[1] >= next_date_in_file(cs.mode.CO2_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.CO2_info)
             end
-            CO2_current = interpolate_midmonth_to_daily(date0, CO2_info)
+            CO2_current = interpolate_midmonth_to_daily(cs.dates.date[1], CO2_info)
             update_field!(atmos_sim, Val(:co2_gm), CO2_current)
 
             ## calculate and accumulate diagnostics at each timestep

@@ -247,18 +247,14 @@ function surface_inputs(::BulkScheme, input_args::NamedTuple)
     (; z0b, z0m, Ch, Cd, beta, gustiness) = scheme_properties
     # wrap state values
     return @. SF.Coefficients(
-        SF.InteriorValues(z_int, uₕ_int, thermo_state_int), # state_in
-        SF.SurfaceValues(                                   # state_sfc
+        SF.StateValues(z_int, uₕ_int, thermo_state_int), # state_in
+        SF.StateValues(                                   # state_sfc
             z_sfc,
             StaticArrays.SVector(FT(0), FT(0)),
             thermo_state_sfc,
         ),
         Cd,                                     # Cd
         Ch,                                     # Ch
-        z0m,                                    # roughness_momentum
-        z0b,                                    # roughness_buoyancy
-        gustiness,                              # gustiness
-        beta,                                   # beta
     )
 end
 function surface_inputs(::MoninObukhovScheme, input_args::NamedTuple)
@@ -268,16 +264,14 @@ function surface_inputs(::MoninObukhovScheme, input_args::NamedTuple)
 
     # wrap state values
     return @. SF.ValuesOnly(
-        SF.InteriorValues(z_int, uₕ_int, thermo_state_int), # state_in
-        SF.SurfaceValues(                                  # state_sfc
+        SF.StateValues(z_int, uₕ_int, thermo_state_int), # state_in
+        SF.StateValues(                                  # state_sfc
             z_sfc,
             StaticArrays.SVector(FT(0), FT(0)),
             thermo_state_sfc,
         ),
         z0m,                                    # z0m
         z0b,                                    # z0b
-        gustiness,                             # gustiness
-        beta,                                   # beta
     )
 
 end

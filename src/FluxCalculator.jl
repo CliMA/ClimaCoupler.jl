@@ -319,7 +319,7 @@ Uses SurfaceFluxes.jl to calculate turbulent surface fluxes. It should be atmos 
 function get_surface_fluxes_point!(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters)
 
     # calculate all fluxes (saturated surface conditions)
-    outputs = @. SF.surface_conditions(surface_params, inputs)
+    outputs = @. SF.surface_conditions(surface_params, inputs, SF.FDScheme())
 
     # drag
     F_turb_ρτxz = outputs.ρτxz

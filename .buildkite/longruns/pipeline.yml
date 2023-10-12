@@ -80,8 +80,8 @@ steps:
       # mid-resolution AMIP: longrun (140 days)
       - label: "MPI AMIP FINE: target longrun"
         key: "amip_longrun_target"
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_longrun_target.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/amip_longrun_target_artifacts/*"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/new_targets.yml"
+        artifact_paths: "experiments/AMIP/modular/output/amip/new_target_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
           BUILD_HISTORY_HANDLE: ""

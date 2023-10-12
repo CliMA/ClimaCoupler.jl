@@ -111,7 +111,7 @@ get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxes_params(sim.in
 
 function update_field!(atmos_sim::ClimaAtmosSimulation, ::Val{:co2_gm}, field)
     if atmos_sim.integrator.p.radiation_model.radiation_mode isa CA.RRTMGPI.GrayRadiation
-        @warn "Gray radiation model initialized, skipping CO2 update"
+        @warn("Gray radiation model initialized, skipping CO2 update", maxlog = 1)
         return
     else
         atmos_sim.integrator.p.radiation_model.volume_mixing_ratio_co2 .= parent(field)[1]

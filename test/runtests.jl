@@ -3,9 +3,6 @@ using SafeTestsets
 @safetestset "Aqua tests" begin
     include("aqua.jl")
 end
-@safetestset "Clock tests" begin
-    include("CoupledSimulations/clock.jl")
-end
 @safetestset "Interfacer tests" begin
     include("interfacer_tests.jl")
 end
@@ -39,8 +36,8 @@ end
 @safetestset "Checkpointer tests" begin
     include("checkpointer_tests.jl")
 end
-@safetestset "CouplerState tests" begin
-    include("CouplerState/cplstate_interface.jl")
+@safetestset "experiment test: CoupledSims tests" begin
+    include("experiment_tests/coupled_sims.jl")
 end
 @safetestset "component test: bucket" begin
     include("component_model_tests/bucket_tests.jl")
@@ -60,5 +57,3 @@ end
 @safetestset "debug diagnostics: amip plots" begin
     include("debug/debug_amip_plots.jl")
 end
-
-# include("CoupledSimulations/cplsolver.jl")

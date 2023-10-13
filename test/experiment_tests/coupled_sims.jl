@@ -4,15 +4,31 @@ using ClimaCoupler, Dates, Unitful
 using IntervalSets
 using ClimaCore: Domains, Meshes, Geometry, Topologies, Spaces, Fields, Operators
 
-struct SimulationA{T} <: ClimaCoupler.AbstractSimulation
-    data::T
-end
-ClimaCoupler.name(::SimulationA) = :simA
+# Load file to test
+include("../../experiments/ClimaCore/CoupledSims/coupled_sim.jl")
 
-struct SimulationB{T} <: ClimaCoupler.AbstractSimulation
+@testset "Clock" begin
+    time_info = (start = 0.0, dt = 0.5, stop = 2.0)
+    clock = Clock(time_info...)
+
+    tick!(clock)
+    @test clock.time == time_info.dt
+    while !stop_time_exceeded(clock)
+        tick!(clock)
+    end
+    @test clock.time == time_info.stop
+end
+
+
+struct SimA{T} <: AbstractSim
     data::T
 end
-ClimaCoupler.name(::SimulationB) = :simB
+name(::SimA) = :simA
+
+struct SimB{T} <: AbstractSim
+    data::T
+end
+name(::SimB) = :simB
 
 function spectral_space_2D(; n1 = 1, n2 = 1, Nij = 4)
     domain = Domains.RectangleDomain(
@@ -36,8 +52,8 @@ end
     spaceA = spectral_space_2D()
     spaceB = spectral_space_2D(n1 = 2, n2 = 2)
 
-    simA = SimulationA(ones(spaceA))
-    simB = SimulationB(zeros(spaceB))
+    simA = SimA(ones(spaceA))
+    simB = SimB(zeros(spaceB))
     coupler = CouplerState(1.0)
 
     coupler_add_field!(coupler, :test1, simA.data; write_sim = simA)
@@ -51,7 +67,7 @@ end
         @test simA.data === coupler_get(coupler, :test1)
 
         # test remapping
-        @test map === ClimaCoupler.get_remap_operator(coupler, ClimaCoupler.name(simB), ClimaCoupler.name(simA))
+        @test map === get_remap_operator(coupler, name(simB), name(simA))
         @test ones(spaceB) ≈ coupler_get(coupler, :test1, simB)
         target_field = zeros(spaceB)
         coupler_get!(target_field, coupler, :test1, simB)

@@ -1,5 +1,8 @@
 # # Ocean Model
 
+# Load coupled simulation code
+include("../CoupledSims/coupled_sim.jl")
+
 #=
 ## Slab Ocean ODE
 For our ocean component, we solve a simple slab ocean ODE just as we did for the land:
@@ -14,7 +17,7 @@ function ocn_rhs!(du, u, (parameters, F_accumulated), t)
     """
     Slab layer equation
         d(T_sfc)/dt = - (F_accumulated) / (h_ocn * ρ_ocn * c_ocn)
-        where 
+        where
             F_accumulated = F_integrated / Δt_coupler
     """
     @unpack ocn_h, ocn_ρ, ocn_c = parameters
@@ -59,21 +62,21 @@ end
 
 # ## Coupled Ocean Wrappers
 ## Ocean Simulation - Later to live in Oceananigans
-struct OceanSimulation <: ClimaCoupler.AbstractOceanSimulation
+struct OceanSim <: AbstractOceanSim
     integrator::Any
 end
 
-function OceanSimulation(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
+function OceanSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
     ocn_prob = ODEProblem(ocn_rhs!, Y_init, (t_start, t_end), p)
     ocn_integ = init(ocn_prob, timestepper, dt = dt, saveat = saveat, callback = callbacks)
-    return OceanSimulation(ocn_integ)
+    return OceanSim(ocn_integ)
 end
 
-function ClimaCoupler.coupler_push!(coupler::ClimaCoupler.CouplerState, ocean::OceanSimulation)
+function coupler_push!(coupler::CouplerState, ocean::OceanSim)
     coupler_put!(coupler, :T_sfc_ocean, ocean.integrator.u.T_sfc, ocean)
 end
 
-function ClimaCoupler.coupler_pull!(ocean::OceanSimulation, coupler::ClimaCoupler.CouplerState)
+function coupler_pull!(ocean::OceanSim, coupler::CouplerState)
     coupler_get!(ocean.integrator.p.F_sfc, coupler, :F_sfc, ocean)
     ocean.integrator.p.F_sfc ./= coupler.Δt_coupled
 end

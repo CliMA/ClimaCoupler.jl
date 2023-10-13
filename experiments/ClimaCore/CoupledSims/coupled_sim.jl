@@ -6,6 +6,86 @@ export CouplerState
 export coupler_push!, coupler_pull!, coupler_put!, coupler_get, coupler_get!
 export coupler_add_field!, coupler_add_map!
 
+
+"""
+    AbstractSim
+
+An abstract type representing a model simulation.
+"""
+abstract type AbstractSim end
+
+abstract type AbstractAtmosSim <: AbstractSim end
+name(::AbstractAtmosSim) = :atmos
+
+abstract type AbstractOceanSim <: AbstractSim end
+name(::AbstractOceanSim) = :ocean
+
+abstract type AbstractLandSim <: AbstractSim end
+name(::AbstractLandSim) = :land
+
+abstract type AbstractCoupledSim <: AbstractSim end
+name(::AbstractCoupledSim) = :coupled
+
+"""
+    CoupledSim
+
+A subtype of the abstract type `AbstractCoupledSim` representing a model simulation.
+"""
+struct CoupledSim{CS, S, CPL, L, C} <: AbstractCoupledSim
+    "The coupled time-stepping scheme"
+    coupler_solver::CS
+    "The component simulations"
+    sims::S
+    "The coupler"
+    coupler::CPL
+    "Diagnostic logger"
+    logger::L
+    "Clock"
+    clock::C
+end
+
+"""
+    run!(::CoupledSim)
+
+A simple outer timestepping loop for coupled system runs.
+
+This will be formalized when the `run!` functionality for component
+models is implemented so to have a consistent interface.
+"""
+function run!(sim::CoupledSim)
+    clock = sim.clock
+    while !stop_time_exceeded(clock)
+        step!(sim, clock.dt)
+        tick!(clock)
+    end
+end
+
+"""
+    step!(sim, dt)
+
+Advances a simulation `sim` by `dt`.
+
+Note that `dt` is not necessarily the simulation's timestep length;
+a simuation could take several shorter steps that total to `dt`.
+"""
+function step!(sim::AbstractSim, dt) end
+
+"""
+    Clock{T}
+
+Manages a simulation's time information.
+"""
+mutable struct Clock{T}
+    time::T         # current simulation time
+    dt::T           # simulation timestep
+    stop_time::T    # simulation end time
+end
+
+tick!(clock::Clock) = (clock.time += clock.dt)
+
+stop_time_exceeded(clock::Clock) = (clock.time >= clock.stop_time)
+
+
 mutable struct CplFieldInfo{DT, MD}
     # the coupled data
     data::DT
@@ -31,7 +111,7 @@ _fields(coupler::CouplerState) = getfield(coupler, :coupled_fields)
 
 Type for holding coupler "state". This is the namespace through which coupled components
 communicate. Its role is to provide a level of indirection so that components remain modular
-and so that any data communication, interpolation, reindexing/unit conversions and filtering 
+and so that any data communication, interpolation, reindexing/unit conversions and filtering
 etc... can be embeded in the intermdediate coupling layer.
 
 A field is exported by one component and imported by one or more other components.
@@ -47,7 +127,7 @@ end
             fieldvalue,
         )
 
-Add a field to the coupler that is accessible with key `fieldname`. 
+Add a field to the coupler that is accessible with key `fieldname`.
 
 # Arguments
 - `coupler`: coupler object the field is added to.
@@ -58,7 +138,7 @@ function coupler_add_field!(
     coupler::CouplerState,
     fieldname::Symbol,
     fieldvalue;
-    write_sim::AbstractSimulation,
+    write_sim::AbstractSim,
     metadata = nothing,
 )
     push!(coupler.coupled_fields, fieldname => CplFieldInfo(fieldvalue, name(write_sim), metadata))
@@ -71,7 +151,7 @@ end
             map::Operators.LinearRemap
         )
 
-Add a map to the coupler that is accessible with key `mapname`. 
+Add a map to the coupler that is accessible with key `mapname`.
 
 # Arguments
 - `coupler`: coupler object the field is added to.
@@ -87,7 +167,7 @@ end
 
 Sets coupler field `fieldname` to `fieldvalue`.
 """
-function coupler_put!(coupler::CouplerState, fieldname::Symbol, fieldvalue, source_sim::AbstractSimulation)
+function coupler_put!(coupler::CouplerState, fieldname::Symbol, fieldvalue, source_sim::AbstractSim)
     cplfield = coupler.coupled_fields[fieldname]
     @assert cplfield.write_sim == name(source_sim) "$fieldname can only be written to by $(cplfield.write_sim)."
 
@@ -109,7 +189,7 @@ them for the coupler.
 function coupler_push!(coupler::CouplerState, model) end
 
 """
-    coupler_get!(target_field::ClimaCore.Fields.Field, coupler::CouplerState, fieldname::Symbol, target_sim::AbstractSimulation)
+    coupler_get!(target_field::ClimaCore.Fields.Field, coupler::CouplerState, fieldname::Symbol, target_sim::AbstractSim)
 
 Retrieve data array corresponding to `fieldname`, remap and store in `target_field`.
 """
@@ -117,7 +197,7 @@ function coupler_get!(
     target_field::ClimaCore.Fields.Field,
     coupler::CouplerState,
     fieldname::Symbol,
-    target_sim::AbstractSimulation,
+    target_sim::AbstractSim,
 )
     cplfield = coupler.coupled_fields[fieldname]
     map = get_remap_operator(coupler, name(target_sim), cplfield.write_sim)
@@ -125,7 +205,7 @@ function coupler_get!(
 end
 
 """
-    coupler_get(coupler::CouplerState, fieldname::Symbol [, target_sim::AbstractSimulation])
+    coupler_get(coupler::CouplerState, fieldname::Symbol [, target_sim::AbstractSim])
 
 Retrieve data array corresponding to `fieldname`.
 
@@ -136,7 +216,7 @@ function coupler_get(coupler::CouplerState, fieldname::Symbol)
     return cplfield.data
 end
 
-function coupler_get(coupler::CouplerState, fieldname::Symbol, target_sim::AbstractSimulation)
+function coupler_get(coupler::CouplerState, fieldname::Symbol, target_sim::AbstractSim)
     cplfield = coupler.coupled_fields[fieldname]
     map = get_remap_operator(coupler, name(target_sim), cplfield.write_sim)
     return Operators.remap(map, cplfield.data)
@@ -176,5 +256,5 @@ function Base.show(io::IO, coupler::CouplerState)
         data[i, :] = [k]
     end
     header = (["Field Name"], [""])
-    pretty_table(data, header = header)
+    PrettyTables.pretty_table(data, header = header)
 end

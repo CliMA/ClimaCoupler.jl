@@ -23,23 +23,23 @@ Total Energy (possibly replace potential temperature equation with total energy 
 \frac{\partial \rho e_{tot}}{\partial t} + \nabla \cdot ((\rho e_{tot} + p )\vec{u}) = \nabla \cdot (\kappa \rho \nabla h_{tot}),
 ```
 
-where ``h_{tot}`` is the total specific enthalpy given by internal and potential energy contributions. 
+where ``h_{tot}`` is the total specific enthalpy given by internal and potential energy contributions.
 
-Tracer transport: 
+Tracer transport:
 ```math
 \frac{\partial \rho \chi}{\partial t} + \nabla \cdot (\rho \chi \vec{u}) = \nabla \cdot (\kappa \rho \nabla \chi) + S(\chi, ...).
 ```
 
 Diffusion (Constant Viscosity):
-The simplest model to represent diffusive processes is a constant-viscosity model, with 
+The simplest model to represent diffusive processes is a constant-viscosity model, with
 prescribed kinematic viscosity ``\nu`` such that the stress tensor can be modelled by
 ```math
 \rho\tau = -2\rho\nu\nabla u.
 ```
 
 Smagorinsky Closure:
-The Smagorinsky closure is an eddy-viscosity model that captures the effect of energy 
-transfer to the smallest scales of motion in the flow. 
+The Smagorinsky closure is an eddy-viscosity model that captures the effect of energy
+transfer to the smallest scales of motion in the flow.
 ```math
 \begin{aligned}
 \rho\tau &= -2\rho\nu\vec{S}, \\
@@ -50,14 +50,14 @@ transfer to the smallest scales of motion in the flow.
 
 with $\Delta_{x,y,z}$ the grid lengthscale (sometimes approximated as a geometric average
 ``\Delta = (\Delta_x\Delta_y\Delta_z)^{1/3}``), $\nu$ is a spatially varying kinematic viscosity
-that depends on the local shear, ``\vec{S}`` the symmetric rate-of-strain tensor, 
-``\tau`` the diffusive momentum flux tensor. In stratified flows, we can apply a correction 
-to the eddy viscosity to account for buoyancy effects. Thermal diffusivities are related to the modelled eddy-viscosity 
+that depends on the local shear, ``\vec{S}`` the symmetric rate-of-strain tensor,
+``\tau`` the diffusive momentum flux tensor. In stratified flows, we can apply a correction
+to the eddy viscosity to account for buoyancy effects. Thermal diffusivities are related to the modelled eddy-viscosity
 through the turbulent Prandtl number which takes a typical value of ``Pr_{t}= 1/3`` such that ``\kappa_{2} = \nu/Pr_{t}``.
 
-Tendencies for fourth-order hyperdiffusion are included in the `rhs!` construction, but the 
-coefficient ``\kappa_{4}`` is ``0`` in this demonstrative case. Hyperdiffusive 
-tendencies are typically included as a scale-selective diffusion mechanism for high-frequency noise 
+Tendencies for fourth-order hyperdiffusion are included in the `rhs!` construction, but the
+coefficient ``\kappa_{4}`` is ``0`` in this demonstrative case. Hyperdiffusive
+tendencies are typically included as a scale-selective diffusion mechanism for high-frequency noise
 (e.g. stabilization in GCMs).
 
 Consider components of the viscous stress tensor in three dimensions:
@@ -78,7 +78,7 @@ Consider components of the viscous stress tensor in three dimensions:
 \end{aligned}
 ```
 
-Assume terms in the ``y``-direction are neglected (2-dimensional simplicfication). The contributions to the momentum equation are then given by: 
+Assume terms in the ``y``-direction are neglected (2-dimensional simplicfication). The contributions to the momentum equation are then given by:
 ```math
 \begin{aligned}
 (\rho u):  \partial_{x} (\rho \tau_{xx}) + \partial_{z}(\rho\tau_{xz})  &= \partial_x  \Big(2\nu \frac{\partial u}{\partial x}\Big) + \partial_z\Big(\nu \frac{\partial u}{\partial z}\Big) + \partial_z\Big(\nu \frac{\partial w}{\partial x}\Big), \\
@@ -112,6 +112,9 @@ using TerminalLoggers: TerminalLogger
 global_logger(TerminalLogger())
 
 using ClimaCoupler
+
+# Load coupled simulation code
+include("../CoupledSims/coupled_sim.jl")
 
 ## set up function space
 function hvspace_2D(xlim = (-π, π), zlim = (0, 4π), helem = 20, velem = 20, npoly = 1)
@@ -321,11 +324,11 @@ end
 
 # ## Coupled Atmos Wrappers
 ## Atmos Simulation - later to live in ClimaAtmos
-struct AtmosSimulation <: ClimaCoupler.AbstractAtmosSimulation
+struct AtmosSim <: AbstractAtmosSim
     integrator::Any
 end
 
-function AtmosSimulation(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
+function AtmosSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
     atm_prob = ODEProblem(atm_rhs!, Y_init, (t_start, t_end), p)
 
     atm_integ = init(
@@ -338,14 +341,14 @@ function AtmosSimulation(Y_init, t_start, dt, t_end, timestepper, p, saveat, cal
         callback = callbacks,
     )
 
-    return AtmosSimulation(atm_integ)
+    return AtmosSim(atm_integ)
 end
 
-function ClimaCoupler.coupler_push!(coupler::ClimaCoupler.CouplerState, atmos::AtmosSimulation)
+function coupler_push!(coupler::CouplerState, atmos::AtmosSim)
     coupler_put!(coupler, :F_sfc, atmos.integrator.u.F_sfc, atmos)
 end
 
-function ClimaCoupler.coupler_pull!(atmos::AtmosSimulation, coupler::ClimaCoupler.CouplerState)
+function coupler_pull!(atmos::AtmosSim, coupler::CouplerState)
     ## reset flux accumulator
     atmos.integrator.u.F_sfc .= 0.0 # reset surface flux to be accumulated
 

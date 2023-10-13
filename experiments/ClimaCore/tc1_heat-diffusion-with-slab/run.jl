@@ -1,12 +1,12 @@
 # # Heat Equation + Slab Tutorial
 
 # In this tutorial, we demonstrate simple sequential coupling
-# of two PDE models using the `ClimaCore.jl` backends. 
+# of two PDE models using the `ClimaCore.jl` backends.
 
 # # Model 1
 # Model 1 represents a simplified atmosphere (atm)
 # and solves the [heat
-# equation](https://en.wikipedia.org/wiki/Heat_equation) 
+# equation](https://en.wikipedia.org/wiki/Heat_equation)
 # in a one-column domain:
 
 # ``
@@ -16,7 +16,7 @@
 #    with top and bottom boundary conditions set to fixed-temperature (non-zero Dirichlet) and fixed-flux (non-zero Neumann) conditions, respectively:
 
 # ``
-#    T_{top}  = 280 K, \,\,\,\,\,\,\, \frac{∂ T_{bottom}}{∂ t} = - ∇ F_{sfc}   
+#    T_{top}  = 280 K, \,\,\,\,\,\,\, \frac{∂ T_{bottom}}{∂ t} = - ∇ F_{sfc}
 # ``
 
 # where
@@ -32,7 +32,7 @@
 #    \frac{dT_{sfc}}{dt} = - (F_{accumulated} + G ) / h_{lnd}
 # ``
 
-#    where 
+#    where
 
 # ``
 #    F_{accumulated} = {F_{integrated}} / Δt_{coupler}
@@ -47,11 +47,11 @@
 
 # # Coupling and Flux Calculation
 
-# We use this Model 1 (usually this is done by the model with the shortest timestep) 
+# We use this Model 1 (usually this is done by the model with the shortest timestep)
 # to calculate and accumulate the downward surface fluxes, `F_sfc`:
 
 # ``
-#    F_{sfc} = - λ (T_{sfc} - T1) 
+#    F_{sfc} = - λ (T_{sfc} - T1)
 # ``
 
 # ``
@@ -62,16 +62,16 @@
 #  - `T1` is the atm temperature near the surface (here assumed equal to the first model level)
 #  - `λ` a constant relaxation timescale
 
-# Note that in a more realistic setup the above equations would be weighted by their domains' densities and thermal heat capacities, so that the thermal flux would have the units of W m$^{-2}$. 
+# Note that in a more realistic setup the above equations would be weighted by their domains' densities and thermal heat capacities, so that the thermal flux would have the units of W m$^{-2}$.
 # Here we assume these are unity for both domains.
 
 # Sequential coupling has the following steps:
 # 1) pre-Model 1: supply Model 1 with `T_sfc` for the `F_sfc` calculation; reset `F_integrated` to zero
 # 2) run Model 1: step forward for all Model 1 timesteps within one coupling cycle using `F_sfc` as the bottom boundary condition; accumulate `F_integrated` at each (sub-)step
-# 3) post-Model 1: pass `F_integrated` into coupler and convert to `F_accumulated` for the correct units. 
-# 4) pre-Model 2: supply Model 2 with `F_accumulated` 
+# 3) post-Model 1: pass `F_integrated` into coupler and convert to `F_accumulated` for the correct units.
+# 4) pre-Model 2: supply Model 2 with `F_accumulated`
 # 5) run Model 2: step forward for all Model 2 timesteps within one coupling cycle;
-# 6) post-Model 2: state variable, `T_sfc` of Model 2 into coupler. 
+# 6) post-Model 2: state variable, `T_sfc` of Model 2 into coupler.
 # 7) repeat steps 1-6 for all coupling timesteps.
 
 # # Implementation
@@ -98,6 +98,9 @@ using OrdinaryDiffEq
 
 using Statistics
 
+# Load utilities for coupling
+include("../CoupledSims/coupled_sim.jl")
+
 #src ## Setup Logging Information
 global_logger(TerminalLogger()) #src
 const CI = !isnothing(get(ENV, "CI", nothing)) #src
@@ -109,17 +112,17 @@ const FT = Float64;
 #  - Experiment-specific Parameters
 parameters = (
     ## atmos parameters
-    zmin_atm = FT(0.0), # height of atm stack bottom [m] 
+    zmin_atm = FT(0.0), # height of atm stack bottom [m]
     zmax_atm = FT(1.0), # height of atm stack top [m]
-    n = 15,  # number of elements in atm stack 
+    n = 15,  # number of elements in atm stack
     μ = FT(0.0001), # diffusion coefficient [m^2 / s]
     T_top = FT(280.0), # fixed temperature at the top of the domain_atm [K]
     T_atm_ini = FT(280.0), # initial condition of at temperature (isothermal) [K]
     ## slab parameters
-    h_lnd = FT(0.5), # depth of slab layer [m] 
+    h_lnd = FT(0.5), # depth of slab layer [m]
     T_lnd_ini = FT(260.0), # initial condition of at temperature (isothermal) [K]
-    ## coupling parameters 
-    λ = FT(1e-5), # transfer coefficient 
+    ## coupling parameters
+    λ = FT(1e-5), # transfer coefficient
 )
 
 
@@ -136,7 +139,7 @@ Heat diffusion equation
         dT/dt = - ∇ F_sfc       at z = zmin_atm
 
 We also use this model to calculate and accumulate the downward surface fluxes, F_sfc:
-    F_sfc = - λ * (T_sfc - T1) 
+    F_sfc = - λ * (T_sfc - T1)
     d(F_integrated)/dt  = F_sfc
     where
         F_integrated is reset to 0 at the beginning of each coupling cycle
@@ -160,10 +163,10 @@ end
 # - Model 2 (lnd) Equations
 """
     ∑tendencies_lnd!(dT_sfc, T_sfc, (parameters, F_accumulated), t)
-    
+
 Slab layer equation
     lnd d(T_sfc)/dt = - (F_accumulated + G) / h_lnd
-    where 
+    where
         F_accumulated = F_integrated / Δt_coupler
 """
 function ∑tendencies_lnd!(dT_sfc, T_sfc, (parameters, F_accumulated), t)
@@ -174,8 +177,8 @@ end
 # - Surface Flux Calculation (coarse bulk formula)
 calculate_flux(T_sfc, T1, parameters) = -parameters.λ * (T_sfc - T1);
 
-# - Coupler Communication Functions 
-# These functions export / import / transform variables 
+# - Coupler Communication Functions
+# These functions export / import / transform variables
 # These functions are now just place holders for coupler transformations (e.g. regridding, masking, etc)
 coupler_get_(x) = x;
 coupler_put_(x) = x;

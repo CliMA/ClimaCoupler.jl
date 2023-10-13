@@ -86,3 +86,61 @@ plot_field_names(sim::SurfaceModelSimulation) = (:area_fraction, :surface_temper
 plot_field_names(sim::BucketSimulation) =
     (:area_fraction, :surface_temperature, :surface_humidity, :air_density, :σS, :Ws, :W)
 plot_field_names(sim::ClimaAtmosSimulation) = (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)
+
+
+
+# offline debuging
+using ClimaCore
+using ClimaCore: InputOutput, Fields, Geometry
+using Plots
+using ClimaCorePlots
+using ClimaCore.Utilities: half, PlusHalf
+import ClimaAtmos.Parameters as CAP
+
+
+include("../components/atmosphere/climaatmos_init.jl")
+
+# monthly mean data
+output_dir = "/central/scratch/esm/slurm-buildkite/climacoupler-longruns/239/climacoupler-longruns/experiments/AMIP/modular/output/amip/new_target" # hdf5
+output_dir_atmos = "/central/scratch/esm/slurm-buildkite/climacoupler-longruns/239/climacoupler-longruns/new_target/" # hdf5
+
+# get the monthly mean data from coupler diagnostics
+vname = "u"
+filename = joinpath(output_dir,"$vname.monthly_mean_3d_.1979-01-01T00:02:30.hdf5")
+reader = InputOutput.HDF5Reader(filename)
+monthly_mean = InputOutput.read_field(reader, vname)
+close(reader)
+
+# get atmos data from coupler restarts
+
+
+# get atmos data from atmos restarts
+filename_atmos = joinpath(output_dir_atmos,"day10.0.hdf5")
+reader_atmos = InputOutput.HDF5Reader(filename_atmos)
+Y = InputOutput.read_field(reader_atmos, "Y")
+close(reader_atmos)
+
+face_space = axes(Y.f)
+
+all_plots = []
+push!(all_plots, Plots.plot(Y.c.ρq_tot, title = "ρq_tot", size = (1500, 800)))
+push!(all_plots, Plots.plot(Y.c.ρe_tot, title = "ρe_tot", size = (1500, 800)))
+push!(all_plots, Plots.plot(ClimaCore.Geometry.UVVector.(Y.c.uₕ).components.data.:1, title = "uₕ", size = (1500, 800)))
+push!(all_plots, Plots.plot(ClimaCore.Geometry.WVector.(Y.f.u₃).components.data.:1, title = "w", size = (1500, 800), level = half))
+fig = Plots.plot(all_plots..., size = (1500, 800))
+Plots.png("atmos_states")
+
+# coordinates of extrema
+using ClimaCore: Spaces
+function get_max_coords(field)
+    max_val, max_idx = findmax(parent(field))
+    @info "Printing coordinates of max: $max_val"
+    lat = Fields.coordinate_field(field).lat
+    println("lat: "*"$(parent(lat)[max_idx])")
+    lon = Fields.coordinate_field(field).long
+    println("lon: "*"$(parent(lon)[max_idx])")
+    if axes(field) isa Spaces.ExtrudedFiniteDifferenceSpace
+        z =  Fields.coordinate_field(field).z
+        println("lz: " * "$(parent(z)[max_idx])")
+    end
+end

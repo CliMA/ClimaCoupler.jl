@@ -66,8 +66,9 @@ steps:
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks: 8
-          slurm_mem: 20GB
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
 
       - label: "AMIP Businger"
         key: "amip_Businger"

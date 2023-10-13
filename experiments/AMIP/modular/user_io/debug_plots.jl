@@ -88,7 +88,7 @@ plot_field_names(sim::BucketSimulation) =
 plot_field_names(sim::ClimaAtmosSimulation) = (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)
 
 
-
+#=
 # offline debuging
 using ClimaCore
 using ClimaCore: InputOutput, Fields, Geometry
@@ -144,3 +144,4 @@ function get_max_coords(field)
         println("lz: " * "$(parent(z)[max_idx])")
     end
 end
+=#

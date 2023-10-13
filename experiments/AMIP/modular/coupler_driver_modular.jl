@@ -159,6 +159,7 @@ saveat = time_to_seconds(config_dict["dt_save_to_sol"])
 date0 = date = DateTime(config_dict["start_date"], dateformat"yyyymmdd")
 mono_surface = config_dict["mono_surface"]
 monthly_checkpoint = config_dict["monthly_checkpoint"]
+hourly_checkpoint = config_dict["hourly_checkpoint"]
 restart_dir = config_dict["restart_dir"]
 restart_t = Int(config_dict["restart_t"])
 
@@ -622,7 +623,7 @@ function solve_coupler!(cs)
             ## checkpoint model state
         end
 
-        trigger_callback!(cs, cs.callbacks.twelvehourly_checkpoint) # TODO: add others and loop
+        hourly_checkpoint ? trigger_callback!(cs, cs.callbacks.twelvehourly_checkpoint) : nothing # TODO: add others and loop
 
 
     end

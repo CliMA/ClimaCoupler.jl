@@ -311,7 +311,7 @@ if mode_name == "amip"
 
     update_midmonth_data!(date0, CO2_info)
     CO2_init = interpolate_midmonth_to_daily(date0, CO2_info)
-    update_field!(atmos_sim, Val(:co2_gm), CO2_init)
+    # update_field!(atmos_sim, Val(:co2_gm), CO2_init)
 
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
 
@@ -556,7 +556,7 @@ function solve_coupler!(cs)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.CO2_info)
             end
             CO2_current = interpolate_midmonth_to_daily(cs.dates.date[1], CO2_info)
-            update_field!(atmos_sim, Val(:co2_gm), CO2_current)
+            # update_field!(atmos_sim, Val(:co2_gm), CO2_current)
 
             ## calculate and accumulate diagnostics at each timestep
             ClimaComms.barrier(comms_ctx)

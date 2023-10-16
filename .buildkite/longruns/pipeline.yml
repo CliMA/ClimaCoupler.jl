@@ -54,7 +54,7 @@ steps:
       
       - label: "AMIP Businger"
         key: "amip_Businger_long"
-        command: "srun julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_businger.yml"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_businger.yml"
         artifact_paths: "experiments/AMIP/modular/output/amip/interactive_debug_run_Businger_long_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
@@ -66,7 +66,7 @@ steps:
       
       - label: "AMIP Holtslag"
         key: "amip_Holtslag_long"
-        command: "srun julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_holtslag.yml"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_holtslag.yml"
         artifact_paths: "experiments/AMIP/modular/output/amip/interactive_debug_run_Holtslag_long_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
@@ -78,7 +78,7 @@ steps:
       
       - label: "AMIP Beljaars"
         key: "amip_Beljaars_long"
-        command: "srun julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_beljaars.yml"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_beljaars.yml"
         artifact_paths: "experiments/AMIP/modular/output/amip/interactive_debug_run_Beljaars_long_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
@@ -90,7 +90,7 @@ steps:
       
       - label: "AMIP Cheng"
         key: "amip_Cheng_long"
-        command: "srun julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_cheng.yml"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_cheng.yml"
         artifact_paths: "experiments/AMIP/modular/output/amip/interactive_debug_run_Cheng_long_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
@@ -102,7 +102,7 @@ steps:
       
       - label: "AMIP Grachev"
         key: "amip_Grachev_long"
-        command: "srun julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_grachev.yml"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_grachev.yml"
         artifact_paths: "experiments/AMIP/modular/output/amip/interactive_debug_run_Grachev_long_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
@@ -114,7 +114,7 @@ steps:
       
       - label: "AMIP Gryanik"
         key: "amip_Gryanik_long"
-        command: "srun julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_gryanik.yml"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_gryanik.yml"
         artifact_paths: "experiments/AMIP/modular/output/amip/interactive_debug_run_Gryanik_long_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"

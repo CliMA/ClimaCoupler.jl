@@ -62,7 +62,7 @@ steps:
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks: 8
-          slurm_mem: 20GB
+          slurm_mem: 32GB
       
       - label: "AMIP Holtslag"
         key: "amip_Holtslag_long"
@@ -74,7 +74,7 @@ steps:
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks: 8
-          slurm_mem: 20GB
+          slurm_mem: 32GB
       
       - label: "AMIP Beljaars"
         key: "amip_Beljaars_long"
@@ -86,7 +86,7 @@ steps:
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks: 8
-          slurm_mem: 20GB
+          slurm_mem: 32GB
       
       - label: "AMIP Cheng"
         key: "amip_Cheng_long"
@@ -98,7 +98,7 @@ steps:
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks: 8
-          slurm_mem: 20GB
+          slurm_mem: 32GB
       
       - label: "AMIP Grachev"
         key: "amip_Grachev_long"
@@ -110,7 +110,7 @@ steps:
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks: 8
-          slurm_mem: 20GB
+          slurm_mem: 32GB
       
       - label: "AMIP Gryanik"
         key: "amip_Gryanik_long"
@@ -122,4 +122,4 @@ steps:
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks: 8
-          slurm_mem: 20GB
+          slurm_mem: 32GB

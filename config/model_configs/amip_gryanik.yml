@@ -5,13 +5,13 @@ rad: "gray"
 energy_check: false
 mode_name: "amip"
 anim: true
-t_end: "32days"
-dt_save_to_sol: "1days"
+t_end: "1000days"
+dt_save_to_sol: "100days"
 dt_cpl: 400
 dt: "400secs"
 mono_surface: false
 h_elem: 6
-dt_save_restart: "10days"
+dt_save_restart: "100days"
 precip_model: "0M"
 apply_limiter: false
 surface_setup: "PrescribedSurface"

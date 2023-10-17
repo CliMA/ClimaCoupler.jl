@@ -11,7 +11,7 @@ end
 function checkpoint_func(cs, ::CouplerCallback)
     for sim in cs.model_sims
         if get_model_state_vector(sim) !== nothing
-            checkpoint_model_state(sim, cs.comms_ctx, Int(cs.dates.date1[1]), output_dir = cs.dirs.artifacts)
+            checkpoint_model_state(sim, cs.comms_ctx, Int( Dates.datetime2epochms(cs.dates.date[1])), output_dir = cs.dirs.artifacts)
         end
     end
 end

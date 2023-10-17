@@ -15,8 +15,9 @@ kappa_4: 3e16
 rayleigh_sponge: true
 alpha_rayleigh_uh: 0
 dt: "100secs"
-t_end: "100days" # TODO this has been decreased from 140 days to avoid instability #460
+t_end: "200days" # TODO this has been decreased from 140 days to avoid instability #460
 job_id: "amip_longrun_target"
 dt_save_to_sol: "5days"
 dt_save_to_disk: "1days"
 apply_limiter: false
+hourly_checkpoint: true

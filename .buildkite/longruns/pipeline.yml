@@ -61,7 +61,7 @@ steps:
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks: 8
+          slurm_ntasks: 32
           slurm_mem: 32GB
       
       - label: "AMIP Holtslag"
@@ -73,7 +73,7 @@ steps:
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks: 8
+          slurm_ntasks: 32
           slurm_mem: 32GB
       
       - label: "AMIP Beljaars"
@@ -85,7 +85,7 @@ steps:
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks: 8
+          slurm_ntasks: 32
           slurm_mem: 32GB
       
       - label: "AMIP Cheng"
@@ -97,7 +97,7 @@ steps:
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks: 8
+          slurm_ntasks: 32
           slurm_mem: 32GB
       
       - label: "AMIP Grachev"
@@ -109,7 +109,7 @@ steps:
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks: 8
+          slurm_ntasks: 32
           slurm_mem: 32GB
       
       - label: "AMIP Gryanik"
@@ -121,5 +121,5 @@ steps:
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks: 8
+          slurm_ntasks: 32
           slurm_mem: 32GB

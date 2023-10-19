@@ -26,7 +26,10 @@ const CI = !isnothing(get(ENV, "CI", nothing))
 # general parameters
 const FT = Float64
 
-include("dummy_surface_fluxes.jl") # placeholder for SurfaceFluxes.jl
+# Load utilities for coupling
+include("../CoupledSims/coupled_sim.jl")
+# Placeholder for SurfaceFluxes.jl
+include("dummy_surface_fluxes.jl")
 
 
 ########
@@ -34,12 +37,12 @@ include("dummy_surface_fluxes.jl") # placeholder for SurfaceFluxes.jl
 ########
 
 parameters = (
-    # timestepping parameters 
+    # timestepping parameters
     Δt_min = 0.02, # minimum model timestep [s]
     timerange = (0.0, 100.0),  # start time and end time [s]
     odesolver = SSPRK33(), # timestepping method from DifferentialEquations.jl (used in both models here)
-    nsteps_atm = 1, # no. time steps of atm before coupling 
-    nsteps_lnd = 1, # no. time steps of lnd before coupling 
+    nsteps_atm = 1, # no. time steps of atm before coupling
+    nsteps_lnd = 1, # no. time steps of lnd before coupling
     saveat = 0.2, # interval at which to save diagnostics [s]
 
     # atmos domain
@@ -254,7 +257,7 @@ function coupler_solve!(stepping, ics, parameters)
 
         # post land
         # coupler_put_land!(land_simulation, coupler)
-        #  1) store required land state (e.g., temperature) in the coupler 
+        #  1) store required land state (e.g., temperature) in the coupler
         coupler_T_lnd .= coupler_put(integ_lnd.u) # update T_sfc
     end
 
@@ -330,9 +333,9 @@ linkfig("output/$(dirname)/heat_end.png", "Heat End Simulation")
 
 # TODO here
 # - integrate ClimaCoupler.jl
-# - revamp for 2D 
+# - revamp for 2D
 # - integrate SurfaceFluxes.jl
-# - revamp for 2D 
+# - revamp for 2D
 
 # Questions / Comments
-# 
+#

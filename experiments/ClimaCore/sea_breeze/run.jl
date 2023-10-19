@@ -13,8 +13,11 @@ In this tutorial we demonstrate the coupling of three component models
 of the ClimaCoupler interface are used and discussed.
 =#
 
+# Load utilities for running coupled simulation
+include("../CoupledSims/coupled_sim.jl")
+
 import SciMLBase: step! #hide
-using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues! #hide
+using OrdinaryDiffEq: ODEProblem, SSPRK33, savevalues! #hide
 import ClimaCore.Utilities: PlusHalf #hide
 import ClimaCore.Spaces as Spaces
 using DiffEqCallbacks #hide
@@ -157,31 +160,26 @@ lnd_F_sfc = Fields.zeros(lnd_domain)
 
 #=
 ## Simulations
-Each component is wrapped as a `Simulation`, which contains both the model (tendency)
-and the time-stepping information (solver, step size, etc). Simulations are the standard
+Each component is wrapped as a `Sim`, which contains both the model (tendency)
+and the time-stepping information (solver, step size, etc). Sims are the standard
 structures that the coupler works with, enabling dispatch of coupler methods.
-Here, we create three simulations: `AtmosSimulation`, `OceanSimulation`, and `LandSimulation`.
+Here, we create three simulations: `AtmosSim`, `OceanSim`, and `LandSim`.
 =#
 atm_Y = Fields.FieldVector(Yc = atm_Y_default.Yc, ρw = atm_Y_default.ρw, F_sfc = atm_F_sfc)
 atm_p = (cpl_p = cpl_parameters, T_sfc = atm_T_sfc, bc = atm_bc)
-atmos = AtmosSimulation(atm_Y, t_start, Δt_coupled / atm_nsteps, t_end, SSPRK33(), atm_p, saveat, dss_callback)
+atmos = AtmosSim(atm_Y, t_start, Δt_coupled / atm_nsteps, t_end, SSPRK33(), atm_p, saveat, dss_callback)
 
 ocn_Y = Fields.FieldVector(T_sfc = ocn_Y_default.T_sfc)
 ocn_p = (cpl_parameters, F_sfc = ocn_F_sfc)
-ocean = OceanSimulation(ocn_Y, t_start, Δt_coupled / ocn_nsteps, t_end, SSPRK33(), ocn_p, saveat)
+ocean = OceanSim(ocn_Y, t_start, Δt_coupled / ocn_nsteps, t_end, SSPRK33(), ocn_p, saveat)
 
 lnd_Y = Fields.FieldVector(T_sfc = lnd_Y_default.T_sfc)
 lnd_p = (cpl_parameters, F_sfc = lnd_F_sfc)
-land = LandSimulation(lnd_Y, t_start, Δt_coupled / lnd_nsteps, t_end, SSPRK33(), lnd_p, saveat)
+land = LandSim(lnd_Y, t_start, Δt_coupled / lnd_nsteps, t_end, SSPRK33(), lnd_p, saveat)
 
 # Additionally, we create a coupled simulation that contains the component simulations
 # and the coupled time-stepping information.
-struct AOLCoupledSimulation{
-    A <: AtmosSimulation,
-    O <: OceanSimulation,
-    L <: LandSimulation,
-    C <: ClimaCoupler.CouplerState,
-} <: ClimaCoupler.AbstractCoupledSimulation
+struct AOLCoupledSim{A <: AtmosSim, O <: OceanSim, L <: LandSim, C <: CouplerState} <: AbstractCoupledSim
     ## Atmosphere Simulation
     atmos::A
     ## Ocean Simulation
@@ -193,15 +191,15 @@ struct AOLCoupledSimulation{
 end
 
 #=
-`step!` is a key method within the Simulations interface. It advances a simulation
+`step!` is a key method within the Sims interface. It advances a simulation
 to the specified `t_stop`, with that simulation advancing by its own internal step
 size to reach the specified time. Each simulation type should specify its own step
 method, allowing components to have different time integration backends. Here, all
 components are using OrdinaryDiffEq integrators and can share the same `step!` method.
 =#
-function step!(sim::ClimaCoupler.AbstractSimulation, t_stop)
+function step!(sim::AbstractSim, t_stop)
     Δt = t_stop - sim.integrator.t
-    step!(sim.integrator, Δt, true)
+    SciMLBase.step!(sim.integrator)
 end
 
 #=
@@ -217,7 +215,7 @@ methods and can be updated via the `coupler_put!` methods.
 
 Similarly, the `coupler_add_map!` method registers remapping operators in the coupler. To
 provide automatic remapping, there is a strict name convention for remap operators: a map
-from SimulationA to SimulationB (where `ClimaCoupler.name` returns `:simA` and `:simB`,
+from SimA to SimB (where `ClimaCoupler.name` returns `:simA` and `:simB`,
 respectively) must be named `simA_to_simB` so that the correct operator can be used.
 
 Here, the models are coupled through heat transfer at the surface. This heat flux is
@@ -239,7 +237,7 @@ for (name, map) in pairs(maps)
     coupler_add_map!(coupler, name, map)
 end
 
-sim = AOLCoupledSimulation(atmos, ocean, land, coupler)
+sim = AOLCoupledSim(atmos, ocean, land, coupler)
 
 
 #=
@@ -265,7 +263,7 @@ coupling time step,
 $$F_{integ} = \int_{\Delta t_{coupler}} F_{sfc}  dt$$
 where  $F_{integ}$ has units of $J m^{-2}$.
 =#
-function cpl_run(simulation::AOLCoupledSimulation)
+function cpl_run(simulation::AOLCoupledSim)
     @info "Run model"
     @unpack atmos, ocean, land, coupler = simulation
     Δt_coupled = coupler.Δt_coupled

@@ -1,5 +1,8 @@
 # # Land Model
 
+# Load coupled simulation code
+include("../CoupledSims/coupled_sim.jl")
+
 #=
 ## Slab Land ODE
 For our land component, we solve a simple slab land ODE:
@@ -14,7 +17,7 @@ function lnd_rhs!(du, u, (parameters, F_accumulated), t)
     """
     Slab layer equation
         d(T_lnd)/dt = - (F_accumulated + G) / (h_lnd * ρ_lnd * c_lnd)
-        where 
+        where
             F_accumulated = F_integrated / Δt_coupler
     """
     @unpack lnd_h, lnd_ρ, lnd_c = parameters
@@ -59,21 +62,21 @@ end
 
 # ## Coupled Land Wrappers
 ## Land Simulation - later to live in ClimaLSM
-struct LandSimulation <: ClimaCoupler.AbstractLandSimulation
+struct LandSim <: AbstractLandSim
     integrator::Any
 end
 
-function LandSimulation(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
+function LandSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
     lnd_prob = ODEProblem(lnd_rhs!, Y_init, (t_start, t_end), p)
     lnd_integ = init(lnd_prob, timestepper, dt = dt, saveat = saveat, callback = callbacks)
-    return LandSimulation(lnd_integ)
+    return LandSim(lnd_integ)
 end
 
-function ClimaCoupler.coupler_push!(coupler::ClimaCoupler.CouplerState, land::LandSimulation)
+function coupler_push!(coupler::CouplerState, land::LandSim)
     coupler_put!(coupler, :T_sfc_land, land.integrator.u.T_sfc, land)
 end
 
-function ClimaCoupler.coupler_pull!(land::LandSimulation, coupler::ClimaCoupler.CouplerState)
+function coupler_pull!(land::LandSim, coupler::CouplerState)
     coupler_get!(land.integrator.p.F_sfc, coupler, :F_sfc, land)
     land.integrator.p.F_sfc ./= coupler.Δt_coupled
 end

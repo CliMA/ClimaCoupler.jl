@@ -39,7 +39,7 @@ mutable struct EnergyConservationCheck <: AbstractConservationCheck
         return new(all_sims)
     end
 end
-Interfacer.name(::EnergyConservationCheck) = "energy [J]"
+Interfacer.name(::EnergyConservationCheck) = "energy [J] * 1e-18"
 
 """
     WaterConservationCheck{A} <: AbstractConservationCheck
@@ -101,18 +101,18 @@ function check_conservation!(
             parent(coupler_sim.fields.F_radiative_TOA) .= parent(Interfacer.get_field(sim, Val(:F_radiative_TOA)))
 
             if isempty(ccs.toa_net_source)
-                radiation_sources_accum = sum(coupler_sim.fields.F_radiative_TOA .* coupler_sim.Δt_cpl) # ∫ J / m^2 dA
+                radiation_sources_accum = sum(coupler_sim.fields.F_radiative_TOA .* coupler_sim.Δt_cpl) * 1e-18 # ∫ J / m^2 dA * 1e-18
             else
                 radiation_sources_accum =
-                    sum(coupler_sim.fields.F_radiative_TOA .* coupler_sim.Δt_cpl) .+ ccs.toa_net_source[end] # ∫ J / m^2 dA
+                    sum(coupler_sim.fields.F_radiative_TOA .* coupler_sim.Δt_cpl) * 1e-18 .+ ccs.toa_net_source[end]  # ∫ J / m^2 dA * 1e-18
             end
             push!(ccs.toa_net_source, radiation_sources_accum)
 
             # save atmos
             previous = getproperty(ccs, sim_name)
-            current = sum(Interfacer.get_field(sim, Val(:energy))) # # ∫ J / m^3 dV
+            current = sum(Interfacer.get_field(sim, Val(:energy))) * 1e-18 # # ∫ J / m^3 dV * 1e-18
 
-            push!(previous, current)
+            push!(previous, current )
             total += current + radiation_sources_accum
 
         elseif sim isa Interfacer.SurfaceModelSimulation || sim isa Interfacer.SurfaceStub
@@ -123,10 +123,12 @@ function check_conservation!(
                 current = FT(0)
             else
                 previous = getproperty(ccs, sim_name)
-                current = sum(Interfacer.get_field(sim, Val(:energy)) .* area_fraction) # # ∫ J / m^3 dV
+                current = sum(Interfacer.get_field(sim, Val(:energy)) .* area_fraction) * 1e-18# # ∫ J / m^3 dV * 1e-18
             end
             push!(previous, current)
-            total += current
+            # LH_f0 = 333600.0
+            # ρ_c_liq = 1000.0
+            # total += current + sum(coupler_sim.fields.res_snow_E .* LH_f0 .* ρ_c_liq) * 1e-18 # ∫ J / m^2 dA * 1e-18
         end
 
     end
@@ -210,8 +212,8 @@ Determines the total water content gain/loss of a surface from the begining of t
 """
 function surface_water_gain_from_rates(cs::Interfacer.CoupledSimulation)
     evaporation = cs.fields.F_turb_moisture # kg / m^2 / s / layer depth
-    precipitation_l = cs.fields.P_liq
-    precipitation_s = cs.fields.P_snow
+    precipitation_l = .- cs.fields.P_liq
+    precipitation_s = .- cs.fields.P_snow
     @. -(evaporation + precipitation_l + precipitation_s) * cs.Δt_cpl # kg / m^2 / layer depth
 end
 

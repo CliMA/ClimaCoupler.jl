@@ -69,7 +69,7 @@ get_field(s::TestLand, ::Val{:area_fraction}) = ones(s.i.space) .* 0.25
         F_turb_moisture = Fields.zeros(space),
     )
     @. cf.F_radiative_TOA = 200
-    @. cf.P_liq = -100
+    @. cf.P_liq = .- 100
 
     # init
     cs = Interfacer.CoupledSimulation{FT}(
@@ -86,6 +86,8 @@ get_field(s::TestLand, ::Val{:area_fraction}) = ones(s.i.space) .* 0.25
         model_sims, # model_sims
         (;), # mode
         (), # diagnostics
+        (;),
+        (;)
     )
 
     # set non-zero radiation and precipitation
@@ -94,8 +96,8 @@ get_field(s::TestLand, ::Val{:area_fraction}) = ones(s.i.space) .* 0.25
     Δt = cs.Δt_cpl
 
     # analytical solution
-    tot_energy_an = sum(F_r .* 3Δt .+ 1e6 .* 1.25)
-    tot_water_an = sum(.-P .* 3Δt .* 0.5 .+ Fields.ones(space))
+    tot_energy_an = sum(F_r .* 3Δt .+ 1e6 .* 1.25) * 1e-18 # scaled by 1e-18 as in the ConservationChecker
+    tot_water_an = sum( .- P .* 3Δt .* 0.5 .+ Fields.ones(space))
 
     # run check_conservation!
     check_conservation!(cs, runtime_check = true)
@@ -163,6 +165,8 @@ end
         model_sims, # model_sims
         (;), # mode
         (), # diagnostics
+        (;),
+        (;),
     )
 
     tot_energy, tot_water = check_conservation!(cs)

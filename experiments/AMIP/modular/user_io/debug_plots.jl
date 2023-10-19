@@ -86,3 +86,38 @@ plot_field_names(sim::SurfaceModelSimulation) = (:area_fraction, :surface_temper
 plot_field_names(sim::BucketSimulation) =
     (:area_fraction, :surface_temperature, :surface_humidity, :air_density, :σS, :Ws, :W)
 plot_field_names(sim::ClimaAtmosSimulation) = (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)
+
+
+#=
+
+# reset land
+function reset_land!(land_sim; W = 0, Ws = 0, σS = 0, T = 310, P_liq = 0, P_snow = 0, R_n = 0, evaporation = 0, T_sfc = 310, q_sfc = 0, turbulent_energy_flux = 0, α_sfc = 0.5, ρ_sfc = 1)
+    land_sim.integrator.u.bucket.W .= W
+    land_sim.integrator.u.bucket.Ws .= Ws
+    land_sim.integrator.u.bucket.σS .=  σS
+    land_sim.integrator.u.bucket.T .=  T
+
+    land_sim.integrator.p.bucket.P_liq .= P_liq # 0.001 :( - increases W
+    land_sim.integrator.p.bucket.P_snow .= P_snow # 0.001 :( - increases σS
+    land_sim.integrator.p.bucket.R_n .= R_n # :) 100 - decreases T
+    land_sim.integrator.p.bucket.evaporation .= evaporation # :| 0.001 decreases W (how can this be negative? - I guess this should be tapered by beta? Negativity checks)
+    land_sim.integrator.p.bucket.T_sfc .= T_sfc
+    land_sim.integrator.p.bucket.q_sfc .= q_sfc
+    land_sim.integrator.p.bucket.turbulent_energy_flux .= turbulent_energy_flux # :) 100 - decreases T
+    land_sim.integrator.p.bucket.α_sfc .= α_sfc
+    land_sim.integrator.p.bucket.ρ_sfc .= ρ_sfc
+end
+
+
+# init land
+reset_land!(land_sim; W=0.0, σS = 0.01)
+debug(cs)
+
+# flux calculation
+land_sim.integrator.p.bucket.evaporation .= 0.001 .* ClimaLSM.surface_evaporative_scaling(land_sim.model, land_sim.integrator.u, land_sim.integrator.p)
+
+# step land
+step!(land_sim, land_sim.integrator.t + Δt_cpl)
+
+debug(cs)
+=#

@@ -59,11 +59,11 @@ function update_field!(sim::BucketSimulation, ::Val{:radiative_energy_flux}, fie
 end
 function update_field!(sim::BucketSimulation, ::Val{:liquid_precipitation}, field)
     ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
-    parent(sim.integrator.p.bucket.P_liq) .= parent(field ./ ρ_liq)
+    parent(sim.integrator.p.bucket.P_liq) .= parent(.- field ./ ρ_liq)
 end
 function update_field!(sim::BucketSimulation, ::Val{:snow_precipitation}, field)
     ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
-    parent(sim.integrator.p.bucket.P_snow) .= parent(field ./ ρ_liq)
+    parent(sim.integrator.p.bucket.P_snow) .= parent(.- field ./ ρ_liq)
 end
 
 function update_field!(sim::BucketSimulation, ::Val{:air_density}, field)
@@ -145,9 +145,9 @@ end
     get_land_temp_from_state(land_sim, u)
 Returns the surface temperature of the earth, computed from the state u.
 """
-function get_land_temp_from_state(land_sim, u)
+function get_land_temp_from_state(land_sim::BucketSimulation, u)
     # required by viz_explorer.jl
-    return ClimaLSM.surface_temperature(land_sim.model, u, land_sim.integrator.p, land_sim.integrator.t)
+    ClimaLSM.Domains.top_center_to_surface(u.bucket.T)
 end
 
 """

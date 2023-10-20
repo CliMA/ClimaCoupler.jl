@@ -128,7 +128,7 @@ function check_conservation!(
             push!(previous, current)
             # LH_f0 = 333600.0
             # ρ_c_liq = 1000.0
-            # total += current + sum(coupler_sim.fields.res_snow_E .* LH_f0 .* ρ_c_liq) * 1e-18 # ∫ J / m^2 dA * 1e-18
+            total += current #+ sum(coupler_sim.fields.res_snow_E .* LH_f0 .* ρ_c_liq) * 1e-18 # ∫ J / m^2 dA * 1e-18
         end
 
     end

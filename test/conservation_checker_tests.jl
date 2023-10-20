@@ -97,7 +97,7 @@ get_field(s::TestLand, ::Val{:area_fraction}) = ones(s.i.space) .* 0.25
 
     # analytical solution
     tot_energy_an = sum(F_r .* 3Δt .+ 1e6 .* 1.25) * 1e-18 # scaled by 1e-18 as in the ConservationChecker
-    tot_water_an = sum( .- P .* 3Δt .* 0.5 .+ Fields.ones(space))
+    tot_water_an = sum( P .* 3Δt .* 0.5 .+ Fields.ones(space))
 
     # run check_conservation!
     check_conservation!(cs, runtime_check = true)

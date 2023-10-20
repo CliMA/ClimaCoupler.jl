@@ -28,4 +28,4 @@ post_process: false
 anim: true
 hourly_checkpoint: true
 apply_limiter: false
-surface_setup: PrescribedSurface
+surface_setup: "PrescribedSurface"

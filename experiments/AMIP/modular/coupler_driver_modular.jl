@@ -118,6 +118,7 @@ include("components/ocean/eisenman_seaice_init.jl")
 ## helpers for user-specified IO
 include("user_io/user_diagnostics.jl")
 include("user_io/user_logging.jl")
+include("general_callbacks.jl")
 
 ## coupler defaults
 include("cli_options.jl")
@@ -439,6 +440,9 @@ if energy_check
     conservation_checks = (; energy = EnergyConservationCheck(model_sims), water = WaterConservationCheck(model_sims))
 end
 
+dir_paths = (; output = COUPLER_OUTPUT_DIR, artifacts = COUPLER_ARTIFACTS_DIR, )
+callbacks = (; twelvehourly_checkpoint = HourlyCallback(dt = FT(24), func = checkpoint_func, ref_date = [date]), )
+
 ## coupler simulation
 cs = CoupledSimulation{FT}(
     comms_ctx,
@@ -454,6 +458,8 @@ cs = CoupledSimulation{FT}(
     model_sims,
     mode_specifics,
     diagnostics,
+    callbacks,
+    dir_paths,
 );
 
 #=
@@ -594,19 +600,28 @@ function solve_coupler!(cs)
 
         import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # radiative and/or turbulent
 
-        ## monthly callbacks
+        # ## monthly callbacks
+        # if trigger_callback(cs, Monthly())
+        #     ## step to the next calendar month
+        #     cs.dates.date1[1] += Dates.Month(1)
+        #     ## checkpoint model state
+        #     if monthly_checkpoint
+        #         for sim in cs.model_sims
+        #             if get_model_state_vector(sim) !== nothing
+        #                 checkpoint_model_state(sim, comms_ctx, Int(t), output_dir = COUPLER_ARTIFACTS_DIR)
+        #             end
+        #         end
+        #     end
+        # end
+
         if trigger_callback(cs, Monthly())
             ## step to the next calendar month
             cs.dates.date1[1] += Dates.Month(1)
             ## checkpoint model state
-            if monthly_checkpoint
-                for sim in cs.model_sims
-                    if get_model_state_vector(sim) !== nothing
-                        checkpoint_model_state(sim, comms_ctx, Int(t), output_dir = COUPLER_ARTIFACTS_DIR)
-                    end
-                end
-            end
         end
+
+        hourly_checkpoint ? trigger_callback!(cs, cs.callbacks.twelvehourly_checkpoint) : nothing # TODO: add others and loop
+
 
     end
     @show walltime

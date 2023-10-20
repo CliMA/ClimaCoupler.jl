@@ -1,6 +1,6 @@
 run_name: "amip_longrun_target"
 anim: true
-dt_cpl: 100
+dt_cpl: 10000000000
 energy_check: false
 mode_name: "amip"
 mono_surface: false

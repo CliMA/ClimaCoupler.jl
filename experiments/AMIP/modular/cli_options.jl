@@ -56,6 +56,8 @@ function argparse_settings()
         help = "Floating point precision  [`Float64` (default), `Float32`]"
         arg_type = String
         default = "Float64"
+        "--coupler_toml_file"
+        help = "A toml file used to overwrite the model parameters. If nothing is specified, the default parameters are used."
         # ClimaAtmos specific
         "--surface_setup"
         help = "Triggers ClimaAtmos into the coupled mode [`PrescribedSurface` (default)]" # retained here for standalone Atmos benchmarks

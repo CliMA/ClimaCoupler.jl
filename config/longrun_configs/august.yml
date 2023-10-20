@@ -29,3 +29,4 @@ anim: true
 hourly_checkpoint: true
 apply_limiter: false
 surface_setup: "PrescribedSurface"
+coupler_toml_file: "toml/august.toml"

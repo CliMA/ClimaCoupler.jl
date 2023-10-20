@@ -42,9 +42,12 @@ function get_atmos_config(coupler_dict)
         )
     end
     atmos_toml_file = coupler_dict["atmos_toml_file"]
-    if !isnothing(atmos_toml_file)
-        @info "Overwriting Atmos parameters from $atmos_toml_file"
-        atmos_config = merge(atmos_config, Dict("toml" => [joinpath(pkgdir(CA), atmos_toml_file)]))
+    coupler_toml_file = coupler_dict["coupler_toml_file"]
+    toml_file = isnothing(coupler_toml_file) ? joinpath(pkgdir(CA), atmos_toml_file) : joinpath(pkgdir(ClimaCoupler), coupler_toml_file)
+
+    if !isnothing(toml_file)
+        @info "Overwriting Atmos parameters from $toml_file"
+        atmos_config = merge(atmos_config, Dict("toml" => [toml_file]))
     end
     return atmos_config
 end

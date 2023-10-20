@@ -211,7 +211,7 @@ boundary_space = atmos_sim.domain.face_space.horizontal_space
 
 # init land-sea fraction
 land_fraction =
-    Regridder.land_fraction(FT, REGRID_DIR, comms_ctx, land_mask_data, "LSMASK", boundary_space, mono = mono_surface)
+    Regridder.land_fraction(FT, REGRID_DIR, comms_ctx, land_mask_data, "LSMASK", boundary_space, mono = mono_surface) .* FT(0) .+ FT(1)
 
 #=
 ### Land

@@ -160,6 +160,7 @@ mono_surface = config_dict["mono_surface"]
 monthly_checkpoint = config_dict["monthly_checkpoint"]
 restart_dir = config_dict["restart_dir"]
 restart_t = Int(config_dict["restart_t"])
+hourly_checkpoint = config_dict["hourly_checkpoint"]
 
 ## I/O directory setup
 if isinteractive()

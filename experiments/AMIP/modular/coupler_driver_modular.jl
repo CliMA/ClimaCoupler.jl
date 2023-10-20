@@ -198,7 +198,7 @@ Here we set initial and boundary conditions for each component model.
 This uses the `ClimaAtmos.jl` driver, with parameterization options specified in the command line arguments.
 =#
 ## init atmos model component
-atmos_sim = atmos_init(FT, config_dict_atmos);
+atmos_sim = atmos_init(FT, config_dict_atmos, comms_ctx);
 thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models
 
 #=

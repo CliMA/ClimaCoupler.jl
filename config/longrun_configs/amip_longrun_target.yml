@@ -1,6 +1,6 @@
 run_name: "amip_longrun_target"
 anim: true
-dt_cpl: 150
+dt_cpl: 100
 energy_check: false
 mode_name: "amip"
 mono_surface: false
@@ -21,4 +21,5 @@ dt_save_to_sol: "5days"
 dt_save_to_disk: "5days"
 hourly_checkpoint: true
 apply_limiter: false
-surface_setup: PrescribedSurface
+surface_setup: "PrescribedSurface"
+start_date: "19790301"

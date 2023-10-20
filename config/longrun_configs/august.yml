@@ -1,13 +1,13 @@
 run_name: "august"
 coupled: true
-start_date: "19790101"
+start_date: "19790301"
 monthly_checkpoint: true
 surface_setup: "PrescribedSurface"
 dt_cpl: 100
 energy_check: false
 mode_name: "amip"
 mono_surface: false
-vert_diff: true
+vert_diff: "true"
 moist: "equil"
 rad: "clearsky"
 precip_model: "0M"

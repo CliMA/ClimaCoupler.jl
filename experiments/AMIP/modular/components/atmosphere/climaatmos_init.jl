@@ -82,11 +82,11 @@ get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux}) =
     Fields.level(sim.integrator.p.ᶠradiation_flux, half)
 function get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation})
     ρ_liq = CAP.ρ_cloud_liq(sim.integrator.p.params)
-    sim.integrator.p.col_integrated_rain .* ρ_liq .+ sim.integrator.p.col_integrated_snow .* ρ_liq # kg/m^2/s
+    sim.integrator.p.col_integrated_rain .* ρ_liq # kg/m^2/s
 end
 function get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation})
     ρ_liq = CAP.ρ_cloud_liq(sim.integrator.p.params)
-    sim.integrator.p.col_integrated_snow .* ρ_liq  .* 0 # kg/m^2/s
+    sim.integrator.p.col_integrated_snow .* ρ_liq  # kg/m^2/s
 end
 
 get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_energy_flux}) =

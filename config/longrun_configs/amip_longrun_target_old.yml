@@ -1,6 +1,6 @@
 run_name: "amip_longrun_target"
 anim: true
-dt_cpl: 100
+dt_cpl: 150
 energy_check: false
 mode_name: "amip"
 mono_surface: false
@@ -18,8 +18,5 @@ dt: "100secs"
 t_end: "100days" # TODO this has been decreased from 140 days to avoid instability #460
 job_id: "amip_longrun_target"
 dt_save_to_sol: "5days"
-dt_save_to_disk: "5days"
-hourly_checkpoint: true
+dt_save_to_disk: "1days"
 apply_limiter: false
-surface_setup: "PrescribedSurface"
-start_date: "19790301"

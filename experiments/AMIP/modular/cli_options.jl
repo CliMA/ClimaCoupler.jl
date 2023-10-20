@@ -34,6 +34,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to checkpoint monthly"
         arg_type = Bool
         default = false
+        "--hourly_checkpoint" # TODO generalize to any frequency
+        help = "Boolean flag indicating whether to checkpoint intervals of 1 hour or multiple thereof"
+        arg_type = Bool
+        default = false
         "--restart_dir"
         help = "Directory containing restart files"
         arg_type = String

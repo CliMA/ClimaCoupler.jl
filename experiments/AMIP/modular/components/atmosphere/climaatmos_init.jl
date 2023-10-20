@@ -49,10 +49,10 @@ function get_atmos_config(coupler_dict)
     return atmos_config
 end
 
-function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
+function atmos_init(::Type{FT}, atmos_config_dict::Dict, comms_ctx) where {FT}
 
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
-    atmos_config = CA.AtmosConfig(atmos_config_dict)
+    atmos_config = CA.AtmosConfig(atmos_config_dict, comms_ctx = comms_ctx)
     integrator = CA.get_integrator(atmos_config)
     Y = integrator.u
     center_space = axes(Y.c.ρe_tot)
@@ -82,11 +82,11 @@ get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux}) =
     Fields.level(sim.integrator.p.ᶠradiation_flux, half)
 function get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation})
     ρ_liq = CAP.ρ_cloud_liq(sim.integrator.p.params)
-    sim.integrator.p.col_integrated_rain .* ρ_liq # kg/m^2/s
+    sim.integrator.p.col_integrated_rain .* ρ_liq .+ sim.integrator.p.col_integrated_snow .* ρ_liq # kg/m^2/s
 end
 function get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation})
     ρ_liq = CAP.ρ_cloud_liq(sim.integrator.p.params)
-    sim.integrator.p.col_integrated_snow .* ρ_liq  # kg/m^2/s
+    sim.integrator.p.col_integrated_snow .* ρ_liq  .* 0 # kg/m^2/s
 end
 
 get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_energy_flux}) =

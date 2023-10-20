@@ -14,4 +14,4 @@ dt_save_restart: "5days"
 precip_model: "0M"
 run_name: "interactive_debug_run"
 job_id: "interactive_debug_run"
-monthly_checkpoint: true
+hourly_checkpoint: true

@@ -215,20 +215,6 @@ land_fraction =
 ### Land
 We use `ClimaLSM.jl`'s bucket model.
 =#
-land_sim = bucket_init(
-    FT,
-    FT.(tspan),
-    config_dict["land_domain_type"],
-    config_dict["land_albedo_type"],
-    comms_ctx,
-    REGRID_DIR;
-    dt = FT(Δt_cpl),
-    space = boundary_space,
-    saveat = FT(saveat),
-    area_fraction = land_fraction,
-    date_ref = date0,
-    t_start = FT(0),
-)
 
 #=
 ### Ocean and Sea Ice
@@ -241,6 +227,23 @@ In the `SlabPlanet` mode, all ocean and sea ice are dynamical models, namely the
 @info mode_name
 if mode_name == "amip"
     @info "AMIP boundary conditions - do not expect energy conservation"
+
+    # land
+    land_sim = bucket_init(
+        FT,
+        FT.(tspan),
+        config_dict["land_domain_type"],
+        config_dict["land_albedo_type"],
+        comms_ctx,
+        REGRID_DIR;
+        dt = FT(Δt_cpl),
+        space = boundary_space,
+        saveat = FT(saveat),
+        area_fraction = land_fraction,
+        date_ref = date0,
+        t_start = FT(0),
+    )
+
 
     ## ocean
     SST_info = bcfile_info_init(
@@ -318,6 +321,24 @@ if mode_name == "amip"
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
 
 elseif mode_name == "slabplanet"
+
+    land_fraction = land_fraction .* 0
+    # land
+    land_sim = bucket_init(
+        FT,
+        FT.(tspan),
+        config_dict["land_domain_type"],
+        config_dict["land_albedo_type"],
+        comms_ctx,
+        REGRID_DIR;
+        dt = FT(Δt_cpl),
+        space = boundary_space,
+        saveat = FT(saveat),
+        area_fraction = land_fraction,
+        date_ref = date0,
+        t_start = FT(0),
+    )
+
     ## ocean
     ocean_sim = ocean_init(
         FT;

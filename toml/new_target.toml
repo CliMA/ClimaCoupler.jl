@@ -1,6 +1,6 @@
 [C_E]
 alias = "C_E"
-value = 0.088
+value = 0.044
 type = "float"
 
 [alpha_rayleigh_w]

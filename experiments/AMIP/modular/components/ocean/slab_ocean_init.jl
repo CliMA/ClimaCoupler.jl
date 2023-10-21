@@ -55,7 +55,8 @@ function slab_ocean_space_init(::Type{FT}, space, p) where {FT}
             stdev = FT(5) / FT(180) * pi
             anom = anom_ampl * exp(-((radlat - lat_0)^2 / 2stdev^2 + (radlon - lon_0)^2 / 2stdev^2))
         elseif anomaly_tropics == true
-            anom = FT(20 * cos(radlat)^4)
+            anom = FT(29) * exp(-coord.lat^2 / (2 * 26^2))
+
         end
         T_sfc = T_sfc_0 + anom
     end
@@ -71,7 +72,8 @@ function slab_ocean_rhs!(dY, Y, cache, t)
     p, F_turb_energy, F_radiative, area_fraction = cache
     FT = eltype(Y.T_sfc)
     rhs = @. -(F_turb_energy + F_radiative) / (p.h * p.ρ * p.c)
-    parent(dY.T_sfc) .= parent(rhs .* Regridder.binary_mask.(area_fraction, threshold = eps(FT)))
+    parent(dY.T_sfc) .= 0 #parent(rhs .* Regridder.binary_mask.(area_fraction, threshold = eps(FT)))
+
 
     @. cache.q_sfc = TD.q_vap_saturation_generic.(cache.thermo_params, Y.T_sfc, cache.ρ_sfc, TD.Liquid())
 end
@@ -83,7 +85,7 @@ Initializes the `DiffEq` problem, and creates a Simulation-type object containin
 """
 function ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, thermo_params, stepper = CTS.RK4()) where {FT}
 
-    params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
+    params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(271.0), FT(1e-3), FT(1e-5), FT(0.06))
 
     Y, space = slab_ocean_space_init(FT, space, params)
     cache = (

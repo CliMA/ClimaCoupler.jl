@@ -208,7 +208,7 @@ function bucket_init(
     z_0m = FT(1e-2)
     z_0b = FT(1e-3)
     κ_soil = FT(0.7)
-    ρc_soil = FT(2e6)
+    ρc_soil = FT(20e6)
     t_crit = dt # This is the timescale on which snow exponentially damps to zero, in the case where all
     # the snow would melt in time t_crit. It prevents us from having to specially time step in cases where
     # all the snow melts in a single timestep.
@@ -226,7 +226,7 @@ function bucket_init(
     anomaly_tropics = false
     hs_sfc = false
     Y.bucket.T = map(coords.subsurface) do coord
-        T_sfc_0 = FT(285.0)
+        T_sfc_0 = FT(271.0)
         radlat = coord.lat / FT(180) * pi
         ΔT = FT(0)
         if anomaly == true
@@ -239,7 +239,8 @@ function bucket_init(
         elseif hs_sfc == true
             ΔT = -FT(60) * sin(radlat)^2
         elseif anomaly_tropics == true
-            ΔT = FT(40 * cos(radlat)^4)
+            # ΔT = FT(40 * cos(radlat)^4)
+            ΔT =  FT(29) * exp(-coord.lat^2 / (2 * 26^2))
         end
         T_sfc_0 + ΔT
     end

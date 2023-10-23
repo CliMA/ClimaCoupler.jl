@@ -12,6 +12,10 @@ import ClimaCoupler.FieldExchanger: get_thermo_params
 import ClimaCoupler.Interfacer: get_field, update_field!, name, get_model_state_vector
 using StaticArrays
 
+import SurfaceFluxes as SF
+
+
+
 # the clima atmos `integrator` is now defined
 struct ClimaAtmosSimulation{P, Y, D, I} <: AtmosModelSimulation
     params::P
@@ -236,20 +240,9 @@ function modified_atmos_cache(atmos_sim, csf_sfc)
     (; zip(p_names, p_values)...)
 end
 
-"""
-    atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
 
-Computes turbulent surface fluxes using ClimaAtmos's `update_surface_conditions!`. This
-requires that we define a new temporary parameter Tuple, `new_p`, and save the new surface state
-in it. We do not want `new_p` to live in the atmospheric model permanently, because that would also
-trigger flux calculation during Atmos `step!`. We only want to trigger this once per coupling
-timestep from ClimaCoupler.
-"""
-function atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
-    new_p = get_new_cache(atmos_sim, csf)
-    CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t)
-    atmos_sim.integrator.p.sfc_conditions .= new_p.sfc_conditions
-end
+
+
 
 """
     get_thermo_params(sim::ClimaAtmosSimulation)
@@ -336,4 +329,205 @@ function dss_state!(sim::ClimaAtmosSimulation)
         buffer = Spaces.create_dss_buffer(field)
         Spaces.weighted_dss!(field, buffer)
     end
+end
+
+
+
+# DEBUG below
+
+
+
+
+"""
+    atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
+
+Computes turbulent surface fluxes using ClimaAtmos's `update_surface_conditions!`. This
+requires that we define a new temporary parameter Tuple, `new_p`, and save the new surface state
+in it. We do not want `new_p` to live in the atmospheric model permanently, because that would also
+trigger flux calculation during Atmos `step!`. We only want to trigger this once per coupling
+timestep from ClimaCoupler.
+"""
+
+function atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
+    integrator = atmos_sim.integrator
+    params = integrator.p.params
+
+    sfc_ts = integrator.p.sfc_conditions.ts
+
+    thermo_params = CAP.thermodynamics_params(params)
+
+    # set surface ts (T, rho and q)
+    new_ts = @. surface_ts(csf.ρ_sfc, csf.T_S, csf.q_sfc, thermo_params)
+    parent(sfc_ts) .= parent(new_ts)
+
+    update_surface_conditions_coupler!(integrator.u, integrator.p, integrator.t)
+end
+
+function surface_ts(ρ_sfc, T_sfc, q_sfc, thermo_params)
+    q_pt_args = (q_sfc, q_sfc .* 0, q_sfc .*0)
+    q_pt = TD.PhasePartition(q_pt_args...)
+    return TD.PhaseNonEquil_ρθq(thermo_params, ρ_sfc, T_sfc, q_pt) # nonequil surface :(
+end
+
+
+# # # function below allows changes in beta and q_sfc
+# function atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
+#     # new_p = get_new_cache(atmos_sim, csf)
+#     # CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t)
+#     # atmos_sim.integrator.p.sfc_conditions .= new_p.sfc_conditions
+#     integrator = atmos_sim.integrator
+#     params = integrator.p.params
+
+#     ᶜts = integrator.p.ᶜts
+
+#     sfc_ts = integrator.p.sfc_conditions.ts
+#     int_ts = Fields.level(integrator.p.ᶜts, 1)
+
+#     sfc_z_values = Fields.field_values(Fields.coordinate_field(sfc_ts).z)
+#     int_z_values = Fields.field_values(Fields.coordinate_field(int_ts).z)
+#     int_ts_values = Fields.field_values(int_ts)
+
+#     int_u_values = Fields.field_values(Fields.level(integrator.u.c.uₕ, 1))
+
+#     int_local_geometry = Fields.local_geometry_field(Fields.level(ᶜts, 1))
+#     int_local_geometry_values = Fields.field_values(int_local_geometry)
+
+#     thermo_params = CAP.thermodynamics_params(params)
+#     surface_params = CAP.surface_fluxes_params(params)
+
+#     # set surface ts (T, rho and q)
+#     new_ts = @. surface_ts(csf.ρ_sfc, csf.T_S, csf.q_sfc, thermo_params)
+#     parent(sfc_ts) .= parent(new_ts)
+
+#     # set surface beta
+#     beta = ones(axes(sfc_ts))
+#     parent(beta) .= parent(csf.beta) # we can;t pass beta to atmos
+#     beta_values = Fields.field_values(beta)
+
+#     sfc_ts_values = Fields.field_values(sfc_ts)
+
+#     parameterization = integrator.p.sfc_setup.parameterization
+#     sc_val = @. surface_conditions_coupler(
+#         sfc_ts_values,
+#         sfc_z_values,
+#         int_ts_values,
+#         ClimaAtmos.SurfaceConditions.projected_vector_data(CT1, int_u_values, int_local_geometry_values),
+#         ClimaAtmos.SurfaceConditions.projected_vector_data(CT2, int_u_values, int_local_geometry_values),
+#         int_z_values,
+#         surface_params,
+#         parameterization.z0m,
+#         parameterization.z0b,
+#         beta_values,
+#         # Fields.field_values(beta),
+#     )
+#     sc = similar(sfc_ts, SF.SurfaceFluxConditions{FT})
+#     parent(sc) .= parent(sc_val)
+
+#     surface_local_geometry = Fields.level(Fields.local_geometry_field(integrator.u.f), Fields.half)
+#     @. integrator.p.sfc_conditions =  ClimaAtmos.SurfaceConditions.atmos_surface_conditions(
+#         sc,
+#         sfc_ts,
+#         surface_local_geometry,
+#         integrator.p.atmos,
+#         params,
+#     )
+
+#     # update_surface_conditions_coupler!(integrator.u, integrator.p, integrator.t) # ideally we'd use this to calculate the flues, but this is not possible because we cannot set beta or q_sfc
+# end
+
+# function surface_conditions_coupler(
+#     sfc_ts_values,
+#     sfc_z_values,
+#     int_ts_values,
+#     interior_u,
+#     interior_v,
+#     interior_z,
+#     surface_params,
+#     z0m,
+#     z0b,
+#     beta,
+# )
+#     FT = eltype(sfc_ts_values)
+#     surface_values =
+#         SF.SurfaceValues(sfc_z_values, StaticArrays.SVector(FT(0), FT(0)), sfc_ts_values)
+#     interior_values = SF.InteriorValues(
+#         interior_z,
+#         StaticArrays.SVector(interior_u, interior_v),
+#         int_ts_values,
+#     )
+
+
+#     surface_inputs = SF.ValuesOnly(
+#         interior_values,
+#         surface_values,
+#         z0m,#(parameterization.z0m),
+#         z0b,# parameterization.z0b),
+#         FT(1), # gustiness
+#         beta, # beta
+#     )
+#     return SF.surface_conditions(surface_params, surface_inputs)
+# end
+
+
+# adapted atmos init cond setter
+using ClimaAtmos
+import ClimaAtmos.SurfaceConditions: update_surface_conditions!
+
+function update_surface_conditions_coupler!(Y, p, t)
+    # Need to extract the field values so that we can do
+    # a DataLayout broadcast rather than a Field broadcast
+    # because we are mixing surface and interior fields
+    # if isnothing(p.sfc_setup)
+    #     p.is_init[] && set_dummy_surface_conditions!(p)
+    #     return
+    # end
+
+    sfc_local_geometry_values = Fields.field_values(
+        Fields.level(Fields.local_geometry_field(Y.f), Fields.half),
+    )
+    int_local_geometry_values =
+        Fields.field_values(Fields.level(Fields.local_geometry_field(Y.c), 1))
+    (; ᶜts, ᶜu, sfc_conditions, params, sfc_setup, atmos) = p
+    int_ts_values = Fields.field_values(Fields.level(ᶜts, 1))
+    int_u_values = Fields.field_values(Fields.level(ᶜu, 1))
+    int_z_values =
+        Fields.field_values(Fields.level(Fields.coordinate_field(Y.c).z, 1))
+    sfc_conditions_values = Fields.field_values(sfc_conditions)
+    wrapped_sfc_setup = ClimaAtmos.SurfaceConditions.sfc_setup_wrapper(sfc_setup)
+    sfc_temp_var =
+        p.atmos.surface_model isa ClimaAtmos.PrognosticSurfaceTemperature ?
+        (; sfc_prognostic_temp = Fields.field_values(Y.sfc.T)) : (;)
+    @. sfc_conditions_values = ClimaAtmos.SurfaceConditions.surface_state_to_conditions(
+        ClimaAtmos.SurfaceConditions.surface_state(
+            wrapped_sfc_setup,
+            sfc_local_geometry_values,
+            int_z_values,
+            t,
+        ),
+        sfc_local_geometry_values,
+        int_ts_values,
+        ClimaAtmos.SurfaceConditions.projected_vector_data(CT1, int_u_values, int_local_geometry_values),
+        ClimaAtmos.SurfaceConditions.projected_vector_data(CT2, int_u_values, int_local_geometry_values),
+        int_z_values,
+        params,
+        atmos,
+        sfc_temp_var...,
+        )
+    # @info "passed check!! :)"
+    return nothing
+end
+
+# overwrite this function
+function ClimaAtmos.SurfaceConditions.update_surface_conditions!(Y, p, t)
+    if t ≈ 0.0
+        update_surface_conditions_coupler!(Y, p, t)
+        @info "init sfc cond :)"
+        @info t
+    # else
+    #     @info "ignoring atmos"
+    #     @info t
+
+    end
+
+    return nothing
 end

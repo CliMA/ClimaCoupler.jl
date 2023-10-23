@@ -1,4 +1,4 @@
-run_name: "amip_longrun_target"
+run_name: "amip_longrun_target_nocouple"
 anim: true
 dt_cpl: 8639800
 energy_check: false
@@ -16,11 +16,11 @@ rayleigh_sponge: true
 alpha_rayleigh_uh: 0
 dt: "100secs"
 t_end: "100days" # TODO this has been decreased from 140 days to avoid instability #460
-job_id: "amip_longrun_target"
+job_id: "amip_longrun_target_nocouple"
 dt_save_to_sol: "5days"
 dt_save_to_disk: "5days"
 hourly_checkpoint: true
 apply_limiter: false
 surface_setup: "PrescribedSurface"
 start_date: "19790301"
-coupler_toml_file: "toml/amip_longrun_target.toml"
+coupler_toml_file: "toml/amip_longrun_target_nocouple.toml"

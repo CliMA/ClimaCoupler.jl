@@ -45,7 +45,7 @@ function slab_ocean_space_init(::Type{FT}, space, p) where {FT}
 
         T_sfc_0 = FT(p.T_init) #- FT(275) # close to the average of T_1 in atmos
         anomaly = false
-        anomaly_tropics = false
+        anomaly_tropics = true
         anom = FT(0)
         radlat = coord.lat / FT(180) * pi
         if anomaly == true

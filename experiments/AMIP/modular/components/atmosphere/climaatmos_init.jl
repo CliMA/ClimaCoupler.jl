@@ -360,13 +360,16 @@ function atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
     # new_ts = @. surface_ts(csf.ρ_sfc, csf.T_S, csf.q_sfc, thermo_params)
     # parent(sfc_ts) .= parent(new_ts)
 
-    update_surface_conditions_coupler!(integrator.u, integrator.p, integrator.t)
+    # update_surface_conditions_coupler!(integrator.u, integrator.p, integrator.t)
 end
 
 function surface_ts(ρ_sfc, T_sfc, q_sfc, thermo_params)
-    q_pt_args = (q_sfc, q_sfc .* 0, q_sfc .*0)
-    q_pt = TD.PhasePartition(q_pt_args...)
-    return TD.PhaseNonEquil_ρθq(thermo_params, ρ_sfc, T_sfc, q_pt) # nonequil surface :(
+    # Assume that the surface is water with saturated air directly
+    # above it.
+    phase = TD.Liquid()
+    q_vap = TD.q_vap_saturation_generic(thermo_params, T_sfc, ρ_sfc, phase)
+    q = TD.PhasePartition(q_vap)
+    return TD.PhaseNonEquil_ρTq(thermo_params, ρ_sfc, T_sfc, q) # nonequil surface :(
 end
 
 
@@ -482,6 +485,8 @@ function update_surface_conditions_coupler!(Y, p, t)
     #     return
     # end
 
+    set_precomputed_quantities_coupler!(Y, p, t)
+
     sfc_local_geometry_values = Fields.field_values(
         Fields.level(Fields.local_geometry_field(Y.f), Fields.half),
     )
@@ -517,17 +522,62 @@ function update_surface_conditions_coupler!(Y, p, t)
     return nothing
 end
 
-# overwrite this function
-function ClimaAtmos.SurfaceConditions.update_surface_conditions!(Y, p, t)
-    if t ≈ 0.0
-        update_surface_conditions_coupler!(Y, p, t)
-        @info "init sfc cond :)"
-        @info t
-    # else
-    #     @info "ignoring atmos"
-    #     @info t
+# # overwrite this function
+# function ClimaAtmos.SurfaceConditions.update_surface_conditions!(Y, p, t)
+#     if t ≈ 0.0
 
-    end
+#         set_precomputed_quantities_coupler!(Y, p, t)
+#         update_surface_conditions_coupler!(Y, p, t)
+#         @info "init sfc cond :)"
+#         @info t
+#     # else
+#     #     @info "ignoring atmos"
+#     #     @info t
+#     end
 
-    return nothing
-end
+#     return nothing
+# end
+
+
+# function set_precomputed_quantities_coupler!(Y, p, t)
+
+#     (; energy_form, moisture_model, turbconv_model) = p.atmos
+#     thermo_params = CAP.thermodynamics_params(p.params)
+#     n = CA.n_mass_flux_subdomains(turbconv_model)
+#     thermo_args = (thermo_params, energy_form, moisture_model)
+#     (; ᶜspecific, ᶜu, ᶠu³, ᶜK, ᶜts, ᶜp, ᶜΦ) = p
+#     ᶠuₕ³ = p.ᶠtemp_CT3
+
+#     @. ᶜspecific = CA.specific_gs(Y.c)
+#     CA.set_ᶠuₕ³!(ᶠuₕ³, Y)
+
+#     # TODO: We might want to move this to dss! (and rename dss! to something
+#     # like enforce_constraints!).
+#     CA.set_velocity_at_surface!(Y, ᶠuₕ³, turbconv_model)
+
+#     CA.set_velocity_quantities!(ᶜu, ᶠu³, ᶜK, Y.f.u₃, Y.c.uₕ, ᶠuₕ³)
+#     if n > 0
+#         # TODO: In the following increments to ᶜK, we actually need to add
+#         # quantities of the form ᶜρaχ⁰ / ᶜρ⁰ and ᶜρaχʲ / ᶜρʲ to ᶜK, rather than
+#         # quantities of the form ᶜρaχ⁰ / ᶜρ and ᶜρaχʲ / ᶜρ. However, we cannot
+#         # compute ᶜρ⁰ and ᶜρʲ without first computing ᶜts⁰ and ᶜtsʲ, both of
+#         # which depend on the value of ᶜp, which in turn depends on ᶜts. Since
+#         # ᶜts depends on ᶜK (at least when the energy_form is TotalEnergy), this
+#         # means that the amount by which ᶜK needs to be incremented is a
+#         # function of ᶜK itself. So, unless we run a nonlinear solver here, this
+#         # circular dependency will prevent us from computing the exact value of
+#         # ᶜK. For now, we will make the anelastic approximation ᶜρ⁰ ≈ ᶜρʲ ≈ ᶜρ.
+#         # add_sgs_ᶜK!(ᶜK, Y, ᶜρa⁰, ᶠu₃⁰, turbconv_model)
+#         # @. ᶜK += Y.c.sgs⁰.ρatke / Y.c.ρ
+#         # TODO: We should think more about these increments before we use them.
+#     end
+#     @. ᶜts = CA.ts_gs(thermo_args..., ᶜspecific, ᶜK, ᶜΦ, Y.c.ρ)
+#     @. ᶜp = TD.air_pressure(thermo_params, ᶜts)
+
+#     if energy_form isa CA.TotalEnergy
+#         (; ᶜh_tot) = p
+#         @. ᶜh_tot =
+#             TD.total_specific_enthalpy(thermo_params, ᶜts, ᶜspecific.e_tot)
+#     end
+
+# end

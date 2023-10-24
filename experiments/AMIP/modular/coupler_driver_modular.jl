@@ -90,8 +90,7 @@ import ClimaCoupler.Interfacer:
     LandModelSimulation,
     OceanModelSimulation,
     get_field,
-    update_field!,
-    update_sim!
+    update_field!
 import ClimaCoupler.FluxCalculator:
     PartitionedStateFluxes,
     CombinedStateFluxes,

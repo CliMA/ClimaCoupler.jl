@@ -23,4 +23,4 @@ hourly_checkpoint: true
 apply_limiter: false
 surface_setup: "DefaultMoninObukhov"
 start_date: "19790301"
-coupler_toml_file: "toml/amip_longrun_target_nocouple.toml"
+coupler_toml_file: "toml/amip_longrun_target.toml"

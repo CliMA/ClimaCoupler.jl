@@ -15,5 +15,5 @@ anim: true
 apply_limiter: false
 job_id: "slabplanet_default_longrun"
 coupler_toml_file: "toml/new_target.toml"
-surface_setup: "DefaultMoninObukhov"
+surface_setup: "PrescribedSurface"
 land_albedo_type: "function"

@@ -21,7 +21,7 @@ dt_save_to_sol: "5days"
 dt_save_to_disk: "5days"
 hourly_checkpoint: true
 apply_limiter: false
-surface_setup: "DefaultMoninObukhov"
+surface_setup: "PrescribedSurface"
 land_albedo_type: "function"
 start_date: "19790301"
 coupler_toml_file: "toml/amip_longrun_target.toml"

@@ -1,19 +1,22 @@
-run_name: "new_target"
-anim: true
-dt_cpl: 150
-energy_check: false
-mode_name: "amip"
-mono_surface: false
-moist: "dry"
-dt: "150secs"
-t_end: "200days" # TODO this has been decreased from 140 days to avoid instability #460
-job_id: "new_target"
-dt_save_to_sol: "5days"
-dt_save_to_disk: "5days"
-apply_limiter: false
-hourly_checkpoint: true
+moist: "equil"
+vert_diff: "true"
+rad: "gray"
+energy_check: true
+mode_name: "slabplanet"
+t_end: "10days"
+dt_save_to_sol: "0.5days"
+dt_cpl: 400
+dt: "400secs"
+mono_surface: true
 turb_flux_partition: "CombinedStateFluxes"
-atmos_config_file: "config/longrun_configs/longrun_aquaplanet_rhoe_equilmoist_nz63_0M_55km_rs35km_clearsky_tvinsolation.yml"
-coupler_toml_file: "toml/new_target.toml"
+h_elem: 4
+dt_save_restart: "5days"
+precip_model: "0M"
+run_name: "up_const_T_coupler_up" #"interactive_debug_run_gray_noTSupdate_set_precomp"
+job_id: "up_const_T_coupler_up" #"interactive_debug_run_gray_noTSupdate_set_precomp"
+monthly_checkpoint: true
+hourly_checkpoint: true
 surface_setup: "PrescribedSurface"
 start_date: "19790301"
+coupler_toml_file: "toml/new_target.toml"
+land_albedo_type: "function"

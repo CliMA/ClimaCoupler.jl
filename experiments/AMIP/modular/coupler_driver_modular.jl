@@ -462,7 +462,7 @@ if energy_check
 end
 
 dir_paths = (; output = COUPLER_OUTPUT_DIR, artifacts = COUPLER_ARTIFACTS_DIR, )
-callbacks = (; twelvehourly_checkpoint = HourlyCallback(dt = FT(24), func = checkpoint_func, ref_date = [date]), )
+callbacks = (; twelvehourly_checkpoint = HourlyCallback(dt = FT(48), func = checkpoint_func, ref_date = [date]), )
 
 ## coupler simulation
 cs = CoupledSimulation{FT}(

@@ -29,4 +29,5 @@ anim: true
 hourly_checkpoint: true
 apply_limiter: false
 surface_setup: "PrescribedSurface"
+land_albedo_type: "function"
 coupler_toml_file: "toml/august.toml"

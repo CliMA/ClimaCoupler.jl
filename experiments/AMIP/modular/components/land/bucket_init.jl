@@ -195,7 +195,7 @@ function bucket_init(
     elseif albedo_type == "function" # Use prescribed function of lat/lon for surface albedo
         function α_sfc(coordinate_point)
             (; lat, long) = coordinate_point
-            return typeof(lat)(0.4)
+            return typeof(lat)(0.38)
         end
         albedo = BulkAlbedoFunction{FT}(α_snow, α_sfc)
     else

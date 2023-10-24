@@ -347,30 +347,41 @@ in it. We do not want `new_p` to live in the atmospheric model permanently, beca
 trigger flux calculation during Atmos `step!`. We only want to trigger this once per coupling
 timestep from ClimaCoupler.
 """
-
 function atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
-    integrator = atmos_sim.integrator
-    params = integrator.p.params
 
-    sfc_ts = integrator.p.sfc_conditions.ts
+    csf.z0m_S .= 1.0e-5
+    csf.z0b_S .= 1.0e-5
+    csf.beta .= 1
+    csf = merge(csf, (;q_sfc = nothing))
 
-    thermo_params = CAP.thermodynamics_params(params)
-
-    # set surface ts (T, rho and q)
-    # new_ts = @. surface_ts(csf.ρ_sfc, csf.T_S, csf.q_sfc, thermo_params)
-    # parent(sfc_ts) .= parent(new_ts)
-
-    # update_surface_conditions_coupler!(integrator.u, integrator.p, integrator.t)
+    new_p = get_new_cache(atmos_sim, csf)
+    CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t)
+    atmos_sim.integrator.p.sfc_conditions .= new_p.sfc_conditions
 end
 
-function surface_ts(ρ_sfc, T_sfc, q_sfc, thermo_params)
-    # Assume that the surface is water with saturated air directly
-    # above it.
-    phase = TD.Liquid()
-    q_vap = TD.q_vap_saturation_generic(thermo_params, T_sfc, ρ_sfc, phase)
-    q = TD.PhasePartition(q_vap)
-    return TD.PhaseNonEquil_ρTq(thermo_params, ρ_sfc, T_sfc, q) # nonequil surface :(
-end
+# function atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
+#     integrator = atmos_sim.integrator
+#     params = integrator.p.params
+
+#     sfc_ts = integrator.p.sfc_conditions.ts
+
+#     thermo_params = CAP.thermodynamics_params(params)
+
+#     # set surface ts (T, rho and q)
+#     # new_ts = @. surface_ts(csf.ρ_sfc, csf.T_S, csf.q_sfc, thermo_params)
+#     # parent(sfc_ts) .= parent(new_ts)
+
+#     # update_surface_conditions_coupler!(integrator.u, integrator.p, integrator.t)
+# end
+
+# function surface_ts(ρ_sfc, T_sfc, q_sfc, thermo_params)
+#     # Assume that the surface is water with saturated air directly
+#     # above it.
+#     phase = TD.Liquid()
+#     q_vap = TD.q_vap_saturation_generic(thermo_params, T_sfc, ρ_sfc, phase)
+#     q = TD.PhasePartition(q_vap)
+#     return TD.PhaseNonEquil_ρTq(thermo_params, ρ_sfc, T_sfc, q) # nonequil surface :(
+# end
 
 
 # # # function below allows changes in beta and q_sfc
@@ -472,55 +483,55 @@ end
 # end
 
 
-# adapted atmos init cond setter
-using ClimaAtmos
-import ClimaAtmos.SurfaceConditions: update_surface_conditions!
+# # adapted atmos init cond setter
+# using ClimaAtmos
+# import ClimaAtmos.SurfaceConditions: update_surface_conditions!
 
-function update_surface_conditions_coupler!(Y, p, t)
-    # Need to extract the field values so that we can do
-    # a DataLayout broadcast rather than a Field broadcast
-    # because we are mixing surface and interior fields
-    # if isnothing(p.sfc_setup)
-    #     p.is_init[] && set_dummy_surface_conditions!(p)
-    #     return
-    # end
+# function update_surface_conditions_coupler!(Y, p, t)
+#     # Need to extract the field values so that we can do
+#     # a DataLayout broadcast rather than a Field broadcast
+#     # because we are mixing surface and interior fields
+#     # if isnothing(p.sfc_setup)
+#     #     p.is_init[] && set_dummy_surface_conditions!(p)
+#     #     return
+#     # end
 
-    set_precomputed_quantities_coupler!(Y, p, t)
+#     set_precomputed_quantities_coupler!(Y, p, t)
 
-    sfc_local_geometry_values = Fields.field_values(
-        Fields.level(Fields.local_geometry_field(Y.f), Fields.half),
-    )
-    int_local_geometry_values =
-        Fields.field_values(Fields.level(Fields.local_geometry_field(Y.c), 1))
-    (; ᶜts, ᶜu, sfc_conditions, params, sfc_setup, atmos) = p
-    int_ts_values = Fields.field_values(Fields.level(ᶜts, 1))
-    int_u_values = Fields.field_values(Fields.level(ᶜu, 1))
-    int_z_values =
-        Fields.field_values(Fields.level(Fields.coordinate_field(Y.c).z, 1))
-    sfc_conditions_values = Fields.field_values(sfc_conditions)
-    wrapped_sfc_setup = ClimaAtmos.SurfaceConditions.sfc_setup_wrapper(sfc_setup)
-    sfc_temp_var =
-        p.atmos.surface_model isa ClimaAtmos.PrognosticSurfaceTemperature ?
-        (; sfc_prognostic_temp = Fields.field_values(Y.sfc.T)) : (;)
-    @. sfc_conditions_values = ClimaAtmos.SurfaceConditions.surface_state_to_conditions(
-        ClimaAtmos.SurfaceConditions.surface_state(
-            wrapped_sfc_setup,
-            sfc_local_geometry_values,
-            int_z_values,
-            t,
-        ),
-        sfc_local_geometry_values,
-        int_ts_values,
-        ClimaAtmos.SurfaceConditions.projected_vector_data(CT1, int_u_values, int_local_geometry_values),
-        ClimaAtmos.SurfaceConditions.projected_vector_data(CT2, int_u_values, int_local_geometry_values),
-        int_z_values,
-        params,
-        atmos,
-        sfc_temp_var...,
-        )
-    # @info "passed check!! :)"
-    return nothing
-end
+#     sfc_local_geometry_values = Fields.field_values(
+#         Fields.level(Fields.local_geometry_field(Y.f), Fields.half),
+#     )
+#     int_local_geometry_values =
+#         Fields.field_values(Fields.level(Fields.local_geometry_field(Y.c), 1))
+#     (; ᶜts, ᶜu, sfc_conditions, params, sfc_setup, atmos) = p
+#     int_ts_values = Fields.field_values(Fields.level(ᶜts, 1))
+#     int_u_values = Fields.field_values(Fields.level(ᶜu, 1))
+#     int_z_values =
+#         Fields.field_values(Fields.level(Fields.coordinate_field(Y.c).z, 1))
+#     sfc_conditions_values = Fields.field_values(sfc_conditions)
+#     wrapped_sfc_setup = ClimaAtmos.SurfaceConditions.sfc_setup_wrapper(sfc_setup)
+#     sfc_temp_var =
+#         p.atmos.surface_model isa ClimaAtmos.PrognosticSurfaceTemperature ?
+#         (; sfc_prognostic_temp = Fields.field_values(Y.sfc.T)) : (;)
+#     @. sfc_conditions_values = ClimaAtmos.SurfaceConditions.surface_state_to_conditions(
+#         ClimaAtmos.SurfaceConditions.surface_state(
+#             wrapped_sfc_setup,
+#             sfc_local_geometry_values,
+#             int_z_values,
+#             t,
+#         ),
+#         sfc_local_geometry_values,
+#         int_ts_values,
+#         ClimaAtmos.SurfaceConditions.projected_vector_data(CT1, int_u_values, int_local_geometry_values),
+#         ClimaAtmos.SurfaceConditions.projected_vector_data(CT2, int_u_values, int_local_geometry_values),
+#         int_z_values,
+#         params,
+#         atmos,
+#         sfc_temp_var...,
+#         )
+#     # @info "passed check!! :)"
+#     return nothing
+# end
 
 # # overwrite this function
 # function ClimaAtmos.SurfaceConditions.update_surface_conditions!(Y, p, t)

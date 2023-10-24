@@ -28,6 +28,6 @@ post_process: false
 anim: true
 hourly_checkpoint: true
 apply_limiter: false
-surface_setup: "PrescribedSurface"
+surface_setup: "DefaultMoninObukhov"
 land_albedo_type: "function"
 coupler_toml_file: "toml/august.toml"

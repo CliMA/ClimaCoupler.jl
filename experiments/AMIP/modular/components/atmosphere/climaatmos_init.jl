@@ -354,9 +354,11 @@ function atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
     csf.beta .= 1
     csf = merge(csf, (;q_sfc = nothing))
 
-    new_p = get_new_cache(atmos_sim, csf)
-    CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t)
-    atmos_sim.integrator.p.sfc_conditions .= new_p.sfc_conditions
+    if isnothing(atmos_sim.integrator.p.sfc_setup) # trigger flux calculation if not done in Atmos internally
+        new_p = get_new_cache(atmos_sim, csf)
+        CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t)
+        atmos_sim.integrator.p.sfc_conditions .= new_p.sfc_conditions
+    end
 end
 
 # function atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)

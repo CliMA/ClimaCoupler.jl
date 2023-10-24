@@ -8,7 +8,7 @@ energy_check: true
 mode_name: "slabplanet_aqua"
 t_end: "20days"
 dt_save_to_sol: "10days"
-dt_cpl: 1727600
+dt_cpl: 1728000
 dt: "400secs"
 mono_surface: true
 h_elem: 4
@@ -18,3 +18,4 @@ turb_flux_partition: "CombinedStateFluxes"
 surface_setup: "DefaultMoninObukhov"
 land_albedo_type: "function"
 evolving_ocean: false
+start_date: "19790301"

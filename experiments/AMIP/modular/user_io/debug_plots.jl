@@ -75,6 +75,40 @@ function get_field(sim::ClimaAtmosSimulation, ::Val{:w})
 end
 get_field(sim::ClimaAtmosSimulation, ::Val{:ρq_tot}) = sim.integrator.u.c.ρq_tot
 get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrator.u.c.ρe_tot
+function get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:F_radiative_sfc})
+    radiation = atmos_sim.integrator.p.radiation_model
+    FT = eltype(atmos_sim.integrator.u)
+    # save radiation source
+    if radiation != nothing
+        face_space = axes(atmos_sim.integrator.u.f)
+        z = parent(Fields.coordinate_field(face_space).z)
+        Δz_top = round(FT(0.5) * (z[end, 1, 1, 1, 1] - z[end - 1, 1, 1, 1, 1]))
+        n_faces = length(z[:, 1, 1, 1, 1])
+
+        LWd_TOA = Fields.level(
+            CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_lw_flux_dn), face_space),
+            half,
+        )
+        LWu_TOA = Fields.level(
+            CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_lw_flux_up), face_space),
+            half,
+        )
+        SWd_TOA = Fields.level(
+            CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_sw_flux_dn), face_space),
+            half,
+        )
+        SWu_TOA = Fields.level(
+            CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_sw_flux_up), face_space),
+            half,
+        )
+
+        return @. -(LWd_TOA + SWd_TOA - LWu_TOA - SWu_TOA) # [W/m^2]
+    else
+        return FT(0)
+    end
+end
+
+get_field(sim::ClimaAtmosSimulation, ::Val{:surface_temperature}) =  TD.air_temperature.(thermo_params, sim.integrator.p.sfc_conditions.ts)
 
 # additional BucketSimulation debug fields
 get_field(sim::BucketSimulation, ::Val{:σS}) = sim.integrator.u.bucket.σS
@@ -85,4 +119,4 @@ get_field(sim::BucketSimulation, ::Val{:W}) = sim.integrator.u.bucket.W
 plot_field_names(sim::SurfaceModelSimulation) = (:area_fraction, :surface_temperature, :surface_humidity)
 plot_field_names(sim::BucketSimulation) =
     (:area_fraction, :surface_temperature, :surface_humidity, :air_density, :σS, :Ws, :W)
-plot_field_names(sim::ClimaAtmosSimulation) = (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)
+plot_field_names(sim::ClimaAtmosSimulation) = (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation, :F_radiative_sfc, :surface_temperature)

@@ -32,6 +32,7 @@ struct OceanSlabParameters{FT <: AbstractFloat}
     z0m::FT
     z0b::FT
     α::FT
+    evolving_switch::FT
 end
 name(::SlabOceanSimulation) = "SlabOceanSimulation"
 
@@ -72,9 +73,7 @@ function slab_ocean_rhs!(dY, Y, cache, t)
     p, F_turb_energy, F_radiative, area_fraction = cache
     FT = eltype(Y.T_sfc)
     rhs = @. -(F_turb_energy + F_radiative) / (p.h * p.ρ * p.c)
-    parent(dY.T_sfc) .= 0
-    # parent(dY.T_sfc) .= parent(rhs .* Regridder.binary_mask.(area_fraction, threshold = eps(FT)))
-
+    parent(dY.T_sfc) .= parent(rhs .* Regridder.binary_mask.(area_fraction, threshold = eps(FT))) * p.evolving_switch
 
     @. cache.q_sfc = TD.q_vap_saturation_generic.(cache.thermo_params, Y.T_sfc, cache.ρ_sfc, TD.Liquid())
 end
@@ -84,9 +83,10 @@ end
 
 Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `step!` in the coupling loop.
 """
-function ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, thermo_params, stepper = CTS.RK4()) where {FT}
+function ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, thermo_params, stepper = CTS.RK4(), evolving = true) where {FT}
 
-    params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(271.0), FT(1e-3), FT(1e-5), FT(0.38))
+    evolving_switch =  evolving ? FT(1) : FT(0)
+    params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(271.0), FT(1e-3), FT(1e-5), FT(0.38), evolving_switch)
 
     Y, space = slab_ocean_space_init(FT, space, params)
     cache = (

@@ -160,6 +160,7 @@ monthly_checkpoint = config_dict["monthly_checkpoint"]
 restart_dir = config_dict["restart_dir"]
 restart_t = Int(config_dict["restart_t"])
 hourly_checkpoint = config_dict["hourly_checkpoint"]
+evolving_ocean = config_dict["evolving_ocean"]
 
 ## I/O directory setup
 if isinteractive()
@@ -208,7 +209,7 @@ boundary_space = atmos_sim.domain.face_space.horizontal_space
 
 # init land-sea fraction
 land_fraction =
-    Regridder.land_fraction(FT, REGRID_DIR, comms_ctx, land_mask_data, "LSMASK", boundary_space, mono = mono_surface) .* 0 .+ 1
+    Regridder.land_fraction(FT, REGRID_DIR, comms_ctx, land_mask_data, "LSMASK", boundary_space, mono = mono_surface)
 
 #=
 ### Land
@@ -319,9 +320,11 @@ if mode_name == "amip"
 
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
 
-elseif mode_name == "slabplanet"
+elseif mode_name in ("slabplanet" , "slabplanet_aqua", "slabplanet_terra")
 
-    land_fraction = land_fraction .* 0
+    land_fraction = mode_name == "slabplanet_aqua" ? land_fraction .* 0 : land_fraction
+    land_fraction = mode_name == "slabplanet_terra" ? land_fraction .* 0 .+ 1 : land_fraction
+
     # land
     land_sim = bucket_init(
         FT,
@@ -347,6 +350,7 @@ elseif mode_name == "slabplanet"
         saveat = saveat,
         area_fraction = (FT(1) .- land_fraction), ## NB: this ocean fraction includes areas covered by sea ice (unlike the one contained in the cs)
         thermo_params = thermo_params,
+        evolving = evolving_ocean,
     )
 
     ## sea ice (here set to zero area coverage)
@@ -550,8 +554,8 @@ update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 function solve_coupler!(cs)
     @info "Starting coupling loop"
 
-    @unpack model_sims, Δt_cpl, tspan = cs
-    @unpack atmos_sim, land_sim, ocean_sim, ice_sim = model_sims
+    @unpack model_sims, Δt_cpl, tspan = cs;
+    @unpack atmos_sim, land_sim, ocean_sim, ice_sim = model_sims;
 
     ## step in time
     walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])

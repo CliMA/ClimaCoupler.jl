@@ -58,6 +58,10 @@ function argparse_settings()
         default = "Float64"
         "--coupler_toml_file"
         help = "A toml file used to overwrite the model parameters. If nothing is specified, the default parameters are used."
+        "--evolving_ocean"
+        help = "Boolean flag indicating whether to use a dynamic slab ocean model or constant surface temperatures"
+        arg_type = Bool
+        default = true
         # ClimaAtmos specific
         "--surface_setup"
         help = "Triggers ClimaAtmos into the coupled mode [`PrescribedSurface` (default)]" # retained here for standalone Atmos benchmarks
@@ -67,6 +71,7 @@ function argparse_settings()
         help = "A yaml file used to set the atmospheric model configuration. If nothing is specified, the default configuration is used."
         "--atmos_toml_file"
         help = "A toml file used to overwrite the atmospheric model parameters. If nothing is specified, the default parameters are used."
+        default = "toml/default.toml"
         # ClimaLSM specific
         "--land_albedo_type"
         help = "Access land surface albedo information from data file. [`function`, `map_static`, `map_temporal`]"

@@ -67,7 +67,7 @@ steps:
       # Integration tests - the expected results were also confirmed locally
       - label: "Slabplanet_aqua: nocouple"
         key: "slabplanet_aqua_atmos_sf_nocouple" # SF at each Atmos stage, no coupling, constant ocean
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_aqua_atmos_sf_nocouple.yml"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_aqua_atmos_sf_nocouple.yml"
         artifact_paths: "experiments/AMIP/modular/output/slabplanet_aqua/slabplanet_aqua_atmos_sf_nocouple_artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
@@ -78,7 +78,7 @@ steps:
 
       - label: "Slabplanet_aqua: couple"
         key: "slabplanet_aqua_atmos_sf_couple" # SF at each Atmos stage, coupling, constant ocean - identical results to the above confirm 1) initial conditions in Atmos are unchanged compared to the slab, 2) coupling not introducing variability when constant surface
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_aqua_atmos_sf_couple.yml"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_aqua_atmos_sf_couple.yml"
         artifact_paths: "experiments/AMIP/modular/output/slabplanet_aqua/slabplanet_aqua_atmos_sf_couple_artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
@@ -89,7 +89,7 @@ steps:
 
       - label: "Slabplanet_aqua: coupler fluxes"
         key: "slabplanet_aqua_coupler_sf" # SF at each coupler timestep, constant ocean - comparing to the above runs, this tests the sensitivity of less frequent flux calculation
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_aqua_coupler_sf.yml"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_aqua_coupler_sf.yml"
         artifact_paths: "experiments/AMIP/modular/output/slabplanet_aqua/slabplanet_aqua_coupler_sf_artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
@@ -100,7 +100,7 @@ steps:
 
       - label: "Slabplanet_aqua: coupler fluxes, evolving ocean"
         key: "slabplanet_aqua_coupler_sf_evolve_ocn" # SF at each coupler timestep, evolving ocean - comparing to the above run, tests the sensitivity of evolving ocean
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_aqua_coupler_sf_evolve_ocn.yml"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_aqua_coupler_sf_evolve_ocn.yml"
         artifact_paths: "experiments/AMIP/modular/output/slabplanet_aqua/slabplanet_aqua_coupler_sf_evolve_ocn_artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
@@ -111,7 +111,7 @@ steps:
 
       - label: "Slabplanet_terra: coupler fluxes, evolving bucket"
         key: "slabplanet_terra" # SF at each coupler timestep, evolving ocean - comparing to the above run, tests the sensitivity of evolving bucket
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_terra.yml"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_terra.yml"
         artifact_paths: "experiments/AMIP/modular/output/slabplanet_aqua/slabplanet_terra_artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""

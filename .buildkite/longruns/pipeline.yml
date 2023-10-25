@@ -48,11 +48,11 @@ steps:
 
   - wait
 
-  - group: "Targeted resolution coupled AMIP long runs"
+  - group: "Conservation tests"
 
     steps:
 
-      # Conservation test
+      #
       - label: "Slabplanet: default"
         key: "slabplanet_default_longrun"
         command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_default_longrun.yml"
@@ -63,6 +63,10 @@ steps:
           slurm_ntasks_per_node: 1
           slurm_nodes: 1
           slurm_mem_per_cpu: 16G
+
+  - group: "Coupler integration tests"
+
+    steps:
 
       # Integration tests - the expected results were also confirmed locally
       - label: "Slabplanet_aqua: nocouple"
@@ -120,51 +124,13 @@ steps:
           slurm_nodes: 1
           slurm_mem_per_cpu: 16G
 
+  - group: "Current target tests"
 
+    steps:
 
-      # # DYAMOND AMIP: 1 day (convection resolving)
-
-      # - label: "MPI AMIP SUPERFINE: dyamond_target"
-      #   key: "dyamond_target"
-      #   command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/dyamond_target.yml"
-      #   artifact_paths: "experiments/AMIP/modular/output/amip/dyamond_target_artifacts/*"
-      #   env:
-      #     CLIMACORE_DISTRIBUTED: "MPI"
-      #     BUILD_HISTORY_HANDLE: ""
-      #   agents:
-      #     slurm_ntasks_per_node: 16
-      #     slurm_nodes: 4
-      #     slurm_mem_per_cpu: 16G
-
-      # mid-resolution AMIP: longrun (140 days)
-      - label: "MPI AMIP FINE: target longrun"
-        key: "amip_longrun_target"
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_longrun_target.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/amip_longrun_target_artifacts/*"
-        env:
-          CLIMACORE_DISTRIBUTED: "MPI"
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_ntasks_per_node: 16
-          slurm_nodes: 4
-          slurm_mem_per_cpu: 16G
-
-      - label: "MPI AMIP FINE: august"
-        key: "august"
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/august.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/august_artifacts/*"
-        env:
-          CLIMACORE_DISTRIBUTED: "MPI"
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_ntasks_per_node: 16
-          slurm_nodes: 4
-          slurm_mem_per_cpu: 16G
-
-      # target tests
       - label: "ClimaAtmos atandalone target"
         command:
-          - srun julia target/driver_atmos.jl --config_file target/$JOB_NAME.yml
+          - srun julia target/atmos_driver.jl --config_file target/$JOB_NAME.yml
         artifact_paths: "$$JOB_NAME/*"
         agents:
           slurm_ntasks: 64
@@ -219,6 +185,51 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
+
+  - group: "Other AMIP targets"
+
+    steps:
+
+      # # DYAMOND AMIP: 1 day (convection resolving)
+
+      # - label: "MPI AMIP SUPERFINE: dyamond_target"
+      #   key: "dyamond_target"
+      #   command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/dyamond_target.yml"
+      #   artifact_paths: "experiments/AMIP/modular/output/amip/dyamond_target_artifacts/*"
+      #   env:
+      #     CLIMACORE_DISTRIBUTED: "MPI"
+      #     BUILD_HISTORY_HANDLE: ""
+      #   agents:
+      #     slurm_ntasks_per_node: 16
+      #     slurm_nodes: 4
+      #     slurm_mem_per_cpu: 16G
+
+      # mid-resolution AMIP: longrun (140 days)
+      - label: "MPI AMIP FINE: target longrun"
+        key: "amip_longrun_target"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_longrun_target.yml"
+        artifact_paths: "experiments/AMIP/modular/output/amip/amip_longrun_target_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
+
+      - label: "MPI AMIP FINE: august"
+        key: "august"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/august.yml"
+        artifact_paths: "experiments/AMIP/modular/output/amip/august_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
+
+
 
       # # mid-resolution AMIP: MPI performance scaling (10 days)
       # - label: "MPI AMIP FINE: n64"

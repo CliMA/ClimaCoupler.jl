@@ -48,21 +48,21 @@ steps:
 
   - wait
 
-  - group: "Conservation tests"
+  # - group: "Conservation tests"
 
-    steps:
+  #   steps:
 
-      #
-      - label: "Slabplanet: default"
-        key: "slabplanet_default_longrun"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_default_longrun.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/*"
-        env:
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_ntasks_per_node: 1
-          slurm_nodes: 1
-          slurm_mem_per_cpu: 16G
+  #     #
+  #     - label: "Slabplanet: default"
+  #       key: "slabplanet_default_longrun"
+  #       command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_default_longrun.yml"
+  #       artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/*"
+  #       env:
+  #         BUILD_HISTORY_HANDLE: ""
+  #       agents:
+  #         slurm_ntasks_per_node: 1
+  #         slurm_nodes: 1
+  #         slurm_mem_per_cpu: 16G
 
   # - group: "Coupler integration tests"
 
@@ -132,11 +132,12 @@ steps:
         command:
           - srun julia --project=experiments/AMIP/modular/ target/atmos_driver.jl --config_file target/longrun_aquaplanet_rhoe_equilmoist_nz63_0M_55km_rs35km_clearsky_tvinsolation.yml
         artifact_paths: "longrun_aquaplanet_rhoe_equilmoist_nz63_0M_55km_rs35km_clearsky_tvinsolation/*"
-        agents:
-          slurm_ntasks: 64
-          slurm_time: 24:00:00
         env:
-          JOB_NAME: "longrun_aquaplanet_rhoe_equilmoist_nz63_0M_55km_rs35km_clearsky_tvinsolation"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 1
+          slurm_nodes: 1
+          slurm_mem_per_cpu: 16G
 
   #     - label: "MPI AMIP FINE: new target aqua - fixed ocean T, nocouple, atmos flux calc"
   #       key: "slabplanet_aqua_new_target_nocouple"

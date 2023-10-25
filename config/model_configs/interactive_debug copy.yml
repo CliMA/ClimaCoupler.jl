@@ -1,0 +1,22 @@
+moist: "equil"
+vert_diff: "true"
+rad: "gray"
+energy_check: true
+mode_name: "slabplanet"
+t_end: "10days"
+dt_save_to_sol: "0.5days"
+dt_cpl: 400
+dt: "400secs"
+mono_surface: true
+turb_flux_partition: "CombinedStateFluxes"
+h_elem: 4
+dt_save_restart: "5days"
+precip_model: "0M"
+run_name: "dyn_ocn_atmos_step" #"interactive_debug_run_gray_noTSupdate_set_precomp"
+job_id: "dyn_ocn_atmos_step" #"interactive_debug_run_gray_noTSupdate_set_precomp"
+monthly_checkpoint: true
+hourly_checkpoint: true
+surface_setup: "DefaultMoninObukhov" # "PrescribedSurface"
+start_date: "19790301"
+coupler_toml_file: "toml/new_target.toml"
+land_albedo_type: "function"

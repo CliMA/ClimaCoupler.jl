@@ -369,6 +369,23 @@ elseif mode_name in ("slabplanet" , "slabplanet_aqua", "slabplanet_terra")
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
 
 elseif mode_name == "slabplanet_eisenman"
+
+    # land
+    land_sim = bucket_init(
+        FT,
+        FT.(tspan),
+        config_dict["land_domain_type"],
+        config_dict["land_albedo_type"],
+        comms_ctx,
+        REGRID_DIR;
+        dt = FT(Δt_cpl),
+        space = boundary_space,
+        saveat = FT(saveat),
+        area_fraction = land_fraction,
+        date_ref = date0,
+        t_start = FT(0),
+    )
+
     ## ocean
     ocean_sim = ocean_init(
         FT;

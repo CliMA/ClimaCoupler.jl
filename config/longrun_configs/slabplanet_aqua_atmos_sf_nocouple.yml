@@ -9,7 +9,7 @@ mode_name: "slabplanet_aqua"
 t_end: "20days"
 dt_save_to_sol: "10days"
 dt_cpl: 1728000
-dt: "400secs"
+dt: "200secs"
 mono_surface: true
 h_elem: 4
 anim: true

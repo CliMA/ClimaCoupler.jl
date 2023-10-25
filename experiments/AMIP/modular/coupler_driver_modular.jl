@@ -581,7 +581,7 @@ function solve_coupler!(cs)
 
         ## print date on the first of month
         if cs.dates.date[1] >= cs.dates.date1[1]
-            @show(cs.dates.date[1])
+            ClimaComms.iamroot(comms_ctx) ? @show(cs.dates.date[1]) : nothing
         end
 
         if cs.mode.name == "amip"

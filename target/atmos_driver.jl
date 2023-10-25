@@ -1,6 +1,9 @@
 using Pkg
 Pkg.activate("../experiments/AMIP/modular/")
 
+import Pkg; Pkg.add("ClimaComms")
+import Pkg; Pkg.add("Logging")
+import Pkg; Pkg.add("ClimaAtmos")
 using ClimaComms
 using Logging
 using ClimaAtmos

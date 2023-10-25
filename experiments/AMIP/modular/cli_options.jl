@@ -78,6 +78,10 @@ function argparse_settings()
         help = "Type of land domain. [`sphere` (default), `single_column`]"
         arg_type = String
         default = "sphere"
+        "--land_temperature_anomaly"
+        help = "Type of temperature anomaly for bucket model. [`zonally_asymmetric`, `amip`, `aquaplanet` (default)]"
+        arg_type = String
+        default = "aquaplanet"
     end
     return s
 end

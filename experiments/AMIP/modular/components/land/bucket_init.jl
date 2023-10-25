@@ -166,6 +166,7 @@ function bucket_init(
     tspan::Tuple{FT, FT},
     config::String,
     albedo_type::String,
+    land_temperature_anomaly::String,
     comms_ctx::AbstractCommsContext,
     regrid_dirpath::String;
     space,
@@ -222,25 +223,23 @@ function bucket_init(
 
     # Initial conditions with no moisture
     Y, p, coords = initialize(model)
-    anomaly = false
-    anomaly_tropics = true
-    hs_sfc = false
     Y.bucket.T = map(coords.subsurface) do coord
         T_sfc_0 = FT(271.0)
         radlat = coord.lat / FT(180) * pi
         ΔT = FT(0)
-        if anomaly == true
+        if land_temperature_anomaly == "zonally_asymmetric"
             anom_ampl = FT(0)# this is zero, no anomaly
             lat_0 = FT(60) / FT(180) * pi
             lon_0 = FT(-90) / FT(180) * pi
             radlon = coord.long / FT(180) * pi
             stdev = FT(5) / FT(180) * pi
             ΔT = anom_ampl * exp(-((radlat - lat_0)^2 / 2stdev^2 + (radlon - lon_0)^2 / 2stdev^2))
-        elseif hs_sfc == true
-            ΔT = -FT(60) * sin(radlat)^2
-        elseif anomaly_tropics == true
-            # ΔT = FT(40 * cos(radlat)^4)
+        elseif land_temperature_anomaly == "aquaplanet"
             ΔT =  FT(29) * exp(-coord.lat^2 / (2 * 26^2))
+        elseif land_temperature_anomaly == "amip"
+            ΔT = FT(40 * cos(radlat)^4)
+        else
+            ΔT = FT(0)
         end
         T_sfc_0 + ΔT
     end

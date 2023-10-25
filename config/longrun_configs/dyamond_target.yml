@@ -12,3 +12,4 @@ turb_flux_partition: "CombinedStateFluxes"
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_dyamond.yml"
 coupler_toml_file: "toml/longrun_aquaplanet_dyamond.toml"
 monthly_checkpoint: false
+land_temperature_anomaly: "amip"

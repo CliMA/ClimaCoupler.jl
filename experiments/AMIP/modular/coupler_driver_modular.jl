@@ -234,6 +234,7 @@ if mode_name == "amip"
         FT.(tspan),
         config_dict["land_domain_type"],
         config_dict["land_albedo_type"],
+        config_dict["land_temperature_anomaly"],
         comms_ctx,
         REGRID_DIR;
         dt = FT(Δt_cpl),
@@ -331,6 +332,7 @@ elseif mode_name in ("slabplanet" , "slabplanet_aqua", "slabplanet_terra")
         FT.(tspan),
         config_dict["land_domain_type"],
         config_dict["land_albedo_type"],
+        config_dict["land_temperature_anomaly"],
         comms_ctx,
         REGRID_DIR;
         dt = FT(Δt_cpl),
@@ -376,6 +378,7 @@ elseif mode_name == "slabplanet_eisenman"
         FT.(tspan),
         config_dict["land_domain_type"],
         config_dict["land_albedo_type"],
+        config_dict["land_temperature_anomaly"],
         comms_ctx,
         REGRID_DIR;
         dt = FT(Δt_cpl),

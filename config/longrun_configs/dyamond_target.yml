@@ -10,5 +10,5 @@ dt_save_to_sol: "0.5days"
 dt_save_to_disk: "0.5days"
 turb_flux_partition: "CombinedStateFluxes"
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_dyamond.yml"
-atmos_toml_file: "toml/longrun_aquaplanet_dyamond.toml"
+coupler_toml_file: "toml/longrun_aquaplanet_dyamond.toml"
 monthly_checkpoint: false

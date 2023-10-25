@@ -24,5 +24,8 @@ else
     const pid, nprocs = ClimaComms.init(comms_ctx)
 end
 
+
 Pkg.activate(joinpath(pkgdir(ClimaAtmos), "examples"))
+ClimaComms.barrier(comms_ctx)
+
 include(joinpath(pkgdir(ClimaAtmos), "examples/hybrid/driver.jl"))

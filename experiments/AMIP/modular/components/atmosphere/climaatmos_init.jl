@@ -45,9 +45,14 @@ function get_atmos_config(coupler_dict)
             Dict("config_file" => atmos_config_file),
         )
     end
-    atmos_toml_file = coupler_dict["atmos_toml_file"]
+    # use coupler toml if atmos is not defined
+    atmos_toml_file = atmos_config["toml"]
     coupler_toml_file = coupler_dict["coupler_toml_file"]
-    toml_file = isnothing(coupler_toml_file) ? joinpath(pkgdir(CA), atmos_toml_file) : joinpath(pkgdir(ClimaCoupler), coupler_toml_file)
+    default_toml_file = "toml/default.toml"
+
+    toml_file = !isempty(atmos_toml_file) ? joinpath(pkgdir(CA), atmos_toml_file[1]) : nothing
+    toml_file = !isnothing(coupler_toml_file) ? joinpath(pkgdir(ClimaCoupler), coupler_toml_file) : toml_file
+    toml_file = isnothing(toml_file) ? joinpath(pkgdir(ClimaCoupler), default_toml_file) : toml_file
 
     if !isnothing(toml_file)
         @info "Overwriting Atmos parameters from $toml_file"

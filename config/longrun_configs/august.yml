@@ -31,4 +31,3 @@ apply_limiter: false
 surface_setup: "PrescribedSurface"
 land_albedo_type: "function"
 coupler_toml_file: "toml/august.toml"
-land_temperature_anomaly: "amip"

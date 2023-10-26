@@ -616,6 +616,8 @@ function solve_coupler!(cs)
             ## save and reset monthly averages
             save_diagnostics(cs)
 
+            update_surface_fractions!(cs)
+
         end
 
         ## compute global energy
@@ -629,7 +631,6 @@ function solve_coupler!(cs)
         step_model_sims!(cs.model_sims, t)
 
         ## exchange combined fields and (if specified) calculate fluxes using combined states
-        update_surface_fractions!(cs)
         import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta
         if turbulent_fluxes isa CombinedStateFluxes
             combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # this updates the surface thermo state, sfc_ts, in ClimaAtmos (but also unnecessarily calculates fluxes)

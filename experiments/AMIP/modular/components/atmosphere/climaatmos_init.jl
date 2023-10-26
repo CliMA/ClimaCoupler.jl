@@ -48,7 +48,7 @@ function get_atmos_config(coupler_dict)
     # use coupler toml if atmos is not defined
     atmos_toml_file = atmos_config["toml"]
     coupler_toml_file = coupler_dict["coupler_toml_file"]
-    default_toml_file = "toml/default.toml"
+    default_toml_file = "toml/default_coarse.toml"
 
     toml_file = !isempty(atmos_toml_file) ? joinpath(pkgdir(CA), atmos_toml_file[1]) : nothing
     toml_file = !isnothing(coupler_toml_file) ? joinpath(pkgdir(ClimaCoupler), coupler_toml_file) : toml_file
@@ -354,10 +354,11 @@ timestep from ClimaCoupler.
 """
 function atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
 
-    csf.z0m_S .= 1.0e-5
-    csf.z0b_S .= 1.0e-5
-    csf.beta .= 1
-    csf = merge(csf, (;q_sfc = nothing))
+    # atmos defaults:
+    # csf.z0m_S .= 1.0e-5
+    # csf.z0b_S .= 1.0e-5
+    # csf.beta .= 1
+    # csf = merge(csf, (;q_sfc = nothing))
 
     if isnothing(atmos_sim.integrator.p.sfc_setup) # trigger flux calculation if not done in Atmos internally
         new_p = get_new_cache(atmos_sim, csf)

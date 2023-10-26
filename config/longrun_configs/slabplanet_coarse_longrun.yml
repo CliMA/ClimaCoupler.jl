@@ -1,4 +1,4 @@
-run_name: "slabplanet_default_longrun"
+run_name: "slabplanet_coarse_longrun"
 moist: "equil"
 vert_diff: "true"
 rad: "gray"
@@ -13,7 +13,6 @@ h_elem: 6
 precip_model: "0M"
 anim: true
 apply_limiter: false
-job_id: "slabplanet_default_longrun"
-coupler_toml_file: "toml/new_target.toml"
+job_id: "slabplanet_coarse_longrun"
 surface_setup: "PrescribedSurface"
 land_albedo_type: "function"

@@ -54,9 +54,9 @@ steps:
 
       #
       - label: "Slabplanet: default"
-        key: "slabplanet_default_longrun"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_default_longrun.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/*"
+        key: "slabplanet_coarse_longrun"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_coarse_longrun.yml"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_coarse_longrun_artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
         agents:
@@ -329,10 +329,10 @@ steps:
 
       # - label: ":envelope: Slack report: Slabplanet"
       #   command:
-      #     - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/total_energy_log_bucket.png -m png -n slab_coarse_log -x "Slabplanet energy conservation (log error)"
-      #     - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/total_energy_bucket.png -m png -n slab_coarse -x "Slabplanet energy conservation"
-      #     - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/total_water_log_bucket.png -m png -n slab_coarse_w_log -x "Slabplanet water conservation (log error)"
-      #     - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/total_water_bucket.png -m png -n slab_coarse_w -x "Slabplanet water conservation"
+      #     - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_coarse_longrun_artifacts/total_energy_log_bucket.png -m png -n slab_coarse_log -x "Slabplanet energy conservation (log error)"
+      #     - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_coarse_longrun_artifacts/total_energy_bucket.png -m png -n slab_coarse -x "Slabplanet energy conservation"
+      #     - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_coarse_longrun_artifacts/total_water_log_bucket.png -m png -n slab_coarse_w_log -x "Slabplanet water conservation (log error)"
+      #     - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_coarse_longrun_artifacts/total_water_bucket.png -m png -n slab_coarse_w -x "Slabplanet water conservation"
 
       # - label: ":envelope: Slack report: target AMIP"
       #   command:

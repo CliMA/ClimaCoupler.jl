@@ -208,12 +208,12 @@ function bucket_init(
     end
 
     σS_c = FT(0.2)
-    W_f = FT(50)
+    W_f = FT(10)
     d_soil = FT(3.5) # soil depth
     z_0m = FT(1e-2)
     z_0b = FT(1e-3)
     κ_soil = FT(0.7)
-    ρc_soil = FT(2e10)# FT(2e6)
+    ρc_soil = FT(2e6)# FT(2e10)
     t_crit = dt # This is the timescale on which snow exponentially damps to zero, in the case where all
     # the snow would melt in time t_crit. It prevents us from having to specially time step in cases where
     # all the snow melts in a single timestep.
@@ -248,7 +248,7 @@ function bucket_init(
         T_sfc_0 + ΔT
     end
 
-    Y.bucket.W .= 50#0.14
+    Y.bucket.W .= 10#0.14
     Y.bucket.Ws .= 0.0
     Y.bucket.σS .= 0.0
     P_liq = zeros(axes(Y.bucket.W)) .+ FT(0.0)

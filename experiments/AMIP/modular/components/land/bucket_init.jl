@@ -213,7 +213,7 @@ function bucket_init(
     z_0m = FT(1e-2)
     z_0b = FT(1e-3)
     κ_soil = FT(0.7)
-    ρc_soil = FT(2e7)# FT(2e10)
+    ρc_soil = FT(2e9)# FT(2e10)
     t_crit = dt # This is the timescale on which snow exponentially damps to zero, in the case where all
     # the snow would melt in time t_crit. It prevents us from having to specially time step in cases where
     # all the snow melts in a single timestep.

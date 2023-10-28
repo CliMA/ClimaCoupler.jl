@@ -1,11 +1,11 @@
-run_name: "slabplanet_terra"
-job_id: "slabplanet_terra"
+run_name: "slabplanet_aqua_coupler_sf"
+job_id: "slabplanet_aqua_coupler_sf"
 moist: "equil"
 vert_diff: "true"
 rad: "gray"
 precip_model: "0M"
 energy_check: true
-mode_name: "slabplanet_terra"
+mode_name: "slabplanet_aqua"
 t_end: "20days"
 dt_save_to_sol: "10days"
 dt_cpl: 200
@@ -17,4 +17,5 @@ apply_limiter: false
 turb_flux_partition: "CombinedStateFluxes"
 surface_setup: "PrescribedSurface"
 land_albedo_type: "function"
+evolving_ocean: false
 start_date: "19790301"

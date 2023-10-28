@@ -1,0 +1,21 @@
+run_name: "amip_new_target"
+anim: true
+dt_cpl: 75
+energy_check: false
+mode_name: "amip"
+mono_surface: false
+dt: "150secs"
+t_end: "200days" # TODO this has been decreased from 140 days to avoid instability #460
+job_id: "amip_new_target"
+dt_save_to_sol: "5days"
+dt_save_to_disk: "5days"
+apply_limiter: false
+hourly_checkpoint: true
+turb_flux_partition: "CombinedStateFluxes"
+atmos_config_file: "config/longrun_configs/longrun_aquaplanet_rhoe_equilmoist_nz63_0M_55km_rs35km_clearsky_tvinsolation.yml"
+surface_setup: "PrescribedSurface"
+land_albedo_type: "map_temporal"
+start_date: "19790301"
+topography: "Earth"
+topo_smoothing: true
+use_reference_state: false

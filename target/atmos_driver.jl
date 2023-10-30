@@ -21,4 +21,15 @@ end
 
 ClimaComms.barrier(comms_ctx)
 
-include(joinpath(pkgdir(ClimaAtmos), "examples/hybrid/driver.jl"))
+# this tests the standalone runs, using the hybrid/driver
+import Random
+Random.seed!(1234)
+
+if !(@isdefined config)
+    config = ClimaAtmos.AtmosConfig(comms_ctx = comms_ctx)
+end
+
+@info(config)
+
+integrator = ClimaAtmos.get_integrator(config)
+sol_res = ClimaAtmos.solve_atmos!(integrator)

@@ -1,7 +1,7 @@
 FLOAT_TYPE: "Float64"
 dt_save_to_disk: "10days"
 dt: "150secs"
-t_end: "300days"
+t_end: "1days"
 h_elem: 16
 z_elem: 63
 dz_bottom: 30.0

@@ -1,4 +1,4 @@
-run_name: "amip_new_target"
+run_name: "amip_new_target_topo"
 anim: true
 dt_cpl: 75
 energy_check: false
@@ -6,7 +6,7 @@ mode_name: "amip"
 mono_surface: false
 dt: "150secs"
 t_end: "200days" # TODO this has been decreased from 140 days to avoid instability #460
-job_id: "amip_new_target"
+job_id: "amip_new_target_topo"
 dt_save_to_sol: "5days"
 dt_save_to_disk: "5days"
 apply_limiter: false

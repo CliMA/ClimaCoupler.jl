@@ -29,7 +29,7 @@ if !(@isdefined config)
     config = ClimaAtmos.AtmosConfig(comms_ctx = comms_ctx)
 end
 
-@info(config)
-
+ClimaComms.iamroot(comms_ctx) ? @info(config) : nothing
 integrator = ClimaAtmos.get_integrator(config)
+ClimaComms.barrier(comms_ctx)
 sol_res = ClimaAtmos.solve_atmos!(integrator)

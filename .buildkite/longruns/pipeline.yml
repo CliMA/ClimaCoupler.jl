@@ -134,9 +134,10 @@ steps:
         artifact_paths: "output/longrun_aquaplanet_rhoe_equilmoist_nz63_0M_55km_rs35km_clearsky_tvinsolation/*"
         env:
           BUILD_HISTORY_HANDLE: ""
+          CLIMACORE_DISTRIBUTED: "MPI"
         agents:
-          slurm_ntasks_per_node: 1 #16
-          slurm_nodes: 1 #4
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
           slurm_mem_per_cpu: 16G
 
   #     - label: "MPI AMIP FINE: new target aqua - fixed ocean T, nocouple, atmos flux calc"

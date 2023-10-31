@@ -46,6 +46,9 @@ struct CoupledSimulation{
     NTSM <: NamedTuple,
     NTMS <: NamedTuple,
     NTM <: NamedTuple,
+    TD <: Tuple,
+    NTC <: NamedTuple,
+    NTP <: NamedTuple,
 }
     comms_ctx::X
     dates::D
@@ -59,10 +62,12 @@ struct CoupledSimulation{
     surface_fractions::NTSM
     model_sims::NTMS
     mode::NTM
-    diagnostics::Tuple
+    diagnostics::TD
+    callbacks::NTC
+    dirs::NTP
 end
 
-CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args[1:12])...}(args...)
+CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args[1:end])...}(args...)
 
 """
     float_type(::CoupledSimulation)

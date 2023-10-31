@@ -52,6 +52,8 @@ end
             (;), # model_sims
             (;), # mode
             (dg_2d,),
+            (;), # callbacks
+            (;), # dirs
         )
         accumulate_diagnostics!(cs)
         @test cs.diagnostics[1].field_vector[1] == expected_results[c_i]
@@ -86,6 +88,8 @@ if !Sys.iswindows() # Windows has NetCDF / HDF5 support limitations
             (;), # model_sims
             (;), # mode
             (dg_2d,), # diagnostics
+            (;), # callbacks
+            (;), # dirs
         )
         save_diagnostics(cs, cs.diagnostics[1])
         file = filter(x -> endswith(x, ".hdf5"), readdir(test_dir))
@@ -124,6 +128,8 @@ end
             (;), # model_sims
             (;), # mode
             (dg_2d,),
+            (;), # callbacks
+            (;), # dirs
         )
         accumulate_diagnostics!(cs)
         @test cs.diagnostics[1].field_vector[1] == expected_results[c_i][1]

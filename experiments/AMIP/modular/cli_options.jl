@@ -30,8 +30,8 @@ function argparse_settings()
         help = "Method to partition turbulent fluxes. [`PartitionedStateFluxes`, `CombinedStateFluxes`]"
         arg_type = String
         default = "CombinedStateFluxes"
-        "--monthly_checkpoint" # TODO generalize to any frequency
-        help = "Boolean flag indicating whether to checkpoint monthly"
+        "--hourly_checkpoint"
+        help = "Boolean flag indicating whether to checkpoint at intervals of 1 hour or multiple hours"
         arg_type = Bool
         default = false
         "--restart_dir"

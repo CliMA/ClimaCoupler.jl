@@ -140,6 +140,8 @@ end
             (;), # model_sims
             (;), # mode
             (), # diagnostics
+            (;), # callbacks
+            (;), # dirs
         )
 
         ClimaComms.barrier(comms_ctx)

@@ -33,8 +33,8 @@ julia --project=artifacts -e 'using Pkg; Pkg.status()'
 julia --project=artifacts artifacts/download_artifacts.jl
 
 # run spin up
-# - specify `--monthly_checkpoint true` to save monthly checkpoints of all model prognostic states
-mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name $RUN_NAME --coupled true   --start_date 19790101 --monthly_checkpoint true  --anim true --surface_setup PrescribedSurface --dt_cpl 200 --energy_check false --mode_name amip --mono_surface false --vert_diff true --moist equil --rad clearsky --precip_model 0M --z_elem 35 --dz_bottom 50 --h_elem 12 --kappa_4 3e16 --rayleigh_sponge true --alpha_rayleigh_uh 0 --dt 200secs --t_end 0.1days --job_id $RUN_NAME --dt_save_to_sol 1000days --dt_save_to_disk 10days --apply_limiter false --FLOAT_TYPE Float64
+# - specify `--hourly_checkpoint true` to save monthly checkpoints of all model prognostic states
+mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --run_name $RUN_NAME --coupled true   --start_date 19790101 --hourly_checkpoint true  --anim true --surface_setup PrescribedSurface --dt_cpl 200 --energy_check false --mode_name amip --mono_surface false --vert_diff true --moist equil --rad clearsky --precip_model 0M --z_elem 35 --dz_bottom 50 --h_elem 12 --kappa_4 3e16 --rayleigh_sponge true --alpha_rayleigh_uh 0 --dt 200secs --t_end 0.1days --job_id $RUN_NAME --dt_save_to_sol 1000days --dt_save_to_disk 10days --apply_limiter false --FLOAT_TYPE Float64
 
 # init using a restart
 # - specify the directory of the `checkpoint/` folder (i.e.,  `--restart_dir`) and time (in secs; `--restart_t`) of the restart file

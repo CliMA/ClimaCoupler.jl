@@ -76,7 +76,16 @@ import ClimaCoupler.ConservationChecker:
 import ClimaCoupler.Utilities: swap_space!
 import ClimaCoupler.BCReader:
     bcfile_info_init, float_type_bcf, update_midmonth_data!, next_date_in_file, interpolate_midmonth_to_daily
-import ClimaCoupler.TimeManager: current_date, datetime_to_strdate, trigger_callback, Monthly, EveryTimestep
+import ClimaCoupler.TimeManager:
+    current_date,
+    datetime_to_strdate,
+    trigger_callback,
+    Monthly,
+    EveryTimestep,
+    HourlyCallback,
+    MonthlyCallback,
+    update_firstdayofmonth!,
+    trigger_callback!
 import ClimaCoupler.Diagnostics: get_var, init_diagnostics, accumulate_diagnostics!, save_diagnostics, TimeMean
 import ClimaCoupler.PostProcessor: postprocess
 
@@ -90,8 +99,7 @@ import ClimaCoupler.Interfacer:
     LandModelSimulation,
     OceanModelSimulation,
     get_field,
-    update_field!,
-    update_sim!
+    update_field!
 import ClimaCoupler.FluxCalculator:
     PartitionedStateFluxes,
     CombinedStateFluxes,
@@ -156,7 +164,7 @@ tspan = (Int(0), t_end)
 saveat = time_to_seconds(config_dict["dt_save_to_sol"])
 date0 = date = DateTime(config_dict["start_date"], dateformat"yyyymmdd")
 mono_surface = config_dict["mono_surface"]
-monthly_checkpoint = config_dict["monthly_checkpoint"]
+hourly_checkpoint = config_dict["hourly_checkpoint"]
 restart_dir = config_dict["restart_dir"]
 restart_t = Int(config_dict["restart_t"])
 
@@ -439,6 +447,13 @@ if energy_check
     conservation_checks = (; energy = EnergyConservationCheck(model_sims), water = WaterConservationCheck(model_sims))
 end
 
+dir_paths = (; output = COUPLER_OUTPUT_DIR, artifacts = COUPLER_ARTIFACTS_DIR)
+checkpoint_cb =
+    HourlyCallback(dt = FT(48), func = checkpoint_sims, ref_date = [dates.date[1]], active = hourly_checkpoint) # bi-daily
+update_firstdayofmonth!_cb =
+    MonthlyCallback(dt = FT(1), func = update_firstdayofmonth!, ref_date = [dates.date1[1]], active = true) # for BCReader
+callbacks = (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb)
+
 ## coupler simulation
 cs = CoupledSimulation{FT}(
     comms_ctx,
@@ -454,6 +469,8 @@ cs = CoupledSimulation{FT}(
     model_sims,
     mode_specifics,
     diagnostics,
+    callbacks,
+    dir_paths,
 );
 
 #=
@@ -572,13 +589,13 @@ function solve_coupler!(cs)
 
         ## run component models sequentially for one coupling timestep (Δt_cpl)
         ClimaComms.barrier(comms_ctx)
+        update_surface_fractions!(cs)
         update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 
         ## step sims
         step_model_sims!(cs.model_sims, t)
 
         ## exchange combined fields and (if specified) calculate fluxes using combined states
-        update_surface_fractions!(cs)
         import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta
         if turbulent_fluxes isa CombinedStateFluxes
             combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # this updates the surface thermo state, sfc_ts, in ClimaAtmos (but also unnecessarily calculates fluxes)
@@ -594,19 +611,11 @@ function solve_coupler!(cs)
 
         import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # radiative and/or turbulent
 
-        ## monthly callbacks
-        if trigger_callback(cs, Monthly())
-            ## step to the next calendar month
-            cs.dates.date1[1] += Dates.Month(1)
-            ## checkpoint model state
-            if monthly_checkpoint
-                for sim in cs.model_sims
-                    if get_model_state_vector(sim) !== nothing
-                        checkpoint_model_state(sim, comms_ctx, Int(t), output_dir = COUPLER_ARTIFACTS_DIR)
-                    end
-                end
-            end
-        end
+        ## callback to update the fist day of month if needed (for BCReader)
+        trigger_callback!(cs, cs.callbacks.update_firstdayofmonth!)
+
+        ## callback to checkpoint model state
+        trigger_callback!(cs, cs.callbacks.checkpoint)
 
     end
     @show walltime

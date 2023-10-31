@@ -194,6 +194,8 @@ for FT in (Float32, Float64)
                 (;), # model_sims
                 (;), # mode
                 (), # diagnostics
+                (;), # callbacks
+                (;), # dirs
             )
 
             # step in time

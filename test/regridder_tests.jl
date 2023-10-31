@@ -81,6 +81,8 @@ for FT in (Float32, Float64)
             (; ice_sim = DummyStub((; area_fraction = ice_d)), ocean_sim = SurfaceStub((; area_fraction = ocean_d))), # model_sims
             (;), # mode
             (), # diagnostics
+            (;), # callbacks
+            (;), # dirs
         )
 
         Regridder.update_surface_fractions!(cs)

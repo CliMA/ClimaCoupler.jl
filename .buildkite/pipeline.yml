@@ -16,6 +16,8 @@ env:
   PERF_CONFIG_PATH: "config/perf_configs"
   MPI_CONFIG_PATH: "config/mpi_configs"
 
+  LD_LIBRARY_PATH: "/central/scratch/esm/slurm-buildkite/climaatmos-ci/depot/cpu/artifacts/e9feeabfa989549ac1dac61e4df5f2849149ad6d/lib/:${LD_LIBRARY_PATH}"
+
 timeout_in_minutes: 1440
 
 steps:
@@ -240,10 +242,10 @@ steps:
       #   command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --coupled true --surface_setup PrescribedSurface --moist equil --vert_diff true --rad allskywithclear --rayleigh_sponge false --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 21600 --dt 200secs --dt_rad 6hours --idealized_insolation true --mono_surface true --h_elem 4 --precip_model 0M --run_name target_params_in_slab1"
       #   artifact_paths: "experiments/AMIP/modular/output/slabplanet/target_params_in_slab1_artifacts/total_energy*.png"
 
-      - label: "AMIP - modular Float64 + monthly checkpoint"
+      - label: "AMIP - modular Float64 + hourly checkpoint"
         key: "modular_amip"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/coarse_single_modular_ft64_monthly_checkpoints.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/coarse_single_modular_ft64_monthly_checkpoints_artifacts/*"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/coarse_single_modular_ft64_hourly_checkpoints.yml"
+        artifact_paths: "experiments/AMIP/modular/output/amip/coarse_single_modular_ft64_hourly_checkpoints_artifacts/*"
         env:
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""
@@ -251,10 +253,10 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 20GB
 
-      - label: "AMIP - modular Float64 + monthly checkpoint + co2"
-        key: "coarse_single_modular_ft64_monthly_checkpoints_co2"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/coarse_single_modular_ft64_monthly_checkpoints_co2.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/coarse_single_modular_ft64_monthly_checkpoints_co2_artifacts/*"
+      - label: "AMIP - modular Float64 + hourly checkpoint + co2"
+        key: "coarse_single_modular_ft64_hourly_checkpoints_co2"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/coarse_single_modular_ft64_hourly_checkpoints_co2.yml"
+        artifact_paths: "experiments/AMIP/modular/output/amip/coarse_single_modular_ft64_hourly_checkpoints_co2_artifacts/*"
         env:
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""

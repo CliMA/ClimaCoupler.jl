@@ -25,10 +25,8 @@ ClimaComms.barrier(comms_ctx)
 import Random
 Random.seed!(1234)
 
-if !(@isdefined config)
-    config = ClimaAtmos.AtmosConfig(comms_ctx = comms_ctx)
-end
-
+config = ClimaAtmos.AtmosConfig()
+ClimaComms.barrier(comms_ctx)
 ClimaComms.iamroot(comms_ctx) ? @info(config) : nothing
 integrator = ClimaAtmos.get_integrator(config)
 ClimaComms.barrier(comms_ctx)

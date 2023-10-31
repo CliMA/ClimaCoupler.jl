@@ -27,7 +27,7 @@ Random.seed!(1234)
 
 config = ClimaAtmos.AtmosConfig()
 ClimaComms.barrier(comms_ctx)
-ClimaComms.iamroot(comms_ctx) ? @info(config) : nothing
+# ClimaComms.iamroot(comms_ctx) ? @info(config) : nothing
 integrator = ClimaAtmos.get_integrator(config)
 ClimaComms.barrier(comms_ctx)
 sol_res = ClimaAtmos.solve_atmos!(integrator)

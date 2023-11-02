@@ -689,9 +689,9 @@ if ClimaComms.iamroot(comms_ctx)
             evaporation = (; clims = (0, 1e-4), units = "kg/m^2/s"),
             v = (; clims = (-30, 30), units = "m/s"),
             w = (; clims = (-0.1, 0.1), units = "m/s"),
-            lapse_rate = (;),
-            eddy_diffusivity = (;),
-            moist_static_energy = (;),
+            lapse_rate = (; clims = (-10, 10), units = "K/m"),
+            eddy_diffusivity = (; clims = (-10, 10), units = "m^2 / s"),
+            moist_static_energy = (; clims = (-10, 10), units = "J / kg"),
         )
         amip_data = amip_paperplots(
             post_spec,

@@ -207,7 +207,7 @@ boundary_space = atmos_sim.domain.face_space.horizontal_space
 
 # init land-sea fraction
 land_fraction =
-    Regridder.land_fraction(FT, REGRID_DIR, comms_ctx, land_mask_data, "LSMASK", boundary_space, mono = mono_surface)
+    Regridder.land_fraction(FT, REGRID_DIR, comms_ctx, land_mask_data, "LSMASK", boundary_space, mono = mono_surface) .* 0
 
 #=
 ### Land
@@ -407,7 +407,8 @@ dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)
 User can write custom diagnostics in the `user_diagnostics.jl`.
 =#
 monthly_3d_diags = init_diagnostics(
-    (:T, :u, :q_tot, :q_liq_ice),
+    (:T, :u, :v, :w, :q_tot, :q_liq_ice,:lapse_rate, :eddy_diffusivity, :moist_static_energy,
+),
     atmos_sim.domain.center_space;
     save = Monthly(),
     operations = (; accumulate = TimeMean([Int(0)])),
@@ -416,7 +417,7 @@ monthly_3d_diags = init_diagnostics(
 )
 
 monthly_2d_diags = init_diagnostics(
-    (:precipitation_rate, :toa_fluxes, :T_sfc, :tubulent_energy_fluxes),
+    (:precipitation_rate, :toa_fluxes, :T_sfc, :tubulent_energy_fluxes, :evaporation, :longwave_down_sfc, :shortwave_down_sfc, :longwave_up_sfc, :shortwave_up_sfc,),
     boundary_space;
     save = Monthly(),
     operations = (; accumulate = TimeMean([Int(0)])),
@@ -668,6 +669,12 @@ if ClimaComms.iamroot(comms_ctx)
             T_sfc = (:regrid, :horizontal_slice),
             tubulent_energy_fluxes = (:regrid, :horizontal_slice),
             q_liq_ice = (:regrid, :zonal_mean),
+            evaporation = (:regrid, :horizontal_slice),
+            v = (:regrid, :zonal_mean),
+            w = (:regrid, :zonal_mean),
+            lapse_rate = (:regrid, :zonal_mean),
+            eddy_diffusivity = (:regrid, :zonal_mean),
+            moist_static_energy = (:regrid, :zonal_mean),
         )
 
         plot_spec = (;
@@ -679,6 +686,12 @@ if ClimaComms.iamroot(comms_ctx)
             T_sfc = (clims = (225, 310), units = "K"),
             tubulent_energy_fluxes = (; clims = (-250, 250), units = "W/m^2"),
             q_liq_ice = (; clims = (0, 10), units = "g/kg"),
+            evaporation = (; clims = (0, 1e-4), units = "kg/m^2/s"),
+            v = (; clims = (-30, 30), units = "m/s"),
+            w = (; clims = (-0.1, 0.1), units = "m/s"),
+            lapse_rate = (;),
+            eddy_diffusivity = (;),
+            moist_static_energy = (;),
         )
         amip_data = amip_paperplots(
             post_spec,

@@ -69,6 +69,8 @@ plot_field_names(sim::SurfaceStub) = (:stub_field,)
         model_sims, # model_sims
         (;), # mode
         (), # diagnostics
+        (;), # callbacks
+        (;), # dirs
     )
 
     output_plots = "test_debug"

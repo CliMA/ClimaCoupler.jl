@@ -86,6 +86,8 @@ get_field(s::TestLand, ::Val{:area_fraction}) = ones(s.i.space) .* 0.25
         model_sims, # model_sims
         (;), # mode
         (), # diagnostics
+        (;), # callbacks
+        (;), # dirs
     )
 
     # set non-zero radiation and precipitation
@@ -163,6 +165,8 @@ end
         model_sims, # model_sims
         (;), # mode
         (), # diagnostics
+        (;), # callbacks
+        (;), # dirs
     )
 
     tot_energy, tot_water = check_conservation!(cs)

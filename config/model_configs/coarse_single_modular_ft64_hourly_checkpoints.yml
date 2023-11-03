@@ -1,8 +1,8 @@
-run_name: "coarse_single_modular_ft64_monthly_checkpoints_co2"
-monthly_checkpoint: true
+run_name: "coarse_single_modular_ft64_hourly_checkpoints"
+hourly_checkpoint: true
 moist: "equil"
 vert_diff: "true"
-rad: "allskywithclear"
+rad: "gray"
 energy_check: false
 mode_name: "amip"
 anim: true
@@ -15,4 +15,4 @@ h_elem: 6
 dt_save_restart: "10days"
 precip_model: "0M"
 apply_limiter: false
-job_id: "coarse_single_modular_ft64_monthly_checkpoints_co2"
+job_id: "coarse_single_modular_ft64_hourly_checkpoints"

@@ -13,4 +13,8 @@ ClimaCoupler.TimeManager.datetime_to_strdate
 ClimaCoupler.TimeManager.trigger_callback
 ClimaCoupler.TimeManager.Monthly
 ClimaCoupler.TimeManager.EveryTimestep
+ClimaCoupler.TimeManager.trigger_callback!
+ClimaCoupler.TimeManager.HourlyCallback
+ClimaCoupler.TimeManager.MonthlyCallback
+ClimaCoupler.TimeManager.update_firstdayofmonth!
 ```

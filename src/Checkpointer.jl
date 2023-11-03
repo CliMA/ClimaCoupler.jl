@@ -8,7 +8,6 @@ module Checkpointer
 using ClimaCore: Fields, InputOutput
 using ClimaCoupler: Interfacer
 using Dates
-using ClimaCoupler.TimeManager: AbstractFrequency, Monthly, EveryTimestep, trigger_callback
 using ClimaComms
 export get_model_state_vector, checkpoint_model_state, restart_model_state!
 

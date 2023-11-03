@@ -8,8 +8,8 @@ import ClimaCoupler.FluxCalculator:
     extrapolate_ρ_to_sfc,
     get_surface_params
 using ClimaCore: Fields.level, Geometry
-import ClimaCoupler.FieldExchanger: get_thermo_params
-import ClimaCoupler.Interfacer: get_field, update_field!, name, get_model_state_vector
+import ClimaCoupler.Interfacer: get_field, update_field!, name
+import ClimaCoupler.Checkpointer: get_model_state_vector
 using StaticArrays
 
 # the clima atmos `integrator` is now defined

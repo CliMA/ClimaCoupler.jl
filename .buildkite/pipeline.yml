@@ -16,6 +16,8 @@ env:
   PERF_CONFIG_PATH: "config/perf_configs"
   MPI_CONFIG_PATH: "config/mpi_configs"
 
+  LD_LIBRARY_PATH: "/central/scratch/esm/slurm-buildkite/climaatmos-ci/depot/cpu/artifacts/e9feeabfa989549ac1dac61e4df5f2849149ad6d/lib/:${LD_LIBRARY_PATH}"
+
 timeout_in_minutes: 1440
 
 steps:

@@ -118,7 +118,7 @@ steps:
       - label: "Slabplanet_terra: coupler fluxes, evolving bucket"
         key: "slabplanet_terra" # SF at each coupler timestep, evolving ocean - comparing to the above run, tests the sensitivity of evolving bucket
         command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_terra.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet_aqua/slabplanet_terra_artifacts/*"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet_terra/slabplanet_terra_artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
         agents:
@@ -190,6 +190,18 @@ steps:
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
 
+      - label: "MPI AMIP FINE: new target slab aqua - evolving slab ocean T"
+        key: "slabplanet_aqua_new_target_evolve_ocn"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_aqua_new_target_evolve_ocn.yml"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_aqua_new_target_evolve_ocn_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
+
 
       - label: "MPI AMIP FINE: new target amip"
         key: "amip_new_target"
@@ -215,7 +227,7 @@ steps:
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
 
-      - label: "MPI AMIP FINE: new target amip"
+      - label: "MPI AMIP FINE: new target amip: topo"
         key: "amip_new_target_topo"
         command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_new_target_topo.yml"
         artifact_paths: "experiments/AMIP/modular/output/amip/amip_new_target_topo_artifacts/*"

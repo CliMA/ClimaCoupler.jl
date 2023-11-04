@@ -5,7 +5,7 @@ energy_check: false
 mode_name: "amip"
 mono_surface: false
 dt: "150secs"
-t_end: "200days" # TODO this has been decreased from 140 days to avoid instability #460
+t_end: "900days" # TODO this has been decreased from 140 days to avoid instability #460
 job_id: "amip_new_target_topo"
 dt_save_to_sol: "5days"
 dt_save_to_disk: "5days"

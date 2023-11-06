@@ -1,6 +1,8 @@
 # atmos_init: for ClimaAtmos pre-AMIP interface
-using ClimaAtmos: RRTMGPI
+import ClimaAtmos as CA
 import ClimaAtmos: CT1, CT2, CT12, CT3, C3, C12, unit_basis_vector_data, ⊗
+import SurfaceFluxes as SF
+
 import ClimaCoupler.FluxCalculator:
     atmos_turbulent_fluxes!,
     calculate_surface_air_density,
@@ -41,10 +43,19 @@ function get_atmos_config(coupler_dict)
             Dict("config_file" => atmos_config_file),
         )
     end
-    atmos_toml_file = coupler_dict["atmos_toml_file"]
-    if !isnothing(atmos_toml_file)
-        @info "Overwriting Atmos parameters from $atmos_toml_file"
-        atmos_config = merge(atmos_config, Dict("toml" => [joinpath(pkgdir(CA), atmos_toml_file)]))
+
+    # use coupler toml if atmos is not defined
+    atmos_toml_file = atmos_config["toml"]
+    coupler_toml_file = coupler_dict["coupler_toml_file"]
+    default_toml_file = "toml/default_coarse.toml"
+
+    toml_file = !isempty(atmos_toml_file) ? joinpath(pkgdir(CA), atmos_toml_file[1]) : nothing
+    toml_file = !isnothing(coupler_toml_file) ? joinpath(pkgdir(ClimaCoupler), coupler_toml_file) : toml_file
+    toml_file = isnothing(toml_file) ? joinpath(pkgdir(ClimaCoupler), default_toml_file) : toml_file
+
+    if !isnothing(toml_file)
+        @info "Overwriting Atmos parameters from $toml_file"
+        atmos_config = merge(atmos_config, Dict("toml" => [toml_file]))
     end
     return atmos_config
 end
@@ -123,14 +134,14 @@ function update_field!(atmos_sim::ClimaAtmosSimulation, ::Val{:co2_gm}, field)
 end
 # extensions required by the Interfacer
 function update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temperature}, csf)
-    sim.integrator.p.radiation_model.surface_temperature .= RRTMGPI.field2array(csf.T_S)
+    sim.integrator.p.radiation_model.surface_temperature .= CA.RRTMGPI.field2array(csf.T_S)
 end
 
 function update_field!(sim::ClimaAtmosSimulation, ::Val{:albedo}, field)
     sim.integrator.p.radiation_model.diffuse_sw_surface_albedo .=
-        reshape(RRTMGPI.field2array(field), 1, length(parent(field)))
+        reshape(CA.RRTMGPI.field2array(field), 1, length(parent(field)))
     sim.integrator.p.radiation_model.direct_sw_surface_albedo .=
-        reshape(RRTMGPI.field2array(field), 1, length(parent(field)))
+        reshape(CA.RRTMGPI.field2array(field), 1, length(parent(field)))
 end
 
 # get_surface_params required by FluxCalculator (partitioned fluxes)
@@ -241,11 +252,20 @@ requires that we define a new temporary parameter Tuple, `new_p`, and save the n
 in it. We do not want `new_p` to live in the atmospheric model permanently, because that would also
 trigger flux calculation during Atmos `step!`. We only want to trigger this once per coupling
 timestep from ClimaCoupler.
+
+For debigging atmos, we can set the following atmos defaults:
+ csf.z0m_S .= 1.0e-5
+ csf.z0b_S .= 1.0e-5
+ csf.beta .= 1
+ csf = merge(csf, (;q_sfc = nothing))
 """
 function atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
-    new_p = get_new_cache(atmos_sim, csf)
-    CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t)
-    atmos_sim.integrator.p.sfc_conditions .= new_p.sfc_conditions
+
+    if isnothing(atmos_sim.integrator.p.sfc_setup) # trigger flux calculation if not done in Atmos internally
+        new_p = get_new_cache(atmos_sim, csf)
+        CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t)
+        atmos_sim.integrator.p.sfc_conditions .= new_p.sfc_conditions
+    end
 end
 
 """
@@ -292,19 +312,19 @@ function get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:F_radiative_TOA})
         n_faces = length(z[:, 1, 1, 1, 1])
 
         LWd_TOA = Fields.level(
-            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_lw_flux_dn), face_space),
+            CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_lw_flux_dn), face_space),
             n_faces - half,
         )
         LWu_TOA = Fields.level(
-            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_lw_flux_up), face_space),
+            CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_lw_flux_up), face_space),
             n_faces - half,
         )
         SWd_TOA = Fields.level(
-            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_sw_flux_dn), face_space),
+            CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_sw_flux_dn), face_space),
             n_faces - half,
         )
         SWu_TOA = Fields.level(
-            RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_sw_flux_up), face_space),
+            CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_sw_flux_up), face_space),
             n_faces - half,
         )
 

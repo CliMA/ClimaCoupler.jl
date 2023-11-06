@@ -167,6 +167,7 @@ mono_surface = config_dict["mono_surface"]
 hourly_checkpoint = config_dict["hourly_checkpoint"]
 restart_dir = config_dict["restart_dir"]
 restart_t = Int(config_dict["restart_t"])
+evolving_ocean = config_dict["evolving_ocean"]
 
 ## I/O directory setup
 if isinteractive()
@@ -218,35 +219,36 @@ land_fraction =
     Regridder.land_fraction(FT, REGRID_DIR, comms_ctx, land_mask_data, "LSMASK", boundary_space, mono = mono_surface)
 
 #=
-### Land
-We use `ClimaLSM.jl`'s bucket model.
-=#
-land_sim = bucket_init(
-    FT,
-    FT.(tspan),
-    config_dict["land_domain_type"],
-    config_dict["land_albedo_type"],
-    comms_ctx,
-    REGRID_DIR;
-    dt = FT(Δt_cpl),
-    space = boundary_space,
-    saveat = FT(saveat),
-    area_fraction = land_fraction,
-    date_ref = date0,
-    t_start = FT(0),
-)
-
-#=
 ### Ocean and Sea Ice
 In the `AMIP` mode, all ocean properties are prescribed from a file, while sea-ice temperatures are calculated using observed
 SIC and assuming a 2m thickness of the ice.
 
 In the `SlabPlanet` mode, all ocean and sea ice are dynamical models, namely thermal slabs, with different parameters.
+
+### Land
+If evolving, use `ClimaLSM.jl`'s bucket model.
 =#
 
 @info mode_name
 if mode_name == "amip"
     @info "AMIP boundary conditions - do not expect energy conservation"
+
+    ## land
+    land_sim = bucket_init(
+        FT,
+        FT.(tspan),
+        config_dict["land_domain_type"],
+        config_dict["land_albedo_type"],
+        config_dict["land_temperature_anomaly"],
+        comms_ctx,
+        REGRID_DIR;
+        dt = FT(Δt_cpl),
+        space = boundary_space,
+        saveat = FT(saveat),
+        area_fraction = land_fraction,
+        date_ref = date0,
+        t_start = FT(0),
+    )
 
     ## ocean
     SST_info = bcfile_info_init(
@@ -276,6 +278,7 @@ if mode_name == "amip"
         phase = TD.Liquid(),
         thermo_params = thermo_params,
     ))
+
     ## sea ice
     SIC_info = bcfile_info_init(
         FT,
@@ -323,7 +326,28 @@ if mode_name == "amip"
 
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
 
-elseif mode_name == "slabplanet"
+elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
+
+    land_fraction = mode_name == "slabplanet_aqua" ? land_fraction .* 0 : land_fraction
+    land_fraction = mode_name == "slabplanet_terra" ? land_fraction .* 0 .+ 1 : land_fraction
+
+    ## land
+    land_sim = bucket_init(
+        FT,
+        FT.(tspan),
+        config_dict["land_domain_type"],
+        config_dict["land_albedo_type"],
+        config_dict["land_temperature_anomaly"],
+        comms_ctx,
+        REGRID_DIR;
+        dt = FT(Δt_cpl),
+        space = boundary_space,
+        saveat = FT(saveat),
+        area_fraction = land_fraction,
+        date_ref = date0,
+        t_start = FT(0),
+    )
+
     ## ocean
     ocean_sim = ocean_init(
         FT;
@@ -333,6 +357,7 @@ elseif mode_name == "slabplanet"
         saveat = saveat,
         area_fraction = (FT(1) .- land_fraction), ## NB: this ocean fraction includes areas covered by sea ice (unlike the one contained in the cs)
         thermo_params = thermo_params,
+        evolving = evolving_ocean,
     )
 
     ## sea ice (here set to zero area coverage)
@@ -351,6 +376,24 @@ elseif mode_name == "slabplanet"
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
 
 elseif mode_name == "slabplanet_eisenman"
+
+    ## land
+    land_sim = bucket_init(
+        FT,
+        FT.(tspan),
+        config_dict["land_domain_type"],
+        config_dict["land_albedo_type"],
+        config_dict["land_temperature_anomaly"],
+        comms_ctx,
+        REGRID_DIR;
+        dt = FT(Δt_cpl),
+        space = boundary_space,
+        saveat = FT(saveat),
+        area_fraction = land_fraction,
+        date_ref = date0,
+        t_start = FT(0),
+    )
+
     ## ocean
     ocean_sim = ocean_init(
         FT;
@@ -449,7 +492,7 @@ end
 
 dir_paths = (; output = COUPLER_OUTPUT_DIR, artifacts = COUPLER_ARTIFACTS_DIR)
 checkpoint_cb =
-    HourlyCallback(dt = FT(48), func = checkpoint_sims, ref_date = [dates.date[1]], active = hourly_checkpoint) # bi-daily
+    HourlyCallback(dt = FT(480), func = checkpoint_sims, ref_date = [dates.date[1]], active = hourly_checkpoint) # 20 days
 update_firstdayofmonth!_cb =
     MonthlyCallback(dt = FT(1), func = update_firstdayofmonth!, ref_date = [dates.date1[1]], active = true) # for BCReader
 callbacks = (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb)
@@ -550,7 +593,7 @@ function solve_coupler!(cs)
 
         ## print date on the first of month
         if cs.dates.date[1] >= cs.dates.date1[1]
-            @show(cs.dates.date[1])
+            ClimaComms.iamroot(comms_ctx) ? @show(cs.dates.date[1]) : nothing
         end
 
         if cs.mode.name == "amip"

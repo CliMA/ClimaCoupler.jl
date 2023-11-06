@@ -5,7 +5,7 @@ vert_diff: "true"
 rad: "gray"
 energy_check: true
 mode_name: "slabplanet_eisenman"
-t_end: "10days"
+t_end: "2days"
 dt_save_to_sol: "9days"
 dt_cpl: 200
 dt: "200secs"

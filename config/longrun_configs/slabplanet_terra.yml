@@ -1,11 +1,11 @@
-run_name: "interactive_debug_run"
-job_id: "interactive_debug_run"
+run_name: "slabplanet_terra"
+job_id: "slabplanet_terra"
 moist: "equil"
 vert_diff: "true"
 rad: "gray"
 precip_model: "0M"
 energy_check: true
-mode_name: "slabplanet"
+mode_name: "slabplanet_terra"
 t_end: "20days"
 dt_save_to_sol: "10days"
 dt_cpl: 200
@@ -17,5 +17,4 @@ apply_limiter: false
 turb_flux_partition: "CombinedStateFluxes"
 surface_setup: "PrescribedSurface"
 land_albedo_type: "function"
-evolving_ocean: true
 start_date: "19790301"

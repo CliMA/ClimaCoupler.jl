@@ -1,6 +1,5 @@
 agents:
   queue: central
-  slurm_mem: 8G
   slurm_time: 24:00:00
   modules: julia/1.9.3 cuda/12.2 ucx/1.14.1_cuda-12.2 openmpi/4.1.5_cuda-12.2 hdf5/1.12.2-ompi415 nsight-systems/2023.2.1
 
@@ -24,7 +23,6 @@ steps:
   - label: "init environment :computer:"
     key: "init_cpu_env"
     command:
-      # - "echo $$JULIA_DEPOT_PATH"
 
       - echo "--- Configure MPI"
       - julia -e 'using Pkg; Pkg.add("MPIPreferences"); using MPIPreferences; use_system_binary()'

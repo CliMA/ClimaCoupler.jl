@@ -564,7 +564,7 @@ elseif turbulent_fluxes isa PartitionedStateFluxes
     # TODO: this is hard coded and needs to be simplified (need CA modification)
     new_p = get_new_cache(atmos_sim, cs.fields)
     CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) # sets T_sfc (but SF calculation not necessary - CA)
-    atmos_sim.integrator.p.sfc_conditions .= new_p.sfc_conditions
+    atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
 end
 
 # 4) given the new sfc_conditions, atmos calls the radiative flux callback
@@ -649,7 +649,7 @@ function solve_coupler!(cs)
             # update atmos sfc_conditions for surface temperature - TODO: this needs to be simplified (need CA modification)
             new_p = get_new_cache(atmos_sim, cs.fields)
             CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) # to set T_sfc (but SF calculation not necessary - CA modification)
-            atmos_sim.integrator.p.sfc_conditions .= new_p.sfc_conditions
+            atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
         end
 
         import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # radiative and/or turbulent

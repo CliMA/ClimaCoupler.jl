@@ -12,7 +12,8 @@ Air temperature (K).
 """
 function get_var(cs::CoupledSimulation, ::Val{:T})
     p = cs.model_sims.atmos_sim.integrator.p
-    (; ᶜts, params) = p
+    (; ᶜts) = p.precomputed
+    (; params) = p
     thermo_params = CAP.thermodynamics_params(params)
     @. TD.air_temperature(thermo_params, ᶜts)
 end
@@ -41,7 +42,8 @@ Cloud specific humidity (g kg⁻¹).
 """
 function get_var(cs::CoupledSimulation, ::Val{:q_liq_ice})
     p = cs.model_sims.atmos_sim.integrator.p
-    (; ᶜts, params) = p
+    (; ᶜts) = p.precomputed
+    (; params) = p
     thermo_params = CAP.thermodynamics_params(params)
     TD.liquid_specific_humidity.(thermo_params, ᶜts) .* float_type(cs)(1000)
 end
@@ -59,19 +61,19 @@ function get_var(cs::CoupledSimulation, ::Val{:toa_fluxes})
     n_faces = length(z[:, 1, 1, 1, 1])
 
     LWd_TOA = Fields.level(
-        CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_lw_flux_dn), face_space),
+        CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_lw_flux_dn), face_space),
         n_faces - half,
     )
     LWu_TOA = Fields.level(
-        CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_lw_flux_up), face_space),
+        CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_lw_flux_up), face_space),
         n_faces - half,
     )
     SWd_TOA = Fields.level(
-        CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_sw_flux_dn), face_space),
+        CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_sw_flux_dn), face_space),
         n_faces - half,
     )
     SWu_TOA = Fields.level(
-        CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation_model.face_sw_flux_up), face_space),
+        CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_sw_flux_up), face_space),
         n_faces - half,
     )
 
@@ -87,8 +89,8 @@ Precipitation rate (Kg m⁻² s⁻¹).
 get_var(cs::CoupledSimulation, ::Val{:precipitation_rate}) =
     .-swap_space!(
         zeros(cs.boundary_space),
-        cs.model_sims.atmos_sim.integrator.p.col_integrated_rain .+
-        cs.model_sims.atmos_sim.integrator.p.col_integrated_snow,
+        cs.model_sims.atmos_sim.integrator.p.precipitation.col_integrated_rain .+
+        cs.model_sims.atmos_sim.integrator.p.precipitation.col_integrated_snow,
     )
 
 # coupler diagnotics

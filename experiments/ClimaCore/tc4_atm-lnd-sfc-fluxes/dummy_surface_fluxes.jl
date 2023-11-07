@@ -94,7 +94,8 @@ function calculate_sfc_fluxes(formulation::DryMonin, parameters, θ_sfc, θ_1, u
         z_0,
         θ_basic,
         z_in,
-        SF.FVScheme(),
+        SF.PointValueScheme(),
+        # TODO Check if statement below is still problematic
         maxiter = 500, # often unconverged + coeffs v small, check with FMS (esp Mo_params_guess), update for conditional states
     )
 

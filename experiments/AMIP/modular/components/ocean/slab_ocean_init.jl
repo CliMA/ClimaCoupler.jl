@@ -32,6 +32,7 @@ struct OceanSlabParameters{FT <: AbstractFloat}
     z0m::FT
     z0b::FT
     α::FT
+    evolving_switch::FT
 end
 name(::SlabOceanSimulation) = "SlabOceanSimulation"
 
@@ -45,7 +46,7 @@ function slab_ocean_space_init(::Type{FT}, space, p) where {FT}
 
         T_sfc_0 = FT(p.T_init) #- FT(275) # close to the average of T_1 in atmos
         anomaly = false
-        anomaly_tropics = false
+        anomaly_tropics = true
         anom = FT(0)
         radlat = coord.lat / FT(180) * pi
         if anomaly == true
@@ -55,7 +56,7 @@ function slab_ocean_space_init(::Type{FT}, space, p) where {FT}
             stdev = FT(5) / FT(180) * pi
             anom = anom_ampl * exp(-((radlat - lat_0)^2 / 2stdev^2 + (radlon - lon_0)^2 / 2stdev^2))
         elseif anomaly_tropics == true
-            anom = FT(20 * cos(radlat)^4)
+            anom = FT(29) * exp(-coord.lat^2 / (2 * 26^2))
         end
         T_sfc = T_sfc_0 + anom
     end
@@ -71,7 +72,7 @@ function slab_ocean_rhs!(dY, Y, cache, t)
     p, F_turb_energy, F_radiative, area_fraction = cache
     FT = eltype(Y.T_sfc)
     rhs = @. -(F_turb_energy + F_radiative) / (p.h * p.ρ * p.c)
-    parent(dY.T_sfc) .= parent(rhs .* Regridder.binary_mask.(area_fraction, threshold = eps(FT)))
+    parent(dY.T_sfc) .= parent(rhs .* Regridder.binary_mask.(area_fraction, threshold = eps(FT))) * p.evolving_switch
 
     @. cache.q_sfc = TD.q_vap_saturation_generic.(cache.thermo_params, Y.T_sfc, cache.ρ_sfc, TD.Liquid())
 end
@@ -81,9 +82,21 @@ end
 
 Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `step!` in the coupling loop.
 """
-function ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, thermo_params, stepper = CTS.RK4()) where {FT}
+function ocean_init(
+    ::Type{FT};
+    tspan,
+    dt,
+    saveat,
+    space,
+    area_fraction,
+    thermo_params,
+    stepper = CTS.RK4(),
+    evolving = true,
+) where {FT}
 
-    params = OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(280.0), FT(1e-3), FT(1e-5), FT(0.06))
+    evolving_switch = evolving ? FT(1) : FT(0)
+    params =
+        OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(271.0), FT(1e-5), FT(1e-5), FT(0.38), evolving_switch)
 
     Y, space = slab_ocean_space_init(FT, space, params)
     cache = (

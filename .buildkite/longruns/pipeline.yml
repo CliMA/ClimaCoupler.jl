@@ -16,7 +16,6 @@ env:
 
   LD_LIBRARY_PATH: "/central/scratch/esm/slurm-buildkite/climaatmos-ci/depot/cpu/artifacts/e9feeabfa989549ac1dac61e4df5f2849149ad6d/lib/:${LD_LIBRARY_PATH}"
 
-
 timeout_in_minutes: 1440
 
 steps:
@@ -51,14 +50,15 @@ steps:
 
   - wait
 
-  - group: "Targeted resolution coupled AMIP long runs"
+  - group: "Coupler integration and conservation tests"
 
     steps:
 
-      - label: "Slabplanet: default"
-        key: "slabplanet_default_longrun"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_default_longrun.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/*"
+      # Integration tests - the expected results were also confirmed locally
+      - label: "Slabplanet_aqua: nocouple"
+        key: "slabplanet_aqua_atmos_sf_nocouple" # SF at each Atmos stage, no coupling, prescribed SST from atmos
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_aqua_atmos_sf_nocouple.yml"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet_aqua/slabplanet_aqua_atmos_sf_nocouple_artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
         agents:
@@ -66,12 +66,81 @@ steps:
           slurm_nodes: 1
           slurm_mem_per_cpu: 16G
 
-      # DYAMOND AMIP: 1 day (convection resolving)
+      - label: "Slabplanet_aqua: couple"
+        key: "slabplanet_aqua_atmos_sf_couple" # SF at each Atmos stage, coupling, prescribed SST from coupler - identical results to the above confirm 1) initial conditions in Atmos are unchanged compared to the slab, 2) coupling not introducing variability when constant surface
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_aqua_atmos_sf_couple.yml"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet_aqua/slabplanet_aqua_atmos_sf_couple_artifacts/*"
+        env:
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 1
+          slurm_nodes: 1
+          slurm_mem_per_cpu: 16G
 
-      - label: "MPI AMIP SUPERFINE: dyamond_target"
-        key: "dyamond_target"
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/dyamond_target.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/dyamond_target_artifacts/*"
+      - label: "Slabplanet_aqua: coupler fluxes"
+        key: "slabplanet_aqua_coupler_sf" # SF at each coupler timestep, constant ocean - comparing to the above runs, this tests the sensitivity of less frequent flux calculation
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_aqua_coupler_sf.yml"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet_aqua/slabplanet_aqua_coupler_sf_artifacts/*"
+        env:
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 1
+          slurm_nodes: 1
+          slurm_mem_per_cpu: 16G
+
+      - label: "Slabplanet_aqua: coupler fluxes, evolving ocean"
+        key: "slabplanet_aqua_coupler_sf_evolve_ocn" # SF at each coupler timestep, evolving ocean - comparing to the above run, tests the sensitivity of evolving ocean
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_aqua_coupler_sf_evolve_ocn.yml"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet_aqua/slabplanet_aqua_coupler_sf_evolve_ocn_artifacts/*"
+        env:
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 1
+          slurm_nodes: 1
+          slurm_mem_per_cpu: 16G
+
+      - label: "Slabplanet_terra: coupler fluxes, evolving bucket"
+        key: "slabplanet_terra" # SF at each coupler timestep, evolving ocean - comparing to the above run, tests the sensitivity of evolving bucket
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_terra.yml"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet_terra/slabplanet_terra_artifacts/*"
+        env:
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 1
+          slurm_nodes: 1
+          slurm_mem_per_cpu: 16G
+
+      - label: "Slabplanet: coupler fluxes, evolving ocean and land"
+        key: "slabplanet_coupler_sf_evolve_ocn"
+        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_coupler_sf_evolve_ocn.yml"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_coupler_sf_evolve_ocn_artifacts/*"
+        env:
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 1
+          slurm_nodes: 1
+          slurm_mem_per_cpu: 16G
+
+  - group: "Current target tests: idealized surface"
+
+    steps:
+
+      - label: "ClimaAtmos standalone target"
+        command:
+          - srun julia --project=experiments/AMIP/modular/ target/atmos_driver.jl --config_file target/longrun_aquaplanet_rhoe_equilmoist_nz63_0M_55km_rs35km_clearsky_tvinsolation.yml
+        artifact_paths: "longrun_aquaplanet_rhoe_equilmoist_nz63_0M_55km_rs35km_clearsky_tvinsolation/*"
+        env:
+          BUILD_HISTORY_HANDLE: ""
+          CLIMACORE_DISTRIBUTED: "MPI"
+        agents:
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
+
+      - label: "TARGET IDEALIZED: new target aqua - fixed ocean T, nocouple, atmos flux calc"
+        key: "slabplanet_aqua_target_nocouple"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_aqua_target_nocouple.yml"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet_aqua/slabplanet_aqua_target_nocouple_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
           BUILD_HISTORY_HANDLE: ""
@@ -80,11 +149,94 @@ steps:
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
 
-      # mid-resolution AMIP: longrun (140 days)
-      - label: "MPI AMIP FINE: target longrun"
-        key: "amip_longrun_target"
-        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_longrun_target.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/amip_longrun_target_artifacts/*"
+      - label: "TARGET IDEALIZED: new target aqua - fixed ocean T, coupler flux calc"
+        key: "slabplanet_aqua_target"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_aqua_target.yml"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet_aqua/slabplanet_aqua_target_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
+
+      - label: "TARGET IDEALIZED: new target aqua - evolving slab ocean T"
+        key: "slabplanet_aqua_target_evolve_ocn"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_aqua_target_evolve_ocn.yml"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet_aqua/slabplanet_aqua_target_evolve_ocn_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
+
+      - label: "TARGET IDEALIZED: new target slab - fixed ocean T, bucket"
+        key: "slabplanet_target"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_target.yml"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_target_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
+
+      - label: "TARGET IDEALIZED: new target slab - evolving slab ocean T, bucket"
+        key: "slabplanet_target_evolve_ocn"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_target_evolve_ocn.yml"
+        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_target_evolve_ocn_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
+
+
+  - group: "Current target tests: AMIP surface"
+
+    steps:
+
+      - label: "MPI AMIP FINE: new target amip"
+        key: "amip_target"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_target.yml"
+        artifact_paths: "experiments/AMIP/modular/output/amip/amip_target_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
+
+      - label: "MPI AMIP FINE: new target amip: topo"
+        key: "amip_target_topo"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/amip_target_topo.yml"
+        artifact_paths: "experiments/AMIP/modular/output/amip/amip_target_topo_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
+
+
+  - group: "Other AMIP targets"
+
+    steps:
+
+      # DYAMOND AMIP: 1 day (convection resolving)
+
+      - label: "MPI AMIP SUPERFINE: dyamond_target"
+        key: "dyamond_target"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/dyamond_target.yml"
+        artifact_paths: "experiments/AMIP/modular/output/amip/dyamond_target_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
           BUILD_HISTORY_HANDLE: ""
@@ -190,14 +342,14 @@ steps:
 
       - label: ":envelope: Slack report: Slabplanet"
         command:
-          - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/total_energy_log_bucket.png -m png -n slab_coarse_log -x "Slabplanet energy conservation (log error)"
-          - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/total_energy_bucket.png -m png -n slab_coarse -x "Slabplanet energy conservation"
-          - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/total_water_log_bucket.png -m png -n slab_coarse_w_log -x "Slabplanet water conservation (log error)"
-          - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_default_longrun_artifacts/total_water_bucket.png -m png -n slab_coarse_w -x "Slabplanet water conservation"
+          - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_coupler_sf_evolve_ocn_artifacts/total_energy_log_bucket.png -m png -n slab_coarse_log -x "Slabplanet energy conservation (log error)"
+          - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_coupler_sf_evolve_ocn_artifacts/total_energy_bucket.png -m png -n slab_coarse -x "Slabplanet energy conservation"
+          - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_coupler_sf_evolve_ocn_artifacts/total_water_log_bucket.png -m png -n slab_coarse_w_log -x "Slabplanet water conservation (log error)"
+          - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/slabplanet/slabplanet_coupler_sf_evolve_ocn_artifacts/total_water_bucket.png -m png -n slab_coarse_w -x "Slabplanet water conservation"
 
       - label: ":envelope: Slack report: target AMIP"
         command:
-          - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/amip/amip_longrun_target_artifacts/amip_paperplots.png -m png -n amip_fine -x "AMIP Target Longrun"
+          - slack-upload -c "#coupler-report" -f experiments/AMIP/modular/output/amip/amip_target_artifacts/amip_paperplots.png -m png -n amip_fine -x "AMIP Target Longrun"
 
       - label: ":envelope: Slack report: Flame Diff"
         command:

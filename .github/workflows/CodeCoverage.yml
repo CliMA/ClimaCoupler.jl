@@ -2,8 +2,6 @@ name: Code Coverage
 
 on:
    push:
-     branches:
-       - main
      tags: '*'
    pull_request:
 

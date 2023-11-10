@@ -3,9 +3,7 @@ name: Documentation
 on:
   push:
     branches:
-      - main
-      - trying
-      - staging
+      - "main"
     tags: '*'
   pull_request:
 

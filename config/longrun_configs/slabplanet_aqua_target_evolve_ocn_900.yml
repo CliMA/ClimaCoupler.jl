@@ -1,12 +1,12 @@
-run_name: "slabplanet_target_evolve_ocn"
+run_name: "slabplanet_aqua_target_evolve_ocn_900"
 anim: true
 dt_cpl: 150
 energy_check: true
-mode_name: "slabplanet"
+mode_name: "slabplanet_aqua"
 mono_surface: false
 dt: "150secs"
-t_end: "200days"
-job_id: "slabplanet_target_evolve_ocn"
+t_end: "900days"
+job_id: "slabplanet_aqua_target_evolve_ocn_900"
 dt_save_to_sol: "10days"
 dt_save_to_disk: "20days"
 apply_limiter: false

@@ -5,7 +5,7 @@ energy_check: false
 mode_name: "amip"
 mono_surface: false
 dt: "150secs"
-t_end: "100days"
+t_end: "900days"
 job_id: "amip_target_topo"
 dt_save_to_sol: "10days"
 dt_save_to_disk: "20days"

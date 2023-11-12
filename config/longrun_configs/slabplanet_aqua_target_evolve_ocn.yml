@@ -1,7 +1,7 @@
 run_name: "slabplanet_aqua_target_evolve_ocn"
 anim: true
 dt_cpl: 150
-energy_check: true
+energy_check: false
 mode_name: "slabplanet_aqua"
 mono_surface: false
 dt: "150secs"

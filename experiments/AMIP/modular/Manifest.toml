@@ -235,8 +235,8 @@ weakdeps = ["SparseArrays"]
 
 [[deps.ClimaAtmos]]
 deps = ["ArgParse", "ArtifactWrappers", "Artifacts", "AtmosphericProfilesLibrary", "CLIMAParameters", "CUDA", "ClimaComms", "ClimaCore", "ClimaTimeSteppers", "CloudMicrophysics", "Colors", "Dates", "Dierckx", "DiffEqBase", "DiffEqCallbacks", "Distributions", "DocStringExtensions", "FastGaussQuadrature", "ImageFiltering", "Insolation", "Interpolations", "IntervalSets", "JLD2", "Krylov", "LambertW", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "OrdinaryDiffEq", "Pkg", "Printf", "RRTMGP", "Random", "RootSolvers", "SciMLBase", "StaticArrays", "Statistics", "StatsBase", "SurfaceFluxes", "TerminalLoggers", "Test", "Thermodynamics", "YAML"]
-git-tree-sha1 = "908b0a3c6449a2528bd2d01510a204d0a13fa555"
-repo-rev = "4b69de60b4095ce42a332ba7526aa162558fb25b"
+git-tree-sha1 = "5ac19390ebf110662aece231bde1f0ff6120b6af"
+repo-rev = "b0d1cb4b1fb7b0ef8c094dc5e1de065ddc586236"
 repo-url = "https://github.com/CliMA/ClimaAtmos.jl.git"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
 version = "0.16.2"

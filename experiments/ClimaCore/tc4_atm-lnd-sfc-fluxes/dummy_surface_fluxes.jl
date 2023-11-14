@@ -21,9 +21,8 @@ SF.surface_conditions(
     universal_func::Union{Nothing, F} = SF.UniversalFunctions.Businger,
     sol_type::NS.SolutionType = NS.CompactSolution(),
     tol::NS.AbstractTolerance = NS.ResidualTolerance{FT}(sqrt(eps(FT))),
-    maxiter::Int = 10_000,
 ) where {FT <: AbstractFloat, APS, F} =
-    SF.surface_conditions(args..., wθ_flux_star, universal_func, sol_type, tol, maxiter)
+    SF.surface_conditions(args..., wθ_flux_star, universal_func, sol_type, tol)
 
 calculate_sfc_fluxes_energy(formulation::LinearRelaxation, p, θ_sfc, θ_1) = p.λ .* (θ_sfc .- θ_1)
 
@@ -95,8 +94,6 @@ function calculate_sfc_fluxes(formulation::DryMonin, parameters, θ_sfc, θ_1, u
         θ_basic,
         z_in,
         SF.PointValueScheme(),
-        # TODO Check if statement below is still problematic
-        maxiter = 500, # often unconverged + coeffs v small, check with FMS (esp Mo_params_guess), update for conditional states
     )
 
     C_exchange = output.C_exchange

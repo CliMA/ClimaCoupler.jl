@@ -192,6 +192,7 @@ function bucket_init(
         # By default, this uses a file containing bareground albedo without a time component. Snow albedo is specified separately.
         if ClimaComms.iamroot(comms_ctx)
             albedo = BulkAlbedoStatic{FT}(regrid_dirpath, α_snow = α_snow)
+        end
         ClimaComms.barrier(comms_ctx)
         albedo = BulkAlbedoStatic{FT}(regrid_dirpath, α_snow = α_snow)
     elseif albedo_type == "map_temporal" # Read in albedo from data file containing data over time

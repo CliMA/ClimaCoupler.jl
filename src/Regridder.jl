@@ -26,14 +26,15 @@ export write_to_hdf5,
     combine_surfaces!,
     combine_surfaces_from_sol!,
     binary_mask,
-    nans_to_zero
+    nans_to_zero,
+    cgll2latlonz
 
 
 #= Converts NaNs to zeros of the same type. =#
 nans_to_zero(v) = isnan(v) ? typeof(v)(0) : v
 
 """
-    reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R)
+    reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R, ::Spaces.SpectralElementSpace2D)
 
 Reshapes a sparse vector array `in_array` (CGLL, raw output of the TempestRemap),
 and uses its data to populate the input Field object `field`.
@@ -43,20 +44,63 @@ Redundant nodes are populated using `dss` operations.
 - `field`: [Fields.Field] object populated with the input array.
 - `in_array`: [Array] input used to fill `field`.
 - `R`: [NamedTuple] containing `target_idxs` and `row_indices` used for indexing.
+- `space`: [Spaces.SpectralElementSpace2D] 2d space to which we are mapping.
 """
-function reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R)
+function reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::SubArray, R, ::Spaces.SpectralElementSpace2D)
     field_array = parent(field)
 
     fill!(field_array, zero(eltype(field_array)))
     Nf = size(field_array, 3)
 
+    # populate the field by iterating over the sparse vector per face
     for (n, row) in enumerate(R.row_indices)
-        it, jt, et = (view(R.target_idxs[1], n), view(R.target_idxs[2], n), view(R.target_idxs[3], n))
+        it, jt, et = (view(R.target_idxs[1], n), view(R.target_idxs[2], n), view(R.target_idxs[3], n)) # cgll_x, cgll_y, elem
         for f in 1:Nf
             field_array[it, jt, f, et] .= in_array[row]
         end
     end
 
+    # broadcast to the redundant nodes using unweighted dss
+    space = axes(field)
+    topology = Spaces.topology(space)
+    hspace = Spaces.horizontal_space(space)
+    Spaces.dss!(Fields.field_values(field), topology, hspace.quadrature_style)
+end
+
+"""
+    reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R, ::Spaces.ExtrudedFiniteDifferenceSpace)
+
+Reshapes a sparse vector array `in_array` (CGLL, raw output of the TempestRemap),
+and uses its data to populate the input Field object `field`.
+Redundant nodes are populated using `dss` operations.
+
+# Arguments
+- `field`: [Fields.Field] object populated with the input array.
+- `in_array`: [Array] input used to fill `field`.
+- `R`: [NamedTuple] containing `target_idxs` and `row_indices` used for indexing.
+- `space`: [Spaces.ExtrudedFiniteDifferenceSpace] 3d space to which we are mapping.
+"""
+function reshape_cgll_sparse_to_field!(
+    field::Fields.Field,
+    in_array::SubArray,
+    R,
+    ::Spaces.ExtrudedFiniteDifferenceSpace,
+)
+    field_array = parent(field)
+
+    fill!(field_array, zero(eltype(field_array)))
+    Nf = size(field_array, 4)
+    Nz = size(field_array, 1)
+
+    # populate the field by iterating over height, then over the sparse vector per face
+    for z in 1:Nz
+        for (n, row) in enumerate(R.row_indices)
+            it, jt, et = (view(R.target_idxs[1], n), view(R.target_idxs[2], n), view(R.target_idxs[3], n)) # cgll_x, cgll_y, elem
+            for f in 1:Nf
+                field_array[z, it, jt, f, et] .= in_array[row, z]
+            end
+        end
+    end
     # broadcast to the redundant nodes using unweighted dss
     space = axes(field)
     topology = Spaces.topology(space)
@@ -112,10 +156,22 @@ function hdwrite_regridfile_rll_to_cgll(
     meshfile_overlap = joinpath(REGRID_DIR, outfile_root * "_mesh_overlap.g")
     weightfile = joinpath(REGRID_DIR, outfile_root * "_remap_weights.nc")
 
-    topology = Topologies.Topology2D(space.topology.mesh, Topologies.spacefillingcurve(space.topology.mesh))
-    Nq = Spaces.Quadratures.polynomial_degree(space.quadrature_style) + 1
-    space_undistributed = Spaces.SpectralElementSpace2D(topology, Spaces.Quadratures.GLL{Nq}())
+    if space isa Spaces.ExtrudedFiniteDifferenceSpace
+        space2d = Spaces.horizontal_space(space)
+    else
+        space2d = space
+    end
 
+    topology = Topologies.Topology2D(space2d.topology.mesh, Topologies.spacefillingcurve(space2d.topology.mesh))
+    Nq = Spaces.Quadratures.polynomial_degree(space2d.quadrature_style) + 1
+    space2d_undistributed = Spaces.SpectralElementSpace2D(topology, Spaces.Quadratures.GLL{Nq}())
+
+    if space isa Spaces.ExtrudedFiniteDifferenceSpace
+        vert_center_space = Spaces.CenterFiniteDifferenceSpace(space.vertical_topology.mesh)
+        space_undistributed = Spaces.ExtrudedFiniteDifferenceSpace(space2d_undistributed, vert_center_space)
+    else
+        space_undistributed = space2d_undistributed
+    end
     if isfile(datafile_cgll) == false
         isdir(REGRID_DIR) ? nothing : mkpath(REGRID_DIR)
 
@@ -140,24 +196,15 @@ function hdwrite_regridfile_rll_to_cgll(
         @warn "Using the existing $datafile_cgll : check topology is consistent"
     end
 
-    function get_time(ds)
-        if "time" in ds
-            data_dates = Dates.DateTime.(ds["time"][:])
-        elseif "date" in ds
-            data_dates = TimeManager.strdate_to_datetime.(string.(ds["date"][:]))
-        else
-            @warn "No dates available in file $datafile_rll"
-            data_dates = [Dates.DateTime(0)]
-        end
-    end
-
     # read the remapped file with sparse matrices
-    offline_outvector, times = NCDataset(datafile_cgll, "r") do ds_wt
+    offline_outvector, coords = NCDataset(datafile_cgll, "r") do ds_wt
         (
-            offline_outvector = ds_wt[varname][:][:, :], # ncol, times
-            times = get_time(ds_wt),
+            offline_outvector = Array(ds_wt[varname])[:, :, :], # ncol, z, times
+            coords = get_coords(ds_wt, space),
         )
     end
+
+    times = coords[1]
 
     # weightfile info needed to populate all nodes and save into fields with
     #  sparse matrices
@@ -166,8 +213,8 @@ function hdwrite_regridfile_rll_to_cgll(
     end
 
     target_unique_idxs =
-        out_type == "cgll" ? collect(Spaces.unique_nodes(space_undistributed)) :
-        collect(Spaces.all_nodes(space_undistributed))
+        out_type == "cgll" ? collect(Spaces.unique_nodes(space2d_undistributed)) :
+        collect(Spaces.all_nodes(space2d_undistributed))
     target_unique_idxs_i = map(row -> target_unique_idxs[row][1][1], row_indices)
     target_unique_idxs_j = map(row -> target_unique_idxs[row][1][2], row_indices)
     target_unique_idxs_e = map(row -> target_unique_idxs[row][2], row_indices)
@@ -179,9 +226,16 @@ function hdwrite_regridfile_rll_to_cgll(
 
     offline_fields = ntuple(x -> similar(offline_field), length(times))
 
-    ntuple(x -> reshape_cgll_sparse_to_field!(offline_fields[x], offline_outvector[:, x], R), length(times))
+    ntuple(
+        x -> reshape_cgll_sparse_to_field!(
+            offline_fields[x],
+            selectdim(offline_outvector, length(coords) + 1, x),
+            R,
+            space,
+        ),
+        length(times),
+    )
 
-    # TODO: extend write! to handle time-dependent fields
     map(
         x -> write_to_hdf5(
             REGRID_DIR,
@@ -194,6 +248,41 @@ function hdwrite_regridfile_rll_to_cgll(
         1:length(times),
     )
     jldsave(joinpath(REGRID_DIR, hd_outfile_root * "_times.jld2"); times = times)
+end
+
+"""
+    get_coords(ds, ::Spaces.ExtrudedFiniteDifferenceSpace)
+    get_coords(ds, ::Spaces.SpectralElementSpace2D)
+
+Extracts the coordinates from a NetCDF file `ds`. The coordinates are
+returned as a tuple of arrays, one for each dimension. The dimensions are
+determined by the space type.
+"""
+function get_coords(ds, ::Spaces.ExtrudedFiniteDifferenceSpace)
+    data_dates = get_time(ds)
+    z = ds["z"][:]
+    return (data_dates, z)
+end
+function get_coords(ds, ::Spaces.SpectralElementSpace2D)
+    data_dates = get_time(ds)
+    return (data_dates,)
+end
+
+"""
+    get_time(ds)
+
+Extracts the time information from a NetCDF file `ds`.
+"""
+function get_time(ds)
+    if "time" in ds
+        data_dates = Dates.DateTime.(ds["time"][:])
+    elseif "date" in ds
+        data_dates = TimeManager.strdate_to_datetime.(string.(Int.(ds["date"][:])))
+    else
+        @warn "No dates available in file $datafile_rll"
+        data_dates = [Dates.DateTime(0)]
+    end
+    return data_dates
 end
 
 """
@@ -485,5 +574,50 @@ function combine_surfaces_from_sol!(combined_field::Fields.Field, fractions::Nam
     end
     warn_nans && @warn "NaNs were detected and converted to zeros."
 end
+
+"""
+    read_remapped_field(name::Symbol, datafile_latlon::String, lev_name = "z")
+
+Extract data and coordinates from `datafile_latlon`.
+"""
+function read_remapped_field(name::Symbol, datafile_latlon::String, lev_name = "z")
+    out = NCDataset(datafile_latlon, "r") do nc
+        lon = nc["lon"][:]
+        lat = nc["lat"][:]
+        lev = lev_name in keys(nc) ? nc[lev_name][:] : Float64(-999)
+        var = nc[name][:]
+        coords = (; lon = lon, lat = lat, lev = lev)
+
+        (var, coords)
+    end
+
+    return out
+end
+
+
+"""
+    function cgll2latlonz(field; DIR = "cgll2latlonz_dir", nlat = 360, nlon = 720, clean_dir = true)
+
+Regrids a field from CGLL to an RLL array using TempestRemap. It can hanlde multiple other dimensions, such as time and level.
+
+# Arguments
+- `field`: [Fields.Field] to be remapped.
+- `DIR`: [String] directory used for remapping.
+- `nlat`: [Int] number of latitudes of the regridded array.
+- `nlon`: [Int] number of longitudes of the regridded array.
+- `clean_dir`: [Bool] flag to delete the temporary directory after remapping.
+
+# Returns
+- Tuple containing the remapped field and its coordinates.
+"""
+function cgll2latlonz(field; DIR = "cgll2latlonz_dir", nlat = 360, nlon = 720, clean_dir = true)
+    isdir(DIR) ? nothing : mkpath(DIR)
+    datafile_latlon = DIR * "/remapped_" * string(name) * ".nc"
+    remap_field_cgll_to_rll(:var, field, DIR, datafile_latlon, nlat = nlat, nlon = nlon)
+    new_data, coords = read_remapped_field(:var, datafile_latlon)
+    clean_dir ? rm(DIR; recursive = true) : nothing
+    return new_data, coords
+end
+
 
 end # Module

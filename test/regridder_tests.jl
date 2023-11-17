@@ -8,7 +8,7 @@ using Test
 using NCDatasets
 using Dates
 
-using ClimaCoupler: Interfacer, Regridder, TestHelper
+using ClimaCoupler: Interfacer, Regridder, TestHelper, TimeManager, PostProcessor
 import ClimaCoupler.Interfacer: get_field, name, SurfaceModelSimulation, SurfaceStub, update_field!
 
 REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regrid_tmp/")
@@ -235,6 +235,80 @@ for FT in (Float32, Float64)
 
             # Delete testing directory and files
             rm(REGRID_DIR; recursive = true, force = true)
+        end
+
+        @testset "test hdwrite_regridfile_rll_to_cgll 3d space for FT=$FT" begin
+            # Test setup
+            R = FT(6371e3)
+            space = TestHelper.create_space(FT, nz = 2, ne = 16, R = R)
+
+            ispath(REGRID_DIR) ? rm(REGRID_DIR; recursive = true, force = true) : nothing
+            mkpath(REGRID_DIR)
+
+            # lat-lon dataset
+            data = ones(720, 360, 2, 3) # (lon, lat, z, time)
+            time = [19000101.0, 19000201.0, 19000301.0]
+            lats = collect(range(-90, 90, length = 360))
+            lons = collect(range(-180, 180, length = 720))
+            z = [1000.0, 2000.0]
+            data = reshape(sin.(lats * π / 90)[:], 1, :, 1, 1) .* data
+            varname = "sinlat"
+
+            # save the lat-lon data to a netcdf file in the required format for TempestRemap
+            datafile_rll = joinpath(REGRID_DIR, "lat_lon_data.nc")
+            NCDataset(datafile_rll, "c") do ds
+
+                defDim(ds, "lat", size(lats)...)
+                defDim(ds, "lon", size(lons)...)
+                defDim(ds, "z", size(z)...)
+                defDim(ds, "date", size(time)...)
+
+                defVar(ds, "lon", lons, ("lon",))
+                defVar(ds, "lat", lats, ("lat",))
+                defVar(ds, "z", z, ("z",))
+                defVar(ds, "date", time, ("date",))
+
+                defVar(ds, varname, data, ("lon", "lat", "z", "date"))
+
+            end
+
+            hd_outfile_root = "data_cgll_test"
+            Regridder.hdwrite_regridfile_rll_to_cgll(
+                FT,
+                REGRID_DIR,
+                datafile_rll,
+                varname,
+                space,
+                mono = true,
+                hd_outfile_root = hd_outfile_root,
+            )
+
+            # read in data on CGLL grid from the last saved date
+            date1 = TimeManager.strdate_to_datetime.(string(Int(time[end])))
+            cgll_path = joinpath(REGRID_DIR, "$(hd_outfile_root)_$date1.hdf5")
+            hdfreader = InputOutput.HDF5Reader(cgll_path)
+            T_cgll = InputOutput.read_field(hdfreader, varname)
+            Base.close(hdfreader)
+
+            # regrid back to lat-lon
+            T_rll, _ = Regridder.cgll2latlonz(T_cgll)
+
+            # check consistency across z-levels
+            @test T_rll[:, :, 1] == T_rll[:, :, 2]
+
+            # check consistency of CGLL remapped data with original data
+            @test all(isapprox.(extrema(data), extrema(parent(T_cgll)), atol = 1e-2))
+
+            # check consistency of lat-lon remapped data with original data
+            @test all(isapprox.(extrema(data), extrema(T_rll), atol = 1e-3))
+
+            # visual inspection
+            # Plots.plot(T_cgll) # using ClimaCorePlots
+            # Plots.contourf(T_rll[:,:,1])
+
+            # Delete testing directory and files
+            rm(REGRID_DIR; recursive = true, force = true)
+
         end
     end
 end

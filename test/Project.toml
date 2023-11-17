@@ -34,6 +34,7 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
 ArtifactWrappers = "0.2"
+Aqua = "0.8"
 ClimaCoupler = "0.1"
 Downloads = "1"
 HDF5_jll = "=1.12.2"

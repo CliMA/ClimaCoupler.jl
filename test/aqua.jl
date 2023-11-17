@@ -27,6 +27,5 @@ end
     Aqua.test_stale_deps(ClimaCoupler)
     Aqua.test_deps_compat(ClimaCoupler)
     Aqua.test_project_extras(ClimaCoupler)
-    Aqua.test_project_toml_formatting(ClimaCoupler)
-    Aqua.test_piracy(ClimaCoupler)
+    Aqua.test_piracies(ClimaCoupler)
 end

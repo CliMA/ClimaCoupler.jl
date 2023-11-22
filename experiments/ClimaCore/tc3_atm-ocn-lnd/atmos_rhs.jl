@@ -2,28 +2,28 @@
 
 #=
 Ekman column:
-    ∂_t ρ =  ∇ (μ ∇ ρ - w ρ) 
+    ∂_t ρ =  ∇ (μ ∇ ρ - w ρ)
     ∂_t ρθ =  ∇ (μ ∇ ρθ - w ρθ)
     ∂_t u =  ∇ (μ ∇ u - w u) + (v - v_g)
-    ∂_t v =  ∇ (μ ∇ v - w v) - (u - u_g) 
-    ∂_t w =  ∇ (μ ∇ w - w w) - g - c_p θ ∂_z Π  
+    ∂_t v =  ∇ (μ ∇ v - w v) - (u - u_g)
+    ∂_t w =  ∇ (μ ∇ w - w w) - g - c_p θ ∂_z Π
 
-where 
+where
     Π = (p/p_0)^{R/c_p}
 
 top BCs are insulating and impenetrable:
-    ∂_t T = 0           
-    u = u_g             
-    v = v_g             
-    w = 0.0            
-    ∂_t ρ = 0     
+    ∂_t T = 0
+    u = u_g
+    v = v_g
+    w = 0.0
+    ∂_t ρ = 0
 
 and bottom BCs use bulk formulae for surface fluxes of heat and momentum:
-    ∂_t ρθ = F₃ = -Ch ρ ||u|| (T_sfc - ρθ / ρ)       
-    ∂_t u  = F₁ = -Cd u ||u||                        
-    ∂_t v  = F₂ = -Cd v ||u||                        
-    w = 0.0                                     
-    ∂_t ρ = 0                                   
+    ∂_t ρθ = F₃ = -Ch ρ ||u|| (T_sfc - ρθ / ρ)
+    ∂_t u  = F₁ = -Cd u ||u||
+    ∂_t v  = F₂ = -Cd v ||u||
+    w = 0.0
+    ∂_t ρ = 0
 
 We also use this model to accumulate fluxes it calculates
     ∂_t F_accum = -(F₁, F₂, F₃)
@@ -31,14 +31,14 @@ We also use this model to accumulate fluxes it calculates
 
 function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
 
-    UnPack.@unpack Ch, Cd, f, ν, ug, vg, C_p, MSLP, R_d, R_m, C_v, grav = parameters
+    (; Ch, Cd, f, ν, ug, vg, C_p, MSLP, R_d, R_m, C_v, grav) = parameters
 
-    #@show(t, Y.x[3]) 
+    #@show(t, Y.x[3])
     (Yc, Yf, F_sfc) = Y.x
     (dYc, dYf, dF_sfc) = dY.x
 
-    UnPack.@unpack ρ, u, v, ρθ = Yc
-    UnPack.@unpack w = Yf
+    (; ρ, u, v, ρθ) = Yc
+    (; w) = Yf
     dρ = dYc.ρ
     du = dYc.u
     dv = dYc.v
@@ -52,7 +52,7 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     ρθ_1 = parent(ρθ)[1]
     u_wind = sqrt(u_1^2 + v_1^2)
 
-    # surface flux calculations 
+    # surface flux calculations
     surface_flux_ρθ =
         -calculate_sfc_fluxes_energy(
             DryBulkFormulaWithRadiation(),
@@ -69,15 +69,15 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
 
     # accumulate in the required right units
     @inbounds begin
-        dY.x[3][1] = -ρ_1 * surface_flux_u  # 
-        dY.x[3][2] = -ρ_1 * surface_flux_v  # 
+        dY.x[3][1] = -ρ_1 * surface_flux_u  #
+        dY.x[3][2] = -ρ_1 * surface_flux_v  #
         dY.x[3][3] = -C_p * surface_flux_ρθ # W / m^2
     end
 
     # @inbounds begin
-    #     dY.x[3][1] = - 10.0 
-    #     dY.x[3][2] = - 1.0  
-    #     dY.x[3][3] = - 1.0 
+    #     dY.x[3][1] = - 10.0
+    #     dY.x[3][2] = - 1.0
+    #     dY.x[3][3] = - 1.0
     # end
 
     # Density tendency (located at cell centers)

@@ -20,8 +20,8 @@ function ocn_rhs!(du, u, (parameters, F_accumulated), t)
         where
             F_accumulated = F_integrated / Δt_coupler
     """
-    @unpack ocn_h, ocn_ρ, ocn_c = parameters
-    @unpack T_sfc = du
+    (; ocn_h, ocn_ρ, ocn_c) = parameters
+    (; T_sfc) = du
 
     @. T_sfc = (-F_accumulated) / (ocn_h * ocn_ρ * ocn_c)
 end

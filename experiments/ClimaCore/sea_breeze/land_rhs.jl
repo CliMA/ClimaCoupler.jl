@@ -20,8 +20,8 @@ function lnd_rhs!(du, u, (parameters, F_accumulated), t)
         where
             F_accumulated = F_integrated / Δt_coupler
     """
-    @unpack lnd_h, lnd_ρ, lnd_c = parameters
-    @unpack T_sfc = du
+    (; lnd_h, lnd_ρ, lnd_c) = parameters
+    (; T_sfc) = du
 
     @. T_sfc = (-F_accumulated) / (lnd_h * lnd_ρ * lnd_c)
 end

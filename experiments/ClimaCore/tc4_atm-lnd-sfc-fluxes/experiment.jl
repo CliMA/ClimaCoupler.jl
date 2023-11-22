@@ -11,7 +11,6 @@ using ClimaCore: DataLayouts, Operators, Geometry
 using ClimaAtmos.Simulations: Simulation
 using ClimaCore: Fields, Domains, Topologies, Meshes, Spaces
 
-using UnPack
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33
 using Logging: global_logger
 using TerminalLoggers: TerminalLogger
@@ -48,12 +47,12 @@ include("dummy_surface_fluxes.jl")
 include("atmos_rhs.jl")
 
 parameters_ = (
-    # timestepping parameters 
+    # timestepping parameters
     Δt_min = 0.01, # minimum model timestep [s]
     timerange = (0.0, 10.0),  # start time and end time [s]
     odesolver = SSPRK33(), # timestepping method from DifferentialEquations.jl (used in both models here)
-    nsteps_atm = 1, # no. time steps of atm before coupling 
-    nsteps_lnd = 1, # no. time steps of lnd before coupling 
+    nsteps_atm = 1, # no. time steps of atm before coupling
+    nsteps_lnd = 1, # no. time steps of lnd before coupling
     saveat = 0.2, # interval at which to save diagnostics [s]
 
     # atmos domain
@@ -95,7 +94,7 @@ parameters_ = (
     τ_d = 10,     # idealized daily cycle period [s]
 
     # surface fluxes
-    λ = FT(0.01),#FT(1e-5)    # coupling transfer coefficient for LinearRelaxation() SurfaceFluxType 
+    λ = FT(0.01),#FT(1e-5)    # coupling transfer coefficient for LinearRelaxation() SurfaceFluxType
     Ch = 0.0015, # bulk transfer coefficient for sensible heat
     Cd = 0.0015, # drag coefficient
 )
@@ -294,7 +293,7 @@ function postprocess(sol_atm, sol_lnd; visualize = false)
     end
     return rel_error
 end
-#= 
+#=
 sol_atm, sol_lnd = exp_tc4(parameters_)
 rel_error = postprocess(sol_atm, sol_lnd, visualize = false  );
 =#

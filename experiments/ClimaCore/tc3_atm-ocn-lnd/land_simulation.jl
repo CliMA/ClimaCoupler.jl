@@ -1,4 +1,4 @@
-import ClimaCore.Geometry, LinearAlgebra, UnPack
+import ClimaCore.Geometry, LinearAlgebra
 import ClimaCore: Fields, Domains, Topologies, Meshes, DataLayouts, Operators, Geometry, Spaces
 
 using CLIMAParameters
@@ -10,7 +10,6 @@ using RecursiveArrayTools
 using OrdinaryDiffEq:
     ODEProblem, solve, SSPRK33, Rosenbrock23, Tsit5, SSPRK432, Feagin14, TsitPap8, CarpenterKennedy2N54
 using DifferentialEquations
-using UnPack
 using LandHydrology
 using LandHydrology.SoilHeatParameterizations
 using LandHydrology.SoilWaterParameterizations
@@ -31,8 +30,8 @@ function compute_soil_rhs!(dY, Y, t, p)
     sp = p[1]
     param_set = p[2]
     zc = p[3]
-    @unpack top_heat_flux, btm_heat_flux, top_water_flux, btm_water_flux = p[4]
-    @unpack ν, vgn, vgα, vgm, ksat, θr, ρc_ds, κ_sat_unfrozen, κ_sat_frozen = sp
+    (; top_heat_flux, btm_heat_flux, top_water_flux, btm_water_flux) = p[4]
+    (; ν, vgn, vgα, vgm, ksat, θr, ρc_ds, κ_sat_unfrozen, κ_sat_frozen) = sp
     ϑ_l = Y.x[1]
     θ_i = Y.x[2]
     ρe_int = Y.x[3]

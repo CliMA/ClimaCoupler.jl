@@ -1,8 +1,7 @@
-# from ClimaAtmos:test/test_cases/run_3d_baroclinic_wave.jl, removing `step!` 
+# from ClimaAtmos:test/test_cases/run_3d_baroclinic_wave.jl, removing `step!`
 
 using OrdinaryDiffEq: SSPRK33
 using ClimaCorePlots, Plots
-using UnPack
 
 import ClimaCore
 import ClimaCore: Fields, Geometry, Operators
@@ -66,7 +65,7 @@ function atmos_init(::Type{FT}, tspan; stepper = SSPRK33(), nelements = (6, 10),
     simulation = Simulation(model, stepper, dt = dt, tspan = tspan)
 
     # test set function
-    @unpack ρ, uh, w, ρe_tot = init_3d_baroclinic_wave(FT, params)
+    (; ρ, uh, w, ρe_tot) = init_3d_baroclinic_wave(FT, params)
     set!(simulation, :base, ρ = ρ, uh = uh, w = w)
     set!(simulation, :thermodynamics, ρe_tot = ρe_tot)
 

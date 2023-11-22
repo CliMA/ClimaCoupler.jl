@@ -6,41 +6,41 @@ This is a slightly modified ClimaAtmos Ekman column model
 
 #=
 Ekman column:
-    ∂_t ρ =  ∇ (μ ∇ ρ - w ρ) 
+    ∂_t ρ =  ∇ (μ ∇ ρ - w ρ)
     ∂_t ρθ =  ∇ (μ ∇ ρθ - w ρθ)
     ∂_t u =  ∇ (μ ∇ u - w u) + (v - v_g)
-    ∂_t v =  ∇ (μ ∇ v - w v) - (u - u_g) 
-    ∂_t w =  ∇ (μ ∇ w - w w) - g - c_p θ ∂_z Π  
+    ∂_t v =  ∇ (μ ∇ v - w v) - (u - u_g)
+    ∂_t w =  ∇ (μ ∇ w - w w) - g - c_p θ ∂_z Π
 
-where 
+where
     Π = (p/p_0)^{R/c_p}
 
 top BCs are insulating and impenetrable:
-    ∂_t T = 0           
-    u = u_g             
-    v = v_g             
-    w = 0.0            
-    ∂_t ρ = 0     
+    ∂_t T = 0
+    u = u_g
+    v = v_g
+    w = 0.0
+    ∂_t ρ = 0
 
 and bottom BCs use bulk formulae for surface fluxes of heat and momentum:
-    ∂_t ρθ = F₃ = -Ch ρ ||u|| (T_sfc - ρθ / ρ)       
-    ∂_t u  = F₁ = -Cd u ||u||                        
-    ∂_t v  = F₂ = -Cd v ||u||                        
-    w = 0.0                                     
-    ∂_t ρ = 0                                   
+    ∂_t ρθ = F₃ = -Ch ρ ||u|| (T_sfc - ρθ / ρ)
+    ∂_t u  = F₁ = -Cd u ||u||
+    ∂_t v  = F₂ = -Cd v ||u||
+    w = 0.0
+    ∂_t ρ = 0
 
 We also use this model to accumulate fluxes it calculates
     ∂_t F_accum = -(F₁, F₂, F₃)
 =#
 
 function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
-    @unpack Cd, f, ν, uvg, C_p, MSLP, R_d, R_m, C_v, grav = parameters
+    (; Cd, f, ν, uvg, C_p, MSLP, R_d, R_m, C_v, grav) = parameters
 
     # unpack tendencies and state
     (Yc, Yf, F_sfc) = Y.x
     (dYc, dYf, dF_sfc) = dY.x
 
-    UnPack.@unpack ρ, uv, ρθ = Yc
+    (; ρ, uv, ρθ) = Yc
 
     w = Yf
     dρ = dYc.ρ
@@ -54,7 +54,7 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     uv_1 = Operators.getidx(uv, Operators.Interior(), 1)
     u_wind = LinearAlgebra.norm(uv_1)
 
-    # surface flux calculations 
+    # surface flux calculations
     fluxes = calculate_sfc_fluxes(DryMonin(), parameters, T_sfc[1], ρθ_1 / ρ_1, uv_1, ρ_1, t)
 
     surface_flux_ρθ = fluxes.SH
@@ -126,11 +126,11 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
 end
 
 
-""" 
-Initialize fields located at cell centers in the vertical. 
+"""
+Initialize fields located at cell centers in the vertical.
 """
 @inline function init_ekman_column_1d_c(z, params::NamedTuple)
-    @unpack grav, C_p, MSLP, R_d, T_surf_atm, T_min_ref, u0, v0, w0 = params
+    (; grav, C_p, MSLP, R_d, T_surf_atm, T_min_ref, u0, v0, w0) = params
 
     T_surf = T_surf_atm
     Γ = grav / C_p
@@ -155,11 +155,11 @@ Initialize fields located at cell centers in the vertical.
 end
 
 
-""" 
-Initialize fields located at cell interfaces in the vertical. 
+"""
+Initialize fields located at cell interfaces in the vertical.
 """
 @inline function init_ekman_column_1d_f(z, params::NamedTuple)
-    @unpack grav, C_p, MSLP, R_d, T_surf_atm, T_min_ref, u0, v0, w0 = params
+    (; grav, C_p, MSLP, R_d, T_surf_atm, T_min_ref, u0, v0, w0) = params
 
     w = Geometry.Cartesian3Vector(w0) # w component
 

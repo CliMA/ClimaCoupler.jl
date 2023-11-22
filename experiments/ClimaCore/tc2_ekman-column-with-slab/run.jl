@@ -5,7 +5,7 @@ using Base: show_supertypes
 # add https://github.com/CliMA/ClimaAtmos.jl/#main
 
 # import required modules
-import ClimaCore.Geometry, LinearAlgebra, UnPack
+import ClimaCore.Geometry, LinearAlgebra
 import ClimaCore: Fields, Domains, Topologies, Meshes, DataLayouts, Operators, Geometry, Spaces
 
 using ClimaAtmos
@@ -105,7 +105,7 @@ face_space_atm = Spaces.FaceFiniteDifferenceSpace(center_space_atm)
 # Set up inital conditions
 ########
 function init_centers(zc, parameters)
-    UnPack.@unpack T_surf, T_min_ref, grav, C_p, MSLP, R_d = parameters
+    (; T_surf, T_min_ref, grav, C_p, MSLP, R_d) = parameters
 
     # temperature
     Γ = grav / C_p

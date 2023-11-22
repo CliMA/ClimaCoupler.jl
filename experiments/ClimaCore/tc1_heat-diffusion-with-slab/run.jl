@@ -83,7 +83,7 @@
 ## import Pkg; Pkg.add(url="https://github.com/CliMA/ClimaCore.jl",rev="main")
 
 #  - load external packages:
-import LinearAlgebra, UnPack
+import LinearAlgebra
 import ClimaCore: Fields, Domains, Topologies, Meshes, DataLayouts, Operators, Geometry, Spaces
 
 using Base: show_supertypes

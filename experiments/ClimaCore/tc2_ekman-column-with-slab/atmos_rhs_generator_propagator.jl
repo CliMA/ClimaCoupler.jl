@@ -2,9 +2,9 @@
 
 function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     # Heat diffusion:
-    # ∂_t ρ =  ∇ (μ ∇ ρ - w ρ) 
-    # ∂_t ρθ =  ∇ (μ ∇ ρθ - w ρθ) 
-    # ∂_t w =  ∇ (μ ∇ w - w w) 
+    # ∂_t ρ =  ∇ (μ ∇ ρ - w ρ)
+    # ∂_t ρθ =  ∇ (μ ∇ ρθ - w ρθ)
+    # ∂_t w =  ∇ (μ ∇ w - w w)
 
     # where
     # ∂_t T = n \cdot F   at z = zmin_atm
@@ -27,12 +27,12 @@ function ∑tendencies_atm!(dY, Y, (parameters, T_sfc), t)
     # @. du.x[1] = gradf2c( μ * gradc2f(T))
     # du.x[2] .= - F_sfc[1]
 
-    UnPack.@unpack Cd, f, ν, ug, vg, C_p, MSLP, R_d, R_m, C_v, grav = parameters
+    (; Cd, f, ν, ug, vg, C_p, MSLP, R_d, R_m, C_v, grav) = parameters
 
     (Yc, Yf, F_sfc) = Y.x
     (dYc, dYf, dF_sfc) = dY.x
-    UnPack.@unpack ρ, u, v, ρθ = Yc
-    UnPack.@unpack w = Yf
+    (; ρ, u, v, ρθ) = Yc
+    (; w) = Yf
     dρ = dYc.ρ
     du = dYc.u
     dv = dYc.v

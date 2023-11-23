@@ -23,7 +23,7 @@ This driver contains two modes. The full `AMIP` mode and a `SlabPlanet` (all sur
 Before starting Julia, ensure your environment is properly set up:
 ```julia
 module purge
-module load julia/1.9.3 openmpi/4.1.1 hdf5/1.12.1-ompi411 #netcdf-c/4.6.1
+module load julia/1.9.4 openmpi/4.1.1 hdf5/1.12.1-ompi411 #netcdf-c/4.6.1
 
 export CLIMACORE_DISTRIBUTED="MPI" #include if using MPI, otherwise leave empty
 export JUlIA_MPI_BINARY="system"
@@ -56,7 +56,6 @@ using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
 using LinearAlgebra
 import Test: @test
 using Dates
-using UnPack
 using Plots
 using Statistics: mean
 import ClimaAtmos as CA
@@ -583,8 +582,8 @@ update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 function solve_coupler!(cs)
     @info "Starting coupling loop"
 
-    @unpack model_sims, Δt_cpl, tspan = cs
-    @unpack atmos_sim, land_sim, ocean_sim, ice_sim = model_sims
+    (; model_sims, Δt_cpl, tspan) = cs
+    (; atmos_sim, land_sim, ocean_sim, ice_sim) = model_sims
 
     ## step in time
     walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])

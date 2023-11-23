@@ -11,7 +11,6 @@ using NCDatasets
 using ClimaCoreTempestRemap
 using Dates
 using JLD2
-using UnPack
 using Plots
 using ClimaAtmos: RRTMGPI
 using ClimaLSM
@@ -85,7 +84,7 @@ function check_conservation!(
 )
 
     ccs = cc.sums
-    @unpack model_sims = coupler_sim
+    (; model_sims) = coupler_sim
 
     boundary_space = coupler_sim.boundary_space # thin shell approx (boundary_space[z=0] = boundary_space[z_top])
 
@@ -158,7 +157,7 @@ function check_conservation!(
 )
 
     ccs = cc.sums
-    @unpack model_sims = coupler_sim
+    (; model_sims) = coupler_sim
 
     boundary_space = coupler_sim.boundary_space # thin shell approx (boundary_space[z=0] = boundary_space[z_top])
 

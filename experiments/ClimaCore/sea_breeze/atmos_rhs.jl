@@ -101,7 +101,7 @@ and for vertical-momentum, as:
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", ".."))
 
 using Test
-using StaticArrays, IntervalSets, LinearAlgebra, UnPack
+using StaticArrays, IntervalSets, LinearAlgebra
 
 import ClimaCore: ClimaCore, slab, Spaces, Domains, Meshes, Geometry, Topologies, Spaces, Fields, Operators
 using ClimaCore.Geometry

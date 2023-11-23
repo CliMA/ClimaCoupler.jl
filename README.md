@@ -22,3 +22,5 @@ Coupler Specific Shared Development
 
 Provides coupled system time stepping control and support for mapping import and export
 boundary information between components.
+
+Recommended Julia Version: Stable release v1.9.4. CI no longer tests earlier versions of Julia.

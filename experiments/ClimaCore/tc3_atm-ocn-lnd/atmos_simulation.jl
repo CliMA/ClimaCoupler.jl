@@ -7,7 +7,6 @@ using ClimaAtmos.Interface: PeriodicRectangle, BarotropicFluidModel
 using ClimaCore: Fields, Domains, Topologies, Meshes, Spaces
 
 using IntervalSets
-using UnPack
 using OrdinaryDiffEq: SSPRK33
 using OrdinaryDiffEq: ODEProblem, solve, SSPRK33
 using Logging: global_logger
@@ -55,7 +54,7 @@ parameters = (
     τ_d = 10,     # idealized daily cycle period [s]
 
     # surface fluxes
-    λ = FT(0.01),#FT(1e-5)    # coupling transfer coefficient for LinearRelaxation() SurfaceFluxType 
+    λ = FT(0.01),#FT(1e-5)    # coupling transfer coefficient for LinearRelaxation() SurfaceFluxType
 )
 
 function atmos_simulation(
@@ -82,7 +81,7 @@ function atmos_simulation(
 
     """ Initialize fields located at cell centers in the vertical. """
     function init_centers(zc, parameters)
-        UnPack.@unpack grav, C_p, MSLP, R_d = parameters
+        (; grav, C_p, MSLP, R_d) = parameters
 
         # temperature
         Γ = grav / C_p

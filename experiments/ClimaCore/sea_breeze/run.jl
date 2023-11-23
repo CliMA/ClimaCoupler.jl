@@ -265,7 +265,7 @@ where  $F_{integ}$ has units of $J m^{-2}$.
 =#
 function cpl_run(simulation::AOLCoupledSim)
     @info "Run model"
-    @unpack atmos, ocean, land, coupler = simulation
+    (; atmos, ocean, land, coupler) = simulation
     Δt_coupled = coupler.Δt_coupled
     ## coupler stepping
     for t in ((t_start + Δt_coupled):Δt_coupled:t_end)

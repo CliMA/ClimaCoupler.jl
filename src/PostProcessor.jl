@@ -10,7 +10,7 @@ export PostProcessedData, ZLatLonData, ZLatData, LatLonData, LatData, RawData, D
 using Statistics
 using NCDatasets: NCDataset
 
-using ClimaCoupler.Regridder: remap_field_cgll_to_rll
+using ClimaCoupler: Regridder
 using ClimaCore: Fields
 
 # data types for postprocessing
@@ -93,8 +93,8 @@ function postprocess(
         isdir(DIR) ? nothing : mkpath(DIR)
         datafile_latlon =
             (datafile_latlon == nothing) ? datafile_latlon = DIR * "/remapped_" * string(name) * ".nc" : datafile_latlon
-        remap_field_cgll_to_rll(name, raw_data, DIR, datafile_latlon, nlat = nlat, nlon = nlon)
-        new_data, coords = read_remapped_field(name, datafile_latlon)
+        Regridder.remap_field_cgll_to_rll(name, raw_data, DIR, datafile_latlon, nlat = nlat, nlon = nlon)
+        new_data, coords = Regridder.read_remapped_field(name, datafile_latlon)
         raw_tag = length(size(new_data)) == 3 ? ZLatLonData() : LatLonData()
         package = DataPackage(raw_tag, name, new_data, coords = coords)
     else
@@ -134,24 +134,5 @@ function postprocess(
     return package
 end
 
-
-"""
-    read_remapped_field(name::Symbol, datafile_latlon::String, lev_name = "z")
-
-Extract data and coordinates from `datafile_latlon`.
-"""
-function read_remapped_field(name::Symbol, datafile_latlon::String, lev_name = "z")
-    out = NCDataset(datafile_latlon, "r") do nc
-        lon = nc["lon"][:]
-        lat = nc["lat"][:]
-        lev = lev_name in keys(nc) ? nc[lev_name][:] : Float64(-999)
-        var = nc[name][:]
-        coords = (; lon = lon, lat = lat, lev = lev)
-
-        (var, coords)
-    end
-
-    return out
-end
 
 end # module

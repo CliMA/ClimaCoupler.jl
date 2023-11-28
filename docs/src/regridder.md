@@ -18,6 +18,7 @@ ClimaCoupler.Regridder.remap_field_cgll_to_rll
 ClimaCoupler.Regridder.land_fraction
 ClimaCoupler.Regridder.update_surface_fractions!
 ClimaCoupler.Regridder.combine_surfaces!
+ClimaCoupler.Regridder.rcgll2latlonz
 ```
 
 
@@ -28,4 +29,7 @@ ClimaCoupler.Regridder.reshape_cgll_sparse_to_field!
 ClimaCoupler.Regridder.hdwrite_regridfile_rll_to_cgll
 ClimaCoupler.Regridder.write_datafile_cc
 ClimaCoupler.Regridder.binary_mask
+ClimaCoupler.Regridder.read_remapped_field
+ClimaCoupler.Regridder.get_coords
+ClimaCoupler.Regridder.get_time
 ```

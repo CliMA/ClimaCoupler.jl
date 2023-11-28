@@ -67,8 +67,12 @@ struct LandSim <: AbstractLandSim
 end
 
 function LandSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
-    lnd_prob = ODEProblem(lnd_rhs!, Y_init, (t_start, t_end), p)
-    lnd_integ = init(lnd_prob, timestepper, dt = dt, saveat = saveat, callback = callbacks)
+    ode_algo = CTS.ExplicitAlgorithm(timestepper)
+    ode_function = CTS.ClimaODEFunction(T_exp! = lnd_rhs!)
+
+    problem = ODEProblem(ode_function, Y_init, (t_start, t_end), p)
+    lnd_integ = init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false, callback = callbacks)
+
     return LandSim(lnd_integ)
 end
 

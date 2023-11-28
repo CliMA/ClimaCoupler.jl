@@ -50,9 +50,7 @@ Here we import standard Julia packages, ClimaESM packages, parse in command-line
 We then specify the input data file names. If these are not already downloaded, include `artifacts/download_artifacts.jl`.
 =#
 
-import SciMLBase: step!, reinit!
-using OrdinaryDiffEq
-using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
+import SciMLBase: ODEProblem, solve, step!, init, reinit!
 using LinearAlgebra
 import Test: @test
 using Dates

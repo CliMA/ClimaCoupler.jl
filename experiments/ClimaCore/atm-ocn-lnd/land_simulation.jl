@@ -7,8 +7,8 @@ struct EarthParameterSet <: AbstractEarthParameterSet end
 const param_set = EarthParameterSet()
 
 using RecursiveArrayTools
-using OrdinaryDiffEq:
-    ODEProblem, solve, SSPRK33, Rosenbrock23, Tsit5, SSPRK432, Feagin14, TsitPap8, CarpenterKennedy2N54
+import SciMLBase: ODEProblem, solve, step!, init, reinit!
+import ClimaTimeSteppers as CTS
 using DifferentialEquations
 using LandHydrology
 using LandHydrology.SoilHeatParameterizations
@@ -179,7 +179,8 @@ function ∑land_tendencies!(dY, Y, p, t)
     compute_soil_rhs!(dY, Y, t, p)
 end
 
-land_prob = ODEProblem(∑land_tendencies!, Y, (t0, tf), p)
-algorithm = CarpenterKennedy2N54()
+ode_algo = CTS.ExplicitAlgorithm(CTS.RK4())
+ode_function = CTS.ClimaODEFunction(T_exp! = ∑land_tendencies!)
 
-land_simulation() = init(land_prob, algorithm, dt = dt, saveat = 1 * dt) # dt is the land model step
+problem = ODEProblem(ode_function, Y, (t0, tf), p)
+land_simulation() = init(problem, ode_algo, dt = dt, saveat = 1 * dt, adaptive = false) # dt is the land model step

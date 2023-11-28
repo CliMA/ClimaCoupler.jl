@@ -144,13 +144,9 @@ with the thermal conductivity of ice, $k_i = 2$ W m$^{-2}$ K$^{-1}$, and $T_{bas
 
 # NB:
 - first coupled iteration does not call rhs!
-- slab `T_sfc` gets huge numbers when using `SSPRK33`. ok with `Euler`
+- slab `T_sfc` gets huge numbers when using `SSP333`. ok with `Euler`
 - do not init global fields with mpi context
 
 # References
 - [Kang et al 2021](https://arxiv.org/abs/2101.09263)
 - [kth.se blog for strong and weak scaling](https://www.kth.se/blogs/pdc/2018/11/scalability-strong-and-weak-scaling/)
-
-
-
-

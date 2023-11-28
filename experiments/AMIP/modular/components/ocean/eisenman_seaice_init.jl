@@ -1,9 +1,9 @@
 import ClimaCoupler: FluxCalculator
 import ClimaTimeSteppers as CTS
-import DiffEqBase: ODEProblem, init, step!
 import ClimaCoupler.FluxCalculator: update_turbulent_fluxes_point!, differentiate_turbulent_fluxes!
 import ClimaCoupler.Interfacer: get_field, update_field!
 using ClimaCore.Fields: getindex
+import SciMLBase: step!, reinit!, init, ODEProblem
 
 """
     EisenmanIceSimulation{P, Y, D, I}

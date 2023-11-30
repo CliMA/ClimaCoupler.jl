@@ -214,6 +214,7 @@ function hdwrite_regridfile_rll_to_cgll(
     _, _, row_indices = NCDataset(weightfile, "r") do ds_wt
         (Array(ds_wt["S"]), Array(ds_wt["col"]), Array(ds_wt["row"]))
     end
+    @show out_type
 
     target_unique_idxs =
         out_type == "cgll" ? collect(Spaces.unique_nodes(space2d_undistributed)) :

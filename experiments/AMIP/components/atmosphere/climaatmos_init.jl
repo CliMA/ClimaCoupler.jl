@@ -77,9 +77,8 @@ function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
     # set initial fluxes to zero
     @. integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot = Geometry.Covariant3Vector(FT(0.0))
     @. integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot = Geometry.Covariant3Vector(FT(0.0))
-    @. integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ.components =
-        zeros(axes(integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ.components))
-    parent(integrator.p.radiation.ᶠradiation_flux) .= parent(zeros(axes(integrator.p.radiation.ᶠradiation_flux)))
+    @. integrator.p.radiation.ᶠradiation_flux = Geometry.WVector(FT(0))
+    integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ.components .= Ref(SMatrix{1, 2}([FT(0), FT(0)]))
     integrator.p.precipitation.col_integrated_rain .= FT(0)
     integrator.p.precipitation.col_integrated_snow .= FT(0)
 

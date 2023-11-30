@@ -224,9 +224,6 @@ end
 Returns a new `p` with the updated surface conditions.
 """
 function get_new_cache(atmos_sim::ClimaAtmosSimulation, csf)
-
-    p = atmos_sim.integrator.p
-
     csf_sfc = (; T = csf.T_S, z0m = csf.z0m_S, z0b = csf.z0b_S, beta = csf.beta, q_vap = csf.q_sfc)
     modified_atmos_cache(atmos_sim, csf_sfc)
 end

@@ -69,7 +69,7 @@ end
 
 # additional ClimaAtmos model debug fields
 function get_field(sim::ClimaAtmosSimulation, ::Val{:w})
-    w_c = ones(sim.domain.face_space.horizontal_space)
+    w_c = ones(Spaces.horizontal_space(sim.domain.face_space))
     parent(w_c) .= parent(Fields.level(Geometry.WVector.(sim.integrator.u.f.u₃), 5 .+ half))
     return w_c
 end

@@ -64,7 +64,7 @@ function reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::SubArray, 
     space = axes(field)
     topology = Spaces.topology(space)
     hspace = Spaces.horizontal_space(space)
-    Spaces.dss!(Fields.field_values(field), topology, hspace.quadrature_style)
+    Topologies.dss!(Fields.field_values(field), topology)
 end
 
 """
@@ -105,7 +105,7 @@ function reshape_cgll_sparse_to_field!(
     space = axes(field)
     topology = Spaces.topology(space)
     hspace = Spaces.horizontal_space(space)
-    Spaces.dss!(Fields.field_values(field), topology, hspace.quadrature_style)
+    Topologies.dss!(Fields.field_values(field), topology)
 end
 
 """
@@ -162,8 +162,11 @@ function hdwrite_regridfile_rll_to_cgll(
         space2d = space
     end
 
-    topology = Topologies.Topology2D(space2d.topology.mesh, Topologies.spacefillingcurve(space2d.topology.mesh))
-    Nq = Spaces.Quadratures.polynomial_degree(space2d.quadrature_style) + 1
+    topology = Topologies.Topology2D(
+        Spaces.topology(space2d).mesh,
+        Topologies.spacefillingcurve(Spaces.topology(space2d).mesh),
+    )
+    Nq = Spaces.Quadratures.polynomial_degree(Spaces.quadrature_style(space2d)) + 1
     space2d_undistributed = Spaces.SpectralElementSpace2D(topology, Spaces.Quadratures.GLL{Nq}())
 
     if space isa Spaces.ExtrudedFiniteDifferenceSpace
@@ -279,7 +282,7 @@ function get_time(ds)
     elseif "date" in ds
         data_dates = TimeManager.strdate_to_datetime.(string.(Int.(ds["date"][:])))
     else
-        @warn "No dates available in file $datafile_rll"
+        @warn "No dates available in input data file"
         data_dates = [Dates.DateTime(0)]
     end
     return data_dates
@@ -392,12 +395,12 @@ grid using TempestRemap.
 """
 function remap_field_cgll_to_rll(name, field::Fields.Field, remap_tmpdir, datafile_rll; nlat = 90, nlon = 180)
     space = axes(field)
-    hspace = :topology in propertynames(space) ? space : space.horizontal_space
-    Nq = Spaces.Quadratures.polynomial_degree(hspace.quadrature_style) + 1
+    hspace = :topology in propertynames(space) ? space : Spaces.horizontal_space(space)
+    Nq = Spaces.Quadratures.polynomial_degree(Spaces.quadrature_style(hspace)) + 1
 
     # write out our cubed sphere mesh
     meshfile_cc = remap_tmpdir * "/mesh_cubedsphere.g"
-    write_exodus(meshfile_cc, hspace.topology)
+    write_exodus(meshfile_cc, Spaces.topology(hspace))
 
     meshfile_rll = remap_tmpdir * "/mesh_rll.g"
     rll_mesh(meshfile_rll; nlat = nlat, nlon = nlon)

@@ -14,9 +14,11 @@ function make_lsm_domain(
 ) where {FT}
     @assert zlim[1] < zlim[2]
     depth = zlim[2] - zlim[1]
-    radius = atmos_boundary_space.topology.mesh.domain.radius
-    npolynomial = ClimaCore.Spaces.Quadratures.polynomial_degree(atmos_boundary_space.quadrature_style)
-    nelements_horz = atmos_boundary_space.topology.mesh.ne
+
+    radius = ClimaCore.Spaces.topology(atmos_boundary_space).mesh.domain.radius
+    nelements_horz = ClimaCore.Spaces.topology(atmos_boundary_space).mesh.ne
+    npolynomial =
+        ClimaCore.Spaces.Quadratures.polynomial_degree(ClimaCore.Spaces.quadrature_style(atmos_boundary_space))
     nelements = (nelements_horz, nelements_vert)
     vertdomain = ClimaCore.Domains.IntervalDomain(
         ClimaCore.Geometry.ZPoint(FT(zlim[1])),

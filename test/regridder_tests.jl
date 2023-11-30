@@ -304,7 +304,7 @@ for FT in (Float32, Float64)
 
             # visual inspection
             # Plots.plot(T_cgll) # using ClimaCorePlots
-            # Plots.contourf(T_rll[:,:,1])
+            # Plots.contourf(Array(T_rll)[:,1])
 
             # Delete testing directory and files
             rm(REGRID_DIR; recursive = true, force = true)

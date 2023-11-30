@@ -13,7 +13,7 @@ using NCDatasets
 export create_space, gen_ncdata
 
 """
-    create_space(FT; comms_ctx = ClimaComms.SingletonCommsContext(), 
+    create_space(FT; comms_ctx = ClimaComms.SingletonCommsContext(),
         R = FT(6371e3), ne = 4, polynomial_degree = 3, nz = 1)
 
 Initialize a space on a sphere with the given parameters.

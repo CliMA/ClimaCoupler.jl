@@ -263,7 +263,7 @@ determined by the space type.
 """
 function get_coords(ds, ::Spaces.ExtrudedFiniteDifferenceSpace)
     data_dates = get_time(ds)
-    z = ds["z"][:]
+    z = Array(ds["z"])
     return (data_dates, z)
 end
 function get_coords(ds, ::Spaces.SpectralElementSpace2D)
@@ -278,9 +278,9 @@ Extracts the time information from a NetCDF file `ds`.
 """
 function get_time(ds)
     if "time" in ds
-        data_dates = Dates.DateTime.(ds["time"][:])
+        data_dates = Dates.DateTime.(Array(ds["time"]))
     elseif "date" in ds
-        data_dates = TimeManager.strdate_to_datetime.(string.(Int.(ds["date"][:])))
+        data_dates = TimeManager.strdate_to_datetime.(string.(Int.(Array(ds["date"]))))
     else
         @warn "No dates available in input data file"
         data_dates = [Dates.DateTime(0)]
@@ -585,10 +585,10 @@ Extract data and coordinates from `datafile_latlon`.
 """
 function read_remapped_field(name::Symbol, datafile_latlon::String, lev_name = "z")
     out = NCDataset(datafile_latlon, "r") do nc
-        lon = nc["lon"][:]
-        lat = nc["lat"][:]
-        lev = lev_name in keys(nc) ? nc[lev_name][:] : Float64(-999)
-        var = nc[name][:]
+        lon = Array(nc["lon"])
+        lat = Array(nc["lat"])
+        lev = lev_name in keys(nc) ? Array(nc[lev_name]) : Float64(-999)
+        var = Array(nc[name])
         coords = (; lon = lon, lat = lat, lev = lev)
 
         (var, coords)

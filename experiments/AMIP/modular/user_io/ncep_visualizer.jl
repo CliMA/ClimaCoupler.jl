@@ -87,16 +87,16 @@ function download_read_nc(data_source::NCEPMonthlyDataSource, https::String, nce
     local_file = joinpath(data_source.tmp_dir, ncep_vname * ".nc")
     Downloads.download(https, local_file)
     NCDataset(local_file) do ds
-        t_i = findall(x -> Dates.yearmonth(x) == Dates.yearmonth(data_source.month_date[1]), ds["time"][:]) # time index of month in file
-        d_i = length(size(ds[ncep_vname][:])) # index of time in the dimension list
-        lev = "level" in keys(ds) ? ds["level"][:] : [Float64(-999)]
-        data = dropdims(selectdim(ds[ncep_vname][:], d_i, t_i), dims = d_i)
+        t_i = findall(x -> Dates.yearmonth(x) == Dates.yearmonth(data_source.month_date[1]), Array(ds["time"])) # time index of month in file
+        d_i = length(size(Array(ds[ncep_vname]))) # index of time in the dimension list
+        lev = "level" in keys(ds) ? Array(ds["level"]) : [Float64(-999)]
+        data = dropdims(selectdim(Array(ds[ncep_vname]), d_i, t_i), dims = d_i)
         if length(size(data)) == 3
             data .= data[:, end:-1:1, end:-1:1]
         else
             data .= data[:, end:-1:1]
         end
-        coords = (; lon = ds["lon"][:], lat = ds["lat"][:][end:-1:1], lev = lev[end:-1:1])
+        coords = (; lon = Array(ds["lon"]), lat = Array(ds["lat"])[end:-1:1], lev = lev[end:-1:1])
         (Array(data), coords)
     end
 end

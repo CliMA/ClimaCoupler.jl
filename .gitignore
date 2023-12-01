@@ -29,7 +29,7 @@ docs/src/generated/
 
 # Experiments
 !experiments/AMIP/**/Manifest.toml
-!experiments/ClimaCore/sea_breeze/Manifest.toml
+!experiments/ClimaCore/**/Manifest.toml
 !perf/Manifest.toml
 
 # Data

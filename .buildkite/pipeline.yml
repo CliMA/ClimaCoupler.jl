@@ -37,6 +37,11 @@ steps:
       - "julia --project=experiments/ClimaCore/sea_breeze -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaCore/sea_breeze -e 'using Pkg; Pkg.status()'"
 
+      - echo "--- Instantiate climacore exp env"
+      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.status()'"
+
       - echo "--- Instantiate amip modular"
       - "julia --project=experiments/AMIP/modular/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=experiments/AMIP/modular/ -e 'using Pkg; Pkg.precompile()'"
@@ -203,9 +208,21 @@ steps:
 
       # < end Drivers for release
 
-      # - label: "Unit tests"
-      #   command: "julia --color=yes --project=test test/runtests.jl"
-      #   artifact_paths: "test/*"slabplanet_albedo_static_map
+      # CLIMACORE EXPERIMENTS
+
+      - label: "sea_breeze"
+        command: "julia --color=yes --project=experiments/ClimaCore/sea_breeze experiments/ClimaCore/sea_breeze/run.jl"
+        artifact_paths: "sea_breeze/"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "heat-diffusion"
+        command: "julia --color=yes --project=experiments/ClimaCore/ experiments/ClimaCore/heat-diffusion/run.jl"
+        artifact_paths: "heat-diffusion/images/*"
+        agents:
+          slurm_mem: 20GB
+
+      # AMIP AND SLABPLANET EXPERIMENTS
 
       - label: "Moist earth with slab surface - default: monin gray no_sponge idealinsol freq_dt_cpl"
         command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/default_mono.yml"
@@ -269,12 +286,6 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 20GB
 
-      - label: "sea_breeze"
-        command: "julia --color=yes --project=experiments/ClimaCore/sea_breeze experiments/ClimaCore/sea_breeze/run.jl"
-        artifact_paths: "sea_breeze/"
-        agents:
-          slurm_mem: 20GB
-
       - label: "MPI AMIP"
         command: "srun julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/coarse_mpi_n2.yml"
         artifact_paths: "experiments/AMIP/modular/output/amip/coarse_mpi_n2_artifacts/*"
@@ -297,7 +308,7 @@ steps:
         agents:
           slurm_mem: 20GB
 
-      # flame graphs + allocation tests
+      # PERFORMANCE RUNS: flame graphs + allocation tests
 
       - label: ":rocket: flame graph and allocation tests: perf_coarse_single_modular_ft64"
         command: "julia --color=yes --project=perf perf/flame.jl --config_file $PERF_CONFIG_PATH/perf_coarse_single_modular_ft64.yml"

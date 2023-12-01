@@ -96,9 +96,7 @@ import SciMLBase: step!, ODEProblem, init
 
 using Logging: global_logger
 using TerminalLoggers: TerminalLogger
-
 using RecursiveArrayTools
-
 using Statistics
 
 # Load utilities for coupling
@@ -307,29 +305,25 @@ ENV["GKSwstype"] = "nul"
 import Plots
 Plots.GRBackend()
 
-show_plots = isdefined(Main, :SHOWPLOTS) ? SHOWPLOTS : true
-
-path = joinpath(dirname(@__FILE__), "images/")
-mkpath(path);
+ARTIFACTS_DIR = joinpath("experiments/ClimaCore/output/heat-diffusion_artifacts")
+mkpath(ARTIFACTS_DIR)
 
 # - Vertical profile at start and end
 t0_ = parent(sol_atm.u[1].T_atm)[:, 1];
 tend_ = parent(sol_atm.u[end].T_atm)[:, 1];
 z_centers = parent(Fields.coordinate_field(center_space_atm))[:, 1];
-show_plots ?
 Plots.png(
     Plots.plot(
         [t0_ tend_],
         z_centers,
-        title = "model 1: atm",
         labels = ["t=0" "t=end"],
         xlabel = "T (K)",
         ylabel = "z (m)",
+        title = "Atmos profile at start & end of Simulation",
         linewidth = 2,
     ),
-    joinpath(path, "heat-diffusion_f1.png"),
-) : nothing
-# ![](images/heat-diffusion_f1.png)
+    joinpath(ARTIFACTS_DIR, "atmos_profile.png"),
+)
 
 # - Conservation: absolute "energy" of both models with time
 # convert to the same units (analogous to energy conservation, assuming that is both domains density=1 and thermal capacity=1)
@@ -338,24 +332,22 @@ atm_sum_u_t =
     [sum(parent(u.T_atm)[:]) for u in sol_atm.u] .* (parameters.zmax_atm - parameters.zmin_atm) ./ parameters.n;
 v1 = lnd_sfc_u_t .- lnd_sfc_u_t[1];
 v2 = atm_sum_u_t .- atm_sum_u_t[1];
-show_plots ?
 Plots.png(
     Plots.plot(
         sol_lnd.t,
         [v1 v2 v1 + v2],
         labels = ["lnd" "atm" "tot"],
         xlabel = "time (s)",
-        ylabel = "pseudo-energy (J / m2)",
+        ylabel = "energy flux (J / m2)",
+        title = "Component Model Energy during Simulation",
         linewidth = 2,
     ),
-    joinpath(path, "heat-diffusion_f2.png"),
-) : nothing
-# ![](images/heat-diffusion_f2.png)
+    joinpath(ARTIFACTS_DIR, "component_energy.png"),
+)
 
 # - Conservation: relative error with time
 total = atm_sum_u_t + lnd_sfc_u_t;
 rel_error = abs.(total .- total[1]) / mean(total);
-show_plots ?
 Plots.png(
     Plots.plot(
         sol_lnd.t,
@@ -366,9 +358,8 @@ Plots.png(
         title = "Total Energy Conservation",
         linewidth = 2,
     ),
-    joinpath(path, "heat-diffusion_f3.png"),
-) : nothing
-# ![](images/heat-diffusion_f3.png)
+    joinpath(ARTIFACTS_DIR, "energy_conservation.png"),
+)
 
 #src # - Animation
 #src anim = Plots.@animate for u in sol_atm.u

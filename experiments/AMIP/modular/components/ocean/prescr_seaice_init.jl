@@ -110,8 +110,8 @@ function ice_init(::Type{FT}; tspan, saveat, dt, space, area_fraction, thermo_pa
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     ode_function = CTS.ClimaODEFunction(T_exp! = ice_rhs!, dss! = weighted_dss_slab!)
 
-    problem = ODEProblem(ode_function, Y, FT.(tspan), (; additional_cache..., params = params))
-    integrator = init(problem, ode_algo, dt = FT(dt), saveat = FT(saveat), adaptive = false)
+    problem = ODEProblem(ode_function, Y, Float64.(tspan), (; additional_cache..., params = params))
+    integrator = init(problem, ode_algo, dt = Float64(dt), saveat = Float64(saveat), adaptive = false)
 
     sim = PrescribedIceSimulation(params, Y, space, integrator)
 

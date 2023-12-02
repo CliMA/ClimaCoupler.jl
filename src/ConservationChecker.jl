@@ -109,7 +109,7 @@ function check_conservation!(
 
             # save atmos
             previous = getproperty(ccs, sim_name)
-            current = sum(Interfacer.get_field(sim, Val(:energy))) # # ∫ J / m^3 dV
+            current = sum(FT.(Interfacer.get_field(sim, Val(:energy)))) # # ∫ J / m^3 dV
 
             push!(previous, current)
             total += current + radiation_sources_accum
@@ -122,7 +122,7 @@ function check_conservation!(
                 current = FT(0)
             else
                 previous = getproperty(ccs, sim_name)
-                current = sum(Interfacer.get_field(sim, Val(:energy)) .* area_fraction) # # ∫ J / m^3 dV
+                current = sum(FT.(Interfacer.get_field(sim, Val(:energy)) .* area_fraction)) # # ∫ J / m^3 dV
             end
             push!(previous, current)
             total += current

@@ -121,7 +121,6 @@ Updates the surface component model cache with the current coupler fields of F_t
 - `csf`: [NamedTuple] containing coupler fields.
 """
 function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, turbulent_fluxes, area_fraction = nothing)
-
     FT = eltype(area_fraction)
 
     # atmospheric surface density
@@ -130,16 +129,15 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, turbulent_flux
     # turbulent fluxes
     # when PartitionedStateFluxes, turbulent fluxes are updated during the flux calculation
     if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
-
         Interfacer.update_field!(
             sim,
             Val(:turbulent_energy_flux),
-            Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_turb_energy,
+            FT.(Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_turb_energy),
         )
         Interfacer.update_field!(
             sim,
             Val(:turbulent_moisture_flux),
-            Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_turb_moisture,
+            FT.(Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_turb_moisture),
         )
     end
 
@@ -147,7 +145,7 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, turbulent_flux
     Interfacer.update_field!(
         sim,
         Val(:radiative_energy_flux),
-        Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_radiative,
+        FT.(Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_radiative),
     )
 
     # precipitation

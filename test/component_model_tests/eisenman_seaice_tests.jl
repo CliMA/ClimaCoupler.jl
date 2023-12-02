@@ -20,7 +20,7 @@ for FT in (Float32, Float64)
     params_ocean = EisenmanOceanParameters{FT}()
     params = (; p_i = params_ice, p_o = params_ocean)
 
-    Δt = FT(1e6)
+    Δt = Float64(1e6)
 
     # create a boundary space
     boundary_space = TestHelper.create_space(FT)
@@ -254,7 +254,7 @@ for FT in (Float32, Float64)
     # conductive flux and q flux
     @testset "Non-zero conductive flux for FT=$FT" begin
         Y, Ya = state_init(params_ice, boundary_space)
-        Δt = FT(100)
+        Δt = Float64(100)
 
         # ice covered
         Y.h_ice .= 10
@@ -288,7 +288,7 @@ for FT in (Float32, Float64)
 
     @testset "Nonzero Q-flux (~horizontal ocean transport) for FT=$FT" begin
         Y, Ya = state_init(params_ice, boundary_space)
-        Δt = FT(100)
+        Δt = Float64(100)
 
         # ice covered
         Y.h_ice .= 10
@@ -323,7 +323,7 @@ for FT in (Float32, Float64)
 
     include("../../experiments/AMIP/modular/components/slab_utils.jl")
     @testset "step! update + total energy calculation for FT=$FT" begin
-        Δt = 1000
+        Δt = Float64(1000)
 
         sim = eisenman_seaice_init(
             FT,

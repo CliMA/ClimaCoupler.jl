@@ -15,17 +15,24 @@ import ClimaCoupler.Interfacer:
     SeaIceModelSimulation,
     SurfaceStub,
     update_field!
-FT = Float64
 
 # test for a simple generic surface model
-struct DummySimulation <: SeaIceModelSimulation end
-struct DummySimulation2 <: OceanModelSimulation end
-struct DummySimulation3 <: LandModelSimulation end
+struct DummySimulation{S} <: SeaIceModelSimulation
+    space::S
+end
+struct DummySimulation2{S} <: OceanModelSimulation
+    space::S
+end
+struct DummySimulation3{S} <: LandModelSimulation
+    space::S
+end
 
-boundary_space = TestHelper.create_space(FT);
-get_field(::SurfaceModelSimulation, ::Val{:var}) = ones(boundary_space)
-get_field(::SurfaceModelSimulation, ::Val{:var_float}) = FT(2)
-get_field(::SurfaceModelSimulation, ::Val{:surface_temperature}) = ones(boundary_space) .* FT(300)
+get_field(sim::SurfaceModelSimulation, ::Val{:var}) = ones(sim.space)
+get_field(sim::SurfaceModelSimulation, ::Val{:surface_temperature}) = ones(sim.space) .* FT(300)
+function get_field(sim::SurfaceModelSimulation, ::Val{:var_float})
+    FT = Domains.float_type(Meshes.domain(sim.space.grid.topology.mesh))
+    FT(2)
+end
 
 for FT in (Float32, Float64)
     @testset "test CoupledSim construction, float_type for FT=$FT" begin
@@ -51,7 +58,8 @@ for FT in (Float32, Float64)
     end
 
     @testset "get_field indexing" begin
-        for sim in (DummySimulation(), DummySimulation2(), DummySimulation3())
+        space = TestHelper.create_space(FT)
+        for sim in (DummySimulation(space), DummySimulation2(space), DummySimulation3(space))
             # field
             colidx = Fields.ColumnIndex{2}((1, 1), 73)
             @test parent(get_field(sim, Val(:var), colidx))[1] == FT(1)
@@ -61,14 +69,14 @@ for FT in (Float32, Float64)
     end
 
     @testset "undefined get_field" begin
-        sim = DummySimulation()
+        space = TestHelper.create_space(FT)
+        sim = DummySimulation(space)
         val = Val(:v)
         @test_throws ErrorException("undefined field $val for " * name(sim)) get_field(sim, val)
     end
 
     # test for a simple generic surface model
     @testset "get_field for a SurfaceStub" begin
-
         toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
         aliases = string.(fieldnames(TDP.ThermodynamicsParameters))
         param_pairs = CP.get_parameter_values!(toml_dict, aliases, "Thermodynamics")

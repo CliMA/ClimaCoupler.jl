@@ -50,10 +50,11 @@ end
 end
 
 @testset "trigger_callback" begin
+    FT = Float64
     date0 = date = DateTime("19790321", dateformat"yyyymmdd")
     dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)])
 
-    cs = Interfacer.CoupledSimulation{Float64}(
+    cs = Interfacer.CoupledSimulation{FT}(
         nothing, # comms_ctx
         dates, # dates
         nothing, # boundary_space
@@ -74,7 +75,6 @@ end
 end
 
 @testset "trigger_callback!" begin
-
     FT = Float64
     date0 = date = DateTime("19790321", dateformat"yyyymmdd")
     dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)])
@@ -89,7 +89,7 @@ end
     monthly_counter =
         TimeManager.MonthlyCallback{FT}(func = counter_func, ref_date = [date0], data = [0], active = true)
 
-    cs = Interfacer.CoupledSimulation{Float64}(
+    cs = Interfacer.CoupledSimulation{FT}(
         nothing, # comms_ctx
         dates, # dates
         nothing, # boundary_space
@@ -152,12 +152,11 @@ end
 
 # TimeManager
 @testset "update_firstdayofmonth!" begin
-
     FT = Float64
     date0 = date = DateTime("19790321", dateformat"yyyymmdd")
     dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)])
 
-    cs = Interfacer.CoupledSimulation{Float64}(
+    cs = Interfacer.CoupledSimulation{FT}(
         nothing, # comms_ctx
         dates, # dates
         nothing, # boundary_space

@@ -312,16 +312,6 @@ function atm_init(; xmin = -500, xmax = 500, zmin = 0, zmax = 1000, npoly = 3, h
     return Y, bc, domain
 end
 
-using OrdinaryDiffEq
-function atm_run!(Y, bc, domain)
-    dYdt = similar(Y)
-    params = (aux_params = 0.0, T_sfc = 1.0, bc = bc, domain = domain)
-    atm_rhs!(dYdt, Y, params, 0.0)
-    prob = ODEProblem(atm_rhs!, Y, (0.0, 250.0), params)
-    Δt = 0.025
-    sol = solve(prob, SSPRK33(), dt = Δt, saveat = 1.0, progress = true, progress_message = (dt, u, params, t) -> t)
-end
-
 # ## Coupled Atmos Wrappers
 ## Atmos Simulation - later to live in ClimaAtmos
 struct AtmosSim <: AbstractAtmosSim
@@ -329,13 +319,16 @@ struct AtmosSim <: AbstractAtmosSim
 end
 
 function AtmosSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
-    atm_prob = ODEProblem(atm_rhs!, Y_init, (t_start, t_end), p)
+    ode_algo = CTS.ExplicitAlgorithm(timestepper)
+    ode_function = CTS.ClimaODEFunction(T_exp! = atm_rhs!)
 
+    problem = ODEProblem(ode_function, Y_init, (t_start, t_end), p)
     atm_integ = init(
-        atm_prob,
-        timestepper,
+        problem,
+        ode_algo,
         dt = dt,
         saveat = saveat,
+        adaptive = false,
         progress = true,
         progress_message = (dt, u, params, t) -> t,
         callback = callbacks,

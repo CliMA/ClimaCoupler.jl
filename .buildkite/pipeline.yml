@@ -218,7 +218,7 @@ steps:
 
       - label: "heat-diffusion"
         command: "julia --color=yes --project=experiments/ClimaCore/ experiments/ClimaCore/heat-diffusion/run.jl"
-        artifact_paths: "heat-diffusion/images/*"
+        artifact_paths: "experiments/ClimaCore/output/heat-diffusion_artifacts/*"
         agents:
           slurm_mem: 20GB
 

@@ -7,14 +7,13 @@ using ClimaAtmos.Interface: PeriodicRectangle, BarotropicFluidModel
 using ClimaCore: Fields, Domains, Topologies, Meshes, Spaces
 
 using IntervalSets
-using OrdinaryDiffEq: SSPRK33
-using OrdinaryDiffEq: ODEProblem, solve, SSPRK33
+import SciMLBase: ODEProblem, solve, step!, init, reinit!
+import ClimaTimeSteppers as CTS
 using Logging: global_logger
 using TerminalLoggers: TerminalLogger
 
 using RecursiveArrayTools
 using LinearAlgebra
-using OrdinaryDiffEq
 using Random
 
 global_logger(TerminalLogger())
@@ -123,8 +122,12 @@ function atmos_simulation(
 
     # Put all prognostic variable arrays into a vector and ensure that solve can partition them
     Y_atm = ArrayPartition((T_atm_0.Yc, T_atm_0.Yf, zeros(3)))
-    prob_atm = ODEProblem(∑tendencies_atm!, Y_atm, (start_time, stop_time), (parameters, [land_surface_temperature]))
-    simulation = init(prob_atm, SSPRK33(), dt = Δt_min, saveat = 1 * Δt_min)
+
+    ode_algo = CTS.ExplicitAlgorithm(CTS.RK4())
+    ode_function = CTS.ClimaODEFunction(T_exp! = ∑tendencies_atm!)
+
+    problem = ODEProblem(ode_function, Y_atm, (start_time, stop_time), (parameters, [land_surface_temperature]))
+    simulation = init(problem, ode_algo, dt = Δt_min, saveat = 1 * Δt_min, adaptive = false)
 
     return simulation
 end

@@ -114,8 +114,8 @@ function ocean_init(
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     ode_function = CTS.ClimaODEFunction(T_exp! = slab_ocean_rhs!, dss! = weighted_dss_slab!)
 
-    problem = ODEProblem(ode_function, Y, FT.(tspan), cache)
-    integrator = init(problem, ode_algo, dt = FT(dt), saveat = FT(saveat), adaptive = false)
+    problem = ODEProblem(ode_function, Y, Float64.(tspan), cache)
+    integrator = init(problem, ode_algo, dt = Float64(dt), saveat = Float64(saveat), adaptive = false)
 
     sim = SlabOceanSimulation(params, Y, space, integrator)
 

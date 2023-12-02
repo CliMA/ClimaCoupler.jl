@@ -50,9 +50,7 @@ Here we import standard Julia packages, ClimaESM packages, parse in command-line
 We then specify the input data file names. If these are not already downloaded, include `artifacts/download_artifacts.jl`.
 =#
 
-import SciMLBase: step!, reinit!
-using OrdinaryDiffEq
-using OrdinaryDiffEq: ODEProblem, solve, SSPRK33, savevalues!, Euler
+import SciMLBase: ODEProblem, solve, step!, init, reinit!
 using LinearAlgebra
 import Test: @test
 using Dates
@@ -157,10 +155,11 @@ run_name = config_dict["run_name"]
 energy_check = config_dict["energy_check"]
 const FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim_name = "bucket"
-t_end = Int(time_to_seconds(config_dict["t_end"]))
-tspan = (Int(0), t_end)
-Δt_cpl = Int(config_dict["dt_cpl"])
-saveat = time_to_seconds(config_dict["dt_save_to_sol"])
+t_end = Float64(time_to_seconds(config_dict["t_end"]))
+t_start = 0.0
+tspan = (t_start, t_end)
+Δt_cpl = Float64(config_dict["dt_cpl"])
+saveat = Float64(time_to_seconds(config_dict["dt_save_to_sol"]))
 date0 = date = DateTime(config_dict["start_date"], dateformat"yyyymmdd")
 mono_surface = config_dict["mono_surface"]
 hourly_checkpoint = config_dict["hourly_checkpoint"]
@@ -235,18 +234,18 @@ if mode_name == "amip"
     ## land
     land_sim = bucket_init(
         FT,
-        FT.(tspan),
+        tspan,
         config_dict["land_domain_type"],
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
         comms_ctx,
         REGRID_DIR;
-        dt = FT(Δt_cpl),
+        dt = Δt_cpl,
         space = boundary_space,
-        saveat = FT(saveat),
+        saveat = saveat,
         area_fraction = land_fraction,
         date_ref = date0,
-        t_start = FT(0),
+        t_start = t_start,
     )
 
     ## ocean
@@ -333,18 +332,18 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
     ## land
     land_sim = bucket_init(
         FT,
-        FT.(tspan),
+        tspan,
         config_dict["land_domain_type"],
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
         comms_ctx,
         REGRID_DIR;
-        dt = FT(Δt_cpl),
+        dt = Δt_cpl,
         space = boundary_space,
-        saveat = FT(saveat),
+        saveat = saveat,
         area_fraction = land_fraction,
         date_ref = date0,
-        t_start = FT(0),
+        t_start = t_start,
     )
 
     ## ocean
@@ -379,18 +378,18 @@ elseif mode_name == "slabplanet_eisenman"
     ## land
     land_sim = bucket_init(
         FT,
-        FT.(tspan),
+        tspan,
         config_dict["land_domain_type"],
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
         comms_ctx,
         REGRID_DIR;
-        dt = FT(Δt_cpl),
+        dt = Δt_cpl,
         space = boundary_space,
-        saveat = FT(saveat),
+        saveat = saveat,
         area_fraction = land_fraction,
         date_ref = date0,
-        t_start = FT(0),
+        t_start = t_start,
     )
 
     ## ocean

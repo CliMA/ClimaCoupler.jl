@@ -1,9 +1,9 @@
 import ClimaCoupler: FluxCalculator
 import ClimaTimeSteppers as CTS
-import DiffEqBase: ODEProblem, init, step!
 import ClimaCoupler.FluxCalculator: update_turbulent_fluxes_point!, differentiate_turbulent_fluxes!
 import ClimaCoupler.Interfacer: get_field, update_field!
 using ClimaCore.Fields: getindex
+import SciMLBase: step!, reinit!, init, ODEProblem
 
 """
     EisenmanIceSimulation{P, Y, D, I}
@@ -226,8 +226,8 @@ function eisenman_seaice_init(
         thermo_params = thermo_params,
         dss_buffer = ClimaCore.Spaces.create_dss_buffer(ClimaCore.Fields.zeros(space)),
     )
-    problem = ODEProblem(ode_function, Y, FT.(tspan), cache)
-    integrator = init(problem, ode_algo, dt = FT(dt), saveat = FT(saveat), adaptive = false)
+    problem = ODEProblem(ode_function, Y, Float64.(tspan), cache)
+    integrator = init(problem, ode_algo, dt = Float64(dt), saveat = Float64(saveat), adaptive = false)
 
     sim = EisenmanIceSimulation(params, Y, space, integrator)
     @warn name(sim) *

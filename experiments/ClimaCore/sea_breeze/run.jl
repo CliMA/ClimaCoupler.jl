@@ -16,12 +16,13 @@ of the ClimaCoupler interface are used and discussed.
 # Load utilities for running coupled simulation
 include("../CoupledSims/coupled_sim.jl")
 
-import SciMLBase: step! #hide
-using OrdinaryDiffEq: ODEProblem, SSPRK33, savevalues! #hide
+using SciMLBase: ODEProblem, savevalues!, solve, init, CallbackSet #hide
+import SciMLBase #hide
+import ClimaTimeSteppers as CTS #hide
 import ClimaCore.Utilities: PlusHalf #hide
 import ClimaCore.Spaces as Spaces
 using DiffEqCallbacks #hide
-#hide
+
 ## enable broadcasting with mismatched spaces #hide
 import ClimaCore: Fields, Operators #hide
 Fields.allow_mismatched_diagonalized_spaces() = true #hide
@@ -167,15 +168,15 @@ Here, we create three simulations: `AtmosSim`, `OceanSim`, and `LandSim`.
 =#
 atm_Y = Fields.FieldVector(Yc = atm_Y_default.Yc, ρw = atm_Y_default.ρw, F_sfc = atm_F_sfc)
 atm_p = (cpl_p = cpl_parameters, T_sfc = atm_T_sfc, bc = atm_bc)
-atmos = AtmosSim(atm_Y, t_start, Δt_coupled / atm_nsteps, t_end, SSPRK33(), atm_p, saveat, dss_callback)
+atmos = AtmosSim(atm_Y, t_start, Δt_coupled / atm_nsteps, t_end, CTS.RK4(), atm_p, saveat, dss_callback)
 
 ocn_Y = Fields.FieldVector(T_sfc = ocn_Y_default.T_sfc)
 ocn_p = (cpl_parameters, F_sfc = ocn_F_sfc)
-ocean = OceanSim(ocn_Y, t_start, Δt_coupled / ocn_nsteps, t_end, SSPRK33(), ocn_p, saveat)
+ocean = OceanSim(ocn_Y, t_start, Δt_coupled / ocn_nsteps, t_end, CTS.RK4(), ocn_p, saveat)
 
 lnd_Y = Fields.FieldVector(T_sfc = lnd_Y_default.T_sfc)
 lnd_p = (cpl_parameters, F_sfc = lnd_F_sfc)
-land = LandSim(lnd_Y, t_start, Δt_coupled / lnd_nsteps, t_end, SSPRK33(), lnd_p, saveat)
+land = LandSim(lnd_Y, t_start, Δt_coupled / lnd_nsteps, t_end, CTS.RK4(), lnd_p, saveat)
 
 # Additionally, we create a coupled simulation that contains the component simulations
 # and the coupled time-stepping information.
@@ -195,7 +196,7 @@ end
 to the specified `t_stop`, with that simulation advancing by its own internal step
 size to reach the specified time. Each simulation type should specify its own step
 method, allowing components to have different time integration backends. Here, all
-components are using OrdinaryDiffEq integrators and can share the same `step!` method.
+components are using SciMLBase integrators and can share the same `step!` method.
 =#
 function step!(sim::AbstractSim, t_stop)
     Δt = t_stop - sim.integrator.t

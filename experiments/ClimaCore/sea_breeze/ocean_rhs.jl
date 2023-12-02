@@ -67,8 +67,12 @@ struct OceanSim <: AbstractOceanSim
 end
 
 function OceanSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
-    ocn_prob = ODEProblem(ocn_rhs!, Y_init, (t_start, t_end), p)
-    ocn_integ = init(ocn_prob, timestepper, dt = dt, saveat = saveat, callback = callbacks)
+    ode_algo = CTS.ExplicitAlgorithm(timestepper)
+    ode_function = CTS.ClimaODEFunction(T_exp! = ocn_rhs!)
+
+    problem = ODEProblem(ode_function, Y_init, (t_start, t_end), p)
+    ocn_integ = init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false, callback = callbacks)
+
     return OceanSim(ocn_integ)
 end
 

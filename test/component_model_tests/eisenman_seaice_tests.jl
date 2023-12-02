@@ -14,343 +14,344 @@ import Thermodynamics.Parameters as TP
 
 include("../../experiments/AMIP/modular/components/ocean/eisenman_seaice_init.jl")
 
-FT = Float64
-params_ice = EisenmanIceParameters{FT}()
-params_ocean = EisenmanOceanParameters{FT}()
-params = (; p_i = params_ice, p_o = params_ocean)
 
-Δt = FT(1e6)
+for FT in (Float32, Float64)
+    params_ice = EisenmanIceParameters{FT}()
+    params_ocean = EisenmanOceanParameters{FT}()
+    params = (; p_i = params_ice, p_o = params_ocean)
 
-# create a boundary space
-boundary_space = TestHelper.create_space(FT)
+    Δt = FT(1e6)
 
-# thermodynammic parameter set
-aliases = string.(fieldnames(TP.ThermodynamicsParameters))
-toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
-pairs = CP.get_parameter_values!(toml_dict, aliases, "Thermodynamics")
-thermo_params = TP.ThermodynamicsParameters{FT}(; pairs...)
+    # create a boundary space
+    boundary_space = TestHelper.create_space(FT)
 
-@testset "No net fluxes" begin
-    Y, Ya = state_init(params_ice, boundary_space)
+    # thermodynammic parameter set
+    aliases = string.(fieldnames(TP.ThermodynamicsParameters))
+    toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
+    pairs = CP.get_parameter_values!(toml_dict, aliases, "Thermodynamics")
+    thermo_params = TP.ThermodynamicsParameters{FT}(; pairs...)
 
-    # ice covered
-    Y.h_ice .= 1
+    @testset "No net fluxes for FT=$FT" begin
+        Y, Ya = state_init(params_ice, boundary_space)
 
-    # no conductive flux, or basal interface flux
-    Y.T_sfc .= params_ice.T_base
-    Y.T_ml .= params_ice.T_base
+        # ice covered
+        Y.h_ice .= 1
 
-    # no atmos fluxes, F_a
-    Ya.∂F_turb_energy∂T_sfc .= .-get_∂F_rad_energy∂T_sfc.(Y.T_sfc, Ref(params_ice)) # ∂F_turb_energy∂T_sfc + ∂F_rad_energy∂T_sfc = 0
-    Ya.F_rad .= 0
-    Ya.F_turb .= 0
+        # no conductive flux, or basal interface flux
+        Y.T_sfc .= params_ice.T_base
+        Y.T_ml .= params_ice.T_base
 
-    Fields.bycolumn(boundary_space) do colidx
-        solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
-    end
-    @test all(parent(Ya.e_base) .≈ 0)
-    @test all(parent(Y.T_ml) .≈ params_ice.T_base)
-    @test all(parent(Y.T_sfc) .≈ params_ice.T_base)
-    @test all(parent(Y.h_ice) .≈ 1)
-end
+        # no atmos fluxes, F_a
+        Ya.∂F_turb_energy∂T_sfc .= .-get_∂F_rad_energy∂T_sfc.(Y.T_sfc, Ref(params_ice)) # ∂F_turb_energy∂T_sfc + ∂F_rad_energy∂T_sfc = 0
+        Ya.F_rad .= 0
+        Ya.F_turb .= 0
 
-@testset "Radiative fluxes: outgoing longwave -> ice growth" begin
-    Y, Ya = state_init(params_ice, boundary_space)
-
-    # ice covered
-    Y.h_ice .= 1
-    h_ice_0 = deepcopy(Y.h_ice)
-
-    # no conductive flux, or basal interface flux
-    Y.T_sfc .= params_ice.T_base
-    Y.T_ml .= params_ice.T_base
-
-    # ice growth due to outgoing longwave
-    # only radiative (no aerodynamic) atmos fluxes considered here (F_atm = F_rad)
-    Ya.∂F_turb_energy∂T_sfc .= 0
-    ∂F_atm∂T_sfc = get_∂F_rad_energy∂T_sfc(Y.T_sfc, params_ice) .+ Ya.∂F_turb_energy∂T_sfc
-    @. Ya.F_rad = (1 - params_ice.α) * params_ice.σ * Y.T_sfc .^ 4 # outgoing longwave
-
-    Fields.bycolumn(boundary_space) do colidx
-        solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
+        Fields.bycolumn(boundary_space) do colidx
+            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
+        end
+        @test all(parent(Ya.e_base) .≈ 0)
+        @test all(parent(Y.T_ml) .≈ params_ice.T_base)
+        @test all(parent(Y.T_sfc) .≈ params_ice.T_base)
+        @test all(parent(Y.h_ice) .≈ 1)
     end
 
-    F_atm = @. Ya.F_rad + Ya.F_turb
+    @testset "Radiative fluxes: outgoing longwave -> ice growth for FT=$FT" begin
+        Y, Ya = state_init(params_ice, boundary_space)
 
-    @test all(parent(Ya.e_base) .≈ 0)
-    @test all(parent(Y.T_ml) .≈ params_ice.T_base) # ocean temperature below ice remains unchanged
-    h_ice_new = @. h_ice_0 + F_atm * Δt / params_ice.L_ice
-    @test all(parent(Y.h_ice) .≈ parent(h_ice_new)) # ice growth
-    T_sfc_new = @. params_ice.T_base .+ (-F_atm) / (params_ice.k_ice / (h_ice_new) + ∂F_atm∂T_sfc)
-    @test all(parent(Y.T_sfc) .≈ parent(T_sfc_new)) # surface temperature decreases
-end
+        # ice covered
+        Y.h_ice .= 1
+        h_ice_0 = deepcopy(Y.h_ice)
 
-@testset "Radiative fluxes balance turbulent fluxes -> no ice growth" begin
-    # no ice growth due to outgoing longwave = incoming longwave + incoming shortwave
-    # (NB: incoming independent of T_sfc)
-    Y, Ya = state_init(params_ice, boundary_space)
+        # no conductive flux, or basal interface flux
+        Y.T_sfc .= params_ice.T_base
+        Y.T_ml .= params_ice.T_base
 
-    # ice covered
-    Y.h_ice .= 1
-    h_ice_0 = deepcopy(Y.h_ice)
+        # ice growth due to outgoing longwave
+        # only radiative (no aerodynamic) atmos fluxes considered here (F_atm = F_rad)
+        Ya.∂F_turb_energy∂T_sfc .= 0
+        ∂F_atm∂T_sfc = get_∂F_rad_energy∂T_sfc(Y.T_sfc, params_ice) .+ Ya.∂F_turb_energy∂T_sfc
+        @. Ya.F_rad = (1 - params_ice.α) * params_ice.σ * Y.T_sfc .^ 4 # outgoing longwave
 
-    # prescribe radiative and tubulent fluxes
-    Ya.F_rad .= 100
-    Ya.F_turb .= -100
+        Fields.bycolumn(boundary_space) do colidx
+            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
+        end
 
-    # no conductive flux, or basal interface flux
-    Y.T_sfc .= params_ice.T_base
-    Y.T_ml .= params_ice.T_base
+        F_atm = @. Ya.F_rad + Ya.F_turb
 
-    Fields.bycolumn(boundary_space) do colidx
-        solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
+        @test all(parent(Ya.e_base) .≈ 0)
+        @test all(parent(Y.T_ml) .≈ params_ice.T_base) # ocean temperature below ice remains unchanged
+        h_ice_new = @. h_ice_0 + F_atm * Δt / params_ice.L_ice
+        @test all(parent(Y.h_ice) .≈ parent(h_ice_new)) # ice growth
+        T_sfc_new = @. params_ice.T_base .+ (-F_atm) / (params_ice.k_ice / (h_ice_new) + ∂F_atm∂T_sfc)
+        @test all(parent(Y.T_sfc) .≈ parent(T_sfc_new)) # surface temperature decreases
     end
 
-    F_atm = @. Ya.F_rad + Ya.F_turb
-    ∂F_atm∂T_sfc = 0
+    @testset "Radiative fluxes balance turbulent fluxes -> no ice growth for FT=$FT" begin
+        # no ice growth due to outgoing longwave = incoming longwave + incoming shortwave
+        # (NB: incoming independent of T_sfc)
+        Y, Ya = state_init(params_ice, boundary_space)
 
-    @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal fluxes
-    @test all(parent(Y.T_ml) .≈ params_ice.T_base) # ocean temperature stays at freezing point
-    h_ice_new = @. h_ice_0 + F_atm * Δt / params_ice.L_ice
-    @test all(parent(Y.h_ice) .≈ parent(h_ice_new)) # no ice growth
-    T_sfc_new = @. params_ice.T_base .+ (-F_atm) / (params_ice.k_ice / (h_ice_new) + ∂F_atm∂T_sfc)
-    @test all(parent(Y.T_sfc) .≈ parent(T_sfc_new)) # surface temperature decreases
-end
+        # ice covered
+        Y.h_ice .= 1
+        h_ice_0 = deepcopy(Y.h_ice)
 
-@testset "Ice surface temperature never exceeds the freezing point (even when positive radiative and conductive fluxes)" begin
+        # prescribe radiative and tubulent fluxes
+        Ya.F_rad .= 100
+        Ya.F_turb .= -100
 
-    Y, Ya = state_init(params_ice, boundary_space)
+        # no conductive flux, or basal interface flux
+        Y.T_sfc .= params_ice.T_base
+        Y.T_ml .= params_ice.T_base
 
-    # ice covered
-    Y.h_ice .= 10
-    h_ice_0 = deepcopy(Y.h_ice)
+        Fields.bycolumn(boundary_space) do colidx
+            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
+        end
 
-    # no basal interface fluxes
-    Y.T_ml .= params_ice.T_base
+        F_atm = @. Ya.F_rad + Ya.F_turb
+        ∂F_atm∂T_sfc = 0
 
-    # net incoming energy
-    Ya.F_turb .= 0
-    Ya.F_rad .= @. (1 - params_ice.α) * params_ice.σ * Y.T_sfc^4 - 300 # outgoing longwave < incoming longwave + incoming shortwave
-
-    # non-zero conductive flux
-    Y.T_sfc .= params_ice.T_base .- 1
-    T_sfc_0 = deepcopy(Y.T_sfc)
-
-    Fields.bycolumn(boundary_space) do colidx
-        solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
+        @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal fluxes
+        @test all(parent(Y.T_ml) .≈ params_ice.T_base) # ocean temperature stays at freezing point
+        h_ice_new = @. h_ice_0 + F_atm * Δt / params_ice.L_ice
+        @test all(parent(Y.h_ice) .≈ parent(h_ice_new)) # no ice growth
+        T_sfc_new = @. params_ice.T_base .+ (-F_atm) / (params_ice.k_ice / (h_ice_new) + ∂F_atm∂T_sfc)
+        @test all(parent(Y.T_sfc) .≈ parent(T_sfc_new)) # surface temperature decreases
     end
 
-    F_atm = @. Ya.F_rad + Ya.F_turb
-    ∂F_atm∂T_sfc = 0
+    @testset "Ice surface temp below freezing for FT=$FT" begin
+        # Ensure ice surface temperature never exceeds the freezing point (even when positive radiative and conductive fluxes)
 
-    F_conductive = @. params_ice.k_ice / (Y.h_ice) * (params_ice.T_base - T_sfc_0)
-    ΔT_sfc = @. (-F_atm + F_conductive) / (params_ice.k_ice / (Y.h_ice) + ∂F_atm∂T_sfc)
+        Y, Ya = state_init(params_ice, boundary_space)
 
-    @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal fluxes
-    @test all(parent(Y.T_ml) .≈ params_ice.T_base) # ocean temperature stays at freezing point
-    h_ice_new = @. h_ice_0 + F_atm * Δt / params_ice.L_ice
-    @test all(parent(Y.h_ice) .≈ parent(h_ice_new)) # ice growth
-    @test all(parent(Y.T_sfc) .≈ params_ice.T_base) # ice surface temperature doesn't exceed freezing
-    @test all(parent(Y.T_sfc) .< parent(T_sfc_0 .+ ΔT_sfc))
-end
+        # ice covered
+        Y.h_ice .= 10
+        h_ice_0 = deepcopy(Y.h_ice)
 
-@testset "Transition to ice free due to incoming > outgoing" begin
+        # no basal interface fluxes
+        Y.T_ml .= params_ice.T_base
 
-    Y, Ya = state_init(params_ice, boundary_space)
+        # net incoming energy
+        Ya.F_turb .= 0
+        Ya.F_rad .= @. (1 - params_ice.α) * params_ice.σ * Y.T_sfc^4 - 300 # outgoing longwave < incoming longwave + incoming shortwave
 
-    # ice covered
-    Y.h_ice .= 0.1
-    h_ice_0 = deepcopy(Y.h_ice)
+        # non-zero conductive flux
+        Y.T_sfc .= params_ice.T_base .- 1
+        T_sfc_0 = deepcopy(Y.T_sfc)
 
-    # prescribe radiative and tubulent fluxes
-    Ya.F_rad .= @. (1 - params_ice.α) * params_ice.σ * Y.T_sfc .^ 4 - 300  # outgoing longwave < incoming longwave + incoming shortwave
-    Ya.F_turb .= 0
-    ∂F_atm∂T_sfc = 0
+        Fields.bycolumn(boundary_space) do colidx
+            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
+        end
 
-    # no conductive flux, or basal interface flux
-    Y.T_sfc .= params_ice.T_base
-    Y.T_ml .= params_ice.T_base
-    T_ml_0 = deepcopy(Y.T_ml)
+        F_atm = @. Ya.F_rad + Ya.F_turb
+        ∂F_atm∂T_sfc = 0
 
-    Fields.bycolumn(boundary_space) do colidx
-        solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
+        F_conductive = @. params_ice.k_ice / (Y.h_ice) * (params_ice.T_base - T_sfc_0)
+        ΔT_sfc = @. (-F_atm + F_conductive) / (params_ice.k_ice / (Y.h_ice) + ∂F_atm∂T_sfc)
+
+        @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal fluxes
+        @test all(parent(Y.T_ml) .≈ params_ice.T_base) # ocean temperature stays at freezing point
+        h_ice_new = @. h_ice_0 + F_atm * Δt / params_ice.L_ice
+        @test all(parent(Y.h_ice) .≈ parent(h_ice_new)) # ice growth
+        @test all(parent(Y.T_sfc) .≈ params_ice.T_base) # ice surface temperature doesn't exceed freezing
+        @test all(parent(Y.T_sfc) .< parent(T_sfc_0 .+ ΔT_sfc))
     end
 
-    F_atm = @. Ya.F_rad + Ya.F_turb
+    @testset "Transition to ice free due to incoming > outgoing for FT=$FT" begin
+        Y, Ya = state_init(params_ice, boundary_space)
 
-    @test all(parent(Y.h_ice) .≈ 0) # ice melts
-    T_ml_new = @. T_ml_0 - (F_atm) * Δt / (params_ocean.h * params_ocean.ρ * params_ocean.c) -
-       h_ice_0 * params_ice.L_ice / (params_ocean.h * params_ocean.ρ * params_ocean.c)
-    @test all(parent(Y.T_ml) .≈ parent(T_ml_new)) # ocean temperature increases due to F_atm (reduced by the latent heat of melting)
+        # ice covered
+        Y.h_ice .= 0.1
+        h_ice_0 = deepcopy(Y.h_ice)
 
-end
+        # prescribe radiative and tubulent fluxes
+        Ya.F_rad .= @. (1 - params_ice.α) * params_ice.σ * Y.T_sfc .^ 4 - 300  # outgoing longwave < incoming longwave + incoming shortwave
+        Ya.F_turb .= 0
+        ∂F_atm∂T_sfc = 0
 
-@testset "Mixed layer warming due to net negative radiation fluxes" begin
-    Y, Ya = state_init(params_ice, boundary_space)
+        # no conductive flux, or basal interface flux
+        Y.T_sfc .= params_ice.T_base
+        Y.T_ml .= params_ice.T_base
+        T_ml_0 = deepcopy(Y.T_ml)
 
-    # ice free
-    Y.h_ice .= 0
-    h_ice_0 = deepcopy(Y.h_ice)
+        Fields.bycolumn(boundary_space) do colidx
+            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
+        end
 
-    # no conductive flux, or basal interface flux
-    Y.T_sfc .= params_ice.T_base
-    Y.T_ml .= params_ice.T_base
-    T_ml_0 = deepcopy(Y.T_ml)
+        F_atm = @. Ya.F_rad + Ya.F_turb
 
-    # net positive radiative fluxes
-    Y.T_sfc .= params_ice.T_base
-    Ya.F_turb .= 0
-    Ya.F_rad .= @. (1 - params_ice.α) * params_ice.σ * Y.T_sfc^4 - 300
+        @test all(parent(Y.h_ice) .≈ 0) # ice melts
+        T_ml_new = @. T_ml_0 - (F_atm) * Δt / (params_ocean.h * params_ocean.ρ * params_ocean.c) -
+           h_ice_0 * params_ice.L_ice / (params_ocean.h * params_ocean.ρ * params_ocean.c)
+        @test all(parent(Y.T_ml) .≈ parent(T_ml_new)) # ocean temperature increases due to F_atm (reduced by the latent heat of melting)
 
-    Fields.bycolumn(boundary_space) do colidx
-        solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
     end
 
-    F_atm = @. Ya.F_rad + Ya.F_turb
+    @testset "Mixed layer warming due to net negative radiation fluxes for FT=$FT" begin
+        Y, Ya = state_init(params_ice, boundary_space)
 
-    @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal fluxes
-    T_ml_new = @. T_ml_0 - (F_atm) * Δt / (params_ocean.h * params_ocean.ρ * params_ocean.c)
-    @test all(parent(Y.T_ml) .≈ parent(T_ml_new)) # ocean temperature increases
-    @test all(parent(Y.h_ice) .≈ 0) # no ice
-    @test all(parent(Y.T_sfc) .≈ parent(T_ml_new)) # surface temperature = ocean temperature
+        # ice free
+        Y.h_ice .= 0
+        h_ice_0 = deepcopy(Y.h_ice)
 
-end
+        # no conductive flux, or basal interface flux
+        Y.T_sfc .= params_ice.T_base
+        Y.T_ml .= params_ice.T_base
+        T_ml_0 = deepcopy(Y.T_ml)
 
-@testset "Mixed layer freezing due to net positive radiation fluxes" begin
+        # net positive radiative fluxes
+        Y.T_sfc .= params_ice.T_base
+        Ya.F_turb .= 0
+        Ya.F_rad .= @. (1 - params_ice.α) * params_ice.σ * Y.T_sfc^4 - 300
 
-    Y, Ya = state_init(params_ice, boundary_space)
+        Fields.bycolumn(boundary_space) do colidx
+            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
+        end
 
-    # ice free
-    Y.h_ice .= 0
-    h_ice_0 = deepcopy(Y.h_ice)
+        F_atm = @. Ya.F_rad + Ya.F_turb
 
-    # no conductive flux, or basal interface flux
-    Y.T_sfc .= params_ice.T_base
-    Y.T_ml .= params_ice.T_base
-    T_sfc_0 = deepcopy(Y.T_sfc)
-    T_ml_0 = deepcopy(Y.T_ml)
+        @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal fluxes
+        T_ml_new = @. T_ml_0 - (F_atm) * Δt / (params_ocean.h * params_ocean.ρ * params_ocean.c)
+        @test all(parent(Y.T_ml) .≈ parent(T_ml_new)) # ocean temperature increases
+        @test all(parent(Y.h_ice) .≈ 0) # no ice
+        @test all(parent(Y.T_sfc) .≈ parent(T_ml_new)) # surface temperature = ocean temperature
 
-    # net outgoing longwave
-    Ya.F_rad .= @. (1 - params_ice.α) * params_ice.σ * Y.T_sfc^4
-
-    Fields.bycolumn(boundary_space) do colidx
-        solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
     end
 
-    F_atm = @. Ya.F_rad + Ya.F_turb
-    ∂F_atm∂T_sfc = get_∂F_rad_energy∂T_sfc(T_sfc_0, params_ice) .+ Ya.∂F_turb_energy∂T_sfc
+    @testset "Mixed layer freezing due to net positive radiation fluxes for FT=$FT" begin
+        Y, Ya = state_init(params_ice, boundary_space)
 
-    @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal fluxes
-    @test all(parent(Y.T_ml) .≈ params_ice.T_freeze) # ocean temperature remains at the freezing point
-    h_ice_new = @. (F_atm - (T_ml_0 - params_ice.T_freeze) * params_ocean.h * params_ocean.ρ * params_ocean.c) * Δt /
-       params_ice.L_ice
-    @test all(parent(Y.h_ice) .≈ parent(h_ice_new)) # ice growth
-    @test all(parent(Y.h_ice) .> 0)
-    T_sfc_new = @. T_sfc_0 - F_atm / (params_ice.k_ice / (h_ice_new) + ∂F_atm∂T_sfc)
-    @test all(parent(Y.T_sfc) .≈ parent(T_sfc_new)) # surface temperature decreases
-end
+        # ice free
+        Y.h_ice .= 0
+        h_ice_0 = deepcopy(Y.h_ice)
 
-# conductive flux and q flux
-@testset "Non-zero conductive flux" begin
-    Y, Ya = state_init(params_ice, boundary_space)
-    Δt = FT(100)
+        # no conductive flux, or basal interface flux
+        Y.T_sfc .= params_ice.T_base
+        Y.T_ml .= params_ice.T_base
+        T_sfc_0 = deepcopy(Y.T_sfc)
+        T_ml_0 = deepcopy(Y.T_ml)
 
-    # ice covered
-    Y.h_ice .= 10
-    h_ice_0 = deepcopy(Y.h_ice)
+        # net outgoing longwave
+        Ya.F_rad .= @. (1 - params_ice.α) * params_ice.σ * Y.T_sfc^4
 
-    # non-zero interface basal
-    ΔT_ml = 10
-    Y.T_ml .= params_ice.T_base .+ ΔT_ml
-    T_ml_0 = deepcopy(Y.T_ml)
+        Fields.bycolumn(boundary_space) do colidx
+            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
+        end
 
-    # zero conductive fluxes
-    Y.T_sfc .= params_ice.T_base
+        F_atm = @. Ya.F_rad + Ya.F_turb
+        ∂F_atm∂T_sfc = get_∂F_rad_energy∂T_sfc(T_sfc_0, params_ice) .+ Ya.∂F_turb_energy∂T_sfc
 
-    # zero atmos fluxes and their derivatives
-    Ya.∂F_turb_energy∂T_sfc .= .-get_∂F_rad_energy∂T_sfc.(Y.T_sfc, Ref(params_ice)) # ∂F_turb_energy∂T_sfc + ∂F_rad_energy∂T_sfc = 0
-    Ya.F_turb .= 0
-    Ya.F_rad .= 0
-
-    Fields.bycolumn(boundary_space) do colidx
-        solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
+        @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal fluxes
+        @test all(parent(Y.T_ml) .≈ params_ice.T_freeze) # ocean temperature remains at the freezing point
+        h_ice_new =
+            @. (F_atm - (T_ml_0 - params_ice.T_freeze) * params_ocean.h * params_ocean.ρ * params_ocean.c) * Δt /
+               params_ice.L_ice
+        @test all(parent(Y.h_ice) .≈ parent(h_ice_new)) # ice growth
+        @test all(parent(Y.h_ice) .> 0)
+        T_sfc_new = @. T_sfc_0 - F_atm / (params_ice.k_ice / (h_ice_new) + ∂F_atm∂T_sfc)
+        @test all(parent(Y.T_sfc) .≈ parent(T_sfc_new)) # surface temperature decreases
     end
 
-    @test all(parent(Ya.e_base) .≈ params_ice.C0_base * ΔT_ml * Δt) # non-zero contribution from basal flux
-    T_ml_new = T_ml_0 .- params_ice.C0_base .* ΔT_ml * Δt / (params_ocean.h * params_ocean.ρ * params_ocean.c)
-    @test all(parent(Y.T_ml) .≈ parent(T_ml_new)) # ocean temperature decreases
-    @test all(parent(Y.T_ml) .< parent(T_ml_0))
-    h_ice_new = @. h_ice_0 - params_ice.C0_base * 10 * Δt / params_ice.L_ice
-    @test all(parent(Y.h_ice) .≈ parent(h_ice_new))
-    @test all(parent(Y.T_sfc) .≈ params_ice.T_base) # surface temperature unchanged (T_ml can affect in only if ice free)
-end
+    # conductive flux and q flux
+    @testset "Non-zero conductive flux for FT=$FT" begin
+        Y, Ya = state_init(params_ice, boundary_space)
+        Δt = FT(100)
 
-@testset "Nonzero Q-flux (~horizontal ocean transport)" begin
-    Y, Ya = state_init(params_ice, boundary_space)
-    Δt = FT(100)
+        # ice covered
+        Y.h_ice .= 10
+        h_ice_0 = deepcopy(Y.h_ice)
 
-    # ice covered
-    Y.h_ice .= 10
-    h_ice_0 = deepcopy(Y.h_ice)
+        # non-zero interface basal
+        ΔT_ml = 10
+        Y.T_ml .= params_ice.T_base .+ ΔT_ml
+        T_ml_0 = deepcopy(Y.T_ml)
 
-    # positive q_flux (positive toward current column)
-    Ya.ocean_qflux .= 100
+        # zero conductive fluxes
+        Y.T_sfc .= params_ice.T_base
 
-    # no conductive flux, or basal interface flux
-    Y.T_sfc .= params_ice.T_base
-    Y.T_ml .= params_ice.T_base
-    T_ml_0 = deepcopy(Y.T_ml)
+        # zero atmos fluxes and their derivatives
+        Ya.∂F_turb_energy∂T_sfc .= .-get_∂F_rad_energy∂T_sfc.(Y.T_sfc, Ref(params_ice)) # ∂F_turb_energy∂T_sfc + ∂F_rad_energy∂T_sfc = 0
+        Ya.F_turb .= 0
+        Ya.F_rad .= 0
 
-    # no atmos fluxes or their derivatives
-    Ya.∂F_turb_energy∂T_sfc .= .-get_∂F_rad_energy∂T_sfc.(Y.T_sfc, Ref(params_ice)) # ∂F_turb_energy∂T_sfc + ∂F_rad_energy∂T_sfc = 0
-    Ya.F_turb .= 0
-    Ya.F_rad .= 0
+        Fields.bycolumn(boundary_space) do colidx
+            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
+        end
 
-    Fields.bycolumn(boundary_space) do colidx
-        solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
+        @test all(parent(Ya.e_base) .≈ params_ice.C0_base * ΔT_ml * Δt) # non-zero contribution from basal flux
+        T_ml_new = T_ml_0 .- params_ice.C0_base .* ΔT_ml * Δt / (params_ocean.h * params_ocean.ρ * params_ocean.c)
+        @test all(parent(Y.T_ml) .≈ parent(T_ml_new)) # ocean temperature decreases
+        @test all(parent(Y.T_ml) .< parent(T_ml_0))
+        h_ice_new = @. h_ice_0 - params_ice.C0_base * 10 * Δt / params_ice.L_ice
+        @test all(parent(Y.h_ice) .≈ parent(h_ice_new))
+        @test all(parent(Y.T_sfc) .≈ params_ice.T_base) # surface temperature unchanged (T_ml can affect in only if ice free)
     end
 
-    @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal flux
-    T_ml_new = @. T_ml_0 + Ya.ocean_qflux * Δt / (params_ocean.h * params_ocean.ρ * params_ocean.c)
-    @test all(parent(Y.T_ml) .≈ parent(T_ml_new)) # qflux increases ocean temperature
-    @test all(parent(Y.T_ml) .> parent(T_ml_0))
-    @test all(parent(Y.T_sfc) .≈ params_ice.T_base) # surface temperature unchanged (T_ml can affect in only if ice free)
-    h_ice_new = @. h_ice_0 - Ya.ocean_qflux * Δt / params_ice.L_ice
-    @test all(parent(Y.h_ice) .≈ parent(h_ice_new)) # # qflux decreases sea-ice thickness
-    @test all(parent(Y.h_ice) .< parent(h_ice_0))
-end
+    @testset "Nonzero Q-flux (~horizontal ocean transport) for FT=$FT" begin
+        Y, Ya = state_init(params_ice, boundary_space)
+        Δt = FT(100)
 
-include("../../experiments/AMIP/modular/components/slab_utils.jl")
-@testset "step! update + total energy calculation" begin
+        # ice covered
+        Y.h_ice .= 10
+        h_ice_0 = deepcopy(Y.h_ice)
 
-    Δt = 1000
+        # positive q_flux (positive toward current column)
+        Ya.ocean_qflux .= 100
 
-    sim = eisenman_seaice_init(
-        FT,
-        (0, 2e6),
-        space = boundary_space,
-        area_fraction = ones(boundary_space),
-        thermo_params = thermo_params,
-        stepper = CTS.RK4(),
-        dt = Δt,
-        saveat = 1.0e10,
-    )
-    sim.integrator.p.Ya.F_turb .= 0
-    sim.integrator.p.Ya.F_rad .= 300
-    sim.integrator.u.T_ml .= sim.integrator.p.params.p_i.T_freeze # init conditions for ocean temperature
+        # no conductive flux, or basal interface flux
+        Y.T_sfc .= params_ice.T_base
+        Y.T_ml .= params_ice.T_base
+        T_ml_0 = deepcopy(Y.T_ml)
 
-    total_energy_0 = get_field(sim, Val(:energy))
-    h_ice_0 = deepcopy(sim.integrator.u.h_ice)
+        # no atmos fluxes or their derivatives
+        Ya.∂F_turb_energy∂T_sfc .= .-get_∂F_rad_energy∂T_sfc.(Y.T_sfc, Ref(params_ice)) # ∂F_turb_energy∂T_sfc + ∂F_rad_energy∂T_sfc = 0
+        Ya.F_turb .= 0
+        Ya.F_rad .= 0
 
-    step!(sim, Δt)
-    h_ice = sim.integrator.u.h_ice
-    @test all(parent(h_ice) .≈ 0.001)
-    step!(sim, 2 * Δt)
-    h_ice = sim.integrator.u.h_ice
-    @test all(parent(h_ice) .≈ 0.002)
+        Fields.bycolumn(boundary_space) do colidx
+            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
+        end
 
-    total_energy_calc = (get_field(sim, Val(:energy)) .- total_energy_0)
-    total_energy_expeted = 300 .* ones(boundary_space) .* 2 .* Δt
-    @test all(parent(total_energy_calc) .≈ parent(total_energy_expeted))
+        @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal flux
+        T_ml_new = @. T_ml_0 + Ya.ocean_qflux * Δt / (params_ocean.h * params_ocean.ρ * params_ocean.c)
+        @test all(parent(Y.T_ml) .≈ parent(T_ml_new)) # qflux increases ocean temperature
+        @test all(parent(Y.T_ml) .> parent(T_ml_0))
+        @test all(parent(Y.T_sfc) .≈ params_ice.T_base) # surface temperature unchanged (T_ml can affect in only if ice free)
+        h_ice_new = @. h_ice_0 - Ya.ocean_qflux * Δt / params_ice.L_ice
+        @test all(parent(Y.h_ice) .≈ parent(h_ice_new)) # # qflux decreases sea-ice thickness
+        @test all(parent(Y.h_ice) .< parent(h_ice_0))
+    end
 
+    include("../../experiments/AMIP/modular/components/slab_utils.jl")
+    @testset "step! update + total energy calculation for FT=$FT" begin
+        Δt = 1000
+
+        sim = eisenman_seaice_init(
+            FT,
+            (0, 2e6),
+            space = boundary_space,
+            area_fraction = ones(boundary_space),
+            thermo_params = thermo_params,
+            stepper = CTS.RK4(),
+            dt = Δt,
+            saveat = 1.0e10,
+        )
+        sim.integrator.p.Ya.F_turb .= 0
+        sim.integrator.p.Ya.F_rad .= 300
+        sim.integrator.u.T_ml .= sim.integrator.p.params.p_i.T_freeze # init conditions for ocean temperature
+
+        total_energy_0 = get_field(sim, Val(:energy))
+        h_ice_0 = deepcopy(sim.integrator.u.h_ice)
+
+        step!(sim, Δt)
+        h_ice = sim.integrator.u.h_ice
+        @test all(parent(h_ice) .≈ 0.001)
+        step!(sim, 2 * Δt)
+        h_ice = sim.integrator.u.h_ice
+        @test all(parent(h_ice) .≈ 0.002)
+
+        total_energy_calc = (get_field(sim, Val(:energy)) .- total_energy_0)
+        total_energy_expeted = 300 .* ones(boundary_space) .* 2 .* Δt
+        @test all(parent(total_energy_calc) .≈ parent(total_energy_expeted))
+
+    end
 end

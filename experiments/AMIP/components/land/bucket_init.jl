@@ -160,6 +160,24 @@ function ClimaLSM.initialize_drivers(a::CoupledRadiativeFluxes{FT}, coords) wher
 end
 
 """
+    temp_anomaly_aquaplanet(coord)
+
+Introduce a temperature IC anomaly for the aquaplanet case.
+The values for this case follow the moist Held-Suarez setup of Thatcher &
+Jablonowski (2016, eq. 6), consistent with ClimaAtmos aquaplanet.
+"""
+temp_anomaly_aquaplanet(coord) = 29 * exp(-coord.lat^2 / (2 * 26^2))
+
+"""
+    temp_anomaly_amip(coord)
+
+Introduce a temperature IC anomaly for the AMIP case.
+The values used in this case have been tuned to align with observed temperature
+and result in stable simulations.
+"""
+temp_anomaly_amip(coord) = 40 * cosd(coord.lat)^4
+
+"""
     bucket_init
 
 Initializes the bucket model variables.
@@ -226,26 +244,16 @@ function bucket_init(
 
     # Initial conditions with no moisture
     Y, p, coords = initialize(model)
-    Y.bucket.T = map(coords.subsurface) do coord
-        T_sfc_0 = FT(271.0)
-        radlat = coord.lat / FT(180) * pi
-        ΔT = FT(0)
-        if land_temperature_anomaly == "zonally_asymmetric"
-            anom_ampl = FT(0)# this is zero, no anomaly
-            lat_0 = FT(60) / FT(180) * pi
-            lon_0 = FT(-90) / FT(180) * pi
-            radlon = coord.long / FT(180) * pi
-            stdev = FT(5) / FT(180) * pi
-            ΔT = anom_ampl * exp(-((radlat - lat_0)^2 / 2stdev^2 + (radlon - lon_0)^2 / 2stdev^2))
-        elseif land_temperature_anomaly == "aquaplanet"
-            ΔT = FT(29) * exp(-coord.lat^2 / (2 * 26^2))
-        elseif land_temperature_anomaly == "amip"
-            ΔT = FT(40 * cos(radlat)^4)
-        else
-            ΔT = FT(0)
-        end
-        T_sfc_0 + ΔT
-    end
+
+    # Get temperature anomaly function
+    T_functions = Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
+    haskey(T_functions, land_temperature_anomaly) ||
+        error("land temp anomaly function $land_temperature_anomaly not supported")
+    temp_anomaly = T_functions[land_temperature_anomaly]
+
+    # Set temperature IC including anomaly, based on atmospheric setup
+    T_sfc_0 = FT(271.0)
+    @. Y.bucket.T = T_sfc_0 + temp_anomaly(coords.subsurface)
 
     Y.bucket.W .= 10.0
     Y.bucket.Ws .= 0.0

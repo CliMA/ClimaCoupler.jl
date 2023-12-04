@@ -1,7 +1,7 @@
 agents:
   queue: central
   slurm_time: 24:00:00
-  modules: julia/1.9.4 cuda/12.2 ucx/1.14.1_cuda-12.2 openmpi/4.1.5_cuda-12.2 hdf5/1.12.2-ompi415 nsight-systems/2023.2.1
+  modules: julia/1.9.4 cuda/12.2 ucx/1.14.1_cuda-12.2 openmpi/4.1.5_cuda-12.2 nsight-systems/2023.3.1
 
 env:
   JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
@@ -10,12 +10,16 @@ env:
   OMPI_MCA_opal_warn_on_missing_libcuda: 0
   JULIA_MAX_NUM_PRECOMPILE_FILES: 100
   GKSwstype: 100
+  SLURM_KILL_BAD_EXIT: 1
+  JULIA_NVTX_CALLBACKS: gc
+  JULIA_CUDA_MEMORY_POOL: none
+  JULIA_MPI_HAS_CUDA: "true"
+  MPITRAMPOLINE_LIB: "/groups/esm/software/MPIwrapper/ompi4.1.5_cuda-12.2/lib64/libmpiwrapper.so"
+  MPITRAMPOLINE_MPIEXEC: "/groups/esm/software/MPIwrapper/ompi4.1.5_cuda-12.2/bin/mpiwrapperexec"
 
   CONFIG_PATH: "config/model_configs"
   PERF_CONFIG_PATH: "config/perf_configs"
   MPI_CONFIG_PATH: "config/mpi_configs"
-
-  LD_LIBRARY_PATH: "/central/scratch/esm/slurm-buildkite/climaatmos-ci/depot/cpu/artifacts/e9feeabfa989549ac1dac61e4df5f2849149ad6d/lib/:${LD_LIBRARY_PATH}"
 
 timeout_in_minutes: 1440
 
@@ -24,8 +28,13 @@ steps:
     key: "init_cpu_env"
     command:
 
-      - echo "--- Configure MPI"
-      - julia -e 'using Pkg; Pkg.add("MPIPreferences"); using MPIPreferences; use_system_binary()'
+      # Local MPIPreferences take precedence over the one set by JuliaProject.toml,
+      # so we make sure that we remove them to use MPITrampoline.
+      #
+      # TODO: This can be removed once all the branches that use MPIPreferences
+      # are deleted
+      - echo "--- Remove MPIPreferences"
+      - "rm -f ${JULIA_DEPOT_PATH}/environments/v1.9/LocalPreferences.toml"
 
       - echo "--- Instantiate package env"
       - "julia --project -e 'using Pkg; Pkg.instantiate(;verbose=true)'"

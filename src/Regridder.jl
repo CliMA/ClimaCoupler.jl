@@ -162,11 +162,16 @@ function hdwrite_regridfile_rll_to_cgll(
         space2d = space
     end
 
+    # If doesn't make sense to regrid with GPUs/MPI processes
+    cpu_context = ClimaComms.SingletonCommsContext(ClimaComms.CPUSingleThreaded())
+
     topology = Topologies.Topology2D(
+        cpu_context,
         Spaces.topology(space2d).mesh,
         Topologies.spacefillingcurve(Spaces.topology(space2d).mesh),
     )
     Nq = Spaces.Quadratures.polynomial_degree(Spaces.quadrature_style(space2d)) + 1
+
     space2d_undistributed = Spaces.SpectralElementSpace2D(topology, Spaces.Quadratures.GLL{Nq}())
 
     if space isa Spaces.ExtrudedFiniteDifferenceSpace
@@ -241,14 +246,7 @@ function hdwrite_regridfile_rll_to_cgll(
     )
 
     map(
-        x -> write_to_hdf5(
-            REGRID_DIR,
-            hd_outfile_root,
-            times[x],
-            offline_fields[x],
-            varname,
-            ClimaComms.SingletonCommsContext(),
-        ),
+        x -> write_to_hdf5(REGRID_DIR, hd_outfile_root, times[x], offline_fields[x], varname, cpu_context),
         1:length(times),
     )
     jldsave(joinpath(REGRID_DIR, hd_outfile_root * "_times.jld2"); times = times)

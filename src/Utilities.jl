@@ -20,8 +20,7 @@ Remap the values of a field onto a new space.
 - `field_out`: [Fields.Field] to remap `field_in` to.
 """
 function swap_space!(field_out, field_in::Fields.Field)
-    parent(field_out) .= parent(field_in)
-    return field_out
+    field_out = Fields.Field(Fields.field_values(field_in), axes(field_out))
 end
 
 end # module

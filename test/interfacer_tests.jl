@@ -28,10 +28,10 @@ struct DummySimulation3{S} <: LandModelSimulation
 end
 
 get_field(sim::SurfaceModelSimulation, ::Val{:var}) = ones(sim.space)
-get_field(sim::SurfaceModelSimulation, ::Val{:surface_temperature}) = ones(sim.space) .* FT(300)
+get_field(sim::SurfaceModelSimulation, ::Val{:surface_temperature}) = ones(sim.space) .* 300
 function get_field(sim::SurfaceModelSimulation, ::Val{:var_float})
     FT = Domains.float_type(Meshes.domain(sim.space.grid.topology.mesh))
-    FT(2)
+    return FT(2)
 end
 
 for FT in (Float32, Float64)

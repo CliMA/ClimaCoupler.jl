@@ -25,51 +25,36 @@ struct TestAtmos{I} <: Interfacer.AtmosModelSimulation
     i::I
 end
 name(s::TestAtmos) = "TestAtmos"
-function get_field(s::TestAtmos, ::Val{:F_radiative_TOA})
-    FT = Domains.float_type(Meshes.domain(s.i.space.grid.topology.mesh))
-    ones(s.i.space) .* FT.(200)
-end
+get_field(s::TestAtmos, ::Val{:F_radiative_TOA}) = ones(s.i.space) .* 200
+get_field(s::TestAtmos, ::Val{:water}) = ones(s.i.space) .* 1
 function get_field(s::TestAtmos, ::Val{:energy})
     FT = Domains.float_type(Meshes.domain(s.i.space.grid.topology.mesh))
-    ones(s.i.space) .* FT.(1e6)
-end
-function get_field(s::TestAtmos, ::Val{:water})
-    FT = Domains.float_type(Meshes.domain(s.i.space.grid.topology.mesh))
-    ones(s.i.space) .* FT.(1)
+    ones(s.i.space) .* FT(1e6)
 end
 
 struct TestOcean{I} <: Interfacer.SurfaceModelSimulation
     i::I
 end
 name(s::TestOcean) = "TestOcean"
+get_field(s::TestOcean, ::Val{:water}) = ones(s.i.space) .* 0
 function get_field(s::TestOcean, ::Val{:energy})
     FT = Domains.float_type(Meshes.domain(s.i.space.grid.topology.mesh))
-    ones(s.i.space) .* FT.(1e6)
-end
-function get_field(s::TestOcean, ::Val{:water})
-    FT = Domains.float_type(Meshes.domain(s.i.space.grid.topology.mesh))
-    ones(s.i.space) .* FT.(0)
+    ones(s.i.space) .* FT(1e6)
 end
 function get_field(s::TestOcean, ::Val{:area_fraction})
     FT = Domains.float_type(Meshes.domain(s.i.space.grid.topology.mesh))
-    ones(s.i.space) .* FT.(0.25)
+    ones(s.i.space) .* FT(0.25)
 end
 
 struct TestLand{I} <: Interfacer.SurfaceModelSimulation
     i::I
 end
 name(s::TestLand) = "TestLand"
-function get_field(s::TestLand, ::Val{:energy})
-    FT = Domains.float_type(Meshes.domain(s.i.space.grid.topology.mesh))
-    ones(s.i.space) .* FT.(0)
-end
-function get_field(s::TestLand, ::Val{:water})
-    FT = Domains.float_type(Meshes.domain(s.i.space.grid.topology.mesh))
-    ones(s.i.space) .* FT.(0)
-end
+get_field(s::TestLand, ::Val{:energy}) = ones(s.i.space) .* 0
+get_field(s::TestLand, ::Val{:water}) = ones(s.i.space) .* 0
 function get_field(s::TestLand, ::Val{:area_fraction})
     FT = Domains.float_type(Meshes.domain(s.i.space.grid.topology.mesh))
-    ones(s.i.space) .* FT.(0.25)
+    ones(s.i.space) .* FT(0.25)
 end
 
 

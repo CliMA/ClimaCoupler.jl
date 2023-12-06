@@ -19,7 +19,7 @@ import ClimaCoupler.Diagnostics:
     post_save,
     save_time_format
 
-get_var(cs::Interfacer.CoupledSimulation, ::Val{:x}) = float_type(cs)(1)
+get_var(cs::Interfacer.CoupledSimulation, ::Val{:x}) = 1
 
 for FT in (Float32, Float64)
     @testset "init_diagnostics for FT=$FT" begin

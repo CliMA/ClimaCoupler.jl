@@ -6,7 +6,7 @@ This module contains functions for defining, gathering and outputting online mod
 module Diagnostics
 
 using ClimaCore: Spaces, Fields, InputOutput
-using ClimaCoupler.Interfacer: CoupledSimulation
+using ClimaCoupler.Interfacer: CoupledSimulation, float_type
 using Dates
 using ClimaCoupler.TimeManager: AbstractFrequency, Monthly, EveryTimestep, trigger_callback
 using ClimaComms
@@ -78,12 +78,12 @@ end
 Collects diagnostics in diags names.
 """
 function collect_diags(cs::CoupledSimulation, dg::DiagnosticsGroup)
-
+    FT = float_type(cs)
     diags = (;)
 
     diag_names = propertynames(dg.field_vector)
     for name in diag_names
-        diags = (; diags..., zip((name,), (get_var(cs, Val(name)),))...)
+        diags = (; diags..., zip((name,), (FT.(get_var(cs, Val(name))),))...)
     end
 
     return Fields.FieldVector(; diags...)

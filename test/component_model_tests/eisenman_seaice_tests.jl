@@ -80,7 +80,7 @@ for FT in (Float32, Float64)
 
         @test all(parent(Ya.e_base) .≈ 0)
         @test all(parent(Y.T_ml) .≈ params_ice.T_base) # ocean temperature below ice remains unchanged
-        h_ice_new = @. h_ice_0 + F_atm * Δt / params_ice.L_ice
+        h_ice_new = @. h_ice_0 + F_atm * FT(Δt) / params_ice.L_ice
         @test all(parent(Y.h_ice) .≈ parent(h_ice_new)) # ice growth
         T_sfc_new = @. params_ice.T_base .+ (-F_atm) / (params_ice.k_ice / (h_ice_new) + ∂F_atm∂T_sfc)
         @test all(parent(Y.T_sfc) .≈ parent(T_sfc_new)) # surface temperature decreases
@@ -112,7 +112,7 @@ for FT in (Float32, Float64)
 
         @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal fluxes
         @test all(parent(Y.T_ml) .≈ params_ice.T_base) # ocean temperature stays at freezing point
-        h_ice_new = @. h_ice_0 + F_atm * Δt / params_ice.L_ice
+        h_ice_new = @. h_ice_0 + F_atm * FT(Δt) / params_ice.L_ice
         @test all(parent(Y.h_ice) .≈ parent(h_ice_new)) # no ice growth
         T_sfc_new = @. params_ice.T_base .+ (-F_atm) / (params_ice.k_ice / (h_ice_new) + ∂F_atm∂T_sfc)
         @test all(parent(Y.T_sfc) .≈ parent(T_sfc_new)) # surface temperature decreases
@@ -150,7 +150,7 @@ for FT in (Float32, Float64)
 
         @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal fluxes
         @test all(parent(Y.T_ml) .≈ params_ice.T_base) # ocean temperature stays at freezing point
-        h_ice_new = @. h_ice_0 + F_atm * Δt / params_ice.L_ice
+        h_ice_new = @. h_ice_0 + F_atm * FT(Δt) / params_ice.L_ice
         @test all(parent(Y.h_ice) .≈ parent(h_ice_new)) # ice growth
         @test all(parent(Y.T_sfc) .≈ params_ice.T_base) # ice surface temperature doesn't exceed freezing
         @test all(parent(Y.T_sfc) .< parent(T_sfc_0 .+ ΔT_sfc))
@@ -180,7 +180,7 @@ for FT in (Float32, Float64)
         F_atm = @. Ya.F_rad + Ya.F_turb
 
         @test all(parent(Y.h_ice) .≈ 0) # ice melts
-        T_ml_new = @. T_ml_0 - (F_atm) * Δt / (params_ocean.h * params_ocean.ρ * params_ocean.c) -
+        T_ml_new = @. T_ml_0 - (F_atm) * FT(Δt) / (params_ocean.h * params_ocean.ρ * params_ocean.c) -
            h_ice_0 * params_ice.L_ice / (params_ocean.h * params_ocean.ρ * params_ocean.c)
         @test all(parent(Y.T_ml) .≈ parent(T_ml_new)) # ocean temperature increases due to F_atm (reduced by the latent heat of melting)
 
@@ -210,7 +210,7 @@ for FT in (Float32, Float64)
         F_atm = @. Ya.F_rad + Ya.F_turb
 
         @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal fluxes
-        T_ml_new = @. T_ml_0 - (F_atm) * Δt / (params_ocean.h * params_ocean.ρ * params_ocean.c)
+        T_ml_new = @. T_ml_0 - (F_atm) * FT(Δt) / (params_ocean.h * params_ocean.ρ * params_ocean.c)
         @test all(parent(Y.T_ml) .≈ parent(T_ml_new)) # ocean temperature increases
         @test all(parent(Y.h_ice) .≈ 0) # no ice
         @test all(parent(Y.T_sfc) .≈ parent(T_ml_new)) # surface temperature = ocean temperature
@@ -240,10 +240,11 @@ for FT in (Float32, Float64)
         F_atm = @. Ya.F_rad + Ya.F_turb
         ∂F_atm∂T_sfc = get_∂F_rad_energy∂T_sfc(T_sfc_0, params_ice) .+ Ya.∂F_turb_energy∂T_sfc
 
+        FT = eltype(F_atm)
         @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal fluxes
         @test all(parent(Y.T_ml) .≈ params_ice.T_freeze) # ocean temperature remains at the freezing point
         h_ice_new =
-            @. (F_atm - (T_ml_0 - params_ice.T_freeze) * params_ocean.h * params_ocean.ρ * params_ocean.c) * Δt /
+            @. (F_atm - (T_ml_0 - params_ice.T_freeze) * params_ocean.h * params_ocean.ρ * params_ocean.c) * FT(Δt) /
                params_ice.L_ice
         @test all(parent(Y.h_ice) .≈ parent(h_ice_new)) # ice growth
         @test all(parent(Y.h_ice) .> 0)
@@ -277,11 +278,11 @@ for FT in (Float32, Float64)
             solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
         end
 
-        @test all(parent(Ya.e_base) .≈ params_ice.C0_base * ΔT_ml * Δt) # non-zero contribution from basal flux
-        T_ml_new = T_ml_0 .- params_ice.C0_base .* ΔT_ml * Δt / (params_ocean.h * params_ocean.ρ * params_ocean.c)
+        @test all(parent(Ya.e_base) .≈ params_ice.C0_base * ΔT_ml * FT(Δt)) # non-zero contribution from basal flux
+        T_ml_new = T_ml_0 .- params_ice.C0_base .* ΔT_ml * FT(Δt) / (params_ocean.h * params_ocean.ρ * params_ocean.c)
         @test all(parent(Y.T_ml) .≈ parent(T_ml_new)) # ocean temperature decreases
         @test all(parent(Y.T_ml) .< parent(T_ml_0))
-        h_ice_new = @. h_ice_0 - params_ice.C0_base * 10 * Δt / params_ice.L_ice
+        h_ice_new = @. h_ice_0 - params_ice.C0_base * 10 * FT(Δt) / params_ice.L_ice
         @test all(parent(Y.h_ice) .≈ parent(h_ice_new))
         @test all(parent(Y.T_sfc) .≈ params_ice.T_base) # surface temperature unchanged (T_ml can affect in only if ice free)
     end
@@ -312,11 +313,11 @@ for FT in (Float32, Float64)
         end
 
         @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal flux
-        T_ml_new = @. T_ml_0 + Ya.ocean_qflux * Δt / (params_ocean.h * params_ocean.ρ * params_ocean.c)
+        T_ml_new = @. T_ml_0 + Ya.ocean_qflux * FT(Δt) / (params_ocean.h * params_ocean.ρ * params_ocean.c)
         @test all(parent(Y.T_ml) .≈ parent(T_ml_new)) # qflux increases ocean temperature
         @test all(parent(Y.T_ml) .> parent(T_ml_0))
         @test all(parent(Y.T_sfc) .≈ params_ice.T_base) # surface temperature unchanged (T_ml can affect in only if ice free)
-        h_ice_new = @. h_ice_0 - Ya.ocean_qflux * Δt / params_ice.L_ice
+        h_ice_new = @. h_ice_0 - Ya.ocean_qflux * FT(Δt) / params_ice.L_ice
         @test all(parent(Y.h_ice) .≈ parent(h_ice_new)) # # qflux decreases sea-ice thickness
         @test all(parent(Y.h_ice) .< parent(h_ice_0))
     end
@@ -347,10 +348,10 @@ for FT in (Float32, Float64)
         @test all(parent(h_ice) .≈ 0.001)
         step!(sim, 2 * Δt)
         h_ice = sim.integrator.u.h_ice
-        @test all(parent(h_ice) .≈ 0.002)
+        @test all(abs.(parent(h_ice) .- 0.002) .< 10eps(FT))
 
         total_energy_calc = (get_field(sim, Val(:energy)) .- total_energy_0)
-        total_energy_expeted = 300 .* ones(boundary_space) .* 2 .* Δt
+        total_energy_expeted = 300 .* ones(boundary_space) .* 2 .* FT(Δt)
         @test all(parent(total_energy_calc) .≈ parent(total_energy_expeted))
 
     end

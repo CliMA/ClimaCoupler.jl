@@ -163,19 +163,19 @@ Initializes the bucket model variables.
 """
 function bucket_init(
     ::Type{FT},
-    tspan::Tuple{FT, FT},
+    tspan::Tuple{Float64, Float64},
     config::String,
     albedo_type::String,
     land_temperature_anomaly::String,
     comms_ctx::AbstractCommsContext,
     regrid_dirpath::String;
     space,
-    dt::FT,
-    saveat::FT,
+    dt::Float64,
+    saveat::Float64,
     area_fraction,
     stepper = CTS.RK4(),
     date_ref::DateTime,
-    t_start::FT,
+    t_start::Float64,
 ) where {FT}
     if config != "sphere"
         println(
@@ -210,7 +210,7 @@ function bucket_init(
     z_0b = FT(1e-3)
     κ_soil = FT(0.7)
     ρc_soil = FT(2e8)
-    t_crit = dt # This is the timescale on which snow exponentially damps to zero, in the case where all
+    t_crit = FT(dt) # This is the timescale on which snow exponentially damps to zero, in the case where all
     # the snow would melt in time t_crit. It prevents us from having to specially time step in cases where
     # all the snow melts in a single timestep.
     params = BucketModelParameters(κ_soil, ρc_soil, albedo, σS_c, W_f, z_0m, z_0b, t_crit, earth_param_set)

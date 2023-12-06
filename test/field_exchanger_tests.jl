@@ -74,7 +74,10 @@ end
 struct TestSurfaceSimulationLand{C} <: SurfaceModelSimulation
     cache::C
 end
-get_field(::TestSurfaceSimulationLand, ::Val{:area_fraction}) = 0.5
+function get_field(sim::TestSurfaceSimulationLand, ::Val{:area_fraction})
+    FT = eltype(sim.cache.turbulent_energy_flux)
+    return FT(0.5)
+end
 function update_field!(sim::TestSurfaceSimulationLand, ::Val{:turbulent_energy_flux}, field)
     parent(sim.cache.turbulent_energy_flux) .= parent(field)
 end
@@ -109,7 +112,6 @@ for FT in (Float32, Float64)
             @test parent(coupler_fields.P_snow)[1] == results[1]
         end
     end
-
 
     @testset "import_combined_surface_fields! for FT=$FT" begin
         # coupler cache setup

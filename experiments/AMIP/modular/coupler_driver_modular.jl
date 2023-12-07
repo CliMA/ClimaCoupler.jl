@@ -210,7 +210,7 @@ the atmospheric and surface components, so exchanges are parallelized. Note this
 atmosphere and surface are of the same horizontal resolution.
 =#
 ## init a 2D boundary space at the surface
-boundary_space = atmos_sim.domain.face_space.horizontal_space
+boundary_space = Spaces.horizontal_space(atmos_sim.domain.face_space)
 
 # init land-sea fraction
 land_fraction =

@@ -15,7 +15,7 @@ for FT in (Float64,)
     @testset "dss_state! BucketSimulation for FT=$FT" begin
         # use TestHelper to create space, extract surface space
         subsurface_space = create_space(FT, nz = 2)
-        surface_space = subsurface_space.horizontal_space
+        surface_space = Spaces.horizontal_space(subsurface_space)
 
         # set up objects for test
         dss_buffer_3d = Spaces.create_dss_buffer(Fields.zeros(subsurface_space))

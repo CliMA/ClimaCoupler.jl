@@ -64,7 +64,8 @@ function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
 
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
     atmos_config = CA.AtmosConfig(atmos_config_dict)
-    integrator = CA.get_integrator(atmos_config)
+    simulation = CA.get_simulation(atmos_config)
+    (; integrator) = simulation
     Y = integrator.u
     center_space = axes(Y.c.ρe_tot)
     face_space = axes(Y.f.u₃)
@@ -224,9 +225,6 @@ end
 Returns a new `p` with the updated surface conditions.
 """
 function get_new_cache(atmos_sim::ClimaAtmosSimulation, csf)
-
-    p = atmos_sim.integrator.p
-
     csf_sfc = (; T = csf.T_S, z0m = csf.z0m_S, z0b = csf.z0b_S, beta = csf.beta, q_vap = csf.q_sfc)
     modified_atmos_cache(atmos_sim, csf_sfc)
 end

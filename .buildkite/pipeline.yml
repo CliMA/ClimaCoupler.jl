@@ -21,7 +21,7 @@ env:
   PERF_CONFIG_PATH: "config/perf_configs"
   MPI_CONFIG_PATH: "config/mpi_configs"
 
-timeout_in_minutes: 1440
+timeout_in_minutes: 240
 
 steps:
   - label: "init environment :computer:"
@@ -312,6 +312,7 @@ steps:
       - label: "MPI AMIP"
         command: "srun julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/coarse_mpi_n2.yml"
         artifact_paths: "experiments/AMIP/modular/output/amip/coarse_mpi_n2_artifacts/*"
+        timeout_in_minutes: 240
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
         agents:

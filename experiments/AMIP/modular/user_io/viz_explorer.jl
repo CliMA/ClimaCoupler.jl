@@ -15,17 +15,33 @@ function plot_anim(cs, out_dir = ".")
     sol_atm = atmos_sim.integrator.sol
 
     anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(Geometry.UVVector.(u.c.uₕ).components.data.:1, 5))
+        Plots.plot(
+            Fields.level(Geometry.UVVector.(u.c.uₕ).components.data.:1, 5),
+            title = "Surface wind speed",
+            xlabel = "",
+            ylabel = "cubed sphere panels",
+        )
     end
     Plots.mp4(anim, joinpath(out_dir, "anim_u.mp4"), fps = 10)
 
     anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(u.c.ρe_tot, 1) .- Fields.level(sol_atm.u[1].c.ρe_tot, 1), clims = (-5000, 50000))
+        Plots.plot(
+            Fields.level(u.c.ρe_tot, 1) .- Fields.level(sol_atm.u[1].c.ρe_tot, 1),
+            clims = (-5000, 50000),
+            title = "Surface rho e",
+            xlabel = "",
+            ylabel = "cubed sphere panels",
+        )
     end
     Plots.mp4(anim, joinpath(out_dir, "anim_rhoe_anom.mp4"), fps = 10)
 
     anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(u.c.ρq_tot ./ u.c.ρ, 1))
+        Plots.plot(
+            Fields.level(u.c.ρq_tot ./ u.c.ρ, 1),
+            title = "Surface humidity",
+            xlabel = "",
+            ylabel = "cubed sphere panels",
+        )
     end
     Plots.mp4(anim, joinpath(out_dir, "anim_qt.mp4"), fps = 10)
 
@@ -42,7 +58,7 @@ function plot_anim(cs, out_dir = ".")
                 cs.surface_fractions,
                 (; land = land_T_sfc, ocean = oceanu.T_sfc, ice = FT(0)),
             )
-            Plots.plot(combined_field)
+            Plots.plot(combined_field, title = "Surface temperature [K]", xlabel = "", ylabel = "cubed sphere panels")
         end
     elseif mode_name == "slabplanet_eisenman"
         slab_ice_sim = slab_ice_sim.integrator.sol
@@ -53,7 +69,7 @@ function plot_anim(cs, out_dir = ".")
                 cs.surface_fractions,
                 (; land = land_T_sfc, ocean = FT(0), ice = iceu.T_sfc),
             )
-            Plots.plot(combined_field)
+            Plots.plot(combined_field, title = "Surface temperature [K])", xlabel = "", ylabel = "cubed sphere panels")
         end
 
     elseif mode_name == "amip"
@@ -65,7 +81,7 @@ function plot_anim(cs, out_dir = ".")
                 cs.surface_fractions,
                 (; land = land_T_sfc, ocean = SST, ice = iceu.T_sfc),
             )
-            Plots.plot(combined_field)
+            Plots.plot(combined_field, title = "Surface temperature [K])", xlabel = "", ylabel = "cubed sphere panels")
         end
     end
     Plots.mp4(anim, joinpath(out_dir, "earth_T.mp4"), fps = 10)
@@ -77,7 +93,7 @@ function plot_anim(cs, out_dir = ".")
             cs.surface_fractions,
             (; land = bucketu.bucket.W, ocean = 0.0, ice = 0.0),
         )
-        Plots.plot(combined_field)
+        Plots.plot(combined_field, title = "Sub-surface water storage [m]", xlabel = "", ylabel = "cubed sphere panels")
     end
     Plots.mp4(anim, joinpath(out_dir, "bucket_W.mp4"), fps = 10)
 
@@ -88,7 +104,7 @@ function plot_anim(cs, out_dir = ".")
             cs.surface_fractions,
             (; land = bucketu.bucket.σS, ocean = 0.0, ice = 0.0),
         )
-        Plots.plot(combined_field)
+        Plots.plot(combined_field, title = "Snow cover fraction over land", xlabel = "", ylabel = "cubed sphere panels")
     end
     Plots.mp4(anim, joinpath(out_dir, "bucket_snow.mp4"), fps = 10)
 

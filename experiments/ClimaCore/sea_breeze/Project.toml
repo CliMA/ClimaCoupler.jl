@@ -1,5 +1,6 @@
 [deps]
 ClimaCore = "d414da3d-4745-48bb-8d80-42e94e092884"
+ClimaCorePlots = "cf7c7e5a-b407-4c48-9047-11a94a308626"
 ClimaCoupler = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 ClimaTimeSteppers = "595c0a79-7f3d-439a-bc5a-b232dc3bde79"
 DiffEqCallbacks = "459566f4-90b8-5000-8ac3-15dfb0a30def"

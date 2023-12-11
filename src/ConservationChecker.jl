@@ -251,8 +251,9 @@ function plot_global_conservation(
         total .- total[1],
         label = "total",
         xlabel = "time [days]",
-        ylabel = "$var_name: (t) - (t=0)",
-        linewidth = 3,
+        ylabel = "$var_name: (t) - (t0)",
+        title = "Component model $var_name during simulation",
+        linewidth = 4,
     )
     for sim in model_sims
         sim_name = Interfacer.name(sim)
@@ -266,6 +267,30 @@ function plot_global_conservation(
         Plots.plot!(days, diff_global_field[1:length(days)], label = "toa_net")
     end
     Plots.savefig(figname1)
+
+    # duplicated for presentation plots
+    Plots.plot(
+        days,
+        total .- total[1],
+        label = "total",
+        xlabel = "time [days]",
+        ylabel = "$var_name: (t) - (t0)",
+        title = "Component model $var_name during simulation",
+        linewidth = 4,
+        legend = :bottomleft,
+    )
+    for sim in model_sims
+        sim_name = Interfacer.name(sim)
+        global_field = getproperty(ccs, Symbol(sim_name))
+        diff_global_field = (global_field .- global_field[1])
+        Plots.plot!(days, diff_global_field[1:length(days)], label = sim_name)
+    end
+    if cc isa EnergyConservationCheck
+        global_field = ccs.toa_net_source
+        diff_global_field = (global_field .- global_field[1])
+        Plots.plot!(days, diff_global_field[1:length(days)], label = "toa_net")
+    end
+    Plots.savefig(figname1[1:(end - 4)] * "legend_bottomleft.png")
 
     # evolution of log error of total
     Plots.plot(

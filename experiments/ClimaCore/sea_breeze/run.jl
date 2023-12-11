@@ -293,33 +293,30 @@ cpl_run(sim)
 
 # ### References
 # - [Antonelli & Rotunno 2007](https://journals.ametsoc.org/view/journals/atsc/64/12/2007jas2261.1.xml?tab_body=pdf)
-#hide
-## sol = sim.atmos.integrator.sol #hide
-#hide
-## dirname = "sea_breeze_2d" #hide
-## path = joinpath(@__DIR__, "output", dirname) #hide
-## mkpath(path) #hide
-#hide
-## using JLD2 #hide
-## save(joinpath(path, "last_sim.jld2"), "coupled_sim", sim) #hide
-#hide
-## post-processing #hide
-## import Plots, ClimaCorePlots #hide
-## Plots.GRBackend() #hide
-## interp = 5 #hide
-#hide
-## anim = Plots.@animate for u in sol.u #hide
-##     Plots.contourf(u.Yc.ρθ ./ u.Yc.ρ) #hide
-## end #hide
-## Plots.mp4(anim, joinpath(path, "theta.mp4"), fps = 20) #hide
-#hide
-##  If2c = Operators.InterpolateF2C() #hide
-##  anim = Plots.@animate for u in sol.u #hide
-##      Plots.contourf(If2c.(u.ρw) ./ u.Yc.ρ) #hide
-##  end #hide
-##  Plots.mp4(anim, joinpath(path, "vel_w.mp4"), fps = 20) #hide
-#hide
-##  anim = Plots.@animate for u in sol.u #hide
-##      Plots.contourf(u.Yc.ρuₕ ./ u.Yc.ρ) #hide
-##  end #hide
-##  Plots.mp4(anim, joinpath(path, "vel_u.mp4"), fps = 20) #hide
+
+## Post-processing
+using JLD2 #hide
+import Plots, ClimaCorePlots #hide
+
+sol = sim.atmos.integrator.sol #hide
+path = joinpath(@__DIR__, "output") #hide
+mkpath(path) #hide
+save(joinpath(path, "last_sim.jld2"), "coupled_sim", sim) #hide
+
+Plots.GRBackend() #hide
+
+anim = Plots.@animate for u in sol.u #hide
+    Plots.contourf(u.Yc.ρθ ./ u.Yc.ρ) #hide
+end #hide
+Plots.mp4(anim, joinpath(path, "theta.mp4"), fps = 20) #hide
+
+If2c = Operators.InterpolateF2C() #hide
+anim = Plots.@animate for u in sol.u #hide
+    Plots.contourf(If2c.(u.ρw) ./ u.Yc.ρ) #hide
+end #hide
+
+Plots.mp4(anim, joinpath(path, "vel_w.mp4"), fps = 20) #hide
+anim = Plots.@animate for u in sol.u #hide
+    Plots.contourf(u.Yc.ρuₕ ./ u.Yc.ρ) #hide
+end #hide
+Plots.mp4(anim, joinpath(path, "vel_u.mp4"), fps = 20) #hide

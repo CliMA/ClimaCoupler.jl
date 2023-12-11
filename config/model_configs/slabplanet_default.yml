@@ -5,7 +5,7 @@ rad: "gray"
 energy_check: true
 mode_name: "slabplanet"
 t_end: "10days"
-dt_save_to_sol: "9days"
+dt_save_to_sol: "1days"
 dt_cpl: 200
 dt: "200secs"
 mono_surface: true

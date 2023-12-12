@@ -253,18 +253,18 @@ function plot_global_conservation(
         xlabel = "time [days]",
         ylabel = "$var_name: (t) - (t0)",
         title = "Component model $var_name during simulation",
-        linewidth = 4,
+        linewidth = 3,
     )
     for sim in model_sims
         sim_name = Interfacer.name(sim)
         global_field = getproperty(ccs, Symbol(sim_name))
         diff_global_field = (global_field .- global_field[1])
-        Plots.plot!(days, diff_global_field[1:length(days)], label = sim_name)
+        Plots.plot!(days, diff_global_field[1:length(days)], label = sim_name, linewidth = 3)
     end
     if cc isa EnergyConservationCheck
         global_field = ccs.toa_net_source
         diff_global_field = (global_field .- global_field[1])
-        Plots.plot!(days, diff_global_field[1:length(days)], label = "toa_net")
+        Plots.plot!(days, diff_global_field[1:length(days)], label = "top of atmosphere", linewidth = 3)
     end
     Plots.savefig(figname1)
 
@@ -276,19 +276,19 @@ function plot_global_conservation(
         xlabel = "time [days]",
         ylabel = "$var_name: (t) - (t0)",
         title = "Component model $var_name during simulation",
-        linewidth = 4,
+        linewidth = 3,
         legend = :bottomleft,
     )
     for sim in model_sims
         sim_name = Interfacer.name(sim)
         global_field = getproperty(ccs, Symbol(sim_name))
         diff_global_field = (global_field .- global_field[1])
-        Plots.plot!(days, diff_global_field[1:length(days)], label = sim_name)
+        Plots.plot!(days, diff_global_field[1:length(days)], label = sim_name, linewidth = 3)
     end
     if cc isa EnergyConservationCheck
         global_field = ccs.toa_net_source
         diff_global_field = (global_field .- global_field[1])
-        Plots.plot!(days, diff_global_field[1:length(days)], label = "toa_net")
+        Plots.plot!(days, diff_global_field[1:length(days)], label = "toa_net", linewidth = 3)
     end
     Plots.savefig(figname1[1:(end - 4)] * "legend_bottomleft.png")
 

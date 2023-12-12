@@ -22,7 +22,7 @@ function plot_anim(cs, out_dir = ".")
             ylabel = "cubed sphere panels",
         )
     end
-    Plots.mp4(anim, joinpath(out_dir, "anim_u.mp4"), fps = 10)
+    Plots.mp4(anim, joinpath(out_dir, "anim_u.mp4"), fps = 5)
 
     anim = Plots.@animate for u in sol_atm.u
         Plots.plot(
@@ -33,7 +33,7 @@ function plot_anim(cs, out_dir = ".")
             ylabel = "cubed sphere panels",
         )
     end
-    Plots.mp4(anim, joinpath(out_dir, "anim_rhoe_anom.mp4"), fps = 10)
+    Plots.mp4(anim, joinpath(out_dir, "anim_rhoe_anom.mp4"), fps = 5)
 
     anim = Plots.@animate for u in sol_atm.u
         Plots.plot(
@@ -43,7 +43,7 @@ function plot_anim(cs, out_dir = ".")
             ylabel = "cubed sphere panels",
         )
     end
-    Plots.mp4(anim, joinpath(out_dir, "anim_qt.mp4"), fps = 10)
+    Plots.mp4(anim, joinpath(out_dir, "anim_qt.mp4"), fps = 5)
 
     # plot combined surfaces
     combined_field = zeros(boundary_space)
@@ -84,7 +84,7 @@ function plot_anim(cs, out_dir = ".")
             Plots.plot(combined_field, title = "Surface temperature [K])", xlabel = "", ylabel = "cubed sphere panels")
         end
     end
-    Plots.mp4(anim, joinpath(out_dir, "earth_T.mp4"), fps = 10)
+    Plots.mp4(anim, joinpath(out_dir, "earth_T.mp4"), fps = 5)
 
     combined_field = zeros(boundary_space)
     anim = Plots.@animate for bucketu in sol_slab.u
@@ -95,7 +95,7 @@ function plot_anim(cs, out_dir = ".")
         )
         Plots.plot(combined_field, title = "Sub-surface water storage [m]", xlabel = "", ylabel = "cubed sphere panels")
     end
-    Plots.mp4(anim, joinpath(out_dir, "bucket_W.mp4"), fps = 10)
+    Plots.mp4(anim, joinpath(out_dir, "bucket_W.mp4"), fps = 5)
 
     combined_field = zeros(boundary_space)
     anim = Plots.@animate for bucketu in sol_slab.u
@@ -106,7 +106,7 @@ function plot_anim(cs, out_dir = ".")
         )
         Plots.plot(combined_field, title = "Snow cover fraction over land", xlabel = "", ylabel = "cubed sphere panels")
     end
-    Plots.mp4(anim, joinpath(out_dir, "bucket_snow.mp4"), fps = 10)
+    Plots.mp4(anim, joinpath(out_dir, "bucket_snow.mp4"), fps = 5)
 
     if mode_name == "slabplanet_eisenman"
         sol_ice = cs.model_sims.ice_sim.integrator.sol
@@ -119,7 +119,7 @@ function plot_anim(cs, out_dir = ".")
             )
             Plots.plot(combined_field)
         end
-        Plots.mp4(anim, joinpath(out_dir, "eisenman_seaice.mp4"), fps = 10)
+        Plots.mp4(anim, joinpath(out_dir, "eisenman_seaice.mp4"), fps = 5)
     end
     # plot surface fluxes
     # TODO as part of the flux accumulation PR

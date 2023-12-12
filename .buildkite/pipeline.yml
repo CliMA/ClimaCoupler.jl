@@ -221,7 +221,7 @@ steps:
 
       - label: "sea_breeze"
         command: "julia --color=yes --project=experiments/ClimaCore/sea_breeze experiments/ClimaCore/sea_breeze/run.jl"
-        artifact_paths: "sea_breeze/"
+        artifact_paths: "sea_breeze/output/*"
         agents:
           slurm_mem: 20GB
 

@@ -308,15 +308,15 @@ Plots.GRBackend() #hide
 anim = Plots.@animate for u in sol.u #hide
     Plots.contourf(u.Yc.ρθ ./ u.Yc.ρ) #hide
 end #hide
-Plots.mp4(anim, joinpath(path, "theta.mp4"), fps = 20) #hide
+Plots.mp4(anim, joinpath(path, "theta.mp4"), fps = 10) #hide
 
 If2c = Operators.InterpolateF2C() #hide
 anim = Plots.@animate for u in sol.u #hide
     Plots.contourf(If2c.(u.ρw) ./ u.Yc.ρ) #hide
 end #hide
 
-Plots.mp4(anim, joinpath(path, "vel_w.mp4"), fps = 20) #hide
+Plots.mp4(anim, joinpath(path, "vel_w.mp4"), fps = 10) #hide
 anim = Plots.@animate for u in sol.u #hide
     Plots.contourf(u.Yc.ρuₕ ./ u.Yc.ρ) #hide
 end #hide
-Plots.mp4(anim, joinpath(path, "vel_u.mp4"), fps = 20) #hide
+Plots.mp4(anim, joinpath(path, "vel_u.mp4"), fps = 10) #hide

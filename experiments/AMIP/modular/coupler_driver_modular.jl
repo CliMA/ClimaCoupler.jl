@@ -703,6 +703,39 @@ if ClimaComms.iamroot(comms_ctx)
         plot_anim(cs, COUPLER_ARTIFACTS_DIR)
     end
 
+    post_spec = (;
+        T = (:zonal_mean,),
+    )
+    plot_spec = (;
+        T = (; clims = (190, 320), units = "K"),
+    )
+    files_dir = COUPLER_OUTPUT_DIR
+    output_dir = COUPLER_ARTIFACTS_DIR
+    month_date = cs.dates.date[1]
+    fig_name = "slabplanet_plots"
+
+    diags_names = propertynames(post_spec)
+
+    nlat = 180
+    nlon = 360
+
+    for name in diags_vnames
+        diag_data = read_latest_model_data(name, files_dir, files_root)
+
+        # post_data = postprocess(name, diag_data, getproperty(post_spec, name), coords = coords, raw_tag = raw_tag)
+        post_data =
+            postprocess(name, diag_data, getproperty(post_spec, name), REGRID_DIR = files_dir, nlat = nlat, nlon = nlon)
+        post_data.data[1] = sum(post_data.data) == 0 ? post_data.data[1] + eps() : post_data.data[1] # avoids InexactError
+
+        p = Plots.plot(
+            post_data,
+            zmd_params = (; getproperty(plot_spec, name)...),
+            hsd_params = (; getproperty(plot_spec, name)...),
+        )
+
+        savefig("zonal_mean_$name.png")
+    end
+
     ## plotting AMIP results
     if cs.mode.name == "amip"
         @info "AMIP plots"

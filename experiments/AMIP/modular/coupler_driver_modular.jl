@@ -134,7 +134,7 @@ pkg_dir = pkgdir(ClimaCoupler)
 if isinteractive()
     include("user_io/debug_plots.jl")
     parsed_args["config_file"] =
-        isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/model_configs/interactive_debug.yml") :
+        isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/model_configs/slabplanet_default.yml") :
         parsed_args["config_file"]
 end
 

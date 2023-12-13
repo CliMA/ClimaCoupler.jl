@@ -1,6 +1,7 @@
 using Plots
 using ClimaCorePlots
 using ClimaCore: Geometry
+using Statistics
 
 function plot_anim(cs, out_dir = ".")
 
@@ -17,7 +18,7 @@ function plot_anim(cs, out_dir = ".")
     anim = Plots.@animate for u in sol_atm.u
         Plots.plot(
             Fields.level(Geometry.UVVector.(u.c.uₕ).components.data.:1, 5),
-            title = "Surface wind speed",
+            title = "Surface zonal wind",
             xlabel = "",
             ylabel = "cubed sphere panels",
         )
@@ -28,7 +29,7 @@ function plot_anim(cs, out_dir = ".")
         Plots.plot(
             Fields.level(u.c.ρe_tot, 1) .- Fields.level(sol_atm.u[1].c.ρe_tot, 1),
             clims = (-5000, 50000),
-            title = "Surface rho e",
+            title = "Surface total energy",
             xlabel = "",
             ylabel = "cubed sphere panels",
         )
@@ -38,7 +39,7 @@ function plot_anim(cs, out_dir = ".")
     anim = Plots.@animate for u in sol_atm.u
         Plots.plot(
             Fields.level(u.c.ρq_tot ./ u.c.ρ, 1),
-            title = "Surface humidity",
+            title = "Surface total humidity",
             xlabel = "",
             ylabel = "cubed sphere panels",
         )
@@ -58,7 +59,10 @@ function plot_anim(cs, out_dir = ".")
                 cs.surface_fractions,
                 (; land = land_T_sfc, ocean = oceanu.T_sfc, ice = FT(0)),
             )
-            Plots.plot(combined_field, title = "Surface temperature [K]", xlabel = "", ylabel = "cubed sphere panels")
+            # TODO do anomaly from global mean temp
+            global_mean = mean(combined_field)
+            anomaly = combined_field .- global_mean
+            Plots.plot(anomaly, title = "Surface temperature anomaly [K]", xlabel = "", ylabel = "cubed sphere panels")
         end
     elseif mode_name == "slabplanet_eisenman"
         slab_ice_sim = slab_ice_sim.integrator.sol

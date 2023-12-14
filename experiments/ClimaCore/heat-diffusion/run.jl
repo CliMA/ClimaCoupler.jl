@@ -208,7 +208,7 @@ ics = (; atm = T_atm_0, lnd = T_lnd_0)
 # - specify timestepping information
 stepping = (;
     Δt_min = 0.02,
-    timerange = (0.0, 6.0),
+    timerange = (0.0, 100.0),
     Δt_coupler = 0.1,
     odesolver = CTS.ExplicitAlgorithm(CTS.RK4()),
     nsteps_atm = 8, # number of timesteps of atm per coupling cycle
@@ -308,19 +308,23 @@ Plots.GRBackend()
 ARTIFACTS_DIR = joinpath("experiments/ClimaCore/output/heat-diffusion_artifacts")
 mkpath(ARTIFACTS_DIR)
 
-# - Vertical profile at start and end
+# - Vertical profile at start, midpoint, and end
+n = length(sol_atm.u)
+mdpt = n ÷ 2 + 1
+
 t0_ = parent(sol_atm.u[1].T_atm)[:, 1];
+tmdpt_ = parent(sol_atm.u[mdpt].T_atm)[:, 1];
 tend_ = parent(sol_atm.u[end].T_atm)[:, 1];
 z_centers = parent(Fields.coordinate_field(center_space_atm))[:, 1];
 Plots.png(
     Plots.plot(
-        [t0_ tend_],
+        [t0_ tmdpt_ tend_],
         z_centers,
-        labels = ["t=0" "t=end"],
+        labels = ["t=0" "t=50s" "t=100s"],
         xlabel = "T (K)",
         ylabel = "z (m)",
-        title = "Atmos profile at start & end of Simulation",
-        linewidth = 2,
+        title = "Atmos profile throughout Simulation",
+        linewidth = 3,
     ),
     joinpath(ARTIFACTS_DIR, "atmos_profile.png"),
 )
@@ -339,8 +343,8 @@ Plots.png(
         labels = ["lnd" "atm" "tot"],
         xlabel = "time (s)",
         ylabel = "energy flux (J / m2)",
-        title = "Component Model Energy during Simulation",
-        linewidth = 2,
+        title = "Component model energy during simulation",
+        linewidth = 3,
     ),
     joinpath(ARTIFACTS_DIR, "component_energy.png"),
 )

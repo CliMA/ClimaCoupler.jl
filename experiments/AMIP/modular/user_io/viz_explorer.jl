@@ -29,7 +29,7 @@ function plot_anim(cs, out_dir = ".")
         Plots.plot(
             Fields.level(u.c.ρe_tot, 1) .- Fields.level(sol_atm.u[1].c.ρe_tot, 1),
             clims = (-5000, 50000),
-            title = "Surface total energy",
+            title = "Surface total energy [J]",
             xlabel = "",
             ylabel = "cubed sphere panels",
         )

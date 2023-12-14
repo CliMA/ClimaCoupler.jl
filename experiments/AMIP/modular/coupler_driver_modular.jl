@@ -703,12 +703,8 @@ if ClimaComms.iamroot(comms_ctx)
         plot_anim(cs, COUPLER_ARTIFACTS_DIR)
     end
 
-    post_spec = (;
-        T = (:zonal_mean,),
-    )
-    plot_spec = (;
-        T = (; clims = (190, 320), units = "K"),
-    )
+    post_spec = (; T = (:zonal_mean,),)
+    plot_spec = (; T = (; clims = (190, 320), units = "K"),)
     files_dir = COUPLER_OUTPUT_DIR
     output_dir = COUPLER_ARTIFACTS_DIR
     month_date = cs.dates.date[1]
@@ -719,7 +715,7 @@ if ClimaComms.iamroot(comms_ctx)
     nlat = 180
     nlon = 360
 
-    for name in diags_vnames
+    for name in diags_names
         diag_data = read_latest_model_data(name, files_dir, files_root)
 
         # post_data = postprocess(name, diag_data, getproperty(post_spec, name), coords = coords, raw_tag = raw_tag)

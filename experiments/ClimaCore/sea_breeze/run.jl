@@ -115,9 +115,9 @@ system before executing the simulation.
 =#
 @info "Init Models and Maps"
 
-t_start, t_end = (0.0, 1.0)
+t_start, t_end = (0.0, 1e4)
 Δt_coupled = 0.1
-saveat = 1e2
+saveat = 1.0
 atm_nsteps, ocn_nsteps, lnd_nsteps = (5, 1, 1)
 
 ## Initialize Models
@@ -308,15 +308,15 @@ Plots.GRBackend() #hide
 anim = Plots.@animate for u in sol.u #hide
     Plots.contourf(u.Yc.ρθ ./ u.Yc.ρ) #hide
 end #hide
-Plots.mp4(anim, joinpath(path, "theta.mp4"), fps = 10) #hide
+Plots.mp4(anim, joinpath(path, "theta.mp4"), fps = 20) #hide
 
 If2c = Operators.InterpolateF2C() #hide
 anim = Plots.@animate for u in sol.u #hide
     Plots.contourf(If2c.(u.ρw) ./ u.Yc.ρ) #hide
 end #hide
 
-Plots.mp4(anim, joinpath(path, "vel_w.mp4"), fps = 10) #hide
+Plots.mp4(anim, joinpath(path, "vel_w.mp4"), fps = 20) #hide
 anim = Plots.@animate for u in sol.u #hide
     Plots.contourf(u.Yc.ρuₕ ./ u.Yc.ρ) #hide
 end #hide
-Plots.mp4(anim, joinpath(path, "vel_u.mp4"), fps = 10) #hide
+Plots.mp4(anim, joinpath(path, "vel_u.mp4"), fps = 20) #hide

@@ -26,7 +26,7 @@ struct BucketSimulation{C} <: SurfaceModelSimulation
 end
 name(sim::BucketSimulation) = "BucketSimulation"
 
-include("../../experiments/AMIP/modular/user_io/debug_plots.jl")
+include("../../experiments/AMIP/user_io/debug_plots.jl")
 
 get_field(sim::BucketSimulation, ::Val{:surface_field}) = sim.cache.surface_field
 get_field(sim::SurfaceStub, ::Val{:stub_field}) = sim.cache.stub_field

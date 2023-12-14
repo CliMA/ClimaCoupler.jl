@@ -281,7 +281,7 @@ version = "0.3.11"
 
 [[deps.ClimaCoupler]]
 deps = ["CLIMAParameters", "ClimaAtmos", "ClimaComms", "ClimaCore", "ClimaCoreTempestRemap", "ClimaLSM", "Dates", "DocStringExtensions", "Insolation", "JLD2", "NCDatasets", "Plots", "SciMLBase", "StaticArrays", "Statistics", "SurfaceFluxes", "TempestRemap_jll", "Thermodynamics"]
-path = "../../.."
+path = "../.."
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.1.0"
 

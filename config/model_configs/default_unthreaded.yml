@@ -1,4 +1,4 @@
-run_name: "default_modular_unthreaded"
+run_name: "default_unthreaded"
 moist: "equil"
 vert_diff: "true"
 rad: "gray"
@@ -13,4 +13,4 @@ h_elem: 4
 precip_model: "0M"
 anim: true
 apply_limiter: false
-job_id: "default_modular_unthreaded"
+job_id: "default_unthreaded"

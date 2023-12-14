@@ -292,7 +292,7 @@ function plot_global_conservation(
     if cc isa EnergyConservationCheck
         global_field = ccs.toa_net_source
         diff_global_field = (global_field .- global_field[1])
-        Plots.plot!(days, diff_global_field[1:length(days)], label = "toa_net", linewidth = 3)
+        Plots.plot!(days, diff_global_field[1:length(days)], label = "top of atmos.", linewidth = 3)
     end
     Plots.savefig(figname1[1:(end - 4)] * "legend_bottomleft_nostub.png")
 

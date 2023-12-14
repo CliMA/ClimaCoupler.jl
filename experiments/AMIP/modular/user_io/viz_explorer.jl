@@ -62,7 +62,7 @@ function plot_anim(cs, out_dir = ".")
             # TODO do anomaly from zonal mean temp
             # global_mean = mean(combined_field)
             # anomaly = combined_field .- global_mean
-            Plots.plot(anomaly, title = "Surface temperature [K]", xlabel = "", ylabel = "cubed sphere panels")
+            Plots.plot(combined_field, title = "Surface temperature [K]", xlabel = "", ylabel = "cubed sphere panels")
         end
     elseif mode_name == "slabplanet_eisenman"
         slab_ice_sim = slab_ice_sim.integrator.sol

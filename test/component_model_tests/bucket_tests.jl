@@ -6,12 +6,7 @@ using ClimaCore: Fields, Spaces
 include(pkgdir(ClimaCoupler, "experiments/AMIP/modular/components/land/bucket_init.jl"))
 include(pkgdir(ClimaCoupler, "experiments/AMIP/modular/components/land/bucket_utils.jl"))
 
-# struct DummySimulationBucket{I} <: BucketSimulation
-#     integrator::I
-# end
-
-# TODO bucket doesn't currently work with Float32, but we want to eventually test with both FTs
-for FT in (Float64,)
+for FT in (Float32, Float64)
     @testset "dss_state! BucketSimulation for FT=$FT" begin
         # use TestHelper to create space, extract surface space
         subsurface_space = create_space(FT, nz = 2)
@@ -35,7 +30,6 @@ for FT in (Float64,)
             t = FT(0),
         )
         integrator_copy = deepcopy(integrator)
-        # sim = DummySimulationBucket(integrator)
         sim = BucketSimulation(nothing, nothing, nothing, integrator, nothing)
 
         # make fields non-constant to check the impact of the dss step

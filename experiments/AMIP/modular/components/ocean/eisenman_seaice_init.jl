@@ -103,13 +103,15 @@ function solve_eisenman_model!(Y, Ya, p, thermo_params, Δt)
 
     # ice thickness and mixed layer temperature changes due to atmosphereic and ocean fluxes
     ice_covered = parent(h_ice)[1] > 0
+
+    FT = eltype(T_ml)
     if ice_covered # ice-covered
         F_base = @. C0_base * (T_ml - T_base)
-        ΔT_ml = @. -(F_base - ocean_qflux) * Δt / (hρc_ml)
-        Δh_ice = @. (F_atm - F_base - ocean_qflux) * Δt / L_ice
-        @. e_base .+= F_base * Δt
+        ΔT_ml = @. -(F_base - ocean_qflux) * FT(Δt) / (hρc_ml)
+        Δh_ice = @. (F_atm - F_base - ocean_qflux) * FT(Δt) / L_ice
+        @. e_base .+= F_base * FT(Δt)
     else # ice-free
-        ΔT_ml = @. -(F_atm - ocean_qflux) * Δt / (hρc_ml)
+        ΔT_ml = @. -(F_atm - ocean_qflux) * FT(Δt) / (hρc_ml)
         Δh_ice = 0
     end
 
@@ -317,11 +319,13 @@ function get_field(sim::EisenmanIceSimulation, ::Val{:energy})
     e_base = cache.Ya.e_base
     ocean_qflux = cache.Ya.ocean_qflux
 
+    FT = eltype(sim.integrator.u)
+
     hρc_ml = p_o.h * p_o.ρ * p_o.c
 
     e_ml = @. p_o.h * p_o.ρ * p_o.c * sim.integrator.u.T_ml # heat
     e_ice = @. p_i.L_ice * sim.integrator.u.h_ice # phase
-    e_qflux = @. ocean_qflux * sim.integrator.t
+    e_qflux = @. ocean_qflux * FT(sim.integrator.t)
 
     return @. e_ml + e_ice + e_qflux + e_base
 

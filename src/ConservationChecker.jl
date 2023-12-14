@@ -100,10 +100,10 @@ function check_conservation!(
             parent(coupler_sim.fields.F_radiative_TOA) .= parent(Interfacer.get_field(sim, Val(:F_radiative_TOA)))
 
             if isempty(ccs.toa_net_source)
-                radiation_sources_accum = sum(coupler_sim.fields.F_radiative_TOA .* coupler_sim.Δt_cpl) # ∫ J / m^2 dA
+                radiation_sources_accum = sum(coupler_sim.fields.F_radiative_TOA .* FT(coupler_sim.Δt_cpl)) # ∫ J / m^2 dA
             else
                 radiation_sources_accum =
-                    sum(coupler_sim.fields.F_radiative_TOA .* coupler_sim.Δt_cpl) .+ ccs.toa_net_source[end] # ∫ J / m^2 dA
+                    sum(coupler_sim.fields.F_radiative_TOA .* FT(coupler_sim.Δt_cpl)) .+ ccs.toa_net_source[end] # ∫ J / m^2 dA
             end
             push!(ccs.toa_net_source, radiation_sources_accum)
 
@@ -211,7 +211,8 @@ function surface_water_gain_from_rates(cs::Interfacer.CoupledSimulation)
     evaporation = cs.fields.F_turb_moisture # kg / m^2 / s / layer depth
     precipitation_l = cs.fields.P_liq
     precipitation_s = cs.fields.P_snow
-    @. -(evaporation + precipitation_l + precipitation_s) * cs.Δt_cpl # kg / m^2 / layer depth
+    FT = eltype(evaporation)
+    @. -(evaporation + precipitation_l + precipitation_s) * FT(cs.Δt_cpl) # kg / m^2 / layer depth
 end
 
 # setup the GKS socket application environment as nul for better performance and to avoid GKS connection errors while plotting

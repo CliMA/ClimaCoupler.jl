@@ -257,16 +257,18 @@ function plot_global_conservation(
     )
     for sim in model_sims
         sim_name = Interfacer.name(sim)
-        global_field = getproperty(ccs, Symbol(sim_name))
-        diff_global_field = (global_field .- global_field[1])
-        Plots.plot!(days, diff_global_field[1:length(days)], label = sim_name, linewidth = 3)
+        if !(sim_name == "SurfaceStub")
+            global_field = getproperty(ccs, Symbol(sim_name))
+            diff_global_field = (global_field .- global_field[1])
+            Plots.plot!(days, diff_global_field[1:length(days)], label = sim_name, linewidth = 3)
+        end
     end
     if cc isa EnergyConservationCheck
         global_field = ccs.toa_net_source
         diff_global_field = (global_field .- global_field[1])
         Plots.plot!(days, diff_global_field[1:length(days)], label = "top of atmosphere", linewidth = 3)
     end
-    Plots.savefig(figname1)
+    Plots.savefig(figname1 * "_nostub.png")
 
     # duplicated for presentation plots
     Plots.plot(
@@ -281,16 +283,18 @@ function plot_global_conservation(
     )
     for sim in model_sims
         sim_name = Interfacer.name(sim)
-        global_field = getproperty(ccs, Symbol(sim_name))
-        diff_global_field = (global_field .- global_field[1])
-        Plots.plot!(days, diff_global_field[1:length(days)], label = sim_name, linewidth = 3)
+        if !(sim_name == "SurfaceStub")
+            global_field = getproperty(ccs, Symbol(sim_name))
+            diff_global_field = (global_field .- global_field[1])
+            Plots.plot!(days, diff_global_field[1:length(days)], label = sim_name, linewidth = 3)
+        end
     end
     if cc isa EnergyConservationCheck
         global_field = ccs.toa_net_source
         diff_global_field = (global_field .- global_field[1])
         Plots.plot!(days, diff_global_field[1:length(days)], label = "toa_net", linewidth = 3)
     end
-    Plots.savefig(figname1[1:(end - 4)] * "legend_bottomleft.png")
+    Plots.savefig(figname1[1:(end - 4)] * "legend_bottomleft_nostub.png")
 
     # evolution of log error of total
     Plots.plot(

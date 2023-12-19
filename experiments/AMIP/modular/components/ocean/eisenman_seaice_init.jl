@@ -252,51 +252,7 @@ get_field(sim::EisenmanIceSimulation, ::Val{:albedo}) =
        sim.integrator.p.params.p_o.α .* (1 - sim.integrator.p.ice_area_fraction)
 get_field(sim::EisenmanIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 get_field(sim::EisenmanIceSimulation, ::Val{:air_density}) = sim.integrator.p.Ya.ρ_sfc
-
-function update_field!(sim::EisenmanIceSimulation, ::Val{:area_fraction}, field::Fields.Field)
-    sim.integrator.p.area_fraction .= field
-end
-function update_field!(sim::EisenmanIceSimulation, ::Val{:turbulent_energy_flux}, field)
-    parent(sim.integrator.p.Ya.F_turb) .= parent(field)
-end
-function update_field!(sim::EisenmanIceSimulation, ::Val{:radiative_energy_flux}, field)
-    parent(sim.integrator.p.Ya.F_rad) .= parent(field)
-end
-function update_field!(sim::EisenmanIceSimulation, ::Val{:air_density}, field)
-    parent(sim.integrator.p.Ya.ρ_sfc) .= parent(field)
-end
-
-# extensions required by FieldExchanger
-step!(sim::EisenmanIceSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
-reinit!(sim::EisenmanIceSimulation) = reinit!(sim.integrator)
-
-# extensions required by FluxCalculator (partitioned fluxes)
-function update_turbulent_fluxes_point!(sim::EisenmanIceSimulation, fields::NamedTuple, colidx::Fields.ColumnIndex)
-    (; F_turb_energy) = fields
-    @. sim.integrator.p.Ya.F_turb[colidx] = F_turb_energy
-end
-
-"""
-    get_model_state_vector(sim::EisenmanIceSimulation)
-
-Extension of Checkpointer.get_model_state_vector to get the model state.
-"""
-function get_model_state_vector(sim::EisenmanIceSimulation)
-    return sim.integrator.u
-end
-
-"""
-    differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args)
-
-Extension of differentiate_turbulent_fluxes! from FluxCalculator to get the turbulent fluxes.
-"""
-differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args) =
-    differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args..., ΔT_sfc = 0.1)
-
-function update_field!(sim::EisenmanIceSimulation, ::Val{:∂F_turb_energy∂T_sfc}, field, colidx)
-    sim.integrator.p.Ya.∂F_turb_energy∂T_sfc[colidx] .= field
-end
-
+get_field(sim::EisenmanIceSimulation, ::Val{:water}) = nothing
 
 """
     get_field(sim::EisenmanIceSimulation, ::Val{:energy})
@@ -331,4 +287,45 @@ function get_field(sim::EisenmanIceSimulation, ::Val{:energy})
 
 end
 
-get_field(sim::EisenmanIceSimulation, ::Val{:water}) = nothing
+function update_field!(sim::EisenmanIceSimulation, ::Val{:area_fraction}, field::Fields.Field)
+    sim.integrator.p.area_fraction .= field
+end
+function update_field!(sim::EisenmanIceSimulation, ::Val{:turbulent_energy_flux}, field)
+    parent(sim.integrator.p.Ya.F_turb) .= parent(field)
+end
+function update_field!(sim::EisenmanIceSimulation, ::Val{:radiative_energy_flux}, field)
+    parent(sim.integrator.p.Ya.F_rad) .= parent(field)
+end
+function update_field!(sim::EisenmanIceSimulation, ::Val{:air_density}, field)
+    parent(sim.integrator.p.Ya.ρ_sfc) .= parent(field)
+end
+function update_field!(sim::EisenmanIceSimulation, ::Val{:∂F_turb_energy∂T_sfc}, field, colidx)
+    sim.integrator.p.Ya.∂F_turb_energy∂T_sfc[colidx] .= field
+end
+
+# extensions required by FieldExchanger
+step!(sim::EisenmanIceSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
+reinit!(sim::EisenmanIceSimulation) = reinit!(sim.integrator)
+
+# extensions required by FluxCalculator (partitioned fluxes)
+function update_turbulent_fluxes_point!(sim::EisenmanIceSimulation, fields::NamedTuple, colidx::Fields.ColumnIndex)
+    (; F_turb_energy) = fields
+    @. sim.integrator.p.Ya.F_turb[colidx] = F_turb_energy
+end
+
+"""
+    get_model_state_vector(sim::EisenmanIceSimulation)
+
+Extension of Checkpointer.get_model_state_vector to get the model state.
+"""
+function get_model_state_vector(sim::EisenmanIceSimulation)
+    return sim.integrator.u
+end
+
+"""
+    differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args)
+
+Extension of differentiate_turbulent_fluxes! from FluxCalculator to get the turbulent fluxes.
+"""
+differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args) =
+    differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args..., ΔT_sfc = 0.1)

@@ -140,11 +140,20 @@ get_field(sim::PrescribedIceSimulation, ::Val{:beta}) = convert(eltype(sim.integ
 get_field(sim::PrescribedIceSimulation, ::Val{:albedo}) = sim.integrator.p.params.α
 get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 get_field(sim::PrescribedIceSimulation, ::Val{:air_density}) = sim.integrator.p.ρ_sfc
+get_field(sim::PrescribedIceSimulation, ::Val{:water}) = nothing
+
+"""
+    get_field(sim::PrescribedIceSimulation, ::Val{:energy})
+
+Extension of Interfacer.get_field to get the energy of the ocean.
+It multiplies the the slab temperature by the heat capacity, density, and depth.
+"""
+get_field(sim::PrescribedIceSimulation, ::Val{:energy}) =
+    sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h
 
 function update_field!(sim::PrescribedIceSimulation, ::Val{:area_fraction}, field::Fields.Field)
     sim.integrator.p.area_fraction .= field
 end
-
 function update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_energy_flux}, field)
     parent(sim.integrator.p.F_turb_energy) .= parent(field)
 end
@@ -173,17 +182,6 @@ Extension of Checkpointer.get_model_state_vector to get the model state.
 function get_model_state_vector(sim::PrescribedIceSimulation)
     return sim.integrator.u
 end
-
-"""
-    get_field(sim::PrescribedIceSimulation, ::Val{:energy})
-
-Extension of Interfacer.get_field to get the energy of the ocean.
-It multiplies the the slab temperature by the heat capacity, density, and depth.
-"""
-get_field(sim::PrescribedIceSimulation, ::Val{:energy}) =
-    sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h
-
-get_field(sim::PrescribedIceSimulation, ::Val{:water}) = nothing
 
 """
     dss_state!(sim::PrescribedIceSimulation)

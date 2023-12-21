@@ -279,7 +279,9 @@ if mode_name == "amip"
 
     @show "before SST update"
     update_midmonth_data!(date0, SST_info)
+    @show "after SST update"
     SST_init = interpolate_midmonth_to_daily(date0, SST_info)
+    @show "after SST interpolation"
     ocean_sim = SurfaceStub((;
         T_sfc = SST_init,
         ρ_sfc = ClimaCore.Fields.zeros(boundary_space),
@@ -291,6 +293,7 @@ if mode_name == "amip"
         phase = TD.Liquid(),
         thermo_params = thermo_params,
     ))
+    @show "after surfacestub"
 
     ## sea ice
     @show "before SIC init"

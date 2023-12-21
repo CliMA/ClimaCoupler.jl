@@ -615,6 +615,7 @@ function solve_coupler!(cs)
 
         if cs.mode.name == "amip"
 
+            @show "before update midmonths"
             ## monthly read of boundary condition data for SST and SIC and CO2
             if cs.dates.date[1] >= next_date_in_file(cs.mode.SST_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.SST_info)
@@ -635,12 +636,15 @@ function solve_coupler!(cs)
             CO2_current = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.CO2_info)
             update_field!(atmos_sim, Val(:co2_gm), CO2_current)
 
+            @show "after update midmonths"
             ## calculate and accumulate diagnostics at each timestep
             ClimaComms.barrier(comms_ctx)
+            @show "after barrier"
             accumulate_diagnostics!(cs)
 
             ## save and reset monthly averages
             save_diagnostics(cs)
+            @show "after diagnostics"
 
         end
 
@@ -651,9 +655,11 @@ function solve_coupler!(cs)
         ClimaComms.barrier(comms_ctx)
         update_surface_fractions!(cs)
         update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
+        @show "after update model sims"
 
         ## step sims
         step_model_sims!(cs.model_sims, t)
+        @show "after step model sims"
 
         ## exchange combined fields and (if specified) calculate fluxes using combined states
         import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta
@@ -677,6 +683,7 @@ function solve_coupler!(cs)
         ## callback to checkpoint model state
         trigger_callback!(cs, cs.callbacks.checkpoint)
 
+        @show "end of coupling loop"
     end
     @show walltime
 
@@ -689,7 +696,9 @@ if haskey(ENV, "CI_PERF_SKIP_COUPLED_RUN") #hide
 end #hide
 
 ## run the coupled simulation
+@show "before coupler solve"
 solve_coupler!(cs);
+@show "after coupler solve"
 
 #=
 ## Postprocessing
@@ -698,6 +707,7 @@ Currently all postprocessing is performed using the root process only.
 
 if ClimaComms.iamroot(comms_ctx)
 
+    @show "before energy check plots"
     ## energy check plots
     if !isnothing(cs.conservation_checks) && cs.mode.name[1:10] == "slabplanet"
         @info "Conservation Check Plots"
@@ -714,6 +724,7 @@ if ClimaComms.iamroot(comms_ctx)
             figname2 = joinpath(COUPLER_ARTIFACTS_DIR, "total_water_log_bucket.png"),
         )
     end
+    @show "after energy check plots"
 
     ## sample animations
     if !is_distributed && config_dict["anim"]
@@ -721,6 +732,7 @@ if ClimaComms.iamroot(comms_ctx)
         include("user_io/viz_explorer.jl")
         plot_anim(cs, COUPLER_ARTIFACTS_DIR)
     end
+    @show "after animations"
 
     ## plotting AMIP results
     if cs.mode.name == "amip"
@@ -756,6 +768,7 @@ if ClimaComms.iamroot(comms_ctx)
             files_root = ".monthly",
             output_dir = COUPLER_ARTIFACTS_DIR,
         )
+        @show "after amip paperplots"
 
         ## NCEP reanalysis
         @info "NCEP plots"
@@ -777,6 +790,7 @@ if ClimaComms.iamroot(comms_ctx)
             output_dir = COUPLER_ARTIFACTS_DIR,
             month_date = cs.dates.date[1],
         ) ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
+        @show "after ncep paperplots"
     end
 
     ## clean up

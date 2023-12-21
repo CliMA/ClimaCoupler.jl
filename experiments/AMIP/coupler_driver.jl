@@ -201,7 +201,9 @@ Here we set initial and boundary conditions for each component model.
 This uses the `ClimaAtmos.jl` driver, with parameterization options specified in the command line arguments.
 =#
 ## init atmos model component
+@show "before atmos init"
 atmos_sim = atmos_init(FT, config_dict_atmos);
+@show "after atmos init"
 thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models
 
 #=
@@ -242,6 +244,7 @@ if mode_name == "amip"
     @info "AMIP boundary conditions - do not expect energy conservation"
 
     ## land
+    @show "before bucket init"
     land_sim = bucket_init(
         FT,
         tspan,
@@ -259,6 +262,7 @@ if mode_name == "amip"
     )
 
     ## ocean
+    @show "before SST init"
     SST_info = bcfile_info_init(
         FT,
         REGRID_DIR,
@@ -273,6 +277,7 @@ if mode_name == "amip"
         mono = mono_surface,
     )
 
+    @show "before SST update"
     update_midmonth_data!(date0, SST_info)
     SST_init = interpolate_midmonth_to_daily(date0, SST_info)
     ocean_sim = SurfaceStub((;
@@ -288,6 +293,7 @@ if mode_name == "amip"
     ))
 
     ## sea ice
+    @show "before SIC init"
     SIC_info = bcfile_info_init(
         FT,
         REGRID_DIR,
@@ -301,6 +307,7 @@ if mode_name == "amip"
         date0 = date0,
         mono = mono_surface,
     )
+    @show "before SIC update"
     update_midmonth_data!(date0, SIC_info)
     SIC_init = interpolate_midmonth_to_daily(date0, SIC_info)
     ice_fraction = get_ice_fraction.(SIC_init, mono_surface)
@@ -315,6 +322,7 @@ if mode_name == "amip"
     )
 
     ## CO2 concentration
+    @show "before CO2 init"
     CO2_info = bcfile_info_init(
         FT,
         REGRID_DIR,
@@ -328,12 +336,13 @@ if mode_name == "amip"
         mono = mono_surface,
     )
 
+    @show "before CO2 update"
     update_midmonth_data!(date0, CO2_info)
     CO2_init = interpolate_midmonth_to_daily(date0, CO2_info)
     update_field!(atmos_sim, Val(:co2_gm), CO2_init)
 
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
-
+    @show "end of AMIP branch"
 elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
 
     land_fraction = mode_name == "slabplanet_aqua" ? land_fraction .* 0 : land_fraction

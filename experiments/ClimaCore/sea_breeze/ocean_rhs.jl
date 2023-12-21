@@ -51,7 +51,7 @@ function ocn_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
 
     ## initial condition
     T_sfc = map(coords) do coord
-        T_sfc = 267.0
+        T_sfc = 257.0
     end
 
     ## prognostic variable

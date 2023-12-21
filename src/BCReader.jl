@@ -195,6 +195,7 @@ function update_midmonth_data!(date, bcf_info::BCFileInfo{FT}) where {FT}
         )
         bcf_info.monthly_fields[2] .= deepcopy(bcf_info.monthly_fields[1])
         bcf_info.segment_length .= Int(0)
+        @show "end of update_midmonth if case"
 
     elseif Dates.days(date - all_dates[end - 1]) > 0 # for fini
         @warn "this time period is after BC data - using file from $(all_dates[end - 1])"
@@ -273,6 +274,7 @@ or returns the first Field if interpolation is switched off.
 - Fields.field
 """
 function interpolate_midmonth_to_daily(date, bcf_info::BCFileInfo{FT}) where {FT}
+    @show "start of interpolate"
     (; segment_length, segment_idx, all_dates, monthly_fields, interpolate_daily) = bcf_info
     if interpolate_daily && segment_length[1] > FT(0) && date != all_dates[Int(segment_idx[1])]
         return interpol.(

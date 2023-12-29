@@ -10,8 +10,8 @@ params = create_parameters(FT)
 
 include("dummy_surface_fluxes.jl") # placeholder for SurfaceFluxes.jl
 # include("components/land/land_init.jl") # LandHydrology no longer exists
-include("components/land/bucket_init.jl")
-include("components/land/bucket_utils.jl")
+# include("components/land/bucket_init.jl")
+# include("components/land/bucket_utils.jl")
 
 include("components/ocean/ocean_init.jl")
 include("components/atmosphere/atmos_init.jl")
@@ -19,7 +19,6 @@ include("components/atmosphere/atmos_init.jl")
 struct CoupledSimulation{O, A, L, C} # TODO: use Interfacer.CoupledSimulation
     ocean::O
     atmos::A
-    land::L
     clock::C
 end
 
@@ -29,14 +28,14 @@ function step!(coupled_sim::CoupledSimulation, coupling_Δt)
 
     atmos_sim = coupled_sim.atmos
     ocean_sim = coupled_sim.ocean
-    land_sim = coupled_sim.land
+    # land_sim = coupled_sim.land
 
     clock = coupled_sim.clock
     next_time = clock.time + coupling_Δt
     @info("Coupling cycle", time = clock.time)
 
     # Extract states and parameters at coupled boundaries for flux calculations
-    land_surface_T = land_sim.p[5]
+    # land_surface_T = land_sim.p[5]
 
     ocean_Nz = ocean_sim.model.grid.Nz
     @inbounds begin
@@ -45,7 +44,7 @@ function step!(coupled_sim::CoupledSimulation, coupling_Δt)
 
     # Step forward atmosphere
     atmos_sim.u.x[3] .= [0.0, 0.0, 0.0] # reset surface flux to be accumulated during each coupling_Δt
-    atmos_sim.p[2] .= land_surface_T # get land temperature and set on atmosphere (Tland is prognostic)
+    atmos_sim.p[2] .= ocean_surface_T # get land temperature and set on atmosphere (Tland is prognostic)
 
     step!(atmos_sim, next_time - atmos_sim.t, true) # TODO: use FieldExchanger.step_model_sims!
 
@@ -70,9 +69,9 @@ function step!(coupled_sim::CoupledSimulation, coupling_Δt)
     push!(ocean_data, data)
 
     # Advance land
-    @show(∫surface_x_momentum_flux, ∫surface_y_momentum_flux, ∫surface_heat_flux)
-    land_sim.p[4].top_heat_flux = ∫surface_heat_flux / coupling_Δt # [W/m^2] same BC across land Δt
-    step!(land_sim, next_time - land_sim.t, true)
+    # @show(∫surface_x_momentum_flux, ∫surface_y_momentum_flux, ∫surface_heat_flux)
+    # land_sim.p[4].top_heat_flux = ∫surface_heat_flux / coupling_Δt # [W/m^2] same BC across land Δt
+    # step!(land_sim, next_time - land_sim.t, true)
 
     tick!(clock, coupling_Δt)
 
@@ -113,13 +112,14 @@ start_time = 0.0
 stop_time = 1#coupling_Δt*100#60*60
 
 # Build the respective models
-land_sim = land_init()
-atmos_sim = atmos_init(land_sim, Nz = atmos_Nz, Lz = atmos_Lz, start_time = start_time, stop_time = stop_time)
-ocean_sim, ocean_data = ocean_init(Nz = ocean_Nz, Lz = ocean_Lz, f = f, g = g)
+# land_sim = land_init()
+T_sfc_init = FT(273 + 20.0) # K
+atmos_sim = atmos_init(T_sfc_init, Nz = atmos_Nz, Lz = atmos_Lz, start_time = start_time, stop_time = stop_time)
+ocean_sim, ocean_data = ocean_init(T_sfc_init)
 
 # Build a coupled simulation
 clock = Clock(time = 0.0)
-coupled_sim = CoupledSimulation(ocean_sim, atmos_sim, land_sim, clock)
+coupled_sim = CoupledSimulation(ocean_sim, atmos_sim, clock)
 
 # Run it!
 coupling_Δt = 0.02
@@ -147,18 +147,18 @@ Plots.png(Plots.plot([t0_u tend_u], z_centers, labels = ["t=0" "t=end"]), joinpa
 Plots.png(Plots.plot([t0_v tend_v], z_centers, labels = ["t=0" "t=end"]), joinpath(path, "v_atm_height.png"))
 
 # Land plots
-sol_lnd = coupled_sim.land.sol
-t0_θ_l = parent(sol_lnd.u[1].x[1])
-tend_θ_l = parent(sol_lnd.u[end].x[1])
-t0_ρe = parent(sol_lnd.u[1].x[3])
-tend_ρe = parent(sol_lnd.u[end].x[3])
-t0_ρc_s = volumetric_heat_capacity.(t0_θ_l, parent(θ_i), Ref(msp.ρc_ds), Ref(param_set)) #convert energy to temp
-t0_T = temperature_from_ρe_int.(t0_ρe, parent(θ_i), t0_ρc_s, Ref(param_set)) #convert energy to temp
-tend_ρc_s = volumetric_heat_capacity.(tend_θ_l, parent(θ_i), Ref(msp.ρc_ds), Ref(param_set)) #convert energy to temp
-tend_T = temperature_from_ρe_int.(tend_ρe, parent(θ_i), tend_ρc_s, Ref(param_set)) #convert energy to temp
-z_centers = collect(1:1:length(tend_ρe))#parent(Fields.coordinate_field(center_space_atm))[:,1]
-Plots.png(Plots.plot([t0_θ_l tend_θ_l], parent(zc), labels = ["t=0" "t=end"]), joinpath(path, "Th_l_lnd_height.png"))
-Plots.png(Plots.plot([t0_T tend_T], parent(zc), labels = ["t=0" "t=end"]), joinpath(path, "T(K)_lnd_height.png"))
+# sol_lnd = coupled_sim.land.sol
+# t0_θ_l = parent(sol_lnd.u[1].x[1])
+# tend_θ_l = parent(sol_lnd.u[end].x[1])
+# t0_ρe = parent(sol_lnd.u[1].x[3])
+# tend_ρe = parent(sol_lnd.u[end].x[3])
+# t0_ρc_s = volumetric_heat_capacity.(t0_θ_l, parent(θ_i), Ref(msp.ρc_ds), Ref(param_set)) #convert energy to temp
+# t0_T = temperature_from_ρe_int.(t0_ρe, parent(θ_i), t0_ρc_s, Ref(param_set)) #convert energy to temp
+# tend_ρc_s = volumetric_heat_capacity.(tend_θ_l, parent(θ_i), Ref(msp.ρc_ds), Ref(param_set)) #convert energy to temp
+# tend_T = temperature_from_ρe_int.(tend_ρe, parent(θ_i), tend_ρc_s, Ref(param_set)) #convert energy to temp
+# z_centers = collect(1:1:length(tend_ρe))#parent(Fields.coordinate_field(center_space_atm))[:,1]
+# Plots.png(Plots.plot([t0_θ_l tend_θ_l], parent(zc), labels = ["t=0" "t=end"]), joinpath(path, "Th_l_lnd_height.png"))
+# Plots.png(Plots.plot([t0_T tend_T], parent(zc), labels = ["t=0" "t=end"]), joinpath(path, "T(K)_lnd_height.png"))
 
 # Ocean plots
 sol_ocn = coupled_sim.ocean.model

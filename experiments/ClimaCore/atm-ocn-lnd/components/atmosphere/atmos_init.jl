@@ -16,6 +16,11 @@ using Random
 include("atmos_rhs.jl")
 
 parameters = (
+    # domain
+    zmin_atm = FT(0.0), # height of atm stack bottom [m]
+    zmax_atm = FT(1.0), # height of atm stack top [m]
+    n = 15,  # number of elements in atm stack
+
     # atmos physics (overwriting CliMAParameters defaults?)
     MSLP = 1e5, # mean sea level pressure [Pa]
     grav = 9.8, # gravitational acceleration [m /s^2]
@@ -45,8 +50,8 @@ parameters = (
     λ = FT(0.01),#FT(1e-5)    # coupling transfer coefficient for LinearRelaxation() SurfaceFluxType
 )
 
-function atmos_init(
-    land_simulation;
+
+function atmos_init(T_sfc_init;
     Lz,
     Nz,
     minimum_reference_temperature = 230.0, # K
@@ -56,15 +61,18 @@ function atmos_init(
 )
 
     # Get surface temperature from the land simulation
-    land_surface_temperature = land_sim.p[5]
+    surface_temperature = T_sfc_init
 
     ########
     # Set up atmos domain
     ########
-
-    domain_atm = Domains.IntervalDomain(0, Lz, x3boundary = (:bottom, :top)) # struct
-    mesh_atm = Meshes.IntervalMesh(domain_atm, nelems = Nz) # struct, allocates face boundaries to 5,6
-    center_space_atm = Spaces.CenterFiniteDifferenceSpace(mesh_atm) # collection of the above, discretises space into FD and provides coords
+    domain_atm = Domains.IntervalDomain(
+        Geometry.ZPoint{FT}(parameters.zmin_atm),
+        Geometry.ZPoint{FT}(parameters.zmax_atm);
+        boundary_tags = (:bottom, :top),
+    );
+    mesh_atm = Meshes.IntervalMesh(domain_atm, nelems = parameters.n); # struct, allocates face boundaries to 5,6: atmos
+    center_space_atm = Spaces.CenterFiniteDifferenceSpace(mesh_atm); # collection of the above, discretises space into FD and provides coords
     face_space_atm = Spaces.FaceFiniteDifferenceSpace(center_space_atm)
 
     """ Initialize fields located at cell centers in the vertical. """
@@ -73,19 +81,19 @@ function atmos_init(
 
         # temperature
         Γ = grav / C_p
-        T = max(land_surface_temperature - Γ * zc, minimum_reference_temperature)
+        T = max(surface_temperature - Γ * zc, minimum_reference_temperature)
 
         # pressure
-        p = MSLP * (T / land_surface_temperature)^(grav / (R_d * Γ))
+        p = MSLP * (T / surface_temperature)^(grav / (R_d * Γ))
 
         if T == minimum_reference_temperature
-            z_top = (land_surface_temperature - minimum_reference_temperature) / Γ
+            z_top = (surface_temperature - minimum_reference_temperature) / Γ
             H_min = R_d * minimum_reference_temperature / grav
             p *= exp(-(zc - z_top) / H_min)
         end
 
         # potential temperature
-        θ = land_surface_temperature
+        θ = surface_temperature
 
         # density
         ρ = p / (R_d * θ * (p / MSLP)^(R_d / C_p))
@@ -103,8 +111,8 @@ function atmos_init(
     end
 
     # Initialize the atmospheric states Yc and Yf
-    z_centers = Fields.coordinate_field(center_space_atm)
-    z_faces = Fields.coordinate_field(face_space_atm)
+    z_centers = Fields.coordinate_field(center_space_atm).z
+    z_faces = Fields.coordinate_field(face_space_atm).z
     Yc = init_centers.(z_centers, Ref(parameters))
     Yf = init_faces.(z_faces, Ref(parameters))
     T_atm_0 = (Yc = Yc, Yf = Yf)
@@ -115,7 +123,7 @@ function atmos_init(
     ode_algo = CTS.ExplicitAlgorithm(CTS.RK4())
     ode_function = CTS.ClimaODEFunction(T_exp! = ∑tendencies_atm!)
 
-    problem = ODEProblem(ode_function, Y_atm, (start_time, stop_time), (parameters, [land_surface_temperature]))
+    problem = ODEProblem(ode_function, Y_atm, (start_time, stop_time), (parameters, [surface_temperature]))
     simulation = init(problem, ode_algo, dt = Δt_min, saveat = 1 * Δt_min, adaptive = false)
 
     return simulation

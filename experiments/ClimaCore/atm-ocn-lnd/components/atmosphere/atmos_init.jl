@@ -1,9 +1,5 @@
-using ClimaAtmos
 using ClimaCore.Geometry
-
 using ClimaCore: DataLayouts, Operators, Geometry
-using ClimaAtmos.Interface: TimeStepper, Simulation
-using ClimaAtmos.Interface: PeriodicRectangle, BarotropicFluidModel
 using ClimaCore: Fields, Domains, Topologies, Meshes, Spaces
 
 using IntervalSets
@@ -15,13 +11,6 @@ using TerminalLoggers: TerminalLogger
 using RecursiveArrayTools
 using LinearAlgebra
 using Random
-
-global_logger(TerminalLogger())
-
-const CI = !isnothing(get(ENV, "CI", nothing))
-
-# general parameters
-const FT = Float64
 
 # define model equations:
 include("atmos_rhs.jl")
@@ -56,7 +45,7 @@ parameters = (
     λ = FT(0.01),#FT(1e-5)    # coupling transfer coefficient for LinearRelaxation() SurfaceFluxType
 )
 
-function atmos_simulation(
+function atmos_init(
     land_simulation;
     Lz,
     Nz,

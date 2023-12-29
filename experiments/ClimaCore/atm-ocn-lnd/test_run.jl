@@ -4,15 +4,9 @@ import SciMLBase: step!
 
 using Printf
 
-FT = Float64
-include("parameters.jl")
-params = create_parameters(FT)
-
 include("dummy_surface_fluxes.jl") # placeholder for SurfaceFluxes.jl
-# include("components/land/land_init.jl") # LandHydrology no longer exists
-include("components/land/bucket_init.jl")
-include("components/land/bucket_utils.jl")
 
+include("components/land/land_init.jl") #refactoring of land interface to come
 include("components/ocean/ocean_init.jl")
 include("components/atmosphere/atmos_init.jl")
 

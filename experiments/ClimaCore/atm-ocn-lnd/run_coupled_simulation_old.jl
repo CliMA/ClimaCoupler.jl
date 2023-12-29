@@ -4,19 +4,13 @@ import SciMLBase: step!
 
 using Printf
 
-FT = Float64
-include("parameters.jl")
-params = create_parameters(FT)
-
 include("dummy_surface_fluxes.jl") # placeholder for SurfaceFluxes.jl
-# include("components/land/land_init.jl") # LandHydrology no longer exists
-include("components/land/bucket_init.jl")
-include("components/land/bucket_utils.jl")
 
-include("components/ocean/ocean_init.jl")
-include("components/atmosphere/atmos_init.jl")
+include("land_simulation.jl") #refactoring of land interface to come
+include("ocean_simulation.jl")
+include("atmos_simulation.jl")
 
-struct CoupledSimulation{O, A, L, C} # TODO: use Interfacer.CoupledSimulation
+struct CoupledSimulation{O, A, L, C}
     ocean::O
     atmos::A
     land::L
@@ -24,8 +18,6 @@ struct CoupledSimulation{O, A, L, C} # TODO: use Interfacer.CoupledSimulation
 end
 
 function step!(coupled_sim::CoupledSimulation, coupling_Δt)
-
-    # TODO: update date of the sim, using the TimeManager
 
     atmos_sim = coupled_sim.atmos
     ocean_sim = coupled_sim.ocean
@@ -44,19 +36,17 @@ function step!(coupled_sim::CoupledSimulation, coupling_Δt)
     end
 
     # Step forward atmosphere
-    atmos_sim.u.x[3] .= [0.0, 0.0, 0.0] # reset surface flux to be accumulated during each coupling_Δt
+    atmos_sim.u.x[3] .= [0.0, 0.0, 0.0] # reset surface flux to be accumulated during each coupling_Δt 
     atmos_sim.p[2] .= land_surface_T # get land temperature and set on atmosphere (Tland is prognostic)
 
-    step!(atmos_sim, next_time - atmos_sim.t, true) # TODO: use FieldExchanger.step_model_sims!
-
-    # TODO: use FluxCalculator.partitioned_turbulent_fluxes!
+    step!(atmos_sim, next_time - atmos_sim.t, true)
 
     # Extract surface fluxes for ocean and land boundaries
     ∫surface_x_momentum_flux = atmos_sim.u.x[3][1] # kg / m s^2
     ∫surface_y_momentum_flux = atmos_sim.u.x[3][2] # kg / m s^2
     ∫surface_heat_flux = atmos_sim.u.x[3][3]       # W / m^2
 
-    surface_flux_u_ocean = ocean_sim.model.velocities.u.boundary_conditions.top.condition # use FieldExchange.update_sim!
+    surface_flux_u_ocean = ocean_sim.model.velocities.u.boundary_conditions.top.condition
     surface_flux_v_ocean = ocean_sim.model.velocities.v.boundary_conditions.top.condition
     surface_flux_T_ocean = ocean_sim.model.tracers.T.boundary_conditions.top.condition
 
@@ -76,8 +66,6 @@ function step!(coupled_sim::CoupledSimulation, coupling_Δt)
 
     tick!(clock, coupling_Δt)
 
-    # TODO: use the Checkpointer to save the state of the coupled simulation
-    # TODO: ise the ConservationChecker to check conservation of energy
     return nothing
 end
 
@@ -113,9 +101,9 @@ start_time = 0.0
 stop_time = 1#coupling_Δt*100#60*60
 
 # Build the respective models
-land_sim = land_init()
-atmos_sim = atmos_init(land_sim, Nz = atmos_Nz, Lz = atmos_Lz, start_time = start_time, stop_time = stop_time)
-ocean_sim, ocean_data = ocean_init(Nz = ocean_Nz, Lz = ocean_Lz, f = f, g = g)
+land_sim = land_simulation()
+atmos_sim = atmos_simulation(land_sim, Nz = atmos_Nz, Lz = atmos_Lz, start_time = start_time, stop_time = stop_time)
+ocean_sim, ocean_data = ocean_simulation(Nz = ocean_Nz, Lz = ocean_Lz, f = f, g = g)
 
 # Build a coupled simulation
 clock = Clock(time = 0.0)

@@ -7,7 +7,7 @@ using Oceananigans.TurbulenceClosures: TKEBasedVerticalDiffusivity
 #####
 
 """
-    ocean_simulation(; kwargs...)
+    ocean_init(; kwargs...)
 
 Return an `Oceananigans.Simulation` of a column model initialized with
 mutable array surface boundary conditions and a linear density stratification.
@@ -24,7 +24,7 @@ Arguments
     * α: Thermal expansion coefficient
     * β: Haline contraction coefficient
 """
-function ocean_simulation(;
+function ocean_init(;
     Nz = 64,  # Number of vertical grid points
     Lz = 512, # Vertical extent of domain
     f = 1e-4, # Coriolis parameter

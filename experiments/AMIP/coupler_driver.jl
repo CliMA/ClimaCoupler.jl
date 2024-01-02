@@ -296,6 +296,7 @@ if mode_name == "amip"
     @show "after surfacestub"
 
     ## sea ice
+    @show comms_ctx
     @show "before SIC init"
     SIC_info = bcfile_info_init(
         FT,

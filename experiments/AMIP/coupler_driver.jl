@@ -623,21 +623,30 @@ function solve_coupler!(cs)
             if cs.dates.date[1] >= next_date_in_file(cs.mode.SST_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.SST_info)
             end
+            @show "SST midmonth updated"
             SST_current = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SST_info)
+            @show "SST interpolated"
             update_field!(ocean_sim, Val(:surface_temperature), SST_current)
+            @show "after SST"
 
             if cs.dates.date[1] >= next_date_in_file(cs.mode.SIC_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.SIC_info)
             end
+            @show "SIC midmonth updated"
             SIC_current =
                 get_ice_fraction.(interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info), mono_surface)
+            @show "SIC interpolated"
             update_field!(ice_sim, Val(:area_fraction), SIC_current)
+            @show "after SIC"
 
             if cs.dates.date[1] >= next_date_in_file(cs.mode.CO2_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.CO2_info)
             end
+            @show "CO2 midmonth updated"
             CO2_current = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.CO2_info)
+            @show "CO2 interpolated"
             update_field!(atmos_sim, Val(:co2_gm), CO2_current)
+            @show "after CO2"
 
             @show "after update midmonths"
             ## calculate and accumulate diagnostics at each timestep

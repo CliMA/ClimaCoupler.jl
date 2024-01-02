@@ -608,6 +608,7 @@ function solve_coupler!(cs)
 
     ## step in time
     walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
+        @show t
 
         cs.dates.date[1] = current_date(cs, t) # if not global, `date` is not updated.
 
@@ -651,12 +652,12 @@ function solve_coupler!(cs)
             @show "after update midmonths"
             ## calculate and accumulate diagnostics at each timestep
             ClimaComms.barrier(comms_ctx)
-            @show "after barrier"
+            # @show "after barrier"
             accumulate_diagnostics!(cs)
 
             ## save and reset monthly averages
             save_diagnostics(cs)
-            @show "after diagnostics"
+            # @show "after diagnostics"
 
         end
 
@@ -667,11 +668,11 @@ function solve_coupler!(cs)
         ClimaComms.barrier(comms_ctx)
         update_surface_fractions!(cs)
         update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
-        @show "after update model sims"
+        # @show "after update model sims"
 
         ## step sims
         step_model_sims!(cs.model_sims, t)
-        @show "after step model sims"
+        # @show "after step model sims"
 
         ## exchange combined fields and (if specified) calculate fluxes using combined states
         import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta

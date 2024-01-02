@@ -4,18 +4,17 @@
 - these experiments represent the basic cases for testing physical soundness of coupling methods in [ClimaCore.jl](https://github.com/CliMA/ClimaCore.jl/)
     - 1D finite-difference column test cases
         - Integration tests for individual functionalities
-            - Dry heat diffusion + slab (`experiments/ClimaCore/heat-diffusion/`)
+            - Dry heat diffusive atmos + slab surface (`experiments/ClimaCore/heat-diffusion/`)
                 - Purpose:
                     - minimal example for prototype developments and integration tests
                     - flux calculation / accumulation inside the atmos model `rhs!`
                     - one-file tutorial
-
-        - Interface tests
-            - Ekman column + Land (+ Oceananigans) (`experiments/ClimaCore/atm-ocn-lnd/`)
+    - 2D box test cases
+        - Integration test - seabreeze experiment
+            - Dry heat diffusive atmos + slab ocean + slab land (`experiments/ClimaCore/sea_breeze/`)
                 - Purpose:
-                    - combine all three interfaces
-                    - showcase ClimaCoupler interface functions
-                    - let flux calculation be done by coupler
-                    - tested with SurfaceFluxes.jl
+                    - demonstrate coupling of a simple atmosphere model with multiple surface models
+                    - expand domain from 1D to 2D case
+                    - flux calculations, exchange, and accumulation
 
 - documentation and test results can be found in our [Design Doc](https://www.overleaf.com/read/bgfmhgtncpws).

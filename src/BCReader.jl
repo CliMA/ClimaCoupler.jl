@@ -193,7 +193,9 @@ function update_midmonth_data!(date, bcf_info::BCFileInfo{FT}) where {FT}
             Regridder.read_from_hdf5(bcfile_dir, hd_outfile_root, all_dates[Int(midmonth_idx0)], varname, comms_ctx),
             bcf_info,
         )
+        @show "after read_from_hdf5"
         bcf_info.monthly_fields[2] .= deepcopy(bcf_info.monthly_fields[1])
+        @show "after deepcopy"
         bcf_info.segment_length .= Int(0)
         @show "end of update_midmonth if case"
 

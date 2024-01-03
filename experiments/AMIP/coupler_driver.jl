@@ -608,8 +608,6 @@ function solve_coupler!(cs)
 
     ## step in time
     walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
-        @show t
-
         cs.dates.date[1] = current_date(cs, t) # if not global, `date` is not updated.
 
         ## print date on the first of month
@@ -626,9 +624,9 @@ function solve_coupler!(cs)
             end
             @show "SST midmonth updated"
             SST_current = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SST_info)
-            @show "SST interpolated"
+            # @show "SST interpolated"
             update_field!(ocean_sim, Val(:surface_temperature), SST_current)
-            @show "after SST"
+            # @show "after SST"
 
             if cs.dates.date[1] >= next_date_in_file(cs.mode.SIC_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.SIC_info)
@@ -636,20 +634,20 @@ function solve_coupler!(cs)
             @show "SIC midmonth updated"
             SIC_current =
                 get_ice_fraction.(interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info), mono_surface)
-            @show "SIC interpolated"
+            # @show "SIC interpolated"
             update_field!(ice_sim, Val(:area_fraction), SIC_current)
-            @show "after SIC"
+            # @show "after SIC"
 
             if cs.dates.date[1] >= next_date_in_file(cs.mode.CO2_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.CO2_info)
             end
             @show "CO2 midmonth updated"
             CO2_current = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.CO2_info)
-            @show "CO2 interpolated"
+            # @show "CO2 interpolated"
             update_field!(atmos_sim, Val(:co2_gm), CO2_current)
-            @show "after CO2"
+            # @show "after CO2"
 
-            @show "after update midmonths"
+            # @show "after update midmonths"
             ## calculate and accumulate diagnostics at each timestep
             ClimaComms.barrier(comms_ctx)
             # @show "after barrier"

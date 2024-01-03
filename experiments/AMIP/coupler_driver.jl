@@ -238,8 +238,10 @@ In the `SlabPlanet` mode, all ocean and sea ice are dynamical models, namely the
 ### Land
 If evolving, use `ClimaLSM.jl`'s bucket model.
 =#
+using MPI
 function mpiprint(str, comms_ctx)
-    print(string(MPI.Comm_rank(comms_ctx.mpicomm)) * " " * str); flush(stdout)
+    print(string(MPI.Comm_rank(comms_ctx.mpicomm)) * " " * str)
+    flush(stdout)
 end
 
 @info mode_name

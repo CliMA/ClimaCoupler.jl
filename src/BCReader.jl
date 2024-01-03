@@ -12,6 +12,7 @@ using ClimaCore: Fields
 using ClimaComms
 using Dates
 using JLD2
+using MPI
 
 export BCFileInfo,
     float_type_bcf, bcfile_info_init, update_midmonth_data!, next_date_in_file, interpolate_midmonth_to_daily
@@ -180,7 +181,8 @@ The times for which data is extracted depends on the specifications in the
 - `bcf_info`: [BCFileInfo] containing boundary condition data.
 """
 function mpiprint(str, comms_ctx)
-    print(string(MPI.Comm_rank(comms_ctx.mpicomm)) * " " * str); flush(stdout)
+    print(string(MPI.Comm_rank(comms_ctx.mpicomm)) * " " * str)
+    flush(stdout)
 end
 function update_midmonth_data!(date, bcf_info::BCFileInfo{FT}) where {FT}
     # monthly count

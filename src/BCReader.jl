@@ -185,7 +185,7 @@ function update_midmonth_data!(date, bcf_info::BCFileInfo{FT}) where {FT}
     midmonth_idx = bcf_info.segment_idx[1]
     midmonth_idx0 = bcf_info.segment_idx0[1]
 
-    @show comms_ctx
+    @show "update_midmonth_data $comms_ctx"
     if (midmonth_idx == midmonth_idx0) && (Dates.days(date - all_dates[midmonth_idx]) < 0) # for init
         midmonth_idx = bcf_info.segment_idx[1] -= Int(1)
         midmonth_idx = midmonth_idx < Int(1) ? midmonth_idx + Int(1) : midmonth_idx

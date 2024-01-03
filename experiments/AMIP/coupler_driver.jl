@@ -201,9 +201,9 @@ Here we set initial and boundary conditions for each component model.
 This uses the `ClimaAtmos.jl` driver, with parameterization options specified in the command line arguments.
 =#
 ## init atmos model component
-@show "before atmos init"
+# @show "before atmos init"
 atmos_sim = atmos_init(FT, config_dict_atmos);
-@show "after atmos init"
+# @show "after atmos init"
 thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models
 
 #=
@@ -293,7 +293,6 @@ if mode_name == "amip"
         phase = TD.Liquid(),
         thermo_params = thermo_params,
     ))
-    @show "after surfacestub"
 
     ## sea ice
     @show comms_ctx
@@ -346,7 +345,7 @@ if mode_name == "amip"
     update_field!(atmos_sim, Val(:co2_gm), CO2_init)
 
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
-    @show "end of AMIP branch"
+    # @show "end of AMIP branch"
 elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
 
     land_fraction = mode_name == "slabplanet_aqua" ? land_fraction .* 0 : land_fraction
@@ -697,7 +696,7 @@ function solve_coupler!(cs)
         ## callback to checkpoint model state
         trigger_callback!(cs, cs.callbacks.checkpoint)
 
-        @show "end of coupling loop"
+        # @show "end of coupling loop"
     end
     @show walltime
 

@@ -329,15 +329,17 @@ the input HDF5 file must be readable by multiple MPI processes.
 # Returns
 - Field or FieldVector
 """
+function mpiprint(str, comms_ctx)
+    print(string(MPI.Comm_rank(comms_ctx.mpicomm)) * " " * str); flush(stdout)
+end
 function read_from_hdf5(REGRID_DIR, hd_outfile_root, time, varname, comms_ctx)
-    @show "read_from_hdf5 $comms_ctx"
-    # @show "in read_from_hdf5"
+    mpiprint("read_from_hdf5 $comms_ctx", comms_ctx)
     hdfreader = InputOutput.HDF5Reader(joinpath(REGRID_DIR, hd_outfile_root * "_" * string(time) * ".hdf5"), comms_ctx)
-    @show "after HDF5Reader"
+    mpiprint("after HDF5Reader", comms_ctx)
     field = InputOutput.read_field(hdfreader, varname)
-    @show "after read_field"
+    mpiprint("after read_field", comms_ctx)
     Base.close(hdfreader)
-    @show "after close"
+    mpiprint("after close", comms_ctx)
     return field
 end
 

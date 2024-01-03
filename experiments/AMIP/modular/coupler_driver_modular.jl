@@ -238,13 +238,16 @@ In the `SlabPlanet` mode, all ocean and sea ice are dynamical models, namely the
 ### Land
 If evolving, use `ClimaLSM.jl`'s bucket model.
 =#
+function mpiprint(str, comms_ctx)
+    print(string(MPI.Comm_rank(comms_ctx.mpicomm)) * " " * str); flush(stdout)
+end
 
 @info mode_name
 if mode_name == "amip"
     @info "AMIP boundary conditions - do not expect energy conservation"
 
     ## land
-    @show "before bucket init"
+    mpiprint("before bucket init", comms_ctx)
     land_sim = bucket_init(
         FT,
         tspan,
@@ -262,7 +265,7 @@ if mode_name == "amip"
     )
 
     ## ocean
-    @show "before SST init"
+    mpiprint("before SST init", comms_ctx)
     SST_info = bcfile_info_init(
         FT,
         REGRID_DIR,
@@ -277,11 +280,11 @@ if mode_name == "amip"
         mono = mono_surface,
     )
 
-    @show "before SST update"
+    mpiprint("before SST update", comms_ctx)
     update_midmonth_data!(date0, SST_info)
-    @show "after SST update"
+    mpiprint("after SST update", comms_ctx)
     SST_init = interpolate_midmonth_to_daily(date0, SST_info)
-    @show "after SST interpolation"
+    mpiprint("after SST interpolation", comms_ctx)
     ocean_sim = SurfaceStub((;
         T_sfc = SST_init,
         ρ_sfc = ClimaCore.Fields.zeros(boundary_space),
@@ -296,7 +299,7 @@ if mode_name == "amip"
 
     ## sea ice
     @show comms_ctx
-    @show "before SIC init"
+    mpiprint("before SIC init", comms_ctx)
     SIC_info = bcfile_info_init(
         FT,
         REGRID_DIR,
@@ -310,7 +313,7 @@ if mode_name == "amip"
         date0 = date0,
         mono = mono_surface,
     )
-    @show "before SIC update"
+    mpiprint("before SIC update", comms_ctx)
     update_midmonth_data!(date0, SIC_info)
     SIC_init = interpolate_midmonth_to_daily(date0, SIC_info)
     ice_fraction = get_ice_fraction.(SIC_init, mono_surface)
@@ -325,7 +328,7 @@ if mode_name == "amip"
     )
 
     ## CO2 concentration
-    @show "before CO2 init"
+    mpiprint("before CO2 init", comms_ctx)
     CO2_info = bcfile_info_init(
         FT,
         REGRID_DIR,
@@ -339,13 +342,12 @@ if mode_name == "amip"
         mono = mono_surface,
     )
 
-    @show "before CO2 update"
+    mpiprint("before CO2 update", comms_ctx)
     update_midmonth_data!(date0, CO2_info)
     CO2_init = interpolate_midmonth_to_daily(date0, CO2_info)
     update_field!(atmos_sim, Val(:co2_gm), CO2_init)
 
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
-    # @show "end of AMIP branch"
 elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
 
     land_fraction = mode_name == "slabplanet_aqua" ? land_fraction .* 0 : land_fraction
@@ -617,12 +619,12 @@ function solve_coupler!(cs)
 
         if cs.mode.name == "amip"
 
-            @show "before update midmonths"
+            mpiprint("before update midmonths", comms_ctx)
             ## monthly read of boundary condition data for SST and SIC and CO2
             if cs.dates.date[1] >= next_date_in_file(cs.mode.SST_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.SST_info)
             end
-            @show "SST midmonth updated"
+            mpiprint("SST midmonth updated", comms_ctx)
             SST_current = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SST_info)
             # @show "SST interpolated"
             update_field!(ocean_sim, Val(:surface_temperature), SST_current)
@@ -631,7 +633,7 @@ function solve_coupler!(cs)
             if cs.dates.date[1] >= next_date_in_file(cs.mode.SIC_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.SIC_info)
             end
-            @show "SIC midmonth updated"
+            mpiprint("SIC midmonth updated", comms_ctx)
             SIC_current =
                 get_ice_fraction.(interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info), mono_surface)
             # @show "SIC interpolated"
@@ -641,7 +643,7 @@ function solve_coupler!(cs)
             if cs.dates.date[1] >= next_date_in_file(cs.mode.CO2_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.CO2_info)
             end
-            @show "CO2 midmonth updated"
+            mpiprint("CO2 midmonth updated", comms_ctx)
             CO2_current = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.CO2_info)
             # @show "CO2 interpolated"
             update_field!(atmos_sim, Val(:co2_gm), CO2_current)
@@ -707,9 +709,9 @@ if haskey(ENV, "CI_PERF_SKIP_COUPLED_RUN") #hide
 end #hide
 
 ## run the coupled simulation
-@show "before coupler solve"
+mpiprint("before coupler solve", comms_ctx)
 solve_coupler!(cs);
-@show "after coupler solve"
+mpiprint("after coupler solve", comms_ctx)
 
 #=
 ## Postprocessing

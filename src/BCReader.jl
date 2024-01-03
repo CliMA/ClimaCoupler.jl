@@ -179,13 +179,16 @@ The times for which data is extracted depends on the specifications in the
 - `date`: [Dates.DateTime] start date for data.
 - `bcf_info`: [BCFileInfo] containing boundary condition data.
 """
+function mpiprint(str, comms_ctx)
+    print(string(MPI.Comm_rank(comms_ctx.mpicomm)) * " " * str); flush(stdout)
+end
 function update_midmonth_data!(date, bcf_info::BCFileInfo{FT}) where {FT}
     # monthly count
     (; bcfile_dir, comms_ctx, hd_outfile_root, varname, all_dates, scaling_function) = bcf_info
     midmonth_idx = bcf_info.segment_idx[1]
     midmonth_idx0 = bcf_info.segment_idx0[1]
 
-    @show "update_midmonth_data $comms_ctx"
+    mpiprint("update_midmonth_data $comms_ctx", comms_ctx)
     if (midmonth_idx == midmonth_idx0) && (Dates.days(date - all_dates[midmonth_idx]) < 0) # for init
         midmonth_idx = bcf_info.segment_idx[1] -= Int(1)
         midmonth_idx = midmonth_idx < Int(1) ? midmonth_idx + Int(1) : midmonth_idx
@@ -194,11 +197,11 @@ function update_midmonth_data!(date, bcf_info::BCFileInfo{FT}) where {FT}
             Regridder.read_from_hdf5(bcfile_dir, hd_outfile_root, all_dates[Int(midmonth_idx0)], varname, comms_ctx),
             bcf_info,
         )
-        @show "after read_from_hdf5"
+        mpiprint("after read_from_hdf5", comms_ctx)
         bcf_info.monthly_fields[2] .= deepcopy(bcf_info.monthly_fields[1])
-        @show "after deepcopy"
+        mpiprint("after deepcopy", comms_ctx)
         bcf_info.segment_length .= Int(0)
-        @show "end of update_midmonth if case"
+        mpiprint("end of update_midmonth if case", comms_ctx)
 
     elseif Dates.days(date - all_dates[end - 1]) > 0 # for fini
         @warn "this time period is after BC data - using file from $(all_dates[end - 1])"

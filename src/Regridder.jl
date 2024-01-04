@@ -336,19 +336,15 @@ function mpiprint(str, comms_ctx)
     flush(stdout)
 end
 function read_from_hdf5(REGRID_DIR, hd_outfile_root, time, varname, comms_ctx)
-    if ClimaComms.iamroot(comms_ctx)
-        mpiprint("read_from_hdf5 $comms_ctx", comms_ctx)
-        hdfreader =
-            InputOutput.HDF5Reader(joinpath(REGRID_DIR, hd_outfile_root * "_" * string(time) * ".hdf5"), comms_ctx)
-        mpiprint("after HDF5Reader", comms_ctx)
-        mpiprint("hdfreader context $hdfreader.context", comms_ctx)
-        field = InputOutput.read_field(hdfreader, varname)
-        mpiprint("after read_field", comms_ctx)
-        Base.close(hdfreader)
-        mpiprint("after close", comms_ctx)
-    end
-    ClimaComms.barrier(comms_ctx)
-    ClimaComms.bcast(comms_ctx, field)
+    mpiprint("read_from_hdf5 $comms_ctx", comms_ctx)
+    hdfreader =
+        InputOutput.HDF5Reader(joinpath(REGRID_DIR, hd_outfile_root * "_" * string(time) * ".hdf5"), comms_ctx)
+    mpiprint("after HDF5Reader", comms_ctx)
+    mpiprint("hdfreader context $hdfreader.context", comms_ctx)
+    field = InputOutput.read_field(hdfreader, varname)
+    mpiprint("after read_field", comms_ctx)
+    Base.close(hdfreader)
+    mpiprint("after close", comms_ctx)
     return field
 end
 

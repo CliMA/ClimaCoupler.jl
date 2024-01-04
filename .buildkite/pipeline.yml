@@ -307,6 +307,16 @@ steps:
       #     slurm_ntasks: 1
       #     slurm_mem: 20GB
 
+      - label: "read_field debug script"
+        command: "srun julia --color=yes --project=test test/read_field_debug.jl"
+        artifact_paths: "debug/regrid/*"
+        timeout_in_minutes: 30
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+        agents:
+          slurm_ntasks: 2
+          slurm_mem: 16GB
+
       - label: "MPI AMIP"
         command: "srun julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/coarse_mpi_n2.yml"
         artifact_paths: "experiments/AMIP/modular/output/amip/coarse_mpi_n2_artifacts/*"

@@ -330,10 +330,12 @@ the input HDF5 file must be readable by multiple MPI processes.
 - Field or FieldVector
 """
 function read_from_hdf5(REGRID_DIR, hd_outfile_root, time, varname, comms_ctx)
-    hdfreader = InputOutput.HDF5Reader(joinpath(REGRID_DIR, hd_outfile_root * "_" * string(time) * ".hdf5"), comms_ctx)
-
+    filename = joinpath(REGRID_DIR, hd_outfile_root * "_" * string(time) * ".hdf5")
+    @info "reading HDF5" filename comms_ctx pid=ClimaComms.mypid(comms_ctx) stacktrace=stacktrace()
+    hdfreader = InputOutput.HDF5Reader(filename, comms_ctx)
     field = InputOutput.read_field(hdfreader, varname)
-    Base.close(hdfreader)
+    Base.close(hdfreader) 
+    @info "reading complete" pid=ClimaComms.mypid(comms_ctx)
     return field
 end
 

@@ -92,11 +92,10 @@ steps:
     steps:
       - label: "MPI Regridder unit tests"
         key: "regridder_mpi_tests"
-        command: "mpirun julia --color=yes --project=test/ test/mpi_tests/regridder_mpi_tests.jl --config_file $MPI_CONFIG_PATH/regridder_mpi.yml"
+        command: "srun julia --color=yes --project=test/ test/mpi_tests/regridder_mpi_tests.jl --config_file $MPI_CONFIG_PATH/regridder_mpi.yml"
         timeout_in_minutes: 20
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
-          # CLIMACOMMS_CONTEXT: "MPI"
           NPROCS: 2
         agents:
           slurm_ntasks: 2

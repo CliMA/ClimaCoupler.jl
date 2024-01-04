@@ -1,4 +1,4 @@
-run_name: "coarse_single_modular_ft32"
+run_name: "perf_coarse_single_ft64"
 moist: "equil"
 vert_diff: "true"
 rad: "gray"
@@ -13,6 +13,5 @@ mono_surface: true
 h_elem: 6
 dt_save_restart: "10days"
 precip_model: "0M"
-apply_limiter: false
-FLOAT_TYPE: "Float32"
-job_id: "coarse_single_modular_ft32"
+apply_limiter: true
+job_id: "perf_coarse_single_ft64"

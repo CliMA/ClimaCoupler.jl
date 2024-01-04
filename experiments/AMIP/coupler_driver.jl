@@ -171,7 +171,7 @@ evolving_ocean = config_dict["evolving_ocean"]
 if isinteractive()
     COUPLER_OUTPUT_DIR = joinpath("output", joinpath(mode_name, run_name)) # TempestRemap fails if interactive and paths are too long
 else
-    COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/modular/output", joinpath(mode_name, run_name))
+    COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/output", joinpath(mode_name, run_name))
 end
 mkpath(COUPLER_OUTPUT_DIR)
 

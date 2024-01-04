@@ -4,7 +4,7 @@ using ClimaCoupler.Interfacer: AtmosModelSimulation
 using ClimaCoupler.TestHelper: create_space
 using ClimaCore: Fields, Spaces
 
-include(pkgdir(ClimaCoupler, "experiments/AMIP/modular/components/atmosphere/climaatmos_init.jl"))
+include(pkgdir(ClimaCoupler, "experiments/AMIP/components/atmosphere/climaatmos_init.jl"))
 
 for FT in (Float32, Float64)
     @testset "dss_state! ClimaAtmosSimulation for FT=$FT" begin

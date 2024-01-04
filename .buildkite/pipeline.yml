@@ -51,10 +51,10 @@ steps:
       - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.status()'"
 
-      - echo "--- Instantiate amip modular"
-      - "julia --project=experiments/AMIP/modular/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/AMIP/modular/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=experiments/AMIP/modular/ -e 'using Pkg; Pkg.status()'"
+      - echo "--- Instantiate AMIP env"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate perf env"
       - "julia --project=perf/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
@@ -138,56 +138,56 @@ steps:
       #   - diagnostics: check and plot energy conservation, output plots after 9 days
       - label: "Slabplanet: default"
         key: "slabplanet_default"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_default.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_default_artifacts/*"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/slabplanet_default.yml"
+        artifact_paths: "experiments/AMIP/output/slabplanet/slabplanet_default_artifacts/*"
         agents:
           slurm_mem: 20GB
 
       - label: "Slabplanet: default with Float32"
         key: "slabplanet_ft32"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_ft32.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_ft32_artifacts/*"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/slabplanet_ft32.yml"
+        artifact_paths: "experiments/AMIP/output/slabplanet/slabplanet_ft32_artifacts/*"
         agents:
           slurm_mem: 20GB
 
       - label: "Slabplanet: partitioned turbulent fluxes"
         key: "slabplanet_partitioned_fluxes"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_partitioned_fluxes.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_partitioned_fluxes_artifacts/*"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/slabplanet_partitioned_fluxes.yml"
+        artifact_paths: "experiments/AMIP/output/slabplanet/slabplanet_partitioned_fluxes_artifacts/*"
         agents:
           slurm_mem: 20GB
 
       - label: "Slabplanet: non-monotonous surface remap"
         key: "slabplanet_non-monotonous"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_nonmono.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_nonmono_artifacts/*"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/slabplanet_nonmono.yml"
+        artifact_paths: "experiments/AMIP/output/slabplanet/slabplanet_nonmono_artifacts/*"
         agents:
           slurm_mem: 20GB
 
       - label: "Slabplanet: albedo from static map"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_albedo_static_map.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_albedo_static_map_artifacts/total_energy*.png"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/slabplanet_albedo_static_map.yml"
+        artifact_paths: "experiments/AMIP/output/slabplanet/slabplanet_albedo_static_map_artifacts/total_energy*.png"
         agents:
           slurm_mem: 20GB
 
       - label: "Slabplanet: albedo from temporal map"
         key: "slabplanet_albedo_map_temporal"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_albedo_temporal_map.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_albedo_temporal_map_artifacts/*"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/slabplanet_albedo_temporal_map.yml"
+        artifact_paths: "experiments/AMIP/output/slabplanet/slabplanet_albedo_temporal_map_artifacts/*"
         agents:
           slurm_mem: 20GB
 
       - label: "Slabplanet: albedo from function"
         key: "slabplanet_albedo_function"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_albedo_function.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/slabplanet_albedo_function_artifacts/*"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/slabplanet_albedo_function.yml"
+        artifact_paths: "experiments/AMIP/output/slabplanet/slabplanet_albedo_function_artifacts/*"
         agents:
           slurm_mem: 20GB
 
       - label: "Slabplanet: eisenman sea ice"
         key: "slabplanet_eisenman"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/slabplanet_eisenman.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet_eisenman/slabplanet_eisenman_artifacts/*"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/slabplanet_eisenman.yml"
+        artifact_paths: "experiments/AMIP/output/slabplanet_eisenman/slabplanet_eisenman_artifacts/*"
         agents:
           slurm_mem: 20GB
 
@@ -200,9 +200,9 @@ steps:
 
       # slabplanet default: track unthreaded performance (alloc tests, flame graph, flame graph diff, build history)
       - label: ":rocket: Slabplanet: default (unthreaded)"
-        key: "modular_slabplanet_unthreaded"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/default_modular_unthreaded.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/default_modular_unthreaded_artifacts/*"
+        key: "slabplanet_unthreaded"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/default_unthreaded.yml"
+        artifact_paths: "experiments/AMIP/output/slabplanet/default_unthreaded_artifacts/*"
         env:
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""
@@ -211,14 +211,14 @@ steps:
           slurm_mem: 20GB
 
       - label: ":rocket: Slabplanet: default (unthreaded) - flame graph and allocation tests"
-        command: "julia --color=yes --project=perf perf/flame.jl --config_file $PERF_CONFIG_PATH/perf_default_modular_unthreaded.yml"
-        artifact_paths: "perf/output/perf_default_modular_unthreaded/*"
+        command: "julia --color=yes --project=perf perf/flame.jl --config_file $PERF_CONFIG_PATH/perf_default_unthreaded.yml"
+        artifact_paths: "perf/output/perf_default_unthreaded/*"
         agents:
           slurm_mem: 20GB
 
       - label: ":rocket: Slabplanet: default (unthreaded) - flame graph diff"
-        command: "julia --color=yes --project=perf perf/flame_diff.jl --config_file $PERF_CONFIG_PATH/perf_diff_default_modular_unthreaded.yml"
-        artifact_paths: "perf/output/perf_diff_default_modular_unthreaded/*"
+        command: "julia --color=yes --project=perf perf/flame_diff.jl --config_file $PERF_CONFIG_PATH/perf_diff_default_unthreaded.yml"
+        artifact_paths: "perf/output/perf_diff_default_unthreaded/*"
         agents:
           slurm_mem: 20GB
 
@@ -241,42 +241,42 @@ steps:
       # AMIP AND SLABPLANET EXPERIMENTS
 
       - label: "Moist earth with slab surface - default: monin gray no_sponge idealinsol freq_dt_cpl"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/default_mono.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/default_mono_artifacts/total_energy*.png"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/default_mono.yml"
+        artifact_paths: "experiments/AMIP/output/slabplanet/default_mono_artifacts/total_energy*.png"
         agents:
           slurm_mem: 20GB
 
       - label: "Moist earth with slab surface - notmono: monin gray no_sponge idealinsol freq_dt_cpl notmono"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/default_notmono.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/default_notmono_artifacts/total_energy*.png"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/default_notmono.yml"
+        artifact_paths: "experiments/AMIP/output/slabplanet/default_notmono_artifacts/total_energy*.png"
         agents:
           slurm_mem: 20GB
 
       # - label: "Moist earth with slab surface - test: monin allsky sponge idealinsol infreq_dt_cpl"
-        # command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --FLOAT_TYPE Float64 --coupled true --surface_setup PrescribedSurface --moist equil --vert_diff true --rad allskywithclear --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 21600 --dt 200secs --dt_rad 6hours --mono_surface true --h_elem 4 --precip_model 0M --run_name target_params_in_slab_test1 --job_id target_params_in_slab_test1" # Unconverged SF (reproduced locally); works with 200s dt_cpl
-        # artifact_paths: "experiments/AMIP/modular/output/slabplanet/target_params_in_slab_test1_artifacts/total_energy*.png"
+        # command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --FLOAT_TYPE Float64 --coupled true --surface_setup PrescribedSurface --moist equil --vert_diff true --rad allskywithclear --rayleigh_sponge true --alpha_rayleigh_uh 0 --alpha_rayleigh_w 10 --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 21600 --dt 200secs --dt_rad 6hours --mono_surface true --h_elem 4 --precip_model 0M --run_name target_params_in_slab_test1 --job_id target_params_in_slab_test1" # Unconverged SF (reproduced locally); works with 200s dt_cpl
+        # artifact_paths: "experiments/AMIP/output/slabplanet/target_params_in_slab_test1_artifacts/total_energy*.png"
 
       - label: "Moist earth with slab surface - test: bulk allsky sponge realinsol infreq_dt_cpl"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/target_params_in_slab_test2.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/target_params_in_slab_test2_artifacts/total_energy*.png"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/target_params_in_slab_test2.yml"
+        artifact_paths: "experiments/AMIP/output/slabplanet/target_params_in_slab_test2_artifacts/total_energy*.png"
         agents:
           slurm_mem: 20GB
 
       - label: "Moist earth with slab surface - test: monin gray sponge realinsol infreq_dt_cpl"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/target_params_in_slab_test3.yml"
-        artifact_paths: "experiments/AMIP/modular/output/slabplanet/target_params_in_slab_test3_artifacts/total_energy*.png"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/target_params_in_slab_test3.yml"
+        artifact_paths: "experiments/AMIP/output/slabplanet/target_params_in_slab_test3_artifacts/total_energy*.png"
         agents:
           slurm_mem: 20GB
 
       # breaking:
       # - label: "Moist earth with slab surface - monin allsky no_sponge idealinsol infreq_dt_cpl"
-      #   command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --coupled true --surface_setup PrescribedSurface --moist equil --vert_diff true --rad allskywithclear --rayleigh_sponge false --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 21600 --dt 200secs --dt_rad 6hours --idealized_insolation true --mono_surface true --h_elem 4 --precip_model 0M --run_name target_params_in_slab1"
-      #   artifact_paths: "experiments/AMIP/modular/output/slabplanet/target_params_in_slab1_artifacts/total_energy*.png"
+      #   command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --coupled true --surface_setup PrescribedSurface --moist equil --vert_diff true --rad allskywithclear --rayleigh_sponge false --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 21600 --dt 200secs --dt_rad 6hours --idealized_insolation true --mono_surface true --h_elem 4 --precip_model 0M --run_name target_params_in_slab1"
+      #   artifact_paths: "experiments/AMIP/output/slabplanet/target_params_in_slab1_artifacts/total_energy*.png"
 
-      - label: "AMIP - modular Float64 + hourly checkpoint"
-        key: "modular_amip"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/coarse_single_modular_ft64_hourly_checkpoints.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/coarse_single_modular_ft64_hourly_checkpoints_artifacts/*"
+      - label: "AMIP - Float64 + hourly checkpoint"
+        key: "amip"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/coarse_single_ft64_hourly_checkpoints.yml"
+        artifact_paths: "experiments/AMIP/output/amip/coarse_single_ft64_hourly_checkpoints_artifacts/*"
         env:
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""
@@ -284,10 +284,10 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 20GB
 
-      - label: "AMIP - modular Float64 + hourly checkpoint + co2"
-        key: "coarse_single_modular_ft64_hourly_checkpoints_co2"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/coarse_single_modular_ft64_hourly_checkpoints_co2.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/coarse_single_modular_ft64_hourly_checkpoints_co2_artifacts/*"
+      - label: "AMIP - Float64 + hourly checkpoint + co2"
+        key: "coarse_single_ft64_hourly_checkpoints_co2"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/coarse_single_ft64_hourly_checkpoints_co2.yml"
+        artifact_paths: "experiments/AMIP/output/amip/coarse_single_ft64_hourly_checkpoints_co2_artifacts/*"
         env:
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""
@@ -295,23 +295,23 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 20GB
 
-      - label: "AMIP - modular, Float64 test"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/coarse_single_modular_ft64.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/coarse_single_modular_ft64_artifacts/*"
+      - label: "AMIP - Float64 test"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/coarse_single_ft64.yml"
+        artifact_paths: "experiments/AMIP/output/amip/coarse_single_ft64_artifacts/*"
         agents:
           slurm_ntasks: 1
           slurm_mem: 20GB
 
-      - label: "AMIP - modular, Float32 test"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/coarse_single_modular_ft32.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/coarse_single_modular_ft32_artifacts/*"
+      - label: "AMIP - Float32 test"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/coarse_single_ft32.yml"
+        artifact_paths: "experiments/AMIP/output/amip/coarse_single_ft32_artifacts/*"
         agents:
           slurm_ntasks: 1
           slurm_mem: 20GB
 
       - label: "MPI AMIP"
-        command: "srun julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/coarse_mpi_n2.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/coarse_mpi_n2_artifacts/*"
+        command: "srun julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/coarse_mpi_n2.yml"
+        artifact_paths: "experiments/AMIP/output/amip/coarse_mpi_n2_artifacts/*"
         timeout_in_minutes: 240
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
@@ -325,8 +325,8 @@ steps:
       # short high-res performance test
       - label: "Unthreaded AMIP FINE" # also reported by longruns with a flame graph
         key: "unthreaded_amip_fine"
-        command: "julia --color=yes --project=experiments/AMIP/modular/ experiments/AMIP/modular/coupler_driver_modular.jl --config_file $CONFIG_PATH/target_amip_n1_shortrun.yml"
-        artifact_paths: "experiments/AMIP/modular/output/amip/target_amip_n1_shortrun_artifacts/*"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/target_amip_n1_shortrun.yml"
+        artifact_paths: "experiments/AMIP/output/amip/target_amip_n1_shortrun_artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
         agents:
@@ -334,15 +334,15 @@ steps:
 
       # PERFORMANCE RUNS: flame graphs + allocation tests
 
-      - label: ":rocket: flame graph and allocation tests: perf_coarse_single_modular_ft64"
-        command: "julia --color=yes --project=perf perf/flame.jl --config_file $PERF_CONFIG_PATH/perf_coarse_single_modular_ft64.yml"
-        artifact_paths: "perf/output/perf_coarse_single_modular_ft64/*"
+      - label: ":rocket: flame graph and allocation tests: perf_coarse_single_ft64"
+        command: "julia --color=yes --project=perf perf/flame.jl --config_file $PERF_CONFIG_PATH/perf_coarse_single_ft64.yml"
+        artifact_paths: "perf/output/perf_coarse_single_ft64/*"
         agents:
           slurm_mem: 20GB
 
-      - label: ":rocket: performance: flame graph diff: perf_diff_coarse_single_modular_ft64"
-        command: "julia --color=yes --project=perf perf/flame_diff.jl --config_file $PERF_CONFIG_PATH/perf_diff_coarse_single_modular_ft64.yml"
-        artifact_paths: "perf/output/perf_diff_coarse_single_modular_ft64/*"
+      - label: ":rocket: performance: flame graph diff: perf_diff_coarse_single_ft64"
+        command: "julia --color=yes --project=perf perf/flame_diff.jl --config_file $PERF_CONFIG_PATH/perf_diff_coarse_single_ft64.yml"
+        artifact_paths: "perf/output/perf_diff_coarse_single_ft64/*"
         agents:
           slurm_mem: 20GB
 

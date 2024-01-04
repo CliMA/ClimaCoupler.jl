@@ -12,7 +12,7 @@ import CLIMAParameters as CP
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TP
 
-include("../../experiments/AMIP/modular/components/ocean/eisenman_seaice_init.jl")
+include("../../experiments/AMIP/components/ocean/eisenman_seaice_init.jl")
 
 
 for FT in (Float32, Float64)
@@ -322,7 +322,7 @@ for FT in (Float32, Float64)
         @test all(parent(Y.h_ice) .< parent(h_ice_0))
     end
 
-    include("../../experiments/AMIP/modular/components/slab_utils.jl")
+    include("../../experiments/AMIP/components/slab_utils.jl")
     @testset "step! update + total energy calculation for FT=$FT" begin
         Δt = Float64(1000)
 

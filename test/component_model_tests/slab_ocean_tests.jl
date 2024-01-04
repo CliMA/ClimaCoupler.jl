@@ -7,7 +7,7 @@ using ClimaCore: Fields, Spaces
 import CLIMAParameters as CP
 import Thermodynamics.Parameters as TDP
 
-include(pkgdir(ClimaCoupler, "experiments/AMIP/modular/components/ocean/slab_ocean_init.jl"))
+include(pkgdir(ClimaCoupler, "experiments/AMIP/components/ocean/slab_ocean_init.jl"))
 
 for FT in (Float32, Float64)
     @testset "dss_state! SlabOceanSimulation for FT=$FT" begin

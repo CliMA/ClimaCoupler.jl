@@ -31,10 +31,10 @@ cwd = pwd()
 
 cc_dir = joinpath(dirname(@__DIR__));
 config_dir = joinpath(cc_dir, "config", "model_configs");
-include(joinpath(cc_dir, "experiments", "AMIP", "modular", "cli_options.jl"));
+include(joinpath(cc_dir, "experiments", "AMIP", "cli_options.jl"));
 
 # assuming a common driver for all tested runs
-filename = joinpath(cc_dir, "experiments", "AMIP", "modular", "coupler_driver_modular.jl")
+filename = joinpath(cc_dir, "experiments", "AMIP", "coupler_driver.jl")
 
 # number of time steps used for profiling
 n_samples = 2
@@ -45,7 +45,7 @@ parsed_args = parse_commandline(argparse_settings())
 # select the configuration file and extract the run-name
 config_file =
     parsed_args["config_file"] =
-        isinteractive() ? "../config/perf_configs/perf_default_modular_unthreaded.yml" : parsed_args["config_file"]
+        isinteractive() ? "../config/perf_configs/perf_default_unthreaded.yml" : parsed_args["config_file"]
 run_name = parsed_args["run_name"] = split(basename(config_file), ".")[1]
 
 # import config setup

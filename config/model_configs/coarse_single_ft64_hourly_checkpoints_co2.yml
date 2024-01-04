@@ -1,4 +1,4 @@
-run_name: "coarse_single_modular_ft64_hourly_checkpoints_co2"
+run_name: "coarse_single_ft64_hourly_checkpoints_co2"
 hourly_checkpoint: true
 moist: "equil"
 vert_diff: "true"
@@ -15,4 +15,4 @@ h_elem: 6
 dt_save_restart: "10days"
 precip_model: "0M"
 apply_limiter: false
-job_id: "coarse_single_modular_ft64_hourly_checkpoints_co2"
+job_id: "coarse_single_ft64_hourly_checkpoints_co2"

@@ -1,4 +1,4 @@
-run_name: "perf_diff_default_modular_unthreaded"
+run_name: "perf_diff_default_unthreaded"
 moist: "equil"
 vert_diff: "true"
 rad: "gray"
@@ -13,4 +13,4 @@ h_elem: 4
 precip_model: "0M"
 anim: true
 apply_limiter: true
-job_id: "perf_diff_default_modular_unthreaded"
+job_id: "perf_diff_default_unthreaded"

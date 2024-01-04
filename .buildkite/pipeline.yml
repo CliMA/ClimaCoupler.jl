@@ -315,7 +315,7 @@ steps:
           CLIMACORE_DISTRIBUTED: "MPI"
         agents:
           slurm_ntasks: 2
-          slurm_mem: 24GB
+          slurm_mem: 32GB
 
       - label: "batch script"
         command: "sbatch test/mpi_tests/local_checks.sh"

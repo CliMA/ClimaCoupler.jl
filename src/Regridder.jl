@@ -332,7 +332,7 @@ the input HDF5 file must be readable by multiple MPI processes.
 """
 
 function mpiprint(str, comms_ctx)
-    print(string(MPI.Comm_rank(comms_ctx.mpicomm)) * " " * str)
+    print(string(MPI.Comm_rank(comms_ctx.mpicomm)) * " " * str * "\n")
     flush(stdout)
 end
 function read_from_hdf5(REGRID_DIR, hd_outfile_root, time, varname, comms_ctx)

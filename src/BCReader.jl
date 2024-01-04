@@ -181,7 +181,7 @@ The times for which data is extracted depends on the specifications in the
 - `bcf_info`: [BCFileInfo] containing boundary condition data.
 """
 function mpiprint(str, comms_ctx)
-    print(string(MPI.Comm_rank(comms_ctx.mpicomm)) * " " * str)
+    print(string(MPI.Comm_rank(comms_ctx.mpicomm)) * " " * str * "\n")
     flush(stdout)
 end
 function update_midmonth_data!(date, bcf_info::BCFileInfo{FT}) where {FT}
@@ -282,7 +282,8 @@ or returns the first Field if interpolation is switched off.
 - Fields.field
 """
 function interpolate_midmonth_to_daily(date, bcf_info::BCFileInfo{FT}) where {FT}
-    @show "start of interpolate"
+    (; comms_ctx) = bcf_info
+    mpiprint("start of interpolate", comms_ctx)
     (; segment_length, segment_idx, all_dates, monthly_fields, interpolate_daily) = bcf_info
     if interpolate_daily && segment_length[1] > FT(0) && date != all_dates[Int(segment_idx[1])]
         return interpol.(

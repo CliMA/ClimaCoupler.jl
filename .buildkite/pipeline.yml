@@ -5,6 +5,7 @@ agents:
 
 env:
   JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
+  JULIA_DEPOT_PATH: "${BUILDKITE_BUILD_PATH}/${BUILDKITE_PIPELINE_SLUG}/depot/cpu"
   OPENBLAS_NUM_THREADS: 1
   JULIA_NVTX_CALLBACKS: gc
   OMPI_MCA_opal_warn_on_missing_libcuda: 0
@@ -27,6 +28,11 @@ steps:
   - label: "init environment :computer:"
     key: "init_cpu_env"
     command:
+      - |
+        if [ -n "$$CLEAR_DEPOT" ]; then
+          echo "--- Clearing depot"
+          rm -rf ${JULIA_DEPOT_PATH}
+        fi
 
       # Local MPIPreferences take precedence over the one set by JuliaProject.toml,
       # so we make sure that we remove them to use MPITrampoline.
@@ -74,10 +80,10 @@ steps:
       - "julia --project=artifacts artifacts/download_artifacts.jl"
 
     agents:
-      slurm_cpus_per_task: 8
+      slurm_cpus_per_task: 12
       slurm_gpus: 1
     env:
-      JULIA_NUM_PRECOMPILE_TASKS: 8
+      JULIA_NUM_PRECOMPILE_TASKS: 12
       JULIA_MAX_NUM_PRECOMPILE_FILES: 50
 
   - wait
@@ -86,11 +92,10 @@ steps:
     steps:
       - label: "MPI Regridder unit tests"
         key: "regridder_mpi_tests"
-        command: "mpirun julia --color=yes --project=test/ test/mpi_tests/regridder_mpi_tests.jl --config_file $MPI_CONFIG_PATH/regridder_mpi.yml"
+        command: "srun julia --color=yes --project=test/ test/mpi_tests/regridder_mpi_tests.jl --config_file $MPI_CONFIG_PATH/regridder_mpi.yml"
         timeout_in_minutes: 20
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
-          # CLIMACOMMS_CONTEXT: "MPI"
           NPROCS: 2
         agents:
           slurm_ntasks: 2

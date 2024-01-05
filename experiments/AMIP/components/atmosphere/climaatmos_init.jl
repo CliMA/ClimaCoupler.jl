@@ -64,6 +64,7 @@ function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
 
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
     atmos_config = CA.AtmosConfig(atmos_config_dict)
+    Logging.global_logger(Logging.ConsoleLogger(stderr, Logging.Info))
     simulation = CA.get_simulation(atmos_config)
     (; integrator) = simulation
     Y = integrator.u

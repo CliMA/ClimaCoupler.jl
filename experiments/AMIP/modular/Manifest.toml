@@ -240,8 +240,8 @@ version = "0.5.6"
 
 [[deps.ClimaCore]]
 deps = ["Adapt", "BandedMatrices", "BlockArrays", "CUDA", "ClimaComms", "CubedSphere", "DataStructures", "DocStringExtensions", "ForwardDiff", "GaussQuadrature", "GilbertCurves", "HDF5", "InteractiveUtils", "IntervalSets", "KrylovKit", "LinearAlgebra", "Memoize", "PkgVersion", "RecursiveArrayTools", "RootSolvers", "SparseArrays", "Static", "StaticArrays", "Statistics", "Unrolled", "WeakValueDicts"]
-git-tree-sha1 = "cbb52246f897033506c6ed03a209a2d62da9d74d"
-repo-rev = "js/coupler-debug"
+git-tree-sha1 = "28243eb27d8cedc77a6f32c69aec61fd01c9fb8d"
+repo-rev = "4a97e1"
 repo-url = "https://github.com/CliMA/ClimaCore.jl.git"
 uuid = "d414da3d-4745-48bb-8d80-42e94e092884"
 version = "0.11.7"

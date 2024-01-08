@@ -340,8 +340,7 @@ function mpiprint(str, comms_ctx)
 end
 function read_from_hdf5(REGRID_DIR, hd_outfile_root, time, varname, comms_ctx)
     mpiprint("read_from_hdf5 $comms_ctx", comms_ctx)
-    hdfreader =
-        InputOutput.HDF5Reader(joinpath(REGRID_DIR, hd_outfile_root * "_" * string(time) * ".hdf5"), comms_ctx)
+    hdfreader = InputOutput.HDF5Reader(joinpath(REGRID_DIR, hd_outfile_root * "_" * string(time) * ".hdf5"), comms_ctx)
     mpiprint("after HDF5Reader", comms_ctx)
     mpiprint("hdfreader context $hdfreader.context", comms_ctx)
     field = InputOutput.read_field(hdfreader, varname)

@@ -312,12 +312,12 @@ steps:
       #     slurm_mem: 20GB
 
       - label: "read_field debug script"
-         command: "srun julia --color=yes --project=test test/read_field_debug.jl"
-         artifact_paths: "debug/regrid/*"
-         timeout_in_minutes: 30
-         env:
+        command: "srun julia --color=yes --project=test test/read_field_debug.jl"
+        artifact_paths: "debug/regrid/*"
+        timeout_in_minutes: 30
+        env:
           CLIMACORE_DISTRIBUTED: "MPI"
-         agents:
+        agents:
           slurm_ntasks: 2
           slurm_mem: 16GB
 

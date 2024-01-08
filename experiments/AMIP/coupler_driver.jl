@@ -240,7 +240,11 @@ If evolving, use `ClimaLSM.jl`'s bucket model.
 =#
 using MPI
 function mpiprint(str, comms_ctx)
-    print(string(MPI.Comm_rank(comms_ctx.mpicomm)) * " " * str * "\n")
+    if comms_ctx isa ClimaComms.SingletonCommsContext
+        print(str * "\n")
+    else
+        print(string(MPI.Comm_rank(comms_ctx.mpicomm)) * " " * str * "\n")
+    end
     flush(stdout)
 end
 

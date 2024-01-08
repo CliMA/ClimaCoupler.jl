@@ -330,9 +330,12 @@ the input HDF5 file must be readable by multiple MPI processes.
 # Returns
 - Field or FieldVector
 """
-
 function mpiprint(str, comms_ctx)
-    print(string(MPI.Comm_rank(comms_ctx.mpicomm)) * " " * str * "\n")
+    if comms_ctx isa ClimaComms.SingletonCommsContext
+        print(str * "\n")
+    else
+        print(string(MPI.Comm_rank(comms_ctx.mpicomm)) * " " * str * "\n")
+    end
     flush(stdout)
 end
 function read_from_hdf5(REGRID_DIR, hd_outfile_root, time, varname, comms_ctx)

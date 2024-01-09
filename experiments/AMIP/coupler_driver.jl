@@ -253,7 +253,7 @@ if mode_name == "amip"
     @info "AMIP boundary conditions - do not expect energy conservation"
 
     ## land
-    mpiprint("before bucket init", comms_ctx)
+    # mpiprint("before bucket init", comms_ctx)
     land_sim = bucket_init(
         FT,
         tspan,
@@ -271,7 +271,7 @@ if mode_name == "amip"
     )
 
     ## ocean
-    mpiprint("before SST init", comms_ctx)
+    # mpiprint("before SST init", comms_ctx)
     SST_info = bcfile_info_init(
         FT,
         REGRID_DIR,
@@ -286,11 +286,11 @@ if mode_name == "amip"
         mono = mono_surface,
     )
 
-    mpiprint("before SST update", comms_ctx)
+    # mpiprint("before SST update", comms_ctx)
     update_midmonth_data!(date0, SST_info)
-    mpiprint("after SST update", comms_ctx)
+    # mpiprint("after SST update", comms_ctx)
     SST_init = interpolate_midmonth_to_daily(date0, SST_info)
-    mpiprint("after SST interpolation", comms_ctx)
+    # mpiprint("after SST interpolation", comms_ctx)
     ocean_sim = SurfaceStub((;
         T_sfc = SST_init,
         ρ_sfc = ClimaCore.Fields.zeros(boundary_space),
@@ -305,7 +305,7 @@ if mode_name == "amip"
 
     ## sea ice
     @show comms_ctx
-    mpiprint("before SIC init", comms_ctx)
+    # mpiprint("before SIC init", comms_ctx)
     SIC_info = bcfile_info_init(
         FT,
         REGRID_DIR,
@@ -319,7 +319,7 @@ if mode_name == "amip"
         date0 = date0,
         mono = mono_surface,
     )
-    mpiprint("before SIC update", comms_ctx)
+    # mpiprint("before SIC update", comms_ctx)
     update_midmonth_data!(date0, SIC_info)
     SIC_init = interpolate_midmonth_to_daily(date0, SIC_info)
     ice_fraction = get_ice_fraction.(SIC_init, mono_surface)
@@ -334,7 +334,7 @@ if mode_name == "amip"
     )
 
     ## CO2 concentration
-    mpiprint("before CO2 init", comms_ctx)
+    # mpiprint("before CO2 init", comms_ctx)
     CO2_info = bcfile_info_init(
         FT,
         REGRID_DIR,
@@ -348,7 +348,7 @@ if mode_name == "amip"
         mono = mono_surface,
     )
 
-    mpiprint("before CO2 update", comms_ctx)
+    # mpiprint("before CO2 update", comms_ctx)
     update_midmonth_data!(date0, CO2_info)
     CO2_init = interpolate_midmonth_to_daily(date0, CO2_info)
     update_field!(atmos_sim, Val(:co2_gm), CO2_init)
@@ -625,12 +625,12 @@ function solve_coupler!(cs)
 
         if cs.mode.name == "amip"
 
-            mpiprint("before update midmonths", comms_ctx)
+            # mpiprint("before update midmonths", comms_ctx)
             ## monthly read of boundary condition data for SST and SIC and CO2
             if cs.dates.date[1] >= next_date_in_file(cs.mode.SST_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.SST_info)
             end
-            mpiprint("SST midmonth updated", comms_ctx)
+            # mpiprint("SST midmonth updated", comms_ctx)
             SST_current = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SST_info)
             # @show "SST interpolated"
             update_field!(ocean_sim, Val(:surface_temperature), SST_current)
@@ -639,7 +639,7 @@ function solve_coupler!(cs)
             if cs.dates.date[1] >= next_date_in_file(cs.mode.SIC_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.SIC_info)
             end
-            mpiprint("SIC midmonth updated", comms_ctx)
+            # mpiprint("SIC midmonth updated", comms_ctx)
             SIC_current =
                 get_ice_fraction.(interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info), mono_surface)
             # @show "SIC interpolated"
@@ -649,7 +649,7 @@ function solve_coupler!(cs)
             if cs.dates.date[1] >= next_date_in_file(cs.mode.CO2_info)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.CO2_info)
             end
-            mpiprint("CO2 midmonth updated", comms_ctx)
+            # mpiprint("CO2 midmonth updated", comms_ctx)
             CO2_current = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.CO2_info)
             # @show "CO2 interpolated"
             update_field!(atmos_sim, Val(:co2_gm), CO2_current)
@@ -715,9 +715,9 @@ if haskey(ENV, "CI_PERF_SKIP_COUPLED_RUN") #hide
 end #hide
 
 ## run the coupled simulation
-mpiprint("before coupler solve", comms_ctx)
+# mpiprint("before coupler solve", comms_ctx)
 solve_coupler!(cs);
-mpiprint("after coupler solve", comms_ctx)
+# mpiprint("after coupler solve", comms_ctx)
 
 #=
 ## Postprocessing

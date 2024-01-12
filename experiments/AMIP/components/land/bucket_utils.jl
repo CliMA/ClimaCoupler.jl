@@ -61,11 +61,11 @@ function update_field!(sim::BucketSimulation, ::Val{:radiative_energy_flux}, fie
 end
 function update_field!(sim::BucketSimulation, ::Val{:liquid_precipitation}, field)
     ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
-    parent(sim.integrator.p.bucket.P_liq) .= parent(field ./ ρ_liq)
+    parent(sim.integrator.p.drivers.P_liq) .= parent(field ./ ρ_liq)
 end
 function update_field!(sim::BucketSimulation, ::Val{:snow_precipitation}, field)
     ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
-    parent(sim.integrator.p.bucket.P_snow) .= parent(field ./ ρ_liq)
+    parent(sim.integrator.p.drivers.P_snow) .= parent(field ./ ρ_liq)
 end
 
 function update_field!(sim::BucketSimulation, ::Val{:air_density}, field)

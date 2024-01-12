@@ -1,28 +1,15 @@
 # slab_rhs!
 using ClimaCore
-using ClimaLSM
-import ClimaLSM
 import ClimaTimeSteppers as CTS
 import Thermodynamics as TD
 using Dates: DateTime
-
-include(joinpath(pkgdir(ClimaLSM), "parameters", "create_parameters.jl"))
-using ClimaLSM.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers
 using ClimaComms: AbstractCommsContext
 
-import ClimaLSM.Bucket:
-    surface_fluxes,
-    net_radiation,
-    surface_air_density,
-    liquid_precipitation,
-    BulkAlbedoTemporal,
-    BulkAlbedoStatic,
-    BulkAlbedoFunction,
-    surface_albedo,
-    snow_precipitation
-
-using ClimaLSM:
-    make_exp_tendency, initialize, obtain_surface_space, make_set_initial_aux_state, surface_evaporative_scaling
+import ClimaLSM
+using ClimaLSM.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers
+import ClimaLSM.Bucket: BulkAlbedoTemporal, BulkAlbedoStatic, BulkAlbedoFunction
+using ClimaLSM: make_exp_tendency, initialize, make_set_initial_cache, surface_evaporative_scaling
+include(joinpath(pkgdir(ClimaLSM), "parameters", "create_parameters.jl"))
 
 import ClimaCoupler.Interfacer: LandModelSimulation, get_field, update_field!, name
 import ClimaCoupler.FieldExchanger: step!, reinit!
@@ -61,7 +48,7 @@ multiple dispatch on `surface_fluxes`.
 struct CoupledAtmosphere{FT} <: AbstractAtmosphericDrivers{FT} end
 
 """
-    surface_fluxes(atmos::CoupledAtmosphere{FT},
+    ClimaLSM.turbulent_fluxes(atmos::CoupledAtmosphere{FT},
                     model::BucketModel{FT},
                     Y,
                     p,
@@ -75,7 +62,7 @@ The turbulent energy flux is currently not split up between latent and sensible
 heat fluxes. This will be fixed once `lhf` and `shf` are added to the bucket's
 cache.
 """
-function ClimaLSM.Bucket.surface_fluxes(
+function ClimaLSM.turbulent_fluxes(
     atmos::CoupledAtmosphere{FT},
     model::BucketModel{FT},
     Y,
@@ -92,7 +79,7 @@ function ClimaLSM.Bucket.surface_fluxes(
 end
 
 """
-    net_radiation(radiation::CoupledRadiativeFluxes{FT},
+    ClimaLSM.net_radiation(radiation::CoupledRadiativeFluxes{FT},
                     model::BucketModel{FT},
                     Y,
                     p,
@@ -101,7 +88,7 @@ end
 
 Computes the net radiative flux at the ground for a coupled simulation.
 """
-function ClimaLSM.Bucket.net_radiation(
+function ClimaLSM.net_radiation(
     radiation::CoupledRadiativeFluxes{FT},
     model::BucketModel{FT},
     Y::ClimaCore.Fields.FieldVector,
@@ -124,7 +111,7 @@ end
 an extension of the bucket model method which returns the surface air
 density in the case of a coupled simulation.
 """
-function surface_air_density(
+function ClimaLSM.surface_air_density(
     atmos::CoupledAtmosphere{FT},
     model::BucketModel{FT},
     Y,
@@ -135,25 +122,41 @@ function surface_air_density(
 end
 
 """
-    ClimaLSM.Bucket.liquid_precipitation(atmos::CoupledAtmosphere, p, t)
+    ClimaLSM.liquid_precipitation(atmos::CoupledAtmosphere, p, t)
 
 an extension of the bucket model method which returns the precipitation
 (m/s) in the case of a coupled simulation.
 """
-function liquid_precipitation(atmos::CoupledAtmosphere, p, t)
+function ClimaLSM.liquid_precipitation(atmos::CoupledAtmosphere, p, t)
     # coupler has filled this in
-    return p.bucket.P_liq
+    return p.drivers.P_liq
 end
 
 """
-    ClimaLSM.Bucket.snow_precipitation(atmos::CoupledAtmosphere, p, t)
+    ClimaLSM.snow_precipitation(atmos::CoupledAtmosphere, p, t)
 
 an extension of the bucket model method which returns the precipitation
 (m/s) in the case of a coupled simulation.
 """
-function snow_precipitation(atmos::CoupledAtmosphere, p, t)
+function ClimaLSM.snow_precipitation(atmos::CoupledAtmosphere, p, t)
     # coupler has filled this in
-    return p.bucket.P_snow
+    return p.drivers.P_snow
+end
+
+function ClimaLSM.initialize_drivers(a::CoupledAtmosphere{FT}, coords) where {FT}
+    keys = (:P_liq, :P_snow)
+    types = ([FT for k in keys]...,)
+    domain_names = ([:surface for k in keys]...,)
+    model_name = :drivers
+    # intialize_vars packages the variables as a named tuple,
+    # as part of a named tuple with `model_name` as the key.
+    # Here we just want the variable named tuple itself
+    vars = ClimaLSM.initialize_vars(keys, types, domain_names, coords, model_name)
+    return vars.drivers
+end
+
+function ClimaLSM.initialize_drivers(a::CoupledRadiativeFluxes{FT}, coords) where {FT}
+    return (;)
 end
 
 """
@@ -244,28 +247,20 @@ function bucket_init(
         T_sfc_0 + ΔT
     end
 
-    Y.bucket.W .= 10#0.14
+    Y.bucket.W .= 10.0
     Y.bucket.Ws .= 0.0
     Y.bucket.σS .= 0.0
-    P_liq = zeros(axes(Y.bucket.W)) .+ FT(0.0)
-    P_snow = zeros(axes(Y.bucket.W)) .+ FT(0.0)
-    variable_names = (propertynames(p.bucket)..., :P_liq, :P_snow)
-    orig_fields = map(x -> getproperty(p.bucket, x), propertynames(p.bucket))
-    fields = (orig_fields..., P_liq, P_snow)
-    p_new = (;
-        :bucket => (; zip(variable_names, fields)...),
-        :dss_buffer_2d => p.dss_buffer_2d,
-        :dss_buffer_3d => p.dss_buffer_3d,
-    )
 
     # Set initial aux variable values
-    set_initial_aux_state! = make_set_initial_aux_state(model)
-    set_initial_aux_state!(p_new, Y, tspan[1])
+    set_initial_cache! = make_set_initial_cache(model)
+    set_initial_cache!(p, Y, tspan[1])
+
+    @show propertynames(p)
 
     exp_tendency! = make_exp_tendency(model)
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     bucket_ode_function = CTS.ClimaODEFunction(T_exp! = exp_tendency!, dss! = ClimaLSM.dss!)
-    prob = ODEProblem(bucket_ode_function, Y, tspan, p_new)
+    prob = ODEProblem(bucket_ode_function, Y, tspan, p)
     integrator = init(prob, ode_algo; dt = dt, saveat = saveat, adaptive = false)
 
     sim = BucketSimulation(model, Y, (; domain = domain, soil_depth = d_soil), integrator, area_fraction)

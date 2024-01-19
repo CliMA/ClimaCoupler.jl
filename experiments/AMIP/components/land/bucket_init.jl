@@ -255,8 +255,6 @@ function bucket_init(
     set_initial_cache! = make_set_initial_cache(model)
     set_initial_cache!(p, Y, tspan[1])
 
-    @show propertynames(p)
-
     exp_tendency! = make_exp_tendency(model)
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     bucket_ode_function = CTS.ClimaODEFunction(T_exp! = exp_tendency!, dss! = ClimaLSM.dss!)

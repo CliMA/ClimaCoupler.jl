@@ -1,3 +1,5 @@
+run_name: "slabplanet_albedo_function"
+job_id: "slabplanet_albedo_function"
 moist: "equil"
 vert_diff: "true"
 rad: "gray"
@@ -10,7 +12,5 @@ dt: "200secs"
 mono_surface: true
 h_elem: 4
 precip_model: "0M"
-land_albedo_type: "map_static"
-run_name: "slabplanet_albedo_function"
+land_albedo_type: "function"
 apply_limiter: false
-job_id: "slabplanet_albedo_function"

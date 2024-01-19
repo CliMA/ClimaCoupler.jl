@@ -61,8 +61,6 @@ end
     map = Operators.LinearRemap(spaceB, spaceA)
     coupler_add_map!(coupler, :simA_to_simB, map)
 
-    @show coupler
-
     @testset "coupler_get" begin
         @test simA.data === coupler_get(coupler, :test1)
 

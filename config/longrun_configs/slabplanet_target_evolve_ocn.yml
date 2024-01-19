@@ -8,7 +8,7 @@ dt: "150secs"
 t_end: "200days"
 job_id: "slabplanet_target_evolve_ocn"
 dt_save_to_sol: "10days"
-dt_save_to_disk: "20days"
+dt_save_state_to_disk: "20days"
 apply_limiter: false
 hourly_checkpoint: true
 turb_flux_partition: "CombinedStateFluxes"

@@ -770,6 +770,8 @@ if ClimaComms.iamroot(comms_ctx)
         ) ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
     end
 
-    ## clean up
-    rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
+    ## clean up for interactive runs, retain all output otherwise
+    if isinteractive()
+        rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
+    end
 end

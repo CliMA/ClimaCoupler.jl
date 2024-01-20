@@ -64,8 +64,8 @@ function update_field!(sim::BucketSimulation, ::Val{:liquid_precipitation}, fiel
     parent(sim.integrator.p.drivers.P_liq) .= parent(field ./ ρ_liq)
 end
 function update_field!(sim::BucketSimulation, ::Val{:snow_precipitation}, field)
-    ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
-    parent(sim.integrator.p.drivers.P_snow) .= parent(field ./ ρ_liq)
+    ρ_ice = (LSMP.ρ_cloud_ice(sim.model.parameters.earth_param_set))
+    parent(sim.integrator.p.drivers.P_snow) .= parent(field ./ ρ_ice)
 end
 
 function update_field!(sim::BucketSimulation, ::Val{:air_density}, field)
@@ -127,7 +127,7 @@ function get_field(bucket_sim::BucketSimulation, ::Val{:energy})
 
     e_per_area .+=
         -LSMP.LH_f0(bucket_sim.model.parameters.earth_param_set) .*
-        LSMP.ρ_cloud_liq(bucket_sim.model.parameters.earth_param_set) .* bucket_sim.integrator.u.bucket.σS
+        LSMP.ρ_cloud_ice(bucket_sim.model.parameters.earth_param_set) .* bucket_sim.integrator.u.bucket.σS
     return e_per_area
 end
 
@@ -137,10 +137,10 @@ end
 Extension of Interfacer.get_field that provides the total water contained in the bucket, including the liquid water in snow.
 """
 function get_field(bucket_sim::BucketSimulation, ::Val{:water})
-    ρ_cloud_liq = ClimaLSM.LSMP.ρ_cloud_liq(bucket_sim.model.parameters.earth_param_set)
+    ρ_cloud_ice = ClimaLSM.LSMP.ρ_cloud_ice(bucket_sim.model.parameters.earth_param_set)
     return
     @. (bucket_sim.integrator.u.bucket.σS + bucket_sim.integrator.u.bucket.W + bucket_sim.integrator.u.bucket.Ws) *
-       ρ_cloud_liq  # kg water / m2
+       ρ_cloud_ice  # kg water / m2
 end
 
 """

@@ -219,7 +219,6 @@ function hdwrite_regridfile_rll_to_cgll(
     _, _, row_indices = NCDataset(weightfile, "r") do ds_wt
         (Array(ds_wt["S"]), Array(ds_wt["col"]), Array(ds_wt["row"]))
     end
-    @show out_type
 
     target_unique_idxs =
         out_type == "cgll" ? collect(Spaces.unique_nodes(space2d_undistributed)) :
@@ -482,7 +481,7 @@ function land_fraction(
     file_dates = JLD2.load(joinpath(REGRID_DIR, outfile_root * "_times.jld2"), "times")
     fraction = read_from_hdf5(REGRID_DIR, outfile_root, file_dates[1], varname, comms_ctx)
     fraction = swap_space!(zeros(boundary_space), fraction) # needed if we are reading from previous run
-    return mono ? fraction : binary_mask.(fraction, threshold = threshold)
+    return mono ? fraction : binary_mask.(fraction, threshold)
 end
 
 """
@@ -519,15 +518,27 @@ function update_surface_fractions!(cs::CoupledSimulation)
 end
 
 """
-    binary_mask(var::FT; threshold = 0.5)
+    binary_mask(var, threshold)
 
-Converts a number `var` to 1, if `var` is greater or equal than a given `threshold` value, or 0 otherwise, keeping the same type.
+Converts a number `var` to 1, if `var` is greater or equal than a given `threshold` value,
+or 0 otherwise, keeping the same type.
 
 # Arguments
 - `var`: [FT] value to be converted.
-- `threshold`: [Float] cutoff value for conversions.
+- `threshold`: [FT] cutoff value for conversions.
 """
-binary_mask(var::FT; threshold = FT(0.5)) where {FT} = var < FT(threshold) ? FT(0) : FT(1)
+binary_mask(var, threshold) = var >= threshold ? one(var) : zero(var)
+
+"""
+    binary_mask(var)
+
+Converts a number `var` to 1, if `var` is greater or equal than `eps(FT)`,
+or 0 otherwise, keeping the same type.
+
+# Arguments
+- `var`: [FT] value to be converted.
+"""
+binary_mask(var) = binary_mask(var, eps(eltype(var)))
 
 """
     combine_surfaces!(combined_field::Fields.Field, sims, field_name::Val)

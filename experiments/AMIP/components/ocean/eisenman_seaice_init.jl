@@ -189,7 +189,7 @@ function ∑tendencies(dY, Y, cache, _)
     @. dY.q_sfc = -Y.q_sfc / Δt
 
     # update ice area fraction (binary mask for now)
-    cache.ice_area_fraction .= Regridder.binary_mask.(Y.h_ice, threshold = eps())
+    cache.ice_area_fraction .= Regridder.binary_mask.(Y.h_ice)
 
 end
 

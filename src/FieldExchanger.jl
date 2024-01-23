@@ -149,8 +149,8 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, turbulent_flux
     )
 
     # precipitation
-    Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)
-    Interfacer.update_field!(sim, Val(:snow_precipitation), csf.P_snow)
+    Interfacer.update_field!(sim, Val(:liquid_precipitation), .-csf.P_liq)
+    Interfacer.update_field!(sim, Val(:snow_precipitation), .-csf.P_snow)
 end
 
 """

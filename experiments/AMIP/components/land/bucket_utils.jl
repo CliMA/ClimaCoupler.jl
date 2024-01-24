@@ -54,7 +54,7 @@ function update_field!(sim::BucketSimulation, ::Val{:turbulent_energy_flux}, fie
 end
 function update_field!(sim::BucketSimulation, ::Val{:turbulent_moisture_flux}, field)
     ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
-    parent(sim.integrator.p.bucket.evaporation) .= parent(field ./ ρ_liq)
+    parent(sim.integrator.p.bucket.evaporation) .= parent(field ./ ρ_liq) # TODO: account for sublimation
 end
 function update_field!(sim::BucketSimulation, ::Val{:radiative_energy_flux}, field)
     parent(sim.integrator.p.bucket.R_n) .= parent(field)
@@ -64,9 +64,8 @@ function update_field!(sim::BucketSimulation, ::Val{:liquid_precipitation}, fiel
     parent(sim.integrator.p.drivers.P_liq) .= parent(field ./ ρ_liq)
 end
 function update_field!(sim::BucketSimulation, ::Val{:snow_precipitation}, field)
-    ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
     ρ_ice = (LSMP.ρ_cloud_ice(sim.model.parameters.earth_param_set))
-    parent(sim.integrator.p.drivers.P_snow) .= parent(field ./ ρ_liq)
+    parent(sim.integrator.p.drivers.P_snow) .= parent(field ./ ρ_ice)
 end
 
 function update_field!(sim::BucketSimulation, ::Val{:air_density}, field)
@@ -129,7 +128,7 @@ function get_field(bucket_sim::BucketSimulation, ::Val{:energy})
     e_per_area .+=
         -LSMP.LH_f0(bucket_sim.model.parameters.earth_param_set) .*
         LSMP.ρ_cloud_liq(bucket_sim.model.parameters.earth_param_set) .* bucket_sim.integrator.u.bucket.σS
-        # LSMP.ρ_cloud_ice(bucket_sim.model.parameters.earth_param_set) .* bucket_sim.integrator.u.bucket.σS
+    # LSMP.ρ_cloud_ice(bucket_sim.model.parameters.earth_param_set) .* bucket_sim.integrator.u.bucket.σS
     return e_per_area
 end
 

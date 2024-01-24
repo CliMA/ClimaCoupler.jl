@@ -277,6 +277,13 @@ steps:
       #   command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --coupled true --surface_setup PrescribedSurface --moist equil --vert_diff true --rad allskywithclear --rayleigh_sponge false --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 21600 --dt 200secs --dt_rad 6hours --idealized_insolation true --mono_surface true --h_elem 4 --precip_model 0M --run_name target_params_in_slab1"
       #   artifact_paths: "experiments/AMIP/output/slabplanet/target_params_in_slab1_artifacts/total_energy*.png"
 
+      - label: "AMIP target: albedo from function"
+        key: "target_amip_albedo_function"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/target_amip_albedo_function.yml"
+        artifact_paths: "experiments/AMIP/output/amip/target_amip_albedo_function_artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
       - label: "AMIP - Float64 + hourly checkpoint"
         key: "amip"
         command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/coarse_single_ft64_hourly_checkpoints.yml"
@@ -376,6 +383,17 @@ steps:
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
+
+      # GPU RUNS: AMIP
+      - label: "GPU AMIP target: albedo from function"
+        key: "gpu_target_amip_albedo_function"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_target_amip_albedo_function.yml"
+        artifact_paths: "experiments/AMIP/output/amip/gpu_target_amip_albedo_function_artifacts/*"
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
+
+      - wait
 
   - wait
 

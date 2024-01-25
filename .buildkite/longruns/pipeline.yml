@@ -226,6 +226,18 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
+      
+      - label: "MPI AMIP FINE: new target amip: topo + diagedmf"
+        key: "amip_target_topo_diagedmf"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf.yml"
+        artifact_paths: "experiments/AMIP/output/amip/amip_target_topo_diagedmf_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 20G
 
 
   - group: "Other AMIP targets"

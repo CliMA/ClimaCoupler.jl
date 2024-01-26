@@ -128,7 +128,6 @@ function get_field(bucket_sim::BucketSimulation, ::Val{:energy})
     e_per_area .+=
         -LSMP.LH_f0(bucket_sim.model.parameters.earth_param_set) .*
         LSMP.ρ_cloud_liq(bucket_sim.model.parameters.earth_param_set) .* bucket_sim.integrator.u.bucket.σS
-    # LSMP.ρ_cloud_ice(bucket_sim.model.parameters.earth_param_set) .* bucket_sim.integrator.u.bucket.σS
     return e_per_area
 end
 

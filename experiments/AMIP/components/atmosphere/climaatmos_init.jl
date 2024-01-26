@@ -82,6 +82,9 @@ function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
     parent(integrator.p.radiation.ᶠradiation_flux) .= parent(zeros(axes(integrator.p.radiation.ᶠradiation_flux)))
     integrator.p.precipitation.col_integrated_rain .= FT(0)
     integrator.p.precipitation.col_integrated_snow .= FT(0)
+    integrator.p.precipitation.ᶜS_ρq_tot .= FT(0)
+    integrator.p.precipitation.ᶜ3d_rain .= FT(0)
+    integrator.p.precipitation.ᶜ3d_snow .= FT(0)
 
     sim = ClimaAtmosSimulation(integrator.p.params, Y, spaces, integrator)
 
@@ -336,7 +339,20 @@ function get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:F_radiative_TOA})
     end
 end
 
-get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:energy}) = atmos_sim.integrator.u.c.ρe_tot
+function get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:energy})
+    thermo_params = get_thermo_params(atmos_sim)
+
+    ᶜS_ρq_tot = atmos_sim.integrator.p.precipitation.ᶜS_ρq_tot
+    ᶜts = atmos_sim.integrator.p.precomputed.ᶜts
+    ᶜΦ = atmos_sim.integrator.p.core.ᶜΦ
+
+    # account for total energy and the energy lost due to precipitation
+    if atmos_sim.integrator.p.atmos.precip_model isa CA.Microphysics0Moment
+        atmos_sim.integrator.u.c.ρe_tot .- ᶜS_ρq_tot .* CA.e_tot_0M_precipitation_sources_helper.(Ref(thermo_params),ᶜts, ᶜΦ, ) .* atmos_sim.integrator.dt
+    else
+        atmos_sim.integrator.u.c.ρe_tot
+    end
+end
 
 get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:water}) = atmos_sim.integrator.u.c.ρq_tot
 

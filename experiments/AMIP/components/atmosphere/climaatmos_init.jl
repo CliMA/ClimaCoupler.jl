@@ -348,7 +348,8 @@ function get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:energy})
 
     # account for total energy and the energy lost due to precipitation
     if atmos_sim.integrator.p.atmos.precip_model isa CA.Microphysics0Moment
-        atmos_sim.integrator.u.c.ρe_tot .- ᶜS_ρq_tot .* CA.e_tot_0M_precipitation_sources_helper.(Ref(thermo_params),ᶜts, ᶜΦ, ) .* atmos_sim.integrator.dt
+        atmos_sim.integrator.u.c.ρe_tot .-
+        ᶜS_ρq_tot .* CA.e_tot_0M_precipitation_sources_helper.(Ref(thermo_params), ᶜts, ᶜΦ) .* atmos_sim.integrator.dt
     else
         atmos_sim.integrator.u.c.ρe_tot
     end

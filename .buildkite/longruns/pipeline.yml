@@ -128,8 +128,8 @@ steps:
 
       - label: "ClimaAtmos standalone target"
         command:
-          - srun julia --project=experiments/AMIP/ target/atmos_driver.jl --config_file target/longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_0M.yml
-        artifact_paths: "longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_0M/*"
+          - srun julia --project=experiments/AMIP/ target/atmos_driver.jl --config_file target/longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_tvinsol_0M_slabocean.yml
+        artifact_paths: "longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_tvinsol_0M_slabocean/*"
         env:
           BUILD_HISTORY_HANDLE: ""
           CLIMACORE_DISTRIBUTED: "MPI"

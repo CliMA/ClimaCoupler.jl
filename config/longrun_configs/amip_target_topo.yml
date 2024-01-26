@@ -20,3 +20,4 @@ topography: "Earth"
 topo_smoothing: true
 use_reference_state: false
 rad: "allskywithclear"
+dt_rad: "1hours"

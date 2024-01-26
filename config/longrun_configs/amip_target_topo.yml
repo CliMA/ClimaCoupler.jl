@@ -19,3 +19,4 @@ start_date: "19790301"
 topography: "Earth"
 topo_smoothing: true
 use_reference_state: false
+rad: "allskywithclear"

@@ -95,7 +95,7 @@ and returns the info packaged in a single struct.
 - `boundary_space`: [Spaces.AbstractSpace] the space to which we are mapping.
 - `comms_ctx`: [ClimaComms.AbstractCommsContext] context used for this operation.
 - `interpolate_daily`: [Bool] switch to trigger daily interpolation.
-- `segment_idx0`: [Vector{Int}] index of the file data that is closest to date0.
+- `segment_idx0`: [Vector{Int}] reference date which, after initialization, refers to the the first file date index used minus 1 (segment_idx[1] - 1)
 - `scaling function`: [Function] scales, offsets or transforms `varname`.
 - `land_fraction`: [Fields.field] fraction with 1 = land, 0 = ocean / sea-ice.
 - `date0`: [Dates.DateTime] start date of the file data.
@@ -182,22 +182,54 @@ The times for which data is extracted depends on the specifications in the
 function update_midmonth_data!(date, bcf_info::BCFileInfo{FT}) where {FT}
     # monthly count
     (; bcfile_dir, comms_ctx, hd_outfile_root, varname, all_dates, scaling_function) = bcf_info
-    midmonth_idx = bcf_info.segment_idx[1]
-    midmonth_idx0 = bcf_info.segment_idx0[1]
+    segment_idx = bcf_info.segment_idx[1] # index of the current date in the file. [segment_idx, segment_idx+1] indexes the current segment between which we interpolate
+    segment_idx0 = bcf_info.segment_idx0[1] # reference index (first segment_idx - 1)
 
-    if (midmonth_idx == midmonth_idx0) && (Dates.days(date - all_dates[midmonth_idx]) < 0) # for init
-        midmonth_idx = bcf_info.segment_idx[1] -= Int(1)
-        midmonth_idx = midmonth_idx < Int(1) ? midmonth_idx + Int(1) : midmonth_idx
-        @warn "this time period is before BC data - using file from $(all_dates[midmonth_idx0])"
-        bcf_info.monthly_fields[1] .= scaling_function(
-            Regridder.read_from_hdf5(bcfile_dir, hd_outfile_root, all_dates[Int(midmonth_idx0)], varname, comms_ctx),
-            bcf_info,
-        )
-        bcf_info.monthly_fields[2] .= deepcopy(bcf_info.monthly_fields[1])
-        bcf_info.segment_length .= Int(0)
+    # upon initialization (segment_idx == segment_idx0) with model date before the final file date
+    if (segment_idx == segment_idx0) && !((date - all_dates[end]).value >= 0)
+        #  case 1: model date is before the first segment read from file
+        if (date - all_dates[segment_idx0]).value < 0
+            @warn "This time period is before BC data - using file from $(all_dates[segment_idx0])"
+            bcf_info.monthly_fields[1] .= scaling_function(
+                Regridder.read_from_hdf5(bcfile_dir, hd_outfile_root, all_dates[Int(segment_idx0)], varname, comms_ctx),
+                bcf_info,
+            )
+            bcf_info.monthly_fields[2] .= deepcopy(bcf_info.monthly_fields[1])
+            bcf_info.segment_length .= Int(0)
+            bcf_info.segment_idx[1] -= Int(1)
+            bcf_info.segment_idx0[1] -= Int(2)
 
-    elseif Dates.days(date - all_dates[end - 1]) > 0 # for fini
-        @warn "this time period is after BC data - using file from $(all_dates[end - 1])"
+            # case 2: model date is after the first segment read from file
+        elseif (date - all_dates[Int(segment_idx0) + 1]).value >= 0
+            nearest_idx = argmin(
+                abs.(
+                    parse(FT, TimeManager.datetime_to_strdate(date)) .-
+                    parse.(FT, TimeManager.datetime_to_strdate.(all_dates[:]))
+                ),
+            )
+            @warn "Initializing with `segment_idx = $nearest_idx"
+            bcf_info.segment_idx[1] = nearest_idx
+            bcf_info.segment_idx0[1] = nearest_idx
+            update_midmonth_data!(date, bcf_info)
+
+            # case 3: model date is within the first segment read from file
+        elseif (date - all_dates[segment_idx0]).value >= 0
+            @warn "On $date updating file data reads: file dates = [ $(all_dates[segment_idx]) , $(all_dates[segment_idx+1]) ]"
+            bcf_info.segment_length .= (all_dates[segment_idx + 1] - all_dates[segment_idx]).value
+            bcf_info.monthly_fields[1] .= scaling_function(
+                Regridder.read_from_hdf5(bcfile_dir, hd_outfile_root, all_dates[segment_idx], varname, comms_ctx),
+                bcf_info,
+            )
+            bcf_info.monthly_fields[2] .= scaling_function(
+                Regridder.read_from_hdf5(bcfile_dir, hd_outfile_root, all_dates[segment_idx + 1], varname, comms_ctx),
+                bcf_info,
+            )
+            bcf_info.segment_idx0[1] -= Int(1)
+        end
+
+        # case 4: date is at or after the last date in file
+    elseif (date - all_dates[end]).value >= 0
+        @warn "This time period is after BC data - using file from $(all_dates[end])"
         bcf_info.monthly_fields[1] .= scaling_function(
             Regridder.read_from_hdf5(
                 bcfile_dir,
@@ -211,34 +243,28 @@ function update_midmonth_data!(date, bcf_info::BCFileInfo{FT}) where {FT}
         bcf_info.monthly_fields[2] .= deepcopy(bcf_info.monthly_fields[1])
         bcf_info.segment_length .= Int(0)
 
-        # throw error when there are closer initial indices for the bc file data that matches this date0
-    elseif Dates.days(date - all_dates[Int(midmonth_idx + 1)]) > 2
-        nearest_idx = argmin(
-            abs.(
-                parse(FT, TimeManager.datetime_to_strdate(date)) .-
-                parse.(FT, TimeManager.datetime_to_strdate.(all_dates[:]))
-            ),
-        )
-        # TODO test this
-        bcf_info.segment_idx[1] = midmonth_idx = midmonth_idx0 = nearest_idx
-        @warn "init data does not correspond to start date. Initializing with `SIC_info.segment_idx[1] = midmonth_idx = midmonth_idx0 = $nearest_idx` for this start date"
+        # case 5: model date crosses to the next segment
+    elseif (date - all_dates[Int(segment_idx) + 1]).value >= 0
+        segment_idx = bcf_info.segment_idx[1] += Int(1)
 
-        # date crosses to the next month
-    elseif Dates.days(date - all_dates[Int(midmonth_idx)]) > 0
-        midmonth_idx = bcf_info.segment_idx[1] += Int(1)
-        @warn "On $date updating monthly data files: mid-month dates = [ $(all_dates[Int(midmonth_idx)]) , $(all_dates[Int(midmonth_idx+1)]) ]"
-        bcf_info.segment_length .= (all_dates[Int(midmonth_idx + 1)] - all_dates[Int(midmonth_idx)]).value
+        bcf_info.segment_length .= (all_dates[Int(segment_idx + 1)] - all_dates[Int(segment_idx)]).value
+
         bcf_info.monthly_fields[1] .= scaling_function(
-            Regridder.read_from_hdf5(bcfile_dir, hd_outfile_root, all_dates[Int(midmonth_idx)], varname, comms_ctx),
+            Regridder.read_from_hdf5(bcfile_dir, hd_outfile_root, all_dates[Int(segment_idx)], varname, comms_ctx),
             bcf_info,
         )
         bcf_info.monthly_fields[2] .= scaling_function(
-            Regridder.read_from_hdf5(bcfile_dir, hd_outfile_root, all_dates[Int(midmonth_idx + 1)], varname, comms_ctx),
+            Regridder.read_from_hdf5(bcfile_dir, hd_outfile_root, all_dates[Int(segment_idx + 1)], varname, comms_ctx),
             bcf_info,
         )
 
+        # case 6: undefined condition
     else
-        throw(ErrorException("Check boundary file specification"))
+        throw(
+            ErrorException(
+                "Check boundary file specification: segment: $(all_dates[segment_idx]) - $(all_dates[segment_idx+1]), date: $date",
+            ),
+        )
     end
 end
 

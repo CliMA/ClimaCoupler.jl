@@ -227,60 +227,113 @@ for FT in (Float32, Float64)
                 bcf_info.monthly_fields[1] .= current_fields[1]
                 bcf_info.monthly_fields[2] .= current_fields[2]
                 bcf_info.segment_length[1] = Int(1)
+                bcf_info.segment_idx[1] = bcf_info.segment_idx0[1]
             end
 
             hd_outfile_root = varname * "_cgll"
 
-            #  case 1: segment_idx == segment_idx0, date < all_dates[segment_idx]
+            #  case 1: date < all_dates[segment_idx] (init)
             bcf_info.segment_idx[1] = bcf_info.segment_idx0[1]
             date = DateTime(bcf_info.all_dates[bcf_info.segment_idx[1]] - Dates.Day(1))
             BCReader.update_midmonth_data!(date, bcf_info)
 
-            @test bcf_info.monthly_fields[1] == bcf_info.scaling_function(
-                Regridder.read_from_hdf5(
-                    regrid_dir,
-                    hd_outfile_root,
-                    bcf_info.all_dates[Int(bcf_info.segment_idx0[1])],
-                    varname,
-                    comms_ctx,
-                ),
-                bcf_info,
-            )
+            # unmodified field
             @test bcf_info.monthly_fields[2] == bcf_info.monthly_fields[1]
+            # zero segment length
             @test bcf_info.segment_length[1] == Int(0)
+            # segment index is reset
+            @test bcf_info.segment_idx0[1] == bcf_info.segment_idx[1] - 1
 
-            #  case 2: date > all_dates[end - 1]
-            reset_bcf_info(bcf_info)
-            date = DateTime(bcf_info.all_dates[end - 1] + Dates.Day(1))
-            BCReader.update_midmonth_data!(date, bcf_info)
+            # cases 2 and 3
+            extra_days = [Dates.Day(0), Dates.Day(3)]
+            for extra in extra_days
+                # case 3: (date - all_dates[Int(segment_idx0)]) >= 0 (init)
+                reset_bcf_info(bcf_info)
+                date = DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1]]) + extra
+                BCReader.update_midmonth_data!(date, bcf_info)
 
-            @test bcf_info.monthly_fields[1] == bcf_info.scaling_function(
-                Regridder.read_from_hdf5(
-                    regrid_dir,
-                    hd_outfile_root,
-                    bcf_info.all_dates[Int(length(bcf_info.all_dates))],
-                    varname,
-                    comms_ctx,
-                ),
-                bcf_info,
-            )
-            @test bcf_info.monthly_fields[2] == bcf_info.monthly_fields[1]
-            @test bcf_info.segment_length[1] == Int(0)
+                end_field_c2 = deepcopy(bcf_info.monthly_fields[2])
+                segment_length_c2 = deepcopy(bcf_info.segment_length[1])
+                current_index_c2 = deepcopy(bcf_info.segment_idx[1])
 
-            #  case 3: date - all_dates[segment_idx + 1] > 2
-            reset_bcf_info(bcf_info)
-            date = DateTime(bcf_info.all_dates[bcf_info.segment_idx[1] + 1] + Dates.Day(3))
-            BCReader.update_midmonth_data!(date, bcf_info)
+                # modified field
+                @test end_field_c2 !== bcf_info.monthly_fields[1]
+                # updated segment length
+                @test segment_length_c2[1] !== Int(0)
+                # updated reference segment index
+                @test current_index_c2 == bcf_info.segment_idx0[1] + 1
 
-            nearest_idx = argmin(
-                abs.(
-                    parse(FT, TimeManager.datetime_to_strdate(date)) .-
-                    parse.(FT, TimeManager.datetime_to_strdate.(bcf_info.all_dates[:]))
-                ),
-            )
-            @test bcf_info.segment_idx[1] == bcf_info.segment_idx0[1] == nearest_idx
+                # case 2: (date - all_dates[Int(segment_idx0) + 1]) >= 0 (init)
+                # do not reset segment_idx0. It's current value ensures that we get the same result as case 3
+                reset_bcf_info(bcf_info)
 
-            #  case 4: everything else
+                date = DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1] + 1]) + extra
+                BCReader.update_midmonth_data!(date, bcf_info)
+
+                nearest_idx = argmin(
+                    abs.(
+                        parse(FT, TimeManager.datetime_to_strdate(date)) .-
+                        parse.(FT, TimeManager.datetime_to_strdate.(bcf_info.all_dates[:]))
+                    ),
+                )
+
+                @test bcf_info.segment_idx[1] == bcf_info.segment_idx0[1] + 1 == nearest_idx
+
+                # compare to case 3 (expecting the same result - this defaults to it):
+                @test bcf_info.monthly_fields[1] == bcf_info.scaling_function(
+                    Regridder.read_from_hdf5(
+                        regrid_dir,
+                        hd_outfile_root,
+                        bcf_info.all_dates[Int(bcf_info.segment_idx[1])],
+                        varname,
+                        comms_ctx,
+                    ),
+                    bcf_info,
+                )
+
+                # check case 2 defaults to case 3
+                @test end_field_c2 !== bcf_info.monthly_fields[1]
+                @test segment_length_c2[1] !== Int(0)
+                @test current_index_c2 == bcf_info.segment_idx0[1] + 1
+
+            end
+
+            #  case 4: date > all_dates[end]
+            for extra in extra_days
+                bcf_info.segment_idx0[1] = length(bcf_info.all_dates)
+                reset_bcf_info(bcf_info)
+
+                date = DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1]]) + extra
+                BCReader.update_midmonth_data!(date, bcf_info)
+
+                @test bcf_info.monthly_fields[1] == bcf_info.scaling_function(
+                    Regridder.read_from_hdf5(
+                        regrid_dir,
+                        hd_outfile_root,
+                        bcf_info.all_dates[Int(length(bcf_info.all_dates))],
+                        varname,
+                        comms_ctx,
+                    ),
+                    bcf_info,
+                )
+                @test bcf_info.monthly_fields[2] == bcf_info.monthly_fields[1]
+                @test bcf_info.segment_length[1] == Int(0)
+            end
+
+            #  case 5: Dates.days(date - all_dates[segment_idx]) >= 0
+
+            extra = Dates.Day(3)
+            for extra in extra_days
+                bcf_info.segment_idx0[1] = 2
+                reset_bcf_info(bcf_info)
+
+                date = DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1]] + extra)
+                BCReader.update_midmonth_data!(date, bcf_info)
+
+                @test bcf_info.segment_idx[1] == bcf_info.segment_idx0[1] + 1
+            end
+
+            #  case 6: everything else
             reset_bcf_info(bcf_info)
             bcf_info.segment_idx[1] = bcf_info.segment_idx0[1] + Int(1)
             date = bcf_info.all_dates[bcf_info.segment_idx[1]] - Dates.Day(1)

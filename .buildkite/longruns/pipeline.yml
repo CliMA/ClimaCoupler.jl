@@ -199,9 +199,9 @@ steps:
   #         slurm_mem_per_cpu: 16G
 
 
-  # - group: "Current target tests: AMIP surface"
+  - group: "Current target tests: AMIP surface"
 
-  #   steps:
+    steps:
 
   #     - label: "MPI AMIP FINE: new target amip"
   #       key: "amip_target"
@@ -215,17 +215,17 @@ steps:
   #         slurm_nodes: 4
   #         slurm_mem_per_cpu: 16G
 
-  #     - label: "MPI AMIP FINE: new target amip: topo"
-  #       key: "amip_target_topo"
-  #       command: "mpiexec julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/amip_target_topo.yml"
-  #       artifact_paths: "experiments/AMIP/output/amip/amip_target_topo_artifacts/*"
-  #       env:
-  #         CLIMACORE_DISTRIBUTED: "MPI"
-  #         BUILD_HISTORY_HANDLE: ""
-  #       agents:
-  #         slurm_ntasks_per_node: 16
-  #         slurm_nodes: 4
-  #         slurm_mem_per_cpu: 16G
+      - label: "MPI AMIP FINE: new target amip: topo"
+        key: "amip_target_topo"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/amip_target_topo.yml"
+        artifact_paths: "experiments/AMIP/output/amip/amip_target_topo_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
 
 
   # - group: "Other AMIP targets"

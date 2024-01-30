@@ -36,3 +36,4 @@ z_elem: 63
 z_max: 55000.0
 turb_flux_partition: "CombinedStateFluxes"
 use_reference_state: false
+vert_diff: true

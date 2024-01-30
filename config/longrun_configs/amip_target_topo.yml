@@ -21,3 +21,4 @@ topo_smoothing: true
 use_reference_state: false
 rad: "allskywithclear"
 dt_rad: "1hours"
+dt_cloud_fraction: "1hours"

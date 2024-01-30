@@ -18,3 +18,4 @@ land_albedo_type: "function"
 evolving_ocean: false
 start_date: "19790301"
 dt_rad: "1hours"
+dt_cloud_fraction: "1hours"

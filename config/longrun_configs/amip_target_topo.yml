@@ -1,10 +1,10 @@
 run_name: "amip_target_topo"
 anim: true
-dt_cpl: 75
+dt_cpl: 100
 energy_check: false
 mode_name: "amip"
 mono_surface: false
-dt: "150secs"
+dt: "100secs"
 t_end: "100days"
 job_id: "amip_target_topo"
 dt_save_to_sol: "10days"

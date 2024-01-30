@@ -12,10 +12,11 @@ dt_save_state_to_disk: "20days"
 apply_limiter: false
 hourly_checkpoint: true
 turb_flux_partition: "CombinedStateFluxes"
-atmos_config_file: "config/longrun_configs/longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_0M.yml"
+atmos_config_file: "config/longrun_configs/longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_tvinsol_0M_slabocean.yml"
 surface_setup: "PrescribedSurface"
 land_albedo_type: "map_temporal"
 start_date: "19790301"
 rad: "allskywithclear"
 dt_rad: "1hours"
 dt_cloud_fraction: "1hours"
+prognostic_surface: false

@@ -1,6 +1,7 @@
 anim: true
 approximate_linear_solve_iters: 2
 apply_limiter: false
+atmos_config_file: "config/longrun_configs/longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_0M.yml"
 dt_cloud_fraction: "1hours"
 dt_cpl: 100
 dt_rad: "1hours"
@@ -13,7 +14,7 @@ energy_check: false
 h_elem: 16
 implicit_diffusion: true
 FLOAT_TYPE: "Float32"
-hourly_checkpoint: true
+hourly_checkpoint: false
 idealized_insolation: false
 job_id: "amip_target_topo"
 land_albedo_type: "map_temporal"
@@ -31,7 +32,6 @@ surface_setup: "PrescribedSurface"
 t_end: "100days"
 topo_smoothing: true
 topography: "Earth"
-toml: [toml/longrun_aquaplanet_amip.toml]
 z_elem: 63
 z_max: 55000.0
 turb_flux_partition: "CombinedStateFluxes"

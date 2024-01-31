@@ -31,7 +31,7 @@ surface_setup: "PrescribedSurface"
 t_end: "100days"
 topo_smoothing: true
 topography: "Earth"
-coupler_toml_file: "target/amip.toml"
+toml: [toml/longrun_aquaplanet_amip.toml]
 z_elem: 63
 z_max: 55000.0
 turb_flux_partition: "CombinedStateFluxes"

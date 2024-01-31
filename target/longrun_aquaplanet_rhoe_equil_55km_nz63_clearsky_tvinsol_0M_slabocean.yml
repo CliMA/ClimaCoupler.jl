@@ -22,4 +22,4 @@ coupler_toml_file: "target/longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_tvin
 vert_diff: "FriersonDiffusion"
 z_elem: 63
 z_max: 55000.0
-
+output_default_diagnostics: false

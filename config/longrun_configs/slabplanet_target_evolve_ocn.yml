@@ -17,6 +17,6 @@ mono_surface: false
 run_name: "slabplanet_target_evolve_ocn"
 start_date: "19790301"
 surface_setup: "PrescribedSurface"
-t_end: "200days"
+t_end: "100days"
 turb_flux_partition: "CombinedStateFluxes"
 vert_diff: "true"

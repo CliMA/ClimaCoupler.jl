@@ -7,7 +7,7 @@ dt_rad: "1hours"
 dt_save_state_to_disk: "20days"
 dt_save_to_sol: "10days"
 dt: "100secs"
-energy_check: true
+energy_check: false
 evolving_ocean: true
 hourly_checkpoint: true
 job_id: "slabplanet_target_evolve_ocn"

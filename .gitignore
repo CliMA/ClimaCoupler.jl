@@ -51,3 +51,6 @@ testdel.jl
 # ignore vscode artifacts
 *.vscode
 *.DS
+
+# PythonPlot resources
+test/.CondaPkg/*

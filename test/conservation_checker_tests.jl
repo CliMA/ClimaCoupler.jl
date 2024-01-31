@@ -13,8 +13,12 @@ using Test
 using NCDatasets
 using Dates
 using Downloads
+using Plots
 
 import ClimaCoupler.Interfacer: AtmosModelSimulation, SurfaceModelSimulation, SurfaceStub, get_field, name
+
+# Change plotting backend to PythonPlot to avoid GR/MacOS issues
+Plots.pythonplot()
 
 REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regrid_tmp/")
 

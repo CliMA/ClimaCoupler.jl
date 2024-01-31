@@ -18,6 +18,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to check energy conservation"
         arg_type = Bool
         default = false
+        "--conservation_softfail"
+        help = "Boolean flag indicating whether to soft fail on conservation errors"
+        arg_type = Bool
+        default = false
         "--mode_name"
         help = "Mode of coupled simulation. [`amip`, `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`, `slabplanet_eisenman`]"
         arg_type = String

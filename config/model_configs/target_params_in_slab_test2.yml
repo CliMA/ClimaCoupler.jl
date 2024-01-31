@@ -18,3 +18,4 @@ precip_model: "0M"
 run_name: "target_params_in_slab_test2"
 apply_limiter: false
 job_id: "target_params_in_slab_test2"
+conservation_softfail: true

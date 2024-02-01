@@ -23,3 +23,4 @@ topography: "Earth"
 turb_flux_partition: "CombinedStateFluxes"
 use_reference_state: false
 vert_diff: "true"
+FLOAT_TYPE: "Float32"

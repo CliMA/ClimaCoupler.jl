@@ -13,7 +13,6 @@ dz_top: 3000.0
 energy_check: false
 h_elem: 16
 implicit_diffusion: true
-FLOAT_TYPE: "Float32"
 hourly_checkpoint: false
 idealized_insolation: false
 job_id: "amip_target_topo"
@@ -27,7 +26,7 @@ precip_model: "0M"
 rad: "allskywithclear"
 rayleigh_sponge: true
 run_name: "amip_target_topo"
-start_date: "19790828"
+start_date: "19790301"
 surface_setup: "PrescribedSurface"
 t_end: "100days"
 topo_smoothing: true

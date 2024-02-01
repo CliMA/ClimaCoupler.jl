@@ -162,11 +162,16 @@ function hdwrite_regridfile_rll_to_cgll(
         space2d = space
     end
 
+    # If doesn't make sense to regrid with GPUs/MPI processes
+    cpu_context = ClimaComms.SingletonCommsContext(ClimaComms.CPUSingleThreaded())
+
     topology = Topologies.Topology2D(
+        cpu_context,
         Spaces.topology(space2d).mesh,
         Topologies.spacefillingcurve(Spaces.topology(space2d).mesh),
     )
     Nq = Spaces.Quadratures.polynomial_degree(Spaces.quadrature_style(space2d)) + 1
+
     space2d_undistributed = Spaces.SpectralElementSpace2D(topology, Spaces.Quadratures.GLL{Nq}())
 
     if space isa Spaces.ExtrudedFiniteDifferenceSpace
@@ -240,14 +245,7 @@ function hdwrite_regridfile_rll_to_cgll(
     )
 
     map(
-        x -> write_to_hdf5(
-            REGRID_DIR,
-            hd_outfile_root,
-            times[x],
-            offline_fields[x],
-            varname,
-            ClimaComms.SingletonCommsContext(),
-        ),
+        x -> write_to_hdf5(REGRID_DIR, hd_outfile_root, times[x], offline_fields[x], varname, cpu_context),
         1:length(times),
     )
     jldsave(joinpath(REGRID_DIR, hd_outfile_root * "_times.jld2"); times = times)
@@ -483,7 +481,7 @@ function land_fraction(
     file_dates = JLD2.load(joinpath(REGRID_DIR, outfile_root * "_times.jld2"), "times")
     fraction = read_from_hdf5(REGRID_DIR, outfile_root, file_dates[1], varname, comms_ctx)
     fraction = swap_space!(zeros(boundary_space), fraction) # needed if we are reading from previous run
-    return mono ? fraction : binary_mask.(fraction, threshold = threshold)
+    return mono ? fraction : binary_mask.(fraction, threshold)
 end
 
 """
@@ -520,15 +518,27 @@ function update_surface_fractions!(cs::CoupledSimulation)
 end
 
 """
-    binary_mask(var::FT; threshold = 0.5)
+    binary_mask(var, threshold)
 
-Converts a number `var` to 1, if `var` is greater or equal than a given `threshold` value, or 0 otherwise, keeping the same type.
+Converts a number `var` to 1, if `var` is greater or equal than a given `threshold` value,
+or 0 otherwise, keeping the same type.
 
 # Arguments
 - `var`: [FT] value to be converted.
-- `threshold`: [Float] cutoff value for conversions.
+- `threshold`: [FT] cutoff value for conversions.
 """
-binary_mask(var::FT; threshold = FT(0.5)) where {FT} = var < FT(threshold) ? FT(0) : FT(1)
+binary_mask(var, threshold) = var >= threshold ? one(var) : zero(var)
+
+"""
+    binary_mask(var)
+
+Converts a number `var` to 1, if `var` is greater or equal than `eps(FT)`,
+or 0 otherwise, keeping the same type.
+
+# Arguments
+- `var`: [FT] value to be converted.
+"""
+binary_mask(var) = binary_mask(var, eps(eltype(var)))
 
 """
     combine_surfaces!(combined_field::Fields.Field, sims, field_name::Val)

@@ -36,30 +36,31 @@ struct OceanSlabParameters{FT <: AbstractFloat}
 end
 name(::SlabOceanSimulation) = "SlabOceanSimulation"
 
-# init simulation
-function slab_ocean_space_init(::Type{FT}, space, p) where {FT}
+"""
+    temp_anomaly(coord)
 
+Calculates a an anomaly to be added to the initial condition for temperature.
+This default case includes only an anomaly at the tropics.
+"""
+function temp_anomaly(coord)
+    # include tropics anomaly
+    anom = FT(29 * exp(-coord.lat^2 / (2 * 26^2)))
+    return anom
+end
+
+"""
+    slab_ocean_space_init(space, params)
+
+Initialize the slab ocean prognostic variable (temperature), including an
+anomaly in the tropics by default.
+"""
+function slab_ocean_space_init(space, params)
+    FT = ClimaCore.Spaces.undertype(space)
     coords = ClimaCore.Fields.coordinate_field(space)
 
     # initial condition
-    T_sfc = map(coords) do coord
-
-        T_sfc_0 = FT(p.T_init) #- FT(275) # close to the average of T_1 in atmos
-        anomaly = false
-        anomaly_tropics = true
-        anom = FT(0)
-        radlat = coord.lat / FT(180) * pi
-        if anomaly == true
-            lat_0 = FT(60) / FT(180) * pi
-            lon_0 = FT(-90) / FT(180) * pi
-            radlon = coord.long / FT(180) * pi
-            stdev = FT(5) / FT(180) * pi
-            anom = anom_ampl * exp(-((radlat - lat_0)^2 / 2stdev^2 + (radlon - lon_0)^2 / 2stdev^2))
-        elseif anomaly_tropics == true
-            anom = FT(29) * exp(-coord.lat^2 / (2 * 26^2))
-        end
-        T_sfc = T_sfc_0 + anom
-    end
+    T_sfc = ClimaCore.Fields.zeros(space) .+ params.T_init # FT(271) close to the average of T_1 in atmos
+    @. T_sfc += temp_anomaly(coords)
 
     # prognostic variable
     Y = ClimaCore.Fields.FieldVector(T_sfc = T_sfc)
@@ -72,8 +73,7 @@ function slab_ocean_rhs!(dY, Y, cache, t)
     p, F_turb_energy, F_radiative, area_fraction = cache
     FT = eltype(Y.T_sfc)
     rhs = @. -(F_turb_energy + F_radiative) / (p.h * p.ρ * p.c)
-    parent(dY.T_sfc) .= parent(rhs .* Regridder.binary_mask.(area_fraction, threshold = eps(FT))) * p.evolving_switch
-
+    @. dY.T_sfc = rhs * Regridder.binary_mask(area_fraction) * p.evolving_switch
     @. cache.q_sfc = TD.q_vap_saturation_generic.(cache.thermo_params, Y.T_sfc, cache.ρ_sfc, TD.Liquid())
 end
 
@@ -98,7 +98,7 @@ function ocean_init(
     params =
         OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(271.0), FT(1e-5), FT(1e-5), FT(0.38), evolving_switch)
 
-    Y, space = slab_ocean_space_init(FT, space, params)
+    Y, space = slab_ocean_space_init(space, params)
     cache = (
         params = params,
         F_turb_energy = ClimaCore.Fields.zeros(space),

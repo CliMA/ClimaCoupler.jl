@@ -77,9 +77,8 @@ function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
     # set initial fluxes to zero
     @. integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot = Geometry.Covariant3Vector(FT(0.0))
     @. integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot = Geometry.Covariant3Vector(FT(0.0))
-    @. integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ.components =
-        zeros(axes(integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ.components))
-    parent(integrator.p.radiation.ᶠradiation_flux) .= parent(zeros(axes(integrator.p.radiation.ᶠradiation_flux)))
+    @. integrator.p.radiation.ᶠradiation_flux = Geometry.WVector(FT(0))
+    integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ.components .= Ref(SMatrix{1, 2}([FT(0), FT(0)]))
     integrator.p.precipitation.col_integrated_rain .= FT(0)
     integrator.p.precipitation.col_integrated_snow .= FT(0)
 
@@ -309,25 +308,23 @@ function get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:F_radiative_TOA})
     # save radiation source
     if radiation != nothing
         face_space = axes(atmos_sim.integrator.u.f)
-        z = parent(Fields.coordinate_field(face_space).z)
-        Δz_top = round(FT(0.5) * (z[end, 1, 1, 1, 1] - z[end - 1, 1, 1, 1, 1]))
-        n_faces = length(z[:, 1, 1, 1, 1])
+        nz_faces = length(Spaces.vertical_topology(face_space).mesh.faces)
 
         LWd_TOA = Fields.level(
             CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_lw_flux_dn), face_space),
-            n_faces - half,
+            nz_faces - half,
         )
         LWu_TOA = Fields.level(
             CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_lw_flux_up), face_space),
-            n_faces - half,
+            nz_faces - half,
         )
         SWd_TOA = Fields.level(
             CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_sw_flux_dn), face_space),
-            n_faces - half,
+            nz_faces - half,
         )
         SWu_TOA = Fields.level(
             CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_sw_flux_up), face_space),
-            n_faces - half,
+            nz_faces - half,
         )
 
         return @. -(LWd_TOA + SWd_TOA - LWu_TOA - SWu_TOA) # [W/m^2]

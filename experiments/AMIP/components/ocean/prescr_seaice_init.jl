@@ -78,8 +78,9 @@ function ice_rhs!(du, u, p, _)
     rhs = @. (-F_turb_energy - F_radiative + F_conductive) / (params.h * params.ρ * params.c)
 
     # do not count tendencies that lead to temperatures above freezing, and mask out no-ice areas
-    area_mask = Regridder.binary_mask.(area_fraction, threshold = eps(FT))
-    unphysical = @. Regridder.binary_mask.(T_freeze - (Y.T_sfc + FT(rhs) * FT(p.dt)), threshold = FT(0)) .* area_mask
+    area_mask = Regridder.binary_mask.(area_fraction)
+    threshold = zero(FT)
+    unphysical = @. Regridder.binary_mask.(T_freeze - (Y.T_sfc + FT(rhs) * FT(p.dt)), threshold) .* area_mask
     parent(dY.T_sfc) .= parent(rhs .* unphysical)
 
     @. p.q_sfc = TD.q_vap_saturation_generic.(p.thermo_params, Y.T_sfc, p.ρ_sfc, TD.Ice())
@@ -129,7 +130,7 @@ clean_sic(SIC, _info) = swap_space!(zeros(axes(_info.land_fraction)), SIC) ./ fl
 
 # setting that SIC < 0.5 is counted as ocean if binary remapping.
 get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
-    mono ? h_ice : Regridder.binary_mask(h_ice, threshold = FT(threshold))
+    mono ? h_ice : Regridder.binary_mask(h_ice, threshold)
 
 # extensions required by Interfacer
 get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc

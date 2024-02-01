@@ -112,7 +112,7 @@ function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf, turbulent_
 end
 
 """
-    update_sim!(sim::SurfaceModelSimulation, csf, area_fraction = nothing)
+    update_sim!(sim::SurfaceModelSimulation, csf, area_fraction)
 
 Updates the surface component model cache with the current coupler fields of F_turb_energy, F_radiative, F_turb_moisture, P_liq, and ρ_sfc.
 
@@ -120,33 +120,24 @@ Updates the surface component model cache with the current coupler fields of F_t
 - `sim`: [Interfacer.SurfaceModelSimulation] containing a surface model simulation object.
 - `csf`: [NamedTuple] containing coupler fields.
 """
-function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, turbulent_fluxes, area_fraction = nothing)
+function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, turbulent_fluxes, area_fraction)
     FT = eltype(area_fraction)
 
     # atmospheric surface density
     Interfacer.update_field!(sim, Val(:air_density), csf.ρ_sfc)
 
     # turbulent fluxes
+    mask = Regridder.binary_mask.(area_fraction)
+
     # when PartitionedStateFluxes, turbulent fluxes are updated during the flux calculation
     if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
-        Interfacer.update_field!(
-            sim,
-            Val(:turbulent_energy_flux),
-            FT.(Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_turb_energy),
-        )
-        Interfacer.update_field!(
-            sim,
-            Val(:turbulent_moisture_flux),
-            FT.(Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_turb_moisture),
-        )
+        F_turb_energy_masked = FT.(mask .* csf.F_turb_energy)
+        Interfacer.update_field!(sim, Val(:turbulent_energy_flux), F_turb_energy_masked)
+        Interfacer.update_field!(sim, Val(:turbulent_moisture_flux), FT.(mask .* csf.F_turb_moisture))
     end
 
     # radiative fluxes
-    Interfacer.update_field!(
-        sim,
-        Val(:radiative_energy_flux),
-        FT.(Regridder.binary_mask.(area_fraction, threshold = eps(FT)) .* csf.F_radiative),
-    )
+    Interfacer.update_field!(sim, Val(:radiative_energy_flux), FT.(mask .* csf.F_radiative))
 
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)

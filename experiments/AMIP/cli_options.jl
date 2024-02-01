@@ -75,7 +75,7 @@ function argparse_settings()
         arg_type = String
         default = "sphere"
         "--land_temperature_anomaly"
-        help = "Type of temperature anomaly for bucket model. [`zonally_asymmetric`, `amip`, `aquaplanet` (default)]"
+        help = "Type of temperature anomaly for bucket model. [`amip`, `aquaplanet` (default)]"
         arg_type = String
         default = "aquaplanet"
     end

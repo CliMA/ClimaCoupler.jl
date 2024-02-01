@@ -5,7 +5,10 @@
 # (See also Base.type_limited_string_from_context())
 redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(false)))
 
-include("mpi/mpi_init.jl") # setup MPI context for distributed runs #hide
+# Set up context for CPU single thread/CPU with MPI/GPU
+using ClimaComms
+comms_ctx = ClimaComms.context()
+const pid, nprocs = ClimaComms.init(comms_ctx)
 
 # # AMIP Driver
 
@@ -713,8 +716,8 @@ if ClimaComms.iamroot(comms_ctx)
         )
     end
 
-    ## sample animations
-    if !is_distributed && config_dict["anim"]
+    ## sample animations (not compatible with MPI)
+    if !CA.is_distributed(comms_ctx) && config_dict["anim"]
         @info "Animations"
         include("user_io/viz_explorer.jl")
         plot_anim(cs, COUPLER_ARTIFACTS_DIR)

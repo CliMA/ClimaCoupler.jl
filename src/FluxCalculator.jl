@@ -154,7 +154,7 @@ function partitioned_turbulent_fluxes!(
                 # get area fraction (min = 0, max = 1)
                 area_fraction = Interfacer.get_field(sim, Val(:area_fraction), colidx)
                 # get area mask [0, 1], where area_mask = 1 if area_fraction > 0
-                area_mask = Regridder.binary_mask.(area_fraction, threshold = eps())
+                area_mask = Regridder.binary_mask.(area_fraction)
 
                 if !iszero(parent(area_mask))
 

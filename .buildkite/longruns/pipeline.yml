@@ -122,9 +122,9 @@ steps:
       #     slurm_nodes: 1
       #     slurm_mem_per_cpu: 16G
 
-  - group: "Current target tests: idealized surface"
+  # - group: "Current target tests: idealized surface"
 
-    steps:
+  #   steps:
 
       # - label: "ClimaAtmos standalone target"
       #   command:

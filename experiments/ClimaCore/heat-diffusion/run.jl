@@ -376,5 +376,4 @@ Plots.png(
 #src     end
 #src end
 #src
-#src dirname = "heat"
-#src linkfig("output/$(dirname)/heat_end.png", "Heat End Simulation")
+#src linkfig(ARTIFACTS_DIR * "/heat_end.png", "Heat End Simulation")

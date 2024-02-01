@@ -13,7 +13,6 @@ job_id: "amip_target"
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
-netcdf_interpolate_z_over_msl: true
 rad: "allskywithclear"
 run_name: "amip_target"
 start_date: "19790301"

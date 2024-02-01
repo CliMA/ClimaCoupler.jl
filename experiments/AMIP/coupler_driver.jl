@@ -174,6 +174,7 @@ restart_dir = config_dict["restart_dir"]
 restart_t = Int(config_dict["restart_t"])
 evolving_ocean = config_dict["evolving_ocean"]
 
+using Pkg
 @info Pkg.status()
 
 ## I/O directory setup

@@ -354,6 +354,14 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
+      - label: "GPU Slabplanet: albedo from static map"
+        key: "gpu_slabplanet_albedo_static_map"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/slabplanet_albedo_static_map.yml"
+        artifact_paths: "experiments/AMIP/output/gpu/slabplanet/slabplanet_albedo_static_map_artifacts/*"
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
+
   - wait
 
   # plot job performance history

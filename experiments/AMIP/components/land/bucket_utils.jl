@@ -50,11 +50,11 @@ get_field(sim::BucketSimulation, ::Val{:area_fraction}) = sim.area_fraction
 get_field(sim::BucketSimulation, ::Val{:air_density}) = sim.integrator.p.bucket.ρ_sfc
 
 function update_field!(sim::BucketSimulation, ::Val{:turbulent_energy_flux}, field)
-    parent(sim.integrator.p.bucket.turbulent_energy_flux) .= parent(field)
+    parent(sim.integrator.p.bucket.turbulent_fluxes.shf) .= parent(field)
 end
 function update_field!(sim::BucketSimulation, ::Val{:turbulent_moisture_flux}, field)
     ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
-    parent(sim.integrator.p.bucket.evaporation) .= parent(field ./ ρ_liq) # TODO: account for sublimation
+    parent(sim.integrator.p.bucket.turbulent_fluxes.vapor_flux) .= parent(field ./ ρ_liq) # TODO: account for sublimation
 end
 function update_field!(sim::BucketSimulation, ::Val{:radiative_energy_flux}, field)
     parent(sim.integrator.p.bucket.R_n) .= parent(field)
@@ -79,8 +79,8 @@ reinit!(sim::BucketSimulation) = reinit!(sim.integrator)
 # extensions required by FluxCalculator (partitioned fluxes)
 function update_turbulent_fluxes_point!(sim::BucketSimulation, fields::NamedTuple, colidx::Fields.ColumnIndex)
     (; F_turb_energy, F_turb_moisture) = fields
-    sim.integrator.p.bucket.turbulent_energy_flux[colidx] .= F_turb_energy
-    sim.integrator.p.bucket.evaporation[colidx] .=
+    sim.integrator.p.bucket.turbulent_fluxes.shf[colidx] .= F_turb_energy
+    sim.integrator.p.bucket.turbulent_fluxes.vapor_flux[colidx] .=
         F_turb_moisture ./ LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
     return nothing
 end

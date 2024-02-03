@@ -8,7 +8,14 @@ using ClimaComms: AbstractCommsContext
 import ClimaLSM
 using ClimaLSM.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers
 import ClimaLSM.Bucket: BulkAlbedoTemporal, BulkAlbedoStatic, BulkAlbedoFunction
-using ClimaLSM: make_exp_tendency, initialize, make_set_initial_cache, surface_evaporative_scaling
+using ClimaLSM:
+    make_exp_tendency,
+    initialize,
+    make_set_initial_cache,
+    surface_evaporative_scaling,
+    CoupledRadiativeFluxes,
+    CoupledAtmosphere
+import ClimaLSM.Parameters as LSMP
 include(joinpath(pkgdir(ClimaLSM), "parameters", "create_parameters.jl"))
 
 import ClimaCoupler.Interfacer: LandModelSimulation, get_field, update_field!, name
@@ -31,117 +38,14 @@ name(::BucketSimulation) = "BucketSimulation"
 
 include("./bucket_utils.jl")
 
-"""
-    CoupledRadiativeFluxes{FT} <: AbstractRadiativeDrivers{FT}
-
-To be used when coupling to an atmosphere model; internally, used for
-multiple dispatch on `surface_fluxes`.
-"""
-struct CoupledRadiativeFluxes{FT} <: AbstractRadiativeDrivers{FT} end
-
-"""
-    CoupledAtmosphere{FT} <: AbstractAtmosphericDrivers{FT}
-
-To be used when coupling to an atmosphere model; internally, used for
-multiple dispatch on `surface_fluxes`.
-"""
-struct CoupledAtmosphere{FT} <: AbstractAtmosphericDrivers{FT} end
-
-"""
-    ClimaLSM.turbulent_fluxes(atmos::CoupledAtmosphere{FT},
-                    model::BucketModel{FT},
-                    Y,
-                    p,
-                    ) where {FT <: AbstractFloat}
-
-Computes the turbulent surface fluxes terms at the ground for a coupled simulation.
-Note that `Ch` is not used with the current implementation of the bucket model,
-but will be used once the canopy is incorporated.
-
-The turbulent energy flux is currently not split up between latent and sensible
-heat fluxes. This will be fixed once `lhf` and `shf` are added to the bucket's
-cache.
-"""
-function ClimaLSM.turbulent_fluxes(
-    atmos::CoupledAtmosphere{FT},
-    model::BucketModel{FT},
-    Y,
-    p,
-    _...,
-) where {FT <: AbstractFloat}
-    space = model.domain.space.surface
-    return (
-        lhf = ClimaCore.Fields.zeros(space),
-        shf = p.bucket.turbulent_energy_flux,
-        vapor_flux = p.bucket.evaporation,
-        Ch = ClimaCore.Fields.similar(p.bucket.evaporation),
-    )
-end
-
-"""
-    ClimaLSM.net_radiation(radiation::CoupledRadiativeFluxes{FT},
-                    model::BucketModel{FT},
-                    Y,
-                    p,
-                    _...,
-                    ) where {FT <: AbstractFloat}
-
-Computes the net radiative flux at the ground for a coupled simulation.
-"""
-function ClimaLSM.net_radiation(
-    radiation::CoupledRadiativeFluxes{FT},
-    model::BucketModel{FT},
-    Y::ClimaCore.Fields.FieldVector,
-    p::NamedTuple,
-    _...,
-) where {FT <: AbstractFloat}
+# TODO remove this function after ClimaLand v0.8.1 update
+function ClimaLSM.turbulent_fluxes(atmos::CoupledAtmosphere, model::BucketModel, Y, p, t)
     # coupler has done its thing behind the scenes already
-    return p.bucket.R_n
+    model_name = ClimaLSM.name(model)
+    model_cache = getproperty(p, model_name)
+    return model_cache.turbulent_fluxes
 end
 
-
-"""
-    ClimaLSM.surface_air_density(
-                    atmos::CoupledAtmosphere{FT},
-                    model::BucketModel{FT},
-                    Y,
-                    p,
-                    _...,
-                )
-an extension of the bucket model method which returns the surface air
-density in the case of a coupled simulation.
-"""
-function ClimaLSM.surface_air_density(
-    atmos::CoupledAtmosphere{FT},
-    model::BucketModel{FT},
-    Y,
-    p,
-    _...,
-) where {FT <: AbstractFloat}
-    return p.bucket.ρ_sfc
-end
-
-"""
-    ClimaLSM.liquid_precipitation(atmos::CoupledAtmosphere, p, t)
-
-an extension of the bucket model method which returns the precipitation
-(m/s) in the case of a coupled simulation.
-"""
-function ClimaLSM.liquid_precipitation(atmos::CoupledAtmosphere, p, t)
-    # coupler has filled this in
-    return p.drivers.P_liq
-end
-
-"""
-    ClimaLSM.snow_precipitation(atmos::CoupledAtmosphere, p, t)
-
-an extension of the bucket model method which returns the precipitation
-(m/s) in the case of a coupled simulation.
-"""
-function ClimaLSM.snow_precipitation(atmos::CoupledAtmosphere, p, t)
-    # coupler has filled this in
-    return p.drivers.P_snow
-end
 
 function ClimaLSM.initialize_drivers(a::CoupledAtmosphere{FT}, coords) where {FT}
     keys = (:P_liq, :P_snow)
@@ -155,9 +59,6 @@ function ClimaLSM.initialize_drivers(a::CoupledAtmosphere{FT}, coords) where {FT
     return vars.drivers
 end
 
-function ClimaLSM.initialize_drivers(a::CoupledRadiativeFluxes{FT}, coords) where {FT}
-    return (;)
-end
 
 """
     temp_anomaly_aquaplanet(coord)

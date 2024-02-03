@@ -233,7 +233,8 @@ relative to the initial value;
 """
 function plot_global_conservation(
     cc::AbstractConservationCheck,
-    coupler_sim::Interfacer.CoupledSimulation;
+    coupler_sim::Interfacer.CoupledSimulation,
+    softfail = false;
     figname1 = "total.png",
     figname2 = "total_log.png",
 )
@@ -247,6 +248,8 @@ function plot_global_conservation(
     total = ccs.total  # total
 
     var_name = Interfacer.name(cc)
+    cum_total = [0.0]
+
     Plots.plot(
         days,
         total .- total[1],
@@ -260,23 +263,27 @@ function plot_global_conservation(
         global_field = getproperty(ccs, Symbol(sim_name))
         diff_global_field = (global_field .- global_field[1])
         Plots.plot!(days, diff_global_field[1:length(days)], label = sim_name)
+        cum_total .+= abs.(global_field[end])
     end
     if cc isa EnergyConservationCheck
         global_field = ccs.toa_net_source
         diff_global_field = (global_field .- global_field[1])
         Plots.plot!(days, diff_global_field[1:length(days)], label = "toa_net")
+        cum_total .+= abs.(global_field[end])
     end
     Plots.savefig(figname1)
 
+    # use the cumulative global sum at the final time step as a reference for the error calculation
+    rse = abs.((total .- total[1]) ./ cum_total)
+
     # evolution of log error of total
-    Plots.plot(
-        days,
-        log.(abs.(total .- total[1]) / abs(total[1])),
-        label = "tot",
-        xlabel = "time [days]",
-        ylabel = "log( | e(t) - e(t=0)| / e(t=0))",
-    )
+    Plots.plot(days, log.(rse), label = "rs error", xlabel = "time [days]", ylabel = "log( |x(t) - x(t=0)| / Σx(t=T) )")
     Plots.savefig(figname2)
+
+    # check that the relative error is small (TODO: reduce this to sqrt(eps(FT)))
+    if !softfail
+        @assert rse[end] < 1e-3
+    end
 end
 
 end # module

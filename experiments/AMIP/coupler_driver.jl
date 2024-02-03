@@ -705,12 +705,14 @@ if ClimaComms.iamroot(comms_ctx)
         plot_global_conservation(
             cs.conservation_checks.energy,
             cs,
+            config_dict["conservation_softfail"],
             figname1 = joinpath(COUPLER_ARTIFACTS_DIR, "total_energy_bucket.png"),
             figname2 = joinpath(COUPLER_ARTIFACTS_DIR, "total_energy_log_bucket.png"),
         )
         plot_global_conservation(
             cs.conservation_checks.water,
             cs,
+            config_dict["conservation_softfail"],
             figname1 = joinpath(COUPLER_ARTIFACTS_DIR, "total_water_bucket.png"),
             figname2 = joinpath(COUPLER_ARTIFACTS_DIR, "total_water_log_bucket.png"),
         )
@@ -780,6 +782,8 @@ if ClimaComms.iamroot(comms_ctx)
         ) ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
     end
 
-    ## clean up
-    rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
+    ## clean up for interactive runs, retain all output otherwise
+    if isinteractive()
+        rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
+    end
 end

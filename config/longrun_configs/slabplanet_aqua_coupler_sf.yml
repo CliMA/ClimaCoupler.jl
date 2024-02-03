@@ -19,3 +19,4 @@ surface_setup: "PrescribedSurface"
 land_albedo_type: "function"
 evolving_ocean: false
 start_date: "19790301"
+conservation_softfail: true

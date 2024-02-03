@@ -15,3 +15,4 @@ precip_model: "0M"
 anim: true
 apply_limiter: false
 job_id: "slabplanet_eisenman"
+conservation_softfail: true

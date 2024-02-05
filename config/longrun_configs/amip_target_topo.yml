@@ -1,14 +1,14 @@
+FLOAT_TYPE: "Float32"
 anim: true
 apply_limiter: false
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_0M_earth.yml"
+dt: "100secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: 100
 dt_rad: "1hours"
 dt_save_state_to_disk: "20days"
 dt_save_to_sol: "10days"
-dt: "100secs"
 energy_check: false
-FLOAT_TYPE: "Float32"
 hourly_checkpoint: true
 job_id: "amip_target_topo"
 land_albedo_type: "map_temporal"

@@ -77,10 +77,7 @@ for FT in (Float32, Float64)
 
     # test for a simple generic surface model
     @testset "get_field for a SurfaceStub" begin
-        toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
-        aliases = string.(fieldnames(TDP.ThermodynamicsParameters))
-        param_pairs = CP.get_parameter_values!(toml_dict, aliases, "Thermodynamics")
-        thermo_params = TDP.ThermodynamicsParameters{FT}(; param_pairs...)
+        thermo_params = TDP.ThermodynamicsParameters(FT)
 
         stub = SurfaceStub((;
             area_fraction = FT(1),

@@ -23,8 +23,9 @@ import ClimaCoupler: Interfacer
 
 import CLIMAParameters as CP
 import Thermodynamics as TD
-import Thermodynamics.Parameters as TP
+import Thermodynamics.Parameters.ThermodynamicsParameters
 import SurfaceFluxes as SF
+import SurfaceFluxes.Parameters.SurfaceFluxesParameters
 import SurfaceFluxes.UniversalFunctions as UF
 
 using StaticArrays
@@ -41,41 +42,6 @@ end
 
 function atmos_turbulent_fluxes!(sim::DummySimulation, csf)
     sim.cache.flux .= (csf.T_sfc .- sim.state.T) .* sim.cache.κ ./ sim.cache.dz # Eq. 1
-end
-
-# Test for the PartitionedStateFluxes() case
-# parameter set generated CLIMAParamerers and helper functions from SurfaceFluxes.jl
-function create_uf_parameters(toml_dict, ::UF.BusingerType)
-    FT = CP.float_type(toml_dict)
-    aliases = ["Pr_0_Businger", "a_m_Businger", "a_h_Businger", "ζ_a_Businger", "γ_Businger"]
-
-    pairs = CP.get_parameter_values!(toml_dict, aliases, "UniversalFunctions")
-    pairs = (; pairs...) # convert to NamedTuple
-
-    pairs = (;
-        Pr_0 = pairs.Pr_0_Businger,
-        a_m = pairs.a_m_Businger,
-        a_h = pairs.a_h_Businger,
-        ζ_a = pairs.ζ_a_Businger,
-        γ = pairs.γ_Businger,
-    )
-    return UF.BusingerParams{FT}(; pairs...)
-end
-
-function create_parameters(toml_dict, ufpt)
-    FT = CP.float_type(toml_dict)
-
-    ufp = create_uf_parameters(toml_dict, ufpt)
-    AUFP = typeof(ufp)
-
-    aliases = string.(fieldnames(TD.Parameters.ThermodynamicsParameters))
-    pairs = CP.get_parameter_values!(toml_dict, aliases, "Thermodynamics")
-    thermo_params = TD.Parameters.ThermodynamicsParameters{FT}(; pairs...)
-    TP = typeof(thermo_params)
-
-    aliases = ["von_karman_const"]
-    pairs = CP.get_parameter_values!(toml_dict, aliases, "SurfaceFluxesParameters")
-    return SF.Parameters.SurfaceFluxesParameters{FT, AUFP, TP}(; pairs..., ufp, thermo_params)
 end
 
 # atmos sim object and extensions
@@ -104,16 +70,13 @@ end
 
 function get_thermo_params(sim::TestAtmos)
     FT = sim.params.FT
-    aliases = string.(fieldnames(TP.ThermodynamicsParameters))
-    toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
-    pairs = CP.get_parameter_values!(toml_dict, aliases, "Thermodynamics")
-    TP.ThermodynamicsParameters{FT}(; pairs...)
+    thermo_params = ThermodynamicsParameters(FT)
+    return thermo_params
 end
 
 function get_surface_params(sim::TestAtmos)
     FT = sim.params.FT
-    toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
-    sf_params = create_parameters(toml_dict, UF.BusingerType())
+    sf_params = SurfaceFluxesParameters(FT, UF.BusingerParams)
     return sf_params
 end
 
@@ -138,7 +101,7 @@ Interfacer.get_field(sim::TestOcean, ::Val{:albedo}) = sim.integrator.p.α
 
 function surface_thermo_state(
     sim::TestOcean,
-    thermo_params::TD.Parameters.ThermodynamicsParameters,
+    thermo_params::ThermodynamicsParameters,
     thermo_state_int,
     colidx::Fields.ColumnIndex,
 )
@@ -172,7 +135,7 @@ function Interfacer.update_field!(sim::DummySurfaceSimulation3, ::Val{:∂F_turb
 end
 function surface_thermo_state(
     sim::DummySurfaceSimulation3,
-    thermo_params::TD.Parameters.ThermodynamicsParameters,
+    thermo_params::ThermodynamicsParameters,
     thermo_state_int,
     colidx::Fields.ColumnIndex,
 )
@@ -325,8 +288,7 @@ for FT in (Float32, Float64)
     end
 
     @testset "get_surface_params for FT=$FT" begin
-        toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
-        sf_params = create_parameters(toml_dict, UF.BusingerType())
+        sf_params = SurfaceFluxesParameters(FT, UF.BusingerParams)
 
         @test get_surface_params(TestAtmos((; FT = FT), [], [], [])) == sf_params
         sim = DummySimulation([], [])

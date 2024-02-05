@@ -31,10 +31,7 @@ for FT in (Float32, Float64)
             ice_fraction = Fields.ones(space) .* FT(global_mask)
             dt = FT(1.0)
 
-            toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
-            aliases = string.(fieldnames(TDP.ThermodynamicsParameters))
-            param_pairs = CP.get_parameter_values!(toml_dict, aliases, "Thermodynamics")
-            thermo_params = TDP.ThermodynamicsParameters{FT}(; param_pairs...)
+            thermo_params = TDP.ThermodynamicsParameters(FT)
 
             additional_cache = (;
                 F_turb_energy = ClimaCore.Fields.zeros(space),

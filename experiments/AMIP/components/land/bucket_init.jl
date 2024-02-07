@@ -128,8 +128,8 @@ function bucket_init(
     σS_c = FT(0.2)
     W_f = FT(10)
     d_soil = FT(3.5) # soil depth
-    z_0m = FT(1e-2)
-    z_0b = FT(1e-3)
+    z_0m = FT(1e-3) # roughness length for momentum over smooth bare soil
+    z_0b = FT(1e-3) # roughness length for tracers over smooth bare soil
     κ_soil = FT(0.7)
     ρc_soil = FT(2e8)
     t_crit = FT(dt) # This is the timescale on which snow exponentially damps to zero, in the case where all
@@ -156,7 +156,7 @@ function bucket_init(
     T_sfc_0 = FT(271.0)
     @. Y.bucket.T = T_sfc_0 + temp_anomaly(coords.subsurface)
 
-    Y.bucket.W .= 10.0
+    Y.bucket.W .= 6.5
     Y.bucket.Ws .= 0.0
     Y.bucket.σS .= 0.0
 

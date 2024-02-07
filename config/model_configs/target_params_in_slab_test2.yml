@@ -14,7 +14,7 @@ mode_name: "slabplanet"
 moist: "equil"
 mono_surface: true
 precip_model: "0M"
-rad: "allskywithclear"
+rad: "gray"
 rayleigh_sponge: true
 run_name: "target_params_in_slab_test2"
 t_end: "10days"

@@ -25,11 +25,8 @@ for FT in (Float32, Float64)
     # create a boundary space
     boundary_space = TestHelper.create_space(FT)
 
-    # thermodynammic parameter set
-    aliases = string.(fieldnames(TP.ThermodynamicsParameters))
-    toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
-    pairs = CP.get_parameter_values!(toml_dict, aliases, "Thermodynamics")
-    thermo_params = TP.ThermodynamicsParameters{FT}(; pairs...)
+    # thermodynamic parameter set
+    thermo_params = TP.ThermodynamicsParameters(FT)
 
     @testset "No net fluxes for FT=$FT" begin
         Y, Ya = state_init(params_ice, boundary_space)

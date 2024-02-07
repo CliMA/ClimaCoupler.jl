@@ -32,6 +32,9 @@ docs/src/generated/
 !experiments/ClimaCore/**/Manifest.toml
 !perf/Manifest.toml
 
+# Output
+output/
+
 # Data
 *.vtk
 *.dat

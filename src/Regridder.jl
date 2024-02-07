@@ -275,9 +275,9 @@ end
 Extracts the time information from a NetCDF file `ds`.
 """
 function get_time(ds)
-    if "time" in ds
+    if "time" in keys(ds.dim)
         data_dates = Dates.DateTime.(Array(ds["time"]))
-    elseif "date" in ds
+    elseif "date" in keys(ds.dim)
         data_dates = TimeManager.strdate_to_datetime.(string.(Int.(Array(ds["date"]))))
     else
         @warn "No dates available in input data file"

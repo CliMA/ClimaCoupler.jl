@@ -12,7 +12,7 @@ mode_name: "amip"
 moist: "equil"
 mono_surface: false
 precip_model: "0M"
-rad: "gray"
+rad: "allskywithclear"
 run_name: "coarse_single_ft64_hourly_checkpoints_co2"
 t_end: "32days"
 vert_diff: "true"

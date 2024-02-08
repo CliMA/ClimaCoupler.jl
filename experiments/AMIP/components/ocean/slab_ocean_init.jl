@@ -96,7 +96,7 @@ function ocean_init(
 
     evolving_switch = evolving ? FT(1) : FT(0)
     params =
-        OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(271.0), FT(5e-5), FT(5e-5), FT(0.38), evolving_switch)
+        OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(271.0), FT(1e-4), FT(1e-4), FT(0.38), evolving_switch)
 
     Y, space = slab_ocean_space_init(space, params)
     cache = (

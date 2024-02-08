@@ -156,7 +156,7 @@ function bucket_init(
     T_sfc_0 = FT(271.0)
     @. Y.bucket.T = T_sfc_0 + temp_anomaly(coords.subsurface)
 
-    Y.bucket.W .= 9.0
+    Y.bucket.W .= 6.5
     Y.bucket.Ws .= 0.0
     Y.bucket.σS .= 0.0
 

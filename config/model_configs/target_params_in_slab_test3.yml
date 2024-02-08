@@ -19,3 +19,4 @@ rayleigh_sponge: true
 run_name: "target_params_in_slab_test3"
 t_end: "10days"
 vert_diff: "true"
+could_model: "grid_scale"

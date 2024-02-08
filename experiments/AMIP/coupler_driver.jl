@@ -143,6 +143,7 @@ parsed_args = parse_commandline(argparse_settings())
 pkg_dir = pkgdir(ClimaCoupler)
 if isinteractive()
     include("user_io/debug_plots.jl")
+    mkpath("debug_output")
     parsed_args["config_file"] =
         isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/model_configs/interactive_debug.yml") :
         parsed_args["config_file"]
@@ -545,6 +546,8 @@ if restart_dir !== "unspecified"
     end
 end
 
+debug(cs, "debug_output/1_initialized_cs") #hide
+
 #=
 ## Initialize Component Model Exchange
 =#
@@ -562,6 +565,9 @@ update_surface_fractions!(cs)
 import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
 import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
 update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
+
+debug(cs, "debug_output/2_init_exchange_cs") #hide
+debug_csf0 = isinteractive() ? deepcopy(cs.fields) : nothing #hide
 
 # 2) each surface component model calculates its own vapor specific humidity (q_sfc)
 # TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step!
@@ -585,8 +591,16 @@ elseif turbulent_fluxes isa PartitionedStateFluxes
     atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
 end
 
+if isinteractive() #hide
+    debug(cs, "debug_output/3_init_flux_calc") #hide
+end #hide
+
 # 4) given the new sfc_conditions, atmos calls the radiative flux callback
 reinit_model_sims!(cs.model_sims) # NB: for atmos this sets a nonzero radiation flux
+
+if isinteractive() #hide
+    debug(cs, "debug_output/4_reinit") #hide
+end #hide
 
 # 5) coupler re-imports updated atmos fluxes (radiative fluxes for both `turbulent_fluxes` types
 # and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxes`,
@@ -594,6 +608,8 @@ reinit_model_sims!(cs.model_sims) # NB: for atmos this sets a nonzero radiation 
 # atmos receives the turbulent fluxes from the coupler.
 import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
 update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
+
+isinteractive() ? debug(cs, "debug_output/5_precomputed_cs") : nothing #hide
 
 #=
 ## Coupling Loop
@@ -656,6 +672,7 @@ function solve_coupler!(cs)
         ## step sims
         step_model_sims!(cs.model_sims, t)
 
+        isinteractive() ? debug(cs, "debug_output/6_first_step") : nothing #hide
         ## exchange combined fields and (if specified) calculate fluxes using combined states
         import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta
         if turbulent_fluxes isa CombinedStateFluxes
@@ -677,7 +694,9 @@ function solve_coupler!(cs)
 
         ## callback to checkpoint model state
         trigger_callback!(cs, cs.callbacks.checkpoint)
+        isinteractive() ? debug(cs, "debug_output/7_first_step_clean") : nothing #hide
 
+        dd = dddd
     end
     @show walltime
 

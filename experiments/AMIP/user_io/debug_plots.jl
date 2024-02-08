@@ -10,12 +10,16 @@ using ClimaCoupler.Interfacer: ComponentModelSimulation, SurfaceModelSimulation
 Plot the fields of a coupled simulation and save plots to a directory.
 """
 function debug(cs::CoupledSimulation, dir = "debug")
-    mkpath(dir)
-    @info "plotting debug in " * dir
-    for sim in cs.model_sims
-        debug(sim, dir)
+    if isinteractive()
+        mkpath(dir)
+        @info "plotting debug in " * dir
+        for sim in cs.model_sims
+            debug(sim, dir)
+        end
+        debug(cs.fields, dir)
+    else
+        @warn "debug plots are only available in interactive mode"
     end
-    debug(cs.fields, dir)
 end
 
 """
@@ -24,11 +28,22 @@ end
 Plot useful coupler fields (in `field_names`) and save plots to a directory.
 """
 function debug(cs_fields::NamedTuple, dir)
-    field_names = (:F_turb_energy, :F_turb_moisture, :P_liq, :T_S, :ρ_sfc, :q_sfc)
+    field_names =
+        (:albedo, :F_radiative, :F_turb_energy, :F_turb_moisture, :P_liq, :T_S, :ρ_sfc, :q_sfc, :beta, :z0b_S, :z0m_S)
     all_plots = []
     for field_name in field_names
         field = getproperty(cs_fields, field_name)
         push!(all_plots, Plots.plot(field, title = string(field_name) * print_extrema(field)))
+        if (field_name == :T_S) && (@isdefined debug_csf0)
+            push!(
+                all_plots,
+                Plots.plot(
+                    field .- debug_csf0.T_S,
+                    title = string(field_name) * "_anom" * print_extrema(field),
+                    color = :viridis,
+                ),
+            )
+        end
     end
     fig = Plots.plot(all_plots..., size = (1500, 800))
     Plots.png(joinpath(dir, "debug_coupler"))

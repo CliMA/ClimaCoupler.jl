@@ -591,16 +591,12 @@ elseif turbulent_fluxes isa PartitionedStateFluxes
     atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
 end
 
-if isinteractive() #hide
-    debug(cs, "debug_output/3_init_flux_calc") #hide
-end #hide
+ debug(cs, "debug_output/3_init_flux_calc") #hide
 
 # 4) given the new sfc_conditions, atmos calls the radiative flux callback
 reinit_model_sims!(cs.model_sims) # NB: for atmos this sets a nonzero radiation flux
 
-if isinteractive() #hide
-    debug(cs, "debug_output/4_reinit") #hide
-end #hide
+debug(cs, "debug_output/4_reinit") #hide
 
 # 5) coupler re-imports updated atmos fluxes (radiative fluxes for both `turbulent_fluxes` types
 # and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxes`,
@@ -609,7 +605,7 @@ end #hide
 import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
 update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 
-isinteractive() ? debug(cs, "debug_output/5_precomputed_cs") : nothing #hide
+debug(cs, "debug_output/5_precomputed_cs") #hide
 
 #=
 ## Coupling Loop
@@ -672,7 +668,7 @@ function solve_coupler!(cs)
         ## step sims
         step_model_sims!(cs.model_sims, t)
 
-        isinteractive() ? debug(cs, "debug_output/6_first_step") : nothing #hide
+        # isinteractive() ? debug(cs, "debug_output/6_first_step") : nothing #hide
         ## exchange combined fields and (if specified) calculate fluxes using combined states
         import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta
         if turbulent_fluxes isa CombinedStateFluxes
@@ -694,9 +690,8 @@ function solve_coupler!(cs)
 
         ## callback to checkpoint model state
         trigger_callback!(cs, cs.callbacks.checkpoint)
-        isinteractive() ? debug(cs, "debug_output/7_first_step_clean") : nothing #hide
+        # isinteractive() ? debug(cs, "debug_output/7_first_step_clean") : nothing #hide
 
-        dd = dddd
     end
     @show walltime
 
@@ -710,6 +705,8 @@ end #hide
 
 ## run the coupled simulation
 solve_coupler!(cs);
+
+debug(cs, "debug_output/6_after_solve")
 
 #=
 ## Postprocessing

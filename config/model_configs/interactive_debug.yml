@@ -6,14 +6,14 @@ dt_save_to_sol: "10days"
 energy_check: true
 evolving_ocean: true
 h_elem: 4
-job_id: "interactive_debug_run_4"
+job_id: "interactive_debug_run_5e4"
 land_albedo_type: "function"
 mode_name: "slabplanet"
 moist: "equil"
 mono_surface: true
 precip_model: "0M"
 rad: "gray"
-run_name: "interactive_debug_run_4"
+run_name: "interactive_debug_run_5e4"
 start_date: "19790301"
 surface_setup: "PrescribedSurface"
 t_end: "10days"

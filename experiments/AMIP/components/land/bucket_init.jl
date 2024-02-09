@@ -5,18 +5,18 @@ import Thermodynamics as TD
 using Dates: DateTime
 using ClimaComms: AbstractCommsContext
 
-import ClimaLSM
-using ClimaLSM.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers
-import ClimaLSM.Bucket: BulkAlbedoTemporal, BulkAlbedoStatic, BulkAlbedoFunction
-using ClimaLSM:
+import ClimaLand
+using ClimaLand.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers
+import ClimaLand.Bucket: BulkAlbedoTemporal, BulkAlbedoStatic, BulkAlbedoFunction
+using ClimaLand:
     make_exp_tendency,
     initialize,
     make_set_initial_cache,
     surface_evaporative_scaling,
     CoupledRadiativeFluxes,
     CoupledAtmosphere
-import ClimaLSM.Parameters as LSMP
-include(joinpath(pkgdir(ClimaLSM), "parameters", "create_parameters.jl"))
+import ClimaLand.Parameters as LP
+include(joinpath(pkgdir(ClimaLand), "parameters", "create_parameters.jl"))
 
 import ClimaCoupler.Interfacer: LandModelSimulation, get_field, update_field!, name
 import ClimaCoupler.FieldExchanger: step!, reinit!
@@ -39,15 +39,15 @@ name(::BucketSimulation) = "BucketSimulation"
 include("./bucket_utils.jl")
 
 # TODO remove this function after ClimaLand v0.8.1 update
-function ClimaLSM.turbulent_fluxes(atmos::CoupledAtmosphere, model::BucketModel, Y, p, t)
+function ClimaLand.turbulent_fluxes(atmos::CoupledAtmosphere, model::BucketModel, Y, p, t)
     # coupler has done its thing behind the scenes already
-    model_name = ClimaLSM.name(model)
+    model_name = ClimaLand.name(model)
     model_cache = getproperty(p, model_name)
     return model_cache.turbulent_fluxes
 end
 
 
-function ClimaLSM.initialize_drivers(a::CoupledAtmosphere{FT}, coords) where {FT}
+function ClimaLand.initialize_drivers(a::CoupledAtmosphere{FT}, coords) where {FT}
     keys = (:P_liq, :P_snow)
     types = ([FT for k in keys]...,)
     domain_names = ([:surface for k in keys]...,)
@@ -55,7 +55,7 @@ function ClimaLSM.initialize_drivers(a::CoupledAtmosphere{FT}, coords) where {FT
     # intialize_vars packages the variables as a named tuple,
     # as part of a named tuple with `model_name` as the key.
     # Here we just want the variable named tuple itself
-    vars = ClimaLSM.initialize_vars(keys, types, domain_names, coords, model_name)
+    vars = ClimaLand.initialize_vars(keys, types, domain_names, coords, model_name)
     return vars.drivers
 end
 
@@ -139,7 +139,7 @@ function bucket_init(
     n_vertical_elements = 7
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
-    domain = make_lsm_domain(space, (-d_soil, FT(0.0)), n_vertical_elements)
+    domain = make_land_domain(space, (-d_soil, FT(0.0)), n_vertical_elements)
     args = (params, CoupledAtmosphere{FT}(), CoupledRadiativeFluxes{FT}(), domain)
     model = BucketModel{FT, typeof.(args)...}(args...)
 
@@ -166,7 +166,7 @@ function bucket_init(
 
     exp_tendency! = make_exp_tendency(model)
     ode_algo = CTS.ExplicitAlgorithm(stepper)
-    bucket_ode_function = CTS.ClimaODEFunction(T_exp! = exp_tendency!, dss! = ClimaLSM.dss!)
+    bucket_ode_function = CTS.ClimaODEFunction(T_exp! = exp_tendency!, dss! = ClimaLand.dss!)
     prob = ODEProblem(bucket_ode_function, Y, tspan, p)
     integrator = init(prob, ode_algo; dt = dt, saveat = saveat, adaptive = false)
 

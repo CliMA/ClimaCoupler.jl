@@ -61,7 +61,7 @@ function lnd_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
 end
 
 # ## Coupled Land Wrappers
-## Land Simulation - later to live in ClimaLSM
+## Land Simulation - later to live in ClimaLand
 struct LandSim <: AbstractLandSim
     integrator::Any
 end

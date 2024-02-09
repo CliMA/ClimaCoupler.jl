@@ -69,7 +69,7 @@ function argparse_settings()
         default = "PrescribedSurface"
         "--atmos_config_file"
         help = "A yaml file used to set the atmospheric model configuration. If nothing is specified, the default configuration is used."
-        # ClimaLSM specific
+        # ClimaLand specific
         "--land_albedo_type"
         help = "Access land surface albedo information from data file. [`function`, `map_static`, `map_temporal`]"
         arg_type = String

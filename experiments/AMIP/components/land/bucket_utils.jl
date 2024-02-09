@@ -1,13 +1,13 @@
 """
-    make_lsm_domain(
+    make_land_domain(
         atmos_boundary_space::ClimaCore.Spaces.SpectralElementSpace2D,
         zlim::Tuple{FT, FT},
         nelements_vert::Int,) where {FT}
 
-Creates the LSM Domain from the horizontal space of the atmosphere, and information
+Creates the land model domain from the horizontal space of the atmosphere, and information
 about the number of elements and extent of the vertical domain.
 """
-function make_lsm_domain(
+function make_land_domain(
     atmos_boundary_space::ClimaCore.Spaces.SpectralElementSpace2D,
     zlim::Tuple{FT, FT},
     nelements_vert::Int,
@@ -32,20 +32,20 @@ function make_lsm_domain(
     subsurface_space = ClimaCore.Spaces.ExtrudedFiniteDifferenceSpace(atmos_boundary_space, vert_center_space)
     space = (; surface = atmos_boundary_space, subsurface = subsurface_space)
 
-    return ClimaLSM.Domains.SphericalShell{FT}(radius, depth, nothing, nelements, npolynomial, space)
+    return ClimaLand.Domains.SphericalShell{FT}(radius, depth, nothing, nelements, npolynomial, space)
 end
 
 # extensions required by Interfacer
 get_field(sim::BucketSimulation, ::Val{:surface_temperature}) =
-    ClimaLSM.surface_temperature(sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
+    ClimaLand.surface_temperature(sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
 get_field(sim::BucketSimulation, ::Val{:surface_humidity}) =
-    ClimaLSM.surface_specific_humidity(sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
+    ClimaLand.surface_specific_humidity(sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
 get_field(sim::BucketSimulation, ::Val{:roughness_momentum}) = sim.model.parameters.z_0m
 get_field(sim::BucketSimulation, ::Val{:roughness_buoyancy}) = sim.model.parameters.z_0b
 get_field(sim::BucketSimulation, ::Val{:beta}) =
-    ClimaLSM.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
+    ClimaLand.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
 get_field(sim::BucketSimulation, ::Val{:albedo}) =
-    ClimaLSM.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
+    ClimaLand.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 get_field(sim::BucketSimulation, ::Val{:area_fraction}) = sim.area_fraction
 get_field(sim::BucketSimulation, ::Val{:air_density}) = sim.integrator.p.bucket.ρ_sfc
 
@@ -53,18 +53,18 @@ function update_field!(sim::BucketSimulation, ::Val{:turbulent_energy_flux}, fie
     parent(sim.integrator.p.bucket.turbulent_fluxes.shf) .= parent(field)
 end
 function update_field!(sim::BucketSimulation, ::Val{:turbulent_moisture_flux}, field)
-    ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
+    ρ_liq = (LP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
     parent(sim.integrator.p.bucket.turbulent_fluxes.vapor_flux) .= parent(field ./ ρ_liq) # TODO: account for sublimation
 end
 function update_field!(sim::BucketSimulation, ::Val{:radiative_energy_flux}, field)
     parent(sim.integrator.p.bucket.R_n) .= parent(field)
 end
 function update_field!(sim::BucketSimulation, ::Val{:liquid_precipitation}, field)
-    ρ_liq = (LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
+    ρ_liq = (LP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
     parent(sim.integrator.p.drivers.P_liq) .= parent(field ./ ρ_liq)
 end
 function update_field!(sim::BucketSimulation, ::Val{:snow_precipitation}, field)
-    ρ_ice = (LSMP.ρ_cloud_ice(sim.model.parameters.earth_param_set))
+    ρ_ice = (LP.ρ_cloud_ice(sim.model.parameters.earth_param_set))
     parent(sim.integrator.p.drivers.P_snow) .= parent(field ./ ρ_ice)
 end
 
@@ -81,7 +81,7 @@ function update_turbulent_fluxes_point!(sim::BucketSimulation, fields::NamedTupl
     (; F_turb_energy, F_turb_moisture) = fields
     sim.integrator.p.bucket.turbulent_fluxes.shf[colidx] .= F_turb_energy
     sim.integrator.p.bucket.turbulent_fluxes.vapor_flux[colidx] .=
-        F_turb_moisture ./ LSMP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
+        F_turb_moisture ./ LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
     return nothing
 end
 
@@ -126,8 +126,8 @@ function get_field(bucket_sim::BucketSimulation, ::Val{:energy})
     end
 
     e_per_area .+=
-        -LSMP.LH_f0(bucket_sim.model.parameters.earth_param_set) .*
-        LSMP.ρ_cloud_liq(bucket_sim.model.parameters.earth_param_set) .* bucket_sim.integrator.u.bucket.σS
+        -LP.LH_f0(bucket_sim.model.parameters.earth_param_set) .*
+        LP.ρ_cloud_liq(bucket_sim.model.parameters.earth_param_set) .* bucket_sim.integrator.u.bucket.σS
     return e_per_area
 end
 
@@ -137,7 +137,7 @@ end
 Extension of Interfacer.get_field that provides the total water contained in the bucket, including the liquid water in snow.
 """
 function get_field(bucket_sim::BucketSimulation, ::Val{:water})
-    ρ_cloud_liq = ClimaLSM.LSMP.ρ_cloud_liq(bucket_sim.model.parameters.earth_param_set)
+    ρ_cloud_liq = ClimaLand.LP.ρ_cloud_liq(bucket_sim.model.parameters.earth_param_set)
     return
     @. (bucket_sim.integrator.u.bucket.σS + bucket_sim.integrator.u.bucket.W + bucket_sim.integrator.u.bucket.Ws) *
        ρ_cloud_liq  # kg water / m2
@@ -149,7 +149,7 @@ Returns the surface temperature of the earth, computed from the state u.
 """
 function get_land_temp_from_state(land_sim, u)
     # required by viz_explorer.jl
-    return ClimaLSM.surface_temperature(land_sim.model, u, land_sim.integrator.p, land_sim.integrator.t)
+    return ClimaLand.surface_temperature(land_sim.model, u, land_sim.integrator.p, land_sim.integrator.t)
 end
 
 """
@@ -157,10 +157,10 @@ end
 
 Perform DSS on the state of a component simulation, intended to be used
 before the initial step of a run. This method acts on bucket land simulations.
-The `dss!` function of ClimaLSM must be called because it uses either the 2D
+The `dss!` function of ClimaLand must be called because it uses either the 2D
 or 3D dss buffer stored in the cache depending on space of each variable in
 `sim.integrator.u`.
 """
 function dss_state!(sim::BucketSimulation)
-    ClimaLSM.dss!(sim.integrator.u, sim.integrator.p, sim.integrator.t)
+    ClimaLand.dss!(sim.integrator.u, sim.integrator.p, sim.integrator.t)
 end

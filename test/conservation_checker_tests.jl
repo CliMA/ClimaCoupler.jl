@@ -7,7 +7,7 @@ using ClimaCoupler.ConservationChecker:
     EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
 using ClimaCore: ClimaCore, Geometry, Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 import ClimaCore.InputOutput: read_field
-using ClimaLSM
+using ClimaLand
 using ClimaComms
 using Test
 using NCDatasets

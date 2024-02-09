@@ -1,3 +1,4 @@
+import ClimaComms
 include("plot_helper.jl")
 
 """
@@ -77,6 +78,7 @@ function read_latest_model_data(name::Symbol, filedir::String, root::String)
     varfile_root = @sprintf "%s%s" string(name) root
     filename = glob("*" * varfile_root * "*", filedir)[end]
 
+    comms_ctx = ClimaComms.SingletonCommsContext()
     hdfreader = InputOutput.HDF5Reader(filename)
     var = InputOutput.read_field(hdfreader, string(name))
     close(hdfreader)

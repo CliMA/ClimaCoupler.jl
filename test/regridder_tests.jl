@@ -286,7 +286,7 @@ for FT in (Float32, Float64)
             # read in data on CGLL grid from the last saved date
             date1 = TimeManager.strdate_to_datetime.(string(Int(time[end])))
             cgll_path = joinpath(REGRID_DIR, "$(hd_outfile_root)_$date1.hdf5")
-            hdfreader = InputOutput.HDF5Reader(cgll_path)
+            hdfreader = InputOutput.HDF5Reader(cgll_path, comms_ctx)
             T_cgll = InputOutput.read_field(hdfreader, varname)
             Base.close(hdfreader)
 

@@ -244,7 +244,7 @@ SIC and assuming a 2m thickness of the ice.
 In the `SlabPlanet` mode, all ocean and sea ice are dynamical models, namely thermal slabs, with different parameters.
 
 ### Land
-If evolving, use `ClimaLSM.jl`'s bucket model.
+If evolving, use `ClimaLand.jl`'s bucket model.
 =#
 
 @info mode_name

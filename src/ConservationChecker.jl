@@ -13,7 +13,7 @@ using Dates
 using JLD2
 using Plots
 using ClimaAtmos: RRTMGPI
-using ClimaLSM
+using ClimaLand
 using ClimaCoupler.Utilities: swap_space!
 import ClimaCoupler: Interfacer
 

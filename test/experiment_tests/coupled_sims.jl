@@ -3,6 +3,7 @@ using Random
 using ClimaCoupler, Dates, Unitful
 using IntervalSets
 using ClimaCore: Domains, Meshes, Geometry, Topologies, Spaces, Fields, Operators
+using ClimaComms
 
 # Load file to test
 include("../../experiments/ClimaCore/CoupledSims/coupled_sim.jl")
@@ -40,7 +41,8 @@ function spectral_space_2D(; n1 = 1, n2 = 1, Nij = 4)
         x2boundary = (:south, :north),
     )
     mesh = Meshes.RectilinearMesh(domain, n1, n2)
-    grid_topology = Topologies.Topology2D(mesh)
+    comms_ctx = ClimaComms.SingletonCommsContext()
+    grid_topology = Topologies.Topology2D(comms_ctx, mesh)
 
     quad = Spaces.Quadratures.GLL{Nij}()
     space = Spaces.SpectralElementSpace2D(grid_topology, quad)

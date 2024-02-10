@@ -1,7 +1,7 @@
 import ArgParse
 function argparse_settings()
     s = ArgParse.ArgParseSettings()
-    ArgParse.@add_arg_table s begin
+    ArgParse.@add_arg_table! s begin
         # ClimaCoupler flags
         "--run_name"
         help = "Name of this run."

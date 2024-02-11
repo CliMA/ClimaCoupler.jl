@@ -13,17 +13,7 @@ for FT in (Float32, Float64)
     @testset "test sea-ice energy slab for FT=$FT" begin
         function test_sea_ice_rhs(; F_radiative = 0.0, T_base = 271.2, global_mask = 1.0)
             space = create_space(FT)
-            params = IceSlabParameters(
-                FT(2),  # ice thickness
-                FT(900.0), # density of sea ice
-                FT(2100.0), # specific heat of sea ice
-                FT(T_base), # temperature of sea water at the ice base
-                FT(1e-3), # roughness length for momentum
-                FT(1e-5), # roughness length for tracers
-                FT(271.2), # freezing point of sea water
-                FT(2.0),# thermal condictivity of ice
-                FT(0.8), # sea ice albedo
-            )
+            params = IceSlabParameters{FT}(T_base = T_base)
 
             Y = slab_ice_space_init(FT, space, params)
             dY = slab_ice_space_init(FT, space, params) .* FT(0.0)

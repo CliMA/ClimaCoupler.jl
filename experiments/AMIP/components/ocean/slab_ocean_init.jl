@@ -24,16 +24,17 @@ end
 name(::SlabOceanSimulation) = "SlabOceanSimulation"
 
 # ocean parameters
-struct OceanSlabParameters{FT <: AbstractFloat}
-    h::FT
-    ρ::FT
-    c::FT
-    T_init::FT
-    z0m::FT
-    z0b::FT
-    α::FT
-    evolving_switch::FT
+Base.@kwdef struct OceanSlabParameters{FT <: AbstractFloat}
+    h::FT = 20              # depth of the ocean [m]
+    ρ::FT = 1500            # density of the ocean [kg / m3]
+    c::FT = 800             # specific heat of the ocean [J / kg / K]
+    T_init::FT = 271        # initial temperature of the ocean [K]
+    z0m::FT = 5e-4          # roughness length for momentum [m]
+    z0b::FT = 5e-4          # roughness length for heat [m]
+    α::FT = 0.38            # albedo of the ocean [0, 1]
+    evolving_switch::FT = 1 # switch to turn off the evolution of the ocean temperature [0 or 1]
 end
+
 name(::SlabOceanSimulation) = "SlabOceanSimulation"
 
 """
@@ -95,8 +96,7 @@ function ocean_init(
 ) where {FT}
 
     evolving_switch = evolving ? FT(1) : FT(0)
-    params =
-        OceanSlabParameters(FT(20), FT(1500.0), FT(800.0), FT(271.0), FT(1e-5), FT(1e-5), FT(0.38), evolving_switch)
+    params = OceanSlabParameters{FT}(evolving_switch = evolving_switch)
 
     Y, space = slab_ocean_space_init(space, params)
     cache = (

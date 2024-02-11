@@ -35,17 +35,18 @@ end
 name(::PrescribedIceSimulation) = "PrescribedIceSimulation"
 
 # sea-ice parameters
-struct IceSlabParameters{FT <: AbstractFloat}
-    h::FT # ice thickness [m]
-    ρ::FT # density of sea ice [kg / m3]
-    c::FT # specific heat of sea ice [J / kg / K]
-    T_base::FT # temperature of sea water at the ice base
-    z0m::FT # roughness length for momentum [m]
-    z0b::FT # roughness length for tracers [m]
-    T_freeze::FT # freezing point of sea water [K]
-    k_ice::FT # thermal condictivity of ice [W / m / K] (less in HM71)
-    α::FT # sea ice albedo
+Base.@kwdef struct IceSlabParameters{FT <: AbstractFloat}
+    h::FT = 2               # ice thickness [m]
+    ρ::FT = 900             # density of sea ice [kg / m3]
+    c::FT = 2100            # specific heat of sea ice [J / kg / K]
+    T_base::FT = 271.2      # temperature of sea water at the ice base
+    z0m::FT = 1e-4          # roughness length for momentum [m]
+    z0b::FT = 1e-4          # roughness length for tracers [m]
+    T_freeze::FT = 271.2    # freezing temperature of sea water [K]
+    k_ice::FT = 2           # thermal conductivity of sea ice [W / m / K] (less in HM71)
+    α::FT = 0.8             # albedo of sea ice [0, 1]
 end
+
 name(::IceSlabParameters) = "IceSlabParameters"
 
 # init simulation
@@ -93,7 +94,7 @@ Initializes the `DiffEq` problem, and creates a Simulation-type object containin
 """
 function ice_init(::Type{FT}; tspan, saveat, dt, space, area_fraction, thermo_params, stepper = CTS.RK4()) where {FT}
 
-    params = IceSlabParameters(FT(2), FT(900.0), FT(2100.0), FT(271.2), FT(1e-3), FT(1e-5), FT(271.2), FT(2.0), FT(0.8))
+    params = IceSlabParameters{FT}()
 
     Y = slab_ice_space_init(FT, space, params)
     additional_cache = (;

@@ -177,7 +177,7 @@ steps:
 
       - label: "Slabplanet: albedo from static map"
         command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/slabplanet_albedo_static_map.yml"
-        artifact_paths: "experiments/AMIP/output/slabplanet/slabplanet_albedo_static_map_artifacts/total_energy*.png"
+        artifact_paths: "experiments/AMIP/output/slabplanet/slabplanet_albedo_static_map_artifacts/*"
         agents:
           slurm_mem: 20GB
 

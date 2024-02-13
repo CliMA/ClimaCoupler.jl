@@ -188,6 +188,13 @@ steps:
         agents:
           slurm_mem: 20GB
 
+      - label: "Slabplanet: extra atmos diagnostics"
+        key: "slabplanet_atmos_diags"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/slabplanet_atmos_diags.yml"
+        artifact_paths: "experiments/AMIP/output/slabplanet/slabplanet_atmos_diags_artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
       # AMIP
 
       # ...

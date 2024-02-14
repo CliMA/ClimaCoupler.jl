@@ -5,33 +5,54 @@ using ClimaCoupler.Interfacer: ComponentModelSimulation, SurfaceModelSimulation
 
 # plotting functions for the coupled simulation
 """
-    debug(cs::CoupledSimulation, dir = "debug")
+    debug(cs::CoupledSimulation, dir = "debug", cs_fields_ref = nothing)
 
 Plot the fields of a coupled simulation and save plots to a directory.
 """
-function debug(cs::CoupledSimulation, dir = "debug")
+function debug(cs::CoupledSimulation, dir = "debug", cs_fields_ref = nothing)
     mkpath(dir)
     @info "plotting debug in " * dir
     for sim in cs.model_sims
         debug(sim, dir)
     end
-    debug(cs.fields, dir)
+    debug(cs.fields, dir, cs_fields_ref)
 end
 
 """
-    debug(cs_fields::NamedTuple, dir)
+    debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
 
 Plot useful coupler fields (in `field_names`) and save plots to a directory.
+
+If `cs_fields_ref` is provided (e.g., using a copy of cs.fields from the initialization),
+plot the anomalies of the fields with respect to `cs_fields_ref`.
 """
-function debug(cs_fields::NamedTuple, dir)
-    field_names = (:F_turb_energy, :F_turb_moisture, :P_liq, :T_S, :ρ_sfc, :q_sfc)
+function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
+    field_names =
+        (:albedo, :F_radiative, :F_turb_energy, :F_turb_moisture, :P_liq, :T_S, :ρ_sfc, :q_sfc, :beta, :z0b_S, :z0m_S)
     all_plots = []
     for field_name in field_names
         field = getproperty(cs_fields, field_name)
         push!(all_plots, Plots.plot(field, title = string(field_name) * print_extrema(field)))
     end
-    fig = Plots.plot(all_plots..., size = (1500, 800))
+    Plots.plot(all_plots..., size = (1500, 800))
     Plots.png(joinpath(dir, "debug_coupler"))
+
+    # plot anomalies if a reference cs.fields, `cs_fields_ref`, are provided
+    if !isnothing(cs_fields_ref)
+        all_plots = []
+        for field_name in field_names
+            field = getproperty(cs_fields, field_name)
+            push!(
+                all_plots,
+                Plots.plot(
+                    field .- getproperty(cs_fields_ref, field_name),
+                    title = string(field_name) * print_extrema(field),
+                ),
+            )
+        end
+        Plots.plot(all_plots..., size = (1500, 800))
+        Plots.png(joinpath(dir, "debug_coupler_amomalies"))
+    end
 end
 
 """

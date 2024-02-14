@@ -382,6 +382,7 @@ steps:
       - label: ":envelope: Slack report: target AMIP"
         command:
           - slack-upload -c "#coupler-report" -f experiments/AMIP/output/amip/amip_target_artifacts/amip_paperplots.png -m png -n amip_fine -x "AMIP Target Longrun"
+          - slack-upload -c "#coupler-report" -f experiments/AMIP/output/amip/amip_target_artifacts/biases.png -m png -n amip_fine -x "AMIP Target Longrun"
 
       - label: ":envelope: Slack report: Flame Diff"
         command:

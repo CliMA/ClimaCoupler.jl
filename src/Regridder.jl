@@ -167,10 +167,7 @@ function hdwrite_regridfile_rll_to_cgll(
 
     # Note: this topology gives us `space == space_undistributed` in the undistributed
     # case (as desired), which wouldn't hold if we used `spacefillingcurve` here.
-    topology = Topologies.Topology2D(
-        cpu_context,
-        Spaces.topology(space).mesh,
-    )
+    topology = Topologies.Topology2D(cpu_context, Spaces.topology(space).mesh)
     Nq = Spaces.Quadratures.polynomial_degree(Spaces.quadrature_style(space2d)) + 1
 
     space2d_undistributed = Spaces.SpectralElementSpace2D(topology, Spaces.Quadratures.GLL{Nq}())

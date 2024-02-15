@@ -316,7 +316,7 @@ version = "0.1.0"
 
 [[deps.ClimaLand]]
 deps = ["Adapt", "ArtifactWrappers", "CFTime", "CSV", "CUDA", "ClimaComms", "ClimaCore", "ClimaCoreTempestRemap", "DataFrames", "Dates", "DocStringExtensions", "Flux", "HTTP", "Insolation", "IntervalSets", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "StatsBase", "SurfaceFluxes", "Thermodynamics", "cuDNN"]
-git-tree-sha1 = "c69632da614e03b1db0b354f4537cee964db68ba"
+git-tree-sha1 = "b8e1d958122f10456af78926f5dd3b35363b1159"
 repo-rev = "js/patch"
 repo-url = "https://github.com/CliMA/ClimaLand.jl.git"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"

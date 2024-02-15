@@ -151,7 +151,7 @@ for FT in (Float32, Float64)
             Nq = 4
             domain = Domains.SphereDomain(radius)
             mesh = Meshes.EquiangularCubedSphere(domain, 4)
-            topology = Topologies.DistributedTopology2D(comms_ctx, mesh, Topologies.spacefillingcurve(mesh))
+            topology = Topologies.DistributedTopology2D(comms_ctx, mesh)
             quad = Spaces.Quadratures.GLL{Nq}()
             boundary_space_t = Spaces.SpectralElementSpace2D(topology, quad)
 

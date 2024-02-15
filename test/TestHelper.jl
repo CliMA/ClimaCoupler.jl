@@ -40,9 +40,9 @@ function create_space(
     mesh = Meshes.EquiangularCubedSphere(domain, ne)
 
     if comms_ctx isa ClimaComms.SingletonCommsContext
-        topology = Topologies.Topology2D(comms_ctx, mesh, Topologies.spacefillingcurve(mesh))
+        topology = Topologies.Topology2D(comms_ctx, mesh)
     else
-        topology = Topologies.DistributedTopology2D(comms_ctx, mesh, Topologies.spacefillingcurve(mesh))
+        topology = Topologies.DistributedTopology2D(comms_ctx, mesh)
     end
 
     Nq = polynomial_degree + 1

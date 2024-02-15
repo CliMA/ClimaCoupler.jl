@@ -42,7 +42,7 @@ function spectral_space_2D(; n1 = 1, n2 = 1, Nij = 4)
     )
     mesh = Meshes.RectilinearMesh(domain, n1, n2)
     comms_ctx = ClimaComms.SingletonCommsContext()
-    grid_topology = Topologies.Topology2D(comms_ctx, mesh, Topologies.spacefillingcurve(mesh))
+    grid_topology = Topologies.Topology2D(comms_ctx, mesh)
 
     quad = Spaces.Quadratures.GLL{Nij}()
     space = Spaces.SpectralElementSpace2D(grid_topology, quad)

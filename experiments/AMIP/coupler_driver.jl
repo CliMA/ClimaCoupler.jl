@@ -221,6 +221,7 @@ atmosphere and surface are of the same horizontal resolution.
 =#
 ## init a 2D boundary space at the surface
 boundary_space = Spaces.horizontal_space(atmos_sim.domain.face_space)
+@show boundary_space.topology
 
 # init land-sea fraction
 land_fraction =

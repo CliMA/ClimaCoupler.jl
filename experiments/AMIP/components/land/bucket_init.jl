@@ -137,7 +137,8 @@ function bucket_init(
     Y.bucket.W .= 6.5
     Y.bucket.Ws .= 0.0
     Y.bucket.σS .= 0.0
-
+    @show axes(Y.bucket.σS) == space
+    @show space.topology
     # Set initial aux variable values
     set_initial_cache! = make_set_initial_cache(model)
     set_initial_cache!(p, Y, tspan[1])

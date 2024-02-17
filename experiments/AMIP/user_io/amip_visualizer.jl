@@ -78,8 +78,9 @@ function read_latest_model_data(name::Symbol, filedir::String, root::String)
     varfile_root = @sprintf "%s%s" string(name) root
     filename = glob("*" * varfile_root * "*", filedir)[end]
 
-    comms_ctx = ClimaComms.SingletonCommsContext()
-    hdfreader = InputOutput.HDF5Reader(filename)
+    # Ensure file gets read onto CPU for postprocessing
+    cpu_singleton_context = ClimaComms.SingletonCommsContext(ClimaComms.CPUSingleThreaded())
+    hdfreader = InputOutput.HDF5Reader(filename, cpu_singleton_context)
     var = InputOutput.read_field(hdfreader, string(name))
     close(hdfreader)
     return var

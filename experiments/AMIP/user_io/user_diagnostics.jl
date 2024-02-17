@@ -56,25 +56,23 @@ Top of the atmosphere radiation fluxes (W m⁻²).
 function get_var(cs::CoupledSimulation, ::Val{:toa_fluxes})
     atmos_sim = cs.model_sims.atmos_sim
     face_space = axes(atmos_sim.integrator.u.f)
-    z = parent(Fields.coordinate_field(face_space).z)
-    Δz_top = round(FT(0.5) * (z[end, 1, 1, 1, 1] - z[end - 1, 1, 1, 1, 1]))
-    n_faces = length(z[:, 1, 1, 1, 1])
+    nz_faces = length(face_space.grid.vertical_grid.topology.mesh.faces)
 
     LWd_TOA = Fields.level(
         CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_lw_flux_dn), face_space),
-        n_faces - half,
+        nz_faces - half,
     )
     LWu_TOA = Fields.level(
         CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_lw_flux_up), face_space),
-        n_faces - half,
+        nz_faces - half,
     )
     SWd_TOA = Fields.level(
         CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_sw_flux_dn), face_space),
-        n_faces - half,
+        nz_faces - half,
     )
     SWu_TOA = Fields.level(
         CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_sw_flux_up), face_space),
-        n_faces - half,
+        nz_faces - half,
     )
 
     radiation_sources = @. -(LWd_TOA + SWd_TOA - LWu_TOA - SWu_TOA)

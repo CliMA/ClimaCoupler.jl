@@ -380,10 +380,18 @@ steps:
           slurm_gpus: 1
 
       # GPU RUNS: AMIP
-      - label: "GPU AMIP target: albedo from function"
-        key: "gpu_target_amip_albedo_function"
-        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_target_amip_albedo_function.yml"
-        artifact_paths: "experiments/AMIP/output/amip/gpu_target_amip_albedo_function_artifacts/*"
+      - label: "GPU AMIP test: albedo from function"
+        key: "gpu_amip_albedo_function"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_amip_albedo_function.yml"
+        artifact_paths: "experiments/AMIP/output/amip/gpu_amip_albedo_function_artifacts/*"
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
+
+      - label: "GPU AMIP target: topography and diagnostic EDMF"
+        key: "gpu_amip_target_topo_diagedmf_shortrun"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_amip_target_topo_diagedmf_shortrun.yml"
+        artifact_paths: "experiments/AMIP/output/amip/gpu_amip_target_topo_diagedmf_shortrun_artifacts/*"
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1

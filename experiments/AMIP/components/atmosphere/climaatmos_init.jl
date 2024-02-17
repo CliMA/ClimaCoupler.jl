@@ -129,7 +129,7 @@ function update_field!(atmos_sim::ClimaAtmosSimulation, ::Val{:co2_gm}, field)
         @warn("Gray radiation model initialized, skipping CO2 update", maxlog = 1)
         return
     else
-        atmos_sim.integrator.p.radiation.radiation_model.volume_mixing_ratio_co2 .= parent(field)[1]
+        atmos_sim.integrator.p.radiation.radiation_model.volume_mixing_ratio_co2 .= mean(parent(field))
     end
 end
 # extensions required by the Interfacer

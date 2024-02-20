@@ -62,6 +62,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to use a dynamic slab ocean model or constant surface temperatures"
         arg_type = Bool
         default = true
+        "--device"
+        help = "Device type to use [`auto` (default) `CPUSingleThreaded`, `CPUMultiThreaded`, `CUDADevice`]"
+        arg_type = String
+        default = "auto"
         # ClimaAtmos specific
         "--surface_setup"
         help = "Triggers ClimaAtmos into the coupled mode [`PrescribedSurface` (default)]" # retained here for standalone Atmos benchmarks

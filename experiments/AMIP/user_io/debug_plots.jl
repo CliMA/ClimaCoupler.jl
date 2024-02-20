@@ -45,6 +45,16 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
     for field_name in field_names
         field = getproperty(cs_fields, field_name)
         push!(all_plots, Plots.plot(field, title = string(field_name) * print_extrema(field)))
+        if (field_name == :T_S) && (@isdefined debug_csf0)
+            push!(
+                all_plots,
+                Plots.plot(
+                    field .- debug_csf0.T_S,
+                    title = string(field_name) * "_anom" * print_extrema(field),
+                    color = :viridis,
+                ),
+            )
+        end
     end
     Plots.plot(all_plots..., size = (1500, 800))
     Plots.png(joinpath(dir, "debug_coupler"))

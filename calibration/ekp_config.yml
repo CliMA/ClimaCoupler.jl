@@ -1,0 +1,7 @@
+output_dir: output/amip_coupled
+prior_path: experiments/amip_coupled/prior.toml
+parameter_names: ["coefficient_a_m_businger", "coefficient_b_m_businger", "coefficient_a_h_businger", "coefficient_b_h_businger"]
+ensemble_size: 10
+n_iterations: 3
+truth_data: experiments/amip_coupled/obs_mean.jld2
+truth_noise: experiments/amip_coupled/obs_noise_cov.jld2

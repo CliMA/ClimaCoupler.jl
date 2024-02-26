@@ -19,8 +19,11 @@ netcdf_output_at_levels: true
 run_name: "amip_target_topo_diagedmf"
 start_date: "19790301"
 surface_setup: "PrescribedSurface"
-t_end: "40days"
+t_end: "60days"
 topo_smoothing: true
 topography: "Earth"
 turb_flux_partition: "CombinedStateFluxes"
-use_reference_state: false
+coupler_toml_file: "config/longrun_configs/amip_target_topo_diagedmf.toml"
+diagnostics:
+  - short_name: [ua, va, wa, ta, hus, clw, cli, pr, evspsbl, hfes, rsdt, rsds, rsut, rsus, rlds, rlut, rlus]
+    period: 1days

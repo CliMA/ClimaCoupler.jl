@@ -9,7 +9,6 @@ dz_bottom: 30
 dz_top: 3000
 h_elem: 16
 job_id: "gpu_target_amip_albedo_function"
-kappa_4: 1e16
 land_albedo_type: "function"
 mode_name: "amip"
 moist: "equil"

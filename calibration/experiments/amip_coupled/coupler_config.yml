@@ -23,4 +23,5 @@ t_end: "150secs"
 vert_diff: "true"
 z_elem: 50
 z_stretch: false
+dt_save_restart: "150secs"
 restart_dir: "./output/restart/"

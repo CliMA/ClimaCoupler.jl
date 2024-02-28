@@ -163,7 +163,7 @@ config_dict = merge(config_dict_atmos, config_dict)
 mode_name = config_dict["mode_name"]
 run_name = config_dict["run_name"]
 energy_check = config_dict["energy_check"]
-const FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
+FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim_name = "bucket"
 t_end = Float64(time_to_seconds(config_dict["t_end"]))
 t_start = 0.0
@@ -533,6 +533,7 @@ cs = CoupledSimulation{FT}(
     callbacks,
     dir_paths,
 );
+
 
 #=
 ## Restart component model states if specified

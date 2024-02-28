@@ -75,12 +75,11 @@ contain any internals of the ClimaCoupler source code, except extensions to the 
 =#
 
 ## helpers for component models
-include("components/atmosphere/climaatmos_init.jl")
-include("components/land/bucket_init.jl")
-include("components/land/bucket_utils.jl")
-include("components/ocean/slab_ocean_init.jl")
-include("components/ocean/prescr_seaice_init.jl")
-include("components/ocean/eisenman_seaice_init.jl")
+include("components/atmosphere/climaatmos.jl")
+include("components/land/climaland_bucket.jl")
+include("components/ocean/slab_ocean.jl")
+include("components/ocean/prescr_seaice.jl")
+include("components/ocean/eisenman_seaice.jl")
 
 ## helpers for user-specified IO
 include("user_io/user_diagnostics.jl")

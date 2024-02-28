@@ -7,7 +7,7 @@ using ClimaCore: Fields, Spaces
 import CLIMAParameters as CP
 import Thermodynamics.Parameters as TDP
 
-include(pkgdir(ClimaCoupler, "experiments/AMIP/components/ocean/prescr_seaice_init.jl"))
+include(pkgdir(ClimaCoupler, "experiments/AMIP/components/ocean/prescr_seaice.jl"))
 
 for FT in (Float32, Float64)
     @testset "test sea-ice energy slab for FT=$FT" begin

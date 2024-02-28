@@ -3,7 +3,7 @@ import ClimaCoupler
 using ClimaCoupler.TestHelper: create_space
 using ClimaCore: Fields, Spaces
 
-include(pkgdir(ClimaCoupler, "experiments/AMIP/components/land/bucket_init.jl"))
+include(pkgdir(ClimaCoupler, "experiments/AMIP/components/land/climaland_bucket.jl"))
 
 for FT in (Float32, Float64)
     @testset "dss_state! BucketSimulation for FT=$FT" begin

@@ -472,8 +472,6 @@ cs = CoupledSimulation{FT}(
     dir_paths,
 );
 
-@show cs
-
 #=
 ## Restart component model states if specified
 =#

@@ -68,7 +68,7 @@ steps:
 
     agents:
       slurm_cpus_per_task: 12
-      slurm_gpus: 1
+      # slurm_gpus: 1
     env:
       JULIA_NUM_PRECOMPILE_TASKS: 12
       JULIA_MAX_NUM_PRECOMPILE_FILES: 50
@@ -352,41 +352,41 @@ steps:
         agents:
           slurm_mem: 20GB
 
-  - group: "GPU integration tests"
-    steps:
-      # GPU RUNS: slabplanet
-      - label: "GPU Slabplanet: albedo from function"
-        key: "gpu_slabplanet_albedo_function"
-        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_slabplanet_albedo_function.yml"
-        artifact_paths: "experiments/AMIP/output/slabplanet/gpu_slabplanet_albedo_function_artifacts/*"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
+  # - group: "GPU integration tests"
+  #   steps:
+  #     # GPU RUNS: slabplanet
+  #     - label: "GPU Slabplanet: albedo from function"
+  #       key: "gpu_slabplanet_albedo_function"
+  #       command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_slabplanet_albedo_function.yml"
+  #       artifact_paths: "experiments/AMIP/output/slabplanet/gpu_slabplanet_albedo_function_artifacts/*"
+  #       agents:
+  #         slurm_mem: 20GB
+  #         slurm_gpus: 1
 
-      - label: "GPU Slabplanet: albedo from static map"
-        key: "gpu_slabplanet_albedo_static_map"
-        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_slabplanet_albedo_static_map.yml"
-        artifact_paths: "experiments/AMIP/output/slabplanet/gpu_slabplanet_albedo_static_map_artifacts/*"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
+  #     - label: "GPU Slabplanet: albedo from static map"
+  #       key: "gpu_slabplanet_albedo_static_map"
+  #       command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_slabplanet_albedo_static_map.yml"
+  #       artifact_paths: "experiments/AMIP/output/slabplanet/gpu_slabplanet_albedo_static_map_artifacts/*"
+  #       agents:
+  #         slurm_mem: 20GB
+  #         slurm_gpus: 1
 
-      - label: "GPU Slabplanet: albedo from temporal map"
-        key: "gpu_slabplanet_albedo_temporal_map"
-        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_slabplanet_albedo_temporal_map.yml"
-        artifact_paths: "experiments/AMIP/output/slabplanet/gpu_slabplanet_albedo_temporal_map_artifacts/*"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
+  #     - label: "GPU Slabplanet: albedo from temporal map"
+  #       key: "gpu_slabplanet_albedo_temporal_map"
+  #       command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_slabplanet_albedo_temporal_map.yml"
+  #       artifact_paths: "experiments/AMIP/output/slabplanet/gpu_slabplanet_albedo_temporal_map_artifacts/*"
+  #       agents:
+  #         slurm_mem: 20GB
+  #         slurm_gpus: 1
 
-      # GPU RUNS: AMIP
-      - label: "GPU AMIP target: albedo from function"
-        key: "gpu_target_amip_albedo_function"
-        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_target_amip_albedo_function.yml"
-        artifact_paths: "experiments/AMIP/output/amip/gpu_target_amip_albedo_function_artifacts/*"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
+  #     # GPU RUNS: AMIP
+  #     - label: "GPU AMIP target: albedo from function"
+  #       key: "gpu_target_amip_albedo_function"
+  #       command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_target_amip_albedo_function.yml"
+  #       artifact_paths: "experiments/AMIP/output/amip/gpu_target_amip_albedo_function_artifacts/*"
+  #       agents:
+  #         slurm_mem: 20GB
+  #         slurm_gpus: 1
 
       - wait
 

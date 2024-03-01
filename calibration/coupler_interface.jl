@@ -1,5 +1,4 @@
 import EnsembleKalmanProcesses as EKP
-import ClimaAtmos as CA
 import ClimaCoupler as CCo
 import YAML
 
@@ -20,7 +19,7 @@ function get_coupler_sim(member, iteration, experiment_id::AbstractString)
         EKP.TOMLInterface.path_to_ensemble_member(output_dir, iteration, member)
     config_dict["output_dir"] = member_path
     # COPY Coupler Driver
-    include("/Users/akshaysridhar/Research/Codes/ClimaCoupler.jl/experiments/AMIP/coupler_driver_calibration.jl")
+    include("../experiments/AMIP/coupler_driver_calibration.jl")
     # END Coupler Driver
 
     parameter_path = joinpath(member_path, "parameters.toml")
@@ -34,8 +33,7 @@ function get_coupler_sim(member, iteration, experiment_id::AbstractString)
     config_dict["output_default_diagnostics"] = false
 
     # Set restart file for initial equilibrium state
-    ENV["RESTART_FILE"] = config_dict["restart_file"]
-    return get_coupled_simulation(config_dict)
+    return cs
 end
 
 """

@@ -475,13 +475,14 @@ cs = CoupledSimulation{FT}(
 #=
 ## Restart component model states if specified
 =#
-if restart_dir !== "unspecified"
-    for sim in cs.model_sims
-        if get_model_state_vector(sim) !== nothing
-            restart_model_state!(sim, comms_ctx, restart_t; input_dir = restart_dir)
-        end
-    end
-end
+#if restart_dir !== "unspecified"
+#    for sim in cs.model_sims
+#        if get_model_state_vector(sim) !== nothing
+#            @skipping restart
+#            restart_model_state!(sim, comms_ctx, restart_t; input_dir = restart_dir)
+#        end
+#    end
+#end
 
 #=
 ## Initialize Component Model Exchange

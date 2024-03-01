@@ -12,6 +12,7 @@ The `compute!` function is called at every atmos time step to compute the diagno
 
 To output these variables, short_name needs to be specified under diagnostics in the required yml file.
 """
+### TODO This has been fixed in a recent update
 
 add_diagnostic_variable!(
     short_name = "mse",

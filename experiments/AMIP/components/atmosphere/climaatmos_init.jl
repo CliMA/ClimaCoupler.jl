@@ -1,4 +1,4 @@
-# atmos_init: for ClimaAtmos pre-AMIP interface
+# atmos_init: for ClimaAtmos pre-AMIP interface: ln/coupler-albedo
 import ClimaAtmos as CA
 import ClimaAtmos: CT1, CT2, CT12, CT3, C3, C12, unit_basis_vector_data, ⊗
 import SurfaceFluxes as SF
@@ -64,8 +64,12 @@ end
 
 function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
 
+    # atmos_config_dict["surface_albedo"] = "CouplerAlbedo"
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
     atmos_config = CA.AtmosConfig(atmos_config_dict)
+
+    # atmos_config_dict["surface_albedo"] = set_surface_albedo!(Y, p, t, p.atmos.surface_albedo)
+
     simulation = CA.get_simulation(atmos_config)
     (; integrator) = simulation
     Y = integrator.u
@@ -367,4 +371,31 @@ function dss_state!(sim::ClimaAtmosSimulation)
         buffer = Spaces.create_dss_buffer(field)
         Spaces.weighted_dss!(field, buffer)
     end
+end
+
+# albedo extension # the atmos albedo should be moved to the ClimaUtilities?
+function ocean_albedo_from_wind(atmos_sim::ClimaAtmosSimulation, direct_albedo::Fields.Field, diffuse_albedo::Fields.Field)
+
+    Y = atmos_sim.integrator.u
+    radiation_model = atmos_sim.integrator.p.radiation.radiation_model
+    λ = FT(0) # spectral wavelength (not used for now)
+    bottom_coords = Fields.coordinate_field(Spaces.level(Y.c, 1))
+    μ = CA.RRTMGPI.array2field(
+        radiation_model.cos_zenith,
+        axes(bottom_coords),
+    )
+    FT = eltype(atmos_sim.integrator.u)
+    α_model = CA.RegressionFunctionAlbedo{FT}()
+
+
+    # set the direct and diffuse surface albedos
+    direct_albedo .=
+            CA.surface_albedo_direct(
+                α_model,
+            ).(λ, μ, norm.(Fields.level(Y.c.uₕ, 1)))
+    diffuse_albedo .=
+            CA.surface_albedo_diffuse(
+                α_model,
+            ).(λ, μ, norm.(Fields.level(Y.c.uₕ, 1)))
+
 end

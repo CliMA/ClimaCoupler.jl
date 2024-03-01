@@ -396,6 +396,24 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
+      - label: "GPU AMIP: albedo from static map"
+        key: "gpu_amip_albedo_static_map"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_amip_albedo_static_map.yml"
+        artifact_paths: "experiments/AMIP/output/amip/gpu_amip_albedo_static_map_artifacts/*"
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
+
+      - label: "GPU AMIP: albedo from temporal map"
+        key: "gpu_amip_albedo_temporal_map"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_amip_albedo_temporal_map.yml"
+        artifact_paths: "experiments/AMIP/output/amip/gpu_amip_albedo_temporal_map_artifacts/*"
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
+
+
+
       - wait
 
   - wait

@@ -235,6 +235,29 @@ steps:
           slurm_nodes: 4
           slurm_mem_per_cpu: 20G
 
+  - group: "Current target tests on GPU: AMIP surface"
+
+    steps:
+
+      - label: "GPU AMIP FINE: new target amip: topo"
+        key: "gpu_amip_target_topo"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_amip_target_topo.yml"
+        artifact_paths: "experiments/AMIP/output/amip/gpu_amip_target_topo_artifacts/*"
+        agents:
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
+          slurm_gpus: 1
+
+      - label: "GPU AMIP FINE: new target amip: topo + diagedmf"
+        key: "gpu_amip_target_topo_diagedmf"
+        command: "mpiexec julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_amip_target_topo_diagedmf.yml"
+        artifact_paths: "experiments/AMIP/output/amip/gpu_amip_target_topo_diagedmf_artifacts/*"
+        agents:
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
+          slurm_gpus: 1
 
   - group: "Other AMIP targets"
 

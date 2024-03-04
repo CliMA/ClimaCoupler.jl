@@ -2,7 +2,7 @@
 
 julia_version = "1.10.1"
 manifest_format = "2.0"
-project_hash = "3410fb43c22f219f7d863bac9a2a7bee34357166"
+project_hash = "e237b6466db7bb85f7730efc9e7650e946e179a5"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "41c37aa88889c171f1300ceac1313c06e891d245"
@@ -295,6 +295,12 @@ weakdeps = ["Krylov"]
 
     [deps.ClimaCore.extensions]
     KrylovExt = "Krylov"
+
+[[deps.ClimaCorePlots]]
+deps = ["ClimaCore", "RecipesBase", "StaticArrays", "TriplotBase"]
+git-tree-sha1 = "11b973227d09bbdeaaa191ab59f2338f3f11d118"
+uuid = "cf7c7e5a-b407-4c48-9047-11a94a308626"
+version = "0.2.6"
 
 [[deps.ClimaCoreTempestRemap]]
 deps = ["ClimaComms", "ClimaCore", "CommonDataModel", "Dates", "LinearAlgebra", "NCDatasets", "PkgVersion", "TempestRemap_jll"]
@@ -2161,6 +2167,11 @@ version = "0.4.80"
 git-tree-sha1 = "eae1bb484cd63b36999ee58be2de6c178105112f"
 uuid = "410a4b4d-49e4-4fbc-ab6d-cb71b17b3775"
 version = "0.1.8"
+
+[[deps.TriplotBase]]
+git-tree-sha1 = "4d4ed7f294cda19382ff7de4c137d24d16adc89b"
+uuid = "981d1d27-644d-49a2-9326-4793e63143c3"
+version = "0.1.0"
 
 [[deps.TruncatedStacktraces]]
 deps = ["InteractiveUtils", "MacroTools", "Preferences"]

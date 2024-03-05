@@ -126,10 +126,10 @@ end
 
 # file specific
 """
-    clean_sst(SST::FT, _info)
+    scale_sst(SST::FT, _info)
 Ensures that the space of the SST struct matches that of the land_fraction, and converts the units to Kelvin (N.B.: this is dataset specific)
 """
-clean_sst(SST, _info) = (swap_space!(zeros(axes(_info.land_fraction)), SST) .+ float_type_bcf(_info)(273.15))
+scale_sst(SST, _info) = (swap_space!(zeros(axes(_info.land_fraction)), SST) .+ float_type_bcf(_info)(273.15))
 
 # extensions required by Interfacer
 get_field(sim::SlabOceanSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
@@ -137,7 +137,7 @@ get_field(sim::SlabOceanSimulation, ::Val{:surface_humidity}) = sim.integrator.p
 get_field(sim::SlabOceanSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
 get_field(sim::SlabOceanSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
 get_field(sim::SlabOceanSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
-get_field(sim::SlabOceanSimulation, ::Val{:albedo}) = sim.integrator.p.params.α
+get_field(sim::SlabOceanSimulation, ::Val{:surface_albedo}) = sim.integrator.p.params.α
 get_field(sim::SlabOceanSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 get_field(sim::SlabOceanSimulation, ::Val{:air_density}) = sim.integrator.p.ρ_sfc
 
@@ -148,7 +148,7 @@ end
 function update_field!(sim::SlabOceanSimulation, ::Val{:turbulent_energy_flux}, field)
     parent(sim.integrator.p.F_turb_energy) .= parent(field)
 end
-function update_field!(sim::SlabOceanSimulation, ::Val{:radiative_energy_flux}, field)
+function update_field!(sim::SlabOceanSimulation, ::Val{:radiative_energy_flux_sfc}, field)
     parent(sim.integrator.p.F_radiative) .= parent(field)
 end
 function update_field!(sim::SlabOceanSimulation, ::Val{:air_density}, field)
@@ -167,11 +167,11 @@ function update_turbulent_fluxes_point!(sim::SlabOceanSimulation, fields::NamedT
 end
 
 """
-    get_model_state_vector(sim::SlabOceanSimulation)
+    get_model_prog_state(sim::SlabOceanSimulation)
 
-Extension of Checkpointer.get_model_state_vector to get the model state.
+Extension of Checkpointer.get_model_prog_state to get the model state.
 """
-function get_model_state_vector(sim::SlabOceanSimulation)
+function get_model_prog_state(sim::SlabOceanSimulation)
     return sim.integrator.u
 end
 

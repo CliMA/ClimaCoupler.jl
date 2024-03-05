@@ -27,8 +27,19 @@ If `cs_fields_ref` is provided (e.g., using a copy of cs.fields from the initial
 plot the anomalies of the fields with respect to `cs_fields_ref`.
 """
 function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
-    field_names =
-        (:albedo, :F_radiative, :F_turb_energy, :F_turb_moisture, :P_liq, :T_S, :ρ_sfc, :q_sfc, :beta, :z0b_S, :z0m_S)
+    field_names = (
+        :surface_albedo,
+        :F_radiative,
+        :F_turb_energy,
+        :F_turb_moisture,
+        :P_liq,
+        :T_S,
+        :ρ_sfc,
+        :q_sfc,
+        :beta,
+        :z0b_S,
+        :z0m_S,
+    )
     all_plots = []
     for field_name in field_names
         field = getproperty(cs_fields, field_name)

@@ -46,7 +46,7 @@ get_field(sim::BucketSimulation, ::Val{:roughness_momentum}) = sim.model.paramet
 get_field(sim::BucketSimulation, ::Val{:roughness_buoyancy}) = sim.model.parameters.z_0b
 get_field(sim::BucketSimulation, ::Val{:beta}) =
     ClimaLand.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
-get_field(sim::BucketSimulation, ::Val{:albedo}) =
+get_field(sim::BucketSimulation, ::Val{:surface_albedo}) =
     ClimaLand.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 get_field(sim::BucketSimulation, ::Val{:area_fraction}) = sim.area_fraction
 get_field(sim::BucketSimulation, ::Val{:air_density}) = sim.integrator.p.bucket.ρ_sfc
@@ -58,7 +58,7 @@ function update_field!(sim::BucketSimulation, ::Val{:turbulent_moisture_flux}, f
     ρ_liq = (LP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
     parent(sim.integrator.p.bucket.turbulent_fluxes.vapor_flux) .= parent(field ./ ρ_liq) # TODO: account for sublimation
 end
-function update_field!(sim::BucketSimulation, ::Val{:radiative_energy_flux}, field)
+function update_field!(sim::BucketSimulation, ::Val{:radiative_energy_flux_sfc}, field)
     parent(sim.integrator.p.bucket.R_n) .= parent(field)
 end
 function update_field!(sim::BucketSimulation, ::Val{:liquid_precipitation}, field)
@@ -106,11 +106,11 @@ function surface_thermo_state(
 end
 
 """
-    get_model_state_vector(sim::BucketSimulation)
+    get_model_prog_state(sim::BucketSimulation)
 
-Extension of Checkpointer.get_model_state_vector to get the model state.
+Extension of Checkpointer.get_model_prog_state to get the model state.
 """
-function get_model_state_vector(sim::BucketSimulation)
+function get_model_prog_state(sim::BucketSimulation)
     return sim.integrator.u.bucket
 end
 

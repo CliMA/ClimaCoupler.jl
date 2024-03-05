@@ -11,7 +11,7 @@ import ClimaCoupler.FluxCalculator:
     get_surface_params
 using ClimaCore: Fields.level, Geometry
 import ClimaCoupler.Interfacer: get_field, update_field!, name
-import ClimaCoupler.Checkpointer: get_model_state_vector
+import ClimaCoupler.Checkpointer: get_model_prog_state
 using StaticArrays
 
 include("climaatmos_extra_diags.jl")
@@ -105,7 +105,7 @@ function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
 end
 
 # extensions required by the Interfacer
-get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux}) =
+get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
     Fields.level(sim.integrator.p.radiation.ᶠradiation_flux, half)
 get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) = sim.integrator.p.precipitation.col_integrated_rain # kg/m^2/s
 get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) = sim.integrator.p.precipitation.col_integrated_snow  # kg/m^2/s
@@ -128,13 +128,10 @@ get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) =
     TD.air_density.(thermo_params, sim.integrator.p.precomputed.ᶜts)
 get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
     TD.air_temperature.(thermo_params, sim.integrator.p.precomputed.ᶜts)
-get_field(sim::ClimaAtmosSimulation, ::Val{:cv_m}) = TD.cv_m.(thermo_params, sim.integrator.p.precomputed.ᶜts)
-get_field(sim::ClimaAtmosSimulation, ::Val{:gas_constant_air}) =
-    TD.gas_constant_air.(thermo_params, sim.integrator.p.precomputed.ᶜts)
 
 get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxes_params(sim.integrator.p.params)
 
-function update_field!(atmos_sim::ClimaAtmosSimulation, ::Val{:co2_gm}, field)
+function update_field!(atmos_sim::ClimaAtmosSimulation, ::Val{:co2}, field)
     if atmos_sim.integrator.p.atmos.radiation_mode isa CA.RRTMGPI.GrayRadiation
         @warn("Gray radiation model initialized, skipping CO2 update", maxlog = 1)
         return
@@ -147,7 +144,7 @@ function update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temperature}, c
     sim.integrator.p.radiation.radiation_model.surface_temperature .= CA.RRTMGPI.field2array(csf.T_S)
 end
 
-function update_field!(sim::ClimaAtmosSimulation, ::Val{:albedo}, field)
+function update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_albedo}, field)
     sim.integrator.p.radiation.radiation_model.diffuse_sw_surface_albedo .=
         reshape(CA.RRTMGPI.field2array(field), 1, length(parent(field)))
     sim.integrator.p.radiation.radiation_model.direct_sw_surface_albedo .=
@@ -188,7 +185,7 @@ step!(sim::ClimaAtmosSimulation, t) = step!(sim.integrator, t - sim.integrator.t
 reinit!(sim::ClimaAtmosSimulation) = reinit!(sim.integrator)
 
 function update_sim!(atmos_sim::ClimaAtmosSimulation, csf, turbulent_fluxes)
-    update_field!(atmos_sim, Val(:albedo), csf.albedo)
+    update_field!(atmos_sim, Val(:surface_albedo), csf.surface_albedo)
     update_field!(atmos_sim, Val(:surface_temperature), csf)
 
     if turbulent_fluxes isa PartitionedStateFluxes
@@ -295,21 +292,21 @@ function calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::Fie
 end
 
 """
-    get_model_state_vector(sim::ClimaAtmosSimulation)
+    get_model_prog_state(sim::ClimaAtmosSimulation)
 
-Extension of Checkpointer.get_model_state_vector to get the model state.
+Extension of Checkpointer.get_model_prog_state to get the model state.
 """
-function get_model_state_vector(sim::ClimaAtmosSimulation)
+function get_model_prog_state(sim::ClimaAtmosSimulation)
     return sim.integrator.u
 end
 
 """
-    get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:F_radiative_TOA})
+    get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_toa})
 
 Extension of Interfacer.get_field to get the net TOA radiation, which is a sum of the
 upward and downward longwave and shortwave radiation.
 """
-function get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:F_radiative_TOA})
+function get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_toa})
     FT = eltype(atmos_sim.integrator.u)
     # save radiation source
     if atmos_sim.integrator.p.radiation.radiation_model != nothing

@@ -21,7 +21,7 @@ end
 
 get_field(sim::DummySimulation, ::Val{:turbulent_energy_flux}) = sim.cache.turbulent_energy_flux
 get_field(sim::DummySimulation, ::Val{:turbulent_moisture_flux}) = sim.cache.turbulent_moisture_flux
-get_field(sim::DummySimulation, ::Val{:radiative_energy_flux}) = sim.cache.radiative_energy_flux
+get_field(sim::DummySimulation, ::Val{:radiative_energy_flux_sfc}) = sim.cache.radiative_energy_flux_sfc
 get_field(sim::DummySimulation, ::Val{:liquid_precipitation}) = sim.cache.liquid_precipitation
 get_field(sim::DummySimulation, ::Val{:snow_precipitation}) = sim.cache.snow_precipitation
 
@@ -41,7 +41,7 @@ end
 
 get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:surface_temperature}) =
     sim.cache_field .* eltype(sim.cache_field)(1.0)
-get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:albedo}) =
+get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:surface_albedo}) =
     sim.cache_field .* eltype(sim.cache_field)(1.0)
 get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:roughness_momentum}) =
     sim.cache_field .* eltype(sim.cache_field)(1.0)
@@ -63,12 +63,15 @@ get_field(sim::Union{TestSurfaceSimulation2, TestSurfaceSimulation2}, ::Val{:sur
 struct TestAtmosSimulation{C} <: AtmosModelSimulation
     cache::C
 end
-function update_field!(sim::TestAtmosSimulation, ::Val{:albedo}, field)
-    parent(sim.cache.albedo) .= parent(field)
+function update_field!(sim::TestAtmosSimulation, ::Val{:surface_albedo}, field)
+    parent(sim.cache.surface_albedo) .= parent(field)
 end
 function update_field!(sim::TestAtmosSimulation, ::Val{:roughness_momentum}, field)
     parent(sim.cache.roughness_momentum) .= parent(field)
 end
+
+update_field!(sim::TestAtmosSimulation, ::Val{:roughness_buoyancy}, field) = nothing
+update_field!(sim::TestAtmosSimulation, ::Val{:beta}, field) = nothing
 
 #surface sim
 struct TestSurfaceSimulationLand{C} <: SurfaceModelSimulation
@@ -92,7 +95,7 @@ for FT in (Float32, Float64)
         atmos_names = (
             :turbulent_energy_flux,
             :turbulent_moisture_flux,
-            :radiative_energy_flux,
+            :radiative_energy_flux_sfc,
             :liquid_precipitation,
             :snow_precipitation,
         )
@@ -116,10 +119,10 @@ for FT in (Float32, Float64)
     @testset "import_combined_surface_fields! for FT=$FT" begin
         # coupler cache setup
         boundary_space = TestHelper.create_space(FT)
-        coupler_names = (:T_S, :z0m_S, :z0b_S, :albedo, :beta, :q_sfc)
+        coupler_names = (:T_S, :z0m_S, :z0b_S, :surface_albedo, :beta, :q_sfc)
 
         # coupler cache setup
-        exchanged_fields = (:surface_temperature, :albedo, :roughness_momentum, :roughness_buoyancy, :beta)
+        exchanged_fields = (:surface_temperature, :surface_albedo, :roughness_momentum, :roughness_buoyancy, :beta)
 
         sims = (; a = TestSurfaceSimulation1(ones(boundary_space)), b = TestSurfaceSimulation2(ones(boundary_space)))
 
@@ -131,7 +134,7 @@ for FT in (Float32, Float64)
             coupler_fields = NamedTuple{coupler_names}(ntuple(i -> Fields.zeros(boundary_space), length(coupler_names)))
             import_combined_surface_fields!(coupler_fields, sims, boundary_space, t)
             @test parent(coupler_fields.T_S)[1] == results[1]
-            @test parent(coupler_fields.albedo)[1] == results[1]
+            @test parent(coupler_fields.surface_albedo)[1] == results[1]
             @test parent(coupler_fields.z0m_S)[1] == results[i]
             @test parent(coupler_fields.z0b_S)[1] == results[i]
             @test parent(coupler_fields.beta)[1] == results[i]
@@ -146,7 +149,7 @@ for FT in (Float32, Float64)
             :T_S,
             :z0m_S,
             :z0b_S,
-            :albedo,
+            :surface_albedo,
             :beta,
             :F_turb_energy,
             :F_turb_moisture,
@@ -159,13 +162,13 @@ for FT in (Float32, Float64)
 
         # model cache setup
 
-        atmos_names = (:surface_temperature, :albedo, :roughness_momentum, :roughness_buoyancy, :beta)
+        atmos_names = (:surface_temperature, :surface_albedo, :roughness_momentum, :roughness_buoyancy, :beta)
         atmos_fields = NamedTuple{atmos_names}(ntuple(i -> Fields.zeros(boundary_space), length(atmos_names)))
 
         land_names = (
             :turbulent_energy_flux,
             :turbulent_moisture_flux,
-            :radiative_energy_flux,
+            :radiative_energy_flux_sfc,
             :liquid_precipitation,
             :snow_precipitation,
             :ρ_sfc,
@@ -189,7 +192,7 @@ for FT in (Float32, Float64)
             update_model_sims!(model_sims, coupler_fields, t)
 
             # test atmos
-            @test parent(model_sims.atmos_sim.cache.albedo)[1] == results[2]
+            @test parent(model_sims.atmos_sim.cache.surface_albedo)[1] == results[2]
             if t isa CombinedStateFluxes
                 @test parent(model_sims.atmos_sim.cache.roughness_momentum)[1] == results[2]
             else
@@ -206,7 +209,7 @@ for FT in (Float32, Float64)
             @test parent(model_sims.land_sim.cache.turbulent_moisture_flux)[1] == results[2]
 
             # unspecified variables
-            @test parent(model_sims.land_sim.cache.radiative_energy_flux)[1] == results[1]
+            @test parent(model_sims.land_sim.cache.radiative_energy_flux_sfc)[1] == results[1]
             @test parent(model_sims.land_sim.cache.liquid_precipitation)[1] == results[1]
             @test parent(model_sims.land_sim.cache.snow_precipitation)[1] == results[1]
 

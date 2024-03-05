@@ -5,7 +5,7 @@ This module contains general functions for logging the model states and restarti
 ## Checkpointer API
 
 ```@docs
-    ClimaCoupler.Checkpointer.get_model_state_vector
+    ClimaCoupler.Checkpointer.get_model_prog_state
     ClimaCoupler.Checkpointer.restart_model_state!
     ClimaCoupler.Checkpointer.checkpoint_model_state
 ```

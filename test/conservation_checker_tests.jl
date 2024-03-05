@@ -25,7 +25,7 @@ struct TestAtmos{I} <: Interfacer.AtmosModelSimulation
     i::I
 end
 name(s::TestAtmos) = "TestAtmos"
-get_field(s::TestAtmos, ::Val{:F_radiative_TOA}) = ones(s.i.space) .* 200
+get_field(s::TestAtmos, ::Val{:radiative_energy_flux_toa}) = ones(s.i.space) .* 200
 get_field(s::TestAtmos, ::Val{:water}) = ones(s.i.space) .* 1
 function get_field(s::TestAtmos, ::Val{:energy})
     FT = Domains.float_type(Meshes.domain(s.i.space.grid.topology.mesh))
@@ -74,13 +74,13 @@ for FT in (Float32, Float64)
 
         # coupler fields
         cf = (;
-            F_radiative_TOA = Fields.ones(space),
+            radiative_energy_flux_toa = Fields.ones(space),
             P_net = Fields.zeros(space),
             P_liq = Fields.zeros(space),
             P_snow = Fields.zeros(space),
             F_turb_moisture = Fields.zeros(space),
         )
-        @. cf.F_radiative_TOA = 200
+        @. cf.radiative_energy_flux_toa = 200
         @. cf.P_liq = -100
 
         # init
@@ -103,7 +103,7 @@ for FT in (Float32, Float64)
         )
 
         # set non-zero radiation and precipitation
-        F_r = cf.F_radiative_TOA
+        F_r = cf.radiative_energy_flux_toa
         P = cf.P_liq
         Δt = cs.Δt_cpl
 
@@ -152,13 +152,13 @@ for FT in (Float32, Float64)
 
         # coupler fields
         cf = (;
-            F_radiative_TOA = Fields.ones(space),
+            radiative_energy_flux_toa = Fields.ones(space),
             P_net = Fields.zeros(space),
             P_liq = Fields.zeros(space),
             P_snow = Fields.zeros(space),
             F_turb_moisture = Fields.zeros(space),
         )
-        @. cf.F_radiative_TOA = 200
+        @. cf.radiative_energy_flux_toa = 200
         @. cf.P_liq = -100
 
         # init

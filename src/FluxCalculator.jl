@@ -379,38 +379,12 @@ end
 
 update_turbulent_fluxes_point!(sim::Interfacer.SurfaceStub, fields::NamedTuple, colidx::Fields.ColumnIndex) = nothing
 
+"""
+    differentiate_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, args)
+
+This function provides a placeholder for differentiating fluxes with respect to
+surface temperature in surface energy balance calculations.
+"""
 differentiate_turbulent_fluxes!(::Interfacer.SurfaceModelSimulation, args) = nothing
-
-"""
-    differentiate_turbulent_fluxes(sim::Interfacer.SurfaceModelSimulation, thermo_params, input_args, fluxes, δT_sfc = 0.1)
-
-Differentiates the turbulent fluxes in the surface model simulation `sim` with respect to the surface temperature,
-using δT_sfc as the perturbation.
-"""
-function differentiate_turbulent_fluxes!(
-    sim::Interfacer.SurfaceModelSimulation,
-    thermo_params,
-    input_args,
-    fluxes;
-    δT_sfc = 0.1,
-)
-    (; thermo_state_int, surface_params, surface_scheme, colidx) = input_args
-    thermo_state_sfc_dT = surface_thermo_state(sim, thermo_params, thermo_state_int, colidx, δT_sfc = δT_sfc)
-    input_args = merge(input_args, (; thermo_state_sfc = thermo_state_sfc_dT))
-
-    # set inputs based on whether the surface_scheme is `MoninObukhovScheme` or `BulkScheme`
-    inputs = surface_inputs(surface_scheme, input_args)
-
-    # calculate the surface fluxes
-    _, _, F_shf_δT_sfc, F_lhf_δT_sfc, _ = get_surface_fluxes_point!(inputs, surface_params)
-
-    (; F_shf, F_lhf) = fluxes
-
-    # calculate the derivative
-    ∂F_turb_energy∂T_sfc = @. (F_shf_δT_sfc + F_lhf_δT_sfc - F_shf - F_lhf) / δT_sfc
-
-    Interfacer.update_field!(sim, Val(:∂F_turb_energy∂T_sfc), ∂F_turb_energy∂T_sfc, colidx)
-
-end
 
 end # module

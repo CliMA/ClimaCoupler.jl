@@ -63,7 +63,6 @@ function get_atmos_config(coupler_dict)
 end
 
 function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
-
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
     atmos_config = CA.AtmosConfig(atmos_config_dict)
     simulation = CA.get_simulation(atmos_config)
@@ -76,16 +75,27 @@ function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
         @warn("Running with ρe_int in coupled mode is not tested yet.", maxlog = 1)
     end
 
+    # define shorter references for long variable names to increase readability
+    ρ_flux_h_tot = integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot
+    ρ_flux_q_tot = integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot
+    ᶠradiation_flux = integrator.p.radiation.ᶠradiation_flux
+    ρ_flux_uₕ = integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ
+    col_integrated_rain = integrator.p.precipitation.col_integrated_rain
+    col_integrated_snow = integrator.p.precipitation.col_integrated_snow
+    ᶜS_ρq_tot = integrator.p.precipitation.ᶜS_ρq_tot
+    ᶜ3d_rain = integrator.p.precipitation.ᶜ3d_rain
+    ᶜ3d_snow = integrator.p.precipitation.ᶜ3d_snow
+
     # set initial fluxes to zero
-    @. integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot = Geometry.Covariant3Vector(FT(0.0))
-    @. integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot = Geometry.Covariant3Vector(FT(0.0))
-    @. integrator.p.radiation.ᶠradiation_flux = Geometry.WVector(FT(0))
-    integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ.components .= Ref(SMatrix{1, 2}([FT(0), FT(0)]))
-    integrator.p.precipitation.col_integrated_rain .= FT(0)
-    integrator.p.precipitation.col_integrated_snow .= FT(0)
-    integrator.p.precipitation.ᶜS_ρq_tot .= FT(0)
-    integrator.p.precipitation.ᶜ3d_rain .= FT(0)
-    integrator.p.precipitation.ᶜ3d_snow .= FT(0)
+    @. ρ_flux_h_tot = Geometry.Covariant3Vector(FT(0.0))
+    @. ρ_flux_q_tot = Geometry.Covariant3Vector(FT(0.0))
+    @. ᶠradiation_flux = Geometry.WVector(FT(0))
+    ρ_flux_uₕ.components .= Ref(SMatrix{1, 2}([FT(0), FT(0)]))
+    col_integrated_rain .= FT(0)
+    col_integrated_snow .= FT(0)
+    ᶜS_ρq_tot .= FT(0)
+    ᶜ3d_rain .= FT(0)
+    ᶜ3d_snow .= FT(0)
 
     sim = ClimaAtmosSimulation(integrator.p.params, Y, spaces, integrator)
 
@@ -300,29 +310,19 @@ Extension of Interfacer.get_field to get the net TOA radiation, which is a sum o
 upward and downward longwave and shortwave radiation.
 """
 function get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:F_radiative_TOA})
-    radiation = atmos_sim.integrator.p.radiation.radiation_model
     FT = eltype(atmos_sim.integrator.u)
     # save radiation source
-    if radiation != nothing
+    if atmos_sim.integrator.p.radiation.radiation_model != nothing
         face_space = axes(atmos_sim.integrator.u.f)
         nz_faces = length(Spaces.vertical_topology(face_space).mesh.faces)
 
-        LWd_TOA = Fields.level(
-            CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_lw_flux_dn), face_space),
-            nz_faces - half,
-        )
-        LWu_TOA = Fields.level(
-            CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_lw_flux_up), face_space),
-            nz_faces - half,
-        )
-        SWd_TOA = Fields.level(
-            CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_sw_flux_dn), face_space),
-            nz_faces - half,
-        )
-        SWu_TOA = Fields.level(
-            CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_sw_flux_up), face_space),
-            nz_faces - half,
-        )
+        (; face_lw_flux_dn, face_lw_flux_up, face_sw_flux_dn, face_sw_flux_up) =
+            atmos_sim.integrator.p.radiation.radiation_model
+
+        LWd_TOA = Fields.level(CA.RRTMGPI.array2field(FT.(face_lw_flux_dn), face_space), nz_faces - half)
+        LWu_TOA = Fields.level(CA.RRTMGPI.array2field(FT.(face_lw_flux_up), face_space), nz_faces - half)
+        SWd_TOA = Fields.level(CA.RRTMGPI.array2field(FT.(face_sw_flux_dn), face_space), nz_faces - half)
+        SWu_TOA = Fields.level(CA.RRTMGPI.array2field(FT.(face_sw_flux_up), face_space), nz_faces - half)
 
         return @. -(LWd_TOA + SWd_TOA - LWu_TOA - SWu_TOA) # [W/m^2]
     else

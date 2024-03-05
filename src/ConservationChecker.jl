@@ -96,14 +96,14 @@ function check_conservation!(
     for sim in model_sims
         sim_name = Symbol(Interfacer.name(sim))
         if sim isa Interfacer.AtmosModelSimulation
+            F_radiative_TOA = coupler_sim.fields.F_radiative_TOA
             # save radiation source
-            parent(coupler_sim.fields.F_radiative_TOA) .= parent(Interfacer.get_field(sim, Val(:F_radiative_TOA)))
+            parent(F_radiative_TOA) .= parent(Interfacer.get_field(sim, Val(:F_radiative_TOA)))
 
             if isempty(ccs.toa_net_source)
-                radiation_sources_accum = sum(coupler_sim.fields.F_radiative_TOA .* FT(coupler_sim.Δt_cpl)) # ∫ J / m^2 dA
+                radiation_sources_accum = sum(F_radiative_TOA .* FT(coupler_sim.Δt_cpl)) # ∫ J / m^2 dA
             else
-                radiation_sources_accum =
-                    sum(coupler_sim.fields.F_radiative_TOA .* FT(coupler_sim.Δt_cpl)) .+ ccs.toa_net_source[end] # ∫ J / m^2 dA
+                radiation_sources_accum = sum(F_radiative_TOA .* FT(coupler_sim.Δt_cpl)) .+ ccs.toa_net_source[end] # ∫ J / m^2 dA
             end
             push!(ccs.toa_net_source, radiation_sources_accum)
 

@@ -15,8 +15,10 @@ function make_land_domain(
     @assert zlim[1] < zlim[2]
     depth = zlim[2] - zlim[1]
 
-    radius = ClimaCore.Spaces.topology(atmos_boundary_space).mesh.domain.radius
-    nelements_horz = ClimaCore.Spaces.topology(atmos_boundary_space).mesh.ne
+    mesh = ClimaCore.Spaces.topology(atmos_boundary_space).mesh
+
+    radius = mesh.domain.radius
+    nelements_horz = mesh.ne
     npolynomial =
         ClimaCore.Spaces.Quadratures.polynomial_degree(ClimaCore.Spaces.quadrature_style(atmos_boundary_space))
     nelements = (nelements_horz, nelements_vert)
@@ -79,9 +81,10 @@ reinit!(sim::BucketSimulation) = reinit!(sim.integrator)
 # extensions required by FluxCalculator (partitioned fluxes)
 function update_turbulent_fluxes_point!(sim::BucketSimulation, fields::NamedTuple, colidx::Fields.ColumnIndex)
     (; F_turb_energy, F_turb_moisture) = fields
-    sim.integrator.p.bucket.turbulent_fluxes.shf[colidx] .= F_turb_energy
-    sim.integrator.p.bucket.turbulent_fluxes.vapor_flux[colidx] .=
-        F_turb_moisture ./ LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
+    turbulent_fluxes = sim.integrator.p.bucket.turbulent_fluxes
+    turbulent_fluxes.shf[colidx] .= F_turb_energy
+    earth_params = sim.model.parameters.earth_param_set
+    turbulent_fluxes.vapor_flux[colidx] .= F_turb_moisture ./ LP.ρ_cloud_liq(earth_params)
     return nothing
 end
 

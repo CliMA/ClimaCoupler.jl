@@ -6,6 +6,8 @@ using Test
 using ClimaCoupler: Utilities, TestHelper
 using ClimaCore: Fields
 
+import ClimaComms
+
 for FT in (Float32, Float64)
     @testset "test swap_space!" begin
         space1 = TestHelper.create_space(FT, R = FT(6371e3))
@@ -18,5 +20,37 @@ for FT in (Float32, Float64)
 
         @test parent(field1) == parent(field2)
         @test axes(field2) == space2
+    end
+
+    @testset "test comms_ctx" begin
+        parsed_args = Dict("device" => "auto")
+
+        this_device = ClimaComms.device()
+        this_ctx = ClimaComms.context(this_device)
+
+        @test typeof(Utilities.get_comms_context(parsed_args)) == typeof(this_ctx)
+
+        if typeof(this_device) == typeof(ClimaComms.CUDADevice())
+            parsed_args["device"] = "CUDADevice"
+        elseif typeof(this_device) == typeof(ClimaComms.CPUMultiThreaded())
+            parsed_args["device"] = "CPUMultiThreaded"
+        else
+            parsed_args["device"] = "CPUSingleThreaded"
+        end
+
+        ClimaComms.init(this_ctx)
+        @test typeof(Utilities.get_comms_context(parsed_args)) == typeof(this_ctx)
+
+        # Additional test calls for code coverage since Github Actions only exercises the SingleThreaded calculates
+        # More meaningful testing performed on buildkite
+        # Cannot test CUDADevice on CPU 
+        # Test other devices: 
+        parsed_args["device"] = "CPUMultiThreaded"
+        @test typeof(Utilities.get_comms_context(parsed_args)) ==
+              typeof(ClimaComms.context(ClimaComms.CPUMultiThreaded()))
+
+        parsed_args["device"] = ""
+        @test typeof(Utilities.get_comms_context(parsed_args)) ==
+              typeof(ClimaComms.context(ClimaComms.CPUSingleThreaded()))
     end
 end

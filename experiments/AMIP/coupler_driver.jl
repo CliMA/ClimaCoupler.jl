@@ -5,11 +5,6 @@
 # (See also Base.type_limited_string_from_context())
 redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(false)))
 
-# Set up context for CPU single thread/CPU with MPI/GPU
-using ClimaComms
-comms_ctx = ClimaComms.context()
-const pid, nprocs = ClimaComms.init(comms_ctx)
-
 # # AMIP Driver
 
 #=
@@ -80,7 +75,7 @@ import ClimaCoupler.Regridder:
     update_surface_fractions!, combine_surfaces!, combine_surfaces_from_sol!, dummmy_remap!, binary_mask
 import ClimaCoupler.ConservationChecker:
     EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
-import ClimaCoupler.Utilities: swap_space!
+import ClimaCoupler.Utilities: swap_space!, get_comms_context
 import ClimaCoupler.BCReader:
     bcfile_info_init, float_type_bcf, update_midmonth_data!, next_date_in_file, interpolate_midmonth_to_daily
 import ClimaCoupler.TimeManager:
@@ -158,6 +153,11 @@ config_dict_atmos = get_atmos_config(config_dict)
 # merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
 # (if there are common keys, the last dictorionary in the `merge` arguments takes precedence)
 config_dict = merge(config_dict_atmos, config_dict)
+
+# Set up context for CPU single thread/CPU with MPI/GPU
+using ClimaComms
+comms_ctx = get_comms_context(parsed_args)
+const pid, nprocs = ClimaComms.init(comms_ctx)
 
 ## read in some parsed command line arguments
 mode_name = config_dict["mode_name"]

@@ -8,14 +8,14 @@ dt_save_to_sol: "1days"
 dz_bottom: 30
 dz_top: 3000
 h_elem: 4
-job_id: "gpu_amip_albedo_function"
-land_albedo_type: "function"
+job_id: "gpu_amip_albedo_temporal_map"
+land_albedo_type: "map_temporal"
 mode_name: "amip"
 moist: "equil"
 precip_model: "0M"
 rad: "gray"
 rayleigh_sponge: true
-run_name: "gpu_amip_albedo_function"
+run_name: "gpu_amip_albedo_temporal_map"
 t_end: "300secs"
 vert_diff: "true"
 z_elem: 50

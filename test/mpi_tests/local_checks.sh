@@ -6,6 +6,8 @@
 #SBATCH --mem=32GB
 #SBATCH --ntasks=2
 
+# TODO: this needs to be updated (+ implement better tests that are caught on Buildkite) #667
+
 module purge
 module load julia/1.10.1
 export JULIA_MPI_BINARY=system

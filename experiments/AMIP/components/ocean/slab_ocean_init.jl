@@ -1,9 +1,12 @@
-using ClimaCore
+import SciMLBase: ODEProblem, init
 
+using ClimaCore
 import ClimaTimeSteppers as CTS
 import ClimaCoupler.Interfacer: OceanModelSimulation, get_field, update_field!, name
 import ClimaCoupler.FieldExchanger: step!, reinit!
 import ClimaCoupler.FluxCalculator: update_turbulent_fluxes_point!
+import ClimaCoupler.Utilities: swap_space!
+import ClimaCoupler.BCReader: float_type_bcf
 
 include("../slab_utils.jl")
 
@@ -141,7 +144,7 @@ get_field(sim::SlabOceanSimulation, ::Val{:surface_albedo}) = sim.integrator.p.p
 get_field(sim::SlabOceanSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 get_field(sim::SlabOceanSimulation, ::Val{:air_density}) = sim.integrator.p.ρ_sfc
 
-function update_field!(sim::SlabOceanSimulation, ::Val{:area_fraction}, field::Fields.Field)
+function update_field!(sim::SlabOceanSimulation, ::Val{:area_fraction}, field::ClimaCore.Fields.Field)
     sim.integrator.p.area_fraction .= field
 end
 
@@ -161,7 +164,11 @@ step!(sim::SlabOceanSimulation, t) = step!(sim.integrator, t - sim.integrator.t,
 reinit!(sim::SlabOceanSimulation) = reinit!(sim.integrator)
 
 # extensions required by FluxCalculator (partitioned fluxes)
-function update_turbulent_fluxes_point!(sim::SlabOceanSimulation, fields::NamedTuple, colidx::Fields.ColumnIndex)
+function update_turbulent_fluxes_point!(
+    sim::SlabOceanSimulation,
+    fields::NamedTuple,
+    colidx::ClimaCore.Fields.ColumnIndex,
+)
     (; F_turb_energy) = fields
     @. sim.integrator.p.F_turb_energy[colidx] = F_turb_energy
 end
@@ -198,6 +205,6 @@ function dss_state!(sim::SlabOceanSimulation)
     for key in propertynames(Y)
         field = getproperty(Y, key)
         buffer = get_dss_buffer(axes(field), p)
-        Spaces.weighted_dss!(field, buffer)
+        ClimaCore.Spaces.weighted_dss!(field, buffer)
     end
 end

@@ -79,7 +79,7 @@ step!(sim::BucketSimulation, t) = step!(sim.integrator, t - sim.integrator.t, tr
 reinit!(sim::BucketSimulation) = reinit!(sim.integrator)
 
 # extensions required by FluxCalculator (partitioned fluxes)
-function update_turbulent_fluxes_point!(sim::BucketSimulation, fields::NamedTuple, colidx::Fields.ColumnIndex)
+function update_turbulent_fluxes_point!(sim::BucketSimulation, fields::NamedTuple, colidx::ClimaCore.Fields.ColumnIndex)
     (; F_turb_energy, F_turb_moisture) = fields
     turbulent_fluxes = sim.integrator.p.bucket.turbulent_fluxes
     turbulent_fluxes.shf[colidx] .= F_turb_energy

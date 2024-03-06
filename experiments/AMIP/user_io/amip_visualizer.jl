@@ -1,4 +1,7 @@
 import ClimaComms
+using ClimaCore
+import ClimaCoupler.PostProcessor: postprocess
+
 include("plot_helper.jl")
 
 """
@@ -80,8 +83,8 @@ function read_latest_model_data(name::Symbol, filedir::String, root::String)
 
     # Ensure file gets read onto CPU for postprocessing
     cpu_singleton_context = ClimaComms.SingletonCommsContext(ClimaComms.CPUSingleThreaded())
-    hdfreader = InputOutput.HDF5Reader(filename, cpu_singleton_context)
-    var = InputOutput.read_field(hdfreader, string(name))
+    hdfreader = ClimaCore.InputOutput.HDF5Reader(filename, cpu_singleton_context)
+    var = ClimaCore.InputOutput.read_field(hdfreader, string(name))
     close(hdfreader)
     return var
 end

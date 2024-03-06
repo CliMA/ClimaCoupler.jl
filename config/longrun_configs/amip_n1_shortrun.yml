@@ -22,3 +22,7 @@ t_end: "1days"
 vert_diff: "true"
 z_elem: 50
 z_stretch: false
+diagnostics: 
+  - short_name: [pfull, wa, va, rv]
+    period: 150secs
+    reduction: average

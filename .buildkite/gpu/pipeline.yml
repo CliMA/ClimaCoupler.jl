@@ -76,7 +76,7 @@ steps:
         command:
           - >
             srun --cpu-bind=threads --cpus-per-task=4
-            julia --threads=3 --color=yes --project=experiments/AMIP experiments/AMIP/hybrid/driver.jl
+            julia --threads=3 --color=yes --project=experiments/AMIP experiments/AMIP/coupler_driver.jl
             --config_file $GPU_CONFIG_PATH/gpu_amip_chap_4process.yml
         artifact_paths: "gpu_amip_chap_4process/*"
         agents:
@@ -124,7 +124,7 @@ steps:
         command:
           - >
             srun --cpu-bind=threads --cpus-per-task=4
-            julia --threads=3 --color=yes --project=experiments/AMIP experiments/AMIP/hybrid/driver.jl
+            julia --threads=3 --color=yes --project=experiments/AMIP experiments/AMIP/coupler_driver.jl
             --config_file $GPU_CONFIG_PATH/gpu_amip_chap_ws_4process.yml
         artifact_paths: "gpu_amip_chap_ws_4process/*"
         agents:

@@ -1,0 +1,87 @@
+agents:
+  queue: clima
+  slurm_mem: 8G
+  modules: common nsight-systems/2023.4.1
+
+env:
+  JULIA_CUDA_MEMORY_POOL: none
+  JULIA_MPI_HAS_CUDA: "true"
+  JULIA_NVTX_CALLBACKS: gc
+  JULIA_MAX_NUM_PRECOMPILE_FILES: 100
+  OPENBLAS_NUM_THREADS: 1
+  OMPI_MCA_opal_warn_on_missing_libcuda: 0
+  SLURM_KILL_BAD_EXIT: 1
+  SLURM_GPU_BIND: none # https://github.com/open-mpi/ompi/issues/11949#issuecomment-1737712291
+  GPU_CONFIG_PATH: "config/gpu_configs"
+  CLIMAATMOS_GC_NSTEPS: 10
+
+steps:
+  - label: "init :GPU:"
+    key: "init_gpu_env"
+    command:
+      - echo "--- Instantiate experiments/AMIP"
+      - julia --project=experiments/AMIP -e 'using Pkg; Pkg.instantiate(;verbose=true)'
+      - julia --project=experiments/AMIP -e 'using Pkg; Pkg.precompile()'
+      - julia --project=experiments/AMIP -e 'using Pkg; Pkg.status()'
+
+      - echo "--- Download artifacts"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.status()'"
+      - "julia --project=artifacts artifacts/download_artifacts.jl"
+
+    agents:
+      slurm_gpus: 1
+      slurm_cpus_per_task: 8
+    env:
+      JULIA_NUM_PRECOMPILE_TASKS: 8
+      JULIA_MAX_NUM_PRECOMPILE_FILES: 50
+
+  - wait
+
+  - group: "CHAP GPU strong scaling"
+    steps:
+
+      - label: "GPU AMIP CHAP - strong scaling - 1 GPU"
+        key: "gpu_amip_chap"
+        command:
+          - >
+            julia --threads=3 --color=yes --project=experiments/AMIP experiments/AMIP/coupler_driver.jl
+            --config_file $GPU_CONFIG_PATH/gpu_amip_chap.yml
+        artifact_paths: "gpu_amip_chap/*"
+        agents:
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 1
+          slurm_mem: 32G
+          slurm_exclusive:
+
+      - label: "GPU AMIP CHAP - strong scaling - 2 GPUs"
+        key: "gpu_amip_chap_2process"
+        command:
+          - >
+            srun --cpu-bind=threads --cpus-per-task=4
+            julia --threads=3 --color=yes --project=experiments/AMIP experiments/AMIP/coupler_driver.jl
+            --config_file $GPU_CONFIG_PATH/gpu_amip_chap_2process.yml
+        artifact_paths: "gpu_amip_chap_2process/*"
+        agents:
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 2
+          slurm_mem: 32G
+          slurm_exclusive:
+
+      - label: "GPU AMIP CHAP - strong scaling - 4 GPUs"
+        key: "gpu_amip_chap_4process"
+        command:
+          - >
+            srun --cpu-bind=threads --cpus-per-task=4
+            julia --threads=3 --color=yes --project=experiments/AMIP experiments/AMIP/hybrid/driver.jl
+            --config_file $GPU_CONFIG_PATH/gpu_amip_chap_4process.yml
+        artifact_paths: "gpu_amip_chap_4process/*"
+        agents:
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 4
+          slurm_mem: 32G
+          slurm_exclusive:

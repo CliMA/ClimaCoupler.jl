@@ -678,7 +678,7 @@ function solve_coupler!(cs)
     end
     @show walltime
 
-    return cs
+    return walltime
 end
 
 ## exit if running performance anaysis #hide
@@ -687,7 +687,11 @@ if haskey(ENV, "CI_PERF_SKIP_COUPLED_RUN") #hide
 end #hide
 
 ## run the coupled simulation
-solve_coupler!(cs);
+walltime = solve_coupler!(cs);
+
+# Show the simulated years per day of the simulation
+es = CA.EfficiencyStats(tspan, walltime)
+@info "SYPD: $(CA.simulated_years_per_day(es))"
 
 #=
 ## Postprocessing

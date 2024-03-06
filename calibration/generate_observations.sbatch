@@ -24,7 +24,7 @@ output_dir = joinpath(experiment_dir, "truth_simulation")
 include("coupler_driver_calibration.jl");
 solve_coupler!(cs); # Integrate the coupled model
 
-ts = ncread(joinpath(output_dir, "", "ts_60d_average.nc"), "ta")
+ta = ncread(joinpath(output_dir, "", "ta_150s_average.nc"), "ta")
 include(joinpath(experiment_dir, "observation_map.jl"))
 (; observation, variance) = process_member_data(ta; output_variance = true)
 JLD2.save_object(joinpath(experiment_dir, "obs_mean.jld2"), observation)

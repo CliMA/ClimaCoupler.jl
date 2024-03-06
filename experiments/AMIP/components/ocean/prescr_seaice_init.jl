@@ -124,10 +124,10 @@ end
 
 # file-specific
 """
-    clean_sic(SIC, _info)
+    scale_sic(SIC, _info)
 Ensures that the space of the SIC struct matches that of the mask, and converts the units from area % to area fraction.
 """
-clean_sic(SIC, _info) = swap_space!(zeros(axes(_info.land_fraction)), SIC) ./ float_type_bcf(_info)(100.0)
+scale_sic(SIC, _info) = swap_space!(zeros(axes(_info.land_fraction)), SIC) ./ float_type_bcf(_info)(100.0)
 
 # setting that SIC < 0.5 is counted as ocean if binary remapping.
 get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
@@ -139,7 +139,7 @@ get_field(sim::PrescribedIceSimulation, ::Val{:surface_humidity}) = sim.integrat
 get_field(sim::PrescribedIceSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
 get_field(sim::PrescribedIceSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
 get_field(sim::PrescribedIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
-get_field(sim::PrescribedIceSimulation, ::Val{:albedo}) = sim.integrator.p.params.α
+get_field(sim::PrescribedIceSimulation, ::Val{:surface_albedo}) = sim.integrator.p.params.α
 get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 get_field(sim::PrescribedIceSimulation, ::Val{:air_density}) = sim.integrator.p.ρ_sfc
 
@@ -150,7 +150,7 @@ end
 function update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_energy_flux}, field)
     parent(sim.integrator.p.F_turb_energy) .= parent(field)
 end
-function update_field!(sim::PrescribedIceSimulation, ::Val{:radiative_energy_flux}, field)
+function update_field!(sim::PrescribedIceSimulation, ::Val{:radiative_energy_flux_sfc}, field)
     parent(sim.integrator.p.F_radiative) .= parent(field)
 end
 function update_field!(sim::PrescribedIceSimulation, ::Val{:air_density}, field)
@@ -168,11 +168,11 @@ function update_turbulent_fluxes_point!(sim::PrescribedIceSimulation, fields::Na
 end
 
 """
-    get_model_state_vector(sim::PrescribedIceSimulation)
+    get_model_prog_state(sim::PrescribedIceSimulation)
 
-Extension of Checkpointer.get_model_state_vector to get the model state.
+Extension of Checkpointer.get_model_prog_state to get the model state.
 """
-function get_model_state_vector(sim::PrescribedIceSimulation)
+function get_model_prog_state(sim::PrescribedIceSimulation)
     return sim.integrator.u
 end
 

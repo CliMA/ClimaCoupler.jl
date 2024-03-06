@@ -10,7 +10,7 @@ using ClimaCoupler: TestHelper
 using ClimaComms
 using Test
 import ClimaCoupler: Interfacer
-import ClimaCoupler.Checkpointer: get_model_state_vector, restart_model_state!, checkpoint_model_state
+import ClimaCoupler.Checkpointer: get_model_prog_state, restart_model_state!, checkpoint_model_state
 
 # set up MPI communications context
 const comms_ctx = ClimaComms.context(ClimaComms.CPUSingleThreaded())
@@ -22,7 +22,7 @@ FT = Float64
 struct DummySimulation{S} <: Interfacer.AtmosModelSimulation
     state::S
 end
-get_model_state_vector(sim::DummySimulation) = sim.state
+get_model_prog_state(sim::DummySimulation) = sim.state
 @testset "checkpoint_model_state, restart_model_state!" begin
     boundary_space = TestHelper.create_space(FT, comms_ctx = comms_ctx)
     t = 1

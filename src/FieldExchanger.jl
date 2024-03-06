@@ -16,7 +16,7 @@ using ClimaCoupler: Interfacer, FluxCalculator, Regridder, Utilities
     import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
 
 Updates the coupler with the atmospheric fluxes. The `Interfacer.get_field` functions
-(`:turbulent_energy_flux`, `:turbulent_moisture_flux`, `:radiative_energy_flux`, `:liquid_precipitation`, `:snow_precipitation`)
+(`:turbulent_energy_flux`, `:turbulent_moisture_flux`, `:radiative_energy_flux_sfc`, `:liquid_precipitation`, `:snow_precipitation`)
 have to be defined for the amtospheric component model type.
 
 # Arguments
@@ -38,7 +38,7 @@ function import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
     Regridder.dummmy_remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_S))
 
     # radiative fluxes
-    Regridder.dummmy_remap!(csf.F_radiative, Interfacer.get_field(atmos_sim, Val(:radiative_energy_flux)))
+    Regridder.dummmy_remap!(csf.F_radiative, Interfacer.get_field(atmos_sim, Val(:radiative_energy_flux_sfc)))
 
     # precipitation
     Regridder.dummmy_remap!(csf.P_liq, Interfacer.get_field(atmos_sim, Val(:liquid_precipitation)))
@@ -49,7 +49,7 @@ end
     import_combined_surface_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
 
 Updates the coupler with the surface properties. The `Interfacer.get_field` functions for
-(`:surface_temperature`, `:albedo`, `:roughness_momentum`, `:roughness_buoyancy`, `:beta`)
+(`:surface_temperature`, `:surface_albedo`, `:roughness_momentum`, `:roughness_buoyancy`, `:beta`)
 need to be specified for each surface model.
 
 # Arguments
@@ -67,8 +67,8 @@ function import_combined_surface_fields!(csf, model_sims, boundary_space, turbul
     Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_temperature))
     Regridder.dummmy_remap!(csf.T_S, combined_field)
 
-    Regridder.combine_surfaces!(combined_field, model_sims, Val(:albedo))
-    Regridder.dummmy_remap!(csf.albedo, combined_field)
+    Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_albedo))
+    Regridder.dummmy_remap!(csf.surface_albedo, combined_field)
 
     if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
         Regridder.combine_surfaces!(combined_field, model_sims, Val(:roughness_momentum))
@@ -97,7 +97,7 @@ Updates the surface fields for temperature, roughness length, albedo, and specif
 """
 function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf, turbulent_fluxes)
 
-    Interfacer.update_field!(atmos_sim, Val(:albedo), csf.albedo)
+    Interfacer.update_field!(atmos_sim, Val(:surface_albedo), csf.surface_albedo)
     Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf.T_S)
 
     if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
@@ -137,7 +137,7 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, turbulent_flux
     end
 
     # radiative fluxes
-    Interfacer.update_field!(sim, Val(:radiative_energy_flux), FT.(mask .* csf.F_radiative))
+    Interfacer.update_field!(sim, Val(:radiative_energy_flux_sfc), FT.(mask .* csf.F_radiative))
 
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)

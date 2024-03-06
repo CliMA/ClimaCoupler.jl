@@ -9,15 +9,15 @@ using ClimaCore: Fields, InputOutput
 using ClimaCoupler: Interfacer
 using Dates
 using ClimaComms
-export get_model_state_vector, checkpoint_model_state, restart_model_state!
+export get_model_prog_state, checkpoint_model_state, restart_model_state!
 
 """
-    get_model_state_vector(sim::Interfacer.ComponentModelSimulation)
+    get_model_prog_state(sim::Interfacer.ComponentModelSimulation)
 
 Returns the model state of a simulation as a `ClimaCore.FieldVector`.
 This is a template function that should be implemented for each component model.
 """
-get_model_state_vector(sim::Interfacer.ComponentModelSimulation) = nothing
+get_model_prog_state(sim::Interfacer.ComponentModelSimulation) = nothing
 
 """
     checkpoint_model_state(sim::Interfacer.ComponentModelSimulation, comms_ctx::ClimaComms.AbstractCommsContext, t::Int; output_dir = "output")
@@ -30,7 +30,7 @@ function checkpoint_model_state(
     t::Int;
     output_dir = "output",
 )
-    Y = get_model_state_vector(sim)
+    Y = get_model_prog_state(sim)
     day = floor(Int, t / (60 * 60 * 24))
     sec = floor(Int, t % (60 * 60 * 24))
     @info "Saving checkpoint " * Interfacer.name(sim) * " model state to HDF5 on day $day second $sec"
@@ -55,7 +55,7 @@ function restart_model_state!(
     t::Int;
     input_dir = "input",
 )
-    Y = get_model_state_vector(sim)
+    Y = get_model_prog_state(sim)
     day = floor(Int, t / (60 * 60 * 24))
     sec = floor(Int, t % (60 * 60 * 24))
     input_file = joinpath(input_dir, "checkpoint", "checkpoint_" * Interfacer.name(sim) * "_$t.hdf5")

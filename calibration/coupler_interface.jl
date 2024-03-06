@@ -45,11 +45,7 @@ of running a CoupledSimulation.
 Currently only has basic error handling.
 """
 function run_forward_model(coupled_sim::CCo.Interfacer.CoupledSimulation)
-    sol_res = solve_coupled!(coupled_sim)
-    if sol_res.ret_code == :simulation_crashed
-        !isnothing(sol_res.sol) && sol_res.sol .= eltype(sol_res.sol)(NaN)
-        error(
-            "The coupled simulation has crashed. See the stack trace for details.",
-        )
-    end
+    sol_res = solve_coupler!(coupled_sim)
+    # Is there a return code in coupler sims? 
+    # Can we get the atmos version instead ?
 end

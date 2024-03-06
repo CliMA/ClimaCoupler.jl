@@ -161,6 +161,7 @@ hourly_checkpoint = config_dict["hourly_checkpoint"]
 restart_dir = config_dict["restart_dir"]
 restart_t = Int(config_dict["restart_t"])
 evolving_ocean = config_dict["evolving_ocean"]
+config_dict["print_config_dict"] = false
 
 ## I/O directory setup
 COUPLER_OUTPUT_DIR = "/Users/akshaysridhar/Research/Codes/ClimaCoupler.jl/calibration/output/amip/"
@@ -172,7 +173,6 @@ mkpath(REGRID_DIR)
 COUPLER_ARTIFACTS_DIR = COUPLER_OUTPUT_DIR * "_artifacts"
 isdir(COUPLER_ARTIFACTS_DIR) ? nothing : mkpath(COUPLER_ARTIFACTS_DIR)
 
-@info COUPLER_OUTPUT_DIR
 config_dict["print_config_dict"] ? @info(config_dict) : nothing
 
 # get the paths to the necessary data files: land-sea mask, sst map, sea ice concentration
@@ -182,16 +182,6 @@ sic_data = joinpath(sic_dataset_path(), "sic.nc")
 co2_data = joinpath(co2_dataset_path(), "mauna_loa_co2.nc")
 land_mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 
-#=
-## Component Model Initialization
-Here we set initial and boundary conditions for each component model.
-=#
-
-#=
-### Atmosphere
-This uses the `ClimaAtmos.jl` driver, with parameterization options specified in the command line arguments.
-=#
-## init atmos model component
 atmos_sim = atmos_init(FT, config_dict_atmos);
 thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models
 

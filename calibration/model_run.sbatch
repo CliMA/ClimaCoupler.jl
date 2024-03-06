@@ -17,7 +17,8 @@ srun --output=$output julia --color=no --project=experiments -e "
     using ClimaComms
     using ClimaCoupler
     ClimaComms.init(ClimaComms.context())
-    import CalibrateAtmos, ClimaCoupler
-    coupled_simulation = get_coupler_sim($SLURM_ARRAY_TASK_ID, $iteration, \"$experiment_id\")
-    run_forward_model(coupled_simulation)
+    include(\"coupler_interface.jl\")
+    import CalibrateAtmos
+    coupled_simulation = get_coupler_sim($SLURM_ARRAY_TASK_ID, $iteration, \"$experiment_id\");
+    run_forward_model(coupled_simulation);
 "

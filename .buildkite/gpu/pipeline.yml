@@ -85,3 +85,52 @@ steps:
           slurm_ntasks: 4
           slurm_mem: 32G
           slurm_exclusive:
+
+  - group: "CHAP GPU weak scaling"
+    steps:
+
+      - label: "GPU AMIP CHAP - weak scaling - 1 GPU"
+        key: "gpu_amip_chap_ws"
+        command:
+          - >
+            julia --threads=3 --color=yes --project=experiments/AMIP experiments/AMIP/coupler_driver.jl
+            --config_file $GPU_CONFIG_PATH/gpu_amip_chap_ws.yml
+        artifact_paths: "gpu_amip_chap_ws/*"
+        agents:
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 1
+          slurm_mem: 32G
+          slurm_exclusive:
+
+      - label: "GPU AMIP CHAP - weak scaling - 2 GPUs"
+        key: "gpu_amip_chap_ws_2process"
+        command:
+          - >
+            srun --cpu-bind=threads --cpus-per-task=4
+            julia --threads=3 --color=yes --project=experiments/AMIP experiments/AMIP/coupler_driver.jl
+            --config_file $GPU_CONFIG_PATH/gpu_amip_chap_ws_2process.yml
+        artifact_paths: "gpu_amip_chap_ws_2process/*"
+        agents:
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 2
+          slurm_mem: 32G
+          slurm_time: 8:00:00
+          slurm_exclusive:
+
+      - label: "GPU AMIP CHAP - weak scaling - 4 GPUs"
+        key: "gpu_amip_chap_ws_4process"
+        command:
+          - >
+            srun --cpu-bind=threads --cpus-per-task=4
+            julia --threads=3 --color=yes --project=experiments/AMIP experiments/AMIP/hybrid/driver.jl
+            --config_file $GPU_CONFIG_PATH/gpu_amip_chap_ws_4process.yml
+        artifact_paths: "gpu_amip_chap_ws_4process/*"
+        agents:
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 4
+          slurm_mem: 32G
+          slurm_time: 8:00:00
+          slurm_exclusive:

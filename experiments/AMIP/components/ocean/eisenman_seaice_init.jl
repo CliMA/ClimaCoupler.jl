@@ -1,6 +1,7 @@
 import ClimaCoupler: FluxCalculator
 import ClimaTimeSteppers as CTS
-import ClimaCoupler.FluxCalculator: update_turbulent_fluxes_point!, differentiate_turbulent_fluxes!
+import ClimaCoupler.FluxCalculator:
+    update_turbulent_fluxes_point!, differentiate_turbulent_fluxes!, surface_thermo_state
 import ClimaCoupler.Interfacer: get_field, update_field!
 using ClimaCore.Fields: getindex
 import SciMLBase: step!, reinit!, init, ODEProblem
@@ -247,7 +248,7 @@ get_field(sim::EisenmanIceSimulation, ::Val{:roughness_buoyancy}) =
     @. sim.integrator.p.params.p_i.z0b * (sim.integrator.p.ice_area_fraction) +
        sim.integrator.p.params.p_o.z0b .* (1 - sim.integrator.p.ice_area_fraction)
 get_field(sim::EisenmanIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
-get_field(sim::EisenmanIceSimulation, ::Val{:albedo}) =
+get_field(sim::EisenmanIceSimulation, ::Val{:surface_albedo}) =
     @. sim.integrator.p.params.p_i.α * (sim.integrator.p.ice_area_fraction) +
        sim.integrator.p.params.p_o.α .* (1 - sim.integrator.p.ice_area_fraction)
 get_field(sim::EisenmanIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
@@ -259,7 +260,7 @@ end
 function update_field!(sim::EisenmanIceSimulation, ::Val{:turbulent_energy_flux}, field)
     parent(sim.integrator.p.Ya.F_turb) .= parent(field)
 end
-function update_field!(sim::EisenmanIceSimulation, ::Val{:radiative_energy_flux}, field)
+function update_field!(sim::EisenmanIceSimulation, ::Val{:radiative_energy_flux_sfc}, field)
     parent(sim.integrator.p.Ya.F_rad) .= parent(field)
 end
 function update_field!(sim::EisenmanIceSimulation, ::Val{:air_density}, field)
@@ -277,11 +278,11 @@ function update_turbulent_fluxes_point!(sim::EisenmanIceSimulation, fields::Name
 end
 
 """
-    get_model_state_vector(sim::EisenmanIceSimulation)
+    get_model_prog_state(sim::EisenmanIceSimulation)
 
-Extension of Checkpointer.get_model_state_vector to get the model state.
+Extension of Checkpointer.get_model_prog_state to get the model state.
 """
-function get_model_state_vector(sim::EisenmanIceSimulation)
+function get_model_prog_state(sim::EisenmanIceSimulation)
     return sim.integrator.u
 end
 
@@ -292,6 +293,31 @@ Extension of differentiate_turbulent_fluxes! from FluxCalculator to get the turb
 """
 differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args) =
     differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args..., ΔT_sfc = 0.1)
+
+"""
+    differentiate_turbulent_fluxes(sim::Interfacer.SurfaceModelSimulation, thermo_params, input_args, fluxes, δT_sfc = 0.1)
+
+Differentiates the turbulent fluxes in the surface model simulation `sim` with respect to the surface temperature,
+using δT_sfc as the perturbation.
+"""
+function differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, thermo_params, input_args, fluxes; δT_sfc = 0.1)
+    (; thermo_state_int, surface_params, surface_scheme, colidx) = input_args
+    thermo_state_sfc_dT = surface_thermo_state(sim, thermo_params, thermo_state_int, colidx, δT_sfc = δT_sfc)
+    input_args = merge(input_args, (; thermo_state_sfc = thermo_state_sfc_dT))
+
+    # set inputs based on whether the surface_scheme is `MoninObukhovScheme` or `BulkScheme`
+    inputs = surface_inputs(surface_scheme, input_args)
+
+    # calculate the surface fluxes
+    _, _, F_shf_δT_sfc, F_lhf_δT_sfc, _ = get_surface_fluxes_point!(inputs, surface_params)
+
+    (; F_shf, F_lhf) = fluxes
+
+    # calculate the derivative
+    ∂F_turb_energy∂T_sfc = @. (F_shf_δT_sfc + F_lhf_δT_sfc - F_shf - F_lhf) / δT_sfc
+
+    Interfacer.update_field!(sim, Val(:∂F_turb_energy∂T_sfc), ∂F_turb_energy∂T_sfc, colidx)
+end
 
 function update_field!(sim::EisenmanIceSimulation, ::Val{:∂F_turb_energy∂T_sfc}, field, colidx)
     sim.integrator.p.Ya.∂F_turb_energy∂T_sfc[colidx] .= field

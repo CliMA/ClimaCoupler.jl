@@ -115,7 +115,7 @@ import ClimaCoupler.FieldExchanger:
     update_model_sims!,
     reinit_model_sims!,
     step_model_sims!
-import ClimaCoupler.Checkpointer: checkpoint_model_state, get_model_state_vector, restart_model_state!
+import ClimaCoupler.Checkpointer: checkpoint_model_state, get_model_prog_state, restart_model_state!
 
 ## helpers for component models
 include("components/atmosphere/climaatmos_init.jl")
@@ -276,7 +276,7 @@ if mode_name == "amip"
         boundary_space,
         comms_ctx,
         interpolate_daily = true,
-        scaling_function = clean_sst, ## convert to Kelvin
+        scaling_function = scale_sst, ## convert to Kelvin
         land_fraction = land_fraction,
         date0 = date0,
         mono = mono_surface,
@@ -305,7 +305,7 @@ if mode_name == "amip"
         boundary_space,
         comms_ctx,
         interpolate_daily = true,
-        scaling_function = clean_sic, ## convert to fraction
+        scaling_function = scale_sic, ## convert to fraction
         land_fraction = land_fraction,
         date0 = date0,
         mono = mono_surface,
@@ -339,7 +339,7 @@ if mode_name == "amip"
 
     update_midmonth_data!(date0, CO2_info)
     CO2_init = interpolate_midmonth_to_daily(date0, CO2_info)
-    update_field!(atmos_sim, Val(:co2_gm), CO2_init)
+    update_field!(atmos_sim, Val(:co2), CO2_init)
 
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
 
@@ -447,7 +447,7 @@ coupler_field_names = (
     :z0b_S,
     :ρ_sfc,
     :q_sfc,
-    :albedo,
+    :surface_albedo,
     :beta,
     :F_turb_energy,
     :F_turb_moisture,
@@ -456,7 +456,7 @@ coupler_field_names = (
     :F_radiative,
     :P_liq,
     :P_snow,
-    :F_radiative_TOA,
+    :radiative_energy_flux_toa,
     :P_net,
 )
 coupler_fields =
@@ -536,7 +536,7 @@ cs = CoupledSimulation{FT}(
 =#
 if restart_dir !== "unspecified"
     for sim in cs.model_sims
-        if get_model_state_vector(sim) !== nothing
+        if get_model_prog_state(sim) !== nothing
             restart_model_state!(sim, comms_ctx, restart_t; input_dir = restart_dir)
         end
     end
@@ -569,7 +569,7 @@ step!(ice_sim, Δt_cpl)
 # 3) coupler re-imports updated surface fields and calculates turbulent fluxes, while updating atmos sfc_conditions
 if turbulent_fluxes isa CombinedStateFluxes
     # calculate fluxes using combined surface states on the atmos grid
-    import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta, q_sfc
+    import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, surface_albedo, z0, beta, q_sfc
     combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # this updates the atmos thermo state, sfc_ts
 elseif turbulent_fluxes isa PartitionedStateFluxes
     # calculate turbulent fluxes in surface models and save the weighted average in coupler fields
@@ -631,7 +631,7 @@ function solve_coupler!(cs)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.CO2_info)
             end
             CO2_current = interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.CO2_info)
-            update_field!(atmos_sim, Val(:co2_gm), CO2_current)
+            update_field!(atmos_sim, Val(:co2), CO2_current)
 
             ## calculate and accumulate diagnostics at each timestep
             ClimaComms.barrier(comms_ctx)
@@ -654,7 +654,7 @@ function solve_coupler!(cs)
         step_model_sims!(cs.model_sims, t)
 
         ## exchange combined fields and (if specified) calculate fluxes using combined states
-        import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta
+        import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, surface_albedo, z0, beta
         if turbulent_fluxes isa CombinedStateFluxes
             combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # this updates the surface thermo state, sfc_ts, in ClimaAtmos (but also unnecessarily calculates fluxes)
         elseif turbulent_fluxes isa PartitionedStateFluxes

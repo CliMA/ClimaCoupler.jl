@@ -13,6 +13,7 @@ import ClimaCoupler.Interfacer:
     LandModelSimulation,
     OceanModelSimulation,
     SeaIceModelSimulation,
+    AtmosModelSimulation,
     SurfaceStub,
     update_field!
 
@@ -26,9 +27,13 @@ end
 struct DummySimulation3{S} <: LandModelSimulation
     space::S
 end
+name(::DummySimulation3) = "DummySimulation3"
+struct DummySimulation4{S} <: AtmosModelSimulation
+    space::S
+end
+name(::DummySimulation4) = "DummySimulation4"
 
 get_field(sim::SurfaceModelSimulation, ::Val{:var}) = ones(sim.space)
-get_field(sim::SurfaceModelSimulation, ::Val{:surface_temperature}) = ones(sim.space) .* 300
 function get_field(sim::SurfaceModelSimulation, ::Val{:var_float})
     FT = Domains.float_type(Meshes.domain(sim.space.grid.topology.mesh))
     return FT(2)
@@ -57,7 +62,7 @@ for FT in (Float32, Float64)
         @test float_type(cs) == FT
     end
 
-    @testset "get_field indexing" begin
+    @testset "get_field indexing for FT=$FT" begin
         space = TestHelper.create_space(FT)
         for sim in (DummySimulation(space), DummySimulation2(space), DummySimulation3(space))
             # field
@@ -68,15 +73,8 @@ for FT in (Float32, Float64)
         end
     end
 
-    @testset "undefined get_field" begin
-        space = TestHelper.create_space(FT)
-        sim = DummySimulation(space)
-        val = Val(:v)
-        @test_throws ErrorException("undefined field $val for " * name(sim)) get_field(sim, val)
-    end
-
     # test for a simple generic surface model
-    @testset "get_field for a SurfaceStub" begin
+    @testset "get_field for a SurfaceStub for FT=$FT" begin
         thermo_params = TDP.ThermodynamicsParameters(FT)
 
         stub = SurfaceStub((;
@@ -92,19 +90,14 @@ for FT in (Float32, Float64)
         ))
         @test get_field(stub, Val(:area_fraction)) == FT(1)
         @test get_field(stub, Val(:surface_temperature)) == FT(280)
-        @test get_field(stub, Val(:albedo)) == 3
+        @test get_field(stub, Val(:surface_albedo)) == 3
         @test get_field(stub, Val(:roughness_momentum)) == 4
         @test get_field(stub, Val(:roughness_buoyancy)) == 5
         @test get_field(stub, Val(:beta)) == 6
         @test ≈(get_field(stub, Val(:surface_humidity))[1], FT(0.0076), atol = FT(1e-4))
     end
 
-    @testset "name(::SurfaceStub)" begin
-        stub = SurfaceStub((;))
-        @test name(stub) == "SurfaceStub"
-    end
-
-    @testset "update_field! the SurfaceStub area_fraction" begin
+    @testset "update_field! the SurfaceStub area_fraction for FT=$FT" begin
         boundary_space = TestHelper.create_space(FT)
 
         stub = SurfaceStub((; area_fraction = zeros(boundary_space), T_sfc = zeros(boundary_space)))
@@ -116,3 +109,127 @@ for FT in (Float32, Float64)
         @test parent(get_field(stub, Val(:surface_temperature)))[1] == FT(2)
     end
 end
+
+@testset "name(::SurfaceStub)" begin
+    stub = SurfaceStub((;))
+    @test name(stub) == "SurfaceStub"
+end
+
+@testset "undefined get_field for generic val" begin
+    FT = Float32
+    space = TestHelper.create_space(FT)
+    sim = DummySimulation(space)
+    val = Val(:v)
+    @test_throws ErrorException("undefined field `v` for " * name(sim)) get_field(sim, val)
+end
+
+@testset "undefined get_field for SurfaceModelSimulation" begin
+    FT = Float32
+    space = TestHelper.create_space(FT)
+    sim = DummySimulation3(space)
+
+    # Test that get_field gives correct warnings for unextended fields
+    for value in (
+        :air_density,
+        :area_fraction,
+        :beta,
+        :roughness_buoyancy,
+        :roughness_momentum,
+        :surface_albedo,
+        :surface_humidity,
+        :surface_temperature,
+    )
+        val = Val(value)
+        @test_throws ErrorException("undefined field `$value` for " * name(sim)) get_field(sim, val)
+    end
+end
+
+@testset "undefined get_field for AtmosModelSimulation" begin
+    FT = Float32
+    space = TestHelper.create_space(FT)
+    sim = DummySimulation4(space)
+
+    # Test that get_field gives correct warnings for unextended fields
+    for value in (
+        :air_density,
+        :air_temperature,
+        :energy,
+        :height_int,
+        :height_sfc,
+        :liquid_precipitation,
+        :radiative_energy_flux_sfc,
+        :radiative_energy_flux_toa,
+        :snow_precipitation,
+        :turbulent_energy_flux,
+        :turbulent_moisture_flux,
+        :thermo_state_int,
+        :uv_int,
+        :water,
+    )
+        val = Val(value)
+        @test_throws ErrorException("undefined field `$value` for " * name(sim)) get_field(sim, val)
+    end
+end
+
+@testset "update_field! warnings for SurfaceModelSimulation" begin
+    FT = Float32
+    space = TestHelper.create_space(FT)
+    dummy_field = Fields.ones(space)
+    sim = DummySimulation3(space)
+
+    # Test that update_field! gives correct warnings for unextended fields
+    for value in (
+        :air_density,
+        :area_fraction,
+        :liquid_precipitation,
+        :radiative_energy_flux_sfc,
+        :snow_precipitation,
+        :turbulent_energy_flux,
+        :turbulent_moisture_flux,
+    )
+        val = Val(value)
+        @test_logs (
+            :warn,
+            "`update_field!` is not extended for the `$value` field of " * name(sim) * ": skipping update.",
+        ) update_field!(sim, val, dummy_field)
+        @test_throws ErrorException("undefined field `$value` for " * name(sim)) get_field(sim, val)
+    end
+end
+
+@testset "undefined update_field! warnings for AtmosModelSimulation" begin
+    FT = Float32
+    space = TestHelper.create_space(FT)
+    dummy_field = Fields.ones(space)
+    sim = DummySimulation4(space)
+
+    # Test that update_field! gives correct warnings for unextended fields
+    for value in (:co2, :surface_albedo, :surface_temperature, :turbulent_fluxes)
+        val = Val(value)
+        @test_logs (
+            :warn,
+            "`update_field!` is not extended for the `$value` field of " * name(sim) * ": skipping update.",
+        ) update_field!(sim, val, dummy_field)
+        @test_throws ErrorException("undefined field `$value` for " * name(sim)) get_field(sim, val)
+    end
+end
+
+# # Test that update_field! gives correct warnings for unextended fields
+# for value in (
+#     :air_density,
+#     :air_temperature,
+#     :energy,
+#     :height_int,
+#     :height_sfc,
+#     :liquid_precipitation,
+#     :radiative_energy_flux_sfc,
+#     :radiative_energy_flux_toa,
+#     :snow_precipitation,
+#     :turbulent_energy_flux,
+#     :turbulent_moisture_flux,
+#     :thermo_state_int,
+#     :uv_int,
+#     :water,
+# )
+#     val = Val(value)
+#     @test_throws ErrorException("undefined field `$value` for " * name(sim)) get_field(sim, val)
+# end

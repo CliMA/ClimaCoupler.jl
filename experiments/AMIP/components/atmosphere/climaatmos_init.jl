@@ -65,6 +65,15 @@ function get_atmos_config(coupler_dict)
         @info "Overwriting Atmos parameters from $toml_file"
         atmos_config = merge(atmos_config, Dict("toml" => [toml_file]))
     end
+
+    # specify atmos output directory to be inside the coupler output directory
+    atmos_output_dir = joinpath(
+        coupler_dict["coupler_output_dir"],
+        joinpath(coupler_dict["mode_name"], coupler_dict["run_name"]),
+        "clima_atmos",
+    )
+    atmos_config = merge(atmos_config, Dict("output_dir" => atmos_output_dir))
+
     return atmos_config
 end
 

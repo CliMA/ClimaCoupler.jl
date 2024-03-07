@@ -1,9 +1,10 @@
-#import Diagnostics: get_var
-
-# Atmos diagnostics
+using ClimaCore
 import ClimaAtmos.Parameters as CAP
 import Thermodynamics as TD
+
+import ClimaCoupler.Diagnostics: get_var
 using ClimaCoupler.Interfacer: CoupledSimulation, float_type
+import ClimaCoupler.Utilities: swap_space!
 
 """
     get_var(cs::CoupledSimulation, ::Val{:T})
@@ -58,19 +59,19 @@ function get_var(cs::CoupledSimulation, ::Val{:toa_fluxes})
     face_space = axes(atmos_sim.integrator.u.f)
     nz_faces = length(face_space.grid.vertical_grid.topology.mesh.faces)
 
-    LWd_TOA = Fields.level(
+    LWd_TOA = ClimaCore.Fields.level(
         CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_lw_flux_dn), face_space),
         nz_faces - half,
     )
-    LWu_TOA = Fields.level(
+    LWu_TOA = ClimaCore.Fields.level(
         CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_lw_flux_up), face_space),
         nz_faces - half,
     )
-    SWd_TOA = Fields.level(
+    SWd_TOA = ClimaCore.Fields.level(
         CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_sw_flux_dn), face_space),
         nz_faces - half,
     )
-    SWu_TOA = Fields.level(
+    SWu_TOA = ClimaCore.Fields.level(
         CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_sw_flux_up), face_space),
         nz_faces - half,
     )

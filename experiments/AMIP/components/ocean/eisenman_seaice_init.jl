@@ -1,10 +1,14 @@
-import ClimaCoupler: FluxCalculator
+import SciMLBase: ODEProblem, init
+
+using ClimaCore
+using ClimaCore.Fields: getindex
 import ClimaTimeSteppers as CTS
+
+import ClimaCoupler: FluxCalculator
 import ClimaCoupler.FluxCalculator:
     update_turbulent_fluxes_point!, differentiate_turbulent_fluxes!, surface_thermo_state
 import ClimaCoupler.Interfacer: get_field, update_field!
-using ClimaCore.Fields: getindex
-import SciMLBase: step!, reinit!, init, ODEProblem
+import ClimaCoupler.FieldExchanger: step!, reinit!
 
 """
     EisenmanIceSimulation{P, Y, D, I}
@@ -46,14 +50,14 @@ end
 
 Initialize the state vectors for the Eisenman-Zhang sea ice model.
 """
-function state_init(p::EisenmanIceParameters, space::Spaces.AbstractSpace)
-    Y = Fields.FieldVector(
+function state_init(p::EisenmanIceParameters, space::ClimaCore.Spaces.AbstractSpace)
+    Y = ClimaCore.Fields.FieldVector(
         T_sfc = ones(space) .* p.T_freeze,
         h_ice = zeros(space),
         T_ml = ones(space) .* 277,
         q_sfc = ClimaCore.Fields.zeros(space),
     )
-    Ya = Fields.FieldVector(
+    Ya = ClimaCore.Fields.FieldVector(
         F_turb = ClimaCore.Fields.zeros(space),
         ∂F_turb_energy∂T_sfc = ClimaCore.Fields.zeros(space),
         F_rad = ClimaCore.Fields.zeros(space),
@@ -179,7 +183,7 @@ function ∑tendencies(dY, Y, cache, _)
     @. dY.T_sfc = -Y.T_sfc / Δt
     @. dY.q_sfc = -Y.q_sfc / Δt
 
-    Fields.bycolumn(axes(Y.T_sfc)) do colidx
+    ClimaCore.Fields.bycolumn(axes(Y.T_sfc)) do colidx
         solve_eisenman_model!(Y[colidx], Ya[colidx], p, thermo_params, Δt)
     end
 
@@ -254,7 +258,7 @@ get_field(sim::EisenmanIceSimulation, ::Val{:surface_albedo}) =
 get_field(sim::EisenmanIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 get_field(sim::EisenmanIceSimulation, ::Val{:air_density}) = sim.integrator.p.Ya.ρ_sfc
 
-function update_field!(sim::EisenmanIceSimulation, ::Val{:area_fraction}, field::Fields.Field)
+function update_field!(sim::EisenmanIceSimulation, ::Val{:area_fraction}, field::ClimaCore.Fields.Field)
     sim.integrator.p.area_fraction .= field
 end
 function update_field!(sim::EisenmanIceSimulation, ::Val{:turbulent_energy_flux}, field)
@@ -272,7 +276,11 @@ step!(sim::EisenmanIceSimulation, t) = step!(sim.integrator, t - sim.integrator.
 reinit!(sim::EisenmanIceSimulation) = reinit!(sim.integrator)
 
 # extensions required by FluxCalculator (partitioned fluxes)
-function update_turbulent_fluxes_point!(sim::EisenmanIceSimulation, fields::NamedTuple, colidx::Fields.ColumnIndex)
+function update_turbulent_fluxes_point!(
+    sim::EisenmanIceSimulation,
+    fields::NamedTuple,
+    colidx::ClimaCore.Fields.ColumnIndex,
+)
     (; F_turb_energy) = fields
     @. sim.integrator.p.Ya.F_turb[colidx] = F_turb_energy
 end

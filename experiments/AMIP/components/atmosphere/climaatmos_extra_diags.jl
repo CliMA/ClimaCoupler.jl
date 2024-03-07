@@ -24,7 +24,7 @@ add_diagnostic_variable!(
         (; ᶜts) = cache.precomputed
         c_space = axes(state.c)
         thermo_params = CAP.thermodynamics_params(params)
-        e_pot = CAP.grav(params) .* Fields.coordinate_field(c_space).z
+        e_pot = CAP.grav(params) .* ClimaCore.Fields.coordinate_field(c_space).z
         if isnothing(out)
             return TD.moist_static_energy.(thermo_params, ᶜts, e_pot)
         else
@@ -62,11 +62,11 @@ add_diagnostic_variable!(
     compute! = (out, state, cache, time) -> begin
         (; ᶜp) = cache.precomputed
         (; C_E) = cache.atmos.vert_diff
-        interior_uₕ = Fields.level(state.c.uₕ, 1)
+        interior_uₕ = ClimaCore.Fields.level(state.c.uₕ, 1)
         ᶠp = ᶠK_E = cache.scratch.ᶠtemp_scalar
-        Fields.bycolumn(axes(ᶜp)) do colidx
+        ClimaCore.Fields.bycolumn(axes(ᶜp)) do colidx
             @. ᶠp[colidx] = CAD.ᶠinterp(ᶜp[colidx])
-            ᶜΔz_surface = Fields.Δz_field(interior_uₕ)
+            ᶜΔz_surface = ClimaCore.Fields.Δz_field(interior_uₕ)
             @. ᶠK_E[colidx] = CA.eddy_diffusivity_coefficient(
                 C_E,
                 CA.norm(interior_uₕ[colidx]),

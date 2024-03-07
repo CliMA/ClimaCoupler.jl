@@ -35,7 +35,7 @@ function import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
     end
 
     # surface density - needed for q_sat and requires atmos and sfc states, so it is calculated and saved in the coupler
-    Regridder.dummmy_remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_S))
+    Regridder.dummmy_remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_S)) # TODO: generalize for PartitionedStateFluxes (#445) (use individual T_S)
 
     # radiative fluxes
     Regridder.dummmy_remap!(csf.F_radiative, Interfacer.get_field(atmos_sim, Val(:radiative_energy_flux_sfc)))

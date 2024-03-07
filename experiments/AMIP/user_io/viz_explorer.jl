@@ -1,6 +1,8 @@
 using Plots
 using ClimaCorePlots
-using ClimaCore: Geometry
+using ClimaCore: Fields, Geometry
+
+import ClimaCoupler.Regridder: combine_surfaces_from_sol!
 
 function plot_anim(cs, out_dir = ".")
 

@@ -1,9 +1,15 @@
+import SciMLBase: ODEProblem, init
+
+using ClimaCore
 import ClimaTimeSteppers as CTS
+import Thermodynamics as TD
+
 import ClimaCoupler.Interfacer: SeaIceModelSimulation, get_field, update_field!, name
 import ClimaCoupler.FieldExchanger: step!, reinit!
 import ClimaCoupler.FluxCalculator: update_turbulent_fluxes_point!
 using ClimaCoupler: Regridder
-import Thermodynamics as TD
+import ClimaCoupler.Utilities: swap_space!
+import ClimaCoupler.BCReader: float_type_bcf
 
 include("../slab_utils.jl")
 
@@ -51,7 +57,7 @@ name(::IceSlabParameters) = "IceSlabParameters"
 
 # init simulation
 function slab_ice_space_init(::Type{FT}, space, p) where {FT}
-    Y = Fields.FieldVector(T_sfc = ones(space) .* p.T_freeze)
+    Y = ClimaCore.Fields.FieldVector(T_sfc = ones(space) .* p.T_freeze)
     return Y
 end
 
@@ -143,7 +149,7 @@ get_field(sim::PrescribedIceSimulation, ::Val{:surface_albedo}) = sim.integrator
 get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 get_field(sim::PrescribedIceSimulation, ::Val{:air_density}) = sim.integrator.p.ρ_sfc
 
-function update_field!(sim::PrescribedIceSimulation, ::Val{:area_fraction}, field::Fields.Field)
+function update_field!(sim::PrescribedIceSimulation, ::Val{:area_fraction}, field::ClimaCore.Fields.Field)
     sim.integrator.p.area_fraction .= field
 end
 
@@ -162,7 +168,11 @@ step!(sim::PrescribedIceSimulation, t) = step!(sim.integrator, t - sim.integrato
 reinit!(sim::PrescribedIceSimulation) = reinit!(sim.integrator)
 
 # extensions required by FluxCalculator (partitioned fluxes)
-function update_turbulent_fluxes_point!(sim::PrescribedIceSimulation, fields::NamedTuple, colidx::Fields.ColumnIndex)
+function update_turbulent_fluxes_point!(
+    sim::PrescribedIceSimulation,
+    fields::NamedTuple,
+    colidx::ClimaCore.Fields.ColumnIndex,
+)
     (; F_turb_energy) = fields
     @. sim.integrator.p.F_turb_energy[colidx] = F_turb_energy
 end
@@ -199,6 +209,6 @@ function dss_state!(sim::PrescribedIceSimulation)
     for key in propertynames(Y)
         field = getproperty(Y, key)
         buffer = get_dss_buffer(axes(field), p)
-        Spaces.weighted_dss!(field, buffer)
+        ClimaCore.Spaces.weighted_dss!(field, buffer)
     end
 end

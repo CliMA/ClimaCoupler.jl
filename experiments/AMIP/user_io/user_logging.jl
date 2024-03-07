@@ -1,4 +1,4 @@
-using ClimaCoupler: Checkpointer
+using ClimaCoupler.Checkpointer: checkpoint_model_state
 
 """
     Base.show(io::IO, dict::Dict)
@@ -22,7 +22,7 @@ function checkpoint_sims(cs::CoupledSimulation, _)
         if get_model_prog_state(sim) !== nothing
             t = Dates.datetime2epochms(cs.dates.date[1])
             t0 = Dates.datetime2epochms(cs.dates.date0[1])
-            Checkpointer.checkpoint_model_state(sim, cs.comms_ctx, Int((t - t0) / 1e3), output_dir = cs.dirs.artifacts)
+            checkpoint_model_state(sim, cs.comms_ctx, Int((t - t0) / 1e3), output_dir = cs.dirs.artifacts)
         end
     end
 end

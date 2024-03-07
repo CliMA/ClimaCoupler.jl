@@ -152,11 +152,7 @@ the plots (from postprocessing and the conservation checks) of the simulation wi
 temporary files will be saved.
 =#
 
-if isinteractive()
-    COUPLER_OUTPUT_DIR = joinpath("output", joinpath(mode_name, run_name)) # TempestRemap fails if interactive and paths are too long
-else
-    COUPLER_OUTPUT_DIR = joinpath(pkg_dir, "experiments/AMIP/output", joinpath(mode_name, run_name))
-end
+COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], joinpath(mode_name, run_name))
 mkpath(COUPLER_OUTPUT_DIR)
 
 REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp/")
@@ -578,7 +574,7 @@ depend on initial conditions of other component models than those in which the v
 The concrete steps for proper initialization are:
 =#
 
-# 1. decide on the type of turbulent flux partition (see `FluxCalculator` documentation for more details)
+# 1.decide on the type of turbulent flux partition (see `FluxCalculator` documentation for more details)
 turbulent_fluxes = nothing
 if config_dict["turb_flux_partition"] == "PartitionedStateFluxes"
     turbulent_fluxes = PartitionedStateFluxes()
@@ -588,22 +584,22 @@ else
     error("turb_flux_partition must be either PartitionedStateFluxes or CombinedStateFluxes")
 end
 
-# 2. coupler updates surface model area fractions
+# 2.coupler updates surface model area fractions
 update_surface_fractions!(cs)
 
-# 3. surface density (`ρ_sfc`): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface.
+# 3.surface density (`ρ_sfc`): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface.
 # For this, we need to import surface and atmospheric fields. The model sims are then updated with the new surface density.
 import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
 import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
 update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 
-# 4. surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
+# 4.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
 ## TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step! (#331)
 step!(land_sim, Δt_cpl)
 step!(ocean_sim, Δt_cpl)
 step!(ice_sim, Δt_cpl)
 
-# 5. turbulent fluxes: now we have all information needed for calculating the initial turbulent surface fluxes using the combined state
+# 5.turbulent fluxes: now we have all information needed for calculating the initial turbulent surface fluxes using the combined state
 # or the partitioned state method
 if turbulent_fluxes isa CombinedStateFluxes
     ## import the new surface properties into the coupler (note the atmos state was also imported in step 3.)
@@ -621,10 +617,10 @@ elseif turbulent_fluxes isa PartitionedStateFluxes
     atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
 end
 
-# 6. reinitialize models + radiative flux: prognostic states and time are set to their initial conditions. For atmos, this also triggers the callbacks and sets a nonzero radiation flux (given the new sfc_conditions)
+# 6.reinitialize models + radiative flux: prognostic states and time are set to their initial conditions. For atmos, this also triggers the callbacks and sets a nonzero radiation flux (given the new sfc_conditions)
 reinit_model_sims!(cs.model_sims)
 
-# 7. update all fluxes: coupler re-imports updated atmos fluxes (radiative fluxes for both `turbulent_fluxes` types
+# 7.update all fluxes: coupler re-imports updated atmos fluxes (radiative fluxes for both `turbulent_fluxes` types
 # and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxes`,
 # and sends them to the surface component models. If `turbulent_fluxes isa PartitionedStateFluxes`
 # atmos receives the turbulent fluxes from the coupler.
@@ -701,10 +697,10 @@ function solve_coupler!(cs)
         if turbulent_fluxes isa CombinedStateFluxes
             combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # this updates the surface thermo state, sfc_ts, in ClimaAtmos (but also unnecessarily calculates fluxes)
         elseif turbulent_fluxes isa PartitionedStateFluxes
-            # calculate turbulent fluxes in surfaces and save the weighted average in coupler fields
+            ## calculate turbulent fluxes in surfaces and save the weighted average in coupler fields
             partitioned_turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, MoninObukhovScheme(), thermo_params)
 
-            # update atmos sfc_conditions for surface temperature - TODO: this needs to be simplified (need CA modification)
+            ## update atmos sfc_conditions for surface temperature - TODO: this needs to be simplified (need CA modification)
             new_p = get_new_cache(atmos_sim, cs.fields)
             CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) # to set T_sfc (but SF calculation not necessary - CA modification)
             atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
@@ -822,8 +818,12 @@ if ClimaComms.iamroot(comms_ctx)
         ) ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
     end
 
-    ## clean up for interactive runs, retain all output otherwise
     if isinteractive()
+        ## clean up for interactive runs, retain all output otherwise
         rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
+
+        ## plot all model states and coupler fields (useful for debugging)
+        debug(cs)
     end
+
 end

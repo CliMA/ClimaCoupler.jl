@@ -118,7 +118,8 @@ A getter function, that should not allocate. If undefined, it returns a descript
 """
 get_field(sim::SurfaceStub, ::Val{:area_fraction}) = sim.cache.area_fraction
 get_field(sim::SurfaceStub, ::Val{:surface_temperature}) = sim.cache.T_sfc
-get_field(sim::SurfaceStub, ::Val{:albedo}) = sim.cache.α
+get_field(sim::SurfaceStub, ::Val{:albedo_direct}) = sim.cache.α_direct
+get_field(sim::SurfaceStub, ::Val{:albedo_diffuse}) = sim.cache.α_diffuse
 get_field(sim::SurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m
 get_field(sim::SurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
 get_field(sim::SurfaceStub, ::Val{:beta}) = sim.cache.beta
@@ -175,6 +176,12 @@ function update_field!(sim::SurfaceStub, ::Val{:surface_temperature}, field::Fie
 end
 function update_field!(sim::SurfaceStub, ::Val{:air_density}, field)
     parent(sim.cache.ρ_sfc) .= parent(field)
+end
+function update_field!(sim::SurfaceStub, ::Val{:direct_albedo}, field::Fields.Field)
+    sim.cache.α_direct .= field
+end
+function update_field!(sim::SurfaceStub, ::Val{:diffuse_albedo}, field::Fields.Field)
+    sim.cache.α_diffuse .= field
 end
 
 """

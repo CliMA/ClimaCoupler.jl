@@ -112,7 +112,8 @@ import ClimaCoupler.FluxCalculator:
     CombinedStateFluxes,
     combined_turbulent_fluxes!,
     MoninObukhovScheme,
-    partitioned_turbulent_fluxes!
+    partitioned_turbulent_fluxes!,
+    water_albedo_from_wind!
 import ClimaCoupler.FieldExchanger:
     import_atmos_fields!,
     import_combined_surface_fields!,
@@ -176,6 +177,8 @@ hourly_checkpoint = config_dict["hourly_checkpoint"]
 restart_dir = config_dict["restart_dir"]
 restart_t = Int(config_dict["restart_t"])
 evolving_ocean = config_dict["evolving_ocean"]
+dt_rad = config_dict["dt_rad"]
+dt_rad_coupler = parse(FT, filter(x -> !occursin(x,"hours"), dt_rad)) # breaks if not in hours
 
 ## I/O directory setup
 if isinteractive()
@@ -290,7 +293,8 @@ if mode_name == "amip"
         z0m = FT(1e-3),
         z0b = FT(1e-3),
         beta = FT(1),
-        α = FT(0.06),
+        α_direct = ClimaCore.Fields.ones(boundary_space) .* FT(0.06),
+        α_diffuse = ClimaCore.Fields.ones(boundary_space) .* FT(0.06),
         area_fraction = (FT(1) .- land_fraction),
         phase = TD.Liquid(),
         thermo_params = thermo_params,
@@ -383,7 +387,8 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         z0m = FT(0),
         z0b = FT(0),
         beta = FT(1),
-        α = FT(1),
+        α_direct = ClimaCore.Fields.ones(boundary_space) .* FT(1),
+        α_diffuse = ClimaCore.Fields.ones(boundary_space) .* FT(1),
         area_fraction = ClimaCore.Fields.zeros(boundary_space),
         phase = TD.Ice(),
         thermo_params = thermo_params,
@@ -447,7 +452,8 @@ coupler_field_names = (
     :z0b_S,
     :ρ_sfc,
     :q_sfc,
-    :albedo,
+    :albedo_direct,
+    :albedo_diffuse,
     :beta,
     :F_turb_energy,
     :F_turb_moisture,
@@ -458,7 +464,10 @@ coupler_field_names = (
     :P_snow,
     :F_radiative_TOA,
     :P_net,
+    :temp1,
+    :temp2,
 )
+
 coupler_fields =
     NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
 
@@ -510,7 +519,9 @@ checkpoint_cb =
     HourlyCallback(dt = FT(480), func = checkpoint_sims, ref_date = [dates.date[1]], active = hourly_checkpoint) # 20 days
 update_firstdayofmonth!_cb =
     MonthlyCallback(dt = FT(1), func = update_firstdayofmonth!, ref_date = [dates.date1[1]], active = true) # for BCReader
-callbacks = (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb)
+albedo_cb = HourlyCallback(dt = dt_rad_coupler, func = water_albedo_from_wind!, ref_date = [dates.date[1]], active = mode_name == "amip") # eventually, we will call radiation from the coupler (wind-deduced albedo calculation only now)
+callbacks = (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb, albedo = albedo_cb)
+
 
 ## coupler simulation
 cs = CoupledSimulation{FT}(
@@ -647,6 +658,7 @@ function solve_coupler!(cs)
 
         ## run component models sequentially for one coupling timestep (Δt_cpl)
         ClimaComms.barrier(comms_ctx)
+        trigger_callback!(cs, cs.callbacks.albedo) # update albedo from wind at the dt_rad
         update_surface_fractions!(cs)
         update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 

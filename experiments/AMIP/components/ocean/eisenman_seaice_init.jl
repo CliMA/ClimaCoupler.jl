@@ -247,7 +247,7 @@ get_field(sim::EisenmanIceSimulation, ::Val{:roughness_buoyancy}) =
     @. sim.integrator.p.params.p_i.z0b * (sim.integrator.p.ice_area_fraction) +
        sim.integrator.p.params.p_o.z0b .* (1 - sim.integrator.p.ice_area_fraction)
 get_field(sim::EisenmanIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
-get_field(sim::EisenmanIceSimulation, ::Val{:albedo}) =
+get_field(sim::EisenmanIceSimulation, ::Union{Val{:albedo_direct}, Val{:albedo_diffuse}}) =
     @. sim.integrator.p.params.p_i.α * (sim.integrator.p.ice_area_fraction) +
        sim.integrator.p.params.p_o.α .* (1 - sim.integrator.p.ice_area_fraction)
 get_field(sim::EisenmanIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction

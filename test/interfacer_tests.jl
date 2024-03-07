@@ -92,7 +92,8 @@ for FT in (Float32, Float64)
         ))
         @test get_field(stub, Val(:area_fraction)) == FT(1)
         @test get_field(stub, Val(:surface_temperature)) == FT(280)
-        @test get_field(stub, Val(:albedo)) == 3
+        @test get_field(stub, Val(:albedo_direct)) == 3
+        @test get_field(stub, Val(:albedo_diffuse)) == 3
         @test get_field(stub, Val(:roughness_momentum)) == 4
         @test get_field(stub, Val(:roughness_buoyancy)) == 5
         @test get_field(stub, Val(:beta)) == 6

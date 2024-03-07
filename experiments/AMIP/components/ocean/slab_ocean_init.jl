@@ -137,7 +137,9 @@ get_field(sim::SlabOceanSimulation, ::Val{:surface_humidity}) = sim.integrator.p
 get_field(sim::SlabOceanSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
 get_field(sim::SlabOceanSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
 get_field(sim::SlabOceanSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
-get_field(sim::SlabOceanSimulation, ::Val{:albedo}) = sim.integrator.p.params.α
+get_field(sim::SlabOceanSimulation, ::Val{:albedo_direct}) = sim.integrator.p.params.α
+get_field(sim::SlabOceanSimulation, ::Val{:albedo_diffuse}) = sim.integrator.p.params.α
+
 get_field(sim::SlabOceanSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 get_field(sim::SlabOceanSimulation, ::Val{:air_density}) = sim.integrator.p.ρ_sfc
 

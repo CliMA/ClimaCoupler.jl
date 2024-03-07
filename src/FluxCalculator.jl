@@ -23,7 +23,8 @@ export PartitionedStateFluxes,
     BulkScheme,
     partitioned_turbulent_fluxes!,
     get_surface_params,
-    update_turbulent_fluxes_point!
+    update_turbulent_fluxes_point!,
+    water_albedo_from_wind!
 
 """
     TurbulentFluxPartition
@@ -410,6 +411,20 @@ function differentiate_turbulent_fluxes!(
     ∂F_turb_energy∂T_sfc = @. (F_shf_δT_sfc + F_lhf_δT_sfc - F_shf - F_lhf) / δT_sfc
 
     Interfacer.update_field!(sim, Val(:∂F_turb_energy∂T_sfc), ∂F_turb_energy∂T_sfc, colidx)
+
+end
+
+# callback for albedo for radiative fluxes (to be called at the radiative timestep, and eventially replaced by the full radiation callback)
+function water_albedo_from_wind!(cs, _)
+    atmos_sim = cs.model_sims.atmos_sim
+    ocean_sim = cs.model_sims.ocean_sim
+    cf = cs.fields
+
+    # use temp fields
+    water_albedo_from_wind!(atmos_sim, cf.temp1, cf.temp2)
+
+    Interfacer.update_field!(ocean_sim, Val(:direct_albedo), cf.temp1)
+    Interfacer.update_field!(ocean_sim, Val(:diffuse_albedo), cf.temp2)
 
 end
 

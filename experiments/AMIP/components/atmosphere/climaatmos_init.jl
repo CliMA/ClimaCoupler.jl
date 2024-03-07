@@ -8,7 +8,8 @@ import ClimaCoupler.FluxCalculator:
     calculate_surface_air_density,
     PartitionedStateFluxes,
     extrapolate_ρ_to_sfc,
-    get_surface_params
+    get_surface_params,
+    water_albedo_from_wind!
 using ClimaCore: Fields.level, Geometry
 import ClimaCoupler.Interfacer: get_field, update_field!, name
 import ClimaCoupler.Checkpointer: get_model_state_vector
@@ -68,7 +69,7 @@ function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
     atmos_config = CA.AtmosConfig(atmos_config_dict)
 
-    # atmos_config_dict["surface_albedo"] = set_surface_albedo!(Y, p, t, p.atmos.surface_albedo)
+    atmos_config_dict["surface_albedo"] = "CouplerAlbedo"
 
     simulation = CA.get_simulation(atmos_config)
     (; integrator) = simulation
@@ -141,10 +142,13 @@ function update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temperature}, c
     sim.integrator.p.radiation.radiation_model.surface_temperature .= CA.RRTMGPI.field2array(csf.T_S)
 end
 
-function update_field!(sim::ClimaAtmosSimulation, ::Val{:albedo}, field)
-    sim.integrator.p.radiation.radiation_model.diffuse_sw_surface_albedo .=
-        reshape(CA.RRTMGPI.field2array(field), 1, length(parent(field)))
+function update_field!(sim::ClimaAtmosSimulation, ::Val{:albedo_direct}, field)
     sim.integrator.p.radiation.radiation_model.direct_sw_surface_albedo .=
+        reshape(CA.RRTMGPI.field2array(field), 1, length(parent(field)))
+end
+
+function update_field!(sim::ClimaAtmosSimulation, ::Val{:albedo_diffuse}, field)
+    sim.integrator.p.radiation.radiation_model.diffuse_sw_surface_albedo .=
         reshape(CA.RRTMGPI.field2array(field), 1, length(parent(field)))
 end
 
@@ -182,7 +186,8 @@ step!(sim::ClimaAtmosSimulation, t) = step!(sim.integrator, t - sim.integrator.t
 reinit!(sim::ClimaAtmosSimulation) = reinit!(sim.integrator)
 
 function update_sim!(atmos_sim::ClimaAtmosSimulation, csf, turbulent_fluxes)
-    update_field!(atmos_sim, Val(:albedo), csf.albedo)
+    update_field!(atmos_sim, Val(:albedo_direct), csf.albedo_direct)
+    update_field!(atmos_sim, Val(:albedo_diffuse), csf.albedo_diffuse)
     update_field!(atmos_sim, Val(:surface_temperature), csf)
 
     if turbulent_fluxes isa PartitionedStateFluxes
@@ -374,11 +379,24 @@ function dss_state!(sim::ClimaAtmosSimulation)
 end
 
 # albedo extension # the atmos albedo should be moved to the ClimaUtilities?
-function ocean_albedo_from_wind(atmos_sim::ClimaAtmosSimulation, direct_albedo::Fields.Field, diffuse_albedo::Fields.Field)
+"""
+    water_surface_albedo_from_wind(atmos_sim::ClimaAtmosSimulation, direct_albedo::Fields.Field, diffuse_albedo::Fields.Field)
+
+Extension to calculate the water surface albedo from wind speed, and it can be used for prescribed ocean and lakes.
+"""
+function water_albedo_from_wind!(atmos_sim::ClimaAtmosSimulation, direct_albedo::Fields.Field, diffuse_albedo::Fields.Field)
 
     Y = atmos_sim.integrator.u
+    p = atmos_sim.integrator.p
+    t = atmos_sim.integrator.t
+
     radiation_model = atmos_sim.integrator.p.radiation.radiation_model
+    FT = eltype(Y)
     λ = FT(0) # spectral wavelength (not used for now)
+
+    # update for current zenith angle
+    CA.set_insolation_variables!(Y,p,t)
+
     bottom_coords = Fields.coordinate_field(Spaces.level(Y.c, 1))
     μ = CA.RRTMGPI.array2field(
         radiation_model.cos_zenith,
@@ -399,3 +417,5 @@ function ocean_albedo_from_wind(atmos_sim::ClimaAtmosSimulation, direct_albedo::
             ).(λ, μ, norm.(Fields.level(Y.c.uₕ, 1)))
 
 end
+
+

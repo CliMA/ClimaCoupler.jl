@@ -28,7 +28,7 @@ plot the anomalies of the fields with respect to `cs_fields_ref`.
 """
 function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
     field_names =
-        (:albedo, :F_radiative, :F_turb_energy, :F_turb_moisture, :P_liq, :T_S, :ρ_sfc, :q_sfc, :beta, :z0b_S, :z0m_S)
+        (:albedo_direct, :albedo_diffuse, :F_radiative, :F_turb_energy, :F_turb_moisture, :P_liq, :T_S, :ρ_sfc, :q_sfc, :beta, :z0b_S, :z0m_S)
     all_plots = []
     for field_name in field_names
         field = getproperty(cs_fields, field_name)

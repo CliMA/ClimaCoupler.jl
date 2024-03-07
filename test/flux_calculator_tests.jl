@@ -97,7 +97,8 @@ Interfacer.get_field(sim::TestOcean, ::Val{:beta}) = sim.integrator.p.beta
 Interfacer.get_field(sim::TestOcean, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 Interfacer.get_field(sim::TestOcean, ::Val{:heat_transfer_coefficient}) = sim.integrator.p.Ch
 Interfacer.get_field(sim::TestOcean, ::Val{:drag_coefficient}) = sim.integrator.p.Cd
-Interfacer.get_field(sim::TestOcean, ::Val{:albedo}) = sim.integrator.p.α
+Interfacer.get_field(sim::TestOcean, ::Val{:albedo_direct}) = sim.integrator.p.α
+Interfacer.get_field(sim::TestOcean, ::Val{:albedo_diffuse}) = sim.integrator.p.α
 
 function surface_thermo_state(
     sim::TestOcean,
@@ -224,7 +225,8 @@ for FT in (Float32, Float64)
 
             coupler_cache_names = (
                 :T_S,
-                :albedo,
+                :albedo_direct,
+                :albedo_diffuse,
                 :F_R_sfc,
                 :F_R_toa,
                 :P_liq,

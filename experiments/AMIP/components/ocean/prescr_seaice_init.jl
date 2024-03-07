@@ -139,7 +139,8 @@ get_field(sim::PrescribedIceSimulation, ::Val{:surface_humidity}) = sim.integrat
 get_field(sim::PrescribedIceSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
 get_field(sim::PrescribedIceSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
 get_field(sim::PrescribedIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
-get_field(sim::PrescribedIceSimulation, ::Val{:albedo}) = sim.integrator.p.params.α
+get_field(sim::PrescribedIceSimulation, ::Val{:albedo_direct}) = sim.integrator.p.params.α
+get_field(sim::PrescribedIceSimulation, ::Val{:albedo_diffuse}) = sim.integrator.p.params.α
 get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 get_field(sim::PrescribedIceSimulation, ::Val{:air_density}) = sim.integrator.p.ρ_sfc
 

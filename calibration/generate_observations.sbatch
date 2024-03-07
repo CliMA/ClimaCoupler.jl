@@ -19,8 +19,11 @@ using NCDatasets
 import JLD2
 
 experiment_dir = joinpath("experiments", "amip_coupled")
-output_dir = joinpath(experiment_dir, "truth_simulation")
+COUPLER_OUTPUT_DIR = joinpath(experiment_dir, "truth_simulation")
 
+include("coupler_driver_init.jl")
+include("coupler_parse_args.jl")
+include("coupler_component_init.jl")
 include("coupler_driver_calibration.jl");
 solve_coupler!(cs); # Integrate the coupled model
 

@@ -1,6 +1,4 @@
-include("coupler_driver_init.jl")
-include("coupler_parse_args.jl")
-include("coupler_component_init.jl")
+
 
 ## coupler simulation
 cs = CoupledSimulation{FT}(
@@ -21,21 +19,6 @@ cs = CoupledSimulation{FT}(
     dir_paths,
 );
 
-#=
-## Restart component model states if specified
-=#
-#if restart_dir !== "unspecified"
-#    for sim in cs.model_sims
-#        if get_model_state_vector(sim) !== nothing
-#            @skipping restart
-#            restart_model_state!(sim, comms_ctx, restart_t; input_dir = restart_dir)
-#        end
-#    end
-#end
-
-#=
-## Initialize Component Model Exchange
-=#
 turbulent_fluxes = nothing
 if config_dict["turb_flux_partition"] == "PartitionedStateFluxes"
     turbulent_fluxes = PartitionedStateFluxes()

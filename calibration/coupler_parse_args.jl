@@ -34,7 +34,6 @@ evolving_ocean = config_dict["evolving_ocean"]
 config_dict["print_config_dict"] = false
 
 ## I/O directory setup
-COUPLER_OUTPUT_DIR = "/Users/akshaysridhar/Research/Codes/ClimaCoupler.jl/calibration/output/amip/"
 mkpath(COUPLER_OUTPUT_DIR)
 
 REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp/")

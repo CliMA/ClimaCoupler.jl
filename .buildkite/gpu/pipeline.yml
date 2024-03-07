@@ -55,6 +55,7 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 32G
           slurm_exclusive:
+      - wait
 
       - label: "GPU AMIP CHAP - strong scaling - 2 GPUs"
         key: "gpu_amip_chap_2process"
@@ -70,6 +71,7 @@ steps:
           slurm_ntasks: 2
           slurm_mem: 32G
           slurm_exclusive:
+      - wait
 
       - label: "GPU AMIP CHAP - strong scaling - 4 GPUs"
         key: "gpu_amip_chap_4process"
@@ -85,6 +87,8 @@ steps:
           slurm_ntasks: 4
           slurm_mem: 32G
           slurm_exclusive:
+      - wait
+  - wait
 
   - group: "CHAP GPU weak scaling"
     steps:
@@ -102,6 +106,7 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 32G
           slurm_exclusive:
+      - wait
 
       - label: "GPU AMIP CHAP - weak scaling - 2 GPUs"
         key: "gpu_amip_chap_ws_2process"
@@ -118,6 +123,7 @@ steps:
           slurm_mem: 32G
           slurm_time: 8:00:00
           slurm_exclusive:
+      - wait
 
       - label: "GPU AMIP CHAP - weak scaling - 4 GPUs"
         key: "gpu_amip_chap_ws_4process"
@@ -134,3 +140,4 @@ steps:
           slurm_mem: 32G
           slurm_time: 8:00:00
           slurm_exclusive:
+      - wait

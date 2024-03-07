@@ -816,6 +816,15 @@ if ClimaComms.iamroot(comms_ctx)
             output_dir = COUPLER_ARTIFACTS_DIR,
             month_date = cs.dates.date[1],
         ) ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
+
+        # Compare against observations
+        if t_end > 84600
+            @info "Error against observations"
+            include("user_io/leaderboard.jl")
+            compare_vars = ["pr"]
+            output_path = joinpath(COUPLER_ARTIFACTS_DIR, "biases.png")
+            Leaderboard.plot_biases(atmos_sim.integrator.p.output_dir, compare_vars, cs.dates.date; output_path)
+        end
     end
 
     if isinteractive()

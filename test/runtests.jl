@@ -39,6 +39,9 @@ end
 @safetestset "experiment test: CoupledSims tests" begin
     include("experiment_tests/coupled_sims.jl")
 end
+@safetestset "experiment test: Leaderboard" begin
+    include("experiment_tests/leaderboard.jl")
+end
 @safetestset "component test: bucket" begin
     include("component_model_tests/bucket_tests.jl")
 end

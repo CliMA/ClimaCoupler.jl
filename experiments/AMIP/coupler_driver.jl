@@ -553,6 +553,7 @@ elseif config_dict["turb_flux_partition"] == "CombinedStateFluxes"
 else
     error("turb_flux_partition must be either PartitionedStateFluxes or CombinedStateFluxes")
 end
+ClimaComms.barrier(comms_ctx)
 
 # 1) coupler combines surface states and calculates rho_sfc using surface and atmos variables
 update_surface_fractions!(cs)

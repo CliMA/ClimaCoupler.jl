@@ -507,6 +507,9 @@ function update_surface_fractions!(cs::CoupledSimulation)
     cs.surface_fractions.ice .= max.(min.(ice_d, FT(1) .- land_s), FT(0))
     cs.surface_fractions.ocean .= max.(FT(1) .- (cs.surface_fractions.ice .+ land_s), FT(0))
 
+    @show cs.surface_fractions.ice
+    @show cs.surface_fractions.land
+    @show cs.surface_fractions.ocean
     @assert minimum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) ≈ FT(1)
     @assert maximum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) ≈ FT(1)
 

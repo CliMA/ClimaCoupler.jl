@@ -507,12 +507,17 @@ function update_surface_fractions!(cs::CoupledSimulation)
     cs.surface_fractions.ice .= max.(min.(ice_d, FT(1) .- land_s), FT(0))
     cs.surface_fractions.ocean .= max.(FT(1) .- (cs.surface_fractions.ice .+ land_s), FT(0))
 
-    @show cs.surface_fractions.ice
-    @show cs.surface_fractions.land
-    @show cs.surface_fractions.ocean
-    @show cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean
-    @show minimum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean)
-    @show maximum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean)
+    # sf_sum = cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean
+    # if abs(minimum(sf_sum) - FT(1)) > eps(FT) || abs(maximum(sf_sum) - FT(1)) > eps(FT)
+    #     @show cs.surface_fractions.ice
+    #     @show cs.surface_fractions.land
+    #     @show cs.surface_fractions.ocean
+    #     @show cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean
+    #     @show minimum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean)
+    #     @show maximum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean)
+    # end
+    comms_ctx = axes(land_s).grid.topology.context
+    ClimaComms.barrier(comms_ctx)
     @assert minimum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) ≈ FT(1)
     @assert maximum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) ≈ FT(1)
 

@@ -13,6 +13,9 @@ import ClimaCoupler.BCReader: float_type_bcf
 
 include("../slab_utils.jl")
 
+###
+### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
+###
 """
     PrescribedIceSimulation{P, Y, D, I}
 
@@ -62,38 +65,6 @@ function slab_ice_space_init(::Type{FT}, space, p) where {FT}
 end
 
 """
-    ice_rhs!(du, u, p, _)
-
-Rhs method in the form as required by `ClimeTimeSteppers`, with the tendency vector `du`,
-the state vector `u` and the parameter vector, `p`, as input arguments.
-
-This sea-ice energy formulation follows [Holloway and Manabe 1971](https://journals.ametsoc.org/view/journals/mwre/99/5/1520-0493_1971_099_0335_socbag_2_3_co_2.xml?tab_body=pdf),
-where sea-ice concentrations and thicknes are prescribed, and the model solves for temperature (curbed at the freezing point).
-"""
-function ice_rhs!(du, u, p, _)
-    dY = du
-    Y = u
-    FT = eltype(dY)
-
-    params = p.params
-    F_turb_energy = p.F_turb_energy
-    F_radiative = p.F_radiative
-    area_fraction = p.area_fraction
-    T_freeze = params.T_freeze
-
-    F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc) # fluxes are defined to be positive when upward
-    rhs = @. (-F_turb_energy - F_radiative + F_conductive) / (params.h * params.ρ * params.c)
-
-    # do not count tendencies that lead to temperatures above freezing, and mask out no-ice areas
-    area_mask = Regridder.binary_mask.(area_fraction)
-    threshold = zero(FT)
-    unphysical = @. Regridder.binary_mask.(T_freeze - (Y.T_sfc + FT(rhs) * FT(p.dt)), threshold) .* area_mask
-    parent(dY.T_sfc) .= parent(rhs .* unphysical)
-
-    @. p.q_sfc = TD.q_vap_saturation_generic.(p.thermo_params, Y.T_sfc, p.ρ_sfc, TD.Ice())
-end
-
-"""
     ice_init(::Type{FT}; tspan, dt, saveat, space, ice_fraction, stepper = CTS.RK4()) where {FT}
 
 Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `step!` in the coupling loop.
@@ -128,39 +99,37 @@ function ice_init(::Type{FT}; tspan, saveat, dt, space, area_fraction, thermo_pa
     return sim
 end
 
-# file-specific
-"""
-    scale_sic(SIC, _info)
-Ensures that the space of the SIC struct matches that of the mask, and converts the units from area % to area fraction.
-"""
-scale_sic(SIC, _info) = swap_space!(zeros(axes(_info.land_fraction)), SIC) ./ float_type_bcf(_info)(100.0)
-
-# setting that SIC < 0.5 is counted as ocean if binary remapping.
-get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
-    mono ? h_ice : Regridder.binary_mask(h_ice, threshold)
-
 # extensions required by Interfacer
-get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
-get_field(sim::PrescribedIceSimulation, ::Val{:surface_humidity}) = sim.integrator.p.q_sfc
-get_field(sim::PrescribedIceSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
-get_field(sim::PrescribedIceSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
-get_field(sim::PrescribedIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
-get_field(sim::PrescribedIceSimulation, ::Val{:surface_albedo}) = sim.integrator.p.params.α
-get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 get_field(sim::PrescribedIceSimulation, ::Val{:air_density}) = sim.integrator.p.ρ_sfc
+get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
+get_field(sim::PrescribedIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
+get_field(sim::PrescribedIceSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
+get_field(sim::PrescribedIceSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
+get_field(sim::PrescribedIceSimulation, ::Val{:surface_albedo}) = sim.integrator.p.params.α
+get_field(sim::PrescribedIceSimulation, ::Val{:surface_humidity}) = sim.integrator.p.q_sfc
+get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
+get_field(sim::PrescribedIceSimulation, ::Val{:water}) = nothing
 
+"""
+    get_field(sim::PrescribedIceSimulation, ::Val{:energy})
+
+Extension of Interfacer.get_field to get the energy of the ocean.
+It multiplies the the slab temperature by the heat capacity, density, and depth.
+"""
+get_field(sim::PrescribedIceSimulation, ::Val{:energy}) =
+    sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h
+
+function update_field!(sim::PrescribedIceSimulation, ::Val{:air_density}, field)
+    parent(sim.integrator.p.ρ_sfc) .= parent(field)
+end
 function update_field!(sim::PrescribedIceSimulation, ::Val{:area_fraction}, field::ClimaCore.Fields.Field)
     sim.integrator.p.area_fraction .= field
-end
-
-function update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_energy_flux}, field)
-    parent(sim.integrator.p.F_turb_energy) .= parent(field)
 end
 function update_field!(sim::PrescribedIceSimulation, ::Val{:radiative_energy_flux_sfc}, field)
     parent(sim.integrator.p.F_radiative) .= parent(field)
 end
-function update_field!(sim::PrescribedIceSimulation, ::Val{:air_density}, field)
-    parent(sim.integrator.p.ρ_sfc) .= parent(field)
+function update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_energy_flux}, field)
+    parent(sim.integrator.p.F_turb_energy) .= parent(field)
 end
 
 # extensions required by FieldExchanger
@@ -186,16 +155,50 @@ function get_model_prog_state(sim::PrescribedIceSimulation)
     return sim.integrator.u
 end
 
+###
+### Sea ice model-specific functions (not explicitly required by ClimaCoupler.jl)
+###
 """
-    get_field(sim::PrescribedIceSimulation, ::Val{:energy})
-
-Extension of Interfacer.get_field to get the energy of the ocean.
-It multiplies the the slab temperature by the heat capacity, density, and depth.
+    scale_sic(SIC, _info)
+Ensures that the space of the SIC struct matches that of the mask, and converts the units from area % to area fraction.
 """
-get_field(sim::PrescribedIceSimulation, ::Val{:energy}) =
-    sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h
+scale_sic(SIC, _info) = swap_space!(zeros(axes(_info.land_fraction)), SIC) ./ float_type_bcf(_info)(100.0)
 
-get_field(sim::PrescribedIceSimulation, ::Val{:water}) = nothing
+# setting that SIC < 0.5 is counted as ocean if binary remapping.
+get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
+    mono ? h_ice : Regridder.binary_mask(h_ice, threshold)
+
+"""
+    ice_rhs!(du, u, p, _)
+
+Rhs method in the form as required by `ClimeTimeSteppers`, with the tendency vector `du`,
+the state vector `u` and the parameter vector, `p`, as input arguments.
+
+This sea-ice energy formulation follows [Holloway and Manabe 1971](https://journals.ametsoc.org/view/journals/mwre/99/5/1520-0493_1971_099_0335_socbag_2_3_co_2.xml?tab_body=pdf),
+where sea-ice concentrations and thicknes are prescribed, and the model solves for temperature (curbed at the freezing point).
+"""
+function ice_rhs!(du, u, p, _)
+    dY = du
+    Y = u
+    FT = eltype(dY)
+
+    params = p.params
+    F_turb_energy = p.F_turb_energy
+    F_radiative = p.F_radiative
+    area_fraction = p.area_fraction
+    T_freeze = params.T_freeze
+
+    F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc) # fluxes are defined to be positive when upward
+    rhs = @. (-F_turb_energy - F_radiative + F_conductive) / (params.h * params.ρ * params.c)
+
+    # do not count tendencies that lead to temperatures above freezing, and mask out no-ice areas
+    area_mask = Regridder.binary_mask.(area_fraction)
+    threshold = zero(FT)
+    unphysical = @. Regridder.binary_mask.(T_freeze - (Y.T_sfc + FT(rhs) * FT(p.dt)), threshold) .* area_mask
+    parent(dY.T_sfc) .= parent(rhs .* unphysical)
+
+    @. p.q_sfc = TD.q_vap_saturation_generic.(p.thermo_params, Y.T_sfc, p.ρ_sfc, TD.Ice())
+end
 
 """
     dss_state!(sim::PrescribedIceSimulation)

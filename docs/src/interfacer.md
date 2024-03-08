@@ -29,7 +29,7 @@ information needed to run that simulation.
 
 Each `ComponentModelSimulation` must extend the following functions to be able
 to use our coupler. For some existing models, these are defined within
-ClimaCoupler.jl in that model’s `init.jl` file, but it is preferable
+ClimaCoupler.jl in that model’s file in `experiments/AMIP/components/`, but it is preferable
 for these to be defined in a model’s own repository. Note that the dispatch
 `::ComponentModelSimulation` in the function definitions given below should
 be replaced with the particular component model extending these functions.
@@ -72,7 +72,7 @@ for the following properties:
 
 | Coupler name      | Description | Units |
 |-------------------|-------------|-------|
-| `air_density`       | air density at the surface of the atmosphere | kg m^-3 |
+| `air_density`       | air density of the atmosphere | kg m^-3 |
 | `air_temperature`   | air temperature at the surface of the atmosphere | K |
 | `energy`            | globally integrated energy | J |
 | `height_int`        | height at the first internal model level | m |
@@ -105,6 +105,9 @@ following properties:
 | `surface_temperature` | temperature over the combined surface space | K |
 | `turbulent_fluxes` | turbulent fluxes (note: only required when using `PartitionedStateFluxes` option - see our `FluxCalculator` module docs for more information) | W m^-2 |
 
+- `calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_S::Fields.Field)`:
+A function to return the air density of the atmosphere simulation
+extrapolated to the surface, with units of [kg m^-3].
 
 ### SurfaceModelSimulation - required functions
 Analogously to the `AtmosModelSimulation`, a `SurfaceModelSimulation`

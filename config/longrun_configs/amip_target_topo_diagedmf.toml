@@ -7,7 +7,7 @@ value = 0.0
 
 [alpha_rayleigh_w]
 alias = "alpha_rayleigh_uh"
-value = 10.0
+value = 3.0
 
 [precipitation_timescale]
 value = 600

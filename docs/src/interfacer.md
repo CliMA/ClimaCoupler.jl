@@ -187,3 +187,18 @@ function update_field!(sim::SurfaceStub, ::Val{:surface_temperature}, field::Fie
     sim.cache.T_sfc .= field
 end
 ```
+
+## Interfacer API
+```@docs
+    ClimaCoupler.Interfacer.CoupledSimulation
+    ClimaCoupler.Interfacer.AtmosModelSimulation
+    ClimaCoupler.Interfacer.SurfaceModelSimulation
+    ClimaCoupler.Interfacer.ComponentModelSimulation
+    ClimaCoupler.Interfacer.AbstractSimulation
+    ClimaCoupler.Interfacer.SurfaceStub
+    ClimaCoupler.Interfacer.stub_init
+    ClimaCoupler.Interfacer.float_type
+    ClimaCoupler.Interfacer.name
+    ClimaCoupler.Interfacer.get_field
+    ClimaCoupler.Interfacer.update_field!
+```

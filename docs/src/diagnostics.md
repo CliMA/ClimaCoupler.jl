@@ -1,8 +1,8 @@
 # Diagnostics
 
-This module contains functions for defining, gathering and outputting model diagnostics from the Coupler. 
+This module contains functions for defining, gathering and outputting model diagnostics from the Coupler.
 
-Note that `ClimaCoupler.Diagnostics` is deployed online (i.e., as the model runs), working with cached model data (usually) on the model grid. This does not include offline post-processing (i.e., manipulating saved model output after the model is run, such as regridding data to the latitude-longitude grid). See `ClimaCoupler.PostProcessor` for offline model data treatment. 
+Note that `ClimaCoupler.Diagnostics` is deployed online (i.e., as the model runs), working with cached model data (usually) on the model grid. This does not include offline post-processing (i.e., manipulating saved model output after the model is run, such as regridding data to the latitude-longitude grid). See `ClimaCoupler.PostProcessor` for offline model data treatment.
 
 ## Diagnostics API
 
@@ -14,6 +14,7 @@ Note that `ClimaCoupler.Diagnostics` is deployed online (i.e., as the model runs
     ClimaCoupler.Diagnostics.get_var
     ClimaCoupler.Diagnostics.accumulate_diagnostics!
     ClimaCoupler.Diagnostics.save_diagnostics
+    ClimaCoupler.Diagnostics.init_diagnostics
 ```
 
 

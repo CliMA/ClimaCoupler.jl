@@ -428,7 +428,7 @@ end
 #=
 ## Coupler Initialization
 The coupler needs to contain exchange information, manage the calendar and be able to access all component models. It can also optionally
-save online diagnostics. These are all initialized here and saved in a global `CouplerSimulation` struct, `cs`.
+save online diagnostics. These are all initialized here and saved in a global `CoupledSimulation` struct, `cs`.
 =#
 
 ## coupler exchange fields

@@ -14,12 +14,41 @@ using ClimaCoupler: Regridder
 using ClimaCore: Fields
 
 # data types for postprocessing
+"""
+    PostProcessedData
+
+Abstract type for postprocessed data.
+"""
 abstract type PostProcessedData end
 
+"""
+    ZLatLonData <: PostProcessedData
+Concrete type for 3D data.
+"""
 struct ZLatLonData <: PostProcessedData end
+
+"""
+    ZLatData <: PostProcessedData
+Concrete type for 2D data with latitude and level.
+"""
 struct ZLatData <: PostProcessedData end
+
+"""
+    LatLonData <: PostProcessedData
+Concrete type for 2D data with latitude and longitude.
+"""
 struct LatLonData <: PostProcessedData end
+
+"""
+    LatData <: PostProcessedData
+Concrete type for 1D data with latitude.
+"""
 struct LatData <: PostProcessedData end
+
+"""
+    RawData <: PostProcessedData
+Concrete type for raw model data.
+"""
 struct RawData <: PostProcessedData end
 
 """

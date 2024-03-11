@@ -9,7 +9,7 @@ dt_save_state_to_disk: "Inf"
 dt_save_to_sol: "Inf"
 energy_check: false
 evolving_ocean: false
-h_elem: 86
+h_elem: 84
 hourly_checkpoint: false
 job_id: "gpu_amip_chap_ws_4process"
 land_albedo_type: "map_static"

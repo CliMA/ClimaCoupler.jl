@@ -93,7 +93,7 @@ steps:
       #   command:
       #     - >
       #       julia --threads=3 --color=yes --project=experiments/AMIP experiments/AMIP/coupler_driver.jl
-      #       --config_file $GPU_DYAMOND_CONFIG_PATH_WS/gpu_amip_dyamond_ws.yml
+      #       --config_file $GPU_DYAMOND_WS_CONFIG_PATH/gpu_amip_dyamond_ws.yml
       #   artifact_paths: "gpu_amip_dyamond_ws/*"
       #   agents:
       #     slurm_gpus_per_task: 1
@@ -107,7 +107,7 @@ steps:
           - >
             srun --cpu-bind=threads --cpus-per-task=4
             julia --threads=3 --color=yes --project=experiments/AMIP experiments/AMIP/coupler_driver.jl
-            --config_file $GPU_DYAMOND_CONFIG_PATH_WS/gpu_amip_dyamond_ws_2process.yml
+            --config_file $GPU_DYAMOND_WS_CONFIG_PATH/gpu_amip_dyamond_ws_2process.yml
         artifact_paths: "gpu_amip_dyamond_ws_2process/*"
         agents:
           slurm_gpus_per_task: 1
@@ -121,7 +121,7 @@ steps:
           - >
             srun --cpu-bind=threads --cpus-per-task=4
             julia --threads=3 --color=yes --project=experiments/AMIP experiments/AMIP/coupler_driver.jl
-            --config_file $GPU_DYAMOND_CONFIG_PATH_WS/gpu_amip_dyamond_ws_4process.yml
+            --config_file $GPU_DYAMOND_WS_CONFIG_PATH/gpu_amip_dyamond_ws_4process.yml
         artifact_paths: "gpu_amip_dyamond_ws_4process/*"
         agents:
           slurm_gpus_per_task: 1

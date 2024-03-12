@@ -1,14 +1,14 @@
 anim: false
 apply_limiter: false
 atmos_config_file: "config/gpu_configs/gpu_aquaplanet_dyamond.yml"
-dt: "100secs"
-dt_cpl: 100
+dt: "50secs"
+dt_cpl: 50
 dt_rad: "1hours"
 dt_save_state_to_disk: "Inf"
 dt_save_to_sol: "Inf"
 energy_check: false
 evolving_ocean: false
-h_elem: 30
+h_elem: 42
 hourly_checkpoint: false
 job_id: "gpu_amip_dyamond"
 land_albedo_type: "map_static"

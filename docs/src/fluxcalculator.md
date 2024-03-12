@@ -16,5 +16,19 @@ Fluxes over a heterogeneous surface (e.g., from a gridpoint where atmospheric ce
     ClimaCoupler.FluxCalculator.CombinedStateFluxes
     ClimaCoupler.FluxCalculator.combined_turbulent_fluxes!
     ClimaCoupler.FluxCalculator.atmos_turbulent_fluxes!
+    ClimaCoupler.FluxCalculator.surface_inputs
+    ClimaCoupler.FluxCalculator.calculate_surface_air_density
+    ClimaCoupler.FluxCalculator.get_surface_params
+    ClimaCoupler.FluxCalculator.partitioned_turbulent_fluxes!
+    ClimaCoupler.FluxCalculator.differentiate_turbulent_fluxes!
+    ClimaCoupler.FluxCalculator.get_surface_fluxes_point!
+    ClimaCoupler.FluxCalculator.update_turbulent_fluxes_point!
+    ClimaCoupler.FluxCalculator.extrapolate_ρ_to_sfc
+    ClimaCoupler.FluxCalculator.surface_thermo_state
+```
 
+## FieldExchanger Internal Functions
+
+```@docs
+    ClimaCoupler.FluxCalculator.get_scheme_properties
 ```

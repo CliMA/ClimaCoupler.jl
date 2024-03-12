@@ -11,5 +11,5 @@ mono_surface: false
 monthly_checkpoint: false
 run_name: "gpu_dyamond_target"
 start_date: "19790301"
-t_end: "1days"
+t_end: "50days"
 turb_flux_partition: "CombinedStateFluxes"

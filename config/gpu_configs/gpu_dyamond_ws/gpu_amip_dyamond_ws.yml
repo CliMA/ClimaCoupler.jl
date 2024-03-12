@@ -17,5 +17,5 @@ mono_surface: false
 run_name: "gpu_amip_dyamond"
 start_date: "19790301"
 surface_setup: "PrescribedSurface"
-t_end: "12hours"
+t_end: "1days"
 turb_flux_partition: "CombinedStateFluxes"

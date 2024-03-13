@@ -5,7 +5,7 @@ parsed_args = parse_commandline(argparse_settings())
 config_dict = YAML.load_file("./experiments/amip_coupled/coupler_config.yml")
 config_dict = YAML.load_file(joinpath(experiment_dir, "coupler_config.yml"));
 config_dict["t_end"] = "150secs";
-config_dict["output_dir"] = output_dir;
+config_dict["output_dir"] = COUPLER_OUTPUT_DIR;
 config_dict = merge(parsed_args, config_dict)
 config_dict_atmos = get_atmos_config(config_dict)
 

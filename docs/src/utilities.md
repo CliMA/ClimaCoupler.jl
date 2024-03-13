@@ -10,4 +10,5 @@ modules in the coupler.
 ClimaCoupler.Utilities.swap_space!
 ClimaCoupler.Utilities.get_comms_context
 ClimaCoupler.Utilities.get_device
+ClimaCoupler.Utilities.show_memory_usage
 ```

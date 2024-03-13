@@ -23,6 +23,7 @@ Given that ClimaCore objects are heavily parametrized, non-abbreviated stacktrac
 so we force abbreviated stacktraces even in non-interactive runs.
 (See also `Base.type_limited_string_from_context()`)
 =#
+using CUDA
 
 redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(false)))
 
@@ -64,7 +65,7 @@ using ClimaCoupler.Regridder
 using ClimaCoupler.Regridder: update_surface_fractions!, combine_surfaces!, binary_mask
 using ClimaCoupler.TimeManager:
     current_date, Monthly, EveryTimestep, HourlyCallback, MonthlyCallback, update_firstdayofmonth!, trigger_callback!
-import ClimaCoupler.Utilities: get_comms_context
+import ClimaCoupler.Utilities: get_comms_context, show_memory_usage
 
 pkg_dir = pkgdir(ClimaCoupler)
 
@@ -190,8 +191,12 @@ returns a `ComponentModelSimulation` object (see `Interfacer` docs for more deta
 This uses the `ClimaAtmos.jl` model, with parameterization options specified in the `config_dict_atmos` dictionary.
 =#
 
+show_memory_usage(comms_ctx, Dict())
+
 ## init atmos model component
 atmos_sim = atmos_init(FT, config_dict_atmos);
+show_memory_usage(comms_ctx, Dict(atmos_sim => name(atmos_sim)))
+
 thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models #610
 
 #=
@@ -222,6 +227,7 @@ land_fraction =
             mono = mono_surface,
         )
     )
+show_memory_usage(comms_ctx, Dict(land_fraction => "land_fraction"))
 
 #=
 ### Surface Models: AMIP and SlabPlanet Modes
@@ -332,6 +338,17 @@ if mode_name == "amip"
     update_field!(atmos_sim, Val(:co2), CO2_init)
 
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
+    show_memory_usage(
+        comms_ctx,
+        Dict(
+            land_sim => name(land_sim),
+            ocean_sim => name(ocean_sim),
+            ice_sim => name(ice_sim),
+            SST_info => "SST_info",
+            SIC_info => "SIC_info",
+            CO2_info => "CO2_info",
+        ),
+    )
 
 elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
 
@@ -381,6 +398,10 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
     ))
 
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
+    show_memory_usage(
+        comms_ctx,
+        Dict(land_sim => name(land_sim), ocean_sim => name(ocean_sim), ice_sim => name(ice_sim)),
+    )
 
 elseif mode_name == "slabplanet_eisenman"
 
@@ -423,7 +444,12 @@ elseif mode_name == "slabplanet_eisenman"
     )
 
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
+    show_memory_usage(
+        comms_ctx,
+        Dict(land_sim => name(land_sim), ocean_sim => name(ocean_sim), ice_sim => name(ice_sim)),
+    )
 end
+
 
 #=
 ## Coupler Initialization
@@ -452,6 +478,7 @@ coupler_field_names = (
 )
 coupler_fields =
     NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
+show_memory_usage(comms_ctx, Dict(coupler_fields => "coupler_fields"))
 
 ## model simulations
 model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim);
@@ -485,6 +512,7 @@ monthly_2d_diags = init_diagnostics(
 )
 
 diagnostics = (monthly_3d_diags, monthly_2d_diags)
+show_memory_usage(comms_ctx, Dict(diagnostics => "diagnostics"))
 
 #=
 ## Initialize Conservation Checks
@@ -503,6 +531,8 @@ if energy_check
     )
     conservation_checks = (; energy = EnergyConservationCheck(model_sims), water = WaterConservationCheck(model_sims))
 end
+show_memory_usage(comms_ctx, Dict(conservation_checks => "conservation_checks"))
+
 
 #=
 ## Initialize Callbacks
@@ -523,6 +553,7 @@ checkpoint_cb =
 update_firstdayofmonth!_cb =
     MonthlyCallback(dt = FT(1), func = update_firstdayofmonth!, ref_date = [dates.date1[1]], active = true)
 callbacks = (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb)
+show_memory_usage(comms_ctx, Dict(callbacks => "callbacks"))
 
 #=
 ## Initialize Coupled Simulation
@@ -550,6 +581,7 @@ cs = CoupledSimulation{FT}(
     callbacks,
     dir_paths,
 );
+show_memory_usage(comms_ctx, Dict(cs => "cs"))
 
 #=
 ## Restart component model states if specified
@@ -625,6 +657,8 @@ reinit_model_sims!(cs.model_sims)
 # atmos receives the turbulent fluxes from the coupler.
 import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
 update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
+
+show_memory_usage(comms_ctx, Dict(cs => "cs"))
 
 #=
 ## Coupling Loop
@@ -726,6 +760,7 @@ end #hide
 
 ## run the coupled simulation
 solve_coupler!(cs);
+show_memory_usage(comms_ctx, Dict(cs => "cs"))
 
 #=
 ## Postprocessing
@@ -825,6 +860,7 @@ if ClimaComms.iamroot(comms_ctx)
             Leaderboard.plot_biases(atmos_sim.integrator.p.output_dir, compare_vars, cs.dates.date; output_path)
         end
     end
+    show_memory_usage(comms_ctx, Dict(cs => "cs"))
 
     if isinteractive()
         ## clean up for interactive runs, retain all output otherwise

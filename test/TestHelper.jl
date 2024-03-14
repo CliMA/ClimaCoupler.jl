@@ -51,7 +51,7 @@ function create_space(
 
     if nz > 1
         vertdomain =
-            Domains.IntervalDomain(Geometry.ZPoint{FT}(0), Geometry.ZPoint{FT}(100); boundary_tags = (:bottom, :top))
+            Domains.IntervalDomain(Geometry.ZPoint{FT}(0), Geometry.ZPoint{FT}(100); boundary_names = (:bottom, :top))
         vertmesh = Meshes.IntervalMesh(vertdomain, nelems = nz)
         vert_center_space = Spaces.CenterFiniteDifferenceSpace(vertmesh)
         return Spaces.ExtrudedFiniteDifferenceSpace(sphere_space, vert_center_space)

@@ -4,7 +4,7 @@ using ClimaCoupler.Interfacer: SeaIceModelSimulation
 using ClimaCoupler.TestHelper: create_space
 using ClimaCore
 using ClimaCore: Fields, Spaces
-import CLIMAParameters as CP
+import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
 
 include(pkgdir(ClimaCoupler, "experiments/AMIP/components/ocean/prescr_seaice.jl"))

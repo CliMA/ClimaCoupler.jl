@@ -131,6 +131,7 @@ saveat = Float64(time_to_seconds(config_dict["dt_save_to_sol"]))
 date0 = date = DateTime(config_dict["start_date"], dateformat"yyyymmdd")
 mono_surface = config_dict["mono_surface"]
 hourly_checkpoint = config_dict["hourly_checkpoint"]
+hourly_checkpoint_dt = config_dict["hourly_checkpoint_dt"]
 restart_dir = config_dict["restart_dir"]
 restart_t = Int(config_dict["restart_t"])
 evolving_ocean = config_dict["evolving_ocean"]
@@ -526,8 +527,13 @@ The currently implemented callbacks are:
   being approximated from wind speed). It is updated at the same frequency as the atmospheric radiation.
   NB: Eventually, we will call all of radiation from the coupler, in addition to the albedo calculation.
 =#
-checkpoint_cb =
-    HourlyCallback(dt = FT(480), func = checkpoint_sims, ref_date = [dates.date[1]], active = hourly_checkpoint) # 20 days
+
+checkpoint_cb = HourlyCallback(
+    dt = hourly_checkpoint_dt,
+    func = checkpoint_sims,
+    ref_date = [dates.date[1]],
+    active = hourly_checkpoint,
+) # 20 days
 update_firstdayofmonth!_cb =
     MonthlyCallback(dt = FT(1), func = update_firstdayofmonth!, ref_date = [dates.date1[1]], active = true)
 dt_water_albedo = parse(FT, filter(x -> !occursin(x, "hours"), dt_rad))

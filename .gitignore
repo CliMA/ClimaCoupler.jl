@@ -50,7 +50,7 @@ experiments/AMIP/output/*
 *.so
 
 # internal tests
-testdel.jl
+slurm-*.out
 
 # ignore vscode artifacts
 *.vscode

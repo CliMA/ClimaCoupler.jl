@@ -38,6 +38,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to checkpoint at intervals of 1 hour or multiple hours"
         arg_type = Bool
         default = false
+        "--hourly_checkpoint_dt"
+        help = "Time interval for hourly checkpointing in hours (20 days by default)"
+        arg_type = Int
+        default = 480
         "--coupler_output_dir"
         help = "Directory to save output files. Note that TempestRemap fails if interactive and paths are too long."
         arg_type = String

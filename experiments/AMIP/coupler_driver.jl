@@ -860,8 +860,18 @@ if ClimaComms.iamroot(comms_ctx)
             @info "Error against observations"
             include("user_io/leaderboard.jl")
             compare_vars = ["pr"]
-            output_path = joinpath(COUPLER_ARTIFACTS_DIR, "biases.png")
-            Leaderboard.plot_biases(atmos_sim.integrator.p.output_dir, compare_vars, cs.dates.date; output_path)
+            function plot_biases(dates, output_name)
+                output_path = joinpath(COUPLER_ARTIFACTS_DIR, "bias_$(output_name).png")
+                Leaderboard.plot_biases(atmos_sim.integrator.p.output_dir, compare_vars, dates; output_path)
+            end
+            plot_biases(cs.dates.date, "total")
+
+            MAM, JJA, SON, DJF = Leaderboard.split_by_season(cs.dates.date)
+
+            !isempty(MAM) && plot_biases(cs.dates.date, "MAM")
+            !isempty(JJA) && plot_biases(cs.dates.date, "JJA")
+            !isempty(SON) && plot_biases(cs.dates.date, "SON")
+            !isempty(DJF) && plot_biases(cs.dates.date, "DJF")
         end
     end
 

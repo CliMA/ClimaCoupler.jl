@@ -2,7 +2,7 @@ using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 using ClimaCoupler: Regridder, TestHelper
 using Test
 import Thermodynamics as TD
-import CLIMAParameters as CP
+import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
 import ClimaCoupler.Interfacer:
     CoupledSimulation,

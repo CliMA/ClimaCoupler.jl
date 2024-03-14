@@ -20,7 +20,7 @@ import ClimaCoupler.FluxCalculator:
     surface_thermo_state
 import ClimaCoupler: Interfacer
 
-import CLIMAParameters as CP
+import ClimaParams as CP
 import Thermodynamics as TD
 import Thermodynamics.Parameters.ThermodynamicsParameters
 import SurfaceFluxes as SF

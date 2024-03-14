@@ -8,7 +8,7 @@ import ClimaCoupler.TestHelper
 import ClimaCoupler.Interfacer: SeaIceModelSimulation
 import ClimaCoupler: Regridder
 
-import CLIMAParameters as CP
+import ClimaParams as CP
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TP
 

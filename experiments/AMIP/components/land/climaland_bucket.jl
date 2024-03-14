@@ -4,7 +4,7 @@ import ClimaTimeSteppers as CTS
 import Thermodynamics as TD
 using Dates: DateTime
 using ClimaComms: AbstractCommsContext
-import CLIMAParameters
+import ClimaParams
 
 import ClimaLand
 using ClimaLand.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers

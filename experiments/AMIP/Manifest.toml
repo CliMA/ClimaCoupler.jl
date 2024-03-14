@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.1"
+julia_version = "1.10.2"
 manifest_format = "2.0"
-project_hash = "8d2ff3613412ce745a56f29971ef6211131f932f"
+project_hash = "284db48dcd39d58ad8518daa0c1caded1552fa4a"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "41c37aa88889c171f1300ceac1313c06e891d245"
@@ -382,7 +382,7 @@ uuid = "d934ef94-cdd4-4710-83d6-720549644b70"
 version = "0.3.13"
 
 [[deps.ClimaCoupler]]
-deps = ["CLIMAParameters", "ClimaAtmos", "ClimaComms", "ClimaCore", "ClimaCoreTempestRemap", "ClimaLand", "Dates", "DocStringExtensions", "Insolation", "JLD2", "NCDatasets", "Plots", "SciMLBase", "StaticArrays", "Statistics", "SurfaceFluxes", "TempestRemap_jll", "Thermodynamics"]
+deps = ["ClimaAtmos", "ClimaComms", "ClimaCore", "ClimaCoreTempestRemap", "ClimaLand", "ClimaParams", "Dates", "DocStringExtensions", "Insolation", "JLD2", "NCDatasets", "Plots", "SciMLBase", "StaticArrays", "Statistics", "SurfaceFluxes", "TempestRemap_jll", "Thermodynamics"]
 path = "../.."
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.1.0"
@@ -396,6 +396,12 @@ weakdeps = ["CLIMAParameters"]
 
     [deps.ClimaLand.extensions]
     CreateParametersExt = "CLIMAParameters"
+
+[[deps.ClimaParams]]
+deps = ["DocStringExtensions", "TOML", "Test"]
+git-tree-sha1 = "ec67949db856e01df4cbf7d6ddafefeda02f93ee"
+uuid = "5c42b081-d73a-476f-9059-fd94b934656c"
+version = "0.10.3"
 
 [[deps.ClimaTimeSteppers]]
 deps = ["ClimaComms", "Colors", "DataStructures", "DiffEqBase", "DiffEqCallbacks", "KernelAbstractions", "Krylov", "LinearAlgebra", "LinearOperators", "NVTX", "SciMLBase", "StaticArrays"]

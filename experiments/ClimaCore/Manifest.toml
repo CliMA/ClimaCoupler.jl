@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.1"
+julia_version = "1.10.2"
 manifest_format = "2.0"
-project_hash = "7453f2d69076b669252dbe4dc1f5fe3e732e1493"
+project_hash = "259cae42429247b16710ab2dd21991c786e66868"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "41c37aa88889c171f1300ceac1313c06e891d245"
@@ -169,12 +169,6 @@ git-tree-sha1 = "389ad5c84de1ae7cf0e28e381131c98ea87d54fc"
 uuid = "fa961155-64e5-5f13-b03f-caf6b980ea82"
 version = "0.5.0"
 
-[[deps.CLIMAParameters]]
-deps = ["DocStringExtensions", "TOML", "Test"]
-git-tree-sha1 = "9fcb37be791b4762943cbbf15ccf35c99d91460c"
-uuid = "6eacf6c3-8458-43b9-ae03-caf5306d3d53"
-version = "0.9.1"
-
 [[deps.CPUSummary]]
 deps = ["CpuId", "IfElse", "PrecompileTools", "Static"]
 git-tree-sha1 = "601f7e7b3d36f18790e2caf83a882d88e9b71ff1"
@@ -247,6 +241,12 @@ weakdeps = ["Krylov"]
 
     [deps.ClimaCore.extensions]
     KrylovExt = "Krylov"
+
+[[deps.ClimaParams]]
+deps = ["DocStringExtensions", "TOML", "Test"]
+git-tree-sha1 = "ec67949db856e01df4cbf7d6ddafefeda02f93ee"
+uuid = "5c42b081-d73a-476f-9059-fd94b934656c"
+version = "0.10.3"
 
 [[deps.ClimaTimeSteppers]]
 deps = ["ClimaComms", "Colors", "DataStructures", "DiffEqBase", "DiffEqCallbacks", "KernelAbstractions", "Krylov", "LinearAlgebra", "LinearOperators", "NVTX", "SciMLBase", "StaticArrays"]

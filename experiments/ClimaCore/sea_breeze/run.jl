@@ -26,7 +26,6 @@ using DiffEqCallbacks #hide
 
 ## enable broadcasting with mismatched spaces #hide
 import ClimaCore: Fields, Operators #hide
-Fields.allow_mismatched_diagonalized_spaces() = true #hide
 Operators.allow_mismatched_fd_spaces() = true #hide
 #hide
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", "..")) #hide

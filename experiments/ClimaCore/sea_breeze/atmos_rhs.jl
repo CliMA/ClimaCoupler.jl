@@ -122,7 +122,7 @@ function hvspace_2D(xlim = (-π, π), zlim = (0, 4π), helem = 20, velem = 20, n
     vertdomain = Domains.IntervalDomain(
         Geometry.ZPoint{FT}(zlim[1]),
         Geometry.ZPoint{FT}(zlim[2]);
-        boundary_tags = (:bottom, :top),
+        boundary_names = (:bottom, :top),
     )
     vertmesh = Meshes.IntervalMesh(vertdomain, nelems = velem)
     vert_center_space = Spaces.CenterFiniteDifferenceSpace(vertmesh)

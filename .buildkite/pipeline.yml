@@ -429,6 +429,13 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
+      - label: "GPU AMIP DYAMOND without diagnostics"
+        key: "gpu_dyamond_nodiags"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_dyamond_nodiags.yml"
+        artifact_paths: "experiments/AMIP/output/amip/gpu_dyamond_nodiags_artifacts/*"
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
 
 
       - wait

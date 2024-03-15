@@ -62,6 +62,7 @@ steps:
       - "julia --project=artifacts -e 'using Pkg; Pkg.status()'"
       - "julia --project=artifacts artifacts/download_artifacts.jl"
 
+      - echo "--- Run simulation"
       - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_dyamond_target.yml"
     artifact_paths: "experiments/AMIP/output/amip/gpu_dyamond_target_artifacts/*"
     agents:

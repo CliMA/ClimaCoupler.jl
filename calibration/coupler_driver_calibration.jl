@@ -1,7 +1,8 @@
+include("coupler_driver_init.jl")
+include("coupler_parse_args.jl")
 
-
-## coupler simulation
-cs = CoupledSimulation{FT}(
+include("coupler_component_init.jl")
+cs = ClimaCoupler.Interfacer.CoupledSimulation{FT}(
     comms_ctx,
     dates,
     boundary_space,

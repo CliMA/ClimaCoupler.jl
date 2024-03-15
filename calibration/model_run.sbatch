@@ -10,7 +10,10 @@ iteration=$2
 # Find output directory
 format_i=$(printf "iteration_%03d" "$iteration")
 member=$(printf "member_%03d" "$SLURM_ARRAY_TASK_ID")
-output=output/$experiment_id/$format_i/$member/model_log.out
+output="output/$experiment_id/$format_i/$member/model_log.out"
+
+experiment_dir = joinpath("experiments", "amip_coupled")
+COUPLER_OUTPUT_DIR = joinpath("experiments","$format_i","$member")
 
 # Run the forward model
 srun --output=$output julia --color=no --project=experiments -e "

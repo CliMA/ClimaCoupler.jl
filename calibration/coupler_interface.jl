@@ -19,7 +19,7 @@ function get_coupler_sim(member, iteration, experiment_id::AbstractString)
         EKP.TOMLInterface.path_to_ensemble_member(output_dir, iteration, member)
     config_dict["output_dir"] = member_path
     # COPY Coupler Driver
-    include("../experiments/AMIP/coupler_driver_calibration.jl")
+    include("coupler_driver_calibration.jl")
     # END Coupler Driver
 
     parameter_path = joinpath(member_path, "parameters.toml")

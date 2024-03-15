@@ -23,4 +23,3 @@ t_end: "100days"
 topo_smoothing: true
 topography: "Earth"
 turb_flux_partition: "CombinedStateFluxes"
-vert_diff: "true"

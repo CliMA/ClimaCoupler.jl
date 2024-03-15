@@ -29,7 +29,8 @@ plot the anomalies of the fields with respect to `cs_fields_ref`.
 """
 function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
     field_names = (
-        :surface_albedo,
+        :surface_direct_albedo,
+        :surface_diffuse_albedo,
         :F_radiative,
         :F_turb_energy,
         :F_turb_moisture,

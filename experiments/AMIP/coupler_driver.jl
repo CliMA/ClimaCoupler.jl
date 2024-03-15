@@ -58,7 +58,8 @@ using ClimaCoupler.FluxCalculator:
     CombinedStateFluxes,
     combined_turbulent_fluxes!,
     MoninObukhovScheme,
-    partitioned_turbulent_fluxes!
+    partitioned_turbulent_fluxes!,
+    water_albedo_from_atmosphere!
 using ClimaCoupler.Interfacer: CoupledSimulation, SurfaceStub, get_field, update_field!
 using ClimaCoupler.Regridder
 using ClimaCoupler.Regridder: update_surface_fractions!, combine_surfaces!, binary_mask
@@ -133,6 +134,7 @@ hourly_checkpoint = config_dict["hourly_checkpoint"]
 restart_dir = config_dict["restart_dir"]
 restart_t = Int(config_dict["restart_t"])
 evolving_ocean = config_dict["evolving_ocean"]
+dt_rad = config_dict["dt_rad"]
 
 #=
 ## Setup Communication Context
@@ -280,7 +282,8 @@ if mode_name == "amip"
         z0m = FT(1e-3),
         z0b = FT(1e-3),
         beta = FT(1),
-        α = FT(0.06),
+        α_direct = ClimaCore.Fields.ones(boundary_space) .* FT(0.06),
+        α_diffuse = ClimaCore.Fields.ones(boundary_space) .* FT(0.06),
         area_fraction = (FT(1) .- land_fraction),
         phase = TD.Liquid(),
         thermo_params = thermo_params,
@@ -374,7 +377,8 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         z0m = FT(0),
         z0b = FT(0),
         beta = FT(1),
-        α = FT(1),
+        α_direct = ClimaCore.Fields.ones(boundary_space) .* FT(1),
+        α_diffuse = ClimaCore.Fields.ones(boundary_space) .* FT(1),
         area_fraction = ClimaCore.Fields.zeros(boundary_space),
         phase = TD.Ice(),
         thermo_params = thermo_params,
@@ -438,7 +442,8 @@ coupler_field_names = (
     :z0b_S,
     :ρ_sfc,
     :q_sfc,
-    :surface_albedo,
+    :surface_direct_albedo,
+    :surface_diffuse_albedo,
     :beta,
     :F_turb_energy,
     :F_turb_moisture,
@@ -449,6 +454,8 @@ coupler_field_names = (
     :P_snow,
     :radiative_energy_flux_toa,
     :P_net,
+    :temp1,
+    :temp2,
 )
 coupler_fields =
     NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
@@ -515,14 +522,23 @@ the `ref_date` field specifies the reference (first) date for the callback, and 
 The currently implemented callbacks are:
 - `checkpoint_cb`: generates a checkpoint of all model states at a specified interval. This is mainly used for restarting simulations.
 - `update_firstdayofmonth!_cb`: generates a callback to update the first day of the month for monthly message print (and other monthly operations).
+- `albedo_cb`: for the amip mode, the water albedo is time varying (since the reflectivity of water depends on insolation and wave characteristics, with the latter
+  being approximated from wind speed). It is updated at the same frequency as the atmospheric radiation.
+  NB: Eventually, we will call all of radiation from the coupler, in addition to the albedo calculation.
 =#
-
-## checkpoint_cb generates a checkpoint of all model states at a specified interval. This mainly used for restarting simulations.
 checkpoint_cb =
     HourlyCallback(dt = FT(480), func = checkpoint_sims, ref_date = [dates.date[1]], active = hourly_checkpoint) # 20 days
 update_firstdayofmonth!_cb =
     MonthlyCallback(dt = FT(1), func = update_firstdayofmonth!, ref_date = [dates.date1[1]], active = true)
-callbacks = (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb)
+dt_water_albedo = parse(FT, filter(x -> !occursin(x, "hours"), dt_rad))
+albedo_cb = HourlyCallback(
+    dt = dt_water_albedo,
+    func = water_albedo_from_atmosphere!,
+    ref_date = [dates.date[1]],
+    active = mode_name == "amip",
+)
+callbacks =
+    (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb, water_albedo = albedo_cb)
 
 #=
 ## Initialize turbulent fluxes
@@ -690,9 +706,12 @@ function solve_coupler!(cs)
 
         ## compute global energy
         !isnothing(cs.conservation_checks) ? check_conservation!(cs) : nothing
+        ClimaComms.barrier(comms_ctx)
+
+        ## update water albedo from wind at dt_water_albedo (this will be extended to a radiation callback from the coupler)
+        trigger_callback!(cs, cs.callbacks.water_albedo)
 
         ## run component models sequentially for one coupling timestep (Δt_cpl)
-        ClimaComms.barrier(comms_ctx)
         update_surface_fractions!(cs)
         update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 

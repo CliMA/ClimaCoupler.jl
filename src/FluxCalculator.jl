@@ -9,7 +9,6 @@ module FluxCalculator
 import SurfaceFluxes as SF
 import Thermodynamics as TD
 using StaticArrays
-
 using ClimaCoupler: Interfacer, Regridder
 using ClimaCore: Fields, Spaces
 export PartitionedStateFluxes,
@@ -23,7 +22,8 @@ export PartitionedStateFluxes,
     BulkScheme,
     partitioned_turbulent_fluxes!,
     get_surface_params,
-    update_turbulent_fluxes_point!
+    update_turbulent_fluxes_point!,
+    water_albedo_from_atmosphere!
 
 """
     TurbulentFluxPartition
@@ -386,5 +386,32 @@ This function provides a placeholder for differentiating fluxes with respect to
 surface temperature in surface energy balance calculations.
 """
 differentiate_turbulent_fluxes!(::Interfacer.SurfaceModelSimulation, args) = nothing
+
+"""
+    water_albedo_from_atmosphere!(cs::Interfacer.CoupledSimulation, _)
+
+Callback to calculate the water albedo from atmospheric state. This is a placeholder for the full radiation callback.
+"""
+function water_albedo_from_atmosphere!(cs::Interfacer.CoupledSimulation, _)
+    atmos_sim = cs.model_sims.atmos_sim
+    ocean_sim = cs.model_sims.ocean_sim
+    cf = cs.fields
+
+    # use temp fields
+    water_albedo_from_atmosphere!(atmos_sim, cf.temp1, cf.temp2)
+
+    Interfacer.update_field!(ocean_sim, Val(:surface_direct_albedo), cf.temp1)
+    Interfacer.update_field!(ocean_sim, Val(:surface_diffuse_albedo), cf.temp2)
+
+end
+
+"""
+    water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulation, ::Fields.Field, ::Fields.Field)
+
+Placeholder for the water albedo calculation from the atmosphere. It returns an error if not extended.
+"""
+function water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulation, ::Fields.Field, ::Fields.Field)
+    error("this function is required to be dispatched on" * Interfacer.name(atmos_sim) * ", but no method defined")
+end
 
 end # module

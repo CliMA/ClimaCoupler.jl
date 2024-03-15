@@ -39,7 +39,8 @@ plot_field_names(sim::SurfaceStub) = (:stub_field,)
 
     boundary_space = TestHelper.create_space(FT)
     coupler_names = (
-        :surface_albedo,
+        :surface_direct_albedo,
+        :surface_diffuse_albedo,
         :F_radiative,
         :F_turb_energy,
         :F_turb_moisture,

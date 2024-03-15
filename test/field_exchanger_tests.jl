@@ -41,8 +41,10 @@ end
 
 get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:surface_temperature}) =
     sim.cache_field .* eltype(sim.cache_field)(1.0)
-get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:surface_albedo}) =
-    sim.cache_field .* eltype(sim.cache_field)(1.0)
+get_field(
+    sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2},
+    ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}},
+) = sim.cache_field .* eltype(sim.cache_field)(1.0)
 get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:roughness_momentum}) =
     sim.cache_field .* eltype(sim.cache_field)(1.0)
 get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:roughness_buoyancy}) =
@@ -63,8 +65,11 @@ get_field(sim::Union{TestSurfaceSimulation2, TestSurfaceSimulation2}, ::Val{:sur
 struct TestAtmosSimulation{C} <: AtmosModelSimulation
     cache::C
 end
-function update_field!(sim::TestAtmosSimulation, ::Val{:surface_albedo}, field)
-    parent(sim.cache.surface_albedo) .= parent(field)
+function update_field!(sim::TestAtmosSimulation, ::Val{:surface_direct_albedo}, field)
+    parent(sim.cache.albedo_direct) .= parent(field)
+end
+function update_field!(sim::TestAtmosSimulation, ::Val{:surface_diffuse_albedo}, field)
+    parent(sim.cache.albedo_diffuse) .= parent(field)
 end
 function update_field!(sim::TestAtmosSimulation, ::Val{:roughness_momentum}, field)
     parent(sim.cache.roughness_momentum) .= parent(field)
@@ -119,10 +124,17 @@ for FT in (Float32, Float64)
     @testset "import_combined_surface_fields! for FT=$FT" begin
         # coupler cache setup
         boundary_space = TestHelper.create_space(FT)
-        coupler_names = (:T_S, :z0m_S, :z0b_S, :surface_albedo, :beta, :q_sfc)
+        coupler_names = (:T_S, :z0m_S, :z0b_S, :surface_direct_albedo, :surface_diffuse_albedo, :beta, :q_sfc)
 
         # coupler cache setup
-        exchanged_fields = (:surface_temperature, :surface_albedo, :roughness_momentum, :roughness_buoyancy, :beta)
+        exchanged_fields = (
+            :surface_temperature,
+            :surface_direct_albedo,
+            :surface_diffuse_albedo,
+            :roughness_momentum,
+            :roughness_buoyancy,
+            :beta,
+        )
 
         sims = (; a = TestSurfaceSimulation1(ones(boundary_space)), b = TestSurfaceSimulation2(ones(boundary_space)))
 
@@ -134,7 +146,8 @@ for FT in (Float32, Float64)
             coupler_fields = NamedTuple{coupler_names}(ntuple(i -> Fields.zeros(boundary_space), length(coupler_names)))
             import_combined_surface_fields!(coupler_fields, sims, boundary_space, t)
             @test parent(coupler_fields.T_S)[1] == results[1]
-            @test parent(coupler_fields.surface_albedo)[1] == results[1]
+            @test parent(coupler_fields.surface_direct_albedo)[1] == results[1]
+            @test parent(coupler_fields.surface_diffuse_albedo)[1] == results[1]
             @test parent(coupler_fields.z0m_S)[1] == results[i]
             @test parent(coupler_fields.z0b_S)[1] == results[i]
             @test parent(coupler_fields.beta)[1] == results[i]
@@ -149,7 +162,8 @@ for FT in (Float32, Float64)
             :T_S,
             :z0m_S,
             :z0b_S,
-            :surface_albedo,
+            :surface_direct_albedo,
+            :surface_diffuse_albedo,
             :beta,
             :F_turb_energy,
             :F_turb_moisture,
@@ -162,7 +176,8 @@ for FT in (Float32, Float64)
 
         # model cache setup
 
-        atmos_names = (:surface_temperature, :surface_albedo, :roughness_momentum, :roughness_buoyancy, :beta)
+        atmos_names =
+            (:surface_temperature, :albedo_direct, :albedo_diffuse, :roughness_momentum, :roughness_buoyancy, :beta)
         atmos_fields = NamedTuple{atmos_names}(ntuple(i -> Fields.zeros(boundary_space), length(atmos_names)))
 
         land_names = (
@@ -181,18 +196,22 @@ for FT in (Float32, Float64)
             stub_sim = SurfaceStub((;
                 area_fraction = Fields.ones(boundary_space),
                 ρ_sfc = Fields.ones(boundary_space),
+                albedo_direct = Fields.ones(boundary_space),
+                albedo_diffuse = Fields.ones(boundary_space),
             )),
         )
+        coupler_fields.surface_diffuse_albedo .= FT(0.5)
 
         # test the sim update under CombinedStateFluxes (update all) and PartitionedStateFluxes (update all except turbulent fluxes)
         flux_types = (CombinedStateFluxes(), PartitionedStateFluxes())
-        results = [FT(0), FT(1)]
+        results = [FT(0), FT(1), FT(0.5)]
         for (i, t) in enumerate(flux_types)
             model_sims.atmos_sim.cache.roughness_momentum .= FT(0)
             update_model_sims!(model_sims, coupler_fields, t)
 
             # test atmos
-            @test parent(model_sims.atmos_sim.cache.surface_albedo)[1] == results[2]
+            @test parent(model_sims.atmos_sim.cache.albedo_direct)[1] == results[2]
+            @test parent(model_sims.atmos_sim.cache.albedo_diffuse)[1] == results[3]
             if t isa CombinedStateFluxes
                 @test parent(model_sims.atmos_sim.cache.roughness_momentum)[1] == results[2]
             else
@@ -212,6 +231,10 @@ for FT in (Float32, Float64)
             @test parent(model_sims.land_sim.cache.radiative_energy_flux_sfc)[1] == results[1]
             @test parent(model_sims.land_sim.cache.liquid_precipitation)[1] == results[1]
             @test parent(model_sims.land_sim.cache.snow_precipitation)[1] == results[1]
+
+            # test stub - albedo should be updated by update_sim!
+            @test parent(model_sims.stub_sim.cache.albedo_direct)[1] == results[2]
+            @test parent(model_sims.stub_sim.cache.albedo_diffuse)[1] == results[2]
 
         end
     end

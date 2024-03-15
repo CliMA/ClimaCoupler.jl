@@ -101,11 +101,12 @@ following properties:
 | Coupler name      | Description | Units |
 |-------------------|-------------|-------|
 | `co2`              | global mean co2 | ppm |
-| `surface_albedo`   | bulk surface albedo over the whole surface space | |
+| `surface_direct_albedo`   | bulk direct surface albedo over the whole surface space | |
+| `surface_diffuse_albedo`   | bulk diffuse surface albedo over the whole surface space | |
 | `surface_temperature` | temperature over the combined surface space | K |
 | `turbulent_fluxes` | turbulent fluxes (note: only required when using `PartitionedStateFluxes` option - see our `FluxCalculator` module docs for more information) | W m^-2 |
 
-- `calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_S::Fields.Field)`:
+- `calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_S::ClimaCore.Fields.Field)`:
 A function to return the air density of the atmosphere simulation
 extrapolated to the surface, with units of [kg m^-3].
 
@@ -124,7 +125,8 @@ for the following properties:
 | `beta`              | factor that scales evaporation based on its estimated level of saturation | |
 | `roughness_buoyancy` | aerodynamic roughness length for buoyancy | m |
 | `roughness_momentum` | aerodynamic roughness length for momentum | m |
-| `surface_albedo`    | bulk surface albedo | |
+| `surface_direct albedo`    | bulk direct surface albedo | |
+| `surface_diffuse albedo`    | bulk diffuse surface albedo | |
 | `surface_humidity`  | surface humidity | kg kg^-1 |
 | `surface_temperature` | surface temperature | K |
 
@@ -170,7 +172,7 @@ get_field(sim::SurfaceStub, ::Val{:beta}) = sim.cache.beta
 get_field(sim::SurfaceStub, ::Val{:energy}) = nothing
 get_field(sim::SurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
 get_field(sim::SurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m
-get_field(sim::SurfaceStub, ::Val{:surface_albedo}) = sim.cache.α
+get_field(sim::SurfaceStub, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) = sim.cache.α
 get_field(sim::SurfaceStub, ::Val{:surface_humidity}) = TD.q_vap_saturation_generic.(sim.cache.thermo_params, sim.cache.T_sfc, sim.cache.ρ_sfc, sim.cache.phase)
 get_field(sim::SurfaceStub, ::Val{:surface_temperature}) = sim.cache.T_sfc
 get_field(sim::SurfaceStub, ::Val{:water}) = nothing
@@ -180,10 +182,10 @@ and with the corresponding `update_field!` functions
 function update_field!(sim::SurfaceStub, ::Val{:air_density}, field)
     sim.cache.ρ_sfc .= field
 end
-function update_field!(sim::SurfaceStub, ::Val{:area_fraction}, field::Fields.Field)
+function update_field!(sim::SurfaceStub, ::Val{:area_fraction}, field::ClimaCore.Fields.Field)
     sim.cache.area_fraction .= field
 end
-function update_field!(sim::SurfaceStub, ::Val{:surface_temperature}, field::Fields.Field)
+function update_field!(sim::SurfaceStub, ::Val{:surface_temperature}, field::ClimaCore.Fields.Field)
     sim.cache.T_sfc .= field
 end
 ```

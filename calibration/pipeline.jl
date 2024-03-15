@@ -3,7 +3,7 @@
 using ClimaComms
 import CalibrateAtmos
 ClimaComms.init(ClimaComms.context())
-import ClimaCoupler as CCo
+import ClimaCoupler 
 import YAML
 using NCDatasets
 import JLD2

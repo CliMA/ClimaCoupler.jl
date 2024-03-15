@@ -1,23 +1,46 @@
+#=
+## Data File Paths
+The data files are downloaded from the `ClimaCoupler` artifacts directory. If the data files are not present, they are downloaded from the
+original sources.
+=#
 
-# get the paths to the necessary data files: land-sea mask, sst map, sea ice concentration
 include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
 sst_data = joinpath(sst_dataset_path(), "sst.nc")
 sic_data = joinpath(sic_dataset_path(), "sic.nc")
 co2_data = joinpath(co2_dataset_path(), "mauna_loa_co2.nc")
 land_mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 
-atmos_sim = atmos_init(FT, config_dict_atmos);
-thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models
+#=
+## Component Model Initialization
+Here we set initial and boundary conditions for each component model. Each component model is required to have an `init` function that
+returns a `ComponentModelSimulation` object (see `Interfacer` docs for more details).
+=#
 
 #=
+### Atmosphere
+This uses the `ClimaAtmos.jl` model, with parameterization options specified in the `config_dict_atmos` dictionary.
+=#
+
+## init atmos model component
+atmos_sim = atmos_init(FT, config_dict_atmos);
+thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models #610
+
+#=
+### Boundary Space
 We use a common `Space` for all global surfaces. This enables the MPI processes to operate on the same columns in both
 the atmospheric and surface components, so exchanges are parallelized. Note this is only possible when the
 atmosphere and surface are of the same horizontal resolution.
 =#
-## init a 2D boundary space at the surface
-boundary_space = Spaces.horizontal_space(atmos_sim.domain.face_space)
 
-# init land-sea fraction
+## init a 2D boundary space at the surface
+boundary_space = ClimaCore.Spaces.horizontal_space(atmos_sim.domain.face_space) # TODO: specify this in the coupler and pass it to all component models #665
+
+#=
+### Land-sea Fraction
+This is a static field that contains the area fraction of land and sea, ranging from 0 to 1. If applicable, sea ice is included in the sea fraction. at this stage.
+Note that land-sea area fraction is different to the land-sea mask, which is a binary field (masks are used internally by the coupler to indicate passive cells that are not populated by a given component model).
+=#
+
 land_fraction =
     FT.(
         Regridder.land_fraction(
@@ -31,18 +54,31 @@ land_fraction =
         )
     )
 
-@info mode_name
-if mode_name == "amip"
-    @info "AMIP boundary conditions - do not expect energy conservation"
+#=
+### Surface Models: AMIP and SlabPlanet Modes
+Both modes evolve `ClimaLand.jl`'s bucket model.
 
-    ## land
+In the `AMIP` mode, all ocean properties are prescribed from a file, while sea-ice temperatures are calculated using observed
+SIC and assuming a 2m thickness of the ice.
+
+In the `SlabPlanet` mode, all ocean and sea ice are dynamical models, namely thermal slabs, with different parameters. We have several `SlabPlanet` versions
+- `slabplanet` = land + slab ocean
+- `slabplanet_aqua` = slab ocean everywhere
+- `slabplanet_terra` = land everywhere
+- `slabplanet_eisenman` = land + slab ocean + slab sea ice with an evolving thickness
+=#
+
+ClimaComms.iamroot(comms_ctx) ? @info(mode_name) : nothing
+if mode_name == "amip"
+    ClimaComms.iamroot(comms_ctx) ? @info("AMIP boundary conditions - do not expect energy conservation") : nothing
+
+    ## land model
     land_sim = bucket_init(
         FT,
         tspan,
         config_dict["land_domain_type"],
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
-        comms_ctx,
         REGRID_DIR;
         dt = Δt_cpl,
         space = boundary_space,
@@ -52,7 +88,7 @@ if mode_name == "amip"
         t_start = t_start,
     )
 
-    ## ocean
+    ## ocean stub
     SST_info = bcfile_info_init(
         FT,
         REGRID_DIR,
@@ -61,7 +97,7 @@ if mode_name == "amip"
         boundary_space,
         comms_ctx,
         interpolate_daily = true,
-        scaling_function = clean_sst, ## convert to Kelvin
+        scaling_function = scale_sst, ## convert to Kelvin
         land_fraction = land_fraction,
         date0 = date0,
         mono = mono_surface,
@@ -81,7 +117,7 @@ if mode_name == "amip"
         thermo_params = thermo_params,
     ))
 
-    ## sea ice
+    ## sea ice model
     SIC_info = bcfile_info_init(
         FT,
         REGRID_DIR,
@@ -90,7 +126,7 @@ if mode_name == "amip"
         boundary_space,
         comms_ctx,
         interpolate_daily = true,
-        scaling_function = clean_sic, ## convert to fraction
+        scaling_function = scale_sic, ## convert to fraction
         land_fraction = land_fraction,
         date0 = date0,
         mono = mono_surface,
@@ -108,7 +144,7 @@ if mode_name == "amip"
         thermo_params = thermo_params,
     )
 
-    ## CO2 concentration
+    ## CO2 concentration from temporally varying file
     CO2_info = bcfile_info_init(
         FT,
         REGRID_DIR,
@@ -124,23 +160,23 @@ if mode_name == "amip"
 
     update_midmonth_data!(date0, CO2_info)
     CO2_init = interpolate_midmonth_to_daily(date0, CO2_info)
-    update_field!(atmos_sim, Val(:co2_gm), CO2_init)
+    update_field!(atmos_sim, Val(:co2), CO2_init)
 
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
 
 elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
 
+
     land_fraction = mode_name == "slabplanet_aqua" ? land_fraction .* 0 : land_fraction
     land_fraction = mode_name == "slabplanet_terra" ? land_fraction .* 0 .+ 1 : land_fraction
 
-    ## land
+    ## land model
     land_sim = bucket_init(
         FT,
         tspan,
         config_dict["land_domain_type"],
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
-        comms_ctx,
         REGRID_DIR;
         dt = Δt_cpl,
         space = boundary_space,
@@ -150,7 +186,7 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         t_start = t_start,
     )
 
-    ## ocean
+    ## ocean model
     ocean_sim = ocean_init(
         FT;
         tspan = tspan,
@@ -162,7 +198,7 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         evolving = evolving_ocean,
     )
 
-    ## sea ice (here set to zero area coverage)
+    ## sea ice stub (here set to zero area coverage)
     ice_sim = SurfaceStub((;
         T_sfc = ClimaCore.Fields.ones(boundary_space),
         ρ_sfc = ClimaCore.Fields.zeros(boundary_space),
@@ -176,82 +212,46 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
     ))
 
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
-end
 
-#=
-## Coupler Initialization
-The coupler needs to contain exchange information, manage the calendar and be able to access all component models. It can also optionally
-save online diagnostics. These are all initialized here and saved in a global `CouplerSimulation` struct, `cs`.
-=#
+elseif mode_name == "slabplanet_eisenman"
 
-## coupler exchange fields
-coupler_field_names = (
-    :T_S,
-    :z0m_S,
-    :z0b_S,
-    :ρ_sfc,
-    :q_sfc,
-    :albedo,
-    :beta,
-    :F_turb_energy,
-    :F_turb_moisture,
-    :F_turb_ρτxz,
-    :F_turb_ρτyz,
-    :F_radiative,
-    :P_liq,
-    :P_snow,
-    :F_radiative_TOA,
-    :P_net,
-)
-coupler_fields =
-    NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
-
-## model simulations
-model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim);
-
-## dates
-dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)], new_month = [false])
-
-#=
-### Online Diagnostics
-User can write custom diagnostics in the `user_diagnostics.jl`.
-=#
-monthly_3d_diags = init_diagnostics(
-    (:T, :u, :q_tot, :q_liq_ice),
-    atmos_sim.domain.center_space;
-    save = Monthly(),
-    operations = (; accumulate = TimeMean([Int(0)])),
-    output_dir = COUPLER_OUTPUT_DIR,
-    name_tag = "monthly_mean_3d_",
-)
-
-monthly_2d_diags = init_diagnostics(
-    (:precipitation_rate, :toa_fluxes, :T_sfc, :tubulent_energy_fluxes),
-    boundary_space;
-    save = Monthly(),
-    operations = (; accumulate = TimeMean([Int(0)])),
-    output_dir = COUPLER_OUTPUT_DIR,
-    name_tag = "monthly_mean_2d_",
-)
-
-diagnostics = (monthly_3d_diags, monthly_2d_diags)
-
-#=
-## Initialize Conservation Checks
-=#
-## init conservation info collector
-conservation_checks = nothing
-if energy_check
-    @assert(
-        mode_name[1:10] == "slabplanet" && !CA.is_distributed(ClimaComms.context(boundary_space)),
-        "Only non-distributed slabplanet allowable for energy_check"
+    ## land model
+    land_sim = bucket_init(
+        FT,
+        tspan,
+        config_dict["land_domain_type"],
+        config_dict["land_albedo_type"],
+        config_dict["land_temperature_anomaly"],
+        REGRID_DIR;
+        dt = Δt_cpl,
+        space = boundary_space,
+        saveat = saveat,
+        area_fraction = land_fraction,
+        date_ref = date0,
+        t_start = t_start,
     )
-    conservation_checks = (; energy = EnergyConservationCheck(model_sims), water = WaterConservationCheck(model_sims))
-end
 
-dir_paths = (; output = COUPLER_OUTPUT_DIR, artifacts = COUPLER_ARTIFACTS_DIR)
-checkpoint_cb =
-    HourlyCallback(dt = FT(480), func = checkpoint_sims, ref_date = [dates.date[1]], active = hourly_checkpoint) # 20 days
-update_firstdayofmonth!_cb =
-    MonthlyCallback(dt = FT(1), func = update_firstdayofmonth!, ref_date = [dates.date1[1]], active = true) # for BCReader
-callbacks = (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb)
+    ## ocean stub (here set to zero area coverage)
+    ocean_sim = ocean_init(
+        FT;
+        tspan = tspan,
+        dt = Δt_cpl,
+        space = boundary_space,
+        saveat = saveat,
+        area_fraction = ClimaCore.Fields.zeros(boundary_space), # zero, since ML is calculated below
+        thermo_params = thermo_params,
+    )
+
+    ## sea ice + ocean model
+    ice_sim = eisenman_seaice_init(
+        FT,
+        tspan,
+        space = boundary_space,
+        area_fraction = (FT(1) .- land_fraction),
+        dt = Δt_cpl,
+        saveat = saveat,
+        thermo_params = thermo_params,
+    )
+
+    mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
+end

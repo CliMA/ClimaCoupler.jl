@@ -8,6 +8,7 @@ module Utilities
 
 import ClimaComms
 using ClimaCore: Fields, Spaces
+using CUDA
 
 export swap_space!
 
@@ -97,12 +98,5 @@ function show_memory_usage(comms_ctx, objects)
         @warn "Invalid device type $device; cannot show memory usage."
     end
 end
-# show_memory_usage(device::ClimaComms.CUDADevice, _) = @info "Memory usage: $(CUDA.memory_status())"
-# function show_memory_usage(device::ClimaComms.AbstractCPUDevice, objects)
-#     for obj in objects
-#         @info "Memory footprint of `$(obj)` in bytes: $(Base.summarysize(obj))"
-#     end
-# end
-# show_memory_usage(device, _) = @warn "Invalid device type $device; cannot show memory usage."
 
 end # module

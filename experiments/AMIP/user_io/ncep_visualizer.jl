@@ -1,5 +1,7 @@
 using Downloads
 using NCDatasets
+import ClimaCoupler.Diagnostics: get_var
+import ClimaCoupler.PostProcessor: postprocess
 
 include("plot_helper.jl")
 

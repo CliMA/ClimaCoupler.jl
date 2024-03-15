@@ -2,6 +2,7 @@ using Plots
 using ClimaCorePlots
 using Printf
 using ClimaCoupler.Interfacer: ComponentModelSimulation, SurfaceModelSimulation
+using ClimaCore
 
 # plotting functions for the coupled simulation
 """
@@ -27,8 +28,19 @@ If `cs_fields_ref` is provided (e.g., using a copy of cs.fields from the initial
 plot the anomalies of the fields with respect to `cs_fields_ref`.
 """
 function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
-    field_names =
-        (:albedo, :F_radiative, :F_turb_energy, :F_turb_moisture, :P_liq, :T_S, :ρ_sfc, :q_sfc, :beta, :z0b_S, :z0m_S)
+    field_names = (
+        :surface_albedo,
+        :F_radiative,
+        :F_turb_energy,
+        :F_turb_moisture,
+        :P_liq,
+        :T_S,
+        :ρ_sfc,
+        :q_sfc,
+        :beta,
+        :z0b_S,
+        :z0m_S,
+    )
     all_plots = []
     for field_name in field_names
         field = getproperty(cs_fields, field_name)
@@ -90,8 +102,8 @@ end
 
 # additional ClimaAtmos model debug fields
 function get_field(sim::ClimaAtmosSimulation, ::Val{:w})
-    w_c = ones(Spaces.horizontal_space(sim.domain.face_space))
-    parent(w_c) .= parent(Fields.level(Geometry.WVector.(sim.integrator.u.f.u₃), 5 .+ half))
+    w_c = ones(ClimaCore.Spaces.horizontal_space(sim.domain.face_space))
+    parent(w_c) .= parent(ClimaCore.Fields.level(ClimaCore.Geometry.WVector.(sim.integrator.u.f.u₃), 5 .+ half))
     return w_c
 end
 get_field(sim::ClimaAtmosSimulation, ::Val{:ρq_tot}) = sim.integrator.u.c.ρq_tot

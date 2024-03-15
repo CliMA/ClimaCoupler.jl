@@ -8,11 +8,11 @@ import ClimaCoupler.TestHelper
 import ClimaCoupler.Interfacer: SeaIceModelSimulation
 import ClimaCoupler: Regridder
 
-import CLIMAParameters as CP
+import ClimaParams as CP
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TP
 
-include("../../experiments/AMIP/components/ocean/eisenman_seaice_init.jl")
+include("../../experiments/AMIP/components/ocean/eisenman_seaice.jl")
 
 
 for FT in (Float32, Float64)

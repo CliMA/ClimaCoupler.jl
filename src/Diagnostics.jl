@@ -13,8 +13,21 @@ using ClimaComms
 
 export get_var, init_diagnostics, accumulate_diagnostics!, save_diagnostics, TimeMean
 
+"""
+    AbstractOutputGroup
+
+Abstract type for ClimaCoupler's output diagnostics groups. Each diagnostic group should
+contain fields that are of the same type and size, so the extended methods for the group's
+operation functions work in the same way for all the fields.
+"""
 abstract type AbstractOutputGroup end
 
+"""
+    DiagnosticsGroup{S, NTO <: NamedTuple}
+
+Defines a concrete diagnostics group type with fields `field_vector`, `operations`, `save`,
+`output_dir` and `name_tag`.
+"""
 struct DiagnosticsGroup{S, NTO <: NamedTuple} <: AbstractOutputGroup
     field_vector::Fields.FieldVector
     operations::NTO
@@ -23,15 +36,33 @@ struct DiagnosticsGroup{S, NTO <: NamedTuple} <: AbstractOutputGroup
     name_tag::String
 end
 
+"""
+    AbstractDiagnosticsOperations
+
+Abstract type for operations to be performed on ClimaCoupler's diagnostics.
+"""
 abstract type AbstractDiagnosticsOperations end
 
+"""
+    TimeMean{C}
+
+Defines a concrete operation type for time-averaged diagnostics. The counter `ct`
+is used to accumulate the sum of the diagnostics.
+"""
 struct TimeMean{C} <: AbstractDiagnosticsOperations
     ct::C
 end
 # TODO: TemporalVariances, SpatialMean, SpatialVariances
 
 """
-    init_diagnostics(names::Tuple, space::Spaces.Space; save = EveryTimestep(), operations = (;), output_dir = "", name_tag = "" )
+    function init_diagnostics(
+        names::Tuple,
+        space::Spaces.AbstractSpace;
+        save = EveryTimestep(),
+        operations = (;),
+        output_dir = "",
+        name_tag = "",
+    )
 
 Initializes diagnostics groups.
 """
@@ -50,7 +81,8 @@ end
 """
     get_var(cs::CoupledSimulation, x)
 
-Defines variable extraction from the coupler simulation. User specific diagnostics should extend this function in the experiments folder.
+Defines variable extraction from the coupler simulation. User specific diagnostics
+should extend this function in the experiments folder.
 
 Example:
 
@@ -67,7 +99,8 @@ Accumulates user-defined diagnostics listed in the in the `field_vector` of each
 function accumulate_diagnostics!(cs::CoupledSimulation)
     for dg in cs.diagnostics
         if dg.operations.accumulate !== nothing
-            iterate_operations(cs, dg, collect_diags(cs, dg)) # TODO: avoid collecting at each timestep where not needed
+            # TODO: avoid collecting at each timestep where not needed
+            iterate_operations(cs, dg, collect_diags(cs, dg))
         end
     end
 end
@@ -94,7 +127,6 @@ end
 
 Applies iteratively all specified diagnostics operations.
 """
-
 function iterate_operations(cs::CoupledSimulation, dg::DiagnosticsGroup, new_diags::Fields.FieldVector)
     for op in dg.operations
         operation(cs, dg, new_diags, op)
@@ -104,7 +136,8 @@ end
 """
     operation(cs::CoupledSimulation, dg::DiagnosticsGroup, new_diags::Fields.FieldVector, ::TimeMean)
 
-Accumulates in time all entries in `new_diags` and saves the result in `dg.field_vector`, while increasing the `dg.ct` counter.
+Accumulates in time all entries in `new_diags` and saves the result in `dg.field_vector`, while
+increasing the `dg.ct` counter.
 """
 function operation(::CoupledSimulation, dg::DiagnosticsGroup, new_diags::Fields.FieldVector, ::TimeMean)
     dg.field_vector .+= new_diags
@@ -116,7 +149,8 @@ end
 """
     operation(cs::CoupledSimulation, dg::DiagnosticsGroup, new_diags::Fields.FieldVector, ::Nothing)
 
-Accumulates in time all entries in `new_diags` and saves the result in `dg.field_vector`, while increasing the `dg.ct` counter.
+Accumulates in time all entries in `new_diags` and saves the result in `dg.field_vector`, while
+increasing the `dg.ct` counter.
 """
 function operation(::CoupledSimulation, dg::DiagnosticsGroup, new_diags::Fields.FieldVector, ::Nothing)
     dg.field_vector .= new_diags

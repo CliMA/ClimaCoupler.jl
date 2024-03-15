@@ -9,7 +9,7 @@ The `FieldExchanger` needs to populate the coupler with
 The component models are updated by broadcasting the coupler fields, via the `update_model_sims!` function. For an update, this function requires that `update_field!` is defined for the particular variable and component model. Currently, we support the:
 - `AtmosModelSimulation`: `albedo`, `surface_temperature`
     - if calculating fluxes in the atmospheric model: `roughness_momentum`, `roughness_buoyancy`, `beta`
-- `SurfaceModelSimulation`: `air_density`, `turbulent_energy_flux`, `turbulent_moisture_flux`, `radiative_energy_flux`, `liquid_precipitation`, `snow_precipitation`
+- `SurfaceModelSimulation`: `air_density`, `turbulent_energy_flux`, `turbulent_moisture_flux`, `radiative_energy_flux_sfc`, `liquid_precipitation`, `snow_precipitation`
 
 If an `update_field!` function is not defined for a particular component model, it will be ignored.
 

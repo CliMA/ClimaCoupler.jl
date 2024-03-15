@@ -207,7 +207,8 @@ function hdwrite_regridfile_rll_to_cgll(
     # read the remapped file with sparse matrices
     offline_outvector, coords = NCDataset(datafile_cgll, "r") do ds_wt
         (
-            offline_outvector = nomissing(Array(ds_wt[varname])[:, :]), # ncol, times
+            # read the data in, and remove missing type (will error if missing data is present)
+            offline_outvector = nomissing(Array(ds_wt[varname])[:, :, :]), # ncol, z, times
             coords = get_coords(ds_wt, space),
         )
     end

@@ -3,22 +3,22 @@ using ClimaCoupler: TestHelper
 using ClimaComms
 using Test
 import ClimaCoupler: Interfacer
-import ClimaCoupler.Checkpointer: get_model_state_vector, restart_model_state!, checkpoint_model_state
+import ClimaCoupler.Checkpointer: get_model_prog_state, restart_model_state!, checkpoint_model_state
 
 FT = Float64
 
 struct DummySimulation{S} <: Interfacer.AtmosModelSimulation
     state::S
 end
-get_model_state_vector(sim::DummySimulation) = sim.state
+get_model_prog_state(sim::DummySimulation) = sim.state
 
-@testset "get_model_state_vector" begin
+@testset "get_model_prog_state" begin
     boundary_space = TestHelper.create_space(FT)
     sim = DummySimulation((; T = ones(boundary_space)))
-    @test get_model_state_vector(sim) == sim.state
+    @test get_model_prog_state(sim) == sim.state
 
     sim2 = Interfacer.SurfaceStub([])
-    @test get_model_state_vector(sim2) == nothing
+    @test get_model_prog_state(sim2) == nothing
 end
 
 @testset "checkpoint_model_state, restart_model_state!" begin

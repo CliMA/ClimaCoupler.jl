@@ -195,7 +195,7 @@ coupler_put_(x) = x;
 domain_atm = Domains.IntervalDomain(
     Geometry.ZPoint{FT}(parameters.zmin_atm),
     Geometry.ZPoint{FT}(parameters.zmax_atm);
-    boundary_tags = (:bottom, :top),
+    boundary_names = (:bottom, :top),
 );
 mesh_atm = Meshes.IntervalMesh(domain_atm, nelems = parameters.n); # struct, allocates face boundaries to 5,6: atmos
 center_space_atm = Spaces.CenterFiniteDifferenceSpace(mesh_atm); # collection of the above, discretises space into FD and provides coords

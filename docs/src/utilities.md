@@ -7,7 +7,7 @@ modules in the coupler.
 ## Utilities API
 
 ```@docs
-ClimaCoupler.Utilities.CouplerSimulation
-ClimaCoupler.Utilities.float_type
 ClimaCoupler.Utilities.swap_space!
+ClimaCoupler.Utilities.get_comms_context
+ClimaCoupler.Utilities.get_device
 ```

@@ -4,6 +4,9 @@ git-tree-sha1 = "0c6039bfcc39f6c6cb20fb331a71f6a381d93f24"
 [land_mask]
 git-tree-sha1 = "e41bc8c44124f867b64a9d70f1599515ae27f38a"
 
+[pr_obs_data]
+git-tree-sha1 = "7486bf32e9352493f69364aead26f01eaf90d2af"
+
 [sic]
 git-tree-sha1 = "139d23f6de29900917d79b41a87a8ee6483c72d0"
 

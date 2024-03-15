@@ -26,7 +26,7 @@ export current_date,
 
 
 """
-    current_date(cs::CoupledSimulation, t::Int)
+    current_date(cs::Interfacer.CoupledSimulation, t::Int)
 
 Return the model date at the current timestep.
 
@@ -61,8 +61,23 @@ datetime_to_strdate(datetime::DateTime) =
     string(string(lpad(Dates.month(datetime), 2, "0"))) *
     string(lpad(Dates.day(datetime), 2, "0"))
 
+"""
+    AbstractFrequency
+
+This is an abstract type for the frequency of the callback function.
+"""
 abstract type AbstractFrequency end
+
+"""
+    Monthly
+A concrete type for the monthly frequency of the callback function.
+"""
 struct Monthly <: AbstractFrequency end
+
+"""
+    EveryTimestep
+A concrete type for the every-timestep frequency of the callback function.
+"""
 struct EveryTimestep <: AbstractFrequency end
 
 """
@@ -73,9 +88,13 @@ Returns `true` if the current date is equal to or exceeds the saved first of the
 # Arguments
 - `cs`: [CoupledSimulation] containing info about the simulation
 """
-trigger_callback(cs::CoupledSimulation, ::Monthly) = cs.dates.date[1] >= cs.dates.date1[1] ? true : false
+trigger_callback(cs::Interfacer.CoupledSimulation, ::Monthly) = cs.dates.date[1] >= cs.dates.date1[1] ? true : false
 
+"""
+    CouplerCallback
 
+This is an abstract type for ClimaCoupler's callback functions.
+"""
 abstract type CouplerCallback end
 
 """
@@ -119,6 +138,12 @@ $(DSE.FIELDS)
     data::Array = []
 end
 
+"""
+    dt_cb(cb::HourlyCallback)
+    dt_cb(cb::MonthlyCallback)
+
+This function returns the time interval for the callback function.
+"""
 dt_cb(cb::HourlyCallback) = Dates.Hour(cb.dt)
 dt_cb(cb::MonthlyCallback) = Dates.Month(cb.dt)
 

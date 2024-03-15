@@ -38,6 +38,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to checkpoint at intervals of 1 hour or multiple hours"
         arg_type = Bool
         default = false
+        "--coupler_output_dir"
+        help = "Directory to save output files. Note that TempestRemap fails if interactive and paths are too long."
+        arg_type = String
+        default = "experiments/AMIP/output"
         "--restart_dir"
         help = "Directory containing restart files"
         arg_type = String
@@ -62,6 +66,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to use a dynamic slab ocean model or constant surface temperatures"
         arg_type = Bool
         default = true
+        "--device"
+        help = "Device type to use [`auto` (default) `CPUSingleThreaded`, `CPUMultiThreaded`, `CUDADevice`]"
+        arg_type = String
+        default = "auto"
         # ClimaAtmos specific
         "--surface_setup"
         help = "Triggers ClimaAtmos into the coupled mode [`PrescribedSurface` (default)]" # retained here for standalone Atmos benchmarks

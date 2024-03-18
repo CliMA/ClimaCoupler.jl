@@ -8,7 +8,6 @@ module Utilities
 
 import ClimaComms
 using ClimaCore: Fields, Spaces
-using CUDA
 
 export swap_space!
 
@@ -68,35 +67,6 @@ function get_comms_context(parsed_args)
     end
 
     return comms_ctx
-end
-
-"""
-    show_memory_usage(comms_ctx, objects)
-
-Display the current memory footprint of the simulation, using an appropriate
-method based on the device being used.
-
-In the GPU case, show the memory usage of the GPU.
-In the CPU case, show the memory footprint of the provided object(s).
-Note that these two cases provide different information, and should not be
-directly compared.
-
-# Arguments
-`comms_ctx`: the communication context being used to run the model
-`objects`: Dict mapping objects whose memory footprint is displayed in the CPU case to their names
-"""
-function show_memory_usage(comms_ctx, objects)
-    if comms_ctx.device isa ClimaComms.CUDADevice
-        @info "Memory usage: $(CUDA.memory_status())"
-    elseif comms_ctx.device isa ClimaComms.AbstractCPUDevice
-        if ClimaComms.iamroot(comms_ctx)
-            for (obj, name) in objects
-                @info "Memory footprint of `$(name)` in bytes: $(Base.summarysize(obj))"
-            end
-        end
-    else
-        @warn "Invalid device type $device; cannot show memory usage."
-    end
 end
 
 end # module

@@ -44,6 +44,7 @@ for FT in (Float32, Float64)
             segment_idx0,                       # segment_idx0
             Int[],                              # segment_length
             false,                              # interpolate_daily
+            false,                              # mono
         )
 
         idx = segment_idx0[1]
@@ -113,6 +114,7 @@ for FT in (Float32, Float64)
             segment_idx0,                       # segment_idx0
             segment_length,                     # segment_length
             interpolate_daily,                  # interpolate_daily
+            false,                              # mono
         )
         @test BCReader.interpolate_midmonth_to_daily(date0, bcf_info_interp) == ones(boundary_space_t) .* FT(0.5)
 
@@ -132,6 +134,7 @@ for FT in (Float32, Float64)
             segment_idx0,                       # segment_idx0
             segment_length,                     # segment_length
             interpolate_daily,                  # interpolate_daily
+            false,                              # mono
         )
         @test BCReader.interpolate_midmonth_to_daily(date0, bcf_info_no_interp) == monthly_fields[1]
     end
@@ -196,6 +199,8 @@ for FT in (Float32, Float64)
                 (), # diagnostics
                 (;), # callbacks
                 (;), # dirs
+                nothing, # turbulent_fluxes
+                nothing, # thermo_params
             )
 
             # step in time

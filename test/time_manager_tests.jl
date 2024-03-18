@@ -31,6 +31,8 @@ for FT in (Float32, Float64)
             (), # diagnostics
             (;), # callbacks
             (;), # dirs
+            nothing, # turbulent_fluxes
+            nothing, # thermo_params
         )
 
         for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
@@ -70,6 +72,8 @@ end
         (), # diagnostics
         (;), # callbacks
         (;), # dirs
+        nothing, # turbulent_fluxes
+        nothing, # thermo_params
     )
     @test TimeManager.trigger_callback(cs, TimeManager.Monthly()) == true
 end
@@ -110,6 +114,8 @@ end
             monthly_counter = monthly_counter,
         ), # callbacks
         (;), # dirs
+        nothing, # turbulent_fluxes
+        nothing, # thermo_params
     )
 
     TimeManager.trigger_callback!(cs, cs.callbacks.twhohourly_inactive)
@@ -172,6 +178,8 @@ end
         (), # diagnostics
         (;), # callbacks
         (;), # dirs
+        nothing, # turbulent_fluxes
+        nothing, # thermo_params
     )
 
     TimeManager.update_firstdayofmonth!(cs, nothing)

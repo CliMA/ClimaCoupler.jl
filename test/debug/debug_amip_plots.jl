@@ -83,6 +83,8 @@ plot_field_names(sim::SurfaceStub) = (:stub_field,)
         (), # diagnostics
         (;), # callbacks
         (;), # dirs
+        nothing, # turbulent_fluxes
+        nothing, # thermo_params
     )
 
     output_plots = "test_debug"

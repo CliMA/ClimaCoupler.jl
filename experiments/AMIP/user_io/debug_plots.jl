@@ -45,11 +45,22 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
     all_plots = []
     cpu_comms_ctx = ClimaComms.SingletonCommsContext()
 
+    # Extract information from input space to create space on CPU for plotting
+    field = getproperty(cs_fields, field_names[begin])
+    space = axes(field)
+    FT = ClimaCore.Spaces.undertype(space)
+    R = space.grid.global_geometry.radius
+    ne = space.grid.topology.mesh.ne
+    polynomial_degree = Quadratures.degrees_of_freedom(Spaces.quadrature_style(space.grid))
+    nz = Spaces.nlevels(space)
+
+    cpu_space = TestHelper.create_space(FT, comms_ctx = cpu_comms_ctx, R, ne, polynomial_degree, nz)
+    cpu_field = Fields.ones(cpu_space)
 
     for field_name in field_names
         field = getproperty(cs_fields, field_name)
-        # Convert field from GPU to CPU if necessary
-        cpu_field = Adapt.adapt(Array, field)
+        # Copy field onto cpu space
+        parent(cpu_field) .= parent(field)
 
         push!(all_plots, plot(cpu_field, title = string(field_name) * print_extrema(field)))
         if (field_name == :T_S) && (@isdefined debug_csf0)

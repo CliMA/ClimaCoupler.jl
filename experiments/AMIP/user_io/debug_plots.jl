@@ -51,11 +51,11 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
         # Convert field from GPU to CPU if necessary
         cpu_field = Adapt.adapt(Array, field)
 
-        push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(field)))
+        push!(all_plots, plot(cpu_field, title = string(field_name) * print_extrema(field)))
         if (field_name == :T_S) && (@isdefined debug_csf0)
             push!(
                 all_plots,
-                Plots.plot(
+                plot(
                     cpu_field .- debug_csf0.T_S,
                     title = string(field_name) * "_anom" * print_extrema(field),
                     color = :viridis,
@@ -63,7 +63,7 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
             )
         end
     end
-    Plots.plot(all_plots..., size = (1500, 800))
+    plot(all_plots..., size = (1500, 800))
     Plots.png(joinpath(dir, "debug_coupler"))
 
     # plot anomalies if a reference cs.fields, `cs_fields_ref`, are provided
@@ -76,13 +76,13 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
 
             push!(
                 all_plots,
-                Plots.plot(
+                plot(
                     cpu_field .- getproperty(cs_fields_ref, field_name),
                     title = string(field_name) * print_extrema(field),
                 ),
             )
         end
-        Plots.plot(all_plots..., size = (1500, 800))
+        plot(all_plots..., size = (1500, 800))
         Plots.png(joinpath(dir, "debug_coupler_amomalies"))
     end
 end
@@ -102,9 +102,9 @@ function debug(sim::ComponentModelSimulation, dir)
         # Convert field from GPU to CPU if necessary
         cpu_field = Adapt.adapt(Array, field)
 
-        push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(field)))
+        push!(all_plots, plot(cpu_field, title = string(field_name) * print_extrema(field)))
     end
-    fig = Plots.plot(all_plots..., size = (1500, 800))
+    fig = plot(all_plots..., size = (1500, 800))
     Plots.png(joinpath(dir, "debug_$(name(sim))"))
 
 end

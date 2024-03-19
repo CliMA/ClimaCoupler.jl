@@ -142,7 +142,7 @@ then `ClimaComms` automatically selects the device from which this code is calle
 
 using ClimaComms
 comms_ctx = get_comms_context(parsed_args)
-const pid, nprocs = ClimaComms.init(comms_ctx)
+ClimaComms.init(comms_ctx)
 
 #=
 ### I/O Directory Setup
@@ -525,6 +525,20 @@ update_firstdayofmonth!_cb =
 callbacks = (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb)
 
 #=
+## Initialize turbulent fluxes
+
+Decide on the type of turbulent flux partition (see `FluxCalculator` documentation for more details).
+=#
+turbulent_fluxes = nothing
+if config_dict["turb_flux_partition"] == "PartitionedStateFluxes"
+    turbulent_fluxes = PartitionedStateFluxes()
+elseif config_dict["turb_flux_partition"] == "CombinedStateFluxes"
+    turbulent_fluxes = CombinedStateFluxes()
+else
+    error("turb_flux_partition must be either PartitionedStateFluxes or CombinedStateFluxes")
+end
+
+#=
 ## Initialize Coupled Simulation
 
 The coupled simulation is initialized here and saved in a global `CoupledSimulation` struct, `cs`. It contains all the information
@@ -549,6 +563,8 @@ cs = CoupledSimulation{FT}(
     diagnostics,
     callbacks,
     dir_paths,
+    turbulent_fluxes,
+    thermo_params,
 );
 
 #=
@@ -573,41 +589,31 @@ depend on initial conditions of other component models than those in which the v
 The concrete steps for proper initialization are:
 =#
 
-# 1.decide on the type of turbulent flux partition (see `FluxCalculator` documentation for more details)
-turbulent_fluxes = nothing
-if config_dict["turb_flux_partition"] == "PartitionedStateFluxes"
-    turbulent_fluxes = PartitionedStateFluxes()
-elseif config_dict["turb_flux_partition"] == "CombinedStateFluxes"
-    turbulent_fluxes = CombinedStateFluxes()
-else
-    error("turb_flux_partition must be either PartitionedStateFluxes or CombinedStateFluxes")
-end
-
-# 2.coupler updates surface model area fractions
+# 1.coupler updates surface model area fractions
 update_surface_fractions!(cs)
 
-# 3.surface density (`ρ_sfc`): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface.
+# 2.surface density (`ρ_sfc`): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface.
 # For this, we need to import surface and atmospheric fields. The model sims are then updated with the new surface density.
-import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
-import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
-update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
+import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
+import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
+update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 
-# 4.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
+# 3.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
 ## TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step! (#331)
 step!(land_sim, Δt_cpl)
 step!(ocean_sim, Δt_cpl)
 step!(ice_sim, Δt_cpl)
 
-# 5.turbulent fluxes: now we have all information needed for calculating the initial turbulent surface fluxes using the combined state
+# 4.turbulent fluxes: now we have all information needed for calculating the initial turbulent surface fluxes using the combined state
 # or the partitioned state method
-if turbulent_fluxes isa CombinedStateFluxes
+if cs.turbulent_fluxes isa CombinedStateFluxes
     ## import the new surface properties into the coupler (note the atmos state was also imported in step 3.)
-    import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta, q_sfc
+    import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta, q_sfc
     ## calculate turbulent fluxes inside the atmos cache based on the combined surface state in each grid box
-    combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # this updates the atmos thermo state, sfc_ts
-elseif turbulent_fluxes isa PartitionedStateFluxes
+    combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes) # this updates the atmos thermo state, sfc_ts
+elseif cs.turbulent_fluxes isa PartitionedStateFluxes
     ## calculate turbulent fluxes in surface models and save the weighted average in coupler fields
-    partitioned_turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, MoninObukhovScheme(), thermo_params)
+    partitioned_turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, MoninObukhovScheme(), cs.thermo_params)
 
     ## update atmos sfc_conditions for surface temperature
     ## TODO: this is hard coded and needs to be simplified (req. CA modification) (#479)
@@ -616,15 +622,15 @@ elseif turbulent_fluxes isa PartitionedStateFluxes
     atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
 end
 
-# 6.reinitialize models + radiative flux: prognostic states and time are set to their initial conditions. For atmos, this also triggers the callbacks and sets a nonzero radiation flux (given the new sfc_conditions)
+# 5.reinitialize models + radiative flux: prognostic states and time are set to their initial conditions. For atmos, this also triggers the callbacks and sets a nonzero radiation flux (given the new sfc_conditions)
 reinit_model_sims!(cs.model_sims)
 
-# 7.update all fluxes: coupler re-imports updated atmos fluxes (radiative fluxes for both `turbulent_fluxes` types
+# 6.update all fluxes: coupler re-imports updated atmos fluxes (radiative fluxes for both `turbulent_fluxes` types
 # and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxes`,
 # and sends them to the surface component models. If `turbulent_fluxes isa PartitionedStateFluxes`
 # atmos receives the turbulent fluxes from the coupler.
-import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
-update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
+import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
+update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 
 #=
 ## Coupling Loop
@@ -634,13 +640,12 @@ Note that we want to implement this in a dispatchable function to allow for othe
 =#
 
 function solve_coupler!(cs)
-    ClimaComms.iamroot(comms_ctx) ? @info("Starting coupling loop") : nothing
-
-    (; model_sims, Δt_cpl, tspan) = cs
+    (; model_sims, Δt_cpl, tspan, comms_ctx) = cs
     (; atmos_sim, land_sim, ocean_sim, ice_sim) = model_sims
 
+    ClimaComms.iamroot(comms_ctx) ? @info("Starting coupling loop") : nothing
     ## step in time
-    walltime = @elapsed for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
+    walltime = @elapsed for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
 
         cs.dates.date[1] = current_date(cs, t)
 
@@ -662,7 +667,10 @@ function solve_coupler!(cs)
                 update_midmonth_data!(cs.dates.date[1], cs.mode.SIC_info)
             end
             SIC_current =
-                get_ice_fraction.(interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info), mono_surface)
+                get_ice_fraction.(
+                    interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info),
+                    cs.mode.SIC_info.mono,
+                )
             update_field!(ice_sim, Val(:area_fraction), SIC_current)
 
             if cs.dates.date[1] >= next_date_in_file(cs.mode.CO2_info)
@@ -686,18 +694,24 @@ function solve_coupler!(cs)
         ## run component models sequentially for one coupling timestep (Δt_cpl)
         ClimaComms.barrier(comms_ctx)
         update_surface_fractions!(cs)
-        update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
+        update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 
         ## step sims
         step_model_sims!(cs.model_sims, t)
 
         ## exchange combined fields and (if specified) calculate fluxes using combined states
-        import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, surface_albedo, z0, beta
-        if turbulent_fluxes isa CombinedStateFluxes
-            combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # this updates the surface thermo state, sfc_ts, in ClimaAtmos (but also unnecessarily calculates fluxes)
-        elseif turbulent_fluxes isa PartitionedStateFluxes
+        import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # i.e. T_sfc, surface_albedo, z0, beta
+        if cs.turbulent_fluxes isa CombinedStateFluxes
+            combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes) # this updates the surface thermo state, sfc_ts, in ClimaAtmos (but also unnecessarily calculates fluxes)
+        elseif cs.turbulent_fluxes isa PartitionedStateFluxes
             ## calculate turbulent fluxes in surfaces and save the weighted average in coupler fields
-            partitioned_turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, MoninObukhovScheme(), thermo_params)
+            partitioned_turbulent_fluxes!(
+                cs.model_sims,
+                cs.fields,
+                cs.boundary_space,
+                MoninObukhovScheme(),
+                cs.thermo_params,
+            )
 
             ## update atmos sfc_conditions for surface temperature - TODO: this needs to be simplified (need CA modification)
             new_p = get_new_cache(atmos_sim, cs.fields)
@@ -705,7 +719,7 @@ function solve_coupler!(cs)
             atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
         end
 
-        import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # radiative and/or turbulent
+        import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
 
         ## callback to update the fist day of month if needed (for BCReader)
         trigger_callback!(cs, cs.callbacks.update_firstdayofmonth!)

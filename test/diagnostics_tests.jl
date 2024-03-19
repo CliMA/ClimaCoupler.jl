@@ -53,6 +53,8 @@ for FT in (Float32, Float64)
                 (dg_2d,),
                 (;), # callbacks
                 (;), # dirs
+                nothing, # turbulent_fluxes
+                nothing, # thermo_params
             )
             accumulate_diagnostics!(cs)
             @test cs.diagnostics[1].field_vector[1] == expected_results[c_i]
@@ -89,6 +91,8 @@ for FT in (Float32, Float64)
                 (dg_2d,), # diagnostics
                 (;), # callbacks
                 (;), # dirs
+                nothing, # turbulent_fluxes
+                nothing, # thermo_params
             )
             save_diagnostics(cs, cs.diagnostics[1])
             file = filter(x -> endswith(x, ".hdf5"), readdir(test_dir))
@@ -129,6 +133,8 @@ for FT in (Float32, Float64)
                 (dg_2d,),
                 (;), # callbacks
                 (;), # dirs
+                nothing, # turbulent_fluxes
+                nothing, # thermo_params
             )
             accumulate_diagnostics!(cs)
             @test cs.diagnostics[1].field_vector[1] == expected_results[c_i][1]

@@ -35,6 +35,7 @@ Stores information specific to each boundary condition from a file and each vari
 - segment_idx0::Vector{Int}       # `segment_idx` of the file data that is closest to date0
 - segment_length::Vector{Int}     # length of each month segment (used in the daily interpolation)
 - interpolate_daily::Bool         # switch to trigger daily interpolation
+- mono::Bool                      # flag for monotone remapping of input data
 """
 struct BCFileInfo{FT <: Real, B, X, S, V, D, C, O, M, VI}
     bcfile_dir::B
@@ -49,6 +50,7 @@ struct BCFileInfo{FT <: Real, B, X, S, V, D, C, O, M, VI}
     segment_idx0::VI
     segment_length::VI
     interpolate_daily::Bool
+    mono::Bool
 end
 
 BCFileInfo{FT}(args...) where {FT} = BCFileInfo{FT, typeof.(args[1:9])...}(args...)
@@ -164,6 +166,7 @@ function bcfile_info_init(
         segment_idx0,
         segment_length,
         interpolate_daily,
+        mono,
     )
 end
 

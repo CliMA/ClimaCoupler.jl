@@ -66,6 +66,8 @@ steps:
       - "julia --project=artifacts -e 'using Pkg; Pkg.status()'"
       - "julia --project=artifacts artifacts/download_artifacts.jl"
 
+    concurrency: 1
+    concurrency_group: 'depot/climacoupler-ci'
     agents:
       slurm_cpus_per_task: 12
       slurm_gpus: 1

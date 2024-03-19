@@ -540,7 +540,7 @@ monthly_2d_diags = init_diagnostics(
     name_tag = "monthly_mean_2d_",
 )
 
-diagnostics = (monthly_3d_diags, monthly_2d_diags)
+diagnostics = () #(monthly_3d_diags, monthly_2d_diags)
 show_memory_usage(comms_ctx, Dict(diagnostics => "diagnostics"))
 
 #=

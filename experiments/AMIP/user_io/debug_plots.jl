@@ -3,6 +3,7 @@ using ClimaCorePlots
 using Printf
 using ClimaCoupler.Interfacer: ComponentModelSimulation, SurfaceModelSimulation
 using ClimaCore
+using Adapt
 
 # plotting functions for the coupled simulation
 """
@@ -42,15 +43,21 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
         :z0m_S,
     )
     all_plots = []
+    cpu_comms_ctx = ClimaComms.SingletonCommsContext()
+
+
     for field_name in field_names
         field = getproperty(cs_fields, field_name)
-        push!(all_plots, Plots.plot(field, title = string(field_name) * print_extrema(field)))
+        # Convert field from GPU to CPU if necessary
+        cpu_field = Adapt.adapt(Array, field)
+
+        push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(cpu_field)))
         if (field_name == :T_S) && (@isdefined debug_csf0)
             push!(
                 all_plots,
                 Plots.plot(
-                    field .- debug_csf0.T_S,
-                    title = string(field_name) * "_anom" * print_extrema(field),
+                    cpu_field .- debug_csf0.T_S,
+                    title = string(field_name) * "_anom" * print_extrema(cpu_field),
                     color = :viridis,
                 ),
             )
@@ -64,11 +71,14 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
         all_plots = []
         for field_name in field_names
             field = getproperty(cs_fields, field_name)
+            # Convert field from GPU to CPU if necessary
+            cpu_field = Adapt.adapt(Array, field)
+
             push!(
                 all_plots,
                 Plots.plot(
-                    field .- getproperty(cs_fields_ref, field_name),
-                    title = string(field_name) * print_extrema(field),
+                    cpu_field .- getproperty(cs_fields_ref, field_name),
+                    title = string(field_name) * print_extrema(cpu_field),
                 ),
             )
         end
@@ -89,7 +99,10 @@ function debug(sim::ComponentModelSimulation, dir)
     all_plots = []
     for field_name in field_names
         field = get_field(sim, Val(field_name))
-        push!(all_plots, Plots.plot(field, title = string(field_name) * print_extrema(field)))
+        # Convert field from GPU to CPU if necessary
+        cpu_field = Adapt.adapt(Array, field)
+
+        push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(cpu_field)))
     end
     fig = Plots.plot(all_plots..., size = (1500, 800))
     Plots.png(joinpath(dir, "debug_$(name(sim))"))

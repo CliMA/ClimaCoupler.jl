@@ -51,13 +51,13 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
         # Convert field from GPU to CPU if necessary
         cpu_field = Adapt.adapt(Array, field)
 
-        push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(cpu_field)))
+        push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(field)))
         if (field_name == :T_S) && (@isdefined debug_csf0)
             push!(
                 all_plots,
                 Plots.plot(
                     cpu_field .- debug_csf0.T_S,
-                    title = string(field_name) * "_anom" * print_extrema(cpu_field),
+                    title = string(field_name) * "_anom" * print_extrema(field),
                     color = :viridis,
                 ),
             )
@@ -78,7 +78,7 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
                 all_plots,
                 Plots.plot(
                     cpu_field .- getproperty(cs_fields_ref, field_name),
-                    title = string(field_name) * print_extrema(cpu_field),
+                    title = string(field_name) * print_extrema(field),
                 ),
             )
         end
@@ -102,7 +102,7 @@ function debug(sim::ComponentModelSimulation, dir)
         # Convert field from GPU to CPU if necessary
         cpu_field = Adapt.adapt(Array, field)
 
-        push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(cpu_field)))
+        push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(field)))
     end
     fig = Plots.plot(all_plots..., size = (1500, 800))
     Plots.png(joinpath(dir, "debug_$(name(sim))"))

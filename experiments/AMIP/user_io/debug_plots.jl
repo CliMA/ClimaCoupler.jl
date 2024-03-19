@@ -43,7 +43,7 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
         :z0m_S,
     )
     all_plots = []
-    cpu_comms_ctx = ClimaComms.SingletonCommsContext()
+    cpu_comms_ctx = ClimaComms.SingletonCommsContext(ClimaComms.CPUSingleThreaded())
 
     for field_name in field_names
         field = getproperty(cs_fields, field_name)
@@ -128,7 +128,7 @@ function debug(sim::ComponentModelSimulation, dir)
 
     @show name(sim)
     field_names = plot_field_names(sim)
-    cpu_comms_ctx = ClimaComms.SingletonCommsContext()
+    cpu_comms_ctx = ClimaComms.SingletonCommsContext(ClimaComms.CPUSingleThreaded())
 
     all_plots = []
     for field_name in field_names

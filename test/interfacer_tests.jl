@@ -57,6 +57,8 @@ for FT in (Float32, Float64)
             (), # diagnostics
             (;), # callbacks
             (;), # dirs
+            nothing, # turbulent_fluxes
+            nothing, # thermo_params
         )
 
         @test float_type(cs) == FT

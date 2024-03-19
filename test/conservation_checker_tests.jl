@@ -100,6 +100,8 @@ for FT in (Float32, Float64)
             (), # diagnostics
             (;), # callbacks
             (;), # dirs
+            nothing, # turbulent_fluxes
+            nothing, # thermo_params
         )
 
         # set non-zero radiation and precipitation
@@ -178,6 +180,8 @@ for FT in (Float32, Float64)
             (), # diagnostics
             (;), # callbacks
             (;), # dirs
+            nothing, # turbulent_fluxes
+            nothing, # thermo_params
         )
 
         tot_energy, tot_water = check_conservation!(cs)

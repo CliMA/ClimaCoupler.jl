@@ -143,6 +143,8 @@ end
             (), # diagnostics
             (;), # callbacks
             (;), # dirs
+            nothing, # turbulent_fluxes
+            nothing, # thermo_params
         )
 
         ClimaComms.barrier(comms_ctx)

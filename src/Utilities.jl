@@ -25,12 +25,12 @@ function swap_space!(field_out, field_in::Fields.Field)
 end
 
 """
-    get_device(parsed_args) 
+    get_device(parsed_args)
 
-Returns the device on which the model is being run 
+Returns the device on which the model is being run
 
-# Arguments 
-- `parsed_args`: dictionary containing a "device" flag which decides which device to run on 
+# Arguments
+- `parsed_args`: dictionary containing a "device" flag which decides which device to run on
 """
 function get_device(parsed_args)
     if parsed_args["device"] == "auto"
@@ -46,11 +46,11 @@ end
 
 
 """
-    get_comms_context(parsed_args) 
+    get_comms_context(parsed_args)
 
-Sets up the appropriate ClimaComms context for the device the model is to be run on 
+Sets up the appropriate ClimaComms context for the device the model is to be run on
 
-# Arguments 
+# Arguments
 `parsed_args`: dictionary containing a "device" flag whcih decides which device context is needed
 """
 function get_comms_context(parsed_args)

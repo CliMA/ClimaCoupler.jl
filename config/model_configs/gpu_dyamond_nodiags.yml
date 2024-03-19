@@ -1,0 +1,13 @@
+anim: false
+atmos_config_file: "config/gpu_configs/gpu_aquaplanet_dyamond.yml"
+dt_cpl: 100
+energy_check: false
+job_id: "gpu_dyamond_target_nodiags"
+land_albedo_type: "map_temporal"
+mode_name: "amip"
+mono_surface: false
+monthly_checkpoint: false
+run_name: "gpu_dyamond_target_nodiags"
+start_date: "19790301"
+t_end: "12hours"
+turb_flux_partition: "CombinedStateFluxes"

@@ -9,7 +9,8 @@ land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
 monthly_checkpoint: false
+output_default_diagnostics: false
 run_name: "gpu_dyamond_target"
 start_date: "19790301"
-t_end: "1days"
+t_end: "4hours"
 turb_flux_partition: "CombinedStateFluxes"

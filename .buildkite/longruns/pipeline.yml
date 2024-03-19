@@ -46,15 +46,40 @@ steps:
   #     JULIA_MAX_NUM_PRECOMPILE_FILES: 50
 
   # DYAMOND AMIP: 1 day (convection resolving)
-  - label: "GPU AMIP SUPERFINE: dyamond_target"
-    key: "gpu_dyamond_target"
+  # - label: "GPU AMIP SUPERFINE: dyamond_target"
+  #   key: "gpu_dyamond_target"
+  #   command:
+  #     - "echo $$JULIA_DEPOT_PATH"
+
+  #     - echo "--- Instantiate AMIP env"
+  #     - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+  #     - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
+  #     - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
+
+  #     - echo "--- Download artifacts"
+  #     - "julia --project=artifacts -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+  #     - "julia --project=artifacts -e 'using Pkg; Pkg.precompile()'"
+  #     - "julia --project=artifacts -e 'using Pkg; Pkg.status()'"
+  #     - "julia --project=artifacts artifacts/download_artifacts.jl"
+
+  #     - echo "--- Run simulation"
+  #     - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_dyamond_target.yml"
+  #   artifact_paths: "experiments/AMIP/output/amip/gpu_dyamond_target_artifacts/*"
+  #   agents:
+  #     queue: clima
+  #     slurm_mem: 20GB
+  #     slurm_gpus: 1
+  #     modules: common
+
+  - label: "GPU atmos-only DYAMOND without diagnostics"
+    key: "longrun_aquaplanet_dyamond"
     command:
       - "echo $$JULIA_DEPOT_PATH"
 
-      - echo "--- Instantiate AMIP env"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
+      - echo "--- Instantiate test env"
+      - "julia --project=test -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=test -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=test -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Download artifacts"
       - "julia --project=artifacts -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
@@ -63,13 +88,14 @@ steps:
       - "julia --project=artifacts artifacts/download_artifacts.jl"
 
       - echo "--- Run simulation"
-      - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_dyamond_target.yml"
-    artifact_paths: "experiments/AMIP/output/amip/gpu_dyamond_target_artifacts/*"
+      - "julia --color=yes --project=test test/component_model_tests/climaatmos_standalone/atmos_driver.jl"
+    artifact_paths: "test/component_model_tests/climaatmos_standalone/output/longrun_aquaplanet_dyamond_artifacts/*"
     agents:
       queue: clima
       slurm_mem: 20GB
       slurm_gpus: 1
       modules: common
+
 
   - wait
 

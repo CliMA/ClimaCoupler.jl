@@ -12,8 +12,8 @@ using ClimaCore
 Plot the fields of a coupled simulation and save plots to a directory.
 """
 function debug(cs::CoupledSimulation, dir = "debug", cs_fields_ref = nothing)
-    mkpath(dir)
-    @info "plotting debug in " * dir
+    # mkpath(dir)
+    # @info "plotting debug in " * dir
     for sim in cs.model_sims
         debug(sim, dir)
     end
@@ -80,7 +80,7 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
         end
     end
     Plots.plot(all_plots..., size = (1500, 800))
-    Plots.png(joinpath(dir, "debug_coupler"))
+    Plots.png(dir * "debug_coupler")
 
     # plot anomalies if a reference cs.fields, `cs_fields_ref`, are provided
     if !isnothing(cs_fields_ref)
@@ -99,7 +99,7 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
             )
         end
         Plots.plot(all_plots..., size = (1500, 800))
-        Plots.png(joinpath(dir, "debug_coupler_amomalies"))
+        Plots.png(dir * "debug_coupler_amomalies")
     end
 end
 
@@ -149,14 +149,12 @@ function debug(sim::ComponentModelSimulation, dir)
             nz = nz,
         )
         cpu_field = ClimaCore.Fields.ones(cpu_space)
-        @show space
-        @show cpu_space
         parent(cpu_field) .= parent(field)
 
         push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(field)))
     end
     fig = Plots.plot(all_plots..., size = (1500, 800))
-    Plots.png(joinpath(dir, "debug_$(name(sim))"))
+    Plots.png(dir * "debug_$(name(sim))")
 
 end
 

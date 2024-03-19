@@ -175,7 +175,7 @@ The data files are downloaded from the `ClimaCoupler` artifacts directory. If th
 original sources.
 =#
 
-debug_dir = joinpath(COUPLER_ARTIFACTS_DIR, "debug_output/")
+debug_dir = COUPLER_ARTIFACTS_DIR
 isdir(debug_dir) ? nothing : mkpath(debug_dir)
 
 # get the paths to the necessary data files: land-sea mask, sst map, sea ice concentration
@@ -573,7 +573,7 @@ cs = CoupledSimulation{FT}(
     thermo_params,
 );
 
-debug(cs, debug_dir * "0_initialized_cs")
+debug(cs, debug_dir * "/0_initialized_cs_")
 
 #=
 ## Restart component model states if specified
@@ -599,21 +599,21 @@ The concrete steps for proper initialization are:
 
 # 1.coupler updates surface model area fractions
 update_surface_fractions!(cs)
-debug(cs, "debug_output/2_surface_fraction_update")
+debug(cs, debug_dir * "/2_surface_fraction_update_")
 
 # 2.surface density (`ρ_sfc`): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface.
 # For this, we need to import surface and atmospheric fields. The model sims are then updated with the new surface density.
 import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
 import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
 update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
-debug(cs, "debug_output/3_update_sims")
+debug(cs, debug_dir * "/3_update_sims_")
 
 # 3.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
 ## TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step! (#331)
 step!(land_sim, Δt_cpl)
 step!(ocean_sim, Δt_cpl)
 step!(ice_sim, Δt_cpl)
-debug(cs, "debug_output/4_step_surface_models")
+debug(cs, debug_dir * "/4_step_surface_models_")
 
 # 4.turbulent fluxes: now we have all information needed for calculating the initial turbulent surface fluxes using the combined state
 # or the partitioned state method
@@ -632,11 +632,11 @@ elseif cs.turbulent_fluxes isa PartitionedStateFluxes
     CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) ## sets T_sfc (but SF calculation not necessary - requires split functionality in CA)
     atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
 end
-debug(cs, "debug_output/5_after_turb_fluxes")
+debug(cs, debug_dir * "/5_after_turb_fluxes_")
 
 # 5.reinitialize models + radiative flux: prognostic states and time are set to their initial conditions. For atmos, this also triggers the callbacks and sets a nonzero radiation flux (given the new sfc_conditions)
 reinit_model_sims!(cs.model_sims)
-debug(cs, "debug_output/6_after_reinit")
+debug(cs, debug_dir * "/6_after_reinit_")
 
 # 6.update all fluxes: coupler re-imports updated atmos fluxes (radiative fluxes for both `turbulent_fluxes` types
 # and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxes`,
@@ -645,7 +645,7 @@ debug(cs, "debug_output/6_after_reinit")
 import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
 update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 
-debug(cs, "debug_output/7_import_atmos_fluxes")
+debug(cs, debug_dir * "/7_import_atmos_fluxes_")
 
 #=
 ## Coupling Loop
@@ -784,7 +784,7 @@ end #hide
 ## run the coupled simulation
 solve_coupler!(cs);
 
-debug(cs, "debug_output/6_after_solve")
+debug(cs, debug_dir * "/8_after_solve_")
 #=
 ## Postprocessing
 Currently all postprocessing is performed using the root process only.

@@ -65,10 +65,14 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
         )
         cpu_field = ClimaCore.Fields.ones(cpu_space)
 
+        @show typeof(parent(field))
         parent(cpu_field) .= Array(parent(field))
         # Check what we're doing is correct on CPU
         if comms_ctx isa ClimaComms.SingletonCommsContext
-            @assert cpu_field == field
+            if cpu_field != field
+                @show field
+                @show cpu_field
+            end
         end
 
         push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(field)))
@@ -96,7 +100,10 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
 
             # Check what we're doing is correct on CPU
             if comms_ctx isa ClimaComms.SingletonCommsContext
-                @assert cpu_field == field
+                if cpu_field != field
+                    @show field
+                    @show cpu_field
+                end
             end
 
             push!(

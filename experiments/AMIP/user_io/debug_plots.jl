@@ -65,7 +65,11 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
         )
         cpu_field = ClimaCore.Fields.ones(cpu_space)
 
-        parent(cpu_field) .= parent(field)
+        parent(cpu_field) .= Array(parent(field))
+        # Check what we're doing is correct on CPU
+        if comms_ctx isa ClimaComms.SingletonCommsContext
+            @assert cpu_field == field
+        end
 
         push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(field)))
         if (field_name == :T_S) && (@isdefined debug_csf0)
@@ -89,6 +93,11 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
             field = getproperty(cs_fields, field_name)
             # Copy field onto cpu space
             parent(cpu_field) .= parent(field)
+
+            # Check what we're doing is correct on CPU
+            if comms_ctx isa ClimaComms.SingletonCommsContext
+                @assert cpu_field == field
+            end
 
             push!(
                 all_plots,
@@ -149,7 +158,7 @@ function debug(sim::ComponentModelSimulation, dir)
             nz = nz,
         )
         cpu_field = ClimaCore.Fields.ones(cpu_space)
-        parent(cpu_field) .= parent(field)
+        parent(cpu_field) .= Array(parent(field))
 
         push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(field)))
     end

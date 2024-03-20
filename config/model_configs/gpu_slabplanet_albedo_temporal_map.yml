@@ -13,5 +13,5 @@ mono_surface: true
 precip_model: "0M"
 rad: "gray"
 run_name: "gpu_slabplanet_albedo_temporal_map"
-t_end: "10days"
+t_end: "200secs"
 vert_diff: "true"

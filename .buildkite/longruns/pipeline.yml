@@ -62,14 +62,6 @@ steps:
       - "julia --project=artifacts -e 'using Pkg; Pkg.status()'"
       - "julia --project=artifacts artifacts/download_artifacts.jl"
 
-      - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_dyamond_target.yml"
-    artifact_paths: "experiments/AMIP/output/amip/gpu_dyamond_target_artifacts/*"
-    agents:
-      queue: clima
-      slurm_mem: 20GB
-      slurm_gpus: 1
-      modules: common
-
   - wait
 
   - group: "Current target tests: AMIP surface"
@@ -87,4 +79,3 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
-

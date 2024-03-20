@@ -45,7 +45,12 @@ steps:
       JULIA_NUM_PRECOMPILE_TASKS: 8
       JULIA_MAX_NUM_PRECOMPILE_FILES: 50
 
-  # DYAMOND AMIP: 1 day (convection resolving)
+    concurrency: 1
+    concurrency_group: 'depot/climacoupler-longruns'
+
+  - wait
+
+  # DYAMOND AMIP: 1 day (convection resolving) - running on clima, so need to instantiate again
   - label: "GPU AMIP SUPERFINE: dyamond_target"
     key: "gpu_dyamond_target"
     command:

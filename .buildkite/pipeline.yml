@@ -34,15 +34,15 @@ steps:
       - "julia --project -e 'using Pkg; Pkg.precompile()'"
       - "julia --project -e 'using Pkg; Pkg.status()'"
 
-      - echo "--- Instantiate sea breeze env"
-      - "julia --project=experiments/ClimaCore/sea_breeze -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/ClimaCore/sea_breeze -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=experiments/ClimaCore/sea_breeze -e 'using Pkg; Pkg.status()'"
+      # - echo "--- Instantiate sea breeze env"
+      # - "julia --project=experiments/ClimaCore/sea_breeze -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      # - "julia --project=experiments/ClimaCore/sea_breeze -e 'using Pkg; Pkg.precompile()'"
+      # - "julia --project=experiments/ClimaCore/sea_breeze -e 'using Pkg; Pkg.status()'"
 
-      - echo "--- Instantiate climacore exp env"
-      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.status()'"
+      # - echo "--- Instantiate climacore exp env"
+      # - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      # - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.precompile()'"
+      # - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate AMIP env"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
@@ -54,11 +54,11 @@ steps:
       - "julia --project=perf/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=perf/ -e 'using Pkg; Pkg.status()'"
 
-      - echo "--- Instantiate test env"
-      - "julia --project=test/ -e 'using Pkg; Pkg.develop(path=\".\")'"
-      - "julia --project=test/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=test/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=test/ -e 'using Pkg; Pkg.status()'"
+      # - echo "--- Instantiate test env"
+      # - "julia --project=test/ -e 'using Pkg; Pkg.develop(path=\".\")'"
+      # - "julia --project=test/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      # - "julia --project=test/ -e 'using Pkg; Pkg.precompile()'"
+      # - "julia --project=test/ -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Download artifacts"
       - "julia --project=artifacts -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
@@ -202,12 +202,12 @@ steps:
       #   agents:
       #     slurm_mem: 20GB
 
-      - label: "Slabplanet: extra atmos diagnostics"
-        key: "slabplanet_atmos_diags"
-        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/slabplanet_atmos_diags.yml"
-        artifact_paths: "experiments/AMIP/output/slabplanet/slabplanet_atmos_diags_artifacts/*"
-        agents:
-          slurm_mem: 20GB
+      # - label: "Slabplanet: extra atmos diagnostics"
+      #   key: "slabplanet_atmos_diags"
+      #   command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/slabplanet_atmos_diags.yml"
+      #   artifact_paths: "experiments/AMIP/output/slabplanet/slabplanet_atmos_diags_artifacts/*"
+      #   agents:
+      #     slurm_mem: 20GB
 
       # AMIP
 
@@ -291,23 +291,23 @@ steps:
       # #   command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --coupled true --surface_setup PrescribedSurface --moist equil --vert_diff true --rad allskywithclear --rayleigh_sponge false --energy_check true --mode_name slabplanet --t_end 10days --dt_save_to_sol 3600secs --dt_cpl 21600 --dt 200secs --dt_rad 6hours --idealized_insolation true --mono_surface true --h_elem 4 --precip_model 0M --run_name target_params_in_slab1"
       # #   artifact_paths: "experiments/AMIP/output/slabplanet/target_params_in_slab1_artifacts/total_energy*.png"
 
-      - label: "AMIP target: albedo from function"
-        key: "target_amip_albedo_function"
-        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/target_amip_albedo_function.yml"
-        artifact_paths: "experiments/AMIP/output/amip/target_amip_albedo_function_artifacts/*"
-        agents:
-          slurm_mem: 20GB
+      # - label: "AMIP target: albedo from function"
+      #   key: "target_amip_albedo_function"
+      #   command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/target_amip_albedo_function.yml"
+      #   artifact_paths: "experiments/AMIP/output/amip/target_amip_albedo_function_artifacts/*"
+      #   agents:
+      #     slurm_mem: 20GB
 
-      - label: "AMIP - Float64 + hourly checkpoint"
-        key: "amip"
-        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/coarse_single_ft64_hourly_checkpoints.yml"
-        artifact_paths: "experiments/AMIP/output/amip/coarse_single_ft64_hourly_checkpoints_artifacts/*"
-        env:
-          FLAME_PLOT: ""
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_ntasks: 1
-          slurm_mem: 20GB
+      # - label: "AMIP - Float64 + hourly checkpoint"
+      #   key: "amip"
+      #   command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/coarse_single_ft64_hourly_checkpoints.yml"
+      #   artifact_paths: "experiments/AMIP/output/amip/coarse_single_ft64_hourly_checkpoints_artifacts/*"
+      #   env:
+      #     FLAME_PLOT: ""
+      #     BUILD_HISTORY_HANDLE: ""
+      #   agents:
+      #     slurm_ntasks: 1
+      #     slurm_mem: 20GB
 
       # - label: "AMIP - Float64 + hourly checkpoint + co2"
       #   key: "coarse_single_ft64_hourly_checkpoints_co2"
@@ -370,6 +370,35 @@ steps:
       #   artifact_paths: "perf/output/perf_diff_coarse_single_ft64/*"
       #   agents:
       #     slurm_mem: 20GB
+
+      # GPU COMPARISON RUNS: AMIP
+      - label: "AMIP test: albedo from function"
+        key: "amip_albedo_function"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/amip_albedo_function.yml"
+        artifact_paths: "experiments/AMIP/output/amip/amip_albedo_function_artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "AMIP target: topography and diagnostic EDMF"
+        key: "amip_target_topo_diagedmf_shortrun"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf_shortrun.yml"
+        artifact_paths: "experiments/AMIP/output/amip/amip_target_topo_diagedmf_shortrun_artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "AMIP: albedo from static map"
+        key: "amip_albedo_static_map"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/amip_albedo_static_map.yml"
+        artifact_paths: "experiments/AMIP/output/amip/amip_albedo_static_map_artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "AMIP: albedo from temporal map"
+        key: "amip_albedo_temporal_map"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/amip_albedo_temporal_map.yml"
+        artifact_paths: "experiments/AMIP/output/amip/amip_albedo_temporal_map_artifacts/*"
+        agents:
+          slurm_mem: 20GB
 
   - group: "GPU integration tests"
     steps:

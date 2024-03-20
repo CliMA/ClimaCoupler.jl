@@ -11,7 +11,6 @@ env:
   JULIA_MAX_NUM_PRECOMPILE_FILES: 100
   GKSwstype: 100
   SLURM_KILL_BAD_EXIT: 1
-
   CONFIG_PATH: "config/longrun_configs"
 
 timeout_in_minutes: 1440
@@ -300,11 +299,11 @@ steps:
 
   # DYAMOND AMIP: 1 day (convection resolving)
   - label: "GPU AMIP SUPERFINE: dyamond_target"
-    key: "gpu_dyamond_target"
+    key: "gpu_longrun_amip_dyamond"
     command:
       - echo "--- Run simulation"
-      - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_dyamond_target.yml"
-    artifact_paths: "experiments/AMIP/output/amip/gpu_dyamond_target_artifacts/*"
+      - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_longrun_amip_dyamond.yml"
+    artifact_paths: "experiments/AMIP/output/amip/gpu_longrun_amip_dyamond_artifacts/*"
     agents:
       queue: clima
       slurm_mem: 20GB

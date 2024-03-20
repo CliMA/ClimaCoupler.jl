@@ -4,6 +4,7 @@ authors = ["CliMA Contributors <clima-software@caltech.edu>"]
 version = "0.0.1"
 
 [deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
 ClimaCore = "d414da3d-4745-48bb-8d80-42e94e092884"
 ClimaCoreTempestRemap = "d934ef94-cdd4-4710-83d6-720549644b70"
@@ -23,6 +24,7 @@ Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 ClimaComms = "0.5.6"
 ClimaCore = "0.13"
 ClimaCoreTempestRemap = "0.3"
+CUDA = "5"
 Dates = "1"
 DocStringExtensions = "0.8, 0.9"
 JLD2 = "0.4"

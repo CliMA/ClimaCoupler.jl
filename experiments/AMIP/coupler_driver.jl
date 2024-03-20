@@ -95,7 +95,7 @@ parsed_args = parse_commandline(argparse_settings())
 ## modify parsed args for fast testing from REPL #hide
 if isinteractive()
     parsed_args["config_file"] =
-        isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/model_configs/interactive_debug.yml") :
+        isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/ci_configs/interactive_debug.yml") :
         parsed_args["config_file"]
 end
 
@@ -178,8 +178,12 @@ returns a `ComponentModelSimulation` object (see `Interfacer` docs for more deta
 This uses the `ClimaAtmos.jl` model, with parameterization options specified in the `config_dict_atmos` dictionary.
 =#
 
+Utilities.show_memory_usage(comms_ctx)
+
 ## init atmos model component
 atmos_sim = atmos_init(FT, config_dict_atmos);
+Utilities.show_memory_usage(comms_ctx)
+
 thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models #610
 
 #=
@@ -210,6 +214,7 @@ land_area_fraction =
             mono = mono_surface,
         )
     )
+Utilities.show_memory_usage(comms_ctx)
 
 #=
 ### Surface Models: AMIP and SlabPlanet Modes
@@ -322,6 +327,7 @@ if mode_name == "amip"
     Interfacer.update_field!(atmos_sim, Val(:co2), CO2_init)
 
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
+    Utilities.show_memory_usage(comms_ctx)
 
 elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
 
@@ -373,6 +379,7 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
     ))
 
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
+    Utilities.show_memory_usage(comms_ctx)
 
 elseif mode_name == "slabplanet_eisenman"
 
@@ -416,6 +423,7 @@ elseif mode_name == "slabplanet_eisenman"
     )
 
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
+    Utilities.show_memory_usage(comms_ctx)
 end
 
 #=
@@ -448,6 +456,7 @@ coupler_field_names = (
 )
 coupler_fields =
     NamedTuple{coupler_field_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_field_names)))
+Utilities.show_memory_usage(comms_ctx)
 
 ## model simulations
 model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim);
@@ -481,6 +490,7 @@ monthly_2d_diags = Diagnostics.init_diagnostics(
 )
 
 diagnostics = (monthly_3d_diags, monthly_2d_diags)
+Utilities.show_memory_usage(comms_ctx)
 
 #=
 ## Initialize Conservation Checks
@@ -583,6 +593,7 @@ cs = Interfacer.CoupledSimulation{FT}(
     turbulent_fluxes,
     thermo_params,
 );
+Utilities.show_memory_usage(comms_ctx)
 
 #=
 ## Restart component model states if specified
@@ -668,7 +679,7 @@ function solve_coupler!(cs)
 
     ClimaComms.iamroot(comms_ctx) && @info("Starting coupling loop")
     ## step in time
-    walltime = @elapsed for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
+    for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
 
         cs.dates.date[1] = TimeManager.current_date(cs, t)
 
@@ -754,9 +765,8 @@ function solve_coupler!(cs)
         TimeManager.trigger_callback!(cs, cs.callbacks.checkpoint)
 
     end
-    ClimaComms.iamroot(comms_ctx) && @show(walltime)
 
-    return cs
+    return nothing
 end
 
 ## exit if running performance anaysis #hide
@@ -764,8 +774,39 @@ if haskey(ENV, "CI_PERF_SKIP_COUPLED_RUN") #hide
     throw(:exit_profile_init) #hide
 end #hide
 
-## run the coupled simulation
-solve_coupler!(cs);
+## run the coupled simulation for one timestep to precompile everything before timing
+cs.tspan[2] = Δt_cpl * 2
+solve_coupler!(cs)
+
+## run the coupled simulation for the full timespan and time it
+cs.tspan[1] = Δt_cpl * 2
+cs.tspan[2] = tspan[2]
+
+## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos
+GC.gc()
+
+## Use ClimaComms.@elapsed to time the simulation on both CPU and GPU
+walltime = ClimaComms.@elapsed comms_ctx.device begin
+    s = CA.@timed_str begin
+        solve_coupler!(cs)
+    end
+end
+ClimaComms.iamroot(comms_ctx) && @show(walltime)
+
+## Use ClimaAtmos calculation to show the simulated years per day of the simulation (SYPD)
+es = CA.EfficiencyStats(tspan, walltime)
+sypd = CA.simulated_years_per_day(es)
+@info "SYPD: $sypd"
+
+## Save the SYPD and allocation information
+if ClimaComms.iamroot(comms_ctx)
+    sypd_filename = joinpath(dir_paths.artifacts, "sypd.txt")
+    write(sypd_filename, "$sypd")
+
+    cpu_allocs_GB = Utilities.show_memory_usage(comms_ctx)
+    cpu_allocs_filename = joinpath(dir_paths.artifacts, "allocations_cpu.txt")
+    write(cpu_allocs_filename, cpu_allocs_GB)
+end
 
 #=
 ## Postprocessing
@@ -863,7 +904,7 @@ if ClimaComms.iamroot(comms_ctx)
         Plots.png(joinpath(dir_paths.artifacts, "amip_ncep.png"))
 
         ## Compare against observations
-        if t_end > 84600
+        if t_end > 84600 && config_dict["output_default_diagnostics"]
             @info "Error against observations"
             output_dates = cs.dates.date0[] .+ Dates.Second.(atmos_sim.integrator.sol.t)
 

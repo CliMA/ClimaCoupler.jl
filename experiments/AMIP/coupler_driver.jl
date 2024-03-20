@@ -686,8 +686,10 @@ function solve_coupler!(cs)
         Regridder.write_to_hdf5(COUPLER_ARTIFACTS_DIR, "land_W", date, land_W, "land_W", comms_ctx)
 
         # ocean state
-        ocean_T_sfc = cs.model_sims.ocean_sim.integrator.u.T_sfc
-        Regridder.write_to_hdf5(COUPLER_ARTIFACTS_DIR, "ocean_T_sfc", date, ocean_T_sfc, "ocean_T_sfc", comms_ctx)
+        if cs.mode.name != "amip"
+            ocean_T_sfc = cs.model_sims.ocean_sim.integrator.u.T_sfc
+            Regridder.write_to_hdf5(COUPLER_ARTIFACTS_DIR, "ocean_T_sfc", date, ocean_T_sfc, "ocean_T_sfc", comms_ctx)
+        end
         # end
 
         cs.dates.date[1] = current_date(cs, t) # if not global, `date` is not updated.

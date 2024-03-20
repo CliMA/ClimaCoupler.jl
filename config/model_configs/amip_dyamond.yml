@@ -1,0 +1,15 @@
+anim: false
+atmos_config_file: "config/gpu_configs/gpu_aquaplanet_dyamond.yml"
+dt_cpl: 100
+dt_save_state_to_disk: "1days"
+dt_save_to_sol: "1days"
+energy_check: false
+job_id: "amip_dyamond"
+land_albedo_type: "map_temporal"
+mode_name: "amip"
+mono_surface: false
+monthly_checkpoint: false
+run_name: "amip_dyamond"
+start_date: "19790301"
+t_end: "1days"
+turb_flux_partition: "CombinedStateFluxes"

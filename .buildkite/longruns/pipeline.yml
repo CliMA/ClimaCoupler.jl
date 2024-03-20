@@ -14,6 +14,8 @@ env:
 
   CONFIG_PATH: "config/longrun_configs"
   PERF_CONFIG_PATH: "config/perf_configs"
+  MODEL_CONFIG_PATH: "config/model_configs"
+  ATMOS_CONFIG_PATH: "config/atmos_configs"
 
 timeout_in_minutes: 1440
 
@@ -412,3 +414,42 @@ steps:
         command:
           - slack-upload -c "#coupler-report" -f perf/output/perf_diff_target_amip_n1_shortrun/flame_diff.html -m png -n amip_fine_flamegraphdiff -x "AMIP Longrun FlameGraphDiff"
           - slack-upload -c "#coupler-report" -f perf/output/perf_diff_target_amip_n1_shortrun/flame_diff_self_count.html -m png -n amip_fine_flamegraphdiffself -x "AMIP Longrun FlameGraphDiffSelf"
+
+  - group: "Table output targets"
+
+    steps:
+
+      - label: "GPU AMIP DYAMOND"
+        key: "gpu_amip_dyamond"
+        command: "srun julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $MODEL_CONFIG_PATH/gpu_amip_dyamond.yml"
+        artifact_paths: "experiments/AMIP/output/amip/gpu_amip_dyamond_artifacts/*"
+        agents:
+          slurm_gpus: 1
+          slurm_mem: 16GB
+
+      - label: "CPU AMIP DYAMOND"
+        key: "amip_dyamond"
+        command: "srun julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $MODEL_CONFIG_PATH/amip_dyamond.yml"
+        artifact_paths: "experiments/AMIP/output/amip/amip_dyamond_artifacts/*"
+        agents:
+          slurm_ntasks_per_node: 1
+          slurm_nodes: 1
+          slurm_mem_per_cpu: 16G
+
+      # Note: These config files live in the ClimaAtmos repository
+      - label: "GPU aquaplanet DYAMOND"
+        key: "gpu_aquaplanet_dyamond"
+        command: "srun julia --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $ATMOS_CONFIG_PATH/gpu_aquaplanet_dyamond.yml"
+        artifact_paths: "experiments/AMIP/output/gpu_aquaplanet_dyamond/*"
+        agents:
+          slurm_gpus: 1
+          slurm_mem: 16GB
+
+      - label: "CPU aquaplanet DYAMOND"
+        key: "aquaplanet_dyamond"
+        command: "srun julia --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $ATMOS_CONFIG_PATH/aquaplanet_dyamond.yml"
+        artifact_paths: "experiments/AMIP/output/aquaplanet_dyamond/*"
+        agents:
+          slurm_ntasks_per_node: 1
+          slurm_nodes: 1
+          slurm_mem_per_cpu: 16G

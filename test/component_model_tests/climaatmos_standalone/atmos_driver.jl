@@ -29,7 +29,7 @@ if !(isnothing(atmos_config_file))
     config = CA.default_config_dict()
 else
     @info "Using Atmos configuration from $atmos_config_file"
-    config = CA.override_default_config(joinpath(pkgdir(CA), atmos_config_file))
+    config = CA.override_default_config(joinpath(pkgdir(ClimaCoupler), atmos_config_file))
 end
 
 # Specify atmos output directory to be inside the coupler output directory

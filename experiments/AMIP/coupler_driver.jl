@@ -39,6 +39,7 @@ We then specify the input data file names. If these are not already downloaded, 
 ## standard packages
 using Dates
 import YAML
+import DelimitedFiles as DLM
 
 # ## ClimaESM packages
 import ClimaAtmos as CA
@@ -661,37 +662,6 @@ function solve_coupler!(cs)
     ClimaComms.iamroot(comms_ctx) ? @info("Starting coupling loop") : nothing
     ## step in time
     walltime = @elapsed for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
-
-
-        # # save states every day
-        # if t % 86400 == 0
-        # save state every timestep
-        date = date0 + Dates.Second(t)
-
-        # atmos state
-        atmos_ρe_tot = cs.model_sims.atmos_sim.integrator.u.c.ρe_tot
-        atmos_ρq_tot = cs.model_sims.atmos_sim.integrator.u.c.ρq_tot
-        atmos_ρ = cs.model_sims.atmos_sim.integrator.u.c.ρ
-        atmos_uₕ = cs.model_sims.atmos_sim.integrator.u.c.uₕ
-        atmos_u₃ = cs.model_sims.atmos_sim.integrator.u.f.u₃
-        Regridder.write_to_hdf5(COUPLER_ARTIFACTS_DIR, "atmos_ρe_tot", date, atmos_ρe_tot, "atmos_ρe_tot", comms_ctx)
-        Regridder.write_to_hdf5(COUPLER_ARTIFACTS_DIR, "atmos_ρq_tot", date, atmos_ρq_tot, "atmos_ρq_tot", comms_ctx)
-
-        # land state
-        land_T = cs.model_sims.land_sim.integrator.u.bucket.T
-        land_W = cs.model_sims.land_sim.integrator.u.bucket.W
-        land_Ws = cs.model_sims.land_sim.integrator.u.bucket.Ws
-        land_σS = cs.model_sims.land_sim.integrator.u.bucket.σS
-        Regridder.write_to_hdf5(COUPLER_ARTIFACTS_DIR, "land_T", date, land_T, "land_T", comms_ctx)
-        Regridder.write_to_hdf5(COUPLER_ARTIFACTS_DIR, "land_W", date, land_W, "land_W", comms_ctx)
-
-        # ocean state
-        if cs.mode.name != "amip"
-            ocean_T_sfc = cs.model_sims.ocean_sim.integrator.u.T_sfc
-            Regridder.write_to_hdf5(COUPLER_ARTIFACTS_DIR, "ocean_T_sfc", date, ocean_T_sfc, "ocean_T_sfc", comms_ctx)
-        end
-        # end
-
         cs.dates.date[1] = current_date(cs, t) # if not global, `date` is not updated.
 
         ## print date on the first of month
@@ -787,6 +757,54 @@ end #hide
 solve_coupler!(cs);
 
 debug(cs, debug_dir * "/8_after_solve_")
+
+
+# Save states after simulation for CPU/GPU comparison
+device_suffix = comms_ctx isa ClimaComms.AbstractCPUDevice ? "cpu" : "gpu"
+
+# Extract atmos state variables
+atmos_ρe_tot = cs.model_sims.atmos_sim.integrator.u.c.ρe_tot
+atmos_ρq_tot = cs.model_sims.atmos_sim.integrator.u.c.ρq_tot
+atmos_ρ = cs.model_sims.atmos_sim.integrator.u.c.ρ
+atmos_uₕ = cs.model_sims.atmos_sim.integrator.u.c.uₕ
+atmos_u₃ = cs.model_sims.atmos_sim.integrator.u.f.u₃
+
+# Write to text files
+open(joinpath(COUPLER_ARTIFACTS_DIR, "atmos_state_tend_$device_suffix.txt"), "w") do io
+    DLM.writedlm(
+        io,
+        hcat(
+            parent(atmos_ρe_tot)[:],
+            parent(atmos_ρq_tot)[:],
+            parent(atmos_ρ)[:],
+            parent(atmos_uₕ)[:],
+            parent(atmos_u₃)[:],
+        ),
+        ',',
+    )
+end;
+
+# Extract land state variables
+land_T = cs.model_sims.land_sim.integrator.u.bucket.T
+land_W = cs.model_sims.land_sim.integrator.u.bucket.W
+land_Ws = cs.model_sims.land_sim.integrator.u.bucket.Ws
+land_σS = cs.model_sims.land_sim.integrator.u.bucket.σS
+
+# Write to text files
+open(joinpath(COUPLER_ARTIFACTS_DIR, "land_state_tend_$device_suffix.txt"), "w") do io
+    DLM.writedlm(io, hcat(parent(land_T)[:], parent(land_W)[:], parent(land_Ws)[:], parent(land_σS)[:]), ',')
+end;
+
+# ocean state
+if cs.mode.name != "amip"
+    ocean_T_sfc = cs.model_sims.ocean_sim.integrator.u.T_sfc
+
+    # Write to text files
+    open(joinpath(COUPLER_ARTIFACTS_DIR, "ocean_state_tend_$device_suffix.txt"), "w") do io
+        DLM.writedlm(io, parent(ocean_T_sfc)[:], ',')
+    end
+end;
+
 #=
 ## Postprocessing
 Currently all postprocessing is performed using the root process only.

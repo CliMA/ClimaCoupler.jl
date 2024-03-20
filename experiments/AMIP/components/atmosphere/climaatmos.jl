@@ -1,6 +1,7 @@
 # atmos_init: for ClimaAtmos pre-AMIP interface
 using StaticArrays
 using Statistics: mean
+using LinearAlgebra: norm
 
 import ClimaAtmos as CA
 import ClimaAtmos: CT1, CT2, CT12, CT3, C3, C12, unit_basis_vector_data, ⊗
@@ -14,7 +15,8 @@ import ClimaCoupler.FluxCalculator:
     calculate_surface_air_density,
     PartitionedStateFluxes,
     extrapolate_ρ_to_sfc,
-    get_surface_params
+    get_surface_params,
+    water_albedo_from_atmosphere!
 import ClimaCoupler.Interfacer: get_field, update_field!, name
 import ClimaCoupler.Checkpointer: get_model_prog_state
 import ClimaCoupler.FieldExchanger: update_sim!, step!, reinit!
@@ -35,6 +37,7 @@ name(::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
 
 function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
+    atmos_config_dict["surface_albedo"] = "CouplerAlbedo"
     atmos_config = CA.AtmosConfig(atmos_config_dict)
     simulation = CA.get_simulation(atmos_config)
     (; integrator) = simulation
@@ -171,10 +174,13 @@ function update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temperature}, c
     sim.integrator.p.radiation.radiation_model.surface_temperature .= CA.RRTMGPI.field2array(csf.T_S)
 end
 
-function update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_albedo}, field)
-    sim.integrator.p.radiation.radiation_model.diffuse_sw_surface_albedo .=
-        reshape(CA.RRTMGPI.field2array(field), 1, length(parent(field)))
+function update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_direct_albedo}, field)
     sim.integrator.p.radiation.radiation_model.direct_sw_surface_albedo .=
+        reshape(CA.RRTMGPI.field2array(field), 1, length(parent(field)))
+end
+
+function update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_diffuse_albedo}, field)
+    sim.integrator.p.radiation.radiation_model.diffuse_sw_surface_albedo .=
         reshape(CA.RRTMGPI.field2array(field), 1, length(parent(field)))
 end
 
@@ -210,7 +216,8 @@ step!(sim::ClimaAtmosSimulation, t) = step!(sim.integrator, t - sim.integrator.t
 reinit!(sim::ClimaAtmosSimulation) = reinit!(sim.integrator)
 
 function update_sim!(atmos_sim::ClimaAtmosSimulation, csf, turbulent_fluxes)
-    update_field!(atmos_sim, Val(:surface_albedo), csf.surface_albedo)
+    update_field!(atmos_sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
+    update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
     update_field!(atmos_sim, Val(:surface_temperature), csf)
 
     if turbulent_fluxes isa PartitionedStateFluxes
@@ -383,4 +390,38 @@ function dss_state!(sim::ClimaAtmosSimulation)
         buffer = ClimaCore.Spaces.create_dss_buffer(field)
         ClimaCore.Spaces.weighted_dss!(field, buffer)
     end
+end
+
+"""
+    water_albedo_from_atmosphere!(atmos_sim::ClimaAtmosSimulation, direct_albedo::ClimaCore.Fields.Field, diffuse_albedo::ClimaCore.Fields.Field)
+
+Extension to calculate the water surface albedo from wind speed and insolation. It can be used for prescribed ocean and lakes.
+"""
+function water_albedo_from_atmosphere!(
+    atmos_sim::ClimaAtmosSimulation,
+    direct_albedo::ClimaCore.Fields.Field,
+    diffuse_albedo::ClimaCore.Fields.Field,
+)
+
+    Y = atmos_sim.integrator.u
+    p = atmos_sim.integrator.p
+    t = atmos_sim.integrator.t
+
+    radiation_model = atmos_sim.integrator.p.radiation.radiation_model
+    FT = eltype(Y)
+    λ = FT(0) # spectral wavelength (not used for now)
+
+    # update for current zenith angle
+    CA.set_insolation_variables!(Y, p, t)
+
+    bottom_coords = ClimaCore.Fields.coordinate_field(ClimaCore.Spaces.level(Y.c, 1))
+    μ = CA.RRTMGPI.array2field(radiation_model.cos_zenith, axes(bottom_coords))
+    FT = eltype(atmos_sim.integrator.u)
+    α_model = CA.RegressionFunctionAlbedo{FT}()
+
+
+    # set the direct and diffuse surface albedos
+    direct_albedo .= CA.surface_albedo_direct(α_model).(λ, μ, norm.(ClimaCore.Fields.level(Y.c.uₕ, 1)))
+    diffuse_albedo .= CA.surface_albedo_diffuse(α_model).(λ, μ, norm.(ClimaCore.Fields.level(Y.c.uₕ, 1)))
+
 end

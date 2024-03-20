@@ -49,7 +49,7 @@ end
     import_combined_surface_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
 
 Updates the coupler with the surface properties. The `Interfacer.get_field` functions for
-(`:surface_temperature`, `:surface_albedo`, `:roughness_momentum`, `:roughness_buoyancy`, `:beta`)
+(`:surface_temperature`, `:surface_direct_albedo`, `:surface_diffuse_albedo`, `:roughness_momentum`, `:roughness_buoyancy`, `:beta`)
 need to be specified for each surface model.
 
 # Arguments
@@ -67,8 +67,11 @@ function import_combined_surface_fields!(csf, model_sims, boundary_space, turbul
     Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_temperature))
     Regridder.dummmy_remap!(csf.T_S, combined_field)
 
-    Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_albedo))
-    Regridder.dummmy_remap!(csf.surface_albedo, combined_field)
+    Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_direct_albedo))
+    Regridder.dummmy_remap!(csf.surface_direct_albedo, combined_field)
+
+    Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_diffuse_albedo))
+    Regridder.dummmy_remap!(csf.surface_diffuse_albedo, combined_field)
 
     if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
         Regridder.combine_surfaces!(combined_field, model_sims, Val(:roughness_momentum))
@@ -97,7 +100,8 @@ Updates the surface fields for temperature, roughness length, albedo, and specif
 """
 function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf, turbulent_fluxes)
 
-    Interfacer.update_field!(atmos_sim, Val(:surface_albedo), csf.surface_albedo)
+    Interfacer.update_field!(atmos_sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
+    Interfacer.update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
     Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf.T_S)
 
     if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes

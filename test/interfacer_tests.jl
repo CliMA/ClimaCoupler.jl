@@ -82,7 +82,8 @@ for FT in (Float32, Float64)
         stub = SurfaceStub((;
             area_fraction = FT(1),
             T_sfc = FT(280),
-            α = 3,
+            α_direct = 3,
+            α_diffuse = 3,
             z0m = 4,
             z0b = 5,
             beta = 6,
@@ -92,23 +93,37 @@ for FT in (Float32, Float64)
         ))
         @test get_field(stub, Val(:area_fraction)) == FT(1)
         @test get_field(stub, Val(:surface_temperature)) == FT(280)
-        @test get_field(stub, Val(:surface_albedo)) == 3
+        @test get_field(stub, Val(:surface_direct_albedo)) == 3
+        @test get_field(stub, Val(:surface_diffuse_albedo)) == 3
         @test get_field(stub, Val(:roughness_momentum)) == 4
         @test get_field(stub, Val(:roughness_buoyancy)) == 5
         @test get_field(stub, Val(:beta)) == 6
+        @test get_field(stub, Val(:air_density)) == FT(1)
         @test ≈(get_field(stub, Val(:surface_humidity))[1], FT(0.0076), atol = FT(1e-4))
     end
 
     @testset "update_field! the SurfaceStub area_fraction for FT=$FT" begin
         boundary_space = TestHelper.create_space(FT)
 
-        stub = SurfaceStub((; area_fraction = zeros(boundary_space), T_sfc = zeros(boundary_space)))
+        stub = SurfaceStub((;
+            area_fraction = zeros(boundary_space),
+            T_sfc = zeros(boundary_space),
+            α_direct = zeros(boundary_space),
+            α_diffuse = zeros(boundary_space),
+            z0m = zeros(boundary_space),
+            z0b = zeros(boundary_space),
+            beta = zeros(boundary_space),
+        ))
 
         update_field!(stub, Val(:area_fraction), ones(boundary_space))
         update_field!(stub, Val(:surface_temperature), ones(boundary_space) .* 2)
+        update_field!(stub, Val(:surface_direct_albedo), ones(boundary_space) .* 3)
+        update_field!(stub, Val(:surface_diffuse_albedo), ones(boundary_space) .* 4)
 
         @test parent(get_field(stub, Val(:area_fraction)))[1] == FT(1)
         @test parent(get_field(stub, Val(:surface_temperature)))[1] == FT(2)
+        @test parent(get_field(stub, Val(:surface_direct_albedo)))[1] == FT(3)
+        @test parent(get_field(stub, Val(:surface_diffuse_albedo)))[1] == FT(4)
     end
 end
 
@@ -137,7 +152,8 @@ end
         :beta,
         :roughness_buoyancy,
         :roughness_momentum,
-        :surface_albedo,
+        :surface_direct_albedo,
+        :surface_diffuse_albedo,
         :surface_humidity,
         :surface_temperature,
     )
@@ -205,7 +221,7 @@ end
     sim = DummySimulation4(space)
 
     # Test that update_field! gives correct warnings for unextended fields
-    for value in (:co2, :surface_albedo, :surface_temperature, :turbulent_fluxes)
+    for value in (:co2, :surface_direct_albedo, :surface_diffuse_albedo, :surface_temperature, :turbulent_fluxes)
         val = Val(value)
         @test_logs (
             :warn,

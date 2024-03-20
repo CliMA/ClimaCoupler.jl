@@ -1,6 +1,6 @@
 
 using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput, Geometry
-using ClimaCoupler: Utilities, Regridder, TestHelper
+using ClimaCoupler: Utilities, Regridder, TestHelper, Interfacer
 using Test
 import ClimaCoupler.FluxCalculator:
     atmos_turbulent_fluxes!,
@@ -17,16 +17,15 @@ import ClimaCoupler.FluxCalculator:
     surface_inputs,
     get_surface_fluxes_point!,
     get_scheme_properties,
-    surface_thermo_state
+    surface_thermo_state,
+    water_albedo_from_atmosphere!
 import ClimaCoupler: Interfacer
-
 import ClimaParams as CP
 import Thermodynamics as TD
 import Thermodynamics.Parameters.ThermodynamicsParameters
 import SurfaceFluxes as SF
 import SurfaceFluxes.Parameters.SurfaceFluxesParameters
 import SurfaceFluxes.UniversalFunctions as UF
-
 using StaticArrays
 
 # simple generic atmos model
@@ -50,6 +49,8 @@ struct TestAtmos{P, Y, D, I} <: Interfacer.AtmosModelSimulation
     domain::D
     integrator::I
 end
+struct TestAtmos2 <: Interfacer.AtmosModelSimulation end
+name(sim::TestAtmos2) = "TestAtmos2"
 
 Interfacer.get_field(sim::TestAtmos, ::Val{:height_int}) = sim.integrator.p.z
 Interfacer.get_field(sim::TestAtmos, ::Val{:height_sfc}) = sim.integrator.p.z_sfc
@@ -96,7 +97,8 @@ Interfacer.get_field(sim::TestOcean, ::Val{:beta}) = sim.integrator.p.beta
 Interfacer.get_field(sim::TestOcean, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 Interfacer.get_field(sim::TestOcean, ::Val{:heat_transfer_coefficient}) = sim.integrator.p.Ch
 Interfacer.get_field(sim::TestOcean, ::Val{:drag_coefficient}) = sim.integrator.p.Cd
-Interfacer.get_field(sim::TestOcean, ::Val{:surface_albedo}) = sim.integrator.p.α
+Interfacer.get_field(sim::TestOcean, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) =
+    sim.integrator.p.α
 
 function surface_thermo_state(
     sim::TestOcean,
@@ -143,6 +145,10 @@ function surface_thermo_state(
     @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
 end
 
+function water_albedo_from_atmosphere!(::TestAtmos, temp1::Fields.Field, temp2::Fields.Field)
+    temp1 .*= 2
+    temp2 .*= 3
+end
 
 for FT in (Float32, Float64)
     @testset "combined_turbulent_fluxes! for FT=$FT" begin
@@ -220,7 +226,8 @@ for FT in (Float32, Float64)
 
             coupler_cache_names = (
                 :T_S,
-                :surface_albedo,
+                :surface_direct_albedo,
+                :surface_diffuse_albedo,
                 :F_R_sfc,
                 :F_R_toa,
                 :P_liq,
@@ -321,5 +328,40 @@ for FT in (Float32, Float64)
         colidx = Fields.ColumnIndex{2}((1, 1), 73) # arbitrary index
         @test surface_thermo_state(surface_sim, thermo_params, thermo_state_int[colidx], colidx).ρ ==
               thermo_state_int[colidx].ρ
+    end
+
+    @testset "water_albedo_from_atmosphere!" begin
+        boundary_space = TestHelper.create_space(FT)
+        ocean_sim = Interfacer.SurfaceStub((; α_direct = zeros(boundary_space), α_diffuse = zeros(boundary_space)))
+        atmos_sim = TestAtmos(1, 2, 3, 4)
+        coupler_fields = (; temp1 = ones(boundary_space), temp2 = ones(boundary_space))
+        model_sims = (; atmos_sim, ocean_sim)
+        cs = Interfacer.CoupledSimulation{FT}(
+            nothing, # comms_ctx
+            nothing, # dates
+            nothing, # boundary_space
+            coupler_fields, # fields
+            nothing, # parsed_args
+            nothing, # conservation_checks
+            (Int(0), Int(1)), # tspan
+            0, # t
+            0, # Δt_cpl
+            (;), # surface_masks
+            model_sims, # model_sims
+            (;), # mode
+            (), # diagnostics
+            (;), # callbacks
+            (;), # dirs
+            nothing, # turbulent_fluxes
+            nothing, # thermo_params
+        )
+        water_albedo_from_atmosphere!(cs, nothing)
+        @test sum(parent(cs.model_sims.ocean_sim.cache.α_direct) .- parent(ones(boundary_space)) .* 2) == 0
+        @test sum(parent(cs.model_sims.ocean_sim.cache.α_diffuse) .- parent(ones(boundary_space)) .* 3) == 0
+
+        atmos_sim2 = TestAtmos2()
+        @test_throws ErrorException(
+            "this function is required to be dispatched on" * Interfacer.name(atmos_sim2) * ", but no method defined",
+        ) water_albedo_from_atmosphere!(atmos_sim2, ones(boundary_space), ones(boundary_space))
     end
 end

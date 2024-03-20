@@ -145,7 +145,9 @@ get_field(sim::BucketSimulation, ::Val{:beta}) =
     ClimaLand.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
 get_field(sim::BucketSimulation, ::Val{:roughness_buoyancy}) = sim.model.parameters.z_0b
 get_field(sim::BucketSimulation, ::Val{:roughness_momentum}) = sim.model.parameters.z_0m
-get_field(sim::BucketSimulation, ::Val{:surface_albedo}) =
+get_field(sim::BucketSimulation, ::Val{:surface_direct_albedo}) =
+    ClimaLand.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
+get_field(sim::BucketSimulation, ::Val{:surface_diffuse_albedo}) =
     ClimaLand.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 get_field(sim::BucketSimulation, ::Val{:surface_humidity}) =
     ClimaLand.surface_specific_humidity(sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)

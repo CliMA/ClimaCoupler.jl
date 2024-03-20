@@ -55,6 +55,8 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
         ne = get_ne(space.grid)
         polynomial_degree = ClimaCore.Quadratures.polynomial_degree(ClimaCore.Spaces.quadrature_style(space.grid))
         nz = ClimaCore.Spaces.nlevels(space)
+        height = get_height(space.grid)
+
         cpu_space = TestHelper.create_space(
             FT,
             comms_ctx = cpu_comms_ctx,
@@ -62,14 +64,14 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
             ne = ne,
             polynomial_degree = polynomial_degree,
             nz = nz,
+            height = height,
         )
         cpu_field = ClimaCore.Fields.ones(cpu_space)
 
-        @show typeof(parent(field))
         parent(cpu_field) .= Array(parent(field))
         # Check what we're doing is correct on CPU
-        if comms_ctx isa ClimaComms.SingletonCommsContext
-            if cpu_field != field
+        if comms_ctx.device isa ClimaComms.AbstractCPUDevice
+            if !(cpu_field ≈ field)
                 @show field
                 @show cpu_field
             end
@@ -99,8 +101,8 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
             parent(cpu_field) .= parent(field)
 
             # Check what we're doing is correct on CPU
-            if comms_ctx isa ClimaComms.SingletonCommsContext
-                if cpu_field != field
+            if comms_ctx.device isa ClimaComms.AbstractCPUDevice
+                if !(cpu_field ≈ field)
                     @show field
                     @show cpu_field
                 end
@@ -128,9 +130,13 @@ end
 function get_ne(grid::ClimaCore.Grids.ExtrudedFiniteDifferenceGrid)
     return get_ne(grid.horizontal_grid)
 end
-# function get_ne(space)
-#     return get_ne(ClimaCore.Spaces.horizontal_space(space).grid)
-# end
+
+function get_height(grid::ClimaCore.Grids.ExtrudedFiniteDifferenceGrid)
+    return grid.vertical_grid.topology.mesh.domain.coord_max.z
+end
+function get_height(grid)
+    return nothing # 2d case
+end
 
 function get_R(grid)#::ClimaCore.Grids.SpectralElementGrid2D)
     return ClimaCore.Grids.global_geometry(grid).radius
@@ -156,6 +162,7 @@ function debug(sim::ComponentModelSimulation, dir)
         ne = get_ne(space.grid)
         polynomial_degree = ClimaCore.Quadratures.polynomial_degree(ClimaCore.Spaces.quadrature_style(space.grid))
         nz = ClimaCore.Spaces.nlevels(space)
+        height = get_height(space.grid)
         cpu_space = TestHelper.create_space(
             FT,
             comms_ctx = cpu_comms_ctx,
@@ -163,6 +170,7 @@ function debug(sim::ComponentModelSimulation, dir)
             ne = ne,
             polynomial_degree = polynomial_degree,
             nz = nz,
+            height = height,
         )
         cpu_field = ClimaCore.Fields.ones(cpu_space)
         parent(cpu_field) .= Array(parent(field))

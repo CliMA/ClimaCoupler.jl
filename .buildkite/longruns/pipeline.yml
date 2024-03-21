@@ -431,9 +431,12 @@ steps:
         key: "amip_diagedmf"
         command: "srun julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $MODEL_CONFIG_PATH/amip_diagedmf.yml"
         artifact_paths: "experiments/AMIP/output/amip/amip_diagedmf_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks_per_node: 1
-          slurm_nodes: 1
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
           slurm_mem_per_cpu: 16G
 
       # Note: These config files live in the ClimaAtmos repository
@@ -449,7 +452,10 @@ steps:
         key: "aquaplanet_diagedmf"
         command: "srun julia --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $ATMOS_CONFIG_PATH/aquaplanet_diagedmf.yml"
         artifact_paths: "experiments/AMIP/output/aquaplanet_diagedmf/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks_per_node: 1
-          slurm_nodes: 1
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
           slurm_mem_per_cpu: 16G

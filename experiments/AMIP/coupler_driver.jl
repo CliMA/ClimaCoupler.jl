@@ -32,8 +32,8 @@ using CUDA
     show_memory_usage(comms_ctx, objects)
 Display the current memory footprint of the simulation, using an appropriate
 method based on the device being used.
-In the GPU case, show the memory usage of the GPU.
-In the CPU case, show the memory footprint of the provided object(s).
+In the GPU case, show and return the memory usage of the GPU.
+In the CPU case, show and return the memory footprint of the provided object(s) in GB.
 Note that these two cases provide different information, and should not be
 directly compared.
 # Arguments
@@ -42,15 +42,21 @@ directly compared.
 """
 function show_memory_usage(comms_ctx, objects)
     if comms_ctx.device isa ClimaComms.CUDADevice
-        @info "Memory usage: $(CUDA.memory_status())"
+        mem_status = CUDA.memory_status()
+        @info "Memory usage: $mem_status"
+        return mem_status
     elseif comms_ctx.device isa ClimaComms.AbstractCPUDevice
         if ClimaComms.iamroot(comms_ctx)
+            cumul_size = 0
             for (obj, name) in objects
-                @info "Memory footprint of `$(name)` in bytes: $(Base.summarysize(obj))"
+                cumul_size += Base.summarysize(obj)
+                @info "Memory footprint of `$(name)` in GB: $(Base.summarysize(obj) / 1e9)"
             end
+            return cumul_size / 1e9
         end
     else
         @warn "Invalid device type $device; cannot show memory usage."
+        return nothing
     end
 end
 
@@ -816,11 +822,21 @@ end #hide
 
 ## run the coupled simulation
 walltime = solve_coupler!(cs);
-show_memory_usage(comms_ctx, Dict(cs => "cs"))
 
-## Use ClimaAtmos calculation to show the simulated years per day of the simulation
+## Use ClimaAtmos calculation to show the simulated years per day of the simulation (SYPD)
 es = CA.EfficiencyStats(tspan, walltime)
-@info "SYPD: $(CA.simulated_years_per_day(es))"
+sypd = CA.simulated_years_per_day(es)
+@info "SYPD: $sypd"
+
+## Save the SYPD and allocation information
+if ClimaComms.iamroot(comms_ctx)
+    sypd_filename = joinpath(COUPLER_ARTIFACTS_DIR, "SYPD.txt")
+    save_as_txt(sypd, sypd_filename)
+
+    allocs = show_memory_usage(comms_ctx, Dict(cs => "cs"))
+    allocs_filename = joinpath(COUPLER_ARTIFACTS_DIR, "allocations.txt")
+    save_as_txt(allocs, allocs_filename)
+end
 
 #=
 ## Postprocessing

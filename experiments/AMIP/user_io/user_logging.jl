@@ -1,4 +1,5 @@
 using ClimaCoupler.Checkpointer: checkpoint_model_state
+import DelimitedFiles as DLM
 
 """
     Base.show(io::IO, dict::Dict)
@@ -8,6 +9,18 @@ This prints the keys and values of a Dict in sorted order.
 function Base.show(io::IO, dict::Dict)
     for k in sort!(collect(keys(dict)))
         println(io, " $k => $(dict[k])")
+    end
+end
+
+"""
+    save_as_txt(var, filename::String)
+
+Save the input variable to a text file at `filename` using DelimitedFiles.jl.
+`filename` should end in `.txt`.
+"""
+function save_as_txt(var, filename::String)
+    open(filename, "w") do io
+        DLM.writedlm(io, var, ',')
     end
 end
 

@@ -770,18 +770,16 @@ atmos_uₕ = cs.model_sims.atmos_sim.integrator.u.c.uₕ
 atmos_u₃ = cs.model_sims.atmos_sim.integrator.u.f.u₃
 
 # Write to text files
-open(joinpath(COUPLER_ARTIFACTS_DIR, "atmos_state_tend_$device_suffix.txt"), "w") do io
+open(joinpath(COUPLER_ARTIFACTS_DIR, "atmos_state_center_tend_$device_suffix.txt"), "w") do io
     DLM.writedlm(
         io,
-        hcat(
-            parent(atmos_ρe_tot)[:],
-            parent(atmos_ρq_tot)[:],
-            parent(atmos_ρ)[:],
-            parent(atmos_uₕ)[:],
-            parent(atmos_u₃)[:],
-        ),
+        hcat(parent(atmos_ρe_tot)[:], parent(atmos_ρq_tot)[:], parent(atmos_ρ)[:], parent(atmos_uₕ)[:]),
         ',',
     )
+end;
+
+open(joinpath(COUPLER_ARTIFACTS_DIR, "atmos_state_face_tend_$device_suffix.txt"), "w") do io
+    DLM.writedlm(io, parent(atmos_u₃)[:], ',')
 end;
 
 # Extract land state variables
@@ -791,8 +789,11 @@ land_Ws = cs.model_sims.land_sim.integrator.u.bucket.Ws
 land_σS = cs.model_sims.land_sim.integrator.u.bucket.σS
 
 # Write to text files
-open(joinpath(COUPLER_ARTIFACTS_DIR, "land_state_tend_$device_suffix.txt"), "w") do io
-    DLM.writedlm(io, hcat(parent(land_T)[:], parent(land_W)[:], parent(land_Ws)[:], parent(land_σS)[:]), ',')
+open(joinpath(COUPLER_ARTIFACTS_DIR, "land_state_3d_tend_$device_suffix.txt"), "w") do io
+    DLM.writedlm(io, parent(land_T)[:], ',')
+end;
+open(joinpath(COUPLER_ARTIFACTS_DIR, "land_state_2d_tend_$device_suffix.txt"), "w") do io
+    DLM.writedlm(io, hcat(parent(land_W)[:], parent(land_Ws)[:], parent(land_σS)[:]), ',')
 end;
 
 # ocean state

@@ -53,23 +53,40 @@ gpu_artifacts_dir = joinpath(output_dir, joinpath(mode_name, gpu_run_name)) * "_
 
 
 # Read in and compare atmos state variables
-cpu_atmos_state = DLM.readdlm(joinpath(cpu_artifacts_dir, "atmos_state_tend_cpu.txt"), ',')
-gpu_atmos_state = DLM.readdlm(joinpath(gpu_artifacts_dir, "atmos_state_tend_gpu.txt"), ',')
+cpu_atmos_state_center = DLM.readdlm(joinpath(cpu_artifacts_dir, "atmos_state_center_tend_cpu.txt"), ',')
+gpu_atmos_state_center = DLM.readdlm(joinpath(gpu_artifacts_dir, "atmos_state_center_tend_gpu.txt"), ',')
 
-@show abs(maximum(cpu_atmos_state .- gpu_atmos_state))
-@show abs(median(cpu_atmos_state .- gpu_atmos_state))
-@show abs(mean(cpu_atmos_state .- gpu_atmos_state))
-@assert isapprox(cpu_atmos_state, gpu_atmos_state)
+@show abs(maximum(cpu_atmos_state_center .- gpu_atmos_state_center))
+@show abs(median(cpu_atmos_state_center .- gpu_atmos_state_center))
+@show abs(mean(cpu_atmos_state_center .- gpu_atmos_state_center))
+@assert isapprox(cpu_atmos_state_center, gpu_atmos_state_center)
+
+cpu_atmos_state_face = DLM.readdlm(joinpath(cpu_artifacts_dir, "atmos_state_face_tend_cpu.txt"), ',')
+gpu_atmos_state_face = DLM.readdlm(joinpath(gpu_artifacts_dir, "atmos_state_face_tend_gpu.txt"), ',')
+
+@show abs(maximum(cpu_atmos_state_face .- gpu_atmos_state_face))
+@show abs(median(cpu_atmos_state_face .- gpu_atmos_state_face))
+@show abs(mean(cpu_atmos_state_face .- gpu_atmos_state_face))
+@assert isapprox(cpu_atmos_state_face, gpu_atmos_state_face)
 
 
 # Read in and compare land state variables
-cpu_land_state = DLM.readdlm(joinpath(cpu_artifacts_dir, "land_state_tend_cpu.txt"), ',')
-gpu_land_state = DLM.readdlm(joinpath(gpu_artifacts_dir, "land_state_tend_gpu.txt"), ',')
+cpu_land_state_3d = DLM.readdlm(joinpath(cpu_artifacts_dir, "land_state_3d_tend_cpu.txt"), ',')
+gpu_land_state_3d = DLM.readdlm(joinpath(gpu_artifacts_dir, "land_state_3d_tend_gpu.txt"), ',')
 
-@show abs(maximum(cpu_land_state .- gpu_land_state))
-@show abs(median(cpu_land_state .- gpu_land_state))
-@show abs(mean(cpu_land_state .- gpu_land_state))
-@assert isapprox(cpu_land_state, gpu_land_state)
+@show abs(maximum(cpu_land_state_3d .- gpu_land_state_3d))
+@show abs(median(cpu_land_state_3d .- gpu_land_state_3d))
+@show abs(mean(cpu_land_state_3d .- gpu_land_state_3d))
+@assert isapprox(cpu_land_state_3d, gpu_land_state_3d)
+
+cpu_land_state_2d = DLM.readdlm(joinpath(cpu_artifacts_dir, "land_state_2d_tend_cpu.txt"), ',')
+gpu_land_state_2d = DLM.readdlm(joinpath(gpu_artifacts_dir, "land_state_2d_tend_gpu.txt"), ',')
+
+@show abs(maximum(cpu_land_state_2d .- gpu_land_state_2d))
+@show abs(median(cpu_land_state_2d .- gpu_land_state_2d))
+@show abs(mean(cpu_land_state_2d .- gpu_land_state_2d))
+@assert isapprox(cpu_land_state_2d, gpu_land_state_2d)
+
 
 # Read in ocean state variables (if not AMIP)
 if !(mode_name == "amip")

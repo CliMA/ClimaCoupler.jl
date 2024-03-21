@@ -3,7 +3,7 @@ alpha_rayleigh_w: 10
 apply_limiter: false
 dt: "150secs"
 dt_cpl: 150
-dt_rad: "1hours"
+dt_rad: "2days"
 dt_save_to_sol: "1days"
 dz_bottom: 30
 dz_top: 3000

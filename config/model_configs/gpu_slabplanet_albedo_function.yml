@@ -2,6 +2,7 @@ apply_limiter: false
 conservation_softfail: true
 dt: "200secs"
 dt_cpl: 200
+dt_rad: "2days"
 dt_save_to_sol: "3600secs"
 energy_check: true
 h_elem: 4

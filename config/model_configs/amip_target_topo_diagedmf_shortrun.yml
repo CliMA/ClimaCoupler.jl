@@ -5,7 +5,7 @@ atmos_config_file: "config/longrun_configs/longrun_aquaplanet_rhoe_equil_55km_nz
 dt: "100secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: 100
-dt_rad: "1hours"
+dt_rad: "2days"
 dt_save_state_to_disk: "1days"
 dt_save_to_sol: "1days"
 energy_check: false

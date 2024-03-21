@@ -771,42 +771,48 @@ atmos_ρ = cs.model_sims.atmos_sim.integrator.u.c.ρ
 atmos_uₕ = cs.model_sims.atmos_sim.integrator.u.c.uₕ
 atmos_u₃ = cs.model_sims.atmos_sim.integrator.u.f.u₃
 
-# # Write to text files
-# open(joinpath(COUPLER_ARTIFACTS_DIR, "atmos_state_center_tend_$device_suffix.txt"), "w") do io
-#     DLM.writedlm(
-#         io,
-#         hcat(parent(atmos_ρe_tot)[:], parent(atmos_ρq_tot)[:], parent(atmos_ρ)[:], parent(atmos_uₕ)[:]),
-#         ',',
-#     )
-# end;
+# Write to text files
+open(joinpath(COUPLER_ARTIFACTS_DIR, "atmos_state_center_tend_$device_suffix.txt"), "w") do io
+    DLM.writedlm(
+        io,
+        hcat(
+            Array(parent(atmos_ρe_tot))[:],
+            Array(parent(atmos_ρq_tot))[:],
+            Array(parent(atmos_ρ))[:],
+            Array(parent(atmos_uₕ.components))[:, :, :, 1, :][:],
+            Array(parent(atmos_uₕ.components))[:, :, :, 2, :][:],
+        ),
+        ',',
+    )
+end;
 
-# open(joinpath(COUPLER_ARTIFACTS_DIR, "atmos_state_face_tend_$device_suffix.txt"), "w") do io
-#     DLM.writedlm(io, parent(atmos_u₃)[:], ',')
-# end;
+open(joinpath(COUPLER_ARTIFACTS_DIR, "atmos_state_face_tend_$device_suffix.txt"), "w") do io
+    DLM.writedlm(io, Array(parent(atmos_u₃))[:], ',')
+end;
 
-# # Extract land state variables
-# land_T = cs.model_sims.land_sim.integrator.u.bucket.T
-# land_W = cs.model_sims.land_sim.integrator.u.bucket.W
-# land_Ws = cs.model_sims.land_sim.integrator.u.bucket.Ws
-# land_σS = cs.model_sims.land_sim.integrator.u.bucket.σS
+# Extract land state variables
+land_T = cs.model_sims.land_sim.integrator.u.bucket.T
+land_W = cs.model_sims.land_sim.integrator.u.bucket.W
+land_Ws = cs.model_sims.land_sim.integrator.u.bucket.Ws
+land_σS = cs.model_sims.land_sim.integrator.u.bucket.σS
 
-# # Write to text files
-# open(joinpath(COUPLER_ARTIFACTS_DIR, "land_state_3d_tend_$device_suffix.txt"), "w") do io
-#     DLM.writedlm(io, parent(land_T)[:], ',')
-# end;
-# open(joinpath(COUPLER_ARTIFACTS_DIR, "land_state_2d_tend_$device_suffix.txt"), "w") do io
-#     DLM.writedlm(io, hcat(parent(land_W)[:], parent(land_Ws)[:], parent(land_σS)[:]), ',')
-# end;
+# Write to text files
+open(joinpath(COUPLER_ARTIFACTS_DIR, "land_state_3d_tend_$device_suffix.txt"), "w") do io
+    DLM.writedlm(io, Array(parent(land_T))[:], ',')
+end;
+open(joinpath(COUPLER_ARTIFACTS_DIR, "land_state_2d_tend_$device_suffix.txt"), "w") do io
+    DLM.writedlm(io, hcat(Array(parent(land_W))[:], Array(parent(land_Ws))[:], Array(parent(land_σS))[:]), ',')
+end;
 
-# # ocean state
-# if cs.mode.name != "amip"
-#     ocean_T_sfc = cs.model_sims.ocean_sim.integrator.u.T_sfc
+# ocean state
+if cs.mode.name != "amip"
+    ocean_T_sfc = cs.model_sims.ocean_sim.integrator.u.T_sfc
 
-#     # Write to text files
-#     open(joinpath(COUPLER_ARTIFACTS_DIR, "ocean_state_tend_$device_suffix.txt"), "w") do io
-#         DLM.writedlm(io, parent(ocean_T_sfc)[:], ',')
-#     end
-# end;
+    # Write to text files
+    open(joinpath(COUPLER_ARTIFACTS_DIR, "ocean_state_tend_$device_suffix.txt"), "w") do io
+        DLM.writedlm(io, Array(parent(ocean_T_sfc))[:], ',')
+    end
+end;
 
 #=
 ## Postprocessing

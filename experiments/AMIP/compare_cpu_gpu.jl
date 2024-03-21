@@ -27,7 +27,7 @@ function argparse_settings()
 end
 
 # Read in CPU and GPU run name info from command line
-parsed_args = parse_commandline(argparse_settings())
+parsed_args = ArgParse.parse_args(ARGS, argparse_settings())
 cpu_run_name = parsed_args["cpu_run_name"]
 gpu_run_name = parsed_args["gpu_run_name"]
 if isnothing(cpu_run_name) && isnothing(gpu_run_name)

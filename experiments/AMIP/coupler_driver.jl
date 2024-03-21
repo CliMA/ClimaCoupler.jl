@@ -664,6 +664,8 @@ function solve_coupler!(cs)
     walltime = @elapsed for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
         cs.dates.date[1] = current_date(cs, t) # if not global, `date` is not updated.
 
+        debug(cs, debug_dir * "/9_coupler_loop_$t")
+
         ## print date on the first of month
         if cs.dates.date[1] >= cs.dates.date1[1]
             ClimaComms.iamroot(comms_ctx) ? @show(cs.dates.date[1]) : nothing

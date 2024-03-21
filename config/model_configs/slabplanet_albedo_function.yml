@@ -13,5 +13,5 @@ mono_surface: true
 precip_model: "0M"
 rad: "gray"
 run_name: "slabplanet_albedo_function"
-t_end: "1days"
+t_end: "400secs"
 vert_diff: "true"

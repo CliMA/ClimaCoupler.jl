@@ -463,56 +463,56 @@ steps:
 
       - wait
 
-  # - group: "CPU/GPU comparisons"
-  #   steps:
-  #     - label: "Compare Slabplanet: albedo from function"
-  #       key: "compare_slabplanet_albedo_function"
-  #       command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/compare_cpu_gpu.jl --cpu_run_name slabplanet_albedo_function --mode_name slabplanet"
-  #       depends_on:
-  #         - "slabplanet_albedo_function"
-  #         - "gpu_slabplanet_albedo_function"
+  - group: "CPU/GPU comparisons"
+    steps:
+      - label: "Compare Slabplanet: albedo from function"
+        key: "compare_slabplanet_albedo_function"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/compare_cpu_gpu.jl --cpu_run_name slabplanet_albedo_function --mode_name slabplanet"
+        depends_on:
+          - "slabplanet_albedo_function"
+          - "gpu_slabplanet_albedo_function"
 
-  #     - label: "Compare Slabplanet: albedo from static map"
-  #       key: "compare_slabplanet_albedo_static_map"
-  #       command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/compare_cpu_gpu.jl --cpu_run_name slabplanet_albedo_static_map --mode_name slabplanet"
-  #       depends_on:
-  #         - "slabplanet_albedo_static_map"
-  #         - "gpu_slabplanet_albedo_static_map"
+      - label: "Compare Slabplanet: albedo from static map"
+        key: "compare_slabplanet_albedo_static_map"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/compare_cpu_gpu.jl --cpu_run_name slabplanet_albedo_static_map --mode_name slabplanet"
+        depends_on:
+          - "slabplanet_albedo_static_map"
+          - "gpu_slabplanet_albedo_static_map"
 
-  #     - label: "Compare Slabplanet: albedo from temporal map"
-  #       key: "compare_slabplanet_albedo_temporal_map"
-  #       command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/compare_cpu_gpu.jl --cpu_run_name slabplanet_albedo_temporal_map --mode_name slabplanet"
-  #       depends_on:
-  #         - "slabplanet_albedo_temporal_map"
-  #         - "gpu_slabplanet_albedo_temporal_map"
+      - label: "Compare Slabplanet: albedo from temporal map"
+        key: "compare_slabplanet_albedo_temporal_map"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/compare_cpu_gpu.jl --cpu_run_name slabplanet_albedo_temporal_map --mode_name slabplanet"
+        depends_on:
+          - "slabplanet_albedo_temporal_map"
+          - "gpu_slabplanet_albedo_temporal_map"
 
-  #     - label: "Compare AMIP: albedo from function"
-  #       key: "compare_amip_albedo_function"
-  #       command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/compare_cpu_gpu.jl --cpu_run_name amip_albedo_function --mode_name amip"
-  #       depends_on:
-  #         - "amip_albedo_function"
-  #         - "gpu_amip_albedo_function"
+      - label: "Compare AMIP: albedo from function"
+        key: "compare_amip_albedo_function"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/compare_cpu_gpu.jl --cpu_run_name amip_albedo_function --mode_name amip"
+        depends_on:
+          - "amip_albedo_function"
+          - "gpu_amip_albedo_function"
 
-  #     - label: "Compare AMIP: albedo from static map"
-  #       key: "compare_amip_albedo_static_map"
-  #       command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/compare_cpu_gpu.jl --cpu_run_name amip_albedo_static_map --mode_name amip"
-  #       depends_on:
-  #         - "amip_albedo_static_map"
-  #         - "gpu_amip_albedo_static_map"
+      - label: "Compare AMIP: albedo from static map"
+        key: "compare_amip_albedo_static_map"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/compare_cpu_gpu.jl --cpu_run_name amip_albedo_static_map --mode_name amip"
+        depends_on:
+          - "amip_albedo_static_map"
+          - "gpu_amip_albedo_static_map"
 
-  #     - label: "Compare AMIP: albedo from temporal map"
-  #       key: "compare_amip_albedo_temporal_map"
-  #       command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/compare_cpu_gpu.jl --cpu_run_name amip_albedo_temporal_map --mode_name amip"
-  #       depends_on:
-  #         - "amip_albedo_temporal_map"
-  #         - "gpu_amip_albedo_temporal_map"
+      - label: "Compare AMIP: albedo from temporal map"
+        key: "compare_amip_albedo_temporal_map"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/compare_cpu_gpu.jl --cpu_run_name amip_albedo_temporal_map --mode_name amip"
+        depends_on:
+          - "amip_albedo_temporal_map"
+          - "gpu_amip_albedo_temporal_map"
 
-  #     - label: "Compare AMIP target: topography and diagnostic EDMF"
-  #       key: "compare_amip_target_topo_diagedmf_shortrun"
-  #       command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/compare_cpu_gpu.jl --cpu_run_name amip_target_topo_diagedmf_shortrun --mode_name amip"
-  #       depends_on:
-  #         - "amip_target_topo_diagedmf_shortrun"
-  #         - "gpu_amip_target_topo_diagedmf_shortrun"
+      - label: "Compare AMIP target: topography and diagnostic EDMF"
+        key: "compare_amip_target_topo_diagedmf_shortrun"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/compare_cpu_gpu.jl --cpu_run_name amip_target_topo_diagedmf_shortrun --mode_name amip"
+        depends_on:
+          - "amip_target_topo_diagedmf_shortrun"
+          - "gpu_amip_target_topo_diagedmf_shortrun"
 
   - wait
 

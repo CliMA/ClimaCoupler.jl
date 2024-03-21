@@ -16,7 +16,7 @@ precip_model: "0M"
 rad: "gray"
 rayleigh_sponge: true
 run_name: "gpu_amip_albedo_temporal_map"
-t_end: "1days"
+t_end: "400secs"
 vert_diff: "true"
 z_elem: 50
 z_stretch: false

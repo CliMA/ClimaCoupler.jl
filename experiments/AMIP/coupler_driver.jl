@@ -124,10 +124,10 @@ run_name = config_dict["run_name"]
 energy_check = config_dict["energy_check"]
 const FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim_name = "bucket"
-# t_end = Float64(time_to_seconds(config_dict["t_end"]))
+t_end = Float64(time_to_seconds(config_dict["t_end"]))
 t_start = 0.0
 Δt_cpl = Float64(config_dict["dt_cpl"])
-t_end = Δt_cpl
+# t_end = Δt_cpl
 tspan = (t_start, t_end)
 saveat = Float64(time_to_seconds(config_dict["dt_save_to_sol"]))
 date0 = date = DateTime(config_dict["start_date"], dateformat"yyyymmdd")

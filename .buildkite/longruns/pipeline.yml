@@ -45,8 +45,8 @@ steps:
       JULIA_NUM_PRECOMPILE_TASKS: 8
       JULIA_MAX_NUM_PRECOMPILE_FILES: 50
 
-    concurrency: 1
-    concurrency_group: 'depot/climacoupler-longruns'
+    # concurrency: 1
+    # concurrency_group: 'depot/climacoupler-longruns'
 
   - wait
 

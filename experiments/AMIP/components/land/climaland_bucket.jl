@@ -207,7 +207,7 @@ function update_field!(sim::BucketSimulation, ::Val{:turbulent_moisture_flux}, f
 end
 
 # extensions required by FieldExchanger
-step!(sim::BucketSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
+NVTX.@annotate step!(sim::BucketSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
 reinit!(sim::BucketSimulation) = reinit!(sim.integrator)
 
 # extensions required by FluxCalculator (partitioned fluxes)

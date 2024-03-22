@@ -206,7 +206,7 @@ function update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fluxes}, fiel
 end
 
 # extensions required by FieldExchanger
-step!(sim::ClimaAtmosSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
+NVTX.@annotate step!(sim::ClimaAtmosSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
 reinit!(sim::ClimaAtmosSimulation) = reinit!(sim.integrator)
 
 function update_sim!(atmos_sim::ClimaAtmosSimulation, csf, turbulent_fluxes)

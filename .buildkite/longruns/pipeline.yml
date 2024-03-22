@@ -14,6 +14,8 @@ env:
 
   CONFIG_PATH: "config/longrun_configs"
   PERF_CONFIG_PATH: "config/perf_configs"
+  MODEL_CONFIG_PATH: "config/model_configs"
+  ATMOS_CONFIG_PATH: "config/atmos_configs"
 
 timeout_in_minutes: 1440
 
@@ -52,7 +54,7 @@ steps:
 
   # DYAMOND AMIP: 1 day (convection resolving) - running on clima, so need to instantiate again
   - label: "GPU AMIP SUPERFINE: dyamond_target"
-    key: "gpu_dyamond_target"
+    key: "gpu_longrun_amip_dyamond"
     command:
       - "echo $$JULIA_DEPOT_PATH"
 
@@ -68,8 +70,8 @@ steps:
       - "julia --project=artifacts artifacts/download_artifacts.jl"
 
       - echo "--- Run simulation"
-      - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_dyamond_target.yml"
-    artifact_paths: "experiments/AMIP/output/amip/gpu_dyamond_target_artifacts/*"
+      - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_longrun_amip_dyamond.yml"
+    artifact_paths: "experiments/AMIP/output/amip/gpu_longrun_amip_dyamond_artifacts/*"
     agents:
       queue: clima
       slurm_mem: 20GB

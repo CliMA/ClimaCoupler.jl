@@ -4,12 +4,12 @@ dt_cpl: 50
 dt_save_state_to_disk: "0.5days"
 dt_save_to_sol: "0.5days"
 energy_check: false
-job_id: "gpu_dyamond_target"
+job_id: "gpu_longrun_amip_dyamond"
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
 monthly_checkpoint: false
-run_name: "gpu_dyamond_target"
+run_name: "gpu_longrun_amip_dyamond"
 start_date: "19790301"
 t_end: "1days"
 turb_flux_partition: "CombinedStateFluxes"

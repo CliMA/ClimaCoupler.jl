@@ -26,6 +26,50 @@ so we force abbreviated stacktraces even in non-interactive runs.
 
 redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(false)))
 
+using CUDA
+
+"""
+    show_memory_usage(comms_ctx, objects, io::Union{Base.TTY, IOBuffer} = stdout)
+
+Display the current memory footprint of the simulation, using an appropriate
+method based on the device being used.
+In the GPU case, show and return the memory usage of the GPU. Note that the
+return value in this case is a vector of unicode hex characters that must be
+converted to text to read (e.g. via a call`write(file, alloc_info)`).
+In the CPU case, show and return the memory footprint of the provided object(s) in GB.
+Note that these two cases provide different information, and should not be
+directly compared.
+# Arguments
+`comms_ctx`: the communication context being used to run the model
+`objects`: Dict mapping objects whose memory footprint is displayed in the CPU case to their names
+`io`: The input/output stream to use. Currently, `stdout` and `IOBuffer` types are supported.
+"""
+function show_memory_usage(comms_ctx, objects, io::Union{Base.TTY, IOContext, IOBuffer} = stdout)
+    if comms_ctx.device isa ClimaComms.CUDADevice
+        # If `io` is `stdout`, print the memory status, otherwise store in buffer to return
+        CUDA.memory_status(io)
+        if io == stdout
+            return nothing
+        else
+            # Get the memory usage in GB by parsing the output of `CUDA.memory_status`
+            allocs_GB = split(split(String(take!(io)), '(')[2], '/')[1]
+            return allocs_GB
+        end
+    elseif comms_ctx.device isa ClimaComms.AbstractCPUDevice
+        if ClimaComms.iamroot(comms_ctx)
+            cumul_size = 0
+            for (obj, name) in objects
+                cumul_size += Base.summarysize(obj)
+                @info "Memory footprint of `$(name)` in GB: $(Base.summarysize(obj) / 1e9)"
+            end
+            return cumul_size / 1e9
+        end
+    else
+        @warn "Invalid device type $device; cannot show memory usage."
+        return nothing
+    end
+end
+
 #=
 ## Configuration initialization
 Here we import standard Julia packages, ClimaESM packages, parse in command-line arguments (if none are specified then the defaults in `cli_options.jl` apply).
@@ -192,8 +236,12 @@ returns a `ComponentModelSimulation` object (see `Interfacer` docs for more deta
 This uses the `ClimaAtmos.jl` model, with parameterization options specified in the `config_dict_atmos` dictionary.
 =#
 
+show_memory_usage(comms_ctx, Dict())
+
 ## init atmos model component
 atmos_sim = atmos_init(FT, config_dict_atmos);
+show_memory_usage(comms_ctx, Dict(atmos_sim => name(atmos_sim)))
+
 thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models #610
 
 #=
@@ -224,6 +272,7 @@ land_fraction =
             mono = mono_surface,
         )
     )
+show_memory_usage(comms_ctx, Dict(land_fraction => "land_fraction"))
 
 #=
 ### Surface Models: AMIP and SlabPlanet Modes
@@ -335,6 +384,17 @@ if mode_name == "amip"
     update_field!(atmos_sim, Val(:co2), CO2_init)
 
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
+    show_memory_usage(
+        comms_ctx,
+        Dict(
+            land_sim => name(land_sim),
+            ocean_sim => name(ocean_sim),
+            ice_sim => name(ice_sim),
+            SST_info => "SST_info",
+            SIC_info => "SIC_info",
+            CO2_info => "CO2_info",
+        ),
+    )
 
 elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
 
@@ -385,6 +445,10 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
     ))
 
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
+    show_memory_usage(
+        comms_ctx,
+        Dict(land_sim => name(land_sim), ocean_sim => name(ocean_sim), ice_sim => name(ice_sim)),
+    )
 
 elseif mode_name == "slabplanet_eisenman"
 
@@ -427,6 +491,10 @@ elseif mode_name == "slabplanet_eisenman"
     )
 
     mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
+    show_memory_usage(
+        comms_ctx,
+        Dict(land_sim => name(land_sim), ocean_sim => name(ocean_sim), ice_sim => name(ice_sim)),
+    )
 end
 
 #=
@@ -459,6 +527,7 @@ coupler_field_names = (
 )
 coupler_fields =
     NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
+show_memory_usage(comms_ctx, Dict(coupler_fields => "coupler_fields"))
 
 ## model simulations
 model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim);
@@ -492,6 +561,7 @@ monthly_2d_diags = init_diagnostics(
 )
 
 diagnostics = (monthly_3d_diags, monthly_2d_diags)
+show_memory_usage(comms_ctx, Dict(diagnostics => "diagnostics"))
 
 #=
 ## Initialize Conservation Checks
@@ -582,6 +652,7 @@ cs = CoupledSimulation{FT}(
     turbulent_fluxes,
     thermo_params,
 );
+show_memory_usage(comms_ctx, Dict(cs => "cs"))
 
 #=
 ## Restart component model states if specified
@@ -647,6 +718,8 @@ reinit_model_sims!(cs.model_sims)
 # atmos receives the turbulent fluxes from the coupler.
 import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
 update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
+
+show_memory_usage(comms_ctx, Dict(cs => "cs"))
 
 #=
 ## Coupling Loop
@@ -749,7 +822,7 @@ function solve_coupler!(cs)
     end
     ClimaComms.iamroot(comms_ctx) ? @show(walltime) : nothing
 
-    return cs
+    return walltime
 end
 
 ## exit if running performance anaysis #hide
@@ -758,7 +831,24 @@ if haskey(ENV, "CI_PERF_SKIP_COUPLED_RUN") #hide
 end #hide
 
 ## run the coupled simulation
-solve_coupler!(cs);
+walltime = solve_coupler!(cs);
+
+## Use ClimaAtmos calculation to show the simulated years per day of the simulation (SYPD)
+es = CA.EfficiencyStats(tspan, walltime)
+sypd = CA.simulated_years_per_day(es)
+@info "SYPD: $sypd"
+
+## Save the SYPD and allocation information
+if ClimaComms.iamroot(comms_ctx)
+    sypd_filename = joinpath(COUPLER_ARTIFACTS_DIR, "sypd.txt")
+    write(sypd_filename, "$sypd")
+
+    # For GPU allocation information, we have to save to a buffer before writing
+    alloc_buf = IOBuffer()
+    allocs = show_memory_usage(comms_ctx, Dict(cs => "cs"), alloc_buf)
+    allocs_filename = joinpath(COUPLER_ARTIFACTS_DIR, "allocations.txt")
+    write(allocs_filename, allocs)
+end
 
 #=
 ## Postprocessing

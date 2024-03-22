@@ -383,7 +383,7 @@ steps:
       - label: "GPU Slabplanet: albedo from static map (nsys)"
         key: "gpu_slabplanet_albedo_static_map"
         command: >
-          nsys profile --trace=nvtx,cuda --output=experiments/AMIP/output/amip/gpu_slabplanet_albedo_static_map_artifacts
+          nsys profile --trace=nvtx,cuda --output=experiments/AMIP/output/slabplanet/gpu_slabplanet_albedo_static_map_artifacts/
           julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_slabplanet_albedo_static_map.yml
         artifact_paths: "experiments/AMIP/output/slabplanet/gpu_slabplanet_albedo_static_map_artifacts/*"
         agents:
@@ -410,7 +410,7 @@ steps:
       - label: "GPU AMIP target: topography and diagnostic EDMF (nsys)"
         key: "gpu_amip_target_topo_diagedmf_shortrun"
         command: >
-          nsys profile --trace=nvtx,cuda --output=experiments/AMIP/output/amip/gpu_amip_target_topo_diagedmf_shortrun_artifacts
+          nsys profile --trace=nvtx,cuda --output=experiments/AMIP/output/amip/gpu_amip_target_topo_diagedmf_shortrun_artifacts/
           julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_amip_target_topo_diagedmf_shortrun.yml
         artifact_paths: "experiments/AMIP/output/amip/gpu_amip_target_topo_diagedmf_shortrun_artifacts/*"
         agents:

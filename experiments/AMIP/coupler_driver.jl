@@ -48,7 +48,9 @@ function show_memory_usage(comms_ctx, objects, io::Union{Base.TTY, IOContext, IO
     if comms_ctx.device isa ClimaComms.CUDADevice
         # If `io` is `stdout`, print the memory status, otherwise store in buffer to return
         CUDA.memory_status(io)
-        return io != stdout ? take!(io) : nothing
+        # Get the memory usage in GB by parsing the output of `CUDA.memory_status`
+        allocs_GB = split(split(take!(io), '(')[2], '/')[1]
+        return io != stdout ? allocs_GB : nothing
     elseif comms_ctx.device isa ClimaComms.AbstractCPUDevice
         if ClimaComms.iamroot(comms_ctx)
             cumul_size = 0

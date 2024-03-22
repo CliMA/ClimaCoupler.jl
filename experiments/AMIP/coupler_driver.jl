@@ -762,7 +762,7 @@ debug(cs, debug_dir * "/8_after_solve_")
 
 
 # Save states after simulation for CPU/GPU comparison
-device_suffix = comms_ctx isa ClimaComms.AbstractCPUDevice ? "cpu" : "gpu"
+device_suffix = comms_ctx.device isa ClimaComms.AbstractCPUDevice ? "cpu" : "gpu"
 
 # Extract atmos state variables
 atmos_ρe_tot = cs.model_sims.atmos_sim.integrator.u.c.ρe_tot

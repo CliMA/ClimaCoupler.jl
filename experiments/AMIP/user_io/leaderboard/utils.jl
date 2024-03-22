@@ -203,3 +203,27 @@ function find_and_resample(
 
     return resample(data_arr, (lon_arr, lat_arr), dest_lonlat)
 end
+
+"""
+    split_by_season(dates::AbstractArray{<: Dates.DateTime})
+
+Take an array of dates and return 4 split into seasons.
+"""
+function split_by_season(dates::AbstractArray{<:Dates.DateTime})
+    MAM, JJA, SON, DJF =
+        Vector{Dates.DateTime}(), Vector{Dates.DateTime}(), Vector{Dates.DateTime}(), Vector{Dates.DateTime}()
+
+    for date in dates
+        if Dates.Month(3) <= Dates.Month(date) <= Dates.Month(5)
+            push!(MAM, date)
+        elseif Dates.Month(6) <= Dates.Month(date) <= Dates.Month(8)
+            push!(JJA, date)
+        elseif Dates.Month(9) <= Dates.Month(date) <= Dates.Month(11)
+            push!(SON, date)
+        else
+            push!(DJF, date)
+        end
+    end
+
+    return (MAM, JJA, SON, DJF)
+end

@@ -44,7 +44,7 @@ directly compared.
 `objects`: Dict mapping objects whose memory footprint is displayed in the CPU case to their names
 `io`: The input/output stream to use. Currently, `stdout` and `IOBuffer` types are supported.
 """
-function show_memory_usage(comms_ctx, objects, io::Union{Base.TTY, IOBuffer} = stdout)
+function show_memory_usage(comms_ctx, objects, io::Union{Base.TTY, IOContext, IOBuffer} = stdout)
     if comms_ctx.device isa ClimaComms.CUDADevice
         # If `io` is `stdout`, print the memory status, otherwise store in buffer to return
         CUDA.memory_status(io)

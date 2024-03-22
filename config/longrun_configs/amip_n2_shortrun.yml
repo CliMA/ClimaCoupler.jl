@@ -19,5 +19,5 @@ rayleigh_sponge: true
 run_name: "amip_n2_shortrun"
 t_end: "1days"
 vert_diff: "true"
-z_elem: 50
-z_stretch: false
+z_elem: 64
+z_stretch: true

@@ -12,18 +12,6 @@ function Base.show(io::IO, dict::Dict)
     end
 end
 
-"""
-    save_as_txt(var, filename::String)
-
-Save the input variable to a text file at `filename` using DelimitedFiles.jl.
-`filename` should end in `.txt`.
-"""
-function save_as_txt(var, filename::String)
-    open(filename, "w") do io
-        DLM.writedlm(io, var, ',')
-    end
-end
-
 # user callbacks
 """
     checkpoint_sims(cs::CoupledSimulation, _)

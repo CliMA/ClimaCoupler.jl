@@ -29,22 +29,26 @@ redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(false)))
 using CUDA
 
 """
-    show_memory_usage(comms_ctx, objects)
+    show_memory_usage(comms_ctx, objects, io::Union{Base.TTY, IOBuffer} = stdout)
+
 Display the current memory footprint of the simulation, using an appropriate
 method based on the device being used.
-In the GPU case, show and return the memory usage of the GPU.
+In the GPU case, show and return the memory usage of the GPU. Note that the
+return value in this case is a vector of unicode hex characters that must be
+converted to text to read (e.g. via a call`write(file, alloc_info)`).
 In the CPU case, show and return the memory footprint of the provided object(s) in GB.
 Note that these two cases provide different information, and should not be
 directly compared.
 # Arguments
 `comms_ctx`: the communication context being used to run the model
 `objects`: Dict mapping objects whose memory footprint is displayed in the CPU case to their names
+`io`: The input/output stream to use. Currently, `stdout` and `IOBuffer` types are supported.
 """
-function show_memory_usage(comms_ctx, objects)
+function show_memory_usage(comms_ctx, objects, io::Union{Base.TTY, IOBuffer} = stdout)
     if comms_ctx.device isa ClimaComms.CUDADevice
-        mem_status = CUDA.memory_status()
-        @info "Memory usage: $mem_status"
-        return mem_status
+        # If `io` is `stdout`, print the memory status, otherwise store in buffer to return
+        CUDA.memory_status(io)
+        return io != stdout ? take!(io) : nothing
     elseif comms_ctx.device isa ClimaComms.AbstractCPUDevice
         if ClimaComms.iamroot(comms_ctx)
             cumul_size = 0
@@ -830,12 +834,14 @@ sypd = CA.simulated_years_per_day(es)
 
 ## Save the SYPD and allocation information
 if ClimaComms.iamroot(comms_ctx)
-    sypd_filename = joinpath(COUPLER_ARTIFACTS_DIR, "SYPD.txt")
-    save_as_txt(sypd, sypd_filename)
+    sypd_filename = joinpath(COUPLER_ARTIFACTS_DIR, "sypd.txt")
+    write(sypd_filename, "$sypd")
 
-    allocs = show_memory_usage(comms_ctx, Dict(cs => "cs"))
+    # For GPU allocation information, we have to save to a buffer before writing
+    alloc_buf = IOBuffer()
+    allocs = show_memory_usage(comms_ctx, Dict(cs => "cs"), alloc_buf)
     allocs_filename = joinpath(COUPLER_ARTIFACTS_DIR, "allocations.txt")
-    save_as_txt(allocs, allocs_filename)
+    write(allocs_filename, allocs)
 end
 
 #=

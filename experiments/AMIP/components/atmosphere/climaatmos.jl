@@ -1,6 +1,7 @@
 # atmos_init: for ClimaAtmos pre-AMIP interface
 using StaticArrays
 using Statistics: mean
+import NVTX
 
 import ClimaAtmos as CA
 import ClimaAtmos: CT1, CT2, CT12, CT3, C3, C12, unit_basis_vector_data, ⊗

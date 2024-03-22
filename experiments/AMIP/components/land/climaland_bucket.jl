@@ -5,6 +5,7 @@ import Thermodynamics as TD
 using Dates: DateTime
 using ClimaComms: AbstractCommsContext
 import ClimaParams
+import NVTX
 
 import ClimaLand
 using ClimaLand.Bucket: BucketModel, BucketModelParameters, AbstractAtmosphericDrivers, AbstractRadiativeDrivers

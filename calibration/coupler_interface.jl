@@ -1,51 +1,68 @@
 import EnsembleKalmanProcesses as EKP
 import ClimaCoupler as CCo
 import YAML
+import CalibrateAtmos: get_forward_model, AbstractPhysicalModel, get_config
 
-"""
-    get_coupler_sim(member, iteration, experiment_id::AbstractString)
+struct CoupledModel <: AbstractPhysicalModel end
 
-Returns a CouplerSimulation object for the given member and iteration. 
-If given an experiment id string, it will load the config from the corresponding YAML file.
-Turns off default diagnostics and sets the TOML parameter file to the member's path.
-This assumes that the config dictionary has `output_dir` and `restart_file` keys.
-"""
-function get_coupler_sim(member, iteration, experiment_id::AbstractString)
+function get_forward_model(
+    experiment_id::Val{:amip_coupled}
+)
+    return CoupledModel()
+end
+
+function get_config(
+    model::CoupledModel,
+    member,
+    iteration, 
+    experiment_id::AbstractString
+)
+    config_dict = YAML.load_file("experiments/$experiment_id/model_config.yml")
+    return get_config(model, member, iteration, config_dict)
+end
+
+function get_config(
+    ::CoupledModel,
+    member,
+    iteration,
+    config_dict::AbstractDict,
+)
     # Specify member path for output_dir
     # Set TOML to use EKP parameter(s)
-    config_dict = YAML.load_file("./experiments/amip_coupled/coupler_config.yml")
+    config_dict = YAML.load_file("./experiments/amip_coupled/model_config.yml")
     output_dir = "output"
     member_path =
         EKP.TOMLInterface.path_to_ensemble_member(output_dir, iteration, member)
-    config_dict["output_dir"] = member_path
-    # COPY Coupler Driver
-    include("coupler_driver_calibration.jl")
-    # END Coupler Driver
+    config_dict = merge(parsed_args, config_dict)
 
+    ## get component model dictionaries (if applicable)
+    config_dict_atmos = get_atmos_config(config_dict)
+   
+    ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
+    ## (if there are common keys, the last dictorionary in the `merge` arguments takes precedence)
+    config_dict = merge(config_dict_atmos, config_dict)
+    # COPY Coupler Driver
+    config_dict["output_dir"] = member_path
+    include("coupler_driver_calibration.jl")
+    config_dict["output_dir"] = member_path
+    # END Coupler Driver
     parameter_path = joinpath(member_path, "parameters.toml")
     if haskey(config_dict, "toml")
         push!(config_dict["toml"], parameter_path)
     else
         config_dict["toml"] = [parameter_path]
     end
-
     # Turn off default diagnostics
     config_dict["output_default_diagnostics"] = false
-
-    # Set restart file for initial equilibrium state
-    return cs
+    return (;config_dict=config_dict)
 end
 
-"""
-    run_forward_model(coupled_sim::CCo.CoupledSimulation)
-
-Runs the coupled model with the given a CoupledSimulation object.
-Note that running an AtmosModel can be considered a special case 
-of running a CoupledSimulation. 
-Currently only has basic error handling.
-"""
-function run_forward_model(coupled_sim::CCo.Interfacer.CoupledSimulation)
-    sol_res = solve_coupler!(coupled_sim)
-    # Is there a return code in coupler sims? 
-    # Can we get the atmos version instead ?
+function run_forward_model(
+    ::CoupledModel,
+    config;
+    lk = nothing,
+)   
+    cs = get_simulation(config);
+    sol_res = solve_coupler!(cs);
+    return sol_res
 end

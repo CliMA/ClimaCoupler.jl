@@ -13,7 +13,7 @@ echo "Generating truth observations."
 srun  --open-mode=append julia --project=experiments -e '
 using ClimaComms
 ClimaComms.init(ClimaComms.context())
-import ClimaCoupler as CCo
+import ClimaCoupler
 import YAML
 using NCDatasets
 import JLD2

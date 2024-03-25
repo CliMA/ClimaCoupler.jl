@@ -1,209 +1,251 @@
+## standard packages
+using Dates
+import YAML
+
+# ## ClimaESM packages
+import ClimaAtmos as CA
+using ClimaCore
+
+# ## Coupler specific imports
+using ClimaCoupler
+using ClimaCoupler.BCReader: bcfile_info_init, update_midmonth_data!, next_date_in_file, interpolate_midmonth_to_daily
+using ClimaCoupler.ConservationChecker:
+    EnergyConservationCheck, WaterConservationCheck, check_conservation!, plot_global_conservation
+using ClimaCoupler.Checkpointer: restart_model_state!
+using ClimaCoupler.Diagnostics: init_diagnostics, accumulate_diagnostics!, save_diagnostics, TimeMean
+using ClimaCoupler.FieldExchanger:
+    import_atmos_fields!, import_combined_surface_fields!, update_model_sims!, reinit_model_sims!, step_model_sims!
+using ClimaCoupler.FluxCalculator:
+    PartitionedStateFluxes,
+    CombinedStateFluxes,
+    combined_turbulent_fluxes!,
+    MoninObukhovScheme,
+    partitioned_turbulent_fluxes!
+using ClimaCoupler.Interfacer: CoupledSimulation, SurfaceStub, get_field, update_field!
+using ClimaCoupler.Regridder
+using ClimaCoupler.Regridder: update_surface_fractions!, combine_surfaces!, binary_mask
+using ClimaCoupler.TimeManager:
+    current_date, Monthly, EveryTimestep, HourlyCallback, MonthlyCallback, update_firstdayofmonth!, trigger_callback!
+import ClimaCoupler.Utilities: get_comms_context
+
+pkg_dir = pkgdir(ClimaCoupler)
+
 
 include("coupler_driver_init.jl")
 include("coupler_parse_args.jl")
 include("coupler_component_init.jl")
 
-#=
-## Coupler Initialization
-The coupler needs to contain exchange information, manage the calendar and be able to access all component models. It can also optionally
-save online diagnostics. These are all initialized here and saved in a global `CoupledSimulation` struct, `cs`.
-=#
 
-## coupler exchange fields
-coupler_field_names = (
-    :T_S,
-    :z0m_S,
-    :z0b_S,
-    :ρ_sfc,
-    :q_sfc,
-    :surface_albedo,
-    :beta,
-    :F_turb_energy,
-    :F_turb_moisture,
-    :F_turb_ρτxz,
-    :F_turb_ρτyz,
-    :F_radiative,
-    :P_liq,
-    :P_snow,
-    :radiative_energy_flux_toa,
-    :P_net,
-)
-coupler_fields =
-    NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
+function get_simulation(config_dict)
+    #=
+    ## Coupler Initialization
+    The coupler needs to contain exchange information, manage the calendar and be able to access all component models. It can also optionally
+    save online diagnostics. These are all initialized here and saved in a global `CoupledSimulation` struct, `cs`.
+    =#
 
-## model simulations
-model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim);
-
-## dates
-dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)], new_month = [false])
-
-#=
-### Online Diagnostics
-User can write custom diagnostics in the `user_diagnostics.jl`.
-Note, this will be replaced by the diagnostics framework currently in ClimaAtmos, once it is abstracted
-into a more general package, so we can use it to save fields from surface models.
-=#
-
-monthly_3d_diags = init_diagnostics(
-    (:T, :u, :q_tot, :q_liq_ice),
-    atmos_sim.domain.center_space;
-    save = Monthly(),
-    operations = (; accumulate = TimeMean([Int(0)])),
-    output_dir = COUPLER_OUTPUT_DIR,
-    name_tag = "monthly_mean_3d_",
-)
-
-monthly_2d_diags = init_diagnostics(
-    (:precipitation_rate, :toa_fluxes, :T_sfc, :tubulent_energy_fluxes),
-    boundary_space;
-    save = Monthly(),
-    operations = (; accumulate = TimeMean([Int(0)])),
-    output_dir = COUPLER_OUTPUT_DIR,
-    name_tag = "monthly_mean_2d_",
-)
-
-diagnostics = (monthly_3d_diags, monthly_2d_diags)
-
-#=
-## Initialize Conservation Checks
-
-The conservation checks are used to monitor the global energy and water conservation of the coupled system. The checks are only
-applicable to the `slabplanet` mode, as the `amip` mode is not a closed system. The conservation checks are initialized here and
-saved in a global `ConservationChecks` struct, `conservation_checks`.
-=#
-
-## init conservation info collector
-conservation_checks = nothing
-if energy_check
-    @assert(
-        mode_name[1:10] == "slabplanet" && !CA.is_distributed(ClimaComms.context(boundary_space)),
-        "Only non-distributed slabplanet allowable for energy_check"
+    ## coupler exchange fields
+    coupler_field_names = (
+        :T_S,
+        :z0m_S,
+        :z0b_S,
+        :ρ_sfc,
+        :q_sfc,
+        :surface_albedo,
+        :beta,
+        :F_turb_energy,
+        :F_turb_moisture,
+        :F_turb_ρτxz,
+        :F_turb_ρτyz,
+        :F_radiative,
+        :P_liq,
+        :P_snow,
+        :radiative_energy_flux_toa,
+        :P_net,
     )
-    conservation_checks = (; energy = EnergyConservationCheck(model_sims), water = WaterConservationCheck(model_sims))
-end
+    coupler_fields =
+        NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
 
-#=
-## Initialize Callbacks
-Callbacks are used to update at a specified interval. The callbacks are initialized here and
-saved in a global `Callbacks` struct, `callbacks`. The `trigger_callback!` function is used to call the callback during the simulation below.
+    ## model simulations
+    model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim);
 
-The frequency of the callbacks is specified in the `HourlyCallback` and `MonthlyCallback` structs. The `func` field specifies the function to be called,
-the `ref_date` field specifies the reference (first) date for the callback, and the `active` field specifies whether the callback is active or not.
+    ## dates
+    dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)], new_month = [false])
 
-The currently implemented callbacks are:
-- `checkpoint_cb`: generates a checkpoint of all model states at a specified interval. This is mainly used for restarting simulations.
-- `update_firstdayofmonth!_cb`: generates a callback to update the first day of the month for monthly message print (and other monthly operations).
-=#
+    #=
+    ### Online Diagnostics
+    User can write custom diagnostics in the `user_diagnostics.jl`.
+    Note, this will be replaced by the diagnostics framework currently in ClimaAtmos, once it is abstracted
+    into a more general package, so we can use it to save fields from surface models.
+    =#
 
-## checkpoint_cb generates a checkpoint of all model states at a specified interval. This mainly used for restarting simulations.
-checkpoint_cb =
-    HourlyCallback(dt = FT(480), func = checkpoint_sims, ref_date = [dates.date[1]], active = hourly_checkpoint) # 20 days
-update_firstdayofmonth!_cb =
-    MonthlyCallback(dt = FT(1), func = update_firstdayofmonth!, ref_date = [dates.date1[1]], active = true)
-callbacks = (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb)
+    @info "output directory:" COUPLER_OUTPUT_DIR
 
-#=
-## Initialize Coupled Simulation
+    monthly_3d_diags = init_diagnostics(
+        (:T, :u, :q_tot, :q_liq_ice),
+        atmos_sim.domain.center_space;
+        save = Monthly(),
+        operations = (; accumulate = TimeMean([Int(0)])),
+        output_dir = COUPLER_OUTPUT_DIR,
+        name_tag = "monthly_mean_3d_",
+    )
 
-The coupled simulation is initialized here and saved in a global `CoupledSimulation` struct, `cs`. It contains all the information
-required to run the coupled simulation, including the communication context, the dates, the boundary space, the coupler fields, the
-configuration dictionary, the conservation checks, the time span, the time step, the land fraction, the model simulations, the mode
-specifics, the diagnostics, the callbacks, and the directory paths.
-=#
+    monthly_2d_diags = init_diagnostics(
+        (:precipitation_rate, :toa_fluxes, :T_sfc, :tubulent_energy_fluxes),
+        boundary_space;
+        save = Monthly(),
+        operations = (; accumulate = TimeMean([Int(0)])),
+        output_dir = COUPLER_OUTPUT_DIR,
+        name_tag = "monthly_mean_2d_",
+    )
 
-cs = CoupledSimulation{FT}(
-    comms_ctx,
-    dates,
-    boundary_space,
-    coupler_fields,
-    config_dict,
-    conservation_checks,
-    [tspan[1], tspan[2]],
-    atmos_sim.integrator.t,
-    Δt_cpl,
-    (; land = land_fraction, ocean = zeros(boundary_space), ice = zeros(boundary_space)),
-    model_sims,
-    mode_specifics,
-    diagnostics,
-    callbacks,
-    dir_paths,
-);
+    diagnostics = (monthly_3d_diags, monthly_2d_diags)
+
+    #=
+    ## Initialize Conservation Checks
+
+    The conservation checks are used to monitor the global energy and water conservation of the coupled system. The checks are only
+    applicable to the `slabplanet` mode, as the `amip` mode is not a closed system. The conservation checks are initialized here and
+    saved in a global `ConservationChecks` struct, `conservation_checks`.
+    =#
+
+    ## init conservation info collector
+    conservation_checks = nothing
+    if energy_check
+        @assert(
+            mode_name[1:10] == "slabplanet" && !CA.is_distributed(ClimaComms.context(boundary_space)),
+            "Only non-distributed slabplanet allowable for energy_check"
+        )
+        conservation_checks = (; energy = EnergyConservationCheck(model_sims), water = WaterConservationCheck(model_sims))
+    end
+
+    #=
+    ## Initialize Callbacks
+    Callbacks are used to update at a specified interval. The callbacks are initialized here and
+    saved in a global `Callbacks` struct, `callbacks`. The `trigger_callback!` function is used to call the callback during the simulation below.
+
+    The frequency of the callbacks is specified in the `HourlyCallback` and `MonthlyCallback` structs. The `func` field specifies the function to be called,
+    the `ref_date` field specifies the reference (first) date for the callback, and the `active` field specifies whether the callback is active or not.
+
+    The currently implemented callbacks are:
+    - `checkpoint_cb`: generates a checkpoint of all model states at a specified interval. This is mainly used for restarting simulations.
+    - `update_firstdayofmonth!_cb`: generates a callback to update the first day of the month for monthly message print (and other monthly operations).
+    =#
+
+    ## checkpoint_cb generates a checkpoint of all model states at a specified interval. This mainly used for restarting simulations.
+    checkpoint_cb =
+        HourlyCallback(dt = FT(480), func = checkpoint_sims, ref_date = [dates.date[1]], active = hourly_checkpoint) # 20 days
+    update_firstdayofmonth!_cb =
+        MonthlyCallback(dt = FT(1), func = update_firstdayofmonth!, ref_date = [dates.date1[1]], active = true)
+    callbacks = (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb)
+
+    #=
+    ## Initialize Coupled Simulation
+
+    The coupled simulation is initialized here and saved in a global `CoupledSimulation` struct, `cs`. It contains all the information
+    required to run the coupled simulation, including the communication context, the dates, the boundary space, the coupler fields, the
+    configuration dictionary, the conservation checks, the time span, the time step, the land fraction, the model simulations, the mode
+    specifics, the diagnostics, the callbacks, and the directory paths.
+    =#
+
+    cs = CoupledSimulation{FT}(
+        comms_ctx,
+        dates,
+        boundary_space,
+        coupler_fields,
+        config_dict,
+        conservation_checks,
+        [tspan[1], tspan[2]],
+        atmos_sim.integrator.t,
+        Δt_cpl,
+        (; land = land_fraction, ocean = zeros(boundary_space), ice = zeros(boundary_space)),
+        model_sims,
+        mode_specifics,
+        diagnostics,
+        callbacks,
+        dir_paths,
+    );
 
 
-#=
-## Restart component model states if specified
-If a restart directory is specified and contains output files from the `checkpoint_cb` callback, the component model states are restarted from those files. The restart directory
-is specified in the `config_dict` dictionary. The `restart_t` field specifies the time step at which the restart is performed.
-=#
 
-if restart_dir !== "unspecified"
-    for sim in cs.model_sims
-        if get_model_prog_state(sim) !== nothing
-            restart_model_state!(sim, comms_ctx, restart_t; input_dir = restart_dir)
+    #=
+    ## Restart component model states if specified
+    If a restart directory is specified and contains output files from the `checkpoint_cb` callback, the component model states are restarted from those files. The restart directory
+    is specified in the `config_dict` dictionary. The `restart_t` field specifies the time step at which the restart is performed.
+    =#
+
+    #=
+    if restart_dir !== "unspecified"
+        for sim in cs.model_sims
+            if get_model_prog_state(sim) !== nothing
+                restart_model_state!(sim, comms_ctx, restart_t; input_dir = restart_dir)
+            end
         end
     end
+    =#
+
+    #=
+    ## Initialize Component Model Exchange
+
+    We need to ensure all models' initial conditions are shared to enable the coupler to calculate the first instance of surface fluxes. Some auxiliary variables (namely surface humidity and radiation fluxes)
+    depend on initial conditions of other component models than those in which the variables are calculated, which is why we need to step these models in time and/or reinitialize them.
+    The concrete steps for proper initialization are:
+    =#
+
+    # 1.decide on the type of turbulent flux partition (see `FluxCalculator` documentation for more details)
+    turbulent_fluxes = nothing
+    if config_dict["turb_flux_partition"] == "PartitionedStateFluxes"
+        turbulent_fluxes = PartitionedStateFluxes()
+    elseif config_dict["turb_flux_partition"] == "CombinedStateFluxes"
+        turbulent_fluxes = CombinedStateFluxes()
+    else
+        error("turb_flux_partition must be either PartitionedStateFluxes or CombinedStateFluxes")
+    end
+
+    # 2.coupler updates surface model area fractions
+    update_surface_fractions!(cs)
+
+    # 3.surface density (`ρ_sfc`): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface.
+    # For this, we need to import surface and atmospheric fields. The model sims are then updated with the new surface density.
+    import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
+    import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
+    update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
+
+    # 4.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
+    ## TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step! (#331)
+    step!(land_sim, Δt_cpl)
+    step!(ocean_sim, Δt_cpl)
+    step!(ice_sim, Δt_cpl)
+
+    # 5.turbulent fluxes: now we have all information needed for calculating the initial turbulent surface fluxes using the combined state
+    # or the partitioned state method
+    if turbulent_fluxes isa CombinedStateFluxes
+        ## import the new surface properties into the coupler (note the atmos state was also imported in step 3.)
+        import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta, q_sfc
+        ## calculate turbulent fluxes inside the atmos cache based on the combined surface state in each grid box
+        combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # this updates the atmos thermo state, sfc_ts
+    elseif turbulent_fluxes isa PartitionedStateFluxes
+        ## calculate turbulent fluxes in surface models and save the weighted average in coupler fields
+        partitioned_turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, MoninObukhovScheme(), thermo_params)
+
+        ## update atmos sfc_conditions for surface temperature
+        ## TODO: this is hard coded and needs to be simplified (req. CA modification) (#479)
+        new_p = get_new_cache(atmos_sim, cs.fields)
+        CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) ## sets T_sfc (but SF calculation not necessary - requires split functionality in CA)
+        atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
+    end
+
+    # 6.reinitialize models + radiative flux: prognostic states and time are set to their initial conditions. For atmos, this also triggers the callbacks and sets a nonzero radiation flux (given the new sfc_conditions)
+    reinit_model_sims!(cs.model_sims)
+
+    # 7.update all fluxes: coupler re-imports updated atmos fluxes (radiative fluxes for both `turbulent_fluxes` types
+    # and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxes`,
+    # and sends them to the surface component models. If `turbulent_fluxes isa PartitionedStateFluxes`
+    # atmos receives the turbulent fluxes from the coupler.
+    import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
+    update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
+
+    return cs
 end
-
-#=
-## Initialize Component Model Exchange
-
-We need to ensure all models' initial conditions are shared to enable the coupler to calculate the first instance of surface fluxes. Some auxiliary variables (namely surface humidity and radiation fluxes)
-depend on initial conditions of other component models than those in which the variables are calculated, which is why we need to step these models in time and/or reinitialize them.
-The concrete steps for proper initialization are:
-=#
-
-# 1.decide on the type of turbulent flux partition (see `FluxCalculator` documentation for more details)
-turbulent_fluxes = nothing
-if config_dict["turb_flux_partition"] == "PartitionedStateFluxes"
-    turbulent_fluxes = PartitionedStateFluxes()
-elseif config_dict["turb_flux_partition"] == "CombinedStateFluxes"
-    turbulent_fluxes = CombinedStateFluxes()
-else
-    error("turb_flux_partition must be either PartitionedStateFluxes or CombinedStateFluxes")
-end
-
-# 2.coupler updates surface model area fractions
-update_surface_fractions!(cs)
-
-# 3.surface density (`ρ_sfc`): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface.
-# For this, we need to import surface and atmospheric fields. The model sims are then updated with the new surface density.
-import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
-import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
-update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
-
-# 4.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
-## TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step! (#331)
-step!(land_sim, Δt_cpl)
-step!(ocean_sim, Δt_cpl)
-step!(ice_sim, Δt_cpl)
-
-# 5.turbulent fluxes: now we have all information needed for calculating the initial turbulent surface fluxes using the combined state
-# or the partitioned state method
-if turbulent_fluxes isa CombinedStateFluxes
-    ## import the new surface properties into the coupler (note the atmos state was also imported in step 3.)
-    import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta, q_sfc
-    ## calculate turbulent fluxes inside the atmos cache based on the combined surface state in each grid box
-    combined_turbulent_fluxes!(cs.model_sims, cs.fields, turbulent_fluxes) # this updates the atmos thermo state, sfc_ts
-elseif turbulent_fluxes isa PartitionedStateFluxes
-    ## calculate turbulent fluxes in surface models and save the weighted average in coupler fields
-    partitioned_turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, MoninObukhovScheme(), thermo_params)
-
-    ## update atmos sfc_conditions for surface temperature
-    ## TODO: this is hard coded and needs to be simplified (req. CA modification) (#479)
-    new_p = get_new_cache(atmos_sim, cs.fields)
-    CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) ## sets T_sfc (but SF calculation not necessary - requires split functionality in CA)
-    atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
-end
-
-# 6.reinitialize models + radiative flux: prognostic states and time are set to their initial conditions. For atmos, this also triggers the callbacks and sets a nonzero radiation flux (given the new sfc_conditions)
-reinit_model_sims!(cs.model_sims)
-
-# 7.update all fluxes: coupler re-imports updated atmos fluxes (radiative fluxes for both `turbulent_fluxes` types
-# and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxes`,
-# and sends them to the surface component models. If `turbulent_fluxes isa PartitionedStateFluxes`
-# atmos receives the turbulent fluxes from the coupler.
-import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, turbulent_fluxes)
-update_model_sims!(cs.model_sims, cs.fields, turbulent_fluxes)
 
 #=
 ## Coupling Loop
@@ -229,6 +271,15 @@ function solve_coupler!(cs)
         end
 
         if cs.mode.name == "amip"
+
+            turbulent_fluxes = nothing
+            if config_dict["turb_flux_partition"] == "PartitionedStateFluxes"
+                turbulent_fluxes = PartitionedStateFluxes()
+            elseif config_dict["turb_flux_partition"] == "CombinedStateFluxes"
+                turbulent_fluxes = CombinedStateFluxes()
+            else
+                error("turb_flux_partition must be either PartitionedStateFluxes or CombinedStateFluxes")
+            end
 
             ## monthly read of boundary condition data for SST and SIC and CO2
             if cs.dates.date[1] >= next_date_in_file(cs.mode.SST_info)

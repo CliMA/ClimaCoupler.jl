@@ -25,3 +25,4 @@ z_elem: 50
 z_stretch: false
 dt_save_restart: "150secs"
 restart_dir: "./restart"
+output_dir: output/amip_coupled

@@ -11,7 +11,7 @@ include("../experiments/AMIP/cli_options.jl")
 parsed_args = parse_commandline(argparse_settings())
 
 ## read in config dictionary from file, overriding the coupler defaults
-config_dict = YAML.load_file(joinpath(experiment_dir, "coupler_config.yml"));
+config_dict = YAML.load_file(joinpath(experiment_dir, "model_config.yml"));
 config_dict = merge(parsed_args, config_dict)
 
 ## get component model dictionaries (if applicable)
@@ -56,7 +56,6 @@ the plots (from postprocessing and the conservation checks) of the simulation wi
 temporary files will be saved.
 =#
 
-COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], joinpath(mode_name, run_name))
 mkpath(COUPLER_OUTPUT_DIR)
 
 REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp/")

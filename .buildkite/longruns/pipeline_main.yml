@@ -1,7 +1,7 @@
 agents:
   queue: new-central
   slurm_time: 24:00:00
-  modules: climacommon/2024_04_05
+  modules: climacommon/2024_03_18
 
 env:
   JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
@@ -13,6 +13,7 @@ env:
   SLURM_KILL_BAD_EXIT: 1
 
   CONFIG_PATH: "config/longrun_configs"
+  PERF_CONFIG_PATH: "config/perf_configs"
 
 timeout_in_minutes: 1440
 
@@ -32,6 +33,11 @@ steps:
       - "julia --project=artifacts -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=artifacts -e 'using Pkg; Pkg.status()'"
       - "julia --project=artifacts artifacts/download_artifacts.jl"
+
+      - echo "--- Instantiate perf env"
+      - "julia --project=perf/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=perf/ -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=perf/ -e 'using Pkg; Pkg.status()'"
 
     agents:
       slurm_cpus_per_task: 8
@@ -69,7 +75,6 @@ steps:
       slurm_mem: 20GB
       slurm_gpus: 1
       modules: common
-    soft_fail: true
 
   - group: "Coupler integration and conservation tests"
 
@@ -86,7 +91,6 @@ steps:
           slurm_ntasks_per_node: 1
           slurm_nodes: 1
           slurm_mem_per_cpu: 16G
-        soft_fail: true
 
       - label: "Slabplanet_aqua: couple"
         key: "slabplanet_aqua_atmos_sf_couple" # SF at each Atmos stage, coupling, prescribed SST from coupler - identical results to the above confirm 1) initial conditions in Atmos are unchanged compared to the slab, 2) coupling not introducing variability when constant surface
@@ -98,7 +102,6 @@ steps:
           slurm_ntasks_per_node: 1
           slurm_nodes: 1
           slurm_mem_per_cpu: 16G
-        soft_fail: true
 
       - label: "Slabplanet_aqua: coupler fluxes"
         key: "slabplanet_aqua_coupler_sf" # SF at each coupler timestep, constant ocean - comparing to the above runs, this tests the sensitivity of less frequent flux calculation
@@ -110,7 +113,6 @@ steps:
           slurm_ntasks_per_node: 1
           slurm_nodes: 1
           slurm_mem_per_cpu: 16G
-        soft_fail: true
 
       - label: "Slabplanet_aqua: coupler fluxes, evolving ocean"
         key: "slabplanet_aqua_coupler_sf_evolve_ocn" # SF at each coupler timestep, evolving ocean - comparing to the above run, tests the sensitivity of evolving ocean
@@ -122,7 +124,6 @@ steps:
           slurm_ntasks_per_node: 1
           slurm_nodes: 1
           slurm_mem_per_cpu: 16G
-        soft_fail: true
 
       - label: "Slabplanet_terra: coupler fluxes, evolving bucket"
         key: "slabplanet_terra" # SF at each coupler timestep, evolving ocean - comparing to the above run, tests the sensitivity of evolving bucket
@@ -134,7 +135,6 @@ steps:
           slurm_ntasks_per_node: 1
           slurm_nodes: 1
           slurm_mem_per_cpu: 16G
-        soft_fail: true
 
       - label: "Slabplanet: coupler fluxes, evolving ocean and land"
         key: "slabplanet_coupler_sf_evolve_ocn"
@@ -146,9 +146,8 @@ steps:
           slurm_ntasks_per_node: 1
           slurm_nodes: 1
           slurm_mem_per_cpu: 16G
-        soft_fail: true
 
-  - group: "Current target tests: idealized surfaces"
+  - group: "Current target tests: idealized surface"
 
     steps:
 
@@ -163,7 +162,6 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
-        soft_fail: true
 
       - label: "TARGET IDEALIZED: new target aqua - fixed ocean T, nocouple, atmos flux calc"
         key: "slabplanet_aqua_target_nocouple"
@@ -176,7 +174,6 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
-        soft_fail: true
 
       - label: "TARGET IDEALIZED: new target aqua - fixed ocean T, coupler flux calc"
         key: "slabplanet_aqua_target"
@@ -189,7 +186,6 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
-        soft_fail: true
 
       - label: "TARGET IDEALIZED: new target aqua - evolving slab ocean T"
         key: "slabplanet_aqua_target_evolve_ocn"
@@ -202,7 +198,6 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
-        soft_fail: true
 
       - label: "TARGET IDEALIZED: new target slab - fixed ocean T, bucket"
         key: "slabplanet_target"
@@ -215,7 +210,6 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
-        soft_fail: true
 
       - label: "TARGET IDEALIZED: new target slab - evolving slab ocean T, bucket"
         key: "slabplanet_target_evolve_ocn"
@@ -228,10 +222,9 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
-        soft_fail: true
 
 
-  - group: "Current target tests: AMIP surfaces"
+  - group: "Current target tests: AMIP surface"
 
     steps:
 
@@ -246,7 +239,6 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
-        soft_fail: true
 
       - label: "MPI AMIP FINE: new target amip: topo"
         key: "amip_target_topo"
@@ -259,7 +251,6 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
-        soft_fail: true
 
       - label: "MPI AMIP FINE: new target amip: topo + diagedmf"
         key: "amip_target_topo_diagedmf"
@@ -272,7 +263,6 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 20G
-        soft_fail: true
 
   - group: "Current target tests on GPU: AMIP surface"
 
@@ -285,7 +275,6 @@ steps:
         agents:
           slurm_gpus: 1
           slurm_mem: 16GB
-        soft_fail: true
 
       - label: "GPU AMIP FINE: new target amip: topo + diagedmf"
         key: "gpu_amip_target_topo_diagedmf"
@@ -294,13 +283,105 @@ steps:
         agents:
           slurm_gpus: 1
           slurm_mem: 16GB
-        soft_fail: true
 
-  - wait
-
-  - group: "Job analysis and reporting"
+  - group: "Other AMIP targets"
 
     steps:
+
+      # DYAMOND AMIP: 1 day (convection resolving)
+      - label: "MPI AMIP SUPERFINE: dyamond_target"
+        key: "dyamond_target"
+        command: "srun julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/dyamond_target.yml"
+        artifact_paths: "experiments/AMIP/output/amip/dyamond_target_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
+
+      # mid-resolution AMIP: MPI performance scaling (10 days)
+      - label: "MPI AMIP FINE: n64"
+        key: "mpi_amip_fine_n64"
+        command: "srun julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/amip_n64_shortrun.yml"
+        artifact_paths: "experiments/AMIP/output/amip/amip_n64_shortrun_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 16
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
+
+      - label: "MPI AMIP FINE: n32"
+        key: "mpi_amip_fine_n32"
+        command: "srun julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/amip_n32_shortrun.yml"
+        artifact_paths: "experiments/AMIP/output/amip/amip_n32_shortrun_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 8
+          slurm_nodes: 4
+          slurm_mem_per_cpu: 16G
+
+      - label: "MPI AMIP FINE: n8"
+        key: "mpi_amip_fine_n8"
+        command: "srun julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/amip_n8_shortrun.yml"
+        artifact_paths: "experiments/AMIP/output/amip/amip_n8_shortrun_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 8
+          slurm_nodes: 1
+          slurm_mem_per_cpu: 16G
+
+      - label: "MPI AMIP FINE: n2" # 10d take 21h, so reducing to 1d
+        key: "mpi_amip_fine_n2"
+        command: "srun julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/amip_n2_shortrun.yml"
+        artifact_paths: "experiments/AMIP/output/amip/amip_n2_shortrun_artifacts/*"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 2
+          slurm_nodes: 1
+          slurm_mem_per_cpu: 16G
+
+      - label: "MPI AMIP FINE: n1" # also reported by longruns with a flame graph; 10d take 21h, so reducing to 1d
+        key: "mpi_amip_fine_n1"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/amip_n1_shortrun.yml"
+        artifact_paths: "experiments/AMIP/output/amip/amip_n1_shortrun_artifacts/*"
+        env:
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 1
+          slurm_nodes: 1
+          slurm_mem_per_cpu: 16G
+
+      - label: "MPI AMIP FINE: n1 no couple" # sim time = Δt_cpl (~ benchmarking with standalone models)
+        key: "mpi_amip_fine_n1_nocouple"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/amip_n1_shortrun_nocouple.yml"
+        artifact_paths: "experiments/AMIP/output/amip/amip_n1_shortrun_nocouple_artifacts/*"
+        env:
+          BUILD_HISTORY_HANDLE: ""
+        agents:
+          slurm_ntasks_per_node: 1
+          slurm_nodes: 1
+          slurm_mem_per_cpu: 16G
+
+      # mpi_amip_fine_n1 flame graph report (NB: arguments passed from the ci pipeline.yml)
+      - label: ":rocket: performance: flame graph diff: perf_target_amip_n1_shortrun"
+        command: "julia --color=yes --project=perf perf/flame_diff.jl --config_file $PERF_CONFIG_PATH/perf_diff_target_amip_n1_shortrun.yml"
+        artifact_paths: "perf/output/perf_diff_target_amip_n1_shortrun/*"
+        agents:
+          slurm_ntasks_per_node: 1
+          slurm_nodes: 1
+          slurm_mem_per_cpu: 16G
+
+      - wait
 
       # plot job performance history
       - label: ":chart_with_downwards_trend: build history"
@@ -313,18 +394,21 @@ steps:
 
       - label: ":envelope: Slack report: build_history"
         command:
-          - |
-            slack-upload -c "#coupler-report" -f build_history.html -m html -n build_history -x ":rocket: Interactive overall job performance history (download the attached file and view in browser) :rocket:"
+          - slack-upload -c "#coupler-report" -f build_history.html -m html -n build_history -x "Overall job performance"
 
       - label: ":envelope: Slack report: Slabplanet"
         command:
+          - slack-upload -c "#coupler-report" -f experiments/AMIP/output/slabplanet/slabplanet_coupler_sf_evolve_ocn_artifacts/total_energy_log_bucket.png -m png -n slab_coarse_log -x "Slabplanet energy conservation (log error)"
           - slack-upload -c "#coupler-report" -f experiments/AMIP/output/slabplanet/slabplanet_coupler_sf_evolve_ocn_artifacts/total_energy_bucket.png -m png -n slab_coarse -x "Slabplanet energy conservation"
+          - slack-upload -c "#coupler-report" -f experiments/AMIP/output/slabplanet/slabplanet_coupler_sf_evolve_ocn_artifacts/total_water_log_bucket.png -m png -n slab_coarse_w_log -x "Slabplanet water conservation (log error)"
           - slack-upload -c "#coupler-report" -f experiments/AMIP/output/slabplanet/slabplanet_coupler_sf_evolve_ocn_artifacts/total_water_bucket.png -m png -n slab_coarse_w -x "Slabplanet water conservation"
 
       - label: ":envelope: Slack report: target AMIP"
         command:
-          - slack-upload -c "#coupler-report" -f experiments/AMIP/output/amip/amip_target_topo_diagedmf_artifacts/amip_ncep.png -m png -n amip_fine -x "Target AMIP v NCEP Last Month Mean"
-          - |
-            find experiments/AMIP/output/amip/amip_target_topo_diagedmf_artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
-              slack-upload -c "#coupler-report" -f "$$file" -m png -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
-            done
+          - slack-upload -c "#coupler-report" -f experiments/AMIP/output/amip/amip_target_artifacts/amip_paperplots.png -m png -n amip_fine -x "AMIP Target Longrun"
+          - slack-upload -c "#coupler-report" -f experiments/AMIP/output/amip/amip_target_artifacts/biases.png -m png -n amip_fine -x "AMIP Target Longrun"
+
+      - label: ":envelope: Slack report: Flame Diff"
+        command:
+          - slack-upload -c "#coupler-report" -f perf/output/perf_diff_target_amip_n1_shortrun/flame_diff.html -m png -n amip_fine_flamegraphdiff -x "AMIP Longrun FlameGraphDiff"
+          - slack-upload -c "#coupler-report" -f perf/output/perf_diff_target_amip_n1_shortrun/flame_diff_self_count.html -m png -n amip_fine_flamegraphdiffself -x "AMIP Longrun FlameGraphDiffSelf"

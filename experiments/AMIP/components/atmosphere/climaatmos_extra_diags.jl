@@ -80,3 +80,108 @@ CAD.add_diagnostic_variable!(
 
     end,
 )
+
+###
+# Add the mass streamfunction diagnostic variable
+###
+
+# TODO: this should be integrated from top-down
+add_diagnostic_variable!(
+    short_name = "mass_streamfunction",
+    long_name = "Meridional Mass Streamfunction: vertical integral of meridional mass flux, rho v",
+    standard_name = "meridional_mass_streamfunction",
+    units = "kg m^-1 s^-1",
+    compute! = (out, state, cache, time) -> begin
+        ρv = ClimaCore.Geometry.UVVector.(state.c.uₕ).components.data.:2 .* state.c.ρ
+        ᶠ∫_0_z_ρv = cache.scratch.ᶠtemp_scalar
+        ClimaCore.Fields.bycolumn(axes(ρv)) do colidx
+            ClimaCore.Operators.column_integral_indefinite!(ᶠ∫_0_z_ρv[colidx], ρv[colidx])
+        end
+        if isnothing(out)
+            return copy(ᶠ∫_0_z_ρv)
+        else
+            out .= ᶠ∫_0_z_ρv
+        end
+    end,
+)
+
+add_diagnostic_variable!(
+    short_name = "stab",
+    long_name = "Static Stability: N^2 = -g/theta dtheta/dz",
+    standard_name = "static_stability",
+    units = "s^-2",
+    compute! = (out, state, cache, time) -> begin
+        dθdz = ClimaCore.Geometry.WVector.(cache.precomputed.ᶜgradᵥ_θ_virt)
+        thermo_params = CAP.thermodynamics_params(cache.params)
+        ᶜts = cache.precomputed.ᶜts
+        θ_virt = TD.virtual_pottemp.(thermo_params, ᶜts)
+        temp = cache.scratch.ᶜtemp_scalar
+        parent(temp) .= parent(CAP.grav(cache.params) ./ θ_virt .* dθdz)
+        if isnothing(out)
+            return copy(temp)
+        else
+            out .= temp
+        end
+    end,
+)
+
+add_diagnostic_variable!(
+    short_name = "vT",
+    long_name = "Product of meridional wind and temperature",
+    standard_name = "vT",
+    units = "K m/s",
+    compute! = (out, state, cache, time) -> begin
+        thermo_params = CAP.thermodynamics_params(cache.params)
+        T = TD.air_temperature.(thermo_params, cache.precomputed.ᶜts)
+        v = ClimaCore.Geometry.UVVector.(state.c.uₕ).components.data.:2
+        if isnothing(out)
+            return  v .* T
+        else
+            out .= v .* T
+        end
+    end,
+)
+
+const ᶜgradᵥ_ = ClimaCore.Operators.GradientF2C()
+const ᶠinterp_ = ClimaCore.Operators.InterpolateC2F(
+    bottom = ClimaCore.Operators.Extrapolate(),
+    top = ClimaCore.Operators.Extrapolate(),
+)
+
+add_diagnostic_variable!(
+    short_name = "egr",
+    long_name = "max. Eady growth rate (0.31 f/N du/dz)",
+    standard_name = "Eady_growth_rate",
+    units = "s^-1",
+    compute! = (out, state, cache, time) -> begin
+        FT = eltype(state)
+        thermo_params = CAP.thermodynamics_params(cache.params)
+        dθdz = cache.precomputed.ᶜgradᵥ_θ_virt
+        ᶜts = cache.precomputed.ᶜts
+        θ_virt = TD.virtual_pottemp.(thermo_params, ᶜts)
+        N = cache.scratch.ᶜtemp_scalar
+        Nsq = CAP.grav(cache.params) ./ θ_virt .* ClimaCore.Geometry.WVector.(dθdz)
+        mask = parent(Nsq) .> 0
+        parent(N) .= sqrt.((parent(Nsq) .* mask ))
+
+        Ω = CAP.Omega(cache.params)
+        φ = ClimaCore.Fields.coordinate_field(N).lat
+        f = 2Ω .* sin.(φ)
+        u = ClimaCore.Geometry.UVVector.(state.c.uₕ).components.data.:1
+        grad_u = @. ᶜgradᵥ_.(ᶠinterp_(u))
+        du_dz = ClimaCore.Geometry.WVector.(grad_u)
+        temp = cache.scratch.ᶜtemp_scalar
+        parent(temp) .= parent(FT(0.31) .* f ./ N .* du_dz)
+        if isnothing(out)
+            return copy(temp)
+        else
+            out .= temp
+        end
+    end,
+)
+
+# climate diagnostics: ta, ua, (hus), *mass_streamfunction, *stab, mse
+
+# storm track diagnostics: [vT], [v][T], egr = f/N dTdy
+
+# vars = [mse, lr, ediff, mass_streamfunction, stab, vT, egr]

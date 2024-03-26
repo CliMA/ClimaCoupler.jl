@@ -21,10 +21,7 @@ struct ClimaAtmosSimulation{P, Y, D, I} <: Interfacer.AtmosModelSimulation
 end
 Interfacer.name(::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
 
-function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
-    # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
-    atmos_config_dict["surface_albedo"] = "CouplerAlbedo"
-    atmos_config = CA.AtmosConfig(atmos_config_dict)
+function atmos_init(::Type{FT}, atmos_config) where {FT}
     simulation = CA.get_simulation(atmos_config)
     (; integrator) = simulation
     Y = integrator.u
@@ -235,12 +232,12 @@ FluxCalculator.get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxe
 ### ClimaAtmos.jl model-specific functions (not explicitly required by ClimaCoupler.jl)
 ###
 """
-    get_atmos_config(coupler_dict::Dict)
+    get_atmos_config_dict(coupler_dict::Dict)
 
 Returns the specified atmospheric configuration (`atmos_config_dict`) overwitten by arguments
 in the coupler dictionary (`config_dict`).
 """
-function get_atmos_config(coupler_dict)
+function get_atmos_config_dict(coupler_dict)
     atmos_config_file = coupler_dict["atmos_config_file"]
     # override default or specified configs with coupler arguments, and set the correct atmos config_file
     if isnothing(atmos_config_file)

@@ -2,23 +2,11 @@ using ClimaComms
 using Logging
 using ClimaAtmos
 
-
 redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(false)))
 import ClimaAtmos as CA
 import Random
 Random.seed!(1234)
 
-if !(@isdefined config)
-    config = CA.AtmosConfig()
-end
-simulation = CA.get_simulation(config)
-(; integrator) = simulation
-sol_res = CA.solve_atmos!(simulation)
-
-
-# ___
-(; atmos, params) = integrator.p
-(; p) = integrator
 
 import ClimaCore
 import ClimaCore: Topologies, Quadratures, Spaces
@@ -41,6 +29,19 @@ import Base.Filesystem: rm
 # using ClimaCorePlots
 import Pkg; Pkg.add("ClimaCoreMakie")
 using ClimaCoreMakie, CairoMakie
+
+if !(@isdefined config)
+    config = CA.AtmosConfig()
+end
+simulation = CA.get_simulation(config)
+(; integrator) = simulation
+sol_res = CA.solve_atmos!(simulation)
+
+
+# ___
+(; atmos, params) = integrator.p
+(; p) = integrator
+
 include(joinpath(pkgdir(CA), "post_processing", "ci_plots.jl"))
 
 ref_job_id = config.parsed_args["reference_job_id"]

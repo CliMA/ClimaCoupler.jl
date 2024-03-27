@@ -39,6 +39,7 @@ import Base.Filesystem: rm
 # import OrderedCollections
 # using ClimaCoreTempestRemap
 # using ClimaCorePlots
+import Pkg; Pkg.add("ClimaCoreMakie")
 using ClimaCoreMakie, CairoMakie
 include(joinpath(pkgdir(CA), "post_processing", "ci_plots.jl"))
 

@@ -57,7 +57,7 @@ steps:
       - label: "CPU ClimaAtmos standalone target"
         command:
           - srun julia --project=experiments/AMIP/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file test/component_model_tests/climaatmos_standalone/longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_tvinsol_0M_slabocean.yml
-        artifact_paths:  "experiments/AMIP/output/amip/longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_tvinsol_0M_slabocean_artifacts/*"
+        artifact_paths:  "longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_tvinsol_0M_slabocean/*"
         env:
           BUILD_HISTORY_HANDLE: ""
           CLIMACORE_DISTRIBUTED: "MPI"
@@ -84,9 +84,7 @@ steps:
 
           - echo "--- Run simulation"
           - srun julia --project=experiments/AMIP/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file test/component_model_tests/climaatmos_standalone/longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_tvinsol_0M_slabocean_gpu.yml
-        artifact_paths:  "experiments/AMIP/output/amip/longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_tvinsol_0M_slabocean_gpu_artifacts/*"
-        env:
-          CLIMACORE_DISTRIBUTED: "MPI"
+        artifact_paths:  "longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_tvinsol_0M_slabocean_gpu/*"
         agents:
           queue: clima
           slurm_mem: 20GB

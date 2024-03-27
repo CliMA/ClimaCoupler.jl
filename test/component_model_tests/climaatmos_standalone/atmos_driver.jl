@@ -2,17 +2,18 @@ using ClimaComms
 using Logging
 using ClimaAtmos
 
-# redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(false)))
-# import ClimaAtmos as CA
-# import Random
-# Random.seed!(1234)
 
-# if !(@isdefined config)
-#     config = CA.AtmosConfig()
-# end
-# simulation = CA.get_simulation(config)
-# (; integrator) = simulation
-# sol_res = CA.solve_atmos!(simulation)
+redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(false)))
+import ClimaAtmos as CA
+import Random
+Random.seed!(1234)
+
+if !(@isdefined config)
+    config = CA.AtmosConfig()
+end
+simulation = CA.get_simulation(config)
+(; integrator) = simulation
+sol_res = CA.solve_atmos!(simulation)
 
 
 # ___
@@ -28,29 +29,29 @@ import Thermodynamics as TD
 import ClimaComms
 using SciMLBase
 using PrettyTables
-using JLD2
+# using JLD2
 using NCDatasets
 using ClimaTimeSteppers
-import JSON
+# import JSON
 using Test
 import Tar
 import Base.Filesystem: rm
-import OrderedCollections
-using ClimaCoreTempestRemap
-using ClimaCorePlots
+# import OrderedCollections
+# using ClimaCoreTempestRemap
+# using ClimaCorePlots
 using ClimaCoreMakie, CairoMakie
 include(joinpath(pkgdir(CA), "post_processing", "ci_plots.jl"))
 
 ref_job_id = config.parsed_args["reference_job_id"]
 reference_job_id = isnothing(ref_job_id) ? simulation.job_id : ref_job_id
 
-# if sol_res.ret_code == :simulation_crashed
-#     error(
-#         "The ClimaAtmos simulation has crashed. See the stack trace for details.",
-#     )
-# end
-# # Simulation did not crash
-# (; sol, walltime) = sol_res
+if sol_res.ret_code == :simulation_crashed
+    error(
+        "The ClimaAtmos simulation has crashed. See the stack trace for details.",
+    )
+end
+# Simulation did not crash
+(; sol, walltime) = sol_res
 
 # # we gracefully exited, so we won't have reached t_end
 # if !isempty(integrator.tstops)

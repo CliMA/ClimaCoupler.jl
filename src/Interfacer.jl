@@ -147,7 +147,8 @@ get_field(
         Val{:beta},
         Val{:roughness_buoyancy},
         Val{:roughness_momentum},
-        Val{:surface_albedo},
+        Val{:surface_direct_albedo},
+        Val{:surface_diffuse_albedo},
         Val{:surface_humidity},
         Val{:surface_temperature},
     },
@@ -190,7 +191,8 @@ get_field(sim::SurfaceStub, ::Val{:beta}) = sim.cache.beta
 get_field(sim::SurfaceStub, ::Val{:energy}) = nothing
 get_field(sim::SurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
 get_field(sim::SurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m
-get_field(sim::SurfaceStub, ::Val{:surface_albedo}) = sim.cache.α
+get_field(sim::SurfaceStub, ::Val{:surface_direct_albedo}) = sim.cache.α_direct
+get_field(sim::SurfaceStub, ::Val{:surface_diffuse_albedo}) = sim.cache.α_diffuse
 get_field(sim::SurfaceStub, ::Val{:surface_humidity}) =
     TD.q_vap_saturation_generic.(sim.cache.thermo_params, sim.cache.T_sfc, sim.cache.ρ_sfc, sim.cache.phase)
 get_field(sim::SurfaceStub, ::Val{:surface_temperature}) = sim.cache.T_sfc
@@ -218,7 +220,13 @@ If it isn't extended, the field won't be updated and a warning will be raised.
 """
 update_field!(
     sim::AtmosModelSimulation,
-    val::Union{Val{:co2}, Val{:surface_albedo}, Val{:surface_temperature}, Val{:turbulent_fluxes}},
+    val::Union{
+        Val{:co2},
+        Val{:surface_direct_albedo},
+        Val{:surface_diffuse_albedo},
+        Val{:surface_temperature},
+        Val{:turbulent_fluxes},
+    },
     _,
 ) = update_field_warning(sim, val)
 
@@ -239,6 +247,8 @@ update_field!(
         Val{:snow_precipitation},
         Val{:turbulent_energy_flux},
         Val{:turbulent_moisture_flux},
+        Val{:surface_direct_albedo},
+        Val{:surface_diffuse_albedo},
     },
     _,
 ) = update_field_warning(sim, val)
@@ -259,6 +269,12 @@ function update_field!(sim::SurfaceStub, ::Val{:surface_temperature}, field::Fie
 end
 function update_field!(sim::SurfaceStub, ::Val{:air_density}, field)
     parent(sim.cache.ρ_sfc) .= parent(field)
+end
+function update_field!(sim::SurfaceStub, ::Val{:surface_direct_albedo}, field::Fields.Field)
+    sim.cache.α_direct .= field
+end
+function update_field!(sim::SurfaceStub, ::Val{:surface_diffuse_albedo}, field::Fields.Field)
+    sim.cache.α_diffuse .= field
 end
 
 """

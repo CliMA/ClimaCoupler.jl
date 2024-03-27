@@ -11,6 +11,7 @@ if !(@isdefined config)
     config = CA.AtmosConfig()
 end
 simulation = CA.get_simulation(config)
+(; integrator) = simulation
 sol_res = CA.solve_atmos!(simulation)
 
 

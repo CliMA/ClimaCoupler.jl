@@ -344,8 +344,17 @@ steps:
           slurm_ntasks: 2
           slurm_mem: 16GB
 
-      - label: "batch script"
-        command: "sbatch test/mpi_tests/local_checks.sh"
+      # - label: "batch script"
+      #   command:
+      #     - |
+      #       sed -n '10,37' test/mpi_tests/local_checks.sh | bash &&
+      #       sed -n '38,49' test/mpi_tests/local_checks.sh | bash &&
+      #       sed -n '50,$$p' test/mpi_tests/local_checks.sh | bash
+      #   env:
+      #     CLIMACORE_DISTRIBUTED: "MPI"
+      #   agents:
+      #     slurm_ntasks: 2
+      #     slurm_mem: 16GB
 
       # short high-res performance test
       - label: "Unthreaded AMIP FINE" # also reported by longruns with a flame graph
@@ -431,9 +440,35 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
+  - group: "Bash scripts"
 
+    steps:
+      - label: "batch script - part 1: first srun"
+        command:
+          - "sed -n '8,34p' test/mpi_tests/local_checks.sh | bash"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+        agents:
+          slurm_ntasks: 2
+          slurm_mem: 16GB
 
       - wait
+
+      - label: "batch script - part 2: second srun"
+        command:
+          - "sed -n '8,33p; 36,46p' test/mpi_tests/local_checks.sh | bash"
+        env:
+          CLIMACORE_DISTRIBUTED: "MPI"
+        agents:
+          slurm_ntasks: 2
+          slurm_mem: 16GB
+
+      - wait
+
+      - label: "batch script - part 3: check for output"
+        command: "sed -n '8,24p; 47,$$p' test/mpi_tests/local_checks.sh | bash"
+        agents:
+          slurm_mem: 16GB
 
   - wait
 

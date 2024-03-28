@@ -882,6 +882,13 @@ if ClimaComms.iamroot(comms_ctx)
         end
     end
 
+    ## ci plots
+    if config_dict["ci_plots"]
+        @info "Generating CI plots"
+        include("user_io/ci_plots.jl")
+        make_plots(Val(:general_ci_plots), [joinpath(COUPLER_OUTPUT_DIR, "clima_atmos")], COUPLER_ARTIFACTS_DIR)
+    end
+
     if isinteractive()
         ## clean up for interactive runs, retain all output otherwise
         rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)

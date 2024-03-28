@@ -27,7 +27,7 @@ import Base.Filesystem: rm
 # import OrderedCollections
 # using ClimaCoreTempestRemap
 # using ClimaCorePlots
-import Pkg; Pkg.add("ClimaCoreMakie")
+# import Pkg; Pkg.add("ClimaCoreMakie")
 using ClimaCoreMakie, CairoMakie
 
 if !(@isdefined config)

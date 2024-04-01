@@ -636,5 +636,85 @@ function cgll2latlonz(field; DIR = "cgll2latlonz_dir", nlat = 360, nlon = 720, c
     return new_data, coords
 end
 
+"""
+    truncate_dataset(datafile, name, datapath_trunc, date0, time_start, time_end, comms_ctx)
+
+Truncates given data set, and constructs a new dataset containing only the dates that are used in the simulation
+"""
+function truncate_dataset(
+    datafile,
+    name,
+    datapath_trunc,
+    date0,
+    time_start,
+    time_end,
+    comms_ctx::ClimaComms.AbstractCommsContext,
+)
+    date_start = date0 + Dates.Second(time_start)
+    date_end = date0 + Dates.Second(time_start + time_end)
+
+    file_name = replace(string(name, "_truncated_data_", string(date_start), string(date_end), ".nc"), r":" => "")
+    datafile_truncated = joinpath(datapath_trunc, file_name)
+
+    if ClimaComms.iamroot(comms_ctx)
+        ds = NCDatasets.NCDataset(datafile, "r")
+        dates = ds["time"][:]
+
+        (start_id, end_id) = find_idx_bounding_dates(dates, date_start, date_end)
+
+        ds_truncated = NCDatasets.NCDataset(datafile_truncated, "c")
+        ds_truncated = NCDatasets.write(ds_truncated, NCDatasets.view(ds, time = start_id:end_id))
+
+        close(ds)
+        close(ds_truncated)
+
+        return datafile_truncated
+    end
+end
+
+"""
+    find_idx_bounding_dates(dates, date_start, date_end) 
+
+Returns the index range from dates that contains date_start to date_end
+"""
+function find_idx_bounding_dates(dates, date_start, date_end)
+    # if the simulation start date is before our first date in the dataset
+    # leave the beginning of the truncated dataset to be first date available
+    if date_start < dates[1]
+        start_id = 1
+        # if the simulation start date is after the last date in the dataset
+        # start the truncated dataset at its last possible date
+    elseif date_start > last(dates)
+        start_id = length(dates)
+        # if the simulation start date falls within the range of the dataset
+        # find the closest date to the start date and truncate there 
+    else
+        (~, start_id) = findmin(x -> abs(x - date_start), dates)
+        # if the closest date is after the start date, add one more date before 
+        if dates[start_id] > date_start
+            start_id = start_id - 1
+        end
+    end
+
+    # if the simulation end date is before our first date in the dataset
+    # truncate the end of the dataset to be the first date
+    if date_end < dates[1]
+        end_id = 1
+        # if the simulation end date is after the last date in the dataset
+        # leave the end of the dataset as is 
+    elseif date_end > last(dates)
+        end_id = length(dates)
+        # if the simulation end date falls within the range of the dataset
+        # find the closest date to the end date and truncate there 
+    else
+        (~, end_id) = findmin(x -> abs(x - date_end), dates)
+        # if the closest date is before the end date, add one more date after
+        if dates[end_id] < date_end
+            end_id = end_id + 1
+        end
+    end
+
+    return (; start_id, end_id)
+end
 
 end # Module

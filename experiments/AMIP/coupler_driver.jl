@@ -168,10 +168,10 @@ original sources.
 =#
 
 include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
-sst_data = joinpath(sst_dataset_path(), "sst.nc")
-sic_data = joinpath(sic_dataset_path(), "sic.nc")
-co2_data = joinpath(co2_dataset_path(), "mauna_loa_co2.nc")
-land_mask_data = joinpath(mask_dataset_path(), "seamask.nc")
+sst_data = artifact_data(sst_dataset_path(), "sst", REGRID_DIR, date0, t_start, t_end, comms_ctx)
+sic_data = artifact_data(sic_dataset_path(), "sic", REGRID_DIR, date0, t_start, t_end, comms_ctx)
+co2_data = artifact_data(co2_dataset_path(), "mauna_loa_co2", REGRID_DIR, date0, t_start, t_end, comms_ctx)
+land_mask_data = artifact_data(mask_dataset_path(), "seamask")
 
 #=
 ## Component Model Initialization

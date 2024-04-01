@@ -37,12 +37,12 @@ include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
         Dates.DateTime(1981, 7, 6),
         Dates.DateTime(1993, 11, 19),
         Dates.DateTime(2040, 4, 1),
-        Dates.DateTime(2000, 8, 30),
+        Dates.DateTime(2000, 8, 18),
     ]
 
     expected_dates = (
         [Dates.DateTime(2040, 4, 1)],
-        [Dates.DateTime(1981, 7, 6), Dates.DateTime(2000, 8, 30)],
+        [Dates.DateTime(1981, 7, 6), Dates.DateTime(2000, 8, 18)],
         [Dates.DateTime(1993, 11, 19)],
         [Dates.DateTime(2015, 1, 13), Dates.DateTime(2018, 2, 13)],
     )

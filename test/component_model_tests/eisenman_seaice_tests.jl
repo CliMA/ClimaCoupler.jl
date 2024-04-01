@@ -5,7 +5,7 @@ using ClimaCore: Fields, Spaces
 
 import ClimaCoupler
 import ClimaCoupler.TestHelper
-import ClimaCoupler.Interfacer: SeaIceModelSimulation
+import ClimaCoupler.Interfacer: SeaIceModelSimulation, step!
 import ClimaCoupler: Regridder
 
 import ClimaParams as CP

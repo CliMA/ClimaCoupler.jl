@@ -301,15 +301,13 @@ for FT in (Float32, Float64)
     end
 
     @testset "update_turbulent_fluxes_point! for FT=$FT" begin
-        sim = Interfacer.SurfaceStub([])
-        sim2 = DummySurfaceSimulation3([], [], [], [])
+        sim = DummySurfaceSimulation3([], [], [], [])
         colidx = Fields.ColumnIndex{2}((1, 1), 73) # arbitrary index
-        @test update_turbulent_fluxes_point!(sim, (;), colidx) == nothing
         @test_throws ErrorException(
             "update_turbulent_fluxes_point! is required to be dispatched on" *
-            Interfacer.name(sim2) *
+            Interfacer.name(sim) *
             ", but no method defined",
-        ) update_turbulent_fluxes_point!(sim2, (;), colidx) == ErrorException
+        ) update_turbulent_fluxes_point!(sim, (;), colidx) == ErrorException
     end
 
     @testset "surface_thermo_state for FT=$FT" begin

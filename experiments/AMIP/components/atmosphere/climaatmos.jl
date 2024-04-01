@@ -17,9 +17,9 @@ import ClimaCoupler.FluxCalculator:
     extrapolate_ρ_to_sfc,
     get_surface_params,
     water_albedo_from_atmosphere!
-import ClimaCoupler.Interfacer: get_field, update_field!, name
+import ClimaCoupler.Interfacer: get_field, update_field!, name, step!, reinit!
 import ClimaCoupler.Checkpointer: get_model_prog_state
-import ClimaCoupler.FieldExchanger: update_sim!, step!, reinit!
+import ClimaCoupler.FieldExchanger: update_sim!
 import ClimaCoupler.Utilities: swap_space!
 
 include("climaatmos_extra_diags.jl")

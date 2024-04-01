@@ -163,7 +163,8 @@ module docs for more information.
 - `SurfaceStub` is a `SurfaceModelSimulation`, but it only contains
 required data in `<surface_stub>.cache`, e.g., for the calculation
 of surface fluxes through a prescribed surface state. The above
-adapter functions are already predefined for `SurfaceStub`, with
+adapter functions are already predefined for `SurfaceStub`
+in the `surface_stub.jl` file, with
 the cache variables specified as:
 ```
 get_field(sim::SurfaceStub, ::Val{:air_density}) = sim.cache.ρ_sfc

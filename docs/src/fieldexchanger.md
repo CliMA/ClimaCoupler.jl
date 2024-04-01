@@ -13,8 +13,6 @@ The component models are updated by broadcasting the coupler fields, via the `up
 
 If an `update_field!` function is not defined for a particular component model, it will be ignored.
 
-Each component model is also required to define its own `step!` and `reinit!` functions, otherwise this will be ignored.
-
 ## FieldExchanger API
 
 ```@docs
@@ -24,12 +22,4 @@ Each component model is also required to define its own `step!` and `reinit!` fu
     ClimaCoupler.FieldExchanger.update_sim!
     ClimaCoupler.FieldExchanger.reinit_model_sims!
     ClimaCoupler.FieldExchanger.step_model_sims!
-```
-
-
-## FieldExchanger Internal Functions
-
-```@docs
-    ClimaCoupler.FieldExchanger.step!
-    ClimaCoupler.FieldExchanger.reinit!
 ```

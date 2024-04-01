@@ -377,8 +377,6 @@ function update_turbulent_fluxes_point!(
     )
 end
 
-update_turbulent_fluxes_point!(sim::Interfacer.SurfaceStub, fields::NamedTuple, colidx::Fields.ColumnIndex) = nothing
-
 """
     differentiate_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, args)
 

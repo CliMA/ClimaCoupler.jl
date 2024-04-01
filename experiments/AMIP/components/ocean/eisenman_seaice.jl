@@ -7,8 +7,7 @@ import ClimaTimeSteppers as CTS
 import ClimaCoupler: FluxCalculator
 import ClimaCoupler.FluxCalculator:
     update_turbulent_fluxes_point!, differentiate_turbulent_fluxes!, surface_thermo_state
-import ClimaCoupler.Interfacer: get_field, update_field!
-import ClimaCoupler.FieldExchanger: step!, reinit!
+import ClimaCoupler.Interfacer: get_field, update_field!, step!, reinit!
 
 ###
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation

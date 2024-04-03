@@ -1,29 +1,26 @@
-using Glob
-using Printf
-using ClimaCoupler.PostProcessor: PostProcessedData, ZLatData, LatLonData, DataPackage, ZLatLonData
-using Plots
+import Plots
+import ClimaCoupler: PostProcessor
 
 """
-    plot(post_data::DataPackage; zmd_params = (;), hsd_params = (;))
+    Plots.plot(post_data::DataPackage; zmd_params = (;), hsd_params = (;))
 
 Coordinates plotting based on parsed data types.
 """
-function plot(post_data::DataPackage; zmd_params = (;), hsd_params = (;))
-
-    if post_data.tag isa ZLatData
+function Plots.plot(post_data::PostProcessor.DataPackage; zmd_params = (;), hsd_params = (;))
+    if post_data.tag isa PostProcessor.ZLatData
         plot_params = zmd_params
-    elseif post_data.tag isa LatLonData
+    elseif post_data.tag isa PostProcessor.LatLonData
         plot_params = hsd_params
     else
         plot_params = (;)
     end
-    contourf(post_data.tag, post_data; plot_params...)
+    Plots.contourf(post_data.tag, post_data; plot_params...)
 end
 
 """
-    function contourf(
-        ::ZLatData,
-        p::DataPackage;
+    Plots.contourf(
+        ::PostProcessor.ZLatData,
+        p::PostProcessor.DataPackage;
         xlabel = "lat (deg N)",
         ylabel = "z (km)",
         yaxis = (:log,),
@@ -34,9 +31,9 @@ end
 
 Plots a filled contour plot on the latitude-level plane.
 """
-function contourf(
-    ::ZLatData,
-    p::DataPackage;
+function Plots.contourf(
+    ::PostProcessor.ZLatData,
+    p::PostProcessor.DataPackage;
     xlabel = "lat (deg N)",
     ylabel = "z (km)",
     yaxis = (:log,),
@@ -44,7 +41,7 @@ function contourf(
     clims = nothing,
     units = " ",
 )
-    clims = clims == nothing ? extrema(p.data) : clims
+    clims = isnothing(clims) ? extrema(p.data) : clims
     Plots.contourf(
         p.coords.lat,
         p.coords.lev,
@@ -60,9 +57,9 @@ function contourf(
 end
 
 """
-    function contourf(
-        ::LatLonData,
-        p::DataPackage;
+    Plots.contourf(
+        ::PostProcessor.LatLonData,
+        p::PostProcessor.DataPackage;
         xlabel = "lat (deg N)",
         ylabel = "z (km)",
         yaxis = (:log,),
@@ -73,16 +70,16 @@ end
 
 Plots a filled contour plot on the longitude-latitude plane.
 """
-function contourf(
-    ::LatLonData,
-    p::DataPackage;
+function Plots.contourf(
+    ::PostProcessor.LatLonData,
+    p::PostProcessor.DataPackage;
     xlabel = "lon (deg E)",
     ylabel = "lat (deg N)",
     clims = nothing,
     units = " ",
 )
-    clims = clims == nothing ? extrema(p.data) : clims
-    plot_p = Plots.contourf(
+    clims = isnothing(clims) ? extrema(p.data) : clims
+    Plots.contourf(
         p.coords.lon,
         p.coords.lat,
         p.data',

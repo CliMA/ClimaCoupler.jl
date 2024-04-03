@@ -100,18 +100,17 @@ and for vertical-momentum, as:
 # ## Model Code
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", ".."))
 
-using Test
-using StaticArrays, IntervalSets, LinearAlgebra
+using IntervalSets # for `..`
+import LinearAlgebra
+import Logging
+import SciMLBase
+import StaticArrays
+import TerminalLoggers
 
-import ClimaCore: ClimaCore, slab, Spaces, Domains, Meshes, Geometry, Topologies, Spaces, Fields, Operators
-using ClimaCore.Geometry
-using ClimaCore.Utilities: PlusHalf
+import ClimaCore as CC
+import ClimaCore.Geometry: ⊗
 
-using Logging: global_logger
-using TerminalLoggers: TerminalLogger
-global_logger(TerminalLogger())
-
-using ClimaCoupler
+Logging.global_logger(TerminalLoggers.TerminalLogger())
 
 # Load coupled simulation code
 include("../CoupledSims/coupled_sim.jl")
@@ -119,23 +118,24 @@ include("../CoupledSims/coupled_sim.jl")
 ## set up function space
 function hvspace_2D(xlim = (-π, π), zlim = (0, 4π), helem = 20, velem = 20, npoly = 1)
     FT = Float64
-    vertdomain = Domains.IntervalDomain(
-        Geometry.ZPoint{FT}(zlim[1]),
-        Geometry.ZPoint{FT}(zlim[2]);
+    vertdomain = CC.Domains.IntervalDomain(
+        CC.Geometry.ZPoint{FT}(zlim[1]),
+        CC.Geometry.ZPoint{FT}(zlim[2]);
         boundary_names = (:bottom, :top),
     )
-    vertmesh = Meshes.IntervalMesh(vertdomain, nelems = velem)
-    vert_center_space = Spaces.CenterFiniteDifferenceSpace(vertmesh)
+    vertmesh = CC.Meshes.IntervalMesh(vertdomain, nelems = velem)
+    vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(vertmesh)
 
-    horzdomain = Domains.IntervalDomain(Geometry.XPoint{FT}(xlim[1]) .. Geometry.XPoint{FT}(xlim[2]), periodic = true)
-    horzmesh = Meshes.IntervalMesh(horzdomain; nelems = helem)
-    horztopology = Topologies.IntervalTopology(horzmesh)
+    horzdomain =
+        CC.Domains.IntervalDomain(CC.Geometry.XPoint{FT}(xlim[1]) .. CC.Geometry.XPoint{FT}(xlim[2]), periodic = true)
+    horzmesh = CC.Meshes.IntervalMesh(horzdomain; nelems = helem)
+    horztopology = CC.Topologies.IntervalTopology(horzmesh)
 
-    quad = Spaces.Quadratures.GLL{npoly + 1}()
-    horzspace = Spaces.SpectralElementSpace1D(horztopology, quad)
+    quad = CC.Spaces.Quadratures.GLL{npoly + 1}()
+    horzspace = CC.Spaces.SpectralElementSpace1D(horztopology, quad)
 
-    hv_center_space = Spaces.ExtrudedFiniteDifferenceSpace(horzspace, vert_center_space)
-    hv_face_space = Spaces.FaceExtrudedFiniteDifferenceSpace(hv_center_space)
+    hv_center_space = CC.Spaces.ExtrudedFiniteDifferenceSpace(horzspace, vert_center_space)
+    hv_face_space = CC.Spaces.FaceExtrudedFiniteDifferenceSpace(hv_center_space)
     return (hv_center_space, hv_face_space)
 end
 
@@ -152,8 +152,8 @@ end
 abstract type BCtag end
 struct ZeroFlux <: BCtag end
 
-bc_divF2C_bottom!(::ZeroFlux, dY, Y, p, t) = Operators.SetValue(Geometry.WVector(0.0))
-bc_divF2C_top!(::ZeroFlux, dY, Y, p, t) = Operators.SetValue(Geometry.WVector(0.0))
+bc_divF2C_bottom!(::ZeroFlux, dY, Y, p, t) = CC.Operators.SetValue(CC.Geometry.WVector(0.0))
+bc_divF2C_top!(::ZeroFlux, dY, Y, p, t) = CC.Operators.SetValue(CC.Geometry.WVector(0.0))
 
 function init_sea_breeze_2d(x, z)
     θ₀ = atm_T_ini
@@ -171,7 +171,7 @@ function init_sea_breeze_2d(x, z)
     p = p₀ * π_exn^(cp_d / R_d) # pressure
     ρ = p / R_d / T # density
     ρθ = ρ * θ # potential temperature density
-    return (ρ = ρ, ρθ = ρθ, ρuₕ = ρ * Geometry.UVector(0.0))
+    return (ρ = ρ, ρθ = ρθ, ρuₕ = ρ * CC.Geometry.UVector(0.0))
 end
 
 function atm_rhs!(dY, Y, params, t)
@@ -180,41 +180,41 @@ function atm_rhs!(dY, Y, params, t)
     dYc = dY.Yc
     dρw = dY.ρw
 
-    center_coords = Fields.coordinate_field(axes(Yc))
+    center_coords = CC.Fields.coordinate_field(axes(Yc))
 
     ## spectral horizontal operators
-    hdiv = Operators.Divergence()
-    hgrad = Operators.Gradient()
-    hwdiv = Operators.WeakDivergence()
-    hwgrad = Operators.WeakGradient()
+    hdiv = CC.Operators.Divergence()
+    hgrad = CC.Operators.Gradient()
+    hwdiv = CC.Operators.WeakDivergence()
+    hwgrad = CC.Operators.WeakGradient()
 
     ## vertical FD operators with BC's
-    vdivf2c = Operators.DivergenceF2C(
-        bottom = Operators.SetValue(Geometry.WVector(0.0)),
-        top = Operators.SetValue(Geometry.WVector(0.0)),
+    vdivf2c = CC.Operators.DivergenceF2C(
+        bottom = CC.Operators.SetValue(CC.Geometry.WVector(0.0)),
+        top = CC.Operators.SetValue(CC.Geometry.WVector(0.0)),
     )
-    vvdivc2f = Operators.DivergenceC2F(
-        bottom = Operators.SetDivergence(Geometry.WVector(0.0)),
-        top = Operators.SetDivergence(Geometry.WVector(0.0)),
+    vvdivc2f = CC.Operators.DivergenceC2F(
+        bottom = CC.Operators.SetDivergence(CC.Geometry.WVector(0.0)),
+        top = CC.Operators.SetDivergence(CC.Geometry.WVector(0.0)),
     )
-    uvdivf2c = Operators.DivergenceF2C(
-        bottom = Operators.SetValue(Geometry.WVector(0.0) ⊗ Geometry.UVector(0.0)),
-        top = Operators.SetValue(Geometry.WVector(0.0) ⊗ Geometry.UVector(0.0)),
+    uvdivf2c = CC.Operators.DivergenceF2C(
+        bottom = CC.Operators.SetValue(CC.Geometry.WVector(0.0) ⊗ CC.Geometry.UVector(0.0)),
+        top = CC.Operators.SetValue(CC.Geometry.WVector(0.0) ⊗ CC.Geometry.UVector(0.0)),
     )
-    If = Operators.InterpolateC2F(bottom = Operators.Extrapolate(), top = Operators.Extrapolate())
-    Ic = Operators.InterpolateF2C()
-    ∂ = Operators.DivergenceF2C(
-        bottom = Operators.SetValue(Geometry.WVector(0.0)),
-        top = Operators.SetValue(Geometry.WVector(0.0)),
+    If = CC.Operators.InterpolateC2F(bottom = CC.Operators.Extrapolate(), top = CC.Operators.Extrapolate())
+    Ic = CC.Operators.InterpolateF2C()
+    ∂ = CC.Operators.DivergenceF2C(
+        bottom = CC.Operators.SetValue(CC.Geometry.WVector(0.0)),
+        top = CC.Operators.SetValue(CC.Geometry.WVector(0.0)),
     )
-    ∂f = Operators.GradientC2F()
-    ∂c = Operators.GradientF2C()
-    B = Operators.SetBoundaryOperator(
-        bottom = Operators.SetValue(Geometry.WVector(0.0)),
-        top = Operators.SetValue(Geometry.WVector(0.0)),
+    ∂f = CC.Operators.GradientC2F()
+    ∂c = CC.Operators.GradientF2C()
+    B = CC.Operators.SetBoundaryOperator(
+        bottom = CC.Operators.SetValue(CC.Geometry.WVector(0.0)),
+        top = CC.Operators.SetValue(CC.Geometry.WVector(0.0)),
     )
 
-    ∇_z_ρθ = Operators.DivergenceF2C(
+    ∇_z_ρθ = CC.Operators.DivergenceF2C(
         bottom = bc_divF2C_bottom!(params.bc.ρθ.bottom, dY, Y, params, t),
         top = bc_divF2C_top!(params.bc.ρθ.top, dY, Y, params, t),
     )
@@ -231,8 +231,8 @@ function atm_rhs!(dY, Y, params, t)
     @. dYc.ρθ = hwdiv(hgrad(θ))
     @. dYc.ρuₕ = hwdiv(hgrad(uₕ))
     @. dρw = hwdiv(hgrad(w))
-    Spaces.weighted_dss!(dYc)
-    Spaces.weighted_dss!(dρw)
+    CC.Spaces.weighted_dss!(dYc)
+    CC.Spaces.weighted_dss!(dρw)
 
     κ₄ = 0.0 # m^4/s
     @. dYc.ρθ = -κ₄ * hwdiv(Yc.ρ * hgrad(dYc.ρθ))
@@ -248,13 +248,14 @@ function atm_rhs!(dY, Y, params, t)
     @. dYc.ρθ -= hdiv(uₕ * Yc.ρθ)
 
     ## horizontal momentum
-    Ih = Ref(Geometry.Axis2Tensor((Geometry.UAxis(), Geometry.UAxis()), @SMatrix [1.0]))
+    Ih = Ref(CC.Geometry.Axis2Tensor((CC.Geometry.UAxis(), CC.Geometry.UAxis()), StaticArrays.@SMatrix [1.0]))
     @. dYc.ρuₕ += -uvdivf2c(ρw ⊗ If(uₕ))
     @. dYc.ρuₕ -= hdiv(Yc.ρuₕ ⊗ uₕ + p * Ih)
 
     ## vertical momentum
-    @. dρw +=
-        B(Geometry.transform(Geometry.WAxis(), -(∂f(p)) - If(Yc.ρ) * ∂f(Φ(center_coords.z))) - vvdivc2f(Ic(ρw ⊗ w)))
+    @. dρw += B(
+        CC.Geometry.transform(CC.Geometry.WAxis(), -(∂f(p)) - If(Yc.ρ) * ∂f(Φ(center_coords.z))) - vvdivc2f(Ic(ρw ⊗ w)),
+    )
     uₕf = @. If(Yc.ρuₕ / Yc.ρ) # requires boundary conditions
     @. dρw -= hdiv(uₕf ⊗ ρw)
 
@@ -275,8 +276,8 @@ function atm_rhs!(dY, Y, params, t)
     ##  2b) vertical div of vertial grad of potential temperature
     @. dYc.ρθ += ∇_z_ρθ(κ₂ * (Yfρ * ∂f(Yc.ρθ / Yc.ρ)))
 
-    Spaces.weighted_dss!(dYc)
-    Spaces.weighted_dss!(dρw)
+    CC.Spaces.weighted_dss!(dYc)
+    CC.Spaces.weighted_dss!(dρw)
     return dY
 end
 
@@ -285,8 +286,8 @@ function atm_init(; xmin = -500, xmax = 500, zmin = 0, zmax = 1000, npoly = 3, h
 
     ## construct domain spaces
     hv_center_space, hv_face_space = hvspace_2D((xmin, xmax), (zmin, zmax), helem, velem, npoly) # [m]
-    center_coords = Fields.coordinate_field(hv_center_space)
-    face_coords = Fields.coordinate_field(hv_face_space)
+    center_coords = CC.Fields.coordinate_field(hv_center_space)
+    face_coords = CC.Fields.coordinate_field(hv_face_space)
     domain = (hv_center_space = hv_center_space, hv_face_space = hv_face_space)
 
     ## initialize prognostic variables
@@ -296,10 +297,10 @@ function atm_init(; xmin = -500, xmax = 500, zmin = 0, zmax = 1000, npoly = 3, h
     end
 
     ρw = map(face_coords) do coord
-        Geometry.WVector(0.0)
+        CC.Geometry.WVector(0.0)
     end
 
-    Y = Fields.FieldVector(Yc = Yc, ρw = ρw)
+    Y = CC.Fields.FieldVector(Yc = Yc, ρw = ρw)
 
     ## select boundary conditions
     if bc === nothing
@@ -322,8 +323,8 @@ function AtmosSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks 
     ode_algo = CTS.ExplicitAlgorithm(timestepper)
     ode_function = CTS.ClimaODEFunction(T_exp! = atm_rhs!)
 
-    problem = ODEProblem(ode_function, Y_init, (t_start, t_end), p)
-    atm_integ = init(
+    problem = SciMLBase.ODEProblem(ode_function, Y_init, (t_start, t_end), p)
+    atm_integ = SciMLBase.init(
         problem,
         ode_algo,
         dt = dt,
@@ -368,24 +369,24 @@ function bc_divF2C_bottom!(::CoupledFlux, dY, Y, p, t)
     Yc = Y.Yc
     uₕ = Yc.ρuₕ ./ Yc.ρ
     ρw = Y.ρw
-    If2c = Operators.InterpolateF2C()
-    Ic2f = Operators.InterpolateC2F(bottom = Operators.Extrapolate(), top = Operators.Extrapolate())
+    If2c = CC.Operators.InterpolateF2C()
+    Ic2f = CC.Operators.InterpolateC2F(bottom = CC.Operators.Extrapolate(), top = CC.Operators.Extrapolate())
     w = If2c.(ρw) ./ Yc.ρ
-    cuv = @. Geometry.UWVector(uₕ)
-    windspeed = @. norm(cuv)
-    windspeed_boundary = Fields.level(windspeed, 1)
-    θ_boundary = Fields.level(Yc.ρθ ./ Yc.ρ, 1)
-    ρ_boundary = Fields.level(Yc.ρ, 1)
+    cuv = @. CC.Geometry.UWVector(uₕ)
+    windspeed = @. LinearAlgebra.norm(cuv)
+    windspeed_boundary = CC.Fields.level(windspeed, 1)
+    θ_boundary = CC.Fields.level(Yc.ρθ ./ Yc.ρ, 1)
+    ρ_boundary = CC.Fields.level(Yc.ρ, 1)
 
     ## build atmos face fields on surface boundary space to enable broadcasting
-    windspeed_boundary = Fields.Field(Fields.field_values(windspeed_boundary), axes(p.T_sfc))
-    θ_boundary = Fields.Field(Fields.field_values(θ_boundary), axes(p.T_sfc))
-    ρ_boundary = Fields.Field(Fields.field_values(ρ_boundary), axes(p.T_sfc))
+    windspeed_boundary = CC.Fields.Field(CC.Fields.field_values(windspeed_boundary), axes(p.T_sfc))
+    θ_boundary = CC.Fields.Field(CC.Fields.field_values(θ_boundary), axes(p.T_sfc))
+    ρ_boundary = CC.Fields.Field(CC.Fields.field_values(ρ_boundary), axes(p.T_sfc))
 
     λ = @. p.cpl_p.C_p * p.cpl_p.C_H * ρ_boundary * windspeed_boundary
     dθ = @. θ_boundary - p.T_sfc
     heat_flux = @. -λ * dθ
     @. dY.F_sfc += heat_flux # accumulation
 
-    return Operators.SetValue(Geometry.WVector.(heat_flux))
+    return CC.Operators.SetValue(CC.Geometry.WVector.(heat_flux))
 end

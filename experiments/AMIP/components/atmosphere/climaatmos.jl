@@ -1,39 +1,25 @@
-# atmos_init: for ClimaAtmos pre-AMIP interface
-using StaticArrays
-using Statistics: mean
-using LinearAlgebra: norm
-
+# atmos_init: for ClimaAtmos interface
+import StaticArrays
+import Statistics
+import LinearAlgebra
 import ClimaAtmos as CA
-import ClimaAtmos: CT1, CT2, CT12, CT3, C3, C12, unit_basis_vector_data, ⊗
+import ClimaCore as CC
+import ClimaCore.Geometry: ⊗
 import SurfaceFluxes as SF
-using ClimaCore
-using ClimaCore.Utilities: half
-
-import ClimaCoupler.Interfacer: AtmosModelSimulation
-import ClimaCoupler.FluxCalculator:
-    atmos_turbulent_fluxes!,
-    calculate_surface_air_density,
-    PartitionedStateFluxes,
-    extrapolate_ρ_to_sfc,
-    get_surface_params,
-    water_albedo_from_atmosphere!
-import ClimaCoupler.Interfacer: get_field, update_field!, name, step!, reinit!
-import ClimaCoupler.Checkpointer: get_model_prog_state
-import ClimaCoupler.FieldExchanger: update_sim!
-import ClimaCoupler.Utilities: swap_space!
+import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 
 include("climaatmos_extra_diags.jl")
 
 ###
 ### Functions required by ClimaCoupler.jl for an AtmosModelSimulation
 ###
-struct ClimaAtmosSimulation{P, Y, D, I} <: AtmosModelSimulation
+struct ClimaAtmosSimulation{P, Y, D, I} <: Interfacer.AtmosModelSimulation
     params::P
     Y_init::Y
     domain::D
     integrator::I
 end
-name(::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
+Interfacer.name(::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
 
 function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
@@ -49,7 +35,7 @@ function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
         @warn("Running with ρe_int in coupled mode is not tested yet.", maxlog = 1)
     end
 
-    # define shorter references for long variable names to increase readability
+    # define shorter references for long variable Interfacer.names to increase readability
     ρ_flux_h_tot = integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot
     ρ_flux_q_tot = integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot
     ᶠradiation_flux = integrator.p.radiation.ᶠradiation_flux
@@ -61,10 +47,10 @@ function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
     ᶜ3d_snow = integrator.p.precipitation.ᶜ3d_snow
 
     # set initial fluxes to zero
-    @. ρ_flux_h_tot = ClimaCore.Geometry.Covariant3Vector(FT(0.0))
-    @. ρ_flux_q_tot = ClimaCore.Geometry.Covariant3Vector(FT(0.0))
-    @. ᶠradiation_flux = ClimaCore.Geometry.WVector(FT(0))
-    ρ_flux_uₕ.components .= Ref(SMatrix{1, 2}([FT(0), FT(0)]))
+    @. ρ_flux_h_tot = CC.Geometry.Covariant3Vector(FT(0.0))
+    @. ρ_flux_q_tot = CC.Geometry.Covariant3Vector(FT(0.0))
+    @. ᶠradiation_flux = CC.Geometry.WVector(FT(0))
+    ρ_flux_uₕ.components .= Ref(StaticArrays.SMatrix{1, 2}([FT(0), FT(0)]))
     col_integrated_rain .= FT(0)
     col_integrated_snow .= FT(0)
     ᶜS_ρq_tot .= FT(0)
@@ -79,34 +65,38 @@ function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
 end
 
 """
-    get_model_prog_state(sim::ClimaAtmosSimulation)
+    Checkpointer.get_model_prog_state(sim::ClimaAtmosSimulation)
 
 Extension of Checkpointer.get_model_prog_state to get the model state.
 """
-function get_model_prog_state(sim::ClimaAtmosSimulation)
+function Checkpointer.get_model_prog_state(sim::ClimaAtmosSimulation)
     return sim.integrator.u
 end
 
 """
-    get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_toa})
+Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_toa})
 
 Extension of Interfacer.get_field to get the net TOA radiation, which is a sum of the
 upward and downward longwave and shortwave radiation.
 """
-function get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_toa})
+function Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_toa})
     FT = eltype(atmos_sim.integrator.u)
 
     if atmos_sim.integrator.p.radiation.radiation_model != nothing
         face_space = axes(atmos_sim.integrator.u.f)
-        nz_faces = length(ClimaCore.Spaces.vertical_topology(face_space).mesh.faces)
+        nz_faces = length(CC.Spaces.vertical_topology(face_space).mesh.faces)
 
         (; face_lw_flux_dn, face_lw_flux_up, face_sw_flux_dn, face_sw_flux_up) =
             atmos_sim.integrator.p.radiation.radiation_model
 
-        LWd_TOA = ClimaCore.Fields.level(CA.RRTMGPI.array2field(FT.(face_lw_flux_dn), face_space), nz_faces - half)
-        LWu_TOA = ClimaCore.Fields.level(CA.RRTMGPI.array2field(FT.(face_lw_flux_up), face_space), nz_faces - half)
-        SWd_TOA = ClimaCore.Fields.level(CA.RRTMGPI.array2field(FT.(face_sw_flux_dn), face_space), nz_faces - half)
-        SWu_TOA = ClimaCore.Fields.level(CA.RRTMGPI.array2field(FT.(face_sw_flux_up), face_space), nz_faces - half)
+        LWd_TOA =
+            CC.Fields.level(CA.RRTMGPI.array2field(FT.(face_lw_flux_dn), face_space), nz_faces - CC.Utilities.half)
+        LWu_TOA =
+            CC.Fields.level(CA.RRTMGPI.array2field(FT.(face_lw_flux_up), face_space), nz_faces - CC.Utilities.half)
+        SWd_TOA =
+            CC.Fields.level(CA.RRTMGPI.array2field(FT.(face_sw_flux_dn), face_space), nz_faces - CC.Utilities.half)
+        SWu_TOA =
+            CC.Fields.level(CA.RRTMGPI.array2field(FT.(face_sw_flux_up), face_space), nz_faces - CC.Utilities.half)
 
         return @. -(LWd_TOA + SWd_TOA - LWu_TOA - SWu_TOA)
     else
@@ -114,7 +104,7 @@ function get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux
     end
 end
 
-function get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:energy})
+function Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:energy})
     thermo_params = get_thermo_params(atmos_sim)
 
     ᶜS_ρq_tot = atmos_sim.integrator.p.precipitation.ᶜS_ρq_tot
@@ -135,71 +125,73 @@ function get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:energy})
 end
 
 # extensions required by the Interfacer
-get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) =
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) =
     TD.air_density.(thermo_params, sim.integrator.p.precomputed.ᶜts)
-get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
     TD.air_temperature.(thermo_params, sim.integrator.p.precomputed.ᶜts)
-get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) = sim.integrator.p.precipitation.col_integrated_rain
-get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
-    ClimaCore.Fields.level(sim.integrator.p.radiation.ᶠradiation_flux, half)
-get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) = sim.integrator.p.precipitation.col_integrated_snow
-get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_energy_flux}) =
-    ClimaCore.Geometry.WVector.(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot)
-get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_moisture_flux}) =
-    ClimaCore.Geometry.WVector.(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot)
-get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_state_int}) =
-    ClimaCore.Spaces.level(sim.integrator.p.precomputed.ᶜts, 1)
-get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:water}) = atmos_sim.integrator.u.c.ρq_tot
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) =
+    sim.integrator.p.precipitation.col_integrated_rain
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
+    CC.Fields.level(sim.integrator.p.radiation.ᶠradiation_flux, CC.Utilities.half)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =
+    sim.integrator.p.precipitation.col_integrated_snow
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_energy_flux}) =
+    CC.Geometry.WVector.(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_moisture_flux}) =
+    CC.Geometry.WVector.(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_state_int}) =
+    CC.Spaces.level(sim.integrator.p.precomputed.ᶜts, 1)
+Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:water}) = atmos_sim.integrator.u.c.ρq_tot
 
 # extensions required by FluxCalculator (partitioned fluxes)
-get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =
-    ClimaCore.Spaces.level(ClimaCore.Fields.coordinate_field(sim.integrator.u.c).z, 1)
-get_field(sim::ClimaAtmosSimulation, ::Val{:height_sfc}) =
-    ClimaCore.Spaces.level(ClimaCore.Fields.coordinate_field(sim.integrator.u.f).z, half)
-function get_field(sim::ClimaAtmosSimulation, ::Val{:uv_int})
-    uₕ_int = ClimaCore.Geometry.UVVector.(ClimaCore.Spaces.level(sim.integrator.u.c.uₕ, 1))
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =
+    CC.Spaces.level(CC.Fields.coordinate_field(sim.integrator.u.c).z, 1)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_sfc}) =
+    CC.Spaces.level(CC.Fields.coordinate_field(sim.integrator.u.f).z, CC.Utilities.half)
+function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:uv_int})
+    uₕ_int = CC.Geometry.UVVector.(CC.Spaces.level(sim.integrator.u.c.uₕ, 1))
     return @. StaticArrays.SVector(uₕ_int.components.data.:1, uₕ_int.components.data.:2)
 end
 
-function update_field!(atmos_sim::ClimaAtmosSimulation, ::Val{:co2}, field)
+function Interfacer.update_field!(atmos_sim::ClimaAtmosSimulation, ::Val{:co2}, field)
     if atmos_sim.integrator.p.atmos.radiation_mode isa CA.RRTMGPI.GrayRadiation
         @warn("Gray radiation model initialized, skipping CO2 update", maxlog = 1)
         return
     else
-        atmos_sim.integrator.p.radiation.radiation_model.volume_mixing_ratio_co2 .= mean(parent(field))
+        atmos_sim.integrator.p.radiation.radiation_model.volume_mixing_ratio_co2 .= Statistics.mean(parent(field))
     end
 end
 # extensions required by the Interfacer
-function update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temperature}, csf)
+function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temperature}, csf)
     sim.integrator.p.radiation.radiation_model.surface_temperature .= CA.RRTMGPI.field2array(csf.T_S)
 end
 
-function update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_direct_albedo}, field)
+function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_direct_albedo}, field)
     sim.integrator.p.radiation.radiation_model.direct_sw_surface_albedo .=
         reshape(CA.RRTMGPI.field2array(field), 1, length(parent(field)))
 end
 
-function update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_diffuse_albedo}, field)
+function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_diffuse_albedo}, field)
     sim.integrator.p.radiation.radiation_model.diffuse_sw_surface_albedo .=
         reshape(CA.RRTMGPI.field2array(field), 1, length(parent(field)))
 end
 
-function update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fluxes}, fields)
+function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fluxes}, fields)
     (; F_turb_energy, F_turb_moisture, F_turb_ρτxz, F_turb_ρτyz) = fields
 
     Y = sim.integrator.u
-    surface_local_geometry = ClimaCore.Fields.level(ClimaCore.Fields.local_geometry_field(Y.f), ClimaCore.Fields.half)
-    surface_normal = @. C3(unit_basis_vector_data(C3, surface_local_geometry))
+    surface_local_geometry = CC.Fields.level(CC.Fields.local_geometry_field(Y.f), CC.Fields.half)
+    surface_normal = @. CA.C3(CA.unit_basis_vector_data(CA.C3, surface_local_geometry))
 
     # get template objects for the contravariant components of the momentum fluxes (required by Atmos boundary conditions)
-    vec_ct12_ct1 = @. CT12(CT2(unit_basis_vector_data(CT1, surface_local_geometry)), surface_local_geometry)
-    vec_ct12_ct2 = @. CT12(CT2(unit_basis_vector_data(CT2, surface_local_geometry)), surface_local_geometry)
+    vec_ct12_ct1 = @. CA.CT12(CA.CT2(CA.unit_basis_vector_data(CA.CT1, surface_local_geometry)), surface_local_geometry)
+    vec_ct12_ct2 = @. CA.CT12(CA.CT2(CA.unit_basis_vector_data(CA.CT2, surface_local_geometry)), surface_local_geometry)
 
     sim.integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ .= (
         surface_normal .⊗
-        C12.(
-            swap_space!(ones(axes(vec_ct12_ct1)), F_turb_ρτxz) .* vec_ct12_ct1 .+
-            swap_space!(ones(axes(vec_ct12_ct2)), F_turb_ρτyz) .* vec_ct12_ct2,
+        CA.C12.(
+            Utilities.swap_space!(ones(axes(vec_ct12_ct1)), F_turb_ρτxz) .* vec_ct12_ct1 .+
+            Utilities.swap_space!(ones(axes(vec_ct12_ct2)), F_turb_ρτyz) .* vec_ct12_ct2,
             surface_local_geometry,
         )
     )
@@ -212,32 +204,32 @@ function update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fluxes}, fiel
 end
 
 # extensions required by FieldExchanger
-step!(sim::ClimaAtmosSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
-reinit!(sim::ClimaAtmosSimulation) = reinit!(sim.integrator)
+Interfacer.step!(sim::ClimaAtmosSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+Interfacer.reinit!(sim::ClimaAtmosSimulation) = Interfacer.reinit!(sim.integrator)
 
-function update_sim!(atmos_sim::ClimaAtmosSimulation, csf, turbulent_fluxes)
-    update_field!(atmos_sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
-    update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
-    update_field!(atmos_sim, Val(:surface_temperature), csf)
+function FieldExchanger.update_sim!(atmos_sim::ClimaAtmosSimulation, csf, turbulent_fluxes)
+    Interfacer.update_field!(atmos_sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
+    Interfacer.update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
+    Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf)
 
-    if turbulent_fluxes isa PartitionedStateFluxes
-        update_field!(atmos_sim, Val(:turbulent_fluxes), csf)
+    if turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
+        Interfacer.update_field!(atmos_sim, Val(:turbulent_fluxes), csf)
     end
 end
 
 """
-    calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::ClimaCore.Fields.Field)
+    FluxCalculator.calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::CC.Fields.Field)
 
 Extension for this function to calculate surface density.
 """
-function calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::ClimaCore.Fields.Field)
+function FluxCalculator.calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::CC.Fields.Field)
     thermo_params = get_thermo_params(atmos_sim)
-    ts_int = get_field(atmos_sim, Val(:thermo_state_int))
-    extrapolate_ρ_to_sfc.(Ref(thermo_params), ts_int, swap_space!(ones(axes(ts_int.ρ)), T_S))
+    ts_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
+    FluxCalculator.extrapolate_ρ_to_sfc.(Ref(thermo_params), ts_int, Utilities.swap_space!(ones(axes(ts_int.ρ)), T_S))
 end
 
-# get_surface_params required by FluxCalculator (partitioned fluxes)
-get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxes_params(sim.integrator.p.params)
+# FluxCalculator.get_surface_params required by FluxCalculator (partitioned fluxes)
+FluxCalculator.get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxes_params(sim.integrator.p.params)
 
 ###
 ### ClimaAtmos.jl model-specific functions (not explicitly required by ClimaCoupler.jl)
@@ -299,7 +291,7 @@ struct CoupledMoninObukhov end
 """
     coupler_surface_setup(::CoupledMoninObukhov, p, csf_sfc = (; T = nothing, z0m = nothing, z0b = nothing, beta = nothing, q_vap = nothing))
 
-Sets up `surface_setup` as a `ClimaCore.Fields.Field` of `SurfaceState`s.
+Sets up `surface_setup` as a `CC.Fields.Field` of `SurfaceState`s.
 """
 function coupler_surface_setup(
     ::CoupledMoninObukhov,
@@ -345,12 +337,12 @@ function modified_atmos_cache(atmos_sim, csf_sfc)
 end
 
 """
-    atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
+    FluxCalculator.atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
 
 Computes turbulent surface fluxes using ClimaAtmos's `update_surface_conditions!`. This
 requires that we define a new temporary parameter Tuple, `new_p`, and save the new surface state
 in it. We do not want `new_p` to live in the atmospheric model permanently, because that would also
-trigger flux calculation during Atmos `step!`. We only want to trigger this once per coupling
+trigger flux calculation during Atmos `Interfacer.step!`. We only want to trigger this once per coupling
 timestep from ClimaCoupler.
 
 For debigging atmos, we can set the following atmos defaults:
@@ -359,7 +351,7 @@ For debigging atmos, we can set the following atmos defaults:
  csf.beta .= 1
  csf = merge(csf, (;q_sfc = nothing))
 """
-function atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
+function FluxCalculator.atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
 
     if isnothing(atmos_sim.integrator.p.sfc_setup) # trigger flux calculation if not done in Atmos internally
         new_p = get_new_cache(atmos_sim, csf)
@@ -387,20 +379,20 @@ function dss_state!(sim::ClimaAtmosSimulation)
     Y = sim.integrator.u
     for key in propertynames(Y)
         field = getproperty(Y, key)
-        buffer = ClimaCore.Spaces.create_dss_buffer(field)
-        ClimaCore.Spaces.weighted_dss!(field, buffer)
+        buffer = CC.Spaces.create_dss_buffer(field)
+        CC.Spaces.weighted_dss!(field, buffer)
     end
 end
 
 """
-    water_albedo_from_atmosphere!(atmos_sim::ClimaAtmosSimulation, direct_albedo::ClimaCore.Fields.Field, diffuse_albedo::ClimaCore.Fields.Field)
+    FluxCalculator.water_albedo_from_atmosphere!(atmos_sim::ClimaAtmosSimulation, direct_albedo::CC.Fields.Field, diffuse_albedo::CC.Fields.Field)
 
 Extension to calculate the water surface albedo from wind speed and insolation. It can be used for prescribed ocean and lakes.
 """
-function water_albedo_from_atmosphere!(
+function FluxCalculator.water_albedo_from_atmosphere!(
     atmos_sim::ClimaAtmosSimulation,
-    direct_albedo::ClimaCore.Fields.Field,
-    diffuse_albedo::ClimaCore.Fields.Field,
+    direct_albedo::CC.Fields.Field,
+    diffuse_albedo::CC.Fields.Field,
 )
 
     Y = atmos_sim.integrator.u
@@ -414,14 +406,14 @@ function water_albedo_from_atmosphere!(
     # update for current zenith angle
     CA.set_insolation_variables!(Y, p, t)
 
-    bottom_coords = ClimaCore.Fields.coordinate_field(ClimaCore.Spaces.level(Y.c, 1))
+    bottom_coords = CC.Fields.coordinate_field(CC.Spaces.level(Y.c, 1))
     μ = CA.RRTMGPI.array2field(radiation_model.cos_zenith, axes(bottom_coords))
     FT = eltype(atmos_sim.integrator.u)
     α_model = CA.RegressionFunctionAlbedo{FT}()
 
 
     # set the direct and diffuse surface albedos
-    direct_albedo .= CA.surface_albedo_direct(α_model).(λ, μ, norm.(ClimaCore.Fields.level(Y.c.uₕ, 1)))
-    diffuse_albedo .= CA.surface_albedo_diffuse(α_model).(λ, μ, norm.(ClimaCore.Fields.level(Y.c.uₕ, 1)))
+    direct_albedo .= CA.surface_albedo_direct(α_model).(λ, μ, LinearAlgebra.norm.(CC.Fields.level(Y.c.uₕ, 1)))
+    diffuse_albedo .= CA.surface_albedo_diffuse(α_model).(λ, μ, LinearAlgebra.norm.(CC.Fields.level(Y.c.uₕ, 1)))
 
 end

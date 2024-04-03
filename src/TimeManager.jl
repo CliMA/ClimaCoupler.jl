@@ -6,11 +6,9 @@ of data.
 """
 module TimeManager
 
-using ..Interfacer
-using Dates
-
-using DocStringExtensions
-const DSE = DocStringExtensions
+import Dates
+import DocStringExtensions
+import ..Interfacer
 
 export current_date,
     strdate_to_datetime,
@@ -54,9 +52,9 @@ strdate_to_datetime(strdate::String) =
 Convert from Date to String ("YYYYMMDD") format.
 
 # Arguments
-- `datetime`: [DateTime] object to be converted to string
+- `datetime`: [Dates.DateTime] object to be converted to string
 """
-datetime_to_strdate(datetime::DateTime) =
+datetime_to_strdate(datetime::Dates.DateTime) =
     string(lpad(Dates.year(datetime), 4, "0")) *
     string(string(lpad(Dates.month(datetime), 2, "0"))) *
     string(lpad(Dates.day(datetime), 2, "0"))
@@ -111,7 +109,7 @@ This is a callback type that triggers at intervals of 1h or multiple hours.
 
 # Fields
 
-$(DSE.FIELDS)
+$(DocStringExtensions.FIELDS)
 """
 @kwdef struct HourlyCallback{FT} <: CouplerCallback
     dt::FT = FT(1) # hours
@@ -128,7 +126,7 @@ This is a callback type that triggers at intervals of 1 month or multiple months
 
 # Fields
 
-$(DSE.FIELDS)
+$(DocStringExtensions.FIELDS)
 """
 @kwdef struct MonthlyCallback{FT} <: CouplerCallback
     dt::FT = FT(1) # months

@@ -2,11 +2,11 @@
 # and check for overall allocation limits based on previous runs
 # copied and modified from `ClimaAtmos/perf`
 
+import Test: @test, @testset
 import ClimaAtmos as CA
 import Profile
 import ProfileCanvas
-using Test
-using YAML
+import YAML
 
 cc_dir = joinpath(dirname(@__DIR__));
 config_dir = joinpath(cc_dir, "config", "model_configs");

@@ -3,12 +3,11 @@
 
 import ClimaAtmos as CA
 import Profile
-using Test
 import Base: view
 include("ProfileCanvasDiff.jl")
 import .ProfileCanvasDiff
-using JLD2
-using YAML
+import JLD2
+import YAML
 
 if isinteractive()
     buildkite_cc_dir = "."
@@ -87,7 +86,7 @@ end
 ref_file = joinpath(buildkite_cc_dir, "$perf_run_name.jld2")
 
 if isfile(ref_file)
-    tracked_list = load(ref_file)
+    tracked_list = JLD2.load(ref_file)
 else
     tracked_list = Dict{String, Float64}()
     @warn "FlameGraphDiff: No reference file: $ref_file found"
@@ -131,5 +130,5 @@ if buildkite_branch == "staging"
     isfile(ref_file) ?
     mv(ref_file, joinpath(scratch_cc_dir, "flame_reference_file.$perf_run_name.$buildkite_commit.jld2"), force = true) :
     nothing
-    save(ref_file, new_tracked_list) # reset ref_file upon staging
+    JLD2.save(ref_file, new_tracked_list) # reset ref_file upon staging
 end

@@ -1,50 +1,35 @@
-using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput
-using ClimaCoupler: Regridder, TestHelper
-using Test
-import Thermodynamics as TD
+import Test: @test, @testset, @test_throws, @test_logs
+import ClimaCore as CC
 import ClimaParams as CP
+import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
-import ClimaCoupler.Interfacer:
-    CoupledSimulation,
-    float_type,
-    get_field,
-    name,
-    SurfaceModelSimulation,
-    LandModelSimulation,
-    OceanModelSimulation,
-    SeaIceModelSimulation,
-    AtmosModelSimulation,
-    SurfaceStub,
-    update_field!,
-    reinit!,
-    step!,
-    update_turbulent_fluxes_point!
+import ClimaCoupler: Interfacer, TestHelper
 
 # test for a simple generic surface model
-struct DummySimulation{S} <: SeaIceModelSimulation
+struct DummySimulation{S} <: Interfacer.SeaIceModelSimulation
     space::S
 end
-struct DummySimulation2{S} <: OceanModelSimulation
+struct DummySimulation2{S} <: Interfacer.OceanModelSimulation
     space::S
 end
-struct DummySimulation3{S} <: LandModelSimulation
+struct DummySimulation3{S} <: Interfacer.LandModelSimulation
     space::S
 end
-name(::DummySimulation3) = "DummySimulation3"
-struct DummySimulation4{S} <: AtmosModelSimulation
+Interfacer.name(::DummySimulation3) = "DummySimulation3"
+struct DummySimulation4{S} <: Interfacer.AtmosModelSimulation
     space::S
 end
-name(::DummySimulation4) = "DummySimulation4"
+Interfacer.name(::DummySimulation4) = "DummySimulation4"
 
-get_field(sim::SurfaceModelSimulation, ::Val{:var}) = ones(sim.space)
-function get_field(sim::SurfaceModelSimulation, ::Val{:var_float})
-    FT = Domains.float_type(Meshes.domain(sim.space.grid.topology.mesh))
+Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var}) = ones(sim.space)
+function Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var_float})
+    FT = CC.Domains.float_type(CC.Meshes.domain(sim.space.grid.topology.mesh))
     return FT(2)
 end
 
 for FT in (Float32, Float64)
     @testset "test CoupledSim construction, float_type for FT=$FT" begin
-        cs = CoupledSimulation{FT}(
+        cs = Interfacer.CoupledSimulation{FT}(
             nothing, # comms_ctx
             nothing, # dates
             nothing, # boundary_space
@@ -64,17 +49,17 @@ for FT in (Float32, Float64)
             nothing, # thermo_params
         )
 
-        @test float_type(cs) == FT
+        @test Interfacer.float_type(cs) == FT
     end
 
     @testset "get_field indexing for FT=$FT" begin
         space = TestHelper.create_space(FT)
         for sim in (DummySimulation(space), DummySimulation2(space), DummySimulation3(space))
             # field
-            colidx = Fields.ColumnIndex{2}((1, 1), 73)
-            @test parent(get_field(sim, Val(:var), colidx))[1] == FT(1)
+            colidx = CC.Fields.ColumnIndex{2}((1, 1), 73)
+            @test parent(Interfacer.get_field(sim, Val(:var), colidx))[1] == FT(1)
             # float
-            @test get_field(sim, Val(:var_float), colidx) == FT(2)
+            @test Interfacer.get_field(sim, Val(:var_float), colidx) == FT(2)
         end
     end
 
@@ -82,7 +67,7 @@ for FT in (Float32, Float64)
     @testset "get_field for a SurfaceStub for FT=$FT" begin
         thermo_params = TDP.ThermodynamicsParameters(FT)
 
-        stub = SurfaceStub((;
+        stub = Interfacer.SurfaceStub((;
             area_fraction = FT(1),
             T_sfc = FT(280),
             α_direct = 3,
@@ -94,21 +79,21 @@ for FT in (Float32, Float64)
             phase = TD.Liquid(),
             thermo_params = thermo_params,
         ))
-        @test get_field(stub, Val(:area_fraction)) == FT(1)
-        @test get_field(stub, Val(:surface_temperature)) == FT(280)
-        @test get_field(stub, Val(:surface_direct_albedo)) == 3
-        @test get_field(stub, Val(:surface_diffuse_albedo)) == 3
-        @test get_field(stub, Val(:roughness_momentum)) == 4
-        @test get_field(stub, Val(:roughness_buoyancy)) == 5
-        @test get_field(stub, Val(:beta)) == 6
-        @test get_field(stub, Val(:air_density)) == FT(1)
-        @test ≈(get_field(stub, Val(:surface_humidity))[1], FT(0.0076), atol = FT(1e-4))
+        @test Interfacer.get_field(stub, Val(:area_fraction)) == FT(1)
+        @test Interfacer.get_field(stub, Val(:surface_temperature)) == FT(280)
+        @test Interfacer.get_field(stub, Val(:surface_direct_albedo)) == 3
+        @test Interfacer.get_field(stub, Val(:surface_diffuse_albedo)) == 3
+        @test Interfacer.get_field(stub, Val(:roughness_momentum)) == 4
+        @test Interfacer.get_field(stub, Val(:roughness_buoyancy)) == 5
+        @test Interfacer.get_field(stub, Val(:beta)) == 6
+        @test Interfacer.get_field(stub, Val(:air_density)) == FT(1)
+        @test ≈(Interfacer.get_field(stub, Val(:surface_humidity))[1], FT(0.0076), atol = FT(1e-4))
     end
 
     @testset "update_field! the SurfaceStub area_fraction for FT=$FT" begin
         boundary_space = TestHelper.create_space(FT)
 
-        stub = SurfaceStub((;
+        stub = Interfacer.SurfaceStub((;
             area_fraction = zeros(boundary_space),
             T_sfc = zeros(boundary_space),
             α_direct = zeros(boundary_space),
@@ -118,21 +103,21 @@ for FT in (Float32, Float64)
             beta = zeros(boundary_space),
         ))
 
-        update_field!(stub, Val(:area_fraction), ones(boundary_space))
-        update_field!(stub, Val(:surface_temperature), ones(boundary_space) .* 2)
-        update_field!(stub, Val(:surface_direct_albedo), ones(boundary_space) .* 3)
-        update_field!(stub, Val(:surface_diffuse_albedo), ones(boundary_space) .* 4)
+        Interfacer.update_field!(stub, Val(:area_fraction), ones(boundary_space))
+        Interfacer.update_field!(stub, Val(:surface_temperature), ones(boundary_space) .* 2)
+        Interfacer.update_field!(stub, Val(:surface_direct_albedo), ones(boundary_space) .* 3)
+        Interfacer.update_field!(stub, Val(:surface_diffuse_albedo), ones(boundary_space) .* 4)
 
-        @test parent(get_field(stub, Val(:area_fraction)))[1] == FT(1)
-        @test parent(get_field(stub, Val(:surface_temperature)))[1] == FT(2)
-        @test parent(get_field(stub, Val(:surface_direct_albedo)))[1] == FT(3)
-        @test parent(get_field(stub, Val(:surface_diffuse_albedo)))[1] == FT(4)
+        @test parent(Interfacer.get_field(stub, Val(:area_fraction)))[1] == FT(1)
+        @test parent(Interfacer.get_field(stub, Val(:surface_temperature)))[1] == FT(2)
+        @test parent(Interfacer.get_field(stub, Val(:surface_direct_albedo)))[1] == FT(3)
+        @test parent(Interfacer.get_field(stub, Val(:surface_diffuse_albedo)))[1] == FT(4)
     end
 end
 
 @testset "name(::SurfaceStub)" begin
-    stub = SurfaceStub((;))
-    @test name(stub) == "SurfaceStub"
+    stub = Interfacer.SurfaceStub((;))
+    @test Interfacer.name(stub) == "SurfaceStub"
 end
 
 @testset "undefined get_field for generic val" begin
@@ -140,7 +125,7 @@ end
     space = TestHelper.create_space(FT)
     sim = DummySimulation(space)
     val = Val(:v)
-    @test_throws ErrorException("undefined field `v` for " * name(sim)) get_field(sim, val)
+    @test_throws ErrorException("undefined field `v` for " * Interfacer.name(sim)) Interfacer.get_field(sim, val)
 end
 
 @testset "undefined get_field for SurfaceModelSimulation" begin
@@ -161,7 +146,10 @@ end
         :surface_temperature,
     )
         val = Val(value)
-        @test_throws ErrorException("undefined field `$value` for " * name(sim)) get_field(sim, val)
+        @test_throws ErrorException("undefined field `$value` for " * Interfacer.name(sim)) Interfacer.get_field(
+            sim,
+            val,
+        )
     end
 end
 
@@ -188,14 +176,17 @@ end
         :water,
     )
         val = Val(value)
-        @test_throws ErrorException("undefined field `$value` for " * name(sim)) get_field(sim, val)
+        @test_throws ErrorException("undefined field `$value` for " * Interfacer.name(sim)) Interfacer.get_field(
+            sim,
+            val,
+        )
     end
 end
 
 @testset "update_field! warnings for SurfaceModelSimulation" begin
     FT = Float32
     space = TestHelper.create_space(FT)
-    dummy_field = Fields.ones(space)
+    dummy_field = CC.Fields.ones(space)
     sim = DummySimulation3(space)
 
     # Test that update_field! gives correct warnings for unextended fields
@@ -211,16 +202,19 @@ end
         val = Val(value)
         @test_logs (
             :warn,
-            "`update_field!` is not extended for the `$value` field of " * name(sim) * ": skipping update.",
-        ) update_field!(sim, val, dummy_field)
-        @test_throws ErrorException("undefined field `$value` for " * name(sim)) get_field(sim, val)
+            "`update_field!` is not extended for the `$value` field of " * Interfacer.name(sim) * ": skipping update.",
+        ) Interfacer.update_field!(sim, val, dummy_field)
+        @test_throws ErrorException("undefined field `$value` for " * Interfacer.name(sim)) Interfacer.get_field(
+            sim,
+            val,
+        )
     end
 end
 
 @testset "undefined update_field! warnings for AtmosModelSimulation" begin
     FT = Float32
     space = TestHelper.create_space(FT)
-    dummy_field = Fields.ones(space)
+    dummy_field = CC.Fields.ones(space)
     sim = DummySimulation4(space)
 
     # Test that update_field! gives correct warnings for unextended fields
@@ -228,38 +222,41 @@ end
         val = Val(value)
         @test_logs (
             :warn,
-            "`update_field!` is not extended for the `$value` field of " * name(sim) * ": skipping update.",
-        ) update_field!(sim, val, dummy_field)
-        @test_throws ErrorException("undefined field `$value` for " * name(sim)) get_field(sim, val)
+            "`update_field!` is not extended for the `$value` field of " * Interfacer.name(sim) * ": skipping update.",
+        ) Interfacer.update_field!(sim, val, dummy_field)
+        @test_throws ErrorException("undefined field `$value` for " * Interfacer.name(sim)) Interfacer.get_field(
+            sim,
+            val,
+        )
     end
 end
 
 @testset "undefined step! error" begin
     FT = Float32
     sim = DummySimulation3(nothing)
-    @test_throws ErrorException("undefined step! for " * name(sim)) step!(sim, 1)
+    @test_throws ErrorException("undefined step! for " * Interfacer.name(sim)) Interfacer.step!(sim, 1)
 end
 
 @testset "undefined reinit! error" begin
     FT = Float32
     sim = DummySimulation3(nothing)
-    @test_throws ErrorException("undefined reinit! for " * name(sim)) reinit!(sim)
+    @test_throws ErrorException("undefined reinit! for " * Interfacer.name(sim)) Interfacer.reinit!(sim)
 end
 
 @testset "SurfaceStub step!" begin
     FT = Float32
-    @test step!(SurfaceStub(FT(0)), 1) == nothing
+    @test isnothing(Interfacer.step!(Interfacer.SurfaceStub(FT(0)), 1))
 end
 
 @testset "SurfaceStub reinit!" begin
     FT = Float32
-    @test reinit!(SurfaceStub(FT(0))) == nothing
+    @test isnothing(Interfacer.reinit!(Interfacer.SurfaceStub(FT(0))))
 end
 
 @testset "SurfaceStub update_turbulent_fluxes_point!" begin
     FT = Float32
-    colidx = Fields.ColumnIndex{2}((1, 1), 73) # arbitrary index
-    @test update_turbulent_fluxes_point!(SurfaceStub(FT(0)), (;), colidx) == nothing
+    colidx = CC.Fields.ColumnIndex{2}((1, 1), 73) # arbitrary index
+    @test isnothing(Interfacer.update_turbulent_fluxes_point!(Interfacer.SurfaceStub(FT(0)), (;), colidx))
 end
 
 # # Test that update_field! gives correct warnings for unextended fields

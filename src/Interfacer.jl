@@ -4,10 +4,12 @@
 This modules contains abstract types, interface templates and model stubs for coupling component models.
 """
 module Interfacer
-import Thermodynamics as TD
-import SciMLBase: step!, reinit!
 
-using ClimaCore: Fields
+import SciMLBase
+import ClimaCore as CC
+import Thermodynamics as TD
+import SciMLBase: step!, reinit! # explicitly import to extend these functions
+
 export CoupledSimulation,
     float_type,
     ComponentModelSimulation,
@@ -167,11 +169,11 @@ get_field(sim::ComponentModelSimulation, val::Val) = get_field_error(sim, val)
 get_field_error(sim, val::Val{X}) where {X} = error("undefined field `$X` for " * name(sim))
 
 """
-    get_field(::ComponentModelSimulation, ::Val, colidx::Fields.ColumnIndex)
+    get_field(::ComponentModelSimulation, ::Val, colidx::CC.Fields.ColumnIndex)
 
 Extension of `get_field(::ComponentModelSimulation, ::Val)`, indexing into the specified colum index.
 """
-function get_field(sim::ComponentModelSimulation, val::Val, colidx::Fields.ColumnIndex)
+function get_field(sim::ComponentModelSimulation, val::Val, colidx::CC.Fields.ColumnIndex)
     if get_field(sim, val) isa AbstractFloat
         get_field(sim, val)
     else

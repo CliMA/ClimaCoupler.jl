@@ -6,12 +6,10 @@ atmospheric and surface component models.
 """
 module FieldExchanger
 
+import ..Interfacer, ..FluxCalculator, ..Regridder
+
 export import_atmos_fields!,
     import_combined_surface_fields!, update_sim!, update_model_sims!, reinit_model_sims!, step_model_sims!
-
-using ClimaCoupler: Interfacer, FluxCalculator, Regridder, Utilities
-import ClimaCoupler.Interfacer: step!, reinit!
-
 """
     import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
 
@@ -180,7 +178,7 @@ Iterates `reinit!` over all component model simulations saved in `cs.model_sims`
 """
 function reinit_model_sims!(model_sims)
     for sim in model_sims
-        reinit!(sim)
+        Interfacer.reinit!(sim)
     end
 end
 
@@ -195,7 +193,7 @@ Iterates `step!` over all component model simulations saved in `cs.model_sims`.
 """
 function step_model_sims!(model_sims, t)
     for sim in model_sims
-        step!(sim, t)
+        Interfacer.step!(sim, t)
     end
 end
 

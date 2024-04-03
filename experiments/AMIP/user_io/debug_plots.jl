@@ -1,16 +1,16 @@
-using Plots
-using ClimaCorePlots
-using Printf
-using ClimaCoupler.Interfacer: ComponentModelSimulation, SurfaceModelSimulation
-using ClimaCore
+import Plots
+import Printf
+import ClimaCore as CC
+import ClimaCorePlots
+import ClimaCoupler: Interfacer
 
 # plotting functions for the coupled simulation
 """
-    debug(cs::CoupledSimulation, dir = "debug", cs_fields_ref = nothing)
+    debug(cs::Interfacer.CoupledSimulation, dir = "debug", cs_fields_ref = nothing)
 
 Plot the fields of a coupled simulation and save plots to a directory.
 """
-function debug(cs::CoupledSimulation, dir = "debug", cs_fields_ref = nothing)
+function debug(cs::Interfacer.CoupledSimulation, dir = "debug", cs_fields_ref = nothing)
     mkpath(dir)
     @info "plotting debug in " * dir
     for sim in cs.model_sims
@@ -69,54 +69,54 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
 end
 
 """
-    debug(sim::ComponentModelSimulation, dir)
+    debug(sim::Interfacer.ComponentModelSimulation, dir)
 
 Plot the fields of a component model simulation and save plots to a directory.
 """
-function debug(sim::ComponentModelSimulation, dir)
+function debug(sim::Interfacer.ComponentModelSimulation, dir)
 
     field_names = plot_field_names(sim)
 
     all_plots = []
     for field_name in field_names
-        field = get_field(sim, Val(field_name))
+        field = Interfacer.get_field(sim, Val(field_name))
         push!(all_plots, Plots.plot(field, title = string(field_name) * print_extrema(field)))
     end
     fig = Plots.plot(all_plots..., size = (1500, 800))
-    Plots.png(joinpath(dir, "debug_$(name(sim))"))
+    Plots.png(joinpath(dir, "debug_$(Interfacer.name(sim))"))
 
 end
 
 """
-    print_extrema(field::ClimaCore.Fields.Field)
+    print_extrema(field::CC.Fields.Field)
 
 Return the minimum and maximum values of a field as a string.
 """
-function print_extrema(field::ClimaCore.Fields.Field)
+function print_extrema(field::CC.Fields.Field)
     ext_vals = extrema(field)
-    min = @sprintf("%.2E", ext_vals[1])
-    max = @sprintf("%.2E", ext_vals[2])
+    min = Printf.@sprintf("%.2E", ext_vals[1])
+    max = Printf.@sprintf("%.2E", ext_vals[2])
     return " [$min, $max]"
 end
 
 # below are additional fields specific to this experiment (ourside of the required coupler fields) that we are interested in plotting for debugging purposes
 
 # additional ClimaAtmos model debug fields
-function get_field(sim::ClimaAtmosSimulation, ::Val{:w})
-    w_c = ones(ClimaCore.Spaces.horizontal_space(sim.domain.face_space))
-    parent(w_c) .= parent(ClimaCore.Fields.level(ClimaCore.Geometry.WVector.(sim.integrator.u.f.u₃), 5 .+ half))
+function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:w})
+    w_c = ones(CC.Spaces.horizontal_space(sim.domain.face_space))
+    parent(w_c) .= parent(CC.Fields.level(CC.Geometry.WVector.(sim.integrator.u.f.u₃), 5 .+ CC.Utilities.half))
     return w_c
 end
-get_field(sim::ClimaAtmosSimulation, ::Val{:ρq_tot}) = sim.integrator.u.c.ρq_tot
-get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrator.u.c.ρe_tot
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρq_tot}) = sim.integrator.u.c.ρq_tot
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrator.u.c.ρe_tot
 
 # additional BucketSimulation debug fields
-get_field(sim::BucketSimulation, ::Val{:σS}) = sim.integrator.u.bucket.σS
-get_field(sim::BucketSimulation, ::Val{:Ws}) = sim.integrator.u.bucket.Ws
-get_field(sim::BucketSimulation, ::Val{:W}) = sim.integrator.u.bucket.W
+Interfacer.get_field(sim::BucketSimulation, ::Val{:σS}) = sim.integrator.u.bucket.σS
+Interfacer.get_field(sim::BucketSimulation, ::Val{:Ws}) = sim.integrator.u.bucket.Ws
+Interfacer.get_field(sim::BucketSimulation, ::Val{:W}) = sim.integrator.u.bucket.W
 
 # currently selected plot fields
-plot_field_names(sim::SurfaceModelSimulation) = (:area_fraction, :surface_temperature, :surface_humidity)
+plot_field_names(sim::Interfacer.SurfaceModelSimulation) = (:area_fraction, :surface_temperature, :surface_humidity)
 plot_field_names(sim::BucketSimulation) =
     (:area_fraction, :surface_temperature, :surface_humidity, :air_density, :σS, :Ws, :W)
 plot_field_names(sim::ClimaAtmosSimulation) = (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)

@@ -6,9 +6,9 @@ various files in the test folder.
 =#
 module TestHelper
 
-using ClimaCore: Geometry, Meshes, Domains, Topologies, Spaces, Fields, InputOutput
-using ClimaComms
-using NCDatasets
+import ClimaCore as CC
+import ClimaComms
+import NCDatasets
 
 export create_space, gen_ncdata
 
@@ -36,25 +36,28 @@ function create_space(
     polynomial_degree = 3,
     nz = 1,
 )
-    domain = Domains.SphereDomain(R)
-    mesh = Meshes.EquiangularCubedSphere(domain, ne)
+    domain = CC.Domains.SphereDomain(R)
+    mesh = CC.Meshes.EquiangularCubedSphere(domain, ne)
 
     if comms_ctx isa ClimaComms.SingletonCommsContext
-        topology = Topologies.Topology2D(comms_ctx, mesh, Topologies.spacefillingcurve(mesh))
+        topology = CC.Topologies.Topology2D(comms_ctx, mesh, CC.Topologies.spacefillingcurve(mesh))
     else
-        topology = Topologies.DistributedTopology2D(comms_ctx, mesh, Topologies.spacefillingcurve(mesh))
+        topology = CC.Topologies.DistributedTopology2D(comms_ctx, mesh, CC.Topologies.spacefillingcurve(mesh))
     end
 
     Nq = polynomial_degree + 1
-    quad = Spaces.Quadratures.GLL{Nq}()
-    sphere_space = Spaces.SpectralElementSpace2D(topology, quad)
+    quad = CC.Spaces.Quadratures.GLL{Nq}()
+    sphere_space = CC.Spaces.SpectralElementSpace2D(topology, quad)
 
     if nz > 1
-        vertdomain =
-            Domains.IntervalDomain(Geometry.ZPoint{FT}(0), Geometry.ZPoint{FT}(100); boundary_names = (:bottom, :top))
-        vertmesh = Meshes.IntervalMesh(vertdomain, nelems = nz)
-        vert_center_space = Spaces.CenterFiniteDifferenceSpace(vertmesh)
-        return Spaces.ExtrudedFiniteDifferenceSpace(sphere_space, vert_center_space)
+        vertdomain = CC.Domains.IntervalDomain(
+            CC.Geometry.ZPoint{FT}(0),
+            CC.Geometry.ZPoint{FT}(100);
+            boundary_names = (:bottom, :top),
+        )
+        vertmesh = CC.Meshes.IntervalMesh(vertdomain, nelems = nz)
+        vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(vertmesh)
+        return CC.Spaces.ExtrudedFiniteDifferenceSpace(sphere_space, vert_center_space)
     else
         return sphere_space
     end
@@ -76,17 +79,17 @@ function gen_ncdata(FT, path, varname, val)
     isfile(path) ? rm(path) : nothing
 
     # Create dataset of all ones
-    nc = NCDataset(path, "c")
+    nc = NCDatasets.NCDataset(path, "c")
 
     # Define dataset information
-    defDim(nc, "lon", 64)
-    defDim(nc, "lat", 32)
+    NCDatasets.defDim(nc, "lon", 64)
+    NCDatasets.defDim(nc, "lat", 32)
     nc.attrib["title"] = "this is an NCDataset containing all 1s on a lat/lon grid"
 
     # Define variables
-    lon = defVar(nc, "lon", FT, ("lon",))
-    lat = defVar(nc, "lat", FT, ("lat",))
-    v = defVar(nc, varname, FT, ("lon", "lat"))
+    lon = NCDatasets.defVar(nc, "lon", FT, ("lon",))
+    lat = NCDatasets.defVar(nc, "lat", FT, ("lat",))
+    v = NCDatasets.defVar(nc, varname, FT, ("lon", "lat"))
 
     # Populate lon and lat
     lon[:] = [i for i in 0.0:(360 / 64):(360 - (360 / 64))]

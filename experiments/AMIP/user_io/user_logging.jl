@@ -1,4 +1,4 @@
-using ClimaCoupler.Checkpointer: checkpoint_model_state
+import ClimaCoupler: Checkpointer, Interfacer
 
 """
     Base.show(io::IO, dict::Dict)
@@ -17,12 +17,12 @@ end
 
 This is a callback function that checkpoints all simulations defined in the current coupled simulation.
 """
-function checkpoint_sims(cs::CoupledSimulation, _)
+function checkpoint_sims(cs::Interfacer.CoupledSimulation, _)
     for sim in cs.model_sims
-        if get_model_prog_state(sim) !== nothing
+        if Checkpointer.get_model_prog_state(sim) !== nothing
             t = Dates.datetime2epochms(cs.dates.date[1])
             t0 = Dates.datetime2epochms(cs.dates.date0[1])
-            checkpoint_model_state(sim, cs.comms_ctx, Int((t - t0) / 1e3), output_dir = cs.dirs.artifacts)
+            Checkpointer.checkpoint_model_state(sim, cs.comms_ctx, Int((t - t0) / 1e3), output_dir = cs.dirs.artifacts)
         end
     end
 end

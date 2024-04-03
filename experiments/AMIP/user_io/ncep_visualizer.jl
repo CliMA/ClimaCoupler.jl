@@ -60,18 +60,21 @@ function ncep_paperplots(
     end
 
     # combine plots and save figure
+    layout = @layout([A{0.05h}; [B C D; E F G; H I J]])
+    title = "NCEP Monthly Mean Fields: " * Dates.format(month_date, "mmmm yyyy")
+    title_plot = Plots.plot(plot_title = title, grid = false, showaxis = false, bottom_margin = -50Plots.px)
     save_fig = Plots.plot(
+        title_plot,
         all_plots...,
         size = (1500, 1200),
-        right_margin = 3Plots.mm,
-        left_margin = 3Plots.mm,
-        bottom_margin = 3Plots.mm,
-        top_margin = 3Plots.mm,
+        layout = layout,
+        titlefont = font(12),
+        margin = 2Plots.mm,
     )
 
     Plots.png(save_fig, joinpath(output_dir, fig_name * ".png"))
 
-    return all_data
+    return all_data, save_fig
 end
 
 abstract type DataSource end

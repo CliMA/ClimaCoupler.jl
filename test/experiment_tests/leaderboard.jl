@@ -30,6 +30,24 @@ include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
 
     @test_throws ErrorException Leaderboard.bias([1], [2, 3], ([1], [2]))
     @test_throws ErrorException Leaderboard.bias([1, 2], [2, 3, 4], ([1], [2]))
+
+    dates = [
+        Dates.DateTime(2015, 1, 13),
+        Dates.DateTime(2018, 2, 13),
+        Dates.DateTime(1981, 7, 6),
+        Dates.DateTime(1993, 11, 19),
+        Dates.DateTime(2040, 4, 1),
+        Dates.DateTime(2000, 8, 18),
+    ]
+
+    expected_dates = (
+        [Dates.DateTime(2040, 4, 1)],
+        [Dates.DateTime(1981, 7, 6), Dates.DateTime(2000, 8, 18)],
+        [Dates.DateTime(1993, 11, 19)],
+        [Dates.DateTime(2015, 1, 13), Dates.DateTime(2018, 2, 13)],
+    )
+
+    @test Leaderboard.split_by_season(dates) == expected_dates
 end
 
 @testset "Leaderboard" begin

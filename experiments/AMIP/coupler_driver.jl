@@ -114,7 +114,7 @@ config_dict = merge(parsed_args, config_dict)
 config_dict_atmos = get_atmos_config(config_dict)
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
-## (if there are common keys, the last dictorionary in the `merge` arguments takes precedence)
+## (if there are common keys, the last dictionary in the `merge` arguments takes precedence)
 config_dict = merge(config_dict_atmos, config_dict)
 
 ## read in some parsed command line arguments, required by this script
@@ -858,20 +858,22 @@ if ClimaComms.iamroot(comms_ctx)
         # Compare against observations
         if t_end > 84600
             @info "Error against observations"
+            output_dates = cs.dates.date0[] .+ Second.(atmos_sim.integrator.sol.t)
+
             include("user_io/leaderboard.jl")
             compare_vars = ["pr"]
             function plot_biases(dates, output_name)
                 output_path = joinpath(COUPLER_ARTIFACTS_DIR, "bias_$(output_name).png")
                 Leaderboard.plot_biases(atmos_sim.integrator.p.output_dir, compare_vars, dates; output_path)
             end
-            plot_biases(cs.dates.date, "total")
+            plot_biases(output_dates, "total")
 
-            MAM, JJA, SON, DJF = Leaderboard.split_by_season(cs.dates.date)
+            MAM, JJA, SON, DJF = Leaderboard.split_by_season(output_dates)
 
-            !isempty(MAM) && plot_biases(cs.dates.date, "MAM")
-            !isempty(JJA) && plot_biases(cs.dates.date, "JJA")
-            !isempty(SON) && plot_biases(cs.dates.date, "SON")
-            !isempty(DJF) && plot_biases(cs.dates.date, "DJF")
+            !isempty(MAM) && plot_biases(MAM, "MAM")
+            !isempty(JJA) && plot_biases(JJA, "JJA")
+            !isempty(SON) && plot_biases(SON, "SON")
+            !isempty(DJF) && plot_biases(DJF, "DJF")
         end
     end
 

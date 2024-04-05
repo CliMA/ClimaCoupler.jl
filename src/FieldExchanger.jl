@@ -6,11 +6,11 @@ atmospheric and surface component models.
 """
 module FieldExchanger
 
-import SciMLBase: step!, reinit!
 export import_atmos_fields!,
     import_combined_surface_fields!, update_sim!, update_model_sims!, reinit_model_sims!, step_model_sims!
 
 using ClimaCoupler: Interfacer, FluxCalculator, Regridder, Utilities
+import ClimaCoupler.Interfacer: step!, reinit!
 
 """
     import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
@@ -149,14 +149,6 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, turbulent_flux
 end
 
 """
-    update_sim!(::SurfaceStub, csf, area_fraction)
-
-The stub surface simulation only updates the air density (needed for the turbulent flux calculation).
-"""
-function update_sim!(sim::Interfacer.SurfaceStub, csf, area_fraction)
-    Interfacer.update_field!(sim, Val(:air_density), csf.ρ_sfc)
-end
-"""
     update_model_sims!(model_sims, csf, turbulent_fluxes)
 
 Iterates `update_sim!` over all component model simulations saved in `cs.model_sims`.
@@ -193,13 +185,6 @@ function reinit_model_sims!(model_sims)
 end
 
 """
-    reinit!(cs::SurfaceStub)
-
-The stub surface simulation is not updated by this function. Extends `SciMLBase.reinit!`.
-"""
-reinit!(::Interfacer.SurfaceStub) = nothing
-
-"""
     step_model_sims!(model_sims, t)
 
 Iterates `step!` over all component model simulations saved in `cs.model_sims`.
@@ -213,12 +198,5 @@ function step_model_sims!(model_sims, t)
         step!(sim, t)
     end
 end
-
-"""
-    step!(::SurfaceStub, t)
-
-The stub surface simulation is not updated by this function. Extends `SciMLBase.step!`.
-"""
-step!(::Interfacer.SurfaceStub, _) = nothing
 
 end # module

@@ -60,7 +60,7 @@ using ClimaCoupler.FluxCalculator:
     MoninObukhovScheme,
     partitioned_turbulent_fluxes!,
     water_albedo_from_atmosphere!
-using ClimaCoupler.Interfacer: CoupledSimulation, SurfaceStub, get_field, update_field!
+using ClimaCoupler.Interfacer: CoupledSimulation, SurfaceStub, get_field, update_field!, step!
 using ClimaCoupler.Regridder
 using ClimaCoupler.Regridder: update_surface_fractions!, combine_surfaces!, binary_mask
 using ClimaCoupler.TimeManager:

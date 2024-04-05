@@ -4,8 +4,7 @@ using ClimaCore
 import ClimaTimeSteppers as CTS
 import Thermodynamics as TD
 
-import ClimaCoupler.Interfacer: SeaIceModelSimulation, get_field, update_field!, name
-import ClimaCoupler.FieldExchanger: step!, reinit!
+import ClimaCoupler.Interfacer: SeaIceModelSimulation, get_field, update_field!, name, step!, reinit!
 import ClimaCoupler.FluxCalculator: update_turbulent_fluxes_point!
 using ClimaCoupler: Regridder
 import ClimaCoupler.Utilities: swap_space!

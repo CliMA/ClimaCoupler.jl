@@ -15,7 +15,10 @@ import ClimaCoupler.Interfacer:
     SeaIceModelSimulation,
     AtmosModelSimulation,
     SurfaceStub,
-    update_field!
+    update_field!,
+    reinit!,
+    step!,
+    update_turbulent_fluxes_point!
 
 # test for a simple generic surface model
 struct DummySimulation{S} <: SeaIceModelSimulation
@@ -229,6 +232,34 @@ end
         ) update_field!(sim, val, dummy_field)
         @test_throws ErrorException("undefined field `$value` for " * name(sim)) get_field(sim, val)
     end
+end
+
+@testset "undefined step! error" begin
+    FT = Float32
+    sim = DummySimulation3(nothing)
+    @test_throws ErrorException("undefined step! for " * name(sim)) step!(sim, 1)
+end
+
+@testset "undefined reinit! error" begin
+    FT = Float32
+    sim = DummySimulation3(nothing)
+    @test_throws ErrorException("undefined reinit! for " * name(sim)) reinit!(sim)
+end
+
+@testset "SurfaceStub step!" begin
+    FT = Float32
+    @test step!(SurfaceStub(FT(0)), 1) == nothing
+end
+
+@testset "SurfaceStub reinit!" begin
+    FT = Float32
+    @test reinit!(SurfaceStub(FT(0))) == nothing
+end
+
+@testset "SurfaceStub update_turbulent_fluxes_point!" begin
+    FT = Float32
+    colidx = Fields.ColumnIndex{2}((1, 1), 73) # arbitrary index
+    @test update_turbulent_fluxes_point!(SurfaceStub(FT(0)), (;), colidx) == nothing
 end
 
 # # Test that update_field! gives correct warnings for unextended fields

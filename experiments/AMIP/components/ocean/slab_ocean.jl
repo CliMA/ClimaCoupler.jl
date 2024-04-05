@@ -2,8 +2,7 @@ import SciMLBase: ODEProblem, init
 
 using ClimaCore
 import ClimaTimeSteppers as CTS
-import ClimaCoupler.Interfacer: OceanModelSimulation, get_field, update_field!, name
-import ClimaCoupler.FieldExchanger: step!, reinit!
+import ClimaCoupler.Interfacer: OceanModelSimulation, get_field, update_field!, name, step!, reinit!
 import ClimaCoupler.FluxCalculator: update_turbulent_fluxes_point!
 import ClimaCoupler.Utilities: swap_space!
 import ClimaCoupler.BCReader: float_type_bcf

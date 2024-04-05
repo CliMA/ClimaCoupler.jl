@@ -18,8 +18,7 @@ using ClimaLand:
     CoupledAtmosphere
 import ClimaLand.Parameters as LP
 
-import ClimaCoupler.Interfacer: LandModelSimulation, get_field, update_field!, name
-import ClimaCoupler.FieldExchanger: step!, reinit!
+import ClimaCoupler.Interfacer: LandModelSimulation, get_field, update_field!, name, step!, reinit!
 import ClimaCoupler.FluxCalculator: update_turbulent_fluxes_point!, surface_thermo_state
 
 ###

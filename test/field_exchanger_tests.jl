@@ -2,16 +2,11 @@ using Test
 using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput
 using ClimaCoupler: Utilities, Regridder, TestHelper
 import ClimaCoupler.Interfacer:
-    update_field!, AtmosModelSimulation, SurfaceModelSimulation, SurfaceStub, get_field, update_field!
+    update_field!, AtmosModelSimulation, SurfaceModelSimulation, SurfaceStub, get_field, update_field!, step!, reinit!
 import ClimaCoupler.FluxCalculator: CombinedStateFluxes, PartitionedStateFluxes, calculate_surface_air_density
 import ClimaCoupler.FieldExchanger:
-    import_atmos_fields!,
-    import_combined_surface_fields!,
-    update_model_sims!,
-    reinit_model_sims!,
-    reinit!,
-    step_model_sims!,
-    step!
+    import_atmos_fields!, import_combined_surface_fields!, update_model_sims!, reinit_model_sims!, step_model_sims!
+
 
 
 # test for a simple generic atmos model
@@ -60,6 +55,8 @@ get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:sur
 get_field(sim::Union{TestSurfaceSimulation2, TestSurfaceSimulation2}, ::Val{:surface_humidity}) =
     sim.cache_field .* eltype(sim.cache_field)(0)
 
+reinit!(::TestSurfaceSimulation1) = nothing
+step!(::TestSurfaceSimulation1, _) = nothing
 
 # atmos sim
 struct TestAtmosSimulation{C} <: AtmosModelSimulation
@@ -239,10 +236,10 @@ for FT in (Float32, Float64)
         end
     end
     @testset "reinit_model_sims! for FT=$FT" begin
-        @test reinit_model_sims!((; stub = SurfaceStub(FT(0)))) == nothing
+        @test reinit_model_sims!((; stub = TestSurfaceSimulation1(FT(0)))) == nothing
     end
 
     @testset "step_model_sims! for FT=$FT" begin
-        @test step_model_sims!((; stub = SurfaceStub(FT(0))), 1) == nothing
+        @test step_model_sims!((; stub = TestSurfaceSimulation1(FT(0))), 1) == nothing
     end
 end

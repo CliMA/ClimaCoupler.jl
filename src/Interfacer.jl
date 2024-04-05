@@ -5,6 +5,7 @@ This modules contains abstract types, interface templates and model stubs for co
 """
 module Interfacer
 import Thermodynamics as TD
+import SciMLBase: step!, reinit!
 
 using ClimaCore: Fields
 export CoupledSimulation,
@@ -12,13 +13,15 @@ export CoupledSimulation,
     ComponentModelSimulation,
     AtmosModelSimulation,
     SurfaceModelSimulation,
-    SurfaceStub,
     SeaIceModelSimulation,
     LandModelSimulation,
     OceanModelSimulation,
     name,
     get_field,
-    update_field!
+    update_field!,
+    SurfaceStub,
+    step!,
+    reinit!
 
 
 """
@@ -163,41 +166,6 @@ get_field(sim::ComponentModelSimulation, val::Val) = get_field_error(sim, val)
 
 get_field_error(sim, val::Val{X}) where {X} = error("undefined field `$X` for " * name(sim))
 
-
-"""
-    SurfaceStub
-
-On object containing simulation-like info, used as a stub or for prescribed data.
-"""
-struct SurfaceStub{I} <: SurfaceModelSimulation
-    cache::I
-end
-
-"""
-    stub_init(cache)
-
-Initialization function for SurfaceStub simulation type.
-"""
-stub_init(cache) = SurfaceStub(cache)
-
-"""
-    get_field(::SurfaceStub, ::Val)
-
-A getter function, that should not allocate. If undefined, it returns a descriptive error.
-"""
-get_field(sim::SurfaceStub, ::Val{:air_density}) = sim.cache.ρ_sfc
-get_field(sim::SurfaceStub, ::Val{:area_fraction}) = sim.cache.area_fraction
-get_field(sim::SurfaceStub, ::Val{:beta}) = sim.cache.beta
-get_field(sim::SurfaceStub, ::Val{:energy}) = nothing
-get_field(sim::SurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
-get_field(sim::SurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m
-get_field(sim::SurfaceStub, ::Val{:surface_direct_albedo}) = sim.cache.α_direct
-get_field(sim::SurfaceStub, ::Val{:surface_diffuse_albedo}) = sim.cache.α_diffuse
-get_field(sim::SurfaceStub, ::Val{:surface_humidity}) =
-    TD.q_vap_saturation_generic.(sim.cache.thermo_params, sim.cache.T_sfc, sim.cache.ρ_sfc, sim.cache.phase)
-get_field(sim::SurfaceStub, ::Val{:surface_temperature}) = sim.cache.T_sfc
-get_field(sim::SurfaceStub, ::Val{:water}) = nothing
-
 """
     get_field(::ComponentModelSimulation, ::Val, colidx::Fields.ColumnIndex)
 
@@ -257,32 +225,38 @@ update_field_warning(sim, val::Val{X}) where {X} =
     @warn("`update_field!` is not extended for the `$X` field of " * name(sim) * ": skipping update.", maxlog = 1)
 
 """
-    update_field!(sim::SurfaceStub, ::Val{:area_fraction}, field::Fields.Field)
-
-Updates the specified value in the cache of `SurfaceStub`.
-"""
-function update_field!(sim::SurfaceStub, ::Val{:area_fraction}, field::Fields.Field)
-    sim.cache.area_fraction .= field
-end
-function update_field!(sim::SurfaceStub, ::Val{:surface_temperature}, field::Fields.Field)
-    sim.cache.T_sfc .= field
-end
-function update_field!(sim::SurfaceStub, ::Val{:air_density}, field)
-    parent(sim.cache.ρ_sfc) .= parent(field)
-end
-function update_field!(sim::SurfaceStub, ::Val{:surface_direct_albedo}, field::Fields.Field)
-    sim.cache.α_direct .= field
-end
-function update_field!(sim::SurfaceStub, ::Val{:surface_diffuse_albedo}, field::Fields.Field)
-    sim.cache.α_diffuse .= field
-end
-
-"""
     name(::ComponentModelSimulation)
 
 Returns simulation name, if defined, or `Unnamed` if not.
 """
 name(::ComponentModelSimulation) = "Unnamed"
-name(::SurfaceStub) = "SurfaceStub"
+
+"""
+    step!(sim::ComponentModelSimulation, t)
+
+A function to update the simulation in-place with values calculate for time `t`.
+For the models we currently have implemented, this is a simple wrapper around
+the `step!` function implemented in SciMLBase.jl.
+
+This must be extended for all component models - otherwise this default
+function will be called and an error will be raised.
+"""
+step!(sim::ComponentModelSimulation, t) = error("undefined step! for " * name(sim))
+
+"""
+    reinit!(sim::ComponentModelSimulation)
+
+A function to restart a simulation after solving of the simulation has been
+paused or interrupted. Like `step!`, this is currently a simple wrapper
+around the `reinit!` function of SciMLBase.jl.
+
+This must be extended for all component models - otherwise this default
+function will be called and an error will be raised.
+"""
+reinit!(sim::ComponentModelSimulation) = error("undefined reinit! for " * name(sim))
+
+
+# Include file containing the surface stub simulation type.
+include("surface_stub.jl")
 
 end # module

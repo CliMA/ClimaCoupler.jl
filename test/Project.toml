@@ -38,7 +38,6 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 [compat]
 Aqua = "0.8"
 ArtifactWrappers = "0.2"
-ClimaCoupler = "0.1"
 Dates = "1"
 Downloads = "1"
 IntervalSets = "0.5, 0.6, 0.7"

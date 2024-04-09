@@ -7,7 +7,7 @@
 
 export MODULEPATH="/groups/esm/modules:$MODULEPATH"
 module purge
-module load climacommon/2024_03_18
+module load climacommon/2024_04_05
 
 export CC_PATH=$(pwd)/ # adjust this to the path of your ClimaCoupler.jl directory
 export RUN_NAME=coarse_single_ft64_hourly_checkpoints_restart
@@ -18,7 +18,6 @@ export OPENBLAS_NUM_THREADS=1
 export JULIA_NVTX_CALLBACKS=gc
 export OMPI_MCA_opal_warn_on_missing_libcuda=0
 export JULIA_MAX_NUM_PRECOMPILE_FILES=100
-export JULIA_CPU_TARGET='broadwell;skylake;icelake;cascadelake;epyc'
 export SLURM_KILL_BAD_EXIT=1
 
 julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'

@@ -57,18 +57,15 @@ function amip_paperplots(
     end
 
     # combine plots and save figure
-    save_fig = Plots.plot(
-        all_plots...,
-        size = (1500, 1200),
-        right_margin = 3Plots.mm,
-        left_margin = 3Plots.mm,
-        bottom_margin = 3Plots.mm,
-        top_margin = 3Plots.mm,
-    )
+    layout = @layout([A{0.05h}; [B C D; E F G; H I J]])
+    title =
+        Plots.plot(plot_title = "AMIP Monthly Mean Fields", grid = false, showaxis = false, bottom_margin = -50Plots.px)
+    save_fig =
+        Plots.plot(title, all_plots..., size = (1500, 1200), layout = layout, titlefont = font(12), margin = 2Plots.mm)
 
     Plots.png(save_fig, joinpath(output_dir, fig_name * ".png"))
 
-    return all_data
+    return all_data, save_fig
 end
 
 """

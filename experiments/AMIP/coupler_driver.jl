@@ -114,7 +114,7 @@ config_dict = merge(parsed_args, config_dict)
 config_dict_atmos = get_atmos_config(config_dict)
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
-## (if there are common keys, the last dictorionary in the `merge` arguments takes precedence)
+## (if there are common keys, the last dictionary in the `merge` arguments takes precedence)
 config_dict = merge(config_dict_atmos, config_dict)
 
 ## read in some parsed command line arguments, required by this script
@@ -826,7 +826,7 @@ if ClimaComms.iamroot(comms_ctx)
             tubulent_energy_fluxes = (; clims = (-250, 250), units = "W/m^2"),
             q_liq_ice = (; clims = (0, 10), units = "g/kg"),
         )
-        amip_data = amip_paperplots(
+        amip_data, fig_amip = amip_paperplots(
             post_spec,
             plot_spec,
             COUPLER_OUTPUT_DIR,
@@ -847,7 +847,7 @@ if ClimaComms.iamroot(comms_ctx)
             tubulent_energy_fluxes = (:horizontal_slice,),
         )
         ncep_plot_spec = plot_spec
-        ncep_data = ncep_paperplots(
+        ncep_data, fig_ncep = ncep_paperplots(
             ncep_post_spec,
             ncep_plot_spec,
             COUPLER_OUTPUT_DIR,
@@ -855,23 +855,30 @@ if ClimaComms.iamroot(comms_ctx)
             month_date = cs.dates.date[1],
         ) ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
 
-        # Compare against observations
+        ## combined plots
+        plot_combined = Plots.plot(fig_amip, fig_ncep, layout = (2, 1), size = (1400, 1800))
+        Plots.png(joinpath(COUPLER_ARTIFACTS_DIR, "amip_ncep.png"))
+
+        ## Compare against observations
         if t_end > 84600
             @info "Error against observations"
+            output_dates = cs.dates.date0[] .+ Second.(atmos_sim.integrator.sol.t)
+
             include("user_io/leaderboard.jl")
             compare_vars = ["pr"]
             function plot_biases(dates, output_name)
                 output_path = joinpath(COUPLER_ARTIFACTS_DIR, "bias_$(output_name).png")
                 Leaderboard.plot_biases(atmos_sim.integrator.p.output_dir, compare_vars, dates; output_path)
             end
-            plot_biases(cs.dates.date, "total")
+            plot_biases(output_dates, "total")
 
-            MAM, JJA, SON, DJF = Leaderboard.split_by_season(cs.dates.date)
+            ## collect all days between cs.dates.date0 and cs.dates.date
+            MAM, JJA, SON, DJF = Leaderboard.split_by_season(output_dates)
 
-            !isempty(MAM) && plot_biases(cs.dates.date, "MAM")
-            !isempty(JJA) && plot_biases(cs.dates.date, "JJA")
-            !isempty(SON) && plot_biases(cs.dates.date, "SON")
-            !isempty(DJF) && plot_biases(cs.dates.date, "DJF")
+            !isempty(MAM) && plot_biases(MAM, "MAM")
+            !isempty(JJA) && plot_biases(JJA, "JJA")
+            !isempty(SON) && plot_biases(SON, "SON")
+            !isempty(DJF) && plot_biases(DJF, "DJF")
         end
     end
 

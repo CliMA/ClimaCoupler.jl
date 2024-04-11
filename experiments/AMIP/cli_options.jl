@@ -18,6 +18,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to check energy conservation"
         arg_type = Bool
         default = false
+        "--ci_plots"
+        help = "Boolean flag indicating whether to make CI plots"
+        arg_type = Bool
+        default = false
         "--conservation_softfail"
         help = "Boolean flag indicating whether to soft fail on conservation errors"
         arg_type = Bool

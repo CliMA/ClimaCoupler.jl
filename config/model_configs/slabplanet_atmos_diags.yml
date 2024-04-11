@@ -1,5 +1,6 @@
 anim: true
 apply_limiter: false
+ci_plots: true
 dt: "200secs"
 dt_cpl: 200
 dt_save_to_sol: "9days"
@@ -9,11 +10,13 @@ job_id: "slabplanet_atmos_diags"
 mode_name: "slabplanet"
 moist: "equil"
 mono_surface: true
+output_default_diagnostics: false
 precip_model: "0M"
 rad: "gray"
 run_name: "slabplanet_atmos_diags"
 t_end: "10days"
 vert_diff: "true"
 diagnostics:
-  - short_name: [mse, lr, ediff]
+  - short_name: [mse, lr, ediff, ts]
+    reduction_time: average
     period: 1days

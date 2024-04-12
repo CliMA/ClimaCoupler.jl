@@ -1,26 +1,25 @@
-using Test
+import Test: @test, @testset
+import ClimaCore as CC
 import ClimaCoupler
-using ClimaCoupler.Interfacer: OceanModelSimulation
-using ClimaCoupler.TestHelper: create_space
-using ClimaCore
-using ClimaCore: Fields, Spaces
-import ClimaParams as CP
-import Thermodynamics.Parameters as TDP
+import ClimaCoupler: TestHelper
 
 include(pkgdir(ClimaCoupler, "experiments/AMIP/components/ocean/slab_ocean.jl"))
 
 for FT in (Float32, Float64)
     @testset "dss_state! SlabOceanSimulation for FT=$FT" begin
         # use TestHelper to create space
-        boundary_space = create_space(FT)
+        boundary_space = TestHelper.create_space(FT)
 
         # construct dss buffer to put in cache
-        dss_buffer = Spaces.create_dss_buffer(Fields.zeros(boundary_space))
+        dss_buffer = CC.Spaces.create_dss_buffer(CC.Fields.zeros(boundary_space))
 
         # set up objects for test
         integrator = (;
-            u = (; state_field1 = FT.(Fields.ones(boundary_space)), state_field2 = FT.(Fields.zeros(boundary_space))),
-            p = (; cache_field = FT.(Fields.zeros(boundary_space)), dss_buffer = dss_buffer),
+            u = (;
+                state_field1 = FT.(CC.Fields.ones(boundary_space)),
+                state_field2 = FT.(CC.Fields.zeros(boundary_space)),
+            ),
+            p = (; cache_field = FT.(CC.Fields.zeros(boundary_space)), dss_buffer = dss_buffer),
         )
         integrator_copy = deepcopy(integrator)
         sim = SlabOceanSimulation(nothing, nothing, nothing, integrator)

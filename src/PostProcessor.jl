@@ -5,13 +5,11 @@ This module contains functions for postprocessing model data (saved during the s
 """
 module PostProcessor
 
+import Statistics
+import ClimaCore as CC
+import ..Regridder
+
 export PostProcessedData, ZLatLonData, ZLatData, LatLonData, LatData, RawData, DataPackage, postprocess
-
-using Statistics
-using NCDatasets: NCDataset
-
-using ClimaCoupler: Regridder
-using ClimaCore: Fields
 
 # data types for postprocessing
 """
@@ -56,7 +54,7 @@ struct RawData <: PostProcessedData end
 
 A container for storing the tyoe, name, data and coordinates of a variable.
 """
-struct DataPackage{PPD <: PostProcessedData, NTC <: NamedTuple, A <: Union{Fields.Field, AbstractArray}} # TODO: add long name (ppp info) and units
+struct DataPackage{PPD <: PostProcessedData, NTC <: NamedTuple, A <: Union{CC.Fields.Field, AbstractArray}} # TODO: add long name (ppp info) and units
     tag::PPD
     name::String
     data::A
@@ -74,14 +72,14 @@ end
 function DataPackage(tag::LatData, name::Symbol, data::AbstractArray; coords = coords)
     DataPackage(tag, string(name), data, (; lat = coords.lat))
 end
-function DataPackage(tag::RawData, name::Symbol, data::Union{AbstractArray, Fields.Field}; coords = nothing)
+function DataPackage(tag::RawData, name::Symbol, data::Union{AbstractArray, CC.Fields.Field}; coords = nothing)
     DataPackage(tag, string(name), data, (;))
 end
 
 """
     postprocess(
         name::Symbol,
-        raw_data::Union{Fields.Field, Array},
+        raw_data::Union{CC.Fields.Field, Array},
         p_methods::Tuple;
         lev_slice = 1,
         datafile_latlon = nothing,
@@ -96,7 +94,7 @@ Array with [longitude, latitude] or a 3D Array [longitude, latitude, level].
 
 # Arguments:
 - `name`: [Symbol] variable name
-- `raw_data`: [Union{Fields.Field, Array}] variable data
+- `raw_data`: [Union{CC.Fields.Field, Array}] variable data
 - `p_methods`: [Tuple] postproessing methods (`:regrid`, `:horizontal_slice`, `:zonal_mean`)
 - `lev_slice`: [Int] level index along which the `:horizontal_slice` is applied
 - `datafile_latlon`: [String] name of the regrid file
@@ -106,7 +104,7 @@ Array with [longitude, latitude] or a 3D Array [longitude, latitude, level].
 """
 function postprocess(
     name::Symbol,
-    raw_data::Union{Fields.Field, Array},
+    raw_data::Union{CC.Fields.Field, Array},
     p_methods::Tuple;
     lev_slice = 1,
     datafile_latlon = nothing,

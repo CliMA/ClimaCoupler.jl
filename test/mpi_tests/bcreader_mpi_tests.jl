@@ -4,14 +4,13 @@
 These are in a separate testing file from the other BCReader unit tests so
 that MPI can be enabled for testing of these functions.
 =#
-using ClimaCoupler
-using ClimaCoupler: Regridder, BCReader, TimeManager, Interfacer
-using ClimaCore: Fields, Meshes, Domains, Topologies, Spaces
-using ClimaComms
-using Test
-using Dates
-using NCDatasets
-import ArtifactWrappers as AW
+import Test: @test, @testset, @test_throws
+import Dates
+import NCDatasets
+import ClimaComms
+import ClimaCore as CC
+import ClimaCoupler
+import ClimaCoupler: Regridder, BCReader, TimeManager, Interfacer
 
 # Get the path to the necessary data file - sst map
 pkg_dir = pkgdir(ClimaCoupler)
@@ -29,12 +28,12 @@ ClimaComms.barrier(comms_ctx)
         # setup for test
         radius = FT(6731e3)
         Nq = 4
-        domain = Domains.SphereDomain(radius)
-        mesh = Meshes.EquiangularCubedSphere(domain, 4)
-        topology = Topologies.DistributedTopology2D(comms_ctx, mesh, Topologies.spacefillingcurve(mesh))
-        quad = Spaces.Quadratures.GLL{Nq}()
-        boundary_space_t = Spaces.SpectralElementSpace2D(topology, quad)
-        land_fraction_t = Fields.zeros(boundary_space_t)
+        domain = CC.Domains.SphereDomain(radius)
+        mesh = CC.Meshes.EquiangularCubedSphere(domain, 4)
+        topology = CC.Topologies.DistributedTopology2D(comms_ctx, mesh, CC.Topologies.spacefillingcurve(mesh))
+        quad = CC.Spaces.Quadratures.GLL{Nq}()
+        boundary_space_t = CC.Spaces.SpectralElementSpace2D(topology, quad)
+        land_fraction_t = CC.Fields.zeros(boundary_space_t)
 
         datafile_rll = sst_data
         varname = "SST"
@@ -67,7 +66,7 @@ ClimaComms.barrier(comms_ctx)
         weightfile = joinpath(regrid_dir, outfile_root * "_remap_weights.nc")
 
         # test monotone remapping (all weights in [0, 1])
-        nt = NCDataset(weightfile) do weights
+        nt = NCDatasets.NCDataset(weightfile) do weights
             max_weight = maximum(weights["S"])
             min_weight = minimum(weights["S"])
             (; max_weight, min_weight)
@@ -87,20 +86,20 @@ end
 @testset "test update_midmonth_data! with MPI" begin
     for FT in (Float32, Float64)
         # setup for test
-        date0 = date1 = DateTime(1979, 01, 01, 01, 00, 00)
-        date = DateTime(1979, 01, 01, 00, 00, 00)
+        date0 = date1 = Dates.DateTime(1979, 01, 01, 01, 00, 00)
+        date = Dates.DateTime(1979, 01, 01, 00, 00, 00)
         tspan = (1, 90 * 86400) # Jan-Mar
         Δt = 1 * 3600
 
         radius = FT(6731e3)
         Nq = 4
-        domain = Domains.SphereDomain(radius)
-        mesh = Meshes.EquiangularCubedSphere(domain, 4)
-        topology = Topologies.DistributedTopology2D(comms_ctx, mesh, Topologies.spacefillingcurve(mesh))
-        quad = Spaces.Quadratures.GLL{Nq}()
-        boundary_space_t = Spaces.SpectralElementSpace2D(topology, quad)
+        domain = CC.Domains.SphereDomain(radius)
+        mesh = CC.Meshes.EquiangularCubedSphere(domain, 4)
+        topology = CC.Topologies.DistributedTopology2D(comms_ctx, mesh, CC.Topologies.spacefillingcurve(mesh))
+        quad = CC.Spaces.Quadratures.GLL{Nq}()
+        boundary_space_t = CC.Spaces.SpectralElementSpace2D(topology, quad)
 
-        land_fraction_t = Fields.zeros(boundary_space_t)
+        land_fraction_t = CC.Fields.zeros(boundary_space_t)
         dummy_data = (; test_data = zeros(axes(land_fraction_t)))
 
         datafile_rll = sst_data
@@ -169,10 +168,10 @@ end
         # test if the SST field was modified
         @test SST_all[end] !== SST_all[end - 1]
         # check that the final file date is as expected
-        @test Date(updating_dates[end]) == Date(1979, 03, 16)
+        @test Dates.Date(updating_dates[end]) == Dates.Date(1979, 03, 16)
 
         # test warning/error cases
-        current_fields = Fields.zeros(FT, boundary_space_t), Fields.zeros(FT, boundary_space_t)
+        current_fields = CC.Fields.zeros(FT, boundary_space_t), CC.Fields.zeros(FT, boundary_space_t)
 
         # use this function to reset values between test cases
         function reset_bcf_info(bcf_info)
@@ -186,7 +185,7 @@ end
 
         #  case 1: date < all_dates[segment_idx] (init)
         bcf_info.segment_idx[1] = bcf_info.segment_idx0[1]
-        date = DateTime(bcf_info.all_dates[bcf_info.segment_idx[1]] - Dates.Day(1))
+        date = Dates.DateTime(bcf_info.all_dates[bcf_info.segment_idx[1]] - Dates.Day(1))
         BCReader.update_midmonth_data!(date, bcf_info)
 
         ClimaComms.barrier(comms_ctx)
@@ -202,7 +201,7 @@ end
         for extra in extra_days
             # case 3: (date - all_dates[Int(segment_idx0)]) >= 0 (init)
             reset_bcf_info(bcf_info)
-            date = DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1]]) + extra
+            date = Dates.DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1]]) + extra
             BCReader.update_midmonth_data!(date, bcf_info)
 
             end_field_c2 = deepcopy(bcf_info.monthly_fields[2])
@@ -221,7 +220,7 @@ end
             # do not reset segment_idx0. It's current value ensures that we get the same result as case 3
             reset_bcf_info(bcf_info)
 
-            date = DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1] + 1]) + extra
+            date = Dates.DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1] + 1]) + extra
             BCReader.update_midmonth_data!(date, bcf_info)
 
             nearest_idx = argmin(
@@ -258,7 +257,7 @@ end
             bcf_info.segment_idx0[1] = length(bcf_info.all_dates)
             reset_bcf_info(bcf_info)
 
-            date = DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1]]) + extra
+            date = Dates.DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1]]) + extra
             BCReader.update_midmonth_data!(date, bcf_info)
 
             ClimaComms.barrier(comms_ctx)
@@ -283,7 +282,7 @@ end
             bcf_info.segment_idx0[1] = 2
             reset_bcf_info(bcf_info)
 
-            date = DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1]] + extra)
+            date = Dates.DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1]] + extra)
             BCReader.update_midmonth_data!(date, bcf_info)
 
             ClimaComms.barrier(comms_ctx)

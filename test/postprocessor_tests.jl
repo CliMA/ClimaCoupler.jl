@@ -1,14 +1,11 @@
-#= 
+#=
     Unit tests for ClimaCoupler PostProcessor module
 =#
-using Test
-using Dates
-using ClimaComms
-using ClimaCore: Fields
-using ClimaCoupler: Utilities, TestHelper, PostProcessor
+import Test: @test, @testset
+import ClimaCore as CC
+import ClimaCoupler: PostProcessor, TestHelper
 
-import Base.size
-data(f::Fields.Field) = (parent(f))
+data(f::CC.Fields.Field) = (parent(f))
 data(f::Array) = f
 
 REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regrid_tmp/")

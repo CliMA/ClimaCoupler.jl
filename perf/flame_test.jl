@@ -1,9 +1,9 @@
+import Test: @test, @testset
 import Profile
-using Test
 import Base: view
 include("ProfileCanvasDiff.jl")
 import .ProfileCanvasDiff
-using JLD2
+import JLD2
 
 if isinteractive()
     buildkite_cc_dir = build_path = "."
@@ -49,12 +49,12 @@ end
 
 # ref file
 ref_file = joinpath(output_dir, "reference.jld2")
-tracked_list = isfile(ref_file) ? load(ref_file) : Dict{String, Float64}()
+tracked_list = isfile(ref_file) ? JLD2.load(ref_file) : Dict{String, Float64}()
 
 # save ref file
 profile_data, new_tracked_list = ProfileCanvasDiff.view(Profile.fetch(), tracked_list = tracked_list, self_count = true);
 
-save(ref_file, new_tracked_list) # reset ref_file upon staging
+JLD2.save(ref_file, new_tracked_list) # reset ref_file upon staging
 
 
 """
@@ -85,7 +85,7 @@ end
 
 @testset "flame diff tests" begin
     # load the dictionary of tracked counts from the reference file
-    tracked_list = isfile(ref_file) ? load(ref_file) : Dict{String, Float64}()
+    tracked_list = isfile(ref_file) ? JLD2.load(ref_file) : Dict{String, Float64}()
 
     test_func_name = "get_y.flame_test.jl.26"
 

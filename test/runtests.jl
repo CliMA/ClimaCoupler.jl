@@ -1,4 +1,4 @@
-using SafeTestsets
+import SafeTestsets: @safetestset
 
 @safetestset "Aqua tests" begin
     include("aqua.jl")

@@ -1,5 +1,10 @@
 # # Land Model
 
+import DiffEqCallbacks
+import SciMLBase
+import ClimaCore as CC
+import ClimaTimeSteppers as CTS
+
 # Load coupled simulation code
 include("../CoupledSims/coupled_sim.jl")
 
@@ -30,13 +35,14 @@ end
 function hspace_1D(xlim = (-π, π), npoly = 0, helem = 10)
     FT = Float64
 
-    domain = Domains.IntervalDomain(Geometry.XPoint{FT}(xlim[1]) .. Geometry.XPoint{FT}(xlim[2]), periodic = true)
-    mesh = Meshes.IntervalMesh(domain; nelems = helem)
-    topology = Topologies.IntervalTopology(mesh)
+    domain =
+        CC.Domains.IntervalDomain(CC.Geometry.XPoint{FT}(xlim[1]) .. CC.Geometry.XPoint{FT}(xlim[2]), periodic = true)
+    mesh = CC.Meshes.IntervalMesh(domain; nelems = helem)
+    topology = CC.Topologies.IntervalTopology(mesh)
 
     ## Finite Volume Approximation: Gauss-Lobatto with 1pt per element
-    quad = Spaces.Quadratures.GL{npoly + 1}()
-    space = Spaces.SpectralElementSpace1D(topology, quad)
+    quad = CC.Spaces.Quadratures.GL{npoly + 1}()
+    space = CC.Spaces.SpectralElementSpace1D(topology, quad)
 
     return space
 end
@@ -46,7 +52,7 @@ function lnd_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
 
     ## construct domain spaces - get only surface layer (NB: z should be zero, not z = first central height)
     space = hspace_1D((xmin, xmax), npoly, helem)
-    coords = Fields.coordinate_field(space)
+    coords = CC.Fields.coordinate_field(space)
     domain = space
 
     ## initial condition
@@ -55,7 +61,7 @@ function lnd_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
     end
 
     ## prognostic variable
-    Y = Fields.FieldVector(T_sfc = T_sfc)
+    Y = CC.Fields.FieldVector(T_sfc = T_sfc)
 
     return Y, domain
 end
@@ -66,12 +72,12 @@ struct LandSim <: AbstractLandSim
     integrator::Any
 end
 
-function LandSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
+function LandSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = DiffEqCallbacks.CallbackSet())
     ode_algo = CTS.ExplicitAlgorithm(timestepper)
     ode_function = CTS.ClimaODEFunction(T_exp! = lnd_rhs!)
 
-    problem = ODEProblem(ode_function, Y_init, (t_start, t_end), p)
-    lnd_integ = init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false, callback = callbacks)
+    problem = SciMLBase.ODEProblem(ode_function, Y_init, (t_start, t_end), p)
+    lnd_integ = SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false, callback = callbacks)
 
     return LandSim(lnd_integ)
 end

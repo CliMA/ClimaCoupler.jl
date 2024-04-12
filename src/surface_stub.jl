@@ -35,23 +35,23 @@ get_field(sim::SurfaceStub, ::Val{:surface_temperature}) = sim.cache.T_sfc
 get_field(sim::SurfaceStub, ::Val{:water}) = nothing
 
 """
-    update_field!(sim::SurfaceStub, ::Val{:area_fraction}, field::Fields.Field)
+    update_field!(sim::SurfaceStub, ::Val{:area_fraction}, field::CC.Fields.Field)
 
 Updates the specified value in the cache of `SurfaceStub`.
 """
-function update_field!(sim::SurfaceStub, ::Val{:area_fraction}, field::Fields.Field)
+function update_field!(sim::SurfaceStub, ::Val{:area_fraction}, field::CC.Fields.Field)
     sim.cache.area_fraction .= field
 end
-function update_field!(sim::SurfaceStub, ::Val{:surface_temperature}, field::Fields.Field)
+function update_field!(sim::SurfaceStub, ::Val{:surface_temperature}, field::CC.Fields.Field)
     sim.cache.T_sfc .= field
 end
 function update_field!(sim::SurfaceStub, ::Val{:air_density}, field)
     parent(sim.cache.ρ_sfc) .= parent(field)
 end
-function update_field!(sim::SurfaceStub, ::Val{:surface_direct_albedo}, field::Fields.Field)
+function update_field!(sim::SurfaceStub, ::Val{:surface_direct_albedo}, field::CC.Fields.Field)
     sim.cache.α_direct .= field
 end
-function update_field!(sim::SurfaceStub, ::Val{:surface_diffuse_albedo}, field::Fields.Field)
+function update_field!(sim::SurfaceStub, ::Val{:surface_diffuse_albedo}, field::CC.Fields.Field)
     sim.cache.α_diffuse .= field
 end
 
@@ -91,4 +91,4 @@ step!(::SurfaceStub, _) = nothing
 
 ## Extensions of FluxCalculator.jl functions
 
-update_turbulent_fluxes_point!(sim::SurfaceStub, fields::NamedTuple, colidx::Fields.ColumnIndex) = nothing
+update_turbulent_fluxes_point!(sim::SurfaceStub, fields::NamedTuple, colidx::CC.Fields.ColumnIndex) = nothing

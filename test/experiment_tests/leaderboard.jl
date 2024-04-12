@@ -1,4 +1,4 @@
-using Test
+import Test: @test, @testset, @test_throws
 import ClimaCoupler
 import ClimaAnalysis
 import Dates

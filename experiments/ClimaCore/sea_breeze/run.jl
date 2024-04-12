@@ -16,21 +16,17 @@ of the ClimaCoupler interface are used and discussed.
 # Load utilities for running coupled simulation
 include("../CoupledSims/coupled_sim.jl")
 
-using SciMLBase: ODEProblem, savevalues!, solve, init, CallbackSet #hide
-import SciMLBase #hide
-import ClimaTimeSteppers as CTS #hide
-import ClimaCore.Utilities: PlusHalf #hide
-import ClimaCore.Spaces as Spaces
+import DiffEqCallbacks #hide
 import Random #hide
-using DiffEqCallbacks #hide
+import SciMLBase #hide
+
+import ClimaCore as CC #hide
+import ClimaTimeSteppers as CTS #hide
 
 ## enable broadcasting with mismatched spaces #hide
-import ClimaCore: Fields, Operators #hide
-Operators.allow_mismatched_fd_spaces() = true #hide
-#hide
+CC.Operators.allow_mismatched_fd_spaces() = true #hide
+
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", "..")) #hide
-using ClimaCoupler #hide
-#hide
 const FT = Float64 #hide
 
 # Set random seed for reproducibility
@@ -94,17 +90,17 @@ cpl_parameters = (
 
 ## DSS callback
 function make_dss_func()
-    function _dss!(x::Fields.Field)
-        Spaces.weighted_dss!(x)
+    function _dss!(x::CC.Fields.Field)
+        CC.Spaces.weighted_dss!(x)
     end
     function _dss!(::Any)
         nothing
     end
-    dss_func(Y, t, integrator) = foreach(_dss!, Fields._values(Y))
+    dss_func(Y, t, integrator) = foreach(_dss!, CC.Fields._values(Y))
     return dss_func
 end
 dss_func = make_dss_func()
-dss_callback = FunctionCallingCallback(dss_func, func_start = true)
+dss_callback = DiffEqCallbacks.FunctionCallingCallback(dss_func, func_start = true)
 
 #=
 ## Initialization
@@ -145,22 +141,22 @@ Because models may live on different grids, remapping is necessary at the bounda
 Maps between coupled components must be constructed for each interacting pair. Remapping
 utilities are imported from `ClimaCore.Operators`.
 =#
-atm_boundary = Spaces.level(atm_domain.hv_face_space, PlusHalf(0))
+atm_boundary = CC.Spaces.level(atm_domain.hv_face_space, CC.Utilities.PlusHalf(0))
 
 maps = (
-    atmos_to_ocean = Operators.LinearRemap(ocn_domain, atm_boundary),
-    atmos_to_land = Operators.LinearRemap(lnd_domain, atm_boundary),
-    ocean_to_atmos = Operators.LinearRemap(atm_boundary, ocn_domain),
-    land_to_atmos = Operators.LinearRemap(atm_boundary, lnd_domain),
+    atmos_to_ocean = CC.Operators.LinearRemap(ocn_domain, atm_boundary),
+    atmos_to_land = CC.Operators.LinearRemap(lnd_domain, atm_boundary),
+    ocean_to_atmos = CC.Operators.LinearRemap(atm_boundary, ocn_domain),
+    land_to_atmos = CC.Operators.LinearRemap(atm_boundary, lnd_domain),
 )
 
 ## initialize coupling fields
 atm_T_sfc =
-    Operators.remap(maps.ocean_to_atmos, ocn_Y_default.T_sfc) .+
-    Operators.remap(maps.land_to_atmos, lnd_Y_default.T_sfc) # masked arrays; regrid to atm grid
-atm_F_sfc = Fields.zeros(atm_boundary)
-ocn_F_sfc = Fields.zeros(ocn_domain)
-lnd_F_sfc = Fields.zeros(lnd_domain)
+    CC.Operators.remap(maps.ocean_to_atmos, ocn_Y_default.T_sfc) .+
+    CC.Operators.remap(maps.land_to_atmos, lnd_Y_default.T_sfc) # masked arrays; regrid to atm grid
+atm_F_sfc = CC.Fields.zeros(atm_boundary)
+ocn_F_sfc = CC.Fields.zeros(ocn_domain)
+lnd_F_sfc = CC.Fields.zeros(lnd_domain)
 
 #=
 ## Simulations
@@ -169,15 +165,15 @@ and the time-stepping information (solver, step size, etc). Sims are the standar
 structures that the coupler works with, enabling dispatch of coupler methods.
 Here, we create three simulations: `AtmosSim`, `OceanSim`, and `LandSim`.
 =#
-atm_Y = Fields.FieldVector(Yc = atm_Y_default.Yc, ρw = atm_Y_default.ρw, F_sfc = atm_F_sfc)
+atm_Y = CC.Fields.FieldVector(Yc = atm_Y_default.Yc, ρw = atm_Y_default.ρw, F_sfc = atm_F_sfc)
 atm_p = (cpl_p = cpl_parameters, T_sfc = atm_T_sfc, bc = atm_bc)
 atmos = AtmosSim(atm_Y, t_start, Δt_coupled / atm_nsteps, t_end, CTS.RK4(), atm_p, saveat, dss_callback)
 
-ocn_Y = Fields.FieldVector(T_sfc = ocn_Y_default.T_sfc)
+ocn_Y = CC.Fields.FieldVector(T_sfc = ocn_Y_default.T_sfc)
 ocn_p = (cpl_parameters, F_sfc = ocn_F_sfc)
 ocean = OceanSim(ocn_Y, t_start, Δt_coupled / ocn_nsteps, t_end, CTS.RK4(), ocn_p, saveat)
 
-lnd_Y = Fields.FieldVector(T_sfc = lnd_Y_default.T_sfc)
+lnd_Y = CC.Fields.FieldVector(T_sfc = lnd_Y_default.T_sfc)
 lnd_p = (cpl_parameters, F_sfc = lnd_F_sfc)
 land = LandSim(lnd_Y, t_start, Δt_coupled / lnd_nsteps, t_end, CTS.RK4(), lnd_p, saveat)
 
@@ -297,13 +293,13 @@ cpl_run(sim)
 # ### References
 # - [Antonelli & Rotunno 2007](https://journals.ametsoc.org/view/journals/atsc/64/12/2007jas2261.1.xml?tab_body=pdf)
 ## Post-processing
-using JLD2 #hide
+import JLD2 #hide
 import Plots, ClimaCorePlots #hide
 
 sol = sim.atmos.integrator.sol #hide
 path = joinpath(@__DIR__, "output") #hide
 mkpath(path) #hide
-# save(joinpath(path, "last_sim.jld2"), "coupled_sim", sim) #hide
+# JLD2.save(joinpath(path, "last_sim.jld2"), "coupled_sim", sim) #hide
 
 Plots.GRBackend() #hide
 
@@ -313,7 +309,7 @@ anim = Plots.@animate for u in sol.u #hide
 end #hide
 Plots.mp4(anim, joinpath(path, "theta.mp4"), fps = 20) #hide
 
-If2c = Operators.InterpolateF2C() #hide
+If2c = CC.Operators.InterpolateF2C() #hide
 anim = Plots.@animate for u in sol.u #hide
     Plots.contourf(If2c.(u.ρw) ./ u.Yc.ρ) #hide
 end #hide

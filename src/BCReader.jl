@@ -7,11 +7,10 @@ monthly to daily intervals.
 """
 module BCReader
 
-using ..Utilities, ..Regridder, ..TimeManager
-using ClimaCore: Fields
-using ClimaComms
-using Dates
-using JLD2
+import JLD2
+import ClimaComms
+import ClimaCore as CC
+import ..Utilities, ..Regridder, ..TimeManager
 
 export BCFileInfo,
     float_type_bcf, bcfile_info_init, update_midmonth_data!, next_date_in_file, interpolate_midmonth_to_daily
@@ -64,10 +63,10 @@ Remap the values of a `field` onto the space of the
 `bcf_info`'s land_fraction without scaling.
 
 # Arguments
-- `field`: [Fields.Field] contains the values to be remapped.
+- `field`: [CC.Fields.Field] contains the values to be remapped.
 - `bcf_info`: [BCFileInfo] contains a land_fraction to remap onto the space of.
 """
-no_scaling(field::Fields.Field, bcf_info::BCFileInfo{FT}) where {FT} =
+no_scaling(field::CC.Fields.Field, bcf_info::BCFileInfo{FT}) where {FT} =
     Utilities.swap_space!(zeros(axes(bcf_info.land_fraction)), field)
 
 """
@@ -99,7 +98,7 @@ and returns the info packaged in a single struct.
 - `interpolate_daily`: [Bool] switch to trigger daily interpolation.
 - `segment_idx0`: [Vector{Int}] reference date which, after initialization, refers to the the first file date index used minus 1 (segment_idx[1] - 1)
 - `scaling function`: [Function] scales, offsets or transforms `varname`.
-- `land_fraction`: [Fields.field] fraction with 1 = land, 0 = ocean / sea-ice.
+- `land_fraction`: [CC.Fields.field] fraction with 1 = land, 0 = ocean / sea-ice.
 - `date0`: [Dates.DateTime] start date of the file data.
 - `mono`: [Bool] flag for monotone remapping of `datafile_rll`.
 
@@ -138,7 +137,7 @@ function bcfile_info_init(
     data_dates = JLD2.load(joinpath(bcfile_dir, hd_outfile_root * "_times.jld2"), "times")
 
     # init time tracking info
-    current_fields = Fields.zeros(FT, boundary_space), Fields.zeros(FT, boundary_space)
+    current_fields = CC.Fields.zeros(FT, boundary_space), CC.Fields.zeros(FT, boundary_space)
     segment_length = [Int(0)]
 
     # unless the start file date is specified, find the closest one to the start date
@@ -299,7 +298,7 @@ or returns the first Field if interpolation is switched off.
 - `bcf_info`: [BCFileInfo] contains fields to be interpolated.
 
 # Returns
-- Fields.field
+- CC.Fields.field
 """
 function interpolate_midmonth_to_daily(date, bcf_info::BCFileInfo{FT}) where {FT}
     (; segment_length, segment_idx, all_dates, monthly_fields, interpolate_daily) = bcf_info

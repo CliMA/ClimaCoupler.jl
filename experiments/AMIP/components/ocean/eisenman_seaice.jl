@@ -1,13 +1,7 @@
-import SciMLBase: ODEProblem, init
-
-using ClimaCore
-using ClimaCore.Fields: getindex
+import SciMLBase
+import ClimaCore as CC
 import ClimaTimeSteppers as CTS
-
-import ClimaCoupler: FluxCalculator
-import ClimaCoupler.FluxCalculator:
-    update_turbulent_fluxes_point!, differentiate_turbulent_fluxes!, surface_thermo_state
-import ClimaCoupler.Interfacer: get_field, update_field!, step!, reinit!
+import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer
 
 ###
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
@@ -18,13 +12,13 @@ import ClimaCoupler.Interfacer: get_field, update_field!, step!, reinit!
 Thermodynamic 0-layer, based on the Semtner 1979 model and later refined by
 Eisenmen 2009 and Zhang et al 2021.
 """
-struct EisenmanIceSimulation{P, Y, D, I} <: SeaIceModelSimulation
+struct EisenmanIceSimulation{P, Y, D, I} <: Interfacer.SeaIceModelSimulation
     params_ice::P
     Y_init::Y
     domain::D
     integrator::I
 end
-name(::EisenmanIceSimulation) = "EisenmanIceSimulation"
+Interfacer.name(::EisenmanIceSimulation) = "EisenmanIceSimulation"
 
 Base.@kwdef struct EisenmanIceParameters{FT <: AbstractFloat}
     z0m::FT = 1e-3                  # roughness length for momentum [m]
@@ -80,41 +74,41 @@ function eisenman_seaice_init(
         area_fraction = area_fraction,
         ice_area_fraction = zeros(space),
         thermo_params = thermo_params,
-        dss_buffer = ClimaCore.Spaces.create_dss_buffer(ClimaCore.Fields.zeros(space)),
+        dss_buffer = CC.Spaces.create_dss_buffer(CC.Fields.zeros(space)),
     )
-    problem = ODEProblem(ode_function, Y, Float64.(tspan), cache)
-    integrator = init(problem, ode_algo, dt = Float64(dt), saveat = Float64(saveat), adaptive = false)
+    problem = SciMLBase.ODEProblem(ode_function, Y, Float64.(tspan), cache)
+    integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64(saveat), adaptive = false)
 
     sim = EisenmanIceSimulation(params, Y, space, integrator)
-    @warn name(sim) *
+    @warn Interfacer.name(sim) *
           " assumes gray radiation, no snow coverage, and PartitionedStateFluxes for the surface flux calculation."
     return sim
 end
 
 # extensions required by Interfacer
-get_field(sim::EisenmanIceSimulation, ::Val{:air_density}) = sim.integrator.p.Ya.ρ_sfc
-get_field(sim::EisenmanIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
-get_field(sim::EisenmanIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
-get_field(sim::EisenmanIceSimulation, ::Val{:roughness_buoyancy}) =
+Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:air_density}) = sim.integrator.p.Ya.ρ_sfc
+Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
+Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
+Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:roughness_buoyancy}) =
     @. sim.integrator.p.params.p_i.z0b * (sim.integrator.p.ice_area_fraction) +
        sim.integrator.p.params.p_o.z0b .* (1 - sim.integrator.p.ice_area_fraction)
-get_field(sim::EisenmanIceSimulation, ::Val{:roughness_momentum}) =
+Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:roughness_momentum}) =
     @. sim.integrator.p.params.p_i.z0m * (sim.integrator.p.ice_area_fraction) +
        sim.integrator.p.params.p_o.z0m .* (1 - sim.integrator.p.ice_area_fraction)
-get_field(sim::EisenmanIceSimulation, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) =
+Interfacer.get_field(sim::EisenmanIceSimulation, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) =
     @. sim.integrator.p.params.p_i.α * (sim.integrator.p.ice_area_fraction) +
        sim.integrator.p.params.p_o.α .* (1 - sim.integrator.p.ice_area_fraction)
-get_field(sim::EisenmanIceSimulation, ::Val{:surface_humidity}) = sim.integrator.u.q_sfc
-get_field(sim::EisenmanIceSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
-get_field(sim::EisenmanIceSimulation, ::Val{:water}) = nothing
+Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:surface_humidity}) = sim.integrator.u.q_sfc
+Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
+Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:water}) = nothing
 
 """
-    get_field(sim::EisenmanIceSimulation, ::Val{:energy})
+    Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:energy})
 
 Extension of Interfacer.get_field to get the energy of the ocean.
 It is the sum of the heat content of the mixed layer, the heat content of the ice, the heat flux from the ocean below ice.
 """
-function get_field(sim::EisenmanIceSimulation, ::Val{:energy})
+function Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:energy})
     p_i = sim.integrator.p.params.p_i
     p_o = sim.integrator.p.params.p_o
     C0_base = p_i.C0_base
@@ -140,52 +134,52 @@ function get_field(sim::EisenmanIceSimulation, ::Val{:energy})
     return @. e_ml + e_ice + e_qflux + e_base
 end
 
-function update_field!(sim::EisenmanIceSimulation, ::Val{:air_density}, field)
+function Interfacer.update_field!(sim::EisenmanIceSimulation, ::Val{:air_density}, field)
     parent(sim.integrator.p.Ya.ρ_sfc) .= parent(field)
 end
-function update_field!(sim::EisenmanIceSimulation, ::Val{:area_fraction}, field::ClimaCore.Fields.Field)
+function Interfacer.update_field!(sim::EisenmanIceSimulation, ::Val{:area_fraction}, field::CC.Fields.Field)
     sim.integrator.p.area_fraction .= field
 end
-function update_field!(sim::EisenmanIceSimulation, ::Val{:∂F_turb_energy∂T_sfc}, field, colidx)
+function Interfacer.update_field!(sim::EisenmanIceSimulation, ::Val{:∂F_turb_energy∂T_sfc}, field, colidx)
     sim.integrator.p.Ya.∂F_turb_energy∂T_sfc[colidx] .= field
 end
-function update_field!(sim::EisenmanIceSimulation, ::Val{:radiative_energy_flux_sfc}, field)
+function Interfacer.update_field!(sim::EisenmanIceSimulation, ::Val{:radiative_energy_flux_sfc}, field)
     parent(sim.integrator.p.Ya.F_rad) .= parent(field)
 end
-function update_field!(sim::EisenmanIceSimulation, ::Val{:turbulent_energy_flux}, field)
+function Interfacer.update_field!(sim::EisenmanIceSimulation, ::Val{:turbulent_energy_flux}, field)
     parent(sim.integrator.p.Ya.F_turb) .= parent(field)
 end
 
 # extensions required by FieldExchanger
-step!(sim::EisenmanIceSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
-reinit!(sim::EisenmanIceSimulation) = reinit!(sim.integrator)
+Interfacer.step!(sim::EisenmanIceSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+Interfacer.reinit!(sim::EisenmanIceSimulation) = Interfacer.reinit!(sim.integrator)
 
 # extensions required by FluxCalculator (partitioned fluxes)
-function update_turbulent_fluxes_point!(
+function FluxCalculator.update_turbulent_fluxes_point!(
     sim::EisenmanIceSimulation,
     fields::NamedTuple,
-    colidx::ClimaCore.Fields.ColumnIndex,
+    colidx::CC.Fields.ColumnIndex,
 )
     (; F_turb_energy) = fields
     @. sim.integrator.p.Ya.F_turb[colidx] = F_turb_energy
 end
 
 """
-    get_model_prog_state(sim::EisenmanIceSimulation)
+    Checkpointer.get_model_prog_state(sim::EisenmanIceSimulation)
 
 Extension of Checkpointer.get_model_prog_state to get the model state.
 """
-function get_model_prog_state(sim::EisenmanIceSimulation)
+function Checkpointer.get_model_prog_state(sim::EisenmanIceSimulation)
     return sim.integrator.u
 end
 
 """
-    differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args)
+    FluxCalculator.differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args)
 
-Extension of differentiate_turbulent_fluxes! from FluxCalculator to get the turbulent fluxes.
+Extension of FluxCalculator.differentiate_turbulent_fluxes! from FluxCalculator to get the turbulent fluxes.
 """
-differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args) =
-    differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args..., ΔT_sfc = 0.1)
+FluxCalculator.differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args) =
+    FluxCalculator.differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args..., ΔT_sfc = 0.1)
 
 """
     differentiate_turbulent_fluxes(sim::Interfacer.SurfaceModelSimulation, thermo_params, input_args, fluxes, δT_sfc = 0.1)
@@ -193,9 +187,16 @@ differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args) =
 Differentiates the turbulent fluxes in the surface model simulation `sim` with respect to the surface temperature,
 using δT_sfc as the perturbation.
 """
-function differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, thermo_params, input_args, fluxes; δT_sfc = 0.1)
+function FluxCalculator.differentiate_turbulent_fluxes!(
+    sim::EisenmanIceSimulation,
+    thermo_params,
+    input_args,
+    fluxes;
+    δT_sfc = 0.1,
+)
     (; thermo_state_int, surface_params, surface_scheme, colidx) = input_args
-    thermo_state_sfc_dT = surface_thermo_state(sim, thermo_params, thermo_state_int, colidx, δT_sfc = δT_sfc)
+    thermo_state_sfc_dT =
+        FluxCalculator.surface_thermo_state(sim, thermo_params, thermo_state_int, colidx, δT_sfc = δT_sfc)
     input_args = merge(input_args, (; thermo_state_sfc = thermo_state_sfc_dT))
 
     # set inputs based on whether the surface_scheme is `MoninObukhovScheme` or `BulkScheme`
@@ -220,20 +221,20 @@ end
 
 Initialize the state vectors for the Eisenman-Zhang sea ice model.
 """
-function state_init(p::EisenmanIceParameters, space::ClimaCore.Spaces.AbstractSpace)
-    Y = ClimaCore.Fields.FieldVector(
+function state_init(p::EisenmanIceParameters, space::CC.Spaces.AbstractSpace)
+    Y = CC.Fields.FieldVector(
         T_sfc = ones(space) .* p.T_freeze,
         h_ice = zeros(space),
         T_ml = ones(space) .* 277,
-        q_sfc = ClimaCore.Fields.zeros(space),
+        q_sfc = CC.Fields.zeros(space),
     )
-    Ya = ClimaCore.Fields.FieldVector(
-        F_turb = ClimaCore.Fields.zeros(space),
-        ∂F_turb_energy∂T_sfc = ClimaCore.Fields.zeros(space),
-        F_rad = ClimaCore.Fields.zeros(space),
-        e_base = ClimaCore.Fields.zeros(space),
-        ocean_qflux = ClimaCore.Fields.zeros(space),
-        ρ_sfc = ClimaCore.Fields.zeros(space),
+    Ya = CC.Fields.FieldVector(
+        F_turb = CC.Fields.zeros(space),
+        ∂F_turb_energy∂T_sfc = CC.Fields.zeros(space),
+        F_rad = CC.Fields.zeros(space),
+        e_base = CC.Fields.zeros(space),
+        ocean_qflux = CC.Fields.zeros(space),
+        ρ_sfc = CC.Fields.zeros(space),
     )
     return Y, Ya
 end
@@ -353,7 +354,7 @@ function ∑tendencies(dY, Y, cache, _)
     @. dY.T_sfc = -Y.T_sfc / Δt
     @. dY.q_sfc = -Y.q_sfc / Δt
 
-    ClimaCore.Fields.bycolumn(axes(Y.T_sfc)) do colidx
+    CC.Fields.bycolumn(axes(Y.T_sfc)) do colidx
         solve_eisenman_model!(Y[colidx], Ya[colidx], p, thermo_params, Δt)
     end
 

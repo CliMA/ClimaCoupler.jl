@@ -1,50 +1,47 @@
 #=
     Unit tests for ClimaCoupler Regridder module
 =#
-
-using ClimaCore: Geometry, Meshes, Domains, Topologies, Spaces, Fields, InputOutput
-using ClimaComms
-using Test
-using NCDatasets
-using Dates
-
-using ClimaCoupler: Interfacer, Regridder, TestHelper, TimeManager, PostProcessor
-import ClimaCoupler.Interfacer: get_field, name, SurfaceModelSimulation, SurfaceStub, update_field!
+import Test: @testset, @test
+import Dates
+import NCDatasets
+import ClimaComms
+import ClimaCore as CC
+import ClimaCoupler: Interfacer, Regridder, TestHelper, TimeManager
 
 REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regrid_tmp/")
 
 const comms_ctx = ClimaComms.SingletonCommsContext()
 const pid, nprocs = ClimaComms.init(comms_ctx)
 
-struct TestSurfaceSimulationA <: SurfaceModelSimulation end
-struct TestSurfaceSimulationB <: SurfaceModelSimulation end
-struct TestSurfaceSimulationC <: SurfaceModelSimulation end
-struct TestSurfaceSimulationD <: SurfaceModelSimulation end
+struct TestSurfaceSimulationA <: Interfacer.SurfaceModelSimulation end
+struct TestSurfaceSimulationB <: Interfacer.SurfaceModelSimulation end
+struct TestSurfaceSimulationC <: Interfacer.SurfaceModelSimulation end
+struct TestSurfaceSimulationD <: Interfacer.SurfaceModelSimulation end
 
 # Initialize weights (fractions) and initial values (fields)
-get_field(::TestSurfaceSimulationA, ::Val{:random}) = 1.0
-get_field(::TestSurfaceSimulationB, ::Val{:random}) = 1.0
-get_field(::TestSurfaceSimulationC, ::Val{:random}) = 1.0
-get_field(::TestSurfaceSimulationD, ::Val{:random}) = 1.0
+Interfacer.get_field(::TestSurfaceSimulationA, ::Val{:random}) = 1.0
+Interfacer.get_field(::TestSurfaceSimulationB, ::Val{:random}) = 1.0
+Interfacer.get_field(::TestSurfaceSimulationC, ::Val{:random}) = 1.0
+Interfacer.get_field(::TestSurfaceSimulationD, ::Val{:random}) = 1.0
 
-get_field(::TestSurfaceSimulationA, ::Val{:area_fraction}) = 0.0
-get_field(::TestSurfaceSimulationB, ::Val{:area_fraction}) = 0.5
-get_field(::TestSurfaceSimulationC, ::Val{:area_fraction}) = 2.0
-get_field(::TestSurfaceSimulationD, ::Val{:area_fraction}) = -10.0
+Interfacer.get_field(::TestSurfaceSimulationA, ::Val{:area_fraction}) = 0.0
+Interfacer.get_field(::TestSurfaceSimulationB, ::Val{:area_fraction}) = 0.5
+Interfacer.get_field(::TestSurfaceSimulationC, ::Val{:area_fraction}) = 2.0
+Interfacer.get_field(::TestSurfaceSimulationD, ::Val{:area_fraction}) = -10.0
 
-struct DummyStub{C} <: SurfaceModelSimulation
+struct DummyStub{C} <: Interfacer.SurfaceModelSimulation
     cache::C
 end
-get_field(sim::DummyStub, ::Val{:area_fraction}) = sim.cache.area_fraction
-function update_field!(sim::DummyStub, ::Val{:area_fraction}, field::Fields.Field)
+Interfacer.get_field(sim::DummyStub, ::Val{:area_fraction}) = sim.cache.area_fraction
+function Interfacer.update_field!(sim::DummyStub, ::Val{:area_fraction}, field::CC.Fields.Field)
     sim.cache.area_fraction .= field
 end
 
 for FT in (Float32, Float64)
     @testset "test dummmy_remap!" begin
         test_space = TestHelper.create_space(FT)
-        test_field_ones = Fields.ones(test_space)
-        target_field = Fields.zeros(test_space)
+        test_field_ones = CC.Fields.ones(test_space)
+        target_field = CC.Fields.zeros(test_space)
 
         Regridder.dummmy_remap!(target_field, test_field_ones)
         @test parent(target_field) == parent(test_field_ones)
@@ -53,18 +50,18 @@ for FT in (Float32, Float64)
     @testset "test update_surface_fractions!" begin
         test_space = TestHelper.create_space(FT)
         # Construct land fraction of 0s in top half, 1s in bottom half
-        land_fraction = Fields.ones(test_space)
+        land_fraction = CC.Fields.ones(test_space)
         dims = size(parent(land_fraction))
         m = dims[1]
         n = dims[2]
         parent(land_fraction)[1:(m ÷ 2), :, :, :] .= FT(0)
 
         # Construct ice fraction of 0s on left, 0.5s on right
-        ice_d = Fields.zeros(test_space)
+        ice_d = CC.Fields.zeros(test_space)
         parent(ice_d)[:, (n ÷ 2 + 1):n, :, :] .= FT(0.5)
 
         # Construct ice fraction of 0s on left, 0.5s on right
-        ocean_d = Fields.zeros(test_space)
+        ocean_d = CC.Fields.zeros(test_space)
 
         # Fill in only the necessary parts of the simulation
         cs = Interfacer.CoupledSimulation{FT}(
@@ -77,8 +74,11 @@ for FT in (Float32, Float64)
             (Int(0), Int(1000)), # tspan
             Int(200), # t
             Int(200), # Δt_cpl
-            (; land = land_fraction, ice = Fields.zeros(test_space), ocean = Fields.zeros(test_space)), # surface_fractions
-            (; ice_sim = DummyStub((; area_fraction = ice_d)), ocean_sim = SurfaceStub((; area_fraction = ocean_d))), # model_sims
+            (; land = land_fraction, ice = CC.Fields.zeros(test_space), ocean = CC.Fields.zeros(test_space)), # surface_fractions
+            (;
+                ice_sim = DummyStub((; area_fraction = ice_d)),
+                ocean_sim = Interfacer.SurfaceStub((; area_fraction = ocean_d)),
+            ), # model_sims
             (;), # mode
             (), # diagnostics
             (;), # callbacks
@@ -95,19 +95,19 @@ for FT in (Float32, Float64)
 
     @testset "test combine_surfaces_from_sol!" begin
         test_space = TestHelper.create_space(FT)
-        combined_field = Fields.ones(test_space)
+        combined_field = CC.Fields.ones(test_space)
 
         # Initialize weights (fractions) and initial values (fields)
         fractions = (a = 0.0, b = 0.5, c = 2.0, d = -10.0)
         fields = (a = 1.0, b = 1.0, c = 1.0, d = 1.0)
 
-        Regridder.combine_surfaces_from_sol!(combined_field::Fields.Field, fractions::NamedTuple, fields::NamedTuple)
+        Regridder.combine_surfaces_from_sol!(combined_field::CC.Fields.Field, fractions::NamedTuple, fields::NamedTuple)
         @test all(parent(combined_field) .== FT(sum(fractions) * sum(fields) / length(fields)))
     end
 
     @testset "test combine_surfaces" begin
         test_space = TestHelper.create_space(FT)
-        combined_field = Fields.ones(test_space)
+        combined_field = CC.Fields.ones(test_space)
 
         var_name = Val(:random)
         sims = (;
@@ -118,16 +118,16 @@ for FT in (Float32, Float64)
         )
 
         fractions = (
-            a = get_field(sims.a, Val(:area_fraction)),
-            b = get_field(sims.b, Val(:area_fraction)),
-            c = get_field(sims.c, Val(:area_fraction)),
-            d = get_field(sims.d, Val(:area_fraction)),
+            a = Interfacer.get_field(sims.a, Val(:area_fraction)),
+            b = Interfacer.get_field(sims.b, Val(:area_fraction)),
+            c = Interfacer.get_field(sims.c, Val(:area_fraction)),
+            d = Interfacer.get_field(sims.d, Val(:area_fraction)),
         )
         fields = (
-            a = get_field(sims.a, var_name),
-            b = get_field(sims.b, var_name),
-            c = get_field(sims.c, var_name),
-            d = get_field(sims.d, var_name),
+            a = Interfacer.get_field(sims.a, var_name),
+            b = Interfacer.get_field(sims.b, var_name),
+            c = Interfacer.get_field(sims.c, var_name),
+            d = Interfacer.get_field(sims.d, var_name),
         )
 
         Regridder.combine_surfaces!(combined_field, sims, var_name)
@@ -146,7 +146,7 @@ for FT in (Float32, Float64)
             hd_outfile_root = "hdf5_out_test"
             tx = Dates.DateTime(1979, 01, 01, 01, 00, 00)
             test_space = TestHelper.create_space(FT)
-            input_field = Fields.ones(test_space)
+            input_field = CC.Fields.ones(test_space)
             varname = "testdata"
 
             Regridder.write_to_hdf5(REGRID_DIR, hd_outfile_root, tx, input_field, varname, comms_ctx)
@@ -167,12 +167,12 @@ for FT in (Float32, Float64)
             datafile_rll = remap_tmpdir * "/" * name * "_rll.nc"
 
             test_space = TestHelper.create_space(FT)
-            field = Fields.ones(test_space)
+            field = CC.Fields.ones(test_space)
 
             Regridder.remap_field_cgll_to_rll(name, field, remap_tmpdir, datafile_rll)
 
             # Test no new extrema are introduced in monotone remapping
-            nt = NCDataset(datafile_rll) do ds
+            nt = NCDatasets.NCDataset(datafile_rll) do ds
                 max_remapped = maximum(ds[name])
                 min_remapped = minimum(ds[name])
                 (; max_remapped, min_remapped)
@@ -203,7 +203,7 @@ for FT in (Float32, Float64)
                 Regridder.land_fraction(FT, REGRID_DIR, comms_ctx, data_path, varname, test_space, mono = true)
 
             # Test no new extrema are introduced in monotone remapping
-            nt = NCDataset(data_path) do ds
+            nt = NCDatasets.NCDataset(data_path) do ds
                 max_val = maximum(ds[varname])
                 min_val = minimum(ds[varname])
                 (; max_val, min_val)
@@ -258,20 +258,18 @@ for FT in (Float32, Float64)
 
             # save the lat-lon data to a netcdf file in the required format for TempestRemap
             datafile_rll = joinpath(REGRID_DIR, "lat_lon_data.nc")
-            NCDataset(datafile_rll, "c") do ds
+            NCDatasets.NCDataset(datafile_rll, "c") do ds
+                NCDatasets.defDim(ds, "lat", size(lats)...)
+                NCDatasets.defDim(ds, "lon", size(lons)...)
+                NCDatasets.defDim(ds, "z", size(z)...)
+                NCDatasets.defDim(ds, "date", size(time)...)
 
-                defDim(ds, "lat", size(lats)...)
-                defDim(ds, "lon", size(lons)...)
-                defDim(ds, "z", size(z)...)
-                defDim(ds, "date", size(time)...)
+                NCDatasets.defVar(ds, "lon", lons, ("lon",))
+                NCDatasets.defVar(ds, "lat", lats, ("lat",))
+                NCDatasets.defVar(ds, "z", z, ("z",))
+                NCDatasets.defVar(ds, "date", time, ("date",))
 
-                defVar(ds, "lon", lons, ("lon",))
-                defVar(ds, "lat", lats, ("lat",))
-                defVar(ds, "z", z, ("z",))
-                defVar(ds, "date", time, ("date",))
-
-                defVar(ds, varname, data, ("lon", "lat", "z", "date"))
-
+                NCDatasets.defVar(ds, varname, data, ("lon", "lat", "z", "date"))
             end
 
             hd_outfile_root = "data_cgll_test"
@@ -288,8 +286,8 @@ for FT in (Float32, Float64)
             # read in data on CGLL grid from the last saved date
             date1 = TimeManager.strdate_to_datetime.(string(Int(time[end])))
             cgll_path = joinpath(REGRID_DIR, "$(hd_outfile_root)_$date1.hdf5")
-            hdfreader = InputOutput.HDF5Reader(cgll_path, comms_ctx)
-            T_cgll = InputOutput.read_field(hdfreader, varname)
+            hdfreader = CC.InputOutput.HDF5Reader(cgll_path, comms_ctx)
+            T_cgll = CC.InputOutput.read_field(hdfreader, varname)
             Base.close(hdfreader)
 
             # regrid back to lat-lon
@@ -310,7 +308,6 @@ for FT in (Float32, Float64)
 
             # Delete testing directory and files
             rm(REGRID_DIR; recursive = true, force = true)
-
         end
     end
 end

@@ -59,3 +59,25 @@ function pr_obs_data_path()
     )
     return AW.get_data_folder(pr_obs_data)
 end
+
+"""
+    artifact_data(datapath_full, name)
+
+Returns input dataset at datapath_full
+"""
+function artifact_data(datapath_full, name)
+    datafile_truncated = joinpath(datapath_full, string(name, ".nc"))
+    return datafile_truncated
+end
+
+"""
+    artifact_data(datapath_full, name, datapath_trunc, date0, time_start, time_end, comms_ctx)
+
+Truncates given data set, and constructs a new dataset containing only the dates needed and stores it in datapath_trunc
+"""
+function artifact_data(datapath_full, name, datapath_trunc, date0, time_start, time_end, comms_ctx)
+    datafile = joinpath(datapath_full, string(name, ".nc"))
+    datafile_truncated =
+        Regridder.truncate_dataset(datafile, name, datapath_trunc, date0, time_start, time_end, comms_ctx)
+    return datafile_truncated
+end

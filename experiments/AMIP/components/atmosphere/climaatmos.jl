@@ -37,7 +37,7 @@ function atmos_init(::Type{FT}, atmos_config) where {FT}
     ρ_flux_uₕ = integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ
 
     @. ρ_flux_h_tot = CC.Geometry.Covariant3Vector(FT(0.0))
-    ρ_flux_uₕ.components .= Ref(SMatrix{1, 2}([FT(0), FT(0)]))
+    ρ_flux_uₕ.components .= Ref(StaticArrays.SMatrix{1, 2}([FT(0), FT(0)]))
 
     if !isnothing(integrator.p.atmos.radiation_mode)
         ᶠradiation_flux = integrator.p.radiation.ᶠradiation_flux
@@ -128,7 +128,7 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) =
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
     TD.air_temperature.(thermo_params, sim.integrator.p.precomputed.ᶜts)
 
-temp_scalar_half(integrator) = CC.Fields.level(integrator.p.scratch.ᶠtemp_scalar, half)
+temp_scalar_half(integrator) = CC.Fields.level(integrator.p.scratch.ᶠtemp_scalar, CC.Utilities.half)
 temp_scalar_one(integrator) = CC.Fields.level(integrator.p.scratch.ᶜtemp_scalar, 1)
 temp_scalar_center(integrator) = integrator.p.scratch.ᶜtemp_scalar
 
@@ -194,7 +194,7 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fl
     (; F_turb_energy, F_turb_moisture, F_turb_ρτxz, F_turb_ρτyz) = fields
 
     Y = sim.integrator.u
-    surface_local_geometry = CC.Fields.level(CC.Fields.local_geometry_field(Y.f), CC.Fields.half)
+    surface_local_geometry = CC.Fields.level(CC.Fields.local_geometry_field(Y.f), CC.Utilities.half)
     surface_normal = @. CA.C3(CA.unit_basis_vector_data(CA.C3, surface_local_geometry))
 
     # get template objects for the contravariant components of the momentum fluxes (required by Atmos boundary conditions)

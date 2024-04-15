@@ -86,7 +86,7 @@ CAD.add_diagnostic_variable!(
 ###
 
 # TODO: this should be integrated from top-down
-add_diagnostic_variable!(
+CAD.add_diagnostic_variable!(
     short_name = "mass_streamfunction",
     long_name = "Meridional Mass Streamfunction: vertical integral of meridional mass flux, rho v",
     standard_name = "meridional_mass_streamfunction",
@@ -105,7 +105,7 @@ add_diagnostic_variable!(
     end,
 )
 
-add_diagnostic_variable!(
+CAD.add_diagnostic_variable!(
     short_name = "stab",
     long_name = "Static Stability: N^2 = -g/theta dtheta/dz",
     standard_name = "static_stability",
@@ -125,7 +125,7 @@ add_diagnostic_variable!(
     end,
 )
 
-add_diagnostic_variable!(
+CAD.add_diagnostic_variable!(
     short_name = "vT",
     long_name = "Product of meridional wind and temperature",
     standard_name = "vT",
@@ -148,7 +148,7 @@ const ᶠinterp_ = ClimaCore.Operators.InterpolateC2F(
     top = ClimaCore.Operators.Extrapolate(),
 )
 
-add_diagnostic_variable!(
+CAD.add_diagnostic_variable!(
     short_name = "egr",
     long_name = "max. Eady growth rate (0.31 f/N du/dz)",
     standard_name = "Eady_growth_rate",

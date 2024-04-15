@@ -149,15 +149,15 @@ Extension of Interfacer.get_field that provides the total energy contained in th
 function Interfacer.get_field(bucket_sim::BucketSimulation, ::Val{:energy})
     # required by ConservationChecker
     e_per_area = zeros(axes(bucket_sim.integrator.u.bucket.W))
-    CC.Fields.bycolumn(axes(bucket_sim.integrator.u.bucket.T)) do colidx
-        e_per_area[colidx] .=
-            bucket_sim.model.parameters.ρc_soil .* Statistics.mean(bucket_sim.integrator.u.bucket.T[colidx]) .*
-            bucket_sim.domain.soil_depth
-    end
+    CC.Operators.column_integral_definite!(
+        e_per_area,
+        bucket_sim.model.parameters.ρc_soil .* bucket_sim.integrator.u.bucket.T,
+    )
 
     e_per_area .+=
         -LP.LH_f0(bucket_sim.model.parameters.earth_param_set) .*
         LP.ρ_cloud_liq(bucket_sim.model.parameters.earth_param_set) .* bucket_sim.integrator.u.bucket.σS
+
     return e_per_area
 end
 

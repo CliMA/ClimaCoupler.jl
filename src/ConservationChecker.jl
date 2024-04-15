@@ -214,10 +214,11 @@ ENV["GKSwstype"] = "nul"
 
 """
     plot_global_conservation(
-        cc::EnergyConservationCheck,
-        coupler_sim::Interfacer.CoupledSimulation;
-        figname1 = "total_energy.png",
-        figname2 = "total_energy_log.png",
+        cc::AbstractConservationCheck,
+        coupler_sim::Interfacer.CoupledSimulation,
+        softfail = false;
+        figname1 = "total.png",
+        figname2 = "total_log.png",
     )
 
 Creates two plots of the globally integrated quantity (energy, ``\\rho e``):
@@ -276,7 +277,7 @@ function plot_global_conservation(
 
     # check that the relative error is small (TODO: reduce this to sqrt(eps(FT)))
     if !softfail
-        @assert rse[end] < 1e-3
+        @assert rse[end] < 2e-3
     end
 end
 

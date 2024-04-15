@@ -302,13 +302,11 @@ or returns the first Field if interpolation is switched off.
 """
 function interpolate_midmonth_to_daily(date, bcf_info::BCFileInfo{FT}) where {FT}
     (; segment_length, segment_idx, all_dates, monthly_fields, interpolate_daily) = bcf_info
-    if interpolate_daily && segment_length[1] > FT(0) && date != all_dates[Int(segment_idx[1])]
-        return interpol.(
-            monthly_fields[1],
-            monthly_fields[2],
-            FT((date - all_dates[Int(segment_idx[1])]).value),
-            FT(segment_length[1]),
-        )
+    if interpolate_daily && segment_length[1] > FT(0) && date > all_dates[Int(segment_idx[1])]
+        Δt_tt1 = FT((date - all_dates[Int(segment_idx[1])]).value)
+        interp_fraction = Δt_tt1 / FT(segment_length[1])
+        @assert abs(interp_fraction) <= FT(1) "time interpolation weights must be <= 1, but `interp_fraction` = $interp_fraction"
+        return interpol.(monthly_fields[1], monthly_fields[2], Δt_tt1, FT(segment_length[1]))
     else
         return monthly_fields[1]
     end
@@ -330,9 +328,7 @@ a segment `Δt_t2t1 = (t2 - t1)`, of fields `f1` and `f2`, with `t2 > t1`.
 - FT
 """
 function interpol(f1::FT, f2::FT, Δt_tt1::FT, Δt_t2t1::FT) where {FT}
-    @assert Δt_t2t1 > FT(0) "t2 must be > t1, but `Δt_t2t1` = $Δt_t2t1"
     interp_fraction = Δt_tt1 / Δt_t2t1
-    @assert abs(interp_fraction) <= FT(1) "time interpolation weights must be <= 1, but `interp_fraction` = $interp_fraction"
     return f1 * (FT(1) - interp_fraction) + f2 * interp_fraction
 end
 

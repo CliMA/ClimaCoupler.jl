@@ -57,7 +57,7 @@ for FT in (Float32, Float64)
         for sim in (DummySimulation(space), DummySimulation2(space), DummySimulation3(space))
             # field
             colidx = CC.Fields.ColumnIndex{2}((1, 1), 73)
-            @test parent(Interfacer.get_field(sim, Val(:var), colidx))[1] == FT(1)
+            @test Array(parent(Interfacer.get_field(sim, Val(:var), colidx)))[1] == FT(1)
             # float
             @test Interfacer.get_field(sim, Val(:var_float), colidx) == FT(2)
         end
@@ -108,10 +108,10 @@ for FT in (Float32, Float64)
         Interfacer.update_field!(stub, Val(:surface_direct_albedo), ones(boundary_space) .* 3)
         Interfacer.update_field!(stub, Val(:surface_diffuse_albedo), ones(boundary_space) .* 4)
 
-        @test parent(Interfacer.get_field(stub, Val(:area_fraction)))[1] == FT(1)
-        @test parent(Interfacer.get_field(stub, Val(:surface_temperature)))[1] == FT(2)
-        @test parent(Interfacer.get_field(stub, Val(:surface_direct_albedo)))[1] == FT(3)
-        @test parent(Interfacer.get_field(stub, Val(:surface_diffuse_albedo)))[1] == FT(4)
+        @test Array(parent(Interfacer.get_field(stub, Val(:area_fraction))))[1] == FT(1)
+        @test Array(parent(Interfacer.get_field(stub, Val(:surface_temperature))))[1] == FT(2)
+        @test Array(parent(Interfacer.get_field(stub, Val(:surface_direct_albedo))))[1] == FT(3)
+        @test Array(parent(Interfacer.get_field(stub, Val(:surface_diffuse_albedo))))[1] == FT(4)
     end
 end
 

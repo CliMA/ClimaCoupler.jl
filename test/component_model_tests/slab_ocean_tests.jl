@@ -21,15 +21,14 @@ for FT in (Float32, Float64)
             ),
             p = (; cache_field = FT.(CC.Fields.zeros(boundary_space)), dss_buffer = dss_buffer),
         )
-        integrator_copy = deepcopy(integrator)
         sim = SlabOceanSimulation(nothing, nothing, nothing, integrator)
 
         # make field non-constant to check the impact of the dss step
-        for i in eachindex(parent(sim.integrator.u.state_field2))
-            parent(sim.integrator.u.state_field2)[i] = FT(sin(i))
-        end
+        coords_lat = CC.Fields.coordinate_field(sim.integrator.u.state_field2).lat
+        @. sim.integrator.u.state_field2 = sin(coords_lat)
 
         # apply DSS
+        integrator_copy = deepcopy(integrator)
         dss_state!(sim)
 
         # test that uniform field and cache are unchanged, non-constant is changed

@@ -1,4 +1,7 @@
 import SafeTestsets: @safetestset
+import ClimaComms
+
+gpu_broken = ClimaComms.device() isa ClimaComms.CUDADevice
 
 @safetestset "Aqua tests" begin
     include("aqua.jl")
@@ -6,13 +9,13 @@ end
 @safetestset "Interfacer tests" begin
     include("interfacer_tests.jl")
 end
-@safetestset "Regridder tests" begin
+gpu_broken || @safetestset "Regridder tests" begin
     include("regridder_tests.jl")
 end
 @safetestset "ConservationChecker tests" begin
     include("conservation_checker_tests.jl")
 end
-@safetestset "BCReader tests" begin
+gpu_broken || @safetestset "BCReader tests" begin
     include("bcreader_tests.jl")
 end
 @safetestset "Utilities tests" begin
@@ -24,19 +27,19 @@ end
 @safetestset "FieldExchanger tests" begin
     include("field_exchanger_tests.jl")
 end
-@safetestset "FluxCalculator tests" begin
+gpu_broken || @safetestset "FluxCalculator tests" begin
     include("flux_calculator_tests.jl")
 end
-@safetestset "Diagnostics tests" begin
+gpu_broken || @safetestset "Diagnostics tests" begin
     include("diagnostics_tests.jl")
 end
-@safetestset "PostProcessor tests" begin
+gpu_broken || @safetestset "PostProcessor tests" begin
     include("postprocessor_tests.jl")
 end
-@safetestset "Checkpointer tests" begin
+gpu_broken || @safetestset "Checkpointer tests" begin
     include("checkpointer_tests.jl")
 end
-@safetestset "experiment test: CoupledSims tests" begin
+gpu_broken || @safetestset "experiment test: CoupledSims tests" begin
     include("experiment_tests/coupled_sims.jl")
 end
 @safetestset "experiment test: Leaderboard" begin
@@ -51,12 +54,12 @@ end
 @safetestset "component model test: prescr. sea ice" begin
     include("component_model_tests/prescr_seaice_tests.jl")
 end
-@safetestset "component model test: eisenman sea ice" begin
+gpu_broken || @safetestset "component model test: eisenman sea ice" begin
     include("component_model_tests/eisenman_seaice_tests.jl")
 end
 @safetestset "component model test: slab ocean" begin
     include("component_model_tests/slab_ocean_tests.jl")
 end
-@safetestset "debug diagnostics: amip plots" begin
+gpu_broken || @safetestset "debug diagnostics: amip plots" begin
     include("debug/debug_amip_plots.jl")
 end

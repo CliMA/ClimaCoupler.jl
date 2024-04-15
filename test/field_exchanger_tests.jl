@@ -105,11 +105,11 @@ for FT in (Float32, Float64)
             coupler_fields =
                 NamedTuple{coupler_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_names)))
             FieldExchanger.import_atmos_fields!(coupler_fields, model_sims, boundary_space, t)
-            @test parent(coupler_fields.F_turb_energy)[1] == results[i]
-            @test parent(coupler_fields.F_turb_moisture)[1] == results[i]
-            @test parent(coupler_fields.F_radiative)[1] == results[1]
-            @test parent(coupler_fields.P_liq)[1] == results[1]
-            @test parent(coupler_fields.P_snow)[1] == results[1]
+            @test Array(parent(coupler_fields.F_turb_energy))[1] == results[i]
+            @test Array(parent(coupler_fields.F_turb_moisture))[1] == results[i]
+            @test Array(parent(coupler_fields.F_radiative))[1] == results[1]
+            @test Array(parent(coupler_fields.P_liq))[1] == results[1]
+            @test Array(parent(coupler_fields.P_snow))[1] == results[1]
         end
     end
 
@@ -138,12 +138,12 @@ for FT in (Float32, Float64)
             coupler_fields =
                 NamedTuple{coupler_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_names)))
             FieldExchanger.import_combined_surface_fields!(coupler_fields, sims, boundary_space, t)
-            @test parent(coupler_fields.T_S)[1] == results[1]
-            @test parent(coupler_fields.surface_direct_albedo)[1] == results[1]
-            @test parent(coupler_fields.surface_diffuse_albedo)[1] == results[1]
-            @test parent(coupler_fields.z0m_S)[1] == results[i]
-            @test parent(coupler_fields.z0b_S)[1] == results[i]
-            @test parent(coupler_fields.beta)[1] == results[i]
+            @test Array(parent(coupler_fields.T_S))[1] == results[1]
+            @test Array(parent(coupler_fields.surface_direct_albedo))[1] == results[1]
+            @test Array(parent(coupler_fields.surface_diffuse_albedo))[1] == results[1]
+            @test Array(parent(coupler_fields.z0m_S))[1] == results[i]
+            @test Array(parent(coupler_fields.z0b_S))[1] == results[i]
+            @test Array(parent(coupler_fields.beta))[1] == results[i]
         end
     end
 
@@ -203,31 +203,31 @@ for FT in (Float32, Float64)
             FieldExchanger.update_model_sims!(model_sims, coupler_fields, t)
 
             # test atmos
-            @test parent(model_sims.atmos_sim.cache.albedo_direct)[1] == results[2]
-            @test parent(model_sims.atmos_sim.cache.albedo_diffuse)[1] == results[3]
+            @test Array(parent(model_sims.atmos_sim.cache.albedo_direct))[1] == results[2]
+            @test Array(parent(model_sims.atmos_sim.cache.albedo_diffuse))[1] == results[3]
             if t isa FluxCalculator.CombinedStateFluxes
-                @test parent(model_sims.atmos_sim.cache.roughness_momentum)[1] == results[2]
+                @test Array(parent(model_sims.atmos_sim.cache.roughness_momentum))[1] == results[2]
             else
-                @test parent(model_sims.atmos_sim.cache.roughness_momentum)[1] == results[1]
+                @test Array(parent(model_sims.atmos_sim.cache.roughness_momentum))[1] == results[1]
             end
 
             # unspecified variables
-            @test parent(model_sims.atmos_sim.cache.surface_temperature)[1] == results[1]
-            @test parent(model_sims.atmos_sim.cache.beta)[1] == results[1]
-            @test parent(model_sims.atmos_sim.cache.roughness_buoyancy)[1] == results[1]
+            @test Array(parent(model_sims.atmos_sim.cache.surface_temperature))[1] == results[1]
+            @test Array(parent(model_sims.atmos_sim.cache.beta))[1] == results[1]
+            @test Array(parent(model_sims.atmos_sim.cache.roughness_buoyancy))[1] == results[1]
 
             # test surface
-            @test parent(model_sims.land_sim.cache.turbulent_energy_flux)[1] == results[2] # assuming units / m2
-            @test parent(model_sims.land_sim.cache.turbulent_moisture_flux)[1] == results[2]
+            @test Array(parent(model_sims.land_sim.cache.turbulent_energy_flux))[1] == results[2] # assuming units / m2
+            @test Array(parent(model_sims.land_sim.cache.turbulent_moisture_flux))[1] == results[2]
 
             # unspecified variables
-            @test parent(model_sims.land_sim.cache.radiative_energy_flux_sfc)[1] == results[1]
-            @test parent(model_sims.land_sim.cache.liquid_precipitation)[1] == results[1]
-            @test parent(model_sims.land_sim.cache.snow_precipitation)[1] == results[1]
+            @test Array(parent(model_sims.land_sim.cache.radiative_energy_flux_sfc))[1] == results[1]
+            @test Array(parent(model_sims.land_sim.cache.liquid_precipitation))[1] == results[1]
+            @test Array(parent(model_sims.land_sim.cache.snow_precipitation))[1] == results[1]
 
             # test stub - albedo should be updated by update_sim!
-            @test parent(model_sims.stub_sim.cache.albedo_direct)[1] == results[2]
-            @test parent(model_sims.stub_sim.cache.albedo_diffuse)[1] == results[2]
+            @test Array(parent(model_sims.stub_sim.cache.albedo_direct))[1] == results[2]
+            @test Array(parent(model_sims.stub_sim.cache.albedo_diffuse))[1] == results[2]
 
         end
     end

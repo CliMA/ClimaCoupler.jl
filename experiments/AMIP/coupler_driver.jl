@@ -943,7 +943,7 @@ if ClimaComms.iamroot(comms_ctx)
     if config_dict["ci_plots"]
         @info "Generating CI plots"
         include("user_io/ci_plots.jl")
-        make_plots(Val(:general_ci_plots), [joinpath(dir_paths.output, "clima_atmos")], dir_paths.artifacts)
+        make_plots(Val(:general_ci_plots), [atmos_sim.integrator.p.output_dir], dir_paths.artifacts)
     end
 
     ## plot all model states and coupler fields (useful for debugging) TODO: make MPI & GPU compatible

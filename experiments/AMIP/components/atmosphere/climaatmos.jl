@@ -32,27 +32,32 @@ function atmos_init(::Type{FT}, atmos_config) where {FT}
         @warn("Running with ρe_int in coupled mode is not tested yet.", maxlog = 1)
     end
 
-    # define shorter references for long variable Interfacer.names to increase readability
-    ρ_flux_h_tot = integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot
-    ρ_flux_q_tot = integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot
-    ᶠradiation_flux = integrator.p.radiation.ᶠradiation_flux
-    ρ_flux_uₕ = integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ
-    col_integrated_rain = integrator.p.precipitation.col_integrated_rain
-    col_integrated_snow = integrator.p.precipitation.col_integrated_snow
-    ᶜS_ρq_tot = integrator.p.precipitation.ᶜS_ρq_tot
-    ᶜ3d_rain = integrator.p.precipitation.ᶜ3d_rain
-    ᶜ3d_snow = integrator.p.precipitation.ᶜ3d_snow
-
     # set initial fluxes to zero
+    ρ_flux_h_tot = integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot
+    ρ_flux_uₕ = integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ
+
     @. ρ_flux_h_tot = CC.Geometry.Covariant3Vector(FT(0.0))
-    @. ρ_flux_q_tot = CC.Geometry.Covariant3Vector(FT(0.0))
-    @. ᶠradiation_flux = CC.Geometry.WVector(FT(0))
-    ρ_flux_uₕ.components .= Ref(StaticArrays.SMatrix{1, 2}([FT(0), FT(0)]))
-    col_integrated_rain .= FT(0)
-    col_integrated_snow .= FT(0)
-    ᶜS_ρq_tot .= FT(0)
-    ᶜ3d_rain .= FT(0)
-    ᶜ3d_snow .= FT(0)
+    ρ_flux_uₕ.components .= Ref(SMatrix{1, 2}([FT(0), FT(0)]))
+
+    if !isnothing(integrator.p.atmos.radiation_mode)
+        ᶠradiation_flux = integrator.p.radiation.ᶠradiation_flux
+        @. ᶠradiation_flux = CC.Geometry.WVector(FT(0))
+    end
+    if !(integrator.p.atmos.moisture_model isa CA.DryModel)
+        ρ_flux_q_tot = integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot
+        col_integrated_rain = integrator.p.precipitation.col_integrated_rain
+        col_integrated_snow = integrator.p.precipitation.col_integrated_snow
+        ᶜS_ρq_tot = integrator.p.precipitation.ᶜS_ρq_tot
+        ᶜ3d_rain = integrator.p.precipitation.ᶜ3d_rain
+        ᶜ3d_snow = integrator.p.precipitation.ᶜ3d_snow
+        @. ρ_flux_q_tot = CC.Geometry.Covariant3Vector(FT(0.0))
+        col_integrated_rain .= FT(0)
+        col_integrated_snow .= FT(0)
+        ᶜS_ρq_tot .= FT(0)
+        ᶜ3d_rain .= FT(0)
+        ᶜ3d_snow .= FT(0)
+
+    end
 
     sim = ClimaAtmosSimulation(integrator.p.params, Y, spaces, integrator)
 
@@ -71,7 +76,7 @@ function Checkpointer.get_model_prog_state(sim::ClimaAtmosSimulation)
 end
 
 """
-Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_toa})
+    Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_toa})
 
 Extension of Interfacer.get_field to get the net TOA radiation, which is a sum of the
 upward and downward longwave and shortwave radiation.
@@ -86,14 +91,10 @@ function Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:radiative_
         (; face_lw_flux_dn, face_lw_flux_up, face_sw_flux_dn, face_sw_flux_up) =
             atmos_sim.integrator.p.radiation.radiation_model
 
-        LWd_TOA =
-            CC.Fields.level(CA.RRTMGPI.array2field(FT.(face_lw_flux_dn), face_space), nz_faces - CC.Utilities.half)
-        LWu_TOA =
-            CC.Fields.level(CA.RRTMGPI.array2field(FT.(face_lw_flux_up), face_space), nz_faces - CC.Utilities.half)
-        SWd_TOA =
-            CC.Fields.level(CA.RRTMGPI.array2field(FT.(face_sw_flux_dn), face_space), nz_faces - CC.Utilities.half)
-        SWu_TOA =
-            CC.Fields.level(CA.RRTMGPI.array2field(FT.(face_sw_flux_up), face_space), nz_faces - CC.Utilities.half)
+        LWd_TOA = CC.Fields.level(CA.RRTMGPI.array2field(FT.(face_lw_flux_dn), face_space), nz_faces - CC.Utilities.half)
+        LWu_TOA = CC.Fields.level(CA.RRTMGPI.array2field(FT.(face_lw_flux_up), face_space), nz_faces - CC.Utilities.half)
+        SWd_TOA = CC.Fields.level(CA.RRTMGPI.array2field(FT.(face_sw_flux_dn), face_space), nz_faces - CC.Utilities.half)
+        SWu_TOA = CC.Fields.level(CA.RRTMGPI.array2field(FT.(face_sw_flux_up), face_space), nz_faces - CC.Utilities.half)
 
         return @. -(LWd_TOA + SWd_TOA - LWu_TOA - SWu_TOA)
     else
@@ -126,19 +127,35 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) =
     TD.air_density.(thermo_params, sim.integrator.p.precomputed.ᶜts)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
     TD.air_temperature.(thermo_params, sim.integrator.p.precomputed.ᶜts)
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) =
-    sim.integrator.p.precipitation.col_integrated_rain
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
-    CC.Fields.level(sim.integrator.p.radiation.ᶠradiation_flux, CC.Utilities.half)
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =
-    sim.integrator.p.precipitation.col_integrated_snow
+
+temp_scalar_half(integrator) = CC.Fields.level(integrator.p.scratch.ᶠtemp_scalar, half)
+temp_scalar_one(integrator) = CC.Fields.level(integrator.p.scratch.ᶜtemp_scalar, 1)
+temp_scalar_center(integrator) = integrator.p.scratch.ᶜtemp_scalar
+
+col_integrated_rain(::CA.DryModel, integrator) = temp_scalar_half(integrator)
+col_integrated_rain(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator)= integrator.p.precipitation.col_integrated_rain
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) = col_integrated_rain(sim.integrator.p.atmos.moisture_model, sim.integrator)
+
+surface_radiation_flux(::CA.RRTMGPI.GrayRadiation, integrator) = temp_scalar_half(integrator)
+surface_radiation_flux(::Nothing, integrator) = temp_scalar_half(integrator)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) = surface_radiation_flux(sim.integrator.p.atmos.radiation_mode, sim.integrator)
+
+col_integrated_snow(::CA.DryModel, integrator) = temp_scalar_half(integrator)
+col_integrated_snow(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) = integrator.p.precipitation.col_integrated_snow
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) = col_integrated_snow(sim.integrator.p.atmos.moisture_model, sim.integrator)
+
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_energy_flux}) =
     CC.Geometry.WVector.(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot)
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_moisture_flux}) =
-    CC.Geometry.WVector.(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot)
+
+moisture_flux(::CA.DryModel, integrator) = temp_scalar_half(integrator)
+moisture_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) = integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_moisture_flux}) = moisture_flux(sim.integrator.p.atmos.moisture_model, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_state_int}) =
     CC.Spaces.level(sim.integrator.p.precomputed.ᶜts, 1)
-Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:water}) = atmos_sim.integrator.u.c.ρq_tot
+
+ρq_tot(::CA.DryModel, integrator) = temp_scalar_center(integrator)
+ρq_tot(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) = integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot
+Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:water}) = ρq_tot(atmos_sim.integrator.p.atmos.moisture_model, atmos_sim.integrator)
 
 # extensions required by FluxCalculator (partitioned fluxes)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =

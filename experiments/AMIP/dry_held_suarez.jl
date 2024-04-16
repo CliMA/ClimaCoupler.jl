@@ -75,7 +75,7 @@ restart_dir = "unspecified"
 restart_t = Int(0)
 
 ## coupler simulation specific configuration
-Δt_cpl = Float64(450)
+Δt_cpl = Float64(400)
 t_end = "200days"
 tspan = (Float64(0.0), Float64(time_to_seconds(t_end)))
 start_date = "19790301"
@@ -91,20 +91,24 @@ config_dict = Dict(
     "run_name" => run_name,
     # timestepping
     "dt" => "$(Δt_cpl)secs",
-    "dt_save_to_sol" => "10days",
+    "dt_save_to_sol" => "1days",
     "t_end" => t_end,
     "start_date" => "19790301",
     # domain
-    # "h_elem" => 6,#16,
-    "z_elem" => 25,#63,
-    "z_max" => 45000.0, # semi-high top
+    "h_elem" => 4,#16,
+    "z_elem" => 10,#63,
+    "z_max" => 30000.0, # semi-high top
     "dz_bottom" => 300.0,
+    "nh_poly" => 4,
     # "dz_top" => 3000.0,
     # output
-    "dt_save_state_to_disk" => "1000days",
+    "dt_save_to_sol" => "1days",
     # numerics
     "apply_limiter" => false,
-    "rayleigh_sponge" => true,
+    "viscous_sponge" => false,
+    "rayleigh_sponge" => false,
+    "vert_diff" => "false",
+    "hyperdiff" => "ClimaHyperdiffusion",
     # run
     "job_id" => run_name,
     "surface_setup" => "PrescribedSurface",
@@ -112,12 +116,18 @@ config_dict = Dict(
     "diagnostics" => [Dict("short_name" => ["mse", "lr", "mass_streamfunction", "stab", "vT", "egr"], "period" => "1days"),],
     # held-suarez specific
     "forcing" => "held_suarez",
-    "viscous_sponge" => true,
-    "rayleigh_sponge" => true,
-    "vert_diff" => "true",
 )
 
 
+
+# 621 - toml/sphere_held_suarez_rhoe_equilmoist_hightop_sponge.toml, except that dry
+
+
+# https://github.com/CliMA/ClimaCore.jl/blob/d352572f589185487c484e103886669877b901d6/examples/hybrid/sphere/held_suarez_rhoe.jl#L26
+# except default hyperdiff CC.spaces.node_horizontal_length_scale()
+
+
+#_____
 # Alternative
 # dt_save_state_to_disk: "10days"
 # dt: "150secs"
@@ -373,11 +383,5 @@ solve_coupler!(cs);
 anim = true
 energy_check = false
 # include("postprocessing.jl")
-
-
-# climate diagnostics: T, u, (q), rho v, N, MSE
-
-# storm track diagnostics: [vT], [v][T], EGR = f/N dTdy
-
 
 

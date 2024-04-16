@@ -113,7 +113,8 @@ config_dict = Dict(
     "job_id" => run_name,
     "surface_setup" => "PrescribedSurface",
     # diagnostic (nested wirh period and short_name)
-    "diagnostics" => [Dict("short_name" => ["mse", "lr", "mass_streamfunction", "stab", "vT", "egr"], "period" => "1days"),],
+    "output_default_diagnostics" => false,
+    "diagnostics" => [Dict("short_name" => ["mse", "lr", "mass_streamfunction", "stab", "vT", "egr", "ua", "va", "wa", "ta", "rhoa"], "period" => "1days", "reduction" => "inst"),],
     # held-suarez specific
     "forcing" => "held_suarez",
 )

@@ -54,24 +54,29 @@ make_plots(Val(:general_plots), [COUPLER_OUTPUT_DIR], COUPLER_OUTPUT_DIR)
 using NCDatasets
 using Statistics
 
-DIAG_DIR = "."
-# var, red = ("mass_streamfunction", "inst")
+DIAG_DIR = "data_623/"
+var, red = ("mass_streamfunction", "inst")
 # var, red = ("va", "30d_average")
 var, red = ("ua", "30d_average")
+# var, red = ("ta", "30d_average")
 ds = NCDataset("$DIAG_DIR/$(var)_$red.nc")
-strf = ds["$var"][:,:,:,:]
 lat = ds["lat"][:]
 lon = ds["lon"][:]
 z = ds["z"][:]
 time = ds["time"][:]
+strf = ds["$var"][:,:,:,:] #.* 2π * 6371e3 .* cosd.(reshape(lat, 1,1,length(lat),1)) # kg s^-1
 close(ds)
 
 strf_time_zonal_mean = mean(strf, dims=(1,2))[1, 1, :, :]
+strf_time_mean_sfc = mean(strf, dims=(1))[1, :, :, 39]
 
 # plot
 using Plots
 contourf(lat, z, strf_time_zonal_mean', xlabel="Latitude", ylabel="Height (m)", title="$var", color=:viridis, ylims = (0, 1e4))# , clims=(-1e10, 1e10))
-png("$var.png")
+png(joinpath(DIAG_DIR, "$var.png"))
+
+contourf(lon, lat, strf_time_mean_sfc', xlabel="Longitude", ylabel="Latitude", title="$var", color=:viridis)#, clims=(-1e10, 1e10))
+png(joinpath(DIAG_DIR, "$(var)_10k.png"))
 
 using ClimaCorePlots
 
@@ -79,7 +84,7 @@ using ClimaCorePlots
 plot(CC.Geometry.UVVector.(atmos_sim.integrator.u.c.uₕ).components.data.:1)
 png("cc_u")
 
-sol_atm = atmos_sim.integrator.sol
+sol_atm = atmos_sim.integrator.sol;
 
 anim = Plots.@animate for u in sol_atm.u
     Plots.plot(CC.Fields.level(CC.Geometry.UVVector.(u.c.uₕ).components.data.:1, 5))

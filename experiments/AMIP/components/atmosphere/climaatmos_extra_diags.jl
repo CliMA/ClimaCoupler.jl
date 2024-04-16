@@ -85,22 +85,25 @@ CAD.add_diagnostic_variable!(
 # Add the mass streamfunction diagnostic variable
 ###
 
-# TODO: this should be integrated from top-down
+# TODO: this should be integrated from top-down!
 CAD.add_diagnostic_variable!(
     short_name = "mass_streamfunction",
-    long_name = "Meridional Mass Streamfunction: vertical integral of meridional mass flux, rho v",
+    long_name = "Meridional Mass Streamfunction (Hartmann Eq 6.9)",
     standard_name = "meridional_mass_streamfunction",
     units = "kg m^-1 s^-1",
     compute! = (out, state, cache, time) -> begin
+        FT = eltype(state)
+        lat = CC.Fields.coordinate_field(axes(state.f)).lat
         ρv = ClimaCore.Geometry.UVVector.(state.c.uₕ).components.data.:2 .* state.c.ρ
         ᶠ∫_0_z_ρv = cache.scratch.ᶠtemp_scalar
         ClimaCore.Fields.bycolumn(axes(ρv)) do colidx
             ClimaCore.Operators.column_integral_indefinite!(ᶠ∫_0_z_ρv[colidx], ρv[colidx])
         end
+        twoπa = FT(2π * 6371e3)
         if isnothing(out)
-            return copy(ᶠ∫_0_z_ρv)
+            return ᶠ∫_0_z_ρv .* twoπa .* cosd.(lat)
         else
-            out .= ᶠ∫_0_z_ρv
+            out .= ᶠ∫_0_z_ρv .* twoπa .* cosd.(lat)
         end
     end,
 )

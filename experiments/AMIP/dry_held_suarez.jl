@@ -111,7 +111,7 @@ config_dict = Dict(
     # diagnostic (nested wirh period and short_name)
     "diagnostics" => [Dict("short_name" => ["mse", "lr", "mass_streamfunction", "stab", "vT", "egr"], "period" => "1days"),],
     # held-suarez specific
-    # "forcing" => "held_suarez",
+    "forcing" => "held_suarez",
     "viscous_sponge" => true,
     "rayleigh_sponge" => true,
     "vert_diff" => "true",

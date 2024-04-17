@@ -19,7 +19,7 @@ netcdf_output_at_levels: true
 run_name: "gpu_amip_target_topo_diagedmf"
 start_date: "19790301"
 surface_setup: "PrescribedSurface"
-t_end: "40days"
+t_end: "90days"
 topo_smoothing: true
 topography: "Earth"
 turb_flux_partition: "CombinedStateFluxes"

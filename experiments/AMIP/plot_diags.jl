@@ -54,39 +54,66 @@ make_plots(Val(:general_plots), [COUPLER_OUTPUT_DIR], COUPLER_OUTPUT_DIR)
 using NCDatasets
 using Statistics
 
-DIAG_DIR = "data_623/"
+DIAG_DIR = "dry_held_suarez3/dry_held_suarez3/clima_atmos"
 var, red = ("mass_streamfunction", "inst")
 # var, red = ("va", "30d_average")
-var, red = ("ua", "30d_average")
+# var, red = ("ua", "30d_average")
 # var, red = ("ta", "30d_average")
-ds = NCDataset("$DIAG_DIR/$(var)_$red.nc")
-lat = ds["lat"][:]
-lon = ds["lon"][:]
-z = ds["z"][:]
-time = ds["time"][:]
-strf = ds["$var"][:,:,:,:] #.* 2π * 6371e3 .* cosd.(reshape(lat, 1,1,length(lat),1)) # kg s^-1
-close(ds)
+get_nc_data = (var, red, level = 1, spinup=15) -> begin
+    ds = NCDataset("$DIAG_DIR/$(var)_$red.nc")
+    lat = ds["lat"][:]
+    lon = ds["lon"][:]
+    z = ds["z"][:]
+    time = ds["time"][:]
+    var = ds["$var"][:,:,:,:] #.* 2π * 6371e3 .* cosd.(reshape(lat, 1,1,length(lat),1)) # kg s^-1
+    close(ds)
 
-strf_time_zonal_mean = mean(strf, dims=(1,2))[1, 1, :, :]
-strf_time_mean_sfc = mean(strf, dims=(1))[1, :, :, 39]
+    var_time_zonal_mean = mean(var[spinup:end,:,:,:], dims=(1,2))[1, 1, :, :]
+    var_time_mean_sfc = mean(var[spinup:end,:,:,:], dims=(1))[1, :, :, level]
+
+    return var_time_zonal_mean, var_time_mean_sfc, lat, lon, z
+end
+
+var, red = ("ua", "inst")
+strf_zm, strf_sfc, lat, lon, z = get_nc_data(var, red)
 
 # plot
 using Plots
-contourf(lat, z, strf_time_zonal_mean', xlabel="Latitude", ylabel="Height (m)", title="$var", color=:viridis, ylims = (0, 1e4))# , clims=(-1e10, 1e10))
+contourf(lat, z, strf_zm', xlabel="Latitude", ylabel="Height (m)", title="$var", color=:viridis, ylims = (0, 1e4))# , clims=(-1e10, 1e10))
 png(joinpath(DIAG_DIR, "$var.png"))
 
-contourf(lon, lat, strf_time_mean_sfc', xlabel="Longitude", ylabel="Latitude", title="$var", color=:viridis)#, clims=(-1e10, 1e10))
-png(joinpath(DIAG_DIR, "$(var)_10k.png"))
+contourf(lon, lat, strf_sfc', xlabel="Longitude", ylabel="Latitude", title="$var", color=:viridis)#, clims=(-1e10, 1e10))
+png(joinpath(DIAG_DIR, "$(var)_sfc.png"))
 
+# storm tracks
+ta_zm, ta_sfc,lat, lon, z = get_nc_data("ta", "inst")
+va_zm, va_sfc,lat, lon, z = get_nc_data("va", "inst")
+vT_zm, vT_sfc,lat, lon, z = get_nc_data("vT", "inst")
+
+heat_flux = vT_zm .- va_zm .* ta_zm
+contourf(lat, z, heat_flux', xlabel="Latitude", ylabel="Height (m)", title="Heat flux", color=:viridis, ylims = (0, 1e4))# , clims=(-1e10, 1e10))
+png(joinpath(DIAG_DIR, "heat_flux.png"))
+
+contourf(lon, lat, strf_sfc', xlabel="Longitude", ylabel="Latitude", title="Heat flux", color=:viridis)#, clims=(-1e10, 1e10))
+png(joinpath(DIAG_DIR, "heat_flux)_sfc.png"))
+
+
+egr_zm, egr_sfc, lat, lon, z = get_nc_data("egr", "inst")
+contourf(lat, z, egr_zm', xlabel="Latitude", ylabel="Height (m)", title="Eady growth rate", color=:viridis, ylims = (0, 1e4))# , clims=(-1e10, 1e10))
+png(joinpath(DIAG_DIR, "egr.png"))
+
+contourf(lon, lat, strf_sfc', xlabel="Longitude", ylabel="Latitude", title="Eady growth rate", color=:viridis)#, clims=(-1e10, 1e10))
+png(joinpath(DIAG_DIR, "egr_sfc.png"))
+
+
+# raw fields
 using ClimaCorePlots
-
-
 plot(CC.Geometry.UVVector.(atmos_sim.integrator.u.c.uₕ).components.data.:1)
 png("cc_u")
 
 sol_atm = atmos_sim.integrator.sol;
-
+ANIM_DIR = "."
 anim = Plots.@animate for u in sol_atm.u
     Plots.plot(CC.Fields.level(CC.Geometry.UVVector.(u.c.uₕ).components.data.:1, 5))
 end
-Plots.mp4(anim, joinpath(DIAG_DIR, "anim_u.mp4"), fps = 10)
+Plots.mp4(anim, joinpath(ANIM_DIR, "anim_u.mp4"), fps = 10)

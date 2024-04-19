@@ -5,10 +5,10 @@ This module contains template functions for checkpointing the model states and r
 """
 module Checkpointer
 
-using ClimaCore: Fields, InputOutput
-using ClimaCoupler: Interfacer
-using Dates
-using ClimaComms
+import ClimaComms
+import ClimaCore as CC
+import ..Interfacer
+
 export get_model_prog_state, checkpoint_model_state, restart_model_state!
 
 """
@@ -36,9 +36,9 @@ function checkpoint_model_state(
     @info "Saving checkpoint " * Interfacer.name(sim) * " model state to HDF5 on day $day second $sec"
     mkpath(joinpath(output_dir, "checkpoint"))
     output_file = joinpath(output_dir, "checkpoint", "checkpoint_" * Interfacer.name(sim) * "_$t.hdf5")
-    checkpoint_writer = InputOutput.HDF5Writer(output_file, comms_ctx)
-    InputOutput.HDF5.write_attribute(checkpoint_writer.file, "time", t)
-    InputOutput.write!(checkpoint_writer, Y, "model_state")
+    checkpoint_writer = CC.InputOutput.HDF5Writer(output_file, comms_ctx)
+    CC.InputOutput.HDF5.write_attribute(checkpoint_writer.file, "time", t)
+    CC.InputOutput.write!(checkpoint_writer, Y, "model_state")
     Base.close(checkpoint_writer)
     return nothing
 
@@ -63,8 +63,8 @@ function restart_model_state!(
     @info "Setting " Interfacer.name(sim) " state to checkpoint: $input_file, corresponding to day $day second $sec"
 
     # open file and read
-    restart_reader = InputOutput.HDF5Reader(input_file, comms_ctx)
-    Y_new = InputOutput.read_field(restart_reader, "model_state")
+    restart_reader = CC.InputOutput.HDF5Reader(input_file, comms_ctx)
+    Y_new = CC.InputOutput.read_field(restart_reader, "model_state")
     Base.close(restart_reader)
 
     # set new state

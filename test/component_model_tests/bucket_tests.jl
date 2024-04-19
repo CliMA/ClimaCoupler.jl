@@ -1,28 +1,28 @@
-using Test
+import Test: @test, @testset
+import ClimaCore as CC
 import ClimaCoupler
-using ClimaCoupler.TestHelper: create_space
-using ClimaCore: Fields, Spaces
+import ClimaCoupler: TestHelper
 
 include(pkgdir(ClimaCoupler, "experiments/AMIP/components/land/climaland_bucket.jl"))
 
 for FT in (Float32, Float64)
     @testset "dss_state! BucketSimulation for FT=$FT" begin
         # use TestHelper to create space, extract surface space
-        subsurface_space = create_space(FT, nz = 2)
-        surface_space = Spaces.horizontal_space(subsurface_space)
+        subsurface_space = TestHelper.create_space(FT, nz = 2)
+        surface_space = CC.Spaces.horizontal_space(subsurface_space)
 
         # set up objects for test
-        dss_buffer_3d = Spaces.create_dss_buffer(Fields.zeros(subsurface_space))
-        dss_buffer_2d = Spaces.create_dss_buffer(Fields.zeros(surface_space))
+        dss_buffer_3d = CC.Spaces.create_dss_buffer(CC.Fields.zeros(subsurface_space))
+        dss_buffer_2d = CC.Spaces.create_dss_buffer(CC.Fields.zeros(surface_space))
 
         integrator = (;
-            u = Fields.FieldVector(
-                state_field1 = Fields.ones(surface_space),
-                state_field_2d = Fields.zeros(surface_space),
-                state_field_3d = Fields.zeros(subsurface_space),
+            u = CC.Fields.FieldVector(
+                state_field1 = CC.Fields.ones(surface_space),
+                state_field_2d = CC.Fields.zeros(surface_space),
+                state_field_3d = CC.Fields.zeros(subsurface_space),
             ),
             p = (;
-                cache_field = Fields.zeros(surface_space),
+                cache_field = CC.Fields.zeros(surface_space),
                 dss_buffer_2d = dss_buffer_2d,
                 dss_buffer_3d = dss_buffer_3d,
             ),

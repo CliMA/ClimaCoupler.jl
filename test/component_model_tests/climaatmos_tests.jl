@@ -1,20 +1,22 @@
-using Test
+import Test: @test, @testset
+import ClimaCore as CC
 import ClimaCoupler
-using ClimaCoupler.Interfacer: AtmosModelSimulation
-using ClimaCoupler.TestHelper: create_space
-using ClimaCore: Fields, Spaces
+import ClimaCoupler: TestHelper
 
 include(pkgdir(ClimaCoupler, "experiments/AMIP/components/atmosphere/climaatmos.jl"))
 
 for FT in (Float32, Float64)
     @testset "dss_state! ClimaAtmosSimulation for FT=$FT" begin
         # use TestHelper to create space
-        boundary_space = create_space(FT)
+        boundary_space = TestHelper.create_space(FT)
 
         # set up objects for test
         integrator = (;
-            u = (; state_field1 = FT.(Fields.ones(boundary_space)), state_field2 = FT.(Fields.zeros(boundary_space))),
-            p = (; cache_field = FT.(Fields.zeros(boundary_space))),
+            u = (;
+                state_field1 = FT.(CC.Fields.ones(boundary_space)),
+                state_field2 = FT.(CC.Fields.zeros(boundary_space)),
+            ),
+            p = (; cache_field = FT.(CC.Fields.zeros(boundary_space))),
         )
         integrator_copy = deepcopy(integrator)
         sim = ClimaAtmosSimulation(nothing, nothing, nothing, integrator)

@@ -1,7 +1,7 @@
 agents:
   queue: new-central
-  slurm_time: 24:00:00
-  modules: climacommon/2024_03_18
+  slurm_time: 4:00:00
+  modules: climacommon/2024_04_05
 
 env:
   JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
@@ -344,8 +344,6 @@ steps:
           slurm_ntasks: 2
           slurm_mem: 16GB
 
-      - label: "batch script"
-        command: "sbatch test/mpi_tests/local_checks.sh"
 
       # short high-res performance test
       - label: "Unthreaded AMIP FINE" # also reported by longruns with a flame graph
@@ -431,9 +429,13 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
-
-
-      - wait
+  - group: "Bash scripts"
+    steps:
+      - label: "Submit and Monitor sbatch Job on Caltech HPC"
+        # check that (1) the script can be succesfully submitted, (2) it runs successfully
+        command: "test/mpi_tests/test_sbatch_script.sh"
+        agents:
+          slurm_ntasks: 1
 
   - wait
 

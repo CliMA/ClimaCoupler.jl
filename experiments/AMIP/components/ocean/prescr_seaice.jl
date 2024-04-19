@@ -1,15 +1,8 @@
-import SciMLBase: ODEProblem, init
-
-using ClimaCore
+import SciMLBase
+import ClimaCore as CC
 import ClimaTimeSteppers as CTS
 import Thermodynamics as TD
-
-import ClimaCoupler.Interfacer: SeaIceModelSimulation, get_field, update_field!, name
-import ClimaCoupler.FieldExchanger: step!, reinit!
-import ClimaCoupler.FluxCalculator: update_turbulent_fluxes_point!
-using ClimaCoupler: Regridder
-import ClimaCoupler.Utilities: swap_space!
-import ClimaCoupler.BCReader: float_type_bcf
+import ClimaCoupler: BCReader, Checkpointer, FluxCalculator, Interfacer, Regridder, Utilities
 
 include("../slab_utils.jl")
 
@@ -35,13 +28,13 @@ In the current version, the sea ice has a prescribed thickness, and we assume th
 sublimating. That contribution has been zeroed out in the atmos fluxes.
 
 """
-struct PrescribedIceSimulation{P, Y, D, I} <: SeaIceModelSimulation
+struct PrescribedIceSimulation{P, Y, D, I} <: Interfacer.SeaIceModelSimulation
     params::P
     Y_init::Y
     domain::D
     integrator::I
 end
-name(::PrescribedIceSimulation) = "PrescribedIceSimulation"
+Interfacer.name(::PrescribedIceSimulation) = "PrescribedIceSimulation"
 
 # sea-ice parameters
 Base.@kwdef struct IceSlabParameters{FT <: AbstractFloat}
@@ -56,18 +49,18 @@ Base.@kwdef struct IceSlabParameters{FT <: AbstractFloat}
     α::FT = 0.8             # albedo of sea ice [0, 1]
 end
 
-name(::IceSlabParameters) = "IceSlabParameters"
+Interfacer.name(::IceSlabParameters) = "IceSlabParameters"
 
 # init simulation
 function slab_ice_space_init(::Type{FT}, space, p) where {FT}
-    Y = ClimaCore.Fields.FieldVector(T_sfc = ones(space) .* p.T_freeze)
+    Y = CC.Fields.FieldVector(T_sfc = ones(space) .* p.T_freeze)
     return Y
 end
 
 """
     ice_init(::Type{FT}; tspan, dt, saveat, space, ice_fraction, stepper = CTS.RK4()) where {FT}
 
-Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `step!` in the coupling loop.
+Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `Interfacer.step!` in the coupling loop.
 """
 function ice_init(::Type{FT}; tspan, saveat, dt, space, area_fraction, thermo_params, stepper = CTS.RK4()) where {FT}
 
@@ -75,22 +68,22 @@ function ice_init(::Type{FT}; tspan, saveat, dt, space, area_fraction, thermo_pa
 
     Y = slab_ice_space_init(FT, space, params)
     additional_cache = (;
-        F_turb_energy = ClimaCore.Fields.zeros(space),
-        F_radiative = ClimaCore.Fields.zeros(space),
-        q_sfc = ClimaCore.Fields.zeros(space),
-        ρ_sfc = ClimaCore.Fields.zeros(space),
+        F_turb_energy = CC.Fields.zeros(space),
+        F_radiative = CC.Fields.zeros(space),
+        q_sfc = CC.Fields.zeros(space),
+        ρ_sfc = CC.Fields.zeros(space),
         area_fraction = area_fraction,
         dt = dt,
         thermo_params = thermo_params,
         # add dss_buffer to cache to avoid runtime dss allocation
-        dss_buffer = ClimaCore.Spaces.create_dss_buffer(ClimaCore.Fields.zeros(space)),
+        dss_buffer = CC.Spaces.create_dss_buffer(CC.Fields.zeros(space)),
     )
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     ode_function = CTS.ClimaODEFunction(T_exp! = ice_rhs!, dss! = weighted_dss_slab!)
 
-    problem = ODEProblem(ode_function, Y, Float64.(tspan), (; additional_cache..., params = params))
-    integrator = init(problem, ode_algo, dt = Float64(dt), saveat = Float64(saveat), adaptive = false)
+    problem = SciMLBase.ODEProblem(ode_function, Y, Float64.(tspan), (; additional_cache..., params = params))
+    integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64(saveat), adaptive = false)
 
     sim = PrescribedIceSimulation(params, Y, space, integrator)
 
@@ -100,59 +93,59 @@ function ice_init(::Type{FT}; tspan, saveat, dt, space, area_fraction, thermo_pa
 end
 
 # extensions required by Interfacer
-get_field(sim::PrescribedIceSimulation, ::Val{:air_density}) = sim.integrator.p.ρ_sfc
-get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
-get_field(sim::PrescribedIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
-get_field(sim::PrescribedIceSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
-get_field(sim::PrescribedIceSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
-get_field(sim::PrescribedIceSimulation, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) =
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:air_density}) = sim.integrator.p.ρ_sfc
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) =
     sim.integrator.p.params.α
-get_field(sim::PrescribedIceSimulation, ::Val{:surface_humidity}) = sim.integrator.p.q_sfc
-get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
-get_field(sim::PrescribedIceSimulation, ::Val{:water}) = nothing
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_humidity}) = sim.integrator.p.q_sfc
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:water}) = nothing
 
 """
-    get_field(sim::PrescribedIceSimulation, ::Val{:energy})
+    Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:energy})
 
 Extension of Interfacer.get_field to get the energy of the ocean.
 It multiplies the the slab temperature by the heat capacity, density, and depth.
 """
-get_field(sim::PrescribedIceSimulation, ::Val{:energy}) =
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:energy}) =
     sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h
 
-function update_field!(sim::PrescribedIceSimulation, ::Val{:air_density}, field)
+function Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:air_density}, field)
     parent(sim.integrator.p.ρ_sfc) .= parent(field)
 end
-function update_field!(sim::PrescribedIceSimulation, ::Val{:area_fraction}, field::ClimaCore.Fields.Field)
+function Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:area_fraction}, field::CC.Fields.Field)
     sim.integrator.p.area_fraction .= field
 end
-function update_field!(sim::PrescribedIceSimulation, ::Val{:radiative_energy_flux_sfc}, field)
+function Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:radiative_energy_flux_sfc}, field)
     parent(sim.integrator.p.F_radiative) .= parent(field)
 end
-function update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_energy_flux}, field)
+function Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_energy_flux}, field)
     parent(sim.integrator.p.F_turb_energy) .= parent(field)
 end
 
 # extensions required by FieldExchanger
-step!(sim::PrescribedIceSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
-reinit!(sim::PrescribedIceSimulation) = reinit!(sim.integrator)
+Interfacer.step!(sim::PrescribedIceSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+Interfacer.reinit!(sim::PrescribedIceSimulation) = Interfacer.reinit!(sim.integrator)
 
 # extensions required by FluxCalculator (partitioned fluxes)
-function update_turbulent_fluxes_point!(
+function FluxCalculator.update_turbulent_fluxes_point!(
     sim::PrescribedIceSimulation,
     fields::NamedTuple,
-    colidx::ClimaCore.Fields.ColumnIndex,
+    colidx::CC.Fields.ColumnIndex,
 )
     (; F_turb_energy) = fields
     @. sim.integrator.p.F_turb_energy[colidx] = F_turb_energy
 end
 
 """
-    get_model_prog_state(sim::PrescribedIceSimulation)
+    Checkpointer.get_model_prog_state(sim::PrescribedIceSimulation)
 
 Extension of Checkpointer.get_model_prog_state to get the model state.
 """
-function get_model_prog_state(sim::PrescribedIceSimulation)
+function Checkpointer.get_model_prog_state(sim::PrescribedIceSimulation)
     return sim.integrator.u
 end
 
@@ -163,7 +156,8 @@ end
     scale_sic(SIC, _info)
 Ensures that the space of the SIC struct matches that of the mask, and converts the units from area % to area fraction.
 """
-scale_sic(SIC, _info) = swap_space!(zeros(axes(_info.land_fraction)), SIC) ./ float_type_bcf(_info)(100.0)
+scale_sic(SIC, _info) =
+    Utilities.swap_space!(zeros(axes(_info.land_fraction)), SIC) ./ BCReader.float_type_bcf(_info)(100.0)
 
 # setting that SIC < 0.5 is counted as ocean if binary remapping.
 get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
@@ -213,6 +207,6 @@ function dss_state!(sim::PrescribedIceSimulation)
     for key in propertynames(Y)
         field = getproperty(Y, key)
         buffer = get_dss_buffer(axes(field), p)
-        ClimaCore.Spaces.weighted_dss!(field, buffer)
+        CC.Spaces.weighted_dss!(field, buffer)
     end
 end

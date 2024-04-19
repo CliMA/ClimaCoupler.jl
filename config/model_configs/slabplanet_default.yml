@@ -14,3 +14,8 @@ rad: "gray"
 run_name: "slabplanet_default"
 t_end: "10days"
 vert_diff: "true"
+output_default_diagnostics: false
+diagnostics:
+ - short_name: [mse, lr, ediff, hfes, evspsbl, ts]
+   period: 1days
+

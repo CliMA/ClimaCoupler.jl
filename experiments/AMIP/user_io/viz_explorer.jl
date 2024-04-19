@@ -1,8 +1,7 @@
-using Plots
-using ClimaCorePlots
-using ClimaCore: Fields, Geometry
-
-import ClimaCoupler.Regridder: combine_surfaces_from_sol!
+import Plots
+import ClimaCorePlots
+import ClimaCore as CC
+import ClimaCoupler: Regridder
 
 function plot_anim(cs, out_dir = ".")
 
@@ -17,17 +16,17 @@ function plot_anim(cs, out_dir = ".")
     sol_atm = atmos_sim.integrator.sol
 
     anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(Geometry.UVVector.(u.c.uₕ).components.data.:1, 5))
+        Plots.plot(CC.Fields.level(CC.Geometry.UVVector.(u.c.uₕ).components.data.:1, 5))
     end
     Plots.mp4(anim, joinpath(out_dir, "anim_u.mp4"), fps = 10)
 
     anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(u.c.ρe_tot, 1) .- Fields.level(sol_atm.u[1].c.ρe_tot, 1), clims = (-5000, 50000))
+        Plots.plot(CC.Fields.level(u.c.ρe_tot, 1) .- CC.Fields.level(sol_atm.u[1].c.ρe_tot, 1), clims = (-5000, 50000))
     end
     Plots.mp4(anim, joinpath(out_dir, "anim_rhoe_anom.mp4"), fps = 10)
 
     anim = Plots.@animate for u in sol_atm.u
-        Plots.plot(Fields.level(u.c.ρq_tot ./ u.c.ρ, 1))
+        Plots.plot(CC.Fields.level(u.c.ρq_tot ./ u.c.ρ, 1))
     end
     Plots.mp4(anim, joinpath(out_dir, "anim_qt.mp4"), fps = 10)
 
@@ -39,7 +38,7 @@ function plot_anim(cs, out_dir = ".")
         sol_slab_ocean = slab_ocean_sim.integrator.sol
         anim = Plots.@animate for (bucketu, oceanu) in zip(sol_slab.u, sol_slab_ocean.u)
             land_T_sfc = get_land_temp_from_state(cs.model_sims.land_sim, bucketu)
-            combine_surfaces_from_sol!(
+            Regridder.combine_surfaces_from_sol!(
                 combined_field,
                 cs.surface_fractions,
                 (; land = land_T_sfc, ocean = oceanu.T_sfc, ice = FT(0)),
@@ -50,7 +49,7 @@ function plot_anim(cs, out_dir = ".")
         slab_ice_sim = slab_ice_sim.integrator.sol
         anim = Plots.@animate for (bucketu, iceu) in zip(sol_slab.u, slab_ice_sim.u)
             land_T_sfc = get_land_temp_from_state(cs.model_sims.land_sim, bucketu)
-            combine_surfaces_from_sol!(
+            Regridder.combine_surfaces_from_sol!(
                 combined_field,
                 cs.surface_fractions,
                 (; land = land_T_sfc, ocean = FT(0), ice = iceu.T_sfc),
@@ -62,7 +61,7 @@ function plot_anim(cs, out_dir = ".")
         sol_slab_ice = slab_ice_sim.integrator.sol
         anim = Plots.@animate for (bucketu, iceu) in zip(sol_slab.u, sol_slab_ice.u)
             land_T_sfc = get_land_temp_from_state(cs.model_sims.land_sim, bucketu)
-            combine_surfaces_from_sol!(
+            Regridder.combine_surfaces_from_sol!(
                 combined_field,
                 cs.surface_fractions,
                 (; land = land_T_sfc, ocean = SST, ice = iceu.T_sfc),
@@ -74,7 +73,7 @@ function plot_anim(cs, out_dir = ".")
 
     combined_field = zeros(boundary_space)
     anim = Plots.@animate for bucketu in sol_slab.u
-        combine_surfaces_from_sol!(
+        Regridder.combine_surfaces_from_sol!(
             combined_field,
             cs.surface_fractions,
             (; land = bucketu.bucket.W, ocean = 0.0, ice = 0.0),
@@ -85,7 +84,7 @@ function plot_anim(cs, out_dir = ".")
 
     combined_field = zeros(boundary_space)
     anim = Plots.@animate for bucketu in sol_slab.u
-        combine_surfaces_from_sol!(
+        Regridder.combine_surfaces_from_sol!(
             combined_field,
             cs.surface_fractions,
             (; land = bucketu.bucket.σS, ocean = 0.0, ice = 0.0),
@@ -98,7 +97,7 @@ function plot_anim(cs, out_dir = ".")
         sol_ice = cs.model_sims.ice_sim.integrator.sol
         combined_field = zeros(boundary_space)
         anim = Plots.@animate for sol_iceu in sol_ice.u
-            combine_surfaces_from_sol!(
+            Regridder.combine_surfaces_from_sol!(
                 combined_field,
                 cs.surface_fractions,
                 (; land = 0.0, ocean = 0.0, ice = sol_iceu.h_ice),

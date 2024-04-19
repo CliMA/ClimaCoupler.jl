@@ -6,11 +6,13 @@ or to call flux calculating functions from the component models.
 """
 
 module FluxCalculator
+
+import StaticArrays
 import SurfaceFluxes as SF
 import Thermodynamics as TD
-using StaticArrays
-using ClimaCoupler: Interfacer, Regridder
-using ClimaCore: Fields, Spaces
+import ClimaCore as CC
+import ..Interfacer, ..Regridder
+
 export PartitionedStateFluxes,
     CombinedStateFluxes,
     combined_turbulent_fluxes!,
@@ -92,16 +94,16 @@ atmos_turbulent_fluxes!(sim::Interfacer.ComponentModelSimulation, _) =
 
 
 """
-    calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::Fields.Field)
+    calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::CC.Fields.Field)
 
 Extension for this  to to calculate surface density.
 """
-function calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_S::Fields.Field)
+function calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_S::CC.Fields.Field)
     error("this function is required to be dispatched on" * Interfacer.name(atmos_sim) * ", but no method defined")
 end
 
 """
-    partitioned_turbulent_fluxes!(model_sims::NamedTuple, fields::NamedTuple, boundary_space::Spaces.AbstractSpace, surface_scheme, thermo_params::TD.Parameters.ThermodynamicsParameters)
+    partitioned_turbulent_fluxes!(model_sims::NamedTuple, fields::NamedTuple, boundary_space::CC.Spaces.AbstractSpace, surface_scheme, thermo_params::TD.Parameters.ThermodynamicsParameters)
 
 The current setup calculates the aerodynamic fluxes in the coupler (assuming no regridding is needed)
 using adapter function `get_surface_fluxes_point!`, which calls `SurfaceFluxes.jl`. The coupler saves
@@ -110,7 +112,7 @@ the area-weighted sums of the fluxes.
 Args:
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
 - `fields`: [NamedTuple] containing coupler fields.
-- `boundary_space`: [Spaces.AbstractSpace] the space of the coupler surface.
+- `boundary_space`: [CC.Spaces.AbstractSpace] the space of the coupler surface.
 - `surface_scheme`: [AbstractSurfaceFluxScheme] the surface flux scheme.
 - `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
 
@@ -125,7 +127,7 @@ TODO:
 function partitioned_turbulent_fluxes!(
     model_sims::NamedTuple,
     fields::NamedTuple,
-    boundary_space::Spaces.AbstractSpace,
+    boundary_space::CC.Spaces.AbstractSpace,
     surface_scheme,
     thermo_params::TD.Parameters.ThermodynamicsParameters,
 )
@@ -141,7 +143,7 @@ function partitioned_turbulent_fluxes!(
     csf.F_turb_moisture .*= FT(0)
 
     # iterate over all columns (when regridding, this will need to change)
-    Fields.bycolumn(boundary_space) do colidx
+    CC.Fields.bycolumn(boundary_space) do colidx
         # atmos state of center level 1
         z_int = Interfacer.get_field(atmos_sim, Val(:height_int), colidx)
         uₕ_int = Interfacer.get_field(atmos_sim, Val(:uv_int), colidx)
@@ -215,18 +217,22 @@ struct BulkScheme <: AbstractSurfaceFluxScheme end
 struct MoninObukhovScheme <: AbstractSurfaceFluxScheme end
 
 """
-    get_scheme_properties(scheme::AbstractSurfaceFluxScheme, sim::Interfacer.SurfaceModelSimulation, colidx::Fields.ColumnIndex)
+    get_scheme_properties(scheme::AbstractSurfaceFluxScheme, sim::Interfacer.SurfaceModelSimulation, colidx::CC.Fields.ColumnIndex)
 
 Returns the scheme-specific properties for the surface model simulation `sim`.
 """
-function get_scheme_properties(::BulkScheme, sim::Interfacer.SurfaceModelSimulation, colidx::Fields.ColumnIndex)
+function get_scheme_properties(::BulkScheme, sim::Interfacer.SurfaceModelSimulation, colidx::CC.Fields.ColumnIndex)
     Ch = Interfacer.get_field(sim, Val(:heat_transfer_coefficient), colidx)
     Cd = Interfacer.get_field(sim, Val(:beta), colidx)
     beta = Interfacer.get_field(sim, Val(:drag_coefficient), colidx)
     FT = eltype(Ch)
     return (; z0b = FT(0), z0m = FT(0), Ch = Ch, Cd = Cd, beta = beta, gustiness = FT(1))
 end
-function get_scheme_properties(::MoninObukhovScheme, sim::Interfacer.SurfaceModelSimulation, colidx::Fields.ColumnIndex)
+function get_scheme_properties(
+    ::MoninObukhovScheme,
+    sim::Interfacer.SurfaceModelSimulation,
+    colidx::CC.Fields.ColumnIndex,
+)
     z0m = Interfacer.get_field(sim, Val(:roughness_momentum), colidx)
     z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy), colidx)
     beta = Interfacer.get_field(sim, Val(:beta), colidx)
@@ -242,7 +248,7 @@ Returns the inputs for the surface model simulation `sim`.
 function surface_inputs(::BulkScheme, input_args::NamedTuple)
 
     (; thermo_state_sfc, thermo_state_int, uₕ_int, z_int, z_sfc, scheme_properties) = input_args
-    FT = Spaces.undertype(axes(z_sfc))
+    FT = CC.Spaces.undertype(axes(z_sfc))
 
     (; z0b, z0m, Ch, Cd, beta, gustiness) = scheme_properties
     # wrap state values
@@ -261,7 +267,7 @@ function surface_inputs(::BulkScheme, input_args::NamedTuple)
 end
 function surface_inputs(::MoninObukhovScheme, input_args::NamedTuple)
     (; thermo_state_sfc, thermo_state_int, uₕ_int, z_int, z_sfc, scheme_properties) = input_args
-    FT = Spaces.undertype(axes(z_sfc))
+    FT = CC.Spaces.undertype(axes(z_sfc))
     (; z0b, z0m, Ch, Cd, beta, gustiness) = scheme_properties
 
     # wrap state values
@@ -281,7 +287,7 @@ function surface_inputs(::MoninObukhovScheme, input_args::NamedTuple)
 end
 
 """
-    surface_thermo_state(sim::Interfacer.SurfaceModelSimulation, thermo_params::TD.Parameters.ThermodynamicsParameters, thermo_state_int, colidx::Fields.ColumnIndex)
+    surface_thermo_state(sim::Interfacer.SurfaceModelSimulation, thermo_params::TD.Parameters.ThermodynamicsParameters, thermo_state_int, colidx::CC.Fields.ColumnIndex)
 
 Returns the surface parameters for the surface model simulation `sim`. The default is assuming saturated surfaces, unless an extension is defined for the given `SurfaceModelSimulation`.
 """
@@ -289,7 +295,7 @@ function surface_thermo_state(
     sim::Interfacer.SurfaceModelSimulation,
     thermo_params::TD.Parameters.ThermodynamicsParameters,
     thermo_state_int,
-    colidx::Fields.ColumnIndex;
+    colidx::CC.Fields.ColumnIndex;
     δT_sfc = 0,
 )
     FT = eltype(parent(thermo_state_int))
@@ -361,14 +367,14 @@ function get_surface_params(atmos_sim::Interfacer.AtmosModelSimulation)
 end
 
 """
-    update_turbulent_fluxes_point!(sim::Interfacer.SurfaceModelSimulation, fields::NamedTuple, colidx::Fields.ColumnIndex)
+    update_turbulent_fluxes_point!(sim::Interfacer.SurfaceModelSimulation, fields::NamedTuple, colidx::CC.Fields.ColumnIndex)
 
 Updates the fluxes in the surface model simulation `sim` with the fluxes in `fields`.
 """
 function update_turbulent_fluxes_point!(
     sim::Interfacer.SurfaceModelSimulation,
     fields::NamedTuple,
-    colidx::Fields.ColumnIndex,
+    colidx::CC.Fields.ColumnIndex,
 )
     return error(
         "update_turbulent_fluxes_point! is required to be dispatched on" *
@@ -376,8 +382,6 @@ function update_turbulent_fluxes_point!(
         ", but no method defined",
     )
 end
-
-update_turbulent_fluxes_point!(sim::Interfacer.SurfaceStub, fields::NamedTuple, colidx::Fields.ColumnIndex) = nothing
 
 """
     differentiate_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, args)
@@ -406,11 +410,11 @@ function water_albedo_from_atmosphere!(cs::Interfacer.CoupledSimulation, _)
 end
 
 """
-    water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulation, ::Fields.Field, ::Fields.Field)
+    water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulation, ::CC.Fields.Field, ::CC.Fields.Field)
 
 Placeholder for the water albedo calculation from the atmosphere. It returns an error if not extended.
 """
-function water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulation, ::Fields.Field, ::Fields.Field)
+function water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulation, ::CC.Fields.Field, ::CC.Fields.Field)
     error("this function is required to be dispatched on" * Interfacer.name(atmos_sim) * ", but no method defined")
 end
 

@@ -7,30 +7,30 @@ modules in the coupler.
 module Utilities
 
 import ClimaComms
-using ClimaCore: Fields, Spaces
+import ClimaCore as CC
 
 export swap_space!
 
 """
-    swap_space!(field_out::Fields.Field, field_in::Fields.Field)
+    swap_space!(field_out::CC.Fields.Field, field_in::CC.Fields.Field)
 
 Remap the values of a field onto a new space.
 
 # Arguments
-- `field_in`: [Fields.Field] to be remapped to new space.
-- `field_out`: [Fields.Field] to remap `field_in` to.
+- `field_in`: [CC.Fields.Field] to be remapped to new space.
+- `field_out`: [CC.Fields.Field] to remap `field_in` to.
 """
-function swap_space!(field_out, field_in::Fields.Field)
-    field_out = Fields.Field(Fields.field_values(field_in), axes(field_out))
+function swap_space!(field_out, field_in::CC.Fields.Field)
+    field_out = CC.Fields.Field(CC.Fields.field_values(field_in), axes(field_out))
 end
 
 """
-    get_device(parsed_args) 
+    get_device(parsed_args)
 
-Returns the device on which the model is being run 
+Returns the device on which the model is being run
 
-# Arguments 
-- `parsed_args`: dictionary containing a "device" flag which decides which device to run on 
+# Arguments
+- `parsed_args`: dictionary containing a "device" flag which decides which device to run on
 """
 function get_device(parsed_args)
     if parsed_args["device"] == "auto"
@@ -46,11 +46,11 @@ end
 
 
 """
-    get_comms_context(parsed_args) 
+    get_comms_context(parsed_args)
 
-Sets up the appropriate ClimaComms context for the device the model is to be run on 
+Sets up the appropriate ClimaComms context for the device the model is to be run on
 
-# Arguments 
+# Arguments
 `parsed_args`: dictionary containing a "device" flag whcih decides which device context is needed
 """
 function get_comms_context(parsed_args)

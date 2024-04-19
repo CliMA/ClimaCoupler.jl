@@ -1,29 +1,24 @@
 #!/bin/bash
-#SBATCH --time=24:00:00
-#SBATCH --nodes=1
-#SBATCH --job-name=mpi_restart_test
-#SBATCH --reservation=clima
-#SBATCH --mem=32GB
 #SBATCH --ntasks=2
+#SBATCH --job-name=mpi_amip
+#SBATCH --time=24:00:00
+#SBATCH --mem-per-cpu=16G
+#SBATCH --partition=expansion
 
-# TODO: this needs to be updated (+ implement better tests that are caught on Buildkite) #667
-
+export MODULEPATH="/groups/esm/modules:$MODULEPATH"
 module purge
-module load julia/1.10.1
-export JULIA_MPI_BINARY=system
-export JULIA_NUM_THREADS=${SLURM_CPUS_PER_TASK:=1}
-export CLIMACORE_DISTRIBUTED="MPI"
-export JULIA_HDF5_PATH=""
+module load climacommon/2024_04_05
 
-export RUN_NAME=amip_restart_mpi_test
+export CC_PATH=$(pwd)/ # adjust this to the path of your ClimaCoupler.jl directory
+export RUN_NAME=coarse_single_ft64_hourly_checkpoints_restart
+export CONFIG_FILE=${CC_PATH}config/model_configs/${RUN_NAME}.yml
 export RESTART_DIR=experiments/AMIP/output/amip/${RUN_NAME}_artifacts/
-export RESTART_T=200
 
-julia -e 'using Pkg; Pkg.add("MPIPreferences"); using MPIPreferences; use_system_binary()'
-julia --project -e 'using Pkg; Pkg.instantiate()'
-julia --project -e 'using Pkg; Pkg.build("MPI")'
-julia --project -e 'using Pkg; Pkg.build("HDF5")'
-julia --project -e 'using Pkg; Pkg.API.precompile()'
+export OPENBLAS_NUM_THREADS=1
+export JULIA_NVTX_CALLBACKS=gc
+export OMPI_MCA_opal_warn_on_missing_libcuda=0
+export JULIA_MAX_NUM_PRECOMPILE_FILES=100
+export SLURM_KILL_BAD_EXIT=1
 
 julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'
 julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'
@@ -34,10 +29,29 @@ julia --project=artifacts -e 'using Pkg; Pkg.precompile()'
 julia --project=artifacts -e 'using Pkg; Pkg.status()'
 julia --project=artifacts artifacts/download_artifacts.jl
 
-# run spin up
-# - specify `--hourly_checkpoint true` to save monthly checkpoints of all model prognostic states
-mpiexec julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --run_name $RUN_NAME --coupled true   --start_date 19790101 --hourly_checkpoint true  --anim true --surface_setup PrescribedSurface --dt_cpl 200 --energy_check false --mode_name amip --mono_surface false --vert_diff true --moist equil --rad clearsky --precip_model 0M --z_elem 35 --dz_bottom 50 --h_elem 12 --rayleigh_sponge true --alpha_rayleigh_uh 0 --dt 200secs --t_end 0.1days --job_id $RUN_NAME --dt_save_to_sol 1000days --dt_save_state_to_disk 10days --apply_limiter false --FLOAT_TYPE Float64
+srun -K julia --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_FILE
 
-# init using a restart
-# - specify the directory of the `checkpoint/` folder (i.e.,  `--restart_dir`) and time (in secs; `--restart_t`) of the restart file
-mpiexec julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --run_name $RUN_NAME --coupled true --restart_dir $RESTART_DIR --restart_t $RESTART_T --start_date 19790102 --anim true --surface_setup PrescribedSurface --dt_cpl 200 --energy_check false --mode_name amip --mono_surface false --vert_diff true --moist equil --rad clearsky --precip_model 0M --z_elem 35 --dz_bottom 50 --h_elem 12 --rayleigh_sponge true --alpha_rayleigh_uh 0 --dt 200secs --t_end 0.1days --job_id $RUN_NAME --dt_save_to_sol 1000days --dt_save_state_to_disk 10days --apply_limiter false --FLOAT_TYPE Float64
+# restart from simulation time of 400 seconds
+export RESTART_T=400
+
+# setup the new config file with ammened checkpointing frequency
+export RESTART_CONFIG_FILE=${CONFIG_FILE::-4}_tmp.yml
+cp $CONFIG_FILE $RESTART_CONFIG_FILE
+sed -i 's/t_end: \"800secs\"/t_end: \"3600secs\"/g' $RESTART_CONFIG_FILE
+
+# rerun the model
+srun -K julia --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $RESTART_CONFIG_FILE --restart_dir $RESTART_DIR --restart_t $RESTART_T
+
+# throw an error if no restart checkpoint files are found
+if [ $(ls -1 $RESTART_DIR/checkpoint | wc -l) -lt 5 ]; then
+  echo "Error: RESTART_DIR does not contain enough files"
+  exit 1
+else
+  echo "Successful: RESTART_DIR contains $(ls -1 $RESTART_DIR/checkpoint | wc -l) files"
+  exit 0
+fi
+
+# Trouble shooting?
+# - ensure you're using the latest module file of climacommon and set MODULEPATH to the correct location
+# - ensure you're using the latest version of ClimaCoupler.jl
+# - did you cd to your version of ClimaCoupler.jl?

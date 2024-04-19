@@ -1,6 +1,9 @@
+import Glob
+import Plots
+import Printf
 import ClimaComms
-using ClimaCore
-import ClimaCoupler.PostProcessor: postprocess
+import ClimaCore as CC
+import ClimaCoupler: PostProcessor
 
 include("plot_helper.jl")
 
@@ -13,6 +16,7 @@ include("plot_helper.jl")
         files_root = ".hdf5",
         fig_name = "amip_paperplots",
     )
+
 Coordinates the postprocessing and plotting of sample fields (specified in `post_spec`)
 of the last monthly mean file. Any specific plot customization should be done here.
 """
@@ -26,7 +30,6 @@ function amip_paperplots(
     nlat = 180,
     nlon = 360,
 )
-
     diags_names = propertynames(post_spec)
 
     all_plots = []
@@ -38,12 +41,18 @@ function amip_paperplots(
         diag_data = read_latest_model_data(name, files_dir, files_root)
 
         # postprocess
-        post_data =
-            postprocess(name, diag_data, getproperty(post_spec, name), REGRID_DIR = files_dir, nlat = nlat, nlon = nlon)
+        post_data = PostProcessor.postprocess(
+            name,
+            diag_data,
+            getproperty(post_spec, name),
+            REGRID_DIR = files_dir,
+            nlat = nlat,
+            nlon = nlon,
+        )
         post_data.data[1] = sum(post_data.data) == 0 ? post_data.data[1] + eps() : post_data.data[1] # avoids InexactError
 
         # create individual plots
-        p = plot(
+        p = Plots.plot(
             post_data,
             zmd_params = (; getproperty(plot_spec, name)...),
             hsd_params = (; getproperty(plot_spec, name)...),
@@ -57,18 +66,21 @@ function amip_paperplots(
     end
 
     # combine plots and save figure
+    layout = Plots.@layout([A{0.05h}; [B C D; E F G; H I J]])
+    title =
+        Plots.plot(plot_title = "AMIP Monthly Mean Fields", grid = false, showaxis = false, bottom_margin = -50Plots.px)
     save_fig = Plots.plot(
+        title,
         all_plots...,
         size = (1500, 1200),
-        right_margin = 3Plots.mm,
-        left_margin = 3Plots.mm,
-        bottom_margin = 3Plots.mm,
-        top_margin = 3Plots.mm,
+        layout = layout,
+        titlefont = Plots.font(12),
+        margin = 2Plots.mm,
     )
 
     Plots.png(save_fig, joinpath(output_dir, fig_name * ".png"))
 
-    return all_data
+    return all_data, save_fig
 end
 
 """
@@ -77,14 +89,13 @@ end
 Reads in a variable from a HDF5 file, as outputted by `ClimaCoupler.Dignostics`.
 """
 function read_latest_model_data(name::Symbol, filedir::String, root::String)
-
-    varfile_root = @sprintf "%s%s" string(name) root
-    filename = glob("*" * varfile_root * "*", filedir)[end]
+    varfile_root = Printf.@sprintf "%s%s" string(name) root
+    filename = Glob.glob("*" * varfile_root * "*", filedir)[end]
 
     # Ensure file gets read onto CPU for postprocessing
     cpu_singleton_context = ClimaComms.SingletonCommsContext(ClimaComms.CPUSingleThreaded())
-    hdfreader = ClimaCore.InputOutput.HDF5Reader(filename, cpu_singleton_context)
-    var = ClimaCore.InputOutput.read_field(hdfreader, string(name))
+    hdfreader = CC.InputOutput.HDF5Reader(filename, cpu_singleton_context)
+    var = CC.InputOutput.read_field(hdfreader, string(name))
     close(hdfreader)
     return var
 end

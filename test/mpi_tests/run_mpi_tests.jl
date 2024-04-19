@@ -1,4 +1,4 @@
-using MPI
+import MPI
 #=
 # if running locally:
 module purge

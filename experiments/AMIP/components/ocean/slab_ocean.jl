@@ -1,12 +1,7 @@
-import SciMLBase: ODEProblem, init
-
-using ClimaCore
+import SciMLBase
+import ClimaCore as CC
 import ClimaTimeSteppers as CTS
-import ClimaCoupler.Interfacer: OceanModelSimulation, get_field, update_field!, name
-import ClimaCoupler.FieldExchanger: step!, reinit!
-import ClimaCoupler.FluxCalculator: update_turbulent_fluxes_point!
-import ClimaCoupler.Utilities: swap_space!
-import ClimaCoupler.BCReader: float_type_bcf
+import ClimaCoupler: BCReader, Checkpointer, FluxCalculator, Interfacer, Utilities
 
 include("../slab_utils.jl")
 
@@ -21,13 +16,13 @@ Equation:
     (h * ρ * c) dTdt = -(F_turb_energy + F_radiative)
 
 """
-struct SlabOceanSimulation{P, Y, D, I} <: OceanModelSimulation
+struct SlabOceanSimulation{P, Y, D, I} <: Interfacer.OceanModelSimulation
     params::P
     Y_init::Y
     domain::D
     integrator::I
 end
-name(::SlabOceanSimulation) = "SlabOceanSimulation"
+Interfacer.name(::SlabOceanSimulation) = "SlabOceanSimulation"
 
 # ocean parameters
 Base.@kwdef struct OceanSlabParameters{FT <: AbstractFloat}
@@ -41,7 +36,7 @@ Base.@kwdef struct OceanSlabParameters{FT <: AbstractFloat}
     evolving_switch::FT = 1 # switch to turn off the evolution of the ocean temperature [0 or 1]
 end
 
-name(::SlabOceanSimulation) = "SlabOceanSimulation"
+Interfacer.name(::SlabOceanSimulation) = "SlabOceanSimulation"
 
 """
     slab_ocean_space_init(space, params)
@@ -50,15 +45,15 @@ Initialize the slab ocean prognostic variable (temperature), including an
 anomaly in the tropics by default.
 """
 function slab_ocean_space_init(space, params)
-    FT = ClimaCore.Spaces.undertype(space)
-    coords = ClimaCore.Fields.coordinate_field(space)
+    FT = CC.Spaces.undertype(space)
+    coords = CC.Fields.coordinate_field(space)
 
     # initial condition
-    T_sfc = ClimaCore.Fields.zeros(space) .+ params.T_init # FT(271) close to the average of T_1 in atmos
+    T_sfc = CC.Fields.zeros(space) .+ params.T_init # FT(271) close to the average of T_1 in atmos
     @. T_sfc += temp_anomaly(coords)
 
     # prognostic variable
-    Y = ClimaCore.Fields.FieldVector(T_sfc = T_sfc)
+    Y = CC.Fields.FieldVector(T_sfc = T_sfc)
 
     return Y, space
 end
@@ -86,21 +81,21 @@ function ocean_init(
     Y, space = slab_ocean_space_init(space, params)
     cache = (
         params = params,
-        F_turb_energy = ClimaCore.Fields.zeros(space),
-        F_radiative = ClimaCore.Fields.zeros(space),
-        q_sfc = ClimaCore.Fields.zeros(space),
-        ρ_sfc = ClimaCore.Fields.zeros(space),
+        F_turb_energy = CC.Fields.zeros(space),
+        F_radiative = CC.Fields.zeros(space),
+        q_sfc = CC.Fields.zeros(space),
+        ρ_sfc = CC.Fields.zeros(space),
         area_fraction = area_fraction,
         thermo_params = thermo_params,
         # add dss_buffer to cache to avoid runtime dss allocation
-        dss_buffer = ClimaCore.Spaces.create_dss_buffer(ClimaCore.Fields.zeros(space)),
+        dss_buffer = CC.Spaces.create_dss_buffer(CC.Fields.zeros(space)),
     )
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     ode_function = CTS.ClimaODEFunction(T_exp! = slab_ocean_rhs!, dss! = weighted_dss_slab!)
 
-    problem = ODEProblem(ode_function, Y, Float64.(tspan), cache)
-    integrator = init(problem, ode_algo, dt = Float64(dt), saveat = Float64(saveat), adaptive = false)
+    problem = SciMLBase.ODEProblem(ode_function, Y, Float64.(tspan), cache)
+    integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64(saveat), adaptive = false)
 
     sim = SlabOceanSimulation(params, Y, space, integrator)
 
@@ -110,59 +105,59 @@ function ocean_init(
 end
 
 # extensions required by Interfacer
-get_field(sim::SlabOceanSimulation, ::Val{:air_density}) = sim.integrator.p.ρ_sfc
-get_field(sim::SlabOceanSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
-get_field(sim::SlabOceanSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
-get_field(sim::SlabOceanSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
-get_field(sim::SlabOceanSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
-get_field(sim::SlabOceanSimulation, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) =
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:air_density}) = sim.integrator.p.ρ_sfc
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
+Interfacer.get_field(sim::SlabOceanSimulation, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) =
     sim.integrator.p.params.α
-get_field(sim::SlabOceanSimulation, ::Val{:surface_humidity}) = sim.integrator.p.q_sfc
-get_field(sim::SlabOceanSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
-get_field(sim::SlabOceanSimulation, ::Val{:water}) = nothing
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_humidity}) = sim.integrator.p.q_sfc
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:water}) = nothing
 
 """
-    get_field(sim::SlabOceanSimulation, ::Val{:energy})
+    Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:energy})
 
 Extension of Interfacer.get_field to get the energy of the ocean.
 It multiplies the the slab temperature by the heat capacity, density, and depth.
 """
-get_field(sim::SlabOceanSimulation, ::Val{:energy}) =
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:energy}) =
     sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h
 
-function update_field!(sim::SlabOceanSimulation, ::Val{:area_fraction}, field::ClimaCore.Fields.Field)
+function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:area_fraction}, field::CC.Fields.Field)
     sim.integrator.p.area_fraction .= field
 end
-function update_field!(sim::SlabOceanSimulation, ::Val{:air_density}, field)
+function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:air_density}, field)
     parent(sim.integrator.p.ρ_sfc) .= parent(field)
 end
-function update_field!(sim::SlabOceanSimulation, ::Val{:radiative_energy_flux_sfc}, field)
+function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:radiative_energy_flux_sfc}, field)
     parent(sim.integrator.p.F_radiative) .= parent(field)
 end
-function update_field!(sim::SlabOceanSimulation, ::Val{:turbulent_energy_flux}, field)
+function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:turbulent_energy_flux}, field)
     parent(sim.integrator.p.F_turb_energy) .= parent(field)
 end
 
 # extensions required by FieldExchanger
-step!(sim::SlabOceanSimulation, t) = step!(sim.integrator, t - sim.integrator.t, true)
-reinit!(sim::SlabOceanSimulation) = reinit!(sim.integrator)
+Interfacer.step!(sim::SlabOceanSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+Interfacer.reinit!(sim::SlabOceanSimulation) = Interfacer.reinit!(sim.integrator)
 
 # extensions required by FluxCalculator (partitioned fluxes)
-function update_turbulent_fluxes_point!(
+function FluxCalculator.update_turbulent_fluxes_point!(
     sim::SlabOceanSimulation,
     fields::NamedTuple,
-    colidx::ClimaCore.Fields.ColumnIndex,
+    colidx::CC.Fields.ColumnIndex,
 )
     (; F_turb_energy) = fields
     @. sim.integrator.p.F_turb_energy[colidx] = F_turb_energy
 end
 
 """
-    get_model_prog_state(sim::SlabOceanSimulation)
+    Checkpointer.get_model_prog_state(sim::SlabOceanSimulation)
 
 Extension of Checkpointer.get_model_prog_state to get the model state.
 """
-function get_model_prog_state(sim::SlabOceanSimulation)
+function Checkpointer.get_model_prog_state(sim::SlabOceanSimulation)
     return sim.integrator.u
 end
 
@@ -173,7 +168,8 @@ end
     scale_sst(SST::FT, _info)
 Ensures that the space of the SST struct matches that of the land_fraction, and converts the units to Kelvin (N.B.: this is dataset specific)
 """
-scale_sst(SST, _info) = (swap_space!(zeros(axes(_info.land_fraction)), SST) .+ float_type_bcf(_info)(273.15))
+scale_sst(SST, _info) =
+    (Utilities.swap_space!(zeros(axes(_info.land_fraction)), SST) .+ BCReader.float_type_bcf(_info)(273.15))
 
 # ode
 function slab_ocean_rhs!(dY, Y, cache, t)
@@ -208,7 +204,7 @@ function dss_state!(sim::SlabOceanSimulation)
     for key in propertynames(Y)
         field = getproperty(Y, key)
         buffer = get_dss_buffer(axes(field), p)
-        ClimaCore.Spaces.weighted_dss!(field, buffer)
+        CC.Spaces.weighted_dss!(field, buffer)
     end
 
 end

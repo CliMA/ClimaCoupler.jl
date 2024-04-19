@@ -1,16 +1,9 @@
 import Test: @test, @testset
-
-using ClimaCore
-using ClimaCore: Fields, Spaces
-
-import ClimaCoupler
-import ClimaCoupler.TestHelper
-import ClimaCoupler.Interfacer: SeaIceModelSimulation
-import ClimaCoupler: Regridder
-
-import ClimaParams as CP
+import ClimaCore as CC
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TP
+import ClimaCoupler
+import ClimaCoupler: Interfacer, Regridder, TestHelper
 
 include("../../experiments/AMIP/components/ocean/eisenman_seaice.jl")
 
@@ -43,7 +36,7 @@ for FT in (Float32, Float64)
         Ya.F_rad .= 0
         Ya.F_turb .= 0
 
-        Fields.bycolumn(boundary_space) do colidx
+        CC.Fields.bycolumn(boundary_space) do colidx
             solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
         end
         @test all(parent(Ya.e_base) .≈ 0)
@@ -69,7 +62,7 @@ for FT in (Float32, Float64)
         ∂F_atm∂T_sfc = get_∂F_rad_energy∂T_sfc(Y.T_sfc, params_ice) .+ Ya.∂F_turb_energy∂T_sfc
         @. Ya.F_rad = (1 - params_ice.α) * params_ice.σ * Y.T_sfc .^ 4 # outgoing longwave
 
-        Fields.bycolumn(boundary_space) do colidx
+        CC.Fields.bycolumn(boundary_space) do colidx
             solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
         end
 
@@ -100,7 +93,7 @@ for FT in (Float32, Float64)
         Y.T_sfc .= params_ice.T_base
         Y.T_ml .= params_ice.T_base
 
-        Fields.bycolumn(boundary_space) do colidx
+        CC.Fields.bycolumn(boundary_space) do colidx
             solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
         end
 
@@ -135,7 +128,7 @@ for FT in (Float32, Float64)
         Y.T_sfc .= params_ice.T_base .- 1
         T_sfc_0 = deepcopy(Y.T_sfc)
 
-        Fields.bycolumn(boundary_space) do colidx
+        CC.Fields.bycolumn(boundary_space) do colidx
             solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
         end
 
@@ -170,7 +163,7 @@ for FT in (Float32, Float64)
         Y.T_ml .= params_ice.T_base
         T_ml_0 = deepcopy(Y.T_ml)
 
-        Fields.bycolumn(boundary_space) do colidx
+        CC.Fields.bycolumn(boundary_space) do colidx
             solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
         end
 
@@ -200,7 +193,7 @@ for FT in (Float32, Float64)
         Ya.F_turb .= 0
         Ya.F_rad .= @. (1 - params_ice.α) * params_ice.σ * Y.T_sfc^4 - 300
 
-        Fields.bycolumn(boundary_space) do colidx
+        CC.Fields.bycolumn(boundary_space) do colidx
             solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
         end
 
@@ -230,7 +223,7 @@ for FT in (Float32, Float64)
         # net outgoing longwave
         Ya.F_rad .= @. (1 - params_ice.α) * params_ice.σ * Y.T_sfc^4
 
-        Fields.bycolumn(boundary_space) do colidx
+        CC.Fields.bycolumn(boundary_space) do colidx
             solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
         end
 
@@ -271,7 +264,7 @@ for FT in (Float32, Float64)
         Ya.F_turb .= 0
         Ya.F_rad .= 0
 
-        Fields.bycolumn(boundary_space) do colidx
+        CC.Fields.bycolumn(boundary_space) do colidx
             solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
         end
 
@@ -305,7 +298,7 @@ for FT in (Float32, Float64)
         Ya.F_turb .= 0
         Ya.F_rad .= 0
 
-        Fields.bycolumn(boundary_space) do colidx
+        CC.Fields.bycolumn(boundary_space) do colidx
             solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
         end
 
@@ -337,17 +330,17 @@ for FT in (Float32, Float64)
         sim.integrator.p.Ya.F_rad .= 300
         sim.integrator.u.T_ml .= sim.integrator.p.params.p_i.T_freeze # init conditions for ocean temperature
 
-        total_energy_0 = get_field(sim, Val(:energy))
+        total_energy_0 = Interfacer.get_field(sim, Val(:energy))
         h_ice_0 = deepcopy(sim.integrator.u.h_ice)
 
-        step!(sim, Δt)
+        Interfacer.step!(sim, Δt)
         h_ice = sim.integrator.u.h_ice
         @test all(parent(h_ice) .≈ 0.001)
-        step!(sim, 2 * Δt)
+        Interfacer.step!(sim, 2 * Δt)
         h_ice = sim.integrator.u.h_ice
         @test all(abs.(parent(h_ice) .- 0.002) .< 10eps(FT))
 
-        total_energy_calc = (get_field(sim, Val(:energy)) .- total_energy_0)
+        total_energy_calc = (Interfacer.get_field(sim, Val(:energy)) .- total_energy_0)
         total_energy_expeted = 300 .* ones(boundary_space) .* 2 .* FT(Δt)
         @test all(parent(total_energy_calc) .≈ parent(total_energy_expeted))
 

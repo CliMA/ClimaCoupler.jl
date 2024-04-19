@@ -1,8 +1,6 @@
 # these extensions add extra diagnostics to the atmos model output
 import ClimaAtmos.Diagnostics as CAD
 
-import ClimaAtmos.Diagnostics: add_diagnostic_variable!
-
 """
     add_diagnostic_variable!(short_name::String, long_name::String, standard_name::String, units::String, comments::String, compute!::Function)
 
@@ -13,7 +11,7 @@ The `compute!` function is called at every atmos time step to compute the diagno
 To output these variables, short_name needs to be specified under diagnostics in the required yml file.
 """
 
-add_diagnostic_variable!(
+CAD.add_diagnostic_variable!(
     short_name = "mse",
     long_name = "Moist static energy",
     standard_name = "moist_static_energy",
@@ -24,7 +22,7 @@ add_diagnostic_variable!(
         (; ᶜts) = cache.precomputed
         c_space = axes(state.c)
         thermo_params = CAP.thermodynamics_params(params)
-        e_pot = CAP.grav(params) .* ClimaCore.Fields.coordinate_field(c_space).z
+        e_pot = CAP.grav(params) .* CC.Fields.coordinate_field(c_space).z
         if isnothing(out)
             return TD.moist_static_energy.(thermo_params, ᶜts, e_pot)
         else
@@ -33,7 +31,7 @@ add_diagnostic_variable!(
     end,
 )
 
-add_diagnostic_variable!(
+CAD.add_diagnostic_variable!(
     short_name = "lr",
     long_name = "Lapse rate",
     standard_name = "lapse_rate",
@@ -45,15 +43,15 @@ add_diagnostic_variable!(
         thermo_params = CAP.thermodynamics_params(params)
         ᶜT = @. TD.air_temperature(thermo_params, ᶜts)
         if isnothing(out)
-            return ClimaCore.Geometry.WVector.(CAD.ᶜgradᵥ.(CAD.ᶠinterp.(ᶜT))).components.data.:1
+            return CC.Geometry.WVector.(CAD.ᶜgradᵥ.(CAD.ᶠinterp.(ᶜT))).components.data.:1
         else
-            out .= ClimaCore.Geometry.WVector.(CAD.ᶜgradᵥ.(CAD.ᶠinterp.(ᶜT))).components.data.:1
+            out .= CC.Geometry.WVector.(CAD.ᶜgradᵥ.(CAD.ᶠinterp.(ᶜT))).components.data.:1
         end
 
     end,
 )
 
-add_diagnostic_variable!(
+CAD.add_diagnostic_variable!(
     short_name = "ediff",
     long_name = "Eddy diffusivity",
     standard_name = "eddy_diffusivity",
@@ -62,11 +60,11 @@ add_diagnostic_variable!(
     compute! = (out, state, cache, time) -> begin
         (; ᶜp) = cache.precomputed
         (; C_E) = cache.atmos.vert_diff
-        interior_uₕ = ClimaCore.Fields.level(state.c.uₕ, 1)
+        interior_uₕ = CC.Fields.level(state.c.uₕ, 1)
         ᶠp = ᶠK_E = cache.scratch.ᶠtemp_scalar
-        ClimaCore.Fields.bycolumn(axes(ᶜp)) do colidx
+        CC.Fields.bycolumn(axes(ᶜp)) do colidx
             @. ᶠp[colidx] = CAD.ᶠinterp(ᶜp[colidx])
-            ᶜΔz_surface = ClimaCore.Fields.Δz_field(interior_uₕ)
+            ᶜΔz_surface = CC.Fields.Δz_field(interior_uₕ)
             @. ᶠK_E[colidx] = CA.eddy_diffusivity_coefficient(
                 C_E,
                 CA.norm(interior_uₕ[colidx]),

@@ -1,21 +1,19 @@
 """
     Regridder
 
-This module contains functions to regrid information between spaces.
+This module contains functions to regrid information between CC.Spaces.
 Many of the functions used in this module call TempestRemap functions
 via ClimaCoreTempestRemap wrappers.
 """
 module Regridder
 
-using ..Utilities
-using ..TimeManager
-using ..Interfacer: CoupledSimulation, float_type, SurfaceModelSimulation, get_field, update_field!
-using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput
-using ClimaComms
-using NCDatasets
-using ClimaCoreTempestRemap
-using Dates
-using JLD2
+import Dates
+import JLD2
+import NCDatasets
+import ClimaComms
+import ClimaCore as CC
+import ClimaCoreTempestRemap as CCTR
+import ..Interfacer, ..Utilities, ..TimeManager
 
 export write_to_hdf5,
     read_from_hdf5,
@@ -34,19 +32,24 @@ export write_to_hdf5,
 nans_to_zero(v) = isnan(v) ? typeof(v)(0) : v
 
 """
-    reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R, ::Spaces.SpectralElementSpace2D)
+    reshape_cgll_sparse_to_field!(field::CC.Fields.Field, in_array::Array, R, ::CC.Spaces.SpectralElementSpace2D)
 
 Reshapes a sparse vector array `in_array` (CGLL, raw output of the TempestRemap),
 and uses its data to populate the input Field object `field`.
 Redundant nodes are populated using `dss` operations.
 
 # Arguments
-- `field`: [Fields.Field] object populated with the input array.
+- `field`: [CC.Fields.Field] object populated with the input array.
 - `in_array`: [Array] input used to fill `field`.
 - `R`: [NamedTuple] containing `target_idxs` and `row_indices` used for indexing.
-- `space`: [Spaces.SpectralElementSpace2D] 2d space to which we are mapping.
+- `space`: [CC.Spaces.SpectralElementSpace2D] 2d space to which we are mapping.
 """
-function reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::SubArray, R, ::Spaces.SpectralElementSpace2D)
+function reshape_cgll_sparse_to_field!(
+    field::CC.Fields.Field,
+    in_array::SubArray,
+    R,
+    ::CC.Spaces.SpectralElementSpace2D,
+)
     field_array = parent(field)
 
     fill!(field_array, zero(eltype(field_array)))
@@ -62,29 +65,29 @@ function reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::SubArray, 
 
     # broadcast to the redundant nodes using unweighted dss
     space = axes(field)
-    topology = Spaces.topology(space)
-    hspace = Spaces.horizontal_space(space)
-    Topologies.dss!(Fields.field_values(field), topology)
+    topology = CC.Spaces.topology(space)
+    hspace = CC.Spaces.horizontal_space(space)
+    CC.Topologies.dss!(CC.Fields.field_values(field), topology)
 end
 
 """
-    reshape_cgll_sparse_to_field!(field::Fields.Field, in_array::Array, R, ::Spaces.ExtrudedFiniteDifferenceSpace)
+    reshape_cgll_sparse_to_field!(field::CC.Fields.Field, in_array::Array, R, ::CC.Spaces.ExtrudedFiniteDifferenceSpace)
 
 Reshapes a sparse vector array `in_array` (CGLL, raw output of the TempestRemap),
 and uses its data to populate the input Field object `field`.
 Redundant nodes are populated using `dss` operations.
 
 # Arguments
-- `field`: [Fields.Field] object populated with the input array.
+- `field`: [CC.Fields.Field] object populated with the input array.
 - `in_array`: [Array] input used to fill `field`.
 - `R`: [NamedTuple] containing `target_idxs` and `row_indices` used for indexing.
-- `space`: [Spaces.ExtrudedFiniteDifferenceSpace] 3d space to which we are mapping.
+- `space`: [CC.Spaces.ExtrudedFiniteDifferenceSpace] 3d space to which we are mapping.
 """
 function reshape_cgll_sparse_to_field!(
-    field::Fields.Field,
+    field::CC.Fields.Field,
     in_array::SubArray,
     R,
-    ::Spaces.ExtrudedFiniteDifferenceSpace,
+    ::CC.Spaces.ExtrudedFiniteDifferenceSpace,
 )
     field_array = parent(field)
 
@@ -103,9 +106,9 @@ function reshape_cgll_sparse_to_field!(
     end
     # broadcast to the redundant nodes using unweighted dss
     space = axes(field)
-    topology = Spaces.topology(space)
-    hspace = Spaces.horizontal_space(space)
-    Topologies.dss!(Fields.field_values(field), topology)
+    topology = CC.Spaces.topology(space)
+    hspace = CC.Spaces.horizontal_space(space)
+    CC.Topologies.dss!(CC.Fields.field_values(field), topology)
 end
 
 """
@@ -132,7 +135,7 @@ The saved regridded HDF5 output is readable by multiple MPI processes.
 - `REGRID_DIR`: [String] directory to save output files in.
 - `datafile_rll`: [String] filename of RLL dataset to be mapped to CGLL.
 - `varname`: [String] the name of the variable to be remapped.
-- `space`: [Spaces.AbstractSpace] the space to which we are mapping.
+- `space`: [CC.Spaces.AbstractSpace] the space to which we are mapping.
 - `hd_outfile_root`: [String] root of the output file name.
 - `mono`: [Bool] flag to specify monotone remapping.
 """
@@ -156,8 +159,8 @@ function hdwrite_regridfile_rll_to_cgll(
     meshfile_overlap = joinpath(REGRID_DIR, outfile_root * "_mesh_overlap.g")
     weightfile = joinpath(REGRID_DIR, outfile_root * "_remap_weights.nc")
 
-    if space isa Spaces.ExtrudedFiniteDifferenceSpace
-        space2d = Spaces.horizontal_space(space)
+    if space isa CC.Spaces.ExtrudedFiniteDifferenceSpace
+        space2d = CC.Spaces.horizontal_space(space)
     else
         space2d = space
     end
@@ -165,50 +168,50 @@ function hdwrite_regridfile_rll_to_cgll(
     # If doesn't make sense to regrid with GPUs/MPI processes
     cpu_singleton_context = ClimaComms.SingletonCommsContext(ClimaComms.CPUSingleThreaded())
 
-    topology = Topologies.Topology2D(
+    topology = CC.Topologies.Topology2D(
         cpu_singleton_context,
-        Spaces.topology(space2d).mesh,
-        Topologies.spacefillingcurve(Spaces.topology(space2d).mesh),
+        CC.Spaces.topology(space2d).mesh,
+        CC.Topologies.spacefillingcurve(CC.Spaces.topology(space2d).mesh),
     )
-    Nq = Spaces.Quadratures.polynomial_degree(Spaces.quadrature_style(space2d)) + 1
+    Nq = CC.Spaces.Quadratures.polynomial_degree(CC.Spaces.quadrature_style(space2d)) + 1
 
-    space2d_undistributed = Spaces.SpectralElementSpace2D(topology, Spaces.Quadratures.GLL{Nq}())
+    space2d_undistributed = CC.Spaces.SpectralElementSpace2D(topology, CC.Spaces.Quadratures.GLL{Nq}())
 
-    if space isa Spaces.ExtrudedFiniteDifferenceSpace
-        vert_center_space = Spaces.CenterFiniteDifferenceSpace(Spaces.vertical_topology(space).mesh)
-        space_undistributed = Spaces.ExtrudedFiniteDifferenceSpace(space2d_undistributed, vert_center_space)
+    if space isa CC.Spaces.ExtrudedFiniteDifferenceSpace
+        vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(CC.Spaces.vertical_topology(space).mesh)
+        space_undistributed = CC.Spaces.ExtrudedFiniteDifferenceSpace(space2d_undistributed, vert_center_space)
     else
         space_undistributed = space2d_undistributed
     end
     if isfile(datafile_cgll) == false
         isdir(REGRID_DIR) ? nothing : mkpath(REGRID_DIR)
 
-        nlat, nlon = NCDataset(datafile_rll) do ds
+        nlat, nlon = NCDatasets.NCDataset(datafile_rll) do ds
             (ds.dim["lat"], ds.dim["lon"])
         end
         # write lat-lon mesh
-        rll_mesh(meshfile_rll; nlat = nlat, nlon = nlon)
+        CCTR.rll_mesh(meshfile_rll; nlat = nlat, nlon = nlon)
 
         # write cgll mesh, overlap mesh and weight file
-        write_exodus(meshfile_cgll, topology)
-        overlap_mesh(meshfile_overlap, meshfile_rll, meshfile_cgll)
+        CCTR.write_exodus(meshfile_cgll, topology)
+        CCTR.overlap_mesh(meshfile_overlap, meshfile_rll, meshfile_cgll)
 
         # 'in_np = 1' and 'mono = true' arguments ensure mapping is conservative and monotone
         # Note: for a kwarg not followed by a value, set it to true here (i.e. pass 'mono = true' to produce '--mono')
         # Note: out_np = degrees of freedom = polynomial degree + 1
         kwargs = (; out_type = out_type, out_np = Nq)
         kwargs = mono ? (; (kwargs)..., in_np = 1, mono = mono) : kwargs
-        remap_weights(weightfile, meshfile_rll, meshfile_cgll, meshfile_overlap; kwargs...)
-        apply_remap(datafile_cgll, datafile_rll, weightfile, [varname])
+        CCTR.remap_weights(weightfile, meshfile_rll, meshfile_cgll, meshfile_overlap; kwargs...)
+        CCTR.apply_remap(datafile_cgll, datafile_rll, weightfile, [varname])
     else
         @warn "Using the existing $datafile_cgll : check topology is consistent"
     end
 
     # read the remapped file with sparse matrices
-    offline_outvector, coords = NCDataset(datafile_cgll, "r") do ds_wt
+    offline_outvector, coords = NCDatasets.NCDataset(datafile_cgll, "r") do ds_wt
         (
             # read the data in, and remove missing type (will error if missing data is present)
-            offline_outvector = nomissing(Array(ds_wt[varname])[:, :, :]), # ncol, z, times
+            offline_outvector = NCDatasets.nomissing(Array(ds_wt[varname])[:, :, :]), # ncol, z, times
             coords = get_coords(ds_wt, space),
         )
     end
@@ -217,13 +220,13 @@ function hdwrite_regridfile_rll_to_cgll(
 
     # weightfile info needed to populate all nodes and save into fields with
     #  sparse matrices
-    _, _, row_indices = NCDataset(weightfile, "r") do ds_wt
+    _, _, row_indices = NCDatasets.NCDataset(weightfile, "r") do ds_wt
         (Array(ds_wt["S"]), Array(ds_wt["col"]), Array(ds_wt["row"]))
     end
 
     target_unique_idxs =
-        out_type == "cgll" ? collect(Spaces.unique_nodes(space2d_undistributed)) :
-        collect(Spaces.all_nodes(space2d_undistributed))
+        out_type == "cgll" ? collect(CC.Spaces.unique_nodes(space2d_undistributed)) :
+        collect(CC.Spaces.all_nodes(space2d_undistributed))
     target_unique_idxs_i = map(row -> target_unique_idxs[row][1][1], row_indices)
     target_unique_idxs_j = map(row -> target_unique_idxs[row][1][2], row_indices)
     target_unique_idxs_e = map(row -> target_unique_idxs[row][2], row_indices)
@@ -231,7 +234,7 @@ function hdwrite_regridfile_rll_to_cgll(
 
     R = (; target_idxs = target_unique_idxs, row_indices = row_indices)
 
-    offline_field = Fields.zeros(FT, space_undistributed)
+    offline_field = CC.Fields.zeros(FT, space_undistributed)
 
     offline_fields = ntuple(x -> similar(offline_field), length(times))
 
@@ -249,23 +252,23 @@ function hdwrite_regridfile_rll_to_cgll(
         x -> write_to_hdf5(REGRID_DIR, hd_outfile_root, times[x], offline_fields[x], varname, cpu_singleton_context),
         1:length(times),
     )
-    jldsave(joinpath(REGRID_DIR, hd_outfile_root * "_times.jld2"); times = times)
+    JLD2.jldsave(joinpath(REGRID_DIR, hd_outfile_root * "_times.jld2"); times = times)
 end
 
 """
-    get_coords(ds, ::Spaces.ExtrudedFiniteDifferenceSpace)
-    get_coords(ds, ::Spaces.SpectralElementSpace2D)
+    get_coords(ds, ::CC.Spaces.ExtrudedFiniteDifferenceSpace)
+    get_coords(ds, ::CC.Spaces.SpectralElementSpace2D)
 
 Extracts the coordinates from a NetCDF file `ds`. The coordinates are
 returned as a tuple of arrays, one for each dimension. The dimensions are
 determined by the space type.
 """
-function get_coords(ds, ::Spaces.ExtrudedFiniteDifferenceSpace)
+function get_coords(ds, ::CC.Spaces.ExtrudedFiniteDifferenceSpace)
     data_dates = get_time(ds)
     z = Array(ds["z"])
     return (data_dates, z)
 end
-function get_coords(ds, ::Spaces.SpectralElementSpace2D)
+function get_coords(ds, ::CC.Spaces.SpectralElementSpace2D)
     data_dates = get_time(ds)
     return (data_dates,)
 end
@@ -298,16 +301,17 @@ the HDF5 output is readable by multiple MPI processes.
 - `REGRID_DIR`: [String] directory to save output files in.
 - `hd_outfile_root`: [String] root of the output file name.
 - `time`: [Dates.DateTime] the timestamp of the data being written.
-- `field`: [Fields.Field] object to be written.
+- `field`: [CC.Fields.Field] object to be written.
 - `varname`: [String] variable name of data.
 - `comms_ctx`: [ClimaComms.AbstractCommsContext] context used for this operation.
 """
 function write_to_hdf5(REGRID_DIR, hd_outfile_root, time, field, varname, comms_ctx)
     t = Dates.datetime2unix.(time)
-    hdfwriter = InputOutput.HDF5Writer(joinpath(REGRID_DIR, hd_outfile_root * "_" * string(time) * ".hdf5"), comms_ctx)
+    hdfwriter =
+        CC.InputOutput.HDF5Writer(joinpath(REGRID_DIR, hd_outfile_root * "_" * string(time) * ".hdf5"), comms_ctx)
 
-    InputOutput.HDF5.write_attribute(hdfwriter.file, "unix time", t) # TODO: a better way to write metadata, CMIP convention
-    InputOutput.write!(hdfwriter, field, string(varname))
+    CC.InputOutput.HDF5.write_attribute(hdfwriter.file, "unix time", t) # TODO: a better way to write metadata, CMIP convention
+    CC.InputOutput.write!(hdfwriter, field, string(varname))
     Base.close(hdfwriter)
 end
 
@@ -329,9 +333,10 @@ the input HDF5 file must be readable by multiple MPI processes.
 - Field or FieldVector
 """
 function read_from_hdf5(REGRID_DIR, hd_outfile_root, time, varname, comms_ctx)
-    hdfreader = InputOutput.HDF5Reader(joinpath(REGRID_DIR, hd_outfile_root * "_" * string(time) * ".hdf5"), comms_ctx)
+    hdfreader =
+        CC.InputOutput.HDF5Reader(joinpath(REGRID_DIR, hd_outfile_root * "_" * string(time) * ".hdf5"), comms_ctx)
 
-    field = InputOutput.read_field(hdfreader, varname)
+    field = CC.InputOutput.read_field(hdfreader, varname)
     Base.close(hdfreader)
     return field
 end
@@ -340,12 +345,12 @@ end
     dummmy_remap!(target, source)
 
 Simple stand-in function for remapping.
-For AMIP we don't need regridding of surface model fields.
+For AMIP we don't need regridding of surface model CC.Fields.
 When we do, we re-introduce the ClimaCoreTempestRemap remapping functions.
 
 # Arguments
-- `target`: [Fields.Field] destination of remapping.
-- `source`: [Fields.Field] source of remapping.
+- `target`: [CC.Fields.Field] destination of remapping.
+- `source`: [CC.Fields.Field] source of remapping.
 """
 function dummmy_remap!(target, source)
     parent(target) .= parent(source)
@@ -358,15 +363,15 @@ Write the data stored in `field` to an NCDataset file `datafile_cc`.
 
 # Arguments
 - `datafile_cc`: [String] filename of output file.
-- `field`: [Fields.Field] to be written to file.
+- `field`: [CC.Fields.Field] to be written to file.
 - `name`: [Symbol] variable name.
 """
 function write_datafile_cc(datafile_cc, field, name)
     space = axes(field)
     # write data
-    NCDataset(datafile_cc, "c") do nc
-        def_space_coord(nc, space; type = "cgll")
-        nc_field = defVar(nc, name, Float64, space)
+    NCDatasets.NCDataset(datafile_cc, "c") do nc
+        CCTR.def_space_coord(nc, space; type = "cgll")
+        nc_field = NCDatasets.defVar(nc, name, Float64, space)
         nc_field[:, 1] = field
 
         nothing
@@ -376,7 +381,7 @@ end
 """
     remap_field_cgll_to_rll(
         name,
-        field::Fields.Field,
+        field::CC.Fields.Field,
         remap_tmpdir,
         datafile_rll;
         nlat = 90,
@@ -388,32 +393,32 @@ grid using TempestRemap.
 
 # Arguments
 - `name`: [Symbol] variable name.
-- `field`: [Fields.Field] data to be remapped.
+- `field`: [CC.Fields.Field] data to be remapped.
 - `remap_tmpdir`: [String] directory used for remapping.
 - `datafile_rll`: [String] filename of remapped data output.
 """
-function remap_field_cgll_to_rll(name, field::Fields.Field, remap_tmpdir, datafile_rll; nlat = 90, nlon = 180)
+function remap_field_cgll_to_rll(name, field::CC.Fields.Field, remap_tmpdir, datafile_rll; nlat = 90, nlon = 180)
     space = axes(field)
-    hspace = :topology in propertynames(space) ? space : Spaces.horizontal_space(space)
-    Nq = Spaces.Quadratures.polynomial_degree(Spaces.quadrature_style(hspace)) + 1
+    hspace = :topology in propertynames(space) ? space : CC.Spaces.horizontal_space(space)
+    Nq = CC.Spaces.Quadratures.polynomial_degree(CC.Spaces.quadrature_style(hspace)) + 1
 
     # write out our cubed sphere mesh
     meshfile_cc = remap_tmpdir * "/mesh_cubedsphere.g"
-    write_exodus(meshfile_cc, Spaces.topology(hspace))
+    CCTR.write_exodus(meshfile_cc, CC.Spaces.topology(hspace))
 
     meshfile_rll = remap_tmpdir * "/mesh_rll.g"
-    rll_mesh(meshfile_rll; nlat = nlat, nlon = nlon)
+    CCTR.rll_mesh(meshfile_rll; nlat = nlat, nlon = nlon)
 
     meshfile_overlap = remap_tmpdir * "/mesh_overlap.g"
-    overlap_mesh(meshfile_overlap, meshfile_cc, meshfile_rll)
+    CCTR.overlap_mesh(meshfile_overlap, meshfile_cc, meshfile_rll)
 
     weightfile = remap_tmpdir * "/remap_weights.nc"
-    remap_weights(weightfile, meshfile_cc, meshfile_rll, meshfile_overlap; in_type = "cgll", in_np = Nq)
+    CCTR.remap_weights(weightfile, meshfile_cc, meshfile_rll, meshfile_overlap; in_type = "cgll", in_np = Nq)
 
     datafile_cc = remap_tmpdir * "/datafile_cc.nc"
     write_datafile_cc(datafile_cc, field, name)
 
-    apply_remap( # TODO: this can be done online
+    CCTR.apply_remap( # TODO: this can be done online
         datafile_rll,
         datafile_cc,
         weightfile,
@@ -447,13 +452,13 @@ See https://github.com/CliMA/ClimaCoupler.jl/wiki/ClimaCoupler-Lessons-Learned
 - `comms_ctx`: [ClimaComms.AbstractCommsContext] context used for this operation.
 - `infile`: [String] filename containing input data.
 - `varname`: [Symbol] variable name.
-- `boundary_space`: [Spaces.AbstractSpace] over which we are mapping data.
+- `boundary_space`: [CC.Spaces.AbstractSpace] over which we are mapping data.
 - `outfile_root`: [String] root for output file name.
 - `mono`: [Bool] flag for monotone remapping.
 - `threshold`: [FT] cutoff value for `binary_mask` when non-monotone remapping.
 
 # Returns
-- Fields.Field
+- CC.Fields.Field
 """
 function land_fraction(
     FT,
@@ -481,24 +486,23 @@ function land_fraction(
     ClimaComms.barrier(comms_ctx)
     file_dates = JLD2.load(joinpath(REGRID_DIR, outfile_root * "_times.jld2"), "times")
     fraction = read_from_hdf5(REGRID_DIR, outfile_root, file_dates[1], varname, comms_ctx)
-    fraction = swap_space!(zeros(boundary_space), fraction) # needed if we are reading from previous run
+    fraction = Utilities.swap_space!(zeros(boundary_space), fraction) # needed if we are reading from previous run
     return mono ? fraction : binary_mask.(fraction, threshold)
 end
 
 """
-    update_surface_fractions!(cs::CoupledSimulation)
+    update_surface_fractions!(cs::Interfacer.CoupledSimulation)
 
 Updates dynamically changing area fractions.
 Maintains the invariant that the sum of area fractions is 1 at all points.
 
 # Arguments
-- `cs`: [CoupledSimulation] containing area fraction information.
+- `cs`: [Interfacer.CoupledSimulation] containing area fraction information.
 """
-function update_surface_fractions!(cs::CoupledSimulation)
+function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
+    FT = Interfacer.float_type(cs)
 
-    FT = float_type(cs)
-
-    ice_d = get_field(cs.model_sims.ice_sim, Val(:area_fraction))
+    ice_d = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction))
 
     # static fraction
     land_s = cs.surface_fractions.land
@@ -512,10 +516,8 @@ function update_surface_fractions!(cs::CoupledSimulation)
     @assert maximum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) ≈ FT(1)
 
     # update component models
-    update_field!(cs.model_sims.ocean_sim, Val(:area_fraction), cs.surface_fractions.ocean)
-    update_field!(cs.model_sims.ice_sim, Val(:area_fraction), cs.surface_fractions.ice)
-
-
+    Interfacer.update_field!(cs.model_sims.ocean_sim, Val(:area_fraction), cs.surface_fractions.ocean)
+    Interfacer.update_field!(cs.model_sims.ice_sim, Val(:area_fraction), cs.surface_fractions.ice)
 end
 
 """
@@ -542,30 +544,31 @@ or 0 otherwise, keeping the same type.
 binary_mask(var) = binary_mask(var, eps(eltype(var)))
 
 """
-    combine_surfaces!(combined_field::Fields.Field, sims, field_name::Val)
+    combine_surfaces!(combined_field::CC.Fields.Field, sims, field_name::Val)
 
 Sums the fields, specified by `field_name`, weighted by the respective area fractions of all
 surface simulations. THe result is saved in `combined_field`.
 
 # Arguments
-- `combined_field`: [Fields.Field] output object containing weighted values.
+- `combined_field`: [CC.Fields.Field] output object containing weighted values.
 - `sims`: [NamedTuple] containing simulations .
-- `field_name`: [Val] containing the name Symbol of the field t be extracted by the `get_field` functions.
+- `field_name`: [Val] containing the name Symbol of the field t be extracted by the `Interfacer.get_field` functions.
 
 # Example
 - `combine_surfaces!(zeros(boundary_space), cs.model_sims, Val(:surface_temperature))`
 """
-function combine_surfaces!(combined_field::Fields.Field, sims::NamedTuple, field_name::Val)
+function combine_surfaces!(combined_field::CC.Fields.Field, sims::NamedTuple, field_name::Val)
     combined_field .= eltype(combined_field)(0)
     for sim in sims
-        if sim isa SurfaceModelSimulation
-            combined_field .+= get_field(sim, Val(:area_fraction)) .* nans_to_zero.(get_field(sim, field_name)) # this ensures that unitialized (masked) areas do not affect (TODO: move to mask / remove)
+        if sim isa Interfacer.SurfaceModelSimulation
+            combined_field .+=
+                Interfacer.get_field(sim, Val(:area_fraction)) .* nans_to_zero.(Interfacer.get_field(sim, field_name)) # this ensures that unitialized (masked) areas do not affect (TODO: move to mask / remove)
         end
     end
 end
 
 """
-    combine_surfaces_from_sol!(combined_field::Fields.Field, fractions::NamedTuple, fields::NamedTuple)
+    combine_surfaces_from_sol!(combined_field::CC.Fields.Field, fractions::NamedTuple, fields::NamedTuple)
 
 Sums Field objects in `fields` weighted by the respective area fractions, and updates
 these values in `combined_field`.
@@ -573,11 +576,11 @@ NamedTuples `fields` and `fractions` must have matching field names.
 This method can be used to combine fields that were saved in the solution history.
 
 # Arguments
-- `combined_field`: [Fields.Field] output object containing weighted values.
+- `combined_field`: [CC.Fields.Field] output object containing weighted values.
 - `fractions`: [NamedTuple] containing weights used on values in `fields`.
 - `fields`: [NamedTuple] containing values to be weighted by `fractions`.
 """
-function combine_surfaces_from_sol!(combined_field::Fields.Field, fractions::NamedTuple, fields::NamedTuple)
+function combine_surfaces_from_sol!(combined_field::CC.Fields.Field, fractions::NamedTuple, fields::NamedTuple)
     combined_field .= eltype(combined_field)(0)
     warn_nans = false
     for surface_name in propertynames(fields) # could use dot here?
@@ -595,7 +598,7 @@ end
 Extract data and coordinates from `datafile_latlon`.
 """
 function read_remapped_field(name::Symbol, datafile_latlon::String, lev_name = "z")
-    out = NCDataset(datafile_latlon, "r") do nc
+    out = NCDatasets.NCDataset(datafile_latlon, "r") do nc
         lon = Array(nc["lon"])
         lat = Array(nc["lat"])
         lev = lev_name in keys(nc) ? Array(nc[lev_name]) : Float64(-999)
@@ -615,7 +618,7 @@ end
 Regrids a field from CGLL to an RLL array using TempestRemap. It can hanlde multiple other dimensions, such as time and level.
 
 # Arguments
-- `field`: [Fields.Field] to be remapped.
+- `field`: [CC.Fields.Field] to be remapped.
 - `DIR`: [String] directory used for remapping.
 - `nlat`: [Int] number of latitudes of the regridded array.
 - `nlon`: [Int] number of longitudes of the regridded array.
@@ -626,12 +629,92 @@ Regrids a field from CGLL to an RLL array using TempestRemap. It can hanlde mult
 """
 function cgll2latlonz(field; DIR = "cgll2latlonz_dir", nlat = 360, nlon = 720, clean_dir = true)
     isdir(DIR) ? nothing : mkpath(DIR)
-    datafile_latlon = DIR * "/remapped_" * string(name) * ".nc"
+    datafile_latlon = DIR * "/remapped_" * string(Interfacer.name) * ".nc"
     remap_field_cgll_to_rll(:var, field, DIR, datafile_latlon, nlat = nlat, nlon = nlon)
     new_data, coords = read_remapped_field(:var, datafile_latlon)
     clean_dir ? rm(DIR; recursive = true) : nothing
     return new_data, coords
 end
 
+"""
+    truncate_dataset(datafile, name, datapath_trunc, date0, time_start, time_end, comms_ctx)
+
+Truncates given data set, and constructs a new dataset containing only the dates that are used in the simulation
+"""
+function truncate_dataset(
+    datafile,
+    name,
+    datapath_trunc,
+    date0,
+    time_start,
+    time_end,
+    comms_ctx::ClimaComms.AbstractCommsContext,
+)
+    date_start = date0 + Dates.Second(time_start)
+    date_end = date0 + Dates.Second(time_start + time_end)
+
+    file_name = replace(string(name, "_truncated_data_", string(date_start), string(date_end), ".nc"), r":" => "")
+    datafile_truncated = joinpath(datapath_trunc, file_name)
+
+    if ClimaComms.iamroot(comms_ctx)
+        ds = NCDatasets.NCDataset(datafile, "r")
+        dates = ds["time"][:]
+
+        (start_id, end_id) = find_idx_bounding_dates(dates, date_start, date_end)
+
+        ds_truncated = NCDatasets.NCDataset(datafile_truncated, "c")
+        ds_truncated = NCDatasets.write(ds_truncated, NCDatasets.view(ds, time = start_id:end_id))
+
+        close(ds)
+        close(ds_truncated)
+
+        return datafile_truncated
+    end
+end
+
+"""
+    find_idx_bounding_dates(dates, date_start, date_end) 
+
+Returns the index range from dates that contains date_start to date_end
+"""
+function find_idx_bounding_dates(dates, date_start, date_end)
+    # if the simulation start date is before our first date in the dataset
+    # leave the beginning of the truncated dataset to be first date available
+    if date_start < dates[1]
+        start_id = 1
+        # if the simulation start date is after the last date in the dataset
+        # start the truncated dataset at its last possible date
+    elseif date_start > last(dates)
+        start_id = length(dates)
+        # if the simulation start date falls within the range of the dataset
+        # find the closest date to the start date and truncate there 
+    else
+        (~, start_id) = findmin(x -> abs(x - date_start), dates)
+        # if the closest date is after the start date, add one more date before 
+        if dates[start_id] > date_start
+            start_id = start_id - 1
+        end
+    end
+
+    # if the simulation end date is before our first date in the dataset
+    # truncate the end of the dataset to be the first date
+    if date_end < dates[1]
+        end_id = 1
+        # if the simulation end date is after the last date in the dataset
+        # leave the end of the dataset as is 
+    elseif date_end > last(dates)
+        end_id = length(dates)
+        # if the simulation end date falls within the range of the dataset
+        # find the closest date to the end date and truncate there 
+    else
+        (~, end_id) = findmin(x -> abs(x - date_end), dates)
+        # if the closest date is before the end date, add one more date after
+        if dates[end_id] < date_end
+            end_id = end_id + 1
+        end
+    end
+
+    return (; start_id, end_id)
+end
 
 end # Module

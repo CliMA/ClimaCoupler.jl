@@ -80,7 +80,7 @@ function find_child(flame_tree, target_name; self_count = false)
             end
         end
     end
-    return @isdefined(out) ? out : nothing
+    return @isdefined(out) && out
 end
 
 @testset "flame diff tests" begin

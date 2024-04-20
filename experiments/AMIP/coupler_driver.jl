@@ -158,7 +158,7 @@ dir_paths = (; output = COUPLER_OUTPUT_DIR, artifacts = COUPLER_ARTIFACTS_DIR)
 
 if ClimaComms.iamroot(comms_ctx)
     @info(COUPLER_OUTPUT_DIR)
-    config_dict["print_config_dict"] ? @info(config_dict) : nothing
+    config_dict["print_config_dict"] && @info(config_dict)
 end
 
 #=
@@ -231,9 +231,9 @@ In the `SlabPlanet` mode, all ocean and sea ice are dynamical models, namely the
 - `slabplanet_eisenman` = land + slab ocean + slab sea ice with an evolving thickness
 =#
 
-ClimaComms.iamroot(comms_ctx) ? @info(mode_name) : nothing
+ClimaComms.iamroot(comms_ctx) && @info(mode_name)
 if mode_name == "amip"
-    ClimaComms.iamroot(comms_ctx) ? @info("AMIP boundary conditions - do not expect energy conservation") : nothing
+    ClimaComms.iamroot(comms_ctx) && @info("AMIP boundary conditions - do not expect energy conservation")
 
     ## land model
     land_sim = bucket_init(
@@ -669,7 +669,7 @@ function solve_coupler!(cs)
     (; model_sims, Δt_cpl, tspan, comms_ctx) = cs
     (; atmos_sim, land_sim, ocean_sim, ice_sim) = model_sims
 
-    ClimaComms.iamroot(comms_ctx) ? @info("Starting coupling loop") : nothing
+    ClimaComms.iamroot(comms_ctx) && @info("Starting coupling loop")
     ## step in time
     walltime = @elapsed for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
 
@@ -677,7 +677,7 @@ function solve_coupler!(cs)
 
         ## print date on the first of month
         if cs.dates.date[1] >= cs.dates.date1[1]
-            ClimaComms.iamroot(comms_ctx) ? @show(cs.dates.date[1]) : nothing
+            ClimaComms.iamroot(comms_ctx) && @show(cs.dates.date[1])
         end
 
         if cs.mode.name == "amip"
@@ -715,7 +715,7 @@ function solve_coupler!(cs)
         end
 
         ## compute global energy
-        !isnothing(cs.conservation_checks) ? ConservationChecker.check_conservation!(cs) : nothing
+        !isnothing(cs.conservation_checks) && ConservationChecker.check_conservation!(cs)
         ClimaComms.barrier(comms_ctx)
 
         ## update water albedo from wind at dt_water_albedo (this will be extended to a radiation callback from the coupler)
@@ -757,7 +757,7 @@ function solve_coupler!(cs)
         TimeManager.trigger_callback!(cs, cs.callbacks.checkpoint)
 
     end
-    ClimaComms.iamroot(comms_ctx) ? @show(walltime) : nothing
+    ClimaComms.iamroot(comms_ctx) && @show(walltime)
 
     return cs
 end

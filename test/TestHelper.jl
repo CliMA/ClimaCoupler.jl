@@ -76,7 +76,7 @@ variable `varname`, and store it at `path`.
 - `val`: [FT] value to store as `varname` at all indices.
 """
 function gen_ncdata(FT, path, varname, val)
-    isfile(path) ? rm(path) : nothing
+    isfile(path) && rm(path)
 
     # Create dataset of all ones
     nc = NCDatasets.NCDataset(path, "c")

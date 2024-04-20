@@ -78,7 +78,7 @@ ClimaComms.barrier(comms_ctx)
 
         # delete testing directory and files
         ClimaComms.barrier(comms_ctx)
-        ClimaComms.iamroot(comms_ctx) ? rm(regrid_dir; recursive = true, force = true) : nothing
+        ClimaComms.iamroot(comms_ctx) && rm(regrid_dir; recursive = true, force = true)
         ClimaComms.barrier(comms_ctx)
     end
 end
@@ -298,7 +298,7 @@ end
         @test_throws ErrorException BCReader.update_midmonth_data!(date, bcf_info)
 
         ClimaComms.barrier(comms_ctx)
-        ClimaComms.iamroot(comms_ctx) ? rm(regrid_dir; recursive = true, force = true) : nothing
+        ClimaComms.iamroot(comms_ctx) && rm(regrid_dir; recursive = true, force = true)
         ClimaComms.barrier(comms_ctx)
     end
 end

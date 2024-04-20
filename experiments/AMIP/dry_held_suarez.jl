@@ -76,7 +76,7 @@ restart_t = Int(0)
 
 ## coupler simulation specific configuration
 Δt_cpl = Float64(400)
-t_end = "200days"
+t_end = "1000days"
 tspan = (Float64(0.0), Float64(time_to_seconds(t_end)))
 start_date = "19790301"
 hourly_checkpoint = true

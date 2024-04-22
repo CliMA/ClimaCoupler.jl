@@ -294,7 +294,7 @@ steps:
           slurm_gpus_per_task: 1
           slurm_cpus_per_task: 4
           slurm_ntasks: 4
-          slurm_mem: 20GB
+          slurm_mem: 30GB
           modules: common
         soft_fail: true
 
@@ -339,7 +339,7 @@ steps:
 
       - label: ":envelope: Slack report: target AMIP"
         command:
-          - slack-upload -c "#coupler-report" -f experiments/AMIP/output/amip/gpu_amip_target_topo_diagedmf_artifacts/amip_ncep.png -m png -n amip_fine -x "90d Target AMIP v NCEP Last Month Mean"
+          - slack-upload -c "#coupler-report" -f experiments/AMIP/output/amip/gpu_amip_target_topo_diagedmf_artifacts/amip_ncep.png -m png -n amip_fine -x "300d Target AMIP v NCEP Last Month Mean"
           - |
             find experiments/AMIP/output/amip/gpu_amip_target_topo_diagedmf_artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
               slack-upload -c "#coupler-report" -f "$$file" -m png -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
@@ -347,4 +347,3 @@ steps:
         agents:
           queue: clima
           modules: common
-

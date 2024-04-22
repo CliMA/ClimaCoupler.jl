@@ -34,13 +34,17 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
         :F_radiative,
         :F_turb_energy,
         :F_turb_moisture,
+        :F_turb_ρτxz,
+        :F_turb_ρτyz,
         :P_liq,
+        :P_snow,
         :T_S,
         :ρ_sfc,
         :q_sfc,
         :beta,
         :z0b_S,
         :z0m_S,
+        :radiative_energy_flux_toa,
     )
     atmos_names = (:atmos_field,)
     surface_names = (:surface_field,)

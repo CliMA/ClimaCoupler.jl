@@ -23,7 +23,6 @@ Interfacer.name(::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
 
 function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
-    atmos_config_dict["surface_albedo"] = "CouplerAlbedo"
     atmos_config = CA.AtmosConfig(atmos_config_dict)
     simulation = CA.get_simulation(atmos_config)
     (; integrator) = simulation
@@ -62,6 +61,23 @@ function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
     # DSS state to ensure we have continuous fields
     dss_state!(sim)
     return sim
+end
+
+# Extension of CA.set_surface_albedo! to set the surface albedo to 0.38 at the beginning of the simulation,
+# so the initial callback initialization doesn't lead to NaNs in the radiation model.
+# Subsequently, the surface albedo will be updated by the coupler, via water_albedo_from_atmosphere!.
+function CA.set_surface_albedo!(Y, p, t, ::CA.CouplerAlbedo)
+    if t == 0
+        FT = eltype(Y)
+        # set initial insolation initial conditions
+        !p.radiation.idealized_insolation && CA.set_insolation_variables!(Y, p, t)
+        # set surface albedo to 0.38
+        @warn "Setting surface albedo to 0.38 at the beginning of the simulation"
+        p.radiation.radiation_model.direct_sw_surface_albedo .= FT(0.38)
+        p.radiation.radiation_model.diffuse_sw_surface_albedo .= FT(0.38)
+    else
+        nothing
+    end
 end
 
 """
@@ -208,6 +224,13 @@ Interfacer.step!(sim::ClimaAtmosSimulation, t) = Interfacer.step!(sim.integrator
 Interfacer.reinit!(sim::ClimaAtmosSimulation) = Interfacer.reinit!(sim.integrator)
 
 function FieldExchanger.update_sim!(atmos_sim::ClimaAtmosSimulation, csf, turbulent_fluxes)
+
+    u = atmos_sim.integrator.u
+    p = atmos_sim.integrator.p
+    t = atmos_sim.integrator.t
+
+    !p.radiation.idealized_insolation && CA.set_insolation_variables!(u, p, t)
+
     Interfacer.update_field!(atmos_sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
     Interfacer.update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
     Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf)
@@ -404,13 +427,10 @@ function FluxCalculator.water_albedo_from_atmosphere!(
     λ = FT(0) # spectral wavelength (not used for now)
 
     # update for current zenith angle
-    CA.set_insolation_variables!(Y, p, t)
-
     bottom_coords = CC.Fields.coordinate_field(CC.Spaces.level(Y.c, 1))
     μ = CA.RRTMGPI.array2field(radiation_model.cos_zenith, axes(bottom_coords))
     FT = eltype(atmos_sim.integrator.u)
     α_model = CA.RegressionFunctionAlbedo{FT}()
-
 
     # set the direct and diffuse surface albedos
     direct_albedo .= CA.surface_albedo_direct(α_model).(λ, μ, LinearAlgebra.norm.(CC.Fields.level(Y.c.uₕ, 1)))

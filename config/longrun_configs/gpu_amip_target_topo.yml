@@ -1,5 +1,6 @@
 FLOAT_TYPE: "Float32"
 anim: false
+albedo_model: "CouplerAlbedo"
 apply_limiter: false
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_0M_earth.yml"
 dt: "100secs"

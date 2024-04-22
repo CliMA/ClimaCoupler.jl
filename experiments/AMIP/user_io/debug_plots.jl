@@ -34,13 +34,17 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
         :F_radiative,
         :F_turb_energy,
         :F_turb_moisture,
+        :F_turb_ρτxz,
+        :F_turb_ρτyz,
         :P_liq,
+        :P_snow,
         :T_S,
         :ρ_sfc,
         :q_sfc,
         :beta,
         :z0b_S,
         :z0m_S,
+        :radiative_energy_flux_toa,
     )
     all_plots = []
     for field_name in field_names

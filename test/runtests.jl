@@ -36,7 +36,7 @@ end
 gpu_broken || @safetestset "PostProcessor tests" begin
     include("postprocessor_tests.jl")
 end
-gpu_broken || @safetestset "Checkpointer tests" begin
+@safetestset "Checkpointer tests" begin
     include("checkpointer_tests.jl")
 end
 gpu_broken || @safetestset "experiment test: CoupledSims tests" begin

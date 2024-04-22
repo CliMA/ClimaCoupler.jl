@@ -1,8 +1,7 @@
 FLOAT_TYPE: "Float32"
 anim: true
 apply_limiter: false
-atmos_config_file: "config/longrun_configs/longrun_aquaplanet_rhoe_equil_55km_nz63_allsky_diagedmf_0M.yml"
-coupler_toml_file: "toml/amip_target_topo_diagedmf.toml"
+atmos_config_file: "config/gpu_configs/gpu_aquaplanet_diagedmf.yml"
 dt: "100secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: 100

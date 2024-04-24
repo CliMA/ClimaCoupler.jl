@@ -162,6 +162,13 @@ steps:
         agents:
           slurm_mem: 20GB
 
+      - label: "Slabplanet: dry, no radiation"
+        key: "slabplanet_dry_norad"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/slabplanet_dry_norad.yml"
+        artifact_paths: "experiments/AMIP/output/slabplanet/slabplanet_dry_norad_artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
       - label: "Slabplanet: default with Float32"
         key: "slabplanet_ft32"
         command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/slabplanet_ft32.yml"

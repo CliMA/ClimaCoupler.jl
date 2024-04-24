@@ -76,7 +76,7 @@ restart_t = Int(0)
 
 ## coupler simulation specific configuration
 Δt_cpl = Float64(400)
-t_end = "1000days"
+t_end = "50days"
 tspan = (Float64(0.0), Float64(time_to_seconds(t_end)))
 start_date = "19790301"
 hourly_checkpoint = true
@@ -114,7 +114,7 @@ config_dict = Dict(
     "surface_setup" => "PrescribedSurface",
     # diagnostic (nested wirh period and short_name)
     "output_default_diagnostics" => false,
-    "diagnostics" => [Dict("short_name" => ["mse", "lr", "mass_streamfunction", "stab", "vT", "egr", "ua", "va", "wa", "ta", "rhoa", "pfull"], "period" => "1days", "reduction" => "inst"),],
+    "diagnostics" => [Dict("short_name" => ["mse", "lr", "mass_streamfunction", "stab", "vT", "egr", "ua", "va", "wa", "ta", "rhoa", "pfull", "stab"], "period" => "1days", "reduction" => "inst"),],
     # held-suarez specific
     "forcing" => "held_suarez",
 )

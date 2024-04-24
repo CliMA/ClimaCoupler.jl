@@ -114,12 +114,12 @@ CAD.add_diagnostic_variable!(
     standard_name = "static_stability",
     units = "s^-2",
     compute! = (out, state, cache, time) -> begin
-        dθdz = ClimaCore.Geometry.WVector.(cache.precomputed.ᶜgradᵥ_θ_virt)
         thermo_params = CAP.thermodynamics_params(cache.params)
         ᶜts = cache.precomputed.ᶜts
         θ_virt = TD.virtual_pottemp.(thermo_params, ᶜts)
+        dθ_virtdz = @. ᶜgradᵥ_.(ᶠinterp_(θ_virt))
         temp = cache.scratch.ᶜtemp_scalar
-        parent(temp) .= parent(CAP.grav(cache.params) ./ θ_virt .* dθdz)
+        parent(temp) .= parent(CAP.grav(cache.params) ./ θ_virt .* dθ_virtdz)
         if isnothing(out)
             return copy(temp)
         else
@@ -159,11 +159,11 @@ CAD.add_diagnostic_variable!(
     compute! = (out, state, cache, time) -> begin
         FT = eltype(state)
         thermo_params = CAP.thermodynamics_params(cache.params)
-        dθdz = cache.precomputed.ᶜgradᵥ_θ_virt
         ᶜts = cache.precomputed.ᶜts
         θ_virt = TD.virtual_pottemp.(thermo_params, ᶜts)
+        dθ_virtdz = @. ᶜgradᵥ_.(ᶠinterp_(θ_virt))
         N = cache.scratch.ᶜtemp_scalar
-        Nsq = CAP.grav(cache.params) ./ θ_virt .* ClimaCore.Geometry.WVector.(dθdz)
+        Nsq = CAP.grav(cache.params) ./ θ_virt .* ClimaCore.Geometry.WVector.(dθ_virtdz)
         mask = parent(Nsq) .> 0
         parent(N) .= sqrt.((parent(Nsq) .* mask ))
 

@@ -16,7 +16,7 @@ Checkpointer.get_model_prog_state(sim::DummySimulation) = sim.state
     @test Checkpointer.get_model_prog_state(sim) == sim.state
 
     sim2 = Interfacer.SurfaceStub([])
-    @test Checkpointer.get_model_prog_state(sim2) == nothing
+    @test Checkpointer.get_model_prog_state(sim2) === nothing
 end
 
 @testset "checkpoint_model_state, restart_model_state!" begin

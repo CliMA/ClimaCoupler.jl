@@ -232,10 +232,10 @@ for FT in (Float32, Float64)
         end
     end
     @testset "reinit_model_sims! for FT=$FT" begin
-        @test FieldExchanger.reinit_model_sims!((; stub = TestSurfaceSimulation1(FT(0)))) == nothing
+        @test FieldExchanger.reinit_model_sims!((; stub = TestSurfaceSimulation1(FT(0)))) === nothing
     end
 
     @testset "step_model_sims! for FT=$FT" begin
-        @test FieldExchanger.step_model_sims!((; stub = TestSurfaceSimulation1(FT(0))), 1) == nothing
+        @test FieldExchanger.step_model_sims!((; stub = TestSurfaceSimulation1(FT(0))), 1) === nothing
     end
 end

@@ -141,7 +141,7 @@ for FT in (Float32, Float64)
     if !Sys.iswindows()
         @testset "test write_to_hdf5 and read_from_hdf5" begin
             # Set up testing directory
-            ispath(REGRID_DIR) ? rm(REGRID_DIR; recursive = true, force = true) : nothing
+            ispath(REGRID_DIR) && rm(REGRID_DIR; recursive = true, force = true)
             mkpath(REGRID_DIR)
 
             hd_outfile_root = "hdf5_out_test"
@@ -162,7 +162,7 @@ for FT in (Float32, Float64)
         @testset "test remap_field_cgll_to_rll for FT=$FT" begin
             # Set up testing directory
             remap_tmpdir = joinpath(REGRID_DIR, "cgll_to_rll")
-            ispath(remap_tmpdir) ? rm(remap_tmpdir; recursive = true, force = true) : nothing
+            ispath(remap_tmpdir) && rm(remap_tmpdir; recursive = true, force = true)
             mkpath(remap_tmpdir)
             name = "testdata"
             datafile_rll = remap_tmpdir * "/" * name * "_rll.nc"
@@ -191,7 +191,7 @@ for FT in (Float32, Float64)
             # Test setup
             R = FT(6371e3)
             test_space = TestHelper.create_space(FT, R = R)
-            ispath(REGRID_DIR) ? rm(REGRID_DIR; recursive = true, force = true) : nothing
+            ispath(REGRID_DIR) && rm(REGRID_DIR; recursive = true, force = true)
             mkpath(REGRID_DIR)
 
             # Initialize dataset of all ones
@@ -221,7 +221,7 @@ for FT in (Float32, Float64)
             rm(REGRID_DIR; recursive = true, force = true)
 
             # Set up testing directory
-            ispath(REGRID_DIR) ? rm(REGRID_DIR; recursive = true, force = true) : nothing
+            ispath(REGRID_DIR) && rm(REGRID_DIR; recursive = true, force = true)
             mkpath(REGRID_DIR)
 
             # Initialize dataset of all 0.5s
@@ -245,7 +245,7 @@ for FT in (Float32, Float64)
             R = FT(6371e3)
             space = TestHelper.create_space(FT, nz = 2, ne = 16, R = R)
 
-            ispath(REGRID_DIR) ? rm(REGRID_DIR; recursive = true, force = true) : nothing
+            ispath(REGRID_DIR) && rm(REGRID_DIR; recursive = true, force = true)
             mkpath(REGRID_DIR)
 
             # lat-lon dataset

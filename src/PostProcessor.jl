@@ -119,7 +119,8 @@ function postprocess(
         DIR = joinpath(REGRID_DIR, "cgll2rll")
         isdir(DIR) ? nothing : mkpath(DIR)
         datafile_latlon =
-            (datafile_latlon == nothing) ? datafile_latlon = DIR * "/remapped_" * string(name) * ".nc" : datafile_latlon
+            (datafile_latlon === nothing) ? datafile_latlon = DIR * "/remapped_" * string(name) * ".nc" :
+            datafile_latlon
         Regridder.remap_field_cgll_to_rll(name, raw_data, DIR, datafile_latlon, nlat = nlat, nlon = nlon)
         new_data, coords = Regridder.read_remapped_field(name, datafile_latlon)
         raw_tag = length(size(new_data)) == 3 ? ZLatLonData() : LatLonData()
@@ -131,15 +132,14 @@ function postprocess(
 
     # spatial slicing and averaging
     if :horizontal_slice in p_methods
-        package.tag == RawData() ? @error("Cannot perform horizontal slicing on raw model data. Specify :regrid") :
-        nothing
+        package.tag == RawData() && @error("Cannot perform horizontal slicing on raw model data. Specify :regrid")
         if package.tag == ZLatLonData()
             package = DataPackage(ZLatData(), name, package.data[:, :, lev_slice], coords = package.coords)
         end
     end
 
     if :zonal_mean in p_methods
-        package.tag == RawData() ? @error("Cannot perform zonal mean on raw model data. Specify :regrid") : nothing
+        package.tag == RawData() && @error("Cannot perform zonal mean on raw model data. Specify :regrid")
         if package.tag == ZLatLonData()
             package = DataPackage(
                 ZLatData(),

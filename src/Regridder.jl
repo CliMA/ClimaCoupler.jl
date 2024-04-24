@@ -632,7 +632,7 @@ function cgll2latlonz(field; DIR = "cgll2latlonz_dir", nlat = 360, nlon = 720, c
     datafile_latlon = DIR * "/remapped_" * string(Interfacer.name) * ".nc"
     remap_field_cgll_to_rll(:var, field, DIR, datafile_latlon, nlat = nlat, nlon = nlon)
     new_data, coords = read_remapped_field(:var, datafile_latlon)
-    clean_dir ? rm(DIR; recursive = true) : nothing
+    clean_dir && rm(DIR; recursive = true)
     return new_data, coords
 end
 

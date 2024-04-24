@@ -39,7 +39,7 @@ pid, nprocs = ClimaComms.init(comms_ctx)
         @test parent(input_field) == parent(output_field)
 
         ClimaComms.barrier(comms_ctx)
-        ClimaComms.iamroot(comms_ctx) ? rm(REGRID_DIR; recursive = true, force = true) : nothing
+        ClimaComms.iamroot(comms_ctx) && rm(REGRID_DIR; recursive = true, force = true)
         ClimaComms.barrier(comms_ctx)
     end
 end

@@ -28,18 +28,17 @@ for FT in (Float32, Float64)
             ),
             t = FT(0),
         )
-        integrator_copy = deepcopy(integrator)
         sim = BucketSimulation(nothing, nothing, nothing, integrator, nothing)
 
         # make fields non-constant to check the impact of the dss step
-        for i in eachindex(parent(sim.integrator.u.state_field_2d))
-            parent(sim.integrator.u.state_field_2d)[i] = sin(i)
-        end
-        for i in eachindex(parent(sim.integrator.u.state_field_3d))
-            parent(sim.integrator.u.state_field_3d)[i] = sin(i)
-        end
+        coords_lat = CC.Fields.coordinate_field(sim.integrator.u.state_field_2d).lat
+        @. sim.integrator.u.state_field_2d = sin(coords_lat)
+
+        coords_lat = CC.Fields.coordinate_field(sim.integrator.u.state_field_3d).lat
+        @. sim.integrator.u.state_field_3d = sin(coords_lat)
 
         # apply DSS
+        integrator_copy = deepcopy(integrator)
         dss_state!(sim)
 
         # test that uniform field and cache are unchanged, non-constant is changed

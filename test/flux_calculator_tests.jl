@@ -1,6 +1,7 @@
 import Test: @test, @testset, @test_throws
 import StaticArrays
 import ClimaCore as CC
+import ClimaParams
 import Thermodynamics as TD
 import Thermodynamics.Parameters.ThermodynamicsParameters
 import SurfaceFluxes.Parameters.SurfaceFluxesParameters
@@ -149,7 +150,7 @@ for FT in (Float32, Float64)
         for (i, t) in enumerate(flux_types)
             sim.cache.flux .= FT(0)
             FluxCalculator.combined_turbulent_fluxes!(model_sims, coupler_fields, t)
-            @test parent(sim.cache.flux)[1] ≈ results[i]
+            @test Array(parent(sim.cache.flux))[1] ≈ results[i]
         end
         sim2 = DummySimulation2((; cache = (; flux = zeros(boundary_space))))
         model_sims = (; atmos_sim = sim2)
@@ -270,7 +271,7 @@ for FT in (Float32, Float64)
                 @test parent(fields.F_turb_energy[colidx]) == -parent(atmos_sim.integrator.p.energy_bc[colidx])
 
             end
-            @test parent(fields.F_turb_moisture)[1] ≈ FT(0)
+            @test Array(parent(fields.F_turb_moisture))[1] ≈ FT(0)
         end
     end
 

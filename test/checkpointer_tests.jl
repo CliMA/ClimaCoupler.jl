@@ -20,9 +20,9 @@ Checkpointer.get_model_prog_state(sim::DummySimulation) = sim.state
 end
 
 @testset "checkpoint_model_state, restart_model_state!" begin
-    boundary_space = TestHelper.create_space(FT)
-    t = 1
     comms_ctx = ClimaComms.context(ClimaComms.CPUSingleThreaded())
+    boundary_space = TestHelper.create_space(FT; comms_ctx = comms_ctx)
+    t = 1
     # old sim run
     sim = DummySimulation(CC.Fields.FieldVector(T = ones(boundary_space)))
     Checkpointer.checkpoint_model_state(sim, comms_ctx, t, output_dir = "test_checkpoint")

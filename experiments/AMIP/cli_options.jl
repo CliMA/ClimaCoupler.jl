@@ -78,6 +78,10 @@ function argparse_settings()
         help = "Device type to use [`auto` (default) `CPUSingleThreaded`, `CPUMultiThreaded`, `CUDADevice`]"
         arg_type = String
         default = "auto"
+        "--use_coupler_diagnostics"
+        help = "Boolean flag indicating whether to compute and output coupler diagnostics [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
         # ClimaAtmos specific
         "--surface_setup"
         help = "Triggers ClimaAtmos into the coupled mode [`PrescribedSurface` (default)]" # retained here for standalone Atmos benchmarks

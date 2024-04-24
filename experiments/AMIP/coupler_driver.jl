@@ -129,6 +129,7 @@ restart_dir = config_dict["restart_dir"]
 restart_t = Int(config_dict["restart_t"])
 evolving_ocean = config_dict["evolving_ocean"]
 dt_rad = config_dict["dt_rad"]
+use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
 
 #=
 ## Setup Communication Context
@@ -470,27 +471,39 @@ User can write custom diagnostics in the `user_diagnostics.jl`.
 Note, this will be replaced by the diagnostics framework currently in ClimaAtmos, once it is abstracted
 into a more general package, so we can use it to save fields from surface models.
 =#
+if use_coupler_diagnostics
+    monthly_3d_diags = Diagnostics.init_diagnostics(
+        (:T, :u, :q_tot, :q_liq_ice),
+        atmos_sim.domain.center_space;
+        save = TimeManager.Monthly(),
+        operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
+        output_dir = COUPLER_OUTPUT_DIR,
+        name_tag = "monthly_mean_3d_",
+    )
 
-monthly_3d_diags = Diagnostics.init_diagnostics(
-    (:T, :u, :q_tot, :q_liq_ice),
-    atmos_sim.domain.center_space;
-    save = TimeManager.Monthly(),
-    operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
-    output_dir = dir_paths.output,
-    name_tag = "monthly_mean_3d_",
-)
+    monthly_3d_diags = Diagnostics.init_diagnostics(
+        (:T, :u, :q_tot, :q_liq_ice),
+        atmos_sim.domain.center_space;
+        save = TimeManager.Monthly(),
+        operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
+        output_dir = dir_paths.output,
+        name_tag = "monthly_mean_3d_",
+    )
 
-monthly_2d_diags = Diagnostics.init_diagnostics(
-    (:precipitation_rate, :toa_fluxes, :T_sfc, :tubulent_energy_fluxes),
-    boundary_space;
-    save = TimeManager.Monthly(),
-    operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
-    output_dir = dir_paths.output,
-    name_tag = "monthly_mean_2d_",
-)
+    monthly_2d_diags = Diagnostics.init_diagnostics(
+        (:precipitation_rate, :toa_fluxes, :T_sfc, :tubulent_energy_fluxes),
+        boundary_space;
+        save = TimeManager.Monthly(),
+        operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
+        output_dir = dir_paths.output,
+        name_tag = "monthly_mean_2d_",
+    )
 
-diagnostics = (monthly_3d_diags, monthly_2d_diags)
-Utilities.show_memory_usage(comms_ctx)
+    diagnostics = (monthly_3d_diags, monthly_2d_diags)
+    Utilities.show_memory_usage(comms_ctx)
+else
+    diagnostics = ()
+end
 
 #=
 ## Initialize Conservation Checks
@@ -713,13 +726,14 @@ function solve_coupler!(cs)
             CO2_current = BCReader.interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.CO2_info)
             Interfacer.update_field!(atmos_sim, Val(:co2), CO2_current)
 
-            ## calculate and accumulate diagnostics at each timestep
-            ClimaComms.barrier(comms_ctx)
-            Diagnostics.accumulate_diagnostics!(cs)
+            ## calculate and accumulate diagnostics at each timestep, if we're using diagnostics in this run
+            if !isempty(cs.diagnostics)
+                ClimaComms.barrier(comms_ctx)
+                Diagnostics.accumulate_diagnostics!(cs)
 
-            ## save and reset monthly averages
-            Diagnostics.save_diagnostics(cs)
-
+                ## save and reset monthly averages
+                Diagnostics.save_diagnostics(cs)
+            end
         end
 
         ## compute global energy
@@ -842,9 +856,8 @@ if ClimaComms.iamroot(comms_ctx)
     end
 
     ## plotting AMIP results
-    if cs.mode.name == "amip"
+    if cs.mode.name == "amip" && !isempty(cs.diagnostics)
         ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
-
         @info "AMIP plots"
 
         ## ClimaESM

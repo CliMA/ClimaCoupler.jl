@@ -3,12 +3,6 @@
 redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(false)))
 
 #=
-## Configuration initialization
-Here we import standard Julia packages, ClimaESM packages, parse in command-line arguments (if none are specified then the defaults in `cli_options.jl` apply).
-We then specify the input data file names. If these are not already downloaded, include `artifacts/download_artifacts.jl`.
-=#
-
-#=
 ### Package Import
 =#
 
@@ -59,12 +53,13 @@ include("user_io/user_diagnostics.jl")
 include("user_io/user_logging.jl")
 
 include("driver_utils.jl")
-#=
-### Configuration Dictionaries
-Each simulation mode has its own configuration dictionary. The `config_dict` of each simulation is a merge of the default configuration
-dictionary and the simulation-specific configuration dictionary, which allows the user to override the default settings.
 
-We can additionally pass the configuration dictionary to the component model initializers, which will then override the default settings of the component models.
+#=
+### Setup simulation parameters
+
+Here we follow ClimaCore's dry Held-Suarez example:
+https://github.com/CliMA/ClimaCore.jl/blob/d352572f589185487c484e103886669877b901d6/examples/hybrid/sphere/held_suarez_rhoe.jl#L26
+
 =#
 
 ## run names
@@ -119,47 +114,15 @@ config_dict = Dict(
     "forcing" => "held_suarez",
 )
 
-
-
-# 621 - toml/sphere_held_suarez_rhoe_equilmoist_hightop_sponge.toml, except that dry
-
-
-# https://github.com/CliMA/ClimaCore.jl/blob/d352572f589185487c484e103886669877b901d6/examples/hybrid/sphere/held_suarez_rhoe.jl#L26
 # except default hyperdiff CC.spaces.node_horizontal_length_scale()
-
-
-#_____
-# Alternative
-# dt_save_state_to_disk: "10days"
-# dt: "150secs"
-# t_end: "300days"
-# h_elem: 16
-# z_elem: 63
-# dz_bottom: 30.0
-# dz_top: 3000.0
-# z_max: 55000.0
-# vert_diff: "true"
-# moist: "equil"
-# precip_model: "0M"
-# rayleigh_sponge: true
-# forcing: "held_suarez"
-# job_id: "longrun_hs_rhoe_equil_55km_nz63_0M"
-# toml: [toml/longrun_hs_rhoe_equil_55km_nz63_0M.toml]
-
-# cirrently
-#precip_model: "0M"
-#moist: "equil"
-# toml: [toml/sphere_held_suarez_rhoe_equilmoist_hightop_sponge.toml]
-
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
 ## (if there are common keys, the last dictorionary in the `merge` arguments takes precedence)
 config_dict_atmos = get_atmos_config_dict(config_dict)
 config_dict = merge(config_dict_atmos, config_dict)
 atmos_config_object = CA.AtmosConfig(config_dict_atmos)
-# By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
 
-# overriding parameter values
+# overriding toml parameter values
 atmos_config_object.toml_dict["zd_viscous"]["value"] = 30000.0
 atmos_config_object.toml_dict["zd_rayleigh"]["value"] = 30000.0
 
@@ -255,32 +218,7 @@ model_sims = (atmos_sim = atmos_sim,);
 date0 = date = DateTime(start_date, dateformat"yyyymmdd")
 dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)], new_month = [false])
 
-#=
-### Online Diagnostics
-User can write custom diagnostics in the `user_diagnostics.jl`.
-Note, this will be replaced by the diagnostics framework currently in ClimaAtmos, once it is abstracted
-into a more general package, so we can use it to save fields from surface models.
-=#
 
-# monthly_3d_diags = init_diagnostics(
-#     (:T, :u, :q_tot, :q_liq_ice),
-#     atmos_sim.domain.center_space;
-#     save = Monthly(),
-#     operations = (; accumulate = TimeMean([Int(0)])),
-#     output_dir = dir_paths.output,
-#     name_tag = "monthly_mean_3d_",
-# )
-
-# monthly_2d_diags = init_diagnostics(
-#     (:precipitation_rate,),
-#     boundary_space;
-#     save = Monthly(),
-#     operations = (; accumulate = TimeMean([Int(0)])),
-#     output_dir = dir_paths.output,
-#     name_tag = "monthly_mean_2d_",
-# )
-
-diagnostics = ()
 
 #=
 ## Initialize Callbacks
@@ -304,6 +242,8 @@ update_firstdayofmonth!_cb =
 callbacks =
     (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb)
 
+coupler_online_diagnostics = ()
+
 cs = CoupledSimulation{FT}(
     comms_ctx,
     dates,
@@ -317,7 +257,7 @@ cs = CoupledSimulation{FT}(
     (; land = land_fraction, ocean = zeros(boundary_space), ice = zeros(boundary_space)),
     model_sims,
     (;), # mode_specifics
-    diagnostics,
+    coupler_online_diagnostics,
     callbacks,
     dir_paths,
     nothing, # turbulent_fluxes

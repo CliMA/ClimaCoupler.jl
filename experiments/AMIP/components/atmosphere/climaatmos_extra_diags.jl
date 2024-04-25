@@ -117,7 +117,7 @@ CAD.add_diagnostic_variable!(
         thermo_params = CAP.thermodynamics_params(cache.params)
         ᶜts = cache.precomputed.ᶜts
         θ_virt = TD.virtual_pottemp.(thermo_params, ᶜts)
-        dθ_virtdz = @. ᶜgradᵥ_.(ᶠinterp_(θ_virt))
+        dθ_virtdz = @. ClimaCore.Geometry.WVector.(ᶜgradᵥ_.(ᶠinterp_(θ_virt))).components.data.:1
         temp = cache.scratch.ᶜtemp_scalar
         parent(temp) .= parent(CAP.grav(cache.params) ./ θ_virt .* dθ_virtdz)
         if isnothing(out)
@@ -163,13 +163,13 @@ CAD.add_diagnostic_variable!(
         θ_virt = TD.virtual_pottemp.(thermo_params, ᶜts)
         dθ_virtdz = @. ᶜgradᵥ_.(ᶠinterp_(θ_virt))
         N = cache.scratch.ᶜtemp_scalar
-        Nsq = CAP.grav(cache.params) ./ θ_virt .* ClimaCore.Geometry.WVector.(dθ_virtdz)
+        Nsq = CAP.grav(cache.params) ./ θ_virt .* ClimaCore.Geometry.WVector.(dθ_virtdz).components.data.:1
         mask = parent(Nsq) .> 0
         parent(N) .= sqrt.((parent(Nsq) .* mask ))
 
         Ω = CAP.Omega(cache.params)
         φ = ClimaCore.Fields.coordinate_field(N).lat
-        f = 2Ω .* sin.(φ)
+        f = 2Ω .* sind.(φ)
         u = ClimaCore.Geometry.UVVector.(state.c.uₕ).components.data.:1
         grad_u = @. ᶜgradᵥ_.(ᶠinterp_(u))
         du_dz = ClimaCore.Geometry.WVector.(grad_u)

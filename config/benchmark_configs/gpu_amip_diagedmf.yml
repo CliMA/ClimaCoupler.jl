@@ -1,6 +1,7 @@
 FLOAT_TYPE: "Float32"
 anim: false
-atmos_config_file: "config/gpu_configs/gpu_aquaplanet_diagedmf.yml"
+atmos_config_file: "config/benchmark_configs/gpu_climaatmos_diagedmf.yml"
+atmos_config_repo: "ClimaCoupler"
 dt_cpl: 120
 dt_save_state_to_disk: "Inf"
 dt_save_to_sol: "Inf"

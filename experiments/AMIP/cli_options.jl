@@ -93,6 +93,10 @@ function argparse_settings()
         help = "Type of albedo model. [`ConstantAlbedo` (default), `RegressionFunctionAlbedo`, `CouplerAlbedo`]"
         arg_type = String
         default = "CouplerAlbedo"
+        "--atmos_config_repo"
+        help = "The repository containing the ClimaAtmos configuration file to use [`ClimaAtmos` (default), `ClimaCoupler`]"
+        arg_type = String
+        default = "ClimaAtmos"
         # ClimaLand specific
         "--land_albedo_type"
         help = "Access land surface albedo information from data file. [`function`, `map_static`, `map_temporal`]"

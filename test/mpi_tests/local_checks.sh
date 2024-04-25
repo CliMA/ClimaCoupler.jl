@@ -29,7 +29,7 @@ julia --project=artifacts -e 'using Pkg; Pkg.precompile()'
 julia --project=artifacts -e 'using Pkg; Pkg.status()'
 julia --project=artifacts artifacts/download_artifacts.jl
 
-srun -K julia --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_FILE
+srun -K julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_FILE
 
 # restart from simulation time of 400 seconds
 export RESTART_T=400
@@ -40,7 +40,7 @@ cp $CONFIG_FILE $RESTART_CONFIG_FILE
 sed -i 's/t_end: \"800secs\"/t_end: \"3600secs\"/g' $RESTART_CONFIG_FILE
 
 # rerun the model
-srun -K julia --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $RESTART_CONFIG_FILE --restart_dir $RESTART_DIR --restart_t $RESTART_T
+srun -K julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $RESTART_CONFIG_FILE --restart_dir $RESTART_DIR --restart_t $RESTART_T
 
 # throw an error if no restart checkpoint files are found
 if [ $(ls -1 $RESTART_DIR/checkpoint | wc -l) -lt 5 ]; then

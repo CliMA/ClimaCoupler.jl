@@ -23,7 +23,7 @@ Interfacer.name(::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
 
 function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
-    atmos_config_dict["surface_albedo"] = "CouplerAlbedo"
+    atmos_config_dict["albedo_model"] = "CouplerAlbedo"
     atmos_config = CA.AtmosConfig(atmos_config_dict)
     simulation = CA.get_simulation(atmos_config)
     (; integrator) = simulation

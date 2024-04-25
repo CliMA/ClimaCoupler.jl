@@ -16,6 +16,7 @@ land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
 netcdf_output_at_levels: true
+output_default_diagnostics: true
 run_name: "gpu_amip_target_topo_diagedmf"
 start_date: "19790301"
 surface_setup: "PrescribedSurface"

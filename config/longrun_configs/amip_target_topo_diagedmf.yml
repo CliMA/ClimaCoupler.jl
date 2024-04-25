@@ -1,5 +1,5 @@
 FLOAT_TYPE: "Float32"
-anim: true
+anim: false
 apply_limiter: false
 atmos_config_file: "config/gpu_configs/gpu_aquaplanet_diagedmf.yml"
 dt: "100secs"
@@ -16,6 +16,7 @@ land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
 netcdf_output_at_levels: true
+output_default_diagnostics: true
 run_name: "amip_target_topo_diagedmf"
 start_date: "19790301"
 surface_setup: "PrescribedSurface"
@@ -23,3 +24,4 @@ t_end: "40days"
 topo_smoothing: true
 topography: "Earth"
 turb_flux_partition: "CombinedStateFluxes"
+use_reference_state: false

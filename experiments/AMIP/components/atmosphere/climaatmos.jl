@@ -71,7 +71,7 @@ end
 function CA.set_surface_albedo!(Y, p, t, ::CA.CouplerAlbedo)
     if t == 0
         # set initial insolation initial conditions
-        CA.set_insolation_variables!(sim.integrator.u, sim.integrator.p, sim.integrator.t)
+        CA.set_insolation_variables!(Y, p, t)
         # set surface albedo to 1.0
         p.radiation.radiation_model.direct_sw_surface_albedo .= 1
         p.radiation.radiation_model.diffuse_sw_surface_albedo .= 1

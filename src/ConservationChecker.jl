@@ -277,6 +277,7 @@ function plot_global_conservation(
 
     # check that the relative error is small (TODO: reduce this to sqrt(eps(FT)))
     if !softfail
+        @show rse[end]
         @assert rse[end] < 2e-3
     end
 end

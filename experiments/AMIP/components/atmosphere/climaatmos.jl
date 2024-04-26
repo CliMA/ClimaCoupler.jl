@@ -74,6 +74,7 @@ function CA.set_surface_albedo!(Y, p, t, ::CA.CouplerAlbedo)
         # set initial insolation initial conditions
         !p.radiation.idealized_insolation && CA.set_insolation_variables!(Y, p, t)
         # set surface albedo to 1.0
+        @warn "Setting surface albedo to 0.38 at the beginning of the simulation"
         p.radiation.radiation_model.direct_sw_surface_albedo .= FT(0.38)
         p.radiation.radiation_model.diffuse_sw_surface_albedo .= FT(0.38)
     else
@@ -184,11 +185,11 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temp
 end
 
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_direct_albedo}, field)
-    sim.integrator.p.radiation.radiation_model.direct_sw_surface_albedo .= CA.RRTMGPI.field2array(field)'
+    sim.integrator.p.radiation.radiation_model.direct_sw_surface_albedo .= reshape(CA.RRTMGPI.field2array(field), 1, length(parent(field))) #CA.RRTMGPI.field2array(field)'
 end
 
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_diffuse_albedo}, field)
-    sim.integrator.p.radiation.radiation_model.diffuse_sw_surface_albedo .= CA.RRTMGPI.field2array(field)'
+    sim.integrator.p.radiation.radiation_model.diffuse_sw_surface_albedo .= reshape(CA.RRTMGPI.field2array(field), 1, length(parent(field))) #CA.RRTMGPI.field2array(field)'
 end
 
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fluxes}, fields)

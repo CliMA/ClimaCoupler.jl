@@ -59,18 +59,25 @@ function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
 
     sim = ClimaAtmosSimulation(integrator.p.params, Y, spaces, integrator)
 
-    # set initial insolation initial conditions
-    # CA.set_insolation_variables!(sim.integrator.u, sim.integrator.p, sim.integrator.t)
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)
 
-    (; direct_sw_surface_albedo, diffuse_sw_surface_albedo) =
-    sim.integrator.p.radiation.radiation_model
-    @. direct_sw_surface_albedo = FT(0.38)
-    diffuse_sw_surface_albedo = FT(0.38)
-
     return sim
+end
+
+# Extension of CA.set_surface_albedo! to set the surface albedo to 1.0 at the beginning of the simulation,
+# so the initial callback initialization doesn't lead to NaNs in the radiation model.
+function CA.set_surface_albedo!(Y, p, t, ::CA.CouplerAlbedo)
+    if t == 0
+        # set initial insolation initial conditions
+        CA.set_insolation_variables!(sim.integrator.u, sim.integrator.p, sim.integrator.t)
+        # set surface albedo to 1.0
+        p.radiation.radiation_model.direct_sw_surface_albedo .= 1
+        p.radiation.radiation_model.diffuse_sw_surface_albedo .= 1
+    else
+        nothing
+    end
 end
 
 """
@@ -216,10 +223,11 @@ Interfacer.reinit!(sim::ClimaAtmosSimulation) = Interfacer.reinit!(sim.integrato
 
 function FieldExchanger.update_sim!(atmos_sim::ClimaAtmosSimulation, csf, turbulent_fluxes)
 
+    CA.set_insolation_variables!(atmos_sim.integrator.u, atmos_sim.integrator.p, atmos_sim.integrator.t)
+
     Interfacer.update_field!(atmos_sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
     Interfacer.update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
     Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf)
-
 
     if turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
         Interfacer.update_field!(atmos_sim, Val(:turbulent_fluxes), csf)
@@ -413,8 +421,6 @@ function FluxCalculator.water_albedo_from_atmosphere!(
     λ = FT(0) # spectral wavelength (not used for now)
 
     # update for current zenith angle
-    # CA.set_insolation_variables!(Y, p, t)
-
     bottom_coords = CC.Fields.coordinate_field(CC.Spaces.level(Y.c, 1))
     μ = CA.RRTMGPI.array2field(radiation_model.cos_zenith, axes(bottom_coords))
     FT = eltype(atmos_sim.integrator.u)

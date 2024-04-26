@@ -617,6 +617,7 @@ Regridder.update_surface_fractions!(cs)
 FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
 FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
 FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
+debug(cs, "Surface density initialized")
 
 # 3.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
 ## TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step! (#331)
@@ -648,16 +649,17 @@ elseif cs.turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
     atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
 end
 
+debug(cs, "Turbulent fluxes initialized")
 # 5.reinitialize models + radiative flux: prognostic states and time are set to their initial conditions. For atmos, this also triggers the callbacks and sets a nonzero radiation flux (given the new sfc_conditions)
 FieldExchanger.reinit_model_sims!(cs.model_sims)
-
+debug(cs, "Models reinitialized")
 # 6.update all fluxes: coupler re-imports updated atmos fluxes (radiative fluxes for both `turbulent_fluxes` types
 # and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxes`,
 # and sends them to the surface component models. If `turbulent_fluxes isa PartitionedStateFluxes`
 # atmos receives the turbulent fluxes from the coupler.
 FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
 FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
-
+debug(cs, "All fluxes initialized")
 #=
 ## Coupling Loop
 
@@ -717,6 +719,8 @@ function solve_coupler!(cs)
         ## compute global energy
         !isnothing(cs.conservation_checks) && ConservationChecker.check_conservation!(cs)
         ClimaComms.barrier(comms_ctx)
+
+        CA.set_insolation_variables!(atmos_sim.integrator.u, atmos_sim.integrator.p, atmos_sim.integrator.t)
 
         ## update water albedo from wind at dt_water_albedo (this will be extended to a radiation callback from the coupler)
         TimeManager.trigger_callback!(cs, cs.callbacks.water_albedo)

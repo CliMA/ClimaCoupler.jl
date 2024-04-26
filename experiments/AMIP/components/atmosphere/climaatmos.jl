@@ -71,7 +71,7 @@ end
 function CA.set_surface_albedo!(Y, p, t, ::CA.CouplerAlbedo)
     if t == 0
         # set initial insolation initial conditions
-        CA.set_insolation_variables!(Y, p, t)
+        !p.radiation.idealized_insolation && CA.set_insolation_variables!(Y, p, t)
         # set surface albedo to 1.0
         p.radiation.radiation_model.direct_sw_surface_albedo .= 1
         p.radiation.radiation_model.diffuse_sw_surface_albedo .= 1
@@ -223,7 +223,11 @@ Interfacer.reinit!(sim::ClimaAtmosSimulation) = Interfacer.reinit!(sim.integrato
 
 function FieldExchanger.update_sim!(atmos_sim::ClimaAtmosSimulation, csf, turbulent_fluxes)
 
-    CA.set_insolation_variables!(atmos_sim.integrator.u, atmos_sim.integrator.p, atmos_sim.integrator.t)
+    u = atmos_sim.integrator.u
+    p = atmos_sim.integrator.p
+    t = atmos_sim.integrator.t
+
+    !p.radiation.idealized_insolation && CA.set_insolation_variables!(u, p, t)
 
     Interfacer.update_field!(atmos_sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
     Interfacer.update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)

@@ -77,6 +77,7 @@ include("components/ocean/eisenman_seaice.jl")
 ## helpers for user-specified IO
 include("user_io/user_diagnostics.jl")
 include("user_io/user_logging.jl")
+include("user_io/debug_plots.jl")
 
 #=
 ### Configuration Dictionaries
@@ -92,7 +93,6 @@ parsed_args = parse_commandline(argparse_settings())
 
 ## modify parsed args for fast testing from REPL #hide
 if isinteractive()
-    include("user_io/debug_plots.jl")
     parsed_args["config_file"] =
         isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/model_configs/interactive_debug.yml") :
         parsed_args["config_file"]

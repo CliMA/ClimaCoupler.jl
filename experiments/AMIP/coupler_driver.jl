@@ -893,12 +893,12 @@ if ClimaComms.iamroot(comms_ctx)
         make_plots(Val(:general_ci_plots), [joinpath(COUPLER_OUTPUT_DIR, "clima_atmos")], COUPLER_ARTIFACTS_DIR)
     end
 
+    ## plot all model states and coupler fields (useful for debugging)
+    debug(cs, COUPLER_ARTIFACTS_DIR)
+
     if isinteractive()
         ## clean up for interactive runs, retain all output otherwise
         rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
-
-        ## plot all model states and coupler fields (useful for debugging)
-        debug(cs)
     end
 
 end

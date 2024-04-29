@@ -587,6 +587,8 @@ cs = Interfacer.CoupledSimulation{FT}(
     thermo_params,
 );
 
+debug(cs, joinpath(COUPLER_ARTIFACTS_DIR,"init"))
+
 #=
 ## Restart component model states if specified
 If a restart directory is specified and contains output files from the `checkpoint_cb` callback, the component model states are restarted from those files. The restart directory
@@ -894,7 +896,7 @@ if ClimaComms.iamroot(comms_ctx)
     end
 
     ## plot all model states and coupler fields (useful for debugging)
-    debug(cs, COUPLER_ARTIFACTS_DIR)
+    debug(cs, joinpath(COUPLER_ARTIFACTS_DIR, "end"))
 
     if isinteractive()
         ## clean up for interactive runs, retain all output otherwise

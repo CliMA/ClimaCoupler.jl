@@ -1,8 +1,7 @@
 using Plots
 using ClimaCorePlots
 using Printf
-using ClimaCoupler.Interfacer: ComponentModelSimulation, SurfaceModelSimulation
-using ClimaCoupler: TestHelper
+using ClimaCoupler: TestHelper, Interfacer
 using ClimaCore
 
 # plotting functions for the coupled simulation
@@ -11,7 +10,7 @@ using ClimaCore
 
 Plot the fields of a coupled simulation and save plots to a directory.
 """
-function debug(cs::CoupledSimulation, dir = "debug", cs_fields_ref = nothing)
+function debug(cs::Interfacer.CoupledSimulation, dir = "debug", cs_fields_ref = nothing)
     mkpath(dir)
     # @info "plotting debug in " * dir
     for sim in cs.model_sims
@@ -30,17 +29,22 @@ plot the anomalies of the fields with respect to `cs_fields_ref`.
 """
 function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
     field_names = (
-        :surface_albedo,
-        :F_radiative,
-        :F_turb_energy,
-        :F_turb_moisture,
-        :P_liq,
         :T_S,
+        :z0m_S,
+        :z0b_S,
         :ρ_sfc,
         :q_sfc,
+        :surface_direct_albedo,
+        :surface_diffuse_albedo,
         :beta,
-        :z0b_S,
-        :z0m_S,
+        :F_turb_energy,
+        :F_turb_moisture,
+        :F_turb_ρτxz,
+        :F_turb_ρτyz,
+        :F_radiative,
+        :P_liq,
+        :P_snow,
+        :radiative_energy_flux_toa,
     )
     all_plots = []
     cpu_comms_ctx = ClimaComms.SingletonCommsContext(ClimaComms.CPUSingleThreaded())
@@ -50,11 +54,11 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
 
         # Copy field onto cpu space
         space = axes(field)
-        FT = ClimaCore.Spaces.undertype(space)
+        FT = CC.Spaces.undertype(space)
         R = get_R(space.grid)
         ne = get_ne(space.grid)
-        polynomial_degree = ClimaCore.Quadratures.polynomial_degree(ClimaCore.Spaces.quadrature_style(space.grid))
-        nz = ClimaCore.Spaces.nlevels(space)
+        polynomial_degree = CC.Quadratures.polynomial_degree(CC.Spaces.quadrature_style(space.grid))
+        nz = CC.Spaces.nlevels(space)
         height = get_height(space.grid)
 
         cpu_space = TestHelper.create_space(
@@ -66,7 +70,7 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
             nz = nz,
             height = height,
         )
-        cpu_field = ClimaCore.Fields.ones(cpu_space)
+        cpu_field = CC.Fields.ones(cpu_space)
 
         parent(cpu_field) .= Array(parent(field))
 
@@ -106,47 +110,48 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
     end
 end
 
-function get_ne(grid::ClimaCore.Grids.SpectralElementGrid2D)
+function get_ne(grid::CC.Grids.SpectralElementGrid2D)
     return grid.topology.mesh.ne
 end
-function get_ne(grid::ClimaCore.Grids.LevelGrid)
+function get_ne(grid::CC.Grids.LevelGrid)
     return get_ne(grid.full_grid.horizontal_grid)
 end
-function get_ne(grid::ClimaCore.Grids.ExtrudedFiniteDifferenceGrid)
+function get_ne(grid::CC.Grids.ExtrudedFiniteDifferenceGrid)
     return get_ne(grid.horizontal_grid)
 end
 
-function get_height(grid::ClimaCore.Grids.ExtrudedFiniteDifferenceGrid)
+function get_height(grid::CC.Grids.ExtrudedFiniteDifferenceGrid)
     return grid.vertical_grid.topology.mesh.domain.coord_max.z
 end
 function get_height(grid)
     return nothing # 2d case
 end
 
-function get_R(grid)#::ClimaCore.Grids.SpectralElementGrid2D)
-    return ClimaCore.Grids.global_geometry(grid).radius
+function get_R(grid)#::CC.Grids.SpectralElementGrid2D)
+    return CC.Grids.global_geometry(grid).radius
 end
 """
     debug(sim::ComponentModelSimulation, dir)
 
 Plot the fields of a component model simulation and save plots to a directory.
 """
-function debug(sim::ComponentModelSimulation, dir)
+function debug(sim::Interfacer.ComponentModelSimulation, dir)
 
-    @show name(sim)
+    mkpath(dir)
+    @show Interfacer.name(sim)
     field_names = plot_field_names(sim)
     cpu_comms_ctx = ClimaComms.SingletonCommsContext(ClimaComms.CPUSingleThreaded())
 
     all_plots = []
     for field_name in field_names
-        field = get_field(sim, Val(field_name))
+        field = Interfacer.get_field(sim, Val(field_name))
         # Copy field onto cpu space
         space = axes(field)
-        FT = ClimaCore.Spaces.undertype(space)
+        FT = CC.Spaces.undertype(space)
         R = get_R(space.grid)
         ne = get_ne(space.grid)
-        polynomial_degree = ClimaCore.Quadratures.polynomial_degree(ClimaCore.Spaces.quadrature_style(space.grid))
-        nz = ClimaCore.Spaces.nlevels(space)
+        polynomial_degree = CC.Quadratures.polynomial_degree(CC.Spaces.quadrature_style(space.grid))
+        nz = CC.Spaces.nlevels(space)
         height = get_height(space.grid)
         cpu_space = TestHelper.create_space(
             FT,
@@ -157,22 +162,23 @@ function debug(sim::ComponentModelSimulation, dir)
             nz = nz,
             height = height,
         )
-        cpu_field = ClimaCore.Fields.ones(cpu_space)
+        cpu_field = CC.Fields.ones(cpu_space)
         parent(cpu_field) .= Array(parent(field))
 
         push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(field)))
     end
     fig = Plots.plot(all_plots..., size = (1500, 800))
-    Plots.png(dir * "debug_$(name(sim))")
+    sim_name = Interfacer.name(sim)
+    Plots.png(dir * "debug_$sim_name")
 
 end
 
 """
-    print_extrema(field::ClimaCore.Fields.Field)
+    print_extrema(field::CC.Fields.Field)
 
 Return the minimum and maximum values of a field as a string.
 """
-function print_extrema(field::ClimaCore.Fields.Field)
+function print_extrema(field::CC.Fields.Field)
     ext_vals = extrema(field)
     min = @sprintf("%.2E", ext_vals[1])
     max = @sprintf("%.2E", ext_vals[2])
@@ -182,21 +188,21 @@ end
 # below are additional fields specific to this experiment (ourside of the required coupler fields) that we are interested in plotting for debugging purposes
 
 # additional ClimaAtmos model debug fields
-function get_field(sim::ClimaAtmosSimulation, ::Val{:w})
-    w_c = ones(ClimaCore.Spaces.horizontal_space(sim.domain.face_space))
-    parent(w_c) .= parent(ClimaCore.Fields.level(ClimaCore.Geometry.WVector.(sim.integrator.u.f.u₃), 5 .+ half))
+function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:w})
+    w_c = ones(CC.Spaces.horizontal_space(sim.domain.face_space))
+    parent(w_c) .= parent(CC.Fields.level(CC.Geometry.WVector.(sim.integrator.u.f.u₃), 5 .+ CC.Utilities.half))
     return w_c
 end
-get_field(sim::ClimaAtmosSimulation, ::Val{:ρq_tot}) = sim.integrator.u.c.ρq_tot
-get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrator.u.c.ρe_tot
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρq_tot}) = sim.integrator.u.c.ρq_tot
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrator.u.c.ρe_tot
 
 # additional BucketSimulation debug fields
-get_field(sim::BucketSimulation, ::Val{:σS}) = sim.integrator.u.bucket.σS
-get_field(sim::BucketSimulation, ::Val{:Ws}) = sim.integrator.u.bucket.Ws
-get_field(sim::BucketSimulation, ::Val{:W}) = sim.integrator.u.bucket.W
+Interfacer.get_field(sim::BucketSimulation, ::Val{:σS}) = sim.integrator.u.bucket.σS
+Interfacer.get_field(sim::BucketSimulation, ::Val{:Ws}) = sim.integrator.u.bucket.Ws
+Interfacer.get_field(sim::BucketSimulation, ::Val{:W}) = sim.integrator.u.bucket.W
 
 # currently selected plot fields
-plot_field_names(sim::SurfaceModelSimulation) = (:area_fraction, :surface_temperature, :surface_humidity)
+plot_field_names(sim::Interfacer.SurfaceModelSimulation) = (:area_fraction, :surface_temperature, :surface_humidity)
 plot_field_names(sim::BucketSimulation) =
     (:area_fraction, :surface_temperature, :surface_humidity, :air_density, :σS, :Ws, :W)
 plot_field_names(sim::ClimaAtmosSimulation) = (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)

@@ -35,6 +35,7 @@ function create_space(
     ne = 4,
     polynomial_degree = 3,
     nz = 1,
+    height = FT(1e3),
 )
     domain = CC.Domains.SphereDomain(R)
     mesh = CC.Meshes.EquiangularCubedSphere(domain, ne)
@@ -52,11 +53,12 @@ function create_space(
     if nz > 1
         vertdomain = CC.Domains.IntervalDomain(
             CC.Geometry.ZPoint{FT}(0),
-            CC.Geometry.ZPoint{FT}(100);
+            CC.Geometry.ZPoint{FT}(height);
             boundary_names = (:bottom, :top),
         )
         vertmesh = CC.Meshes.IntervalMesh(vertdomain, nelems = nz)
-        vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(vertmesh)
+        vert_topology = CC.Topologies.IntervalTopology(comms_ctx, vertmesh)
+        vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(vert_topology)
         return CC.Spaces.ExtrudedFiniteDifferenceSpace(sphere_space, vert_center_space)
     else
         return sphere_space

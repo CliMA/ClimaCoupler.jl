@@ -20,7 +20,7 @@ output_default_diagnostics: true
 run_name: "gpu_amip_target_topo_diagedmf"
 start_date: "19790301"
 surface_setup: "PrescribedSurface"
-t_end: "250days"
+t_end: "70days"
 topo_smoothing: true
 topography: "Earth"
 turb_flux_partition: "CombinedStateFluxes"

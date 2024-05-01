@@ -590,7 +590,7 @@ cs = Interfacer.CoupledSimulation{FT}(
     thermo_params,
 );
 
-debug(cs, joinpath(COUPLER_ARTIFACTS_DIR,"init"))
+# debug(cs, joinpath(COUPLER_ARTIFACTS_DIR,"init"))
 
 #=
 ## Restart component model states if specified

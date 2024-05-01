@@ -465,25 +465,28 @@ Note, this will be replaced by the diagnostics framework currently in ClimaAtmos
 into a more general package, so we can use it to save fields from surface models.
 =#
 
-monthly_3d_diags = Diagnostics.init_diagnostics(
-    (:T, :u, :q_tot, :q_liq_ice),
-    atmos_sim.domain.center_space;
-    save = TimeManager.Monthly(),
-    operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
-    output_dir = COUPLER_OUTPUT_DIR,
-    name_tag = "monthly_mean_3d_",
-)
+# monthly_3d_diags = Diagnostics.init_diagnostics(
+#     (:T, :u, :q_tot, :q_liq_ice),
+#     atmos_sim.domain.center_space;
+#     save = TimeManager.Monthly(),
+#     operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
+#     output_dir = COUPLER_OUTPUT_DIR,
+#     name_tag = "monthly_mean_3d_",
+# )
 
-monthly_2d_diags = Diagnostics.init_diagnostics(
-    (:precipitation_rate, :toa_fluxes, :T_sfc, :tubulent_energy_fluxes),
-    boundary_space;
-    save = TimeManager.Monthly(),
-    operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
-    output_dir = COUPLER_OUTPUT_DIR,
-    name_tag = "monthly_mean_2d_",
-)
+# monthly_2d_diags = Diagnostics.init_diagnostics(
+#     (:precipitation_rate, :toa_fluxes, :T_sfc, :tubulent_energy_fluxes),
+#     boundary_space;
+#     save = TimeManager.Monthly(),
+#     operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
+#     output_dir = COUPLER_OUTPUT_DIR,
+#     name_tag = "monthly_mean_2d_",
+# )
 
-diagnostics = (monthly_3d_diags, monthly_2d_diags)
+# diagnostics = (monthly_3d_diags, monthly_2d_diags)
+
+
+diagnostics = ()
 
 #=
 ## Initialize Conservation Checks
@@ -707,12 +710,12 @@ function solve_coupler!(cs)
             CO2_current = BCReader.interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.CO2_info)
             Interfacer.update_field!(atmos_sim, Val(:co2), CO2_current)
 
-            ## calculate and accumulate diagnostics at each timestep
-            ClimaComms.barrier(comms_ctx)
-            Diagnostics.accumulate_diagnostics!(cs)
+            # ## calculate and accumulate diagnostics at each timestep
+            # ClimaComms.barrier(comms_ctx)
+            # Diagnostics.accumulate_diagnostics!(cs)
 
-            ## save and reset monthly averages
-            Diagnostics.save_diagnostics(cs)
+            # ## save and reset monthly averages
+            # Diagnostics.save_diagnostics(cs)
 
         end
 
@@ -805,88 +808,88 @@ if ClimaComms.iamroot(comms_ctx)
         plot_anim(cs, COUPLER_ARTIFACTS_DIR)
     end
 
-    ## plotting AMIP results
-    if cs.mode.name == "amip"
-        @info "AMIP plots"
+    # ## plotting AMIP results
+    # if cs.mode.name == "amip"
+    #     @info "AMIP plots"
 
-        ## ClimaESM
-        include("user_io/amip_visualizer.jl")
-        post_spec = (;
-            T = (:regrid, :zonal_mean),
-            u = (:regrid, :zonal_mean),
-            q_tot = (:regrid, :zonal_mean),
-            toa_fluxes = (:regrid, :horizontal_slice),
-            precipitation_rate = (:regrid, :horizontal_slice),
-            T_sfc = (:regrid, :horizontal_slice),
-            tubulent_energy_fluxes = (:regrid, :horizontal_slice),
-            q_liq_ice = (:regrid, :zonal_mean),
-        )
+    #     ## ClimaESM
+    #     include("user_io/amip_visualizer.jl")
+    #     post_spec = (;
+    #         T = (:regrid, :zonal_mean),
+    #         u = (:regrid, :zonal_mean),
+    #         q_tot = (:regrid, :zonal_mean),
+    #         toa_fluxes = (:regrid, :horizontal_slice),
+    #         precipitation_rate = (:regrid, :horizontal_slice),
+    #         T_sfc = (:regrid, :horizontal_slice),
+    #         tubulent_energy_fluxes = (:regrid, :horizontal_slice),
+    #         q_liq_ice = (:regrid, :zonal_mean),
+    #     )
 
-        plot_spec = (;
-            T = (; clims = (190, 320), units = "K"),
-            u = (; clims = (-50, 50), units = "m/s"),
-            q_tot = (; clims = (0, 30), units = "g/kg"),
-            toa_fluxes = (; clims = (-250, 250), units = "W/m^2"),
-            precipitation_rate = (clims = (0, 1e-4), units = "kg/m^2/s"),
-            T_sfc = (clims = (225, 310), units = "K"),
-            tubulent_energy_fluxes = (; clims = (-250, 250), units = "W/m^2"),
-            q_liq_ice = (; clims = (0, 10), units = "g/kg"),
-        )
-        amip_data, fig_amip = amip_paperplots(
-            post_spec,
-            plot_spec,
-            COUPLER_OUTPUT_DIR,
-            files_root = ".monthly",
-            output_dir = COUPLER_ARTIFACTS_DIR,
-        )
+    #     plot_spec = (;
+    #         T = (; clims = (190, 320), units = "K"),
+    #         u = (; clims = (-50, 50), units = "m/s"),
+    #         q_tot = (; clims = (0, 30), units = "g/kg"),
+    #         toa_fluxes = (; clims = (-250, 250), units = "W/m^2"),
+    #         precipitation_rate = (clims = (0, 1e-4), units = "kg/m^2/s"),
+    #         T_sfc = (clims = (225, 310), units = "K"),
+    #         tubulent_energy_fluxes = (; clims = (-250, 250), units = "W/m^2"),
+    #         q_liq_ice = (; clims = (0, 10), units = "g/kg"),
+    #     )
+    #     amip_data, fig_amip = amip_paperplots(
+    #         post_spec,
+    #         plot_spec,
+    #         COUPLER_OUTPUT_DIR,
+    #         files_root = ".monthly",
+    #         output_dir = COUPLER_ARTIFACTS_DIR,
+    #     )
 
-        ## NCEP reanalysis
-        @info "NCEP plots"
-        include("user_io/ncep_visualizer.jl")
-        ncep_post_spec = (;
-            T = (:zonal_mean,),
-            u = (:zonal_mean,),
-            q_tot = (:zonal_mean,),
-            toa_fluxes = (:horizontal_slice,),
-            precipitation_rate = (:horizontal_slice,),
-            T_sfc = (:horizontal_slice,),
-            tubulent_energy_fluxes = (:horizontal_slice,),
-        )
-        ncep_plot_spec = plot_spec
-        ncep_data, fig_ncep = ncep_paperplots(
-            ncep_post_spec,
-            ncep_plot_spec,
-            COUPLER_OUTPUT_DIR,
-            output_dir = COUPLER_ARTIFACTS_DIR,
-            month_date = cs.dates.date[1],
-        ) ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
+    #     ## NCEP reanalysis
+    #     @info "NCEP plots"
+    #     include("user_io/ncep_visualizer.jl")
+    #     ncep_post_spec = (;
+    #         T = (:zonal_mean,),
+    #         u = (:zonal_mean,),
+    #         q_tot = (:zonal_mean,),
+    #         toa_fluxes = (:horizontal_slice,),
+    #         precipitation_rate = (:horizontal_slice,),
+    #         T_sfc = (:horizontal_slice,),
+    #         tubulent_energy_fluxes = (:horizontal_slice,),
+    #     )
+    #     ncep_plot_spec = plot_spec
+    #     ncep_data, fig_ncep = ncep_paperplots(
+    #         ncep_post_spec,
+    #         ncep_plot_spec,
+    #         COUPLER_OUTPUT_DIR,
+    #         output_dir = COUPLER_ARTIFACTS_DIR,
+    #         month_date = cs.dates.date[1],
+    #     ) ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
 
-        ## combined plots
-        plot_combined = Plots.plot(fig_amip, fig_ncep, layout = (2, 1), size = (1400, 1800))
-        Plots.png(joinpath(COUPLER_ARTIFACTS_DIR, "amip_ncep.png"))
+    #     ## combined plots
+    #     plot_combined = Plots.plot(fig_amip, fig_ncep, layout = (2, 1), size = (1400, 1800))
+    #     Plots.png(joinpath(COUPLER_ARTIFACTS_DIR, "amip_ncep.png"))
 
-        ## Compare against observations
-        if t_end > 84600
-            @info "Error against observations"
-            output_dates = cs.dates.date0[] .+ Dates.Second.(atmos_sim.integrator.sol.t)
+    #     ## Compare against observations
+    #     if t_end > 84600
+    #         @info "Error against observations"
+    #         output_dates = cs.dates.date0[] .+ Dates.Second.(atmos_sim.integrator.sol.t)
 
-            include("user_io/leaderboard.jl")
-            compare_vars = ["pr"]
-            function plot_biases(dates, output_name)
-                output_path = joinpath(COUPLER_ARTIFACTS_DIR, "bias_$(output_name).png")
-                Leaderboard.plot_biases(atmos_sim.integrator.p.output_dir, compare_vars, dates; output_path)
-            end
-            plot_biases(output_dates, "total")
+    #         include("user_io/leaderboard.jl")
+    #         compare_vars = ["pr"]
+    #         function plot_biases(dates, output_name)
+    #             output_path = joinpath(COUPLER_ARTIFACTS_DIR, "bias_$(output_name).png")
+    #             Leaderboard.plot_biases(atmos_sim.integrator.p.output_dir, compare_vars, dates; output_path)
+    #         end
+    #         plot_biases(output_dates, "total")
 
-            ## collect all days between cs.dates.date0 and cs.dates.date
-            MAM, JJA, SON, DJF = Leaderboard.split_by_season(output_dates)
+    #         ## collect all days between cs.dates.date0 and cs.dates.date
+    #         MAM, JJA, SON, DJF = Leaderboard.split_by_season(output_dates)
 
-            !isempty(MAM) && plot_biases(MAM, "MAM")
-            !isempty(JJA) && plot_biases(JJA, "JJA")
-            !isempty(SON) && plot_biases(SON, "SON")
-            !isempty(DJF) && plot_biases(DJF, "DJF")
-        end
-    end
+    #         !isempty(MAM) && plot_biases(MAM, "MAM")
+    #         !isempty(JJA) && plot_biases(JJA, "JJA")
+    #         !isempty(SON) && plot_biases(SON, "SON")
+    #         !isempty(DJF) && plot_biases(DJF, "DJF")
+    #     end
+    # end
 
     ## ci plots
     if config_dict["ci_plots"]

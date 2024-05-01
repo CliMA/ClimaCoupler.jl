@@ -284,13 +284,17 @@ steps:
         key: "gpu_amip_target_topo_diagedmf"
         command:
           - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_amip_target_topo_diagedmf.yml"
+          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $CONFIG_PATH/gpu_amip_target_topo_diagedmf.yml"
         artifact_paths: "experiments/AMIP/output/amip/gpu_amip_target_topo_diagedmf_artifacts/*"
         timeout_in_minutes: 1440
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
         agents:
           queue: clima
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 4
           slurm_mem: 20GB
-          slurm_gpus: 1
           modules: common
         soft_fail: true
 

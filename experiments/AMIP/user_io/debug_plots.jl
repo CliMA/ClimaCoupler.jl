@@ -3,6 +3,7 @@ import Printf
 import ClimaCore as CC
 import ClimaCorePlots
 import ClimaCoupler: Interfacer
+import ClimaAtmos as CA
 
 # plotting functions for the coupled simulation
 """
@@ -96,7 +97,7 @@ end
 
 Return the minimum and maximum values of a field as a string.
 """
-function print_extrema(field::CC.Fields.Field)
+function print_extrema(field::Union{CC.Fields.Field, Vector})
     ext_vals = extrema(field)
     min = Printf.@sprintf("%.2E", ext_vals[1])
     max = Printf.@sprintf("%.2E", ext_vals[2])
@@ -111,7 +112,10 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:w})
     parent(w_c) .= parent(CC.Fields.level(CC.Geometry.WVector.(sim.integrator.u.f.u₃), 5 .+ CC.Utilities.half))
     return w_c
 end
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρq_tot}) = sim.integrator.u.c.ρq_tot
+specific_humidity(::CA.DryModel, integrator) = [eltype(integrator.u)(0)]
+specific_humidity(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) = integrator.u.c.ρq_tot
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρq_tot}) =
+    specific_humidity(sim.integrator.p.atmos.moisture_model, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrator.u.c.ρe_tot
 
 # additional BucketSimulation debug fields

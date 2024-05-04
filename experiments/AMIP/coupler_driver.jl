@@ -78,6 +78,7 @@ include("components/ocean/eisenman_seaice.jl")
 include("user_io/user_diagnostics.jl")
 include("user_io/user_logging.jl")
 include("user_io/debug_plots.jl")
+include("user_io/io_helpers.jl")
 
 #=
 ### Configuration Dictionaries
@@ -103,7 +104,7 @@ config_dict = YAML.load_file(parsed_args["config_file"])
 config_dict = merge(parsed_args, config_dict)
 
 ## get component model dictionaries (if applicable)
-config_dict_atmos = get_atmos_config(config_dict)
+config_dict_atmos = get_atmos_config_dict(config_dict)
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
 ## (if there are common keys, the last dictionary in the `merge` arguments takes precedence)
@@ -140,24 +141,17 @@ ClimaComms.init(comms_ctx)
 
 #=
 ### I/O Directory Setup
-`COUPLER_OUTPUT_DIR` is the directory where the output of the simulation will be saved, and `COUPLER_ARTIFACTS_DIR` is the directory where
-the plots (from postprocessing and the conservation checks) of the simulation will be saved. `REGRID_DIR` is the directory where the regridding
+`setup_output_dirs` returns `dir_paths.output = COUPLER_OUTPUT_DIR`, which is the directory where the output of the simulation will be saved, and `dir_paths.artifacts` is the directory where
+the plots (from postprocessing and the conservation checks) of the simulation will be saved. `dir_paths.regrid` is the directory where the regridding
 temporary files will be saved.
 =#
 
 COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], joinpath(mode_name, run_name))
-mkpath(COUPLER_OUTPUT_DIR)
+dir_paths = setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
 
-REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp/")
-mkpath(REGRID_DIR)
-
-COUPLER_ARTIFACTS_DIR = COUPLER_OUTPUT_DIR * "_artifacts"
-isdir(COUPLER_ARTIFACTS_DIR) ? nothing : mkpath(COUPLER_ARTIFACTS_DIR)
-
-dir_paths = (; output = COUPLER_OUTPUT_DIR, artifacts = COUPLER_ARTIFACTS_DIR)
 
 if ClimaComms.iamroot(comms_ctx)
-    @info(COUPLER_OUTPUT_DIR)
+    @info(dir_paths.output)
     config_dict["print_config_dict"] && @info(config_dict)
 end
 
@@ -168,9 +162,9 @@ original sources.
 =#
 
 include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
-sst_data = artifact_data(sst_dataset_path(), "sst", REGRID_DIR, date0, t_start, t_end, comms_ctx)
-sic_data = artifact_data(sic_dataset_path(), "sic", REGRID_DIR, date0, t_start, t_end, comms_ctx)
-co2_data = artifact_data(co2_dataset_path(), "mauna_loa_co2", REGRID_DIR, date0, t_start, t_end, comms_ctx)
+sst_data = artifact_data(sst_dataset_path(), "sst", dir_paths.regrid, date0, t_start, t_end, comms_ctx)
+sic_data = artifact_data(sic_dataset_path(), "sic", dir_paths.regrid, date0, t_start, t_end, comms_ctx)
+co2_data = artifact_data(co2_dataset_path(), "mauna_loa_co2", dir_paths.regrid, date0, t_start, t_end, comms_ctx)
 land_mask_data = artifact_data(mask_dataset_path(), "seamask")
 
 #=
@@ -208,7 +202,7 @@ land_area_fraction =
     FT.(
         Regridder.land_fraction(
             FT,
-            REGRID_DIR,
+            dir_paths.regrid,
             comms_ctx,
             land_mask_data,
             "LSMASK",
@@ -242,7 +236,7 @@ if mode_name == "amip"
         config_dict["land_domain_type"],
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
-        REGRID_DIR;
+        dir_paths.regrid;
         dt = Δt_cpl,
         space = boundary_space,
         saveat = saveat,
@@ -254,7 +248,7 @@ if mode_name == "amip"
     ## ocean stub
     SST_info = BCReader.bcfile_info_init(
         FT,
-        REGRID_DIR,
+        dir_paths.regrid,
         sst_data,
         "SST",
         boundary_space,
@@ -284,7 +278,7 @@ if mode_name == "amip"
     ## sea ice model
     SIC_info = BCReader.bcfile_info_init(
         FT,
-        REGRID_DIR,
+        dir_paths.regrid,
         sic_data,
         "SEAICE",
         boundary_space,
@@ -311,7 +305,7 @@ if mode_name == "amip"
     ## CO2 concentration from temporally varying file
     CO2_info = BCReader.bcfile_info_init(
         FT,
-        REGRID_DIR,
+        dir_paths.regrid,
         co2_data,
         "co2",
         boundary_space,
@@ -341,7 +335,7 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         config_dict["land_domain_type"],
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
-        REGRID_DIR;
+        dir_paths.regrid;
         dt = Δt_cpl,
         space = boundary_space,
         saveat = saveat,
@@ -387,7 +381,7 @@ elseif mode_name == "slabplanet_eisenman"
         config_dict["land_domain_type"],
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
-        REGRID_DIR;
+        dir_paths.regrid;
         dt = Δt_cpl,
         space = boundary_space,
         saveat = saveat,
@@ -470,7 +464,7 @@ monthly_3d_diags = Diagnostics.init_diagnostics(
     atmos_sim.domain.center_space;
     save = TimeManager.Monthly(),
     operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
-    output_dir = COUPLER_OUTPUT_DIR,
+    output_dir = dir_paths.output,
     name_tag = "monthly_mean_3d_",
 )
 
@@ -479,7 +473,7 @@ monthly_2d_diags = Diagnostics.init_diagnostics(
     boundary_space;
     save = TimeManager.Monthly(),
     operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
-    output_dir = COUPLER_OUTPUT_DIR,
+    output_dir = dir_paths.output,
     name_tag = "monthly_mean_2d_",
 )
 
@@ -784,15 +778,15 @@ if ClimaComms.iamroot(comms_ctx)
             cs.conservation_checks.energy,
             cs,
             config_dict["conservation_softfail"],
-            figname1 = joinpath(COUPLER_ARTIFACTS_DIR, "total_energy_bucket.png"),
-            figname2 = joinpath(COUPLER_ARTIFACTS_DIR, "total_energy_log_bucket.png"),
+            figname1 = joinpath(dir_paths.artifacts, "total_energy_bucket.png"),
+            figname2 = joinpath(dir_paths.artifacts, "total_energy_log_bucket.png"),
         )
         ConservationChecker.plot_global_conservation(
             cs.conservation_checks.water,
             cs,
             config_dict["conservation_softfail"],
-            figname1 = joinpath(COUPLER_ARTIFACTS_DIR, "total_water_bucket.png"),
-            figname2 = joinpath(COUPLER_ARTIFACTS_DIR, "total_water_log_bucket.png"),
+            figname1 = joinpath(dir_paths.artifacts, "total_water_bucket.png"),
+            figname2 = joinpath(dir_paths.artifacts, "total_water_log_bucket.png"),
         )
     end
 
@@ -800,7 +794,7 @@ if ClimaComms.iamroot(comms_ctx)
     if !CA.is_distributed(comms_ctx) && config_dict["anim"]
         @info "Animations"
         include("user_io/viz_explorer.jl")
-        plot_anim(cs, COUPLER_ARTIFACTS_DIR)
+        plot_anim(cs, dir_paths.artifacts)
     end
 
     ## plotting AMIP results
@@ -835,9 +829,9 @@ if ClimaComms.iamroot(comms_ctx)
         amip_data, fig_amip = amip_paperplots(
             post_spec,
             plot_spec,
-            COUPLER_OUTPUT_DIR,
+            dir_paths.output,
             files_root = ".monthly",
-            output_dir = COUPLER_ARTIFACTS_DIR,
+            output_dir = dir_paths.artifacts,
         )
 
         ## NCEP reanalysis
@@ -856,14 +850,14 @@ if ClimaComms.iamroot(comms_ctx)
         ncep_data, fig_ncep = ncep_paperplots(
             ncep_post_spec,
             ncep_plot_spec,
-            COUPLER_OUTPUT_DIR,
-            output_dir = COUPLER_ARTIFACTS_DIR,
+            dir_paths.output,
+            output_dir = dir_paths.artifacts,
             month_date = cs.dates.date[1],
         )
 
         ## combine AMIP and NCEP plots
         plot_combined = Plots.plot(fig_amip, fig_ncep, layout = (2, 1), size = (1400, 1800))
-        Plots.png(joinpath(COUPLER_ARTIFACTS_DIR, "amip_ncep.png"))
+        Plots.png(joinpath(dir_paths.artifacts, "amip_ncep.png"))
 
         ## Compare against observations
         if t_end > 84600
@@ -873,7 +867,7 @@ if ClimaComms.iamroot(comms_ctx)
             include("user_io/leaderboard.jl")
             compare_vars = ["pr"]
             function plot_biases(dates, output_name)
-                output_path = joinpath(COUPLER_ARTIFACTS_DIR, "bias_$(output_name).png")
+                output_path = joinpath(dir_paths.artifacts, "bias_$(output_name).png")
                 Leaderboard.plot_biases(atmos_sim.integrator.p.output_dir, compare_vars, dates; output_path)
             end
             plot_biases(output_dates, "total")
@@ -892,17 +886,17 @@ if ClimaComms.iamroot(comms_ctx)
     if config_dict["ci_plots"]
         @info "Generating CI plots"
         include("user_io/ci_plots.jl")
-        make_plots(Val(:general_ci_plots), [joinpath(COUPLER_OUTPUT_DIR, "clima_atmos")], COUPLER_ARTIFACTS_DIR)
+        make_plots(Val(:general_ci_plots), [joinpath(dir_paths.output, "clima_atmos")], dir_paths.artifacts)
     end
 
     ## plot all model states and coupler fields (useful for debugging) TODO: make MPI & GPU compatible
     comms_ctx.device == ClimaComms.CPUSingleThreaded() &&
         comms_ctx isa ClimaComms.SingletonCommsContext &&
-        debug(cs, joinpath(COUPLER_ARTIFACTS_DIR, "end_"))
+        debug(cs, joinpath(dir_paths.artifacts, "endstates_"))
 
     if isinteractive()
         ## clean up for interactive runs, retain all output otherwise
-        rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
+        rm(dir_paths.output; recursive = true, force = true)
     end
 
 end

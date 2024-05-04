@@ -17,6 +17,6 @@ run_name: "slabplanet_atmos_diags"
 t_end: "10days"
 vert_diff: "true"
 diagnostics:
-  - short_name: [mse, lr, ediff, ts]
+  - short_name: [mse, lr, ediff, ts, mass_strf, stab, vt, egr]
     reduction_time: average
     period: 1days

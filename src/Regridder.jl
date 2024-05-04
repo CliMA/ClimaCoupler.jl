@@ -25,7 +25,8 @@ export write_to_hdf5,
     combine_surfaces_from_sol!,
     binary_mask,
     nans_to_zero,
-    cgll2latlonz
+    cgll2latlonz,
+    truncate_dataset
 
 
 #= Converts NaNs to zeros of the same type. =#
@@ -673,7 +674,7 @@ function truncate_dataset(
 end
 
 """
-    find_idx_bounding_dates(dates, date_start, date_end) 
+    find_idx_bounding_dates(dates, date_start, date_end)
 
 Returns the index range from dates that contains date_start to date_end
 """
@@ -687,10 +688,10 @@ function find_idx_bounding_dates(dates, date_start, date_end)
     elseif date_start > last(dates)
         start_id = length(dates)
         # if the simulation start date falls within the range of the dataset
-        # find the closest date to the start date and truncate there 
+        # find the closest date to the start date and truncate there
     else
         (~, start_id) = findmin(x -> abs(x - date_start), dates)
-        # if the closest date is after the start date, add one more date before 
+        # if the closest date is after the start date, add one more date before
         if dates[start_id] > date_start
             start_id = start_id - 1
         end
@@ -701,11 +702,11 @@ function find_idx_bounding_dates(dates, date_start, date_end)
     if date_end < dates[1]
         end_id = 1
         # if the simulation end date is after the last date in the dataset
-        # leave the end of the dataset as is 
+        # leave the end of the dataset as is
     elseif date_end > last(dates)
         end_id = length(dates)
         # if the simulation end date falls within the range of the dataset
-        # find the closest date to the end date and truncate there 
+        # find the closest date to the end date and truncate there
     else
         (~, end_id) = findmin(x -> abs(x - date_end), dates)
         # if the closest date is before the end date, add one more date after

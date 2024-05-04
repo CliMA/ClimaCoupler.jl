@@ -77,6 +77,7 @@ include("components/ocean/eisenman_seaice.jl")
 ## helpers for user-specified IO
 include("user_io/user_diagnostics.jl")
 include("user_io/user_logging.jl")
+include("user_io/debug_plots.jl")
 
 #=
 ### Configuration Dictionaries
@@ -92,7 +93,6 @@ parsed_args = parse_commandline(argparse_settings())
 
 ## modify parsed args for fast testing from REPL #hide
 if isinteractive()
-    include("user_io/debug_plots.jl")
     parsed_args["config_file"] =
         isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/model_configs/interactive_debug.yml") :
         parsed_args["config_file"]
@@ -805,6 +805,8 @@ if ClimaComms.iamroot(comms_ctx)
 
     ## plotting AMIP results
     if cs.mode.name == "amip"
+        ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
+
         @info "AMIP plots"
 
         ## ClimaESM
@@ -857,9 +859,9 @@ if ClimaComms.iamroot(comms_ctx)
             COUPLER_OUTPUT_DIR,
             output_dir = COUPLER_ARTIFACTS_DIR,
             month_date = cs.dates.date[1],
-        ) ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
+        )
 
-        ## combined plots
+        ## combine AMIP and NCEP plots
         plot_combined = Plots.plot(fig_amip, fig_ncep, layout = (2, 1), size = (1400, 1800))
         Plots.png(joinpath(COUPLER_ARTIFACTS_DIR, "amip_ncep.png"))
 
@@ -893,12 +895,14 @@ if ClimaComms.iamroot(comms_ctx)
         make_plots(Val(:general_ci_plots), [joinpath(COUPLER_OUTPUT_DIR, "clima_atmos")], COUPLER_ARTIFACTS_DIR)
     end
 
+    ## plot all model states and coupler fields (useful for debugging) TODO: make MPI & GPU compatible
+    comms_ctx.device == ClimaComms.CPUSingleThreaded() &&
+        comms_ctx isa ClimaComms.SingletonCommsContext &&
+        debug(cs, joinpath(COUPLER_ARTIFACTS_DIR, "end_"))
+
     if isinteractive()
         ## clean up for interactive runs, retain all output otherwise
         rm(COUPLER_OUTPUT_DIR; recursive = true, force = true)
-
-        ## plot all model states and coupler fields (useful for debugging)
-        debug(cs)
     end
 
 end

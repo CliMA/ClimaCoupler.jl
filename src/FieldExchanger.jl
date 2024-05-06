@@ -44,7 +44,7 @@ function import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
 end
 
 """
-    import_combined_surface_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
+    import_combined_surface_fields!(csf, model_sims, turbulent_fluxes)
 
 Updates the coupler with the surface properties. The `Interfacer.get_field` functions for
 (`:surface_temperature`, `:surface_direct_albedo`, `:surface_diffuse_albedo`, `:roughness_momentum`, `:roughness_buoyancy`, `:beta`)
@@ -53,13 +53,12 @@ need to be specified for each surface model.
 # Arguments
 - `csf`: [NamedTuple] containing coupler fields.
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
-- `boundary_space`: [Spaces.AbstractSpace] the space of the coupler surface.
 - `turbulent_fluxes`: [TurbulentFluxPartition] denotes a flag for turbulent flux calculation.
 
 """
-function import_combined_surface_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
+function import_combined_surface_fields!(csf, model_sims, turbulent_fluxes)
 
-    combined_field = zeros(boundary_space)
+    combined_field = csf.temp1
 
     # surface fields
     Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_temperature))

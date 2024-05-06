@@ -12,16 +12,17 @@ import ClimaCore as CC
 export swap_space!
 
 """
-    swap_space!(field_out::CC.Fields.Field, field_in::CC.Fields.Field)
+    swap_space!(space_out::CC.Spaces.AbstractSpace, field_in::CC.Fields.Field)
 
 Remap the values of a field onto a new space.
 
 # Arguments
+- `space_out`: [CC.Spaces.AbstractSpace] The axes of the space we want to remap onto
 - `field_in`: [CC.Fields.Field] to be remapped to new space.
-- `field_out`: [CC.Fields.Field] to remap `field_in` to.
 """
-function swap_space!(field_out, field_in::CC.Fields.Field)
-    field_out = CC.Fields.Field(CC.Fields.field_values(field_in), axes(field_out))
+function swap_space!(space_out::CC.Spaces.AbstractSpace, field_in::CC.Fields.Field)
+    field_out = CC.Fields.Field(CC.Fields.field_values(field_in), space_out)
+    return field_out
 end
 
 """

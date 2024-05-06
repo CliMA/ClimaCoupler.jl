@@ -156,8 +156,7 @@ end
     scale_sic(SIC, _info)
 Ensures that the space of the SIC struct matches that of the mask, and converts the units from area % to area fraction.
 """
-scale_sic(SIC, _info) =
-    Utilities.swap_space!(zeros(axes(_info.land_fraction)), SIC) ./ BCReader.float_type_bcf(_info)(100.0)
+scale_sic(SIC, _info) = Utilities.swap_space!(axes(_info.land_fraction), SIC) ./ BCReader.float_type_bcf(_info)(100.0)
 
 # setting that SIC < 0.5 is counted as ocean if binary remapping.
 get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =

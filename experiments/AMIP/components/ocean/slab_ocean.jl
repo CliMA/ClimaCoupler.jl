@@ -169,7 +169,7 @@ end
 Ensures that the space of the SST struct matches that of the land_fraction, and converts the units to Kelvin (N.B.: this is dataset specific)
 """
 scale_sst(SST, _info) =
-    (Utilities.swap_space!(zeros(axes(_info.land_fraction)), SST) .+ BCReader.float_type_bcf(_info)(273.15))
+    (Utilities.swap_space!(axes(_info.land_fraction), SST) .+ BCReader.float_type_bcf(_info)(273.15))
 
 # ode
 function slab_ocean_rhs!(dY, Y, cache, t)

@@ -116,7 +116,7 @@ for FT in (Float32, Float64)
     @testset "import_combined_surface_fields! for FT=$FT" begin
         # coupler cache setup
         boundary_space = TestHelper.create_space(FT)
-        coupler_names = (:T_S, :z0m_S, :z0b_S, :surface_direct_albedo, :surface_diffuse_albedo, :beta, :q_sfc)
+        coupler_names = (:T_S, :z0m_S, :z0b_S, :surface_direct_albedo, :surface_diffuse_albedo, :beta, :q_sfc, :temp1)
 
         # coupler cache setup
         exchanged_fields = (
@@ -137,7 +137,7 @@ for FT in (Float32, Float64)
         for (i, t) in enumerate(flux_types)
             coupler_fields =
                 NamedTuple{coupler_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_names)))
-            FieldExchanger.import_combined_surface_fields!(coupler_fields, sims, boundary_space, t)
+            FieldExchanger.import_combined_surface_fields!(coupler_fields, sims, t)
             @test Array(parent(coupler_fields.T_S))[1] == results[1]
             @test Array(parent(coupler_fields.surface_direct_albedo))[1] == results[1]
             @test Array(parent(coupler_fields.surface_diffuse_albedo))[1] == results[1]

@@ -157,8 +157,7 @@ function check_conservation!(
 
     # net precipitation (for surfaces that don't collect water)
     PE_net =
-        coupler_sim.fields.P_net .+=
-            Utilities.swap_space!(zeros(boundary_space), surface_water_gain_from_rates(coupler_sim))
+        coupler_sim.fields.P_net .+= Utilities.swap_space!(boundary_space, surface_water_gain_from_rates(coupler_sim))
 
     # save surfaces
     for sim in model_sims

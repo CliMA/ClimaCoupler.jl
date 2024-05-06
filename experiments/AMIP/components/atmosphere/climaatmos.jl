@@ -238,8 +238,8 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fl
     sim.integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ .= (
         surface_normal .⊗
         CA.C12.(
-            Utilities.swap_space!(ones(axes(vec_ct12_ct1)), F_turb_ρτxz) .* vec_ct12_ct1 .+
-            Utilities.swap_space!(ones(axes(vec_ct12_ct2)), F_turb_ρτyz) .* vec_ct12_ct2,
+            Utilities.swap_space!(axes(vec_ct12_ct1), F_turb_ρτxz) .* vec_ct12_ct1 .+
+            Utilities.swap_space!(axes(vec_ct12_ct2), F_turb_ρτyz) .* vec_ct12_ct2,
             surface_local_geometry,
         )
     )
@@ -285,7 +285,7 @@ Extension for this function to calculate surface density.
 function FluxCalculator.calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::CC.Fields.Field)
     thermo_params = get_thermo_params(atmos_sim)
     ts_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
-    FluxCalculator.extrapolate_ρ_to_sfc.(Ref(thermo_params), ts_int, Utilities.swap_space!(ones(axes(ts_int.ρ)), T_S))
+    FluxCalculator.extrapolate_ρ_to_sfc.(Ref(thermo_params), ts_int, Utilities.swap_space!(axes(ts_int.ρ), T_S))
 end
 
 # FluxCalculator.get_surface_params required by FluxCalculator (partitioned fluxes)

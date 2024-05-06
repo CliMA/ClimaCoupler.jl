@@ -487,7 +487,7 @@ function land_fraction(
     ClimaComms.barrier(comms_ctx)
     file_dates = JLD2.load(joinpath(REGRID_DIR, outfile_root * "_times.jld2"), "times")
     fraction = read_from_hdf5(REGRID_DIR, outfile_root, file_dates[1], varname, comms_ctx)
-    fraction = Utilities.swap_space!(zeros(boundary_space), fraction) # needed if we are reading from previous run
+    fraction = Utilities.swap_space!(boundary_space, fraction) # needed if we are reading from previous run
     return mono ? fraction : binary_mask.(fraction, threshold)
 end
 
@@ -556,7 +556,7 @@ surface simulations. THe result is saved in `combined_field`.
 - `field_name`: [Val] containing the name Symbol of the field t be extracted by the `Interfacer.get_field` functions.
 
 # Example
-- `combine_surfaces!(zeros(boundary_space), cs.model_sims, Val(:surface_temperature))`
+- `combine_surfaces!(temp_field, cs.model_sims, Val(:surface_temperature))`
 """
 function combine_surfaces!(combined_field::CC.Fields.Field, sims::NamedTuple, field_name::Val)
     combined_field .= eltype(combined_field)(0)

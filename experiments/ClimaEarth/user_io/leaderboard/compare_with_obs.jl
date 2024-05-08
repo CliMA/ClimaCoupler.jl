@@ -1,16 +1,15 @@
 const OBS_DS = Dict()
+const SIM_DS_KWARGS = Dict()
 
 function preprocess_pr_fn(data)
-    # 1 mm/day -> - 1 kg/m/s2
-    # The minus sign comes from the different conventions used
-    return data .* Float32(-1 / 86400)
+    # -1 kg/m/s2 -> 1 mm/day
+    return data .* Float32(-86400)
 end
 
-OBS_DS["pr"] = ObsDataSource(;
-    path = joinpath(pr_obs_data_path(), "gpcp.precip.mon.mean.197901-202305.nc"),
-    var_name = "precip",
-    preprocess_data_fn = preprocess_pr_fn,
-)
+OBS_DS["pr"] =
+    ObsDataSource(; path = joinpath(pr_obs_data_path(), "gpcp.precip.mon.mean.197901-202305.nc"), var_name = "precip")
+
+SIM_DS_KWARGS["pr"] = (; preprocess_data_fn = preprocess_pr_fn, new_units = "mm / day")
 
 # OBS_DS["rsut"] = ObsDataSource(;
 #                              path = "OBS/CERES_EBAF-TOA_Ed4.2_Subset_200003-202303.g025.nc",
@@ -24,7 +23,7 @@ OBS_DS["pr"] = ObsDataSource(;
 
 function bias(output_dir::AbstractString, short_name::AbstractString, target_dates::AbstractArray{<:Dates.DateTime})
     obs = OBS_DS[short_name]
-    sim = SimDataSource(; path = output_dir, short_name)
+    sim = SimDataSource(; path = output_dir, short_name, SIM_DS_KWARGS["pr"]...)
     return bias(obs, sim, target_dates)
 end
 

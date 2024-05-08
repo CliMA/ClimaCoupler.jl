@@ -638,7 +638,7 @@ function cgll2latlonz(field; DIR = "cgll2latlonz_dir", nlat = 360, nlon = 720, c
 end
 
 """
-    truncate_dataset(datafile, name, datapath_trunc, date0, time_start, time_end, comms_ctx)
+    truncate_dataset(datafile, name, datapath_trunc, date0, t_start, t_end, comms_ctx)
 
 Truncates given data set, and constructs a new dataset containing only the dates that are used in the simulation
 """
@@ -647,12 +647,12 @@ function truncate_dataset(
     name,
     datapath_trunc,
     date0,
-    time_start,
-    time_end,
+    t_start,
+    t_end,
     comms_ctx::ClimaComms.AbstractCommsContext,
 )
-    date_start = date0 + Dates.Second(time_start)
-    date_end = date0 + Dates.Second(time_start + time_end)
+    date_start = date0 + Dates.Second(t_start)
+    date_end = date0 + Dates.Second(t_start + t_end)
 
     file_name = replace(string(name, "_truncated_data_", string(date_start), string(date_end), ".nc"), r":" => "")
     datafile_truncated = joinpath(datapath_trunc, file_name)

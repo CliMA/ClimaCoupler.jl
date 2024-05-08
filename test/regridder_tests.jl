@@ -312,9 +312,9 @@ for FT in (Float32, Float64)
         end
     end
 end
-# test dataset truncation 
+# test dataset truncation
 @testset "test dataset truncation" begin
-    # Get the original dataset set up 
+    # Get the original dataset set up
     include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
     sst_data_all = joinpath(sst_dataset_path(), "sst.nc")
     ds = NCDatasets.NCDataset(sst_data_all, "r")
@@ -322,30 +322,30 @@ end
     first_date = dates[1]
     last_date = last(dates)
 
-    # set up comms_ctx 
+    # set up comms_ctx
     device = ClimaComms.device()
     comms_ctx = ClimaComms.context(device)
     ClimaComms.init(comms_ctx)
 
-    # make path for truncated datasets 
+    # make path for truncated datasets
     COUPLER_OUTPUT_DIR = joinpath("experiments", "AMIP", "output", "tests")
     mkpath(COUPLER_OUTPUT_DIR)
 
     REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp", "")
     mkpath(REGRID_DIR)
 
-    # values for the truncations 
-    time_start = 0.0
-    time_end = 1.728e6
+    # values for the truncations
+    t_start = 0.0
+    t_end = 1.728e6
     date0test = ["18690101", "18700101", "19790228", "20220301", "20230101"]
     for date in date0test
         date0 = Dates.DateTime(date, Dates.dateformat"yyyymmdd")
-        sst_data = Regridder.truncate_dataset(sst_data_all, "test", REGRID_DIR, date0, time_start, time_end, comms_ctx)
+        sst_data = Regridder.truncate_dataset(sst_data_all, "test", REGRID_DIR, date0, t_start, t_end, comms_ctx)
         ds_truncated = NCDatasets.NCDataset(sst_data, "r")
         new_dates = ds_truncated["time"][:]
 
-        date_start = date0 + Dates.Second(time_start)
-        date_end = date0 + Dates.Second(time_start + time_end)
+        date_start = date0 + Dates.Second(t_start)
+        date_end = date0 + Dates.Second(t_start + t_end)
 
         # start date is before the first date of datafile
         if date_start < first_date
@@ -359,10 +359,10 @@ end
             @test new_dates[2] >= date_start
         end
 
-        # end date is before the first date of datafile 
+        # end date is before the first date of datafile
         if date_end < first_date
             @test last(new_dates) == first_date
-            # end date is after the last date of datafile 
+            # end date is after the last date of datafile
         elseif date_end > last_date
             @test last(new_dates) == last_date
             # end date is within the bounds of datafile
@@ -371,7 +371,7 @@ end
             @test new_dates[length(new_dates) - 1] <= date_end
         end
 
-        # check that truncation is indexing correctly 
+        # check that truncation is indexing correctly
         all_data = ds["SST"][:, :, :]
         new_data = ds_truncated["SST"][:, :, :]
         (start_id, end_id) = Regridder.find_idx_bounding_dates(dates, date_start, date_end)

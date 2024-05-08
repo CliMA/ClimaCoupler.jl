@@ -71,13 +71,12 @@ function artifact_data(datapath_full, name)
 end
 
 """
-    artifact_data(datapath_full, name, datapath_trunc, date0, time_start, time_end, comms_ctx)
+    artifact_data(datapath_full, name, datapath_trunc, date0, t_start, t_end, comms_ctx)
 
 Truncates given data set, and constructs a new dataset containing only the dates needed and stores it in datapath_trunc
 """
-function artifact_data(datapath_full, name, datapath_trunc, date0, time_start, time_end, comms_ctx)
+function artifact_data(datapath_full, name, datapath_trunc, date0, t_start, t_end, comms_ctx)
     datafile = joinpath(datapath_full, string(name, ".nc"))
-    datafile_truncated =
-        Regridder.truncate_dataset(datafile, name, datapath_trunc, date0, time_start, time_end, comms_ctx)
+    datafile_truncated = Regridder.truncate_dataset(datafile, name, datapath_trunc, date0, t_start, t_end, comms_ctx)
     return datafile_truncated
 end

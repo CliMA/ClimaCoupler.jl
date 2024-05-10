@@ -243,6 +243,7 @@ if mode_name == "amip"
         area_fraction = land_area_fraction,
         date_ref = date0,
         t_start = t_start,
+        energy_check = energy_check,
     )
 
     ## ocean stub
@@ -342,6 +343,7 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         area_fraction = land_area_fraction,
         date_ref = date0,
         t_start = t_start,
+        energy_check = energy_check,
     )
 
     ## ocean model
@@ -388,6 +390,7 @@ elseif mode_name == "slabplanet_eisenman"
         area_fraction = land_area_fraction,
         date_ref = date0,
         t_start = t_start,
+        energy_check = energy_check,
     )
 
     ## ocean stub (here set to zero area coverage)
@@ -608,7 +611,7 @@ Regridder.update_surface_fractions!(cs)
 
 # 2.surface density (`ρ_sfc`): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface.
 # For this, we need to import surface and atmospheric fields. The model sims are then updated with the new surface density.
-FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
+FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes)
 FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
 FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 
@@ -622,7 +625,7 @@ Interfacer.step!(ice_sim, Δt_cpl)
 # or the partitioned state method
 if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
     ## import the new surface properties into the coupler (note the atmos state was also imported in step 3.)
-    FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta, q_sfc
+    FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta, q_sfc
     ## calculate turbulent fluxes inside the atmos cache based on the combined surface state in each grid box
     FluxCalculator.combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes) # this updates the atmos thermo state, sfc_ts
 elseif cs.turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
@@ -723,7 +726,7 @@ function solve_coupler!(cs)
         FieldExchanger.step_model_sims!(cs.model_sims, t)
 
         ## exchange combined fields and (if specified) calculate fluxes using combined states
-        FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # i.e. T_sfc, surface_albedo, z0, beta
+        FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, surface_albedo, z0, beta
         if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
             FluxCalculator.combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes) # this updates the surface thermo state, sfc_ts, in ClimaAtmos (but also unnecessarily calculates fluxes)
         elseif cs.turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes

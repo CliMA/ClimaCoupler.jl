@@ -75,7 +75,7 @@ function Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:toa_fluxes
     )
 
     radiation_sources = @. -(LWd_TOA + SWd_TOA - LWu_TOA - SWu_TOA)
-    Utilities.swap_space!(zeros(cs.boundary_space), radiation_sources)
+    Utilities.swap_space!(cs.boundary_space, radiation_sources)
 end
 
 """
@@ -85,7 +85,7 @@ Precipitation rate (Kg m⁻² s⁻¹).
 """
 Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:precipitation_rate}) =
     .-Utilities.swap_space!(
-        zeros(cs.boundary_space),
+        cs.boundary_space,
         cs.model_sims.atmos_sim.integrator.p.precipitation.col_integrated_rain .+
         cs.model_sims.atmos_sim.integrator.p.precipitation.col_integrated_snow,
     )
@@ -97,7 +97,7 @@ Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:precipitation_rate}
 Combined surface temperature (K).
 """
 Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:T_sfc}) =
-    Utilities.swap_space!(zeros(cs.boundary_space), cs.fields.T_S)
+    Utilities.swap_space!(cs.boundary_space, cs.fields.T_S)
 
 """
     Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:tubulent_energy_fluxes})
@@ -105,6 +105,6 @@ Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:T_sfc}) =
 Combined aerodynamic turbulent energy surface fluxes (W m⁻²).
 """
 Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:tubulent_energy_fluxes}) =
-    Utilities.swap_space!(zeros(cs.boundary_space), cs.fields.F_turb_energy)
+    Utilities.swap_space!(cs.boundary_space, cs.fields.F_turb_energy)
 
 # land diagnotics

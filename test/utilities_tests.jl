@@ -13,7 +13,7 @@ for FT in (Float32, Float64)
         field1 = ones(space1)
         field2 = ones(space2)
 
-        field2 = Utilities.swap_space!(field2, field1)
+        field2 = Utilities.swap_space!(space2, field1)
 
         @test parent(field1) == parent(field2)
         @test axes(field2) == space2

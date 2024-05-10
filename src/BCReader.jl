@@ -67,7 +67,7 @@ Remap the values of a `field` onto the space of the
 - `bcf_info`: [BCFileInfo] contains a land_fraction to remap onto the space of.
 """
 no_scaling(field::CC.Fields.Field, bcf_info::BCFileInfo{FT}) where {FT} =
-    Utilities.swap_space!(zeros(axes(bcf_info.land_fraction)), field)
+    Utilities.swap_space!(axes(bcf_info.land_fraction), field)
 
 """
     bcfile_info_init(

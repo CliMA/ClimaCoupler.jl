@@ -29,7 +29,7 @@ cwd = pwd()
 @info "build_path is: $build_path"
 
 cc_dir = joinpath(dirname(@__DIR__));
-config_dir = joinpath(cc_dir, "config", "model_configs");
+config_dir = joinpath(cc_dir, "config", "perf_configs");
 include(joinpath(cc_dir, "experiments", "AMIP", "cli_options.jl"));
 
 # assuming a common driver for all tested runs

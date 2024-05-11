@@ -299,20 +299,36 @@ FluxCalculator.get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxe
 
 Returns the specified atmospheric configuration (`atmos_config`) overwitten by arguments
 in the coupler dictionary (`config_dict`). The returned dictionary will then be passed to CA.AtmosConfig().
+The `atmos_config_repo` flag allows us to
+use a configuration specified within the ClimaCoupler repo, which is useful for direct
+coupled/atmos-only comparisons.
 """
 function get_atmos_config_dict(coupler_dict)
     atmos_config_file = coupler_dict["atmos_config_file"]
+    atmos_config_repo = coupler_dict["atmos_config_repo"]
     # override default or specified configs with coupler arguments, and set the correct atmos config_file
-    if isnothing(atmos_config_file)
-        @info "Using Atmos default configuration"
-        atmos_config = merge(CA.default_config_dict(), coupler_dict, Dict("config_file" => atmos_config_file))
-    else
-        @info "Using Atmos configuration from $atmos_config_file"
+    if atmos_config_repo == "ClimaCoupler"
+        @assert !isnothing(atmos_config_file) "Must specify `atmos_config_file` within ClimaCoupler."
+        @info "Using Atmos configuration from ClimaCoupler in $atmos_config_file"
         atmos_config = merge(
-            CA.override_default_config(joinpath(pkgdir(CA), atmos_config_file)),
+            CA.override_default_config(joinpath(pkgdir(ClimaCoupler), atmos_config_file)),
             coupler_dict,
             Dict("config_file" => atmos_config_file),
         )
+    elseif atmos_config_repo == "ClimaAtmos"
+        if isnothing(atmos_config_file)
+            @info "Using Atmos default configuration"
+            atmos_config = merge(CA.default_config_dict(), coupler_dict, Dict("config_file" => atmos_config_file))
+        else
+            @info "Using Atmos configuration from $atmos_config_file"
+            atmos_config = merge(
+                CA.override_default_config(joinpath(pkgdir(CA), atmos_config_file)),
+                coupler_dict,
+                Dict("config_file" => atmos_config_file),
+            )
+        end
+    else
+        error("Invalid `atmos_config_repo`; please use \"ClimaCoupler\" or \"ClimaAtmos\"")
     end
 
     # use coupler toml if atmos is not defined

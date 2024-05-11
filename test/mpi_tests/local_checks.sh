@@ -11,7 +11,7 @@ module load climacommon/2024_04_05
 
 export CC_PATH=$(pwd)/ # adjust this to the path of your ClimaCoupler.jl directory
 export RUN_NAME=coarse_single_ft64_hourly_checkpoints_restart
-export CONFIG_FILE=${CC_PATH}config/model_configs/${RUN_NAME}.yml
+export CONFIG_FILE=${CC_PATH}config/ci_configs/${RUN_NAME}.yml
 export RESTART_DIR=experiments/AMIP/output/amip/${RUN_NAME}_artifacts/
 
 export OPENBLAS_NUM_THREADS=1

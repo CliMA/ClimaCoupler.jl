@@ -6,6 +6,7 @@ modules in the coupler.
 """
 module Utilities
 
+import CUDA
 import ClimaComms
 import ClimaCore as CC
 
@@ -68,6 +69,24 @@ function get_comms_context(parsed_args)
     end
 
     return comms_ctx
+end
+
+"""
+    show_memory_usage(comms_ctx)
+
+Display and return the maximum resident set size (RSS) memory footprint on the
+CPU of this process since it began.
+
+# Arguments
+`comms_ctx`: the communication context being used to run the model
+"""
+function show_memory_usage(comms_ctx)
+    cpu_allocs_GB = ""
+    if ClimaComms.iamroot(comms_ctx)
+        cpu_allocs_GB = "CPU: " * string(round(Sys.maxrss() / 1e9, digits = 3)) * " GiB"
+        @info cpu_allocs_GB
+    end
+    return cpu_allocs_GB
 end
 
 end # module

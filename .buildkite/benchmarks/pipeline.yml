@@ -1,0 +1,108 @@
+agents:
+  queue: clima
+  slurm_time: 24:00:00
+  modules: common
+
+env:
+  JULIA_NVTX_CALLBACKS: gc
+  OPENBLAS_NUM_THREADS: 1
+  OMPI_MCA_opal_warn_on_missing_libcuda: 0
+  SLURM_KILL_BAD_EXIT: 1
+  SLURM_GRES_FLAGS: "allow-task-sharing"
+  BENCHMARK_CONFIG_PATH: "config/benchmark_configs"
+
+steps:
+  - label: "init :GPU:"
+    key: "init_gpu_env"
+    command:
+      - echo "--- Instantiate experiments/AMIP"
+      - julia --project=experiments/AMIP -e 'using Pkg; Pkg.instantiate(;verbose=true)'
+      - julia --project=experiments/AMIP -e 'using Pkg; Pkg.precompile()'
+      - julia --project=experiments/AMIP -e 'using Pkg; Pkg.status()'
+
+      - echo "--- Instantiate test env"
+      - "julia --project=test/ -e 'using Pkg; Pkg.develop(path=\".\")'"
+      - "julia --project=test/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=test/ -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=test/ -e 'using Pkg; Pkg.status()'"
+
+      - echo "--- Download artifacts"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.status()'"
+      - "julia --project=artifacts artifacts/download_artifacts.jl"
+
+    agents:
+      slurm_gpus: 1
+      slurm_cpus_per_task: 8
+    env:
+      JULIA_NUM_PRECOMPILE_TASKS: 8
+      JULIA_MAX_NUM_PRECOMPILE_FILES: 50
+
+  - wait
+
+  - group: "CPU benchmarks"
+    steps:
+      - label: "CPU ClimaAtmos with diagnostic EDMF"
+        key: "climaatmos_diagedmf"
+        command: "srun julia --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos_diagedmf.yml"
+        artifact_paths: "experiments/AMIP/output/climaatmos/climaatmos_diagedmf_artifacts/*"
+        env:
+          BUILD_HISTORY_HANDLE: ""
+          CLIMACOMMS_DEVICE: "CPU"
+        agents:
+          slurm_ntasks_per_node: 64
+          slurm_nodes: 1
+          slurm_mem_per_cpu: 4GB
+
+      - label: "CPU AMIP with diagnostic EDMF"
+        key: "amip_diagedmf"
+        command: "srun julia --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $BENCHMARK_CONFIG_PATH/amip_diagedmf.yml"
+        artifact_paths: "experiments/AMIP/output/amip/amip_diagedmf_artifacts/*"
+        env:
+          BUILD_HISTORY_HANDLE: ""
+          CLIMACOMMS_DEVICE: "CPU"
+        agents:
+          slurm_ntasks_per_node: 64
+          slurm_nodes: 1
+          slurm_mem_per_cpu: 4GB
+
+  - group: "GPU benchmarks"
+    steps:
+      - label: "GPU ClimaAtmos with diagnostic EDMF"
+        key: "gpu_climaatmos_diagedmf"
+        command: "srun julia --threads=3 --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/gpu_climaatmos_diagedmf.yml"
+        artifact_paths: "experiments/AMIP/output/climaatmos/gpu_climaatmos_diagedmf_artifacts/*"
+        agents:
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 4
+          slurm_mem: 16GB
+
+      - label: "GPU AMIP with diagnostic EDMF"
+        key: "gpu_amip_diagedmf"
+        command: "srun julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/coupler_driver.jl --config_file $BENCHMARK_CONFIG_PATH/gpu_amip_diagedmf.yml"
+        artifact_paths: "experiments/AMIP/output/amip/gpu_amip_diagedmf_artifacts/*"
+        agents:
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 4
+          slurm_mem: 16GB
+
+  - group: "Generate output table"
+    steps:
+      - label: "Compare AMIP/Atmos-only with diagnostic EDMF"
+        key: "compare_amip_climaatmos_amip_diagedmf"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/user_io/benchmarks.jl --cpu_run_name_coupled amip_diagedmf --cpu_run_name_atmos climaatmos_diagedmf --gpu_run_name_coupled gpu_amip_diagedmf --gpu_run_name_atmos gpu_climaatmos_diagedmf --mode_name amip --build_id $BUILDKITE_BUILD_NUMBER"
+        artifact_paths: "experiments/AMIP/output/compare_amip_climaatmos_amip_diagedmf/*"
+        depends_on:
+          - "climaatmos_diagedmf"
+          - "amip_diagedmf"
+          - "gpu_climaatmos_diagedmf"
+          - "gpu_amip_diagedmf"
+
+      - label: ":envelope: Slack report: CPU/GPU AMIP/Atmos-only table"
+        depends_on:
+          - "compare_amip_climaatmos_amip_diagedmf"
+        command:
+          - slack-upload -c "#coupler-report" -f experiments/AMIP/output/compare_amip_climaatmos_amip_diagedmf/table.txt -m txt -n compare_amip_climaatmos_amip_diagedmf_table -x "Coupler CPU/GPU Comparison Table"

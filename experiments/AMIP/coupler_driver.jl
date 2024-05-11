@@ -163,9 +163,9 @@ original sources.
 =#
 
 include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
-sst_data = artifact_data(sst_dataset_path(), "sst", dir_paths.regrid, date0, t_start, t_end, comms_ctx)
-sic_data = artifact_data(sic_dataset_path(), "sic", dir_paths.regrid, date0, t_start, t_end, comms_ctx)
-co2_data = artifact_data(co2_dataset_path(), "mauna_loa_co2", dir_paths.regrid, date0, t_start, t_end, comms_ctx)
+sst_data = artifact_data(sst_dataset_path(), "sst", "SST", dir_paths.regrid, date0, t_start, t_end, comms_ctx)
+sic_data = artifact_data(sic_dataset_path(), "sic", "SEAICE", dir_paths.regrid, date0, t_start, t_end, comms_ctx)
+co2_data = artifact_data(co2_dataset_path(), "mauna_loa_co2", "co2", dir_paths.regrid, date0, t_start, t_end, comms_ctx)
 land_mask_data = artifact_data(mask_dataset_path(), "seamask")
 
 #=

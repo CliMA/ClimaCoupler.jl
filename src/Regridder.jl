@@ -638,13 +638,15 @@ function cgll2latlonz(field; DIR = "cgll2latlonz_dir", nlat = 360, nlon = 720, c
 end
 
 """
-    truncate_dataset(datafile, name, datapath_trunc, date0, t_start, t_end, comms_ctx)
+    truncate_dataset(datafile, filename, varname, datapath_trunc, date0, t_start, t_end, comms_ctx)
 
-Truncates given data set, and constructs a new dataset containing only the dates that are used in the simulation
+Truncates given data set, and constructs a new dataset containing only
+the dates that are used in the simulation
 """
 function truncate_dataset(
     datafile,
-    name,
+    filename,
+    varname,
     datapath_trunc,
     date0,
     t_start,
@@ -654,17 +656,44 @@ function truncate_dataset(
     date_start = date0 + Dates.Second(t_start)
     date_end = date0 + Dates.Second(t_start + t_end)
 
-    file_name = replace(string(name, "_truncated_data_", string(date_start), string(date_end), ".nc"), r":" => "")
-    datafile_truncated = joinpath(datapath_trunc, file_name)
+    filename_truncated = replace(
+        string(lowercase(filename), "_truncated_data_", string(date_start), string(date_end), ".nc"),
+        r":" => "",
+    )
+    datafile_truncated = joinpath(datapath_trunc, filename_truncated)
 
     if ClimaComms.iamroot(comms_ctx)
         ds = NCDatasets.NCDataset(datafile, "r")
         dates = ds["time"][:]
 
+        # Find the bounding indices of the dates we need
         (start_id, end_id) = find_idx_bounding_dates(dates, date_start, date_end)
 
+        var_truncated = NCDatasets.nomissing(NCDatasets.view(ds, time = start_id:end_id)[varname])
+
+        # Create new dataset to fill with truncated data
         ds_truncated = NCDatasets.NCDataset(datafile_truncated, "c")
-        ds_truncated = NCDatasets.write(ds_truncated, NCDatasets.view(ds, time = start_id:end_id))
+
+        # Keep all dimensions of original dataset (except for time, which we truncate)
+        ds_dim_names = NCDatasets.dimnames(ds[varname])
+        for dim_name in ds_dim_names
+            dim_name != "time" && NCDatasets.defDim(ds_truncated, dim_name, ds.dim[dim_name])
+        end
+        dates_truncated = dates[start_id:end_id]
+        NCDatasets.defDim(ds_truncated, "time", length(dates_truncated))
+        ds_truncated.attrib["title"] = ds.attrib["title"] * " (dates truncated)"
+
+        # Define dimension variables
+        for dim_name in ds_dim_names
+            if dim_name == "time"
+                var = NCDatasets.defVar(ds_truncated, dim_name, dates_truncated, (dim_name,))
+            else
+                var = NCDatasets.defVar(ds_truncated, dim_name, ds[dim_name][:], (dim_name,))
+            end
+        end
+
+        # Create variable of interest in new dataset, and fill with input dataset values
+        var = NCDatasets.defVar(ds_truncated, varname, var_truncated, ds_dim_names)
 
         close(ds)
         close(ds_truncated)

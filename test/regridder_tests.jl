@@ -312,6 +312,7 @@ for FT in (Float32, Float64)
         end
     end
 end
+
 # test dataset truncation
 @testset "test dataset truncation" begin
     # Get the original dataset set up
@@ -324,8 +325,8 @@ end
 
     # set up comms_ctx
     device = ClimaComms.device()
-    comms_ctx = ClimaComms.context(device)
-    ClimaComms.init(comms_ctx)
+    comms_ctx_device = ClimaComms.context(device)
+    ClimaComms.init(comms_ctx_device)
 
     # make path for truncated datasets
     COUPLER_OUTPUT_DIR = joinpath("experiments", "AMIP", "output", "tests")
@@ -340,7 +341,8 @@ end
     date0test = ["18690101", "18700101", "19790228", "20220301", "20230101"]
     for date in date0test
         date0 = Dates.DateTime(date, Dates.dateformat"yyyymmdd")
-        sst_data = Regridder.truncate_dataset(sst_data_all, "test", REGRID_DIR, date0, t_start, t_end, comms_ctx)
+        sst_data =
+            Regridder.truncate_dataset(sst_data_all, "sst", "SST", REGRID_DIR, date0, t_start, t_end, comms_ctx_device)
         ds_truncated = NCDatasets.NCDataset(sst_data, "r")
         new_dates = ds_truncated["time"][:]
 

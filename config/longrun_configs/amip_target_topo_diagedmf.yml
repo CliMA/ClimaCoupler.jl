@@ -1,4 +1,4 @@
-FLOAT_TYPE: "Float32"
+FLOAT_TYPE: "Float64"
 albedo_model: "CouplerAlbedo"
 anim: false
 apply_limiter: false

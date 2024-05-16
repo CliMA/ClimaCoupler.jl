@@ -105,6 +105,7 @@ config_dict = merge(parsed_args, config_dict)
 
 ## get component model dictionaries (if applicable)
 config_dict_atmos = get_atmos_config_dict(config_dict)
+atmos_config_object = CA.AtmosConfig(config_dict_atmos)
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
 ## (if there are common keys, the last dictionary in the `merge` arguments takes precedence)
@@ -182,7 +183,7 @@ This uses the `ClimaAtmos.jl` model, with parameterization options specified in 
 Utilities.show_memory_usage(comms_ctx)
 
 ## init atmos model component
-atmos_sim = atmos_init(FT, config_dict_atmos);
+atmos_sim = atmos_init(FT, atmos_config_object);
 Utilities.show_memory_usage(comms_ctx)
 
 thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models #610

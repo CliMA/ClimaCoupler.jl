@@ -5,6 +5,7 @@ import ClimaCore as CC
 import ClimaCorePlots
 import ClimaCoupler: Interfacer
 import ClimaAtmos as CA
+import StaticArrays
 
 include("plot_helper.jl")
 
@@ -110,7 +111,7 @@ end
 
 Return the minimum and maximum values of a field as a string.
 """
-function print_extrema(field::Union{CC.Fields.Field, Vector})
+function print_extrema(field::Union{CC.Fields.Field, Vector, StaticArrays.SVector})
     ext_vals = extrema(field)
     min = Printf.@sprintf("%.2E", ext_vals[1])
     max = Printf.@sprintf("%.2E", ext_vals[2])

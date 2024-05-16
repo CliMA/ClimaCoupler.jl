@@ -4,7 +4,7 @@ import ClimaAnalysis
 import Dates
 
 # Load file to test
-include("../../experiments/AMIP/user_io/leaderboard.jl")
+include("../../experiments/ClimaEarth/user_io/leaderboard.jl")
 # Data
 include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
 

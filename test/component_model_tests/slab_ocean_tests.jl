@@ -3,7 +3,7 @@ import ClimaCore as CC
 import ClimaCoupler
 import ClimaCoupler: TestHelper
 
-include(pkgdir(ClimaCoupler, "experiments/AMIP/components/ocean/slab_ocean.jl"))
+include(pkgdir(ClimaCoupler, "experiments/ClimaEarth/components/ocean/slab_ocean.jl"))
 
 for FT in (Float32, Float64)
     @testset "dss_state! SlabOceanSimulation for FT=$FT" begin

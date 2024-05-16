@@ -3,7 +3,7 @@ import ClimaCore as CC
 import ClimaCoupler
 import ClimaCoupler: TestHelper
 
-include(pkgdir(ClimaCoupler, "experiments/AMIP/components/atmosphere/climaatmos.jl"))
+include(pkgdir(ClimaCoupler, "experiments/ClimaEarth/components/atmosphere/climaatmos.jl"))
 
 for FT in (Float32, Float64)
     @testset "dss_state! ClimaAtmosSimulation for FT=$FT" begin

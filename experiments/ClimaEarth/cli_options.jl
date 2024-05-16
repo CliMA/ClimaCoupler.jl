@@ -49,7 +49,7 @@ function argparse_settings()
         "--coupler_output_dir"
         help = "Directory to save output files. Note that TempestRemap fails if interactive and paths are too long."
         arg_type = String
-        default = "experiments/AMIP/output"
+        default = "experiments/ClimaEarth/output"
         "--restart_dir"
         help = "Directory containing restart files"
         arg_type = String

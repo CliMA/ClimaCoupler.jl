@@ -1,6 +1,6 @@
 import Statistics: median
 
-pr_file_path = joinpath(artifact"cmip_model_rmse", "pr_rmse_amippr_amip.csv")
+pr_file_path = joinpath(@clima_artifact("cmip_model_rmse"), "pr_rmse_amip_pr_amip_5yr.csv")
 
 open(pr_file_path, "r") do io
     # Skip the header

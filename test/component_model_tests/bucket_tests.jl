@@ -3,7 +3,7 @@ import ClimaCore as CC
 import ClimaCoupler
 import ClimaCoupler: TestHelper
 
-include(pkgdir(ClimaCoupler, "experiments/AMIP/components/land/climaland_bucket.jl"))
+include(pkgdir(ClimaCoupler, "experiments/ClimaEarth/components/land/climaland_bucket.jl"))
 
 for FT in (Float32, Float64)
     @testset "dss_state! BucketSimulation for FT=$FT" begin

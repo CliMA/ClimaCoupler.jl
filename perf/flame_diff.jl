@@ -30,10 +30,10 @@ cwd = pwd()
 
 cc_dir = joinpath(dirname(@__DIR__));
 config_dir = joinpath(cc_dir, "config", "perf_configs");
-include(joinpath(cc_dir, "experiments", "AMIP", "cli_options.jl"));
+include(joinpath(cc_dir, "experiments", "ClimaEarth", "cli_options.jl"));
 
 # assuming a common driver for all tested runs
-filename = joinpath(cc_dir, "experiments", "AMIP", "coupler_driver.jl")
+filename = joinpath(cc_dir, "experiments", "ClimaEarth", "run_amip.jl")
 
 # number of time steps used for profiling
 n_samples = 2

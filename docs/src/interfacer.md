@@ -29,7 +29,7 @@ information needed to run that simulation.
 
 Each `ComponentModelSimulation` must extend the following functions to be able
 to use our coupler. For some existing models, these are defined within
-ClimaCoupler.jl in that model’s file in `experiments/AMIP/components/`, but it is preferable
+ClimaCoupler.jl in that model’s file in `experiments/ClimaEarth/components/`, but it is preferable
 for these to be defined in a model’s own repository. Note that the dispatch
 `::ComponentModelSimulation` in the function definitions given below should
 be replaced with the particular component model extending these functions.

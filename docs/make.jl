@@ -10,7 +10,7 @@ const OUTPUT_DIR = joinpath(@__DIR__, "src/generated")
 
 # sea breeze tutorial
 TUTORIAL_DIR_SB = joinpath(EXPERIMENTS_DIR, "ClimaCore/sea_breeze/")
-TUTORIAL_DIR_AMIP = joinpath(EXPERIMENTS_DIR, "AMIP/")
+TUTORIAL_DIR_AMIP = joinpath(EXPERIMENTS_DIR, "ClimaEarth/")
 
 # Pkg.activate(TUTORIAL_DIR)
 # Pkg.instantiate()
@@ -19,7 +19,7 @@ TUTORIAL_DIR_AMIP = joinpath(EXPERIMENTS_DIR, "AMIP/")
 
 # execute Literate on all julia files
 tutorial_files_sb = filter(x -> last(x, 3) == ".jl", readdir(TUTORIAL_DIR_SB))
-tutorial_files_amip = filter(x -> last(x, 9) == "driver.jl", readdir(TUTORIAL_DIR_AMIP))
+tutorial_files_amip = filter(x -> last(x, 11) == "run_amip.jl", readdir(TUTORIAL_DIR_AMIP))
 
 # Literate generates markdown files and stores them in docs/src/generated/sea_breeze
 map(

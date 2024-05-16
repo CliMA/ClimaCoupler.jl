@@ -1,3 +1,5 @@
+# AMIP Log
+
 ## Current AMIP components
 
 ### Atmosphere
@@ -12,9 +14,9 @@ Parameterizations:
 
 - Radiation: A scheme based on RRTM for General circulation model applications—Parallel (RRTMGP) (Pincus et al. 2019)
 
-- Convection and turbulence: Diagnostic Eddy-diffusivity Mass-Flux (EDMF) scheme with prognostic turbulent kinetic energy. 
-EDMF is a unified parameterization for turbulence and convection (Tan et al. 2018, Cohen et al. 2020, Lopez-Gomez et al. 2020). The grid is decomposed into convective updrafts and the turbulent environment. 
-Updraft properties are calculated from mass, momentum and energy conservation of the updraft. 
+- Convection and turbulence: Diagnostic Eddy-diffusivity Mass-Flux (EDMF) scheme with prognostic turbulent kinetic energy.
+EDMF is a unified parameterization for turbulence and convection (Tan et al. 2018, Cohen et al. 2020, Lopez-Gomez et al. 2020). The grid is decomposed into convective updrafts and the turbulent environment.
+Updraft properties are calculated from mass, momentum and energy conservation of the updraft.
 Mass and momentum exchange between the updrafts and the environment, and
 turbulent mixing in the environment, are represented with physical closures. Currently, only one updraft is used.
 
@@ -36,7 +38,7 @@ Dynamical core:
 - Spatial discretization: Finite difference, multiple independent columns on the sphere
 - Time stepping: Explicit additive Runge–Kutta method
 
-Land surface albedo: 
+Land surface albedo:
 - Bare ground: Prescribed from files
 - Snow: Constant
 

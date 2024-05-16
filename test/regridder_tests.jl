@@ -329,7 +329,7 @@ end
     ClimaComms.init(comms_ctx_device)
 
     # make path for truncated datasets
-    COUPLER_OUTPUT_DIR = joinpath("experiments", "AMIP", "output", "tests")
+    COUPLER_OUTPUT_DIR = joinpath("experiments", "ClimaEarth", "output", "tests")
     mkpath(COUPLER_OUTPUT_DIR)
 
     REGRID_DIR = joinpath(COUPLER_OUTPUT_DIR, "regrid_tmp", "")

@@ -4,7 +4,7 @@ import Thermodynamics.Parameters as TDP
 import ClimaCoupler
 import ClimaCoupler: TestHelper
 
-include(pkgdir(ClimaCoupler, "experiments/AMIP/components/ocean/prescr_seaice.jl"))
+include(pkgdir(ClimaCoupler, "experiments/ClimaEarth/components/ocean/prescr_seaice.jl"))
 
 for FT in (Float32, Float64)
     @testset "test sea-ice energy slab for FT=$FT" begin

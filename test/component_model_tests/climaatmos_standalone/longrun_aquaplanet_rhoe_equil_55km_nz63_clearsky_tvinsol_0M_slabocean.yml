@@ -9,7 +9,6 @@ dz_top: 3000.0
 h_elem: 16
 idealized_insolation: false
 implicit_diffusion: true
-job_id: "longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_tvinsol_0M_slabocean"
 moist: "equil"
 precip_model: "0M"
 prognostic_surface: "PrognosticSurfaceTemperature"

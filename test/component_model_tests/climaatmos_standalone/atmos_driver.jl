@@ -16,6 +16,10 @@ function argparse_settings()
         help = "A yaml file used to set the configuration of the coupled model"
         arg_type = String
         default = nothing
+        "--job_id"
+        help = "A unique string ID for this job"
+        arg_type = String
+        default = "climaatmos_test"
     end
     return s
 end
@@ -37,6 +41,7 @@ end
 parse_commandline(s) = ArgParse.parse_args(ARGS, s)
 parsed_args = parse_commandline(argparse_settings())
 atmos_config_file = parsed_args["config_file"]
+job_id = parsed_args["job_id"]
 
 # Use input atmos configuration file
 if isnothing(atmos_config_file)
@@ -48,8 +53,7 @@ else
 end
 
 # Specify atmos output directory to be inside the coupler output directory
-output_dir =
-    joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "output", "climaatmos", config["job_id"]) * "_artifacts"
+output_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "output", "climaatmos", job_id) * "_artifacts"
 !isdir(output_dir) && mkpath(output_dir)
 config = merge(config, Dict("output_dir" => output_dir))
 atmos_config = CA.AtmosConfig(config)

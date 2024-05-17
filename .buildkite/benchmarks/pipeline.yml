@@ -45,7 +45,7 @@ steps:
     steps:
       - label: "CPU ClimaAtmos with diagnostic EDMF"
         key: "climaatmos_diagedmf"
-        command: "srun julia --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos_diagedmf.yml"
+        command: "srun julia --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos_diagedmf.yml --job_id climaatmos_diagedmf"
         artifact_paths: "experiments/ClimaEarth/output/climaatmos/climaatmos_diagedmf_artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
@@ -71,7 +71,7 @@ steps:
     steps:
       - label: "GPU ClimaAtmos with diagnostic EDMF"
         key: "gpu_climaatmos_diagedmf"
-        command: "srun julia --threads=3 --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/gpu_climaatmos_diagedmf.yml"
+        command: "srun julia --threads=3 --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/gpu_climaatmos_diagedmf.yml --job_id gpu_climaatmos_diagedmf"
         artifact_paths: "experiments/ClimaEarth/output/climaatmos/gpu_climaatmos_diagedmf_artifacts/*"
         agents:
           slurm_gpus_per_task: 1

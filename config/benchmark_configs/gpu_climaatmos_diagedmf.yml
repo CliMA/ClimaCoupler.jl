@@ -16,7 +16,6 @@ edmfx_upwinding: first_order
 h_elem: 30
 idealized_insolation: false
 implicit_diffusion: true
-job_id: "gpu_climaatmos_diagedmf"
 moist: equil
 output_default_diagnostics: false
 precip_model: 0M

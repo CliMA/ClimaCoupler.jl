@@ -22,7 +22,7 @@ Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 
 [compat]
 ClimaComms = "0.5.6"
-ClimaCore = "0.13"
+ClimaCore = "0.14"
 ClimaCoreTempestRemap = "0.3"
 CUDA = "5"
 Dates = "1"

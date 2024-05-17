@@ -152,6 +152,7 @@ function bias(obs_ds::ObsDataSource, sim_ds::SimDataSource, target_dates::Abstra
 
     bias_attribs = Dict{String, Any}(
         "short_name" => "sim-obs_$short_name",
+        "var_short_name" => "$short_name",
         "long_name" => "SIM - OBS mean $short_name\n(RMSE: $rmse $units, Global bias: $global_bias $units)",
         "rmse" => rmse,
         "bias" => global_bias,

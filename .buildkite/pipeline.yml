@@ -43,7 +43,7 @@ steps:
       - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.status()'"
 
-      - echo "--- Instantiate AMIP env"
+      - echo "--- Instantiate ClimaEarth env"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"

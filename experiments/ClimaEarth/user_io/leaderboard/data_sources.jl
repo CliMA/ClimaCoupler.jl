@@ -19,8 +19,7 @@ struct ObsDataSource
     """Name of the latitude dimension in the NetCDF file"""
     lat_name::AbstractString
 
-    """Function that has to be applied to the data to convert it to the same conventions
-    as CliMA"""
+    """Function that has to be applied to the data to convert it to different units"""
     preprocess_data_fn::Function
 
     """The NCDataset associated to the file"""
@@ -75,9 +74,24 @@ struct SimDataSource
 
     """Simulation longitudes and latitudes"""
     lonlat::Tuple{AbstractArray, AbstractArray}
+
+    """Function that has to be applied to the data to convert it to different units"""
+    preprocess_data_fn::Function
+
+    # TODO: This should be handled by ClimaAnalysis
+    """preprocess_data_fn is typically used to change units, so we have to tell ClimaAnalysis what the new
+    units are."""
+    new_units::Union{Nothing, AbstractString}
 end
 
-function SimDataSource(; path, short_name, reduction = "average", period = "10d")
+function SimDataSource(;
+    path,
+    short_name,
+    reduction = "average",
+    period = "10d",
+    preprocess_data_fn = identity,
+    new_units = nothing,
+)
 
     sim = ClimaAnalysis.SimDir(path)
     # TODO: Add period, for the time-being, we just pick up what's there
@@ -85,7 +99,7 @@ function SimDataSource(; path, short_name, reduction = "average", period = "10d"
 
     lonlat = (var.dims["lon"], var.dims["lat"])
 
-    return SimDataSource(path, short_name, reduction, period, var, lonlat)
+    return SimDataSource(path, short_name, reduction, period, var, lonlat, preprocess_data_fn, new_units)
 end
 
 """
@@ -96,5 +110,5 @@ Return the simulation data at the given date.
 function data_at_date(sim_ds::SimDataSource, date::Dates.DateTime)
     start_date = Dates.DateTime(sim_ds.var.attributes["start_date"])
     time_diff_seconds = (date - start_date) / Dates.Second(1)
-    return ClimaAnalysis.slice(sim_ds.var, time = time_diff_seconds).data
+    return sim_ds.preprocess_data_fn(ClimaAnalysis.slice(sim_ds.var, time = time_diff_seconds).data)
 end

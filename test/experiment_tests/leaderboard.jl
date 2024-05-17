@@ -53,16 +53,18 @@ end
 @testset "Leaderboard" begin
     simdir = ClimaAnalysis.SimDir(@__DIR__)
 
-    sim_datasource = Leaderboard.SimDataSource(path = @__DIR__, short_name = "pr")
+    preprocess_fn = (data) -> data .* Float32(-1 / 86400)
+
+    # The conversion is technically not correct for this data source, but what
+    # we care about here is that preprocess_data_fn works
+    sim_datasource = Leaderboard.SimDataSource(path = @__DIR__, short_name = "pr", preprocess_data_fn = preprocess_fn)
 
     pr = get(simdir, "pr")
 
     @test sim_datasource.lonlat[1] == pr.dims["lon"]
     @test sim_datasource.lonlat[2] == pr.dims["lat"]
 
-    @test Leaderboard.data_at_date(sim_datasource, Dates.DateTime(1979, 1, 2)) == pr.data[1, :, :]
-
-    preprocess_fn = (data) -> data .* Float32(-1 / 86400)
+    @test Leaderboard.data_at_date(sim_datasource, Dates.DateTime(1979, 1, 2)) == preprocess_fn(pr.data[1, :, :])
 
     obs_datasource = Leaderboard.ObsDataSource(;
         path = joinpath(pr_obs_data_path(), "gpcp.precip.mon.mean.197901-202305.nc"),

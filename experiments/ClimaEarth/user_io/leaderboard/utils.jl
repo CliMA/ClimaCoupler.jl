@@ -148,7 +148,7 @@ function bias(obs_ds::ObsDataSource, sim_ds::SimDataSource, target_dates::Abstra
     rmse = round(sqrt(integrate_on_sphere(mse_arr, lonlat)); sigdigits = 3)
     global_bias = round(integrate_on_sphere(bias_arr, lonlat); sigdigits = 3)
 
-    units = sim_ds.var.attributes["units"]
+    units = isnothing(sim_ds.new_units) ? sim_ds.var.attributes["units"] : sim_ds.new_units
 
     bias_attribs = Dict{String, Any}(
         "short_name" => "sim-obs_$short_name",

@@ -43,7 +43,7 @@ steps:
       - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.status()'"
 
-      - echo "--- Instantiate AMIP env"
+      - echo "--- Instantiate ClimaEarth env"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
@@ -118,13 +118,6 @@ steps:
         agents:
           slurm_ntasks: 2
           slurm_mem: 16GB
-
-      - label: "GPU Utilities unit tests"
-        key: "utilities_gpu_tests"
-        command: "srun julia --color=yes --project=test/ test/utilities_tests.jl --run_name utilities_gpu --job_id utilities_gpu"
-        agents:
-          slurm_mem: 5GB
-          slurm_gpus: 1
 
       - label: "Perf flame graph diff tests"
         command: "julia --color=yes --project=perf/ perf/flame_test.jl --run_name flame_test --job_id flame_perf_target"

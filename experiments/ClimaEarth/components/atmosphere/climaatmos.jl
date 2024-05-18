@@ -353,6 +353,11 @@ function get_atmos_config_dict(coupler_dict)
     )
     atmos_config = merge(atmos_config, Dict("output_dir" => atmos_output_dir))
 
+    # set restart file to the initial file saved in this location if it is not nothing
+    # TODO this is hardcoded and should be fixed once we have a better restart system
+    if !isnothing(atmos_config["restart_file"])
+        atmos_config["restart_file"] = replace(atmos_config["restart_file"], "active" => "0000")
+    end
     return atmos_config
 end
 

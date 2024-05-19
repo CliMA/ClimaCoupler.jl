@@ -923,19 +923,49 @@ if ClimaComms.iamroot(comms_ctx)
 
             include("user_io/leaderboard.jl")
             compare_vars = ["pr"]
-            function plot_biases(dates, output_name)
-                output_path = joinpath(dir_paths.artifacts, "bias_$(output_name).png")
-                Leaderboard.plot_biases(atmos_sim.integrator.p.output_dir, compare_vars, dates; output_path)
+            function compute_biases(dates)
+                if isempty(dates)
+                    return map(x -> 0.0, compare_vars)
+                else
+                    return Leaderboard.compute_biases(atmos_sim.integrator.p.output_dir, compare_vars, dates)
+                end
             end
-            plot_biases(output_dates, "total")
+
+            function plot_biases(dates, biases, output_name)
+                isempty(dates) && return nothing
+
+                output_path = joinpath(dir_paths.artifacts, "bias_$(output_name).png")
+                Leaderboard.plot_biases(biases; output_path)
+            end
+
+            ann_biases = compute_biases(output_dates)
+            plot_biases(output_dates, ann_biases, "total")
 
             ## collect all days between cs.dates.date0 and cs.dates.date
             MAM, JJA, SON, DJF = Leaderboard.split_by_season(output_dates)
 
-            !isempty(MAM) && plot_biases(MAM, "MAM")
-            !isempty(JJA) && plot_biases(JJA, "JJA")
-            !isempty(SON) && plot_biases(SON, "SON")
-            !isempty(DJF) && plot_biases(DJF, "DJF")
+            MAM_biases = compute_biases(MAM)
+            plot_biases(MAM, MAM_biases, "MAM")
+            JJA_biases = compute_biases(JJA)
+            plot_biases(JJA, JJA_biases, "JJA")
+            SON_biases = compute_biases(SON)
+            plot_biases(SON, SON_biases, "SON")
+            DJF_biases = compute_biases(DJF)
+            plot_biases(DJF, DJF_biases, "DJF")
+
+            rmses = map(
+                (index) -> Leaderboard.RMSEs(;
+                    model_name = "CliMA",
+                    ANN = ann_biases[index],
+                    DJF = DJF_biases[index],
+                    JJA = JJA_biases[index],
+                    MAM = MAM_biases[index],
+                    SON = SON_biases[index],
+                ),
+                1:length(compare_vars),
+            )
+
+            Leaderboard.plot_leaderboard(rmses; output_path = "bias_leaderboard.png")
         end
     end
 

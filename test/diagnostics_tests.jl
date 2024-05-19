@@ -2,6 +2,7 @@
     Unit tests for ClimaCoupler Diagnostics module
 =#
 import Test: @test, @testset
+import CUDA
 import Dates
 import ClimaComms
 import ClimaCore as CC
@@ -50,7 +51,10 @@ for FT in (Float32, Float64)
                 nothing, # thermo_params
             )
             Diagnostics.accumulate_diagnostics!(cs)
-            @test cs.diagnostics[1].field_vector[1] == expected_results[c_i]
+
+            CUDA.@allowscalar begin
+                @test cs.diagnostics[1].field_vector[1] == expected_results[c_i]
+            end
 
             @test isnothing(Diagnostics.get_var(cs, Val(:z)))
         end

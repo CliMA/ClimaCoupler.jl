@@ -1,9 +1,12 @@
 import Plots
 import Printf
+import ClimaComms
 import ClimaCore as CC
 import ClimaCorePlots
 import ClimaCoupler: Interfacer
 import ClimaAtmos as CA
+
+include("plot_helper.jl")
 
 # plotting functions for the coupled simulation
 """
@@ -12,7 +15,7 @@ import ClimaAtmos as CA
 Plot the fields of a coupled simulation and save plots to a directory.
 """
 function debug(cs::Interfacer.CoupledSimulation, dir = "debug", cs_fields_ref = nothing)
-    mkpath(dir)
+    isdir(dir) || mkpath(dir)
     @info "plotting debug in " * dir
     for sim in cs.model_sims
         debug(sim, dir)
@@ -48,9 +51,14 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
         :radiative_energy_flux_toa,
     )
     all_plots = []
+
     for field_name in field_names
         field = getproperty(cs_fields, field_name)
-        push!(all_plots, Plots.plot(field, title = string(field_name) * print_extrema(field)))
+
+        # Copy field onto cpu space if necessary
+        cpu_field = to_cpu(field)
+
+        push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(field)))
     end
     Plots.plot(all_plots..., size = (1500, 800))
     Plots.png(joinpath(dir, "debug_coupler"))
@@ -60,10 +68,13 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
         all_plots = []
         for field_name in field_names
             field = getproperty(cs_fields, field_name)
+            # Copy field onto cpu space if necessary
+            cpu_field = to_cpu(field)
+
             push!(
                 all_plots,
                 Plots.plot(
-                    field .- getproperty(cs_fields_ref, field_name),
+                    cpu_field .- getproperty(cs_fields_ref, field_name),
                     title = string(field_name) * print_extrema(field),
                 ),
             )
@@ -79,17 +90,19 @@ end
 Plot the fields of a component model simulation and save plots to a directory.
 """
 function debug(sim::Interfacer.ComponentModelSimulation, dir)
-
     field_names = plot_field_names(sim)
 
     all_plots = []
     for field_name in field_names
         field = Interfacer.get_field(sim, Val(field_name))
-        push!(all_plots, Plots.plot(field, title = string(field_name) * print_extrema(field)))
+
+        # Copy field onto cpu space if necessary
+        cpu_field = to_cpu(field)
+
+        push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(field)))
     end
     fig = Plots.plot(all_plots..., size = (1500, 800))
     Plots.png(joinpath(dir, "debug_$(Interfacer.name(sim))"))
-
 end
 
 """

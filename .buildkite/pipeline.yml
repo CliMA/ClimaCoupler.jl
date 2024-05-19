@@ -403,6 +403,14 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
+      - label: "GPU Slabplanet: extra atmos diagnostics"
+        key: "gpu_slabplanet_atmos_diags"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/gpu_slabplanet_atmos_diags.yml"
+        artifact_paths: "experiments/ClimaEarth/output/slabplanet/gpu_slabplanet_atmos_diags_artifacts/*"
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
+
       # GPU RUNS: AMIP
       - label: "GPU AMIP test: albedo from function"
         key: "gpu_amip_albedo_function"

@@ -976,10 +976,8 @@ if ClimaComms.iamroot(comms_ctx)
         make_plots(Val(:general_ci_plots), [atmos_sim.integrator.p.output_dir], dir_paths.artifacts)
     end
 
-    ## plot all model states and coupler fields (useful for debugging) TODO: make MPI & GPU compatible
-    comms_ctx.device == ClimaComms.CPUSingleThreaded() &&
-        comms_ctx isa ClimaComms.SingletonCommsContext &&
-        debug(cs, joinpath(dir_paths.artifacts, "endstates_"))
+    ## plot all model states and coupler fields (useful for debugging)
+    !(comms_ctx isa ClimaComms.MPICommsContext) && debug(cs, dir_paths.artifacts)
 
     if isinteractive()
         ## clean up for interactive runs, retain all output otherwise

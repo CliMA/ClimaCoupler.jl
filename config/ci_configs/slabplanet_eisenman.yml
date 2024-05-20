@@ -6,7 +6,6 @@ dt_cpl: 200
 dt_save_to_sol: "9days"
 energy_check: true
 h_elem: 6
-job_id: "slabplanet_eisenman"
 mode_name: "slabplanet_eisenman"
 moist: "equil"
 mono_surface: true

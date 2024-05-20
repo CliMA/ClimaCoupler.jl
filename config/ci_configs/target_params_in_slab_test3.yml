@@ -9,7 +9,6 @@ dt_save_to_sol: "3600secs"
 energy_check: true
 h_elem: 6
 idealized_insolation: false
-job_id: "target_params_in_slab_test3"
 mode_name: "slabplanet"
 moist: "equil"
 mono_surface: true

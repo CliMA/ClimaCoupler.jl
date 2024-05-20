@@ -4,7 +4,6 @@ dt_cpl: 200
 dt_save_to_sol: "3600secs"
 energy_check: true
 h_elem: 4
-job_id: "slabplanet_albedo_temporal_map"
 land_albedo_type: "map_temporal"
 mode_name: "slabplanet"
 moist: "equil"

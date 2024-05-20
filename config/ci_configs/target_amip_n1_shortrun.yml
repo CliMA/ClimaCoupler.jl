@@ -9,7 +9,6 @@ dz_bottom: 30
 dz_top: 3000
 energy_check: false
 h_elem: 16
-job_id: "target_amip_n1_shortrun"
 mode_name: "amip"
 moist: "equil"
 mono_surface: false

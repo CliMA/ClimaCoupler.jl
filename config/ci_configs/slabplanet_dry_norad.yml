@@ -6,7 +6,6 @@ dt_cpl: 200
 dt_save_to_sol: "9days"
 energy_check: true
 h_elem: 4
-job_id: "slabplanet_dry_norad"
 mode_name: "slabplanet"
 moist: "dry"
 mono_surface: true

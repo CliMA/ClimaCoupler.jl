@@ -29,8 +29,9 @@ function hasmoisture(integrator)
     return !(integrator.p.atmos.moisture_model isa CA.DryModel)
 end
 
-function atmos_init(::Type{FT}, atmos_config) where {FT}
+function atmos_init(atmos_config)
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
+    FT = atmos_config.parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
     simulation = CA.get_simulation(atmos_config)
     (; integrator) = simulation
     Y = integrator.u
@@ -297,7 +298,7 @@ FluxCalculator.get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxe
     get_atmos_config_dict(coupler_dict::Dict)
 
 Returns the specified atmospheric configuration (`atmos_config`) overwitten by arguments
-in the coupler dictionary (`config_dict`). The returned dictionary will then be passed to CA.AtmosConfig().
+in the coupler dictionary (`config_dict`). The returned `atmos_config` dictionary will then be passed to CA.AtmosConfig().
 The `atmos_config_repo` flag allows us to
 use a configuration specified within the ClimaCoupler repo, which is useful for direct
 coupled/atmos-only comparisons.
@@ -350,14 +351,18 @@ function get_atmos_config_dict(coupler_dict)
         joinpath(coupler_dict["mode_name"], coupler_dict["run_name"]),
         "clima_atmos",
     )
+
+    # merge configs
+    # (if there are common keys, the last dictionary in the `merge` arguments takes precedence)
     atmos_config = merge(atmos_config, Dict("output_dir" => atmos_output_dir))
+    coupler_config = merge(atmos_config, config_dict)
 
     # set restart file to the initial file saved in this location if it is not nothing
     # TODO this is hardcoded and should be fixed once we have a better restart system
     if !isnothing(atmos_config["restart_file"])
         atmos_config["restart_file"] = replace(atmos_config["restart_file"], "active" => "0000")
     end
-    return atmos_config
+    return atmos_config, coupler_config
 end
 
 
@@ -416,9 +421,10 @@ function get_new_cache(atmos_sim::ClimaAtmosSimulation, csf)
 end
 
 """
-    FluxCalculator.atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
+    FluxCalculator.atmos_turbulent_fluxes_most!(atmos_sim::ClimaAtmosSimulation, csf)
 
-Computes turbulent surface fluxes using ClimaAtmos's `update_surface_conditions!`. This
+Computes turbulent surface fluxes using ClimaAtmos's `update_surface_conditions!` and
+and the Monin Obukhov Similarity Theory. This
 requires that we define a new temporary parameter Tuple, `new_p`, and save the new surface state
 in it. We do not want `new_p` to live in the atmospheric model permanently, because that would also
 trigger flux calculation during Atmos `Interfacer.step!`. We only want to trigger this once per coupling
@@ -430,7 +436,7 @@ For debigging atmos, we can set the following atmos defaults:
  csf.beta .= 1
  csf = merge(csf, (;q_sfc = nothing))
 """
-function FluxCalculator.atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
+function FluxCalculator.atmos_turbulent_fluxes_most!(atmos_sim::ClimaAtmosSimulation, csf)
 
     if isnothing(atmos_sim.integrator.p.sfc_setup) # trigger flux calculation if not done in Atmos internally
         new_p = get_new_cache(atmos_sim, csf)

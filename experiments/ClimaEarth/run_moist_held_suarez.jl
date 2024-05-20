@@ -1,4 +1,4 @@
-# # Dry Held-Suarez
+# # Moist Held-Suarez
 
 redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(false)))
 
@@ -11,17 +11,27 @@ redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(false)))
 =#
 
 ## standard packages
-using Dates
+import Dates
 import YAML
 
-## ClimaESM packages
+# ## ClimaESM packages
 import ClimaAtmos as CA
-import ClimaCore
-using ClimaComms
+import ClimaComms
+import ClimaCore as CC
 
-## Coupler specific imports
+# ## Coupler specific imports
 import ClimaCoupler
-import ClimaCoupler: Checkpointer, FieldExchanger, Interfacer, TimeManager, Utilities
+import ClimaCoupler:
+    BCReader,
+    ConservationChecker,
+    Checkpointer,
+    Diagnostics,
+    FieldExchanger,
+    FluxCalculator,
+    Interfacer,
+    Regridder,
+    TimeManager,
+    Utilities
 
 pkg_dir = pkgdir(ClimaCoupler)
 
@@ -40,11 +50,11 @@ include("user_io/io_helpers.jl")
 
 #=
 ### Setup simulation parameters
-Here we follow ClimaCore's dry Held-Suarez `held_suarez_rhoe` example.
+Here we follow Thatcher and Jablonowski (2016).
 =#
 
 ## run names
-run_name = "dry_held_suarez"
+run_name = "moist_held_suarez"
 coupler_output_dir = "$run_name"
 const FT = Float64
 restart_dir = "unspecified"
@@ -85,7 +95,7 @@ config_dict = Dict(
     "apply_limiter" => false,
     "viscous_sponge" => false,
     "rayleigh_sponge" => false,
-    "vert_diff" => "false",
+    "vert_diff" => "true",
     "hyperdiff" => "ClimaHyperdiffusion",
     # run
     "job_id" => run_name,
@@ -101,8 +111,13 @@ config_dict = Dict(
         ),
     ],
     # held-suarez specific
-    "forcing" => "held_suarez",
+    "forcing" => "held_suarez", # Newtonian cooling already modified for moisture internally in Atmos
+    "precip_model" => "0M",
+    "moist" => "equil",
+    "prognostic_surface" => "PrescribedSurfaceTemperature",
+    "turb_flux_partition" => "CombinedStateFluxesMOST",
 )
+# TODO: may need to switch to Bulk fluxes
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
 atmos_config_dict, config_dict = get_atmos_config_dict(config_dict)
@@ -126,6 +141,11 @@ ClimaComms.iamroot(comms_ctx) ? @info(config_dict) : nothing
 ## Component Model Initialization
 =#
 
+#=
+### Atmosphere
+This uses the `ClimaAtmos.jl` model, with parameterization options specified in the `atmos_config_object` dictionary.
+=#
+
 ## init atmos model component
 atmos_sim = atmos_init(atmos_config_object);
 thermo_params = get_thermo_params(atmos_sim)
@@ -135,7 +155,29 @@ thermo_params = get_thermo_params(atmos_sim)
 =#
 
 ## init a 2D boundary space at the surface
-boundary_space = ClimaCore.Spaces.horizontal_space(atmos_sim.domain.face_space)
+boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
+
+#=
+### Surface Model: Prescribed Ocean
+=#
+
+# could overload surface_temperature in atmos as well, but this is more transparent
+## idealized SST profile
+sst_tj16(ϕ::FT; Δϕ² = FT(26)^2, ΔT = FT(29), T_min = FT(271)) = T_min + ΔT * exp(-ϕ^2 / 2Δϕ²)
+ϕ = CC.Fields.coordinate_field(boundary_space).lat
+
+ocean_sim = Interfacer.SurfaceStub((;
+    T_sfc = sst_tj16.(ϕ),
+    ρ_sfc = CC.Fields.zeros(boundary_space),
+    z0m = FT(5e-4),
+    z0b = FT(5e-4),
+    beta = FT(1),
+    α_direct = CC.Fields.ones(boundary_space) .* FT(1),
+    α_diffuse = CC.Fields.ones(boundary_space) .* FT(1),
+    area_fraction = CC.Fields.ones(boundary_space),
+    phase = TD.Liquid(),
+    thermo_params = thermo_params,
+))
 
 #=
 ## Coupler Initialization
@@ -164,10 +206,11 @@ coupler_field_names = (
     :temp2,
 )
 coupler_fields =
-    NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
+    NamedTuple{coupler_field_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_field_names)))
+Utilities.show_memory_usage(comms_ctx)
 
 ## model simulations
-model_sims = (atmos_sim = atmos_sim,);
+model_sims = (atmos_sim = atmos_sim, ocean_sim = ocean_sim);
 
 ## dates
 date0 = date = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
@@ -176,12 +219,13 @@ dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)
 #=
 ## Initialize Callbacks
 =#
+
 checkpoint_cb = TimeManager.HourlyCallback(
     dt = FT(480),
     func = checkpoint_sims,
     ref_date = [dates.date[1]],
     active = hourly_checkpoint,
-) # 20 days TODO: not GPU friendly
+)
 update_firstdayofmonth!_cb = TimeManager.MonthlyCallback(
     dt = FT(1),
     func = TimeManager.update_firstdayofmonth!,
@@ -189,6 +233,20 @@ update_firstdayofmonth!_cb = TimeManager.MonthlyCallback(
     active = true,
 )
 callbacks = (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb)
+
+#=
+## Initialize turbulent fluxes
+=#
+turbulent_fluxes = nothing
+if config_dict["turb_flux_partition"] == "CombinedStateFluxesMOST"
+    turbulent_fluxes = FluxCalculator.CombinedStateFluxesMOST()
+else
+    error("turb_flux_partition must be CombinedStateFluxesMOST")
+end
+
+#=
+## Initialize Coupled Simulation
+=#
 
 cs = Interfacer.CoupledSimulation{FT}(
     comms_ctx,
@@ -200,13 +258,13 @@ cs = Interfacer.CoupledSimulation{FT}(
     [tspan[1], tspan[2]],
     atmos_sim.integrator.t,
     Δt_cpl,
-    (;),
+    (; land = zeros(boundary_space), ocean = ones(boundary_space), ice = zeros(boundary_space)),
     model_sims,
     (;), # mode_specifics
     (), # coupler diagnostics
     callbacks,
     dir_paths,
-    nothing, # turbulent_fluxes
+    turbulent_fluxes,
     thermo_params,
 );
 
@@ -216,11 +274,37 @@ cs = Interfacer.CoupledSimulation{FT}(
 
 if restart_dir !== "unspecified"
     for sim in cs.model_sims
-        if get_model_prog_state(sim) !== nothing
+        if Checkpointer.get_model_prog_state(sim) !== nothing
             Checkpointer.restart_model_state!(sim, comms_ctx, restart_t; input_dir = restart_dir)
         end
     end
 end
+
+#=
+## Initialize Component Model Exchange
+=#
+
+# 1.surface density (`ρ_sfc`): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface.
+# For this, we need to import surface and atmospheric fields. The model sims are then updated with the new surface density.
+FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes)
+FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
+FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
+
+# 2.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
+Interfacer.step!(ocean_sim, Δt_cpl)
+
+# 3.turbulent fluxes
+## import the new surface properties into the coupler (note the atmos state was also imported in step 3.)
+FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta, q_sfc
+## calculate turbulent fluxes inside the atmos cache based on the combined surface state in each grid box
+FluxCalculator.combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes) # this updates the atmos thermo state, sfc_ts
+
+# 4.reinitialize models + radiative flux: prognostic states and time are set to their initial conditions.
+FieldExchanger.reinit_model_sims!(cs.model_sims)
+
+# 5.update all fluxes: coupler re-imports updated atmos fluxes
+FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
+FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 
 #=
 ## Coupling Loop
@@ -228,34 +312,40 @@ end
 
 function solve_coupler!(cs)
     (; model_sims, Δt_cpl, tspan, comms_ctx) = cs
-    (; atmos_sim) = model_sims
 
-    ClimaComms.iamroot(comms_ctx) ? @info("Starting coupling loop") : nothing
+    ClimaComms.iamroot(comms_ctx) && @info("Starting coupling loop")
     ## step in time
-    walltime = @elapsed for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
+    for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
 
         cs.dates.date[1] = TimeManager.current_date(cs, t)
 
         ## print date on the first of month
         if cs.dates.date[1] >= cs.dates.date1[1]
-            ClimaComms.iamroot(comms_ctx) ? @show(cs.dates.date[1]) : nothing
+            ClimaComms.iamroot(comms_ctx) && @show(cs.dates.date[1])
         end
+        ClimaComms.barrier(comms_ctx)
+
+        ## run component models sequentially for one coupling timestep (Δt_cpl)
+        FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 
         ## step sims
         FieldExchanger.step_model_sims!(cs.model_sims, t)
 
-        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
+        ## exchange combined fields and (if specified) calculate fluxes using combined states
+        FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, surface_albedo, z0, beta
+        FluxCalculator.combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 
-        ## callback to update the fist day of month if needed (for BCReader)
+        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
+
+        ## callback to update the fist day of month
         TimeManager.trigger_callback!(cs, cs.callbacks.update_firstdayofmonth!)
 
         ## callback to checkpoint model state
         TimeManager.trigger_callback!(cs, cs.callbacks.checkpoint)
 
     end
-    ClimaComms.iamroot(comms_ctx) ? @show(walltime) : nothing
 
-    return cs
+    return nothing
 end
 
 ## run the coupled simulation

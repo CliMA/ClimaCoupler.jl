@@ -378,12 +378,21 @@ steps:
 
   - group: "Hierarchy tests (1d)"
     steps:
-      - label: "Dry Held Suarez"
+      - label: ":construction: Dry Held Suarez"
         key: "dry_held_suarez"
         command:
-          - sed 's/t_end = "1000days"/t_end = "1days"/' experiments/ClimaEarth/run_dry_held_suarez.jl > experiments/ClimaEarth/run_dry_held_suarez_modified.jl
-          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_dry_held_suarez_modified.jl"
+          - sed 's/t_end = "1000days"/t_end = "1days"/' experiments/ClimaEarth/run_dry_held_suarez.jl > experiments/ClimaEarth/run_dry_held_suarez_short.jl
+          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_dry_held_suarez_short.jl"
         artifact_paths:  "dry_held_suarez/dry_held_suarez/clima_atmos/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: ":construction: Moist Held Suarez"
+        key: "moist_held_suarez"
+        command:
+          - sed 's/t_end = "1000days"/t_end = "1days"/' experiments/ClimaEarth/run_moist_held_suarez.jl > experiments/ClimaEarth/run_moist_held_suarez_short.jl
+          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_moist_held_suarez_short.jl"
+        artifact_paths:  "moist_held_suarez/moist_held_suarez/clima_atmos/*"
         agents:
           slurm_mem: 20GB
 

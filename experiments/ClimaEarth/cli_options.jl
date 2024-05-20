@@ -35,9 +35,9 @@ function argparse_settings()
         arg_type = Bool
         default = false
         "--turb_flux_partition"
-        help = "Method to partition turbulent fluxes. [`PartitionedStateFluxes`, `CombinedStateFluxes`]"
+        help = "Method to partition turbulent fluxes. [`PartitionedStateFluxes`, `CombinedStateFluxesMOST`]"
         arg_type = String
-        default = "CombinedStateFluxes"
+        default = "CombinedStateFluxesMOST"
         "--hourly_checkpoint"
         help = "Boolean flag indicating whether to checkpoint at intervals of 1 hour or multiple hours"
         arg_type = Bool

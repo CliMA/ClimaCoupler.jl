@@ -99,17 +99,13 @@ if isinteractive()
         parsed_args["config_file"]
 end
 
-## read in config dictionary from file, overriding the coupler defaults
+## read in config dictionary from file, overriding the coupler defaults in `parsed_args`
 config_dict = YAML.load_file(parsed_args["config_file"])
 config_dict = merge(parsed_args, config_dict)
 
 ## get component model dictionaries (if applicable)
-config_dict_atmos = get_atmos_config_dict(config_dict)
-atmos_config_object = CA.AtmosConfig(config_dict_atmos)
-
-## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
-## (if there are common keys, the last dictionary in the `merge` arguments takes precedence)
-config_dict = merge(config_dict_atmos, config_dict)
+atmos_config_dict, config_dict = get_atmos_config_dict(config_dict)
+atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 
 ## read in some parsed command line arguments, required by this script
 mode_name = config_dict["mode_name"]
@@ -177,13 +173,13 @@ returns a `ComponentModelSimulation` object (see `Interfacer` docs for more deta
 
 #=
 ### Atmosphere
-This uses the `ClimaAtmos.jl` model, with parameterization options specified in the `config_dict_atmos` dictionary.
+This uses the `ClimaAtmos.jl` model, with parameterization options specified in the `atmos_config_object` dictionary.
 =#
 
 Utilities.show_memory_usage(comms_ctx)
 
 ## init atmos model component
-atmos_sim = atmos_init(FT, atmos_config_object);
+atmos_sim = atmos_init(atmos_config_object);
 Utilities.show_memory_usage(comms_ctx)
 
 thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models #610
@@ -573,10 +569,10 @@ Decide on the type of turbulent flux partition (see `FluxCalculator` documentati
 turbulent_fluxes = nothing
 if config_dict["turb_flux_partition"] == "PartitionedStateFluxes"
     turbulent_fluxes = FluxCalculator.PartitionedStateFluxes()
-elseif config_dict["turb_flux_partition"] == "CombinedStateFluxes"
-    turbulent_fluxes = FluxCalculator.CombinedStateFluxes()
+elseif config_dict["turb_flux_partition"] == "CombinedStateFluxesMOST"
+    turbulent_fluxes = FluxCalculator.CombinedStateFluxesMOST()
 else
-    error("turb_flux_partition must be either PartitionedStateFluxes or CombinedStateFluxes")
+    error("turb_flux_partition must be either PartitionedStateFluxes or CombinedStateFluxesMOST")
 end
 
 #=
@@ -648,7 +644,7 @@ Interfacer.step!(ice_sim, Δt_cpl)
 
 # 4.turbulent fluxes: now we have all information needed for calculating the initial turbulent surface fluxes using the combined state
 # or the partitioned state method
-if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
+if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
     ## import the new surface properties into the coupler (note the atmos state was also imported in step 3.)
     FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta, q_sfc
     ## calculate turbulent fluxes inside the atmos cache based on the combined surface state in each grid box
@@ -674,7 +670,7 @@ end
 FieldExchanger.reinit_model_sims!(cs.model_sims)
 
 # 6.update all fluxes: coupler re-imports updated atmos fluxes (radiative fluxes for both `turbulent_fluxes` types
-# and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxes`,
+# and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxesMOST`,
 # and sends them to the surface component models. If `turbulent_fluxes isa PartitionedStateFluxes`
 # atmos receives the turbulent fluxes from the coupler.
 FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
@@ -753,7 +749,7 @@ function solve_coupler!(cs)
 
         ## exchange combined fields and (if specified) calculate fluxes using combined states
         FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, surface_albedo, z0, beta
-        if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
+        if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
             FluxCalculator.combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes) # this updates the surface thermo state, sfc_ts, in ClimaAtmos (but also unnecessarily calculates fluxes)
         elseif cs.turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
             ## calculate turbulent fluxes in surfaces and save the weighted average in coupler fields

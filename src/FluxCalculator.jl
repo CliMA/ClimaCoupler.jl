@@ -14,10 +14,10 @@ import ClimaCore as CC
 import ..Interfacer, ..Regridder
 
 export PartitionedStateFluxes,
-    CombinedStateFluxes,
+    CombinedStateFluxesMOST,
     combined_turbulent_fluxes!,
     TurbulentFluxPartition,
-    atmos_turbulent_fluxes!,
+    atmos_turbulent_fluxes_most!,
     calculate_surface_air_density,
     extrapolate_ρ_to_sfc,
     MoninObukhovScheme,
@@ -43,12 +43,12 @@ over each surface model and then combined. This is calculated on the coupler gri
 struct PartitionedStateFluxes <: TurbulentFluxPartition end
 
 """
-    CombinedStateFluxes <: TurbulentFluxPartition
+    CombinedStateFluxesMOST <: TurbulentFluxPartition
 
 A flag indicating that the turbulent fluxes (e.g. sensible and latent heat fluxes,
 drag and moisture fluxes) are to be  calculated on the Atmos grid, and saved in Atmos cache.
 """
-struct CombinedStateFluxes <: TurbulentFluxPartition end
+struct CombinedStateFluxesMOST <: TurbulentFluxPartition end
 
 """
     combined_turbulent_fluxes!(model_sims, csf, turbulent_fluxes::TurbulentFluxPartition)
@@ -62,17 +62,18 @@ Calls the method(s) which calculate turbulent surface fluxes from combined surfa
 
 """
 function combined_turbulent_fluxes!(model_sims, csf, turbulent_fluxes::TurbulentFluxPartition)
-    if turbulent_fluxes isa CombinedStateFluxes
-        atmos_turbulent_fluxes!(model_sims.atmos_sim, csf)
+    if turbulent_fluxes isa CombinedStateFluxesMOST
+        atmos_turbulent_fluxes_most!(model_sims.atmos_sim, csf)
     else
         nothing # TODO: may want to add CombinedCouplerGrid
     end
 end
 
 """
-    atmos_turbulent_fluxes!(sim::Interfacer.ComponentModelSimulation, csf)
+    atmos_turbulent_fluxes_most!(sim::Interfacer.ComponentModelSimulation, csf)
 
-A function to calculate turbulent surface fluxes using the combined surface states.
+A function to calculate turbulent surface fluxes using the combined surface states
+and the Monin Obukhov Similarity Theory.
 It is required that a method is defined for the given `sim` and that the fluxes are
 saved in that sim's cache. `csf` refers to the coupler fields.
 
@@ -83,13 +84,13 @@ saved in that sim's cache. `csf` refers to the coupler fields.
 # Example:
 
 ```
-function atmos_turbulent_fluxes!(atmos_sim::ClimaAtmosSimulation, csf)
+function atmos_turbulent_fluxes_most!(atmos_sim::ClimaAtmosSimulation, csf)
     atmos_sim.cache.flux .= atmos_sim.c .* (csf.T_S .- atmos_sim.temperature)
 end
 ```
 
 """
-atmos_turbulent_fluxes!(sim::Interfacer.ComponentModelSimulation, _) =
+atmos_turbulent_fluxes_most!(sim::Interfacer.ComponentModelSimulation, _) =
     error("calling flux calculation in " * Interfacer.name(sim) * " but no method defined")
 
 

@@ -99,6 +99,9 @@ if isinteractive()
         parsed_args["config_file"]
 end
 
+## read in job_id from command_line
+job_id = parsed_args["job_id"]
+
 ## read in config dictionary from file, overriding the coupler defaults
 config_dict = YAML.load_file(parsed_args["config_file"])
 config_dict = merge(parsed_args, config_dict)

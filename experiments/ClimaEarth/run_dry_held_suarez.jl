@@ -44,8 +44,8 @@ Here we follow ClimaCore's dry Held-Suarez `held_suarez_rhoe` example.
 =#
 
 ## run names
-run_name = "dry_held_suarez"
-coupler_output_dir = "$run_name"
+job_id = "dry_held_suarez"
+coupler_output_dir = "$job_id"
 const FT = Float64
 restart_dir = "unspecified"
 restart_t = Int(0)
@@ -66,7 +66,6 @@ config_dict = Dict(
     "coupler_toml_file" => nothing,
     "coupler_output_dir" => coupler_output_dir,
     "mode_name" => "",
-    "run_name" => run_name,
     "atmos_config_repo" => "ClimaAtmos",
     # timestepping
     "dt" => "$(Δt_cpl)secs",
@@ -88,7 +87,6 @@ config_dict = Dict(
     "vert_diff" => "false",
     "hyperdiff" => "ClimaHyperdiffusion",
     # run
-    "job_id" => run_name,
     "surface_setup" => "PrescribedSurface",
     # diagnostic (nested with period and short_name)
     "output_default_diagnostics" => false,
@@ -105,7 +103,7 @@ config_dict = Dict(
 )
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
-atmos_config_dict, config_dict = get_atmos_config_dict(config_dict)
+atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 
 #=

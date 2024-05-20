@@ -13,7 +13,6 @@ moist: "equil"
 precip_model: "0M"
 prognostic_surface: "PrognosticSurfaceTemperature"
 rad: "clearsky"
-run_name: "longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_tvinsol_0M_slabocean"
 rayleigh_sponge: true
 surface_setup: "DefaultMoninObukhov"
 t_end: "100days"

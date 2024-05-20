@@ -10,11 +10,9 @@ dt_save_to_sol: "10days"
 energy_check: false
 evolving_ocean: false
 hourly_checkpoint: true
-job_id: "slabplanet_aqua_target"
 land_albedo_type: "function"
 mode_name: "slabplanet_aqua"
 mono_surface: false
-run_name: "slabplanet_aqua_target"
 start_date: "19790301"
 surface_setup: "PrescribedSurface"
 t_end: "100days"

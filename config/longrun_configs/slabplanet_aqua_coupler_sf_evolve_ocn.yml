@@ -6,14 +6,12 @@ dt_save_to_sol: "10days"
 energy_check: true
 evolving_ocean: true
 h_elem: 6
-job_id: "slabplanet_aqua_coupler_sf_evolve_ocn"
 land_albedo_type: "function"
 mode_name: "slabplanet_aqua"
 moist: "equil"
 mono_surface: true
 precip_model: "0M"
 rad: "gray"
-run_name: "slabplanet_aqua_coupler_sf_evolve_ocn"
 start_date: "19790301"
 surface_setup: "PrescribedSurface"
 t_end: "20days"

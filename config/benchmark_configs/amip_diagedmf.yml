@@ -6,12 +6,10 @@ dt_cpl: 120
 dt_save_state_to_disk: "Inf"
 dt_save_to_sol: "Inf"
 energy_check: false
-job_id: "amip_diagedmf"
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
 monthly_checkpoint: false
-run_name: "amip_diagedmf"
 start_date: "19790301"
 t_end: "12hours"
 turb_flux_partition: "CombinedStateFluxesMOST"

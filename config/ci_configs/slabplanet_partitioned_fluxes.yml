@@ -5,13 +5,11 @@ dt_cpl: 200
 dt_save_to_sol: "9days"
 energy_check: true
 h_elem: 4
-job_id: "slabplanet_partitioned_fluxes"
 mode_name: "slabplanet"
 moist: "equil"
 mono_surface: true
 precip_model: "0M"
 rad: "gray"
-run_name: "slabplanet_partitioned_fluxes"
 t_end: "10days"
 turb_flux_partition: "PartitionedStateFluxes"
 vert_diff: "true"

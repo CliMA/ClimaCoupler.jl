@@ -295,7 +295,7 @@ FluxCalculator.get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxe
 ### ClimaAtmos.jl model-specific functions (not explicitly required by ClimaCoupler.jl)
 ###
 """
-    get_atmos_config_dict(coupler_dict::Dict)
+    get_atmos_config_dict(coupler_dict::Dict, job_id::String)
 
 Returns the specified atmospheric configuration (`atmos_config`) overwitten by arguments
 in the coupler dictionary (`config_dict`). The returned `atmos_config` dictionary will then be passed to CA.AtmosConfig().
@@ -303,7 +303,7 @@ The `atmos_config_repo` flag allows us to
 use a configuration specified within the ClimaCoupler repo, which is useful for direct
 coupled/atmos-only comparisons.
 """
-function get_atmos_config_dict(coupler_dict)
+function get_atmos_config_dict(coupler_dict::Dict, job_id::String)
     atmos_config_file = coupler_dict["atmos_config_file"]
     atmos_config_repo = coupler_dict["atmos_config_repo"]
     # override default or specified configs with coupler arguments, and set the correct atmos config_file
@@ -346,11 +346,8 @@ function get_atmos_config_dict(coupler_dict)
     end
 
     # specify atmos output directory to be inside the coupler output directory
-    atmos_output_dir = joinpath(
-        coupler_dict["coupler_output_dir"],
-        joinpath(coupler_dict["mode_name"], coupler_dict["run_name"]),
-        "clima_atmos",
-    )
+    atmos_output_dir =
+        joinpath(coupler_dict["coupler_output_dir"], joinpath(coupler_dict["mode_name"], job_id), "clima_atmos")
 
     # merge configs
     # (if there are common keys, the last dictionary in the `merge` arguments takes precedence)

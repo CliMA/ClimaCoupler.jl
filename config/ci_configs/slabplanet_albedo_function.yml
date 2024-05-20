@@ -4,13 +4,11 @@ dt_cpl: 200
 dt_save_to_sol: "3600secs"
 energy_check: true
 h_elem: 4
-job_id: "slabplanet_albedo_function"
 land_albedo_type: "function"
 mode_name: "slabplanet"
 moist: "equil"
 mono_surface: true
 precip_model: "0M"
 rad: "gray"
-run_name: "slabplanet_albedo_function"
 t_end: "10days"
 vert_diff: "true"

@@ -57,7 +57,7 @@ steps:
 
       - label: "CPU AMIP with diagnostic EDMF"
         key: "amip_diagedmf"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $BENCHMARK_CONFIG_PATH/amip_diagedmf.yml"
+        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $BENCHMARK_CONFIG_PATH/amip_diagedmf.yml --job_id amip_diagedmf"
         artifact_paths: "experiments/ClimaEarth/output/amip/amip_diagedmf_artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
@@ -71,7 +71,7 @@ steps:
     steps:
       - label: "GPU ClimaAtmos with diagnostic EDMF"
         key: "gpu_climaatmos_diagedmf"
-        command: "srun julia --threads=3 --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/gpu_climaatmos_diagedmf.yml --job_id gpu_climaatmos_diagedmf"
+        command: "srun julia --threads=3 --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos_diagedmf.yml --job_id gpu_climaatmos_diagedmf"
         artifact_paths: "experiments/ClimaEarth/output/climaatmos/gpu_climaatmos_diagedmf_artifacts/*"
         agents:
           slurm_gpus_per_task: 1
@@ -81,7 +81,7 @@ steps:
 
       - label: "GPU AMIP with diagnostic EDMF"
         key: "gpu_amip_diagedmf"
-        command: "srun julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $BENCHMARK_CONFIG_PATH/gpu_amip_diagedmf.yml"
+        command: "srun julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $BENCHMARK_CONFIG_PATH/amip_diagedmf.yml --job_id gpu_amip_diagedmf"
         artifact_paths: "experiments/ClimaEarth/output/amip/gpu_amip_diagedmf_artifacts/*"
         agents:
           slurm_gpus_per_task: 1
@@ -93,7 +93,7 @@ steps:
     steps:
       - label: "Compare AMIP/Atmos-only with diagnostic EDMF"
         key: "compare_amip_climaatmos_amip_diagedmf"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/user_io/benchmarks.jl --cpu_run_name_coupled amip_diagedmf --cpu_run_name_atmos climaatmos_diagedmf --gpu_run_name_coupled gpu_amip_diagedmf --gpu_run_name_atmos gpu_climaatmos_diagedmf --mode_name amip --build_id $BUILDKITE_BUILD_NUMBER"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/user_io/benchmarks.jl --cpu_job_id_coupled amip_diagedmf --cpu_job_id_atmos climaatmos_diagedmf --gpu_job_id_coupled gpu_amip_diagedmf --gpu_job_id_atmos gpu_climaatmos_diagedmf --mode_name amip --build_id $BUILDKITE_BUILD_NUMBER"
         artifact_paths: "experiments/ClimaEarth/output/compare_amip_climaatmos_amip_diagedmf/*"
         depends_on:
           - "climaatmos_diagedmf"

@@ -6,7 +6,6 @@ dt_save_to_sol: "10days"
 energy_check: true
 evolving_ocean: true
 h_elem: 6
-job_id: "slabplanet_aqua_coupler_sf_evolve_ocn"
 land_albedo_type: "function"
 mode_name: "slabplanet_aqua"
 moist: "equil"

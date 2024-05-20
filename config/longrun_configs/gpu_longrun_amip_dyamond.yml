@@ -4,7 +4,6 @@ dt_cpl: 50
 dt_save_state_to_disk: "0.5days"
 dt_save_to_sol: "0.5days"
 energy_check: false
-job_id: "gpu_longrun_amip_dyamond"
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false

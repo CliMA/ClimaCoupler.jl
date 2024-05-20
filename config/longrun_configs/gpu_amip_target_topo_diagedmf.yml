@@ -12,7 +12,6 @@ dt_save_to_sol: "10days"
 energy_check: false
 hourly_checkpoint: false
 idealized_insolation: false
-job_id: "gpu_amip_target_topo_diagedmf"
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false

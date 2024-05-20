@@ -131,13 +131,9 @@ Interfacer.step!(sim::PrescribedIceSimulation, t) = Interfacer.step!(sim.integra
 Interfacer.reinit!(sim::PrescribedIceSimulation) = Interfacer.reinit!(sim.integrator)
 
 # extensions required by FluxCalculator (partitioned fluxes)
-function FluxCalculator.update_turbulent_fluxes_point!(
-    sim::PrescribedIceSimulation,
-    fields::NamedTuple,
-    colidx::CC.Fields.ColumnIndex,
-)
+function FluxCalculator.update_turbulent_fluxes!(sim::PrescribedIceSimulation, fields::NamedTuple)
     (; F_turb_energy) = fields
-    @. sim.integrator.p.F_turb_energy[colidx] = F_turb_energy
+    @. sim.integrator.p.F_turb_energy = F_turb_energy
 end
 
 """

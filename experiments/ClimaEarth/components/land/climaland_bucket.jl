@@ -29,8 +29,8 @@ Interfacer.name(::BucketSimulation) = "BucketSimulation"
 """
     get_new_cache(p, Y, energy_check)
 
-Returns a new `p` with an updated field to store e_per_area if energy conservation 
-    checks are turned on. 
+Returns a new `p` with an updated field to store e_per_area if energy conservation
+    checks are turned on.
 """
 function get_new_cache(p, Y, energy_check)
     if energy_check
@@ -216,16 +216,12 @@ Interfacer.step!(sim::BucketSimulation, t) = Interfacer.step!(sim.integrator, t 
 Interfacer.reinit!(sim::BucketSimulation) = Interfacer.reinit!(sim.integrator)
 
 # extensions required by FluxCalculator (partitioned fluxes)
-function FluxCalculator.update_turbulent_fluxes_point!(
-    sim::BucketSimulation,
-    fields::NamedTuple,
-    colidx::CC.Fields.ColumnIndex,
-)
+function FluxCalculator.update_turbulent_fluxes!(sim::BucketSimulation, fields::NamedTuple)
     (; F_turb_energy, F_turb_moisture) = fields
     turbulent_fluxes = sim.integrator.p.bucket.turbulent_fluxes
-    turbulent_fluxes.shf[colidx] .= F_turb_energy
+    turbulent_fluxes.shf .= F_turb_energy
     earth_params = sim.model.parameters.earth_param_set
-    turbulent_fluxes.vapor_flux[colidx] .= F_turb_moisture ./ LP.ρ_cloud_liq(earth_params)
+    turbulent_fluxes.vapor_flux .= F_turb_moisture ./ LP.ρ_cloud_liq(earth_params)
     return nothing
 end
 
@@ -234,15 +230,14 @@ function FluxCalculator.surface_thermo_state(
     sim::BucketSimulation,
     thermo_params::TD.Parameters.ThermodynamicsParameters,
     thermo_state_int,
-    colidx::CC.Fields.ColumnIndex,
 )
 
-    T_sfc = Interfacer.get_field(sim, Val(:surface_temperature), colidx)
+    T_sfc = Interfacer.get_field(sim, Val(:surface_temperature))
     # Note that the surface air density, ρ_sfc, is computed using the atmospheric state at the first level and making ideal gas
     # and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
     # a reasonable stand-in.
-    ρ_sfc = Interfacer.get_field(sim, Val(:air_density), colidx)
-    q_sfc = Interfacer.get_field(sim, Val(:surface_humidity), colidx) # already calculated in rhs! (cache)
+    ρ_sfc = Interfacer.get_field(sim, Val(:air_density))
+    q_sfc = Interfacer.get_field(sim, Val(:surface_humidity)) # already calculated in rhs! (cache)
     @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
 end
 

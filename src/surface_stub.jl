@@ -87,8 +87,3 @@ reinit!(::SurfaceStub) = nothing
 The stub surface simulation is not updated by this function. Extends `SciMLBase.step!`.
 """
 step!(::SurfaceStub, _) = nothing
-
-
-## Extensions of FluxCalculator.jl functions
-
-update_turbulent_fluxes_point!(sim::SurfaceStub, fields::NamedTuple, colidx::CC.Fields.ColumnIndex) = nothing

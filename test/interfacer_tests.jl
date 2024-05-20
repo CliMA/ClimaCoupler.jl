@@ -56,10 +56,9 @@ for FT in (Float32, Float64)
         space = TestHelper.create_space(FT)
         for sim in (DummySimulation(space), DummySimulation2(space), DummySimulation3(space))
             # field
-            colidx = CC.Fields.ColumnIndex{2}((1, 1), 73)
-            @test Array(parent(Interfacer.get_field(sim, Val(:var), colidx)))[1] == FT(1)
+            @test Array(parent(Interfacer.get_field(sim, Val(:var))))[1] == FT(1)
             # float
-            @test Interfacer.get_field(sim, Val(:var_float), colidx) == FT(2)
+            @test Interfacer.get_field(sim, Val(:var_float)) == FT(2)
         end
     end
 
@@ -252,30 +251,3 @@ end
     FT = Float32
     @test isnothing(Interfacer.reinit!(Interfacer.SurfaceStub(FT(0))))
 end
-
-@testset "SurfaceStub update_turbulent_fluxes_point!" begin
-    FT = Float32
-    colidx = CC.Fields.ColumnIndex{2}((1, 1), 73) # arbitrary index
-    @test isnothing(Interfacer.update_turbulent_fluxes_point!(Interfacer.SurfaceStub(FT(0)), (;), colidx))
-end
-
-# # Test that update_field! gives correct warnings for unextended fields
-# for value in (
-#     :air_density,
-#     :air_temperature,
-#     :energy,
-#     :height_int,
-#     :height_sfc,
-#     :liquid_precipitation,
-#     :radiative_energy_flux_sfc,
-#     :radiative_energy_flux_toa,
-#     :snow_precipitation,
-#     :turbulent_energy_flux,
-#     :turbulent_moisture_flux,
-#     :thermo_state_int,
-#     :uv_int,
-#     :water,
-# )
-#     val = Val(value)
-#     @test_throws ErrorException("undefined field `$value` for " * name(sim)) get_field(sim, val)
-# end

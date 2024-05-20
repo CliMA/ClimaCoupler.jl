@@ -151,13 +151,9 @@ Interfacer.step!(sim::SlabOceanSimulation, t) = Interfacer.step!(sim.integrator,
 Interfacer.reinit!(sim::SlabOceanSimulation) = Interfacer.reinit!(sim.integrator)
 
 # extensions required by FluxCalculator (partitioned fluxes)
-function FluxCalculator.update_turbulent_fluxes_point!(
-    sim::SlabOceanSimulation,
-    fields::NamedTuple,
-    colidx::CC.Fields.ColumnIndex,
-)
+function FluxCalculator.update_turbulent_fluxes!(sim::SlabOceanSimulation, fields::NamedTuple)
     (; F_turb_energy) = fields
-    @. sim.integrator.p.F_turb_energy[colidx] = F_turb_energy
+    @. sim.integrator.p.F_turb_energy = F_turb_energy
 end
 
 """

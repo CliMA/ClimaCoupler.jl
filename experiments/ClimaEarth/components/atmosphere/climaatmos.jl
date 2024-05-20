@@ -29,9 +29,8 @@ function hasmoisture(integrator)
     return !(integrator.p.atmos.moisture_model isa CA.DryModel)
 end
 
-function atmos_init(::Type{FT}, atmos_config_dict::Dict) where {FT}
+function atmos_init(::Type{FT}, atmos_config) where {FT}
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
-    atmos_config = CA.AtmosConfig(atmos_config_dict)
     simulation = CA.get_simulation(atmos_config)
     (; integrator) = simulation
     Y = integrator.u
@@ -151,23 +150,23 @@ end
 
 # helpers for get_field extensions, dipatchable on different moisture model options and radiation modes
 
-col_integrated_rain(::CA.DryModel, integrator) = [eltype(integrator.u)(0)]
+col_integrated_rain(::CA.DryModel, integrator) = StaticArrays.SVector(eltype(integrator.u)(0))
 col_integrated_rain(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
     integrator.p.precipitation.col_integrated_rain
 
-col_integrated_snow(::CA.DryModel, integrator) = [eltype(integrator.u)(0)]
+col_integrated_snow(::CA.DryModel, integrator) = StaticArrays.SVector(eltype(integrator.u)(0))
 col_integrated_snow(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
     integrator.p.precipitation.col_integrated_snow
 
-surface_radiation_flux(::Nothing, integrator) = [eltype(integrator.u)(0)]
+surface_radiation_flux(::Nothing, integrator) = StaticArrays.SVector(eltype(integrator.u)(0))
 surface_radiation_flux(::CA.RRTMGPI.AbstractRRTMGPMode, integrator) =
     CC.Fields.level(integrator.p.radiation.ᶠradiation_flux, CC.Utilities.half)
 
-moisture_flux(::CA.DryModel, integrator) = [eltype(integrator.u)(0)]
+moisture_flux(::CA.DryModel, integrator) = StaticArrays.SVector(eltype(integrator.u)(0))
 moisture_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
     CC.Geometry.WVector.(integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot)
 
-ρq_tot(::CA.DryModel, integrator) = [eltype(integrator.u)(0)]
+ρq_tot(::CA.DryModel, integrator) = StaticArrays.SVector(eltype(integrator.u)(0))
 ρq_tot(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) = integrator.u.c.ρq_tot
 
 # extensions required by the Interfacer

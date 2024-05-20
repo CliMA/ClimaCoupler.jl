@@ -2,6 +2,7 @@ import Adapt
 import CUDA
 import Plots
 import ClimaCoupler: PostProcessor, TestHelper
+import StaticArrays
 
 """
     Plots.plot(post_data::DataPackage; zmd_params = (;), hsd_params = (;))
@@ -168,5 +169,5 @@ function to_cpu(field::CC.Fields.Field)
     end
 end
 
-to_cpu(arr::Array) = arr
+to_cpu(arr::Union{Array, StaticArrays.SVector}) = arr
 to_cpu(arr::CUDA.CuArray) = Adapt.adapt(Array, arr)

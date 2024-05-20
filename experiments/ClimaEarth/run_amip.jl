@@ -140,6 +140,11 @@ then `ClimaComms` automatically selects the device from which this code is calle
 comms_ctx = Utilities.get_comms_context(parsed_args)
 ClimaComms.init(comms_ctx)
 
+## make sure we don't use animations for GPU runs
+if comms_ctx.device isa ClimaComms.CUDADevice
+    config_dict["anim"] = false
+end
+
 #=
 ### I/O Directory Setup
 `setup_output_dirs` returns `dir_paths.output = COUPLER_OUTPUT_DIR`, which is the directory where the output of the simulation will be saved, and `dir_paths.artifacts` is the directory where

@@ -58,7 +58,7 @@ import ClimaCoupler:
     Regridder,
     TimeManager,
     Utilities
-
+import ClimaParams as CP
 pkg_dir = pkgdir(ClimaCoupler)
 
 #=
@@ -131,6 +131,12 @@ restart_t = Int(config_dict["restart_t"])
 evolving_ocean = config_dict["evolving_ocean"]
 dt_rad = config_dict["dt_rad"]
 use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
+
+coupler_toml_file = config_dict["coupler_toml_file"]
+default_toml_file = "toml/default_coarse.toml"
+
+toml_file = !isnothing(coupler_toml_file) ? joinpath(pkgdir(ClimaCoupler), coupler_toml_file) : toml_file
+toml_file = isnothing(toml_file) ? joinpath(pkgdir(ClimaCoupler), default_toml_file) : toml_file
 
 #=
 ## Setup Communication Context
@@ -249,6 +255,7 @@ if mode_name == "amip"
         saveat = saveat,
         area_fraction = land_area_fraction,
         date_ref = date0,
+        CP.create_toml_dict(toml_file),
         t_start = t_start,
         energy_check = energy_check,
     )
@@ -350,6 +357,7 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         saveat = saveat,
         area_fraction = land_area_fraction,
         date_ref = date0,
+        CP.create_toml_dict(toml_file),
         t_start = t_start,
         energy_check = energy_check,
     )
@@ -398,6 +406,7 @@ elseif mode_name == "slabplanet_eisenman"
         saveat = saveat,
         area_fraction = land_area_fraction,
         date_ref = date0,
+        CP.create_toml_dict(toml_file),
         t_start = t_start,
         energy_check = energy_check,
     )

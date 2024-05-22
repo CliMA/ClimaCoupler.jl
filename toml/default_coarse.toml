@@ -1,3 +1,19 @@
 [C_E]
 value = 0.044
 type = "float"
+
+[critical_snow_water_equivalent]
+value = 0.2
+type = "float"
+
+[land_bucket_capacity]
+value = 10
+type = "float"
+
+[soil_conductivity]
+value = 0.7
+type = "float"
+
+[soil_heat_capacity]
+value = 2e8
+type = "float"

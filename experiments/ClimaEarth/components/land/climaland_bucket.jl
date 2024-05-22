@@ -8,6 +8,7 @@ import Thermodynamics as TD
 import ClimaLand as CL
 import ClimaLand.Parameters as LP
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer
+import ClimaParams as CP
 
 ###
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
@@ -59,6 +60,7 @@ function bucket_init(
     area_fraction,
     stepper = CTS.RK4(),
     date_ref::Dates.DateTime,
+    toml_dict::CP.AbstractTOMLDict,
     t_start::Float64,
     energy_check::Bool,
 ) where {FT}
@@ -92,12 +94,7 @@ function bucket_init(
     τc = FT(dt) # This is the timescale on which snow exponentially damps to zero, in the case where all
     # the snow would melt in time `τc`. It prevents us from having to specially time step in cases where
     # all the snow melts in a single timestep.
-    σS_c = FT(0.2) # critical snow water equivalent
-    W_f = FT(10) # bucket capacity
-    κ_soil = FT(0.7) # soil conductivity
-    ρc_soil = FT(2e8) # soil volumetric heat capacity
-
-    params = CL.Bucket.BucketModelParameters(FT; albedo, z_0m, z_0b, τc, σS_c, W_f, κ_soil, ρc_soil)
+    params = CL.Bucket.BucketModelParameters(toml_dict; albedo, z_0m, z_0b, τc)
 
     n_vertical_elements = 7
     # Note that this does not take into account topography of the surface, which is OK for this land model.

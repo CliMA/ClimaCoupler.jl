@@ -99,7 +99,7 @@ for FT in (Float32, Float64)
 
         model_sims = (; atmos_sim = DummySimulation(atmos_fields))
 
-        flux_types = (FluxCalculator.CombinedStateFluxes(), FluxCalculator.PartitionedStateFluxes())
+        flux_types = (FluxCalculator.CombinedStateFluxesMOST(), FluxCalculator.PartitionedStateFluxes())
         results = [FT(1), FT(0)]
         for (i, t) in enumerate(flux_types)
             coupler_fields =
@@ -130,9 +130,9 @@ for FT in (Float32, Float64)
 
         sims = (; a = TestSurfaceSimulation1(ones(boundary_space)), b = TestSurfaceSimulation2(ones(boundary_space)))
 
-        # test the coupler update under CombinedStateFluxes (update all) and PartitionedStateFluxes (update all except
+        # test the coupler update under CombinedStateFluxesMOST (update all) and PartitionedStateFluxes (update all except
         # surface info needed for the calculation of turbulent fluxes)
-        flux_types = (FluxCalculator.CombinedStateFluxes(), FluxCalculator.PartitionedStateFluxes())
+        flux_types = (FluxCalculator.CombinedStateFluxesMOST(), FluxCalculator.PartitionedStateFluxes())
         results = [FT(0.5), FT(0)] # 0.5 due to the area fraction weighting
         for (i, t) in enumerate(flux_types)
             coupler_fields =
@@ -195,8 +195,8 @@ for FT in (Float32, Float64)
         )
         coupler_fields.surface_diffuse_albedo .= FT(0.5)
 
-        # test the sim update under CombinedStateFluxes (update all) and PartitionedStateFluxes (update all except turbulent fluxes)
-        flux_types = (FluxCalculator.CombinedStateFluxes(), FluxCalculator.PartitionedStateFluxes())
+        # test the sim update under CombinedStateFluxesMOST (update all) and PartitionedStateFluxes (update all except turbulent fluxes)
+        flux_types = (FluxCalculator.CombinedStateFluxesMOST(), FluxCalculator.PartitionedStateFluxes())
         results = [FT(0), FT(1), FT(0.5)]
         for (i, t) in enumerate(flux_types)
             model_sims.atmos_sim.cache.roughness_momentum .= FT(0)
@@ -205,7 +205,7 @@ for FT in (Float32, Float64)
             # test atmos
             @test Array(parent(model_sims.atmos_sim.cache.albedo_direct))[1] == results[2]
             @test Array(parent(model_sims.atmos_sim.cache.albedo_diffuse))[1] == results[3]
-            if t isa FluxCalculator.CombinedStateFluxes
+            if t isa FluxCalculator.CombinedStateFluxesMOST
                 @test Array(parent(model_sims.atmos_sim.cache.roughness_momentum))[1] == results[2]
             else
                 @test Array(parent(model_sims.atmos_sim.cache.roughness_momentum))[1] == results[1]

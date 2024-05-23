@@ -14,5 +14,5 @@ monthly_checkpoint: false
 run_name: "amip_diagedmf"
 start_date: "19790301"
 t_end: "12hours"
-turb_flux_partition: "CombinedStateFluxes"
+turb_flux_partition: "CombinedStateFluxesMOST"
 use_coupler_diagnostics: false

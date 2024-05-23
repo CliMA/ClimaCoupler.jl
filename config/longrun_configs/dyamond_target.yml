@@ -12,4 +12,4 @@ monthly_checkpoint: false
 run_name: "dyamond_target"
 start_date: "19790301"
 t_end: "1days"
-turb_flux_partition: "CombinedStateFluxes"
+turb_flux_partition: "CombinedStateFluxesMOST"

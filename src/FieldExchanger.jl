@@ -27,7 +27,7 @@ function import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
     (; atmos_sim) = model_sims
 
     # turbulent fluxes
-    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
+    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
         Regridder.dummmy_remap!(csf.F_turb_energy, Interfacer.get_field(atmos_sim, Val(:turbulent_energy_flux)))
         Regridder.dummmy_remap!(csf.F_turb_moisture, Interfacer.get_field(atmos_sim, Val(:turbulent_moisture_flux)))
     end
@@ -70,7 +70,7 @@ function import_combined_surface_fields!(csf, model_sims, turbulent_fluxes)
     Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_diffuse_albedo))
     Regridder.dummmy_remap!(csf.surface_diffuse_albedo, combined_field)
 
-    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
+    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
         Regridder.combine_surfaces!(combined_field, model_sims, Val(:roughness_momentum))
         Regridder.dummmy_remap!(csf.z0m_S, combined_field)
 
@@ -101,7 +101,7 @@ function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf, turbulent_
     Interfacer.update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
     Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf.T_S)
 
-    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
+    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
         Interfacer.update_field!(atmos_sim, Val(:roughness_momentum), csf.z0m_S)
         Interfacer.update_field!(atmos_sim, Val(:roughness_buoyancy), csf.z0b_S)
         Interfacer.update_field!(atmos_sim, Val(:beta), csf.beta) # not in this version of atmos
@@ -131,7 +131,7 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, turbulent_flux
     mask = Regridder.binary_mask.(area_fraction)
 
     # when PartitionedStateFluxes, turbulent fluxes are updated during the flux calculation
-    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
+    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
         F_turb_energy_masked = FT.(mask .* csf.F_turb_energy)
         Interfacer.update_field!(sim, Val(:turbulent_energy_flux), F_turb_energy_masked)
         Interfacer.update_field!(sim, Val(:turbulent_moisture_flux), FT.(mask .* csf.F_turb_moisture))

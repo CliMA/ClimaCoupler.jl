@@ -62,7 +62,7 @@ restart_dir = "unspecified"
 restart_t = Int(0)
 
 ## coupler simulation specific configuration
-Δt_cpl = Float64(400)
+Δt_cpl = Float64(120)
 t_end = "1000days"
 tspan = (Float64(0.0), Float64(time_to_seconds(t_end)))
 start_date = "19790301"
@@ -86,11 +86,11 @@ config_dict = Dict(
     "t_end" => t_end,
     "start_date" => "19790301",
     # domain
-    "h_elem" => 4,
-    "z_elem" => 10,
+    "h_elem" => 16,
+    "z_elem" => 63,
     "z_max" => 30000.0, # semi-high top
-    "dz_bottom" => 300.0,
-    "nh_poly" => 4,
+    "dz_bottom" => 30.0,
+    "nh_poly" => 3,
     # output
     "dt_save_to_sol" => "1days",
     # numerics
@@ -120,6 +120,7 @@ config_dict = Dict(
     "rad" => "gray",
     "dt_rad" => dt_rad,
     "albedo_model" => "CouplerAlbedo",
+    "implicit_diffusion" => true
 )
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries

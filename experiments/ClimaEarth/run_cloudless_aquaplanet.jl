@@ -125,7 +125,7 @@ config_dict = Dict(
 )
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
-atmos_config_dict, config_dict = get_atmos_config_dict(config_dict)
+atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 
 # override default toml parameters

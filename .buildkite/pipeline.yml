@@ -397,6 +397,15 @@ steps:
         agents:
           slurm_mem: 20GB
 
+      - wait
+      - label: ":construction: Hierarchy lots"
+        key: "hierarchy_plots"
+        command:
+          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/hierarchy/climate_plots.jl"
+        artifact_paths:  "paper_figs/*"
+        agents:
+          slurm_mem: 20GB
+
   - group: "GPU integration tests"
     steps:
       # GPU RUNS: slabplanet

@@ -89,6 +89,8 @@ function ocean_init(
         thermo_params = thermo_params,
         # add dss_buffer to cache to avoid runtime dss allocation
         dss_buffer = CC.Spaces.create_dss_buffer(CC.Fields.zeros(space)),
+        α_direct = CC.Fields.ones(space) .* params.α,
+        α_diffuse = CC.Fields.ones(space) .* params.α,
     )
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
@@ -110,8 +112,8 @@ Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:area_fraction}) = sim.inte
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
-Interfacer.get_field(sim::SlabOceanSimulation, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) =
-    sim.integrator.p.params.α
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_direct_albedo}) = sim.integrator.p.α_direct
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_diffuse_albedo}) = sim.integrator.p.α_diffuse
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_humidity}) = sim.integrator.p.q_sfc
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:water}) = nothing
@@ -136,6 +138,12 @@ function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:radiative_ene
 end
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:turbulent_energy_flux}, field)
     parent(sim.integrator.p.F_turb_energy) .= parent(field)
+end
+function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:surface_direct_albedo}, field::CC.Fields.Field)
+    sim.integrator.p.α_direct .= field
+end
+function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:surface_diffuse_albedo}, field::CC.Fields.Field)
+    sim.integrator.p.α_diffuse .= field
 end
 
 # extensions required by FieldExchanger

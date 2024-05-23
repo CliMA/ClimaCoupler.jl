@@ -62,12 +62,12 @@ restart_dir = "unspecified"
 restart_t = Int(0)
 
 ## coupler simulation specific configuration
-Δt_cpl = Float64(120)
+Δt_cpl = Float64(400)
 t_end = "1000days"
 tspan = (Float64(0.0), Float64(time_to_seconds(t_end)))
 start_date = "19790301"
 hourly_checkpoint = true
-dt_rad = "6hours"
+dt_rad = "1hours"
 
 ## namelist
 config_dict = Dict(
@@ -86,10 +86,10 @@ config_dict = Dict(
     "t_end" => t_end,
     "start_date" => "19790301",
     # domain
-    "h_elem" => 16,
-    "z_elem" => 63,
+    "h_elem" => 4,
+    "z_elem" => 10,
     "z_max" => 30000.0, # semi-high top
-    "dz_bottom" => 30.0,
+    "dz_bottom" => 300.0,
     "nh_poly" => 3,
     # output
     "dt_save_to_sol" => "1days",
@@ -120,12 +120,17 @@ config_dict = Dict(
     "rad" => "gray",
     "dt_rad" => dt_rad,
     "albedo_model" => "CouplerAlbedo",
-    "implicit_diffusion" => true
+    "implicit_diffusion" => true,
+    "rayleigh_sponge" => true
 )
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
 atmos_config_dict, config_dict = get_atmos_config_dict(config_dict)
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
+
+# override default toml parameters
+atmos_config_object.toml_dict["zd_rayleigh"] = 35000.0
+atmos_config_object.toml_dict["alpha_rayleigh_uh"] = 0.0
 
 #=
 ## Setup Communication Context

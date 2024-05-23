@@ -1,7 +1,7 @@
 agents:
   queue: new-central
   slurm_time: 4:00:00
-  modules: climacommon/2024_04_30
+  modules: climacommon/2024_05_27
 
 env:
   JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
@@ -397,6 +397,16 @@ steps:
         agents:
           slurm_mem: 20GB
 
+      - label: ":construction: Cloudless Aquaplanet"
+        key: "cloudless_aquaplanet"
+        command:
+          - sed 's/t_end = "1000days"/t_end = "1days"/' experiments/ClimaEarth/run_cloudless_aquaplanet.jl > experiments/ClimaEarth/run_cloudless_aquaplanet_short.jl
+          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_cloudless_aquaplanet_short.jl"
+        artifact_paths:  "cloudless_aquaplanet/cloudless_aquaplanet/clima_atmos/*"
+
+        agents:
+          slurm_mem: 20GB
+
       - label: ":construction: Cloudy Aquaplanet"
         key: "cloudy_aquaplanet"
         command:
@@ -417,7 +427,14 @@ steps:
         agents:
           slurm_mem: 20GB
 
-
+      - wait
+      - label: ":construction: Hierarchy plots"
+        key: "hierarchy_plots"
+        command:
+          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/hierarchy/climate_plots.jl"
+        artifact_paths:  "paper_figs/*"
+        agents:
+          slurm_mem: 20GB
 
   - group: "GPU integration tests"
     steps:

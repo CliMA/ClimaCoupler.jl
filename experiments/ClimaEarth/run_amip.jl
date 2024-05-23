@@ -92,6 +92,10 @@ We can additionally pass the configuration dictionary to the component model ini
 include("cli_options.jl")
 parsed_args = parse_commandline(argparse_settings())
 
+## the unique job id should be passed in via the command line
+job_id = parsed_args["job_id"]
+@assert !isnothing(job_id) "job_id must be passed in via the command line"
+
 ## modify parsed args for fast testing from REPL #hide
 if isinteractive()
     parsed_args["config_file"] =
@@ -104,12 +108,11 @@ config_dict = YAML.load_file(parsed_args["config_file"])
 config_dict = merge(parsed_args, config_dict)
 
 ## get component model dictionaries (if applicable)
-atmos_config_dict, config_dict = get_atmos_config_dict(config_dict)
+atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 
 ## read in some parsed command line arguments, required by this script
 mode_name = config_dict["mode_name"]
-run_name = config_dict["run_name"]
 energy_check = config_dict["energy_check"]
 const FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim_name = "bucket"
@@ -137,6 +140,11 @@ then `ClimaComms` automatically selects the device from which this code is calle
 comms_ctx = Utilities.get_comms_context(parsed_args)
 ClimaComms.init(comms_ctx)
 
+## make sure we don't use animations for GPU runs
+if comms_ctx.device isa ClimaComms.CUDADevice
+    config_dict["anim"] = false
+end
+
 #=
 ### I/O Directory Setup
 `setup_output_dirs` returns `dir_paths.output = COUPLER_OUTPUT_DIR`, which is the directory where the output of the simulation will be saved, and `dir_paths.artifacts` is the directory where
@@ -144,7 +152,7 @@ the plots (from postprocessing and the conservation checks) of the simulation wi
 temporary files will be saved.
 =#
 
-COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], joinpath(mode_name, run_name))
+COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], joinpath(mode_name, job_id))
 dir_paths = setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
 
 

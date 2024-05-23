@@ -41,20 +41,17 @@ n_samples = 2
 # import parsed command line arguments
 parsed_args = parse_commandline(argparse_settings())
 
-# select the configuration file and extract the run-name
+# select the configuration file and extract the job ID
 config_file =
     parsed_args["config_file"] =
         isinteractive() ? "../config/perf_configs/perf_default_unthreaded.yml" : parsed_args["config_file"]
-run_name = parsed_args["run_name"] = split(basename(config_file), ".")[1]
+job_id = parsed_args["job_id"]
 
 # import config setup
 config_dict = YAML.load_file(config_file)
 
-# modify names for performance testing
-perf_run_name = run_name
-parsed_args["job_id"] = perf_run_name
-parsed_args["run_name"] = perf_run_name
-parsed_args = merge(config_dict, parsed_args) # global scope needed to recognize this definition in the coupler driver
+# global scope needed to recognize this definition in the coupler driver
+parsed_args = merge(config_dict, parsed_args)
 
 # disable threading
 parsed_args["enable_threading"] = false
@@ -62,7 +59,7 @@ parsed_args["enable_threading"] = false
 # flag to split coupler init from its solve
 ENV["CI_PERF_SKIP_COUPLED_RUN"] = true
 
-@info run_name
+@info job_id
 
 function step_coupler!(cs, n_samples)
     cs.tspan[1] = cs.model_sims.atmos_sim.integrator.t
@@ -83,7 +80,7 @@ end
 #####
 
 # obtain the stacktree from the last saved file in `buildkite_cc_dir`
-ref_file = joinpath(buildkite_cc_dir, "$perf_run_name.jld2")
+ref_file = joinpath(buildkite_cc_dir, "$job_id.jld2")
 
 if isfile(ref_file)
     tracked_list = JLD2.load(ref_file)
@@ -107,7 +104,7 @@ end
 # produce flamegraph with colors highlighting the allocation differences relative to the last saved run
 # profile_data
 if haskey(ENV, "BUILDKITE_COMMIT") || haskey(ENV, "BUILDKITE_BRANCH")
-    output_dir = "perf/output/$perf_run_name"
+    output_dir = "perf/output/$job_id"
     mkpath(output_dir)
     ProfileCanvasDiff.html_file(
         joinpath(output_dir, "flame_diff.html"),
@@ -128,7 +125,7 @@ end
 profile_data, new_tracked_list = ProfileCanvasDiff.view(Profile.fetch(), tracked_list = tracked_list, self_count = true);
 if buildkite_branch == "staging"
     isfile(ref_file) ?
-    mv(ref_file, joinpath(scratch_cc_dir, "flame_reference_file.$perf_run_name.$buildkite_commit.jld2"), force = true) :
+    mv(ref_file, joinpath(scratch_cc_dir, "flame_reference_file.$job_id.$buildkite_commit.jld2"), force = true) :
     nothing
     JLD2.save(ref_file, new_tracked_list) # reset ref_file upon staging
 end

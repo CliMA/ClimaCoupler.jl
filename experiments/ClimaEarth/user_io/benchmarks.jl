@@ -10,11 +10,11 @@ added in a future PR):
 ------------------------------------------------------------------------------------
 |             | CPU Run      | GPU Run     | Max Diff  |  Median Diff |  Mean Diff |
 ------------------------------------------------------------------------------------
-|             |  $run_name   |  $run_name  |           |              |              |
+|             |   $job_id    |   $job_id   |           |              |              |
 | Coupled run |    $SYPD     |    $SYPD    | $max_diff | $median_diff |  $mean_diff  |
 |             | $cpu_allocs  | $cpu_allocs |           |              |              |
 ------------------------------------------------------------------------------------
-|             |  $run_name   |  $run_name  |           |              |              |
+|             |   $job_id    |   $job_id   |           |              |              |
 | Atmos-only  |    $SYPD     |    $SYPD    | $max_diff | $median_diff |  $mean_diff  |
 |             | $cpu_allocs  | $cpu_allocs |           |              |              |
 ------------------------------------------------------------------------------------
@@ -28,19 +28,19 @@ import ClimaCoupler
 function argparse_settings()
     s = ArgParse.ArgParseSettings()
     ArgParse.@add_arg_table! s begin
-        "--cpu_run_name_coupled"
+        "--cpu_job_id_coupled"
         help = "The name of the CPU coupled run we want to compare. User must specify CPU and/or GPU coupled run name."
         arg_type = String
         default = nothing
-        "--gpu_run_name_coupled"
+        "--gpu_job_id_coupled"
         help = "The name of the GPU coupled run we want to compare."
         arg_type = String
         default = nothing
-        "--cpu_run_name_atmos"
+        "--cpu_job_id_atmos"
         help = "The name of the CPU atmos-only run we want to compare. User must specify CPU and/or GPU atmos-only run name."
         arg_type = String
         default = nothing
-        "--gpu_run_name_atmos"
+        "--gpu_job_id_atmos"
         help = "The name of the GPU atmos-only run we want to compare."
         arg_type = String
         default = nothing
@@ -76,14 +76,14 @@ output_dir = parsed_args["coupler_output_dir"]
 
 # Coupled runs
 # Read in CPU and GPU run name info from command line
-cpu_run_name_coupled = parsed_args["cpu_run_name_coupled"]
-gpu_run_name_coupled = parsed_args["gpu_run_name_coupled"]
-if isnothing(cpu_run_name_coupled) && isnothing(gpu_run_name_coupled)
+cpu_job_id_coupled = parsed_args["cpu_job_id_coupled"]
+gpu_job_id_coupled = parsed_args["gpu_job_id_coupled"]
+if isnothing(cpu_job_id_coupled) && isnothing(gpu_job_id_coupled)
     error("Must pass CPU and/or GPU coupled run name to compare them.")
-elseif isnothing(gpu_run_name_coupled)
-    gpu_run_name_coupled = "gpu_" * cpu_run_name_coupled
-elseif isnothing(cpu_run_name_coupled)
-    cpu_run_name_coupled = gpu_run_name_coupled[5:end]
+elseif isnothing(gpu_job_id_coupled)
+    gpu_job_id_coupled = "gpu_" * cpu_job_id_coupled
+elseif isnothing(cpu_job_id_coupled)
+    cpu_job_id_coupled = gpu_job_id_coupled[5:end]
 end
 
 # Read in mode name from command line (or retrieve from run name).
@@ -91,29 +91,29 @@ end
 mode_name = parsed_args["mode_name"]
 if isnothing(mode_name)
     mode_name =
-        occursin("amip", cpu_run_name_coupled) ? "amip" :
-        (occursin("slabplanet", cpu_run_name_coupled) ? "slabplanet" : error("Please provide a valid `mode_name`."))
+        occursin("amip", cpu_job_id_coupled) ? "amip" :
+        (occursin("slabplanet", cpu_job_id_coupled) ? "slabplanet" : error("Please provide a valid `mode_name`."))
 end
 
-gpu_artifacts_dir_coupled = joinpath(output_dir, mode_name, gpu_run_name_coupled) * "_artifacts"
-cpu_artifacts_dir_coupled = joinpath(output_dir, mode_name, cpu_run_name_coupled) * "_artifacts"
+gpu_artifacts_dir_coupled = joinpath(output_dir, mode_name, gpu_job_id_coupled) * "_artifacts"
+cpu_artifacts_dir_coupled = joinpath(output_dir, mode_name, cpu_job_id_coupled) * "_artifacts"
 
 # Atmos-only runs
 # Read in CPU and GPU run name info from command line
-cpu_run_name_atmos = parsed_args["cpu_run_name_atmos"]
-gpu_run_name_atmos = parsed_args["gpu_run_name_atmos"]
-if isnothing(cpu_run_name_atmos) && isnothing(gpu_run_name_atmos)
+cpu_job_id_atmos = parsed_args["cpu_job_id_atmos"]
+gpu_job_id_atmos = parsed_args["gpu_job_id_atmos"]
+if isnothing(cpu_job_id_atmos) && isnothing(gpu_job_id_atmos)
     error("Must pass CPU and/or GPU coupled run name to compare them.")
-elseif isnothing(gpu_run_name_atmos)
-    gpu_run_name_atmos = "gpu_" * cpu_run_name_atmos
-elseif isnothing(cpu_run_name_atmos)
-    cpu_run_name_atmos = gpu_run_name_atmos[5:end]
-    cpu_artifacts_dir_atmos = joinpath(output_dir, cpu_run_name_atmos)
+elseif isnothing(gpu_job_id_atmos)
+    gpu_job_id_atmos = "gpu_" * cpu_job_id_atmos
+elseif isnothing(cpu_job_id_atmos)
+    cpu_job_id_atmos = gpu_job_id_atmos[5:end]
+    cpu_artifacts_dir_atmos = joinpath(output_dir, cpu_job_id_atmos)
 end
 
 mode_name_atmos = "climaatmos"
-gpu_artifacts_dir_atmos = joinpath(output_dir, mode_name_atmos, gpu_run_name_atmos) * "_artifacts"
-cpu_artifacts_dir_atmos = joinpath(output_dir, mode_name_atmos, cpu_run_name_atmos) * "_artifacts"
+gpu_artifacts_dir_atmos = joinpath(output_dir, mode_name_atmos, gpu_job_id_atmos) * "_artifacts"
+cpu_artifacts_dir_atmos = joinpath(output_dir, mode_name_atmos, cpu_job_id_atmos) * "_artifacts"
 
 # Read in SYPD and allocations info from artifacts directories
 function get_sypd_allocs(artifacts_dir)
@@ -138,16 +138,16 @@ headers = [build_id_str, "Horiz. res.: 30 elems", "CPU Run [64 processes]", "GPU
 data = [
     ["" "Vert. res.: 63 levels" "" ""]
     ["" "dt: 120secs" "" ""]
-    ["" "run name:" cpu_run_name_coupled gpu_run_name_coupled]
+    ["" "job ID:" cpu_job_id_coupled gpu_job_id_coupled]
     ["Coupled" "SYPD:" cpu_sypd_coupled gpu_sypd_coupled]
     ["" "CPU max RSS allocs:" cpu_allocs_coupled gpu_cpu_allocs_coupled]
-    ["" "run name:" cpu_run_name_atmos gpu_run_name_atmos]
+    ["" "job ID:" cpu_job_id_atmos gpu_job_id_atmos]
     ["Atmos-only" "SYPD:" cpu_sypd_atmos gpu_sypd_atmos]
     ["" "CPU max RSS allocs:" cpu_allocs_atmos gpu_cpu_allocs_atmos]
 ]
 
-# Use the coupled CPU run name for the output dir
-table_output_dir = joinpath(output_dir, "compare_$(mode_name)_$(mode_name_atmos)_$(cpu_run_name_coupled)")
+# Use the coupled CPU job ID for the output dir
+table_output_dir = joinpath(output_dir, "compare_$(mode_name)_$(mode_name_atmos)_$(cpu_job_id_coupled)")
 !isdir(table_output_dir) && mkdir(table_output_dir)
 table_path = joinpath(table_output_dir, "table.txt")
 open(table_path, "w") do f

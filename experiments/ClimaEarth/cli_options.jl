@@ -3,9 +3,6 @@ function argparse_settings()
     s = ArgParse.ArgParseSettings()
     ArgParse.@add_arg_table! s begin
         # ClimaCoupler flags
-        "--run_name"
-        help = "Name of this run."
-        arg_type = String
         "--dt_cpl"
         help = " Coupling time step in seconds"
         arg_type = Int
@@ -60,6 +57,11 @@ function argparse_settings()
         default = 0
         "--config_file"
         help = "A yaml file used to set the configuration of the coupled model"
+        arg_type = String
+        "--job_id"
+        help = "A unique identifier for this run"
+        arg_type = String
+        default = nothing
         "--print_config_dict"
         help = "Boolean flag indicating whether to print the final configuration dictionary"
         arg_type = Bool
@@ -115,157 +117,3 @@ function argparse_settings()
 end
 
 parse_commandline(s) = ArgParse.parse_args(ARGS, s)
-
-function cli_defaults(s::ArgParse.ArgParseSettings)
-    defaults = Dict()
-    # TODO: Don't use ArgParse internals
-    for arg in s.args_table.fields
-        defaults[arg.dest_name] = arg.default
-    end
-    return defaults
-end
-
-"""
-    job_id_from_parsed_args(
-        s::ArgParseSettings,
-        parsed_args = ArgParse.parse_args(ARGS, s)
-    )
-Returns a unique name (`String`) given
- - `s::ArgParse.ArgParseSettings` The arg parse settings
- - `parsed_args` The parse arguments
-The `ArgParseSettings` are used for truncating
-this string based on the default values.
-"""
-job_id_from_parsed_args(s, parsed_args = ArgParse.parse_args(ARGS, s)) =
-    job_id_from_parsed_args(cli_defaults(s), parsed_args)
-
-function job_id_from_parsed_args(defaults::Dict, parsed_args)
-    _parsed_args = deepcopy(parsed_args)
-    s = ""
-    warn = false
-    for k in keys(_parsed_args)
-        # Skip defaults to alleviate verbose names
-        !haskey(defaults, k) && continue
-        defaults[k] == _parsed_args[k] && continue
-
-        if _parsed_args[k] isa String
-            # We don't need keys if the value is a string
-            # (alleviate verbose names)
-            s *= _parsed_args[k]
-        elseif _parsed_args[k] isa Int
-            s *= k * "_" * string(_parsed_args[k])
-        elseif _parsed_args[k] isa AbstractFloat
-            warn = true
-        else
-            s *= k * "_" * string(_parsed_args[k])
-        end
-        s *= "_"
-    end
-    s = replace(s, "/" => "_")
-    s = strip(s, '_')
-    warn && @warn "Truncated job ID:$s may not be unique due to use of Real"
-    return s
-end
-
-
-"""
-    print_repl_script(str::String)
-Generate a block of code to run a particular
-buildkite job given the `command:` string.
-Example:
-"""
-function print_repl_script(str)
-    ib = """"""
-    ib *= """\n"""
-    ib *= """using Revise; include("src/utils/cli_options.jl");\n"""
-    ib *= """\n"""
-    ib *= """parsed_args = parse_commandline(argparse_settings());\n"""
-    parsed_args = parsed_args_from_command_line_flags(str)
-    for (flag, val) in parsed_args
-        if val isa AbstractString
-            ib *= "parsed_args[\"$flag\"] = \"$val\";\n"
-        else
-            ib *= "parsed_args[\"$flag\"] = $val;\n"
-        end
-    end
-    ib *= """\n"""
-    ib *= """include("examples/hybrid/driver.jl")\n"""
-    println(ib)
-end
-
-parsed_args_from_ARGS(ARGS, parsed_args = Dict()) = parsed_args_from_ARGS_string(strip(join(ARGS, " ")), parsed_args)
-
-parsed_args_from_command_line_flags(str, parsed_args = Dict()) =
-    parsed_args_from_ARGS_string(strip(last(split(str, ".jl"))), parsed_args)
-
-function parsed_args_from_ARGS_string(str, parsed_args = Dict())
-    str = replace(str, "    " => " ", "   " => " ", "  " => " ")
-    parsed_args_list = split(str, " ")
-    parsed_args_list == [""] && return parsed_args
-    @assert iseven(length(parsed_args_list))
-    parsed_arg_pairs = map(1:2:(length(parsed_args_list) - 1)) do i
-        Pair(parsed_args_list[i], strip(parsed_args_list[i + 1], '\"'))
-    end
-    function parse_arg(val)
-        for T in (Bool, Int, Float32, Float64)
-            try
-                return parse(T, val)
-            catch
-            end
-        end
-        return String(val) # string
-    end
-    for (flag, val) in parsed_arg_pairs
-        parsed_args[replace(flag, "--" => "")] = parse_arg(val)
-    end
-    return parsed_args
-end
-
-"""
-    parsed_args_per_job_id()
-    parsed_args_per_job_id(buildkite_yaml)
-
-A dict of `parsed_args` to run the ClimaAtmos driver
-whose keys are the `job_id`s from buildkite yaml.
-
-# Example
-
-To run the `sphere_aquaplanet_rhoe_equilmoist_allsky`
-buildkite job from the standard buildkite pipeline, use:
-```
-using Revise; include("examples/hybrid/cli_options.jl");
-dict = parsed_args_per_job_id();
-parsed_args = dict["sphere_aquaplanet_rhoe_equilmoist_allsky"];
-include("examples/hybrid/driver.jl")
-```
-"""
-function parsed_args_per_job_id(; trigger = "driver.jl")
-    cc_dir = joinpath(@__DIR__, "..", "..", "..")
-    buildkite_yaml = joinpath(cc_dir, ".buildkite", "pipeline.yml")
-    parsed_args_per_job_id(buildkite_yaml; trigger)
-end
-
-function parsed_args_per_job_id(buildkite_yaml; trigger = "driver.jl")
-    buildkite_commands = readlines(buildkite_yaml)
-    filter!(x -> occursin(trigger, x), buildkite_commands)
-
-    @assert length(buildkite_commands) > 0 # sanity check
-    result = Dict()
-    for bkcs in buildkite_commands
-        default_parsed_args = parse_commandline(argparse_settings())
-        job_id = first(split(last(split(bkcs, "--run_name ")), " "))
-        job_id = strip(job_id, '\"')
-        result[job_id] = parsed_args_from_command_line_flags(bkcs, default_parsed_args)
-    end
-    return result
-end
-
-function non_default_command_line_flags_parsed_args(parsed_args)
-    default_parsed_args = parse_commandline(argparse_settings())
-    s = ""
-    for k in keys(parsed_args)
-        default_parsed_args[k] == parsed_args[k] && continue
-        s *= "--$k $(parsed_args[k]) "
-    end
-    return rstrip(s)
-end

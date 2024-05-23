@@ -8,12 +8,10 @@ energy_check: false
 h_elem: 6
 hourly_checkpoint: true
 hourly_checkpoint_dt: 1
-job_id: "coarse_single_ft64_hourly_checkpoints_restart"
 mode_name: "amip"
 moist: "equil"
 mono_surface: false
 precip_model: "0M"
 rad: "gray"
-run_name: "coarse_single_ft64_hourly_checkpoints_restart"
 t_end: "800secs"
 vert_diff: "true"

@@ -11,12 +11,10 @@ dt_save_to_sol: "1days"
 energy_check: false
 hourly_checkpoint: true
 idealized_insolation: false
-job_id: "gpu_amip_target_topo_diagedmf_shortrun"
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
 netcdf_output_at_levels: true
-run_name: "gpu_amip_target_topo_diagedmf_shortrun"
 start_date: "19790301"
 surface_setup: "PrescribedSurface"
 t_end: "200secs"

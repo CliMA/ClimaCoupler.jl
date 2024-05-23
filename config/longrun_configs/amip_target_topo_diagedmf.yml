@@ -12,14 +12,12 @@ dt_save_to_sol: "10days"
 energy_check: false
 hourly_checkpoint: false
 idealized_insolation: false
-job_id: "amip_target_topo_diagedmf"
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
 netcdf_output_at_levels: true
 output_default_diagnostics: true
 rayleigh_sponge: true
-run_name: "amip_target_topo_diagedmf"
 start_date: "19790301"
 surface_setup: "PrescribedSurface"
 t_end: "30days"

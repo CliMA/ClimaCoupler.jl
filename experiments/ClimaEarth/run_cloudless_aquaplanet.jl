@@ -121,7 +121,7 @@ config_dict = Dict(
     "dt_rad" => dt_rad,
     "albedo_model" => "CouplerAlbedo",
     "implicit_diffusion" => true,
-    "rayleigh_sponge" => true
+    "rayleigh_sponge" => true,
 )
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries

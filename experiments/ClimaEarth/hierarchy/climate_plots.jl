@@ -9,11 +9,16 @@ import DelimitedFiles: writedlm, readdlm
 include("plot_helper.jl")
 
 for job_id in ["dry_held_suarez", "moist_held_suarez",]
+    if isinteractive()
+        DATA_DIR = "experiments/ClimaEarth/$job_id/$job_id/clima_atmos/output_active/"
+    else
+        build = ENV["BUILDKITE_BUILD_NUMBER"]
+        DATA_DIR = "/scratch/clima/slurm-buildkite/climacoupler-hierarchies/$build/climacoupler-hierarchies/$job_id/$job_id/clima_atmos/output_active/"
+    end
 
-    build = ENV["BUILDKITE_BUILD_NUMBER"]
-    DATA_DIR = "/scratch/clima/slurm-buildkite/climacoupler-hierarchies/$build/climacoupler-hierarchies/$job_id/$job_id/clima_atmos/output_active/"
-
+    reduction = "6h_inst"
     PLOT_DIR = "paper_figs"
+
     mkpath(PLOT_DIR)
 
     # SUPPLEMENTAL: animation of surface temperature
@@ -23,7 +28,7 @@ for job_id in ["dry_held_suarez", "moist_held_suarez",]
     end
     Plots.mp4(anim, joinpath(PLOT_DIR, "anim_ta_sfc.mp4"), fps = 10)
 
-    reduction = "6h_inst"
+
     upper_level = 10
 
     # F2: climatology

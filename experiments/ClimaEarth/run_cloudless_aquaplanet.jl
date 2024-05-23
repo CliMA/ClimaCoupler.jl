@@ -129,8 +129,8 @@ atmos_config_dict, config_dict = get_atmos_config_dict(config_dict)
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 
 # override default toml parameters
-atmos_config_object.toml_dict["zd_rayleigh"] = 35000.0
-atmos_config_object.toml_dict["alpha_rayleigh_uh"] = 0.0
+atmos_config_object.toml_dict["zd_rayleigh"]["value"] = 35000.0
+atmos_config_object.toml_dict["alpha_rayleigh_uh"]["value"] = 0.0
 
 #=
 ## Setup Communication Context

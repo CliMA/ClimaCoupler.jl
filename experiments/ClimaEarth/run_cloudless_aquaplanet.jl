@@ -1,9 +1,7 @@
-# # Moist Held-Suarez
-## This script runs an idealized global circulation model, as in Thatcher and Jablonowski (2016).
-## As in the dry Held-Suarez case, this case implements a Newtonian cooling scheme for radiation
-## (though with modified parameters), and a Rayleigh damping scheme for dissipation.
-## Additionally to the dry case, the model includes moisture with a 0-moment microphysics scheme,
-## a prescribed ocean surface and a turbulent surface flux scheme.
+# # Cloudless Aquaplanet
+## This follows the setup of Frierson et al. (2006) with diffusion for subgridscale vertical transport.
+## It is an idealized cloudless aquaplanet with a slab ocean in perpetual equinox, gray radiation and
+## 0-moment microphysics.
 
 redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(false)))
 
@@ -46,6 +44,7 @@ pkg_dir = pkgdir(ClimaCoupler)
 
 ## helpers for component models
 include("components/atmosphere/climaatmos.jl")
+include("components/ocean/slab_ocean.jl")
 
 ## helpers for user-specified IO
 include("user_io/user_diagnostics.jl")
@@ -55,11 +54,10 @@ include("user_io/io_helpers.jl")
 
 #=
 ### Setup simulation parameters
-Here we follow Thatcher and Jablonowski (2016).
 =#
 
 ## run names
-job_id = "moist_held_suarez"
+job_id = "cloudless_aquaplanet"
 coupler_output_dir = "$job_id"
 const FT = Float64
 restart_dir = "unspecified"
@@ -71,6 +69,7 @@ t_end = "1000days"
 tspan = (Float64(0.0), Float64(time_to_seconds(t_end)))
 start_date = "19790301"
 hourly_checkpoint = true
+dt_rad = "6hours"
 
 ## namelist
 config_dict = Dict(
@@ -100,7 +99,7 @@ config_dict = Dict(
     "apply_limiter" => false,
     "viscous_sponge" => false,
     "rayleigh_sponge" => false,
-    "vert_diff" => "true",
+    "vert_diff" => "FriersonDiffusion",
     "hyperdiff" => "ClimaHyperdiffusion",
     # run
     "surface_setup" => "PrescribedSurface",
@@ -114,14 +113,16 @@ config_dict = Dict(
             "reduction" => "inst",
         ),
     ],
-    # held-suarez specific
-    "forcing" => "held_suarez", # Newtonian cooling already modified for moisture internally in Atmos
+    # cloudless aquaplanet-specific
+    "idealized_insolation" => true, # perpetual equinox with no diurnal cycle
     "precip_model" => "0M",
     "moist" => "equil",
     "prognostic_surface" => "PrescribedSurfaceTemperature",
     "turb_flux_partition" => "CombinedStateFluxesMOST",
+    "rad" => "gray",
+    "dt_rad" => dt_rad,
+    "albedo_model" => "CouplerAlbedo",
 )
-# TODO: may need to switch to Bulk fluxes
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
 atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
@@ -147,7 +148,7 @@ ClimaComms.iamroot(comms_ctx) ? @info(config_dict) : nothing
 
 #=
 ### Atmosphere
-This uses the `ClimaAtmos.jl` model, with parameterization options specified in the `atmos_config_object` dictionary.
+This uses the `ClimaAtmos.jl` model, with parameterization options specified in the `config_dict_atmos` dictionary.
 =#
 
 ## init atmos model component
@@ -159,29 +160,22 @@ thermo_params = get_thermo_params(atmos_sim)
 =#
 
 ## init a 2D boundary space at the surface
-boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
+boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space) # TODO: specify this in the coupler and pass it to all component models #665
 
 #=
-### Surface Model: Prescribed Ocean
+### Surface Model: Slab Ocean
 =#
 
-# could overload surface_temperature in atmos as well, but this is more transparent
-## idealized SST profile
-sst_tj16(ϕ::FT; Δϕ² = FT(26)^2, ΔT = FT(29), T_min = FT(271)) = T_min + ΔT * exp(-ϕ^2 / 2Δϕ²)
-ϕ = CC.Fields.coordinate_field(boundary_space).lat
-
-ocean_sim = Interfacer.SurfaceStub((;
-    T_sfc = sst_tj16.(ϕ),
-    ρ_sfc = CC.Fields.zeros(boundary_space),
-    z0m = FT(5e-4),
-    z0b = FT(5e-4),
-    beta = FT(1),
-    α_direct = CC.Fields.ones(boundary_space) .* FT(1),
-    α_diffuse = CC.Fields.ones(boundary_space) .* FT(1),
-    area_fraction = CC.Fields.ones(boundary_space),
-    phase = TD.Liquid(),
+ocean_sim = ocean_init(
+    FT;
+    tspan = tspan,
+    dt = Δt_cpl,
+    space = boundary_space,
+    saveat = Float64(time_to_seconds(config_dict["dt_save_to_sol"])),
+    area_fraction = ones(boundary_space),
     thermo_params = thermo_params,
-))
+    evolving = true,
+)
 
 #=
 ## Coupler Initialization
@@ -229,18 +223,29 @@ checkpoint_cb = TimeManager.HourlyCallback(
     func = checkpoint_sims,
     ref_date = [dates.date[1]],
     active = hourly_checkpoint,
-)
+) # 20 days
 update_firstdayofmonth!_cb = TimeManager.MonthlyCallback(
     dt = FT(1),
     func = TimeManager.update_firstdayofmonth!,
     ref_date = [dates.date1[1]],
     active = true,
 )
-callbacks = (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb)
+dt_water_albedo = parse(FT, filter(x -> !occursin(x, "hours"), dt_rad))
+albedo_cb = TimeManager.HourlyCallback(
+    dt = dt_water_albedo,
+    func = FluxCalculator.water_albedo_from_atmosphere!,
+    ref_date = [dates.date[1]],
+    active = true,
+)
+callbacks =
+    (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb, water_albedo = albedo_cb)
 
 #=
 ## Initialize turbulent fluxes
+
+Decide on the type of turbulent flux partition (see `FluxCalculator` documentation for more details).
 =#
+
 turbulent_fluxes = nothing
 if config_dict["turb_flux_partition"] == "CombinedStateFluxesMOST"
     turbulent_fluxes = FluxCalculator.CombinedStateFluxesMOST()
@@ -315,7 +320,7 @@ FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 =#
 
 function solve_coupler!(cs)
-    (; model_sims, Δt_cpl, tspan, comms_ctx) = cs
+    (; Δt_cpl, tspan, comms_ctx) = cs
 
     ClimaComms.iamroot(comms_ctx) && @info("Starting coupling loop")
     ## step in time
@@ -327,7 +332,11 @@ function solve_coupler!(cs)
         if cs.dates.date[1] >= cs.dates.date1[1]
             ClimaComms.iamroot(comms_ctx) && @show(cs.dates.date[1])
         end
+
         ClimaComms.barrier(comms_ctx)
+
+        ## update water albedo from wind at dt_water_albedo (this will be extended to a radiation callback from the coupler)
+        TimeManager.trigger_callback!(cs, cs.callbacks.water_albedo)
 
         ## run component models sequentially for one coupling timestep (Δt_cpl)
         FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
@@ -339,9 +348,9 @@ function solve_coupler!(cs)
         FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, surface_albedo, z0, beta
         FluxCalculator.combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 
-        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
+        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
 
-        ## callback to update the fist day of month
+        ## callback to update the fist day of month if needed (for BCReader)
         TimeManager.trigger_callback!(cs, cs.callbacks.update_firstdayofmonth!)
 
         ## callback to checkpoint model state
@@ -352,5 +361,4 @@ function solve_coupler!(cs)
     return nothing
 end
 
-## run the coupled simulation
-solve_coupler!(cs);
+solve_coupler!(cs)

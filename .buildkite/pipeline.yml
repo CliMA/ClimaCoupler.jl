@@ -397,6 +397,15 @@ steps:
         agents:
           slurm_mem: 20GB
 
+      - label: ":construction: Cloudless Aquaplanet"
+        key: "cloudless_aquaplanet"
+        command:
+          - sed 's/t_end = "1000days"/t_end = "1days"/' experiments/ClimaEarth/run_cloudless_aquaplanet.jl > experiments/ClimaEarth/run_cloudless_aquaplanet_short.jl
+          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_cloudless_aquaplanet_short.jl"
+        artifact_paths:  "cloudless_aquaplanet/cloudless_aquaplanet/clima_atmos/*"
+        agents:
+          slurm_mem: 20GB
+
   - group: "GPU integration tests"
     steps:
       # GPU RUNS: slabplanet

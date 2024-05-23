@@ -55,8 +55,8 @@ Here we follow Frierson et al. (2006) with diffusion for vertical transport.
 =#
 
 ## run names
-run_name = "cloudless_aquaplanet"
-coupler_output_dir = "$run_name"
+job_id = "cloudless_aquaplanet"
+coupler_output_dir = "$job_id"
 const FT = Float64
 restart_dir = "unspecified"
 restart_t = Int(0)
@@ -78,7 +78,7 @@ config_dict = Dict(
     "coupler_toml_file" => nothing,
     "coupler_output_dir" => coupler_output_dir,
     "mode_name" => "",
-    "run_name" => run_name,
+    "job_id" => job_id,
     "atmos_config_repo" => "ClimaAtmos",
     # timestepping
     "dt" => "$(Δt_cpl)secs",
@@ -100,7 +100,6 @@ config_dict = Dict(
     "vert_diff" => "FriersonDiffusion",
     "hyperdiff" => "ClimaHyperdiffusion",
     # run
-    "job_id" => run_name,
     "surface_setup" => "PrescribedSurface",
     # diagnostic (nested with period and short_name)
     "output_default_diagnostics" => false,

@@ -68,20 +68,20 @@ steps:
           slurm_gpus: 1
           modules: common
 
-      - label: "Clima: GPU ClimaCoupler Cloudless Aquaplanet"
+      - label: "Clima: GPU ClimaCoupler Cloudy Aquaplanet"
         command:
-          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_cloudless_aquaplanet.jl"
-        artifact_paths:  "cloudless_aquaplanet/cloudless_aquaplanet/clima_atmos/*"
+          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_cloudy_aquaplanet.jl"
+        artifact_paths:  "cloudy_aquaplanet/cloudy_aquaplanet/clima_atmos/*"
         agents:
           queue: clima
           slurm_mem: 20GB
           slurm_gpus: 1
           modules: common
 
-      - label: "Clima: GPU ClimaCoupler Cloudy Aquaplanet"
+      - label: "Clima: GPU ClimaCoupler Cloudy Slabplanet"
         command:
-          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_cloudy_aquaplanet.jl"
-        artifact_paths:  "cloudy_aquaplanet/cloudy_aquaplanet/clima_atmos/*"
+          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_cloudy_slabplanet.jl"
+        artifact_paths:  "cloudy_slabplanet/cloudy_slabplanet/clima_atmos/*"
         agents:
           queue: clima
           slurm_mem: 20GB

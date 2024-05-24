@@ -13,7 +13,7 @@ for job_id in ["dry_held_suarez", "moist_held_suarez"]
         DATA_DIR = "experiments/ClimaEarth/$job_id/$job_id/clima_atmos/output_active/"
     else
         build = ENV["BUILDKITE_BUILD_NUMBER"]
-        DATA_DIR = "/scratch/clima/slurm-buildkite/climacoupler-hierarchies/$build/climacoupler-hierarchies/$job_id/$job_id/clima_atmos/output_active/"
+        DATA_DIR = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/$build/climacoupler-ci/$job_id/$job_id/clima_atmos/output_active/"
     end
 
     reduction = "6h_inst"

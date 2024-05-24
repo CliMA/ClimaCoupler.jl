@@ -169,11 +169,9 @@ function hdwrite_regridfile_rll_to_cgll(
     # If doesn't make sense to regrid with GPUs/MPI processes
     cpu_singleton_context = ClimaComms.SingletonCommsContext(ClimaComms.CPUSingleThreaded())
 
-    topology = CC.Topologies.Topology2D(
-        cpu_singleton_context,
-        CC.Spaces.topology(space2d).mesh,
-        CC.Topologies.spacefillingcurve(CC.Spaces.topology(space2d).mesh),
-    )
+    # Note: this topology gives us `space == space_undistributed` in the undistributed
+    # case (as desired), which wouldn't hold if we used `spacefillingcurve` here.
+    topology = CC.Topologies.Topology2D(cpu_singleton_context, CC.Spaces.topology(space2d).mesh)
     Nq = CC.Spaces.Quadratures.polynomial_degree(CC.Spaces.quadrature_style(space2d)) + 1
 
     space2d_undistributed = CC.Spaces.SpectralElementSpace2D(topology, CC.Spaces.Quadratures.GLL{Nq}())

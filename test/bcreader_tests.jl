@@ -6,7 +6,7 @@ import Dates
 import NCDatasets
 import ClimaComms
 import ClimaCore as CC
-import ClimaCoupler: Regridder, BCReader, TimeManager, Interfacer
+import ClimaCoupler: Regridder, BCReader, TimeManager, Interfacer, TestHelper
 
 # get the paths to the necessary data files - sst map, land sea mask
 include(joinpath(@__DIR__, "..", "artifacts", "artifact_funcs.jl"))
@@ -148,14 +148,15 @@ for FT in (Float32, Float64)
             tspan = (Int(1), Int(90 * 86400)) # Jan-Mar
             Δt = Int(1 * 3600)
 
-            radius = FT(6731e3)
-            Nq = 4
-            domain = CC.Domains.SphereDomain(radius)
-            mesh = CC.Meshes.EquiangularCubedSphere(domain, 4)
-            topology = CC.Topologies.DistributedTopology2D(comms_ctx, mesh, CC.Topologies.spacefillingcurve(mesh))
-            quad = CC.Spaces.Quadratures.GLL{Nq}()
-            boundary_space_t = CC.Spaces.SpectralElementSpace2D(topology, quad)
+            # radius = FT(6731e3)
+            # Nq = 4
+            # domain = CC.Domains.SphereDomain(radius)
+            # mesh = CC.Meshes.EquiangularCubedSphere(domain, 4)
+            # topology = CC.Topologies.DistributedTopology2D(comms_ctx, mesh)
+            # quad = CC.Spaces.Quadratures.GLL{Nq}()
+            # boundary_space_t = CC.Spaces.SpectralElementSpace2D(topology, quad)
 
+            boundary_space_t = TestHelper.create_space(FT, comms_ctx = comms_ctx, nz = 1)
             land_fraction_t = CC.Fields.zeros(boundary_space_t)
             dummy_data = (; test_data = zeros(axes(land_fraction_t)))
 

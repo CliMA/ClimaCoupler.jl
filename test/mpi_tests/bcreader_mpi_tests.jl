@@ -26,13 +26,14 @@ ClimaComms.barrier(comms_ctx)
 @testset "test bcf_info_init with MPI" begin
     for FT in (Float32, Float64)
         # setup for test
-        radius = FT(6731e3)
-        Nq = 4
-        domain = CC.Domains.SphereDomain(radius)
-        mesh = CC.Meshes.EquiangularCubedSphere(domain, 4)
-        topology = CC.Topologies.DistributedTopology2D(comms_ctx, mesh, CC.Topologies.spacefillingcurve(mesh))
-        quad = CC.Spaces.Quadratures.GLL{Nq}()
-        boundary_space_t = CC.Spaces.SpectralElementSpace2D(topology, quad)
+        # radius = FT(6731e3)
+        # Nq = 4
+        # domain = CC.Domains.SphereDomain(radius)
+        # mesh = CC.Meshes.EquiangularCubedSphere(domain, 4)
+        # topology = CC.Topologies.DistributedTopology2D(comms_ctx, mesh)
+        # quad = CC.Spaces.Quadratures.GLL{Nq}()
+        # boundary_space_t = CC.Spaces.SpectralElementSpace2D(topology, quad)
+        boundary_space_t = TestHelper.create_space(FT, comms_ctx = comms_ctx, nz = 1)
         land_fraction_t = CC.Fields.zeros(boundary_space_t)
 
         datafile_rll = sst_data
@@ -91,13 +92,14 @@ end
         tspan = (1, 90 * 86400) # Jan-Mar
         Δt = 1 * 3600
 
-        radius = FT(6731e3)
-        Nq = 4
-        domain = CC.Domains.SphereDomain(radius)
-        mesh = CC.Meshes.EquiangularCubedSphere(domain, 4)
-        topology = CC.Topologies.DistributedTopology2D(comms_ctx, mesh, CC.Topologies.spacefillingcurve(mesh))
-        quad = CC.Spaces.Quadratures.GLL{Nq}()
-        boundary_space_t = CC.Spaces.SpectralElementSpace2D(topology, quad)
+        # radius = FT(6731e3)
+        # Nq = 4
+        # domain = CC.Domains.SphereDomain(radius)
+        # mesh = CC.Meshes.EquiangularCubedSphere(domain, 4)
+        # topology = CC.Topologies.DistributedTopology2D(comms_ctx, mesh, CC.Topologies.spacefillingcurve(mesh))
+        # quad = CC.Spaces.Quadratures.GLL{Nq}()
+        # boundary_space_t = CC.Spaces.SpectralElementSpace2D(topology, quad)
+        boundary_space_t = TestHelper.create_space(FT, comms_ctx = comms_ctx, nz = 1)
 
         land_fraction_t = CC.Fields.zeros(boundary_space_t)
         dummy_data = (; test_data = zeros(axes(land_fraction_t)))

@@ -1,4 +1,8 @@
 # # Dry Held-Suarez
+## This script runs an idealized global circulation model, as in Held and Suarez (1994).
+## There is no moisture, the radiation is approximated by a Newtonian cooling scheme,
+## and dissipation is applied via a Rayleigh damping scheme.
+## The numerics follow ClimaCore's dry Held-Suarez `held_suarez_rhoe` example.
 
 redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(false)))
 

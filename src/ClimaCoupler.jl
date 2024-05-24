@@ -5,6 +5,7 @@ Module for atmos-ocean-land coupled simulations.
 """
 module ClimaCoupler
 
+include("Artifacts.jl")
 include("Interfacer.jl")
 include("../test/TestHelper.jl")
 include("Utilities.jl")
@@ -17,5 +18,6 @@ include("FieldExchanger.jl")
 include("Diagnostics.jl")
 include("PostProcessor.jl")
 include("Checkpointer.jl")
+
 
 end

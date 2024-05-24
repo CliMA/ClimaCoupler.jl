@@ -23,8 +23,10 @@ function Base.values(r::RMSEs)
     return val_or_rmse.([r.ANN, r.DJF, r.JJA, r.MAM, r.SON])
 end
 
-OBS_DS["pr"] =
-    ObsDataSource(; path = joinpath(pr_obs_data_path(), "gpcp.precip.mon.mean.197901-202305.nc"), var_name = "precip")
+OBS_DS["pr"] = ObsDataSource(;
+    path = ClimaCoupler.Artifacts.precipitation_obs_data(context = ClimaComms.context()),
+    var_name = "precip",
+)
 
 SIM_DS_KWARGS["pr"] = (; preprocess_data_fn = preprocess_pr_fn, new_units = "mm / day")
 

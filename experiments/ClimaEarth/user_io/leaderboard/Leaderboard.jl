@@ -1,5 +1,6 @@
 module Leaderboard
 
+import ClimaComms
 import ClimaAnalysis
 import Dates
 import NCDatasets

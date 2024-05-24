@@ -17,12 +17,12 @@ get_nc_data_all = (var, red, DATA_DIR) -> begin
 end
 
 """
-    mean_climate_data(var, red, DATA_DIR; lev_i = 1, spinup=1)
+    mean_climate_data(varname, reduction, DATA_DIR; lev_i = 1, spinup=1)
 
-Postprocesses the climate data for the variable `var` and reduction `red` from the directory `DATA_DIR`. Returns the zonal mean and horizontal surface slice mean of the variable.
+Postprocesses the climate data for the variable `varname` and `reduction` from the directory `DATA_DIR`. Returns the zonal mean and horizontal surface slice mean of the variable.
 """
 mean_climate_data =
-    (varname, reduction, DATA_DIR; lev_i = 2, spinup = 1) -> begin
+    (varname, reduction, DATA_DIR; lev_i = 1, spinup = 1) -> begin
 
         var, lat, lon, z, time = get_nc_data_all(varname, reduction, DATA_DIR)
         @assert spinup < size(var, 1)
@@ -47,7 +47,7 @@ point_timeseries_data =
     end
 
 """
-    plot_climate(var, DATA_DIR, PLOT_DIR; reduction = "inst")
+    plot_climate(var, DATA_DIR, PLOT_DIR, job_id; reduction = "inst", interpolate_to_pressure = false)
 
 Plots the zonal mean and horizontal surface slice mean of the variable `var` from the directory `DATA_DIR` and saves the plots in the directory `PLOT_DIR`.
 """

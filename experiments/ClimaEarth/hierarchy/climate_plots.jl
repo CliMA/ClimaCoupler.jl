@@ -37,16 +37,13 @@ for job_id in ["dry_held_suarez", "moist_held_suarez"]
     end
     Plots.mp4(anim, joinpath(PLOT_DIR, "anim_ta_sfc.mp4"), fps = 10)
 
-
-    upper_level = 10
-
-    # F2: climatology
+    # Figure 2: climatology
     vars = ["mass_strf", "va", "ua", "ta", "egr", "wa"]
     for var in vars
         plot_climate(var, DATA_DIR, PLOT_DIR, job_id, reduction = reduction, interpolate_to_pressure = true)
     end
 
-    # F4: storm track diagnostics: time mean maps
+    # Figure 4: storm track diagnostics: time mean maps
     lev_st = 6
     ta_zm, ta_sfc, lat, lon, z = mean_climate_data("ta", reduction, DATA_DIR, lev_i = lev_st)
     va_zm, va_sfc, lat, lon, z = mean_climate_data("va", reduction, DATA_DIR, lev_i = lev_st)
@@ -68,10 +65,10 @@ for job_id in ["dry_held_suarez", "moist_held_suarez"]
         color = :viridis,
         ylims = (-pa_grid[1], -pa_grid[end]),
         yticks = (-pa_grid, pa_grid),
-    )# , clims=(-1e10, 1e10))
+    )
     png(joinpath(PLOT_DIR, "$(job_id)_heat_flux.png"))
 
-    # F5: storm track diagnostics: timeseries
+    # Figure 5: storm track diagnostics reduced to timeseries
     lev_i, lat_s_i, lat_n_i, lon_w_i, lon_e_i = lev_st, 60, 75, 1, 30
     println(
         "Sectorial selevtion for timeseries: \n level: $(z[lev_i]), lat: $(lat[lat_s_i]) to $(lat[lat_n_i]), lon: $(lon[lon_w_i]) to $(lon[lon_e_i])",

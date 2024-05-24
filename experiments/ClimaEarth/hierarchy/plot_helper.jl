@@ -17,12 +17,12 @@ get_nc_data_all = (var, red, DATA_DIR) -> begin
 end
 
 """
-    mean_climate_data(var, red, DATA_DIR; lev_i = 1, spinup=100)
+    mean_climate_data(var, red, DATA_DIR; lev_i = 1, spinup=1)
 
 Postprocesses the climate data for the variable `var` and reduction `red` from the directory `DATA_DIR`. Returns the zonal mean and horizontal surface slice mean of the variable.
 """
 mean_climate_data =
-    (varname, reduction, DATA_DIR; lev_i = 2, spinup = 160) -> begin
+    (varname, reduction, DATA_DIR; lev_i = 2, spinup = 1) -> begin
 
         var, lat, lon, z, time = get_nc_data_all(varname, reduction, DATA_DIR)
         @assert spinup < size(var, 1)

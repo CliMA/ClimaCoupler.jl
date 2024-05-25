@@ -92,16 +92,17 @@ We can additionally pass the configuration dictionary to the component model ini
 include("cli_options.jl")
 parsed_args = parse_commandline(argparse_settings())
 
-## the unique job id should be passed in via the command line
-job_id = parsed_args["job_id"]
-@assert !isnothing(job_id) "job_id must be passed in via the command line"
-
 ## modify parsed args for fast testing from REPL #hide
 if isinteractive()
     parsed_args["config_file"] =
         isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/ci_configs/interactive_debug.yml") :
         parsed_args["config_file"]
+    parsed_args["job_id"] = "interactive_debug"
 end
+
+## the unique job id should be passed in via the command line
+job_id = parsed_args["job_id"]
+@assert !isnothing(job_id) "job_id must be passed in via the command line"
 
 ## read in config dictionary from file, overriding the coupler defaults in `parsed_args`
 config_dict = YAML.load_file(parsed_args["config_file"])

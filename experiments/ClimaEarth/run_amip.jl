@@ -971,7 +971,7 @@ if ClimaComms.iamroot(comms_ctx)
                 1:length(compare_vars),
             )
 
-            Leaderboard.plot_leaderboard(rmses; output_path = "bias_leaderboard.png")
+            Leaderboard.plot_leaderboard(rmses; output_path = joinpath(dir_paths.artifacts, "bias_leaderboard.png"))
         end
     end
 

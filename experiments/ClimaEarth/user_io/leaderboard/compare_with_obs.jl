@@ -1,6 +1,7 @@
 const OBS_DS = Dict()
 const SIM_DS_KWARGS = Dict()
 const OTHER_MODELS_RMSEs = Dict()
+const COMPARISON_RMSEs = Dict()
 
 function preprocess_pr_fn(data)
     # -1 kg/m/s2 -> 1 mm/day
@@ -28,8 +29,9 @@ OBS_DS["pr"] =
 
 SIM_DS_KWARGS["pr"] = (; preprocess_data_fn = preprocess_pr_fn, new_units = "mm / day")
 
-# TODO: These numbers are eyeballed and should not be really used. Use instead real values from the various models
-OTHER_MODELS_RMSEs["pr"] = [RMSEs(; model_name = "AM4.0", ANN = 0.5, DJF = 1.0, JJA = 1.5, MAM = 0.5, SON = 1.0)]
+OTHER_MODELS_RMSEs["pr"] = []
+
+include("cmip_rmse.jl")
 
 # OBS_DS["rsut"] = ObsDataSource(;
 #                              path = "OBS/CERES_EBAF-TOA_Ed4.2_Subset_200003-202303.g025.nc",
@@ -74,12 +76,33 @@ function plot_leaderboard(rmses; output_path)
             xticks = (1:5, ["Ann", "DJF", "JJA", "MAM", "SON"]),
             title = "Global RMSE",
         )
-        CairoMakie.scatter!(ax, 1:5, values(rmse), label = rmse.model_name)
-        for other_model_rmse in OTHER_MODELS_RMSEs[short_name]
-            CairoMakie.scatter!(ax, 1:5, values(other_model_rmse), label = other_model_rmse.model_name)
-        end
+
+        # Against other models
+        (; best_single_model, median_model, worst_model, best_model) = COMPARISON_RMSEs[short_name]
+
+        CairoMakie.errorbars!(
+            ax,
+            1:5,
+            values(median_model),
+            values(best_model),
+            values(worst_model),
+            whiskerwidth = 10,
+            color = :black,
+            linewidth = 0.5,
+        )
+        CairoMakie.scatter!(
+            ax,
+            1:5,
+            values(median_model),
+            label = median_model.model_name,
+            color = :black,
+            marker = :hline,
+        )
+        CairoMakie.scatter!(ax, 1:5, values(best_single_model), label = best_single_model.model_name)
+        CairoMakie.scatter!(ax, 1:5, values(rmse), label = rmse.model_name, marker = :star5)
+
         # Add a fake extra point to center the legend a little better
-        CairoMakie.scatter!(ax, [6], [0.1], markersize = 0.01)
+        CairoMakie.scatter!(ax, [6.5], [0.1], markersize = 0.01)
         CairoMakie.axislegend()
         loc = loc + 1
     end

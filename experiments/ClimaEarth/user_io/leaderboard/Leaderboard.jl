@@ -8,6 +8,7 @@ import CairoMakie
 import GeoMakie
 import ClimaCoupler
 import Statistics: mean
+import Artifacts
 
 include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
 include("data_sources.jl")

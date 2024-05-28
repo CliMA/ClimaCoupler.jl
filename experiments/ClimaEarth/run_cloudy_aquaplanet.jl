@@ -62,12 +62,12 @@ restart_dir = "unspecified"
 restart_t = Int(0)
 
 ## coupler simulation specific configuration
-Δt_cpl = Float64(400)
+Δt_cpl = Float64(120)
 t_end = "1000days"
 tspan = (Float64(0.0), Float64(time_to_seconds(t_end)))
-start_date = "19790301"
+start_date = "19790321"
 hourly_checkpoint = true
-dt_rad = "6hours"
+dt_rad = "1hours"
 
 ## namelist
 config_dict = Dict(
@@ -86,17 +86,19 @@ config_dict = Dict(
     "t_end" => t_end,
     "start_date" => "19790321",
     # domain
-    "h_elem" => 4,
-    "z_elem" => 10,
-    "z_max" => 30000.0, # semi-high top
-    "dz_bottom" => 300.0,
-    "nh_poly" => 4,
+    "h_elem" => 30,
+    "z_elem" => 63,
+    "z_max" => 55000.0, # semi-high top
+    "dz_bottom" => 30.0,
+    "dz_top" => 3000.0,
+    # "nh_poly" => 4,
     # output
     "dt_save_to_sol" => "1days",
     # numerics
     "apply_limiter" => false,
     "viscous_sponge" => false,
-    "rayleigh_sponge" => false,
+    "rayleigh_sponge" => true,
+    "use_reference_state" => false,
     # "vert_diff" => "true", #required
     "hyperdiff" => "ClimaHyperdiffusion",
     # run
@@ -147,6 +149,9 @@ atmos_config_object.toml_dict["detr_vertdiv_coeff"]["value"] = 0.6
 atmos_config_object.toml_dict["detr_buoy_coeff"]["value"] = 0.12
 atmos_config_object.toml_dict["min_area_limiter_scale"]["value"] = 0
 atmos_config_object.toml_dict["max_area_limiter_scale"]["value"] = 0
+atmos_config_object.toml_dict["alpha_rayleigh_w"]["value"] = 3.0
+atmos_config_object.toml_dict["zd_rayleigh"]["value"] = 35000.0
+atmos_config_object.toml_dict["alpha_rayleigh_uh"]["value"] = 0.0
 
 #=
 ## Setup Communication Context

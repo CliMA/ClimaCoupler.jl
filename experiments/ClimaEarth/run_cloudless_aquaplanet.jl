@@ -56,6 +56,14 @@ include("user_io/io_helpers.jl")
 ### Setup simulation parameters
 =#
 
+# FLOAT_TYPE: "Float32"
+#atmos_config_file: "config/model_configs/aquaplanet_diagedmf.yml"
+# dt_cloud_fraction: "1hours"
+# idealized_insolation: false # here true since perp eqnox
+# mono_surface: false
+# topo_smoothing: true
+# topography: "Earth"
+
 ## run names
 job_id = "cloudless_aquaplanet"
 coupler_output_dir = "$job_id"
@@ -64,12 +72,12 @@ restart_dir = "unspecified"
 restart_t = Int(0)
 
 ## coupler simulation specific configuration
-Δt_cpl = Float64(400)
+Δt_cpl = Float64(120)
 t_end = "1000days"
 tspan = (Float64(0.0), Float64(time_to_seconds(t_end)))
-start_date = "19790301"
+start_date = "19790321"
 hourly_checkpoint = true
-dt_rad = "6hours"
+dt_rad = "1hours"
 
 ## namelist
 config_dict = Dict(
@@ -88,19 +96,23 @@ config_dict = Dict(
     "t_end" => t_end,
     "start_date" => "19790301",
     # domain
-    "h_elem" => 4,
-    "z_elem" => 10,
-    "z_max" => 30000.0, # semi-high top
-    "dz_bottom" => 300.0,
-    "nh_poly" => 4,
+    "h_elem" => 30,
+    "z_elem" => 63,
+    "z_max" => 55000.0, # semi-high top
+    "dz_bottom" => 30.0,
+    "dz_top" => 3000.0,
+    # "nh_poly" => 4,
     # output
     "dt_save_to_sol" => "1days",
     # numerics
+    "use_reference_state" => false,
     "apply_limiter" => false,
     "viscous_sponge" => false,
-    "rayleigh_sponge" => false,
+    "rayleigh_sponge" => true,
     "vert_diff" => "FriersonDiffusion",
     "hyperdiff" => "ClimaHyperdiffusion",
+    "implicit_diffusion" => true,
+    "approximate_linear_solve_iters" => 2,
     # run
     "surface_setup" => "PrescribedSurface",
     # diagnostic (nested with period and short_name)
@@ -127,6 +139,11 @@ config_dict = Dict(
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
 atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
+
+## override default toml parameters
+atmos_config_object.toml_dict["alpha_rayleigh_w"]["value"] = 3.0
+atmos_config_object.toml_dict["zd_rayleigh"]["value"] = 35000.0
+atmos_config_object.toml_dict["alpha_rayleigh_uh"]["value"] = 0.0
 
 #=
 ## Setup Communication Context

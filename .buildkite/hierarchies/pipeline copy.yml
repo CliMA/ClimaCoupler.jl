@@ -1,0 +1,89 @@
+agents:
+  queue: new-central
+  slurm_time: 24:00:00
+  modules: climacommon/2024_05_27
+
+env:
+  JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
+  OPENBLAS_NUM_THREADS: 1
+  JULIA_NVTX_CALLBACKS: gc
+  OMPI_MCA_opal_warn_on_missing_libcuda: 0
+  JULIA_MAX_NUM_PRECOMPILE_FILES: 100
+  GKSwstype: 100
+  SLURM_KILL_BAD_EXIT: 1
+
+  CONFIG_PATH: "config/longrun_configs"
+  PERF_CONFIG_PATH: "config/perf_configs"
+
+timeout_in_minutes: 1440
+
+steps:
+  - label: "init clima :computer:"
+    key: "init_cpu_env_clima"
+    command:
+      - "echo $$JULIA_DEPOT_PATH"
+
+      - echo "--- Instantiate AMIP env"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
+
+      - echo "--- Download artifacts"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.status()'"
+      - "julia --project=artifacts artifacts/download_artifacts.jl"
+
+    agents:
+      queue: clima
+      modules: common
+    env:
+      JULIA_NUM_PRECOMPILE_TASKS: 8
+      JULIA_MAX_NUM_PRECOMPILE_FILES: 50
+
+
+  - wait
+
+  - group: "Coupler integration and conservation tests"
+
+    steps:
+
+      - label: "Clima: GPU ClimaCoupler dry HS"
+        command:
+          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_dry_held_suarez.jl"
+        artifact_paths:  "dry_held_suarez/dry_held_suarez/clima_atmos/*"
+        agents:
+          queue: clima
+          slurm_mem: 20GB
+          slurm_gpus: 1
+          modules: common
+
+      - label: "Clima: GPU ClimaCoupler moist HS"
+        command:
+          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_moist_held_suarez.jl"
+        artifact_paths:  "moist_held_suarez/moist_held_suarez/clima_atmos/*"
+        agents:
+          queue: clima
+          slurm_mem: 20GB
+          slurm_gpus: 1
+          modules: common
+
+      - label: "Clima: GPU ClimaCoupler Cloudy Aquaplanet"
+        command:
+          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_cloudy_aquaplanet.jl"
+        artifact_paths:  "cloudy_aquaplanet/cloudy_aquaplanet/clima_atmos/*"
+        agents:
+          queue: clima
+          slurm_mem: 20GB
+          slurm_gpus: 1
+          modules: common
+
+      - label: "Clima: GPU ClimaCoupler Cloudy Slabplanet"
+        command:
+          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_cloudy_slabplanet.jl"
+        artifact_paths:  "cloudy_slabplanet/cloudy_slabplanet/clima_atmos/*"
+        agents:
+          queue: clima
+          slurm_mem: 20GB
+          slurm_gpus: 1
+          modules: common

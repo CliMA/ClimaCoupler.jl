@@ -9,8 +9,8 @@ Coupler Specific Shared Development
 [docs-bld-img]: https://github.com/CliMA/ClimaCoupler.jl/workflows/Documentation/badge.svg
 [docs-bld-url]: https://github.com/CliMA/ClimaCoupler.jl/actions?query=workflow%3ADocumentation
 
-[unit-tests-img]: https://github.com/CliMA/ClimaCoupler.jl/workflows/Unit%20Tests/badge.svg
-[unit-tests-url]: https://github.com/CliMA/ClimaCoupler.jl/actions?query=workflow%3A%22Unit+Tests%22
+[unit-tests-img]: https://github.com/CliMA/ClimaCoupler.jl/actions/workflows/ci.yml/badge.svg
+[unit-tests-url]: https://github.com/CliMA/ClimaCoupler.jl/actions?query=workflow%3Aci
 
 [codecov-img]: https://codecov.io/gh/CliMA/ClimaCoupler.jl/branch/main/graph/badge.svg
 [codecov-url]: https://codecov.io/gh/CliMA/ClimaCoupler.jl

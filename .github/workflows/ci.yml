@@ -46,3 +46,8 @@ jobs:
       - uses: codecov/codecov-action@v1
         with:
           file: lcov.info
+      - name: Submit coverage
+        if: ${{ matrix.version == '1.10' }} && ${{ matrix.os == 'ubuntu-latest' }}
+        uses: codecov/codecov-action@v1.0.7
+        with:
+          token: ${{secrets.CODECOV_TOKEN}}

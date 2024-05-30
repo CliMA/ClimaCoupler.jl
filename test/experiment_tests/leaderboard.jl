@@ -1,6 +1,8 @@
 import Test: @test, @testset, @test_throws
+import ClimaComms
 import ClimaCoupler
 import ClimaAnalysis
+import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Dates
 
 # Load file to test
@@ -67,7 +69,7 @@ end
     @test Leaderboard.data_at_date(sim_datasource, Dates.DateTime(1979, 1, 2)) == preprocess_fn(pr.data[1, :, :])
 
     obs_datasource = Leaderboard.ObsDataSource(;
-        path = joinpath(pr_obs_data_path(), "gpcp.precip.mon.mean.197901-202305.nc"),
+        path = joinpath(@clima_artifact("precipitation_obs"), "gpcp.precip.mon.mean.197901-202305.nc"),
         var_name = "precip",
         preprocess_data_fn = preprocess_fn,
     )

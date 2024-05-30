@@ -48,18 +48,6 @@ function mask_dataset_path()
     return AW.get_data_folder(mask_dataset)
 end
 
-function pr_obs_data_path()
-    pr_obs_data = AW.ArtifactWrapper(
-        @__DIR__,
-        "pr_obs_data",
-        AW.ArtifactFile[AW.ArtifactFile(
-            url = "https://caltech.box.com/shared/static/k1or5d0d9xdvyfiytl1os7z341monkzn.nc",
-            filename = "gpcp.precip.mon.mean.197901-202305.nc",
-        ),],
-    )
-    return AW.get_data_folder(pr_obs_data)
-end
-
 """
     artifact_data(datapath_full, filename)
 

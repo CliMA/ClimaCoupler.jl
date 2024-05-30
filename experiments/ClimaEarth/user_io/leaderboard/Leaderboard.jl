@@ -1,5 +1,6 @@
 module Leaderboard
 
+import ClimaComms
 import ClimaAnalysis
 import Dates
 import NCDatasets
@@ -8,11 +9,10 @@ import CairoMakie
 import GeoMakie
 import ClimaCoupler
 import Statistics: mean
+import ClimaUtilities.ClimaArtifacts: @clima_artifact
 
-include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
 include("data_sources.jl")
 include("utils.jl")
 include("compare_with_obs.jl")
-
 
 end

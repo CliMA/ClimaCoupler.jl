@@ -7,7 +7,7 @@
 
 export MODULEPATH="/groups/esm/modules:$MODULEPATH"
 module purge
-module load climacommon/2024_04_05
+module load climacommon/2024_05_27
 
 export CC_PATH=$(pwd)/ # adjust this to the path of your ClimaCoupler.jl directory
 export JOB_ID=coarse_single_ft64_hourly_checkpoints_restart

@@ -66,10 +66,38 @@ function plot_biases(biases; output_path)
 end
 
 function plot_leaderboard(rmses; output_path)
-    fig = CairoMakie.Figure(; size = (600, 300 * length(rmses)))
+    fig = CairoMakie.Figure(; size = (800, 300 * length(rmses) + 400), fontsize = 20)
     loc = 1
 
-    for rmse in rmses
+    NUM_BOXES = 4 + 1 # 4 seasons and 1 annual
+    NUM_MODELS = 2  # CliMA vs best
+
+    num_variables = length(rmses)
+
+    var_names = map(r -> r.ANN.attributes["var_short_name"], rmses)
+
+    # The square plot is at the very bottom
+    loc_squares = length(rmses) + 1
+    ax_squares = CairoMakie.Axis(
+        fig[loc_squares, 1],
+        yticks = (1:num_variables, var_names),
+        xticks = ([3, NUM_BOXES + 3], ["CliMA", "Best model"]),
+        aspect = NUM_BOXES * NUM_MODELS,
+    )
+    ax_squares2 = CairoMakie.Axis(
+        fig[loc_squares, 1],
+        xaxisposition = :top,
+        xticks = (0.5:4.5, ["Ann", "DJF", "MAM", "JJA", "SON"]),
+        aspect = NUM_BOXES * NUM_MODELS,
+    )
+    CairoMakie.hidespines!(ax_squares2)
+    CairoMakie.hideydecorations!(ax_squares2)
+
+    # Preallocate the matrix for the squares, each row is (4 seasons + annual) x
+    # models compared, and there is one row per variable
+    squares = zeros(NUM_BOXES * NUM_MODELS, num_variables)
+
+    for (var_num, rmse) in enumerate(rmses)
         short_name = rmse.ANN.attributes["var_short_name"]
         units = rmse.ANN.attributes["units"]
         ax = CairoMakie.Axis(
@@ -81,6 +109,9 @@ function plot_leaderboard(rmses; output_path)
 
         # Against other models
         (; best_single_model, median_model, worst_model, best_model) = COMPARISON_RMSEs[short_name]
+
+        squares[begin:NUM_BOXES, var_num] .= values(rmse) ./ values(median_model)
+        squares[(NUM_BOXES + 1):end, var_num] .= values(best_single_model) ./ values(median_model)
 
         CairoMakie.errorbars!(
             ax,
@@ -108,5 +139,25 @@ function plot_leaderboard(rmses; output_path)
         CairoMakie.axislegend()
         loc = loc + 1
     end
+
+    colormap = CairoMakie.Reverse(:RdYlGn)
+
+    # Now, the square plot
+    CairoMakie.heatmap!(
+        ax_squares,
+        squares,
+        colormap = colormap,
+        # Trick to exclude the zeros
+        lowclip = :white,
+        colorrange = (1e-10, maximum(squares)),
+    )
+    CairoMakie.vlines!(ax_squares2, NUM_BOXES, color = :black, linewidth = 3.0)
+    CairoMakie.Colorbar(
+        fig[loc_squares, 2],
+        limits = extrema(squares),
+        label = "RMSE/median(RMSE)",
+        colormap = colormap,
+    )
+
     CairoMakie.save(output_path, fig)
 end

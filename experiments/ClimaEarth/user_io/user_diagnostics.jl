@@ -58,19 +58,19 @@ function Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:toa_fluxes
     nz_faces = length(face_space.grid.vertical_grid.topology.mesh.faces)
 
     LWd_TOA = CC.Fields.level(
-        CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_lw_flux_dn), face_space),
+        CC.Fields.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_lw_flux_dn), face_space),
         nz_faces - CC.Utilities.half,
     )
     LWu_TOA = CC.Fields.level(
-        CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_lw_flux_up), face_space),
+        CC.Fields.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_lw_flux_up), face_space),
         nz_faces - CC.Utilities.half,
     )
     SWd_TOA = CC.Fields.level(
-        CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_sw_flux_dn), face_space),
+        CC.Fields.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_sw_flux_dn), face_space),
         nz_faces - CC.Utilities.half,
     )
     SWu_TOA = CC.Fields.level(
-        CA.RRTMGPI.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_sw_flux_up), face_space),
+        CC.Fields.array2field(FT.(atmos_sim.integrator.p.radiation.radiation_model.face_sw_flux_up), face_space),
         nz_faces - CC.Utilities.half,
     )
 

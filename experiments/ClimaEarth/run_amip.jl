@@ -925,7 +925,17 @@ if ClimaComms.iamroot(comms_ctx)
         ## Compare against observations
         if t_end > 84600 && config_dict["output_default_diagnostics"]
             @info "Error against observations"
-            output_dates = cs.dates.date0[] .+ Dates.Second.(atmos_sim.integrator.sol.t)
+            diagnostics_times = copy(atmos_sim.integrator.sol.t)
+            # Remove the first `spinup_months` months from the leaderboard
+            spinup_months = 6
+            spinup_cutoff = spinup_months * 30 * 86400.0
+            if t_end > spinup_cutoff
+                filter!(x -> x < spinup_cutoff, diagnostics_times)
+            end
+
+            output_dates = cs.dates.date0[] .+ Dates.Second.(diagnostics_times)
+            @info "Working with dates:"
+            @info output_dates
 
             include("user_io/leaderboard.jl")
             compare_vars = ["pr"]

@@ -23,7 +23,7 @@ surface_setup: "PrescribedSurface"
 t_end: "30days"
 topo_smoothing: true
 topography: "Earth"
-vert_diff: true
+vert_diff: "true"
 coupler_toml_file: "toml/amip_target_topo_diagedmf.toml"
 turb_flux_partition: "CombinedStateFluxesMOST"
 use_reference_state: false

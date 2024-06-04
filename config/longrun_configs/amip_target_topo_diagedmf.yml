@@ -17,6 +17,8 @@ mode_name: "amip"
 mono_surface: false
 netcdf_output_at_levels: true
 output_default_diagnostics: true
+vorticity_hyperdiffusion_coefficient: 4.0
+scalar_hyperdiffusion_coefficient: 4.0
 rayleigh_sponge: true
 start_date: "19790301"
 surface_setup: "PrescribedSurface"

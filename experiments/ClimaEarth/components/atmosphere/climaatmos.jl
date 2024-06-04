@@ -116,14 +116,10 @@ function Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:radiative_
         (; face_lw_flux_dn, face_lw_flux_up, face_sw_flux_dn, face_sw_flux_up) =
             atmos_sim.integrator.p.radiation.radiation_model
 
-        LWd_TOA =
-            CC.Fields.level(CA.RRTMGPI.array2field(FT.(face_lw_flux_dn), face_space), nz_faces - CC.Utilities.half)
-        LWu_TOA =
-            CC.Fields.level(CA.RRTMGPI.array2field(FT.(face_lw_flux_up), face_space), nz_faces - CC.Utilities.half)
-        SWd_TOA =
-            CC.Fields.level(CA.RRTMGPI.array2field(FT.(face_sw_flux_dn), face_space), nz_faces - CC.Utilities.half)
-        SWu_TOA =
-            CC.Fields.level(CA.RRTMGPI.array2field(FT.(face_sw_flux_up), face_space), nz_faces - CC.Utilities.half)
+        LWd_TOA = CC.Fields.level(CC.Fields.array2field(FT.(face_lw_flux_dn), face_space), nz_faces - CC.Utilities.half)
+        LWu_TOA = CC.Fields.level(CC.Fields.array2field(FT.(face_lw_flux_up), face_space), nz_faces - CC.Utilities.half)
+        SWd_TOA = CC.Fields.level(CC.Fields.array2field(FT.(face_sw_flux_dn), face_space), nz_faces - CC.Utilities.half)
+        SWu_TOA = CC.Fields.level(CC.Fields.array2field(FT.(face_sw_flux_up), face_space), nz_faces - CC.Utilities.half)
 
         return @. -(LWd_TOA + SWd_TOA - LWu_TOA - SWu_TOA)
     else
@@ -193,7 +189,7 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temp
     # note that this field is also being updated internally by the surface thermo state in ClimaAtmos
     # if turbulent fluxes are calculated, to ensure consistency. In case the turbulent fluxes are not
     # calculated, we update the field here.
-    sim.integrator.p.radiation.radiation_model.surface_temperature .= CA.RRTMGPI.field2array(csf.T_S)
+    sim.integrator.p.radiation.radiation_model.surface_temperature .= CC.Fields.field2array(csf.T_S)
 end
 # extensions required by FluxCalculator (partitioned fluxes)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =
@@ -216,12 +212,12 @@ end
 # extensions required by the Interfacer
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_direct_albedo}, field)
     sim.integrator.p.radiation.radiation_model.direct_sw_surface_albedo .=
-        reshape(CA.RRTMGPI.field2array(field), 1, length(parent(field)))
+        reshape(CC.Fields.field2array(field), 1, length(parent(field)))
 end
 
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_diffuse_albedo}, field)
     sim.integrator.p.radiation.radiation_model.diffuse_sw_surface_albedo .=
-        reshape(CA.RRTMGPI.field2array(field), 1, length(parent(field)))
+        reshape(CC.Fields.field2array(field), 1, length(parent(field)))
 end
 
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fluxes}, fields)
@@ -487,7 +483,7 @@ function FluxCalculator.water_albedo_from_atmosphere!(
 
     # update for current zenith angle
     bottom_coords = CC.Fields.coordinate_field(CC.Spaces.level(Y.c, 1))
-    μ = CA.RRTMGPI.array2field(radiation_model.cos_zenith, axes(bottom_coords))
+    μ = CC.Fields.array2field(radiation_model.cos_zenith, axes(bottom_coords))
     FT = eltype(atmos_sim.integrator.u)
     α_model = CA.RegressionFunctionAlbedo{FT}()
 

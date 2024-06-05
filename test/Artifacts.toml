@@ -1,0 +1,13 @@
+[cmip_model_rmse]
+git-tree-sha1 = "aa2d5178a656e9ce7a37698d978d8ed92aa46d99"
+
+    [[cmip_model_rmse.download]]
+    sha256 = "b019d40510cebc678899a74d2cf14e33aa60452805478b2bf7176b891012aa97"
+    url = "https://caltech.box.com/shared/static/lmzvnjkxctlb0fanieeqxll0vdrbei9e.gz"
+
+[precipitation_obs]
+git-tree-sha1 = "7486bf32e9352493f69364aead26f01eaf90d2af"
+
+    [[precipitation_obs.download]]
+    sha256 = "463ebc1886c4e0be9656656da699f2cbb87d7c2568d5e81277c0c8a415dc8143"
+    url = "https://caltech.box.com/shared/static/j63uak557kw7tlzb3dgwifoaeczekzm4.gz"

@@ -317,9 +317,9 @@ weakdeps = ["CairoMakie", "GeoMakie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "ArtifactWrappers", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Colors", "Dates", "Dierckx", "DiffEqBase", "Distributions", "DocStringExtensions", "FastGaussQuadrature", "Insolation", "Interpolations", "IntervalSets", "Krylov", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "Pkg", "Printf", "RRTMGP", "Random", "RootSolvers", "SciMLBase", "StaticArrays", "Statistics", "StatsBase", "SurfaceFluxes", "Thermodynamics", "YAML"]
-git-tree-sha1 = "a1e7d0db0b52307911ea1c28057d3f4140c5fdb3"
+git-tree-sha1 = "ee93c2561464da2fc5a6bf7453761c75f9468cfb"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.24.2"
+version = "0.24.3"
 
 [[deps.ClimaComms]]
 deps = ["CUDA", "MPI"]

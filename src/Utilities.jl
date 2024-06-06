@@ -81,12 +81,12 @@ CPU of this process since it began.
 `comms_ctx`: the communication context being used to run the model
 """
 function show_memory_usage(comms_ctx)
-    cpu_allocs_GB = ""
+    cpu_max_rss_GB = ""
     if ClimaComms.iamroot(comms_ctx)
-        cpu_allocs_GB = "CPU: " * string(round(Sys.maxrss() / 1e9, digits = 3)) * " GiB"
-        @info cpu_allocs_GB
+        cpu_max_rss_GB = string(round(Sys.maxrss() / 1e9, digits = 3)) * " GiB"
+        @info cpu_max_rss_GB
     end
-    return cpu_allocs_GB
+    return cpu_max_rss_GB
 end
 
 end # module

@@ -74,8 +74,8 @@ if ClimaComms.iamroot(comms_ctx)
         write(sypd_filename, "$sypd")
     end
 
-    open(joinpath(output_dir, "allocs_cpu.txt"), "w") do cpu_allocs_filename
-        cpu_allocs_GB = Utilities.show_memory_usage(comms_ctx)
-        write(cpu_allocs_filename, cpu_allocs_GB)
+    open(joinpath(output_dir, "max_rss_cpu.txt"), "w") do cpu_max_rss_filename
+        cpu_max_rss_GB = Utilities.show_memory_usage(comms_ctx)
+        write(cpu_max_rss_filename, cpu_max_rss_GB)
     end
 end

@@ -2,8 +2,8 @@
 Our goal here is to output a table displaying some results from benchmark runs
 in the coupler. We want to be able to compare between CPU and GPU runs, as well
 as between coupled and atmos-only runs. The metrics we want to compare are
-SYPD, allocations, and the maximum, median, and mean differences between the
-CPU and GPU states.
+SYPD, memory usage, allocations, and the maximum, median, and mean differences
+between the CPU and GPU states.
 
 The table should look something like this (note that the last 3 columns will be
 added in a future PR):
@@ -12,11 +12,11 @@ added in a future PR):
 ------------------------------------------------------------------------------------
 |             |   $job_id    |   $job_id   |           |              |              |
 | Coupled run |    $SYPD     |    $SYPD    | $max_diff | $median_diff |  $mean_diff  |
-|             | $cpu_allocs  | $cpu_allocs |           |              |              |
+|             | $cpu_max_rss | $cpu_max_rss|           |              |              |
 ------------------------------------------------------------------------------------
 |             |   $job_id    |   $job_id   |           |              |              |
 | Atmos-only  |    $SYPD     |    $SYPD    | $max_diff | $median_diff |  $mean_diff  |
-|             | $cpu_allocs  | $cpu_allocs |           |              |              |
+|             | $cpu_max_rss | $cpu_max_rss|           |              |              |
 ------------------------------------------------------------------------------------
 
 =#
@@ -108,22 +108,22 @@ function get_run_info(parsed_args, run_type)
 end
 
 """
-    get_sypd_allocs(artifacts_dir)
+    get_run_data(artifacts_dir)
 
-Read in SYPD and allocations info from artifacts directories.
+Read in run data from artifacts directories, currently SYPD and max RSS on the CPU.
 """
-function get_sypd_allocs(artifacts_dir)
+function get_run_data(artifacts_dir)
     # Read in SYPD info
     sypd = open(joinpath(artifacts_dir, "sypd.txt"), "r") do sypd_file
         round(parse(Float64, read(sypd_file, String)), digits = 4)
     end
 
-    # Read in allocation info
-    cpu_allocs = open(joinpath(artifacts_dir, "allocs_cpu.txt"), "r") do cpu_allocs_file
-        read(cpu_allocs_file, String)
+    # Read in max RSS info
+    cpu_max_rss = open(joinpath(artifacts_dir, "max_rss_cpu.txt"), "r") do cpu_max_rss_file
+        read(cpu_max_rss_file, String)
     end
 
-    return (sypd, cpu_allocs)
+    return (sypd, cpu_max_rss)
 end
 
 """
@@ -133,14 +133,14 @@ Append data for a given setup to the table data.
 """
 function append_table_data(table_data, setup_id, cpu_job_id, gpu_job_id, cpu_artifacts_dir, gpu_artifacts_dir)
     # Get SYPD and allocation info for both input runs
-    cpu_sypd, cpu_allocs = get_sypd_allocs(cpu_artifacts_dir)
-    gpu_sypd, gpu_cpu_allocs = get_sypd_allocs(gpu_artifacts_dir)
+    cpu_sypd, cpu_max_rss = get_run_data(cpu_artifacts_dir)
+    gpu_sypd, gpu_cpu_max_rss = get_run_data(gpu_artifacts_dir)
 
     # Create rows containing data for these runs
     new_table_data = [
         ["" "job ID:" cpu_job_id gpu_job_id]
         [setup_id "SYPD:" cpu_sypd gpu_sypd]
-        ["" "CPU max RSS allocs:" cpu_allocs gpu_cpu_allocs]
+        ["" "CPU max RSS:" cpu_max_rss gpu_cpu_max_rss]
     ]
     return vcat(table_data, new_table_data)
 end

@@ -19,7 +19,7 @@ else
     buildkite_number = ENV["BUILDKITE_BUILD_NUMBER"]
     buildkite_build_path = ENV["BUILDKITE_BUILD_PATH"]
     buildkite_pipeline_slug = ENV["BUILDKITE_PIPELINE_SLUG"]
-    buildkite_cc_dir = "/groups/esm/slurm-buildkite/climacoupler-ci/"
+    buildkite_cc_dir = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/"
     scratch_cc_dir = joinpath(buildkite_build_path, buildkite_pipeline_slug)
     build_path =
         joinpath(buildkite_build_path, buildkite_pipeline_slug, buildkite_number, buildkite_pipeline_slug, "perf/")

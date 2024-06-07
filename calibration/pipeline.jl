@@ -1,7 +1,7 @@
 ### Generate synthetic truth datasets
 @info "Generating synthetic truth data"
 using ClimaComms
-import CalibrateAtmos
+import ClimaCalibrate
 ClimaComms.init(ClimaComms.context())
 import ClimaCoupler 
 import YAML
@@ -9,7 +9,7 @@ using NCDatasets
 import JLD2
 using Statistics
 
-import CalibrateAtmos: AbstractPhysicalModel, get_forward_model
+import ClimaCalibrate: get_forward_model
 
 experiment_dir = joinpath("experiments", "amip_coupled")
 COUPLER_OUTPUT_DIR = joinpath(experiment_dir, "truth_simulation")
@@ -43,6 +43,6 @@ run_forward_model(CoupledModel(), config_dict);
 # This outputs in experiments/AMIP/output/amip/target_amip_n1_shortrun
 
 ### Calibrate
-CalibrateAtmos.calibrate("amip_coupled")
+ClimaCalibrate.calibrate("amip_coupled")
 
 ### Re-run target simulation

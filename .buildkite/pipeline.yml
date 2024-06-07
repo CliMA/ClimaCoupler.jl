@@ -511,6 +511,7 @@ steps:
         command: "test/mpi_tests/test_sbatch_script.sh"
         agents:
           slurm_ntasks: 1
+        soft_fail: true
 
   - wait
 

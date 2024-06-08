@@ -9,7 +9,7 @@ if isinteractive()
     buildkite_cc_dir = build_path = "."
 else
     buildkite_number = ENV["BUILDKITE_BUILD_NUMBER"]
-    buildkite_cc_dir = "/groups/esm/slurm-buildkite/climacoupler-ci/"
+    buildkite_cc_dir = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/"
     build_path = "/central/scratch/esm/slurm-buildkite/climacoupler-ci/$buildkite_number/climacoupler-ci/perf/"
 end
 

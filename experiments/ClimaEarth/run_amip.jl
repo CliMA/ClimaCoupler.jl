@@ -823,9 +823,9 @@ if ClimaComms.iamroot(comms_ctx)
     sypd_filename = joinpath(dir_paths.artifacts, "sypd.txt")
     write(sypd_filename, "$sypd")
 
-    cpu_allocs_GB = Utilities.show_memory_usage(comms_ctx)
-    cpu_allocs_filename = joinpath(dir_paths.artifacts, "allocations_cpu.txt")
-    write(cpu_allocs_filename, cpu_allocs_GB)
+    cpu_max_rss_GB = Utilities.show_memory_usage(comms_ctx)
+    cpu_max_rss_filename = joinpath(dir_paths.artifacts, "max_rss_cpu.txt")
+    write(cpu_max_rss_filename, cpu_max_rss_GB)
 end
 
 #=

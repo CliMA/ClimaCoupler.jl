@@ -39,9 +39,5 @@ temperature and sea ice
 ### Comparison Metrics
 - Simulated years per day (SYPD): The number of years of simulation time we
 can run in 1 day of walltime
-- CPU simulation object allocations: The allocations in GB of the simulation
-object, which contains everything needed to run the simulation.
-In the atmosphere-only case, this is the `AtmosSimulation` object.
-In the coupled case, this is the `CoupledSimulation` object, which includes
-all of the component models, coupler fields, and auxiliary objects. More
-information on this object can be found in the `Interfacer` docs.
+- CPU maximum resident set size (max RSS): The max RSS memory footprint on the
+CPU of this process since it began. This is measured for both CPU and GPU runs.

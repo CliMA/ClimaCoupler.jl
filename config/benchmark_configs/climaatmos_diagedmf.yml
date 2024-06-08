@@ -22,7 +22,7 @@ precip_model: 0M
 prognostic_tke: true
 rad: allskywithclear
 surface_setup: DefaultMoninObukhov
-t_end: 12hours
+t_end: 1days
 toml: [toml/diagnostic_edmfx.toml]
 turbconv: diagnostic_edmfx
 z_elem: 63

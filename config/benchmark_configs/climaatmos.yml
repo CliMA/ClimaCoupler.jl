@@ -14,7 +14,7 @@ precip_model: 0M
 prognostic_tke: true
 rad: allskywithclear
 surface_setup: DefaultMoninObukhov
-t_end: 12hours
+t_end: 1days
 turb_flux_partition: "CombinedStateFluxesMOST"
 vert_diff: "true"
 z_elem: 63

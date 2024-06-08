@@ -11,6 +11,6 @@ mode_name: "amip"
 mono_surface: false
 monthly_checkpoint: false
 start_date: "19790301"
-t_end: "12hours"
+t_end: "1days"
 turb_flux_partition: "CombinedStateFluxesMOST"
 use_coupler_diagnostics: false

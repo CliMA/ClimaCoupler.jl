@@ -1,4 +1,4 @@
-import Statistics: median
+import Statistics: median, quantile
 
 const RMSE_FILE_PATHS = Dict()
 
@@ -75,7 +75,25 @@ function RSME_stats(vecRMSEs)
         SON = minimum(abs.(SON)),
     )
 
-    (; best_single_model = best_single_model(vecRMSEs), median_model, worst_model, best_model)
+    quantile25 = RMSEs(;
+        model_name = "Quantile 0.25",
+        ANN = quantile(ANN, 0.25),
+        DJF = quantile(DJF, 0.25),
+        JJA = quantile(JJA, 0.25),
+        MAM = quantile(MAM, 0.25),
+        SON = quantile(SON, 0.25),
+    )
+
+    quantile75 = RMSEs(;
+        model_name = "Quantile 0.75",
+        ANN = quantile(ANN, 0.75),
+        DJF = quantile(DJF, 0.75),
+        JJA = quantile(JJA, 0.75),
+        MAM = quantile(MAM, 0.75),
+        SON = quantile(SON, 0.75),
+    )
+
+    (; best_single_model = best_single_model(vecRMSEs), median_model, worst_model, best_model, quantile25, quantile75)
 end
 
 for short_name in short_names

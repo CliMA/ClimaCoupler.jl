@@ -119,16 +119,6 @@ function plot_leaderboard(rmses; output_path)
         squares[begin:NUM_BOXES, var_num] .= values(rmse) ./ values(median_model)
         squares[(NUM_BOXES + 1):end, var_num] .= values(best_single_model) ./ values(median_model)
 
-        CairoMakie.errorbars!(
-            ax,
-            1:5,
-            values(median_model),
-            values(best_model),
-            values(worst_model),
-            whiskerwidth = 10,
-            color = :black,
-            linewidth = 0.5,
-        )
         CairoMakie.scatter!(
             ax,
             1:5,
@@ -136,9 +126,35 @@ function plot_leaderboard(rmses; output_path)
             label = median_model.model_name,
             color = :black,
             marker = :hline,
+            markersize = 15,
         )
-        CairoMakie.scatter!(ax, 1:5, values(best_single_model), label = best_single_model.model_name)
-        CairoMakie.scatter!(ax, 1:5, values(rmse), label = rmse.model_name, marker = :star5)
+
+        categories = vcat(map(_ -> collect(1:5), 1:length(OTHER_MODELS_RMSEs[short_name]))...)
+
+        CairoMakie.boxplot!(
+            ax,
+            categories,
+            vcat(values.(OTHER_MODELS_RMSEs[short_name])...);
+            whiskerwidth = 1,
+            width = 0.35,
+            mediancolor = :black,
+            color = :gray,
+            whiskerlinewidth = 1,
+        )
+
+        for model in OTHER_MODELS_RMSEs[short_name]
+            CairoMakie.scatter!(ax, 1:5, values(model), marker = :hline)
+        end
+
+        CairoMakie.scatter!(
+            ax,
+            1:5,
+            values(rmse),
+            label = rmse.model_name,
+            marker = :star5,
+            markersize = 20,
+            color = :orange,
+        )
 
         # Add a fake extra point to center the legend a little better
         CairoMakie.scatter!(ax, [6.5], [0.1], markersize = 0.01)

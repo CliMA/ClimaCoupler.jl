@@ -16,7 +16,7 @@ mode_name: "amip"
 mono_surface: false
 netcdf_interpolate_z_over_msl: true
 rad: "allskywithclear"
-start_date: "19790301"
+start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "100days"
 topo_smoothing: true

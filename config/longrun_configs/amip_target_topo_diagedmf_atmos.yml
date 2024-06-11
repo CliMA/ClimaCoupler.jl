@@ -1,23 +1,24 @@
 FLOAT_TYPE: "Float32"
-albedo_model: "CouplerAlbedo"
-anim: false
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
 dt: "120secs"
-dt_cpl: 120
 dt_save_state_to_disk: "30days"
 dt_save_to_sol: "30days"
 energy_check: false
 hourly_checkpoint: true
 hourly_checkpoint_dt: 720
-land_albedo_type: "map_temporal"
-mode_name: "amip"
-mono_surface: false
 netcdf_output_at_levels: true
 output_default_diagnostics: true
-start_date: "20121026"
+start_date: "20100401"
 surface_setup: "PrescribedSurface"
-t_end: "900days"
+t_end: "10days"
 topo_smoothing: true
 topography: "Earth"
 coupler_toml_file: "toml/amip_target_topo_diagedmf.toml"
 turb_flux_partition: "CombinedStateFluxesMOST"
+use_reference_state: false
+diagnostics:
+  - short_name: [rsdt, rsut, rsds, rsus]
+    period: 1days
+    writer: h5
+  - short_name: [rsdt, rsut, rsds, rsus]
+    period: 1days

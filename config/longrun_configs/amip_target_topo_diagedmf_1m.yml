@@ -14,10 +14,12 @@ mode_name: "amip"
 mono_surface: false
 netcdf_output_at_levels: true
 output_default_diagnostics: true
-start_date: "20121026"
+precip_model: "1M"
+start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "900days"
+t_end: "90days"
 topo_smoothing: true
 topography: "Earth"
-coupler_toml_file: "toml/amip_target_topo_diagedmf.toml"
+coupler_toml_file: "toml/amip_target_topo_diagedmf_1m.toml"
 turb_flux_partition: "CombinedStateFluxesMOST"
+use_reference_state: false

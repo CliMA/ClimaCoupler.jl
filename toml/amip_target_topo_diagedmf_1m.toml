@@ -1,14 +1,11 @@
 [alpha_rayleigh_w]
-value = 10.0
+value = 3.0
 
 [zd_rayleigh]
 value = 35000.0
 
 [alpha_rayleigh_uh]
 value = 0.0
-
-[precipitation_timescale]
-value = 600
 
 [entr_inv_tau]
 value = 0.002

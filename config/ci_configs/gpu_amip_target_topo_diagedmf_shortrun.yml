@@ -15,7 +15,7 @@ land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
 netcdf_output_at_levels: true
-start_date: "19790301"
+start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "200secs"
 topo_smoothing: true

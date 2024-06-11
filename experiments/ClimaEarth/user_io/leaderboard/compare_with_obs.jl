@@ -8,6 +8,10 @@ function preprocess_pr_fn(data)
     return data .* Float32(-86400)
 end
 
+function replace_nan(x; v = 0.0)
+    return map(x -> isnan(x) ? zero(x) : x, v)
+end
+
 Base.@kwdef struct RMSEs
     model_name::String
     ANN::Union{<:Real, ClimaAnalysis.OutputVar} = 0.0
@@ -28,26 +32,28 @@ OBS_DS["pr"] = ObsDataSource(;
     path = joinpath(@clima_artifact("precipitation_obs"), "gpcp.precip.mon.mean.197901-202305.nc"),
     var_name = "precip",
 )
-
 SIM_DS_KWARGS["pr"] = (; preprocess_data_fn = preprocess_pr_fn, new_units = "mm / day")
-
 OTHER_MODELS_RMSEs["pr"] = []
+
+OBS_DS["rsut"] = ObsDataSource(;
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF-TOA_Ed4.2_Subset_200003-202303.g025.nc"),
+    var_name = "toa_sw_all_mon",
+)
+SIM_DS_KWARGS["rsut"] = (;)
+OTHER_MODELS_RMSEs["rsut"] = []
+
+OBS_DS["rlut"] = ObsDataSource(;
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF-TOA_Ed4.2_Subset_200003-202303.g025.nc"),
+    var_name = "toa_lw_all_mon",
+)
+SIM_DS_KWARGS["rlut"] = (;)
+OTHER_MODELS_RMSEs["rlut"] = []
 
 include("cmip_rmse.jl")
 
-# OBS_DS["rsut"] = ObsDataSource(;
-#                              path = "OBS/CERES_EBAF-TOA_Ed4.2_Subset_200003-202303.g025.nc",
-#                              var_name = "toa_sw_all_mon",
-#                              )
-
-# OBS_DS["rlut"] = ObsDataSource(;
-#                              path = "OBS/CERES_EBAF-TOA_Ed4.2_Subset_200003-202303.g025.nc",
-#                              var_name = "toa_lw_all_mon",
-#                              )
-
 function bias(output_dir::AbstractString, short_name::AbstractString, target_dates::AbstractArray{<:Dates.DateTime})
     obs = OBS_DS[short_name]
-    sim = SimDataSource(; path = output_dir, short_name, SIM_DS_KWARGS["pr"]...)
+    sim = SimDataSource(; path = output_dir, short_name, SIM_DS_KWARGS[short_name]...)
     return bias(obs, sim, target_dates)
 end
 
@@ -59,7 +65,7 @@ function plot_biases(biases; output_path)
     fig = CairoMakie.Figure(; size = (600, 300 * length(biases)))
     loc = 1
     for bias_var in biases
-        ClimaAnalysis.Visualize.heatmap2D_on_globe!(fig, bias_var; p_loc = (1, loc))
+        ClimaAnalysis.Visualize.heatmap2D_on_globe!(fig, bias_var; p_loc = (loc, 1))
         loc = loc + 1
     end
     CairoMakie.save(output_path, fig)
@@ -101,10 +107,10 @@ function plot_leaderboard(rmses; output_path)
         short_name = rmse.ANN.attributes["var_short_name"]
         units = rmse.ANN.attributes["units"]
         ax = CairoMakie.Axis(
-            fig[1, loc],
+            fig[loc, 1],
             ylabel = "$short_name [$units]",
             xticks = (1:5, ["Ann", "DJF", "JJA", "MAM", "SON"]),
-            title = "Global RMSE",
+            title = "Global RMSE $short_name [$units]",
         )
 
         # Against other models

@@ -1,19 +1,26 @@
 import Statistics: median
 
-pr_file_path = joinpath(@clima_artifact("cmip_model_rmse"), "pr_rmse_amip_pr_amip_5yr.csv")
+const RMSE_FILE_PATHS = Dict()
 
-open(pr_file_path, "r") do io
-    # Skip the header
-    header = readline(io)
+RMSE_FILE_PATHS["pr"] = joinpath(@clima_artifact("cmip_model_rmse"), "pr_rmse_amip_pr_amip_5yr.csv")
+RMSE_FILE_PATHS["rsut"] = joinpath(@clima_artifact("cmip_model_rmse"), "rsut_rmse_amip_rsut_amip_5yr.csv")
+RMSE_FILE_PATHS["rlut"] = joinpath(@clima_artifact("cmip_model_rmse"), "rlut_rmse_amip_rlut_amip_5yr.csv")
 
-    # Process each line
-    for line in eachline(io)
-        # Split the line by comma
-        fields = split(line, ',')
-        model_name = fields[1]
-        DJF, MAM, JJA, SON, ANN = map(x -> parse(Float64, x), fields[2:end])
+short_names = ["pr", "rsut", "rlut"]
+for short_name in short_names
+    open(RMSE_FILE_PATHS[short_name], "r") do io
+        # Skip the header
+        header = readline(io)
 
-        push!(OTHER_MODELS_RMSEs["pr"], RMSEs(; model_name, DJF, MAM, JJA, SON, ANN))
+        # Process each line
+        for line in eachline(io)
+            # Split the line by comma
+            fields = split(line, ',')
+            model_name = fields[1]
+            DJF, MAM, JJA, SON, ANN = map(x -> parse(Float64, x), fields[2:end])
+
+            push!(OTHER_MODELS_RMSEs[short_name], RMSEs(; model_name, DJF, MAM, JJA, SON, ANN))
+        end
     end
 end
 
@@ -71,4 +78,6 @@ function RSME_stats(vecRMSEs)
     (; best_single_model = best_single_model(vecRMSEs), median_model, worst_model, best_model)
 end
 
-COMPARISON_RMSEs["pr"] = RSME_stats(OTHER_MODELS_RMSEs["pr"])
+for short_name in short_names
+    COMPARISON_RMSEs[short_name] = RSME_stats(OTHER_MODELS_RMSEs[short_name])
+end

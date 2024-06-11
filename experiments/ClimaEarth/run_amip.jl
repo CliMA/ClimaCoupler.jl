@@ -938,7 +938,7 @@ if ClimaComms.iamroot(comms_ctx)
             @info output_dates
 
             include("user_io/leaderboard.jl")
-            compare_vars = ["pr"]
+            compare_vars = ["pr", "rsut", "rlut"]
             function compute_biases(dates)
                 if isempty(dates)
                     return map(x -> 0.0, compare_vars)

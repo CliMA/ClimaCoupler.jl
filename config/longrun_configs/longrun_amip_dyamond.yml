@@ -8,6 +8,6 @@ land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
 monthly_checkpoint: false
-start_date: "19790301"
+start_date: "20100101"
 t_end: "1days"
 turb_flux_partition: "CombinedStateFluxesMOST"

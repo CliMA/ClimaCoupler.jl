@@ -14,7 +14,7 @@ land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
 rad: "allskywithclear"
-start_date: "19790301"
+start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "100days"
 turb_flux_partition: "CombinedStateFluxesMOST"

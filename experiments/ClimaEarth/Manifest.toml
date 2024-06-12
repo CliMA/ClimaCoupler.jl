@@ -370,7 +370,7 @@ version = "0.2.2"
 
 [[deps.ClimaLand]]
 deps = ["Adapt", "ArtifactWrappers", "ClimaComms", "ClimaCore", "ClimaUtilities", "DataFrames", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "IntervalSets", "LazyArtifacts", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities"]
-git-tree-sha1 = "224fcf894d54c3b112cabc40b1e6ff34084a82ad"
+git-tree-sha1 = "97afd37fba375218fa0c20ba3dd3dc5f12ac2a90"
 repo-rev = "kd/dss_off"
 repo-url = "https://github.com/CliMA/ClimaLand.jl.git"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"

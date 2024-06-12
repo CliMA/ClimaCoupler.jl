@@ -16,8 +16,8 @@ Base.@kwdef struct RMSEs
     model_name::String
     ANN::Union{<:Real, ClimaAnalysis.OutputVar} = 0.0
     DJF::Union{<:Real, ClimaAnalysis.OutputVar} = 0.0
-    JJA::Union{<:Real, ClimaAnalysis.OutputVar} = 0.0
     MAM::Union{<:Real, ClimaAnalysis.OutputVar} = 0.0
+    JJA::Union{<:Real, ClimaAnalysis.OutputVar} = 0.0
     SON::Union{<:Real, ClimaAnalysis.OutputVar} = 0.0
 end
 
@@ -109,7 +109,7 @@ function plot_leaderboard(rmses; output_path)
         ax = CairoMakie.Axis(
             fig[loc, 1],
             ylabel = "$short_name [$units]",
-            xticks = (1:5, ["Ann", "DJF", "JJA", "MAM", "SON"]),
+            xticks = (1:5, ["Ann", "DJF", "MAM", "JJA", "SON"]),
             title = "Global RMSE $short_name [$units]",
         )
 

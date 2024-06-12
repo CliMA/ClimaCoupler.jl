@@ -86,7 +86,7 @@ function plot_leaderboard(rmses; output_path)
     loc_squares = length(rmses) + 1
     ax_squares = CairoMakie.Axis(
         fig[loc_squares, 1],
-        yticks = (1:num_variables, var_names),
+        yticks = (1:num_variables, reverse(var_names)),
         xticks = ([3, NUM_BOXES + 3], ["CliMA", "Best model"]),
         aspect = NUM_BOXES * NUM_MODELS,
     )
@@ -116,8 +116,8 @@ function plot_leaderboard(rmses; output_path)
         # Against other models
         (; best_single_model, median_model, worst_model, best_model) = COMPARISON_RMSEs[short_name]
 
-        squares[begin:NUM_BOXES, var_num] .= values(rmse) ./ values(median_model)
-        squares[(NUM_BOXES + 1):end, var_num] .= values(best_single_model) ./ values(median_model)
+        squares[begin:NUM_BOXES, end - var_num + 1] .= values(rmse) ./ values(median_model)
+        squares[(NUM_BOXES + 1):end, end - var_num + 1] .= values(best_single_model) ./ values(median_model)
 
         CairoMakie.scatter!(
             ax,
@@ -142,9 +142,10 @@ function plot_leaderboard(rmses; output_path)
             whiskerlinewidth = 1,
         )
 
-        for model in OTHER_MODELS_RMSEs[short_name]
-            CairoMakie.scatter!(ax, 1:5, values(model), marker = :hline)
-        end
+        # If we want to plot other models
+        # for model in OTHER_MODELS_RMSEs[short_name]
+        #     CairoMakie.scatter!(ax, 1:5, values(model), marker = :hline)
+        # end
 
         CairoMakie.scatter!(
             ax,

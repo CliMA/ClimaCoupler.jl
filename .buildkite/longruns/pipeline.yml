@@ -150,7 +150,7 @@ steps:
         artifact_paths: "longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_tvinsol_0M_slabocean/*"
         env:
           BUILD_HISTORY_HANDLE: ""
-          CLIMACORE_DISTRIBUTED: "MPI"
+          CLIMACOMMS_CONTEXT: "MPI"
         agents:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
@@ -162,7 +162,7 @@ steps:
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_aqua_target_nocouple.yml --job_id slabplanet_aqua_target_nocouple"
         artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua/slabplanet_aqua_target_nocouple_artifacts/*"
         env:
-          CLIMACORE_DISTRIBUTED: "MPI"
+          CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks_per_node: 16
@@ -175,7 +175,7 @@ steps:
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_aqua_target.yml --job_id slabplanet_aqua_target"
         artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua/slabplanet_aqua_target_artifacts/*"
         env:
-          CLIMACORE_DISTRIBUTED: "MPI"
+          CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks_per_node: 16
@@ -188,7 +188,7 @@ steps:
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_aqua_target_evolve_ocn.yml --job_id slabplanet_aqua_target_evolve_ocn"
         artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua/slabplanet_aqua_target_evolve_ocn_artifacts/*"
         env:
-          CLIMACORE_DISTRIBUTED: "MPI"
+          CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks_per_node: 16
@@ -201,7 +201,7 @@ steps:
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_target.yml --job_id slabplanet_target"
         artifact_paths: "experiments/ClimaEarth/output/slabplanet/slabplanet_target_artifacts/*"
         env:
-          CLIMACORE_DISTRIBUTED: "MPI"
+          CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks_per_node: 16
@@ -214,7 +214,7 @@ steps:
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_target_evolve_ocn.yml --job_id slabplanet_target_evolve_ocn"
         artifact_paths: "experiments/ClimaEarth/output/slabplanet/slabplanet_target_evolve_ocn_artifacts/*"
         env:
-          CLIMACORE_DISTRIBUTED: "MPI"
+          CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks_per_node: 16
@@ -232,7 +232,7 @@ steps:
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target.yml --job_id amip_target"
         artifact_paths: "experiments/ClimaEarth/output/amip/amip_target_artifacts/*"
         env:
-          CLIMACORE_DISTRIBUTED: "MPI"
+          CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks_per_node: 16
@@ -245,7 +245,7 @@ steps:
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo.yml --job_id amip_target_topo"
         artifact_paths: "experiments/ClimaEarth/output/amip/amip_target_topo_artifacts/*"
         env:
-          CLIMACORE_DISTRIBUTED: "MPI"
+          CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks_per_node: 16
@@ -258,7 +258,7 @@ steps:
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf_cpu.yml --job_id amip_target_topo_diagedmf_cpu"
         artifact_paths: "experiments/ClimaEarth/output/amip/amip_target_topo_diagedmf_cpu_artifacts/*"
         env:
-          CLIMACORE_DISTRIBUTED: "MPI"
+          CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
         agents:
           slurm_ntasks_per_node: 16
@@ -274,6 +274,9 @@ steps:
         key: "amip_target_topo_gpu"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo.yml --job_id amip_target_topo_gpu"
         artifact_paths: "experiments/ClimaEarth/output/amip/amip_target_topo_gpu_artifacts/*"
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
+          CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_gpus: 1
           slurm_mem: 16GB
@@ -288,6 +291,7 @@ steps:
         timeout_in_minutes: 1440
         env:
           CLIMACOMMS_CONTEXT: "MPI"
+          CLIMACOMMS_DEVICE: "CUDA"
         agents:
           queue: clima
           slurm_gpus_per_task: 1
@@ -304,6 +308,8 @@ steps:
       - echo "--- Run simulation"
       - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/longrun_amip_dyamond.yml --job_id longrun_amip_dyamond_gpu"
     artifact_paths: "experiments/ClimaEarth/output/amip/longrun_amip_dyamond_gpu_artifacts/*"
+    env:
+      CLIMACOMMS_DEVICE: "CUDA"
     agents:
       queue: clima
       slurm_mem: 20GB

@@ -50,14 +50,14 @@ function atmos_init(atmos_config)
 
     if hasmoisture(integrator)
         ρ_flux_q_tot = integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot
-        col_integrated_rain = integrator.p.precipitation.col_integrated_rain
-        col_integrated_snow = integrator.p.precipitation.col_integrated_snow
+        surface_rain_flux = integrator.p.precipitation.surface_rain_flux
+        surface_snow_flux = integrator.p.precipitation.surface_snow_flux
         ᶜS_ρq_tot = integrator.p.precipitation.ᶜS_ρq_tot
         ᶜ3d_rain = integrator.p.precipitation.ᶜ3d_rain
         ᶜ3d_snow = integrator.p.precipitation.ᶜ3d_snow
         @. ρ_flux_q_tot = CC.Geometry.Covariant3Vector(FT(0.0))
-        col_integrated_rain .= FT(0)
-        col_integrated_snow .= FT(0)
+        surface_rain_flux .= FT(0)
+        surface_snow_flux .= FT(0)
         ᶜS_ρq_tot .= FT(0)
         ᶜ3d_rain .= FT(0)
         ᶜ3d_snow .= FT(0)
@@ -147,13 +147,13 @@ end
 
 # helpers for get_field extensions, dipatchable on different moisture model options and radiation modes
 
-col_integrated_rain(::CA.DryModel, integrator) = StaticArrays.SVector(eltype(integrator.u)(0))
-col_integrated_rain(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
-    integrator.p.precipitation.col_integrated_rain
+surface_rain_flux(::CA.DryModel, integrator) = StaticArrays.SVector(eltype(integrator.u)(0))
+surface_rain_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
+    integrator.p.precipitation.surface_rain_flux
 
-col_integrated_snow(::CA.DryModel, integrator) = StaticArrays.SVector(eltype(integrator.u)(0))
-col_integrated_snow(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
-    integrator.p.precipitation.col_integrated_snow
+surface_snow_flux(::CA.DryModel, integrator) = StaticArrays.SVector(eltype(integrator.u)(0))
+surface_snow_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
+    integrator.p.precipitation.surface_snow_flux
 
 surface_radiation_flux(::Nothing, integrator) = StaticArrays.SVector(eltype(integrator.u)(0))
 surface_radiation_flux(::CA.RRTMGPI.AbstractRRTMGPMode, integrator) =
@@ -172,11 +172,11 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) =
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
     TD.air_temperature.(thermo_params, sim.integrator.p.precomputed.ᶜts)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) =
-    col_integrated_rain(sim.integrator.p.atmos.moisture_model, sim.integrator)
+    surface_rain_flux(sim.integrator.p.atmos.moisture_model, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
     surface_radiation_flux(sim.integrator.p.atmos.radiation_mode, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =
-    col_integrated_snow(sim.integrator.p.atmos.moisture_model, sim.integrator)
+    surface_snow_flux(sim.integrator.p.atmos.moisture_model, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_energy_flux}) =
     CC.Geometry.WVector.(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_moisture_flux}) =

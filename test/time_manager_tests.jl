@@ -4,6 +4,7 @@
 import Test: @testset, @test
 import Dates
 import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ClimaCoupler: Interfacer, TimeManager
 
 for FT in (Float32, Float64)

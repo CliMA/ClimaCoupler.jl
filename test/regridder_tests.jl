@@ -5,6 +5,7 @@ import Test: @testset, @test
 import Dates
 import NCDatasets
 import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ClimaCore as CC
 import ClimaCoupler
 import ClimaCoupler: Interfacer, Regridder, TestHelper, TimeManager

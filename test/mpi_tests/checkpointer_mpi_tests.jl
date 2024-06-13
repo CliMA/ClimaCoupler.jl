@@ -6,6 +6,7 @@ that MPI can be enabled for testing of these functions.
 =#
 import Test: @test, @testset
 import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ClimaCore as CC
 import ClimaCoupler
 import ClimaCoupler: Checkpointer, Interfacer, TestHelper

@@ -25,7 +25,7 @@ function Base.values(r::RMSEs)
     val_or_rmse(v::Real) = v
     val_or_rmse(v::ClimaAnalysis.OutputVar) = v.attributes["rmse"]
 
-    return val_or_rmse.([r.ANN, r.DJF, r.JJA, r.MAM, r.SON])
+    return val_or_rmse.([r.ANN, r.DJF, r.MAM, r.JJA, r.SON])
 end
 
 OBS_DS["pr"] = ObsDataSource(;

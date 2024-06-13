@@ -1,3 +1,5 @@
+import CairoMakie
+
 const OBS_DS = Dict()
 const SIM_DS_KWARGS = Dict()
 const OTHER_MODELS_RMSEs = Dict()
@@ -61,11 +63,73 @@ function compute_biases(output_dir, short_names, target_dates::AbstractArray{<:D
     return map(name -> bias(output_dir, name, target_dates), short_names)
 end
 
+
+# colors are sampled in [0,1], so define a function that linearly transforms x ∈ [lo, hi] to [0, 1].
+to_unitrange(x::Number, lo::Number, hi::Number) = (x - lo) / (hi - lo)
+
+"""
+    constrained_cmap(cols, lo, hi; [categorical=false], [rev=false], [mid=0])
+    constrained_cmap(lo, hi; [categorical=false], [rev=false], [mid=0])
+
+Constrain a colormap to a given range.
+
+Given a colormap implicitly defined in `± maximum(abs, (lo, hi))`, constrain it to the range [lo, hi].
+This is useful to ensure that a colormap which is desired to diverge symmetrically around zero maps
+the same color intensity to the same magnitude.
+
+The second form is a convenience function that uses the `:redsblues` colormap.
+
+# Arguments
+- `cols`: a vector of colors, or a ColorScheme
+- `lo`: lower bound of the range
+- `hi`: upper bound of the range
+
+# Keyword Arguments
+- `mid`: midpoint of the range  # TODO: test `mid` better
+- `categorical`: flag for whether returned colormap should be categorical or continous
+- `rev`: flag for whether to reverse the colormap
+
+# Returns
+- `cmap::Makie.ColorGradient`: a colormap
+"""
+function constrained_cmap(cols::Vector, lo, hi; mid = 0, categorical = false, rev = false)
+    constrained_cmap(CairoMakie.Makie.ColorScheme(cols), lo, hi; mid, categorical, rev)
+end
+function constrained_cmap(cols::CairoMakie.Makie.ColorScheme, lo, hi; mid = 0, categorical = false, rev = false)
+    rev && (cols = reverse(cols))  # reverse colorscheme if requested, don't reverse below in `cgrad`.
+    absmax = maximum(abs, (lo, hi) .- mid)
+    # map lo, hi ∈ [-absmax, absmax] onto [0,1] to sample their corresponding colors
+    lo_m, hi_m = to_unitrange.((lo, hi) .- mid, -absmax, absmax)
+    # values on [0,1] where each color in cols is defined
+    colsvals = range(0, 1; length = length(cols))
+    # filter colsvals, keep only values in [lo_m, hi_m] + the endpoints lo_m and hi_m.
+    filter_colsvals = filter(x -> lo_m <= x <= hi_m, unique([lo_m; colsvals; hi_m]))
+    # select colors in filtered range; interpolate new low and hi colors.
+    newcols = CairoMakie.Makie.get(cols, filter_colsvals)
+    # values on [0,1] where the new colors are defined
+    new_colsvals = to_unitrange.(filter_colsvals, lo_m, hi_m)
+    cmap = CairoMakie.cgrad(newcols, new_colsvals; categorical, rev = false)
+    return cmap
+end
+
 function plot_biases(biases; output_path)
     fig = CairoMakie.Figure(; size = (600, 300 * length(biases)))
     loc = 1
+
     for bias_var in biases
-        ClimaAnalysis.Visualize.heatmap2D_on_globe!(fig, bias_var; p_loc = (loc, 1))
+        # Make sure that 0 is at the center
+        cmap = constrained_cmap(CairoMakie.cgrad(:vik).colors, extrema(bias_var.data)...; categorical = true)
+        nlevels = 10
+        # Offset so that it covers 0
+        levels = collect(range(minimum(bias_var.data), maximum(bias_var.data), length = nlevels))
+        offset = levels[argmin(abs.(levels))]
+        levels = levels .- offset
+        ticklabels = map(x -> string(round(x; digits = 0)), levels)
+        ticks = (levels, ticklabels)
+
+        more_kwargs = Dict(:plot => Dict(:colormap => cmap, :levels => levels), :cb => Dict(:ticks => ticks))
+
+        ClimaAnalysis.Visualize.contour2D_on_globe!(fig, bias_var; p_loc = (loc, 1), more_kwargs)
         loc = loc + 1
     end
     CairoMakie.save(output_path, fig)

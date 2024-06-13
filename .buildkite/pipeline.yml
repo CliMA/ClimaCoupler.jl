@@ -46,7 +46,6 @@ steps:
       - echo "--- Instantiate ClimaEarth env"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=.buildkite -e 'using Pkg; Pkg.add(url=\"https://github.com/CliMA/ClimaUtilities.jl.git\", rev=\"js/spacefillingcurve\"); Pkg.instantiate(;verbose=true)'"
-      - "julia --project=.buildkite -e 'using Pkg; Pkg.add(url=\"https://github.com/CliMA/ClimaLand.jl.git\", rev=\"js/utilities-fix\"); Pkg.instantiate(;verbose=true)'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
 

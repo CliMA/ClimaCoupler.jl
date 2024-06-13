@@ -19,9 +19,10 @@ using Dates
 import YAML
 
 ## ClimaESM packages
+using ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ClimaAtmos as CA
 import ClimaCore
-using ClimaComms
 
 ## Coupler specific imports
 import ClimaCoupler

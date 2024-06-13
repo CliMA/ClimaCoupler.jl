@@ -1,5 +1,6 @@
 import Test: @test, @testset, @test_throws
 import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ClimaCoupler
 import ClimaAnalysis
 import ClimaUtilities.ClimaArtifacts: @clima_artifact

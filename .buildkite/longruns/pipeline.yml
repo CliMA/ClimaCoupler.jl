@@ -254,9 +254,9 @@ steps:
         soft_fail: true
 
       - label: "MPI AMIP FINE: new target amip: topo + diagedmf"
-        key: "amip_target_topo_diagedmf"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf.yml --job_id amip_target_topo_diagedmf"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_target_topo_diagedmf_artifacts/*"
+        key: "amip_target_topo_diagedmf_cpu"
+        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf_cpu.yml --job_id amip_target_topo_diagedmf_cpu"
+        artifact_paths: "experiments/ClimaEarth/output/amip/amip_target_topo_diagedmf_cpu_artifacts/*"
         env:
           CLIMACORE_DISTRIBUTED: "MPI"
           BUILD_HISTORY_HANDLE: ""
@@ -271,20 +271,20 @@ steps:
     steps:
 
       - label: "GPU AMIP FINE: new target amip: topo"
-        key: "gpu_amip_target_topo"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo.yml --job_id gpu_amip_target_topo"
-        artifact_paths: "experiments/ClimaEarth/output/amip/gpu_amip_target_topo_artifacts/*"
+        key: "amip_target_topo_gpu"
+        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo.yml --job_id amip_target_topo_gpu"
+        artifact_paths: "experiments/ClimaEarth/output/amip/amip_target_topo_gpu_artifacts/*"
         agents:
           slurm_gpus: 1
           slurm_mem: 16GB
         soft_fail: true
 
       - label: "GPU AMIP FINE: new target amip: topo + diagedmf"
-        key: "gpu_amip_target_topo_diagedmf"
+        key: "amip_target_topo_diagedmf_gpu"
         command:
           - echo "--- Run simulation"
-          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf.yml --job_id gpu_amip_target_topo_diagedmf"
-        artifact_paths: "experiments/ClimaEarth/output/amip/gpu_amip_target_topo_diagedmf_artifacts/*"
+          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf.yml --job_id amip_target_topo_diagedmf_gpu"
+        artifact_paths: "experiments/ClimaEarth/output/amip/amip_target_topo_diagedmf_gpu_artifacts/*"
         timeout_in_minutes: 1440
         env:
           CLIMACOMMS_CONTEXT: "MPI"
@@ -299,11 +299,11 @@ steps:
 
   # DYAMOND AMIP: 1 day (convection resolving)
   - label: "GPU AMIP SUPERFINE: dyamond_target"
-    key: "gpu_longrun_amip_dyamond"
+    key: "longrun_amip_dyamond_gpu"
     command:
       - echo "--- Run simulation"
-      - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/longrun_amip_dyamond.yml --job_id gpu_longrun_amip_dyamond"
-    artifact_paths: "experiments/ClimaEarth/output/amip/gpu_longrun_amip_dyamond_artifacts/*"
+      - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/longrun_amip_dyamond.yml --job_id longrun_amip_dyamond_gpu"
+    artifact_paths: "experiments/ClimaEarth/output/amip/longrun_amip_dyamond_gpu_artifacts/*"
     agents:
       queue: clima
       slurm_mem: 20GB
@@ -338,9 +338,9 @@ steps:
 
       - label: ":envelope: Slack report: target AMIP"
         command:
-          - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/amip/gpu_amip_target_topo_diagedmf_artifacts/amip_ncep.png -m png -n amip_fine -x "300d Target AMIP v NCEP Last Month Mean"
+          - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/amip/amip_target_topo_diagedmf_gpu_artifacts/amip_ncep.png -m png -n amip_fine -x "300d Target AMIP v NCEP Last Month Mean"
           - |
-            find experiments/ClimaEarth/output/amip/gpu_amip_target_topo_diagedmf_artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
+            find experiments/ClimaEarth/output/amip/amip_target_topo_diagedmf_gpu_artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
               slack-upload -c "#coupler-report" -f "$$file" -m png -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
             done
         agents:

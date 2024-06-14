@@ -1,3 +1,5 @@
+import OrderedCollections: OrderedDict
+
 """
     isequispaced(arr::Vector)
 
@@ -142,7 +144,7 @@ function bias(obs_ds::ObsDataSource, sim_ds::SimDataSource, target_dates::Abstra
 
     short_name = ClimaAnalysis.short_name(sim_ds.var)
 
-    bias_dims = Dict("lon" => lonlat[1], "lat" => lonlat[2])
+    bias_dims = OrderedDict("lon" => lonlat[1], "lat" => lonlat[2])
     bias_dim_attribs = Dict{String, Any}()
 
     rmse = round(sqrt(integrate_on_sphere(mse_arr, lonlat)); sigdigits = 3)

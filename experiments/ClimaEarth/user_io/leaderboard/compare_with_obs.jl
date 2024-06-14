@@ -3,7 +3,6 @@ import CairoMakie
 const OBS_DS = Dict()
 const SIM_DS_KWARGS = Dict()
 const OTHER_MODELS_RMSEs = Dict()
-const COMPARISON_RMSEs = Dict()
 
 function preprocess_pr_fn(data)
     # -1 kg/m/s2 -> 1 mm/day
@@ -167,6 +166,8 @@ function plot_leaderboard(rmses; output_path)
     # models compared, and there is one row per variable
     squares = zeros(NUM_BOXES * NUM_MODELS, num_variables)
 
+    (; absolute_best_model, absolute_worst_model) = COMPARISON_RMSEs_STATS
+
     for (var_num, rmse) in enumerate(rmses)
         short_name = rmse.ANN.attributes["var_short_name"]
         units = rmse.ANN.attributes["units"]
@@ -178,7 +179,11 @@ function plot_leaderboard(rmses; output_path)
         )
 
         # Against other models
-        (; best_single_model, median_model, worst_model, best_model) = COMPARISON_RMSEs[short_name]
+
+        (; median_model) = COMPARISON_RMSEs_STATS.stats[short_name]
+
+        best_single_model = first(filter(x -> x.model_name == absolute_best_model, OTHER_MODELS_RMSEs[short_name]))
+        worst_single_model = first(filter(x -> x.model_name == absolute_worst_model, OTHER_MODELS_RMSEs[short_name]))
 
         squares[begin:NUM_BOXES, end - var_num + 1] .= values(rmse) ./ values(median_model)
         squares[(NUM_BOXES + 1):end, end - var_num + 1] .= values(best_single_model) ./ values(median_model)
@@ -190,7 +195,7 @@ function plot_leaderboard(rmses; output_path)
             label = median_model.model_name,
             color = :black,
             marker = :hline,
-            markersize = 15,
+            markersize = 10,
         )
 
         categories = vcat(map(_ -> collect(1:5), 1:length(OTHER_MODELS_RMSEs[short_name]))...)
@@ -205,6 +210,9 @@ function plot_leaderboard(rmses; output_path)
             color = :gray,
             whiskerlinewidth = 1,
         )
+
+        CairoMakie.scatter!(ax, 1:5, values(best_single_model), label = absolute_best_model)
+        CairoMakie.scatter!(ax, 1:5, values(worst_single_model), label = absolute_worst_model)
 
         # If we want to plot other models
         # for model in OTHER_MODELS_RMSEs[short_name]

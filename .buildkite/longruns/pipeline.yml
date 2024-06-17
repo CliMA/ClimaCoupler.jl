@@ -283,7 +283,7 @@ steps:
         key: "amip_target_topo_diagedmf_gpu"
         command:
           - echo "--- Run simulation"
-          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf.yml --job_id amip_target_topo_diagedmf_gpu"
+          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf_gpu.yml --job_id amip_target_topo_diagedmf_gpu"
         artifact_paths: "experiments/ClimaEarth/output/amip/amip_target_topo_diagedmf_gpu_artifacts/*"
         timeout_in_minutes: 1440
         env:

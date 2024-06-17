@@ -95,9 +95,9 @@ parsed_args = parse_commandline(argparse_settings())
 ## modify parsed args for fast testing from REPL #hide
 if isinteractive()
     parsed_args["config_file"] =
-        isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/ci_configs/interactive_debug.yml") :
+        isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/ci_configs/slabplanet_albedo_temporal_map.yml") :
         parsed_args["config_file"]
-    parsed_args["job_id"] = "interactive_debug"
+    parsed_args["job_id"] = "slabplanet_albedo_temporal_map"
 end
 
 ## the unique job id should be passed in via the command line
@@ -684,6 +684,10 @@ FieldExchanger.reinit_model_sims!(cs.model_sims)
 # atmos receives the turbulent fluxes from the coupler.
 FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
 FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
+
+tempest_albedo_before_step = CL.surface_albedo(land_sim.model, land_sim.integrator.u, land_sim.integrator.p)
+Plots.plot(tempest_albedo_before_step)
+Plots.savefig("june13-albedos/slabplanet_tempest_albedo_spacefillingcurve")
 
 #=
 ## Coupling Loop

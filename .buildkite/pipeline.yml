@@ -84,7 +84,6 @@ steps:
         timeout_in_minutes: 20
         env:
           CLIMACOMMS_CONTEXT: "MPI"
-          CLIMACOMMS_DEVICE: "CUDA"
           NPROCS: 2
         agents:
           slurm_ntasks: 2
@@ -96,7 +95,6 @@ steps:
         timeout_in_minutes: 20
         env:
           CLIMACOMMS_CONTEXT: "MPI"
-          CLIMACOMMS_DEVICE: "CUDA" 
         agents:
           slurm_ntasks: 2
           slurm_mem: 16GB
@@ -107,7 +105,6 @@ steps:
         timeout_in_minutes: 20
         env:
           CLIMACOMMS_CONTEXT: "MPI"
-          CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_ntasks: 2
           slurm_mem: 16GB
@@ -118,7 +115,6 @@ steps:
         timeout_in_minutes: 20
         env:
           CLIMACOMMS_CONTEXT: "MPI"
-          CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_ntasks: 2
           slurm_mem: 16GB
@@ -133,6 +129,8 @@ steps:
     steps:
       - label: "GPU runtests"
         command: "julia --color=yes --project=test/ test/runtests.jl"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_ntasks: 1
           slurm_gres: "gpu:1"
@@ -351,7 +349,6 @@ steps:
         artifact_paths: "experiments/ClimaEarth/output/amip/coarse_mpi_n2_artifacts/*"
         timeout_in_minutes: 240
         env:
-          CLIMACOMMS_DEVICE: "CUDA"
           CLIMACOMMS_CONTEXT: "MPI"
         agents:
           slurm_ntasks: 2

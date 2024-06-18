@@ -274,6 +274,9 @@ steps:
         key: "amip_target_topo_gpu"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo.yml --job_id amip_target_topo_gpu"
         artifact_paths: "experiments/ClimaEarth/output/amip/amip_target_topo_gpu_artifacts/*"
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
+          CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_gpus: 1
           slurm_mem: 16GB
@@ -305,6 +308,8 @@ steps:
       - echo "--- Run simulation"
       - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/longrun_amip_dyamond.yml --job_id longrun_amip_dyamond_gpu"
     artifact_paths: "experiments/ClimaEarth/output/amip/longrun_amip_dyamond_gpu_artifacts/*"
+    env:
+      CLIMACOMMS_DEVICE: "CUDA"
     agents:
       queue: clima
       slurm_mem: 20GB

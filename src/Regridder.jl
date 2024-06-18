@@ -179,7 +179,7 @@ function hdwrite_regridfile_rll_to_cgll(
     space2d_undistributed = CC.Spaces.SpectralElementSpace2D(topology, CC.Spaces.Quadratures.GLL{Nq}())
 
     if space isa CC.Spaces.ExtrudedFiniteDifferenceSpace
-        vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(CC.Spaces.vertical_topology(space).mesh)
+        vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(CC.Spaces.vertical_topology(space))
         space_undistributed = CC.Spaces.ExtrudedFiniteDifferenceSpace(space2d_undistributed, vert_center_space)
     else
         space_undistributed = space2d_undistributed

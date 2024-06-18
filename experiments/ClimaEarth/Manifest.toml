@@ -2,7 +2,7 @@
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "252cfb4efc6c845579309d3088c2926b876adfb3"
+project_hash = "afda340012fd05e6c7fd2baf7decd5033d3e5be2"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "fc02d55798c1af91123d07915a990fbb9a10d146"
@@ -323,9 +323,9 @@ weakdeps = ["CairoMakie", "GeoMakie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "ArtifactWrappers", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Colors", "Dates", "Dierckx", "DiffEqBase", "DocStringExtensions", "FastGaussQuadrature", "Insolation", "Interpolations", "IntervalSets", "Krylov", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "Pkg", "Printf", "RRTMGP", "Random", "RootSolvers", "SciMLBase", "StaticArrays", "Statistics", "StatsBase", "SurfaceFluxes", "Thermodynamics", "YAML"]
-git-tree-sha1 = "344b312f4557e3ba52f52af4e7cd9fd7afa9f94d"
+git-tree-sha1 = "48c79faad3dee5f6b29e7b425fa17a72e4ff5fd2"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.25.0"
+version = "0.26.0"
 
 [[deps.ClimaComms]]
 git-tree-sha1 = "d76590e99fa942e07f1e992a4d4a5e25121a26d6"
@@ -1260,9 +1260,15 @@ version = "0.1.5"
 
 [[deps.InlineStrings]]
 deps = ["Parsers"]
-git-tree-sha1 = "9cc2baf75c6d09f9da536ddf58eb2f29dedaf461"
+git-tree-sha1 = "86356004f30f8e737eff143d57d41bd580e437aa"
 uuid = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
-version = "1.4.0"
+version = "1.4.1"
+
+    [deps.InlineStrings.extensions]
+    ArrowTypesExt = "ArrowTypes"
+
+    [deps.InlineStrings.weakdeps]
+    ArrowTypes = "31f734f8-188a-4ce0-8406-c8a06bd891cd"
 
 [[deps.Insolation]]
 deps = ["Artifacts", "Dates", "DelimitedFiles", "Interpolations"]

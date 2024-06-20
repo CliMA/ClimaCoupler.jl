@@ -224,8 +224,8 @@ Returns the scheme-specific properties for the surface model simulation `sim`.
 """
 function get_scheme_properties(::BulkScheme, sim::Interfacer.SurfaceModelSimulation, colidx::CC.Fields.ColumnIndex)
     Ch = Interfacer.get_field(sim, Val(:heat_transfer_coefficient), colidx)
-    Cd = Interfacer.get_field(sim, Val(:beta), colidx)
-    beta = Interfacer.get_field(sim, Val(:drag_coefficient), colidx)
+    Cd = Interfacer.get_field(sim, Val(:drag_coefficient), colidx)
+    beta = Interfacer.get_field(sim, Val(:beta), colidx)
     FT = eltype(Ch)
     return (; z0b = FT(0), z0m = FT(0), Ch = Ch, Cd = Cd, beta = beta, gustiness = FT(1))
 end

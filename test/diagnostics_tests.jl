@@ -2,9 +2,10 @@
     Unit tests for ClimaCoupler Diagnostics module
 =#
 import Test: @test, @testset
+import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import CUDA
 import Dates
-import ClimaComms
 import ClimaCore as CC
 import ClimaCoupler: ConservationChecker, Diagnostics, Interfacer, TestHelper, TimeManager
 

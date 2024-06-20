@@ -1,6 +1,7 @@
 import Test: @test, @testset, @test_throws
 using IntervalSets # for `..`
 import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ClimaCore as CC
 
 # Load file to test

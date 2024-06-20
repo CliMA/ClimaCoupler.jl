@@ -86,8 +86,8 @@ Precipitation rate (Kg m⁻² s⁻¹).
 Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:precipitation_rate}) =
     .-Utilities.swap_space!(
         cs.boundary_space,
-        cs.model_sims.atmos_sim.integrator.p.precipitation.col_integrated_rain .+
-        cs.model_sims.atmos_sim.integrator.p.precipitation.col_integrated_snow,
+        cs.model_sims.atmos_sim.integrator.p.precipitation.surface_rain_flux .+
+        cs.model_sims.atmos_sim.integrator.p.precipitation.surface_snow_flux,
     )
 
 # coupler diagnotics

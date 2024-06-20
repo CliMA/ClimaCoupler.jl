@@ -100,7 +100,7 @@ config_dict = Dict(
     "viscous_sponge" => false,
     "rayleigh_sponge" => false,
     "vert_diff" => "FriersonDiffusion",
-    "hyperdiff" => "ClimaHyperdiffusion",
+    "hyperdiff" => "CAM_SE",
     # run
     "surface_setup" => "PrescribedSurface",
     # diagnostic (nested with period and short_name)

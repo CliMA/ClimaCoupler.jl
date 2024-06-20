@@ -17,8 +17,9 @@ import Dates
 import YAML
 
 # ## ClimaESM packages
-import ClimaAtmos as CA
 import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+import ClimaAtmos as CA
 import ClimaCore as CC
 
 # ## Coupler specific imports
@@ -99,7 +100,8 @@ config_dict = Dict(
     "viscous_sponge" => false,
     "rayleigh_sponge" => false,
     # "vert_diff" => "true", #required
-    "hyperdiff" => "ClimaHyperdiffusion",
+    "hyperdiff" => "CAM_SE",
+    "ode_algo" => "ARS343",
     # run
     "surface_setup" => "PrescribedSurface",
     # diagnostic (nested with period and short_name)

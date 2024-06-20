@@ -33,6 +33,6 @@ t_end: "100days"
 topo_smoothing: true
 topography: "Earth"
 turb_flux_partition: "CombinedStateFluxesMOST"
-vert_diff: "FriersonDiffusion"
+vert_diff: "true"
 z_elem: 63
 z_max: 55000.0

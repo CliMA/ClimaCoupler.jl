@@ -513,6 +513,27 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     cs.surface_fractions.ice .= max.(min.(ice_d, FT(1) .- land_s), FT(0))
     cs.surface_fractions.ocean .= max.(FT(1) .- (cs.surface_fractions.ice .+ land_s), FT(0))
 
+    if !(minimum(cs.surface_fractions.ice .+ land_s .+ cs.surface_fractions.ocean) ≈ FT(1))
+        @show minimum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean)
+        @show maximum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean)
+
+        aland = Array(parent(land_s))
+        aice = Array(parent(cs.surface_fractions.ice))
+        aocean = Array(parent(cs.surface_fractions.ocean))
+        for i in eachindex(Array(parent(land_s)))
+            land_i = aland[i]
+            ice_i = aice[i]
+            ocean_i = aocean[i]
+
+            # ice = max(min(ice_i, FT(1) - land_i), FT(0))
+            if !(ice_i + land_i + ocean_i ≈ FT(1))
+                @show "INVALID SUM AT INDEX $i"
+                @show ice_i, land_i, ocean_i
+                println()
+            end
+        end
+    end
+
     @assert minimum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) ≈ FT(1)
     @assert maximum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) ≈ FT(1)
 

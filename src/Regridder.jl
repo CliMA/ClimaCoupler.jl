@@ -517,7 +517,7 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
         @show minimum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean)
         @show maximum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean)
 
-        aland = Array(parent(land_s))
+        aland = Array(parent(cs.surface_fractions.land))
         aice = Array(parent(cs.surface_fractions.ice))
         aocean = Array(parent(cs.surface_fractions.ocean))
         for i in eachindex(Array(parent(land_s)))

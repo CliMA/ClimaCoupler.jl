@@ -515,12 +515,14 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
 
     if !(minimum(cs.surface_fractions.ice .+ land_s .+ cs.surface_fractions.ocean) ≈ FT(1))
         @show minimum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean)
+        @show minimum(parent(cs.surface_fractions.ice) .+ parent(cs.surface_fractions.land) .+ parent(cs.surface_fractions.ocean))
+        @show argmin(parent(cs.surface_fractions.ice) .+ parent(cs.surface_fractions.land) .+ parent(cs.surface_fractions.ocean))
         @show maximum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean)
 
         aland = Array(parent(cs.surface_fractions.land))
         aice = Array(parent(cs.surface_fractions.ice))
         aocean = Array(parent(cs.surface_fractions.ocean))
-        for i in eachindex(Array(parent(land_s)))
+        for i in eachindex(aland)
             land_i = aland[i]
             ice_i = aice[i]
             ocean_i = aocean[i]

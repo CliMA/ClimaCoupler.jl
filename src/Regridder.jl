@@ -522,6 +522,14 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
         aland = Array(parent(cs.surface_fractions.land))
         aice = Array(parent(cs.surface_fractions.ice))
         aocean = Array(parent(cs.surface_fractions.ocean))
+
+        @show extrema(aland)
+        @show extrema(cs.surface_fractions.land)
+        @show extrema(aice)
+        @show extrema(cs.surface_fractions.ice)
+        @show extrema(aocean)
+        @show extrema(cs.surface_fractions.ocean)
+
         for i in eachindex(aland)
             land_i = aland[i]
             ice_i = aice[i]

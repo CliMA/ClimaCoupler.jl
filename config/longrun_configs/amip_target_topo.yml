@@ -29,10 +29,17 @@ rayleigh_sponge: true
 start_date: "20100101"
 smoothing_order: 2
 surface_setup: "PrescribedSurface"
-t_end: "100days"
+t_end: "1days"
 topo_smoothing: true
 topography: "Earth"
 turb_flux_partition: "CombinedStateFluxesMOST"
 vert_diff: "true"
 z_elem: 63
 z_max: 55000.0
+diagnostics:
+  - short_name: [ts, ta, thetaa, ha, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, hussfc, evspsbl, pr, lmix]
+    period: 100secs
+  - short_name: [husra, hussn]
+    period: 100secs
+  - short_name: [rsdscs, rldscs, rld, hfes, rsdt, rsucs, rsu, rlut, rsuscs, rsd, rlu, rsutcs, rlucs, rsut, rsdcs, rsds, rlds, rlus, rldcs, rlutcs, rsus]
+    period: 100secs

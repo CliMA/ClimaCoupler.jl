@@ -7,7 +7,7 @@ dt_rad: "1hours"
 dt_save_to_sol: "1days"
 dz_bottom: 30
 dz_top: 3000
-h_elem: 4
+h_elem: 30
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 moist: "equil"

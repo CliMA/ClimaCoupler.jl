@@ -1,3 +1,4 @@
+FLOAT_TYPE: "Float32"
 alpha_rayleigh_uh: 0
 alpha_rayleigh_w: 10
 apply_limiter: false

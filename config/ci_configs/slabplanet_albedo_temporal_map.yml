@@ -1,3 +1,4 @@
+FLOAT_TYPE: "Float32"
 apply_limiter: false
 dt: "200secs"
 dt_cpl: 200

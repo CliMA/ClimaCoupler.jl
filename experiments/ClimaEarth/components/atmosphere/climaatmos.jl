@@ -52,12 +52,16 @@ function atmos_init(atmos_config)
         ρ_flux_q_tot = integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot
         surface_rain_flux = integrator.p.precipitation.surface_rain_flux
         surface_snow_flux = integrator.p.precipitation.surface_snow_flux
-        ᶜS_ρq_tot = integrator.p.precipitation.ᶜS_ρq_tot
-        ᶜ3d_rain = integrator.p.precipitation.ᶜ3d_rain
-        ᶜ3d_snow = integrator.p.precipitation.ᶜ3d_snow
+        #TODO  - something like for both 1M and 0M
+        # surface_energy_flux_from_precip = ...
         @. ρ_flux_q_tot = CC.Geometry.Covariant3Vector(FT(0.0))
         surface_rain_flux .= FT(0)
         surface_snow_flux .= FT(0)
+    end
+    if integrator.p.atmos.precip_model isa CA.Microphysics0Moment
+        ᶜS_ρq_tot = integrator.p.precipitation.ᶜS_ρq_tot
+        ᶜ3d_rain = integrator.p.precipitation.ᶜ3d_rain
+        ᶜ3d_snow = integrator.p.precipitation.ᶜ3d_snow
         ᶜS_ρq_tot .= FT(0)
         ᶜ3d_rain .= FT(0)
         ᶜ3d_snow .= FT(0)
@@ -131,7 +135,6 @@ function Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:energy})
     integrator = atmos_sim.integrator
     p = integrator.p
 
-
     # return total energy and (if Microphysics0Moment) the energy lost due to precipitation removal
     if p.atmos.precip_model isa CA.Microphysics0Moment
         ᶜts = p.precomputed.ᶜts
@@ -141,6 +144,7 @@ function Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:energy})
         return integrator.u.c.ρe_tot .-
                ᶜS_ρq_tot .* CA.e_tot_0M_precipitation_sources_helper.(Ref(thermo_params), ᶜts, ᶜΦ) .* integrator.dt
     else
+        # TODO - do we need to add anything for 1M?
         return integrator.u.c.ρe_tot
     end
 end

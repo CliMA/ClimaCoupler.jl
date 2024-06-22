@@ -52,12 +52,14 @@ function atmos_init(atmos_config)
         ρ_flux_q_tot = integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot
         surface_rain_flux = integrator.p.precipitation.surface_rain_flux
         surface_snow_flux = integrator.p.precipitation.surface_snow_flux
-        ᶜS_ρq_tot = integrator.p.precipitation.ᶜS_ρq_tot
-        ᶜ3d_rain = integrator.p.precipitation.ᶜ3d_rain
-        ᶜ3d_snow = integrator.p.precipitation.ᶜ3d_snow
         @. ρ_flux_q_tot = CC.Geometry.Covariant3Vector(FT(0.0))
         surface_rain_flux .= FT(0)
         surface_snow_flux .= FT(0)
+    end
+    if integrator.p.atmos.precip_model isa CA.Microphysics0Moment
+        ᶜS_ρq_tot = integrator.p.precipitation.ᶜS_ρq_tot
+        ᶜ3d_rain = integrator.p.precipitation.ᶜ3d_rain
+        ᶜ3d_snow = integrator.p.precipitation.ᶜ3d_snow
         ᶜS_ρq_tot .= FT(0)
         ᶜ3d_rain .= FT(0)
         ᶜ3d_snow .= FT(0)

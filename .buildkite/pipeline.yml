@@ -509,10 +509,20 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
-      - label: "GPU AMIP: albedo from temporal map"
+      - label: "GPU AMIP: albedo from temporal map + 0M"
         key: "gpu_amip_albedo_temporal_map"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/gpu_amip_albedo_temporal_map.yml --job_id gpu_amip_albedo_temporal_map"
         artifact_paths: "experiments/ClimaEarth/output/amip/gpu_amip_albedo_temporal_map_artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
+
+      - label: "GPU AMIP: albedo from temporal map + 1M"
+        key: "gpu_amip_albedo_temporal_map_1M"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/gpu_amip_albedo_temporal_map_1M.yml --job_id gpu_amip_albedo_temporal_map_1M"
+        artifact_paths: "experiments/ClimaEarth/output/amip/gpu_amip_albedo_temporal_map_1M_artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

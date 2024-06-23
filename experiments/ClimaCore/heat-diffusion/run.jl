@@ -195,8 +195,9 @@ domain_atm = CC.Domains.IntervalDomain(
     CC.Geometry.ZPoint{FT}(parameters.zmax_atm);
     boundary_names = (:bottom, :top),
 );
+context = ClimaComms.context()
 mesh_atm = CC.Meshes.IntervalMesh(domain_atm, nelems = parameters.n); # struct, allocates face boundaries to 5,6: atmos
-center_space_atm = CC.Spaces.CenterFiniteDifferenceSpace(mesh_atm); # collection of the above, discretises space into FD and provides coords
+center_space_atm = CC.Spaces.CenterFiniteDifferenceSpace(context, mesh_atm); # collection of the above, discretises space into FD and provides coords
 
 # - initialize prognostic variables, either as ClimaCore's Field objects or as Arrays
 T_atm_0 = CC.Fields.ones(FT, center_space_atm) .* parameters.T_atm_ini; # initiates a spatially uniform atm progostic var

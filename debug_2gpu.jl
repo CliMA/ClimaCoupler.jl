@@ -39,9 +39,10 @@ space = make_space(comms_ctx, FT)
 # Create a field of 0s in top half, 1s in bottom half
 f = Fields.ones(space)
 ClimaComms.allowscalar(device) do
-    dims = size(parent(f))
-    m = dims[1]
-    parent(f)[1:(m ÷ 2), :, :, :] .= FT(0)
+    parent(f) .= rand()
+    # dims = size(parent(f))
+    # m = dims[1]
+    # parent(f)[1:(m ÷ 2), :, :, :] .= FT(0)
 end
 
 value₀ = FT(0)

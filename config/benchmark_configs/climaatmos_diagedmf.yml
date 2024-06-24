@@ -17,6 +17,7 @@ h_elem: 30
 idealized_insolation: false
 implicit_diffusion: true
 moist: equil
+ode_algo: ARS343
 output_default_diagnostics: false
 precip_model: 0M
 prognostic_tke: true

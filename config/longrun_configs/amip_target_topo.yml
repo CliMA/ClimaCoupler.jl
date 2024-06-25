@@ -9,11 +9,16 @@ dt_cpl: 100
 dt_rad: "1hours"
 dt_save_state_to_disk: "20days"
 dt_save_to_sol: "10days"
+ode_algo: "ARS343"
 energy_check: false
 hourly_checkpoint: true
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
+hyperdiffusion: "ClimaHyperdiffusion"
+vorticity_hyperdiffusion_coefficient: 1.0
+scalar_hyperdiffusion_coefficient: 4.0
+divergence_damping_factor: 4.0
 netcdf_interpolate_z_over_msl: true
 rad: "allskywithclear"
 start_date: "20100101"

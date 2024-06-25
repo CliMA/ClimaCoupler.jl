@@ -108,6 +108,9 @@ job_id = parsed_args["job_id"]
 config_dict = YAML.load_file(parsed_args["config_file"])
 config_dict = merge(parsed_args, config_dict)
 
+comms_ctx = Utilities.get_comms_context(parsed_args)
+ClimaComms.init(comms_ctx)
+
 ## get component model dictionaries (if applicable)
 atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
@@ -138,8 +141,6 @@ We set up communication context for CPU single thread/CPU with MPI/GPU. If no de
 then `ClimaComms` automatically selects the device from which this code is called.
 =#
 
-comms_ctx = Utilities.get_comms_context(parsed_args)
-ClimaComms.init(comms_ctx)
 
 ## make sure we don't use animations for GPU runs
 if comms_ctx.device isa ClimaComms.CUDADevice

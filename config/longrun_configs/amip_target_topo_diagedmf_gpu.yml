@@ -20,3 +20,5 @@ topo_smoothing: true
 topography: "Earth"
 coupler_toml_file: "toml/amip_target_topo_diagedmf.toml"
 turb_flux_partition: "CombinedStateFluxesMOST"
+ode_algo: "ARS343"
+hyperdiffusion: "CAM_SE"

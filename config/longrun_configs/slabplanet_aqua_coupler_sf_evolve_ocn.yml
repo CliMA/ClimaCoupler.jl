@@ -9,6 +9,7 @@ h_elem: 6
 land_albedo_type: "function"
 mode_name: "slabplanet_aqua"
 moist: "equil"
+ode_algo: "ARS343"
 mono_surface: true
 precip_model: "0M"
 rad: "gray"

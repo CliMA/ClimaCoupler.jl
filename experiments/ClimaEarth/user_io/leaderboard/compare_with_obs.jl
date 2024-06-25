@@ -196,6 +196,7 @@ function plot_leaderboard(rmses; output_path)
             color = :black,
             marker = :hline,
             markersize = 10,
+            visible = false,
         )
 
         categories = vcat(map(_ -> collect(1:5), 1:length(OTHER_MODELS_RMSEs[short_name]))...)

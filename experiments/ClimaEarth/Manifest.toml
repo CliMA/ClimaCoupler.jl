@@ -1,13 +1,13 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.4"
+julia_version = "1.10.3"
 manifest_format = "2.0"
-project_hash = "afda340012fd05e6c7fd2baf7decd5033d3e5be2"
+project_hash = "21c747b53577d075d3bfa396efb04bb9b1e1c965"
 
 [[deps.ADTypes]]
-git-tree-sha1 = "fa0822e5baee6e23081c2685ae27265dabee23d8"
+git-tree-sha1 = "3a6511b6e54550bcbc986c560921a8cd7761fcd8"
 uuid = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
-version = "1.4.0"
+version = "1.5.1"
 weakdeps = ["ChainRulesCore", "EnzymeCore"]
 
     [deps.ADTypes.extensions]
@@ -119,9 +119,9 @@ version = "7.11.0"
 
 [[deps.ArrayLayouts]]
 deps = ["FillArrays", "LinearAlgebra"]
-git-tree-sha1 = "420e2853770f50e5306b9d96b5a66f26e7c73bc6"
+git-tree-sha1 = "600078184f7de14b3e60efe13fc0ba5c59f6dca5"
 uuid = "4c555306-a7a7-4459-81d9-ec55ddd5c99a"
-version = "1.9.4"
+version = "1.10.0"
 weakdeps = ["SparseArrays"]
 
     [deps.ArrayLayouts.extensions]
@@ -311,10 +311,10 @@ weakdeps = ["SparseArrays"]
     ChainRulesCoreSparseArraysExt = "SparseArrays"
 
 [[deps.ClimaAnalysis]]
-deps = ["NCDatasets", "OrderedCollections", "Statistics"]
-git-tree-sha1 = "c2e1c0d5c30a2519a4282988037b255dbc9aee00"
+deps = ["NCDatasets", "OrderedCollections", "Reexport", "Statistics"]
+git-tree-sha1 = "69c740df5906f48a5739588d7dadf772311d8b7d"
 uuid = "29b5916a-a76c-4e73-9657-3c8fd22e65e6"
-version = "0.5.3"
+version = "0.5.4"
 weakdeps = ["CairoMakie", "GeoMakie"]
 
     [deps.ClimaAnalysis.extensions]
@@ -1739,9 +1739,9 @@ version = "2024.1.0+0"
 
 [[deps.MPI]]
 deps = ["Distributed", "DocStringExtensions", "Libdl", "MPICH_jll", "MPIPreferences", "MPItrampoline_jll", "MicrosoftMPI_jll", "OpenMPI_jll", "PkgVersion", "PrecompileTools", "Requires", "Serialization", "Sockets"]
-git-tree-sha1 = "4e3136db3735924f96632a5b40a5979f1f53fa07"
+git-tree-sha1 = "14cef41baf5b675b192b02a22c710f725ab333a7"
 uuid = "da04e1cc-30fd-572f-bb4f-1f8673147195"
-version = "0.20.19"
+version = "0.20.20"
 
     [deps.MPI.extensions]
     AMDGPUExt = "AMDGPU"
@@ -2830,9 +2830,9 @@ uuid = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 version = "0.5.24"
 
 [[deps.TranscodingStreams]]
-git-tree-sha1 = "a947ea21087caba0a798c5e494d0bb78e3a1a3a0"
+git-tree-sha1 = "d73336d81cafdc277ff45558bb7eaa2b04a8e472"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
-version = "0.10.9"
+version = "0.10.10"
 weakdeps = ["Random", "Test"]
 
     [deps.TranscodingStreams.extensions]

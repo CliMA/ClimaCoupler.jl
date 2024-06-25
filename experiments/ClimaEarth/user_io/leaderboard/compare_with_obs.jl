@@ -227,7 +227,7 @@ function plot_leaderboard(rmses; output_path)
             label = rmse.model_name,
             marker = :star5,
             markersize = 20,
-            color = :orange,
+            color = :green,
         )
 
         # Add a fake extra point to center the legend a little better

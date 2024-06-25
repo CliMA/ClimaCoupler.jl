@@ -14,6 +14,7 @@ hourly_checkpoint: true
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
+hyperdiffusion: "ClimaHyperdiffusion"
 netcdf_interpolate_z_over_msl: true
 rad: "allskywithclear"
 start_date: "20100101"
@@ -22,4 +23,4 @@ t_end: "100days"
 topo_smoothing: true
 topography: "Earth"
 turb_flux_partition: "CombinedStateFluxesMOST"
-vert_diff: "true"
+vert_diff: "FriersonDiffusion"

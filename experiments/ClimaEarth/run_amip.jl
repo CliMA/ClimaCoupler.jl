@@ -115,7 +115,7 @@ atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 ## read in some parsed command line arguments, required by this script
 mode_name = config_dict["mode_name"]
 energy_check = config_dict["energy_check"]
-const FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
+FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim_name = "bucket"
 t_end = Float64(time_to_seconds(config_dict["t_end"]))
 t_start = 0.0
@@ -613,6 +613,7 @@ cs = Interfacer.CoupledSimulation{FT}(
     thermo_params,
 );
 Utilities.show_memory_usage(comms_ctx)
+
 
 #=
 ## Restart component model states if specified

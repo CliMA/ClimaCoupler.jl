@@ -925,32 +925,40 @@ if ClimaComms.iamroot(comms_ctx)
         ## Compare against observations
         if t_end > 84600 && config_dict["output_default_diagnostics"]
             @info "Error against observations"
-            diagnostics_times = copy(atmos_sim.integrator.sol.t)
+            include("user_io/leaderboard.jl")
+            ClimaAnalysis = Leaderboard.ClimaAnalysis
+
+            compare_vars = ["pr", "rsut", "rlut"]
+            diagnostics_folder_path = atmos_sim.integrator.p.output_dir
+            leaderboard_base_path = dir_paths.artifacts
+
+            first_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = first(compare_vars))
+
+            diagnostics_times = ClimaAnalysis.times(first_var)
             # Remove the first `spinup_months` months from the leaderboard
             spinup_months = 6
             spinup_cutoff = spinup_months * 30 * 86400.0
-            if t_end > spinup_cutoff
-                filter!(x -> x < spinup_cutoff, diagnostics_times)
+            if diagnostics_times[end] > spinup_cutoff
+                filter!(x -> x > spinup_cutoff, diagnostics_times)
             end
 
-            output_dates = cs.dates.date0[] .+ Dates.Second.(diagnostics_times)
+            output_dates = Dates.DateTime(first_var.attributes["start_date"]) .+ Dates.Second.(diagnostics_times)
+
             @info "Working with dates:"
             @info output_dates
 
-            include("user_io/leaderboard.jl")
-            compare_vars = ["pr", "rsut", "rlut"]
             function compute_biases(dates)
                 if isempty(dates)
                     return map(x -> 0.0, compare_vars)
                 else
-                    return Leaderboard.compute_biases(atmos_sim.integrator.p.output_dir, compare_vars, dates)
+                    return Leaderboard.compute_biases(diagnostics_folder_path, compare_vars, dates)
                 end
             end
 
             function plot_biases(dates, biases, output_name)
                 isempty(dates) && return nothing
 
-                output_path = joinpath(dir_paths.artifacts, "bias_$(output_name).png")
+                output_path = joinpath(leaderboard_base_path, "bias_$(output_name).png")
                 Leaderboard.plot_biases(biases; output_path)
             end
 
@@ -981,7 +989,7 @@ if ClimaComms.iamroot(comms_ctx)
                 1:length(compare_vars),
             )
 
-            Leaderboard.plot_leaderboard(rmses; output_path = joinpath(dir_paths.artifacts, "bias_leaderboard.png"))
+            Leaderboard.plot_leaderboard(rmses; output_path = joinpath(leaderboard_base_path, "bias_leaderboard.png"))
         end
     end
 

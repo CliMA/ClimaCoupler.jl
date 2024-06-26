@@ -98,7 +98,7 @@ config_dict = Dict(
     "apply_limiter" => false,
     "viscous_sponge" => false,
     "rayleigh_sponge" => false,
-    "vert_diff" => "FriersonDiffusion",
+    "vert_diff" => "false",
     "hyperdiff" => "CAM_SE",
     # run
     "surface_setup" => "PrescribedSurface",

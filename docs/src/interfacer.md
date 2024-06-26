@@ -29,7 +29,7 @@ information needed to run that simulation.
 
 Each `ComponentModelSimulation` must extend the following functions to be able
 to use our coupler. For some existing models, these are defined within
-ClimaCoupler.jl in that model’s file in `experiments/AMIP/components/`, but it is preferable
+ClimaCoupler.jl in that model’s file in `experiments/ClimaEarth/components/`, but it is preferable
 for these to be defined in a model’s own repository. Note that the dispatch
 `::ComponentModelSimulation` in the function definitions given below should
 be replaced with the particular component model extending these functions.
@@ -101,11 +101,12 @@ following properties:
 | Coupler name      | Description | Units |
 |-------------------|-------------|-------|
 | `co2`              | global mean co2 | ppm |
-| `surface_albedo`   | bulk surface albedo over the whole surface space | |
+| `surface_direct_albedo`   | bulk direct surface albedo over the whole surface space | |
+| `surface_diffuse_albedo`   | bulk diffuse surface albedo over the whole surface space | |
 | `surface_temperature` | temperature over the combined surface space | K |
 | `turbulent_fluxes` | turbulent fluxes (note: only required when using `PartitionedStateFluxes` option - see our `FluxCalculator` module docs for more information) | W m^-2 |
 
-- `calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_S::Fields.Field)`:
+- `calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_S::ClimaCore.Fields.Field)`:
 A function to return the air density of the atmosphere simulation
 extrapolated to the surface, with units of [kg m^-3].
 
@@ -124,7 +125,8 @@ for the following properties:
 | `beta`              | factor that scales evaporation based on its estimated level of saturation | |
 | `roughness_buoyancy` | aerodynamic roughness length for buoyancy | m |
 | `roughness_momentum` | aerodynamic roughness length for momentum | m |
-| `surface_albedo`    | bulk surface albedo | |
+| `surface_direct albedo`    | bulk direct surface albedo | |
+| `surface_diffuse albedo`    | bulk diffuse surface albedo | |
 | `surface_humidity`  | surface humidity | kg kg^-1 |
 | `surface_temperature` | surface temperature | K |
 
@@ -147,9 +149,11 @@ following properties:
 | `snow_precipitation` | snow precipitation at the surface | kg m^-2 s^-1 |
 | `turbulent_energy_flux` | aerodynamic turbulent surface fluxes of energy (sensible and latent heat) | W m^-2 |
 | `turbulent_moisture_flux` | aerodynamic turbulent surface fluxes of energy (evaporation) | kg m^-2 s^-1 |
+| `surface_direct albedo`    | bulk direct surface albedo; needed if calculated externally of the surface model (e.g. ocean albedo from the atmospheric state) | |
+| `surface_diffuse albedo`    | bulk diffuse surface albedo; needed if calculated externally of the surface model (e.g. ocean albedo from the atmospheric state) | |
 
 ### SurfaceModelSimulation - optional functions
-- `update_turbulent_fluxes_point!(::ComponentModelSimulation, fields::NamedTuple, colidx)`:
+- `update_turbulent_fluxes!(::ComponentModelSimulation, fields::NamedTuple)`:
 This function updates the turbulent fluxes of the component model simulation
 at this point in horizontal space. The values are updated using the energy
 and moisture turbulent fluxes stored in fields which are calculated by the
@@ -161,7 +165,8 @@ module docs for more information.
 - `SurfaceStub` is a `SurfaceModelSimulation`, but it only contains
 required data in `<surface_stub>.cache`, e.g., for the calculation
 of surface fluxes through a prescribed surface state. The above
-adapter functions are already predefined for `SurfaceStub`, with
+adapter functions are already predefined for `SurfaceStub`
+in the `surface_stub.jl` file, with
 the cache variables specified as:
 ```
 get_field(sim::SurfaceStub, ::Val{:air_density}) = sim.cache.ρ_sfc
@@ -170,7 +175,7 @@ get_field(sim::SurfaceStub, ::Val{:beta}) = sim.cache.beta
 get_field(sim::SurfaceStub, ::Val{:energy}) = nothing
 get_field(sim::SurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
 get_field(sim::SurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m
-get_field(sim::SurfaceStub, ::Val{:surface_albedo}) = sim.cache.α
+get_field(sim::SurfaceStub, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) = sim.cache.α
 get_field(sim::SurfaceStub, ::Val{:surface_humidity}) = TD.q_vap_saturation_generic.(sim.cache.thermo_params, sim.cache.T_sfc, sim.cache.ρ_sfc, sim.cache.phase)
 get_field(sim::SurfaceStub, ::Val{:surface_temperature}) = sim.cache.T_sfc
 get_field(sim::SurfaceStub, ::Val{:water}) = nothing
@@ -180,10 +185,10 @@ and with the corresponding `update_field!` functions
 function update_field!(sim::SurfaceStub, ::Val{:air_density}, field)
     sim.cache.ρ_sfc .= field
 end
-function update_field!(sim::SurfaceStub, ::Val{:area_fraction}, field::Fields.Field)
+function update_field!(sim::SurfaceStub, ::Val{:area_fraction}, field::ClimaCore.Fields.Field)
     sim.cache.area_fraction .= field
 end
-function update_field!(sim::SurfaceStub, ::Val{:surface_temperature}, field::Fields.Field)
+function update_field!(sim::SurfaceStub, ::Val{:surface_temperature}, field::ClimaCore.Fields.Field)
     sim.cache.T_sfc .= field
 end
 ```

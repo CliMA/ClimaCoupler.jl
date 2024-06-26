@@ -1,33 +1,12 @@
-
-using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput, Geometry
-using ClimaCoupler: Utilities, Regridder, TestHelper
-using Test
-import ClimaCoupler.FluxCalculator:
-    atmos_turbulent_fluxes!,
-    combined_turbulent_fluxes!,
-    CombinedStateFluxes,
-    PartitionedStateFluxes,
-    calculate_surface_air_density,
-    MoninObukhovScheme,
-    BulkScheme,
-    partitioned_turbulent_fluxes!,
-    get_surface_params,
-    update_turbulent_fluxes_point!,
-    surface_thermo_state,
-    surface_inputs,
-    get_surface_fluxes_point!,
-    get_scheme_properties,
-    surface_thermo_state
-import ClimaCoupler: Interfacer
-
-import ClimaParams as CP
+import Test: @test, @testset, @test_throws
+import StaticArrays
+import ClimaCore as CC
+import ClimaParams
 import Thermodynamics as TD
 import Thermodynamics.Parameters.ThermodynamicsParameters
-import SurfaceFluxes as SF
 import SurfaceFluxes.Parameters.SurfaceFluxesParameters
 import SurfaceFluxes.UniversalFunctions as UF
-
-using StaticArrays
+import ClimaCoupler: FieldExchanger, FluxCalculator, Interfacer, TestHelper
 
 # simple generic atmos model
 struct DummySimulation{S, C} <: Interfacer.AtmosModelSimulation
@@ -39,7 +18,7 @@ struct DummySimulation2{C} <: Interfacer.AtmosModelSimulation
     cache::C
 end
 
-function atmos_turbulent_fluxes!(sim::DummySimulation, csf)
+function FluxCalculator.atmos_turbulent_fluxes_most!(sim::DummySimulation, csf)
     sim.cache.flux .= (csf.T_sfc .- sim.state.T) .* sim.cache.κ ./ sim.cache.dz # Eq. 1
 end
 
@@ -50,6 +29,8 @@ struct TestAtmos{P, Y, D, I} <: Interfacer.AtmosModelSimulation
     domain::D
     integrator::I
 end
+struct TestAtmos2 <: Interfacer.AtmosModelSimulation end
+Interfacer.name(sim::TestAtmos2) = "TestAtmos2"
 
 Interfacer.get_field(sim::TestAtmos, ::Val{:height_int}) = sim.integrator.p.z
 Interfacer.get_field(sim::TestAtmos, ::Val{:height_sfc}) = sim.integrator.p.z_sfc
@@ -59,7 +40,7 @@ Interfacer.get_field(sim::TestAtmos, ::Val{:thermo_state_int}) =
 Interfacer.get_field(sim::TestAtmos, ::Val{:air_density}) = sim.integrator.ρ
 Interfacer.get_field(sim::TestAtmos, ::Val{:air_temperature}) = sim.integrator.T
 
-function update_sim!(sim::TestAtmos, fields, _)
+function FieldExchanger.update_sim!(sim::TestAtmos, fields, _)
     (; F_turb_ρτxz, F_turb_energy, F_turb_moisture) = fields
     ρ_int = sim.integrator.ρ
     @. sim.integrator.p.energy_bc = -(F_turb_energy)
@@ -73,7 +54,7 @@ function get_thermo_params(sim::TestAtmos)
     return thermo_params
 end
 
-function get_surface_params(sim::TestAtmos)
+function FluxCalculator.get_surface_params(sim::TestAtmos)
     FT = sim.params.FT
     sf_params = SurfaceFluxesParameters(FT, UF.BusingerParams)
     return sf_params
@@ -96,23 +77,19 @@ Interfacer.get_field(sim::TestOcean, ::Val{:beta}) = sim.integrator.p.beta
 Interfacer.get_field(sim::TestOcean, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 Interfacer.get_field(sim::TestOcean, ::Val{:heat_transfer_coefficient}) = sim.integrator.p.Ch
 Interfacer.get_field(sim::TestOcean, ::Val{:drag_coefficient}) = sim.integrator.p.Cd
-Interfacer.get_field(sim::TestOcean, ::Val{:surface_albedo}) = sim.integrator.p.α
+Interfacer.get_field(sim::TestOcean, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) =
+    sim.integrator.p.α
 
-function surface_thermo_state(
-    sim::TestOcean,
-    thermo_params::ThermodynamicsParameters,
-    thermo_state_int,
-    colidx::Fields.ColumnIndex,
-)
-    T_sfc = Interfacer.get_field(sim, Val(:surface_temperature), colidx)
+function FluxCalculator.surface_thermo_state(sim::TestOcean, thermo_params::ThermodynamicsParameters, thermo_state_int)
+    T_sfc = Interfacer.get_field(sim, Val(:surface_temperature))
     ρ_sfc = thermo_state_int.ρ # arbitrary
-    q_sfc = Interfacer.get_field(sim, Val(:air_humidity), colidx) # read from cache
+    q_sfc = Interfacer.get_field(sim, Val(:air_humidity)) # read from cache
     @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
 end
 
-function update_turbulent_fluxes_point!(sim::TestOcean, fields::NamedTuple, colidx::Fields.ColumnIndex)
+function FluxCalculator.update_turbulent_fluxes!(sim::TestOcean, fields::NamedTuple)
     (; F_turb_energy) = fields
-    @. sim.integrator.p.F_aero[colidx] = F_turb_energy
+    @. sim.integrator.p.F_aero = F_turb_energy
 end
 
 # simple surface sim object and extensions
@@ -129,13 +106,8 @@ Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:heat_transfer_coeffici
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:drag_coefficient}) = sim.integrator.p.Cd
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:beta}) = sim.integrator.p.beta
 
-function surface_thermo_state(
-    sim::DummySurfaceSimulation3,
-    thermo_params::ThermodynamicsParameters,
-    thermo_state_int,
-    colidx::Fields.ColumnIndex,
-)
-    T_sfc = Interfacer.get_field(sim, Val(:surface_temperature), colidx)
+function surface_thermo_state(sim::DummySurfaceSimulation3, thermo_params::ThermodynamicsParameters, thermo_state_int)
+    T_sfc = Interfacer.get_field(sim, Val(:surface_temperature))
     FT = eltype(T_sfc)
 
     ρ_sfc = @. T_sfc * FT(0) .+ FT(1.2) # arbitrary
@@ -143,6 +115,10 @@ function surface_thermo_state(
     @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
 end
 
+function FluxCalculator.water_albedo_from_atmosphere!(::TestAtmos, temp1::CC.Fields.Field, temp2::CC.Fields.Field)
+    temp1 .*= 2
+    temp2 .*= 3
+end
 
 for FT in (Float32, Float64)
     @testset "combined_turbulent_fluxes! for FT=$FT" begin
@@ -153,18 +129,18 @@ for FT in (Float32, Float64)
             (; κ = FT(0.01), dz = FT(1), flux = zeros(boundary_space)),
         )
         model_sims = (; atmos_sim = sim)
-        flux_types = (CombinedStateFluxes(), PartitionedStateFluxes())
+        flux_types = (FluxCalculator.CombinedStateFluxesMOST(), FluxCalculator.PartitionedStateFluxes())
         # the result of Eq 1 above, given these states, is 0.1 W/m2, but under PartitionedStateFluxes() turbulent fluxes are
         # not calculated using this method (using combined surface properties), so the fluxes remain 0.
         results = [FT(0.1), FT(0.0)]
         for (i, t) in enumerate(flux_types)
             sim.cache.flux .= FT(0)
-            combined_turbulent_fluxes!(model_sims, coupler_fields, t)
-            @test parent(sim.cache.flux)[1] ≈ results[i]
+            FluxCalculator.combined_turbulent_fluxes!(model_sims, coupler_fields, t)
+            @test Array(parent(sim.cache.flux))[1] ≈ results[i]
         end
         sim2 = DummySimulation2((; cache = (; flux = zeros(boundary_space))))
         model_sims = (; atmos_sim = sim2)
-        @test_throws ErrorException atmos_turbulent_fluxes!(sim2, coupler_fields)
+        @test_throws ErrorException FluxCalculator.atmos_turbulent_fluxes_most!(sim2, coupler_fields)
 
     end
 
@@ -172,11 +148,11 @@ for FT in (Float32, Float64)
         boundary_space = TestHelper.create_space(FT)
         coupler_fields = (; T_sfc = 310 .* ones(boundary_space))
         sim2 = DummySimulation2((; cache = (; flux = zeros(boundary_space))))
-        @test_throws ErrorException calculate_surface_air_density(sim2, coupler_fields.T_sfc)
+        @test_throws ErrorException FluxCalculator.calculate_surface_air_density(sim2, coupler_fields.T_sfc)
     end
 
     @testset "calculate correct fluxes: dry for FT=$FT" begin
-        surface_scheme_list = (MoninObukhovScheme(), BulkScheme())
+        surface_scheme_list = (FluxCalculator.MoninObukhovScheme(), FluxCalculator.BulkScheme())
         for scheme in surface_scheme_list
             boundary_space = TestHelper.create_space(FT)
 
@@ -220,7 +196,8 @@ for FT in (Float32, Float64)
 
             coupler_cache_names = (
                 :T_S,
-                :surface_albedo,
+                :surface_direct_albedo,
+                :surface_diffuse_albedo,
                 :F_R_sfc,
                 :F_R_toa,
                 :P_liq,
@@ -231,16 +208,17 @@ for FT in (Float32, Float64)
                 :F_turb_ρτyz,
                 :F_turb_moisture,
             )
-            fields =
-                NamedTuple{coupler_cache_names}(ntuple(i -> Fields.zeros(boundary_space), length(coupler_cache_names)))
+            fields = NamedTuple{coupler_cache_names}(
+                ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_cache_names)),
+            )
 
             # calculate turbulent fluxes
             thermo_params = get_thermo_params(atmos_sim)
-            partitioned_turbulent_fluxes!(model_sims, fields, boundary_space, scheme, thermo_params)
+            FluxCalculator.partitioned_turbulent_fluxes!(model_sims, fields, boundary_space, scheme, thermo_params)
 
             # calculating the fluxes twice ensures that no accumulation occurred (i.e. fluxes are reset to zero each time)
             # TODO: this will need to be extended once flux accumulation is re-enabled
-            partitioned_turbulent_fluxes!(model_sims, fields, boundary_space, scheme, thermo_params)
+            FluxCalculator.partitioned_turbulent_fluxes!(model_sims, fields, boundary_space, scheme, thermo_params)
 
             windspeed = @. hypot(atmos_sim.integrator.p.u, atmos_sim.integrator.p.v)
 
@@ -248,13 +226,10 @@ for FT in (Float32, Float64)
             thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
 
             surface_thermo_states = similar(thermo_state_int)
-            Fields.bycolumn(boundary_space) do colidx
-                surface_thermo_states[colidx] .=
-                    surface_thermo_state(ocean_sim, thermo_params, thermo_state_int[colidx], colidx)
-            end
+            surface_thermo_states .= FluxCalculator.surface_thermo_state(ocean_sim, thermo_params, thermo_state_int)
 
             # analytical solution is possible for the BulkScheme() case
-            if scheme isa BulkScheme
+            if scheme isa FluxCalculator.BulkScheme
                 ρ_sfc = Interfacer.get_field(atmos_sim, Val(:air_density))
                 cpm = TD.cv_m.(thermo_params, thermo_state_int) .+ TD.gas_constant_air.(thermo_params, thermo_state_int) # cp = R + cv
                 gz =
@@ -267,47 +242,43 @@ for FT in (Float32, Float64)
                    ρ_sfc *
                    windspeed #-ρ_sfc * Ch * windspeed(sc) * (cp_m * ΔT + ΔΦ)
 
-                colidx = Fields.ColumnIndex{2}((1, 1), 73) # arbitrary index
                 # check the coupler field update
-                @test isapprox(parent(shf_analytical[colidx]), parent(fields.F_turb_energy[colidx]), rtol = 1e-6)
+                @test isapprox(parent(shf_analytical), parent(fields.F_turb_energy), rtol = 1e-6)
 
                 # test the surface field update
-                @test parent(fields.F_turb_energy[colidx]) == parent(ocean_sim.integrator.p.F_aero[colidx])
+                @test parent(fields.F_turb_energy) == parent(ocean_sim.integrator.p.F_aero)
 
                 # test the atmos field update
-                update_sim!(atmos_sim, fields, nothing)
-                @test parent(fields.F_turb_energy[colidx]) == -parent(atmos_sim.integrator.p.energy_bc[colidx])
+                FieldExchanger.update_sim!(atmos_sim, fields, nothing)
+                @test parent(fields.F_turb_energy) == -parent(atmos_sim.integrator.p.energy_bc)
 
             end
-            @test parent(fields.F_turb_moisture)[1] ≈ FT(0)
+            @test Array(parent(fields.F_turb_moisture))[1] ≈ FT(0)
         end
     end
 
     @testset "get_surface_params for FT=$FT" begin
         sf_params = SurfaceFluxesParameters(FT, UF.BusingerParams)
 
-        @test get_surface_params(TestAtmos((; FT = FT), [], [], [])) == sf_params
+        @test FluxCalculator.get_surface_params(TestAtmos((; FT = FT), [], [], [])) == sf_params
         sim = DummySimulation([], [])
         @test_throws ErrorException(
             "get_surface_params is required to be dispatched on" * Interfacer.name(sim) * ", but no method defined",
-        ) get_surface_params(DummySimulation([], []))
+        ) FluxCalculator.get_surface_params(DummySimulation([], []))
     end
 
-    @testset "update_turbulent_fluxes_point! for FT=$FT" begin
-        sim = Interfacer.SurfaceStub([])
-        sim2 = DummySurfaceSimulation3([], [], [], [])
-        colidx = Fields.ColumnIndex{2}((1, 1), 73) # arbitrary index
-        @test update_turbulent_fluxes_point!(sim, (;), colidx) == nothing
+    @testset "update_turbulent_fluxes! for FT=$FT" begin
+        sim = DummySurfaceSimulation3([], [], [], [])
         @test_throws ErrorException(
-            "update_turbulent_fluxes_point! is required to be dispatched on" *
-            Interfacer.name(sim2) *
+            "update_turbulent_fluxes! is required to be dispatched on" *
+            Interfacer.name(sim) *
             ", but no method defined",
-        ) update_turbulent_fluxes_point!(sim2, (;), colidx) == ErrorException
+        ) FluxCalculator.update_turbulent_fluxes!(sim, (;)) == ErrorException
     end
 
     @testset "surface_thermo_state for FT=$FT" begin
         boundary_space = TestHelper.create_space(FT)
-        _ones = Fields.ones(boundary_space)
+        _ones = CC.Fields.ones(boundary_space)
         surface_sim = DummySurfaceSimulation3(
             [],
             [],
@@ -318,8 +289,46 @@ for FT in (Float32, Float64)
             TestAtmos((; FT = FT), [], [], (; T = _ones .* FT(300), ρ = _ones .* FT(1.2), q = _ones .* FT(0.01)))
         thermo_params = get_thermo_params(atmos_sim)
         thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
-        colidx = Fields.ColumnIndex{2}((1, 1), 73) # arbitrary index
-        @test surface_thermo_state(surface_sim, thermo_params, thermo_state_int[colidx], colidx).ρ ==
-              thermo_state_int[colidx].ρ
+        @test FluxCalculator.surface_thermo_state(surface_sim, thermo_params, thermo_state_int).ρ == thermo_state_int.ρ
     end
+
+    @testset "water_albedo_from_atmosphere!" begin
+        boundary_space = TestHelper.create_space(FT)
+        ocean_sim = Interfacer.SurfaceStub((; α_direct = zeros(boundary_space), α_diffuse = zeros(boundary_space)))
+        atmos_sim = TestAtmos(1, 2, 3, 4)
+        coupler_fields = (; temp1 = ones(boundary_space), temp2 = ones(boundary_space))
+        model_sims = (; atmos_sim, ocean_sim)
+        cs = Interfacer.CoupledSimulation{FT}(
+            nothing, # comms_ctx
+            nothing, # dates
+            nothing, # boundary_space
+            coupler_fields, # fields
+            nothing, # parsed_args
+            nothing, # conservation_checks
+            (Int(0), Int(1)), # tspan
+            0, # t
+            0, # Δt_cpl
+            (;), # surface_masks
+            model_sims, # model_sims
+            (;), # mode
+            (), # diagnostics
+            (;), # callbacks
+            (;), # dirs
+            nothing, # turbulent_fluxes
+            nothing, # thermo_params
+        )
+        FluxCalculator.water_albedo_from_atmosphere!(cs, nothing)
+        @test sum(parent(cs.model_sims.ocean_sim.cache.α_direct) .- parent(ones(boundary_space)) .* 2) == 0
+        @test sum(parent(cs.model_sims.ocean_sim.cache.α_diffuse) .- parent(ones(boundary_space)) .* 3) == 0
+
+        atmos_sim2 = TestAtmos2()
+        @test_throws ErrorException(
+            "this function is required to be dispatched on" * Interfacer.name(atmos_sim2) * ", but no method defined",
+        ) FluxCalculator.water_albedo_from_atmosphere!(atmos_sim2, ones(boundary_space), ones(boundary_space))
+    end
+end
+
+@testset "SurfaceStub update_turbulent_fluxes!" begin
+    FT = Float32
+    @test isnothing(FluxCalculator.update_turbulent_fluxes!(Interfacer.SurfaceStub(FT(0)), (;)))
 end

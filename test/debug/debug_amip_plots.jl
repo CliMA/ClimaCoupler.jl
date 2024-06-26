@@ -1,73 +1,66 @@
 # testing functions used to produce user-defined debugging plots for AMIP experiments
-
-using Test
-using ClimaCore
-using ClimaCoupler: TestHelper
-import ClimaCoupler.Interfacer:
-    CoupledSimulation,
-    update_field!,
-    AtmosModelSimulation,
-    SurfaceModelSimulation,
-    SurfaceStub,
-    get_field,
-    update_field!,
-    name
+import Test: @test, @testset
+import ClimaCore as CC
+import ClimaCoupler: Interfacer, TestHelper
 
 FT = Float64
 
-struct ClimaAtmosSimulation{C} <: AtmosModelSimulation
+struct ClimaAtmosSimulation{C} <: Interfacer.AtmosModelSimulation
     cache::C
 end
-name(sim::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
-get_field(sim::AtmosModelSimulation, ::Val{:atmos_field}) = sim.cache.atmos_field
+Interfacer.name(sim::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:atmos_field}) = sim.cache.atmos_field
 
-struct BucketSimulation{C} <: SurfaceModelSimulation
+struct BucketSimulation{C} <: Interfacer.SurfaceModelSimulation
     cache::C
 end
-name(sim::BucketSimulation) = "BucketSimulation"
+Interfacer.name(sim::BucketSimulation) = "BucketSimulation"
 
-include("../../experiments/AMIP/user_io/debug_plots.jl")
+include("../../experiments/ClimaEarth/user_io/debug_plots.jl")
 
-get_field(sim::BucketSimulation, ::Val{:surface_field}) = sim.cache.surface_field
-get_field(sim::SurfaceStub, ::Val{:stub_field}) = sim.cache.stub_field
+Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_field}) = sim.cache.surface_field
+Interfacer.get_field(sim::Interfacer.SurfaceStub, ::Val{:stub_field}) = sim.cache.stub_field
 
 plot_field_names(sim::ClimaAtmosSimulation) = (:atmos_field,)
 plot_field_names(sim::BucketSimulation) = (:surface_field,)
-plot_field_names(sim::SurfaceStub) = (:stub_field,)
+plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
 
 @testset "import_atmos_fields!" begin
 
     boundary_space = TestHelper.create_space(FT)
     coupler_names = (
-        :surface_albedo,
+        :surface_direct_albedo,
+        :surface_diffuse_albedo,
         :F_radiative,
         :F_turb_energy,
         :F_turb_moisture,
+        :F_turb_ρτxz,
+        :F_turb_ρτyz,
         :P_liq,
+        :P_snow,
         :T_S,
         :ρ_sfc,
         :q_sfc,
         :beta,
         :z0b_S,
         :z0m_S,
+        :radiative_energy_flux_toa,
     )
     atmos_names = (:atmos_field,)
     surface_names = (:surface_field,)
     stub_names = (:stub_field,)
 
-    atmos_fields = NamedTuple{atmos_names}(ntuple(i -> ClimaCore.Fields.ones(boundary_space), length(atmos_names)))
-    surface_fields =
-        NamedTuple{surface_names}(ntuple(i -> ClimaCore.Fields.ones(boundary_space), length(surface_names)))
-    stub_fields = NamedTuple{stub_names}(ntuple(i -> ClimaCore.Fields.ones(boundary_space), length(stub_names)))
-    coupler_fields =
-        NamedTuple{coupler_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_names)))
+    atmos_fields = NamedTuple{atmos_names}(ntuple(i -> CC.Fields.ones(boundary_space), length(atmos_names)))
+    surface_fields = NamedTuple{surface_names}(ntuple(i -> CC.Fields.ones(boundary_space), length(surface_names)))
+    stub_fields = NamedTuple{stub_names}(ntuple(i -> CC.Fields.ones(boundary_space), length(stub_names)))
+    coupler_fields = NamedTuple{coupler_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_names)))
 
     model_sims = (;
         atmos_sim = ClimaAtmosSimulation(atmos_fields),
         surface_sim = BucketSimulation(surface_fields),
-        ice_sim = SurfaceStub(stub_fields),
+        ice_sim = Interfacer.SurfaceStub(stub_fields),
     )
-    cs = CoupledSimulation{FT}(
+    cs = Interfacer.CoupledSimulation{FT}(
         nothing, # comms_ctx
         nothing, # dates
         nothing, # boundary_space
@@ -83,6 +76,8 @@ plot_field_names(sim::SurfaceStub) = (:stub_field,)
         (), # diagnostics
         (;), # callbacks
         (;), # dirs
+        nothing, # turbulent_fluxes
+        nothing, # thermo_params
     )
 
     output_plots = "test_debug"

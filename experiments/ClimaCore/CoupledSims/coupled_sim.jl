@@ -1,10 +1,8 @@
-using ClimaCore
-using ClimaCore: Operators, Fields
-using PrettyTables
+import PrettyTables
+import ClimaCore as CC
 
-export CouplerState
-export coupler_push!, coupler_pull!, coupler_put!, coupler_get, coupler_get!
-export coupler_add_field!, coupler_add_map!
+export CouplerState,
+    coupler_push!, coupler_pull!, coupler_put!, coupler_get, coupler_get!, coupler_add_field!, coupler_add_map!
 
 
 """
@@ -117,7 +115,7 @@ etc... can be embeded in the intermdediate coupling layer.
 A field is exported by one component and imported by one or more other components.
 """
 function CouplerState(Δt_coupled)
-    return CouplerState(Dict{Symbol, CplFieldInfo}(), Dict{Symbol, Operators.LinearRemap}(), Δt_coupled)
+    return CouplerState(Dict{Symbol, CplFieldInfo}(), Dict{Symbol, CC.Operators.LinearRemap}(), Δt_coupled)
 end
 
 """
@@ -148,7 +146,7 @@ end
     coupler_add_map!(
             coupler::CouplerState,
             map_name::Symbol,
-            map::Operators.LinearRemap
+            map::CC.Operators.LinearRemap
         )
 
 Add a map to the coupler that is accessible with key `mapname`.
@@ -158,7 +156,7 @@ Add a map to the coupler that is accessible with key `mapname`.
 - `mapname`: key to access the map in the coupler's map list.
 - `map`: a remap operator.
 """
-function coupler_add_map!(coupler::CouplerState, map_name::Symbol, map::Operators.LinearRemap)
+function coupler_add_map!(coupler::CouplerState, map_name::Symbol, map::CC.Operators.LinearRemap)
     push!(coupler.remap_operators, map_name => map)
 end
 
@@ -189,19 +187,14 @@ them for the coupler.
 function coupler_push!(coupler::CouplerState, model) end
 
 """
-    coupler_get!(target_field::ClimaCore.Fields.Field, coupler::CouplerState, fieldname::Symbol, target_sim::AbstractSim)
+    coupler_get!(target_field::CC.Fields.Field, coupler::CouplerState, fieldname::Symbol, target_sim::AbstractSim)
 
 Retrieve data array corresponding to `fieldname`, remap and store in `target_field`.
 """
-function coupler_get!(
-    target_field::ClimaCore.Fields.Field,
-    coupler::CouplerState,
-    fieldname::Symbol,
-    target_sim::AbstractSim,
-)
+function coupler_get!(target_field::CC.Fields.Field, coupler::CouplerState, fieldname::Symbol, target_sim::AbstractSim)
     cplfield = coupler.coupled_fields[fieldname]
     map = get_remap_operator(coupler, name(target_sim), cplfield.write_sim)
-    Operators.remap!(target_field, map, cplfield.data)
+    CC.Operators.remap!(target_field, map, cplfield.data)
 end
 
 """
@@ -219,7 +212,7 @@ end
 function coupler_get(coupler::CouplerState, fieldname::Symbol, target_sim::AbstractSim)
     cplfield = coupler.coupled_fields[fieldname]
     map = get_remap_operator(coupler, name(target_sim), cplfield.write_sim)
-    return Operators.remap(map, cplfield.data)
+    return CC.Operators.remap(map, cplfield.data)
 end
 
 """

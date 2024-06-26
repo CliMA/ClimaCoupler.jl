@@ -9,14 +9,12 @@ dz_bottom: 30
 dz_top: 3000
 energy_check: false
 h_elem: 16
-job_id: "amip_n64_shortrun"
 mode_name: "amip"
 moist: "equil"
 mono_surface: false
 precip_model: "0M"
 rad: "gray"
 rayleigh_sponge: true
-run_name: "amip_n64_shortrun"
 t_end: "10days"
 vert_diff: "true"
 z_elem: 50

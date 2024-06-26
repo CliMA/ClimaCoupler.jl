@@ -88,22 +88,20 @@
 
 #  - load external packages:
 import LinearAlgebra
-import ClimaCore: Fields, Domains, Topologies, Meshes, DataLayouts, Operators, Geometry, Spaces
+import Logging
+import SciMLBase
+import Statistics
+import TerminalLoggers
+
+# load CliMA packages:
+import ClimaCore as CC
 import ClimaTimeSteppers as CTS
-
-using Base: show_supertypes
-import SciMLBase: step!, ODEProblem, init
-
-using Logging: global_logger
-using TerminalLoggers: TerminalLogger
-using RecursiveArrayTools
-using Statistics
 
 # Load utilities for coupling
 include("../CoupledSims/coupled_sim.jl")
 
 #src ## Setup Logging Information
-global_logger(TerminalLogger()) #src
+Logging.global_logger(TerminalLoggers.TerminalLogger()) #src
 const CI = !isnothing(get(ENV, "CI", nothing)) #src
 
 # ## Define Parameters
@@ -152,14 +150,14 @@ function ∑tendencies_atm!(du, u, cache, t)
     F_sfc = calculate_flux(T_sfc[1], parent(T_atm)[1], parameters)
 
     ## set boundary conditions
-    C3 = Geometry.WVector
+    C3 = CC.Geometry.WVector
     # note: F_sfc is converted to a Cartesian vector in direction 3 (vertical)
-    bcs_bottom = Operators.SetValue(C3(F_sfc))
-    bcs_top = Operators.SetValue(C3(FT(0)))
+    bcs_bottom = CC.Operators.SetValue(C3(F_sfc))
+    bcs_top = CC.Operators.SetValue(C3(FT(0)))
 
     ## gradient and divergence operators needed for diffusion in tendency calc.
-    ᶠgradᵥ = Operators.GradientC2F()
-    ᶜdivᵥ = Operators.DivergenceF2C(bottom = bcs_bottom, top = bcs_top)
+    ᶠgradᵥ = CC.Operators.GradientC2F()
+    ᶜdivᵥ = CC.Operators.DivergenceF2C(bottom = bcs_bottom, top = bcs_top)
 
     ## perform tendency calculations
     # note: `atm_F_sfc` is a prognostic variable (i.e. is timestepped) in the atmosphere model
@@ -192,16 +190,16 @@ coupler_put_(x) = x;
 
 # ## Model Initialization
 # - initialize atm model domain and grid
-domain_atm = Domains.IntervalDomain(
-    Geometry.ZPoint{FT}(parameters.zmin_atm),
-    Geometry.ZPoint{FT}(parameters.zmax_atm);
+domain_atm = CC.Domains.IntervalDomain(
+    CC.Geometry.ZPoint{FT}(parameters.zmin_atm),
+    CC.Geometry.ZPoint{FT}(parameters.zmax_atm);
     boundary_names = (:bottom, :top),
 );
-mesh_atm = Meshes.IntervalMesh(domain_atm, nelems = parameters.n); # struct, allocates face boundaries to 5,6: atmos
-center_space_atm = Spaces.CenterFiniteDifferenceSpace(mesh_atm); # collection of the above, discretises space into FD and provides coords
+mesh_atm = CC.Meshes.IntervalMesh(domain_atm, nelems = parameters.n); # struct, allocates face boundaries to 5,6: atmos
+center_space_atm = CC.Spaces.CenterFiniteDifferenceSpace(mesh_atm); # collection of the above, discretises space into FD and provides coords
 
 # - initialize prognostic variables, either as ClimaCore's Field objects or as Arrays
-T_atm_0 = Fields.ones(FT, center_space_atm) .* parameters.T_atm_ini; # initiates a spatially uniform atm progostic var
+T_atm_0 = CC.Fields.ones(FT, center_space_atm) .* parameters.T_atm_ini; # initiates a spatially uniform atm progostic var
 T_lnd_0 = [parameters.T_lnd_ini]; # initiates lnd progostic var
 ics = (; atm = T_atm_0, lnd = T_lnd_0)
 
@@ -234,15 +232,15 @@ function coupler_solve!(stepping, ics, parameters)
     ## SETUP ATMOS
     ## put all prognostic variable arrays into a vector and ensure that solve can partition them
     T_atm = ics.atm
-    Y_atm = Fields.FieldVector(T_atm = T_atm, atm_F_sfc = atm_F_sfc)
+    Y_atm = CC.Fields.FieldVector(T_atm = T_atm, atm_F_sfc = atm_F_sfc)
 
     ode_algo = stepping.odesolver
     ode_function = CTS.ClimaODEFunction(T_exp! = ∑tendencies_atm!)
 
     # `saveat` determines the frequency with which the solution is saved
     # `adaptive` determines whether the solver should use an adaptive timestep
-    prob_atm = ODEProblem(ode_function, Y_atm, (t_start, t_end), (parameters = parameters, T_sfc = atm_T_lnd))
-    integ_atm = init(prob_atm, ode_algo, dt = Δt_min, saveat = 10 * Δt_min, adaptive = false)
+    prob_atm = SciMLBase.ODEProblem(ode_function, Y_atm, (t_start, t_end), (parameters = parameters, T_sfc = atm_T_lnd))
+    integ_atm = SciMLBase.init(prob_atm, ode_algo, dt = Δt_min, saveat = 10 * Δt_min, adaptive = false)
 
     ## land copies of coupler variables
     # note: `lnd_F_sfc` is a diagnostic variable (i.e. is not timestepped) in the land model
@@ -252,8 +250,8 @@ function coupler_solve!(stepping, ics, parameters)
     ## SETUP LAND
     ode_function = CTS.ClimaODEFunction(T_exp! = ∑tendencies_lnd!)
 
-    prob_lnd = ODEProblem(ode_function, T_lnd, (t_start, t_end), (parameters, lnd_F_sfc))
-    integ_lnd = init(prob_lnd, ode_algo, dt = Δt_min, saveat = 10 * Δt_min, adaptive = false)
+    prob_lnd = SciMLBase.ODEProblem(ode_function, T_lnd, (t_start, t_end), (parameters, lnd_F_sfc))
+    integ_lnd = SciMLBase.init(prob_lnd, ode_algo, dt = Δt_min, saveat = 10 * Δt_min, adaptive = false)
 
 
     ## coupler stepping
@@ -266,7 +264,7 @@ function coupler_solve!(stepping, ics, parameters)
 
         ## run atmos
         ## NOTE: use (t - integ_atm.t) here instead of Δt_coupler to avoid accumulating roundoff error in our timestepping.
-        step!(integ_atm, t - integ_atm.t, true)
+        SciMLBase.step!(integ_atm, t - integ_atm.t, true)
 
         ## post_atmos
         ## retrieve the updated surface flux from the atmosphere model
@@ -278,7 +276,7 @@ function coupler_solve!(stepping, ics, parameters)
         lnd_F_sfc .= coupler_get_(coupler_F_sfc)
 
         ## run land
-        step!(integ_lnd, t - integ_lnd.t, true)
+        SciMLBase.step!(integ_lnd, t - integ_lnd.t, true)
 
         ## post land
         coupler_T_lnd .= coupler_put_(integ_lnd.u) # update T_sfc
@@ -311,7 +309,7 @@ mkpath(ARTIFACTS_DIR)
 # - Vertical profile at start and end
 t0_ = parent(sol_atm.u[1].T_atm)[:, 1];
 tend_ = parent(sol_atm.u[end].T_atm)[:, 1];
-z_centers = parent(Fields.coordinate_field(center_space_atm))[:, 1];
+z_centers = parent(CC.Fields.coordinate_field(center_space_atm))[:, 1];
 Plots.png(
     Plots.plot(
         [t0_ tend_],
@@ -347,7 +345,7 @@ Plots.png(
 
 # - Conservation: relative error with time
 total = atm_sum_u_t + lnd_sfc_u_t;
-rel_error = abs.(total .- total[1]) / mean(total);
+rel_error = abs.(total .- total[1]) / Statistics.mean(total);
 Plots.png(
     Plots.plot(
         sol_lnd.t,

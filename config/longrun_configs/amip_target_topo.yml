@@ -1,4 +1,5 @@
 FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
 anim: true
 apply_limiter: false
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_0M_earth.yml"
@@ -10,17 +11,15 @@ dt_save_state_to_disk: "20days"
 dt_save_to_sol: "10days"
 energy_check: false
 hourly_checkpoint: true
-job_id: "amip_target_topo"
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
 netcdf_interpolate_z_over_msl: true
 rad: "allskywithclear"
-run_name: "amip_target_topo"
-start_date: "19790301"
+start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "100days"
 topo_smoothing: true
 topography: "Earth"
-turb_flux_partition: "CombinedStateFluxes"
+turb_flux_partition: "CombinedStateFluxesMOST"
 vert_diff: "true"

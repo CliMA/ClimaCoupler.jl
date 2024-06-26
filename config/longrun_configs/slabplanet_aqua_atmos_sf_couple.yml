@@ -7,16 +7,14 @@ dt_save_to_sol: "10days"
 energy_check: true
 evolving_ocean: false
 h_elem: 6
-job_id: "slabplanet_aqua_atmos_sf_couple"
 land_albedo_type: "function"
 mode_name: "slabplanet_aqua"
 moist: "equil"
 mono_surface: true
 precip_model: "0M"
 rad: "gray"
-run_name: "slabplanet_aqua_atmos_sf_couple"
 start_date: "19790301"
 surface_setup: "DefaultMoninObukhov"
 t_end: "20days"
-turb_flux_partition: "CombinedStateFluxes"
+turb_flux_partition: "CombinedStateFluxesMOST"
 vert_diff: "true"

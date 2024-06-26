@@ -1,6 +1,6 @@
-using Test
-using ClimaCoupler
-using Aqua
+import Test: @test, @testset
+import ClimaCoupler
+import Aqua
 
 @testset "Aqua tests (performance)" begin
     # This tests that we don't accidentally run into

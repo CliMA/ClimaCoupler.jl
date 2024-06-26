@@ -1,0 +1,16 @@
+FLOAT_TYPE: "Float32"
+anim: false
+atmos_config_file: "config/benchmark_configs/climaatmos_diagedmf.yml"
+atmos_config_repo: "ClimaCoupler"
+dt_cpl: 120
+dt_save_state_to_disk: "Inf"
+dt_save_to_sol: "Inf"
+energy_check: false
+land_albedo_type: "map_temporal"
+mode_name: "amip"
+mono_surface: false
+monthly_checkpoint: false
+start_date: "19790301"
+t_end: "12hours"
+turb_flux_partition: "CombinedStateFluxesMOST"
+use_coupler_diagnostics: false

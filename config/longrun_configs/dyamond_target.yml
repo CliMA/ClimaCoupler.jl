@@ -4,12 +4,10 @@ dt_cpl: 50
 dt_save_state_to_disk: "0.5days"
 dt_save_to_sol: "0.5days"
 energy_check: false
-job_id: "dyamond_target"
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
 monthly_checkpoint: false
-run_name: "dyamond_target"
-start_date: "19790301"
+start_date: "20100101"
 t_end: "1days"
-turb_flux_partition: "CombinedStateFluxes"
+turb_flux_partition: "CombinedStateFluxesMOST"

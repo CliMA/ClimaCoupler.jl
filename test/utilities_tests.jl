@@ -1,12 +1,10 @@
 #=
     Unit tests for ClimaCoupler Utilities module
 =#
-
-using Test
-using ClimaCoupler: Utilities, TestHelper
-using ClimaCore: Fields
-
+import Test: @testset, @test
 import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+import ClimaCoupler: Utilities, TestHelper
 
 for FT in (Float32, Float64)
     @testset "test swap_space!" begin
@@ -16,7 +14,7 @@ for FT in (Float32, Float64)
         field1 = ones(space1)
         field2 = ones(space2)
 
-        field2 = Utilities.swap_space!(field2, field1)
+        field2 = Utilities.swap_space!(space2, field1)
 
         @test parent(field1) == parent(field2)
         @test axes(field2) == space2
@@ -43,8 +41,8 @@ for FT in (Float32, Float64)
 
         # Additional test calls for code coverage since Github Actions only exercises the SingleThreaded calculates
         # More meaningful testing performed on buildkite
-        # Cannot test CUDADevice on CPU 
-        # Test other devices: 
+        # Cannot test CUDADevice on CPU
+        # Test other devices:
         parsed_args["device"] = "CPUMultiThreaded"
         @test typeof(Utilities.get_comms_context(parsed_args)) ==
               typeof(ClimaComms.context(ClimaComms.CPUMultiThreaded()))

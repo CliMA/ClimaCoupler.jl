@@ -4,12 +4,13 @@
 These are in a separate testing file from the other Regridder unit tests so
 that MPI can be enabled for testing of these functions.
 =#
-
-using ClimaCoupler: TestHelper, Regridder
-using ClimaCore: Geometry, Meshes, Domains, Topologies, Spaces, Fields, InputOutput
-using ClimaComms
-using Dates
-using Test
+import Test: @test, @testset
+import Dates
+import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+import ClimaCore as CC
+import ClimaCoupler
+import ClimaCoupler: Regridder, TestHelper
 
 REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regridder_test_tmp/")
 
@@ -28,7 +29,7 @@ pid, nprocs = ClimaComms.init(comms_ctx)
         hd_outfile_root = "hdf5_out_test"
         tx = Dates.DateTime(1979, 01, 01, 01, 00, 00)
         test_space = TestHelper.create_space(FT, comms_ctx = comms_ctx)
-        input_field = Fields.ones(test_space)
+        input_field = CC.Fields.ones(test_space)
         varname = "testdata"
 
         ClimaComms.barrier(comms_ctx)
@@ -39,7 +40,7 @@ pid, nprocs = ClimaComms.init(comms_ctx)
         @test parent(input_field) == parent(output_field)
 
         ClimaComms.barrier(comms_ctx)
-        ClimaComms.iamroot(comms_ctx) ? rm(REGRID_DIR; recursive = true, force = true) : nothing
+        ClimaComms.iamroot(comms_ctx) && rm(REGRID_DIR; recursive = true, force = true)
         ClimaComms.barrier(comms_ctx)
     end
 end

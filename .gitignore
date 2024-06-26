@@ -28,13 +28,13 @@ docs/src/generated/
 !docs/src/images/*.png
 
 # Experiments
-!experiments/AMIP/**/Manifest.toml
+!experiments/ClimaEarth/**/Manifest.toml
 !experiments/ClimaCore/**/Manifest.toml
 !perf/Manifest.toml
 
 # Output
 output/
-experiments/AMIP/output/*
+experiments/ClimaEarth/output/*
 
 # Data
 *.vtk
@@ -50,7 +50,7 @@ experiments/AMIP/output/*
 *.so
 
 # internal tests
-testdel.jl
+slurm-*.out
 
 # ignore vscode artifacts
 *.vscode

@@ -6,12 +6,10 @@ atmospheric and surface component models.
 """
 module FieldExchanger
 
-import SciMLBase: step!, reinit!
+import ..Interfacer, ..FluxCalculator, ..Regridder
+
 export import_atmos_fields!,
     import_combined_surface_fields!, update_sim!, update_model_sims!, reinit_model_sims!, step_model_sims!
-
-using ClimaCoupler: Interfacer, FluxCalculator, Regridder, Utilities
-
 """
     import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
 
@@ -29,7 +27,7 @@ function import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
     (; atmos_sim) = model_sims
 
     # turbulent fluxes
-    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
+    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
         Regridder.dummmy_remap!(csf.F_turb_energy, Interfacer.get_field(atmos_sim, Val(:turbulent_energy_flux)))
         Regridder.dummmy_remap!(csf.F_turb_moisture, Interfacer.get_field(atmos_sim, Val(:turbulent_moisture_flux)))
     end
@@ -46,31 +44,33 @@ function import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
 end
 
 """
-    import_combined_surface_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
+    import_combined_surface_fields!(csf, model_sims, turbulent_fluxes)
 
 Updates the coupler with the surface properties. The `Interfacer.get_field` functions for
-(`:surface_temperature`, `:surface_albedo`, `:roughness_momentum`, `:roughness_buoyancy`, `:beta`)
+(`:surface_temperature`, `:surface_direct_albedo`, `:surface_diffuse_albedo`, `:roughness_momentum`, `:roughness_buoyancy`, `:beta`)
 need to be specified for each surface model.
 
 # Arguments
 - `csf`: [NamedTuple] containing coupler fields.
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
-- `boundary_space`: [Spaces.AbstractSpace] the space of the coupler surface.
 - `turbulent_fluxes`: [TurbulentFluxPartition] denotes a flag for turbulent flux calculation.
 
 """
-function import_combined_surface_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
+function import_combined_surface_fields!(csf, model_sims, turbulent_fluxes)
 
-    combined_field = zeros(boundary_space)
+    combined_field = csf.temp1
 
     # surface fields
     Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_temperature))
     Regridder.dummmy_remap!(csf.T_S, combined_field)
 
-    Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_albedo))
-    Regridder.dummmy_remap!(csf.surface_albedo, combined_field)
+    Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_direct_albedo))
+    Regridder.dummmy_remap!(csf.surface_direct_albedo, combined_field)
 
-    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
+    Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_diffuse_albedo))
+    Regridder.dummmy_remap!(csf.surface_diffuse_albedo, combined_field)
+
+    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
         Regridder.combine_surfaces!(combined_field, model_sims, Val(:roughness_momentum))
         Regridder.dummmy_remap!(csf.z0m_S, combined_field)
 
@@ -97,10 +97,11 @@ Updates the surface fields for temperature, roughness length, albedo, and specif
 """
 function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf, turbulent_fluxes)
 
-    Interfacer.update_field!(atmos_sim, Val(:surface_albedo), csf.surface_albedo)
+    Interfacer.update_field!(atmos_sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
+    Interfacer.update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
     Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf.T_S)
 
-    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
+    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
         Interfacer.update_field!(atmos_sim, Val(:roughness_momentum), csf.z0m_S)
         Interfacer.update_field!(atmos_sim, Val(:roughness_buoyancy), csf.z0b_S)
         Interfacer.update_field!(atmos_sim, Val(:beta), csf.beta) # not in this version of atmos
@@ -130,7 +131,7 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, turbulent_flux
     mask = Regridder.binary_mask.(area_fraction)
 
     # when PartitionedStateFluxes, turbulent fluxes are updated during the flux calculation
-    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxes
+    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
         F_turb_energy_masked = FT.(mask .* csf.F_turb_energy)
         Interfacer.update_field!(sim, Val(:turbulent_energy_flux), F_turb_energy_masked)
         Interfacer.update_field!(sim, Val(:turbulent_moisture_flux), FT.(mask .* csf.F_turb_moisture))
@@ -144,14 +145,6 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, turbulent_flux
     Interfacer.update_field!(sim, Val(:snow_precipitation), csf.P_snow)
 end
 
-"""
-    update_sim!(::SurfaceStub, csf, area_fraction)
-
-The stub surface simulation only updates the air density (needed for the turbulent flux calculation).
-"""
-function update_sim!(sim::Interfacer.SurfaceStub, csf, area_fraction)
-    Interfacer.update_field!(sim, Val(:air_density), csf.ρ_sfc)
-end
 """
     update_model_sims!(model_sims, csf, turbulent_fluxes)
 
@@ -184,16 +177,9 @@ Iterates `reinit!` over all component model simulations saved in `cs.model_sims`
 """
 function reinit_model_sims!(model_sims)
     for sim in model_sims
-        reinit!(sim)
+        Interfacer.reinit!(sim)
     end
 end
-
-"""
-    reinit!(cs::SurfaceStub)
-
-The stub surface simulation is not updated by this function. Extends `SciMLBase.reinit!`.
-"""
-reinit!(::Interfacer.SurfaceStub) = nothing
 
 """
     step_model_sims!(model_sims, t)
@@ -206,15 +192,8 @@ Iterates `step!` over all component model simulations saved in `cs.model_sims`.
 """
 function step_model_sims!(model_sims, t)
     for sim in model_sims
-        step!(sim, t)
+        Interfacer.step!(sim, t)
     end
 end
-
-"""
-    step!(::SurfaceStub, t)
-
-The stub surface simulation is not updated by this function. Extends `SciMLBase.step!`.
-"""
-step!(::Interfacer.SurfaceStub, _) = nothing
 
 end # module

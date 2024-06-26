@@ -1,14 +1,13 @@
 #=
     Unit tests for ClimaCoupler BCReader module
 =#
-
-using ClimaCoupler: Regridder, BCReader, TimeManager, Interfacer
-using ClimaCore: Fields, Meshes, Domains, Topologies, Spaces
-using ClimaComms
-using Test
-using Dates
-using NCDatasets
-import ArtifactWrappers as AW
+import Test: @test, @testset, @test_throws
+import Dates
+import NCDatasets
+import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+import ClimaCore as CC
+import ClimaCoupler: Regridder, BCReader, TimeManager, Interfacer
 
 # get the paths to the necessary data files - sst map, land sea mask
 include(joinpath(@__DIR__, "..", "artifacts", "artifact_funcs.jl"))
@@ -20,7 +19,7 @@ const pid, nprocs = ClimaComms.init(comms_ctx)
 
 for FT in (Float32, Float64)
     @testset "test next_date_in_file for FT=$FT" begin
-        dummy_dates = Vector(range(DateTime(1999, 1, 1); step = Day(1), length = 10))
+        dummy_dates = Vector(range(Dates.DateTime(1999, 1, 1); step = Dates.Day(1), length = 10))
         date0 = dummy_dates[1]
         segment_idx0 = [
             argmin(
@@ -44,6 +43,7 @@ for FT in (Float32, Float64)
             segment_idx0,                       # segment_idx0
             Int[],                              # segment_length
             false,                              # interpolate_daily
+            false,                              # mono
         )
 
         idx = segment_idx0[1]
@@ -84,7 +84,7 @@ for FT in (Float32, Float64)
     @testset "test interpolate_midmonth_to_daily for FT=$FT" begin
         # test interpolate_midmonth_to_daily with interpolation
         interpolate_daily = true
-        dummy_dates = Vector(range(DateTime(1999, 1, 1); step = Day(1), length = 100))
+        dummy_dates = Vector(range(Dates.DateTime(1999, 1, 1); step = Dates.Day(1), length = 100))
         segment_idx0 = [Int(1)]
 
         # these values give an `interp_fraction` of 0.5 in `interpol` for ease of testing
@@ -93,11 +93,11 @@ for FT in (Float32, Float64)
 
         radius = FT(6731e3)
         Nq = 4
-        domain = Domains.SphereDomain(radius)
-        mesh = Meshes.EquiangularCubedSphere(domain, 4)
-        topology = Topologies.Topology2D(comms_ctx, mesh)
-        quad = Spaces.Quadratures.GLL{Nq}()
-        boundary_space_t = Spaces.SpectralElementSpace2D(topology, quad)
+        domain = CC.Domains.SphereDomain(radius)
+        mesh = CC.Meshes.EquiangularCubedSphere(domain, 4)
+        topology = CC.Topologies.Topology2D(comms_ctx, mesh)
+        quad = CC.Spaces.Quadratures.GLL{Nq}()
+        boundary_space_t = CC.Spaces.SpectralElementSpace2D(topology, quad)
         monthly_fields = (zeros(boundary_space_t), ones(boundary_space_t))
 
         bcf_info_interp = BCReader.BCFileInfo{FT}(
@@ -113,6 +113,7 @@ for FT in (Float32, Float64)
             segment_idx0,                       # segment_idx0
             segment_length,                     # segment_length
             interpolate_daily,                  # interpolate_daily
+            false,                              # mono
         )
         @test BCReader.interpolate_midmonth_to_daily(date0, bcf_info_interp) == ones(boundary_space_t) .* FT(0.5)
 
@@ -132,6 +133,7 @@ for FT in (Float32, Float64)
             segment_idx0,                       # segment_idx0
             segment_length,                     # segment_length
             interpolate_daily,                  # interpolate_daily
+            false,                              # mono
         )
         @test BCReader.interpolate_midmonth_to_daily(date0, bcf_info_no_interp) == monthly_fields[1]
     end
@@ -142,20 +144,20 @@ for FT in (Float32, Float64)
     if !Sys.iswindows()
         @testset "test update_midmonth_data! for FT=$FT" begin
             # setup for test
-            date0 = date1 = DateTime(1979, 01, 01, 01, 00, 00)
-            date = DateTime(1979, 01, 01, 00, 00, 00)
+            date0 = date1 = Dates.DateTime(1979, 01, 01, 01, 00, 00)
+            date = Dates.DateTime(1979, 01, 01, 00, 00, 00)
             tspan = (Int(1), Int(90 * 86400)) # Jan-Mar
             Δt = Int(1 * 3600)
 
             radius = FT(6731e3)
             Nq = 4
-            domain = Domains.SphereDomain(radius)
-            mesh = Meshes.EquiangularCubedSphere(domain, 4)
-            topology = Topologies.DistributedTopology2D(comms_ctx, mesh, Topologies.spacefillingcurve(mesh))
-            quad = Spaces.Quadratures.GLL{Nq}()
-            boundary_space_t = Spaces.SpectralElementSpace2D(topology, quad)
+            domain = CC.Domains.SphereDomain(radius)
+            mesh = CC.Meshes.EquiangularCubedSphere(domain, 4)
+            topology = CC.Topologies.DistributedTopology2D(comms_ctx, mesh, CC.Topologies.spacefillingcurve(mesh))
+            quad = CC.Spaces.Quadratures.GLL{Nq}()
+            boundary_space_t = CC.Spaces.SpectralElementSpace2D(topology, quad)
 
-            land_fraction_t = Fields.zeros(boundary_space_t)
+            land_fraction_t = CC.Fields.zeros(boundary_space_t)
             dummy_data = (; test_data = zeros(axes(land_fraction_t)))
 
             datafile_rll = sst_data
@@ -196,6 +198,8 @@ for FT in (Float32, Float64)
                 (), # diagnostics
                 (;), # callbacks
                 (;), # dirs
+                nothing, # turbulent_fluxes
+                nothing, # thermo_params
             )
 
             # step in time
@@ -217,10 +221,10 @@ for FT in (Float32, Float64)
             # test if the SST field was modified
             @test SST_all[end] !== SST_all[end - 1]
             # check that the final file date is as expected
-            @test Date(updating_dates[end]) == Date(1979, 03, 16)
+            @test Dates.Date(updating_dates[end]) == Dates.Date(1979, 03, 16)
 
             # test warning/error cases
-            current_fields = Fields.zeros(FT, boundary_space_t), Fields.zeros(FT, boundary_space_t)
+            current_fields = CC.Fields.zeros(FT, boundary_space_t), CC.Fields.zeros(FT, boundary_space_t)
 
             # use this function to reset values between test cases
             function reset_bcf_info(bcf_info)
@@ -234,7 +238,7 @@ for FT in (Float32, Float64)
 
             #  case 1: date < all_dates[segment_idx] (init)
             bcf_info.segment_idx[1] = bcf_info.segment_idx0[1]
-            date = DateTime(bcf_info.all_dates[bcf_info.segment_idx[1]] - Dates.Day(1))
+            date = Dates.DateTime(bcf_info.all_dates[bcf_info.segment_idx[1]] - Dates.Day(1))
             BCReader.update_midmonth_data!(date, bcf_info)
 
             # unmodified field
@@ -249,7 +253,7 @@ for FT in (Float32, Float64)
             for extra in extra_days
                 # case 3: (date - all_dates[Int(segment_idx0)]) >= 0 (init)
                 reset_bcf_info(bcf_info)
-                date = DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1]]) + extra
+                date = Dates.DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1]]) + extra
                 BCReader.update_midmonth_data!(date, bcf_info)
 
                 end_field_c2 = deepcopy(bcf_info.monthly_fields[2])
@@ -267,7 +271,7 @@ for FT in (Float32, Float64)
                 # do not reset segment_idx0. It's current value ensures that we get the same result as case 3
                 reset_bcf_info(bcf_info)
 
-                date = DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1] + 1]) + extra
+                date = Dates.DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1] + 1]) + extra
                 BCReader.update_midmonth_data!(date, bcf_info)
 
                 nearest_idx = argmin(
@@ -303,7 +307,7 @@ for FT in (Float32, Float64)
                 bcf_info.segment_idx0[1] = length(bcf_info.all_dates)
                 reset_bcf_info(bcf_info)
 
-                date = DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1]]) + extra
+                date = Dates.DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1]]) + extra
                 BCReader.update_midmonth_data!(date, bcf_info)
 
                 @test bcf_info.monthly_fields[1] == bcf_info.scaling_function(
@@ -327,7 +331,7 @@ for FT in (Float32, Float64)
                 bcf_info.segment_idx0[1] = 2
                 reset_bcf_info(bcf_info)
 
-                date = DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1]] + extra)
+                date = Dates.DateTime(bcf_info.all_dates[bcf_info.segment_idx0[1]] + extra)
                 BCReader.update_midmonth_data!(date, bcf_info)
 
                 @test bcf_info.segment_idx[1] == bcf_info.segment_idx0[1] + 1
@@ -347,12 +351,12 @@ for FT in (Float32, Float64)
             # setup for test
             radius = FT(6731e3)
             Nq = 4
-            domain = Domains.SphereDomain(radius)
-            mesh = Meshes.EquiangularCubedSphere(domain, 4)
-            topology = Topologies.Topology2D(comms_ctx, mesh)
-            quad = Spaces.Quadratures.GLL{Nq}()
-            boundary_space_t = Spaces.SpectralElementSpace2D(topology, quad)
-            land_fraction_t = Fields.zeros(boundary_space_t)
+            domain = CC.Domains.SphereDomain(radius)
+            mesh = CC.Meshes.EquiangularCubedSphere(domain, 4)
+            topology = CC.Topologies.Topology2D(comms_ctx, mesh)
+            quad = CC.Spaces.Quadratures.GLL{Nq}()
+            boundary_space_t = CC.Spaces.SpectralElementSpace2D(topology, quad)
+            land_fraction_t = CC.Fields.zeros(boundary_space_t)
 
             datafile_rll = mask_data
             varname = "LSMASK"
@@ -384,7 +388,7 @@ for FT in (Float32, Float64)
             weightfile = joinpath(regrid_dir, outfile_root * "_remap_weights.nc")
 
             # test monotone remapping (all weights in [0, 1])
-            nt = NCDataset(weightfile) do weights
+            nt = NCDatasets.NCDataset(weightfile) do weights
                 max_weight = maximum(weights["S"])
                 min_weight = minimum(weights["S"])
                 (; max_weight, min_weight)

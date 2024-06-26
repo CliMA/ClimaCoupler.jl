@@ -6,31 +6,33 @@ modules in the coupler.
 """
 module Utilities
 
+import CUDA
 import ClimaComms
-using ClimaCore: Fields, Spaces
+import ClimaCore as CC
 
 export swap_space!
 
 """
-    swap_space!(field_out::Fields.Field, field_in::Fields.Field)
+    swap_space!(space_out::CC.Spaces.AbstractSpace, field_in::CC.Fields.Field)
 
 Remap the values of a field onto a new space.
 
 # Arguments
-- `field_in`: [Fields.Field] to be remapped to new space.
-- `field_out`: [Fields.Field] to remap `field_in` to.
+- `space_out`: [CC.Spaces.AbstractSpace] The axes of the space we want to remap onto
+- `field_in`: [CC.Fields.Field] to be remapped to new space.
 """
-function swap_space!(field_out, field_in::Fields.Field)
-    field_out = Fields.Field(Fields.field_values(field_in), axes(field_out))
+function swap_space!(space_out::CC.Spaces.AbstractSpace, field_in::CC.Fields.Field)
+    field_out = CC.Fields.Field(CC.Fields.field_values(field_in), space_out)
+    return field_out
 end
 
 """
-    get_device(parsed_args) 
+    get_device(parsed_args)
 
-Returns the device on which the model is being run 
+Returns the device on which the model is being run
 
-# Arguments 
-- `parsed_args`: dictionary containing a "device" flag which decides which device to run on 
+# Arguments
+- `parsed_args`: dictionary containing a "device" flag which decides which device to run on
 """
 function get_device(parsed_args)
     if parsed_args["device"] == "auto"
@@ -46,11 +48,11 @@ end
 
 
 """
-    get_comms_context(parsed_args) 
+    get_comms_context(parsed_args)
 
-Sets up the appropriate ClimaComms context for the device the model is to be run on 
+Sets up the appropriate ClimaComms context for the device the model is to be run on
 
-# Arguments 
+# Arguments
 `parsed_args`: dictionary containing a "device" flag whcih decides which device context is needed
 """
 function get_comms_context(parsed_args)
@@ -67,6 +69,24 @@ function get_comms_context(parsed_args)
     end
 
     return comms_ctx
+end
+
+"""
+    show_memory_usage(comms_ctx)
+
+Display and return the maximum resident set size (RSS) memory footprint on the
+CPU of this process since it began.
+
+# Arguments
+`comms_ctx`: the communication context being used to run the model
+"""
+function show_memory_usage(comms_ctx)
+    cpu_max_rss_GB = ""
+    if ClimaComms.iamroot(comms_ctx)
+        cpu_max_rss_GB = string(round(Sys.maxrss() / 1e9, digits = 3)) * " GiB"
+        @info cpu_max_rss_GB
+    end
+    return cpu_max_rss_GB
 end
 
 end # module

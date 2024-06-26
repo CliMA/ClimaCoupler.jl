@@ -1,0 +1,16 @@
+FLOAT_TYPE: "Float32"
+anim: true
+apply_limiter: false
+dt: "200secs"
+dt_cpl: 200
+dt_save_restart: "10days"
+dt_save_to_sol: "100days"
+energy_check: false
+h_elem: 6
+mode_name: "amip"
+moist: "equil"
+mono_surface: true
+precip_model: "0M"
+rad: "gray"
+t_end: "10days"
+vert_diff: "true"

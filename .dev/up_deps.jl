@@ -11,7 +11,7 @@ dirs = (
     joinpath(root, ".dev"),
     joinpath(root, "perf"),
     joinpath(root, "docs"),
-    joinpath(root, "experiments/AMIP"),
+    joinpath(root, "experiments/ClimaEarth"),
 )
 
 cd(root) do

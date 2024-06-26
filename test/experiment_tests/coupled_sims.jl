@@ -1,9 +1,8 @@
-using Test
-using Random
-using ClimaCoupler, Dates, Unitful
-using IntervalSets
-using ClimaCore: Domains, Meshes, Geometry, Topologies, Spaces, Fields, Operators
-using ClimaComms
+import Test: @test, @testset, @test_throws
+using IntervalSets # for `..`
+import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+import ClimaCore as CC
 
 # Load file to test
 include("../../experiments/ClimaCore/CoupledSims/coupled_sim.jl")
@@ -32,20 +31,20 @@ end
 name(::SimB) = :simB
 
 function spectral_space_2D(; n1 = 1, n2 = 1, Nij = 4)
-    domain = Domains.RectangleDomain(
-        Geometry.XPoint(-1.0) .. Geometry.XPoint(1.0),
-        Geometry.YPoint(-1.0) .. Geometry.YPoint(1.0),
+    domain = CC.Domains.RectangleDomain(
+        CC.Geometry.XPoint(-1.0) .. CC.Geometry.XPoint(1.0),
+        CC.Geometry.YPoint(-1.0) .. CC.Geometry.YPoint(1.0),
         x1periodic = false,
         x2periodic = false,
         x1boundary = (:east, :west),
         x2boundary = (:south, :north),
     )
-    mesh = Meshes.RectilinearMesh(domain, n1, n2)
+    mesh = CC.Meshes.RectilinearMesh(domain, n1, n2)
     comms_ctx = ClimaComms.SingletonCommsContext()
-    grid_topology = Topologies.Topology2D(comms_ctx, mesh)
+    grid_topology = CC.Topologies.Topology2D(comms_ctx, mesh)
 
-    quad = Spaces.Quadratures.GLL{Nij}()
-    space = Spaces.SpectralElementSpace2D(grid_topology, quad)
+    quad = CC.Spaces.Quadratures.GLL{Nij}()
+    space = CC.Spaces.SpectralElementSpace2D(grid_topology, quad)
     return space
 end
 
@@ -60,7 +59,7 @@ end
 
     coupler_add_field!(coupler, :test1, simA.data; write_sim = simA)
 
-    map = Operators.LinearRemap(spaceB, spaceA)
+    map = CC.Operators.LinearRemap(spaceB, spaceA)
     coupler_add_map!(coupler, :simA_to_simB, map)
 
     @testset "coupler_get" begin

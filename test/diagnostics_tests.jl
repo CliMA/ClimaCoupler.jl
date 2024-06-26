@@ -1,41 +1,36 @@
 #=
     Unit tests for ClimaCoupler Diagnostics module
 =#
-using Test
-using Dates
-using ClimaCore: InputOutput
-using ClimaComms
-using ClimaCoupler: Interfacer
-using ClimaCoupler.TimeManager: EveryTimestep, Monthly
-using ClimaCoupler.TestHelper: create_space
-import ClimaCoupler.Diagnostics:
-    get_var,
-    init_diagnostics,
-    accumulate_diagnostics!,
-    save_diagnostics,
-    TimeMean,
-    DiagnosticsGroup,
-    pre_save,
-    post_save,
-    save_time_format
+import Test: @test, @testset
+import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+import CUDA
+import Dates
+import ClimaCore as CC
+import ClimaCoupler: ConservationChecker, Diagnostics, Interfacer, TestHelper, TimeManager
 
-get_var(cs::Interfacer.CoupledSimulation, ::Val{:x}) = 1
+Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:x}) = 1
 
 for FT in (Float32, Float64)
     @testset "init_diagnostics for FT=$FT" begin
         names = (:x, :y)
-        space = create_space(FT)
-        dg = init_diagnostics(names, space)
-        @test typeof(dg) == DiagnosticsGroup{EveryTimestep, NamedTuple{(), Tuple{}}}
+        space = TestHelper.create_space(FT)
+        dg = Diagnostics.init_diagnostics(names, space)
+        @test typeof(dg) == Diagnostics.DiagnosticsGroup{TimeManager.EveryTimestep, NamedTuple{(), Tuple{}}}
     end
 
     @testset "accumulate_diagnostics!, collect_diags, iterate_operations, operation{accumulation{TimeMean, Nothing}}, get_var for FT=$FT" begin
-        cases = (nothing, TimeMean([Int(0)]))
+        cases = (nothing, Diagnostics.TimeMean([Int(0)]))
         expected_results = (FT(2), FT(3))
         for (c_i, case) in enumerate(cases)
             names = (:x,)
-            space = create_space(FT)
-            dg_2d = init_diagnostics(names, space, save = EveryTimestep(), operations = (; accumulate = case))
+            space = TestHelper.create_space(FT)
+            dg_2d = Diagnostics.init_diagnostics(
+                names,
+                space,
+                save = TimeManager.EveryTimestep(),
+                operations = (; accumulate = case),
+            )
             dg_2d.field_vector .= FT(2)
             cs = Interfacer.CoupledSimulation{FT}(
                 nothing, # comms_ctx
@@ -53,11 +48,16 @@ for FT in (Float32, Float64)
                 (dg_2d,),
                 (;), # callbacks
                 (;), # dirs
+                nothing, # turbulent_fluxes
+                nothing, # thermo_params
             )
-            accumulate_diagnostics!(cs)
-            @test cs.diagnostics[1].field_vector[1] == expected_results[c_i]
+            Diagnostics.accumulate_diagnostics!(cs)
 
-            @test isnothing(get_var(cs, Val(:z)))
+            CUDA.@allowscalar begin
+                @test cs.diagnostics[1].field_vector[1] == expected_results[c_i]
+            end
+
+            @test isnothing(Diagnostics.get_var(cs, Val(:z)))
         end
     end
 
@@ -65,17 +65,17 @@ for FT in (Float32, Float64)
         @testset "save_diagnostics" begin
             test_dir = "diag_test_dir"
             names = (:x,)
-            space = create_space(FT)
-            dg_2d = init_diagnostics(
+            space = TestHelper.create_space(FT)
+            dg_2d = Diagnostics.init_diagnostics(
                 names,
                 space,
-                save = EveryTimestep(),
-                operations = (; accumulate = TimeMean([Int(0)])),
+                save = TimeManager.EveryTimestep(),
+                operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
                 output_dir = test_dir,
             ) # or use accumulate = nothing for snapshop save
             cs = Interfacer.CoupledSimulation{FT}(
                 ClimaComms.SingletonCommsContext(), # comms_ctx
-                (date = [DateTime(0, 2)], date1 = [DateTime(0, 1)]), # dates
+                (date = [Dates.DateTime(0, 2)], date1 = [Dates.DateTime(0, 1)]), # dates
                 nothing, # boundary_space
                 nothing, # fields
                 nothing, # parsed_args
@@ -89,8 +89,10 @@ for FT in (Float32, Float64)
                 (dg_2d,), # diagnostics
                 (;), # callbacks
                 (;), # dirs
+                nothing, # turbulent_fluxes
+                nothing, # thermo_params
             )
-            save_diagnostics(cs, cs.diagnostics[1])
+            Diagnostics.save_diagnostics(cs, cs.diagnostics[1])
             file = filter(x -> endswith(x, ".hdf5"), readdir(test_dir))
             @test !isempty(file)
             rm(test_dir; recursive = true, force = true)
@@ -99,19 +101,24 @@ for FT in (Float32, Float64)
     end
 
     @testset "save_time_format for FT=$FT" begin
-        date = DateTime(1970, 2, 1, 0, 1)
-        unix = save_time_format(date, Monthly())
+        date = Dates.DateTime(1970, 2, 1, 0, 1)
+        unix = Diagnostics.save_time_format(date, TimeManager.Monthly())
         @test unix == 0
     end
 
     @testset "pre_save{TimeMean, Nothing}, post_save for FT=$FT" begin
-        cases = (nothing, TimeMean([Int(0)]))
+        cases = (nothing, Diagnostics.TimeMean([Int(0)]))
         expected_results = ((FT(3), FT(1), FT(1)), (FT(4), FT(2.5), FT(0)))
 
         for (c_i, case) in enumerate(cases)
             names = (:x,)
-            space = create_space(FT)
-            dg_2d = init_diagnostics(names, space, save = EveryTimestep(), operations = (; accumulate = case))
+            space = TestHelper.create_space(FT)
+            dg_2d = Diagnostics.init_diagnostics(
+                names,
+                space,
+                save = TimeManager.EveryTimestep(),
+                operations = (; accumulate = case),
+            )
             dg_2d.field_vector .= FT(3)
             cs = Interfacer.CoupledSimulation{FT}(
                 nothing, # comms_ctx
@@ -129,14 +136,16 @@ for FT in (Float32, Float64)
                 (dg_2d,),
                 (;), # callbacks
                 (;), # dirs
+                nothing, # turbulent_fluxes
+                nothing, # thermo_params
             )
-            accumulate_diagnostics!(cs)
+            Diagnostics.accumulate_diagnostics!(cs)
             @test cs.diagnostics[1].field_vector[1] == expected_results[c_i][1]
-            accumulate_diagnostics!(cs)
-            pre_save(cs.diagnostics[1].operations.accumulate, cs, cs.diagnostics[1])
+            Diagnostics.accumulate_diagnostics!(cs)
+            Diagnostics.pre_save(cs.diagnostics[1].operations.accumulate, cs, cs.diagnostics[1])
             @test cs.diagnostics[1].field_vector[1] == expected_results[c_i][2]
 
-            post_save(cs.diagnostics[1].operations.accumulate, cs, cs.diagnostics[1])
+            Diagnostics.post_save(cs.diagnostics[1].operations.accumulate, cs, cs.diagnostics[1])
             @test cs.diagnostics[1].field_vector[1] == expected_results[c_i][3]
         end
     end

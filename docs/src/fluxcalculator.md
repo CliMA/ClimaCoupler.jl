@@ -22,8 +22,8 @@ Fluxes over a heterogeneous surface (e.g., from a gridpoint where atmospheric ce
     ClimaCoupler.FluxCalculator.get_surface_params
     ClimaCoupler.FluxCalculator.partitioned_turbulent_fluxes!
     ClimaCoupler.FluxCalculator.differentiate_turbulent_fluxes!
-    ClimaCoupler.FluxCalculator.get_surface_fluxes_point!
-    ClimaCoupler.FluxCalculator.update_turbulent_fluxes_point!
+    ClimaCoupler.FluxCalculator.get_surface_fluxes!
+    ClimaCoupler.FluxCalculator.update_turbulent_fluxes!
     ClimaCoupler.FluxCalculator.extrapolate_ρ_to_sfc
     ClimaCoupler.FluxCalculator.surface_thermo_state
     ClimaCoupler.FluxCalculator.water_albedo_from_atmosphere!

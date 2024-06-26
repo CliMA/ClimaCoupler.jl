@@ -140,8 +140,8 @@ end
 function Interfacer.update_field!(sim::EisenmanIceSimulation, ::Val{:area_fraction}, field::CC.Fields.Field)
     sim.integrator.p.area_fraction .= field
 end
-function Interfacer.update_field!(sim::EisenmanIceSimulation, ::Val{:∂F_turb_energy∂T_sfc}, field, colidx)
-    sim.integrator.p.Ya.∂F_turb_energy∂T_sfc[colidx] .= field
+function Interfacer.update_field!(sim::EisenmanIceSimulation, ::Val{:∂F_turb_energy∂T_sfc}, field)
+    sim.integrator.p.Ya.∂F_turb_energy∂T_sfc .= field
 end
 function Interfacer.update_field!(sim::EisenmanIceSimulation, ::Val{:radiative_energy_flux_sfc}, field)
     parent(sim.integrator.p.Ya.F_rad) .= parent(field)
@@ -155,13 +155,9 @@ Interfacer.step!(sim::EisenmanIceSimulation, t) = Interfacer.step!(sim.integrato
 Interfacer.reinit!(sim::EisenmanIceSimulation) = Interfacer.reinit!(sim.integrator)
 
 # extensions required by FluxCalculator (partitioned fluxes)
-function FluxCalculator.update_turbulent_fluxes_point!(
-    sim::EisenmanIceSimulation,
-    fields::NamedTuple,
-    colidx::CC.Fields.ColumnIndex,
-)
+function FluxCalculator.update_turbulent_fluxes!(sim::EisenmanIceSimulation, fields::NamedTuple)
     (; F_turb_energy) = fields
-    @. sim.integrator.p.Ya.F_turb[colidx] = F_turb_energy
+    @. sim.integrator.p.Ya.F_turb = F_turb_energy
 end
 
 """
@@ -194,23 +190,22 @@ function FluxCalculator.differentiate_turbulent_fluxes!(
     fluxes;
     δT_sfc = 0.1,
 )
-    (; thermo_state_int, surface_params, surface_scheme, colidx) = input_args
-    thermo_state_sfc_dT =
-        FluxCalculator.surface_thermo_state(sim, thermo_params, thermo_state_int, colidx, δT_sfc = δT_sfc)
+    (; thermo_state_int, surface_params, surface_scheme) = input_args
+    thermo_state_sfc_dT = FluxCalculator.surface_thermo_state(sim, thermo_params, thermo_state_int, δT_sfc = δT_sfc)
     input_args = merge(input_args, (; thermo_state_sfc = thermo_state_sfc_dT))
 
     # set inputs based on whether the surface_scheme is `MoninObukhovScheme` or `BulkScheme`
     inputs = surface_inputs(surface_scheme, input_args)
 
     # calculate the surface fluxes
-    _, _, F_shf_δT_sfc, F_lhf_δT_sfc, _ = get_surface_fluxes_point!(inputs, surface_params)
+    _, _, F_shf_δT_sfc, F_lhf_δT_sfc, _ = get_surface_fluxes!(inputs, surface_params)
 
     (; F_shf, F_lhf) = fluxes
 
     # calculate the derivative
     ∂F_turb_energy∂T_sfc = @. (F_shf_δT_sfc + F_lhf_δT_sfc - F_shf - F_lhf) / δT_sfc
 
-    Interfacer.update_field!(sim, Val(:∂F_turb_energy∂T_sfc), ∂F_turb_energy∂T_sfc, colidx)
+    Interfacer.update_field!(sim, Val(:∂F_turb_energy∂T_sfc), ∂F_turb_energy∂T_sfc)
 end
 
 ###
@@ -354,9 +349,7 @@ function ∑tendencies(dY, Y, cache, _)
     @. dY.T_sfc = -Y.T_sfc / Δt
     @. dY.q_sfc = -Y.q_sfc / Δt
 
-    CC.Fields.bycolumn(axes(Y.T_sfc)) do colidx
-        solve_eisenman_model!(Y[colidx], Ya[colidx], p, thermo_params, Δt)
-    end
+    solve_eisenman_model!(Y, Ya, p, thermo_params, Δt)
 
     # Get dY/dt
     @. dY.T_ml += Y.T_ml / Δt

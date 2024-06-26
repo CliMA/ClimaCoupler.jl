@@ -65,16 +65,9 @@ CAD.add_diagnostic_variable!(
         (; C_E) = cache.atmos.vert_diff
         interior_uₕ = CC.Fields.level(state.c.uₕ, 1)
         ᶠp = ᶠK_E = cache.scratch.ᶠtemp_scalar
-        CC.Fields.bycolumn(axes(ᶜp)) do colidx
-            @. ᶠp[colidx] = CAD.ᶠinterp(ᶜp[colidx])
-            ᶜΔz_surface = CC.Fields.Δz_field(interior_uₕ)
-            @. ᶠK_E[colidx] = CA.eddy_diffusivity_coefficient(
-                C_E,
-                CA.norm(interior_uₕ[colidx]),
-                ᶜΔz_surface[colidx] / 2,
-                ᶠp[colidx],
-            )
-        end
+        @. ᶠp = CAD.ᶠinterp(ᶜp)
+        ᶜΔz_surface = CC.Fields.Δz_field(interior_uₕ)
+        @. ᶠK_E = CA.eddy_diffusivity_coefficient(C_E, CA.norm(interior_uₕ), ᶜΔz_surface / 2, ᶠp)
         if isnothing(out)
             return CAD.ᶜinterp.(ᶠK_E)
         else

@@ -169,19 +169,6 @@ get_field(sim::ComponentModelSimulation, val::Val) = get_field_error(sim, val)
 get_field_error(sim, val::Val{X}) where {X} = error("undefined field `$X` for " * name(sim))
 
 """
-    get_field(::ComponentModelSimulation, ::Val, colidx::CC.Fields.ColumnIndex)
-
-Extension of `get_field(::ComponentModelSimulation, ::Val)`, indexing into the specified colum index.
-"""
-function get_field(sim::ComponentModelSimulation, val::Val, colidx::CC.Fields.ColumnIndex)
-    if get_field(sim, val) isa AbstractFloat
-        get_field(sim, val)
-    else
-        get_field(sim, val)[colidx]
-    end
-end
-
-"""
     update_field!(::AtmosModelSimulation, ::Val, _...)
 
 Default functions for updating fields at each timestep in an atmosphere

@@ -36,9 +36,8 @@ for FT in (Float32, Float64)
         Ya.F_rad .= 0
         Ya.F_turb .= 0
 
-        CC.Fields.bycolumn(boundary_space) do colidx
-            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
-        end
+        solve_eisenman_model!(Y, Ya, params, thermo_params, Δt)
+
         @test all(parent(Ya.e_base) .≈ 0)
         @test all(parent(Y.T_ml) .≈ params_ice.T_base)
         @test all(parent(Y.T_sfc) .≈ params_ice.T_base)
@@ -62,9 +61,7 @@ for FT in (Float32, Float64)
         ∂F_atm∂T_sfc = get_∂F_rad_energy∂T_sfc(Y.T_sfc, params_ice) .+ Ya.∂F_turb_energy∂T_sfc
         @. Ya.F_rad = (1 - params_ice.α) * params_ice.σ * Y.T_sfc .^ 4 # outgoing longwave
 
-        CC.Fields.bycolumn(boundary_space) do colidx
-            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
-        end
+        solve_eisenman_model!(Y, Ya, params, thermo_params, Δt)
 
         F_atm = @. Ya.F_rad + Ya.F_turb
 
@@ -93,9 +90,7 @@ for FT in (Float32, Float64)
         Y.T_sfc .= params_ice.T_base
         Y.T_ml .= params_ice.T_base
 
-        CC.Fields.bycolumn(boundary_space) do colidx
-            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
-        end
+        solve_eisenman_model!(Y, Ya, params, thermo_params, Δt)
 
         F_atm = @. Ya.F_rad + Ya.F_turb
         ∂F_atm∂T_sfc = 0
@@ -128,9 +123,7 @@ for FT in (Float32, Float64)
         Y.T_sfc .= params_ice.T_base .- 1
         T_sfc_0 = deepcopy(Y.T_sfc)
 
-        CC.Fields.bycolumn(boundary_space) do colidx
-            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
-        end
+        solve_eisenman_model!(Y, Ya, params, thermo_params, Δt)
 
         F_atm = @. Ya.F_rad + Ya.F_turb
         ∂F_atm∂T_sfc = 0
@@ -163,9 +156,7 @@ for FT in (Float32, Float64)
         Y.T_ml .= params_ice.T_base
         T_ml_0 = deepcopy(Y.T_ml)
 
-        CC.Fields.bycolumn(boundary_space) do colidx
-            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
-        end
+        solve_eisenman_model!(Y, Ya, params, thermo_params, Δt)
 
         F_atm = @. Ya.F_rad + Ya.F_turb
 
@@ -193,9 +184,7 @@ for FT in (Float32, Float64)
         Ya.F_turb .= 0
         Ya.F_rad .= @. (1 - params_ice.α) * params_ice.σ * Y.T_sfc^4 - 300
 
-        CC.Fields.bycolumn(boundary_space) do colidx
-            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
-        end
+        solve_eisenman_model!(Y, Ya, params, thermo_params, Δt)
 
         F_atm = @. Ya.F_rad + Ya.F_turb
 
@@ -223,9 +212,7 @@ for FT in (Float32, Float64)
         # net outgoing longwave
         Ya.F_rad .= @. (1 - params_ice.α) * params_ice.σ * Y.T_sfc^4
 
-        CC.Fields.bycolumn(boundary_space) do colidx
-            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
-        end
+        solve_eisenman_model!(Y, Ya, params, thermo_params, Δt)
 
         F_atm = @. Ya.F_rad + Ya.F_turb
         ∂F_atm∂T_sfc = get_∂F_rad_energy∂T_sfc(T_sfc_0, params_ice) .+ Ya.∂F_turb_energy∂T_sfc
@@ -264,9 +251,7 @@ for FT in (Float32, Float64)
         Ya.F_turb .= 0
         Ya.F_rad .= 0
 
-        CC.Fields.bycolumn(boundary_space) do colidx
-            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
-        end
+        solve_eisenman_model!(Y, Ya, params, thermo_params, Δt)
 
         @test all(parent(Ya.e_base) .≈ params_ice.C0_base * ΔT_ml * FT(Δt)) # non-zero contribution from basal flux
         T_ml_new = T_ml_0 .- params_ice.C0_base .* ΔT_ml * FT(Δt) / (params_ocean.h * params_ocean.ρ * params_ocean.c)
@@ -298,9 +283,7 @@ for FT in (Float32, Float64)
         Ya.F_turb .= 0
         Ya.F_rad .= 0
 
-        CC.Fields.bycolumn(boundary_space) do colidx
-            solve_eisenman_model!(Y[colidx], Ya[colidx], params, thermo_params, Δt)
-        end
+        solve_eisenman_model!(Y, Ya, params, thermo_params, Δt)
 
         @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal flux
         T_ml_new = @. T_ml_0 + Ya.ocean_qflux * FT(Δt) / (params_ocean.h * params_ocean.ρ * params_ocean.c)

@@ -153,7 +153,7 @@ following properties:
 | `surface_diffuse albedo`    | bulk diffuse surface albedo; needed if calculated externally of the surface model (e.g. ocean albedo from the atmospheric state) | |
 
 ### SurfaceModelSimulation - optional functions
-- `update_turbulent_fluxes_point!(::ComponentModelSimulation, fields::NamedTuple, colidx)`:
+- `update_turbulent_fluxes!(::ComponentModelSimulation, fields::NamedTuple)`:
 This function updates the turbulent fluxes of the component model simulation
 at this point in horizontal space. The values are updated using the energy
 and moisture turbulent fluxes stored in fields which are calculated by the

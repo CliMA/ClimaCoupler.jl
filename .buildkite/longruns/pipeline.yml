@@ -1,6 +1,6 @@
 agents:
   queue: new-central
-  slurm_time: 72:00:00
+  slurm_time: 24:00:00
   modules: climacommon/2024_05_27
 
 env:
@@ -13,7 +13,7 @@ env:
   SLURM_KILL_BAD_EXIT: 1
   CONFIG_PATH: "config/longrun_configs"
 
-timeout_in_minutes: 4320
+timeout_in_minutes: 1440
 
 steps:
 
@@ -49,18 +49,18 @@ steps:
 
     steps:
 
-      - label: "GPU AMIP FINE: new target amip: topo + diagedmf"
-        key: "amip_target_topo_diagedmf_gpu"
+      - label: "GPU AMIP FINE: new target amip: topo + progedmf"
+        key: "amip_target_topo_progedmf_gpu"
         command:
           - echo "--- Run simulation"
-          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf_gpu.yml --restart_dir $$RESTART_DIR --restart_t $$RESTART_T --job_id amip_target_topo_diagedmf_gpu"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_target_topo_diagedmf_gpu_artifacts/*"
-        timeout_in_minutes: 4320
+          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo_progedmf_gpu.yml --job_id amip_target_topo_progedmf_gpu"
+        artifact_paths: "experiments/ClimaEarth/output/amip/amip_target_topo_progedmf_gpu_artifacts/*"
+        timeout_in_minutes: 1440
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"
-          RESTART_DIR: "/scratch/clima/slurm-buildkite/climacoupler-longruns/756/climacoupler-longruns/experiments/ClimaEarth/output/amip/amip_target_topo_diagedmf_gpu_artifacts/"
-          RESTART_T: 46656000
+          # RESTART_DIR: "/scratch/clima/slurm-buildkite/climacoupler-longruns/756/climacoupler-longruns/experiments/ClimaEarth/output/amip/amip_target_topo_diagedmf_gpu_artifacts/"
+          # RESTART_T: 46656000
         agents:
           queue: clima
           slurm_gpus_per_task: 1

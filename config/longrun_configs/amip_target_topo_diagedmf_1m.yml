@@ -8,14 +8,14 @@ dt_save_state_to_disk: "30days"
 dt_save_to_sol: "30days"
 energy_check: false
 hourly_checkpoint: true
-hourly_checkpoint_dt: 720
+hourly_checkpoint_dt: 24
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
 netcdf_output_at_levels: true
 output_default_diagnostics: true
 precip_model: "1M"
-start_date: "20100101"
+start_date: "20100131"
 surface_setup: "PrescribedSurface"
 t_end: "90days"
 topo_smoothing: true
@@ -23,3 +23,11 @@ topography: "Earth"
 coupler_toml_file: "toml/amip_target_topo_diagedmf_1m.toml"
 turb_flux_partition: "CombinedStateFluxesMOST"
 use_reference_state: false
+diagnostics:
+diagnostics:
+  - short_name: [ts, ta, thetaa, ha, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, hussfc, evspsbl, pr]
+    period: 1days
+  - short_name: [rsdt, rsut, rlut, rsds, rsus, rlds, rlus]
+    period: 1days
+  - short_name: [arup, waup, taup, thetaaup, haup, husup, hurup, clwup, cliup, waen, tke, lmix]
+    period: 1days

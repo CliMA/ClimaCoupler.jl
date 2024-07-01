@@ -59,8 +59,8 @@ steps:
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"
-          RESTART_DIR: "/scratch/clima/slurm-buildkite/climacoupler-longruns/770/climacoupler-longruns/experiments/ClimaEarth/output/amip/amip_target_topo_diagedmf_gpu_artifacts/"
-          RESTART_T: 20736000
+          RESTART_DIR: "/net/sampo/data1/zhaoyi/climacoupler/longrun_718/amip/gpu_amip_target_topo_diagedmf_artifacts/"
+          RESTART_T: 6912000
         agents:
           queue: clima
           slurm_gpus_per_task: 1

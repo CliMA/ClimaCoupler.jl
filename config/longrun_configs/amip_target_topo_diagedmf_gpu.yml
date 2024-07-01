@@ -15,9 +15,9 @@ mode_name: "amip"
 mono_surface: false
 netcdf_output_at_levels: true
 output_default_diagnostics: true
-start_date: "20120229"
+start_date: "20100510"
 surface_setup: "PrescribedSurface"
-t_end: "1020days"
+t_end: "330days"
 topo_smoothing: true
 topography: "Earth"
 coupler_toml_file: "toml/amip_target_topo_diagedmf.toml"

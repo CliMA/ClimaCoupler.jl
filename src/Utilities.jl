@@ -60,12 +60,12 @@ function get_comms_context(parsed_args)
     comms_ctx = ClimaComms.context(device)
     ClimaComms.init(comms_ctx)
 
-    @info "Running on $(nameof(typeof(device)))."
-
     if comms_ctx isa ClimaComms.SingletonCommsContext
-        @info "Setting up single-process ClimaCoupler run"
+        @info "Setting up single-process ClimaCoupler run on device: $(nameof(typeof(device)))."
     else
-        @info "Setting up distributed ClimaCoupler run" nprocs = ClimaComms.nprocs(comms_ctx)
+        if ClimaComms.iamroot(comms_ctx)
+            @info "Setting up distributed ClimaCoupler run on " nprocs = ClimaComms.nprocs(comms_ctx) device = "$(nameof(typeof(device)))"
+        end
     end
 
     return comms_ctx

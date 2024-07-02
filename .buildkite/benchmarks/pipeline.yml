@@ -165,8 +165,8 @@ steps:
           - "gpu_amip_diagedmf"
           - "gpu_amip_diagedmf_io"
 
-      - label: ":envelope: Slack report: CPU/GPU AMIP/Atmos-only table"
-        depends_on:
-          - "compare_amip_climaatmos_amip_diagedmf"
-        command:
-          - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/compare_amip_climaatmos_amip_diagedmf/table.txt -m txt -n compare_amip_climaatmos_amip_diagedmf_table -x "Coupler CPU/GPU Comparison Table"
+      # - label: ":envelope: Slack report: CPU/GPU AMIP/Atmos-only table"
+      #   depends_on:
+      #     - "compare_amip_climaatmos_amip_diagedmf"
+      #   command:
+      #     - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/compare_amip_climaatmos_amip_diagedmf/table.txt -m txt -n compare_amip_climaatmos_amip_diagedmf_table -x "Coupler CPU/GPU Comparison Table"

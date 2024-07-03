@@ -55,29 +55,6 @@ CAD.add_diagnostic_variable!(
 )
 
 CAD.add_diagnostic_variable!(
-    short_name = "ediff",
-    long_name = "Eddy diffusivity",
-    standard_name = "eddy_diffusivity",
-    units = "m^2 s^-1",
-    comments = "Eddy diffusivity consistent with the VerticalDiffusion scheme in ClimaAtmos.",
-    compute! = (out, state, cache, time) -> begin
-        (; ᶜp) = cache.precomputed
-        (; C_E) = cache.atmos.vert_diff
-        interior_uₕ = CC.Fields.level(state.c.uₕ, 1)
-        ᶠp = ᶠK_E = cache.scratch.ᶠtemp_scalar
-        @. ᶠp = CAD.ᶠinterp(ᶜp)
-        ᶜΔz_surface = CC.Fields.Δz_field(interior_uₕ)
-        @. ᶠK_E = CA.eddy_diffusivity_coefficient(C_E, CA.norm(interior_uₕ), ᶜΔz_surface / 2, ᶠp)
-        if isnothing(out)
-            return CAD.ᶜinterp.(ᶠK_E)
-        else
-            out .= CAD.ᶜinterp.(ᶠK_E)
-        end
-
-    end,
-)
-
-CAD.add_diagnostic_variable!(
     short_name = "mass_strf",
     long_name = "Meridional Mass Streamfunction",
     standard_name = "meridional_mass_streamfunction",

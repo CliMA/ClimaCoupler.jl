@@ -164,7 +164,7 @@ function make_plots(
     simdirs = CAN.SimDir.(output_paths)
 
     # Default output diagnostics
-    short_names_3D = ["mse", "lr", "ediff"]
+    short_names_3D = ["mse", "lr", "edt"]
     short_names_2D = ["ts"]
 
     available_periods = CAN.available_periods(simdirs[1]; short_name = short_names_3D[1], reduction)

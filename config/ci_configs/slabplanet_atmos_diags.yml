@@ -15,6 +15,6 @@ rad: "gray"
 t_end: "10days"
 vert_diff: "true"
 diagnostics:
-  - short_name: [mse, lr, ediff, ts, mass_strf, stab, vt, egr]
+  - short_name: [mse, lr, edt, evu, ts, mass_strf, stab, vt, egr]
     reduction_time: average
     period: 1days

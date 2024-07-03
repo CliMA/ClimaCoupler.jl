@@ -14,5 +14,5 @@ t_end: "10days"
 vert_diff: "true"
 output_default_diagnostics: false
 diagnostics:
- - short_name: [mse, lr, ediff, hfes, evspsbl, ts]
+ - short_name: [mse, lr, edt, evu, hfes, evspsbl, ts]
    period: 1days

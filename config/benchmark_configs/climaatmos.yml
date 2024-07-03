@@ -8,7 +8,7 @@ dt_save_to_sol: "Inf"
 dz_bottom: 30.0
 dz_top: 3000.0
 h_elem: 30
-idealized_insolation: false
+insolation: "timevarying"
 implicit_diffusion: true
 moist: equil
 output_default_diagnostics: false

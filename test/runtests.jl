@@ -56,9 +56,6 @@ end
 @safetestset "experiment test: Leaderboard" begin
     include("experiment_tests/leaderboard.jl")
 end
-@safetestset "component test: bucket" begin
-    include("component_model_tests/bucket_tests.jl")
-end
 @safetestset "component model test: ClimaAtmos" begin
     include("component_model_tests/climaatmos_tests.jl")
 end

@@ -36,6 +36,14 @@ function argparse_settings()
         help = "The name of the GPU coupled run we want to compare."
         arg_type = String
         default = nothing
+        "--cpu_job_id_coupled_io"
+        help = "The name of the CPU coupled run with IO we want to compare. User must specify CPU and/or GPU coupled run name."
+        arg_type = String
+        default = nothing
+        "--gpu_job_id_coupled_io"
+        help = "The name of the GPU coupled with IO run we want to compare."
+        arg_type = String
+        default = nothing
         "--cpu_job_id_atmos"
         help = "The name of the CPU atmos-only run without diagnostic EDMF we want to compare. User must specify CPU and/or GPU atmos-only non-EDMF run name."
         arg_type = String
@@ -70,13 +78,17 @@ end
 Use the input `parsed_args` to get the job ID and artifacts directories for
 both the CPU and GPU runs of the given `run_type`.
 
-`run_type` must be one of "coupled", "atmos", or "atmos_diagedmf".
+`run_type` must be one of "coupled", "coupled_io", "atmos", or "atmos_diagedmf".
 """
 function get_run_info(parsed_args, run_type)
     # Read in CPU and GPU job ID info from command line
     if run_type == "coupled"
         cpu_job_id = parsed_args["cpu_job_id_coupled"]
         gpu_job_id = parsed_args["gpu_job_id_coupled"]
+        mode_name = "amip"
+    elseif run_type == "coupled_io"
+        cpu_job_id = parsed_args["cpu_job_id_coupled_io"]
+        gpu_job_id = parsed_args["gpu_job_id_coupled_io"]
         mode_name = "amip"
     elseif run_type == "atmos_diagedmf"
         cpu_job_id = parsed_args["cpu_job_id_atmos_diagedmf"]
@@ -160,6 +172,7 @@ end
 
 # Read in run info for each of the cases we want to compare
 run_info_coupled = get_run_info(parsed_args, "coupled")
+run_info_coupled_io = get_run_info(parsed_args, "coupled_io")
 run_info_atmos_diagedmf = get_run_info(parsed_args, "atmos_diagedmf")
 run_info_atmos = get_run_info(parsed_args, "atmos")
 
@@ -172,6 +185,7 @@ data = [
 
 # Append data to the table for each of the cases we want to compare
 data = append_table_data(data, "Coupled", run_info_coupled...)
+data = append_table_data(data, "Coupled with IO", run_info_coupled_io...)
 data = append_table_data(data, "Atmos with diag. EDMF", run_info_atmos_diagedmf...)
 data = append_table_data(data, "Atmos without diag. EDMF", run_info_atmos...)
 

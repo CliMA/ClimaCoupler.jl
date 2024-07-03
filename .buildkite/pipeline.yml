@@ -44,11 +44,13 @@ steps:
       - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate ClimaEarth env"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.develop(path=\".\")'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate perf env"
+      - "julia --project=perf/ -e 'using Pkg; Pkg.develop(path=\".\")'"
       - "julia --project=perf/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=perf/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=perf/ -e 'using Pkg; Pkg.status()'"

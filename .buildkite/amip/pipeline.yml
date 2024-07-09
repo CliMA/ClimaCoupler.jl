@@ -1,7 +1,7 @@
 agents:
   queue: clima
   slurm_time: 72:00:00
-  modules: climacommon/2024_05_27
+  modules: common
 
 env:
   JULIA_MAX_NUM_PRECOMPILE_FILES: 100

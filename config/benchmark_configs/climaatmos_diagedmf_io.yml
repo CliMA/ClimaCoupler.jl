@@ -14,7 +14,7 @@ edmfx_sgs_diffusive_flux: true
 edmfx_sgs_mass_flux: true
 edmfx_upwinding: first_order
 h_elem: 30
-idealized_insolation: false
+insolation: "timevarying"
 implicit_diffusion: true
 moist: equil
 ode_algo: ARS343

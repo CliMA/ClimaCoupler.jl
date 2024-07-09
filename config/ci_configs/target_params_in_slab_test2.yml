@@ -8,7 +8,7 @@ dt_rad: "6hours"
 dt_save_to_sol: "3600secs"
 energy_check: true
 h_elem: 6
-idealized_insolation: false
+insolation: "timevarying"
 mode_name: "slabplanet"
 moist: "equil"
 mono_surface: true

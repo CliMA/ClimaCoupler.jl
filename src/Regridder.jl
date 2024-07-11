@@ -7,13 +7,15 @@ via ClimaCoreTempestRemap wrappers.
 """
 module Regridder
 
-import Dates
-import JLD2
-import NCDatasets
-import ClimaComms
-import ClimaCore as CC
-import ClimaCoreTempestRemap as CCTR
-import ..Interfacer, ..Utilities, ..TimeManager
+using ..Utilities
+using ..Interfacer
+using ClimaCore: Meshes, Domains, Topologies, Spaces, Fields, InputOutput
+using ClimaComms
+using ClimaUtilities.TimeManager
+using NCDatasets
+using ClimaCoreTempestRemap
+using Dates
+using JLD2
 
 export write_to_hdf5,
     read_from_hdf5,
@@ -206,6 +208,17 @@ function hdwrite_regridfile_rll_to_cgll(
         CCTR.apply_remap(datafile_cgll, datafile_rll, weightfile, [varname])
     else
         @warn "Using the existing $datafile_cgll : check topology is consistent"
+    end
+
+    function get_time(ds)
+        if "time" in ds
+            data_dates = Dates.DateTime.(ds["time"][:])
+        elseif "date" in ds
+            data_dates = strdate_to_datetime.(string.(ds["date"][:]))
+        else
+            @warn "No dates available in file $datafile_rll"
+            data_dates = [Dates.DateTime(0)]
+        end
     end
 
     # read the remapped file with sparse matrices

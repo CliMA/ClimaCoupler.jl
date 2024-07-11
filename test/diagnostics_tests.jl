@@ -1,13 +1,23 @@
 #=
     Unit tests for ClimaCoupler Diagnostics module
 =#
-import Test: @test, @testset
-import ClimaComms
-@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
-import CUDA
-import Dates
-import ClimaCore as CC
-import ClimaCoupler: ConservationChecker, Diagnostics, Interfacer, TestHelper, TimeManager
+using Test
+using Dates
+using ClimaCore: InputOutput
+using ClimaComms
+using ClimaUtilities.TimeManager: Monthly, EveryTimestep
+using ClimaCoupler: Utilities
+using ClimaCoupler.TestHelper: create_space
+import ClimaCoupler.Diagnostics:
+    get_var,
+    init_diagnostics,
+    accumulate_diagnostics!,
+    save_diagnostics,
+    TimeMean,
+    DiagnosticsGroup,
+    pre_save,
+    post_save,
+    save_time_format
 
 Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:x}) = 1
 

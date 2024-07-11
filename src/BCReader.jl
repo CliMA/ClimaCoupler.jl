@@ -7,10 +7,12 @@ monthly to daily intervals.
 """
 module BCReader
 
-import JLD2
-import ClimaComms
-import ClimaCore as CC
-import ..Utilities, ..Regridder, ..TimeManager
+using ..Utilities, ..Regridder
+using ClimaCore: Fields
+using ClimaComms
+import ClimaUtilities: TimeManager
+using Dates
+using JLD2
 
 export BCFileInfo,
     float_type_bcf, bcfile_info_init, update_midmonth_data!, next_date_in_file, interpolate_midmonth_to_daily

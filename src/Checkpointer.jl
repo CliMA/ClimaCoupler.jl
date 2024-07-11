@@ -5,11 +5,11 @@ This module contains template functions for checkpointing the model states and r
 """
 module Checkpointer
 
-import ClimaComms
-import ClimaCore as CC
-import ..Interfacer
-
-export get_model_prog_state, checkpoint_model_state, restart_model_state!
+using ClimaCore: Fields, InputOutput
+using ClimaCoupler: Interfacer
+using Dates
+using ClimaComms
+export get_model_state_vector, checkpoint_model_state, restart_model_state!
 
 """
     get_model_prog_state(sim::Interfacer.ComponentModelSimulation)

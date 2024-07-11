@@ -67,8 +67,6 @@ interface_pages = [
     "postprocessor.md",
     "regridder.md",
     "testhelper.md",
-    "timemanager.md",
-    "utilities.md",
 ]
 performance_pages = ["performance.md"]
 

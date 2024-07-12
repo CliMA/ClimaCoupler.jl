@@ -64,23 +64,9 @@ steps:
 
     steps:
 
-      # plot job performance history
-      - label: ":chart_with_downwards_trend: build history"
+      - label: ":envelope: Slack report: current AMIP"
         command:
-          - build_history main # name of branch to plot
-        artifact_paths:
-          - "build_history.html"
-
-      - wait
-
-      - label: ":envelope: Slack report: build_history"
-        command:
-          - |
-            slack-upload -c "#coupler-report" -f build_history.html -m html -n build_history -x ":rocket: Interactive overall job performance history (download the attached file and view in browser) :rocket:"
-
-      - label: ":envelope: Slack report: target AMIP"
-        command:
-          - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/amip/amip_artifacts/amip_ncep.png -m png -n amip_fine -x "300d Target AMIP v NCEP Last Month Mean"
+          - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/amip/amip_artifacts/amip_ncep.png -m png -n amip_fine -x "3-year Target AMIP v NCEP Last Month Mean"
           - |
             find experiments/ClimaEarth/output/amip/amip_artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
               slack-upload -c "#coupler-report" -f "$$file" -m png -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"

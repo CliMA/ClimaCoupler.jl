@@ -193,7 +193,7 @@ function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_density}, fi
     parent(sim.integrator.p.bucket.ρ_sfc) .= parent(field)
 end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:surface_temperature}, field)
-    parent(sim.integrator.u.bucket.T) .= parent(field)
+    parent(sim.integrator.p.bucket.T_sfc) .= parent(field)
 end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:liquid_precipitation}, field)
     ρ_liq = (LP.ρ_cloud_liq(sim.model.parameters.earth_param_set))

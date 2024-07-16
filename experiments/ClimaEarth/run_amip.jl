@@ -342,16 +342,20 @@ if mode_name == "amip"
     CO2_init = BCReader.interpolate_midmonth_to_daily(date0, CO2_info)
     Interfacer.update_field!(atmos_sim, Val(:co2), CO2_init)
     
+    # Adjust temperature when orographic features are present
+    # Get surface elevation from `atmos` simulation and use the 
+    # `Interface.update_field!` functionality to modify 
+    # `:surface_temperature`
     surface_elevation = CC.Fields.field_values(CC.Fields.level(
                            CC.Fields.coordinate_field(
                                atmos_sim.integrator.u.f).z, 
                                CC.Utilities.half
                               ))
-    coords = CC.Fields.coordinate_field(land_sim.integrator.u.bucket.T)
-    orog_adjusted_temp =  @. FT(271) + 
-                          40 * cosd(coords.lat)^4 
-    parent(orog_adjusted_temp)[1,:,:,:,:] .-=  FT(6.5e-3) .* parent(surface_elevation)[:,:,:,:]
-    Interfacer.update_field!(land_sim, Val(:surface_temperature), orog_adjusted_temp);
+    T_sfc = Interfacer.get_field(land_sim, Val(:surface_temperature))
+    orog_adjusted_T_sfc = parent(T_sfc) .-  FT(6.5e-3) .* parent(surface_elevation)
+    # TODO: Here and in other locations in the coupler, remove `parent` usage
+    Interfacer.update_field!(land_sim, Val(:surface_temperature), orog_adjusted_T_sfc)
+    @. land_sim.integrator.u.bucket.T = land_sim.integrator.p.bucket.T_sfc
 
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
     Utilities.show_memory_usage(comms_ctx)

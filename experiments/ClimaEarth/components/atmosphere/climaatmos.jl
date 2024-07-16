@@ -306,7 +306,6 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String)
     atmos_config_repo = coupler_dict["atmos_config_repo"]
     # override default or specified configs with coupler arguments, and set the correct atmos config_file
     comms_ctx = ClimaComms.context()
-    @info atmos_config_repo
     if atmos_config_repo == "ClimaCoupler"
         @assert !isnothing(atmos_config_file) "Must specify `atmos_config_file` within ClimaCoupler."
         if ClimaComms.iamroot(comms_ctx)

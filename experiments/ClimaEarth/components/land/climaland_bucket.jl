@@ -114,7 +114,8 @@ function bucket_init(
     T_functions = Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
     haskey(T_functions, land_temperature_anomaly) ||
         error("land temp anomaly function $land_temperature_anomaly not supported")
-    temp_anomaly = T_functions[land_temperature_anomaly]
+    #temp_anomaly = T_functions[land_temperature_anomaly]
+    temp_anomaly = temp_anomaly_amip
 
     # Set temperature IC including anomaly, based on atmospheric setup
     T_sfc_0 = FT(271.0)

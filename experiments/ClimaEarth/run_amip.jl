@@ -249,7 +249,6 @@ The specific models and data that are set up depend on which mode we're running.
 ClimaComms.iamroot(comms_ctx) && @info(mode_name)
 if mode_name == "amip"
     ClimaComms.iamroot(comms_ctx) && @info("AMIP boundary conditions - do not expect energy conservation")
-
     ## land model
     land_sim = bucket_init(
         FT,

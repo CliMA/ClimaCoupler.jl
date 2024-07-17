@@ -114,7 +114,8 @@ function bucket_init(
     T_functions = Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
     haskey(T_functions, land_temperature_anomaly) ||
         error("land temp anomaly function $land_temperature_anomaly not supported")
-    temp_anomaly = T_functions[land_temperature_anomaly]
+    #temp_anomaly = T_functions[land_temperature_anomaly]
+    temp_anomaly = temp_anomaly_amip
 
     # Set temperature IC including anomaly, based on atmospheric setup
     T_sfc_0 = FT(271.0)
@@ -191,6 +192,9 @@ end
 
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_density}, field)
     parent(sim.integrator.p.bucket.ρ_sfc) .= parent(field)
+end
+function Interfacer.update_field!(sim::BucketSimulation, ::Val{:surface_temperature}, field)
+    parent(sim.integrator.p.bucket.T_sfc) .= parent(field)
 end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:liquid_precipitation}, field)
     ρ_liq = (LP.ρ_cloud_liq(sim.model.parameters.earth_param_set))

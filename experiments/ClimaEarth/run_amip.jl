@@ -249,7 +249,6 @@ The specific models and data that are set up depend on which mode we're running.
 ClimaComms.iamroot(comms_ctx) && @info(mode_name)
 if mode_name == "amip"
     ClimaComms.iamroot(comms_ctx) && @info("AMIP boundary conditions - do not expect energy conservation")
-
     ## land model
     land_sim = bucket_init(
         FT,
@@ -341,6 +340,21 @@ if mode_name == "amip"
     BCReader.update_midmonth_data!(date0, CO2_info)
     CO2_init = BCReader.interpolate_midmonth_to_daily(date0, CO2_info)
     Interfacer.update_field!(atmos_sim, Val(:co2), CO2_init)
+    
+    # Adjust temperature when orographic features are present
+    # Get surface elevation from `atmos` simulation and use the 
+    # `Interface.update_field!` functionality to modify 
+    # `:surface_temperature`
+    surface_elevation = CC.Fields.field_values(CC.Fields.level(
+                           CC.Fields.coordinate_field(
+                               atmos_sim.integrator.u.f).z, 
+                               CC.Utilities.half
+                              ))
+    T_sfc = Interfacer.get_field(land_sim, Val(:surface_temperature))
+    orog_adjusted_T_sfc = parent(T_sfc) .-  FT(6.5e-3) .* parent(surface_elevation)
+    # TODO: Here and in other locations in the coupler, remove `parent` usage
+    Interfacer.update_field!(land_sim, Val(:surface_temperature), orog_adjusted_T_sfc)
+    parent(land_sim.integrator.u.bucket.T) .= reshape(parent(orog_adjusted_T_sfc), (1,size(parent(orog_adjusted_T_sfc))...))
 
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
     Utilities.show_memory_usage(comms_ctx)
@@ -387,8 +401,8 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         z0m = FT(0),
         z0b = FT(0),
         beta = FT(1),
-        α_direct = CC.Fields.ones(boundary_space) .* FT(1),
-        α_diffuse = CC.Fields.ones(boundary_space) .* FT(1),
+        α_direct = CC.Fields.ones(boundary_space),
+        α_diffuse = CC.Fields.ones(boundary_space),
         area_fraction = CC.Fields.zeros(boundary_space),
         phase = TD.Ice(),
         thermo_params = thermo_params,

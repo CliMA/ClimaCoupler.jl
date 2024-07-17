@@ -354,7 +354,7 @@ if mode_name == "amip"
     orog_adjusted_T_sfc = parent(T_sfc) .-  FT(6.5e-3) .* parent(surface_elevation)
     # TODO: Here and in other locations in the coupler, remove `parent` usage
     Interfacer.update_field!(land_sim, Val(:surface_temperature), orog_adjusted_T_sfc)
-    @. land_sim.integrator.u.bucket.T = land_sim.integrator.p.bucket.T_sfc
+    parent(land_sim.integrator.u.bucket.T) .= reshape(parent(orog_adjusted_T_sfc), (1,size(parent(orog_adjusted_T_sfc))...))
 
     mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
     Utilities.show_memory_usage(comms_ctx)

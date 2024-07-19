@@ -155,7 +155,7 @@ function Diagnostics.get_var(data_source::NCEPMonthlyDataSource, ::Val{:T_sfc})
     return (t_celsius .+ 273.15, coords)
 end
 
-function Diagnostics.get_var(data_source::NCEPMonthlyDataSource, ::Val{:tubulent_energy_fluxes})
+function Diagnostics.get_var(data_source::NCEPMonthlyDataSource, ::Val{:turbulent_energy_fluxes})
     https = "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis2/Monthlies/gaussian_grid/lhtfl.sfc.mon.mean.nc"
     ncep_vname = "lhtfl"
     lhtfl, coords = download_read_nc(data_source, https, ncep_vname)

@@ -71,6 +71,3 @@ steps:
             find experiments/ClimaEarth/output/amip/amip_artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
               slack-upload -c "#coupler-report" -f "$$file" -m png -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
             done
-        agents:
-          queue: clima
-          modules: common

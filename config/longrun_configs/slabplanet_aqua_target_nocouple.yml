@@ -1,6 +1,6 @@
 anim: true
 apply_limiter: false
-atmos_config_file: "config/longrun_configs/longrun_aquaplanet_rhoe_equil_allsky_0M.yml"
+atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_0M.yml"
 dt: "120secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: 8639800

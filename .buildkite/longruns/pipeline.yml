@@ -222,7 +222,6 @@ steps:
           slurm_mem_per_cpu: 16G
         soft_fail: true
 
-
   - group: "Current target tests: AMIP surfaces"
 
     steps:

@@ -1,7 +1,7 @@
 anim: true
 apply_limiter: false
-atmos_config_file: "config/longrun_configs/longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_0M.yml"
-dt: "150secs"
+atmos_config_file: "config/longrun_configs/longrun_aquaplanet_rhoe_equil_allsky_0M.yml"
+dt: "120secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: 8639800
 dt_rad: "1hours"
@@ -15,6 +15,6 @@ mode_name: "slabplanet_aqua"
 mono_surface: false
 start_date: "19790301"
 surface_setup: "DefaultMoninObukhov"
-t_end: "100days"
+t_end: "120days"
 turb_flux_partition: "CombinedStateFluxesMOST"
 vert_diff: "true"

@@ -43,7 +43,7 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 [compat]
 Aqua = "0.8"
 ArtifactWrappers = "0.2"
-ClimaAtmos = "0.26"
+ClimaAtmos = "0.27"
 ClimaLand = "0.12"
 ClimaParams = "0.10"
 ClimaUtilities = "0.1"

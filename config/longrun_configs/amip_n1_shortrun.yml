@@ -1,8 +1,6 @@
-apply_limiter: false
-dt: "150secs"
-dt_cpl: 150
+dt: "120secs"
+dt_cpl: 120
 dt_rad: "1hours"
-dt_save_to_sol: "100days"
 dz_bottom: 30
 dz_top: 3000
 energy_check: false
@@ -14,6 +12,6 @@ precip_model: "0M"
 rad: "gray"
 rayleigh_sponge: true
 t_end: "1days"
-vert_diff: "true"
-z_elem: 50
-z_stretch: false
+vert_diff: true
+z_max: 55000.0
+z_elem: 63

@@ -1,5 +1,4 @@
 anim: true
-apply_limiter: false
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_0M.yml"
 dt: "120secs"
 dt_cloud_fraction: "1hours"
@@ -13,8 +12,8 @@ hourly_checkpoint: true
 land_albedo_type: "function"
 mode_name: "slabplanet"
 mono_surface: false
-start_date: "19790301"
+start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "120days"
 turb_flux_partition: "CombinedStateFluxesMOST"
-vert_diff: "true"
+vert_diff: "FriersonDiffusion"

@@ -1,14 +1,11 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
-anim: true
-apply_limiter: false
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_0M_earth.yml"
 dt: "120secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: 120
 dt_rad: "1hours"
 dt_save_state_to_disk: "20days"
-dt_save_to_sol: "10days"
 energy_check: false
 hourly_checkpoint: true
 insolation: "timevarying"

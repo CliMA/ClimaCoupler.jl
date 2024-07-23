@@ -1,4 +1,5 @@
 FLOAT_TYPE: "Float32"
+aerosol_radiation: false
 albedo_model: "CouplerAlbedo"
 anim: false
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
@@ -14,6 +15,7 @@ mode_name: "amip"
 mono_surface: false
 netcdf_output_at_levels: true
 output_default_diagnostics: true
+prescribed_aerosols: []
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "1080days"

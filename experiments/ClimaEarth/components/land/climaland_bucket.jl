@@ -250,32 +250,6 @@ function Checkpointer.get_model_prog_state(sim::BucketSimulation)
     return sim.integrator.u.bucket
 end
 
-###
-### CL.jl bucket model-specific functions (not explicitly required by ClimaCoupler.jl)
-###
-
-# TODO remove this function after ClimaLand v0.8.1 update
-function CL.turbulent_fluxes(atmos::CL.CoupledAtmosphere, model::CL.Bucket.BucketModel, Y, p, t)
-    # coupler has done its thing behind the scenes already
-    model_name = CL.name(model)
-    model_cache = getproperty(p, model_name)
-    return model_cache.turbulent_fluxes
-end
-
-
-function CL.initialize_drivers(a::CL.CoupledAtmosphere{FT}, coords) where {FT}
-    keys = (:P_liq, :P_snow)
-    types = ([FT for k in keys]...,)
-    domain_names = ([:surface for k in keys]...,)
-    model_name = :drivers
-    # intialize_vars packages the variables as a Interfacer.named tuple,
-    # as part of a Interfacer.named tuple with `model_name` as the key.
-    # Here we just want the variable Interfacer.named tuple itself
-    vars = CL.initialize_vars(keys, types, domain_names, coords, model_name)
-    return vars.drivers
-end
-
-
 """
     temp_anomaly_aquaplanet(coord)
 

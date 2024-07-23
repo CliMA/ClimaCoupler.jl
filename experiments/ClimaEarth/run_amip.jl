@@ -108,6 +108,9 @@ job_id = parsed_args["job_id"]
 config_dict = YAML.load_file(parsed_args["config_file"])
 config_dict = merge(parsed_args, config_dict)
 
+comms_ctx = Utilities.get_comms_context(parsed_args)
+ClimaComms.init(comms_ctx)
+
 ## get component model dictionaries (if applicable)
 atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
@@ -138,8 +141,6 @@ We set up communication context for CPU single thread/CPU with MPI/GPU. If no de
 then `ClimaComms` automatically selects the device from which this code is called.
 =#
 
-comms_ctx = Utilities.get_comms_context(parsed_args)
-ClimaComms.init(comms_ctx)
 
 ## make sure we don't use animations for GPU runs
 if comms_ctx.device isa ClimaComms.CUDADevice
@@ -191,13 +192,16 @@ Utilities.show_memory_usage(comms_ctx)
 atmos_sim = atmos_init(atmos_config_object);
 Utilities.show_memory_usage(comms_ctx)
 
-thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models #610
+thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models #342
 
 #=
 ### Boundary Space
 We use a common `Space` for all global surfaces. This enables the MPI processes to operate on the same columns in both
 the atmospheric and surface components, so exchanges are parallelized. Note this is only possible when the
 atmosphere and surface are of the same horizontal resolution.
+
+Currently, we use the 2D surface space from the atmosphere model as our shared space,
+but ultimately we want this to specified within the coupler and passed to all component models. (see issue #665)
 =#
 
 ## init a 2D boundary space at the surface
@@ -205,8 +209,10 @@ boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space) # TODO:
 
 #=
 ### Land-sea Fraction
-This is a static field that contains the area fraction of land and sea, ranging from 0 to 1. If applicable, sea ice is included in the sea fraction. at this stage.
-Note that land-sea area fraction is different to the land-sea mask, which is a binary field (masks are used internally by the coupler to indicate passive cells that are not populated by a given component model).
+This is a static field that contains the area fraction of land and sea, ranging from 0 to 1.
+If applicable, sea ice is included in the sea fraction at this stage.
+Note that land-sea area fraction is different to the land-sea mask, which is a binary field
+(masks are used internally by the coupler to indicate passive cells that are not populated by a given component model).
 =#
 
 land_area_fraction =
@@ -235,6 +241,9 @@ In the `SlabPlanet` mode, all ocean and sea ice are dynamical models, namely the
 - `slabplanet_aqua` = slab ocean everywhere
 - `slabplanet_terra` = land everywhere
 - `slabplanet_eisenman` = land + slab ocean + slab sea ice with an evolving thickness
+
+In this section of the code, we initialize all component models and read in the prescribed data we'll be using.
+The specific models and data that are set up depend on which mode we're running.
 =#
 
 ClimaComms.iamroot(comms_ctx) && @info(mode_name)
@@ -435,8 +444,10 @@ end
 
 #=
 ## Coupler Initialization
-The coupler needs to contain exchange information, manage the calendar and be able to access all component models. It can also optionally
-save online diagnostics. These are all initialized here and saved in a global `CoupledSimulation` struct, `cs`.
+The coupler needs to contain exchange information, access all component models, and manage the calendar,
+among other responsibilities.
+Objects containing information to enable these are initialized here and saved in the
+global `CoupledSimulation` struct, `cs`, below.
 =#
 
 ## coupler exchange fields
@@ -473,7 +484,7 @@ dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)
 
 #=
 ### Online Diagnostics
-User can write custom diagnostics in the `user_diagnostics.jl`.
+The user can write custom diagnostics in the `user_diagnostics.jl` file.
 Note, this will be replaced by the diagnostics framework currently in ClimaAtmos, once it is abstracted
 into a more general package, so we can use it to save fields from surface models.
 =#
@@ -516,7 +527,7 @@ end
 
 The conservation checks are used to monitor the global energy and water conservation of the coupled system. The checks are only
 applicable to the `slabplanet` mode, as the `amip` mode is not a closed system. The conservation checks are initialized here and
-saved in a global `ConservationChecks` struct, `conservation_checks`.
+saved in a global `ConservationChecks` struct, `conservation_checks`, which is then stored as part of the larger `cs` struct.
 =#
 
 ## init conservation info collector
@@ -538,7 +549,7 @@ Callbacks are used to update at a specified interval. The callbacks are initiali
 saved in a global `Callbacks` struct, `callbacks`. The `trigger_callback!` function is used to call the callback during the simulation below.
 
 The frequency of the callbacks is specified in the `HourlyCallback` and `MonthlyCallback` structs. The `func` field specifies the function to be called,
-the `ref_date` field specifies the reference (first) date for the callback, and the `active` field specifies whether the callback is active or not.
+the `ref_date` field specifies the first date for the callback, and the `active` field specifies whether the callback is active or not.
 
 The currently implemented callbacks are:
 - `checkpoint_cb`: generates a checkpoint of all model states at a specified interval. This is mainly used for restarting simulations.
@@ -573,7 +584,7 @@ callbacks =
 #=
 ## Initialize turbulent fluxes
 
-Decide on the type of turbulent flux partition (see `FluxCalculator` documentation for more details).
+Decide on the type of turbulent flux partition, partitioned or combined (see `FluxCalculator` documentation for more details).
 =#
 turbulent_fluxes = nothing
 if config_dict["turb_flux_partition"] == "PartitionedStateFluxes"
@@ -652,8 +663,8 @@ Interfacer.step!(land_sim, Δt_cpl)
 Interfacer.step!(ocean_sim, Δt_cpl)
 Interfacer.step!(ice_sim, Δt_cpl)
 
-# 4.turbulent fluxes: now we have all information needed for calculating the initial turbulent surface fluxes using the combined state
-# or the partitioned state method
+# 4.turbulent fluxes: now we have all information needed for calculating the initial turbulent
+# surface fluxes using either the combined state or the partitioned state method
 if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
     ## import the new surface properties into the coupler (note the atmos state was also imported in step 3.)
     FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta, q_sfc
@@ -689,8 +700,9 @@ FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 #=
 ## Coupling Loop
 
-The coupling loop is the main part of the simulation. It runs the component models sequentially for one coupling timestep (`Δt_cpl`), and exchanges combined fields and calculates fluxes using combined states.
-Note that we want to implement this in a dispatchable function to allow for other forms of timestepping (e.g. leapfrog). (TODO: #610)
+The coupling loop is the main part of the simulation. It runs the component models sequentially for one coupling timestep (`Δt_cpl`) at a time,
+and exchanges combined fields and calculates fluxes using the selected turbulent fluxes option.
+Note that we want to implement this in a dispatchable function to allow for other forms of timestepping (e.g. leapfrog).
 =#
 
 function solve_coupler!(cs)
@@ -710,7 +722,7 @@ function solve_coupler!(cs)
 
         if cs.mode.name == "amip"
 
-            ## monthly read of boundary condition data for SST and SIC and CO2
+            ## update values of SST, SIC, and CO2 for this timestep
             if cs.dates.date[1] >= BCReader.next_date_in_file(cs.mode.SST_info)
                 BCReader.update_midmonth_data!(cs.dates.date[1], cs.mode.SST_info)
             end
@@ -743,21 +755,25 @@ function solve_coupler!(cs)
             end
         end
 
-        ## compute global energy
+        ## compute global energy and water conservation checks
+        ## (only for slabplanet if tracking conservation is enabled)
         !isnothing(cs.conservation_checks) && ConservationChecker.check_conservation!(cs)
         ClimaComms.barrier(comms_ctx)
 
-        ## update water albedo from wind at dt_water_albedo (this will be extended to a radiation callback from the coupler)
+        ## update water albedo from wind at dt_water_albedo
+        ## (this will be extended to a radiation callback from the coupler)
         TimeManager.trigger_callback!(cs, cs.callbacks.water_albedo)
 
-        ## run component models sequentially for one coupling timestep (Δt_cpl)
+
+        ## update the surface fractions for surface models,
+        ## and update all component model simulations with the current fluxes stored in the coupler
         Regridder.update_surface_fractions!(cs)
         FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 
-        ## step sims
+        ## step component model simulations sequentially for one coupling timestep (Δt_cpl)
         FieldExchanger.step_model_sims!(cs.model_sims, t)
 
-        ## exchange combined fields and (if specified) calculate fluxes using combined states
+        ## update the coupler with the new surface properties and calculate the turbulent fluxes
         FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, surface_albedo, z0, beta
         if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
             FluxCalculator.combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes) # this updates the surface thermo state, sfc_ts, in ClimaAtmos (but also unnecessarily calculates fluxes)
@@ -777,6 +793,7 @@ function solve_coupler!(cs)
             atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
         end
 
+        ## update the coupler with the new atmospheric properties
         FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
 
         ## callback to update the fist day of month if needed (for BCReader)
@@ -784,9 +801,7 @@ function solve_coupler!(cs)
 
         ## callback to checkpoint model state
         TimeManager.trigger_callback!(cs, cs.callbacks.checkpoint)
-
     end
-
     return nothing
 end
 
@@ -795,18 +810,32 @@ if haskey(ENV, "CI_PERF_SKIP_COUPLED_RUN") #hide
     throw(:exit_profile_init) #hide
 end #hide
 
-## run the coupled simulation for one timestep to precompile everything before timing
+#=
+## Precompilation of Coupling Loop
+
+Here we run the entire coupled simulation for two timesteps to precompile everything
+for accurate timing of the overall simulation. After these two steps, we update the
+beginning and end of the simulation timespan to the correct values.
+=#
+
+## run the coupled simulation for two timesteps to precompile
 cs.tspan[2] = Δt_cpl * 2
 solve_coupler!(cs)
 
-## run the coupled simulation for the full timespan and time it
+## update the timespan to the correct values
 cs.tspan[1] = Δt_cpl * 2
 cs.tspan[2] = tspan[2]
 
 ## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos
 GC.gc()
 
-## Use ClimaComms.@elapsed to time the simulation on both CPU and GPU
+#=
+## Solving and Timing the Full Simulation
+
+This is where the full coupling loop, `solve_coupler!` is called for the full timespan of the simulation.
+We use the `ClimaComms.@elapsed` macro to time the simulation on both CPU and GPU, and use this
+value to calculare the simulated years per day (SYPD) of the simulation.
+=#
 walltime = ClimaComms.@elapsed comms_ctx.device begin
     s = CA.@timed_str begin
         solve_coupler!(cs)
@@ -831,7 +860,18 @@ end
 
 #=
 ## Postprocessing
-Currently all postprocessing is performed using the root process only.
+All postprocessing is performed using the root process only, if applicable.
+Our postprocessing consists of outputting a number of plots and animations to visualize the model output.
+
+The postprocessing includes:
+- Energy and water conservation checks (if running SlabPlanet with checks enabled)
+- Animations (if not running in MPI)
+- AMIP plots of the final state of the model
+- NCEP plots of reanalysis data
+- Combined AMIP and NCEP plots
+- Error against observations
+- Optional additional atmosphere diagnostics plots
+- Plots of useful coupler and component model fields for debugging
 =#
 
 if ClimaComms.iamroot(comms_ctx)
@@ -926,32 +966,40 @@ if ClimaComms.iamroot(comms_ctx)
         ## Compare against observations
         if t_end > 84600 && config_dict["output_default_diagnostics"]
             @info "Error against observations"
-            diagnostics_times = copy(atmos_sim.integrator.sol.t)
+            include("user_io/leaderboard.jl")
+            ClimaAnalysis = Leaderboard.ClimaAnalysis
+
+            compare_vars = ["pr", "rsut", "rlut"]
+            diagnostics_folder_path = atmos_sim.integrator.p.output_dir
+            leaderboard_base_path = dir_paths.artifacts
+
+            first_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = first(compare_vars))
+
+            diagnostics_times = ClimaAnalysis.times(first_var)
             # Remove the first `spinup_months` months from the leaderboard
             spinup_months = 6
             spinup_cutoff = spinup_months * 30 * 86400.0
-            if t_end > spinup_cutoff
-                filter!(x -> x < spinup_cutoff, diagnostics_times)
+            if diagnostics_times[end] > spinup_cutoff
+                filter!(x -> x > spinup_cutoff, diagnostics_times)
             end
 
-            output_dates = cs.dates.date0[] .+ Dates.Second.(diagnostics_times)
+            output_dates = Dates.DateTime(first_var.attributes["start_date"]) .+ Dates.Second.(diagnostics_times)
+
             @info "Working with dates:"
             @info output_dates
 
-            include("user_io/leaderboard.jl")
-            compare_vars = ["pr", "rsut", "rlut"]
             function compute_biases(dates)
                 if isempty(dates)
                     return map(x -> 0.0, compare_vars)
                 else
-                    return Leaderboard.compute_biases(atmos_sim.integrator.p.output_dir, compare_vars, dates)
+                    return Leaderboard.compute_biases(diagnostics_folder_path, compare_vars, dates)
                 end
             end
 
             function plot_biases(dates, biases, output_name)
                 isempty(dates) && return nothing
 
-                output_path = joinpath(dir_paths.artifacts, "bias_$(output_name).png")
+                output_path = joinpath(leaderboard_base_path, "bias_$(output_name).png")
                 Leaderboard.plot_biases(biases; output_path)
             end
 
@@ -982,11 +1030,11 @@ if ClimaComms.iamroot(comms_ctx)
                 1:length(compare_vars),
             )
 
-            Leaderboard.plot_leaderboard(rmses; output_path = joinpath(dir_paths.artifacts, "bias_leaderboard.png"))
+            Leaderboard.plot_leaderboard(rmses; output_path = joinpath(leaderboard_base_path, "bias_leaderboard.png"))
         end
     end
 
-    ## ci plots
+    ## plot extra atmosphere diagnostics if specified
     if config_dict["ci_plots"]
         @info "Generating CI plots"
         include("user_io/ci_plots.jl")
@@ -994,11 +1042,11 @@ if ClimaComms.iamroot(comms_ctx)
     end
 
     ## plot all model states and coupler fields (useful for debugging)
-    !(comms_ctx isa ClimaComms.MPICommsContext) && debug(cs, dir_paths.artifacts)
+    !CA.is_distributed(comms_ctx) && debug(cs, dir_paths.artifacts)
 
-    if isinteractive()
-        ## clean up for interactive runs, retain all output otherwise
-        rm(dir_paths.output; recursive = true, force = true)
-    end
+    if isinteractive() #hide
+        ## clean up for interactive runs, retain all output otherwise #hide
+        rm(dir_paths.output; recursive = true, force = true) #hide
+    end #hide
 
 end

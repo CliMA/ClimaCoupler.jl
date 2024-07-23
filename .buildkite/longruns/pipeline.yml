@@ -222,7 +222,6 @@ steps:
           slurm_mem_per_cpu: 16G
         soft_fail: true
 
-
   - group: "Current target tests: AMIP surfaces"
 
     steps:
@@ -345,10 +344,6 @@ steps:
       - label: ":envelope: Slack report: target AMIP"
         command:
           - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/amip/amip_target_topo_diagedmf_gpu_artifacts/amip_ncep.png -m png -n amip_fine -x "300d Target AMIP v NCEP Last Month Mean"
-          - |
-            find experiments/ClimaEarth/output/amip/amip_target_topo_diagedmf_gpu_artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
-              slack-upload -c "#coupler-report" -f "$$file" -m png -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
-            done
         agents:
           queue: clima
           modules: common

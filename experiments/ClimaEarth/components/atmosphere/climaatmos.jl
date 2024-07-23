@@ -83,11 +83,11 @@ function CA.set_surface_albedo!(Y, p, t, ::CA.CouplerAlbedo)
     if t == 0
         FT = eltype(Y)
         # set initial insolation initial conditions
-        !p.radiation.idealized_insolation && CA.set_insolation_variables!(Y, p, t)
+        !(p.atmos.insolation isa CA.IdealizedInsolation) && CA.set_insolation_variables!(Y, p, t, p.atmos.insolation)
         # set surface albedo to 0.38
         @warn "Setting surface albedo to 0.38 at the beginning of the simulation"
-        p.radiation.radiation_model.direct_sw_surface_albedo .= FT(0.38)
-        p.radiation.radiation_model.diffuse_sw_surface_albedo .= FT(0.38)
+        p.radiation.rrtmgp_model.direct_sw_surface_albedo .= FT(0.38)
+        p.radiation.rrtmgp_model.diffuse_sw_surface_albedo .= FT(0.38)
     else
         nothing
     end
@@ -116,7 +116,7 @@ function Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:radiative_
         nz_faces = length(CC.Spaces.vertical_topology(face_space).mesh.faces)
 
         (; face_lw_flux_dn, face_lw_flux_up, face_sw_flux_dn, face_sw_flux_up) =
-            atmos_sim.integrator.p.radiation.radiation_model
+            atmos_sim.integrator.p.radiation.rrtmgp_model
 
         LWd_TOA = CC.Fields.level(CC.Fields.array2field(FT.(face_lw_flux_dn), face_space), nz_faces - CC.Utilities.half)
         LWu_TOA = CC.Fields.level(CC.Fields.array2field(FT.(face_lw_flux_up), face_space), nz_faces - CC.Utilities.half)
@@ -191,7 +191,7 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temp
     # note that this field is also being updated internally by the surface thermo state in ClimaAtmos
     # if turbulent fluxes are calculated, to ensure consistency. In case the turbulent fluxes are not
     # calculated, we update the field here.
-    sim.integrator.p.radiation.radiation_model.surface_temperature .= CC.Fields.field2array(csf.T_S)
+    sim.integrator.p.radiation.rrtmgp_model.surface_temperature .= CC.Fields.field2array(csf.T_S)
 end
 # extensions required by FluxCalculator (partitioned fluxes)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =
@@ -208,17 +208,17 @@ function Interfacer.update_field!(atmos_sim::ClimaAtmosSimulation, ::Val{:co2}, 
         @warn("Gray radiation model initialized, skipping CO2 update", maxlog = 1)
         return
     else
-        atmos_sim.integrator.p.radiation.radiation_model.volume_mixing_ratio_co2 .= Statistics.mean(parent(field))
+        atmos_sim.integrator.p.radiation.rrtmgp_model.volume_mixing_ratio_co2 .= Statistics.mean(parent(field))
     end
 end
 # extensions required by the Interfacer
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_direct_albedo}, field)
-    sim.integrator.p.radiation.radiation_model.direct_sw_surface_albedo .=
+    sim.integrator.p.radiation.rrtmgp_model.direct_sw_surface_albedo .=
         reshape(CC.Fields.field2array(field), 1, length(parent(field)))
 end
 
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_diffuse_albedo}, field)
-    sim.integrator.p.radiation.radiation_model.diffuse_sw_surface_albedo .=
+    sim.integrator.p.radiation.rrtmgp_model.diffuse_sw_surface_albedo .=
         reshape(CC.Fields.field2array(field), 1, length(parent(field)))
 end
 
@@ -260,8 +260,8 @@ function FieldExchanger.update_sim!(atmos_sim::ClimaAtmosSimulation, csf, turbul
     t = atmos_sim.integrator.t
 
     !isempty(atmos_sim.integrator.p.radiation) &&
-        !p.radiation.idealized_insolation &&
-        CA.set_insolation_variables!(u, p, t)
+        !(p.atmos.insolation isa CA.IdealizedInsolation) &&
+        CA.set_insolation_variables!(u, p, t, p.atmos.insolation)
 
     if hasradiation(atmos_sim.integrator)
         Interfacer.update_field!(atmos_sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
@@ -305,9 +305,12 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String)
     atmos_config_file = coupler_dict["atmos_config_file"]
     atmos_config_repo = coupler_dict["atmos_config_repo"]
     # override default or specified configs with coupler arguments, and set the correct atmos config_file
+    comms_ctx = ClimaComms.context()
     if atmos_config_repo == "ClimaCoupler"
         @assert !isnothing(atmos_config_file) "Must specify `atmos_config_file` within ClimaCoupler."
-        @info "Using Atmos configuration from ClimaCoupler in $atmos_config_file"
+        if ClimaComms.iamroot(comms_ctx)
+            @info "Using Atmos configuration from ClimaCoupler in $atmos_config_file"
+        end
         atmos_config = merge(
             CA.override_default_config(joinpath(pkgdir(ClimaCoupler), atmos_config_file)),
             coupler_dict,
@@ -315,10 +318,14 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String)
         )
     elseif atmos_config_repo == "ClimaAtmos"
         if isnothing(atmos_config_file)
-            @info "Using Atmos default configuration"
+            if ClimaComms.iamroot(comms_ctx)
+                @info "Using Atmos default configuration"
+            end
             atmos_config = merge(CA.default_config_dict(), coupler_dict, Dict("config_file" => atmos_config_file))
         else
-            @info "Using Atmos configuration from $atmos_config_file"
+            if ClimaComms.iamroot(comms_ctx)
+                @info "Using Atmos configuration from $atmos_config_file"
+            end
             atmos_config = merge(
                 CA.override_default_config(joinpath(pkgdir(CA), atmos_config_file)),
                 coupler_dict,
@@ -339,7 +346,9 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String)
     toml_file = isnothing(toml_file) ? joinpath(pkgdir(ClimaCoupler), default_toml_file) : toml_file
 
     if !isnothing(toml_file)
-        @info "Overwriting Atmos parameters from $toml_file"
+        if ClimaComms.iamroot(comms_ctx)
+            @info "Overwriting Atmos parameters from $toml_file"
+        end
         atmos_config = merge(atmos_config, Dict("toml" => [toml_file]))
     end
 
@@ -479,13 +488,13 @@ function FluxCalculator.water_albedo_from_atmosphere!(
     p = atmos_sim.integrator.p
     t = atmos_sim.integrator.t
 
-    radiation_model = atmos_sim.integrator.p.radiation.radiation_model
+    rrtmgp_model = atmos_sim.integrator.p.radiation.rrtmgp_model
     FT = eltype(Y)
     λ = FT(0) # spectral wavelength (not used for now)
 
     # update for current zenith angle
     bottom_coords = CC.Fields.coordinate_field(CC.Spaces.level(Y.c, 1))
-    μ = CC.Fields.array2field(radiation_model.cos_zenith, axes(bottom_coords))
+    μ = CC.Fields.array2field(rrtmgp_model.cos_zenith, axes(bottom_coords))
     FT = eltype(atmos_sim.integrator.u)
     α_model = CA.RegressionFunctionAlbedo{FT}()
 

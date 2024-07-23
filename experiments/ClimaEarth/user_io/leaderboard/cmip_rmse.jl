@@ -35,67 +35,101 @@ function best_single_model(RMSEs)
 end
 
 """
-    RSME_stats(RMSEs)
+    worst_single_model(RMSEs)
+
+Return the one model that has the overall largest error.
+"""
+function worst_single_model(RMSEs)
+    _, index = findmax(r -> abs.(values(r)), RMSEs)
+    return RMSEs[index]
+end
+
+"""
+    RMSE_stats(RMSEs)
+
+RMSEs is the dictionary OTHER_MODELS_RMSEs.
 
 Return:
 - best single model
+- worst single model
 - "model" with all the medians
 - "model" with all the best values
 - "model" with all the worst values
 """
-function RSME_stats(vecRMSEs)
-    # Collect into vectors that we can process independently
-    all_values = stack(values.(vecRMSEs))
-    ANN, DJF, JJA, MAM, SON = ntuple(i -> all_values[i, :], 5)
+function RMSE_stats(dict_vecRMSEs)
+    stats = Dict()
+    # cumulative_error maps model_names with the total RMSE across metrics normalized by median(RMSE)
+    cumulative_error = Dict()
+    for (key, vecRMSEs) in dict_vecRMSEs
+        # Collect into vectors that we can process independently
+        all_values = stack(values.(vecRMSEs))
+        ANN, DJF, JJA, MAM, SON = ntuple(i -> all_values[i, :], 5)
 
-    median_model = RMSEs(;
-        model_name = "Median",
-        ANN = median(ANN),
-        DJF = median(DJF),
-        JJA = median(JJA),
-        MAM = median(MAM),
-        SON = median(SON),
-    )
+        median_model = RMSEs(;
+            model_name = "Median",
+            ANN = median(ANN),
+            DJF = median(DJF),
+            JJA = median(JJA),
+            MAM = median(MAM),
+            SON = median(SON),
+        )
 
-    worst_model = RMSEs(;
-        model_name = "Worst",
-        ANN = maximum(abs.(ANN)),
-        DJF = maximum(abs.(DJF)),
-        JJA = maximum(abs.(JJA)),
-        MAM = maximum(abs.(MAM)),
-        SON = maximum(abs.(SON)),
-    )
+        worst_model = RMSEs(;
+            model_name = "Worst",
+            ANN = maximum(abs.(ANN)),
+            DJF = maximum(abs.(DJF)),
+            JJA = maximum(abs.(JJA)),
+            MAM = maximum(abs.(MAM)),
+            SON = maximum(abs.(SON)),
+        )
 
-    best_model = RMSEs(;
-        model_name = "Best",
-        ANN = minimum(abs.(ANN)),
-        DJF = minimum(abs.(DJF)),
-        JJA = minimum(abs.(JJA)),
-        MAM = minimum(abs.(MAM)),
-        SON = minimum(abs.(SON)),
-    )
+        best_model = RMSEs(;
+            model_name = "Best",
+            ANN = minimum(abs.(ANN)),
+            DJF = minimum(abs.(DJF)),
+            JJA = minimum(abs.(JJA)),
+            MAM = minimum(abs.(MAM)),
+            SON = minimum(abs.(SON)),
+        )
 
-    quantile25 = RMSEs(;
-        model_name = "Quantile 0.25",
-        ANN = quantile(ANN, 0.25),
-        DJF = quantile(DJF, 0.25),
-        JJA = quantile(JJA, 0.25),
-        MAM = quantile(MAM, 0.25),
-        SON = quantile(SON, 0.25),
-    )
+        quantile25 = RMSEs(;
+            model_name = "Quantile 0.25",
+            ANN = quantile(ANN, 0.25),
+            DJF = quantile(DJF, 0.25),
+            JJA = quantile(JJA, 0.25),
+            MAM = quantile(MAM, 0.25),
+            SON = quantile(SON, 0.25),
+        )
 
-    quantile75 = RMSEs(;
-        model_name = "Quantile 0.75",
-        ANN = quantile(ANN, 0.75),
-        DJF = quantile(DJF, 0.75),
-        JJA = quantile(JJA, 0.75),
-        MAM = quantile(MAM, 0.75),
-        SON = quantile(SON, 0.75),
-    )
+        quantile75 = RMSEs(;
+            model_name = "Quantile 0.75",
+            ANN = quantile(ANN, 0.75),
+            DJF = quantile(DJF, 0.75),
+            JJA = quantile(JJA, 0.75),
+            MAM = quantile(MAM, 0.75),
+            SON = quantile(SON, 0.75),
+        )
 
-    (; best_single_model = best_single_model(vecRMSEs), median_model, worst_model, best_model, quantile25, quantile75)
+        for rmse in vecRMSEs
+            haskey(cumulative_error, cumulative_error) || (cumulative_error[rmse.model_name] = 0.0)
+            cumulative_error[rmse.model_name] += sum(values(rmse) ./ values(median_model))
+        end
+
+        stats[key] = (;
+            best_single_model = best_single_model(vecRMSEs),
+            worst_single_model = worst_single_model(vecRMSEs),
+            median_model,
+            worst_model,
+            best_model,
+            quantile25,
+            quantile75,
+        )
+    end
+
+    _, absolute_best_model = findmin(cumulative_error)
+    _, absolute_worst_model = findmax(cumulative_error)
+
+    return (; stats, absolute_best_model, absolute_worst_model)
 end
 
-for short_name in short_names
-    COMPARISON_RMSEs[short_name] = RSME_stats(OTHER_MODELS_RMSEs[short_name])
-end
+const COMPARISON_RMSEs_STATS = RMSE_stats(OTHER_MODELS_RMSEs)

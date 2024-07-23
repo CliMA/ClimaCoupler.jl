@@ -1,0 +1,73 @@
+agents:
+  queue: clima
+  slurm_time: 72:00:00
+  modules: common
+
+env:
+  JULIA_MAX_NUM_PRECOMPILE_FILES: 100
+  GKSwstype: 100
+  SLURM_KILL_BAD_EXIT: 1
+  CONFIG_PATH: "config/amip_configs"
+
+timeout_in_minutes: 4320
+
+steps:
+
+  - label: "init :GPU:"
+    key: "init_gpu_env"
+    command:
+      - "echo $$JULIA_DEPOT_PATH"
+
+      - echo "--- Instantiate AMIP env"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
+
+      - echo "--- Download artifacts"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=artifacts -e 'using Pkg; Pkg.status()'"
+      - "julia --project=artifacts artifacts/download_artifacts.jl"
+
+    agents:
+      slurm_gpus: 1
+      slurm_cpus_per_task: 8
+    env:
+      JULIA_NUM_PRECOMPILE_TASKS: 8
+      JULIA_MAX_NUM_PRECOMPILE_FILES: 50
+
+  - wait
+
+  - group: "AMIP"
+
+    steps:
+
+      - label: "Current AMIP: diagedmf + 0M + bucket land"
+        key: "amip"
+        command:
+          - echo "--- Run simulation"
+          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip.yml --job_id amip"
+        artifact_paths: "experiments/ClimaEarth/output/amip/amip_artifacts/*"
+        timeout_in_minutes: 4320
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 1
+          slurm_mem: 30GB
+        soft_fail: true
+
+  - wait
+
+  - group: "Job analysis and reporting"
+
+    steps:
+
+      - label: ":envelope: Slack report: current AMIP"
+        command:
+          - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/amip/amip_artifacts/amip_ncep.png -m png -n amip_fine -x "3-year Target AMIP v NCEP Last Month Mean"
+          - |
+            find experiments/ClimaEarth/output/amip/amip_artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
+              slack-upload -c "#coupler-report" -f "$$file" -m png -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
+            done

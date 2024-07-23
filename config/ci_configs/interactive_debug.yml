@@ -13,7 +13,7 @@ moist: "equil"
 mono_surface: true
 precip_model: "0M"
 rad: "gray"
-start_date: "19790301"
+start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "20days"
 turb_flux_partition: "CombinedStateFluxesMOST"

@@ -74,7 +74,7 @@ config_dict = Dict(
     # general
     "FLOAT_TYPE" => string(FT),
     # file paths
-    "atmos_config_file" => nothing,
+    "atmos_config_file" => "config/longrun_configs/longrun_aquaplanet_allsky_diagedmf_0M.yml",
     "coupler_toml_file" => nothing,
     "coupler_output_dir" => coupler_output_dir,
     "mode_name" => "",

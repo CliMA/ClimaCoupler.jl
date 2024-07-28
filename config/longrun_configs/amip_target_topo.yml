@@ -19,4 +19,3 @@ t_end: "120days"
 topo_smoothing: true
 topography: "Earth"
 turb_flux_partition: "CombinedStateFluxesMOST"
-vert_diff: "FriersonDiffusion"

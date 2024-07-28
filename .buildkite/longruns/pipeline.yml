@@ -146,8 +146,8 @@ steps:
 
       - label: "ClimaAtmos standalone target"
         command:
-          - srun julia --project=experiments/ClimaEarth/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file test/component_model_tests/climaatmos_standalone/longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_tvinsol_0M_slabocean.yml --job_id longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_tvinsol_0M_slabocean
-        artifact_paths: "longrun_aquaplanet_rhoe_equil_55km_nz63_clearsky_tvinsol_0M_slabocean/*"
+          - srun julia --project=experiments/ClimaEarth/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file test/component_model_tests/climaatmos_standalone/longrun_aquaplanet_allsky_tvinsol_0M_slabocean.yml --job_id longrun_aquaplanet_allsky_tvinsol_0M_slabocean
+        artifact_paths: "longrun_aquaplanet_allsky_tvinsol_0M_slabocean/*"
         env:
           BUILD_HISTORY_HANDLE: ""
           CLIMACOMMS_CONTEXT: "MPI"

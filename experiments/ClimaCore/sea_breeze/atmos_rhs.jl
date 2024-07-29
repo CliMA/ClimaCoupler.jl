@@ -109,6 +109,7 @@ import TerminalLoggers
 
 import ClimaCore as CC
 import ClimaCore.Geometry: ⊗
+import ClimaComms
 
 Logging.global_logger(TerminalLoggers.TerminalLogger())
 
@@ -123,8 +124,13 @@ function hvspace_2D(xlim = (-π, π), zlim = (0, 4π), helem = 20, velem = 20, n
         CC.Geometry.ZPoint{FT}(zlim[2]);
         boundary_names = (:bottom, :top),
     )
+    context = ClimaComms.context()
     vertmesh = CC.Meshes.IntervalMesh(vertdomain, nelems = velem)
-    vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(vertmesh)
+    if pkgversion(CC) >= v"0.14.10"
+        vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(context, vertmesh)
+    else
+        vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(vertmesh)
+    end
 
     horzdomain =
         CC.Domains.IntervalDomain(CC.Geometry.XPoint{FT}(xlim[1]) .. CC.Geometry.XPoint{FT}(xlim[2]), periodic = true)

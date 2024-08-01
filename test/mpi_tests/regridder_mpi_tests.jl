@@ -10,7 +10,10 @@ import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ClimaCore as CC
 import ClimaCoupler
-import ClimaCoupler: Regridder, TestHelper
+import ClimaCoupler: Regridder
+
+include(joinpath("..", "TestHelper.jl"))
+import .TestHelper
 
 REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regridder_test_tmp/")
 

@@ -7,7 +7,10 @@ import ClimaComms
 import CUDA
 import Dates
 import ClimaCore as CC
-import ClimaCoupler: ConservationChecker, Diagnostics, Interfacer, TestHelper, TimeManager
+import ClimaCoupler: ConservationChecker, Diagnostics, Interfacer, TimeManager
+
+include("TestHelper.jl")
+import .TestHelper
 
 Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:x}) = 1
 

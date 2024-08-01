@@ -6,7 +6,6 @@ Module for atmos-ocean-land coupled simulations.
 module ClimaCoupler
 
 include("Interfacer.jl")
-include("../test/TestHelper.jl")
 include("Utilities.jl")
 include("TimeManager.jl")
 include("Regridder.jl")

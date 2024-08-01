@@ -1,6 +1,9 @@
 import Test: @test, @testset
 import ClimaCore as CC
-import ClimaCoupler: Interfacer, FieldExchanger, FluxCalculator, TestHelper
+import ClimaCoupler: Interfacer, FieldExchanger, FluxCalculator
+
+include("TestHelper.jl")
+import .TestHelper
 
 # test for a simple generic atmos model
 struct DummySimulation{C} <: Interfacer.AtmosModelSimulation

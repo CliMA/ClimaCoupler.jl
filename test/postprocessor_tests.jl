@@ -3,7 +3,10 @@
 =#
 import Test: @test, @testset
 import ClimaCore as CC
-import ClimaCoupler: PostProcessor, TestHelper
+import ClimaCoupler: PostProcessor
+
+include("TestHelper.jl")
+import .TestHelper
 
 data(f::CC.Fields.Field) = (parent(f))
 data(f::Array) = f

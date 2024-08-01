@@ -494,21 +494,12 @@ if use_coupler_diagnostics
         atmos_sim.domain.center_space;
         save = TimeManager.Monthly(),
         operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
-        output_dir = COUPLER_OUTPUT_DIR,
-        name_tag = "monthly_mean_3d_",
-    )
-
-    monthly_3d_diags = Diagnostics.init_diagnostics(
-        (:T, :u, :q_tot, :q_liq_ice),
-        atmos_sim.domain.center_space;
-        save = TimeManager.Monthly(),
-        operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
         output_dir = dir_paths.output,
         name_tag = "monthly_mean_3d_",
     )
 
     monthly_2d_diags = Diagnostics.init_diagnostics(
-        (:precipitation_rate, :toa_fluxes, :T_sfc, :tubulent_energy_fluxes),
+        (:precipitation_rate, :toa_fluxes, :T_sfc, :turbulent_energy_fluxes),
         boundary_space;
         save = TimeManager.Monthly(),
         operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
@@ -915,7 +906,7 @@ if ClimaComms.iamroot(comms_ctx)
             toa_fluxes = (:regrid, :horizontal_slice),
             precipitation_rate = (:regrid, :horizontal_slice),
             T_sfc = (:regrid, :horizontal_slice),
-            tubulent_energy_fluxes = (:regrid, :horizontal_slice),
+            turbulent_energy_fluxes = (:regrid, :horizontal_slice),
             q_liq_ice = (:regrid, :zonal_mean),
         )
 
@@ -926,7 +917,7 @@ if ClimaComms.iamroot(comms_ctx)
             toa_fluxes = (; clims = (-250, 250), units = "W/m^2"),
             precipitation_rate = (clims = (0, 1e-4), units = "kg/m^2/s"),
             T_sfc = (clims = (225, 310), units = "K"),
-            tubulent_energy_fluxes = (; clims = (-250, 250), units = "W/m^2"),
+            turbulent_energy_fluxes = (; clims = (-250, 250), units = "W/m^2"),
             q_liq_ice = (; clims = (0, 10), units = "g/kg"),
         )
         amip_data, fig_amip = amip_paperplots(
@@ -947,7 +938,7 @@ if ClimaComms.iamroot(comms_ctx)
             toa_fluxes = (:horizontal_slice,),
             precipitation_rate = (:horizontal_slice,),
             T_sfc = (:horizontal_slice,),
-            tubulent_energy_fluxes = (:horizontal_slice,),
+            turbulent_energy_fluxes = (:horizontal_slice,),
         )
         ncep_plot_spec = plot_spec
         ncep_data, fig_ncep = ncep_paperplots(

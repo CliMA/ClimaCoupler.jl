@@ -100,11 +100,11 @@ Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:T_sfc}) =
     Utilities.swap_space!(cs.boundary_space, cs.fields.T_S)
 
 """
-    Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:tubulent_energy_fluxes})
+    Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:turbulent_energy_fluxes})
 
 Combined aerodynamic turbulent energy surface fluxes (W m⁻²).
 """
-Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:tubulent_energy_fluxes}) =
+Diagnostics.get_var(cs::Interfacer.CoupledSimulation, ::Val{:turbulent_energy_fluxes}) =
     Utilities.swap_space!(cs.boundary_space, cs.fields.F_turb_energy)
 
 # land diagnotics

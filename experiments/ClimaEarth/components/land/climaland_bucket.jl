@@ -203,8 +203,8 @@ function Interfacer.update_field!(sim::BucketSimulation, ::Val{:turbulent_energy
     parent(sim.integrator.p.bucket.turbulent_fluxes.shf) .= parent(field)
 end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:snow_precipitation}, field)
-    ρ_ice = (LP.ρ_cloud_ice(sim.model.parameters.earth_param_set))
-    parent(sim.integrator.p.drivers.P_snow) .= parent(field ./ ρ_ice)
+    ρ_liq = (LP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
+    parent(sim.integrator.p.drivers.P_snow) .= parent(field ./ ρ_liq)
 end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:turbulent_moisture_flux}, field)
     ρ_liq = (LP.ρ_cloud_liq(sim.model.parameters.earth_param_set))

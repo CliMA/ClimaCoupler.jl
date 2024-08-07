@@ -10,6 +10,6 @@ mode_name: "amip"
 moist: "equil"
 mono_surface: true
 precip_model: "0M"
-rad: "gray"
+rad: "allskywithclear"
 t_end: "10days"
 vert_diff: "true"

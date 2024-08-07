@@ -959,11 +959,11 @@ if ClimaComms.iamroot(comms_ctx)
             include("user_io/leaderboard.jl")
             ClimaAnalysis = Leaderboard.ClimaAnalysis
 
-            compare_vars = ["pr", "rsut", "rlut"]
+            compare_vars_biases = ["pr", "rsut", "rlut", "rsutcs", "rlutcs"]
             diagnostics_folder_path = atmos_sim.integrator.p.output_dir
             leaderboard_base_path = dir_paths.artifacts
 
-            first_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = first(compare_vars))
+            first_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = first(compare_vars_biases))
 
             diagnostics_times = ClimaAnalysis.times(first_var)
             # Remove the first `spinup_months` months from the leaderboard
@@ -980,9 +980,9 @@ if ClimaComms.iamroot(comms_ctx)
 
             function compute_biases(dates)
                 if isempty(dates)
-                    return map(x -> 0.0, compare_vars)
+                    return map(x -> 0.0, compare_vars_biases)
                 else
-                    return Leaderboard.compute_biases(diagnostics_folder_path, compare_vars, dates)
+                    return Leaderboard.compute_biases(diagnostics_folder_path, compare_vars_biases, dates)
                 end
             end
 
@@ -1008,6 +1008,8 @@ if ClimaComms.iamroot(comms_ctx)
             DJF_biases = compute_biases(DJF)
             plot_biases(DJF, DJF_biases, "DJF")
 
+            compare_vars_rmses = ["pr", "rsut", "rlut"]
+
             rmses = map(
                 (index) -> Leaderboard.RMSEs(;
                     model_name = "CliMA",
@@ -1017,7 +1019,7 @@ if ClimaComms.iamroot(comms_ctx)
                     JJA = JJA_biases[index],
                     SON = SON_biases[index],
                 ),
-                1:length(compare_vars),
+                1:length(compare_vars_rmses),
             )
 
             Leaderboard.plot_leaderboard(rmses; output_path = joinpath(leaderboard_base_path, "bias_leaderboard.png"))

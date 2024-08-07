@@ -50,6 +50,18 @@ OBS_DS["rlut"] = ObsDataSource(;
 SIM_DS_KWARGS["rlut"] = (;)
 OTHER_MODELS_RMSEs["rlut"] = []
 
+OBS_DS["rsutcs"] = ObsDataSource(;
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF-TOA_Ed4.2_Subset_200003-202303.g025.nc"),
+    var_name = "toa_sw_clr_c_mon",
+)
+SIM_DS_KWARGS["rsutcs"] = (;)
+
+OBS_DS["rlutcs"] = ObsDataSource(;
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF-TOA_Ed4.2_Subset_200003-202303.g025.nc"),
+    var_name = "toa_lw_clr_c_mon",
+)
+SIM_DS_KWARGS["rlutcs"] = (;)
+
 include("cmip_rmse.jl")
 
 function bias(output_dir::AbstractString, short_name::AbstractString, target_dates::AbstractArray{<:Dates.DateTime})

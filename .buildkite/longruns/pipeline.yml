@@ -331,19 +331,7 @@ steps:
 
       - wait
 
-      - label: ":envelope: Slack report: build_history"
-        command:
-          - |
-            slack-upload -c "#coupler-report" -f build_history.html -m html -n build_history -x ":rocket: Interactive overall job performance history (download the attached file and view in browser) :rocket:"
-
       - label: ":envelope: Slack report: Slabplanet"
         command:
           - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/slabplanet/slabplanet_coupler_sf_evolve_ocn_artifacts/total_energy_bucket.png -m png -n slab_coarse -x "Slabplanet energy conservation"
           - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/slabplanet/slabplanet_coupler_sf_evolve_ocn_artifacts/total_water_bucket.png -m png -n slab_coarse_w -x "Slabplanet water conservation"
-
-      - label: ":envelope: Slack report: target AMIP"
-        command:
-          - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/amip/amip_target_topo_diagedmf_gpu_artifacts/amip_ncep.png -m png -n amip_fine -x "300d Target AMIP v NCEP Last Month Mean"
-        agents:
-          queue: clima
-          modules: common

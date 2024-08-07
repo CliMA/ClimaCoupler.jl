@@ -960,6 +960,15 @@ if ClimaComms.iamroot(comms_ctx)
             ClimaAnalysis = Leaderboard.ClimaAnalysis
 
             compare_vars_biases = ["pr", "rsut", "rlut", "rsutcs", "rlutcs"]
+
+            compare_vars_biases_plot_extrema = Dict(
+                "pr" => (-5.0, 5.0),
+                "rsut" => (-50.0, 50.0),
+                "rlut" => (-50.0, 50.0),
+                "rsutcs" => (-20.0, 20.0),
+                "rlutcs" => (-20.0, 20.0),
+            )
+
             diagnostics_folder_path = atmos_sim.integrator.p.output_dir
             leaderboard_base_path = dir_paths.artifacts
 
@@ -982,7 +991,12 @@ if ClimaComms.iamroot(comms_ctx)
                 if isempty(dates)
                     return map(x -> 0.0, compare_vars_biases)
                 else
-                    return Leaderboard.compute_biases(diagnostics_folder_path, compare_vars_biases, dates)
+                    return Leaderboard.compute_biases(
+                        diagnostics_folder_path,
+                        compare_vars_biases,
+                        dates,
+                        cmap_extrema = compare_vars_biases_plot_extrema,
+                    )
                 end
             end
 

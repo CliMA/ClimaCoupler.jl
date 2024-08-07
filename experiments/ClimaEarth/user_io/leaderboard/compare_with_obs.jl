@@ -70,8 +70,13 @@ function bias(output_dir::AbstractString, short_name::AbstractString, target_dat
     return bias(obs, sim, target_dates)
 end
 
-function compute_biases(output_dir, short_names, target_dates::AbstractArray{<:Dates.DateTime})
-    return map(name -> bias(output_dir, name, target_dates), short_names)
+function compute_biases(output_dir, short_names, target_dates::AbstractArray{<:Dates.DateTime}; cmap_extrema = Dict())
+    return map(short_names) do name
+        bias_outvar = bias(output_dir, name, target_dates)
+        # The attribute is used in plot_bias to fix the colormap
+        haskey(cmap_extrema, name) && (bias_outvar.attributes["cmap_extrema"] = cmap_extrema[name])
+        return bias_outvar
+    end
 end
 
 
@@ -128,17 +133,22 @@ function plot_biases(biases; output_path)
     loc = 1
 
     for bias_var in biases
+        min_level, max_level = get(bias_var.attributes, "cmap_extrema", extrema(bias_var.data))
+
         # Make sure that 0 is at the center
-        cmap = constrained_cmap(CairoMakie.cgrad(:vik).colors, extrema(bias_var.data)...; categorical = true)
-        nlevels = 10
+        cmap = constrained_cmap(CairoMakie.cgrad(:vik).colors, min_level, max_level; categorical = true)
+        nlevels = 11
         # Offset so that it covers 0
-        levels = collect(range(minimum(bias_var.data), maximum(bias_var.data), length = nlevels))
+        levels = collect(range(min_level, max_level, length = nlevels))
         offset = levels[argmin(abs.(levels))]
         levels = levels .- offset
         ticklabels = map(x -> string(round(x; digits = 0)), levels)
         ticks = (levels, ticklabels)
 
-        more_kwargs = Dict(:plot => Dict(:colormap => cmap, :levels => levels), :cb => Dict(:ticks => ticks))
+        more_kwargs = Dict(
+            :plot => Dict(:colormap => cmap, :levels => levels, :extendhigh => :auto, :extendlow => :auto),
+            :cb => Dict(:ticks => ticks),
+        )
 
         ClimaAnalysis.Visualize.contour2D_on_globe!(fig, bias_var; p_loc = (loc, 1), more_kwargs)
         loc = loc + 1

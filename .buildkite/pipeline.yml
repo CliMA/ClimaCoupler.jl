@@ -321,17 +321,6 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 20GB
 
-      - label: "AMIP - Float64 + hourly checkpoint + co2"
-        key: "coarse_single_ft64_hourly_checkpoints_co2"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/coarse_single_ft64_hourly_checkpoints_co2.yml --job_id coarse_single_ft64_hourly_checkpoints_co2"
-        artifact_paths: "experiments/ClimaEarth/output/amip/coarse_single_ft64_hourly_checkpoints_co2_artifacts/*"
-        env:
-          FLAME_PLOT: ""
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_ntasks: 1
-          slurm_mem: 20GB
-
       - label: "AMIP - Float64 test"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/coarse_single_ft64.yml --job_id coarse_single_ft64"
         artifact_paths: "experiments/ClimaEarth/output/amip/coarse_single_ft64_artifacts/*"
@@ -347,13 +336,13 @@ steps:
           slurm_mem: 20GB
 
       - label: "MPI AMIP"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/coarse_mpi_n2.yml --job_id coarse_mpi_n2"
-        artifact_paths: "experiments/ClimaEarth/output/amip/coarse_mpi_n2_artifacts/*"
+        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/coarse_mpi_n4.yml --job_id coarse_mpi_n4"
+        artifact_paths: "experiments/ClimaEarth/output/amip/coarse_mpi_n4_artifacts/*"
         timeout_in_minutes: 240
         env:
           CLIMACOMMS_CONTEXT: "MPI"
         agents:
-          slurm_ntasks: 2
+          slurm_ntasks: 4
           slurm_mem: 16GB
 
 

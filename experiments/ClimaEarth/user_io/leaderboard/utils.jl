@@ -37,7 +37,11 @@ function resample(
     vec_to_range(v) = range(v[begin], v[end], length = length(v))
     src_lonlat_ranges = vec_to_range.(src_lonlat)
 
-    itp = Interpolations.constant_interpolation(src_lonlat_ranges, data, extrapolation_bc = Interpolations.Flat())
+    itp = Interpolations.constant_interpolation(
+        src_lonlat_ranges,
+        data,
+        extrapolation_bc = (Interpolations.Periodic(), Interpolations.Flat()),
+    )
 
     dest_lon, dest_lat = dest_lonlat
 
@@ -202,16 +206,6 @@ function find_and_resample(
     data_arr = obs.preprocess_data_fn(obs.ncdataset[obs.var_name][:, :, time_index])
 
     lon_arr = obs.ncdataset[obs.lon_name][:]
-    if abs.(maximum(lon_arr)) > 180.0
-        # Longitudes are defined between 0 and 360 instead of -180 to 180 as CliMA does, so
-        # we shift them back to -180 to 180
-        index_zero = findfirst(x -> x >= 180, lon_arr)
-        lon_arr_shifted = circshift(lon_arr, -index_zero + 1)
-        lon_arr_shifted[begin:(index_zero - 1)] .-= 360
-        @assert issorted(lon_arr_shifted)
-        data_arr = circshift(data_arr, (-index_zero + 1, 0))
-        lon_arr = lon_arr_shifted
-    end
     lat_arr = obs.ncdataset[obs.lat_name][:]
 
     return resample(data_arr, (lon_arr, lat_arr), dest_lonlat)

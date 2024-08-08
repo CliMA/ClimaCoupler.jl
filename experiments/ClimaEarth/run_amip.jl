@@ -857,8 +857,6 @@ The postprocessing includes:
 - Energy and water conservation checks (if running SlabPlanet with checks enabled)
 - Animations (if not running in MPI)
 - AMIP plots of the final state of the model
-- NCEP plots of reanalysis data
-- Combined AMIP and NCEP plots
 - Error against observations
 - Optional additional atmosphere diagnostics plots
 - Plots of useful coupler and component model fields for debugging
@@ -927,31 +925,6 @@ if ClimaComms.iamroot(comms_ctx)
             files_root = ".monthly",
             output_dir = dir_paths.artifacts,
         )
-
-        ## NCEP reanalysis
-        @info "NCEP plots"
-        include("user_io/ncep_visualizer.jl")
-        ncep_post_spec = (;
-            T = (:zonal_mean,),
-            u = (:zonal_mean,),
-            q_tot = (:zonal_mean,),
-            toa_fluxes = (:horizontal_slice,),
-            precipitation_rate = (:horizontal_slice,),
-            T_sfc = (:horizontal_slice,),
-            turbulent_energy_fluxes = (:horizontal_slice,),
-        )
-        ncep_plot_spec = plot_spec
-        ncep_data, fig_ncep = ncep_paperplots(
-            ncep_post_spec,
-            ncep_plot_spec,
-            dir_paths.output,
-            output_dir = dir_paths.artifacts,
-            month_date = cs.dates.date[1],
-        )
-
-        ## combine AMIP and NCEP plots
-        plot_combined = Plots.plot(fig_amip, fig_ncep, layout = (2, 1), size = (1400, 1800))
-        Plots.png(joinpath(dir_paths.artifacts, "amip_ncep.png"))
 
         ## Compare against observations
         if t_end > 84600 && config_dict["output_default_diagnostics"]

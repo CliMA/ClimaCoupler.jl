@@ -4,7 +4,10 @@
 import Test: @testset, @test
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
-import ClimaCoupler: Utilities, TestHelper
+import ClimaCoupler: Utilities
+
+include("TestHelper.jl")
+import .TestHelper
 
 for FT in (Float32, Float64)
     @testset "test swap_space!" begin

@@ -9,7 +9,10 @@ import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ClimaCore as CC
 import ClimaCoupler
-import ClimaCoupler: Checkpointer, Interfacer, TestHelper
+import ClimaCoupler: Checkpointer, Interfacer
+
+include(joinpath("..", "TestHelper.jl"))
+import .TestHelper
 
 # set up MPI communications context
 const comms_ctx = ClimaComms.context(ClimaComms.CPUSingleThreaded())

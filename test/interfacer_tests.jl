@@ -3,7 +3,10 @@ import ClimaCore as CC
 import ClimaParams as CP
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
-import ClimaCoupler: Interfacer, TestHelper
+import ClimaCoupler: Interfacer
+
+include("TestHelper.jl")
+import .TestHelper
 
 # test for a simple generic surface model
 struct DummySimulation{S} <: Interfacer.SeaIceModelSimulation

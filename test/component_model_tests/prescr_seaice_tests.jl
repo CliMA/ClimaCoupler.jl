@@ -2,7 +2,9 @@ import Test: @test, @testset
 import ClimaCore as CC
 import Thermodynamics.Parameters as TDP
 import ClimaCoupler
-import ClimaCoupler: TestHelper
+
+include(joinpath("..", "TestHelper.jl"))
+import .TestHelper
 
 include(pkgdir(ClimaCoupler, "experiments/ClimaEarth/components/ocean/prescr_seaice.jl"))
 

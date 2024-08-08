@@ -1,7 +1,10 @@
 # testing functions used to produce user-defined debugging plots for AMIP experiments
 import Test: @test, @testset
 import ClimaCore as CC
-import ClimaCoupler: Interfacer, TestHelper
+import ClimaCoupler: Interfacer
+
+include(joinpath("..", "TestHelper.jl"))
+import .TestHelper
 
 FT = Float64
 

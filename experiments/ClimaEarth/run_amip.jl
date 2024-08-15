@@ -808,15 +808,18 @@ walltime_per_atmos_step = es.walltime / n_atmos_steps
 
 ## Save the SYPD and allocation information
 if ClimaComms.iamroot(comms_ctx)
-    sypd_filename = joinpath(dir_paths.artifacts, "sypd.txt")
-    write(sypd_filename, "$sypd")
+    open(joinpath(dir_paths.artifacts, "sypd.txt"), "w") do sypd_filename
+        println(sypd_filename, "$sypd")
+    end
 
-    walltime_per_atmos_step_filename = joinpath(dir_paths.artifacts, "walltime_per_atmos_step.txt")
-    write(walltime_per_atmos_step_filename, "$(walltime_per_atmos_step)")
+    open(joinpath(dir_paths.artifacts, "walltime_per_atmos_step.txt"), "w") do walltime_per_atmos_step_filename
+        println(walltime_per_atmos_step_filename, "$(walltime_per_atmos_step)")
+    end
 
-    cpu_max_rss_GB = Utilities.show_memory_usage(comms_ctx)
-    cpu_max_rss_filename = joinpath(dir_paths.artifacts, "max_rss_cpu.txt")
-    write(cpu_max_rss_filename, cpu_max_rss_GB)
+    open(joinpath(dir_paths.artifacts, "max_rss_cpu.txt"), "w") do cpu_max_rss_filename
+        cpu_max_rss_GB = Utilities.show_memory_usage(comms_ctx)
+        println(cpu_max_rss_filename, cpu_max_rss_GB)
+    end
 end
 
 #=

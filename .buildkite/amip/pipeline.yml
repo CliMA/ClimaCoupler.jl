@@ -70,4 +70,3 @@ steps:
             find experiments/ClimaEarth/output/amip/amip_artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
               slack-upload -c "#coupler-report" -f "$$file" -m png -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
             done
-          - SYPD="$(cat experiments/ClimaEarth/output/amip/amip_artifacts/sypd.txt)"; WALL="$(cat experiments/ClimaEarth/output/amip/amip_artifacts/walltime_per_atmos_step.txt)"; slack-message -c "#coupler-report" -x "SYPD: $SYPD Walltime per Atmos step: $WALL"

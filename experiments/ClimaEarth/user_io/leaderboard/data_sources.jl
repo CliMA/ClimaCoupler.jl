@@ -24,6 +24,9 @@ struct ObsDataSource
 
     """The NCDataset associated to the file"""
     ncdataset::NCDatasets.NCDataset
+
+    """Shift dates so that they are at the end of month?"""
+    shift_to_end_of_month::Bool
 end
 
 function ObsDataSource(;
@@ -33,11 +36,21 @@ function ObsDataSource(;
     lon_name = "lon",
     lat_name = "lat",
     preprocess_data_fn = identity,
+    shift_to_end_of_month = true,
 )
 
     ncdataset = NCDatasets.NCDataset(path)
 
-    return ObsDataSource(path, var_name, time_name, lon_name, lat_name, preprocess_data_fn, ncdataset)
+    return ObsDataSource(
+        path,
+        var_name,
+        time_name,
+        lon_name,
+        lat_name,
+        preprocess_data_fn,
+        ncdataset,
+        shift_to_end_of_month,
+    )
 end
 
 """

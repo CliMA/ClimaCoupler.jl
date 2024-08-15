@@ -56,6 +56,12 @@ OBS_DS["rsutcs"] = ObsDataSource(;
 )
 SIM_DS_KWARGS["rsutcs"] = (;)
 
+OBS_DS["rsdt"] = ObsDataSource(;
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF-TOA_Ed4.2_Subset_200003-202303.g025.nc"),
+    var_name = "solar_mon",
+)
+SIM_DS_KWARGS["rsdt"] = (;)
+
 OBS_DS["rlutcs"] = ObsDataSource(;
     path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF-TOA_Ed4.2_Subset_200003-202303.g025.nc"),
     var_name = "toa_lw_clr_c_mon",

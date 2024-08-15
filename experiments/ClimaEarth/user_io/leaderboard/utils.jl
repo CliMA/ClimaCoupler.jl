@@ -197,6 +197,10 @@ function find_and_resample(
 
     available_times = obs.ncdataset[observed_data.time_name]
 
+    if observed_data.shift_to_end_of_month
+        available_times = Dates.DateTime.(Dates.lastdayofmonth.(available_times))
+    end
+
     time_index = ClimaAnalysis.Utils.nearest_index(available_times, date)
 
     # NOTE: We are hardcoding that the time index is the last one and that there are three

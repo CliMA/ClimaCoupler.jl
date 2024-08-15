@@ -932,12 +932,13 @@ if ClimaComms.iamroot(comms_ctx)
             include("user_io/leaderboard.jl")
             ClimaAnalysis = Leaderboard.ClimaAnalysis
 
-            compare_vars_biases = ["pr", "rsut", "rlut", "rsutcs", "rlutcs"]
+            compare_vars_biases = ["pr", "rsut", "rlut", "rsdt", "rsutcs", "rlutcs"]
 
             compare_vars_biases_plot_extrema = Dict(
                 "pr" => (-5.0, 5.0),
                 "rsut" => (-50.0, 50.0),
                 "rlut" => (-50.0, 50.0),
+                "rsdt" => (-10.0, 10.0),
                 "rsutcs" => (-20.0, 20.0),
                 "rlutcs" => (-20.0, 20.0),
             )

@@ -836,12 +836,18 @@ ClimaComms.iamroot(comms_ctx) && @show(walltime)
 ## Use ClimaAtmos calculation to show the simulated years per day of the simulation (SYPD)
 es = CA.EfficiencyStats(tspan, walltime)
 sypd = CA.simulated_years_per_day(es)
+n_atmos_steps = atmos_sim.integrator.step
+walltime_per_atmos_step = es.walltime / n_atmos_steps
 @info "SYPD: $sypd"
+@info "Walltime per Atmos step: $(walltime_per_atmos_step)"
 
 ## Save the SYPD and allocation information
 if ClimaComms.iamroot(comms_ctx)
     sypd_filename = joinpath(dir_paths.artifacts, "sypd.txt")
     write(sypd_filename, "$sypd")
+
+    walltime_per_atmos_step_filename = joinpath(dir_paths.artifacts, "walltime_per_atmos_step.txt")
+    write(walltime_per_atmos_step_filename, "$(walltime_per_atmos_step)")
 
     cpu_max_rss_GB = Utilities.show_memory_usage(comms_ctx)
     cpu_max_rss_filename = joinpath(dir_paths.artifacts, "max_rss_cpu.txt")

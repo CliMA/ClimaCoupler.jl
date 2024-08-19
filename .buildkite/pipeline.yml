@@ -343,7 +343,7 @@ steps:
           CLIMACOMMS_CONTEXT: "MPI"
         agents:
           slurm_ntasks: 4
-          slurm_mem: 16GB
+          slurm_mem: 32GB
 
 
       # short high-res performance test

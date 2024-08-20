@@ -939,6 +939,7 @@ if ClimaComms.iamroot(comms_ctx)
             ClimaAnalysis = Leaderboard.ClimaAnalysis
 
             compare_vars_biases = ["pr", "rsut", "rlut", "rsdt", "rsutcs", "rlutcs"]
+            compare_vars_biases = ["rsutcs"]
 
             compare_vars_biases_plot_extrema = Dict(
                 "pr" => (-5.0, 5.0),
@@ -960,7 +961,7 @@ if ClimaComms.iamroot(comms_ctx)
             # The monthly average output is at the end of the month, so this is safe
             spinup_cutoff = spinup_months * 31 * 86400.0
             if diagnostics_times[end] > spinup_cutoff
-                filter!(x -> x > spinup_cutoff, diagnostics_times)
+                filter!(x -> x > spinup_cutoff && x < stop_cutoff, diagnostics_times)
             end
 
             output_dates = Dates.DateTime(first_var.attributes["start_date"]) .+ Dates.Second.(diagnostics_times)

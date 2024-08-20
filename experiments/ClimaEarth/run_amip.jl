@@ -944,7 +944,7 @@ if ClimaComms.iamroot(comms_ctx)
                 "pr" => (-5.0, 5.0),
                 "rsut" => (-50.0, 50.0),
                 "rlut" => (-50.0, 50.0),
-                "rsdt" => (-10.0, 10.0),
+                "rsdt" => (-2.0, 2.0),
                 "rsutcs" => (-20.0, 20.0),
                 "rlutcs" => (-20.0, 20.0),
             )
@@ -957,7 +957,8 @@ if ClimaComms.iamroot(comms_ctx)
             diagnostics_times = ClimaAnalysis.times(first_var)
             # Remove the first `spinup_months` months from the leaderboard
             spinup_months = 6
-            spinup_cutoff = spinup_months * 30 * 86400.0
+            # The monthly average output is at the end of the month, so this is safe
+            spinup_cutoff = spinup_months * 31 * 86400.0
             if diagnostics_times[end] > spinup_cutoff
                 filter!(x -> x > spinup_cutoff, diagnostics_times)
             end

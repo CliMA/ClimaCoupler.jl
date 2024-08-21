@@ -17,7 +17,7 @@ include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
 
     input_matrix = reshape(1.0:16, (4, 4))
 
-    @test Leaderboard.resample(input_matrix, (1.0:4, 1.0:4), ([2.8], [3.7]))[1] == 15.0
+    @test Leaderboard.resample(input_matrix, (1.0:4, 1.0:4), ([2.8], [3.7]))[1] == 13.6
 
     @test_throws ErrorException Leaderboard.integration_weights(([1.0], [10.0]))
     @test_throws ErrorException Leaderboard.integration_weights(([10.0], [1.0]))

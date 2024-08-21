@@ -37,7 +37,7 @@ function resample(
     vec_to_range(v) = range(v[begin], v[end], length = length(v))
     src_lonlat_ranges = vec_to_range.(src_lonlat)
 
-    itp = Interpolations.constant_interpolation(
+    itp = Interpolations.linear_interpolation(
         src_lonlat_ranges,
         data,
         extrapolation_bc = (Interpolations.Periodic(), Interpolations.Flat()),

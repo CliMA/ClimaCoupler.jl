@@ -1,7 +1,7 @@
 import Adapt
 import CUDA
 import Plots
-import ClimaCoupler: PostProcessor, TestHelper
+import ClimaCoupler: PostProcessor
 import StaticArrays
 
 """
@@ -153,15 +153,27 @@ function to_cpu(field::CC.Fields.Field)
         height = get_height(space.grid)
 
         cpu_comms_ctx = ClimaComms.SingletonCommsContext(ClimaComms.CPUSingleThreaded())
-        cpu_space = TestHelper.create_space(
-            FT,
-            comms_ctx = cpu_comms_ctx,
-            R = R,
-            ne = ne,
-            polynomial_degree = polynomial_degree,
-            nz = nz,
-            height = height,
-        )
+        domain = CC.Domains.SphereDomain(R)
+        mesh = CC.Meshes.EquiangularCubedSphere(domain, ne)
+        topology = CC.Topologies.Topology2D(cpu_comms_ctx, mesh, CC.Topologies.spacefillingcurve(mesh))
+
+        Nq = polynomial_degree + 1
+        quad = CC.Spaces.Quadratures.GLL{Nq}()
+        sphere_space = CC.Spaces.SpectralElementSpace2D(topology, quad)
+        if nz > 1
+            vertdomain = CC.Domains.IntervalDomain(
+                CC.Geometry.ZPoint{FT}(0),
+                CC.Geometry.ZPoint{FT}(height);
+                boundary_names = (:bottom, :top),
+            )
+            vertmesh = CC.Meshes.IntervalMesh(vertdomain, nelems = nz)
+            vert_topology = CC.Topologies.IntervalTopology(cpu_comms_ctx, vertmesh)
+            vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(vert_topology)
+
+            cpu_space = CC.Spaces.ExtrudedFiniteDifferenceSpace(sphere_space, vert_center_space)
+        else
+            cpu_space = sphere_space
+        end
         cpu_field = CC.Fields.ones(cpu_space)
 
         parent(cpu_field) .= Array(parent(field))

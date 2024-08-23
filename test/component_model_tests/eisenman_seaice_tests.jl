@@ -3,7 +3,10 @@ import ClimaCore as CC
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TP
 import ClimaCoupler
-import ClimaCoupler: Interfacer, Regridder, TestHelper
+import ClimaCoupler: Interfacer, Regridder
+
+include(joinpath("..", "TestHelper.jl"))
+import .TestHelper
 
 include("../../experiments/ClimaEarth/components/ocean/eisenman_seaice.jl")
 

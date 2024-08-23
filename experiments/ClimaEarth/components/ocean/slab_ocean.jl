@@ -168,13 +168,6 @@ end
 ###
 ### Slab ocean model-specific functions (not explicitly required by ClimaCoupler.jl)
 ###
-"""
-    scale_sst(SST::FT, _info)
-Ensures that the space of the SST struct matches that of the land_fraction, and converts the units to Kelvin (N.B.: this is dataset specific)
-"""
-scale_sst(SST, _info) =
-    (Utilities.swap_space!(axes(_info.land_fraction), SST) .+ BCReader.float_type_bcf(_info)(273.15))
-
 # ode
 function slab_ocean_rhs!(dY, Y, cache, t)
     p, F_turb_energy, F_radiative, area_fraction = cache

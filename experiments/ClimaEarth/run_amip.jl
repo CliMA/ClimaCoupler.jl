@@ -48,7 +48,6 @@ import ClimaCore as CC
 # ## Coupler specific imports
 import ClimaCoupler
 import ClimaCoupler:
-    BCReader,
     ConservationChecker,
     Checkpointer,
     Diagnostics,
@@ -58,6 +57,10 @@ import ClimaCoupler:
     Regridder,
     TimeManager,
     Utilities
+
+import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
+import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
+import Interpolations
 
 pkg_dir = pkgdir(ClimaCoupler)
 
@@ -168,12 +171,11 @@ end
 The data files are downloaded from the `ClimaCoupler` artifacts directory. If the data files are not present, they are downloaded from the
 original sources.
 =#
-
 include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
-sst_data = artifact_data(sst_dataset_path(), "sst", "SST", dir_paths.regrid, date0, t_start, t_end, comms_ctx)
-sic_data = artifact_data(sic_dataset_path(), "sic", "SEAICE", dir_paths.regrid, date0, t_start, t_end, comms_ctx)
-co2_data = artifact_data(co2_dataset_path(), "mauna_loa_co2", "co2", dir_paths.regrid, date0, t_start, t_end, comms_ctx)
-land_mask_data = artifact_data(mask_dataset_path(), "seamask")
+sst_data = joinpath(sst_dataset_path(), "sst.nc")
+sic_data = joinpath(sic_dataset_path(), "sic.nc")
+co2_data = joinpath(co2_dataset_path(), "mauna_loa_co2.nc")
+land_mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 
 #=
 ## Component Model Initialization
@@ -215,18 +217,7 @@ Note that land-sea area fraction is different to the land-sea mask, which is a b
 (masks are used internally by the coupler to indicate passive cells that are not populated by a given component model).
 =#
 
-land_area_fraction =
-    FT.(
-        Regridder.land_fraction(
-            FT,
-            dir_paths.regrid,
-            comms_ctx,
-            land_mask_data,
-            "LSMASK",
-            boundary_space,
-            mono = mono_surface,
-        )
-    )
+land_area_fraction = SpaceVaryingInput(land_mask_data, "LSMASK", boundary_space)
 Utilities.show_memory_usage(comms_ctx)
 
 #=
@@ -268,22 +259,17 @@ if mode_name == "amip"
     )
 
     ## ocean stub
-    SST_info = BCReader.bcfile_info_init(
-        FT,
-        dir_paths.regrid,
+    SST_timevaryinginput = TimeVaryingInput(
         sst_data,
         "SST",
         boundary_space,
-        comms_ctx,
-        interpolate_daily = true,
-        scaling_function = scale_sst, ## convert to Kelvin
-        land_fraction = land_area_fraction,
-        date0 = date0,
-        mono = mono_surface,
+        reference_date = date0,
+        file_reader_kwargs = (; preprocess_func = (data) -> data + FT(273.15),), ## convert to Kelvin
     )
 
-    BCReader.update_midmonth_data!(date0, SST_info)
-    SST_init = BCReader.interpolate_midmonth_to_daily(date0, SST_info)
+    SST_init = CC.Fields.zeros(boundary_space)
+    evaluate!(SST_init, SST_timevaryinginput, t_start)
+
     ocean_sim = Interfacer.SurfaceStub((;
         T_sfc = SST_init,
         ρ_sfc = CC.Fields.zeros(boundary_space),
@@ -298,21 +284,17 @@ if mode_name == "amip"
     ))
 
     ## sea ice model
-    SIC_info = BCReader.bcfile_info_init(
-        FT,
-        dir_paths.regrid,
+    SIC_timevaryinginput = TimeVaryingInput(
         sic_data,
         "SEAICE",
         boundary_space,
-        comms_ctx,
-        interpolate_daily = true,
-        scaling_function = scale_sic, ## convert to fraction
-        land_fraction = land_area_fraction,
-        date0 = date0,
-        mono = mono_surface,
+        reference_date = date0,
+        file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
     )
-    BCReader.update_midmonth_data!(date0, SIC_info)
-    SIC_init = BCReader.interpolate_midmonth_to_daily(date0, SIC_info)
+
+    SIC_init = CC.Fields.zeros(boundary_space)
+    evaluate!(SIC_init, SIC_timevaryinginput, t_start)
+
     ice_fraction = get_ice_fraction.(SIC_init, mono_surface)
     ice_sim = ice_init(
         FT;
@@ -325,24 +307,18 @@ if mode_name == "amip"
     )
 
     ## CO2 concentration from temporally varying file
-    CO2_info = BCReader.bcfile_info_init(
-        FT,
-        dir_paths.regrid,
-        co2_data,
-        "co2",
-        boundary_space,
-        comms_ctx,
-        interpolate_daily = true,
-        land_fraction = ones(boundary_space),
-        date0 = date0,
-        mono = mono_surface,
+    CO2_timevaryinginput = TimeVaryingInput(co2_data, "co2", boundary_space, reference_date = date0)
+
+    CO2_init = CC.Fields.zeros(boundary_space)
+    evaluate!(CO2_init, CO2_timevaryinginput, t_start)
+    CO2_field = Interfacer.update_field!(atmos_sim, Val(:co2), CO2_init)
+
+    mode_specifics = (;
+        name = mode_name,
+        SST_timevaryinginput = SST_timevaryinginput,
+        SIC_timevaryinginput = SIC_timevaryinginput,
+        CO2_timevaryinginput = CO2_timevaryinginput,
     )
-
-    BCReader.update_midmonth_data!(date0, CO2_info)
-    CO2_init = BCReader.interpolate_midmonth_to_daily(date0, CO2_info)
-    Interfacer.update_field!(atmos_sim, Val(:co2), CO2_init)
-
-    mode_specifics = (; name = mode_name, SST_info = SST_info, SIC_info = SIC_info, CO2_info = CO2_info)
     Utilities.show_memory_usage(comms_ctx)
 
 elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
@@ -394,7 +370,7 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         thermo_params = thermo_params,
     ))
 
-    mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
+    mode_specifics = (; name = mode_name, SST_timevaryinginput = nothing, SIC_timevaryinginput = nothing)
     Utilities.show_memory_usage(comms_ctx)
 
 elseif mode_name == "slabplanet_eisenman"
@@ -438,7 +414,7 @@ elseif mode_name == "slabplanet_eisenman"
         thermo_params = thermo_params,
     )
 
-    mode_specifics = (; name = mode_name, SST_info = nothing, SIC_info = nothing)
+    mode_specifics = (; name = mode_name, SST_timevaryinginput = nothing, SIC_timevaryinginput = nothing)
     Utilities.show_memory_usage(comms_ctx)
 end
 
@@ -712,28 +688,13 @@ function solve_coupler!(cs)
 
         if cs.mode.name == "amip"
 
-            ## update values of SST, SIC, and CO2 for this timestep
-            if cs.dates.date[1] >= BCReader.next_date_in_file(cs.mode.SST_info)
-                BCReader.update_midmonth_data!(cs.dates.date[1], cs.mode.SST_info)
-            end
-            SST_current = BCReader.interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SST_info)
-            Interfacer.update_field!(ocean_sim, Val(:surface_temperature), SST_current)
+            evaluate!(Interfacer.get_field(ocean_sim, Val(:surface_temperature)), cs.mode.SST_timevaryinginput, t)
+            evaluate!(Interfacer.get_field(ice_sim, Val(:area_fraction)), cs.mode.SIC_timevaryinginput, t)
 
-            if cs.dates.date[1] >= BCReader.next_date_in_file(cs.mode.SIC_info)
-                BCReader.update_midmonth_data!(cs.dates.date[1], cs.mode.SIC_info)
-            end
-            SIC_current =
-                get_ice_fraction.(
-                    BCReader.interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.SIC_info),
-                    cs.mode.SIC_info.mono,
-                )
-            Interfacer.update_field!(ice_sim, Val(:area_fraction), SIC_current)
-
-            if cs.dates.date[1] >= BCReader.next_date_in_file(cs.mode.CO2_info)
-                BCReader.update_midmonth_data!(cs.dates.date[1], cs.mode.CO2_info)
-            end
-            CO2_current = BCReader.interpolate_midmonth_to_daily(cs.dates.date[1], cs.mode.CO2_info)
-            Interfacer.update_field!(atmos_sim, Val(:co2), CO2_current)
+            # TODO: get_field with :co2 is not implemented, so this is a little awkward
+            current_CO2 = CC.Fields.zeros(boundary_space)
+            evaluate!(current_CO2, cs.mode.CO2_timevaryinginput, t)
+            Interfacer.update_field!(atmos_sim, Val(:co2), current_CO2)
 
             ## calculate and accumulate diagnostics at each timestep, if we're using diagnostics in this run
             if !isempty(cs.diagnostics)

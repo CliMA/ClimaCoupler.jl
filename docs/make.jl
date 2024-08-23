@@ -57,7 +57,6 @@ experiment_pages = [
     "AMIP" => map(s -> "generated/amip/$(s)", readdir(joinpath(@__DIR__, "src/generated/amip"))),
 ]
 interface_pages = [
-    "bcreader.md",
     "checkpointer.md",
     "conservation.md",
     "diagnostics.md",

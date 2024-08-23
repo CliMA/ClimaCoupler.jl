@@ -91,16 +91,6 @@ steps:
           slurm_ntasks: 2
           slurm_mem: 16GB
 
-      - label: "MPI BCReader unit tests"
-        key: "bcreader_mpi_tests"
-        command: "srun julia --color=yes --project=test/ test/mpi_tests/bcreader_mpi_tests.jl --job_id bcreader_mpi"
-        timeout_in_minutes: 20
-        env:
-          CLIMACOMMS_CONTEXT: "MPI"
-        agents:
-          slurm_ntasks: 2
-          slurm_mem: 16GB
-
       - label: "MPI Checkpointer unit tests"
         key: "checkpointer_mpi_tests"
         command: "srun julia --color=yes --project=test/ test/mpi_tests/checkpointer_mpi_tests.jl --job_id checkpointer_mpi"

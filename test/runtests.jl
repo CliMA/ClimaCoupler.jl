@@ -26,9 +26,6 @@ end
 @safetestset "ConservationChecker tests" begin
     include("conservation_checker_tests.jl")
 end
-gpu_broken || @safetestset "BCReader tests" begin
-    include("bcreader_tests.jl")
-end
 @safetestset "Utilities tests" begin
     include("utilities_tests.jl")
 end

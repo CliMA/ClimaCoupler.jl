@@ -2,7 +2,7 @@ import SciMLBase
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
 import Thermodynamics as TD
-import ClimaCoupler: BCReader, Checkpointer, FluxCalculator, Interfacer, Regridder, Utilities
+import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Regridder, Utilities
 
 include("../slab_utils.jl")
 

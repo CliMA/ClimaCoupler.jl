@@ -218,6 +218,9 @@ Note that land-sea area fraction is different to the land-sea mask, which is a b
 =#
 
 land_area_fraction = SpaceVaryingInput(land_mask_data, "LSMASK", boundary_space)
+if !mono_surface
+    land_area_fraction = Regridder.binary_mask.(land_area_fraction)
+end
 Utilities.show_memory_usage(comms_ctx)
 
 #=
@@ -747,7 +750,7 @@ function solve_coupler!(cs)
         ## update the coupler with the new atmospheric properties
         FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
 
-        ## callback to update the fist day of month if needed (for BCReader)
+        ## callback to update the fist day of month if needed
         TimeManager.trigger_callback!(cs, cs.callbacks.update_firstdayofmonth!)
 
         ## callback to checkpoint model state

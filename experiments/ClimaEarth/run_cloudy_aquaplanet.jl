@@ -25,7 +25,6 @@ import ClimaCore as CC
 # ## Coupler specific imports
 import ClimaCoupler
 import ClimaCoupler:
-    BCReader,
     ConservationChecker,
     Checkpointer,
     Diagnostics,
@@ -359,7 +358,7 @@ function solve_coupler!(cs)
 
         FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
 
-        ## callback to update the fist day of month if needed (for BCReader)
+        ## callback to update the fist day of month if needed
         TimeManager.trigger_callback!(cs, cs.callbacks.update_firstdayofmonth!)
 
         ## callback to checkpoint model state

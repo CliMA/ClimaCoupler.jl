@@ -33,6 +33,5 @@ end
 if !Sys.iswindows()
     @info "tests started"
     runmpi(joinpath(@__DIR__, "regridder_mpi_tests.jl"), ntasks = 2)
-    runmpi(joinpath(@__DIR__, "bcreader_mpi_tests.jl"), ntasks = 1)
     runmpi(joinpath(@__DIR__, "checkpointer_mpi_tests.jl"), ntasks = 1)
 end

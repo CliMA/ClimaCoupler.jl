@@ -1,5 +1,3 @@
-import Adapt
-import CUDA
 import Plots
 import ClimaCoupler: PostProcessor
 import StaticArrays
@@ -181,5 +179,4 @@ function to_cpu(field::CC.Fields.Field)
     end
 end
 
-to_cpu(arr::Union{Array, StaticArrays.SVector}) = arr
-to_cpu(arr::CUDA.CuArray) = Adapt.adapt(Array, arr)
+to_cpu(arr::AbstractArray) = Array(arr)

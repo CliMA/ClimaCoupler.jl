@@ -4,7 +4,6 @@
 import Test: @test, @testset
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
-import CUDA
 import Dates
 import ClimaCore as CC
 import ClimaCoupler: ConservationChecker, Diagnostics, Interfacer, TimeManager
@@ -56,7 +55,7 @@ for FT in (Float32, Float64)
             )
             Diagnostics.accumulate_diagnostics!(cs)
 
-            CUDA.@allowscalar begin
+            ClimaComms.allowscalar(ClimaComms.device()) do
                 @test cs.diagnostics[1].field_vector[1] == expected_results[c_i]
             end
 

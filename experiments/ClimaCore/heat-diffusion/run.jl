@@ -87,11 +87,8 @@
 ## import Pkg; Pkg.add(url="https://github.com/CliMA/ClimaCore.jl",rev="main")
 
 #  - load external packages:
-import LinearAlgebra
 import Logging
 import SciMLBase
-import Statistics
-import TerminalLoggers
 
 # load CliMA packages:
 import ClimaCore as CC
@@ -101,7 +98,6 @@ import ClimaTimeSteppers as CTS
 include("../CoupledSims/coupled_sim.jl")
 
 #src ## Setup Logging Information
-Logging.global_logger(TerminalLoggers.TerminalLogger()) #src
 const CI = !isnothing(get(ENV, "CI", nothing)) #src
 
 # ## Define Parameters
@@ -198,7 +194,8 @@ domain_atm = CC.Domains.IntervalDomain(
 context = CC.ClimaComms.context()
 mesh_atm = CC.Meshes.IntervalMesh(domain_atm, nelems = parameters.n); # struct, allocates face boundaries to 5,6: atmos
 if pkgversion(CC) >= v"0.14.10"
-    center_space_atm = CC.Spaces.CenterFiniteDifferenceSpace(context, mesh_atm) # collection of the above, discretises space into FD and provides coords
+    device = CC.ClimaComms.device(context)
+    center_space_atm = CC.Spaces.CenterFiniteDifferenceSpace(device, mesh_atm) # collection of the above, discretises space into FD and provides coords
 else
     center_space_atm = CC.Spaces.CenterFiniteDifferenceSpace(mesh_atm) # collection of the above, discretises space into FD and provides coords
 end
@@ -349,8 +346,9 @@ Plots.png(
 )
 
 # - Conservation: relative error with time
+mean(arr) = sum(arr) / length(arr)
 total = atm_sum_u_t + lnd_sfc_u_t;
-rel_error = abs.(total .- total[1]) / Statistics.mean(total);
+rel_error = abs.(total .- total[1]) / mean(total);
 Plots.png(
     Plots.plot(
         sol_lnd.t,

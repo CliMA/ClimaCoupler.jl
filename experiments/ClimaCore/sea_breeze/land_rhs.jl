@@ -36,7 +36,7 @@ function hspace_1D(xlim = (-π, π), npoly = 0, helem = 10)
     FT = Float64
 
     domain =
-        CC.Domains.IntervalDomain(CC.Geometry.XPoint{FT}(xlim[1]) .. CC.Geometry.XPoint{FT}(xlim[2]), periodic = true)
+        CC.Domains.IntervalDomain(CC.Geometry.XPoint{FT}(xlim[1]), CC.Geometry.XPoint{FT}(xlim[2]), periodic = true)
     mesh = CC.Meshes.IntervalMesh(domain; nelems = helem)
     topology = CC.Topologies.IntervalTopology(mesh)
 

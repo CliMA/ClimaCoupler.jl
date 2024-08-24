@@ -7,7 +7,6 @@ of data.
 module TimeManager
 
 import Dates
-import DocStringExtensions
 import ..Interfacer
 
 export current_date,
@@ -109,7 +108,11 @@ This is a callback type that triggers at intervals of 1h or multiple hours.
 
 # Fields
 
-$(DocStringExtensions.FIELDS)
+- `dt`
+- `func`
+- `ref_date`
+- `active`
+- `data
 """
 @kwdef struct HourlyCallback{FT} <: CouplerCallback
     dt::FT = FT(1) # hours
@@ -126,7 +129,11 @@ This is a callback type that triggers at intervals of 1 month or multiple months
 
 # Fields
 
-$(DocStringExtensions.FIELDS)
+- `dt`
+- `func`
+- `ref_date`
+- `active`
+- `data`
 """
 @kwdef struct MonthlyCallback{FT} <: CouplerCallback
     dt::FT = FT(1) # months

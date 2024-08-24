@@ -1,7 +1,6 @@
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ArgParse
-import CUDA
 import ClimaCoupler
 import ClimaCoupler: Utilities
 import ClimaAtmos as CA

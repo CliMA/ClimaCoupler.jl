@@ -5,7 +5,6 @@ This module contains functions for postprocessing model data (saved during the s
 """
 module PostProcessor
 
-import Statistics
 import ClimaCore as CC
 import ..Regridder
 
@@ -76,6 +75,10 @@ function DataPackage(tag::RawData, name::Symbol, data::Union{AbstractArray, CC.F
     DataPackage(tag, string(name), data, (;))
 end
 
+function mean(arr::AbstractArray; dims)
+    return sum(arr, dims = dims) ./ size(arr, dims)
+end
+
 """
     postprocess(
         name::Symbol,
@@ -141,18 +144,14 @@ function postprocess(
     if :zonal_mean in p_methods
         package.tag == RawData() && @error("Cannot perform zonal mean on raw model data. Specify :regrid")
         if package.tag == ZLatLonData()
-            package = DataPackage(
-                ZLatData(),
-                name,
-                dropdims(Statistics.mean(package.data, dims = 1), dims = 1),
-                coords = package.coords,
-            )
+            package =
+                DataPackage(ZLatData(), name, dropdims(mean(package.data, dims = 1), dims = 1), coords = package.coords)
         else
             package.tag == LatLonData()
             package = DataPackage(
                 LatData(),
                 name,
-                dropdims(Statistics.mean(package.data, dims = 1), dims = 1),
+                dropdims(mean(package.data, dims = 1), dims = 1),
                 coords = (; lat = package.coords.lat),
             )
         end

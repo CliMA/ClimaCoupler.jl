@@ -14,5 +14,5 @@ mono_surface: false
 rad: "allskywithclear"
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "120days"
+t_end: "366days"
 turb_flux_partition: "CombinedStateFluxesMOST"

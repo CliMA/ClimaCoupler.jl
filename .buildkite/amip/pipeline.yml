@@ -1,6 +1,6 @@
 agents:
   queue: clima
-  slurm_time: 76:00:00
+  slurm_time: 96:00:00
   modules: common
 
 env:
@@ -9,7 +9,7 @@ env:
   SLURM_KILL_BAD_EXIT: 1
   CONFIG_PATH: "config/amip_configs"
 
-timeout_in_minutes: 4560
+timeout_in_minutes: 5760
 
 steps:
 
@@ -46,7 +46,7 @@ steps:
           - echo "--- Run simulation"
           - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip.yml --job_id amip"
         artifact_paths: "experiments/ClimaEarth/output/amip/amip_artifacts/*"
-        timeout_in_minutes: 4320
+        timeout_in_minutes: 5760
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

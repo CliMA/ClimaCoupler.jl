@@ -6,7 +6,6 @@ modules in the coupler.
 """
 module Utilities
 
-import CUDA
 import ClimaComms
 import ClimaCore as CC
 

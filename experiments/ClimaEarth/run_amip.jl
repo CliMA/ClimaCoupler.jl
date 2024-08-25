@@ -837,14 +837,14 @@ if ClimaComms.iamroot(comms_ctx)
     ## energy check plots
     if !isnothing(cs.conservation_checks) && cs.mode.name[1:10] == "slabplanet"
         @info "Conservation Check Plots"
-        ConservationChecker.plot_global_conservation(
+        plot_global_conservation(
             cs.conservation_checks.energy,
             cs,
             config_dict["conservation_softfail"],
             figname1 = joinpath(dir_paths.artifacts, "total_energy_bucket.png"),
             figname2 = joinpath(dir_paths.artifacts, "total_energy_log_bucket.png"),
         )
-        ConservationChecker.plot_global_conservation(
+        plot_global_conservation(
             cs.conservation_checks.water,
             cs,
             config_dict["conservation_softfail"],

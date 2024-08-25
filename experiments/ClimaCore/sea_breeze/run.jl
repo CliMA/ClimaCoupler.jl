@@ -17,7 +17,6 @@ of the ClimaCoupler interface are used and discussed.
 include("../CoupledSims/coupled_sim.jl")
 
 import DiffEqCallbacks #hide
-import Random #hide
 import SciMLBase #hide
 
 import ClimaCore as CC #hide
@@ -28,9 +27,6 @@ CC.Operators.allow_mismatched_fd_spaces() = true #hide
 
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", "..")) #hide
 const FT = Float64 #hide
-
-# Set random seed for reproducibility
-Random.seed!(1234)
 
 #=
 ## Model Initialization
@@ -293,7 +289,6 @@ cpl_run(sim)
 # ### References
 # - [Antonelli & Rotunno 2007](https://journals.ametsoc.org/view/journals/atsc/64/12/2007jas2261.1.xml?tab_body=pdf)
 ## Post-processing
-import JLD2 #hide
 import Plots, ClimaCorePlots #hide
 
 sol = sim.atmos.integrator.sol #hide

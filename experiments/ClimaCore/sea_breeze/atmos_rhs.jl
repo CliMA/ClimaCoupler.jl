@@ -100,18 +100,13 @@ and for vertical-momentum, as:
 # ## Model Code
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", ".."))
 
-using IntervalSets # for `..`
 import LinearAlgebra
-import Logging
 import SciMLBase
 import StaticArrays
-import TerminalLoggers
 
 import ClimaCore as CC
 import ClimaCore.Geometry: ⊗
 import ClimaComms
-
-Logging.global_logger(TerminalLoggers.TerminalLogger())
 
 # Load coupled simulation code
 include("../CoupledSims/coupled_sim.jl")
@@ -127,13 +122,14 @@ function hvspace_2D(xlim = (-π, π), zlim = (0, 4π), helem = 20, velem = 20, n
     context = ClimaComms.context()
     vertmesh = CC.Meshes.IntervalMesh(vertdomain, nelems = velem)
     if pkgversion(CC) >= v"0.14.10"
-        vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(context, vertmesh)
+        device = ClimaComms.device(context)
+        vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(device, vertmesh)
     else
         vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(vertmesh)
     end
 
     horzdomain =
-        CC.Domains.IntervalDomain(CC.Geometry.XPoint{FT}(xlim[1]) .. CC.Geometry.XPoint{FT}(xlim[2]), periodic = true)
+        CC.Domains.IntervalDomain(CC.Geometry.XPoint{FT}(xlim[1]), CC.Geometry.XPoint{FT}(xlim[2]), periodic = true)
     horzmesh = CC.Meshes.IntervalMesh(horzdomain; nelems = helem)
     horztopology = CC.Topologies.IntervalTopology(horzmesh)
 

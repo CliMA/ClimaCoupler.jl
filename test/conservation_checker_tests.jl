@@ -185,29 +185,5 @@ for FT in (Float32, Float64)
         )
 
         tot_energy, tot_water = ConservationChecker.check_conservation!(cs)
-
-        output_plots = "test_cons_plots/"
-        mkpath(output_plots)
-        ConservationChecker.plot_global_conservation(
-            cs.conservation_checks.energy,
-            cs,
-            figname1 = output_plots * "energy.png",
-            figname2 = output_plots * "energy_log.png",
-        )
-        ConservationChecker.plot_global_conservation(
-            cs.conservation_checks.water,
-            cs,
-            figname1 = output_plots * "water.png",
-            figname2 = output_plots * "water_log.png",
-        )
-
-        # test that files exist
-        @test isfile("test_cons_plots/energy.png")
-        @test isfile("test_cons_plots/energy_log.png")
-        @test isfile("test_cons_plots/water.png")
-        @test isfile("test_cons_plots/water_log.png")
-
-        # remove output
-        rm(output_plots; recursive = true)
     end
 end

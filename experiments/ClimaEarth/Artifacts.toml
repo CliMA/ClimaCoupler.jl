@@ -1,10 +1,5 @@
 [land_mask]
 git-tree-sha1 = "e41bc8c44124f867b64a9d70f1599515ae27f38a"
-[sic]
-git-tree-sha1 = "139d23f6de29900917d79b41a87a8ee6483c72d0"
-
-[sst]
-git-tree-sha1 = "9969543acd3c9084b8238b7858d0c76aa0bf98a7"
 
 [test]
 git-tree-sha1 = "b377e7c997804b47720b8e7243361d399d108441"
@@ -29,3 +24,6 @@ git-tree-sha1 = "c9eef049fc3bf057f35332c316755a694b0eb5ef"
     [[radiation_obs.download]]
     sha256 = "3274926803246cd3738e2d9f36c3fc2652fdb564fba80ddcb10860fd5d8cb552"
     url = "https://caltech.box.com/shared/static/odvaz76hi3ujakhwgkilzbitk49ty1fw.gz"
+
+[historical_sst_sic]
+git-tree-sha1 = "c4f82cd33fb26513ee45bff78330c6b606630fa5"

@@ -29,3 +29,6 @@ toml: [toml/diagnostic_edmfx.toml]
 turbconv: diagnostic_edmfx
 z_elem: 63
 z_max: 55000.0
+prescribe_ozone: true
+aerosol_radiation: true
+prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]

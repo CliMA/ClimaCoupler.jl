@@ -21,3 +21,6 @@ topo_smoothing: true
 topography: "Earth"
 coupler_toml_file: "toml/amip_target_topo_diagedmf.toml"
 turb_flux_partition: "CombinedStateFluxesMOST"
+prescribe_ozone: true
+aerosol_radiation: true
+prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]

@@ -16,3 +16,6 @@ start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "366days"
 turb_flux_partition: "CombinedStateFluxesMOST"
+prescribe_ozone: true
+aerosol_radiation: true
+prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]

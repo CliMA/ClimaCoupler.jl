@@ -1,5 +1,5 @@
 FLOAT_TYPE: "Float32"
-atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_0M.yml"
+atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_1M.yml"
 dt: "120secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: 120

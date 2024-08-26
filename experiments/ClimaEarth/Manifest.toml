@@ -292,7 +292,9 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "ArtifactWrappers", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "DiffEqBase", "DocStringExtensions", "FastGaussQuadrature", "Insolation", "Interpolations", "IntervalSets", "Krylov", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "Pkg", "Printf", "RRTMGP", "Random", "RootSolvers", "SciMLBase", "StaticArrays", "Statistics", "StatsBase", "SurfaceFluxes", "Thermodynamics", "YAML"]
-git-tree-sha1 = "129bf59b0a75efbc4bb6d2e45574c99fca8d08fd"
+git-tree-sha1 = "57b8cc2e27e5c59eed2e91a35d75fad277f3a411"
+repo-rev = "main"
+repo-url = "/home/asridhar/Codes/ClimaAtmos.jl"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
 version = "0.27.4"
 

@@ -60,6 +60,7 @@ import ClimaCoupler:
 
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
+import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Interpolations
 
 pkg_dir = pkgdir(ClimaCoupler)
@@ -172,8 +173,8 @@ The data files are downloaded from the `ClimaCoupler` artifacts directory. If th
 original sources.
 =#
 include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
-sst_data = joinpath(sst_dataset_path(), "sst.nc")
-sic_data = joinpath(sic_dataset_path(), "sic.nc")
+sst_data = joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.SST.HAD187001-198110.OI198111-202206.nc")
+sic_data = joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.ICE.HAD187001-198110.OI198111-202206.nc")
 co2_data = joinpath(co2_dataset_path(), "mauna_loa_co2.nc")
 land_mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 

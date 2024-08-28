@@ -1,6 +1,6 @@
 agents:
   queue: clima
-  slurm_time: 76:00:00
+  slurm_time: 96:00:00
   modules: common
 
 env:
@@ -9,7 +9,7 @@ env:
   SLURM_KILL_BAD_EXIT: 1
   CONFIG_PATH: "config/amip_configs"
 
-timeout_in_minutes: 4560
+timeout_in_minutes: 5760
 
 steps:
 
@@ -46,7 +46,7 @@ steps:
           - echo "--- Run simulation"
           - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip.yml --job_id amip"
         artifact_paths: "experiments/ClimaEarth/output/amip/amip_artifacts/*"
-        timeout_in_minutes: 4320
+        timeout_in_minutes: 5760
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
@@ -70,4 +70,3 @@ steps:
             find experiments/ClimaEarth/output/amip/amip_artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
               slack-upload -c "#coupler-report" -f "$$file" -m png -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
             done
-          - SYPD="$(cat experiments/ClimaEarth/output/amip/amip_artifacts/sypd.txt)"; WALL="$(cat experiments/ClimaEarth/output/amip/amip_artifacts/walltime_per_atmos_step.txt)"; slack-message -c "#coupler-report" -x "SYPD: $SYPD Walltime per Atmos step: $WALL"

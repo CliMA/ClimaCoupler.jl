@@ -19,11 +19,7 @@ git-tree-sha1 = "7486bf32e9352493f69364aead26f01eaf90d2af"
     url = "https://caltech.box.com/shared/static/j63uak557kw7tlzb3dgwifoaeczekzm4.gz"
 
 [radiation_obs]
-git-tree-sha1 = "c9eef049fc3bf057f35332c316755a694b0eb5ef"
-
-    [[radiation_obs.download]]
-    sha256 = "3274926803246cd3738e2d9f36c3fc2652fdb564fba80ddcb10860fd5d8cb552"
-    url = "https://caltech.box.com/shared/static/odvaz76hi3ujakhwgkilzbitk49ty1fw.gz"
+git-tree-sha1 = "945e31f8028a581f7e8435cb691462124484567a"
 
 [historical_sst_sic]
 git-tree-sha1 = "c4f82cd33fb26513ee45bff78330c6b606630fa5"

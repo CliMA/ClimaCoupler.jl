@@ -50,23 +50,65 @@ OBS_DS["rlut"] = ObsDataSource(;
 SIM_DS_KWARGS["rlut"] = (;)
 OTHER_MODELS_RMSEs["rlut"] = []
 
-OBS_DS["rsutcs"] = ObsDataSource(;
-    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
-    var_name = "toa_sw_clr_t_mon",
-)
-SIM_DS_KWARGS["rsutcs"] = (;)
-
 OBS_DS["rsdt"] = ObsDataSource(;
     path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
     var_name = "solar_mon",
 )
 SIM_DS_KWARGS["rsdt"] = (;)
 
+OBS_DS["rsutcs"] = ObsDataSource(;
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
+    var_name = "toa_sw_clr_t_mon",
+)
+SIM_DS_KWARGS["rsutcs"] = (;)
+
 OBS_DS["rlutcs"] = ObsDataSource(;
     path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
     var_name = "toa_lw_clr_t_mon",
 )
 SIM_DS_KWARGS["rlutcs"] = (;)
+
+OBS_DS["rsus"] = ObsDataSource(;
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
+    var_name = "sfc_sw_up_all_mon",
+)
+SIM_DS_KWARGS["rsus"] = (;)
+
+OBS_DS["rsds"] = ObsDataSource(;
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
+    var_name = "sfc_sw_down_all_mon",
+)
+SIM_DS_KWARGS["rsds"] = (;)
+
+OBS_DS["rlus"] = ObsDataSource(;
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
+    var_name = "sfc_lw_up_all_mon",
+)
+SIM_DS_KWARGS["rlus"] = (;)
+
+OBS_DS["rlds"] = ObsDataSource(;
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
+    var_name = "sfc_lw_down_all_mon",
+)
+SIM_DS_KWARGS["rlds"] = (;)
+
+OBS_DS["rsdscs"] = ObsDataSource(;
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
+    var_name = "sfc_sw_down_clr_t_mon",
+)
+SIM_DS_KWARGS["rsdscs"] = (;)
+
+OBS_DS["rsuscs"] = ObsDataSource(;
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
+    var_name = "sfc_sw_up_clr_t_mon",
+)
+SIM_DS_KWARGS["rsuscs"] = (;)
+
+OBS_DS["rldscs"] = ObsDataSource(;
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
+    var_name = "sfc_lw_down_clr_t_mon",
+)
+SIM_DS_KWARGS["rldscs"] = (;)
 
 include("cmip_rmse.jl")
 

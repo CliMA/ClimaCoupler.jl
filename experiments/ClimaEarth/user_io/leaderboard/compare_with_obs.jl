@@ -37,34 +37,34 @@ SIM_DS_KWARGS["pr"] = (; preprocess_data_fn = preprocess_pr_fn, new_units = "mm 
 OTHER_MODELS_RMSEs["pr"] = []
 
 OBS_DS["rsut"] = ObsDataSource(;
-    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF-TOA_Ed4.2_Subset_200003-202303.g025.nc"),
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
     var_name = "toa_sw_all_mon",
 )
 SIM_DS_KWARGS["rsut"] = (;)
 OTHER_MODELS_RMSEs["rsut"] = []
 
 OBS_DS["rlut"] = ObsDataSource(;
-    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF-TOA_Ed4.2_Subset_200003-202303.g025.nc"),
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
     var_name = "toa_lw_all_mon",
 )
 SIM_DS_KWARGS["rlut"] = (;)
 OTHER_MODELS_RMSEs["rlut"] = []
 
 OBS_DS["rsutcs"] = ObsDataSource(;
-    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF-TOA_Ed4.2_Subset_200003-202303.g025.nc"),
-    var_name = "toa_sw_clr_c_mon",
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
+    var_name = "toa_sw_clr_t_mon",
 )
 SIM_DS_KWARGS["rsutcs"] = (;)
 
 OBS_DS["rsdt"] = ObsDataSource(;
-    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF-TOA_Ed4.2_Subset_200003-202303.g025.nc"),
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
     var_name = "solar_mon",
 )
 SIM_DS_KWARGS["rsdt"] = (;)
 
 OBS_DS["rlutcs"] = ObsDataSource(;
-    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF-TOA_Ed4.2_Subset_200003-202303.g025.nc"),
-    var_name = "toa_lw_clr_c_mon",
+    path = joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
+    var_name = "toa_lw_clr_t_mon",
 )
 SIM_DS_KWARGS["rlutcs"] = (;)
 

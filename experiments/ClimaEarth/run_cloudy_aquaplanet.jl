@@ -246,7 +246,7 @@ checkpoint_cb = CallbackManager.HourlyCallback(
 ) # 20 days
 update_firstdayofmonth!_cb = CallbackManager.MonthlyCallback(
     dt = FT(1),
-    func = CallbackManager.update_firstdayofmonth!,
+    func = Interfacer.update_firstdayofmonth!,
     ref_date = [dates.first_day_of_month[1]],
     active = true,
 )

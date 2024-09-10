@@ -77,7 +77,7 @@ for FT in (Float32, Float64)
             ) # or use accumulate = nothing for snapshop save
             cs = Interfacer.CoupledSimulation{FT}(
                 ClimaComms.SingletonCommsContext(), # comms_ctx
-                (date = [Dates.DateTime(0, 2)], date1 = [Dates.DateTime(0, 1)]), # dates
+                (date = [Dates.DateTime(0, 2)], first_day_of_month = [Dates.DateTime(0, 1)]), # dates
                 nothing, # boundary_space
                 nothing, # fields
                 nothing, # parsed_args

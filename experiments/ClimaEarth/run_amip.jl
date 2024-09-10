@@ -453,7 +453,7 @@ Utilities.show_memory_usage(comms_ctx)
 model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim);
 
 ## dates
-dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)], new_month = [false])
+dates = (; date = [date], date0 = [date0], first_day_of_month = [Dates.firstdayofmonth(date0)], new_month = [false])
 
 #=
 ### Online Diagnostics
@@ -533,7 +533,7 @@ checkpoint_cb = CallbackManager.HourlyCallback(
 update_firstdayofmonth!_cb = CallbackManager.MonthlyCallback(
     dt = FT(1),
     func = CallbackManager.update_firstdayofmonth!,
-    ref_date = [dates.date1[1]],
+    ref_date = [dates.first_day_of_month[1]],
     active = true,
 )
 dt_water_albedo = parse(FT, filter(x -> !occursin(x, "hours"), dt_rad))
@@ -680,7 +680,7 @@ function solve_coupler!(cs)
         cs.dates.date[1] = Interfacer.current_date(cs, t)
 
         ## print date on the first of month
-        if cs.dates.date[1] >= cs.dates.date1[1]
+        if cs.dates.date[1] >= cs.dates.first_day_of_month[1]
             ClimaComms.iamroot(comms_ctx) && @show(cs.dates.date[1])
         end
 

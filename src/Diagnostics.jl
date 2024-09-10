@@ -165,8 +165,8 @@ Saves all entries in `dg` in separate HDF5 files per variable in `output_dir`.
 function save_diagnostics(cs::Interfacer.CoupledSimulation)
     for dg in cs.diagnostics
 
-        # Check if the date is greater than the next date to save
-        if cs.dates.date[1] >= cs.dates.date1[1]
+        # Check if the date has crossed to the next month
+        if cs.dates.date[1] >= cs.dates.first_day_of_month[1]
             pre_save(dg.operations.accumulate, cs, dg)
             save_diagnostics(cs, dg)
             post_save(dg.operations.accumulate, cs, dg)

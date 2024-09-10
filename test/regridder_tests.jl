@@ -289,8 +289,8 @@ for FT in (Float32, Float64)
             )
 
             # read in data on CGLL grid from the last saved date
-            date1 = CallbackManager.strdate_to_datetime.(string(Int(time[end])))
-            cgll_path = joinpath(REGRID_DIR, "$(hd_outfile_root)_$date1.hdf5")
+            date_end = CallbackManager.strdate_to_datetime.(string(Int(time[end])))
+            cgll_path = joinpath(REGRID_DIR, "$(hd_outfile_root)_$date_end.hdf5")
             hdfreader = CC.InputOutput.HDF5Reader(cgll_path, comms_ctx)
             T_cgll = CC.InputOutput.read_field(hdfreader, varname)
             Base.close(hdfreader)

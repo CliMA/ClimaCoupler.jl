@@ -174,7 +174,7 @@ model_sims = (atmos_sim = atmos_sim,);
 
 ## dates
 date0 = date = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
-dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)], new_month = [false])
+dates = (; date = [date], date0 = [date0], first_day_of_month = [Dates.firstdayofmonth(date0)], new_month = [false])
 
 #=
 ## Initialize Callbacks
@@ -188,7 +188,7 @@ checkpoint_cb = CallbackManager.HourlyCallback(
 update_firstdayofmonth!_cb = CallbackManager.MonthlyCallback(
     dt = FT(1),
     func = CallbackManager.update_firstdayofmonth!,
-    ref_date = [dates.date1[1]],
+    ref_date = [dates.first_day_of_month[1]],
     active = true,
 )
 callbacks = (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb)
@@ -240,7 +240,7 @@ function solve_coupler!(cs)
         cs.dates.date[1] = Interfacer.current_date(cs, t)
 
         ## print date on the first of month
-        if cs.dates.date[1] >= cs.dates.date1[1]
+        if cs.dates.date[1] >= cs.dates.first_day_of_month[1]
             ClimaComms.iamroot(comms_ctx) ? @show(cs.dates.date[1]) : nothing
         end
 

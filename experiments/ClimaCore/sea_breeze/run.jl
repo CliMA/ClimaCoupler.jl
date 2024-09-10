@@ -16,6 +16,8 @@ of the ClimaCoupler interface are used and discussed.
 # Load utilities for running coupled simulation
 include("../CoupledSims/coupled_sim.jl")
 
+import Random #hide
+
 import DiffEqCallbacks #hide
 import SciMLBase #hide
 
@@ -27,6 +29,9 @@ CC.Operators.allow_mismatched_fd_spaces() = true #hide
 
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", "..")) #hide
 const FT = Float64 #hide
+
+# Set random seed for reproducibility, rand is called in init_sea_breeze_2d in atmos_rhs
+Random.seed!(1234)
 
 #=
 ## Model Initialization

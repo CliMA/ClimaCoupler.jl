@@ -218,7 +218,7 @@ model_sims = (atmos_sim = atmos_sim, ocean_sim = ocean_sim);
 
 ## dates
 date0 = date = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
-dates = (; date = [date], date0 = [date0], first_day_of_month = [Dates.firstdayofmonth(date0)], new_month = [false])
+dates = (; date = [date], date0 = [date0], first_day_of_month = [Dates.firstdayofmonth(date0)])
 
 #=
 ## Initialize Callbacks

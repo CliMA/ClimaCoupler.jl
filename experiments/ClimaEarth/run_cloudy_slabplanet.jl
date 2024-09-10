@@ -175,7 +175,7 @@ land_mask_data = artifact_data(mask_dataset_path(), "seamask")
 
 ## dates
 date0 = date = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
-dates = (; date = [date], date0 = [date0], first_day_of_month = [Dates.firstdayofmonth(date0)], new_month = [false])
+dates = (; date = [date], date0 = [date0], first_day_of_month = [Dates.firstdayofmonth(date0)])
 
 
 #=

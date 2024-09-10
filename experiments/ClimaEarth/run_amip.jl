@@ -453,7 +453,7 @@ Utilities.show_memory_usage(comms_ctx)
 model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim);
 
 ## dates
-dates = (; date = [date], date0 = [date0], first_day_of_month = [Dates.firstdayofmonth(date0)], new_month = [false])
+dates = (; date = [date], date0 = [date0], first_day_of_month = [Dates.firstdayofmonth(date0)])
 
 #=
 ### Online Diagnostics

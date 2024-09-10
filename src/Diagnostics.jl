@@ -6,7 +6,8 @@ This module contains functions for defining, gathering and outputting online mod
 module Diagnostics
 import Dates
 import ClimaCore as CC
-import ..Interfacer, ..TimeManager
+import ClimaUtilities: CallbackManager
+import ..Interfacer
 
 export get_var, init_diagnostics, accumulate_diagnostics!, save_diagnostics, TimeMean
 
@@ -55,7 +56,7 @@ end
     function init_diagnostics(
         names::Tuple,
         space::CC.Spaces.AbstractSpace;
-        save = TimeManager.EveryTimestep(),
+        save = CallbackManager.EveryTimestep(),
         operations = (;),
         output_dir = "",
         name_tag = "",
@@ -66,7 +67,7 @@ Initializes diagnostics groups.
 function init_diagnostics(
     names::Tuple,
     space::CC.Spaces.AbstractSpace;
-    save = TimeManager.EveryTimestep(),
+    save = CallbackManager.EveryTimestep(),
     operations = (;),
     output_dir = "",
     name_tag = "",
@@ -163,7 +164,9 @@ Saves all entries in `dg` in separate HDF5 files per variable in `output_dir`.
 """
 function save_diagnostics(cs::Interfacer.CoupledSimulation)
     for dg in cs.diagnostics
-        if TimeManager.trigger_callback(cs, dg.save)
+
+        # Check if the date is greater than the next date to save
+        if cs.dates.date[1] >= cs.dates.date1[1]
             pre_save(dg.operations.accumulate, cs, dg)
             save_diagnostics(cs, dg)
             post_save(dg.operations.accumulate, cs, dg)
@@ -197,17 +200,17 @@ function save_diagnostics(cs::Interfacer.CoupledSimulation, dg::DiagnosticsGroup
 end
 
 """
-    save_time_format(date::Dates.DateTime, ::TimeManager.Monthly)
+    save_time_format(date::Dates.DateTime, ::CallbackManager.Monthly)
 
 Converts the DateTime `date` to the conventional Unix format (seconds elapsed since 00:00:00 UTC on 1 January 1970).
 """
-function save_time_format(date::Dates.DateTime, ::TimeManager.Monthly)
+function save_time_format(date::Dates.DateTime, ::CallbackManager.Monthly)
     date_m1 = date - Dates.Day(1) # obtain previous month
     datetime = Dates.DateTime(Dates.yearmonth(date_m1)[1], Dates.yearmonth(date_m1)[2])
     Dates.datetime2unix(datetime)
 end
 
-save_time_format(date::Dates.DateTime, ::TimeManager.EveryTimestep) = Dates.datetime2unix(date)
+save_time_format(date::Dates.DateTime, ::CallbackManager.EveryTimestep) = Dates.datetime2unix(date)
 
 """
     pre_save(::TimeMean, cs::Interfacer.CoupledSimulation, dg::DiagnosticsGroup)

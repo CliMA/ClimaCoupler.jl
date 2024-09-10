@@ -6,7 +6,7 @@ import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import Dates
 import ClimaCore as CC
-import ClimaCoupler: ConservationChecker, Diagnostics, Interfacer, TimeManager
+import ClimaCoupler: ConservationChecker, Diagnostics, Interfacer, CallbackManager
 
 include("TestHelper.jl")
 import .TestHelper
@@ -18,7 +18,7 @@ for FT in (Float32, Float64)
         names = (:x, :y)
         space = TestHelper.create_space(FT)
         dg = Diagnostics.init_diagnostics(names, space)
-        @test typeof(dg) == Diagnostics.DiagnosticsGroup{TimeManager.EveryTimestep, NamedTuple{(), Tuple{}}}
+        @test typeof(dg) == Diagnostics.DiagnosticsGroup{CallbackManager.EveryTimestep, NamedTuple{(), Tuple{}}}
     end
 
     @testset "accumulate_diagnostics!, collect_diags, iterate_operations, operation{accumulation{TimeMean, Nothing}}, get_var for FT=$FT" begin
@@ -30,7 +30,7 @@ for FT in (Float32, Float64)
             dg_2d = Diagnostics.init_diagnostics(
                 names,
                 space,
-                save = TimeManager.EveryTimestep(),
+                save = CallbackManager.EveryTimestep(),
                 operations = (; accumulate = case),
             )
             dg_2d.field_vector .= FT(2)
@@ -71,7 +71,7 @@ for FT in (Float32, Float64)
             dg_2d = Diagnostics.init_diagnostics(
                 names,
                 space,
-                save = TimeManager.EveryTimestep(),
+                save = CallbackManager.EveryTimestep(),
                 operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
                 output_dir = test_dir,
             ) # or use accumulate = nothing for snapshop save
@@ -104,7 +104,7 @@ for FT in (Float32, Float64)
 
     @testset "save_time_format for FT=$FT" begin
         date = Dates.DateTime(1970, 2, 1, 0, 1)
-        unix = Diagnostics.save_time_format(date, TimeManager.Monthly())
+        unix = Diagnostics.save_time_format(date, CallbackManager.Monthly())
         @test unix == 0
     end
 
@@ -118,7 +118,7 @@ for FT in (Float32, Float64)
             dg_2d = Diagnostics.init_diagnostics(
                 names,
                 space,
-                save = TimeManager.EveryTimestep(),
+                save = CallbackManager.EveryTimestep(),
                 operations = (; accumulate = case),
             )
             dg_2d.field_vector .= FT(3)

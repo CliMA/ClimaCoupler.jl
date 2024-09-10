@@ -13,7 +13,7 @@ import NCDatasets
 import ClimaComms
 import ClimaCore as CC
 import ClimaCoreTempestRemap as CCTR
-import ..Interfacer, ..Utilities, ..TimeManager
+import ..Interfacer, ..Utilities, ..CallbackManager
 
 export write_to_hdf5,
     read_from_hdf5,
@@ -283,7 +283,7 @@ function get_time(ds)
     if "time" in keys(ds.dim)
         data_dates = Dates.DateTime.(Array(ds["time"]))
     elseif "date" in keys(ds.dim)
-        data_dates = TimeManager.strdate_to_datetime.(string.(Int.(Array(ds["date"]))))
+        data_dates = CallbackManager.strdate_to_datetime.(string.(Int.(Array(ds["date"]))))
     else
         @warn "No dates available in input data file"
         data_dates = [Dates.DateTime(0)]

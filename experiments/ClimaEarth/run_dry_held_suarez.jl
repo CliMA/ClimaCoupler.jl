@@ -26,7 +26,7 @@ import ClimaCore
 
 ## Coupler specific imports
 import ClimaCoupler
-import ClimaCoupler: Checkpointer, FieldExchanger, Interfacer, TimeManager, Utilities
+import ClimaCoupler: Checkpointer, FieldExchanger, Interfacer, CallbackManager, Utilities
 
 pkg_dir = pkgdir(ClimaCoupler)
 
@@ -179,15 +179,15 @@ dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)
 #=
 ## Initialize Callbacks
 =#
-checkpoint_cb = TimeManager.HourlyCallback(
+checkpoint_cb = CallbackManager.HourlyCallback(
     dt = FT(480),
     func = checkpoint_sims,
     ref_date = [dates.date[1]],
     active = hourly_checkpoint,
 ) # 20 days TODO: not GPU friendly
-update_firstdayofmonth!_cb = TimeManager.MonthlyCallback(
+update_firstdayofmonth!_cb = CallbackManager.MonthlyCallback(
     dt = FT(1),
-    func = TimeManager.update_firstdayofmonth!,
+    func = CallbackManager.update_firstdayofmonth!,
     ref_date = [dates.date1[1]],
     active = true,
 )
@@ -237,7 +237,7 @@ function solve_coupler!(cs)
     ## step in time
     walltime = @elapsed for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
 
-        cs.dates.date[1] = TimeManager.current_date(cs, t)
+        cs.dates.date[1] = Interfacer.current_date(cs, t)
 
         ## print date on the first of month
         if cs.dates.date[1] >= cs.dates.date1[1]
@@ -250,10 +250,10 @@ function solve_coupler!(cs)
         FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
 
         ## callback to update the fist day of month if needed
-        TimeManager.trigger_callback!(cs, cs.callbacks.update_firstdayofmonth!)
+        CallbackManager.trigger_callback!(cs.callbacks.update_firstdayofmonth!, cs.dates.date[1])
 
         ## callback to checkpoint model state
-        TimeManager.trigger_callback!(cs, cs.callbacks.checkpoint)
+        CallbackManager.trigger_callback!(cs.callbacks.checkpoint, cs.dates.date[1])
 
     end
     ClimaComms.iamroot(comms_ctx) ? @show(walltime) : nothing

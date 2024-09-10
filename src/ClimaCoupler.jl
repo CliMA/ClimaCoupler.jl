@@ -7,7 +7,6 @@ module ClimaCoupler
 
 include("Interfacer.jl")
 include("Utilities.jl")
-include("TimeManager.jl")
 include("Regridder.jl")
 include("ConservationChecker.jl")
 include("FluxCalculator.jl")

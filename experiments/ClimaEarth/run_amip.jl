@@ -48,19 +48,12 @@ import ClimaCore as CC
 # ## Coupler specific imports
 import ClimaCoupler
 import ClimaCoupler:
-    ConservationChecker,
-    Checkpointer,
-    Diagnostics,
-    FieldExchanger,
-    FluxCalculator,
-    Interfacer,
-    Regridder,
-    TimeManager,
-    Utilities
+    ConservationChecker, Checkpointer, Diagnostics, FieldExchanger, FluxCalculator, Interfacer, Regridder, Utilities
 
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
+import ClimaUtilities: CallbackManager
 import Interpolations
 
 pkg_dir = pkgdir(ClimaCoupler)
@@ -472,7 +465,7 @@ if use_coupler_diagnostics
     monthly_3d_diags = Diagnostics.init_diagnostics(
         (:T, :u, :q_tot, :q_liq_ice),
         atmos_sim.domain.center_space;
-        save = TimeManager.Monthly(),
+        save = CallbackManager.Monthly(),
         operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
         output_dir = dir_paths.output,
         name_tag = "monthly_mean_3d_",
@@ -481,7 +474,7 @@ if use_coupler_diagnostics
     monthly_2d_diags = Diagnostics.init_diagnostics(
         (:precipitation_rate, :toa_fluxes, :T_sfc, :turbulent_energy_fluxes),
         boundary_space;
-        save = TimeManager.Monthly(),
+        save = CallbackManager.Monthly(),
         operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
         output_dir = dir_paths.output,
         name_tag = "monthly_mean_2d_",
@@ -517,7 +510,8 @@ end
 #=
 ## Initialize Callbacks
 Callbacks are used to update at a specified interval. The callbacks are initialized here and
-saved in a global `Callbacks` struct, `callbacks`. The `trigger_callback!` function is used to call the callback during the simulation below.
+saved in a global `Callbacks` struct, `callbacks`. The `trigger_callback!` function is used to call the callback
+when required during the simulation below.
 
 The frequency of the callbacks is specified in the `HourlyCallback` and `MonthlyCallback` structs. The `func` field specifies the function to be called,
 the `ref_date` field specifies the first date for the callback, and the `active` field specifies whether the callback is active or not.
@@ -530,20 +524,20 @@ The currently implemented callbacks are:
   NB: Eventually, we will call all of radiation from the coupler, in addition to the albedo calculation.
 =#
 
-checkpoint_cb = TimeManager.HourlyCallback(
+checkpoint_cb = CallbackManager.HourlyCallback(
     dt = hourly_checkpoint_dt,
     func = checkpoint_sims,
     ref_date = [dates.date[1]],
     active = hourly_checkpoint,
 ) # 20 days
-update_firstdayofmonth!_cb = TimeManager.MonthlyCallback(
+update_firstdayofmonth!_cb = CallbackManager.MonthlyCallback(
     dt = FT(1),
-    func = TimeManager.update_firstdayofmonth!,
+    func = CallbackManager.update_firstdayofmonth!,
     ref_date = [dates.date1[1]],
     active = true,
 )
 dt_water_albedo = parse(FT, filter(x -> !occursin(x, "hours"), dt_rad))
-albedo_cb = TimeManager.HourlyCallback(
+albedo_cb = CallbackManager.HourlyCallback(
     dt = dt_water_albedo,
     func = FluxCalculator.water_albedo_from_atmosphere!,
     ref_date = [dates.date[1]],
@@ -683,7 +677,7 @@ function solve_coupler!(cs)
     ## step in time
     for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
 
-        cs.dates.date[1] = TimeManager.current_date(cs, t)
+        cs.dates.date[1] = Interfacer.current_date(cs, t)
 
         ## print date on the first of month
         if cs.dates.date[1] >= cs.dates.date1[1]
@@ -717,8 +711,7 @@ function solve_coupler!(cs)
 
         ## update water albedo from wind at dt_water_albedo
         ## (this will be extended to a radiation callback from the coupler)
-        TimeManager.trigger_callback!(cs, cs.callbacks.water_albedo)
-
+        CallbackManager.trigger_callback!(cs.callbacks.water_albedo, cs.dates.date[1])
 
         ## update the surface fractions for surface models,
         ## and update all component model simulations with the current fluxes stored in the coupler
@@ -752,10 +745,10 @@ function solve_coupler!(cs)
         FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
 
         ## callback to update the fist day of month if needed
-        TimeManager.trigger_callback!(cs, cs.callbacks.update_firstdayofmonth!)
+        CallbackManager.trigger_callback!(cs.callbacks.update_firstdayofmonth!, cs.dates.date[1])
 
         ## callback to checkpoint model state
-        TimeManager.trigger_callback!(cs, cs.callbacks.checkpoint)
+        CallbackManager.trigger_callback!(cs.callbacks.checkpoint, cs.dates.date[1])
     end
     return nothing
 end

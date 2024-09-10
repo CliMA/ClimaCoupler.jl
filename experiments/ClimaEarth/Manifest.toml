@@ -292,9 +292,7 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "ArtifactWrappers", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "DiffEqBase", "DocStringExtensions", "FastGaussQuadrature", "Insolation", "Interpolations", "IntervalSets", "Krylov", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "Pkg", "Printf", "RRTMGP", "Random", "RootSolvers", "SciMLBase", "StaticArrays", "Statistics", "StatsBase", "SurfaceFluxes", "Thermodynamics", "YAML"]
-git-tree-sha1 = "57b8cc2e27e5c59eed2e91a35d75fad277f3a411"
-repo-rev = "main"
-repo-url = "/home/asridhar/Codes/ClimaAtmos.jl"
+git-tree-sha1 = "129bf59b0a75efbc4bb6d2e45574c99fca8d08fd"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
 version = "0.27.4"
 
@@ -313,11 +311,11 @@ version = "0.6.4"
 
 [[deps.ClimaCore]]
 deps = ["Adapt", "BandedMatrices", "BlockArrays", "ClimaComms", "CubedSphere", "DataStructures", "DocStringExtensions", "ForwardDiff", "GaussQuadrature", "GilbertCurves", "HDF5", "InteractiveUtils", "IntervalSets", "KrylovKit", "LinearAlgebra", "MultiBroadcastFusion", "NVTX", "PkgVersion", "RecursiveArrayTools", "RootSolvers", "SparseArrays", "StaticArrays", "Statistics", "Unrolled"]
-git-tree-sha1 = "cf2fe8229b93976085fd5d92d379151e510505e3"
+git-tree-sha1 = "9e5f2c9894491207d08c6219afa73fc31dd15fd3"
 repo-rev = "main"
 repo-url = "https://github.com/CliMA/ClimaCore.jl.git"
 uuid = "d414da3d-4745-48bb-8d80-42e94e092884"
-version = "0.14.12"
+version = "0.14.13"
 
     [deps.ClimaCore.extensions]
     ClimaCoreCUDAExt = "CUDA"

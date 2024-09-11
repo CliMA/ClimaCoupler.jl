@@ -21,3 +21,6 @@ topo_smoothing: true
 topography: "Earth"
 coupler_toml_file: "toml/amip_target_topo_diagedmf.toml"
 turb_flux_partition: "CombinedStateFluxesMOST"
+diagnostics:
+  - short_name: [ts, ta, thetaa, ha, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, hussfc, evspsbl, pr, hfes, edt]
+    period: 2hours

@@ -1,5 +1,5 @@
 FLOAT_TYPE: "Float32"
-atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_0M.yml"
+atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_1M.yml"
 dt: "120secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: 120
@@ -16,3 +16,6 @@ start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "366days"
 turb_flux_partition: "CombinedStateFluxesMOST"
+diagnostics:
+  - short_name: [ts, ta, thetaa, ha, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, hussfc, evspsbl, pr, hfes, edt]
+    period: 2hours

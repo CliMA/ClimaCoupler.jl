@@ -144,10 +144,10 @@ function map_comparison(func, simdirs, args)
 end
 
 """
-    make_plots(
-        ::Union{Val{:general_ci_plots}},
+    make_ci_plots(
         output_paths::Vector{<:AbstractString},
         plot_path::AbstractString;
+        short_names::Vector{<:AbstractString} = ["mse", "lr", "edt", "ts"],
         reduction::String = "average",
     )
 Create plots for the general CI diagnostics. The plots are saved to `plot_path`.
@@ -155,19 +155,15 @@ This is the default plotting function for the CI diagnostics and it can be exten
 to include additional diagnostics.
 The `reduction` keyword argument should be consistent with the reduction used to save the diagnostics.
 """
-function make_plots(
-    ::Union{Val{:general_ci_plots}},
+function make_ci_plots(
     output_paths::Vector{<:AbstractString},
     plot_path::AbstractString;
+    short_names::Vector{<:AbstractString} = ["mse", "lr", "edt", "ts"],
     reduction::String = "average",
 )
     simdirs = CAN.SimDir.(output_paths)
 
-    # Default output diagnostics
-    short_names_3D = ["mse", "lr", "edt"]
-    short_names_2D = ["ts"]
-
-    available_periods = CAN.available_periods(simdirs[1]; short_name = short_names_3D[1], reduction)
+    available_periods = CAN.available_periods(simdirs[1]; short_name = short_names[1], reduction)
     period = ""
     if "10d" in available_periods
         period = "10d"
@@ -177,20 +173,18 @@ function make_plots(
         period = "12h"
     end
 
-    # Creates diagnostics vector
-    # 3D fields are zonally averaged platted onf the lat-z plane
-    # 2D fields are plotted on the lon-lat plane
-    vars_3D = map_comparison(simdirs, short_names_3D) do simdir, short_name
-        get(simdir; short_name, reduction, period) |> CAN.average_lon
-    end
-
-    available_periods = CAN.available_periods(simdirs[1]; short_name = short_names_2D[1], reduction)
-
-    vars_2D = map_comparison(simdirs, short_names_2D) do simdir, short_name
+    # Create a CAN.OutputVar for each input field
+    vars = map_comparison(simdirs, short_names) do simdir, short_name
         get(simdir; short_name, reduction, period)
     end
 
+    # Filter vars into 2D and 3D variable diagnostics vectors
+    # 3D fields are zonally averaged platted on the lat-z plane
+    # 2D fields are plotted on the lon-lat plane
+    vars_3D = map(var_3D -> CAN.average_lon(var_3D), filter(var -> CAN.has_altitude(var), vars))
+    vars_2D = filter(var -> !CAN.has_altitude(var), vars)
+
+    # Generate plots and save in `plot_path`
     make_plots_generic(output_paths, plot_path, vars_3D, time = LAST_SNAP, more_kwargs = YLINEARSCALE)
     make_plots_generic(output_paths, plot_path, vars_2D, time = LAST_SNAP, output_name = "summary_2D")
-
 end

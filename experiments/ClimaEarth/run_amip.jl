@@ -890,40 +890,17 @@ if ClimaComms.iamroot(comms_ctx)
     end
 
     ## plotting AMIP results
-    if cs.mode.name == "amip" && !isempty(cs.diagnostics)
+    if cs.mode.name == "amip"
         ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
         @info "AMIP plots"
 
         ## ClimaESM
-        include("user_io/amip_visualizer.jl")
-        post_spec = (;
-            T = (:regrid, :zonal_mean),
-            u = (:regrid, :zonal_mean),
-            q_tot = (:regrid, :zonal_mean),
-            toa_fluxes = (:regrid, :horizontal_slice),
-            precipitation_rate = (:regrid, :horizontal_slice),
-            T_sfc = (:regrid, :horizontal_slice),
-            turbulent_energy_fluxes = (:regrid, :horizontal_slice),
-            q_liq_ice = (:regrid, :zonal_mean),
-        )
+        include("user_io/ci_plots.jl")
 
-        plot_spec = (;
-            T = (; clims = (190, 320), units = "K"),
-            u = (; clims = (-50, 50), units = "m/s"),
-            q_tot = (; clims = (0, 30), units = "g/kg"),
-            toa_fluxes = (; clims = (-250, 250), units = "W/m^2"),
-            precipitation_rate = (clims = (0, 1e-4), units = "kg/m^2/s"),
-            T_sfc = (clims = (225, 310), units = "K"),
-            turbulent_energy_fluxes = (; clims = (-250, 250), units = "W/m^2"),
-            q_liq_ice = (; clims = (0, 10), units = "g/kg"),
-        )
-        amip_data, fig_amip = amip_paperplots(
-            post_spec,
-            plot_spec,
-            dir_paths.output,
-            files_root = ".monthly",
-            output_dir = dir_paths.artifacts,
-        )
+        # TODO add turbulent_energy_fluxes?
+        amip_short_names = ["ta", "ua", "hus", "clw", "pr", "ts", "toa_fluxes_net", "F_turb_energy"]
+        make_ci_plots([atmos_sim.integrator.p.output_dir], dir_paths.artifacts, short_names = amip_short_names)
+
         # Check this because we only want monthly data for making plots
         if t_end > 84600 * 31 * 3 && config_dict["output_default_diagnostics"]
             include("leaderboard/leaderboard.jl")
@@ -936,7 +913,7 @@ if ClimaComms.iamroot(comms_ctx)
     if config_dict["ci_plots"]
         @info "Generating CI plots"
         include("user_io/ci_plots.jl")
-        make_plots(Val(:general_ci_plots), [atmos_sim.integrator.p.output_dir], dir_paths.artifacts)
+        make_ci_plots([atmos_sim.integrator.p.output_dir], dir_paths.artifacts)
     end
 
     ## plot all model states and coupler fields (useful for debugging)

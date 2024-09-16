@@ -83,11 +83,11 @@ for FT in (Float32, Float64)
                 ocean_sim = Interfacer.SurfaceStub((; area_fraction = ocean_d)),
             ), # model_sims
             (;), # mode
-            (), # diagnostics
             (;), # callbacks
             (;), # dirs
             nothing, # turbulent_fluxes
             nothing, # thermo_params
+            nothing, # amip_diags_handler
         )
 
         Regridder.update_surface_fractions!(cs)

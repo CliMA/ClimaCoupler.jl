@@ -3,9 +3,11 @@ import StaticArrays
 import Statistics
 import LinearAlgebra
 import ClimaAtmos as CA
+import ClimaAtmos.Parameters as CAP
 import ClimaCore as CC
 import ClimaCore.Geometry: ⊗
 import SurfaceFluxes as SF
+import Thermodynamics as TD
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 
 include("climaatmos_extra_diags.jl")

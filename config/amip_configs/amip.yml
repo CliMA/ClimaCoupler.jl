@@ -21,3 +21,4 @@ topo_smoothing: true
 topography: "Earth"
 coupler_toml_file: "toml/amip.toml"
 turb_flux_partition: "CombinedStateFluxesMOST"
+aerosol_radiation: false

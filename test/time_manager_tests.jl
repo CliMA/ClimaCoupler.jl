@@ -27,11 +27,11 @@ for FT in (Float32, Float64)
             Int(Δt_cpl), # Δt_cpl
             (;), # model_sims
             (;), # mode
-            (), # diagnostics
             (;), # callbacks
             (;), # dirs
             nothing, # turbulent_fluxes
             nothing, # thermo_params
+            nothing, # amip_diags_handler
         )
 
         for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
@@ -67,11 +67,11 @@ end
         Int(200), # Δt_cpl
         (;), # model_sims
         (;), # mode
-        (), # diagnostics
         (;), # callbacks
         (;), # dirs
         nothing, # turbulent_fluxes
         nothing, # thermo_params
+        nothing, # amip_diags_handler
     )
     @test TimeManager.trigger_callback(cs, TimeManager.Monthly()) == true
 end
@@ -103,7 +103,6 @@ end
         Int(200), # Δt_cpl
         (;), # model_sims
         (;), # mode
-        (), # diagnostics
         (;
             twhohourly_inactive = twhohourly_inactive,
             twhohourly_nothing = twhohourly_nothing,
@@ -113,6 +112,7 @@ end
         (;), # dirs
         nothing, # turbulent_fluxes
         nothing, # thermo_params
+        nothing, # amip_diags_handler
     )
 
     TimeManager.trigger_callback!(cs, cs.callbacks.twhohourly_inactive)
@@ -171,11 +171,11 @@ end
         Int(200), # Δt_cpl
         (;), # model_sims
         (;), # mode
-        (), # diagnostics
         (;), # callbacks
         (;), # dirs
         nothing, # turbulent_fluxes
         nothing, # thermo_params
+        nothing, # amip_diags_handler
     )
 
     TimeManager.update_firstdayofmonth!(cs, nothing)

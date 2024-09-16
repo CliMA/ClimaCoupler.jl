@@ -38,7 +38,6 @@ pkg_dir = pkgdir(ClimaCoupler)
 include("components/atmosphere/climaatmos.jl")
 
 ## helpers for user-specified IO
-include("user_io/user_diagnostics.jl")
 include("user_io/user_logging.jl")
 
 include("user_io/io_helpers.jl")
@@ -204,11 +203,11 @@ cs = Interfacer.CoupledSimulation{FT}(
     Δt_cpl,
     model_sims,
     (;), # mode_specifics
-    (), # coupler diagnostics
     callbacks,
     dir_paths,
     nothing, # turbulent_fluxes
     thermo_params,
+    nothing, # amip_diags_handler
 );
 
 #=

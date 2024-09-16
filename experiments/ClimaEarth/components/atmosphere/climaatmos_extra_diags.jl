@@ -136,6 +136,29 @@ CAD.add_diagnostic_variable!(
     end,
 )
 
+CAD.add_diagnostic_variable!(
+    short_name = "toa_fluxes_net",
+    long_name = "Net TOA radiation fluxes",
+    standard_name = "net_toa_radiation_fluxes",
+    units = "W m^-2",
+    comments = "Net top of the atmosphere radiation fluxes, calculated by summing the upward and downward shortwave and longwave radiation fluxes.",
+    compute! = (out, state, cache, time) -> begin
+        # Perform sum of radiation fluxes (rsu + rlu - rsd - rld)
+        if isnothing(out)
+            return CC.Fields.array2field(cache.radiation.rrtmgp_model.face_sw_flux_up, axes(state.f)) .+
+                   CC.Fields.array2field(cache.radiation.rrtmgp_model.face_lw_flux_up, axes(state.f)) .-
+                   CC.Fields.array2field(cache.radiation.rrtmgp_model.face_sw_flux_dn, axes(state.f)) .-
+                   CC.Fields.array2field(cache.radiation.rrtmgp_model.face_lw_flux_dn, axes(state.f)) |> copy
+        else
+            out .=
+                CC.Fields.array2field(cache.radiation.rrtmgp_model.face_sw_flux_up, axes(state.f)) .+
+                CC.Fields.array2field(cache.radiation.rrtmgp_model.face_lw_flux_up, axes(state.f)) .-
+                CC.Fields.array2field(cache.radiation.rrtmgp_model.face_sw_flux_dn, axes(state.f)) .-
+                CC.Fields.array2field(cache.radiation.rrtmgp_model.face_lw_flux_dn, axes(state.f))
+        end
+    end,
+)
+
 """
     static_stability(cache)
 

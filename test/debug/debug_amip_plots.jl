@@ -75,11 +75,11 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
         Int(200), # Δt_cpl
         model_sims, # model_sims
         (;), # mode
-        (), # diagnostics
         (;), # callbacks
         (;), # dirs
         nothing, # turbulent_fluxes
         nothing, # thermo_params
+        nothing, # amip_diags_handler
     )
 
     output_plots = "test_debug"

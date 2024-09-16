@@ -59,7 +59,6 @@ experiment_pages = [
 interface_pages = [
     "checkpointer.md",
     "conservation.md",
-    "diagnostics.md",
     "fieldexchanger.md",
     "fluxcalculator.md",
     "interfacer.md",
@@ -70,7 +69,7 @@ interface_pages = [
 ]
 performance_pages = ["performance.md"]
 
-output_pages = ["leaderboard.md"]
+output_pages = ["diagnostics.md", "leaderboard.md"]
 
 pages = Any[
     "Home" => "index.md",

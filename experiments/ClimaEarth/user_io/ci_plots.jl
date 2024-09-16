@@ -145,7 +145,7 @@ end
 
 """
     make_ci_plots(
-        output_paths::Vector{<:AbstractString},
+        output_path::AbstractString,
         plot_path::AbstractString;
         short_names::Vector{<:AbstractString} = ["mse", "lr", "edt", "ts"],
         reduction::String = "average",
@@ -156,14 +156,19 @@ to include additional diagnostics.
 The `reduction` keyword argument should be consistent with the reduction used to save the diagnostics.
 """
 function make_ci_plots(
-    output_paths::Vector{<:AbstractString},
+    output_path::AbstractString,
     plot_path::AbstractString;
     short_names::Vector{<:AbstractString} = ["mse", "lr", "edt", "ts"],
     reduction::String = "average",
 )
-    simdirs = CAN.SimDir.(output_paths)
 
-    available_periods = CAN.available_periods(simdirs[1]; short_name = short_names[1], reduction)
+    simdir = CAN.SimDir(output_path)
+    if !all(v -> v in CAN.available_vars(simdir), short_names)
+        @warn "Not all variables are available in the output directory $output_path"
+        return
+    end
+
+    available_periods = CAN.available_periods(simdir; short_name = short_names[1], reduction)
     period = ""
     if "10d" in available_periods
         period = "10d"
@@ -174,9 +179,7 @@ function make_ci_plots(
     end
 
     # Create a CAN.OutputVar for each input field
-    vars = map_comparison(simdirs, short_names) do simdir, short_name
-        get(simdir; short_name, reduction, period)
-    end
+    vars = [get(simdir; short_name, reduction, period) for short_name in short_names]
 
     # Filter vars into 2D and 3D variable diagnostics vectors
     # 3D fields are zonally averaged platted on the lat-z plane
@@ -185,6 +188,6 @@ function make_ci_plots(
     vars_2D = filter(var -> !CAN.has_altitude(var), vars)
 
     # Generate plots and save in `plot_path`
-    make_plots_generic(output_paths, plot_path, vars_3D, time = LAST_SNAP, more_kwargs = YLINEARSCALE)
-    make_plots_generic(output_paths, plot_path, vars_2D, time = LAST_SNAP, output_name = "summary_2D")
+    make_plots_generic(output_path, plot_path, vars_3D, time = LAST_SNAP, more_kwargs = YLINEARSCALE)
+    make_plots_generic(output_path, plot_path, vars_2D, time = LAST_SNAP, output_name = "summary_2D")
 end

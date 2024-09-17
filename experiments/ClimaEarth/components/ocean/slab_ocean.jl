@@ -26,7 +26,7 @@ Interfacer.name(::SlabOceanSimulation) = "SlabOceanSimulation"
 
 # ocean parameters
 Base.@kwdef struct OceanSlabParameters{FT <: AbstractFloat}
-    h::FT = 20              # depth of the ocean [m]
+    h::FT = 40              # depth of the ocean [m]
     ρ::FT = 1500            # density of the ocean [kg / m3]
     c::FT = 800             # specific heat of the ocean [J / kg / K]
     T_init::FT = 271        # initial temperature of the ocean [K]

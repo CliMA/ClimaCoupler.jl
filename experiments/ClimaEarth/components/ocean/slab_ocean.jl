@@ -3,8 +3,6 @@ import ClimaCore as CC
 import ClimaTimeSteppers as CTS
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
 
-include("../slab_utils.jl")
-
 ###
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###
@@ -86,13 +84,14 @@ function ocean_init(
         area_fraction = area_fraction,
         thermo_params = thermo_params,
         # add dss_buffer to cache to avoid runtime dss allocation
-        dss_buffer = CC.Spaces.create_dss_buffer(CC.Fields.zeros(space)),
+        dss_buffer = CC.Spaces.create_dss_buffer(Y),
         α_direct = CC.Fields.ones(space) .* params.α,
         α_diffuse = CC.Fields.ones(space) .* params.α,
     )
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
-    ode_function = CTS.ClimaODEFunction(; T_exp! = slab_ocean_rhs!, dss! = weighted_dss_slab!)
+    ode_function =
+        CTS.ClimaODEFunction(; T_exp! = slab_ocean_rhs!, dss! = (Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer))
 
     problem = SciMLBase.ODEProblem(ode_function, Y, Float64.(tspan), cache)
     integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64(saveat), adaptive = false)
@@ -194,13 +193,4 @@ end
 Perform DSS on the state of a component simulation, intended to be used
 before the initial step of a run. This method acts on slab ocean model sims.
 """
-function dss_state!(sim::SlabOceanSimulation)
-    Y = sim.integrator.u
-    p = sim.integrator.p
-    for key in propertynames(Y)
-        field = getproperty(Y, key)
-        buffer = get_dss_buffer(axes(field), p)
-        CC.Spaces.weighted_dss!(field, buffer)
-    end
-
-end
+dss_state!(sim::SlabOceanSimulation) = CC.Spaces.weighted_dss!(sim.integrator.u, sim.integrator.p.dss_buffer)

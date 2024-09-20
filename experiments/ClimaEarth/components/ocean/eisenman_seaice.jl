@@ -68,7 +68,8 @@ function eisenman_seaice_init(
     Y, Ya = state_init(params_ice, space)
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
-    ode_function = CTS.ClimaODEFunction(T_exp! = ∑tendencies, dss! = weighted_dss_slab!)
+    ode_function =
+        CTS.ClimaODEFunction(T_exp! = ∑tendencies, dss! = (Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer))
 
     cache = (;
         Ya = Ya,
@@ -77,7 +78,7 @@ function eisenman_seaice_init(
         area_fraction = area_fraction,
         ice_area_fraction = zeros(space),
         thermo_params = thermo_params,
-        dss_buffer = CC.Spaces.create_dss_buffer(CC.Fields.zeros(space)),
+        dss_buffer = CC.Spaces.create_dss_buffer(Y),
     )
     problem = SciMLBase.ODEProblem(ode_function, Y, Float64.(tspan), cache)
     integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64(saveat), adaptive = false)

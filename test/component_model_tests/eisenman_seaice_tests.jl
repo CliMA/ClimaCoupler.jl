@@ -298,7 +298,6 @@ for FT in (Float32, Float64)
         @test all(parent(Y.h_ice) .< parent(h_ice_0))
     end
 
-    include("../../experiments/ClimaEarth/components/slab_utils.jl")
     @testset "step! update + total energy calculation for FT=$FT" begin
         Δt = Float64(1000)
 

@@ -2,7 +2,7 @@
 
 julia_version = "1.10.0"
 manifest_format = "2.0"
-project_hash = "0a5ef4691aac8519cb45950f67c96bcaab893b0a"
+project_hash = "2b9f90f70b93edb8cd502bab0fe34a20a2d4ab0e"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "5a5eafb8344b81b8c2237f8a6f6b3602b3f6180e"
@@ -328,7 +328,7 @@ weakdeps = ["GeoMakie", "Makie"]
 deps = ["Adapt", "ArgParse", "ArtifactWrappers", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "DiffEqBase", "FastGaussQuadrature", "Insolation", "Interpolations", "LazyArtifacts", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "RRTMGP", "SciMLBase", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "YAML"]
 git-tree-sha1 = "67a6ae0add1333852c93fcb7bd48df98aa8a8eb4"
 repo-rev = "as/rrtmgp018"
-repo-url = "/home/asridhar/Codes/ClimaAtmos.jl"
+repo-url = "https://github.com/CliMA/ClimaAtmos.jl.git"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
 version = "0.27.5"
 

@@ -20,7 +20,7 @@ steps:
 
       - echo "--- Instantiate AMIP env"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\")'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\", version=\"0.20.20\"); Pkg.add(\"CUDA\", version=\"5.4.3\")'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
 
@@ -70,7 +70,3 @@ steps:
             find experiments/ClimaEarth/output/amip/amip_artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
               slack-upload -c "#coupler-report" -f "$$file" -m png -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
             done
-          - cat experiments/ClimaEarth/output/amip/amip_artifacts/sypd.txt experiments/ClimaEarth/output/amip/amip_artifacts/walltime_per_atmos_step.txt > report1.txt
-          - echo -e "SYPD:                        \nWalltime per atmos step:" > report2.txt
-          - paste report2.txt report1.txt > report.txt
-          - cat report.txt | xargs -I {} slack-message -c "#coupler-report" -x "{}"

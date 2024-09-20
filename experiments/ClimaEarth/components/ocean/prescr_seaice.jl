@@ -80,7 +80,8 @@ function ice_init(::Type{FT}; tspan, saveat, dt, space, area_fraction, thermo_pa
     )
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
-    ode_function = CTS.ClimaODEFunction(T_exp! = ice_rhs!, dss! = weighted_dss_slab!)
+    ode_function =
+        CTS.ClimaODEFunction(T_exp! = ice_rhs!, dss! = dss!((Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer)))
 
     problem = SciMLBase.ODEProblem(ode_function, Y, Float64.(tspan), (; additional_cache..., params = params))
     integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64(saveat), adaptive = false)

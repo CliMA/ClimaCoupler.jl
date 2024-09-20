@@ -296,7 +296,11 @@ for FT in (Float32, Float64)
             Base.close(hdfreader)
 
             # regrid back to lat-lon
-            T_rll, _ = Regridder.cgll2latlonz(T_cgll)
+            datafile_latlon = joinpath(REGRID_DIR, "remapped_latlon.nc")
+            nlat = 360
+            nlon = 720
+            Regridder.remap_field_cgll_to_rll(:var, T_cgll, REGRID_DIR, datafile_latlon, nlat = nlat, nlon = nlon)
+            T_rll, _ = Regridder.read_remapped_field(:var, datafile_latlon)
 
             # check consistency across z-levels
             @test T_rll[:, :, 1] == T_rll[:, :, 2]

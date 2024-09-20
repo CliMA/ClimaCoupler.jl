@@ -18,7 +18,6 @@ ClimaCoupler.Regridder.remap_field_cgll_to_rll
 ClimaCoupler.Regridder.land_fraction
 ClimaCoupler.Regridder.update_surface_fractions!
 ClimaCoupler.Regridder.combine_surfaces!
-ClimaCoupler.Regridder.cgll2latlonz
 ClimaCoupler.Regridder.combine_surfaces_from_sol!
 ```
 

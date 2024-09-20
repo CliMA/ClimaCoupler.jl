@@ -25,7 +25,6 @@ export write_to_hdf5,
     combine_surfaces_from_sol!,
     binary_mask,
     nans_to_zero,
-    cgll2latlonz,
     truncate_dataset
 
 
@@ -610,31 +609,6 @@ function read_remapped_field(name::Symbol, datafile_latlon::String, lev_name = "
     end
 
     return out
-end
-
-
-"""
-    function cgll2latlonz(field; DIR = "cgll2latlonz_dir", nlat = 360, nlon = 720, clean_dir = true)
-
-Regrids a field from CGLL to an RLL array using TempestRemap. It can hanlde multiple other dimensions, such as time and level.
-
-# Arguments
-- `field`: [CC.Fields.Field] to be remapped.
-- `DIR`: [String] directory used for remapping.
-- `nlat`: [Int] number of latitudes of the regridded array.
-- `nlon`: [Int] number of longitudes of the regridded array.
-- `clean_dir`: [Bool] flag to delete the temporary directory after remapping.
-
-# Returns
-- Tuple containing the remapped field and its coordinates.
-"""
-function cgll2latlonz(field; DIR = "cgll2latlonz_dir", nlat = 360, nlon = 720, clean_dir = true)
-    isdir(DIR) ? nothing : mkpath(DIR)
-    datafile_latlon = DIR * "/remapped_" * string(Interfacer.name) * ".nc"
-    remap_field_cgll_to_rll(:var, field, DIR, datafile_latlon, nlat = nlat, nlon = nlon)
-    new_data, coords = read_remapped_field(:var, datafile_latlon)
-    clean_dir && rm(DIR; recursive = true)
-    return new_data, coords
 end
 
 """

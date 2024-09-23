@@ -63,6 +63,10 @@ import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Interpolations
 
+# Random is used by RRMTGP for some cloud properties
+import Random
+Random.seed!(1234)
+
 pkg_dir = pkgdir(ClimaCoupler)
 
 #=

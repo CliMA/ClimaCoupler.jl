@@ -16,7 +16,7 @@ netcdf_output_at_levels: true
 output_default_diagnostics: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "1098days"
+t_end: "180days"
 topo_smoothing: true
 topography: "Earth"
 coupler_toml_file: "toml/amip.toml"

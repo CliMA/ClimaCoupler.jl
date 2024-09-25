@@ -162,8 +162,12 @@ function make_ci_plots(
     short_names::Vector{<:AbstractString} = ["mse", "lr", "edt", "ts"],
     reduction::String = "average",
 )
-
+    @show "in make_ci_plots"
     simdir = CAN.SimDir(output_path)
+
+    @show simdir
+    @show short_names
+    @show all(v -> v in CAN.available_vars(simdir), short_names)
     if !all(v -> v in CAN.available_vars(simdir), short_names)
         @warn "Not all variables are available in the output directory $output_path"
         return

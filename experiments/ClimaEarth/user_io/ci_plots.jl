@@ -129,6 +129,7 @@ function make_plots_generic(
 
     # Save plots
     output_file = joinpath(plot_path, "$(output_name).pdf")
+    @show "saved at $output_file"
 
     pdfunite() do unite
         run(Cmd([unite, summary_files..., output_file]))
@@ -188,6 +189,15 @@ function make_ci_plots(
     vars_2D = filter(var -> !CAN.has_altitude(var), vars)
 
     # Generate plots and save in `plot_path`
-    make_plots_generic(output_path, plot_path, vars_3D, time = LAST_SNAP, more_kwargs = YLINEARSCALE)
+    @show "3D first"
+    make_plots_generic(
+        output_path,
+        plot_path,
+        vars_3D,
+        time = LAST_SNAP,
+        output_name = "summary_3D",
+        more_kwargs = YLINEARSCALE,
+    )
+    @show "2D now"
     make_plots_generic(output_path, plot_path, vars_2D, time = LAST_SNAP, output_name = "summary_2D")
 end

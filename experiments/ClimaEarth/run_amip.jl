@@ -177,8 +177,24 @@ The data files are downloaded from the `ClimaCoupler` artifacts directory. If th
 original sources.
 =#
 include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
-sst_data = joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.SST.HAD187001-198110.OI198111-202206.nc")
-sic_data = joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.ICE.HAD187001-198110.OI198111-202206.nc")
+
+if artifact_exists("historical_sst_sic")
+    sst_data =
+        joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.SST.HAD187001-198110.OI198111-202206.nc")
+    sic_data =
+        joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.ICE.HAD187001-198110.OI198111-202206.nc")
+else
+    ClimaComms.iamroot(comms_ctx) &&
+        @warn "Using lowres sst sic. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
+    sst_data = joinpath(
+        @clima_artifact("historical_sst_sic_lowres", comms_ctx),
+        "MODEL.SST.HAD187001-198110.OI198111-202206_lowres.nc",
+    )
+    sic_data = joinpath(
+        @clima_artifact("historical_sst_sic_lowres", comms_ctx),
+        "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
+    )
+end
 co2_data = joinpath(co2_dataset_path(), "mauna_loa_co2.nc")
 land_mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 

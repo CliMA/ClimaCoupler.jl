@@ -22,4 +22,11 @@ git-tree-sha1 = "7486bf32e9352493f69364aead26f01eaf90d2af"
 git-tree-sha1 = "945e31f8028a581f7e8435cb691462124484567a"
 
 [historical_sst_sic]
-git-tree-sha1 = "c4f82cd33fb26513ee45bff78330c6b606630fa5"
+git-tree-sha1 = "0d30d71a6f9b6548fe7395ca647e853ec36d1699"
+
+[historical_sst_sic_lowres]
+git-tree-sha1 = "9f684b5fef730fa2ed6b21dd507888459421a429"
+
+    [[historical_sst_sic_lowres.download]]
+    sha256 = "420b309b185c34eb8944bcfcfc67135f6599788ee1d9678014a024c7518ecb88"
+    url = "https://caltech.box.com/shared/static/ufnesb00zkvlc3sxzhnnmqc3zbatxkb9.gz"

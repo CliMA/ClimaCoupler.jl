@@ -1,0 +1,13 @@
+agents:
+  queue: derecho
+  pbs_time: 1:00:00
+  modules: climacommon/2024_05_27
+
+timeout_in_minutes: 60
+
+steps:
+
+  - label: "init"
+    key: "init"
+    command:
+      - "echo HI"

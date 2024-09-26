@@ -2,11 +2,14 @@ FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 anim: false
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
+coupler_toml_file: "toml/amip.toml"
 dt: "120secs"
 dt_cpl: 120
 dt_save_state_to_disk: "30days"
 dt_save_to_sol: "30days"
+dz_bottom: 30.0
 energy_check: false
+h_elem: 16
 hourly_checkpoint: true
 hourly_checkpoint_dt: 720
 land_albedo_type: "map_temporal"
@@ -19,5 +22,6 @@ surface_setup: "PrescribedSurface"
 t_end: "1098days"
 topo_smoothing: true
 topography: "Earth"
-coupler_toml_file: "toml/amip.toml"
 turb_flux_partition: "CombinedStateFluxesMOST"
+z_elem: 63
+z_max: 55000.0

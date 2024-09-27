@@ -1,7 +1,7 @@
 # helpers with boiler plate code for IO operations, useful for all ClimaEarth drivers.
 
 """
-    setup_output_dirs(; output_dir = nothing, regrid_dir = nothing, artifacts_dir = nothing, comms_ctx = nothing)
+    setup_output_dirs(; output_dir = nothing, regrid_dir = nothing, artifacts_dir = nothing, comms_ctx)
 
 Create output directories for the experiment. If `comms_ctx` is provided, only the root process will create the directories.
 
@@ -14,7 +14,7 @@ Create output directories for the experiment. If `comms_ctx` is provided, only t
 # Returns
 - A tuple with the paths to the output, regrid, and artifacts directories.
 """
-function setup_output_dirs(; output_dir = nothing, regrid_dir = nothing, artifacts_dir = nothing, comms_ctx = nothing)
+function setup_output_dirs(; output_dir = nothing, regrid_dir = nothing, artifacts_dir = nothing, comms_ctx)
     if output_dir === nothing
         output_dir = "."
     end
@@ -25,14 +25,14 @@ function setup_output_dirs(; output_dir = nothing, regrid_dir = nothing, artifac
         artifacts_dir = output_dir * "_artifacts"
     end
 
-    if !isnothing(comms_ctx) && ClimaComms.iamroot(comms_ctx)
-        @info(output_dir)
+    @info(output_dir)
+    if ClimaComms.iamroot(comms_ctx)
         mkpath(output_dir)
         mkpath(regrid_dir)
         mkpath(artifacts_dir)
     end
 
-    !isnothing(comms_ctx) ? ClimaComms.barrier(comms_ctx) : nothing
+    ClimaComms.barrier(comms_ctx)
 
     return (; output = output_dir, artifacts = artifacts_dir, regrid = regrid_dir)
 

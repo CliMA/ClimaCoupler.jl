@@ -8,6 +8,7 @@ module Utilities
 
 import ClimaComms
 import ClimaCore as CC
+import Logging
 
 export swap_space!
 
@@ -59,32 +60,28 @@ function get_comms_context(parsed_args)
     comms_ctx = ClimaComms.context(device)
     ClimaComms.init(comms_ctx)
 
+    # Ensure that logging only happens on the root process when using multiple processes
+    ClimaComms.iamroot(comms_ctx) || Logging.disable_logging(Logging.AboveMaxLevel)
+
     if comms_ctx isa ClimaComms.SingletonCommsContext
         @info "Setting up single-process ClimaCoupler run on device: $(nameof(typeof(device)))."
     else
-        if ClimaComms.iamroot(comms_ctx)
-            @info "Setting up distributed ClimaCoupler run on " nprocs = ClimaComms.nprocs(comms_ctx) device = "$(nameof(typeof(device)))"
-        end
+        @info "Setting up distributed ClimaCoupler run on " nprocs = ClimaComms.nprocs(comms_ctx) device = "$(nameof(typeof(device)))"
     end
 
     return comms_ctx
 end
 
 """
-    show_memory_usage(comms_ctx)
+    show_memory_usage()
 
 Display and return the maximum resident set size (RSS) memory footprint on the
 CPU of this process since it began.
-
-# Arguments
-`comms_ctx`: the communication context being used to run the model
 """
-function show_memory_usage(comms_ctx)
+function show_memory_usage()
     cpu_max_rss_GB = ""
-    if ClimaComms.iamroot(comms_ctx)
-        cpu_max_rss_GB = string(round(Sys.maxrss() / 1e9, digits = 3)) * " GiB"
-        @info cpu_max_rss_GB
-    end
+    cpu_max_rss_GB = string(round(Sys.maxrss() / 1e9, digits = 3)) * " GiB"
+    @info cpu_max_rss_GB
     return cpu_max_rss_GB
 end
 

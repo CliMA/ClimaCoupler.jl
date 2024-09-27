@@ -75,7 +75,7 @@ if ClimaComms.iamroot(comms_ctx)
     end
 
     open(joinpath(output_dir, "max_rss_cpu.txt"), "w") do cpu_max_rss_filename
-        cpu_max_rss_GB = Utilities.show_memory_usage(comms_ctx)
+        cpu_max_rss_GB = Utilities.show_memory_usage()
         println(cpu_max_rss_filename, cpu_max_rss_GB)
     end
 end

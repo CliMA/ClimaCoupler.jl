@@ -87,7 +87,6 @@
 ## import Pkg; Pkg.add(url="https://github.com/CliMA/ClimaCore.jl",rev="main")
 
 #  - load external packages:
-import Logging
 import SciMLBase
 
 # load CliMA packages:

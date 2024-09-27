@@ -108,6 +108,8 @@ if isinteractive()
     parsed_args["job_id"] = "interactive_debug"
 end
 
+comms_ctx = Utilities.get_comms_context(parsed_args)
+
 ## the unique job id should be passed in via the command line
 job_id = parsed_args["job_id"]
 @assert !isnothing(job_id) "job_id must be passed in via the command line"
@@ -115,9 +117,6 @@ job_id = parsed_args["job_id"]
 ## read in config dictionary from file, overriding the coupler defaults in `parsed_args`
 config_dict = YAML.load_file(parsed_args["config_file"])
 config_dict = merge(parsed_args, config_dict)
-
-comms_ctx = Utilities.get_comms_context(parsed_args)
-ClimaComms.init(comms_ctx)
 
 ## get component model dictionaries (if applicable)
 atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
@@ -165,11 +164,8 @@ temporary files will be saved.
 COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], joinpath(mode_name, job_id))
 dir_paths = setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
 
-
-if ClimaComms.iamroot(comms_ctx)
-    @info(dir_paths.output)
-    config_dict["print_config_dict"] && @info(config_dict)
-end
+@info(dir_paths.output)
+config_dict["print_config_dict"] && @info(config_dict)
 
 #=
 ## Data File Paths
@@ -193,11 +189,11 @@ returns a `ComponentModelSimulation` object (see `Interfacer` docs for more deta
 This uses the `ClimaAtmos.jl` model, with parameterization options specified in the `atmos_config_object` dictionary.
 =#
 
-Utilities.show_memory_usage(comms_ctx)
+Utilities.show_memory_usage()
 
 ## init atmos model component
 atmos_sim = atmos_init(atmos_config_object);
-Utilities.show_memory_usage(comms_ctx)
+Utilities.show_memory_usage()
 
 thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models #342
 
@@ -226,7 +222,7 @@ land_area_fraction = SpaceVaryingInput(land_mask_data, "LSMASK", boundary_space)
 if !mono_surface
     land_area_fraction = Regridder.binary_mask.(land_area_fraction)
 end
-Utilities.show_memory_usage(comms_ctx)
+Utilities.show_memory_usage()
 
 #=
 ### Surface Models: AMIP and SlabPlanet Modes
@@ -245,9 +241,9 @@ In this section of the code, we initialize all component models and read in the 
 The specific models and data that are set up depend on which mode we're running.
 =#
 
-ClimaComms.iamroot(comms_ctx) && @info(mode_name)
+@info(mode_name)
 if mode_name == "amip"
-    ClimaComms.iamroot(comms_ctx) && @info("AMIP boundary conditions - do not expect energy conservation")
+    @info("AMIP boundary conditions - do not expect energy conservation")
 
     ## land model
     land_sim = bucket_init(
@@ -327,7 +323,7 @@ if mode_name == "amip"
         SIC_timevaryinginput = SIC_timevaryinginput,
         CO2_timevaryinginput = CO2_timevaryinginput,
     )
-    Utilities.show_memory_usage(comms_ctx)
+    Utilities.show_memory_usage()
 
 elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
 
@@ -379,7 +375,7 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
     ))
 
     mode_specifics = (; name = mode_name, SST_timevaryinginput = nothing, SIC_timevaryinginput = nothing)
-    Utilities.show_memory_usage(comms_ctx)
+    Utilities.show_memory_usage()
 
 elseif mode_name == "slabplanet_eisenman"
 
@@ -423,7 +419,7 @@ elseif mode_name == "slabplanet_eisenman"
     )
 
     mode_specifics = (; name = mode_name, SST_timevaryinginput = nothing, SIC_timevaryinginput = nothing)
-    Utilities.show_memory_usage(comms_ctx)
+    Utilities.show_memory_usage()
 end
 
 #=
@@ -458,7 +454,7 @@ coupler_field_names = (
 )
 coupler_fields =
     NamedTuple{coupler_field_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_field_names)))
-Utilities.show_memory_usage(comms_ctx)
+Utilities.show_memory_usage()
 
 ## model simulations
 model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim);
@@ -492,7 +488,7 @@ if use_coupler_diagnostics
     )
 
     diagnostics = (monthly_3d_diags, monthly_2d_diags)
-    Utilities.show_memory_usage(comms_ctx)
+    Utilities.show_memory_usage()
 else
     diagnostics = ()
 end
@@ -598,7 +594,7 @@ cs = Interfacer.CoupledSimulation{FT}(
     turbulent_fluxes,
     thermo_params,
 );
-Utilities.show_memory_usage(comms_ctx)
+Utilities.show_memory_usage()
 
 #=
 ## Restart component model states if specified
@@ -683,16 +679,14 @@ function solve_coupler!(cs)
     (; model_sims, Δt_cpl, tspan, comms_ctx) = cs
     (; atmos_sim, land_sim, ocean_sim, ice_sim) = model_sims
 
-    ClimaComms.iamroot(comms_ctx) && @info("Starting coupling loop")
+    @info("Starting coupling loop")
     ## step in time
     for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
 
         cs.dates.date[1] = TimeManager.current_date(cs, t)
 
         ## print date on the first of month
-        if cs.dates.date[1] >= cs.dates.date1[1]
-            ClimaComms.iamroot(comms_ctx) && @show(cs.dates.date[1])
-        end
+        cs.dates.date[1] >= cs.dates.date1[1] && @info(cs.dates.date[1])
 
         if cs.mode.name == "amip"
 
@@ -800,7 +794,7 @@ walltime = ClimaComms.@elapsed comms_ctx.device begin
         solve_coupler!(cs)
     end
 end
-ClimaComms.iamroot(comms_ctx) && @show(walltime)
+@info(walltime)
 
 ## Use ClimaAtmos calculation to show the simulated years per day of the simulation (SYPD)
 es = CA.EfficiencyStats(tspan, walltime)
@@ -821,7 +815,7 @@ if ClimaComms.iamroot(comms_ctx)
     end
 
     open(joinpath(dir_paths.artifacts, "max_rss_cpu.txt"), "w") do cpu_max_rss_filename
-        cpu_max_rss_GB = Utilities.show_memory_usage(comms_ctx)
+        cpu_max_rss_GB = Utilities.show_memory_usage()
         println(cpu_max_rss_filename, cpu_max_rss_GB)
     end
 end

@@ -116,14 +116,13 @@ atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 =#
 
 comms_ctx = Utilities.get_comms_context(Dict("device" => "auto"))
-ClimaComms.init(comms_ctx)
 
 #=
 ### I/O Directory Setup
 =#
 
 dir_paths = setup_output_dirs(output_dir = coupler_output_dir, comms_ctx = comms_ctx)
-ClimaComms.iamroot(comms_ctx) ? @info(config_dict) : nothing
+@info(config_dict)
 
 #=
 ## Component Model Initialization
@@ -233,16 +232,15 @@ function solve_coupler!(cs)
     (; model_sims, Δt_cpl, tspan, comms_ctx) = cs
     (; atmos_sim) = model_sims
 
-    ClimaComms.iamroot(comms_ctx) ? @info("Starting coupling loop") : nothing
+    @info("Starting coupling loop")
+
     ## step in time
     walltime = @elapsed for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
 
         cs.dates.date[1] = TimeManager.current_date(cs, t)
 
         ## print date on the first of month
-        if cs.dates.date[1] >= cs.dates.date1[1]
-            ClimaComms.iamroot(comms_ctx) ? @show(cs.dates.date[1]) : nothing
-        end
+        cs.dates.date[1] >= cs.dates.date1[1] && @info(cs.dates.date[1])
 
         ## step sims
         FieldExchanger.step_model_sims!(cs.model_sims, t)
@@ -256,7 +254,7 @@ function solve_coupler!(cs)
         TimeManager.trigger_callback!(cs, cs.callbacks.checkpoint)
 
     end
-    ClimaComms.iamroot(comms_ctx) ? @show(walltime) : nothing
+    @info(walltime)
 
     return cs
 end

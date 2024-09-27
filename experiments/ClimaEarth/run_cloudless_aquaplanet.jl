@@ -132,14 +132,13 @@ atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 =#
 
 comms_ctx = Utilities.get_comms_context(Dict("device" => "auto"))
-ClimaComms.init(comms_ctx)
 
 #=
 ### I/O Directory Setup
 =#
 
 dir_paths = setup_output_dirs(output_dir = coupler_output_dir, comms_ctx = comms_ctx)
-ClimaComms.iamroot(comms_ctx) ? @info(config_dict) : nothing
+@info(config_dict)
 
 #=
 ## Component Model Initialization
@@ -204,7 +203,7 @@ coupler_field_names = (
 )
 coupler_fields =
     NamedTuple{coupler_field_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_field_names)))
-Utilities.show_memory_usage(comms_ctx)
+Utilities.show_memory_usage()
 
 ## model simulations
 model_sims = (atmos_sim = atmos_sim, ocean_sim = ocean_sim);
@@ -321,16 +320,14 @@ FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 function solve_coupler!(cs)
     (; Δt_cpl, tspan, comms_ctx) = cs
 
-    ClimaComms.iamroot(comms_ctx) && @info("Starting coupling loop")
+    @info("Starting coupling loop")
     ## step in time
     for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
 
         cs.dates.date[1] = TimeManager.current_date(cs, t)
 
         ## print date on the first of month
-        if cs.dates.date[1] >= cs.dates.date1[1]
-            ClimaComms.iamroot(comms_ctx) && @show(cs.dates.date[1])
-        end
+        cs.dates.date[1] >= cs.dates.date1[1] && @info(cs.dates.date[1])
 
         ClimaComms.barrier(comms_ctx)
 

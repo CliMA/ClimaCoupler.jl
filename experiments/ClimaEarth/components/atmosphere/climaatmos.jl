@@ -302,12 +302,10 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String)
     atmos_config_file = coupler_dict["atmos_config_file"]
     atmos_config_repo = coupler_dict["atmos_config_repo"]
     # override default or specified configs with coupler arguments, and set the correct atmos config_file
-    comms_ctx = ClimaComms.context()
     if atmos_config_repo == "ClimaCoupler"
         @assert !isnothing(atmos_config_file) "Must specify `atmos_config_file` within ClimaCoupler."
-        if ClimaComms.iamroot(comms_ctx)
-            @info "Using Atmos configuration from ClimaCoupler in $atmos_config_file"
-        end
+
+        @info "Using Atmos configuration from ClimaCoupler in $atmos_config_file"
         atmos_config = merge(
             CA.override_default_config(joinpath(pkgdir(ClimaCoupler), atmos_config_file)),
             coupler_dict,
@@ -315,14 +313,10 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String)
         )
     elseif atmos_config_repo == "ClimaAtmos"
         if isnothing(atmos_config_file)
-            if ClimaComms.iamroot(comms_ctx)
-                @info "Using Atmos default configuration"
-            end
+            @info "Using Atmos default configuration"
             atmos_config = merge(CA.default_config_dict(), coupler_dict, Dict("config_file" => atmos_config_file))
         else
-            if ClimaComms.iamroot(comms_ctx)
-                @info "Using Atmos configuration from $atmos_config_file"
-            end
+            @info "Using Atmos configuration from $atmos_config_file"
             atmos_config = merge(
                 CA.override_default_config(joinpath(pkgdir(CA), atmos_config_file)),
                 coupler_dict,
@@ -343,9 +337,7 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String)
     toml_file = isnothing(toml_file) ? joinpath(pkgdir(ClimaCoupler), default_toml_file) : toml_file
 
     if !isnothing(toml_file)
-        if ClimaComms.iamroot(comms_ctx)
-            @info "Overwriting Atmos parameters from $toml_file"
-        end
+        @info "Overwriting Atmos parameters from $toml_file"
         atmos_config = merge(atmos_config, Dict("toml" => [toml_file]))
     end
 

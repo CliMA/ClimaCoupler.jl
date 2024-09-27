@@ -15,8 +15,6 @@ import ClimaCoupler: Regridder
 include(joinpath("..", "TestHelper.jl"))
 import .TestHelper
 
-REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regridder_test_tmp/")
-
 # Set up MPI communications context
 # Note that runs will hang if a context is initialized twice in the same file,
 # so this context should be shared among all tests in this file.
@@ -26,8 +24,12 @@ pid, nprocs = ClimaComms.init(comms_ctx)
 
 @testset "test write_to_hdf5 and read_from_hdf5 with MPI" begin
     for FT in (Float32, Float64)
-        # Set up testing directory
-        mkpath(REGRID_DIR)
+        # Create temporary regrid directory on root process and broadcast
+        regrid_dir = nothing
+        if ClimaComms.iamroot(comms_ctx)
+            regrid_dir = mktempdir(pwd(), prefix = "regrid_tmp_")
+        end
+        regrid_dir = ClimaComms.bcast(comms_ctx, regrid_dir)
 
         hd_outfile_root = "hdf5_out_test"
         tx = Dates.DateTime(1979, 01, 01, 01, 00, 00)
@@ -36,14 +38,10 @@ pid, nprocs = ClimaComms.init(comms_ctx)
         varname = "testdata"
 
         ClimaComms.barrier(comms_ctx)
-        Regridder.write_to_hdf5(REGRID_DIR, hd_outfile_root, tx, input_field, varname, comms_ctx)
+        Regridder.write_to_hdf5(regrid_dir, hd_outfile_root, tx, input_field, varname, comms_ctx)
 
         ClimaComms.barrier(comms_ctx)
-        output_field = Regridder.read_from_hdf5(REGRID_DIR, hd_outfile_root, tx, varname, comms_ctx)
+        output_field = Regridder.read_from_hdf5(regrid_dir, hd_outfile_root, tx, varname, comms_ctx)
         @test parent(input_field) == parent(output_field)
-
-        ClimaComms.barrier(comms_ctx)
-        ClimaComms.iamroot(comms_ctx) && rm(REGRID_DIR; recursive = true, force = true)
-        ClimaComms.barrier(comms_ctx)
     end
 end

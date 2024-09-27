@@ -1,9 +1,11 @@
 # helpers with boiler plate code for IO operations, useful for all ClimaEarth drivers.
 
 """
-    setup_output_dirs(; output_dir = nothing, regrid_dir = nothing, artifacts_dir = nothing, comms_ctx)
+    setup_output_dirs(; output_dir = nothing, artifacts_dir = nothing, comms_ctx)
 
 Create output directories for the experiment. If `comms_ctx` is provided, only the root process will create the directories.
+By default, the regrid directory is created as a temporary directory inside the output directory,
+and the artifacts directory is created inside the output directory with the suffix `_artifacts`.
 
 # Arguments
 - `output_dir::String`: The directory where the output files will be stored. Default is the current directory.
@@ -14,28 +16,24 @@ Create output directories for the experiment. If `comms_ctx` is provided, only t
 # Returns
 - A tuple with the paths to the output, regrid, and artifacts directories.
 """
-function setup_output_dirs(; output_dir = nothing, regrid_dir = nothing, artifacts_dir = nothing, comms_ctx)
+function setup_output_dirs(; output_dir = nothing, artifacts_dir = nothing, comms_ctx)
     if output_dir === nothing
         output_dir = "."
-    end
-    if regrid_dir === nothing
-        regrid_dir = joinpath(output_dir, "regrid_tmp/")
     end
     if artifacts_dir === nothing
         artifacts_dir = output_dir * "_artifacts"
     end
 
     @info(output_dir)
+    regrid_dir = nothing
     if ClimaComms.iamroot(comms_ctx)
         mkpath(output_dir)
-        mkpath(regrid_dir)
         mkpath(artifacts_dir)
+        regrid_dir = mktempdir(output_dir, prefix = "regrid_tmp_")
     end
-
-    ClimaComms.barrier(comms_ctx)
+    regrid_dir = ClimaComms.bcast(comms_ctx, regrid_dir)
 
     return (; output = output_dir, artifacts = artifacts_dir, regrid = regrid_dir)
-
 end
 
 """

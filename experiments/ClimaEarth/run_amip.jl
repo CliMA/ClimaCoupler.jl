@@ -39,7 +39,6 @@ We then specify the input data file names. If these are not already downloaded, 
 ## standard packages
 import Dates
 import YAML
-import Logging
 
 # ## ClimaESM packages
 import ClimaAtmos as CA

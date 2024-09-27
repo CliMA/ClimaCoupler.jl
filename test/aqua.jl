@@ -17,7 +17,7 @@ import Aqua
 
     # Uncomment for debugging:
     # for method_ambiguity in ambs
-    #     @show method_ambiguity
+    #     @info method_ambiguity
     # end
     @test length(ambs) == 0
 end

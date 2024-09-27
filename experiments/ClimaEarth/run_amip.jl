@@ -686,7 +686,7 @@ function solve_coupler!(cs)
         cs.dates.date[1] = TimeManager.current_date(cs, t)
 
         ## print date on the first of month
-        cs.dates.date[1] >= cs.dates.date1[1] && @show(cs.dates.date[1])
+        cs.dates.date[1] >= cs.dates.date1[1] && @info(cs.dates.date[1])
 
         if cs.mode.name == "amip"
 
@@ -794,7 +794,7 @@ walltime = ClimaComms.@elapsed comms_ctx.device begin
         solve_coupler!(cs)
     end
 end
-@show(walltime)
+@info(walltime)
 
 ## Use ClimaAtmos calculation to show the simulated years per day of the simulation (SYPD)
 es = CA.EfficiencyStats(tspan, walltime)

@@ -327,7 +327,7 @@ function solve_coupler!(cs)
         cs.dates.date[1] = TimeManager.current_date(cs, t)
 
         ## print date on the first of month
-        cs.dates.date[1] >= cs.dates.date1[1] && @show(cs.dates.date[1])
+        cs.dates.date[1] >= cs.dates.date1[1] && @info(cs.dates.date[1])
 
         ClimaComms.barrier(comms_ctx)
 

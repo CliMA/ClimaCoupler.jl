@@ -38,9 +38,6 @@ function atmos_init(atmos_config)
     center_space = axes(Y.c.ρe_tot)
     face_space = axes(Y.f.u₃)
     spaces = (; center_space = center_space, face_space = face_space)
-    if :ρe_int in propertynames(Y.c)
-        @warn("Running with ρe_int in coupled mode is not tested yet.", maxlog = 1)
-    end
 
     # define shorter references for long variable names to increase readability, and set to zero
     ρ_flux_h_tot = integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot

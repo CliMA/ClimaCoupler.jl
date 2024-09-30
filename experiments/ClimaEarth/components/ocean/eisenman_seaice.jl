@@ -65,7 +65,8 @@ function eisenman_seaice_init(
     Y, Ya = state_init(params_ice, space)
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
-    ode_function = CTS.ClimaODEFunction(T_exp! = ∑tendencies, dss! = weighted_dss_slab!)
+    ode_function =
+        CTS.ClimaODEFunction(T_exp! = ∑tendencies, dss! = dss!((Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer)))
 
     cache = (;
         Ya = Ya,

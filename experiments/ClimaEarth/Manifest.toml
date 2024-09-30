@@ -2,7 +2,7 @@
 
 julia_version = "1.10.5"
 manifest_format = "2.0"
-project_hash = "3f041ae318abcda7361d1017b4769284277fd054"
+project_hash = "4b893fc507a36bfff019f70ec53323e3f9a653a9"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "5a5eafb8344b81b8c2237f8a6f6b3602b3f6180e"
@@ -334,7 +334,7 @@ uuid = "d934ef94-cdd4-4710-83d6-720549644b70"
 version = "0.3.17"
 
 [[deps.ClimaCoupler]]
-deps = ["ClimaComms", "ClimaCore", "ClimaCoreTempestRemap", "Dates", "JLD2", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
+deps = ["Artifacts", "ClimaComms", "ClimaCore", "ClimaCoreTempestRemap", "ClimaLand", "Dates", "JLD2", "Logging", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
 path = "../.."
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.1.1"
@@ -347,7 +347,9 @@ version = "0.2.6"
 
 [[deps.ClimaLand]]
 deps = ["ArtifactWrappers", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "ecb91842be1740ba97cbedd7123f4479013ec9d9"
+git-tree-sha1 = "dbe9bfdc6ef1ec04b0d5da8052659f1eddbec02d"
+repo-rev = "kd/bucket_qsat_fix"
+repo-url = "https://github.com/CliMA/ClimaLand.jl.git"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
 version = "0.15.0"
 

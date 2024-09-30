@@ -97,7 +97,7 @@ function bucket_init(
     # the snow would melt in time `τc`. It prevents us from having to specially time step in cases where
     # all the snow melts in a single timestep.
     σS_c = FT(0.2) # critical snow water equivalent
-    W_f = FT(10) # bucket capacity
+    W_f = FT(0.2) # bucket capacity
     κ_soil = FT(0.7) # soil conductivity
     ρc_soil = FT(2e8) # soil volumetric heat capacity
 
@@ -124,7 +124,7 @@ function bucket_init(
     T_sfc_0 = FT(271.0)
     @. Y.bucket.T = T_sfc_0 + temp_anomaly(coords.subsurface)
 
-    Y.bucket.W .= 6.5
+    Y.bucket.W .= 0.1
     Y.bucket.Ws .= 0.0
     Y.bucket.σS .= 0.0
 
@@ -208,7 +208,7 @@ function Interfacer.update_field!(sim::BucketSimulation, ::Val{:turbulent_energy
 end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:snow_precipitation}, field)
     ρ_liq = (LP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
-    parent(sim.integrator.p.drivers.P_snow) .= parent(field ./ ρ_liq)
+    parent(sim.integrator.p.drivers.P_snow) .= parent(0)#field ./ ρ_liq)
 end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:turbulent_moisture_flux}, field)
     ρ_liq = (LP.ρ_cloud_liq(sim.model.parameters.earth_param_set))

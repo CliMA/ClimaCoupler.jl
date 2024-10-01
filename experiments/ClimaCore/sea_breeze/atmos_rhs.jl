@@ -317,8 +317,8 @@ end
 
 # ## Coupled Atmos Wrappers
 ## Atmos Simulation - later to live in ClimaAtmos
-struct AtmosSim <: AbstractAtmosSim
-    integrator::Any
+struct AtmosSim{T} <: AbstractAtmosSim
+    integrator::T
 end
 
 function AtmosSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())

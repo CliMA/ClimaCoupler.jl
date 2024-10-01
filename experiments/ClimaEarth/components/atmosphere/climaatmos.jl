@@ -122,7 +122,7 @@ function Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:radiative_
 
         return @. -(LWd_TOA + SWd_TOA - LWu_TOA - SWu_TOA)
     else
-        return [FT(0)]
+        return FT[0]
     end
 end
 

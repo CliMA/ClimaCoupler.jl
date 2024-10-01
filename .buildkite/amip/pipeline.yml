@@ -45,7 +45,7 @@ steps:
         command:
           - echo "--- Run simulation"
           - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip.yml --job_id amip"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/amip/amip/artifacts/*"
         timeout_in_minutes: 5760
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -64,9 +64,9 @@ steps:
 
       - label: ":envelope: Slack report: current AMIP"
         command:
-          - for file in $(find experiments/ClimaEarth/output/amip/amip_artifacts/ -regextype posix-extended -regex '.*/bias_[A-Z]{3}\.png'); do label=$(basename "$file" | grep -oP '(?<=bias_)[A-Za-z]{3}'); convert "$file" -gravity North -pointsize 50 -annotate +0+0 "$label" "experiments/ClimaEarth/output/amip/amip_artifacts/tmp_bias_$label.png"; done
-          - convert +append "experiments/ClimaEarth/output/amip/amip_artifacts/tmp_bias_???.png" experiments/ClimaEarth/output/amip/amip_artifacts/bias_all_seasons.png
+          - for file in $(find experiments/ClimaEarth/output/amip/amip/artifacts/ -regextype posix-extended -regex '.*/bias_[A-Z]{3}\.png'); do label=$(basename "$file" | grep -oP '(?<=bias_)[A-Za-z]{3}'); convert "$file" -gravity North -pointsize 50 -annotate +0+0 "$label" "experiments/ClimaEarth/output/amip/amip/artifacts/tmp_bias_$label.png"; done
+          - convert +append "experiments/ClimaEarth/output/amip/amip/artifacts/tmp_bias_???.png" experiments/ClimaEarth/output/amip/amip/artifacts/bias_all_seasons.png
           - |
-            find experiments/ClimaEarth/output/amip/amip_artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
+            find experiments/ClimaEarth/output/amip/amip/artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
               slack-upload -c "#coupler-report" -f "$$file" -m png -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
             done

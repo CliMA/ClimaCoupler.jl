@@ -202,6 +202,8 @@ temporary files will be saved.
 
 COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], joinpath(mode_name, job_id))
 dir_paths = setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
+@info "Coupler output directory $(dir_paths.output)"
+@info "Coupler artifacts directory $(dir_paths.artifacts)"
 
 @info(dir_paths.output)
 config_dict["print_config_dict"] && @info(config_dict)

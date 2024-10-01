@@ -294,19 +294,19 @@ if mode_name == "amip"
         file_reader_kwargs = (; preprocess_func = (data) -> data + FT(273.15),), ## convert to Kelvin
     )
 
-    SST_init = CC.Fields.zeros(boundary_space)
+    SST_init = zeros(boundary_space)
     evaluate!(SST_init, SST_timevaryinginput, t_start)
 
     ocean_sim = Interfacer.SurfaceStub((;
         T_sfc = SST_init,
-        ρ_sfc = CC.Fields.zeros(boundary_space),
-        # ocean roughness follows GFDL model 
+        ρ_sfc = zeros(boundary_space),
+        # ocean roughness follows GFDL model
         # (https://github.com/NOAA-GFDL/ice_param/blob/main/ocean_rough.F90#L47)
         z0m = FT(5.8e-5),
         z0b = FT(5.8e-5),
         beta = FT(1),
-        α_direct = CC.Fields.ones(boundary_space) .* FT(0.06),
-        α_diffuse = CC.Fields.ones(boundary_space) .* FT(0.06),
+        α_direct = ones(boundary_space) .* FT(0.06),
+        α_diffuse = ones(boundary_space) .* FT(0.06),
         area_fraction = (FT(1) .- land_area_fraction),
         phase = TD.Liquid(),
         thermo_params = thermo_params,
@@ -321,7 +321,7 @@ if mode_name == "amip"
         file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
     )
 
-    SIC_init = CC.Fields.zeros(boundary_space)
+    SIC_init = zeros(boundary_space)
     evaluate!(SIC_init, SIC_timevaryinginput, t_start)
 
     ice_fraction = get_ice_fraction.(SIC_init, mono_surface)
@@ -338,7 +338,7 @@ if mode_name == "amip"
     ## CO2 concentration from temporally varying file
     CO2_timevaryinginput = TimeVaryingInput(co2_data, "co2", boundary_space, reference_date = date0)
 
-    CO2_init = CC.Fields.zeros(boundary_space)
+    CO2_init = zeros(boundary_space)
     evaluate!(CO2_init, CO2_timevaryinginput, t_start)
     CO2_field = Interfacer.update_field!(atmos_sim, Val(:co2), CO2_init)
 
@@ -389,14 +389,14 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
 
     ## sea ice stub (here set to zero area coverage)
     ice_sim = Interfacer.SurfaceStub((;
-        T_sfc = CC.Fields.ones(boundary_space),
-        ρ_sfc = CC.Fields.zeros(boundary_space),
+        T_sfc = ones(boundary_space),
+        ρ_sfc = zeros(boundary_space),
         z0m = FT(0),
         z0b = FT(0),
         beta = FT(1),
-        α_direct = CC.Fields.ones(boundary_space) .* FT(1),
-        α_diffuse = CC.Fields.ones(boundary_space) .* FT(1),
-        area_fraction = CC.Fields.zeros(boundary_space),
+        α_direct = ones(boundary_space),
+        α_diffuse = ones(boundary_space),
+        area_fraction = zeros(boundary_space),
         phase = TD.Ice(),
         thermo_params = thermo_params,
     ))
@@ -432,7 +432,7 @@ elseif mode_name == "slabplanet_eisenman"
         dt = Δt_component,
         space = boundary_space,
         saveat = saveat,
-        area_fraction = CC.Fields.zeros(boundary_space), # zero, since ML is calculated below
+        area_fraction = zeros(boundary_space), # zero, since ML is calculated below
         thermo_params = thermo_params,
     )
 
@@ -481,8 +481,7 @@ coupler_field_names = (
     :temp1,
     :temp2,
 )
-coupler_fields =
-    NamedTuple{coupler_field_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_field_names)))
+coupler_fields = NamedTuple{coupler_field_names}(ntuple(i -> zeros(boundary_space), length(coupler_field_names)))
 Utilities.show_memory_usage()
 
 ## model simulations
@@ -723,7 +722,7 @@ function solve_coupler!(cs)
             evaluate!(Interfacer.get_field(ice_sim, Val(:area_fraction)), cs.mode.SIC_timevaryinginput, t)
 
             # TODO: get_field with :co2 is not implemented, so this is a little awkward
-            current_CO2 = CC.Fields.zeros(boundary_space)
+            current_CO2 = zeros(boundary_space)
             evaluate!(current_CO2, cs.mode.CO2_timevaryinginput, t)
             Interfacer.update_field!(atmos_sim, Val(:co2), current_CO2)
 

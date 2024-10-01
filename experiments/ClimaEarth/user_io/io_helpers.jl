@@ -21,7 +21,7 @@ function setup_output_dirs(; output_dir = nothing, artifacts_dir = nothing, comm
         output_dir = "."
     end
     if artifacts_dir === nothing
-        artifacts_dir = output_dir * "_artifacts"
+        artifacts_dir = joinpath(output_dir, "artifacts")
     end
 
     @info(output_dir)

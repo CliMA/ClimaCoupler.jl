@@ -66,50 +66,50 @@ steps:
           slurm_mem: 30GB
         soft_fail: true
 
-      - label: "2 Coarse current AMIP: diagedmf + 0M + bucket land"
-        key: "amip2"
-        command:
-          - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse.yml --job_id amip_coarse2"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_coarse2_artifacts/*"
-        timeout_in_minutes: 1080
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 30GB
-        soft_fail: true
+      # - label: "2 Coarse current AMIP: diagedmf + 0M + bucket land"
+      #   key: "amip2"
+      #   command:
+      #     - echo "--- Run simulation"
+      #     - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse.yml --job_id amip_coarse2"
+      #   artifact_paths: "experiments/ClimaEarth/output/amip/amip_coarse2_artifacts/*"
+      #   timeout_in_minutes: 1080
+      #   env:
+      #     CLIMACOMMS_DEVICE: "CUDA"
+      #   agents:
+      #     slurm_gpus_per_task: 1
+      #     slurm_cpus_per_task: 4
+      #     slurm_ntasks: 1
+      #     slurm_mem: 30GB
+      #   soft_fail: true
 
-      - label: "3 Coarse current AMIP: diagedmf + 0M + bucket land"
-        key: "amip3"
-        command:
-          - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse.yml --job_id amip_coarse3"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_coarse3_artifacts/*"
-        timeout_in_minutes: 1080
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 30GB
-        soft_fail: true
+      # - label: "3 Coarse current AMIP: diagedmf + 0M + bucket land"
+      #   key: "amip3"
+      #   command:
+      #     - echo "--- Run simulation"
+      #     - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse.yml --job_id amip_coarse3"
+      #   artifact_paths: "experiments/ClimaEarth/output/amip/amip_coarse3_artifacts/*"
+      #   timeout_in_minutes: 1080
+      #   env:
+      #     CLIMACOMMS_DEVICE: "CUDA"
+      #   agents:
+      #     slurm_gpus_per_task: 1
+      #     slurm_cpus_per_task: 4
+      #     slurm_ntasks: 1
+      #     slurm_mem: 30GB
+      #   soft_fail: true
 
-      - label: "4 Coarse current AMIP: diagedmf + 0M + bucket land"
-        key: "amip4"
-        command:
-          - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse.yml --job_id amip_coarse4"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_coarse4_artifacts/*"
-        timeout_in_minutes: 1080
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 30GB
-        soft_fail: true
+      # - label: "4 Coarse current AMIP: diagedmf + 0M + bucket land"
+      #   key: "amip4"
+      #   command:
+      #     - echo "--- Run simulation"
+      #     - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse.yml --job_id amip_coarse4"
+      #   artifact_paths: "experiments/ClimaEarth/output/amip/amip_coarse4_artifacts/*"
+      #   timeout_in_minutes: 1080
+      #   env:
+      #     CLIMACOMMS_DEVICE: "CUDA"
+      #   agents:
+      #     slurm_gpus_per_task: 1
+      #     slurm_cpus_per_task: 4
+      #     slurm_ntasks: 1
+      #     slurm_mem: 30GB
+      #   soft_fail: true

@@ -14,24 +14,6 @@ import Logging
 export swap_space!
 
 """
-    artifact_exists(name)
-
-Return whether the artifact with the given name exists and is available to use.
-"""
-function artifact_exists(name)
-    # There seems to be no easy way to determine if an artifact exists from the name
-    # only...
-    return try
-        # We need to macroexpand because we only want to resolve @artifact_str when
-        # we call this function
-        @macroexpand Artifacts.@artifact_str(name)
-        true
-    catch error
-        false
-    end
-end
-
-"""
     swap_space!(space_out::CC.Spaces.AbstractSpace, field_in::CC.Fields.Field)
 
 Remap the values of a field onto a new space.

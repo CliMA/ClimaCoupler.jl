@@ -174,19 +174,16 @@ original sources.
 =#
 include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
 
-if Utilities.artifact_exists("historical_sst_sic")
-    sst_data =
-        joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.SST.HAD187001-198110.OI198111-202206.nc")
-    sic_data =
-        joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.ICE.HAD187001-198110.OI198111-202206.nc")
-else
-    ClimaComms.iamroot(comms_ctx) &&
-        @warn "Using lowres sst sic. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
-    sst_data = joinpath(
+sst_data, sic_data = try
+    joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.SST.HAD187001-198110.OI198111-202206.nc"),
+    joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.ICE.HAD187001-198110.OI198111-202206.nc")
+catch error
+    @warn "Using lowres sst sic. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
+    joinpath(
         @clima_artifact("historical_sst_sic_lowres", comms_ctx),
         "MODEL.SST.HAD187001-198110.OI198111-202206_lowres.nc",
-    )
-    sic_data = joinpath(
+    ),
+    joinpath(
         @clima_artifact("historical_sst_sic_lowres", comms_ctx),
         "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
     )

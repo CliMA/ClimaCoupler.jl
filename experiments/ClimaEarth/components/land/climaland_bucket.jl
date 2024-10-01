@@ -61,6 +61,7 @@ function bucket_init(
     date_ref::Dates.DateTime,
     t_start::Float64,
     energy_check::Bool,
+    surface_elevation,
 ) where {FT}
     if config != "sphere"
         println(
@@ -121,8 +122,15 @@ function bucket_init(
     temp_anomaly = T_functions[land_temperature_anomaly]
 
     # Set temperature IC including anomaly, based on atmospheric setup
-    T_sfc_0 = FT(271.0)
+    # Bucket surface temperature is in `p.bucket.T_sfc` (ClimaLand.jl)
+    lapse_rate = FT(6.5e-3)
+    T_sfc_0 = FT(271)
     @. Y.bucket.T = T_sfc_0 + temp_anomaly(coords.subsurface)
+    # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
+    orog_adjusted_T = CC.Fields.field_values(Y.bucket.T) .- lapse_rate .* CC.Fields.field_values(surface_elevation)
+    # Adjust T based on surface elevation (p.bucket.T_sfc is then set using the 
+    # set_initial_cache! function)
+    parent(Y.bucket.T) .= parent(orog_adjusted_T)
 
     Y.bucket.W .= 0.15
     Y.bucket.Ws .= 0.0

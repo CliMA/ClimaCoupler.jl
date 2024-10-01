@@ -275,6 +275,16 @@ if mode_name == "amip"
         energy_check = energy_check,
     )
 
+     # Update land surface temperature to account for orography
+     surface_elevation = CC.Fields.field_values(
+         CC.Fields.level(CC.Fields.coordinate_field(atmos_sim.integrator.u.f).z, CC.Utilities.half     )
+     )
+     T_sfc = Interfacer.get_field(land_sim, Val(:surface_temperature))
+     orog_adjusted_T_sfc = parent(T_sfc) .- FT(6.5e-3) .* parent(surface_elevation)
+     Interfacer.update_field!(land_sim, Val(:surface_temperature), orog_adjusted_T_sfc)
+     parent(land_sim.integrator.u.bucket.T) .=
+         reshape(parent(orog_adjusted_T_sfc), (1, size(parent(orog_adjusted_T_sfc))...))
+
     ## ocean stub
     SST_timevaryinginput = TimeVaryingInput(
         sst_data,

@@ -193,6 +193,9 @@ function Interfacer.get_field(bucket_sim::BucketSimulation, ::Val{:water})
        ρ_cloud_liq  # kg water / m2
 end
 
+function Interfacer.update_field!(sim::BucketSimulation, ::Val{:surfacc_temperature})
+    parent(sim.integrator.p.bucket.T_sfc) .= parent(field)
+end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_density}, field)
     parent(sim.integrator.p.bucket.ρ_sfc) .= parent(field)
 end

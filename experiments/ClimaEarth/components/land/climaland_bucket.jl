@@ -97,9 +97,9 @@ function bucket_init(
     # the snow would melt in time `τc`. It prevents us from having to specially time step in cases where
     # all the snow melts in a single timestep.
     σS_c = FT(0.2) # critical snow water equivalent
-    W_f = FT(10) # bucket capacity
-    κ_soil = FT(0.7) # soil conductivity
-    ρc_soil = FT(2e8) # soil volumetric heat capacity
+    W_f = FT(0.2) # bucket capacity
+    κ_soil = FT(1.5) # soil conductivity
+    ρc_soil = FT(2e6) # soil volumetric heat capacity
 
     params = CL.Bucket.BucketModelParameters(FT; albedo, z_0m, z_0b, τc, σS_c, W_f, κ_soil, ρc_soil)
 
@@ -124,7 +124,7 @@ function bucket_init(
     T_sfc_0 = FT(271.0)
     @. Y.bucket.T = T_sfc_0 + temp_anomaly(coords.subsurface)
 
-    Y.bucket.W .= 6.5
+    Y.bucket.W .= 0.15
     Y.bucket.Ws .= 0.0
     Y.bucket.σS .= 0.0
 

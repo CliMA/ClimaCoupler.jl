@@ -100,6 +100,16 @@ We can additionally pass the configuration dictionary to the component model ini
 include("cli_options.jl")
 parsed_args = parse_commandline(argparse_settings())
 
+## set unique random seed if desired, otherwise use default
+if parsed_args["unique_seed"]
+    time_ns = time_ns()
+    Random.seed!(time_ns)
+    @info("Random seed set to $time_ns")
+else
+    Random.seed!(1234)
+    @info("Random seed set to 1234")
+end
+
 ## modify parsed args for fast testing from REPL #hide
 if isinteractive()
     parsed_args["config_file"] =

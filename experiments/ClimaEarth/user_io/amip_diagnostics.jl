@@ -15,6 +15,7 @@ function amip_diagnostics_setup(fields, artifacts_dir, start_date, t)
     schedule_everystep = CD.Schedules.EveryStepSchedule()
     schedule_12hour = CD.Schedules.EveryCalendarDtSchedule(Dates.Hour(12), start_date = start_date)
     netcdf_writer = CD.Writers.NetCDFWriter(axes(fields.F_turb_energy), artifacts_dir)
+    @info "expect amip diagnostics in $artifacts_dir"
 
     # Create the diagnostic for turbulent energy fluxes
     F_turb_energy_diag = CD.DiagnosticVariable(;

@@ -216,6 +216,8 @@ Utilities.show_memory_usage()
 
 ## init atmos model component
 atmos_sim = atmos_init(atmos_config_object);
+# Get surface elevation from `atmos` coordinate field
+surface_elevation = CC.Fields.level(CC.Fields.coordinate_field(atmos_sim.integrator.u.f).z, CC.Utilities.half)
 Utilities.show_memory_usage()
 
 thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models #342
@@ -283,6 +285,7 @@ if mode_name == "amip"
         date_ref = date0,
         t_start = t_start,
         energy_check = energy_check,
+        surface_elevation,
     )
 
     ## ocean stub
@@ -369,6 +372,7 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         date_ref = date0,
         t_start = t_start,
         energy_check = energy_check,
+        surface_elevation,
     )
 
     ## ocean model
@@ -417,6 +421,7 @@ elseif mode_name == "slabplanet_eisenman"
         date_ref = date0,
         t_start = t_start,
         energy_check = energy_check,
+        surface_elevation,
     )
 
     ## ocean stub (here set to zero area coverage)

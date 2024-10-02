@@ -46,7 +46,7 @@ Base.@kwdef struct IceSlabParameters{FT <: AbstractFloat}
     z0b::FT = 1e-4          # roughness length for tracers [m]
     T_freeze::FT = 271.2    # freezing temperature of sea water [K]
     k_ice::FT = 2           # thermal conductivity of sea ice [W / m / K] (less in HM71)
-    α::FT = 0.8             # albedo of sea ice [0, 1]
+    α::FT = 0.65            # albedo of sea ice, roughly tuned to match observations
 end
 
 Interfacer.name(::IceSlabParameters) = "IceSlabParameters"

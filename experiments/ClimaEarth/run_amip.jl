@@ -272,7 +272,7 @@ if mode_name == "amip"
         config_dict["land_domain_type"],
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
-        dir_paths.regrid;
+        dir_paths;
         dt = Δt_cpl,
         space = boundary_space,
         saveat = saveat,
@@ -359,7 +359,7 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         config_dict["land_domain_type"],
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
-        dir_paths.regrid;
+        dir_paths;
         dt = Δt_cpl,
         space = boundary_space,
         saveat = saveat,
@@ -408,7 +408,7 @@ elseif mode_name == "slabplanet_eisenman"
         config_dict["land_domain_type"],
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
-        dir_paths.regrid;
+        dir_paths;
         dt = Δt_cpl,
         space = boundary_space,
         saveat = saveat,

@@ -28,19 +28,19 @@ function swap_space!(space_out::CC.Spaces.AbstractSpace, field_in::CC.Fields.Fie
 end
 
 """
-    get_device(parsed_args)
+    get_device(config_dict)
 
 Returns the device on which the model is being run
 
 # Arguments
-- `parsed_args`: dictionary containing a "device" flag which decides which device to run on
+- `config_dict`: dictionary containing a "device" flag which decides which device to run on
 """
-function get_device(parsed_args)
-    if parsed_args["device"] == "auto"
+function get_device(config_dict)
+    if config_dict["device"] == "auto"
         return ClimaComms.device()
-    elseif parsed_args["device"] == "CUDADevice"
+    elseif config_dict["device"] == "CUDADevice"
         return ClimaComms.CUDADevice()
-    elseif parsed_args["device"] == "CPUMultiThreaded" || Threads.nthreads() > 1
+    elseif config_dict["device"] == "CPUMultiThreaded" || Threads.nthreads() > 1
         return ClimaComms.CPUMultiThreaded()
     else
         return ClimaComms.CPUSingleThreaded()
@@ -49,15 +49,15 @@ end
 
 
 """
-    get_comms_context(parsed_args)
+    get_comms_context(config_dict)
 
 Sets up the appropriate ClimaComms context for the device the model is to be run on
 
 # Arguments
-`parsed_args`: dictionary containing a "device" flag whcih decides which device context is needed
+`config_dict`: dictionary containing a "device" flag whcih decides which device context is needed
 """
-function get_comms_context(parsed_args)
-    device = get_device(parsed_args)
+function get_comms_context(config_dict)
+    device = get_device(config_dict)
     comms_ctx = ClimaComms.context(device)
     ClimaComms.init(comms_ctx)
 

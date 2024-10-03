@@ -100,16 +100,6 @@ We can additionally pass the configuration dictionary to the component model ini
 include("cli_options.jl")
 parsed_args = parse_commandline(argparse_settings())
 
-## set unique random seed if desired, otherwise use default
-if parsed_args["unique_seed"]
-    time_ns = time_ns()
-    Random.seed!(time_ns)
-    @info("Random seed set to $time_ns")
-else
-    Random.seed!(1234)
-    @info("Random seed set to 1234")
-end
-
 ## modify parsed args for fast testing from REPL #hide
 if isinteractive()
     parsed_args["config_file"] =
@@ -118,8 +108,6 @@ if isinteractive()
     parsed_args["job_id"] = "interactive_debug"
 end
 
-comms_ctx = Utilities.get_comms_context(parsed_args)
-
 ## the unique job id should be passed in via the command line
 job_id = parsed_args["job_id"]
 @assert !isnothing(job_id) "job_id must be passed in via the command line"
@@ -127,6 +115,13 @@ job_id = parsed_args["job_id"]
 ## read in config dictionary from file, overriding the coupler defaults in `parsed_args`
 config_dict = YAML.load_file(parsed_args["config_file"])
 config_dict = merge(parsed_args, config_dict)
+
+## set unique random seed if desired, otherwise use default
+random_seed = config_dict["unique_seed"] ? time_ns() : 1234
+Random.seed!(random_seed)
+@info "Random seed set to $(random_seed)"
+
+comms_ctx = Utilities.get_comms_context(config_dict)
 
 ## get component model dictionaries (if applicable)
 atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)

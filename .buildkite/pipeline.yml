@@ -474,7 +474,9 @@ steps:
 
       - label: "GPU AMIP target: topography and diagnostic EDMF"
         key: "gpu_amip_target_topo_diagedmf_shortrun"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/gpu_amip_target_topo_diagedmf_shortrun.yml --job_id gpu_amip_target_topo_diagedmf_shortrun"
+        command: 
+        - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/gpu_amip_target_topo_diagedmf_shortrun.yml --job_id gpu_amip_target_topo_diagedmf_shortrun"
+        - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/leaderboard.jl experiments/ClimaEarth/output/amip/gpu_amip_target_topo_diagedmf_shortun/clima_atmos/output_active"
         artifact_paths: "experiments/ClimaEarth/output/amip/gpu_amip_target_topo_diagedmf_shortrun_artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"

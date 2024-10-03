@@ -33,7 +33,7 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 [compat]
 ArgParse = "1.1"
 ArtifactWrappers = "0.2"
-ClimaAnalysis = "0.5.4"
+ClimaAnalysis = "0.5.10"
 ClimaAtmos = "0.27"
 ClimaCorePlots = "0.2"
 ClimaLand = "0.14, 0.15"

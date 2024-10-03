@@ -70,11 +70,14 @@ interface_pages = [
 ]
 performance_pages = ["performance.md"]
 
+output_pages = ["leaderboard.md"]
+
 pages = Any[
     "Home" => "index.md",
     "Examples" => experiment_pages,
     "Coupler Interface" => interface_pages,
     "Performance" => performance_pages,
+    "Model Output" => output_pages,
 ]
 
 

@@ -9,12 +9,11 @@ h_elem: 4
 mode_name: "slabplanet"
 moist: "equil"
 mono_surface: true
-output_default_diagnostics: false
 precip_model: "0M"
 rad: "gray"
 t_end: "10days"
 vert_diff: "true"
 diagnostics:
-  - short_name: [mse, lr, edt, evu, ts, mass_strf, stab, vt, egr]
+  - short_name: [mse, lr, edt, evu, ts, mass_strf, stab, vt, egr, toa_fluxes_net]
     reduction_time: average
     period: 1days

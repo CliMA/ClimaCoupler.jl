@@ -59,7 +59,6 @@ experiment_pages = [
 interface_pages = [
     "checkpointer.md",
     "conservation.md",
-    "diagnostics.md",
     "fieldexchanger.md",
     "fluxcalculator.md",
     "interfacer.md",

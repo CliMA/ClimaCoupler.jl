@@ -51,11 +51,11 @@ struct CoupledSimulation{
     NTSM <: NamedTuple,
     NTMS <: NamedTuple,
     NTM <: NamedTuple,
-    TD <: Tuple,
     NTC <: NamedTuple,
     NTP <: NamedTuple,
     TF,
     TP,
+    DH,
 }
     comms_ctx::X
     dates::D
@@ -69,11 +69,11 @@ struct CoupledSimulation{
     surface_fractions::NTSM
     model_sims::NTMS
     mode::NTM
-    diagnostics::TD
     callbacks::NTC
     dirs::NTP
     turbulent_fluxes::TF
     thermo_params::TP
+    amip_diags_handler::DH
 end
 
 CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args[1:end])...}(args...)

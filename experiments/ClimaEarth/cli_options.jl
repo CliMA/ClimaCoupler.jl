@@ -80,10 +80,6 @@ function argparse_settings()
         help = "Device type to use [`auto` (default) `CPUSingleThreaded`, `CPUMultiThreaded`, `CUDADevice`]"
         arg_type = String
         default = "auto"
-        "--use_coupler_diagnostics"
-        help = "Boolean flag indicating whether to compute and output coupler diagnostics [`true` (default), `false`]"
-        arg_type = Bool
-        default = true
         "--unique_seed"
         help = "Boolean flag indicating whether to set the random number seed to a unique value [`false` (default), `true`]"
         arg_type = Bool

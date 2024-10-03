@@ -1,7 +1,7 @@
 """
     PostProcessor
 
-This module contains functions for postprocessing model data (saved during the simulation by `Diagnostics.jl`) after the simulation is complete.
+This module contains functions for postprocessing model data after the simulation is complete.
 """
 module PostProcessor
 

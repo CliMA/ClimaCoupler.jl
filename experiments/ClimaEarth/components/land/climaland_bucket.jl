@@ -7,6 +7,7 @@ import ClimaParams
 import Thermodynamics as TD
 import ClimaLand as CL
 import ClimaLand.Parameters as LP
+import ClimaDiagnostics as CD
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer
 
 ###
@@ -52,7 +53,7 @@ function bucket_init(
     config::String,
     albedo_type::String,
     land_temperature_anomaly::String,
-    regrid_dirpath::String;
+    dir_paths::NamedTuple;
     space,
     dt::Float64,
     saveat::Float64,
@@ -69,6 +70,9 @@ function bucket_init(
         )
         @assert config == "sphere"
     end
+
+    regrid_dirpath = dir_paths.regrid
+    artifacts_dir = dir_paths.artifacts
 
     α_snow = FT(0.8) # snow albedo
     if albedo_type == "map_static" # Read in albedo from static data file (default type)
@@ -144,7 +148,22 @@ function bucket_init(
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     bucket_ode_function = CTS.ClimaODEFunction(T_exp! = exp_tendency!, dss! = CL.dss!)
     prob = SciMLBase.ODEProblem(bucket_ode_function, Y, tspan, p)
-    integrator = SciMLBase.init(prob, ode_algo; dt = dt, saveat = saveat, adaptive = false)
+
+    # Add diagnostics
+    netcdf_writer = CD.Writers.NetCDFWriter(domain.space.subsurface, artifacts_dir)
+    scheduled_diagnostics = CL.default_diagnostics(model, date_ref, output_writer = netcdf_writer)
+
+    diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, t_start; dt = dt)
+    diag_cb = CD.DiagnosticsCallback(diagnostic_handler)
+
+    integrator = SciMLBase.init(
+        prob,
+        ode_algo;
+        dt = dt,
+        saveat = saveat,
+        adaptive = false,
+        callback = SciMLBase.CallbackSet(diag_cb),
+    )
 
     sim = BucketSimulation(model, Y, (; domain = domain, soil_depth = d_soil), integrator, area_fraction)
 

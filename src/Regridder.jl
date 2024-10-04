@@ -184,8 +184,6 @@ function hdwrite_regridfile_rll_to_cgll(
         space_undistributed = space2d_undistributed
     end
     if isfile(datafile_cgll) == false
-        isdir(REGRID_DIR) ? nothing : mkpath(REGRID_DIR)
-
         nlat, nlon = NCDatasets.NCDataset(datafile_rll) do ds
             (ds.dim["lat"], ds.dim["lon"])
         end

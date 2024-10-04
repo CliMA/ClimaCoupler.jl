@@ -226,7 +226,7 @@ land_sim = bucket_init(
     "sphere",
     "map_static",
     "aquaplanet",
-    dir_paths.regrid;
+    dir_paths;
     dt = Δt_cpl,
     space = boundary_space,
     saveat = saveat,

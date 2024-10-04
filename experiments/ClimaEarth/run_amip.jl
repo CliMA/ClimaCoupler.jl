@@ -65,7 +65,6 @@ import Interpolations
 
 # Random is used by RRMTGP for some cloud properties
 import Random
-Random.seed!(1234)
 
 pkg_dir = pkgdir(ClimaCoupler)
 

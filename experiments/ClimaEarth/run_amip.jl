@@ -104,9 +104,9 @@ end
 ## modify parsed args for fast testing from REPL #hide
 if isinteractive()
     parsed_args["config_file"] =
-        isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/ci_configs/interactive_debug.yml") :
+        isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/ci_configs/coarse_single_ft32.yml") :
         parsed_args["config_file"]
-    parsed_args["job_id"] = "interactive_debug"
+    parsed_args["job_id"] = "coarse_single_ft32"
 end
 
 comms_ctx = Utilities.get_comms_context(parsed_args)
@@ -123,18 +123,18 @@ config_dict = merge(parsed_args, config_dict)
 atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 
-if config_dict["mode_name"] == "amip" && config_dict["output_default_diagnostics"]
-    @info "Using default AMIP diagnostics"
-    !haskey(config_dict, "diagnostics") && (config_dict["diagnostics"] = [])
-    push!(
-        config_dict["diagnostics"],
-        Dict(
-            "short_name" => ["mse", "lr", "edt", "evu", "ts", "mass_strf", "stab", "vt", "egr", "toa_fluxes_net"],
-            "reduction_time" => "average",
-            "period" => "1days",
-        ),
-    )
-end
+# if config_dict["mode_name"] == "amip" && config_dict["output_default_diagnostics"]
+#     @info "Using default AMIP diagnostics"
+#     !haskey(config_dict, "diagnostics") && (config_dict["diagnostics"] = [])
+#     push!(
+#         config_dict["diagnostics"],
+#         Dict(
+#             "short_name" => ["mse", "lr", "edt", "evu", "ts", "mass_strf", "stab", "vt", "egr", "toa_fluxes_net"],
+#             "reduction_time" => "average",
+#             "period" => "1days",
+#         ),
+#     )
+# end
 
 ## read in some parsed command line arguments, required by this script
 mode_name = config_dict["mode_name"]

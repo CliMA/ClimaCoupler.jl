@@ -308,28 +308,43 @@ if mode_name == "amip"
         thermo_params = thermo_params,
     ))
 
-    ## sea ice model
-    SIC_timevaryinginput = TimeVaryingInput(
-        sic_data,
-        "SEAICE",
-        boundary_space,
-        reference_date = date0,
-        file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
-    )
+    # ## sea ice model
+    # SIC_timevaryinginput = TimeVaryingInput(
+    #     sic_data,
+    #     "SEAICE",
+    #     boundary_space,
+    #     reference_date = date0,
+    #     file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
+    # )
 
-    SIC_init = CC.Fields.zeros(boundary_space)
-    evaluate!(SIC_init, SIC_timevaryinginput, t_start)
+    # SIC_init = CC.Fields.zeros(boundary_space)
+    # evaluate!(SIC_init, SIC_timevaryinginput, t_start)
 
-    ice_fraction = get_ice_fraction.(SIC_init, mono_surface)
-    ice_sim = ice_init(
-        FT;
-        tspan = tspan,
-        dt = Δt_cpl,
-        space = boundary_space,
-        saveat = saveat,
-        area_fraction = ice_fraction,
+    # ice_fraction = get_ice_fraction.(SIC_init, mono_surface)
+    # ice_sim = ice_init(
+    #     FT;
+    #     tspan = tspan,
+    #     dt = Δt_cpl,
+    #     space = boundary_space,
+    #     saveat = saveat,
+    #     area_fraction = ice_fraction,
+    #     thermo_params = thermo_params,
+    # )
+    ## sea ice stub (here set to zero area coverage)
+        ice_sim = Interfacer.SurfaceStub((;
+        T_sfc = CC.Fields.ones(boundary_space),
+        ρ_sfc = CC.Fields.zeros(boundary_space),
+        z0m = FT(0),
+        z0b = FT(0),
+        beta = FT(1),
+        α_direct = CC.Fields.ones(boundary_space) .* FT(1),
+        α_diffuse = CC.Fields.ones(boundary_space) .* FT(1),
+        area_fraction = CC.Fields.zeros(boundary_space),
+        phase = TD.Ice(),
         thermo_params = thermo_params,
-    )
+    ))
+
+
 
     ## CO2 concentration from temporally varying file
     CO2_timevaryinginput = TimeVaryingInput(co2_data, "co2", boundary_space, reference_date = date0)

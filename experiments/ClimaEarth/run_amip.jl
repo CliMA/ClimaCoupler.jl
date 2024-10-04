@@ -356,7 +356,7 @@ if mode_name == "amip"
     mode_specifics = (;
         name = mode_name,
         SST_timevaryinginput = SST_timevaryinginput,
-        SIC_timevaryinginput = SIC_timevaryinginput,
+        SIC_timevaryinginput = nothing,
         CO2_timevaryinginput = CO2_timevaryinginput,
     )
     Utilities.show_memory_usage()
@@ -729,7 +729,7 @@ function solve_coupler!(cs)
         if cs.mode.name == "amip"
 
             evaluate!(Interfacer.get_field(ocean_sim, Val(:surface_temperature)), cs.mode.SST_timevaryinginput, t)
-            evaluate!(Interfacer.get_field(ice_sim, Val(:area_fraction)), cs.mode.SIC_timevaryinginput, t)
+            # evaluate!(Interfacer.get_field(ice_sim, Val(:area_fraction)), cs.mode.SIC_timevaryinginput, t)
 
             # TODO: get_field with :co2 is not implemented, so this is a little awkward
             current_CO2 = CC.Fields.zeros(boundary_space)

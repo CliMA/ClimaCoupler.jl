@@ -881,16 +881,14 @@ if ClimaComms.iamroot(comms_ctx)
         # define variable names and output directories for each diagnostic
         amip_short_names_atmos = ["ta", "ua", "hus", "clw", "pr", "ts", "toa_fluxes_net"]
         output_dir_atmos = atmos_sim.integrator.p.output_dir
+        artifacts_dir_atmos = mkpath(joinpath(dir_paths.artifacts, "atmos"))
         amip_short_names_coupler = ["F_turb_energy"]
         output_dir_coupler = dir_paths.artifacts
+        artifacts_dir_coupler = mkpath(joinpath(dir_paths.artifacts, "coupler"))
 
         # Check if all output variables are available in the specified directories
-        make_ci_plots(output_dir_atmos, joinpath(dir_paths.artifacts, "atmos"), short_names = amip_short_names_atmos)
-        make_ci_plots(
-            output_dir_coupler,
-            joinpath(dir_paths.artifacts, "coupler"),
-            short_names = amip_short_names_coupler,
-        )
+        make_ci_plots(output_dir_atmos, artifacts_dir_atmos, short_names = amip_short_names_atmos)
+        make_ci_plots(output_dir_coupler, artifacts_dir_coupler, short_names = amip_short_names_coupler)
 
         ## Compare against observations
         if t_end > 84600 && config_dict["output_default_diagnostics"]

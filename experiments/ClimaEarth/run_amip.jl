@@ -115,12 +115,12 @@ job_id = parsed_args["job_id"]
 config_dict = YAML.load_file(parsed_args["config_file"])
 config_dict = merge(parsed_args, config_dict)
 
+comms_ctx = Utilities.get_comms_context(config_dict)
+
 ## set unique random seed if desired, otherwise use default
 random_seed = config_dict["unique_seed"] ? time_ns() : 1234
 Random.seed!(random_seed)
 @info "Random seed set to $(random_seed)"
-
-comms_ctx = Utilities.get_comms_context(config_dict)
 
 ## get component model dictionaries (if applicable)
 atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)

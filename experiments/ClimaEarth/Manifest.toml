@@ -2,7 +2,7 @@
 
 julia_version = "1.10.5"
 manifest_format = "2.0"
-project_hash = "068d169322176676d4a2ff1e87cafb47cc58b76b"
+project_hash = "8cfbbdd3c55bdfe11ee11fceafa27d98a3409be5"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "5a5eafb8344b81b8c2237f8a6f6b3602b3f6180e"
@@ -289,10 +289,10 @@ weakdeps = ["GeoMakie", "Makie"]
     ClimaAnalysisMakieExt = "Makie"
 
 [[deps.ClimaAtmos]]
-deps = ["Adapt", "ArgParse", "ArtifactWrappers", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "DiffEqBase", "FastGaussQuadrature", "Insolation", "Interpolations", "LazyArtifacts", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "RRTMGP", "SciMLBase", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "YAML"]
-git-tree-sha1 = "0bf67981e00dc746b0d386ef6b20407f817b2a63"
+deps = ["Adapt", "ArgParse", "ArtifactWrappers", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "DiffEqBase", "FastGaussQuadrature", "Insolation", "Interpolations", "LazyArtifacts", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "RRTMGP", "SciMLBase", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
+git-tree-sha1 = "ea3534c0db72817156dd6b558ba3e6f07c84b28c"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.27.5"
+version = "0.27.6"
 
 [[deps.ClimaComms]]
 git-tree-sha1 = "ec303a4a66dc0a0ebe15a639a7e685afeaa0daef"
@@ -347,9 +347,9 @@ version = "0.2.7"
 
 [[deps.ClimaLand]]
 deps = ["ArtifactWrappers", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "ecb91842be1740ba97cbedd7123f4479013ec9d9"
+git-tree-sha1 = "e8f2937db023023675dc440c43abd7a78d74b88d"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
-version = "0.15.0"
+version = "0.15.1"
 
     [deps.ClimaLand.extensions]
     CreateParametersExt = "ClimaParams"
@@ -2431,9 +2431,9 @@ version = "7.2.1+1"
 
 [[deps.SurfaceFluxes]]
 deps = ["DocStringExtensions", "RootSolvers", "Thermodynamics"]
-git-tree-sha1 = "89c701c87f378ce95e7ddbcd69b8f1106ba8b968"
+git-tree-sha1 = "aee530bde85cd41374273568cb649e72d82921e7"
 uuid = "49b00bb7-8bd4-4f2b-b78c-51cd0450215f"
-version = "0.11.0"
+version = "0.12.0"
 weakdeps = ["ClimaParams"]
 
     [deps.SurfaceFluxes.extensions]
@@ -2501,9 +2501,9 @@ version = "1.0.2"
 
 [[deps.Thermodynamics]]
 deps = ["DocStringExtensions", "KernelAbstractions", "Random", "RootSolvers"]
-git-tree-sha1 = "80b13ddc5ae7b8605ef5a055e7f23c5b5f4775cf"
+git-tree-sha1 = "8c2afc6dbb2bdac698a5b05816b7521630dea034"
 uuid = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
-version = "0.12.7"
+version = "0.12.8"
 weakdeps = ["ClimaParams"]
 
     [deps.Thermodynamics.extensions]
@@ -2593,6 +2593,15 @@ deps = ["MacroTools"]
 git-tree-sha1 = "6cc9d682755680e0f0be87c56392b7651efc2c7b"
 uuid = "9602ed7d-8fef-5bc8-8597-8f21381861e8"
 version = "0.1.5"
+
+[[deps.UnrolledUtilities]]
+git-tree-sha1 = "1244bd810bfd53c539ef5463b01dd9b808c2e5da"
+uuid = "0fe1646c-419e-43be-ac14-22321958931b"
+version = "0.1.5"
+weakdeps = ["StaticArrays"]
+
+    [deps.UnrolledUtilities.extensions]
+    UnrolledUtilitiesStaticArraysExt = "StaticArrays"
 
 [[deps.UnsafeAtomics]]
 git-tree-sha1 = "6331ac3440856ea1988316b46045303bef658278"

@@ -83,7 +83,7 @@ steps:
         soft_fail: true
 
       - label: "1 Coarse current AMIP (50km): frierson + 0M + bucket land"
-        key: "amip1"
+        key: "amip2"
         command:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_no_orography_50km.yml--job_id amip_notopo_50km"

@@ -116,6 +116,10 @@ function argparse_settings()
         help = "Type of temperature anomaly for bucket model. [`amip`, `aquaplanet` (default)]"
         arg_type = String
         default = "aquaplanet"
+        "--use_land_diagnostics"
+        help = "Boolean flag indicating whether to compute and output land model diagnostics [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
     end
     return s
 end

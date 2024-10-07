@@ -24,6 +24,7 @@ t_end: "366days"
 turb_flux_partition: "CombinedStateFluxesMOST"
 unique_seed: true
 viscous_sponge: false
+vert_diff: true
 z_elem: 31
 z_max: 50000.0
 diagnostics:

@@ -25,4 +25,7 @@ turb_flux_partition: "CombinedStateFluxesMOST"
 unique_seed: true
 viscous_sponge: false
 z_elem: 31
-z_max: 50000.0
+z_max: 55000.0
+diagnostics:
+  - short_name: [ts, ta, thetaa, ha, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, hussfc, evspsbl, pr, edt, hfes]
+    period: 1hours

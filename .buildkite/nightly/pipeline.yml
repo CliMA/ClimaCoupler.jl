@@ -56,7 +56,7 @@ steps:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse.yml --job_id amip_coarse1"
         artifact_paths: "experiments/ClimaEarth/output/amip/amip_coarse1_artifacts/*"
-        timeout_in_minutes: 1080
+        timeout_in_minutes: 840
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

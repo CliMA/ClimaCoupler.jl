@@ -63,6 +63,7 @@ function bucket_init(
     t_start::Float64,
     energy_check::Bool,
     surface_elevation,
+    use_land_diagnostics::Bool,
 ) where {FT}
     if config != "sphere"
         println(
@@ -132,7 +133,7 @@ function bucket_init(
     @. Y.bucket.T = T_sfc_0 + temp_anomaly(coords.subsurface)
     # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
     orog_adjusted_T = CC.Fields.field_values(Y.bucket.T) .- lapse_rate .* CC.Fields.field_values(surface_elevation)
-    # Adjust T based on surface elevation (p.bucket.T_sfc is then set using the 
+    # Adjust T based on surface elevation (p.bucket.T_sfc is then set using the
     # set_initial_cache! function)
     parent(Y.bucket.T) .= parent(orog_adjusted_T)
 
@@ -150,12 +151,16 @@ function bucket_init(
     prob = SciMLBase.ODEProblem(bucket_ode_function, Y, tspan, p)
 
     # Add diagnostics
-    netcdf_writer = CD.Writers.NetCDFWriter(domain.space.subsurface, artifacts_dir)
-    scheduled_diagnostics =
-        CL.default_diagnostics(model, date_ref, output_writer = netcdf_writer, average_period = :monthly)
+    if use_land_diagnostics
+        netcdf_writer = CD.Writers.NetCDFWriter(domain.space.subsurface, artifacts_dir)
+        scheduled_diagnostics =
+            CL.default_diagnostics(model, date_ref, output_writer = netcdf_writer, average_period = :monthly)
 
-    diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, t_start; dt = dt)
-    diag_cb = CD.DiagnosticsCallback(diagnostic_handler)
+        diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, t_start; dt = dt)
+        diag_cb = CD.DiagnosticsCallback(diagnostic_handler)
+    else
+        diag_cb = nothing
+    end
 
     integrator = SciMLBase.init(
         prob,

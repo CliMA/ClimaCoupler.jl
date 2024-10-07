@@ -146,6 +146,7 @@ restart_t = Int(config_dict["restart_t"])
 evolving_ocean = config_dict["evolving_ocean"]
 dt_rad = config_dict["dt_rad"]
 use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
+use_land_diagnostics = config_dict["use_land_diagnostics"]
 
 #=
 ## Setup Communication Context
@@ -281,6 +282,7 @@ if mode_name == "amip"
         t_start = t_start,
         energy_check = energy_check,
         surface_elevation,
+        use_land_diagnostics,
     )
 
     ## ocean stub
@@ -370,6 +372,7 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         t_start = t_start,
         energy_check = energy_check,
         surface_elevation,
+        use_land_diagnostics,
     )
 
     ## ocean model
@@ -419,6 +422,7 @@ elseif mode_name == "slabplanet_eisenman"
         t_start = t_start,
         energy_check = energy_check,
         surface_elevation,
+        use_land_diagnostics,
     )
 
     ## ocean stub (here set to zero area coverage)

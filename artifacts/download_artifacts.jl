@@ -9,9 +9,11 @@ end
 # Download land artifacts
 module Land
 import ClimaLand
-include(joinpath(pkgdir(ClimaLand), "src", "standalone", "Bucket", "artifacts", "artifacts.jl"))
-@info "CESM", cesm2_albedo_dataset_path()
-@info "Bareground albedo", bareground_albedo_dataset_path()
+if pkgversion(ClimaLand) < v"0.15.2"
+    include(joinpath(pkgdir(ClimaLand), "src", "standalone", "Bucket", "artifacts", "artifacts.jl"))
+    @info "CESM", cesm2_albedo_dataset_path()
+    @info "Bareground albedo", bareground_albedo_dataset_path()
+end
 end
 
 

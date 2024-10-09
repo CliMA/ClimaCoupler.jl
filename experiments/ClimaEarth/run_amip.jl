@@ -297,8 +297,10 @@ if mode_name == "amip"
     ocean_sim = Interfacer.SurfaceStub((;
         T_sfc = SST_init,
         ρ_sfc = CC.Fields.zeros(boundary_space),
-        z0m = FT(1e-3),
-        z0b = FT(1e-3),
+        # ocean roughness follows GFDL model 
+        # (https://github.com/NOAA-GFDL/ice_param/blob/main/ocean_rough.F90#L47)
+        z0m = FT(5.8e-5),
+        z0b = FT(5.8e-5),
         beta = FT(1),
         α_direct = CC.Fields.ones(boundary_space) .* FT(0.06),
         α_diffuse = CC.Fields.ones(boundary_space) .* FT(0.06),

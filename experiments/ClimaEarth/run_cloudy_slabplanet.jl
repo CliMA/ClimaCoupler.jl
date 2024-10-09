@@ -235,6 +235,7 @@ land_sim = bucket_init(
     t_start = tspan[1],
     energy_check = false,
     surface_elevation,
+    use_land_diagnostics = true,
 )
 
 ocean_sim = ocean_init(

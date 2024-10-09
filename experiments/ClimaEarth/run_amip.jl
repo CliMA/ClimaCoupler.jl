@@ -134,6 +134,7 @@ land_sim_name = "bucket"
 t_end = Float64(time_to_seconds(config_dict["t_end"]))
 t_start = 0.0
 tspan = (t_start, t_end)
+Δt_component = Float64(time_to_seconds(config_dict["dt"]))
 Δt_cpl = Float64(config_dict["dt_cpl"])
 saveat = Float64(time_to_seconds(config_dict["dt_save_to_sol"]))
 date0 = date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
@@ -145,6 +146,7 @@ restart_t = Int(config_dict["restart_t"])
 evolving_ocean = config_dict["evolving_ocean"]
 dt_rad = config_dict["dt_rad"]
 use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
+use_land_diagnostics = config_dict["use_land_diagnostics"]
 
 #=
 ## Setup Communication Context
@@ -272,7 +274,7 @@ if mode_name == "amip"
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
         dir_paths;
-        dt = Δt_cpl,
+        dt = Δt_component,
         space = boundary_space,
         saveat = saveat,
         area_fraction = land_area_fraction,
@@ -280,6 +282,7 @@ if mode_name == "amip"
         t_start = t_start,
         energy_check = energy_check,
         surface_elevation,
+        use_land_diagnostics,
     )
 
     ## ocean stub
@@ -325,7 +328,7 @@ if mode_name == "amip"
     ice_sim = ice_init(
         FT;
         tspan = tspan,
-        dt = Δt_cpl,
+        dt = Δt_component,
         space = boundary_space,
         saveat = saveat,
         area_fraction = ice_fraction,
@@ -361,7 +364,7 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
         dir_paths;
-        dt = Δt_cpl,
+        dt = Δt_component,
         space = boundary_space,
         saveat = saveat,
         area_fraction = land_area_fraction,
@@ -369,13 +372,14 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         t_start = t_start,
         energy_check = energy_check,
         surface_elevation,
+        use_land_diagnostics,
     )
 
     ## ocean model
     ocean_sim = ocean_init(
         FT;
         tspan = tspan,
-        dt = Δt_cpl,
+        dt = Δt_component,
         space = boundary_space,
         saveat = saveat,
         area_fraction = (FT(1) .- land_area_fraction), ## NB: this ocean fraction includes areas covered by sea ice (unlike the one contained in the cs)
@@ -410,7 +414,7 @@ elseif mode_name == "slabplanet_eisenman"
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
         dir_paths;
-        dt = Δt_cpl,
+        dt = Δt_component,
         space = boundary_space,
         saveat = saveat,
         area_fraction = land_area_fraction,
@@ -418,13 +422,14 @@ elseif mode_name == "slabplanet_eisenman"
         t_start = t_start,
         energy_check = energy_check,
         surface_elevation,
+        use_land_diagnostics,
     )
 
     ## ocean stub (here set to zero area coverage)
     ocean_sim = ocean_init(
         FT;
         tspan = tspan,
-        dt = Δt_cpl,
+        dt = Δt_component,
         space = boundary_space,
         saveat = saveat,
         area_fraction = CC.Fields.zeros(boundary_space), # zero, since ML is calculated below
@@ -437,7 +442,7 @@ elseif mode_name == "slabplanet_eisenman"
         tspan,
         space = boundary_space,
         area_fraction = (FT(1) .- land_area_fraction),
-        dt = Δt_cpl,
+        dt = Δt_component,
         saveat = saveat,
         thermo_params = thermo_params,
     )

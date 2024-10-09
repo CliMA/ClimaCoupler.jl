@@ -192,8 +192,13 @@ catch error
         "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
     )
 end
+land_mask_data = try
+    joinpath(@clima_artifact("earth_orography_30arcseconds", comms_ctx), "ETOPO_2022_v1_30s_N90W180_surface.nc")
+catch error
+    joinpath(@clima_artifact("earth_orography_60arcseconds", comms_ctx), "ETOPO_2022_v1_60s_N90W180_surface.nc")
+end
+
 co2_data = joinpath(co2_dataset_path(), "mauna_loa_co2.nc")
-land_mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 
 #=
 ## Component Model Initialization
@@ -203,7 +208,7 @@ returns a `ComponentModelSimulation` object (see `Interfacer` docs for more deta
 
 #=
 ### Atmosphere
-This uses the `ClimaAtmos.jl` model, with parameterization options specified in the `atmos_config_object` dictionary.
+This uses the `ClimaAtmos.jl` model, with parametrization options specified in the `atmos_config_object` dictionary.
 =#
 
 Utilities.show_memory_usage()
@@ -237,7 +242,13 @@ Note that land-sea area fraction is different to the land-sea mask, which is a b
 (masks are used internally by the coupler to indicate passive cells that are not populated by a given component model).
 =#
 
-land_area_fraction = SpaceVaryingInput(land_mask_data, "LSMASK", boundary_space)
+# Preprocess the file to be 1s and 0s before remapping into onto the grid
+land_area_fraction = SpaceVaryingInput(
+    land_mask_data,
+    "z",
+    boundary_space,
+    file_reader_kwargs = (; preprocess_func = (data) -> data >= 0),
+)
 if !mono_surface
     land_area_fraction = Regridder.binary_mask.(land_area_fraction)
 end

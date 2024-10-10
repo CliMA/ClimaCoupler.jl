@@ -151,7 +151,8 @@ function bucket_init(
 
     # Add diagnostics
     netcdf_writer = CD.Writers.NetCDFWriter(domain.space.subsurface, artifacts_dir)
-    scheduled_diagnostics = CL.default_diagnostics(model, date_ref, output_writer = netcdf_writer)
+    scheduled_diagnostics =
+        CL.default_diagnostics(model, date_ref, output_writer = netcdf_writer, average_period = :monthly)
 
     diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, t_start; dt = dt)
     diag_cb = CD.DiagnosticsCallback(diagnostic_handler)

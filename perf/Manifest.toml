@@ -380,9 +380,9 @@ version = "0.2.8"
 
 [[deps.ClimaLand]]
 deps = ["ArtifactWrappers", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "ecb91842be1740ba97cbedd7123f4479013ec9d9"
+git-tree-sha1 = "e8f2937db023023675dc440c43abd7a78d74b88d"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
-version = "0.15.0"
+version = "0.15.1"
 
     [deps.ClimaLand.extensions]
     CreateParametersExt = "ClimaParams"

@@ -14,7 +14,7 @@ include("../slab_utils.jl")
 
 Ice concentration is prescribed, and we solve the following energy equation:
 
-    (h * ρ * c) d T_sfc dt = -(F_turb_energy + F_radiativead) + F_conductive
+    (h * ρ * c) d T_sfc dt = -(F_turb_energy + F_radiative) + F_conductive
 
     with
     F_conductive = k_ice (T_base - T_sfc) / (h)
@@ -173,13 +173,14 @@ function ice_rhs!(du, u, p, _)
     T_freeze = params.T_freeze
 
     F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc) # fluxes are defined to be positive when upward
-    rhs = @. (-F_turb_energy - F_radiative + F_conductive) / (params.h * params.ρ * params.c)
-
-    # do not count tendencies that lead to temperatures above freezing, and mask out no-ice areas
+    # If tendencies lead to temperature above freezing, set temperature to freezing
+    rhs = @. min(
+        (-F_turb_energy - F_radiative + F_conductive) / (params.h * params.ρ * params.c),
+        (T_freeze - Y.T_sfc) / p.dt,
+    )
+    #mask out no-ice areas
     area_mask = Regridder.binary_mask.(area_fraction)
-    threshold = zero(FT)
-    unphysical = @. Regridder.binary_mask.(T_freeze - (Y.T_sfc + FT(rhs) * FT(p.dt)), threshold) .* area_mask
-    parent(dY.T_sfc) .= parent(rhs .* unphysical)
+    parent(dY.T_sfc) .= parent(rhs .* area_mask)
 
     @. p.q_sfc = TD.q_vap_saturation_generic.(p.thermo_params, Y.T_sfc, p.ρ_sfc, TD.Ice())
 end

@@ -12,18 +12,6 @@ function co2_dataset_path()
     return AW.get_data_folder(co2_dataset)
 end
 
-function mask_dataset_path()
-    mask_dataset = AW.ArtifactWrapper(
-        @__DIR__,
-        "land_mask",
-        AW.ArtifactFile[AW.ArtifactFile(
-            url = "https://caltech.box.com/shared/static/vubmq84nhvbgdqayezguf3i1w6nqtwvu.ncc",
-            filename = "seamask.nc",
-        ),],
-    )
-    return AW.get_data_folder(mask_dataset)
-end
-
 """
     artifact_data(datapath_full, filename)
 

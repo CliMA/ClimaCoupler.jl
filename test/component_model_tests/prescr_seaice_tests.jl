@@ -48,9 +48,10 @@ for FT in (Float32, Float64)
         dT_expected = -1.0 / (p.params.h * p.params.ρ * p.params.c)
         @test sum([i for i in extrema(dY)] .≈ [FT(dT_expected), FT(dT_expected)]) == 2
 
-        # check that tendency not added if T of ice would have done above freezing
+        # check that tendency will not result in above freezing T
         dY, Y, p = test_sea_ice_rhs(F_radiative = 0.0, T_base = 330.0) # Float32 requires a large number here!
-        @test sum([i for i in extrema(dY)] .≈ [FT(0.0), FT(0.0)]) == 2
+        dT_maximum = @. (p.params.T_freeze - Y.T_sfc) / p.dt
+        @test minimum(dT_maximum .- dY.T_sfc) >= FT(0.0)
 
         # check that the correct tendency was added due to basal flux
         dY, Y, p = test_sea_ice_rhs(F_radiative = 0.0, T_base = 269.2, global_mask = 1.0)

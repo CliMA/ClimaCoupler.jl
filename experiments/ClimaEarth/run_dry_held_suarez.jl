@@ -202,7 +202,6 @@ cs = Interfacer.CoupledSimulation{FT}(
     [tspan[1], tspan[2]],
     atmos_sim.integrator.t,
     Δt_cpl,
-    (;),
     model_sims,
     (;), # mode_specifics
     (), # coupler diagnostics

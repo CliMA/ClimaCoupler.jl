@@ -500,22 +500,30 @@ Maintains the invariant that the sum of area fractions is 1 at all points.
 function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     FT = Interfacer.float_type(cs)
 
-    ice_d = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction))
+    ice_fraction_before = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction))
 
     # static fraction
-    land_s = cs.surface_fractions.land
+    land_fraction = Interfacer.get_field(cs.model_sims.land_sim, Val(:area_fraction))
 
-    # update dynamic area fractions
+    # update component models with dynamic area fractions
     # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-    cs.surface_fractions.ice .= max.(min.(ice_d, FT(1) .- land_s), FT(0))
-    cs.surface_fractions.ocean .= max.(FT(1) .- (cs.surface_fractions.ice .+ land_s), FT(0))
+    Interfacer.update_field!(
+        cs.model_sims.ice_sim,
+        Val(:area_fraction),
+        max.(min.(ice_fraction_before, FT(1) .- land_fraction), FT(0)),
+    )
+    ice_fraction = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction))
 
-    @assert minimum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) ≈ FT(1)
-    @assert maximum(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) ≈ FT(1)
+    Interfacer.update_field!(
+        cs.model_sims.ocean_sim,
+        Val(:area_fraction),
+        max.(FT(1) .- (ice_fraction .+ land_fraction), FT(0)),
+    )
+    ocean_fraction = Interfacer.get_field(cs.model_sims.ocean_sim, Val(:area_fraction))
 
-    # update component models
-    Interfacer.update_field!(cs.model_sims.ocean_sim, Val(:area_fraction), cs.surface_fractions.ocean)
-    Interfacer.update_field!(cs.model_sims.ice_sim, Val(:area_fraction), cs.surface_fractions.ice)
+    # check that the sum of area fractions is 1
+    @assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
+    @assert maximum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
 end
 
 """
@@ -579,7 +587,7 @@ This method can be used to combine fields that were saved in the solution histor
 - `fields`: [NamedTuple] containing values to be weighted by `fractions`.
 """
 function combine_surfaces_from_sol!(combined_field::CC.Fields.Field, fractions::NamedTuple, fields::NamedTuple)
-    combined_field .= eltype(combined_field)(0)
+    combined_field .= 0
     warn_nans = false
     for surface_name in propertynames(fields) # could use dot here?
         if any(x -> isnan(x), getproperty(fields, surface_name))

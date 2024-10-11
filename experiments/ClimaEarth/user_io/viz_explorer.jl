@@ -30,6 +30,12 @@ function plot_anim(cs, out_dir = ".")
     end
     Plots.mp4(anim, joinpath(out_dir, "anim_qt.mp4"), fps = 10)
 
+    # get all surface fractions and package into a named tuple
+    land_fraction = Interfacer.get_field(land_sim, Val(:area_fraction))
+    ocean_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction))
+    ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
+    surface_fractions = (; land = land_fraction, ocean = ocean_fraction, ice = ice_fraction)
+
     # plot combined surfaces
     combined_field = zeros(boundary_space)
     sol_slab = slab_land_sim.integrator.sol
@@ -40,7 +46,7 @@ function plot_anim(cs, out_dir = ".")
             land_T_sfc = get_land_temp_from_state(cs.model_sims.land_sim, bucketu)
             Regridder.combine_surfaces_from_sol!(
                 combined_field,
-                cs.surface_fractions,
+                surface_fractions,
                 (; land = land_T_sfc, ocean = oceanu.T_sfc, ice = FT(0)),
             )
             Plots.plot(combined_field)
@@ -51,7 +57,7 @@ function plot_anim(cs, out_dir = ".")
             land_T_sfc = get_land_temp_from_state(cs.model_sims.land_sim, bucketu)
             Regridder.combine_surfaces_from_sol!(
                 combined_field,
-                cs.surface_fractions,
+                surface_fractions,
                 (; land = land_T_sfc, ocean = FT(0), ice = iceu.T_sfc),
             )
             Plots.plot(combined_field)
@@ -63,7 +69,7 @@ function plot_anim(cs, out_dir = ".")
             land_T_sfc = get_land_temp_from_state(cs.model_sims.land_sim, bucketu)
             Regridder.combine_surfaces_from_sol!(
                 combined_field,
-                cs.surface_fractions,
+                surface_fractions,
                 (; land = land_T_sfc, ocean = SST, ice = iceu.T_sfc),
             )
             Plots.plot(combined_field)
@@ -75,7 +81,7 @@ function plot_anim(cs, out_dir = ".")
     anim = Plots.@animate for bucketu in sol_slab.u
         Regridder.combine_surfaces_from_sol!(
             combined_field,
-            cs.surface_fractions,
+            surface_fractions,
             (; land = bucketu.bucket.W, ocean = 0.0, ice = 0.0),
         )
         Plots.plot(combined_field)
@@ -86,7 +92,7 @@ function plot_anim(cs, out_dir = ".")
     anim = Plots.@animate for bucketu in sol_slab.u
         Regridder.combine_surfaces_from_sol!(
             combined_field,
-            cs.surface_fractions,
+            surface_fractions,
             (; land = bucketu.bucket.σS, ocean = 0.0, ice = 0.0),
         )
         Plots.plot(combined_field)
@@ -99,7 +105,7 @@ function plot_anim(cs, out_dir = ".")
         anim = Plots.@animate for sol_iceu in sol_ice.u
             Regridder.combine_surfaces_from_sol!(
                 combined_field,
-                cs.surface_fractions,
+                surface_fractions,
                 (; land = 0.0, ocean = 0.0, ice = sol_iceu.h_ice),
             )
             Plots.plot(combined_field)

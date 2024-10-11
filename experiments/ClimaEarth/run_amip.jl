@@ -613,7 +613,6 @@ cs = Interfacer.CoupledSimulation{FT}(
     [tspan[1], tspan[2]],
     atmos_sim.integrator.t,
     Δt_cpl,
-    (; land = land_area_fraction, ocean = zeros(boundary_space), ice = zeros(boundary_space)),
     model_sims,
     mode_specifics,
     diagnostics,

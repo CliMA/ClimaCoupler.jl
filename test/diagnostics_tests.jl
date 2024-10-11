@@ -1,7 +1,7 @@
 #=
     Unit tests for ClimaCoupler Diagnostics module
 =#
-import Test: @test, @testset
+import Test: @test, @testset, @test_warn
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import Dates
@@ -58,7 +58,7 @@ for FT in (Float32, Float64)
                 @test cs.diagnostics[1].field_vector[1] == expected_results[c_i]
             end
 
-            @test isnothing(Diagnostics.get_var(cs, Val(:z)))
+            @test_warn "Variable Val{:z}() is not defined." Diagnostics.get_var(cs, Val(:z))
         end
     end
 

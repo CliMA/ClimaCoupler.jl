@@ -3,6 +3,7 @@ import StaticArrays
 import Statistics
 import LinearAlgebra
 import ClimaAtmos as CA
+import ClimaAtmos: set_surface_albedo!
 import ClimaCore as CC
 import ClimaCore.Geometry: ⊗
 import SurfaceFluxes as SF

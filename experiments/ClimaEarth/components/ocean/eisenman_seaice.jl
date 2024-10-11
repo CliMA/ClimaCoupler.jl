@@ -11,6 +11,9 @@ import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer
 
 Thermodynamic 0-layer, based on the Semtner 1979 model and later refined by
 Eisenmen 2009 and Zhang et al 2021.
+
+Note that Eisenman sea ice assumes gray radiation, no snow coverage, and
+PartitionedStateFluxes for the surface flux calculation.
 """
 struct EisenmanIceSimulation{P, Y, D, I} <: Interfacer.SeaIceModelSimulation
     params_ice::P
@@ -80,8 +83,6 @@ function eisenman_seaice_init(
     integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64(saveat), adaptive = false)
 
     sim = EisenmanIceSimulation(params, Y, space, integrator)
-    @warn Interfacer.name(sim) *
-          " assumes gray radiation, no snow coverage, and PartitionedStateFluxes for the surface flux calculation."
     return sim
 end
 

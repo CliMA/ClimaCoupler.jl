@@ -77,10 +77,10 @@ for FT in (Float32, Float64)
             (Int(0), Int(1000)), # tspan
             Int(200), # t
             Int(200), # Δt_cpl
-            (; land = land_fraction, ice = CC.Fields.zeros(test_space), ocean = CC.Fields.zeros(test_space)), # surface_fractions
             (;
                 ice_sim = DummyStub((; area_fraction = ice_d)),
                 ocean_sim = Interfacer.SurfaceStub((; area_fraction = ocean_d)),
+                land_sim = DummyStub((; area_fraction = land_fraction)),
             ), # model_sims
             (;), # mode
             (), # diagnostics
@@ -93,7 +93,9 @@ for FT in (Float32, Float64)
         Regridder.update_surface_fractions!(cs)
 
         # Test that sum of fractions is 1 everywhere
-        @test all(parent(cs.surface_fractions.ice .+ cs.surface_fractions.land .+ cs.surface_fractions.ocean) .== FT(1))
+        ice_fraction = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction))
+        ocean_fraction = Interfacer.get_field(cs.model_sims.ocean_sim, Val(:area_fraction))
+        @test all(parent(ice_fraction .+ ocean_fraction .+ land_fraction) .== FT(1))
     end
 
     @testset "test combine_surfaces_from_sol!" begin

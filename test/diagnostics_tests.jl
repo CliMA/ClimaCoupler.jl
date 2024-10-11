@@ -44,7 +44,6 @@ for FT in (Float32, Float64)
                 (Int(0), Int(1000)), # tspan
                 Int(100), # t
                 Int(100), # Δt_cpl
-                (;), # surface_masks
                 (;), # model_sims
                 (;), # mode
                 (dg_2d,),
@@ -85,7 +84,6 @@ for FT in (Float32, Float64)
                 (Int(0), Int(1000)),# tspan
                 Int(100), # t
                 Int(100), # Δt_cpl
-                (;), # surface_masks
                 (;), # model_sims
                 (;), # mode
                 (dg_2d,), # diagnostics
@@ -132,7 +130,6 @@ for FT in (Float32, Float64)
                 (Int(0), Int(1000)), # tspan
                 Int(100), # t
                 Int(100), # Δt_cpl
-                (;), # surface_masks
                 (;), # model_sims
                 (;), # mode
                 (dg_2d,),

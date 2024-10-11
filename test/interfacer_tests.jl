@@ -42,7 +42,6 @@ for FT in (Float32, Float64)
             (Int(0), Int(1000)), # tspan
             Int(200), # t
             Int(200), # Δt_cpl
-            (;), # surface_masks
             (;), # model_sims
             (;), # mode
             (), # diagnostics

@@ -1,15 +1,8 @@
 import ArtifactWrappers as AW
+import ClimaUtilities.ClimaArtifacts: @clima_artifact
 
-function co2_dataset_path()
-    co2_dataset = AW.ArtifactWrapper(
-        @__DIR__,
-        "co2",
-        AW.ArtifactFile[AW.ArtifactFile(
-            url = "https://caltech.box.com/shared/static/xg028wnsn57wam6euwrh98fe43ibei8g.nc",
-            filename = "mauna_loa_co2.nc",
-        ),],
-    )
-    return AW.get_data_folder(co2_dataset)
+function co2_dataset_path(; context = nothing)
+    return @clima_artifact("co2_dataset", context)
 end
 
 function mask_dataset_path()

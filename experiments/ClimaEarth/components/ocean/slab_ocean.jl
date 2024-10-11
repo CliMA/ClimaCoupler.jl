@@ -36,8 +36,6 @@ Base.@kwdef struct OceanSlabParameters{FT <: AbstractFloat}
     evolving_switch::FT = 1 # switch to turn off the evolution of the ocean temperature [0 or 1]
 end
 
-Interfacer.name(::SlabOceanSimulation) = "SlabOceanSimulation"
-
 """
     slab_ocean_space_init(space, params)
 

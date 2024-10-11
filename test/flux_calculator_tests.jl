@@ -32,6 +32,7 @@ struct TestAtmos{P, Y, D, I} <: Interfacer.AtmosModelSimulation
     domain::D
     integrator::I
 end
+Interfacer.name(sim::TestAtmos) = "TestAtmos"
 struct TestAtmos2 <: Interfacer.AtmosModelSimulation end
 Interfacer.name(sim::TestAtmos2) = "TestAtmos2"
 
@@ -71,6 +72,7 @@ struct TestOcean{M, Y, D, I} <: Interfacer.SurfaceModelSimulation
     domain::D
     integrator::I
 end
+Interfacer.name(sim::TestOcean) = "TestOcean"
 
 Interfacer.get_field(sim::TestOcean, ::Val{:surface_temperature}) = sim.integrator.T
 Interfacer.get_field(sim::TestOcean, ::Val{:air_humidity}) = sim.integrator.p.q
@@ -102,6 +104,7 @@ struct DummySurfaceSimulation3{M, Y, D, I} <: Interfacer.SurfaceModelSimulation
     domain::D
     integrator::I
 end
+Interfacer.name(sim::DummySurfaceSimulation3) = "DummySurfaceSimulation3"
 
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:surface_temperature}) = sim.integrator.T
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
@@ -109,7 +112,11 @@ Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:heat_transfer_coeffici
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:drag_coefficient}) = sim.integrator.p.Cd
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:beta}) = sim.integrator.p.beta
 
-function surface_thermo_state(sim::DummySurfaceSimulation3, thermo_params::ThermodynamicsParameters, thermo_state_int)
+function FluxCalculator.surface_thermo_state(
+    sim::DummySurfaceSimulation3,
+    thermo_params::ThermodynamicsParameters,
+    thermo_state_int,
+)
     T_sfc = Interfacer.get_field(sim, Val(:surface_temperature))
     FT = eltype(T_sfc)
 

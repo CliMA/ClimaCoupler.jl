@@ -17,7 +17,7 @@ Interfacer.get_field(sim::DummySimulation, ::Val{:liquid_precipitation}) = sim.c
 Interfacer.get_field(sim::DummySimulation, ::Val{:snow_precipitation}) = sim.cache.snow_precipitation
 
 function FluxCalculator.calculate_surface_air_density(atmos_sim::DummySimulation, T_S::CC.Fields.Field)
-    FT = eltype(T_S)
+    FT = CC.Spaces.undertype(axes(T_S))
     return T_S .* FT(0.0) .+ FT(1.0)
 end
 
@@ -31,26 +31,25 @@ struct TestSurfaceSimulation2{C} <: Interfacer.SurfaceModelSimulation
 end
 
 Interfacer.get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:surface_temperature}) =
-    sim.cache_field .* eltype(sim.cache_field)(1.0)
+    sim.cache_field
 Interfacer.get_field(
     sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2},
     ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}},
-) = sim.cache_field .* eltype(sim.cache_field)(1.0)
+) = sim.cache_field
 Interfacer.get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:roughness_momentum}) =
-    sim.cache_field .* eltype(sim.cache_field)(1.0)
+    sim.cache_field
 Interfacer.get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:roughness_buoyancy}) =
-    sim.cache_field .* eltype(sim.cache_field)(1.0)
-Interfacer.get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:beta}) =
-    sim.cache_field .* eltype(sim.cache_field)(1.0)
+    sim.cache_field
+Interfacer.get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:beta}) = sim.cache_field
 
-Interfacer.get_field(sim::TestSurfaceSimulation1, ::Val{:area_fraction}) = sim.cache_field .* eltype(sim.cache_field)(0)
+Interfacer.get_field(sim::TestSurfaceSimulation1, ::Val{:area_fraction}) = sim.cache_field .* 0
 Interfacer.get_field(sim::TestSurfaceSimulation2, ::Val{:area_fraction}) =
-    sim.cache_field .* eltype(sim.cache_field)(0.5)
+    sim.cache_field .* CC.Spaces.undertype(axes(sim.cache_field))(0.5)
 
 Interfacer.get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:surface_humidity}) =
-    sim.cache_field .* eltype(sim.cache_field)(0)
+    sim.cache_field .* 0
 Interfacer.get_field(sim::Union{TestSurfaceSimulation2, TestSurfaceSimulation2}, ::Val{:surface_humidity}) =
-    sim.cache_field .* eltype(sim.cache_field)(0)
+    sim.cache_field .* 0
 
 Interfacer.reinit!(::TestSurfaceSimulation1) = nothing
 Interfacer.step!(::TestSurfaceSimulation1, _) = nothing
@@ -69,6 +68,7 @@ function Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:roughness_mom
     parent(sim.cache.roughness_momentum) .= parent(field)
 end
 
+Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:surface_temperature}, field) = nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:roughness_buoyancy}, field) = nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:beta}, field) = nothing
 
@@ -77,7 +77,7 @@ struct TestSurfaceSimulationLand{C} <: Interfacer.SurfaceModelSimulation
     cache::C
 end
 function Interfacer.get_field(sim::TestSurfaceSimulationLand, ::Val{:area_fraction})
-    FT = eltype(sim.cache.turbulent_energy_flux)
+    FT = CC.Spaces.undertype(axes(sim.cache.turbulent_energy_flux))
     return FT(0.5)
 end
 function Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:turbulent_energy_flux}, field)

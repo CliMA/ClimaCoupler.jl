@@ -49,11 +49,11 @@ function slab_ocean_space_init(space, params)
     coords = CC.Fields.coordinate_field(space)
 
     # initial condition
-    T_sfc = CC.Fields.zeros(space) .+ params.T_init # FT(271) close to the average of T_1 in atmos
-    @. T_sfc += temp_anomaly(coords)
+    # FT(271) close to the average of T_1 in atmos
+    T_sfc = params.T_init .+ temp_anomaly.(coords)
 
     # prognostic variable
-    Y = CC.Fields.FieldVector(T_sfc = T_sfc)
+    Y = CC.Fields.FieldVector(; T_sfc = T_sfc)
 
     return Y, space
 end
@@ -94,7 +94,7 @@ function ocean_init(
     )
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
-    ode_function = CTS.ClimaODEFunction(T_exp! = slab_ocean_rhs!, dss! = weighted_dss_slab!)
+    ode_function = CTS.ClimaODEFunction(; T_exp! = slab_ocean_rhs!, dss! = weighted_dss_slab!)
 
     problem = SciMLBase.ODEProblem(ode_function, Y, Float64.(tspan), cache)
     integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64(saveat), adaptive = false)
@@ -185,6 +185,7 @@ This default case includes only an anomaly at the tropics.
 """
 function temp_anomaly(coord)
     # include tropics anomaly
+    FT = eltype(coord)
     anom = FT(29 * exp(-coord.lat^2 / (2 * 26^2)))
     return anom
 end

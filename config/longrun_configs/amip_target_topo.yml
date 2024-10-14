@@ -1,8 +1,10 @@
 FLOAT_TYPE: "Float32"
+coupler_toml_file: "toml/amip.toml"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_0M_earth.yml"
 dt: "120secs"
 dt_cloud_fraction: "1hours"
+viscous_sponge: true
 dt_cpl: 120
 dt_rad: "1hours"
 dt_save_state_to_disk: "20days"

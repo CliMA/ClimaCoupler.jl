@@ -1,6 +1,7 @@
 import Test: @test, @testset
 import ClimaCore as CC
 import Thermodynamics.Parameters as TDP
+import ClimaParams # required for TDP
 import ClimaCoupler
 
 include(joinpath("..", "TestHelper.jl"))

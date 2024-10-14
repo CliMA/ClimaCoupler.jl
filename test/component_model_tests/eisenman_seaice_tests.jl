@@ -1,7 +1,8 @@
 import Test: @test, @testset
 import ClimaCore as CC
 import Thermodynamics as TD
-import Thermodynamics.Parameters as TP
+import Thermodynamics.Parameters as TDP
+import ClimaParams # required for TDP
 import ClimaCoupler
 import ClimaCoupler: Interfacer, Regridder
 
@@ -22,7 +23,7 @@ for FT in (Float32, Float64)
     boundary_space = TestHelper.create_space(FT)
 
     # thermodynamic parameter set
-    thermo_params = TP.ThermodynamicsParameters(FT)
+    thermo_params = TDP.ThermodynamicsParameters(FT)
 
     @testset "No net fluxes for FT=$FT" begin
         Y, Ya = state_init(params_ice, boundary_space)

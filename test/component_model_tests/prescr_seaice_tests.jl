@@ -1,6 +1,7 @@
 import Test: @test, @testset
 import ClimaCore as CC
 import Thermodynamics.Parameters as TDP
+import ClimaParams # required for TDP
 import ClimaCoupler
 
 include(joinpath("..", "TestHelper.jl"))
@@ -71,13 +72,12 @@ for FT in (Float32, Float64)
         dss_buffer = CC.Spaces.create_dss_buffer(CC.Fields.zeros(boundary_space))
 
         # set up objects for test
-        integrator = (;
-            u = (;
-                state_field1 = FT.(CC.Fields.ones(boundary_space)),
-                state_field2 = FT.(CC.Fields.zeros(boundary_space)),
-            ),
-            p = (; cache_field = FT.(CC.Fields.zeros(boundary_space)), dss_buffer = dss_buffer),
+        u = CC.Fields.FieldVector(;
+            state_field1 = CC.Fields.ones(boundary_space),
+            state_field2 = CC.Fields.zeros(boundary_space),
         )
+        p = (; cache_field = CC.Fields.zeros(boundary_space), dss_buffer = CC.Spaces.create_dss_buffer(u))
+        integrator = (; u, p)
         sim = PrescribedIceSimulation(nothing, nothing, nothing, integrator)
 
         # make field non-constant to check the impact of the dss step

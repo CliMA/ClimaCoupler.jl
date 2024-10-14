@@ -14,11 +14,8 @@ for FT in (Float32, Float64)
 
         # set up objects for test
         integrator = (;
-            u = (;
-                state_field1 = FT.(CC.Fields.ones(boundary_space)),
-                state_field2 = FT.(CC.Fields.zeros(boundary_space)),
-            ),
-            p = (; cache_field = FT.(CC.Fields.zeros(boundary_space))),
+            u = (; state_field1 = CC.Fields.ones(boundary_space), state_field2 = CC.Fields.zeros(boundary_space)),
+            p = (; cache_field = CC.Fields.zeros(boundary_space)),
         )
         sim = ClimaAtmosSimulation(nothing, nothing, nothing, integrator)
 

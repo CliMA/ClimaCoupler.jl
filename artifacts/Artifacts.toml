@@ -1,10 +1,3 @@
-[co2_dataset]
-git-tree-sha1 = "9c3bd05b68e820fceb43d130ce6b4e86ce788e4e"
-
-    [[co2_dataset.download]]
-    sha256 = "46923ec3e1f9028a11899c47e6b13d675d84daa9db2f37351a19ec9187f87865"
-    url = "https://caltech.box.com/shared/static/fuwajscgyblccy8y9aq01d0pgy91gwut.gz"
-
 [land_mask]
 git-tree-sha1 = "e41bc8c44124f867b64a9d70f1599515ae27f38a"
 

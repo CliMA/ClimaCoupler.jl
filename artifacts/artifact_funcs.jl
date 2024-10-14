@@ -1,10 +1,6 @@
 import ArtifactWrappers as AW
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 
-function co2_dataset_path(; context = nothing)
-    return @clima_artifact("co2_dataset", context)
-end
-
 function mask_dataset_path()
     mask_dataset = AW.ArtifactWrapper(
         @__DIR__,

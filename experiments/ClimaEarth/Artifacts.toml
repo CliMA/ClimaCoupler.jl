@@ -30,3 +30,10 @@ git-tree-sha1 = "7f7b6d4ae6055c4c2b6a6dfba5be8b4e6ca1b0be"
     [[historical_sst_sic_lowres.download]]
     sha256 = "b68c0ce6ea682c38e29cb87c9c6ced6736ecac32d0d32dbaba78beb66046a06c"
     url = "https://caltech.box.com/shared/static/ufnesb00zkvlc3sxzhnnmqc3zbatxkb9.gz"
+
+[co2_dataset]
+git-tree-sha1 = "9c3bd05b68e820fceb43d130ce6b4e86ce788e4e"
+
+    [[co2_dataset.download]]
+    sha256 = "46923ec3e1f9028a11899c47e6b13d675d84daa9db2f37351a19ec9187f87865"
+    url = "https://caltech.box.com/shared/static/fuwajscgyblccy8y9aq01d0pgy91gwut.gz"

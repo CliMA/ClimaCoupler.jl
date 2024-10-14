@@ -72,10 +72,10 @@ for FT in (Float32, Float64)
 
         # set up objects for test
         u = CC.Fields.FieldVector(;
-            state_field1 = FT.(CC.Fields.ones(boundary_space)),
-            state_field2 = FT.(CC.Fields.zeros(boundary_space)),
+            state_field1 = CC.Fields.ones(boundary_space),
+            state_field2 = CC.Fields.zeros(boundary_space),
         )
-        p = (; cache_field = FT.(CC.Fields.zeros(boundary_space)), dss_buffer = CC.Spaces.create_dss_buffer(u))
+        p = (; cache_field = CC.Fields.zeros(boundary_space), dss_buffer = CC.Spaces.create_dss_buffer(u))
         integrator = (; u, p)
         sim = PrescribedIceSimulation(nothing, nothing, nothing, integrator)
 

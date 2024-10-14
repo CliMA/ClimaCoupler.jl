@@ -196,7 +196,7 @@ catch error
         "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
     )
 end
-co2_data = joinpath(co2_dataset_path(), "co2_mm_mlo.txt")
+co2_data = joinpath(@clima_artifact("co2_dataset", comms_ctx), "co2_mm_mlo.txt")
 land_mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 
 #=
@@ -340,9 +340,11 @@ if mode_name == "amip"
     ## CO2 concentration from temporally varying file
     CO2_text = DelimitedFiles.readdlm(co2_data, Float64; comments = true)
     # The text file only has month and year, so we set the day to 15th of the month
-    CO2_dates = Dates.DateTime.(CO2_text[:, 1], CO2_text[:, 2]) + Dates.Day(14)
+    years = CO2_text[:, 1]
+    months = CO2_text[:, 2]
+    CO2_dates = Dates.DateTime.(years, months) + Dates.Day(14)
     CO2_times = period_to_seconds_float.(CO2_dates .- date0)
-    # convert from ppm to fraction
+    # convert from ppm to fraction, data is in fourth column of the text file
     CO2_vals = CO2_text[:, 4] .* 10^(-6)
     CO2_timevaryinginput = TimeVaryingInput(CO2_times, CO2_vals;)
 

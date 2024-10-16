@@ -1,5 +1,4 @@
 import Plots
-import ClimaCoupler: PostProcessor
 import StaticArrays
 
 """

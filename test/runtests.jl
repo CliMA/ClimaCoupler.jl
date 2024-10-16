@@ -38,9 +38,6 @@ end
 @safetestset "FluxCalculator tests" begin
     include("flux_calculator_tests.jl")
 end
-gpu_broken || @safetestset "PostProcessor tests" begin
-    include("postprocessor_tests.jl")
-end
 @safetestset "Checkpointer tests" begin
     include("checkpointer_tests.jl")
 end

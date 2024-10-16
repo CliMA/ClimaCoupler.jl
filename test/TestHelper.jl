@@ -94,8 +94,8 @@ function gen_ncdata(FT, path, varname, val)
     v = NCDatasets.defVar(nc, varname, FT, ("lon", "lat"))
 
     # Populate lon and lat
-    lon[:] = [i for i in 0.0:(360 / 64):(360 - (360 / 64))]
-    lat[:] = [i for i in (-90 + (180 / 64)):(180 / 32):(90 - (180 / 64))]
+    lon[:] = [i for i in 0.0:(360/64):(360-(360/64))]
+    lat[:] = [i for i in (-90+(180/64)):(180/32):(90-(180/64))]
 
     # Generate some example data and write it to v
     v[:, :] = [val for i in 1:nc.dim["lon"], j in 1:nc.dim["lat"]]

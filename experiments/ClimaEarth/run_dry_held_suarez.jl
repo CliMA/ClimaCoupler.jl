@@ -233,7 +233,7 @@ function solve_coupler!(cs)
     @info("Starting coupling loop")
 
     ## step in time
-    walltime = @elapsed for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
+    walltime = @elapsed for t in ((tspan[begin]+Δt_cpl):Δt_cpl:tspan[end])
 
         cs.dates.date[1] = TimeManager.current_date(cs, t)
 

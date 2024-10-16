@@ -256,7 +256,7 @@ function coupler_solve!(stepping, ics, parameters)
 
 
     ## coupler stepping
-    for t in ((t_start + Δt_coupler):Δt_coupler:t_end)
+    for t in ((t_start+Δt_coupler):Δt_coupler:t_end)
 
         ## STEP ATMOS
         ## pre_atmos

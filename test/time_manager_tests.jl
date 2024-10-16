@@ -34,7 +34,7 @@ for FT in (Float32, Float64)
             nothing, # amip_diags_handler
         )
 
-        for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
+        for t in ((tspan[1]+Δt_cpl):Δt_cpl:tspan[end])
             @test TimeManager.current_date(cs, t) == date0 + Dates.Second(t)
         end
     end

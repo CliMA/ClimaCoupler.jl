@@ -39,6 +39,7 @@ We then specify the input data file names. If these are not already downloaded, 
 ## standard packages
 import Dates
 import YAML
+import DelimitedFiles
 
 # ## ClimaESM packages
 import ClimaAtmos as CA
@@ -52,6 +53,7 @@ import ClimaCoupler:
 
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
+import ClimaUtilities.Utils: period_to_seconds_float
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Interpolations
 
@@ -229,7 +231,7 @@ catch error
         "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
     )
 end
-co2_data = joinpath(co2_dataset_path(), "mauna_loa_co2.nc")
+co2_data = joinpath(@clima_artifact("co2_dataset", comms_ctx), "co2_mm_mlo.txt")
 land_mask_data = joinpath(mask_dataset_path(), "seamask.nc")
 
 #=
@@ -371,7 +373,15 @@ if mode_name == "amip"
     )
 
     ## CO2 concentration from temporally varying file
-    CO2_timevaryinginput = TimeVaryingInput(co2_data, "co2", boundary_space, reference_date = date0)
+    CO2_text = DelimitedFiles.readdlm(co2_data, Float64; comments = true)
+    # The text file only has month and year, so we set the day to 15th of the month
+    years = CO2_text[:, 1]
+    months = CO2_text[:, 2]
+    CO2_dates = Dates.DateTime.(years, months) + Dates.Day(14)
+    CO2_times = period_to_seconds_float.(CO2_dates .- date0)
+    # convert from ppm to fraction, data is in fourth column of the text file
+    CO2_vals = CO2_text[:, 4] .* 10^(-6)
+    CO2_timevaryinginput = TimeVaryingInput(CO2_times, CO2_vals;)
 
     CO2_init = zeros(boundary_space)
     evaluate!(CO2_init, CO2_timevaryinginput, t_start)

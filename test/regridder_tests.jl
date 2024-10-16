@@ -306,16 +306,24 @@ end
 
 # test dataset truncation
 @testset "test dataset truncation" begin
-    # Get the original dataset set up
-    include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
-    co2_data_all = joinpath(co2_dataset_path(), "mauna_loa_co2.nc")
-    ds = NCDatasets.NCDataset(co2_data_all, "r")
-    dates = ds["time"][:]
-    first_date = dates[1]
-    last_date = last(dates)
-
     # Set up regrid directory for this test only
     mktempdir(pwd()) do regrid_dir
+        # Create a dummy dataset for testing
+        test_data_all = joinpath(regrid_dir, "test_truncation.nc")
+        ds = NCDatasets.NCDataset(test_data_all, "c")
+        NCDatasets.defDim(ds, "time", 100)
+        NCDatasets.defDim(ds, "lat", 32)
+        NCDatasets.defDim(ds, "lon", 64)
+        dates = Dates.DateTime.(1923:2022)
+        first_date = dates[1]
+        last_date = last(dates)
+        NCDatasets.defVar(ds, "time", dates, ("time",);)
+        NCDatasets.defVar(ds, "lat", 1:32, ("lat",);)
+        NCDatasets.defVar(ds, "lon", 1:64, ("lon",);)
+        dummy_data = reshape(1:(32 * 64 * 100), 64, 32, 100)
+        NCDatasets.defVar(ds, "dummy_var", dummy_data, ("lon", "lat", "time"))
+        ds.attrib["title"] = "dummy dataset"
+        close(ds)
         # set up comms_ctx
         device = ClimaComms.device()
         comms_ctx_device = ClimaComms.context(device)
@@ -324,20 +332,21 @@ end
         # values for the truncations
         t_start = 0.0
         t_end = 1.728e6
-        date0test = ["18690101", "18700101", "19790228", "20220301", "20230101"]
+        date0test = ["18690101", "19230101", "19790228", "20220301", "20230101"]
         for date in date0test
             date0 = Dates.DateTime(date, Dates.dateformat"yyyymmdd")
-            co2_data = Regridder.truncate_dataset(
-                co2_data_all,
-                "mauna_loa_co2",
-                "co2",
+            test_data = Regridder.truncate_dataset(
+                test_data_all,
+                "test_truncation",
+                "dummy_var",
                 regrid_dir,
                 date0,
                 t_start,
                 t_end,
                 comms_ctx_device,
             )
-            ds_truncated = NCDatasets.NCDataset(co2_data, "r")
+            ds_truncated = NCDatasets.NCDataset(test_data, "r")
+            ds = NCDatasets.NCDataset(test_data_all, "r")
             new_dates = ds_truncated["time"][:]
 
             date_start = date0 + Dates.Second(t_start)
@@ -368,8 +377,8 @@ end
             end
 
             # check that truncation is indexing correctly
-            all_data = ds["co2"][:, :, :]
-            new_data = ds_truncated["co2"][:, :, :]
+            all_data = ds["dummy_var"][:, :, :]
+            new_data = ds_truncated["dummy_var"][:, :, :]
             (start_id, end_id) = Regridder.find_idx_bounding_dates(dates, date_start, date_end)
             @test new_data[:, :, 1] ≈ all_data[:, :, start_id]
             @test new_data[:, :, length(new_dates)] ≈ all_data[:, :, end_id]

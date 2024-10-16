@@ -83,11 +83,11 @@ for FT in (Float32, Float64)
                 land_sim = DummyStub((; area_fraction = land_fraction)),
             ), # model_sims
             (;), # mode
-            (), # diagnostics
             (;), # callbacks
             (;), # dirs
             nothing, # turbulent_fluxes
             nothing, # thermo_params
+            nothing, # amip_diags_handler
         )
 
         Regridder.update_surface_fractions!(cs)

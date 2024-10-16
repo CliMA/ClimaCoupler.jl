@@ -320,11 +320,11 @@ for FT in (Float32, Float64)
             0, # Δt_cpl
             model_sims, # model_sims
             (;), # mode
-            (), # diagnostics
             (;), # callbacks
             (;), # dirs
             nothing, # turbulent_fluxes
             nothing, # thermo_params
+            nothing, # amip_diags_handler
         )
         FluxCalculator.water_albedo_from_atmosphere!(cs, nothing)
         @test sum(parent(cs.model_sims.ocean_sim.cache.α_direct) .- parent(ones(boundary_space)) .* 2) == 0

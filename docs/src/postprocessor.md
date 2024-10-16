@@ -1,10 +1,10 @@
 # PostProcessor
 
-This module contains functions for postprocessing model data that was saved during the simulation
-by `ClimaCoupler.Diagnostics`. This module is used for offline regridding, slicing and spatial
+This module contains functions for postprocessing model data that was saved during the simulation.
+This module is used for offline regridding, slicing and spatial
 averages. It can also handle data from other sources (e.g., NCEP reanalysis).
 
-## Diagnostics API
+## PostProcessor API
 
 ```@docs
 ClimaCoupler.PostProcessor.postprocess
@@ -17,4 +17,3 @@ ClimaCoupler.PostProcessor.RawData
 ClimaCoupler.PostProcessor.DataPackage
 
 ```
-

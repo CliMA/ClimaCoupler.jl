@@ -25,15 +25,7 @@ import ClimaCore as CC
 # ## Coupler specific imports
 import ClimaCoupler
 import ClimaCoupler:
-    ConservationChecker,
-    Checkpointer,
-    Diagnostics,
-    FieldExchanger,
-    FluxCalculator,
-    Interfacer,
-    Regridder,
-    TimeManager,
-    Utilities
+    ConservationChecker, Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Regridder, TimeManager, Utilities
 
 pkg_dir = pkgdir(ClimaCoupler)
 
@@ -47,7 +39,6 @@ include("components/ocean/slab_ocean.jl")
 include("components/land/climaland_bucket.jl")
 
 ## helpers for user-specified IO
-include("user_io/user_diagnostics.jl")
 include("user_io/user_logging.jl")
 include("user_io/io_helpers.jl")
 
@@ -334,11 +325,11 @@ cs = Interfacer.CoupledSimulation{FT}(
     Δt_cpl,
     model_sims,
     (;), # mode_specifics
-    (), # coupler diagnostics
     callbacks,
     dir_paths,
     turbulent_fluxes,
     thermo_params,
+    nothing, # amip_diags_handler
 );
 
 #=

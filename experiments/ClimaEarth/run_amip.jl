@@ -48,15 +48,7 @@ import ClimaCore as CC
 # ## Coupler specific imports
 import ClimaCoupler
 import ClimaCoupler:
-    ConservationChecker,
-    Checkpointer,
-    Diagnostics,
-    FieldExchanger,
-    FluxCalculator,
-    Interfacer,
-    Regridder,
-    TimeManager,
-    Utilities
+    ConservationChecker, Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Regridder, TimeManager, Utilities
 
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
@@ -70,7 +62,7 @@ pkg_dir = pkgdir(ClimaCoupler)
 
 #=
 ### Helper Functions
-These will be eventually moved to their respective component model and diagnostics packages, and so they should not
+These will be eventually moved to their respective component model and utility packages, and so they should not
 contain any internals of the ClimaCoupler source code, except extensions to the Interfacer functions.
 =#
 
@@ -82,7 +74,6 @@ include("components/ocean/prescr_seaice.jl")
 include("components/ocean/eisenman_seaice.jl")
 
 ## helpers for user-specified IO
-include("user_io/user_diagnostics.jl")
 include("user_io/user_logging.jl")
 include("user_io/debug_plots.jl")
 include("user_io/io_helpers.jl")
@@ -102,9 +93,9 @@ parsed_args = parse_commandline(argparse_settings())
 ## modify parsed args for fast testing from REPL #hide
 if isinteractive()
     parsed_args["config_file"] =
-        isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/ci_configs/interactive_debug.yml") :
+        isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/ci_configs/coarse_single_ft32.yml") : #interactive_debug.yml") :
         parsed_args["config_file"]
-    parsed_args["job_id"] = "interactive_debug"
+    parsed_args["job_id"] = "coarse_single_ft32"#"interactive_debug"
 end
 
 ## the unique job id should be passed in via the command line
@@ -122,12 +113,55 @@ random_seed = config_dict["unique_seed"] ? time_ns() : 1234
 Random.seed!(random_seed)
 @info "Random seed set to $(random_seed)"
 
+## set up diagnostics before retrieving atmos config
+mode_name = config_dict["mode_name"]
+use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
+t_end = Float64(time_to_seconds(config_dict["t_end"]))
+t_start = 0.0
+
+function get_period(t_start, t_end)
+    sim_duration = t_end - t_start
+    secs_per_day = 86400
+    if sim_duration >= 90 * secs_per_day
+        # if duration >= 90 days, take monthly means
+        period = "30days"
+        calendar_dt = Dates.Day(30)
+    elseif sim_duration >= 30 * secs_per_day
+        # if duration >= 30 days, take means over 10 days
+        period = "10days"
+        calendar_dt = Dates.Day(10)
+    elseif sim_duration >= secs_per_day
+        # if duration >= 1 day, take daily means
+        period = "1days"
+        calendar_dt = Dates.Day(1)
+    else
+        # if duration < 1 day, take hourly means
+        period = "1hours"
+        calendar_dt = Dates.Hour(1)
+    end
+    return (period, calendar_dt)
+end
+
+if mode_name == "amip" && use_coupler_diagnostics
+    @info "Using default AMIP diagnostics"
+    (period, calendar_dt) = get_period(t_start, t_end)
+
+    !haskey(config_dict, "diagnostics") && (config_dict["diagnostics"] = Vector{Dict{Any, Any}}())
+    push!(
+        config_dict["diagnostics"],
+        Dict(
+            "short_name" => ["ta", "ua", "hus", "clw", "pr", "ts", "toa_fluxes_net"],
+            "reduction_time" => "average",
+            "period" => period,
+        ),
+    )
+end
+
 ## get component model dictionaries (if applicable)
 atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 
 ## read in some parsed command line arguments, required by this script
-mode_name = config_dict["mode_name"]
 energy_check = config_dict["energy_check"]
 const FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim_name = "bucket"
@@ -145,7 +179,6 @@ restart_dir = config_dict["restart_dir"]
 restart_t = Int(config_dict["restart_t"])
 evolving_ocean = config_dict["evolving_ocean"]
 dt_rad = config_dict["dt_rad"]
-use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
 use_land_diagnostics = config_dict["use_land_diagnostics"]
 
 #=
@@ -169,6 +202,8 @@ temporary files will be saved.
 
 COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], joinpath(mode_name, job_id))
 dir_paths = setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
+@info "Coupler output directory $(dir_paths.output)"
+@info "Coupler artifacts directory $(dir_paths.artifacts)"
 
 @info(dir_paths.output)
 config_dict["print_config_dict"] && @info(config_dict)
@@ -491,37 +526,6 @@ model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, oce
 dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)], new_month = [false])
 
 #=
-### Online Diagnostics
-The user can write custom diagnostics in the `user_diagnostics.jl` file.
-Note, this will be replaced by the diagnostics framework currently in ClimaAtmos, once it is abstracted
-into a more general package, so we can use it to save fields from surface models.
-=#
-if use_coupler_diagnostics
-    monthly_3d_diags = Diagnostics.init_diagnostics(
-        (:T, :u, :q_tot, :q_liq_ice),
-        atmos_sim.domain.center_space;
-        save = TimeManager.Monthly(),
-        operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
-        output_dir = dir_paths.output,
-        name_tag = "monthly_mean_3d_",
-    )
-
-    monthly_2d_diags = Diagnostics.init_diagnostics(
-        (:precipitation_rate, :toa_fluxes, :T_sfc, :turbulent_energy_fluxes),
-        boundary_space;
-        save = TimeManager.Monthly(),
-        operations = (; accumulate = Diagnostics.TimeMean([Int(0)])),
-        output_dir = dir_paths.output,
-        name_tag = "monthly_mean_2d_",
-    )
-
-    diagnostics = (monthly_3d_diags, monthly_2d_diags)
-    Utilities.show_memory_usage()
-else
-    diagnostics = ()
-end
-
-#=
 ## Initialize Conservation Checks
 
 The conservation checks are used to monitor the global energy and water conservation of the coupled system. The checks are only
@@ -594,13 +598,23 @@ else
     error("turb_flux_partition must be either PartitionedStateFluxes or CombinedStateFluxesMOST")
 end
 
+#= Set up default AMIP diagnostics
+Use ClimaDiagnostics for default AMIP diagnostics, which currently include turbulent energy fluxes.
+=#
+if mode_name == "amip" && use_coupler_diagnostics
+    include("user_io/amip_diagnostics.jl")
+    amip_diags_handler = amip_diagnostics_setup(coupler_fields, dir_paths.output, dates.date0[1], tspan[1], calendar_dt)
+else
+    amip_diags_handler = nothing
+end
+
 #=
 ## Initialize Coupled Simulation
 
 The coupled simulation is initialized here and saved in a global `CoupledSimulation` struct, `cs`. It contains all the information
 required to run the coupled simulation, including the communication context, the dates, the boundary space, the coupler fields, the
 configuration dictionary, the conservation checks, the time span, the time step, the land fraction, the model simulations, the mode
-specifics, the diagnostics, the callbacks, and the directory paths.
+specifics, the callbacks, the directory paths, and diagnostics for AMIP simulations.
 =#
 
 cs = Interfacer.CoupledSimulation{FT}(
@@ -615,11 +629,11 @@ cs = Interfacer.CoupledSimulation{FT}(
     Δt_cpl,
     model_sims,
     mode_specifics,
-    diagnostics,
     callbacks,
     dir_paths,
     turbulent_fluxes,
     thermo_params,
+    amip_diags_handler,
 );
 Utilities.show_memory_usage()
 
@@ -724,15 +738,6 @@ function solve_coupler!(cs)
             current_CO2 = zeros(boundary_space)
             evaluate!(current_CO2, cs.mode.CO2_timevaryinginput, t)
             Interfacer.update_field!(atmos_sim, Val(:co2), current_CO2)
-
-            ## calculate and accumulate diagnostics at each timestep, if we're using diagnostics in this run
-            if !isempty(cs.diagnostics)
-                ClimaComms.barrier(comms_ctx)
-                Diagnostics.accumulate_diagnostics!(cs)
-
-                ## save and reset monthly averages
-                Diagnostics.save_diagnostics(cs)
-            end
         end
 
         ## compute global energy and water conservation checks
@@ -781,6 +786,12 @@ function solve_coupler!(cs)
 
         ## callback to checkpoint model state
         TimeManager.trigger_callback!(cs, cs.callbacks.checkpoint)
+
+        ## compute/output AMIP diagnostics if scheduled for this timestep
+        ## wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface
+        cs_nt = (; u = cs.fields, p = nothing, t = t, step = round(t / Δt_cpl))
+        (cs.mode.name == "amip" && !isnothing(cs.amip_diags_handler)) &&
+            CD.orchestrate_diagnostics(cs_nt, cs.amip_diags_handler)
     end
     return nothing
 end
@@ -890,40 +901,35 @@ if ClimaComms.iamroot(comms_ctx)
     end
 
     ## plotting AMIP results
-    if cs.mode.name == "amip" && !isempty(cs.diagnostics)
-        ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
-        @info "AMIP plots"
+    if cs.mode.name == "amip"
+        if use_coupler_diagnostics
+            ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
+            @info "AMIP plots"
 
-        ## ClimaESM
-        include("user_io/amip_visualizer.jl")
-        post_spec = (;
-            T = (:regrid, :zonal_mean),
-            u = (:regrid, :zonal_mean),
-            q_tot = (:regrid, :zonal_mean),
-            toa_fluxes = (:regrid, :horizontal_slice),
-            precipitation_rate = (:regrid, :horizontal_slice),
-            T_sfc = (:regrid, :horizontal_slice),
-            turbulent_energy_fluxes = (:regrid, :horizontal_slice),
-            q_liq_ice = (:regrid, :zonal_mean),
-        )
+            ## ClimaESM
+            include("user_io/ci_plots.jl")
 
-        plot_spec = (;
-            T = (; clims = (190, 320), units = "K"),
-            u = (; clims = (-50, 50), units = "m/s"),
-            q_tot = (; clims = (0, 30), units = "g/kg"),
-            toa_fluxes = (; clims = (-250, 250), units = "W/m^2"),
-            precipitation_rate = (clims = (0, 1e-4), units = "kg/m^2/s"),
-            T_sfc = (clims = (225, 310), units = "K"),
-            turbulent_energy_fluxes = (; clims = (-250, 250), units = "W/m^2"),
-            q_liq_ice = (; clims = (0, 10), units = "g/kg"),
-        )
-        amip_data, fig_amip = amip_paperplots(
-            post_spec,
-            plot_spec,
-            dir_paths.output,
-            files_root = ".monthly",
-            output_dir = dir_paths.artifacts,
-        )
+            # define variable names and output directories for each diagnostic
+            amip_short_names_atmos = ["ta", "ua", "hus", "clw", "pr", "ts", "toa_fluxes_net"]
+            output_dir_atmos = atmos_sim.integrator.p.output_dir
+            amip_short_names_coupler = ["F_turb_energy"]
+            output_dir_coupler = dir_paths.output
+
+            # Check if all output variables are available in the specified directories
+            make_ci_plots(
+                output_dir_atmos,
+                dir_paths.artifacts,
+                short_names = amip_short_names_atmos,
+                output_prefix = "atmos_",
+            )
+            make_ci_plots(
+                output_dir_coupler,
+                dir_paths.artifacts,
+                short_names = amip_short_names_coupler,
+                output_prefix = "coupler_",
+            )
+        end
+
         # Check this because we only want monthly data for making plots
         if t_end > 84600 * 31 * 3 && config_dict["output_default_diagnostics"]
             include("leaderboard/leaderboard.jl")
@@ -936,15 +942,17 @@ if ClimaComms.iamroot(comms_ctx)
     if config_dict["ci_plots"]
         @info "Generating CI plots"
         include("user_io/ci_plots.jl")
-        make_plots(Val(:general_ci_plots), [atmos_sim.integrator.p.output_dir], dir_paths.artifacts)
+        make_ci_plots(atmos_sim.integrator.p.output_dir, dir_paths.artifacts)
     end
 
     ## plot all model states and coupler fields (useful for debugging)
     !CA.is_distributed(comms_ctx) && debug(cs, dir_paths.artifacts)
 
-    if isinteractive() #hide
-        ## clean up for interactive runs, retain all output otherwise #hide
-        rm(dir_paths.output; recursive = true, force = true) #hide
-    end #hide
+    # if isinteractive() #hide
+    #     ## clean up for interactive runs, retain all output otherwise #hide
+    #     rm(dir_paths.output; recursive = true, force = true) #hide
+    # end #hide
 
+    ## close all AMIP diagnostics file writers
+    mode_name == "amip" && map(diag -> close(diag.output_writer), amip_diags_handler.scheduled_diagnostics)
 end

@@ -25,10 +25,10 @@ export write_to_hdf5,
     combine_surfaces_from_sol!,
     binary_mask,
     nans_to_zero,
-    truncate_dataset
+    truncate_dataset#= Converts NaNs to zeros of the same type. =#
 
 
-#= Converts NaNs to zeros of the same type. =#
+
 nans_to_zero(v) = isnan(v) ? typeof(v)(0) : v
 
 """

@@ -36,7 +36,7 @@ for FT in (Float32, Float64)
         Y.T_ml .= params_ice.T_base
 
         # no atmos fluxes, F_a
-        Ya.∂F_turb_energy∂T_sfc .= .-get_∂F_rad_energy∂T_sfc.(Y.T_sfc, Ref(params_ice)) # ∂F_turb_energy∂T_sfc + ∂F_rad_energy∂T_sfc = 0
+        Ya.∂F_turb_energy∂T_sfc .= .- get_∂F_rad_energy∂T_sfc.(Y.T_sfc, Ref(params_ice)) # ∂F_turb_energy∂T_sfc + ∂F_rad_energy∂T_sfc = 0
         Ya.F_rad .= 0
         Ya.F_turb .= 0
 
@@ -251,7 +251,7 @@ for FT in (Float32, Float64)
         Y.T_sfc .= params_ice.T_base
 
         # zero atmos fluxes and their derivatives
-        Ya.∂F_turb_energy∂T_sfc .= .-get_∂F_rad_energy∂T_sfc.(Y.T_sfc, Ref(params_ice)) # ∂F_turb_energy∂T_sfc + ∂F_rad_energy∂T_sfc = 0
+        Ya.∂F_turb_energy∂T_sfc .= .- get_∂F_rad_energy∂T_sfc.(Y.T_sfc, Ref(params_ice)) # ∂F_turb_energy∂T_sfc + ∂F_rad_energy∂T_sfc = 0
         Ya.F_turb .= 0
         Ya.F_rad .= 0
 
@@ -283,7 +283,7 @@ for FT in (Float32, Float64)
         T_ml_0 = deepcopy(Y.T_ml)
 
         # no atmos fluxes or their derivatives
-        Ya.∂F_turb_energy∂T_sfc .= .-get_∂F_rad_energy∂T_sfc.(Y.T_sfc, Ref(params_ice)) # ∂F_turb_energy∂T_sfc + ∂F_rad_energy∂T_sfc = 0
+        Ya.∂F_turb_energy∂T_sfc .= .- get_∂F_rad_energy∂T_sfc.(Y.T_sfc, Ref(params_ice)) # ∂F_turb_energy∂T_sfc + ∂F_rad_energy∂T_sfc = 0
         Ya.F_turb .= 0
         Ya.F_rad .= 0
 

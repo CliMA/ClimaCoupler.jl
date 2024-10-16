@@ -1,5 +1,4 @@
 import ArtifactWrappers as AW
-import ClimaUtilities.ClimaArtifacts: @clima_artifact
 
 function mask_dataset_path()
     mask_dataset = AW.ArtifactWrapper(

@@ -62,7 +62,6 @@ interface_pages = [
     "fieldexchanger.md",
     "fluxcalculator.md",
     "interfacer.md",
-    "postprocessor.md",
     "regridder.md",
     "timemanager.md",
     "utilities.md",

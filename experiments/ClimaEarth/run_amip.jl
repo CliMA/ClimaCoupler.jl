@@ -126,8 +126,8 @@ function get_period(t_start, t_end)
     secs_per_day = 86400
     if sim_duration >= 90 * secs_per_day
         # if duration >= 90 days, take monthly means
-        period = "30days"
-        calendar_dt = Dates.Day(30)
+        period = "1months"
+        calendar_dt = Dates.Month(1)
     elseif sim_duration >= 30 * secs_per_day
         # if duration >= 30 days, take means over 10 days
         period = "10days"

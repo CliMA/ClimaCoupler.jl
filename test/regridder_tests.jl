@@ -320,7 +320,7 @@ end
         NCDatasets.defVar(ds, "time", dates, ("time",);)
         NCDatasets.defVar(ds, "lat", 1:32, ("lat",);)
         NCDatasets.defVar(ds, "lon", 1:64, ("lon",);)
-        dummy_data = reshape(1:(32 * 64 * 100), 64, 32, 100)
+        dummy_data = reshape(1:(32*64*100), 64, 32, 100)
         NCDatasets.defVar(ds, "dummy_var", dummy_data, ("lon", "lat", "time"))
         ds.attrib["title"] = "dummy dataset"
         close(ds)

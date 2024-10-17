@@ -22,6 +22,7 @@ jobs:
       matrix:
         version:
           - '1.10'
+          - '1.11'
         os:
           - ubuntu-latest
           - macOS-latest
@@ -39,7 +40,7 @@ jobs:
         with:
           file: lcov.info
       - name: Submit coverage
-        if: ${{ matrix.version == '1.10' }} && ${{ matrix.os == 'ubuntu-latest' }}
+        if: ${{ matrix.version == '1.11' }} && ${{ matrix.os == 'ubuntu-latest' }}
         uses: codecov/codecov-action@v4
         with:
           token: ${{secrets.CODECOV_TOKEN}}

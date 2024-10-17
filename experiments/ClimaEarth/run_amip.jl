@@ -152,7 +152,7 @@ if mode_name == "amip" && use_coupler_diagnostics
     push!(
         config_dict["diagnostics"],
         Dict(
-            "short_name" => ["ta", "ua", "hus", "clw", "pr", "ts", "toa_fluxes_net"],
+            "short_name" => ["toa_fluxes_net"],
             "reduction_time" => "average",
             "period" => period,
         ),

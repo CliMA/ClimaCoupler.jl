@@ -18,10 +18,3 @@ end
 
 
 include(joinpath(@__DIR__, "artifact_funcs.jl"))
-
-# Trigger download if data doesn't exist locally
-function trigger_download()
-    @info "mask dataset path: `$(mask_dataset_path())`"
-    return nothing
-end
-trigger_download()

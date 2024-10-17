@@ -22,10 +22,11 @@ rayleigh_sponge: true
 smoothing_order: 10
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "732days"
+t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
 turb_flux_partition: "CombinedStateFluxesMOST"
 viscous_sponge: true
 z_elem: 31
 z_max: 55000.0
+aerosol_radiation: false

@@ -2,7 +2,6 @@
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
-ArtifactWrappers = "a14bc488-3040-4b00-9dc1-f6467924858a"
 Artifacts = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 ClimaAnalysis = "29b5916a-a76c-4e73-9657-3c8fd22e65e6"
@@ -38,7 +37,6 @@ Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 
 [compat]
 Aqua = "0.8"
-ArtifactWrappers = "0.2"
 ClimaAtmos = "0.27"
 ClimaLand = "0.14, 0.15"
 ClimaParams = "0.10"

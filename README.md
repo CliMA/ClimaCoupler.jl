@@ -34,7 +34,7 @@ required for it.
 | **Unit Tests**       | [![unit tests][unit-tests-img]][unit-tests-url] [![codecov][codecov-img]][codecov-url]|
 |||
 
-Recommended Julia Version: Stable release v1.10.1. CI no longer tests earlier versions of Julia.
+Recommended Julia Version: Stable release v1.11.1. CI tests Julia v1.10 and 1.11.
 
 # Running AMIP
 Here we will focus on the AMIP experiment, which uses the environment in the `experiments/ClimaEarth/` subdirectory of ClimaCoupler.jl

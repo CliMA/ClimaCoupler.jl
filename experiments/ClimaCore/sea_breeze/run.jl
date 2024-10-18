@@ -269,7 +269,7 @@ function cpl_run(simulation::AOLCoupledSim)
     (; atmos, ocean, land, coupler) = simulation
     Δt_coupled = coupler.Δt_coupled
     ## coupler stepping
-    for t in ((t_start+Δt_coupled):Δt_coupled:t_end)
+    for t in ((t_start + Δt_coupled):Δt_coupled:t_end)
         ## Atmos
         coupler_pull!(atmos, coupler)
         step!(atmos, t)

@@ -191,9 +191,18 @@ This is a static field that contains the area fraction of land and sea, ranging 
 Note that land-sea area fraction is different to the land-sea mask, which is a binary field (masks are used internally by the coupler to indicate passive cells that are not populated by a given component model).
 =#
 
-land_area_fraction = FT.(
-    Regridder.land_fraction(FT, dir_paths.regrid, comms_ctx, land_mask_data, "LSMASK", boundary_space, mono = false),
-)
+land_area_fraction =
+    FT.(
+        Regridder.land_fraction(
+            FT,
+            dir_paths.regrid,
+            comms_ctx,
+            land_mask_data,
+            "LSMASK",
+            boundary_space,
+            mono = false,
+        ),
+    )
 
 #=
 ### Surface Model: Bucket Land and Slab Ocean
@@ -370,7 +379,7 @@ function solve_coupler!(cs)
 
     @info("Starting coupling loop")
     ## step in time
-    for t in ((tspan[begin]+Δt_cpl):Δt_cpl:tspan[end])
+    for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
 
         cs.dates.date[1] = TimeManager.current_date(cs, t)
 

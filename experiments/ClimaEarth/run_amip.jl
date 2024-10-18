@@ -151,11 +151,7 @@ if mode_name == "amip" && use_coupler_diagnostics
     !haskey(config_dict, "diagnostics") && (config_dict["diagnostics"] = Vector{Dict{Any, Any}}())
     push!(
         config_dict["diagnostics"],
-        Dict(
-            "short_name" => ["toa_fluxes_net"],
-            "reduction_time" => "average",
-            "period" => period,
-        ),
+        Dict("short_name" => ["toa_fluxes_net"], "reduction_time" => "average", "period" => period),
     )
 end
 
@@ -732,7 +728,7 @@ function solve_coupler!(cs)
 
     @info("Starting coupling loop")
     ## step in time
-    for t in ((tspan[begin]+Δt_cpl):Δt_cpl:tspan[end])
+    for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
 
         cs.dates.date[1] = TimeManager.current_date(cs, t)
 

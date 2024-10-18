@@ -234,7 +234,8 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fl
     vec_ct12_ct2 = @. CA.CT12(CA.CT2(CA.unit_basis_vector_data(CA.CT2, surface_local_geometry)), surface_local_geometry)
 
     sim.integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ .= (
-        surface_normal .⊗ CA.C12.(
+        surface_normal .⊗
+        CA.C12.(
             Utilities.swap_space!(axes(vec_ct12_ct1), F_turb_ρτxz) .* vec_ct12_ct1 .+
             Utilities.swap_space!(axes(vec_ct12_ct2), F_turb_ρτyz) .* vec_ct12_ct2,
             surface_local_geometry,

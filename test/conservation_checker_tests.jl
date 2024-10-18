@@ -107,7 +107,7 @@ for FT in (Float32, Float64)
 
         # analytical solution
         tot_energy_an = sum(FT.(F_r .* 3Δt .+ 1e6 .* 1.25))
-        tot_water_an = sum(FT.(.- P .* 3Δt .* 0.5 .+ CC.Fields.ones(space)))
+        tot_water_an = sum(FT.(.-P .* 3Δt .* 0.5 .+ CC.Fields.ones(space)))
 
         # run check_conservation!
         ConservationChecker.check_conservation!(cs, runtime_check = true)

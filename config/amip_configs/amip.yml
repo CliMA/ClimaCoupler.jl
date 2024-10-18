@@ -24,6 +24,6 @@ t_end: "1098days"
 topo_smoothing: true
 topography: "Earth"
 turb_flux_partition: "CombinedStateFluxesMOST"
-viscous_sponge: false
+viscous_sponge: true
 z_elem: 63
 z_max: 55000.0

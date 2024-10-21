@@ -37,3 +37,13 @@ git-tree-sha1 = "9c3bd05b68e820fceb43d130ce6b4e86ce788e4e"
     [[co2_dataset.download]]
     sha256 = "46923ec3e1f9028a11899c47e6b13d675d84daa9db2f37351a19ec9187f87865"
     url = "https://caltech.box.com/shared/static/fuwajscgyblccy8y9aq01d0pgy91gwut.gz"
+
+[earth_orography_30arcseconds]
+git-tree-sha1 = "03dd08fcbf363ed055a176dd7adefb60ff1c3493"
+
+[earth_orography_60arcseconds]
+git-tree-sha1 = "fe19d8dbe7a18ff39588e1f718014b0479d9c0f7"
+
+    [[earth_orography_60arcseconds.download]]
+    sha256 = "eca66c0701d1c2b9e271742314915ffbf4a0fae92709df611c323f38e019966e"
+    url = "https://caltech.box.com/shared/static/4asrxcgl6xsgenfcug9p0wkkyhtqilgk.gz"

@@ -960,5 +960,5 @@ if ClimaComms.iamroot(comms_ctx)
     # end #hide
 
     ## close all AMIP diagnostics file writers
-    mode_name == "amip" && map(diag -> close(diag.output_writer), amip_diags_handler.scheduled_diagnostics)
+    !isnothing(amip_diags_handler) && map(diag -> close(diag.output_writer), amip_diags_handler.scheduled_diagnostics)
 end

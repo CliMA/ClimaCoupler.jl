@@ -2,10 +2,10 @@
 value = 10.0
 
 [zd_rayleigh]
-value = 35000.0
+value = 45000.0
 
 [zd_viscous]
-value = 35000.0
+value = 45000.0
 
 [precipitation_timescale]
 value = 600

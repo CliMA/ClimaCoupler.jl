@@ -5,7 +5,7 @@
 # Note that this test doesn't check stability or correctness of the model.
 
 # Specify the config file and job id
-push!(ARGS, "--config_file", "amip_test.yml")
+push!(ARGS, "--config_file", joinpath(@__DIR__, "amip_test.yml"))
 push!(ARGS, "--job_id", "amip_test")
 
 # Run the AMIP test

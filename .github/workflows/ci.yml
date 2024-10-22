@@ -44,3 +44,8 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           token: ${{secrets.CODECOV_TOKEN}}
+      # Run own downstream test
+      - run: |
+          julia --color=yes --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate()'
+          julia --color=yes --project=experiments/ClimaEarth -e 'using Pkg; Pkg.develop(; path = ".")'
+          julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/test/runtests.jl

@@ -208,11 +208,7 @@ config_dict["print_config_dict"] && @info(config_dict)
 
 #=
 ## Data File Paths
-The data files are downloaded from the `ClimaCoupler` artifacts directory. If the data files are not present, they are downloaded from the
-original sources.
 =#
-include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
-
 sst_data, sic_data = try
     joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.SST.HAD187001-198110.OI198111-202206.nc"),
     joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.ICE.HAD187001-198110.OI198111-202206.nc")

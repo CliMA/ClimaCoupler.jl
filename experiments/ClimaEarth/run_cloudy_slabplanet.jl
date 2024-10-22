@@ -160,7 +160,6 @@ dir_paths = setup_output_dirs(output_dir = coupler_output_dir, comms_ctx = comms
 #=
 ## Data File Paths
 =#
-include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
 land_mask_data =
     joinpath(@clima_artifact("earth_orography_60arcseconds", comms_ctx), "ETOPO_2022_v1_60s_N90W180_surface.nc")
 

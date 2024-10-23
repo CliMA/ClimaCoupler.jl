@@ -66,9 +66,6 @@ steps:
       - "julia --project=test/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=test/ -e 'using Pkg; Pkg.status()'"
 
-      - echo "--- Download artifacts"
-      - "julia --project=experiments/ClimaEarth/ artifacts/download_artifacts.jl"
-
     concurrency: 1
     concurrency_group: 'depot/climacoupler-ci'
     agents:

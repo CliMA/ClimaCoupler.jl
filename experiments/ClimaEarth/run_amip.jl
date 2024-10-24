@@ -218,8 +218,7 @@ end
 #=
 ### I/O Directory Setup
 `setup_output_dirs` returns `dir_paths.output = COUPLER_OUTPUT_DIR`, which is the directory where the output of the simulation will be saved, and `dir_paths.artifacts` is the directory where
-the plots (from postprocessing and the conservation checks) of the simulation will be saved. `dir_paths.regrid` is the directory where the regridding
-temporary files will be saved.
+the plots (from postprocessing and the conservation checks) of the simulation will be saved.
 =#
 
 COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], joinpath(mode_name, job_id))

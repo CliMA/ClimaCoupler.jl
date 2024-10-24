@@ -121,29 +121,6 @@ use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
 t_end = Float64(time_to_seconds(config_dict["t_end"]))
 t_start = 0.0
 
-function get_period(t_start, t_end)
-    sim_duration = t_end - t_start
-    secs_per_day = 86400
-    if sim_duration >= 90 * secs_per_day
-        # if duration >= 90 days, take monthly means
-        period = "1months"
-        calendar_dt = Dates.Month(1)
-    elseif sim_duration >= 30 * secs_per_day
-        # if duration >= 30 days, take means over 10 days
-        period = "10days"
-        calendar_dt = Dates.Day(10)
-    elseif sim_duration >= secs_per_day
-        # if duration >= 1 day, take daily means
-        period = "1days"
-        calendar_dt = Dates.Day(1)
-    else
-        # if duration < 1 day, take hourly means
-        period = "1hours"
-        calendar_dt = Dates.Hour(1)
-    end
-    return (period, calendar_dt)
-end
-
 if mode_name == "amip" && use_coupler_diagnostics
     @info "Using default AMIP diagnostics"
     (period, calendar_dt) = get_period(t_start, t_end)
@@ -155,8 +132,42 @@ if mode_name == "amip" && use_coupler_diagnostics
     )
 end
 
+#=
+### I/O Directory Setup
+`setup_output_dirs` returns `dir_paths.output = COUPLER_OUTPUT_DIR`, which is the directory where the output of the simulation will be saved, and `dir_paths.artifacts` is the directory where
+the plots (from postprocessing and the conservation checks) of the simulation will be saved.
+
+We use `ClimaUtilities.OutputPathGenerator` to manage the output directories.
+`OutputPathGenerator` takes care of creating new folders when simulations are
+re-run or restarted, so that no data is lost and simulations can be continued.
+
+The output structure looks something this:
+```
+coupler_output_dir_amip/
+├── output_0000/
+│   └── ... component model outputs in their folders ...
+├── output_0001/
+│   └── ... component model outputs in their folders ...
+├── output_0002/
+│   └── ... component model outputs in their folders ...
+└── output_active -> output_0002/
+```
+=#
+
+COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], joinpath(mode_name, job_id))
+dir_paths = setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
+@info "Coupler output directory $(dir_paths.output)"
+@info "Coupler artifacts directory $(dir_paths.artifacts)"
+
+@info(dir_paths.output)
+config_dict["print_config_dict"] && @info(config_dict)
+
 ## get component model dictionaries (if applicable)
 atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
+# Specify atmos output directory to be inside the coupler output directory and disable
+# output with counters in atmos (we already have that in ClimaCoupler)
+atmos_config_dict["output_dir"] = joinpath(dir_paths.output, "clima_atmos")
+atmos_config_dict["output_dir_style"] = "RemovePreexisting"
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 
 ## read in some parsed command line arguments, required by this script
@@ -173,8 +184,6 @@ date0 = date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymm
 mono_surface = config_dict["mono_surface"]
 hourly_checkpoint = config_dict["hourly_checkpoint"]
 hourly_checkpoint_dt = config_dict["hourly_checkpoint_dt"]
-restart_dir = config_dict["restart_dir"]
-restart_t = Int(config_dict["restart_t"])
 evolving_ocean = config_dict["evolving_ocean"]
 dt_rad = config_dict["dt_rad"]
 use_land_diagnostics = config_dict["use_land_diagnostics"]
@@ -190,20 +199,6 @@ then `ClimaComms` automatically selects the device from which this code is calle
 if comms_ctx.device isa ClimaComms.CUDADevice
     config_dict["anim"] = false
 end
-
-#=
-### I/O Directory Setup
-`setup_output_dirs` returns `dir_paths.output = COUPLER_OUTPUT_DIR`, which is the directory where the output of the simulation will be saved, and `dir_paths.artifacts` is the directory where
-the plots (from postprocessing and the conservation checks) of the simulation will be saved.
-=#
-
-COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], joinpath(mode_name, job_id))
-dir_paths = setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
-@info "Coupler output directory $(dir_paths.output)"
-@info "Coupler artifacts directory $(dir_paths.artifacts)"
-
-@info(dir_paths.output)
-config_dict["print_config_dict"] && @info(config_dict)
 
 #=
 ## Data File Paths
@@ -643,16 +638,15 @@ cs = Interfacer.CoupledSimulation{FT}(
 Utilities.show_memory_usage()
 
 #=
-## Restart component model states if specified
-If a restart directory is specified and contains output files from the `checkpoint_cb` callback, the component model states are restarted from those files. The restart directory
-is specified in the `config_dict` dictionary. The `restart_t` field specifies the time step at which the restart is performed.
-=#
+## Restart component model states if restart files exist
 
-if restart_dir !== "unspecified"
-    for sim in cs.model_sims
-        if Checkpointer.get_model_prog_state(sim) !== nothing
-            Checkpointer.restart_model_state!(sim, comms_ctx, restart_t; input_dir = restart_dir)
-        end
+If a restart files exist (as produced by the `checkpoint_cb` callback), the component model states are restarted from the most recent of these files.
+
+If you want to have finer control over how to restart, use the `restart_model_state!` function instead.
+=#
+for sim in cs.model_sims
+    if Checkpointer.get_model_prog_state(sim) !== nothing
+        Checkpointer.maybe_auto_restart_model_state!(sim, comms_ctx; input_dir = COUPLER_OUTPUT_DIR)
     end
 end
 

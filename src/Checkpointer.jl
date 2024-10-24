@@ -8,6 +8,7 @@ module Checkpointer
 import ClimaComms
 import ClimaCore as CC
 import ..Interfacer
+import ClimaUtilities.OutputPathGenerator: ActiveLinkStyle, detect_restart_file
 
 export get_model_prog_state, checkpoint_model_state, restart_model_state!
 
@@ -45,6 +46,40 @@ function checkpoint_model_state(
 end
 
 """
+    maybe_auto_restart_model_state!(sim::Interfacer.ComponentModelSimulation,
+                                    comms_ctx::ClimaComms.AbstractCommsContext;
+                                    input_dir = "input")
+
+Look for restart files for `sim` in `input_dir`. If anything exists, reset the
+state in `sim` to be what is in the file.
+
+Detecting restart files is one with `ClimaUtilities.OutputPathGenerator.detect_restart_file`.
+"""
+function maybe_auto_restart_model_state!(
+    sim::Interfacer.ComponentModelSimulation,
+    comms_ctx::ClimaComms.AbstractCommsContext;
+    input_dir = "input",
+)
+    Y = get_model_prog_state(sim)
+    restart_file_rx = Regex("checkpoint_$(Interfacer.name(sim))_\\d+.hdf5")
+    input_file = detect_restart_file(input_dir; restart_file_rx)
+
+    Main.@infiltrate
+
+    if !isnothing(input_file)
+        @info "Restarting " Interfacer.name(sim) " from $input_file"
+
+        # open file and read
+        restart_reader = CC.InputOutput.HDF5Reader(input_file, comms_ctx)
+        Y_new = CC.InputOutput.read_field(restart_reader, "model_state")
+        close(restart_reader)
+
+        # set new state
+        Y .= Y_new
+    end
+end
+
+"""
     restart_model_state!(sim::Interfacer.ComponentModelSimulation, comms_ctx::ClimaComms.AbstractCommsContext, t::Int; input_dir = "input")
 
 Sets the model state of a simulation from a HDF5 file from a given time, t (in seconds).
@@ -70,5 +105,6 @@ function restart_model_state!(
     # set new state
     Y .= Y_new
 end
+
 
 end # module

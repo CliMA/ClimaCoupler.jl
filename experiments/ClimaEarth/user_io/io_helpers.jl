@@ -1,4 +1,6 @@
 # helpers with boiler plate code for IO operations, useful for all ClimaEarth drivers.
+import ClimaUtilities.OutputPathGenerator: generate_output_path
+
 
 """
     setup_output_dirs(; output_dir = nothing, artifacts_dir = nothing, comms_ctx)
@@ -6,6 +8,19 @@
 Create output directories for the experiment. If `comms_ctx` is provided, only the root process will create the directories.
 By default, the regrid directory is created as a temporary directory inside the output directory,
 and the artifacts directory is created inside the output directory with the suffix `_artifacts`.
+
+`ClimaUtilities.OutputPathGenerator` is used so that simulations can be re-run and re-started.
+The output path looks like:
+```
+output_dir/
+├── output_0000/
+│   └── ... component model outputs in their folders ...
+├── output_0001/
+│   └── ... component model outputs in their folders ...
+├── output_0002/
+│   └── ... component model outputs in their folders ...
+└── output_active -> output_0002/
+```
 
 # Arguments
 - `output_dir::String`: The directory where the output files will be stored. Default is the current directory.
@@ -16,18 +31,12 @@ and the artifacts directory is created inside the output directory with the suff
 # Returns
 - A tuple with the paths to the output, regrid, and artifacts directories.
 """
-function setup_output_dirs(; output_dir = nothing, artifacts_dir = nothing, comms_ctx)
-    if output_dir === nothing
-        output_dir = "."
-    end
-    if artifacts_dir === nothing
-        artifacts_dir = joinpath(output_dir, "artifacts")
-    end
+function setup_output_dirs(; output_dir = pwd(), artifacts_dir = joinpath(output_dir, "artifacts"), comms_ctx)
+    output_dir = generate_output_path(output_dir)
 
     @info(output_dir)
     regrid_dir = nothing
     if ClimaComms.iamroot(comms_ctx)
-        mkpath(output_dir)
         mkpath(artifacts_dir)
         regrid_dir = mktempdir(output_dir, prefix = "regrid_tmp_")
     end
@@ -58,4 +67,32 @@ function time_to_seconds(s::String)
         return parse(Float64, first(split(s, match))) * factor[match]
     end
     error("Uncaught case in computing time from given string.")
+end
+
+"""
+    get_period(t_start, t_end)
+
+Return a period that depends on the duration of the simulation. Used for diagnostics.
+"""
+function get_period(t_start, t_end)
+    sim_duration = t_end - t_start
+    secs_per_day = 86400
+    if sim_duration >= 90 * secs_per_day
+        # if duration >= 90 days, take monthly means
+        period = "1months"
+        calendar_dt = Dates.Month(1)
+    elseif sim_duration >= 30 * secs_per_day
+        # if duration >= 30 days, take means over 10 days
+        period = "10days"
+        calendar_dt = Dates.Day(10)
+    elseif sim_duration >= secs_per_day
+        # if duration >= 1 day, take daily means
+        period = "1days"
+        calendar_dt = Dates.Day(1)
+    else
+        # if duration < 1 day, take hourly means
+        period = "1hours"
+        calendar_dt = Dates.Hour(1)
+    end
+    return (period, calendar_dt)
 end

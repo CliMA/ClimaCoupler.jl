@@ -9,7 +9,7 @@ import .TestHelper
 struct DummySimulation{C} <: Interfacer.AtmosModelSimulation
     cache::C
 end
-
+Interfacer.name(::DummySimulation) = "DummySimulation"
 Interfacer.get_field(sim::DummySimulation, ::Val{:turbulent_energy_flux}) = sim.cache.turbulent_energy_flux
 Interfacer.get_field(sim::DummySimulation, ::Val{:turbulent_moisture_flux}) = sim.cache.turbulent_moisture_flux
 Interfacer.get_field(sim::DummySimulation, ::Val{:radiative_energy_flux_sfc}) = sim.cache.radiative_energy_flux_sfc
@@ -26,9 +26,11 @@ end
 struct TestSurfaceSimulation1{C} <: Interfacer.SurfaceModelSimulation
     cache_field::C
 end
+Interfacer.name(::TestSurfaceSimulation1) = "TestSurfaceSimulation1"
 struct TestSurfaceSimulation2{C} <: Interfacer.SurfaceModelSimulation
     cache_field::C
 end
+Interfacer.name(::TestSurfaceSimulation2) = "TestSurfaceSimulation2"
 
 Interfacer.get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:surface_temperature}) =
     sim.cache_field
@@ -58,6 +60,7 @@ Interfacer.step!(::TestSurfaceSimulation1, _) = nothing
 struct TestAtmosSimulation{C} <: Interfacer.AtmosModelSimulation
     cache::C
 end
+Interfacer.name(::TestAtmosSimulation) = "TestAtmosSimulation"
 function Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:surface_direct_albedo}, field)
     parent(sim.cache.albedo_direct) .= parent(field)
 end
@@ -67,15 +70,17 @@ end
 function Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:roughness_momentum}, field)
     parent(sim.cache.roughness_momentum) .= parent(field)
 end
-
+Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:co2}, field) = nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:surface_temperature}, field) = nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:roughness_buoyancy}, field) = nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:beta}, field) = nothing
+Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:turbulent_fluxes}, field) = nothing
 
 #surface sim
 struct TestSurfaceSimulationLand{C} <: Interfacer.SurfaceModelSimulation
     cache::C
 end
+Interfacer.name(::TestSurfaceSimulationLand) = "TestSurfaceSimulationLand"
 function Interfacer.get_field(sim::TestSurfaceSimulationLand, ::Val{:area_fraction})
     FT = CC.Spaces.undertype(axes(sim.cache.turbulent_energy_flux))
     return FT(0.5)
@@ -86,6 +91,12 @@ end
 function Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:turbulent_moisture_flux}, field)
     parent(sim.cache.turbulent_moisture_flux) .= parent(field)
 end
+function Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:air_density}, field)
+    parent(sim.cache.air_density) .= parent(field)
+end
+Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:radiative_energy_flux_sfc}, field) = nothing
+Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:liquid_precipitation}, field) = nothing
+Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:snow_precipitation}, field) = nothing
 
 for FT in (Float32, Float64)
     @testset "import_atmos_fields! for FT=$FT" begin
@@ -179,10 +190,10 @@ for FT in (Float32, Float64)
         land_names = (
             :turbulent_energy_flux,
             :turbulent_moisture_flux,
+            :air_density,
             :radiative_energy_flux_sfc,
             :liquid_precipitation,
             :snow_precipitation,
-            :ρ_sfc,
         )
         land_fields = NamedTuple{land_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(land_names)))
 
@@ -214,7 +225,7 @@ for FT in (Float32, Float64)
                 @test Array(parent(model_sims.atmos_sim.cache.roughness_momentum))[1] == results[1]
             end
 
-            # unspecified variables
+            # test variables without updates
             @test Array(parent(model_sims.atmos_sim.cache.surface_temperature))[1] == results[1]
             @test Array(parent(model_sims.atmos_sim.cache.beta))[1] == results[1]
             @test Array(parent(model_sims.atmos_sim.cache.roughness_buoyancy))[1] == results[1]
@@ -223,7 +234,7 @@ for FT in (Float32, Float64)
             @test Array(parent(model_sims.land_sim.cache.turbulent_energy_flux))[1] == results[2] # assuming units / m2
             @test Array(parent(model_sims.land_sim.cache.turbulent_moisture_flux))[1] == results[2]
 
-            # unspecified variables
+            # test variables without updates
             @test Array(parent(model_sims.land_sim.cache.radiative_energy_flux_sfc))[1] == results[1]
             @test Array(parent(model_sims.land_sim.cache.liquid_precipitation))[1] == results[1]
             @test Array(parent(model_sims.land_sim.cache.snow_precipitation))[1] == results[1]

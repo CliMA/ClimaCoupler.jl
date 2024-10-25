@@ -54,6 +54,11 @@ end
 function update_field!(sim::SurfaceStub, ::Val{:surface_diffuse_albedo}, field::CC.Fields.Field)
     sim.cache.α_diffuse .= field
 end
+update_field!(::SurfaceStub, ::Val{:liquid_precipitation}, field) = nothing
+update_field!(::SurfaceStub, ::Val{:radiative_energy_flux_sfc}, field) = nothing
+update_field!(::SurfaceStub, ::Val{:snow_precipitation}, field) = nothing
+update_field!(::SurfaceStub, ::Val{:turbulent_energy_flux}, field) = nothing
+update_field!(::SurfaceStub, ::Val{:turbulent_moisture_flux}, field) = nothing
 
 """
     name(::ComponentModelSimulation)

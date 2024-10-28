@@ -1,8 +1,7 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 anim: false
-#atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
-atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_0M_earth.yml"
+atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
 coupler_toml_file: "toml/amip.toml"
 dt: "180secs"
 dt_cpl: 180
@@ -20,6 +19,7 @@ netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
 output_default_diagnostics: true
 rayleigh_sponge: true
+smoothing_order: 10
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "549days"
@@ -29,6 +29,3 @@ turb_flux_partition: "CombinedStateFluxesMOST"
 viscous_sponge: false
 z_elem: 31
 z_max: 50000.0
-#diagnostics:
-#  - short_name: [ts, ta, thetaa, ha, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, hussfc, evspsbl, pr, edt, hfes]
-#    period: 30mins

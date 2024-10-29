@@ -1,11 +1,13 @@
 # testing functions used to produce user-defined debugging plots for AMIP experiments
-import Test: @test, @testset
+import Test: @test, @testset, @test_logs
 import ClimaCore as CC
 import ClimaCoupler: Interfacer
 
 include(joinpath("..", "TestHelper.jl"))
 import .TestHelper
 
+# Prevent GKS headless operation mode warning
+ENV["GKSwstype"] = "nul"
 FT = Float64
 
 struct ClimaAtmosSimulation{C} <: Interfacer.AtmosModelSimulation
@@ -53,9 +55,9 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
     surface_names = (:surface_field,)
     stub_names = (:stub_field,)
 
-    atmos_fields = NamedTuple{atmos_names}(ntuple(i -> CC.Fields.ones(boundary_space), length(atmos_names)))
-    surface_fields = NamedTuple{surface_names}(ntuple(i -> CC.Fields.ones(boundary_space), length(surface_names)))
-    stub_fields = NamedTuple{stub_names}(ntuple(i -> CC.Fields.ones(boundary_space), length(stub_names)))
+    atmos_fields = NamedTuple{atmos_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(atmos_names)))
+    surface_fields = NamedTuple{surface_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(surface_names)))
+    stub_fields = NamedTuple{stub_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(stub_names)))
     coupler_fields = NamedTuple{coupler_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_names)))
 
     model_sims = (;
@@ -83,7 +85,7 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
     )
 
     output_plots = "test_debug"
-    debug(cs, output_plots)
+    @test_logs (:info, "plotting debug in test_debug") debug(cs, output_plots)
     @test isfile("test_debug/debug_ClimaAtmosSimulation.png")
     @test isfile("test_debug/debug_BucketSimulation.png")
     @test isfile("test_debug/debug_SurfaceStub.png")
@@ -91,5 +93,4 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
 
     # remove output
     rm(output_plots; recursive = true)
-
 end

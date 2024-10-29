@@ -1,7 +1,7 @@
 #=
     Unit tests for ClimaCoupler Regridder module
 =#
-import Test: @testset, @test
+import Test: @testset, @test, @test_logs
 import Dates
 import NCDatasets
 import ClimaComms
@@ -139,6 +139,26 @@ for FT in (Float32, Float64)
         @test all(parent(combined_field) .== FT(sum(fractions) * sum(fields) / length(fields)))
     end
 
+    @testset "test get_time" begin
+        # Set up regrid directory for this test only
+        mktempdir(pwd()) do regrid_dir
+            # Test dataset containing times
+            data_path = joinpath(regrid_dir, "data_times.nc")
+            varname = "test_data"
+            TestHelper.gen_ncdata_time(FT, data_path, varname, FT(1))
+            NCDatasets.NCDataset(data_path, "r") do ds
+                @test Regridder.get_time(ds) == Dates.DateTime.(Array(ds["time"]))
+            end
+
+            # Test warning when no dates are available in input data file
+            data_path = joinpath(regrid_dir, "data_no_times.nc")
+            varname = "test_data"
+            TestHelper.gen_ncdata(FT, data_path, varname, FT(1))
+            NCDatasets.NCDataset(data_path, "r") do ds
+                @test_logs (:warn, "No dates available in input data file") Regridder.get_time(ds)
+            end
+        end
+    end
 
     # Add tests which use TempestRemap here -
     # TempestRemap is not built on Windows because of NetCDF support limitations
@@ -193,7 +213,7 @@ for FT in (Float32, Float64)
                 # Initialize dataset of all ones
                 data_path = joinpath(regrid_dir, "ls_mask_data.nc")
                 varname = "test_data"
-                TestHelper.gen_ncdata(FT, data_path, varname, FT(1))
+                TestHelper.gen_ncdata_time(FT, data_path, varname, FT(1))
 
                 # Test monotone masking
                 land_fraction_mono =
@@ -219,7 +239,7 @@ for FT in (Float32, Float64)
                 # Initialize dataset of all 0.5s
                 data_path = joinpath(regrid_dir, "ls_mask_data.nc")
                 varname = "test_data_halves"
-                TestHelper.gen_ncdata(FT, data_path, varname, FT(0.5))
+                TestHelper.gen_ncdata_time(FT, data_path, varname, FT(0.5))
 
                 # Test non-monotone masking
                 land_fraction_halves =

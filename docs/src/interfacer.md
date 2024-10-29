@@ -149,8 +149,8 @@ following properties:
 | `snow_precipitation` | snow precipitation at the surface | kg m^-2 s^-1 |
 | `turbulent_energy_flux` | aerodynamic turbulent surface fluxes of energy (sensible and latent heat) | W m^-2 |
 | `turbulent_moisture_flux` | aerodynamic turbulent surface fluxes of energy (evaporation) | kg m^-2 s^-1 |
-| `surface_direct albedo`    | bulk direct surface albedo; needed if calculated externally of the surface model (e.g. ocean albedo from the atmospheric state) | |
-| `surface_diffuse albedo`    | bulk diffuse surface albedo; needed if calculated externally of the surface model (e.g. ocean albedo from the atmospheric state) | |
+| `surface_direct_albedo`    | bulk direct surface albedo; needed if calculated externally of the surface model (e.g. ocean albedo from the atmospheric state) | |
+| `surface_diffuse_albedo`    | bulk diffuse surface albedo; needed if calculated externally of the surface model (e.g. ocean albedo from the atmospheric state) | |
 
 ### SurfaceModelSimulation - optional functions
 - `update_turbulent_fluxes!(::ComponentModelSimulation, fields::NamedTuple)`:

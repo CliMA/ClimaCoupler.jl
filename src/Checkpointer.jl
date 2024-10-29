@@ -8,7 +8,8 @@ module Checkpointer
 import ClimaComms
 import ClimaCore as CC
 import ..Interfacer
-import ClimaUtilities.OutputPathGenerator: ActiveLinkStyle, detect_restart_file
+
+import ClimaUtilities.Utils: sort_by_creation_time
 
 export get_model_prog_state, checkpoint_model_state, restart_model_state!
 
@@ -57,17 +58,20 @@ Detecting restart files is one with `ClimaUtilities.OutputPathGenerator.detect_r
 """
 function maybe_auto_restart_model_state!(
     sim::Interfacer.ComponentModelSimulation,
-    comms_ctx::ClimaComms.AbstractCommsContext;
-    input_dir = "input",
+    comms_ctx::ClimaComms.AbstractCommsContext,
+    checkpoint_dir,
 )
+    isdir(checkpoint_dir) || return nothing
     Y = get_model_prog_state(sim)
     restart_file_rx = Regex("checkpoint_$(Interfacer.name(sim))_\\d+.hdf5")
-    input_file = detect_restart_file(input_dir; restart_file_rx)
+    restarts = filter(f -> !isnothing(match(restart_file_rx, f)), readdir(checkpoint_dir))
+    isempty(restarts) && return nothing
+    input_file = joinpath(checkpoint_dir, last(sort_by_creation_time(restarts)))
 
-    Main.@infiltrate
+    # TODO: Add check that all t_restart for all the component_models are the same
 
     if !isnothing(input_file)
-        @info "Restarting " Interfacer.name(sim) " from $input_file"
+        @info "Restarting $(Interfacer.name(sim)) from $input_file"
 
         # open file and read
         restart_reader = CC.InputOutput.HDF5Reader(input_file, comms_ctx)
@@ -77,6 +81,22 @@ function maybe_auto_restart_model_state!(
         # set new state
         Y .= Y_new
     end
+end
+
+
+"""
+    t_start_from_checkpoint(checkpoint_dir)
+
+Look for restart files in `checkpoint_dir`, if found, return the time of the latest.
+If not found, return `nothing`.
+"""
+function t_start_from_checkpoint(checkpoint_dir)
+    isdir(checkpoint_dir) || return nothing
+    restart_file_rx = r"checkpoint_(\w+)_(\d+).hdf5"
+    restarts = filter(f -> !isnothing(match(restart_file_rx, f)), readdir(checkpoint_dir))
+    isempty(restarts) && return nothing
+    latest_restart = last(sort_by_creation_time(restarts))
+    return parse(Float64, match(restart_file_rx, latest_restart)[2])
 end
 
 """

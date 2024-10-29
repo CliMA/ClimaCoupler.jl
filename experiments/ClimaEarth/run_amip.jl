@@ -115,23 +115,6 @@ random_seed = config_dict["unique_seed"] ? time_ns() : 1234
 Random.seed!(random_seed)
 @info "Random seed set to $(random_seed)"
 
-## set up diagnostics before retrieving atmos config
-mode_name = config_dict["mode_name"]
-use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
-t_end = Float64(time_to_seconds(config_dict["t_end"]))
-t_start = 0.0
-
-if mode_name == "amip" && use_coupler_diagnostics
-    @info "Using default AMIP diagnostics"
-    (period, calendar_dt) = get_period(t_start, t_end)
-
-    !haskey(config_dict, "diagnostics") && (config_dict["diagnostics"] = Vector{Dict{Any, Any}}())
-    push!(
-        config_dict["diagnostics"],
-        Dict("short_name" => ["toa_fluxes_net"], "reduction_time" => "average", "period" => period),
-    )
-end
-
 #=
 ### I/O Directory Setup
 `setup_output_dirs` returns `dir_paths.output = COUPLER_OUTPUT_DIR`, which is the directory where the output of the simulation will be saved, and `dir_paths.artifacts` is the directory where
@@ -154,12 +137,33 @@ coupler_output_dir_amip/
 ```
 =#
 
+mode_name = config_dict["mode_name"]
 COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], joinpath(mode_name, job_id))
 dir_paths = setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
 @info "Coupler output directory $(dir_paths.output)"
 @info "Coupler artifacts directory $(dir_paths.artifacts)"
+@info "Coupler checkpoint directory $(dir_paths.checkpoints)"
 
 @info(dir_paths.output)
+
+## set up diagnostics before retrieving atmos config
+use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
+t_end = Float64(time_to_seconds(config_dict["t_end"]))
+maybe_t_start_from_checkpoint = Checkpointer.t_start_from_checkpoint(dir_paths.checkpoints)
+t_start = isnothing(maybe_t_start_from_checkpoint) ? 0.0 : maybe_t_start_from_checkpoint
+@info "Starting from t_start $(t_start)"
+
+if mode_name == "amip" && use_coupler_diagnostics
+    @info "Using default AMIP diagnostics"
+    (period, calendar_dt) = get_period(t_start, t_end)
+
+    !haskey(config_dict, "diagnostics") && (config_dict["diagnostics"] = Vector{Dict{Any, Any}}())
+    push!(
+        config_dict["diagnostics"],
+        Dict("short_name" => ["toa_fluxes_net"], "reduction_time" => "average", "period" => period),
+    )
+end
+
 config_dict["print_config_dict"] && @info(config_dict)
 
 ## get component model dictionaries (if applicable)
@@ -174,8 +178,6 @@ atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 energy_check = config_dict["energy_check"]
 const FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim_name = "bucket"
-t_end = Float64(time_to_seconds(config_dict["t_end"]))
-t_start = 0.0
 tspan = (t_start, t_end)
 Δt_component = Float64(time_to_seconds(config_dict["dt"]))
 Δt_cpl = Float64(config_dict["dt_cpl"])
@@ -183,7 +185,9 @@ saveat = Float64(time_to_seconds(config_dict["dt_save_to_sol"]))
 date0 = date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
 mono_surface = config_dict["mono_surface"]
 hourly_checkpoint = config_dict["hourly_checkpoint"]
-hourly_checkpoint_dt = config_dict["hourly_checkpoint_dt"]
+# TODO: Rename hourly_checkpoint to something more general
+checkpoint_period = time_to_period(config_dict["hourly_checkpoint_dt"])
+
 evolving_ocean = config_dict["evolving_ocean"]
 dt_rad = config_dict["dt_rad"]
 use_land_diagnostics = config_dict["use_land_diagnostics"]
@@ -562,12 +566,12 @@ The currently implemented callbacks are:
   NB: Eventually, we will call all of radiation from the coupler, in addition to the albedo calculation.
 =#
 
-checkpoint_cb = TimeManager.HourlyCallback(
-    dt = hourly_checkpoint_dt,
-    func = checkpoint_sims,
-    ref_date = [dates.date[1]],
+checkpoint_cb = checkpoint_callback(
+    checkpoint_period,
     active = hourly_checkpoint,
-) # 20 days
+    start_date = dates.date[1]
+)
+
 update_firstdayofmonth!_cb = TimeManager.MonthlyCallback(
     dt = FT(1),
     func = TimeManager.update_firstdayofmonth!,
@@ -646,7 +650,7 @@ If you want to have finer control over how to restart, use the `restart_model_st
 =#
 for sim in cs.model_sims
     if Checkpointer.get_model_prog_state(sim) !== nothing
-        Checkpointer.maybe_auto_restart_model_state!(sim, comms_ctx; input_dir = COUPLER_OUTPUT_DIR)
+        Checkpointer.maybe_auto_restart_model_state!(sim, comms_ctx, dir_paths.checkpoints)
     end
 end
 
@@ -784,7 +788,7 @@ function solve_coupler!(cs)
         TimeManager.trigger_callback!(cs, cs.callbacks.update_firstdayofmonth!)
 
         ## callback to checkpoint model state
-        TimeManager.trigger_callback!(cs, cs.callbacks.checkpoint)
+        maybe_checkpoint(cs, t, cs.callbacks.checkpoint)
 
         ## compute/output AMIP diagnostics if scheduled for this timestep
         ## wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface

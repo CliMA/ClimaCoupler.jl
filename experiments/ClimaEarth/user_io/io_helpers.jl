@@ -13,6 +13,7 @@ and the artifacts directory is created inside the output directory with the suff
 The output path looks like:
 ```
 output_dir/
+├── checkpoints
 ├── output_0000/
 │   └── ... component model outputs in their folders ...
 ├── output_0001/
@@ -25,24 +26,27 @@ output_dir/
 # Arguments
 - `output_dir::String`: The directory where the output files will be stored. Default is the current directory.
 - `regrid_dir::String`: The directory where the regridded files will be stored. Default is `output_dir/regrid_tmp/`.
+- `checkpoint_dir::String`: The directory where the checkpoint files will be stored. Default is `output_dir/checkpoints/`.
 - `artifacts_dir::String`: The directory where the artifacts will be stored. Default is `output_dir_artifacts/`.
 - `comms_ctx::Union{Nothing, ClimaComms.AbstractCommsContext}`: The communicator context. If provided, only the root process will create the directories.
 
 # Returns
 - A tuple with the paths to the output, regrid, and artifacts directories.
 """
-function setup_output_dirs(; output_dir = pwd(), artifacts_dir = joinpath(output_dir, "artifacts"), comms_ctx)
+function setup_output_dirs(; output_dir = pwd(), artifacts_dir = joinpath(output_dir, "artifacts"), checkpoints_dir = joinpath(output_dir, "checkpoints"), comms_ctx)
     output_dir = generate_output_path(output_dir)
 
     @info(output_dir)
     regrid_dir = nothing
     if ClimaComms.iamroot(comms_ctx)
         mkpath(artifacts_dir)
+        mkpath(checkpoints_dir)
         regrid_dir = mktempdir(output_dir, prefix = "regrid_tmp_")
     end
     regrid_dir = ClimaComms.bcast(comms_ctx, regrid_dir)
 
-    return (; output = output_dir, artifacts = artifacts_dir, regrid = regrid_dir)
+    return (; output = output_dir, artifacts = artifacts_dir, regrid = regrid_dir,
+            checkpoints = checkpoints_dir)
 end
 
 """
@@ -67,6 +71,48 @@ function time_to_seconds(s::String)
         return parse(Float64, first(split(s, match))) * factor[match]
     end
     error("Uncaught case in computing time from given string.")
+end
+
+"""
+    time_to_period(s::String)
+
+Convert a string to a `Dates.Period` object.
+
+The string can be in one of two formats:
+
+1. **Months:** `<NUM>months`, where `<NUM>` is an integer representing the number of months. For example, `"2months"` represents 2 months.
+2. **Other units:** `<NUM><unit>`, where `<NUM>` is a number (integer or floating point) and `<unit>` is one of `secs`, `mins`, `hours`, or `days`.
+   This format is handled by the `time_to_seconds` function and converted to a `Dates.Millisecond` object.
+
+# Arguments
+- `s::String`: The string to convert to a `Dates.Period`.
+
+# Returns
+- A `Dates.Period` object representing the time period specified in the string.
+
+# Examples
+```julia
+julia> time_to_period("2months")
+2 months
+
+julia> time_to_period("10secs")
+10000 milliseconds
+
+julia> time_to_period("2.5hours")
+9000000 milliseconds
+```
+"""
+function time_to_period(s::String)
+    if occursin("months", s)
+        months = match(r"^(\d+)months$", s)
+        isnothing(months) && error(
+                    "$(s) has to be of the form <NUM>months, e.g. 2months for 2 months",
+                )
+        return Dates.Month(parse(Int, first(months)))
+    else
+        # Milliseconds to support fractional seconds
+        return Dates.Millisecond(1000 * time_to_seconds(s))
+    end
 end
 
 """

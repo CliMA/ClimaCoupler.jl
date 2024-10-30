@@ -6,8 +6,8 @@ git-tree-sha1 = "53a27731c0a2ec60756af24e4c60ac37da4a32bc"
     url = "https://caltech.box.com/shared/static/lmzvnjkxctlb0fanieeqxll0vdrbei9e.gz"
 
 [precipitation_obs]
-git-tree-sha1 = "7486bf32e9352493f69364aead26f01eaf90d2af"
+git-tree-sha1 = "5f0075f042bc83b580d2c4f725f851d8e0b9c20a"
 
     [[precipitation_obs.download]]
-    sha256 = "463ebc1886c4e0be9656656da699f2cbb87d7c2568d5e81277c0c8a415dc8143"
+    sha256 = "1aea361ee1c2636bd5c4cc343202dab814d246a7e0356a9caac9fd9c7cf3821c"
     url = "https://caltech.box.com/shared/static/j63uak557kw7tlzb3dgwifoaeczekzm4.gz"

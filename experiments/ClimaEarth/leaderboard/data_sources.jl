@@ -67,7 +67,7 @@ obs_var_dict = Dict{String, Any}(
     "pr" =>
         (start_date) -> begin
             obs_var = ClimaAnalysis.OutputVar(
-                joinpath(@clima_artifact("precipitation_obs"), "gpcp.precip.mon.mean.197901-202305.nc"),
+                joinpath(@clima_artifact("precipitation_obs"), "precip.mon.mean.nc"),
                 "precip",
                 new_start_date = start_date,
                 shift_by = Dates.firstdayofmonth,

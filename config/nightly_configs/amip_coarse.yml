@@ -16,6 +16,7 @@ mono_surface: false
 netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
 output_default_diagnostics: true
+prescribe_clouds_in_radiation: true
 radiation_reset_rng_seed: true
 rayleigh_sponge: true
 start_date: "20100101"

@@ -159,6 +159,46 @@ CAD.add_diagnostic_variable!(
     end,
 )
 
+CAD.add_diagnostic_variable!(
+    short_name = "cc",
+    long_name = "Cloud Cover",
+    units = "",
+    compute! = (out, state, cache, time) -> begin
+        if isnothing(out)
+            return copy(cache.radiation.prescribed_clouds_field.cc)
+        else
+            out .= cache.radiation.prescribed_clouds_field.cc
+        end
+    end,
+)
+
+CAD.add_diagnostic_variable!(
+    short_name = "clwc",
+    long_name = "Cloud Liquid Water Content",
+    units = "kg kg^-1",
+    compute! = (out, state, cache, time) -> begin
+        if isnothing(out)
+            return copy(cache.radiation.prescribed_clouds_field.clwc)
+        else
+            out .= cache.radiation.prescribed_clouds_field.clwc
+        end
+    end,
+)
+
+CAD.add_diagnostic_variable!(
+    short_name = "ciwc",
+    long_name = "Cloud Ice Water Content",
+    units = "kg kg^-1",
+    compute! = (out, state, cache, time) -> begin
+        if isnothing(out)
+            return copy(cache.radiation.prescribed_clouds_field.ciwc)
+        else
+            out .= cache.radiation.prescribed_clouds_field.ciwc
+        end
+    end,
+)
+
+
 """
     static_stability(cache)
 

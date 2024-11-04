@@ -346,15 +346,6 @@ function make_land_domain(
 end
 
 """
-    get_land_temp_from_state(land_sim, u)
-Returns the surface temperature of the earth, computed from the state u.
-"""
-function get_land_temp_from_state(land_sim, u)
-    # required by viz_explorer.jl
-    return CL.surface_temperature(land_sim.model, u, land_sim.integrator.p, land_sim.integrator.t)
-end
-
-"""
     dss_state!(sim::BucketSimulation)
 
 Perform DSS on the state of a component simulation, intended to be used

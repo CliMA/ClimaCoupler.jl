@@ -43,7 +43,7 @@ function plot_anim(cs, out_dir = ".")
     if mode_name == "slabplanet"
         sol_slab_ocean = slab_ocean_sim.integrator.sol
         anim = Plots.@animate for (bucketu, oceanu) in zip(sol_slab.u, sol_slab_ocean.u)
-            land_T_sfc = get_land_temp_from_state(cs.model_sims.land_sim, bucketu)
+            land_T_sfc = get_field(cs.model_sims.land_sim, Val(:surface_temperature))
             Regridder.combine_surfaces_from_sol!(
                 combined_field,
                 surface_fractions,
@@ -54,7 +54,7 @@ function plot_anim(cs, out_dir = ".")
     elseif mode_name == "slabplanet_eisenman"
         slab_ice_sim = slab_ice_sim.integrator.sol
         anim = Plots.@animate for (bucketu, iceu) in zip(sol_slab.u, slab_ice_sim.u)
-            land_T_sfc = get_land_temp_from_state(cs.model_sims.land_sim, bucketu)
+            land_T_sfc = get_field(cs.model_sims.land_sim, Val(:surface_temperature))
             Regridder.combine_surfaces_from_sol!(
                 combined_field,
                 surface_fractions,
@@ -66,7 +66,7 @@ function plot_anim(cs, out_dir = ".")
     elseif mode_name == "amip"
         sol_slab_ice = slab_ice_sim.integrator.sol
         anim = Plots.@animate for (bucketu, iceu) in zip(sol_slab.u, sol_slab_ice.u)
-            land_T_sfc = get_land_temp_from_state(cs.model_sims.land_sim, bucketu)
+            land_T_sfc = get_field(cs.model_sims.land_sim, Val(:surface_temperature))
             Regridder.combine_surfaces_from_sol!(
                 combined_field,
                 surface_fractions,

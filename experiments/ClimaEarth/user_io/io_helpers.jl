@@ -5,12 +5,12 @@
 
 Create output directories for the experiment. If `comms_ctx` is provided, only the root process will create the directories.
 By default, the regrid directory is created as a temporary directory inside the output directory,
-and the artifacts directory is created inside the output directory with the suffix `_artifacts`.
+and the artifacts directory is created inside the output directory with the name `artifacts/`.
 
 # Arguments
 - `output_dir::String`: The directory where the output files will be stored. Default is the current directory.
 - `regrid_dir::String`: The directory where the regridded files will be stored. Default is `output_dir/regrid_tmp/`.
-- `artifacts_dir::String`: The directory where the artifacts will be stored. Default is `output_dir_artifacts/`.
+- `artifacts_dir::String`: The directory where the artifacts will be stored. Default is `output_dir/artifacts/`.
 - `comms_ctx::Union{Nothing, ClimaComms.AbstractCommsContext}`: The communicator context. If provided, only the root process will create the directories.
 
 # Returns

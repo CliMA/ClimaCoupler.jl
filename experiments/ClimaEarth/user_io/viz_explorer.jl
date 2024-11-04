@@ -6,11 +6,10 @@ import ClimaCoupler: Regridder
 function plot_anim(cs, out_dir = ".")
 
     atmos_sim = cs.model_sims.atmos_sim
-    slab_land_sim = cs.model_sims.land_sim
-    slab_ocean_sim = cs.model_sims.ocean_sim
-    slab_ice_sim = cs.model_sims.ice_sim
+    land_sim = cs.model_sims.land_sim
+    ocean_sim = cs.model_sims.ocean_sim
+    ice_sim = cs.model_sims.ice_sim
     mode_name = cs.mode.name
-    SST = cs.fields.T_S
 
     # plot the lowest atmos (center) levels of key variables
     sol_atm = atmos_sim.integrator.sol
@@ -38,12 +37,16 @@ function plot_anim(cs, out_dir = ".")
 
     # plot combined surfaces
     combined_field = zeros(boundary_space)
-    sol_slab = slab_land_sim.integrator.sol
+    FT = CC.Spaces.undertype(boundary_space)
 
+    land_T_sfc = Interfacer.get_field(cs.model_sims.land_sim, Val(:surface_temperature))
+    SST = cs.fields.T_S
+
+    # Surface temperature plots
     if mode_name == "slabplanet"
-        sol_slab_ocean = slab_ocean_sim.integrator.sol
-        anim = Plots.@animate for (bucketu, oceanu) in zip(sol_slab.u, sol_slab_ocean.u)
-            land_T_sfc = get_field(cs.model_sims.land_sim, Val(:surface_temperature))
+        # Ocean surface temperature
+        sol_ocean = ocean_sim.integrator.sol
+        anim_T = Plots.@animate for oceanu in sol_ocean.u
             Regridder.combine_surfaces_from_sol!(
                 combined_field,
                 surface_fractions,
@@ -52,9 +55,9 @@ function plot_anim(cs, out_dir = ".")
             Plots.plot(combined_field)
         end
     elseif mode_name == "slabplanet_eisenman"
-        slab_ice_sim = slab_ice_sim.integrator.sol
-        anim = Plots.@animate for (bucketu, iceu) in zip(sol_slab.u, slab_ice_sim.u)
-            land_T_sfc = get_field(cs.model_sims.land_sim, Val(:surface_temperature))
+        # Ice surface temperature
+        sol_ice = ice_sim.integrator.sol
+        anim_T = Plots.@animate for iceu in sol_ice.u
             Regridder.combine_surfaces_from_sol!(
                 combined_field,
                 surface_fractions,
@@ -63,10 +66,21 @@ function plot_anim(cs, out_dir = ".")
             Plots.plot(combined_field)
         end
 
+        # Ice height
+        sol_ice = ice_sim.integrator.sol
+        anim = Plots.@animate for sol_iceu in sol_ice.u
+            Regridder.combine_surfaces_from_sol!(
+                combined_field,
+                surface_fractions,
+                (; land = FT(0), ocean = FT(0), ice = sol_iceu.h_ice),
+            )
+            Plots.plot(combined_field)
+        end
+        Plots.mp4(anim, joinpath(out_dir, "eisenman_seaice.mp4"), fps = 10)
     elseif mode_name == "amip"
-        sol_slab_ice = slab_ice_sim.integrator.sol
-        anim = Plots.@animate for (bucketu, iceu) in zip(sol_slab.u, sol_slab_ice.u)
-            land_T_sfc = get_field(cs.model_sims.land_sim, Val(:surface_temperature))
+        # Ice surface temperature
+        sol_ice = ice_sim.integrator.sol
+        anim_T = Plots.@animate for iceu in sol_ice.u
             Regridder.combine_surfaces_from_sol!(
                 combined_field,
                 surface_fractions,
@@ -75,43 +89,30 @@ function plot_anim(cs, out_dir = ".")
             Plots.plot(combined_field)
         end
     end
-    Plots.mp4(anim, joinpath(out_dir, "earth_T.mp4"), fps = 10)
+    Plots.mp4(anim_T, joinpath(out_dir, "earth_T.mp4"), fps = 10)
 
-    combined_field = zeros(boundary_space)
-    anim = Plots.@animate for bucketu in sol_slab.u
+    # Land surface plots
+    sol_land = land_sim.integrator.sol
+
+    # Water content
+    anim = Plots.@animate for bucketu in sol_land.u
         Regridder.combine_surfaces_from_sol!(
             combined_field,
             surface_fractions,
-            (; land = bucketu.bucket.W, ocean = 0.0, ice = 0.0),
+            (; land = bucketu.bucket.W, ocean = FT(0), ice = FT(0)),
         )
         Plots.plot(combined_field)
     end
     Plots.mp4(anim, joinpath(out_dir, "bucket_W.mp4"), fps = 10)
 
-    combined_field = zeros(boundary_space)
-    anim = Plots.@animate for bucketu in sol_slab.u
+    # Snow cover fraction
+    anim = Plots.@animate for bucketu in sol_land.u
         Regridder.combine_surfaces_from_sol!(
             combined_field,
             surface_fractions,
-            (; land = bucketu.bucket.σS, ocean = 0.0, ice = 0.0),
+            (; land = bucketu.bucket.σS, ocean = FT(0), ice = FT(0)),
         )
         Plots.plot(combined_field)
     end
     Plots.mp4(anim, joinpath(out_dir, "bucket_snow.mp4"), fps = 10)
-
-    if mode_name == "slabplanet_eisenman"
-        sol_ice = cs.model_sims.ice_sim.integrator.sol
-        combined_field = zeros(boundary_space)
-        anim = Plots.@animate for sol_iceu in sol_ice.u
-            Regridder.combine_surfaces_from_sol!(
-                combined_field,
-                surface_fractions,
-                (; land = 0.0, ocean = 0.0, ice = sol_iceu.h_ice),
-            )
-            Plots.plot(combined_field)
-        end
-        Plots.mp4(anim, joinpath(out_dir, "eisenman_seaice.mp4"), fps = 10)
-    end
-    # plot surface fluxes
-    # TODO as part of the flux accumulation PR
 end

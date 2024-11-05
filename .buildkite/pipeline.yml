@@ -42,16 +42,10 @@ steps:
       - echo "--- Instantiate ClimaEarth env"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.develop(path=\".\")'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\")'"
+      # ProfileCanvas and JSON are used by the perf jobs
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\"); Pkg.add(\"ProfileCanvas\"); Pkg.add(\"JSON\")'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
-
-      - echo "--- Instantiate perf env"
-      - "julia --project=perf/ -e 'using Pkg; Pkg.develop(path=\".\")'"
-      - "julia --project=perf/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=perf/ -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\")'"
-      - "julia --project=perf/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=perf/ -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate test env"
       - "julia --project=test/ -e 'using Pkg; Pkg.develop(path=\".\")'"
@@ -105,7 +99,7 @@ steps:
           slurm_mem: 16GB
 
       - label: "Perf flame graph diff tests"
-        command: "julia --color=yes --project=perf/ perf/flame_test.jl --job_id flame_perf_target"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ perf/flame_test.jl --job_id flame_perf_target"
         timeout_in_minutes: 5
         agents:
           slurm_mem: 16GB
@@ -224,13 +218,13 @@ steps:
           slurm_mem: 20GB
 
       - label: ":rocket: Slabplanet: default (unthreaded) - flame graph and allocation tests"
-        command: "julia --color=yes --project=perf perf/flame.jl --config_file $PERF_CONFIG_PATH/perf_default_unthreaded.yml --job_id perf_default_unthreaded"
+        command: "julia --color=yes --project=experiments/ClimaEarth perf/flame.jl --config_file $PERF_CONFIG_PATH/perf_default_unthreaded.yml --job_id perf_default_unthreaded"
         artifact_paths: "perf/output/perf_default_unthreaded/*"
         agents:
           slurm_mem: 20GB
 
       - label: ":rocket: Slabplanet: default (unthreaded) - flame graph diff"
-        command: "julia --color=yes --project=perf perf/flame_diff.jl --config_file $PERF_CONFIG_PATH/perf_diff_default_unthreaded.yml --job_id perf_diff_default_unthreaded"
+        command: "julia --color=yes --project=experiments/ClimaEarth perf/flame_diff.jl --config_file $PERF_CONFIG_PATH/perf_diff_default_unthreaded.yml --job_id perf_diff_default_unthreaded"
         artifact_paths: "perf/output/perf_diff_default_unthreaded/*"
         agents:
           slurm_mem: 20GB
@@ -342,13 +336,13 @@ steps:
       # PERFORMANCE RUNS: flame graphs + allocation tests
 
       - label: ":rocket: flame graph and allocation tests: perf_coarse_single_ft64"
-        command: "julia --color=yes --project=perf perf/flame.jl --config_file $PERF_CONFIG_PATH/perf_coarse_single_ft64.yml --job_id perf_coarse_single_ft64"
+        command: "julia --color=yes --project=experiments/ClimaEarth perf/flame.jl --config_file $PERF_CONFIG_PATH/perf_coarse_single_ft64.yml --job_id perf_coarse_single_ft64"
         artifact_paths: "perf/output/perf_coarse_single_ft64/*"
         agents:
           slurm_mem: 20GB
 
       - label: ":rocket: performance: flame graph diff: perf_diff_coarse_single_ft64"
-        command: "julia --color=yes --project=perf perf/flame_diff.jl --config_file $PERF_CONFIG_PATH/perf_diff_coarse_single_ft64.yml --job_id perf_diff_coarse_single_ft64"
+        command: "julia --color=yes --project=experiments/ClimaEarth perf/flame_diff.jl --config_file $PERF_CONFIG_PATH/perf_diff_coarse_single_ft64.yml --job_id perf_diff_coarse_single_ft64"
         artifact_paths: "perf/output/perf_diff_coarse_single_ft64/*"
         agents:
           slurm_mem: 20GB

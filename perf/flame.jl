@@ -1,6 +1,8 @@
 # flame.jl: provides allocation breakdown for individual backtraces for single-process unthredded runs
 # and check for overall allocation limits based on previous runs
 # copied and modified from `ClimaAtmos/perf`
+#
+# To run this, add ProfileCanvas to the ClimaEarth environment
 
 import Test: @test, @testset
 import ClimaAtmos as CA

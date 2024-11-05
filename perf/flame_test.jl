@@ -1,3 +1,5 @@
+# The JSON package is needed to run this
+
 import Test: @test, @testset
 import Profile
 import Base: view

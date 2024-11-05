@@ -1,6 +1,8 @@
 # flame_diff.jl: provides allocation breakdown for individual backtraces for single-process unthredded runs
 # and check for fractional change in allocation compared to the last staged run
 
+# The JSON package is needed to run this
+
 import ClimaAtmos as CA
 import Profile
 import Base: view

@@ -33,12 +33,6 @@ steps:
       - "julia --project -e 'using Pkg; Pkg.precompile()'"
       - "julia --project -e 'using Pkg; Pkg.status()'"
 
-      - echo "--- Instantiate sea breeze env"
-      - "julia --project=experiments/ClimaCore/sea_breeze -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/ClimaCore/sea_breeze -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\")'"
-      - "julia --project=experiments/ClimaCore/sea_breeze -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=experiments/ClimaCore/sea_breeze -e 'using Pkg; Pkg.status()'"
-
       - echo "--- Instantiate climacore exp env"
       - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\")'"
@@ -246,7 +240,7 @@ steps:
       # CLIMACORE EXPERIMENTS
 
       - label: "sea_breeze"
-        command: "julia --color=yes --project=experiments/ClimaCore/sea_breeze experiments/ClimaCore/sea_breeze/run.jl"
+        command: "julia --color=yes --project=experiments/ClimaCore experiments/ClimaCore/sea_breeze/run.jl"
         artifact_paths: "experiments/ClimaCore/sea_breeze/output/*"
         agents:
           slurm_mem: 20GB

@@ -61,9 +61,9 @@ For example, to run the default AMIP configuration, you could use the following 
 julia --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file config/ci_configs/amip_default.jl --job_id amip_default
 ```
 
-Output from your run will be saved in the folder `experiments/ClimaEarth/output/amip/<job_id>/` for AMIP runs, or
-`experiments/ClimaEarth/output/slabplanet/<job_id>/` for slabplanet runs. If no configuration file is specified, the default
-`interactive_debug.yml` will be used, and output will be saved in `experiments/ClimaEarth/output/slabplanet/interactive_debug/`.
+Output from your run will be saved in the folder `experiments/ClimaEarth/output/<job_id>/`.
+If no configuration file is specified, the default
+`interactive_debug.yml` will be used, and output will be saved in `experiments/ClimaEarth/output/interactive_debug/`.
 
 The output will take up approximately 1GB of space, and the simulation will take around 10 minutes to run on a single CPU, or less time on multiple CPUs or GPU.
 

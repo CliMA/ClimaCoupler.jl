@@ -41,7 +41,7 @@ steps:
       - label: "CPU ClimaAtmos without diagnostic EDMF"
         key: "climaatmos"
         command: "srun julia --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos.yml --job_id climaatmos"
-        artifact_paths: "experiments/ClimaEarth/output/climaatmos/climaatmos/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/climaatmos/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
@@ -54,7 +54,7 @@ steps:
       - label: "CPU ClimaAtmos with diagnostic EDMF"
         key: "climaatmos_diagedmf"
         command: "srun julia --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos_diagedmf.yml --job_id climaatmos_diagedmf"
-        artifact_paths: "experiments/ClimaEarth/output/climaatmos/climaatmos_diagedmf/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/climaatmos_diagedmf/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
@@ -67,7 +67,7 @@ steps:
       - label: "CPU AMIP with diagnostic EDMF"
         key: "amip_diagedmf"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $BENCHMARK_CONFIG_PATH/amip_diagedmf.yml --job_id amip_diagedmf"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_diagedmf/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/amip_diagedmf/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
@@ -80,7 +80,7 @@ steps:
       - label: "CPU AMIP with diagnostic EDMF and io"
         key: "amip_diagedmf_io"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $BENCHMARK_CONFIG_PATH/amip_diagedmf_io.yml --job_id amip_diagedmf_io"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_diagedmf_io/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/amip_diagedmf_io/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
@@ -95,7 +95,7 @@ steps:
       - label: "GPU ClimaAtmos without diagnostic EDMF"
         key: "gpu_climaatmos"
         command: "srun julia --threads=3 --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos.yml --job_id gpu_climaatmos"
-        artifact_paths: "experiments/ClimaEarth/output/climaatmos/gpu_climaatmos/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/gpu_climaatmos/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"
@@ -108,7 +108,7 @@ steps:
       - label: "GPU ClimaAtmos with diagnostic EDMF"
         key: "gpu_climaatmos_diagedmf"
         command: "srun julia --threads=3 --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos_diagedmf.yml --job_id gpu_climaatmos_diagedmf"
-        artifact_paths: "experiments/ClimaEarth/output/climaatmos/gpu_climaatmos_diagedmf/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/gpu_climaatmos_diagedmf/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"
@@ -121,7 +121,7 @@ steps:
       - label: "GPU AMIP with diagnostic EDMF"
         key: "gpu_amip_diagedmf"
         command: "srun julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $BENCHMARK_CONFIG_PATH/amip_diagedmf.yml --job_id gpu_amip_diagedmf"
-        artifact_paths: "experiments/ClimaEarth/output/amip/gpu_amip_diagedmf/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_diagedmf/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"
@@ -134,7 +134,7 @@ steps:
       - label: "GPU AMIP with diagnostic EDMF and IO"
         key: "gpu_amip_diagedmf_io"
         command: "srun julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $BENCHMARK_CONFIG_PATH/amip_diagedmf_io.yml --job_id gpu_amip_diagedmf_io"
-        artifact_paths: "experiments/ClimaEarth/output/amip/gpu_amip_diagedmf_io/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_diagedmf_io/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"

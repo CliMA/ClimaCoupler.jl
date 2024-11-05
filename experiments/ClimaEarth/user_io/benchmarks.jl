@@ -113,8 +113,8 @@ function get_run_info(parsed_args, run_type)
     end
 
     # Construct CPU and GPU artifacts directories
-    cpu_artifacts_dir = joinpath(output_dir, mode_name, cpu_job_id, "artifacts")
-    gpu_artifacts_dir = joinpath(output_dir, mode_name, gpu_job_id, "artifacts")
+    cpu_artifacts_dir = joinpath(output_dir, cpu_job_id, "artifacts")
+    gpu_artifacts_dir = joinpath(output_dir, gpu_job_id, "artifacts")
 
     return (cpu_job_id, gpu_job_id, cpu_artifacts_dir, gpu_artifacts_dir)
 end

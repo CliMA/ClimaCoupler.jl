@@ -24,6 +24,13 @@ sea level (Dead Sea, Death Valley, ...).
 
 
 ### Code cleanup
+#### Output path update - PR [#1058](https://github.com/CliMA/ClimaCoupler.jl/pull/1058)
+Previously, ClimaEarth simulation outputs were saved in a path
+`experiments/ClimaEarth/output/$mode_name/$job_id/artifacts/`.
+This PR removes `mode_name` has from this pattern, so output will now be in
+`experiments/ClimaEarth/output/$job_id/artifacts/`.
+Note that any external scripts that assume an output path will need to be updated.
+
 #### Remove ClimaCoupler.Diagnostics module - PR [#953](https://github.com/CliMA/ClimaCoupler.jl/pull/953)
 
 The ClimaCoupler Diagnostics module had become redundant with

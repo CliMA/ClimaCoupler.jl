@@ -72,10 +72,8 @@ for FT in (Float32, Float64)
             nothing, # dates
             nothing, # boundary_space
             nothing, # fields
-            nothing, # parsed_args
             nothing, # conservation_checks
             (Int(0), Int(1000)), # tspan
-            Int(200), # t
             Int(200), # Δt_cpl
             (;
                 ice_sim = DummyStub((; area_fraction = ice_d)),

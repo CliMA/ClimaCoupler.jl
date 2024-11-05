@@ -43,10 +43,8 @@ struct CoupledSimulation{
     D,
     B,
     FV,
-    P,
     E,
     TS,
-    TI <: Real,
     DTI <: Real,
     NTMS <: NamedTuple,
     NTM <: NamedTuple,
@@ -60,10 +58,8 @@ struct CoupledSimulation{
     dates::D
     boundary_space::B
     fields::FV
-    parsed_args::P
     conservation_checks::E
     tspan::TS
-    t::TI
     Δt_cpl::DTI
     model_sims::NTMS
     mode::NTM

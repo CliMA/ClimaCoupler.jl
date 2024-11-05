@@ -251,10 +251,8 @@ cs = Interfacer.CoupledSimulation{FT}(
     dates,
     boundary_space,
     coupler_fields,
-    config_dict,
     nothing, # conservation checks
     [tspan[1], tspan[2]],
-    atmos_sim.integrator.t,
     Δt_cpl,
     model_sims,
     (;), # mode_specifics

@@ -6,10 +6,8 @@ files in all of our environments.
 root = dirname(@__DIR__)
 dirs = (
     root,
-    joinpath(root, "artifacts"),
     joinpath(root, "test"),
     joinpath(root, ".dev"),
-    joinpath(root, "perf"),
     joinpath(root, "docs"),
     joinpath(root, "experiments/ClimaEarth"),
 )

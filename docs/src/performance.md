@@ -1,5 +1,11 @@
 # Performance Analysis Tools
 
+Until commit
+[7a7e98](https://github.com/CliMA/ClimaCoupler.jl/tree/7a7e98db25fe740b6ff0e3eca1e028e876a8a09e),
+ClimaCoupler provided included performance jobs. You can find them by following the link above.
+
+Below is a short description.
+
 `ClimaCoupler.jl` provides basic tools for analyzing performance:
 1. **Flame graphs**: the `perf/flame.jl` script is run by Buildkite to produce flame graphs using [ProfileCanvas.jl](https://github.com/pfitzseb/ProfileCanvas.jl) in the `perf/output/` directory.
 2. **Job walltime and allocation history**: use Buildkite to trigger the [`build_history`](https://github.com/CliMA/slurm-buildkite/blob/master/bin/build_history) script to output an interactive plot with the history of memory usage and time elapsed for each tracked job (default: current build and past builds of the `staging` branch over the past year). Use `key` to select which jobs to track. More documentation can be found in the [SLURM-Buildkite Wiki](https://github.com/CliMA/slurm-buildkite/wiki/Memory#plotting-memory-usage-over-time).

@@ -13,7 +13,6 @@ env:
   SLURM_KILL_BAD_EXIT: 1
 
   CONFIG_PATH: "config/longrun_configs"
-  PERF_CONFIG_PATH: "config/perf_configs"
 
 timeout_in_minutes: 1440
 

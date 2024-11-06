@@ -165,22 +165,26 @@ t_start = 0.0
 tspan = (t_start, t_end)
 Δt_cpl = Float64(config_dict["dt_cpl"])
 component_dt_names = [:dt_atmos, :dt_land, :dt_ocean, :dt_seaice]
-# if any of the component dt's are not specified, set them all to the overall dt
+# check if all component dt's are specified
 if all(key -> !isnothing(config_dict[String(key)]), component_dt_names)
-    haskey(config_dict, "dt") && @warn "Ignoring dt in favor of individual component dt's"
+    # when all component dt's are specified, ignore the dt field
+    if haskey(config_dict, "dt")
+        @warn "Removing dt in favor of individual component dt's"
+        delete!(config_dict, "dt")
+    end
     for key in component_dt_names
         component_dt = Float64(time_to_seconds(config_dict[String(key)]))
         @assert Δt_cpl % component_dt == 0.0 "Coupler dt must be divisible by all component dt's\n dt_cpl = $Δt_cpl\n $key = $component_dt"
         eval(:($key = $component_dt))
     end
-    # the Atmos `get_simulation` function expects the atmos config to contain a value dt,
-    # which describes it simulation timestep, so we set it here
-    config_dict["dt"] = config_dict["dt_atmos"]
 else
-    @assert !isnothing(config_dict["dt"]) "dt or (dt_atmos, dt_land, dt_ocean, and dt_seaice) must be specified"
+    # when not all component dt's are specified, use the dt field
+    @assert haskey(config_dict, "dt") "dt or (dt_atmos, dt_land, dt_ocean, and dt_seaice) must be specified"
     for key in component_dt_names
-        !isnothing(config_dict[String(key)]) &&
-            @warn "Ignoring $key in favor of dt because not all component dt's are specified"
+        if !isnothing(config_dict[String(key)])
+            @warn "Removing $key from config in favor of dt because not all component dt's are specified"
+        end
+        delete!(config_dict, String(key))
         eval(:($key = Float64(time_to_seconds(config_dict["dt"]))))
     end
 end

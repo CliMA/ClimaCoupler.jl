@@ -304,6 +304,12 @@ coupled/atmos-only comparisons.
 function get_atmos_config_dict(coupler_dict::Dict, job_id::String)
     atmos_config_file = coupler_dict["atmos_config_file"]
     atmos_config_repo = coupler_dict["atmos_config_repo"]
+    # the Atmos `get_simulation` function expects the atmos config to contains its timestep size
+    # in the `dt` field. If there is a `dt_atmos` field in coupler_dict, we temporarly change
+    # it to `dt` to create the atmos config, and then remove it from coupler_dict.
+    if haskey(coupler_dict, "dt_atmos")
+        coupler_dict["dt"] = coupler_dict["dt_atmos"]
+    end
     # override default or specified configs with coupler arguments, and set the correct atmos config_file
     if atmos_config_repo == "ClimaCoupler"
         @assert !isnothing(atmos_config_file) "Must specify `atmos_config_file` within ClimaCoupler."
@@ -352,6 +358,11 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String)
     # (if there are common keys, the last dictionary in the `merge` arguments takes precedence)
     atmos_config = merge(atmos_config, Dict("output_dir" => atmos_output_dir))
     coupler_config = merge(atmos_config, config_dict)
+
+    # if "dt" was temporarly set to "dt_atmos", remove it from the coupler config
+    if haskey(coupler_dict, "dt_atmos")
+        delete!(coupler_config, "dt")
+    end
 
     # set restart file to the initial file saved in this location if it is not nothing
     # TODO this is hardcoded and should be fixed once we have a better restart system

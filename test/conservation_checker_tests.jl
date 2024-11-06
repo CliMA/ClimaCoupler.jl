@@ -86,10 +86,8 @@ for FT in (Float32, Float64)
             nothing, # dates
             space, # boundary_space
             cf, # fields
-            nothing, # parsed_args
             cc, # conservation_checks
             (Int(0), Int(1000)), # tspan
-            Int(200), # t
             Int(200), # Δt_cpl
             model_sims, # model_sims
             (;), # mode
@@ -168,10 +166,8 @@ for FT in (Float32, Float64)
             nothing, # dates
             space, # boundary_space
             cf, # fields
-            nothing, # parsed_args
             cc, # conservation_checks
             (Int(0), Int(1000)), # tspan
-            Int(200), # t
             Int(200), # Δt_cpl
             model_sims, # model_sims
             (;), # mode

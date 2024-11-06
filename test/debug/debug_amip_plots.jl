@@ -70,10 +70,8 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
         nothing, # dates
         nothing, # boundary_space
         coupler_fields, # fields
-        nothing, # parsed_args
         nothing, # conservation_checks
         (Int(0), Int(1)), # tspan
-        Int(200), # t
         Int(200), # Δt_cpl
         model_sims, # model_sims
         (;), # mode

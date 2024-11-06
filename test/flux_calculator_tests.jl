@@ -313,10 +313,8 @@ for FT in (Float32, Float64)
             nothing, # dates
             nothing, # boundary_space
             coupler_fields, # fields
-            nothing, # parsed_args
             nothing, # conservation_checks
             (Int(0), Int(1)), # tspan
-            0, # t
             0, # Δt_cpl
             model_sims, # model_sims
             (;), # mode

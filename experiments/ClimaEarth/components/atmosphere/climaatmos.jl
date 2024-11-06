@@ -357,7 +357,7 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String)
     # merge configs
     # (if there are common keys, the last dictionary in the `merge` arguments takes precedence)
     atmos_config = merge(atmos_config, Dict("output_dir" => atmos_output_dir))
-    coupler_config = merge(atmos_config, config_dict)
+    coupler_config = merge(atmos_config, coupler_dict)
 
     # if "dt" was temporarly set to "dt_atmos", remove it from the coupler config
     if haskey(coupler_dict, "dt_atmos")

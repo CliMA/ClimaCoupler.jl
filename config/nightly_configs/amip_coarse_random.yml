@@ -19,7 +19,6 @@ netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
 output_default_diagnostics: true
 rayleigh_sponge: true
-smoothing_order: 10
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "732days"

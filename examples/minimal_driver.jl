@@ -15,6 +15,7 @@ FT = Float64
 !isnothing(config_file) && parse_inputs(config_file)
 
 # Set up exchange space - requires component models to regrid to/from this space
+# Can reach out to Alistair Adcroft at GFDL for guidance (worked on MIT GCM)
 space = create_sphere(FT, context) # including topography and land/sea mask
 
 # Set up timestepping information
@@ -26,16 +27,16 @@ output_dir = "output"
 
 # Set up parameters - need to be unified for calibration
 # Default parameters, can be overwritten by TOML files or user inputs
+# Tapio: allow TOML files for both physical and simulation parameters (e.g. tspan, dt_cpl)
 parameters = init_params()
 
 # Initialize component model simulations - maybe from restart
 # Simulation instead of model allows each component to step/solve independently
+# Optional config, TOML files passed here
 atmos = CA.atmos_init(FT, space, output_dir)
 land = CL.LandSimulation(FT, space, output_dir) # or stub_init()
 ocean = ocean_init(FT, space, output_dir) # or stub_init()
 ice = ice_init(FT, space, output_dir) # or stub_init()
-
-coupled_model = CoupledModel(atmos, ocean, land, ice)
 
 # Initialize coupled simulation
 coupled_simulation = CoupledSimulation(atmos, ocean, land, seaice, tspan, dt_cpl)
@@ -49,6 +50,8 @@ solve_coupler!(coupled_simulation)
 # Postprocessing (optional - will bring in many deps) - maybe in extension
 # Dispatch on config ID
 postprocess(coupled_simulation)
+
+
 
 # Q: How can we communicate to user which input files are needed?
 # One option: run short, coarse simulation first to display which files are requires

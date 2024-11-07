@@ -44,7 +44,6 @@ include("components/land/climaland_bucket.jl")
 
 ## helpers for user-specified IO
 include("user_io/user_logging.jl")
-include("user_io/io_helpers.jl")
 
 #=
 ### Setup simulation parameters
@@ -60,7 +59,7 @@ restart_t = Int(0)
 ## coupler simulation specific configuration
 Δt_cpl = Float64(100)
 t_end = "1000days"
-tspan = (Float64(0.0), Float64(time_to_seconds(t_end)))
+tspan = (Float64(0.0), Float64(Utilities.time_to_seconds(t_end)))
 start_date = "19790321"
 hourly_checkpoint = true
 dt_rad = "6hours"
@@ -154,7 +153,7 @@ comms_ctx = Utilities.get_comms_context(Dict("device" => "auto"))
 ### I/O Directory Setup
 =#
 
-dir_paths = setup_output_dirs(output_dir = coupler_output_dir, comms_ctx = comms_ctx)
+dir_paths = Utilities.setup_output_dirs(output_dir = coupler_output_dir, comms_ctx = comms_ctx)
 @info(config_dict)
 
 #=
@@ -206,7 +205,7 @@ land_area_fraction = SpaceVaryingInput(
 ### Surface Model: Bucket Land and Slab Ocean
 =#
 
-saveat = Float64(time_to_seconds(config_dict["dt_save_to_sol"]))
+saveat = Float64(Utilities.time_to_seconds(config_dict["dt_save_to_sol"]))
 
 ## land model
 land_sim = bucket_init(

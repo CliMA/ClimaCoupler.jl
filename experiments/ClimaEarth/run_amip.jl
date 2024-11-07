@@ -78,7 +78,6 @@ include("components/ocean/eisenman_seaice.jl")
 ## helpers for user-specified IO
 include("user_io/user_logging.jl")
 include("user_io/debug_plots.jl")
-include("user_io/io_helpers.jl")
 
 #=
 ### Configuration Dictionaries
@@ -118,7 +117,7 @@ Random.seed!(random_seed)
 ## set up diagnostics before retrieving atmos config
 mode_name = config_dict["mode_name"]
 use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
-t_end = Float64(time_to_seconds(config_dict["t_end"]))
+t_end = Float64(Utilities.time_to_seconds(config_dict["t_end"]))
 t_start = 0.0
 
 function get_period(t_start, t_end)
@@ -160,7 +159,7 @@ end
 energy_check = config_dict["energy_check"]
 const FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim_name = "bucket"
-t_end = Float64(time_to_seconds(config_dict["t_end"]))
+t_end = Float64(Utilities.time_to_seconds(config_dict["t_end"]))
 t_start = 0.0
 tspan = (t_start, t_end)
 Δt_cpl = Float64(config_dict["dt_cpl"])
@@ -174,7 +173,7 @@ if all(key -> !isnothing(config_dict[key]), component_dt_names)
         delete!(config_dict, "dt")
     end
     for key in component_dt_names
-        component_dt = Float64(time_to_seconds(config_dict[key]))
+        component_dt = Float64(Utilities.time_to_seconds(config_dict[key]))
         @assert Δt_cpl % component_dt == 0.0 "Coupler dt must be divisible by all component dt's\n dt_cpl = $Δt_cpl\n $key = $component_dt"
         component_dt_dict[key] = component_dt
     end
@@ -186,14 +185,14 @@ else
             @warn "Removing $key from config in favor of dt because not all component dt's are specified"
         end
         delete!(config_dict, key)
-        component_dt_dict[key] = Float64(time_to_seconds(config_dict["dt"]))
+        component_dt_dict[key] = Float64(Utilities.time_to_seconds(config_dict["dt"]))
     end
 end
 ## get component model dictionaries (if applicable)
 atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 
-saveat = Float64(time_to_seconds(config_dict["dt_save_to_sol"]))
+saveat = Float64(Utilities.time_to_seconds(config_dict["dt_save_to_sol"]))
 date0 = date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
 mono_surface = config_dict["mono_surface"]
 hourly_checkpoint = config_dict["hourly_checkpoint"]
@@ -218,13 +217,13 @@ end
 
 #=
 ### I/O Directory Setup
-`setup_output_dirs` returns `dir_paths.output = COUPLER_OUTPUT_DIR`, which is the directory where the output of the simulation will be saved, and `dir_paths.artifacts` is the directory where
+`Utilities.setup_output_dirs` returns `dir_paths.output = COUPLER_OUTPUT_DIR`, which is the directory where the output of the simulation will be saved, and `dir_paths.artifacts` is the directory where
 the plots (from postprocessing and the conservation checks) of the simulation will be saved. `dir_paths.regrid` is the directory where the regridding
 temporary files will be saved.
 =#
 
 COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], joinpath(mode_name, job_id))
-dir_paths = setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
+dir_paths = Utilities.setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
 @info "Coupler output directory $(dir_paths.output)"
 @info "Coupler artifacts directory $(dir_paths.artifacts)"
 

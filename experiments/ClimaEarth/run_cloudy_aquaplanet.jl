@@ -39,7 +39,6 @@ include("components/ocean/slab_ocean.jl")
 
 ## helpers for user-specified IO
 include("user_io/user_logging.jl")
-include("user_io/io_helpers.jl")
 
 #=
 ### Setup simulation parameters
@@ -55,7 +54,7 @@ restart_t = Int(0)
 ## coupler simulation specific configuration
 Δt_cpl = Float64(400)
 t_end = "1000days"
-tspan = (Float64(0.0), Float64(time_to_seconds(t_end)))
+tspan = (Float64(0.0), Float64(Utilities.time_to_seconds(t_end)))
 start_date = "19790301"
 hourly_checkpoint = true
 dt_rad = "6hours"
@@ -152,7 +151,7 @@ ClimaComms.init(comms_ctx)
 ### I/O Directory Setup
 =#
 
-dir_paths = setup_output_dirs(output_dir = coupler_output_dir, comms_ctx = comms_ctx)
+dir_paths = Utilities.setup_output_dirs(output_dir = coupler_output_dir, comms_ctx = comms_ctx)
 @info(config_dict)
 
 #=
@@ -183,7 +182,7 @@ ocean_sim = ocean_init(
     tspan = tspan,
     dt = Δt_cpl,
     space = boundary_space,
-    saveat = Float64(time_to_seconds(config_dict["dt_save_to_sol"])),
+    saveat = Float64(Utilities.time_to_seconds(config_dict["dt_save_to_sol"])),
     area_fraction = ones(boundary_space),
     thermo_params = thermo_params,
     evolving = true,

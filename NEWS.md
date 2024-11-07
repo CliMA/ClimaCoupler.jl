@@ -52,5 +52,7 @@ This PR follows directly from the Diagnostics module removal.
 
 #### Various ClimaEarth cleanup - PR [#1070](https://github.com/CliMA/ClimaCoupler.jl/pull/1070)
 This PR does a few cleanup tasks in the experiments/ClimaEarth/ directory:
-- Update the ClimaEarth README
+- Update the ClimaEarth README.
 - Delete the `viz_explorer.jl`, which was previously used to create animations of simulation fields, but is not currently being used. Note that these animations will no longer appear in buildkite output.
+- Move functions in the `io_helpers.jl` file to the Utilities module and delete this file.
+This should not change any behavior.

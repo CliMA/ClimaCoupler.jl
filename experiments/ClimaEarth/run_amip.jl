@@ -925,13 +925,6 @@ if ClimaComms.iamroot(comms_ctx)
         )
     end
 
-    ## sample animations (not compatible with MPI)
-    if !CA.is_distributed(comms_ctx) && config_dict["anim"]
-        @info "Animations"
-        include("user_io/viz_explorer.jl")
-        plot_anim(cs, dir_paths.artifacts)
-    end
-
     ## plotting AMIP results
     if cs.mode.name == "amip"
         if use_coupler_diagnostics

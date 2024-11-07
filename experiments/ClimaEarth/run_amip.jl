@@ -115,34 +115,50 @@ random_seed = config_dict["unique_seed"] ? time_ns() : 1234
 Random.seed!(random_seed)
 @info "Random seed set to $(random_seed)"
 
-## set up diagnostics before retrieving atmos config
+#=
+### I/O Directory Setup `setup_output_dirs` returns `dir_paths.output =
+COUPLER_OUTPUT_DIR`, which is the directory where the output of the simulation
+will be saved, `dir_paths.artifacts` is the directory where the plots (from
+postprocessing and the conservation checks) of the simulation will be saved,
+#and `dir_paths.checkpoints`, where restart files are saved.
+
+We use `ClimaUtilities.OutputPathGenerator` to manage the output directories.
+`OutputPathGenerator` takes care of creating new folders when simulations are
+re-run or restarted, so that no data is lost and simulations can be continued.
+
+The output structure looks like this:
+```
+coupler_output_dir_amip/
+├── checkpoints
+│       └── checkpoints for the various models
+├── output_0000/
+│   ├── atmos/
+│   │   └── output of the atmos model
+│   └── ocean/
+│       └── output of the ocean model
+├── output_0001/
+│   └── ... component model outputs in their folders ...
+├── output_0002/
+│   └── ... component model outputs in their folders ...
+└── output_active -> output_0002/
+```
+=#
+
 mode_name = config_dict["mode_name"]
+COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], joinpath(mode_name, job_id))
+dir_paths = setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
+@info "Coupler output directory $(dir_paths.output)"
+@info "Coupler artifacts directory $(dir_paths.artifacts)"
+@info "Coupler checkpoint directory $(dir_paths.checkpoints)"
+
+@info(dir_paths.output)
+
+## set up diagnostics before retrieving atmos config
 use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
 t_end = Float64(time_to_seconds(config_dict["t_end"]))
-t_start = 0.0
-
-function get_period(t_start, t_end)
-    sim_duration = t_end - t_start
-    secs_per_day = 86400
-    if sim_duration >= 90 * secs_per_day
-        # if duration >= 90 days, take monthly means
-        period = "1months"
-        calendar_dt = Dates.Month(1)
-    elseif sim_duration >= 30 * secs_per_day
-        # if duration >= 30 days, take means over 10 days
-        period = "10days"
-        calendar_dt = Dates.Day(10)
-    elseif sim_duration >= secs_per_day
-        # if duration >= 1 day, take daily means
-        period = "1days"
-        calendar_dt = Dates.Day(1)
-    else
-        # if duration < 1 day, take hourly means
-        period = "1hours"
-        calendar_dt = Dates.Hour(1)
-    end
-    return (period, calendar_dt)
-end
+maybe_t_start_from_checkpoint = Checkpointer.t_start_from_checkpoint(dir_paths.checkpoints)
+t_start = isnothing(maybe_t_start_from_checkpoint) ? 0.0 : maybe_t_start_from_checkpoint
+@info "Starting from t_start $(t_start)"
 
 if mode_name == "amip" && use_coupler_diagnostics
     @info "Using default AMIP diagnostics"
@@ -155,13 +171,20 @@ if mode_name == "amip" && use_coupler_diagnostics
     )
 end
 
+config_dict["print_config_dict"] && @info(config_dict)
+
+## get component model dictionaries (if applicable)
+atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
+# Specify atmos output directory to be inside the coupler output directory and disable
+# output with counters in atmos (we already have that in ClimaCoupler)
+atmos_config_dict["output_dir"] = joinpath(dir_paths.output, "clima_atmos")
+atmos_config_dict["output_dir_style"] = "RemovePreexisting"
+atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 
 ## read in some parsed command line arguments, required by this script
 energy_check = config_dict["energy_check"]
 const FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 land_sim_name = "bucket"
-t_end = Float64(time_to_seconds(config_dict["t_end"]))
-t_start = 0.0
 tspan = (t_start, t_end)
 Δt_cpl = Float64(config_dict["dt_cpl"])
 component_dt_names = [:dt_atmos, :dt_land, :dt_ocean, :dt_seaice]
@@ -196,9 +219,9 @@ saveat = Float64(time_to_seconds(config_dict["dt_save_to_sol"]))
 date0 = date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
 mono_surface = config_dict["mono_surface"]
 hourly_checkpoint = config_dict["hourly_checkpoint"]
-hourly_checkpoint_dt = config_dict["hourly_checkpoint_dt"]
-restart_dir = config_dict["restart_dir"]
-restart_t = Int(config_dict["restart_t"])
+# TODO: Rename hourly_checkpoint to something more general
+checkpoint_period = time_to_period(config_dict["hourly_checkpoint_dt"])
+
 evolving_ocean = config_dict["evolving_ocean"]
 dt_rad = config_dict["dt_rad"]
 use_land_diagnostics = config_dict["use_land_diagnostics"]
@@ -214,20 +237,6 @@ then `ClimaComms` automatically selects the device from which this code is calle
 if comms_ctx.device isa ClimaComms.CUDADevice
     config_dict["anim"] = false
 end
-
-#=
-### I/O Directory Setup
-`setup_output_dirs` returns `dir_paths.output = COUPLER_OUTPUT_DIR`, which is the directory where the output of the simulation will be saved, and `dir_paths.artifacts` is the directory where
-the plots (from postprocessing and the conservation checks) of the simulation will be saved.
-=#
-
-COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], joinpath(mode_name, job_id))
-dir_paths = setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
-@info "Coupler output directory $(dir_paths.output)"
-@info "Coupler artifacts directory $(dir_paths.artifacts)"
-
-@info(dir_paths.output)
-config_dict["print_config_dict"] && @info(config_dict)
 
 #=
 ## Data File Paths
@@ -591,25 +600,16 @@ The currently implemented callbacks are:
   NB: Eventually, we will call all of radiation from the coupler, in addition to the albedo calculation.
 =#
 
-checkpoint_cb = TimeManager.HourlyCallback(
-    dt = hourly_checkpoint_dt,
-    func = checkpoint_sims,
-    ref_date = [dates.date[1]],
-    active = hourly_checkpoint,
-) # 20 days
+checkpoint_cb = periodic_callback(checkpoint_period, start_date = dates.date[1])
+
 update_firstdayofmonth!_cb = TimeManager.MonthlyCallback(
     dt = FT(1),
     func = TimeManager.update_firstdayofmonth!,
     ref_date = [dates.date1[1]],
     active = true,
 )
-dt_water_albedo = parse(FT, filter(x -> !occursin(x, "hours"), dt_rad))
-albedo_cb = TimeManager.HourlyCallback(
-    dt = dt_water_albedo,
-    func = FluxCalculator.water_albedo_from_atmosphere!,
-    ref_date = [dates.date[1]],
-    active = mode_name == "amip",
-)
+dt_water_albedo = time_to_period(config_dict["dt_rad"])
+albedo_cb = periodic_callback(dt_water_albedo, start_date = dates.date[1])
 callbacks =
     (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb, water_albedo = albedo_cb)
 
@@ -665,16 +665,15 @@ cs = Interfacer.CoupledSimulation{FT}(
 Utilities.show_memory_usage()
 
 #=
-## Restart component model states if specified
-If a restart directory is specified and contains output files from the `checkpoint_cb` callback, the component model states are restarted from those files. The restart directory
-is specified in the `config_dict` dictionary. The `restart_t` field specifies the time step at which the restart is performed.
-=#
+## Restart component model states if restart files exist
 
-if restart_dir !== "unspecified"
-    for sim in cs.model_sims
-        if Checkpointer.get_model_prog_state(sim) !== nothing
-            Checkpointer.restart_model_state!(sim, comms_ctx, restart_t; input_dir = restart_dir)
-        end
+If a restart files exist (as produced by the `checkpoint_cb` callback), the component model states are restarted from the most recent of these files.
+
+If you want to have finer control over how to restart, use the `restart_model_state!` function instead.
+=#
+for sim in cs.model_sims
+    if Checkpointer.get_model_prog_state(sim) !== nothing
+        Checkpointer.maybe_auto_restart_model_state!(sim, comms_ctx, dir_paths.checkpoints)
     end
 end
 
@@ -756,6 +755,9 @@ function solve_coupler!(cs)
         ## print date on the first of month
         cs.dates.date[1] >= cs.dates.date1[1] && @info(cs.dates.date[1])
 
+        ## wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface
+        cs_nt = (; u = cs.fields, p = nothing, t = t, step = round(t / Δt_cpl))
+
         if cs.mode.name == "amip"
 
             evaluate!(Interfacer.get_field(ocean_sim, Val(:surface_temperature)), cs.mode.SST_timevaryinginput, t)
@@ -772,10 +774,11 @@ function solve_coupler!(cs)
         !isnothing(cs.conservation_checks) && ConservationChecker.check_conservation!(cs)
         ClimaComms.barrier(comms_ctx)
 
-        ## update water albedo from wind at dt_water_albedo
-        ## (this will be extended to a radiation callback from the coupler)
-        TimeManager.trigger_callback!(cs, cs.callbacks.water_albedo)
-
+        if cs.mode.name == "amip"
+            ## update water albedo from wind at dt_water_albedo
+            ## (this will be extended to a radiation callback from the coupler)
+            cs.callbacks.water_albedo((; t)) && FluxCalculator.water_albedo_from_atmosphere!(cs, nothing)
+        end
 
         ## update the surface fractions for surface models,
         ## and update all component model simulations with the current fluxes stored in the coupler
@@ -812,11 +815,9 @@ function solve_coupler!(cs)
         TimeManager.trigger_callback!(cs, cs.callbacks.update_firstdayofmonth!)
 
         ## callback to checkpoint model state
-        TimeManager.trigger_callback!(cs, cs.callbacks.checkpoint)
+        cs.callbacks.checkpoint((; t)) && checkpoint_sims(cs, t)
 
         ## compute/output AMIP diagnostics if scheduled for this timestep
-        ## wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface
-        cs_nt = (; u = cs.fields, p = nothing, t = t, step = round(t / Δt_cpl))
         (cs.mode.name == "amip" && !isnothing(cs.amip_diags_handler)) &&
             CD.orchestrate_diagnostics(cs_nt, cs.amip_diags_handler)
     end
@@ -831,17 +832,18 @@ end #hide
 #=
 ## Precompilation of Coupling Loop
 
-Here we run the entire coupled simulation for two timesteps to precompile everything
-for accurate timing of the overall simulation. After these two steps, we update the
-beginning and end of the simulation timespan to the correct values.
+Here we optionally run the entire coupled simulation for two timesteps to
+precompile everything for accurate timing of the overall simulation. After these
+two steps, we update the beginning and end of the simulation timespan to the
+correct values.
 =#
 
-## run the coupled simulation for two timesteps to precompile
-cs.tspan[2] = Δt_cpl * 2
+# run the coupled simulation for two timesteps to precompile
+cs.tspan[2] = t_start + Δt_cpl * 2
 solve_coupler!(cs)
 
 ## update the timespan to the correct values
-cs.tspan[1] = Δt_cpl * 2
+cs.tspan[1] = t_start + Δt_cpl * 2
 cs.tspan[2] = tspan[2]
 
 ## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos

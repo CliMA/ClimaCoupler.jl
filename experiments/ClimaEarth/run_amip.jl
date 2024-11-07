@@ -76,7 +76,6 @@ include("components/ocean/prescr_seaice.jl")
 include("components/ocean/eisenman_seaice.jl")
 
 ## helpers for user-specified IO
-include("user_io/user_logging.jl")
 include("user_io/debug_plots.jl")
 
 #=
@@ -597,7 +596,7 @@ The currently implemented callbacks are:
 
 checkpoint_cb = TimeManager.HourlyCallback(
     dt = hourly_checkpoint_dt,
-    func = checkpoint_sims,
+    func = Checkpointer.checkpoint_sims,
     ref_date = [dates.date[1]],
     active = hourly_checkpoint,
 ) # 20 days

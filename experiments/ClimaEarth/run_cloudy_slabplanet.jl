@@ -42,9 +42,6 @@ include("components/atmosphere/climaatmos.jl")
 include("components/ocean/slab_ocean.jl")
 include("components/land/climaland_bucket.jl")
 
-## helpers for user-specified IO
-include("user_io/user_logging.jl")
-
 #=
 ### Setup simulation parameters
 =#
@@ -276,7 +273,7 @@ model_sims = (atmos_sim = atmos_sim, ocean_sim = ocean_sim);
 
 checkpoint_cb = TimeManager.HourlyCallback(
     dt = FT(480),
-    func = checkpoint_sims,
+    func = Checkpointer.checkpoint_sims,
     ref_date = [dates.date[1]],
     active = hourly_checkpoint,
 ) # 20 days

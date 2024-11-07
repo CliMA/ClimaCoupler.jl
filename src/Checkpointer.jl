@@ -8,8 +8,9 @@ module Checkpointer
 import ClimaComms
 import ClimaCore as CC
 import ..Interfacer
+import Dates
 
-export get_model_prog_state, checkpoint_model_state, restart_model_state!
+export get_model_prog_state, checkpoint_model_state, restart_model_state!, checkpoint_sims
 
 """
     get_model_prog_state(sim::Interfacer.ComponentModelSimulation)
@@ -69,6 +70,21 @@ function restart_model_state!(
 
     # set new state
     Y .= Y_new
+end
+
+"""
+    checkpoint_sims(cs::CoupledSimulation, _)
+
+This is a callback function that checkpoints all simulations defined in the current coupled simulation.
+"""
+function checkpoint_sims(cs::Interfacer.CoupledSimulation, _)
+    for sim in cs.model_sims
+        if Checkpointer.get_model_prog_state(sim) !== nothing
+            t = Dates.datetime2epochms(cs.dates.date[1])
+            t0 = Dates.datetime2epochms(cs.dates.date0[1])
+            Checkpointer.checkpoint_model_state(sim, cs.comms_ctx, Int((t - t0) / 1e3), output_dir = cs.dirs.artifacts)
+        end
+    end
 end
 
 end # module

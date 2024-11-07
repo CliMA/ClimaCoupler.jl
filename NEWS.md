@@ -56,3 +56,5 @@ This PR does a few cleanup tasks in the experiments/ClimaEarth/ directory:
 - Delete the `viz_explorer.jl`, which was previously used to create animations of simulation fields, but is not currently being used. Note that these animations will no longer appear in buildkite output.
 - Move functions in the `io_helpers.jl` file to the Utilities module and delete this file.
 This should not change any behavior.
+- Move `checkpoint_sims` function to the Checkpointer module and delete the `user_logging.jl` file.
+This should not change any behavior.

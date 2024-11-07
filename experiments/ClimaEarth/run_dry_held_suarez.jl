@@ -37,9 +37,6 @@ pkg_dir = pkgdir(ClimaCoupler)
 ## helpers for component models
 include("components/atmosphere/climaatmos.jl")
 
-## helpers for user-specified IO
-include("user_io/user_logging.jl")
-
 #=
 ### Setup simulation parameters
 Here we follow ClimaCore's dry Held-Suarez `held_suarez_rhoe` example.
@@ -177,7 +174,7 @@ dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)
 =#
 checkpoint_cb = TimeManager.HourlyCallback(
     dt = FT(480),
-    func = checkpoint_sims,
+    func = Checkpointer.checkpoint_sims,
     ref_date = [dates.date[1]],
     active = hourly_checkpoint,
 ) # 20 days TODO: not GPU friendly

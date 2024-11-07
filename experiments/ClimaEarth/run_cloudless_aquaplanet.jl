@@ -37,9 +37,6 @@ pkg_dir = pkgdir(ClimaCoupler)
 include("components/atmosphere/climaatmos.jl")
 include("components/ocean/slab_ocean.jl")
 
-## helpers for user-specified IO
-include("user_io/user_logging.jl")
-
 #=
 ### Setup simulation parameters
 =#
@@ -207,7 +204,7 @@ dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)
 
 checkpoint_cb = TimeManager.HourlyCallback(
     dt = FT(480),
-    func = checkpoint_sims,
+    func = Checkpointer.checkpoint_sims,
     ref_date = [dates.date[1]],
     active = hourly_checkpoint,
 ) # 20 days

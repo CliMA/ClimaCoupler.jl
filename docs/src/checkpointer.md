@@ -8,4 +8,5 @@ This module contains general functions for logging the model states and restarti
     ClimaCoupler.Checkpointer.get_model_prog_state
     ClimaCoupler.Checkpointer.restart_model_state!
     ClimaCoupler.Checkpointer.checkpoint_model_state
+    ClimaCoupler.Checkpointer.checkpoint_sims
 ```

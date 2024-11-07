@@ -7,6 +7,18 @@ function argparse_settings()
         help = " Coupling time step in seconds"
         arg_type = Int
         default = 400
+        "--dt_atmos"
+        help = " Atmos simulation time step"
+        arg_type = String
+        "--dt_land"
+        help = " Land simulation time step"
+        arg_type = String
+        "--dt_ocean"
+        help = " Ocean simulation time step"
+        arg_type = String
+        "--dt_seaice"
+        help = " Sea Ice simulation time step"
+        arg_type = String
         "--anim"
         help = "Boolean flag indicating whether to make animations"
         arg_type = Bool

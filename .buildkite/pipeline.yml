@@ -327,6 +327,13 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 20GB
 
+      - label: "AMIP - Component dts test"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/target_amip_component_dts.yml --job_id target_amip_component_dts"
+        artifact_paths: "experiments/ClimaEarth/output/amip/target_amip_component_dts/artifacts/*"
+        agents:
+          slurm_ntasks: 1
+          slurm_mem: 20GB
+
       - label: "MPI AMIP"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/coarse_mpi_n4.yml --job_id coarse_mpi_n4"
         artifact_paths: "experiments/ClimaEarth/output/amip/coarse_mpi_n4/artifacts/*"

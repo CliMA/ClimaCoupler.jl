@@ -155,9 +155,6 @@ if mode_name == "amip" && use_coupler_diagnostics
     )
 end
 
-## get component model dictionaries (if applicable)
-atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
-atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 
 ## read in some parsed command line arguments, required by this script
 energy_check = config_dict["energy_check"]
@@ -166,8 +163,35 @@ land_sim_name = "bucket"
 t_end = Float64(time_to_seconds(config_dict["t_end"]))
 t_start = 0.0
 tspan = (t_start, t_end)
-Δt_component = Float64(time_to_seconds(config_dict["dt"]))
 Δt_cpl = Float64(config_dict["dt_cpl"])
+component_dt_names = [:dt_atmos, :dt_land, :dt_ocean, :dt_seaice]
+# check if all component dt's are specified
+if all(key -> !isnothing(config_dict[String(key)]), component_dt_names)
+    # when all component dt's are specified, ignore the dt field
+    if haskey(config_dict, "dt")
+        @warn "Removing dt in favor of individual component dt's"
+        delete!(config_dict, "dt")
+    end
+    for key in component_dt_names
+        component_dt = Float64(time_to_seconds(config_dict[String(key)]))
+        @assert Δt_cpl % component_dt == 0.0 "Coupler dt must be divisible by all component dt's\n dt_cpl = $Δt_cpl\n $key = $component_dt"
+        eval(:($key = $component_dt))
+    end
+else
+    # when not all component dt's are specified, use the dt field
+    @assert haskey(config_dict, "dt") "dt or (dt_atmos, dt_land, dt_ocean, and dt_seaice) must be specified"
+    for key in component_dt_names
+        if !isnothing(config_dict[String(key)])
+            @warn "Removing $key from config in favor of dt because not all component dt's are specified"
+        end
+        delete!(config_dict, String(key))
+        eval(:($key = Float64(time_to_seconds(config_dict["dt"]))))
+    end
+end
+## get component model dictionaries (if applicable)
+atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
+atmos_config_object = CA.AtmosConfig(atmos_config_dict)
+
 saveat = Float64(time_to_seconds(config_dict["dt_save_to_sol"]))
 date0 = date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
 mono_surface = config_dict["mono_surface"]
@@ -307,7 +331,7 @@ if mode_name == "amip"
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
         dir_paths;
-        dt = Δt_component,
+        dt = dt_land,
         space = boundary_space,
         saveat = saveat,
         area_fraction = land_area_fraction,
@@ -361,7 +385,7 @@ if mode_name == "amip"
     ice_sim = ice_init(
         FT;
         tspan = tspan,
-        dt = Δt_component,
+        dt = dt_seaice,
         space = boundary_space,
         saveat = saveat,
         area_fraction = ice_fraction,
@@ -405,7 +429,7 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
         dir_paths;
-        dt = Δt_component,
+        dt = dt_land,
         space = boundary_space,
         saveat = saveat,
         area_fraction = land_area_fraction,
@@ -420,7 +444,7 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
     ocean_sim = ocean_init(
         FT;
         tspan = tspan,
-        dt = Δt_component,
+        dt = dt_ocean,
         space = boundary_space,
         saveat = saveat,
         area_fraction = (FT(1) .- land_area_fraction), ## NB: this ocean fraction includes areas covered by sea ice (unlike the one contained in the cs)
@@ -455,7 +479,7 @@ elseif mode_name == "slabplanet_eisenman"
         config_dict["land_albedo_type"],
         config_dict["land_temperature_anomaly"],
         dir_paths;
-        dt = Δt_component,
+        dt = dt_land,
         space = boundary_space,
         saveat = saveat,
         area_fraction = land_area_fraction,
@@ -470,7 +494,7 @@ elseif mode_name == "slabplanet_eisenman"
     ocean_sim = ocean_init(
         FT;
         tspan = tspan,
-        dt = Δt_component,
+        dt = dt_ocean,
         space = boundary_space,
         saveat = saveat,
         area_fraction = zeros(boundary_space), # zero, since ML is calculated below
@@ -483,7 +507,7 @@ elseif mode_name == "slabplanet_eisenman"
         tspan,
         space = boundary_space,
         area_fraction = (FT(1) .- land_area_fraction),
-        dt = Δt_component,
+        dt = dt_seaice,
         saveat = saveat,
         thermo_params = thermo_params,
     )

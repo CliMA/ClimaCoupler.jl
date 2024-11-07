@@ -1,5 +1,5 @@
 # Eisenman-Zhang Model
-Thermodynamic 0-layer model, based on the Semtner 1979 model and later refined by
+Thermodynamic 0-layer model, based on the Semtner 1976 model and later refined by
 Eisenman & Wettlaufer (2009) and Zhang et al. (2021).
 
 There are three prognostic variables, the height of ice (`h_i`), the ocean mixed layer depth (`T_ml`) and the surface air temperature (`T_s`).

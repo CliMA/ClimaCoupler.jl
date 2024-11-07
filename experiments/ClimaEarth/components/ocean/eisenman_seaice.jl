@@ -9,7 +9,7 @@ import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer
 """
     EisenmanIceSimulation{P, Y, D, I}
 
-Thermodynamic 0-layer, based on the Semtner 1979 model and later refined by
+Thermodynamic 0-layer, based on the Semtner 1976 model and later refined by
 Eisenmen 2009 and Zhang et al 2021.
 
 Note that Eisenman sea ice assumes gray radiation, no snow coverage, and

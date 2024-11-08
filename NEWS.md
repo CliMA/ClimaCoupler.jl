@@ -36,6 +36,7 @@ for our diagnostics, the PostProcessor module is not needed.
 This PR follows directly from the Diagnostics module removal.
 
 ### Maintenance
+- Add Downgrade test to CI. PR [#1072](https://github.com/CliMA/ClimaCoupler.jl/pull/1072)
 - Update to JuliaFormatter v2. PR [#1024](https://github.com/CliMA/ClimaCoupler.jl/pull/1024)
 - Update CI to use Julia v1.11. Introduce Manifest files for
 Julia 1.11, in addition to the existing generic Manifests. PR [#1026](https://github.com/CliMA/ClimaCoupler.jl/pull/1026)

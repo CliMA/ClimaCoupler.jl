@@ -61,8 +61,6 @@ steps:
 
       - label: ":envelope: Slack report: current AMIP"
         command:
-          - for file in $(find experiments/ClimaEarth/output/amip/amip/artifacts/ -regextype posix-extended -regex '.*/bias_[A-Z]{3}\.png'); do label=$(basename "$file" | grep -oP '(?<=bias_)[A-Za-z]{3}'); convert "$file" -gravity North -pointsize 50 -annotate +0+0 "$label" "experiments/ClimaEarth/output/amip/amip/artifacts/tmp_bias_$label.png"; done
-          - convert +append "experiments/ClimaEarth/output/amip/amip/artifacts/tmp_bias_???.png" experiments/ClimaEarth/output/amip/amip/artifacts/bias_all_seasons.png
           - |
             find experiments/ClimaEarth/output/amip/amip/artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
               slack-upload -c "#coupler-report" -f "$$file" -m png -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"

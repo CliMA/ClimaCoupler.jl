@@ -24,11 +24,6 @@ julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=
 julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'
 julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'
 
-julia --project=artifacts -e 'using Pkg; Pkg.instantiate(;verbose=true)'
-julia --project=artifacts -e 'using Pkg; Pkg.precompile()'
-julia --project=artifacts -e 'using Pkg; Pkg.status()'
-julia --project=artifacts artifacts/download_artifacts.jl
-
 srun -K julia --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_FILE --job_id $JOB_ID
 
 # restart from simulation time of 400 seconds
@@ -44,11 +39,11 @@ srun -K julia --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.
 
 # throw an error if no restart checkpoint files are found
 if [ $(ls -1 $RESTART_DIR/checkpoint | wc -l) -lt 5 ]; then
-  echo "Error: RESTART_DIR does not contain enough files"
-  exit 1
+    echo "Error: RESTART_DIR does not contain enough files"
+    exit 1
 else
-  echo "Successful: RESTART_DIR contains $(ls -1 $RESTART_DIR/checkpoint | wc -l) files"
-  exit 0
+    echo "Successful: RESTART_DIR contains $(ls -1 $RESTART_DIR/checkpoint | wc -l) files"
+    exit 0
 fi
 
 # Trouble shooting?

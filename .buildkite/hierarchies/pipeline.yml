@@ -13,7 +13,6 @@ env:
   SLURM_KILL_BAD_EXIT: 1
 
   CONFIG_PATH: "config/longrun_configs"
-  PERF_CONFIG_PATH: "config/perf_configs"
 
 timeout_in_minutes: 1440
 
@@ -28,9 +27,6 @@ steps:
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\")'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
-
-      - echo "--- Download artifacts"
-      - "julia --project=experiments/ClimaEarth/ artifacts/download_artifacts.jl"
 
     agents:
       queue: clima

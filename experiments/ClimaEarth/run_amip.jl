@@ -232,11 +232,7 @@ config_dict["print_config_dict"] && @info(config_dict)
 
 #=
 ## Data File Paths
-The data files are downloaded from the `ClimaCoupler` artifacts directory. If the data files are not present, they are downloaded from the
-original sources.
 =#
-include(joinpath(pkgdir(ClimaCoupler), "artifacts", "artifact_funcs.jl"))
-
 sst_data, sic_data = try
     joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.SST.HAD187001-198110.OI198111-202206.nc"),
     joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.ICE.HAD187001-198110.OI198111-202206.nc")
@@ -252,7 +248,8 @@ catch error
     )
 end
 co2_data = joinpath(@clima_artifact("co2_dataset", comms_ctx), "co2_mm_mlo.txt")
-land_mask_data = joinpath(mask_dataset_path(), "seamask.nc")
+land_mask_data =
+    joinpath(@clima_artifact("earth_orography_60arcseconds", comms_ctx), "ETOPO_2022_v1_60s_N90W180_surface.nc")
 
 #=
 ## Component Model Initialization
@@ -296,7 +293,13 @@ Note that land-sea area fraction is different to the land-sea mask, which is a b
 (masks are used internally by the coupler to indicate passive cells that are not populated by a given component model).
 =#
 
-land_area_fraction = SpaceVaryingInput(land_mask_data, "LSMASK", boundary_space)
+# Preprocess the file to be 1s and 0s before remapping into onto the grid
+land_area_fraction = SpaceVaryingInput(
+    land_mask_data,
+    "z",
+    boundary_space,
+    file_reader_kwargs = (; preprocess_func = (data) -> data >= 0),
+)
 if !mono_surface
     land_area_fraction = Regridder.binary_mask.(land_area_fraction)
 end

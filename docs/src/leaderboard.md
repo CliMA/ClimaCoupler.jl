@@ -9,10 +9,13 @@ preprocessing variables of interest are done in `data_sources.jl` and computing 
 and plotting are done in `leaderboard.jl`. To add a new variable, you ideally only need to
 modify `data_sources.jl`.
 
-#### Add a new variable to the bias plots
-If you want to add a new variable to the bias plots, you add the variable to `sim_var_dict`,
-`obs_var_dict`, `compare_vars_biases_groups`, and optionally
-`compare_vars_biases_plot_extrema`.
+#### Add a new 3D variable to the bias plots
+If you want to add a new 3D variable defined over latitude, longitude, and time to the bias
+plots, you add the variable to `sim_var_dict`, `obs_var_dict`, `compare_vars_biases_groups`,
+and optionally `compare_vars_biases_plot_extrema`. The variables `sim_var_dict`,
+`obs_var_dict`, `compare_vars_biases_groups`, `compare_vars_biases_plot_extrema` are in the
+function `get_sim_var_dict`, `get_obs_var_dict`, `get_compare_vars_biases_groups`, and
+`get_compare_vars_biases_plot_extrema` respectively.
 
 The dictionaries `sim_var_dict` and `obs_var_dict` map short names to an anonymous function
 that returns a [`OutputVar`](https://clima.github.io/ClimaAnalysis.jl/dev/var/). Both

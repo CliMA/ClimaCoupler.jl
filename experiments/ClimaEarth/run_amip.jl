@@ -95,9 +95,9 @@ parsed_args = parse_commandline(argparse_settings())
 ## modify parsed args for fast testing from REPL #hide
 if isinteractive()
     parsed_args["config_file"] =
-        isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/ci_configs/coarse_single_ft32.yml") : #interactive_debug.yml") :
+        isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/ci_configs/interactive_debug.yml") :
         parsed_args["config_file"]
-    parsed_args["job_id"] = "coarse_single_ft32"#"interactive_debug"
+    parsed_args["job_id"] = "interactive_debug"
 end
 
 ## the unique job id should be passed in via the command line

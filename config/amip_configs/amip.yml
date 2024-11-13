@@ -27,4 +27,4 @@ topography: "Earth"
 turb_flux_partition: "CombinedStateFluxesMOST"
 viscous_sponge: true
 z_elem: 63
-z_max: 55000.0
+z_max: 60000.0

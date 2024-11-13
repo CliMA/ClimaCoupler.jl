@@ -21,11 +21,11 @@ output_default_diagnostics: true
 rayleigh_sponge: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "732days"
+t_end: "549days"
 topo_smoothing: true
 topography: "Earth"
 turb_flux_partition: "CombinedStateFluxesMOST"
 unique_seed: true
 viscous_sponge: true
-z_elem: 31
-z_max: 55000.0
+z_elem: 39
+z_max: 60000.0

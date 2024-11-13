@@ -24,19 +24,6 @@ function argparse_settings()
     return s
 end
 
-function time_to_seconds(s::String)
-    factor = Dict("secs" => 1, "mins" => 60, "hours" => 60 * 60, "days" => 60 * 60 * 24)
-    s == "Inf" && return Inf
-    if count(occursin.(keys(factor), Ref(s))) != 1
-        error("Bad format for flag $s. Examples: [`10secs`, `20mins`, `30hours`, `40days`]")
-    end
-    for match in keys(factor)
-        occursin(match, s) || continue
-        return parse(Float64, first(split(s, match))) * factor[match]
-    end
-    error("Uncaught case in computing time from given string.")
-end
-
 # Read in atmos configuration file from command line
 parse_commandline(s) = ArgParse.parse_args(ARGS, s)
 parsed_args = parse_commandline(argparse_settings())
@@ -61,7 +48,7 @@ simulation = CA.get_simulation(atmos_config)
 sol_res = CA.solve_atmos!(simulation)
 
 ## Use ClimaAtmos calculation to show the simulated years per day of the simulation (SYPD)
-tspan = (Float64(0), Float64(time_to_seconds(config["t_end"])))
+tspan = (Float64(0), Float64(Utilities.time_to_seconds(config["t_end"])))
 walltime = sol_res.walltime
 es = CA.EfficiencyStats(tspan, walltime)
 sypd = CA.simulated_years_per_day(es)

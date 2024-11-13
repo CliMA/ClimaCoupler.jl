@@ -39,11 +39,6 @@ pkg_dir = pkgdir(ClimaCoupler)
 ## helpers for component models
 include("components/atmosphere/climaatmos.jl")
 
-## helpers for user-specified IO
-include("user_io/user_logging.jl")
-
-include("user_io/io_helpers.jl")
-
 #=
 ### Setup simulation parameters
 Here we follow Thatcher and Jablonowski (2016).
@@ -59,7 +54,7 @@ restart_t = Int(0)
 ## coupler simulation specific configuration
 Δt_cpl = Float64(400)
 t_end = "1000days"
-tspan = (Float64(0.0), Float64(time_to_seconds(t_end)))
+tspan = (Float64(0.0), Float64(Utilities.time_to_seconds(t_end)))
 start_date = "19790301"
 hourly_checkpoint = true
 
@@ -128,7 +123,7 @@ comms_ctx = Utilities.get_comms_context(Dict("device" => "auto"))
 ### I/O Directory Setup
 =#
 
-dir_paths = setup_output_dirs(output_dir = coupler_output_dir, comms_ctx = comms_ctx)
+dir_paths = Utilities.setup_output_dirs(output_dir = coupler_output_dir, comms_ctx = comms_ctx)
 @info(config_dict)
 
 #=
@@ -216,7 +211,7 @@ dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)
 
 checkpoint_cb = TimeManager.HourlyCallback(
     dt = FT(480),
-    func = checkpoint_sims,
+    func = Checkpointer.checkpoint_sims,
     ref_date = [dates.date[1]],
     active = hourly_checkpoint,
 )

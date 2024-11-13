@@ -49,3 +49,12 @@ This PR follows directly from the Diagnostics module removal.
 ### Maintenance
 - Update to JuliaFormatter v2. PR [#1024](https://github.com/CliMA/ClimaCoupler.jl/pull/1024)
 - Update CI to use Julia v1.11. Introduce Manifest files for Julia 1.11, in addition to the existing generic Manifests. PR [#1026](https://github.com/CliMA/ClimaCoupler.jl/pull/1026)
+
+#### Various ClimaEarth cleanup - PR [#1070](https://github.com/CliMA/ClimaCoupler.jl/pull/1070)
+This PR does a few cleanup tasks in the experiments/ClimaEarth/ directory:
+- Update the ClimaEarth README.
+- Delete the `viz_explorer.jl`, which was previously used to create animations of simulation fields, but is not currently being used. Note that these animations will no longer appear in buildkite output.
+- Move functions in the `io_helpers.jl` file to the Utilities module and delete this file.
+This should not change any behavior.
+- Move `checkpoint_sims` function to the Checkpointer module and delete the `user_logging.jl` file.
+This should not change any behavior.

@@ -36,7 +36,7 @@ function argparse_settings()
         arg_type = Bool
         default = false
         "--mode_name"
-        help = "Mode of coupled simulation. [`amip`, `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`, `slabplanet_eisenman`]"
+        help = "Mode of coupled simulation. [`amip` (default), `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`, `slabplanet_eisenman`]"
         arg_type = String
         default = "amip"
         "--mono_surface"
@@ -44,7 +44,7 @@ function argparse_settings()
         arg_type = Bool
         default = false
         "--turb_flux_partition"
-        help = "Method to partition turbulent fluxes. [`PartitionedStateFluxes`, `CombinedStateFluxesMOST`]"
+        help = "Method to partition turbulent fluxes. [`PartitionedStateFluxes`, `CombinedStateFluxesMOST` (default)]"
         arg_type = String
         default = "CombinedStateFluxesMOST"
         "--hourly_checkpoint"
@@ -108,7 +108,7 @@ function argparse_settings()
         "--atmos_config_file"
         help = "A yaml file used to set the atmospheric model configuration. If nothing is specified, the default configuration is used."
         "--albedo_model"
-        help = "Type of albedo model. [`ConstantAlbedo` (default), `RegressionFunctionAlbedo`, `CouplerAlbedo`]"
+        help = "Type of albedo model. [`ConstantAlbedo`, `RegressionFunctionAlbedo`, `CouplerAlbedo` (default)]"
         arg_type = String
         default = "CouplerAlbedo"
         "--atmos_config_repo"
@@ -117,7 +117,7 @@ function argparse_settings()
         default = "ClimaAtmos"
         # ClimaLand specific
         "--land_albedo_type"
-        help = "Access land surface albedo information from data file. [`function`, `map_static`, `map_temporal`]"
+        help = "Access land surface albedo information from data file. [`map_static` (default), `function`, `map_temporal`]"
         arg_type = String
         default = "map_static" # to be replaced by land config file, when available
         "--land_domain_type"

@@ -56,9 +56,9 @@ julia --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl
 
 When running from the terminal, you can also specify a configuration file to use for the simulation setup, and a job ID to keep track of this run's output.
 Existing configuration files are specified in the `config/` directory within ClimaCoupler.jl.
-For example, to run a coarse AMIP run using Float64, you could use the following command:
+For example, to run the default AMIP configuration, you could use the following command:
 ```julia
-julia --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file config/ci_configs/coarse_single_ft64.jl --job_id coarse_single_ft64
+julia --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file config/ci_configs/amip_default.jl --job_id amip_default
 ```
 
 Output from your run will be saved in the folder `experiments/ClimaEarth/output/amip/<job_id>/` for AMIP runs, or
@@ -71,10 +71,10 @@ The output will take up approximately 1GB of space, and the simulation will take
 while running the driver interactively, you'll need to
 manually set the values for `parsed_args["config_file"]` and `parsed_args["job_id"]`.
 
->For example, to use the configuration file found at `config/ci_configs/coarse_single_ft64.yml`, you would use add the following lines in the `run_amip` driver:
+>For example, to use the configuration file found at `config/ci_configs/amip_default.yml`, you would use add the following lines in the `run_amip` driver:
 ```
-parsed_args["config_file"] = "config/ci_configs/coarse_single_ft64.yml"
-parsed_args["job_id"] = "coarse_single_ft64"
+parsed_args["config_file"] = "config/ci_configs/amip_default.yml"
+parsed_args["job_id"] = "amip_default"
 ```
 
 ### A Note about ClimaComms and MPI
@@ -146,3 +146,5 @@ module load common
 
 For additional information about these clusters, including how to gain access for the first time,
 see our slurm-buildkite wiki pages for [Central](https://github.com/CliMA/slurm-buildkite/wiki/Central) and [clima](https://github.com/CliMA/slurm-buildkite/wiki/clima).
+
+## Buildkite pipelines

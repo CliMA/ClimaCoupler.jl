@@ -1,4 +1,3 @@
-anim: true
 apply_limiter: false
 coupler_output_dir: "experiments/ClimaEarth/output"
 dt: "200secs"

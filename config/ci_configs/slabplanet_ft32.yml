@@ -1,5 +1,4 @@
 FLOAT_TYPE: "Float32"
-anim: true
 apply_limiter: false
 dt: "200secs"
 dt_cpl: 200

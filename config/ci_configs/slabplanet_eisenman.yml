@@ -1,4 +1,3 @@
-anim: true
 apply_limiter: false
 conservation_softfail: true
 dt: "200secs"

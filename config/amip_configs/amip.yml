@@ -1,6 +1,5 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
-anim: false
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
 coupler_toml_file: "toml/amip.toml"
 dt: "120secs"

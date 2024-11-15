@@ -1,5 +1,4 @@
 FLOAT_TYPE: "Float32"
-anim: false
 apply_limiter: false
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_diagedmf_0M.yml"
 dt: "100secs"

@@ -1,4 +1,3 @@
-anim: false
 apply_limiter: false
 dt: "400secs"
 dt_cpl: 400

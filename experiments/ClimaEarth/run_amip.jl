@@ -873,6 +873,7 @@ if ClimaComms.iamroot(comms_ctx)
             diagnostics_folder_path = atmos_sim.integrator.p.output_dir
             leaderboard_base_path = dir_paths.artifacts
             compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
+            compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path)
         end
     end
     ## plot extra atmosphere diagnostics if specified

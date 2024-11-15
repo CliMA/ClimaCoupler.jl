@@ -51,7 +51,6 @@ steps:
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
           slurm_mem: 30GB
-        soft_fail: true
 
   - wait
 

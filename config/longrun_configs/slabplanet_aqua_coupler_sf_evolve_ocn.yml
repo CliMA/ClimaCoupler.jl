@@ -1,4 +1,3 @@
-anim: true
 dt: "200secs"
 dt_cpl: 200
 dt_save_to_sol: "10days"

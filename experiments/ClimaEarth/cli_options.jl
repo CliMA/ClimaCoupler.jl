@@ -19,10 +19,6 @@ function argparse_settings()
         "--dt_seaice"
         help = " Sea Ice simulation time step"
         arg_type = String
-        "--anim"
-        help = "Boolean flag indicating whether to make animations"
-        arg_type = Bool
-        default = false
         "--energy_check"
         help = "Boolean flag indicating whether to check energy conservation"
         arg_type = Bool

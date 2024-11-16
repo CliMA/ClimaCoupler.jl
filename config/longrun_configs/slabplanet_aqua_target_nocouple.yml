@@ -1,4 +1,3 @@
-anim: true
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_0M.yml"
 dt: "120secs"
 dt_cloud_fraction: "1hours"

@@ -1,4 +1,3 @@
-anim: true
 apply_limiter: false
 ci_plots: true
 dt: "200secs"

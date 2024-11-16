@@ -15,7 +15,6 @@ redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(false)))
 
 ## standard packages
 import Dates
-import YAML
 
 # ## ClimaESM packages
 import ClimaAtmos as CA
@@ -45,7 +44,7 @@ include("components/ocean/slab_ocean.jl")
 job_id = "cloudless_aquaplanet"
 coupler_output_dir = "$job_id"
 const FT = Float64
-restart_dir = "unspecified"
+restart_dir = nothing
 restart_t = Int(0)
 
 ## coupler simulation specific configuration
@@ -90,7 +89,7 @@ config_dict = Dict(
     "surface_setup" => "PrescribedSurface",
     # diagnostic (nested with period and short_name)
     "output_default_diagnostics" => false,
-    "diagnostics" => [
+    "extra_atmos_diagnostics" => [
         Dict(
             "short_name" =>
                 ["mse", "lr", "mass_strf", "stab", "vt", "egr", "ua", "va", "wa", "ta", "rhoa", "pfull"],
@@ -110,7 +109,7 @@ config_dict = Dict(
 )
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
-atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
+atmos_config_dict = get_atmos_config_dict(config_dict, job_id)
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 
 #=
@@ -262,7 +261,7 @@ cs = Interfacer.CoupledSimulation{FT}(
 ## Restart component model states if specified in the config_dict
 =#
 
-if restart_dir !== "unspecified"
+if !isnothing(restart_dir)
     for sim in cs.model_sims
         if Checkpointer.get_model_prog_state(sim) !== nothing
             Checkpointer.restart_model_state!(sim, comms_ctx, restart_t; input_dir = restart_dir)

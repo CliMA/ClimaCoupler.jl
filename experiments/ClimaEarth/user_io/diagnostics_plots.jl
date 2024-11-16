@@ -144,19 +144,19 @@ function map_comparison(func, simdirs, args)
 end
 
 """
-    make_ci_plots(
+    make_diagnostics_plots(
         output_path::AbstractString,
         plot_path::AbstractString;
         short_names::Vector{<:AbstractString} = ["mse", "lr", "edt", "ts"],
         reduction::String = "average",
         output_prefix = "",
     )
-Create plots for the general CI diagnostics. The plots are saved to `plot_path`.
-This is the default plotting function for the CI diagnostics and it can be extended
+Create plots for diagnostics. The plots are saved to `plot_path`.
+This is the default plotting function for diagnostics and it can be extended
 to include additional diagnostics.
 The `reduction` keyword argument should be consistent with the reduction used to save the diagnostics.
 """
-function make_ci_plots(
+function make_diagnostics_plots(
     output_path::AbstractString,
     plot_path::AbstractString;
     short_names::Vector{<:AbstractString} = ["mse", "lr", "edt", "ts"],

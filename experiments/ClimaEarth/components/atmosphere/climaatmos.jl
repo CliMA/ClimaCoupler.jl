@@ -296,10 +296,22 @@ FluxCalculator.get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxe
     get_atmos_config_dict(coupler_dict::Dict, job_id::String)
 
 Returns the specified atmospheric configuration (`atmos_config`) overwitten by arguments
-in the coupler dictionary (`config_dict`). The returned `atmos_config` dictionary will then be passed to CA.AtmosConfig().
-The `atmos_config_repo` flag allows us to
-use a configuration specified within the ClimaCoupler repo, which is useful for direct
+in the coupler dictionary (`config_dict`).
+The returned `atmos_config` dictionary will then be used to set up the atmosphere simulation.
+
+The `atmos_config_repo` flag allows us to use a configuration specified within
+either the ClimaCoupler or ClimaAtmos repos, which is useful for direct
 coupled/atmos-only comparisons.
+
+In this function, parameters are overwritten in a specific order, from lowest to highest priority:
+    1. Default atmos config
+    2. Provided atmos config file (if any)
+    3. TOML parameter file
+    5. Output directory and timestep are set explicitly based on the coupler config
+
+The TOML parameter file to use is chosen using the following priority:
+If a coupler TOML file is provided, it is used. Otherwise we use an atmos TOML
+file if it's provided. If neither is provided, we use a default coupler TOML file.
 """
 function get_atmos_config_dict(coupler_dict::Dict, job_id::String)
     atmos_config_file = coupler_dict["atmos_config_file"]
@@ -344,23 +356,24 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String)
         atmos_config = merge(atmos_config, Dict("toml" => [toml_file]))
     end
 
-    # specify atmos output directory to be inside the coupler output directory
+    # Specify atmos output directory to be inside the coupler output directory
     atmos_output_dir = joinpath(coupler_dict["coupler_output_dir"], job_id, "clima_atmos")
+    atmos_config["output_dir"] = atmos_output_dir
 
-    # merge configs
-    # (if there are common keys, the last dictionary in the `merge` arguments takes precedence)
+    # Access extra atmosphere diagnostics from coupler so we can rename for atmos code
+    atmos_config["diagnostics"] = coupler_dict["extra_atmos_diagnostics"]
+
     # The Atmos `get_simulation` function expects the atmos config to contains its timestep size
     # in the `dt` field. If there is a `dt_atmos` field in coupler_dict, we add it to the atmos config as `dt`
     dt_atmos = haskey(coupler_dict, "dt_atmos") ? coupler_dict["dt_atmos"] : coupler_dict["dt"]
-    atmos_config = merge(atmos_config, Dict("output_dir" => atmos_output_dir, "dt" => dt_atmos))
-    coupler_config = merge(atmos_config, coupler_dict)
+    atmos_config["dt"] = dt_atmos
 
     # set restart file to the initial file saved in this location if it is not nothing
     # TODO this is hardcoded and should be fixed once we have a better restart system
     if !isnothing(atmos_config["restart_file"])
         atmos_config["restart_file"] = replace(atmos_config["restart_file"], "active" => "0000")
     end
-    return atmos_config, coupler_config
+    return atmos_config
 end
 
 

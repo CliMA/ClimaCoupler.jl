@@ -1,6 +1,4 @@
 apply_limiter: false
-dt: "400secs"
-dt_cpl: 400
 dt_save_restart: "10days"
 dt_save_to_sol: "1days"
 energy_check: false

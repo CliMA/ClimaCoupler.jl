@@ -1,7 +1,7 @@
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_0M.yml"
 dt: "120secs"
 dt_cloud_fraction: "1hours"
-dt_cpl: 120
+dt_cpl: "120secs"
 dt_rad: "1hours"
 dt_save_state_to_disk: "20days"
 dt_save_to_sol: "10days"

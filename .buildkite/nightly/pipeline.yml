@@ -2,7 +2,7 @@ agents:
   queue: derecho
   modules: climacommon/2024_10_09
   pbs_q: main
-  pbs_l_job_priority: "economy"@desched1
+  pbs_l_job_priority: "economy"
 
 env:
   JULIA_MAX_NUM_PRECOMPILE_FILES: 100

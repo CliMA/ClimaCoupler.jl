@@ -1,7 +1,7 @@
 agents:
   queue: derecho
   modules: climacommon/2024_10_09
-  pbs_q: develop@desched1
+  pbs_q: regular@desched1
 
 env:
   JULIA_MAX_NUM_PRECOMPILE_FILES: 100
@@ -59,7 +59,7 @@ steps:
           agents:
             pbs_l_select: "1:ngpus=1:ncpus=4"
             pbs_l_walltime: "11:59:00"
-            pbs_q: develop
+            pbs_q: regular
   
         - label: "1 Coarse current AMIP: diagedmf + 0M + bucket land (unique seed)"
           key: "amip_random1"
@@ -73,7 +73,7 @@ steps:
           agents:
             pbs_l_select: "1:ngpus=1:ncpus=4"
             pbs_l_walltime: "11:59:00"
-            pbs_q: develop
+            pbs_q: regular
   
         - label: "2 Coarse current AMIP: diagedmf + 0M + bucket land (unique seed)"
           key: "amip_random2"
@@ -87,7 +87,7 @@ steps:
           agents:
             pbs_l_select: "1:ngpus=1:ncpus=4"
             pbs_l_walltime: "11:59:00"
-            pbs_q: develop
+            pbs_q: regular
   
         - label: "3 Coarse current AMIP: diagedmf + 0M + bucket land (unique seed)"
           key: "amip_random3"
@@ -101,5 +101,5 @@ steps:
           agents:
             pbs_l_select: "1:ngpus=1:ncpus=4"
             pbs_l_walltime: "11:59:00"
-            pbs_q: develop
+            pbs_q: regular
 

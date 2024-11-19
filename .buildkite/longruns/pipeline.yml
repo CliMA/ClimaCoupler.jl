@@ -61,7 +61,7 @@ steps:
       - label: "Slabplanet_aqua: nocouple"
         key: "slabplanet_aqua_atmos_sf_nocouple" # SF at each Atmos stage, no coupling, prescribed SST from atmos
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_aqua_atmos_sf_nocouple.yml --job_id slabplanet_aqua_atmos_sf_nocouple"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua/slabplanet_aqua_atmos_sf_nocouple/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua_atmos_sf_nocouple/artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
         agents:
@@ -73,7 +73,7 @@ steps:
       - label: "Slabplanet_aqua: couple"
         key: "slabplanet_aqua_atmos_sf_couple" # SF at each Atmos stage, coupling, prescribed SST from coupler - identical results to the above confirm 1) initial conditions in Atmos are unchanged compared to the slab, 2) coupling not introducing variability when constant surface
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_aqua_atmos_sf_couple.yml --job_id slabplanet_aqua_atmos_sf_couple"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua/slabplanet_aqua_atmos_sf_couple/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua_atmos_sf_couple/artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
         agents:
@@ -85,7 +85,7 @@ steps:
       - label: "Slabplanet_aqua: coupler fluxes"
         key: "slabplanet_aqua_coupler_sf" # SF at each coupler timestep, constant ocean - comparing to the above runs, this tests the sensitivity of less frequent flux calculation
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_aqua_coupler_sf.yml --job_id slabplanet_aqua_coupler_sf"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua/slabplanet_aqua_coupler_sf/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua_coupler_sf/artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
         agents:
@@ -97,7 +97,7 @@ steps:
       - label: "Slabplanet_aqua: coupler fluxes, evolving ocean"
         key: "slabplanet_aqua_coupler_sf_evolve_ocn" # SF at each coupler timestep, evolving ocean - comparing to the above run, tests the sensitivity of evolving ocean
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_aqua_coupler_sf_evolve_ocn.yml --job_id slabplanet_aqua_coupler_sf_evolve_ocn"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua/slabplanet_aqua_coupler_sf_evolve_ocn/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua_coupler_sf_evolve_ocn/artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
         agents:
@@ -109,7 +109,7 @@ steps:
       - label: "Slabplanet_terra: coupler fluxes, evolving bucket"
         key: "slabplanet_terra" # SF at each coupler timestep, evolving ocean - comparing to the above run, tests the sensitivity of evolving bucket
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_terra.yml --job_id slabplanet_terra"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_terra/slabplanet_terra/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/slabplanet_terra/artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
         agents:
@@ -121,7 +121,7 @@ steps:
       - label: "Slabplanet: coupler fluxes, evolving ocean and land"
         key: "slabplanet_coupler_sf_evolve_ocn"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_coupler_sf_evolve_ocn.yml --job_id slabplanet_coupler_sf_evolve_ocn"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet/slabplanet_coupler_sf_evolve_ocn/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/slabplanet_coupler_sf_evolve_ocn/artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
         agents:
@@ -150,7 +150,7 @@ steps:
       - label: "TARGET IDEALIZED: new target aqua - fixed ocean T, nocouple, atmos flux calc"
         key: "slabplanet_aqua_target_nocouple"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_aqua_target_nocouple.yml --job_id slabplanet_aqua_target_nocouple"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua/slabplanet_aqua_target_nocouple/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua_target_nocouple/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
@@ -163,7 +163,7 @@ steps:
       - label: "TARGET IDEALIZED: new target aqua - fixed ocean T, coupler flux calc"
         key: "slabplanet_aqua_target"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_aqua_target.yml --job_id slabplanet_aqua_target"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua/slabplanet_aqua_target/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua_target/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
@@ -176,7 +176,7 @@ steps:
       - label: "TARGET IDEALIZED: new target aqua - evolving slab ocean T"
         key: "slabplanet_aqua_target_evolve_ocn"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_aqua_target_evolve_ocn.yml --job_id slabplanet_aqua_target_evolve_ocn"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua/slabplanet_aqua_target_evolve_ocn/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua_target_evolve_ocn/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
@@ -189,7 +189,7 @@ steps:
       - label: "TARGET IDEALIZED: new target slab - fixed ocean T, bucket"
         key: "slabplanet_target"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_target.yml --job_id slabplanet_target"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet/slabplanet_target/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/slabplanet_target/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
@@ -202,7 +202,7 @@ steps:
       - label: "TARGET IDEALIZED: new target slab - evolving slab ocean T, bucket"
         key: "slabplanet_target_evolve_ocn"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_target_evolve_ocn.yml --job_id slabplanet_target_evolve_ocn"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet/slabplanet_target_evolve_ocn/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/slabplanet_target_evolve_ocn/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
@@ -219,7 +219,7 @@ steps:
       - label: "MPI AMIP FINE: new target amip"
         key: "amip_target"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target.yml --job_id amip_target"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_target/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/amip_target/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
@@ -232,7 +232,7 @@ steps:
       - label: "MPI AMIP FINE: new target amip: topo"
         key: "amip_target_topo"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo.yml --job_id amip_target_topo"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_target_topo/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/amip_target_topo/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
@@ -245,7 +245,7 @@ steps:
       - label: "MPI AMIP FINE: new target amip: topo + diagedmf"
         key: "amip_target_topo_diagedmf_cpu"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf_cpu.yml --job_id amip_target_topo_diagedmf_cpu"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_target_topo_diagedmf_cpu/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/amip_target_topo_diagedmf_cpu/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           BUILD_HISTORY_HANDLE: ""
@@ -262,7 +262,7 @@ steps:
       - label: "GPU AMIP FINE: new target amip: topo"
         key: "amip_target_topo_gpu"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo.yml --job_id amip_target_topo_gpu"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_target_topo_gpu/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/amip_target_topo_gpu/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"
@@ -276,7 +276,7 @@ steps:
         command:
           - echo "--- Run simulation"
           - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf_gpu.yml --job_id amip_target_topo_diagedmf_gpu"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_target_topo_diagedmf_gpu/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/amip_target_topo_diagedmf_gpu/artifacts/*"
         timeout_in_minutes: 1440
         env:
           CLIMACOMMS_CONTEXT: "MPI"
@@ -296,7 +296,7 @@ steps:
     command:
       - echo "--- Run simulation"
       - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/longrun_amip_dyamond.yml --job_id longrun_amip_dyamond_gpu"
-    artifact_paths: "experiments/ClimaEarth/output/amip/longrun_amip_dyamond_gpu/artifacts/*"
+    artifact_paths: "experiments/ClimaEarth/output/longrun_amip_dyamond_gpu/artifacts/*"
     env:
       CLIMACOMMS_DEVICE: "CUDA"
     agents:
@@ -323,5 +323,5 @@ steps:
 
       - label: ":envelope: Slack report: Slabplanet"
         command:
-          - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/slabplanet/slabplanet_coupler_sf_evolve_ocn/artifacts/total_energy_bucket.png -m png -n slab_coarse -x "Slabplanet energy conservation"
-          - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/slabplanet/slabplanet_coupler_sf_evolve_ocn/artifacts/total_water_bucket.png -m png -n slab_coarse_w -x "Slabplanet water conservation"
+          - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/slabplanet_coupler_sf_evolve_ocn/artifacts/total_energy_bucket.png -m png -n slab_coarse -x "Slabplanet energy conservation"
+          - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/slabplanet_coupler_sf_evolve_ocn/artifacts/total_water_bucket.png -m png -n slab_coarse_w -x "Slabplanet water conservation"

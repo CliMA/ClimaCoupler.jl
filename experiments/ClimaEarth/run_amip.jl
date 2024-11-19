@@ -221,7 +221,7 @@ the plots (from postprocessing and the conservation checks) of the simulation wi
 temporary files will be saved.
 =#
 
-COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], joinpath(mode_name, job_id))
+COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], job_id)
 dir_paths = Utilities.setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
 @info "Coupler output directory $(dir_paths.output)"
 @info "Coupler artifacts directory $(dir_paths.artifacts)"

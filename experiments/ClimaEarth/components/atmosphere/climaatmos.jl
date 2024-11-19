@@ -345,8 +345,7 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String)
     end
 
     # specify atmos output directory to be inside the coupler output directory
-    atmos_output_dir =
-        joinpath(coupler_dict["coupler_output_dir"], joinpath(coupler_dict["mode_name"], job_id), "clima_atmos")
+    atmos_output_dir = joinpath(coupler_dict["coupler_output_dir"], job_id, "clima_atmos")
 
     # merge configs
     # (if there are common keys, the last dictionary in the `merge` arguments takes precedence)

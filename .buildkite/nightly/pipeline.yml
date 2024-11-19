@@ -52,7 +52,7 @@ steps:
         command:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse.yml --job_id amip_coarse"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_coarse/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"
         timeout_in_minutes: 840
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -67,7 +67,7 @@ steps:
         command:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_random.yml --job_id amip_coarse_random1"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_coarse_random1/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_random1/artifacts/*"
         timeout_in_minutes: 1080
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -82,7 +82,7 @@ steps:
         command:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_random.yml --job_id amip_coarse_random2"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_coarse_random2/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_random2/artifacts/*"
         timeout_in_minutes: 1080
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -97,7 +97,7 @@ steps:
         command:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_random.yml --job_id amip_coarse_random3"
-        artifact_paths: "experiments/ClimaEarth/output/amip/amip_coarse_random3/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_random3/artifacts/*"
         timeout_in_minutes: 1080
         env:
           CLIMACOMMS_DEVICE: "CUDA"

@@ -59,7 +59,7 @@ steps:
           agents:
             pbs_l_select: "1:ngpus=1:ncpus=4"
             pbs_l_walltime: "11:59:00"
-            pbs_q: preempt
+            pbs_q: develop
   
         - label: "1 Coarse current AMIP: diagedmf + 0M + bucket land (unique seed)"
           key: "amip_random1"
@@ -73,7 +73,7 @@ steps:
           agents:
             pbs_l_select: "1:ngpus=1:ncpus=4"
             pbs_l_walltime: "11:59:00"
-            pbs_q: preempt
+            pbs_q: develop
   
         - label: "2 Coarse current AMIP: diagedmf + 0M + bucket land (unique seed)"
           key: "amip_random2"
@@ -87,7 +87,7 @@ steps:
           agents:
             pbs_l_select: "1:ngpus=1:ncpus=4"
             pbs_l_walltime: "11:59:00"
-            pbs_q: preempt
+            pbs_q: develop
   
         - label: "3 Coarse current AMIP: diagedmf + 0M + bucket land (unique seed)"
           key: "amip_random3"
@@ -101,5 +101,5 @@ steps:
           agents:
             pbs_l_select: "1:ngpus=1:ncpus=4"
             pbs_l_walltime: "11:59:00"
-            pbs_q: preempt
+            pbs_q: develop
 

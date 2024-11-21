@@ -301,8 +301,8 @@ sol_atm, sol_lnd = integ_atm.sol, integ_lnd.sol;
 # `parent(sol_atm.u[<time-index>].atm_F_sfc)[<z-index>,<variable-index>]`
 
 ENV["GKSwstype"] = "nul"
-import Plots
-Plots.GRBackend()
+import Makie
+import CairoMakie
 
 ARTIFACTS_DIR = joinpath("experiments/ClimaCore/output/heat-diffusion/artifacts")
 mkpath(ARTIFACTS_DIR)
@@ -311,18 +311,17 @@ mkpath(ARTIFACTS_DIR)
 t0_ = parent(sol_atm.u[1].T_atm)[:, 1];
 tend_ = parent(sol_atm.u[end].T_atm)[:, 1];
 z_centers = parent(CC.Fields.coordinate_field(center_space_atm))[:, 1];
-Plots.png(
-    Plots.plot(
-        [t0_ tend_],
-        z_centers,
-        labels = ["t=0" "t=end"],
-        xlabel = "T (K)",
-        ylabel = "z (m)",
-        title = "Atmos profile at start & end of Simulation",
-        linewidth = 2,
-    ),
-    joinpath(ARTIFACTS_DIR, "atmos_profile.png"),
+profile_fig = Makie.Figure();
+profile_ax = Makie.Axis(
+    profile_fig[1, 1],
+    xlabel = "T (K)",
+    ylabel = "z (m)",
+    title = "Atmos profile at start & end of Simulation",
 )
+Makie.lines!(profile_ax, t0_, z_centers, label = "t=0"; linewidth = 2)
+Makie.lines!(profile_ax, tend_, z_centers, label = "t=end"; linewidth = 2)
+Makie.axislegend(profile_ax, position = :lt)
+Makie.save(joinpath(ARTIFACTS_DIR, "atmos_profile.png"), profile_fig)
 
 # - Conservation: absolute "energy" of both models with time
 # convert to the same units (analogous to energy conservation, assuming that is both domains density=1 and thermal capacity=1)
@@ -331,35 +330,32 @@ atm_sum_u_t =
     [sum(parent(u.T_atm)[:]) for u in sol_atm.u] .* (parameters.zmax_atm - parameters.zmin_atm) ./ parameters.n;
 v1 = lnd_sfc_u_t .- lnd_sfc_u_t[1];
 v2 = atm_sum_u_t .- atm_sum_u_t[1];
-Plots.png(
-    Plots.plot(
-        sol_lnd.t,
-        [v1 v2 v1 + v2],
-        labels = ["lnd" "atm" "tot"],
-        xlabel = "time (s)",
-        ylabel = "energy flux (J / m2)",
-        title = "Component Model Energy during Simulation",
-        linewidth = 2,
-    ),
-    joinpath(ARTIFACTS_DIR, "component_energy.png"),
+component_energy_fig = Makie.Figure();
+component_energy_ax = Makie.Axis(
+    component_energy_fig[1, 1],
+    xlabel = "time (s)",
+    ylabel = "energy flux (J / m2)",
+    title = "Component Model Energy during Simulation",
 )
+Makie.lines!(component_energy_ax, sol_lnd.t, v1, label = "lnd"; linewidth = 2)
+Makie.lines!(component_energy_ax, sol_lnd.t, v2, label = "atm"; linewidth = 2)
+Makie.lines!(component_energy_ax, sol_lnd.t, v1 .+ v2, label = "tot"; linewidth = 2)
+Makie.axislegend(component_energy_ax, position = :lt)
+Makie.save(joinpath(ARTIFACTS_DIR, "component_energy.png"), component_energy_fig)
 
 # - Conservation: relative error with time
 mean(arr) = sum(arr) / length(arr)
 total = atm_sum_u_t + lnd_sfc_u_t;
 rel_error = abs.(total .- total[1]) / mean(total);
-Plots.png(
-    Plots.plot(
-        sol_lnd.t,
-        rel_error,
-        labels = nothing,
-        xlabel = "simulation time (s)",
-        ylabel = "relative error",
-        title = "Total Energy Conservation",
-        linewidth = 2,
-    ),
-    joinpath(ARTIFACTS_DIR, "energy_conservation.png"),
+energy_conservation_fig = Makie.Figure();
+energy_conservation_ax = Makie.Axis(
+    energy_conservation_fig[1, 1],
+    xlabel = "simulation time (s)",
+    ylabel = "relative error",
+    title = "Total Energy Conservation",
 )
+Makie.lines!(energy_conservation_ax, sol_lnd.t, rel_error, linewidth = 2)
+Makie.save(joinpath(ARTIFACTS_DIR, "energy_conservation.png"), energy_conservation_fig)
 
 #src # - Animation
 #src anim = Plots.@animate for u in sol_atm.u

@@ -313,10 +313,6 @@ for FT in (Float32, Float64)
 
                 # check consistency of lat-lon remapped data with original data
                 @test all(isapprox.(extrema(data), extrema(T_rll), atol = 1e-3))
-
-                # visual inspection
-                # Plots.plot(T_cgll) # using ClimaCorePlots
-                # Plots.contourf(Array(T_rll)[:,1])
             end
         end
     end

@@ -1,9 +1,10 @@
-import Plots
 import Printf
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ClimaCore as CC
-import ClimaCorePlots
+import Makie
+import ClimaCoreMakie
+import CairoMakie
 import ClimaCoupler: Interfacer, ConservationChecker
 import ClimaAtmos as CA
 import StaticArrays
@@ -40,36 +41,36 @@ function plot_global_conservation(
 
     var_name = Interfacer.name(cc)
     cum_total = [0.0]
-
-    Plots.plot(
-        days,
-        total .- total[1],
-        label = "total",
-        xlabel = "time [days]",
-        ylabel = "$var_name: (t) - (t=0)",
-        linewidth = 3,
-    )
+    f = Makie.Figure()
+    ax = Makie.Axis(f[1, 1], xlabel = "time [days]", ylabel = "$var_name: (t) - (t=0)")
+    Makie.lines!(ax, days, total .- total[1], label = "total"; linewidth = 3)
     for sim in model_sims
         sim_name = Interfacer.name(sim)
         global_field = getproperty(ccs, Symbol(sim_name))
         diff_global_field = (global_field .- global_field[1])
-        Plots.plot!(days, diff_global_field[1:length(days)], label = sim_name)
+        Makie.lines!(ax, days, diff_global_field[1:length(days)], label = sim_name)
         cum_total .+= abs.(global_field[end])
     end
     if cc isa ConservationChecker.EnergyConservationCheck
         global_field = ccs.toa_net_source
         diff_global_field = (global_field .- global_field[1])
-        Plots.plot!(days, diff_global_field[1:length(days)], label = "toa_net")
+        Makie.lines!(ax, days, diff_global_field[1:length(days)], label = "toa_net")
         cum_total .+= abs.(global_field[end])
     end
-    Plots.savefig(figname1)
+    Makie.axislegend(ax, position = :lb)
+    Makie.save(figname1, f)
 
     # use the cumulative global sum at the final time step as a reference for the error calculation
     rse = abs.((total .- total[1]) ./ cum_total)
-
+    l_rse = log.(rse)
     # evolution of log error of total
-    Plots.plot(days, log.(rse), label = "rs error", xlabel = "time [days]", ylabel = "log( |x(t) - x(t=0)| / Σx(t=T) )")
-    Plots.savefig(figname2)
+    lp = Makie.lines(days, l_rse, label = "rs error")
+    lp.axis.xlabel = "time [days]"
+    lp.axis.ylabel = "log( |x(t) - x(t=0)| / Σx(t=T) )"
+    filter_l_rse = filter(x -> !isinf(x) && !isnan(x), l_rse)
+    !isempty(filter_l_rse) && Makie.ylims!(minimum(filter_l_rse), maximum(filter_l_rse))
+    Makie.axislegend(position = :lt)
+    Makie.save(figname2, lp)
 
     # check that the relative error is small (TODO: reduce this to sqrt(eps(FT)))
     if !softfail
@@ -122,37 +123,46 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
         :z0m_S,
         :radiative_energy_flux_toa,
     )
-    all_plots = []
+    fig = Makie.Figure(size = (1500, 800))
+    min_square_len = ceil(Int, sqrt(length(field_names)))
+    for i in 1:min_square_len, j in 1:min_square_len
+        field_index = (i - 1) * min_square_len + j
+        if field_index <= length(field_names)
+            field_name = field_names[field_index]
+            field = getproperty(cs_fields, field_name)
 
-    for field_name in field_names
-        field = getproperty(cs_fields, field_name)
-
-        # Copy field onto cpu space if necessary
-        cpu_field = to_cpu(field)
-
-        push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(field)))
+            # Copy field onto cpu space if necessary
+            cpu_field = to_cpu(field)
+            field_min, field_max = extrema(cpu_field)
+            colorrange = isapprox(field_min, field_max) ? (field_min - 1, field_max + 1) : (field_min, field_max)
+            ax = Makie.Axis(fig[i, j * 2 - 1], title = string(field_name) * print_extrema(field))
+            hm = ClimaCoreMakie.fieldheatmap!(ax, cpu_field, colorrange = colorrange)
+            Makie.Colorbar(fig[i, j * 2], hm)
+        end
     end
-    Plots.plot(all_plots..., size = (1500, 800))
-    Plots.png(joinpath(dir, "debug_coupler"))
+    Makie.save(joinpath(dir, "debug_coupler.png"), fig)
 
     # plot anomalies if a reference cs.fields, `cs_fields_ref`, are provided
     if !isnothing(cs_fields_ref)
-        all_plots = []
-        for field_name in field_names
-            field = getproperty(cs_fields, field_name)
-            # Copy field onto cpu space if necessary
-            cpu_field = to_cpu(field)
-
-            push!(
-                all_plots,
-                Plots.plot(
+        for i in 1:min_square_len, j in 1:min_square_len
+            field_index = (i - 1) * min_square_len + j
+            if field_index <= length(field_names)
+                field_name = field_names[field_index]
+                field = getproperty(cs_fields, field_name)
+                # Copy field onto cpu space if necessary
+                cpu_field = to_cpu(field)
+                field_min, field_max = extrema(cpu_field)
+                colorrange = isapprox(field_min, field_max) ? (field_min - 1, field_max + 1) : (field_min, field_max)
+                ax = Makie.Axis(fig[i, j * 2 - 1], title = string(field_name) * print_extrema(field))
+                hm = ClimaCoreMakie.fieldheatmap!(
+                    ax,
                     cpu_field .- getproperty(cs_fields_ref, field_name),
-                    title = string(field_name) * print_extrema(field),
-                ),
-            )
+                    colorrange = colorrange,
+                )
+                Makie.Colorbar(fig[i, j * 2], hm)
+            end
         end
-        Plots.plot(all_plots..., size = (1500, 800))
-        Plots.png(joinpath(dir, "debug_coupler_amomalies"))
+        Makie.save(joinpath(dir, "debug_coupler_anomalies.png"), fig)
     end
 end
 
@@ -163,18 +173,30 @@ Plot the fields of a component model simulation and save plots to a directory.
 """
 function debug(sim::Interfacer.ComponentModelSimulation, dir)
     field_names = plot_field_names(sim)
-
-    all_plots = []
-    for field_name in field_names
-        field = Interfacer.get_field(sim, Val(field_name))
-
-        # Copy field onto cpu space if necessary
-        cpu_field = to_cpu(field)
-
-        push!(all_plots, Plots.plot(cpu_field, title = string(field_name) * print_extrema(field)))
+    fig = Makie.Figure(size = (1500, 800))
+    min_square_len = ceil(Int, sqrt(length(field_names)))
+    for i in 1:min_square_len, j in 1:min_square_len
+        field_index = (i - 1) * min_square_len + j
+        if field_index <= length(field_names)
+            field_name = field_names[field_index]
+            field = Interfacer.get_field(sim, Val(field_name))
+            # # Copy field onto cpu space if necessary
+            cpu_field = to_cpu(field)
+            if cpu_field isa CC.Fields.ExtrudedCubedSphereSpectralElementField3D
+                cpu_field = CC.Fields.level(cpu_field, 1)
+            end
+            ax = Makie.Axis(fig[i, j * 2 - 1], title = string(field_name) * print_extrema(field))
+            if cpu_field isa Vector
+                lin = Makie.lines!(ax, cpu_field)
+            else
+                field_min, field_max = extrema(cpu_field)
+                colorrange = isapprox(field_min, field_max) ? (field_min - 1, field_max + 1) : (field_min, field_max)
+                hm = ClimaCoreMakie.fieldheatmap!(ax, cpu_field, colorrange = colorrange)
+                Makie.Colorbar(fig[i, j * 2], hm)
+            end
+        end
     end
-    fig = Plots.plot(all_plots..., size = (1500, 800))
-    Plots.png(joinpath(dir, "debug_$(Interfacer.name(sim))"))
+    Makie.save(joinpath(dir, "debug_$(Interfacer.name(sim)).png"), fig)
 end
 
 """

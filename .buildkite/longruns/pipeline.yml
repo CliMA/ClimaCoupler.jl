@@ -54,21 +54,23 @@ steps:
   - wait
 
   - group: "Testing highres (DYAMOND config)"
+    
+    steps: 
 
-  - label: "GPU AMIP SUPERFINE: dyamond_target"
-    key: "longrun_amip_dyamond_gpu"
-    command:
-      - echo "--- Run simulation"
-      - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/longrun_amip_dyamond.yml --job_id longrun_amip_dyamond_gpu"
-    artifact_paths: "experiments/ClimaEarth/output/longrun_amip_dyamond_gpu/artifacts/*"
-    env:
-      CLIMACOMMS_DEVICE: "CUDA"
-    agents:
-      queue: clima
-      slurm_mem: 30GB
-      slurm_gpus: 1
-      modules: climacommon/2024_10_09
-    soft_fail: true
+    - label: "GPU AMIP SUPERFINE: dyamond_target"
+      key: "longrun_amip_dyamond_gpu"
+      command:
+        - echo "--- Run simulation"
+        - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/longrun_amip_dyamond.yml --job_id longrun_amip_dyamond_gpu"
+      artifact_paths: "experiments/ClimaEarth/output/longrun_amip_dyamond_gpu/artifacts/*"
+      env:
+        CLIMACOMMS_DEVICE: "CUDA"
+      agents:
+        queue: clima
+        slurm_mem: 30GB
+        slurm_gpus: 1
+        modules: climacommon/2024_10_09
+      soft_fail: true
 
   - wait
 

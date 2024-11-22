@@ -1,4 +1,5 @@
 [deps]
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 ClimaCore = "d414da3d-4745-48bb-8d80-42e94e092884"
 ClimaCoreMakie = "908f55d8-4145-4867-9c14-5dad1a479e4d"
 ClimaCoupler = "4ade58fe-a8da-486c-bd89-46df092ec0c7"

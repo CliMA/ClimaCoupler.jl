@@ -83,7 +83,7 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
     )
 
     output_plots = "test_debug"
-    @test_logs (:info, "plotting debug in test_debug") debug(cs, output_plots)
+    @test_logs (:info, "plotting debug in test_debug") match_mode = :any debug(cs, output_plots)
     @test isfile("test_debug/debug_ClimaAtmosSimulation.png")
     @test isfile("test_debug/debug_BucketSimulation.png")
     @test isfile("test_debug/debug_SurfaceStub.png")

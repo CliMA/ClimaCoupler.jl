@@ -304,7 +304,7 @@ ENV["GKSwstype"] = "nul"
 import Plots
 Plots.GRBackend()
 
-ARTIFACTS_DIR = joinpath("experiments/ClimaCore/output/heat-diffusion_artifacts")
+ARTIFACTS_DIR = joinpath("experiments/ClimaCore/output/heat-diffusion/artifacts")
 mkpath(ARTIFACTS_DIR)
 
 # - Vertical profile at start and end

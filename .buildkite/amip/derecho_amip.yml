@@ -51,7 +51,7 @@ steps:
           key: "amip"
           command:
             - echo "--- Run simulation"
-            - "mpiwrapperexec -n 8 -ppn 4 julia --threads=4 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse.yml --job_id amip_coarse"
+            - "mpiwrapperexec -n 8 -ppn 4 set_gpu_rank julia --threads=4 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse.yml --job_id amip_coarse"
           artifact_paths: "experiments/ClimaEarth/output/amip/amip_coarse/artifacts/*"
           timeout_in_minutes: 840
           env:

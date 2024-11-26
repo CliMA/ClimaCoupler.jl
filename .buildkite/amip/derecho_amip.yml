@@ -51,51 +51,12 @@ steps:
           key: "amip"
           command:
             - echo "--- Run simulation"
-            - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse.yml --job_id amip_coarse"
+            - "mpiwrapperexec -n 8 -ppn 4 julia --threads=4 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse.yml --job_id amip_coarse"
           artifact_paths: "experiments/ClimaEarth/output/amip/amip_coarse/artifacts/*"
           timeout_in_minutes: 840
           env:
             CLIMACOMMS_DEVICE: "CUDA"
           agents:
-            pbs_l_select: "1:ngpus=1:ncpus=4"
-            pbs_l_walltime: "11:59:00"
-  
-        - label: "1 Coarse current AMIP: diagedmf + 0M + bucket land (unique seed)"
-          key: "amip_random1"
-          command:
-            - echo "--- Run simulation"
-            - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_random.yml --job_id amip_coarse_random1"
-          artifact_paths: "experiments/ClimaEarth/output/amip/amip_coarse_random1/artifacts/*"
-          timeout_in_minutes: 1080
-          env:
-            CLIMACOMMS_DEVICE: "CUDA"
-          agents:
-            pbs_l_select: "1:ngpus=1:ncpus=4"
-            pbs_l_walltime: "11:59:00"
-  
-        - label: "2 Coarse current AMIP: diagedmf + 0M + bucket land (unique seed)"
-          key: "amip_random2"
-          command:
-            - echo "--- Run simulation"
-            - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_random.yml --job_id amip_coarse_random2"
-          artifact_paths: "experiments/ClimaEarth/output/amip/amip_coarse_random2/artifacts/*"
-          timeout_in_minutes: 1080
-          env:
-            CLIMACOMMS_DEVICE: "CUDA"
-          agents:
-            pbs_l_select: "1:ngpus=1:ncpus=4"
-            pbs_l_walltime: "11:59:00"
-  
-        - label: "3 Coarse current AMIP: diagedmf + 0M + bucket land (unique seed)"
-          key: "amip_random3"
-          command:
-            - echo "--- Run simulation"
-            - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_random.yml --job_id amip_coarse_random3"
-          artifact_paths: "experiments/ClimaEarth/output/amip/amip_coarse_random3/artifacts/*"
-          timeout_in_minutes: 1080
-          env:
-            CLIMACOMMS_DEVICE: "CUDA"
-          agents:
-            pbs_l_select: "1:ngpus=1:ncpus=4"
-            pbs_l_walltime: "11:59:00"
+            pbs_l_select: "2:ngpus=4:ncpus=64"
+            pbs_l_walltime: "0:59:00"
 

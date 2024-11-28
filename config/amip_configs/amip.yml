@@ -1,6 +1,7 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
+cloud_model: quadrature
 coupler_toml_file: "toml/amip.toml"
 dt: "120secs"
 dt_cpl: 120
@@ -20,10 +21,12 @@ radiation_reset_rng_seed: true
 rayleigh_sponge: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "1098days"
+t_end: "93days"
 topo_smoothing: true
 topography: "Earth"
+turbconv: ~
 turb_flux_partition: "CombinedStateFluxesMOST"
+vert_diff: "FriersonDiffusion"
 viscous_sponge: true
 z_elem: 63
 z_max: 60000.0

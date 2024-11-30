@@ -3,19 +3,19 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
 cloud_model: quadrature
 coupler_toml_file: "toml/amip.toml"
-dt: "240secs"
-dt_cpl: 240
+dt: "120secs"
+dt_cpl: 120
 dt_save_state_to_disk: "30days"
 dt_save_to_sol: "30days"
-dz_bottom: 100.0
+dz_bottom: 30.0
 energy_check: false
-h_elem: 8
+h_elem: 16
 hourly_checkpoint: true
 hourly_checkpoint_dt: 720
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
-netcdf_interpolation_num_points: [90, 45, 31]
+#netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
@@ -29,5 +29,5 @@ turb_flux_partition: "CombinedStateFluxesMOST"
 turbconv: ~
 vert_diff: "FriersonDiffusion"
 viscous_sponge: true
-z_elem: 39
+z_elem: 63
 z_max: 60000.0

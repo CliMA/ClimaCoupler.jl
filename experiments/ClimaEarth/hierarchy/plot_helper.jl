@@ -61,40 +61,40 @@ function plot_climate(var, DATA_DIR, PLOT_DIR, job_id; reduction = "inst", inter
         pa_zm = pa_zm ./ 100 # convert to hPa
         pa_grid = [950, 800, 700, 600, 500, 400, 300, 200, 50]
         strf_zm = interpolate_to_pressure_coord_2d(strf_zm, pa_zm, pa_grid)
-        Plots.contourf(
-            lat,
-            -pa_grid,
-            strf_zm',
-            xlabel = "Latitude (deg N)",
-            ylabel = "Pressure (hPa)",
-            title = "$var",
-            color = :viridis,
-            ylims = (-pa_grid[1], -pa_grid[end]),
-            yticks = (-pa_grid, pa_grid),
-        )# , clims=(-1e10, 1e10))
-        png(joinpath(PLOT_DIR, "$(job_id)_$(var)_pa.png"))
+        co = Makie.contourf(lat, -pa_grid, strf_zm, colormap = :viridis, levels = 16)
+        co.axis.xlabel = "Latitude (deg N)"
+        co.axis.ylabel = "Pressure (hPa)"
+        co.axis.title = "$var"
+        Makie.ylims!(co.axis, -pa_grid[1], -pa_grid[end])
+        co.axis.yticks = (-pa_grid, string.(pa_grid))
+        Makie.Colorbar(co.figure[1, 2], co.plot)
+        Makie.save(joinpath(PLOT_DIR, "$(job_id)_$(var)_pa.png"), co)
     else
-        Plots.contourf(
-            lat,
-            z,
-            strf_zm',
-            xlabel = "Latitude",
-            ylabel = "Height (km)",
-            title = "$var",
-            color = :viridis,
-            ylims = (0, 3e4),
-            yscale = :log10,
-            yticks = ([1e3, 5e3, 10e3, 20e3, 30e3], ["1", "5", "10", "20", "30"]),
-        )# , clims=(-1e10, 1e10)
-        png(joinpath(PLOT_DIR, "$(job_id)_$var.png"))
+        co = Makie.contourf(lat, z, strf_zm, colormap = :viridis, levels = 16)
+        co.axis.xlabel = "Latitude"
+        co.axis.ylabel = "Height (km)"
+        co.axis.yscale = log10
+        co.axis.title = "$var"
+        Makie.ylims!(co.axis, 0, 3e4)
+        co.axis.yticks = ([1e3, 5e3, 10e3, 20e3, 30e3], ["1", "5", "10", "20", "30"])
+        Makie.Colorbar(co.figure[1, 2], co.plot)
+        Makie.save(joinpath(PLOT_DIR, "$(job_id)_$var.png"), co)
     end
 
     # horizontal slices
-    Plots.contourf(lon, lat, strf_sfc', xlabel = "Longitude", ylabel = "Latitude", title = "$var", color = :viridis)#, clims=(-1e10, 1e10))
-    png(joinpath(PLOT_DIR, "$(job_id)_$(var)_sfc.png"))
+    co_sfc = Makie.contourf(lon, lat, strf_sfc, colormap = :viridis, levels = 16)
+    co_sfc.axis.xlabel = "Longitude"
+    co_sfc.axis.ylabel = "Latitude"
+    co_sfc.axis.title = "$var"
+    Makie.Colorbar(co_sfc.figure[1, 2], co_sfc.plot)
+    Makie.save(joinpath(PLOT_DIR, "$(job_id)_$(var)_sfc.png"), co_sfc)
 
-    Plots.contourf(lon, lat, strf_upper', xlabel = "Longitude", ylabel = "Latitude", title = "$var", color = :viridis)#, clims=(-1e10, 1e10))
-    png(joinpath(PLOT_DIR, "$(job_id)_$(var)_10km.png"))
+    co_upper = Makie.contourf(lon, lat, strf_upper, colormap = :viridis, levels = 16)
+    co_upper.axis.xlabel = "Longitude"
+    co_upper.axis.ylabel = "Latitude"
+    co_upper.axis.title = "$var"
+    Makie.Colorbar(co_upper.figure[1, 2], co_upper.plot)
+    Makie.save(joinpath(PLOT_DIR, "$(job_id)_$(var)_10km.png"), co_upper)
 end
 
 """

@@ -1,7 +1,8 @@
 # paper_figs
 using NCDatasets
 using Statistics
-using Plots
+import Makie
+import CairoMakie
 
 import Interpolations: LinearInterpolation
 import DelimitedFiles: writedlm, readdlm
@@ -23,20 +24,22 @@ for job_id in ["dry_held_suarez", "moist_held_suarez"]
 
     # SUPPLEMENTAL: animation of surface temperature
     ta_sfc, lat, lon, z, time = get_nc_data_all("ta", reduction, DATA_DIR)
-    anim = Plots.@animate for i in 1:size(ta_sfc, 1)
-        Plots.contourf(
-            lon,
-            lat,
-            ta_sfc[i, :, :, 1]',
-            xlabel = "Longitude",
-            ylabel = "Latitude",
-            title = "$var",
-            color = :viridis,
-            clims = (260, 315),
-        )
-    end
-    Plots.mp4(anim, joinpath(PLOT_DIR, "anim_ta_sfc.mp4"), fps = 10)
+    f = Makie.Figure()
+    ax = Makie.Axis(f[1, 1], xlabel = "Longitude", ylabel = "Latitude", title = "ta_sfc")
+    # plot once before animation to set axis
+    co_ta_sfc = Makie.contourf!(
+        ax,
+        lon,
+        lat,
+        ta_sfc[1, :, :, 1],
+        colormap = :viridis,
+        levels = [k for k in range(260.0, 315.0)],
+    )
+    Makie.Colorbar(f[1, 2], co_ta_sfc)
 
+    Makie.record(f, joinpath(PLOT_DIR, "anim_ta_sfc.mp4"), 1:size(ta_sfc, 1); framerate = 10) do t
+        Makie.contourf!(lon, lat, ta_sfc[t, :, :, 1], colormap = :viridis, levels = [k for k in range(260.0, 315.0)])
+    end
     # Figure 2: climatology
     # this plots the time-mean (upper-level and surface) slices and zonal means of
     # the mass streamfunction, zonal wind, meridional wind, temperature, max. Eady growth rate, and vertical velocity
@@ -58,18 +61,13 @@ for job_id in ["dry_held_suarez", "moist_held_suarez"]
     pa_grid = [950, 800, 700, 600, 500, 400, 300, 200, 50]
 
     heat_flux_int_zm = interpolate_to_pressure_coord_2d(heat_flux_zm, pa_zm, pa_grid)
-    Plots.contourf(
-        lat,
-        -pa_grid,
-        heat_flux_int_zm',
-        xlabel = "Latitude (deg N)",
-        ylabel = "Pressure (hPa)",
-        title = "Heat flux",
-        color = :viridis,
-        ylims = (-pa_grid[1], -pa_grid[end]),
-        yticks = (-pa_grid, pa_grid),
-    )
-    png(joinpath(PLOT_DIR, "$(job_id)_heat_flux.png"))
+    co_heat_flux = Makie.contourf(lat, -pa_grid, heat_flux_int_zm, colormap = :viridis, levels = 16)
+    co_heat_flux.axis.xlabel = "Latitude (deg N)"
+    co_heat_flux.axis.ylabel = "Pressure (hPa)"
+    co_heat_flux.axis.title = "Heat flux"
+    Makie.ylims!(co_heat_flux.axis, -pa_grid[1], -pa_grid[end])
+    co_heat_flux.axis.yticks = (-pa_grid, string.(pa_grid))
+    Makie.save(joinpath(PLOT_DIR, "$(job_id)_heat_flux.png"), co_heat_flux)
 
     # Figure 5: storm track diagnostics reduced to timeseries
     # this plots the eddy heat flux and max. Eady growth rate in a sectorial selection

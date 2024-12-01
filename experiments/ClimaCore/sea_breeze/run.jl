@@ -294,30 +294,44 @@ cpl_run(sim)
 # ### References
 # - [Antonelli & Rotunno 2007](https://journals.ametsoc.org/view/journals/atsc/64/12/2007jas2261.1.xml?tab_body=pdf)
 ## Post-processing
-import Plots, ClimaCorePlots #hide
+import Makie, CairoMakie, ClimaCoreMakie #hide
 
 sol = sim.atmos.integrator.sol #hide
 path = joinpath(@__DIR__, "output") #hide
 mkpath(path) #hide
 # JLD2.save(joinpath(path, "last_sim.jld2"), "coupled_sim", sim) #hide
 
-Plots.GRBackend() #hide
 
 # Plot atmospheric potential temperature [K] throughout the simulation
-anim = Plots.@animate for u in sol.u #hide
-    Plots.contourf(u.Yc.ρθ ./ u.Yc.ρ) #hide
-end #hide
-Plots.mp4(anim, joinpath(path, "theta.mp4"), fps = 20) #hide
+theta_fig = Makie.Figure();
+theta_ax = Makie.Axis(theta_fig[1, 1])
+# initial plot to setup axis and make consistent levels
+theta_plot = ClimaCoreMakie.fieldcontourf!(theta_ax, sol.u[end].Yc.ρθ ./ sol.u[end].Yc.ρ)
+theta_cb = Makie.Colorbar(theta_fig[1, 2], theta_plot)
+theta_levels = [k for k in range(theta_cb.limits[][1], theta_cb.limits[][2], theta_plot.levels[])]
+Makie.record(theta_fig, joinpath(path, "theta.mp4"), 1:length(sol.u); framerate = 20) do i
+    ClimaCoreMakie.fieldcontourf!(theta_ax, sol.u[i].Yc.ρθ ./ sol.u[i].Yc.ρ, levels = theta_levels)
+end
 
 If2c = CC.Operators.InterpolateF2C() #hide
-anim = Plots.@animate for u in sol.u #hide
-    Plots.contourf(If2c.(u.ρw) ./ u.Yc.ρ) #hide
-end #hide
-
 # Plot atmospheric vertical velocity [m/s] throughout the simulation
-Plots.mp4(anim, joinpath(path, "vel_w.mp4"), fps = 20) #hide
-anim = Plots.@animate for u in sol.u #hide
-    Plots.contourf(u.Yc.ρuₕ ./ u.Yc.ρ) #hide
-end #hide
+vel_w_fig = Makie.Figure();
+vel_w_ax = Makie.Axis(vel_w_fig[1, 1])
+# initial plot to setup axis and make consistent levels
+vel_w_plot = ClimaCoreMakie.fieldcontourf!(vel_w_ax, If2c.(sol.u[end].ρw) ./ sol.u[end].Yc.ρ)
+vel_w_cb = Makie.Colorbar(vel_w_fig[1, 2], vel_w_plot)
+vel_w_levels = [k for k in range(vel_w_cb.limits[][1], vel_w_cb.limits[][2], vel_w_plot.levels[])]
+Makie.record(vel_w_fig, joinpath(path, "vel_w.mp4"), 1:length(sol.u); framerate = 20) do i
+    ClimaCoreMakie.fieldcontourf!(vel_w_ax, If2c.(sol.u[i].ρw) ./ sol.u[i].Yc.ρ, levels = vel_w_levels)
+end
+
 # Plot atmospheric longitudinal velocity [m/s] throughout the simulation
-Plots.mp4(anim, joinpath(path, "vel_u.mp4"), fps = 20) #hide
+vel_u_fig = Makie.Figure();
+vel_u_ax = Makie.Axis(vel_u_fig[1, 1])
+# initial plot to setup axis and make consistent levels
+vel_u_plot = ClimaCoreMakie.fieldcontourf!(vel_u_ax, sol.u[end].Yc.ρuₕ ./ sol.u[end].Yc.ρ)
+vel_u_cb = Makie.Colorbar(vel_u_fig[1, 2], vel_u_plot)
+vel_u_levels = [k for k in range(vel_u_cb.limits[][1], vel_u_cb.limits[][2], vel_u_plot.levels[])]
+Makie.record(vel_u_fig, joinpath(path, "vel_u.mp4"), 1:length(sol.u); framerate = 20) do i
+    ClimaCoreMakie.fieldcontourf!(vel_u_ax, sol.u[i].Yc.ρuₕ ./ sol.u[i].Yc.ρ, levels = vel_u_levels)
+end

@@ -1,6 +1,6 @@
 agents:
   queue: clima
-  slurm_time: 96:00:00
+  slurm_time: 6:00:00
   modules: climacommon/2024_10_09
 
 env:
@@ -9,7 +9,7 @@ env:
   SLURM_KILL_BAD_EXIT: 1
   CONFIG_PATH: "config/amip_configs"
 
-timeout_in_minutes: 5760
+timeout_in_minutes: 360
 
 steps:
 

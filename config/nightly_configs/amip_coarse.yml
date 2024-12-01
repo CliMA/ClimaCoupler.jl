@@ -3,8 +3,8 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
 cloud_model: quadrature
 coupler_toml_file: "toml/amip.toml"
-dt: "90secs"
-dt_cpl: 90
+dt: "120secs"
+dt_cpl: 120
 dt_save_state_to_disk: "30days"
 dt_save_to_sol: "30days"
 dz_bottom: 30.0

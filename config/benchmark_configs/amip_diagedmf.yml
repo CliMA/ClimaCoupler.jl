@@ -2,7 +2,7 @@ FLOAT_TYPE: "Float32"
 atmos_config_file: "config/benchmark_configs/climaatmos_diagedmf.yml"
 atmos_config_repo: "ClimaCoupler"
 dt: "120secs"
-dt_cpl: 120
+dt_cpl: "120secs"
 dt_save_state_to_disk: "Inf"
 dt_save_to_sol: "Inf"
 energy_check: false

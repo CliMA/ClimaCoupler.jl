@@ -51,7 +51,14 @@ end
 """
     get_comms_context(config_dict)
 
-Sets up the appropriate ClimaComms context for the device the model is to be run on
+Sets up the appropriate ClimaComms context for the device the model is to be run on,
+choosing from the following options:
+    - CPU single threaded
+    - CPU with MPI
+    - GPU
+
+If no device is passed to `ClimaComms.context()` then `ClimaComms` automatically
+selects the device from which this code is called.
 
 # Arguments
 `config_dict`: dictionary containing a "device" flag whcih decides which device context is needed

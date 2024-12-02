@@ -1,7 +1,5 @@
 FLOAT_TYPE: "Float32"
 apply_limiter: false
-dt: "400secs"
-dt_cpl: 400
 dt_save_to_sol: "100days"
 energy_check: false
 h_elem: 6

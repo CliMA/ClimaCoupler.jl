@@ -38,7 +38,6 @@ We then specify the input data file names. If these are not already downloaded, 
 
 ## standard packages
 import Dates
-import YAML
 import DelimitedFiles
 
 # ## ClimaESM packages
@@ -86,133 +85,58 @@ dictionary and the simulation-specific configuration dictionary, which allows th
 We can additionally pass the configuration dictionary to the component model initializers, which will then override the default settings of the component models.
 =#
 
-## coupler simulation default configuration
 include("cli_options.jl")
-parsed_args = parse_commandline(argparse_settings())
+include("user_io/arg_parsing.jl")
+config_dict = get_coupler_config()
 
-## modify parsed args for fast testing from REPL #hide
-if isinteractive()
-    parsed_args["config_file"] =
-        isnothing(parsed_args["config_file"]) ? joinpath(pkg_dir, "config/ci_configs/interactive_debug.yml") :
-        parsed_args["config_file"]
-    parsed_args["job_id"] = "interactive_debug"
-end
+# Select the correct timestep for each component model based on which are available
+parse_component_dts!(config_dict)
+# Add extra diagnostics if specified
+add_extra_diagnostics!(config_dict)
 
-## the unique job id should be passed in via the command line
-job_id = parsed_args["job_id"]
-@assert !isnothing(job_id) "job_id must be passed in via the command line"
+(;
+    job_id,
+    mode_name,
+    random_seed,
+    FT,
+    comms_ctx,
+    t_end,
+    t_start,
+    date0,
+    date,
+    Δt_cpl,
+    component_dt_dict,
+    saveat,
+    hourly_checkpoint,
+    hourly_checkpoint_dt,
+    restart_dir,
+    restart_t,
+    use_coupler_diagnostics,
+    use_land_diagnostics,
+    calendar_dt,
+    evolving_ocean,
+    mono_surface,
+    turb_flux_partition,
+    land_domain_type,
+    land_albedo_type,
+    land_temperature_anomaly,
+    energy_check,
+    conservation_softfail,
+    output_dir_root,
+    plot_diagnostics,
+) = get_coupler_args(config_dict)
 
-## read in config dictionary from file, overriding the coupler defaults in `parsed_args`
-config_dict = YAML.load_file(parsed_args["config_file"])
-config_dict = merge(parsed_args, config_dict)
-
-comms_ctx = Utilities.get_comms_context(config_dict)
+## get component model dictionaries (if applicable)
+## Note this step must come after parsing the coupler config dictionary, since
+##  some parameters are passed from the coupler config to the component model configs
+atmos_config_dict = get_atmos_config_dict(config_dict, job_id)
+(; dt_rad, output_default_diagnostics) = get_atmos_args(atmos_config_dict)
 
 ## set unique random seed if desired, otherwise use default
-random_seed = config_dict["unique_seed"] ? time_ns() : 1234
 Random.seed!(random_seed)
 @info "Random seed set to $(random_seed)"
 
-## set up diagnostics before retrieving atmos config
-mode_name = config_dict["mode_name"]
-use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
-t_end = Float64(Utilities.time_to_seconds(config_dict["t_end"]))
-t_start = 0.0
-
-function get_period(t_start, t_end)
-    sim_duration = t_end - t_start
-    secs_per_day = 86400
-    if sim_duration >= 90 * secs_per_day
-        # if duration >= 90 days, take monthly means
-        period = "1months"
-        calendar_dt = Dates.Month(1)
-    elseif sim_duration >= 30 * secs_per_day
-        # if duration >= 30 days, take means over 10 days
-        period = "10days"
-        calendar_dt = Dates.Day(10)
-    elseif sim_duration >= secs_per_day
-        # if duration >= 1 day, take daily means
-        period = "1days"
-        calendar_dt = Dates.Day(1)
-    else
-        # if duration < 1 day, take hourly means
-        period = "1hours"
-        calendar_dt = Dates.Hour(1)
-    end
-    return (period, calendar_dt)
-end
-
-if mode_name == "amip" && use_coupler_diagnostics
-    @info "Using default AMIP diagnostics"
-    (period, calendar_dt) = get_period(t_start, t_end)
-
-    !haskey(config_dict, "diagnostics") && (config_dict["diagnostics"] = Vector{Dict{Any, Any}}())
-    push!(
-        config_dict["diagnostics"],
-        Dict("short_name" => ["toa_fluxes_net"], "reduction_time" => "average", "period" => period),
-    )
-end
-
-
-## read in some parsed command line arguments, required by this script
-energy_check = config_dict["energy_check"]
-const FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
-land_sim_name = "bucket"
-t_end = Float64(Utilities.time_to_seconds(config_dict["t_end"]))
-t_start = 0.0
 tspan = (t_start, t_end)
-Δt_cpl = Float64(config_dict["dt_cpl"])
-component_dt_names = ["dt_atmos", "dt_land", "dt_ocean", "dt_seaice"]
-component_dt_dict = Dict{String, Float64}()
-# check if all component dt's are specified
-if all(key -> !isnothing(config_dict[key]), component_dt_names)
-    # when all component dt's are specified, ignore the dt field
-    if haskey(config_dict, "dt")
-        @warn "Removing dt in favor of individual component dt's"
-        delete!(config_dict, "dt")
-    end
-    for key in component_dt_names
-        component_dt = Float64(Utilities.time_to_seconds(config_dict[key]))
-        @assert Δt_cpl % component_dt == 0.0 "Coupler dt must be divisible by all component dt's\n dt_cpl = $Δt_cpl\n $key = $component_dt"
-        component_dt_dict[key] = component_dt
-    end
-else
-    # when not all component dt's are specified, use the dt field
-    @assert haskey(config_dict, "dt") "dt or (dt_atmos, dt_land, dt_ocean, and dt_seaice) must be specified"
-    for key in component_dt_names
-        if !isnothing(config_dict[key])
-            @warn "Removing $key from config in favor of dt because not all component dt's are specified"
-        end
-        delete!(config_dict, key)
-        component_dt_dict[key] = Float64(Utilities.time_to_seconds(config_dict["dt"]))
-    end
-end
-## get component model dictionaries (if applicable)
-atmos_config_dict, config_dict = get_atmos_config_dict(config_dict, job_id)
-atmos_config_object = CA.AtmosConfig(atmos_config_dict)
-
-saveat = Float64(Utilities.time_to_seconds(config_dict["dt_save_to_sol"]))
-date0 = date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
-mono_surface = config_dict["mono_surface"]
-hourly_checkpoint = config_dict["hourly_checkpoint"]
-hourly_checkpoint_dt = config_dict["hourly_checkpoint_dt"]
-restart_dir = config_dict["restart_dir"]
-restart_t = Int(config_dict["restart_t"])
-evolving_ocean = config_dict["evolving_ocean"]
-dt_rad = config_dict["dt_rad"]
-use_land_diagnostics = config_dict["use_land_diagnostics"]
-
-#=
-## Setup Communication Context
-We set up communication context for CPU single thread/CPU with MPI/GPU. If no device is passed to `ClimaComms.context()`
-then `ClimaComms` automatically selects the device from which this code is called.
-=#
-
-
-## make sure we don't use animations for GPU runs
-if comms_ctx.device isa ClimaComms.CUDADevice
-    config_dict["anim"] = false
-end
 
 #=
 ### I/O Directory Setup
@@ -221,13 +145,10 @@ the plots (from postprocessing and the conservation checks) of the simulation wi
 temporary files will be saved.
 =#
 
-COUPLER_OUTPUT_DIR = joinpath(config_dict["coupler_output_dir"], job_id)
+COUPLER_OUTPUT_DIR = joinpath(output_dir_root, job_id)
 dir_paths = Utilities.setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
 @info "Coupler output directory $(dir_paths.output)"
 @info "Coupler artifacts directory $(dir_paths.artifacts)"
-
-@info(dir_paths.output)
-config_dict["print_config_dict"] && @info(config_dict)
 
 #=
 ## Data File Paths
@@ -264,7 +185,7 @@ This uses the `ClimaAtmos.jl` model, with parameterization options specified in 
 Utilities.show_memory_usage()
 
 ## init atmos model component
-atmos_sim = atmos_init(atmos_config_object);
+atmos_sim = atmos_init(CA.AtmosConfig(atmos_config_dict));
 # Get surface elevation from `atmos` coordinate field
 surface_elevation = CC.Fields.level(CC.Fields.coordinate_field(atmos_sim.integrator.u.f).z, CC.Utilities.half)
 Utilities.show_memory_usage()
@@ -329,9 +250,9 @@ if mode_name == "amip"
     land_sim = bucket_init(
         FT,
         tspan,
-        config_dict["land_domain_type"],
-        config_dict["land_albedo_type"],
-        config_dict["land_temperature_anomaly"],
+        land_domain_type,
+        land_albedo_type,
+        land_temperature_anomaly,
         dir_paths;
         dt = component_dt_dict["dt_land"],
         space = boundary_space,
@@ -427,9 +348,9 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
     land_sim = bucket_init(
         FT,
         tspan,
-        config_dict["land_domain_type"],
-        config_dict["land_albedo_type"],
-        config_dict["land_temperature_anomaly"],
+        land_domain_type,
+        land_albedo_type,
+        land_temperature_anomaly,
         dir_paths;
         dt = component_dt_dict["dt_land"],
         space = boundary_space,
@@ -477,9 +398,9 @@ elseif mode_name == "slabplanet_eisenman"
     land_sim = bucket_init(
         FT,
         tspan,
-        config_dict["land_domain_type"],
-        config_dict["land_albedo_type"],
-        config_dict["land_temperature_anomaly"],
+        land_domain_type,
+        land_albedo_type,
+        land_temperature_anomaly,
         dir_paths;
         dt = component_dt_dict["dt_land"],
         space = boundary_space,
@@ -622,9 +543,9 @@ callbacks =
 Decide on the type of turbulent flux partition, partitioned or combined (see `FluxCalculator` documentation for more details).
 =#
 turbulent_fluxes = nothing
-if config_dict["turb_flux_partition"] == "PartitionedStateFluxes"
+if turb_flux_partition == "PartitionedStateFluxes"
     turbulent_fluxes = FluxCalculator.PartitionedStateFluxes()
-elseif config_dict["turb_flux_partition"] == "CombinedStateFluxesMOST"
+elseif turb_flux_partition == "CombinedStateFluxesMOST"
     turbulent_fluxes = FluxCalculator.CombinedStateFluxesMOST()
 else
     error("turb_flux_partition must be either PartitionedStateFluxes or CombinedStateFluxesMOST")
@@ -673,7 +594,7 @@ If a restart directory is specified and contains output files from the `checkpoi
 is specified in the `config_dict` dictionary. The `restart_t` field specifies the time step at which the restart is performed.
 =#
 
-if restart_dir !== "unspecified"
+if !isnothing(restart_dir)
     for sim in cs.model_sims
         if Checkpointer.get_model_prog_state(sim) !== nothing
             Checkpointer.restart_model_state!(sim, comms_ctx, restart_t; input_dir = restart_dir)
@@ -891,7 +812,7 @@ end
 #=
 ## Postprocessing
 All postprocessing is performed using the root process only, if applicable.
-Our postprocessing consists of outputting a number of plots and animations to visualize the model output.
+Our postprocessing consists of outputting a number of plots to visualize the model output.
 
 The postprocessing includes:
 - Energy and water conservation checks (if running SlabPlanet with checks enabled)
@@ -910,14 +831,14 @@ if ClimaComms.iamroot(comms_ctx)
         plot_global_conservation(
             cs.conservation_checks.energy,
             cs,
-            config_dict["conservation_softfail"],
+            conservation_softfail,
             figname1 = joinpath(dir_paths.artifacts, "total_energy_bucket.png"),
             figname2 = joinpath(dir_paths.artifacts, "total_energy_log_bucket.png"),
         )
         plot_global_conservation(
             cs.conservation_checks.water,
             cs,
-            config_dict["conservation_softfail"],
+            conservation_softfail,
             figname1 = joinpath(dir_paths.artifacts, "total_water_bucket.png"),
             figname2 = joinpath(dir_paths.artifacts, "total_water_log_bucket.png"),
         )
@@ -930,7 +851,7 @@ if ClimaComms.iamroot(comms_ctx)
             @info "AMIP plots"
 
             ## ClimaESM
-            include("user_io/ci_plots.jl")
+            include("user_io/diagnostics_plots.jl")
 
             # define variable names and output directories for each diagnostic
             amip_short_names_atmos = ["ta", "ua", "hus", "clw", "pr", "ts", "toa_fluxes_net"]
@@ -939,13 +860,13 @@ if ClimaComms.iamroot(comms_ctx)
             output_dir_coupler = dir_paths.output
 
             # Check if all output variables are available in the specified directories
-            make_ci_plots(
+            make_diagnostics_plots(
                 output_dir_atmos,
                 dir_paths.artifacts,
                 short_names = amip_short_names_atmos,
                 output_prefix = "atmos_",
             )
-            make_ci_plots(
+            make_diagnostics_plots(
                 output_dir_coupler,
                 dir_paths.artifacts,
                 short_names = amip_short_names_coupler,
@@ -954,7 +875,7 @@ if ClimaComms.iamroot(comms_ctx)
         end
 
         # Check this because we only want monthly data for making plots
-        if t_end > 84600 * 31 * 3 && config_dict["output_default_diagnostics"]
+        if t_end > 84600 * 31 * 3 && output_default_diagnostics
             include("leaderboard/leaderboard.jl")
             diagnostics_folder_path = atmos_sim.integrator.p.output_dir
             leaderboard_base_path = dir_paths.artifacts
@@ -962,10 +883,10 @@ if ClimaComms.iamroot(comms_ctx)
         end
     end
     ## plot extra atmosphere diagnostics if specified
-    if config_dict["ci_plots"]
-        @info "Generating CI plots"
-        include("user_io/ci_plots.jl")
-        make_ci_plots(atmos_sim.integrator.p.output_dir, dir_paths.artifacts)
+    if plot_diagnostics
+        @info "Plotting diagnostics"
+        include("user_io/diagnostics_plots.jl")
+        make_diagnostics_plots(atmos_sim.integrator.p.output_dir, dir_paths.artifacts)
     end
 
     ## plot all model states and coupler fields (useful for debugging)

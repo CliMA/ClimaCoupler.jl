@@ -4,7 +4,6 @@ authors = ["CliMA Contributors <clima-software@caltech.edu>"]
 version = "0.1.1"
 
 [deps]
-Artifacts = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
 ClimaCore = "d414da3d-4745-48bb-8d80-42e94e092884"
 ClimaCoreTempestRemap = "d934ef94-cdd4-4710-83d6-720549644b70"
@@ -18,7 +17,6 @@ SurfaceFluxes = "49b00bb7-8bd4-4f2b-b78c-51cd0450215f"
 Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 
 [compat]
-Artifacts = "1"
 ClimaComms = "0.5.6, 0.6"
 ClimaCore = "0.14.19"
 ClimaCoreTempestRemap = "0.3"

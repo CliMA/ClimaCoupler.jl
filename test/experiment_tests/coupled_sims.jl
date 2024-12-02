@@ -1,5 +1,4 @@
 import Test: @test, @testset, @test_throws
-using IntervalSets # for `..`
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ClimaCore as CC
@@ -31,14 +30,19 @@ end
 name(::SimB) = :simB
 
 function spectral_space_2D(; n1 = 1, n2 = 1, Nij = 4)
-    domain = CC.Domains.RectangleDomain(
-        CC.Geometry.XPoint(-1.0) .. CC.Geometry.XPoint(1.0),
-        CC.Geometry.YPoint(-1.0) .. CC.Geometry.YPoint(1.0),
-        x1periodic = false,
-        x2periodic = false,
-        x1boundary = (:east, :west),
-        x2boundary = (:south, :north),
+    xdomain = CC.Domains.IntervalDomain(
+        CC.Geometry.XPoint(-1.0),
+        CC.Geometry.XPoint(1.0),
+        periodic = false,
+        boundary_names = (:east, :west),
     )
+    ydomain = CC.Domains.IntervalDomain(
+        CC.Geometry.YPoint(-1.0),
+        CC.Geometry.YPoint(1.0),
+        periodic = false,
+        boundary_names = (:south, :north),
+    )
+    domain = CC.Domains.RectangleDomain(xdomain, ydomain)
     mesh = CC.Meshes.RectilinearMesh(domain, n1, n2)
     comms_ctx = ClimaComms.SingletonCommsContext()
     grid_topology = CC.Topologies.Topology2D(comms_ctx, mesh)

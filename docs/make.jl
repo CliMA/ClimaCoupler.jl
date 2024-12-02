@@ -1,5 +1,5 @@
 using ClimaCoupler
-using Documenter, Literate, Pkg
+using Documenter, Literate
 
 const COUPLER_DIR = joinpath(@__DIR__, "..")
 const EXPERIMENTS_DIR = joinpath(@__DIR__, "..", "experiments")

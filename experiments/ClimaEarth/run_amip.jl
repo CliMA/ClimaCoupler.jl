@@ -741,7 +741,7 @@ function solve_coupler!(cs)
     return nothing
 end
 
-## exit if running performance anaysis #hide
+## exit if running performance analysis #hide
 if haskey(ENV, "CI_PERF_SKIP_COUPLED_RUN") #hide
     throw(:exit_profile_init) #hide
 end #hide
@@ -770,7 +770,7 @@ GC.gc()
 
 This is where the full coupling loop, `solve_coupler!` is called for the full timespan of the simulation.
 We use the `ClimaComms.@elapsed` macro to time the simulation on both CPU and GPU, and use this
-value to calculare the simulated years per day (SYPD) of the simulation.
+value to calculate the simulated years per day (SYPD) of the simulation.
 =#
 walltime = ClimaComms.@elapsed comms_ctx.device begin
     s = CA.@timed_str begin

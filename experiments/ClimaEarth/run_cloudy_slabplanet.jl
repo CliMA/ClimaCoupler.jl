@@ -122,7 +122,7 @@ config_dict = Dict(
     "edmfx_nh_pressure" => true,
     "edmfx_sgs_mass_flux" => true,
     "edmfx_sgs_diffusive_flux" => true,
-    "override_τ_precip" => false,
+    "override_precip_timescale" => false,
 )
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries

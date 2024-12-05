@@ -56,6 +56,29 @@ Interfacer.get_field(sim::Union{TestSurfaceSimulation2, TestSurfaceSimulation2},
 Interfacer.reinit!(::TestSurfaceSimulation1) = nothing
 Interfacer.step!(::TestSurfaceSimulation1, _) = nothing
 
+struct TestSurfaceSimulationA <: Interfacer.SurfaceModelSimulation end
+struct TestSurfaceSimulationB <: Interfacer.SurfaceModelSimulation end
+struct TestSurfaceSimulationC <: Interfacer.SurfaceModelSimulation end
+struct TestSurfaceSimulationD <: Interfacer.SurfaceModelSimulation end
+
+# Initialize weights (fractions) and initial values (fields)
+Interfacer.get_field(::TestSurfaceSimulationA, ::Val{:random}) = 1.0
+Interfacer.get_field(::TestSurfaceSimulationB, ::Val{:random}) = 0.5
+Interfacer.get_field(::TestSurfaceSimulationC, ::Val{:random}) = -1.0
+Interfacer.get_field(::TestSurfaceSimulationD, ::Val{:random}) = 0.75
+
+Interfacer.get_field(::TestSurfaceSimulationA, ::Val{:area_fraction}) = 0.0
+Interfacer.get_field(::TestSurfaceSimulationB, ::Val{:area_fraction}) = 0.5
+Interfacer.get_field(::TestSurfaceSimulationC, ::Val{:area_fraction}) = 2.0
+Interfacer.get_field(::TestSurfaceSimulationD, ::Val{:area_fraction}) = -10.0
+
+struct DummyStub{C} <: Interfacer.SurfaceModelSimulation
+    cache::C
+end
+Interfacer.get_field(sim::DummyStub, ::Val{:area_fraction}) = sim.cache.area_fraction
+function Interfacer.update_field!(sim::DummyStub, ::Val{:area_fraction}, field::CC.Fields.Field)
+    sim.cache.area_fraction .= field
+end
 # atmos sim
 struct TestAtmosSimulation{C} <: Interfacer.AtmosModelSimulation
     cache::C
@@ -99,6 +122,92 @@ Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:liquid_precipita
 Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:snow_precipitation}, field) = nothing
 
 for FT in (Float32, Float64)
+    @testset "test dummmy_remap!" begin
+        test_space = TestHelper.create_space(FT)
+        test_field_ones = CC.Fields.ones(test_space)
+        target_field = CC.Fields.zeros(test_space)
+
+        FieldExchanger.dummmy_remap!(target_field, test_field_ones)
+        @test parent(target_field) == parent(test_field_ones)
+    end
+
+    @testset "test update_surface_fractions!" begin
+        test_space = TestHelper.create_space(FT)
+        # Construct land fraction of 0s in top half, 1s in bottom half
+        land_fraction = CC.Fields.ones(test_space)
+        dims = size(parent(land_fraction))
+        m = dims[1]
+        n = dims[2]
+        parent(land_fraction)[1:(m ÷ 2), :, :, :] .= FT(0)
+
+        # Construct ice fraction of 0s on left, 0.5s on right
+        ice_d = CC.Fields.zeros(test_space)
+        parent(ice_d)[:, (n ÷ 2 + 1):n, :, :] .= FT(0.5)
+
+        # Construct ice fraction of 0s on left, 0.5s on right
+        ocean_d = CC.Fields.zeros(test_space)
+
+        # Fill in only the necessary parts of the simulation
+        cs = Interfacer.CoupledSimulation{FT}(
+            nothing, # comms_ctx
+            nothing, # dates
+            nothing, # boundary_space
+            nothing, # fields
+            nothing, # conservation_checks
+            (Int(0), Int(1000)), # tspan
+            Int(200), # Δt_cpl
+            (;
+                ice_sim = DummyStub((; area_fraction = ice_d)),
+                ocean_sim = Interfacer.SurfaceStub((; area_fraction = ocean_d)),
+                land_sim = DummyStub((; area_fraction = land_fraction)),
+            ), # model_sims
+            (;), # mode
+            (;), # callbacks
+            (;), # dirs
+            nothing, # turbulent_fluxes
+            nothing, # thermo_params
+            nothing, # amip_diags_handler
+        )
+
+        FieldExchanger.update_surface_fractions!(cs)
+
+        # Test that sum of fractions is 1 everywhere
+        ice_fraction = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction))
+        ocean_fraction = Interfacer.get_field(cs.model_sims.ocean_sim, Val(:area_fraction))
+        @test all(parent(ice_fraction .+ ocean_fraction .+ land_fraction) .== FT(1))
+    end
+
+    @testset "test combine_surfaces" begin
+        test_space = TestHelper.create_space(FT)
+        combined_field = CC.Fields.ones(test_space)
+
+        var_name = Val(:random)
+        sims = (;
+            a = TestSurfaceSimulationA(),
+            b = TestSurfaceSimulationB(),
+            c = TestSurfaceSimulationC(),
+            d = TestSurfaceSimulationD(),
+        )
+
+        fractions = (
+            Interfacer.get_field(sims.a, Val(:area_fraction)),
+            Interfacer.get_field(sims.b, Val(:area_fraction)),
+            Interfacer.get_field(sims.c, Val(:area_fraction)),
+            Interfacer.get_field(sims.d, Val(:area_fraction)),
+        )
+        fields = (
+            Interfacer.get_field(sims.a, var_name),
+            Interfacer.get_field(sims.b, var_name),
+            Interfacer.get_field(sims.c, var_name),
+            Interfacer.get_field(sims.d, var_name),
+        )
+
+        FieldExchanger.combine_surfaces!(combined_field, sims, var_name)
+        # println(parent(combined_field))
+        println(sum(fractions .* fields))
+        @test all(parent(combined_field) .== FT(sum(fractions .* fields)))
+    end
+
     @testset "import_atmos_fields! for FT=$FT" begin
         boundary_space = TestHelper.create_space(FT)
         coupler_names = (:F_turb_energy, :F_turb_moisture, :F_radiative, :P_liq, :P_snow, :ρ_sfc, :T_S)

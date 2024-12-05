@@ -11,7 +11,7 @@ import StaticArrays
 import SurfaceFluxes as SF
 import Thermodynamics as TD
 import ClimaCore as CC
-import ..Interfacer, ..Regridder
+import ..Interfacer, ..Utilities
 
 export PartitionedStateFluxes,
     CombinedStateFluxesMOST,
@@ -155,7 +155,7 @@ function partitioned_turbulent_fluxes!(
             # get area fraction (min = 0, max = 1)
             area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
             # get area mask [0, 1], where area_mask = 1 if area_fraction > 0
-            area_mask = Regridder.binary_mask.(area_fraction)
+            area_mask = Utilities.binary_mask.(area_fraction)
 
             thermo_state_sfc = FluxCalculator.surface_thermo_state(sim, thermo_params, thermo_state_int)
 

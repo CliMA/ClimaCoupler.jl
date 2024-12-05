@@ -24,7 +24,7 @@ import ClimaCore as CC
 # ## Coupler specific imports
 import ClimaCoupler
 import ClimaCoupler:
-    ConservationChecker, Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Regridder, TimeManager, Utilities
+    ConservationChecker, Checkpointer, FieldExchanger, FluxCalculator, Interfacer, TimeManager, Utilities
 
 pkg_dir = pkgdir(ClimaCoupler)
 

@@ -11,7 +11,30 @@ import ClimaCore as CC
 import Logging
 import ClimaUtilities.OutputPathGenerator: generate_output_path
 
-export swap_space!, get_device, get_comms_context, show_memory_usage, setup_output_dirs, time_to_seconds
+export binary_mask, swap_space!, get_device, get_comms_context, show_memory_usage, setup_output_dirs, time_to_seconds
+
+"""
+    binary_mask(var, threshold)
+
+Converts a number `var` to 1, if `var` is greater or equal than a given `threshold` value,
+or 0 otherwise, keeping the same type.
+
+# Arguments
+- `var`: [FT] value to be converted.
+- `threshold`: [FT] cutoff value for conversions.
+"""
+binary_mask(var, threshold) = var >= threshold ? one(var) : zero(var)
+
+"""
+    binary_mask(var)
+
+Converts a number `var` to 1, if `var` is greater or equal than `eps(FT)`,
+or 0 otherwise, keeping the same type.
+
+# Arguments
+- `var`: [FT] value to be converted.
+"""
+binary_mask(var) = binary_mask(var, eps(eltype(var)))
 
 """
     swap_space!(space_out::CC.Spaces.AbstractSpace, field_in::CC.Fields.Field)

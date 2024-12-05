@@ -1,7 +1,7 @@
 import SciMLBase
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
-import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer
+import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
 
 ###
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
@@ -360,5 +360,5 @@ function ∑tendencies(dY, Y, cache, _)
     @. dY.q_sfc = -Y.q_sfc / Δt
 
     # update ice area fraction (binary mask for now)
-    cache.ice_area_fraction .= Regridder.binary_mask.(Y.h_ice)
+    cache.ice_area_fraction .= Utilities.binary_mask.(Y.h_ice)
 end

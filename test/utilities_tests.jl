@@ -54,4 +54,12 @@ for FT in (Float32, Float64)
         @test typeof(Utilities.get_comms_context(parsed_args)) ==
               typeof(ClimaComms.context(ClimaComms.CPUSingleThreaded()))
     end
+
+    @testset "test binary_mask" begin
+        space = TestHelper.create_space(FT)
+        @test all(parent(Utilities.binary_mask.(zeros(space))) .== 0)
+        @test all(parent(Utilities.binary_mask.(ones(space))) .== 1)
+        @test all(parent(Utilities.binary_mask.(fill(FT(0.5), space), FT(0.6))) .== 0)
+        @test all(parent(Utilities.binary_mask.(fill(FT(0.5), space), FT(0.4))) .== 1)
+    end
 end

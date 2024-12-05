@@ -2,7 +2,7 @@ import SciMLBase
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
 import Thermodynamics as TD
-import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Regridder, Utilities
+import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
 
 ###
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
@@ -146,7 +146,7 @@ end
 ###
 # setting that SIC < 0.5 is counted as ocean if binary remapping.
 get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
-    mono ? h_ice : Regridder.binary_mask(h_ice, threshold)
+    mono ? h_ice : Utilities.binary_mask(h_ice, threshold)
 
 """
     ice_rhs!(du, u, p, _)
@@ -173,7 +173,7 @@ function ice_rhs!(du, u, p, _)
     # If tendencies lead to temperature above freezing, set temperature to freezing
     @. rhs = min(rhs, (T_freeze - Y.T_sfc) / p.dt)
     # mask out no-ice areas
-    area_mask = Regridder.binary_mask.(area_fraction)
+    area_mask = Utilities.binary_mask.(area_fraction)
     dY.T_sfc .= rhs .* area_mask
 
     @. p.q_sfc = TD.q_vap_saturation_generic.(p.thermo_params, Y.T_sfc, p.ρ_sfc, TD.Ice())

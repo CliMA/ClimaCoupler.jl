@@ -39,9 +39,8 @@ pid, nprocs = ClimaComms.init(comms_ctx)
         if ClimaComms.iamroot(comms_ctx)
             data_path = joinpath(regrid_dir, "test_data")
             TestHelper.gen_ncdata_time(FT, data_path, varname, FT(1))
-            Regridders.TempestRegridder(test_space, varname, data_path; regrid_dir, mono = true)
+            Regridders.TempestRegridder(TestHelper.create_space(FT), varname, data_path; regrid_dir, mono = true)
         end
-        ClimaComms.barrier(comms_ctx)
         ClimaComms.barrier(comms_ctx)
         output_field_ones =
             Regridder.read_from_hdf5(regrid_dir, hd_outfile_root, Dates.DateTime(2021), varname, comms_ctx)

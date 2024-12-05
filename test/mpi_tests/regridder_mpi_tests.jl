@@ -36,9 +36,12 @@ pid, nprocs = ClimaComms.init(comms_ctx)
         test_space = TestHelper.create_space(FT, comms_ctx = comms_ctx)
         varname = "testdata"
         hd_outfile_root = varname
-        data_path = joinpath(regrid_dir, "test_data")
-        TestHelper.gen_ncdata_time(FT, data_path, varname, FT(1))
-
+        data_path = nothing
+        if ClimaComms.iamroot(comms_ctx)
+            data_path = joinpath(regrid_dir, "test_data")
+            TestHelper.gen_ncdata_time(FT, data_path, varname, FT(1))
+        end
+        data_path = ClimaComms.bcast(comms_ctx, data_path)
         ClimaComms.barrier(comms_ctx)
         Regridders.TempestRegridder(test_space, varname, data_path; regrid_dir, mono = true)
         ClimaComms.barrier(comms_ctx)

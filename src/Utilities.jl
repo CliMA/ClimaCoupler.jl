@@ -6,7 +6,6 @@ modules in the coupler.
 """
 module Utilities
 
-import Artifacts
 import ClimaComms
 import ClimaCore as CC
 import Logging

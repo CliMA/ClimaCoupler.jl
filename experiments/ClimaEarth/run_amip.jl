@@ -54,8 +54,7 @@ import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.Utils: period_to_seconds_float
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
-import Interpolations
-
+import Interpolations # triggers InterpolationsExt in ClimaUtilities
 # Random is used by RRMTGP for some cloud properties
 import Random
 

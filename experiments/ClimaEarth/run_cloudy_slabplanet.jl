@@ -28,7 +28,7 @@ import ClimaCoupler:
 
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
-import Interpolations
+import Interpolations # triggers InterpolationsExt in ClimaUtilities
 
 pkg_dir = pkgdir(ClimaCoupler)
 

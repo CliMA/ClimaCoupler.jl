@@ -14,8 +14,9 @@ import ClimaComms
 import ClimaCore as CC
 import ClimaCoreTempestRemap as CCTR
 import ..Interfacer, ..Utilities, ..TimeManager
+import ClimaUtilities.Regridders
 
-export write_to_hdf5,
+export read_available_dates,
     read_from_hdf5,
     dummmy_remap!,
     remap_field_cgll_to_rll,
@@ -30,288 +31,6 @@ export write_to_hdf5,
 
 
 nans_to_zero(v) = isnan(v) ? typeof(v)(0) : v
-
-"""
-    reshape_cgll_sparse_to_field!(field::CC.Fields.Field, in_array::Array, R, ::CC.Spaces.SpectralElementSpace2D)
-
-Reshapes a sparse vector array `in_array` (CGLL, raw output of the TempestRemap),
-and uses its data to populate the input Field object `field`.
-Redundant nodes are populated using `dss` operations.
-
-# Arguments
-- `field`: [CC.Fields.Field] object populated with the input array.
-- `in_array`: [Array] input used to fill `field`.
-- `R`: [NamedTuple] containing `target_idxs` and `row_indices` used for indexing.
-- `space`: [CC.Spaces.SpectralElementSpace2D] 2d space to which we are mapping.
-"""
-function reshape_cgll_sparse_to_field!(
-    field::CC.Fields.Field,
-    in_array::SubArray,
-    R,
-    ::CC.Spaces.SpectralElementSpace2D,
-)
-    field_array = parent(field)
-
-    fill!(field_array, zero(eltype(field_array)))
-    Nf = size(field_array, 3)
-
-    # populate the field by iterating over the sparse vector per face
-    for (n, row) in enumerate(R.row_indices)
-        it, jt, et = (view(R.target_idxs[1], n), view(R.target_idxs[2], n), view(R.target_idxs[3], n)) # cgll_x, cgll_y, elem
-        for f in 1:Nf
-            field_array[it, jt, f, et] .= in_array[row]
-        end
-    end
-
-    # broadcast to the redundant nodes using unweighted dss
-    space = axes(field)
-    topology = CC.Spaces.topology(space)
-    hspace = CC.Spaces.horizontal_space(space)
-    CC.Topologies.dss!(CC.Fields.field_values(field), topology)
-end
-
-"""
-    reshape_cgll_sparse_to_field!(field::CC.Fields.Field, in_array::Array, R, ::CC.Spaces.ExtrudedFiniteDifferenceSpace)
-
-Reshapes a sparse vector array `in_array` (CGLL, raw output of the TempestRemap),
-and uses its data to populate the input Field object `field`.
-Redundant nodes are populated using `dss` operations.
-
-# Arguments
-- `field`: [CC.Fields.Field] object populated with the input array.
-- `in_array`: [Array] input used to fill `field`.
-- `R`: [NamedTuple] containing `target_idxs` and `row_indices` used for indexing.
-- `space`: [CC.Spaces.ExtrudedFiniteDifferenceSpace] 3d space to which we are mapping.
-"""
-function reshape_cgll_sparse_to_field!(
-    field::CC.Fields.Field,
-    in_array::SubArray,
-    R,
-    ::CC.Spaces.ExtrudedFiniteDifferenceSpace,
-)
-    field_array = parent(field)
-
-    fill!(field_array, zero(eltype(field_array)))
-    Nf = size(field_array, 4)
-    Nz = size(field_array, 1)
-
-    # populate the field by iterating over height, then over the sparse vector per face
-    for z in 1:Nz
-        for (n, row) in enumerate(R.row_indices)
-            it, jt, et = (view(R.target_idxs[1], n), view(R.target_idxs[2], n), view(R.target_idxs[3], n)) # cgll_x, cgll_y, elem
-            for f in 1:Nf
-                field_array[z, it, jt, f, et] .= in_array[row, z]
-            end
-        end
-    end
-    # broadcast to the redundant nodes using unweighted dss
-    space = axes(field)
-    topology = CC.Spaces.topology(space)
-    hspace = CC.Spaces.horizontal_space(space)
-    CC.Topologies.dss!(CC.Fields.field_values(field), topology)
-end
-
-"""
-    hdwrite_regridfile_rll_to_cgll(
-        FT,
-        REGRID_DIR,
-        datafile_rll,
-        varname,
-        space;
-        hd_outfile_root = "data_cgll",
-        mono = false,
-    )
-
-Reads and regrids data of the `varname` variable from an input NetCDF file and
-saves it as another NetCDF file using Tempest Remap.
-The input NetCDF fileneeds to be `Exodus` formatted, and can contain
-time-dependent data. The output NetCDF file is then read back, the output
-arrays converted into Fields and saved as HDF5 files (one per time slice).
-This function should be called by the root process.
-The saved regridded HDF5 output is readable by multiple MPI processes.
-
-# Arguments
-- `FT`: [DataType] Float type.
-- `REGRID_DIR`: [String] directory to save output files in.
-- `datafile_rll`: [String] filename of RLL dataset to be mapped to CGLL.
-- `varname`: [String] the name of the variable to be remapped.
-- `space`: [CC.Spaces.AbstractSpace] the space to which we are mapping.
-- `hd_outfile_root`: [String] root of the output file name.
-- `mono`: [Bool] flag to specify monotone remapping.
-"""
-function hdwrite_regridfile_rll_to_cgll(
-    FT,
-    REGRID_DIR,
-    datafile_rll,
-    varname,
-    space;
-    hd_outfile_root = "data_cgll",
-    mono = false,
-)
-    out_type = "cgll"
-
-    outfile = hd_outfile_root * ".nc"
-    outfile_root = mono ? outfile[1:(end - 3)] * "_mono" : outfile[1:(end - 3)]
-    datafile_cgll = joinpath(REGRID_DIR, outfile_root * ".g")
-
-    meshfile_rll = joinpath(REGRID_DIR, outfile_root * "_mesh_rll.g")
-    meshfile_cgll = joinpath(REGRID_DIR, outfile_root * "_mesh_cgll.g")
-    meshfile_overlap = joinpath(REGRID_DIR, outfile_root * "_mesh_overlap.g")
-    weightfile = joinpath(REGRID_DIR, outfile_root * "_remap_weights.nc")
-
-    if space isa CC.Spaces.ExtrudedFiniteDifferenceSpace
-        space2d = CC.Spaces.horizontal_space(space)
-    else
-        space2d = space
-    end
-
-    # If doesn't make sense to regrid with GPUs/MPI processes
-    cpu_singleton_context = ClimaComms.SingletonCommsContext(ClimaComms.CPUSingleThreaded())
-
-    topology = CC.Topologies.Topology2D(
-        cpu_singleton_context,
-        CC.Spaces.topology(space2d).mesh,
-        CC.Topologies.spacefillingcurve(CC.Spaces.topology(space2d).mesh),
-    )
-    Nq = CC.Spaces.Quadratures.polynomial_degree(CC.Spaces.quadrature_style(space2d)) + 1
-
-    space2d_undistributed = CC.Spaces.SpectralElementSpace2D(topology, CC.Spaces.Quadratures.GLL{Nq}())
-
-    if space isa CC.Spaces.ExtrudedFiniteDifferenceSpace
-        vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(CC.Spaces.vertical_topology(space))
-        space_undistributed = CC.Spaces.ExtrudedFiniteDifferenceSpace(space2d_undistributed, vert_center_space)
-    else
-        space_undistributed = space2d_undistributed
-    end
-    if isfile(datafile_cgll) == false
-        nlat, nlon = NCDatasets.NCDataset(datafile_rll) do ds
-            (ds.dim["lat"], ds.dim["lon"])
-        end
-        # write lat-lon mesh
-        CCTR.rll_mesh(meshfile_rll; nlat = nlat, nlon = nlon)
-
-        # write cgll mesh, overlap mesh and weight file
-        CCTR.write_exodus(meshfile_cgll, topology)
-        CCTR.overlap_mesh(meshfile_overlap, meshfile_rll, meshfile_cgll)
-
-        # 'in_np = 1' and 'mono = true' arguments ensure mapping is conservative and monotone
-        # Note: for a kwarg not followed by a value, set it to true here (i.e. pass 'mono = true' to produce '--mono')
-        # Note: out_np = degrees of freedom = polynomial degree + 1
-        kwargs = (; out_type = out_type, out_np = Nq)
-        kwargs = mono ? (; (kwargs)..., in_np = 1, mono = mono) : kwargs
-        CCTR.remap_weights(weightfile, meshfile_rll, meshfile_cgll, meshfile_overlap; kwargs...)
-        CCTR.apply_remap(datafile_cgll, datafile_rll, weightfile, [varname])
-    else
-        @warn "Using the existing $datafile_cgll : check topology is consistent"
-    end
-
-    # read the remapped file with sparse matrices
-    offline_outvector, coords = NCDatasets.NCDataset(datafile_cgll, "r") do ds_wt
-        (
-            # read the data in, and remove missing type (will error if missing data is present)
-            offline_outvector = NCDatasets.nomissing(Array(ds_wt[varname])[:, :, :]), # ncol, z, times
-            coords = get_coords(ds_wt, space),
-        )
-    end
-
-    times = coords[1]
-
-    # weightfile info needed to populate all nodes and save into fields with
-    #  sparse matrices
-    _, _, row_indices = NCDatasets.NCDataset(weightfile, "r") do ds_wt
-        (Array(ds_wt["S"]), Array(ds_wt["col"]), Array(ds_wt["row"]))
-    end
-
-    target_unique_idxs =
-        out_type == "cgll" ? collect(CC.Spaces.unique_nodes(space2d_undistributed)) :
-        collect(CC.Spaces.all_nodes(space2d_undistributed))
-    target_unique_idxs_i = map(row -> target_unique_idxs[row][1][1], row_indices)
-    target_unique_idxs_j = map(row -> target_unique_idxs[row][1][2], row_indices)
-    target_unique_idxs_e = map(row -> target_unique_idxs[row][2], row_indices)
-    target_unique_idxs = (target_unique_idxs_i, target_unique_idxs_j, target_unique_idxs_e)
-
-    R = (; target_idxs = target_unique_idxs, row_indices = row_indices)
-
-    offline_field = CC.Fields.zeros(FT, space_undistributed)
-
-    offline_fields = ntuple(x -> similar(offline_field), length(times))
-
-    ntuple(
-        x -> reshape_cgll_sparse_to_field!(
-            offline_fields[x],
-            selectdim(offline_outvector, length(coords) + 1, x),
-            R,
-            space,
-        ),
-        length(times),
-    )
-
-    map(
-        x -> write_to_hdf5(REGRID_DIR, hd_outfile_root, times[x], offline_fields[x], varname, cpu_singleton_context),
-        1:length(times),
-    )
-    JLD2.jldsave(joinpath(REGRID_DIR, hd_outfile_root * "_times.jld2"); times = times)
-end
-
-"""
-    get_coords(ds, ::CC.Spaces.ExtrudedFiniteDifferenceSpace)
-    get_coords(ds, ::CC.Spaces.SpectralElementSpace2D)
-
-Extracts the coordinates from a NetCDF file `ds`. The coordinates are
-returned as a tuple of arrays, one for each dimension. The dimensions are
-determined by the space type.
-"""
-function get_coords(ds, ::CC.Spaces.ExtrudedFiniteDifferenceSpace)
-    data_dates = get_time(ds)
-    z = Array(ds["z"])
-    return (data_dates, z)
-end
-function get_coords(ds, ::CC.Spaces.SpectralElementSpace2D)
-    data_dates = get_time(ds)
-    return (data_dates,)
-end
-
-"""
-    get_time(ds)
-
-Extracts the time information from a NetCDF file `ds`.
-"""
-function get_time(ds)
-    if "time" in keys(ds.dim)
-        data_dates = Dates.DateTime.(Array(ds["time"]))
-    elseif "date" in keys(ds.dim)
-        data_dates = TimeManager.strdate_to_datetime.(string.(Int.(Array(ds["date"]))))
-    else
-        @warn "No dates available in input data file"
-        data_dates = [Dates.DateTime(0)]
-    end
-    return data_dates
-end
-
-"""
-    write_to_hdf5(REGRID_DIR, hd_outfile_root, time, field, varname, comms_ctx)
-
-Function to save individual HDF5 files after remapping.
-If a CommsContext other than `SingletonCommsContext` is used for `comms_ctx`,
-the HDF5 output is readable by multiple MPI processes.
-
-# Arguments
-- `REGRID_DIR`: [String] directory to save output files in.
-- `hd_outfile_root`: [String] root of the output file name.
-- `time`: [Dates.DateTime] the timestamp of the data being written.
-- `field`: [CC.Fields.Field] object to be written.
-- `varname`: [String] variable name of data.
-- `comms_ctx`: [ClimaComms.AbstractCommsContext] context used for this operation.
-"""
-function write_to_hdf5(REGRID_DIR, hd_outfile_root, time, field, varname, comms_ctx)
-    t = Dates.datetime2unix.(time)
-    hdfwriter =
-        CC.InputOutput.HDF5Writer(joinpath(REGRID_DIR, hd_outfile_root * "_" * string(time) * ".hdf5"), comms_ctx)
-
-    CC.InputOutput.HDF5.write_attribute(hdfwriter.file, "unix time", t) # TODO: a better way to write metadata, CMIP convention
-    CC.InputOutput.write!(hdfwriter, field, string(varname))
-    Base.close(hdfwriter)
-end
 
 """
     read_from_hdf5(REGIRD_DIR, hd_outfile_root, time, varname, comms_ctx)
@@ -331,8 +50,10 @@ the input HDF5 file must be readable by multiple MPI processes.
 - Field or FieldVector
 """
 function read_from_hdf5(REGRID_DIR, hd_outfile_root, time, varname, comms_ctx)
-    hdfreader =
-        CC.InputOutput.HDF5Reader(joinpath(REGRID_DIR, hd_outfile_root * "_" * string(time) * ".hdf5"), comms_ctx)
+    hdfreader = CC.InputOutput.HDF5Reader(
+        joinpath(REGRID_DIR, hd_outfile_root * "_" * varname * "_" * string(time) * ".hdf5"),
+        comms_ctx,
+    )
 
     field = CC.InputOutput.read_field(hdfreader, varname)
     Base.close(hdfreader)
@@ -425,6 +146,38 @@ function remap_field_cgll_to_rll(name, field::CC.Fields.Field, remap_tmpdir, dat
 end
 
 """
+    read_available_dates(ds::NCDatasets.NCDataset)
+
+Return all the dates in the given NCDataset. The dates are read from the "time"
+or "date" datasets. If none is available, return an empty vector.
+
+Code taken from ClimaUtilities
+"""
+function read_available_dates(ds)
+    if "time" in keys(ds.dim)
+        return Dates.DateTime.(reinterpret.(Ref(NCDatasets.DateTimeStandard), ds["time"][:]))
+    elseif "date" in keys(ds.dim)
+        return yyyymmdd_to_datetime.(string.(ds["date"][:]))
+    else
+        return Dates.DateTime[]
+    end
+end
+
+"""
+    strdate_to_datetime(strdate::String)
+
+Convert from String ("YYYYMMDD") to Date format.
+
+# Arguments
+- `yyyymmdd`: [String] to be converted to Date type
+
+Code taken from ClimaUtilities
+"""
+function yyyymmdd_to_datetime(strdate::String)
+    length(strdate) == 8 || error("$strdate does not have the YYYYMMDD format")
+    return Dates.DateTime(parse(Int, strdate[1:4]), parse(Int, strdate[5:6]), parse(Int, strdate[7:8]))
+end
+"""
     function land_fraction(
         FT,
         REGRID_DIR,
@@ -465,25 +218,21 @@ function land_fraction(
     infile,
     varname,
     boundary_space;
-    outfile_root = "land_sea_cgll",
     mono = false,
     threshold = 0.7,
 )
 
     if ClimaComms.iamroot(comms_ctx)
-        hdwrite_regridfile_rll_to_cgll(
-            FT,
-            REGRID_DIR,
-            infile,
-            varname,
-            boundary_space;
-            hd_outfile_root = outfile_root,
-            mono = mono,
-        )
+        Regridders.TempestRegridder(boundary_space, varname, infile; regrid_dir = REGRID_DIR, mono)
     end
     ClimaComms.barrier(comms_ctx)
-    file_dates = JLD2.load(joinpath(REGRID_DIR, outfile_root * "_times.jld2"), "times")
-    fraction = read_from_hdf5(REGRID_DIR, outfile_root, file_dates[1], varname, comms_ctx)
+    # dates are already read in when using Regridders.TempestRegridder, but they are not
+    # returned, so we need to read them again
+    dates = NCDatasets.NCDataset(infile, "r") do ds
+        read_available_dates(ds)
+    end
+    outfile_root = varname
+    fraction = read_from_hdf5(REGRID_DIR, outfile_root, dates[1], varname, comms_ctx)
     fraction = Utilities.swap_space!(boundary_space, fraction) # needed if we are reading from previous run
     return mono ? fraction : binary_mask.(fraction, threshold)
 end

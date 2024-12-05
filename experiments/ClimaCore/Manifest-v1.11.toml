@@ -300,7 +300,7 @@ uuid = "d934ef94-cdd4-4710-83d6-720549644b70"
 version = "0.3.18"
 
 [[deps.ClimaCoupler]]
-deps = ["ClimaComms", "ClimaCore", "ClimaCoreTempestRemap", "Dates", "JLD2", "Logging", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
+deps = ["ClimaComms", "ClimaCore", "ClimaCoreTempestRemap", "ClimaUtilities", "Dates", "JLD2", "Logging", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
 path = "../.."
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.1.1"
@@ -320,6 +320,28 @@ version = "0.7.38"
     OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
     PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
     StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+
+[[deps.ClimaUtilities]]
+deps = ["Artifacts", "ClimaComms", "Dates"]
+git-tree-sha1 = "ae6e4d3223ecb29d3f3d9c5f82b622bae12f3bff"
+uuid = "b3f4f4ca-9299-4f7f-bd9b-81e1242a7513"
+version = "0.1.19"
+
+    [deps.ClimaUtilities.extensions]
+    ClimaUtilitiesCUDAExt = "CUDA"
+    ClimaUtilitiesClimaCoreExt = "ClimaCore"
+    ClimaUtilitiesClimaCoreInterpolationsExt = ["ClimaCore", "Interpolations"]
+    ClimaUtilitiesClimaCoreNCDatasetsExt = ["ClimaCore", "NCDatasets"]
+    ClimaUtilitiesClimaCoreTempestRemapExt = "ClimaCoreTempestRemap"
+    ClimaUtilitiesNCDatasetsExt = "NCDatasets"
+
+    [deps.ClimaUtilities.weakdeps]
+    Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+    ClimaCore = "d414da3d-4745-48bb-8d80-42e94e092884"
+    ClimaCoreTempestRemap = "d934ef94-cdd4-4710-83d6-720549644b70"
+    Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+    NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
 
 [[deps.CloseOpenIntervals]]
 deps = ["Static", "StaticArrayInterface"]

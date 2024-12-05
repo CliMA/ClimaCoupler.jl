@@ -40,7 +40,7 @@ else
 end
 
 # Specify atmos output directory to be inside the coupler output directory
-output_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "output", "climaatmos", job_id, "artifacts")
+output_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "output", job_id, "artifacts")
 !isdir(output_dir) && mkpath(output_dir)
 config = merge(config, Dict("output_dir" => output_dir))
 atmos_config = CA.AtmosConfig(config)

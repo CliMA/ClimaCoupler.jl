@@ -167,8 +167,7 @@ catch error
     )
 end
 co2_data = joinpath(@clima_artifact("co2_dataset", comms_ctx), "co2_mm_mlo.txt")
-land_mask_data =
-    joinpath(@clima_artifact("earth_orography_60arcseconds", comms_ctx), "ETOPO_2022_v1_60s_N90W180_surface.nc")
+land_mask_data = joinpath(@clima_artifact("landsea_mask_60arcseconds", comms_ctx), "landsea_mask.nc")
 
 #=
 ## Component Model Initialization
@@ -213,12 +212,7 @@ Note that land-sea area fraction is different to the land-sea mask, which is a b
 =#
 
 # Preprocess the file to be 1s and 0s before remapping into onto the grid
-land_area_fraction = SpaceVaryingInput(
-    land_mask_data,
-    "z",
-    boundary_space,
-    file_reader_kwargs = (; preprocess_func = (data) -> data >= 0),
-)
+land_area_fraction = SpaceVaryingInput(land_mask_data, "landsea", boundary_space)
 if !mono_surface
     land_area_fraction = Regridder.binary_mask.(land_area_fraction)
 end
@@ -746,7 +740,7 @@ function solve_coupler!(cs)
     return nothing
 end
 
-## exit if running performance anaysis #hide
+## exit if running performance analysis #hide
 if haskey(ENV, "CI_PERF_SKIP_COUPLED_RUN") #hide
     throw(:exit_profile_init) #hide
 end #hide
@@ -775,7 +769,7 @@ GC.gc()
 
 This is where the full coupling loop, `solve_coupler!` is called for the full timespan of the simulation.
 We use the `ClimaComms.@elapsed` macro to time the simulation on both CPU and GPU, and use this
-value to calculare the simulated years per day (SYPD) of the simulation.
+value to calculate the simulated years per day (SYPD) of the simulation.
 =#
 walltime = ClimaComms.@elapsed comms_ctx.device begin
     s = CA.@timed_str begin

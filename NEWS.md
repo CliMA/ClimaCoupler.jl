@@ -21,6 +21,12 @@ by identifying where elevation is greater than 0. Note, this can lead to
 misidentification of ocean in some areas of the globe that are inland but below
 sea level (Dead Sea, Death Valley, ...).
 
+### Leaderboard for variables over longitude, latitude, time, and pressure - PR [#1094](https://github.com/CliMA/ClimaCoupler.jl/pull/1094)
+
+As a part of the post processing pipeline, bias plots for variables at the
+pressure levels of 850.0, 500.0, 250.0 hPa and bias plots over latitude and
+pressure levels are being created.
+
 
 
 ### Code cleanup

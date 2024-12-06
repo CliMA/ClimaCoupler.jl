@@ -9,6 +9,7 @@ module TestHelper
 import ClimaCore as CC
 import ClimaComms
 import NCDatasets
+import Dates
 
 export create_space, gen_ncdata
 
@@ -118,13 +119,41 @@ function gen_ncdata_time(FT, path, varname, val)
     # Define variables
     lon = NCDatasets.defVar(nc, "lon", FT, ("lon",))
     lat = NCDatasets.defVar(nc, "lat", FT, ("lat",))
-    time = NCDatasets.defVar(nc, "time", Float64, ("time",))
+    time = NCDatasets.defVar(nc, "time", Dates.DateTime.([2020.0, 2021.0]), ("time",))
     v = NCDatasets.defVar(nc, varname, FT, ("lon", "lat", "time"))
 
     # Populate lon and lat
     lon[:] = [i for i in 0.0:(360 / 64):(360 - (360 / 64))]
     lat[:] = [i for i in (-90 + (180 / 64)):(180 / 32):(90 - (180 / 64))]
-    time[:] = [Float64(i) for i in 1:2]
+
+    # Generate some example data and write it to v
+    v[:, :, 1] = [val * 0 for i in 1:nc.dim["lon"], j in 1:nc.dim["lat"]]
+    v[:, :, 2] = [val for i in 1:nc.dim["lon"], j in 1:nc.dim["lat"]]
+
+    close(nc)
+end
+
+function gen_ncdata_date(FT, path, varname, val)
+    isfile(path) && rm(path)
+
+    # Create dataset of all ones
+    nc = NCDatasets.NCDataset(path, "c")
+
+    # Define dataset information
+    NCDatasets.defDim(nc, "lon", 64)
+    NCDatasets.defDim(nc, "lat", 32)
+    NCDatasets.defDim(nc, "date", 2)
+    nc.attrib["title"] = "this is an NCDataset containing the same value at each point on a lat/lon grid at two dates"
+
+    # Define variables
+    lon = NCDatasets.defVar(nc, "lon", FT, ("lon",))
+    lat = NCDatasets.defVar(nc, "lat", FT, ("lat",))
+    time = NCDatasets.defVar(nc, "date", ["20200101", "20210101"], ("date",))
+    v = NCDatasets.defVar(nc, varname, FT, ("lon", "lat", "date"))
+
+    # Populate lon and lat
+    lon[:] = [i for i in 0.0:(360 / 64):(360 - (360 / 64))]
+    lat[:] = [i for i in (-90 + (180 / 64)):(180 / 32):(90 - (180 / 64))]
 
     # Generate some example data and write it to v
     v[:, :, 1] = [val * 0 for i in 1:nc.dim["lon"], j in 1:nc.dim["lat"]]

@@ -9,6 +9,8 @@ import ClimaComms
 import ClimaCore as CC
 import ClimaCoupler
 import ClimaCoupler: Interfacer, Regridder, TimeManager
+import ClimaUtilities.Regridders
+import ClimaCoreTempestRemap
 
 include("TestHelper.jl")
 import .TestHelper
@@ -137,7 +139,7 @@ for FT in (Float32, Float64)
         @test all(parent(combined_field) .== FT(sum(fractions) * sum(fields) / length(fields)))
     end
 
-    @testset "test get_time" begin
+    @testset "test read_available_dates" begin
         # Set up regrid directory for this test only
         mktempdir(pwd()) do regrid_dir
             # Test dataset containing times
@@ -145,7 +147,14 @@ for FT in (Float32, Float64)
             varname = "test_data"
             TestHelper.gen_ncdata_time(FT, data_path, varname, FT(1))
             NCDatasets.NCDataset(data_path, "r") do ds
-                @test Regridder.get_time(ds) == Dates.DateTime.(Array(ds["time"]))
+                @test Regridder.read_available_dates(ds) == Dates.DateTime.(Array(ds["time"]))
+            end
+
+            data_path = joinpath(regrid_dir, "data_dates.nc")
+            varname = "test_data"
+            TestHelper.gen_ncdata_date(FT, data_path, varname, FT(1))
+            NCDatasets.NCDataset(data_path, "r") do ds
+                @test Regridder.read_available_dates(ds) == Dates.DateTime.(Array(ds["date"]), "yyyymmdd")
             end
 
             # Test warning when no dates are available in input data file
@@ -153,7 +162,7 @@ for FT in (Float32, Float64)
             varname = "test_data"
             TestHelper.gen_ncdata(FT, data_path, varname, FT(1))
             NCDatasets.NCDataset(data_path, "r") do ds
-                @test_logs (:warn, "No dates available in input data file") Regridder.get_time(ds)
+                @test Dates.DateTime[] == Regridder.read_available_dates(ds)
             end
         end
     end
@@ -161,19 +170,21 @@ for FT in (Float32, Float64)
     # Add tests which use TempestRemap here -
     # TempestRemap is not built on Windows because of NetCDF support limitations
     if !Sys.iswindows()
-        @testset "test write_to_hdf5 and read_from_hdf5" begin
+        @testset "test read_from_hdf5" begin
             # Set up regrid directory for this test only
             mktempdir(pwd()) do regrid_dir
-                hd_outfile_root = "hdf5_out_test"
-                tx = Dates.DateTime(1979, 01, 01, 01, 00, 00)
                 test_space = TestHelper.create_space(FT)
-                input_field = CC.Fields.ones(test_space)
                 varname = "testdata"
-
-                Regridder.write_to_hdf5(regrid_dir, hd_outfile_root, tx, input_field, varname, comms_ctx)
-
-                output_field = Regridder.read_from_hdf5(regrid_dir, hd_outfile_root, tx, varname, comms_ctx)
-                @test parent(input_field) == parent(output_field)
+                hd_outfile_root = varname
+                data_path = joinpath(regrid_dir, "test_data")
+                TestHelper.gen_ncdata_time(FT, data_path, varname, FT(1))
+                Regridders.TempestRegridder(test_space, varname, data_path; regrid_dir, mono = true)
+                output_field_ones =
+                    Regridder.read_from_hdf5(regrid_dir, hd_outfile_root, Dates.DateTime(2021), varname, comms_ctx)
+                output_field_zeros =
+                    Regridder.read_from_hdf5(regrid_dir, hd_outfile_root, Dates.DateTime(2020), varname, comms_ctx)
+                @test parent(CC.Fields.ones(test_space)) == parent(output_field_ones)
+                @test parent(CC.Fields.zeros(test_space)) == parent(output_field_zeros)
             end
         end
 
@@ -248,20 +259,19 @@ for FT in (Float32, Float64)
             end
         end
 
-        @testset "test hdwrite_regridfile_rll_to_cgll 3d space for FT=$FT" begin
+        @testset "test remap_field_cgll_to_rll 2d space for FT=$FT" begin
             # Set up regrid directory for this test only
             mktempdir(pwd()) do regrid_dir
                 # Test setup
                 R = FT(6371e3)
-                space = TestHelper.create_space(FT, nz = 2, ne = 16, R = R)
+                space = TestHelper.create_space(FT, nz = 0, ne = 16, R = R)
 
                 # lat-lon dataset
-                data = ones(720, 360, 2, 3) # (lon, lat, z, time)
-                time = [19000101.0, 19000201.0, 19000301.0]
+                data = ones(720, 360, 3) # (lon, lat, z, time)
+                time = [19000101, 19000201, 19000301]
                 lats = collect(range(-90, 90, length = 360))
                 lons = collect(range(-180, 180, length = 720))
-                z = [1000.0, 2000.0]
-                data = reshape(sin.(lats * π / 90)[:], 1, :, 1, 1) .* data
+                data = reshape(sin.(lats * π / 90)[:], 1, :, 1) .* data
                 varname = "sinlat"
 
                 # save the lat-lon data to a netcdf file in the required format for TempestRemap
@@ -269,31 +279,21 @@ for FT in (Float32, Float64)
                 NCDatasets.NCDataset(datafile_rll, "c") do ds
                     NCDatasets.defDim(ds, "lat", size(lats)...)
                     NCDatasets.defDim(ds, "lon", size(lons)...)
-                    NCDatasets.defDim(ds, "z", size(z)...)
                     NCDatasets.defDim(ds, "date", size(time)...)
 
                     NCDatasets.defVar(ds, "lon", lons, ("lon",))
                     NCDatasets.defVar(ds, "lat", lats, ("lat",))
-                    NCDatasets.defVar(ds, "z", z, ("z",))
                     NCDatasets.defVar(ds, "date", time, ("date",))
 
-                    NCDatasets.defVar(ds, varname, data, ("lon", "lat", "z", "date"))
+                    NCDatasets.defVar(ds, varname, data, ("lon", "lat", "date"))
                 end
 
-                hd_outfile_root = "data_cgll_test"
-                Regridder.hdwrite_regridfile_rll_to_cgll(
-                    FT,
-                    regrid_dir,
-                    datafile_rll,
-                    varname,
-                    space,
-                    mono = true,
-                    hd_outfile_root = hd_outfile_root,
-                )
+                hd_outfile_root = varname
+                Regridders.TempestRegridder(space, varname, datafile_rll; regrid_dir, mono = true)
 
                 # read in data on CGLL grid from the last saved date
                 date1 = TimeManager.strdate_to_datetime.(string(Int(time[end])))
-                cgll_path = joinpath(regrid_dir, "$(hd_outfile_root)_$date1.hdf5")
+                cgll_path = joinpath(regrid_dir, "$(hd_outfile_root)_$(hd_outfile_root)_$date1.hdf5")
                 hdfreader = CC.InputOutput.HDF5Reader(cgll_path, comms_ctx)
                 T_cgll = CC.InputOutput.read_field(hdfreader, varname)
                 Base.close(hdfreader)
@@ -305,12 +305,8 @@ for FT in (Float32, Float64)
                 Regridder.remap_field_cgll_to_rll(:var, T_cgll, regrid_dir, datafile_latlon, nlat = nlat, nlon = nlon)
                 T_rll, _ = Regridder.read_remapped_field(:var, datafile_latlon)
 
-                # check consistency across z-levels
-                @test T_rll[:, :, 1] == T_rll[:, :, 2]
-
                 # check consistency of CGLL remapped data with original data
                 @test all(isapprox.(extrema(data), extrema(parent(T_cgll)), atol = 1e-2))
-
                 # check consistency of lat-lon remapped data with original data
                 @test all(isapprox.(extrema(data), extrema(T_rll), atol = 1e-3))
             end

@@ -125,10 +125,25 @@ add_extra_diagnostics!(config_dict)
     plot_diagnostics,
 ) = get_coupler_args(config_dict)
 
+#=
+### I/O Directory Setup `setup_output_dirs` returns `dir_paths.output =
+COUPLER_OUTPUT_DIR`, which is the directory where the output of the simulation
+will be saved, `dir_paths.artifacts` is the directory where the plots (from
+postprocessing and the conservation checks) of the simulation will be saved,
+#and `dir_paths.checkpoints`, where restart files are saved.
+=#
+
+COUPLER_OUTPUT_DIR = joinpath(output_dir_root, job_id)
+dir_paths = Utilities.setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
+@info "Coupler output directory $(dir_paths.output)"
+@info "Coupler artifacts directory $(dir_paths.artifacts)"
+@info "Coupler checkpoint directory $(dir_paths.checkpoints)"
+
 ## get component model dictionaries (if applicable)
 ## Note this step must come after parsing the coupler config dictionary, since
 ##  some parameters are passed from the coupler config to the component model configs
-atmos_config_dict = get_atmos_config_dict(config_dict, job_id)
+atmos_output_dir = joinpath(dir_paths.output, "clima_atmos")
+atmos_config_dict = get_atmos_config_dict(config_dict, job_id, atmos_output_dir)
 (; dt_rad, output_default_diagnostics) = get_atmos_args(atmos_config_dict)
 
 ## set unique random seed if desired, otherwise use default
@@ -136,18 +151,6 @@ Random.seed!(random_seed)
 @info "Random seed set to $(random_seed)"
 
 tspan = (t_start, t_end)
-
-#=
-### I/O Directory Setup
-`Utilities.setup_output_dirs` returns `dir_paths.output = COUPLER_OUTPUT_DIR`, which is the directory where the output of the simulation will be saved, and `dir_paths.artifacts` is the directory where
-the plots (from postprocessing and the conservation checks) of the simulation will be saved. `dir_paths.regrid` is the directory where the regridding
-temporary files will be saved.
-=#
-
-COUPLER_OUTPUT_DIR = joinpath(output_dir_root, job_id)
-dir_paths = Utilities.setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
-@info "Coupler output directory $(dir_paths.output)"
-@info "Coupler artifacts directory $(dir_paths.artifacts)"
 
 #=
 ## Data File Paths
@@ -848,13 +851,12 @@ if ClimaComms.iamroot(comms_ctx)
 
             # define variable names and output directories for each diagnostic
             amip_short_names_atmos = ["ta", "ua", "hus", "clw", "pr", "ts", "toa_fluxes_net"]
-            output_dir_atmos = atmos_sim.integrator.p.output_dir
             amip_short_names_coupler = ["F_turb_energy"]
             output_dir_coupler = dir_paths.output
 
             # Check if all output variables are available in the specified directories
             make_diagnostics_plots(
-                output_dir_atmos,
+                atmos_output_dir,
                 dir_paths.artifacts,
                 short_names = amip_short_names_atmos,
                 output_prefix = "atmos_",
@@ -870,17 +872,16 @@ if ClimaComms.iamroot(comms_ctx)
         # Check this because we only want monthly data for making plots
         if t_end > 84600 * 31 * 3 && output_default_diagnostics
             include("leaderboard/leaderboard.jl")
-            diagnostics_folder_path = atmos_sim.integrator.p.output_dir
             leaderboard_base_path = dir_paths.artifacts
-            compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
-            compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path)
+            compute_leaderboard(leaderboard_base_path, atmos_output_dir)
+            compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir)
         end
     end
     ## plot extra atmosphere diagnostics if specified
     if plot_diagnostics
         @info "Plotting diagnostics"
         include("user_io/diagnostics_plots.jl")
-        make_diagnostics_plots(atmos_sim.integrator.p.output_dir, dir_paths.artifacts)
+        make_diagnostics_plots(atmos_output_dir, dir_paths.artifacts)
     end
 
     ## plot all model states and coupler fields (useful for debugging)

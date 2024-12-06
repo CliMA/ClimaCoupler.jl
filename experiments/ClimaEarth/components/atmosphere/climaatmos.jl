@@ -293,7 +293,7 @@ FluxCalculator.get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxe
 ### ClimaAtmos.jl model-specific functions (not explicitly required by ClimaCoupler.jl)
 ###
 """
-    get_atmos_config_dict(coupler_dict::Dict, job_id::String)
+    get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_dir)
 
 Returns the specified atmospheric configuration (`atmos_config`) overwitten by arguments
 in the coupler dictionary (`config_dict`).
@@ -313,7 +313,7 @@ The TOML parameter file to use is chosen using the following priority:
 If a coupler TOML file is provided, it is used. Otherwise we use an atmos TOML
 file if it's provided. If neither is provided, we use a default coupler TOML file.
 """
-function get_atmos_config_dict(coupler_dict::Dict, job_id::String)
+function get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_dir)
     atmos_config_file = coupler_dict["atmos_config_file"]
     atmos_config_repo = coupler_dict["atmos_config_repo"]
     # override default or specified configs with coupler arguments, and set the correct atmos config_file
@@ -357,7 +357,7 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String)
     end
 
     # Specify atmos output directory to be inside the coupler output directory
-    atmos_output_dir = joinpath(coupler_dict["coupler_output_dir"], job_id, "clima_atmos")
+    atmos_config["output_dir_style"] = "RemovePreexisting"
     atmos_config["output_dir"] = atmos_output_dir
 
     # Access extra atmosphere diagnostics from coupler so we can rename for atmos code

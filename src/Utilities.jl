@@ -9,6 +9,7 @@ module Utilities
 import ClimaComms
 import ClimaCore as CC
 import Logging
+import ClimaUtilities.OutputPathGenerator: generate_output_path
 
 export swap_space!, get_device, get_comms_context, show_memory_usage, setup_output_dirs, time_to_seconds
 
@@ -99,33 +100,52 @@ Create output directories for the experiment. If `comms_ctx` is provided, only t
 By default, the regrid directory is created as a temporary directory inside the output directory,
 and the artifacts directory is created inside the output directory with the name `artifacts/`.
 
+`ClimaUtilities.OutputPathGenerator` is used so that simulations can be re-run and re-started.
+The output path looks like:
+```
+coupler_output_dir_amip/
+├── checkpoints
+│       └── checkpoints for the various models
+├── artifacts
+│       └── plots produced by the postporcessing step
+├── output_0000/
+│   ├── atmos/
+│   │   └── output of the atmos model
+│   └── ocean/
+│       └── output of the ocean model
+├── output_0001/
+│   └── ... component model outputs in their folders ...
+├── output_0002/
+│   └── ... component model outputs in their folders ...
+└── output_active -> output_0002/
+```
+
 # Arguments
 - `output_dir::String`: The directory where the output files will be stored. Default is the current directory.
 - `regrid_dir::String`: The directory where the regridded files will be stored. Default is `output_dir/regrid_tmp/`.
+- `checkpoint_dir::String`: The directory where the checkpoint files will be stored. Default is `output_dir/checkpoints/`.
 - `artifacts_dir::String`: The directory where the artifacts will be stored. Default is `output_dir/artifacts/`.
 - `comms_ctx::Union{Nothing, ClimaComms.AbstractCommsContext}`: The communicator context. If provided, only the root process will create the directories.
 
 # Returns
 - A tuple with the paths to the output, regrid, and artifacts directories.
 """
-function setup_output_dirs(; output_dir = nothing, artifacts_dir = nothing, comms_ctx)
-    if output_dir === nothing
-        output_dir = "."
-    end
-    if artifacts_dir === nothing
-        artifacts_dir = joinpath(output_dir, "artifacts")
-    end
-
-    @info(output_dir)
+function setup_output_dirs(;
+    output_dir = pwd(),
+    artifacts_dir = joinpath(output_dir, "artifacts"),
+    checkpoints_dir = joinpath(output_dir, "checkpoints"),
+    comms_ctx,
+)
+    output_dir = generate_output_path(output_dir, context = comms_ctx)
     regrid_dir = nothing
     if ClimaComms.iamroot(comms_ctx)
-        mkpath(output_dir)
         mkpath(artifacts_dir)
+        mkpath(checkpoints_dir)
         regrid_dir = mktempdir(output_dir, prefix = "regrid_tmp_")
     end
     regrid_dir = ClimaComms.bcast(comms_ctx, regrid_dir)
 
-    return (; output = output_dir, artifacts = artifacts_dir, regrid = regrid_dir)
+    return (; output = output_dir, artifacts = artifacts_dir, regrid = regrid_dir, checkpoints = checkpoints_dir)
 end
 
 """
@@ -151,4 +171,6 @@ function time_to_seconds(s::String)
     end
     error("Uncaught case in computing time from given string.")
 end
+
+
 end # module

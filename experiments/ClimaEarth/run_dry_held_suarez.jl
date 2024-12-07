@@ -55,6 +55,13 @@ tspan = (Float64(0.0), Float64(Utilities.time_to_seconds(t_end)))
 start_date = "19790301"
 hourly_checkpoint = true
 
+#=
+### I/O Directory Setup
+=#
+
+dir_paths = Utilities.setup_output_dirs(output_dir = coupler_output_dir, comms_ctx = ClimaComms.context())
+@info(config_dict)
+
 ## namelist
 config_dict = Dict(
     # general
@@ -101,7 +108,8 @@ config_dict = Dict(
 )
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
-atmos_config_dict = get_atmos_config_dict(config_dict, job_id)
+atmos_output_dir = joinpath(dir_paths.output, "clima_atmos")
+atmos_config_dict = get_atmos_config_dict(config_dict, job_id, atmos_output_dir)
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 
 #=
@@ -109,13 +117,6 @@ atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 =#
 
 comms_ctx = Utilities.get_comms_context(Dict("device" => "auto"))
-
-#=
-### I/O Directory Setup
-=#
-
-dir_paths = Utilities.setup_output_dirs(output_dir = coupler_output_dir, comms_ctx = comms_ctx)
-@info(config_dict)
 
 #=
 ## Component Model Initialization

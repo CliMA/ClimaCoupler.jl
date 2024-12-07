@@ -60,6 +60,14 @@ start_date = "19790321"
 hourly_checkpoint = true
 dt_rad = "6hours"
 
+#=
+### I/O Directory Setup
+=#
+
+dir_paths = Utilities.setup_output_dirs(output_dir = coupler_output_dir, comms_ctx = ClimaComms.context())
+@info(config_dict)
+
+
 ## namelist
 config_dict = Dict(
     # general
@@ -126,7 +134,8 @@ config_dict = Dict(
 )
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
-atmos_config_dict = get_atmos_config_dict(config_dict, job_id)
+atmos_output_dir = joinpath(dir_paths.output, "clima_atmos")
+atmos_config_dict = get_atmos_config_dict(config_dict, job_id, atmos_output_dir)
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 
 # override default toml parameters
@@ -144,13 +153,6 @@ atmos_config_object.toml_dict["max_area_limiter_scale"]["value"] = 0
 =#
 
 comms_ctx = Utilities.get_comms_context(Dict("device" => "auto"))
-
-#=
-### I/O Directory Setup
-=#
-
-dir_paths = Utilities.setup_output_dirs(output_dir = coupler_output_dir, comms_ctx = comms_ctx)
-@info(config_dict)
 
 #=
 ## Data File Paths

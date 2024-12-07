@@ -27,14 +27,33 @@ As a part of the post processing pipeline, bias plots for variables at the
 pressure levels of 850.0, 500.0, 250.0 hPa and bias plots over latitude and
 pressure levels are being created.
 
-
-
 ### Code cleanup
-#### Output path update - PR [#1058](https://github.com/CliMA/ClimaCoupler.jl/pull/1058)
+
+#### Output path updates - PRs [#1106](https://github.com/CliMA/ClimaCoupler.jl/pull/1058),
+    [#1106](https://github.com/CliMA/ClimaCoupler.jl/pull/1106)
+
 Previously, ClimaEarth simulation outputs were saved in a path
-`experiments/ClimaEarth/output/$mode_name/$job_id/artifacts/`.
-This PR removes `mode_name` has from this pattern, so output will now be in
-`experiments/ClimaEarth/output/$job_id/artifacts/`.
+`experiments/ClimaEarth/output/$mode_name/$job_id/artifacts/`. Now, `ClimaEarth`
+creates output folders with an increment (increasing the counter every time the
+simulation is run). This is in preparation to restarts. The output now looks
+like
+```
+coupler_output_dir_amip/
+├── checkpoints
+│       └── checkpoints for the various models
+├── artifacts
+│       └── plots produced by the postporcessing step
+├── output_0000/
+│   ├── atmos/
+│   │   └── output of the atmos model
+│   └── ocean/
+│       └── output of the ocean model
+├── output_0001/
+│   └── ... component model outputs in their folders ...
+├── output_0002/
+│   └── ... component model outputs in their folders ...
+└── output_active -> output_0002/
+``
 Note that any external scripts that assume an output path will need to be updated.
 
 #### Remove ClimaCoupler.Diagnostics module - PR [#953](https://github.com/CliMA/ClimaCoupler.jl/pull/953)

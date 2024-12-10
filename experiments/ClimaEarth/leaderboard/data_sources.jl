@@ -1,6 +1,5 @@
 import ClimaAnalysis
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
-import OrderedCollections: OrderedDict
 
 # Tuple of short names for loading simulation and observational data
 sim_obs_short_names_no_pr = [
@@ -193,7 +192,11 @@ function get_rmse_var_dict()
     ClimaAnalysis.add_unit!(rmse_var_rlut, "CliMA", "W m^-2")
 
     # Store the rmse vars in a dictionary
-    rmse_var_dict = OrderedDict("pr" => rmse_var_pr, "rsut" => rmse_var_rsut, "rlut" => rmse_var_rlut)
+    rmse_var_dict = ClimaAnalysis.OrderedCollections.OrderedDict(
+        "pr" => rmse_var_pr,
+        "rsut" => rmse_var_rsut,
+        "rlut" => rmse_var_rlut,
+    )
     return rmse_var_dict
 end
 

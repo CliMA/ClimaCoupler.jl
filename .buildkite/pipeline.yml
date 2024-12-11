@@ -65,16 +65,6 @@ steps:
 
   - group: "Unit Tests"
     steps:
-      - label: "MPI Regridder unit tests"
-        key: "regridder_mpi_tests"
-        command: "srun julia --color=yes --project=test/ test/mpi_tests/regridder_mpi_tests.jl"
-        timeout_in_minutes: 20
-        env:
-          CLIMACOMMS_CONTEXT: "MPI"
-          NPROCS: 2
-        agents:
-          slurm_ntasks: 2
-          slurm_mem: 16GB
 
       - label: "MPI Checkpointer unit tests"
         key: "checkpointer_mpi_tests"

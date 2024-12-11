@@ -4,7 +4,7 @@ import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
 import ClimaParams # required for TDP
 import ClimaCoupler
-import ClimaCoupler: Interfacer, Regridder
+import ClimaCoupler: Interfacer
 
 include(joinpath("..", "TestHelper.jl"))
 import .TestHelper

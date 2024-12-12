@@ -23,7 +23,13 @@ export CoupledSimulation,
     update_field!,
     SurfaceStub,
     step!,
-    reinit!
+    reinit!,
+    AbstractSlabplanetSimulationMode,
+    AMIPMode,
+    SlabplanetMode,
+    SlabplanetAquaMode,
+    SlabplanetTerraMode,
+    SlabplanetEisenmanMode
 
 
 """
@@ -241,5 +247,25 @@ reinit!(sim::ComponentModelSimulation) = error("undefined reinit! for " * name(s
 
 # Include file containing the surface stub simulation type.
 include("surface_stub.jl")
+
+"""
+    AbstractModeType
+
+An abstract type representing a simulation mode.
+"""
+abstract type AbstractSimulationMode end
+
+"""
+    AbstractSlabplanetSimulationMode
+
+An abstract type representing a simulation mode for slabplanet models.
+"""
+abstract type AbstractSlabplanetSimulationMode <: AbstractSimulationMode end
+
+struct AMIPMode <: AbstractSimulationMode end
+struct SlabplanetMode <: AbstractSlabplanetSimulationMode end
+struct SlabplanetAquaMode <: AbstractSlabplanetSimulationMode end
+struct SlabplanetTerraMode <: AbstractSlabplanetSimulationMode end
+struct SlabplanetEisenmanMode <: AbstractSlabplanetSimulationMode end
 
 end # module

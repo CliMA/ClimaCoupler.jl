@@ -110,7 +110,7 @@ config_dict = Dict(
     "precip_model" => "0M",
     "moist" => "equil",
     "prognostic_surface" => "PrescribedSurfaceTemperature",
-    "turb_flux_partition" => "CombinedStateFluxesMOST",
+    "turb_flux_partition" => "PartitionedStateFluxes",
 )
 # TODO: may need to switch to Bulk fluxes
 

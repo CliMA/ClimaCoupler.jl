@@ -11,7 +11,7 @@ mono_surface: false
 monthly_checkpoint: false
 start_date: "20100101"
 t_end: "12hours"
-turb_flux_partition: "CombinedStateFluxesMOST"
+turb_flux_partition: "PartitionedStateFluxes"
 use_coupler_diagnostics: false
 prescribe_ozone: true
 aerosol_radiation: true

@@ -16,7 +16,7 @@ precip_model: 0M
 rad: allskywithclear
 surface_setup: DefaultMoninObukhov
 t_end: 12hours
-turb_flux_partition: "CombinedStateFluxesMOST"
+turb_flux_partition: "PartitionedStateFluxes"
 vert_diff: "FriersonDiffusion"
 z_elem: 63
 z_max: 55000.0

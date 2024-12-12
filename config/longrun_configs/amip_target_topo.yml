@@ -1,4 +1,5 @@
 FLOAT_TYPE: "Float32"
+aerosol_radiation: true
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_0M_earth.yml"
 dt: "120secs"
@@ -7,18 +8,16 @@ dt_cpl: "120secs"
 dt_rad: "1hours"
 dt_save_state_to_disk: "20days"
 energy_check: false
-hourly_checkpoint: true
 insolation: "timevarying"
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
 netcdf_interpolate_z_over_msl: true
+prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
+prescribe_ozone: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
 turb_flux_partition: "CombinedStateFluxesMOST"
-prescribe_ozone: true
-aerosol_radiation: true
-prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]

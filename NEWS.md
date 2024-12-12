@@ -6,14 +6,14 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaEarth features
 
-### Sea-surface temperature and sea ice concentration data can now be automatically downloaded
+#### Sea-surface temperature and sea ice concentration data can now be automatically downloaded
 
 Sea-surface temperature and sea ice concentration require external files. Now, a
 low-resolution version of such files is automatically downloaded when a
 higher-resolution version is not available. Please, refer to
 [ClimaArtifacts](https://github.com/CliMA/ClimaArtifacts) for more information.
 
-### A higher resolution land-sea mask is now used and automatically downloaded - PR [#1006](https://github.com/CliMA/ClimaCoupler.jl/pull/1006)
+#### A higher resolution land-sea mask is now used and automatically downloaded - PR [#1006](https://github.com/CliMA/ClimaCoupler.jl/pull/1006)
 
 A 60 arcsecond land-sea mask constructed from topographic data is now used.
 Topographic data is automatically downloaded and a land-sea mask is constructed
@@ -21,11 +21,36 @@ by identifying where elevation is greater than 0. Note, this can lead to
 misidentification of ocean in some areas of the globe that are inland but below
 sea level (Dead Sea, Death Valley, ...).
 
-### Leaderboard for variables over longitude, latitude, time, and pressure - PR [#1094](https://github.com/CliMA/ClimaCoupler.jl/pull/1094)
+#### Leaderboard for variables over longitude, latitude, time, and pressure - PR [#1094](https://github.com/CliMA/ClimaCoupler.jl/pull/1094)
 
 As a part of the post processing pipeline, bias plots for variables at the
 pressure levels of 850.0, 500.0, 250.0 hPa and bias plots over latitude and
 pressure levels are being created.
+
+### Breaking changes
+
+#### `hourly_checkpoint_dt` is now just `checkpoint_dt` - PR[#1121](https://github.com/CliMA/ClimaCoupler.jl/pull/1121)
+
+Previously, the checkpointing frequency had to be specified in hours and it was
+not possible to checkpoint with smaller frequencies. Now, the argument
+`hourly_checkpoint_dt` was renamed to `checkpoint_dt` and any frequency can be
+specified (e.g., "2months", "200secs").
+
+Callbacks were also reworked, and the previous system was removed. Here is an example of the
+new way to create a callback that runs every month:
+```julia
+import ClimaCouper.TimeManager: Callback, maybe_trigger_callback
+import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule # This will be moved to ClimaUtilities
+import Dates
+
+start_date = Dates.DateTime(1912, 4, 15)
+func(cs) = println(maxima(cs.fields.T_s))
+schedule = EveryCalendarDtSchedule(Dates.Month(1); start_date)
+callback = Callback(schedule, func)
+
+# Then, call it with
+maybe_trigger_callback(callback, cs, t)
+```
 
 ### Code cleanup
 

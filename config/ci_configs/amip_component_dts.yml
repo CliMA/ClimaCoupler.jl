@@ -1,11 +1,11 @@
 apply_limiter: false
 dt_atmos: "150secs"
+dt_cpl: "150secs"
 dt_land: "50secs"
 dt_ocean: "30secs"
-dt_seaice: "75secs"
-dt_cpl: "150secs"
 dt_rad: "1hours"
 dt_save_to_sol: "1days"
+dt_seaice: "75secs"
 dz_bottom: 30
 dz_top: 3000
 energy_check: false

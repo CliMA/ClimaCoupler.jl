@@ -73,9 +73,6 @@ include("components/ocean/slab_ocean.jl")
 include("components/ocean/prescr_seaice.jl")
 include("components/ocean/eisenman_seaice.jl")
 
-## helpers for user-specified IO
-include("user_io/debug_plots.jl")
-
 #=
 ### Configuration Dictionaries
 Each simulation mode has its own configuration dictionary. The `config_dict` of each simulation is a merge of the default configuration
@@ -95,7 +92,7 @@ add_extra_diagnostics!(config_dict)
 
 (;
     job_id,
-    mode_name,
+    mode_type,
     random_seed,
     FT,
     comms_ctx,
@@ -244,8 +241,8 @@ In this section of the code, we initialize all component models and read in the 
 The specific models and data that are set up depend on which mode we're running.
 =#
 
-@info(mode_name)
-if mode_name == "amip"
+@info(mode_type)
+if mode_type isa AMIP_mode
     @info("AMIP boundary conditions - do not expect energy conservation")
 
     ## land model
@@ -334,18 +331,18 @@ if mode_name == "amip"
     CO2_field = Interfacer.update_field!(atmos_sim, Val(:co2), CO2_init)
 
     mode_specifics = (;
-        name = mode_name,
+        type = mode_type,
         SST_timevaryinginput = SST_timevaryinginput,
         SIC_timevaryinginput = SIC_timevaryinginput,
         CO2_timevaryinginput = CO2_timevaryinginput,
     )
     Utilities.show_memory_usage()
 
-elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
+elseif mode_type isa AbstractSlabPlanetModeSubType1
 
 
-    land_area_fraction = mode_name == "slabplanet_aqua" ? land_area_fraction .* 0 : land_area_fraction
-    land_area_fraction = mode_name == "slabplanet_terra" ? land_area_fraction .* 0 .+ 1 : land_area_fraction
+    land_area_fraction = mode_type isa slabplanet_aqua_mode ? land_area_fraction .* 0 : land_area_fraction
+    land_area_fraction = mode_type isa slabplanet_terra_mode ? land_area_fraction .* 0 .+ 1 : land_area_fraction
 
     ## land model
     land_sim = bucket_init(
@@ -393,10 +390,10 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         thermo_params = thermo_params,
     ))
 
-    mode_specifics = (; name = mode_name, SST_timevaryinginput = nothing, SIC_timevaryinginput = nothing)
+    mode_specifics = (; type = mode_type, SST_timevaryinginput = nothing, SIC_timevaryinginput = nothing)
     Utilities.show_memory_usage()
 
-elseif mode_name == "slabplanet_eisenman"
+elseif mode_type isa slabplanet_eisenman_mode
 
     ## land model
     land_sim = bucket_init(
@@ -440,7 +437,7 @@ elseif mode_name == "slabplanet_eisenman"
         thermo_params = thermo_params,
     )
 
-    mode_specifics = (; name = mode_name, SST_timevaryinginput = nothing, SIC_timevaryinginput = nothing)
+    mode_specifics = (; type = mode_type, SST_timevaryinginput = nothing, SIC_timevaryinginput = nothing)
     Utilities.show_memory_usage()
 end
 
@@ -495,7 +492,7 @@ saved in a global `ConservationChecks` struct, `conservation_checks`, which is t
 conservation_checks = nothing
 if energy_check
     @assert(
-        mode_name[1:10] == "slabplanet" && !CA.is_distributed(ClimaComms.context(boundary_space)),
+        mode_type isa AbstractSlabPlanetModeType && !CA.is_distributed(ClimaComms.context(boundary_space)),
         "Only non-distributed slabplanet allowable for energy_check"
     )
     conservation_checks = (;
@@ -537,7 +534,7 @@ albedo_cb = TimeManager.HourlyCallback(
     dt = dt_water_albedo,
     func = FluxCalculator.water_albedo_from_atmosphere!,
     ref_date = [dates.date[1]],
-    active = mode_name == "amip",
+    active = mode_type isa AMIP_mode,
 )
 callbacks =
     (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb, water_albedo = albedo_cb)
@@ -559,7 +556,7 @@ end
 #= Set up default AMIP diagnostics
 Use ClimaDiagnostics for default AMIP diagnostics, which currently include turbulent energy fluxes.
 =#
-if mode_name == "amip" && use_coupler_diagnostics
+if mode_type isa AMIP_mode && use_coupler_diagnostics
     include("user_io/amip_diagnostics.jl")
     coupler_diags_path = joinpath(dir_paths.output, "coupler")
     isdir(coupler_diags_path) || mkpath(coupler_diags_path)
@@ -688,7 +685,7 @@ function solve_coupler!(cs)
         ## print date on the first of month
         cs.dates.date[1] >= cs.dates.date1[1] && @info(cs.dates.date[1])
 
-        if cs.mode.name == "amip"
+        if cs.mode.type isa AMIP_mode
 
             evaluate!(Interfacer.get_field(ocean_sim, Val(:surface_temperature)), cs.mode.SST_timevaryinginput, t)
             evaluate!(Interfacer.get_field(ice_sim, Val(:area_fraction)), cs.mode.SIC_timevaryinginput, t)
@@ -749,7 +746,7 @@ function solve_coupler!(cs)
         ## compute/output AMIP diagnostics if scheduled for this timestep
         ## wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface
         cs_nt = (; u = cs.fields, p = nothing, t = t, step = round(t / Δt_cpl))
-        (cs.mode.name == "amip" && !isnothing(cs.amip_diags_handler)) &&
+        (cs.mode.type isa AMIP_mode && !isnothing(cs.amip_diags_handler)) &&
             CD.orchestrate_diagnostics(cs_nt, cs.amip_diags_handler)
     end
     return nothing
@@ -834,7 +831,7 @@ The postprocessing includes:
 if ClimaComms.iamroot(comms_ctx)
 
     ## energy check plots
-    if !isnothing(cs.conservation_checks) && cs.mode.name[1:10] == "slabplanet"
+    if !isnothing(cs.conservation_checks) && cs.mode.type isa AbstractSlabPlanetModeType
         @info "Conservation Check Plots"
         plot_global_conservation(
             cs.conservation_checks.energy,
@@ -853,7 +850,7 @@ if ClimaComms.iamroot(comms_ctx)
     end
 
     ## plotting AMIP results
-    if cs.mode.name == "amip"
+    if cs.mode.type isa AMIP_mode
         if use_coupler_diagnostics
             ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
             @info "AMIP plots"

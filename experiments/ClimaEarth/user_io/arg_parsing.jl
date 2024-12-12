@@ -1,5 +1,21 @@
 import YAML
 
+abstract type AbstractModeType end
+abstract type AbstractSlabPlanetModeType <: AbstractModeType end
+abstract type AbstractSlabPlanetModeSubType1 <: AbstractSlabPlanetModeType end
+struct AMIP_mode <: AbstractModeType end
+struct slabplanet_mode <: AbstractSlabPlanetModeSubType1 end
+struct slabplanet_aqua_mode <: AbstractSlabPlanetModeSubType1 end
+struct slabplanet_terra_mode <: AbstractSlabPlanetModeSubType1 end
+struct slabplanet_eisenman_mode <: AbstractSlabPlanetModeType end
+mode_name_dict = Dict(
+    "amip" => AMIP_mode,
+    "slabplanet" => slabplanet_mode,
+    "slabplanet_aqua" => slabplanet_aqua_mode,
+    "slabplanet_terra" => slabplanet_terra_mode,
+    "slabplanet_eisenman" => slabplanet_eisenman_mode,
+)
+
 """
     get_coupler_config()
 
@@ -42,6 +58,7 @@ function get_coupler_args(config_dict::Dict)
     config_dict["print_config_dict"] && @info(config_dict)
     job_id = config_dict["job_id"]
     mode_name = config_dict["mode_name"]
+    mode_type = mode_name_dict[mode_name]()
 
     # Computational simulation setup information
     random_seed = config_dict["unique_seed"] ? time_ns() : 1234
@@ -91,7 +108,7 @@ function get_coupler_args(config_dict::Dict)
 
     return (;
         job_id,
-        mode_name,
+        mode_type,
         random_seed,
         FT,
         comms_ctx,

@@ -413,11 +413,11 @@ surface temperature in surface energy balance calculations.
 differentiate_turbulent_fluxes!(::Interfacer.SurfaceModelSimulation, args) = nothing
 
 """
-    water_albedo_from_atmosphere!(cs::Interfacer.CoupledSimulation, _)
+    water_albedo_from_atmosphere!(cs::Interfacer.CoupledSimulation)
 
 Callback to calculate the water albedo from atmospheric state. This is a placeholder for the full radiation callback.
 """
-function water_albedo_from_atmosphere!(cs::Interfacer.CoupledSimulation, _)
+function water_albedo_from_atmosphere!(cs::Interfacer.CoupledSimulation)
     atmos_sim = cs.model_sims.atmos_sim
     ocean_sim = cs.model_sims.ocean_sim
     cf = cs.fields

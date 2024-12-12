@@ -29,6 +29,9 @@ import ClimaCoupler
 import ClimaCoupler:
     ConservationChecker, Checkpointer, FieldExchanger, FluxCalculator, Interfacer, TimeManager, Utilities
 
+# TODO: Move to ClimaUtilities once we move the Schedules to ClimaUtilities
+import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
+
 pkg_dir = pkgdir(ClimaCoupler)
 
 #=
@@ -55,7 +58,7 @@ restart_t = Int(0)
 t_end = "1000days"
 tspan = (Float64(0.0), Float64(Utilities.time_to_seconds(t_end)))
 start_date = "19790301"
-hourly_checkpoint = true
+checkpoint_dt = "480hours"
 
 #=
 ### I/O Directory Setup
@@ -209,20 +212,9 @@ dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)
 #=
 ## Initialize Callbacks
 =#
-
-checkpoint_cb = TimeManager.HourlyCallback(
-    dt = FT(480),
-    func = Checkpointer.checkpoint_sims,
-    ref_date = [dates.date[1]],
-    active = hourly_checkpoint,
-)
-update_firstdayofmonth!_cb = TimeManager.MonthlyCallback(
-    dt = FT(1),
-    func = TimeManager.update_firstdayofmonth!,
-    ref_date = [dates.date1[1]],
-    active = true,
-)
-callbacks = (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb)
+schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = date0)
+checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
+callbacks = (; checkpoint = checkpoint_cb)
 
 #=
 ## Initialize turbulent fluxes
@@ -303,11 +295,9 @@ function solve_coupler!(cs)
     @info("Starting coupling loop")
     ## step in time
     for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
+        # Update date
+        cs.dates.date[] = TimeManager.current_date(cs, t)
 
-        cs.dates.date[1] = TimeManager.current_date(cs, t)
-
-        ## print date on the first of month
-        cs.dates.date[1] >= cs.dates.date1[1] && @info(cs.dates.date[1])
         ClimaComms.barrier(comms_ctx)
 
         ## run component models sequentially for one coupling timestep (Δt_cpl)
@@ -322,12 +312,8 @@ function solve_coupler!(cs)
 
         FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
 
-        ## callback to update the fist day of month
-        TimeManager.trigger_callback!(cs, cs.callbacks.update_firstdayofmonth!)
-
         ## callback to checkpoint model state
-        TimeManager.trigger_callback!(cs, cs.callbacks.checkpoint)
-
+        TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs, t)
     end
 
     return nothing

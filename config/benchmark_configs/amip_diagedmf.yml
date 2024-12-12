@@ -1,4 +1,5 @@
 FLOAT_TYPE: "Float32"
+aerosol_radiation: true
 atmos_config_file: "config/benchmark_configs/climaatmos_diagedmf.yml"
 atmos_config_repo: "ClimaCoupler"
 dt: "120secs"
@@ -10,10 +11,9 @@ land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
 monthly_checkpoint: false
+prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
+prescribe_ozone: true
 start_date: "20100101"
 t_end: "12hours"
 turb_flux_partition: "CombinedStateFluxesMOST"
 use_coupler_diagnostics: false
-prescribe_ozone: true
-aerosol_radiation: true
-prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]

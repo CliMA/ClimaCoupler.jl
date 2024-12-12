@@ -7,7 +7,6 @@ dt_save_state_to_disk: "20days"
 dt_save_to_sol: "10days"
 energy_check: false
 evolving_ocean: false
-hourly_checkpoint: true
 land_albedo_type: "function"
 mode_name: "slabplanet"
 mono_surface: false

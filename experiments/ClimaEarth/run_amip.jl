@@ -65,6 +65,9 @@ import Interpolations # triggers InterpolationsExt in ClimaUtilities
 # Random is used by RRMTGP for some cloud properties
 import Random
 
+# TODO: Move to ClimaUtilities once we move the Schedules to ClimaUtilities
+import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
+
 pkg_dir = pkgdir(ClimaCoupler)
 
 #=
@@ -111,8 +114,7 @@ add_extra_diagnostics!(config_dict)
     Δt_cpl,
     component_dt_dict,
     saveat,
-    hourly_checkpoint,
-    hourly_checkpoint_dt,
+    checkpoint_dt,
     restart_dir,
     restart_t,
     use_coupler_diagnostics,
@@ -486,7 +488,7 @@ Utilities.show_memory_usage()
 model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim);
 
 ## dates
-dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)], new_month = [false])
+dates = (; date = [date], date0 = [date0])
 
 #=
 ## Initialize Conservation Checks
@@ -514,38 +516,24 @@ end
 Callbacks are used to update at a specified interval. The callbacks are initialized here and
 saved in a global `Callbacks` struct, `callbacks`. The `trigger_callback!` function is used to call the callback during the simulation below.
 
-The frequency of the callbacks is specified in the `HourlyCallback` and `MonthlyCallback` structs. The `func` field specifies the function to be called,
-the `ref_date` field specifies the first date for the callback, and the `active` field specifies whether the callback is active or not.
-
 The currently implemented callbacks are:
 - `checkpoint_cb`: generates a checkpoint of all model states at a specified interval. This is mainly used for restarting simulations.
-- `update_firstdayofmonth!_cb`: generates a callback to update the first day of the month for monthly message print (and other monthly operations).
 - `albedo_cb`: for the amip mode, the water albedo is time varying (since the reflectivity of water depends on insolation and wave characteristics, with the latter
   being approximated from wind speed). It is updated at the same frequency as the atmospheric radiation.
   NB: Eventually, we will call all of radiation from the coupler, in addition to the albedo calculation.
 =#
+schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = date0)
+checkpoint_cb = TimeManager.TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
 
-checkpoint_cb = TimeManager.HourlyCallback(
-    dt = hourly_checkpoint_dt,
-    func = Checkpointer.checkpoint_sims,
-    ref_date = [dates.date[1]],
-    active = hourly_checkpoint,
-) # 20 days
-update_firstdayofmonth!_cb = TimeManager.MonthlyCallback(
-    dt = FT(1),
-    func = TimeManager.update_firstdayofmonth!,
-    ref_date = [dates.date1[1]],
-    active = true,
-)
-dt_water_albedo = parse(FT, filter(x -> !occursin(x, "hours"), dt_rad))
-albedo_cb = TimeManager.HourlyCallback(
-    dt = dt_water_albedo,
-    func = FluxCalculator.water_albedo_from_atmosphere!,
-    ref_date = [dates.date[1]],
-    active = sim_mode <: AMIPMode,
-)
-callbacks =
-    (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb, water_albedo = albedo_cb)
+if sim_mode <: AMIPMode
+    schedule_albedo = EveryCalendarDtSchedule(TimeManager.time_to_period(dt_rad); start_date = date0)
+else
+    schedule_albedo = TimeManager.NeverSchedule()
+end
+albedo_cb = TimeManager.Callback(schedule_albedo, FluxCalculator.water_albedo_from_atmosphere!)
+
+callbacks = (; checkpoint = checkpoint_cb, water_albedo = albedo_cb)
+
 
 #=
 ## Initialize turbulent fluxes
@@ -687,14 +675,10 @@ function solve_coupler!(cs)
     @info("Starting coupling loop")
     ## step in time
     for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
-
-        cs.dates.date[1] = TimeManager.current_date(cs, t)
-
-        ## print date on the first of month
-        cs.dates.date[1] >= cs.dates.date1[1] && @info(cs.dates.date[1])
+        # Update date
+        cs.dates.date[] = TimeManager.current_date(cs, t)
 
         if cs.mode.type <: AMIPMode
-
             evaluate!(Interfacer.get_field(ocean_sim, Val(:surface_temperature)), cs.mode.SST_timevaryinginput, t)
             evaluate!(Interfacer.get_field(ice_sim, Val(:area_fraction)), cs.mode.SIC_timevaryinginput, t)
 
@@ -711,8 +695,7 @@ function solve_coupler!(cs)
 
         ## update water albedo from wind at dt_water_albedo
         ## (this will be extended to a radiation callback from the coupler)
-        TimeManager.trigger_callback!(cs, cs.callbacks.water_albedo)
-
+        TimeManager.maybe_trigger_callback(cs.callbacks.water_albedo, cs, t)
 
         ## update the surface fractions for surface models,
         ## and update all component model simulations with the current fluxes stored in the coupler
@@ -745,11 +728,8 @@ function solve_coupler!(cs)
         ## update the coupler with the new atmospheric properties
         FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
 
-        ## callback to update the fist day of month if needed
-        TimeManager.trigger_callback!(cs, cs.callbacks.update_firstdayofmonth!)
-
         ## callback to checkpoint model state
-        TimeManager.trigger_callback!(cs, cs.callbacks.checkpoint)
+        TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs, t)
 
         ## compute/output AMIP diagnostics if scheduled for this timestep
         ## wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface

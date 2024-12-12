@@ -8,16 +8,9 @@ module TimeManager
 
 import Dates
 import ..Interfacer
+import ..Utilities: time_to_seconds
 
-export current_date,
-    trigger_callback,
-    AbstractFrequency,
-    Monthly,
-    EveryTimestep,
-    trigger_callback!,
-    HourlyCallback,
-    MonthlyCallback,
-    update_firstdayofmonth!
+export current_date, strdate_to_datetime, datetime_to_strdate
 
 
 """
@@ -32,123 +25,105 @@ Return the model date at the current timestep.
 current_date(cs::Interfacer.CoupledSimulation, t::Real) = cs.dates.date0[1] + Dates.Second(t)
 
 """
-    AbstractFrequency
+    strdate_to_datetime(strdate::String)
 
-This is an abstract type for the frequency of the callback function.
-"""
-abstract type AbstractFrequency end
-
-"""
-    Monthly
-A concrete type for the monthly frequency of the callback function.
-"""
-struct Monthly <: AbstractFrequency end
-
-"""
-    EveryTimestep
-A concrete type for the every-timestep frequency of the callback function.
-"""
-struct EveryTimestep <: AbstractFrequency end
-
-"""
-    trigger_callback(cs, ::Monthly)
-
-Returns `true` if the current date is equal to or exceeds the saved first of the month at time of 00:00:00.
+Convert from String ("YYYYMMDD") to Date format,
+required by the official AMIP input files.
 
 # Arguments
-- `cs`: [CoupledSimulation] containing info about the simulation
+- `strdate`: [String] to be converted to Date type
 """
-trigger_callback(cs::Interfacer.CoupledSimulation, ::Monthly) = cs.dates.date[1] >= cs.dates.date1[1] ? true : false
-
-"""
-    CouplerCallback
-
-This is an abstract type for ClimaCoupler's callback functions.
-"""
-abstract type CouplerCallback end
+strdate_to_datetime(strdate::String) =
+    Dates.DateTime(parse(Int, strdate[1:4]), parse(Int, strdate[5:6]), parse(Int, strdate[7:8]))
 
 """
-    do_nothing(::Interfacer.CoupledSimulation, _)
+    datetime_to_strdate(datetime::DateTime)
 
-This is a helper callback function that does nothing.
+Convert from Date to String ("YYYYMMDD") format.
+
+# Arguments
+- `datetime`: [Dates.DateTime] object to be converted to string
 """
-do_nothing(::Interfacer.CoupledSimulation, _) = nothing
-
-"""
-    HourlyCallback{FT}
-
-This is a callback type that triggers at intervals of 1h or multiple hours.
-
-# Fields
-
-- `dt`
-- `func`
-- `ref_date`
-- `active`
-- `data
-"""
-@kwdef struct HourlyCallback{FT} <: CouplerCallback
-    dt::FT = FT(1) # hours
-    func::Function = do_nothing
-    ref_date::Array = [Dates.DateTime(0)]
-    active::Bool = false
-    data::Array = []
-end
+datetime_to_strdate(datetime::Dates.DateTime) =
+    string(lpad(Dates.year(datetime), 4, "0")) *
+    string(string(lpad(Dates.month(datetime), 2, "0"))) *
+    string(lpad(Dates.day(datetime), 2, "0"))
 
 """
-    MonthlyCallback{FT}
+    time_to_period(s::String)
 
-This is a callback type that triggers at intervals of 1 month or multiple months.
+Convert a string to a `Dates.Period` object.
 
-# Fields
+The string has to have format `<NUM><unit>`, where `<NUM>` is a number (integer
+or floating point) and `<unit>` is one of `secs`, `mins`, `hours`, `days`, or
+`months`.
 
-- `dt`
-- `func`
-- `ref_date`
-- `active`
-- `data`
+# Arguments
+- `s::String`: The string to convert to a `Dates.Period`.
+
+# Returns
+- A `Dates.Period` object representing the time period specified in the string.
+
+# Examples
+```julia
+julia> time_to_period("2months")
+2 months
+
+julia> time_to_period("10secs")
+10000 milliseconds
+
+julia> time_to_period("2.5hours")
+9000000 milliseconds
+```
 """
-@kwdef struct MonthlyCallback{FT} <: CouplerCallback
-    dt::FT = FT(1) # months
-    func::Function = do_nothing
-    ref_date::Array = [Dates.DateTime(0)]
-    active::Bool = false
-    data::Array = []
-end
-
-"""
-    dt_cb(cb::HourlyCallback)
-    dt_cb(cb::MonthlyCallback)
-
-This function returns the time interval for the callback function.
-"""
-dt_cb(cb::HourlyCallback) = Dates.Hour(cb.dt)
-dt_cb(cb::MonthlyCallback) = Dates.Month(cb.dt)
-
-"""
-    trigger_callback!(cs::Interfacer.CoupledSimulation, cb::CouplerCallback)
-
-This function triggers a callback function if the current date is equal to or exceeds the saved callback reference date.
-As well as executing the functions `func`, it automatically updates the reference date, `ref_date`, for the next callback interval.
-"""
-function trigger_callback!(cs::Interfacer.CoupledSimulation, cb::CouplerCallback)
-    if cb.active
-        current_date = cs.dates.date[1]
-        if current_date >= cb.ref_date[1]
-            cb.func(cs, cb)
-            cb.ref_date[1] = cb.ref_date[1] + dt_cb(cb)
-        end
+function time_to_period(s::String)
+    if occursin("months", s)
+        months = match(r"^(\d+)months$", s)
+        isnothing(months) && error("$(s) has to be of the form <NUM>months, e.g. 2months for 2 months")
+        return Dates.Month(parse(Int, first(months)))
+    else
+        # Milliseconds to support fractional seconds
+        return Dates.Millisecond(1000 * time_to_seconds(s))
     end
 end
 
 """
-    update_firstdayofmonth!(cs::Interfacer.CoupledSimulation, _)
+    Callback
 
-This function updates the first of the month reference date.
+A small struct containing a schedule, and the function to be executed if the
+schedule is true.
+
+A `schedule` is a callable object (ie, a function) that takes an integrator-type
+of object and returns true or false.
+TODO: If `cs` contained the correct time, we could just pass `cs` to the schedule
+
+The function `func` calls the coupled state `cs`.
 """
-function update_firstdayofmonth!(cs, _)
-    cs.dates.date1[1] = cs.dates.date1[1] + Dates.Month(1)
-    @info("update_firstdayofmonth! at $(cs.dates.date)")
+struct Callback{SCHEDULE, FUNC}
+    schedule::SCHEDULE
+    func::FUNC
+end
+
+"""
+    maybe_trigger_callback(callback, cs, t)
+
+Check if it time to call `callback`, if yes, call its function on `cs`.
+"""
+function maybe_trigger_callback(callback, cs, t)
+    # TODO: If `cs` contained the correct time, we could just pass `cs` to the schedule
+    callback.schedule((; t)) && callback.func(cs)
+    return nothing
+end
+
+
+"""
+A schedule that is never true. Useful to disable something.
+
+TODO: Move this to ClimaUtilities once we move Schedules there
+"""
+struct NeverSchedule end
+function (::NeverSchedule)(args...)
+    return false
 end
 
 end

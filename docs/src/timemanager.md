@@ -8,15 +8,7 @@ functions from Julia's [Dates](https://docs.julialang.org/en/v1/stdlib/Dates/) m
 
 ```@docs
 ClimaCoupler.TimeManager.current_date
-ClimaCoupler.TimeManager.trigger_callback
-ClimaCoupler.TimeManager.AbstractFrequency
-ClimaCoupler.TimeManager.Monthly
-ClimaCoupler.TimeManager.EveryTimestep
-ClimaCoupler.TimeManager.trigger_callback!
-ClimaCoupler.TimeManager.CouplerCallback
-ClimaCoupler.TimeManager.HourlyCallback
-ClimaCoupler.TimeManager.MonthlyCallback
-ClimaCoupler.TimeManager.update_firstdayofmonth!
-ClimaCoupler.TimeManager.dt_cb
-ClimaCoupler.TimeManager.do_nothing
+ClimaCoupler.TimeManager.strdate_to_datetime
+ClimaCoupler.TimeManager.datetime_to_strdate
+ClimaCoupler.TimeManager.maybe_trigger_callback
 ```

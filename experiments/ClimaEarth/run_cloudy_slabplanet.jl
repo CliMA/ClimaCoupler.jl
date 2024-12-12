@@ -30,6 +30,9 @@ import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
 
+# TODO: Move to ClimaUtilities once we move the Schedules to ClimaUtilities
+import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
+
 pkg_dir = pkgdir(ClimaCoupler)
 
 #=
@@ -57,7 +60,7 @@ restart_t = Int(0)
 t_end = "1000days"
 tspan = (Float64(0.0), Float64(Utilities.time_to_seconds(t_end)))
 start_date = "19790321"
-hourly_checkpoint = true
+checkpoint_dt = "20days"
 dt_rad = "6hours"
 
 #=
@@ -162,7 +165,7 @@ comms_ctx = Utilities.get_comms_context(Dict("device" => "auto"))
 
 ## dates
 date0 = date = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
-dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)], new_month = [false])
+dates = (; date = [date], date0 = [date0])
 
 
 #=
@@ -266,28 +269,13 @@ model_sims = (atmos_sim = atmos_sim, ocean_sim = ocean_sim);
 #=
 ## Initialize Callbacks
 =#
+schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = date0)
+checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
 
-checkpoint_cb = TimeManager.HourlyCallback(
-    dt = FT(480),
-    func = Checkpointer.checkpoint_sims,
-    ref_date = [dates.date[1]],
-    active = hourly_checkpoint,
-) # 20 days
-update_firstdayofmonth!_cb = TimeManager.MonthlyCallback(
-    dt = FT(1),
-    func = TimeManager.update_firstdayofmonth!,
-    ref_date = [dates.date1[1]],
-    active = true,
-)
-dt_water_albedo = parse(FT, filter(x -> !occursin(x, "hours"), dt_rad))
-albedo_cb = TimeManager.HourlyCallback(
-    dt = dt_water_albedo,
-    func = FluxCalculator.water_albedo_from_atmosphere!,
-    ref_date = [dates.date[1]],
-    active = true,
-)
-callbacks =
-    (; checkpoint = checkpoint_cb, update_firstdayofmonth! = update_firstdayofmonth!_cb, water_albedo = albedo_cb)
+schedule_albedo = EveryCalendarDtSchedule(TimeManager.time_to_period(dt_rad); start_date = date0)
+albedo_cb = TimeManager.Callback(schedule_albedo, FluxCalculator.water_albedo_from_atmosphere!)
+
+callbacks = (; checkpoint = checkpoint_cb, water_albedo = albedo_cb)
 
 #=
 ## Initialize turbulent fluxes
@@ -368,16 +356,13 @@ function solve_coupler!(cs)
     @info("Starting coupling loop")
     ## step in time
     for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
-
-        cs.dates.date[1] = TimeManager.current_date(cs, t)
-
-        ## print date on the first of month
-        cs.dates.date[1] >= cs.dates.date1[1] && @info(cs.dates.date[1])
+        # Update date
+        cs.dates.date[] = TimeManager.current_date(cs, t)
 
         ClimaComms.barrier(comms_ctx)
 
         ## update water albedo from wind at dt_water_albedo (this will be extended to a radiation callback from the coupler)
-        TimeManager.trigger_callback!(cs, cs.callbacks.water_albedo)
+        TimeManager.maybe_trigger_callback(cs.callbacks.water_albedo, cs, t)
 
         ## run component models sequentially for one coupling timestep (Δt_cpl)
         FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
@@ -391,12 +376,8 @@ function solve_coupler!(cs)
 
         FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
 
-        ## callback to update the fist day of month if needed
-        TimeManager.trigger_callback!(cs, cs.callbacks.update_firstdayofmonth!)
-
         ## callback to checkpoint model state
-        TimeManager.trigger_callback!(cs, cs.callbacks.checkpoint)
-
+        TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs, t)
     end
 
     return nothing

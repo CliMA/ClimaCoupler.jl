@@ -277,7 +277,9 @@ update_firstdayofmonth!_cb = TimeManager.MonthlyCallback(
     ref_date = [dates.date1[1]],
     active = true,
 )
-dt_water_albedo = parse(FT, filter(x -> !occursin(x, "hours"), dt_rad))
+# if no units specified, assume hours. Otherwise parse and read to seconds, and convert to hours
+dt_water_albedo =
+    isnothing(tryparse(FT, dt_rad)) ? FT(Utilities.time_to_seconds(dt_rad) / (60 * 60)) : parse(FT, dt_rad)
 albedo_cb = TimeManager.HourlyCallback(
     dt = dt_water_albedo,
     func = FluxCalculator.water_albedo_from_atmosphere!,

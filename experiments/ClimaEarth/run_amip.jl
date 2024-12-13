@@ -139,10 +139,15 @@ dir_paths = Utilities.setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_c
 @info "Coupler artifacts directory $(dir_paths.artifacts)"
 @info "Coupler checkpoint directory $(dir_paths.checkpoints)"
 
+atmos_output_dir = joinpath(dir_paths.output, "clima_atmos")
+isdir(atmos_output_dir) || mkpath(atmos_output_dir)
+land_output_dir = joinpath(dir_paths.output, "clima_land")
+isdir(land_output_dir) || mkpath(land_output_dir)
+
+
 ## get component model dictionaries (if applicable)
 ## Note this step must come after parsing the coupler config dictionary, since
 ##  some parameters are passed from the coupler config to the component model configs
-atmos_output_dir = joinpath(dir_paths.output, "clima_atmos")
 atmos_config_dict = get_atmos_config_dict(config_dict, job_id, atmos_output_dir)
 (; dt_rad, output_default_diagnostics) = get_atmos_args(atmos_config_dict)
 
@@ -249,7 +254,7 @@ if mode_name == "amip"
         land_domain_type,
         land_albedo_type,
         land_temperature_anomaly,
-        dir_paths;
+        land_output_dir;
         dt = component_dt_dict["dt_land"],
         space = boundary_space,
         saveat = saveat,
@@ -347,7 +352,7 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         land_domain_type,
         land_albedo_type,
         land_temperature_anomaly,
-        dir_paths;
+        land_output_dir;
         dt = component_dt_dict["dt_land"],
         space = boundary_space,
         saveat = saveat,
@@ -397,7 +402,7 @@ elseif mode_name == "slabplanet_eisenman"
         land_domain_type,
         land_albedo_type,
         land_temperature_anomaly,
-        dir_paths;
+        land_output_dir;
         dt = component_dt_dict["dt_land"],
         space = boundary_space,
         saveat = saveat,
@@ -552,7 +557,10 @@ Use ClimaDiagnostics for default AMIP diagnostics, which currently include turbu
 =#
 if mode_name == "amip" && use_coupler_diagnostics
     include("user_io/amip_diagnostics.jl")
-    amip_diags_handler = amip_diagnostics_setup(coupler_fields, dir_paths.output, dates.date0[1], tspan[1], calendar_dt)
+    coupler_diags_path = joinpath(dir_paths.output, "coupler")
+    isdir(coupler_diags_path) || mkpath(coupler_diags_path)
+    amip_diags_handler =
+        amip_diagnostics_setup(coupler_fields, coupler_diags_path, dates.date0[1], tspan[1], calendar_dt)
 else
     amip_diags_handler = nothing
 end

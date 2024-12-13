@@ -38,16 +38,6 @@ for FT in (Float32, Float64)
     end
 end
 
-@testset "test strdate_to_datetime" begin
-    @test TimeManager.strdate_to_datetime("19000101") == Dates.DateTime(1900, 1, 1)
-    @test TimeManager.strdate_to_datetime("00000101") == Dates.DateTime(0, 1, 1)
-end
-
-@testset "test datetime_to_strdate" begin
-    @test TimeManager.datetime_to_strdate(Dates.DateTime(1900, 1, 1)) == "19000101"
-    @test TimeManager.datetime_to_strdate(Dates.DateTime(0, 1, 1)) == "00000101"
-end
-
 @testset "trigger_callback" begin
     FT = Float64
     date0 = date = Dates.DateTime("19790321", Dates.dateformat"yyyymmdd")

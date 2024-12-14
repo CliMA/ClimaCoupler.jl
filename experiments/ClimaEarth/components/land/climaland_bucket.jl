@@ -53,7 +53,7 @@ function bucket_init(
     config::String,
     albedo_type::String,
     land_temperature_anomaly::String,
-    dir_paths::NamedTuple;
+    output_dir::String;
     space,
     dt::Float64,
     saveat::Float64,
@@ -71,9 +71,6 @@ function bucket_init(
         )
         @assert config == "sphere"
     end
-
-    regrid_dirpath = dir_paths.regrid
-    artifacts_dir = dir_paths.artifacts
 
     α_snow = FT(0.8) # snow albedo
     if albedo_type == "map_static" # Read in albedo from static data file (default type)
@@ -152,7 +149,7 @@ function bucket_init(
 
     # Add diagnostics
     if use_land_diagnostics
-        netcdf_writer = CD.Writers.NetCDFWriter(domain.space.subsurface, artifacts_dir)
+        netcdf_writer = CD.Writers.NetCDFWriter(domain.space.subsurface, output_dir)
         scheduled_diagnostics =
             CL.default_diagnostics(model, date_ref, output_writer = netcdf_writer, average_period = :monthly)
 

@@ -29,8 +29,10 @@ pressure levels are being created.
 
 ### Code cleanup
 
-#### Output path updates - PRs [#1106](https://github.com/CliMA/ClimaCoupler.jl/pull/1058),
-    [#1106](https://github.com/CliMA/ClimaCoupler.jl/pull/1106)
+#### Output path updates - PRs [#1058](https://github.com/CliMA/ClimaCoupler.jl/pull/1058),
+    [#1106](https://github.com/CliMA/ClimaCoupler.jl/pull/1106),
+    [#1123](https://github.com/CliMA/ClimaCoupler.jl/pull/1123)
+
 
 Previously, ClimaEarth simulation outputs were saved in a path
 `experiments/ClimaEarth/output/$mode_name/$job_id/artifacts/`. Now, `ClimaEarth`
@@ -42,10 +44,14 @@ coupler_output_dir_amip/
 ├── checkpoints
 │       └── checkpoints for the various models
 ├── artifacts
-│       └── plots produced by the postporcessing step
+│       └── plots produced by the postprocessing step
 ├── output_0000/
-│   ├── atmos/
+│   ├── clima_atmos/
 │   │   └── output of the atmos model
+│   └── clima_land/
+│   │   └── output of the land model
+│   └── coupler/
+│   │   └── output of coupler quantities
 │   └── ocean/
 │       └── output of the ocean model
 ├── output_0001/

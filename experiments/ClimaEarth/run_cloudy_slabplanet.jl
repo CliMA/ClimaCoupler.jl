@@ -133,8 +133,10 @@ config_dict = Dict(
     "override_precip_timescale" => false,
 )
 
-## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
 atmos_output_dir = joinpath(dir_paths.output, "clima_atmos")
+land_output_dir = joinpath(dir_paths.output, "clima_land")
+
+## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
 atmos_config_dict = get_atmos_config_dict(config_dict, job_id, atmos_output_dir)
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
 
@@ -205,7 +207,7 @@ land_sim = bucket_init(
     "sphere",
     "map_static",
     "aquaplanet",
-    dir_paths;
+    land_output_dir;
     dt = Δt_cpl,
     space = boundary_space,
     saveat = saveat,

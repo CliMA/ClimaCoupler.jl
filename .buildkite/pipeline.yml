@@ -362,15 +362,6 @@ steps:
           slurm_ntasks: 1
         soft_fail: true
 
-  - wait
-
-  # plot job performance history
-  - label: ":chart_with_downwards_trend: build history"
-    command:
-      - build_history staging # name of branch to plot
-    artifact_paths:
-      - "build_history.html"
-
   - group: "Hierarchy tests (1d)"
     steps:
       - label: ":construction: Dry Held Suarez"
@@ -418,11 +409,19 @@ steps:
         agents:
           slurm_mem: 20GB
 
-      - wait
-      - label: ":construction: Hierarchy plots"
-        key: "hierarchy_plots"
-        command:
-          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/hierarchy/climate_plots.jl"
-        artifact_paths:  "paper_figs/*"
-        agents:
-          slurm_mem: 20GB
+  - wait
+
+  # plot job performance history
+  - label: ":chart_with_downwards_trend: build history"
+    command:
+      - build_history staging # name of branch to plot
+    artifact_paths:
+      - "build_history.html"
+
+  - label: ":construction: Hierarchy plots"
+    key: "hierarchy_plots"
+    command:
+      - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/hierarchy/climate_plots.jl"
+    artifact_paths:  "paper_figs/*"
+    agents:
+      slurm_mem: 20GB

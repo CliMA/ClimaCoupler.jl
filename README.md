@@ -58,12 +58,12 @@ When running from the terminal, you can also specify a configuration file to use
 Existing configuration files are specified in the `config/` directory within ClimaCoupler.jl.
 For example, to run the default AMIP configuration, you could use the following command:
 ```julia
-julia --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file config/ci_configs/amip_default.jl --job_id amip_default
+julia --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file config/ci_configs/amip_default.yml --job_id amip_default
 ```
 
 Output from your run will be saved in the folder `experiments/ClimaEarth/output/<job_id>/`.
 If no configuration file is specified, the default
-`interactive_debug.yml` will be used, and output will be saved in `experiments/ClimaEarth/output/interactive_debug/`.
+`amip_default.yml` will be used, and output will be saved in `experiments/ClimaEarth/output/amip_default/`.
 
 The output will take up approximately 1GB of space, and the simulation will take around 10 minutes to run on a single CPU, or less time on multiple CPUs or GPU.
 

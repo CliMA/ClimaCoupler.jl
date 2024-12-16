@@ -118,6 +118,7 @@ add_extra_diagnostics!(config_dict)
     turb_flux_partition,
     land_domain_type,
     land_albedo_type,
+    land_initial_condition,
     land_temperature_anomaly,
     energy_check,
     conservation_softfail,
@@ -253,6 +254,7 @@ if mode_name == "amip"
         tspan,
         land_domain_type,
         land_albedo_type,
+        land_initial_condition,
         land_temperature_anomaly,
         land_output_dir;
         dt = component_dt_dict["dt_land"],
@@ -351,6 +353,7 @@ elseif mode_name in ("slabplanet", "slabplanet_aqua", "slabplanet_terra")
         tspan,
         land_domain_type,
         land_albedo_type,
+        land_initial_condition,
         land_temperature_anomaly,
         land_output_dir;
         dt = component_dt_dict["dt_land"],
@@ -401,6 +404,7 @@ elseif mode_name == "slabplanet_eisenman"
         tspan,
         land_domain_type,
         land_albedo_type,
+        land_initial_condition,
         land_temperature_anomaly,
         land_output_dir;
         dt = component_dt_dict["dt_land"],

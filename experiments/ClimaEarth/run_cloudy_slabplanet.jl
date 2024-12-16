@@ -157,11 +157,6 @@ atmos_config_object.toml_dict["max_area_limiter_scale"]["value"] = 0
 comms_ctx = Utilities.get_comms_context(Dict("device" => "auto"))
 
 #=
-## Data File Paths
-=#
-land_mask_data = joinpath(@clima_artifact("landsea_mask_60arcseconds", comms_ctx), "landsea_mask.nc")
-
-#=
 ## Component Model Initialization
 =#
 
@@ -187,6 +182,10 @@ thermo_params = get_thermo_params(atmos_sim)
 ## init a 2D boundary space at the surface
 boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space) # TODO: specify this in the coupler and pass it to all component models #665
 
+# Land initial condition
+# Use the default land initial condition (not reading from a file)
+land_initial_condition = ""
+
 #=
 ### Land-sea Fraction
 This is a static field that contains the area fraction of land and sea, ranging from 0 to 1. If applicable, sea ice is included in the sea fraction. at this stage.
@@ -206,6 +205,7 @@ land_sim = bucket_init(
     tspan,
     "sphere",
     "map_static",
+    land_initial_condition,
     "aquaplanet",
     land_output_dir;
     dt = Δt_cpl,

@@ -249,7 +249,7 @@ reinit!(sim::ComponentModelSimulation) = error("undefined reinit! for " * name(s
 include("surface_stub.jl")
 
 """
-    AbstractModeType
+    AbstractSimulationMode
 
 An abstract type representing a simulation mode.
 """
@@ -258,14 +258,55 @@ abstract type AbstractSimulationMode end
 """
     AbstractSlabplanetSimulationMode
 
-An abstract type representing a simulation mode for slabplanet models.
+An abstract type representing a simulation mode for slabplanet models. Slabplanet simulations
+are more idealized than the AMIP configuration, but provide valuable insight about
+conservation and individual model behavior.
 """
 abstract type AbstractSlabplanetSimulationMode <: AbstractSimulationMode end
 
+"""
+    AMIPMode
+
+A struct representing the AMIP simulation mode. AMIP is currently the most complex
+configuration of the ClimaEarth model. It runs a ClimaAtmos.jl atmosphere model,
+ClimaLand.jl bucket land model, a prescribed ocean model, and a simple thermal sea ice model.
+"""
 struct AMIPMode <: AbstractSimulationMode end
+
+"""
+    SlabplanetMode
+
+A struct represeting the slabplanet simulation mode with a ClimaAtmos.jl atmosphere model,
+a ClimaLand.jl bucket land model, a thermal slab ocean model, and no sea ice model. Instead
+of using a sea ice model, the ocean evaluated in areas that would be covered in ice.
+"""
 struct SlabplanetMode <: AbstractSlabplanetSimulationMode end
+
+"""
+    SlabplanetAquaMode
+
+A struct representing the slabplanet simulation mode with a ClimaAtmos.jl atmosphere model,
+and only once surface model, a thermal slab ocean model, which is evaluated over the entire
+surface. There are no land or sea ice models.
+"""
 struct SlabplanetAquaMode <: AbstractSlabplanetSimulationMode end
+
+"""
+    SlabplanetTerraMode
+
+A struct representing the slabplanet simulation mode with a ClimaAtmos.jl atmosphere model,
+and only once surface model, a ClimaLand.jl bucket land model, which is evaluated over the
+entire surface. There are no ocean or sea ice models.
+"""
 struct SlabplanetTerraMode <: AbstractSlabplanetSimulationMode end
+
+"""
+    SlabplanetEisenmanMode
+
+A struct representing the slabplanet simulation mode with a ClimaAtmos.jl atmosphere model,
+a ClimaLand.jl bucket land model, and Eisenman sea ice model. The ocean model
+is included in the Eisenman sea ice model.
+"""
 struct SlabplanetEisenmanMode <: AbstractSlabplanetSimulationMode end
 
 end # module

@@ -39,11 +39,12 @@ pressure levels are being created.
 
 ### Code cleanup
 
-#### Output path updates - PRs [#1058](https://github.com/CliMA/ClimaCoupler.jl/pull/1058),
-    [#1106](https://github.com/CliMA/ClimaCoupler.jl/pull/1106),
-    [#1123](https://github.com/CliMA/ClimaCoupler.jl/pull/1123)
 
+#### Output path updates - PRs [#1058][1], [#1106][2], [#1123][3]
 
+[1]: https://github.com/CliMA/ClimaCoupler.jl/pull/1058
+[2]: https://github.com/CliMA/ClimaCoupler.jl/pull/1106
+[3]: https://github.com/CliMA/ClimaCoupler.jl/pull/1123
 Previously, ClimaEarth simulation outputs were saved in a path
 `experiments/ClimaEarth/output/$mode_name/$job_id/artifacts/`. Now, `ClimaEarth`
 creates output folders with an increment (increasing the counter every time the
@@ -69,7 +70,7 @@ coupler_output_dir_amip/
 ├── output_0002/
 │   └── ... component model outputs in their folders ...
 └── output_active -> output_0002/
-``
+```
 Note that any external scripts that assume an output path will need to be updated.
 
 #### Remove ClimaCoupler.Diagnostics module - PR [#953](https://github.com/CliMA/ClimaCoupler.jl/pull/953)

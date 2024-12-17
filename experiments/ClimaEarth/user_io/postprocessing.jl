@@ -5,8 +5,8 @@ include("diagnostics_plots.jl")
 """
     postprocess_sim(sim_mode::AbstractSlabplanetSimulationMode, cs, postprocessing_vars)
 
-If they exist, perform conservation checks, for any slabplanet simulation, and then call
-`common_postprocessing` to perform common postprocessing tasks that are common to all simulation types.
+Call `common_postprocessing` to perform common postprocessing tasks that are common to all simulation types.
+Then, if conservation checks exist, perform them.
 """
 function postprocess_sim(sim_mode::AbstractSlabplanetSimulationMode, cs, postprocessing_vars)
     (; conservation_softfail,) = postprocessing_vars
@@ -35,8 +35,8 @@ end
 """
     postprocess_sim(sim_mode::AMIPMode, cs, postprocessing_vars)
 
-Conditionally plot AMIP diagnostics and call `common_postprocessing` to perform
-postprocessing tasks that are common to all simulation types.
+Call `common_postprocessing` to perform postprocessing tasks that are common to all simulation
+types, and then conditionally plot AMIP diagnostics
 """
 function postprocess_sim(sim_mode::AMIPMode, cs, postprocessing_vars)
     (; use_coupler_diagnostics, output_default_diagnostics, t_end) = postprocessing_vars
@@ -78,6 +78,7 @@ function postprocess_sim(sim_mode::AMIPMode, cs, postprocessing_vars)
         compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir)
     end
 
+    # close all AMIP diagnostics file writers
     !isnothing(cs.amip_diags_handler) &&
         map(diag -> close(diag.output_writer), cs.amip_diags_handler.scheduled_diagnostics)
 end

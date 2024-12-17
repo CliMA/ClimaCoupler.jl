@@ -3,12 +3,12 @@ include("debug_plots.jl")
 include("diagnostics_plots.jl")
 
 """
-    postprocess_sim(sim_mode::AbstractSlabplanetSimulationMode, cs, postprocessing_vars)
+    postprocess_sim(::Type{AbstractSlabplanetSimulationMode}, cs, postprocessing_vars)
 
 Call `common_postprocessing` to perform common postprocessing tasks that are common to all simulation types.
 Then, if conservation checks exist, perform them.
 """
-function postprocess_sim(sim_mode::AbstractSlabplanetSimulationMode, cs, postprocessing_vars)
+function postprocess_sim(::Type{<:AbstractSlabplanetSimulationMode}, cs, postprocessing_vars)
     (; conservation_softfail,) = postprocessing_vars
 
     common_postprocessing(cs, postprocessing_vars)
@@ -33,12 +33,12 @@ function postprocess_sim(sim_mode::AbstractSlabplanetSimulationMode, cs, postpro
 end
 
 """
-    postprocess_sim(sim_mode::AMIPMode, cs, postprocessing_vars)
+    postprocess_sim(::Type{AMIPMode}, cs, postprocessing_vars)
 
 Call `common_postprocessing` to perform postprocessing tasks that are common to all simulation
 types, and then conditionally plot AMIP diagnostics
 """
-function postprocess_sim(sim_mode::AMIPMode, cs, postprocessing_vars)
+function postprocess_sim(::Type{AMIPMode}, cs, postprocessing_vars)
     (; use_coupler_diagnostics, output_default_diagnostics, t_end) = postprocessing_vars
 
     common_postprocessing(cs, postprocessing_vars)

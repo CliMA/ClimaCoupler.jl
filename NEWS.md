@@ -79,6 +79,46 @@ to our output diagnostics using the ClimaDiagnostics interface.
 This PR also removes the AMIP paperplots function, but this
 functionality is replaced by the generalized `make_plots` function.
 
+
+#### Remove ClimaCoupler.Regridder module - PR [#1109](https://github.com/CliMA/ClimaCoupler.jl/pull/1109)
+This PR removes the Regridder module. Most of the functions that were
+inside the module are available in [ClimaUtilities](https://github.com/CliMA/ClimaUtilities.jl/). Some functions were moved
+to other modules, and some unused functions were deleted.
+
+The functions:
+- `ClimaCoupler.Regridder.dummmy_remap!`
+- `ClimaCoupler.Regridder.update_surface_fractions!`
+- `ClimaCoupler.Regridder.combine_surfaces!`
+- `ClimaCoupler.Regridder.binary_mask`
+
+are now:
+- `ClimaCoupler.FieldExchanger.dummmy_remap!`
+- `ClimaCoupler.FieldExchanger.update_surface_fractions!`
+- `ClimaCoupler.FieldExchanger.combine_surfaces!`
+- `ClimaCoupler.Utilities.binary_mask`
+
+The following functions were removed from ClimaCoupler and have an equivalent in [ClimaUtilities](https://github.com/CliMA/ClimaUtilities.jl/tree/main):
+
+- `ClimaCoupler.Regridder.write_to_hdf5`
+- `ClimaCoupler.Regridder.read_from_hdf5`
+- `ClimaCoupler.Regridder.hdwrite_regridfile_rll_to_cgll`
+- `ClimaCoupler.Regridder.reshape_cgll_sparse_to_field!`
+- `ClimaCoupler.Regridder.get_time`
+
+Note that the the `hdwrite_regridfile_rll_to_cgll` in [ClimaUtilities](https://github.com/CliMA/ClimaUtilities.jl/tree/main) does not support 3d fields, but the removed function from the Regridder module did.
+
+The following functions were deleted and do not have an equivalent in [ClimaUtilities](https://github.com/CliMA/ClimaUtilities.jl/tree/main):
+
+- `ClimaCoupler.Regridder.remap_field_cgll_to_rll`
+- `ClimaCoupler.Regridder.land_fraction`
+- `ClimaCoupler.Regridder.combine_surfaces_from_sol!`
+- `ClimaCoupler.Regridder.write_datafile_cc`
+- `ClimaCoupler.Regridder.read_remapped_field`
+- `ClimaCoupler.Regridder.get_coords`
+
+All the above functions can be found in commit
+`9e5bf061f34659188485f066bc322c77bcc0f1fa`
+
 #### Remove PostProcessor module - PR [#1022](https://github.com/CliMA/ClimaCoupler.jl/pull/1022)
 After switching to use ClimaDiagnostics.jl and ClimaAnalysis.jl
 for our diagnostics, the PostProcessor module is not needed.

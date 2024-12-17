@@ -20,9 +20,7 @@ end
 @safetestset "Interfacer tests" begin
     include("interfacer_tests.jl")
 end
-gpu_broken || @safetestset "Regridder tests" begin
-    include("regridder_tests.jl")
-end
+
 @safetestset "ConservationChecker tests" begin
     include("conservation_checker_tests.jl")
 end

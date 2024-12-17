@@ -22,4 +22,13 @@ If an `update_field!` function is not defined for a particular component model, 
     ClimaCoupler.FieldExchanger.update_sim!
     ClimaCoupler.FieldExchanger.reinit_model_sims!
     ClimaCoupler.FieldExchanger.step_model_sims!
+    ClimaCoupler.FieldExchanger.update_surface_fractions!
+```
+
+## FieldExchanger Internal Functions
+
+```@docs
+    ClimaCoupler.FieldExchanger.combine_surfaces!
+    ClimaCoupler.FieldExchanger.dummmy_remap!
+    ClimaCoupler.FieldExchanger.nans_to_zero
 ```

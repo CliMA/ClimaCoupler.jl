@@ -50,7 +50,7 @@ function get_coupler_args(config_dict::Dict)
     config_dict["print_config_dict"] && @info(config_dict)
     job_id = config_dict["job_id"]
     mode_name = config_dict["mode_name"]
-    sim_mode = mode_name_dict[mode_name]()
+    sim_mode = mode_name_dict[mode_name]
 
     # Computational simulation setup information
     random_seed = config_dict["unique_seed"] ? time_ns() : 1234

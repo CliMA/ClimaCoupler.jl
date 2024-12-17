@@ -57,8 +57,7 @@ function get_coupler_args(config_dict::Dict)
     component_dt_dict = config_dict["component_dt_dict"]
 
     # Checkpointing information
-    hourly_checkpoint = config_dict["hourly_checkpoint"]
-    hourly_checkpoint_dt = config_dict["hourly_checkpoint_dt"]
+    checkpoint_dt = config_dict["checkpoint_dt"]
 
     # Restart information
     restart_dir = config_dict["restart_dir"]
@@ -101,8 +100,7 @@ function get_coupler_args(config_dict::Dict)
         Δt_cpl,
         component_dt_dict,
         saveat,
-        hourly_checkpoint,
-        hourly_checkpoint_dt,
+        checkpoint_dt,
         restart_dir,
         restart_t,
         use_coupler_diagnostics,

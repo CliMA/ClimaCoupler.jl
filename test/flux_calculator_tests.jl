@@ -324,7 +324,7 @@ for FT in (Float32, Float64)
             nothing, # thermo_params
             nothing, # amip_diags_handler
         )
-        FluxCalculator.water_albedo_from_atmosphere!(cs, nothing)
+        FluxCalculator.water_albedo_from_atmosphere!(cs)
         @test sum(parent(cs.model_sims.ocean_sim.cache.α_direct) .- parent(ones(boundary_space)) .* 2) == 0
         @test sum(parent(cs.model_sims.ocean_sim.cache.α_diffuse) .- parent(ones(boundary_space)) .* 3) == 0
 

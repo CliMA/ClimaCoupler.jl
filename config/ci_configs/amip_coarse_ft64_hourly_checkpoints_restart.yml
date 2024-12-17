@@ -1,10 +1,9 @@
 apply_limiter: false
+checkpoint_dt: "1hours"
 dt_save_restart: "10days"
 dt_save_to_sol: "1days"
 energy_check: false
 h_elem: 6
-hourly_checkpoint: true
-hourly_checkpoint_dt: 1
 mode_name: "amip"
 moist: "equil"
 mono_surface: false

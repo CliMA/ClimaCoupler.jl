@@ -73,15 +73,10 @@ function argparse_settings()
         help = "Time interval for saving output [\"10days\" (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Inf\"]"
         arg_type = String
         default = "10days"
-        # Checkpointing information
-        "--hourly_checkpoint"
-        help = "Boolean flag indicating whether to checkpoint at multiple-hourly intervals [false (default), true]"
-        arg_type = Bool
-        default = false
-        "--hourly_checkpoint_dt"
-        help = "Time interval for hourly checkpointing in hours [480 (default)]"
-        arg_type = Int
-        default = 480
+        "--checkpoint_dt"
+        help = "Time interval for hourly checkpointing [\"20days\" (default)]"
+        arg_type = String
+        default = "20days"
         # Restart information
         "--restart_dir"
         help = "Directory containing restart files"

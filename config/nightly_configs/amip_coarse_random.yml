@@ -1,6 +1,7 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
+checkpoint_dt: "720hours"
 coupler_toml_file: "toml/amip.toml"
 dt: "240secs"
 dt_cpl: "240secs"
@@ -9,8 +10,6 @@ dt_save_to_sol: "30days"
 dz_bottom: 100.0
 energy_check: false
 h_elem: 8
-hourly_checkpoint: true
-hourly_checkpoint_dt: 720
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false

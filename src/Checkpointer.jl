@@ -73,11 +73,11 @@ function restart_model_state!(
 end
 
 """
-    checkpoint_sims(cs::CoupledSimulation, _)
+    checkpoint_sims(cs::CoupledSimulation)
 
 This is a callback function that checkpoints all simulations defined in the current coupled simulation.
 """
-function checkpoint_sims(cs::Interfacer.CoupledSimulation, _)
+function checkpoint_sims(cs::Interfacer.CoupledSimulation)
     for sim in cs.model_sims
         if Checkpointer.get_model_prog_state(sim) !== nothing
             t = Dates.datetime2epochms(cs.dates.date[1])

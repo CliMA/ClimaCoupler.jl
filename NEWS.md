@@ -39,6 +39,29 @@ pressure levels are being created.
 
 ### Code cleanup
 
+#### Structs representing simulation modes & postprocessing changes - PR [#1120](https://github.com/CliMA/ClimaCoupler.jl/pull/1120)
+
+The available simulation modes are now represented by the following structs:
+
+- `ClimaCoupler.Interfacer.AMIPMode`
+- `ClimaCoupler.Interfacer.SlabplanetMode`
+- `ClimaCoupler.Interfacer.SlabplanetAquaMode`
+- `ClimaCoupler.Interfacer.SlabplanetTerraMode`
+- `ClimaCoupler.Interfacer.SlabplanetEisenmanMode`
+
+All of the above structs are subtypes of the abstract
+`ClimaCoupler.Interfacer.AbstractSlabplanetSimulationMode`, and all of them except
+`ClimaCoupler.Interfacer.AMIPMode` are subtypes of `ClimaCoupler.Interfacer.AbstractSlabplanetSimulationMode`.
+
+These structs are used in `experiments/ClimaEarth/run_amip.jl` instead of representing the
+simulation mode as a string.
+
+The postprocessing in `experiments/ClimaEarth/run_amip.jl` is now moved into functions in
+the new `experiments/ClimaEarth/user_io/postprocessing.jl`. When the simulation is complete,
+`postprocess_sim` is called using the struct representing the simulation mode for dispatch.
+`postprocess_sim` has one method for all slabplanet simulation modes and another for the AMIP
+simulation mode. All postprocessing common to all simulation modes is done in the `common_postprocessing`
+function, which is called by both `postprocess_sim` methods.
 
 #### Output path updates - PRs [#1058][1], [#1106][2], [#1123][3]
 

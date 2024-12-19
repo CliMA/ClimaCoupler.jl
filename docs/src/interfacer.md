@@ -217,5 +217,5 @@ end
 ```@docs
     ClimaCoupler.Interfacer.stub_init
     ClimaCoupler.Interfacer.AbstractSimulation
-    ClimaCoupler.Interfacer.AbstractSlabplanetSimulationMode
+    ClimaCoupler.Interfacer.AbstractSimulationMode
 ```

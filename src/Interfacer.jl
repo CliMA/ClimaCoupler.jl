@@ -278,7 +278,7 @@ abstract type AMIPMode <: AbstractSimulationMode end
 
 An abstract type represeting the slabplanet simulation mode with a ClimaAtmos.jl atmosphere model,
 a ClimaLand.jl bucket land model, a thermal slab ocean model, and no sea ice model. Instead
-of using a sea ice model, the ocean evaluated in areas that would be covered in ice.
+of using a sea ice model, the ocean is evaluated in areas that would be covered in ice.
 """
 abstract type SlabplanetMode <: AbstractSlabplanetSimulationMode end
 

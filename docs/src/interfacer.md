@@ -199,11 +199,23 @@ end
     ClimaCoupler.Interfacer.AtmosModelSimulation
     ClimaCoupler.Interfacer.SurfaceModelSimulation
     ClimaCoupler.Interfacer.ComponentModelSimulation
-    ClimaCoupler.Interfacer.AbstractSimulation
     ClimaCoupler.Interfacer.SurfaceStub
-    ClimaCoupler.Interfacer.stub_init
     ClimaCoupler.Interfacer.float_type
     ClimaCoupler.Interfacer.name
     ClimaCoupler.Interfacer.get_field
     ClimaCoupler.Interfacer.update_field!
+    ClimaCoupler.Interfacer.AbstractSlabplanetSimulationMode
+    ClimaCoupler.Interfacer.AMIPMode
+    ClimaCoupler.Interfacer.SlabplanetMode
+    ClimaCoupler.Interfacer.SlabplanetAquaMode
+    ClimaCoupler.Interfacer.SlabplanetTerraMode
+    ClimaCoupler.Interfacer.SlabplanetEisenmanMode
+```
+
+## Interfacer Internal Functions and Types
+
+```@docs
+    ClimaCoupler.Interfacer.stub_init
+    ClimaCoupler.Interfacer.AbstractSimulation
+    ClimaCoupler.Interfacer.AbstractSimulationMode
 ```

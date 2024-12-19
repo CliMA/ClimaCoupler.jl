@@ -23,7 +23,13 @@ export CoupledSimulation,
     update_field!,
     SurfaceStub,
     step!,
-    reinit!
+    reinit!,
+    AbstractSlabplanetSimulationMode,
+    AMIPMode,
+    SlabplanetMode,
+    SlabplanetAquaMode,
+    SlabplanetTerraMode,
+    SlabplanetEisenmanMode
 
 
 """
@@ -241,5 +247,66 @@ reinit!(sim::ComponentModelSimulation) = error("undefined reinit! for " * name(s
 
 # Include file containing the surface stub simulation type.
 include("surface_stub.jl")
+
+"""
+    AbstractSimulationMode
+
+An abstract type representing a simulation mode.
+"""
+abstract type AbstractSimulationMode end
+
+"""
+    AbstractSlabplanetSimulationMode
+
+An abstract type representing a simulation mode for slabplanet models. Slabplanet simulations
+are more idealized than the AMIP configuration, but provide valuable insight about
+conservation and individual model behavior.
+"""
+abstract type AbstractSlabplanetSimulationMode <: AbstractSimulationMode end
+
+"""
+    AMIPMode
+
+An abstract type representing the AMIP simulation mode. AMIP is currently the most complex
+configuration of the ClimaEarth model. It runs a ClimaAtmos.jl atmosphere model,
+ClimaLand.jl bucket land model, a prescribed ocean model, and a simple thermal sea ice model.
+"""
+abstract type AMIPMode <: AbstractSimulationMode end
+
+"""
+    SlabplanetMode
+
+An abstract type represeting the slabplanet simulation mode with a ClimaAtmos.jl atmosphere model,
+a ClimaLand.jl bucket land model, a thermal slab ocean model, and no sea ice model. Instead
+of using a sea ice model, the ocean is evaluated in areas that would be covered in ice.
+"""
+abstract type SlabplanetMode <: AbstractSlabplanetSimulationMode end
+
+"""
+    SlabplanetAquaMode
+
+An abstract type representing the slabplanet simulation mode with a ClimaAtmos.jl atmosphere model,
+and only once surface model, a thermal slab ocean model, which is evaluated over the entire
+surface. There are no land or sea ice models.
+"""
+abstract type SlabplanetAquaMode <: AbstractSlabplanetSimulationMode end
+
+"""
+    SlabplanetTerraMode
+
+An abstract type representing the slabplanet simulation mode with a ClimaAtmos.jl atmosphere model,
+and only once surface model, a ClimaLand.jl bucket land model, which is evaluated over the
+entire surface. There are no ocean or sea ice models.
+"""
+abstract type SlabplanetTerraMode <: AbstractSlabplanetSimulationMode end
+
+"""
+    SlabplanetEisenmanMode
+
+An abstract type representing the slabplanet simulation mode with a ClimaAtmos.jl atmosphere model,
+a ClimaLand.jl bucket land model, and Eisenman sea ice model. The ocean model
+is included in the Eisenman sea ice model.
+"""
+abstract type SlabplanetEisenmanMode <: AbstractSlabplanetSimulationMode end
 
 end # module

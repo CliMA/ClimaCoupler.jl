@@ -4,12 +4,15 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+
+v0.1.2
+-------
 ### ClimaEarth features
 
 ### Read bucket initial conditions from NetCDF files
 
 Added functionality to allow the bucket initial conditions to be overwritten by interpolated NetCDF datasets.
-To use this feature from the YAML interface, just pass the path of the file to `land_initial_condition`. 
+To use this feature from the YAML interface, just pass the path of the file to `land_initial_condition`.
 We expect the file to contain the following variables:
 `W`, for subsurface water storage (2D),
 `Ws`, for surface water content (2D),

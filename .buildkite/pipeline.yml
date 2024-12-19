@@ -195,6 +195,13 @@ steps:
         artifact_paths: "experiments/ClimaEarth/output/amip_default/artifacts/*"
         agents:
           slurm_mem: 20GB
+      
+      - label: "AMIP: bucket initial condition test"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_bucket_ic.yml --job_id amip_bucket_ic"
+        artifact_paths: "experiments/ClimaEarth/output/amip_bucket_ic/artifacts/*"
+        agents:
+          slurm_ntasks: 1
+          slurm_mem: 20GB
 
       - label: "AMIP target: albedo from function"
         key: "target_amip_albedo_function"

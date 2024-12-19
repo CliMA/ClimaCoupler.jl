@@ -9,6 +9,7 @@ import ClimaLand as CL
 import ClimaLand.Parameters as LP
 import ClimaDiagnostics as CD
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer
+using NCDatasets
 
 ###
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
@@ -52,6 +53,7 @@ function bucket_init(
     tspan::Tuple{Float64, Float64},
     config::String,
     albedo_type::String,
+    land_initial_condition::String,
     land_temperature_anomaly::String,
     output_dir::String;
     space,
@@ -137,6 +139,53 @@ function bucket_init(
     Y.bucket.W .= 0.15
     Y.bucket.Ws .= 0.0
     Y.bucket.σS .= 0.0
+
+    # Overwrite initial conditions with interpolated values from a netcdf file using
+    # the `SpaceVaryingInputs` tool. We expect the file to contain the following variables:
+    # - `W`, for subsurface water storage (2D),
+    # - `Ws`, for surface water content (2D),
+    # - `T`, for soil temperature (3D),
+    # - `S`, for snow water equivalent (2D).
+
+    if !isempty(land_initial_condition)
+        ds = NCDataset(land_initial_condition)
+        has_all_variables = all(key -> haskey(ds, key), ["W", "Ws", "T", "S"])
+        @assert has_all_variables "The land iniital condition file is expected to contain the variables W, Ws, T, and S (read documentation about requirements)."
+        close(ds)
+
+        surface_space = domain.space.surface
+        subsurface_space = domain.space.subsurface
+        regridder_type = :InterpolationsRegridder
+        extrapolation_bc = (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
+        Y.bucket.W .= SpaceVaryingInput(
+            land_initial_condition,
+            "W",
+            surface_space;
+            regridder_type,
+            regridder_kwargs = (; extrapolation_bc,),
+        )
+        Y.bucket.Ws .= SpaceVaryingInput(
+            land_initial_condition,
+            "Ws",
+            surface_space;
+            regridder_type,
+            regridder_kwargs = (; extrapolation_bc,),
+        )
+        Y.bucket.T .= SpaceVaryingInput(
+            land_initial_condition,
+            "T",
+            subsurface_space;
+            regridder_type,
+            regridder_kwargs = (; extrapolation_bc,),
+        )
+        Y.bucket.σS .= SpaceVaryingInput(
+            land_initial_condition,
+            "S",
+            surface_space;
+            regridder_type,
+            regridder_kwargs = (; extrapolation_bc,),
+        )
+    end
 
     # Set initial aux variable values
     set_initial_cache! = CL.make_set_initial_cache(model)

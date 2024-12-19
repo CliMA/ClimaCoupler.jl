@@ -155,6 +155,10 @@ function argparse_settings()
         help = "Access land surface albedo information from data file. [`map_static` (default), `function`, `map_temporal`]"
         arg_type = String
         default = "map_static" # to be replaced by land config file, when available
+        "--land_initial_condition"
+        help = "A file path for a NetCDF file (read documentation about requirements)"
+        arg_type = String
+        default = ""
         "--land_temperature_anomaly"
         help = "Type of temperature anomaly for bucket model. [`amip`, `aquaplanet` (default)]"
         arg_type = String

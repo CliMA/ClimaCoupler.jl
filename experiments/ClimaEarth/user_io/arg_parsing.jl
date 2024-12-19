@@ -85,6 +85,7 @@ function get_coupler_args(config_dict::Dict)
     # ClimaLand-specific information
     land_domain_type = config_dict["land_domain_type"]
     land_albedo_type = config_dict["land_albedo_type"]
+    land_initial_condition = config_dict["land_initial_condition"]
     land_temperature_anomaly = config_dict["land_temperature_anomaly"]
     use_land_diagnostics = config_dict["use_land_diagnostics"]
 
@@ -116,6 +117,7 @@ function get_coupler_args(config_dict::Dict)
         plot_diagnostics,
         land_domain_type,
         land_albedo_type,
+        land_initial_condition,
         land_temperature_anomaly,
         use_land_diagnostics,
     )

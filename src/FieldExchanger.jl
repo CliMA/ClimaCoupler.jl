@@ -6,10 +6,54 @@ atmospheric and surface component models.
 """
 module FieldExchanger
 
-import ..Interfacer, ..FluxCalculator, ..Regridder
+import ..Interfacer, ..FluxCalculator, ..Utilities
 
 export import_atmos_fields!,
-    import_combined_surface_fields!, update_sim!, update_model_sims!, reinit_model_sims!, step_model_sims!
+    update_surface_fractions!,
+    import_combined_surface_fields!,
+    update_sim!,
+    update_model_sims!,
+    reinit_model_sims!,
+    step_model_sims!
+
+"""
+    update_surface_fractions!(cs::Interfacer.CoupledSimulation)
+
+Updates dynamically changing area fractions.
+Maintains the invariant that the sum of area fractions is 1 at all points.
+
+# Arguments
+- `cs`: [Interfacer.CoupledSimulation] containing area fraction information.
+"""
+function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
+    FT = Interfacer.float_type(cs)
+
+    ice_fraction_before = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction))
+
+    # static fraction
+    land_fraction = Interfacer.get_field(cs.model_sims.land_sim, Val(:area_fraction))
+
+    # update component models with dynamic area fractions
+    # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
+    Interfacer.update_field!(
+        cs.model_sims.ice_sim,
+        Val(:area_fraction),
+        max.(min.(ice_fraction_before, FT(1) .- land_fraction), FT(0)),
+    )
+    ice_fraction = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction))
+
+    Interfacer.update_field!(
+        cs.model_sims.ocean_sim,
+        Val(:area_fraction),
+        max.(FT(1) .- (ice_fraction .+ land_fraction), FT(0)),
+    )
+    ocean_fraction = Interfacer.get_field(cs.model_sims.ocean_sim, Val(:area_fraction))
+
+    # check that the sum of area fractions is 1
+    @assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
+    @assert maximum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
+end
+
 """
     import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
 
@@ -28,19 +72,19 @@ function import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
 
     # turbulent fluxes
     if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
-        Regridder.dummmy_remap!(csf.F_turb_energy, Interfacer.get_field(atmos_sim, Val(:turbulent_energy_flux)))
-        Regridder.dummmy_remap!(csf.F_turb_moisture, Interfacer.get_field(atmos_sim, Val(:turbulent_moisture_flux)))
+        dummmy_remap!(csf.F_turb_energy, Interfacer.get_field(atmos_sim, Val(:turbulent_energy_flux)))
+        dummmy_remap!(csf.F_turb_moisture, Interfacer.get_field(atmos_sim, Val(:turbulent_moisture_flux)))
     end
 
     # surface density - needed for q_sat and requires atmos and sfc states, so it is calculated and saved in the coupler
-    Regridder.dummmy_remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_S)) # TODO: generalize for PartitionedStateFluxes (#445) (use individual T_S)
+    dummmy_remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_S)) # TODO: generalize for PartitionedStateFluxes (#445) (use individual T_S)
 
     # radiative fluxes
-    Regridder.dummmy_remap!(csf.F_radiative, Interfacer.get_field(atmos_sim, Val(:radiative_energy_flux_sfc)))
+    dummmy_remap!(csf.F_radiative, Interfacer.get_field(atmos_sim, Val(:radiative_energy_flux_sfc)))
 
     # precipitation
-    Regridder.dummmy_remap!(csf.P_liq, Interfacer.get_field(atmos_sim, Val(:liquid_precipitation)))
-    Regridder.dummmy_remap!(csf.P_snow, Interfacer.get_field(atmos_sim, Val(:snow_precipitation)))
+    dummmy_remap!(csf.P_liq, Interfacer.get_field(atmos_sim, Val(:liquid_precipitation)))
+    dummmy_remap!(csf.P_snow, Interfacer.get_field(atmos_sim, Val(:snow_precipitation)))
 end
 
 """
@@ -61,27 +105,27 @@ function import_combined_surface_fields!(csf, model_sims, turbulent_fluxes)
     combined_field = csf.temp1
 
     # surface fields
-    Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_temperature))
-    Regridder.dummmy_remap!(csf.T_S, combined_field)
+    combine_surfaces!(combined_field, model_sims, Val(:surface_temperature))
+    dummmy_remap!(csf.T_S, combined_field)
 
-    Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_direct_albedo))
-    Regridder.dummmy_remap!(csf.surface_direct_albedo, combined_field)
+    combine_surfaces!(combined_field, model_sims, Val(:surface_direct_albedo))
+    dummmy_remap!(csf.surface_direct_albedo, combined_field)
 
-    Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_diffuse_albedo))
-    Regridder.dummmy_remap!(csf.surface_diffuse_albedo, combined_field)
+    combine_surfaces!(combined_field, model_sims, Val(:surface_diffuse_albedo))
+    dummmy_remap!(csf.surface_diffuse_albedo, combined_field)
 
     if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
-        Regridder.combine_surfaces!(combined_field, model_sims, Val(:roughness_momentum))
-        Regridder.dummmy_remap!(csf.z0m_S, combined_field)
+        combine_surfaces!(combined_field, model_sims, Val(:roughness_momentum))
+        dummmy_remap!(csf.z0m_S, combined_field)
 
-        Regridder.combine_surfaces!(combined_field, model_sims, Val(:roughness_buoyancy))
-        Regridder.dummmy_remap!(csf.z0b_S, combined_field)
+        combine_surfaces!(combined_field, model_sims, Val(:roughness_buoyancy))
+        dummmy_remap!(csf.z0b_S, combined_field)
 
-        Regridder.combine_surfaces!(combined_field, model_sims, Val(:beta))
-        Regridder.dummmy_remap!(csf.beta, combined_field)
+        combine_surfaces!(combined_field, model_sims, Val(:beta))
+        dummmy_remap!(csf.beta, combined_field)
 
-        Regridder.combine_surfaces!(combined_field, model_sims, Val(:surface_humidity))
-        Regridder.dummmy_remap!(csf.q_sfc, combined_field)
+        combine_surfaces!(combined_field, model_sims, Val(:surface_humidity))
+        dummmy_remap!(csf.q_sfc, combined_field)
     end
 
 end
@@ -128,7 +172,7 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, turbulent_flux
     Interfacer.update_field!(sim, Val(:air_density), csf.ρ_sfc)
 
     # turbulent fluxes
-    mask = Regridder.binary_mask.(area_fraction)
+    mask = Utilities.binary_mask.(area_fraction)
 
     # when PartitionedStateFluxes, turbulent fluxes are updated during the flux calculation
     if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
@@ -193,6 +237,52 @@ Iterates `step!` over all component model simulations saved in `cs.model_sims`.
 function step_model_sims!(model_sims, t)
     for sim in model_sims
         Interfacer.step!(sim, t)
+    end
+end
+
+"""
+    dummmy_remap!(target, source)
+
+Simple stand-in function for remapping.
+For AMIP we don't need regridding of surface model CC.Fields.
+When we do, we re-introduce the ClimaCoreTempestRemap remapping functions.
+
+# Arguments
+- `target`: [CC.Fields.Field] destination of remapping.
+- `source`: [CC.Fields.Field] source of remapping.
+"""
+function dummmy_remap!(target, source)
+    parent(target) .= parent(source)
+end
+
+"""
+    nans_to_zero(v)
+
+Replaces NaNs with zeros, otherwise returns the value.
+"""
+nans_to_zero(v) = isnan(v) ? typeof(v)(0) : v
+
+"""
+    combine_surfaces!(combined_field::CC.Fields.Field, sims, field_name::Val)
+
+Sums the fields, specified by `field_name`, weighted by the respective area fractions of all
+surface simulations. THe result is saved in `combined_field`.
+
+# Arguments
+- `combined_field`: [CC.Fields.Field] output object containing weighted values.
+- `sims`: [NamedTuple] containing simulations .
+- `field_name`: [Val] containing the name Symbol of the field t be extracted by the `Interfacer.get_field` functions.
+
+# Example
+- `combine_surfaces!(temp_field, cs.model_sims, Val(:surface_temperature))`
+"""
+function combine_surfaces!(combined_field, sims, field_name)
+    combined_field .= eltype(combined_field)(0)
+    for sim in sims
+        if sim isa Interfacer.SurfaceModelSimulation
+            combined_field .+=
+                Interfacer.get_field(sim, Val(:area_fraction)) .* nans_to_zero.(Interfacer.get_field(sim, field_name)) # this ensures that unitialized (masked) areas do not affect (TODO: move to mask / remove)
+        end
     end
 end
 

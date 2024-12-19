@@ -48,7 +48,7 @@ import ClimaCore as CC
 # ## Coupler specific imports
 import ClimaCoupler
 import ClimaCoupler:
-    ConservationChecker, Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Regridder, TimeManager, Utilities
+    ConservationChecker, Checkpointer, FieldExchanger, FluxCalculator, Interfacer, TimeManager, Utilities
 
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
@@ -223,7 +223,7 @@ Note that land-sea area fraction is different to the land-sea mask, which is a b
 # Preprocess the file to be 1s and 0s before remapping into onto the grid
 land_area_fraction = SpaceVaryingInput(land_mask_data, "landsea", boundary_space)
 if !mono_surface
-    land_area_fraction = Regridder.binary_mask.(land_area_fraction)
+    land_area_fraction = Utilities.binary_mask.(land_area_fraction)
 end
 Utilities.show_memory_usage()
 
@@ -619,7 +619,7 @@ The concrete steps for proper initialization are:
 =#
 
 # 1.coupler updates surface model area fractions
-Regridder.update_surface_fractions!(cs)
+FieldExchanger.update_surface_fractions!(cs)
 
 # 2.surface density (`ρ_sfc`): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface.
 # For this, we need to import surface and atmospheric fields. The model sims are then updated with the new surface density.
@@ -711,7 +711,7 @@ function solve_coupler!(cs)
 
         ## update the surface fractions for surface models,
         ## and update all component model simulations with the current fluxes stored in the coupler
-        Regridder.update_surface_fractions!(cs)
+        FieldExchanger.update_surface_fractions!(cs)
         FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 
         ## step component model simulations sequentially for one coupling timestep (Δt_cpl)

@@ -1,7 +1,7 @@
 agents:
   queue: new-central
   slurm_time: 4:00:00
-  modules: climacommon/2024_10_09
+  modules: climacommon/2024_12_16
 
 env:
   JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"

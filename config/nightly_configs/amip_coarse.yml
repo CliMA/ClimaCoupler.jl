@@ -3,8 +3,8 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_dyamond.yml"
 cloud_model: "quadrature"
 coupler_toml_file: "toml/amip.toml"
-dt: "30secs"
-dt_cpl: "30secs"
+dt: "60secs"
+dt_cpl: "60secs"
 dt_save_state_to_disk: "30days"
 dt_save_to_sol: "30days"
 dz_bottom: 30.0
@@ -15,10 +15,12 @@ hourly_checkpoint_dt: 720
 initial_condition: "artifact\"DYAMOND_SUMMER_ICS_p98deg\"/DYAMOND_SUMMER_ICS_p98deg.nc"
 land_albedo_type: "map_temporal"
 land_initial_condition: "experiments/ClimaEarth/input/bucket_ic_august.nc"
+max_newton_iters_ode: 3
 mode_name: "amip"
 mono_surface: false
 netcdf_interpolation_num_points: [720, 360, 63]
 netcdf_output_at_levels: true
+ode_algo: ARS343
 output_default_diagnostics: true
 precip_model: "1M"
 radiation_reset_rng_seed: true

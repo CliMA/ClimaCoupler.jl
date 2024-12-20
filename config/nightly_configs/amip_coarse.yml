@@ -20,6 +20,7 @@ mono_surface: false
 netcdf_interpolation_num_points: [720, 360, 63]
 netcdf_output_at_levels: true
 output_default_diagnostics: true
+precip_model: "1M"
 radiation_reset_rng_seed: true
 rayleigh_sponge: true
 start_date: "20100801"

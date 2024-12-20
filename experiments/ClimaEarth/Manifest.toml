@@ -292,9 +292,9 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["ArgParse", "ArtifactWrappers", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "DiffEqBase", "FastGaussQuadrature", "Insolation", "Interpolations", "LazyArtifacts", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "RRTMGP", "Random", "SciMLBase", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
-git-tree-sha1 = "1dc686b87ed5310b22fb6e1f6a8baaf911cdc204"
+git-tree-sha1 = "52f0e3c80ca4a79387eb558913a5fb0fcc10a3e0"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.28.0"
+version = "0.28.1"
 
 [[deps.ClimaComms]]
 git-tree-sha1 = "ec303a4a66dc0a0ebe15a639a7e685afeaa0daef"
@@ -343,15 +343,16 @@ version = "0.2.11"
 
 [[deps.ClimaLand]]
 deps = ["ArtifactWrappers", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "cf1be2035f2b240fe7bbbc7449dea6dc4d0c9b03"
+git-tree-sha1 = "84dc3ec7a7cb72e28f35247f44b2877e98259d02"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
-version = "0.15.6"
+version = "0.15.7"
 
     [deps.ClimaLand.extensions]
     CreateParametersExt = "ClimaParams"
-    NeuralSnowExt = ["CSV", "DataFrames", "HTTP", "Flux", "StatsBase", "cuDNN"]
+    NeuralSnowExt = ["CSV", "DataFrames", "HTTP", "Flux", "StatsBase", "cuDNN", "BSON"]
 
     [deps.ClimaLand.weakdeps]
+    BSON = "fbb218c0-5317-5bc6-957e-2ee96dd4b1f0"
     CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
     CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
     ClimaParams = "5c42b081-d73a-476f-9059-fd94b934656c"

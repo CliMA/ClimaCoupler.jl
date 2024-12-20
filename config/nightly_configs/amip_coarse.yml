@@ -3,8 +3,8 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_dyamond.yml"
 cloud_model: "quadrature"
 coupler_toml_file: "toml/amip.toml"
-dt: "60secs"
-dt_cpl: "60secs"
+dt: "30secs"
+dt_cpl: "30secs"
 dt_save_state_to_disk: "30days"
 dt_save_to_sol: "30days"
 dz_bottom: 30.0
@@ -25,7 +25,7 @@ radiation_reset_rng_seed: true
 rayleigh_sponge: true
 start_date: "20100801"
 surface_setup: "PrescribedSurface"
-t_end: "10days"
+t_end: "5days"
 topo_smoothing: true
 topography: "Earth"
 turb_flux_partition: "CombinedStateFluxesMOST"

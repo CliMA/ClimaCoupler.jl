@@ -1,5 +1,13 @@
 import YAML
 
+mode_name_dict = Dict(
+    "amip" => AMIPMode,
+    "slabplanet" => SlabplanetMode,
+    "slabplanet_aqua" => SlabplanetAquaMode,
+    "slabplanet_terra" => SlabplanetTerraMode,
+    "slabplanet_eisenman" => SlabplanetEisenmanMode,
+)
+
 """
     get_coupler_config()
 
@@ -42,6 +50,7 @@ function get_coupler_args(config_dict::Dict)
     config_dict["print_config_dict"] && @info(config_dict)
     job_id = config_dict["job_id"]
     mode_name = config_dict["mode_name"]
+    sim_mode = mode_name_dict[mode_name]
 
     # Computational simulation setup information
     random_seed = config_dict["unique_seed"] ? time_ns() : 1234
@@ -91,7 +100,7 @@ function get_coupler_args(config_dict::Dict)
 
     return (;
         job_id,
-        mode_name,
+        sim_mode,
         random_seed,
         FT,
         comms_ctx,

@@ -42,11 +42,35 @@ pressure levels are being created.
 
 ### Code cleanup
 
-#### Output path updates - PRs [#1058](https://github.com/CliMA/ClimaCoupler.jl/pull/1058),
-    [#1106](https://github.com/CliMA/ClimaCoupler.jl/pull/1106),
-    [#1123](https://github.com/CliMA/ClimaCoupler.jl/pull/1123)
+#### Abstract types representing simulation modes & postprocessing changes - PR [#1120](https://github.com/CliMA/ClimaCoupler.jl/pull/1120)
 
+The available simulation modes are now represented by the following abstract types:
 
+- `ClimaCoupler.Interfacer.AMIPMode`
+- `ClimaCoupler.Interfacer.SlabplanetMode`
+- `ClimaCoupler.Interfacer.SlabplanetAquaMode`
+- `ClimaCoupler.Interfacer.SlabplanetTerraMode`
+- `ClimaCoupler.Interfacer.SlabplanetEisenmanMode`
+
+All of the above types are subtypes of the abstract
+`ClimaCoupler.Interfacer.AbstractSlabplanetSimulationMode`, and all of them except
+`ClimaCoupler.Interfacer.AMIPMode` are subtypes of `ClimaCoupler.Interfacer.AbstractSlabplanetSimulationMode`.
+
+These types are used in `experiments/ClimaEarth/run_amip.jl` instead of representing the
+simulation mode as a string.
+
+The postprocessing in `experiments/ClimaEarth/run_amip.jl` is now moved into functions in
+the new `experiments/ClimaEarth/user_io/postprocessing.jl`. When the simulation is complete,
+`postprocess_sim` is called using the type representing the simulation mode for dispatch.
+`postprocess_sim` has one method for all slabplanet simulation modes and another for the AMIP
+simulation mode. All postprocessing common to all simulation modes is done in the `common_postprocessing`
+function, which is called by both `postprocess_sim` methods.
+
+#### Output path updates - PRs [#1058][1], [#1106][2], [#1123][3]
+
+[1]: https://github.com/CliMA/ClimaCoupler.jl/pull/1058
+[2]: https://github.com/CliMA/ClimaCoupler.jl/pull/1106
+[3]: https://github.com/CliMA/ClimaCoupler.jl/pull/1123
 Previously, ClimaEarth simulation outputs were saved in a path
 `experiments/ClimaEarth/output/$mode_name/$job_id/artifacts/`. Now, `ClimaEarth`
 creates output folders with an increment (increasing the counter every time the
@@ -72,7 +96,7 @@ coupler_output_dir_amip/
 ├── output_0002/
 │   └── ... component model outputs in their folders ...
 └── output_active -> output_0002/
-``
+```
 Note that any external scripts that assume an output path will need to be updated.
 
 #### Remove ClimaCoupler.Diagnostics module - PR [#953](https://github.com/CliMA/ClimaCoupler.jl/pull/953)

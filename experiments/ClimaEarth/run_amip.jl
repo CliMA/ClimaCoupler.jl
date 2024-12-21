@@ -139,7 +139,7 @@ postprocessing and the conservation checks) of the simulation will be saved,
 #and `dir_paths.checkpoints`, where restart files are saved.
 =#
 
-COUPLER_OUTPUT_DIR = joinpath(output_dir_root, job_id)
+COUPLER_OUTPUT_DIR = joinpath(pkg_dir, output_dir_root, job_id)
 dir_paths = Utilities.setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
 @info "Coupler output directory $(dir_paths.output)"
 @info "Coupler artifacts directory $(dir_paths.artifacts)"

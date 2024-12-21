@@ -5,7 +5,8 @@ function argparse_settings()
         ### ClimaCoupler flags
         # Simulation-identifying information
         "--config_file"
-        help = "A yaml file used to set the configuration of the coupled model [\"config/ci_configs/amip_default.yml\" (default)]"
+        help = "A yaml file, relative to ClimaCoupler.jl, used to set the configuration of the\
+        coupled model [\"config/ci_configs/amip_default.yml\" (default)]"
         arg_type = String
         default = "config/ci_configs/amip_default.yml"
         "--job_id"
@@ -84,7 +85,7 @@ function argparse_settings()
         default = 480
         # Restart information
         "--restart_dir"
-        help = "Directory containing restart files"
+        help = "Directory containing restart files, relative to ClimaCoupler.jl [nothing (default)]"
         arg_type = String
         default = nothing
         "--restart_t"
@@ -120,7 +121,8 @@ function argparse_settings()
         default = false
         # Output information
         "--coupler_output_dir"
-        help = "Directory to save output files. Note that TempestRemap fails if interactive and paths are too long. [\"experiments/ClimaEarth/output\" (default)]"
+        help = "Directory to save output files, relative to ClimaCoupler.jl. Note that TempestRemap\
+        fails if interactive and paths are too long. [\"experiments/ClimaEarth/output\" (default)]"
         arg_type = String
         default = "experiments/ClimaEarth/output"
         "--plot_diagnostics"

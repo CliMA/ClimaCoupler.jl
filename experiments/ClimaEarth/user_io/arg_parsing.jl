@@ -22,13 +22,13 @@ function get_coupler_config()
     parsed_args = parse_commandline(argparse_settings())
 
     # Extract the configuration file and job ID
-    config_file = parsed_args["config_file"]
+    config_file = joinpath(pkg_dir, parsed_args["config_file"])
     job_id = parsed_args["job_id"]
     # Get the job ID from the config file string if not provided
     job_id = isnothing(job_id) ? string(split(split(config_file, '/')[end], '.')[1]) : job_id
 
     # Read in config dictionary from file, overriding the defaults in `parsed_args`
-    config_dict = merge(parsed_args, YAML.load_file(parsed_args["config_file"]))
+    config_dict = merge(parsed_args, YAML.load_file(config_file))
     config_dict["job_id"] = job_id
     return config_dict
 end
@@ -70,7 +70,7 @@ function get_coupler_args(config_dict::Dict)
     hourly_checkpoint_dt = config_dict["hourly_checkpoint_dt"]
 
     # Restart information
-    restart_dir = config_dict["restart_dir"]
+    restart_dir = isnothing(config_dict["restart_dir"]) ? nothing : joinpath(pkg_dir, config_dict["restart_dir"])
     restart_t = Int(config_dict["restart_t"])
 
     # Diagnostics information
@@ -88,7 +88,7 @@ function get_coupler_args(config_dict::Dict)
     conservation_softfail = config_dict["conservation_softfail"]
 
     # Output information
-    output_dir_root = config_dict["coupler_output_dir"]
+    output_dir_root = joinpath(pkg_dir, config_dict["coupler_output_dir"])
     plot_diagnostics = config_dict["plot_diagnostics"]
 
     # ClimaLand-specific information

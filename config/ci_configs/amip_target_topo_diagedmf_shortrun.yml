@@ -8,7 +8,6 @@ dt_rad: "1hours"
 dt_save_state_to_disk: "1days"
 dt_save_to_sol: "1days"
 energy_check: false
-hourly_checkpoint: true
 insolation: "timevarying"
 land_albedo_type: "map_temporal"
 mode_name: "amip"

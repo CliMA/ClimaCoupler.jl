@@ -1,6 +1,7 @@
 ## helpers for user-specified IO
 include("debug_plots.jl")
 include("diagnostics_plots.jl")
+include("../leaderboard/leaderboard.jl")
 
 """
     postprocess_sim(::Type{AbstractSlabplanetSimulationMode}, cs, postprocessing_vars)
@@ -46,10 +47,6 @@ function postprocess_sim(::Type{AMIPMode}, cs, postprocessing_vars)
     if use_coupler_diagnostics
         ## plot data that correspond to the model's last save_hdf5 call (i.e., last month)
         @info "AMIP plots"
-
-        ## ClimaESM
-        include("user_io/diagnostics_plots.jl")
-
         # define variable names and output directories for each diagnostic
         amip_short_names_atmos = ["ta", "ua", "hus", "clw", "pr", "ts", "toa_fluxes_net"]
         amip_short_names_coupler = ["F_turb_energy"]
@@ -72,7 +69,6 @@ function postprocess_sim(::Type{AMIPMode}, cs, postprocessing_vars)
 
     # Check this because we only want monthly data for making plots
     if t_end > 84600 * 31 * 3 && output_default_diagnostics
-        include("leaderboard/leaderboard.jl")
         leaderboard_base_path = cs.dirs.artifacts
         compute_leaderboard(leaderboard_base_path, atmos_output_dir)
         compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir)
@@ -92,7 +88,6 @@ function common_postprocessing(cs, postprocessing_vars)
     (; plot_diagnostics, atmos_output_dir) = postprocessing_vars
     if plot_diagnostics
         @info "Plotting diagnostics"
-        include("user_io/diagnostics_plots.jl")
         make_diagnostics_plots(atmos_output_dir, cs.dirs.artifacts)
     end
 

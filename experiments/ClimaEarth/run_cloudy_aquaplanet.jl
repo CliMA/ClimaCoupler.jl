@@ -164,7 +164,7 @@ This uses the `ClimaAtmos.jl` model, with parameterization options specified in 
 =#
 
 ## init atmos model component
-atmos_sim = atmos_init(atmos_config_object);
+atmos_sim = ClimaAtmosSimulation(atmos_config_object);
 thermo_params = get_thermo_params(atmos_sim)
 
 #=
@@ -177,7 +177,7 @@ boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space) # TODO:
 #=
 ### Surface Model: Slab Ocean
 =#
-ocean_sim = ocean_init(
+ocean_sim = SlabOceanSimulation(
     FT;
     tspan = tspan,
     dt = Δt_cpl,

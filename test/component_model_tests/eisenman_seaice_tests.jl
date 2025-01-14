@@ -302,7 +302,7 @@ for FT in (Float32, Float64)
     @testset "step! update + total energy calculation for FT=$FT" begin
         Δt = Float64(1000)
 
-        sim = eisenman_seaice_init(
+        sim = EisenmanIceSimulation(
             FT,
             (0, 2e6),
             space = boundary_space,

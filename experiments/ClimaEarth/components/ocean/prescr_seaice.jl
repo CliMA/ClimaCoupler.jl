@@ -54,11 +54,20 @@ function slab_ice_space_init(::Type{FT}, space, p) where {FT}
 end
 
 """
-    ice_init(::Type{FT}; tspan, dt, saveat, space, ice_fraction, stepper = CTS.RK4()) where {FT}
+    PrescribedIceSimulation(::Type{FT}; tspan, dt, saveat, space, ice_fraction, stepper = CTS.RK4()) where {FT}
 
 Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `Interfacer.step!` in the coupling loop.
 """
-function ice_init(::Type{FT}; tspan, saveat, dt, space, area_fraction, thermo_params, stepper = CTS.RK4()) where {FT}
+function PrescribedIceSimulation(
+    ::Type{FT};
+    tspan,
+    saveat,
+    dt,
+    space,
+    area_fraction,
+    thermo_params,
+    stepper = CTS.RK4(),
+) where {FT}
 
     params = IceSlabParameters{FT}()
 

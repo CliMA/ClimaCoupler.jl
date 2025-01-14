@@ -32,7 +32,7 @@ function hasmoisture(integrator)
     return !(integrator.p.atmos.moisture_model isa CA.DryModel)
 end
 
-function atmos_init(atmos_config)
+function ClimaAtmosSimulation(atmos_config)
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
     FT = atmos_config.parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
     simulation = CA.get_simulation(atmos_config)

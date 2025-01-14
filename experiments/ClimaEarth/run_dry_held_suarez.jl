@@ -126,7 +126,7 @@ comms_ctx = Utilities.get_comms_context(Dict("device" => "auto"))
 =#
 
 ## init atmos model component
-atmos_sim = atmos_init(atmos_config_object);
+atmos_sim = ClimaAtmosSimulation(atmos_config_object);
 thermo_params = get_thermo_params(atmos_sim)
 
 #=

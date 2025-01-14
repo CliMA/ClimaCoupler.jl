@@ -55,11 +55,11 @@ function slab_ocean_space_init(space, params)
 end
 
 """
-    ocean_init(::Type{FT}; tspan, dt, saveat, space, area_fraction, stepper = CTS.RK4()) where {FT}
+    SlabOceanSimulation(::Type{FT}; tspan, dt, saveat, space, area_fraction, stepper = CTS.RK4()) where {FT}
 
 Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `step!` in the coupling loop.
 """
-function ocean_init(
+function SlabOceanSimulation(
     ::Type{FT};
     tspan,
     dt,

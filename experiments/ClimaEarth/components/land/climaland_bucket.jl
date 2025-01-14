@@ -48,7 +48,7 @@ end
 
 Initializes the bucket model variables.
 """
-function bucket_init(
+function BucketSimulation(
     ::Type{FT},
     tspan::Tuple{Float64, Float64},
     config::String,

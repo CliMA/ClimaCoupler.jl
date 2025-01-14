@@ -215,7 +215,6 @@ end
 ## Interfacer Internal Functions and Types
 
 ```@docs
-    ClimaCoupler.Interfacer.stub_init
     ClimaCoupler.Interfacer.AbstractSimulation
     ClimaCoupler.Interfacer.AbstractSimulationMode
 ```

@@ -24,6 +24,12 @@ callback = Callback(schedule, func)
 maybe_trigger_callback(callback, cs, t)
 ```
 
+#### Constructor renaming PR[#1135](https://github.com/CliMA/ClimaCoupler.jl/pull/1135)
+
+Simulation constructor functions have been renamed to use the simulation name
+itself, following general convention for constructor naming. For example,
+`atmos_init` is now `ClimaAtmosSimulation`, and `bucket_init` is now `BucketSimulation`.
+
 v0.1.2
 -------
 ### ClimaEarth features

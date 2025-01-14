@@ -7,13 +7,6 @@ struct SurfaceStub{I} <: SurfaceModelSimulation
     cache::I
 end
 
-"""
-    stub_init(cache)
-
-Initialization function for SurfaceStub simulation type.
-"""
-stub_init(cache) = SurfaceStub(cache)
-
 ## Extensions of Interfacer.jl functions
 
 """

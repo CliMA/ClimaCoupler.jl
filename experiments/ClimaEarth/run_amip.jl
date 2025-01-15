@@ -740,11 +740,6 @@ function solve_coupler!(cs)
     return nothing
 end
 
-## exit if running performance analysis #hide
-if haskey(ENV, "CI_PERF_SKIP_COUPLED_RUN") #hide
-    throw(:exit_profile_init) #hide
-end #hide
-
 #=
 ## Precompilation of Coupling Loop
 

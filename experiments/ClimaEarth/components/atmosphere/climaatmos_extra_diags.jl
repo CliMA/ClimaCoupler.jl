@@ -159,6 +159,50 @@ CAD.add_diagnostic_variable!(
     end,
 )
 
+
+compute_rsut!(out, state, cache, time) =
+    compute_rsut!(out, state, cache, time, cache.atmos.radiation_mode)
+compute_rsut!(_, _, _, _, radiation_mode::T) where {T} =
+    error_diagnostic_variable("rsut", radiation_mode)
+
+function compute_rsut!(
+    out,
+    state,
+    cache,
+    time,
+    radiation_mode::T,
+) where {T <: CA.RRTMGPInterface.AbstractRRTMGPMode}
+    nlevels = CC.Spaces.nlevels(axes(state.c))
+    if isnothing(out)
+        return copy(
+            CC.Fields.level(
+                CC.Fields.array2field(
+                    cache.radiation.rrtmgp_model.face_sw_flux_up,
+                    axes(state.f),
+                ),
+                nlevels + CC.Utilities.half,
+            ),
+        )
+    else
+        out .= CC.Fields.level(
+            CC.Fields.array2field(
+                cache.radiation.rrtmgp_model.face_sw_flux_up,
+                axes(state.f),
+            ),
+            nlevels + CC.Utilities.half,
+        )
+    end
+end
+
+CAD.add_diagnostic_variable!(
+    short_name = "rsut",
+    long_name = "TOA Outgoing Shortwave Radiation",
+    standard_name = "toa_outgoing_shortwave_flux",
+    units = "W m^-2",
+    comments = "Upwelling shortwave radiation at the top of the atmosphere",
+    compute! = compute_rsut!,
+)
+
 """
     static_stability(cache)
 

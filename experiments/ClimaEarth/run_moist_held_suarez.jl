@@ -140,7 +140,7 @@ This uses the `ClimaAtmos.jl` model, with parameterization options specified in 
 =#
 
 ## init atmos model component
-atmos_sim = atmos_init(atmos_config_object);
+atmos_sim = ClimaAtmosSimulation(atmos_config_object);
 thermo_params = get_thermo_params(atmos_sim)
 
 #=

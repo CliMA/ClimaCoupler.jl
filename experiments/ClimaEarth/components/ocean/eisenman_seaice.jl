@@ -45,11 +45,11 @@ Base.@kwdef struct EisenmanOceanParameters{FT <: AbstractFloat}
 end
 
 """
-    eisenman_seaice_init(::Type{FT}, tspan; space = nothing, area_fraction = nothing, thermo_params = nothing, stepper = CTS.RK4(), dt = 0.02, saveat = 1.0e10)
+    EisenmanIceSimulation(::Type{FT}, tspan; space = nothing, area_fraction = nothing, thermo_params = nothing, stepper = CTS.RK4(), dt = 0.02, saveat = 1.0e10)
 
 Initialize the Eisenman-Zhang sea ice model and simulation.
 """
-function eisenman_seaice_init(
+function EisenmanIceSimulation(
     ::Type{FT},
     tspan;
     space = nothing,

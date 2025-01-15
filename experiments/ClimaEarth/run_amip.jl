@@ -199,7 +199,7 @@ This uses the `ClimaAtmos.jl` model, with parameterization options specified in 
 Utilities.show_memory_usage()
 
 ## init atmos model component
-atmos_sim = atmos_init(CA.AtmosConfig(atmos_config_dict));
+atmos_sim = ClimaAtmosSimulation(CA.AtmosConfig(atmos_config_dict));
 # Get surface elevation from `atmos` coordinate field
 surface_elevation = CC.Fields.level(CC.Fields.coordinate_field(atmos_sim.integrator.u.f).z, CC.Utilities.half)
 Utilities.show_memory_usage()
@@ -256,7 +256,7 @@ if sim_mode <: AMIPMode
     @info("AMIP boundary conditions - do not expect energy conservation")
 
     ## land model
-    land_sim = bucket_init(
+    land_sim = BucketSimulation(
         FT,
         tspan,
         land_domain_type,
@@ -315,7 +315,7 @@ if sim_mode <: AMIPMode
     evaluate!(SIC_init, SIC_timevaryinginput, t_start)
 
     ice_fraction = get_ice_fraction.(SIC_init, mono_surface)
-    ice_sim = ice_init(
+    ice_sim = PrescribedIceSimulation(
         FT;
         tspan = tspan,
         dt = component_dt_dict["dt_seaice"],
@@ -355,7 +355,7 @@ elseif (sim_mode <: AbstractSlabplanetSimulationMode) && !(sim_mode <: Slabplane
     land_area_fraction = sim_mode <: SlabplanetTerraMode ? land_area_fraction .* 0 .+ 1 : land_area_fraction
 
     ## land model
-    land_sim = bucket_init(
+    land_sim = BucketSimulation(
         FT,
         tspan,
         land_domain_type,
@@ -375,7 +375,7 @@ elseif (sim_mode <: AbstractSlabplanetSimulationMode) && !(sim_mode <: Slabplane
     )
 
     ## ocean model
-    ocean_sim = ocean_init(
+    ocean_sim = SlabOceanSimulation(
         FT;
         tspan = tspan,
         dt = component_dt_dict["dt_ocean"],
@@ -406,7 +406,7 @@ elseif (sim_mode <: AbstractSlabplanetSimulationMode) && !(sim_mode <: Slabplane
 elseif sim_mode <: SlabplanetEisenmanMode
 
     ## land model
-    land_sim = bucket_init(
+    land_sim = BucketSimulation(
         FT,
         tspan,
         land_domain_type,
@@ -426,7 +426,7 @@ elseif sim_mode <: SlabplanetEisenmanMode
     )
 
     ## ocean stub (here set to zero area coverage)
-    ocean_sim = ocean_init(
+    ocean_sim = SlabOceanSimulation(
         FT;
         tspan = tspan,
         dt = component_dt_dict["dt_ocean"],
@@ -437,7 +437,7 @@ elseif sim_mode <: SlabplanetEisenmanMode
     )
 
     ## sea ice + ocean model
-    ice_sim = eisenman_seaice_init(
+    ice_sim = EisenmanIceSimulation(
         FT,
         tspan,
         space = boundary_space,
@@ -739,11 +739,6 @@ function solve_coupler!(cs)
     end
     return nothing
 end
-
-## exit if running performance analysis #hide
-if haskey(ENV, "CI_PERF_SKIP_COUPLED_RUN") #hide
-    throw(:exit_profile_init) #hide
-end #hide
 
 #=
 ## Precompilation of Coupling Loop

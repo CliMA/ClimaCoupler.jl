@@ -1,6 +1,7 @@
 using Distributed
 import ClimaCalibrate as CAL
 using ClimaCalibrate
+using ClimaAnalysis
 import ClimaAnalysis: SimDir, get, slice, average_xy
 import ClimaComms
 ENV["CLIMACOMMS_DEVICE"] = "CUDA"
@@ -8,7 +9,7 @@ ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
 ClimaComms.@import_required_backends
 
 function CAL.observation_map(iteration)
-    single_member_dims = (1,)
+    single_member_dims = (2,)
     G_ensemble = Array{Float64}(undef, single_member_dims..., ensemble_size)
 
     for m in 1:ensemble_size
@@ -27,11 +28,16 @@ end
 function process_member_data(simdir::SimDir)
     isempty(simdir) && return NaN
     rsut =
+    try
         get(simdir; short_name = "rsut", reduction = "average", period = "30d")
+    catch e
+        @error e
+        return NaN
+    end
     return slice(average_lon(average_lat(rsut)); time = 30).data
 end
 
-addprocs(CAL.SlurmManager(5))
+# addprocs(CAL.SlurmManager(5))
 
 @everywhere begin
     import ClimaComms, CUDA
@@ -41,18 +47,25 @@ addprocs(CAL.SlurmManager(5))
     import ClimaAtmos as CA
     import JLD2
     import EnsembleKalmanProcesses:
-        I, ParameterDistributions.constrained_gaussian
+        I, ParameterDistributions.constrained_gaussian, ParameterDistributions.combine_distributions
 
     experiment_dir = CAL.project_dir()
     include(joinpath(experiment_dir, "calibration_interface.jl"))
     output_dir = joinpath(experiment_dir, "output")
 
     # Experiment Configuration
-    ensemble_size = 10
+    ensemble_size = 50
     n_iterations = 5
     astronomical_unit = 149_597_870_000
     noise = 0.1 * I
-    prior = constrained_gaussian("astronomical_unit", 1.5e11, 1e11, 2e5, Inf)
+    priors = [constrained_gaussian("astronomical_unit", 1.5e11, 1e11, 2e5, Inf),
+[entr_inv_tau] #0.001 - 0.004
+
+            constrained_gaussian("specific_humidity_precipitation_threshold", 5.0e-6, 5.0e-6,  1e-9, Inf),
+            constrained_gaussian("precipitation_timescale", 500, 300, 240, 1000),
+            # constrained_gaussian("supersaturation_precipitation_threshold", 0.04, 0.03, 0, 0.1),
+        ]
+    prior = combine_distributions(priors)
     obs_path = joinpath(experiment_dir, "observations.jld2")
 end
 

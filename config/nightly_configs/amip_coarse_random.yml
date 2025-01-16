@@ -16,6 +16,7 @@ mono_surface: false
 netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
 output_default_diagnostics: false
+override_precip_timescale: false
 rayleigh_sponge: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
@@ -32,6 +33,6 @@ rad: clearsky
 insolation: timevarying
 extra_atmos_diagnostics:
   - reduction_time: average
-    short_name: rsut
+    short_name: [rsut, pr]
     period: 30days
     writer: nc

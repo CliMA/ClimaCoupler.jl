@@ -182,7 +182,6 @@ catch error
         "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
     )
 end
-co2_data = joinpath(@clima_artifact("co2_dataset", comms_ctx), "co2_mm_mlo.txt")
 land_mask_data = joinpath(@clima_artifact("landsea_mask_60arcseconds", comms_ctx), "landsea_mask.nc")
 
 #=
@@ -325,27 +324,8 @@ if sim_mode <: AMIPMode
         thermo_params = thermo_params,
     )
 
-    ## CO2 concentration from temporally varying file
-    CO2_text = DelimitedFiles.readdlm(co2_data, Float64; comments = true)
-    # The text file only has month and year, so we set the day to 15th of the month
-    years = CO2_text[:, 1]
-    months = CO2_text[:, 2]
-    CO2_dates = Dates.DateTime.(years, months) + Dates.Day(14)
-    CO2_times = period_to_seconds_float.(CO2_dates .- date0)
-    # convert from ppm to fraction, data is in fourth column of the text file
-    CO2_vals = CO2_text[:, 4] .* 10^(-6)
-    CO2_timevaryinginput = TimeVaryingInput(CO2_times, CO2_vals;)
-
-    CO2_init = zeros(boundary_space)
-    evaluate!(CO2_init, CO2_timevaryinginput, t_start)
-    CO2_field = Interfacer.update_field!(atmos_sim, Val(:co2), CO2_init)
-
-    mode_specifics = (;
-        type = sim_mode,
-        SST_timevaryinginput = SST_timevaryinginput,
-        SIC_timevaryinginput = SIC_timevaryinginput,
-        CO2_timevaryinginput = CO2_timevaryinginput,
-    )
+    mode_specifics =
+        (; type = sim_mode, SST_timevaryinginput = SST_timevaryinginput, SIC_timevaryinginput = SIC_timevaryinginput)
     Utilities.show_memory_usage()
 
 elseif (sim_mode <: AbstractSlabplanetSimulationMode) && !(sim_mode <: SlabplanetEisenmanMode)
@@ -681,11 +661,6 @@ function solve_coupler!(cs)
         if cs.mode.type <: AMIPMode
             evaluate!(Interfacer.get_field(ocean_sim, Val(:surface_temperature)), cs.mode.SST_timevaryinginput, t)
             evaluate!(Interfacer.get_field(ice_sim, Val(:area_fraction)), cs.mode.SIC_timevaryinginput, t)
-
-            # TODO: get_field with :co2 is not implemented, so this is a little awkward
-            current_CO2 = zeros(boundary_space)
-            evaluate!(current_CO2, cs.mode.CO2_timevaryinginput, t)
-            Interfacer.update_field!(atmos_sim, Val(:co2), current_CO2)
         end
 
         ## compute global energy and water conservation checks

@@ -1,4 +1,5 @@
 apply_limiter: false
+co2: "maunaloa"
 dt: "150secs"
 dt_cpl: "150secs"
 dt_rad: "1hours"

@@ -2,6 +2,7 @@ FLOAT_TYPE: "Float32"
 aerosol_radiation: true
 atmos_config_file: "config/benchmark_configs/climaatmos_diagedmf.yml"
 atmos_config_repo: "ClimaCoupler"
+co2: "maunaloa"
 dt: "120secs"
 dt_cpl: "120secs"
 dt_save_state_to_disk: "Inf"

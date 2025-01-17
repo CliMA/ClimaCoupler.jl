@@ -203,8 +203,6 @@ for FT in (Float32, Float64)
         )
 
         FieldExchanger.combine_surfaces!(combined_field, sims, var_name)
-        # println(parent(combined_field))
-        println(sum(fractions .* fields))
         @test all(parent(combined_field) .== FT(sum(fractions .* fields)))
     end
 

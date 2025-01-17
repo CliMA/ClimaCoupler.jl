@@ -6,6 +6,13 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Prescribed SIC updated in PrescribedIceSimulation PR[#1141](https://github.com/CliMA/ClimaCoupler.jl/pull/1141)
+Previously, SIC was read in directly from the driver during init and in the
+coupling loop. Now, it is read internally within the `PrescribedIceSimulation`
+object initialization and `step!`. Note that this results in changed order of
+operations and slightly different behavior for AMIP simulations - see the PR
+description for more details.
+
 #### Simplified callbacks PR [#1121](https://github.com/CliMA/ClimaCoupler.jl/pull/1121)
 
 Callbacks were also reworked, and the previous system was removed. Here is an example of the

@@ -1,6 +1,9 @@
 import SciMLBase
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
+import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
+import ClimaUtilities.ClimaArtifacts: @clima_artifact
+import Interpolations # triggers InterpolationsExt in ClimaUtilities
 import Thermodynamics as TD
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
 
@@ -48,36 +51,85 @@ end
 Interfacer.name(::IceSlabParameters) = "IceSlabParameters"
 
 # init simulation
-function slab_ice_space_init(::Type{FT}, space, p) where {FT}
-    Y = CC.Fields.FieldVector(T_sfc = ones(space) .* p.T_freeze)
+function slab_ice_space_init(::Type{FT}, space, params) where {FT}
+    Y = CC.Fields.FieldVector(T_sfc = ones(space) .* params.T_freeze)
     return Y
 end
 
 """
-    PrescribedIceSimulation(::Type{FT}; tspan, dt, saveat, space, ice_fraction, stepper = CTS.RK4()) where {FT}
+    PrescribedIceSimulation(
+        ::Type{FT};
+        tspan,
+        dt,
+        saveat,
+        space,
+        thermo_params,
+        comms_ctx,
+        date0,
+        mono_surface,
+        stepper = CTS.RK4()
+    ) where {FT}
 
-Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `Interfacer.step!` in the coupling loop.
+Initializes the `DiffEq` problem, and creates a Simulation-type object
+containing the necessary information for `Interfacer.step!` in the coupling loop.
+
+This model reads in prescribed sea ice concentration data and solves the energy equation
+for the surface temperature of the sea ice. The sea ice concentration is updated
+at each timestep.
+
 """
 function PrescribedIceSimulation(
     ::Type{FT};
     tspan,
-    saveat,
     dt,
+    saveat,
     space,
-    area_fraction,
     thermo_params,
+    comms_ctx,
+    date0,
+    mono_surface,
+    land_area_fraction,
     stepper = CTS.RK4(),
 ) where {FT}
+    # Set up prescribed sea ice concentration object
+    sic_data = try
+        joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.ICE.HAD187001-198110.OI198111-202206.nc")
+    catch error
+        @warn "Using lowres SIC. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
+        joinpath(
+            @clima_artifact("historical_sst_sic_lowres", comms_ctx),
+            "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
+        )
+    end
+
+    SIC_timevaryinginput = TimeVaryingInput(
+        sic_data,
+        "SEAICE",
+        space,
+        reference_date = date0,
+        file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
+    )
+
+    # Get initial SIC values and use them to calculate ice fraction
+    SIC_init = CC.Fields.zeros(space)
+    evaluate!(SIC_init, SIC_timevaryinginput, tspan[1])
+    ice_fraction = get_ice_fraction.(SIC_init, mono_surface)
+
+    # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
+    #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
+    @. ice_fraction = max(min(ice_fraction, FT(1) - land_area_fraction), FT(0))
 
     params = IceSlabParameters{FT}()
 
     Y = slab_ice_space_init(FT, space, params)
-    additional_cache = (;
+    cache = (;
         F_turb_energy = CC.Fields.zeros(space),
         F_radiative = CC.Fields.zeros(space),
         q_sfc = CC.Fields.zeros(space),
         ρ_sfc = CC.Fields.zeros(space),
-        area_fraction = area_fraction,
+        area_fraction = ice_fraction,
+        SIC_timevaryinginput = SIC_timevaryinginput,
+        land_area_fraction = land_area_fraction,
         dt = dt,
         thermo_params = thermo_params,
         # add dss_buffer to cache to avoid runtime dss allocation
@@ -87,7 +139,7 @@ function PrescribedIceSimulation(
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     ode_function = CTS.ClimaODEFunction(T_exp! = ice_rhs!, dss! = (Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer))
 
-    problem = SciMLBase.ODEProblem(ode_function, Y, Float64.(tspan), (; additional_cache..., params = params))
+    problem = SciMLBase.ODEProblem(ode_function, Y, Float64.(tspan), (; cache..., params = params))
     integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64(saveat), adaptive = false)
 
     sim = PrescribedIceSimulation(params, Y, space, integrator)
@@ -130,6 +182,7 @@ end
 function Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_energy_flux}, field)
     parent(sim.integrator.p.F_turb_energy) .= parent(field)
 end
+Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_moisture_flux}, field) = nothing
 
 # extensions required by FieldExchanger
 Interfacer.step!(sim::PrescribedIceSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
@@ -158,31 +211,32 @@ get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
     mono ? h_ice : Utilities.binary_mask(h_ice, threshold)
 
 """
-    ice_rhs!(du, u, p, _)
+    ice_rhs!(dY, Y, p, t)
 
-Rhs method in the form as required by `ClimeTimeSteppers`, with the tendency vector `du`,
-the state vector `u` and the parameter vector, `p`, as input arguments.
+Rhs method in the form as required by `ClimeTimeSteppers`, with the tendency vector `dY`,
+the state vector `Y`, the parameter vector `p`, and the simulation time `t` as input arguments.
 
 This sea-ice energy formulation follows [Holloway and Manabe 1971](https://journals.ametsoc.org/view/journals/mwre/99/5/1520-0493_1971_099_0335_socbag_2_3_co_2.xml?tab_body=pdf),
-where sea-ice concentrations and thicknes are prescribed, and the model solves for temperature (curbed at the freezing point).
+where sea-ice concentrations and thicknes are prescribed, and the model solves
+for temperature (curbed at the freezing point).
 """
-function ice_rhs!(du, u, p, _)
-    dY = du
-    Y = u
-    FT = eltype(dY)
-
+function ice_rhs!(dY, Y, p, t)
+    FT = eltype(Y)
     params = p.params
-    F_turb_energy = p.F_turb_energy
-    F_radiative = p.F_radiative
-    area_fraction = p.area_fraction
-    T_freeze = params.T_freeze
+
+    # Update the cached area fraction with the current SIC
+    evaluate!(p.area_fraction, p.SIC_timevaryinginput, t)
+
+    # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
+    #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
+    @. p.area_fraction = max(min(p.area_fraction, FT(1) - p.land_area_fraction), FT(0))
 
     F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc) # fluxes are defined to be positive when upward
-    rhs = @. (-F_turb_energy - F_radiative + F_conductive) / (params.h * params.ρ * params.c)
+    rhs = @. (-p.F_turb_energy - p.F_radiative + F_conductive) / (params.h * params.ρ * params.c)
     # If tendencies lead to temperature above freezing, set temperature to freezing
-    @. rhs = min(rhs, (T_freeze - Y.T_sfc) / p.dt)
+    @. rhs = min(rhs, (params.T_freeze - Y.T_sfc) / p.dt)
     # mask out no-ice areas
-    area_mask = Utilities.binary_mask.(area_fraction)
+    area_mask = Utilities.binary_mask.(p.area_fraction)
     dY.T_sfc .= rhs .* area_mask
 
     @. p.q_sfc = TD.q_vap_saturation_generic.(p.thermo_params, Y.T_sfc, p.ρ_sfc, TD.Ice())

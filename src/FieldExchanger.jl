@@ -28,12 +28,11 @@ Maintains the invariant that the sum of area fractions is 1 at all points.
 function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     FT = Interfacer.float_type(cs)
 
-    ice_fraction_before = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction))
-
-    # static fraction
+    # land fraction is static
     land_fraction = Interfacer.get_field(cs.model_sims.land_sim, Val(:area_fraction))
 
-    # update component models with dynamic area fractions
+    # ice and ocean fractions are dynamic
+    ice_fraction_before = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction))
     # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
     Interfacer.update_field!(
         cs.model_sims.ice_sim,
@@ -45,7 +44,7 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     Interfacer.update_field!(
         cs.model_sims.ocean_sim,
         Val(:area_fraction),
-        max.(FT(1) .- (ice_fraction .+ land_fraction), FT(0)),
+        max.(FT(1) .- ice_fraction .- land_fraction, FT(0)),
     )
     ocean_fraction = Interfacer.get_field(cs.model_sims.ocean_sim, Val(:area_fraction))
 

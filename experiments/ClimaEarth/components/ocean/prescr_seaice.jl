@@ -67,6 +67,7 @@ end
         comms_ctx,
         date0,
         mono_surface,
+        land_fraction,
         stepper = CTS.RK4()
     ) where {FT}
 
@@ -88,7 +89,7 @@ function PrescribedIceSimulation(
     comms_ctx,
     date0,
     mono_surface,
-    land_area_fraction,
+    land_fraction,
     stepper = CTS.RK4(),
 ) where {FT}
     # Set up prescribed sea ice concentration object
@@ -117,7 +118,7 @@ function PrescribedIceSimulation(
 
     # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
     #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-    @. ice_fraction = max(min(ice_fraction, FT(1) - land_area_fraction), FT(0))
+    @. ice_fraction = max(min(ice_fraction, FT(1) - land_fraction), FT(0))
 
     params = IceSlabParameters{FT}()
 
@@ -129,7 +130,7 @@ function PrescribedIceSimulation(
         ρ_sfc = CC.Fields.zeros(space),
         area_fraction = ice_fraction,
         SIC_timevaryinginput = SIC_timevaryinginput,
-        land_area_fraction = land_area_fraction,
+        land_fraction = land_fraction,
         dt = dt,
         thermo_params = thermo_params,
         # add dss_buffer to cache to avoid runtime dss allocation
@@ -229,7 +230,7 @@ function ice_rhs!(dY, Y, p, t)
 
     # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
     #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-    @. p.area_fraction = max(min(p.area_fraction, FT(1) - p.land_area_fraction), FT(0))
+    @. p.area_fraction = max(min(p.area_fraction, FT(1) - p.land_fraction), FT(0))
 
     F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc) # fluxes are defined to be positive when upward
     rhs = @. (-p.F_turb_energy - p.F_radiative + F_conductive) / (params.h * params.ρ * params.c)

@@ -20,7 +20,7 @@ for FT in (Float32, Float64)
             dY = slab_ice_space_init(FT, space, params) .* FT(0.0)
 
             dt = FT(1.0)
-            t_start = Float64(0)
+            t_start = 0.0
 
             thermo_params = TDP.ThermodynamicsParameters(FT)
 
@@ -51,7 +51,7 @@ for FT in (Float32, Float64)
                 F_radiative = CC.Fields.zeros(space) .+ FT(F_radiative),
                 area_fraction = ice_fraction,
                 SIC_timevaryinginput = SIC_timevaryinginput,
-                land_area_fraction = CC.Fields.zeros(space),
+                land_fraction = CC.Fields.zeros(space),
                 q_sfc = CC.Fields.zeros(space),
                 ρ_sfc = CC.Fields.ones(space),
                 thermo_params = thermo_params,

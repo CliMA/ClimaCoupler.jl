@@ -45,6 +45,83 @@ import ClimaAtmos as CA
 import ClimaComms
 import ClimaCore as CC
 
+filtered_names(f::F, x) where {F} = filtered_names_at_name(f, x, CA.@name())
+function filtered_names_at_name(f::F, x, name) where {F}
+    field = CA.MatrixFields.get_field(x, name)
+    f(field) && return (name,)
+    internal_names = CA.MatrixFields.top_level_names(field)
+    isempty(internal_names) && return ()
+    tuples_of_names = CA.MatrixFields.unrolled_map(internal_names) do internal_name
+        Base.@_inline_meta
+        child_name = CA.MatrixFields.append_internal_name(name, internal_name)
+        filtered_names_at_name(f, x, child_name)
+    end
+    return CA.MatrixFields.unrolled_flatten(tuples_of_names)
+end
+if hasfield(Method, :recursion_relation)
+    dont_limit = (args...) -> true
+    for m in methods(filtered_names_at_name)
+        m.recursion_relation = dont_limit
+    end
+end
+scalar_field_names(fv) =
+    filtered_names(x -> x isa CA.Fields.Field && eltype(x) == eltype(fv), fv)
+
+CA.NVTX.@annotate function CA.remaining_tendency!(Yₜ, Yₜ_lim, Y, p, t)
+    if t < 500 * p.dt
+        Y_copy1 = Yₜ
+        Y_copy2 = Yₜ_lim
+        Y_copy1 .= Y
+        CA.dss!(Y_copy1, p, t)
+        Y_copy2 .= Y_copy1
+        CA.dss!(Y_copy2, p, t)
+        for name in scalar_field_names(Y)
+            field = CA.MatrixFields.get_field(Y, name)
+            field1 = CA.MatrixFields.get_field(Y_copy1, name)
+            field2 = CA.MatrixFields.get_field(Y_copy2, name)
+            for level in 1:CA.Spaces.nlevels(axes(field))
+                vidx = level - 1 + CA.Operators.left_idx(axes(field))
+                level_field = CA.Fields.level(field, vidx)
+                level_field1 = CA.Fields.level(field1, vidx)
+                level_field2 = CA.Fields.level(field2, vidx)
+                max_err1 = maximum(@. abs(level_field1 - level_field))
+                max_err2 = maximum(@. abs(level_field2 - level_field1))
+                rel_err = max_err1 == max_err2 == 0 ? 0 : max_err1 / max_err2
+                rel_err <= 64 && continue
+                name_str = rpad(name, 32)
+                level_str = rpad(level, 2)
+                t_str = rpad(round(Int, t), 4)
+                @info "$name_str at level $level_str, t = $t_str: $rel_err"
+            end
+        end
+    end
+    Yₜ_lim .= zero(eltype(Yₜ_lim))
+    Yₜ .= zero(eltype(Yₜ))
+    CA.horizontal_tracer_advection_tendency!(Yₜ_lim, Y, p, t)
+    CA.fill_with_nans!(p)
+    CA.horizontal_advection_tendency!(Yₜ, Y, p, t)
+    CA.hyperdiffusion_tendency!(Yₜ, Yₜ_lim, Y, p, t)
+    CA.explicit_vertical_advection_tendency!(Yₜ, Y, p, t)
+    CA.additional_tendency!(Yₜ, Y, p, t)
+    return Yₜ
+end
+
+function CA.set_velocity_at_surface!(Y, ᶠuₕ³, turbconv_model)
+    sfc_u₃ = CA.Fields.level(Y.f.u₃.components.data.:1, CA.half)
+    sfc_uₕ³ = CA.Fields.level(ᶠuₕ³.components.data.:1, CA.half)
+    sfc_g³³ = CA.g³³_field(sfc_u₃)
+    @. sfc_u₃ = -sfc_uₕ³ / sfc_g³³ # u³ = uₕ³ + w³ = uₕ³ + w₃ * g³³
+    CA.Spaces.weighted_dss!(sfc_u₃)
+    if turbconv_model isa CA.PrognosticEDMFX
+        for j in 1:CA.n_mass_flux_subdomains(turbconv_model)
+            sfc_u₃ʲ = CA.Fields.level(Y.f.sgsʲs.:($j).u₃.components.data.:1, CA.half)
+            @. sfc_u₃ʲ = sfc_u₃
+            CA.Spaces.weighted_dss!(sfc_u₃ʲ)
+        end
+    end
+    return nothing
+end
+
 # ## Coupler specific imports
 import ClimaCoupler
 import ClimaCoupler:

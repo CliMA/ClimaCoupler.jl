@@ -68,7 +68,7 @@ scalar_field_names(fv) =
     filtered_names(x -> x isa CA.Fields.Field && eltype(x) == eltype(fv), fv)
 
 CA.NVTX.@annotate function CA.remaining_tendency!(Yₜ, Yₜ_lim, Y, p, t)
-    if t < 500 * p.dt
+    if t < 100 * p.dt
         Y_copy1 = Yₜ
         Y_copy2 = Yₜ_lim
         Y_copy1 .= Y
@@ -84,14 +84,15 @@ CA.NVTX.@annotate function CA.remaining_tendency!(Yₜ, Yₜ_lim, Y, p, t)
                 level_field = CA.Fields.level(field, vidx)
                 level_field1 = CA.Fields.level(field1, vidx)
                 level_field2 = CA.Fields.level(field2, vidx)
-                max_err1 = maximum(@. abs(level_field1 - level_field))
-                max_err2 = maximum(@. abs(level_field2 - level_field1))
-                rel_err = max_err1 == max_err2 == 0 ? 0 : max_err1 / max_err2
-                rel_err <= 64 && continue
+                abs_error = maximum(@. abs(level_field1 - level_field))
+                eps_error = maximum(@. abs(level_field2 - level_field1))
+                eps_error == 0 && (eps_error = eps(eltype(Y)))
+                rel_error = abs_error / eps_error
+                rel_error <= 64 && continue
                 name_str = rpad(name, 32)
                 level_str = rpad(level, 2)
-                t_str = rpad(round(Int, t), 4)
-                @info "$name_str at level $level_str, t = $t_str: $rel_err"
+                t_str = rpad(round(Int, t), 6)
+                @info "$name_str at level $level_str, t = $t_str: $rel_error"
             end
         end
     end
@@ -104,22 +105,6 @@ CA.NVTX.@annotate function CA.remaining_tendency!(Yₜ, Yₜ_lim, Y, p, t)
     CA.explicit_vertical_advection_tendency!(Yₜ, Y, p, t)
     CA.additional_tendency!(Yₜ, Y, p, t)
     return Yₜ
-end
-
-function CA.set_velocity_at_surface!(Y, ᶠuₕ³, turbconv_model)
-    sfc_u₃ = CA.Fields.level(Y.f.u₃.components.data.:1, CA.half)
-    sfc_uₕ³ = CA.Fields.level(ᶠuₕ³.components.data.:1, CA.half)
-    sfc_g³³ = CA.g³³_field(sfc_u₃)
-    @. sfc_u₃ = -sfc_uₕ³ / sfc_g³³ # u³ = uₕ³ + w³ = uₕ³ + w₃ * g³³
-    CA.Spaces.weighted_dss!(sfc_u₃)
-    if turbconv_model isa CA.PrognosticEDMFX
-        for j in 1:CA.n_mass_flux_subdomains(turbconv_model)
-            sfc_u₃ʲ = CA.Fields.level(Y.f.sgsʲs.:($j).u₃.components.data.:1, CA.half)
-            @. sfc_u₃ʲ = sfc_u₃
-            CA.Spaces.weighted_dss!(sfc_u₃ʲ)
-        end
-    end
-    return nothing
 end
 
 # ## Coupler specific imports

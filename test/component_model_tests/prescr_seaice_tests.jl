@@ -1,4 +1,5 @@
 import Test: @test, @testset
+import Dates
 import ClimaCore as CC
 import Thermodynamics.Parameters as TDP
 import ClimaParams # required for TDP
@@ -11,43 +12,68 @@ include(pkgdir(ClimaCoupler, "experiments/ClimaEarth/components/ocean/prescr_sea
 
 for FT in (Float32, Float64)
     @testset "test sea-ice energy slab for FT=$FT" begin
-        function test_sea_ice_rhs(; F_radiative = 0.0, T_base = 271.2, global_mask = 1.0)
+        function test_sea_ice_rhs(; F_radiative = 0.0, T_base = 271.2)
             space = TestHelper.create_space(FT)
             params = IceSlabParameters{FT}(T_base = T_base)
 
             Y = slab_ice_space_init(FT, space, params)
             dY = slab_ice_space_init(FT, space, params) .* FT(0.0)
 
-            ice_fraction = CC.Fields.ones(space) .* FT(global_mask)
             dt = FT(1.0)
+            t_start = Float64(0)
 
             thermo_params = TDP.ThermodynamicsParameters(FT)
 
-            additional_cache = (;
+            # Set up prescribed sea ice concentration object
+            sic_data = try
+                joinpath(@clima_artifact("historical_sst_sic"), "MODEL.ICE.HAD187001-198110.OI198111-202206.nc")
+            catch error
+                @warn "Using lowres SIC. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
+                joinpath(
+                    @clima_artifact("historical_sst_sic_lowres"),
+                    "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
+                )
+            end
+            SIC_timevaryinginput = TimeVaryingInput(
+                sic_data,
+                "SEAICE",
+                space,
+                reference_date = Dates.DateTime("20100101", Dates.dateformat"yyyymmdd"),
+                file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
+            )
+            # Get initial SIC values and use them to calculate ice fraction
+            SIC_init = CC.Fields.zeros(space)
+            evaluate!(SIC_init, SIC_timevaryinginput, t_start)
+            ice_fraction = get_ice_fraction.(SIC_init, false)
+
+            cache = (;
                 F_turb_energy = CC.Fields.zeros(space),
                 F_radiative = CC.Fields.zeros(space) .+ FT(F_radiative),
                 area_fraction = ice_fraction,
+                SIC_timevaryinginput = SIC_timevaryinginput,
+                land_area_fraction = CC.Fields.zeros(space),
                 q_sfc = CC.Fields.zeros(space),
                 ρ_sfc = CC.Fields.ones(space),
                 thermo_params = thermo_params,
                 dt = dt,
             )
 
-            p = (; additional_cache..., params = params)
+            p = (; cache..., params = params)
 
-            ice_rhs!(dY, Y, p, 0)
+            ice_rhs!(dY, Y, p, t_start)
 
             return dY, Y, p
         end
 
         # check that nothing changes with no fluxes
         dY, Y, p = test_sea_ice_rhs()
-        @test sum([i for i in extrema(dY)] .≈ [FT(0.0), FT(0.0)]) == 2
+        @test all([i for i in extrema(dY)] .≈ [FT(0.0), FT(0.0)])
 
         # check that extracting expected T due to input atmopsheric fluxes
         dY, Y, p = test_sea_ice_rhs(F_radiative = 1.0)
         dT_expected = -1.0 / (p.params.h * p.params.ρ * p.params.c)
-        @test sum([i for i in extrema(dY)] .≈ [FT(dT_expected), FT(dT_expected)]) == 2
+        @test minimum(dY) ≈ FT(dT_expected)
+        @test maximum(dY) ≈ FT(0)
 
         # check that tendency will not result in above freezing T
         dY, Y, p = test_sea_ice_rhs(F_radiative = 0.0, T_base = 330.0) # Float32 requires a large number here!
@@ -55,13 +81,10 @@ for FT in (Float32, Float64)
         @test minimum(dT_maximum .- dY.T_sfc) >= FT(0.0)
 
         # check that the correct tendency was added due to basal flux
-        dY, Y, p = test_sea_ice_rhs(F_radiative = 0.0, T_base = 269.2, global_mask = 1.0)
+        dY, Y, p = test_sea_ice_rhs(F_radiative = 0.0, T_base = 269.2)
         dT_expected = -2.0 * p.params.k_ice / (p.params.h * p.params.h * p.params.ρ * p.params.c)
-        @test sum([i for i in extrema(dY)] .≈ [FT(dT_expected), FT(dT_expected)]) == 2
-
-        # check that no tendency is applied in a masked case
-        dY, Y, p = test_sea_ice_rhs(F_radiative = 0.0, T_base = 269.2, global_mask = 0.0)
-        @test sum([i for i in extrema(dY)] .≈ [FT(0.0), FT(0.0)]) == 2
+        @test minimum(dY) ≈ FT(dT_expected)
+        @test maximum(dY) ≈ FT(0)
     end
 
     @testset "dss_state! SeaIceModelSimulation for FT=$FT" begin

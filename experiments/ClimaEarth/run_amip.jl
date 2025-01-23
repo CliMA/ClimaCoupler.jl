@@ -622,9 +622,9 @@ FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 
 # 3.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
 ## TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step! (#331)
-Interfacer.step!(land_sim, Δt_cpl)
-Interfacer.step!(ocean_sim, Δt_cpl)
-Interfacer.step!(ice_sim, Δt_cpl)
+Interfacer.step!(land_sim, tspan[1] + Δt_cpl)
+Interfacer.step!(ocean_sim, tspan[1] + Δt_cpl)
+Interfacer.step!(ice_sim, tspan[1] + Δt_cpl)
 
 # 4.turbulent fluxes: now we have all information needed for calculating the initial turbulent
 # surface fluxes using either the combined state or the partitioned state method
@@ -749,11 +749,11 @@ beginning and end of the simulation timespan to the correct values.
 =#
 
 ## run the coupled simulation for two timesteps to precompile
-cs.tspan[2] = Δt_cpl * 2
+cs.tspan[2] = tspan[1] + Δt_cpl * 2
 solve_coupler!(cs)
 
 ## update the timespan to the correct values
-cs.tspan[1] = Δt_cpl * 2
+cs.tspan[1] = tspan[1] + Δt_cpl * 2
 cs.tspan[2] = tspan[2]
 
 ## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos

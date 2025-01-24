@@ -3,7 +3,7 @@ aerosol_radiation: true
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_diagedmf_0M.yml"
 checkpoint_dt: "300days"
-coupler_toml_file: "toml/amip_target_topo_diagedmf.toml"
+coupler_toml: ["toml/amip_target_topo_diagedmf.toml"]
 dt: "120secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: "120secs"

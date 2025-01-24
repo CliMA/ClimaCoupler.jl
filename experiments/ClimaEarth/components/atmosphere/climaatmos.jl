@@ -7,6 +7,7 @@ import ClimaAtmos: set_surface_albedo!
 import ClimaAtmos.Parameters as CAP
 import ClimaCore as CC
 import ClimaCore.Geometry: ⊗
+import ClimaParams as CP
 import SurfaceFluxes as SF
 import Thermodynamics as TD
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
@@ -342,14 +343,12 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_
         error("Invalid `atmos_config_repo`; please use \"ClimaCoupler\" or \"ClimaAtmos\"")
     end
 
-    # use coupler toml if atmos is not defined
-    atmos_toml_file = atmos_config["toml"]
-    coupler_toml_file = coupler_dict["coupler_toml_file"]
+    # use atmos toml if coupler toml is not defined
+    atmos_toml = CP.merge_toml_files(joinpath.(pkgdir(CA), atmos_config["toml"]))
+    coupler_toml = CP.merge_toml_files(joinpath.(pkgdir(ClimaCoupler), coupler_dict["coupler_toml"]))
+    toml_file = isempty(coupler_toml) ? atmos_toml : coupler_toml
 
-    toml_file = !isempty(atmos_toml_file) ? joinpath(pkgdir(CA), atmos_toml_file[1]) : nothing
-    toml_file = !isnothing(coupler_toml_file) ? joinpath(pkgdir(ClimaCoupler), coupler_toml_file) : toml_file
-
-    if !isnothing(toml_file)
+    if !isempty(toml_file)
         @info "Overwriting Atmos parameters from $toml_file"
         atmos_config = merge(atmos_config, Dict("toml" => [toml_file]))
     end

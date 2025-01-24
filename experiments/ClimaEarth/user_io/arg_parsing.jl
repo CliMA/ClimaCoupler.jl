@@ -273,10 +273,10 @@ function add_extra_diagnostics!(config_dict)
         # Additional atmosphere diagnostics
         !haskey(config_dict, "extra_atmos_diagnostics") &&
             (config_dict["extra_atmos_diagnostics"] = Vector{Dict{Any, Any}}())
-        push!(
-            config_dict["extra_atmos_diagnostics"],
-            Dict("short_name" => ["toa_fluxes_net"], "reduction_time" => "average", "period" => period),
-        )
+        # push!(
+        #     config_dict["extra_atmos_diagnostics"],
+        #     Dict("short_name" => ["toa_fluxes_net"], "reduction_time" => "average", "period" => period),
+        # )
     end
     config_dict["calendar_dt"] = calendar_dt
     return nothing

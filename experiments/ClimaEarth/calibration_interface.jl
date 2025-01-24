@@ -135,6 +135,7 @@ function ClimaCalibrate.forward_model(iter, member)
     Utilities.show_memory_usage()
 
     ## init atmos model component
+    @info "TOML" atmos_config_dict["toml"]
     atmos_sim = atmos_init(CA.AtmosConfig(atmos_config_dict));
     # Get surface elevation from `atmos` coordinate field
     surface_elevation = CC.Fields.level(CC.Fields.coordinate_field(atmos_sim.integrator.u.f).z, CC.Utilities.half)

@@ -33,6 +33,6 @@ rad: clearsky
 insolation: timevarying
 extra_atmos_diagnostics:
   - reduction_time: average
-    short_name: [rsut, pr]
+    short_name: [rsut, clw]
     period: 30days
     writer: nc

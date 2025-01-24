@@ -8,8 +8,8 @@ ENV["CLIMACOMMS_DEVICE"] = "CUDA"
 ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
 ClimaComms.@import_required_backends
 
+single_member_dims = (40,)
 function CAL.observation_map(iteration)
-    single_member_dims = (2,)
     G_ensemble = Array{Float64}(undef, single_member_dims..., ensemble_size)
 
     for m in 1:ensemble_size
@@ -26,18 +26,20 @@ function CAL.observation_map(iteration)
 end
 
 function process_member_data(simdir::SimDir)
+    output = zeros(single_member_dims...)
+    days = 86_400
     isempty(simdir) && return NaN
-    rsut =
-    try
-        get(simdir; short_name = "rsut", reduction = "average", period = "30d")
-    catch e
-        @error e
-        return NaN
-    end
-    return slice(average_lon(average_lat(rsut)); time = 30).data
+
+    rsut = get(simdir; short_name = "rsut", reduction = "average", period = "30d")
+    clw = get(simdir; short_name = "clw", reduction = "average", period = "30d")
+    rsut_slice = slice(average_lon(average_lat(rsut)); time = 30days).data
+    clw_slice = slice(average_lon(average_lat(clw)); time = 30days).data
+    output[1] = rsut_slice[1]
+    output[2:40] = clw_slice
+    return output
 end
 
-# addprocs(CAL.SlurmManager(5))
+addprocs(CAL.SlurmManager(1))
 
 @everywhere begin
     import ClimaComms, CUDA
@@ -59,11 +61,9 @@ end
     astronomical_unit = 149_597_870_000
     noise = 0.1 * I
     priors = [constrained_gaussian("astronomical_unit", 1.5e11, 1e11, 2e5, Inf),
-[entr_inv_tau] #0.001 - 0.004
-
+            constrained_gaussian("entr_inv_tau", 0.0025, .001, .001, 0.004),
             constrained_gaussian("specific_humidity_precipitation_threshold", 5.0e-6, 5.0e-6,  1e-9, Inf),
-            constrained_gaussian("precipitation_timescale", 500, 300, 240, 1000),
-            # constrained_gaussian("supersaturation_precipitation_threshold", 0.04, 0.03, 0, 0.1),
+            constrained_gaussian("precipitation_timescale", 550, 250, 240, 1000),
         ]
     prior = combine_distributions(priors)
     obs_path = joinpath(experiment_dir, "observations.jld2")

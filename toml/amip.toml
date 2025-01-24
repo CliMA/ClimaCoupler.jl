@@ -7,11 +7,11 @@ value = 40000.0
 [zd_viscous]
 value = 40000.0
 
-[precipitation_timescale]
-value = 600
+#[precipitation_timescale]
+#value = 600
 
-[entr_inv_tau]
-value = 0.002
+#[entr_inv_tau]
+#value = 0.002
 
 [entr_coeff]
 value = 0

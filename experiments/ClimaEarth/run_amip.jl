@@ -80,6 +80,7 @@ contain any internals of the ClimaCoupler source code, except extensions to the 
 include("components/atmosphere/climaatmos.jl")
 include("components/land/climaland_bucket.jl")
 include("components/ocean/slab_ocean.jl")
+include("components/ocean/prescr_ocean.jl")
 include("components/ocean/prescr_seaice.jl")
 include("components/ocean/eisenman_seaice.jl")
 
@@ -168,15 +169,6 @@ tspan = (t_start, t_end)
 #=
 ## Data File Paths
 =#
-sst_data = try
-    joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.SST.HAD187001-198110.OI198111-202206.nc")
-catch error
-    @warn "Using lowres sst sic. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
-    joinpath(
-        @clima_artifact("historical_sst_sic_lowres", comms_ctx),
-        "MODEL.SST.HAD187001-198110.OI198111-202206_lowres.nc",
-    )
-end
 co2_data = joinpath(@clima_artifact("co2_dataset", comms_ctx), "co2_mm_mlo.txt")
 land_mask_data = joinpath(@clima_artifact("landsea_mask_60arcseconds", comms_ctx), "landsea_mask.nc")
 
@@ -223,9 +215,9 @@ Note that land-sea area fraction is different to the land-sea mask, which is a b
 =#
 
 # Preprocess the file to be 1s and 0s before remapping into onto the grid
-land_area_fraction = SpaceVaryingInput(land_mask_data, "landsea", boundary_space)
+land_fraction = SpaceVaryingInput(land_mask_data, "landsea", boundary_space)
 if !mono_surface
-    land_area_fraction = Utilities.binary_mask.(land_area_fraction)
+    land_fraction = Utilities.binary_mask.(land_fraction)
 end
 Utilities.show_memory_usage()
 
@@ -262,40 +254,13 @@ if sim_mode <: AMIPMode
         dt = component_dt_dict["dt_land"],
         space = boundary_space,
         saveat = saveat,
-        area_fraction = land_area_fraction,
+        area_fraction = land_fraction,
         date_ref = date0,
         t_start = t_start,
         energy_check = energy_check,
         surface_elevation,
         use_land_diagnostics,
     )
-
-    ## ocean stub
-    SST_timevaryinginput = TimeVaryingInput(
-        sst_data,
-        "SST",
-        boundary_space,
-        reference_date = date0,
-        file_reader_kwargs = (; preprocess_func = (data) -> data + FT(273.15),), ## convert to Kelvin
-    )
-
-    SST_init = zeros(boundary_space)
-    evaluate!(SST_init, SST_timevaryinginput, t_start)
-
-    ocean_sim = Interfacer.SurfaceStub((;
-        T_sfc = SST_init,
-        ρ_sfc = zeros(boundary_space),
-        # ocean roughness follows GFDL model
-        # (https://github.com/NOAA-GFDL/ice_param/blob/main/ocean_rough.F90#L47)
-        z0m = FT(5.8e-5),
-        z0b = FT(5.8e-5),
-        beta = FT(1),
-        α_direct = ones(boundary_space) .* FT(0.06),
-        α_diffuse = ones(boundary_space) .* FT(0.06),
-        area_fraction = (FT(1) .- land_area_fraction),
-        phase = TD.Liquid(),
-        thermo_params = thermo_params,
-    ))
 
     ## sea ice model
     ice_sim = PrescribedIceSimulation(
@@ -308,8 +273,13 @@ if sim_mode <: AMIPMode
         comms_ctx,
         date0,
         mono_surface,
-        land_area_fraction,
+        land_fraction,
     )
+
+    ## ocean model using prescribed data
+    ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
+    ocean_fraction = FT(1) .- ice_fraction .- land_fraction
+    ocean_sim = PrescribedOceanSimulation(FT, boundary_space, date0, t_start, ocean_fraction, thermo_params, comms_ctx)
 
     ## CO2 concentration from temporally varying file
     CO2_text = DelimitedFiles.readdlm(co2_data, Float64; comments = true)
@@ -326,15 +296,14 @@ if sim_mode <: AMIPMode
     evaluate!(CO2_init, CO2_timevaryinginput, t_start)
     CO2_field = Interfacer.update_field!(atmos_sim, Val(:co2), CO2_init)
 
-    mode_specifics =
-        (; type = sim_mode, SST_timevaryinginput = SST_timevaryinginput, CO2_timevaryinginput = CO2_timevaryinginput)
+    mode_specifics = (; type = sim_mode, CO2_timevaryinginput = CO2_timevaryinginput)
     Utilities.show_memory_usage()
 
 elseif (sim_mode <: AbstractSlabplanetSimulationMode) && !(sim_mode <: SlabplanetEisenmanMode)
 
 
-    land_area_fraction = sim_mode <: SlabplanetAquaMode ? land_area_fraction .* 0 : land_area_fraction
-    land_area_fraction = sim_mode <: SlabplanetTerraMode ? land_area_fraction .* 0 .+ 1 : land_area_fraction
+    land_fraction = sim_mode <: SlabplanetAquaMode ? land_fraction .* 0 : land_fraction
+    land_fraction = sim_mode <: SlabplanetTerraMode ? land_fraction .* 0 .+ 1 : land_fraction
 
     ## land model
     land_sim = BucketSimulation(
@@ -348,7 +317,7 @@ elseif (sim_mode <: AbstractSlabplanetSimulationMode) && !(sim_mode <: Slabplane
         dt = component_dt_dict["dt_land"],
         space = boundary_space,
         saveat = saveat,
-        area_fraction = land_area_fraction,
+        area_fraction = land_fraction,
         date_ref = date0,
         t_start = t_start,
         energy_check = energy_check,
@@ -363,7 +332,7 @@ elseif (sim_mode <: AbstractSlabplanetSimulationMode) && !(sim_mode <: Slabplane
         dt = component_dt_dict["dt_ocean"],
         space = boundary_space,
         saveat = saveat,
-        area_fraction = (FT(1) .- land_area_fraction), ## NB: this ocean fraction includes areas covered by sea ice (unlike the one contained in the cs)
+        area_fraction = (FT(1) .- land_fraction), ## NB: this ocean fraction includes areas covered by sea ice (unlike the one contained in the cs)
         thermo_params = thermo_params,
         evolving = evolving_ocean,
     )
@@ -382,7 +351,7 @@ elseif (sim_mode <: AbstractSlabplanetSimulationMode) && !(sim_mode <: Slabplane
         thermo_params = thermo_params,
     ))
 
-    mode_specifics = (; type = sim_mode, SST_timevaryinginput = nothing)
+    mode_specifics = (; type = sim_mode)
     Utilities.show_memory_usage()
 
 elseif sim_mode <: SlabplanetEisenmanMode
@@ -399,7 +368,7 @@ elseif sim_mode <: SlabplanetEisenmanMode
         dt = component_dt_dict["dt_land"],
         space = boundary_space,
         saveat = saveat,
-        area_fraction = land_area_fraction,
+        area_fraction = land_fraction,
         date_ref = date0,
         t_start = t_start,
         energy_check = energy_check,
@@ -423,13 +392,13 @@ elseif sim_mode <: SlabplanetEisenmanMode
         FT,
         tspan,
         space = boundary_space,
-        area_fraction = (FT(1) .- land_area_fraction),
+        area_fraction = (FT(1) .- land_fraction),
         dt = component_dt_dict["dt_seaice"],
         saveat = saveat,
         thermo_params = thermo_params,
     )
 
-    mode_specifics = (; type = sim_mode, SST_timevaryinginput = nothing)
+    mode_specifics = (; type = sim_mode)
     Utilities.show_memory_usage()
 end
 
@@ -661,8 +630,6 @@ function solve_coupler!(cs)
         cs.dates.date[] = TimeManager.current_date(cs, t)
 
         if cs.mode.type <: AMIPMode
-            evaluate!(Interfacer.get_field(ocean_sim, Val(:surface_temperature)), cs.mode.SST_timevaryinginput, t)
-
             # TODO: get_field with :co2 is not implemented, so this is a little awkward
             current_CO2 = zeros(boundary_space)
             evaluate!(current_CO2, cs.mode.CO2_timevaryinginput, t)

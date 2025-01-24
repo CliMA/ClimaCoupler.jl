@@ -104,7 +104,7 @@ function check_conservation!(
             push!(previous, current)
             total += current + radiation_sources_accum
 
-        elseif sim isa Interfacer.SurfaceModelSimulation || sim isa Interfacer.SurfaceStub
+        elseif sim isa Interfacer.SurfaceModelSimulation
             # save surfaces
             area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
             if isnothing(Interfacer.get_field(sim, Val(:energy)))

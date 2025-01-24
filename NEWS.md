@@ -6,6 +6,14 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### PrescribedOceanSimulation added, includes SST update PR[#1144](https://github.com/CliMA/ClimaCoupler.jl/pull/1144)
+This PR is similar to #1141 below, but applies to SST rather than SIC.
+SST is now updated within `PrescribedOceanSimulation` methods, rather
+than in the driver. This new simulation type reads in prescribed SST data
+and stores it directly in its cache without any processing.
+Note that this PR results in changed order of operations and slightly different
+behavior for AMIP simulations - see the PR description for more details.
+
 #### Prescribed SIC updated in PrescribedIceSimulation PR[#1141](https://github.com/CliMA/ClimaCoupler.jl/pull/1141)
 Previously, SIC was read in directly from the driver during init and in the
 coupling loop. Now, it is read internally within the `PrescribedIceSimulation`

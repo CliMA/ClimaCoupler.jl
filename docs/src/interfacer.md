@@ -165,30 +165,31 @@ module docs for more information.
 - `SurfaceStub` is a `SurfaceModelSimulation`, but it only contains
 required data in `<surface_stub>.cache`, e.g., for the calculation
 of surface fluxes through a prescribed surface state. The above
-adapter functions are already predefined for `SurfaceStub`
+adapter functions are already predefined for `AbstractSurfaceStub`,
+which is extended by `SurfaceStub`
 in the `surface_stub.jl` file, with
 the cache variables specified as:
 ```
-get_field(sim::SurfaceStub, ::Val{:air_density}) = sim.cache.ρ_sfc
-get_field(sim::SurfaceStub, ::Val{:area_fraction}) = sim.cache.area_fraction
-get_field(sim::SurfaceStub, ::Val{:beta}) = sim.cache.beta
-get_field(sim::SurfaceStub, ::Val{:energy}) = nothing
-get_field(sim::SurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
-get_field(sim::SurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m
-get_field(sim::SurfaceStub, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) = sim.cache.α
-get_field(sim::SurfaceStub, ::Val{:surface_humidity}) = TD.q_vap_saturation_generic.(sim.cache.thermo_params, sim.cache.T_sfc, sim.cache.ρ_sfc, sim.cache.phase)
-get_field(sim::SurfaceStub, ::Val{:surface_temperature}) = sim.cache.T_sfc
-get_field(sim::SurfaceStub, ::Val{:water}) = nothing
+get_field(sim::AbstractSurfaceStub, ::Val{:air_density}) = sim.cache.ρ_sfc
+get_field(sim::AbstractSurfaceStub, ::Val{:area_fraction}) = sim.cache.area_fraction
+get_field(sim::AbstractSurfaceStub, ::Val{:beta}) = sim.cache.beta
+get_field(sim::AbstractSurfaceStub, ::Val{:energy}) = nothing
+get_field(sim::AbstractSurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
+get_field(sim::AbstractSurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m
+get_field(sim::AbstractSurfaceStub, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) = sim.cache.α
+get_field(sim::AbstractSurfaceStub, ::Val{:surface_humidity}) = TD.q_vap_saturation_generic.(sim.cache.thermo_params, sim.cache.T_sfc, sim.cache.ρ_sfc, sim.cache.phase)
+get_field(sim::AbstractSurfaceStub, ::Val{:surface_temperature}) = sim.cache.T_sfc
+get_field(sim::AbstractSurfaceStub, ::Val{:water}) = nothing
 ```
 and with the corresponding `update_field!` functions
 ```
-function update_field!(sim::SurfaceStub, ::Val{:air_density}, field)
+function update_field!(sim::AbstractSurfaceStub, ::Val{:air_density}, field)
     sim.cache.ρ_sfc .= field
 end
-function update_field!(sim::SurfaceStub, ::Val{:area_fraction}, field::ClimaCore.Fields.Field)
+function update_field!(sim::AbstractSurfaceStub, ::Val{:area_fraction}, field::ClimaCore.Fields.Field)
     sim.cache.area_fraction .= field
 end
-function update_field!(sim::SurfaceStub, ::Val{:surface_temperature}, field::ClimaCore.Fields.Field)
+function update_field!(sim::AbstractSurfaceStub, ::Val{:surface_temperature}, field::ClimaCore.Fields.Field)
     sim.cache.T_sfc .= field
 end
 ```
@@ -199,6 +200,7 @@ end
     ClimaCoupler.Interfacer.AtmosModelSimulation
     ClimaCoupler.Interfacer.SurfaceModelSimulation
     ClimaCoupler.Interfacer.ComponentModelSimulation
+    ClimaCoupler.Interfacer.AbstractSurfaceStub
     ClimaCoupler.Interfacer.SurfaceStub
     ClimaCoupler.Interfacer.float_type
     ClimaCoupler.Interfacer.name

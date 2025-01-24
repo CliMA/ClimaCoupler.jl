@@ -402,7 +402,7 @@ function update_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, fields
     )
 end
 
-update_turbulent_fluxes!(sim::Interfacer.SurfaceStub, fields::NamedTuple) = nothing
+update_turbulent_fluxes!(sim::Interfacer.AbstractSurfaceStub, fields::NamedTuple) = nothing
 
 """
     differentiate_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, args)

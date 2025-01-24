@@ -45,68 +45,6 @@ import ClimaAtmos as CA
 import ClimaComms
 import ClimaCore as CC
 
-filtered_names(f::F, x) where {F} = filtered_names_at_name(f, x, CA.@name())
-function filtered_names_at_name(f::F, x, name) where {F}
-    field = CA.MatrixFields.get_field(x, name)
-    f(field) && return (name,)
-    internal_names = CA.MatrixFields.top_level_names(field)
-    isempty(internal_names) && return ()
-    tuples_of_names = CA.MatrixFields.unrolled_map(internal_names) do internal_name
-        Base.@_inline_meta
-        child_name = CA.MatrixFields.append_internal_name(name, internal_name)
-        filtered_names_at_name(f, x, child_name)
-    end
-    return CA.MatrixFields.unrolled_flatten(tuples_of_names)
-end
-if hasfield(Method, :recursion_relation)
-    dont_limit = (args...) -> true
-    for m in methods(filtered_names_at_name)
-        m.recursion_relation = dont_limit
-    end
-end
-scalar_field_names(fv) =
-    filtered_names(x -> x isa CA.Fields.Field && eltype(x) == eltype(fv), fv)
-
-CA.NVTX.@annotate function CA.remaining_tendency!(Yₜ, Yₜ_lim, Y, p, t)
-    if t < 100 * p.dt
-        Y_copy1 = Yₜ
-        Y_copy2 = Yₜ_lim
-        Y_copy1 .= Y
-        CA.dss!(Y_copy1, p, t)
-        Y_copy2 .= Y_copy1
-        CA.dss!(Y_copy2, p, t)
-        for name in scalar_field_names(Y)
-            field = CA.MatrixFields.get_field(Y, name)
-            field1 = CA.MatrixFields.get_field(Y_copy1, name)
-            field2 = CA.MatrixFields.get_field(Y_copy2, name)
-            for level in 1:CA.Spaces.nlevels(axes(field))
-                vidx = level - 1 + CA.Operators.left_idx(axes(field))
-                level_field = CA.Fields.level(field, vidx)
-                level_field1 = CA.Fields.level(field1, vidx)
-                level_field2 = CA.Fields.level(field2, vidx)
-                abs_error = maximum(@. abs(level_field1 - level_field))
-                eps_error = maximum(@. abs(level_field2 - level_field1))
-                eps_error == 0 && (eps_error = eps(eltype(Y)))
-                rel_error = abs_error / eps_error
-                rel_error <= 64 && continue
-                name_str = rpad(name, 32)
-                level_str = rpad(level, 2)
-                t_str = rpad(round(Int, t), 6)
-                @info "$name_str at level $level_str, t = $t_str: $rel_error"
-            end
-        end
-    end
-    Yₜ_lim .= zero(eltype(Yₜ_lim))
-    Yₜ .= zero(eltype(Yₜ))
-    CA.horizontal_tracer_advection_tendency!(Yₜ_lim, Y, p, t)
-    CA.fill_with_nans!(p)
-    CA.horizontal_advection_tendency!(Yₜ, Y, p, t)
-    CA.hyperdiffusion_tendency!(Yₜ, Yₜ_lim, Y, p, t)
-    CA.explicit_vertical_advection_tendency!(Yₜ, Y, p, t)
-    CA.additional_tendency!(Yₜ, Y, p, t)
-    return Yₜ
-end
-
 # ## Coupler specific imports
 import ClimaCoupler
 import ClimaCoupler:

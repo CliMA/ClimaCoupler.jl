@@ -344,13 +344,13 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_
     end
 
     # use atmos toml if coupler toml is not defined
-    atmos_toml = CP.merge_toml_files(joinpath.(pkgdir(CA), atmos_config["toml"]))
-    coupler_toml = CP.merge_toml_files(joinpath.(pkgdir(ClimaCoupler), coupler_dict["coupler_toml"]))
+    atmos_toml = joinpath.(pkgdir(CA), atmos_config["toml"])
+    coupler_toml = joinpath.(pkgdir(ClimaCoupler), coupler_dict["coupler_toml"])
     toml_file = isempty(coupler_toml) ? atmos_toml : coupler_toml
 
     if !isempty(toml_file)
-        @info "Overwriting Atmos parameters from $toml_file"
-        atmos_config = merge(atmos_config, Dict("toml" => [toml_file]))
+        @info "Overwriting Atmos parameters from input TOML file(s)"
+        atmos_config = merge(atmos_config, Dict("toml" => toml_file))
     end
 
     # Specify atmos output directory to be inside the coupler output directory

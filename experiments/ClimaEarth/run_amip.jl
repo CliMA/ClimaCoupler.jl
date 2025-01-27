@@ -432,6 +432,14 @@ coupler_field_names = (
     :temp1,
     :temp2,
 )
+
+# When using PartitionedFluxes, coupler is in charge of computing fluxes and related quantities. In this case, we also
+# have to add ustar and L_MO among the coupler fields (for the Monin-Obukhov quantities). Note that one could use
+# PartitionedFluxes without MoninObukhov, but that's not currently supported and Monin-Obukov is used every time
+# PartitionedFluxes is chosen
+if turb_flux_partition == "PartitionedStateFluxes"
+    coupler_field_names = (coupler_field_names..., :ustar, :L_MO, :buoyancy_flux)
+end
 coupler_fields = NamedTuple{coupler_field_names}(ntuple(i -> zeros(boundary_space), length(coupler_field_names)))
 Utilities.show_memory_usage()
 
@@ -585,7 +593,8 @@ if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
     ## calculate turbulent fluxes inside the atmos cache based on the combined surface state in each grid box
     FluxCalculator.combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes) # this updates the atmos thermo state, sfc_ts
 elseif cs.turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
-    ## calculate turbulent fluxes in surface models and save the weighted average in coupler fields
+    ## calculate turbulent fluxes in surface models and save the weighted average in coupler fields.
+    ## This is only for the surface models
     FluxCalculator.partitioned_turbulent_fluxes!(
         cs.model_sims,
         cs.fields,
@@ -594,11 +603,9 @@ elseif cs.turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
         cs.thermo_params,
     )
 
-    ## update atmos sfc_conditions for surface temperature
-    ## TODO: this is hard coded and needs to be simplified (req. CA modification) (#479)
-    new_p = get_new_cache(atmos_sim, cs.fields)
-    CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) ## sets T_sfc (but SF calculation not necessary - requires split functionality in CA)
-    atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
+    # Updating only surface temperature because it is required by the RRTGMP callback (
+    # called below at reinit). Turbulent fluxes in atmos are updated in `update_model_sims`.
+    Interfacer.update_field!(atmos_sim, Val(:surface_temperature), cs.fields)
 end
 
 # 5.reinitialize models + radiative flux: prognostic states and time are set to their initial conditions. For atmos, this also triggers the callbacks and sets a nonzero radiation flux (given the new sfc_conditions)
@@ -667,10 +674,7 @@ function solve_coupler!(cs)
                 cs.thermo_params,
             )
 
-            ## update atmos sfc_conditions for surface temperature - TODO: this needs to be simplified (need CA modification)
-            new_p = get_new_cache(atmos_sim, cs.fields)
-            CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) # to set T_sfc (but SF calculation not necessary - CA modification)
-            atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
+            Interfacer.update_field!(atmos_sim, Val(:surface_temperature), cs.fields)
         end
 
         ## update the coupler with the new atmospheric properties

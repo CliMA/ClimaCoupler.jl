@@ -108,7 +108,8 @@ end
 
 The current setup calculates the aerodynamic fluxes in the coupler (assuming no regridding is needed)
 using adapter function `get_surface_fluxes!`, which calls `SurfaceFluxes.jl`. The coupler saves
-the area-weighted sums of the fluxes.
+the area-weighted sums of the fluxes. When available, other data is saved too (e.g., the Monin-Obukov
+length).
 
 Args:
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
@@ -142,6 +143,15 @@ function partitioned_turbulent_fluxes!(
     csf.F_turb_ρτyz .*= FT(0)
     csf.F_turb_energy .*= FT(0)
     csf.F_turb_moisture .*= FT(0)
+
+    # If we have L_MO and ustar, we reset those too. Meaning, this function doesn't just
+    # compute fluxes, but also related quantities too.
+    with_monin_obukov = :L_MO in propertynames(csf)
+    if with_monin_obukov
+        csf.L_MO .*= FT(0)
+        csf.ustar .*= FT(0)
+        csf.buoyancy_flux .*= FT(0)
+    end
 
     # atmos state of center level 1
     z_int = Interfacer.get_field(atmos_sim, Val(:height_int))
@@ -201,6 +211,16 @@ function partitioned_turbulent_fluxes!(
             @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction * area_mask
             @. csf.F_turb_energy += (F_shf .+ F_lhf) * area_fraction * area_mask
             @. csf.F_turb_moisture += F_turb_moisture * area_fraction * area_mask
+
+            # If we have ustar and L_MO, add those too
+            #
+            # NOTE: This is still an area weighted contribution, which maybe doesn't make
+            # too much sense for these quantities...
+            if with_monin_obukov
+                @. csf.L_MO += fluxes.L_MO * area_fraction * area_mask
+                @. csf.ustar += fluxes.ustar * area_fraction * area_mask
+                @. csf.buoyancy_flux += fluxes.buoyancy_flux * area_fraction * area_mask
+            end
         end
     end
 
@@ -343,6 +363,8 @@ end
     get_surface_fluxes!(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters)
 
 Uses SurfaceFluxes.jl to calculate turbulent surface fluxes. It should be atmos model agnostic, and columnwise.
+
+When available, it also computes ancillary quantities, such as the Monin-Obukov lengthscale.
 """
 function get_surface_fluxes!(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters)
     # calculate all fluxes (saturated surface conditions)
@@ -367,12 +389,24 @@ function get_surface_fluxes!(inputs, surface_params::SF.Parameters.SurfaceFluxes
     @. F_lhf = ifelse(isnan(F_lhf), zero(F_lhf), F_lhf)
     @. F_turb_moisture = ifelse(isnan(F_turb_moisture), zero(F_turb_moisture), F_turb_moisture)
 
+    # Monin-Obukov length, ustar, and buoyancy_flux when available
+    if :L_MO in propertynames(outputs)
+        more = (
+            L_MO = ifelse.(isnan.(outputs.L_MO), zero(outputs.L_MO), outputs.L_MO),
+            ustar = ifelse.(isnan.(outputs.ustar), zero(outputs.ustar), outputs.ustar),
+            buoyancy_flux = ifelse.(isnan.(outputs.buoy_flux), zero(outputs.buoy_flux), outputs.buoy_flux),
+        )
+    else
+        more = (;)
+    end
+
     return (;
         F_turb_ρτxz = F_turb_ρτxz,
         F_turb_ρτyz = F_turb_ρτyz,
         F_shf = F_shf,
         F_lhf = F_lhf,
         F_turb_moisture = F_turb_moisture,
+        more...,
     )
 end
 

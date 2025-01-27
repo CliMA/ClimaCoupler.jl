@@ -188,10 +188,14 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_state_int}) =
 Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:water}) =
     ρq_tot(atmos_sim.integrator.p.atmos.moisture_model, atmos_sim.integrator)
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temperature}, csf)
-    # note that this field is also being updated internally by the surface thermo state in ClimaAtmos
-    # if turbulent fluxes are calculated, to ensure consistency. In case the turbulent fluxes are not
-    # calculated, we update the field here.
-    sim.integrator.p.radiation.rrtmgp_model.surface_temperature .= CC.Fields.field2array(csf.T_S)
+    # The rrtmgp_model.surface_temperature field is updated by the RRTMGP callback using the
+    # sfc_conditions.ts, so all we need to do is update sfc_conditions.ts
+    if sim.integrator.p.atmos.moisture_model isa CA.DryModel
+        sim.integrator.p.precomputed.sfc_conditions.ts .= TD.PhaseDry_ρT.(get_thermo_params(sim), csf.ρ_sfc, csf.T_S)
+    else
+        sim.integrator.p.precomputed.sfc_conditions.ts .=
+            TD.PhaseNonEquil_ρTq.(get_thermo_params(sim), csf.ρ_sfc, csf.T_S, TD.PhasePartition.(csf.q_sfc))
+    end
 end
 # extensions required by FluxCalculator (partitioned fluxes)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =
@@ -245,6 +249,13 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fl
     parent(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot) .= parent(F_turb_energy) .* parent(surface_normal) # (shf + lhf)
     parent(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot) .=
         parent(F_turb_moisture) .* parent(surface_normal) # (evap)
+
+    # If available, also Monin-Obukhov quantities
+    if :L_MO in propertynames(fields)
+        parent(sim.integrator.p.precomputed.sfc_conditions.obukhov_length) .= parent(fields.L_MO)
+        parent(sim.integrator.p.precomputed.sfc_conditions.ustar) .= parent(fields.ustar)
+        parent(sim.integrator.p.precomputed.sfc_conditions.buoyancy_flux) .= parent(fields.buoyancy_flux)
+    end
 
     # TODO: see if Atmos can rever to a simpler solution
 end
@@ -372,61 +383,6 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_
         atmos_config["restart_file"] = replace(atmos_config["restart_file"], "active" => "0000")
     end
     return atmos_config
-end
-
-
-# flux calculation borrowed from atmos
-"""
-    CoupledMoninObukhov()
-A modified version of a Monin-Obukhov surface for the Coupler, see the link below for more information
-https://clima.github.io/SurfaceFluxes.jl/dev/SurfaceFluxes/#Monin-Obukhov-Similarity-Theory-(MOST)
-"""
-struct CoupledMoninObukhov end
-"""
-    coupler_surface_setup(::CoupledMoninObukhov, p, csf_sfc = (; T = nothing, z0m = nothing, z0b = nothing, beta = nothing, q_vap = nothing))
-
-Sets up `surface_setup` as a `CC.Fields.Field` of `SurfaceState`s.
-"""
-function coupler_surface_setup(
-    ::CoupledMoninObukhov,
-    p,
-    T = nothing,
-    z0m = nothing,
-    z0b = nothing,
-    beta = nothing,
-    q_vap = nothing,
-)
-
-    surface_state(z0m, z0b, T, beta, q_vap) = CA.SurfaceConditions.SurfaceState(;
-        parameterization = CA.SurfaceConditions.MoninObukhov(; z0m, z0b),
-        T,
-        beta,
-        q_vap,
-    )
-    surface_state_field = @. surface_state(z0m, z0b, T, beta, q_vap)
-    return surface_state_field
-end
-
-"""
-    get_new_cache(atmos_sim::ClimaAtmosSimulation, csf)
-
-Returns a new `p` with the updated surface conditions.
-"""
-function get_new_cache(atmos_sim::ClimaAtmosSimulation, csf)
-    if hasmoisture(atmos_sim.integrator)
-        csf_sfc = (csf.T_S, csf.z0m_S, csf.z0b_S, csf.beta, csf.q_sfc)
-    else
-        csf_sfc = (csf.T_S, csf.z0m_S, csf.z0b_S, csf.beta)
-    end
-
-    p = atmos_sim.integrator.p
-
-    coupler_sfc_setup = coupler_surface_setup(CoupledMoninObukhov(), p, csf_sfc...)
-
-    p_names = propertynames(p)
-    p_values = map(x -> x == :sfc_setup ? coupler_sfc_setup : getproperty(p, x), p_names)
-
-    (; zip(p_names, p_values)...)
 end
 
 """

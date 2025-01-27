@@ -84,15 +84,18 @@ If no device is passed to `ClimaComms.context()` then `ClimaComms` automatically
 selects the device from which this code is called.
 
 # Arguments
-`config_dict`: dictionary containing a "device" flag whcih decides which device context is needed
+`config_dict`: dictionary containing a "device" flag which decides which device context is needed
 """
 function get_comms_context(config_dict)
     device = get_device(config_dict)
     comms_ctx = ClimaComms.context(device)
     ClimaComms.init(comms_ctx)
 
-    # Ensure that logging only happens on the root process when using multiple processes
-    ClimaComms.iamroot(comms_ctx) || Logging.disable_logging(Logging.AboveMaxLevel)
+    if pkgversion(ClimaComms) < v"0.6.6"
+        # For older versions of ClimaComms, we have to manually ensure that logging only
+        # happens on the root process when using multiple processes
+        ClimaComms.iamroot(comms_ctx) || Logging.disable_logging(Logging.AboveMaxLevel)
+    end
 
     if comms_ctx isa ClimaComms.SingletonCommsContext
         @info "Setting up single-process ClimaCoupler run on device: $(nameof(typeof(device)))."

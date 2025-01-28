@@ -48,6 +48,6 @@ function amip_diagnostics_setup(fields, output_dir, start_date, t_start, calenda
 
     # Create the diagnostics handler containing the scheduled diagnostics
     scheduled_diags = [F_turb_energy_diag_sched]
-    amip_diags_handler = CD.DiagnosticsHandler(scheduled_diags, fields, nothing, t_start)
-    return amip_diags_handler
+    diags_handler = CD.DiagnosticsHandler(scheduled_diags, fields, nothing, t_start)
+    return diags_handler
 end

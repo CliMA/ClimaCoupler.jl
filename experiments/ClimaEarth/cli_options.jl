@@ -20,9 +20,10 @@ function argparse_settings()
         help = "Mode of coupled simulation. [`amip` (default), `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`, `slabplanet_eisenman`]"
         arg_type = String
         default = "amip"
-        "--coupler_toml_file"
-        help = "An optional toml file used to overwrite the default model parameters."
-        default = nothing
+        "--coupler_toml"
+        help = "An optional list of paths to toml files used to overwrite the default model parameters."
+        arg_type = Vector{String}
+        default = []
         # Computational simulation setup information
         "--unique_seed"
         help = "Boolean flag indicating whether to set the random number seed to a unique value [`false` (default), `true`]"

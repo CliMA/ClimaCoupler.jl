@@ -12,15 +12,14 @@ producing the leaderboard if monthly data is available, performing
 conservation checks if enabled, and closing all diagnostics file writers.
 """
 function postprocess_sim(cs, postprocessing_vars)
-    (; plot_diagnostics, use_coupler_diagnostics, output_default_diagnostics, t_end, conservation_softfail) =
-        postprocessing_vars
+    (; use_coupler_diagnostics, output_default_diagnostics, t_end, conservation_softfail) = postprocessing_vars
     coupler_output_dir = cs.dirs.output
     artifact_dir = cs.dirs.artifacts
     atmos_output_dir = joinpath(coupler_output_dir, "clima_atmos")
     land_output_dir = joinpath(coupler_output_dir, "clima_land")
 
     # Plot generic diagnostics if requested
-    if use_coupler_diagnostics && plot_diagnostics
+    if use_coupler_diagnostics
         @info "Plotting diagnostics for coupler, atmos, and land"
         make_diagnostics_plots(coupler_output_dir, artifact_dir, output_prefix = "coupler_")
         make_diagnostics_plots(atmos_output_dir, artifact_dir, output_prefix = "atmos_")

@@ -6,6 +6,14 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Postprocessing no longer uses `sim_mode` PR[#1153](https://github.com/CliMA/ClimaCoupler.jl/pull/1153)
+Postprocessing now consists of a single function that's used for all simulation
+modes. Note that now all available diagnostics will be plotted at the end of
+the simulation, where before we specified a subset to plot based on the
+simulation type.
+This PR also removes the `plot_diagnostics` config option. `use_coupler_diagnostics`
+should be used instead.
+
 #### PrescribedOceanSimulation added, includes SST update PR[#1144](https://github.com/CliMA/ClimaCoupler.jl/pull/1144)
 This PR is similar to #1141 below, but applies to SST rather than SIC.
 SST is now updated within `PrescribedOceanSimulation` methods, rather

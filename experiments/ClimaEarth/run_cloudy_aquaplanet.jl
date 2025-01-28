@@ -71,7 +71,7 @@ config_dict = Dict(
     "FLOAT_TYPE" => string(FT),
     # file paths
     "atmos_config_file" => nothing,
-    "coupler_toml_file" => nothing,
+    "coupler_toml" => [],
     "coupler_output_dir" => coupler_output_dir,
     "mode_name" => "",
     "job_id" => job_id,

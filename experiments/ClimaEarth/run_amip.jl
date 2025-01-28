@@ -131,7 +131,6 @@ add_extra_diagnostics!(config_dict)
     energy_check,
     conservation_softfail,
     output_dir_root,
-    plot_diagnostics,
 ) = get_coupler_args(config_dict)
 
 #=
@@ -486,10 +485,10 @@ Use ClimaDiagnostics for default AMIP diagnostics, which currently include turbu
 =#
 if use_coupler_diagnostics
     @info "Using default coupler diagnostics"
-    include("user_io/amip_diagnostics.jl")
+    include("user_io/coupler_diagnostics.jl")
     coupler_diags_path = joinpath(dir_paths.output, "coupler")
     isdir(coupler_diags_path) || mkpath(coupler_diags_path)
-    diags_handler = amip_diagnostics_setup(coupler_fields, coupler_diags_path, dates.date0[1], tspan[1], calendar_dt)
+    diags_handler = coupler_diagnostics_setup(coupler_fields, coupler_diags_path, dates.date0[1], tspan[1], calendar_dt)
 else
     diags_handler = nothing
 end
@@ -732,7 +731,6 @@ The postprocessing includes:
 =#
 
 if ClimaComms.iamroot(comms_ctx)
-    postprocessing_vars =
-        (; plot_diagnostics, use_coupler_diagnostics, output_default_diagnostics, t_end, conservation_softfail)
+    postprocessing_vars = (; use_coupler_diagnostics, output_default_diagnostics, t_end, conservation_softfail)
     postprocess_sim(cs, postprocessing_vars)
 end

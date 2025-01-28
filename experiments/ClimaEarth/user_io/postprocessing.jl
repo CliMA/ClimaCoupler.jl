@@ -20,7 +20,7 @@ function postprocess_sim(cs, postprocessing_vars)
     land_output_dir = joinpath(output_dir, "clima_land")
 
     # Plot generic diagnostics if requested
-    if use_coupler_diagnostics && plot_diagnostics
+    if use_coupler_diagnostics
         @info "Plotting diagnostics for coupler, atmos, and land"
         make_diagnostics_plots(coupler_output_dir, artifact_dir, output_prefix = "coupler_")
         make_diagnostics_plots(atmos_output_dir, artifact_dir, output_prefix = "atmos_")

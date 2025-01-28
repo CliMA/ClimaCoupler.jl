@@ -161,12 +161,11 @@ for FT in (Float32, Float64)
                 ocean_sim = Interfacer.SurfaceStub((; area_fraction = ocean_d)),
                 land_sim = DummyStub((; area_fraction = land_fraction)),
             ), # model_sims
-            (;), # mode
             (;), # callbacks
             (;), # dirs
             nothing, # turbulent_fluxes
             nothing, # thermo_params
-            nothing, # amip_diags_handler
+            nothing, # diags_handler
         )
 
         FieldExchanger.update_surface_fractions!(cs)

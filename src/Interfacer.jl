@@ -54,7 +54,6 @@ struct CoupledSimulation{
     TS,
     DTI <: Real,
     NTMS <: NamedTuple,
-    NTM <: NamedTuple,
     NTC <: NamedTuple,
     NTP <: NamedTuple,
     TF,
@@ -69,12 +68,11 @@ struct CoupledSimulation{
     tspan::TS
     Δt_cpl::DTI
     model_sims::NTMS
-    mode::NTM
     callbacks::NTC
     dirs::NTP
     turbulent_fluxes::TF
     thermo_params::TP
-    amip_diags_handler::DH
+    diags_handler::DH
 end
 
 CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args[1:end])...}(args...)

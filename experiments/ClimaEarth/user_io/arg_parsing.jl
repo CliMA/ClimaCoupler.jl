@@ -28,7 +28,7 @@ function get_coupler_config()
     job_id = isnothing(job_id) ? string(split(split(config_file, '/')[end], '.')[1]) : job_id
 
     # Read in config dictionary from file, overriding the defaults in `parsed_args`
-    config_dict = merge(parsed_args, YAML.load_file(parsed_args["config_file"]))
+    config_dict = merge(parsed_args, YAML.load_file(config_file))
     config_dict["job_id"] = job_id
     return config_dict
 end

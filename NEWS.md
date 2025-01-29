@@ -21,6 +21,14 @@ object initialization and `step!`. Note that this results in changed order of
 operations and slightly different behavior for AMIP simulations - see the PR
 description for more details.
 
+#### CO2 is now updated by ClimaAtmos directly PR[#1143](https://github.com/CliMA/ClimaCoupler.jl/pull/1143)
+
+Previously, CO2 was read in directly from the driver during init and in the
+coupling loop. Now, it is read internally by ClimaAtmos. Note that this results
+in changed order of operations and slightly different behavior for AMIP
+simulations - see the PR description for more details.
+
+
 #### Simplified callbacks PR [#1121](https://github.com/CliMA/ClimaCoupler.jl/pull/1121)
 
 Callbacks were also reworked, and the previous system was removed. Here is an example of the

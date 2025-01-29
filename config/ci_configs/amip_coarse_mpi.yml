@@ -1,4 +1,5 @@
 apply_limiter: false
+co2: "maunaloa"
 dt_save_to_sol: "1days"
 energy_check: false
 h_elem: 6

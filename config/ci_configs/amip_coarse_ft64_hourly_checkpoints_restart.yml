@@ -1,4 +1,5 @@
 apply_limiter: false
+co2: "maunaloa"
 checkpoint_dt: "1hours"
 dt_save_restart: "10days"
 dt_save_to_sol: "1days"

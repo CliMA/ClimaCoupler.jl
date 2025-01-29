@@ -1,5 +1,6 @@
 FLOAT_TYPE: "Float32"
 apply_limiter: false
+co2: "maunaloa"
 dt_save_to_sol: "100days"
 energy_check: false
 h_elem: 6

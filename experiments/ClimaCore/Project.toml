@@ -13,6 +13,6 @@ SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
-ClimaTimeSteppers = "0.7"
+ClimaTimeSteppers = "0.7, 0.8"
 PrettyTables = "2"
 Random = "1"

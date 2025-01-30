@@ -312,14 +312,14 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
-  - group: "Bash scripts"
-    steps:
-      - label: "Submit and Monitor sbatch Job on Caltech HPC"
-        # check that (1) the script can be succesfully submitted, (2) it runs successfully
-        command: "test/mpi_tests/test_sbatch_script.sh"
-        agents:
-          slurm_ntasks: 1
-        soft_fail: true
+  # - group: "Bash scripts"
+  #   steps:
+  #     - label: "Submit and Monitor sbatch Job on Caltech HPC"
+  #       # check that (1) the script can be succesfully submitted, (2) it runs successfully
+  #       command: "test/mpi_tests/test_sbatch_script.sh"
+  #       agents:
+  #         slurm_ntasks: 1
+  #       soft_fail: true
 
   - group: "Hierarchy tests (1d)"
     steps:

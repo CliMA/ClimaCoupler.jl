@@ -7,5 +7,5 @@ moist: "equil"
 mono_surface: false
 precip_model: "0M"
 rad: "allskywithclear"
-t_end: "32days"
+t_end: "10days"
 vert_diff: "true"

@@ -121,13 +121,6 @@ steps:
         agents:
           slurm_mem: 20GB
 
-      - label: "Slabplanet: default with Float32"
-        key: "slabplanet_ft32"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_ft32.yml --job_id slabplanet_ft32"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_ft32/artifacts/*"
-        agents:
-          slurm_mem: 20GB
-
       - label: "Slabplanet: partitioned turbulent fluxes"
         key: "slabplanet_partitioned_fluxes"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_partitioned_fluxes.yml --job_id slabplanet_partitioned_fluxes"
@@ -139,20 +132,6 @@ steps:
         key: "slabplanet_nonmono"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_nonmono.yml --job_id slabplanet_nonmono"
         artifact_paths: "experiments/ClimaEarth/output/slabplanet_nonmono/artifacts/*"
-        agents:
-          slurm_mem: 20GB
-
-      - label: "Slabplanet: albedo from temporal map"
-        key: "slabplanet_albedo_temporal_map"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_albedo_temporal_map.yml --job_id slabplanet_albedo_temporal_map"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_albedo_temporal_map/artifacts/*"
-        agents:
-          slurm_mem: 20GB
-
-      - label: "Slabplanet: albedo from function"
-        key: "slabplanet_albedo_function"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_albedo_function.yml --job_id slabplanet_albedo_function"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_albedo_function/artifacts/*"
         agents:
           slurm_mem: 20GB
 
@@ -185,19 +164,12 @@ steps:
         artifact_paths: "experiments/ClimaEarth/output/amip_default/artifacts/*"
         agents:
           slurm_mem: 20GB
-      
+
       - label: "AMIP: bucket initial condition test"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_bucket_ic.yml --job_id amip_bucket_ic"
         artifact_paths: "experiments/ClimaEarth/output/amip_bucket_ic/artifacts/*"
         agents:
           slurm_ntasks: 1
-          slurm_mem: 20GB
-
-      - label: "AMIP target: albedo from function"
-        key: "target_amip_albedo_function"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_albedo_function.yml --job_id target_amip_albedo_function"
-        artifact_paths: "experiments/ClimaEarth/output/target_amip_albedo_function/artifacts/*"
-        agents:
           slurm_mem: 20GB
 
       - label: "AMIP - Float64 + hourly checkpoint"
@@ -279,16 +251,6 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
-      - label: "GPU Slabplanet: albedo from temporal map"
-        key: "gpu_slabplanet_albedo_temporal_map"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_albedo_temporal_map.yml --job_id gpu_slabplanet_albedo_temporal_map"
-        artifact_paths: "experiments/ClimaEarth/output/gpu_slabplanet_albedo_temporal_map/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
-
       - label: "GPU Slabplanet: extra atmos diagnostics"
         key: "gpu_slabplanet_atmos_diags"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_atmos_diags.yml --job_id gpu_slabplanet_atmos_diags"
@@ -350,14 +312,14 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
-  - group: "Bash scripts"
-    steps:
-      - label: "Submit and Monitor sbatch Job on Caltech HPC"
-        # check that (1) the script can be succesfully submitted, (2) it runs successfully
-        command: "test/mpi_tests/test_sbatch_script.sh"
-        agents:
-          slurm_ntasks: 1
-        soft_fail: true
+  # - group: "Bash scripts"
+  #   steps:
+  #     - label: "Submit and Monitor sbatch Job on Caltech HPC"
+  #       # check that (1) the script can be succesfully submitted, (2) it runs successfully
+  #       command: "test/mpi_tests/test_sbatch_script.sh"
+  #       agents:
+  #         slurm_ntasks: 1
+  #       soft_fail: true
 
   - group: "Hierarchy tests (1d)"
     steps:

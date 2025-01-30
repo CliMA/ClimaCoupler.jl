@@ -43,6 +43,7 @@ import DelimitedFiles
 # ## ClimaESM packages
 import ClimaAtmos as CA
 import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ClimaCore as CC
 
 # ## Coupler specific imports

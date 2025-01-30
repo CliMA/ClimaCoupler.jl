@@ -12,11 +12,9 @@ module load climacommon/2024_10_09
 export CC_PATH=$(pwd)/ # adjust this to the path of your ClimaCoupler.jl directory
 export JOB_ID=amip_coarse_ft64_hourly_checkpoints_restart
 export CONFIG_FILE=${CC_PATH}config/ci_configs/${JOB_ID}.yml
-export RESTART_DIR=experiments/ClimaEarth/output/${JOB_ID}/artifacts/
+export RESTART_DIR=experiments/ClimaEarth/output/${JOB_ID}/checkpoints/
 
 export OPENBLAS_NUM_THREADS=1
-export JULIA_NVTX_CALLBACKS=gc
-export OMPI_MCA_opal_warn_on_missing_libcuda=0
 export JULIA_MAX_NUM_PRECOMPILE_FILES=100
 export SLURM_KILL_BAD_EXIT=1
 

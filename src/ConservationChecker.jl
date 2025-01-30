@@ -85,9 +85,7 @@ function check_conservation!(
     for sim in model_sims
         sim_name = Symbol(Interfacer.name(sim))
         if sim isa Interfacer.AtmosModelSimulation
-            radiative_energy_flux_toa = coupler_sim.fields.radiative_energy_flux_toa
-            # save radiation source
-            parent(radiative_energy_flux_toa) .= parent(Interfacer.get_field(sim, Val(:radiative_energy_flux_toa)))
+            radiative_energy_flux_toa = parent(Interfacer.get_field(sim, Val(:radiative_energy_flux_toa)))
 
             if isempty(ccs.toa_net_source)
                 radiation_sources_accum = sum(radiative_energy_flux_toa .* FT(coupler_sim.Δt_cpl)) # ∫ J / m^2 dA

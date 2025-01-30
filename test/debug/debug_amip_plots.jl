@@ -49,7 +49,6 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
         :beta,
         :z0b_S,
         :z0m_S,
-        :radiative_energy_flux_toa,
     )
     atmos_names = (:atmos_field,)
     surface_names = (:surface_field,)

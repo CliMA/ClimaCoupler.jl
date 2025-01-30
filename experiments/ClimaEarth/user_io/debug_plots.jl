@@ -121,7 +121,6 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
         :beta,
         :z0b_S,
         :z0m_S,
-        :radiative_energy_flux_toa,
     )
     fig = Makie.Figure(size = (1500, 800))
     min_square_len = ceil(Int, sqrt(length(field_names)))

@@ -209,7 +209,6 @@ coupler_field_names = (
     :F_radiative,
     :P_liq,
     :P_snow,
-    :radiative_energy_flux_toa,
     :P_net,
     :temp1,
     :temp2,

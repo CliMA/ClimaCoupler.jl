@@ -170,6 +170,10 @@ function make_diagnostics_plots(
         return
     end
 
+    # If the average isn't available, get the first available reduction for the first variable
+    reductions = CAN.available_reductions(simdir, short_name = short_names[1])
+    reduction = !(reduction in reductions) ? reductions[1] : reduction
+
     # Create a CAN.OutputVar for each input field
     vars = [get(simdir; short_name, reduction) for short_name in short_names]
 

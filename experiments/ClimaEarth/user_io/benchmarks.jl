@@ -177,15 +177,15 @@ run_info_atmos_diagedmf = get_run_info(parsed_args, "atmos_diagedmf")
 run_info_atmos = get_run_info(parsed_args, "atmos")
 
 # Set up info for PrettyTables.jl
-headers = [build_id_str, "Horiz. res.: 30 elems", "CPU Run [64 processes]", "GPU Run [4 A100s]"]
+headers = [build_id_str, "Horiz. res.: 30 elems", "CPU Run [64 processes]", "GPU Run [2 A100s]"]
 data = [
     ["" "Vert. res.: 63 levels" "" ""]
     ["" "dt: 120secs" "" ""]
 ]
 
 # Append data to the table for each of the cases we want to compare
-data = append_table_data(data, "Coupled", run_info_coupled...)
-data = append_table_data(data, "Coupled with IO", run_info_coupled_io...)
+data = append_table_data(data, "Coupled with diag. EDMF + IO", run_info_coupled_io...)
+data = append_table_data(data, "Coupled with diag. EDMF", run_info_coupled...)
 data = append_table_data(data, "Atmos with diag. EDMF", run_info_atmos_diagedmf...)
 data = append_table_data(data, "Atmos without diag. EDMF", run_info_atmos...)
 
@@ -196,5 +196,5 @@ table_output_dir = joinpath(output_dir, "compare_amip_climaatmos_$(cpu_job_id_co
 table_path = joinpath(table_output_dir, "table.txt")
 open(table_path, "w") do f
     # Output the table, including lines before and after the header
-    PrettyTables.pretty_table(f, data, header = headers, hlines = [0, 3, 6, 9, 12]) # TODO don't hardcode hlines
+    PrettyTables.pretty_table(f, data, header = headers, hlines = [0, 3, 6, 9, 12, 15])
 end

@@ -8,9 +8,7 @@ import ClimaCoupler: Interfacer
 
 include(joinpath("..", "TestHelper.jl"))
 import .TestHelper
-
-include("../../experiments/ClimaEarth/components/ocean/eisenman_seaice.jl")
-
+include(joinpath("..", "..", "components", "ocean", "eisenman_seaice.jl"))
 
 for FT in (Float32, Float64)
     params_ice = EisenmanIceParameters{FT}()

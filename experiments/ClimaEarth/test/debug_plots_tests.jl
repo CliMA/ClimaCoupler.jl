@@ -3,7 +3,7 @@ import Test: @test, @testset, @test_logs
 import ClimaCore as CC
 import ClimaCoupler: Interfacer
 
-include(joinpath("..", "TestHelper.jl"))
+include("TestHelper.jl")
 import .TestHelper
 
 # Prevent GKS headless operation mode warning
@@ -21,7 +21,7 @@ struct BucketSimulation{C} <: Interfacer.SurfaceModelSimulation
 end
 Interfacer.name(sim::BucketSimulation) = "BucketSimulation"
 
-include("../../experiments/ClimaEarth/user_io/debug_plots.jl")
+include("../user_io/debug_plots.jl")
 
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_field}) = sim.cache.surface_field
 Interfacer.get_field(sim::Interfacer.SurfaceStub, ::Val{:stub_field}) = sim.cache.stub_field

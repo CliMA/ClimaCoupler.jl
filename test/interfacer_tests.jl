@@ -5,7 +5,7 @@ import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
 import ClimaCoupler: Interfacer
 
-include("TestHelper.jl")
+include(joinpath("..", "experiments", "ClimaEarth", "test", "TestHelper.jl"))
 import .TestHelper
 
 # test for a simple generic surface model

@@ -11,7 +11,7 @@ import ClimaCore as CC
 import ClimaCoupler
 import ClimaCoupler: Checkpointer, Interfacer
 
-include(joinpath("..", "TestHelper.jl"))
+include(joinpath("..", "..", "experiments", "ClimaEarth", "test", "TestHelper.jl"))
 import .TestHelper
 
 # set up MPI communications context

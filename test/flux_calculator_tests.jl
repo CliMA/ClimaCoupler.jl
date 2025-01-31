@@ -8,7 +8,7 @@ import SurfaceFluxes.Parameters.SurfaceFluxesParameters
 import SurfaceFluxes.UniversalFunctions as UF
 import ClimaCoupler: FieldExchanger, FluxCalculator, Interfacer
 
-include("TestHelper.jl")
+include(joinpath("..", "experiments", "ClimaEarth", "test", "TestHelper.jl"))
 import .TestHelper
 
 # simple generic atmos model

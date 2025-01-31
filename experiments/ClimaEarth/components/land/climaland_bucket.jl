@@ -83,7 +83,12 @@ function BucketSimulation(
         if pkgversion(CL) < v"0.15"
             albedo = CL.Bucket.PrescribedSurfaceAlbedo{FT}(date_ref, t_start, space)
         else
-            albedo = CL.Bucket.PrescribedSurfaceAlbedo{FT}(date_ref, space)
+            albedo = CL.Bucket.PrescribedSurfaceAlbedo{FT}(
+                date_ref,
+                space;
+                albedo_file_path = CL.Artifacts.ceres_albedo_dataset_path(),
+                varname = "sw_alb_clr",
+            )
         end
     elseif albedo_type == "function" # Use prescribed function of lat/lon for surface albedo
         function α_bareground(coordinate_point)

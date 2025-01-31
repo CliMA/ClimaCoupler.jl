@@ -39,22 +39,3 @@ end
 @safetestset "Checkpointer tests" begin
     include("checkpointer_tests.jl")
 end
-gpu_broken || @safetestset "experiment test: CoupledSims tests" begin
-    include("experiment_tests/coupled_sims.jl")
-end
-
-@safetestset "component model test: ClimaAtmos" begin
-    include("component_model_tests/climaatmos_tests.jl")
-end
-@safetestset "component model test: prescr. sea ice" begin
-    include("component_model_tests/prescr_seaice_tests.jl")
-end
-gpu_broken || @safetestset "component model test: eisenman sea ice" begin
-    include("component_model_tests/eisenman_seaice_tests.jl")
-end
-@safetestset "component model test: slab ocean" begin
-    include("component_model_tests/slab_ocean_tests.jl")
-end
-@safetestset "debug diagnostics: amip plots" begin
-    include("debug/debug_amip_plots.jl")
-end

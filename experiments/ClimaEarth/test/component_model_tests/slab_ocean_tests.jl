@@ -4,8 +4,7 @@ import ClimaCoupler
 
 include(joinpath("..", "TestHelper.jl"))
 import .TestHelper
-
-include(pkgdir(ClimaCoupler, "experiments/ClimaEarth/components/ocean/slab_ocean.jl"))
+include(joinpath("..", "..", "components", "ocean", "slab_ocean.jl"))
 
 for FT in (Float32, Float64)
     @testset "dss_state! SlabOceanSimulation for FT=$FT" begin

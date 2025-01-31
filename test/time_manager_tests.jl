@@ -24,12 +24,11 @@ for FT in (Float32, Float64)
             tspan, # tspan
             Int(Δt_cpl), # Δt_cpl
             (;), # model_sims
-            (;), # mode
             (;), # callbacks
             (;), # dirs
             nothing, # turbulent_fluxes
             nothing, # thermo_params
-            nothing, # amip_diags_handler
+            nothing, # diags_handler
         )
 
         for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])

@@ -238,12 +238,11 @@ cs = Interfacer.CoupledSimulation{FT}(
     [tspan[1], tspan[2]],
     Δt_cpl,
     model_sims,
-    (;), # mode_specifics
     callbacks,
     dir_paths,
     turbulent_fluxes,
     thermo_params,
-    nothing, # amip_diags_handler
+    nothing, # diags_handler
 );
 
 #=

@@ -119,10 +119,6 @@ function argparse_settings()
         help = "Directory to save output files. Note that TempestRemap fails if interactive and paths are too long. [\"experiments/ClimaEarth/output\" (default)]"
         arg_type = String
         default = "experiments/ClimaEarth/output"
-        "--plot_diagnostics"
-        help = "Boolean flag indicating whether to make plot diagnostics [`false` (default), `true`]"
-        arg_type = Bool
-        default = false
         # ClimaAtmos specific
         "--surface_setup"
         help = "Triggers ClimaAtmos into the coupled mode [`PrescribedSurface` (default), `DefaultMoninObukhov`]" # retained here for standalone Atmos benchmarks

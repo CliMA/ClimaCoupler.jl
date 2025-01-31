@@ -131,7 +131,6 @@ add_extra_diagnostics!(config_dict)
     energy_check,
     conservation_softfail,
     output_dir_root,
-    plot_diagnostics,
 ) = get_coupler_args(config_dict)
 
 #=
@@ -280,7 +279,6 @@ if sim_mode <: AMIPMode
     ocean_fraction = FT(1) .- ice_fraction .- land_fraction
     ocean_sim = PrescribedOceanSimulation(FT, boundary_space, date0, t_start, ocean_fraction, thermo_params, comms_ctx)
 
-    mode_specifics = (; type = sim_mode)
     Utilities.show_memory_usage()
 
 elseif (sim_mode <: AbstractSlabplanetSimulationMode) && !(sim_mode <: SlabplanetEisenmanMode)
@@ -335,7 +333,6 @@ elseif (sim_mode <: AbstractSlabplanetSimulationMode) && !(sim_mode <: Slabplane
         thermo_params = thermo_params,
     ))
 
-    mode_specifics = (; type = sim_mode)
     Utilities.show_memory_usage()
 
 elseif sim_mode <: SlabplanetEisenmanMode
@@ -382,7 +379,6 @@ elseif sim_mode <: SlabplanetEisenmanMode
         thermo_params = thermo_params,
     )
 
-    mode_specifics = (; type = sim_mode)
     Utilities.show_memory_usage()
 end
 
@@ -487,14 +483,14 @@ end
 #= Set up default AMIP diagnostics
 Use ClimaDiagnostics for default AMIP diagnostics, which currently include turbulent energy fluxes.
 =#
-if sim_mode <: AMIPMode && use_coupler_diagnostics
-    include("user_io/amip_diagnostics.jl")
+if use_coupler_diagnostics
+    @info "Using default coupler diagnostics"
+    include("user_io/coupler_diagnostics.jl")
     coupler_diags_path = joinpath(dir_paths.output, "coupler")
     isdir(coupler_diags_path) || mkpath(coupler_diags_path)
-    amip_diags_handler =
-        amip_diagnostics_setup(coupler_fields, coupler_diags_path, dates.date0[1], tspan[1], calendar_dt)
+    diags_handler = coupler_diagnostics_setup(coupler_fields, coupler_diags_path, dates.date0[1], tspan[1], calendar_dt)
 else
-    amip_diags_handler = nothing
+    diags_handler = nothing
 end
 
 #=
@@ -515,12 +511,11 @@ cs = Interfacer.CoupledSimulation{FT}(
     [tspan[1], tspan[2]],
     Δt_cpl,
     model_sims,
-    mode_specifics,
     callbacks,
     dir_paths,
     turbulent_fluxes,
     thermo_params,
-    amip_diags_handler,
+    diags_handler,
 );
 Utilities.show_memory_usage()
 
@@ -659,8 +654,7 @@ function solve_coupler!(cs)
         ## compute/output AMIP diagnostics if scheduled for this timestep
         ## wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface
         cs_nt = (; u = cs.fields, p = nothing, t = t, step = round(t / Δt_cpl))
-        (cs.mode.type <: AMIPMode && !isnothing(cs.amip_diags_handler)) &&
-            CD.orchestrate_diagnostics(cs_nt, cs.amip_diags_handler)
+        !isnothing(cs.diags_handler) && CD.orchestrate_diagnostics(cs_nt, cs.diags_handler)
     end
     return nothing
 end
@@ -737,13 +731,6 @@ The postprocessing includes:
 =#
 
 if ClimaComms.iamroot(comms_ctx)
-    postprocessing_vars = (;
-        plot_diagnostics,
-        use_coupler_diagnostics,
-        output_default_diagnostics,
-        t_end,
-        conservation_softfail,
-        atmos_output_dir,
-    )
-    postprocess_sim(cs.mode.type, cs, postprocessing_vars)
+    postprocessing_vars = (; use_coupler_diagnostics, output_default_diagnostics, t_end, conservation_softfail)
+    postprocess_sim(cs, postprocessing_vars)
 end

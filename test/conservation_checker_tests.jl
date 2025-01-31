@@ -90,12 +90,11 @@ for FT in (Float32, Float64)
             (Int(0), Int(1000)), # tspan
             Int(200), # Δt_cpl
             model_sims, # model_sims
-            (;), # mode
             (;), # callbacks
             (;), # dirs
             nothing, # turbulent_fluxes
             nothing, # thermo_params
-            nothing, # amip_diags_handler
+            nothing, # diags_handler
         )
 
         # set non-zero radiation and precipitation
@@ -170,12 +169,11 @@ for FT in (Float32, Float64)
             (Int(0), Int(1000)), # tspan
             Int(200), # Δt_cpl
             model_sims, # model_sims
-            (;), # mode
             (;), # callbacks
             (;), # dirs
             nothing, # turbulent_fluxes
             nothing, # thermo_params
-            nothing, # amip_diags_handler
+            nothing, # diags_handler
         )
 
         tot_energy, tot_water = ConservationChecker.check_conservation!(cs)

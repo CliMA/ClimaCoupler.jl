@@ -13,6 +13,7 @@ moist: "equil"
 precip_model: "1M"
 rad: "gray"
 rayleigh_sponge: true
+start_date: "20100101"
 t_end: "300secs"
 vert_diff: "true"
 z_elem: 50

@@ -9,7 +9,7 @@ dz_top: 3000
 h_elem: 4
 land_albedo_type: "map_temporal"
 mode_name: "amip"
-moist: "equil"
+moist: "nonequil"
 precip_model: "1M"
 rad: "gray"
 rayleigh_sponge: true

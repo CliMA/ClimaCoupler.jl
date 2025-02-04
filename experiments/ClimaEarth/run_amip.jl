@@ -665,24 +665,24 @@ function solve_coupler!(cs)
     return nothing
 end
 
-#=
-## Precompilation of Coupling Loop
+# #=
+# ## Precompilation of Coupling Loop
 
-Here we run the entire coupled simulation for two timesteps to precompile everything
-for accurate timing of the overall simulation. After these two steps, we update the
-beginning and end of the simulation timespan to the correct values.
-=#
+# Here we run the entire coupled simulation for two timesteps to precompile everything
+# for accurate timing of the overall simulation. After these two steps, we update the
+# beginning and end of the simulation timespan to the correct values.
+# =#
 
-## run the coupled simulation for two timesteps to precompile
-cs.tspan[2] = tspan[1] + Δt_cpl * 2
-solve_coupler!(cs)
+# ## run the coupled simulation for two timesteps to precompile
+# cs.tspan[2] = tspan[1] + Δt_cpl * 2
+# solve_coupler!(cs)
 
-## update the timespan to the correct values
-cs.tspan[1] = tspan[1] + Δt_cpl * 2
-cs.tspan[2] = tspan[2]
+# ## update the timespan to the correct values
+# cs.tspan[1] = tspan[1] + Δt_cpl * 2
+# cs.tspan[2] = tspan[2]
 
-## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos
-GC.gc()
+# ## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos
+# GC.gc()
 
 #=
 ## Solving and Timing the Full Simulation

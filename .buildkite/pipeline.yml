@@ -201,7 +201,7 @@ steps:
       - label: "MPI AMIP"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_mpi.yml --job_id amip_coarse_mpi"
         artifact_paths: "experiments/ClimaEarth/output/amip_coarse_mpi/artifacts/*"
-        timeout_in_minutes: 240
+        timeout_in_minutes: 30
         env:
           CLIMACOMMS_CONTEXT: "MPI"
         agents:
@@ -322,6 +322,7 @@ steps:
         agents:
           slurm_ntasks: 1
         soft_fail: true
+        timeout_in_minutes: 40
 
   - group: "Hierarchy tests (1d)"
     steps:

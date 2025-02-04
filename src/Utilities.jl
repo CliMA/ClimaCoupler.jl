@@ -120,11 +120,20 @@ function show_memory_usage()
 end
 
 """
-    setup_output_dirs(; output_dir = nothing, artifacts_dir = nothing, comms_ctx)
+    setup_output_dirs(output_dir = pwd(),
+        artifacts_dir = joinpath(output_dir, "artifacts"),
+        checkpoints_dir = joinpath(output_dir, "checkpoints"),
+        regrid_dir = nothing,
+        comms_ctx,
+    )
 
-Create output directories for the experiment. If `comms_ctx` is provided, only the root process will create the directories.
-By default, the regrid directory is created as a temporary directory inside the output directory,
-and the artifacts directory is created inside the output directory with the name `artifacts/`.
+Create output directories for the experiment. If `comms_ctx` is provided,
+only the root process will create the directories.
+By default, the artifacts and checkpoints directories are created inside the output
+directory with the names `artifacts/` and `checkpoints/`.
+The regrid directory is by default created as a temporary directory inside the output
+directory and is automatically deleted when the process exits.
+
 
 `ClimaUtilities.OutputPathGenerator` is used so that simulations can be re-run and re-started.
 The output path looks like:
@@ -134,6 +143,8 @@ coupler_output_dir_amip/
 │       └── checkpoints for the various models
 ├── artifacts
 │       └── plots produced by the postporcessing step
+├── regrid_tmp_<random_tempdir>/
+│       └── temporary files used for regridding
 ├── output_0000/
 │   ├── atmos/
 │   │   └── output of the atmos model
@@ -148,26 +159,27 @@ coupler_output_dir_amip/
 
 # Arguments
 - `output_dir::String`: The directory where the output files will be stored. Default is the current directory.
-- `regrid_dir::String`: The directory where the regridded files will be stored. Default is `output_dir/regrid_tmp/`.
+- `regrid_dir::String`: The directory where the regridded files will be stored. Default is `output_dir/regrid_tmp_<random_tempdir>/`.
 - `checkpoint_dir::String`: The directory where the checkpoint files will be stored. Default is `output_dir/checkpoints/`.
 - `artifacts_dir::String`: The directory where the artifacts will be stored. Default is `output_dir/artifacts/`.
 - `comms_ctx::Union{Nothing, ClimaComms.AbstractCommsContext}`: The communicator context. If provided, only the root process will create the directories.
 
 # Returns
-- A tuple with the paths to the output, regrid, and artifacts directories.
+- A tuple with the paths to the output, artifacts, regrid, and checkpoints directories.
 """
 function setup_output_dirs(;
     output_dir = pwd(),
     artifacts_dir = joinpath(output_dir, "artifacts"),
     checkpoints_dir = joinpath(output_dir, "checkpoints"),
+    regrid_dir = nothing,
     comms_ctx,
 )
     output_dir = generate_output_path(output_dir, context = comms_ctx)
-    regrid_dir = nothing
     if ClimaComms.iamroot(comms_ctx)
         mkpath(artifacts_dir)
         mkpath(checkpoints_dir)
-        regrid_dir = mktempdir(output_dir, prefix = "regrid_tmp_")
+        # If no regrid_dir is provided, create a temporary directory
+        regrid_dir = isnothing(regrid_dir) ? mktempdir(output_dir, prefix = "regrid_tmp_") : mkpath(regrid_dir)
     end
     regrid_dir = ClimaComms.bcast(comms_ctx, regrid_dir)
 

@@ -58,7 +58,7 @@ function BucketSimulation(
     output_dir::String;
     space,
     dt::Float64,
-    saveat::Float64,
+    saveat::Vector{Float64},
     area_fraction,
     stepper = CTS.RK4(),
     date_ref::Dates.DateTime,

@@ -201,6 +201,7 @@ land_area_fraction = SpaceVaryingInput(land_mask_data, "landsea", boundary_space
 =#
 
 saveat = Float64(Utilities.time_to_seconds(config_dict["dt_save_to_sol"]))
+saveat = [tspan[1]:saveat:tspan[1]..., tspan[2]]
 
 ## land model
 land_sim = BucketSimulation(

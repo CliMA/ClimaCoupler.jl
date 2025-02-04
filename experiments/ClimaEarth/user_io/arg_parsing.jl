@@ -63,6 +63,7 @@ function get_coupler_args(config_dict::Dict)
     date0 = date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
     Δt_cpl = Float64(Utilities.time_to_seconds(config_dict["dt_cpl"]))
     saveat = Float64(Utilities.time_to_seconds(config_dict["dt_save_to_sol"]))
+    saveat = [t_start:saveat:t_end..., t_end]
     component_dt_dict = config_dict["component_dt_dict"]
 
     # Checkpointing information

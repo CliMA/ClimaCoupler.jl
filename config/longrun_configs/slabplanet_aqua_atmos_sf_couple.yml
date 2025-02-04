@@ -16,4 +16,4 @@ surface_setup: "DefaultMoninObukhov"
 t_end: "20days"
 turb_flux_partition: "CombinedStateFluxesMOST"
 use_land_diagnostics: false
-vert_diff: "FriersonDiffusion"
+vert_diff: "DecayWithHeightDiffusion"

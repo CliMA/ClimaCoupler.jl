@@ -145,6 +145,7 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
+          slurm_reservation: "false"
         soft_fail: true
 
       - label: "TARGET IDEALIZED: new target aqua - fixed ocean T, nocouple, atmos flux calc"
@@ -158,6 +159,7 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
+          slurm_reservation: "false"
         soft_fail: true
 
       - label: "TARGET IDEALIZED: new target aqua - fixed ocean T, coupler flux calc"
@@ -171,6 +173,7 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
+          slurm_reservation: "false"
         soft_fail: true
 
       - label: "TARGET IDEALIZED: new target aqua - evolving slab ocean T"
@@ -184,6 +187,7 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
+          slurm_reservation: "false"
         soft_fail: true
 
       - label: "TARGET IDEALIZED: new target slab - fixed ocean T, bucket"
@@ -197,6 +201,7 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
+          slurm_reservation: "false"
         soft_fail: true
 
       - label: "TARGET IDEALIZED: new target slab - evolving slab ocean T, bucket"
@@ -210,6 +215,7 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
+          slurm_reservation: "false"
         soft_fail: true
 
   - group: "Current target tests: AMIP surfaces"
@@ -227,6 +233,7 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
+          slurm_reservation: "false"
         soft_fail: true
 
       - label: "MPI AMIP FINE: new target amip: topo"
@@ -240,6 +247,7 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 16G
+          slurm_reservation: "false"
         soft_fail: true
 
       - label: "MPI AMIP FINE: new target amip: topo + diagedmf"
@@ -253,6 +261,7 @@ steps:
           slurm_ntasks_per_node: 16
           slurm_nodes: 4
           slurm_mem_per_cpu: 20G
+          slurm_reservation: "false"
         soft_fail: true
 
   - group: "Current target tests on GPU: AMIP surface"

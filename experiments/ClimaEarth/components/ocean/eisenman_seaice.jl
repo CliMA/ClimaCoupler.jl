@@ -81,7 +81,7 @@ function EisenmanIceSimulation(
         dss_buffer = CC.Spaces.create_dss_buffer(Y),
     )
     problem = SciMLBase.ODEProblem(ode_function, Y, Float64.(tspan), cache)
-    integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64(saveat), adaptive = false)
+    integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64.(saveat), adaptive = false)
 
     sim = EisenmanIceSimulation(params, Y, space, integrator)
     return sim

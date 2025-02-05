@@ -31,9 +31,10 @@ Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 
 [compat]
 Aqua = "0.8"
-ClimaAtmos = "0.27"
+ClimaAtmos = "0.27, 0.28"
 ClimaParams = "0.10"
 ClimaTimeSteppers = "0.7, 0.8"
+ClimaUtilities = "0.1"
 Dates = "1"
 Pkg = "1"
 PrettyTables = "2"

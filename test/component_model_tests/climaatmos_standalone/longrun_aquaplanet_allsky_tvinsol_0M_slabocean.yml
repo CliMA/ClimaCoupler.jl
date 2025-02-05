@@ -18,7 +18,7 @@ rayleigh_sponge: true
 surface_setup: "DefaultMoninObukhov"
 t_end: "120days"
 coupler_toml: ["test/component_model_tests/climaatmos_standalone/longrun_aquaplanet.toml"]
-vert_diff: "FriersonDiffusion"
+vert_diff: "DecayWithHeightDiffusion"
 z_elem: 63
 z_max: 55000.0
 output_default_diagnostics: false

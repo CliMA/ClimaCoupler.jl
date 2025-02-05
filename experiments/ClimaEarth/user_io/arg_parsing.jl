@@ -28,7 +28,7 @@ function get_coupler_config()
     job_id = isnothing(job_id) ? string(split(split(config_file, '/')[end], '.')[1]) : job_id
 
     # Read in config dictionary from file, overriding the defaults in `parsed_args`
-    config_dict = merge(parsed_args, YAML.load_file(parsed_args["config_file"]))
+    config_dict = merge(parsed_args, YAML.load_file(config_file))
     config_dict["job_id"] = job_id
     return config_dict
 end
@@ -76,7 +76,7 @@ function get_coupler_args(config_dict::Dict)
     # Diagnostics information
     use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
     use_land_diagnostics = config_dict["use_land_diagnostics"]
-    calendar_dt = config_dict["calendar_dt"]
+    (_, calendar_dt) = get_diag_period(t_start, t_end)
 
     # Physical simulation information
     evolving_ocean = config_dict["evolving_ocean"]
@@ -89,7 +89,6 @@ function get_coupler_args(config_dict::Dict)
 
     # Output information
     output_dir_root = config_dict["coupler_output_dir"]
-    plot_diagnostics = config_dict["plot_diagnostics"]
 
     # ClimaLand-specific information
     land_domain_type = config_dict["land_domain_type"]
@@ -122,7 +121,6 @@ function get_coupler_args(config_dict::Dict)
         energy_check,
         conservation_softfail,
         output_dir_root,
-        plot_diagnostics,
         land_domain_type,
         land_albedo_type,
         land_initial_condition,

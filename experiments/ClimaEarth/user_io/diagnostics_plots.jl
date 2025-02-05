@@ -147,31 +147,27 @@ end
     make_diagnostics_plots(
         output_path::AbstractString,
         plot_path::AbstractString;
-        short_names::Vector{<:AbstractString} = ["mse", "lr", "edt", "ts"],
-        reduction::String = "average",
         output_prefix = "",
     )
 Create plots for diagnostics. The plots are saved to `plot_path`.
-This is the default plotting function for diagnostics and it can be extended
-to include additional diagnostics.
+This function will plot all variables that have been saved in `output_path`.
 The `reduction` keyword argument should be consistent with the reduction used to save the diagnostics.
 """
-function make_diagnostics_plots(
-    output_path::AbstractString,
-    plot_path::AbstractString;
-    short_names::Vector{<:AbstractString} = ["mse", "lr", "edt", "ts"],
-    reduction::String = "average",
-    output_prefix = "",
-)
-
+function make_diagnostics_plots(output_path::AbstractString, plot_path::AbstractString; output_prefix = "")
     simdir = CAN.SimDir(output_path)
-    if !all(v -> v in CAN.available_vars(simdir), short_names)
-        @warn "Not all variables are available in the output directory $output_path"
-        return
-    end
+    short_names = CAN.available_vars(simdir)
+
+    # Return if there are no variables to plot
+    isempty(short_names) && return
 
     # Create a CAN.OutputVar for each input field
-    vars = [get(simdir; short_name, reduction) for short_name in short_names]
+    vars = Array{CAN.OutputVar}(undef, length(short_names))
+    for (i, short_name) in enumerate(short_names)
+        # Use "average" if available, otherwise use the first reduction
+        reductions = CAN.available_reductions(simdir; short_name)
+        "average" in reductions ? (reduction = "average") : (reduction = first(reductions))
+        vars[i] = get(simdir; short_name, reduction)
+    end
 
     # Filter vars into 2D and 3D variable diagnostics vectors
     # 3D fields are zonally averaged platted on the lat-z plane

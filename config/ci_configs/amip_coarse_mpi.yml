@@ -1,8 +1,8 @@
 apply_limiter: false
 co2: "maunaloa"
-dt_save_to_sol: "1days"
+dt_save_to_sol: "10days"
 energy_check: false
-h_elem: 6
+h_elem: 4
 mode_name: "amip"
 moist: "equil"
 mono_surface: false

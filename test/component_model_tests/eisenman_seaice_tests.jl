@@ -308,9 +308,7 @@ for FT in (Float32, Float64)
             space = boundary_space,
             area_fraction = ones(boundary_space),
             thermo_params = thermo_params,
-            stepper = CTS.RK4(),
             dt = Δt,
-            saveat = 1.0e10,
         )
         sim.integrator.p.Ya.F_turb .= 0
         sim.integrator.p.Ya.F_rad .= 300

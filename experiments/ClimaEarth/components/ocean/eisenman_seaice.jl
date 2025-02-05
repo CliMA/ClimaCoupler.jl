@@ -57,7 +57,7 @@ function EisenmanIceSimulation(
     thermo_params = nothing,
     stepper = CTS.RK4(),
     dt = 0.02,
-    saveat = 1.0e10,
+    saveat = [1.0e10],
 ) where {FT}
 
     params_ice = EisenmanIceParameters{FT}()

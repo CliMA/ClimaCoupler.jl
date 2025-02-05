@@ -153,12 +153,15 @@ boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space) # TODO:
 ### Surface Model: Slab Ocean
 =#
 
+saveat = Float64(Utilities.time_to_seconds(config_dict["dt_save_to_sol"]))
+saveat = [tspan[1]:saveat:tspan[1]..., tspan[2]]
+
 ocean_sim = SlabOceanSimulation(
     FT;
     tspan = tspan,
     dt = Δt_cpl,
     space = boundary_space,
-    saveat = Float64(Utilities.time_to_seconds(config_dict["dt_save_to_sol"])),
+    saveat = saveat,
     area_fraction = ones(boundary_space),
     thermo_params = thermo_params,
     evolving = true,

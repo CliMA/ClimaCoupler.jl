@@ -206,8 +206,7 @@ steps:
           CLIMACOMMS_CONTEXT: "MPI"
         agents:
           slurm_ntasks: 4
-          slurm_mem: 48GB
-          slurm_reservation: "false"
+          slurm_mem_per_cpu: 8GB
 
       # short high-res performance test
       - label: "Unthreaded AMIP FINE" # also reported by longruns with a flame graph

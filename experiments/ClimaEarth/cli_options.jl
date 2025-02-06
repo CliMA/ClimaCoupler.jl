@@ -85,8 +85,8 @@ function argparse_settings()
         default = nothing
         "--restart_t"
         help = "Time in seconds rounded to the nearest index to use at `t_start` for restarted simulation [0 (default)]"
-        arg_type = Int
-        default = 0
+        arg_type = String
+        default = "0secs"
         # Diagnostics information
         "--use_coupler_diagnostics"
         help = "Boolean flag indicating whether to compute and output coupler diagnostics [`true` (default), `false`]"

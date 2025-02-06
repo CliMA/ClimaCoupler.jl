@@ -421,7 +421,10 @@ function recursively_reset!(v1::T, v2::T; ignore = Set([:rc])) where {T}
     end
 end
 
-function recursively_reset_base!(v1::T, v2::T) where {T <: Union{CC.Fields.Field, CC.Fields.FieldVector, CC.DataLayouts.AbstractData, AbstractArray}}
+function recursively_reset_base!(
+    v1::T,
+    v2::T,
+) where {T <: Union{CC.Fields.Field, CC.Fields.FieldVector, CC.DataLayouts.AbstractData, AbstractArray}}
     parent(v1) .= parent(v2)
 end
 

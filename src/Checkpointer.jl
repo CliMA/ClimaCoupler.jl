@@ -146,10 +146,10 @@ end
 This is a callback function that checkpoints all simulations defined in the current coupled simulation.
 """
 function checkpoint_sims(cs::Interfacer.CoupledSimulation)
+    t = Dates.datetime2epochms(cs.dates.date[1])
+    t0 = Dates.datetime2epochms(cs.dates.date0[1])
     for sim in cs.model_sims
         if Checkpointer.get_model_prog_state(sim) !== nothing
-            t = Dates.datetime2epochms(cs.dates.date[1])
-            t0 = Dates.datetime2epochms(cs.dates.date0[1])
             Checkpointer.checkpoint_model_state(
                 sim,
                 cs.comms_ctx,
@@ -164,6 +164,18 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
             )
         end
     end
+
+    # Checkpoint the Coupler fields
+    output_dir = cs.dirs.checkpoints
+    comms_ctx = cs.comms_ctx
+    time = Int((t - t0) / 1e3)
+    day = floor(Int, time / (60 * 60 * 24))
+    sec = floor(Int, time % (60 * 60 * 24))
+    pid = ClimaComms.mypid(comms_ctx)
+    @info "Saving coupler fields to JLD2 on day $day second $sec"
+    output_file = joinpath(output_dir, "checkpoint", "checkpoint_coupler_fields_$(pid)_$time.jld2")
+    mkpath(joinpath(output_dir, "checkpoint"))
+    JLD2.jldsave(output_file, coupler_fields = cs.fields)
 end
 
 end # module

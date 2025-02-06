@@ -108,8 +108,11 @@ function Checkpointer.get_model_cache(sim::ClimaAtmosSimulation)
 end
 
 function Checkpointer.restore_cache!(sim::ClimaAtmosSimulation, new_cache)
-    restore!(Checkpointer.get_model_cache(sim), new_cache;
-             ignore = Set([:rc, :params, :ghost_buffer, :hyperdiffusion_ghost_buffer, :data_handler]))
+    restore!(
+        Checkpointer.get_model_cache(sim),
+        new_cache;
+        ignore = Set([:rc, :params, :ghost_buffer, :hyperdiffusion_ghost_buffer, :data_handler]),
+    )
     return nothing
 end
 

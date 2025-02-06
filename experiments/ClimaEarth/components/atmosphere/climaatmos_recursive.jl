@@ -8,12 +8,7 @@ import ClimaCore.Geometry: AxisTensor
 import ClimaCore.Spaces: AbstractSpace
 import NCDatasets
 
-function restore!(
-    v1::T,
-    v2::T;
-    name = "",
-    ignore = Set([:rc]),
-) where {T <: Union{NamedTuple, CA.AtmosCache}}
+function restore!(v1::T, v2::T; name = "", ignore = Set([:rc])) where {T <: Union{NamedTuple, CA.AtmosCache}}
     _restore!(v1, v2; name, ignore)
     return nothing
 end

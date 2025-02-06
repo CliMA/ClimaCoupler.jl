@@ -65,6 +65,8 @@ println("Reading and simulating last step")
 
 # Restart (just re-run from the same folder)
 restarted = YAML.load_file(joinpath(tmpdir, "two_steps.yml"))
+restarted["restart_dir"] = TestTwo1.dir_paths.checkpoints
+restarted["restart_t"] = "360secs"
 restarted["t_end"] = "540secs"
 YAML.write_file(joinpath(tmpdir, "restarted.yml"), restarted)
 push!(ARGS, "--config_file", joinpath(tmpdir, "restarted.yml"))
@@ -93,6 +95,7 @@ end
 @test compare(TestThree.cs.model_sims.ice_sim.integrator.u, TestTwo2.cs.model_sims.ice_sim.integrator.u)
 
 @test compare(TestThree.cs.model_sims.land_sim.integrator.u, TestTwo2.cs.model_sims.land_sim.integrator.u)
+@test compare(TestThree.cs.model_sims.land_sim.integrator.p, TestTwo2.cs.model_sims.land_sim.integrator.p)
 
 @test compare(
     TestThree.cs.model_sims.land_sim.integrator.p,
@@ -100,4 +103,13 @@ end
     ignore = [:dss_buffer_3d, :dss_buffer_2d],
 )
 
-@test compare(TestThree.cs.model_sims.ocean_sim.cache, TestTwo2.cs.model_sims.ocean_sim.cache)
+# Ignoring SST_timevaryinginput because it contains closures (which should be reinitialized correctly)
+# We have to remove it from the type, otherwise comapre will not work
+function delete(nt::NamedTuple, fieldnames...)
+    return (; filter(p -> !(first(p) in fieldnames), collect(pairs(nt)))...)
+end
+
+ocean_cache_three = delete(TestThree.cs.model_sims.ocean_sim.cache, :SST_timevaryinginput)
+ocean_cache_two2 = delete(TestTwo2.cs.model_sims.ocean_sim.cache, :SST_timevaryinginput)
+
+@test compare(ocean_cache_three, ocean_cache_two2)

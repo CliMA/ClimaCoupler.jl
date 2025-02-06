@@ -46,8 +46,8 @@ Keyword arguments
 `:rc` is some CUDA/CuArray internal object that we don't care about
 """
 function compare(
-    v1::T,
-    v2::T;
+    v1::T1,
+    v2::T2;
     name = "",
     ignore = Set([:rc]),
 ) where {T <: Union{FieldVector, AbstractSpace, NamedTuple, CA.AtmosCache}}

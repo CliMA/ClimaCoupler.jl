@@ -396,6 +396,38 @@ function make_land_domain(
     return CL.Domains.SphericalShell{FT}(radius, depth, nothing, nelements, npolynomial, space, fields)
 end
 
+function Checkpointer.get_model_cache(sim::BucketSimulation)
+    return sim.integrator.p
+end
+
+function Checkpointer.restore_cache!(sim::Interfacer.ComponentModelSimulation, new_cache)
+    old_cache = Checkpointer.get_model_cache(sim)
+    recursively_reset!(old_cache, new_cache)
+end
+
+function recursively_reset!(v1::T, v2::T; ignore = Set([:rc])) where {T}
+    properties = filter(x -> !(x in ignore), propertynames(v1))
+    if isempty(properties)
+        if !Base.issingletontype(typeof(v1))
+            recursively_reset_base!(v1, v2)
+        else
+            v1 == v2 || error("v1 != v2")
+        end
+    else
+        # Recursive case
+        for p in properties
+            recursively_reset!(getproperty(v1, p), getproperty(v2, p); ignore)
+        end
+    end
+end
+
+function recursively_reset_base!(
+    v1::T,
+    v2::T,
+) where {T <: Union{CC.Fields.Field, CC.Fields.FieldVector, CC.DataLayouts.AbstractData, AbstractArray}}
+    parent(v1) .= parent(v2)
+end
+
 """
     dss_state!(sim::BucketSimulation)
 

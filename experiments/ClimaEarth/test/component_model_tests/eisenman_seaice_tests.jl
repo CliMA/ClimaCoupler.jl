@@ -8,9 +8,7 @@ import ClimaCoupler: Interfacer
 
 include(joinpath("..", "TestHelper.jl"))
 import .TestHelper
-
-include("../../experiments/ClimaEarth/components/ocean/eisenman_seaice.jl")
-
+include(joinpath("..", "..", "components", "ocean", "eisenman_seaice.jl"))
 
 for FT in (Float32, Float64)
     params_ice = EisenmanIceParameters{FT}()
@@ -299,7 +297,7 @@ for FT in (Float32, Float64)
         @test all(parent(Y.h_ice) .< parent(h_ice_0))
     end
 
-    @testset "step! update + total energy calculation for FT=$FT" begin
+    @testset "timestep update + total energy calculation for FT=$FT" begin
         Δt = Float64(1000)
 
         sim = EisenmanIceSimulation(
@@ -317,16 +315,22 @@ for FT in (Float32, Float64)
         total_energy_0 = Interfacer.get_field(sim, Val(:energy))
         h_ice_0 = deepcopy(sim.integrator.u.h_ice)
 
-        Interfacer.step!(sim, Δt)
+        Y = sim.integrator.u
+        Ya = sim.integrator.p.Ya
+        params = sim.integrator.p.params
+
+        # Solve for one timestep and check the results
+        solve_eisenman_model!(Y, Ya, params, thermo_params, Δt)
         h_ice = sim.integrator.u.h_ice
         @test all(parent(h_ice) .≈ 0.001)
-        Interfacer.step!(sim, 2 * Δt)
+
+        # Solve for a second timestep and check the results
+        solve_eisenman_model!(Y, Ya, params, thermo_params, Δt)
         h_ice = sim.integrator.u.h_ice
         @test all(abs.(parent(h_ice) .- 0.002) .< 10eps(FT))
 
         total_energy_calc = (Interfacer.get_field(sim, Val(:energy)) .- total_energy_0)
         total_energy_expeted = 300 .* ones(boundary_space) .* 2 .* FT(Δt)
         @test all(parent(total_energy_calc) .≈ parent(total_energy_expeted))
-
     end
 end

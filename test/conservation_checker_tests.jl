@@ -7,7 +7,7 @@ import ClimaComms
 import ClimaCore as CC
 import ClimaCoupler: ConservationChecker, Interfacer
 
-include("TestHelper.jl")
+include(joinpath("..", "experiments", "ClimaEarth", "test", "TestHelper.jl"))
 import .TestHelper
 
 REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regrid_tmp/")

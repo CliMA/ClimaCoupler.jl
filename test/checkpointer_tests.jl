@@ -4,7 +4,7 @@ import ClimaComms
 import ClimaCore as CC
 import ClimaCoupler: Checkpointer, Interfacer
 
-include("TestHelper.jl")
+include(joinpath("..", "experiments", "ClimaEarth", "test", "TestHelper.jl"))
 import .TestHelper
 
 FT = Float64

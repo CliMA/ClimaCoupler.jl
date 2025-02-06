@@ -7,8 +7,7 @@ import ClimaCoupler
 
 include(joinpath("..", "TestHelper.jl"))
 import .TestHelper
-
-include(pkgdir(ClimaCoupler, "experiments/ClimaEarth/components/ocean/prescr_seaice.jl"))
+include(joinpath("..", "..", "components", "ocean", "prescr_seaice.jl"))
 
 for FT in (Float32, Float64)
     @testset "test sea-ice energy slab for FT=$FT" begin

@@ -42,8 +42,11 @@ jobs:
         with:
           token: ${{secrets.CODECOV_TOKEN}}
           file: lcov.info
-      # Run own downstream test
       - run: |
           julia --color=yes --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate()'
           julia --color=yes --project=experiments/ClimaEarth -e 'using Pkg; Pkg.develop(; path = ".")'
           julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/test/runtests.jl
+      - run: |
+          julia --color=yes --project=experiments/ClimaCore -e 'using Pkg; Pkg.instantiate()'
+          julia --color=yes --project=experiments/ClimaCore -e 'using Pkg; Pkg.develop(; path = ".")'
+          julia --color=yes --project=experiments/ClimaCore experiments/ClimaCore/test/runtests.jl

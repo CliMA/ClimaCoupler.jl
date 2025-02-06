@@ -7,8 +7,8 @@ import ClimaCoupler
 
 include(joinpath("..", "TestHelper.jl"))
 import .TestHelper
+include(joinpath("..", "..", "components", "ocean", "prescr_ocean.jl"))
 
-include(pkgdir(ClimaCoupler, "experiments/ClimaEarth/components/ocean/prescr_ocean.jl"))
 FT = Float32
 
 @testset "PrescribedOceanSimulation name" begin

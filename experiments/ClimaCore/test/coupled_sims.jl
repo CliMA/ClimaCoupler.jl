@@ -4,7 +4,7 @@ import ClimaComms
 import ClimaCore as CC
 
 # Load file to test
-include("../../experiments/ClimaCore/CoupledSims/coupled_sim.jl")
+include("../CoupledSims/coupled_sim.jl")
 
 @testset "Clock" begin
     time_info = (start = 0.0, dt = 0.5, stop = 2.0)

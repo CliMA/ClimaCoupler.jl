@@ -1,9 +1,0 @@
-[radiation_obs]
-git-tree-sha1 = "945e31f8028a581f7e8435cb691462124484567a"
-
-[precipitation_obs]
-git-tree-sha1 = "5f0075f042bc83b580d2c4f725f851d8e0b9c20a"
-
-    [[precipitation_obs.download]]
-    sha256 = "1aea361ee1c2636bd5c4cc343202dab814d246a7e0356a9caac9fd9c7cf3821c"
-    url = "https://caltech.box.com/shared/static/j63uak557kw7tlzb3dgwifoaeczekzm4.gz"

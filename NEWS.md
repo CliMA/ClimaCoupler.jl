@@ -61,6 +61,16 @@ Simulation constructor functions have been renamed to use the simulation name
 itself, following general convention for constructor naming. For example,
 `atmos_init` is now `ClimaAtmosSimulation`, and `bucket_init` is now `BucketSimulation`.
 
+### Maintenance
+
+#### Experiment-related tests moved into `experiments/`
+
+Tests for code in the `experiments/` folder, including for component models and
+debug plotting have been moved into the `experiments/ClimaEarth/` and
+`experiments/ClimaCore` folders. This allows us to remove packages from the `test/`
+environment and keep the `experiments/` environments more self-contained.
+Github Actions have been added for the new `experiments/ClimaCore/` tests.
+
 v0.1.2
 -------
 ### ClimaEarth features

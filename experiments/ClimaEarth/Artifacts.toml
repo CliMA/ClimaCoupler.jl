@@ -1,9 +1,6 @@
 [land_mask]
 git-tree-sha1 = "e41bc8c44124f867b64a9d70f1599515ae27f38a"
 
-[test]
-git-tree-sha1 = "b377e7c997804b47720b8e7243361d399d108441"
-
 [cmip_model_rmse]
 git-tree-sha1 = "53a27731c0a2ec60756af24e4c60ac37da4a32bc"
 

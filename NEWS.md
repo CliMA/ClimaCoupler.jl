@@ -6,6 +6,14 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Driver function `setup_and_run` added PR[#1178](https://github.com/CliMA/ClimaCoupler.jl/pull/1178)
+A new function `setup_and_run` is added, which takes in a path to a config file,
+and contains all the code to initialize component models and run the simulation.
+This function is needed for calibration to easily run multiple simulations
+with different parameters. This function is moved to a different file
+`experiments/ClimaEarth/setup_run.jl`, so it can be included by the `run_amip.jl`
+driver, or by another driver used for calibration.
+
 #### Postprocessing no longer uses `sim_mode` PR[#1153](https://github.com/CliMA/ClimaCoupler.jl/pull/1153)
 Postprocessing now consists of a single function that's used for all simulation
 modes. Note that now all available diagnostics will be plotted at the end of

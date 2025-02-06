@@ -9,7 +9,7 @@ mode_name_dict = Dict(
 )
 
 """
-    get_coupler_config()
+    get_coupler_config_dict(config_file)
 
 Read in the configuration file and job ID from the command line.
 A dictionary is constructed from the input configuration file and returned.
@@ -17,13 +17,11 @@ A dictionary is constructed from the input configuration file and returned.
 # Returns
 - `config_dict`: A dictionary mapping configuration keys to the specified settings
 """
-function get_coupler_config()
-    # Read in command line arguments
+function get_coupler_config_dict(config_file)
+    # Extract the job ID from the command line arguments
     parsed_args = parse_commandline(argparse_settings())
-
-    # Extract the configuration file and job ID
-    config_file = parsed_args["config_file"]
     job_id = parsed_args["job_id"]
+
     # Get the job ID from the config file string if not provided
     job_id = isnothing(job_id) ? string(split(split(config_file, '/')[end], '.')[1]) : job_id
 

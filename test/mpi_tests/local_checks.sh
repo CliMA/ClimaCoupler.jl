@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --ntasks=2
 #SBATCH --job-name=mpi_amip
-#SBATCH --time=24:00:00
+#SBATCH --time=00:10:00
 #SBATCH --mem-per-cpu=16G
 #SBATCH --partition=expansion
 

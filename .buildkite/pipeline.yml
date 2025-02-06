@@ -320,8 +320,8 @@ steps:
         command: "test/mpi_tests/test_sbatch_script.sh"
         agents:
           slurm_ntasks: 1
+          slurm_time: 30
         soft_fail: true
-        timeout_in_minutes: 40
 
   - group: "Hierarchy tests (1d)"
     steps:

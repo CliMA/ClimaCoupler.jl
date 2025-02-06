@@ -12,7 +12,7 @@ const BOTTOM_LVL = -LARGE_NUM
 const TOP_LVL = LARGE_NUM
 
 function Makie.get_tickvalues(yticks::Int, ymin, ymax)
-    return range(max(ymin, 0), ymax, yticks)
+    return range(ymin, ymax, yticks)
 end
 
 YLINEARSCALE = Dict(:axis => CAN.Utils.kwargs(dim_on_y = true, yticks = 10, ytickformat = "{:.3e}"))

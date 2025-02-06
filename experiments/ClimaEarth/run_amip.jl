@@ -529,11 +529,13 @@ Utilities.show_memory_usage()
 If a restart directory is specified and contains output files from the `checkpoint_cb` callback, the component model states are restarted from those files. The restart directory
 is specified in the `config_dict` dictionary. The `restart_t` field specifies the time step at which the restart is performed.
 =#
-
+restart_dir = dir_paths.checkpoints
+restart_t = 180
 if !isnothing(restart_dir)
     for sim in cs.model_sims
         if Checkpointer.get_model_prog_state(sim) !== nothing
             Checkpointer.restart_model_state!(sim, comms_ctx, restart_t; input_dir = restart_dir)
+            Checkpointer.restart_model_cache!(sim, comms_ctx, restart_t; input_dir = restart_dir)
         end
     end
 end

@@ -12,6 +12,7 @@ import Thermodynamics as TD
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 
 include("climaatmos_extra_diags.jl")
+include("climaatmos_recursive.jl")
 
 ###
 ### Functions required by ClimaCoupler.jl for an AtmosModelSimulation
@@ -101,6 +102,17 @@ Extension of Checkpointer.get_model_prog_state to get the model state.
 function Checkpointer.get_model_prog_state(sim::ClimaAtmosSimulation)
     return sim.integrator.u
 end
+
+function Checkpointer.get_model_cache(sim::ClimaAtmosSimulation)
+    return sim.integrator.p
+end
+
+function Checkpointer.restore_cache!(sim::ClimaAtmosSimulation, new_cache)
+    restore!(Checkpointer.get_model_cache(sim), new_cache;
+             ignore = Set([:rc, :params, :ghost_buffer, :hyperdiffusion_ghost_buffer, :data_handler]))
+    return nothing
+end
+
 
 """
 Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_toa})

@@ -7,7 +7,7 @@ function argparse_settings()
         "--config_file"
         help = "A yaml file used to set the configuration of the coupled model [\"config/ci_configs/amip_default.yml\" (default)]"
         arg_type = String
-        default = "config/ci_configs/amip_default.yml"
+        default = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml")
         "--job_id"
         help = "A unique identifier for this run, defaults to the config file name"
         arg_type = String

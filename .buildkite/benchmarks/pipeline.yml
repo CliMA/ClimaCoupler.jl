@@ -20,13 +20,6 @@ steps:
       - julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.add("MPI"); Pkg.add("CUDA")'
       - julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.precompile()'
       - julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.status()'
-
-      - echo "--- Instantiate test env"
-      - "julia --project=test/ -e 'using Pkg; Pkg.develop(path=\".\")'"
-      - "julia --project=test/ -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\")'"
-      - "julia --project=test/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=test/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=test/ -e 'using Pkg; Pkg.status()'"
     agents:
       slurm_gpus: 1
       slurm_cpus_per_task: 8
@@ -40,7 +33,7 @@ steps:
     steps:
       - label: "CPU ClimaAtmos without diagnostic EDMF"
         key: "climaatmos"
-        command: "srun julia --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos.yml --job_id climaatmos"
+        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos.yml --job_id climaatmos"
         artifact_paths: "experiments/ClimaEarth/output/climaatmos/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
@@ -53,7 +46,7 @@ steps:
 
       - label: "CPU ClimaAtmos with diagnostic EDMF"
         key: "climaatmos_diagedmf"
-        command: "srun julia --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos_diagedmf.yml --job_id climaatmos_diagedmf"
+        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos_diagedmf.yml --job_id climaatmos_diagedmf"
         artifact_paths: "experiments/ClimaEarth/output/climaatmos_diagedmf/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
@@ -94,7 +87,7 @@ steps:
     steps:
       - label: "GPU ClimaAtmos without diagnostic EDMF"
         key: "gpu_climaatmos"
-        command: "srun julia --threads=3 --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos.yml --job_id gpu_climaatmos"
+        command: "srun julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos.yml --job_id gpu_climaatmos"
         artifact_paths: "experiments/ClimaEarth/output/gpu_climaatmos/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
@@ -107,7 +100,7 @@ steps:
 
       - label: "GPU ClimaAtmos with diagnostic EDMF"
         key: "gpu_climaatmos_diagedmf"
-        command: "srun julia --threads=3 --color=yes --project=test/ test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos_diagedmf.yml --job_id gpu_climaatmos_diagedmf"
+        command: "srun julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos_diagedmf.yml --job_id gpu_climaatmos_diagedmf"
         artifact_paths: "experiments/ClimaEarth/output/gpu_climaatmos_diagedmf/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"

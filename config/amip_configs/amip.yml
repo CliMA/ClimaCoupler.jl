@@ -5,6 +5,7 @@ checkpoint_dt: "720hours"
 coupler_toml: ["toml/amip.toml"]
 dt: "10secs"
 dt_cpl: "10secs"
+ode_algo: ARS343
 dt_save_state_to_disk: "30days"
 dt_save_to_sol: "30days"
 dz_bottom: 30.0

@@ -3,7 +3,6 @@ import SciMLBase
 import Statistics
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
-import ClimaParams
 import Thermodynamics as TD
 import ClimaLand as CL
 import ClimaLand.Parameters as LP

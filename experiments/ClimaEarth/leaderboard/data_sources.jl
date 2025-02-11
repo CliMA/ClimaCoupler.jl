@@ -191,8 +191,16 @@ function get_rmse_var_dict()
     rmse_var_rlut = ClimaAnalysis.add_model(rmse_var_rlut, "CliMA")
     ClimaAnalysis.add_unit!(rmse_var_rlut, "CliMA", "W m^-2")
 
+    rmse_var_rsutcs = ClimaAnalysis.add_model(rmse_var_rsutcs, "CliMA")
+    ClimaAnalysis.add_unit!(rmse_var_rsutcs, "CliMA", "W m^-2")
+
     # Store the rmse vars in a dictionary
-    rmse_var_dict = ClimaAnalysis.Var.OrderedDict("pr" => rmse_var_pr, "rsut" => rmse_var_rsut, "rlut" => rmse_var_rlut)
+    rmse_var_dict = ClimaAnalysis.Var.OrderedDict(
+        "pr" => rmse_var_pr,
+        "rsut" => rmse_var_rsut,
+        "rlut" => rmse_var_rlut,
+        "rsutcs" => rmse_var_rsutcs,
+    )
     return rmse_var_dict
 end
 

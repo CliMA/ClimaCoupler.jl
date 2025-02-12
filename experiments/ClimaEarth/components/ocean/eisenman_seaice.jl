@@ -80,8 +80,13 @@ function EisenmanIceSimulation(
         thermo_params = thermo_params,
         dss_buffer = CC.Spaces.create_dss_buffer(Y),
     )
-    problem = SciMLBase.ODEProblem(ode_function, Y, Float64.(tspan), cache)
-    integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64.(saveat), adaptive = false)
+    if typeof(dt) isa AbstractFloat
+        dt = Float64(dt)
+        tspan = Float64.(tspan)
+        saveat = Float64.(saveat)
+    end
+    problem = SciMLBase.ODEProblem(ode_function, Y, tspan, cache)
+    integrator = SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
 
     sim = EisenmanIceSimulation(params, Y, space, integrator)
     return sim
@@ -131,7 +136,7 @@ function Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:energy})
 
     e_ml = @. p_o.h * p_o.ρ * p_o.c * sim.integrator.u.T_ml # heat
     e_ice = @. p_i.L_ice * sim.integrator.u.h_ice # phase
-    e_qflux = @. ocean_qflux * FT(sim.integrator.t)
+    e_qflux = @. ocean_qflux * FT(float(sim.integrator.t))
 
     return @. e_ml + e_ice + e_qflux + e_base
 end
@@ -341,7 +346,7 @@ Calculate the tendencies for the Eisenman-Zhang sea ice model.
 """
 function ∑tendencies(dY, Y, cache, _)
     FT = eltype(dY)
-    Δt = cache.Δt
+    Δt = float(cache.Δt)
     Ya = cache.Ya
     thermo_params = cache.thermo_params
     p = cache.params

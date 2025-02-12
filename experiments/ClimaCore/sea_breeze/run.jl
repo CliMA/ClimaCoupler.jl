@@ -117,7 +117,7 @@ system before executing the simulation.
 
 t_start, t_end = (0.0, 1e4)
 Δt_coupled = 0.1
-saveat = t_start:10.0:t_end
+saveat = 10.0
 atm_nsteps, ocn_nsteps, lnd_nsteps = (5, 1, 1)
 
 ## Initialize Models

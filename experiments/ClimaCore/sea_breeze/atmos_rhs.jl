@@ -330,7 +330,7 @@ function AtmosSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks 
         problem,
         ode_algo,
         dt = dt,
-        saveat = saveat,
+        saveat = [t_start:saveat:t_end..., t_end],
         adaptive = false,
         progress = true,
         progress_message = (dt, u, params, t) -> t,

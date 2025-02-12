@@ -12,6 +12,7 @@ import ..Utilities: time_to_seconds
 
 export current_date, strdate_to_datetime, datetime_to_strdate
 
+import ClimaUtilities.TimeManager: ITime, date
 
 """
     current_date(cs::Interfacer.CoupledSimulation, t::Int)
@@ -23,6 +24,17 @@ Return the model date at the current timestep.
 - `t`: [Real] number of seconds since simulation began
 """
 current_date(cs::Interfacer.CoupledSimulation, t::Real) = cs.dates.date0[1] + Dates.Second(t)
+
+"""
+    current_date(cs::Interfacer.CoupledSimulation, t::ITime)
+
+Return the model date at the current timestep.
+
+# Arguments
+- `cs`: [CoupledSimulation] containing info about the simulation
+- `t`: [ITime] containing all the information needed to produce a date
+"""
+current_date(cs::Interfacer.CoupledSimulation, t::ITime) = date(t)
 
 """
     strdate_to_datetime(strdate::String)

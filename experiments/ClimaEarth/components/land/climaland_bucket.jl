@@ -10,6 +10,7 @@ import ClimaLand.Parameters as LP
 import ClimaDiagnostics as CD
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer
 using NCDatasets
+include("climaland_helpers.jl")
 
 ###
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
@@ -27,21 +28,6 @@ struct BucketSimulation{M, Y, D, I, A} <: Interfacer.LandModelSimulation
     area_fraction::A
 end
 Interfacer.name(::BucketSimulation) = "BucketSimulation"
-
-"""
-    get_new_cache(p, Y, energy_check)
-
-Returns a new `p` with an updated field to store e_per_area if energy conservation
-    checks are turned on.
-"""
-function get_new_cache(p, Y, energy_check)
-    if energy_check
-        e_per_area_field = CC.Fields.zeros(axes(Y.bucket.W))
-        return merge(p, (; e_per_area = e_per_area_field))
-    else
-        return p
-    end
-end
 
 """
     bucket_init
@@ -336,64 +322,6 @@ Extension of Checkpointer.get_model_prog_state to get the model state.
 """
 function Checkpointer.get_model_prog_state(sim::BucketSimulation)
     return sim.integrator.u.bucket
-end
-
-"""
-    temp_anomaly_aquaplanet(coord)
-
-Introduce a temperature IC anomaly for the aquaplanet case.
-The values for this case follow the moist Held-Suarez setup of Thatcher &
-Jablonowski (2016, eq. 6), consistent with ClimaAtmos aquaplanet.
-"""
-temp_anomaly_aquaplanet(coord) = 29 * exp(-coord.lat^2 / (2 * 26^2))
-
-"""
-    temp_anomaly_amip(coord)
-
-Introduce a temperature IC anomaly for the AMIP case.
-The values used in this case have been tuned to align with observed temperature
-and result in stable simulations.
-"""
-temp_anomaly_amip(coord) = 40 * cosd(coord.lat)^4
-
-"""
-    make_land_domain(
-        atmos_boundary_space::CC.Spaces.SpectralElementSpace2D,
-        zlim::Tuple{FT, FT},
-        nelements_vert::Int,) where {FT}
-
-Creates the land model domain from the horizontal space of the atmosphere, and information
-about the number of elements and extent of the vertical domain.
-"""
-function make_land_domain(
-    atmos_boundary_space::CC.Spaces.SpectralElementSpace2D,
-    zlim::Tuple{FT, FT},
-    nelements_vert::Int,
-) where {FT}
-    @assert zlim[1] < zlim[2]
-    depth = zlim[2] - zlim[1]
-
-    mesh = CC.Spaces.topology(atmos_boundary_space).mesh
-
-    radius = mesh.domain.radius
-    nelements_horz = mesh.ne
-    npolynomial = CC.Spaces.Quadratures.polynomial_degree(CC.Spaces.quadrature_style(atmos_boundary_space))
-    nelements = (nelements_horz, nelements_vert)
-    vertdomain = CC.Domains.IntervalDomain(
-        CC.Geometry.ZPoint(FT(zlim[1])),
-        CC.Geometry.ZPoint(FT(zlim[2]));
-        boundary_names = (:bottom, :top),
-    )
-
-    vertmesh = CC.Meshes.IntervalMesh(vertdomain, CC.Meshes.Uniform(), nelems = nelements[2])
-    verttopology = CC.Topologies.IntervalTopology(vertmesh)
-    vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(verttopology)
-    subsurface_space = CC.Spaces.ExtrudedFiniteDifferenceSpace(atmos_boundary_space, vert_center_space)
-    space = (; surface = atmos_boundary_space, subsurface = subsurface_space)
-
-    fields = CL.Domains.get_additional_domain_fields(subsurface_space)
-
-    return CL.Domains.SphericalShell{FT}(radius, depth, nothing, nelements, npolynomial, space, fields)
 end
 
 """

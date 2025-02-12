@@ -28,10 +28,14 @@ required for it.
 [codecov-img]: https://codecov.io/gh/CliMA/ClimaCoupler.jl/branch/main/graph/badge.svg
 [codecov-url]: https://codecov.io/gh/CliMA/ClimaCoupler.jl
 
+[downloads-img]: https://img.shields.io/badge/dynamic/json?url=http%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Ftotal_downloads%2FClimaCoupler&query=total_requests&suffix=%2Ftotal&label=Downloads
+[downloads-url]: http://juliapkgstats.com/pkg/ClimaCoupler
+
 |||
 |---------------------:|:-----------------------------------------------|
 | **Documentation**    | [![dev][docs-dev-img]][docs-dev-url] [![docs build][docs-bld-img]][docs-bld-url]|
 | **Unit Tests**       | [![unit tests][unit-tests-img]][unit-tests-url] [![codecov][codecov-img]][codecov-url]|
+| **Downloads**        | [![downloads][downloads-img]][downloads-url]|
 |||
 
 Recommended Julia Version: Stable release v1.11.1. CI tests Julia v1.10 and 1.11.
@@ -146,5 +150,3 @@ module load common
 
 For additional information about these clusters, including how to gain access for the first time,
 see our slurm-buildkite wiki pages for [Central](https://github.com/CliMA/slurm-buildkite/wiki/Central) and [clima](https://github.com/CliMA/slurm-buildkite/wiki/clima).
-
-## Buildkite pipelines

@@ -76,7 +76,6 @@ We can additionally pass the configuration dictionary to the component model ini
 
 include("cli_options.jl")
 include("user_io/arg_parsing.jl")
-include("user_io/postprocessing.jl")
 include("user_io/coupler_diagnostics.jl")
 
 """
@@ -150,6 +149,10 @@ function solve_coupler!(cs)
     return nothing
 end
 
+function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
+    config_dict = get_coupler_config_dict(config_file)
+    return setup_and_run(config_dict)
+end
 """
     setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
 
@@ -157,9 +160,8 @@ This function sets up and runs the coupled model simulation specified by the
 input config file. It initializes the component models, all coupler objects,
 diagnostics, and conservation checks, and then runs the simulation.
 """
-function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
+function setup_and_run(config_dict::AbstractDict)
     # Parse the configuration file
-    config_dict = get_coupler_config_dict(config_file)
     # Select the correct timestep for each component model based on which are available
     parse_component_dts!(config_dict)
     # Add extra diagnostics if specified
@@ -726,6 +728,7 @@ function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_c
     =#
 
     if ClimaComms.iamroot(comms_ctx) && use_coupler_diagnostics
+        include("user_io/postprocessing.jl")
         postprocessing_vars = (; output_default_diagnostics, t_end, conservation_softfail)
         postprocess_sim(cs, postprocessing_vars)
     end

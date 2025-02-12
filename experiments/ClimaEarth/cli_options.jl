@@ -139,10 +139,6 @@ function argparse_settings()
         arg_type = Vector{Dict{Any, Any}}
         default = []
         ### ClimaLand specific
-        "--land_domain_type"
-        help = "Type of land domain. [`sphere` (default), `single_column`]"
-        arg_type = String
-        default = "sphere"
         "--land_albedo_type"
         help = "Access land surface albedo information from data file. [`map_static` (default), `function`, `map_temporal`]"
         arg_type = String

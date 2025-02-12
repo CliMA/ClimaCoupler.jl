@@ -109,7 +109,8 @@ be done in place. If this function isn't extended for a property,
 that property will remain constant throughout the simulation
 and a warning will be raised.
 This function is expected to be extended for the
-following properties:
+following properties, and may also be extended for any additional
+properties needed by a component model.
 
 | Coupler name      | Description | Units |
 |-------------------|-------------|-------|
@@ -174,7 +175,8 @@ isn't extended for a property,
 that property will remain constant throughout the simulation
 and a warning will be raised.
 This function is expected to be extended for the
-following properties:
+following properties, and may also be extended for any additional
+properties needed by a component model.
 
 | Coupler name      | Description | Units |
 |-------------------|-------------|-------|
@@ -183,8 +185,8 @@ following properties:
 | `liquid_precipitation` | liquid precipitation at the surface | kg m^-2 s^-1 |
 | `radiative_energy_flux_sfc` | net radiative flux at the surface | W m^-2 |
 | `snow_precipitation` | snow precipitation at the surface | kg m^-2 s^-1 |
-| `turbulent_energy_flux` | aerodynamic turbulent surface fluxes of energy (sensible and latent heat) | W m^-2 |
-| `turbulent_moisture_flux` | aerodynamic turbulent surface fluxes of energy (evaporation) | kg m^-2 s^-1 |
+| `turbulent_energy_flux` | aerodynamic turbulent surface fluxes of energy (sensible and latent heat); only required when using `CombinedStateFluxes` option - see our `FluxCalculator` module docs for more information  | W m^-2 |
+| `turbulent_moisture_flux` | aerodynamic turbulent surface fluxes of energy (evaporation); only required when using `CombinedStateFluxes` option - see our `FluxCalculator` module docs for more information | kg m^-2 s^-1 |
 | `surface_direct_albedo`    | bulk direct surface albedo; needed if calculated externally of the surface model (e.g. ocean albedo from the atmospheric state) | |
 | `surface_diffuse_albedo`    | bulk diffuse surface albedo; needed if calculated externally of the surface model (e.g. ocean albedo from the atmospheric state) | |
 

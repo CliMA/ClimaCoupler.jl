@@ -194,7 +194,6 @@ function setup_and_run(config_dict::AbstractDict)
         evolving_ocean,
         mono_surface,
         turb_flux_partition,
-        land_domain_type,
         land_albedo_type,
         land_initial_condition,
         land_temperature_anomaly,
@@ -328,22 +327,20 @@ function setup_and_run(config_dict::AbstractDict)
 
         ## land model
         land_sim = BucketSimulation(
-            FT,
-            tspan,
-            land_domain_type,
-            land_albedo_type,
-            land_initial_condition,
-            land_temperature_anomaly,
-            land_output_dir;
+            FT;
             dt = component_dt_dict["dt_land"],
-            space = boundary_space,
-            saveat = saveat,
+            tspan,
+            start_date = date0,
+            output_dir = land_output_dir,
+            boundary_space,
             area_fraction = land_fraction,
-            date_ref = date0,
-            t_start = t_start,
-            energy_check = energy_check,
+            saveat,
             surface_elevation,
+            land_temperature_anomaly,
             use_land_diagnostics,
+            albedo_type = land_albedo_type,
+            land_initial_condition,
+            energy_check,
         )
 
         ## sea ice model
@@ -376,22 +373,20 @@ function setup_and_run(config_dict::AbstractDict)
 
         ## land model
         land_sim = BucketSimulation(
-            FT,
-            tspan,
-            land_domain_type,
-            land_albedo_type,
-            land_initial_condition,
-            land_temperature_anomaly,
-            land_output_dir;
+            FT;
             dt = component_dt_dict["dt_land"],
-            space = boundary_space,
-            saveat = saveat,
+            tspan,
+            start_date = date0,
+            output_dir = land_output_dir,
+            boundary_space,
             area_fraction = land_fraction,
-            date_ref = date0,
-            t_start = t_start,
-            energy_check = energy_check,
+            saveat,
             surface_elevation,
+            land_temperature_anomaly,
             use_land_diagnostics,
+            albedo_type = land_albedo_type,
+            land_initial_condition,
+            energy_check,
         )
 
         ## ocean model
@@ -426,22 +421,20 @@ function setup_and_run(config_dict::AbstractDict)
 
         ## land model
         land_sim = BucketSimulation(
-            FT,
-            tspan,
-            land_domain_type,
-            land_albedo_type,
-            land_initial_condition,
-            land_temperature_anomaly,
-            land_output_dir;
+            FT;
             dt = component_dt_dict["dt_land"],
-            space = boundary_space,
-            saveat = saveat,
+            tspan,
+            start_date = date0,
+            output_dir = land_output_dir,
+            boundary_space,
             area_fraction = land_fraction,
-            date_ref = date0,
-            t_start = t_start,
-            energy_check = energy_check,
+            saveat,
             surface_elevation,
+            land_temperature_anomaly,
             use_land_diagnostics,
+            albedo_type = land_albedo_type,
+            land_initial_condition,
+            energy_check,
         )
 
         ## ocean stub (here set to zero area coverage)

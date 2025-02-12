@@ -219,22 +219,17 @@ saveat = [tspan[1]:saveat:tspan[1]..., tspan[2]]
 
 ## land model
 land_sim = BucketSimulation(
-    FT,
-    tspan,
-    "sphere",
-    "map_static",
-    land_initial_condition,
-    "aquaplanet",
-    land_output_dir;
+    FT;
     dt = Δt_cpl,
-    space = boundary_space,
-    saveat = saveat,
+    tspan,
+    start_date = date0,
+    output_dir = land_output_dir,
+    boundary_space,
     area_fraction = land_area_fraction,
-    date_ref = date0,
-    t_start = tspan[1],
-    energy_check = false,
+    saveat,
     surface_elevation,
-    use_land_diagnostics = true,
+    land_temperature_anomaly = "aquaplanet",
+    land_initial_condition,
 )
 
 ocean_sim = SlabOceanSimulation(

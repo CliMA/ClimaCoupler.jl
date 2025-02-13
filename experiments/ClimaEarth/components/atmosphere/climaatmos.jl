@@ -338,6 +338,7 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_
                 Dict("config_file" => atmos_config_file),
             )
         end
+        # @show atmos_config["diagnostics"] # OK
     else
         error("Invalid `atmos_config_repo`; please use \"ClimaCoupler\" or \"ClimaAtmos\"")
     end
@@ -357,7 +358,8 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_
     atmos_config["output_dir"] = atmos_output_dir
 
     # Access extra atmosphere diagnostics from coupler so we can rename for atmos code
-    atmos_config["diagnostics"] = coupler_dict["extra_atmos_diagnostics"]
+    # TODO: Document
+    map(x -> push!(atmos_config["diagnostics"], x), coupler_dict["extra_atmos_diagnostics"])
 
     # The Atmos `get_simulation` function expects the atmos config to contains its timestep size
     # in the `dt` field. If there is a `dt_atmos` field in coupler_dict, we add it to the atmos config as `dt`

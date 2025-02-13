@@ -4,8 +4,9 @@ atmos_config_file: "config/longrun_configs/longrun_aquaplanet_dyamond.yml"
 checkpoint_dt: "720hours"
 co2: "maunaloa"
 coupler_toml: ["toml/amip.toml"]
-dt: "20secs"
-dt_cpl: "20secs"
+dt: "30secs"
+dt_cpl: "30secs"
+deep_atmosphere: false
 dt_save_state_to_disk: "30days"
 dt_save_to_sol: "30days"
 dz_bottom: 30.0
@@ -25,4 +26,4 @@ topo_smoothing: true
 turb_flux_partition: "CombinedStateFluxesMOST"
 viscous_sponge: true
 z_elem: 63
-z_max: 60000.0
+z_max: 45000.0

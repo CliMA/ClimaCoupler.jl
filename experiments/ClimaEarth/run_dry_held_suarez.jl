@@ -33,6 +33,12 @@ import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
 pkg_dir = pkgdir(ClimaCoupler)
 
 #=
+## Setup Communication Context
+=#
+
+comms_ctx = Utilities.get_comms_context(Dict("device" => "auto"))
+
+#=
 ### Helper Functions
 =#
 
@@ -114,12 +120,6 @@ config_dict = Dict(
 atmos_output_dir = joinpath(dir_paths.output, "clima_atmos")
 atmos_config_dict = get_atmos_config_dict(config_dict, job_id, atmos_output_dir)
 atmos_config_object = CA.AtmosConfig(atmos_config_dict)
-
-#=
-## Setup Communication Context
-=#
-
-comms_ctx = Utilities.get_comms_context(Dict("device" => "auto"))
 
 #=
 ## Component Model Initialization

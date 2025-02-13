@@ -36,6 +36,12 @@ import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
 pkg_dir = pkgdir(ClimaCoupler)
 
 #=
+## Setup Communication Context
+=#
+
+comms_ctx = Utilities.get_comms_context(Dict("device" => "auto"))
+
+#=
 ### Helper Functions
 =#
 
@@ -152,12 +158,6 @@ atmos_config_object.toml_dict["detr_vertdiv_coeff"]["value"] = 0.6
 atmos_config_object.toml_dict["detr_buoy_coeff"]["value"] = 0.12
 atmos_config_object.toml_dict["min_area_limiter_scale"]["value"] = 0
 atmos_config_object.toml_dict["max_area_limiter_scale"]["value"] = 0
-
-#=
-## Setup Communication Context
-=#
-
-comms_ctx = Utilities.get_comms_context(Dict("device" => "auto"))
 
 #=
 ## Component Model Initialization

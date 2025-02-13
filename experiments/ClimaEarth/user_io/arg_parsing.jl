@@ -53,7 +53,6 @@ function get_coupler_args(config_dict::Dict)
     # Computational simulation setup information
     random_seed = config_dict["unique_seed"] ? time_ns() : 1234
     FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
-    comms_ctx = Utilities.get_comms_context(config_dict)
 
     # Time information
     t_end = Float64(Utilities.time_to_seconds(config_dict["t_end"]))
@@ -100,7 +99,6 @@ function get_coupler_args(config_dict::Dict)
         sim_mode,
         random_seed,
         FT,
-        comms_ctx,
         t_end,
         t_start,
         date0,

@@ -160,6 +160,8 @@ diagnostics, and conservation checks, and then runs the simulation.
 function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
     # Parse the configuration file
     config_dict = get_coupler_config_dict(config_file)
+    # Initialize communication context (do this first so all printing is only on root)
+    comms_ctx = Utilities.get_comms_context(config_dict)
     # Select the correct timestep for each component model based on which are available
     parse_component_dts!(config_dict)
     # Add extra diagnostics if specified
@@ -170,7 +172,6 @@ function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_c
         sim_mode,
         random_seed,
         FT,
-        comms_ctx,
         t_end,
         t_start,
         date0,

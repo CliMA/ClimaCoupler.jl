@@ -37,11 +37,11 @@ steps:
 
     steps:
 
-      - label: "Current AMIP: diagedmf + 0M + bucket land"
+      - label: "Current AMIP: edonly + 0M + bucket land"
         key: "amip"
         command:
           - echo "--- Run simulation"
-          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip.yml --job_id amip"
+          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly.yml --job_id amip"
         artifact_paths: "experiments/ClimaEarth/output/amip/artifacts/*"
         timeout_in_minutes: 5760
         env:

@@ -356,8 +356,12 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_
     atmos_config["output_dir_style"] = "RemovePreexisting"
     atmos_config["output_dir"] = atmos_output_dir
 
-    # Access extra atmosphere diagnostics from coupler so we can rename for atmos code
-    atmos_config["diagnostics"] = coupler_dict["extra_atmos_diagnostics"]
+    # Add all extra atmos diagnostic entries into the vector of atmos diagnostics
+    # If atmos doesn't have any diagnostics, use the extra_atmos_diagnostics from the coupler
+    atmos_config["diagnostics"] =
+        haskey(atmos_config, "diagnostics") ?
+        collect([atmos_config["diagnostics"]; coupler_dict["extra_atmos_diagnostics"]]) :
+        coupler_dict["extra_atmos_diagnostics"]
 
     # The Atmos `get_simulation` function expects the atmos config to contains its timestep size
     # in the `dt` field. If there is a `dt_atmos` field in coupler_dict, we add it to the atmos config as `dt`

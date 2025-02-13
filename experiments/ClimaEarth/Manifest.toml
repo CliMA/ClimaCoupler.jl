@@ -2,7 +2,7 @@
 
 julia_version = "1.11.3"
 manifest_format = "2.0"
-project_hash = "34e653b7111bcdfb5898dff6d307350dcfde2388"
+project_hash = "779b3a45707549c1c59e6631964320c524d5f8eb"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "fb97701c117c8162e84dfcf80215caa904aef44f"
@@ -333,9 +333,9 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["ArgParse", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "DiffEqBase", "FastGaussQuadrature", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "NullBroadcasts", "RRTMGP", "Random", "SciMLBase", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
-git-tree-sha1 = "b8b937424a218cb2c0818e4666e02554bb4f0d60"
-repo-rev = "as/dyamond-test"
-repo-url = "/home/asridhar/Codes/ClimaAtmos.jl"
+git-tree-sha1 = "524139b74c934b42dda67033ab306dbd2d5daab6"
+repo-rev = "as/dyamond"
+repo-url = "https://github.com/CliMA/ClimaAtmos.jl.git"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
 version = "0.28.4"
 
@@ -383,7 +383,9 @@ version = "0.2.12"
 
 [[deps.ClimaLand]]
 deps = ["ArtifactWrappers", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "b8025e014a0642d7b468aa7c1df38f039cb3a742"
+git-tree-sha1 = "845e76f2132a7506fe7417e885922cfc37c22276"
+repo-rev = "main"
+repo-url = "https://github.com/CliMA/ClimaLand.jl.git"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
 version = "0.15.9"
 
@@ -410,7 +412,9 @@ version = "0.10.19"
 
 [[deps.ClimaTimeSteppers]]
 deps = ["ClimaComms", "Colors", "DataStructures", "DiffEqBase", "KernelAbstractions", "Krylov", "LinearAlgebra", "LinearOperators", "NVTX", "SciMLBase", "StaticArrays"]
-git-tree-sha1 = "b452132022416ad3511143230f51660a62d583b2"
+git-tree-sha1 = "82cdadc5595215719a6eaf5b7259007fb9db8f50"
+repo-rev = "main"
+repo-url = "https://github.com/CliMA/ClimaTimeSteppers.jl.git"
 uuid = "595c0a79-7f3d-439a-bc5a-b232dc3bde79"
 version = "0.8.2"
 
@@ -453,9 +457,9 @@ version = "0.1.13"
 
 [[deps.CloudMicrophysics]]
 deps = ["ClimaParams", "DocStringExtensions", "ForwardDiff", "HCubature", "LazyArtifacts", "QuadGK", "RootSolvers", "SpecialFunctions", "Thermodynamics"]
-git-tree-sha1 = "fcf2a4e88ca91564c118ce25ede3be3ffc9c7cb0"
+git-tree-sha1 = "98c77aaefaedaa185a7bb676af16ab19aede7ff3"
 uuid = "6a9e3e04-43cd-43ba-94b9-e8782df3c71b"
-version = "0.22.7"
+version = "0.22.8"
 
     [deps.CloudMicrophysics.extensions]
     EmulatorModelsExt = ["DataFrames", "MLJ"]
@@ -2005,9 +2009,11 @@ version = "1.11.0"
 
 [[deps.RRTMGP]]
 deps = ["Adapt", "Artifacts", "ClimaComms", "DocStringExtensions", "Random"]
-git-tree-sha1 = "56240e81cd9fa6dde6c860509cb88833920d0d99"
+git-tree-sha1 = "d258e9495bb6a1b7ad2b28683c9382c0053dafc1"
+repo-rev = "main"
+repo-url = "https://github.com/CliMA/RRTMGP.jl.git"
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
-version = "0.19.2"
+version = "0.20.1"
 weakdeps = ["CUDA", "ClimaParams"]
 
     [deps.RRTMGP.extensions]
@@ -2154,9 +2160,9 @@ version = "0.1.0"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "Accessors", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "Expronicon", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
-git-tree-sha1 = "46c4a97031b9437d5adbb382958820a8ee188c64"
+git-tree-sha1 = "70243d458e69c82d3b928196c9feddb9af857c13"
 uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-version = "2.72.2"
+version = "2.73.0"
 
     [deps.SciMLBase.extensions]
     SciMLBaseChainRulesCoreExt = "ChainRulesCore"
@@ -2419,7 +2425,9 @@ version = "7.7.0+0"
 
 [[deps.SurfaceFluxes]]
 deps = ["DocStringExtensions", "RootSolvers", "Thermodynamics"]
-git-tree-sha1 = "aee530bde85cd41374273568cb649e72d82921e7"
+git-tree-sha1 = "6e03b6b871df1b246b8919051e130fcb74c51a5a"
+repo-rev = "main"
+repo-url = "https://github.com/CliMA/SurfaceFluxes.jl.git"
 uuid = "49b00bb7-8bd4-4f2b-b78c-51cd0450215f"
 version = "0.12.0"
 weakdeps = ["ClimaParams"]
@@ -2479,7 +2487,9 @@ version = "1.0.2"
 
 [[deps.Thermodynamics]]
 deps = ["DocStringExtensions", "KernelAbstractions", "Random", "RootSolvers"]
-git-tree-sha1 = "5de9f9f6019165cedb04e365a9f277a518ac5aaf"
+git-tree-sha1 = "9c98c085957a0e91fafaed2334032e8fad121935"
+repo-rev = "main"
+repo-url = "https://github.com/CliMA/Thermodynamics.jl.git"
 uuid = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 version = "0.12.9"
 weakdeps = ["ClimaParams"]

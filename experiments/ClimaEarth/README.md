@@ -112,3 +112,13 @@ PartitionedStateFluxes for the surface flux calculation.
 [Eisenman & Wettlaufer 2009](https://eisenman.ucsd.edu/papers/Eisenman-Wettlaufer-2009.pdf): Nonlinear threshold behavior during the loss of Arctic sea ice
 
 [Zhang et al. 2021](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2020JC016686): Sea Ice Properties in High-Resoluation Sea Ice Models
+
+## Configuration files
+We use configuration files to specify all of the options used to set up our simulations.
+We currently use the following configuration files specified in ClimaAtmos.jl, which
+are subject to change in the future:
+- config/longrun_configs/longrun_aquaplanet_allsky_diagedmf_0M.yml
+- config/longrun_configs/longrun_aquaplanet_allsky_0M_earth.yml
+- config/longrun_configs/longrun_aquaplanet_allsky_0M.yml
+- config/longrun_configs/longrun_aquaplanet_dyamond.yml
+- config/longrun_configs/amip_target_diagedmf.yml

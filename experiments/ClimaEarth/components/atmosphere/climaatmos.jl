@@ -259,16 +259,13 @@ function FieldExchanger.update_sim!(atmos_sim::ClimaAtmosSimulation, csf, turbul
     p = atmos_sim.integrator.p
     t = atmos_sim.integrator.t
 
-    !isempty(atmos_sim.integrator.p.radiation) &&
-        !(p.atmos.insolation isa CA.IdealizedInsolation) &&
-        CA.set_insolation_variables!(u, p, t, p.atmos.insolation)
-
+    # Perform radiation-specific updates
     if hasradiation(atmos_sim.integrator)
+        !(p.atmos.insolation isa CA.IdealizedInsolation) && CA.set_insolation_variables!(u, p, t, p.atmos.insolation)
         Interfacer.update_field!(atmos_sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
         Interfacer.update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
+        Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf)
     end
-
-    !isempty(atmos_sim.integrator.p.radiation) && Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf)
 
     if turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
         Interfacer.update_field!(atmos_sim, Val(:turbulent_fluxes), csf)

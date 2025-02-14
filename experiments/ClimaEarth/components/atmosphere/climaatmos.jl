@@ -16,9 +16,8 @@ include("climaatmos_extra_diags.jl")
 ###
 ### Functions required by ClimaCoupler.jl for an AtmosModelSimulation
 ###
-struct ClimaAtmosSimulation{P, Y, D, I} <: Interfacer.AtmosModelSimulation
+struct ClimaAtmosSimulation{P, D, I} <: Interfacer.AtmosModelSimulation
     params::P
-    Y_init::Y
     domain::D
     integrator::I
 end
@@ -69,7 +68,7 @@ function ClimaAtmosSimulation(atmos_config)
         @. ᶠradiation_flux = CC.Geometry.WVector(FT(0))
     end
 
-    sim = ClimaAtmosSimulation(integrator.p.params, Y, spaces, integrator)
+    sim = ClimaAtmosSimulation(integrator.p.params, spaces, integrator)
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)

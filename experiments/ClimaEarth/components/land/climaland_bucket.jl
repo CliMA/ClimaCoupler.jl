@@ -15,13 +15,12 @@ using NCDatasets
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###
 """
-    BucketSimulation{M, Y, D, I}
+    BucketSimulation{M, D, I}
 
 The bucket model simulation object.
 """
-struct BucketSimulation{M, Y, D, I, A} <: Interfacer.LandModelSimulation
+struct BucketSimulation{M, D, I, A} <: Interfacer.LandModelSimulation
     model::M
-    Y_init::Y
     domain::D
     integrator::I
     area_fraction::A
@@ -222,7 +221,7 @@ function BucketSimulation(
         callback = SciMLBase.CallbackSet(diag_cb),
     )
 
-    sim = BucketSimulation(model, Y, (; domain = domain, soil_depth = d_soil), integrator, area_fraction)
+    sim = BucketSimulation(model, (; domain = domain, soil_depth = d_soil), integrator, area_fraction)
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)

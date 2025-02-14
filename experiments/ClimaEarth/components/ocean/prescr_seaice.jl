@@ -11,7 +11,7 @@ import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###
 """
-    PrescribedIceSimulation{P, Y, D, I}
+    PrescribedIceSimulation{P, D, I}
 
 Ice concentration is prescribed, and we solve the following energy equation:
 
@@ -27,9 +27,8 @@ Ice concentration is prescribed, and we solve the following energy equation:
 
 In the current version, the sea ice has a prescribed thickness.
 """
-struct PrescribedIceSimulation{P, Y, D, I} <: Interfacer.SeaIceModelSimulation
+struct PrescribedIceSimulation{P, D, I} <: Interfacer.SeaIceModelSimulation
     params::P
-    Y_init::Y
     domain::D
     integrator::I
 end
@@ -143,7 +142,7 @@ function PrescribedIceSimulation(
     problem = SciMLBase.ODEProblem(ode_function, Y, Float64.(tspan), (; cache..., params = params))
     integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64.(saveat), adaptive = false)
 
-    sim = PrescribedIceSimulation(params, Y, space, integrator)
+    sim = PrescribedIceSimulation(params, space, integrator)
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)

@@ -458,9 +458,9 @@ function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_c
 
     ## coupler exchange fields
     coupler_field_names = (
-        :T_S,
-        :z0m_S,
-        :z0b_S,
+        :T_sfc,
+        :z0m_sfc,
+        :z0b_sfc,
         :ρ_sfc,
         :q_sfc,
         :surface_direct_albedo,

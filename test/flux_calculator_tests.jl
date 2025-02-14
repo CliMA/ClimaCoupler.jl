@@ -202,7 +202,7 @@ for FT in (Float32, Float64)
             model_sims = (; atmos_sim, ocean_sim, ocean_sim2)
 
             coupler_cache_names = (
-                :T_S,
+                :T_sfc,
                 :surface_direct_albedo,
                 :surface_diffuse_albedo,
                 :F_R_sfc,

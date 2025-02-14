@@ -6,6 +6,10 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+### Coupler fields surface variable names all use `_sfc` PR[#1195](https://github.com/CliMA/ClimaCoupler.jl/pull/1195)
+`T_S`, `z0m_S`, and `z0b_S` are renamed to `T_sfc`, `z0m_sfc`, and `z0b_sfc`.
+This makes them consistent with the other surface fields, e.g. `ρ_sfc` and `q_sfc`.
+
 #### Driver function `setup_and_run` added PR[#1178](https://github.com/CliMA/ClimaCoupler.jl/pull/1178)
 A new function `setup_and_run` is added, which takes in a path to a config file,
 and contains all the code to initialize component models and run the simulation.

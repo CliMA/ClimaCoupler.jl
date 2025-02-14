@@ -76,7 +76,7 @@ function import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
     end
 
     # surface density - needed for q_sat and requires atmos and sfc states, so it is calculated and saved in the coupler
-    dummmy_remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_S)) # TODO: generalize for PartitionedStateFluxes (#445) (use individual T_S)
+    dummmy_remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_sfc)) # TODO: generalize for PartitionedStateFluxes (#445) (use individual T_sfc)
 
     # radiative fluxes
     dummmy_remap!(csf.F_radiative, Interfacer.get_field(atmos_sim, Val(:radiative_energy_flux_sfc)))
@@ -105,7 +105,7 @@ function import_combined_surface_fields!(csf, model_sims, turbulent_fluxes)
 
     # surface fields
     combine_surfaces!(combined_field, model_sims, Val(:surface_temperature))
-    dummmy_remap!(csf.T_S, combined_field)
+    dummmy_remap!(csf.T_sfc, combined_field)
 
     combine_surfaces!(combined_field, model_sims, Val(:surface_direct_albedo))
     dummmy_remap!(csf.surface_direct_albedo, combined_field)
@@ -115,10 +115,10 @@ function import_combined_surface_fields!(csf, model_sims, turbulent_fluxes)
 
     if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
         combine_surfaces!(combined_field, model_sims, Val(:roughness_momentum))
-        dummmy_remap!(csf.z0m_S, combined_field)
+        dummmy_remap!(csf.z0m_sfc, combined_field)
 
         combine_surfaces!(combined_field, model_sims, Val(:roughness_buoyancy))
-        dummmy_remap!(csf.z0b_S, combined_field)
+        dummmy_remap!(csf.z0b_sfc, combined_field)
 
         combine_surfaces!(combined_field, model_sims, Val(:beta))
         dummmy_remap!(csf.beta, combined_field)
@@ -142,11 +142,11 @@ function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf, turbulent_
 
     Interfacer.update_field!(atmos_sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
     Interfacer.update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
-    Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf.T_S)
+    Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf.T_sfc)
 
     if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
-        Interfacer.update_field!(atmos_sim, Val(:roughness_momentum), csf.z0m_S)
-        Interfacer.update_field!(atmos_sim, Val(:roughness_buoyancy), csf.z0b_S)
+        Interfacer.update_field!(atmos_sim, Val(:roughness_momentum), csf.z0m_sfc)
+        Interfacer.update_field!(atmos_sim, Val(:roughness_buoyancy), csf.z0b_sfc)
         Interfacer.update_field!(atmos_sim, Val(:beta), csf.beta) # not in this version of atmos
     end
 

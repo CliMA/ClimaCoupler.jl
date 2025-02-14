@@ -113,12 +113,12 @@ function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
         :F_turb_ρτyz,
         :P_liq,
         :P_snow,
-        :T_S,
+        :T_sfc,
         :ρ_sfc,
         :q_sfc,
         :beta,
-        :z0b_S,
-        :z0m_S,
+        :z0b_sfc,
+        :z0m_sfc,
         :radiative_energy_flux_toa,
     )
     fig = Makie.Figure(size = (1500, 800))

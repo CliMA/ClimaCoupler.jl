@@ -2,6 +2,8 @@
 import Test: @test, @testset, @test_logs
 import ClimaCore as CC
 import ClimaCoupler: Interfacer
+import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
 include("TestHelper.jl")
 import .TestHelper

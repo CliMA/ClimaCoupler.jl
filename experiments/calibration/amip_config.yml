@@ -20,6 +20,7 @@ override_precip_timescale: false
 rayleigh_sponge: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
+coupler_output_dir: "experiments/calibration/output"
 t_end: "30days"
 topo_smoothing: true
 topography: "Earth"

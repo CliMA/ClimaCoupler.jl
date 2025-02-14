@@ -7,13 +7,16 @@ import ClimaComms
 ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
 ClimaComms.@import_required_backends
 
+# Set this on GCP 
+ENV["JULIA_WORKER_TIMEOUT"] = "300.0"
+
 single_member_dims = (1,)
 function CAL.observation_map(iteration)
     G_ensemble = Array{Float64}(undef, single_member_dims..., ensemble_size)
 
     for m in 1:ensemble_size
         member_path = CAL.path_to_ensemble_member(output_dir, iteration, m)
-        simdir_path = joinpath(member_path, "output_active")
+        simdir_path = joinpath(member_path, "amip_config/output_active/clima_atmos")
         if isdir(simdir_path)
             simdir = SimDir(simdir_path)
             G_ensemble[:, m] .= process_member_data(simdir)
@@ -34,7 +37,7 @@ function process_member_data(simdir::SimDir)
     return rsut_slice
 end
 
-addprocs(CAL.SlurmManager(3), gpus_per_task = 1, cpus_per_task = 4)
+addprocs(CAL.SlurmManager())
 
 @everywhere begin
     import ClimaComms, CUDA
@@ -48,6 +51,7 @@ addprocs(CAL.SlurmManager(3), gpus_per_task = 1, cpus_per_task = 4)
     experiment_dir = CAL.project_dir()
     include(joinpath(experiment_dir, "model_interface.jl"))
     output_dir = joinpath(experiment_dir, "output")
+    obs_path = joinpath(experiment_dir, "observations.jld2")
 end
 
 # Experiment Configuration
@@ -57,7 +61,6 @@ astronomical_unit = 149_597_870_000
 noise = 0.1 * I
 priors = [constrained_gaussian("astronomical_unit", 1.5e11, 1e11, 2e5, Inf)]
 prior = combine_distributions(priors)
-obs_path = joinpath(experiment_dir, "observations.jld2")
 
 # Generate observations if needed
 if !isfile(obs_path)
@@ -66,11 +69,9 @@ if !isfile(obs_path)
     obs_output_dir = CAL.path_to_ensemble_member(output_dir, 0, 0)
     mkpath(obs_output_dir)
     touch(joinpath(obs_output_dir, "parameters.toml"))
-    @everywhere begin
-        CAL.forward_model(0, 0)
-    end
+    CAL.forward_model(0, 0)
     observations = Vector{Float64}(undef, 1)
-    observations .= process_member_data(SimDir(joinpath(obs_output_dir, "output_active")))
+    observations .= process_member_data(SimDir(joinpath(obs_output_dir, "amip_config/output_active/clima_atmos")))
     JLD2.save_object(obs_path, observations)
 end
 

@@ -52,7 +52,7 @@ struct CoupledSimulation{
     FV,
     E,
     TS,
-    DTI <: Real,
+    DTI,
     NTMS <: NamedTuple,
     NTC <: NamedTuple,
     NTP <: NamedTuple,

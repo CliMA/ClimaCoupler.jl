@@ -100,7 +100,7 @@ for FT in (Float32, Float64)
         # set non-zero radiation and precipitation
         F_r = cf.radiative_energy_flux_toa
         P = cf.P_liq
-        Δt = cs.Δt_cpl
+        Δt = float(cs.Δt_cpl)
 
         # analytical solution
         tot_energy_an = sum(FT.(F_r .* 3Δt .+ 1e6 .* 1.25))

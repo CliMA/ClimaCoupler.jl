@@ -16,8 +16,8 @@ Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 
 [compat]
 ClimaComms = "0.6.2"
-ClimaCore = "0.14.17"
-ClimaUtilities = "0.1.9"
+ClimaCore = "0.14.23"
+ClimaUtilities = "0.1.22"
 Dates = "1"
 Logging = "1"
 SciMLBase = "2.11"

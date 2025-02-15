@@ -77,7 +77,14 @@ function OceanSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks 
     ode_function = CTS.ClimaODEFunction(T_exp! = ocn_rhs!)
 
     problem = SciMLBase.ODEProblem(ode_function, Y_init, (t_start, t_end), p)
-    ocn_integ = SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false, callback = callbacks)
+    ocn_integ = SciMLBase.init(
+        problem,
+        ode_algo,
+        dt = dt,
+        saveat = [t_start:saveat:t_end..., t_end],
+        adaptive = false,
+        callback = callbacks,
+    )
 
     return OceanSim(ocn_integ)
 end

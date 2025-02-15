@@ -29,6 +29,7 @@ import ClimaCoupler: Checkpointer, FieldExchanger, Interfacer, TimeManager, Util
 
 # TODO: Move to ClimaUtilities once we move the Schedules to ClimaUtilities
 import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
+import ClimaUtilities.TimeManager: ITime
 
 pkg_dir = pkgdir(ClimaCoupler)
 
@@ -62,6 +63,13 @@ restart_t = Int(0)
 t_end = "1000days"
 tspan = (Float64(0.0), Float64(Utilities.time_to_seconds(t_end)))
 start_date = "19790301"
+use_itime = true
+if use_itime
+    tspan = (
+        ITime(0.0, epoch = Dates.DateTime(1979, 3, 1)),
+        ITime(Utilities.time_to_seconds(t_end), epoch = Dates.DateTime(1979, 3, 1)),
+    )
+end
 checkpoint_dt = "480hours"
 
 #=
@@ -114,6 +122,7 @@ config_dict = Dict(
     ],
     # held-suarez specific
     "forcing" => "held_suarez",
+    "use_itime" => use_itime,
 )
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
@@ -135,6 +144,12 @@ thermo_params = get_thermo_params(atmos_sim)
 
 ## init a 2D boundary space at the surface
 boundary_space = ClimaCore.Spaces.horizontal_space(atmos_sim.domain.face_space)
+
+## Convert Δt_cpl and tspan to ITime
+if use_itime
+    Δt_cpl, t0, tf = promote(ITime(Δt_cpl), tspan[1], tspan[2])
+    tspan = (t0, tf)
+end
 
 #=
 ## Coupler Initialization

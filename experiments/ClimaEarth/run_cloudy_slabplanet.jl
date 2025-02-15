@@ -32,6 +32,7 @@ import Interpolations # triggers InterpolationsExt in ClimaUtilities
 
 # TODO: Move to ClimaUtilities once we move the Schedules to ClimaUtilities
 import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
+import ClimaUtilities.TimeManager: ITime
 
 pkg_dir = pkgdir(ClimaCoupler)
 
@@ -66,6 +67,13 @@ restart_t = Int(0)
 t_end = "1000days"
 tspan = (Float64(0.0), Float64(Utilities.time_to_seconds(t_end)))
 start_date = "19790321"
+use_itime = true
+if use_itime
+    tspan = (
+        ITime(0.0, epoch = Dates.DateTime(1979, 3, 1)),
+        ITime(Utilities.time_to_seconds(t_end), epoch = Dates.DateTime(1979, 3, 1)),
+    )
+end
 checkpoint_dt = "20days"
 dt_rad = "6hours"
 
@@ -140,6 +148,7 @@ config_dict = Dict(
     "edmfx_sgs_mass_flux" => true,
     "edmfx_sgs_diffusive_flux" => true,
     "override_precip_timescale" => false,
+    "use_itime" => use_itime,
 )
 
 atmos_output_dir = joinpath(dir_paths.output, "clima_atmos")
@@ -201,6 +210,11 @@ land_area_fraction = SpaceVaryingInput(land_mask_data, "landsea", boundary_space
 =#
 
 saveat = Float64(Utilities.time_to_seconds(config_dict["dt_save_to_sol"]))
+if use_itime
+    saveat = ITime(saveat)
+    Δt_cpl, t0, tf = promote(ITime(Δt_cpl), tspan[1], tspan[2])
+    tspan = (t0, tf)
+end
 saveat = [tspan[1]:saveat:tspan[1]..., tspan[2]]
 
 ## land model

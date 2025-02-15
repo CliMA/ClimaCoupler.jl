@@ -77,7 +77,14 @@ function LandSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks =
     ode_function = CTS.ClimaODEFunction(T_exp! = lnd_rhs!)
 
     problem = SciMLBase.ODEProblem(ode_function, Y_init, (t_start, t_end), p)
-    lnd_integ = SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false, callback = callbacks)
+    lnd_integ = SciMLBase.init(
+        problem,
+        ode_algo,
+        dt = dt,
+        saveat = [t_start:saveat:t_end..., t_end],
+        adaptive = false,
+        callback = callbacks,
+    )
 
     return LandSim(lnd_integ)
 end

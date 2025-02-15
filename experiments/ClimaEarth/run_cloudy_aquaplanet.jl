@@ -28,6 +28,7 @@ import ClimaCoupler:
 
 # TODO: Move to ClimaUtilities once we move the Schedules to ClimaUtilities
 import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
+import ClimaUtilities.TimeManager: ITime
 
 pkg_dir = pkgdir(ClimaCoupler)
 
@@ -61,6 +62,10 @@ restart_t = Int(0)
 t_end = "1000days"
 tspan = (Float64(0.0), Float64(Utilities.time_to_seconds(t_end)))
 start_date = "19790301"
+use_itime = true
+if use_itime
+    tspan = (ITime(tspan[1], epoch = Dates.DateTime(1979, 3, 01)), ITime(tspan[2], epoch = Dates.DateTime(1979, 3, 01)))
+end
 dt_rad = "6hours"
 checkpoint_dt = "480hours"
 
@@ -86,7 +91,7 @@ config_dict = Dict(
     "dt" => "$(Δt_cpl)secs",
     "dt_save_to_sol" => "1days",
     "t_end" => t_end,
-    "start_date" => "19790321",
+    "start_date" => "19790301",
     # domain
     "h_elem" => 4,
     "z_elem" => 10,
@@ -135,6 +140,7 @@ config_dict = Dict(
     "edmfx_sgs_diffusive_flux" => true,
     "override_precip_timescale" => false,
     "albedo_model" => "CouplerAlbedo",
+    "use_itime" => use_itime,
 )
 
 ## merge dictionaries of command line arguments, coupler dictionary and component model dictionaries
@@ -177,8 +183,12 @@ boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space) # TODO:
 =#
 
 saveat = Float64(Utilities.time_to_seconds(config_dict["dt_save_to_sol"]))
-saveat = [tspan[1]:saveat:tspan[1]..., tspan[2]]
-
+if use_itime
+    saveat = ITime(saveat)
+    Δt_cpl, t0, tf = promote(ITime(Δt_cpl), tspan[1], tspan[2])
+    tspan = (t0, tf)
+end
+saveat = promote([tspan[1]:saveat:tspan[2]..., tspan[2]]...)
 ocean_sim = SlabOceanSimulation(
     FT;
     tspan = tspan,

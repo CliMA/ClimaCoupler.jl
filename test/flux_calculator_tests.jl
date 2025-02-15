@@ -26,9 +26,8 @@ function FluxCalculator.atmos_turbulent_fluxes_most!(sim::DummySimulation, csf)
 end
 
 # atmos sim object and extensions
-struct TestAtmos{P, Y, D, I} <: Interfacer.AtmosModelSimulation
+struct TestAtmos{P, D, I} <: Interfacer.AtmosModelSimulation
     params::P
-    Y_init::Y
     domain::D
     integrator::I
 end
@@ -66,9 +65,8 @@ end
 
 
 # ocean sim object and extensions
-struct TestOcean{M, Y, D, I} <: Interfacer.SurfaceModelSimulation
+struct TestOcean{M, D, I} <: Interfacer.SurfaceModelSimulation
     model::M
-    Y_init::Y
     domain::D
     integrator::I
 end
@@ -98,9 +96,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::TestOcean, fields::NamedTu
 end
 
 # simple surface sim object and extensions
-struct DummySurfaceSimulation3{M, Y, D, I} <: Interfacer.SurfaceModelSimulation
+struct DummySurfaceSimulation3{M, D, I} <: Interfacer.SurfaceModelSimulation
     model::M
-    Y_init::Y
     domain::D
     integrator::I
 end
@@ -181,7 +178,7 @@ for FT in (Float32, Float64)
             Y_init =
                 (; ρ = ones(boundary_space) .* FT(1.2), T = ones(boundary_space) .* FT(310), q = zeros(boundary_space))
             integrator = (; Y_init..., p = p)
-            atmos_sim = TestAtmos(params, Y_init, nothing, integrator)
+            atmos_sim = TestAtmos(params, nothing, integrator)
 
             # ocean
             p = (;
@@ -197,15 +194,15 @@ for FT in (Float32, Float64)
             )
             Y_init = (; T = ones(boundary_space) .* FT(300))
             integrator = (; Y_init..., p = p)
-            ocean_sim = TestOcean(nothing, Y_init, nothing, integrator)
+            ocean_sim = TestOcean(nothing, nothing, integrator)
 
             # ocean
-            ocean_sim2 = TestOcean(nothing, Y_init, nothing, integrator)
+            ocean_sim2 = TestOcean(nothing, nothing, integrator)
 
             model_sims = (; atmos_sim, ocean_sim, ocean_sim2)
 
             coupler_cache_names = (
-                :T_S,
+                :T_sfc,
                 :surface_direct_albedo,
                 :surface_diffuse_albedo,
                 :F_R_sfc,
@@ -270,7 +267,7 @@ for FT in (Float32, Float64)
     @testset "get_surface_params for FT=$FT" begin
         sf_params = SurfaceFluxesParameters(FT, UF.BusingerParams)
 
-        @test FluxCalculator.get_surface_params(TestAtmos((; FT = FT), [], [], [])) == sf_params
+        @test FluxCalculator.get_surface_params(TestAtmos((; FT = FT), [], [])) == sf_params
         sim = DummySimulation([], [])
         @test_throws ErrorException(
             "get_surface_params is required to be dispatched on" * Interfacer.name(sim) * ", but no method defined",
@@ -278,7 +275,7 @@ for FT in (Float32, Float64)
     end
 
     @testset "update_turbulent_fluxes! for FT=$FT" begin
-        sim = DummySurfaceSimulation3([], [], [], [])
+        sim = DummySurfaceSimulation3([], [], [])
         @test_throws ErrorException(
             "update_turbulent_fluxes! is required to be dispatched on" *
             Interfacer.name(sim) *
@@ -292,11 +289,9 @@ for FT in (Float32, Float64)
         surface_sim = DummySurfaceSimulation3(
             [],
             [],
-            [],
             (; T = _ones .* FT(300), ρ = _ones .* FT(1.2), p = (; q = _ones .* FT(0.01))),
         )
-        atmos_sim =
-            TestAtmos((; FT = FT), [], [], (; T = _ones .* FT(300), ρ = _ones .* FT(1.2), q = _ones .* FT(0.01)))
+        atmos_sim = TestAtmos((; FT = FT), [], (; T = _ones .* FT(300), ρ = _ones .* FT(1.2), q = _ones .* FT(0.01)))
         thermo_params = get_thermo_params(atmos_sim)
         thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
         @test FluxCalculator.surface_thermo_state(surface_sim, thermo_params, thermo_state_int).ρ == thermo_state_int.ρ
@@ -305,7 +300,7 @@ for FT in (Float32, Float64)
     @testset "water_albedo_from_atmosphere!" begin
         boundary_space = TestHelper.create_space(FT)
         ocean_sim = Interfacer.SurfaceStub((; α_direct = zeros(boundary_space), α_diffuse = zeros(boundary_space)))
-        atmos_sim = TestAtmos(1, 2, 3, 4)
+        atmos_sim = TestAtmos(1, 2, 3)
         coupler_fields = (; temp1 = ones(boundary_space), temp2 = ones(boundary_space))
         model_sims = (; atmos_sim, ocean_sim)
         cs = Interfacer.CoupledSimulation{FT}(

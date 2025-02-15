@@ -16,9 +16,8 @@ include("climaatmos_extra_diags.jl")
 ###
 ### Functions required by ClimaCoupler.jl for an AtmosModelSimulation
 ###
-struct ClimaAtmosSimulation{P, Y, D, I} <: Interfacer.AtmosModelSimulation
+struct ClimaAtmosSimulation{P, D, I} <: Interfacer.AtmosModelSimulation
     params::P
-    Y_init::Y
     domain::D
     integrator::I
 end
@@ -69,7 +68,7 @@ function ClimaAtmosSimulation(atmos_config)
         @. ᶠradiation_flux = CC.Geometry.WVector(FT(0))
     end
 
-    sim = ClimaAtmosSimulation(integrator.p.params, Y, spaces, integrator)
+    sim = ClimaAtmosSimulation(integrator.p.params, spaces, integrator)
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)
@@ -191,7 +190,7 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temp
     # note that this field is also being updated internally by the surface thermo state in ClimaAtmos
     # if turbulent fluxes are calculated, to ensure consistency. In case the turbulent fluxes are not
     # calculated, we update the field here.
-    sim.integrator.p.radiation.rrtmgp_model.surface_temperature .= CC.Fields.field2array(csf.T_S)
+    sim.integrator.p.radiation.rrtmgp_model.surface_temperature .= CC.Fields.field2array(csf.T_sfc)
 end
 # extensions required by FluxCalculator (partitioned fluxes)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =
@@ -259,16 +258,13 @@ function FieldExchanger.update_sim!(atmos_sim::ClimaAtmosSimulation, csf, turbul
     p = atmos_sim.integrator.p
     t = atmos_sim.integrator.t
 
-    !isempty(atmos_sim.integrator.p.radiation) &&
-        !(p.atmos.insolation isa CA.IdealizedInsolation) &&
-        CA.set_insolation_variables!(u, p, t, p.atmos.insolation)
-
+    # Perform radiation-specific updates
     if hasradiation(atmos_sim.integrator)
+        !(p.atmos.insolation isa CA.IdealizedInsolation) && CA.set_insolation_variables!(u, p, t, p.atmos.insolation)
         Interfacer.update_field!(atmos_sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
         Interfacer.update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
+        Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf)
     end
-
-    !isempty(atmos_sim.integrator.p.radiation) && Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf)
 
     if turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
         Interfacer.update_field!(atmos_sim, Val(:turbulent_fluxes), csf)
@@ -276,14 +272,14 @@ function FieldExchanger.update_sim!(atmos_sim::ClimaAtmosSimulation, csf, turbul
 end
 
 """
-    FluxCalculator.calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::CC.Fields.Field)
+    FluxCalculator.calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_sfc::CC.Fields.Field)
 
 Extension for this function to calculate surface density.
 """
-function FluxCalculator.calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::CC.Fields.Field)
+function FluxCalculator.calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_sfc::CC.Fields.Field)
     thermo_params = get_thermo_params(atmos_sim)
     ts_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
-    FluxCalculator.extrapolate_ρ_to_sfc.(Ref(thermo_params), ts_int, Utilities.swap_space!(axes(ts_int.ρ), T_S))
+    FluxCalculator.extrapolate_ρ_to_sfc.(Ref(thermo_params), ts_int, Utilities.swap_space!(axes(ts_int.ρ), T_sfc))
 end
 
 # FluxCalculator.get_surface_params required by FluxCalculator (partitioned fluxes)
@@ -416,9 +412,9 @@ Returns a new `p` with the updated surface conditions.
 """
 function get_new_cache(atmos_sim::ClimaAtmosSimulation, csf)
     if hasmoisture(atmos_sim.integrator)
-        csf_sfc = (csf.T_S, csf.z0m_S, csf.z0b_S, csf.beta, csf.q_sfc)
+        csf_sfc = (csf.T_sfc, csf.z0m_sfc, csf.z0b_sfc, csf.beta, csf.q_sfc)
     else
-        csf_sfc = (csf.T_S, csf.z0m_S, csf.z0b_S, csf.beta)
+        csf_sfc = (csf.T_sfc, csf.z0m_sfc, csf.z0b_sfc, csf.beta)
     end
 
     p = atmos_sim.integrator.p
@@ -442,8 +438,8 @@ trigger flux calculation during Atmos `Interfacer.step!`. We only want to trigge
 timestep from ClimaCoupler.
 
 For debigging atmos, we can set the following atmos defaults:
- csf.z0m_S .= 1.0e-5
- csf.z0b_S .= 1.0e-5
+ csf.z0m_sfc .= 1.0e-5
+ csf.z0b_sfc .= 1.0e-5
  csf.beta .= 1
  csf = merge(csf, (;q_sfc = nothing))
 """

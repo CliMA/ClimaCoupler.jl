@@ -106,7 +106,7 @@ following properties:
 | `surface_temperature` | temperature over the combined surface space | K |
 | `turbulent_fluxes` | turbulent fluxes (note: only required when using `PartitionedStateFluxes` option - see our `FluxCalculator` module docs for more information) | W m^-2 |
 
-- `calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_S::ClimaCore.Fields.Field)`:
+- `calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_sfc::ClimaCore.Fields.Field)`:
 A function to return the air density of the atmosphere simulation
 extrapolated to the surface, with units of [kg m^-3].
 

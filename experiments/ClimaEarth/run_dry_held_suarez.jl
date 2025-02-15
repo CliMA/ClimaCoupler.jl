@@ -142,9 +142,9 @@ boundary_space = ClimaCore.Spaces.horizontal_space(atmos_sim.domain.face_space)
 
 ## coupler exchange fields
 coupler_field_names = (
-    :T_S,
-    :z0m_S,
-    :z0b_S,
+    :T_sfc,
+    :z0m_sfc,
+    :z0b_sfc,
     :ρ_sfc,
     :q_sfc,
     :surface_direct_albedo,

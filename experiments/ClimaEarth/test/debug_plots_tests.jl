@@ -2,6 +2,8 @@
 import Test: @test, @testset, @test_logs
 import ClimaCore as CC
 import ClimaCoupler: Interfacer
+import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
 include("TestHelper.jl")
 import .TestHelper
@@ -43,12 +45,12 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
         :F_turb_ρτyz,
         :P_liq,
         :P_snow,
-        :T_S,
+        :T_sfc,
         :ρ_sfc,
         :q_sfc,
         :beta,
-        :z0b_S,
-        :z0m_S,
+        :z0b_sfc,
+        :z0m_sfc,
         :radiative_energy_flux_toa,
     )
     atmos_names = (:atmos_field,)

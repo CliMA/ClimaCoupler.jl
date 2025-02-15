@@ -16,9 +16,9 @@ Interfacer.get_field(sim::DummySimulation, ::Val{:radiative_energy_flux_sfc}) = 
 Interfacer.get_field(sim::DummySimulation, ::Val{:liquid_precipitation}) = sim.cache.liquid_precipitation
 Interfacer.get_field(sim::DummySimulation, ::Val{:snow_precipitation}) = sim.cache.snow_precipitation
 
-function FluxCalculator.calculate_surface_air_density(atmos_sim::DummySimulation, T_S::CC.Fields.Field)
-    FT = CC.Spaces.undertype(axes(T_S))
-    return T_S .* FT(0.0) .+ FT(1.0)
+function FluxCalculator.calculate_surface_air_density(atmos_sim::DummySimulation, T_sfc::CC.Fields.Field)
+    FT = CC.Spaces.undertype(axes(T_sfc))
+    return T_sfc .* FT(0.0) .+ FT(1.0)
 end
 
 
@@ -207,7 +207,7 @@ for FT in (Float32, Float64)
 
     @testset "import_atmos_fields! for FT=$FT" begin
         boundary_space = TestHelper.create_space(FT)
-        coupler_names = (:F_turb_energy, :F_turb_moisture, :F_radiative, :P_liq, :P_snow, :ρ_sfc, :T_S)
+        coupler_names = (:F_turb_energy, :F_turb_moisture, :F_radiative, :P_liq, :P_snow, :ρ_sfc, :T_sfc)
         atmos_names = (
             :turbulent_energy_flux,
             :turbulent_moisture_flux,
@@ -236,7 +236,8 @@ for FT in (Float32, Float64)
     @testset "import_combined_surface_fields! for FT=$FT" begin
         # coupler cache setup
         boundary_space = TestHelper.create_space(FT)
-        coupler_names = (:T_S, :z0m_S, :z0b_S, :surface_direct_albedo, :surface_diffuse_albedo, :beta, :q_sfc, :temp1)
+        coupler_names =
+            (:T_sfc, :z0m_sfc, :z0b_sfc, :surface_direct_albedo, :surface_diffuse_albedo, :beta, :q_sfc, :temp1)
 
         # coupler cache setup
         exchanged_fields = (
@@ -258,11 +259,11 @@ for FT in (Float32, Float64)
             coupler_fields =
                 NamedTuple{coupler_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_names)))
             FieldExchanger.import_combined_surface_fields!(coupler_fields, sims, t)
-            @test Array(parent(coupler_fields.T_S))[1] == results[1]
+            @test Array(parent(coupler_fields.T_sfc))[1] == results[1]
             @test Array(parent(coupler_fields.surface_direct_albedo))[1] == results[1]
             @test Array(parent(coupler_fields.surface_diffuse_albedo))[1] == results[1]
-            @test Array(parent(coupler_fields.z0m_S))[1] == results[i]
-            @test Array(parent(coupler_fields.z0b_S))[1] == results[i]
+            @test Array(parent(coupler_fields.z0m_sfc))[1] == results[i]
+            @test Array(parent(coupler_fields.z0b_sfc))[1] == results[i]
             @test Array(parent(coupler_fields.beta))[1] == results[i]
         end
     end
@@ -272,9 +273,9 @@ for FT in (Float32, Float64)
         boundary_space = TestHelper.create_space(FT)
         coupler_field_names = (
             :ρ_sfc,
-            :T_S,
-            :z0m_S,
-            :z0b_S,
+            :T_sfc,
+            :z0m_sfc,
+            :z0b_sfc,
             :surface_direct_albedo,
             :surface_diffuse_albedo,
             :beta,

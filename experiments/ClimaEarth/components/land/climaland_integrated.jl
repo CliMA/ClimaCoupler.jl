@@ -82,8 +82,10 @@ function ClimaLandSimulation(
     Csom = ClimaLand.PrescribedSoilOrganicCarbon{FT}(TimeVaryingInput((t) -> 5))
 
     land_input = (
-        atmos = ClimaLand.CoupledAtmosphere{FT, typeof(start_date)}(start_date),
-        radiation = ClimaLand.CoupledRadiativeFluxes{FT, typeof(start_date)}(start_date),
+        atmos = ClimaLand.CoupledAtmosphere{FT}(),
+        radiation = ClimaLand.CoupledRadiativeFluxes{FT}(),
+        # atmos = ClimaLand.CoupledAtmosphere{FT, typeof(start_date)}(start_date),
+        # radiation = ClimaLand.CoupledRadiativeFluxes{FT, typeof(start_date)}(start_date),
         runoff = runoff_model,
         soil_organic_carbon = Csom,
     )
@@ -122,6 +124,7 @@ function ClimaLandSimulation(
     Y.snow.S_l .= 0.0
     Y.snow.U .= 0.0
 
+    @infiltrate
     set_initial_cache! = make_set_initial_cache(land)
     exp_tendency! = make_exp_tendency(land)
     imp_tendency! = ClimaLand.make_imp_tendency(land)
@@ -339,22 +342,43 @@ end
 Interfacer.step(sim::ClimaLandSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 Interfacer.reinit!(sim::ClimaLandSimulation, t) = Interfacer.reinit!(sim.integrator, t)
 
-function Interfacer.get_model_prog_state(sim::ClimaLandSimulation)
+function Checkpointer.get_model_prog_state(sim::ClimaLandSimulation)
     error("get_model_prog_state not implemented")
 end
 
 # TODO: I think non bucket models calculate this
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:air_density}) = nothing
+# Return effective and components here
+function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:air_density})
+    ρ_eff = sim.integrator.p.drivers.ρ_eff
+    ρ_soil = sim.integrator.p.drivers.ρ_soil
+    ρ_snow = sim.integrator.p.drivers.ρ_snow
+    ρ_canopy = sim.integrator.p.drivers.ρ_canopy
+    return NamedTuple{(:ρ_eff, :ρ_soil, :ρ_snow, :ρ_canopy)}((ρ_eff, ρ_soil, ρ_snow, ρ_canopy))
+end
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:area_fraction}) = sim.area_fraction
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:beta}) = nothing
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:energy}) = nothing
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:roughness_buoyancy}) = nothing
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:roughness_momentum}) = nothing
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_direct_albedo}) = nothing
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_diffuse_albedo}) = nothing
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_humidity}) = nothing
-# TODO: This might be the wrong temperature variable
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_temperature}) = sim.integrator.p.drivers.T
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_direct_albedo}) =
+    CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_diffuse_albedo}) =
+    CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
+# Return effective and components here
+function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_humidity})
+    q_eff = sim.integrator.p.drivers.q_eff
+    q_soil = sim.integrator.p.drivers.q_soil
+    q_snow = sim.integrator.p.drivers.q_snow
+    q_canopy = sim.integrator.p.drivers.q_canopy
+    return NamedTuple{(:q_eff, :q_soil, :q_snow, :q_canopy)}((q_eff, q_soil, q_snow, q_canopy))
+end
+function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_temperature})
+    T_eff = sim.integrator.p.T_sfc
+    T_canopy = ClimaLand.surface_temperature(sim.model.canopy, sim.integrator.u, sim.integrator.p, sim.integrator.t)
+    T_snow = ClimaLand.surface_temperature(sim.model.snow, sim.integrator.u, sim.integrator.p, sim.integrator.t)
+    T_soil = ClimaLand.surface_temperature(sim.model.soil, sim.integrator.u, sim.integrator.p, sim.integrator.t)
+    return NamedTuple{(:T_eff, :T_snow, :T_canopy, :T_soil)}((T_eff, T_snow, T_canopy, T_soil))
+end
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water}) = nothing
 
 # TODO: Add co2?
@@ -364,15 +388,22 @@ function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:liquid_precip
     ρ_liq = (LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set))
     parent(sim.integrator.p.drivers.P_liq) .= parent(field ./ ρ_liq)
 end
-function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:surface_temperature}, field)
-    parent(sim.integrator.p.drivers.T) .= parent(field)
+function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:radiative_energy_flux_sfc}, field)
+    p = sim.integrator.p
+    snow_frac, canopy_frac, soil_frac = get_component_fractions(sim)
+    parent(p.soil.R_n) .= parent(field) .* soil_frac
+    parent(p.snow.R_n) .= parent(field) .* snow_frac
+    parent(p.canopy.radiative_transfer.LW_n) .= parent(field) .* canopy_frac ./ 2
+    parent(p.canopy.radiative_transfer.SW_n) .= parent(field) .* canopy_frac ./ 2
 end
-Interfacer.update_field!(::ClimaLandSimulation, ::Val{:surface_direct_albedo}, field) = nothing
-Interfacer.update_field!(::ClimaLandSimulation, ::Val{:surface_diffuse_albedo}, field) = nothing
-Interfacer.update_field!(::ClimaLandSimulation, ::Val{:radiative_energy_flux_sfc}, field) = nothing
 Interfacer.update_field!(::ClimaLandSimulation, ::Val{:snow_precipitation}, field) = nothing
 Interfacer.update_field!(::ClimaLandSimulation, ::Val{:turbulent_energy_flux}, field) = nothing
 Interfacer.update_field!(::ClimaLandSimulation, ::Val{:turbulent_moisture_flux}, field) = nothing
 
 
 Interfacer.name(::ClimaLandSimulation) = "ClimaLandSimulation"
+
+function component_fractions_weighted(sim::ClimaLandSimulation)
+    component_fracs = ClimaLand.get_component_fractions(sim.model, sim.integrator.p)
+    return map(x -> x * sim.area_fraction, component_fracs)
+end

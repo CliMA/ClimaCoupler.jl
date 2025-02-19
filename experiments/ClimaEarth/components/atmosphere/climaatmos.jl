@@ -10,6 +10,7 @@ import ClimaCore.Geometry: ⊗
 import SurfaceFluxes as SF
 import Thermodynamics as TD
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
+import ClimaUtilities.TimeManager: ITime
 
 include("climaatmos_extra_diags.jl")
 
@@ -140,7 +141,8 @@ function Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:energy})
         ᶜS_ρq_tot = p.precipitation.ᶜS_ρq_tot
         thermo_params = get_thermo_params(atmos_sim)
         return integrator.u.c.ρe_tot .-
-               ᶜS_ρq_tot .* CA.e_tot_0M_precipitation_sources_helper.(Ref(thermo_params), ᶜts, ᶜΦ) .* integrator.dt
+               ᶜS_ρq_tot .* CA.e_tot_0M_precipitation_sources_helper.(Ref(thermo_params), ᶜts, ᶜΦ) .*
+               float(integrator.dt)
     else
         return integrator.u.c.ρe_tot
     end
@@ -249,7 +251,14 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fl
 end
 
 # extensions required by FieldExchanger
-Interfacer.step!(sim::ClimaAtmosSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+Interfacer.step!(sim::ClimaAtmosSimulation, t::Real) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+function Interfacer.step!(sim::ClimaAtmosSimulation, t::ITime)
+    while sim.integrator.t < t
+        Interfacer.step!(sim.integrator)
+    end
+    return nothing
+end
+
 Interfacer.reinit!(sim::ClimaAtmosSimulation) = Interfacer.reinit!(sim.integrator)
 
 function FieldExchanger.update_sim!(atmos_sim::ClimaAtmosSimulation, csf, turbulent_fluxes)

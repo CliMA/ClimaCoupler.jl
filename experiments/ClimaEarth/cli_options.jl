@@ -159,6 +159,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to compute and output land model diagnostics [`true` (default), `false`]"
         arg_type = Bool
         default = true
+        "--use_itime"
+        help = "Boolean flag indicating whether to use ITime (integer time) or not (will use Float64) [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
     end
     return s
 end

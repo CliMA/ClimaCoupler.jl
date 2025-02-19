@@ -90,10 +90,10 @@ function check_conservation!(
             parent(radiative_energy_flux_toa) .= parent(Interfacer.get_field(sim, Val(:radiative_energy_flux_toa)))
 
             if isempty(ccs.toa_net_source)
-                radiation_sources_accum = sum(radiative_energy_flux_toa .* FT(coupler_sim.Δt_cpl)) # ∫ J / m^2 dA
+                radiation_sources_accum = sum(radiative_energy_flux_toa .* FT(float(coupler_sim.Δt_cpl))) # ∫ J / m^2 dA
             else
                 radiation_sources_accum =
-                    sum(radiative_energy_flux_toa .* FT(coupler_sim.Δt_cpl)) .+ ccs.toa_net_source[end] # ∫ J / m^2 dA
+                    sum(radiative_energy_flux_toa .* FT(float(coupler_sim.Δt_cpl))) .+ ccs.toa_net_source[end] # ∫ J / m^2 dA
             end
             push!(ccs.toa_net_source, radiation_sources_accum)
 
@@ -203,7 +203,7 @@ function surface_water_gain_from_rates(cs::Interfacer.CoupledSimulation)
     precipitation_l = cs.fields.P_liq
     precipitation_s = cs.fields.P_snow
     FT = eltype(evaporation)
-    @. -(evaporation + precipitation_l + precipitation_s) * FT(cs.Δt_cpl) # kg / m^2 / layer depth
+    @. -(evaporation + precipitation_l + precipitation_s) * FT(float(cs.Δt_cpl)) # kg / m^2 / layer depth
 end
 
 end # module

@@ -13,6 +13,7 @@ conservation checks if enabled, and closing all diagnostics file writers.
 """
 function postprocess_sim(cs, postprocessing_vars)
     (; output_default_diagnostics, t_end, conservation_softfail) = postprocessing_vars
+    t_end = float(t_end)
     output_dir = cs.dirs.output
     artifact_dir = cs.dirs.artifacts
     coupler_output_dir = joinpath(output_dir, "coupler")

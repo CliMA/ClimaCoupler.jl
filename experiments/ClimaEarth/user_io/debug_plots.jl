@@ -32,7 +32,7 @@ function plot_global_conservation(
     model_sims = coupler_sim.model_sims
     ccs = cc.sums
 
-    days = collect(1:length(ccs[1])) * coupler_sim.Δt_cpl / 86400
+    days = collect(1:length(ccs[1])) * float(coupler_sim.Δt_cpl) / 86400
 
     # evolution of energy of each component relative to initial value
     total = ccs.total  # total

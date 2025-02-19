@@ -44,7 +44,7 @@ Base.@kwdef struct EisenmanOceanParameters{FT <: AbstractFloat}
 end
 
 """
-    EisenmanIceSimulation(::Type{FT}, tspan; space = nothing, area_fraction = nothing, thermo_params = nothing, stepper = CTS.RK4(), dt = 0.02, saveat = 1.0e10)
+    EisenmanIceSimulation(::Type{FT}, tspan; space = nothing, area_fraction = nothing, thermo_params = nothing, stepper = CTS.RK4(), dt, saveat = 1.0e10)
 
 Initialize the Eisenman-Zhang sea ice model and simulation.
 """
@@ -55,7 +55,7 @@ function EisenmanIceSimulation(
     area_fraction = nothing,
     thermo_params = nothing,
     stepper = CTS.RK4(),
-    dt = 0.02,
+    dt,
     saveat = [1.0e10],
 ) where {FT}
 
@@ -79,8 +79,13 @@ function EisenmanIceSimulation(
         thermo_params = thermo_params,
         dss_buffer = CC.Spaces.create_dss_buffer(Y),
     )
-    problem = SciMLBase.ODEProblem(ode_function, Y, Float64.(tspan), cache)
-    integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64.(saveat), adaptive = false)
+    if typeof(dt) isa Number
+        dt = Float64(dt)
+        tspan = Float64.(tspan)
+        saveat = Float64.(saveat)
+    end
+    problem = SciMLBase.ODEProblem(ode_function, Y, tspan, cache)
+    integrator = SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
 
     sim = EisenmanIceSimulation(params, space, integrator)
     return sim
@@ -130,7 +135,7 @@ function Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:energy})
 
     e_ml = @. p_o.h * p_o.ρ * p_o.c * sim.integrator.u.T_ml # heat
     e_ice = @. p_i.L_ice * sim.integrator.u.h_ice # phase
-    e_qflux = @. ocean_qflux * FT(sim.integrator.t)
+    e_qflux = @. ocean_qflux * FT(float(sim.integrator.t))
 
     return @. e_ml + e_ice + e_qflux + e_base
 end
@@ -340,7 +345,7 @@ Calculate the tendencies for the Eisenman-Zhang sea ice model.
 """
 function ∑tendencies(dY, Y, cache, _)
     FT = eltype(dY)
-    Δt = cache.Δt
+    Δt = float(cache.Δt)
     Ya = cache.Ya
     thermo_params = cache.thermo_params
     p = cache.params

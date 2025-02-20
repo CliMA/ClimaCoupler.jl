@@ -89,6 +89,16 @@ steps:
 
   - group: "GPU: unit tests"
     steps:
+      - label: "GPU restarts"
+        key: "gpu_restarts"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/restart.jl"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_gpus: 1
+
+  - group: "GPU: unit tests and global bucket"
+    steps:
       - label: "GPU runtests"
         command: "julia --color=yes --project=test/ test/runtests.jl"
         timeout_in_minutes: 10

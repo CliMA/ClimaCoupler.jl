@@ -1,6 +1,7 @@
 import Dates
 import SciMLBase
 import Statistics
+import ClimaComms
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
 import ClimaParams
@@ -393,6 +394,54 @@ function make_land_domain(
     fields = CL.Domains.get_additional_domain_fields(subsurface_space)
 
     return CL.Domains.SphericalShell{FT}(radius, depth, nothing, nelements, npolynomial, space, fields)
+end
+
+function Checkpointer.get_model_cache(sim::BucketSimulation)
+    return sim.integrator.p
+end
+
+function Checkpointer.restore_cache!(sim::Interfacer.ComponentModelSimulation, new_cache)
+    old_cache = Checkpointer.get_model_cache(sim)
+    recursively_reset!(old_cache, new_cache)
+end
+
+function recursively_reset!(v1::T, v2::T; ignore = Set([:rc, :graph_context])) where {T}
+    properties = filter(x -> !(x in ignore), propertynames(v1))
+    if isempty(properties)
+        if !Base.issingletontype(typeof(v1))
+            recursively_reset_base!(v1, v2)
+        else
+            v1 == v2 || error("v1 != v2")
+        end
+    else
+        # Recursive case
+        for p in properties
+            recursively_reset!(getproperty(v1, p), getproperty(v2, p); ignore)
+        end
+    end
+end
+
+function recursively_reset_base!(
+    v1::T,
+    v2::T,
+) where {T <: Union{CC.Fields.Field, CC.Fields.FieldVector, CC.DataLayouts.AbstractData, AbstractArray}}
+    # HACK: Here we are making the assumption that the default context is being
+    # used. This might not be true! This is currently needed because we don't
+    # have access to CUDA.jl in this file
+    ArrayType = parent(v1) isa Array ? Array : ClimaComms.array_type(ClimaComms.device())
+    moved_to_device = ArrayType(parent(v2))
+
+    parent(v1) .= moved_to_device
+    return nothing
+end
+
+# Don't peek inside the comms context
+function recursively_reset_base!(v1::ClimaComms.MPICommsContext, v2::ClimaComms.MPICommsContext)
+    return nothing
+end
+
+function recursively_reset_base!(v1::Number, v2::Number)
+    v1 === v2 || error("$v1 != $v2")
 end
 
 """

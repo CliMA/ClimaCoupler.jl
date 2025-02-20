@@ -3,7 +3,6 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_vertdiff.yml"
 #atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
 #atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
-cloud_model: "quadrature_sgs"
 checkpoint_dt: "720hours"
 co2: "maunaloa"
 coupler_toml: ["toml/amip.toml"]

@@ -2,6 +2,7 @@ FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 #atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
 atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
+cloud_model: "quadrature_sgs"
 checkpoint_dt: "720hours"
 co2: "maunaloa"
 coupler_toml: ["toml/amip.toml"]
@@ -21,7 +22,7 @@ radiation_reset_rng_seed: true
 rayleigh_sponge: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "1days"
+t_end: "7days"
 topography: "Earth"
 topo_smoothing: true
 turb_flux_partition: "CombinedStateFluxesMOST"

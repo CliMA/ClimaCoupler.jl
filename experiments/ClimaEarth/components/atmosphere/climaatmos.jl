@@ -172,11 +172,13 @@ moisture_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
 
 # extensions required by the Interfacer
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) =
-    TD.air_density.(thermo_params, sim.integrator.p.precomputed.ᶜts)
+    TD.air_density.(get_thermo_params(sim), sim.integrator.p.precomputed.ᶜts)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
-    TD.air_temperature.(thermo_params, sim.integrator.p.precomputed.ᶜts)
+    TD.air_temperature.(get_thermo_params(sim), sim.integrator.p.precomputed.ᶜts)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) =
     surface_rain_flux(sim.integrator.p.atmos.moisture_model, sim.integrator)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:surface_pressure}) =
+    CC.Spaces.level(TD.air_pressure(get_thermo_params(sim), sim.integrator.p.precomputed.ᶜts), 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
     surface_radiation_flux(sim.integrator.p.atmos.radiation_mode, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =
@@ -189,6 +191,8 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_state_int}) =
     CC.Spaces.level(sim.integrator.p.precomputed.ᶜts, 1)
 Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:water}) =
     ρq_tot(atmos_sim.integrator.p.atmos.moisture_model, atmos_sim.integrator)
+Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:zenith_angle}) =
+    acos.(sim.integrator.p.radiation.rrtmgp.cos_zenith)
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temperature}, csf)
     # note that this field is also being updated internally by the surface thermo state in ClimaAtmos
     # if turbulent fluxes are calculated, to ensure consistency. In case the turbulent fluxes are not

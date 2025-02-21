@@ -27,7 +27,7 @@ end
         tspan::Tuple{Float64, Float64},
         start_date::Dates.DateTime,
         dt,
-        atmos_boundary_space,
+        boundary_space,
         n_vertical_elements,
         area_fraction,
     )
@@ -40,9 +40,9 @@ function ClimaLandSimulation(
     tspan::Tuple{Float64, Float64},
     start_date::Dates.DateTime,
     dt,
-    atmos_boundary_space,
-    n_vertical_elements,
+    boundary_space,
     area_fraction,
+    n_vertical_elements = 10,
     energy_check::Bool = false,
     stepper = CTS.RK4(),
     # land_temperature_anomaly::String = "amip",
@@ -51,7 +51,7 @@ function ClimaLandSimulation(
 
     d_soil = FT(3.5) # soil depth
 
-    domain = make_land_domain(atmos_boundary_space, (-d_soil, FT(0.0)), n_vertical_elements)
+    domain = make_land_domain(boundary_space, (-d_soil, FT(0.0)), n_vertical_elements)
     spatially_varying_soil_params =
         ClimaLand.default_spatially_varying_soil_parameters(domain.space.subsurface, domain.space.surface, FT)
     # Set up the soil model args
@@ -85,9 +85,37 @@ function ClimaLandSimulation(
 
     Csom = ClimaLand.PrescribedSoilOrganicCarbon{FT}(TimeVaryingInput((t) -> 5))
 
+    # TODO remove this once CL functions are extended for CoupledAtmosphere
+    precip = TimeVaryingInput((t) -> -1.0e-7)
+    atmos_q = TimeVaryingInput((t) -> 0.002)
+    atmos_T = TimeVaryingInput((t) -> 298.0)
+    atmos_p = TimeVaryingInput((t) -> 101320)
+    atmos_u = TimeVaryingInput((t) -> 3.0)
+    LW_IN = TimeVaryingInput((t) -> 5.67e-8 * 298.0^4)
+    SW_IN = TimeVaryingInput((t) -> 500.0)
+    snow_precip = TimeVaryingInput((t) -> 0.0)
+    atmos_h = FT(32)
+    atmos = ClimaLand.PrescribedAtmosphere(
+        precip,
+        snow_precip,
+        atmos_T,
+        atmos_u,
+        atmos_q,
+        atmos_p,
+        start_date,
+        atmos_h,
+        earth_param_set;
+    )
+    radiation = ClimaLand.PrescribedRadiativeFluxes(
+        FT,
+        SW_IN,
+        LW_IN,
+        start_date,
+        # θs = zenith_angle,
+    )
     land_input = (
-        atmos = ClimaLand.CoupledAtmosphere{FT, Dates.DateTime}(start_date),
-        radiation = ClimaLand.CoupledRadiativeFluxes{FT}(),
+        atmos = atmos,#ClimaLand.CoupledAtmosphere{FT}(),
+        radiation = radiation,#ClimaLand.CoupledRadiativeFluxes{FT}(),
         # atmos = ClimaLand.CoupledAtmosphere{FT, typeof(start_date)}(start_date),
         # radiation = ClimaLand.CoupledRadiativeFluxes{FT, typeof(start_date)}(start_date),
         runoff = runoff_model,
@@ -95,7 +123,7 @@ function ClimaLandSimulation(
     )
 
     land = ClimaLand.LandModel{FT}(;
-        soilco2_type = soilco2_type,
+        soilco2_type = soilco2_type, # TODO this fails because soil CO2 requires PrescribedAtmosphere currently
         soilco2_args = soilco2_args,
         land_args = land_input,
         soil_model_type = soil_model_type,
@@ -353,58 +381,59 @@ function Checkpointer.get_model_prog_state(sim::ClimaLandSimulation)
     error("get_model_prog_state not implemented")
 end
 
-function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:air_density})
-    ρ_eff = sim.integrator.p.drivers.ρ_eff
-    ρ_soil = sim.integrator.p.drivers.ρ_soil
-    ρ_snow = sim.integrator.p.drivers.ρ_snow
-    ρ_canopy = sim.integrator.p.drivers.ρ_canopy
-    return NamedTuple{(:ρ_eff, :ρ_soil, :ρ_snow, :ρ_canopy)}((ρ_eff, ρ_soil, ρ_snow, ρ_canopy))
-end
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:area_fraction}) = sim.area_fraction
-
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:beta}) =
     CL.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
 
 function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:energy})
-    soil_energy = sim.integrator.u.soil.ρe_int
-    canopy_energy = sim.integrator.u.canopy.energy.ρe_int
-    # TODO: This is energy per unit area. We need to find a way to get the area of the grid cell in (m^2)
-    snow_energy = sim.integrator.u.snow.U
+    # TODO this will be implemented in ClimaLand - see https://github.com/CliMA/ClimaLand.jl/issues/1038
+    CL.total_energy(sim.integrator.u, sim.integrator.p)
+    # soil_energy = sim.integrator.u.soil.ρe_int
+    # canopy_energy = sim.integrator.u.canopy.energy.ρe_int
+    # snow_energy = sim.integrator.u.snow.U
 end
-
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:roughness_buoyancy}) = sim.model.parameters.z_0b
-
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:roughness_momentum}) = sim.model.parameters.z_0m
-
+function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:roughness_buoyancy})
+    z_0b_canopy = sim.model.canopy.parameters.z_0b
+    z_0b_snow = sim.model.snow.parameters.z_0b
+    z_0b_soil = sim.model.soil.parameters.z_0b
+    return NamedTuple{(:canopy, :snow, :soil)}((z_0b_canopy, z_0b_snow, z_0b_soil))
+end
+function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:roughness_momentum})
+    z_0m_canopy = sim.model.canopy.parameters.z_0m
+    z_0m_snow = sim.model.snow.parameters.z_0m
+    z_0m_soil = sim.model.soil.parameters.z_0m
+    return NamedTuple{(:canopy, :snow, :soil)}((z_0m_canopy, z_0m_snow, z_0m_soil))
+end
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_direct_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_diffuse_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
-# Return effective and components here
-function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_humidity})
-    q_eff = sim.integrator.p.drivers.q_eff
-    q_soil = sim.integrator.p.drivers.q_soil
-    q_snow = sim.integrator.p.drivers.q_snow
-    q_canopy = sim.integrator.p.drivers.q_canopy
-    return NamedTuple{(:q_eff, :q_soil, :q_snow, :q_canopy)}((q_eff, q_soil, q_snow, q_canopy))
-end
 
 function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_temperature})
     T_eff = sim.integrator.p.T_sfc
     T_canopy = ClimaLand.surface_temperature(sim.model.canopy, sim.integrator.u, sim.integrator.p, sim.integrator.t)
     T_snow = ClimaLand.surface_temperature(sim.model.snow, sim.integrator.u, sim.integrator.p, sim.integrator.t)
     T_soil = ClimaLand.surface_temperature(sim.model.soil, sim.integrator.u, sim.integrator.p, sim.integrator.t)
-    return NamedTuple{(:T_eff, :T_snow, :T_canopy, :T_soil)}((T_eff, T_snow, T_canopy, T_soil))
+    return NamedTuple{(:effective, :canopy, :snow, :soil)}((T_eff, T_canopy, T_snow, T_soil))
 end
 
 function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water})
-    # TODO: The snow liquid is volume per unit ground area. We need to find a way to get the area of the grid cell in (m^2)
-    return sim.integrator.u.snow.S +
-           sim.integrator.p.soil.θ_l +
-           sim.integrator.u.soil.θ_i +
-           sim.integrator.u.canopy.hydraulics.ϑ_l
+    # TODO this will be implemented in ClimaLand - see https://github.com/CliMA/ClimaLand.jl/issues/1038
+    return CL.total_water(sim.integrator.u, sim.integrator.p)
+    # return sim.integrator.u.snow.S +
+    #        sim.integrator.p.soil.θ_l +
+    #        sim.integrator.u.soil.θ_i +
+    #        sim.integrator.u.canopy.hydraulics.ϑ_l
 end
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:emissivity}) = sim.integrator.p.ϵ_sfc
+function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_height})
+    h_canopy = CL.surface_height(sim.model.canopy, sim.integrator.u, sim.integrator.p)
+    h_snow = CL.surface_height(sim.model.snow, sim.integrator.u, sim.integrator.p)
+    h_soil = CL.surface_height(sim.model.soil, sim.integrator.u, sim.integrator.p)
+    return NamedTuple{(:canopy, :snow, :soil)}((h_canopy, h_snow, h_soil))
+end
+
 
 function Interfacer.update_field!(::ClimaLandSimulation, ::Val{:air_density}, field)
     parent(sim.integrator.p.drivers.ρ_eff) .= parent(field)

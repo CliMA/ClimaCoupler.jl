@@ -26,7 +26,7 @@ turb_flux_partition: "CombinedStateFluxesMOST"
 turbconv: ~
 edmfx_sgs_diffusive_flux: false
 vert_diff: "DecayWithHeightDiffusion"
-call_cloud_diagnostics_per_stage: true
+call_cloud_diagnostics_per_stage: false
 viscous_sponge: true
 z_elem: 39
 z_max: 60000.0

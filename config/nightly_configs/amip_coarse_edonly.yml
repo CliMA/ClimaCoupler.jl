@@ -19,12 +19,14 @@ radiation_reset_rng_seed: true
 rayleigh_sponge: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "825days"
+t_end: "93days"
 topography: "Earth"
 topo_smoothing: true
 turb_flux_partition: "CombinedStateFluxesMOST"
 turbconv: ~
+edmfx_sgs_diffusive_flux: false
 vert_diff: "DecayWithHeightDiffusion"
+call_cloud_diagnostics_per_stage: true
 viscous_sponge: true
 z_elem: 39
 z_max: 60000.0

@@ -170,10 +170,6 @@ moisture_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
 ρq_tot(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) = integrator.u.c.ρq_tot
 
 # extensions required by the Interfacer
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) =
-    TD.air_density.(thermo_params, sim.integrator.p.precomputed.ᶜts)
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
-    TD.air_temperature.(thermo_params, sim.integrator.p.precomputed.ᶜts)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) =
     surface_rain_flux(sim.integrator.p.atmos.moisture_model, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =

@@ -229,7 +229,6 @@ function BucketSimulation(
 end
 
 # extensions required by Interfacer
-Interfacer.get_field(sim::BucketSimulation, ::Val{:air_density}) = sim.integrator.p.bucket.ρ_sfc
 Interfacer.get_field(sim::BucketSimulation, ::Val{:area_fraction}) = sim.area_fraction
 Interfacer.get_field(sim::BucketSimulation, ::Val{:beta}) =
     CL.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
@@ -323,7 +322,7 @@ function FluxCalculator.surface_thermo_state(
     # Note that the surface air density, ρ_sfc, is computed using the atmospheric state at the first level and making ideal gas
     # and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
     # a reasonable stand-in.
-    ρ_sfc = Interfacer.get_field(sim, Val(:air_density))
+    ρ_sfc = FluxCalculator.extrapolate_ρ_to_sfc.(thermo_params, thermo_state_int, T_sfc) # ideally the # calculate elsewhere, here just getter...
     q_sfc = Interfacer.get_field(sim, Val(:surface_humidity)) # already calculated in rhs! (cache)
     @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
 end

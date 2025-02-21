@@ -40,8 +40,6 @@ Interfacer.get_field(sim::TestAtmos, ::Val{:height_sfc}) = sim.integrator.p.z_sf
 Interfacer.get_field(sim::TestAtmos, ::Val{:uv_int}) = @. StaticArrays.SVector(sim.integrator.p.u, sim.integrator.p.v)
 Interfacer.get_field(sim::TestAtmos, ::Val{:thermo_state_int}) =
     TD.PhaseEquil_ρTq.(get_thermo_params(sim), sim.integrator.ρ, sim.integrator.T, sim.integrator.q)
-Interfacer.get_field(sim::TestAtmos, ::Val{:air_density}) = sim.integrator.ρ
-Interfacer.get_field(sim::TestAtmos, ::Val{:air_temperature}) = sim.integrator.T
 
 function FieldExchanger.update_sim!(sim::TestAtmos, fields, _)
     (; F_turb_ρτxz, F_turb_energy, F_turb_moisture) = fields
@@ -237,7 +235,7 @@ for FT in (Float32, Float64)
 
             # analytical solution is possible for the BulkScheme() case
             if scheme isa FluxCalculator.BulkScheme
-                ρ_sfc = Interfacer.get_field(atmos_sim, Val(:air_density))
+                ρ_sfc = TD.air_density.(thermo_params, thermo_state_int)
                 cpm = TD.cv_m.(thermo_params, thermo_state_int) .+ TD.gas_constant_air.(thermo_params, thermo_state_int) # cp = R + cv
                 gz =
                     (

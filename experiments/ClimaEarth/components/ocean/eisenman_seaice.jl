@@ -92,7 +92,6 @@ function EisenmanIceSimulation(
 end
 
 # extensions required by Interfacer
-Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:air_density}) = sim.integrator.p.Ya.ρ_sfc
 Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
 Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:roughness_buoyancy}) =

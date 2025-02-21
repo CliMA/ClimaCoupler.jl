@@ -119,8 +119,6 @@ an atmosphere component model.
 get_field(
     sim::AtmosModelSimulation,
     val::Union{
-        Val{:air_density},
-        Val{:air_temperature},
         Val{:energy},
         Val{:height_int},
         Val{:height_sfc},
@@ -146,7 +144,6 @@ a surface component model.
 get_field(
     sim::SurfaceModelSimulation,
     val::Union{
-        Val{:air_density},
         Val{:area_fraction},
         Val{:beta},
         Val{:roughness_buoyancy},

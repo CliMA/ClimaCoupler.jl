@@ -152,6 +152,10 @@ function solve_coupler!(cs)
     return nothing
 end
 
+function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
+    config_dict = get_coupler_config_dict(config_file)
+    return setup_and_run(config_dict)
+end
 """
     setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
 
@@ -159,9 +163,7 @@ This function sets up and runs the coupled model simulation specified by the
 input config file. It initializes the component models, all coupler objects,
 diagnostics, and conservation checks, and then runs the simulation.
 """
-function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
-    # Parse the configuration file
-    config_dict = get_coupler_config_dict(config_file)
+function setup_and_run(config_dict::AbstractDict)
     # Initialize communication context (do this first so all printing is only on root)
     comms_ctx = Utilities.get_comms_context(config_dict)
     # Select the correct timestep for each component model based on which are available
@@ -734,5 +736,6 @@ function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_c
     end
 
     # Close all diagnostics file writers
-    !isnothing(cs.diags_handler) && map(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
+    isnothing(cs.diags_handler) || foreach(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
+    isnothing(atmos_sim.output_writers) || foreach(close, atmos_sim.output_writers)
 end

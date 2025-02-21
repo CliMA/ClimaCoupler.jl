@@ -44,6 +44,8 @@ steps:
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
 
+      - echo "--- Instantiate calibration env"
+      - "julia --project=experiments/calibration/ -e 'using Pkg; Pkg.instantiate(;verbose=true); Pkg.develop(;path=\".\")'"
     agents:
       queue: clima
       modules: climacommon/2024_12_16
@@ -314,6 +316,23 @@ steps:
       slurm_gpus: 1
       modules: climacommon/2024_12_16
     soft_fail: true
+
+  - label: "Perfect model calibration test"
+    key: "amip_pm_calibration"
+    command:
+      - "julia --color=yes --project=experiments/calibration/ experiments/calibration/run_calibration.jl"
+    artifact_paths: "experiments/calibration/output/*"
+    env:
+      CLIMACOMMS_DEVICE: "CUDA"
+      CLIMACOMMS_CONTEXT: "SINGLETON"
+    agents:
+      queue: clima
+      slurm_mem: 96GB
+      slurm_ntasks: 5
+      slurm_gpus_per_task: 1
+      slurm_cpus_per_task: 4
+      slurm_time: 05:00:00
+      modules: climacommon/2024_12_16
 
   - wait
 

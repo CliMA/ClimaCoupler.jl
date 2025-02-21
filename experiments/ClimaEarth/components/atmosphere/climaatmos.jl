@@ -17,10 +17,11 @@ include("climaatmos_extra_diags.jl")
 ###
 ### Functions required by ClimaCoupler.jl for an AtmosModelSimulation
 ###
-struct ClimaAtmosSimulation{P, D, I} <: Interfacer.AtmosModelSimulation
+struct ClimaAtmosSimulation{P, D, I, OW} <: Interfacer.AtmosModelSimulation
     params::P
     domain::D
     integrator::I
+    output_writers::OW
 end
 Interfacer.name(::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
 
@@ -36,7 +37,7 @@ function ClimaAtmosSimulation(atmos_config)
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
     FT = atmos_config.parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
     simulation = CA.get_simulation(atmos_config)
-    (; integrator) = simulation
+    (; integrator, output_writers) = simulation
     Y = integrator.u
     center_space = axes(Y.c.ρe_tot)
     face_space = axes(Y.f.u₃)
@@ -69,7 +70,7 @@ function ClimaAtmosSimulation(atmos_config)
         @. ᶠradiation_flux = CC.Geometry.WVector(FT(0))
     end
 
-    sim = ClimaAtmosSimulation(integrator.p.params, spaces, integrator)
+    sim = ClimaAtmosSimulation(integrator.p.params, spaces, integrator, output_writers)
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)
@@ -351,9 +352,11 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_
     atmos_toml = joinpath.(pkgdir(CA), atmos_config["toml"])
     coupler_toml = joinpath.(pkgdir(ClimaCoupler), coupler_dict["coupler_toml"])
     toml = isempty(coupler_toml) ? atmos_toml : coupler_toml
-
+    if haskey(atmos_config, "calibration_toml")
+        push!(toml, atmos_config["calibration_toml"])
+    end
     if !isempty(toml)
-        @info "Overwriting Atmos parameters from input TOML file(s)"
+        @info "Overwriting Atmos parameters from input TOML file(s): $toml"
         atmos_config = merge(atmos_config, Dict("toml" => toml))
     end
 

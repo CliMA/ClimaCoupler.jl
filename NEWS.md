@@ -6,7 +6,13 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
-### Coupler fields surface variable names all use `_sfc` PR[#1195](https://github.com/CliMA/ClimaCoupler.jl/pull/1195)
+#### Remove extra `get_field` functions PR[#1203](https://github.com/CliMA/ClimaCoupler.jl/pull/1203)
+Removes the `get_field` functions for `air_density` for all models, which
+were unused except for the `BucketSimulation` method, which is replaced by a
+function call to `extrapolate_ρ_to_sfc`. Also removes the `get_field` function
+for `ClimaAtmosSimulation` `air_temperature`, which was unused.
+
+#### Coupler fields surface variable names all use `_sfc` PR[#1195](https://github.com/CliMA/ClimaCoupler.jl/pull/1195)
 `T_S`, `z0m_S`, and `z0b_S` are renamed to `T_sfc`, `z0m_sfc`, and `z0b_sfc`.
 This makes them consistent with the other surface fields, e.g. `ρ_sfc` and `q_sfc`.
 

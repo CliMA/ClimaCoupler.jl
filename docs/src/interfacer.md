@@ -73,7 +73,6 @@ for the following properties:
 | Coupler name      | Description | Units |
 |-------------------|-------------|-------|
 | `air_density`       | air density of the atmosphere | kg m^-3 |
-| `air_temperature`   | air temperature at the surface of the atmosphere | K |
 | `energy`            | globally integrated energy | J |
 | `height_int`        | height at the first internal model level | m |
 | `height_sfc`        | height at the surface (only required when using `PartitionedStateFluxes`) | m |
@@ -120,7 +119,6 @@ for the following properties:
 
 | Coupler name      | Description | Units |
 |-------------------|-------------|-------|
-| `air_density`       | surface air density | kg m^-3 |
 | `area_fraction`     | fraction of the simulation grid surface area this model covers | |
 | `beta`              | factor that scales evaporation based on its estimated level of saturation | |
 | `roughness_buoyancy` | aerodynamic roughness length for buoyancy | m |
@@ -170,7 +168,6 @@ which is extended by `SurfaceStub`
 in the `surface_stub.jl` file, with
 the cache variables specified as:
 ```
-get_field(sim::AbstractSurfaceStub, ::Val{:air_density}) = sim.cache.ρ_sfc
 get_field(sim::AbstractSurfaceStub, ::Val{:area_fraction}) = sim.cache.area_fraction
 get_field(sim::AbstractSurfaceStub, ::Val{:beta}) = sim.cache.beta
 get_field(sim::AbstractSurfaceStub, ::Val{:energy}) = nothing

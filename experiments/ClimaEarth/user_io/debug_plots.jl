@@ -230,8 +230,7 @@ Interfacer.get_field(sim::BucketSimulation, ::Val{:W}) = sim.integrator.u.bucket
 
 # currently selected plot fields
 plot_field_names(sim::Interfacer.SurfaceModelSimulation) = (:area_fraction, :surface_temperature, :surface_humidity)
-plot_field_names(sim::BucketSimulation) =
-    (:area_fraction, :surface_temperature, :surface_humidity, :air_density, :σS, :Ws, :W)
+plot_field_names(sim::BucketSimulation) = (:area_fraction, :surface_temperature, :surface_humidity, :σS, :Ws, :W)
 plot_field_names(sim::ClimaAtmosSimulation) = (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)
 
 

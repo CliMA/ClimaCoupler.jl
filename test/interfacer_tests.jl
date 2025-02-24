@@ -155,12 +155,17 @@ end
 
     # Test that get_field gives correct warnings for unextended fields
     for value in (
+        :cos_zenith_angle,
+        :co2,
+        :diffuse_fraction,
         :height_int,
         :height_sfc,
         :liquid_precipitation,
+        :LW_d,
         :radiative_energy_flux_sfc,
         :radiative_energy_flux_toa,
         :snow_precipitation,
+        :SW_d,
         :turbulent_energy_flux,
         :turbulent_moisture_flux,
         :thermo_state_int,
@@ -209,7 +214,7 @@ end
     sim = DummySimulation4(space)
 
     # Test that update_field! gives correct warnings for unextended fields
-    for value in (:co2, :surface_direct_albedo, :surface_diffuse_albedo, :surface_temperature, :turbulent_fluxes)
+    for value in (:emissivity, :surface_direct_albedo, :surface_diffuse_albedo, :surface_temperature, :turbulent_fluxes)
         val = Val(value)
         @test_logs (
             :warn,

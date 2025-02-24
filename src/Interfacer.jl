@@ -155,12 +155,17 @@ an atmosphere component model.
 get_field(
     sim::AtmosModelSimulation,
     val::Union{
+        Val{:cos_zenith_angle},
+        Val{:co2},
+        Val{:diffuse_fraction},
         Val{:height_int},
         Val{:height_sfc},
         Val{:liquid_precipitation},
+        Val{:LW_d},
         Val{:radiative_energy_flux_sfc},
         Val{:radiative_energy_flux_toa},
         Val{:snow_precipitation},
+        Val{:SW_d},
         Val{:turblent_energy_flux},
         Val{:turbulent_moisture_flux},
         Val{:thermo_state_int},
@@ -214,7 +219,7 @@ If it isn't extended, the field won't be updated and a warning will be raised.
 update_field!(
     sim::AtmosModelSimulation,
     val::Union{
-        Val{:co2},
+        Val{:emissivity},
         Val{:surface_direct_albedo},
         Val{:surface_diffuse_albedo},
         Val{:surface_temperature},

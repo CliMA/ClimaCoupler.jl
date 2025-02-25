@@ -459,33 +459,19 @@ function setup_and_run(config_dict::AbstractDict)
     global `CoupledSimulation` struct, `cs`, below.
     =#
 
-    ## coupler exchange fields
-    coupler_field_names = (
-        :T_sfc,
-        :z0m_sfc,
-        :z0b_sfc,
-        :ρ_sfc,
-        :q_sfc,
-        :surface_direct_albedo,
-        :surface_diffuse_albedo,
-        :beta,
-        :F_turb_energy,
-        :F_turb_moisture,
-        :F_turb_ρτxz,
-        :F_turb_ρτyz,
-        :F_radiative,
-        :P_liq,
-        :P_snow,
-        :radiative_energy_flux_toa,
-        :P_net,
-        :temp1,
-        :temp2,
-    )
-    coupler_fields = NamedTuple{coupler_field_names}(ntuple(i -> zeros(boundary_space), length(coupler_field_names)))
-    Utilities.show_memory_usage()
-
     ## model simulations
     model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim)
+
+    ## coupler exchange fields
+    coupler_field_names = Interfacer.default_coupler_fields()
+    for sim in model_sims
+        Interfacer.add_coupler_fields!(coupler_field_names, sim)
+    end
+    # add coupler fields required to track conservation, if specified
+    energy_check && push!(coupler_field_names, :radiative_energy_flux_toa, :P_net)
+
+    # allocate space for the coupler fields
+    coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
 
     ## dates
     dates = (; date = [date], date0 = [date0])

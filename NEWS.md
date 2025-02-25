@@ -6,6 +6,15 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Add coupler fields based on simulation type PR[#1207](https://github.com/CliMA/ClimaCoupler.jl/pull/1207)
+Previously, the coupler fields were hardcoded to be the same for all
+simulations, independent of what components were included. Now, each
+component model specifies the coupler fields it requires for coupling,
+and these are used to construct the set of coupler fields.
+TOA radiation and net precipitation are added only if conservation is enabled.
+The coupler fields are also now stored as a ClimaCore Field of NamedTuples,
+rather than as a NamedTuple of ClimaCore Fields.
+
 #### Remove extra `get_field` functions PR[#1203](https://github.com/CliMA/ClimaCoupler.jl/pull/1203)
 Removes the `get_field` functions for `air_density` for all models, which
 were unused except for the `BucketSimulation` method, which is replaced by a

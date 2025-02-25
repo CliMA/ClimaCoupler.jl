@@ -199,7 +199,7 @@ for FT in (Float32, Float64)
 
             model_sims = (; atmos_sim, ocean_sim, ocean_sim2)
 
-            coupler_cache_names = (
+            coupler_cache_names = [
                 :T_sfc,
                 :surface_direct_albedo,
                 :surface_diffuse_albedo,
@@ -212,10 +212,8 @@ for FT in (Float32, Float64)
                 :F_turb_ρτxz,
                 :F_turb_ρτyz,
                 :F_turb_moisture,
-            )
-            fields = NamedTuple{coupler_cache_names}(
-                ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_cache_names)),
-            )
+            ]
+            fields = Interfacer.init_coupler_fields(FT, coupler_cache_names, boundary_space)
 
             # calculate turbulent fluxes
             thermo_params = get_thermo_params(atmos_sim)
@@ -248,14 +246,14 @@ for FT in (Float32, Float64)
                    windspeed #-ρ_sfc * Ch * windspeed(sc) * (cp_m * ΔT + ΔΦ)
 
                 # check the coupler field update
-                @test isapprox(parent(shf_analytical), parent(fields.F_turb_energy), rtol = 1e-6)
+                @test isapprox(Array(parent(shf_analytical)), Array(parent(fields.F_turb_energy)), rtol = 1e-6)
 
                 # test the surface field update
-                @test parent(fields.F_turb_energy) == parent(ocean_sim.integrator.p.F_aero)
+                @test Array(parent(fields.F_turb_energy)) == Array(parent(ocean_sim.integrator.p.F_aero))
 
                 # test the atmos field update
                 FieldExchanger.update_sim!(atmos_sim, fields, nothing)
-                @test parent(fields.F_turb_energy) == -parent(atmos_sim.integrator.p.energy_bc)
+                @test Array(parent(fields.F_turb_energy)) == -Array(parent(atmos_sim.integrator.p.energy_bc))
 
             end
             @test Array(parent(fields.F_turb_moisture))[1] ≈ FT(0)

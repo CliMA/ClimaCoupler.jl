@@ -35,7 +35,7 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
 @testset "import_atmos_fields!" begin
 
     boundary_space = TestHelper.create_space(FT)
-    coupler_names = (
+    coupler_names = [
         :surface_direct_albedo,
         :surface_diffuse_albedo,
         :F_radiative,
@@ -52,7 +52,7 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
         :z0b_sfc,
         :z0m_sfc,
         :radiative_energy_flux_toa,
-    )
+    ]
     atmos_names = (:atmos_field,)
     surface_names = (:surface_field,)
     stub_names = (:stub_field,)
@@ -60,7 +60,7 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
     atmos_fields = NamedTuple{atmos_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(atmos_names)))
     surface_fields = NamedTuple{surface_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(surface_names)))
     stub_fields = NamedTuple{stub_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(stub_names)))
-    coupler_fields = NamedTuple{coupler_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_names)))
+    coupler_fields = Interfacer.init_coupler_fields(FT, coupler_names, boundary_space)
 
     model_sims = (;
         atmos_sim = ClimaAtmosSimulation(atmos_fields),

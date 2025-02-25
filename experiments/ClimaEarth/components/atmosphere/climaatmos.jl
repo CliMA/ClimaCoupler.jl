@@ -185,11 +185,11 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_state_int}) =
     CC.Spaces.level(sim.integrator.p.precomputed.ᶜts, 1)
 Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:water}) =
     ρq_tot(atmos_sim.integrator.p.atmos.moisture_model, atmos_sim.integrator)
-function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temperature}, csf)
+function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temperature}, field)
     # note that this field is also being updated internally by the surface thermo state in ClimaAtmos
     # if turbulent fluxes are calculated, to ensure consistency. In case the turbulent fluxes are not
     # calculated, we update the field here.
-    sim.integrator.p.radiation.rrtmgp_model.surface_temperature .= CC.Fields.field2array(csf.T_sfc)
+    sim.integrator.p.radiation.rrtmgp_model.surface_temperature .= CC.Fields.field2array(field)
 end
 # extensions required by FluxCalculator (partitioned fluxes)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =
@@ -269,7 +269,7 @@ function FieldExchanger.update_sim!(atmos_sim::ClimaAtmosSimulation, csf, turbul
         !(p.atmos.insolation isa CA.IdealizedInsolation) && CA.set_insolation_variables!(u, p, t, p.atmos.insolation)
         Interfacer.update_field!(atmos_sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
         Interfacer.update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
-        Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf)
+        Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf.T_sfc)
     end
 
     if turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes

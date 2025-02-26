@@ -405,7 +405,7 @@ function make_land_domain(
     subsurface_space = CC.Spaces.ExtrudedFiniteDifferenceSpace(atmos_boundary_space, vert_center_space)
     space = (; surface = atmos_boundary_space, subsurface = subsurface_space)
 
-    fields = CL.Domains.get_additional_domain_fields(subsurface_space)
+    fields = CL.Domains.get_additional_coordinate_field_data(subsurface_space)
 
     return CL.Domains.SphericalShell{FT}(radius, depth, nothing, nelements, npolynomial, space, fields)
 end

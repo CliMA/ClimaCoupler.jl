@@ -133,7 +133,6 @@ end
     # Test that get_field gives correct warnings for unextended fields
     for value in (
         :area_fraction,
-        :beta,
         :roughness_buoyancy,
         :roughness_momentum,
         :surface_direct_albedo,
@@ -156,7 +155,6 @@ end
 
     # Test that get_field gives correct warnings for unextended fields
     for value in (
-        :energy,
         :height_int,
         :height_sfc,
         :liquid_precipitation,
@@ -167,7 +165,6 @@ end
         :turbulent_moisture_flux,
         :thermo_state_int,
         :uv_int,
-        :water,
     )
         val = Val(value)
         @test_throws ErrorException("undefined field `$value` for " * Interfacer.name(sim)) Interfacer.get_field(

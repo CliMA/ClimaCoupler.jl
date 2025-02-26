@@ -155,7 +155,6 @@ an atmosphere component model.
 get_field(
     sim::AtmosModelSimulation,
     val::Union{
-        Val{:energy},
         Val{:height_int},
         Val{:height_sfc},
         Val{:liquid_precipitation},
@@ -166,7 +165,6 @@ get_field(
         Val{:turbulent_moisture_flux},
         Val{:thermo_state_int},
         Val{:uv_int},
-        Val{:water},
     },
 ) = get_field_error(sim, val)
 
@@ -181,7 +179,6 @@ get_field(
     sim::SurfaceModelSimulation,
     val::Union{
         Val{:area_fraction},
-        Val{:beta},
         Val{:roughness_buoyancy},
         Val{:roughness_momentum},
         Val{:surface_direct_albedo},
@@ -199,6 +196,13 @@ Generic fallback for `get_field` that raises an error.
 get_field(sim::ComponentModelSimulation, val::Val) = get_field_error(sim, val)
 
 get_field_error(sim, val::Val{X}) where {X} = error("undefined field `$X` for " * name(sim))
+
+# Set default values for fields that are not defined in all component models
+get_field(::ComponentModelSimulation, ::Val{:energy}) = nothing
+get_field(::ComponentModelSimulation, ::Val{:water}) = nothing
+get_field(sim::SurfaceModelSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
+get_field(sim::SurfaceModelSimulation, ::Val{:emissivity}) = convert(eltype(sim.integrator.u), 1.0)
+get_field(sim::SurfaceModelSimulation, ::Val{:height_disp}) = convert(eltype(sim.integrator.u), 0.0)
 
 """
     update_field!(::AtmosModelSimulation, ::Val, _...)

@@ -6,6 +6,12 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Add default `get_field` methods for surface models PR[#1210](https://github.com/CliMA/ClimaCoupler.jl/pull/1210)
+Add default methods for `get_field` methods that are commonly
+not extended for surface models. These return reasonable default
+values, and can be extended by surface models that won't use the
+defaults (e.g. the full land model).
+
 #### Add coupler fields based on simulation type PR[#1207](https://github.com/CliMA/ClimaCoupler.jl/pull/1207)
 Previously, the coupler fields were hardcoded to be the same for all
 simulations, independent of what components were included. Now, each

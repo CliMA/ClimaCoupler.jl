@@ -35,7 +35,7 @@ Initializes the bucket model variables.
 function BucketSimulation(
     ::Type{FT},
     tspan::Tuple{TT, TT},
-    config::String,
+    domain_type::String,
     albedo_type::String,
     land_initial_condition::String,
     land_temperature_anomaly::String,
@@ -51,12 +51,7 @@ function BucketSimulation(
     surface_elevation,
     use_land_diagnostics::Bool,
 ) where {FT, TT <: Union{Float64, ITime}}
-    if config != "sphere"
-        println(
-            "Currently only spherical shell domains are supported; single column set-up will be addressed in future PR.",
-        )
-        @assert config == "sphere"
-    end
+    @assert domain_type == "sphere" "Currently only spherical shell domains are supported; single column may be supported in the future."
 
     α_snow = FT(0.8) # snow albedo
     if albedo_type == "map_static" # Read in albedo from static data file (default type)
@@ -106,7 +101,6 @@ function BucketSimulation(
 
     # Initial conditions with no moisture
     Y, p, coords = CL.initialize(model)
-    p = get_new_cache(p, Y, energy_check)
 
     # Get temperature anomaly function
     T_functions = Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)

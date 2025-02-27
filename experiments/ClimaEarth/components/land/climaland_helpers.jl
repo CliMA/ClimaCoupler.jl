@@ -19,21 +19,6 @@ and result in stable simulations.
 temp_anomaly_amip(coord) = 40 * cosd(coord.lat)^4
 
 """
-    get_new_cache(p, Y, energy_check)
-
-Returns a new `p` with an updated field to store e_per_area if energy conservation
-    checks are turned on.
-"""
-function get_new_cache(p, Y, energy_check)
-    if energy_check
-        e_per_area_field = CC.Fields.zeros(axes(Y.bucket.W))
-        return merge(p, (; e_per_area = e_per_area_field))
-    else
-        return p
-    end
-end
-
-"""
     make_land_domain(
         atmos_boundary_space::CC.Spaces.SpectralElementSpace2D,
         zlim::Tuple{FT, FT},

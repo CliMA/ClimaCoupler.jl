@@ -6,6 +6,7 @@ This module contains functions that check global conservation of energy and wate
 module ConservationChecker
 
 import ..Interfacer, ..Utilities
+import ClimaCore as CC
 
 export AbstractConservationCheck, EnergyConservationCheck, WaterConservationCheck, check_conservation!
 
@@ -75,11 +76,8 @@ function check_conservation!(
     ccs = cc.sums
     (; model_sims) = coupler_sim
 
-    boundary_space = coupler_sim.boundary_space # thin shell approx (boundary_space[z=0] = boundary_space[z_top])
-
-    FT = eltype(coupler_sim.fields[1])
-
-    total = 0
+    FT = CC.Spaces.undertype(coupler_sim.boundary_space)
+    total = FT(0)
 
     # save surfaces
     for sim in model_sims

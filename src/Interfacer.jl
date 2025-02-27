@@ -85,6 +85,42 @@ Return the floating point type backing `T`: `T` can either be an object or a typ
 float_type(::CoupledSimulation{FT}) where {FT} = FT
 
 """
+    default_coupler_fields()
+
+Return a list of default coupler fields needed to run a simulation.
+"""
+default_coupler_fields() = [
+    # fields needed for flux calculations and exchange
+    :z0m_sfc,
+    :z0b_sfc,
+    :beta,
+    :F_turb_energy,
+    :F_turb_moisture,
+    :F_turb_ρτxz,
+    :F_turb_ρτyz,
+    # fields used for temporary storage during calculations
+    :temp1,
+    :temp2,
+]
+
+"""
+    init_coupler_fields(FT, coupler_field_names, boundary_space)
+
+Allocate a Field of NamedTuples on the provided boundary space to store
+the provided coupler fields.
+"""
+function init_coupler_fields(FT, coupler_field_names, boundary_space)
+    # First remove any duplicate field names
+    unique!(coupler_field_names)
+
+    key_types = (coupler_field_names...,)
+    val_types = Tuple{(FT for _ in 1:length(coupler_field_names))...}
+    nt_type = NamedTuple{key_types, val_types}
+    coupler_fields = zeros(nt_type, boundary_space)
+    return coupler_fields
+end
+
+"""
     ComponentModelSimulation
 
 An abstract type encompassing all component model (and model stub) simulations.
@@ -208,6 +244,17 @@ update_field!(
 
 update_field_warning(sim, val::Val{X}) where {X} =
     @warn("`update_field!` is not extended for the `$X` field of " * name(sim) * ": skipping update.", maxlog = 1)
+
+
+"""
+    add_coupler_fields!(coupler_fields, sim::ComponentModelSimulation, fields)
+
+A function to add fields to the set of coupler fields. This should be extended
+by component models that require coupler fields beyond the defaults.
+
+If this function isn't extended, no additional fields will be added.
+"""
+add_coupler_fields!(coupler_fields, sim::ComponentModelSimulation) = nothing
 
 """
     name(::ComponentModelSimulation)

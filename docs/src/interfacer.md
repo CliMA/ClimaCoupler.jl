@@ -51,6 +51,12 @@ of SciMLBase.jl.
 - `get_model_prog_state(::ComponentModelSimulation)`: A function that
 returns the state vector of the simulation at its current state. This
 is used for checkpointing the simulation.
+- `add_coupler_fields!(coupler_field_names::Set, ::ComponentModelSimulation)`:
+A function that adds names of quantities the coupler must exchange
+to support this component model. These will be added for each model
+in addition to the existing defaults: `z0m_sfc`, `z0b_sfc`, `beta`,
+`F_turb_energy`, `F_turb_moisture`, `F_turb_ρτxz`, `F_turb_ρτyz`,
+`temp1`, and `temp2`.
 
 ### ComponentModelSimulation - optional functions
 - `update_sim!(::ComponentModelSimulation, csf, turbulent_fluxes)`: A

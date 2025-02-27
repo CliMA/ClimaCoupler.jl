@@ -300,6 +300,20 @@ end
 Interfacer.step!(sim::BucketSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 Interfacer.reinit!(sim::BucketSimulation) = Interfacer.reinit!(sim.integrator)
 
+"""
+Extend Interfacer.add_coupler_fields! to add the fields required for BucketSimulation.
+
+The fields added are:
+- `:ρ_sfc`
+- `:F_radiative` (for radiation input)
+- `:P_liq` (for precipitation input)
+- `:P_snow` (for precipitation input)
+"""
+function Interfacer.add_coupler_fields!(coupler_field_names, ::BucketSimulation)
+    bucket_coupler_fields = [:ρ_sfc, :F_radiative, :P_liq, :P_snow]
+    push!(coupler_field_names, bucket_coupler_fields...)
+end
+
 # extensions required by FluxCalculator (partitioned fluxes)
 function FluxCalculator.update_turbulent_fluxes!(sim::BucketSimulation, fields::NamedTuple)
     (; F_turb_energy, F_turb_moisture) = fields

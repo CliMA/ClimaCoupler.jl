@@ -191,6 +191,18 @@ Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_moisture
 Interfacer.step!(sim::PrescribedIceSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 Interfacer.reinit!(sim::PrescribedIceSimulation) = Interfacer.reinit!(sim.integrator)
 
+"""
+Extend Interfacer.add_coupler_fields! to add the fields required for PrescribedIceSimulation.
+
+The fields added are:
+- `:ρ_sfc` (for humidity calculation)
+- `:F_radiative` (for radiation input)
+"""
+function Interfacer.add_coupler_fields!(coupler_field_names, ::PrescribedIceSimulation)
+    ice_coupler_fields = [:ρ_sfc, :F_radiative]
+    push!(coupler_field_names, ice_coupler_fields...)
+end
+
 # extensions required by FluxCalculator (partitioned fluxes)
 function FluxCalculator.update_turbulent_fluxes!(sim::PrescribedIceSimulation, fields::NamedTuple)
     (; F_turb_energy) = fields

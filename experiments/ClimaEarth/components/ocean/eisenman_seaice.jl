@@ -159,6 +159,18 @@ end
 Interfacer.step!(sim::EisenmanIceSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 Interfacer.reinit!(sim::EisenmanIceSimulation) = Interfacer.reinit!(sim.integrator)
 
+"""
+Extend Interfacer.add_coupler_fields! to add the fields required for EisenmanIceSimulation.
+
+The fields added are:
+- `:ρ_sfc` (for humidity calculation)
+- `:F_radiative` (for radiation input)
+"""
+function Interfacer.add_coupler_fields!(coupler_field_names, ::EisenmanIceSimulation)
+    eisenman_coupler_fields = [:ρ_sfc, :F_radiative]
+    push!(coupler_field_names, eisenman_coupler_fields...)
+end
+
 # extensions required by FluxCalculator (partitioned fluxes)
 function FluxCalculator.update_turbulent_fluxes!(sim::EisenmanIceSimulation, fields::NamedTuple)
     (; F_turb_energy) = fields

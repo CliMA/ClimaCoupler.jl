@@ -95,32 +95,15 @@ function debug(cs::Interfacer.CoupledSimulation, dir = "debug", cs_fields_ref = 
 end
 
 """
-    debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
+    debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing)
 
 Plot useful coupler fields (in `field_names`) and save plots to a directory.
 
 If `cs_fields_ref` is provided (e.g., using a copy of cs.fields from the initialization),
 plot the anomalies of the fields with respect to `cs_fields_ref`.
 """
-function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
-    field_names = (
-        :surface_direct_albedo,
-        :surface_diffuse_albedo,
-        :F_radiative,
-        :F_turb_energy,
-        :F_turb_moisture,
-        :F_turb_ρτxz,
-        :F_turb_ρτyz,
-        :P_liq,
-        :P_snow,
-        :T_sfc,
-        :ρ_sfc,
-        :q_sfc,
-        :beta,
-        :z0b_sfc,
-        :z0m_sfc,
-        :radiative_energy_flux_toa,
-    )
+function debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing)
+    field_names = propertynames(cs_fields)
     fig = Makie.Figure(size = (1500, 800))
     min_square_len = ceil(Int, sqrt(length(field_names)))
     for i in 1:min_square_len, j in 1:min_square_len

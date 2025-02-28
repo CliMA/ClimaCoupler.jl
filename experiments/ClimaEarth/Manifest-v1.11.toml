@@ -350,7 +350,9 @@ version = "0.2.12"
 
 [[deps.ClimaLand]]
 deps = ["ArtifactWrappers", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "b8025e014a0642d7b468aa7c1df38f039cb3a742"
+git-tree-sha1 = "c968f29638830c97e3fa0b0aeb305b81f2b0b69c"
+repo-rev = "tr/support-coupling-LandModel"
+repo-url = "https://github.com/CliMA/ClimaLand.jl.git"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
 version = "0.15.9"
 

@@ -231,13 +231,17 @@ update_field!(
     val::Union{
         Val{:air_density},
         Val{:area_fraction},
+        Val{:air_temperature},
         Val{:liquid_precipitation},
         Val{:radiative_energy_flux_sfc},
         Val{:snow_precipitation},
+        Val{:thermo_state_int},
         Val{:turbulent_energy_flux},
         Val{:turbulent_moisture_flux},
         Val{:surface_direct_albedo},
         Val{:surface_diffuse_albedo},
+        Val{:surface_pressure},
+        Val{:zenith_angle},
     },
     _,
 ) = update_field_warning(sim, val)

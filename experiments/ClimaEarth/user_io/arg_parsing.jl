@@ -61,20 +61,24 @@ function get_coupler_args(config_dict::Dict)
     date0 = date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
     Δt_cpl = Float64(Utilities.time_to_seconds(config_dict["dt_cpl"]))
     saveat = Float64(Utilities.time_to_seconds(config_dict["dt_save_to_sol"]))
-    saveat = promote(t_start:saveat:t_end..., t_end)
     if use_itime
         t_end = ITime(t_end, epoch = date0)
         t_start = ITime(t_start, epoch = date0)
         Δt_cpl = ITime(Δt_cpl, epoch = date0)
         times = promote(t_end, t_start, Δt_cpl, ITime.(values(config_dict["component_dt_dict"]))...)
         t_end, t_start, Δt_cpl = (times[1], times[2], times[3])
-        saveat = ITime(Float64(Utilities.time_to_seconds(config_dict["dt_save_to_sol"])))
-        saveat = [promote([t_start:saveat:t_end..., t_end]...)...]
         component_dt_dict =
             Dict(component => first(promote(ITime(dt), t_end)) for (component, dt) in config_dict["component_dt_dict"])
     else
         component_dt_dict = config_dict["component_dt_dict"]
     end
+    if saveat != Inf
+        use_itime && (saveat = ITime(saveat))
+        saveat = [promote([t_start:saveat:t_end..., t_end]...)...]
+    else
+        saveat = typeof(t_start)[]
+    end
+
     # Checkpointing information
     checkpoint_dt = config_dict["checkpoint_dt"]
 

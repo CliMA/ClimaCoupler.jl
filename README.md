@@ -71,14 +71,13 @@ If no configuration file is specified, the default
 
 The output will take up approximately 1GB of space, and the simulation will take around 10 minutes to run on a single CPU, or less time on multiple CPUs or GPU.
 
-> Note: If you want to set the configuration file to something other than the default
+Note: If you want to set the configuration file to something other than the default
 while running the driver interactively, you'll need to
-manually set the values for `parsed_args["config_file"]` and `parsed_args["job_id"]`.
+manually set the value for `config_file`.
 
->For example, to use the configuration file found at `config/ci_configs/amip_default.yml`, you would use add the following lines in the `run_amip` driver:
+For example, to use the configuration file found at `config/ci_configs/amip_default.yml`, you would set `config_file` as follows in the `run_amip` driver:
 ```
-parsed_args["config_file"] = "config/ci_configs/amip_default.yml"
-parsed_args["job_id"] = "amip_default"
+config_file = "config/ci_configs/amip_default.yml"
 ```
 
 ### A Note about ClimaComms and MPI
@@ -150,3 +149,13 @@ module load common
 
 For additional information about these clusters, including how to gain access for the first time,
 see our slurm-buildkite wiki pages for [Central](https://github.com/CliMA/slurm-buildkite/wiki/Central) and [clima](https://github.com/CliMA/slurm-buildkite/wiki/clima).
+
+# Running Slabplanet
+The `run_amip.jl` driver contains two modes: the full AMIP mode and a Slabplanet mode, where all surfaces are thermal slabs. Since AMIP is not a closed system, the Slabplanet mode is useful for checking conservation properties of the coupling.
+
+Running a Slabplanet simulation is the same as running an AMIP simulation, except for the specifics of the configuration file provided, so all information from the `Running AMIP` section will apply here too. Note that the default configuration used by `run_amip.jl` specifies an AMIP simulation, so a configuration file must be specified to run a Slabplanet simulation. This can be done as follows:
+```julia
+julia --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file config/ci_configs/slabplanet_default.yml --job_id slabplanet_default
+```
+
+To ensure that conservation is tracked throughout the experiment, the `energy_check` field of the configuration file must be set to true.

@@ -43,7 +43,6 @@ get_field(sim::AbstractSurfaceStub, ::Val{:surface_diffuse_albedo}) = sim.cache.
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_humidity}) =
     TD.q_vap_saturation_generic.(sim.cache.thermo_params, sim.cache.T_sfc, sim.cache.ρ_sfc, sim.cache.phase)
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_temperature}) = sim.cache.T_sfc
-get_field(sim::AbstractSurfaceStub, ::Val{:water}) = nothing
 
 """
     update_field!(sim::AbstractSurfaceStub, ::Val{:area_fraction}, field::CC.Fields.Field)

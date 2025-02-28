@@ -93,7 +93,6 @@ end
 
 # extensions required by Interfacer
 Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
-Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
 Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:roughness_buoyancy}) =
     @. sim.integrator.p.params.p_i.z0b * (sim.integrator.p.ice_area_fraction) +
        sim.integrator.p.params.p_o.z0b .* (1 - sim.integrator.p.ice_area_fraction)
@@ -105,7 +104,6 @@ Interfacer.get_field(sim::EisenmanIceSimulation, ::Union{Val{:surface_direct_alb
        sim.integrator.p.params.p_o.α .* (1 - sim.integrator.p.ice_area_fraction)
 Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:surface_humidity}) = sim.integrator.u.q_sfc
 Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
-Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:water}) = nothing
 
 """
     Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:energy})

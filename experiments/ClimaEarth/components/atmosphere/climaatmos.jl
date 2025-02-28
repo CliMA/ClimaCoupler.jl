@@ -171,6 +171,13 @@ moisture_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
 ρq_tot(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) = integrator.u.c.ρq_tot
 
 # extensions required by the Interfacer
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_pressure}) =
+    CC.Fields.level(sim.integrator.p.precomputed.ᶜp, 1)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
+    TD.air_temperature.(
+        sim.integrator.p.params.thermodynamics_params,
+        CC.Fields.level(sim.integrator.p.precomputed.ᶜts, 1),
+    )
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:cos_zenith_angle}) = CC.Fields.array2field(
     sim.integrator.p.radiation.rrtmgp_model.cos_zenith,
     CC.Fields.level(axes(sim.integrator.u.c), 1),
@@ -202,6 +209,8 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:LW_d}) = CC.Fields.level(
     CC.Fields.array2field(sim.integrator.p.radiation.rrtmgp_model.face_lw_flux_dn, axes(sim.integrator.u.f)),
     CC.Utilities.half,
 )
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:humidity}) =
+    CC.Fields.level(sim.integrator.u.c.ρq_tot ./ sim.integrator.u.c.ρ, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
     surface_radiation_flux(sim.integrator.p.atmos.radiation_mode, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =

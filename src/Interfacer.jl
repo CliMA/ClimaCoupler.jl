@@ -155,11 +155,14 @@ an atmosphere component model.
 get_field(
     sim::AtmosModelSimulation,
     val::Union{
+        Val{:air_pressure},
+        Val{:air_temperature},
         Val{:cos_zenith_angle},
         Val{:co2},
         Val{:diffuse_fraction},
         Val{:height_int},
         Val{:height_sfc},
+        Val{:humidity},
         Val{:liquid_precipitation},
         Val{:LW_d},
         Val{:radiative_energy_flux_sfc},

@@ -113,7 +113,7 @@ following properties:
 
 | Coupler name      | Description | Units |
 |-------------------|-------------|-------|
-| `co2`              | global mean co2 | ppm |
+| `emissivity`   | surface emissivity | |
 | `surface_direct_albedo`   | bulk direct surface albedo over the whole surface space | |
 | `surface_diffuse_albedo`   | bulk diffuse surface albedo over the whole surface space | |
 | `surface_temperature` | temperature over the combined surface space | K |
@@ -122,6 +122,31 @@ following properties:
 - `calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_sfc::ClimaCore.Fields.Field)`:
 A function to return the air density of the atmosphere simulation
 extrapolated to the surface, with units of [kg m^-3].
+
+<!-- replace  "full ClimaLand model" with name of coupler sim struct-->
+### AtmosModelSimulation - required functions to run with the full ClimaLand model
+
+Coupling with full `ClimaLand` model requires the following functions, in addition
+to the functions required for coupling with a general `SurfaceModelSimulation`.
+
+- `get_field(::AtmosModelSimulation. ::Val{property})`:
+This getter function must be extended
+for the following properties:
+
+| Coupler name      | Description | Units |
+|-------------------|-------------|-------|
+| `air_pressure`     | air pressure at the bottom of the atmosphere | Pa |
+| `air_temperature`  | air temperature at the bottom of the atmosphere | K |
+| `cos_zenith` | cosine of the zenith angle | |
+| `co2`              | global mean co2 | ppm |
+| `diffuse_fraction` | fraction of downwards shortwave flux that is direct | |
+| `humidity`         | humidity at the bottom of the atmosphere| kg kg^-1 |
+| `LW_d`             | downwards longwave flux | W m^-2 |
+| `SW_d`             | downwards shortwave flux | W m^-2 |
+
+Note that `air_temperature`, `air_pressure`, `cos_zenith_angle`, `co2`, `diffuse_fraction`, `LW_d` and
+`SW_d` will not be present in a `ClimaAtmosSimulation` if the model is setup with no radiation.
+Because of this, a `ClimaAtmosSimulation` must have radiation if running with the full `ClimaLand` model.
 
 ### SurfaceModelSimulation - required functions
 Analogously to the `AtmosModelSimulation`, a `SurfaceModelSimulation`

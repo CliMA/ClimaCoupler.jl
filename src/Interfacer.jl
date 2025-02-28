@@ -157,7 +157,7 @@ get_field(
     val::Union{
         Val{:air_pressure},
         Val{:air_temperature},
-        Val{:cos_zenith_angle},
+        Val{:cos_zenith},
         Val{:co2},
         Val{:diffuse_fraction},
         Val{:height_int},

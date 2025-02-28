@@ -157,7 +157,7 @@ end
     for value in (
         :air_pressure,
         :air_temperature,
-        :cos_zenith_angle,
+        :cos_zenith,
         :co2,
         :diffuse_fraction,
         :height_int,

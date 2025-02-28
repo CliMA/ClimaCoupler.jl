@@ -178,7 +178,7 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
         sim.integrator.p.params.thermodynamics_params,
         CC.Fields.level(sim.integrator.p.precomputed.ᶜts, 1),
     )
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:cos_zenith_angle}) = CC.Fields.array2field(
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:cos_zenith}) = CC.Fields.array2field(
     sim.integrator.p.radiation.rrtmgp_model.cos_zenith,
     CC.Fields.level(axes(sim.integrator.u.c), 1),
 )

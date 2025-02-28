@@ -144,7 +144,7 @@ for the following properties:
 | `LW_d`             | downwards longwave flux | W m^-2 |
 | `SW_d`             | downwards shortwave flux | W m^-2 |
 
-Note that `air_temperature`, `air_pressure`, `cos_zenith_angle`, `co2`, `diffuse_fraction`, `LW_d` and
+Note that `air_temperature`, `air_pressure`, `cos_zenith`, `co2`, `diffuse_fraction`, `LW_d` and
 `SW_d` will not be present in a `ClimaAtmosSimulation` if the model is setup with no radiation.
 Because of this, a `ClimaAtmosSimulation` must have radiation if running with the full `ClimaLand` model.
 

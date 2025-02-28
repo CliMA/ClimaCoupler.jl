@@ -209,7 +209,7 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:LW_d}) = CC.Fields.level(
     CC.Fields.array2field(sim.integrator.p.radiation.rrtmgp_model.face_lw_flux_dn, axes(sim.integrator.u.f)),
     CC.Utilities.half,
 )
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:humidity}) =
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:specific_humidity}) =
     CC.Fields.level(sim.integrator.u.c.ρq_tot ./ sim.integrator.u.c.ρ, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
     surface_radiation_flux(sim.integrator.p.atmos.radiation_mode, sim.integrator)

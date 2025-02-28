@@ -162,7 +162,7 @@ end
         :diffuse_fraction,
         :height_int,
         :height_sfc,
-        :humidity,
+        :specific_humidity,
         :liquid_precipitation,
         :LW_d,
         :radiative_energy_flux_sfc,

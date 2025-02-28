@@ -162,7 +162,7 @@ get_field(
         Val{:diffuse_fraction},
         Val{:height_int},
         Val{:height_sfc},
-        Val{:humidity},
+        Val{:specific_humidity},
         Val{:liquid_precipitation},
         Val{:LW_d},
         Val{:radiative_energy_flux_sfc},

@@ -135,12 +135,12 @@ for the following properties:
 
 | Coupler name      | Description | Units |
 |-------------------|-------------|-------|
-| `air_pressure`     | air pressure at the bottom of the atmosphere | Pa |
-| `air_temperature`  | air temperature at the bottom of the atmosphere | K |
+| `air_pressure`     | air pressure at the bottom cell centers of the atmosphere | Pa |
+| `air_temperature`  | air temperature at the bottom cell centers of the atmosphere | K |
 | `cos_zenith` | cosine of the zenith angle | |
 | `co2`              | global mean co2 | ppm |
 | `diffuse_fraction` | fraction of downwards shortwave flux that is direct | |
-| `humidity`         | humidity at the bottom of the atmosphere| kg kg^-1 |
+| `specific_humidity`         | specific humidity at the bottom cell centers of the atmosphere| kg kg^-1 |
 | `LW_d`             | downwards longwave flux | W m^-2 |
 | `SW_d`             | downwards shortwave flux | W m^-2 |
 

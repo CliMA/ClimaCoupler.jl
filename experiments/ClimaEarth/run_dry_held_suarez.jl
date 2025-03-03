@@ -77,7 +77,6 @@ checkpoint_dt = "480hours"
 =#
 
 dir_paths = Utilities.setup_output_dirs(output_dir = coupler_output_dir, comms_ctx = ClimaComms.context())
-@info(config_dict)
 
 ## namelist
 config_dict = Dict(
@@ -102,6 +101,7 @@ config_dict = Dict(
     "nh_poly" => 4,
     # output
     "dt_save_to_sol" => "1days",
+    "checkpoint_dt" => "1days",
     # numerics
     "apply_limiter" => false,
     "viscous_sponge" => false,

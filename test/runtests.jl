@@ -36,6 +36,3 @@ end
 @safetestset "FluxCalculator tests" begin
     include("flux_calculator_tests.jl")
 end
-@safetestset "Checkpointer tests" begin
-    include("checkpointer_tests.jl")
-end

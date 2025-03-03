@@ -90,7 +90,6 @@ and exchanges combined fields and calculates fluxes using the selected turbulent
 Note that we want to implement this in a dispatchable function to allow for
 other forms of timestepping (e.g. leapfrog).
 """
-
 function solve_coupler!(cs)
     (; model_sims, Δt_cpl, tspan, comms_ctx) = cs
     (; atmos_sim, land_sim, ocean_sim, ice_sim) = model_sims
@@ -164,6 +163,9 @@ input config file. It initializes the component models, all coupler objects,
 diagnostics, and conservation checks, and then runs the simulation.
 """
 function setup_and_run(config_dict::AbstractDict)
+    # Make a copy so that we don't modify the original input
+    config_dict = copy(config_dict)
+
     # Initialize communication context (do this first so all printing is only on root)
     comms_ctx = Utilities.get_comms_context(config_dict)
     # Select the correct timestep for each component model based on which are available
@@ -209,8 +211,7 @@ function setup_and_run(config_dict::AbstractDict)
     #and `dir_paths.checkpoints`, where restart files are saved.
     =#
 
-    COUPLER_OUTPUT_DIR = joinpath(output_dir_root, job_id)
-    dir_paths = Utilities.setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
+    dir_paths = Utilities.setup_output_dirs(output_dir = output_dir_root, comms_ctx = comms_ctx)
     @info "Coupler output directory $(dir_paths.output)"
     @info "Coupler artifacts directory $(dir_paths.artifacts)"
     @info "Coupler checkpoint directory $(dir_paths.checkpoints)"
@@ -230,6 +231,23 @@ function setup_and_run(config_dict::AbstractDict)
     ## set unique random seed if desired, otherwise use default
     Random.seed!(random_seed)
     @info "Random seed set to $(random_seed)"
+
+    isnothing(restart_t) && (restart_t = Checkpointer.t_start_from_checkpoint(dir_paths.checkpoints))
+    isnothing(restart_dir) && (restart_dir = dir_paths.checkpoints)
+    should_restart = !isnothing(restart_t) && !isnothing(restart_dir)
+    if should_restart
+        if t_start isa ITime
+            t_start, _ = promote(ITime(restart_t), t_start)
+        else
+            t_start = restart_t
+        end
+
+        # TODO: Find a cleaner way to do this instead of having a second restart
+        # just for atmos
+        atmos_config_dict["restart_file"] = climaatmos_restart_path(output_dir_root, restart_t)
+
+        @info "Starting from t_start $(t_start)"
+    end
 
     tspan = (t_start, t_end)
 
@@ -579,71 +597,66 @@ function setup_and_run(config_dict::AbstractDict)
     If a restart directory is specified and contains output files from the `checkpoint_cb` callback, the component model states are restarted from those files. The restart directory
     is specified in the `config_dict` dictionary. The `restart_t` field specifies the time step at which the restart is performed.
     =#
+    should_restart && Checkpointer.restart!(cs, restart_dir, restart_t)
 
-    if !isnothing(restart_dir)
-        for sim in cs.model_sims
-            if Checkpointer.get_model_prog_state(sim) !== nothing
-                Checkpointer.restart_model_state!(sim, comms_ctx, restart_t; input_dir = restart_dir)
-            end
+    if !should_restart
+        #=
+        ## Initialize Component Model Exchange
+
+        We need to ensure all models' initial conditions are shared to enable the coupler to calculate the first instance of surface fluxes. Some auxiliary variables (namely surface humidity and radiation fluxes)
+        depend on initial conditions of other component models than those in which the variables are calculated, which is why we need to step these models in time and/or reinitialize them.
+        The concrete steps for proper initialization are:
+        =#
+
+        # 1.coupler updates surface model area fractions
+        FieldExchanger.update_surface_fractions!(cs)
+
+        # 2.surface density (`ρ_sfc`): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface.
+        # For this, we need to import surface and atmospheric fields. The model sims are then updated with the new surface density.
+        FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes)
+        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
+        FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
+
+        # 3.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
+        ## TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step! (#331)
+        Interfacer.step!(land_sim, tspan[1] + Δt_cpl)
+        Interfacer.step!(ocean_sim, tspan[1] + Δt_cpl)
+        Interfacer.step!(ice_sim, tspan[1] + Δt_cpl)
+
+        # 4.turbulent fluxes: now we have all information needed for calculating the initial turbulent
+        # surface fluxes using either the combined state or the partitioned state method
+        if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
+            ## import the new surface properties into the coupler (note the atmos state was also imported in step 3.)
+            FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta, q_sfc
+            ## calculate turbulent fluxes inside the atmos cache based on the combined surface state in each grid box
+            FluxCalculator.combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes) # this updates the atmos thermo state, sfc_ts
+        elseif cs.turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
+            ## calculate turbulent fluxes in surface models and save the weighted average in coupler fields
+            FluxCalculator.partitioned_turbulent_fluxes!(
+                cs.model_sims,
+                cs.fields,
+                cs.boundary_space,
+                FluxCalculator.MoninObukhovScheme(),
+                cs.thermo_params,
+            )
+
+            ## update atmos sfc_conditions for surface temperature
+            ## TODO: this is hard coded and needs to be simplified (req. CA modification) (#479)
+            new_p = get_new_cache(atmos_sim, cs.fields)
+            CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) ## sets T_sfc (but SF calculation not necessary - requires split functionality in CA)
+            atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
         end
+
+        # 5.reinitialize models + radiative flux: prognostic states and time are set to their initial conditions. For atmos, this also triggers the callbacks and sets a nonzero radiation flux (given the new sfc_conditions)
+        FieldExchanger.reinit_model_sims!(cs.model_sims)
+
+        # 6.update all fluxes: coupler re-imports updated atmos fluxes (radiative fluxes for both `turbulent_fluxes` types
+        # and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxesMOST`,
+        # and sends them to the surface component models. If `turbulent_fluxes isa PartitionedStateFluxes`
+        # atmos receives the turbulent fluxes from the coupler.
+        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
+        FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
     end
-
-    #=
-    ## Initialize Component Model Exchange
-
-    We need to ensure all models' initial conditions are shared to enable the coupler to calculate the first instance of surface fluxes. Some auxiliary variables (namely surface humidity and radiation fluxes)
-    depend on initial conditions of other component models than those in which the variables are calculated, which is why we need to step these models in time and/or reinitialize them.
-    The concrete steps for proper initialization are:
-    =#
-
-    # 1.coupler updates surface model area fractions
-    FieldExchanger.update_surface_fractions!(cs)
-
-    # 2.surface density (`ρ_sfc`): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface.
-    # For this, we need to import surface and atmospheric fields. The model sims are then updated with the new surface density.
-    FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes)
-    FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
-    FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
-
-    # 3.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
-    ## TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step! (#331)
-    Interfacer.step!(land_sim, tspan[1] + Δt_cpl)
-    Interfacer.step!(ocean_sim, tspan[1] + Δt_cpl)
-    Interfacer.step!(ice_sim, tspan[1] + Δt_cpl)
-
-    # 4.turbulent fluxes: now we have all information needed for calculating the initial turbulent
-    # surface fluxes using either the combined state or the partitioned state method
-    if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
-        ## import the new surface properties into the coupler (note the atmos state was also imported in step 3.)
-        FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta, q_sfc
-        ## calculate turbulent fluxes inside the atmos cache based on the combined surface state in each grid box
-        FluxCalculator.combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes) # this updates the atmos thermo state, sfc_ts
-    elseif cs.turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
-        ## calculate turbulent fluxes in surface models and save the weighted average in coupler fields
-        FluxCalculator.partitioned_turbulent_fluxes!(
-            cs.model_sims,
-            cs.fields,
-            cs.boundary_space,
-            FluxCalculator.MoninObukhovScheme(),
-            cs.thermo_params,
-        )
-
-        ## update atmos sfc_conditions for surface temperature
-        ## TODO: this is hard coded and needs to be simplified (req. CA modification) (#479)
-        new_p = get_new_cache(atmos_sim, cs.fields)
-        CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) ## sets T_sfc (but SF calculation not necessary - requires split functionality in CA)
-        atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
-    end
-
-    # 5.reinitialize models + radiative flux: prognostic states and time are set to their initial conditions. For atmos, this also triggers the callbacks and sets a nonzero radiation flux (given the new sfc_conditions)
-    FieldExchanger.reinit_model_sims!(cs.model_sims)
-
-    # 6.update all fluxes: coupler re-imports updated atmos fluxes (radiative fluxes for both `turbulent_fluxes` types
-    # and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxesMOST`,
-    # and sends them to the surface component models. If `turbulent_fluxes isa PartitionedStateFluxes`
-    # atmos receives the turbulent fluxes from the coupler.
-    FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
-    FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 
     #=
     ## Precompilation of Coupling Loop
@@ -653,13 +666,15 @@ function setup_and_run(config_dict::AbstractDict)
     beginning and end of the simulation timespan to the correct values.
     =#
 
-    ## run the coupled simulation for two timesteps to precompile
-    cs.tspan[2] = tspan[1] + Δt_cpl * 2
-    solve_coupler!(cs)
+    if tspan[2] > 2Δt_cpl + tspan[1]
+        ## run the coupled simulation for two timesteps to precompile
+        cs.tspan[2] = tspan[1] + Δt_cpl * 2
+        solve_coupler!(cs)
 
-    ## update the timespan to the correct values
-    cs.tspan[1] = tspan[1] + Δt_cpl * 2
-    cs.tspan[2] = tspan[2]
+        ## update the timespan to the correct values
+        cs.tspan[1] = tspan[1] + Δt_cpl * 2
+        cs.tspan[2] = tspan[2]
+    end
 
     ## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos
     GC.gc()
@@ -724,4 +739,5 @@ function setup_and_run(config_dict::AbstractDict)
     # Close all diagnostics file writers
     isnothing(cs.diags_handler) || foreach(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
     isnothing(atmos_sim.output_writers) || foreach(close, atmos_sim.output_writers)
+    return cs
 end

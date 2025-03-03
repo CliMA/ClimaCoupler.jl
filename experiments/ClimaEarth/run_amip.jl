@@ -22,4 +22,4 @@ include("setup_run.jl")
 config_file = parse_commandline(argparse_settings())["config_file"]
 
 # Set up and run the coupled simulation
-setup_and_run(config_file)
+cs = setup_and_run(config_file)

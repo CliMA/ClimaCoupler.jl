@@ -14,6 +14,15 @@ import ClimaUtilities.TimeManager: ITime
 
 include("climaatmos_extra_diags.jl")
 
+if pkgversion(CA) < v"0.28.6"
+    # Allow cache to be moved to CPU (this is a little bit of type piracy, but we
+    # allow it in this particular file)
+    CC.Adapt.@adapt_structure CA.AtmosCache
+    CC.Adapt.@adapt_structure CA.RRTMGPInterface.RRTMGPModel
+end
+
+include("../shared/restore.jl")
+
 ###
 ### Functions required by ClimaCoupler.jl for an AtmosModelSimulation
 ###
@@ -102,6 +111,22 @@ Extension of Checkpointer.get_model_prog_state to get the model state.
 function Checkpointer.get_model_prog_state(sim::ClimaAtmosSimulation)
     return sim.integrator.u
 end
+
+function Checkpointer.get_model_cache(sim::ClimaAtmosSimulation)
+    return sim.integrator.p
+end
+
+function Checkpointer.restore_cache!(sim::ClimaAtmosSimulation, new_cache)
+    comms_ctx = ClimaComms.context(sim.integrator.u.c)
+    restore!(
+        Checkpointer.get_model_cache(sim),
+        new_cache,
+        comms_ctx;
+        ignore = Set([:rc, :params, :ghost_buffer, :hyperdiffusion_ghost_buffer, :data_handler, :graph_context]),
+    )
+    return nothing
+end
+
 
 """
 Interfacer.get_field(atmos_sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_toa})
@@ -375,6 +400,11 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_
     atmos_config["output_dir_style"] = "RemovePreexisting"
     atmos_config["output_dir"] = atmos_output_dir
 
+    # Ensure Atmos's own checkpoints are synced up with ClimaCoupler, so that we
+    # can pick up from where we have left. NOTE: This should not be needed, but
+    # there is no easy way to initialize ClimaAtmos with a different t_start
+    atmos_config["dt_save_state_to_disk"] = coupler_dict["checkpoint_dt"]
+
     # Add all extra atmos diagnostic entries into the vector of atmos diagnostics
     # If atmos doesn't have any diagnostics, use the extra_atmos_diagnostics from the coupler
     atmos_config["diagnostics"] =
@@ -528,4 +558,26 @@ function FluxCalculator.water_albedo_from_atmosphere!(
     direct_albedo .= CA.surface_albedo_direct(α_model).(λ, μ, LinearAlgebra.norm.(CC.Fields.level(Y.c.uₕ, 1)))
     diffuse_albedo .= CA.surface_albedo_diffuse(α_model).(λ, μ, LinearAlgebra.norm.(CC.Fields.level(Y.c.uₕ, 1)))
 
+end
+
+"""
+    climaatmos_restart_path(output_dir_root, t)
+
+Look at the most recent output in `output_dir_root` and find a checkpoint for time `t`.
+"""
+function climaatmos_restart_path(output_dir_root, t)
+    isdir(output_dir_root) || error("$(output_dir_root) does not exist")
+    name_rx = r"output_(\d\d\d\d)"
+    existing_outputs = filter(x -> !isnothing(match(name_rx, x)), readdir(output_dir_root))
+
+    day = floor(Int, t / (60 * 60 * 24))
+    sec = floor(Int, t % (60 * 60 * 24))
+
+    # Walk back the folders and tyr to find a checkpoint
+    for output in sort(existing_outputs, rev = true)
+        previous_folder = joinpath(output_dir_root, output)
+        restart_file = joinpath(previous_folder, "clima_atmos", "day$day.$sec.hdf5")
+        ispath(restart_file) && return restart_file
+    end
+    error("Restart file for time $t not found")
 end

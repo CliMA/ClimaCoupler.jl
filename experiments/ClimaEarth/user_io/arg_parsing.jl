@@ -44,6 +44,9 @@ This function may modify the input dictionary to remove unnecessary keys.
 - All arguments needed for the coupled simulation
 """
 function get_coupler_args(config_dict::Dict)
+    # Make a copy so that we don't modify the original input
+    config_dict = copy(config_dict)
+
     # Simulation-identifying information; Print `config_dict` if requested
     config_dict["print_config_dict"] && @info(config_dict)
     job_id = config_dict["job_id"]
@@ -84,7 +87,8 @@ function get_coupler_args(config_dict::Dict)
 
     # Restart information
     restart_dir = config_dict["restart_dir"]
-    restart_t = Int(config_dict["restart_t"])
+    restart_t =
+        isnothing(config_dict["restart_t"]) ? nothing : Int64(Utilities.time_to_seconds(config_dict["restart_t"]))
 
     # Diagnostics information
     use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
@@ -101,7 +105,7 @@ function get_coupler_args(config_dict::Dict)
     conservation_softfail = config_dict["conservation_softfail"]
 
     # Output information
-    output_dir_root = config_dict["coupler_output_dir"]
+    output_dir_root = joinpath(config_dict["coupler_output_dir"], job_id)
 
     # ClimaLand-specific information
     land_domain_type = config_dict["land_domain_type"]

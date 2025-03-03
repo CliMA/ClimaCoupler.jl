@@ -112,3 +112,17 @@ at each timestep.
 function Interfacer.step!(sim::PrescribedOceanSimulation, t)
     evaluate!(sim.cache.T_sfc, sim.cache.SST_timevaryinginput, t)
 end
+
+function Checkpointer.get_model_cache(sim::PrescribedOceanSimulation)
+    return sim.cache
+end
+
+function Checkpointer.restore_cache!(sim::PrescribedOceanSimulation, new_cache)
+    old_cache = Checkpointer.get_model_cache(sim)
+    for p in propertynames(old_cache)
+        if getproperty(old_cache, p) isa Field
+            ArrayType = ClimaComms.array_type(getproperty(old_cache, p))
+            parent(getproperty(old_cache, p)) .= ArrayType(parent(getproperty(new_cache, p)))
+        end
+    end
+end

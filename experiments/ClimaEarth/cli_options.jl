@@ -75,7 +75,7 @@ function argparse_settings()
         arg_type = String
         default = "10days"
         "--checkpoint_dt"
-        help = "Time interval for hourly checkpointing [\"20days\" (default)]"
+        help = "Time interval for checkpointing [\"20days\" (default)]"
         arg_type = String
         default = "20days"
         # Restart information
@@ -84,9 +84,9 @@ function argparse_settings()
         arg_type = String
         default = nothing
         "--restart_t"
-        help = "Time in seconds rounded to the nearest index to use at `t_start` for restarted simulation [0 (default)]"
+        help = "Time in seconds rounded to the nearest index to use at `t_start` for restarted simulation [nothing (default)]"
         arg_type = Int
-        default = 0
+        default = nothing
         # Diagnostics information
         "--use_coupler_diagnostics"
         help = "Boolean flag indicating whether to compute and output coupler diagnostics [`true` (default), `false`]"

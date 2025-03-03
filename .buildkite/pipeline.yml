@@ -67,16 +67,6 @@ steps:
   - group: "Unit Tests"
     steps:
 
-      - label: "MPI Checkpointer unit tests"
-        key: "checkpointer_mpi_tests"
-        command: "srun julia --color=yes --project=test/ test/mpi_tests/checkpointer_mpi_tests.jl"
-        timeout_in_minutes: 20
-        env:
-          CLIMACOMMS_CONTEXT: "MPI"
-        agents:
-          slurm_ntasks: 2
-          slurm_mem: 16GB
-
       - label: "MPI Utilities unit tests"
         key: "utilities_mpi_tests"
         command: "srun julia --color=yes --project=test/ test/utilities_tests.jl"
@@ -97,6 +87,7 @@ steps:
         agents:
           slurm_ntasks: 1
           slurm_gres: "gpu:1"
+          slurm_mem: 24GB
 
   - group: "GPU: experiments/ClimaEarth/ unit tests and global bucket"
     steps:
@@ -108,6 +99,27 @@ steps:
           slurm_ntasks: 1
           slurm_gres: "gpu:1"
           slurm_mem: 20GB
+
+  - group: "ClimaEarth test"
+    steps:
+      - label: "ClimaEarth test"
+        key: "restarts"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/runtests.jl"
+        agents:
+          slurm_mem: 16GB
+
+      - label: "MPI restarts"
+        key: "mpi_restarts"
+        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/restart.jl"
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
+        timeout_in_minutes: 40
+        soft_fail:
+          - exit_status: -1
+          - exit_status: 255
+        agents:
+          slurm_ntasks: 2
+          slurm_mem: 32G
 
   - group: "Integration Tests"
     steps:
@@ -218,7 +230,7 @@ steps:
           CLIMACOMMS_CONTEXT: "MPI"
         agents:
           slurm_ntasks: 4
-          slurm_mem_per_cpu: 8GB
+          slurm_mem_per_cpu: 12GB
 
       # short high-res performance test
       - label: "Unthreaded AMIP FINE" # also reported by longruns with a flame graph

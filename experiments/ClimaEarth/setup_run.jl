@@ -225,7 +225,7 @@ function setup_and_run(config_dict::AbstractDict)
     ## Note this step must come after parsing the coupler config dictionary, since
     ##  some parameters are passed from the coupler config to the component model configs
     atmos_config_dict = get_atmos_config_dict(config_dict, job_id, atmos_output_dir)
-    (; dt_rad, output_default_diagnostics) = get_atmos_args(atmos_config_dict)
+    (; dt_rad, output_default_diagnostics, toml_files) = get_atmos_args(atmos_config_dict)
 
     ## set unique random seed if desired, otherwise use default
     Random.seed!(random_seed)
@@ -326,6 +326,7 @@ function setup_and_run(config_dict::AbstractDict)
             energy_check = energy_check,
             surface_elevation,
             use_land_diagnostics,
+            toml_files,
         )
 
         ## sea ice model

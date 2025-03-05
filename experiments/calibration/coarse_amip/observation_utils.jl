@@ -16,19 +16,6 @@ const first_year_start_date = DateTime(2000, 12, 1)
 
 include(joinpath(pkgdir(ClimaCoupler), "experiments/ClimaEarth/leaderboard/data_sources.jl"))
 
-# The ERA5 pressure range is not as large as the ClimaAtmos default pressure levels,
-# so we need to limit outputvars to the ERA5 dims
-function limit_pressure_dim_to_era5_range(diagnostic_var3d)
-    @assert has_pressure(diagnostic_var3d)
-    era5_pressure_min = 100.0  # Pa
-    era5_pressure_max = 100_000.0  # Pa
-    pfull_dims = diagnostic_var3d.dims[pressure_name(diagnostic_var3d)]
-    left = minimum(filter(x -> x >= era5_pressure_min, pfull_dims))
-    right = maximum(filter(x -> x <= era5_pressure_max, pfull_dims))
-    # Window the diagnostic var to use the era5 pressure bounds
-    return window(diagnostic_var3d, "pfull"; left, right)
-end
-
 """
     get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
 
@@ -86,21 +73,37 @@ function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
     # specific humidity
     hus = resample(era5_outputvar(joinpath(obs_dir, "era5_monthly_avg_pressure_level_q.nc")))
 
-    # # Cloud specific liquid water content
-    # ql = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_liquid_water_content.nc"))
-    # # Cloud specific ice water content
-    # qi = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_ice_water_content.nc"))
-    # foreach((ql, qi)) do var
-    #     # Convert from hPa to Pa in-place so we don't create more huge OutputVars
-    #     @assert var.dim_attributes[pressure_name(var)]["units"] == "hPa"
-    #     var.dims[pressure_name(var)] .*= 100.0
-    #     set_dim_units!(var, pressure_name(var), "Pa")        
-    # end
+    # Cloud specific liquid water content
+    ql = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_liquid_water_content_1deg.nc"))
+    # Cloud specific ice water content
+    qi = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_ice_water_content_1deg.nc"))
+    foreach((qi, )) do var
+        # Convert from hPa to Pa in-place so we don't create more huge OutputVars
+        @assert var.dim_attributes[pressure_name(var)]["units"] == "hPa"
+        var.dims[pressure_name(var)] .*= 100.0
+        set_dim_units!(var, pressure_name(var), "Pa")
+    end
 
-    # ql = resample(reverse_dim(reverse_dim(ql, latitude_name(ql)), pressure_name(ql)))
-    # qi = resample(reverse_dim(reverse_dim(qi, latitude_name(qi)), pressure_name(qi)))
+    ql = resample(reverse_dim(reverse_dim(ql, latitude_name(ql)), pressure_name(ql)))
+    qi = resample(reverse_dim(reverse_dim(qi, latitude_name(qi)), pressure_name(qi)))
 
     return (; rlut, rsut, rsutcs, rlutcs, pr, net_rad, cre, shf, ts, ta, hur, hus)#, ql, qi)
+end
+
+# The ERA5 pressure range is not as large as the ClimaAtmos default pressure levels,
+# so we need to limit outputvars to the ERA5 pressure range (100.0 - 100_000.0 Pa) 
+function limit_pressure_dim_to_era5_range(diagnostic_var3d)
+    @assert has_pressure(diagnostic_var3d)
+    era5_pressure_min = 100.0
+    era5_pressure_max = 100_000.0
+    pressure_dims = diagnostic_var3d.dims[pressure_name(diagnostic_var3d)]
+    valid_pressure_levels = filter(pressure_dims) do pressure
+        era5_pressure_min <= pressure <= era5_pressure_max
+    end
+    lowest_valid_level = minimum(valid_pressure_levels)
+    highest_valid_level = maximum(valid_pressure_levels)
+
+    return window(diagnostic_var3d, "pfull"; left = lowest_valid_level, right = highest_valid_level)
 end
 
 #####
@@ -140,7 +143,7 @@ function get_seasonal_stdev(output_var)
     all_seasonal_averages = downsample.(all_seasonal_averages, 3)
     seasonal_average_matrix = cat(all_seasonal_averages...; dims = 3)
     interannual_stdev = std(seasonal_average_matrix, dims = 3)
-    # TODO: Add intraseasonal stdev?
+    # TODO: Add spatial variance
     return dropdims(interannual_stdev; dims = 3)
 end
 
@@ -173,7 +176,7 @@ function make_single_year_of_seasonal_observations(output_var, yr)
     downsampled_seasonal_avg_arrays = downsample.(seasonal_avgs, 3)
     all_year_indices = vcat(get_year_indices.(yr)...)
     obs_vec = vcat(vec.(downsampled_seasonal_avg_arrays[all_year_indices])...)
-    
+
     name = get(output_var.attributes, "CF_name", get(output_var.attributes, "long_name", ""))
     cov = get_seasonal_covariance(output_var)
     return EKP.Observation(obs_vec, Diagonal(repeat(cov.diag, 4)), "$(yr)_$name")
@@ -182,6 +185,8 @@ end
 """
     create_observation_vector(nt, yrs = 19)
 
+Given a NamedTuple, produce a vector of `EKP.Observation`s, where each observation
+consists of seasonally averaged fields, with the exception of globally averaged yearly radiative balance
 """
 function create_observation_vector(nt, yrs = 19)
     # Starting year is 2000-12 to 2001-11
@@ -192,7 +197,7 @@ function create_observation_vector(nt, yrs = 19)
     rlutcs = window(nt.rlutcs, "time"; left = t_start)
     cre = window(nt.cre, "time"; left = t_start)
 
-    # Net radiation uses yearly averages, so we treat it differently
+    # Compute yearly net radiative flux separately
     net_rad = window(nt.net_rad, "time"; left = t_start) |> average_lat |> average_lon
     net_rad = get_yearly_averages(net_rad)
     net_rad_stdev = std(cat(net_rad..., dims = 3), dims = 3)
@@ -203,7 +208,6 @@ function create_observation_vector(nt, yrs = 19)
     shf = window(nt.shf, "time"; left = t_start)
 
     ta = window(nt.ta, "time"; left = t_start)
-
     hur = window(nt.hur, "time"; left = t_start)
     hus = window(nt.hus, "time"; left = t_start)
 
@@ -242,4 +246,3 @@ function downsample(arr::AbstractArray, n)
         error("Only 2D and 3D arrays are supported.")
     end
 end
-

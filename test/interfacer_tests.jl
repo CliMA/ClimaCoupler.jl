@@ -155,20 +155,12 @@ end
 
     # Test that get_field gives correct warnings for unextended fields
     for value in (
-        :air_pressure,
-        :air_temperature,
-        :cos_zenith,
-        :co2,
-        :diffuse_fraction,
         :height_int,
         :height_sfc,
-        :specific_humidity,
         :liquid_precipitation,
-        :LW_d,
         :radiative_energy_flux_sfc,
         :radiative_energy_flux_toa,
         :snow_precipitation,
-        :SW_d,
         :turbulent_energy_flux,
         :turbulent_moisture_flux,
         :thermo_state_int,

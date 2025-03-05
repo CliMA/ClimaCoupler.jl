@@ -3,7 +3,7 @@
 using ClimaAnalysis, ClimaCoupler
 using Dates, LinearAlgebra, Statistics
 import EnsembleKalmanProcesses as EKP
-
+import NaNStatistics
 # Workaround to read ql, qi from file nicely
 push!(ClimaAnalysis.Var.TIME_NAMES, "valid_time")
 
@@ -11,23 +11,11 @@ push!(ClimaAnalysis.Var.TIME_NAMES, "valid_time")
 const days_in_seconds = 86_400
 const months = 31days_in_seconds
 const years = 365days_in_seconds
+const spinup_time = 3months
 const start_date = DateTime(2000, 3, 1)
-const first_year_start_date = DateTime(2000, 12, 1)
+const first_year_start_date = DateTime(2002, 12, 1)
 
 include(joinpath(pkgdir(ClimaCoupler), "experiments/ClimaEarth/leaderboard/data_sources.jl"))
-
-# The ERA5 pressure range is not as large as the ClimaAtmos default pressure levels,
-# so we need to limit outputvars to the ERA5 dims
-function limit_pressure_dim_to_era5_range(diagnostic_var3d)
-    @assert has_pressure(diagnostic_var3d)
-    era5_pressure_min = 100.0  # Pa
-    era5_pressure_max = 100_000.0  # Pa
-    pfull_dims = diagnostic_var3d.dims[pressure_name(diagnostic_var3d)]
-    left = minimum(filter(x -> x >= era5_pressure_min, pfull_dims))
-    right = maximum(filter(x -> x <= era5_pressure_max, pfull_dims))
-    # Window the diagnostic var to use the era5 pressure bounds
-    return window(diagnostic_var3d, "pfull"; left, right)
-end
 
 """
     get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
@@ -38,9 +26,9 @@ Start date is set to `DateTime(2000, 3, 1)`. All OutputVars are resampled to the
 function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
     diagnostic_var3d = limit_pressure_dim_to_era5_range(diagnostic_var3d)
 
-    resample_2d(output_var) = resampled_as(output_var, diagnostic_var2d, dim_names = ["longitude", "latitude"])
-    resample_3d(output_var) =
-        resampled_as(output_var, diagnostic_var3d, dim_names = ["longitude", "latitude", "pressure_level"])
+    resample_2d(ov) = resampled_as(shift_longitude(ov, -180.0, 180.0), diagnostic_var2d, dim_names = ["longitude", "latitude"])
+    resample_3d(ov) =
+        resampled_as(shift_longitude(ov, -180.0, 180.0), diagnostic_var3d, dim_names = ["longitude", "latitude", "pressure_level"])
     resample(ov) = has_pressure(ov) ? resample_3d(ov) : resample_2d(ov)
 
     era5_outputvar(path) = OutputVar(path; new_start_date = start_date, shift_by = Dates.firstdayofmonth)
@@ -59,55 +47,38 @@ function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
 
     # TOA net radiative flux
     net_rad = rlut + rsut - rsdt
-    # For some reason we need to add the start date back in
-    net_rad.attributes["start_date"] = string(start_date)
-
     # cloud radiative effect
     cre = rsut + rlut - rsutcs - rlutcs
-    cre.attributes["start_date"] = string(start_date)
-
-    # Precipitation
     pr = resample(rad_and_pr_obs_dict["pr"](start_date))
-
-    # Latent heat flux
-    lhf = resample(era5_outputvar(joinpath(obs_dir, "era5_monthly_averages_surface_single_level_mslhf.nc")))
-    # Sensible heat flux
-    shf = resample(era5_outputvar(joinpath(obs_dir, "era5_monthly_averages_surface_single_level_msshf.nc")))
-    shf = lhf + shf
-    shf.attributes["start_date"] = string(start_date)
-    # Surface temperature
-    ts = resample(era5_outputvar(joinpath(obs_dir, "era5_monthly_avg_ts.nc")))
-    # 3D Fields
-    # Air temperature 
     ta = resample(era5_outputvar(joinpath(obs_dir, "era5_monthly_avg_pressure_level_t.nc")))
 
-    # relative humidity
-    hur = resample(era5_outputvar(joinpath(obs_dir, "era5_monthly_avg_pressure_level_r.nc")))
-    # specific humidity
-    hus = resample(era5_outputvar(joinpath(obs_dir, "era5_monthly_avg_pressure_level_q.nc")))
+    lwp = OutputVar(joinpath(pkgdir(ClimaCoupler),"modis_lwp_iwp.nc"), "lwp", new_start_date = start_date)
+    lwp = resample(lwp)
+    lwp = window(lwp, "latitude"; left = -60, right = 60)
+    lwp = replace(lwp, NaN => NaNStatistics.nanmean(lwp.data))
 
-    # # Cloud specific liquid water content
-    # ql = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_liquid_water_content.nc"))
-    # # Cloud specific ice water content
-    # qi = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_ice_water_content.nc"))
-    # foreach((ql, qi)) do var
-    #     # Convert from hPa to Pa in-place so we don't create more huge OutputVars
-    #     @assert var.dim_attributes[pressure_name(var)]["units"] == "hPa"
-    #     var.dims[pressure_name(var)] .*= 100.0
-    #     set_dim_units!(var, pressure_name(var), "Pa")        
-    # end
+    return (; net_rad, cre, rlut, rsut, rsutcs, rlutcs, pr, ta, lwp)
+end
 
-    # ql = resample(reverse_dim(reverse_dim(ql, latitude_name(ql)), pressure_name(ql)))
-    # qi = resample(reverse_dim(reverse_dim(qi, latitude_name(qi)), pressure_name(qi)))
+# The ERA5 pressure range is not as large as the ClimaAtmos default pressure levels,
+# so we need to limit outputvars to the ERA5 pressure range (100.0 - 100_000.0 Pa) 
+function limit_pressure_dim_to_era5_range(diagnostic_var3d)
+    @assert has_pressure(diagnostic_var3d)
+    era5_pressure_min = 100.0
+    era5_pressure_max = 100_000.0
+    pressure_dims = diagnostic_var3d.dims[pressure_name(diagnostic_var3d)]
+    valid_pressure_levels = filter(pressure_dims) do pressure
+        era5_pressure_min <= pressure <= era5_pressure_max
+    end
+    lowest_valid_level = minimum(valid_pressure_levels)
+    highest_valid_level = maximum(valid_pressure_levels)
 
-    return (; rlut, rsut, rsutcs, rlutcs, pr, net_rad, cre, shf, ts, ta, hur, hus)#, ql, qi)
+    return window(diagnostic_var3d, "pfull"; left = lowest_valid_level, right = highest_valid_level)
 end
 
 #####
 # Processing to create EKP.ObservationSeries
 #####
-
-to_datetime(start_date, time) = DateTime(start_date) + Second(time)
 
 get_monthly_averages(simdir, var_name) = get(simdir; short_name = var_name, reduction = "average", period = "1M")
 
@@ -134,20 +105,35 @@ function get_yearly_averages(var)
     return year_averaged_matrices
 end
 
-# Given an outputvar, compute the standard deviation at each point for each season.
-function get_seasonal_stdev(output_var)
+function get_seasonal_stdevs(output_var)
     all_seasonal_averages = get_seasonal_averages(output_var)
-    all_seasonal_averages = downsample.(all_seasonal_averages, 3)
-    seasonal_average_matrix = cat(all_seasonal_averages...; dims = 3)
-    interannual_stdev = std(seasonal_average_matrix, dims = 3)
-    # TODO: Add intraseasonal stdev?
-    return dropdims(interannual_stdev; dims = 3)
+    
+    # Group the data by season and calculate standard deviation for each season
+    num_seasons = 4
+    return map(1:num_seasons) do season
+        # Get all data for this season across years
+        season_data = [getproperty(all_seasonal_averages[i], :data) for i in season:num_seasons:length(all_seasonal_averages)]
+        
+        # Determine dimensionality of the data
+        dims = length(output_var.dims) 
+        season_matrix = cat(season_data...; dims)
+        # Calculate standard deviation for this season
+        season_stdev = std(season_matrix; dims)
+        dropdims(season_stdev; dims)
+    end
 end
+
 
 # Given an outputvar, compute the covariance for each season.
 function get_seasonal_covariance(output_var)
-    stdev = get_seasonal_stdev(output_var)
-    return Diagonal(vec(stdev) .^ 2)
+    stdevs = get_seasonal_stdevs(output_var)
+    stdev_vec = vcat(vec.(stdevs)...)
+    # If 0.0 in diagonal, we need to add some small noise
+    if 0.0 in stdev_vec
+        mean_variance_without_zeros = mean(filter(x->x!=0, stdev_vec))
+        replace!(stdev_vec, (0.0 => mean_variance_without_zeros))
+    end
+    return Diagonal(stdev_vec .^ 2)
 end
 
 # Given a year, return the indices of that year within a seasonal array
@@ -158,88 +144,65 @@ function get_year_indices(year)
     return start_index:end_index
 end
 
-# Take in a vector of seasonal average OutputVars and a range or single number representing the years,
-# return a vector of all data within the year range
-function vectorize_nyears_of_seasonal_outputvars(vec_of_vars, year_range)
-    # Generate indices for all specified years
-    all_year_indices = vcat(get_year_indices.(year_range)...)
-    result = vcat(vec.(getproperty.(vec_of_vars[all_year_indices], :data))...)
-    return result
-end
-
 # Make an EKP.Observation of a single year of seasonal averages from an OutputVar
 function make_single_year_of_seasonal_observations(output_var, yr)
     seasonal_avgs = get_seasonal_averages(output_var)
-    downsampled_seasonal_avg_arrays = downsample.(seasonal_avgs, 3)
     all_year_indices = vcat(get_year_indices.(yr)...)
-    obs_vec = vcat(vec.(downsampled_seasonal_avg_arrays[all_year_indices])...)
-    
+
+    obs_vec = collect(Iterators.flatten((getproperty.(seasonal_avgs, :data))[all_year_indices]))
+
     name = get(output_var.attributes, "CF_name", get(output_var.attributes, "long_name", ""))
     cov = get_seasonal_covariance(output_var)
-    return EKP.Observation(obs_vec, Diagonal(repeat(cov.diag, 4)), "$(yr)_$name")
+    return EKP.Observation(obs_vec, cov, "$(yr)_$name")
 end
 
 """
-    create_observation_vector(nt, yrs = 19)
+    create_observation_vector(nt, yrs = 17)
 
+Given a NamedTuple, produce a vector of `EKP.Observation`s, where each observation
+consists of seasonally averaged fields, with the exception of globally averaged yearly radiative balance
 """
-function create_observation_vector(nt, yrs = 19)
+function create_observation_vector(nt, nyears = 17)
     # Starting year is 2000-12 to 2001-11
-    t_start = Second(first_year_start_date - start_date).value
-    rsut = window(nt.rsut, "time"; left = t_start)
-    rlut = window(nt.rlut, "time"; left = t_start)
-    rsutcs = window(nt.rsutcs, "time"; left = t_start)
-    rlutcs = window(nt.rlutcs, "time"; left = t_start)
-    cre = window(nt.cre, "time"; left = t_start)
+    rsut = window(nt.rsut, "time"; left = first_year_start_date);
+    rlut = window(nt.rlut, "time"; left = first_year_start_date);
+    cre = window(nt.cre, "time"; left = first_year_start_date);
 
-    # Net radiation uses yearly averages, so we treat it differently
-    net_rad = window(nt.net_rad, "time"; left = t_start) |> average_lat |> average_lon
-    net_rad = get_yearly_averages(net_rad)
+    # Compute yearly net radiative flux separately
+    net_rad = window(nt.net_rad, "time"; left = first_year_start_date) |> average_lat |> average_lon
+    net_rad = get_yearly_averages(net_rad);
     net_rad_stdev = std(cat(net_rad..., dims = 3), dims = 3)
-    net_rad_covariance = Diagonal(vec(net_rad_stdev) .^ 2)
+    net_rad_covariance = Diagonal(vec(net_rad_stdev) .^ 2);
 
-    ts = window(nt.ts, "time"; left = t_start)
-    pr = window(nt.pr, "time"; left = t_start)
-    shf = window(nt.shf, "time"; left = t_start)
+    ta = window(nt.ta, "time"; left = first_year_start_date);
+    pr = window(nt.pr, "time"; left = first_year_start_date);
+    lwp = window(nt.lwp, "time"; left = first_year_start_date);
 
-    ta = window(nt.ta, "time"; left = t_start)
+    all_observations = map(1:nyears) do yr
+        @info "Creating observations for year $yr"
+        net_rad_obs = EKP.Observation(vec(net_rad[yr]), net_rad_covariance, "$(yr)_net_rad");
 
-    hur = window(nt.hur, "time"; left = t_start)
-    hus = window(nt.hus, "time"; left = t_start)
+        rsut_obs = make_single_year_of_seasonal_observations(rsut, yr);
+        rlut_obs = make_single_year_of_seasonal_observations(rlut, yr);
+        cre_obs = make_single_year_of_seasonal_observations(cre, yr);
+        pr_obs = make_single_year_of_seasonal_observations(pr, yr);
+        ta_obs = make_single_year_of_seasonal_observations(ta, yr);
+        lwp_obs = make_single_year_of_seasonal_observations(lwp, yr);
 
-    all_observations = map(1:yrs) do yr
-        net_rad_obs = EKP.Observation(vec(net_rad[yr]), net_rad_covariance, "$(yr)_net_rad")
 
-        rsut_obs = make_single_year_of_seasonal_observations(rsut, yr)
-        rlut_obs = make_single_year_of_seasonal_observations(rlut, yr)
-        rsutcs_obs = make_single_year_of_seasonal_observations(rsutcs, yr)
-        rlutcs_obs = make_single_year_of_seasonal_observations(rlutcs, yr)
-        cre_obs = make_single_year_of_seasonal_observations(cre, yr)
-        pr_obs = make_single_year_of_seasonal_observations(pr, yr)
-        # shf_obs = make_single_year_of_seasonal_observations(shf, yr)
-        ts_obs = make_single_year_of_seasonal_observations(ts, yr)
-
-        # ta_obs = make_single_year_of_seasonal_observations(ta, yr)
-        # hur_obs = make_single_year_of_seasonal_observations(hur, yr)
-        # hus_obs = make_single_year_of_seasonal_observations(hus, yr)
-        EKP.combine_observations([net_rad_obs, rsut_obs, rlut_obs, cre_obs, pr_obs, ts_obs])#, ta_obs, hur_obs, hus_obs])
+        return EKP.combine_observations([net_rad_obs, cre_obs, rsut_obs, rlut_obs, pr_obs, ta_obs, lwp_obs]);
     end
 
     return all_observations # NOT an EKP.ObservationSeries
 end
+#= 
+possible issues
+- to_pressure_coordinates using wrong units (should be using Pa)
+- inconsistent flattening: OutputVar dimensions ordered differently before flattening, different methods of flattening
+- TA being overrepresented
 
-downsample(var::ClimaAnalysis.OutputVar, n) = downsample(var.data, n)
-
-function downsample(arr::AbstractArray, n)
-    if n < 1
-        error("Downsampling factor n must be at least 1.")
-    end
-    if ndims(arr) == 2
-        return arr[1:n:end, 1:n:end]
-    elseif ndims(arr) == 3
-        return arr[1:n:end, 1:n:end, :]
-    else
-        error("Only 2D and 3D arrays are supported.")
-    end
-end
+TODO:
+- deal with possible issues
+- add leaderboard-style plotting for observations 
+=#
 

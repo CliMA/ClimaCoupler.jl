@@ -16,20 +16,33 @@ function ClimaCalibrate.forward_model(iter, member)
     eki = JLD2.load_object(ClimaCalibrate.ekp_path(output_dir_root, iter))
     minibatch = EKP.get_current_minibatch(eki)
     config_dict["start_date"] = minibatch_to_start_date(minibatch)
+    @info "Current minibatch: $minibatch"
+    @info "Current start date: $(minibatch_to_start_date(minibatch))"
+    spinup_days = 92
+    nyears = length(minibatch)
+    t_end_days = spinup_days + 365 * nyears
+    config_dict["t_end"] = "$(t_end_days)days"
 
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)
-    config_dict["calibration_toml"] = sampled_parameter_file
+    config_dict["coupler_toml"] = [sampled_parameter_file]
     # Set member output directory
     member_output_dir = ClimaCalibrate.path_to_ensemble_member(output_dir_root, iter, member)
     config_dict["coupler_output_dir"] = member_output_dir
+    sim = try
+        setup_and_run(config_dict)
+    catch e
+        @info e
+        println(catch_backtrace())
+        rethrow(e)
+    end
 
-    return setup_and_run(config_dict)
+    @info "Completed member $member"
+    return sim
 end
 
-
 function minibatch_to_start_date(batch)
-    start_year = minimum(batch) + 1999
-    @assert start_year >= 2000
+    start_year = minimum(batch) + 2001
+    @assert start_year >= 2002
     return "$(start_year)0901"
 end

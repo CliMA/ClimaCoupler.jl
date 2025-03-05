@@ -1,84 +1,39 @@
-FLOAT_TYPE: "Float32"
-albedo_model: "CouplerAlbedo"
-atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
-checkpoint_dt: "99999days"
-coupler_toml: ["toml/amip.toml"]
 print_config_dict: true
-coupler_output_dir: "experiments/calibration/output"
-dt: "800secs"
-dt_cpl: "800secs"
+FLOAT_TYPE: "Float32"
+use_itime: true
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
+bucket_albedo_type: "map_temporal"
+checkpoint_dt: "1months"
+coupler_toml: ["toml/amip.toml"]
+coupler_output_dir: "experiments/calibration/coarse_amip/output_32_h_elem"
+dt: "120secs"
+dt_cpl: "120secs"
 dt_save_state_to_disk: "99999days"
 dt_save_to_sol: "99999days"
-dz_bottom: 100.0
+dz_bottom: 30.0
+edmfx_entr_model: "PiGroups"
+edmfx_detr_model: "SmoothArea"
 energy_check: false
-h_elem: 3
+h_elem: 32
 land_albedo_type: "map_temporal"
 mode_name: "amip"
-mono_surface: false
+netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
 output_default_diagnostics: false
 use_coupler_diagnostics: false
-radiation_reset_rng_seed: true
 rayleigh_sponge: true
-start_date: "20000901"
+# restart_dir: "output/32_h_elem/model_config/checkpoints"
+# restart_t: 31536000
 surface_setup: "PrescribedSurface"
-t_end: "457days"
 topography: "Earth"
 topo_smoothing: true
-turb_flux_partition: "CombinedStateFluxesMOST"
 viscous_sponge: true
-z_elem: 39
 z_max: 60000.0
+z_elem: 63
+z_stretch: true
 extra_atmos_diagnostics:
   - reduction_time: average
-    short_name: rsut
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: rlut
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: rsdt
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: rsutcs
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: rlutcs
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: pr
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: ts
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: ta
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: hur
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: hus
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: clw
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: cli
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: pfull
+    short_name: [rsut, rlut, rsdt, rsutcs, rlutcs, pr, ta, ts, lwp, clivi, pfull]
     period: 1months
     writer: nc

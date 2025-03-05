@@ -29,6 +29,7 @@ function get_compare_vars_biases_groups()
         ["pr", "rsdt", "rsut", "rlut"],
         ["rsds", "rsus", "rlds", "rlus"],
         ["rsutcs", "rlutcs", "rsdscs", "rsuscs", "rldscs"],
+        ["sw_cre", "lw_cre", "ts", "lwp", "clivi"],
     ]
     return compare_vars_biases_groups
 end
@@ -47,8 +48,8 @@ is the lower bound and the last element is the upper bound for the bias plots.
 function get_compare_vars_biases_plot_extrema()
     compare_vars_biases_plot_extrema = Dict(
         "pr" => (-5.0, 5.0),
-        "rsdt" => (-2.0, 2.0),
-        "rsut" => (-50.0, 50.0),
+        "rsdt" => (-10.0, 10.0),
+        "rsut" => (-80.0, 80.0),
         "rlut" => (-50.0, 50.0),
         "rsutcs" => (-20.0, 20.0),
         "rlutcs" => (-20.0, 20.0),
@@ -59,6 +60,11 @@ function get_compare_vars_biases_plot_extrema()
         "rsdscs" => (-10.0, 10.0),
         "rsuscs" => (-10.0, 10.0),
         "rldscs" => (-20.0, 20.0),
+        "sw_cre" => (-80.0, 80.0),
+        "lw_cre" => (-40.0, 40.0),
+        "ts" => (-10.0, 10.0),
+        "lwp" => (-0.2, 0.2),
+        "clivi" => (-0.4, 0.4),
     )
     return compare_vars_biases_plot_extrema
 end
@@ -81,8 +87,9 @@ function get_sim_var_dict(diagnostics_folder_path)
     available_short_names = get_short_names_monthly_averages(diagnostics_folder_path)
     sim_var_dict = Dict{String, Any}()
     # Dict for loading in simulation data
-    "pr" in available_short_names && (
-        sim_var_dict["pr"] = (
+
+    if ["pr"] ⊆ available_short_names
+        sim_var_dict["pr"] =
             () -> begin
                 sim_var = get(
                     ClimaAnalysis.SimDir(diagnostics_folder_path),
@@ -97,9 +104,51 @@ function get_sim_var_dict(diagnostics_folder_path)
                 )
                 sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
                 return sim_var
-            end,
-        )
-    )
+            end
+    end
+
+    if ["rsut", "rsutcs"] ⊆ available_short_names
+        sim_var_dict["sw_cre"] = () -> begin
+            rsut = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = "rsut")
+            rsutcs = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = "rsutcs")
+
+            sim_var = rsut - rsutcs
+            sim_var = ClimaAnalysis.set_units(sim_var, "W m^-2")
+            sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
+            return sim_var
+        end
+    end
+
+    if ["rlut", "rlutcs"] ⊆ available_short_names
+        sim_var_dict["lw_cre"] = () -> begin
+            rlut = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = "rlut")
+            rlutcs = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = "rlutcs")
+
+            sim_var = rlut - rlutcs
+            sim_var = ClimaAnalysis.set_units(sim_var, "W m^-2")
+            sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
+            return sim_var
+        end
+    end
+
+    if ["ts"] ⊆ available_short_names
+        sim_var_dict["ts"] = () -> begin
+            sim_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = "ts")
+            sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
+            return sim_var
+        end
+    end
+
+    var_names = ["lwp", "clivi"]
+    foreach(var_names) do var
+        if [var] ⊆ available_short_names
+            sim_var_dict[var] = () -> begin
+                sim_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = var)
+                sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
+                return sim_var
+            end
+        end
+    end
 
     # Add "pr" and the necessary preprocessing
     for (short_name, _) in sim_obs_short_names_no_pr
@@ -168,6 +217,52 @@ function get_obs_var_dict()
                 return obs_var
             end
     end
+    obs_var_dict["sw_cre"] =
+        (start_date) -> begin
+            sw_cre = obs_var_dict["rsut"](start_date) - obs_var_dict["rsutcs"](start_date)
+            return set_units(sw_cre, "W m^-2")
+        end
+    obs_var_dict["lw_cre"] =
+        (start_date) -> begin
+            lw_cre = obs_var_dict["rlut"](start_date) - obs_var_dict["rlutcs"](start_date)
+            return set_units(lw_cre, "W m^-2")
+        end
+
+    obs_var_dict["ts"] = 
+        (start_date) -> begin
+            obs_var = ClimaAnalysis.OutputVar(
+                # TODO: Make this an artifact
+                joinpath("/home/ext_nefrathe_caltech_edu/calibration_obs", "era5_monthly_avg_ts.nc"),
+                new_start_date = start_date,
+                shift_by = Dates.firstdayofmonth,
+            )
+            return obs_var
+        end
+    
+    obs_var_dict["lwp"] = 
+        (start_date) -> begin
+            obs_var = ClimaAnalysis.OutputVar(
+                # TODO: Make this an artifact
+                joinpath(pkgdir(ClimaCoupler), "modis_lwp_iwp.nc"), 
+                "lwp",
+                new_start_date = start_date,
+                shift_by = Dates.firstdayofmonth,
+            )
+            obs_var = ClimaAnalysis.Var.convert_units(obs_var, "kg m-2"; conversion_function = x -> x/1000)
+            return obs_var
+        end
+    obs_var_dict["clivi"] = 
+        (start_date) -> begin
+            obs_var = ClimaAnalysis.OutputVar(
+                # TODO: Make this an artifact
+                joinpath(pkgdir(ClimaCoupler), "modis_lwp_iwp.nc"), 
+                "iwp",
+                new_start_date = start_date,
+                shift_by = Dates.firstdayofmonth,
+            )
+            obs_var = ClimaAnalysis.Var.convert_units(obs_var, "kg m-2"; conversion_function = x -> x/1000)
+            return obs_var
+        end
     return obs_var_dict
 end
 

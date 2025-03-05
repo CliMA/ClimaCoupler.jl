@@ -3,77 +3,135 @@ import ClimaCalibrate
 import ClimaCoupler
 import JLD2
 import EnsembleKalmanProcesses as EKP
-obs = JLD2.load_object("experiments/calibration/coarse_amip/observations.jld2")
-const single_member_dims = length(EKP.get_obs(first(obs)))
+import NaNStatistics
+# import CairoMakie
 include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_utils.jl"))
+include(joinpath(pkgdir(ClimaCoupler), "experiments/ClimaEarth/leaderboard/leaderboard.jl"))
 
 function ClimaCalibrate.observation_map(iteration)
-    G_ensemble = Array{Float64}(undef, single_member_dims, ensemble_size)
+    ekp = JLD2.load_object(ClimaCalibrate.ekp_path(output_dir, iteration))
+    current_minibatch = EKP.get_current_minibatch(ekp)
+    obs = EKP.get_obs(ekp)
+    single_obs_len = sum(length(obs))
+    single_member_len = single_obs_len * length(current_minibatch)
+    ensemble_size = EKP.get_N_ens(ekp)
+    short_names = split(obs_series.observations[1].names[1], ";") # This relies on the naming convention
+
+    G_ensemble = Array{Float64}(undef, single_member_len, ensemble_size)
     for m in 1:ensemble_size
-        @show m
         member_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
-        simdir_path = joinpath(member_path, "model_config/output_active")
-        if isdir(simdir_path)
-            simdir = SimDir(simdir_path)
-            G_ensemble[:, m] .= process_member_data(simdir)
-        else
-            @info "No data found for member $m."
+        simdir_path = joinpath(member_path, "model_config")
+        @info "Processing member $m: $simdir_path"
+        try
+            G_ensemble[:, m] .= process_member_data(SimDir(simdir_path), short_names, current_minibatch)
+
+        catch e
+            @error "Error processing member $m, filling observation map entry with NaNs" exception = e
             G_ensemble[:, m] .= NaN
         end
     end
+    total_elements = length(G_ensemble)
+    nan_count = count(isnan, G_ensemble)
+    # Check for 50% nans
+    @assert nan_count < total_elements / 2
+    # TODO: use nanmean
+    @info "Mean bias y - G, averaged across the ensemble" bias = mean(G_ensemble, dims = 2) - obs |> mean
     return G_ensemble
 end
 
-function process_outputvar(simdir, name)
-    days = 86_400
+function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, iteration)
+    plot_output_path = ClimaCalibrate.path_to_iteration(output_dir, iteration)
+    plot_constrained_params_and_errors(plot_output_path, ekp, prior)
 
+    for m in 1:EKP.get_N_ens(ekp)
+        output_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
+        diagnostics_folder_path = joinpath(output_path, "model_config")
+        try
+            compute_leaderboard(output_path, diagnostics_folder_path, spinup_months)
+        catch e
+            @error "Error in `analyze_iteration`" error = e
+        end
+    end
+end
+
+function plot_constrained_params_and_errors(output_dir, ekp, prior)
+    dim_size = sum(length.(EKP.batch(prior)))
+    fig = CairoMakie.Figure(size = ((dim_size + 1) * 500, 500))
+    for i in 1:dim_size
+        EKP.Visualize.plot_ϕ_over_iters(fig[1, i], ekp, prior, i)
+    end
+    EKP.Visualize.plot_error_over_iters(fig[1, dim_size + 1], ekp)
+    EKP.Visualize.plot_error_over_time(fig[1, dim_size + 2], ekp)
+    CairoMakie.save(joinpath(output_dir, "constrained_params_and_error.png"), fig)
+    return nothing
+end
+
+# Process a single ensemble member's data into a vector
+function process_member_data(simdir::SimDir, short_names, current_minibatch)
+    # Define standard diagnostic fields to preprocess
+    diagnostic_var_names = ["rsdt", "rsut", "rlut", "rsutcs", "rlutcs", "pr", "ts", "lwp", "clivi"]
+
+    # Preprocess all diagnostic fields
+    processed_data = Dict{String, Any}()
+    for name in diagnostic_var_names
+        processed_data[name] = preprocess_diagnostic_monthly_averages(simdir, name)
+    end
+
+    # Calculate derived fields
+    processed_data["sw_cre"] = processed_data["rsut"] - processed_data["rsutcs"]
+    processed_data["lw_cre"] = processed_data["rlut"] - processed_data["rlutcs"]
+    processed_data["net_rad"] =
+        processed_data["rlut"] + processed_data["rsut"] - processed_data["rsdt"] |> average_lat |> average_lon
+
+
+    # Apply latitude window and rsdt weighting to IWP/LWP
+    rsdt_mask = remake(processed_data["rsdt"], data = processed_data["rsdt"].data .> 0)
+    rsdt_mask = window(rsdt_mask, "latitude"; left = -60, right = 60)
+    processed_data["iwp"] = processed_data["clivi"]
+    for field in ["lwp", "iwp"]
+        processed_data[field] = window(processed_data[field], "latitude"; left = -60, right = 60)
+        processed_data[field] = processed_data[field] * rsdt_mask
+    end
+
+    start_year = minimum(current_minibatch) + 2002
+    year_range = (start_year):(start_year + length(current_minibatch) - 1)
+
+    year_observations = map(year_range) do yr
+        # Process seasonal data consistently
+        seasonal_data = map(short_names) do short_name
+            # TODO: Replace this with ClimaAnalysis/ClimaAnalysisExt
+            year_averages = year_of_seasonal_averages(processed_data[short_name], yr)
+            @show short_name, length(ClimaAnalysis.flatten(year_averages).data )
+            ClimaAnalysis.flatten(year_averages).data 
+        end
+        return vcat(seasonal_data...)
+    end
+    return vcat(year_observations...)
+end
+
+# Preprocess monthly averages to the right dimensions and dates, remove NaNs
+function preprocess_diagnostic_monthly_averages(simdir, name)
     monthly_avgs = get_monthly_averages(simdir, name)
-    # Preprocess to match observations
+
+    # Interpolate to pressure coordinates to match observations
+    pressure = get_monthly_averages(simdir, "pfull")
     if has_altitude(monthly_avgs)
-        pressure = get_monthly_averages(simdir, "pfull")
+        # This fails sometimes
         monthly_avgs = ClimaAnalysis.Atmos.to_pressure_coordinates(monthly_avgs, pressure)
         monthly_avgs = limit_pressure_dim_to_era5_range(monthly_avgs)
     end
-    monthly_avgs = ClimaAnalysis.replace(monthly_avgs, missing => 0.0, NaN => 0.0)
+    monthly_avgs.attributes["start_date"] = pressure.attributes["start_date"]
+
+    # Line up dates for monthly averages
     monthly_avgs = ClimaAnalysis.shift_to_start_of_previous_month(monthly_avgs)
 
-    # Cut off first 3 months
-    single_year = window(monthly_avgs, "time"; left = 92days)
-    seasons = split_by_season_across_time(single_year)
-    # Ensure we are splitting evenly across seasons
-    @assert all(map(x -> length(times(x)) == 3, seasons))
-    seasonal_avgs = average_time.(seasons)
+    # Remove spinup time
+    start_date = DateTime(monthly_avgs.attributes["start_date"], dateformat"yyyy-mm-ddTHH:MM:SS")
+    monthly_avgs = window(monthly_avgs, "time"; left = DateTime(Year(start_date).value, 12, 1))
+    global_mean = monthly_avgs |> average_lat |> average_lon |> average_time
+    FT = monthly_avgs.data |> eltype
 
-    downsampled_seasonal_avg_arrays = downsample.(seasonal_avgs, 3)
-    return vcat(vec.(downsampled_seasonal_avg_arrays)...)
-    # return vectorize_nyears_of_seasonal_outputvars(seasonal_avgs, 1)
-end
-
-function process_member_data(simdir::SimDir)
-    isempty(simdir) && return fill!(zeros(single_member_length), NaN)
-
-    pressure = get_monthly_averages(simdir, "pfull")
-
-    rsdt_full = get_monthly_averages(simdir, "rsdt")
-    rsut_full = get_monthly_averages(simdir, "rsut")
-    rlut_full = get_monthly_averages(simdir, "rlut")
-    year_net_radiation = (rlut_full + rsut_full - rsdt_full) |> average_lat |> average_lon |> average_time
-
-    rsut = process_outputvar(simdir, "rsut")
-    rlut = process_outputvar(simdir, "rlut")
-    rsutcs = process_outputvar(simdir, "rsutcs")
-    rlutcs = process_outputvar(simdir, "rlutcs")
-    cre = rsut + rlut - rsutcs - rlutcs
-
-    pr = process_outputvar(simdir, "pr")
-    # shf = process_outputvar(simdir, "shf")
-    ts = process_outputvar(simdir, "ts")
-
-    ta = process_outputvar(simdir, "ta")
-    hur = process_outputvar(simdir, "hur")
-    hus = process_outputvar(simdir, "hus")
-    # clw = get_seasonal_averages(simdir, "clw")
-    # cli = get_seasonal_averages(simdir, "cli")
-
-    return vcat(year_net_radiation.data, rsut, rlut, cre, pr, ts)#, ta, hur, hus)
+    # Replace NaNs with global mean
+    monthly_avgs = ClimaAnalysis.replace(monthly_avgs, NaN => FT(NaNStatistics.nanmean(global_mean.data)))
+    return monthly_avgs
 end

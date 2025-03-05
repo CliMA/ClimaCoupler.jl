@@ -2,12 +2,20 @@
 
 #SBATCH --partition=a3
 #SBATCH --output="run_calibration.txt"
-#SBATCH --time=24:00:00
-#SBATCH --ntasks=20
-#SBATCH --gpus-per-task=1
-#SBATCH --cpus-per-task=4
+#SBATCH --time=150:00:00
+#SBATCH --cpus-per-task=1
+# Trap EXIT , should we trap SIGTERM as well?
+# trap 'handle_exit' EXIT
 
-julia --project=experiments/calibration -e 'using Pkg; Pkg.develop(;path="."); Pkg.instantiate(;verbose=true)'
+# handle_exit() {
+# if [ ! -f "output/surface_fluxes_perfect_model/iteration_004/eki_file.jld2" ]; then
+# 	echo "Resubmitting due to incomplete calibration..."
+# 	sbatch "$0"
+# else
+# 	echo "Calibration complete. No resubmission needed."
+# fi
+# }
+julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.develop(;path="."); Pkg.instantiate(;verbose=true)'
 
-julia --project=experiments/calibration experiments/calibration/coarse_amip/run_calibration.jl
+julia --project=experiments/ClimaEarth experiments/calibration/coarse_amip/run_calibration.jl
 

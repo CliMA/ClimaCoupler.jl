@@ -1,0 +1,21 @@
+# Generate and save experiment observations to disk
+using ClimaAnalysis, JLD2, ClimaCoupler
+import EnsembleKalmanProcesses as EKP
+include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_utils.jl"))
+
+const obs_dir = "/home/ext_nefrathe_caltech_edu/calibration_obs"
+const simdir = SimDir(
+    joinpath(
+        pkgdir(ClimaCoupler),
+        "output/output_0000",
+    ),
+)
+
+diagnostic_var2d = get_monthly_averages(simdir, "rsut")
+# pressure = get_monthly_averages(simdir, "pfull")
+# diagnostic_var3d = get_monthly_averages(simdir, "ta")
+# diagnostic_var3d = ClimaAnalysis.Atmos.to_pressure_coordinates(diagnostic_var3d, pressure)
+
+nt = get_all_output_vars(obs_dir, diagnostic_var2d, nothing)
+JLD2.save_object("experiments/calibration/nt_obs_32_h_elem.jld2", nt)
+

@@ -10,23 +10,29 @@ import EnsembleKalmanProcesses as EKP
 
 include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_map.jl"))
 
-ENV["JULIA_WORKER_TIMEOUT"] = "300.0"
 addprocs(CAL.SlurmManager())
+
 # Make variables and the forward model available on the worker sessions
 @everywhere begin
     import ClimaCoupler
     experiment_dir = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/")
-    include(joinpath(experiment_dir, "model_interface.jl"))
+    model_interface = joinpath(experiment_dir, "model_interface.jl")
+    include(model_interface)
 end
 
 # Experiment Configuration
-output_dir = "experiments/calibration/output"
-ensemble_size = 20
-n_iterations = 18 # Cycle through all data
-priors = [constrained_gaussian("liquid_cloud_effective_radius", 14e-6, 6e-6, 2.5e-6, 21.5e-6)]
+output_dir = "experiments/calibration/coarse_amip/output"
+n_iterations = 9
+priors = [
+    constrained_gaussian("liquid_cloud_effective_radius", 14e-6, 6e-6, 2.5e-6, 21.5e-6),
+    constrained_gaussian("ice_cloud_effective_radius", 25e-6, 6e-6, 2.5e-6, 33e-6),
+    constrained_gaussian("precipitation_timescale", 400, 150, 0, 625),
+]
 prior = combine_distributions(priors)
-observation_vec = JLD2.load_object(joinpath(experiment_dir, "observations.jld2"))
+observation_path = joinpath(experiment_dir, "observations.jld2")
+observation_vec = JLD2.load_object(observation_path)
 
+# Create the EKP.ObservationSeries
 batch_size = 1
 num_batches = cld(length(observation_vec), batch_size)
 batches = map(1:num_batches) do i
@@ -39,55 +45,9 @@ minibatcher = EKP.FixedMinibatcher(batches)
 series_names = string.(1:length(observation_vec))
 observation_series = EKP.ObservationSeries(observation_vec, minibatcher, series_names)
 
-eki = EKP.EnsembleKalmanProcess(
-    EKP.construct_initial_ensemble(prior, ensemble_size),
-    observation_series,
-    EKP.TransformInversion(),
+eki = EKP.EnsembleKalmanProcess(observation_series, EKP.TransformUnscented(prior),
+    verbose=true,
 )
+ensemble_size = EKP.get_N_ens(eki)
 
-eki = CAL.calibrate(CAL.WorkerBackend, eki, ensemble_size, n_iterations, prior, output_dir)
-
-# Postprocessing
-import Statistics: var, mean
-using Test
-import CairoMakie
-
-function scatter_plot(eki::EKP.EnsembleKalmanProcess)
-    f = CairoMakie.Figure(resolution = (800, 600))
-    ax = CairoMakie.Axis(f[1, 1], ylabel = "Parameter Value", xlabel = "Top of atmosphere radiative SW flux")
-
-    g = vec.(EKP.get_g(eki; return_array = true))
-    params = vec.((EKP.get_ϕ(prior, eki)))
-
-    for (gg, uu) in zip(g, params)
-        CairoMakie.scatter!(ax, gg, uu)
-    end
-
-    CairoMakie.vlines!(ax, observations, linestyle = :dash)
-
-    output = joinpath(output_dir, "scatter.png")
-    CairoMakie.save(output, f)
-    return output
-end
-
-function param_versus_iter_plot(eki::EKP.EnsembleKalmanProcess)
-    f = CairoMakie.Figure(resolution = (800, 600))
-    ax = CairoMakie.Axis(f[1, 1], ylabel = "Parameter Value", xlabel = "Iteration")
-    params = EKP.get_ϕ(prior, eki)
-    for (i, param) in enumerate(params)
-        CairoMakie.scatter!(ax, fill(i, length(param)), vec(param))
-    end
-
-    output = joinpath(output_dir, "param_vs_iter.png")
-    CairoMakie.save(output, f)
-    return output
-end
-
-scatter_plot(eki)
-param_versus_iter_plot(eki)
-
-params = EKP.get_ϕ(prior, eki)
-spread = map(var, params)
-
-# Spread should be heavily decreased as particles have converged
-@test last(spread) / first(spread) < 0.1
+eki = CAL.calibrate(CAL.WorkerBackend, eki, n_iterations, prior, output_dir)

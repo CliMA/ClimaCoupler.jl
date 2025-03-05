@@ -571,8 +571,8 @@ function run!(cs::CoupledSimulation; precompile = (cs.tspan[end] > 2 * cs.Δt_cp
 
     # Close all diagnostics file writers
     isnothing(cs.diags_handler) || foreach(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
-    foreach(Interfacer.close_output_writers, cs.model_sims)
-
+    isnothing(cs.model_sims.atmos_sim.output_writers) || foreach(close, cs.model_sims.atmos_sim.output_writers)
+    isnothing(cs.model_sims.land_sim.output_writer) || close(cs.model_sims.land_sim.output_writer)
     return nothing
 end
 

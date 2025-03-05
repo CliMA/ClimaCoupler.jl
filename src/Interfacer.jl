@@ -214,7 +214,7 @@ If it isn't extended, the field won't be updated and a warning will be raised.
 update_field!(
     sim::AtmosModelSimulation,
     val::Union{
-        Val{:co2},
+        Val{:emissivity},
         Val{:surface_direct_albedo},
         Val{:surface_diffuse_albedo},
         Val{:surface_temperature},

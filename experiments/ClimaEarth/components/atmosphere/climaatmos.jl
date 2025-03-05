@@ -171,12 +171,54 @@ moisture_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
 ρq_tot(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) = integrator.u.c.ρq_tot
 
 # extensions required by the Interfacer
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_pressure}) =
+    CC.Fields.level(sim.integrator.p.precomputed.ᶜp, 1)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
+    TD.air_temperature.(
+        sim.integrator.p.params.thermodynamics_params,
+        CC.Fields.level(sim.integrator.p.precomputed.ᶜts, 1),
+    )
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:cos_zenith}) = CC.Fields.array2field(
+    sim.integrator.p.radiation.rrtmgp_model.cos_zenith,
+    CC.Fields.level(axes(sim.integrator.u.c), 1),
+)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:co2}) =
+    sim.integrator.p.radiation.rrtmgp_model.volume_mixing_ratio_co2[]
+function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:diffuse_fraction})
+    radiation_model = sim.integrator.p.radiation.rrtmgp_model
+    # only take the first level
+    total_flux_dn = radiation_model.face_sw_flux_dn[1, :]
+    lowest_face_space = CC.Spaces.level(axes(sim.integrator.u.f), CC.Utilities.half)
+    if radiation_model.radiation_mode isa CA.RRTMGPInterface.GrayRadiation
+        diffuse_fraction = zero(total_flux_dn)
+    else
+        direct_flux_dn = radiation_model.face_sw_direct_flux_dn[1, :]
+        FT = eltype(total_flux_dn)
+        diffuse_fraction =
+            clamp.(
+                ((x, y) -> y > zero(y) ? x / y : zero(y)).(total_flux_dn .- direct_flux_dn, total_flux_dn),
+                zero(FT),
+                one(FT),
+            )
+    end
+    return CC.Fields.array2field(diffuse_fraction, lowest_face_space)
+end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) =
     surface_rain_flux(sim.integrator.p.atmos.moisture_model, sim.integrator)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:LW_d}) = CC.Fields.level(
+    CC.Fields.array2field(sim.integrator.p.radiation.rrtmgp_model.face_lw_flux_dn, axes(sim.integrator.u.f)),
+    CC.Utilities.half,
+)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:specific_humidity}) =
+    CC.Fields.level(sim.integrator.u.c.ρq_tot ./ sim.integrator.u.c.ρ, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
     surface_radiation_flux(sim.integrator.p.atmos.radiation_mode, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =
     surface_snow_flux(sim.integrator.p.atmos.moisture_model, sim.integrator)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d}) = CC.Fields.level(
+    CC.Fields.array2field(sim.integrator.p.radiation.rrtmgp_model.face_sw_flux_dn, axes(sim.integrator.u.f)),
+    CC.Utilities.half,
+)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_energy_flux}) =
     CC.Geometry.WVector.(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_moisture_flux}) =
@@ -201,15 +243,12 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:uv_int})
     return @. StaticArrays.SVector(uₕ_int.components.data.:1, uₕ_int.components.data.:2)
 end
 
-function Interfacer.update_field!(atmos_sim::ClimaAtmosSimulation, ::Val{:co2}, field)
-    if atmos_sim.integrator.p.atmos.radiation_mode isa CA.RRTMGPI.GrayRadiation
-        @warn("Gray radiation model initialized, skipping CO2 update", maxlog = 1)
-        return
-    else
-        atmos_sim.integrator.p.radiation.rrtmgp_model.volume_mixing_ratio_co2 .= Statistics.mean(parent(field))
-    end
-end
 # extensions required by the Interfacer
+function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:emissivity}, field)
+    # sets all 16 bands (rows) to the same values
+    sim.integrator.p.radiation.rrtmgp_model.surface_emissivity .=
+        reshape(CC.Fields.field2array(field), 1, length(parent(field)))
+end
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_direct_albedo}, field)
     sim.integrator.p.radiation.rrtmgp_model.direct_sw_surface_albedo .=
         reshape(CC.Fields.field2array(field), 1, length(parent(field)))

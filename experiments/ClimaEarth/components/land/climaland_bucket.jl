@@ -232,6 +232,7 @@ function BucketSimulation(
     else
         output_writer = nothing
         diag_cb = nothing
+        output_writer = nothing
     end
 
     integrator = SciMLBase.init(

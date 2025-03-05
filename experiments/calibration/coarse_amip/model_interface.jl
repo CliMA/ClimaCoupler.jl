@@ -17,6 +17,11 @@ function ClimaCalibrate.forward_model(iter, member)
     minibatch = EKP.get_current_minibatch(eki)
     config_dict["start_date"] = minibatch_to_start_date(minibatch)
 
+    spinup_days = 92
+    nyears = length(minibatch)
+    t_end_days = spinup_days + 365nyears
+    config_dict["t_end"] = "$(t_end_days)days"
+
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)
     config_dict["calibration_toml"] = sampled_parameter_file
@@ -26,7 +31,6 @@ function ClimaCalibrate.forward_model(iter, member)
 
     return setup_and_run(config_dict)
 end
-
 
 function minibatch_to_start_date(batch)
     start_year = minimum(batch) + 1999

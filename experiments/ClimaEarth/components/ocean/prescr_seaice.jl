@@ -1,5 +1,6 @@
 import SciMLBase
 import ClimaCore as CC
+import ClimaDiagnostics as CD
 import ClimaTimeSteppers as CTS
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
@@ -143,14 +144,36 @@ function PrescribedIceSimulation(
         tspan = Float64.(tspan)
         saveat = Float64.(saveat)
     end
+
+    # Set up a callback to read in SST data daily
+    SIC_schedule = CD.Schedules.EveryCalendarDtSchedule(TimeManager.time_to_period("1days"); start_date = date0)
+    SIC_update_cb = TimeManager.Callback(SIC_schedule, read_sic_data!)
+
     problem = SciMLBase.ODEProblem(ode_function, Y, tspan, (; cache..., params = params))
-    integrator = SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
+    integrator = SciMLBase.init(
+        problem,
+        ode_algo,
+        dt = dt,
+        saveat = saveat,
+        adaptive = false,
+        callback = SciMLBase.CallbackSet(SIC_update_cb),
+    )
 
     sim = PrescribedIceSimulation(params, space, integrator)
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)
     return sim
+end
+
+"""
+    read_sic_data!(integrator)
+
+Read in the sea ice concentration data at the current time step.
+This function is intended to be used within a callback
+"""
+function read_sic_data!(integrator)
+    evaluate!(integrator.p.area_fraction, integrator.p.SIC_timevaryinginput, integrator.t)
 end
 
 # extensions required by Interfacer
@@ -236,9 +259,6 @@ for temperature (curbed at the freezing point).
 function ice_rhs!(dY, Y, p, t)
     FT = eltype(Y)
     params = p.params
-
-    # Update the cached area fraction with the current SIC
-    evaluate!(p.area_fraction, p.SIC_timevaryinginput, t)
 
     # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
     #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)

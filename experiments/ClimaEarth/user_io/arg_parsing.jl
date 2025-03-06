@@ -236,7 +236,7 @@ function parse_component_dts!(config_dict)
     @assert all(key -> !isnothing(config_dict[key]), component_dt_names) || haskey(config_dict, "dt") "all model-specific timesteps (dt_atmos, dt_land, dt_ocean, and dt_seaice) or a generic timestep (dt) must be specified"
 
     for key in component_dt_names
-        if haskey(config_dict, key)
+        if !isnothing(config_dict[key])
             # Check if the component timestep is specified
             component_dt = Float64(Utilities.time_to_seconds(config_dict[key]))
             @assert isapprox(Δt_cpl % component_dt, 0.0) "Coupler dt must be divisible by all component dt's\n dt_cpl = $Δt_cpl\n $key = $component_dt"

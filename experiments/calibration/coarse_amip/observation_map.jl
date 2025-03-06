@@ -61,6 +61,7 @@ function process_outputvar(simdir, name)
         monthly_avgs = ClimaAnalysis.Atmos.to_pressure_coordinates(monthly_avgs, pressure)
         monthly_avgs = limit_pressure_dim_to_era5_range(monthly_avgs)
     end
+    # TODO: Ask ollie how to replace nans in a way that makes sense
     monthly_avgs = ClimaAnalysis.replace(monthly_avgs, missing => 0.0, NaN => 0.0)
     monthly_avgs = ClimaAnalysis.shift_to_start_of_previous_month(monthly_avgs)
 

@@ -2,7 +2,7 @@ FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
 checkpoint_dt: "99999days"
-coupler_toml: ["toml/amip.toml"]
+coupler_toml: ["toml/amip_no_precipitation_timescale.toml"]
 print_config_dict: true
 coupler_output_dir: "experiments/calibration/output"
 dt: "800secs"
@@ -31,54 +31,19 @@ z_elem: 39
 z_max: 60000.0
 extra_atmos_diagnostics:
   - reduction_time: average
-    short_name: rsut
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: rlut
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: rsdt
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: rsutcs
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: rlutcs
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: pr
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: ts
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: ta
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: hur
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: hus
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: clw
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: cli
-    period: 1months
-    writer: nc
-  - reduction_time: average
-    short_name: pfull
+    short_name: 
+      - rsut
+      - rlut
+      - rsdt
+      - rsutcs
+      - rlutcs
+      - pr
+      - ts
+      - ta
+      - hur
+      - hus
+      - clw
+      - cli
+      - pfull
     period: 1months
     writer: nc

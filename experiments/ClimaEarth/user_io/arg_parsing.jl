@@ -159,8 +159,8 @@ Extract the necessary arguments from the atmosphere configuration dictionary.
 function get_atmos_args(atmos_config_dict)
     dt_rad = atmos_config_dict["dt_rad"]
     output_default_diagnostics = atmos_config_dict["output_default_diagnostics"]
-
-    return (; dt_rad, output_default_diagnostics)
+    toml_files = atmos_config_dict["toml"]
+    return (; dt_rad, output_default_diagnostics, toml_files)
 end
 
 

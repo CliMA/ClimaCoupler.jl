@@ -7,6 +7,7 @@ import ClimaTimeSteppers as CTS
 import Thermodynamics as TD
 import ClimaLand as CL
 import ClimaLand.Parameters as LP
+import ClimaParams as CP
 import ClimaDiagnostics as CD
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer
 using NCDatasets
@@ -67,6 +68,7 @@ function BucketSimulation(
     energy_check::Bool,
     surface_elevation,
     use_land_diagnostics::Bool,
+    toml_files = [],
 ) where {FT, TT <: Union{Float64, ITime}}
     if config != "sphere"
         println(
@@ -112,7 +114,13 @@ function BucketSimulation(
     κ_soil = FT(1.5) # soil conductivity
     ρc_soil = FT(2e6) # soil volumetric heat capacity
 
-    params = CL.Bucket.BucketModelParameters(FT; albedo, z_0m, z_0b, τc, σS_c, W_f, κ_soil, ρc_soil)
+    params = if isempty(toml_files)
+        CL.Bucket.BucketModelParameters(FT; albedo, z_0m, z_0b, τc, σS_c, W_f, κ_soil, ρc_soil)
+    else
+        toml_dict = CP.create_toml_dict(CP.merge_toml_files(toml_files; override = true))
+        # Add τc separately because it depends on dt
+        CL.Bucket.BucketModelParameters(toml_dict; τc)
+    end
 
     n_vertical_elements = 7
     # Note that this does not take into account topography of the surface, which is OK for this land model.

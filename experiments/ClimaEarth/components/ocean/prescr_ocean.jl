@@ -3,6 +3,7 @@ import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
 import Thermodynamics as TD
 import ClimaCoupler: Checkpointer, FieldExchanger, Interfacer
+import ClimaDiagnostics as CD
 
 """
     PrescribedOceanSimulation{C}
@@ -84,6 +85,8 @@ function PrescribedOceanSimulation(
     SST_init = zeros(space)
     evaluate!(SST_init, SST_timevaryinginput, t_start)
 
+    SST_schedule = CD.Schedules.EveryCalendarDtSchedule(TimeManager.time_to_period("1days"); start_date = date0)
+
     # Create the cache
     cache = (;
         T_sfc = SST_init,
@@ -97,6 +100,7 @@ function PrescribedOceanSimulation(
         phase = TD.Liquid(),
         thermo_params = thermo_params,
         SST_timevaryinginput = SST_timevaryinginput,
+        SST_schedule = SST_schedule,
     )
     return PrescribedOceanSimulation(cache)
 end
@@ -107,10 +111,11 @@ end
     Interfacer.step!(sim::PrescribedOceanSimulation, t)
 
 Update the cached surface temperature field using the prescribed data
-at each timestep.
+at each timestep. This doesn't happen at every timestep,
+but only when the SST data is scheduled to be updated.
 """
 function Interfacer.step!(sim::PrescribedOceanSimulation, t)
-    evaluate!(sim.cache.T_sfc, sim.cache.SST_timevaryinginput, t)
+    sim.cache.SST_schedule(t) && evaluate!(sim.cache.T_sfc, sim.cache.SST_timevaryinginput, t)
 end
 
 function Checkpointer.get_model_cache(sim::PrescribedOceanSimulation)

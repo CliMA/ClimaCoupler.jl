@@ -47,6 +47,7 @@ function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
     # TOA net radiative flux
     net_rad = rlut + rsut - rsdt
     # For some reason we need to add the start date back in
+    # TODO: Make PR in climaanalysis to do this
     net_rad.attributes["start_date"] = string(start_date)
 
     # cloud radiative effect
@@ -77,13 +78,13 @@ function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
     ql = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_liquid_water_content_1deg.nc"))
     # Cloud specific ice water content
     qi = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_ice_water_content_1deg.nc"))
-    foreach((qi, )) do var
+    foreach((ql, qi, )) do var
         # Convert from hPa to Pa in-place so we don't create more huge OutputVars
         @assert var.dim_attributes[pressure_name(var)]["units"] == "hPa"
         var.dims[pressure_name(var)] .*= 100.0
         set_dim_units!(var, pressure_name(var), "Pa")
     end
-
+    # TODO: determine where time is spent here
     ql = resample(reverse_dim(reverse_dim(ql, latitude_name(ql)), pressure_name(ql)))
     qi = resample(reverse_dim(reverse_dim(qi, latitude_name(qi)), pressure_name(qi)))
 
@@ -231,7 +232,7 @@ function create_observation_vector(nt, yrs = 19)
 
     return all_observations # NOT an EKP.ObservationSeries
 end
-
+# TODO: Ask  kevin to implement in 
 downsample(var::ClimaAnalysis.OutputVar, n) = downsample(var.data, n)
 
 function downsample(arr::AbstractArray, n)

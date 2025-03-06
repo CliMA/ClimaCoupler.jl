@@ -6,6 +6,7 @@ This modules contains abstract types, interface templates and model stubs for co
 module Interfacer
 
 import SciMLBase
+import ClimaComms
 import ClimaCore as CC
 import Thermodynamics as TD
 import SciMLBase: step!, reinit! # explicitly import to extend these functions
@@ -76,6 +77,17 @@ struct CoupledSimulation{
 end
 
 CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args[1:end])...}(args...)
+
+function Base.show(io::IO, sim::CoupledSimulation)
+    device_type = nameof(typeof(ClimaComms.device(sim.comms_ctx)))
+    return print(
+        io,
+        "Coupled Simulation\n",
+        "├── Running on: $(device_type)\n",
+        "├── Output folder: $(sim.dirs.output)\n",
+        "└── Current date: $(sim.dates.date[])",
+    )
+end
 
 """
     float_type(::CoupledSimulation)

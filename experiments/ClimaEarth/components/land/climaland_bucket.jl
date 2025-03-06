@@ -1,6 +1,7 @@
 import Dates
 import SciMLBase
 import Statistics
+import ClimaComms
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
 import Thermodynamics as TD
@@ -9,6 +10,8 @@ import ClimaLand.Parameters as LP
 import ClimaDiagnostics as CD
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer
 using NCDatasets
+
+include("../shared/restore.jl")
 
 ###
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
@@ -405,6 +408,21 @@ function make_land_domain(
     fields = CL.Domains.get_additional_domain_fields(subsurface_space)
 
     return CL.Domains.SphericalShell{FT}(radius, depth, nothing, nelements, npolynomial, space, fields)
+end
+
+function Checkpointer.get_model_cache(sim::BucketSimulation)
+    return sim.integrator.p
+end
+
+function Checkpointer.restore_cache!(sim::BucketSimulation, new_cache)
+    old_cache = Checkpointer.get_model_cache(sim)
+    comms_ctx = ClimaComms.context(sim.model)
+    restore!(
+        old_cache,
+        new_cache,
+        comms_ctx,
+        ignore = Set([:rc, :params, :dss_buffer_2d, :dss_buffer_3d, :graph_context]),
+    )
 end
 
 """

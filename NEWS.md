@@ -21,6 +21,20 @@ TOA radiation and net precipitation are added only if conservation is enabled.
 The coupler fields are also now stored as a ClimaCore Field of NamedTuples,
 rather than as a NamedTuple of ClimaCore Fields.
 
+#### Restart simulations with JLD2 files PR[#1179](https://github.com/CliMA/ClimaCoupler.jl/pull/1179)
+
+`ClimaCoupler` can now use `JLD2` files to save state and cache for its model
+component, allowing it to restart from saved checkpoints. Some restrictions
+apply:
+
+- The number of MPI processes has to remain the same across checkpoints
+- Restart files are generally not portable across machines, julia versions, and package versions
+- Adding/changing new component models will probably require adding/changing code
+
+Please, refer to the
+[documentation](https://clima.github.io/ClimaCoupler.jl/dev/checkpointer/) for
+more information.
+
 #### Remove extra `get_field` functions PR[#1203](https://github.com/CliMA/ClimaCoupler.jl/pull/1203)
 Removes the `get_field` functions for `air_density` for all models, which
 were unused except for the `BucketSimulation` method, which is replaced by a

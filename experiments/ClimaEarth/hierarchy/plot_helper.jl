@@ -34,19 +34,6 @@ mean_climate_data =
     end
 
 """
-    point_timeseries_data(variable, lon_i, lat_i, lev_i)
-
-Returns the time series data for the variable `variable` at the indices `lon_i`, `lat_i`, and `lev_i`.
-"""
-point_timeseries_data =
-    (variable, lon_i, lat_i, lev_i) -> begin
-
-        variable_time_mean = mean(variable[:, lon_i[1]:lon_i[2], lat_i[1]:lat_i[2], lev_i], dims = (2, 3))[:, 1, 1]
-
-        return variable_time_mean
-    end
-
-"""
     plot_climate(var, DATA_DIR, PLOT_DIR, job_id; reduction = "inst", interpolate_to_pressure = false)
 
 Plots the zonal mean and horizontal surface slice mean of the variable `var` from the directory `DATA_DIR` and saves the plots in the directory `PLOT_DIR`.

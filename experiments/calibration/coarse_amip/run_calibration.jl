@@ -23,9 +23,10 @@ end
 output_dir = "experiments/calibration/output"
 ensemble_size = 30
 n_iterations = 9
-priors = [constrained_gaussian("liquid_cloud_effective_radius", 14e-6, 6e-6, 2.5e-6, 21.5e-6),
-constrained_gaussian("ice_cloud_effective_radius", 25e-6, 6e-6, 2.5e-6, 33e-6),
-constrained_gaussian("precipitation_timescale", 600, 400, 0, 1200)
+priors = [
+    constrained_gaussian("liquid_cloud_effective_radius", 14e-6, 6e-6, 2.5e-6, 21.5e-6),
+    constrained_gaussian("ice_cloud_effective_radius", 25e-6, 6e-6, 2.5e-6, 33e-6),
+    constrained_gaussian("precipitation_timescale", 600, 400, 0, 1200),
 ]
 prior = combine_distributions(priors)
 observation_path = joinpath(experiment_dir, "observations.jld2")

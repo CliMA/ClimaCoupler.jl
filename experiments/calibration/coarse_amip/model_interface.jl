@@ -15,11 +15,12 @@ function ClimaCalibrate.forward_model(iter, member)
     output_dir_root = config_dict["coupler_output_dir"]
     eki = JLD2.load_object(ClimaCalibrate.ekp_path(output_dir_root, iter))
     minibatch = EKP.get_current_minibatch(eki)
+    @show minibatch
     config_dict["start_date"] = minibatch_to_start_date(minibatch)
 
-    spinup_days = 92
+    spinup_time = 93days
     nyears = length(minibatch)
-    t_end_days = spinup_days + 365nyears
+    t_end_days = spinup_time + 365 * nyears
     config_dict["t_end"] = "$(t_end_days)days"
 
     # Set member parameter file
@@ -28,8 +29,17 @@ function ClimaCalibrate.forward_model(iter, member)
     # Set member output directory
     member_output_dir = ClimaCalibrate.path_to_ensemble_member(output_dir_root, iter, member)
     config_dict["coupler_output_dir"] = member_output_dir
-
-    return setup_and_run(config_dict)
+    sim = try
+        setup_and_run(config_dict)
+    catch e
+        @error "Forward model error" exception = e
+        bt = catch_backtrace()
+        println("Stacktrace:")
+        display(stacktrace(bt))
+        nothing
+    end
+    @info "Completed member $member"
+    return sim
 end
 
 function minibatch_to_start_date(batch)

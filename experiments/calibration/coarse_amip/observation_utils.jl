@@ -11,6 +11,7 @@ push!(ClimaAnalysis.Var.TIME_NAMES, "valid_time")
 const days_in_seconds = 86_400
 const months = 31days_in_seconds
 const years = 365days_in_seconds
+const spinup_time = 3months
 const start_date = DateTime(2000, 3, 1)
 const first_year_start_date = DateTime(2000, 12, 1)
 
@@ -78,7 +79,7 @@ function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
     ql = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_liquid_water_content_1deg.nc"))
     # Cloud specific ice water content
     qi = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_ice_water_content_1deg.nc"))
-    foreach((ql, qi, )) do var
+    foreach((ql, qi)) do var
         # Convert from hPa to Pa in-place so we don't create more huge OutputVars
         @assert var.dim_attributes[pressure_name(var)]["units"] == "hPa"
         var.dims[pressure_name(var)] .*= 100.0
@@ -112,6 +113,7 @@ end
 #####
 
 to_datetime(start_date, time) = DateTime(start_date) + Second(time)
+to_datetime(time) = DateTime(start_date) + Second(time)
 
 get_monthly_averages(simdir, var_name) = get(simdir; short_name = var_name, reduction = "average", period = "1M")
 

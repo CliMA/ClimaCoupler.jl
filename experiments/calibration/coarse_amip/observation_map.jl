@@ -7,35 +7,35 @@ include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/obse
 
 function ClimaCalibrate.observation_map(iteration)
     observation_vec = JLD2.load_object(observation_path)
-    single_member_dims = length(EKP.get_obs(first(observation_vec)))
+    single_member_dims = length(EKP.get_obs(first(observation_vec))) * batch_size
     G_ensemble = Array{Float64}(undef, single_member_dims, ensemble_size)
     for m in 1:ensemble_size
+        @info "Processing member $m"
         member_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
         simdir_path = joinpath(member_path, "model_config/output_active")
         try
             G_ensemble[:, m] .= process_member_data(SimDir(simdir_path))
 
         catch e
-            @warn "Error processing member $m, filling observation map entry with NaNs" exception = e
+            @error "Error processing member $m, filling observation map entry with NaNs" exception = e
+            bt = catch_backtrace()
+            println("Stacktrace:")
+            display(stacktrace(bt))
             G_ensemble[:, m] .= NaN
         end
     end
     return G_ensemble
 end
 
+# Process a single ensemble member's data into a vector
 function process_member_data(simdir::SimDir)
-    pressure = get_monthly_averages(simdir, "pfull")
-
-    rsdt_full = get_monthly_averages(simdir, "rsdt")
-    rsut_full = get_monthly_averages(simdir, "rsut")
-    rlut_full = get_monthly_averages(simdir, "rlut")
-    
-    year_net_radiation = (rlut_full + rsut_full - rsdt_full) |> average_lat |> average_lon |> average_time
-
     rsut = process_outputvar(simdir, "rsut")
     rlut = process_outputvar(simdir, "rlut")
     rsutcs = process_outputvar(simdir, "rsutcs")
     rlutcs = process_outputvar(simdir, "rlutcs")
+    rsdt = process_outputvar(simdir, "rsdt")
+    # This needs to be averaged over lat, lon, and seasons
+    net_rad = rlut + rsut - rsdt
     cre = rsut + rlut - rsutcs - rlutcs
 
     pr = process_outputvar(simdir, "pr")
@@ -45,17 +45,37 @@ function process_member_data(simdir::SimDir)
     ta = process_outputvar(simdir, "ta")
     hur = process_outputvar(simdir, "hur")
     hus = process_outputvar(simdir, "hus")
-    # clw = get_seasonal_averages(simdir, "clw")
-    # cli = get_seasonal_averages(simdir, "cli")
 
-    return vcat(year_net_radiation.data, rsut, rlut, cre, pr, ts)#, ta, hur, hus)
+    year_observations = map(1:4:length(rsut)) do year_start
+        year_end = min(year_start + 3, length(rsut))
+        yr_ind = year_start:year_end
+
+        net_rad_yr = mean(mean.(getproperty.(net_rad[yr_ind], :data)))
+
+        pr_yr = downsample_and_vectorize(pr[yr_ind])
+        rsut_yr = downsample_and_vectorize(rsut[yr_ind])
+        rlut_yr = downsample_and_vectorize(rlut[yr_ind])
+        cre_yr = downsample_and_vectorize(cre[yr_ind])
+        ts_yr = downsample_and_vectorize(ts[yr_ind])
+
+        ta_yr = downsample_and_vectorize(ta[yr_ind])
+        hur_yr = downsample_and_vectorize(hur[yr_ind])
+        hus_yr = downsample_and_vectorize(hus[yr_ind])
+        # ql, qi
+        vcat(net_rad_yr, rsut_yr, rlut_yr, cre_yr, pr_yr, ts_yr)#, ta, hur, hus)
+    end
+    return vcat(year_observations...)
 end
 
-function process_outputvar(simdir, name)
-    days = 86_400
+function downsample_and_vectorize(seasonal_avgs)
+    downsampled_seasonal_avg_arrays = downsample.(seasonal_avgs, 3)
+    return vcat(vec.(downsampled_seasonal_avg_arrays)...)
+end
 
+# Preprocess monthly averages to the right dimensions and dates, remove NaNs
+function preprocess_monthly_averages(simdir, name)
     monthly_avgs = get_monthly_averages(simdir, name)
-    # Preprocess to match observations
+    # Interpolate to pressure coordinates to match observations
     if has_altitude(monthly_avgs)
         pressure = get_monthly_averages(simdir, "pfull")
         monthly_avgs = ClimaAnalysis.Atmos.to_pressure_coordinates(monthly_avgs, pressure)
@@ -64,14 +84,87 @@ function process_outputvar(simdir, name)
     # TODO: Ask ollie how to replace nans in a way that makes sense
     monthly_avgs = ClimaAnalysis.replace(monthly_avgs, missing => 0.0, NaN => 0.0)
     monthly_avgs = ClimaAnalysis.shift_to_start_of_previous_month(monthly_avgs)
+    # Remove spinup time
+    monthly_avgs = window(monthly_avgs, "time"; left = spinup_time)
+    return monthly_avgs
+end
 
-    # Cut off first 3 months
-    single_year = window(monthly_avgs, "time"; left = 92days)
-    seasons = split_by_season_across_time(single_year)
+# Process an outputvar into a vector of seasonal averages
+function process_outputvar(simdir, name)
+    monthly_avgs = preprocess_monthly_averages(simdir, name)
+    seasons = split_by_season_across_time(monthly_avgs)
     # Ensure each season has three months
-    @assert all(map(x -> length(times(x)) == 3, seasons))
+    if !all(map(x -> length(times(x)) == 3, seasons))
+        @info "Uneven months per season, rebalancing..."
+        rebalance_months_per_season!(seasons)
+    end
     seasonal_avgs = average_time.(seasons)
 
-    downsampled_seasonal_avg_arrays = downsample.(seasonal_avgs, 3)
-    return vcat(vec.(downsampled_seasonal_avg_arrays)...)
+    return seasonal_avgs
+end
+
+function rebalance_months_per_season!(seasons)
+    months_per_season = 3
+    # Keep track of which seasons have been modified
+    modified_indices = Set{Int}()
+
+    for i in 1:(length(seasons) - 1)
+        s1, s2 = seasons[i], seasons[i + 1]
+        s1_times = s1 |> times
+        s2_times = s2 |> times
+        s1_months = length(s1_times)
+        s2_months = length(s2_times)
+
+        s1_months == s2_months == months_per_season && continue
+
+        if s1_months == 4 && s2_months == 2
+            # Pop last month of season 1, prepend to season 2
+            # Copy the data so it's not a subarray
+            first_three_months = copy(window(s1, "time"; left = s1_times[1], right = s1_times[3]).data)
+            s1_new_dims = s1.dims
+            s1_new_dims[time_name(s1)] = s1_times[1:3]
+            s1_remake = remake(s1; dims = s1_new_dims, data = first_three_months)
+
+            first_month_s2 = copy(window(s1, "time"; left = s1_times[end]).data)
+            s2_new_dims = s2.dims
+            s2_new_dims[time_name(s2)] = [s1_times[end], s2_times...]
+            s2_new_data = vcat(first_month_s2, s2.data)
+            s2_remake = remake(s2; dims = s2_new_dims, data = s2_new_data)
+
+            seasons[i] = s1_remake
+            seasons[i + 1] = s2_remake
+
+            push!(modified_indices, i, i + 1)
+
+        elseif s1_months == 2 && s2_months == 4
+            # Pop first month of season 2, append to season 1
+            first_month_s2 = copy(window(s2, "time"; left = s2_times[1], right = s2_times[1]).data)
+            s1_new_dims = s1.dims
+            s1_new_dims[time_name(s1)] = [s1_times..., s2_times[1]]
+            s1_new_data = vcat(s1.data, first_month_s2)
+            s1_remake = remake(s1; dims = s1_new_dims, data = s1_new_data)
+
+            last_three_months = copy(window(s2, "time"; left = s2_times[2], right = s2_times[end]).data)
+
+            s2_new_dims = s2.dims
+            s2_new_dims[time_name(s2)] = s2_times[2:end]
+            s2_remake = remake(s2; dims = s2_new_dims, data = last_three_months)
+
+            seasons[i] = s1_remake
+            seasons[i + 1] = s2_remake
+
+            push!(modified_indices, i, i + 1)
+
+        else
+            @info "Only one month has an imbalance. The next pair ($(i+1), $(i+2)) should address this"
+        end
+    end
+
+    # Log which seasons were modified
+    if !isempty(modified_indices)
+        @info "Modified seasons at indices: $(sort(collect(modified_indices)))"
+    else
+        @info "No seasons needed modification"
+    end
+
 end

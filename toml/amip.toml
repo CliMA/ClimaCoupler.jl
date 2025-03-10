@@ -4,6 +4,9 @@ value = 10.0
 [zd_rayleigh]
 value = 40000.0
 
+[kappa_2_sponge]
+value = 1e7
+
 [zd_viscous]
 value = 40000.0
 

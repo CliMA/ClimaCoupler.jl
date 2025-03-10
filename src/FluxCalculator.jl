@@ -127,14 +127,12 @@ TODO:
 """
 function partitioned_turbulent_fluxes!(
     model_sims::NamedTuple,
-    fields::CC.Fields.Field,
+    csf::CC.Fields.Field,
     boundary_space::CC.Spaces.AbstractSpace,
     surface_scheme,
     thermo_params::TD.Parameters.ThermodynamicsParameters,
 )
-
     atmos_sim = model_sims.atmos_sim
-    csf = fields
     FT = CC.Spaces.undertype(boundary_space)
 
     # reset coupler fields
@@ -143,69 +141,13 @@ function partitioned_turbulent_fluxes!(
     csf.F_turb_energy .*= FT(0)
     csf.F_turb_moisture .*= FT(0)
 
-    # atmos state of center level 1
-    z_int = Interfacer.get_field(atmos_sim, Val(:height_int))
-    uₕ_int = Interfacer.get_field(atmos_sim, Val(:uv_int))
-    thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
-    z_sfc = Interfacer.get_field(atmos_sim, Val(:height_sfc))
-
+    # compute the surface fluxes for each surface model and add them to `csf`
     for sim in model_sims
-        # iterate over all surface models
-        if sim isa Interfacer.SurfaceModelSimulation
-            # get area fraction (min = 0, max = 1)
-            area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
-            # get area mask [0, 1], where area_mask = 1 if area_fraction > 0
-            area_mask = Utilities.binary_mask.(area_fraction)
-
-            thermo_state_sfc = FluxCalculator.surface_thermo_state(sim, thermo_params, thermo_state_int)
-
-            # set inputs based on whether the surface_scheme is `MoninObukhovScheme` or `BulkScheme`
-            surface_params = FluxCalculator.get_surface_params(atmos_sim)
-            scheme_properties = FluxCalculator.get_scheme_properties(surface_scheme, sim)
-
-            input_args = (;
-                thermo_state_sfc,
-                thermo_state_int,
-                uₕ_int,
-                z_int,
-                z_sfc,
-                scheme_properties,
-                surface_params,
-                surface_scheme,
-                boundary_space,
-            )
-            inputs = FluxCalculator.surface_inputs(surface_scheme, input_args)
-
-            # calculate the surface fluxes
-            fluxes = FluxCalculator.get_surface_fluxes!(inputs, surface_params)
-            (; F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture) = fluxes
-
-            # perform additional diagnostics if required
-            FluxCalculator.differentiate_turbulent_fluxes!(sim, (thermo_params, input_args, fluxes))
-
-            # update fluxes in the coupler
-            fields = (;
-                F_turb_ρτxz = F_turb_ρτxz,
-                F_turb_ρτyz = F_turb_ρτyz,
-                F_turb_energy = F_shf .+ F_lhf,
-                F_turb_moisture = F_turb_moisture,
-            )
-
-            # update the fluxes of this surface model
-            FluxCalculator.update_turbulent_fluxes!(sim, fields)
-
-            # add the flux contributing from this surface to the coupler field
-            # note that the fluxes are area-weighted, so if a surface model is
-            #  not present at this point, the fluxes are zero
-            @. csf.F_turb_ρτxz += F_turb_ρτxz * area_fraction * area_mask
-            @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction * area_mask
-            @. csf.F_turb_energy += (F_shf .+ F_lhf) * area_fraction * area_mask
-            @. csf.F_turb_moisture += F_turb_moisture * area_fraction * area_mask
-        end
+        compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params, boundary_space, surface_scheme)
     end
 
     # TODO: add allowable bounds here, check explicitly that all fluxes are equal
-
+    return nothing
 end
 
 abstract type AbstractSurfaceFluxScheme end
@@ -437,6 +379,88 @@ Placeholder for the water albedo calculation from the atmosphere. It returns an 
 """
 function water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulation, ::CC.Fields.Field, ::CC.Fields.Field)
     error("this function is required to be dispatched on" * Interfacer.name(atmos_sim) * ", but no method defined")
+end
+
+"""
+    compute_surface_fluxes!(csf, sim, atmos_properties, thermo_params, boundary_space, surface_scheme)
+
+This function computes surface fluxes between the input component model
+simulation and the atmosphere.
+This is intended to be used with the partitioned fluxes option, and
+should be extended for any model that requires non-standard flux calculations.
+
+Update the input coupler surface fields `csf` in-place with the computed fluxes
+for this model. These are then summed using area-weighting across all surface
+models to get the total fluxes.
+
+Since the fluxes are computed between the input model and the atmosphere, this
+function does nothing if called on an atmosphere model simulation.
+"""
+function compute_surface_fluxes!(
+    csf,
+    sim::Interfacer.AtmosModelSimulation,
+    atmos_properties,
+    thermo_params,
+    boundary_space,
+    surface_scheme,
+)
+    return nothing
+end
+
+function compute_surface_fluxes!(
+    csf,
+    sim::Interfacer.SurfaceModelSimulation,
+    atmos_sim,
+    thermo_params,
+    boundary_space,
+    surface_scheme,
+)
+    # atmos state of center level 1
+    z_int = Interfacer.get_field(atmos_sim, Val(:height_int))
+    uₕ_int = Interfacer.get_field(atmos_sim, Val(:uv_int))
+    thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
+    z_sfc = Interfacer.get_field(atmos_sim, Val(:height_sfc))
+
+    # get area fraction (min = 0, max = 1)
+    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
+    # get area mask [0, 1], where area_mask = 1 if area_fraction > 0
+    area_mask = Utilities.binary_mask.(area_fraction)
+
+    thermo_state_sfc = FluxCalculator.surface_thermo_state(sim, thermo_params, thermo_state_int)
+
+    # set inputs based on whether the surface_scheme is `MoninObukhovScheme` or `BulkScheme`
+    surface_params = FluxCalculator.get_surface_params(atmos_sim)
+    scheme_properties = FluxCalculator.get_scheme_properties(surface_scheme, sim)
+
+    input_args = (; thermo_state_sfc, thermo_state_int, uₕ_int, z_int, z_sfc, scheme_properties, boundary_space)
+    inputs = FluxCalculator.surface_inputs(surface_scheme, input_args)
+
+    # calculate the surface fluxes
+    fluxes = FluxCalculator.get_surface_fluxes!(inputs, surface_params)
+    (; F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture) = fluxes
+
+    # perform additional diagnostics if required
+    FluxCalculator.differentiate_turbulent_fluxes!(sim, (thermo_params, input_args, fluxes))
+
+    # update fluxes in the coupler
+    fields = (;
+        F_turb_ρτxz = F_turb_ρτxz,
+        F_turb_ρτyz = F_turb_ρτyz,
+        F_turb_energy = F_shf .+ F_lhf,
+        F_turb_moisture = F_turb_moisture,
+    )
+
+    # update the fluxes of this surface model
+    FluxCalculator.update_turbulent_fluxes!(sim, fields)
+
+    # add the flux contributing from this surface to the coupler field
+    # note that the fluxes are area-weighted, so if a surface model is
+    #  not present at this point, the fluxes are zero
+    @. csf.F_turb_ρτxz += F_turb_ρτxz * area_fraction * area_mask
+    @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction * area_mask
+    @. csf.F_turb_energy += (F_shf .+ F_lhf) * area_fraction * area_mask
+    @. csf.F_turb_moisture += F_turb_moisture * area_fraction * area_mask
+    return nothing
 end
 
 end # module

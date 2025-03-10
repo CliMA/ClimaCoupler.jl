@@ -213,7 +213,8 @@ function FluxCalculator.differentiate_turbulent_fluxes!(
     inputs = surface_inputs(surface_scheme, input_args)
 
     # calculate the surface fluxes
-    _, _, F_shf_δT_sfc, F_lhf_δT_sfc, _ = get_surface_fluxes!(inputs, surface_params)
+    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
+    _, _, F_shf_δT_sfc, F_lhf_δT_sfc, _ = get_surface_fluxes!(inputs, surface_params, area_fraction)
 
     (; F_shf, F_lhf) = fluxes
 

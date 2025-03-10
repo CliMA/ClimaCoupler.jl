@@ -1,11 +1,17 @@
 using Test
 import ClimaCore as CC
+import ClimaAtmos as CA
 import ClimaCoupler
+import ClimaCoupler: FluxCalculator, Interfacer
 import Dates
+import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
-include(joinpath("..", "TestHelper.jl"))
+exp_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth")
+include(joinpath(exp_dir, "test", "TestHelper.jl"))
 import .TestHelper
-include(joinpath("..", "..", "components", "land", "climaland_integrated.jl"))
+include(joinpath(exp_dir, "components", "land", "climaland_integrated.jl"))
+include(joinpath(exp_dir, "components", "atmosphere", "climaatmos.jl"))
 
 FT = Float32
 
@@ -45,4 +51,66 @@ FT = Float32
     # Check that the drivers are correctly initialized
     driver_names = propertynames(land_sim.integrator.p.drivers)
     @test driver_names == (:P_liq, :P_snow, :c_co2, :T, :P, :q, :SW_d, :LW_d, :cosθs, :frac_diff, :soc)
+end
+
+@testset "ClimaLandSimulation flux calculations" begin
+    dt = Float64(120)
+    tspan = (Float64(0), 3.0dt)
+    start_date = Dates.DateTime(2008)
+    output_dir = pwd()
+
+    # Construct atmos and land simulation objects
+    atmos_config_file = joinpath(exp_dir, "test", "component_model_tests", "climaatmos_coarse_short.yml")
+    atmos_config = CA.AtmosConfig(atmos_config_file; job_id = "atmos_land_flux_test")
+    atmos_sim = ClimaAtmosSimulation(atmos_config)
+
+    boundary_space = ClimaCore.Spaces.horizontal_space(atmos_sim.domain.face_space)
+    area_fraction = ClimaCore.Fields.ones(boundary_space)
+    land_sim = ClimaLandSimulation(FT, dt, tspan, start_date, output_dir, boundary_space, area_fraction)
+    model_sims = (; land_sim = land_sim, atmos_sim = atmos_sim)
+
+    # Construct a coupler fields object
+    coupler_fluxes = (;
+        :F_turb_ρτxz => CC.Fields.zeros(boundary_space),
+        :F_turb_ρτyz => CC.Fields.zeros(boundary_space),
+        :F_turb_energy => CC.Fields.zeros(boundary_space),
+        :F_turb_moisture => CC.Fields.zeros(boundary_space),
+        :temp1 => CC.Fields.zeros(boundary_space),
+        :temp2 => CC.Fields.zeros(boundary_space),
+    )
+
+    # Initialize the coupler fields so we can perform exchange
+    coupler_field_names = Interfacer.default_coupler_fields()
+    map(sim -> Interfacer.add_coupler_fields!(coupler_field_names, sim), values(model_sims))
+    coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
+    flux_type = FluxCalculator.PartitionedStateFluxes()
+
+    # Step the atmosphere once to get non-zero wind and humidity
+    Interfacer.step!(atmos_sim, dt)
+
+    # Exchange the initial conditions between atmosphere and land
+    # This also tests the `get_field`, `update_field!` and `update_model_sims!` methods for `ClimaLandSimulation`
+    FieldExchanger.import_combined_surface_fields!(coupler_fields, model_sims, flux_type)
+    FieldExchanger.import_atmos_fields!(coupler_fields, model_sims, boundary_space, flux_type)
+    FieldExchanger.update_model_sims!(model_sims, coupler_fields, flux_type)
+
+    # Update land cache variables with the updated drivers in the cache after the exchange
+    update_aux! = ClimaLand.make_update_aux(land_sim.model)
+    update_aux!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
+
+    # Compute the surface fluxes
+    FluxCalculator.compute_surface_fluxes!(coupler_fluxes, land_sim, atmos_sim, boundary_space, nothing, nothing)
+
+    # Check that the fluxes have been changed
+    zero_field = CC.Fields.zeros(boundary_space)
+    @test coupler_fluxes.F_turb_ρτxz != zero_field
+    @test coupler_fluxes.F_turb_ρτyz != zero_field
+    @test coupler_fluxes.F_turb_energy != zero_field
+    @test coupler_fluxes.F_turb_moisture != zero_field
+
+    # Check that the fluxes don't contain any NaNs
+    @test !any(isnan, coupler_fluxes.F_turb_ρτxz)
+    @test !any(isnan, coupler_fluxes.F_turb_ρτyz)
+    @test !any(isnan, coupler_fluxes.F_turb_energy)
+    @test !any(isnan, coupler_fluxes.F_turb_moisture)
 end

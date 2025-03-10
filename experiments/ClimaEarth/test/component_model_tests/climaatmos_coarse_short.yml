@@ -1,0 +1,26 @@
+FLOAT_TYPE: "Float32"
+aerosol_radiation: true
+approximate_linear_solve_iters: 2
+co2: "maunaloa"
+dt: 120secs
+dt_cloud_fraction: 1hours
+dt_rad: 1hours
+dt_save_state_to_disk: "Inf"
+dt_save_to_sol: "Inf"
+dz_bottom: 30.0
+dz_top: 3000.0
+h_elem: 4
+implicit_diffusion: true
+insolation: "timevarying"
+moist: equil
+output_default_diagnostics: false
+precip_model: 0M
+prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
+prescribe_ozone: true
+rad: allskywithclear
+surface_setup: DefaultMoninObukhov
+t_end: 240secs
+turb_flux_partition: "CombinedStateFluxesMOST"
+vert_diff: "DecayWithHeightDiffusion"
+z_elem: 39
+z_max: 55000.0

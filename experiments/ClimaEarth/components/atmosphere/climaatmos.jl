@@ -453,8 +453,10 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_
 
     # The Atmos `get_simulation` function expects the atmos config to contains its timestep size
     # in the `dt` field. If there is a `dt_atmos` field in coupler_dict, we add it to the atmos config as `dt`
-    dt_atmos = haskey(coupler_dict, "dt_atmos") ? coupler_dict["dt_atmos"] : coupler_dict["dt"]
-    atmos_config["dt"] = dt_atmos
+    component_dt_dict = coupler_dict["component_dt_dict"]
+    dt_atmos = haskey(component_dt_dict, "dt_atmos") ? component_dt_dict["dt_atmos"] : component_dt_dict["dt"]
+    # convert from number of seconds to a string that atmos can parse
+    atmos_config["dt"] = string(dt_atmos) * "secs"
 
     # set restart file to the initial file saved in this location if it is not nothing
     # TODO this is hardcoded and should be fixed once we have a better restart system

@@ -6,6 +6,23 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Shared component `dt` can be overwritten for individual components
+Previously, we required that the user either specify a shared `dt` to be
+used by all component models, or specify values for all component models
+(`dt_atmos`, `dt_ocean`, `dt_seaice`, `dt_land`). If fewer than 4
+model-specific timesteps were provided, they would be discarded and
+`dt` would be used uniformly instead. After this PR, if a user provides
+fewer than 4 model-specific timesteps, they will be used for those models,
+and the generic `dt` will be used for any models that don't have a more
+specific timestep.
+This makes choosing the timesteps simpler and allows us to easily set
+specific `dt`s only for the models we're interested in.
+
+This PR also changes the prescribed ocean and sea ice simulations
+to update the stored SST/SIC based on a daily schedule. Now, the
+input data will be interpolated from monthly to daily instead of
+to every timestep.
+
 #### Add default `get_field` methods for surface models PR[#1210](https://github.com/CliMA/ClimaCoupler.jl/pull/1210)
 Add default methods for `get_field` methods that are commonly
 not extended for surface models. These return reasonable default

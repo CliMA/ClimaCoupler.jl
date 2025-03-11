@@ -51,11 +51,11 @@ function argparse_settings()
         arg_type = String
         default = "20000101"
         "--dt_cpl"
-        help = "Coupling time step in seconds [400 (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Inf\"]"
+        help = "Coupling time step in seconds [400secs (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Inf\"]"
         arg_type = String
         default = "400secs"
         "--dt"
-        help = "Component model time step [allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Inf\"]"
+        help = "Component model time step [400secs (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Inf\"]"
         arg_type = String
         default = "400secs"
         "--dt_atmos"

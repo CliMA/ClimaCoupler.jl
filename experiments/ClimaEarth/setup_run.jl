@@ -527,7 +527,7 @@ function setup_and_run(config_dict::AbstractDict)
     NB: Eventually, we will call all of radiation from the coupler, in addition to the albedo calculation.
     =#
     schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = date0)
-    checkpoint_cb = TimeManager.TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
+    checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
 
     if sim_mode <: AMIPMode
         schedule_albedo = EveryCalendarDtSchedule(TimeManager.time_to_period(dt_rad); start_date = date0)

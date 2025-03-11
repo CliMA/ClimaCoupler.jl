@@ -232,27 +232,20 @@ function parse_component_dts!(config_dict)
     # Specify component model names
     component_dt_names = ["dt_atmos", "dt_land", "dt_ocean", "dt_seaice"]
     component_dt_dict = Dict{String, typeof(Δt_cpl)}()
-    # check if all component dt's are specified
-    if all(key -> !isnothing(config_dict[key]), component_dt_names)
-        # when all component dt's are specified, ignore the dt field
-        if haskey(config_dict, "dt")
-            @warn "Removing dt in favor of individual component dt's"
-            delete!(config_dict, "dt")
-        end
-        for key in component_dt_names
+
+    @assert all(key -> !isnothing(config_dict[key]), component_dt_names) || haskey(config_dict, "dt") "all model-specific timesteps (dt_atmos, dt_land, dt_ocean, and dt_seaice) or a generic timestep (dt) must be specified"
+
+    for key in component_dt_names
+        if !isnothing(config_dict[key])
+            # Check if the component timestep is specified
             component_dt = Float64(Utilities.time_to_seconds(config_dict[key]))
             @assert isapprox(Δt_cpl % component_dt, 0.0) "Coupler dt must be divisible by all component dt's\n dt_cpl = $Δt_cpl\n $key = $component_dt"
             component_dt_dict[key] = component_dt
-        end
-    else
-        # when not all component dt's are specified, use the dt field
-        @assert haskey(config_dict, "dt") "dt or (dt_atmos, dt_land, dt_ocean, and dt_seaice) must be specified"
-        for key in component_dt_names
-            if !isnothing(config_dict[key])
-                @warn "Removing $key from config in favor of dt because not all component dt's are specified"
-            end
-            delete!(config_dict, key)
-            component_dt_dict[key] = Float64(Utilities.time_to_seconds(config_dict["dt"]))
+        else
+            # If the component timestep is not specified, use the generic timestep
+            dt = Float64(Utilities.time_to_seconds(config_dict["dt"]))
+            @assert isapprox(Δt_cpl % dt, 0.0) "Coupler dt must be divisible by all component dt's\n dt_cpl = $Δt_cpl\n dt = $dt"
+            component_dt_dict[key] = dt
         end
     end
     config_dict["component_dt_dict"] = component_dt_dict

@@ -415,7 +415,7 @@ function compute_surface_fluxes!(
     boundary_space,
     surface_scheme,
 )
-    # atmos state of center level 1
+    # `_int` refers to atmos state of center level 1
     z_int = Interfacer.get_field(atmos_sim, Val(:height_int))
     uₕ_int = Interfacer.get_field(atmos_sim, Val(:uv_int))
     thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
@@ -460,6 +460,30 @@ function compute_surface_fluxes!(
     @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction * area_mask
     @. csf.F_turb_energy += (F_shf .+ F_lhf) * area_fraction * area_mask
     @. csf.F_turb_moisture += F_turb_moisture * area_fraction * area_mask
+    return nothing
+end
+
+function compute_surface_fluxes!(
+    csf,
+    sim::Interfacer.ClimaLandSimulation,
+    atmos_sim,
+    thermo_params,
+    boundary_space,
+    surface_scheme,
+)
+    # `_int` refers to atmos state of center level 1
+    z_int = Interfacer.get_field(atmos_sim, Val(:height_int))
+    uₕ_int = Interfacer.get_field(atmos_sim, Val(:uv_int))
+    thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
+    z_sfc = Interfacer.get_field(atmos_sim, Val(:height_sfc))
+
+    atmos_properties = (; z_int, uₕ_int, thermo_state_int, z_sfc)
+
+    model = sim.model
+    Y, p, t = model.integrator.u, model.integrator.p, model.integrator.t
+
+    # update `csf` in-place using this model's flux calculation
+    coupler_land_turbulent_fluxes!(csf, atmos_properties, model, Y, p, t)
     return nothing
 end
 

@@ -143,7 +143,7 @@ function partitioned_turbulent_fluxes!(
 
     # compute the surface fluxes for each surface model and add them to `csf`
     for sim in model_sims
-        compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params, boundary_space, surface_scheme)
+        compute_surface_fluxes!(csf, sim, atmos_sim, boundary_space, thermo_params, surface_scheme)
     end
 
     # TODO: add allowable bounds here, check explicitly that all fluxes are equal
@@ -382,7 +382,7 @@ function water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulatio
 end
 
 """
-    compute_surface_fluxes!(csf, sim, atmos_properties, thermo_params, boundary_space, surface_scheme)
+    compute_surface_fluxes!(csf, sim, atmos_properties, boundary_space, thermo_params, surface_scheme)
 
 This function computes surface fluxes between the input component model
 simulation and the atmosphere.
@@ -395,24 +395,33 @@ models to get the total fluxes.
 
 Since the fluxes are computed between the input model and the atmosphere, this
 function does nothing if called on an atmosphere model simulation.
+
+# Arguments
+- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_turb_energy`, `F_turb_moisture`.
+- `sim`: [Interfacer.ComponentModelSimulation] the surface simulation to compute fluxes for.
+- `atmos_sim`: [Interfacer.AtmosModelSimulation] the atmosphere simulation to compute fluxes with.
+- `boundary_space`: [CC.Spaces.AbstractSpace] the space of the coupler surface.
+- `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
+- `surface_scheme`: [AbstractSurfaceFluxScheme] the surface flux scheme.
 """
 function compute_surface_fluxes!(
     csf,
     sim::Interfacer.AtmosModelSimulation,
-    atmos_properties,
-    thermo_params,
+    atmos_sim::Interfacer.AtmosModelSimulation,
     boundary_space,
+    thermo_params,
     surface_scheme,
 )
+    # do nothing for atmos model
     return nothing
 end
 
 function compute_surface_fluxes!(
     csf,
     sim::Interfacer.SurfaceModelSimulation,
-    atmos_sim,
-    thermo_params,
+    atmos_sim::Interfacer.AtmosModelSimulation,
     boundary_space,
+    thermo_params,
     surface_scheme,
 )
     # `_int` refers to atmos state of center level 1
@@ -466,25 +475,85 @@ end
 function compute_surface_fluxes!(
     csf,
     sim::Interfacer.ClimaLandSimulation,
-    atmos_sim,
-    thermo_params,
+    atmos_sim::Interfacer.AtmosModelSimulation,
     boundary_space,
-    surface_scheme,
+    _,
+    _,
 )
     # `_int` refers to atmos state of center level 1
     z_int = Interfacer.get_field(atmos_sim, Val(:height_int))
     uₕ_int = Interfacer.get_field(atmos_sim, Val(:uv_int))
     thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
-    z_sfc = Interfacer.get_field(atmos_sim, Val(:height_sfc))
+    gustiness = CC.Spaces.undertype(boundary_space)(1)
+    # package atmos properties into a NamedTuple that bridges land/coupler naming differences
+    atmos_properties = (; u = uₕ_int, h = z_int, thermal_state = thermo_state_int, gustiness = gustiness)
 
-    atmos_properties = (; z_int, uₕ_int, thermo_state_int, z_sfc)
+    # get area fraction (min = 0, max = 1)
+    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
+    # get area mask [0, 1], where area_mask = 1 if area_fraction > 0
+    area_mask = Utilities.binary_mask.(area_fraction)
+    coupler_area_info = (; area_fraction, area_mask)
 
     model = sim.model
     Y, p, t = model.integrator.u, model.integrator.p, model.integrator.t
 
     # update `csf` in-place using this model's flux calculation
-    coupler_land_turbulent_fluxes!(csf, atmos_properties, model, Y, p, t)
+    fluxes = coupler_land_turbulent_fluxes!(model, Y, p, t, atmos_properties)
+    (; F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture) = fluxes
+
+    # add the flux contributing from this surface to the coupler field
+    # note that the fluxes are area-weighted, so if a surface model is
+    #  not present at this point, the fluxes are zero
+    @. csf.F_turb_ρτxz += F_turb_ρτxz * area_fraction * area_mask
+    @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction * area_mask
+    @. csf.F_turb_energy += (F_shf .+ F_lhf) * area_fraction * area_mask
+    @. csf.F_turb_moisture += F_turb_moisture * area_fraction * area_mask
     return nothing
 end
 
+"""
+    coupler_land_turbulent_fluxes(model, Y, p, t, atmos_properties)
+
+Compute the turbulent fluxes for the integrated land model by computing them
+for each subcomponent, then combining them.
+It takes in 4 arguments related to the land model simulation: `model`, `Y`, `p`, and `t`.
+It also takes in `atmos_properties`, a NamedTuple containing the atmospheric properties
+required for the flux calculation: `u`, `h`, `thermal_state`, and `gustiness`.
+
+This function is independent of coupler objects/structure, and should be added
+either in ClimaLand.jl or in the climaland.jl file in ClimaCoupler.jl.
+
+Note that this function is currently allocating. We should rewrite it/allocate
+space so that it can update fields in-place instead.
+"""
+function coupler_land_turbulent_fluxes(model::ClimaLand.LandModel, Y, p, t, atmos_properties::NamedTuple)
+    # compute the fluxes for each sub-component and update the land model cache
+    soil_dest = p.soil.turbulent_fluxes
+    ClimaLand.coupler_compute_turbulent_fluxes!(soil_dest, model.soil, atmos_properties, Y, p, t)
+
+    snow_dest = p.snow.turbulent_fluxes
+    ClimaLand.coupler_compute_turbulent_fluxes!(snow_dest, model.snow, atmos_properties, Y, p, t)
+
+    canopy_dest = p.canopy.energy.turbulent_fluxes
+    ClimaLand.coupler_compute_turbulent_fluxes!(canopy_dest, model.canopy, atmos_properties, Y, p, t)
+
+    # combine fluxes from each component of the land model
+    F_lhf =
+        canopy_dest.lhf + soil_dest.lhf * (1 - p.snow.snow_cover_fraction) + p.snow.snow_cover_fraction * snow_dest.lhf
+    F_shf =
+        canopy_dest.shf + soil_dest.shf * (1 - p.snow.snow_cover_fraction) + p.snow.snow_cover_fraction * snow_dest.shf
+    F_turb_moisture =
+        canopy_dest.transpiration +
+        (soil_dest.vapor_flux_liq + soil_dest.vapor_flux_ice) * (1 - p.snow.snow_cover_fraction) +
+        p.snow.snow_cover_fraction * snow_dest.vapor_flux
+    # TODO get F_turb_ρτxz, F_turb_ρτyz - these are output from SF.surface_conditions
+
+    return (;
+        # F_turb_ρτxz = F_turb_ρτxz,
+        # F_turb_ρτyz = F_turb_ρτyz,
+        F_shf = F_shf,
+        F_lhf = F_lhf,
+        F_turb_moisture = F_turb_moisture,
+    )
+end
 end # module

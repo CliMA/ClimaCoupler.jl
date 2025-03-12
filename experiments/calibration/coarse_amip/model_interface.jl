@@ -15,12 +15,12 @@ function ClimaCalibrate.forward_model(iter, member)
     output_dir_root = config_dict["coupler_output_dir"]
     eki = JLD2.load_object(ClimaCalibrate.ekp_path(output_dir_root, iter))
     minibatch = EKP.get_current_minibatch(eki)
-    @show minibatch
+    @info "Current minibatch: $minibatch"
     config_dict["start_date"] = minibatch_to_start_date(minibatch)
 
-    spinup_time = 93days
+    spinup_days = 92
     nyears = length(minibatch)
-    t_end_days = spinup_time + 365 * nyears
+    t_end_days = spinup_days + 365 * nyears
     config_dict["t_end"] = "$(t_end_days)days"
 
     # Set member parameter file

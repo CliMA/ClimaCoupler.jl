@@ -548,6 +548,14 @@ function coupler_land_turbulent_fluxes(model::ClimaLand.LandModel, Y, p, t, atmo
         p.snow.snow_cover_fraction * snow_dest.vapor_flux
     # TODO get F_turb_ρτxz, F_turb_ρτyz - these are output from SF.surface_conditions
 
+    # At locations where this surface model is not evaluated, we get `NaN` for
+    # surface fluxes. In that case, we replace the values with 0.
+    # @. F_turb_ρτxz = ifelse(isnan(F_turb_ρτxz), zero(F_turb_ρτxz), F_turb_ρτxz)
+    # @. F_turb_ρτyz = ifelse(isnan(F_turb_ρτyz), zero(F_turb_ρτyz), F_turb_ρτyz)
+    @. F_shf = ifelse(isnan(F_shf), zero(F_shf), F_shf)
+    @. F_lhf = ifelse(isnan(F_lhf), zero(F_lhf), F_lhf)
+    @. F_turb_moisture = ifelse(isnan(F_turb_moisture), zero(F_turb_moisture), F_turb_moisture)
+
     return (;
         # F_turb_ρτxz = F_turb_ρτxz,
         # F_turb_ρτyz = F_turb_ρτyz,

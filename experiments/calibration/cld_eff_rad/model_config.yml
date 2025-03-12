@@ -12,7 +12,7 @@ dt_save_state_to_disk: "99999days"
 dt_save_to_sol: "99999days"
 dz_bottom: 100.0
 energy_check: false
-h_elem: 3
+h_elem: 30
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
@@ -21,9 +21,9 @@ output_default_diagnostics: false
 use_coupler_diagnostics: false
 radiation_reset_rng_seed: true
 rayleigh_sponge: true
-start_date: "20000901"
+start_date: "20091001"
 surface_setup: "PrescribedSurface"
-t_end: "457days"
+t_end: "124days" # 4 months
 topography: "Earth"
 topo_smoothing: true
 turb_flux_partition: "CombinedStateFluxesMOST"
@@ -34,10 +34,6 @@ extra_atmos_diagnostics:
   - reduction_time: average
     short_name: 
       - rsut
-      - rlut
-      - rsdt
       - rsutcs
-      - rlutcs
-      - pfull
     period: 1months
     writer: nc

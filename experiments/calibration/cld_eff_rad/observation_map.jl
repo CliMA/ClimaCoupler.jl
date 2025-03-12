@@ -30,16 +30,14 @@ end
 # Process a single ensemble member's data into a vector
 function process_member_data(simdir::SimDir)
     rsut = preprocess_monthly_averages(simdir, "rsut")
-    rlut = preprocess_monthly_averages(simdir, "rlut")
     rsutcs = preprocess_monthly_averages(simdir, "rsutcs")
-    rlutcs = preprocess_monthly_averages(simdir, "rlutcs")
-    cre = rsut + rlut - rsutcs - rlutcs
-
+    cre = rsut - rsutcs
     return vcat(vec(rsut.data), vec(cre.data))
 end
 
 # Preprocess monthly averages to the right dimensions and dates, remove NaNs
-spinup_time = 0
+days = 86_400
+spinup_time = 92days
 function preprocess_monthly_averages(simdir, name)
     monthly_avgs = get_monthly_averages(simdir, name)
     # TODO: Replace NaNs with global mean

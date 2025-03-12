@@ -10,7 +10,7 @@ import EnsembleKalmanProcesses as EKP
 
 include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_map.jl"))
 
-addprocs(CAL.SlurmManager())
+# addprocs(CAL.SlurmManager())
 
 # Make variables and the forward model available on the worker sessions
 @everywhere begin
@@ -21,19 +21,19 @@ end
 
 # Experiment Configuration
 output_dir = "experiments/calibration/output"
-ensemble_size = 30
-n_iterations = 9
+ensemble_size = 20
+n_iterations = 5
 priors = [
     constrained_gaussian("liquid_cloud_effective_radius", 14e-6, 6e-6, 2.5e-6, 21.5e-6),
     constrained_gaussian("ice_cloud_effective_radius", 25e-6, 6e-6, 2.5e-6, 33e-6),
 ]
 prior = combine_distributions(priors)
-
-# TODO: Add observation
+obs_path = joinpath(experiment_dir, "observations.jld2")
+observations = JLD2.load_object(obs_path)
 
 eki = EKP.EnsembleKalmanProcess(
     EKP.construct_initial_ensemble(prior, ensemble_size),
-    observation_series,
+    observations,
     EKP.TransformInversion(),
     verbose=true
 )

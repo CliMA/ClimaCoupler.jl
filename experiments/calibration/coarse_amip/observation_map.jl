@@ -10,9 +10,9 @@ function ClimaCalibrate.observation_map(iteration)
     single_member_dims = length(EKP.get_obs(first(observation_vec))) * batch_size
     G_ensemble = Array{Float64}(undef, single_member_dims, ensemble_size)
     for m in 1:ensemble_size
-        @info "Processing member $m"
         member_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
         simdir_path = joinpath(member_path, "model_config/output_active")
+        @info "Processing member $m: $simdir_path"
         try
             G_ensemble[:, m] .= process_member_data(SimDir(simdir_path))
 
@@ -45,7 +45,7 @@ function process_member_data(simdir::SimDir)
     ta = process_outputvar(simdir, "ta")
     hur = process_outputvar(simdir, "hur")
     hus = process_outputvar(simdir, "hus")
-
+    # Map over each year
     year_observations = map(1:4:length(rsut)) do year_start
         year_end = min(year_start + 3, length(rsut))
         yr_ind = year_start:year_end
@@ -62,7 +62,7 @@ function process_member_data(simdir::SimDir)
         hur_yr = downsample_and_vectorize(hur[yr_ind])
         hus_yr = downsample_and_vectorize(hus[yr_ind])
         # ql, qi
-        vcat(net_rad_yr, rsut_yr, rlut_yr, cre_yr, pr_yr, ts_yr)#, ta, hur, hus)
+        vcat(net_rad_yr, rsut_yr, rlut_yr, cre_yr, pr_yr, ts_yr, ta_yr, hur_yr, hus_yr)
     end
     return vcat(year_observations...)
 end
@@ -70,6 +70,16 @@ end
 function downsample_and_vectorize(seasonal_avgs)
     downsampled_seasonal_avg_arrays = downsample.(seasonal_avgs, 3)
     return vcat(vec.(downsampled_seasonal_avg_arrays)...)
+end
+
+# Process an outputvar into a vector of seasonal averages
+function process_outputvar(simdir, name)
+    monthly_avgs = preprocess_monthly_averages(simdir, name)
+    seasons = split_monthly_averages_into_seasons(monthly_avgs)
+    # Ensure each season has three months
+    @assert all(map(x -> length(times(x)) == 3, seasons))
+    seasonal_avgs = average_time.(seasons)
+    return seasonal_avgs
 end
 
 # Preprocess monthly averages to the right dimensions and dates, remove NaNs
@@ -81,26 +91,23 @@ function preprocess_monthly_averages(simdir, name)
         monthly_avgs = ClimaAnalysis.Atmos.to_pressure_coordinates(monthly_avgs, pressure)
         monthly_avgs = limit_pressure_dim_to_era5_range(monthly_avgs)
     end
-    # TODO: Ask ollie how to replace nans in a way that makes sense
-    monthly_avgs = ClimaAnalysis.replace(monthly_avgs, missing => 0.0, NaN => 0.0)
+    # TODO: Replace NaNs with global mean
+    monthly_avgs = ClimaAnalysis.replace(monthly_avgs, NaN => 0.0)
     monthly_avgs = ClimaAnalysis.shift_to_start_of_previous_month(monthly_avgs)
     # Remove spinup time
     monthly_avgs = window(monthly_avgs, "time"; left = spinup_time)
     return monthly_avgs
 end
 
-# Process an outputvar into a vector of seasonal averages
-function process_outputvar(simdir, name)
-    monthly_avgs = preprocess_monthly_averages(simdir, name)
-    seasons = split_by_season_across_time(monthly_avgs)
-    # Ensure each season has three months
-    if !all(map(x -> length(times(x)) == 3, seasons))
-        @info "Uneven months per season, rebalancing..."
-        rebalance_months_per_season!(seasons)
-    end
-    seasonal_avgs = average_time.(seasons)
+function split_monthly_averages_into_seasons(monthly_avgs)
+    all_times = times(monthly_avgs)
+    @assert length(all_times) % 3 == 0
 
-    return seasonal_avgs
+    # Window over 3 months at a time to create seasonal outputvars
+    split_by_seasons = map(all_times[1:3:end]) do t
+        window(monthly_avgs, "time"; left = t, right = t + 2months)
+    end
+    return split_by_seasons
 end
 
 function rebalance_months_per_season!(seasons)

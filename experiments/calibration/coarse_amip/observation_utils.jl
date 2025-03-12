@@ -75,19 +75,19 @@ function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
     # specific humidity
     hus = resample(era5_outputvar(joinpath(obs_dir, "era5_monthly_avg_pressure_level_q.nc")))
 
-    # Cloud specific liquid water content
-    ql = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_liquid_water_content_1deg.nc"))
-    # Cloud specific ice water content
-    qi = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_ice_water_content_1deg.nc"))
-    foreach((ql, qi)) do var
-        # Convert from hPa to Pa in-place so we don't create more huge OutputVars
-        @assert var.dim_attributes[pressure_name(var)]["units"] == "hPa"
-        var.dims[pressure_name(var)] .*= 100.0
-        set_dim_units!(var, pressure_name(var), "Pa")
-    end
+    # # Cloud specific liquid water content
+    # ql = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_liquid_water_content_1deg.nc"))
+    # # Cloud specific ice water content
+    # qi = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_ice_water_content_1deg.nc"))
+    # foreach((ql, qi)) do var
+    #     # Convert from hPa to Pa in-place so we don't create more huge OutputVars
+    #     @assert var.dim_attributes[pressure_name(var)]["units"] == "hPa"
+    #     var.dims[pressure_name(var)] .*= 100.0
+    #     set_dim_units!(var, pressure_name(var), "Pa")
+    # end
     # TODO: determine where time is spent here
-    ql = resample(reverse_dim(reverse_dim(ql, latitude_name(ql)), pressure_name(ql)))
-    qi = resample(reverse_dim(reverse_dim(qi, latitude_name(qi)), pressure_name(qi)))
+    # ql = resample(reverse_dim(reverse_dim(ql, latitude_name(ql)), pressure_name(ql)))
+    # qi = resample(reverse_dim(reverse_dim(qi, latitude_name(qi)), pressure_name(qi)))
 
     return (; rlut, rsut, rsutcs, rlutcs, pr, net_rad, cre, shf, ts, ta, hur, hus)#, ql, qi)
 end
@@ -111,7 +111,10 @@ end
 #####
 # Processing to create EKP.ObservationSeries
 #####
-
+function to_datetime(var::OutputVar)
+    start_date = DateTime(var.attributes["start_date"], dateformat"yyyy-mm-ddTHH:MM:SS")
+    return [start_date + Second(t) for t in times(var)]
+end
 to_datetime(start_date, time) = DateTime(start_date) + Second(time)
 to_datetime(time) = DateTime(start_date) + Second(time)
 
@@ -140,14 +143,17 @@ function get_yearly_averages(var)
     return year_averaged_matrices
 end
 
-# Given an outputvar, compute the standard deviation at each point for each season.
+# TODO: compute seasonal stdev properly
 function get_seasonal_stdev(output_var)
     all_seasonal_averages = get_seasonal_averages(output_var)
     all_seasonal_averages = downsample.(all_seasonal_averages, 3)
-    seasonal_average_matrix = cat(all_seasonal_averages...; dims = 3)
-    interannual_stdev = std(seasonal_average_matrix, dims = 3)
-    # TODO: Add spatial variance
-    return dropdims(interannual_stdev; dims = 3)
+    
+    # Determine dimensionality of the data
+    dims = ndims(all_seasonal_averages[1]) + 1
+    
+    seasonal_average_matrix = cat(all_seasonal_averages...; dims)
+    interannual_stdev = std(seasonal_average_matrix; dims)
+    return dropdims(interannual_stdev; dims)
 end
 
 # Given an outputvar, compute the covariance for each season.
@@ -226,15 +232,15 @@ function create_observation_vector(nt, yrs = 19)
         # shf_obs = make_single_year_of_seasonal_observations(shf, yr)
         ts_obs = make_single_year_of_seasonal_observations(ts, yr)
 
-        # ta_obs = make_single_year_of_seasonal_observations(ta, yr)
-        # hur_obs = make_single_year_of_seasonal_observations(hur, yr)
-        # hus_obs = make_single_year_of_seasonal_observations(hus, yr)
-        EKP.combine_observations([net_rad_obs, rsut_obs, rlut_obs, cre_obs, pr_obs, ts_obs])#, ta_obs, hur_obs, hus_obs])
+        ta_obs = make_single_year_of_seasonal_observations(ta, yr)
+        hur_obs = make_single_year_of_seasonal_observations(hur, yr)
+        hus_obs = make_single_year_of_seasonal_observations(hus, yr)
+        EKP.combine_observations([net_rad_obs, rsut_obs, rlut_obs, cre_obs, pr_obs, ts_obs, ta_obs, hur_obs, hus_obs])
     end
 
     return all_observations # NOT an EKP.ObservationSeries
 end
-# TODO: Ask  kevin to implement in 
+# TODO: Ask  kevin to implement in ClimaAnalysis
 downsample(var::ClimaAnalysis.OutputVar, n) = downsample(var.data, n)
 
 function downsample(arr::AbstractArray, n)

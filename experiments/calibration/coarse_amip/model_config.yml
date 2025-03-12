@@ -1,5 +1,5 @@
 FLOAT_TYPE: "Float32"
-use_itime: true
+# use_itime: true
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
 checkpoint_dt: "99999days"

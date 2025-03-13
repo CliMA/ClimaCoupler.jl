@@ -2,7 +2,7 @@ FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 #atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
 atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
-checkpoint_dt: "720hours"
+checkpoint_dt: "1200hours"
 coupler_toml: ["toml/amip.toml"]
 deep_atmosphere: true
 dt: "240secs"
@@ -34,4 +34,4 @@ extra_atmos_diagnostics:
     reduction_time: average
     period: "1months"
   - short_name: [ts, ta, thetaa, ha, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, hussfc, evspsbl, pr, rv, ke]
-    period: "12hours"
+    period: "24hours"

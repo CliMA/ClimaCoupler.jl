@@ -269,7 +269,7 @@ function create_canopy_args(::Type{FT}, domain, earth_param_set, start_date) whe
     # Set up photosynthesis
     photosynthesis_args = (; parameters = CL.Canopy.FarquharParameters(FT, is_c3; Vcmax25 = Vcmax25))
     # Set up plant hydraulics
-    modis_lai_artifact_path = CL.Artifacts.modis_lai_forcing_data2008_path()
+    modis_lai_artifact_path = CL.Artifacts.modis_lai_forcing_data_path()
     modis_lai_ncdata_path = joinpath(modis_lai_artifact_path, "Yuan_et_al_2008_1x1.nc")
     LAIfunction = CL.prescribed_lai_modis(
         modis_lai_ncdata_path,

@@ -3,7 +3,6 @@ import ClimaCalibrate
 import ClimaCoupler
 import JLD2
 import EnsembleKalmanProcesses as EKP
-include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_utils.jl"))
 
 function ClimaCalibrate.observation_map(iteration)
     observation_vec = JLD2.load_object(observation_path)
@@ -31,13 +30,13 @@ end
 function process_member_data(simdir::SimDir)
     rsut = preprocess_monthly_averages(simdir, "rsut")
     rsutcs = preprocess_monthly_averages(simdir, "rsutcs")
-    cre = rsut - rsutcs
+    cre = rsutcs - rsut
     return vcat(vec(rsut.data), vec(cre.data))
 end
 
 # Preprocess monthly averages to the right dimensions and dates, remove NaNs
 days = 86_400
-spinup_time = 92days
+spinup_time = 93days
 function preprocess_monthly_averages(simdir, name)
     monthly_avgs = get_monthly_averages(simdir, name)
     # TODO: Replace NaNs with global mean

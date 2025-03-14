@@ -8,7 +8,7 @@ include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.j
 
 function ClimaCalibrate.forward_model(iter, member)
 
-    config_file = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "coarse_amip", "model_config.yml")
+    config_file = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "cld_eff_rad", "model_config.yml")
     config_dict = get_coupler_config_dict(config_file)
 
     output_dir_root = config_dict["coupler_output_dir"]

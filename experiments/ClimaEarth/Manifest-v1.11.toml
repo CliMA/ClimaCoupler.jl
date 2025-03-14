@@ -349,7 +349,9 @@ version = "0.2.12"
 
 [[deps.ClimaLand]]
 deps = ["ArtifactWrappers", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "dcbd7350f400e65aa0b0239fd75aa6dd3f4bfca8"
+git-tree-sha1 = "3732f8c0c3c63a71e8866e40229da1b3871a8b38"
+repo-rev = "kd/helper_functions_for_coupler"
+repo-url = "https://github.com/CliMA/ClimaLand.jl.git"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
 version = "0.15.11"
 

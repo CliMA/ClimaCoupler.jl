@@ -382,7 +382,7 @@ function water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulatio
 end
 
 """
-    compute_surface_fluxes!(csf, sim, atmos_properties, boundary_space, thermo_params, surface_scheme)
+    compute_surface_fluxes!(csf, sim, atmos_sim, boundary_space, thermo_params, surface_scheme)
 
 This function computes surface fluxes between the input component model
 simulation and the atmosphere.
@@ -461,44 +461,6 @@ function compute_surface_fluxes!(
 
     # update the fluxes of this surface model
     FluxCalculator.update_turbulent_fluxes!(sim, fields)
-
-    # add the flux contributing from this surface to the coupler field
-    # note that the fluxes are area-weighted, so if a surface model is
-    #  not present at this point, the fluxes are zero
-    @. csf.F_turb_ρτxz += F_turb_ρτxz * area_fraction * area_mask
-    @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction * area_mask
-    @. csf.F_turb_energy += (F_shf .+ F_lhf) * area_fraction * area_mask
-    @. csf.F_turb_moisture += F_turb_moisture * area_fraction * area_mask
-    return nothing
-end
-
-function compute_surface_fluxes!(
-    csf,
-    sim::Interfacer.ClimaLandSimulation,
-    atmos_sim::Interfacer.AtmosModelSimulation,
-    boundary_space,
-    _,
-    _,
-)
-    # `_int` refers to atmos state of center level 1
-    z_int = Interfacer.get_field(atmos_sim, Val(:height_int))
-    uₕ_int = Interfacer.get_field(atmos_sim, Val(:uv_int))
-    thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
-    gustiness = CC.Spaces.undertype(boundary_space)(1)
-    # package atmos properties into a NamedTuple that bridges land/coupler naming differences
-    atmos_properties = (; u = uₕ_int, h = z_int, thermal_state = thermo_state_int, gustiness = gustiness)
-
-    # get area fraction (min = 0, max = 1)
-    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
-    # get area mask [0, 1], where area_mask = 1 if area_fraction > 0
-    area_mask = Utilities.binary_mask.(area_fraction)
-
-    model = sim.model
-    Y, p, t = model.integrator.u, model.integrator.p, model.integrator.t
-
-    # update `csf` in-place using this model's flux calculation
-    fluxes = coupler_land_turbulent_fluxes!(model, Y, p, t, atmos_properties)
-    (; F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture) = fluxes
 
     # add the flux contributing from this surface to the coupler field
     # note that the fluxes are area-weighted, so if a surface model is

@@ -7,10 +7,13 @@ import ClimaComms
 import ClimaCoupler
 using EnsembleKalmanProcesses.ParameterDistributions
 import EnsembleKalmanProcesses as EKP
+import Random
+rng_seed = 1234
+rng = Random.MersenneTwister(rng_seed)
 
-include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_map.jl"))
+include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/cld_eff_rad/observation_map.jl"))
 
-# addprocs(CAL.SlurmManager())
+addprocs(CAL.SlurmManager())
 
 # Make variables and the forward model available on the worker sessions
 @everywhere begin
@@ -21,18 +24,17 @@ end
 
 # Experiment Configuration
 output_dir = "experiments/calibration/output"
-ensemble_size = 20
-n_iterations = 5
+ensemble_size = 10
+n_iterations = 10
 priors = [
-    constrained_gaussian("liquid_cloud_effective_radius", 14e-6, 6e-6, 2.5e-6, 21.5e-6),
-    constrained_gaussian("ice_cloud_effective_radius", 25e-6, 6e-6, 2.5e-6, 33e-6),
+    constrained_gaussian("prescribed_cloud_droplet_number_concentration", 1.5e8, 9e7, 1e7, 1e9),
 ]
 prior = combine_distributions(priors)
 obs_path = joinpath(experiment_dir, "observations.jld2")
 observations = JLD2.load_object(obs_path)
 
 eki = EKP.EnsembleKalmanProcess(
-    EKP.construct_initial_ensemble(prior, ensemble_size),
+    EKP.construct_initial_ensemble(rng, prior, ensemble_size),
     observations,
     EKP.TransformInversion(),
     verbose=true

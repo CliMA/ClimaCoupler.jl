@@ -10,6 +10,7 @@ import ClimaLand.Parameters as LP
 import ClimaDiagnostics as CD
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer
 using NCDatasets
+include("climaland_helpers.jl")
 
 include("../shared/restore.jl")
 
@@ -17,11 +18,22 @@ include("../shared/restore.jl")
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###
 """
-    BucketSimulation{M, D, I}
+    BucketSimulation{M, D, I, A}
 
 The bucket model simulation object.
+
+It contains the following objects:
+- `model::M`: The `ClimaLand.Bucket.BucketModel`.
+- `domain::D`: The land domain object, which must be a spherical shell.
+- `integrator::I`: The integrator used in timestepping this model.
+- `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model.
 """
-struct BucketSimulation{M, D, I, A} <: Interfacer.LandModelSimulation
+struct BucketSimulation{
+    M <: ClimaLand.Bucket.BucketModel,
+    D <: ClimaLand.Domains.SphericalShell,
+    I <: SciMLBase.AbstractODEIntegrator,
+    A <: CC.Fields.Field,
+} <: Interfacer.LandModelSimulation
     model::M
     domain::D
     integrator::I
@@ -31,7 +43,6 @@ Interfacer.name(::BucketSimulation) = "BucketSimulation"
 
 """
     get_new_cache(p, Y, energy_check)
-
 Returns a new `p` with an updated field to store e_per_area if energy conservation
     checks are turned on.
 """
@@ -50,43 +61,37 @@ end
 Initializes the bucket model variables.
 """
 function BucketSimulation(
-    ::Type{FT},
-    tspan::Tuple{TT, TT},
-    config::String,
-    albedo_type::String,
-    land_initial_condition::String,
-    land_temperature_anomaly::String,
-    output_dir::String;
-    space,
+    ::Type{FT};
     dt::TT,
-    saveat::Vector{TT},
+    tspan::Tuple{TT, TT},
+    start_date::Dates.DateTime,
+    output_dir::String,
+    boundary_space,
     area_fraction,
+    saveat::Vector{TT} = [tspan[1], tspan[2]],
+    domain_type::String = "sphere",
+    surface_elevation = CC.Fields.zeros(boundary_space),
+    land_temperature_anomaly::String = "amip",
+    use_land_diagnostics::Bool = true,
     stepper = CTS.RK4(),
-    date_ref::Dates.DateTime,
-    t_start::TT,
-    energy_check::Bool,
-    surface_elevation,
-    use_land_diagnostics::Bool,
+    albedo_type::String = "map_static",
+    land_initial_condition::String = "",
+    energy_check::Bool = false,
 ) where {FT, TT <: Union{Float64, ITime}}
-    if config != "sphere"
-        println(
-            "Currently only spherical shell domains are supported; single column set-up will be addressed in future PR.",
-        )
-        @assert config == "sphere"
-    end
+    @assert domain_type == "sphere" "Currently only spherical shell domains are supported; single column may be supported in the future."
 
     α_snow = FT(0.8) # snow albedo
     if albedo_type == "map_static" # Read in albedo from static data file (default type)
         # By default, this uses a file containing bareground albedo without a time component. Snow albedo is specified separately.
-        albedo = CL.Bucket.PrescribedBaregroundAlbedo{FT}(α_snow, space)
+        albedo = CL.Bucket.PrescribedBaregroundAlbedo{FT}(α_snow, boundary_space)
     elseif albedo_type == "map_temporal" # Read in albedo from data file containing data over time
         # By default, this uses a file containing linearly-interpolated monthly data of clear-sky albedo, generated from CERES.
         if pkgversion(CL) < v"0.15"
-            albedo = CL.Bucket.PrescribedSurfaceAlbedo{FT}(date_ref, t_start, space)
+            albedo = CL.Bucket.PrescribedSurfaceAlbedo{FT}(start_date, tspan[1], boundary_space)
         else
             albedo = CL.Bucket.PrescribedSurfaceAlbedo{FT}(
-                date_ref,
-                space;
+                start_date,
+                boundary_space;
                 albedo_file_path = CL.Artifacts.ceres_albedo_dataset_path(),
                 varname = "sw_alb_clr",
             )
@@ -96,7 +101,7 @@ function BucketSimulation(
             (; lat, long) = coordinate_point
             return typeof(lat)(0.38)
         end
-        albedo = CL.Bucket.PrescribedBaregroundAlbedo{FT}(α_snow, α_bareground, space)
+        albedo = CL.Bucket.PrescribedBaregroundAlbedo{FT}(α_snow, α_bareground, boundary_space)
     else
         error("invalid albedo type $albedo_type")
     end
@@ -117,12 +122,14 @@ function BucketSimulation(
     n_vertical_elements = 7
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
-    domain = make_land_domain(space, (-d_soil, FT(0.0)), n_vertical_elements)
+    domain = make_land_domain(boundary_space, (-d_soil, FT(0.0)), n_vertical_elements)
     args = (params, CL.CoupledAtmosphere{FT}(), CL.CoupledRadiativeFluxes{FT}(), domain)
     model = CL.Bucket.BucketModel{FT, typeof.(args)...}(args...)
 
     # Initial conditions with no moisture
     Y, p, coords = CL.initialize(model)
+
+    # Add space in the cache for the energy if energy checks are enabled
     p = get_new_cache(p, Y, energy_check)
 
     # Get temperature anomaly function
@@ -137,10 +144,11 @@ function BucketSimulation(
     T_sfc_0 = FT(271)
     @. Y.bucket.T = T_sfc_0 + temp_anomaly(coords.subsurface)
     # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
-    orog_adjusted_T = CC.Fields.field_values(Y.bucket.T) .- lapse_rate .* CC.Fields.field_values(surface_elevation)
+    orog_adjusted_T_data = CC.Fields.field_values(Y.bucket.T) .- lapse_rate .* CC.Fields.field_values(surface_elevation)
+    orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, domain.space.subsurface)
     # Adjust T based on surface elevation (p.bucket.T_sfc is then set using the
     # set_initial_cache! function)
-    parent(Y.bucket.T) .= parent(orog_adjusted_T)
+    Y.bucket.T .= orog_adjusted_T
 
     Y.bucket.W .= 0.15
     Y.bucket.Ws .= 0.0
@@ -199,16 +207,16 @@ function BucketSimulation(
 
     exp_tendency! = CL.make_exp_tendency(model)
     ode_algo = CTS.ExplicitAlgorithm(stepper)
-    bucket_ode_function = CTS.ClimaODEFunction(T_exp! = exp_tendency!, dss! = CL.dss!)
+    bucket_ode_function = CTS.ClimaODEFunction(T_exp! = exp_tendency!)
     prob = SciMLBase.ODEProblem(bucket_ode_function, Y, tspan, p)
 
     # Add diagnostics
     if use_land_diagnostics
         netcdf_writer = CD.Writers.NetCDFWriter(domain.space.subsurface, output_dir)
         scheduled_diagnostics =
-            CL.default_diagnostics(model, date_ref, output_writer = netcdf_writer, average_period = :monthly)
+            CL.default_diagnostics(model, start_date, output_writer = netcdf_writer, average_period = :monthly)
 
-        diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, t_start; dt = dt)
+        diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)
         diag_cb = CD.DiagnosticsCallback(diagnostic_handler)
     else
         diag_cb = nothing
@@ -223,11 +231,7 @@ function BucketSimulation(
         callback = SciMLBase.CallbackSet(diag_cb),
     )
 
-    sim = BucketSimulation(model, (; domain = domain, soil_depth = d_soil), integrator, area_fraction)
-
-    # DSS state to ensure we have continuous fields
-    dss_state!(sim)
-    return sim
+    return BucketSimulation(model, domain, integrator, area_fraction)
 end
 
 # extensions required by Interfacer
@@ -352,64 +356,6 @@ function Checkpointer.get_model_prog_state(sim::BucketSimulation)
     return sim.integrator.u.bucket
 end
 
-"""
-    temp_anomaly_aquaplanet(coord)
-
-Introduce a temperature IC anomaly for the aquaplanet case.
-The values for this case follow the moist Held-Suarez setup of Thatcher &
-Jablonowski (2016, eq. 6), consistent with ClimaAtmos aquaplanet.
-"""
-temp_anomaly_aquaplanet(coord) = 29 * exp(-coord.lat^2 / (2 * 26^2))
-
-"""
-    temp_anomaly_amip(coord)
-
-Introduce a temperature IC anomaly for the AMIP case.
-The values used in this case have been tuned to align with observed temperature
-and result in stable simulations.
-"""
-temp_anomaly_amip(coord) = 40 * cosd(coord.lat)^4
-
-"""
-    make_land_domain(
-        atmos_boundary_space::CC.Spaces.SpectralElementSpace2D,
-        zlim::Tuple{FT, FT},
-        nelements_vert::Int,) where {FT}
-
-Creates the land model domain from the horizontal space of the atmosphere, and information
-about the number of elements and extent of the vertical domain.
-"""
-function make_land_domain(
-    atmos_boundary_space::CC.Spaces.SpectralElementSpace2D,
-    zlim::Tuple{FT, FT},
-    nelements_vert::Int,
-) where {FT}
-    @assert zlim[1] < zlim[2]
-    depth = zlim[2] - zlim[1]
-
-    mesh = CC.Spaces.topology(atmos_boundary_space).mesh
-
-    radius = mesh.domain.radius
-    nelements_horz = mesh.ne
-    npolynomial = CC.Spaces.Quadratures.polynomial_degree(CC.Spaces.quadrature_style(atmos_boundary_space))
-    nelements = (nelements_horz, nelements_vert)
-    vertdomain = CC.Domains.IntervalDomain(
-        CC.Geometry.ZPoint(FT(zlim[1])),
-        CC.Geometry.ZPoint(FT(zlim[2]));
-        boundary_names = (:bottom, :top),
-    )
-
-    vertmesh = CC.Meshes.IntervalMesh(vertdomain, CC.Meshes.Uniform(), nelems = nelements[2])
-    verttopology = CC.Topologies.IntervalTopology(vertmesh)
-    vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(verttopology)
-    subsurface_space = CC.Spaces.ExtrudedFiniteDifferenceSpace(atmos_boundary_space, vert_center_space)
-    space = (; surface = atmos_boundary_space, subsurface = subsurface_space)
-
-    fields = CL.Domains.get_additional_coordinate_field_data(subsurface_space)
-
-    return CL.Domains.SphericalShell{FT}(radius, depth, nothing, nelements, npolynomial, space, fields)
-end
-
 function Checkpointer.get_model_cache(sim::BucketSimulation)
     return sim.integrator.p
 end
@@ -423,17 +369,4 @@ function Checkpointer.restore_cache!(sim::BucketSimulation, new_cache)
         comms_ctx,
         ignore = Set([:rc, :params, :dss_buffer_2d, :dss_buffer_3d, :graph_context]),
     )
-end
-
-"""
-    dss_state!(sim::BucketSimulation)
-
-Perform DSS on the state of a component simulation, intended to be used
-before the initial step of a run. This method acts on bucket land simulations.
-The `dss!` function of ClimaLand must be called because it uses either the 2D
-or 3D dss buffer stored in the cache depending on space of each variable in
-`sim.integrator.u`.
-"""
-function dss_state!(sim::BucketSimulation)
-    CL.dss!(sim.integrator.u, sim.integrator.p, sim.integrator.t)
 end

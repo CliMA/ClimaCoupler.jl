@@ -106,6 +106,7 @@ default_coupler_fields() = [
     :z0m_sfc,
     :z0b_sfc,
     :beta,
+    :emissivity,
     :F_turb_energy,
     :F_turb_moisture,
     :F_turb_ρτxz,

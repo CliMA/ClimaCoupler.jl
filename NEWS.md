@@ -6,6 +6,12 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Add `ClimaLandSimulation` object PR[#1199](https://github.com/CliMA/ClimaCoupler.jl/pull/1199)
+Add methods to support running `ClimaLand.LandModel` in a coupled simulation.
+Also add tests to verify the constructor setup and taking a step.
+This type is not yet tested within a coupled simulation, but much
+of the necessary software infrastructure is added in this PR.
+
 #### Add default `get_field` methods for surface models PR[#1210](https://github.com/CliMA/ClimaCoupler.jl/pull/1210)
 Add default methods for `get_field` methods that are commonly
 not extended for surface models. These return reasonable default

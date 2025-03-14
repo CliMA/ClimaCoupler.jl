@@ -258,35 +258,31 @@ Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_temperature}) =
     CL.surface_temperature(sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
 
 """
-    Interfacer.get_field(bucket_sim::BucketSimulation, ::Val{:energy})
+    Interfacer.get_field(sim::BucketSimulation, ::Val{:energy})
 
 Extension of Interfacer.get_field that provides the total energy contained in the bucket, including the latent heat due to snow melt.
 """
-function Interfacer.get_field(bucket_sim::BucketSimulation, ::Val{:energy})
+function Interfacer.get_field(sim::BucketSimulation, ::Val{:energy})
     # required by ConservationChecker
-    e_per_area = bucket_sim.integrator.p.e_per_area .= 0
-    CC.Operators.column_integral_definite!(
-        e_per_area,
-        bucket_sim.model.parameters.ρc_soil .* bucket_sim.integrator.u.bucket.T,
-    )
+    e_per_area = sim.integrator.p.e_per_area .= 0
+    CC.Operators.column_integral_definite!(e_per_area, sim.model.parameters.ρc_soil .* sim.integrator.u.bucket.T)
 
     e_per_area .+=
-        -LP.LH_f0(bucket_sim.model.parameters.earth_param_set) .*
-        LP.ρ_cloud_liq(bucket_sim.model.parameters.earth_param_set) .* bucket_sim.integrator.u.bucket.σS
+        -LP.LH_f0(sim.model.parameters.earth_param_set) .* LP.ρ_cloud_liq(sim.model.parameters.earth_param_set) .*
+        sim.integrator.u.bucket.σS
 
     return e_per_area
 end
 
 """
-    Interfacer.get_field(bucket_sim::BucketSimulation, ::Val{:water})
+    Interfacer.get_field(sim::BucketSimulation, ::Val{:water})
 
 Extension of Interfacer.get_field that provides the total water contained in the bucket, including the liquid water in snow.
 """
-function Interfacer.get_field(bucket_sim::BucketSimulation, ::Val{:water})
-    ρ_cloud_liq = CL.LP.ρ_cloud_liq(bucket_sim.model.parameters.earth_param_set)
+function Interfacer.get_field(sim::BucketSimulation, ::Val{:water})
+    ρ_cloud_liq = CL.LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
     return
-    @. (bucket_sim.integrator.u.bucket.σS + bucket_sim.integrator.u.bucket.W + bucket_sim.integrator.u.bucket.Ws) *
-       ρ_cloud_liq  # kg water / m2
+    @. (sim.integrator.u.bucket.σS + sim.integrator.u.bucket.W + sim.integrator.u.bucket.Ws) * ρ_cloud_liq  # kg water / m2
 end
 
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_density}, field)

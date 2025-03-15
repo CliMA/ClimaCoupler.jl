@@ -58,6 +58,9 @@ function get_coupler_args(config_dict::Dict)
     random_seed = config_dict["unique_seed"] ? time_ns() : 1234
     FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 
+    # Vector of TOML files containing model parameters
+    parameter_files = config_dict["coupler_toml"]
+
     # Time information
     t_end = Float64(Utilities.time_to_seconds(config_dict["t_end"]))
     t_start = Float64(Utilities.time_to_seconds(config_dict["t_start"]))
@@ -140,6 +143,7 @@ function get_coupler_args(config_dict::Dict)
         land_initial_condition,
         land_temperature_anomaly,
         use_land_diagnostics,
+        parameter_files,
     )
 end
 
@@ -157,7 +161,6 @@ Extract the necessary arguments from the atmosphere configuration dictionary.
 function get_atmos_args(atmos_config_dict)
     dt_rad = atmos_config_dict["dt_rad"]
     output_default_diagnostics = atmos_config_dict["output_default_diagnostics"]
-
     return (; dt_rad, output_default_diagnostics)
 end
 

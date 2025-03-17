@@ -200,6 +200,7 @@ function setup_and_run(config_dict::AbstractDict)
         energy_check,
         conservation_softfail,
         output_dir_root,
+        parameter_files,
     ) = get_coupler_args(config_dict)
 
     #=
@@ -341,6 +342,7 @@ function setup_and_run(config_dict::AbstractDict)
             albedo_type = land_albedo_type,
             land_initial_condition,
             energy_check,
+            parameter_files,
         )
 
         ## sea ice model
@@ -387,6 +389,7 @@ function setup_and_run(config_dict::AbstractDict)
             albedo_type = land_albedo_type,
             land_initial_condition,
             energy_check,
+            parameter_files,
         )
 
         ## ocean model
@@ -435,6 +438,7 @@ function setup_and_run(config_dict::AbstractDict)
             albedo_type = land_albedo_type,
             land_initial_condition,
             energy_check,
+            parameter_files,
         )
 
         ## ocean stub (here set to zero area coverage)

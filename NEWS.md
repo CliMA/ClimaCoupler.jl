@@ -6,6 +6,10 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Add support for parameter files in `BucketSimulation` PR[#1217](https://github.com/CliMA/ClimaCoupler.jl/pull/1217)
+Add a keyword argument `parameter_files` to `BucketSimulation` to enable
+calibration in a coupled simulation, passed via the `"coupler_toml"` argument.
+
 #### Add `ClimaLandSimulation` object PR[#1199](https://github.com/CliMA/ClimaCoupler.jl/pull/1199)
 Add methods to support running `ClimaLand.LandModel` in a coupled simulation.
 Also add tests to verify the constructor setup and taking a step.

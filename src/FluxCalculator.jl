@@ -25,7 +25,8 @@ export PartitionedStateFluxes,
     partitioned_turbulent_fluxes!,
     get_surface_params,
     update_turbulent_fluxes!,
-    water_albedo_from_atmosphere!
+    water_albedo_from_atmosphere!,
+    compute_surface_fluxes!
 
 """
     TurbulentFluxPartition

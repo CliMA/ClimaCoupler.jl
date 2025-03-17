@@ -487,7 +487,7 @@ fluxes are computed for each sub-component and then combined to get the total.
 - `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
 - `surface_scheme`: [AbstractSurfaceFluxScheme] the surface flux scheme.
 """
-function compute_surface_fluxes!(
+function FluxCalculator.compute_surface_fluxes!(
     csf,
     sim::ClimaLandSimulation,
     atmos_sim::Interfacer.AtmosModelSimulation,
@@ -508,11 +508,10 @@ function compute_surface_fluxes!(
     # get area mask [0, 1], where area_mask = 1 if area_fraction > 0
     area_mask = Utilities.binary_mask.(area_fraction)
 
-    model = sim.model
-    Y, p, t = model.integrator.u, model.integrator.p, model.integrator.t
+    Y, p, t = sim.integrator.u, sim.integrator.p, sim.integrator.t
 
     # update `csf` in-place using this model's flux calculation
-    fluxes = coupler_land_turbulent_fluxes!(model, Y, p, t, atmos_properties)
+    fluxes = coupler_land_turbulent_fluxes!(p, sim.model, Y, t, atmos_properties)
     (; F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture) = fluxes
 
     # add the flux contributing from this surface to the coupler field
@@ -534,31 +533,35 @@ It takes in 4 arguments related to the land model simulation: `model`, `Y`, `p`,
 It also takes in `atmos_properties`, a NamedTuple containing the atmospheric properties
 required for the flux calculation: `u`, `h`, `thermal_state`, and `gustiness`.
 
+This function updates each subcomponent in place with its own turbulent fluxes, and also
+returns the total turbulent fluxes for the land model.
+
 Note that this function is currently allocating. We should rewrite it/allocate
 space so that it can update fields in-place instead.
 """
-function coupler_land_turbulent_fluxes(model::ClimaLand.LandModel, Y, p, t, atmos_properties::NamedTuple)
+function coupler_land_turbulent_fluxes!(p, model::ClimaLand.LandModel, Y, t, atmos_properties::NamedTuple)
     # compute the fluxes for each sub-component and update the land model cache
     soil_dest = p.soil.turbulent_fluxes
-    ClimaLand.coupler_compute_turbulent_fluxes!(soil_dest, model.soil, atmos_properties, Y, p, t)
+    ClimaLand.coupler_compute_turbulent_fluxes!(soil_dest, atmos_properties, model.soil, Y, p, t)
 
     snow_dest = p.snow.turbulent_fluxes
-    ClimaLand.coupler_compute_turbulent_fluxes!(snow_dest, model.snow, atmos_properties, Y, p, t)
+    ClimaLand.coupler_compute_turbulent_fluxes!(snow_dest, atmos_properties, model.snow, Y, p, t)
 
-    canopy_dest = p.canopy.energy.turbulent_fluxes
-    ClimaLand.coupler_compute_turbulent_fluxes!(canopy_dest, model.canopy, atmos_properties, Y, p, t)
+    canopy_dest = p.canopy.turbulent_fluxes
+    ClimaLand.coupler_compute_turbulent_fluxes!(canopy_dest, atmos_properties, model.canopy, Y, p, t)
 
     # combine fluxes from each component of the land model
-    F_lhf =
-        canopy_dest.lhf + soil_dest.lhf * (1 - p.snow.snow_cover_fraction) + p.snow.snow_cover_fraction * snow_dest.lhf
-    F_shf =
-        canopy_dest.shf + soil_dest.shf * (1 - p.snow.snow_cover_fraction) + p.snow.snow_cover_fraction * snow_dest.shf
-    F_turb_moisture =
-        canopy_dest.transpiration +
-        (soil_dest.vapor_flux_liq + soil_dest.vapor_flux_ice) * (1 - p.snow.snow_cover_fraction) +
-        p.snow.snow_cover_fraction * snow_dest.vapor_flux
-    F_turb_ρτxz = soil_dest.ρτxz * (1 - p.snow.snow_cover_fraction) + p.snow.snow_cover_fraction * snow_dest.ρτxz
-    F_turb_ρτyz = soil_dest.ρτyz * (1 - p.snow.snow_cover_fraction) + p.snow.snow_cover_fraction * snow_dest.ρτyz
+    F_lhf = @. canopy_dest.lhf +
+       soil_dest.lhf * (1 - p.snow.snow_cover_fraction) +
+       p.snow.snow_cover_fraction * snow_dest.lhf
+    F_shf = @. canopy_dest.shf +
+       soil_dest.shf * (1 - p.snow.snow_cover_fraction) +
+       p.snow.snow_cover_fraction * snow_dest.shf
+    F_turb_moisture = @. canopy_dest.transpiration +
+       (soil_dest.vapor_flux_liq + soil_dest.vapor_flux_ice) * (1 - p.snow.snow_cover_fraction) +
+       p.snow.snow_cover_fraction * snow_dest.vapor_flux
+    F_turb_ρτxz = @. soil_dest.ρτxz * (1 - p.snow.snow_cover_fraction) + p.snow.snow_cover_fraction * snow_dest.ρτxz
+    F_turb_ρτyz = @. soil_dest.ρτyz * (1 - p.snow.snow_cover_fraction) + p.snow.snow_cover_fraction * snow_dest.ρτyz
 
     # At locations where this surface model is not evaluated, we get `NaN` for
     # surface fluxes. In that case, we replace the values with 0.

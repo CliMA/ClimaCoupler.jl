@@ -47,11 +47,26 @@ four_steps["dt"] = "180secs"
 four_steps["dt_cpl"] = "180secs"
 four_steps["t_end"] = "720secs"
 four_steps["dt_rad"] = "180secs"
+four_steps["checkpoint_dt"] = "720secs"
+four_steps["coupler_output_dir"] = tmpdir
 four_steps["job_id"] = "four_steps"
 
+println("Simulating four steps")
 cs_four_steps = setup_and_run(four_steps)
 
-println("Simulating two steps")
+# Check that we can pick up a simulation by providing t_restart and restart_dir
+println("Simulating four steps, options from command line")
+four_steps_reading = deepcopy(four_steps)
+
+four_steps_reading["t_end"] = "900secs"
+four_steps_reading["restart_dir"] = cs_four_steps.dirs.checkpoints
+four_steps_reading["restart_t"] = 720
+four_steps_reading["job_id"] = "four_steps_reading"
+
+cs_four_steps_reading = setup_and_run(four_steps_reading)
+@testset "Restarts from command line arguments" begin
+    @test cs_four_steps_reading.tspan[1] == cs_four_steps.tspan[2]
+end
 
 # Now, two steps plus one
 two_steps = deepcopy(default_config)
@@ -65,9 +80,10 @@ two_steps["checkpoint_dt"] = "360secs"
 two_steps["job_id"] = "two_steps"
 
 # Copying since setup_and_run changes its content
+println("Simulating two steps")
 cs_two_steps1 = setup_and_run(two_steps)
 
-println("Reading and simulating last step")
+println("Reading and simulating last two steps")
 # Two additional steps
 two_steps["t_end"] = "720secs"
 cs_two_steps2 = setup_and_run(two_steps)

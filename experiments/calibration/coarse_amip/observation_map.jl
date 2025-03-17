@@ -91,11 +91,13 @@ function preprocess_monthly_averages(simdir, name)
         monthly_avgs = ClimaAnalysis.Atmos.to_pressure_coordinates(monthly_avgs, pressure)
         monthly_avgs = limit_pressure_dim_to_era5_range(monthly_avgs)
     end
-    # TODO: Replace NaNs with global mean
-    monthly_avgs = ClimaAnalysis.replace(monthly_avgs, NaN => 0.0)
+    # Line up dates for monthly averages
     monthly_avgs = ClimaAnalysis.shift_to_start_of_previous_month(monthly_avgs)
     # Remove spinup time
     monthly_avgs = window(monthly_avgs, "time"; left = spinup_time)
+    global_mean = monthly_avgs |> average_lat |> average_lon |> average_time
+    # Replace NaNs with global mean
+    monthly_avgs = ClimaAnalysis.replace(monthly_avgs, NaN => global_mean)
     return monthly_avgs
 end
 

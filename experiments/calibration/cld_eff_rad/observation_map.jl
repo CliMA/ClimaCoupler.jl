@@ -6,7 +6,7 @@ import EnsembleKalmanProcesses as EKP
 
 function ClimaCalibrate.observation_map(iteration)
     observation_vec = JLD2.load_object(observation_path)
-    single_member_dims = length(EKP.get_obs(first(observation_vec))) * batch_size
+    single_member_dims = length(EKP.get_obs(observations))
     G_ensemble = Array{Float64}(undef, single_member_dims, ensemble_size)
     for m in 1:ensemble_size
         member_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
@@ -39,11 +39,11 @@ days = 86_400
 spinup_time = 93days
 function preprocess_monthly_averages(simdir, name)
     monthly_avgs = get_monthly_averages(simdir, name)
-    # TODO: Replace NaNs with global mean
-    monthly_avgs = ClimaAnalysis.replace(monthly_avgs, NaN => 0.0)
     monthly_avgs = ClimaAnalysis.shift_to_start_of_previous_month(monthly_avgs)
     # Remove spinup time
     monthly_avgs = window(monthly_avgs, "time"; left = spinup_time)
+    global_mean = monthly_avgs |> average_lat |> average_lon |> average_time # average_time(average_lon(average_lat(monthly_avgs)))
+    monthly_avgs = ClimaAnalysis.replace(monthly_avgs, NaN => first(global_mean.data))
     return monthly_avgs
 end
 

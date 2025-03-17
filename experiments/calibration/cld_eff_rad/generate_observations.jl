@@ -5,7 +5,8 @@ import EnsembleKalmanProcesses as EKP
 
 const start_date = DateTime(2000, 3, 1)
 const slice_time = 0.0
-const diagnostic_var = OutputVar(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/cld_eff_rad/rsut_1M_average_8_helem.nc"))
+const diagnostic_var =
+    OutputVar(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/cld_eff_rad/rsut_1M_average_8_helem.nc"))
 
 include(joinpath(pkgdir(ClimaCoupler), "experiments/ClimaEarth/leaderboard/data_sources.jl"))
 resample(ov) = resampled_as(ov, diagnostic_var, dim_names = ["longitude", "latitude"])
@@ -27,17 +28,9 @@ cre = rsutcs - rsut
 
 # Create an EKP.Observation
 rsut_slice = slice(rsut; time = slice_time)
-rsut_obs = EKP.Observation(
-    vec(rsut_slice.data),
-    Diagonal(vec(auto_covariance(rsut))),
-    "rsut"
-)
+rsut_obs = EKP.Observation(vec(rsut_slice.data), Diagonal(vec(auto_covariance(rsut))), "rsut")
 cre_slice = slice(cre; time = slice_time)
-cre_obs = EKP.Observation(
-    vec(cre_slice.data),
-    Diagonal(vec(auto_covariance(cre))),
-    "cre"
-)
+cre_obs = EKP.Observation(vec(cre_slice.data), Diagonal(vec(auto_covariance(cre))), "cre")
 
 observations = EKP.combine_observations([rsut_obs, cre_obs])
 JLD2.save_object("experiments/calibration/cld_eff_rad/observations.jld2", observations)

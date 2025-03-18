@@ -447,8 +447,11 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_
     end
 
     # use atmos toml if coupler toml is not defined
-    atmos_toml = joinpath.(pkgdir(CA), atmos_config["toml"])
-    coupler_toml = joinpath.(pkgdir(ClimaCoupler), coupler_dict["coupler_toml"])
+    # If we can't find the file at the relative path, prepend pkgdir(ClimaAtmos)
+    atmos_toml = map(atmos_config["toml"]) do file
+        isfile(file) ? file : joinpath(pkgdir(CA), file)
+    end
+    coupler_toml = atmos_config["coupler_toml"]
     toml = isempty(coupler_toml) ? atmos_toml : coupler_toml
     if !isempty(toml)
         @info "Overwriting Atmos parameters from input TOML file(s): $toml"

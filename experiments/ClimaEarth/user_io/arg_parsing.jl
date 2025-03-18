@@ -59,7 +59,9 @@ function get_coupler_args(config_dict::Dict)
     FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
 
     # Vector of TOML files containing model parameters
-    parameter_files = config_dict["coupler_toml"]
+    parameter_files = map(config_dict["coupler_toml"]) do file
+        isfile(file) ? file : joinpath(pkgdir(ClimaCoupler), file)
+    end
 
     # Time information
     t_end = Float64(Utilities.time_to_seconds(config_dict["t_end"]))

@@ -6,6 +6,11 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Add support for relative parameter filepaths PR[#1228](https://github.com/CliMA/ClimaCoupler.jl/pull/1228)
+Changed TOML parameter file handling to prepend the `pkgdir(ClimaCoupler)` 
+if no file is found at the relative filepath. Before this change, all files
+were assumed to be within the `ClimaCoupler` or `ClimaAtmos` repositories.
+
 #### Add support for parameter files in `BucketSimulation` PR[#1217](https://github.com/CliMA/ClimaCoupler.jl/pull/1217)
 Add a keyword argument `parameter_files` to `BucketSimulation` to enable
 calibration in a coupled simulation, passed via the `"coupler_toml"` argument.

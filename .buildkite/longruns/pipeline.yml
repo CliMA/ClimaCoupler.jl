@@ -1,7 +1,7 @@
 agents:
   queue: new-central
   slurm_time: 24:00:00
-  modules: climacommon/2025_01_27
+  modules: climacommon/2025_03_18
 
 env:
   JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
@@ -48,7 +48,7 @@ steps:
       - "julia --project=experiments/calibration/ -e 'using Pkg; Pkg.instantiate(;verbose=true); Pkg.develop(;path=\".\")'"
     agents:
       queue: clima
-      modules: climacommon/2025_01_27
+      modules: climacommon/2025_03_18
     env:
       JULIA_NUM_PRECOMPILE_TASKS: 8
       JULIA_MAX_NUM_PRECOMPILE_FILES: 50
@@ -298,7 +298,7 @@ steps:
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
           slurm_mem: 30GB
-          modules: climacommon/2025_01_27
+          modules: climacommon/2025_03_18
         soft_fail: true
 
   # DYAMOND AMIP: 1 day (convection resolving)
@@ -314,7 +314,7 @@ steps:
       queue: clima
       slurm_mem: 20GB
       slurm_gpus: 1
-      modules: climacommon/2025_01_27
+      modules: climacommon/2025_03_18
     soft_fail: true
 
   - label: "Perfect model calibration test"
@@ -332,7 +332,7 @@ steps:
       slurm_gpus_per_task: 1
       slurm_cpus_per_task: 4
       slurm_time: 05:00:00
-      modules: climacommon/2025_01_27
+      modules: climacommon/2025_03_18
 
   - wait
 

@@ -9,7 +9,7 @@ function ClimaCalibrate.forward_model(iter, member)
     output_dir_root = config_dict["coupler_output_dir"]
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)
-    config_dict["calibration_toml"] = sampled_parameter_file
+    config_dict["coupler_toml"] = [sampled_parameter_file]
     # Set member output directory
     member_output_dir = ClimaCalibrate.path_to_ensemble_member(output_dir_root, iter, member)
     config_dict["coupler_output_dir"] = member_output_dir

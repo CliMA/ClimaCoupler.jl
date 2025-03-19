@@ -44,6 +44,13 @@ This function may modify the input dictionary to remove unnecessary keys.
 - All arguments needed for the coupled simulation
 """
 function get_coupler_args(config_dict::Dict)
+    # Vector of TOML files containing model parameters
+    # We need to modify this Dict entry to be consistent with ClimaAtmos TOML files
+    config_dict["coupler_toml"] = map(config_dict["coupler_toml"]) do file
+        isfile(file) ? file : joinpath(pkgdir(ClimaCoupler), file)
+    end
+    parameter_files = config_dict["coupler_toml"]
+
     # Make a copy so that we don't modify the original input
     config_dict = copy(config_dict)
 
@@ -57,11 +64,6 @@ function get_coupler_args(config_dict::Dict)
     # Computational simulation setup information
     random_seed = config_dict["unique_seed"] ? time_ns() : 1234
     FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
-
-    # Vector of TOML files containing model parameters
-    parameter_files = map(config_dict["coupler_toml"]) do file
-        isfile(file) ? file : joinpath(pkgdir(ClimaCoupler), file)
-    end
 
     # Time information
     t_end = Float64(Utilities.time_to_seconds(config_dict["t_end"]))

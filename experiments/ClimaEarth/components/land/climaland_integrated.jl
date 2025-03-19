@@ -463,3 +463,119 @@ function Checkpointer.get_model_prog_state(sim::ClimaLandSimulation)
 end
 
 Interfacer.name(::ClimaLandSimulation) = "ClimaLandSimulation"
+
+## Extend functions for land-specific flux calculation
+"""
+    compute_surface_fluxes!(csf, sim::ClimaLandSimulation atmos_sim, boundary_space, thermo_params, surface_scheme)
+
+This function computes surface fluxes between the integrated land model
+simulation and the atmosphere.
+This is intended to be used with the partitioned fluxes option.
+
+Update the input coupler surface fields `csf` in-place with the computed fluxes
+for this model. These are then summed using area-weighting across all surface
+models to get the total fluxes.
+
+Because the integrated land model is composed of multiple sub-components, the
+fluxes are computed for each sub-component and then combined to get the total.
+
+# Arguments
+- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_turb_energy`, `F_turb_moisture`.
+- `sim`: [ClimaLandSimulation] the integrated land simulation to compute fluxes for.
+- `atmos_sim`: [Interfacer.AtmosModelSimulation] the atmosphere simulation to compute fluxes with.
+- `boundary_space`: [CC.Spaces.AbstractSpace] the space of the coupler surface.
+- `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
+- `surface_scheme`: [AbstractSurfaceFluxScheme] the surface flux scheme.
+"""
+function FluxCalculator.compute_surface_fluxes!(
+    csf,
+    sim::ClimaLandSimulation,
+    atmos_sim::Interfacer.AtmosModelSimulation,
+    boundary_space,
+    _,
+    _,
+)
+    # `_int` refers to atmos state of center level 1
+    z_int = Interfacer.get_field(atmos_sim, Val(:height_int))
+    uₕ_int = Interfacer.get_field(atmos_sim, Val(:uv_int))
+    thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
+    gustiness = CC.Spaces.undertype(boundary_space)(1)
+    # package atmos properties into a NamedTuple that bridges land/coupler naming differences
+    atmos_properties = (; u = uₕ_int, h = z_int, thermal_state = thermo_state_int, gustiness = gustiness)
+
+    # get area fraction (min = 0, max = 1)
+    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
+    # get area mask [0, 1], where area_mask = 1 if area_fraction > 0
+    area_mask = Utilities.binary_mask.(area_fraction)
+
+    Y, p, t = sim.integrator.u, sim.integrator.p, sim.integrator.t
+
+    # update `csf` in-place using this model's flux calculation
+    fluxes = coupler_land_turbulent_fluxes!(p, sim.model, Y, t, atmos_properties)
+    (; F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture) = fluxes
+
+    # add the flux contributing from this surface to the coupler field
+    # note that the fluxes are area-weighted, so if a surface model is
+    #  not present at this point, the fluxes are zero
+    @. csf.F_turb_ρτxz += F_turb_ρτxz * area_fraction * area_mask
+    @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction * area_mask
+    @. csf.F_turb_energy += (F_shf .+ F_lhf) * area_fraction * area_mask
+    @. csf.F_turb_moisture += F_turb_moisture * area_fraction * area_mask
+    return nothing
+end
+
+"""
+    coupler_land_turbulent_fluxes(model, Y, p, t, atmos_properties)
+
+Compute the turbulent fluxes for the integrated land model by computing them
+for each subcomponent, then combining them.
+It takes in 4 arguments related to the land model simulation: `model`, `Y`, `p`, and `t`.
+It also takes in `atmos_properties`, a NamedTuple containing the atmospheric properties
+required for the flux calculation: `u`, `h`, `thermal_state`, and `gustiness`.
+
+This function updates each subcomponent in place with its own turbulent fluxes, and also
+returns the total turbulent fluxes for the land model.
+
+Note that this function is currently allocating. We should rewrite it/allocate
+space so that it can update fields in-place instead.
+"""
+function coupler_land_turbulent_fluxes!(p, model::ClimaLand.LandModel, Y, t, atmos_properties::NamedTuple)
+    # compute the fluxes for each sub-component and update the land model cache
+    soil_dest = p.soil.turbulent_fluxes
+    ClimaLand.coupler_compute_turbulent_fluxes!(soil_dest, atmos_properties, model.soil, Y, p, t)
+
+    snow_dest = p.snow.turbulent_fluxes
+    ClimaLand.coupler_compute_turbulent_fluxes!(snow_dest, atmos_properties, model.snow, Y, p, t)
+
+    canopy_dest = p.canopy.turbulent_fluxes
+    ClimaLand.coupler_compute_turbulent_fluxes!(canopy_dest, atmos_properties, model.canopy, Y, p, t)
+
+    # combine fluxes from each component of the land model
+    F_lhf = @. canopy_dest.lhf +
+       soil_dest.lhf * (1 - p.snow.snow_cover_fraction) +
+       p.snow.snow_cover_fraction * snow_dest.lhf
+    F_shf = @. canopy_dest.shf +
+       soil_dest.shf * (1 - p.snow.snow_cover_fraction) +
+       p.snow.snow_cover_fraction * snow_dest.shf
+    F_turb_moisture = @. canopy_dest.transpiration +
+       (soil_dest.vapor_flux_liq + soil_dest.vapor_flux_ice) * (1 - p.snow.snow_cover_fraction) +
+       p.snow.snow_cover_fraction * snow_dest.vapor_flux
+    F_turb_ρτxz = @. soil_dest.ρτxz * (1 - p.snow.snow_cover_fraction) + p.snow.snow_cover_fraction * snow_dest.ρτxz
+    F_turb_ρτyz = @. soil_dest.ρτyz * (1 - p.snow.snow_cover_fraction) + p.snow.snow_cover_fraction * snow_dest.ρτyz
+
+    # At locations where this surface model is not evaluated, we get `NaN` for
+    # surface fluxes. In that case, we replace the values with 0.
+    @. F_turb_ρτxz = ifelse(isnan(F_turb_ρτxz), zero(F_turb_ρτxz), F_turb_ρτxz)
+    @. F_turb_ρτyz = ifelse(isnan(F_turb_ρτyz), zero(F_turb_ρτyz), F_turb_ρτyz)
+    @. F_shf = ifelse(isnan(F_shf), zero(F_shf), F_shf)
+    @. F_lhf = ifelse(isnan(F_lhf), zero(F_lhf), F_lhf)
+    @. F_turb_moisture = ifelse(isnan(F_turb_moisture), zero(F_turb_moisture), F_turb_moisture)
+
+    return (;
+        F_turb_ρτxz = F_turb_ρτxz,
+        F_turb_ρτyz = F_turb_ρτyz,
+        F_shf = F_shf,
+        F_lhf = F_lhf,
+        F_turb_moisture = F_turb_moisture,
+    )
+end

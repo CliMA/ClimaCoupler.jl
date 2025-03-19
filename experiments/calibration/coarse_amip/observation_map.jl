@@ -39,12 +39,16 @@ function process_member_data(simdir::SimDir)
     cre = rsut + rlut - rsutcs - rlutcs
 
     pr = process_outputvar(simdir, "pr")
-    # shf = process_outputvar(simdir, "shf")
+    shf = process_outputvar(simdir, "shf")
     ts = process_outputvar(simdir, "ts")
 
     ta = process_outputvar(simdir, "ta")
     hur = process_outputvar(simdir, "hur")
     hus = process_outputvar(simdir, "hus")
+
+    ql = process_outputvar(simdir, "ql")
+    qi = process_outputvar(simdir, "qi")
+
     # Map over each year
     year_observations = map(1:4:length(rsut)) do year_start
         year_end = min(year_start + 3, length(rsut))
@@ -52,17 +56,20 @@ function process_member_data(simdir::SimDir)
 
         net_rad_yr = mean(mean.(getproperty.(net_rad[yr_ind], :data)))
 
-        pr_yr = downsample_and_vectorize(pr[yr_ind])
         rsut_yr = downsample_and_vectorize(rsut[yr_ind])
         rlut_yr = downsample_and_vectorize(rlut[yr_ind])
         cre_yr = downsample_and_vectorize(cre[yr_ind])
+        pr_yr = downsample_and_vectorize(pr[yr_ind])
+        shf_yr = downsample_and_vectorize(shf[yr_ind])
         ts_yr = downsample_and_vectorize(ts[yr_ind])
 
         ta_yr = downsample_and_vectorize(ta[yr_ind])
         hur_yr = downsample_and_vectorize(hur[yr_ind])
         hus_yr = downsample_and_vectorize(hus[yr_ind])
-        # ql, qi
-        vcat(net_rad_yr, rsut_yr, rlut_yr, cre_yr, pr_yr, ts_yr, ta_yr, hur_yr, hus_yr)
+        ql_yr = downsample_and_vectorize(ql[yr_ind])
+        qi_yr = downsample_and_vectorize(qi[yr_ind])
+
+        vcat(net_rad_yr, rsut_yr, rlut_yr, cre_yr, pr_yr, shf_yr, ts_yr, ta_yr, hur_yr, hus_yr, ql_yr, qi_yr)
     end
     return vcat(year_observations...)
 end

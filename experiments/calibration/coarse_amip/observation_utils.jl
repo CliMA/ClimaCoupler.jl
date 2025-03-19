@@ -48,7 +48,6 @@ function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
     # TOA net radiative flux
     net_rad = rlut + rsut - rsdt
     # For some reason we need to add the start date back in
-    # TODO: Make PR in climaanalysis to do this
     net_rad.attributes["start_date"] = string(start_date)
 
     # cloud radiative effect
@@ -76,18 +75,18 @@ function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
     hus = resample(era5_outputvar(joinpath(obs_dir, "era5_monthly_avg_pressure_level_q.nc")))
 
     # # Cloud specific liquid water content
-    # ql = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_liquid_water_content_1deg.nc"))
-    # # Cloud specific ice water content
-    # qi = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_ice_water_content_1deg.nc"))
-    # foreach((ql, qi)) do var
-    #     # Convert from hPa to Pa in-place so we don't create more huge OutputVars
-    #     @assert var.dim_attributes[pressure_name(var)]["units"] == "hPa"
-    #     var.dims[pressure_name(var)] .*= 100.0
-    #     set_dim_units!(var, pressure_name(var), "Pa")
-    # end
+    ql = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_liquid_water_content_1deg.nc"))
+    # Cloud specific ice water content
+    qi = era5_outputvar(joinpath(obs_dir, "era5_specific_cloud_ice_water_content_1deg.nc"))
+    foreach((ql, qi)) do var
+        # Convert from hPa to Pa in-place so we don't create more huge OutputVars
+        @assert var.dim_attributes[pressure_name(var)]["units"] == "hPa"
+        var.dims[pressure_name(var)] .*= 100.0
+        set_dim_units!(var, pressure_name(var), "Pa")
+    end
     # TODO: determine where time is spent here
-    # ql = resample(reverse_dim(reverse_dim(ql, latitude_name(ql)), pressure_name(ql)))
-    # qi = resample(reverse_dim(reverse_dim(qi, latitude_name(qi)), pressure_name(qi)))
+    ql = resample(reverse_dim(reverse_dim(ql, latitude_name(ql)), pressure_name(ql)))
+    qi = resample(reverse_dim(reverse_dim(qi, latitude_name(qi)), pressure_name(qi)))
 
     return (; rlut, rsut, rsutcs, rlutcs, pr, net_rad, cre, shf, ts, ta, hur, hus)#, ql, qi)
 end
@@ -143,23 +142,35 @@ function get_yearly_averages(var)
     return year_averaged_matrices
 end
 
-# TODO: compute seasonal stdev properly
-function get_seasonal_stdev(output_var)
+function get_seasonal_stdevs(output_var)
     all_seasonal_averages = get_seasonal_averages(output_var)
     all_seasonal_averages = downsample.(all_seasonal_averages, 3)
     
-    # Determine dimensionality of the data
-    dims = ndims(all_seasonal_averages[1]) + 1
-    
-    seasonal_average_matrix = cat(all_seasonal_averages...; dims)
-    interannual_stdev = std(seasonal_average_matrix; dims)
-    return dropdims(interannual_stdev; dims)
+    # Group the data by season and calculate standard deviation for each season
+    num_seasons = 4
+    return map(1:num_seasons) do season
+        # Get all data for this season across years
+        season_data = [all_seasonal_averages[i] for i in season:num_seasons:length(all_seasonal_averages)]
+        
+        # Determine dimensionality of the data
+        dims = ndims(season_data[1]) + 1
+        season_matrix = cat(season_data...; dims=dims)
+        # Calculate standard deviation for this season
+        season_stdev = std(season_matrix; dims=dims)
+        dropdims(season_stdev; dims=dims)
+    end
 end
 
 # Given an outputvar, compute the covariance for each season.
 function get_seasonal_covariance(output_var)
-    stdev = get_seasonal_stdev(output_var)
-    return Diagonal(vec(stdev) .^ 2)
+    stdevs = get_seasonal_stdevs(output_var)
+    stdev_vec = vcat(vec.(stdevs)...)
+    # If 0.0 in diagonal, we need to add some small noise
+    if 0.0 in stdev_vec
+        mean_variance_without_zeros = mean(filter(x->x!=0, stdev_vec))
+        replace!(stdev_vec, (0.0 => mean_variance_without_zeros))
+    end
+    return Diagonal(stdev_vec .^ 2)
 end
 
 # Given a year, return the indices of that year within a seasonal array
@@ -188,7 +199,7 @@ function make_single_year_of_seasonal_observations(output_var, yr)
 
     name = get(output_var.attributes, "CF_name", get(output_var.attributes, "long_name", ""))
     cov = get_seasonal_covariance(output_var)
-    return EKP.Observation(obs_vec, Diagonal(repeat(cov.diag, 4)), "$(yr)_$name")
+    return EKP.Observation(obs_vec, cov, "$(yr)_$name")
 end
 
 """
@@ -197,45 +208,50 @@ end
 Given a NamedTuple, produce a vector of `EKP.Observation`s, where each observation
 consists of seasonally averaged fields, with the exception of globally averaged yearly radiative balance
 """
-function create_observation_vector(nt, yrs = 19)
+function create_observation_vector(nt, nyears = 19)
     # Starting year is 2000-12 to 2001-11
     t_start = Second(first_year_start_date - start_date).value
-    rsut = window(nt.rsut, "time"; left = t_start)
-    rlut = window(nt.rlut, "time"; left = t_start)
-    rsutcs = window(nt.rsutcs, "time"; left = t_start)
-    rlutcs = window(nt.rlutcs, "time"; left = t_start)
-    cre = window(nt.cre, "time"; left = t_start)
+    rsut = window(nt.rsut, "time"; left = t_start);
+    rlut = window(nt.rlut, "time"; left = t_start);
+    rsutcs = window(nt.rsutcs, "time"; left = t_start);
+    rlutcs = window(nt.rlutcs, "time"; left = t_start);
+    cre = window(nt.cre, "time"; left = t_start);
 
     # Compute yearly net radiative flux separately
     net_rad = window(nt.net_rad, "time"; left = t_start) |> average_lat |> average_lon
-    net_rad = get_yearly_averages(net_rad)
+    net_rad = get_yearly_averages(net_rad);
     net_rad_stdev = std(cat(net_rad..., dims = 3), dims = 3)
-    net_rad_covariance = Diagonal(vec(net_rad_stdev) .^ 2)
+    net_rad_covariance = Diagonal(vec(net_rad_stdev) .^ 2);
 
-    ts = window(nt.ts, "time"; left = t_start)
-    pr = window(nt.pr, "time"; left = t_start)
-    shf = window(nt.shf, "time"; left = t_start)
+    ts = window(nt.ts, "time"; left = t_start);
+    pr = window(nt.pr, "time"; left = t_start);
+    shf = window(nt.shf, "time"; left = t_start);
 
-    ta = window(nt.ta, "time"; left = t_start)
-    hur = window(nt.hur, "time"; left = t_start)
-    hus = window(nt.hus, "time"; left = t_start)
+    ta = window(nt.ta, "time"; left = t_start);
+    hur = window(nt.hur, "time"; left = t_start);
+    hus = window(nt.hus, "time"; left = t_start);
 
-    all_observations = map(1:yrs) do yr
-        net_rad_obs = EKP.Observation(vec(net_rad[yr]), net_rad_covariance, "$(yr)_net_rad")
+    ql = window(nt.ql, "time"; left = t_start);
+    qi = window(nt.qi, "time"; left = t_start);
 
-        rsut_obs = make_single_year_of_seasonal_observations(rsut, yr)
-        rlut_obs = make_single_year_of_seasonal_observations(rlut, yr)
-        rsutcs_obs = make_single_year_of_seasonal_observations(rsutcs, yr)
-        rlutcs_obs = make_single_year_of_seasonal_observations(rlutcs, yr)
-        cre_obs = make_single_year_of_seasonal_observations(cre, yr)
-        pr_obs = make_single_year_of_seasonal_observations(pr, yr)
-        # shf_obs = make_single_year_of_seasonal_observations(shf, yr)
-        ts_obs = make_single_year_of_seasonal_observations(ts, yr)
+    all_observations = map(1:nyears) do yr
+        @info "Creating observations for year $yr"
+        net_rad_obs = EKP.Observation(vec(net_rad[yr]), net_rad_covariance, "$(yr)_net_rad");
 
-        ta_obs = make_single_year_of_seasonal_observations(ta, yr)
-        hur_obs = make_single_year_of_seasonal_observations(hur, yr)
-        hus_obs = make_single_year_of_seasonal_observations(hus, yr)
-        EKP.combine_observations([net_rad_obs, rsut_obs, rlut_obs, cre_obs, pr_obs, ts_obs, ta_obs, hur_obs, hus_obs])
+        rsut_obs = make_single_year_of_seasonal_observations(rsut, yr);
+        rlut_obs = make_single_year_of_seasonal_observations(rlut, yr);
+        cre_obs = make_single_year_of_seasonal_observations(cre, yr);
+        pr_obs = make_single_year_of_seasonal_observations(pr, yr);
+        shf_obs = make_single_year_of_seasonal_observations(shf, yr);
+        ts_obs = make_single_year_of_seasonal_observations(ts, yr);
+
+        ta_obs = make_single_year_of_seasonal_observations(ta, yr);
+        hur_obs = make_single_year_of_seasonal_observations(hur, yr);
+        hus_obs = make_single_year_of_seasonal_observations(hus, yr);
+        ql_obs = make_single_year_of_seasonal_observations(ql, yr);
+        qi_obs = make_single_year_of_seasonal_observations(qi, yr);
+
+        EKP.combine_observations([net_rad_obs, rsut_obs, rlut_obs, cre_obs, pr_obs, shf_obs, ts_obs, ta_obs, hur_obs, hus_obs, ql_obs, qi_obs]);
     end
 
     return all_observations # NOT an EKP.ObservationSeries

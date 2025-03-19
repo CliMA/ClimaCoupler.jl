@@ -29,7 +29,7 @@ priors = [
     constrained_gaussian("precipitation_timescale", 600, 400, 0, 1200),
 ]
 prior = combine_distributions(priors)
-observation_path = joinpath(experiment_dir, "observations_3d.jld2")
+observation_path = joinpath(experiment_dir, "observations.jld2")
 observation_vec = JLD2.load_object(observation_path)
 
 # Create the EKP.ObservationSeries

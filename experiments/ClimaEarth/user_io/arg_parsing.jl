@@ -92,8 +92,7 @@ function get_coupler_args(config_dict::Dict)
 
     # Restart information
     restart_dir = config_dict["restart_dir"]
-    restart_t =
-        isnothing(config_dict["restart_t"]) ? nothing : Int64(Utilities.time_to_seconds(config_dict["restart_t"]))
+    restart_t = config_dict["restart_t"]
 
     # Diagnostics information
     use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]

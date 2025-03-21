@@ -17,10 +17,7 @@ function ClimaCalibrate.observation_map(iteration)
             G_ensemble[:, m] .= process_member_data(SimDir(simdir_path))
 
         catch e
-            @error "Error processing member $m, filling observation map entry with NaNs" exception = e
-            bt = catch_backtrace()
-            println("Stacktrace:")
-            display(stacktrace(bt))
+            @error "Error processing member $m, filling observation map entry with NaNs" exception = e 
             G_ensemble[:, m] .= NaN
         end
     end
@@ -46,8 +43,8 @@ function process_member_data(simdir::SimDir)
     hur = process_outputvar(simdir, "hur")
     hus = process_outputvar(simdir, "hus")
 
-    ql = process_outputvar(simdir, "ql")
-    qi = process_outputvar(simdir, "qi")
+    clw = process_outputvar(simdir, "clw")
+    cli = process_outputvar(simdir, "cli")
 
     # Map over each year
     year_observations = map(1:4:length(rsut)) do year_start
@@ -66,10 +63,10 @@ function process_member_data(simdir::SimDir)
         ta_yr = downsample_and_vectorize(ta[yr_ind])
         hur_yr = downsample_and_vectorize(hur[yr_ind])
         hus_yr = downsample_and_vectorize(hus[yr_ind])
-        ql_yr = downsample_and_vectorize(ql[yr_ind])
-        qi_yr = downsample_and_vectorize(qi[yr_ind])
+        clw_yr = downsample_and_vectorize(clw[yr_ind])
+        cli_yr = downsample_and_vectorize(cli[yr_ind])
 
-        vcat(net_rad_yr, rsut_yr, rlut_yr, cre_yr, pr_yr, shf_yr, ts_yr, ta_yr, hur_yr, hus_yr, ql_yr, qi_yr)
+        vcat(net_rad_yr, rsut_yr, rlut_yr, cre_yr, pr_yr, shf_yr, ts_yr, ta_yr, hur_yr, hus_yr, clw_yr, cli_yr)
     end
     return vcat(year_observations...)
 end
@@ -93,18 +90,20 @@ end
 function preprocess_monthly_averages(simdir, name)
     monthly_avgs = get_monthly_averages(simdir, name)
     # Interpolate to pressure coordinates to match observations
+    pressure = get_monthly_averages(simdir, "pfull")
     if has_altitude(monthly_avgs)
-        pressure = get_monthly_averages(simdir, "pfull")
         monthly_avgs = ClimaAnalysis.Atmos.to_pressure_coordinates(monthly_avgs, pressure)
         monthly_avgs = limit_pressure_dim_to_era5_range(monthly_avgs)
     end
+    monthly_avgs.attributes["start_date"] = pressure.attributes["start_date"]
     # Line up dates for monthly averages
     monthly_avgs = ClimaAnalysis.shift_to_start_of_previous_month(monthly_avgs)
     # Remove spinup time
     monthly_avgs = window(monthly_avgs, "time"; left = spinup_time)
     global_mean = monthly_avgs |> average_lat |> average_lon |> average_time
+    FT = monthly_avgs.data |> eltype
     # Replace NaNs with global mean
-    monthly_avgs = ClimaAnalysis.replace(monthly_avgs, NaN => global_mean)
+    monthly_avgs = ClimaAnalysis.replace(monthly_avgs, NaN => FT(mean(global_mean.data)))
     return monthly_avgs
 end
 

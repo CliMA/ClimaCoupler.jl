@@ -46,5 +46,7 @@ extra_atmos_diagnostics:
       - clw
       - cli
       - pfull
+      - clw
+      - cli
     period: 1months
     writer: nc

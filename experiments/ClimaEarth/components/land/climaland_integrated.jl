@@ -389,13 +389,37 @@ Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:area_fraction}) = sim.area
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:beta}) =
     CL.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:emissivity}) = sim.integrator.p.ϵ_sfc
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:energy}) = CL.total_energy(sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_direct_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_diffuse_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water}) = CL.total_water(sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_temperature}) = sim.integrator.p.T_sfc
+function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:energy}, level)
+    surface_field = similar(sim.integrator.p.soil.sfc_scratch)
+    return sum(
+        CL.total_energy_per_area!(
+            surface_field,
+            sim.model,
+            sim.integrator.u,
+            sim.integrator.p,
+            sim.integrator.t,
+            sim.integrator.p.soil.sfc_scratch,
+        ),
+    )
+end
+function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water}, level)
+    surface_field = similar(sim.integrator.p.soil.sfc_scratch)
+    return sum(
+        CL.total_liq_water_vol_per_area!(
+            surface_field,
+            sim.model,
+            sim.integrator.u,
+            sim.integrator.p,
+            sim.integrator.t,
+            sim.integrator.p.soil.sfc_scratch,
+        ),
+    )
+end
 
 # Update fields stored in land model sub-components
 function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:area_fraction}, field)

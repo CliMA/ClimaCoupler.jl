@@ -317,11 +317,9 @@ Extend Interfacer.add_coupler_fields! to add the fields required for BucketSimul
 The fields added are:
 - `:ρ_sfc`
 - `:F_radiative` (for radiation input)
-- `:P_liq` (for precipitation input)
-- `:P_snow` (for precipitation input)
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::BucketSimulation)
-    bucket_coupler_fields = [:ρ_sfc, :F_radiative, :P_liq, :P_snow]
+    bucket_coupler_fields = [:ρ_sfc, :F_radiative]
     push!(coupler_field_names, bucket_coupler_fields...)
 end
 

@@ -102,15 +102,19 @@ float_type(::CoupledSimulation{FT}) where {FT} = FT
 Return a list of default coupler fields needed to run a simulation.
 """
 default_coupler_fields() = [
-    # fields needed for flux calculations and exchange
+    # fields needed for flux calculations
     :z0m_sfc,
     :z0b_sfc,
     :beta,
     :emissivity,
+    # fields used for flux exchange
     :F_turb_energy,
     :F_turb_moisture,
     :F_turb_ρτxz,
     :F_turb_ρτyz,
+    # fields used to track water conservation, and for water fluxes
+    :P_liq,
+    :P_snow,
     # fields used for temporary storage during calculations
     :temp1,
     :temp2,

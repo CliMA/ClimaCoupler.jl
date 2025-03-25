@@ -2,13 +2,13 @@
 value = 10.0
 
 [zd_rayleigh]
-value = 40000.0
+value = 55000.0
 
 [kappa_2_sponge]
-value = 1e7
+value = 1e6
 
 [zd_viscous]
-value = 40000.0
+value = 55000.0
 
 [precipitation_timescale]
 value = 600
@@ -33,3 +33,6 @@ value = 0
 
 [max_area_limiter_scale]
 value = 0
+
+[optics_lookup_temperature_min]
+value = 160

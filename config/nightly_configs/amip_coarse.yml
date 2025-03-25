@@ -5,13 +5,13 @@ atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
 checkpoint_dt: "1200hours"
 coupler_toml: ["toml/amip.toml"]
 deep_atmosphere: true
-dt: "240secs"
-dt_cpl: "240secs"
+dt: "120secs"
+dt_cpl: "120secs"
 dt_save_state_to_disk: "30days"
 dt_save_to_sol: "30days"
 dz_bottom: 100.0
 energy_check: false
-h_elem: 8
+h_elem: 16
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
@@ -34,4 +34,4 @@ extra_atmos_diagnostics:
     reduction_time: average
     period: "1months"
   - short_name: [ts, ta, thetaa, ha, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, hussfc, evspsbl, pr, rv, ke]
-    period: "24hours"
+    period: "12hours"

@@ -68,20 +68,4 @@ for job_id in ["dry_held_suarez", "moist_held_suarez"]
     Makie.ylims!(co_heat_flux.axis, -pa_grid[1], -pa_grid[end])
     co_heat_flux.axis.yticks = (-pa_grid, string.(pa_grid))
     Makie.save(joinpath(PLOT_DIR, "$(job_id)_heat_flux.png"), co_heat_flux)
-
-    # Figure 5: storm track diagnostics reduced to timeseries
-    # this plots the eddy heat flux and max. Eady growth rate in a sectorial selection
-    lev_i, lat_s_i, lat_n_i, lon_w_i, lon_e_i = lev_st, 60, 75, 1, 30
-    println(
-        "Sectorial selevtion for timeseries: \n level: $(z[lev_i]), lat: $(lat[lat_s_i]) to $(lat[lat_n_i]), lon: $(lon[lon_w_i]) to $(lon[lon_e_i])",
-    )
-
-    egr_all, lat, lon, z, time = get_nc_data_all("egr", reduction, DATA_DIR)
-    egr_t = point_timeseries_data(egr_all, [lon_w_i, lon_e_i], [lat_s_i, lat_n_i], lev_i)
-
-    vT_all, lat, lon, z, time = get_nc_data_all("vt", reduction, DATA_DIR)
-    va_all, lat, lon, z, time = get_nc_data_all("va", reduction, DATA_DIR)
-    ta_all, lat, lon, z, time = get_nc_data_all("ta", reduction, DATA_DIR)
-    heat_flux_all = vT_all .- va_all .* ta_all
-    heat_flux_t = point_timeseries_data(heat_flux_all, [lon_w_i, lon_e_i], [lat_s_i, lat_n_i], lev_i)
 end

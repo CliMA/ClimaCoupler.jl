@@ -6,6 +6,21 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Add support for relative parameter filepaths PR[#1228](https://github.com/CliMA/ClimaCoupler.jl/pull/1228)
+Changed TOML parameter file handling to prepend the `pkgdir(ClimaCoupler)` 
+if no file is found at the relative filepath. Before this change, all files
+were assumed to be within the `ClimaCoupler` or `ClimaAtmos` repositories.
+
+#### Add support for parameter files in `BucketSimulation` PR[#1217](https://github.com/CliMA/ClimaCoupler.jl/pull/1217)
+Add a keyword argument `parameter_files` to `BucketSimulation` to enable
+calibration in a coupled simulation, passed via the `"coupler_toml"` argument.
+
+#### Add `ClimaLandSimulation` object PR[#1199](https://github.com/CliMA/ClimaCoupler.jl/pull/1199)
+Add methods to support running `ClimaLand.LandModel` in a coupled simulation.
+Also add tests to verify the constructor setup and taking a step.
+This type is not yet tested within a coupled simulation, but much
+of the necessary software infrastructure is added in this PR.
+
 #### Add default `get_field` methods for surface models PR[#1210](https://github.com/CliMA/ClimaCoupler.jl/pull/1210)
 Add default methods for `get_field` methods that are commonly
 not extended for surface models. These return reasonable default
@@ -20,6 +35,20 @@ and these are used to construct the set of coupler fields.
 TOA radiation and net precipitation are added only if conservation is enabled.
 The coupler fields are also now stored as a ClimaCore Field of NamedTuples,
 rather than as a NamedTuple of ClimaCore Fields.
+
+#### Restart simulations with JLD2 files PR[#1179](https://github.com/CliMA/ClimaCoupler.jl/pull/1179)
+
+`ClimaCoupler` can now use `JLD2` files to save state and cache for its model
+component, allowing it to restart from saved checkpoints. Some restrictions
+apply:
+
+- The number of MPI processes has to remain the same across checkpoints
+- Restart files are generally not portable across machines, julia versions, and package versions
+- Adding/changing new component models will probably require adding/changing code
+
+Please, refer to the
+[documentation](https://clima.github.io/ClimaCoupler.jl/dev/checkpointer/) for
+more information.
 
 #### Remove extra `get_field` functions PR[#1203](https://github.com/CliMA/ClimaCoupler.jl/pull/1203)
 Removes the `get_field` functions for `air_density` for all models, which

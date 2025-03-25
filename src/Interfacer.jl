@@ -6,6 +6,7 @@ This modules contains abstract types, interface templates and model stubs for co
 module Interfacer
 
 import SciMLBase
+import ClimaComms
 import ClimaCore as CC
 import Thermodynamics as TD
 import SciMLBase: step!, reinit! # explicitly import to extend these functions
@@ -77,6 +78,17 @@ end
 
 CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args[1:end])...}(args...)
 
+function Base.show(io::IO, sim::CoupledSimulation)
+    device_type = nameof(typeof(ClimaComms.device(sim.comms_ctx)))
+    return print(
+        io,
+        "Coupled Simulation\n",
+        "├── Running on: $(device_type)\n",
+        "├── Output folder: $(sim.dirs.output)\n",
+        "└── Current date: $(sim.dates.date[])",
+    )
+end
+
 """
     float_type(::CoupledSimulation)
 
@@ -94,6 +106,7 @@ default_coupler_fields() = [
     :z0m_sfc,
     :z0b_sfc,
     :beta,
+    :emissivity,
     :F_turb_energy,
     :F_turb_moisture,
     :F_turb_ρτxz,
@@ -214,7 +227,7 @@ If it isn't extended, the field won't be updated and a warning will be raised.
 update_field!(
     sim::AtmosModelSimulation,
     val::Union{
-        Val{:co2},
+        Val{:emissivity},
         Val{:surface_direct_albedo},
         Val{:surface_diffuse_albedo},
         Val{:surface_temperature},

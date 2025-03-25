@@ -93,7 +93,6 @@ end
 function Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:roughness_momentum}, field)
     parent(sim.cache.roughness_momentum) .= parent(field)
 end
-Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:co2}, field) = nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:surface_temperature}, field) = nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:roughness_buoyancy}, field) = nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:beta}, field) = nothing

@@ -44,6 +44,16 @@ This function may modify the input dictionary to remove unnecessary keys.
 - All arguments needed for the coupled simulation
 """
 function get_coupler_args(config_dict::Dict)
+    # Vector of TOML files containing model parameters
+    # We need to modify this Dict entry to be consistent with ClimaAtmos TOML files
+    config_dict["coupler_toml"] = map(config_dict["coupler_toml"]) do file
+        isfile(file) ? file : joinpath(pkgdir(ClimaCoupler), file)
+    end
+    parameter_files = config_dict["coupler_toml"]
+
+    # Make a copy so that we don't modify the original input
+    config_dict = copy(config_dict)
+
     # Simulation-identifying information; Print `config_dict` if requested
     config_dict["print_config_dict"] && @info(config_dict)
     job_id = config_dict["job_id"]
@@ -84,7 +94,7 @@ function get_coupler_args(config_dict::Dict)
 
     # Restart information
     restart_dir = config_dict["restart_dir"]
-    restart_t = Int(config_dict["restart_t"])
+    restart_t = config_dict["restart_t"]
 
     # Diagnostics information
     use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
@@ -101,10 +111,9 @@ function get_coupler_args(config_dict::Dict)
     conservation_softfail = config_dict["conservation_softfail"]
 
     # Output information
-    output_dir_root = config_dict["coupler_output_dir"]
+    output_dir_root = joinpath(config_dict["coupler_output_dir"], job_id)
 
     # ClimaLand-specific information
-    land_domain_type = config_dict["land_domain_type"]
     land_albedo_type = config_dict["land_albedo_type"]
     land_initial_condition = config_dict["land_initial_condition"]
     land_temperature_anomaly = config_dict["land_temperature_anomaly"]
@@ -133,11 +142,11 @@ function get_coupler_args(config_dict::Dict)
         energy_check,
         conservation_softfail,
         output_dir_root,
-        land_domain_type,
         land_albedo_type,
         land_initial_condition,
         land_temperature_anomaly,
         use_land_diagnostics,
+        parameter_files,
     )
 end
 
@@ -155,7 +164,6 @@ Extract the necessary arguments from the atmosphere configuration dictionary.
 function get_atmos_args(atmos_config_dict)
     dt_rad = atmos_config_dict["dt_rad"]
     output_default_diagnostics = atmos_config_dict["output_default_diagnostics"]
-
     return (; dt_rad, output_default_diagnostics)
 end
 

@@ -115,7 +115,7 @@ CPU of this process since it began.
 function show_memory_usage()
     cpu_max_rss_GB = ""
     cpu_max_rss_GB = string(round(Sys.maxrss() / 1e9, digits = 3)) * " GiB"
-    @info cpu_max_rss_GB
+    @info "Memory in use: $(cpu_max_rss_GB)"
     return cpu_max_rss_GB
 end
 

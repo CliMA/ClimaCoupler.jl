@@ -11,7 +11,7 @@ import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###
 """
-    PrescribedIceSimulation{P, Y, D, I}
+    PrescribedIceSimulation{P, D, I}
 
 Ice concentration is prescribed, and we solve the following energy equation:
 
@@ -27,9 +27,8 @@ Ice concentration is prescribed, and we solve the following energy equation:
 
 In the current version, the sea ice has a prescribed thickness.
 """
-struct PrescribedIceSimulation{P, Y, D, I} <: Interfacer.SeaIceModelSimulation
+struct PrescribedIceSimulation{P, D, I} <: Interfacer.SeaIceModelSimulation
     params::P
-    Y_init::Y
     domain::D
     integrator::I
 end
@@ -139,11 +138,15 @@ function PrescribedIceSimulation(
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     ode_function = CTS.ClimaODEFunction(T_exp! = ice_rhs!, dss! = (Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer))
+    if typeof(dt) isa Number
+        dt = Float64(dt)
+        tspan = Float64.(tspan)
+        saveat = Float64.(saveat)
+    end
+    problem = SciMLBase.ODEProblem(ode_function, Y, tspan, (; cache..., params = params))
+    integrator = SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
 
-    problem = SciMLBase.ODEProblem(ode_function, Y, Float64.(tspan), (; cache..., params = params))
-    integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64.(saveat), adaptive = false)
-
-    sim = PrescribedIceSimulation(params, Y, space, integrator)
+    sim = PrescribedIceSimulation(params, space, integrator)
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)
@@ -151,16 +154,13 @@ function PrescribedIceSimulation(
 end
 
 # extensions required by Interfacer
-Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:air_density}) = sim.integrator.p.ρ_sfc
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
-Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) =
     sim.integrator.p.params.α
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_humidity}) = sim.integrator.p.q_sfc
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
-Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:water}) = nothing
 
 """
     Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:energy})
@@ -188,6 +188,18 @@ Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_moisture
 # extensions required by FieldExchanger
 Interfacer.step!(sim::PrescribedIceSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 Interfacer.reinit!(sim::PrescribedIceSimulation) = Interfacer.reinit!(sim.integrator)
+
+"""
+Extend Interfacer.add_coupler_fields! to add the fields required for PrescribedIceSimulation.
+
+The fields added are:
+- `:ρ_sfc` (for humidity calculation)
+- `:F_radiative` (for radiation input)
+"""
+function Interfacer.add_coupler_fields!(coupler_field_names, ::PrescribedIceSimulation)
+    ice_coupler_fields = [:ρ_sfc, :F_radiative]
+    push!(coupler_field_names, ice_coupler_fields...)
+end
 
 # extensions required by FluxCalculator (partitioned fluxes)
 function FluxCalculator.update_turbulent_fluxes!(sim::PrescribedIceSimulation, fields::NamedTuple)
@@ -235,7 +247,7 @@ function ice_rhs!(dY, Y, p, t)
     F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc) # fluxes are defined to be positive when upward
     rhs = @. (-p.F_turb_energy - p.F_radiative + F_conductive) / (params.h * params.ρ * params.c)
     # If tendencies lead to temperature above freezing, set temperature to freezing
-    @. rhs = min(rhs, (params.T_freeze - Y.T_sfc) / p.dt)
+    @. rhs = min(rhs, (params.T_freeze - Y.T_sfc) / float(p.dt))
     # mask out no-ice areas
     area_mask = Utilities.binary_mask.(p.area_fraction)
     dY.T_sfc .= rhs .* area_mask

@@ -3,7 +3,6 @@ import SciMLBase
 import Statistics
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
-import ClimaParams
 import Thermodynamics as TD
 import ClimaLand as CL
 import ClimaLand.Parameters as LP
@@ -15,13 +14,12 @@ using NCDatasets
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###
 """
-    BucketSimulation{M, Y, D, I}
+    BucketSimulation{M, D, I}
 
 The bucket model simulation object.
 """
-struct BucketSimulation{M, Y, D, I, A} <: Interfacer.LandModelSimulation
+struct BucketSimulation{M, D, I, A} <: Interfacer.LandModelSimulation
     model::M
-    Y_init::Y
     domain::D
     integrator::I
     area_fraction::A
@@ -50,23 +48,23 @@ Initializes the bucket model variables.
 """
 function BucketSimulation(
     ::Type{FT},
-    tspan::Tuple{Float64, Float64},
+    tspan::Tuple{TT, TT},
     config::String,
     albedo_type::String,
     land_initial_condition::String,
     land_temperature_anomaly::String,
     output_dir::String;
     space,
-    dt::Float64,
-    saveat::Vector{Float64},
+    dt::TT,
+    saveat::Vector{TT},
     area_fraction,
     stepper = CTS.RK4(),
     date_ref::Dates.DateTime,
-    t_start::Float64,
+    t_start::TT,
     energy_check::Bool,
     surface_elevation,
     use_land_diagnostics::Bool,
-) where {FT}
+) where {FT, TT <: Union{Float64, ITime}}
     if config != "sphere"
         println(
             "Currently only spherical shell domains are supported; single column set-up will be addressed in future PR.",
@@ -103,7 +101,7 @@ function BucketSimulation(
     d_soil = FT(3.5) # soil depth
     z_0m = FT(1e-3) # roughness length for momentum over smooth bare soil
     z_0b = FT(1e-3) # roughness length for tracers over smooth bare soil
-    τc = FT(dt) # This is the timescale on which snow exponentially damps to zero, in the case where all
+    τc = FT(float(dt)) # This is the timescale on which snow exponentially damps to zero, in the case where all
     # the snow would melt in time `τc`. It prevents us from having to specially time step in cases where
     # all the snow melts in a single timestep.
     σS_c = FT(0.2) # critical snow water equivalent
@@ -222,7 +220,7 @@ function BucketSimulation(
         callback = SciMLBase.CallbackSet(diag_cb),
     )
 
-    sim = BucketSimulation(model, Y, (; domain = domain, soil_depth = d_soil), integrator, area_fraction)
+    sim = BucketSimulation(model, (; domain = domain, soil_depth = d_soil), integrator, area_fraction)
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)
@@ -230,7 +228,6 @@ function BucketSimulation(
 end
 
 # extensions required by Interfacer
-Interfacer.get_field(sim::BucketSimulation, ::Val{:air_density}) = sim.integrator.p.bucket.ρ_sfc
 Interfacer.get_field(sim::BucketSimulation, ::Val{:area_fraction}) = sim.area_fraction
 Interfacer.get_field(sim::BucketSimulation, ::Val{:beta}) =
     CL.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
@@ -303,6 +300,20 @@ end
 Interfacer.step!(sim::BucketSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 Interfacer.reinit!(sim::BucketSimulation) = Interfacer.reinit!(sim.integrator)
 
+"""
+Extend Interfacer.add_coupler_fields! to add the fields required for BucketSimulation.
+
+The fields added are:
+- `:ρ_sfc`
+- `:F_radiative` (for radiation input)
+- `:P_liq` (for precipitation input)
+- `:P_snow` (for precipitation input)
+"""
+function Interfacer.add_coupler_fields!(coupler_field_names, ::BucketSimulation)
+    bucket_coupler_fields = [:ρ_sfc, :F_radiative, :P_liq, :P_snow]
+    push!(coupler_field_names, bucket_coupler_fields...)
+end
+
 # extensions required by FluxCalculator (partitioned fluxes)
 function FluxCalculator.update_turbulent_fluxes!(sim::BucketSimulation, fields::NamedTuple)
     (; F_turb_energy, F_turb_moisture) = fields
@@ -324,7 +335,7 @@ function FluxCalculator.surface_thermo_state(
     # Note that the surface air density, ρ_sfc, is computed using the atmospheric state at the first level and making ideal gas
     # and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
     # a reasonable stand-in.
-    ρ_sfc = Interfacer.get_field(sim, Val(:air_density))
+    ρ_sfc = FluxCalculator.extrapolate_ρ_to_sfc.(thermo_params, thermo_state_int, T_sfc) # ideally the # calculate elsewhere, here just getter...
     q_sfc = Interfacer.get_field(sim, Val(:surface_humidity)) # already calculated in rhs! (cache)
     @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
 end

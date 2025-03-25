@@ -63,7 +63,6 @@ end
     @test !isnothing(sim.cache.SST_timevaryinginput)
 
     # Test `Interfacer.get_field` function
-    @test Interfacer.get_field(sim, Val(:air_density)) == sim.cache.ρ_sfc
     @test Interfacer.get_field(sim, Val(:area_fraction)) == sim.cache.area_fraction
     @test Interfacer.get_field(sim, Val(:beta)) == sim.cache.beta
     @test Interfacer.get_field(sim, Val(:roughness_buoyancy)) == sim.cache.z0b

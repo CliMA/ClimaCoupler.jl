@@ -6,8 +6,6 @@ coupler_toml: ["toml/amip.toml"]
 deep_atmosphere: false
 dt: "240secs"
 dt_cpl: "240secs"
-dt_save_state_to_disk: "30days"
-dt_save_to_sol: "30days"
 dz_bottom: 100.0
 energy_check: false
 h_elem: 8
@@ -16,19 +14,25 @@ mode_name: "amip"
 mono_surface: false
 netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
-output_default_diagnostics: true
+output_default_diagnostics: false
+use_coupler_diagnostics: false
+override_precip_timescale: false
 rayleigh_sponge: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "465days"
+coupler_output_dir: "experiments/calibration/output"
+t_end: "30days"
 topo_smoothing: true
 topography: "Earth"
 turb_flux_partition: "CombinedStateFluxesMOST"
-unique_seed: true
 viscous_sponge: true
 z_elem: 39
 z_max: 60000.0
+insolation: timevarying
+dt_rad: 6hours
+rad: clearsky
 extra_atmos_diagnostics:
-  - short_name: [od550aer, odsc550aer]
-    reduction_time: average
-    period: "1months"
+  - reduction_time: average
+    short_name: rsut
+    period: 30days
+    writer: nc

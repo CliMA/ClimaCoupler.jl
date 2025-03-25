@@ -16,7 +16,7 @@ for FT in (Float32, Float64)
             u = (; state_field1 = CC.Fields.ones(boundary_space), state_field2 = CC.Fields.zeros(boundary_space)),
             p = (; cache_field = CC.Fields.zeros(boundary_space)),
         )
-        sim = ClimaAtmosSimulation(nothing, nothing, nothing, integrator)
+        sim = ClimaAtmosSimulation(nothing, nothing, integrator, nothing)
 
         # make field non-constant to check the impact of the dss step
         coords_lat = CC.Fields.coordinate_field(sim.integrator.u.state_field2).lat

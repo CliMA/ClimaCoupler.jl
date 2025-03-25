@@ -6,6 +6,31 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Add default `get_field` methods for surface models PR[#1210](https://github.com/CliMA/ClimaCoupler.jl/pull/1210)
+Add default methods for `get_field` methods that are commonly
+not extended for surface models. These return reasonable default
+values, and can be extended by surface models that won't use the
+defaults (e.g. the full land model).
+
+#### Add coupler fields based on simulation type PR[#1207](https://github.com/CliMA/ClimaCoupler.jl/pull/1207)
+Previously, the coupler fields were hardcoded to be the same for all
+simulations, independent of what components were included. Now, each
+component model specifies the coupler fields it requires for coupling,
+and these are used to construct the set of coupler fields.
+TOA radiation and net precipitation are added only if conservation is enabled.
+The coupler fields are also now stored as a ClimaCore Field of NamedTuples,
+rather than as a NamedTuple of ClimaCore Fields.
+
+#### Remove extra `get_field` functions PR[#1203](https://github.com/CliMA/ClimaCoupler.jl/pull/1203)
+Removes the `get_field` functions for `air_density` for all models, which
+were unused except for the `BucketSimulation` method, which is replaced by a
+function call to `extrapolate_ρ_to_sfc`. Also removes the `get_field` function
+for `ClimaAtmosSimulation` `air_temperature`, which was unused.
+
+#### Coupler fields surface variable names all use `_sfc` PR[#1195](https://github.com/CliMA/ClimaCoupler.jl/pull/1195)
+`T_S`, `z0m_S`, and `z0b_S` are renamed to `T_sfc`, `z0m_sfc`, and `z0b_sfc`.
+This makes them consistent with the other surface fields, e.g. `ρ_sfc` and `q_sfc`.
+
 #### Driver function `setup_and_run` added PR[#1178](https://github.com/CliMA/ClimaCoupler.jl/pull/1178)
 A new function `setup_and_run` is added, which takes in a path to a config file,
 and contains all the code to initialize component models and run the simulation.

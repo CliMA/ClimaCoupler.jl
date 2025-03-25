@@ -241,7 +241,7 @@ function coupler_solve!(stepping, ics, parameters)
     # `saveat` determines the frequency with which the solution is saved
     # `adaptive` determines whether the solver should use an adaptive timestep
     prob_atm = SciMLBase.ODEProblem(ode_function, Y_atm, (t_start, t_end), (parameters = parameters, T_sfc = atm_T_lnd))
-    integ_atm = SciMLBase.init(prob_atm, ode_algo, dt = Δt_min, saveat = 10 * Δt_min, adaptive = false)
+    integ_atm = SciMLBase.init(prob_atm, ode_algo, dt = Δt_min, saveat = t_start:(10Δt_min):t_end, adaptive = false)
 
     ## land copies of coupler variables
     # note: `lnd_F_sfc` is a diagnostic variable (i.e. is not timestepped) in the land model
@@ -252,7 +252,7 @@ function coupler_solve!(stepping, ics, parameters)
     ode_function = CTS.ClimaODEFunction(T_exp! = ∑tendencies_lnd!)
 
     prob_lnd = SciMLBase.ODEProblem(ode_function, T_lnd, (t_start, t_end), (parameters, lnd_F_sfc))
-    integ_lnd = SciMLBase.init(prob_lnd, ode_algo, dt = Δt_min, saveat = 10 * Δt_min, adaptive = false)
+    integ_lnd = SciMLBase.init(prob_lnd, ode_algo, dt = Δt_min, saveat = t_start:(10Δt_min):t_end, adaptive = false)
 
 
     ## coupler stepping

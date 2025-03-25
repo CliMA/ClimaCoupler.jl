@@ -84,7 +84,6 @@ for FT in (Float32, Float64)
         @test Interfacer.get_field(stub, Val(:roughness_momentum)) == 4
         @test Interfacer.get_field(stub, Val(:roughness_buoyancy)) == 5
         @test Interfacer.get_field(stub, Val(:beta)) == 6
-        @test Interfacer.get_field(stub, Val(:air_density)) == FT(1)
         @test ≈(Interfacer.get_field(stub, Val(:surface_humidity))[1], FT(0.0076), atol = FT(1e-4))
     end
 
@@ -133,9 +132,7 @@ end
 
     # Test that get_field gives correct warnings for unextended fields
     for value in (
-        :air_density,
         :area_fraction,
-        :beta,
         :roughness_buoyancy,
         :roughness_momentum,
         :surface_direct_albedo,
@@ -158,9 +155,6 @@ end
 
     # Test that get_field gives correct warnings for unextended fields
     for value in (
-        :air_density,
-        :air_temperature,
-        :energy,
         :height_int,
         :height_sfc,
         :liquid_precipitation,
@@ -171,7 +165,6 @@ end
         :turbulent_moisture_flux,
         :thermo_state_int,
         :uv_int,
-        :water,
     )
         val = Val(value)
         @test_throws ErrorException("undefined field `$value` for " * Interfacer.name(sim)) Interfacer.get_field(

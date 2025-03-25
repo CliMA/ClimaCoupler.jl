@@ -1,6 +1,4 @@
 import Printf
-import ClimaComms
-@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ClimaCore as CC
 import Makie
 import ClimaCoreMakie
@@ -34,7 +32,7 @@ function plot_global_conservation(
     model_sims = coupler_sim.model_sims
     ccs = cc.sums
 
-    days = collect(1:length(ccs[1])) * coupler_sim.Δt_cpl / 86400
+    days = collect(1:length(ccs[1])) * float(coupler_sim.Δt_cpl) / 86400
 
     # evolution of energy of each component relative to initial value
     total = ccs.total  # total
@@ -97,32 +95,15 @@ function debug(cs::Interfacer.CoupledSimulation, dir = "debug", cs_fields_ref = 
 end
 
 """
-    debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
+    debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing)
 
 Plot useful coupler fields (in `field_names`) and save plots to a directory.
 
 If `cs_fields_ref` is provided (e.g., using a copy of cs.fields from the initialization),
 plot the anomalies of the fields with respect to `cs_fields_ref`.
 """
-function debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
-    field_names = (
-        :surface_direct_albedo,
-        :surface_diffuse_albedo,
-        :F_radiative,
-        :F_turb_energy,
-        :F_turb_moisture,
-        :F_turb_ρτxz,
-        :F_turb_ρτyz,
-        :P_liq,
-        :P_snow,
-        :T_S,
-        :ρ_sfc,
-        :q_sfc,
-        :beta,
-        :z0b_S,
-        :z0m_S,
-        :radiative_energy_flux_toa,
-    )
+function debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing)
+    field_names = propertynames(cs_fields)
     fig = Makie.Figure(size = (1500, 800))
     min_square_len = ceil(Int, sqrt(length(field_names)))
     for i in 1:min_square_len, j in 1:min_square_len
@@ -232,8 +213,7 @@ Interfacer.get_field(sim::BucketSimulation, ::Val{:W}) = sim.integrator.u.bucket
 
 # currently selected plot fields
 plot_field_names(sim::Interfacer.SurfaceModelSimulation) = (:area_fraction, :surface_temperature, :surface_humidity)
-plot_field_names(sim::BucketSimulation) =
-    (:area_fraction, :surface_temperature, :surface_humidity, :air_density, :σS, :Ws, :W)
+plot_field_names(sim::BucketSimulation) = (:area_fraction, :surface_temperature, :surface_humidity, :σS, :Ws, :W)
 plot_field_names(sim::ClimaAtmosSimulation) = (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)
 
 

@@ -85,7 +85,7 @@ saved in that sim's cache. `csf` refers to the coupler fields.
 
 ```
 function atmos_turbulent_fluxes_most!(atmos_sim::ClimaAtmosSimulation, csf)
-    atmos_sim.cache.flux .= atmos_sim.c .* (csf.T_S .- atmos_sim.temperature)
+    atmos_sim.cache.flux .= atmos_sim.c .* (csf.T_sfc .- atmos_sim.temperature)
 end
 ```
 
@@ -95,16 +95,16 @@ atmos_turbulent_fluxes_most!(sim::Interfacer.ComponentModelSimulation, _) =
 
 
 """
-    calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_S::CC.Fields.Field)
+    calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_sfc::CC.Fields.Field)
 
 Extension for this  to to calculate surface density.
 """
-function calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_S::CC.Fields.Field)
+function calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_sfc::CC.Fields.Field)
     error("this function is required to be dispatched on" * Interfacer.name(atmos_sim) * ", but no method defined")
 end
 
 """
-    partitioned_turbulent_fluxes!(model_sims::NamedTuple, fields::NamedTuple, boundary_space::CC.Spaces.AbstractSpace, surface_scheme, thermo_params::TD.Parameters.ThermodynamicsParameters)
+    partitioned_turbulent_fluxes!(model_sims::NamedTuple, fields::CC.Fields.Field, boundary_space::CC.Spaces.AbstractSpace, surface_scheme, thermo_params::TD.Parameters.ThermodynamicsParameters)
 
 The current setup calculates the aerodynamic fluxes in the coupler (assuming no regridding is needed)
 using adapter function `get_surface_fluxes!`, which calls `SurfaceFluxes.jl`. The coupler saves
@@ -127,7 +127,7 @@ TODO:
 """
 function partitioned_turbulent_fluxes!(
     model_sims::NamedTuple,
-    fields::NamedTuple,
+    fields::CC.Fields.Field,
     boundary_space::CC.Spaces.AbstractSpace,
     surface_scheme,
     thermo_params::TD.Parameters.ThermodynamicsParameters,
@@ -135,7 +135,7 @@ function partitioned_turbulent_fluxes!(
 
     atmos_sim = model_sims.atmos_sim
     csf = fields
-    FT = eltype(csf[1])
+    FT = CC.Spaces.undertype(boundary_space)
 
     # reset coupler fields
     csf.F_turb_ρτxz .*= FT(0)

@@ -25,6 +25,7 @@ import DelimitedFiles
 # ## ClimaESM packages
 import ClimaAtmos as CA
 import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ClimaCore as CC
 
 # ## Coupler specific imports
@@ -43,6 +44,7 @@ import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.Utils: period_to_seconds_float
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
+import ClimaUtilities.TimeManager: ITime
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
 # Random is used by RRMTGP for some cloud properties
 import Random
@@ -150,6 +152,10 @@ function solve_coupler!(cs)
     return nothing
 end
 
+function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
+    config_dict = get_coupler_config_dict(config_file)
+    return setup_and_run(config_dict)
+end
 """
     setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
 
@@ -157,9 +163,9 @@ This function sets up and runs the coupled model simulation specified by the
 input config file. It initializes the component models, all coupler objects,
 diagnostics, and conservation checks, and then runs the simulation.
 """
-function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
-    # Parse the configuration file
-    config_dict = get_coupler_config_dict(config_file)
+function setup_and_run(config_dict::AbstractDict)
+    # Initialize communication context (do this first so all printing is only on root)
+    comms_ctx = Utilities.get_comms_context(config_dict)
     # Select the correct timestep for each component model based on which are available
     parse_component_dts!(config_dict)
     # Add extra diagnostics if specified
@@ -170,7 +176,6 @@ function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_c
         sim_mode,
         random_seed,
         FT,
-        comms_ctx,
         t_end,
         t_start,
         date0,
@@ -454,33 +459,19 @@ function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_c
     global `CoupledSimulation` struct, `cs`, below.
     =#
 
-    ## coupler exchange fields
-    coupler_field_names = (
-        :T_S,
-        :z0m_S,
-        :z0b_S,
-        :ρ_sfc,
-        :q_sfc,
-        :surface_direct_albedo,
-        :surface_diffuse_albedo,
-        :beta,
-        :F_turb_energy,
-        :F_turb_moisture,
-        :F_turb_ρτxz,
-        :F_turb_ρτyz,
-        :F_radiative,
-        :P_liq,
-        :P_snow,
-        :radiative_energy_flux_toa,
-        :P_net,
-        :temp1,
-        :temp2,
-    )
-    coupler_fields = NamedTuple{coupler_field_names}(ntuple(i -> zeros(boundary_space), length(coupler_field_names)))
-    Utilities.show_memory_usage()
-
     ## model simulations
     model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim)
+
+    ## coupler exchange fields
+    coupler_field_names = Interfacer.default_coupler_fields()
+    for sim in model_sims
+        Interfacer.add_coupler_fields!(coupler_field_names, sim)
+    end
+    # add coupler fields required to track conservation, if specified
+    energy_check && push!(coupler_field_names, :radiative_energy_flux_toa, :P_net)
+
+    # allocate space for the coupler fields
+    coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
 
     ## dates
     dates = (; date = [date], date0 = [date0])
@@ -731,5 +722,6 @@ function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_c
     end
 
     # Close all diagnostics file writers
-    !isnothing(cs.diags_handler) && map(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
+    isnothing(cs.diags_handler) || foreach(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
+    isnothing(atmos_sim.output_writers) || foreach(close, atmos_sim.output_writers)
 end

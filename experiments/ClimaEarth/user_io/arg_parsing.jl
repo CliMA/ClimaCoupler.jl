@@ -49,11 +49,11 @@ function get_coupler_args(config_dict::Dict)
     job_id = config_dict["job_id"]
     mode_name = config_dict["mode_name"]
     sim_mode = mode_name_dict[mode_name]
+    use_itime = config_dict["use_itime"]
 
     # Computational simulation setup information
     random_seed = config_dict["unique_seed"] ? time_ns() : 1234
     FT = config_dict["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
-    comms_ctx = Utilities.get_comms_context(config_dict)
 
     # Time information
     t_end = Float64(Utilities.time_to_seconds(config_dict["t_end"]))
@@ -61,8 +61,23 @@ function get_coupler_args(config_dict::Dict)
     date0 = date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
     Δt_cpl = Float64(Utilities.time_to_seconds(config_dict["dt_cpl"]))
     saveat = Float64(Utilities.time_to_seconds(config_dict["dt_save_to_sol"]))
-    saveat = [t_start:saveat:t_end..., t_end]
-    component_dt_dict = config_dict["component_dt_dict"]
+    if use_itime
+        t_end = ITime(t_end, epoch = date0)
+        t_start = ITime(t_start, epoch = date0)
+        Δt_cpl = ITime(Δt_cpl, epoch = date0)
+        times = promote(t_end, t_start, Δt_cpl, ITime.(values(config_dict["component_dt_dict"]))...)
+        t_end, t_start, Δt_cpl = (times[1], times[2], times[3])
+        component_dt_dict =
+            Dict(component => first(promote(ITime(dt), t_end)) for (component, dt) in config_dict["component_dt_dict"])
+    else
+        component_dt_dict = config_dict["component_dt_dict"]
+    end
+    if saveat != Inf
+        use_itime && (saveat = ITime(saveat))
+        saveat = [promote([t_start:saveat:t_end..., t_end]...)...]
+    else
+        saveat = typeof(t_start)[]
+    end
 
     # Checkpointing information
     checkpoint_dt = config_dict["checkpoint_dt"]
@@ -100,7 +115,6 @@ function get_coupler_args(config_dict::Dict)
         sim_mode,
         random_seed,
         FT,
-        comms_ctx,
         t_end,
         t_start,
         date0,
@@ -169,7 +183,7 @@ The default periods are:
 - `calendar_dt`: A DateTime interval representing the period
 """
 function get_diag_period(t_start, t_end)
-    sim_duration = t_end - t_start
+    sim_duration = float(t_end - t_start)
     secs_per_day = 86400
     if sim_duration >= 90 * secs_per_day
         # if duration >= 90 days, take monthly means
@@ -213,7 +227,7 @@ function parse_component_dts!(config_dict)
 
     # Specify component model names
     component_dt_names = ["dt_atmos", "dt_land", "dt_ocean", "dt_seaice"]
-    component_dt_dict = Dict{String, Float64}()
+    component_dt_dict = Dict{String, typeof(Δt_cpl)}()
     # check if all component dt's are specified
     if all(key -> !isnothing(config_dict[key]), component_dt_names)
         # when all component dt's are specified, ignore the dt field

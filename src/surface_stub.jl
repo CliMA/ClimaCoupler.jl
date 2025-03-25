@@ -33,7 +33,6 @@ end
 
 A getter function, that should not allocate. If undefined, it returns a descriptive error.
 """
-get_field(sim::AbstractSurfaceStub, ::Val{:air_density}) = sim.cache.ρ_sfc
 get_field(sim::AbstractSurfaceStub, ::Val{:area_fraction}) = sim.cache.area_fraction
 get_field(sim::AbstractSurfaceStub, ::Val{:beta}) = sim.cache.beta
 get_field(sim::AbstractSurfaceStub, ::Val{:energy}) = nothing
@@ -44,7 +43,6 @@ get_field(sim::AbstractSurfaceStub, ::Val{:surface_diffuse_albedo}) = sim.cache.
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_humidity}) =
     TD.q_vap_saturation_generic.(sim.cache.thermo_params, sim.cache.T_sfc, sim.cache.ρ_sfc, sim.cache.phase)
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_temperature}) = sim.cache.T_sfc
-get_field(sim::AbstractSurfaceStub, ::Val{:water}) = nothing
 
 """
     update_field!(sim::AbstractSurfaceStub, ::Val{:area_fraction}, field::CC.Fields.Field)
@@ -97,6 +95,17 @@ end
 The stub surface simulation is not updated by this function. Extends `SciMLBase.reinit!`.
 """
 reinit!(::AbstractSurfaceStub) = nothing
+
+"""
+Extend Interfacer.add_coupler_fields! to add the fields required for AbstractSurfaceStub.
+
+The fields added are:
+- `:ρ_sfc` (for humidity calculation)
+"""
+function Interfacer.add_coupler_fields!(coupler_field_names, ::AbstractSurfaceStub)
+    surface_coupler_fields = [:ρ_sfc]
+    push!(coupler_field_names, surface_coupler_fields...)
+end
 
 """
     step!(::AbstractSurfaceStub, t)

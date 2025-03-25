@@ -7,16 +7,15 @@ import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###
 """
-    SlabOceanSimulation{P, Y, D, I}
+    SlabOceanSimulation{P, D, I}
 
 Equation:
 
     (h * ρ * c) dTdt = -(F_turb_energy + F_radiative)
 
 """
-struct SlabOceanSimulation{P, Y, D, I} <: Interfacer.OceanModelSimulation
+struct SlabOceanSimulation{P, D, I} <: Interfacer.OceanModelSimulation
     params::P
-    Y_init::Y
     domain::D
     integrator::I
 end
@@ -92,11 +91,15 @@ function SlabOceanSimulation(
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     ode_function =
         CTS.ClimaODEFunction(; T_exp! = slab_ocean_rhs!, dss! = (Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer))
+    if typeof(dt) isa Number
+        dt = Float64(dt)
+        tspan = Float64.(tspan)
+        saveat = Float64.(saveat)
+    end
+    problem = SciMLBase.ODEProblem(ode_function, Y, tspan, cache)
+    integrator = SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
 
-    problem = SciMLBase.ODEProblem(ode_function, Y, Float64.(tspan), cache)
-    integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64.(saveat), adaptive = false)
-
-    sim = SlabOceanSimulation(params, Y, space, integrator)
+    sim = SlabOceanSimulation(params, space, integrator)
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)
@@ -104,16 +107,13 @@ function SlabOceanSimulation(
 end
 
 # extensions required by Interfacer
-Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:air_density}) = sim.integrator.p.ρ_sfc
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
-Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_direct_albedo}) = sim.integrator.p.α_direct
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_diffuse_albedo}) = sim.integrator.p.α_diffuse
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_humidity}) = sim.integrator.p.q_sfc
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
-Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:water}) = nothing
 
 """
     Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:energy})
@@ -146,6 +146,18 @@ end
 # extensions required by FieldExchanger
 Interfacer.step!(sim::SlabOceanSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 Interfacer.reinit!(sim::SlabOceanSimulation) = Interfacer.reinit!(sim.integrator)
+
+"""
+Extend Interfacer.add_coupler_fields! to add the fields required for SlabOceanSimulation.
+
+The fields added are:
+- `:ρ_sfc` (for humidity calculation)
+- `:F_radiative` (for radiation input)
+"""
+function Interfacer.add_coupler_fields!(coupler_field_names, ::SlabOceanSimulation)
+    ocean_coupler_fields = [:ρ_sfc, :F_radiative]
+    push!(coupler_field_names, ocean_coupler_fields...)
+end
 
 # extensions required by FluxCalculator (partitioned fluxes)
 function FluxCalculator.update_turbulent_fluxes!(sim::SlabOceanSimulation, fields::NamedTuple)

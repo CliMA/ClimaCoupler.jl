@@ -51,6 +51,12 @@ of SciMLBase.jl.
 - `get_model_prog_state(::ComponentModelSimulation)`: A function that
 returns the state vector of the simulation at its current state. This
 is used for checkpointing the simulation.
+- `add_coupler_fields!(coupler_field_names::Set, ::ComponentModelSimulation)`:
+A function that adds names of quantities the coupler must exchange
+to support this component model. These will be added for each model
+in addition to the existing defaults: `z0m_sfc`, `z0b_sfc`, `beta`,
+`F_turb_energy`, `F_turb_moisture`, `F_turb_ρτxz`, `F_turb_ρτyz`,
+`temp1`, and `temp2`.
 
 ### ComponentModelSimulation - optional functions
 - `update_sim!(::ComponentModelSimulation, csf, turbulent_fluxes)`: A
@@ -60,6 +66,18 @@ this function for both `AtmosModelSimulation` and
 `SurfaceModelSimulation` that update each of the fields expected by
 the coupler. This function can optionally be extended to include
 additional field updates as desired.
+
+- `get_field(::ComponentModelSimulation, ::Val{property})`:
+Default `get_field` functions are provided for `energy` and `water` fields,
+described in the table below.
+These quantities are used to track conservation, and the defaults
+return `nothing`. To check conservation throughout a simulation, these
+functions must be extended for all models being run.
+
+| Coupler name      | Description | Units | Default value |
+|-------------------|-------------|-------|---------------|
+| `energy` | globally integrated energy | J | `nothing` |
+| `water` | globally integrated water | kg | `nothing` |
 
 ### AtmosModelSimulation - required functions
 In addition to the functions required for a general
@@ -73,8 +91,6 @@ for the following properties:
 | Coupler name      | Description | Units |
 |-------------------|-------------|-------|
 | `air_density`       | air density of the atmosphere | kg m^-3 |
-| `air_temperature`   | air temperature at the surface of the atmosphere | K |
-| `energy`            | globally integrated energy | J |
 | `height_int`        | height at the first internal model level | m |
 | `height_sfc`        | height at the surface (only required when using `PartitionedStateFluxes`) | m |
 | `liquid_precipitation` | liquid precipitation at the surface | kg m^-2 s^-1 |
@@ -85,9 +101,6 @@ for the following properties:
 | `turbulent_moisture_flux` | aerodynamic turbulent surface fluxes of energy (evaporation) | kg m^-2 s^-1 |
 | `thermo_state_int`  | thermodynamic state at the first internal model level | |
 | `uv_int`            | horizontal wind velocity vector at the first internal model level | m s^-1 |
-| `water`             | globally integrated water | kg |
-
-
 
 - `update_field!(::AtmosModelSimulation. ::Val{property}, field)`:
 A function to update the value of property in the component model
@@ -106,23 +119,21 @@ following properties:
 | `surface_temperature` | temperature over the combined surface space | K |
 | `turbulent_fluxes` | turbulent fluxes (note: only required when using `PartitionedStateFluxes` option - see our `FluxCalculator` module docs for more information) | W m^-2 |
 
-- `calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_S::ClimaCore.Fields.Field)`:
+- `calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_sfc::ClimaCore.Fields.Field)`:
 A function to return the air density of the atmosphere simulation
 extrapolated to the surface, with units of [kg m^-3].
 
 ### SurfaceModelSimulation - required functions
 Analogously to the `AtmosModelSimulation`, a `SurfaceModelSimulation`
 requires additional functions to those required for a general `ComponentModelSimulation`.
-- `get_field(::SurfaceModelSimulation. ::Val{property})`: This getter
+- `get_field(::SurfaceModelSimulation, ::Val{property})`: This getter
 function returns the value of the field property for the simulation at
 the current time. For a `SurfaceModelSimulation`, it must be extended
 for the following properties:
 
 | Coupler name      | Description | Units |
 |-------------------|-------------|-------|
-| `air_density`       | surface air density | kg m^-3 |
 | `area_fraction`     | fraction of the simulation grid surface area this model covers | |
-| `beta`              | factor that scales evaporation based on its estimated level of saturation | |
 | `roughness_buoyancy` | aerodynamic roughness length for buoyancy | m |
 | `roughness_momentum` | aerodynamic roughness length for momentum | m |
 | `surface_direct albedo`    | bulk direct surface albedo | |
@@ -130,7 +141,7 @@ for the following properties:
 | `surface_humidity`  | surface humidity | kg kg^-1 |
 | `surface_temperature` | surface temperature | K |
 
-- `update_field!(::SurfaceModelSimulation. ::Val{property}, field)`:
+- `update_field!(::SurfaceModelSimulation, ::Val{property}, field)`:
 A function to update the value of property in the component model
 simulation, using the values in `field` passed from the coupler
 This update should be done in place. If this function
@@ -153,6 +164,16 @@ following properties:
 | `surface_diffuse_albedo`    | bulk diffuse surface albedo; needed if calculated externally of the surface model (e.g. ocean albedo from the atmospheric state) | |
 
 ### SurfaceModelSimulation - optional functions
+- `get_field(::SurfaceModelSimulation, ::Val{property})`:
+For some quantities, default `get_field` functions are provided, which may be
+overwritten or used as-is. These currently include the following:
+
+| Coupler name      | Description | Units | Default value |
+|-------------------|-------------|-------|---------------|
+| `beta` | factor that scales evaporation based on its estimated level of saturation | | 1 |
+| `emissivity` | measure of how much energy a surface radiates | | 1 |
+| `height_disp` | displacement height relative to the surface | m | 0 |
+
 - `update_turbulent_fluxes!(::ComponentModelSimulation, fields::NamedTuple)`:
 This function updates the turbulent fluxes of the component model simulation
 at this point in horizontal space. The values are updated using the energy
@@ -170,16 +191,13 @@ which is extended by `SurfaceStub`
 in the `surface_stub.jl` file, with
 the cache variables specified as:
 ```
-get_field(sim::AbstractSurfaceStub, ::Val{:air_density}) = sim.cache.ρ_sfc
 get_field(sim::AbstractSurfaceStub, ::Val{:area_fraction}) = sim.cache.area_fraction
 get_field(sim::AbstractSurfaceStub, ::Val{:beta}) = sim.cache.beta
-get_field(sim::AbstractSurfaceStub, ::Val{:energy}) = nothing
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m
 get_field(sim::AbstractSurfaceStub, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) = sim.cache.α
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_humidity}) = TD.q_vap_saturation_generic.(sim.cache.thermo_params, sim.cache.T_sfc, sim.cache.ρ_sfc, sim.cache.phase)
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_temperature}) = sim.cache.T_sfc
-get_field(sim::AbstractSurfaceStub, ::Val{:water}) = nothing
 ```
 and with the corresponding `update_field!` functions
 ```

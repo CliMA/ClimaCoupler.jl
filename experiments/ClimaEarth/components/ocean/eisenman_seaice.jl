@@ -7,7 +7,7 @@ import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###
 """
-    EisenmanIceSimulation{P, Y, D, I}
+    EisenmanIceSimulation{P, D, I}
 
 Thermodynamic 0-layer, based on the Semtner 1976 model and later refined by
 Eisenmen 2009 and Zhang et al 2021.
@@ -15,9 +15,8 @@ Eisenmen 2009 and Zhang et al 2021.
 Note that Eisenman sea ice assumes gray radiation, no snow coverage, and
 PartitionedStateFluxes for the surface flux calculation.
 """
-struct EisenmanIceSimulation{P, Y, D, I} <: Interfacer.SeaIceModelSimulation
+struct EisenmanIceSimulation{P, D, I} <: Interfacer.SeaIceModelSimulation
     params_ice::P
-    Y_init::Y
     domain::D
     integrator::I
 end
@@ -45,7 +44,7 @@ Base.@kwdef struct EisenmanOceanParameters{FT <: AbstractFloat}
 end
 
 """
-    EisenmanIceSimulation(::Type{FT}, tspan; space = nothing, area_fraction = nothing, thermo_params = nothing, stepper = CTS.RK4(), dt = 0.02, saveat = 1.0e10)
+    EisenmanIceSimulation(::Type{FT}, tspan; space = nothing, area_fraction = nothing, thermo_params = nothing, stepper = CTS.RK4(), dt, saveat = 1.0e10)
 
 Initialize the Eisenman-Zhang sea ice model and simulation.
 """
@@ -56,7 +55,7 @@ function EisenmanIceSimulation(
     area_fraction = nothing,
     thermo_params = nothing,
     stepper = CTS.RK4(),
-    dt = 0.02,
+    dt,
     saveat = [1.0e10],
 ) where {FT}
 
@@ -80,17 +79,20 @@ function EisenmanIceSimulation(
         thermo_params = thermo_params,
         dss_buffer = CC.Spaces.create_dss_buffer(Y),
     )
-    problem = SciMLBase.ODEProblem(ode_function, Y, Float64.(tspan), cache)
-    integrator = SciMLBase.init(problem, ode_algo, dt = Float64(dt), saveat = Float64.(saveat), adaptive = false)
+    if typeof(dt) isa Number
+        dt = Float64(dt)
+        tspan = Float64.(tspan)
+        saveat = Float64.(saveat)
+    end
+    problem = SciMLBase.ODEProblem(ode_function, Y, tspan, cache)
+    integrator = SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
 
-    sim = EisenmanIceSimulation(params, Y, space, integrator)
+    sim = EisenmanIceSimulation(params, space, integrator)
     return sim
 end
 
 # extensions required by Interfacer
-Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:air_density}) = sim.integrator.p.Ya.ρ_sfc
 Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
-Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
 Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:roughness_buoyancy}) =
     @. sim.integrator.p.params.p_i.z0b * (sim.integrator.p.ice_area_fraction) +
        sim.integrator.p.params.p_o.z0b .* (1 - sim.integrator.p.ice_area_fraction)
@@ -102,7 +104,6 @@ Interfacer.get_field(sim::EisenmanIceSimulation, ::Union{Val{:surface_direct_alb
        sim.integrator.p.params.p_o.α .* (1 - sim.integrator.p.ice_area_fraction)
 Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:surface_humidity}) = sim.integrator.u.q_sfc
 Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
-Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:water}) = nothing
 
 """
     Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:energy})
@@ -131,7 +132,7 @@ function Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:energy})
 
     e_ml = @. p_o.h * p_o.ρ * p_o.c * sim.integrator.u.T_ml # heat
     e_ice = @. p_i.L_ice * sim.integrator.u.h_ice # phase
-    e_qflux = @. ocean_qflux * FT(sim.integrator.t)
+    e_qflux = @. ocean_qflux * FT(float(sim.integrator.t))
 
     return @. e_ml + e_ice + e_qflux + e_base
 end
@@ -155,6 +156,18 @@ end
 # extensions required by FieldExchanger
 Interfacer.step!(sim::EisenmanIceSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 Interfacer.reinit!(sim::EisenmanIceSimulation) = Interfacer.reinit!(sim.integrator)
+
+"""
+Extend Interfacer.add_coupler_fields! to add the fields required for EisenmanIceSimulation.
+
+The fields added are:
+- `:ρ_sfc` (for humidity calculation)
+- `:F_radiative` (for radiation input)
+"""
+function Interfacer.add_coupler_fields!(coupler_field_names, ::EisenmanIceSimulation)
+    eisenman_coupler_fields = [:ρ_sfc, :F_radiative]
+    push!(coupler_field_names, eisenman_coupler_fields...)
+end
 
 # extensions required by FluxCalculator (partitioned fluxes)
 function FluxCalculator.update_turbulent_fluxes!(sim::EisenmanIceSimulation, fields::NamedTuple)
@@ -341,7 +354,7 @@ Calculate the tendencies for the Eisenman-Zhang sea ice model.
 """
 function ∑tendencies(dY, Y, cache, _)
     FT = eltype(dY)
-    Δt = cache.Δt
+    Δt = float(cache.Δt)
     Ya = cache.Ya
     thermo_params = cache.thermo_params
     p = cache.params

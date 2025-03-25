@@ -156,7 +156,7 @@ end
 =#
 
 ## coupler exchange fields
-coupler_field_names = (
+coupler_field_names = [
     :T_sfc,
     :z0m_sfc,
     :z0b_sfc,
@@ -176,9 +176,8 @@ coupler_field_names = (
     :P_net,
     :temp1,
     :temp2,
-)
-coupler_fields =
-    NamedTuple{coupler_field_names}(ntuple(i -> ClimaCore.Fields.zeros(boundary_space), length(coupler_field_names)))
+]
+coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
 
 ## model simulations
 model_sims = (atmos_sim = atmos_sim,);

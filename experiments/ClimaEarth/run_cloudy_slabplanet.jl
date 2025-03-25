@@ -248,7 +248,7 @@ ocean_sim = SlabOceanSimulation(
 =#
 
 ## coupler exchange fields
-coupler_field_names = (
+coupler_field_names = [
     :T_sfc,
     :z0m_sfc,
     :z0b_sfc,
@@ -268,9 +268,8 @@ coupler_field_names = (
     :P_net,
     :temp1,
     :temp2,
-)
-coupler_fields =
-    NamedTuple{coupler_field_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_field_names)))
+]
+coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
 Utilities.show_memory_usage()
 
 ## model simulations

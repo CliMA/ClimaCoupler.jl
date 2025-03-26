@@ -384,7 +384,7 @@ git-tree-sha1 = "2afefe559dfea4da7b9c71f5536b8caa44e4aa76"
 repo-rev = "main"
 repo-url = "https://github.com/CliMA/ClimaLand.jl.git"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
-version = "0.15.11"
+version = "0.15.9"
 
     [deps.ClimaLand.extensions]
     CreateParametersExt = "ClimaParams"

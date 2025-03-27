@@ -199,20 +199,23 @@ for FT in (Float32, Float64)
 
             model_sims = (; atmos_sim, ocean_sim, ocean_sim2)
 
-            coupler_cache_names = [
-                :T_sfc,
-                :surface_direct_albedo,
-                :surface_diffuse_albedo,
-                :F_R_sfc,
-                :F_R_toa,
-                :P_liq,
-                :P_snow,
-                :P_net,
-                :F_turb_energy,
-                :F_turb_ρτxz,
-                :F_turb_ρτyz,
-                :F_turb_moisture,
-            ]
+            coupler_cache_names = (
+                [],
+                [
+                    :T_sfc,
+                    :surface_direct_albedo,
+                    :surface_diffuse_albedo,
+                    :F_R_sfc,
+                    :F_R_toa,
+                    :P_liq,
+                    :P_snow,
+                    :P_net,
+                    :F_turb_energy,
+                    :F_turb_ρτxz,
+                    :F_turb_ρτyz,
+                    :F_turb_moisture,
+                ],
+            )
             fields = Interfacer.init_coupler_fields(FT, coupler_cache_names, boundary_space)
 
             # calculate turbulent fluxes

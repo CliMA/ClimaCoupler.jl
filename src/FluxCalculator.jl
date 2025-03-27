@@ -104,7 +104,7 @@ function calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulatio
 end
 
 """
-    partitioned_turbulent_fluxes!(model_sims::NamedTuple, fields::CC.Fields.Field, boundary_space::CC.Spaces.AbstractSpace, surface_scheme, thermo_params::TD.Parameters.ThermodynamicsParameters)
+    partitioned_turbulent_fluxes!(model_sims::NamedTuple, fields::NamedTuple, boundary_space::CC.Spaces.AbstractSpace, surface_scheme, thermo_params::TD.Parameters.ThermodynamicsParameters)
 
 The current setup calculates the aerodynamic fluxes in the coupler (assuming no regridding is needed)
 using adapter function `get_surface_fluxes!`, which calls `SurfaceFluxes.jl`. The coupler saves
@@ -127,14 +127,13 @@ TODO:
 """
 function partitioned_turbulent_fluxes!(
     model_sims::NamedTuple,
-    fields::CC.Fields.Field,
+    csf::NamedTuple,
     boundary_space::CC.Spaces.AbstractSpace,
     surface_scheme,
     thermo_params::TD.Parameters.ThermodynamicsParameters,
 )
 
     atmos_sim = model_sims.atmos_sim
-    csf = fields
     FT = CC.Spaces.undertype(boundary_space)
 
     # reset coupler fields

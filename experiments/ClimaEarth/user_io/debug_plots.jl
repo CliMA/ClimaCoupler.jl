@@ -95,14 +95,14 @@ function debug(cs::Interfacer.CoupledSimulation, dir = "debug", cs_fields_ref = 
 end
 
 """
-    debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing)
+    debug(cs_fields, dir, cs_fields_ref = nothing)
 
 Plot useful coupler fields (in `field_names`) and save plots to a directory.
 
 If `cs_fields_ref` is provided (e.g., using a copy of cs.fields from the initialization),
 plot the anomalies of the fields with respect to `cs_fields_ref`.
 """
-function debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing)
+function debug(cs_fields, dir, cs_fields_ref = nothing)
     field_names = propertynames(cs_fields)
     fig = Makie.Figure(size = (1500, 800))
     min_square_len = ceil(Int, sqrt(length(field_names)))

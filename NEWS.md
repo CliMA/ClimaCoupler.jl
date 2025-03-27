@@ -6,8 +6,16 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Identify coupler fields as 1D or 2D at init PR[#1243](https://github.com/CliMA/ClimaCoupler.jl/pull/1243)
+This PR updates the coupler exchange field initialization to specify whether a
+variable is 1D or 2D as it's added to the coupler fields, to avoid allocating
+and performing operations on unneeded fields. The intermediate `coupler_field_names`,
+which component models fill when extending `Interfacer.add_coupler_fields!`,
+is now a `2-Tuple` of `Vector`s rather than a single `Vector`, but `coupler_fields`
+remains a single NamedTuple.
+
 #### Add support for relative parameter filepaths PR[#1228](https://github.com/CliMA/ClimaCoupler.jl/pull/1228)
-Changed TOML parameter file handling to prepend the `pkgdir(ClimaCoupler)` 
+Changed TOML parameter file handling to prepend the `pkgdir(ClimaCoupler)`
 if no file is found at the relative filepath. Before this change, all files
 were assumed to be within the `ClimaCoupler` or `ClimaAtmos` repositories.
 

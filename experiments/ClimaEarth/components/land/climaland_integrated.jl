@@ -416,8 +416,8 @@ end
 function Interfacer.update_field!(::ClimaLandSimulation, ::Val{:air_humidity}, field)
     parent(sim.integrator.p.drivers.q) .= parent(field)
 end
-function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:c_co2}, field)
-    sim.integrator.p.drivers.c_co2 .= field
+function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:c_co2}, scalar)
+    sim.integrator.p.drivers.c_co2 = scalar
 end
 function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:liquid_precipitation}, field)
     ρ_liq = (LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set))
@@ -441,21 +441,27 @@ Interfacer.step!(sim::ClimaLandSimulation, t) = Interfacer.step!(sim.integrator,
 Interfacer.reinit!(sim::ClimaLandSimulation, t) = Interfacer.reinit!(sim.integrator, t)
 
 """
+    Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaLandSimulation)
+
 Extend Interfacer.add_coupler_fields! to add the fields required for ClimaLandSimulation.
 
 The fields added are:
+- `:c_co2` (for photosynthesis, biogeochemistry) - scalar
 - `:SW_d` (for radiative transfer)
 - `:LW_d` (for radiative transfer)
 - `:cos_zenith_angle` (for radiative transfer)
 - `:diffuse_fraction` (for radiative transfer)
-- `:c_co2` (for photosynthesis, biogeochemistry)
 - `:P_air` (for canopy conductance)
 - `:T_air` (for canopy conductance)
 - `:q_air` (for canopy conductance)
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaLandSimulation)
-    land_coupler_fields = [:SW_d, :LW_d, :cos_zenith_angle, :diffuse_fraction, :c_co2, :P_air, :T_air, :q_air]
-    push!(coupler_field_names, land_coupler_fields...)
+    land_coupler_fields_1d = [:c_co2]
+    land_coupler_fields_2d =
+        [:SW_d, :LW_d, :cos_zenith_angle, :diffuse_fraction, :P_air, :T_air, :q_air, :P_liq, :P_snow]
+    push!(coupler_field_names[1], land_coupler_fields_1d...)
+    push!(coupler_field_names[2], land_coupler_fields_2d...)
+    return nothing
 end
 
 function Checkpointer.get_model_prog_state(sim::ClimaLandSimulation)

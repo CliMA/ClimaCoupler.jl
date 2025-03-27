@@ -312,6 +312,8 @@ Interfacer.step!(sim::BucketSimulation, t) = Interfacer.step!(sim.integrator, t 
 Interfacer.reinit!(sim::BucketSimulation) = Interfacer.reinit!(sim.integrator)
 
 """
+    Interfacer.add_coupler_fields!(coupler_field_names, ::BucketSimulation)
+
 Extend Interfacer.add_coupler_fields! to add the fields required for BucketSimulation.
 
 The fields added are:
@@ -319,8 +321,10 @@ The fields added are:
 - `:F_radiative` (for radiation input)
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::BucketSimulation)
+    # All fields are 2D; update the list of 2D coupler field names
     bucket_coupler_fields = [:ρ_sfc, :F_radiative]
-    push!(coupler_field_names, bucket_coupler_fields...)
+    push!(coupler_field_names[2], bucket_coupler_fields...)
+    return nothing
 end
 
 # extensions required by FluxCalculator (partitioned fluxes)

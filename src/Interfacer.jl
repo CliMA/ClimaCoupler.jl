@@ -99,42 +99,51 @@ float_type(::CoupledSimulation{FT}) where {FT} = FT
 """
     default_coupler_fields()
 
-Return a list of default coupler fields needed to run a simulation.
+Return 2 vectors of default coupler fields needed to run a simulation,
+corresponding to 1D fields (scalars) and 2D fields.
 """
-default_coupler_fields() = [
-    # fields needed for flux calculations
-    :z0m_sfc,
-    :z0b_sfc,
-    :beta,
-    :emissivity,
-    # fields used for flux exchange
-    :F_turb_energy,
-    :F_turb_moisture,
-    :F_turb_ρτxz,
-    :F_turb_ρτyz,
-    # fields used to track water conservation, and for water fluxes
-    :P_liq,
-    :P_snow,
-    # fields used for temporary storage during calculations
-    :temp1,
-    :temp2,
-]
+function default_coupler_fields()
+    keys_1d = [
+        # scalars needed for flux calculations
+        :z0m_sfc,
+        :z0b_sfc,
+        :beta,
+        :emissivity,
+    ]
+    keys_2d = [
+        # fields used for flux exchange
+        :F_turb_energy,
+        :F_turb_moisture,
+        :F_turb_ρτxz,
+        :F_turb_ρτyz,
+        # fields used to track water conservation, and for water fluxes
+        :P_liq,
+        :P_snow,
+        # fields used for temporary storage during calculations
+        :temp1,
+        :temp2,
+    ]
+    return (keys_1d, keys_2d)
+end
 
 """
     init_coupler_fields(FT, coupler_field_names, boundary_space)
 
-Allocate a Field of NamedTuples on the provided boundary space to store
-the provided coupler fields.
+Allocate a NamedTuple of Floats for scalars, and Fields on the provided
+boundary space to store the provided coupler fields.
 """
 function init_coupler_fields(FT, coupler_field_names, boundary_space)
+    keys_1d, keys_2d = coupler_field_names
     # First remove any duplicate field names
-    unique!(coupler_field_names)
+    unique!(keys_1d)
+    unique!(keys_2d)
 
-    key_types = (coupler_field_names...,)
-    val_types = Tuple{(FT for _ in 1:length(coupler_field_names))...}
-    nt_type = NamedTuple{key_types, val_types}
-    coupler_fields = zeros(nt_type, boundary_space)
-    return coupler_fields
+    # Allocate space for the 1D and 2D variables
+    vals_1d = ((Ref(zero(FT)) for _ in 1:length(keys_1d))...,)
+    vals_2d = ((zeros(boundary_space) for _ in 1:length(keys_2d))...,)
+
+    # Dict(zip((keys_1d..., keys_2d...), (vals_1d..., vals_2d...)))
+    return NamedTuple{(keys_1d..., keys_2d...)}((vals_1d..., vals_2d...))
 end
 
 """

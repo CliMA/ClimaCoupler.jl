@@ -490,8 +490,8 @@ function setup_and_run(config_dict::AbstractDict)
     for sim in model_sims
         Interfacer.add_coupler_fields!(coupler_field_names, sim)
     end
-    # add coupler fields required to track conservation, if specified
-    energy_check && push!(coupler_field_names, :radiative_energy_flux_toa, :P_net)
+    # add 2D coupler fields required to track conservation, if specified
+    energy_check && push!(coupler_field_names[2], :radiative_energy_flux_toa, :P_net)
 
     # allocate space for the coupler fields
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)

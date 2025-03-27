@@ -51,12 +51,15 @@ of SciMLBase.jl.
 - `get_model_prog_state(::ComponentModelSimulation)`: A function that
 returns the state vector of the simulation at its current state. This
 is used for checkpointing the simulation.
-- `add_coupler_fields!(coupler_field_names::Set, ::ComponentModelSimulation)`:
+- `add_coupler_fields!(coupler_field_names, ::ComponentModelSimulation)`:
 A function that adds names of quantities the coupler must exchange
 to support this component model. These will be added for each model
-in addition to the existing defaults: `z0m_sfc`, `z0b_sfc`, `beta`,
-`F_turb_energy`, `F_turb_moisture`, `F_turb_ρτxz`, `F_turb_ρτyz`,
-`temp1`, and `temp2`.
+in addition to the existing defaults: `z0m_sfc` (scalar), `z0b_sfc` (scalar),
+`beta` (scalar), `F_turb_energy`, `F_turb_moisture`, `F_turb_ρτxz`, `F_turb_ρτyz`,
+`temp1`, and `temp2`. 1D scalars should be added to the first list in the
+`coupler_field_names` tuple, and 2D fields should be added to the second
+list in `coupler_field_names`. The appropriate space will be allocated based
+on this distinction.
 
 ### ComponentModelSimulation - optional functions
 - `update_sim!(::ComponentModelSimulation, csf, turbulent_fluxes)`: A
@@ -197,9 +200,9 @@ overwritten or used as-is. These currently include the following:
 
 | Coupler name      | Description | Units | Default value |
 |-------------------|-------------|-------|---------------|
-| `beta` | factor that scales evaporation based on its estimated level of saturation | | 1 |
-| `emissivity` | measure of how much energy a surface radiates | | 1 |
-| `height_disp` | displacement height relative to the surface | m | 0 |
+| `beta` | factor that scales evaporation based on its estimated level of saturation (scalar) | | 1 |
+| `emissivity` | measure of how much energy a surface radiates (scalar) | | 1 |
+| `height_disp` | displacement height relative to the surface (scalar) | m | 0 |
 
 - `update_turbulent_fluxes!(::ComponentModelSimulation, fields::NamedTuple)`:
 This function updates the turbulent fluxes of the component model simulation

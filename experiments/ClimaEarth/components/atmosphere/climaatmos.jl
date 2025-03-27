@@ -346,6 +346,8 @@ end
 Interfacer.reinit!(sim::ClimaAtmosSimulation) = Interfacer.reinit!(sim.integrator)
 
 """
+    Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaAtmosSimulation)
+
 Extend Interfacer.add_coupler_fields! to add the fields required for ClimaAtmosSimulation.
 
 The fields added are:
@@ -356,8 +358,10 @@ The fields added are:
 - `:q_sfc` (for moisture)
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaAtmosSimulation)
+    # All fields are 2D; update the list of 2D coupler field names
     atmos_coupler_fields = [:surface_direct_albedo, :surface_diffuse_albedo, :ϵ_sfc, :T_sfc, :q_sfc]
-    push!(coupler_field_names, atmos_coupler_fields...)
+    push!(coupler_field_names[2], atmos_coupler_fields...)
+    return nothing
 end
 
 function FieldExchanger.update_sim!(sim::ClimaAtmosSimulation, csf, turbulent_fluxes)

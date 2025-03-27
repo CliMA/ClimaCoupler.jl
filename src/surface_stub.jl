@@ -97,14 +97,17 @@ The stub surface simulation is not updated by this function. Extends `SciMLBase.
 reinit!(::AbstractSurfaceStub) = nothing
 
 """
+    Interfacer.add_coupler_fields!(coupler_field_names, ::AbstractSurfaceStub)
+
 Extend Interfacer.add_coupler_fields! to add the fields required for AbstractSurfaceStub.
 
 The fields added are:
 - `:ρ_sfc` (for humidity calculation)
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::AbstractSurfaceStub)
+    # Add to the 2D coupler fields
     surface_coupler_fields = [:ρ_sfc]
-    push!(coupler_field_names, surface_coupler_fields...)
+    push!(coupler_field_names[2], surface_coupler_fields...)
 end
 
 """

@@ -253,7 +253,7 @@ Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_direct_albedo}) =
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_diffuse_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_humidity}) =
-    CL.surface_specific_humidity(sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
+    CL.surface_specific_humidity(nothing, sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_temperature}) =
     CL.surface_temperature(sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
 

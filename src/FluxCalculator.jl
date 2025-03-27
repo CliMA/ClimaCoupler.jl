@@ -109,7 +109,8 @@ end
 
 The current setup calculates the aerodynamic fluxes in the coupler (assuming no regridding is needed)
 using adapter function `get_surface_fluxes!`, which calls `SurfaceFluxes.jl`. The coupler saves
-the area-weighted sums of the fluxes.
+the area-weighted sums of the fluxes. When available, other data is saved too (e.g., the Monin-Obukov
+length).
 
 Args:
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
@@ -124,7 +125,6 @@ TODO:
 - add flux bounds
 
 (NB: Radiation surface fluxes are calculated by the atmosphere.)
-
 """
 function partitioned_turbulent_fluxes!(
     model_sims::NamedTuple,
@@ -141,6 +141,22 @@ function partitioned_turbulent_fluxes!(
     csf.F_turb_ρτyz .*= FT(0)
     csf.F_turb_energy .*= FT(0)
     csf.F_turb_moisture .*= FT(0)
+
+    @assert surface_scheme isa MoninObukhovScheme "PartitionedFluxes only works with MoninObukhovScheme"
+
+    csf.z0m_sfc .*= FT(0)
+    csf.z0b_sfc .*= FT(0)
+    csf.beta .*= FT(0)
+    csf.q_sfc .*= FT(0)
+
+    # If we have L_MO and ustar, we reset those too. Meaning, this function doesn't just
+    # compute fluxes, but also related quantities too.
+    with_monin_obukhov = :L_MO in propertynames(csf)
+    if with_monin_obukhov
+        csf.L_MO .*= FT(0)
+        csf.ustar .*= FT(0)
+        csf.buoyancy_flux .*= FT(0)
+    end
 
     # compute the surface fluxes for each surface model and add them to `csf`
     for sim in model_sims
@@ -287,6 +303,8 @@ end
 
 Uses SurfaceFluxes.jl to calculate turbulent surface fluxes. It should be atmos model agnostic, and columnwise.
 Fluxes where the area fraction is zero are set to zero.
+
+When available, it also computes ancillary quantities, such as the Monin-Obukov lengthscale.
 """
 function get_surface_fluxes!(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters, area_fraction)
     # calculate all fluxes (saturated surface conditions)
@@ -310,12 +328,24 @@ function get_surface_fluxes!(inputs, surface_params::SF.Parameters.SurfaceFluxes
     @. F_lhf = ifelse(area_fraction == 0, zero(F_lhf), F_lhf)
     @. F_turb_moisture = ifelse(area_fraction == 0, zero(F_turb_moisture), F_turb_moisture)
 
+    # Monin-Obukov length, ustar, and buoyancy_flux when available
+    if :L_MO in propertynames(outputs)
+        more = (
+            L_MO = ifelse.(isnan.(outputs.L_MO), zero(outputs.L_MO), outputs.L_MO),
+            ustar = ifelse.(isnan.(outputs.ustar), zero(outputs.ustar), outputs.ustar),
+            buoyancy_flux = ifelse.(isnan.(outputs.buoy_flux), zero(outputs.buoy_flux), outputs.buoy_flux),
+        )
+    else
+        more = (;)
+    end
+
     return (;
         F_turb_ρτxz = F_turb_ρτxz,
         F_turb_ρτyz = F_turb_ρτyz,
         F_shf = F_shf,
         F_lhf = F_lhf,
         F_turb_moisture = F_turb_moisture,
+        more...,
     )
 end
 
@@ -470,6 +500,30 @@ function compute_surface_fluxes!(
     @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction * area_mask
     @. csf.F_turb_energy += (F_shf .+ F_lhf) * area_fraction * area_mask
     @. csf.F_turb_moisture += F_turb_moisture * area_fraction * area_mask
+
+    # If we have ustar and L_MO, add those too
+    #
+    # NOTE: This is still an area weighted contribution, which maybe doesn't make
+    # too much sense for these quantities...
+    with_monin_obukhov = :L_MO in propertynames(csf)
+    if with_monin_obukhov
+        @. csf.L_MO += fluxes.L_MO * area_fraction * area_mask
+        @. csf.ustar += fluxes.ustar * area_fraction * area_mask
+        @. csf.buoyancy_flux += fluxes.buoyancy_flux * area_fraction * area_mask
+    end
+
+    # NOTE: Technically only valid with MoninObukhov
+    z0m = Interfacer.get_field(sim, Val(:roughness_momentum))
+    z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy))
+    beta = Interfacer.get_field(sim, Val(:beta))
+
+    @. csf.z0m_sfc += z0m * area_fraction * area_mask
+    @. csf.z0b_sfc += z0b * area_fraction * area_mask
+    @. csf.beta += beta * area_fraction * area_mask
+
+    # NOTE: This is essentially setting q_sfc to the Atmos q_sfc (because we compute the
+    # thermo_state_sfc by extrapolating the atmos properties onto the surface)
+    @. csf.q_sfc += TD.total_specific_humidity.(thermo_params, thermo_state_sfc) * area_fraction * area_mask
     return nothing
 end
 

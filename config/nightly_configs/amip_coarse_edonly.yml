@@ -23,7 +23,7 @@ surface_setup: "PrescribedSurface"
 t_end: "825days"
 topography: "Earth"
 topo_smoothing: true
-turb_flux_partition: "CombinedStateFluxesMOST"
+turb_flux_partition: "PartitionedStateFluxes"
 viscous_sponge: true
 z_elem: 39
 z_max: 60000.0

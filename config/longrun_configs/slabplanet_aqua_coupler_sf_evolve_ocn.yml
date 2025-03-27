@@ -13,6 +13,6 @@ rad: "gray"
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "20days"
-turb_flux_partition: "CombinedStateFluxesMOST"
+turb_flux_partition: "PartitionedStateFluxes"
 use_land_diagnostics: false
 vert_diff: "DecayWithHeightDiffusion"

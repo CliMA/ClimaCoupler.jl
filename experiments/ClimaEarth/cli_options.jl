@@ -104,7 +104,7 @@ function argparse_settings()
         "--turb_flux_partition"
         help = "Method to partition turbulent fluxes. [`PartitionedStateFluxes`, `CombinedStateFluxesMOST` (default)]"
         arg_type = String
-        default = "CombinedStateFluxesMOST"
+        default = "PartitionedStateFluxes"
         # Conservation information
         "--energy_check"
         help = "Boolean flag indicating whether to check energy conservation [`false` (default), `true`]"

@@ -1,7 +1,7 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
-checkpoint_dt: "1200hours"
+checkpoint_dt: "720hours"
 coupler_toml: ["toml/amip.toml"]
 deep_atmosphere: true
 dt: "240secs"
@@ -10,7 +10,7 @@ dt_save_state_to_disk: "30days"
 dt_save_to_sol: "30days"
 dz_bottom: 100.0
 energy_check: false
-h_elem: 16
+h_elem: 8
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
@@ -21,7 +21,7 @@ radiation_reset_rng_seed: true
 rayleigh_sponge: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "360days"
+t_end: "465days"
 topography: "Earth"
 topo_smoothing: true
 turb_flux_partition: "CombinedStateFluxesMOST"
@@ -32,5 +32,3 @@ extra_atmos_diagnostics:
   - short_name: [od550aer, odsc550aer]
     reduction_time: average
     period: "1months"
-  - short_name: [ts, ta, thetaa, ha, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, hussfc, evspsbl, pr, rv, ke]
-    period: "10days"

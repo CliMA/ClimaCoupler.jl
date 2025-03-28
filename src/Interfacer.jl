@@ -23,7 +23,6 @@ export CoupledSimulation,
     LandModelSimulation,
     OceanModelSimulation,
     name,
-    current_date,
     get_field,
     update_field!,
     AbstractSurfaceStub,
@@ -91,7 +90,7 @@ function Base.show(io::IO, sim::CoupledSimulation)
         "Coupled Simulation\n",
         "├── Running on: $(device_type)\n",
         "├── Output folder: $(sim.dirs.output)\n",
-        "└── Current date: $(current_date(sim, sim.t[]))\n",
+        "└── Current time (hours): $(sim.t[] / 3600)\n",
     )
 end
 
@@ -101,28 +100,6 @@ end
 Return the floating point type backing `T`: `T` can either be an object or a type.
 """
 float_type(::CoupledSimulation{FT}) where {FT} = FT
-
-"""
-    current_date(cs::Interfacer.CoupledSimulation, t::Int)
-
-Return the model date at the current timestep.
-
-# Arguments
-- `cs`: [CoupledSimulation] containing info about the simulation
-- `t`: [Real] number of seconds since simulation began
-"""
-current_date(cs::Interfacer.CoupledSimulation, t::Real) = cs.date0[] + Dates.Second(t)
-
-"""
-    current_date(cs::Interfacer.CoupledSimulation, t::ITime)
-
-Return the model date at the current timestep.
-
-# Arguments
-- `cs`: [CoupledSimulation] containing info about the simulation
-- `t`: [ITime] containing all the information needed to produce a date
-"""
-current_date(cs::Interfacer.CoupledSimulation, t::ITime) = date(t)
 
 """
     default_coupler_fields()

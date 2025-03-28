@@ -111,35 +111,6 @@ for FT in (Float32, Float64)
         @test Array(parent(Interfacer.get_field(stub, Val(:surface_direct_albedo))))[1] == FT(3)
         @test Array(parent(Interfacer.get_field(stub, Val(:surface_diffuse_albedo))))[1] == FT(4)
     end
-
-    @testset "test current_date" begin
-        date0 = Dates.DateTime("19790321", Dates.dateformat"yyyymmdd")
-        tspan = (Int(1), Int(90 * 86400)) # Jan-Mar
-        Δt_cpl = 1 * 24 * 3600
-
-        # Fill in only the necessary parts of the simulation
-        cs = Interfacer.CoupledSimulation{FT}(
-            ClimaComms.SingletonCommsContext(), # comms_ctx
-            Ref(date0), # date0
-            nothing, # boundary_space
-            nothing, # fields
-            nothing, # conservation_checks
-            tspan, # tspan
-            Int(Δt_cpl), # Δt_cpl
-            Ref(tspan[1]), # t
-            (;), # model_sims
-            (;), # callbacks
-            (;), # dirs
-            nothing, # turbulent_fluxes
-            nothing, # thermo_params
-            nothing, # diags_handler
-        )
-
-        for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
-            cs.t[] = t
-            @test Interfacer.current_date(cs, cs.t[]) == date0 + Dates.Second(t)
-        end
-    end
 end
 
 @testset "name(::SurfaceStub)" begin

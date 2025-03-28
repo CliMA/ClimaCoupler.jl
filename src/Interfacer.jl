@@ -7,9 +7,12 @@ module Interfacer
 
 import SciMLBase
 import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ClimaCore as CC
+import Dates
 import Thermodynamics as TD
 import SciMLBase: step!, reinit! # explicitly import to extend these functions
+import ClimaUtilities.TimeManager: ITime
 
 export CoupledSimulation,
     float_type,
@@ -20,6 +23,7 @@ export CoupledSimulation,
     LandModelSimulation,
     OceanModelSimulation,
     name,
+    current_date,
     get_field,
     update_field!,
     AbstractSurfaceStub,
@@ -54,6 +58,7 @@ struct CoupledSimulation{
     E,
     TS,
     DTI,
+    TT,
     NTMS <: NamedTuple,
     NTC <: NamedTuple,
     NTP <: NamedTuple,
@@ -62,12 +67,13 @@ struct CoupledSimulation{
     DH,
 }
     comms_ctx::X
-    dates::D
+    date0::D
     boundary_space::B
     fields::FV
     conservation_checks::E
     tspan::TS
     Δt_cpl::DTI
+    t::TT
     model_sims::NTMS
     callbacks::NTC
     dirs::NTP
@@ -76,7 +82,7 @@ struct CoupledSimulation{
     diags_handler::DH
 end
 
-CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args[1:end])...}(args...)
+CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args)...}(args...)
 
 function Base.show(io::IO, sim::CoupledSimulation)
     device_type = nameof(typeof(ClimaComms.device(sim.comms_ctx)))
@@ -85,7 +91,7 @@ function Base.show(io::IO, sim::CoupledSimulation)
         "Coupled Simulation\n",
         "├── Running on: $(device_type)\n",
         "├── Output folder: $(sim.dirs.output)\n",
-        "└── Current date: $(sim.dates.date[])",
+        "└── Current date: $(current_date(sim, sim.t[]))\n",
     )
 end
 
@@ -95,6 +101,28 @@ end
 Return the floating point type backing `T`: `T` can either be an object or a type.
 """
 float_type(::CoupledSimulation{FT}) where {FT} = FT
+
+"""
+    current_date(cs::Interfacer.CoupledSimulation, t::Int)
+
+Return the model date at the current timestep.
+
+# Arguments
+- `cs`: [CoupledSimulation] containing info about the simulation
+- `t`: [Real] number of seconds since simulation began
+"""
+current_date(cs::Interfacer.CoupledSimulation, t::Real) = cs.date0[] + Dates.Second(t)
+
+"""
+    current_date(cs::Interfacer.CoupledSimulation, t::ITime)
+
+Return the model date at the current timestep.
+
+# Arguments
+- `cs`: [CoupledSimulation] containing info about the simulation
+- `t`: [ITime] containing all the information needed to produce a date
+"""
+current_date(cs::Interfacer.CoupledSimulation, t::ITime) = date(t)
 
 """
     default_coupler_fields()

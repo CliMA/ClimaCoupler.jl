@@ -97,8 +97,8 @@ function solve_coupler!(cs)
     @info("Starting coupling loop")
     ## step in time
     for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
-        # Update date
-        cs.dates.date[] = TimeManager.current_date(cs, t)
+        # Update the current time
+        cs.t[] = t
 
         ## compute global energy and water conservation checks
         ## (only for slabplanet if tracking conservation is enabled)
@@ -107,7 +107,7 @@ function solve_coupler!(cs)
 
         ## update water albedo from wind at dt_water_albedo
         ## (this will be extended to a radiation callback from the coupler)
-        TimeManager.maybe_trigger_callback(cs.callbacks.water_albedo, cs, t)
+        TimeManager.maybe_trigger_callback(cs.callbacks.water_albedo, cs)
 
         ## update the surface fractions for surface models,
         ## and update all component model simulations with the current fluxes stored in the coupler
@@ -141,7 +141,7 @@ function solve_coupler!(cs)
         FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
 
         ## callback to checkpoint model state
-        TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs, t)
+        TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs)
 
         ## compute/output AMIP diagnostics if scheduled for this timestep
         ## wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface
@@ -181,7 +181,6 @@ function setup_and_run(config_dict::AbstractDict)
         t_end,
         t_start,
         date0,
-        date,
         Δt_cpl,
         component_dt_dict,
         saveat,
@@ -496,9 +495,6 @@ function setup_and_run(config_dict::AbstractDict)
     # allocate space for the coupler fields
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
 
-    ## dates
-    dates = (; date = [date], date0 = [date0])
-
     #=
     ## Initialize Conservation Checks
 
@@ -532,7 +528,7 @@ function setup_and_run(config_dict::AbstractDict)
     NB: Eventually, we will call all of radiation from the coupler, in addition to the albedo calculation.
     =#
     schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = date0)
-    checkpoint_cb = TimeManager.TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
+    checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
 
     if sim_mode <: AMIPMode
         schedule_albedo = EveryCalendarDtSchedule(TimeManager.time_to_period(dt_rad); start_date = date0)
@@ -565,8 +561,7 @@ function setup_and_run(config_dict::AbstractDict)
         @info "Using default coupler diagnostics"
         coupler_diags_path = joinpath(dir_paths.output, "coupler")
         isdir(coupler_diags_path) || mkpath(coupler_diags_path)
-        diags_handler =
-            coupler_diagnostics_setup(coupler_fields, coupler_diags_path, dates.date0[1], tspan[1], calendar_dt)
+        diags_handler = coupler_diagnostics_setup(coupler_fields, coupler_diags_path, date0, tspan[1], calendar_dt)
     else
         diags_handler = nothing
     end
@@ -582,12 +577,13 @@ function setup_and_run(config_dict::AbstractDict)
 
     cs = Interfacer.CoupledSimulation{FT}(
         comms_ctx,
-        dates,
+        Ref(date0),
         boundary_space,
         coupler_fields,
         conservation_checks,
         [tspan[1], tspan[2]],
         Δt_cpl,
+        Ref(tspan[1]),
         model_sims,
         callbacks,
         dir_paths,

@@ -99,8 +99,8 @@ end
 This is a callback function that checkpoints all simulations defined in the current coupled simulation.
 """
 function checkpoint_sims(cs::Interfacer.CoupledSimulation)
-    t = Dates.datetime2epochms(cs.dates.date[1])
-    t0 = Dates.datetime2epochms(cs.dates.date0[1])
+    t = Dates.datetime2epochms(Interfacer.current_date(cs, cs.t[]))
+    t0 = Dates.datetime2epochms(cs.date0[])
     time = Int((t - t0) / 1e3)
     day = floor(Int, time / (60 * 60 * 24))
     sec = floor(Int, time % (60 * 60 * 24))

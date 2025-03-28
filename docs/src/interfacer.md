@@ -249,6 +249,7 @@ end
     ClimaCoupler.Interfacer.SurfaceStub
     ClimaCoupler.Interfacer.float_type
     ClimaCoupler.Interfacer.name
+    ClimaCoupler.Interfacer.current_date
     ClimaCoupler.Interfacer.get_field
     ClimaCoupler.Interfacer.update_field!
     ClimaCoupler.Interfacer.AbstractSlabplanetSimulationMode

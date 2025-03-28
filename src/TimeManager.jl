@@ -10,31 +10,7 @@ import Dates
 import ..Interfacer
 import ..Utilities: time_to_seconds
 
-export current_date, strdate_to_datetime, datetime_to_strdate
-
-import ClimaUtilities.TimeManager: ITime, date
-
-"""
-    current_date(cs::Interfacer.CoupledSimulation, t::Int)
-
-Return the model date at the current timestep.
-
-# Arguments
-- `cs`: [CoupledSimulation] containing info about the simulation
-- `t`: [Real] number of seconds since simulation began
-"""
-current_date(cs::Interfacer.CoupledSimulation, t::Real) = cs.dates.date0[1] + Dates.Second(t)
-
-"""
-    current_date(cs::Interfacer.CoupledSimulation, t::ITime)
-
-Return the model date at the current timestep.
-
-# Arguments
-- `cs`: [CoupledSimulation] containing info about the simulation
-- `t`: [ITime] containing all the information needed to produce a date
-"""
-current_date(cs::Interfacer.CoupledSimulation, t::ITime) = date(t)
+export strdate_to_datetime, datetime_to_strdate
 
 """
     strdate_to_datetime(strdate::String)
@@ -107,7 +83,6 @@ schedule is true.
 
 A `schedule` is a callable object (ie, a function) that takes an integrator-type
 of object and returns true or false.
-TODO: If `cs` contained the correct time, we could just pass `cs` to the schedule
 
 The function `func` calls the coupled state `cs`.
 """
@@ -117,12 +92,12 @@ struct Callback{SCHEDULE, FUNC}
 end
 
 """
-    maybe_trigger_callback(callback, cs, t)
+    maybe_trigger_callback(callback, cs)
 
 Check if it time to call `callback`, if yes, call its function on `cs`.
 """
-function maybe_trigger_callback(callback, cs, t)
-    # TODO: If `cs` contained the correct time, we could just pass `cs` to the schedule
+function maybe_trigger_callback(callback, cs)
+    t = cs.t[]
     callback.schedule((; t)) && callback.func(cs)
     return nothing
 end

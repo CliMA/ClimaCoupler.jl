@@ -1,6 +1,9 @@
 import Test: @test, @testset, @test_throws, @test_logs
 import ClimaCore as CC
 import ClimaParams as CP
+import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+import Dates
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
 import ClimaCoupler: Interfacer
@@ -37,6 +40,7 @@ for FT in (Float32, Float64)
             nothing, # conservation_checks
             (Int(0), Int(1000)), # tspan
             Int(200), # Δt_cpl
+            Ref(Int(0)), # t
             (;), # model_sims
             (;), # callbacks
             (;), # dirs
@@ -106,6 +110,35 @@ for FT in (Float32, Float64)
         @test Array(parent(Interfacer.get_field(stub, Val(:surface_temperature))))[1] == FT(2)
         @test Array(parent(Interfacer.get_field(stub, Val(:surface_direct_albedo))))[1] == FT(3)
         @test Array(parent(Interfacer.get_field(stub, Val(:surface_diffuse_albedo))))[1] == FT(4)
+    end
+
+    @testset "test current_date" begin
+        date0 = Dates.DateTime("19790321", Dates.dateformat"yyyymmdd")
+        tspan = (Int(1), Int(90 * 86400)) # Jan-Mar
+        Δt_cpl = 1 * 24 * 3600
+
+        # Fill in only the necessary parts of the simulation
+        cs = Interfacer.CoupledSimulation{FT}(
+            ClimaComms.SingletonCommsContext(), # comms_ctx
+            Ref(date0), # date0
+            nothing, # boundary_space
+            nothing, # fields
+            nothing, # conservation_checks
+            tspan, # tspan
+            Int(Δt_cpl), # Δt_cpl
+            Ref(tspan[1]), # t
+            (;), # model_sims
+            (;), # callbacks
+            (;), # dirs
+            nothing, # turbulent_fluxes
+            nothing, # thermo_params
+            nothing, # diags_handler
+        )
+
+        for t in ((tspan[1] + Δt_cpl):Δt_cpl:tspan[end])
+            cs.t[] = t
+            @test Interfacer.current_date(cs, cs.t[]) == date0 + Dates.Second(t)
+        end
     end
 end
 

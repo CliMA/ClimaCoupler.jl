@@ -2,7 +2,6 @@ using Distributed
 import ClimaCalibrate as CAL
 using ClimaCalibrate
 using ClimaAnalysis
-import ClimaAnalysis: SimDir, get, slice, average_xy
 import ClimaComms
 import ClimaCoupler
 using EnsembleKalmanProcesses.ParameterDistributions
@@ -13,10 +12,9 @@ rng = Random.MersenneTwister(rng_seed)
 
 include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/cld_eff_rad/observation_map.jl"))
 
-ensemble_size = 40
 addprocs(CAL.SlurmManager())
-# For running interactively:
-# addprocs(CAL.SlurmManager(ensemble_size); cpus_per_task = 4, gpus_per_task = 1, partition = "a3", time = "08:00:00")
+# To run interactively, comment out line above and run:
+# addprocs(CAL.SlurmManager(15); cpus_per_task = 4, gpus_per_task = 1, partition = "a3", time = "08:00:00")
 
 # Make variables and the forward model available on the worker sessions
 @everywhere begin
@@ -42,10 +40,16 @@ observation_path = joinpath(experiment_dir, "observations.jld2")
 observations = JLD2.load_object(observation_path)
 
 eki = EKP.EnsembleKalmanProcess(
-    EKP.construct_initial_ensemble(rng, prior, ensemble_size),
     observations,
-    EKP.TransformInversion(),
+    EKP.TransformUnscented(prior; impose_prior = true),
     verbose = true,
 );
-# using ClimaAtmos#main
+# If TransformUnscented causes issues, just use TransformInversion:
+# ensemble_size = 40
+# eki = EKP.EnsembleKalmanProcess(
+#     EKP.construct_initial_ensemble(rng, prior, ensemble_size),
+#     observations,
+#     EKP.TransformInversion(),
+#     verbose = true,
+# );
 eki = CAL.calibrate(CAL.WorkerBackend, eki, n_iterations, prior, output_dir)

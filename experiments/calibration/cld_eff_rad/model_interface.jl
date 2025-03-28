@@ -19,15 +19,7 @@ function ClimaCalibrate.forward_model(iter, member)
     # Set member output directory
     member_output_dir = ClimaCalibrate.path_to_ensemble_member(output_dir_root, iter, member)
     config_dict["coupler_output_dir"] = member_output_dir
-    sim = try
-        setup_and_run(config_dict)
-    catch e
-        @error "Forward model error" exception = e
-        bt = catch_backtrace()
-        println("Stacktrace:")
-        display(stacktrace(bt))
-        nothing
-    end
+    setup_and_run(config_dict)
     @info "Completed member $member"
     return sim
 end

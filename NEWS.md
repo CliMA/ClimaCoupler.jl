@@ -6,11 +6,13 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
-### Some misc. cleanup PR
+### Some misc. cleanup PR[#1244](https://github.com/CliMA/ClimaCoupler.jl/pull/1244)
 Changes include
-- land simulation constructors no longer take in `domain_type`, which was unused
-- `SurfaceModelSimulation`s no longer have a `domain` field, which were unused
-- `CoupledSimulation` now stores the current time as `t`
+- Land simulation constructors no longer take in `domain_type`, which was unused.
+- `SurfaceModelSimulation`s no longer have a `domain` field, which were unused.
+- `CoupledSimulation` now stores the current time as `t`, and does not store the
+current date. Its `dates` field is replaced with `date0`.
+- `TimeManager` `strdate_to_datetime` and `datetime_to_strdate` are removed, which were unused.
 
 #### Add support for relative parameter filepaths PR[#1228](https://github.com/CliMA/ClimaCoupler.jl/pull/1228)
 Changed TOML parameter file handling to prepend the `pkgdir(ClimaCoupler)`

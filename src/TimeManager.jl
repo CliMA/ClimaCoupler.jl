@@ -10,33 +10,6 @@ import Dates
 import ..Interfacer
 import ..Utilities: time_to_seconds
 
-export strdate_to_datetime, datetime_to_strdate
-
-"""
-    strdate_to_datetime(strdate::String)
-
-Convert from String ("YYYYMMDD") to Date format,
-required by the official AMIP input files.
-
-# Arguments
-- `strdate`: [String] to be converted to Date type
-"""
-strdate_to_datetime(strdate::String) =
-    Dates.DateTime(parse(Int, strdate[1:4]), parse(Int, strdate[5:6]), parse(Int, strdate[7:8]))
-
-"""
-    datetime_to_strdate(datetime::DateTime)
-
-Convert from Date to String ("YYYYMMDD") format.
-
-# Arguments
-- `datetime`: [Dates.DateTime] object to be converted to string
-"""
-datetime_to_strdate(datetime::Dates.DateTime) =
-    string(lpad(Dates.year(datetime), 4, "0")) *
-    string(string(lpad(Dates.month(datetime), 2, "0"))) *
-    string(lpad(Dates.day(datetime), 2, "0"))
-
 """
     time_to_period(s::String)
 

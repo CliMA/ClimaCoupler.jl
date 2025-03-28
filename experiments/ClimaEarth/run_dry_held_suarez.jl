@@ -183,19 +183,19 @@ coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundar
 model_sims = (atmos_sim = atmos_sim,);
 
 ## start date
-date0 = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
+start_date = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
 
 #=
 ## Initialize Callbacks
 =#
-schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = date0)
+schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = start_date)
 checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
 
 callbacks = (; checkpoint = checkpoint_cb)
 
 cs = Interfacer.CoupledSimulation{FT}(
     comms_ctx,
-    Ref(date0),
+    Ref(start_date),
     boundary_space,
     coupler_fields,
     nothing, # conservation checks

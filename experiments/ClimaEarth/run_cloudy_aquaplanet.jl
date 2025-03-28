@@ -233,15 +233,15 @@ Utilities.show_memory_usage()
 model_sims = (atmos_sim = atmos_sim, ocean_sim = ocean_sim);
 
 ## start date
-date0 = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
+start_date = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
 
 #=
 ## Initialize Callbacks
 =#
-schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = date0)
+schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = start_date)
 checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
 
-schedule_albedo = EveryCalendarDtSchedule(TimeManager.time_to_period(dt_rad); start_date = date0)
+schedule_albedo = EveryCalendarDtSchedule(TimeManager.time_to_period(dt_rad); start_date = start_date)
 albedo_cb = TimeManager.Callback(schedule_albedo, FluxCalculator.water_albedo_from_atmosphere!)
 
 callbacks = (; checkpoint = checkpoint_cb, water_albedo = albedo_cb)
@@ -264,7 +264,7 @@ end
 
 cs = Interfacer.CoupledSimulation{FT}(
     comms_ctx,
-    Ref(date0),
+    Ref(start_date),
     boundary_space,
     coupler_fields,
     nothing, # conservation checks

@@ -180,7 +180,7 @@ function setup_and_run(config_dict::AbstractDict)
         FT,
         t_end,
         t_start,
-        date0,
+        start_date,
         Δt_cpl,
         component_dt_dict,
         saveat,
@@ -338,7 +338,7 @@ function setup_and_run(config_dict::AbstractDict)
             FT;
             dt = component_dt_dict["dt_land"],
             tspan,
-            start_date = date0,
+            start_date = start_date,
             output_dir = land_output_dir,
             boundary_space,
             area_fraction = land_fraction,
@@ -361,7 +361,7 @@ function setup_and_run(config_dict::AbstractDict)
             space = boundary_space,
             thermo_params = thermo_params,
             comms_ctx,
-            date0,
+            start_date,
             mono_surface,
             land_fraction,
         )
@@ -370,7 +370,7 @@ function setup_and_run(config_dict::AbstractDict)
         ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
         ocean_fraction = FT(1) .- ice_fraction .- land_fraction
         ocean_sim =
-            PrescribedOceanSimulation(FT, boundary_space, date0, t_start, ocean_fraction, thermo_params, comms_ctx)
+            PrescribedOceanSimulation(FT, boundary_space, start_date, t_start, ocean_fraction, thermo_params, comms_ctx)
 
         Utilities.show_memory_usage()
 
@@ -385,7 +385,7 @@ function setup_and_run(config_dict::AbstractDict)
             FT;
             dt = component_dt_dict["dt_land"],
             tspan,
-            start_date = date0,
+            start_date = start_date,
             output_dir = land_output_dir,
             boundary_space,
             area_fraction = land_fraction,
@@ -434,7 +434,7 @@ function setup_and_run(config_dict::AbstractDict)
             FT;
             dt = component_dt_dict["dt_land"],
             tspan,
-            start_date = date0,
+            start_date = start_date,
             output_dir = land_output_dir,
             boundary_space,
             area_fraction = land_fraction,
@@ -527,11 +527,11 @@ function setup_and_run(config_dict::AbstractDict)
     being approximated from wind speed). It is updated at the same frequency as the atmospheric radiation.
     NB: Eventually, we will call all of radiation from the coupler, in addition to the albedo calculation.
     =#
-    schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = date0)
+    schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = start_date)
     checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
 
     if sim_mode <: AMIPMode
-        schedule_albedo = EveryCalendarDtSchedule(TimeManager.time_to_period(dt_rad); start_date = date0)
+        schedule_albedo = EveryCalendarDtSchedule(TimeManager.time_to_period(dt_rad); start_date = start_date)
     else
         schedule_albedo = TimeManager.NeverSchedule()
     end
@@ -561,7 +561,7 @@ function setup_and_run(config_dict::AbstractDict)
         @info "Using default coupler diagnostics"
         coupler_diags_path = joinpath(dir_paths.output, "coupler")
         isdir(coupler_diags_path) || mkpath(coupler_diags_path)
-        diags_handler = coupler_diagnostics_setup(coupler_fields, coupler_diags_path, date0, tspan[1], calendar_dt)
+        diags_handler = coupler_diagnostics_setup(coupler_fields, coupler_diags_path, start_date, tspan[1], calendar_dt)
     else
         diags_handler = nothing
     end
@@ -577,7 +577,7 @@ function setup_and_run(config_dict::AbstractDict)
 
     cs = Interfacer.CoupledSimulation{FT}(
         comms_ctx,
-        Ref(date0),
+        Ref(start_date),
         boundary_space,
         coupler_fields,
         conservation_checks,

@@ -173,7 +173,7 @@ atmos_config_object.toml_dict["max_area_limiter_scale"]["value"] = 0
 =#
 
 ## start date
-date0 = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
+start_date = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
 
 #=
 ### Atmosphere
@@ -220,7 +220,7 @@ land_sim = BucketSimulation(
     FT;
     dt = Δt_cpl,
     tspan,
-    start_date = date0,
+    start_date = start_date,
     output_dir = land_output_dir,
     boundary_space,
     area_fraction = land_area_fraction,
@@ -276,10 +276,10 @@ model_sims = (atmos_sim = atmos_sim, ocean_sim = ocean_sim);
 #=
 ## Initialize Callbacks
 =#
-schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = date0)
+schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = start_date)
 checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
 
-schedule_albedo = EveryCalendarDtSchedule(TimeManager.time_to_period(dt_rad); start_date = date0)
+schedule_albedo = EveryCalendarDtSchedule(TimeManager.time_to_period(dt_rad); start_date = start_date)
 albedo_cb = TimeManager.Callback(schedule_albedo, FluxCalculator.water_albedo_from_atmosphere!)
 
 callbacks = (; checkpoint = checkpoint_cb, water_albedo = albedo_cb)
@@ -300,7 +300,7 @@ end
 
 cs = Interfacer.CoupledSimulation{FT}(
     comms_ctx,
-    Ref(date0),
+    Ref(start_date),
     boundary_space,
     coupler_fields,
     nothing, # conservation checks

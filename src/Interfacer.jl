@@ -66,7 +66,7 @@ struct CoupledSimulation{
     DH,
 }
     comms_ctx::X
-    date0::D
+    start_date::D
     boundary_space::B
     fields::FV
     conservation_checks::E

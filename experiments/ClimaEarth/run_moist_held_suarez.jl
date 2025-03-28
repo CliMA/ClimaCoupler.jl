@@ -220,12 +220,12 @@ Utilities.show_memory_usage()
 model_sims = (atmos_sim = atmos_sim, ocean_sim = ocean_sim);
 
 ## start date
-date0 = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
+start_date = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
 
 #=
 ## Initialize Callbacks
 =#
-schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = date0)
+schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = start_date)
 checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
 callbacks = (; checkpoint = checkpoint_cb)
 
@@ -245,7 +245,7 @@ end
 
 cs = Interfacer.CoupledSimulation{FT}(
     comms_ctx,
-    Ref(date0),
+    Ref(start_date),
     boundary_space,
     coupler_fields,
     nothing, # conservation checks

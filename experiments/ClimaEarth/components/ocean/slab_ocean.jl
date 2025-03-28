@@ -7,16 +7,15 @@ import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###
 """
-    SlabOceanSimulation{P, D, I}
+    SlabOceanSimulation{P, I}
 
 Equation:
 
     (h * ρ * c) dTdt = -(F_turb_energy + F_radiative)
 
 """
-struct SlabOceanSimulation{P, D, I} <: Interfacer.OceanModelSimulation
+struct SlabOceanSimulation{P, I} <: Interfacer.OceanModelSimulation
     params::P
-    domain::D
     integrator::I
 end
 Interfacer.name(::SlabOceanSimulation) = "SlabOceanSimulation"
@@ -99,7 +98,7 @@ function SlabOceanSimulation(
     problem = SciMLBase.ODEProblem(ode_function, Y, tspan, cache)
     integrator = SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
 
-    sim = SlabOceanSimulation(params, space, integrator)
+    sim = SlabOceanSimulation(params, integrator)
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)

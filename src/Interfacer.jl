@@ -7,9 +7,12 @@ module Interfacer
 
 import SciMLBase
 import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ClimaCore as CC
+import Dates
 import Thermodynamics as TD
 import SciMLBase: step!, reinit! # explicitly import to extend these functions
+import ClimaUtilities.TimeManager: ITime
 
 export CoupledSimulation,
     float_type,
@@ -54,6 +57,7 @@ struct CoupledSimulation{
     E,
     TS,
     DTI,
+    TT,
     NTMS <: NamedTuple,
     NTC <: NamedTuple,
     NTP <: NamedTuple,
@@ -62,12 +66,13 @@ struct CoupledSimulation{
     DH,
 }
     comms_ctx::X
-    dates::D
+    start_date::D
     boundary_space::B
     fields::FV
     conservation_checks::E
     tspan::TS
     Δt_cpl::DTI
+    t::TT
     model_sims::NTMS
     callbacks::NTC
     dirs::NTP
@@ -76,7 +81,7 @@ struct CoupledSimulation{
     diags_handler::DH
 end
 
-CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args[1:end])...}(args...)
+CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args)...}(args...)
 
 function Base.show(io::IO, sim::CoupledSimulation)
     device_type = nameof(typeof(ClimaComms.device(sim.comms_ctx)))
@@ -85,7 +90,7 @@ function Base.show(io::IO, sim::CoupledSimulation)
         "Coupled Simulation\n",
         "├── Running on: $(device_type)\n",
         "├── Output folder: $(sim.dirs.output)\n",
-        "└── Current date: $(sim.dates.date[])",
+        "└── Current time (hours): $(sim.t[] / 3600)\n",
     )
 end
 

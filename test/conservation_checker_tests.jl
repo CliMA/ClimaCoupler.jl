@@ -20,37 +20,24 @@ struct TestAtmos{I} <: Interfacer.AtmosModelSimulation
 end
 Interfacer.name(s::TestAtmos) = "TestAtmos"
 Interfacer.get_field(s::TestAtmos, ::Val{:radiative_energy_flux_toa}) = ones(s.i.space) .* 200
-Interfacer.get_field(s::TestAtmos, ::Val{:water}) = ones(s.i.space) .* 1
-function Interfacer.get_field(s::TestAtmos, ::Val{:energy})
-    FT = CC.Domains.float_type(CC.Meshes.domain(s.i.space.grid.topology.mesh))
-    ones(s.i.space) .* FT(1e6)
-end
+Interfacer.get_field(s::TestAtmos, ::Val{:water}) = ones(s.i.space)
+Interfacer.get_field(s::TestAtmos, ::Val{:energy}) = ones(s.i.space) .* CC.Spaces.undertype(s.i.space)(1e6)
 
 struct TestOcean{I} <: Interfacer.SurfaceModelSimulation
     i::I
 end
 Interfacer.name(s::TestOcean) = "TestOcean"
-Interfacer.get_field(s::TestOcean, ::Val{:water}) = ones(s.i.space) .* 0
-function Interfacer.get_field(s::TestOcean, ::Val{:energy})
-    FT = CC.Domains.float_type(CC.Meshes.domain(s.i.space.grid.topology.mesh))
-    ones(s.i.space) .* FT(1e6)
-end
-function Interfacer.get_field(s::TestOcean, ::Val{:area_fraction})
-    FT = CC.Domains.float_type(CC.Meshes.domain(s.i.space.grid.topology.mesh))
-    ones(s.i.space) .* FT(0.25)
-end
+Interfacer.get_field(s::TestOcean, ::Val{:water}) = zeros(s.i.space)
+Interfacer.get_field(s::TestOcean, ::Val{:energy}) = ones(s.i.space) .* CC.Spaces.undertype(s.i.space)(1e6)
+Interfacer.get_field(s::TestOcean, ::Val{:area_fraction}) = ones(s.i.space) .* CC.Spaces.undertype(s.i.space)(0.25)
 
 struct TestLand{I} <: Interfacer.SurfaceModelSimulation
     i::I
 end
 Interfacer.name(s::TestLand) = "TestLand"
-Interfacer.get_field(s::TestLand, ::Val{:energy}) = ones(s.i.space) .* 0
-Interfacer.get_field(s::TestLand, ::Val{:water}) = ones(s.i.space) .* 0
-function Interfacer.get_field(s::TestLand, ::Val{:area_fraction})
-    FT = CC.Domains.float_type(CC.Meshes.domain(s.i.space.grid.topology.mesh))
-    ones(s.i.space) .* FT(0.25)
-end
-
+Interfacer.get_field(s::TestLand, ::Val{:energy}) = zeros(s.i.space)
+Interfacer.get_field(s::TestLand, ::Val{:water}) = zeros(s.i.space)
+Interfacer.get_field(s::TestLand, ::Val{:area_fraction}) = ones(s.i.space) .* CC.Spaces.undertype(s.i.space)(0.25)
 
 for FT in (Float32, Float64)
     @testset "test check_conservation for conservation for FT=$FT" begin
@@ -89,6 +76,7 @@ for FT in (Float32, Float64)
             cc, # conservation_checks
             (Int(0), Int(1000)), # tspan
             Int(200), # Δt_cpl
+            Ref(Int(0)), # t
             model_sims, # model_sims
             (;), # callbacks
             (;), # dirs
@@ -168,6 +156,7 @@ for FT in (Float32, Float64)
             cc, # conservation_checks
             (Int(0), Int(1000)), # tspan
             Int(200), # Δt_cpl
+            Ref(Int(0)), # t
             model_sims, # model_sims
             (;), # callbacks
             (;), # dirs

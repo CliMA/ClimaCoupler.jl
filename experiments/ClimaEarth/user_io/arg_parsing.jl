@@ -68,13 +68,13 @@ function get_coupler_args(config_dict::Dict)
     # Time information
     t_end = Float64(Utilities.time_to_seconds(config_dict["t_end"]))
     t_start = Float64(Utilities.time_to_seconds(config_dict["t_start"]))
-    date0 = date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
+    start_date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
     Δt_cpl = Float64(Utilities.time_to_seconds(config_dict["dt_cpl"]))
     saveat = Float64(Utilities.time_to_seconds(config_dict["dt_save_to_sol"]))
     if use_itime
-        t_end = ITime(t_end, epoch = date0)
-        t_start = ITime(t_start, epoch = date0)
-        Δt_cpl = ITime(Δt_cpl, epoch = date0)
+        t_end = ITime(t_end, epoch = start_date)
+        t_start = ITime(t_start, epoch = start_date)
+        Δt_cpl = ITime(Δt_cpl, epoch = start_date)
         times = promote(t_end, t_start, Δt_cpl, ITime.(values(config_dict["component_dt_dict"]))...)
         t_end, t_start, Δt_cpl = (times[1], times[2], times[3])
         component_dt_dict =
@@ -126,8 +126,7 @@ function get_coupler_args(config_dict::Dict)
         FT,
         t_end,
         t_start,
-        date0,
-        date,
+        start_date,
         Δt_cpl,
         component_dt_dict,
         saveat,

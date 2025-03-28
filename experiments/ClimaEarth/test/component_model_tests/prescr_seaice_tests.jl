@@ -100,7 +100,7 @@ for FT in (Float32, Float64)
         )
         p = (; cache_field = CC.Fields.zeros(boundary_space), dss_buffer = CC.Spaces.create_dss_buffer(u))
         integrator = (; u, p)
-        sim = PrescribedIceSimulation(nothing, nothing, integrator)
+        sim = PrescribedIceSimulation(nothing, integrator)
 
         # make field non-constant to check the impact of the dss step
         coords_lat = CC.Fields.coordinate_field(sim.integrator.u.state_field2).lat

@@ -63,7 +63,7 @@ end
         space,
         thermo_params,
         comms_ctx,
-        date0,
+        start_date,
         mono_surface,
         land_fraction,
         stepper = CTS.RK4()
@@ -85,7 +85,7 @@ function PrescribedIceSimulation(
     space,
     thermo_params,
     comms_ctx,
-    date0,
+    start_date,
     mono_surface,
     land_fraction,
     stepper = CTS.RK4(),
@@ -105,7 +105,7 @@ function PrescribedIceSimulation(
         sic_data,
         "SEAICE",
         space,
-        reference_date = date0,
+        reference_date = start_date,
         file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
     )
 

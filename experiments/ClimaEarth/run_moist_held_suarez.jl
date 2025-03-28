@@ -219,14 +219,13 @@ Utilities.show_memory_usage()
 ## model simulations
 model_sims = (atmos_sim = atmos_sim, ocean_sim = ocean_sim);
 
-## dates
-date0 = date = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
-dates = (; date = [date], date0 = [date0], date1 = [Dates.firstdayofmonth(date0)], new_month = [false])
+## start date
+start_date = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
 
 #=
 ## Initialize Callbacks
 =#
-schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = date0)
+schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date)
 checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
 callbacks = (; checkpoint = checkpoint_cb)
 
@@ -246,12 +245,13 @@ end
 
 cs = Interfacer.CoupledSimulation{FT}(
     comms_ctx,
-    dates,
+    Ref(start_date),
     boundary_space,
     coupler_fields,
     nothing, # conservation checks
     [tspan[1], tspan[2]],
     Δt_cpl,
+    Ref(tspan[1]),
     model_sims,
     callbacks,
     dir_paths,
@@ -308,8 +308,8 @@ function solve_coupler!(cs)
     @info("Starting coupling loop")
     ## step in time
     for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
-        # Update date
-        cs.dates.date[] = TimeManager.current_date(cs, t)
+        # Update current time
+        cs.t[] = t
 
         ClimaComms.barrier(comms_ctx)
 
@@ -326,7 +326,7 @@ function solve_coupler!(cs)
         FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
 
         ## callback to checkpoint model state
-        TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs, t)
+        TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs)
     end
 
     return nothing

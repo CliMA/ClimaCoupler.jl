@@ -155,6 +155,7 @@ for FT in (Float32, Float64)
             nothing, # conservation_checks
             (Int(0), Int(1000)), # tspan
             Int(200), # Δt_cpl
+            Ref(Int(0)), # t
             (;
                 ice_sim = DummyStub((; area_fraction = ice_d)),
                 ocean_sim = Interfacer.SurfaceStub((; area_fraction = ocean_d)),

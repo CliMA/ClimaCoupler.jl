@@ -302,6 +302,7 @@ for FT in (Float32, Float64)
             nothing, # conservation_checks
             (Int(0), Int(1)), # tspan
             0, # Δt_cpl
+            Ref(Int(0)), # t
             model_sims, # model_sims
             (;), # callbacks
             (;), # dirs

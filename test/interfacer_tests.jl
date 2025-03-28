@@ -1,6 +1,9 @@
 import Test: @test, @testset, @test_throws, @test_logs
 import ClimaCore as CC
 import ClimaParams as CP
+import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+import Dates
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
 import ClimaCoupler: Interfacer
@@ -37,6 +40,7 @@ for FT in (Float32, Float64)
             nothing, # conservation_checks
             (Int(0), Int(1000)), # tspan
             Int(200), # Δt_cpl
+            Ref(Int(0)), # t
             (;), # model_sims
             (;), # callbacks
             (;), # dirs

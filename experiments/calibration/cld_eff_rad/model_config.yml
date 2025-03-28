@@ -23,7 +23,7 @@ radiation_reset_rng_seed: true
 rayleigh_sponge: true
 start_date: "20091001"
 surface_setup: "PrescribedSurface"
-t_end: "124days" # 4 months
+t_end: "458days"
 topography: "Earth"
 topo_smoothing: true
 turb_flux_partition: "CombinedStateFluxesMOST"

@@ -8,6 +8,7 @@ module Checkpointer
 import ClimaComms
 import ClimaCore as CC
 import ClimaUtilities.Utils: sort_by_creation_time
+import ClimaUtilities.TimeManager: ITime, seconds
 import ..Interfacer
 import Dates
 
@@ -99,7 +100,8 @@ end
 This is a callback function that checkpoints all simulations defined in the current coupled simulation.
 """
 function checkpoint_sims(cs::Interfacer.CoupledSimulation)
-    time = Int(round(cs.t[]))
+    t_seconds = cs.t[] isa ITime ? seconds(cs.t[]) : cs.t[]
+    time = Int(round(t_seconds))
     day = floor(Int, time / (60 * 60 * 24))
     sec = floor(Int, time % (60 * 60 * 24))
     output_dir = cs.dirs.checkpoints

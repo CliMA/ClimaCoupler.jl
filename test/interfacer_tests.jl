@@ -25,10 +25,7 @@ end
 Interfacer.name(::DummySimulation4) = "DummySimulation4"
 
 Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var}) = ones(sim.space)
-function Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var_float})
-    FT = CC.Domains.float_type(CC.Meshes.domain(sim.space.grid.topology.mesh))
-    return FT(2)
-end
+Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var_float}) = CC.Spaces.undertype(sim.space)(2)
 
 for FT in (Float32, Float64)
     @testset "test CoupledSim construction, float_type for FT=$FT" begin

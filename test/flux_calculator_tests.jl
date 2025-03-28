@@ -63,9 +63,8 @@ end
 
 
 # ocean sim object and extensions
-struct TestOcean{M, D, I} <: Interfacer.SurfaceModelSimulation
+struct TestOcean{M, I} <: Interfacer.SurfaceModelSimulation
     model::M
-    domain::D
     integrator::I
 end
 Interfacer.name(sim::TestOcean) = "TestOcean"
@@ -94,9 +93,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::TestOcean, fields::NamedTu
 end
 
 # simple surface sim object and extensions
-struct DummySurfaceSimulation3{M, D, I} <: Interfacer.SurfaceModelSimulation
+struct DummySurfaceSimulation3{M, I} <: Interfacer.SurfaceModelSimulation
     model::M
-    domain::D
     integrator::I
 end
 Interfacer.name(sim::DummySurfaceSimulation3) = "DummySurfaceSimulation3"
@@ -192,10 +190,10 @@ for FT in (Float32, Float64)
             )
             Y_init = (; T = ones(boundary_space) .* FT(300))
             integrator = (; Y_init..., p = p)
-            ocean_sim = TestOcean(nothing, nothing, integrator)
+            ocean_sim = TestOcean(nothing, integrator)
 
             # ocean
-            ocean_sim2 = TestOcean(nothing, nothing, integrator)
+            ocean_sim2 = TestOcean(nothing, integrator)
 
             model_sims = (; atmos_sim, ocean_sim, ocean_sim2)
 
@@ -271,7 +269,7 @@ for FT in (Float32, Float64)
     end
 
     @testset "update_turbulent_fluxes! for FT=$FT" begin
-        sim = DummySurfaceSimulation3([], [], [])
+        sim = DummySurfaceSimulation3([], [])
         @test_throws ErrorException(
             "update_turbulent_fluxes! is required to be dispatched on" *
             Interfacer.name(sim) *
@@ -282,11 +280,8 @@ for FT in (Float32, Float64)
     @testset "surface_thermo_state for FT=$FT" begin
         boundary_space = TestHelper.create_space(FT)
         _ones = CC.Fields.ones(boundary_space)
-        surface_sim = DummySurfaceSimulation3(
-            [],
-            [],
-            (; T = _ones .* FT(300), ρ = _ones .* FT(1.2), p = (; q = _ones .* FT(0.01))),
-        )
+        surface_sim =
+            DummySurfaceSimulation3([], (; T = _ones .* FT(300), ρ = _ones .* FT(1.2), p = (; q = _ones .* FT(0.01))))
         atmos_sim = TestAtmos((; FT = FT), [], (; T = _ones .* FT(300), ρ = _ones .* FT(1.2), q = _ones .* FT(0.01)))
         thermo_params = get_thermo_params(atmos_sim)
         thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))

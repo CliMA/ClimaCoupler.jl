@@ -19,24 +19,21 @@ include("../shared/restore.jl")
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###
 """
-    BucketSimulation{M, D, I, A}
+    BucketSimulation{M, I, A}
 
 The bucket model simulation object.
 
 It contains the following objects:
 - `model::M`: The `ClimaLand.Bucket.BucketModel`.
-- `domain::D`: The land domain object, which must be a spherical shell.
 - `integrator::I`: The integrator used in timestepping this model.
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model.
 """
 struct BucketSimulation{
     M <: ClimaLand.Bucket.BucketModel,
-    D <: ClimaLand.Domains.SphericalShell,
     I <: SciMLBase.AbstractODEIntegrator,
     A <: CC.Fields.Field,
 } <: Interfacer.LandModelSimulation
     model::M
-    domain::D
     integrator::I
     area_fraction::A
 end
@@ -236,7 +233,7 @@ function BucketSimulation(
         callback = SciMLBase.CallbackSet(diag_cb),
     )
 
-    return BucketSimulation(model, domain, integrator, area_fraction)
+    return BucketSimulation(model, integrator, area_fraction)
 end
 
 # extensions required by Interfacer

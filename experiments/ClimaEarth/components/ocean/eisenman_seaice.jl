@@ -7,7 +7,7 @@ import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###
 """
-    EisenmanIceSimulation{P, D, I}
+    EisenmanIceSimulation{P, I}
 
 Thermodynamic 0-layer, based on the Semtner 1976 model and later refined by
 Eisenmen 2009 and Zhang et al 2021.
@@ -15,9 +15,8 @@ Eisenmen 2009 and Zhang et al 2021.
 Note that Eisenman sea ice assumes gray radiation, no snow coverage, and
 PartitionedStateFluxes for the surface flux calculation.
 """
-struct EisenmanIceSimulation{P, D, I} <: Interfacer.SeaIceModelSimulation
+struct EisenmanIceSimulation{P, I} <: Interfacer.SeaIceModelSimulation
     params_ice::P
-    domain::D
     integrator::I
 end
 Interfacer.name(::EisenmanIceSimulation) = "EisenmanIceSimulation"
@@ -87,7 +86,7 @@ function EisenmanIceSimulation(
     problem = SciMLBase.ODEProblem(ode_function, Y, tspan, cache)
     integrator = SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
 
-    sim = EisenmanIceSimulation(params, space, integrator)
+    sim = EisenmanIceSimulation(params, integrator)
     return sim
 end
 

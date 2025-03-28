@@ -13,7 +13,7 @@ import ClimaUtilities.TimeManager: ITime
 include("climaland_helpers.jl")
 
 """
-    ClimaLandSimulation{M, D, I, A}
+    ClimaLandSimulation{M, I, A}
 
 The integrated ClimaLand model simulation object.
 Note that this model must be run with the partitioned surface fluxes option;
@@ -22,18 +22,12 @@ land model.
 
 It contains the following objects:
 - `model::M`: The `ClimaLand.LandModel`.
-- `domain::D`: The land domain object, which must be a spherical shell.
 - `integrator::I`: The integrator used in timestepping this model.
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model.
 """
-struct ClimaLandSimulation{
-    M <: ClimaLand.LandModel,
-    D <: ClimaLand.Domains.SphericalShell,
-    I <: SciMLBase.AbstractODEIntegrator,
-    A <: CC.Fields.Field,
-} <: Interfacer.LandModelSimulation
+struct ClimaLandSimulation{M <: ClimaLand.LandModel, I <: SciMLBase.AbstractODEIntegrator, A <: CC.Fields.Field} <:
+       Interfacer.LandModelSimulation
     model::M
-    domain::D
     integrator::I
     area_fraction::A
 end
@@ -207,7 +201,7 @@ function ClimaLandSimulation(
         callback = SciMLBase.CallbackSet(diag_cb),
     )
 
-    return ClimaLandSimulation(model, domain, integrator, area_fraction)
+    return ClimaLandSimulation(model, integrator, area_fraction)
 end
 
 ###############################################################################

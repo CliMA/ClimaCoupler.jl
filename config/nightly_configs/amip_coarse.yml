@@ -32,3 +32,5 @@ extra_atmos_diagnostics:
   - short_name: [od550aer, odsc550aer]
     reduction_time: average
     period: "1months"
+  - short_name: [ts, ta, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, hussfc, evspsbl, pr]
+    period: "1days"

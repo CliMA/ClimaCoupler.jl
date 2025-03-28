@@ -48,7 +48,6 @@ end
         boundary_space,
         area_fraction;
         saveat::Vector{TT} = [tspan[1], tspan[2]],
-        domain_type::String = "sphere",
         land_temperature_anomaly::String = "amip",
         use_land_diagnostics::Bool = true,
         stepper = CTS.ARS111(),
@@ -70,14 +69,11 @@ function ClimaLandSimulation(
     boundary_space,
     area_fraction;
     saveat::Vector{TT} = [tspan[1], tspan[2]],
-    domain_type::String = "sphere",
     surface_elevation = CC.Fields.zeros(boundary_space),
     land_temperature_anomaly::String = "amip",
     use_land_diagnostics::Bool = true,
     stepper = CTS.ARS111(),
 ) where {FT, TT <: Union{Float64, ITime}}
-    @assert domain_type == "sphere" "Currently only spherical shell domains are supported; single column may be supported in the future."
-
     # Set up domain
     depth = FT(50) # soil depth
     n_vertical_elements = 10

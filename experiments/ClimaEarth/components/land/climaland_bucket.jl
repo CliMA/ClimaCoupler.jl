@@ -70,7 +70,6 @@ function BucketSimulation(
     boundary_space,
     area_fraction,
     saveat::Vector{TT} = [tspan[1], tspan[2]],
-    domain_type::String = "sphere",
     surface_elevation = CC.Fields.zeros(boundary_space),
     land_temperature_anomaly::String = "amip",
     use_land_diagnostics::Bool = true,
@@ -80,8 +79,6 @@ function BucketSimulation(
     energy_check::Bool = false,
     parameter_files = [],
 ) where {FT, TT <: Union{Float64, ITime}}
-    @assert domain_type == "sphere" "Currently only spherical shell domains are supported; single column may be supported in the future."
-
     α_snow = FT(0.8) # snow albedo
     if albedo_type == "map_static" # Read in albedo from static data file (default type)
         # By default, this uses a file containing bareground albedo without a time component. Snow albedo is specified separately.

@@ -12,9 +12,9 @@ rng = Random.MersenneTwister(rng_seed)
 
 include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/cld_eff_rad/observation_map.jl"))
 
-addprocs(CAL.SlurmManager())
+# addprocs(CAL.SlurmManager())
 # To run interactively, comment out line above and run:
-# addprocs(CAL.SlurmManager(15); cpus_per_task = 4, gpus_per_task = 1, partition = "a3", time = "08:00:00")
+addprocs(CAL.SlurmManager(15); cpus_per_task = 4, gpus_per_task = 1, partition = "a3", time = "08:00:00")
 
 # Make variables and the forward model available on the worker sessions
 @everywhere begin

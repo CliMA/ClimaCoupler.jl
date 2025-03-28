@@ -1,5 +1,5 @@
 FLOAT_TYPE: "Float32"
-use_itime: false
+use_itime: true
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
 checkpoint_dt: "99999days"
@@ -9,16 +9,16 @@ coupler_output_dir: "experiments/calibration/output"
 dt: "240secs"
 dt_cpl: "240secs"
 dt_save_state_to_disk: "99999days"
-dt_save_to_sol: "99999days"
 dz_bottom: 100.0
 energy_check: false
 h_elem: 8
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
+prescribed_clouds_in_radiation: true
 netcdf_output_at_levels: true
-output_default_diagnostics: false
-use_coupler_diagnostics: false
+output_default_diagnostics: true
+use_coupler_diagnostics: true
 radiation_reset_rng_seed: true
 rayleigh_sponge: true
 start_date: "20091001"

@@ -28,6 +28,7 @@ cre = rsutcs - rsut
 # Create an EKP.Observation
 const days_in_secs = 86_400
 cre_window = window(cre, "time"; left = 93days_in_secs, right = 426days_in_secs)
+# Observations info: https://clima.github.io/EnsembleKalmanProcesses.jl/dev/observations/
 cre_obs = EKP.Observation(vec(cre_window.data), Diagonal(repeat(vec(auto_covariance(cre)), 12)), "cre")
 
 observations = EKP.combine_observations([cre_obs])

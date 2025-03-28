@@ -6,8 +6,10 @@ Before running, you will need to add two custom branches for packages to the `ex
 - `add EnsembleKalmanProcesses#orad/utki`
 - `add ClimaAtmos#main`
 
+To run from the coupler root dir: `sbatch experiments/calibration/cld_eff_rad/run_calibration.sh`
+
 Files:
-- `run_calibration.sh`: Top-level slurm script, specifies resources and runs `run_calibration.jl`
+- `run_calibration.sh`: Top-level slurm script to be run from the ClimaCoupler.jl root directory, specifies resources and runs `run_calibration.jl`
 - `run_calibration.jl`: Julia script which runs the calibration. Stores the experiment configuration (prior, number of iterations).
 - `generate_observations.jl`: Generates observations for the calibration. Requires a diagnostic `OutputVar` with the correct resolution to resample to. Observations are saved to `observations.jld2`.
 - `observation_map.jl`: Contains function `observation_map` to process a full ensemble of model outputs into a matrix for the EKP update step.

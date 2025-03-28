@@ -1,0 +1,60 @@
+[land_mask]
+git-tree-sha1 = "e41bc8c44124f867b64a9d70f1599515ae27f38a"
+
+[cmip_model_rmse]
+git-tree-sha1 = "53a27731c0a2ec60756af24e4c60ac37da4a32bc"
+
+    [[cmip_model_rmse.download]]
+    sha256 = "3e8fa41df226dda9d375f8cb9dbeee3e10f9fceabcad2c7b91c9633b489b0437"
+    url = "https://caltech.box.com/shared/static/lmzvnjkxctlb0fanieeqxll0vdrbei9e.gz"
+
+[precipitation_obs]
+git-tree-sha1 = "5f0075f042bc83b580d2c4f725f851d8e0b9c20a"
+
+    [[precipitation_obs.download]]
+    sha256 = "1aea361ee1c2636bd5c4cc343202dab814d246a7e0356a9caac9fd9c7cf3821c"
+    url = "https://caltech.box.com/shared/static/j63uak557kw7tlzb3dgwifoaeczekzm4.gz"
+
+[radiation_obs]
+git-tree-sha1 = "945e31f8028a581f7e8435cb691462124484567a"
+
+[historical_sst_sic]
+git-tree-sha1 = "0d30d71a6f9b6548fe7395ca647e853ec36d1699"
+
+[historical_sst_sic_lowres]
+git-tree-sha1 = "7f7b6d4ae6055c4c2b6a6dfba5be8b4e6ca1b0be"
+
+    [[historical_sst_sic_lowres.download]]
+    sha256 = "b68c0ce6ea682c38e29cb87c9c6ced6736ecac32d0d32dbaba78beb66046a06c"
+    url = "https://caltech.box.com/shared/static/ufnesb00zkvlc3sxzhnnmqc3zbatxkb9.gz"
+
+[co2_dataset]
+git-tree-sha1 = "9c3bd05b68e820fceb43d130ce6b4e86ce788e4e"
+
+    [[co2_dataset.download]]
+    sha256 = "46923ec3e1f9028a11899c47e6b13d675d84daa9db2f37351a19ec9187f87865"
+    url = "https://caltech.box.com/shared/static/fuwajscgyblccy8y9aq01d0pgy91gwut.gz"
+
+[landsea_mask_30arcseconds]
+git-tree-sha1 = "517c925535981f9d17ac9e7a65e2c35c3ce9597d"
+
+    [[landsea_mask_30arcseconds.download]]
+    sha256 = "11eaf6b7606056d198f3735f7b76ead76269cced186de78075f415101cf39088"
+    url = "https://caltech.box.com/shared/static/z013ay1k6oqofnw69bv5held9x374sux.gz"
+
+[landsea_mask_60arcseconds]
+git-tree-sha1 = "10ed7ec61def091c44545825cfb4d9599216c3c8"
+
+    [[landsea_mask_60arcseconds.download]]
+    sha256 = "eb88455a39a00bfadb77effbc31a4df561158c0ca1578476edb683d45e3c49da"
+    url = "https://caltech.box.com/shared/static/vivf36pih7e0ttahqarc2nd5jxb4q8jr.gz"
+
+[landsea_mask_1deg]
+git-tree-sha1 = "cbbc6b3752d9cb9b667ec33cfbeb46819f8db418"
+
+    [[landsea_mask_1deg.download]]
+    sha256 = "3722b553c2fdf28a6574aea2e0b167d16ab050f34e5969ada45625b3a3ecb6da"
+    url = "https://caltech.box.com/shared/static/b3u4dv0dsoswvqgp8y63bzj7awbhwztd.gz"
+
+[era5_monthly_averages_pressure_levels_1979_2024]
+git-tree-sha1 = "dd7ee9500805f590f8fc4c00bfc373eeb7a01587"

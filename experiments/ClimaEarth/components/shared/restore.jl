@@ -75,7 +75,7 @@ function restore!(
     T1 <: Union{StaticArrays.StaticArray, Number, UnitRange, Symbol},
     T2 <: Union{StaticArrays.StaticArray, Number, UnitRange, Symbol},
 }
-    v1 == v2 || error("$name is a immutable but it inconsistent")
+    v1 == v2 || error("$name is a immutable but it inconsistent ($(v1) != $(v2))")
     return nothing
 end
 

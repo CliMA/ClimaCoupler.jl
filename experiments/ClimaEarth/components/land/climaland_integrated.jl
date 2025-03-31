@@ -461,7 +461,6 @@ function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, turbulent_flu
 end
 
 function FieldExchanger.import_atmos_fields!(csf, sim::ClimaLandSimulation, atmos_sim, turbulent_fluxes)
-    # TODO we should be able to do this in a loop - need to unify coupler field names with get/update fields
     FieldExchanger.dummmy_remap!(csf.diffuse_fraction, Interfacer.get_field(atmos_sim, Val(:diffuse_fraction)))
     FieldExchanger.dummmy_remap!(csf.SW_d, Interfacer.get_field(atmos_sim, Val(:SW_d)))
     FieldExchanger.dummmy_remap!(csf.LW_d, Interfacer.get_field(atmos_sim, Val(:LW_d)))
@@ -471,7 +470,7 @@ function FieldExchanger.import_atmos_fields!(csf, sim::ClimaLandSimulation, atmo
     FieldExchanger.dummmy_remap!(csf.q_air, Interfacer.get_field(atmos_sim, Val(:specific_humidity)))
     FieldExchanger.dummmy_remap!(csf.P_liq, Interfacer.get_field(atmos_sim, Val(:liquid_precipitation)))
     FieldExchanger.dummmy_remap!(csf.P_snow, Interfacer.get_field(atmos_sim, Val(:snow_precipitation)))
-    # CO2 is a scalar so it doesn't need remapping TODO store CO2 as a scalar in the coupler fields
+    # CO2 is a scalar for now so it doesn't need remapping
     csf.c_co2 .= Interfacer.get_field(atmos_sim, Val(:co2))
 end
 

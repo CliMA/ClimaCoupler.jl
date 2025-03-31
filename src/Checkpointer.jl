@@ -160,7 +160,9 @@ the component models that have a cache.
 function restart_model_cache!(sim, input_file)
     ispath(input_file) || error("File $(input_file) not found")
     # Component models are responsible for defining a method for this
-    restore_cache!(sim, JLD2.jldopen(input_file)["cache"])
+    JLD2.jldopen(input_file) do file
+        restore_cache!(sim, file["cache"])
+    end
 end
 
 """

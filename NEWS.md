@@ -6,6 +6,21 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+### Split `setup_and_run` in multiple functions. PR[#1251](https://github.com/CliMA/ClimaCoupler.jl/pull/1251)
+
+`setup_and_run` was split into three functions:
+- `CoupledSimulation`, which takes a dictionary of a file path and constructs a coupled simulation
+- `run!`, which evolves the model
+- `postprocess`, which makes plots
+
+In addition to this, `step!` was introduced to take a single step forward with
+the coupled simulation.
+
+The function `setup_and_run` is still available.
+
+This change also renames `calendar_dt` to `diagnostics_dt` to make it clearer
+that it refers to diagnostics.
+
 ### Some misc. cleanup PR[#1244](https://github.com/CliMA/ClimaCoupler.jl/pull/1244)
 Changes include
 - Land simulation constructors no longer take in `domain_type`, which was unused.

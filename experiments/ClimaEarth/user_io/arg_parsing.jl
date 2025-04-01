@@ -99,7 +99,7 @@ function get_coupler_args(config_dict::Dict)
     # Diagnostics information
     use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
     use_land_diagnostics = config_dict["use_land_diagnostics"]
-    (_, calendar_dt) = get_diag_period(t_start, t_end)
+    (_, diagnostics_dt) = get_diag_period(t_start, t_end)
 
     # Physical simulation information
     evolving_ocean = config_dict["evolving_ocean"]
@@ -134,7 +134,7 @@ function get_coupler_args(config_dict::Dict)
         restart_dir,
         restart_t,
         use_coupler_diagnostics,
-        calendar_dt,
+        diagnostics_dt,
         evolving_ocean,
         mono_surface,
         turb_flux_partition,
@@ -162,8 +162,7 @@ Extract the necessary arguments from the atmosphere configuration dictionary.
 """
 function get_atmos_args(atmos_config_dict)
     dt_rad = atmos_config_dict["dt_rad"]
-    output_default_diagnostics = atmos_config_dict["output_default_diagnostics"]
-    return (; dt_rad, output_default_diagnostics)
+    return (; dt_rad)
 end
 
 
@@ -187,7 +186,7 @@ The default periods are:
 
 # Returns
 - `period`: A String of how often to average and output diagnostics
-- `calendar_dt`: A DateTime interval representing the period
+- `diagnostics_dt`: A DateTime interval representing the period
 """
 function get_diag_period(t_start, t_end)
     sim_duration = float(t_end - t_start)
@@ -195,21 +194,21 @@ function get_diag_period(t_start, t_end)
     if sim_duration >= 90 * secs_per_day
         # if duration >= 90 days, take monthly means
         period = "1months"
-        calendar_dt = Dates.Month(1)
+        diagnostics_dt = Dates.Month(1)
     elseif sim_duration >= 30 * secs_per_day
         # if duration >= 30 days, take means over 10 days
         period = "10days"
-        calendar_dt = Dates.Day(10)
+        diagnostics_dt = Dates.Day(10)
     elseif sim_duration >= secs_per_day
         # if duration >= 1 day, take daily means
         period = "1days"
-        calendar_dt = Dates.Day(1)
+        diagnostics_dt = Dates.Day(1)
     else
         # if duration < 1 day, take hourly means
         period = "1hours"
-        calendar_dt = Dates.Hour(1)
+        diagnostics_dt = Dates.Hour(1)
     end
-    return (period, calendar_dt)
+    return (period, diagnostics_dt)
 end
 
 """
@@ -271,7 +270,7 @@ diagnostic is the atmosphere TOA net flux for AMIP simulations, but more diagnos
 can be added for any component by following the structure in `climaatmos_extra_diags.jl`.
 
 The added atmosphere diagnostics are added to the `extra_atmos_diagnostics` field
-of the config dict. The `calendar_dt` field is also added to the config dict to
+of the config dict. The `diagnostics_dt` field is also added to the config dict to
 coordinate the output frequency of the diagnostics.
 
 # Arguments
@@ -283,10 +282,10 @@ function add_extra_diagnostics!(config_dict)
     use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
     t_end = Float64(Utilities.time_to_seconds(config_dict["t_end"]))
     t_start = Float64(Utilities.time_to_seconds(config_dict["t_start"]))
-    calendar_dt = nothing
+    diagnostics_dt = nothing
     if mode_name == "amip" && use_coupler_diagnostics
         @info "Using default AMIP diagnostics"
-        (period, calendar_dt) = get_diag_period(t_start, t_end)
+        (period, diagnostics_dt) = get_diag_period(t_start, t_end)
 
         # Additional atmosphere diagnostics
         !haskey(config_dict, "extra_atmos_diagnostics") &&
@@ -296,6 +295,6 @@ function add_extra_diagnostics!(config_dict)
             Dict("short_name" => ["toa_fluxes_net"], "reduction_time" => "average", "period" => period),
         )
     end
-    config_dict["calendar_dt"] = calendar_dt
+    config_dict["diagnostics_dt"] = diagnostics_dt
     return nothing
 end

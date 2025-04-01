@@ -35,6 +35,7 @@ import ClimaCoupler:
 import ClimaCoupler.Interfacer:
     AbstractSlabplanetSimulationMode,
     AMIPMode,
+    CoupledSimulation,
     SlabplanetAquaMode,
     SlabplanetEisenmanMode,
     SlabplanetMode,
@@ -82,87 +83,22 @@ include("user_io/postprocessing.jl")
 include("user_io/coupler_diagnostics.jl")
 
 """
-    solve_coupler!(cs)
+    CoupledSimulation(config_file)
+    CoupledSimulation(config_dict)
 
-This function performs the coupling loop, which is the main part of the simulation.
-It runs the component models sequentially for one coupling timestep (`Δt_cpl`) at a time,
-and exchanges combined fields and calculates fluxes using the selected turbulent fluxes option.
-Note that we want to implement this in a dispatchable function to allow for
-other forms of timestepping (e.g. leapfrog).
+Set up a `CoupledSimulation` as prescribed by the given input.
+
+This struct is defined in the Interfacer module and contains all information
+about component models, diagnostics, timestepping, output directories, etc
+needed to run a coupled simulation.
 """
-function solve_coupler!(cs)
-    (; model_sims, Δt_cpl, tspan, comms_ctx) = cs
-    (; atmos_sim, land_sim, ocean_sim, ice_sim) = model_sims
-
-    @info("Starting coupling loop")
-    ## step in time
-    for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
-        # Update the current time
-        cs.t[] = t
-
-        ## compute global energy and water conservation checks
-        ## (only for slabplanet if tracking conservation is enabled)
-        !isnothing(cs.conservation_checks) && ConservationChecker.check_conservation!(cs)
-        ClimaComms.barrier(comms_ctx)
-
-        ## update water albedo from wind at dt_water_albedo
-        ## (this will be extended to a radiation callback from the coupler)
-        TimeManager.maybe_trigger_callback(cs.callbacks.water_albedo, cs)
-
-        ## update the surface fractions for surface models,
-        ## and update all component model simulations with the current fluxes stored in the coupler
-        FieldExchanger.update_surface_fractions!(cs)
-        FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
-
-        ## step component model simulations sequentially for one coupling timestep (Δt_cpl)
-        FieldExchanger.step_model_sims!(cs.model_sims, t)
-
-        ## update the coupler with the new surface properties and calculate the turbulent fluxes
-        FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, surface_albedo, z0, beta
-        if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
-            FluxCalculator.combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes) # this updates the surface thermo state, sfc_ts, in ClimaAtmos (but also unnecessarily calculates fluxes)
-        elseif cs.turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
-            ## calculate turbulent fluxes in surfaces and save the weighted average in coupler fields
-            FluxCalculator.partitioned_turbulent_fluxes!(
-                cs.model_sims,
-                cs.fields,
-                cs.boundary_space,
-                FluxCalculator.MoninObukhovScheme(),
-                cs.thermo_params,
-            )
-
-            ## update atmos sfc_conditions for surface temperature - TODO: this needs to be simplified (need CA modification)
-            new_p = get_new_cache(atmos_sim, cs.fields)
-            CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) # to set T_sfc (but SF calculation not necessary - CA modification)
-            atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
-        end
-
-        ## update the coupler with the new atmospheric properties
-        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
-
-        ## callback to checkpoint model state
-        TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs)
-
-        ## compute/output AMIP diagnostics if scheduled for this timestep
-        ## wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface
-        cs_nt = (; u = cs.fields, p = nothing, t = t, step = round(t / Δt_cpl))
-        !isnothing(cs.diags_handler) && CD.orchestrate_diagnostics(cs_nt, cs.diags_handler)
-    end
-    return nothing
-end
-
-function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
+function CoupledSimulation(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
     config_dict = get_coupler_config_dict(config_file)
-    return setup_and_run(config_dict)
+    return CoupledSimulation(config_dict)
 end
-"""
-    setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
 
-This function sets up and runs the coupled model simulation specified by the
-input config file. It initializes the component models, all coupler objects,
-diagnostics, and conservation checks, and then runs the simulation.
-"""
-function setup_and_run(config_dict::AbstractDict)
+
+function CoupledSimulation(config_dict::AbstractDict)
     # Make a copy so that we don't modify the original input
     config_dict = copy(config_dict)
 
@@ -187,9 +123,8 @@ function setup_and_run(config_dict::AbstractDict)
         checkpoint_dt,
         restart_dir,
         restart_t,
-        use_coupler_diagnostics,
         use_land_diagnostics,
-        calendar_dt,
+        diagnostics_dt,
         evolving_ocean,
         mono_surface,
         turb_flux_partition,
@@ -197,7 +132,7 @@ function setup_and_run(config_dict::AbstractDict)
         land_initial_condition,
         land_temperature_anomaly,
         energy_check,
-        conservation_softfail,
+        use_coupler_diagnostics,
         output_dir_root,
         parameter_files,
     ) = get_coupler_args(config_dict)
@@ -225,7 +160,7 @@ function setup_and_run(config_dict::AbstractDict)
     ## Note this step must come after parsing the coupler config dictionary, since
     ##  some parameters are passed from the coupler config to the component model configs
     atmos_config_dict = get_atmos_config_dict(config_dict, job_id, atmos_output_dir)
-    (; dt_rad, output_default_diagnostics) = get_atmos_args(atmos_config_dict)
+    (; dt_rad) = get_atmos_args(atmos_config_dict)
 
     ## set unique random seed if desired, otherwise use default
     Random.seed!(random_seed)
@@ -561,7 +496,8 @@ function setup_and_run(config_dict::AbstractDict)
         @info "Using default coupler diagnostics"
         coupler_diags_path = joinpath(dir_paths.output, "coupler")
         isdir(coupler_diags_path) || mkpath(coupler_diags_path)
-        diags_handler = coupler_diagnostics_setup(coupler_fields, coupler_diags_path, start_date, tspan[1], calendar_dt)
+        diags_handler =
+            coupler_diagnostics_setup(coupler_fields, coupler_diags_path, start_date, tspan[1], diagnostics_dt, Δt_cpl)
     else
         diags_handler = nothing
     end
@@ -575,7 +511,7 @@ function setup_and_run(config_dict::AbstractDict)
     specifics, the callbacks, the directory paths, and diagnostics for AMIP simulations.
     =#
 
-    cs = Interfacer.CoupledSimulation{FT}(
+    cs = CoupledSimulation{FT}(
         comms_ctx,
         Ref(start_date),
         boundary_space,
@@ -658,24 +594,26 @@ function setup_and_run(config_dict::AbstractDict)
         FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
         FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
     end
+    return cs
+end
 
-    #=
+"""
+    run!(cs::CoupledSimulation)
+
+Evolve the given simulation, producing plots and other diagnostic information.
+
+Keyword arguments
+==================
+
+`precompile`: If `true`, run the coupled simulations for two steps, so that most functions
+              are precompiled and subsequent timing will be more accurate.
+"""
+function run!(cs::CoupledSimulation; precompile = (cs.tspan[end] > 2 * cs.Δt_cpl + cs.tspan[begin]))
+
     ## Precompilation of Coupling Loop
-
-    Here we run the entire coupled simulation for two timesteps to precompile everything
-    for accurate timing of the overall simulation. After these two steps, we update the
-    beginning and end of the simulation timespan to the correct values.
-    =#
-
-    if tspan[2] > 2Δt_cpl + tspan[1]
-        ## run the coupled simulation for two timesteps to precompile
-        cs.tspan[2] = tspan[1] + Δt_cpl * 2
-        solve_coupler!(cs)
-
-        ## update the timespan to the correct values
-        cs.tspan[1] = tspan[1] + Δt_cpl * 2
-        cs.tspan[2] = tspan[2]
-    end
+    # Here we run the entire coupled simulation for two timesteps to precompile several
+    # functions for more accurate timing of the overall simulation.
+    precompile && (step!(cs); step!(cs))
 
     ## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos
     GC.gc()
@@ -687,37 +625,56 @@ function setup_and_run(config_dict::AbstractDict)
     We use the `ClimaComms.@elapsed` macro to time the simulation on both CPU and GPU, and use this
     value to calculate the simulated years per day (SYPD) of the simulation.
     =#
-    walltime = ClimaComms.@elapsed comms_ctx.device begin
+    @info "Starting coupling loop"
+    walltime = ClimaComms.@elapsed cs.comms_ctx.device begin
         s = CA.@timed_str begin
-            solve_coupler!(cs)
+            while cs.t[] <= cs.tspan[end]
+                step!(cs)
+            end
         end
     end
-    @info(walltime)
+    @info "Simulation took $(walltime) seconds"
 
-    ## Use ClimaAtmos calculation to show the simulated years per day of the simulation (SYPD)
-    es = CA.EfficiencyStats((tspan[1], tspan[2]), walltime)
-    sypd = CA.simulated_years_per_day(es)
-    n_atmos_steps = atmos_sim.integrator.step
-    walltime_per_atmos_step = es.walltime / n_atmos_steps
+    simulated_seconds_per_second = float(cs.tspan[end] - cs.tspan[begin]) / walltime
+    simulated_years_per_day = simulated_seconds_per_second / (365.25 * walltime)
+    sypd = simulated_years_per_day
+    n_coupling_steps = (cs.tspan[end] - cs.tspan[begin]) / cs.Δt_cpl
+    walltime_per_coupling_step = walltime / n_coupling_steps
     @info "SYPD: $sypd"
-    @info "Walltime per Atmos step: $(walltime_per_atmos_step)"
+    @info "Walltime per coupling step: $(walltime_per_coupling_step)"
 
     ## Save the SYPD and allocation information
-    if ClimaComms.iamroot(comms_ctx)
-        open(joinpath(dir_paths.artifacts, "sypd.txt"), "w") do sypd_filename
+    if ClimaComms.iamroot(cs.comms_ctx)
+        open(joinpath(cs.dirs.artifacts, "sypd.txt"), "w") do sypd_filename
             println(sypd_filename, "$sypd")
         end
 
-        open(joinpath(dir_paths.artifacts, "walltime_per_atmos_step.txt"), "w") do walltime_per_atmos_step_filename
-            println(walltime_per_atmos_step_filename, "$(walltime_per_atmos_step)")
+        open(joinpath(cs.dirs.artifacts, "walltime_per_step.txt"), "w") do walltime_per_step_filename
+            println(walltime_per_step_filename, "$(walltime_per_coupling_step)")
         end
 
-        open(joinpath(dir_paths.artifacts, "max_rss_cpu.txt"), "w") do cpu_max_rss_filename
+        open(joinpath(cs.dirs.artifacts, "max_rss_cpu.txt"), "w") do cpu_max_rss_filename
             cpu_max_rss_GB = Utilities.show_memory_usage()
             println(cpu_max_rss_filename, cpu_max_rss_GB)
         end
     end
 
+    # Close all diagnostics file writers
+    isnothing(cs.diags_handler) || foreach(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
+    isnothing(cs.model_sims.atmos_sim.output_writers) || foreach(close, cs.model_sims.atmos_sim.output_writers)
+    return nothing
+end
+
+"""
+    postprocess(cs, conservation_softfail)
+
+Process the results after a simulation has completed, including generating
+plots, checking conservation, and other diagnostics.
+
+When `conservation_softfail` is true, throw an error if conservation is not
+respected.
+"""
+function postprocess(cs, conservation_softfail)
     #=
     ## Postprocessing
     All postprocessing is performed using the root process only, if applicable.
@@ -732,13 +689,95 @@ function setup_and_run(config_dict::AbstractDict)
     - Plots of useful coupler and component model fields for debugging
     =#
 
-    if ClimaComms.iamroot(comms_ctx) && use_coupler_diagnostics
-        postprocessing_vars = (; output_default_diagnostics, t_end, conservation_softfail)
+    if ClimaComms.iamroot(cs.comms_ctx) && !isnothing(cs.diags_handler)
+        postprocessing_vars = (; conservation_softfail)
         postprocess_sim(cs, postprocessing_vars)
     end
+    return nothing
+end
 
-    # Close all diagnostics file writers
-    isnothing(cs.diags_handler) || foreach(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
-    isnothing(atmos_sim.output_writers) || foreach(close, atmos_sim.output_writers)
+"""
+    setup_and_run(config_dict)
+    setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
+
+This function sets up and runs the coupled model simulation specified by the
+input config file or dict. It initializes the component models, all coupler objects,
+diagnostics, and conservation checks, and then runs the simulation.
+"""
+function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
+    cs = CoupledSimulation(config_file)
+    run!(cs)
     return cs
+end
+
+function setup_and_run(config_dict)
+    cs = CoupledSimulation(config_dict)
+    run!(cs)
+    return cs
+end
+
+"""
+    step!(cs::CoupledSimulation)
+
+Take one coupling step forward in time.
+
+This function runs the component models sequentially, and exchanges combined fields and
+calculates fluxes using the selected turbulent fluxes option. Note, one coupling step might
+require multiple steps in some of the component models.
+"""
+function step!(cs::CoupledSimulation)
+    (; model_sims, Δt_cpl, tspan, comms_ctx) = cs
+    (; atmos_sim, land_sim, ocean_sim, ice_sim) = model_sims
+
+    # Update the current time
+    cs.t[] += Δt_cpl
+
+    ## compute global energy and water conservation checks
+    ## (only for slabplanet if tracking conservation is enabled)
+    !isnothing(cs.conservation_checks) && ConservationChecker.check_conservation!(cs)
+    ClimaComms.barrier(comms_ctx)
+
+    ## update water albedo from wind at dt_water_albedo
+    ## (this will be extended to a radiation callback from the coupler)
+    TimeManager.maybe_trigger_callback(cs.callbacks.water_albedo, cs)
+
+    ## update the surface fractions for surface models,
+    ## and update all component model simulations with the current fluxes stored in the coupler
+    FieldExchanger.update_surface_fractions!(cs)
+    FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
+
+    ## step component model simulations sequentially for one coupling timestep (Δt_cpl)
+    FieldExchanger.step_model_sims!(cs.model_sims, cs.t[])
+
+    ## update the coupler with the new surface properties and calculate the turbulent fluxes
+    FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, surface_albedo, z0, beta
+    if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
+        FluxCalculator.combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes) # this updates the surface thermo state, sfc_ts, in ClimaAtmos (but also unnecessarily calculates fluxes)
+    elseif cs.turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
+        ## calculate turbulent fluxes in surfaces and save the weighted average in coupler fields
+        FluxCalculator.partitioned_turbulent_fluxes!(
+            cs.model_sims,
+            cs.fields,
+            cs.boundary_space,
+            FluxCalculator.MoninObukhovScheme(),
+            cs.thermo_params,
+        )
+
+        ## update atmos sfc_conditions for surface temperature - TODO: this needs to be simplified (need CA modification)
+        new_p = get_new_cache(atmos_sim, cs.fields)
+        CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) # to set T_sfc (but SF calculation not necessary - CA modification)
+        atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
+    end
+
+    ## update the coupler with the new atmospheric properties
+    FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
+
+    ## callback to checkpoint model state
+    TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs)
+
+    ## compute/output AMIP diagnostics if scheduled for this timestep
+    ## wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface
+    cs_nt = (; u = cs.fields, p = nothing, t = cs.t[], step = round(cs.t[] / Δt_cpl))
+    !isnothing(cs.diags_handler) && CD.orchestrate_diagnostics(cs_nt, cs.diags_handler)
+    return nothing
 end

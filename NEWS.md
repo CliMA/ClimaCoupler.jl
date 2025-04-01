@@ -6,7 +6,18 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Test AMIP with integrated land model. PR[#1254](https://github.com/CliMA/ClimaCoupler.jl/pull/1254)
+
+The integrated ClimaLand model can now be used in coupled simulations.
+A short run of AMIP using the full land model is now tested in our regular
+Buildkite pipeline, and the restarts test uses the full land model
+rather than the bucket.
+
+This PR adds the config option `land_model`, which can be set to either
+`bucket` or `integrated` to choose which land model to run with.
+
 #### Remove `nans_to_zero`. PR[#1278](https://github.com/CliMA/ClimaCoupler.jl/pull/1278)
+
 Instead of zeroing out all NaNs in a surface field, we zero out all values
 where the area fraction is 0, which is logically what we want to do.
 

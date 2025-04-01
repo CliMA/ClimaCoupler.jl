@@ -131,6 +131,10 @@ function argparse_settings()
         arg_type = Vector{Dict{Any, Any}}
         default = []
         ### ClimaLand specific
+        "--land_model"
+        help = "Land model to use. [`bucket` (default), `integrated`]"
+        arg_type = String
+        default = "bucket"
         "--land_albedo_type"
         help = "Access land surface albedo information from data file. [`map_static` (default), `function`, `map_temporal`]"
         arg_type = String

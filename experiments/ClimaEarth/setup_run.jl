@@ -64,6 +64,7 @@ contain any internals of the ClimaCoupler source code, except extensions to the 
 ## helpers for component models
 include("components/atmosphere/climaatmos.jl")
 include("components/land/climaland_bucket.jl")
+include("components/land/climaland_integrated.jl")
 include("components/ocean/slab_ocean.jl")
 include("components/ocean/prescr_ocean.jl")
 include("components/ocean/prescr_seaice.jl")
@@ -125,6 +126,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         use_land_diagnostics,
         diagnostics_dt,
         evolving_ocean,
+        land_model,
         land_albedo_type,
         land_initial_condition,
         land_temperature_anomaly,
@@ -263,23 +265,42 @@ function CoupledSimulation(config_dict::AbstractDict)
         @info("AMIP boundary conditions - do not expect energy conservation")
 
         ## land model
-        land_sim = BucketSimulation(
-            FT;
-            dt = component_dt_dict["dt_land"],
-            tspan,
-            start_date,
-            output_dir = land_output_dir,
-            boundary_space,
-            area_fraction = land_fraction,
-            saveat,
-            surface_elevation,
-            land_temperature_anomaly,
-            use_land_diagnostics,
-            albedo_type = land_albedo_type,
-            land_initial_condition,
-            energy_check,
-            parameter_files,
-        )
+        land_sim = nothing
+        if land_model == "bucket"
+            land_sim = BucketSimulation(
+                FT;
+                dt = component_dt_dict["dt_land"],
+                tspan,
+                start_date,
+                output_dir = land_output_dir,
+                boundary_space,
+                area_fraction = land_fraction,
+                saveat,
+                surface_elevation,
+                land_temperature_anomaly,
+                use_land_diagnostics,
+                albedo_type = land_albedo_type,
+                land_initial_condition,
+                energy_check,
+                parameter_files,
+            )
+        elseif land_model == "integrated"
+            land_sim = ClimaLandSimulation(
+                FT;
+                dt = component_dt_dict["dt_land"],
+                tspan,
+                start_date,
+                output_dir = land_output_dir,
+                boundary_space,
+                area_fraction = land_fraction,
+                saveat,
+                surface_elevation,
+                land_temperature_anomaly,
+                use_land_diagnostics,
+            )
+        else
+            error("Invalid land model specified: $(land_model)")
+        end
 
         ## sea ice model
         ice_sim = PrescribedIceSimulation(
@@ -530,6 +551,14 @@ function CoupledSimulation(config_dict::AbstractDict)
         FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims)
         FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims)
         FieldExchanger.update_model_sims!(cs.model_sims, cs.fields)
+
+        # Set all initial cache values for the land model, now that we have updated drivers
+        land_set_initial_cache! = CL.make_set_initial_cache(cs.model_sims.land_sim.model)
+        land_set_initial_cache!(
+            cs.model_sims.land_sim.integrator.p,
+            cs.model_sims.land_sim.integrator.u,
+            cs.model_sims.land_sim.integrator.t,
+        )
 
         # 3.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
         ## TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step! (#331)

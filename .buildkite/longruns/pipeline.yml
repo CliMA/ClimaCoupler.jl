@@ -301,6 +301,18 @@ steps:
           modules: climacommon/2025_01_27
         soft_fail: true
 
+      - label: "GPU AMIP with integrated land: ED only"
+        key: "amip_integrated_land_gpu"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_integrated_land.yml --job_id amip_integrated_land_gpu"
+        artifact_paths: "experiments/ClimaEarth/output/amip_integrated_land_gpu/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          queue: clima
+          slurm_mem: 20GB
+          slurm_gpus: 1
+          modules: climacommon/2025_01_27
+
   # DYAMOND AMIP: 1 day (convection resolving)
   - label: "GPU AMIP SUPERFINE: dyamond_target"
     key: "longrun_amip_dyamond_gpu"

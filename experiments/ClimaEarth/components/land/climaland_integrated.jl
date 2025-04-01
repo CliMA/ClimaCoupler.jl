@@ -55,13 +55,13 @@ soil CO2 model. Specific details about the complexity of the model
 can be found in the ClimaLand.jl documentation.
 """
 function ClimaLandSimulation(
-    ::Type{FT},
+    ::Type{FT};
     dt::TT,
     tspan::Tuple{TT, TT},
     start_date::Dates.DateTime,
     output_dir::String,
     boundary_space,
-    area_fraction;
+    area_fraction,
     saveat::Vector{TT} = [tspan[1], tspan[2]],
     surface_elevation = CC.Fields.zeros(boundary_space),
     land_temperature_anomaly::String = "amip",
@@ -430,7 +430,7 @@ function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:cos_zenith_an
 end
 
 Interfacer.step!(sim::ClimaLandSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
-Interfacer.reinit!(sim::ClimaLandSimulation, t) = Interfacer.reinit!(sim.integrator, t)
+Interfacer.reinit!(sim::ClimaLandSimulation) = Interfacer.reinit!(sim.integrator)
 
 function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, turbulent_fluxes, area_fraction)
     # update fields for radiative transfer

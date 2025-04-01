@@ -190,10 +190,12 @@ read from `input_file`.
 """
 function restart_coupler_fields!(cs, input_file)
     ispath(input_file) || error("File $(input_file) not found")
-    fields_read = JLD2.jldopen(input_file)["coupler_fields"]
-    for name in propertynames(cs.fields)
-        ArrayType = ClimaComms.array_type(ClimaComms.device(cs.comms_ctx))
-        parent(getproperty(cs.fields, name)) .= ArrayType(parent(getproperty(fields_read, name)))
+    JLD2.jldopen(input_file) do file
+        fields_read = file["coupler_fields"]
+        for name in propertynames(cs.fields)
+            ArrayType = ClimaComms.array_type(ClimaComms.device(cs.comms_ctx))
+            parent(getproperty(cs.fields, name)) .= ArrayType(parent(getproperty(fields_read, name)))
+        end
     end
 end
 

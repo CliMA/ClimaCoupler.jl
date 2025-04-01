@@ -114,6 +114,7 @@ function get_coupler_args(config_dict::Dict)
     output_dir_root = joinpath(config_dict["coupler_output_dir"], job_id)
 
     # ClimaLand-specific information
+    land_model = config_dict["land_model"]
     land_albedo_type = config_dict["land_albedo_type"]
     land_initial_condition = config_dict["land_initial_condition"]
     land_temperature_anomaly = config_dict["land_temperature_anomaly"]
@@ -141,6 +142,7 @@ function get_coupler_args(config_dict::Dict)
         energy_check,
         conservation_softfail,
         output_dir_root,
+        land_model,
         land_albedo_type,
         land_initial_condition,
         land_temperature_anomaly,

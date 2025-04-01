@@ -27,7 +27,8 @@ function postprocess_sim(cs, postprocessing_vars)
     make_diagnostics_plots(land_output_dir, artifact_dir, output_prefix = "land_")
 
     # Plot all model states and coupler fields (useful for debugging)
-    !CA.is_distributed(cs.comms_ctx) && debug(cs, artifact_dir)
+    # TODO can't make debug plots because we have some NaNs
+    # !CA.is_distributed(cs.comms_ctx) && debug(cs, artifact_dir)
 
     # If we have monthly data, plot the leaderboard
     if t_end > 84600 * 31 * 3 && output_default_diagnostics

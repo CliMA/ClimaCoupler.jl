@@ -56,7 +56,7 @@ end
 """
     import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
 
-Updates the coupler with the atmospheric fluxes. The `Interfacer.get_field` functions
+Update the coupler with the atmospheric fluxes. The `Interfacer.get_field` functions
 (`:turbulent_energy_flux`, `:turbulent_moisture_flux`, `:radiative_energy_flux_sfc`, `:liquid_precipitation`, `:snow_precipitation`)
 have to be defined for the amtospheric component model type.
 
@@ -67,8 +67,20 @@ have to be defined for the amtospheric component model type.
 - `turbulent_fluxes`: [TurbulentFluxPartition] denotes a flag for turbulent flux calculation.
 """
 function import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
-    (; atmos_sim) = model_sims
+    for sim in model_sims
+        import_atmos_fields!(csf, sim, model_sims.atmos_sim, turbulent_fluxes)
+    end
+end
 
+"""
+    import_atmos_fields!(csf, ::Interfacer.SurfaceModelSimulation, atmos_sim, turbulent_fluxes)
+
+Updates the coupler simulation fields with atmospheric fluxes from the atmosphere simulation.
+This is the default function to be used for most surface model simulations, as
+    are computed by the coupler or atmosphere
+and passed to the surfaces.
+"""
+function import_atmos_fields!(csf, ::Interfacer.SurfaceModelSimulation, atmos_sim, turbulent_fluxes)
     # turbulent fluxes
     if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
         dummmy_remap!(csf.F_turb_energy, Interfacer.get_field(atmos_sim, Val(:turbulent_energy_flux)))
@@ -85,6 +97,8 @@ function import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
     dummmy_remap!(csf.P_liq, Interfacer.get_field(atmos_sim, Val(:liquid_precipitation)))
     dummmy_remap!(csf.P_snow, Interfacer.get_field(atmos_sim, Val(:snow_precipitation)))
 end
+
+import_atmos_fields!(csf, ::Interfacer.AtmosModelSimulation, atmos_sim, turbulent_fluxes) = nothing
 
 """
     import_combined_surface_fields!(csf, model_sims, turbulent_fluxes)

@@ -230,8 +230,13 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:cos_zenith}) = CC.Fields.
     sim.integrator.p.radiation.rrtmgp_model.cos_zenith,
     CC.Fields.level(axes(sim.integrator.u.c), 1),
 )
+# When using the `FixedCO2` option, CO2 is stored as that struct type,
+# so we access its value (a scalar) from the struct.
+# When using the `MaunaLoa` option, CO2 is stored as a 1D Array in the tracers
+# cache, so we access it from there.
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:co2}) =
-    sim.integrator.p.radiation.rrtmgp_model.volume_mixing_ratio_co2[]
+    sim.integrator.p.atmos.co2 isa CA.FixedCO2 ? sim.integrator.p.atmos.co2.value : sim.integrator.p.tracers.co2[1]
+
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:diffuse_fraction})
     radiation_model = sim.integrator.p.radiation.rrtmgp_model
     # only take the first level

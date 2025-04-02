@@ -121,9 +121,9 @@ steps:
   #         slurm_ntasks: 2
   #         slurm_mem: 32G
 
-  # - group: "Integration Tests"
-  #   steps:
-  #     # SLABPLANET EXPERIMENTS
+  - group: "Integration Tests"
+    steps:
+      # SLABPLANET EXPERIMENTS
 
   #     # Slabplanet default:
   #     # - this is the most lightweight example with conservation and visual checks, with CLI specification as follows
@@ -189,6 +189,13 @@ steps:
   #       artifact_paths: "experiments/ClimaEarth/output/amip_default/artifacts/*"
   #       agents:
   #         slurm_mem: 20GB
+
+        - label: "AMIP: integrated land"
+          key: "amip_integrated_land"
+          command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_integrated_land.yml --job_id amip_integrated_land"
+          artifact_paths: "experiments/ClimaEarth/output/amip_integrated_land/artifacts/*"
+          agents:
+            slurm_mem: 20GB
 
   #     - label: "AMIP: bucket initial condition test"
   #       command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_bucket_ic.yml --job_id amip_bucket_ic"

@@ -356,12 +356,11 @@ Extend Interfacer.add_coupler_fields! to add the fields required for ClimaAtmosS
 The fields added are:
 - `:surface_direct_albedo` (for radiation)
 - `:surface_diffuse_albedo` (for radiation)
-- `:ϵ_sfc` (for radiation)
 - `:T_sfc` (for radiation)
 - `:q_sfc` (for moisture)
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaAtmosSimulation)
-    atmos_coupler_fields = [:surface_direct_albedo, :surface_diffuse_albedo, :ϵ_sfc, :T_sfc, :q_sfc]
+    atmos_coupler_fields = [:surface_direct_albedo, :surface_diffuse_albedo, :T_sfc, :q_sfc]
     push!(coupler_field_names, atmos_coupler_fields...)
 end
 

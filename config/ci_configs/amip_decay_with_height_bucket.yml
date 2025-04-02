@@ -11,6 +11,7 @@ dz_bottom: 100.0
 energy_check: false
 h_elem: 8
 land_albedo_type: "map_temporal"
+land_model: "bucket"
 mode_name: "amip"
 mono_surface: false
 netcdf_interpolation_num_points: [90, 45, 31]
@@ -24,7 +25,9 @@ surface_setup: "PrescribedSurface"
 t_end: "31days"
 topography: "Earth"
 topo_smoothing: true
+turbconv: ~
 turb_flux_partition: "CombinedStateFluxesMOST"
+vert_diff: "DecayWithHeightDiffusion"
 viscous_sponge: true
 z_elem: 39
 z_max: 60000.0

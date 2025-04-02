@@ -14,7 +14,7 @@ Return a DiagnosticsHandler object to coordinate the diagnostics.
 function coupler_diagnostics_setup(fields, output_dir, start_date, t_start, calendar_dt)
     # Create schedules and writer
     schedule_everystep = CD.Schedules.EveryStepSchedule()
-    schedule_calendar_dt = CD.Schedules.EveryCalendarDtSchedule(calendar_dt, start_date = start_date)
+    schedule_calendar_dt = CD.Schedules.EveryCalendarDtSchedule(calendar_dt; start_date)
     netcdf_writer = CD.Writers.NetCDFWriter(axes(fields.F_turb_energy), output_dir)
 
     # Create the diagnostic for turbulent energy fluxes

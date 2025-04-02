@@ -19,24 +19,21 @@ include("../shared/restore.jl")
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###
 """
-    BucketSimulation{M, D, I, A}
+    BucketSimulation{M, I, A}
 
 The bucket model simulation object.
 
 It contains the following objects:
 - `model::M`: The `ClimaLand.Bucket.BucketModel`.
-- `domain::D`: The land domain object, which must be a spherical shell.
 - `integrator::I`: The integrator used in timestepping this model.
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model.
 """
 struct BucketSimulation{
     M <: ClimaLand.Bucket.BucketModel,
-    D <: ClimaLand.Domains.SphericalShell,
     I <: SciMLBase.AbstractODEIntegrator,
     A <: CC.Fields.Field,
 } <: Interfacer.LandModelSimulation
     model::M
-    domain::D
     integrator::I
     area_fraction::A
 end
@@ -70,7 +67,6 @@ function BucketSimulation(
     boundary_space,
     area_fraction,
     saveat::Vector{TT} = [tspan[1], tspan[2]],
-    domain_type::String = "sphere",
     surface_elevation = CC.Fields.zeros(boundary_space),
     land_temperature_anomaly::String = "amip",
     use_land_diagnostics::Bool = true,
@@ -80,8 +76,6 @@ function BucketSimulation(
     energy_check::Bool = false,
     parameter_files = [],
 ) where {FT, TT <: Union{Float64, ITime}}
-    @assert domain_type == "sphere" "Currently only spherical shell domains are supported; single column may be supported in the future."
-
     α_snow = FT(0.8) # snow albedo
     if albedo_type == "map_static" # Read in albedo from static data file (default type)
         # By default, this uses a file containing bareground albedo without a time component. Snow albedo is specified separately.
@@ -239,7 +233,7 @@ function BucketSimulation(
         callback = SciMLBase.CallbackSet(diag_cb),
     )
 
-    return BucketSimulation(model, domain, integrator, area_fraction)
+    return BucketSimulation(model, integrator, area_fraction)
 end
 
 # extensions required by Interfacer

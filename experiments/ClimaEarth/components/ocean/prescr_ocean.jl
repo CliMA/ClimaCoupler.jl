@@ -34,7 +34,7 @@ Interfacer.name(::PrescribedOceanSimulation) = "PrescribedOceanSimulation"
     PrescribedOceanSimulation(
         ::Type{FT},
         space,
-        date0,
+        start_date,
         area_fraction,
         thermo_params,
         comms_ctx;
@@ -51,7 +51,7 @@ and reading in prescribed SST data.
 function PrescribedOceanSimulation(
     ::Type{FT},
     space,
-    date0,
+    start_date,
     t_start,
     area_fraction,
     thermo_params,
@@ -77,7 +77,7 @@ function PrescribedOceanSimulation(
         sst_data,
         "SST",
         space,
-        reference_date = date0,
+        reference_date = start_date,
         file_reader_kwargs = (; preprocess_func = (data) -> data + FT(273.15),), ## convert to Kelvin
     )
 

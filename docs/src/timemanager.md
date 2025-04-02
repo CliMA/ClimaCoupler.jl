@@ -7,9 +7,6 @@ functions from Julia's [Dates](https://docs.julialang.org/en/v1/stdlib/Dates/) m
 ## TimeManager API
 
 ```@docs
-ClimaCoupler.TimeManager.current_date
-ClimaCoupler.TimeManager.strdate_to_datetime
-ClimaCoupler.TimeManager.datetime_to_strdate
 ClimaCoupler.TimeManager.maybe_trigger_callback
 ```
 

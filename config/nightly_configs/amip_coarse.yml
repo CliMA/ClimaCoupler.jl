@@ -1,4 +1,5 @@
 FLOAT_TYPE: "Float32"
+add_isothermal_boundary_layer: false
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
 checkpoint_dt: "720hours"
@@ -20,7 +21,7 @@ radiation_reset_rng_seed: true
 rayleigh_sponge: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "465days"
+t_end: "366days"
 topography: "Earth"
 topo_smoothing: true
 turb_flux_partition: "CombinedStateFluxesMOST"

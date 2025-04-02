@@ -23,7 +23,7 @@ FT = Float32
     area_fraction = CC.Fields.ones(boundary_space)
 
     # Construct simulation object
-    land_sim = ClimaLandSimulation(FT, dt, tspan, start_date, output_dir, boundary_space, area_fraction)
+    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, boundary_space, area_fraction)
 
     # Try taking a timestep
     Interfacer.step!(land_sim, dt)

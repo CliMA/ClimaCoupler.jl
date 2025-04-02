@@ -190,10 +190,17 @@ steps:
   #       agents:
   #         slurm_mem: 20GB
 
-        - label: "AMIP: integrated land"
+        - label: "AMIP: DecayWithHeight + integrated land"
           key: "amip_integrated_land"
-          command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_integrated_land.yml --job_id amip_integrated_land"
+          command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decay_with_height_integrated_land.yml --job_id amip_integrated_land"
           artifact_paths: "experiments/ClimaEarth/output/amip_integrated_land/artifacts/*"
+          agents:
+            slurm_mem: 20GB
+
+        - label: "AMIP: DecayWithHeight + bucket"
+          key: "amip_decay_with_height_bucket"
+          command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decay_with_height_bucket.yml --job_id amip_decay_with_height_bucket"
+          artifact_paths: "experiments/ClimaEarth/output/amip_decay_with_height_bucket/artifacts/*"
           agents:
             slurm_mem: 20GB
 
@@ -294,25 +301,35 @@ steps:
       #     slurm_gpus: 1
 
       # GPU RUNS: AMIP
-      - label: "GPU AMIP: default"
-        key: "gpu_amip_default"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_default.yml --job_id gpu_amip_default"
-        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_default/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
+      # - label: "GPU AMIP: default"
+      #   key: "gpu_amip_default"
+      #   command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_default.yml --job_id gpu_amip_default"
+      #   artifact_paths: "experiments/ClimaEarth/output/gpu_amip_default/artifacts/*"
+      #   env:
+      #     CLIMACOMMS_DEVICE: "CUDA"
+      #   agents:
+      #     slurm_mem: 20GB
+      #     slurm_gpus: 1
 
-      - label: "GPU AMIP: integrated land"
-        key: "gpu_amip_integrated_land"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_integrated_land.yml --job_id gpu_amip_integrated_land"
-        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_integrated_land/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
+        - label: "GPU AMIP: DecayWithHeight + integrated land"
+          key: "gpu_amip_integrated_land"
+          command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decay_with_height_integrated_land.yml --job_id gpu_amip_integrated_land"
+          artifact_paths: "experiments/ClimaEarth/output/gpu_amip_integrated_land/artifacts/*"
+          env:
+            CLIMACOMMS_DEVICE: "CUDA"
+          agents:
+            slurm_mem: 20GB
+            slurm_gpus: 1
+
+        - label: "GPU AMIP: DecayWithHeight + bucket"
+          key: "gpu_amip_decay_with_height_bucket"
+          command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decay_with_height_bucket.yml --job_id gpu_amip_decay_with_height_bucket"
+          artifact_paths: "experiments/ClimaEarth/output/gpu_amip_decay_with_height_bucket/artifacts/*"
+          env:
+            CLIMACOMMS_DEVICE: "CUDA"
+          agents:
+            slurm_mem: 20GB
+            slurm_gpus: 1
 
   #     - label: "GPU AMIP test: albedo from function"
   #       key: "gpu_amip_albedo_function"

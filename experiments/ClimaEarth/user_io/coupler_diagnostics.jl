@@ -3,7 +3,7 @@ import ClimaCoupler: Interfacer
 import Dates
 
 """
-    coupler_diagnostics_setup(fields, output_dir, start_date, t_start, calendar_dt)
+    coupler_diagnostics_setup(fields, output_dir, start_date, t_start, diagnostics_dt)
 
 Set up the default diagnostics for an AMIP simulation, using ClimaDiagnostics.
 The diagnostics are saved to NetCDF files. Currently, this just includes a
@@ -11,10 +11,10 @@ diagnostic for turbulent energy fluxes.
 
 Return a DiagnosticsHandler object to coordinate the diagnostics.
 """
-function coupler_diagnostics_setup(fields, output_dir, start_date, t_start, calendar_dt)
+function coupler_diagnostics_setup(fields, output_dir, start_date, t_start, diagnostics_dt, coupled_dt)
     # Create schedules and writer
     schedule_everystep = CD.Schedules.EveryStepSchedule()
-    schedule_calendar_dt = CD.Schedules.EveryCalendarDtSchedule(calendar_dt; start_date)
+    schedule_calendar_dt = CD.Schedules.EveryCalendarDtSchedule(diagnostics_dt; start_date)
     netcdf_writer = CD.Writers.NetCDFWriter(axes(fields.F_turb_energy), output_dir)
 
     # Create the diagnostic for turbulent energy fluxes
@@ -48,6 +48,6 @@ function coupler_diagnostics_setup(fields, output_dir, start_date, t_start, cale
 
     # Create the diagnostics handler containing the scheduled diagnostics
     scheduled_diags = [F_turb_energy_diag_sched]
-    diags_handler = CD.DiagnosticsHandler(scheduled_diags, fields, nothing, t_start)
+    diags_handler = CD.DiagnosticsHandler(scheduled_diags, fields, nothing, t_start, dt = coupled_dt)
     return diags_handler
 end

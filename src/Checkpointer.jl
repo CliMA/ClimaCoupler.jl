@@ -8,6 +8,7 @@ module Checkpointer
 import ClimaComms
 import ClimaCore as CC
 import ClimaUtilities.Utils: sort_by_creation_time
+import ClimaUtilities.TimeManager: ITime, seconds
 import ..Interfacer
 import Dates
 
@@ -99,9 +100,7 @@ end
 This is a callback function that checkpoints all simulations defined in the current coupled simulation.
 """
 function checkpoint_sims(cs::Interfacer.CoupledSimulation)
-    t = Dates.datetime2epochms(cs.dates.date[1])
-    t0 = Dates.datetime2epochms(cs.dates.date0[1])
-    time = Int((t - t0) / 1e3)
+    time = Int(round(float(cs.t[])))
     day = floor(Int, time / (60 * 60 * 24))
     sec = floor(Int, time % (60 * 60 * 24))
     output_dir = cs.dirs.checkpoints
@@ -160,7 +159,9 @@ the component models that have a cache.
 function restart_model_cache!(sim, input_file)
     ispath(input_file) || error("File $(input_file) not found")
     # Component models are responsible for defining a method for this
-    restore_cache!(sim, JLD2.jldopen(input_file)["cache"])
+    JLD2.jldopen(input_file) do file
+        restore_cache!(sim, file["cache"])
+    end
 end
 
 """
@@ -188,10 +189,12 @@ read from `input_file`.
 """
 function restart_coupler_fields!(cs, input_file)
     ispath(input_file) || error("File $(input_file) not found")
-    fields_read = JLD2.jldopen(input_file)["coupler_fields"]
-    for name in propertynames(cs.fields)
-        ArrayType = ClimaComms.array_type(ClimaComms.device(cs.comms_ctx))
-        parent(getproperty(cs.fields, name)) .= ArrayType(parent(getproperty(fields_read, name)))
+    JLD2.jldopen(input_file) do file
+        fields_read = file["coupler_fields"]
+        for name in propertynames(cs.fields)
+            ArrayType = ClimaComms.array_type(ClimaComms.device(cs.comms_ctx))
+            parent(getproperty(cs.fields, name)) .= ArrayType(parent(getproperty(fields_read, name)))
+        end
     end
 end
 

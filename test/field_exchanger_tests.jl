@@ -155,6 +155,7 @@ for FT in (Float32, Float64)
             nothing, # conservation_checks
             (Int(0), Int(1000)), # tspan
             Int(200), # Δt_cpl
+            Ref(Int(0)), # t
             (;
                 ice_sim = DummyStub((; area_fraction = ice_d)),
                 ocean_sim = Interfacer.SurfaceStub((; area_fraction = ocean_d)),
@@ -207,16 +208,18 @@ for FT in (Float32, Float64)
     @testset "import_atmos_fields! for FT=$FT" begin
         boundary_space = TestHelper.create_space(FT)
         coupler_names = (:F_turb_energy, :F_turb_moisture, :F_radiative, :P_liq, :P_snow, :ρ_sfc, :T_sfc)
-        atmos_names = (
+        component_names = (
             :turbulent_energy_flux,
             :turbulent_moisture_flux,
             :radiative_energy_flux_sfc,
             :liquid_precipitation,
             :snow_precipitation,
         )
-        atmos_fields = NamedTuple{atmos_names}(ntuple(i -> CC.Fields.ones(boundary_space), length(atmos_names)))
+        component_fields =
+            NamedTuple{component_names}(ntuple(i -> CC.Fields.ones(boundary_space), length(component_names)))
 
-        model_sims = (; atmos_sim = DummySimulation(atmos_fields))
+        model_sims =
+            (; atmos_sim = DummySimulation(component_fields), land_sim = TestSurfaceSimulation1(component_fields))
 
         flux_types = (FluxCalculator.CombinedStateFluxesMOST(), FluxCalculator.PartitionedStateFluxes())
         results = [FT(1), FT(0)]

@@ -10,57 +10,6 @@ import Dates
 import ..Interfacer
 import ..Utilities: time_to_seconds
 
-export current_date, strdate_to_datetime, datetime_to_strdate
-
-import ClimaUtilities.TimeManager: ITime, date
-
-"""
-    current_date(cs::Interfacer.CoupledSimulation, t::Int)
-
-Return the model date at the current timestep.
-
-# Arguments
-- `cs`: [CoupledSimulation] containing info about the simulation
-- `t`: [Real] number of seconds since simulation began
-"""
-current_date(cs::Interfacer.CoupledSimulation, t::Real) = cs.dates.date0[1] + Dates.Second(t)
-
-"""
-    current_date(cs::Interfacer.CoupledSimulation, t::ITime)
-
-Return the model date at the current timestep.
-
-# Arguments
-- `cs`: [CoupledSimulation] containing info about the simulation
-- `t`: [ITime] containing all the information needed to produce a date
-"""
-current_date(cs::Interfacer.CoupledSimulation, t::ITime) = date(t)
-
-"""
-    strdate_to_datetime(strdate::String)
-
-Convert from String ("YYYYMMDD") to Date format,
-required by the official AMIP input files.
-
-# Arguments
-- `strdate`: [String] to be converted to Date type
-"""
-strdate_to_datetime(strdate::String) =
-    Dates.DateTime(parse(Int, strdate[1:4]), parse(Int, strdate[5:6]), parse(Int, strdate[7:8]))
-
-"""
-    datetime_to_strdate(datetime::DateTime)
-
-Convert from Date to String ("YYYYMMDD") format.
-
-# Arguments
-- `datetime`: [Dates.DateTime] object to be converted to string
-"""
-datetime_to_strdate(datetime::Dates.DateTime) =
-    string(lpad(Dates.year(datetime), 4, "0")) *
-    string(string(lpad(Dates.month(datetime), 2, "0"))) *
-    string(lpad(Dates.day(datetime), 2, "0"))
-
 """
     time_to_period(s::String)
 
@@ -107,7 +56,6 @@ schedule is true.
 
 A `schedule` is a callable object (ie, a function) that takes an integrator-type
 of object and returns true or false.
-TODO: If `cs` contained the correct time, we could just pass `cs` to the schedule
 
 The function `func` calls the coupled state `cs`.
 """
@@ -117,12 +65,12 @@ struct Callback{SCHEDULE, FUNC}
 end
 
 """
-    maybe_trigger_callback(callback, cs, t)
+    maybe_trigger_callback(callback, cs)
 
 Check if it time to call `callback`, if yes, call its function on `cs`.
 """
-function maybe_trigger_callback(callback, cs, t)
-    # TODO: If `cs` contained the correct time, we could just pass `cs` to the schedule
+function maybe_trigger_callback(callback, cs)
+    t = cs.t[]
     callback.schedule((; t)) && callback.func(cs)
     return nothing
 end

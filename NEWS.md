@@ -6,8 +6,16 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+### Some misc. cleanup PR[#1244](https://github.com/CliMA/ClimaCoupler.jl/pull/1244)
+Changes include
+- Land simulation constructors no longer take in `domain_type`, which was unused.
+- `SurfaceModelSimulation`s no longer have a `domain` field, which were unused.
+- `CoupledSimulation` now stores the current time as `t`, and does not store the
+current date. Its `dates` field is replaced with `date0`.
+- `TimeManager` `strdate_to_datetime` and `datetime_to_strdate` are removed, which were unused.
+
 #### Add support for relative parameter filepaths PR[#1228](https://github.com/CliMA/ClimaCoupler.jl/pull/1228)
-Changed TOML parameter file handling to prepend the `pkgdir(ClimaCoupler)` 
+Changed TOML parameter file handling to prepend the `pkgdir(ClimaCoupler)`
 if no file is found at the relative filepath. Before this change, all files
 were assumed to be within the `ClimaCoupler` or `ClimaAtmos` repositories.
 
@@ -114,7 +122,7 @@ schedule = EveryCalendarDtSchedule(Dates.Month(1); start_date)
 callback = Callback(schedule, func)
 
 # Then, call it with
-maybe_trigger_callback(callback, cs, t)
+maybe_trigger_callback(callback, cs)
 ```
 
 #### Constructor renaming PR[#1135](https://github.com/CliMA/ClimaCoupler.jl/pull/1135)

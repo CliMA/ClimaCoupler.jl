@@ -18,14 +18,14 @@ end
 
 @testset "PrescribedOceanSimulation constructor" begin
     space = TestHelper.create_space(FT)
-    date0 = Dates.DateTime(2000, 1, 1)
+    start_date = Dates.DateTime(2000, 1, 1)
     t_start = 0.0
     area_fraction = CC.Fields.ones(space)
     thermo_params = TDP.ThermodynamicsParameters(FT)
     comms_ctx = nothing
 
     # Construct simulation object
-    sim = PrescribedOceanSimulation(FT, space, date0, t_start, area_fraction, thermo_params, comms_ctx)
+    sim = PrescribedOceanSimulation(FT, space, start_date, t_start, area_fraction, thermo_params, comms_ctx)
 
     # Read in initial SST data
     sst_data = try
@@ -42,7 +42,7 @@ end
         sst_data,
         "SST",
         space,
-        reference_date = date0,
+        reference_date = start_date,
         file_reader_kwargs = (; preprocess_func = (data) -> data + FT(273.15),), ## convert to Kelvin
     )
     SST_expected = zeros(space)

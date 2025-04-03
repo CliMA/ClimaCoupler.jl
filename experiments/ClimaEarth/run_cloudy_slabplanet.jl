@@ -172,10 +172,8 @@ atmos_config_object.toml_dict["max_area_limiter_scale"]["value"] = 0
 ## Component Model Initialization
 =#
 
-## dates
-date0 = date = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
-dates = (; date = [date], date0 = [date0])
-
+## start date
+start_date = Dates.DateTime(start_date, Dates.dateformat"yyyymmdd")
 
 #=
 ### Atmosphere
@@ -222,7 +220,7 @@ land_sim = BucketSimulation(
     FT;
     dt = Δt_cpl,
     tspan,
-    start_date = date0,
+    start_date,
     output_dir = land_output_dir,
     boundary_space,
     area_fraction = land_area_fraction,
@@ -248,7 +246,7 @@ ocean_sim = SlabOceanSimulation(
 =#
 
 ## coupler exchange fields
-coupler_field_names = (
+coupler_field_names = [
     :T_sfc,
     :z0m_sfc,
     :z0b_sfc,
@@ -268,9 +266,8 @@ coupler_field_names = (
     :P_net,
     :temp1,
     :temp2,
-)
-coupler_fields =
-    NamedTuple{coupler_field_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_field_names)))
+]
+coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
 Utilities.show_memory_usage()
 
 ## model simulations
@@ -279,10 +276,10 @@ model_sims = (atmos_sim = atmos_sim, ocean_sim = ocean_sim);
 #=
 ## Initialize Callbacks
 =#
-schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = date0)
+schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date)
 checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
 
-schedule_albedo = EveryCalendarDtSchedule(TimeManager.time_to_period(dt_rad); start_date = date0)
+schedule_albedo = EveryCalendarDtSchedule(TimeManager.time_to_period(dt_rad); start_date)
 albedo_cb = TimeManager.Callback(schedule_albedo, FluxCalculator.water_albedo_from_atmosphere!)
 
 callbacks = (; checkpoint = checkpoint_cb, water_albedo = albedo_cb)
@@ -303,12 +300,13 @@ end
 
 cs = Interfacer.CoupledSimulation{FT}(
     comms_ctx,
-    dates,
+    Ref(start_date),
     boundary_space,
     coupler_fields,
     nothing, # conservation checks
     [tspan[1], tspan[2]],
     Δt_cpl,
+    Ref(tspan[1]),
     model_sims,
     callbacks,
     dir_paths,
@@ -365,13 +363,13 @@ function solve_coupler!(cs)
     @info("Starting coupling loop")
     ## step in time
     for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])
-        # Update date
-        cs.dates.date[] = TimeManager.current_date(cs, t)
+        # Update current time
+        cs.t[] = t
 
         ClimaComms.barrier(comms_ctx)
 
         ## update water albedo from wind at dt_water_albedo (this will be extended to a radiation callback from the coupler)
-        TimeManager.maybe_trigger_callback(cs.callbacks.water_albedo, cs, t)
+        TimeManager.maybe_trigger_callback(cs.callbacks.water_albedo, cs)
 
         ## run component models sequentially for one coupling timestep (Δt_cpl)
         FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
@@ -386,7 +384,7 @@ function solve_coupler!(cs)
         FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
 
         ## callback to checkpoint model state
-        TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs, t)
+        TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs)
     end
 
     return nothing

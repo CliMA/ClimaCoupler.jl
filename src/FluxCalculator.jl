@@ -468,8 +468,6 @@ function compute_surface_fluxes!(
 
     # get area fraction (min = 0, max = 1)
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
-    # get area mask [0, 1], where area_mask = 1 if area_fraction > 0
-    area_mask = Utilities.binary_mask.(area_fraction)
 
     thermo_state_sfc = FluxCalculator.surface_thermo_state(sim, thermo_params, thermo_state_int)
 
@@ -512,31 +510,31 @@ function compute_surface_fluxes!(
     # add the flux contributing from this surface to the coupler field
     # note that the fluxes are area-weighted, so if a surface model is
     #  not present at this point, the fluxes are zero
-    @. csf.F_turb_ρτxz += F_turb_ρτxz * area_fraction * area_mask
-    @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction * area_mask
-    @. csf.F_turb_energy += (F_shf .+ F_lhf) * area_fraction * area_mask
-    @. csf.F_turb_moisture += F_turb_moisture * area_fraction * area_mask
+    @. csf.F_turb_ρτxz += F_turb_ρτxz * area_fraction
+    @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction
+    @. csf.F_turb_energy += (F_shf .+ F_lhf) * area_fraction
+    @. csf.F_turb_moisture += F_turb_moisture * area_fraction
 
     # NOTE: This is still an area weighted contribution, which maybe doesn't make
     # too much sense for these quantities...
 
     # L_MO can be Inf. We don't want to multiply Inf * 0, so we can handle this
     # separately.
-    @. csf.L_MO += ifelse(isinf(fluxes.L_MO), fluxes.L_MO, fluxes.L_MO * area_fraction * area_mask)
-    @. csf.ustar += fluxes.ustar * area_fraction * area_mask
-    @. csf.buoyancy_flux += fluxes.buoyancy_flux * area_fraction * area_mask
+    @. csf.L_MO += ifelse(isinf(fluxes.L_MO), fluxes.L_MO, fluxes.L_MO * area_fraction)
+    @. csf.ustar += fluxes.ustar * area_fraction
+    @. csf.buoyancy_flux += fluxes.buoyancy_flux * area_fraction
 
     z0m = Interfacer.get_field(sim, Val(:roughness_momentum))
     z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy))
     beta = Interfacer.get_field(sim, Val(:beta))
 
-    @. csf.z0m_sfc += z0m * area_fraction * area_mask
-    @. csf.z0b_sfc += z0b * area_fraction * area_mask
-    @. csf.beta += beta * area_fraction * area_mask
+    @. csf.z0m_sfc += z0m * area_fraction
+    @. csf.z0b_sfc += z0b * area_fraction
+    @. csf.beta += beta * area_fraction
 
     # NOTE: This is essentially setting q_sfc to the Atmos q_sfc (because we compute the
     # thermo_state_sfc by extrapolating the atmos properties onto the surface)
-    @. csf.q_sfc += TD.total_specific_humidity.(thermo_params, thermo_state_sfc) * area_fraction * area_mask
+    @. csf.q_sfc += TD.total_specific_humidity.(thermo_params, thermo_state_sfc) * area_fraction
     return nothing
 end
 

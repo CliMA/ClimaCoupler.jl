@@ -181,7 +181,7 @@ function slab_ocean_rhs!(dY, Y, cache, t)
     p, F_turb_energy, F_radiative, area_fraction = cache
     FT = eltype(Y.T_sfc)
     rhs = @. -(F_turb_energy + F_radiative) / (p.h * p.ρ * p.c)
-    @. dY.T_sfc = rhs * Utilities.binary_mask(area_fraction) * p.evolving_switch
+    @. dY.T_sfc = rhs * area_fraction * p.evolving_switch
     @. cache.q_sfc = TD.q_vap_saturation_generic.(cache.thermo_params, Y.T_sfc, cache.ρ_sfc, TD.Liquid())
 end
 

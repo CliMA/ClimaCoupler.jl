@@ -13,5 +13,4 @@ ClimaCoupler.Utilities.get_device
 ClimaCoupler.Utilities.show_memory_usage
 ClimaCoupler.Utilities.setup_output_dirs
 ClimaCoupler.Utilities.time_to_seconds
-ClimaCoupler.Utilities.binary_mask
 ```

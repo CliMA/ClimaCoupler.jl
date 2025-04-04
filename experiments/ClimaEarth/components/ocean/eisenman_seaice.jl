@@ -409,5 +409,5 @@ function ∑tendencies(dY, Y, cache, _)
     @. dY.q_sfc = -Y.q_sfc / Δt
 
     # update ice area fraction (binary mask for now)
-    cache.ice_area_fraction .= Utilities.binary_mask.(Y.h_ice)
+    @. cache.ice_area_fraction = ifelse(Y.h_ice > 0, one(Y.h_ice), zero(Y.h_ice))
 end

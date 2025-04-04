@@ -65,7 +65,7 @@ end
 
     boundary_space = ClimaCore.Spaces.horizontal_space(atmos_sim.domain.face_space)
     area_fraction = ClimaCore.Fields.ones(boundary_space)
-    land_sim = ClimaLandSimulation(FT, dt, tspan, start_date, output_dir, boundary_space, area_fraction)
+    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, boundary_space, area_fraction)
     model_sims = (; land_sim = land_sim, atmos_sim = atmos_sim)
 
     # Construct a coupler fields object
@@ -84,7 +84,7 @@ end
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
     flux_type = FluxCalculator.PartitionedStateFluxes()
 
-    # Step the atmosphere once to get non-zero wind and humidity
+    # Step the atmosphere once to get non-zero wind and humidity so the fluxes are non-zero
     Interfacer.step!(atmos_sim, dt)
 
     # Exchange the initial conditions between atmosphere and land
@@ -96,6 +96,9 @@ end
     # Update land cache variables with the updated drivers in the cache after the exchange
     update_aux! = ClimaLand.make_update_aux(land_sim.model)
     update_aux!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
+
+    update_boundary_fluxes! = ClimaLand.make_update_boundary_fluxes(land_sim.model)
+    update_boundary_fluxes!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
 
     # Compute the surface fluxes
     FluxCalculator.compute_surface_fluxes!(coupler_fluxes, land_sim, atmos_sim, boundary_space, nothing, nothing)

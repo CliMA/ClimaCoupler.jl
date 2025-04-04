@@ -224,11 +224,11 @@ for FT in (Float32, Float64)
             coupler_fields =
                 NamedTuple{coupler_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_names)))
             FieldExchanger.import_atmos_fields!(coupler_fields, model_sims, t)
-            @test Array(parent(coupler_fields.F_turb_energy))[1] == results[i]
-            @test Array(parent(coupler_fields.F_turb_moisture))[1] == results[i]
-            @test Array(parent(coupler_fields.F_radiative))[1] == results[1]
-            @test Array(parent(coupler_fields.P_liq))[1] == results[1]
-            @test Array(parent(coupler_fields.P_snow))[1] == results[1]
+            @test all(Array(parent(coupler_fields.F_turb_energy)) .== results[i])
+            @test all(Array(parent(coupler_fields.F_turb_moisture)) .== results[i])
+            @test all(Array(parent(coupler_fields.F_radiative)) .== results[1])
+            @test all(Array(parent(coupler_fields.P_liq)) .== results[1])
+            @test all(Array(parent(coupler_fields.P_snow)) .== results[1])
         end
     end
 
@@ -323,32 +323,32 @@ for FT in (Float32, Float64)
             FieldExchanger.update_model_sims!(model_sims, coupler_fields, t)
 
             # test atmos
-            @test Array(parent(model_sims.atmos_sim.cache.albedo_direct))[1] == results[2]
-            @test Array(parent(model_sims.atmos_sim.cache.albedo_diffuse))[1] == results[3]
+            @test all(Array(parent(model_sims.atmos_sim.cache.albedo_direct)) .== results[2])
+            @test all(Array(parent(model_sims.atmos_sim.cache.albedo_diffuse)) .== results[3])
             if t isa FluxCalculator.CombinedStateFluxesMOST
-                @test Array(parent(model_sims.atmos_sim.cache.roughness_momentum))[1] == results[2]
+                @test all(Array(parent(model_sims.atmos_sim.cache.roughness_momentum)) .== results[2])
             else
-                @test Array(parent(model_sims.atmos_sim.cache.roughness_momentum))[1] == results[1]
+                @test all(Array(parent(model_sims.atmos_sim.cache.roughness_momentum)) .== results[1])
             end
 
             # test variables without updates
-            @test Array(parent(model_sims.atmos_sim.cache.surface_temperature))[1] == results[1]
-            @test Array(parent(model_sims.atmos_sim.cache.beta))[1] == results[1]
-            @test Array(parent(model_sims.atmos_sim.cache.roughness_buoyancy))[1] == results[1]
+            @test all(Array(parent(model_sims.atmos_sim.cache.surface_temperature)) .== results[1])
+            @test all(Array(parent(model_sims.atmos_sim.cache.beta)) .== results[1])
+            @test all(Array(parent(model_sims.atmos_sim.cache.roughness_buoyancy)) .== results[1])
 
-            # test surface
-            @test Array(parent(model_sims.land_sim.cache.turbulent_energy_flux))[1] == results[2] # assuming units / m2
-            @test Array(parent(model_sims.land_sim.cache.turbulent_moisture_flux))[1] == results[2]
+            # test surface (fluxes must be multiplied by this surface's area fraction)
+            area_fraction = Interfacer.get_field(model_sims.land_sim, Val(:area_fraction))
+            @test all(Array(parent(model_sims.land_sim.cache.turbulent_energy_flux)) .== results[2] .* area_fraction) # assuming units / m2
+            @test all(Array(parent(model_sims.land_sim.cache.turbulent_moisture_flux)) .== results[2] .* area_fraction)
 
             # test variables without updates
-            @test Array(parent(model_sims.land_sim.cache.radiative_energy_flux_sfc))[1] == results[1]
-            @test Array(parent(model_sims.land_sim.cache.liquid_precipitation))[1] == results[1]
-            @test Array(parent(model_sims.land_sim.cache.snow_precipitation))[1] == results[1]
+            @test all(Array(parent(model_sims.land_sim.cache.radiative_energy_flux_sfc)) .== results[1])
+            @test all(Array(parent(model_sims.land_sim.cache.liquid_precipitation)) .== results[1])
+            @test all(Array(parent(model_sims.land_sim.cache.snow_precipitation)) .== results[1])
 
             # test stub - albedo should be updated by update_sim!
-            @test Array(parent(model_sims.stub_sim.cache.albedo_direct))[1] == results[2]
-            @test Array(parent(model_sims.stub_sim.cache.albedo_diffuse))[1] == results[2]
-
+            @test all(Array(parent(model_sims.stub_sim.cache.albedo_direct)) .== results[2])
+            @test all(Array(parent(model_sims.stub_sim.cache.albedo_diffuse)) .== results[2])
         end
     end
     @testset "reinit_model_sims! for FT=$FT" begin

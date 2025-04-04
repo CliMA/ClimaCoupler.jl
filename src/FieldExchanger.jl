@@ -184,17 +184,15 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, turbulent_flux
     Interfacer.update_field!(sim, Val(:air_density), csf.ρ_sfc)
 
     # turbulent fluxes
-    mask = Utilities.binary_mask.(area_fraction)
-
     # when PartitionedStateFluxes, turbulent fluxes are updated during the flux calculation
     if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
-        F_turb_energy_masked = FT.(mask .* csf.F_turb_energy)
+        F_turb_energy_masked = FT.(area_fraction .* csf.F_turb_energy)
         Interfacer.update_field!(sim, Val(:turbulent_energy_flux), F_turb_energy_masked)
-        Interfacer.update_field!(sim, Val(:turbulent_moisture_flux), FT.(mask .* csf.F_turb_moisture))
+        Interfacer.update_field!(sim, Val(:turbulent_moisture_flux), FT.(area_fraction .* csf.F_turb_moisture))
     end
 
     # radiative fluxes
-    Interfacer.update_field!(sim, Val(:radiative_energy_flux_sfc), FT.(mask .* csf.F_radiative))
+    Interfacer.update_field!(sim, Val(:radiative_energy_flux_sfc), FT.(area_fraction .* csf.F_radiative))
 
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)

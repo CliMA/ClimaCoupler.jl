@@ -64,7 +64,6 @@ end
         thermo_params,
         comms_ctx,
         start_date,
-        mono_surface,
         land_fraction,
         stepper = CTS.RK4()
     ) where {FT}
@@ -86,7 +85,6 @@ function PrescribedIceSimulation(
     thermo_params,
     comms_ctx,
     start_date,
-    mono_surface,
     land_fraction,
     stepper = CTS.RK4(),
 ) where {FT}
@@ -112,11 +110,10 @@ function PrescribedIceSimulation(
     # Get initial SIC values and use them to calculate ice fraction
     SIC_init = CC.Fields.zeros(space)
     evaluate!(SIC_init, SIC_timevaryinginput, tspan[1])
-    ice_fraction = get_ice_fraction.(SIC_init, mono_surface)
 
     # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
     #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-    @. ice_fraction = max(min(ice_fraction, FT(1) - land_fraction), FT(0))
+    ice_fraction = @. max(min(SIC_init, FT(1) - land_fraction), FT(0))
 
     params = IceSlabParameters{FT}()
 
@@ -218,9 +215,6 @@ end
 ###
 ### Sea ice model-specific functions (not explicitly required by ClimaCoupler.jl)
 ###
-# setting that SIC < 0.5 is counted as ocean if binary remapping.
-get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
-    mono ? h_ice : Utilities.binary_mask(h_ice, threshold)
 
 """
     ice_rhs!(dY, Y, p, t)
@@ -248,8 +242,7 @@ function ice_rhs!(dY, Y, p, t)
     # If tendencies lead to temperature above freezing, set temperature to freezing
     @. rhs = min(rhs, (params.T_freeze - Y.T_sfc) / float(p.dt))
     # mask out no-ice areas
-    area_mask = Utilities.binary_mask.(p.area_fraction)
-    dY.T_sfc .= rhs .* area_mask
+    dY.T_sfc .= rhs .* p.area_fraction
 
     @. p.q_sfc = TD.q_vap_saturation_generic.(p.thermo_params, Y.T_sfc, p.ρ_sfc, TD.Ice())
 end

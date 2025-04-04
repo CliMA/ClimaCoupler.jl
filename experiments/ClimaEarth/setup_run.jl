@@ -241,10 +241,7 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     # Preprocess the file to be 1s and 0s before remapping into onto the grid
     land_fraction = SpaceVaryingInput(land_mask_data, "landsea", boundary_space)
-    if !mono_surface
-        land_fraction = Utilities.binary_mask.(land_fraction)
-    end
-    Utilities.show_memory_usage()
+    land_fraction = !mono_surface ? ifelse.(land_fraction .> eps(FT), FT(1), FT(0)) : land_fraction
 
     #=
     ### Surface Models: AMIP and SlabPlanet Modes
@@ -296,7 +293,6 @@ function CoupledSimulation(config_dict::AbstractDict)
             thermo_params = thermo_params,
             comms_ctx,
             start_date,
-            mono_surface,
             land_fraction,
         )
 

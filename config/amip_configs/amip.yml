@@ -20,14 +20,15 @@ radiation_reset_rng_seed: true
 rayleigh_sponge: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "1098days"
+t_end: "3hours"
 topography: "Earth"
 topo_smoothing: true
 turb_flux_partition: "CombinedStateFluxesMOST"
 viscous_sponge: true
 z_elem: 63
 z_max: 60000.0
-extra_atmos_diagnostics:
-  - short_name: [od550aer, odsc550aer]
-    reduction_time: average
-    period: "1months"
+# extra_atmos_diagnostics:
+#   - short_name: [od550aer, odsc550aer]
+#     reduction_time: average
+#     period: "1months"
+use_itime: false

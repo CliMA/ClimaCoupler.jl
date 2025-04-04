@@ -32,7 +32,7 @@ z_elem: 39
 z_max: 60000.0
 extra_atmos_diagnostics:
   - reduction_time: average
-    short_name: 
+    short_name:
       - rsut
       - rsutcs
     period: 1months

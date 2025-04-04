@@ -27,6 +27,20 @@ function process_member_data(simdir::SimDir)
     rsut = preprocess_monthly_averages(simdir, "rsut")
     rsutcs = preprocess_monthly_averages(simdir, "rsutcs")
     cre = rsutcs - rsut
+
+    lon = [-20.0]
+    lat = [-30.0]
+    time = [0.0]
+    data = [1.0]
+    dims = OrderedDict(["lon" => lon, "lat" => lat, "time" => time])
+    attribs = Dict("long_name" => "hi")
+    dim_attribs = OrderedDict([
+        "lon" => Dict("units" => "deg"),
+        "lat" => Dict("units" => "deg"),
+        "time" => Dict("units" => "s"),
+    ])
+    dummy_var = ClimaAnalysis.OutputVar(attribs, dims, dim_attribs, data)
+    cre = ClimaAnalysis.reordered_as(cre, dummy_var)
     return vec(cre.data)
 end
 

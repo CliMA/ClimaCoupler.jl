@@ -1,20 +1,21 @@
-using Oceananigans
+import Oceananigans
+import ClimaOcean as Ocean
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
+import ClimaComms
 
 """
     OceananigansSimulation{M, I, A}
 
-The Oceananigans simulation object. This type is used by the coupler to indicate
-that this simulation is an surface/ocean simulation for dispatch.
+The ClimaCoupler simulation object used to run with Oceananigans.
+This type is used by the coupler to indicate that this simulation
+is an surface/ocean simulation for dispatch.
 
 It contains the following objects:
-- `model::M`: The ocean model object.
-- `integrator::I`: The integrator used in timestepping this model.
+- `sim::M`: The Oceananigans simulation object.
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
 """
 struct OceananigansSimulation{M, I, A} <: Interfacer.OceanModelSimulation
-    model::M
-    integrator::I
+    sim::M
     area_fraction::A
 end
 
@@ -30,16 +31,53 @@ Specific details about the complexity of the model
 can be found in the Oceananigans.jl documentation.
 """
 function OceananigansSimulation(
-    ::Type{FT},
+    ::Type{FT}, # TODO decide which arguments we want here
     dt::TT,
     tspan::Tuple{TT, TT},
     start_date::Dates.DateTime,
     output_dir::String,
     area_fraction,
+    comms_ctx = ClimaComms.context(),
 ) where {FT, TT <: Union{Float64, ITime}}
     # TODO fill this out
+    arch = if comms_ctx.device isa ClimaComms.CUDADevice
+        Oceananigans.GPU()
+    else
+        Oceananigans.CPU()
+    end
 
-    return OceananigansSimulation(model, integrator, area_fraction)
+    # Set up ocean grid
+    Nx = 360
+    Ny = 170
+    Nz = 30
+    z_faces = Ocean.exponential_z_faces(; Nz, h = 30, depth = 6000)
+
+    # TODO how to specify FT?
+    grid = Oceananigans.LatitudeLongitudeGrid(
+        arch;
+        size = (Nx, Ny, Nz),
+        longitude = (0, 360),
+        latitude = (-85, 85),
+        z = z_faces,
+        halo = (7, 7, 7),
+    )
+
+    # Choose parameterizations
+    momentum_advection = Oceananigans.WENOVectorInvariant(order = 5)
+    tracer_advection = Oceananigans.WENO(order = 5)
+    free_surface = Oceananigans.SplitExplicitFreeSurface(grid; substeps = 30)
+
+    # Create ocean simulation
+    ocean = Ocean.ocean_simulation(grid; momentum_advection, tracer_advection, free_surface, warn = false)
+
+
+    # Set up initial conditions for temperature and salinity
+    Tᵢ(λ, φ, z) = 30 * (1 - tanh((abs(φ) - 30) / 5)) / 2 + rand()
+    Sᵢ(λ, φ, z) = 30 - 5e-3 * z + rand()
+    Oceananigans.set!(ocean.model, T = Tᵢ, S = Sᵢ)
+
+    # TODO do we want to store sim or model?
+    return OceananigansSimulation(ocean, area_fraction)
 end
 
 Interfacer.name(::OceananigansSimulation) = "OceananigansSimulation"
@@ -48,9 +86,11 @@ Interfacer.name(::OceananigansSimulation) = "OceananigansSimulation"
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###############################################################################
 
-# Timestepping functions, which use SciMLBase.jl methods
-Interfacer.step!(sim::OceananigansSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
-Interfacer.reinit!(sim::OceananigansSimulation, t) = Interfacer.reinit!(sim.integrator, t)
+# Timestep the simulation forward to time `t`
+Interfacer.step!(sim::OceananigansSimulation, t) = Oceananigans.time_step!(sim.model, t - sim.model.clock.time)
+
+# Reset prognostic state and current time to initial conditions
+Interfacer.reinit!(sim::OceananigansSimulation, t) = nothing # TODO fill this out
 
 """
     Interfacer.get_field(sim::OceananigansSimulation, ::Val{:_})
@@ -176,7 +216,8 @@ end
 
 Update the coupler fields in-place with the values from the atmosphere simulation.
 This is defined here because the coupler exchange fields are specified by the
-Oceananigans simulation `add_coupler_fields!` method, and we need to know which fields to update.
+Oceananigans simulation `add_coupler_fields!` method, and we need to know which fields
+are required from the atmosphere model.
 """
 function FieldExchanger.import_atmos_fields!(csf, sim::OceananigansSimulation, atmos_sim, turbulent_fluxes)
     # TODO fix remap function calls

@@ -43,6 +43,7 @@ eki = EKP.EnsembleKalmanProcess(
     EKP.TransformUnscented(prior; impose_prior = true),
     verbose = true,
 );
+ensemble_size = EKP.get_N_ens(eki)
 # If TransformUnscented causes issues, just use TransformInversion:
 # ensemble_size = 40
 # eki = EKP.EnsembleKalmanProcess(

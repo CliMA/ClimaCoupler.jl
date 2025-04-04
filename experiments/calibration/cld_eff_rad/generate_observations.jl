@@ -8,12 +8,12 @@ const diagnostic_var =
     OutputVar(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/output/iteration_000/member_005/model_config/output_active/clima_atmos/rsut_1M_average.nc"))
 
 include(joinpath(pkgdir(ClimaCoupler), "experiments/ClimaEarth/leaderboard/data_sources.jl"))
-resample(ov) = resampled_as(ov, diagnostic_var, dim_names = ["longitude", "latitude"])
+resample(ov) = resampled_as(shift_longitude(ov, -180.0, 180.0), diagnostic_var, dim_names = ["longitude", "latitude"])
 function auto_covariance(output_var)
-    lat, lon = size(output_var.data)[1:2]
-    covariance = zeros(Float32, lat, lon)
-    for i in 1:lat
-        for j in 1:lon
+    lon, lat = size(output_var.data)[1:2]
+    covariance = zeros(Float32, lon, lat)
+    for i in 1:lon
+        for j in 1:lat
             covariance[i, j] = var(output_var.data[i, j, :])
         end
     end

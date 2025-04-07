@@ -12,8 +12,7 @@ producing the leaderboard if monthly data is available, performing
 conservation checks if enabled, and closing all diagnostics file writers.
 """
 function postprocess_sim(cs, postprocessing_vars)
-    (; output_default_diagnostics, t_end, conservation_softfail) = postprocessing_vars
-    t_end = float(t_end)
+    (; conservation_softfail) = postprocessing_vars
     output_dir = cs.dirs.output
     artifact_dir = cs.dirs.artifacts
     coupler_output_dir = joinpath(output_dir, "coupler")
@@ -29,11 +28,17 @@ function postprocess_sim(cs, postprocessing_vars)
     # Plot all model states and coupler fields (useful for debugging)
     !CA.is_distributed(cs.comms_ctx) && debug(cs, artifact_dir)
 
-    # If we have monthly data, plot the leaderboard
-    if t_end > 84600 * 31 * 3 && output_default_diagnostics
-        leaderboard_base_path = artifact_dir
-        compute_leaderboard(leaderboard_base_path, atmos_output_dir)
-        compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir)
+    # If we have enough data (in time, but also enough variables), plot the leaderboard.
+    # We need pressure to compute the leaderboard.
+    pressure_in_output = "pfull" in CAN.available_vars(CAN.SimDir(atmos_output_dir))
+    if pressure_in_output
+        times = CAN.times(get(CAN.SimDir(atmos_output_dir), "pfull"))
+        t_end = times[end]
+        if t_end > 84600 * 31 * 3 # 3 months for spin up
+            leaderboard_base_path = artifact_dir
+            compute_leaderboard(leaderboard_base_path, atmos_output_dir)
+            compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir)
+        end
     end
 
     # Perform conservation checks if they exist

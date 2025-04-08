@@ -161,7 +161,7 @@ function ClimaLandSimulation(
     exp_tendency! = CL.make_exp_tendency(model)
     imp_tendency! = CL.make_imp_tendency(model)
     jacobian! = CL.make_jacobian(model)
-    set_initial_cache!(p, Y, tspan[1])
+    # set_initial_cache!(p, Y, tspan[1])
 
     # set up jacobian info
     jac_kwargs = (; jac_prototype = CL.FieldMatrixWithSolver(Y), Wfact = jacobian!)

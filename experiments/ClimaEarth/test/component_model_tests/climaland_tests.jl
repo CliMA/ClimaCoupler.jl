@@ -100,6 +100,11 @@ end
     update_boundary_fluxes! = ClimaLand.make_update_boundary_fluxes(land_sim.model)
     update_boundary_fluxes!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
 
+
+    # TODO this should be equivalent to update_aux!; update_boundary_fluxes! - test this
+    land_set_initial_cache! = CL.make_set_initial_cache(cs.model_sims.land_sim.model)
+    land_set_initial_cache!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
+
     # Compute the surface fluxes
     FluxCalculator.compute_surface_fluxes!(coupler_fluxes, land_sim, atmos_sim, boundary_space, nothing, nothing)
 
@@ -115,4 +120,6 @@ end
     @test !any(isnan, coupler_fluxes.F_turb_ρτyz)
     @test !any(isnan, coupler_fluxes.F_turb_energy)
     @test !any(isnan, coupler_fluxes.F_turb_moisture)
+
+    @test land_sim.integrator.p.drivers
 end

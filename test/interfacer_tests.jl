@@ -8,9 +8,6 @@ import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
 import ClimaCoupler: Interfacer
 
-include(joinpath("..", "experiments", "ClimaEarth", "test", "TestHelper.jl"))
-import .TestHelper
-
 # test for a simple generic surface model
 struct DummySimulation{S} <: Interfacer.SeaIceModelSimulation
     space::S
@@ -53,7 +50,7 @@ for FT in (Float32, Float64)
     end
 
     @testset "get_field indexing for FT=$FT" begin
-        space = TestHelper.create_space(FT)
+        space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
         for sim in (DummySimulation(space), DummySimulation2(space), DummySimulation3(space))
             # field
             @test Array(parent(Interfacer.get_field(sim, Val(:var))))[1] == FT(1)
@@ -89,7 +86,7 @@ for FT in (Float32, Float64)
     end
 
     @testset "update_field! the SurfaceStub area_fraction for FT=$FT" begin
-        boundary_space = TestHelper.create_space(FT)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
 
         stub = Interfacer.SurfaceStub((;
             area_fraction = zeros(boundary_space),
@@ -120,7 +117,7 @@ end
 
 @testset "undefined get_field for generic val" begin
     FT = Float32
-    space = TestHelper.create_space(FT)
+    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
     sim = DummySimulation(space)
     val = Val(:v)
     @test_throws ErrorException("undefined field `v` for " * Interfacer.name(sim)) Interfacer.get_field(sim, val)
@@ -128,7 +125,7 @@ end
 
 @testset "undefined get_field for SurfaceModelSimulation" begin
     FT = Float32
-    space = TestHelper.create_space(FT)
+    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
     sim = DummySimulation3(space)
 
     # Test that get_field gives correct warnings for unextended fields
@@ -151,7 +148,7 @@ end
 
 @testset "undefined get_field for AtmosModelSimulation" begin
     FT = Float32
-    space = TestHelper.create_space(FT)
+    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
     sim = DummySimulation4(space)
 
     # Test that get_field gives correct warnings for unextended fields
@@ -177,7 +174,7 @@ end
 
 @testset "update_field! warnings for SurfaceModelSimulation" begin
     FT = Float32
-    space = TestHelper.create_space(FT)
+    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
     dummy_field = CC.Fields.ones(space)
     sim = DummySimulation3(space)
 
@@ -205,7 +202,7 @@ end
 
 @testset "undefined update_field! warnings for AtmosModelSimulation" begin
     FT = Float32
-    space = TestHelper.create_space(FT)
+    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
     dummy_field = CC.Fields.ones(space)
     sim = DummySimulation4(space)
 

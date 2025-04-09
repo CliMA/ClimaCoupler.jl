@@ -2,14 +2,11 @@ import Test: @test, @testset
 import ClimaCore as CC
 import ClimaCoupler
 
-include(joinpath("..", "TestHelper.jl"))
-import .TestHelper
 include(joinpath("..", "..", "components", "ocean", "slab_ocean.jl"))
 
 for FT in (Float32, Float64)
     @testset "dss_state! SlabOceanSimulation for FT=$FT" begin
-        # use TestHelper to create space
-        boundary_space = TestHelper.create_space(FT)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
 
         # construct dss buffer to put in cache
         dss_buffer = CC.Spaces.create_dss_buffer(CC.Fields.zeros(boundary_space))

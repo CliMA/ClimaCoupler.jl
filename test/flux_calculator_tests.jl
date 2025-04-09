@@ -8,9 +8,6 @@ import SurfaceFluxes.Parameters.SurfaceFluxesParameters
 import SurfaceFluxes.UniversalFunctions as UF
 import ClimaCoupler: FieldExchanger, FluxCalculator, Interfacer
 
-include(joinpath("..", "experiments", "ClimaEarth", "test", "TestHelper.jl"))
-import .TestHelper
-
 # simple generic atmos model
 struct DummySimulation{S, C} <: Interfacer.AtmosModelSimulation
     state::S
@@ -125,7 +122,7 @@ end
 
 for FT in (Float32, Float64)
     @testset "combined_turbulent_fluxes! for FT=$FT" begin
-        boundary_space = TestHelper.create_space(FT)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
         coupler_fields = (; T_sfc = 310 .* ones(boundary_space))
         sim = DummySimulation(
             (; T = 300 .* ones(boundary_space)),
@@ -148,7 +145,7 @@ for FT in (Float32, Float64)
     end
 
     @testset "calculate_surface_air_density for FT=$FT" begin
-        boundary_space = TestHelper.create_space(FT)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
         coupler_fields = (; T_sfc = 310 .* ones(boundary_space))
         sim2 = DummySimulation2((; cache = (; flux = zeros(boundary_space))))
         @test_throws ErrorException FluxCalculator.calculate_surface_air_density(sim2, coupler_fields.T_sfc)
@@ -157,7 +154,7 @@ for FT in (Float32, Float64)
     @testset "calculate correct fluxes: dry for FT=$FT" begin
         surface_scheme_list = (FluxCalculator.MoninObukhovScheme(), FluxCalculator.BulkScheme())
         for scheme in surface_scheme_list
-            boundary_space = TestHelper.create_space(FT)
+            boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
 
             params = (; surface_scheme = scheme, FT = FT)
 
@@ -278,7 +275,7 @@ for FT in (Float32, Float64)
     end
 
     @testset "surface_thermo_state for FT=$FT" begin
-        boundary_space = TestHelper.create_space(FT)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
         _ones = CC.Fields.ones(boundary_space)
         surface_sim =
             DummySurfaceSimulation3([], (; T = _ones .* FT(300), ρ = _ones .* FT(1.2), p = (; q = _ones .* FT(0.01))))
@@ -289,7 +286,7 @@ for FT in (Float32, Float64)
     end
 
     @testset "water_albedo_from_atmosphere!" begin
-        boundary_space = TestHelper.create_space(FT)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
         ocean_sim = Interfacer.SurfaceStub((; α_direct = zeros(boundary_space), α_diffuse = zeros(boundary_space)))
         atmos_sim = TestAtmos(1, 2, 3)
         coupler_fields = (; temp1 = ones(boundary_space), temp2 = ones(boundary_space))

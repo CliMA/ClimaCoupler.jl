@@ -2,14 +2,11 @@ import Test: @test, @testset
 import ClimaCore as CC
 import ClimaCoupler
 
-include(joinpath("..", "TestHelper.jl"))
-import .TestHelper
 include(joinpath("..", "..", "components", "atmosphere", "climaatmos.jl"))
 
 for FT in (Float32, Float64)
     @testset "dss_state! ClimaAtmosSimulation for FT=$FT" begin
-        # use TestHelper to create space
-        boundary_space = TestHelper.create_space(FT)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
 
         # set up objects for test
         integrator = (;

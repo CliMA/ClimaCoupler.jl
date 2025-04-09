@@ -5,8 +5,6 @@ import Thermodynamics.Parameters as TDP
 import ClimaParams # required for TDP
 import ClimaCoupler
 
-include(joinpath("..", "TestHelper.jl"))
-import .TestHelper
 include(joinpath("..", "..", "components", "ocean", "prescr_ocean.jl"))
 
 FT = Float32
@@ -17,7 +15,7 @@ FT = Float32
 end
 
 @testset "PrescribedOceanSimulation constructor" begin
-    space = TestHelper.create_space(FT)
+    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
     start_date = Dates.DateTime(2000, 1, 1)
     t_start = 0.0
     area_fraction = CC.Fields.ones(space)

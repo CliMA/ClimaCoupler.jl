@@ -8,8 +8,7 @@ import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
 exp_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth")
-include(joinpath(exp_dir, "test", "TestHelper.jl"))
-import .TestHelper
+
 include(joinpath(exp_dir, "components", "land", "climaland_integrated.jl"))
 include(joinpath(exp_dir, "components", "atmosphere", "climaatmos.jl"))
 
@@ -20,7 +19,7 @@ FT = Float32
     tspan = (Float64(0), 3.0dt)
     start_date = Dates.DateTime(2008)
     output_dir = pwd()
-    boundary_space = TestHelper.create_space(FT)
+    boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
     area_fraction = CC.Fields.ones(boundary_space)
 
     # Construct simulation object

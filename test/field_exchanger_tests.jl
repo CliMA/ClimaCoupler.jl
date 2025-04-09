@@ -2,9 +2,6 @@ import Test: @test, @testset
 import ClimaCore as CC
 import ClimaCoupler: Interfacer, FieldExchanger, FluxCalculator
 
-include(joinpath("..", "experiments", "ClimaEarth", "test", "TestHelper.jl"))
-import .TestHelper
-
 # test for a simple generic atmos model
 struct DummySimulation{C} <: Interfacer.AtmosModelSimulation
     cache::C
@@ -122,7 +119,7 @@ Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:snow_precipitati
 
 for FT in (Float32, Float64)
     @testset "test dummmy_remap!" begin
-        test_space = TestHelper.create_space(FT)
+        test_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
         test_field_ones = CC.Fields.ones(test_space)
         target_field = CC.Fields.zeros(test_space)
 
@@ -131,7 +128,7 @@ for FT in (Float32, Float64)
     end
 
     @testset "test update_surface_fractions!" begin
-        test_space = TestHelper.create_space(FT)
+        test_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
         # Construct land fraction of 0s in top half, 1s in bottom half
         land_fraction = CC.Fields.ones(test_space)
         dims = size(parent(land_fraction))
@@ -177,7 +174,7 @@ for FT in (Float32, Float64)
     end
 
     @testset "test combine_surfaces" begin
-        test_space = TestHelper.create_space(FT)
+        test_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
         combined_field = CC.Fields.ones(test_space)
 
         var_name = Val(:random)
@@ -206,7 +203,7 @@ for FT in (Float32, Float64)
     end
 
     @testset "import_atmos_fields! for FT=$FT" begin
-        boundary_space = TestHelper.create_space(FT)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
         coupler_names = (:F_turb_energy, :F_turb_moisture, :F_radiative, :P_liq, :P_snow, :ρ_sfc, :T_sfc)
         component_names = (
             :turbulent_energy_flux,
@@ -237,7 +234,7 @@ for FT in (Float32, Float64)
 
     @testset "import_combined_surface_fields! for FT=$FT" begin
         # coupler cache setup
-        boundary_space = TestHelper.create_space(FT)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
         coupler_names =
             (:T_sfc, :z0m_sfc, :z0b_sfc, :surface_direct_albedo, :surface_diffuse_albedo, :beta, :q_sfc, :temp1)
 
@@ -272,7 +269,7 @@ for FT in (Float32, Float64)
 
     @testset "update_model_sims! for FT=$FT" begin
         # coupler cache setup
-        boundary_space = TestHelper.create_space(FT)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
         coupler_field_names = (
             :ρ_sfc,
             :T_sfc,

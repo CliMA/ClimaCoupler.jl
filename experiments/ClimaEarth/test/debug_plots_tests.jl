@@ -5,9 +5,6 @@ import ClimaCoupler: Interfacer
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
-include("TestHelper.jl")
-import .TestHelper
-
 # Prevent GKS headless operation mode warning
 ENV["GKSwstype"] = "nul"
 FT = Float64
@@ -34,7 +31,7 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
 
 @testset "import_atmos_fields!" begin
 
-    boundary_space = TestHelper.create_space(FT)
+    boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
     coupler_names = [
         :surface_direct_albedo,
         :surface_diffuse_albedo,

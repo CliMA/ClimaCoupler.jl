@@ -6,8 +6,6 @@ import ClimaParams # required for TDP
 import ClimaCoupler
 import ClimaCoupler: Interfacer
 
-include(joinpath("..", "TestHelper.jl"))
-import .TestHelper
 include(joinpath("..", "..", "components", "ocean", "eisenman_seaice.jl"))
 
 for FT in (Float32, Float64)
@@ -18,7 +16,7 @@ for FT in (Float32, Float64)
     Δt = Float64(1e6)
 
     # create a boundary space
-    boundary_space = TestHelper.create_space(FT)
+    boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
 
     # thermodynamic parameter set
     thermo_params = TDP.ThermodynamicsParameters(FT)

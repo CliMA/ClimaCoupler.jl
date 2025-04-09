@@ -7,9 +7,6 @@ import ClimaComms
 import ClimaCore as CC
 import ClimaCoupler: ConservationChecker, Interfacer
 
-include(joinpath("..", "experiments", "ClimaEarth", "test", "TestHelper.jl"))
-import .TestHelper
-
 REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regrid_tmp/")
 
 get_slab_energy(slab_sim, T_sfc) =
@@ -41,7 +38,7 @@ Interfacer.get_field(s::TestLand, ::Val{:area_fraction}) = ones(s.i.space) .* CC
 
 for FT in (Float32, Float64)
     @testset "test check_conservation for conservation for FT=$FT" begin
-        space = TestHelper.create_space(FT)
+        space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
 
         # set up model simulations
         atmos = TestAtmos((; space = space))
@@ -121,7 +118,7 @@ for FT in (Float32, Float64)
     end
 
     @testset "test plot_global_conservation with dummy models for FT=$FT" begin
-        space = TestHelper.create_space(FT)
+        space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
 
         # set up model simulations
         atmos = TestAtmos((; space = space))

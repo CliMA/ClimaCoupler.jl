@@ -4,9 +4,6 @@ import ClimaComms
 import ClimaCore as CC
 import ClimaCoupler: Checkpointer, Interfacer
 
-include(joinpath("..", "experiments", "ClimaEarth", "test", "TestHelper.jl"))
-import .TestHelper
-
 FT = Float64
 
 struct DummySimulation{S} <: Interfacer.AtmosModelSimulation
@@ -15,7 +12,7 @@ end
 Checkpointer.get_model_prog_state(sim::DummySimulation) = sim.state
 
 @testset "get_model_prog_state" begin
-    boundary_space = TestHelper.create_space(FT)
+    boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
     sim = DummySimulation((; T = ones(boundary_space)))
     @test Checkpointer.get_model_prog_state(sim) == sim.state
 
@@ -25,7 +22,7 @@ end
 
 @testset "checkpoint_model_state, restart_model_state!" begin
     comms_ctx = ClimaComms.context(ClimaComms.CPUSingleThreaded())
-    boundary_space = TestHelper.create_space(FT; comms_ctx = comms_ctx)
+    boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; comms_ctx, radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
     t = 1
     # old sim run
     sim = DummySimulation(CC.Fields.FieldVector(T = ones(boundary_space)))

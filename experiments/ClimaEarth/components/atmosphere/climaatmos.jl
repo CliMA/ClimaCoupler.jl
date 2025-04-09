@@ -100,7 +100,7 @@ end
 # so the initial callback initialization doesn't lead to NaNs in the radiation model.
 # Subsequently, the surface albedo will be updated by the coupler, via water_albedo_from_atmosphere!.
 function CA.set_surface_albedo!(Y, p, t, ::CA.CouplerAlbedo)
-    if t == 0
+    if float(t) == 0
         FT = eltype(Y)
         # set initial insolation initial conditions
         !(p.atmos.insolation isa CA.IdealizedInsolation) && CA.set_insolation_variables!(Y, p, t, p.atmos.insolation)

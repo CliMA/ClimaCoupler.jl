@@ -129,14 +129,14 @@ for FT in (Float32, Float64)
         ∂F_atm∂T_sfc = 0
 
         F_conductive = @. params_ice.k_ice / (Y.h_ice) * (params_ice.T_base - T_sfc_0)
-        ΔT_sfc = @. (-F_atm + F_conductive) / (params_ice.k_ice / (Y.h_ice) + ∂F_atm∂T_sfc)
+        δT_sfc = @. (-F_atm + F_conductive) / (params_ice.k_ice / (Y.h_ice) + ∂F_atm∂T_sfc)
 
         @test all(parent(Ya.e_base) .≈ 0) # no contribution from basal fluxes
         @test all(parent(Y.T_ml) .≈ params_ice.T_base) # ocean temperature stays at freezing point
         h_ice_new = @. h_ice_0 + F_atm * FT(Δt) / params_ice.L_ice
         @test all(parent(Y.h_ice) .≈ parent(h_ice_new)) # ice growth
         @test all(parent(Y.T_sfc) .≈ params_ice.T_base) # ice surface temperature doesn't exceed freezing
-        @test all(parent(Y.T_sfc) .< parent(T_sfc_0 .+ ΔT_sfc))
+        @test all(parent(Y.T_sfc) .< parent(T_sfc_0 .+ δT_sfc))
     end
 
     @testset "Transition to ice free due to incoming > outgoing for FT=$FT" begin

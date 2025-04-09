@@ -87,7 +87,7 @@ Plot the fields of a coupled simulation and save plots to a directory.
 """
 function debug(cs::Interfacer.CoupledSimulation, dir = "debug", cs_fields_ref = nothing)
     isdir(dir) || mkpath(dir)
-    @info "plotting debug in " * dir
+    @info "plotting debug in $dir"
     for sim in cs.model_sims
         debug(sim, dir)
     end
@@ -113,9 +113,17 @@ function debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing)
             field = getproperty(cs_fields, field_name)
 
             # Copy field onto cpu space if necessary
-            cpu_field = to_cpu(field)
-            field_min, field_max = extrema(cpu_field)
-            colorrange = isapprox(field_min, field_max) ? (field_min - 1, field_max + 1) : (field_min, field_max)
+            cpu_field = CC.to_cpu(field)
+
+            # ClimaCoreMakie doesn't support NaNs/Infs, so we substitute them with 100max
+            FT = CC.Spaces.undertype(axes(cpu_field))
+            isinvalid = (x) -> isnan(x) || isinf(x)
+
+            field_valid_min, field_valid_max = extrema(map(x -> isinvalid(x) ? FT(0) : x, parent(cpu_field)))
+            map!(x -> isinvalid(x) ? 100field_valid_max : x, parent(cpu_field), parent(cpu_field))
+            colorrange =
+                isapprox(field_valid_min, field_valid_max) ? (field_valid_min - 1, field_valid_max + 1) :
+                (field_valid_min, field_valid_max)
             ax = Makie.Axis(fig[i, j * 2 - 1], title = string(field_name) * print_extrema(field))
             hm = ClimaCoreMakie.fieldheatmap!(ax, cpu_field, colorrange = colorrange)
             Makie.Colorbar(fig[i, j * 2], hm)
@@ -131,9 +139,19 @@ function debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing)
                 field_name = field_names[field_index]
                 field = getproperty(cs_fields, field_name)
                 # Copy field onto cpu space if necessary
-                cpu_field = to_cpu(field)
-                field_min, field_max = extrema(cpu_field)
-                colorrange = isapprox(field_min, field_max) ? (field_min - 1, field_max + 1) : (field_min, field_max)
+
+                cpu_field = CC.to_cpu(field)
+
+                # ClimaCoreMakie doesn't support NaNs/Infs, so we substitute them with 100max
+                FT = CC.Spaces.undertype(axes(cpu_field))
+                isinvalid = (x) -> isnan(x) || isinf(x)
+
+                field_valid_min, field_valid_max = extrema(map(x -> isinvalid(x) ? FT(0) : x, parent(cpu_field)))
+                map!(x -> isinvalid(x) ? 100field_valid_max : x, parent(cpu_field), parent(cpu_field))
+                colorrange =
+                    isapprox(field_valid_min, field_valid_max) ? (field_valid_min - 1, field_valid_max + 1) :
+                    (field_valid_min, field_valid_max)
+
                 ax = Makie.Axis(fig[i, j * 2 - 1], title = string(field_name) * print_extrema(field))
                 hm = ClimaCoreMakie.fieldheatmap!(
                     ax,
@@ -161,17 +179,26 @@ function debug(sim::Interfacer.ComponentModelSimulation, dir)
         if field_index <= length(field_names)
             field_name = field_names[field_index]
             field = Interfacer.get_field(sim, Val(field_name))
-            # # Copy field onto cpu space if necessary
-            cpu_field = to_cpu(field)
-            if cpu_field isa CC.Fields.ExtrudedCubedSphereSpectralElementField3D
-                cpu_field = CC.Fields.level(cpu_field, 1)
-            end
             ax = Makie.Axis(fig[i, j * 2 - 1], title = string(field_name) * print_extrema(field))
-            if cpu_field isa Vector
-                lin = Makie.lines!(ax, cpu_field)
+            if field isa AbstractArray
+                lin = Makie.lines!(ax, Array(field))
             else
-                field_min, field_max = extrema(cpu_field)
-                colorrange = isapprox(field_min, field_max) ? (field_min - 1, field_max + 1) : (field_min, field_max)
+                # Copy field onto cpu space if necessary
+                cpu_field = CC.to_cpu(field)
+                if cpu_field isa CC.Fields.ExtrudedCubedSphereSpectralElementField3D
+                    cpu_field = CC.Fields.level(cpu_field, 1)
+                end
+                FT = CC.Spaces.undertype(axes(cpu_field))
+                vals = CC.Fields.field_values(cpu_field)
+                isinvalid = (x) -> isnan(x) || isinf(x)
+                # ClimaCoreMakie doesn't support NaNs or Infs, so we make them
+                # stand out by replacing them with 100max
+
+                field_valid_min, field_valid_max = extrema(map(x -> isinvalid(x) ? FT(0) : x, parent(cpu_field)))
+                map!(x -> isinvalid(x) ? 100field_max : x, parent(cpu_field), parent(cpu_field))
+                colorrange =
+                    isapprox(field_valid_min, field_valid_max) ? (field_valid_min - 1, field_valid_max + 1) :
+                    (field_valid_min, field_valid_max)
                 hm = ClimaCoreMakie.fieldheatmap!(ax, cpu_field, colorrange = colorrange)
                 Makie.Colorbar(fig[i, j * 2], hm)
             end
@@ -215,94 +242,3 @@ Interfacer.get_field(sim::BucketSimulation, ::Val{:W}) = sim.integrator.u.bucket
 plot_field_names(sim::Interfacer.SurfaceModelSimulation) = (:area_fraction, :surface_temperature, :surface_humidity)
 plot_field_names(sim::BucketSimulation) = (:area_fraction, :surface_temperature, :surface_humidity, :σS, :Ws, :W)
 plot_field_names(sim::ClimaAtmosSimulation) = (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)
-
-
-### Helper functions for plotting GPU fields
-"""
-    get_ne(grid)
-
-Return the number of horizontal elements in a grid.
-"""
-function get_ne(grid::CC.Grids.SpectralElementGrid2D)
-    return grid.topology.mesh.ne
-end
-function get_ne(grid::CC.Grids.LevelGrid)
-    return get_ne(grid.full_grid.horizontal_grid)
-end
-function get_ne(grid::CC.Grids.ExtrudedFiniteDifferenceGrid)
-    return get_ne(grid.horizontal_grid)
-end
-
-"""
-    get_R(grid)
-
-Return the radius of a grid.
-"""
-function get_R(grid)
-    return CC.Grids.global_geometry(grid).radius
-end
-
-"""
-    get_height(grid)
-
-Return the height of a grid if it is 3D, or nothing otherwise.
-"""
-function get_height(grid::CC.Grids.ExtrudedFiniteDifferenceGrid)
-    return grid.vertical_grid.topology.mesh.domain.coord_max.z
-end
-function get_height(grid)
-    return nothing # 2d case
-end
-
-"""
-    to_cpu(field::CC.Fields.Field)
-
-For a CPU field, return the field unchanged.
-For a GPU field, copy the field and its underlying space onto the CPU.
-
-Note that this function allocates a new space and field,
-and should only be used for debugging and testing.
-"""
-function to_cpu(field::CC.Fields.Field)
-    if parent(field) isa Array
-        return field
-    else
-        # Copy field onto cpu space
-        space = axes(field)
-        FT = CC.Spaces.undertype(space)
-        R = get_R(space.grid)
-        ne = get_ne(space.grid)
-        polynomial_degree = CC.Quadratures.polynomial_degree(CC.Spaces.quadrature_style(space.grid))
-        nz = CC.Spaces.nlevels(space)
-        height = get_height(space.grid)
-
-        cpu_comms_ctx = ClimaComms.SingletonCommsContext(ClimaComms.CPUSingleThreaded())
-        domain = CC.Domains.SphereDomain(R)
-        mesh = CC.Meshes.EquiangularCubedSphere(domain, ne)
-        topology = CC.Topologies.Topology2D(cpu_comms_ctx, mesh, CC.Topologies.spacefillingcurve(mesh))
-
-        Nq = polynomial_degree + 1
-        quad = CC.Spaces.Quadratures.GLL{Nq}()
-        sphere_space = CC.Spaces.SpectralElementSpace2D(topology, quad)
-        if nz > 1
-            vertdomain = CC.Domains.IntervalDomain(
-                CC.Geometry.ZPoint{FT}(0),
-                CC.Geometry.ZPoint{FT}(height);
-                boundary_names = (:bottom, :top),
-            )
-            vertmesh = CC.Meshes.IntervalMesh(vertdomain, nelems = nz)
-            vert_topology = CC.Topologies.IntervalTopology(cpu_comms_ctx, vertmesh)
-            vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(vert_topology)
-
-            cpu_space = CC.Spaces.ExtrudedFiniteDifferenceSpace(sphere_space, vert_center_space)
-        else
-            cpu_space = sphere_space
-        end
-        cpu_field = CC.Fields.ones(cpu_space)
-
-        parent(cpu_field) .= Array(parent(field))
-        return cpu_field
-    end
-end
-
-to_cpu(arr::AbstractArray) = Array(arr)

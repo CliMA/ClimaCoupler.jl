@@ -1,36 +1,58 @@
 # FluxCalculator
 
-This modules contains abstract types and functions to calculate surface fluxes in the coupler, or to call flux calculating functions from the component models.
+This module contains the infrastructure to compute turbulent fluxes.
 
-Fluxes over a heterogeneous surface (e.g., from a gridpoint where atmospheric cell is overlying both land and ocean) can be handled in two different ways:
-1. **Combined fluxes** (called with `CombinedStateFluxesMOST()`)
-  - these are calculated by averaging the surface properties for each gridpoint (e.g., land and ocean temperatures, albedos and roughness lengths are averaged, based on their respective area fractions), so the flux is calculated only once per gridpoint of the grid where we calculate fluxes. This is computationally faster, but it makes the fluxes on surface boundaries more diffuse. Currently, we use this method for calculating radiative fluxes in the atmosphere, and turbulent fluxes in the coupler (on the atmospheric grid). The fluxes are calculated in the atmospheric (host) model's cache, which can be setup to avoid allocating coupler fields.
-2. **Partitioned fluxes** (called with `PartitionedStateFluxes()`)
-  - these are calculated separately for each surface type. It is then the fluxes (rather than the surface states) that are combined and passed to the atmospheric model as a boundary condition. This method ensures that each surface model receives fluxes that correspond to its state properties, resulting in a more accurate model evolution. However, it is more computationally expensive, and requires more communication between the component models.
+## How are fluxes computed?
+
+The key function that computes surface fluxes is
+[`FluxCalculator.partitioned_turbulent_fluxes!`](@ref). This function computes
+turbulent fluxes and ancillary quantities, such as the Obukhov length, using
+[SurfaceFluxes.jl](https://github.com/CliMA/SurfaceFluxes.jl). Generally, this
+function is called at the end of each coupling step.
+
+All the quantities computed in `partitioned_turbulent_fluxes!` are calculated
+separately for each surface type using the
+[`FluxCalculator.compute_surface_fluxes!`](@ref) function. This function can be
+extended by component models if they need specific type of flux calculation, and
+a default is provided for models that can use the standard flux calculation.
+The final result of `partitioned_turbulent_fluxes!` is an area-weighted sum of
+all the contributions of the various surfaces.
+
+The default method of [`FluxCalculator.compute_surface_fluxes!`](@ref), in turn,
+calls [`FluxCalculator.get_surface_fluxes!`](@ref). This function uses a thermal
+state obtained by using the model surface temperature, extrapolates atmospheric
+density adiabatically to the surface, and with the surface humidity (if
+available, if not, assuming a saturation specific humidity for liquid phase).
+`compute_surface_fluxes!` also updates the component internal fluxes fields with
+[`FluxCalculator.update_turbulent_fluxes!`](@ref), and adds the area-weighted
+contribution from this component model to the `CoupledSimulation` fluxes fields.
+Any extension of this function for a particular surface model is also expected
+to update both the component models' internal fluxes and the CoupledSimulation
+object's fluxes fields.
+
+[`FluxCalculator.compute_surface_fluxes!`](@ref) sets:
+- the flux of momenta, `F_turb_ρτxz`, `F_turb_ρτyz`;
+- the flux of energy, `F_turb_energy`;
+- the flux of moisture, `F_turb_moisture`;
+- the Obukhov length, `L_MO`;
+- the buoyancy flux, `buoyancy_flux`;
+- the roughness lengths for momentum and buoyancy, `z0m` and `z0b`;
+- the evaporation scaling factor, `beta`,
+- the frictional velocity `ustar`.
+
+!!! note
+
+    [`FluxCalculator.compute_surface_fluxes!`](@ref) always returns the area weighted sum, even if this is not necessarily the most meaningful operation for a given quantity (e.g., for the Obukhov length). This can be improved in the future, if you know how, please open an issue.
+
+Note also that [`FluxCalculator.partitioned_turbulent_fluxes!`](@ref) only
+computes turbulent fluxes, not radiative fluxes. Currently, these are computed
+within the atmospheric model.
 
 ## FluxCalculator API
 
 ```@docs
-    ClimaCoupler.FluxCalculator.TurbulentFluxPartition
-    ClimaCoupler.FluxCalculator.PartitionedStateFluxes
-    ClimaCoupler.FluxCalculator.CombinedStateFluxesMOST
-    ClimaCoupler.FluxCalculator.combined_turbulent_fluxes!
-    ClimaCoupler.FluxCalculator.atmos_turbulent_fluxes_bulk!
-    ClimaCoupler.FluxCalculator.atmos_turbulent_fluxes_most!
-    ClimaCoupler.FluxCalculator.surface_inputs
-    ClimaCoupler.FluxCalculator.calculate_surface_air_density
-    ClimaCoupler.FluxCalculator.get_surface_params
     ClimaCoupler.FluxCalculator.partitioned_turbulent_fluxes!
-    ClimaCoupler.FluxCalculator.differentiate_turbulent_fluxes!
+    ClimaCoupler.FluxCalculator.compute_surface_fluxes!
     ClimaCoupler.FluxCalculator.get_surface_fluxes!
     ClimaCoupler.FluxCalculator.update_turbulent_fluxes!
-    ClimaCoupler.FluxCalculator.extrapolate_ρ_to_sfc
-    ClimaCoupler.FluxCalculator.surface_thermo_state
-    ClimaCoupler.FluxCalculator.water_albedo_from_atmosphere!
-```
-
-## FieldExchanger Internal Functions
-
-```@docs
-    ClimaCoupler.FluxCalculator.get_scheme_properties
 ```

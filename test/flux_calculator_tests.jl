@@ -141,7 +141,6 @@ for FT in (Float32, Float64)
         sim2 = DummySimulation2((; cache = (; flux = zeros(boundary_space))))
         model_sims = (; atmos_sim = sim2)
         @test_throws ErrorException FluxCalculator.atmos_turbulent_fluxes_most!(sim2, coupler_fields)
-
     end
 
     @testset "calculate_surface_air_density for FT=$FT" begin
@@ -152,106 +151,87 @@ for FT in (Float32, Float64)
     end
 
     @testset "calculate correct fluxes: dry for FT=$FT" begin
-        surface_scheme_list = (FluxCalculator.MoninObukhovScheme(), FluxCalculator.BulkScheme())
-        for scheme in surface_scheme_list
-            boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+        scheme = FluxCalculator.MoninObukhovScheme()
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
 
-            params = (; surface_scheme = scheme, FT = FT)
+        params = (; surface_scheme = scheme, FT = FT)
 
-            # atmos
-            p = (;
-                energy_bc = zeros(boundary_space),
-                ρq_tot_bc = zeros(boundary_space),
-                uₕ_bc = ones(boundary_space),
-                z = ones(boundary_space),
-                z_sfc = zeros(boundary_space),
-                u = ones(boundary_space),
-                v = ones(boundary_space),
-            )
-            Y_init =
-                (; ρ = ones(boundary_space) .* FT(1.2), T = ones(boundary_space) .* FT(310), q = zeros(boundary_space))
-            integrator = (; Y_init..., p = p)
-            atmos_sim = TestAtmos(params, nothing, integrator)
+        # atmos
+        p = (;
+            energy_bc = zeros(boundary_space),
+            ρq_tot_bc = zeros(boundary_space),
+            uₕ_bc = ones(boundary_space),
+            z = ones(boundary_space),
+            z_sfc = zeros(boundary_space),
+            u = ones(boundary_space),
+            v = ones(boundary_space),
+        )
+        Y_init = (; ρ = ones(boundary_space) .* FT(1.2), T = ones(boundary_space) .* FT(310), q = zeros(boundary_space))
+        integrator = (; Y_init..., p = p)
+        atmos_sim = TestAtmos(params, nothing, integrator)
 
-            # ocean
-            p = (;
-                F_aero = zeros(boundary_space),
-                z0m = FT(0.01),
-                z0b = FT(0.01),
-                beta = ones(boundary_space),
-                α = ones(boundary_space) .* FT(0.5),
-                q = zeros(boundary_space),
-                Cd = FT(0.01),
-                Ch = FT(0.01),
-                area_fraction = ones(boundary_space) .* FT(0.5),
-            )
-            Y_init = (; T = ones(boundary_space) .* FT(300))
-            integrator = (; Y_init..., p = p)
-            ocean_sim = TestOcean(nothing, integrator)
+        # ocean
+        p = (;
+            F_aero = zeros(boundary_space),
+            z0m = FT(0.01),
+            z0b = FT(0.01),
+            beta = ones(boundary_space),
+            α = ones(boundary_space) .* FT(0.5),
+            q = zeros(boundary_space),
+            Cd = FT(0.01),
+            Ch = FT(0.01),
+            area_fraction = ones(boundary_space) .* FT(0.5),
+        )
+        Y_init = (; T = ones(boundary_space) .* FT(300))
+        integrator = (; Y_init..., p = p)
+        ocean_sim = TestOcean(nothing, integrator)
 
-            # ocean
-            ocean_sim2 = TestOcean(nothing, integrator)
+        # ocean
+        ocean_sim2 = TestOcean(nothing, integrator)
 
-            model_sims = (; atmos_sim, ocean_sim, ocean_sim2)
+        model_sims = (; atmos_sim, ocean_sim, ocean_sim2)
 
-            coupler_cache_names = [
-                :T_sfc,
-                :surface_direct_albedo,
-                :surface_diffuse_albedo,
-                :F_R_sfc,
-                :F_R_toa,
-                :P_liq,
-                :P_snow,
-                :P_net,
-                :F_turb_energy,
-                :F_turb_ρτxz,
-                :F_turb_ρτyz,
-                :F_turb_moisture,
-            ]
-            fields = Interfacer.init_coupler_fields(FT, coupler_cache_names, boundary_space)
+        coupler_cache_names = [
+            :T_sfc,
+            :surface_direct_albedo,
+            :surface_diffuse_albedo,
+            :P_liq,
+            :P_snow,
+            :P_net,
+            :F_turb_energy,
+            :F_turb_ρτxz,
+            :F_turb_ρτyz,
+            :F_turb_moisture,
+            :z0m_sfc,
+            :z0b_sfc,
+            :beta,
+            :q_sfc,
+            :L_MO,
+            :ustar,
+            :buoyancy_flux,
+        ]
+        fields = Interfacer.init_coupler_fields(FT, coupler_cache_names, boundary_space)
 
-            # calculate turbulent fluxes
-            thermo_params = get_thermo_params(atmos_sim)
-            FluxCalculator.partitioned_turbulent_fluxes!(model_sims, fields, boundary_space, scheme, thermo_params)
+        # calculate turbulent fluxes
+        thermo_params = get_thermo_params(atmos_sim)
+        FluxCalculator.partitioned_turbulent_fluxes!(model_sims, fields, boundary_space, scheme, thermo_params)
 
-            # calculating the fluxes twice ensures that no accumulation occurred (i.e. fluxes are reset to zero each time)
-            # TODO: this will need to be extended once flux accumulation is re-enabled
-            FluxCalculator.partitioned_turbulent_fluxes!(model_sims, fields, boundary_space, scheme, thermo_params)
+        # calculating the fluxes twice ensures that no accumulation occurred (i.e. fluxes are reset to zero each time)
+        # TODO: this will need to be extended once flux accumulation is re-enabled
+        FluxCalculator.partitioned_turbulent_fluxes!(model_sims, fields, boundary_space, scheme, thermo_params)
 
-            windspeed = @. hypot(atmos_sim.integrator.p.u, atmos_sim.integrator.p.v)
+        windspeed = @. hypot(atmos_sim.integrator.p.u, atmos_sim.integrator.p.v)
 
-            thermo_params = get_thermo_params(atmos_sim)
-            thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
+        thermo_params = get_thermo_params(atmos_sim)
+        thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
 
-            surface_thermo_states = similar(thermo_state_int)
-            surface_thermo_states .= FluxCalculator.surface_thermo_state(ocean_sim, thermo_params, thermo_state_int)
+        surface_thermo_states = similar(thermo_state_int)
+        surface_thermo_states .= FluxCalculator.surface_thermo_state(ocean_sim, thermo_params, thermo_state_int)
 
-            # analytical solution is possible for the BulkScheme() case
-            if scheme isa FluxCalculator.BulkScheme
-                ρ_sfc = TD.air_density.(thermo_params, thermo_state_int)
-                cpm = TD.cv_m.(thermo_params, thermo_state_int) .+ TD.gas_constant_air.(thermo_params, thermo_state_int) # cp = R + cv
-                gz =
-                    (
-                        Interfacer.get_field(atmos_sim, Val(:height_int)) .-
-                        Interfacer.get_field(atmos_sim, Val(:height_sfc))
-                    ) .* FT(9.81)
-                shf_analytical = @. (cpm * (ocean_sim.integrator.T - atmos_sim.integrator.T) - gz) *
-                   ocean_sim.integrator.p.Ch *
-                   ρ_sfc *
-                   windspeed #-ρ_sfc * Ch * windspeed(sc) * (cp_m * ΔT + ΔΦ)
-
-                # check the coupler field update
-                @test isapprox(Array(parent(shf_analytical)), Array(parent(fields.F_turb_energy)), rtol = 1e-6)
-
-                # test the surface field update
-                @test Array(parent(fields.F_turb_energy)) == Array(parent(ocean_sim.integrator.p.F_aero))
-
-                # test the atmos field update
-                FieldExchanger.update_sim!(atmos_sim, fields, nothing)
-                @test Array(parent(fields.F_turb_energy)) == -Array(parent(atmos_sim.integrator.p.energy_bc))
-
-            end
-            @test Array(parent(fields.F_turb_moisture))[1] ≈ FT(0)
+        # NOTE: This test is very weak! We should add more stringent tests
+        @test Array(parent(fields.F_turb_moisture))[1] ≈ FT(0)
+        for p in coupler_cache_names
+            @test !any(isnan, getproperty(fields, p))
         end
     end
 

@@ -64,10 +64,10 @@ These quantities are used to track conservation, and the defaults
 return `nothing`. To check conservation throughout a simulation, these
 functions must be extended for all models being run.
 
-| Coupler name      | Description | Units | Default value |
-|-------------------|-------------|-------|---------------|
-| `energy` | vertically integrated energy per surface area  | J m⁻² | `nothing` |
-| `water` | vertically integrated water per surface area | kg m⁻² | `nothing` |
+| Coupler name | Description                                   | Units  | Default value |
+|--------------+-----------------------------------------------+--------+---------------|
+| `energy`     | vertically integrated energy per surface area | J m⁻²  | `nothing`     |
+| `water`      | vertically integrated water per surface area  | kg m⁻² | `nothing`     |
 
 - `add_coupler_fields!(coupler_field_names, ::ComponentModelSimulation)`:
 A set of default coupler exchange fields is initialized for each coupled simulation,
@@ -82,20 +82,21 @@ method for this component model to pass the value from the coupler to the compon
 
 The default coupler exchange fields are the following, defined in
 `default_coupler_fields()` in the Interfacer module:
-| Coupler name      | Description | Units |
-|-------------------|-------------|-------|
-| `z0m_sfc` | momentum roughness length | m |
-| `z0b_sfc` | buoyancy roughness length | m |
-| `beta` | factor to scale evaporation from the surface | - |
-| `emissivity` | surface emissivity | - |
-| `F_turb_energy` | turbulent energy flux | W m⁻²  |
-| `F_turb_moisture` | turbulent moisture flux | kg m⁻² s⁻¹ |
-| `F_turb_ρτxz` | turbulent momentum flux in the zonal direction | kg m⁻¹ s⁻² |
-| `F_turb_ρτyz` | turbulent momentum flux in the meridional direction | kg m⁻¹ s⁻² |
-| `P_liq` | liquid precipitation | kg m⁻² s⁻¹ |
-| `P_snow` | snow precipitation | kg m⁻² s⁻¹ |
-| `temp1` | a surface field used for intermediate calculations | - |
-| `temp2` | a surface field used for intermediate calculations | - |
+
+| Coupler name      | Description                                         | Units      |
+|-------------------+-----------------------------------------------------+------------|
+| `z0m_sfc`         | momentum roughness length                           | m          |
+| `z0b_sfc`         | buoyancy roughness length                           | m          |
+| `beta`            | factor to scale evaporation from the surface        | -          |
+| `emissivity`      | surface emissivity                                  | -          |
+| `F_turb_energy`   | turbulent energy flux                               | W m⁻²      |
+| `F_turb_moisture` | turbulent moisture flux                             | kg m⁻² s⁻¹ |
+| `F_turb_ρτxz`     | turbulent momentum flux in the zonal direction      | kg m⁻¹ s⁻² |
+| `F_turb_ρτyz`     | turbulent momentum flux in the meridional direction | kg m⁻¹ s⁻² |
+| `P_liq`           | liquid precipitation                                | kg m⁻² s⁻¹ |
+| `P_snow`          | snow precipitation                                  | kg m⁻² s⁻¹ |
+| `temp1`           | a surface field used for intermediate calculations  | -          |
+| `temp2`           | a surface field used for intermediate calculations  | -          |
 
 - `update_sim!(::ComponentModelSimulation, csf, turbulent_fluxes)`: A
 function to update each of the fields of the component model simulation
@@ -114,19 +115,19 @@ function returns the value of the field property for the simulation
 in its current state. For an `AtmosModelSimulation`, it must be extended
 for the following properties:
 
-| Coupler name      | Description | Units |
-|-------------------|-------------|-------|
-| `air_density`       | air density of the atmosphere | kg m⁻³ |
-| `height_int`        | height at the first internal model level | m |
-| `height_sfc`        | height at the surface (only required when using `PartitionedStateFluxes`) | m |
-| `liquid_precipitation` | liquid precipitation at the surface | kg m⁻² s⁻¹ |
-| `radiative_energy_flux_sfc` | net radiative flux at the surface | W m⁻² |
-| `radiative_energy_flux_toa` | net radiative flux at the top of the atmosphere | W m⁻² |
-| `snow_precipitation` | snow precipitation at the surface | kg m⁻² s⁻¹ |
-| `turbulent_energy_flux` | aerodynamic turbulent surface fluxes of energy (sensible and latent heat) | W m⁻² |
-| `turbulent_moisture_flux` | aerodynamic turbulent surface fluxes of energy (evaporation) | kg m⁻² s⁻¹ |
-| `thermo_state_int`  | thermodynamic state at the first internal model level | |
-| `uv_int`            | horizontal wind velocity vector at the first internal model level | m s⁻¹ |
+| Coupler name                | Description                                                               | Units      |
+|-----------------------------+---------------------------------------------------------------------------+------------|
+| `air_density`               | air density of the atmosphere                                             | kg m⁻³     |
+| `height_int`                | height at the first internal model level                                  | m          |
+| `height_sfc`                | height at the surface (only required when using `PartitionedStateFluxes`) | m          |
+| `liquid_precipitation`      | liquid precipitation at the surface                                       | kg m⁻² s⁻¹ |
+| `radiative_energy_flux_sfc` | net radiative flux at the surface                                         | W m⁻²      |
+| `radiative_energy_flux_toa` | net radiative flux at the top of the atmosphere                           | W m⁻²      |
+| `snow_precipitation`        | snow precipitation at the surface                                         | kg m⁻² s⁻¹ |
+| `turbulent_energy_flux`     | aerodynamic turbulent surface fluxes of energy (sensible and latent heat) | W m⁻²      |
+| `turbulent_moisture_flux`   | aerodynamic turbulent surface fluxes of energy (evaporation)              | kg m⁻² s⁻¹ |
+| `thermo_state_int`          | thermodynamic state at the first internal model level                     |            |
+| `uv_int`                    | horizontal wind velocity vector at the first internal model level         | m s⁻¹      |
 
 - `update_field!(::AtmosModelSimulation. ::Val{property}, field)`:
 A function to update the value of property in the component model
@@ -138,17 +139,25 @@ This function is expected to be extended for the
 following properties, and may also be extended for any additional
 properties needed by a component model.
 
-| Coupler name      | Description | Units |
-|-------------------|-------------|-------|
-| `emissivity`   | surface emissivity | |
-| `surface_direct_albedo`   | bulk direct surface albedo over the whole surface space | |
-| `surface_diffuse_albedo`   | bulk diffuse surface albedo over the whole surface space | |
-| `surface_temperature` | temperature over the combined surface space | K |
-| `turbulent_fluxes` | turbulent fluxes (note: only required when using `PartitionedStateFluxes` option - see our `FluxCalculator` module docs for more information) | W m⁻² |
+| Coupler name             | Description                                              | Units |
+|--------------------------+----------------------------------------------------------+-------|
+| `emissivity`             | surface emissivity                                       |       |
+| `surface_direct_albedo`  | bulk direct surface albedo over the whole surface space  |       |
+| `surface_diffuse_albedo` | bulk diffuse surface albedo over the whole surface space |       |
+| `surface_temperature`    | temperature over the combined surface space              | K     |
+| `turbulent_fluxes`       | turbulent fluxes                                         | W m⁻² |
 
 - `calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_sfc::ClimaCore.Fields.Field)`:
 A function to return the air density of the atmosphere simulation
 extrapolated to the surface, with units of [kg m⁻³].
+
+ClimaAtmos should also add the following coupler fields for Monin-Obukhov similarity theory:
+| Coupler name    | Description       | Units  |
+|-----------------+-------------------+--------|
+| `ustar`         | friction velocity | m s⁻¹  |
+| `L_MO`          | Obukhov length    | m      |
+| `buoyancy_flux` | flux of buoyancy  | m⁻²s⁻³ |
+
 
 ### AtmosModelSimulation - required functions to run with the ClimaLandSimulation
 
@@ -159,16 +168,16 @@ to the functions required for coupling with a general `SurfaceModelSimulation`.
 This getter function must be extended
 for the following properties:
 
-| Coupler name      | Description | Units |
-|-------------------|-------------|-------|
-| `air_pressure`     | air pressure at the bottom cell centers of the atmosphere | Pa |
-| `air_temperature`  | air temperature at the bottom cell centers of the atmosphere | K |
-| `cos_zenith` | cosine of the zenith angle | |
-| `co2`              | global mean co2 | ppm |
-| `diffuse_fraction` | fraction of downwards shortwave flux that is direct | |
-| `specific_humidity`         | specific humidity at the bottom cell centers of the atmosphere| kg kg⁻¹ |
-| `LW_d`             | downwards longwave flux | W m⁻² |
-| `SW_d`             | downwards shortwave flux | W m⁻² |
+| Coupler name        | Description                                                    | Units   |
+|---------------------+----------------------------------------------------------------+---------|
+| `air_pressure`      | air pressure at the bottom cell centers of the atmosphere      | Pa      |
+| `air_temperature`   | air temperature at the bottom cell centers of the atmosphere   | K       |
+| `cos_zenith`        | cosine of the zenith angle                                     |         |
+| `co2`               | global mean co2                                                | ppm     |
+| `diffuse_fraction`  | fraction of downwards shortwave flux that is direct            |         |
+| `specific_humidity` | specific humidity at the bottom cell centers of the atmosphere | kg kg⁻¹ |
+| `LW_d`              | downwards longwave flux                                        | W m⁻²   |
+| `SW_d`              | downwards shortwave flux                                       | W m⁻²   |
 
 Note that `air_temperature`, `air_pressure`, `cos_zenith`, `co2`, `diffuse_fraction`, `LW_d` and
 `SW_d` will not be present in a `ClimaAtmosSimulation` if the model is setup with no radiation.
@@ -182,15 +191,16 @@ function returns the value of the field property for the simulation at
 the current time. For a `SurfaceModelSimulation`, it must be extended
 for the following properties:
 
-| Coupler name      | Description | Units |
-|-------------------|-------------|-------|
-| `area_fraction`     | fraction of the simulation grid surface area this model covers | |
-| `roughness_buoyancy` | aerodynamic roughness length for buoyancy | m |
-| `roughness_momentum` | aerodynamic roughness length for momentum | m |
-| `surface_direct albedo`    | bulk direct surface albedo | |
-| `surface_diffuse albedo`    | bulk diffuse surface albedo | |
-| `surface_humidity`  | surface humidity | kg kg⁻¹ |
-| `surface_temperature` | surface temperature | K |
+| Coupler name             | Description                                                    | Units   |
+|--------------------------+----------------------------------------------------------------+---------|
+| `area_fraction`          | fraction of the simulation grid surface area this model covers |         |
+| `roughness_buoyancy`     | aerodynamic roughness length for buoyancy                      | m       |
+| `roughness_momentum`     | aerodynamic roughness length for momentum                      | m       |
+| `surface_direct albedo`  | bulk direct surface albedo                                     |         |
+| `surface_diffuse albedo` | bulk diffuse surface albedo                                    |         |
+| `surface_humidity`       | surface humidity                                               | kg kg⁻¹ |
+| `surface_temperature`    | surface temperature                                            | K       |
+
 
 - `update_field!(::SurfaceModelSimulation, ::Val{property}, field)`:
 A function to update the value of property in the component model
@@ -203,26 +213,27 @@ This function is expected to be extended for the
 following properties, and may also be extended for any additional
 properties needed by a component model.
 
-| Coupler name      | Description | Units |
-|-------------------|-------------|-------|
-| `air_density`       | surface air density | kg m⁻³ |
-| `area_fraction`     | fraction of the simulation grid surface area this model covers | |
-| `liquid_precipitation` | liquid precipitation at the surface | kg m⁻² s⁻¹ |
-| `radiative_energy_flux_sfc` OR `LW_d`, `SW_d` | net radiative flux at the surface OR downward longwave, shortwave radiation | W m⁻² |
-| `snow_precipitation` | snow precipitation at the surface | kg m⁻² s⁻¹ |
-| `turbulent_energy_flux` | aerodynamic turbulent surface fluxes of energy (sensible and latent heat); only required when using `CombinedStateFluxes` option - see our `FluxCalculator` module docs for more information  | W m⁻² |
-| `turbulent_moisture_flux` | aerodynamic turbulent surface fluxes of energy (evaporation); only required when using `CombinedStateFluxes` option - see our `FluxCalculator` module docs for more information | kg m⁻² s⁻¹ |
+| Coupler name                                  | Description                                                                                                                                                                                  | Units      |
+|-----------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+------------|
+| `air_density`                                 | surface air density                                                                                                                                                                          | kg m⁻³     |
+| `area_fraction`                               | fraction of the simulation grid surface area this model covers                                                                                                                               |            |
+| `liquid_precipitation`                        | liquid precipitation at the surface                                                                                                                                                          | kg m⁻² s⁻¹ |
+| `radiative_energy_flux_sfc` OR `LW_d`, `SW_d` | net radiative flux at the surface OR downward longwave, shortwave radiation                                                                                                                  | W m⁻²      |
+| `snow_precipitation`                          | snow precipitation at the surface                                                                                                                                                            | kg m⁻² s⁻¹ |
+| `turbulent_energy_flux`                       | aerodynamic turbulent surface fluxes of energy (sensible and latent heat); only required when using `CombinedStateFluxes` option - see our `FluxCalculator` module docs for more information | W m⁻²      |
+| `turbulent_moisture_flux`                     | aerodynamic turbulent surface fluxes of energy (evaporation); only required when using `CombinedStateFluxes` option - see our `FluxCalculator` module docs for more information              | kg m⁻² s⁻¹ |
 
 ### SurfaceModelSimulation - optional functions
 - `get_field(::SurfaceModelSimulation, ::Val{property})`:
 For some quantities, default `get_field` functions are provided, which may be
 overwritten or used as-is. These currently include the following:
 
-| Coupler name      | Description | Units | Default value |
-|-------------------|-------------|-------|---------------|
-| `beta` | factor that scales evaporation based on its estimated level of saturation | | 1 |
-| `emissivity` | measure of how much energy a surface radiates | | 1 |
-| `height_disp` | displacement height relative to the surface | m | 0 |
+| Coupler name  | Description                                                               | Units | Default value |
+|---------------+---------------------------------------------------------------------------+-------+---------------|
+| `beta`        | factor that scales evaporation based on its estimated level of saturation |       |             1 |
+| `emissivity`  | measure of how much energy a surface radiates                             |       |             1 |
+| `height_disp` | displacement height relative to the surface                               | m     |             0 |
+
 
 - `update_turbulent_fluxes!(::ComponentModelSimulation, fields::NamedTuple)`:
 This function updates the turbulent fluxes of the component model simulation

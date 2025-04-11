@@ -341,7 +341,9 @@ version = "0.2.12"
 
 [[deps.ClimaLand]]
 deps = ["ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "309507cd078678f291e1b8698b64b8200a78ab52"
+git-tree-sha1 = "fb661b90227f0ae90b09f5d54cbb2335f3508814"
+repo-rev = "tr/add-energy_per_area-bucket"
+repo-url = "https://github.com/CliMA/ClimaLand.jl"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
 version = "0.15.13"
 

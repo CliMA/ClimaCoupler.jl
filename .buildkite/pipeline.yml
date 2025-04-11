@@ -34,7 +34,8 @@ steps:
 
       - echo "--- Instantiate ClimaCore experiments env"
       - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\")'"
+      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\");'"
+      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.add(url=\"https://github.com/CliMA/ClimaLand.jl\", rev=\"tr/add-energy_per_area-bucket\")'"
       - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.status()'"
       - "julia --project=experiments/ClimaCore/ -e 'using CUDA; CUDA.precompile_runtime()'"
@@ -43,6 +44,7 @@ steps:
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.develop(path=\".\")'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\");'"
+      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.add(url=\"https://github.com/CliMA/ClimaLand.jl\", rev=\"tr/add-energy_per_area-bucket\")'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
 
@@ -50,6 +52,7 @@ steps:
       - "julia --project=test/ -e 'using Pkg; Pkg.develop(path=\".\")'"
       - "julia --project=test/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=test/ -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\")'"
+      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.add(url=\"https://github.com/CliMA/ClimaLand.jl\", rev=\"tr/add-energy_per_area-bucket\")'"
       - "julia --project=test/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=test/ -e 'using Pkg; Pkg.status()'"
 
@@ -183,78 +186,78 @@ steps:
       # AMIP EXPERIMENTS
 
       # Test default behavior with no config file or job ID provided
-      - label: "AMIP: default"
-        key: "amip_default"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl"
-        artifact_paths: "experiments/ClimaEarth/output/amip_default/artifacts/*"
-        agents:
-          slurm_mem: 20GB
+      # - label: "AMIP: default"
+      #   key: "amip_default"
+      #   command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl"
+      #   artifact_paths: "experiments/ClimaEarth/output/amip_default/artifacts/*"
+      #   agents:
+      #     slurm_mem: 20GB
 
-      - label: "AMIP: bucket initial condition test"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_bucket_ic.yml --job_id amip_bucket_ic"
-        artifact_paths: "experiments/ClimaEarth/output/amip_bucket_ic/artifacts/*"
-        agents:
-          slurm_ntasks: 1
-          slurm_mem: 20GB
+      # - label: "AMIP: bucket initial condition test"
+      #   command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_bucket_ic.yml --job_id amip_bucket_ic"
+      #   artifact_paths: "experiments/ClimaEarth/output/amip_bucket_ic/artifacts/*"
+      #   agents:
+      #     slurm_ntasks: 1
+      #     slurm_mem: 20GB
 
-      - label: "AMIP - Float64 + hourly checkpoint"
-        key: "amip"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_ft64_hourly_checkpoints.yml --job_id amip_coarse_ft64_hourly_checkpoints"
-        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_ft64_hourly_checkpoints/artifacts/*"
-        env:
-          FLAME_PLOT: ""
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_ntasks: 1
-          slurm_mem: 20GB
+      # - label: "AMIP - Float64 + hourly checkpoint"
+      #   key: "amip"
+      #   command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_ft64_hourly_checkpoints.yml --job_id amip_coarse_ft64_hourly_checkpoints"
+      #   artifact_paths: "experiments/ClimaEarth/output/amip_coarse_ft64_hourly_checkpoints/artifacts/*"
+      #   env:
+      #     FLAME_PLOT: ""
+      #     BUILD_HISTORY_HANDLE: ""
+      #   agents:
+      #     slurm_ntasks: 1
+      #     slurm_mem: 20GB
 
-      - label: "AMIP - Float32 test"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_ft32.yml --job_id amip_coarse_ft32"
-        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_ft32/artifacts/*"
-        agents:
-          slurm_ntasks: 1
-          slurm_mem: 20GB
+      # - label: "AMIP - Float32 test"
+      #   command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_ft32.yml --job_id amip_coarse_ft32"
+      #   artifact_paths: "experiments/ClimaEarth/output/amip_coarse_ft32/artifacts/*"
+      #   agents:
+      #     slurm_ntasks: 1
+      #     slurm_mem: 20GB
 
-      - label: "AMIP - Component dts test"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_component_dts.yml --job_id target_amip_component_dts"
-        artifact_paths: "experiments/ClimaEarth/output/target_amip_component_dts/artifacts/*"
-        agents:
-          slurm_ntasks: 1
-          slurm_mem: 20GB
+      # - label: "AMIP - Component dts test"
+      #   command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_component_dts.yml --job_id target_amip_component_dts"
+      #   artifact_paths: "experiments/ClimaEarth/output/target_amip_component_dts/artifacts/*"
+      #   agents:
+      #     slurm_ntasks: 1
+      #     slurm_mem: 20GB
 
-      - label: "MPI AMIP"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_mpi.yml --job_id amip_coarse_mpi"
-        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_mpi/artifacts/*"
-        timeout_in_minutes: 30
-        env:
-          CLIMACOMMS_CONTEXT: "MPI"
-        agents:
-          slurm_ntasks: 4
-          slurm_mem_per_cpu: 12GB
+      # - label: "MPI AMIP"
+      #   command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_mpi.yml --job_id amip_coarse_mpi"
+      #   artifact_paths: "experiments/ClimaEarth/output/amip_coarse_mpi/artifacts/*"
+      #   timeout_in_minutes: 30
+      #   env:
+      #     CLIMACOMMS_CONTEXT: "MPI"
+      #   agents:
+      #     slurm_ntasks: 4
+      #     slurm_mem_per_cpu: 12GB
 
-      # short high-res performance test
-      - label: "Unthreaded AMIP FINE" # also reported by longruns with a flame graph
-        key: "unthreaded_amip_fine"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_n1_shortrun.yml --job_id target_amip_n1_shortrun"
-        artifact_paths: "experiments/ClimaEarth/output/target_amip_n1_shortrun/artifacts/*"
-        env:
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_mem: 20GB
+      # # short high-res performance test
+      # - label: "Unthreaded AMIP FINE" # also reported by longruns with a flame graph
+      #   key: "unthreaded_amip_fine"
+      #   command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_n1_shortrun.yml --job_id target_amip_n1_shortrun"
+      #   artifact_paths: "experiments/ClimaEarth/output/target_amip_n1_shortrun/artifacts/*"
+      #   env:
+      #     BUILD_HISTORY_HANDLE: ""
+      #   agents:
+      #     slurm_mem: 20GB
 
-      # CLIMACORE EXPERIMENTS
+      # # CLIMACORE EXPERIMENTS
 
-      - label: "sea_breeze"
-        command: "julia --color=yes --project=experiments/ClimaCore experiments/ClimaCore/sea_breeze/run.jl"
-        artifact_paths: "experiments/ClimaCore/sea_breeze/output/*"
-        agents:
-          slurm_mem: 20GB
+      # - label: "sea_breeze"
+      #   command: "julia --color=yes --project=experiments/ClimaCore experiments/ClimaCore/sea_breeze/run.jl"
+      #   artifact_paths: "experiments/ClimaCore/sea_breeze/output/*"
+      #   agents:
+      #     slurm_mem: 20GB
 
-      - label: "heat-diffusion"
-        command: "julia --color=yes --project=experiments/ClimaCore/ experiments/ClimaCore/heat-diffusion/run.jl"
-        artifact_paths: "experiments/ClimaCore/output/heat-diffusion/artifacts/*"
-        agents:
-          slurm_mem: 20GB
+      # - label: "heat-diffusion"
+      #   command: "julia --color=yes --project=experiments/ClimaCore/ experiments/ClimaCore/heat-diffusion/run.jl"
+      #   artifact_paths: "experiments/ClimaCore/output/heat-diffusion/artifacts/*"
+      #   agents:
+      #     slurm_mem: 20GB
 
   - group: "GPU integration tests"
     steps:

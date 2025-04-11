@@ -2,7 +2,7 @@
 
 julia_version = "1.10.9"
 manifest_format = "2.0"
-project_hash = "64dfae3f3aedb6050f0e3adb679ec45b4a536fac"
+project_hash = "d69ef61e40ee29ebf365599c198ddfa78bec0493"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -198,6 +198,12 @@ weakdeps = ["Adapt", "BandedMatrices"]
     BlockArraysAdaptExt = "Adapt"
     BlockArraysBandedMatricesExt = "BandedMatrices"
 
+[[deps.Blosc_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Lz4_jll", "Zlib_jll", "Zstd_jll"]
+git-tree-sha1 = "535c80f1c0847a4c967ea945fca21becc9de1522"
+uuid = "0b7ba130-8d10-5ba8-a3d6-c5182647fed9"
+version = "1.21.7+0"
+
 [[deps.Bzip2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "1b96ea4a01afe0ea4090c5c8039690672dd13f2e"
@@ -208,6 +214,12 @@ version = "1.0.9+0"
 git-tree-sha1 = "389ad5c84de1ae7cf0e28e381131c98ea87d54fc"
 uuid = "fa961155-64e5-5f13-b03f-caf6b980ea82"
 version = "0.5.0"
+
+[[deps.CFTime]]
+deps = ["Dates", "Printf"]
+git-tree-sha1 = "937628bf8b377208ac359f57314fd85d3e0165d9"
+uuid = "179af706-886a-5703-950a-314cd64e0468"
+version = "0.1.4"
 
 [[deps.CPUSummary]]
 deps = ["CpuId", "IfElse", "PrecompileTools", "Static"]
@@ -298,6 +310,33 @@ path = "../.."
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.1.2"
 
+[[deps.ClimaDiagnostics]]
+deps = ["Accessors", "ClimaComms", "ClimaCore", "ClimaUtilities", "Dates", "NCDatasets", "OrderedCollections", "SciMLBase"]
+git-tree-sha1 = "a67549b46bd3629a1af5739f161bc953914f9c5e"
+uuid = "1ecacbb8-0713-4841-9a07-eb5aa8a2d53f"
+version = "0.2.12"
+
+[[deps.ClimaLand]]
+deps = ["ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
+git-tree-sha1 = "fb661b90227f0ae90b09f5d54cbb2335f3508814"
+repo-rev = "tr/add-energy_per_area-bucket"
+repo-url = "https://github.com/CliMA/ClimaLand.jl"
+uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
+version = "0.15.13"
+
+    [deps.ClimaLand.extensions]
+    CreateParametersExt = "ClimaParams"
+    NeuralSnowExt = ["CSV", "DataFrames", "HTTP", "Flux", "StatsBase", "BSON"]
+
+    [deps.ClimaLand.weakdeps]
+    BSON = "fbb218c0-5317-5bc6-957e-2ee96dd4b1f0"
+    CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+    ClimaParams = "5c42b081-d73a-476f-9059-fd94b934656c"
+    DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+    Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+    HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+    StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+
 [[deps.ClimaTimeSteppers]]
 deps = ["ClimaComms", "Colors", "DataStructures", "DiffEqBase", "KernelAbstractions", "Krylov", "LinearAlgebra", "LinearOperators", "NVTX", "SciMLBase", "StaticArrays"]
 git-tree-sha1 = "e719705cf15fec895abcb547946131ffe83de4d7"
@@ -374,6 +413,12 @@ deps = ["ColorTypes", "FixedPointNumbers", "Reexport"]
 git-tree-sha1 = "64e15186f0aa277e174aa81798f7eb8598e0157e"
 uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
 version = "0.13.0"
+
+[[deps.CommonDataModel]]
+deps = ["CFTime", "DataStructures", "Dates", "Preferences", "Printf", "Statistics"]
+git-tree-sha1 = "358bf5a7d5c1387b995a43577673290c5d344758"
+uuid = "1fbeeb36-5f17-413c-809b-666fb144f157"
+version = "0.3.8"
 
 [[deps.CommonSolve]]
 git-tree-sha1 = "0eee5eb66b1cf62cd6ad1b460238e60e4b09400c"
@@ -479,6 +524,12 @@ git-tree-sha1 = "5620ff4ee0084a6ab7097a27ba0c19290200b037"
 uuid = "927a84f5-c5f4-47a5-9785-b46e178433df"
 version = "1.6.4"
 
+[[deps.DelimitedFiles]]
+deps = ["Mmap"]
+git-tree-sha1 = "9e2f36d3c96a820c678f2f1f1782582fcf685bae"
+uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+version = "1.9.1"
+
 [[deps.DiffEqBase]]
 deps = ["ArrayInterface", "ConcreteStructs", "DataStructures", "DocStringExtensions", "EnumX", "EnzymeCore", "FastBroadcast", "FastClosures", "FastPower", "FunctionWrappers", "FunctionWrappersWrappers", "LinearAlgebra", "Logging", "Markdown", "MuladdMacro", "Parameters", "PrecompileTools", "Printf", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "SciMLStructures", "Setfield", "Static", "StaticArraysCore", "Statistics", "TruncatedStacktraces"]
 git-tree-sha1 = "e384a2cf3bb402e6dc66b1503ade22c7c1471c4d"
@@ -582,6 +633,12 @@ version = "0.6.50"
     Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
     Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
     Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
+
+[[deps.DiskArrays]]
+deps = ["LRUCache", "Mmap", "OffsetArrays"]
+git-tree-sha1 = "8308c389782803ebdba2c04b293d99234e65c5eb"
+uuid = "3c3547ce-8d99-4f5e-a174-61eb10b00ae3"
+version = "0.4.12"
 
 [[deps.Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
@@ -999,6 +1056,18 @@ git-tree-sha1 = "d1b1b796e47d94588b3757fe84fbf65a5ec4a80d"
 uuid = "d25df0c9-e2be-5dd7-82c8-3ad0b3e990b9"
 version = "0.1.5"
 
+[[deps.Insolation]]
+deps = ["Artifacts", "Dates", "DelimitedFiles", "Interpolations"]
+git-tree-sha1 = "29e10cf6320739afe5a2b17e9c854a386fef7acc"
+uuid = "e98cc03f-d57e-4e3c-b70c-8d51efe9e0d8"
+version = "0.9.4"
+
+    [deps.Insolation.extensions]
+    CreateParametersExt = "ClimaParams"
+
+    [deps.Insolation.weakdeps]
+    ClimaParams = "5c42b081-d73a-476f-9059-fd94b934656c"
+
 [[deps.IntelOpenMP_jll]]
 deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
 git-tree-sha1 = "0f14a5456bdc6b9731a5682f439a672750a09e48"
@@ -1161,6 +1230,15 @@ git-tree-sha1 = "78211fb6cbc872f77cad3fc0b6cf647d923f4929"
 uuid = "1d63c593-3942-5779-bab2-d838dc0a180e"
 version = "18.1.7+0"
 
+[[deps.LRUCache]]
+git-tree-sha1 = "5519b95a490ff5fe629c4a7aa3b3dfc9160498b3"
+uuid = "8ac3fa9e-de4c-5943-b1dc-09c6b5f20637"
+version = "1.6.2"
+weakdeps = ["Serialization"]
+
+    [deps.LRUCache.extensions]
+    SerializationExt = ["Serialization"]
+
 [[deps.LZO_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "1c602b1127f4751facb671441ca72715cc95938a"
@@ -1307,6 +1385,12 @@ git-tree-sha1 = "f02b56007b064fbfddb4c9cd60161b6dd0f40df3"
 uuid = "e6f89c97-d47a-5376-807f-9c37f3926c36"
 version = "1.1.0"
 
+[[deps.Lz4_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "191686b1ac1ea9c89fc52e996ad15d1d241d1e33"
+uuid = "5ced341a-0733-55b8-9ab6-a4889d929147"
+version = "1.10.1+0"
+
 [[deps.MKL_jll]]
 deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "oneTBB_jll"]
 git-tree-sha1 = "5de60bc6cb3899cd318d80d627560fae2e2d99ae"
@@ -1421,6 +1505,12 @@ version = "0.3.3"
     Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
     CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 
+[[deps.NCDatasets]]
+deps = ["CFTime", "CommonDataModel", "DataStructures", "Dates", "DiskArrays", "NetCDF_jll", "NetworkOptions", "Printf"]
+git-tree-sha1 = "777b93739ca8804011ee1decad7b070f0e201bbc"
+uuid = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
+version = "0.14.7"
+
 [[deps.NVTX]]
 deps = ["Colors", "JuliaNVTXCallbacks_jll", "Libdl", "NVTX_jll"]
 git-tree-sha1 = "1a24c3430fa2ef3317c4c97fa7e431ef45793bd2"
@@ -1438,6 +1528,12 @@ deps = ["OpenLibm_jll"]
 git-tree-sha1 = "cc0a5deefdb12ab3a096f00a6d42133af4560d71"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
 version = "1.1.2"
+
+[[deps.NetCDF_jll]]
+deps = ["Artifacts", "Blosc_jll", "Bzip2_jll", "HDF5_jll", "JLLWrappers", "LazyArtifacts", "LibCURL_jll", "Libdl", "MPICH_jll", "MPIPreferences", "MPItrampoline_jll", "MicrosoftMPI_jll", "OpenMPI_jll", "TOML", "XML2_jll", "Zlib_jll", "Zstd_jll", "libaec_jll", "libzip_jll"]
+git-tree-sha1 = "d574803b6055116af212434460adf654ce98e345"
+uuid = "7243133f-43d8-5620-bbf4-c2c921802cf3"
+version = "401.900.300+0"
 
 [[deps.Netpbm]]
 deps = ["FileIO", "ImageCore", "ImageMetadata"]
@@ -2329,6 +2425,12 @@ deps = ["Artifacts", "Giflib_jll", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Lib
 git-tree-sha1 = "d2408cac540942921e7bd77272c32e58c33d8a77"
 uuid = "c5f90fcd-3b7e-5836-afba-fc50a0988cb2"
 version = "1.5.0+0"
+
+[[deps.libzip_jll]]
+deps = ["Artifacts", "Bzip2_jll", "JLLWrappers", "Libdl", "OpenSSL_jll", "XZ_jll", "Zlib_jll", "Zstd_jll"]
+git-tree-sha1 = "86addc139bca85fdf9e7741e10977c45785727b7"
+uuid = "337d8026-41b4-5cde-a456-74a10e5b31d1"
+version = "1.11.3+0"
 
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]

@@ -189,7 +189,43 @@ end
 Extension of FluxCalculator.differentiate_turbulent_fluxes! from FluxCalculator to get the turbulent fluxes.
 """
 FluxCalculator.differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args) =
-    FluxCalculator.differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args..., ΔT_sfc = 0.1)
+    FluxCalculator.differentiate_turbulent_fluxes!(sim::EisenmanIceSimulation, args..., δT_sfc = 0.1)
+
+"""
+    FluxCalculator.surface_thermo_state(
+        sim::EisenmanIceSimulation,
+        thermo_params::TD.Parameters.ThermodynamicsParameters,
+        thermo_state_int,
+        δT_sfc = 0,
+    )
+
+Extension of FluxCalculator.surface_thermo_state from FluxCalculator.
+
+The only difference here is the `δT_sfc`.
+"""
+function FluxCalculator.surface_thermo_state(
+    sim::EisenmanIceSimulation,
+    thermo_params::TD.Parameters.ThermodynamicsParameters,
+    thermo_state_int;
+    δT_sfc = 0,
+)
+    FT = eltype(parent(thermo_state_int))
+
+    # get surface temperature (or perturbed surface temperature for differentiation)
+    T_sfc = Interfacer.get_field(sim, Val(:surface_temperature)) .+ FT(δT_sfc)
+    # Note that the surface air density, ρ_sfc, is computed using the atmospheric state at the first level and making ideal gas
+    # and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
+    # a reasonable stand-in.
+    #
+    # NOTE: This allocates! Fix me!
+    ρ_sfc = FluxCalculator.extrapolate_ρ_to_sfc.(thermo_params, thermo_state_int, T_sfc) # ideally the # calculate elsewhere, here just getter...
+
+    # For SurfaceStabs, this is just liquid phase
+    q_sfc = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid()) # saturated liquid surface
+
+    # NOTE: This allocates! Fix me!
+    return @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
+end
 
 """
     differentiate_turbulent_fluxes(sim::Interfacer.SurfaceModelSimulation, thermo_params, input_args, fluxes, δT_sfc = 0.1)
@@ -209,11 +245,11 @@ function FluxCalculator.differentiate_turbulent_fluxes!(
     input_args = merge(input_args, (; thermo_state_sfc = thermo_state_sfc_dT))
 
     # set inputs based on whether the surface_scheme is `MoninObukhovScheme` or `BulkScheme`
-    inputs = surface_inputs(surface_scheme, input_args)
+    inputs = FluxCalculator.surface_inputs(surface_scheme, input_args)
 
     # calculate the surface fluxes
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
-    _, _, F_shf_δT_sfc, F_lhf_δT_sfc, _ = get_surface_fluxes!(inputs, surface_params, area_fraction)
+    _, _, F_shf_δT_sfc, F_lhf_δT_sfc, _ = FluxCalculator.get_surface_fluxes!(inputs, surface_params, area_fraction)
 
     (; F_shf, F_lhf) = fluxes
 
@@ -324,13 +360,13 @@ function solve_eisenman_model!(Y, Ya, p, thermo_params, Δt)
         F_conductive = @. k_ice / h * (T_base - T_sfc)
         numerator = @. -F_atm + F_conductive
         denominator = @. k_ice / h + ∂F_atmo∂T_sfc
-        ΔT_sfc = @. numerator / denominator
-        surface_melting = (parent(T_sfc .+ ΔT_sfc)[1] > T_freeze)
+        δT_sfc = @. numerator / denominator
+        surface_melting = (parent(T_sfc .+ δT_sfc)[1] > T_freeze)
         if surface_melting
-            ΔT_sfc = @. T_freeze - T_sfc # NB: T_sfc not storing energy
+            δT_sfc = @. T_freeze - T_sfc # NB: T_sfc not storing energy
         end
         # surface is ice-covered, so update T_sfc as ice surface temperature
-        T_sfc .+= ΔT_sfc
+        T_sfc .+= δT_sfc
         # update surface humidity
         @. q_sfc = TD.q_vap_saturation_generic.(thermo_params, T_sfc, Ya.ρ_sfc, TD.Ice())
     else # ice-free, so update T_sfc as mixed layer temperature

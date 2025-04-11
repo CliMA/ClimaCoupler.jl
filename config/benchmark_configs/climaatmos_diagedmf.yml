@@ -30,6 +30,6 @@ surface_setup: DefaultMoninObukhov
 t_end: 12hours
 toml: [toml/diagnostic_edmfx.toml]
 turbconv: diagnostic_edmfx
-turb_flux_partition: "CombinedStateFluxesMOST"
+turb_flux_partition: "PartitionedStateFluxes"
 z_elem: 63
 z_max: 55000.0

@@ -23,4 +23,4 @@ surface_setup: "PrescribedSurface"
 t_end: "30days"
 topo_smoothing: true
 topography: "Earth"
-turb_flux_partition: "CombinedStateFluxesMOST"
+turb_flux_partition: "PartitionedStateFluxes"

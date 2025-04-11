@@ -6,6 +6,13 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Remove `area_mask`. [PR#1268](https://github.com/CliMA/ClimaCoupler.jl/pull/1268/files)
+Removes all uses of `area_mask`, as multiplying quantities by both `area_fraction`
+and `area_mask` will potentially lead to physically inaccurate results.
+It also defeats the purpose of maintaining that the sum of surface models'
+area fractions is 1 at all points. See issue [#1255](https://github.com/CliMA/ClimaCoupler.jl/issues/1255) for more details.
+Also removes the function `Utilities.binary_mask`, as it's now unused.
+
 #### Switch to `PartitionedStateFluxes` by default. PR[#1117](https://github.com/CliMA/ClimaCoupler.jl/pull/1117)
 
 Fixed `PartitionedStateFluxes` option. Now `PartitionedStateFluxes` is the

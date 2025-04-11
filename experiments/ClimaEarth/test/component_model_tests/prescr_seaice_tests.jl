@@ -41,12 +41,11 @@ for FT in (Float32, Float64)
             # Get initial SIC values and use them to calculate ice fraction
             SIC_init = CC.Fields.zeros(space)
             evaluate!(SIC_init, SIC_timevaryinginput, t_start)
-            ice_fraction = get_ice_fraction.(SIC_init, false)
 
             cache = (;
                 F_turb_energy = CC.Fields.zeros(space),
                 F_radiative = CC.Fields.zeros(space) .+ FT(F_radiative),
-                area_fraction = ice_fraction,
+                area_fraction = SIC_init,
                 SIC_timevaryinginput = SIC_timevaryinginput,
                 land_fraction = CC.Fields.zeros(space),
                 q_sfc = CC.Fields.zeros(space),

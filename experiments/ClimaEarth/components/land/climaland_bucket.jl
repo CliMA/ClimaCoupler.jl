@@ -40,20 +40,6 @@ end
 Interfacer.name(::BucketSimulation) = "BucketSimulation"
 
 """
-    get_new_cache(p, Y, energy_check)
-Returns a new `p` with an updated field to store e_per_area if energy conservation
-    checks are turned on.
-"""
-function get_new_cache(p, Y, energy_check)
-    if energy_check
-        e_per_area_field = CC.Fields.zeros(axes(Y.bucket.W))
-        return merge(p, (; e_per_area = e_per_area_field))
-    else
-        return p
-    end
-end
-
-"""
     bucket_init
 
 Initializes the bucket model variables.
@@ -130,9 +116,6 @@ function BucketSimulation(
 
     # Initial conditions with no moisture
     Y, p, coords = CL.initialize(model)
-
-    # Add space in the cache for the energy if energy checks are enabled
-    p = get_new_cache(p, Y, energy_check)
 
     # Get temperature anomaly function
     T_functions = Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
@@ -258,7 +241,7 @@ Extension of Interfacer.get_field that provides the total energy contained in th
 """
 function Interfacer.get_field(sim::BucketSimulation, ::Val{:energy})
     # required by ConservationChecker
-    e_per_area = sim.integrator.p.e_per_area .= 0
+    e_per_area = sim.integrator.p.bucket.e_per_area .= 0
     CC.Operators.column_integral_definite!(e_per_area, sim.model.parameters.ρc_soil .* sim.integrator.u.bucket.T)
 
     e_per_area .+=

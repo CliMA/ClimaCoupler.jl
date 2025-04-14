@@ -15,4 +15,3 @@ surface_setup: "DefaultMoninObukhov"
 t_end: "120days"
 turb_flux_partition: "PartitionedStateFluxes"
 use_land_diagnostics: false
-vert_diff: "true"

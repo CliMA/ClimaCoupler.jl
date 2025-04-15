@@ -10,9 +10,9 @@ import EnsembleKalmanProcesses: I, ParameterDistributions.constrained_gaussian
 ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
 ClimaComms.@import_required_backends
 
-single_member_dims = (1,)
+single_member_dims = 1
 function CAL.observation_map(iteration)
-    G_ensemble = Array{Float64}(undef, single_member_dims..., ensemble_size)
+    G_ensemble = Array{Float64}(undef, single_member_dims, ensemble_size)
 
     for m in 1:ensemble_size
         member_path = CAL.path_to_ensemble_member(output_dir, iteration, m)
@@ -29,9 +29,8 @@ function CAL.observation_map(iteration)
 end
 
 function process_member_data(simdir::SimDir)
-    output = zeros(single_member_dims...)
+    output = zeros(single_member_dims)
     days = 86_400
-    isempty(simdir) && return NaN
 
     rsut = get(simdir; short_name = "rsut", reduction = "average", period = "30d")
     rsut_slice = slice(average_lon(average_lat(rsut)); time = 30days).data
@@ -68,7 +67,7 @@ if !isfile(obs_path)
     touch(joinpath(obs_output_dir, "parameters.toml"))
     CAL.forward_model(0, 0)
     observations = Vector{Float64}(undef, 1)
-    observations .= process_member_data(SimDir(joinpath(obs_output_dir, "amip_config/output_active/clima_atmos")))
+    observations .= process_member_data(SimDir(joinpath(obs_output_dir, "model_config/output_active/clima_atmos")))
     JLD2.save_object(obs_path, observations)
 end
 

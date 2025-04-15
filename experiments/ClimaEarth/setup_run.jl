@@ -574,14 +574,12 @@ function CoupledSimulation(config_dict::AbstractDict)
         FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
         FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 
-        # Set full land initial cache values for the land model, now that we have updated drivers
-        # TODO we need to do this before SF calculation, but not if we're taking a step
+        # Set all initial cache values for the land model, now that we have updated drivers
         land_set_initial_cache! = CL.make_set_initial_cache(cs.model_sims.land_sim.model)
         land_set_initial_cache!(cs.model_sims.land_sim.integrator.p, cs.model_sims.land_sim.integrator.u, cs.model_sims.land_sim.integrator.t)
 
         # 3.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
         ## TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step! (#331)
-        # TODO can't step land before computing fluxes ?
         Interfacer.step!(land_sim, tspan[1] + Δt_cpl)
         Interfacer.step!(ocean_sim, tspan[1] + Δt_cpl)
         Interfacer.step!(ice_sim, tspan[1] + Δt_cpl)

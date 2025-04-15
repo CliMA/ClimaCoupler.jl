@@ -486,7 +486,22 @@ function Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaLandSimulati
 end
 
 function Checkpointer.get_model_prog_state(sim::ClimaLandSimulation)
-    error("get_model_prog_state not implemented")
+    return sim.integrator.u
+end
+
+function Checkpointer.get_model_cache(sim::ClimaLandSimulation)
+    return sim.integrator.p
+end
+
+function Checkpointer.restore_cache!(sim::ClimaLandSimulation, new_cache)
+    old_cache = Checkpointer.get_model_cache(sim)
+    comms_ctx = ClimaComms.context(sim.model)
+    restore!(
+        old_cache,
+        new_cache,
+        comms_ctx,
+        ignore = Set([:dss_buffer_2d, :dss_buffer_3d, :scratch1, :scratch2, :scratch3, :subsfc_scratch]),
+    )
 end
 
 Interfacer.name(::ClimaLandSimulation) = "ClimaLandSimulation"

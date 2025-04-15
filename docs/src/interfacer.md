@@ -53,9 +53,17 @@ after solving of the simulation has been paused or interrupted. Like
 of SciMLBase.jl.
 
 ### ComponentModelSimulation - optional functions
-- `get_model_prog_state(::ComponentModelSimulation)`: A function that
-returns the state vector of the simulation at its current state. This
-is used for checkpointing the simulation.
+- `Checkpointer.get_model_prog_state(::ComponentModelSimulation)`:
+A function that returns the state vector of the simulation at its current
+state. This is used for checkpointing the simulation.
+
+- `Checkpointer.get_model_cache(::ComponentModelSimulation)`:
+A function that returns the cache of the simulation at its current state.
+This is used for checkpointing the simulation.
+
+- `Checkpointer.restore_cache(::ComponentModelSimulation, new_cache)`:
+A function that updates the cache of the simulation with the provided
+`new_cache`. This is used for restarting the simulation.
 
 - `get_field(::ComponentModelSimulation, ::Val{property})`:
 Default `get_field` functions are provided for `energy` and `water` fields,

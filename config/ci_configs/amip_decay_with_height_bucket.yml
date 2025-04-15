@@ -13,6 +13,7 @@ h_elem: 8
 land_albedo_type: "map_temporal"
 land_model: "bucket"
 mode_name: "amip"
+moist: equil
 mono_surface: false
 netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true

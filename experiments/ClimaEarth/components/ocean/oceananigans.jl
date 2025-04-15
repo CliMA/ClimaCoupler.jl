@@ -46,37 +46,27 @@ function OceananigansSimulation(
         Oceananigans.CPU()
     end
 
-    # Set up ocean grid
-    Nx = 360
-    Ny = 170
-    Nz = 30
-    z_faces = Ocean.exponential_z_faces(; Nz, h = 30, depth = 6000)
+    # Set up ocean grid (1 degree)
+    Nx = 256
+    Ny = 128
+    Nz = 32
+    z_faces = Ocean.exponential_z_faces(; Nz, depth = 6000, h = 34)
+    underlying_grid = TripolarGrid(arch; size = (Nx, Ny, Nz), z = z_faces)
+
+    bottom_height = regrid_bathymetry(underlying_grid; minimum_depth = 30, interpolation_passes = 20, major_basins = 1)
+    view(bottom_height, 73:78, 88:89, 1) .= -1000 # open Gibraltar strait
 
     # TODO how to specify FT?
-    grid = Oceananigans.LatitudeLongitudeGrid(
-        arch;
-        size = (Nx, Ny, Nz),
-        longitude = (0, 360),
-        latitude = (-85, 85),
-        z = z_faces,
-        halo = (7, 7, 7),
-    )
-
-    # Choose parameterizations
-    momentum_advection = Oceananigans.WENOVectorInvariant(order = 5)
-    tracer_advection = Oceananigans.WENO(order = 5)
-    free_surface = Oceananigans.SplitExplicitFreeSurface(grid; substeps = 30)
+    grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(bottom_height); active_cells_map = true)
 
     # Create ocean simulation
-    ocean = Ocean.ocean_simulation(grid; momentum_advection, tracer_advection, free_surface, warn = false)
-
+    ocean = Ocean.ocean_simulation(grid)
 
     # Set up initial conditions for temperature and salinity
     Tᵢ(λ, φ, z) = 30 * (1 - tanh((abs(φ) - 30) / 5)) / 2 + rand()
     Sᵢ(λ, φ, z) = 30 - 5e-3 * z + rand()
     Oceananigans.set!(ocean.model, T = Tᵢ, S = Sᵢ)
 
-    # TODO do we want to store sim or model?
     return OceananigansSimulation(ocean, area_fraction)
 end
 

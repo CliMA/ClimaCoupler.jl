@@ -314,14 +314,14 @@ function extrapolate_ρ_to_sfc(thermo_params, ts_in, T_sfc)
 end
 
 """
-    get_surface_fluxes!(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters, area_fraction)
+    get_surface_fluxes!(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters)
 
 Uses SurfaceFluxes.jl to calculate turbulent surface fluxes. It should be atmos model agnostic, and columnwise.
-Fluxes where the area fraction is zero are set to zero.
+Fluxes are computed over the entire surface, even where the relevant surface model is not present.
 
 When available, it also computes ancillary quantities, such as the Monin-Obukov lengthscale.
 """
-function get_surface_fluxes!(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters, area_fraction)
+function get_surface_fluxes!(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters)
     # calculate all fluxes (saturated surface conditions)
     outputs = SF.surface_conditions.(surface_params, inputs)
 
@@ -339,17 +339,6 @@ function get_surface_fluxes!(inputs, surface_params::SF.Parameters.SurfaceFluxes
     L_MO = outputs.L_MO
     ustar = outputs.ustar
     buoyancy_flux = outputs.buoy_flux
-
-    # Zero out fluxes where the area fraction is zero
-    @. F_turb_ρτxz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτxz), F_turb_ρτxz)
-    @. F_turb_ρτyz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτyz), F_turb_ρτyz)
-    @. F_shf = ifelse(area_fraction ≈ 0, zero(F_shf), F_shf)
-    @. F_lhf = ifelse(area_fraction ≈ 0, zero(F_lhf), F_lhf)
-    @. F_turb_moisture = ifelse(area_fraction ≈ 0, zero(F_turb_moisture), F_turb_moisture)
-
-    @. L_MO = ifelse(area_fraction ≈ 0, zero(L_MO), L_MO)
-    @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
-    @. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(buoyancy_flux), buoyancy_flux)
 
     return (; F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture, L_MO, ustar, buoyancy_flux)
 end
@@ -490,39 +479,58 @@ function compute_surface_fluxes!(
     inputs = FluxCalculator.surface_inputs(surface_scheme, input_args)
 
     # calculate the surface fluxes
-    fluxes = FluxCalculator.get_surface_fluxes!(inputs, surface_params, area_fraction)
-    (; F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture) = fluxes
+    fluxes = FluxCalculator.get_surface_fluxes!(inputs, surface_params)
+    (; F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture, L_MO, ustar, buoyancy_flux) = fluxes
+
+
+    # Zero out fluxes where the area fraction is zero
+    # Multiplying by `area_fraction` is not sufficient because the fluxes may
+    # be NaN where the area fraction is zero.
+    @. F_turb_ρτxz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτxz), F_turb_ρτxz)
+    @. F_turb_ρτyz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτyz), F_turb_ρτyz)
+    @. F_shf = ifelse(area_fraction ≈ 0, zero(F_shf), F_shf)
+    @. F_lhf = ifelse(area_fraction ≈ 0, zero(F_lhf), F_lhf)
+    @. F_turb_moisture = ifelse(area_fraction ≈ 0, zero(F_turb_moisture), F_turb_moisture)
+    @. L_MO = ifelse(area_fraction ≈ 0, zero(L_MO), L_MO)
+    @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
+    @. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(buoyancy_flux), buoyancy_flux)
+
+    # multiply fluxes by area fraction
+    F_turb_ρτxz .*= area_fraction
+    F_turb_ρτyz .*= area_fraction
+    F_shf .*= area_fraction
+    F_lhf .*= area_fraction
+    F_turb_moisture .*= area_fraction
 
     # perform additional diagnostics if required
     FluxCalculator.differentiate_turbulent_fluxes!(sim, (thermo_params, input_args, fluxes))
 
-    # update fluxes in the coupler
+    # update the fluxes, which are now area-weighted, of this surface model
     fields = (;
         F_turb_ρτxz = F_turb_ρτxz,
         F_turb_ρτyz = F_turb_ρτyz,
         F_turb_energy = F_shf .+ F_lhf,
         F_turb_moisture = F_turb_moisture,
     )
-
-    # update the fluxes of this surface model
     FluxCalculator.update_turbulent_fluxes!(sim, fields)
 
+    # update fluxes in the coupler fields
     # add the flux contributing from this surface to the coupler field
-    # note that the fluxes are area-weighted, so if a surface model is
-    #  not present at this point, the fluxes are zero
-    @. csf.F_turb_ρτxz += F_turb_ρτxz * area_fraction
-    @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction
-    @. csf.F_turb_energy += (F_shf .+ F_lhf) * area_fraction
-    @. csf.F_turb_moisture += F_turb_moisture * area_fraction
+    # note that the fluxes area-weighted, so if a surface model is
+    #  not present at a point, the fluxes are zero
+    @. csf.F_turb_ρτxz += F_turb_ρτxz
+    @. csf.F_turb_ρτyz += F_turb_ρτyz
+    @. csf.F_turb_energy += (F_shf .+ F_lhf)
+    @. csf.F_turb_moisture += F_turb_moisture
 
     # NOTE: This is still an area weighted contribution, which maybe doesn't make
     # too much sense for these quantities...
 
     # L_MO can be Inf. We don't want to multiply Inf * 0, so we can handle this
     # separately.
-    @. csf.L_MO += ifelse(isinf(fluxes.L_MO), fluxes.L_MO, fluxes.L_MO * area_fraction)
-    @. csf.ustar += fluxes.ustar * area_fraction
-    @. csf.buoyancy_flux += fluxes.buoyancy_flux * area_fraction
+    @. csf.L_MO += ifelse(isinf(L_MO), L_MO, L_MO * area_fraction)
+    @. csf.ustar += ustar * area_fraction
+    @. csf.buoyancy_flux += buoyancy_flux * area_fraction
 
     z0m = Interfacer.get_field(sim, Val(:roughness_momentum))
     z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy))

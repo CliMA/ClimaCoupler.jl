@@ -237,12 +237,13 @@ function ice_rhs!(dY, Y, p, t)
     #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
     @. p.area_fraction = max(min(p.area_fraction, FT(1) - p.land_fraction), FT(0))
 
+    # Calculate the conductive flux, and set it to zero if the area fraction is zero
     F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc) # fluxes are defined to be positive when upward
+    @. F_conductive = ifelse(p.area_fraction ≈ 0, zero(F_conductive), F_conductive)
+
     rhs = @. (-p.F_turb_energy - p.F_radiative + F_conductive) / (params.h * params.ρ * params.c)
     # If tendencies lead to temperature above freezing, set temperature to freezing
-    @. rhs = min(rhs, (params.T_freeze - Y.T_sfc) / float(p.dt))
-    # mask out no-ice areas
-    dY.T_sfc .= rhs .* p.area_fraction
+    @. dY.T_sfc = min(rhs, (params.T_freeze - Y.T_sfc) / float(p.dt))
 
     @. p.q_sfc = TD.q_vap_saturation_generic.(p.thermo_params, Y.T_sfc, p.ρ_sfc, TD.Ice())
 end

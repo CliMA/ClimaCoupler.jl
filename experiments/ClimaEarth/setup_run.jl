@@ -576,7 +576,11 @@ function CoupledSimulation(config_dict::AbstractDict)
 
         # Set all initial cache values for the land model, now that we have updated drivers
         land_set_initial_cache! = CL.make_set_initial_cache(cs.model_sims.land_sim.model)
-        land_set_initial_cache!(cs.model_sims.land_sim.integrator.p, cs.model_sims.land_sim.integrator.u, cs.model_sims.land_sim.integrator.t)
+        land_set_initial_cache!(
+            cs.model_sims.land_sim.integrator.p,
+            cs.model_sims.land_sim.integrator.u,
+            cs.model_sims.land_sim.integrator.t,
+        )
 
         # 3.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
         ## TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step! (#331)

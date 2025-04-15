@@ -100,11 +100,6 @@ end
     update_boundary_fluxes! = ClimaLand.make_update_boundary_fluxes(land_sim.model)
     update_boundary_fluxes!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
 
-
-    # TODO this should be equivalent to update_aux!; update_boundary_fluxes! - test this
-    land_set_initial_cache! = CL.make_set_initial_cache(cs.model_sims.land_sim.model)
-    land_set_initial_cache!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
-
     # Compute the surface fluxes
     FluxCalculator.compute_surface_fluxes!(coupler_fluxes, land_sim, atmos_sim, boundary_space, nothing, nothing)
 
@@ -121,5 +116,11 @@ end
     @test !any(isnan, coupler_fluxes.F_turb_energy)
     @test !any(isnan, coupler_fluxes.F_turb_moisture)
 
-    @test land_sim.integrator.p.drivers
+    # Check that drivers in cache got updated
+    for driver in propertynames(land_sim.integrator.p.drivers)
+        # Snow and liquid precipitation are zero with this setup
+        if !(driver in [:P_liq, :P_snow])
+            @test getproperty(land_sim.integrator.p.drivers, driver) != zero_field
+        end
+    end
 end

@@ -107,6 +107,11 @@ function make_plots_generic(
     grid_pos = 1
 
     for var in vars
+        if all(isnan.(var.data))
+            @warn "$(short_name(var)) diagnostic is entirely NaN - skipping plot"
+            vars_left_to_plot -= 1
+            continue
+        end
         if grid_pos > MAX_PLOTS_PER_PAGE
             fig = makefig()
             grid = gridlayout()
@@ -166,7 +171,9 @@ function make_diagnostics_plots(output_path::AbstractString, plot_path::Abstract
         # Use "average" if available, otherwise use the first reduction
         reductions = CAN.available_reductions(simdir; short_name)
         "average" in reductions ? (reduction = "average") : (reduction = first(reductions))
-        vars[i] = get(simdir; short_name, reduction)
+        periods = CAN.available_periods(simdir; short_name, reduction)
+        "1d" in periods ? (period = "1d") : (period = first(periods))
+        vars[i] = get(simdir; short_name, reduction, period)
     end
 
     # Filter vars into 2D and 3D variable diagnostics vectors

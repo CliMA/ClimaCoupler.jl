@@ -27,7 +27,7 @@ function postprocess_sim(cs, postprocessing_vars)
 
     # Plot all model states and coupler fields (useful for debugging)
     # TODO can't make debug plots because we have some NaNs
-    # !CA.is_distributed(cs.comms_ctx) && debug(cs, artifact_dir)
+    !CA.is_distributed(cs.comms_ctx) && debug(cs, artifact_dir)
 
     # If we have enough data (in time, but also enough variables), plot the leaderboard.
     # We need pressure to compute the leaderboard.

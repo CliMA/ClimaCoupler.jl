@@ -180,7 +180,7 @@ function ClimaLandSimulation(
             model,
             start_date,
             output_writer = netcdf_writer,
-            output_vars = :long,
+            output_vars = :short,
             average_period = :daily,
         )
         diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)

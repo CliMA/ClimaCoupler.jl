@@ -516,6 +516,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         @info "Using default coupler diagnostics"
         coupler_diags_path = joinpath(dir_paths.output, "coupler")
         isdir(coupler_diags_path) || mkpath(coupler_diags_path)
+        diagnostics_dt = Dates.Day(1)
         diags_handler =
             coupler_diagnostics_setup(coupler_fields, coupler_diags_path, start_date, tspan[1], diagnostics_dt, Δt_cpl)
     else

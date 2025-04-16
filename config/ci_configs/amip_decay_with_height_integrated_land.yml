@@ -32,3 +32,7 @@ vert_diff: "DecayWithHeightDiffusion"
 viscous_sponge: true
 z_elem: 39
 z_max: 60000.0
+extra_atmos_diagnostics:
+  - short_name: [pr, rhoa, uas, vas, thetaa, hussfc, ts]
+    reduction_time: average
+    period: 1days

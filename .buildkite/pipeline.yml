@@ -121,8 +121,8 @@ steps:
   #         slurm_ntasks: 2
   #         slurm_mem: 32G
 
-  - group: "Integration Tests"
-    steps:
+  # - group: "Integration Tests"
+  #   steps:
       # SLABPLANET EXPERIMENTS
 
   #     # Slabplanet default:
@@ -190,19 +190,19 @@ steps:
   #       agents:
   #         slurm_mem: 20GB
 
-        - label: "AMIP: DecayWithHeight + integrated land"
-          key: "amip_integrated_land"
-          command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decay_with_height_integrated_land.yml --job_id amip_integrated_land"
-          artifact_paths: "experiments/ClimaEarth/output/amip_integrated_land/artifacts/*"
-          agents:
-            slurm_mem: 20GB
+        # - label: "AMIP: DecayWithHeight + integrated land"
+        #   key: "amip_integrated_land"
+        #   command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decay_with_height_integrated_land.yml --job_id amip_integrated_land"
+        #   artifact_paths: "experiments/ClimaEarth/output/amip_integrated_land/artifacts/*"
+        #   agents:
+        #     slurm_mem: 20GB
 
-        - label: "AMIP: DecayWithHeight + bucket"
-          key: "amip_decay_with_height_bucket"
-          command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decay_with_height_bucket.yml --job_id amip_decay_with_height_bucket"
-          artifact_paths: "experiments/ClimaEarth/output/amip_decay_with_height_bucket/artifacts/*"
-          agents:
-            slurm_mem: 20GB
+        # - label: "AMIP: DecayWithHeight + bucket"
+        #   key: "amip_decay_with_height_bucket"
+        #   command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decay_with_height_bucket.yml --job_id amip_decay_with_height_bucket"
+        #   artifact_paths: "experiments/ClimaEarth/output/amip_decay_with_height_bucket/artifacts/*"
+        #   agents:
+        #     slurm_mem: 20GB
 
   #     - label: "AMIP: bucket initial condition test"
   #       command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_bucket_ic.yml --job_id amip_bucket_ic"

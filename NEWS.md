@@ -6,13 +6,15 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
-#### Remove `area_mask`. [PR#1268](https://github.com/CliMA/ClimaCoupler.jl/pull/1268/files)
-
+#### Remove `area_mask`, `binary_mask`, `mono_surface`. [PR#1268](https://github.com/CliMA/ClimaCoupler.jl/pull/1268/files)
 Removes all uses of `area_mask`, as multiplying quantities by both `area_fraction`
 and `area_mask` will potentially lead to physically inaccurate results.
 It also defeats the purpose of maintaining that the sum of surface models'
 area fractions is 1 at all points. See issue [#1255](https://github.com/CliMA/ClimaCoupler.jl/issues/1255) for more details.
-Also removes the function `Utilities.binary_mask`, as it's now unused.
+The function `Utilities.binary_mask` is also removed, as it's now unused.
+The option `mono_surface` is no longer supported, as it was rarely exercised
+and did not do what it was documented to do. All simulations now have
+behavior equivalent to using `mono_surface: false` previously.
 
 #### Removed hierarchy experiments. PR[#1277](https://github.com/CliMA/ClimaCoupler.jl/pull/1277)
 

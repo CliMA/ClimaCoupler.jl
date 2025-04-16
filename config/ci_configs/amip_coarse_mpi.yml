@@ -5,7 +5,6 @@ energy_check: false
 h_elem: 4
 mode_name: "amip"
 moist: "equil"
-mono_surface: false
 precip_model: "0M"
 rad: "allskywithclear"
 t_end: "10days"

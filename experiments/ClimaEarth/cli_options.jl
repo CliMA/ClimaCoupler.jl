@@ -97,10 +97,6 @@ function argparse_settings()
         help = "Boolean flag indicating whether to use a dynamic slab ocean model, as opposed to constant surface temperatures [`true` (default), `false`]"
         arg_type = Bool
         default = true
-        "--mono_surface"
-        help = "Boolean flag indicating whether (1st order) monotone and conservative remapping is applied. [`false` (default), `true`]"
-        arg_type = Bool
-        default = false
         "--turb_flux_partition"
         help = "Method to partition turbulent fluxes. [`PartitionedStateFluxes`, `CombinedStateFluxesMOST` (default)]"
         arg_type = String

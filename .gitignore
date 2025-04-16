@@ -54,3 +54,4 @@ slurm-*.out
 # ignore vscode artifacts
 *.vscode
 *.DS
+*.qodo

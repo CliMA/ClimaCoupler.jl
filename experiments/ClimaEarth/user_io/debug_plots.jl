@@ -238,7 +238,31 @@ Interfacer.get_field(sim::BucketSimulation, ::Val{:σS}) = sim.integrator.u.buck
 Interfacer.get_field(sim::BucketSimulation, ::Val{:Ws}) = sim.integrator.u.bucket.Ws
 Interfacer.get_field(sim::BucketSimulation, ::Val{:W}) = sim.integrator.u.bucket.W
 
+# additional ClimaLand model debug fields
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_water}) = sim.integrator.u.soil.ϑ_l
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_ice}) = sim.integrator.u.soil.θ_i
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_energy}) = sim.integrator.u.soil.ρe_int
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:canopy_temp}) = sim.integrator.u.canopy.energy.T
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:canopy_water}) = sim.integrator.u.canopy.hydraulics.ϑ_l
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_energy}) = sim.integrator.u.snow.U
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_water_equiv}) = sim.integrator.u.snow.S
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_liquid_water}) = sim.integrator.u.snow.S_l
+
 # currently selected plot fields
 plot_field_names(sim::Interfacer.SurfaceModelSimulation) = (:area_fraction, :surface_temperature, :surface_humidity)
+plot_field_names(sim::ClimaLandSimulation) = (
+    :area_fraction,
+    :surface_direct_albedo,
+    :surface_diffuse_albedo,
+    :surface_temperature,
+    :soil_water,
+    :soil_ice,
+    :soil_energy,
+    :canopy_temp,
+    :canopy_water,
+    :snow_energy,
+    :snow_water_equiv,
+    :snow_liquid_water,
+)
 plot_field_names(sim::BucketSimulation) = (:area_fraction, :surface_temperature, :surface_humidity, :σS, :Ws, :W)
 plot_field_names(sim::ClimaAtmosSimulation) = (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)

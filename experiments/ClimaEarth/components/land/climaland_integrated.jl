@@ -24,12 +24,14 @@ It contains the following objects:
 - `model::M`: The `ClimaLand.LandModel`.
 - `integrator::I`: The integrator used in timestepping this model.
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model.
+- `output_writer::OW`: The diagnostic output writer.
 """
-struct ClimaLandSimulation{M <: ClimaLand.LandModel, I <: SciMLBase.AbstractODEIntegrator, A <: CC.Fields.Field} <:
+struct ClimaLandSimulation{M <: ClimaLand.LandModel, I <: SciMLBase.AbstractODEIntegrator, A <: CC.Fields.Field, OW} <:
        Interfacer.LandModelSimulation
     model::M
     integrator::I
     area_fraction::A
+    output_writer::OW
 end
 
 """
@@ -175,17 +177,18 @@ function ClimaLandSimulation(
 
     # Set up diagnostics
     if use_land_diagnostics
-        netcdf_writer = CD.Writers.NetCDFWriter(subsurface_space, output_dir; start_date)
+        output_writer = CD.Writers.NetCDFWriter(subsurface_space, output_dir; start_date)
         scheduled_diagnostics = CL.default_diagnostics(
             model,
             start_date,
-            output_writer = netcdf_writer,
+            output_writer = output_writer,
             output_vars = :short,
             average_period = :monthly,
         )
         diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)
         diag_cb = CD.DiagnosticsCallback(diagnostic_handler)
     else
+        output_writer = nothing
         diag_cb = nothing
     end
 
@@ -201,7 +204,7 @@ function ClimaLandSimulation(
         callback = SciMLBase.CallbackSet(diag_cb),
     )
 
-    return ClimaLandSimulation(model, integrator, area_fraction)
+    return ClimaLandSimulation(model, integrator, area_fraction, output_writer)
 end
 
 ###############################################################################

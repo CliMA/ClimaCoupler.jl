@@ -111,11 +111,3 @@ The resolutions of runs in this pipeline vary from 4 to 16 horizontal elements.
 The simplest simulations are only run on CPU, but some of the more complex
 simulations are run on GPU in addition to CPU.
 
-# [ClimaCoupler-Hierarchies](https://buildkite.com/clima/climacoupler-hierarchies)
-- Runs on Caltech Central cluster
-
-This pipeline runs a set of simulations that will be used in an upcoming paper.
-Notably, this is the only pipeline that doesn't exclusively use the `run_amip.jl` driver.
-
-The paper and simulations are still under development, so this pipeline is unstable
-and prone to changes in the near future.

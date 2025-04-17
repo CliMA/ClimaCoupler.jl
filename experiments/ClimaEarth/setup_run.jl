@@ -550,7 +550,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         # 2.surface density (`ρ_sfc`): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface.
         # For this, we need to import surface and atmospheric fields. The model sims are then updated with the new surface density.
         FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes)
-        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
+        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes)
         FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 
         # 3.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
@@ -588,7 +588,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         # and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxesMOST`,
         # and sends them to the surface component models. If `turbulent_fluxes isa PartitionedStateFluxes`
         # atmos receives the turbulent fluxes from the coupler.
-        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
+        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes)
         FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
     end
     return cs
@@ -764,7 +764,7 @@ function step!(cs::CoupledSimulation)
     end
 
     ## update the coupler with the new atmospheric properties
-    FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
+    FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # radiative and/or turbulent
 
     ## callback to checkpoint model state
     TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs)

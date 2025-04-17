@@ -90,7 +90,7 @@ end
     # Exchange the initial conditions between atmosphere and land
     # This also tests the `get_field`, `update_field!` and `update_model_sims!` methods for `ClimaLandSimulation`
     FieldExchanger.import_combined_surface_fields!(coupler_fields, model_sims, flux_type)
-    FieldExchanger.import_atmos_fields!(coupler_fields, model_sims, boundary_space, flux_type)
+    FieldExchanger.import_atmos_fields!(coupler_fields, model_sims, flux_type)
     FieldExchanger.update_model_sims!(model_sims, coupler_fields, flux_type)
 
     # Update land cache variables with the updated drivers in the cache after the exchange

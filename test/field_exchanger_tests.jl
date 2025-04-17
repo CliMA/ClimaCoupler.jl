@@ -223,7 +223,7 @@ for FT in (Float32, Float64)
         for (i, t) in enumerate(flux_types)
             coupler_fields =
                 NamedTuple{coupler_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_names)))
-            FieldExchanger.import_atmos_fields!(coupler_fields, model_sims, boundary_space, t)
+            FieldExchanger.import_atmos_fields!(coupler_fields, model_sims, t)
             @test Array(parent(coupler_fields.F_turb_energy))[1] == results[i]
             @test Array(parent(coupler_fields.F_turb_moisture))[1] == results[i]
             @test Array(parent(coupler_fields.F_radiative))[1] == results[1]

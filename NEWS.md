@@ -6,6 +6,12 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Removed hierarchy experiments. PR[#1277](https://github.com/CliMA/ClimaCoupler.jl/pull/1277)
+
+The hierarchy experiments have been removed. The last commit that contains them
+is
+[a6557a3](https://github.com/CliMA/ClimaCoupler.jl/commit/a6557a3bd5853e099429c6f3dda4644c3e28c0d0).
+
 #### Switch to `PartitionedStateFluxes` by default. PR[#1117](https://github.com/CliMA/ClimaCoupler.jl/pull/1117)
 
 Fixed `PartitionedStateFluxes` option. Now `PartitionedStateFluxes` is the

@@ -23,7 +23,6 @@ coupler_output_dir: "experiments/calibration/output"
 t_end: "30days"
 topo_smoothing: true
 topography: "Earth"
-turb_flux_partition: "PartitionedStateFluxes"
 viscous_sponge: true
 z_elem: 39
 z_max: 60000.0

@@ -6,6 +6,19 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Removed `SurfaceScheme`. PR[#1280](https://github.com/CliMA/ClimaCoupler.jl/pull/1280)
+
+The `BulkScheme` option for computing fluxes was removed. Now, fluxes
+are always computed with the `MoninObukhovScheme`.
+
+#### Removed `CombinedStateFluxes`. PR[#1276](https://github.com/CliMA/ClimaCoupler.jl/pull/1276)
+
+The `CombinedStateFluxes` option for computing fluxes was removed. Now, fluxes
+are always computed with the option formerly known as `PartitionedStateFluxes`
+(no longer an option). Related code was also removed.
+
+`partitioned_turbolent_fluxes!` was renamed to `turbulent_fluxes!`.
+
 #### Remove `area_mask`, `binary_mask`, `mono_surface`. [PR#1268](https://github.com/CliMA/ClimaCoupler.jl/pull/1268/files)
 Removes all uses of `area_mask`, as multiplying quantities by both `area_fraction`
 and `area_mask` will potentially lead to physically inaccurate results.
@@ -27,7 +40,7 @@ is
 Fixed `PartitionedStateFluxes` option. Now `PartitionedStateFluxes` is the
 default: instead of combining the surface states and computing fluxes once, we
 compute surface fluxes for each component and combine them. Results might be
-different. The `CombinedStateFluxes` option will be removed very soon.
+different.
 
 #### Split `setup_and_run` in multiple functions. PR[#1251](https://github.com/CliMA/ClimaCoupler.jl/pull/1251)
 

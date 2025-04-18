@@ -435,7 +435,7 @@ end
 Interfacer.step!(sim::ClimaLandSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 Interfacer.reinit!(sim::ClimaLandSimulation, t) = Interfacer.reinit!(sim.integrator, t)
 
-function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, turbulent_fluxes, area_fraction)
+function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, area_fraction)
     # update fields for radiative transfer
     Interfacer.update_field!(sim, Val(:diffuse_fraction), csf.diffuse_fraction)
     Interfacer.update_field!(sim, Val(:sw_d), csf.SW_d)
@@ -453,7 +453,7 @@ function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, turbulent_flu
     Interfacer.update_field!(sim, Val(:snow_precipitation), csf.P_snow)
 end
 
-function FieldExchanger.import_atmos_fields!(csf, sim::ClimaLandSimulation, atmos_sim, turbulent_fluxes)
+function FieldExchanger.import_atmos_fields!(csf, sim::ClimaLandSimulation, atmos_sim)
     FieldExchanger.dummmy_remap!(csf.diffuse_fraction, Interfacer.get_field(atmos_sim, Val(:diffuse_fraction)))
     FieldExchanger.dummmy_remap!(csf.SW_d, Interfacer.get_field(atmos_sim, Val(:SW_d)))
     FieldExchanger.dummmy_remap!(csf.LW_d, Interfacer.get_field(atmos_sim, Val(:LW_d)))

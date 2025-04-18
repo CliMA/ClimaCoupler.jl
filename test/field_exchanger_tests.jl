@@ -160,7 +160,6 @@ for FT in (Float32, Float64)
             ), # model_sims
             (;), # callbacks
             (;), # dirs
-            nothing, # turbulent_fluxes
             nothing, # thermo_params
             nothing, # diags_handler
         )
@@ -218,18 +217,14 @@ for FT in (Float32, Float64)
         model_sims =
             (; atmos_sim = DummySimulation(component_fields), land_sim = TestSurfaceSimulation1(component_fields))
 
-        flux_types = (FluxCalculator.CombinedStateFluxesMOST(), FluxCalculator.PartitionedStateFluxes())
-        results = [FT(1), FT(0)]
-        for (i, t) in enumerate(flux_types)
-            coupler_fields =
-                NamedTuple{coupler_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_names)))
-            FieldExchanger.import_atmos_fields!(coupler_fields, model_sims, t)
-            @test all(Array(parent(coupler_fields.F_turb_energy)) .== results[i])
-            @test all(Array(parent(coupler_fields.F_turb_moisture)) .== results[i])
-            @test all(Array(parent(coupler_fields.F_radiative)) .== results[1])
-            @test all(Array(parent(coupler_fields.P_liq)) .== results[1])
-            @test all(Array(parent(coupler_fields.P_snow)) .== results[1])
-        end
+        coupler_fields = NamedTuple{coupler_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_names)))
+        FieldExchanger.import_atmos_fields!(coupler_fields, model_sims)
+        @test Array(parent(coupler_fields.F_turb_energy))[1] == FT(0)
+        @test Array(parent(coupler_fields.F_turb_moisture))[1] == FT(0)
+        @test coupler_fields.F_radiative == model_sims.atmos_sim.cache.radiative_energy_flux_sfc
+        @test coupler_fields.P_liq == model_sims.atmos_sim.cache.liquid_precipitation
+        @test coupler_fields.P_snow == model_sims.atmos_sim.cache.snow_precipitation
+
     end
 
     @testset "import_combined_surface_fields! for FT=$FT" begin
@@ -250,21 +245,14 @@ for FT in (Float32, Float64)
 
         sims = (; a = TestSurfaceSimulation1(ones(boundary_space)), b = TestSurfaceSimulation2(ones(boundary_space)))
 
-        # test the coupler update under CombinedStateFluxesMOST (update all) and PartitionedStateFluxes (update all except
-        # surface info needed for the calculation of turbulent fluxes)
-        flux_types = (FluxCalculator.CombinedStateFluxesMOST(), FluxCalculator.PartitionedStateFluxes())
-        results = [FT(0.5), FT(0)] # 0.5 due to the area fraction weighting
-        for (i, t) in enumerate(flux_types)
-            coupler_fields =
-                NamedTuple{coupler_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_names)))
-            FieldExchanger.import_combined_surface_fields!(coupler_fields, sims, t)
-            @test Array(parent(coupler_fields.T_sfc))[1] == results[1]
-            @test Array(parent(coupler_fields.surface_direct_albedo))[1] == results[1]
-            @test Array(parent(coupler_fields.surface_diffuse_albedo))[1] == results[1]
-            @test Array(parent(coupler_fields.z0m_sfc))[1] == results[i]
-            @test Array(parent(coupler_fields.z0b_sfc))[1] == results[i]
-            @test Array(parent(coupler_fields.beta))[1] == results[i]
-        end
+        coupler_fields = NamedTuple{coupler_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_names)))
+        FieldExchanger.import_combined_surface_fields!(coupler_fields, sims)
+        expected_field =
+            Interfacer.get_field(sims.a, Val(:area_fraction)) .* sims.a.cache_field .+
+            Interfacer.get_field(sims.b, Val(:area_fraction)) .* sims.b.cache_field
+        @test coupler_fields.T_sfc == expected_field
+        @test coupler_fields.surface_direct_albedo == expected_field
+        @test coupler_fields.surface_diffuse_albedo == expected_field
     end
 
     @testset "update_model_sims! for FT=$FT" begin
@@ -315,41 +303,28 @@ for FT in (Float32, Float64)
         )
         coupler_fields.surface_diffuse_albedo .= FT(0.5)
 
-        # test the sim update under CombinedStateFluxesMOST (update all) and PartitionedStateFluxes (update all except turbulent fluxes)
-        flux_types = (FluxCalculator.CombinedStateFluxesMOST(), FluxCalculator.PartitionedStateFluxes())
+        # test the sim update
         results = [FT(0), FT(1), FT(0.5)]
-        for (i, t) in enumerate(flux_types)
-            model_sims.atmos_sim.cache.roughness_momentum .= FT(0)
-            FieldExchanger.update_model_sims!(model_sims, coupler_fields, t)
+        model_sims.atmos_sim.cache.roughness_momentum .= FT(0)
+        FieldExchanger.update_model_sims!(model_sims, coupler_fields)
 
-            # test atmos
-            @test all(Array(parent(model_sims.atmos_sim.cache.albedo_direct)) .== results[2])
-            @test all(Array(parent(model_sims.atmos_sim.cache.albedo_diffuse)) .== results[3])
-            if t isa FluxCalculator.CombinedStateFluxesMOST
-                @test all(Array(parent(model_sims.atmos_sim.cache.roughness_momentum)) .== results[2])
-            else
-                @test all(Array(parent(model_sims.atmos_sim.cache.roughness_momentum)) .== results[1])
-            end
+        # test atmos
+        @test Array(parent(model_sims.atmos_sim.cache.albedo_direct))[1] == results[2]
+        @test Array(parent(model_sims.atmos_sim.cache.albedo_diffuse))[1] == results[3]
 
-            # test variables without updates
-            @test all(Array(parent(model_sims.atmos_sim.cache.surface_temperature)) .== results[1])
-            @test all(Array(parent(model_sims.atmos_sim.cache.beta)) .== results[1])
-            @test all(Array(parent(model_sims.atmos_sim.cache.roughness_buoyancy)) .== results[1])
+        # test variables without updates
+        @test Array(parent(model_sims.atmos_sim.cache.surface_temperature))[1] == results[1]
+        @test Array(parent(model_sims.atmos_sim.cache.beta))[1] == results[1]
+        @test Array(parent(model_sims.atmos_sim.cache.roughness_buoyancy))[1] == results[1]
 
-            # test surface (fluxes must be multiplied by this surface's area fraction)
-            area_fraction = Interfacer.get_field(model_sims.land_sim, Val(:area_fraction))
-            @test all(Array(parent(model_sims.land_sim.cache.turbulent_energy_flux)) .== results[2] .* area_fraction) # assuming units / m2
-            @test all(Array(parent(model_sims.land_sim.cache.turbulent_moisture_flux)) .== results[2] .* area_fraction)
+        # test variables without updates
+        @test Array(parent(model_sims.land_sim.cache.radiative_energy_flux_sfc))[1] == results[1]
+        @test Array(parent(model_sims.land_sim.cache.liquid_precipitation))[1] == results[1]
+        @test Array(parent(model_sims.land_sim.cache.snow_precipitation))[1] == results[1]
 
-            # test variables without updates
-            @test all(Array(parent(model_sims.land_sim.cache.radiative_energy_flux_sfc)) .== results[1])
-            @test all(Array(parent(model_sims.land_sim.cache.liquid_precipitation)) .== results[1])
-            @test all(Array(parent(model_sims.land_sim.cache.snow_precipitation)) .== results[1])
-
-            # test stub - albedo should be updated by update_sim!
-            @test all(Array(parent(model_sims.stub_sim.cache.albedo_direct)) .== results[2])
-            @test all(Array(parent(model_sims.stub_sim.cache.albedo_diffuse)) .== results[2])
-        end
+        # test stub - albedo should be updated by update_sim!
+        @test Array(parent(model_sims.stub_sim.cache.albedo_direct))[1] == results[2]
+        @test Array(parent(model_sims.stub_sim.cache.albedo_diffuse))[1] == results[2]
     end
     @testset "reinit_model_sims! for FT=$FT" begin
         @test FieldExchanger.reinit_model_sims!((; stub = TestSurfaceSimulation1(FT(0)))) === nothing

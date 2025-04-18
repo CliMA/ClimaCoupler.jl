@@ -178,10 +178,12 @@ end
 ###
 # ode
 function slab_ocean_rhs!(dY, Y, cache, t)
-    p, F_turb_energy, F_radiative, area_fraction = cache
-    FT = eltype(Y.T_sfc)
+    p, F_turb_energy, F_radiative = cache
     rhs = @. -(F_turb_energy + F_radiative) / (p.h * p.ρ * p.c)
-    @. dY.T_sfc = rhs * Utilities.binary_mask(area_fraction) * p.evolving_switch
+
+    # Note that the area fraction has already been applied to the fluxes,
+    #  so we don't need to multiply by it here.
+    @. dY.T_sfc = rhs * p.evolving_switch
     @. cache.q_sfc = TD.q_vap_saturation_generic.(cache.thermo_params, Y.T_sfc, cache.ρ_sfc, TD.Liquid())
 end
 

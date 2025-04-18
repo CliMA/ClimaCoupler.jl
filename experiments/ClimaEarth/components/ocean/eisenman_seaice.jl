@@ -249,8 +249,10 @@ function FluxCalculator.differentiate_turbulent_fluxes!(
 
     # calculate the surface fluxes
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
-    _, _, F_shf_δT_sfc, F_lhf_δT_sfc, _ = FluxCalculator.get_surface_fluxes!(inputs, surface_params, area_fraction)
+    _, _, F_shf_δT_sfc, F_lhf_δT_sfc, _ = FluxCalculator.get_surface_fluxes!(inputs, surface_params)
 
+    F_shf_δT_sfc .*= area_fraction
+    F_lhf_δT_sfc .*= area_fraction
     (; F_shf, F_lhf) = fluxes
 
     # calculate the derivative
@@ -409,5 +411,5 @@ function ∑tendencies(dY, Y, cache, _)
     @. dY.q_sfc = -Y.q_sfc / Δt
 
     # update ice area fraction (binary mask for now)
-    cache.ice_area_fraction .= Utilities.binary_mask.(Y.h_ice)
+    @. cache.ice_area_fraction = ifelse(Y.h_ice > 0, one(Y.h_ice), zero(Y.h_ice))
 end

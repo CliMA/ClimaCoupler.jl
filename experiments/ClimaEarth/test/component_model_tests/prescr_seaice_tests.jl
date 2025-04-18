@@ -1,5 +1,6 @@
 import Test: @test, @testset
 import Dates
+import NCDatasets
 import ClimaCore as CC
 import Thermodynamics.Parameters as TDP
 import ClimaParams # required for TDP
@@ -41,12 +42,11 @@ for FT in (Float32, Float64)
             # Get initial SIC values and use them to calculate ice fraction
             SIC_init = CC.Fields.zeros(space)
             evaluate!(SIC_init, SIC_timevaryinginput, t_start)
-            ice_fraction = get_ice_fraction.(SIC_init, false)
 
             cache = (;
                 F_turb_energy = CC.Fields.zeros(space),
                 F_radiative = CC.Fields.zeros(space) .+ FT(F_radiative),
-                area_fraction = ice_fraction,
+                area_fraction = SIC_init,
                 SIC_timevaryinginput = SIC_timevaryinginput,
                 land_fraction = CC.Fields.zeros(space),
                 q_sfc = CC.Fields.zeros(space),
@@ -69,8 +69,7 @@ for FT in (Float32, Float64)
         # check that extracting expected T due to input atmopsheric fluxes
         dY, Y, p = test_sea_ice_rhs(F_radiative = 1.0)
         dT_expected = -1.0 / (p.params.h * p.params.ρ * p.params.c)
-        @test minimum(dY) ≈ FT(dT_expected)
-        @test maximum(dY) ≈ FT(0)
+        @test all(extrema(dY) .≈ FT(dT_expected))
 
         # check that tendency will not result in above freezing T
         dY, Y, p = test_sea_ice_rhs(F_radiative = 0.0, T_base = 330.0) # Float32 requires a large number here!

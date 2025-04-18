@@ -8,7 +8,6 @@ h_elem: 6
 land_albedo_type: "function"
 mode_name: "slabplanet_aqua"
 moist: "equil"
-mono_surface: true
 precip_model: "0M"
 rad: "gray"
 start_date: "20100101"

@@ -103,7 +103,6 @@ function get_coupler_args(config_dict::Dict)
 
     # Physical simulation information
     evolving_ocean = config_dict["evolving_ocean"]
-    mono_surface = config_dict["mono_surface"]
     turb_flux_partition = config_dict["turb_flux_partition"]
 
     # Conservation information
@@ -136,7 +135,6 @@ function get_coupler_args(config_dict::Dict)
         use_coupler_diagnostics,
         diagnostics_dt,
         evolving_ocean,
-        mono_surface,
         turb_flux_partition,
         energy_check,
         conservation_softfail,

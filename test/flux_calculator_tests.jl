@@ -18,10 +18,6 @@ struct DummySimulation2{C} <: Interfacer.AtmosModelSimulation
     cache::C
 end
 
-function FluxCalculator.atmos_turbulent_fluxes_most!(sim::DummySimulation, csf)
-    sim.cache.flux .= (csf.T_sfc .- sim.state.T) .* sim.cache.κ ./ sim.cache.dz # Eq. 1
-end
-
 # atmos sim object and extensions
 struct TestAtmos{P, D, I} <: Interfacer.AtmosModelSimulation
     params::P
@@ -121,28 +117,6 @@ function FluxCalculator.water_albedo_from_atmosphere!(::TestAtmos, temp1::CC.Fie
 end
 
 for FT in (Float32, Float64)
-    @testset "combined_turbulent_fluxes! for FT=$FT" begin
-        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
-        coupler_fields = (; T_sfc = 310 .* ones(boundary_space))
-        sim = DummySimulation(
-            (; T = 300 .* ones(boundary_space)),
-            (; κ = FT(0.01), dz = FT(1), flux = zeros(boundary_space)),
-        )
-        model_sims = (; atmos_sim = sim)
-        flux_types = (FluxCalculator.CombinedStateFluxesMOST(), FluxCalculator.PartitionedStateFluxes())
-        # the result of Eq 1 above, given these states, is 0.1 W/m2, but under PartitionedStateFluxes() turbulent fluxes are
-        # not calculated using this method (using combined surface properties), so the fluxes remain 0.
-        results = [FT(0.1), FT(0.0)]
-        for (i, t) in enumerate(flux_types)
-            sim.cache.flux .= FT(0)
-            FluxCalculator.combined_turbulent_fluxes!(model_sims, coupler_fields, t)
-            @test Array(parent(sim.cache.flux))[1] ≈ results[i]
-        end
-        sim2 = DummySimulation2((; cache = (; flux = zeros(boundary_space))))
-        model_sims = (; atmos_sim = sim2)
-        @test_throws ErrorException FluxCalculator.atmos_turbulent_fluxes_most!(sim2, coupler_fields)
-    end
-
     @testset "calculate_surface_air_density for FT=$FT" begin
         boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
         coupler_fields = (; T_sfc = 310 .* ones(boundary_space))
@@ -214,11 +188,11 @@ for FT in (Float32, Float64)
 
         # calculate turbulent fluxes
         thermo_params = get_thermo_params(atmos_sim)
-        FluxCalculator.partitioned_turbulent_fluxes!(model_sims, fields, boundary_space, scheme, thermo_params)
+        FluxCalculator.turbulent_fluxes!(model_sims, fields, boundary_space, scheme, thermo_params)
 
         # calculating the fluxes twice ensures that no accumulation occurred (i.e. fluxes are reset to zero each time)
         # TODO: this will need to be extended once flux accumulation is re-enabled
-        FluxCalculator.partitioned_turbulent_fluxes!(model_sims, fields, boundary_space, scheme, thermo_params)
+        FluxCalculator.turbulent_fluxes!(model_sims, fields, boundary_space, scheme, thermo_params)
 
         windspeed = @. hypot(atmos_sim.integrator.p.u, atmos_sim.integrator.p.v)
 
@@ -283,7 +257,6 @@ for FT in (Float32, Float64)
             model_sims, # model_sims
             (;), # callbacks
             (;), # dirs
-            nothing, # turbulent_fluxes
             nothing, # thermo_params
             nothing, # diags_handler
         )

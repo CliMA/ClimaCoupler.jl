@@ -321,7 +321,7 @@ function Interfacer.add_coupler_fields!(coupler_field_names, ::BucketSimulation)
     push!(coupler_field_names, bucket_coupler_fields...)
 end
 
-# extensions required by FluxCalculator (partitioned fluxes)
+# extensions required by FluxCalculator
 function FluxCalculator.update_turbulent_fluxes!(sim::BucketSimulation, fields::NamedTuple)
     (; F_turb_energy, F_turb_moisture) = fields
     turbulent_fluxes = sim.integrator.p.bucket.turbulent_fluxes

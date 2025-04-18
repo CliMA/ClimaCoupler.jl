@@ -23,10 +23,8 @@ function coupler_diagnostics_setup(fields, output_dir, start_date, t_start, diag
         long_name = "Turbulent energy fluxes",
         standard_name = "F_turb_energy",
         units = "W m^-2",
-        comments = "When using partitioned surface fluxes, turbulent energy fluxes are calculated as
-                    the sum of sensible and latent heat fluxes, weighted by surface simulation area.
-                    When using combined surface fluxes, turbulent energy fluxes are calculated using
-                    the surface conditions calculated in ClimaAtmos.",
+        comments = "Turbulent energy fluxes are calculated as the sum of sensible and latent heat fluxes,
+                    weighted by surface simulation area.",
         compute! = (out, state, cache, time) -> begin
             if isnothing(out)
                 return state.F_turb_energy

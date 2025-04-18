@@ -1,5 +1,4 @@
 apply_limiter: false
-conservation_softfail: true
 dt: "200secs"
 dt_cpl: "200secs"
 dt_save_to_sol: "9days"

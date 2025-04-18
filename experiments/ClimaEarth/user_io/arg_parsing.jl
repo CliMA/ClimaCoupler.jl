@@ -107,7 +107,6 @@ function get_coupler_args(config_dict::Dict)
 
     # Conservation information
     energy_check = config_dict["energy_check"]
-    conservation_softfail = config_dict["conservation_softfail"]
 
     # Output information
     output_dir_root = joinpath(config_dict["coupler_output_dir"], job_id)
@@ -137,7 +136,6 @@ function get_coupler_args(config_dict::Dict)
         evolving_ocean,
         turb_flux_partition,
         energy_check,
-        conservation_softfail,
         output_dir_root,
         land_albedo_type,
         land_initial_condition,

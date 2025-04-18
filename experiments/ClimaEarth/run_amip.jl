@@ -45,8 +45,4 @@ config_file = parse_commandline(argparse_settings())["config_file"]
 # Set up and run the coupled simulation
 cs = CoupledSimulation(config_file)
 run!(cs)
-
-# Postprocessing
-# TODO: Remove this option?
-conservation_softfail = get_coupler_config_dict(config_file)["conservation_softfail"]
-postprocess(cs, conservation_softfail)
+postprocess(cs)

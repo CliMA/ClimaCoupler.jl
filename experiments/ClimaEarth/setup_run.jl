@@ -659,15 +659,12 @@ function run!(cs::CoupledSimulation; precompile = (cs.tspan[end] > 2 * cs.Δt_cp
 end
 
 """
-    postprocess(cs, conservation_softfail)
+    postprocess(cs)
 
 Process the results after a simulation has completed, including generating
 plots, checking conservation, and other diagnostics.
-
-When `conservation_softfail` is true, throw an error if conservation is not
-respected.
 """
-function postprocess(cs, conservation_softfail)
+function postprocess(cs)
     #=
     ## Postprocessing
     All postprocessing is performed using the root process only, if applicable.
@@ -683,8 +680,7 @@ function postprocess(cs, conservation_softfail)
     =#
 
     if ClimaComms.iamroot(cs.comms_ctx) && !isnothing(cs.diags_handler)
-        postprocessing_vars = (; conservation_softfail)
-        postprocess_sim(cs, postprocessing_vars)
+        postprocess_sim(cs)
     end
     return nothing
 end

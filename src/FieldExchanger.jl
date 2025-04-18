@@ -266,13 +266,6 @@ function dummmy_remap!(target, source)
 end
 
 """
-    nans_to_zero(v)
-
-Replaces NaNs with zeros, otherwise returns the value.
-"""
-nans_to_zero(v) = isnan(v) ? typeof(v)(0) : v
-
-"""
     combine_surfaces!(combined_field::CC.Fields.Field, sims, field_name::Val)
 
 Sums the fields, specified by `field_name`, weighted by the respective area fractions of all
@@ -287,11 +280,15 @@ surface simulations. THe result is saved in `combined_field`.
 - `combine_surfaces!(temp_field, cs.model_sims, Val(:surface_temperature))`
 """
 function combine_surfaces!(combined_field, sims, field_name)
-    combined_field .= eltype(combined_field)(0)
+    combined_field .= 0
     for sim in sims
         if sim isa Interfacer.SurfaceModelSimulation
+            # Zero out the contribution from this surface if the area fraction is zero
+            # Note that multiplying by `area_fraction` is not sufficient in the case of NaNs
+            area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
             combined_field .+=
-                Interfacer.get_field(sim, Val(:area_fraction)) .* nans_to_zero.(Interfacer.get_field(sim, field_name)) # this ensures that unitialized (masked) areas do not affect (TODO: move to mask / remove)
+                area_fraction .*
+                ifelse.(area_fraction .≈ 0, zero(combined_field), Interfacer.get_field(sim, field_name))
         end
     end
 end

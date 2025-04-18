@@ -30,5 +30,4 @@ If an `update_field!` function is not defined for a particular component model, 
 ```@docs
     ClimaCoupler.FieldExchanger.combine_surfaces!
     ClimaCoupler.FieldExchanger.dummmy_remap!
-    ClimaCoupler.FieldExchanger.nans_to_zero
 ```

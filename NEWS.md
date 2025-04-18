@@ -6,6 +6,10 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Remove `nans_to_zero`. PR[#1278](https://github.com/CliMA/ClimaCoupler.jl/pull/1278)
+Instead of zeroing out all NaNs in a surface field, we zero out all values
+where the area fraction is 0, which is logically what we want to do.
+
 #### Remove `area_mask`, `binary_mask`, `mono_surface`. [PR#1268](https://github.com/CliMA/ClimaCoupler.jl/pull/1268/files)
 Removes all uses of `area_mask`, as multiplying quantities by both `area_fraction`
 and `area_mask` will potentially lead to physically inaccurate results.

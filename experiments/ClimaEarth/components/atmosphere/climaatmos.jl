@@ -226,10 +226,13 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
         sim.integrator.p.params.thermodynamics_params,
         CC.Fields.level(sim.integrator.p.precomputed.ᶜts, 1),
     )
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:cos_zenith}) = CC.Fields.array2field(
-    sim.integrator.p.radiation.rrtmgp_model.cos_zenith,
-    CC.Fields.level(axes(sim.integrator.u.c), 1),
-)
+function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:cos_zenith})
+    hasradiation(sim.integrator) || return nothing
+    return CC.Fields.array2field(
+        sim.integrator.p.radiation.rrtmgp_model.cos_zenith,
+        CC.Fields.level(axes(sim.integrator.u.c), 1),
+    )
+end
 # When using the `FixedCO2` option, CO2 is stored as that struct type,
 # so we access its value (a scalar) from the struct.
 # When using the `MaunaLoa` option, CO2 is stored as a 1D Array in the tracers
@@ -238,6 +241,7 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:co2}) =
     sim.integrator.p.atmos.co2 isa CA.FixedCO2 ? sim.integrator.p.atmos.co2.value : sim.integrator.p.tracers.co2[1]
 
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:diffuse_fraction})
+    hasradiation(sim.integrator) || return nothing
     radiation_model = sim.integrator.p.radiation.rrtmgp_model
     # only take the first level
     total_flux_dn = radiation_model.face_sw_flux_dn[1, :]
@@ -258,20 +262,26 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:diffuse_fraction
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) =
     surface_rain_flux(sim.integrator.p.atmos.moisture_model, sim.integrator)
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:LW_d}) = CC.Fields.level(
-    CC.Fields.array2field(sim.integrator.p.radiation.rrtmgp_model.face_lw_flux_dn, axes(sim.integrator.u.f)),
-    CC.Utilities.half,
-)
+function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:LW_d})
+    hasradiation(sim.integrator) || return nothing
+    return CC.Fields.level(
+        CC.Fields.array2field(sim.integrator.p.radiation.rrtmgp_model.face_lw_flux_dn, axes(sim.integrator.u.f)),
+        CC.Utilities.half,
+    )
+end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:specific_humidity}) =
     CC.Fields.level(sim.integrator.u.c.ρq_tot ./ sim.integrator.u.c.ρ, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
     surface_radiation_flux(sim.integrator.p.atmos.radiation_mode, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =
     surface_snow_flux(sim.integrator.p.atmos.moisture_model, sim.integrator)
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d}) = CC.Fields.level(
-    CC.Fields.array2field(sim.integrator.p.radiation.rrtmgp_model.face_sw_flux_dn, axes(sim.integrator.u.f)),
-    CC.Utilities.half,
-)
+function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d})
+    hasradiation(sim.integrator) || return nothing
+    return CC.Fields.level(
+        CC.Fields.array2field(sim.integrator.p.radiation.rrtmgp_model.face_sw_flux_dn, axes(sim.integrator.u.f)),
+        CC.Utilities.half,
+    )
+end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_energy_flux}) =
     CC.Geometry.WVector.(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_moisture_flux}) =
@@ -284,7 +294,6 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temp
     # NOTE: This update_field! takes as argument the entire coupler fields struct, instead
     # of a single field. This is unlike most of other functions, so we may want to revisit
     # it.
-
     # The rrtmgp_model.surface_temperature field is updated by the RRTMGP callback using the
     # sfc_conditions.ts, so all we need to do is update sfc_conditions.ts
     if sim.integrator.p.atmos.moisture_model isa CA.DryModel
@@ -294,7 +303,6 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temp
             TD.PhaseNonEquil_ρTq.(get_thermo_params(sim), csf.ρ_sfc, csf.T_sfc, TD.PhasePartition.(csf.q_sfc))
     end
 end
-# extensions required by FluxCalculator (partitioned fluxes)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =
     CC.Spaces.level(CC.Fields.coordinate_field(sim.integrator.u.c).z, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_sfc}) =
@@ -310,16 +318,19 @@ end
 
 # extensions required by the Interfacer
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:emissivity}, field)
+    hasradiation(sim.integrator) || return nothing
     # sets all 16 bands (rows) to the same values
     sim.integrator.p.radiation.rrtmgp_model.surface_emissivity .=
         reshape(CC.Fields.field2array(field), 1, length(parent(field)))
 end
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_direct_albedo}, field)
+    hasradiation(sim.integrator) || return nothing
     sim.integrator.p.radiation.rrtmgp_model.direct_sw_surface_albedo .=
         reshape(CC.Fields.field2array(field), 1, length(parent(field)))
 end
 
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_diffuse_albedo}, field)
+    hasradiation(sim.integrator) || return nothing
     sim.integrator.p.radiation.rrtmgp_model.diffuse_sw_surface_albedo .=
         reshape(CC.Fields.field2array(field), 1, length(parent(field)))
 end
@@ -397,9 +408,7 @@ function FieldExchanger.update_sim!(sim::ClimaAtmosSimulation, csf, turbulent_fl
         Interfacer.update_field!(sim, Val(:surface_temperature), csf)
     end
 
-    if turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
-        Interfacer.update_field!(sim, Val(:turbulent_fluxes), csf)
-    end
+    Interfacer.update_field!(sim, Val(:turbulent_fluxes), csf)
 end
 
 """
@@ -494,7 +503,7 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_
     # If atmos doesn't have any diagnostics, use the extra_atmos_diagnostics from the coupler
     atmos_config["diagnostics"] =
         haskey(atmos_config, "diagnostics") ?
-        collect([atmos_config["diagnostics"]; coupler_dict["extra_atmos_diagnostics"]]) :
+        collect([atmos_config["diagnostics"], coupler_dict["extra_atmos_diagnostics"]]) :
         coupler_dict["extra_atmos_diagnostics"]
 
     # The Atmos `get_simulation` function expects the atmos config to contains its timestep size
@@ -541,53 +550,6 @@ function coupler_surface_setup(
     )
     surface_state_field = @. surface_state(z0m, z0b, T, beta, q_vap)
     return surface_state_field
-end
-
-"""
-    get_new_cache(sim::ClimaAtmosSimulation, csf)
-
-Returns a new `p` with the updated surface conditions.
-"""
-function get_new_cache(sim::ClimaAtmosSimulation, csf)
-    if hasmoisture(sim.integrator)
-        csf_sfc = (csf.T_sfc, csf.z0m_sfc, csf.z0b_sfc, csf.beta, csf.q_sfc)
-    else
-        csf_sfc = (csf.T_sfc, csf.z0m_sfc, csf.z0b_sfc, csf.beta)
-    end
-
-    p = sim.integrator.p
-
-    coupler_sfc_setup = coupler_surface_setup(CoupledMoninObukhov(), p, csf_sfc...)
-
-    p_names = propertynames(p)
-    p_values = map(x -> x == :sfc_setup ? coupler_sfc_setup : getproperty(p, x), p_names)
-
-    (; zip(p_names, p_values)...)
-end
-
-"""
-    FluxCalculator.atmos_turbulent_fluxes_most!(sim::ClimaAtmosSimulation, csf)
-
-Computes turbulent surface fluxes using ClimaAtmos's `update_surface_conditions!` and
-and the Monin Obukhov Similarity Theory. This
-requires that we define a new temporary parameter Tuple, `new_p`, and save the new surface state
-in it. We do not want `new_p` to live in the atmospheric model permanently, because that would also
-trigger flux calculation during Atmos `Interfacer.step!`. We only want to trigger this once per coupling
-timestep from ClimaCoupler.
-
-For debigging atmos, we can set the following atmos defaults:
- csf.z0m_sfc .= 1.0e-5
- csf.z0b_sfc .= 1.0e-5
- csf.beta .= 1
- csf = merge(csf, (;q_sfc = nothing))
-"""
-function FluxCalculator.atmos_turbulent_fluxes_most!(sim::ClimaAtmosSimulation, csf)
-
-    if isnothing(sim.integrator.p.sfc_setup) # trigger flux calculation if not done in Atmos internally
-        new_p = get_new_cache(sim, csf)
-        CA.SurfaceConditions.update_surface_conditions!(sim.integrator.u, new_p, sim.integrator.t)
-        sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
-    end
 end
 
 """

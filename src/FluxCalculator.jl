@@ -12,87 +12,15 @@ import Thermodynamics as TD
 import ClimaCore as CC
 import ..Interfacer, ..Utilities
 
-export PartitionedStateFluxes,
-    CombinedStateFluxesMOST,
-    combined_turbulent_fluxes!,
-    TurbulentFluxPartition,
-    atmos_turbulent_fluxes_most!,
-    calculate_surface_air_density,
+export calculate_surface_air_density,
     extrapolate_ρ_to_sfc,
     MoninObukhovScheme,
     BulkScheme,
-    partitioned_turbulent_fluxes!,
+    turbulent_fluxes!,
     get_surface_params,
     update_turbulent_fluxes!,
     water_albedo_from_atmosphere!,
     compute_surface_fluxes!
-
-"""
-    TurbulentFluxPartition
-
-Abstract type for flags that denote where and how to calculate tubulent fluxes.
-"""
-abstract type TurbulentFluxPartition end
-
-"""
-    PartitionedStateFluxes <: TurbulentFluxPartition
-
-A flag indicating that the turbulent fluxes should be partitioned and calculated
-over each surface model and then combined. This is calculated on the coupler grid.
-"""
-struct PartitionedStateFluxes <: TurbulentFluxPartition end
-
-"""
-    CombinedStateFluxesMOST <: TurbulentFluxPartition
-
-A flag indicating that the turbulent fluxes (e.g. sensible and latent heat fluxes,
-drag and moisture fluxes) are to be  calculated on the Atmos grid, and saved in Atmos cache.
-"""
-struct CombinedStateFluxesMOST <: TurbulentFluxPartition end
-
-"""
-    combined_turbulent_fluxes!(model_sims, csf, turbulent_fluxes::TurbulentFluxPartition)
-
-Calls the method(s) which calculate turbulent surface fluxes from combined surface states in coupler fields, `csf`.
-
-# Arguments
-- `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
-- `csf`: [NamedTuple] containing coupler fields.
-- `turbulent_fluxes`: [TurbulentFluxPartition] denotes a flag for turbulent flux calculation.
-
-"""
-function combined_turbulent_fluxes!(model_sims, csf, turbulent_fluxes::TurbulentFluxPartition)
-    if turbulent_fluxes isa CombinedStateFluxesMOST
-        atmos_turbulent_fluxes_most!(model_sims.atmos_sim, csf)
-    else
-        nothing # TODO: may want to add CombinedCouplerGrid
-    end
-end
-
-"""
-    atmos_turbulent_fluxes_most!(sim::Interfacer.ComponentModelSimulation, csf)
-
-A function to calculate turbulent surface fluxes using the combined surface states
-and the Monin Obukhov Similarity Theory.
-It is required that a method is defined for the given `sim` and that the fluxes are
-saved in that sim's cache. `csf` refers to the coupler fields.
-
-# Arguments
-- `sim`: [Interfacer.ComponentModelSimulation] object containing the component model simulation.
-- `csf`: [NamedTuple] containing coupler fields.
-
-# Example:
-
-```
-function atmos_turbulent_fluxes_most!(atmos_sim::ClimaAtmosSimulation, csf)
-    atmos_sim.cache.flux .= atmos_sim.c .* (csf.T_sfc .- atmos_sim.temperature)
-end
-```
-
-"""
-atmos_turbulent_fluxes_most!(sim::Interfacer.ComponentModelSimulation, _) =
-    error("calling flux calculation in " * Interfacer.name(sim) * " but no method defined")
-
 
 """
     calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_sfc::CC.Fields.Field)
@@ -104,7 +32,7 @@ function calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulatio
 end
 
 """
-    partitioned_turbulent_fluxes!(model_sims::NamedTuple,
+    turbulent_fluxes!(model_sims::NamedTuple,
                                   csf::CC.Fields.Field,
                                   boundary_space::CC.Spaces.AbstractSpace,
                                   surface_scheme,
@@ -129,7 +57,7 @@ TODO:
 
 (NB: Radiation surface fluxes are calculated by the atmosphere.)
 """
-function partitioned_turbulent_fluxes!(
+function turbulent_fluxes!(
     model_sims::NamedTuple,
     csf::CC.Fields.Field,
     boundary_space::CC.Spaces.AbstractSpace,
@@ -138,8 +66,6 @@ function partitioned_turbulent_fluxes!(
 )
     atmos_sim = model_sims.atmos_sim
     FT = CC.Spaces.undertype(boundary_space)
-
-    @assert surface_scheme isa MoninObukhovScheme "PartitionedFluxes only works with MoninObukhovScheme"
 
     # Reset the coupler fields will compute. We need to do this because we will compute
     # area-weighted averages
@@ -411,8 +337,6 @@ end
 
 This function computes surface fluxes between the input component model
 simulation and the atmosphere.
-This is intended to be used with the partitioned fluxes option, and
-should be extended for any model that requires non-standard flux calculations.
 
 Update the input coupler surface fields `csf` in-place with the computed fluxes
 for this model. These are then summed using area-weighting across all surface

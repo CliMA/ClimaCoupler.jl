@@ -175,6 +175,11 @@ abstract type SeaIceModelSimulation <: SurfaceModelSimulation end
 abstract type LandModelSimulation <: SurfaceModelSimulation end
 abstract type OceanModelSimulation <: SurfaceModelSimulation end
 
+# Simulation objects tend to be very big, so it is best to make sure they are not printed in the REPL
+function Base.show(io::IO, @nospecialize(sim::ComponentModelSimulation))
+    return println(io, "I am simulation object and I do not have a specialized `Base.show` method")
+end
+
 """
     get_field(sim::AtmosModelSimulation, val::Val)
 

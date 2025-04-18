@@ -5,14 +5,12 @@ import Thermodynamics.Parameters as TDP
 import ClimaParams # required for TDP
 import ClimaCoupler
 
-include(joinpath("..", "TestHelper.jl"))
-import .TestHelper
 include(joinpath("..", "..", "components", "ocean", "prescr_seaice.jl"))
 
 for FT in (Float32, Float64)
     @testset "test sea-ice energy slab for FT=$FT" begin
         function test_sea_ice_rhs(; F_radiative = 0.0, T_base = 271.2)
-            space = TestHelper.create_space(FT)
+            space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
             params = IceSlabParameters{FT}(T_base = T_base)
 
             Y = slab_ice_space_init(FT, space, params)
@@ -87,8 +85,7 @@ for FT in (Float32, Float64)
     end
 
     @testset "dss_state! SeaIceModelSimulation for FT=$FT" begin
-        # use TestHelper to create space
-        boundary_space = TestHelper.create_space(FT)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
 
         # construct dss buffer to put in cache
         dss_buffer = CC.Spaces.create_dss_buffer(CC.Fields.zeros(boundary_space))

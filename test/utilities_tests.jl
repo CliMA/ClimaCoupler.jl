@@ -5,14 +5,15 @@ import Test: @testset, @test
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import ClimaCoupler: Utilities
+import ClimaCore as CC
 
-include(joinpath("..", "experiments", "ClimaEarth", "test", "TestHelper.jl"))
-import .TestHelper
+# Initialize MPI context, in case
+ClimaComms.init(ClimaComms.context())
 
 for FT in (Float32, Float64)
     @testset "test swap_space!" begin
-        space1 = TestHelper.create_space(FT, R = FT(6371e3))
-        space2 = TestHelper.create_space(FT, R = FT(6371e3))
+        space1 = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+        space2 = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
 
         field1 = ones(space1)
         field2 = ones(space2)
@@ -56,7 +57,7 @@ for FT in (Float32, Float64)
     end
 
     @testset "test binary_mask" begin
-        space = TestHelper.create_space(FT)
+        space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
         @test all(parent(Utilities.binary_mask.(zeros(space))) .== 0)
         @test all(parent(Utilities.binary_mask.(ones(space))) .== 1)
         @test all(parent(Utilities.binary_mask.(fill(FT(0.5), space), FT(0.6))) .== 0)

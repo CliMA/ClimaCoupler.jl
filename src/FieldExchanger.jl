@@ -54,7 +54,7 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
 end
 
 """
-    import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
+    import_atmos_fields!(csf, model_sims, turbulent_fluxes)
 
 Update the coupler with the atmospheric fluxes. The `Interfacer.get_field` functions
 (`:turbulent_energy_flux`, `:turbulent_moisture_flux`, `:radiative_energy_flux_sfc`, `:liquid_precipitation`, `:snow_precipitation`)
@@ -63,10 +63,9 @@ have to be defined for the amtospheric component model type.
 # Arguments
 - `csf`: [NamedTuple] containing coupler fields.
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
-- `boundary_space`: [Spaces.AbstractSpace] the space of the coupler surface.
 - `turbulent_fluxes`: [TurbulentFluxPartition] denotes a flag for turbulent flux calculation.
 """
-function import_atmos_fields!(csf, model_sims, boundary_space, turbulent_fluxes)
+function import_atmos_fields!(csf, model_sims, turbulent_fluxes)
     for sim in model_sims
         import_atmos_fields!(csf, sim, model_sims.atmos_sim, turbulent_fluxes)
     end

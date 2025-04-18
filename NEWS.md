@@ -6,7 +6,20 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
-### Split `setup_and_run` in multiple functions. PR[#1251](https://github.com/CliMA/ClimaCoupler.jl/pull/1251)
+#### Removed hierarchy experiments. PR[#1277](https://github.com/CliMA/ClimaCoupler.jl/pull/1277)
+
+The hierarchy experiments have been removed. The last commit that contains them
+is
+[a6557a3](https://github.com/CliMA/ClimaCoupler.jl/commit/a6557a3bd5853e099429c6f3dda4644c3e28c0d0).
+
+#### Switch to `PartitionedStateFluxes` by default. PR[#1117](https://github.com/CliMA/ClimaCoupler.jl/pull/1117)
+
+Fixed `PartitionedStateFluxes` option. Now `PartitionedStateFluxes` is the
+default: instead of combining the surface states and computing fluxes once, we
+compute surface fluxes for each component and combine them. Results might be
+different. The `CombinedStateFluxes` option will be removed very soon.
+
+#### Split `setup_and_run` in multiple functions. PR[#1251](https://github.com/CliMA/ClimaCoupler.jl/pull/1251)
 
 `setup_and_run` was split into three functions:
 - `CoupledSimulation`, which takes a dictionary of a file path and constructs a coupled simulation
@@ -21,7 +34,7 @@ The function `setup_and_run` is still available.
 This change also renames `calendar_dt` to `diagnostics_dt` to make it clearer
 that it refers to diagnostics.
 
-### Some misc. cleanup PR[#1244](https://github.com/CliMA/ClimaCoupler.jl/pull/1244)
+#### Some misc. cleanup PR[#1244](https://github.com/CliMA/ClimaCoupler.jl/pull/1244)
 Changes include
 - Land simulation constructors no longer take in `domain_type`, which was unused.
 - `SurfaceModelSimulation`s no longer have a `domain` field, which were unused.

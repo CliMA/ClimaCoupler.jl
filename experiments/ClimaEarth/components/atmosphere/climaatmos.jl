@@ -100,7 +100,7 @@ end
 # so the initial callback initialization doesn't lead to NaNs in the radiation model.
 # Subsequently, the surface albedo will be updated by the coupler, via water_albedo_from_atmosphere!.
 function CA.set_surface_albedo!(Y, p, t, ::CA.CouplerAlbedo)
-    if t == 0
+    if float(t) == 0
         FT = eltype(Y)
         # set initial insolation initial conditions
         !(p.atmos.insolation isa CA.IdealizedInsolation) && CA.set_insolation_variables!(Y, p, t, p.atmos.insolation)
@@ -280,11 +280,19 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_state_int}) =
     CC.Spaces.level(sim.integrator.p.precomputed.ᶜts, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:water}) =
     ρq_tot(sim.integrator.p.atmos.moisture_model, sim.integrator)
-function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temperature}, field)
-    # note that this field is also being updated internally by the surface thermo state in ClimaAtmos
-    # if turbulent fluxes are calculated, to ensure consistency. In case the turbulent fluxes are not
-    # calculated, we update the field here.
-    sim.integrator.p.radiation.rrtmgp_model.surface_temperature .= CC.Fields.field2array(field)
+function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temperature}, csf)
+    # NOTE: This update_field! takes as argument the entire coupler fields struct, instead
+    # of a single field. This is unlike most of other functions, so we may want to revisit
+    # it.
+
+    # The rrtmgp_model.surface_temperature field is updated by the RRTMGP callback using the
+    # sfc_conditions.ts, so all we need to do is update sfc_conditions.ts
+    if sim.integrator.p.atmos.moisture_model isa CA.DryModel
+        sim.integrator.p.precomputed.sfc_conditions.ts .= TD.PhaseDry_ρT.(get_thermo_params(sim), csf.ρ_sfc, csf.T_sfc)
+    else
+        sim.integrator.p.precomputed.sfc_conditions.ts .=
+            TD.PhaseNonEquil_ρTq.(get_thermo_params(sim), csf.ρ_sfc, csf.T_sfc, TD.PhasePartition.(csf.q_sfc))
+    end
 end
 # extensions required by FluxCalculator (partitioned fluxes)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =
@@ -292,8 +300,12 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_sfc}) =
     CC.Spaces.level(CC.Fields.coordinate_field(sim.integrator.u.f).z, CC.Utilities.half)
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:uv_int})
-    uₕ_int = CC.Geometry.UVVector.(CC.Spaces.level(sim.integrator.u.c.uₕ, 1))
-    return @. StaticArrays.SVector(uₕ_int.components.data.:1, uₕ_int.components.data.:2)
+    # NOTE: This calculation is copied from ClimaAtmos (and is allocating! Fix me if you can!)
+    int_local_geometry_values = Fields.level(Fields.local_geometry_field(sim.integrator.u.c), 1)
+    int_u_values = CC.Spaces.level(sim.integrator.p.precomputed.ᶜu, 1)
+    u = CA.projected_vector_data.(CA.CT1, int_u_values, int_local_geometry_values)
+    v = CA.projected_vector_data.(CA.CT2, int_u_values, int_local_geometry_values)
+    return @. StaticArrays.SVector(u, v)
 end
 
 # extensions required by the Interfacer
@@ -320,7 +332,8 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fl
     surface_normal = @. CA.C3(CA.unit_basis_vector_data(CA.C3, surface_local_geometry))
 
     # get template objects for the contravariant components of the momentum fluxes (required by Atmos boundary conditions)
-    vec_ct12_ct1 = @. CA.CT12(CA.CT2(CA.unit_basis_vector_data(CA.CT1, surface_local_geometry)), surface_local_geometry)
+    # NOTE: This is allocating! Fix me if you can!
+    vec_ct12_ct1 = @. CA.CT12(CA.CT1(CA.unit_basis_vector_data(CA.CT1, surface_local_geometry)), surface_local_geometry)
     vec_ct12_ct2 = @. CA.CT12(CA.CT2(CA.unit_basis_vector_data(CA.CT2, surface_local_geometry)), surface_local_geometry)
 
     sim.integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ .= (
@@ -336,7 +349,10 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fl
     parent(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot) .=
         parent(F_turb_moisture) .* parent(surface_normal) # (evap)
 
-    # TODO: see if Atmos can rever to a simpler solution
+    parent(sim.integrator.p.precomputed.sfc_conditions.obukhov_length) .= parent(fields.L_MO)
+    parent(sim.integrator.p.precomputed.sfc_conditions.ustar) .= parent(fields.ustar)
+    parent(sim.integrator.p.precomputed.sfc_conditions.buoyancy_flux) .= parent(fields.buoyancy_flux)
+    return nothing
 end
 
 # extensions required by FieldExchanger
@@ -356,12 +372,14 @@ Extend Interfacer.add_coupler_fields! to add the fields required for ClimaAtmosS
 The fields added are:
 - `:surface_direct_albedo` (for radiation)
 - `:surface_diffuse_albedo` (for radiation)
-- `:ϵ_sfc` (for radiation)
 - `:T_sfc` (for radiation)
 - `:q_sfc` (for moisture)
+- `:ρ_sfc` (for the thermal state)
+- `:ustar`, `:L_MO`, `:buoyancy_flux` (for EDMF boundary conditions)
 """
-function Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaAtmosSimulation)
-    atmos_coupler_fields = [:surface_direct_albedo, :surface_diffuse_albedo, :ϵ_sfc, :T_sfc, :q_sfc]
+function Interfacer.add_coupler_fields!(coupler_field_names, atmos_sim::ClimaAtmosSimulation)
+    atmos_coupler_fields =
+        [:surface_direct_albedo, :surface_diffuse_albedo, :T_sfc, :q_sfc, :ρ_sfc, :ustar, :L_MO, :buoyancy_flux]
     push!(coupler_field_names, atmos_coupler_fields...)
 end
 
@@ -376,7 +394,7 @@ function FieldExchanger.update_sim!(sim::ClimaAtmosSimulation, csf, turbulent_fl
         !(p.atmos.insolation isa CA.IdealizedInsolation) && CA.set_insolation_variables!(u, p, t, p.atmos.insolation)
         Interfacer.update_field!(sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
         Interfacer.update_field!(sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
-        Interfacer.update_field!(sim, Val(:surface_temperature), csf.T_sfc)
+        Interfacer.update_field!(sim, Val(:surface_temperature), csf)
     end
 
     if turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes

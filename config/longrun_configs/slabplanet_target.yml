@@ -13,5 +13,4 @@ mono_surface: false
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "120days"
-turb_flux_partition: "CombinedStateFluxesMOST"
-vert_diff: "true"
+turb_flux_partition: "PartitionedStateFluxes"

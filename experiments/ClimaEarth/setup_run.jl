@@ -97,7 +97,6 @@ function CoupledSimulation(config_file = joinpath(pkgdir(ClimaCoupler), "config/
     return CoupledSimulation(config_dict)
 end
 
-
 function CoupledSimulation(config_dict::AbstractDict)
     # Make a copy so that we don't modify the original input
     config_dict = copy(config_dict)
@@ -551,7 +550,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         # 2.surface density (`ρ_sfc`): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface.
         # For this, we need to import surface and atmospheric fields. The model sims are then updated with the new surface density.
         FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes)
-        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
+        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes)
         FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
 
         # 3.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
@@ -577,11 +576,9 @@ function CoupledSimulation(config_dict::AbstractDict)
                 cs.thermo_params,
             )
 
-            ## update atmos sfc_conditions for surface temperature
-            ## TODO: this is hard coded and needs to be simplified (req. CA modification) (#479)
-            new_p = get_new_cache(atmos_sim, cs.fields)
-            CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) ## sets T_sfc (but SF calculation not necessary - requires split functionality in CA)
-            atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
+            # Updating only surface temperature because it is required by the RRTGMP callback (
+            # called below at reinit). Turbulent fluxes in atmos are updated in `update_model_sims`.
+            Interfacer.update_field!(atmos_sim, Val(:surface_temperature), cs.fields)
         end
 
         # 5.reinitialize models + radiative flux: prognostic states and time are set to their initial conditions. For atmos, this also triggers the callbacks and sets a nonzero radiation flux (given the new sfc_conditions)
@@ -591,7 +588,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         # and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxesMOST`,
         # and sends them to the surface component models. If `turbulent_fluxes isa PartitionedStateFluxes`
         # atmos receives the turbulent fluxes from the coupler.
-        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
+        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes)
         FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
     end
     return cs
@@ -662,6 +659,7 @@ function run!(cs::CoupledSimulation; precompile = (cs.tspan[end] > 2 * cs.Δt_cp
     # Close all diagnostics file writers
     isnothing(cs.diags_handler) || foreach(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
     isnothing(cs.model_sims.atmos_sim.output_writers) || foreach(close, cs.model_sims.atmos_sim.output_writers)
+    isnothing(cs.model_sims.land_sim.output_writer) || close(cs.model_sims.land_sim.output_writer)
     return nothing
 end
 
@@ -763,14 +761,11 @@ function step!(cs::CoupledSimulation)
             cs.thermo_params,
         )
 
-        ## update atmos sfc_conditions for surface temperature - TODO: this needs to be simplified (need CA modification)
-        new_p = get_new_cache(atmos_sim, cs.fields)
-        CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) # to set T_sfc (but SF calculation not necessary - CA modification)
-        atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
+        Interfacer.update_field!(atmos_sim, Val(:surface_temperature), cs.fields)
     end
 
     ## update the coupler with the new atmospheric properties
-    FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
+    FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # radiative and/or turbulent
 
     ## callback to checkpoint model state
     TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs)

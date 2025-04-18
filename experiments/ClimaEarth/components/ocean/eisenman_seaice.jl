@@ -238,12 +238,11 @@ function FluxCalculator.differentiate_turbulent_fluxes!(
     fluxes;
     δT_sfc = 0.1,
 )
-    (; thermo_state_int, surface_params, surface_scheme) = input_args
+    (; thermo_state_int, surface_params) = input_args
     thermo_state_sfc_dT = FluxCalculator.surface_thermo_state(sim, thermo_params, thermo_state_int, δT_sfc = δT_sfc)
     input_args = merge(input_args, (; thermo_state_sfc = thermo_state_sfc_dT))
 
-    # set inputs based on whether the surface_scheme is `MoninObukhovScheme` or `BulkScheme`
-    inputs = FluxCalculator.surface_inputs(surface_scheme, input_args)
+    inputs = FluxCalculator.surface_inputs(input_args)
 
     # calculate the surface fluxes
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))

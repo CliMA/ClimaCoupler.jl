@@ -106,10 +106,6 @@ function argparse_settings()
         help = "Boolean flag indicating whether to check energy conservation [`false` (default), `true`]"
         arg_type = Bool
         default = false
-        "--conservation_softfail"
-        help = "Boolean flag indicating whether to soft fail on conservation errors [`false` (default), `true`]"
-        arg_type = Bool
-        default = false
         # Output information
         "--coupler_output_dir"
         help = "Directory to save output files. Note that TempestRemap fails if interactive and paths are too long. [\"experiments/ClimaEarth/output\" (default)]"

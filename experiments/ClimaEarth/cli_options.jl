@@ -97,10 +97,6 @@ function argparse_settings()
         help = "Boolean flag indicating whether to use a dynamic slab ocean model, as opposed to constant surface temperatures [`true` (default), `false`]"
         arg_type = Bool
         default = true
-        "--turb_flux_partition"
-        help = "Method to partition turbulent fluxes. [`PartitionedStateFluxes`, `CombinedStateFluxesMOST` (default)]"
-        arg_type = String
-        default = "PartitionedStateFluxes"
         # Conservation information
         "--energy_check"
         help = "Boolean flag indicating whether to check energy conservation [`false` (default), `true`]"

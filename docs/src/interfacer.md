@@ -98,7 +98,7 @@ The default coupler exchange fields are the following, defined in
 | `temp1`           | a surface field used for intermediate calculations  | -          |
 | `temp2`           | a surface field used for intermediate calculations  | -          |
 
-- `update_sim!(::ComponentModelSimulation, csf, turbulent_fluxes)`: A
+- `update_sim!(::ComponentModelSimulation, csf)`: A
 function to update each of the fields of the component model simulation
 that are updated by the coupler. ClimaCoupler.jl provides defaults of
 this function for both `AtmosModelSimulation` and
@@ -119,7 +119,7 @@ for the following properties:
 |-----------------------------+---------------------------------------------------------------------------+------------|
 | `air_density`               | air density of the atmosphere                                             | kg m⁻³     |
 | `height_int`                | height at the first internal model level                                  | m          |
-| `height_sfc`                | height at the surface (only required when using `PartitionedStateFluxes`) | m          |
+| `height_sfc`                | height at the surface                                                     | m          |
 | `liquid_precipitation`      | liquid precipitation at the surface                                       | kg m⁻² s⁻¹ |
 | `radiative_energy_flux_sfc` | net radiative flux at the surface                                         | W m⁻²      |
 | `radiative_energy_flux_toa` | net radiative flux at the top of the atmosphere                           | W m⁻²      |
@@ -213,15 +213,16 @@ This function is expected to be extended for the
 following properties, and may also be extended for any additional
 properties needed by a component model.
 
-| Coupler name                                  | Description                                                                                                                                                                                  | Units      |
-|-----------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+------------|
-| `air_density`                                 | surface air density                                                                                                                                                                          | kg m⁻³     |
-| `area_fraction`                               | fraction of the simulation grid surface area this model covers                                                                                                                               |            |
-| `liquid_precipitation`                        | liquid precipitation at the surface                                                                                                                                                          | kg m⁻² s⁻¹ |
-| `radiative_energy_flux_sfc` OR `LW_d`, `SW_d` | net radiative flux at the surface OR downward longwave, shortwave radiation                                                                                                                  | W m⁻²      |
-| `snow_precipitation`                          | snow precipitation at the surface                                                                                                                                                            | kg m⁻² s⁻¹ |
-| `turbulent_energy_flux`                       | aerodynamic turbulent surface fluxes of energy (sensible and latent heat); only required when using `CombinedStateFluxes` option - see our `FluxCalculator` module docs for more information | W m⁻²      |
-| `turbulent_moisture_flux`                     | aerodynamic turbulent surface fluxes of energy (evaporation); only required when using `CombinedStateFluxes` option - see our `FluxCalculator` module docs for more information              | kg m⁻² s⁻¹ |
+| Coupler name                                  | Description                                                                  | Units      |
+|-----------------------------------------------+------------------------------------------------------------------------------+------------|
+| `air_density`                                 | surface air density                                                          | kg m⁻³     |
+| `area_fraction`                               | fraction of the simulation grid surface area this model covers               |            |
+| `liquid_precipitation`                        | liquid precipitation at the surface                                          | kg m⁻² s⁻¹ |
+| `radiative_energy_flux_sfc` OR `LW_d`, `SW_d` | net radiative flux at the surface OR downward longwave, shortwave radiation  | W m⁻²      |
+| `snow_precipitation`                          | snow precipitation at the surface                                            | kg m⁻² s⁻¹ |
+| `turbulent_energy_flux`                       | aerodynamic turbulent surface fluxes of energy (sensible and latent heat)    | W m⁻²      |
+| `turbulent_moisture_flux`                     | aerodynamic turbulent surface fluxes of energy (evaporation)                 | kg m⁻² s⁻¹ |
+
 
 ### SurfaceModelSimulation - optional functions
 - `get_field(::SurfaceModelSimulation, ::Val{property})`:
@@ -239,9 +240,7 @@ overwritten or used as-is. These currently include the following:
 This function updates the turbulent fluxes of the component model simulation
 at this point in horizontal space. The values are updated using the energy
 and moisture turbulent fluxes stored in fields which are calculated by the
-coupler. Note that this function is only required when using the
-`PartitionedStateFluxes` option of ClimaCoupler.jl. See our `FluxCalculator`
-module docs for more information.
+coupler.
 
 ### Prescribed surface conditions - SurfaceStub
 - `SurfaceStub` is a `SurfaceModelSimulation`, but it only contains

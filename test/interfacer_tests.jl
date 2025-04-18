@@ -41,7 +41,6 @@ for FT in (Float32, Float64)
             (;), # model_sims
             (;), # callbacks
             (;), # dirs
-            nothing, # turbulent_fluxes
             nothing, # thermo_params
             nothing, # diags_handler
         )

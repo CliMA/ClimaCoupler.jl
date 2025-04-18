@@ -103,7 +103,6 @@ function get_coupler_args(config_dict::Dict)
 
     # Physical simulation information
     evolving_ocean = config_dict["evolving_ocean"]
-    turb_flux_partition = config_dict["turb_flux_partition"]
 
     # Conservation information
     energy_check = config_dict["energy_check"]
@@ -135,7 +134,6 @@ function get_coupler_args(config_dict::Dict)
         use_coupler_diagnostics,
         diagnostics_dt,
         evolving_ocean,
-        turb_flux_partition,
         energy_check,
         conservation_softfail,
         output_dir_root,

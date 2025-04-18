@@ -60,7 +60,6 @@ struct CoupledSimulation{
     NTMS <: NamedTuple,
     NTC <: NamedTuple,
     NTP <: NamedTuple,
-    TF,
     TP,
     DH,
 }
@@ -75,7 +74,6 @@ struct CoupledSimulation{
     model_sims::NTMS
     callbacks::NTC
     dirs::NTP
-    turbulent_fluxes::TF
     thermo_params::TP
     diags_handler::DH
 end

@@ -4,8 +4,7 @@ Eisenman & Wettlaufer (2009) and Zhang et al. (2021).
 
 There are three prognostic variables, the height of ice (`h_i`), the ocean mixed layer depth (`T_ml`) and the surface air temperature (`T_s`).
 
-Note that Eisenman sea ice assumes gray radiation, no snow coverage, and
-PartitionedStateFluxes for the surface flux calculation.
+Note that Eisenman sea ice assumes gray radiation, and no snow coverage.
 
 ## Formulation
 In ice-covered conditions:

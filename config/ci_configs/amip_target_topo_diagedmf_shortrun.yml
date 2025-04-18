@@ -18,4 +18,3 @@ surface_setup: "PrescribedSurface"
 t_end: "200secs"
 topo_smoothing: true
 topography: "Earth"
-turb_flux_partition: "PartitionedStateFluxes"

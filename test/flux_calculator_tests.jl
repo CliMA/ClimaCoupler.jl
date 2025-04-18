@@ -125,10 +125,9 @@ for FT in (Float32, Float64)
     end
 
     @testset "calculate correct fluxes: dry for FT=$FT" begin
-        scheme = FluxCalculator.MoninObukhovScheme()
         boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
 
-        params = (; surface_scheme = scheme, FT = FT)
+        params = (; FT = FT)
 
         # atmos
         p = (;
@@ -188,11 +187,11 @@ for FT in (Float32, Float64)
 
         # calculate turbulent fluxes
         thermo_params = get_thermo_params(atmos_sim)
-        FluxCalculator.turbulent_fluxes!(model_sims, fields, boundary_space, scheme, thermo_params)
+        FluxCalculator.turbulent_fluxes!(model_sims, fields, boundary_space, thermo_params)
 
         # calculating the fluxes twice ensures that no accumulation occurred (i.e. fluxes are reset to zero each time)
         # TODO: this will need to be extended once flux accumulation is re-enabled
-        FluxCalculator.turbulent_fluxes!(model_sims, fields, boundary_space, scheme, thermo_params)
+        FluxCalculator.turbulent_fluxes!(model_sims, fields, boundary_space, thermo_params)
 
         windspeed = @. hypot(atmos_sim.integrator.p.u, atmos_sim.integrator.p.v)
 

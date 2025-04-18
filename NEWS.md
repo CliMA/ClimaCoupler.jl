@@ -6,6 +6,11 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Removed `SurfaceScheme`. PR[#1280](https://github.com/CliMA/ClimaCoupler.jl/pull/1280)
+
+The `BulkScheme` option for computing fluxes was removed. Now, fluxes
+are always computed with the `MoninObukhovScheme`.
+
 #### Removed `CombinedStateFluxes`. PR[#1276](https://github.com/CliMA/ClimaCoupler.jl/pull/1276)
 
 The `CombinedStateFluxes` option for computing fluxes was removed. Now, fluxes

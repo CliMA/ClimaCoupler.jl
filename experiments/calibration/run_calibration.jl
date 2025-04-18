@@ -5,6 +5,8 @@ using ClimaAnalysis
 import ClimaAnalysis: SimDir, get, slice, average_xy
 import ClimaComms
 import EnsembleKalmanProcesses: I, ParameterDistributions.constrained_gaussian
+import EnsembleKalmanProcesses as EKP
+using Statistics
 
 # Ensure ClimaComms doesn't use MPI
 ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
@@ -53,7 +55,6 @@ addprocs(CAL.SlurmManager())
 end
 
 # Experiment Configuration
-ensemble_size = 10
 n_iterations = 5
 noise = 0.1 * I
 prior = constrained_gaussian("total_solar_irradiance", 1000, 500, 250, 2000)
@@ -70,11 +71,17 @@ if !isfile(obs_path)
     observations .= process_member_data(SimDir(joinpath(obs_output_dir, "model_config/output_active/clima_atmos")))
     JLD2.save_object(obs_path, observations)
 end
+observations = JLD2.load_object(obs_path)
+@show observations
+u0_mean = [mean(prior)]
+uu0_cov = cov(prior)
+eki = EKP.EnsembleKalmanProcess(
+    EKP.ObservationSeries(EKP.Observation(observations, noise, "rsut")),
+    EKP.Unscented(u0_mean, uu0_cov),
+)
+ensemble_size = EKP.get_N_ens(eki)
 
-# Initialize experiment data
-@everywhere observations = JLD2.load_object(obs_path)
-
-eki = CAL.calibrate(CAL.WorkerBackend, ensemble_size, n_iterations, observations, noise, prior, output_dir)
+eki = CAL.calibrate(CAL.WorkerBackend, eki, n_iterations, prior, output_dir)
 
 # Postprocessing
 import EnsembleKalmanProcesses as EKP

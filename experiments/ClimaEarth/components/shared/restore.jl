@@ -25,11 +25,7 @@ function restore!(v1::T1, v2::T2, comms_ctx; name = "", ignore) where {T1, T2}
     # to CuArray)
     fields = filter(x -> !(x in ignore), fieldnames(T2))
     if isempty(fields)
-        if !Base.issingletontype(typeof(v1))
-            restore!(v1, v2, comms_ctx; name, ignore)
-        else
-            v1 == v2 || error("$v1 != $v2")
-        end
+        v1 == v2 || error("$v1 != $v2")
     else
         # Recursive case
         for p in fields
@@ -52,12 +48,12 @@ function restore!(
 end
 
 function restore!(
-    v1::T1,
-    v2::T2,
+    v1::Union{AbstractData, AbstractArray},
+    v2::Union{AbstractData, AbstractArray},
     comms_ctx;
     name,
     ignore,
-) where {T1 <: Union{AbstractData, AbstractArray}, T2 <: Union{AbstractData, AbstractArray}}
+)
     ArrayType = parent(v1) isa Array ? Array : ClimaComms.array_type(ClimaComms.device(comms_ctx))
     moved_to_device = ArrayType(parent(v2))
 
@@ -66,20 +62,17 @@ function restore!(
 end
 
 function restore!(
-    v1::T1,
-    v2::T2,
+    v1::Union{StaticArrays.StaticArray, Number, UnitRange, LinRange, Symbol},
+    v2::Union{StaticArrays.StaticArray, Number, UnitRange, LinRange, Symbol},
     comms_ctx;
     name,
     ignore,
-) where {
-    T1 <: Union{StaticArrays.StaticArray, Number, UnitRange, Symbol},
-    T2 <: Union{StaticArrays.StaticArray, Number, UnitRange, Symbol},
-}
+)
     v1 == v2 || error("$name is a immutable but it inconsistent ($(v1) != $(v2))")
     return nothing
 end
 
-function restore!(v1::T1, v2::T2, comms_ctx; name, ignore) where {T1 <: Dict, T2 <: Dict}
+function restore!(v1::Dict, v2::Dict, comms_ctx; name, ignore)
     # RRTGMP has some internal dictionaries
     v1 == v2 || error("$name is inconsistent")
     return nothing

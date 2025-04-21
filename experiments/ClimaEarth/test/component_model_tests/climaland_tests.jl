@@ -23,7 +23,7 @@ FT = Float32
     area_fraction = CC.Fields.ones(boundary_space)
 
     # Construct simulation object
-    land_sim = ClimaLandSimulation(FT, dt, tspan, start_date, output_dir, boundary_space, area_fraction)
+    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, boundary_space, area_fraction)
 
     # Try taking a timestep
     Interfacer.step!(land_sim, dt)
@@ -65,7 +65,7 @@ end
 
     boundary_space = ClimaCore.Spaces.horizontal_space(atmos_sim.domain.face_space)
     area_fraction = ClimaCore.Fields.ones(boundary_space)
-    land_sim = ClimaLandSimulation(FT, dt, tspan, start_date, output_dir, boundary_space, area_fraction)
+    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, boundary_space, area_fraction)
     model_sims = (; land_sim = land_sim, atmos_sim = atmos_sim)
 
     # Construct a coupler fields object
@@ -83,7 +83,7 @@ end
     map(sim -> Interfacer.add_coupler_fields!(coupler_field_names, sim), values(model_sims))
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
 
-    # Step the atmosphere once to get non-zero wind and humidity
+    # Step the atmosphere once to get non-zero wind and humidity so the fluxes are non-zero
     Interfacer.step!(atmos_sim, dt)
 
     # Exchange the initial conditions between atmosphere and land
@@ -95,6 +95,9 @@ end
     # Update land cache variables with the updated drivers in the cache after the exchange
     update_aux! = ClimaLand.make_update_aux(land_sim.model)
     update_aux!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
+
+    update_boundary_fluxes! = ClimaLand.make_update_boundary_fluxes(land_sim.model)
+    update_boundary_fluxes!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
 
     # Compute the surface fluxes
     FluxCalculator.compute_surface_fluxes!(coupler_fluxes, land_sim, atmos_sim, boundary_space, nothing, nothing)
@@ -111,4 +114,12 @@ end
     @test !any(isnan, coupler_fluxes.F_turb_ρτyz)
     @test !any(isnan, coupler_fluxes.F_turb_energy)
     @test !any(isnan, coupler_fluxes.F_turb_moisture)
+
+    # Check that drivers in cache got updated
+    for driver in propertynames(land_sim.integrator.p.drivers)
+        # Snow and liquid precipitation are zero with this setup
+        if !(driver in [:P_liq, :P_snow])
+            @test getproperty(land_sim.integrator.p.drivers, driver) != zero_field
+        end
+    end
 end

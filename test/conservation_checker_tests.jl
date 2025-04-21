@@ -55,13 +55,11 @@ for FT in (Float32, Float64)
 
         # coupler fields
         cf = (;
-            radiative_energy_flux_toa = CC.Fields.ones(space),
             P_net = CC.Fields.zeros(space),
             P_liq = CC.Fields.zeros(space),
             P_snow = CC.Fields.zeros(space),
             F_turb_moisture = CC.Fields.zeros(space),
         )
-        @. cf.radiative_energy_flux_toa = 200
         @. cf.P_liq = -100
 
         # init
@@ -82,7 +80,7 @@ for FT in (Float32, Float64)
         )
 
         # set non-zero radiation and precipitation
-        F_r = cf.radiative_energy_flux_toa
+        F_r = 200 .* CC.Fields.ones(space)
         P = cf.P_liq
         Δt = float(cs.Δt_cpl)
 
@@ -134,13 +132,11 @@ for FT in (Float32, Float64)
 
         # coupler fields
         cf = (;
-            radiative_energy_flux_toa = CC.Fields.ones(space),
             P_net = CC.Fields.zeros(space),
             P_liq = CC.Fields.zeros(space),
             P_snow = CC.Fields.zeros(space),
             F_turb_moisture = CC.Fields.zeros(space),
         )
-        @. cf.radiative_energy_flux_toa = 200
         @. cf.P_liq = -100
 
         # init

@@ -83,15 +83,28 @@ function check_conservation!(
     for sim in model_sims
         sim_name = Symbol(Interfacer.name(sim))
         if sim isa Interfacer.AtmosModelSimulation
-            radiative_energy_flux_toa = coupler_sim.fields.radiative_energy_flux_toa
-            # save radiation source
-            parent(radiative_energy_flux_toa) .= parent(Interfacer.get_field(sim, Val(:radiative_energy_flux_toa)))
+            radiative_energy_flux_toa = Interfacer.get_field(sim, Val(:radiative_energy_flux_toa))
+
+            # ClimaCore #1578, if radiative_energy_flux_toa comes from Fields.level
+            # TODO: Fix this in ClimaCore
+            rad_grid = CC.Spaces.grid(axes(radiative_energy_flux_toa))
+            if rad_grid isa CC.Grids.LevelGrid
+                if rad_grid.level isa CC.Utilities.PlusHalf
+                    # FaceSpace
+                    surface_integral =
+                        sum(radiative_energy_flux_toa ./ CC.Fields.Δz_field(radiative_energy_flux_toa) .* 2)
+                else
+                    # Center
+                    surface_integral = sum(radiative_energy_flux_toa ./ CC.Fields.Δz_field(radiative_energy_flux_toa))
+                end
+            else
+                surface_integral = sum(radiative_energy_flux_toa)
+            end
 
             if isempty(ccs.toa_net_source)
-                radiation_sources_accum = sum(radiative_energy_flux_toa .* FT(float(coupler_sim.Δt_cpl))) # ∫ J / m^2 dA
+                radiation_sources_accum = surface_integral * FT(float(coupler_sim.Δt_cpl)) # ∫ J / m^2 dA
             else
-                radiation_sources_accum =
-                    sum(radiative_energy_flux_toa .* FT(float(coupler_sim.Δt_cpl))) .+ ccs.toa_net_source[end] # ∫ J / m^2 dA
+                radiation_sources_accum = surface_integral * FT(float(coupler_sim.Δt_cpl)) + ccs.toa_net_source[end] # ∫ J / m^2 dA
             end
             push!(ccs.toa_net_source, radiation_sources_accum)
 
@@ -101,7 +114,6 @@ function check_conservation!(
 
             push!(previous, current)
             total += current + radiation_sources_accum
-
         elseif sim isa Interfacer.SurfaceModelSimulation
             # save surfaces
             area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
@@ -120,7 +132,7 @@ function check_conservation!(
     push!(ccs.total, total)
 
     if runtime_check
-        @assert abs((total[end] - total[1]) / total[end]) < 1e-4
+        @assert abs((ccs.total[end] - ccs.total[1]) / ccs.total[end]) < 1e-4
     end
     return total
 
@@ -185,7 +197,7 @@ function check_conservation!(
     push!(ccs.total, total)
 
     if runtime_check
-        @assert abs((total[end] - total[1]) / total[end]) < 1e-4
+        @assert abs((ccs.total[end] - ccs.total[1]) / ccs.total[end]) < 1e-4
     end
 
     return total

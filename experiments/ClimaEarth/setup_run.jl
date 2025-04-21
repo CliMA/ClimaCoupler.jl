@@ -258,11 +258,11 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
 
     @info(sim_mode)
+    land_sim = ice_sim = ocean_sim = nothing
     if sim_mode <: AMIPMode
         @info("AMIP boundary conditions - do not expect energy conservation")
 
         ## land model
-        land_sim = nothing
         if land_model == "bucket"
             land_sim = BucketSimulation(
                 FT;
@@ -322,7 +322,6 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     elseif (sim_mode <: AbstractSlabplanetSimulationMode)
 
-
         land_fraction = sim_mode <: SlabplanetAquaMode ? land_fraction .* 0 : land_fraction
         land_fraction = sim_mode <: SlabplanetTerraMode ? land_fraction .* 0 .+ 1 : land_fraction
 
@@ -357,22 +356,7 @@ function CoupledSimulation(config_dict::AbstractDict)
             evolving = evolving_ocean,
         )
 
-        ## sea ice stub (here set to zero area coverage)
-        ice_sim = Interfacer.SurfaceStub((;
-            T_sfc = ones(boundary_space),
-            ρ_sfc = zeros(boundary_space),
-            z0m = FT(0),
-            z0b = FT(0),
-            beta = FT(1),
-            α_direct = ones(boundary_space),
-            α_diffuse = ones(boundary_space),
-            area_fraction = zeros(boundary_space),
-            phase = TD.Ice(),
-            thermo_params = thermo_params,
-        ))
-
         Utilities.show_memory_usage()
-
     end
 
     #=
@@ -383,8 +367,10 @@ function CoupledSimulation(config_dict::AbstractDict)
     global `CoupledSimulation` struct, `cs`, below.
     =#
 
-    ## model simulations
-    model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim)
+    ## collect component model simulations that have been initialized
+    model_sims = (; atmos_sim, ice_sim, land_sim, ocean_sim)
+    model_sims = NamedTuple{filter(key -> !isnothing(model_sims[key]), keys(model_sims))}(model_sims)
+    @info "Component models initialized: $(keys(model_sims))"
 
     ## coupler exchange fields
     coupler_field_names = Interfacer.default_coupler_fields()
@@ -585,8 +571,8 @@ function run!(cs::CoupledSimulation; precompile = (cs.tspan[end] > 2 * cs.Δt_cp
 
     # Close all diagnostics file writers
     isnothing(cs.diags_handler) || foreach(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
-    isnothing(cs.model_sims.atmos_sim.output_writers) || foreach(close, cs.model_sims.atmos_sim.output_writers)
-    isnothing(cs.model_sims.land_sim.output_writer) || close(cs.model_sims.land_sim.output_writer)
+    foreach(Interfacer.close_output_writers, cs.model_sims)
+
     return nothing
 end
 
@@ -652,7 +638,6 @@ require multiple steps in some of the component models.
 """
 function step!(cs::CoupledSimulation)
     (; model_sims, Δt_cpl, tspan, comms_ctx) = cs
-    (; atmos_sim, land_sim, ocean_sim, ice_sim) = model_sims
 
     # Update the current time
     cs.t[] += Δt_cpl

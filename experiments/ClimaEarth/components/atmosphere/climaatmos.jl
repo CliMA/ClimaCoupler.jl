@@ -97,7 +97,8 @@ end
 
 # Extension of CA.set_surface_albedo! to set the surface albedo to 0.38 at the beginning of the simulation,
 # so the initial callback initialization doesn't lead to NaNs in the radiation model.
-# Subsequently, the surface albedo will be updated by the coupler, via water_albedo_from_atmosphere!.
+# Subsequently, the surface albedo will be updated by the coupler, via
+# water_albedo_from_atmosphere!.
 function CA.set_surface_albedo!(Y, p, t, ::CA.CouplerAlbedo)
     if float(t) == 0
         FT = eltype(Y)
@@ -393,10 +394,17 @@ function Interfacer.add_coupler_fields!(coupler_field_names, atmos_sim::ClimaAtm
     push!(coupler_field_names, atmos_coupler_fields...)
 end
 
+"""
+    Interfacer.close_output_writers(sim::ClimaAtmosSimulation)
+
+Close all output writers used by the atmos simulation.
+"""
+Interfacer.close_output_writers(sim::ClimaAtmosSimulation) =
+    isnothing(sim.output_writers) || foreach(close, sim.output_writers)
+
 function FieldExchanger.update_sim!(sim::ClimaAtmosSimulation, csf)
     # TODO: This function should be removed once we remove cos_zenith_angle as
     # one of the exchange fields (and use the default method in FieldExchanger)
-
     u = sim.integrator.u
     p = sim.integrator.p
     t = sim.integrator.t
@@ -547,7 +555,6 @@ end
 
 """
     FluxCalculator.water_albedo_from_atmosphere!(sim::ClimaAtmosSimulation, direct_albedo::CC.Fields.Field, diffuse_albedo::CC.Fields.Field)
-
 Extension to calculate the water surface albedo from wind speed and insolation. It can be used for prescribed ocean and lakes.
 """
 function FluxCalculator.water_albedo_from_atmosphere!(

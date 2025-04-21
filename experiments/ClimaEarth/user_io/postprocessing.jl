@@ -11,8 +11,7 @@ diagnostics, plotting all model states and coupler fields for debugging,
 producing the leaderboard if monthly data is available, performing
 conservation checks if enabled, and closing all diagnostics file writers.
 """
-function postprocess_sim(cs, postprocessing_vars)
-    (; conservation_softfail) = postprocessing_vars
+function postprocess_sim(cs)
     output_dir = cs.dirs.output
     artifact_dir = cs.dirs.artifacts
     coupler_output_dir = joinpath(output_dir, "coupler")
@@ -47,14 +46,12 @@ function postprocess_sim(cs, postprocessing_vars)
         plot_global_conservation(
             cs.conservation_checks.energy,
             cs,
-            conservation_softfail,
             figname1 = joinpath(cs.dirs.artifacts, "total_energy_bucket.png"),
             figname2 = joinpath(cs.dirs.artifacts, "total_energy_log_bucket.png"),
         )
         plot_global_conservation(
             cs.conservation_checks.water,
             cs,
-            conservation_softfail,
             figname1 = joinpath(cs.dirs.artifacts, "total_water_bucket.png"),
             figname2 = joinpath(cs.dirs.artifacts, "total_water_log_bucket.png"),
         )

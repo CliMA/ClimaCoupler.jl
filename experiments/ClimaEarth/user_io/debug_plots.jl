@@ -11,7 +11,6 @@ import StaticArrays
     plot_global_conservation(
         cc::AbstractConservationCheck,
         coupler_sim::Interfacer.CoupledSimulation,
-        softfail = false;
         figname1 = "total.png",
         figname2 = "total_log.png",
     )
@@ -23,8 +22,7 @@ relative to the initial value;
 """
 function plot_global_conservation(
     cc::ConservationChecker.AbstractConservationCheck,
-    coupler_sim::Interfacer.CoupledSimulation,
-    softfail = false;
+    coupler_sim::Interfacer.CoupledSimulation;
     figname1 = "total.png",
     figname2 = "total_log.png",
 )
@@ -71,11 +69,9 @@ function plot_global_conservation(
     Makie.save(figname2, lp)
 
     # check that the relative error is small (TODO: reduce this to sqrt(eps(FT)))
-    if !softfail
-        @info typeof(cc)
-        @info rse[end]
-        @assert rse[end] < 0.0055
-    end
+    @info typeof(cc)
+    @info rse[end]
+    @assert rse[end] < 0.0055
 end
 
 

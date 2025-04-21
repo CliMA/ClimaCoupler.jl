@@ -263,7 +263,6 @@ function CoupledSimulation(config_dict::AbstractDict)
         @info("AMIP boundary conditions - do not expect energy conservation")
 
         ## land model
-        land_sim = nothing
         if land_model == "bucket"
             land_sim = BucketSimulation(
                 FT;
@@ -347,7 +346,8 @@ function CoupledSimulation(config_dict::AbstractDict)
 
         ## ocean model
         ocean_sim = SlabOceanSimulation(
-            FT;
+            FT,
+            start_date;
             tspan = tspan,
             dt = component_dt_dict["dt_ocean"],
             space = boundary_space,
@@ -369,7 +369,10 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
 
     ## model simulations
-    model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim)
+    model_sims = (; atmos_sim, ice_sim, land_sim, ocean_sim)
+
+    # remove models that are not used
+    model_sims = filter(sim -> !isnothing(sim), model_sims)
 
     ## coupler exchange fields
     coupler_field_names = Interfacer.default_coupler_fields()
@@ -408,23 +411,12 @@ function CoupledSimulation(config_dict::AbstractDict)
     Callbacks are used to update at a specified interval. The callbacks are initialized here and
     saved in a global `Callbacks` struct, `callbacks`. The `trigger_callback!` function is used to call the callback during the simulation below.
 
-    The currently implemented callbacks are:
+    The currently implemented callback is:
     - `checkpoint_cb`: generates a checkpoint of all model states at a specified interval. This is mainly used for restarting simulations.
-    - `albedo_cb`: for the amip mode, the water albedo is time varying (since the reflectivity of water depends on insolation and wave characteristics, with the latter
-    being approximated from wind speed). It is updated at the same frequency as the atmospheric radiation.
-    NB: Eventually, we will call all of radiation from the coupler, in addition to the albedo calculation.
     =#
     schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date)
     checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
-
-    if sim_mode <: AMIPMode
-        schedule_albedo = EveryCalendarDtSchedule(TimeManager.time_to_period(dt_rad); start_date)
-    else
-        schedule_albedo = TimeManager.NeverSchedule()
-    end
-    albedo_cb = TimeManager.Callback(schedule_albedo, FluxCalculator.water_albedo_from_atmosphere!)
-
-    callbacks = (; checkpoint = checkpoint_cb, water_albedo = albedo_cb)
+    callbacks = (; checkpoint = checkpoint_cb)
 
     #= Set up default AMIP diagnostics
     Use ClimaDiagnostics for default AMIP diagnostics, which currently include turbulent energy fluxes.
@@ -659,9 +651,6 @@ function step!(cs::CoupledSimulation)
     ## calculate turbulent fluxes in the coupler and update the model simulations with them
     FluxCalculator.turbulent_fluxes!(cs)
 
-    ## update water albedo from wind at dt_water_albedo
-    ## (this will be extended to a radiation callback from the coupler)
-    TimeManager.maybe_trigger_callback(cs.callbacks.water_albedo, cs)
     ## callback to checkpoint model state
     TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs)
 

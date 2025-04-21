@@ -13,12 +13,7 @@ import ClimaCore as CC
 import ..Interfacer, ..Utilities
 
 export calculate_surface_air_density,
-    extrapolate_ρ_to_sfc,
-    turbulent_fluxes!,
-    get_surface_params,
-    update_turbulent_fluxes!,
-    water_albedo_from_atmosphere!,
-    compute_surface_fluxes!
+    extrapolate_ρ_to_sfc, turbulent_fluxes!, get_surface_params, update_turbulent_fluxes!, compute_surface_fluxes!
 
 """
     calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_sfc::CC.Fields.Field)
@@ -231,33 +226,6 @@ function update_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, fields
 end
 
 update_turbulent_fluxes!(sim::Interfacer.AbstractSurfaceStub, fields::NamedTuple) = nothing
-
-"""
-    water_albedo_from_atmosphere!(cs::Interfacer.CoupledSimulation)
-
-Callback to calculate the water albedo from atmospheric state. This is a placeholder for the full radiation callback.
-"""
-function water_albedo_from_atmosphere!(cs::Interfacer.CoupledSimulation)
-    atmos_sim = cs.model_sims.atmos_sim
-    ocean_sim = cs.model_sims.ocean_sim
-    cf = cs.fields
-
-    # use temp fields
-    water_albedo_from_atmosphere!(atmos_sim, cf.temp1, cf.temp2)
-
-    Interfacer.update_field!(ocean_sim, Val(:surface_direct_albedo), cf.temp1)
-    Interfacer.update_field!(ocean_sim, Val(:surface_diffuse_albedo), cf.temp2)
-    return nothing
-end
-
-"""
-    water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulation, ::CC.Fields.Field, ::CC.Fields.Field)
-
-Placeholder for the water albedo calculation from the atmosphere. It returns an error if not extended.
-"""
-function water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulation, ::CC.Fields.Field, ::CC.Fields.Field)
-    error("this function is required to be dispatched on $(nameof(atmos_sim)), but no method defined")
-end
 
 """
     compute_surface_fluxes!(csf, sim, atmos_sim, boundary_space, thermo_params)

@@ -27,7 +27,9 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     boundary_space = cs.boundary_space
     FT = CC.Spaces.undertype(boundary_space)
 
-    (; land_sim, ice_sim, ocean_sim) = cs.model_sims
+    land_sim = haskey(cs.model_sims, :land_sim) ? cs.model_sims.land_sim : nothing
+    ice_sim = haskey(cs.model_sims, :ice_sim) ? cs.model_sims.ice_sim : nothing
+    ocean_sim = haskey(cs.model_sims, :ocean_sim) ? cs.model_sims.ocean_sim : nothing
 
     # land fraction is static
     if !isnothing(land_sim)

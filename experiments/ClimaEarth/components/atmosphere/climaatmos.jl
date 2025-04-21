@@ -97,7 +97,6 @@ end
 
 # Extension of CA.set_surface_albedo! to set the surface albedo to 0.38 at the beginning of the simulation,
 # so the initial callback initialization doesn't lead to NaNs in the radiation model.
-# Subsequently, the surface albedo will be updated by the coupler, via water_albedo_from_atmosphere!.
 function CA.set_surface_albedo!(Y, p, t, ::CA.CouplerAlbedo)
     if float(t) == 0
         FT = eltype(Y)
@@ -550,37 +549,6 @@ function dss_state!(sim::ClimaAtmosSimulation)
         buffer = CC.Spaces.create_dss_buffer(field)
         CC.Spaces.weighted_dss!(field, buffer)
     end
-end
-
-"""
-    FluxCalculator.water_albedo_from_atmosphere!(sim::ClimaAtmosSimulation, direct_albedo::CC.Fields.Field, diffuse_albedo::CC.Fields.Field)
-
-Extension to calculate the water surface albedo from wind speed and insolation. It can be used for prescribed ocean and lakes.
-"""
-function FluxCalculator.water_albedo_from_atmosphere!(
-    sim::ClimaAtmosSimulation,
-    direct_albedo::CC.Fields.Field,
-    diffuse_albedo::CC.Fields.Field,
-)
-
-    Y = sim.integrator.u
-    p = sim.integrator.p
-    t = sim.integrator.t
-
-    rrtmgp_model = sim.integrator.p.radiation.rrtmgp_model
-    FT = eltype(Y)
-    λ = FT(0) # spectral wavelength (not used for now)
-
-    # update for current zenith angle
-    bottom_coords = CC.Fields.coordinate_field(CC.Spaces.level(Y.c, 1))
-    μ = CC.Fields.array2field(rrtmgp_model.cos_zenith, axes(bottom_coords))
-    FT = eltype(sim.integrator.u)
-    α_model = CA.RegressionFunctionAlbedo{FT}()
-
-    # set the direct and diffuse surface albedos
-    direct_albedo .= CA.surface_albedo_direct(α_model).(λ, μ, LinearAlgebra.norm.(CC.Fields.level(Y.c.uₕ, 1)))
-    diffuse_albedo .= CA.surface_albedo_diffuse(α_model).(λ, μ, LinearAlgebra.norm.(CC.Fields.level(Y.c.uₕ, 1)))
-
 end
 
 """

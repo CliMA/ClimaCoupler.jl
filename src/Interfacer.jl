@@ -132,6 +132,7 @@ function init_coupler_fields(FT, coupler_field_names, boundary_space)
 
     key_types = (coupler_field_names...,)
     val_types = Tuple{(FT for _ in 1:length(coupler_field_names))...}
+
     nt_type = NamedTuple{key_types, val_types}
     coupler_fields = zeros(nt_type, boundary_space)
     return coupler_fields

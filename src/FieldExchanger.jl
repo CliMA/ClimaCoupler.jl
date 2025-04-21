@@ -27,25 +27,38 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     boundary_space = cs.boundary_space
     FT = CC.Spaces.undertype(boundary_space)
 
+    (; land_sim, ice_sim, ocean_sim) = cs.model_sims
+
     # land fraction is static
-    land_fraction = Interfacer.get_field(cs.model_sims.land_sim, Val(:area_fraction), boundary_space)
+    if !isnothing(land_sim)
+        land_fraction = Interfacer.get_field(land_sim, Val(:area_fraction), boundary_space)
+    else
+        cs.fields.temp1 .= 0
+        land_fraction = cs.fields.temp1
+    end
 
     # ice and ocean fractions are dynamic
-    ice_fraction_before = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction), boundary_space)
-    # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-    Interfacer.update_field!(
-        cs.model_sims.ice_sim,
-        Val(:area_fraction),
-        max.(min.(ice_fraction_before, FT(1) .- land_fraction), FT(0)),
-    )
-    ice_fraction = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction), boundary_space)
+    if !isnothing(ice_sim)
+        ice_fraction_before = Interfacer.get_field(ice_sim, Val(:area_fraction), boundary_space)
+        # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
+        Interfacer.update_field!(
+            ice_sim,
+            Val(:area_fraction),
+            max.(min.(ice_fraction_before, FT(1) .- land_fraction), FT(0)),
+        )
+        ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction), boundary_space)
+    else
+        cs.fields.temp1 .= 0
+        ice_fraction = cs.fields.temp1
+    end
 
-    Interfacer.update_field!(
-        cs.model_sims.ocean_sim,
-        Val(:area_fraction),
-        max.(FT(1) .- ice_fraction .- land_fraction, FT(0)),
-    )
-    ocean_fraction = Interfacer.get_field(cs.model_sims.ocean_sim, Val(:area_fraction), boundary_space)
+    if !isnothing(ocean_sim)
+        Interfacer.update_field!(ocean_sim, Val(:area_fraction), max.(FT(1) .- ice_fraction .- land_fraction, FT(0)))
+        ocean_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction), boundary_space)
+    else
+        cs.fields.temp1 .= 0
+        ocean_fraction = cs.fields.temp1
+    end
 
     # check that the sum of area fractions is 1
     @assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)

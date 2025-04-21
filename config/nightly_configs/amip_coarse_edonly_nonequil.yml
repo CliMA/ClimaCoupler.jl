@@ -2,7 +2,7 @@ FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
 checkpoint_dt: "720hours"
-coupler_toml: ["toml/amip.toml"]
+coupler_toml: ["toml/amip_noneq.toml"]
 cloud_model: "grid_scale"
 moist: "nonequil"
 precip_model: "1M"
@@ -34,4 +34,4 @@ extra_atmos_diagnostics:
   - short_name: [ta, ua, wa, va, rhoa, hur, hus, hussn, husra, clw, cli]
     reduction_time: average
     period: "1months"
-coupler_output_dir: "/glade/derecho/scratch/oalcabes/amip_nonequil"
+coupler_output_dir: "/glade/derecho/scratch/oalcabes/amip_nonequil_implicit_simple"

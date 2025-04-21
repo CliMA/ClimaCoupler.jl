@@ -5,17 +5,17 @@ This module contains the infrastructure to compute turbulent fluxes.
 ## How are fluxes computed?
 
 The key function that computes surface fluxes is
-[`FluxCalculator.partitioned_turbulent_fluxes!`](@ref). This function computes
+[`FluxCalculator.turbulent_fluxes!`](@ref). This function computes
 turbulent fluxes and ancillary quantities, such as the Obukhov length, using
 [SurfaceFluxes.jl](https://github.com/CliMA/SurfaceFluxes.jl). Generally, this
 function is called at the end of each coupling step.
 
-All the quantities computed in `partitioned_turbulent_fluxes!` are calculated
+All the quantities computed in `turbulent_fluxes!` are calculated
 separately for each surface type using the
 [`FluxCalculator.compute_surface_fluxes!`](@ref) function. This function can be
 extended by component models if they need specific type of flux calculation, and
 a default is provided for models that can use the standard flux calculation.
-The final result of `partitioned_turbulent_fluxes!` is an area-weighted sum of
+The final result of `turbulent_fluxes!` is an area-weighted sum of
 all the contributions of the various surfaces.
 
 The default method of [`FluxCalculator.compute_surface_fluxes!`](@ref), in turn,
@@ -44,14 +44,14 @@ object's fluxes fields.
 
     [`FluxCalculator.compute_surface_fluxes!`](@ref) always returns the area weighted sum, even if this is not necessarily the most meaningful operation for a given quantity (e.g., for the Obukhov length). This can be improved in the future, if you know how, please open an issue.
 
-Note also that [`FluxCalculator.partitioned_turbulent_fluxes!`](@ref) only
+Note also that [`FluxCalculator.turbulent_fluxes!`](@ref) only
 computes turbulent fluxes, not radiative fluxes. Currently, these are computed
 within the atmospheric model.
 
 ## FluxCalculator API
 
 ```@docs
-    ClimaCoupler.FluxCalculator.partitioned_turbulent_fluxes!
+    ClimaCoupler.FluxCalculator.turbulent_fluxes!
     ClimaCoupler.FluxCalculator.compute_surface_fluxes!
     ClimaCoupler.FluxCalculator.get_surface_fluxes!
     ClimaCoupler.FluxCalculator.update_turbulent_fluxes!

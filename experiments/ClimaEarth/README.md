@@ -103,8 +103,7 @@ Eisenman & Wettlaufer (2009) and Zhang et al. (2021).
 
 Prognostic variables: ice height (`h_i`), ocean mixed layer depth (`T_ml`) and surface air temperature (`T_s`).
 
-Note that Eisenman sea ice assumes gray radiation, no snow coverage, and
-PartitionedStateFluxes for the surface flux calculation.
+Note that Eisenman sea ice assumes gray radiation and no snow coverage.
 
 #### References: Eisenman sea ice formulation
 [Semtner 1976](https://journals.ametsoc.org/view/journals/phoc/6/3/1520-0485_1976_006_0379_amfttg_2_0_co_2.xml): A Model for the Thermodynamic Growth of Sea Ice in Numerical Investigations of Climate

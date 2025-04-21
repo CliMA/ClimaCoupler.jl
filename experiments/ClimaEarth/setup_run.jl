@@ -125,7 +125,6 @@ function CoupledSimulation(config_dict::AbstractDict)
         use_land_diagnostics,
         diagnostics_dt,
         evolving_ocean,
-        turb_flux_partition,
         land_albedo_type,
         land_initial_condition,
         land_temperature_anomaly,
@@ -468,21 +467,6 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     callbacks = (; checkpoint = checkpoint_cb, water_albedo = albedo_cb)
 
-
-    #=
-    ## Initialize turbulent fluxes
-
-    Decide on the type of turbulent flux partition, partitioned or combined (see `FluxCalculator` documentation for more details).
-    =#
-    turbulent_fluxes = nothing
-    if turb_flux_partition == "PartitionedStateFluxes"
-        turbulent_fluxes = FluxCalculator.PartitionedStateFluxes()
-    elseif turb_flux_partition == "CombinedStateFluxesMOST"
-        turbulent_fluxes = FluxCalculator.CombinedStateFluxesMOST()
-    else
-        error("turb_flux_partition must be either PartitionedStateFluxes or CombinedStateFluxesMOST")
-    end
-
     #= Set up default AMIP diagnostics
     Use ClimaDiagnostics for default AMIP diagnostics, which currently include turbulent energy fluxes.
     =#
@@ -517,7 +501,6 @@ function CoupledSimulation(config_dict::AbstractDict)
         model_sims,
         callbacks,
         dir_paths,
-        turbulent_fluxes,
         thermo_params,
         diags_handler,
     )
@@ -544,9 +527,9 @@ function CoupledSimulation(config_dict::AbstractDict)
 
         # 2.surface density (`ρ_sfc`): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface.
         # For this, we need to import surface and atmospheric fields. The model sims are then updated with the new surface density.
-        FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes)
-        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes)
-        FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
+        FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims)
+        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims)
+        FieldExchanger.update_model_sims!(cs.model_sims, cs.fields)
 
         # 3.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
         ## TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step! (#331)
@@ -554,37 +537,29 @@ function CoupledSimulation(config_dict::AbstractDict)
         Interfacer.step!(ocean_sim, tspan[1] + Δt_cpl)
         Interfacer.step!(ice_sim, tspan[1] + Δt_cpl)
 
-        # 4.turbulent fluxes: now we have all information needed for calculating the initial turbulent
-        # surface fluxes using either the combined state or the partitioned state method
-        if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
-            ## import the new surface properties into the coupler (note the atmos state was also imported in step 3.)
-            FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta, q_sfc
-            ## calculate turbulent fluxes inside the atmos cache based on the combined surface state in each grid box
-            FluxCalculator.combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes) # this updates the atmos thermo state, sfc_ts
-        elseif cs.turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
-            ## calculate turbulent fluxes in surface models and save the weighted average in coupler fields
-            FluxCalculator.partitioned_turbulent_fluxes!(
-                cs.model_sims,
-                cs.fields,
-                cs.boundary_space,
-                FluxCalculator.MoninObukhovScheme(),
-                cs.thermo_params,
-            )
+        # 4.turbulent fluxes: now we have all information needed for calculating the initial
+        # turbulent surface fluxes
 
-            # Updating only surface temperature because it is required by the RRTGMP callback (
-            # called below at reinit). Turbulent fluxes in atmos are updated in `update_model_sims`.
-            Interfacer.update_field!(atmos_sim, Val(:surface_temperature), cs.fields)
-        end
+        ## calculate turbulent fluxes in surface models and save the weighted average in coupler fields
+        FluxCalculator.turbulent_fluxes!(
+            cs.model_sims,
+            cs.fields,
+            cs.boundary_space,
+            FluxCalculator.MoninObukhovScheme(),
+            cs.thermo_params,
+        )
+
+        # Updating only surface temperature because it is required by the RRTGMP callback (
+        # called below at reinit). Turbulent fluxes in atmos are updated in `update_model_sims`.
+        Interfacer.update_field!(atmos_sim, Val(:surface_temperature), cs.fields)
+
 
         # 5.reinitialize models + radiative flux: prognostic states and time are set to their initial conditions. For atmos, this also triggers the callbacks and sets a nonzero radiation flux (given the new sfc_conditions)
         FieldExchanger.reinit_model_sims!(cs.model_sims)
 
-        # 6.update all fluxes: coupler re-imports updated atmos fluxes (radiative fluxes for both `turbulent_fluxes` types
-        # and also turbulent fluxes if `turbulent_fluxes isa CombinedStateFluxesMOST`,
-        # and sends them to the surface component models. If `turbulent_fluxes isa PartitionedStateFluxes`
-        # atmos receives the turbulent fluxes from the coupler.
-        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes)
-        FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
+        # 6.update all fluxes.
+        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims)
+        FieldExchanger.update_model_sims!(cs.model_sims, cs.fields)
     end
     return cs
 end
@@ -737,30 +712,27 @@ function step!(cs::CoupledSimulation)
     ## update the surface fractions for surface models,
     ## and update all component model simulations with the current fluxes stored in the coupler
     FieldExchanger.update_surface_fractions!(cs)
-    FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
+    FieldExchanger.update_model_sims!(cs.model_sims, cs.fields)
 
     ## step component model simulations sequentially for one coupling timestep (Δt_cpl)
     FieldExchanger.step_model_sims!(cs.model_sims, cs.t[])
 
     ## update the coupler with the new surface properties and calculate the turbulent fluxes
-    FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, surface_albedo, z0, beta
-    if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
-        FluxCalculator.combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes) # this updates the surface thermo state, sfc_ts, in ClimaAtmos (but also unnecessarily calculates fluxes)
-    elseif cs.turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
-        ## calculate turbulent fluxes in surfaces and save the weighted average in coupler fields
-        FluxCalculator.partitioned_turbulent_fluxes!(
-            cs.model_sims,
-            cs.fields,
-            cs.boundary_space,
-            FluxCalculator.MoninObukhovScheme(),
-            cs.thermo_params,
-        )
+    FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims) # i.e. T_sfc, surface_albedo, z0, beta
+    ## calculate turbulent fluxes in surfaces and save the weighted average in coupler fields
+    FluxCalculator.turbulent_fluxes!(
+        cs.model_sims,
+        cs.fields,
+        cs.boundary_space,
+        FluxCalculator.MoninObukhovScheme(),
+        cs.thermo_params,
+    )
 
-        Interfacer.update_field!(atmos_sim, Val(:surface_temperature), cs.fields)
-    end
+    Interfacer.update_field!(atmos_sim, Val(:surface_temperature), cs.fields)
+
 
     ## update the coupler with the new atmospheric properties
-    FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # radiative and/or turbulent
+    FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims) # radiative and/or turbulent
 
     ## callback to checkpoint model state
     TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs)

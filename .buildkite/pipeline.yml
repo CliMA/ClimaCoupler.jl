@@ -146,20 +146,6 @@ steps:
         agents:
           slurm_mem: 20GB
 
-      - label: "Slabplanet: partitioned turbulent fluxes"
-        key: "slabplanet_partitioned_fluxes"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_partitioned_fluxes.yml --job_id slabplanet_partitioned_fluxes"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_partitioned_fluxes/artifacts/*"
-        agents:
-          slurm_mem: 20GB
-
-      - label: "Slabplanet: non-monotonous surface remap"
-        key: "slabplanet_nonmono"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_nonmono.yml --job_id slabplanet_nonmono"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_nonmono/artifacts/*"
-        agents:
-          slurm_mem: 20GB
-
       - label: "Slabplanet: eisenman sea ice"
         key: "slabplanet_eisenman"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_eisenman.yml --job_id slabplanet_eisenman"

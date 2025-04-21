@@ -20,7 +20,6 @@ prescribe_ozone: true
 rad: allskywithclear
 surface_setup: DefaultMoninObukhov
 t_end: 12hours
-turb_flux_partition: "PartitionedStateFluxes"
 vert_diff: "DecayWithHeightDiffusion"
 z_elem: 63
 z_max: 55000.0

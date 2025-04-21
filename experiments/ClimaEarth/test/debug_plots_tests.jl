@@ -76,7 +76,6 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
         model_sims, # model_sims
         (;), # callbacks
         (;), # dirs
-        nothing, # turbulent_fluxes
         nothing, # thermo_params
         nothing, # diags_handler
     )

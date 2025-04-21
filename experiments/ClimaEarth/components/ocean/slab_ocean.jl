@@ -158,7 +158,6 @@ function Interfacer.add_coupler_fields!(coupler_field_names, ::SlabOceanSimulati
     push!(coupler_field_names, ocean_coupler_fields...)
 end
 
-# extensions required by FluxCalculator (partitioned fluxes)
 function FluxCalculator.update_turbulent_fluxes!(sim::SlabOceanSimulation, fields::NamedTuple)
     (; F_turb_energy) = fields
     @. sim.integrator.p.F_turb_energy = F_turb_energy

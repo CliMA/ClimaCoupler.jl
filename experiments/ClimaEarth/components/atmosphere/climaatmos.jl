@@ -393,10 +393,17 @@ function Interfacer.add_coupler_fields!(coupler_field_names, atmos_sim::ClimaAtm
     push!(coupler_field_names, atmos_coupler_fields...)
 end
 
+"""
+    Interfacer.close_output_writers(sim::ClimaAtmosSimulation)
+
+Close all output writers used by the atmos simulation.
+"""
+Interfacer.close_output_writers(sim::ClimaAtmosSimulation) =
+    isnothing(sim.output_writers) || foreach(close, sim.output_writers)
+
 function FieldExchanger.update_sim!(sim::ClimaAtmosSimulation, csf)
     # TODO: This function should be removed once we remove cos_zenith_angle as
     # one of the exchange fields (and use the default method in FieldExchanger)
-
     u = sim.integrator.u
     p = sim.integrator.p
     t = sim.integrator.t

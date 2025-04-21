@@ -17,7 +17,7 @@ function argparse_settings()
         arg_type = Bool
         default = true
         "--mode_name"
-        help = "Mode of coupled simulation. [`amip` (default), `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`, `slabplanet_eisenman`]"
+        help = "Mode of coupled simulation. [`amip` (default), `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`]"
         arg_type = String
         default = "amip"
         "--coupler_toml"

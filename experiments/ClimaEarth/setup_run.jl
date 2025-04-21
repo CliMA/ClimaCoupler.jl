@@ -37,7 +37,6 @@ import ClimaCoupler.Interfacer:
     AMIPMode,
     CoupledSimulation,
     SlabplanetAquaMode,
-    SlabplanetEisenmanMode,
     SlabplanetMode,
     SlabplanetTerraMode
 
@@ -68,7 +67,6 @@ include("components/land/climaland_integrated.jl")
 include("components/ocean/slab_ocean.jl")
 include("components/ocean/prescr_ocean.jl")
 include("components/ocean/prescr_seaice.jl")
-include("components/ocean/eisenman_seaice.jl")
 
 #=
 ### Configuration Dictionaries
@@ -254,7 +252,6 @@ function CoupledSimulation(config_dict::AbstractDict)
     - `slabplanet` = land + slab ocean
     - `slabplanet_aqua` = slab ocean everywhere
     - `slabplanet_terra` = land everywhere
-    - `slabplanet_eisenman` = land + slab ocean + slab sea ice with an evolving thickness
 
     In this section of the code, we initialize all component models and read in the prescribed data we'll be using.
     The specific models and data that are set up depend on which mode we're running.
@@ -323,7 +320,7 @@ function CoupledSimulation(config_dict::AbstractDict)
 
         Utilities.show_memory_usage()
 
-    elseif (sim_mode <: AbstractSlabplanetSimulationMode) && !(sim_mode <: SlabplanetEisenmanMode)
+    elseif (sim_mode <: AbstractSlabplanetSimulationMode)
 
 
         land_fraction = sim_mode <: SlabplanetAquaMode ? land_fraction .* 0 : land_fraction
@@ -376,50 +373,6 @@ function CoupledSimulation(config_dict::AbstractDict)
 
         Utilities.show_memory_usage()
 
-    elseif sim_mode <: SlabplanetEisenmanMode
-
-        ## land model
-        land_sim = BucketSimulation(
-            FT;
-            dt = component_dt_dict["dt_land"],
-            tspan,
-            start_date,
-            output_dir = land_output_dir,
-            boundary_space,
-            area_fraction = land_fraction,
-            saveat,
-            surface_elevation,
-            land_temperature_anomaly,
-            use_land_diagnostics,
-            albedo_type = land_albedo_type,
-            land_initial_condition,
-            energy_check,
-            parameter_files,
-        )
-
-        ## ocean stub (here set to zero area coverage)
-        ocean_sim = SlabOceanSimulation(
-            FT;
-            tspan = tspan,
-            dt = component_dt_dict["dt_ocean"],
-            space = boundary_space,
-            saveat = saveat,
-            area_fraction = zeros(boundary_space), # zero, since ML is calculated below
-            thermo_params = thermo_params,
-        )
-
-        ## sea ice + ocean model
-        ice_sim = EisenmanIceSimulation(
-            FT,
-            tspan,
-            space = boundary_space,
-            area_fraction = (FT(1) .- land_fraction),
-            dt = component_dt_dict["dt_seaice"],
-            saveat = saveat,
-            thermo_params = thermo_params,
-        )
-
-        Utilities.show_memory_usage()
     end
 
     #=

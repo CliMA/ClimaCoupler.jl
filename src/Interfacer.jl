@@ -32,9 +32,7 @@ export CoupledSimulation,
     AMIPMode,
     SlabplanetMode,
     SlabplanetAquaMode,
-    SlabplanetTerraMode,
-    SlabplanetEisenmanMode
-
+    SlabplanetTerraMode
 
 """
     AbstractSimulation
@@ -379,14 +377,5 @@ and only once surface model, a ClimaLand.jl bucket land model, which is evaluate
 entire surface. There are no ocean or sea ice models.
 """
 abstract type SlabplanetTerraMode <: AbstractSlabplanetSimulationMode end
-
-"""
-    SlabplanetEisenmanMode
-
-An abstract type representing the slabplanet simulation mode with a ClimaAtmos.jl atmosphere model,
-a ClimaLand.jl bucket land model, and Eisenman sea ice model. The ocean model
-is included in the Eisenman sea ice model.
-"""
-abstract type SlabplanetEisenmanMode <: AbstractSlabplanetSimulationMode end
 
 end # module

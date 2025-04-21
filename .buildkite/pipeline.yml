@@ -146,13 +146,6 @@ steps:
         agents:
           slurm_mem: 20GB
 
-      - label: "Slabplanet: eisenman sea ice"
-        key: "slabplanet_eisenman"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_eisenman.yml --job_id slabplanet_eisenman"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_eisenman/artifacts/*"
-        agents:
-          slurm_mem: 20GB
-
       - label: "Slabplanet: extra atmos diagnostics"
         key: "slabplanet_atmos_diags"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_atmos_diags.yml --job_id slabplanet_atmos_diags"

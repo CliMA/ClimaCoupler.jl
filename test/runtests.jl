@@ -1,6 +1,6 @@
 import SafeTestsets: @safetestset
 import ClimaComms
-@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+ClimaComms.@import_required_backends
 import Pkg, Artifacts
 
 gpu_broken = ClimaComms.device() isa ClimaComms.CUDADevice

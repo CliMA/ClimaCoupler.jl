@@ -3,7 +3,7 @@ import Test: @test, @testset, @test_logs
 import ClimaCore as CC
 import ClimaCoupler: Interfacer
 import ClimaComms
-@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+ClimaComms.@import_required_backends
 
 # Prevent GKS headless operation mode warning
 ENV["GKSwstype"] = "nul"

@@ -3,7 +3,7 @@
 =#
 import Test: @testset, @test
 import ClimaComms
-@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+ClimaComms.@import_required_backends
 import ClimaCoupler: Utilities
 import ClimaCore as CC
 

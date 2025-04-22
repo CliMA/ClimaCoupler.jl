@@ -162,13 +162,13 @@ Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:energy}) =
     sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h
 
 function Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:area_fraction}, field::CC.Fields.Field)
-    sim.integrator.p.area_fraction .= field
+    Interfacer.remap!(sim.integrator.p.area_fraction, field)
 end
 function Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:radiative_energy_flux_sfc}, field)
-    parent(sim.integrator.p.F_radiative) .= parent(field)
+    Interfacer.remap!(sim.integrator.p.F_radiative, field)
 end
 function Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_energy_flux}, field)
-    parent(sim.integrator.p.F_turb_energy) .= parent(field)
+    Interfacer.remap!(sim.integrator.p.F_turb_energy, field)
 end
 Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_moisture_flux}, field) = nothing
 
@@ -176,8 +176,8 @@ Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_moisture
 Interfacer.step!(sim::PrescribedIceSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 
 function FluxCalculator.update_turbulent_fluxes!(sim::PrescribedIceSimulation, fields::NamedTuple)
-    (; F_lh, F_sh) = fields
-    @. sim.integrator.p.F_turb_energy = F_lh + F_sh
+    Interfacer.update_field!(sim, Val(:turbulent_energy_flux), fields.F_lh .+ fields.F_sh)
+    return nothing
 end
 
 """

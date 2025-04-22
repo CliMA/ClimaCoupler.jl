@@ -88,6 +88,9 @@ function get_coupler_args(config_dict::Dict)
         saveat = typeof(t_start)[]
     end
 
+    # Space information
+    share_surface_space = config_dict["share_surface_space"]
+
     # Checkpointing information
     checkpoint_dt = config_dict["checkpoint_dt"]
 
@@ -127,6 +130,7 @@ function get_coupler_args(config_dict::Dict)
         start_date,
         Δt_cpl,
         component_dt_dict,
+        share_surface_space,
         saveat,
         checkpoint_dt,
         restart_dir,

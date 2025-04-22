@@ -12,6 +12,7 @@ moist: "equil"
 precip_model: "0M"
 rad: "gray"
 rayleigh_sponge: true
+share_surface_space: false
 t_end: "300secs"
 vert_diff: "true"
 z_elem: 50

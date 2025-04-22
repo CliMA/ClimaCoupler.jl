@@ -410,26 +410,44 @@ abstract type SlabplanetTerraMode <: AbstractSlabplanetSimulationMode end
 """
     remap(field, target_space)
 
-Remap the given `field` onto the `target_space`.
+Remap the given `field` onto the `target_space`. If the field is already
+on the target space or a compatible one, it is returned unchanged.
+
+Note that this method has a lot of allocations and is not efficient.
 
 Non-ClimaCore fields should provide a method to this function.
-
-TODO: Add support for different source and target fields
 """
 function remap end
 
 function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
     space = axes(field)
-    space_are_compatible =
+    spaces_are_compatible =
         space == target_space || CC.Spaces.issubspace(space, target_space) || CC.Spaces.issubspace(target_space, space)
-    space_are_compatible || error("Space is inconsistent")
+
+    @assert spaces_are_compatible || ClimaComms.context(space) isa ClimaComms.SingletonCommsContext "Remapping is not currently supported with MPI"
 
     # TODO: Handle remapping of Vectors correctly
     if hasproperty(field, :components)
         @assert length(field.components) == 1 "Can only work with simple vectors"
         field = field.components.data.:1
     end
-    return field
+
+    # If the spaces are the same or one is a subspace of the other, we can just return the input field
+    spaces_are_compatible && return field
+
+    # Get vector of LatLongPoints for the target space to get the hcoords
+    # Copy fields onto CPU so we regrid on the CPU
+    field_lat = CC.to_cpu(CC.Fields.coordinate_field(target_space).lat)
+    arr_lat = CC.Fields.field2array(field_lat)
+    field_long = CC.to_cpu(CC.Fields.coordinate_field(target_space).long)
+    arr_long = CC.Fields.field2array(field_long)
+    hcoords = CC.Geometry.LatLongPoint.(arr_lat, arr_long)
+
+    # Remap source field to target space as an array
+    remapped_array = CC.Remapping.interpolate(field, hcoords, [])
+
+    # Convert remapped array to a field in the target space
+    return CC.Fields.array2field(remapped_array, target_space)
 end
 
 function remap(num::Number, target_space::CC.Spaces.AbstractSpace)

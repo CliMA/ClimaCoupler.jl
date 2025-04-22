@@ -112,6 +112,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         start_date,
         Δt_cpl,
         component_dt_dict,
+        share_surface_space,
         saveat,
         checkpoint_dt,
         restart_dir,
@@ -222,7 +223,18 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
 
     ## init a 2D boundary space at the surface
-    boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space) # TODO: specify this in the coupler and pass it to all component models #665
+    # TODO get radius from ClimaParams
+    # toml_dict = CP.create_toml_dict(FT, override_file=parameter_files[1])
+    # (; radius) = CP.get_parameter_values(toml_dict, "planet_radius")
+    if share_surface_space
+        boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
+    else
+        h_elem = config_dict["h_elem"]
+        n_quad_points = CC.Spaces.Quadratures.polynomial_degree(
+            CC.Spaces.quadrature_style(CC.Spaces.horizontal_space(atmos_sim.domain.face_space)),
+        )
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points, h_elem)
+    end
 
     #=
     ### Land-sea Fraction
@@ -258,6 +270,8 @@ function CoupledSimulation(config_dict::AbstractDict)
         @info("AMIP/CMIP boundary conditions - do not expect energy conservation")
 
         ## land model
+        # Determine whether to use a shared surface space
+        shared_surface_space = share_surface_space ? boundary_space : nothing
         if land_model == "bucket"
             land_sim = BucketSimulation(
                 FT;
@@ -265,9 +279,9 @@ function CoupledSimulation(config_dict::AbstractDict)
                 tspan,
                 start_date,
                 output_dir = land_output_dir,
-                boundary_space,
                 area_fraction = land_fraction,
                 saveat,
+                shared_surface_space,
                 surface_elevation,
                 land_temperature_anomaly,
                 use_land_diagnostics,
@@ -283,9 +297,9 @@ function CoupledSimulation(config_dict::AbstractDict)
                 tspan,
                 start_date,
                 output_dir = land_output_dir,
-                boundary_space,
                 area_fraction = land_fraction,
                 saveat,
+                shared_surface_space,
                 surface_elevation,
                 land_temperature_anomaly,
                 use_land_diagnostics,
@@ -338,7 +352,6 @@ function CoupledSimulation(config_dict::AbstractDict)
             tspan,
             start_date,
             output_dir = land_output_dir,
-            boundary_space,
             area_fraction = land_fraction,
             saveat,
             surface_elevation,
@@ -399,7 +412,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     conservation_checks = nothing
     if energy_check
         @assert(
-            sim_mode <: AbstractSlabplanetSimulationMode && !CA.is_distributed(ClimaComms.context(boundary_space)),
+            sim_mode <: AbstractSlabplanetSimulationMode && comms_ctx isa ClimaComms.SingletonCommsContext,
             "Only non-distributed slabplanet allowable for energy_check"
         )
         conservation_checks = (;

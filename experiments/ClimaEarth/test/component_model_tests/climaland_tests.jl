@@ -25,7 +25,7 @@ FT = Float32
     area_fraction = CC.Fields.ones(boundary_space)
 
     # Construct simulation object
-    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, boundary_space, area_fraction)
+    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction)
 
     # Try taking a timestep
     Interfacer.step!(land_sim, dt)
@@ -67,7 +67,7 @@ end
 
     boundary_space = ClimaCore.Spaces.horizontal_space(atmos_sim.domain.face_space)
     area_fraction = ClimaCore.Fields.ones(boundary_space)
-    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, boundary_space, area_fraction)
+    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction)
     model_sims = (; land_sim = land_sim, atmos_sim = atmos_sim)
 
     # Initialize the coupler fields so we can perform exchange

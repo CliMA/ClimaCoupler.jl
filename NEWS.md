@@ -51,6 +51,14 @@ The option `mono_surface` is no longer supported, as it was rarely exercised
 and did not do what it was documented to do. All simulations now have
 behavior equivalent to using `mono_surface: false` previously.
 
+#### Remove `EisenmanSeaIce`. PR[#1284](https://github.com/CliMA/ClimaCoupler.jl/pull/1284)
+
+The `EisenmanSeaIce` was removed. The last commit that contains this model is
+[a3b32d1](https://github.com/CliMA/ClimaCoupler.jl/commit/a3b32d169137f7dad2edf33fd2f5e29ebd6d5356).
+Please refer to this commit if you are interested in running this model. The
+function `FluxCalculator.differentiate_turbulent_fluxes!` was no longer needed
+and was removed.
+
 #### Removed hierarchy experiments. PR[#1277](https://github.com/CliMA/ClimaCoupler.jl/pull/1277)
 
 The hierarchy experiments have been removed. The last commit that contains them
@@ -268,7 +276,6 @@ The available simulation modes are now represented by the following abstract typ
 - `ClimaCoupler.Interfacer.SlabplanetMode`
 - `ClimaCoupler.Interfacer.SlabplanetAquaMode`
 - `ClimaCoupler.Interfacer.SlabplanetTerraMode`
-- `ClimaCoupler.Interfacer.SlabplanetEisenmanMode`
 
 All of the above types are subtypes of the abstract
 `ClimaCoupler.Interfacer.AbstractSlabplanetSimulationMode`, and all of them except

@@ -5,7 +5,6 @@ mode_name_dict = Dict(
     "slabplanet" => SlabplanetMode,
     "slabplanet_aqua" => SlabplanetAquaMode,
     "slabplanet_terra" => SlabplanetTerraMode,
-    "slabplanet_eisenman" => SlabplanetEisenmanMode,
 )
 
 """

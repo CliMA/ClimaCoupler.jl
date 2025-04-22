@@ -297,7 +297,6 @@ end
     ClimaCoupler.Interfacer.SlabplanetMode
     ClimaCoupler.Interfacer.SlabplanetAquaMode
     ClimaCoupler.Interfacer.SlabplanetTerraMode
-    ClimaCoupler.Interfacer.SlabplanetEisenmanMode
 ```
 
 ## Interfacer Internal Functions and Types

@@ -139,12 +139,10 @@ function surface_thermo_state(
     sim::Interfacer.SurfaceModelSimulation,
     thermo_params::TD.Parameters.ThermodynamicsParameters,
     thermo_state_int,
-    δT_sfc = 0,
 )
     FT = eltype(parent(thermo_state_int))
 
-    # get surface temperature (or perturbed surface temperature for differentiation)
-    T_sfc = Interfacer.get_field(sim, Val(:surface_temperature)) .+ FT(δT_sfc)
+    T_sfc = Interfacer.get_field(sim, Val(:surface_temperature))
     # Note that the surface air density, ρ_sfc, is computed using the atmospheric state at the first level and making ideal gas
     # and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
     # a reasonable stand-in.
@@ -231,14 +229,6 @@ end
 update_turbulent_fluxes!(sim::Interfacer.AbstractSurfaceStub, fields::NamedTuple) = nothing
 
 """
-    differentiate_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, args)
-
-This function provides a placeholder for differentiating fluxes with respect to
-surface temperature in surface energy balance calculations.
-"""
-differentiate_turbulent_fluxes!(::Interfacer.SurfaceModelSimulation, args) = nothing
-
-"""
     water_albedo_from_atmosphere!(cs::Interfacer.CoupledSimulation)
 
 Callback to calculate the water albedo from atmospheric state. This is a placeholder for the full radiation callback.
@@ -322,7 +312,6 @@ function compute_surface_fluxes!(
     FT = eltype(z0m)
     scheme_properties = (; z0b = z0b, z0m = z0m, Ch = FT(0), Cd = FT(0), beta = beta, gustiness = FT(1))
 
-    # surface_params, surface_scheme are used by EinsenmanIceSimulation
     input_args =
         (; thermo_state_sfc, thermo_state_int, uₕ_int, z_int, z_sfc, scheme_properties, boundary_space, surface_params)
     inputs = FluxCalculator.surface_inputs(input_args)
@@ -350,9 +339,6 @@ function compute_surface_fluxes!(
     F_shf .*= area_fraction
     F_lhf .*= area_fraction
     F_turb_moisture .*= area_fraction
-
-    # perform additional diagnostics if required
-    FluxCalculator.differentiate_turbulent_fluxes!(sim, (thermo_params, input_args, fluxes))
 
     # update the fluxes, which are now area-weighted, of this surface model
     fields = (;

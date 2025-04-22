@@ -437,9 +437,9 @@ function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, area_fraction
 
     # update fields for canopy conductance and photosynthesis
     Interfacer.update_field!(sim, Val(:c_co2), csf.c_co2)
-    Interfacer.update_field!(sim, Val(:air_temperature), csf.T_air)
-    Interfacer.update_field!(sim, Val(:air_pressure), csf.P_air)
-    Interfacer.update_field!(sim, Val(:air_humidity), csf.q_air)
+    Interfacer.update_field!(sim, Val(:air_temperature), csf.T_atmos)
+    Interfacer.update_field!(sim, Val(:air_pressure), csf.P_atmos)
+    Interfacer.update_field!(sim, Val(:air_humidity), csf.q_atmos)
 
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)
@@ -451,9 +451,9 @@ function FieldExchanger.import_atmos_fields!(csf, sim::ClimaLandSimulation, atmo
     Interfacer.get_field!(csf.SW_d, atmos_sim, Val(:SW_d))
     Interfacer.get_field!(csf.LW_d, atmos_sim, Val(:LW_d))
     Interfacer.get_field!(csf.cos_zenith, atmos_sim, Val(:cos_zenith))
-    Interfacer.get_field!(csf.P_air, atmos_sim, Val(:air_pressure))
-    Interfacer.get_field!(csf.T_air, atmos_sim, Val(:air_temperature))
-    Interfacer.get_field!(csf.q_air, atmos_sim, Val(:specific_humidity))
+    Interfacer.get_field!(csf.P_atmos, atmos_sim, Val(:air_pressure))
+    Interfacer.get_field!(csf.T_atmos, atmos_sim, Val(:air_temperature))
+    Interfacer.get_field!(csf.q_atmos, atmos_sim, Val(:specific_humidity))
     Interfacer.get_field!(csf.P_liq, atmos_sim, Val(:liquid_precipitation))
     Interfacer.get_field!(csf.P_snow, atmos_sim, Val(:snow_precipitation))
     # CO2 is a scalar for now so it doesn't need remapping
@@ -470,15 +470,15 @@ The fields added are:
 - `:cos_zenith` (for radiative transfer)
 - `:diffuse_fraction` (for radiative transfer)
 - `:c_co2` (for photosynthesis, biogeochemistry)
-- `:P_air` (for canopy conductance)
-- `:T_air` (for canopy conductance)
-- `:q_air` (for canopy conductance)
+- `:P_atmos` (for canopy conductance)
+- `:T_atmos` (for canopy conductance)
+- `:q_atmos` (for canopy conductance)
 - `P_liq` (for moisture fluxes)
 - `P_snow` (for moisture fluxes)
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaLandSimulation)
     land_coupler_fields =
-        [:SW_d, :LW_d, :cos_zenith, :diffuse_fraction, :c_co2, :P_air, :T_air, :q_air, :P_liq, :P_snow]
+        [:SW_d, :LW_d, :cos_zenith, :diffuse_fraction, :c_co2, :P_atmos, :T_atmos, :q_atmos, :P_liq, :P_snow]
     push!(coupler_field_names, land_coupler_fields...)
 end
 

@@ -5,7 +5,6 @@ dt: 120secs
 dt_cloud_fraction: 1hours
 dt_rad: 1hours
 dt_save_state_to_disk: "12hours"
-dt_save_to_sol: "12hours"
 dz_bottom: 30.0
 dz_top: 3000.0
 edmfx_detr_model: "Generalized"

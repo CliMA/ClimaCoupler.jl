@@ -14,8 +14,6 @@ import ..Interfacer, ..Utilities
 
 export calculate_surface_air_density,
     extrapolate_ρ_to_sfc,
-    MoninObukhovScheme,
-    BulkScheme,
     turbulent_fluxes!,
     get_surface_params,
     update_turbulent_fluxes!,
@@ -35,7 +33,6 @@ end
     turbulent_fluxes!(model_sims::NamedTuple,
                                   csf::CC.Fields.Field,
                                   boundary_space::CC.Spaces.AbstractSpace,
-                                  surface_scheme,
                                   thermo_params::TD.Parameters.ThermodynamicsParameters)
 
 Compute turbulent fluxes and associated quantities. Store the results in `fields` as
@@ -47,7 +44,6 @@ Args:
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
 - `fields`: [NamedTuple] containing coupler fields.
 - `boundary_space`: [CC.Spaces.AbstractSpace] the space of the coupler surface.
-- `surface_scheme`: [AbstractSurfaceFluxScheme] the surface flux scheme.
 - `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
 
 TODO:
@@ -61,7 +57,6 @@ function turbulent_fluxes!(
     model_sims::NamedTuple,
     csf::CC.Fields.Field,
     boundary_space::CC.Spaces.AbstractSpace,
-    surface_scheme,
     thermo_params::TD.Parameters.ThermodynamicsParameters,
 )
     atmos_sim = model_sims.atmos_sim
@@ -83,77 +78,15 @@ function turbulent_fluxes!(
 
     # Compute the surface fluxes for each surface model and add them to `csf`
     for sim in model_sims
-        compute_surface_fluxes!(csf, sim, atmos_sim, boundary_space, thermo_params, surface_scheme)
+        compute_surface_fluxes!(csf, sim, atmos_sim, boundary_space, thermo_params)
     end
 
     # TODO: add allowable bounds here, check explicitly that all fluxes are equal
     return nothing
 end
 
-abstract type AbstractSurfaceFluxScheme end
-struct BulkScheme <: AbstractSurfaceFluxScheme end
-struct MoninObukhovScheme <: AbstractSurfaceFluxScheme end
 
-"""
-    get_scheme_properties(scheme::AbstractSurfaceFluxScheme, sim::Interfacer.SurfaceModelSimulation)
-
-Returns the scheme-specific properties for the surface model simulation `sim`.
-"""
-function get_scheme_properties(::BulkScheme, sim::Interfacer.SurfaceModelSimulation)
-    Ch = Interfacer.get_field(sim, Val(:heat_transfer_coefficient))
-    Cd = Interfacer.get_field(sim, Val(:drag_coefficient))
-    beta = Interfacer.get_field(sim, Val(:beta))
-    FT = eltype(Ch)
-    return (; z0b = FT(0), z0m = FT(0), Ch = Ch, Cd = Cd, beta = beta, gustiness = FT(1))
-end
-function get_scheme_properties(::MoninObukhovScheme, sim::Interfacer.SurfaceModelSimulation)
-    z0m = Interfacer.get_field(sim, Val(:roughness_momentum))
-    z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy))
-    beta = Interfacer.get_field(sim, Val(:beta))
-    FT = eltype(z0m)
-    return (; z0b = z0b, z0m = z0m, Ch = FT(0), Cd = FT(0), beta = beta, gustiness = FT(1))
-end
-
-"""
-    surface_inputs(scheme::AbstractSurfaceFluxScheme, thermo_state_sfc, thermo_state_int, uₕ_int, z_int, z_sfc, z0b, z0m, Ch, Cd, beta, gustiness)
-
-Returns the inputs for the surface model simulation `sim`.
-"""
-function surface_inputs(::BulkScheme, input_args::NamedTuple)
-
-    (; thermo_state_sfc, thermo_state_int, uₕ_int, z_int, z_sfc, scheme_properties, boundary_space) = input_args
-    FT = CC.Spaces.undertype(axes(z_sfc))
-    (; Ch, Cd, beta, gustiness) = scheme_properties
-
-    # Extract the underlying data layouts of each field
-    # Note: this is a bit "dangerous" because it circumvents ClimaCore, but
-    #  it allows us to broadcast over fields on slightly different spaces
-    fv = CC.Fields.field_values
-    z_int_fv = fv(z_int)
-    uₕ_int_fv = fv(uₕ_int)
-    thermo_state_int_fv = fv(thermo_state_int)
-    z_sfc_fv = fv(z_sfc)
-    thermo_state_sfc_fv = fv(thermo_state_sfc)
-    beta_fv = fv(beta)
-
-    # wrap state values
-    result = @. SF.Coefficients(
-        SF.StateValues(z_int_fv, uₕ_int_fv, thermo_state_int_fv), # state_in
-        SF.StateValues(                                   # state_sfc
-            z_sfc_fv,
-            StaticArrays.SVector(FT(0), FT(0)),
-            thermo_state_sfc_fv,
-        ),
-        Cd,                                     # Cd
-        Ch,                                     # Ch
-        gustiness,                              # gustiness
-        beta_fv,                                # beta
-    )
-
-    # Put the result data layout back onto the surface space
-    return CC.Fields.Field(result, boundary_space)
-end
-function surface_inputs(::MoninObukhovScheme, input_args::NamedTuple)
+function surface_inputs(input_args::NamedTuple)
     (; thermo_state_sfc, thermo_state_int, uₕ_int, z_int, z_sfc, scheme_properties, boundary_space) = input_args
     FT = CC.Spaces.undertype(boundary_space)
     (; z0b, z0m, beta, gustiness) = scheme_properties
@@ -333,7 +266,7 @@ function water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulatio
 end
 
 """
-    compute_surface_fluxes!(csf, sim, atmos_sim, boundary_space, thermo_params, surface_scheme)
+    compute_surface_fluxes!(csf, sim, atmos_sim, boundary_space, thermo_params)
 
 This function computes surface fluxes between the input component model
 simulation and the atmosphere.
@@ -351,7 +284,6 @@ function does nothing if called on an atmosphere model simulation.
 - `atmos_sim`: [Interfacer.AtmosModelSimulation] the atmosphere simulation to compute fluxes with.
 - `boundary_space`: [CC.Spaces.AbstractSpace] the space of the coupler surface.
 - `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
-- `surface_scheme`: [AbstractSurfaceFluxScheme] the surface flux scheme.
 """
 function compute_surface_fluxes!(
     csf,
@@ -359,7 +291,6 @@ function compute_surface_fluxes!(
     atmos_sim::Interfacer.AtmosModelSimulation,
     boundary_space,
     thermo_params,
-    surface_scheme,
 )
     # do nothing for atmos model
     return nothing
@@ -371,7 +302,6 @@ function compute_surface_fluxes!(
     atmos_sim::Interfacer.AtmosModelSimulation,
     boundary_space,
     thermo_params,
-    surface_scheme,
 )
     # `_int` refers to atmos state of center level 1
     z_int = Interfacer.get_field(atmos_sim, Val(:height_int))
@@ -384,23 +314,18 @@ function compute_surface_fluxes!(
 
     thermo_state_sfc = FluxCalculator.surface_thermo_state(sim, thermo_params, thermo_state_int)
 
-    # set inputs based on whether the surface_scheme is `MoninObukhovScheme` or `BulkScheme`
     surface_params = FluxCalculator.get_surface_params(atmos_sim)
-    scheme_properties = FluxCalculator.get_scheme_properties(surface_scheme, sim)
+
+    z0m = Interfacer.get_field(sim, Val(:roughness_momentum))
+    z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy))
+    beta = Interfacer.get_field(sim, Val(:beta))
+    FT = eltype(z0m)
+    scheme_properties = (; z0b = z0b, z0m = z0m, Ch = FT(0), Cd = FT(0), beta = beta, gustiness = FT(1))
 
     # surface_params, surface_scheme are used by EinsenmanIceSimulation
-    input_args = (;
-        thermo_state_sfc,
-        thermo_state_int,
-        uₕ_int,
-        z_int,
-        z_sfc,
-        scheme_properties,
-        boundary_space,
-        surface_params,
-        surface_scheme,
-    )
-    inputs = FluxCalculator.surface_inputs(surface_scheme, input_args)
+    input_args =
+        (; thermo_state_sfc, thermo_state_int, uₕ_int, z_int, z_sfc, scheme_properties, boundary_space, surface_params)
+    inputs = FluxCalculator.surface_inputs(input_args)
 
     # calculate the surface fluxes
     fluxes = FluxCalculator.get_surface_fluxes!(inputs, surface_params)

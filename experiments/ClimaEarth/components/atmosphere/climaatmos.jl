@@ -520,38 +520,6 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_
 end
 
 
-# flux calculation borrowed from atmos
-"""
-    CoupledMoninObukhov()
-A modified version of a Monin-Obukhov surface for the Coupler, see the link below for more information
-https://clima.github.io/SurfaceFluxes.jl/dev/SurfaceFluxes/#Monin-Obukhov-Similarity-Theory-(MOST)
-"""
-struct CoupledMoninObukhov end
-"""
-    coupler_surface_setup(::CoupledMoninObukhov, p, csf_sfc = (; T = nothing, z0m = nothing, z0b = nothing, beta = nothing, q_vap = nothing))
-
-Sets up `surface_setup` as a `CC.Fields.Field` of `SurfaceState`s.
-"""
-function coupler_surface_setup(
-    ::CoupledMoninObukhov,
-    p,
-    T = nothing,
-    z0m = nothing,
-    z0b = nothing,
-    beta = nothing,
-    q_vap = nothing,
-)
-
-    surface_state(z0m, z0b, T, beta, q_vap) = CA.SurfaceConditions.SurfaceState(;
-        parameterization = CA.SurfaceConditions.MoninObukhov(; z0m, z0b),
-        T,
-        beta,
-        q_vap,
-    )
-    surface_state_field = @. surface_state(z0m, z0b, T, beta, q_vap)
-    return surface_state_field
-end
-
 """
     get_thermo_params(sim::ClimaAtmosSimulation)
 

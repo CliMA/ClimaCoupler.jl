@@ -570,13 +570,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         # turbulent surface fluxes
 
         ## calculate turbulent fluxes in surface models and save the weighted average in coupler fields
-        FluxCalculator.turbulent_fluxes!(
-            cs.model_sims,
-            cs.fields,
-            cs.boundary_space,
-            FluxCalculator.MoninObukhovScheme(),
-            cs.thermo_params,
-        )
+        FluxCalculator.turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, cs.thermo_params)
 
         # Updating only surface temperature because it is required by the RRTGMP callback (
         # called below at reinit). Turbulent fluxes in atmos are updated in `update_model_sims`.
@@ -749,13 +743,7 @@ function step!(cs::CoupledSimulation)
     ## update the coupler with the new surface properties and calculate the turbulent fluxes
     FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims) # i.e. T_sfc, surface_albedo, z0, beta
     ## calculate turbulent fluxes in surfaces and save the weighted average in coupler fields
-    FluxCalculator.turbulent_fluxes!(
-        cs.model_sims,
-        cs.fields,
-        cs.boundary_space,
-        FluxCalculator.MoninObukhovScheme(),
-        cs.thermo_params,
-    )
+    FluxCalculator.turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, cs.thermo_params)
 
     Interfacer.update_field!(atmos_sim, Val(:surface_temperature), cs.fields)
 

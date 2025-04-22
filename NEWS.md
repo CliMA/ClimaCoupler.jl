@@ -21,6 +21,11 @@ This PR adds the config option `land_model`, which can be set to either
 Instead of zeroing out all NaNs in a surface field, we zero out all values
 where the area fraction is 0, which is logically what we want to do.
 
+#### Removed `SurfaceScheme`. PR[#1280](https://github.com/CliMA/ClimaCoupler.jl/pull/1280)
+
+The `BulkScheme` option for computing fluxes was removed. Now, fluxes
+are always computed with the `MoninObukhovScheme`.
+
 #### Removed `CombinedStateFluxes`. PR[#1276](https://github.com/CliMA/ClimaCoupler.jl/pull/1276)
 
 The `CombinedStateFluxes` option for computing fluxes was removed. Now, fluxes

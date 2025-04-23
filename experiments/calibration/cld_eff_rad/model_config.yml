@@ -15,15 +15,15 @@ h_elem: 8
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
-prescribed_clouds_in_radiation: true
+prescribe_clouds_in_radiation: true
 netcdf_output_at_levels: true
 output_default_diagnostics: true
 use_coupler_diagnostics: true
 radiation_reset_rng_seed: true
 rayleigh_sponge: true
-start_date: "20091001"
+start_date: "20100801" # 1 month of spinup and Jan: "20091201"
 surface_setup: "PrescribedSurface"
-t_end: "458days"
+t_end: "61days" # FULL: 458 days, 1 month: 31 days, 2 months: 62 days
 topography: "Earth"
 topo_smoothing: true
 turb_flux_partition: "CombinedStateFluxesMOST"
@@ -32,8 +32,6 @@ z_elem: 39
 z_max: 60000.0
 extra_atmos_diagnostics:
   - reduction_time: average
-    short_name:
-      - rsut
-      - rsutcs
+    short_name: [rsut, rsutcs]
     period: 1months
     writer: nc

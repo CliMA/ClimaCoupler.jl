@@ -3,6 +3,7 @@ import ClimaCalibrate
 import ClimaCoupler
 import JLD2
 import EnsembleKalmanProcesses as EKP
+using OrderedCollections
 
 function ClimaCalibrate.observation_map(iteration)
     observation_vec = JLD2.load_object(observation_path)
@@ -46,7 +47,11 @@ end
 
 # Preprocess monthly averages to the right dimensions and dates, remove NaNs
 days = 86_400
-spinup_time = 93days
+if FULL_CALIBRATION
+    spinup_time = 93days
+else
+    spinup_time = 31days
+end
 function preprocess_monthly_averages(simdir, name)
     monthly_avgs = get_monthly_averages(simdir, name)
     monthly_avgs = ClimaAnalysis.shift_to_start_of_previous_month(monthly_avgs)

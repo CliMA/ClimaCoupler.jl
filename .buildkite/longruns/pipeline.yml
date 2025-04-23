@@ -317,29 +317,29 @@ steps:
   #     modules: climacommon/2025_03_18
   #   soft_fail: true
 
-  - label: "GPU AMIP with integrated land: ED only"
-    key: "amip_integrated_land_gpu"
-    command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_integrated_land.yml --job_id amip_integrated_land_gpu"
-    artifact_paths: "experiments/ClimaEarth/output/amip_integrated_land_gpu/artifacts/*"
-    env:
-      CLIMACOMMS_DEVICE: "CUDA"
-    agents:
-      queue: clima
-      slurm_mem: 20GB
-      slurm_gpus: 1
-      modules: climacommon/2025_03_18
+      - label: "GPU AMIP with integrated land: ED only"
+        key: "amip_integrated_land_gpu"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_integrated_land.yml --job_id amip_integrated_land_gpu"
+        artifact_paths: "experiments/ClimaEarth/output/amip_integrated_land_gpu/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          queue: clima
+          slurm_mem: 20GB
+          slurm_gpus: 1
+          modules: climacommon/2025_03_18
 
-  - label: "GPU AMIP with bucket: ED only"
-    key: "amip_bucket_gpu"
-    command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_bucket.yml --job_id amip_bucket_gpu"
-    artifact_paths: "experiments/ClimaEarth/output/amip_bucket_gpu/artifacts/*"
-    env:
-      CLIMACOMMS_DEVICE: "CUDA"
-    agents:
-      queue: clima
-      slurm_mem: 20GB
-      slurm_gpus: 1
-      modules: climacommon/2025_03_18
+      - label: "GPU AMIP with bucket: ED only"
+        key: "amip_bucket_gpu"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_bucket.yml --job_id amip_bucket_gpu"
+        artifact_paths: "experiments/ClimaEarth/output/amip_bucket_gpu/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          queue: clima
+          slurm_mem: 20GB
+          slurm_gpus: 1
+          modules: climacommon/2025_03_18
 
   # - label: "Perfect model calibration test"
   #   key: "amip_pm_calibration"

@@ -1,0 +1,39 @@
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
+checkpoint_dt: "720hours"
+coupler_toml: ["toml/amip.toml"]
+dt: "240secs"
+dt_cloud_fraction: "1hours"
+dt_cpl: "240secs"
+dt_rad: "1hours"
+dt_save_state_to_disk: "20days"
+dz_bottom: 100.0
+energy_check: false
+h_elem: 16
+land_albedo_type: "map_temporal"
+land_model: "integrated"
+mode_name: "amip"
+moist: equil
+netcdf_interpolation_num_points: [90, 45, 31]
+netcdf_output_at_levels: true
+output_default_diagnostics: true
+prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
+rad: allskywithclear
+radiation_reset_rng_seed: true
+rayleigh_sponge: true
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+t_end: "365days"
+topography: "Earth"
+topo_smoothing: true
+turbconv: ~
+turb_flux_partition: "PartitionedStateFluxes"
+vert_diff: "DecayWithHeightDiffusion"
+viscous_sponge: true
+z_elem: 39
+z_max: 60000.0
+extra_atmos_diagnostics:
+  - short_name: [pr, rhoa, uas, vas, thetaa, hussfc, ts]
+    reduction_time: average
+    period: 1months

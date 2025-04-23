@@ -328,33 +328,6 @@ function FluxCalculator.update_turbulent_fluxes!(sim::BucketSimulation, fields::
     return nothing
 end
 
-# extension of FluxCalculator.FluxCalculator.surface_thermo_state, overriding the saturated-surface default
-function FluxCalculator.surface_thermo_state(
-    sim::BucketSimulation,
-    thermo_params::TD.Parameters.ThermodynamicsParameters,
-    atmos_sim::Interfacer.AtmosModelSimulation,
-)
-    T_sfc = Interfacer.get_field(sim, Val(:surface_temperature))
-    FieldExchanger.compute_surface_humidity!(
-        sim.integrator.p.bucket.q_sfc,
-        Interfacer.get_field(atmos_sim, Val(:air_temperature)),
-        Interfacer.get_field(atmos_sim, Val(:specific_humidity)),
-        Interfacer.get_field(atmos_sim, Val(:air_density)),
-        T_sfc,
-        thermo_params,
-    )
-    # Note that the surface air density, ρ_sfc, is computed using the atmospheric state at the first level and making ideal gas
-    # and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
-    # a reasonable stand-in.
-    ρ_sfc =
-        FluxCalculator.extrapolate_ρ_to_sfc.(
-            thermo_params,
-            Interfacer.get_field(atmos_sim, Val(:thermo_state_int)),
-            T_sfc,
-        )
-    return @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, sim.integrator.p.bucket.q_sfc)
-end
-
 """
     Checkpointer.get_model_prog_state(sim::BucketSimulation)
 

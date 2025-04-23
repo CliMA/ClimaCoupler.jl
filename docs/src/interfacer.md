@@ -106,6 +106,13 @@ this function for both `AtmosModelSimulation` and
 the coupler. This function will need to be extended for any model
 that requires additional fields (specified via `add_coupler_fields!`).
 
+- `set_cache!(sim::ComponentModelSimulation)`: A function to perform any
+initialization of the component model caches that isn't done during the model
+simulation initialization, and that must be done after the initial exchange.
+This is necessary, for example, when component models have cache
+interdependencies that must be handled in a specific order.
+Cache variables that are computed as part of the tendencies do not need to be set here.
+
 ### AtmosModelSimulation - required functions
 In addition to the functions required for a general
 `ComponentModelSimulation`, an `AtmosModelSimulation` requires the
@@ -117,7 +124,9 @@ for the following properties:
 
 | Coupler name                | Description                                                               | Units      |
 |-----------------------------+---------------------------------------------------------------------------+------------|
-| `air_density`               | air density of the atmosphere                                             | kg m⁻³     |
+| `air_density`               | air density at the bottom cell centers of the atmosphere                  | kg m⁻³     |
+| `air_pressure`              | air pressure at the bottom cell centers of the atmosphere                 | Pa         |
+| `air_temperature`           | air temperature at the bottom cell centers of the atmosphere              | K          |
 | `height_int`                | height at the first internal model level                                  | m          |
 | `height_sfc`                | height at the surface                                                     | m          |
 | `liquid_precipitation`      | liquid precipitation at the surface                                       | kg m⁻² s⁻¹ |
@@ -171,8 +180,6 @@ for the following properties:
 
 | Coupler name        | Description                                                    | Units   |
 |---------------------+----------------------------------------------------------------+---------|
-| `air_pressure`      | air pressure at the bottom cell centers of the atmosphere      | Pa      |
-| `air_temperature`   | air temperature at the bottom cell centers of the atmosphere   | K       |
 | `cos_zenith`        | cosine of the zenith angle                                     |         |
 | `co2`               | global mean co2                                                | ppm     |
 | `diffuse_fraction`  | fraction of downwards shortwave flux that is direct            |         |
@@ -180,7 +187,7 @@ for the following properties:
 | `LW_d`              | downwards longwave flux                                        | W m⁻²   |
 | `SW_d`              | downwards shortwave flux                                       | W m⁻²   |
 
-Note that `air_temperature`, `air_pressure`, `cos_zenith`, `co2`, `diffuse_fraction`, `LW_d` and
+Note that `cos_zenith`, `co2`, `diffuse_fraction`, `LW_d` and
 `SW_d` will not be present in a `ClimaAtmosSimulation` if the model is setup with no radiation.
 Because of this, a `ClimaAtmosSimulation` must have radiation if running with the full `ClimaLand` model.
 
@@ -199,7 +206,6 @@ for the following properties:
 | `roughness_momentum`     | aerodynamic roughness length for momentum                      | m       |
 | `surface_direct albedo`  | bulk direct surface albedo                                     |         |
 | `surface_diffuse albedo` | bulk diffuse surface albedo                                    |         |
-| `surface_humidity`       | surface humidity                                               | kg kg⁻¹ |
 | `surface_temperature`    | surface temperature                                            | K       |
 
 
@@ -290,6 +296,7 @@ end
     ClimaCoupler.Interfacer.SlabplanetMode
     ClimaCoupler.Interfacer.SlabplanetAquaMode
     ClimaCoupler.Interfacer.SlabplanetTerraMode
+    ClimaCoupler.Interfacer.set_cache!
     ClimaCoupler.Interfacer.remap
     ClimaCoupler.Interfacer.remap!
 ```

@@ -49,7 +49,6 @@ for FT in (Float32, Float64)
                 area_fraction = SIC_init,
                 SIC_timevaryinginput = SIC_timevaryinginput,
                 land_fraction = CC.Fields.zeros(space),
-                q_sfc = CC.Fields.zeros(space),
                 ρ_sfc = CC.Fields.ones(space),
                 thermo_params = thermo_params,
                 dt = dt,

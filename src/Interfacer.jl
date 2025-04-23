@@ -25,6 +25,9 @@ export CoupledSimulation,
     AbstractSurfaceStub,
     SurfaceStub,
     step!,
+    set_cache!,
+    remap,
+    remap!,
     AbstractSlabplanetSimulationMode,
     AMIPMode,
     SlabplanetMode,
@@ -87,13 +90,13 @@ function Base.show(io::IO, sim::CoupledSimulation)
 end
 
 """
-    current_date(cs::Interfacer.CoupledSimulation)
+    current_date(cs::CoupledSimulation)
 
 Return the model date at the current timestep.
 # Arguments
 - `cs`: [CoupledSimulation] containing info about the simulation
 """
-current_date(cs::Interfacer.CoupledSimulation) = cs.t[] isa ITime ? date(cs.t[]) : cs.start_date + Dates.second(cs.t[])
+current_date(cs::CoupledSimulation) = cs.t[] isa ITime ? date(cs.t[]) : cs.start_date + Dates.second(cs.t[])
 
 """
     default_coupler_fields()
@@ -106,12 +109,19 @@ default_coupler_fields() = [
     :z0b_sfc,
     :beta,
     :emissivity,
+    # fields used to compute fluxes
+    :T_atmos,
+    :q_atmos,
+    :ρ_atmos,
+    :T_sfc,
+    :q_sfc,
     # fields used for flux exchange
     :F_lh,
     :F_sh,
     :F_turb_moisture,
     :F_turb_ρτxz,
     :F_turb_ρτyz,
+    :F_radiative,
     # fields used to track water conservation, and for water fluxes
     :P_liq,
     :P_snow,
@@ -429,5 +439,15 @@ function remap!(target_field, source)
     target_field .= remap(source, axes(target_field))
     return nothing
 end
+
+
+"""
+    set_cache!(sim::ComponentModelSimulation)
+
+Perform any initialization of the component model cache that must be done
+after the initial exchange.
+This is not required to be extended, but may be necessary for some models.
+"""
+set_cache!(sim::ComponentModelSimulation) = nothing
 
 end # module

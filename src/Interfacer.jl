@@ -190,7 +190,6 @@ get_field(
         Val{:height_sfc},
         Val{:liquid_precipitation},
         Val{:radiative_energy_flux_sfc},
-        Val{:radiative_energy_flux_toa},
         Val{:snow_precipitation},
         Val{:turblent_energy_flux},
         Val{:turbulent_moisture_flux},

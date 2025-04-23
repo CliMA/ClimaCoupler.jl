@@ -3,7 +3,7 @@
 =#
 import Test: @testset, @test
 import ClimaComms
-@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+ClimaComms.@import_required_backends
 import ClimaCoupler: Utilities
 import ClimaCore as CC
 
@@ -54,5 +54,25 @@ for FT in (Float32, Float64)
         parsed_args["device"] = ""
         @test typeof(Utilities.get_comms_context(parsed_args)) ==
               typeof(ClimaComms.context(ClimaComms.CPUSingleThreaded()))
+    end
+
+    @testset "integral" begin
+        space2d = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+        ones2d = ones(space2d)
+
+        space3d = CC.CommonSpaces.ExtrudedCubedSphereSpace(
+            FT;
+            z_elem = 10,
+            z_min = 0,
+            z_max = 1,
+            radius = FT(6371e3),
+            h_elem = 10,
+            n_quad_points = 4,
+            staggering = CC.CommonSpaces.CellCenter(),
+        )
+        ones3d_level = CC.Fields.level(ones(space3d), 1)
+
+        @test isapprox(Utilities.integral(ones3d_level), Utilities.integral(ones2d), rtol = 1e-5)
+        @test Utilities.integral(ones(space3d)) == sum(ones(space3d))
     end
 end

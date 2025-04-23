@@ -3,11 +3,10 @@
 =#
 import Test: @test, @testset
 import ClimaComms
-@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+ClimaComms.@import_required_backends
 import ClimaCore as CC
 import ClimaCoupler: ConservationChecker, Interfacer
-
-REGRID_DIR = @isdefined(REGRID_DIR) ? REGRID_DIR : joinpath("", "regrid_tmp/")
+import ClimaCoupler.Utilities: integral
 
 get_slab_energy(slab_sim, T_sfc) =
     slab_sim.integrator.p.params.ρ .* slab_sim.integrator.p.params.c .* T_sfc .* slab_sim.integrator.p.params.h
@@ -17,8 +16,8 @@ struct TestAtmos{I} <: Interfacer.AtmosModelSimulation
 end
 Interfacer.name(s::TestAtmos) = "TestAtmos"
 Interfacer.get_field(s::TestAtmos, ::Val{:radiative_energy_flux_toa}) = ones(s.i.space) .* 200
-Interfacer.get_field(s::TestAtmos, ::Val{:water}) = ones(s.i.space)
-Interfacer.get_field(s::TestAtmos, ::Val{:energy}) = ones(s.i.space) .* CC.Spaces.undertype(s.i.space)(1e6)
+Interfacer.get_field(s::TestAtmos, ::Val{:water}) = s.i.water
+Interfacer.get_field(s::TestAtmos, ::Val{:energy}) = s.i.energy
 
 struct TestOcean{I} <: Interfacer.SurfaceModelSimulation
     i::I
@@ -41,7 +40,10 @@ for FT in (Float32, Float64)
         space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
 
         # set up model simulations
-        atmos = TestAtmos((; space = space))
+        initial_energy = ones(space) .* CC.Spaces.undertype(space)(1e6)
+        initial_water = ones(space) .* CC.Spaces.undertype(space)(1e5)
+
+        atmos = TestAtmos((; space = space, energy = initial_energy, water = initial_water))
         land = TestOcean((; space = space))
         ocean = TestLand((; space = space))
         ice = Interfacer.SurfaceStub((; area_fraction = CC.Fields.ones(space) .* FT(0.5)))
@@ -55,13 +57,11 @@ for FT in (Float32, Float64)
 
         # coupler fields
         cf = (;
-            radiative_energy_flux_toa = CC.Fields.ones(space),
             P_net = CC.Fields.zeros(space),
             P_liq = CC.Fields.zeros(space),
             P_snow = CC.Fields.zeros(space),
             F_turb_moisture = CC.Fields.zeros(space),
         )
-        @. cf.radiative_energy_flux_toa = 200
         @. cf.P_liq = -100
 
         # init
@@ -82,17 +82,32 @@ for FT in (Float32, Float64)
         )
 
         # set non-zero radiation and precipitation
-        F_r = cf.radiative_energy_flux_toa
+        F_r = 200 .* CC.Fields.ones(space)
         P = cf.P_liq
         Δt = float(cs.Δt_cpl)
 
+        volume = integral(ones(space))
+
+        area_fraction_scaling =
+            Interfacer.get_field(land, Val(:area_fraction)) .+ Interfacer.get_field(ocean, Val(:area_fraction))
+        water_from_precipitation = integral(P .* area_fraction_scaling) .* FT(Δt)
+        energy_from_radiation = integral(F_r) .* FT(Δt)
+        energy_per_unit_cell = CC.Fields.ones(space) .* energy_from_radiation ./ volume
+        water_per_unit_cell = CC.Fields.ones(space) .* water_from_precipitation ./ volume
+
         # analytical solution
-        tot_energy_an = sum(FT.(F_r .* 3Δt .+ 1e6 .* 1.25))
-        tot_water_an = sum(FT.(.-P .* 3Δt .* 0.5 .+ CC.Fields.ones(space)))
+        # Only ocean and atmos have energy
+        area_fraction_scaling = CC.Fields.ones(space) .+ Interfacer.get_field(ocean, Val(:area_fraction))
+        tot_energy_an = integral(area_fraction_scaling .* FT.(initial_energy)) + energy_from_radiation
+        tot_water_an = integral(FT.(initial_water)) - water_from_precipitation
 
         # run check_conservation!
         ConservationChecker.check_conservation!(cs, runtime_check = true)
+        atmos.i.energy .-= energy_per_unit_cell
+        atmos.i.water .+= water_per_unit_cell
         ConservationChecker.check_conservation!(cs, runtime_check = true)
+        atmos.i.energy .-= energy_per_unit_cell
+        atmos.i.water .+= water_per_unit_cell
         ConservationChecker.check_conservation!(cs, runtime_check = true)
 
         total_energy = cs.conservation_checks.energy.sums.total
@@ -120,7 +135,10 @@ for FT in (Float32, Float64)
         space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
 
         # set up model simulations
-        atmos = TestAtmos((; space = space))
+        initial_energy = ones(space) .* CC.Spaces.undertype(space)(1e6)
+        initial_water = ones(space) .* CC.Spaces.undertype(space)(1e5)
+
+        atmos = TestAtmos((; space = space, energy = initial_energy, water = initial_water))
         land = TestOcean((; space = space))
         ocean = TestLand((; space = space))
         ice = Interfacer.SurfaceStub((; area_fraction = CC.Fields.ones(space) .* FT(0.5)))
@@ -134,13 +152,11 @@ for FT in (Float32, Float64)
 
         # coupler fields
         cf = (;
-            radiative_energy_flux_toa = CC.Fields.ones(space),
             P_net = CC.Fields.zeros(space),
             P_liq = CC.Fields.zeros(space),
             P_snow = CC.Fields.zeros(space),
             F_turb_moisture = CC.Fields.zeros(space),
         )
-        @. cf.radiative_energy_flux_toa = 200
         @. cf.P_liq = -100
 
         # init

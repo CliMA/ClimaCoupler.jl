@@ -25,7 +25,7 @@ import DelimitedFiles
 # ## ClimaESM packages
 import ClimaAtmos as CA
 import ClimaComms
-@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+ClimaComms.@import_required_backends
 import ClimaCore as CC
 
 # ## Coupler specific imports
@@ -392,7 +392,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         Interfacer.add_coupler_fields!(coupler_field_names, sim)
     end
     # add coupler fields required to track conservation, if specified
-    energy_check && push!(coupler_field_names, :radiative_energy_flux_toa, :P_net)
+    energy_check && push!(coupler_field_names, :P_net)
 
     # allocate space for the coupler fields
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)

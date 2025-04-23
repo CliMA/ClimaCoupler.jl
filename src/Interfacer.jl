@@ -194,7 +194,8 @@ get_field(
         Val{:turblent_energy_flux},
         Val{:turbulent_moisture_flux},
         Val{:thermo_state_int},
-        Val{:uv_int},
+        Val{:u_int},
+        Val{:v_int},
     },
 ) = get_field_error(sim, val)
 

@@ -135,7 +135,8 @@ for the following properties:
 | `turbulent_energy_flux`     | aerodynamic turbulent surface fluxes of energy (sensible and latent heat) | W m⁻²      |
 | `turbulent_moisture_flux`   | aerodynamic turbulent surface fluxes of energy (evaporation)              | kg m⁻² s⁻¹ |
 | `thermo_state_int`          | thermodynamic state at the first internal model level                     |            |
-| `uv_int`                    | horizontal wind velocity vector at the first internal model level         | m s⁻¹      |
+| `u_int`                     | zonal wind velocity vector at the first internal model level              | m s⁻¹      |
+| `v_int`                     | meridional wind velocity vector at the first internal model level         | m s⁻¹      |
 
 - `update_field!(::AtmosModelSimulation. ::Val{property}, field)`:
 A function to update the value of property in the component model

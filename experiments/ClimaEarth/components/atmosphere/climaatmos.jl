@@ -307,13 +307,17 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =
     CC.Spaces.level(CC.Fields.coordinate_field(sim.integrator.u.c).z, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_sfc}) =
     CC.Spaces.level(CC.Fields.coordinate_field(sim.integrator.u.f).z, CC.Utilities.half)
-function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:uv_int})
+function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:u_int})
     # NOTE: This calculation is copied from ClimaAtmos (and is allocating! Fix me if you can!)
     int_local_geometry_values = Fields.level(Fields.local_geometry_field(sim.integrator.u.c), 1)
     int_u_values = CC.Spaces.level(sim.integrator.p.precomputed.ᶜu, 1)
-    u = CA.projected_vector_data.(CA.CT1, int_u_values, int_local_geometry_values)
-    v = CA.projected_vector_data.(CA.CT2, int_u_values, int_local_geometry_values)
-    return @. StaticArrays.SVector(u, v)
+    return CA.projected_vector_data.(CA.CT1, int_u_values, int_local_geometry_values)
+end
+function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:v_int})
+    # NOTE: This calculation is copied from ClimaAtmos (and is allocating! Fix me if you can!)
+    int_local_geometry_values = Fields.level(Fields.local_geometry_field(sim.integrator.u.c), 1)
+    int_u_values = CC.Spaces.level(sim.integrator.p.precomputed.ᶜu, 1)
+    return CA.projected_vector_data.(CA.CT2, int_u_values, int_local_geometry_values)
 end
 
 # extensions required by the Interfacer

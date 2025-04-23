@@ -3,22 +3,16 @@ using Statistics, Dates, LinearAlgebra
 import JLD2
 import EnsembleKalmanProcesses as EKP
 
-const start_date = DateTime(2009, 10, 1)
+FULL_CALIBRATION = false
+
+include("generate_observations_helper.jl")
+
+const start_date = DateTime(2010, 8, 1) # DateTime(2009, 12, 1)
 const diagnostic_var =
-    OutputVar(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/output/iteration_000/member_005/model_config/output_active/clima_atmos/rsut_1M_average.nc"))
+    OutputVar(joinpath(pkgdir(ClimaCoupler), "rsut_1M_average.nc"))
 
 include(joinpath(pkgdir(ClimaCoupler), "experiments/ClimaEarth/leaderboard/data_sources.jl"))
 resample(ov) = resampled_as(shift_longitude(ov, -180.0, 180.0), diagnostic_var, dim_names = ["longitude", "latitude"])
-function auto_covariance(output_var)
-    lon, lat = size(output_var.data)[1:2]
-    covariance = zeros(Float32, lon, lat)
-    for i in 1:lon
-        for j in 1:lat
-            covariance[i, j] = var(output_var.data[i, j, :])
-        end
-    end
-    return covariance
-end
 
 rad_and_pr_obs_dict = get_obs_var_dict()
 rsut = resample(rad_and_pr_obs_dict["rsut"](start_date))
@@ -27,9 +21,23 @@ cre = rsutcs - rsut
 
 # Create an EKP.Observation
 const days_in_secs = 86_400
-cre_window = window(cre, "time"; left = 93days_in_secs, right = 426days_in_secs)
-# Observations info: https://clima.github.io/EnsembleKalmanProcesses.jl/dev/observations/
-cre_obs = EKP.Observation(vec(cre_window.data), Diagonal(repeat(vec(auto_covariance(cre)), 12)), "cre")
+const month = 32 * days_in_secs
+
+if FULL_CALIBRATION
+    # covariance_mat = Diagonal(repeat(vec(auto_covariance(cre)), 12))
+    covariance_mat = compute_covariance(cre)
+    cre_window = window(cre, "time"; left = 93days_in_secs, right = 426days_in_secs)
+    # Observations info: https://clima.github.io/EnsembleKalmanProcesses.jl/dev/observations/
+    cre_obs = EKP.Observation(vec(cre_window.data), covariance_mat, "cre")
+else
+    # Hardcoding to only do one month
+    # TODO: Make it easier to change the number of months; not sure how to make it easier
+    covariance_mat = compute_covariance(cre, full = false)
+    cre_window = window(cre, "time"; left = 1month, right = 1month)
+    cre_obs = EKP.Observation(vec(cre_window.data), covariance_mat, "cre")
+end
 
 observations = EKP.combine_observations([cre_obs])
-JLD2.save_object("experiments/calibration/cld_eff_rad/observations.jld2", observations)
+observation_series = EKP.ObservationSeries(observations; metadata = cre_window)
+
+JLD2.save_object("experiments/calibration/cld_eff_rad/sep_obs_series.jld2", observation_series)

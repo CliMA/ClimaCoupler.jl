@@ -118,7 +118,6 @@ function PrescribedIceSimulation(
     cache = (;
         F_turb_energy = CC.Fields.zeros(space),
         F_radiative = CC.Fields.zeros(space),
-        q_sfc = CC.Fields.zeros(space),
         ρ_sfc = CC.Fields.zeros(space),
         area_fraction = ice_fraction,
         SIC_timevaryinginput = SIC_timevaryinginput,
@@ -238,8 +237,6 @@ function ice_rhs!(dY, Y, p, t)
     rhs = @. (-p.F_turb_energy - p.F_radiative + F_conductive) / (params.h * params.ρ * params.c)
     # If tendencies lead to temperature above freezing, set temperature to freezing
     @. dY.T_sfc = min(rhs, (params.T_freeze - Y.T_sfc) / float(p.dt))
-
-    @. p.q_sfc = TD.q_vap_saturation_generic.(p.thermo_params, Y.T_sfc, p.ρ_sfc, TD.Ice())
 end
 
 """

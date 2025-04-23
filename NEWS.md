@@ -6,6 +6,12 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Construct thermo states from exchanged T, q, ρ. PR[#1293](https://github.com/CliMA/ClimaCoupler.jl/pull/1293)
+
+Instead of exchanging atmosphere and surface thermo states, exchange T, q, ρ
+and use these to construct the thermo states. This will be necessary as we
+run with models on different grids and require real remapping.
+
 #### Allow < 3 surface models. PR[#1286](https://github.com/CliMA/ClimaCoupler.jl/pull/1286)
 
 Previously, land, ocean, and sea ice were all required to be defined, and the

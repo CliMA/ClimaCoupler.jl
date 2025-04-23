@@ -454,6 +454,7 @@ function FieldExchanger.import_atmos_fields!(csf, sim::ClimaLandSimulation, atmo
     Interfacer.get_field!(csf.P_atmos, atmos_sim, Val(:air_pressure))
     Interfacer.get_field!(csf.T_atmos, atmos_sim, Val(:air_temperature))
     Interfacer.get_field!(csf.q_atmos, atmos_sim, Val(:specific_humidity))
+    Interfacer.get_field!(csf.ρ_atmos, atmos_sim, Val(:air_density))
     Interfacer.get_field!(csf.P_liq, atmos_sim, Val(:liquid_precipitation))
     Interfacer.get_field!(csf.P_snow, atmos_sim, Val(:snow_precipitation))
     # CO2 is a scalar for now so it doesn't need remapping
@@ -520,25 +521,29 @@ The land model cache is updated with the computed fluxes for each sub-component.
 - `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
 - `sim`: [ClimaLandSimulation] the integrated land simulation to compute fluxes for.
 - `atmos_sim`: [Interfacer.AtmosModelSimulation] the atmosphere simulation to compute fluxes with.
-- unused arguments: `boundary_space`, `thermo_params`, `surface_scheme`
+- `boundary_space`: [ClimaCore.Fields.Field] the boundary space for the model (unused here).
+- `thermo_params`: [ClimaParams.ThermodynamicParameters] the thermodynamic parameters for the simulation.
 """
 function FluxCalculator.compute_surface_fluxes!(
     csf,
     sim::ClimaLandSimulation,
     atmos_sim::Interfacer.AtmosModelSimulation,
-    _...,
+    boundary_space,
+    thermo_params,
 )
     # We should change this to be on the boundary_space
     land_space = axes(sim.integrator.p.soil.turbulent_fluxes)
     coupled_atmos = sim.model.soil.boundary_conditions.top.atmos
 
-    # `_int` refers to atmos state of center level 1
-    z_int = Interfacer.get_field!(coupled_atmos.h, atmos_sim, Val(:height_int))
+    # Update the land simulation's coupled atmosphere state
     u_atmos = Interfacer.get_field(atmos_sim, Val(:u_int), land_space)
     v_atmos = Interfacer.get_field(atmos_sim, Val(:v_int), land_space)
-    Interfacer.get_field!(coupled_atmos.thermal_state, atmos_sim, Val(:thermo_state_int))
-
     @. coupled_atmos.u = StaticArrays.SVector(u_atmos, v_atmos)
+    Interfacer.get_field!(coupled_atmos.h, atmos_sim, Val(:height_int))
+    Interfacer.remap!(
+        coupled_atmos.thermal_state,
+        TD.PhaseEquil_ρTq.(thermo_params, csf.ρ_atmos, csf.T_atmos, csf.q_atmos),
+    )
 
     # set the same atmosphere state for all sub-components
     @assert sim.model.soil.boundary_conditions.top.atmos ===

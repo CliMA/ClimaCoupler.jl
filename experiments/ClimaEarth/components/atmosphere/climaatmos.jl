@@ -226,6 +226,8 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
         sim.integrator.p.params.thermodynamics_params,
         CC.Fields.level(sim.integrator.p.precomputed.ᶜts, 1),
     )
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) =
+    TD.air_density.(sim.integrator.p.params.thermodynamics_params, CC.Fields.level(sim.integrator.p.precomputed.ᶜts, 1))
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:cos_zenith})
     hasradiation(sim.integrator) || return nothing
     return CC.Fields.array2field(
@@ -271,7 +273,6 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:LW_d})
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:specific_humidity}) =
     CC.Fields.level(ρq_tot(sim.integrator.p.atmos.moisture_model, sim.integrator) ./ sim.integrator.u.c.ρ, 1)
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) = CC.Fields.level(sim.integrator.u.c.ρ, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
     surface_radiation_flux(sim.integrator.p.atmos.radiation_mode, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =
@@ -293,11 +294,21 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temp
     # it.
     # The rrtmgp_model.surface_temperature field is updated by the RRTMGP callback using the
     # sfc_conditions.ts, so all we need to do is update sfc_conditions.ts
+
+    # Note also that this method updates the entire thermo state, not just the temperature
+
+    ρ_sfc =
+        FluxCalculator.extrapolate_ρ_to_sfc.(
+            get_thermo_params(sim),
+            sim.integrator.p.precomputed.sfc_conditions.ts,
+            csf.T_sfc,
+        )
+
     if sim.integrator.p.atmos.moisture_model isa CA.DryModel
-        sim.integrator.p.precomputed.sfc_conditions.ts .= TD.PhaseDry_ρT.(get_thermo_params(sim), csf.ρ_sfc, csf.T_sfc)
+        sim.integrator.p.precomputed.sfc_conditions.ts .= TD.PhaseDry_ρT.(get_thermo_params(sim), ρ_sfc, csf.T_sfc)
     else
         sim.integrator.p.precomputed.sfc_conditions.ts .=
-            TD.PhaseNonEquil_ρTq.(get_thermo_params(sim), csf.ρ_sfc, csf.T_sfc, TD.PhasePartition.(csf.q_sfc))
+            TD.PhaseNonEquil_ρTq.(get_thermo_params(sim), ρ_sfc, csf.T_sfc, TD.PhasePartition.(csf.q_sfc))
     end
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =
@@ -383,14 +394,10 @@ Extend Interfacer.add_coupler_fields! to add the fields required for ClimaAtmosS
 The fields added are:
 - `:surface_direct_albedo` (for radiation)
 - `:surface_diffuse_albedo` (for radiation)
-- `:T_sfc` (for radiation)
-- `:q_sfc` (for moisture)
-- `:ρ_sfc` (for the thermal state)
 - `:ustar`, `:L_MO`, `:buoyancy_flux` (for EDMF boundary conditions)
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, atmos_sim::ClimaAtmosSimulation)
-    atmos_coupler_fields =
-        [:surface_direct_albedo, :surface_diffuse_albedo, :T_sfc, :q_sfc, :ρ_sfc, :ustar, :L_MO, :buoyancy_flux]
+    atmos_coupler_fields = [:surface_direct_albedo, :surface_diffuse_albedo, :ustar, :L_MO, :buoyancy_flux]
     push!(coupler_field_names, atmos_coupler_fields...)
 end
 
@@ -418,17 +425,6 @@ function FieldExchanger.update_sim!(sim::ClimaAtmosSimulation, csf)
     end
 
     Interfacer.update_field!(sim, Val(:turbulent_fluxes), csf)
-end
-
-"""
-    FluxCalculator.calculate_surface_air_density(sim::ClimaAtmosSimulation, T_sfc::CC.Fields.Field)
-
-Extension for this function to calculate surface density.
-"""
-function FluxCalculator.calculate_surface_air_density(sim::ClimaAtmosSimulation, T_sfc::CC.Fields.Field)
-    thermo_params = get_thermo_params(sim)
-    ts_int = Interfacer.get_field(sim, Val(:thermo_state_int))
-    FluxCalculator.extrapolate_ρ_to_sfc.(Ref(thermo_params), ts_int, Utilities.swap_space!(axes(ts_int.ρ), T_sfc))
 end
 
 # FluxCalculator.get_surface_params required by FluxCalculator (partitioned fluxes)

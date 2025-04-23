@@ -76,7 +76,6 @@ function SlabOceanSimulation(
         params = params,
         F_turb_energy = CC.Fields.zeros(space),
         F_radiative = CC.Fields.zeros(space),
-        q_sfc = CC.Fields.zeros(space),
         ρ_sfc = CC.Fields.zeros(space),
         area_fraction = area_fraction,
         thermo_params = thermo_params,
@@ -180,7 +179,6 @@ function slab_ocean_rhs!(dY, Y, cache, t)
     # Note that the area fraction has already been applied to the fluxes,
     #  so we don't need to multiply by it here.
     @. dY.T_sfc = rhs * p.evolving_switch
-    @. cache.q_sfc = TD.q_vap_saturation_generic.(cache.thermo_params, Y.T_sfc, cache.ρ_sfc, TD.Liquid())
 end
 
 """

@@ -106,12 +106,19 @@ default_coupler_fields() = [
     :z0b_sfc,
     :beta,
     :emissivity,
+    # fields used to compute fluxes
+    :T_atmos,
+    :q_atmos,
+    :ρ_atmos,
+    :T_sfc,
+    :q_sfc,
     # fields used for flux exchange
     :F_lh,
     :F_sh,
     :F_turb_moisture,
     :F_turb_ρτxz,
     :F_turb_ρτyz,
+    :F_radiative,
     # fields used to track water conservation, and for water fluxes
     :P_liq,
     :P_snow,

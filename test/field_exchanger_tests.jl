@@ -1,21 +1,21 @@
 import Test: @test, @testset
 import ClimaCore as CC
 import ClimaCoupler: Interfacer, FieldExchanger, FluxCalculator
+import Thermodynamics.Parameters as TDP
+import ClimaParams # to load TDP extension
 
 # test for a simple generic atmos model
 struct DummySimulation{C} <: Interfacer.AtmosModelSimulation
     cache::C
 end
+Interfacer.get_field(sim::DummySimulation, ::Val{:air_density}) = sim.cache.air_density
+Interfacer.get_field(sim::DummySimulation, ::Val{:air_temperature}) = sim.cache.air_temperature
+Interfacer.get_field(sim::DummySimulation, ::Val{:specific_humidity}) = sim.cache.specific_humidity
 Interfacer.get_field(sim::DummySimulation, ::Val{:turbulent_energy_flux}) = sim.cache.turbulent_energy_flux
 Interfacer.get_field(sim::DummySimulation, ::Val{:turbulent_moisture_flux}) = sim.cache.turbulent_moisture_flux
 Interfacer.get_field(sim::DummySimulation, ::Val{:radiative_energy_flux_sfc}) = sim.cache.radiative_energy_flux_sfc
 Interfacer.get_field(sim::DummySimulation, ::Val{:liquid_precipitation}) = sim.cache.liquid_precipitation
 Interfacer.get_field(sim::DummySimulation, ::Val{:snow_precipitation}) = sim.cache.snow_precipitation
-
-function FluxCalculator.calculate_surface_air_density(atmos_sim::DummySimulation, T_sfc::CC.Fields.Field)
-    return CC.Fields.ones(axes(T_sfc))
-end
-
 
 # surface field exchange tests
 struct TestSurfaceSimulation1{C} <: Interfacer.SurfaceModelSimulation
@@ -71,6 +71,9 @@ struct TestAtmosSimulation{C} <: Interfacer.AtmosModelSimulation
     cache::C
 end
 
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:air_temperature}) = sim.cache.air_temperature
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:air_density}) = sim.cache.air_density
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:specific_humidity}) = sim.cache.specific_humidity
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) = sim.cache.radiative_energy_flux_sfc
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:liquid_precipitation}) = sim.cache.liquid_precipitation
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:snow_precipitation}) = sim.cache.snow_precipitation
@@ -87,9 +90,6 @@ Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:surface_temperature}, 
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:roughness_buoyancy}, field) = nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:beta}, field) = nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:turbulent_fluxes}, field) = nothing
-function FluxCalculator.calculate_surface_air_density(::TestAtmosSimulation, T_sfc::CC.Fields.Field)
-    return CC.Fields.ones(axes(T_sfc))
-end
 
 #surface sim
 struct TestSurfaceSimulationLand{C} <: Interfacer.SurfaceModelSimulation
@@ -195,14 +195,25 @@ for FT in (Float32, Float64)
 
     @testset "import_atmos_fields! for FT=$FT" begin
         boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
-        coupler_names = [:F_lh, :F_sh, :F_turb_moisture, :F_radiative, :P_liq, :P_snow, :ρ_sfc, :T_sfc]
-        component_names = [:radiative_energy_flux_sfc, :liquid_precipitation, :snow_precipitation]
-        component_fields = Interfacer.init_coupler_fields(FT, component_names, boundary_space)
+        # Initialize coupler fields with 0
+        coupler_names = Interfacer.default_coupler_fields()
+        coupler_fields = Interfacer.init_coupler_fields(FT, coupler_names, boundary_space)
+        # Initialize component fields with 1
+        component_names = [
+            :air_density,
+            :air_temperature,
+            :specific_humidity,
+            :radiative_energy_flux_sfc,
+            :liquid_precipitation,
+            :snow_precipitation,
+        ]
+        key_types = (component_names...,)
+        val_types = Tuple{(FT for _ in 1:length(component_names))...}
+        component_fields = ones(NamedTuple{key_types, val_types}, boundary_space)
 
         model_sims =
             (; atmos_sim = DummySimulation(component_fields), land_sim = TestSurfaceSimulation1(component_fields))
 
-        coupler_fields = Interfacer.init_coupler_fields(FT, coupler_names, boundary_space)
         FieldExchanger.import_atmos_fields!(coupler_fields, model_sims)
         @test Array(parent(coupler_fields.F_lh))[1] == FT(0)
         @test Array(parent(coupler_fields.F_sh))[1] == FT(0)
@@ -216,13 +227,25 @@ for FT in (Float32, Float64)
     @testset "import_combined_surface_fields! for FT=$FT" begin
         # coupler cache setup
         boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
-        coupler_names =
-            [:T_sfc, :z0m_sfc, :z0b_sfc, :surface_direct_albedo, :surface_diffuse_albedo, :beta, :q_sfc, :temp1]
+        coupler_names_additional = [:surface_direct_albedo, :surface_diffuse_albedo]
+        coupler_names = push!(Interfacer.default_coupler_fields(), coupler_names_additional...)
+
+        # coupler cache setup
+        exchanged_fields = (
+            :surface_temperature,
+            :surface_direct_albedo,
+            :surface_diffuse_albedo,
+            :roughness_momentum,
+            :roughness_buoyancy,
+            :beta,
+        )
 
         sims = (; a = TestSurfaceSimulation1(ones(boundary_space)), b = TestSurfaceSimulation2(ones(boundary_space)))
 
         coupler_fields = Interfacer.init_coupler_fields(FT, coupler_names, boundary_space)
-        FieldExchanger.import_combined_surface_fields!(coupler_fields, sims)
+
+        thermo_params = TDP.ThermodynamicsParameters(FT)
+        FieldExchanger.import_combined_surface_fields!(coupler_fields, sims, thermo_params)
         expected_field =
             Interfacer.get_field(sims.a, Val(:area_fraction)) .* sims.a.cache_field .+
             Interfacer.get_field(sims.b, Val(:area_fraction)) .* sims.b.cache_field
@@ -234,21 +257,7 @@ for FT in (Float32, Float64)
     @testset "update_model_sims! for FT=$FT" begin
         # coupler cache setup
         boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
-        coupler_field_names = [
-            :ρ_sfc,
-            :T_sfc,
-            :z0m_sfc,
-            :z0b_sfc,
-            :surface_direct_albedo,
-            :surface_diffuse_albedo,
-            :beta,
-            :F_lh,
-            :F_sh,
-            :F_turb_moisture,
-            :F_radiative,
-            :P_liq,
-            :P_snow,
-        ]
+        coupler_field_names = [Interfacer.default_coupler_fields(); [:surface_direct_albedo, :surface_diffuse_albedo]]
         coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
         # Initialize with ones
         for p in propertynames(coupler_fields)
@@ -318,16 +327,23 @@ for FT in (Float32, Float64)
         #  and two precipitation fields from the atmos to the surface.
         # coupler cache setup
         boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
-        coupler_field_names =
-            [:surface_direct_albedo, :surface_diffuse_albedo, :P_liq, :P_snow, :ρ_sfc, :T_sfc, :F_radiative, :temp1]
+        coupler_field_names = [Interfacer.default_coupler_fields(); [:surface_direct_albedo, :surface_diffuse_albedo]]
         # Initialize coupler fields with 0.5
         key_types = (coupler_field_names...,)
         val_types = Tuple{(FT for _ in 1:length(coupler_field_names))...}
         coupler_fields = zeros(NamedTuple{key_types, val_types}, boundary_space) .+ FT(0.5)
 
         # model cache setup
-        atmos_names =
-            [:albedo_direct, :albedo_diffuse, :liquid_precipitation, :snow_precipitation, :radiative_energy_flux_sfc]
+        atmos_names = [
+            :albedo_direct,
+            :albedo_diffuse,
+            :liquid_precipitation,
+            :snow_precipitation,
+            :radiative_energy_flux_sfc,
+            :air_temperature,
+            :specific_humidity,
+            :air_density,
+        ]
         # Initialize atmos fields with 1
         key_types = (atmos_names...,)
         val_types = Tuple{(FT for _ in 1:length(atmos_names))...}
@@ -346,6 +362,7 @@ for FT in (Float32, Float64)
 
         model_sims =
             (; atmos_sim = TestAtmosSimulation(atmos_fields), land_sim = TestSurfaceSimulationLand(land_fields))
+        thermo_params = TDP.ThermodynamicsParameters(FT)
 
         # construct the CoupledSimulation object
         cs = Interfacer.CoupledSimulation{FT}(
@@ -360,7 +377,7 @@ for FT in (Float32, Float64)
             model_sims,
             (;), # callbacks
             (;), # dirs
-            nothing, # thermo_params
+            thermo_params, # thermo_params
             nothing, # diags_handler
         )
 

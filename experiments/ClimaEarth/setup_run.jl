@@ -319,7 +319,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         # ocean_sim =
         #     PrescribedOceanSimulation(FT, boundary_space, start_date, t_start, ocean_fraction, thermo_params, comms_ctx)
 
-        ocean_sim = OceananigansSimulation(area_fraction, comms_ctx)
+        ocean_sim = OceananigansSimulation(atmos_sim, ocean_fraction; comms_ctx)
 
         Utilities.show_memory_usage()
 

@@ -40,13 +40,14 @@ Slabplanet configuration, please see our [README.md](https://github.com/CliMA/Cl
 include("setup_run.jl")
 
 # Get the configuration file from the command line (or manually set it here)
-config_file = parse_commandline(argparse_settings())["config_file"]
+# config_file = parse_commandline(argparse_settings())["config_file"]
+config_file = "config/nightly_configs/amip_coarse_edonly.yml"
 
 # Set up and run the coupled simulation
 cs = CoupledSimulation(config_file)
-run!(cs)
+# run!(cs)
 
-# Postprocessing
-# TODO: Remove this option?
-conservation_softfail = get_coupler_config_dict(config_file)["conservation_softfail"]
-postprocess(cs, conservation_softfail)
+# # Postprocessing
+# # TODO: Remove this option?
+# conservation_softfail = get_coupler_config_dict(config_file)["conservation_softfail"]
+# postprocess(cs, conservation_softfail)

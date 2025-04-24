@@ -176,6 +176,11 @@ function Base.show(io::IO, @nospecialize(sim::ComponentModelSimulation))
     return println(io, "I am simulation object and I do not have a specialized `Base.show` method")
 end
 
+function Base.summary(@nospecialize(sim::ComponentModelSimulation))
+    return nameof(typeof(sim))
+end
+
+
 """
     get_field(sim::AtmosModelSimulation, val::Val)
 

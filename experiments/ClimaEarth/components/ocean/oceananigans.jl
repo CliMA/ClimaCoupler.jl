@@ -1,23 +1,29 @@
-import Oceananigans
+import Oceananigans as OC
 import ClimaOcean as CO
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms
+import Thermodynamics as TD
 
-const KernelAbstractions = Oceananigans.KernelAbstractions
+const KA = OC.Architectures.KernelAbstractions
+
+import ClimaOcean.OceanSeaIceModels.PrescribedAtmospheres:
+    thermodynamics_parameters,
+    boundary_layer_height,
+    surface_layer_height
 
 """
-    OceananigansSimulation{M, I, A}
+    OceananigansSimulation{SIM, A}
 
 The ClimaCoupler simulation object used to run with Oceananigans.
 This type is used by the coupler to indicate that this simulation
 is an surface/ocean simulation for dispatch.
 
 It contains the following objects:
-- `sim::M`: The Oceananigans simulation object.
+- `sim::SIM`: The Oceananigans simulation object.
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
 """
-struct OceananigansSimulation{M, I, A} <: Interfacer.OceanModelSimulation
-    sim::M
+struct OceananigansSimulation{SIM, A} <: Interfacer.OceanModelSimulation
+    sim::SIM
     area_fraction::A
 end
 
@@ -33,27 +39,27 @@ Specific details about the complexity of the model
 can be found in the Oceananigans.jl documentation.
 """
 function OceananigansSimulation(
-    area_fraction,
+    atmosphere::ClimaAtmosSimulation,
+    area_fraction;
+    resolution_points = (90, 45, 15),
     comms_ctx = ClimaComms.context(),
-) where {FT, TT <: Union{Float64, ITime}}
+)
     # TODO fill this out
     arch = if comms_ctx.device isa ClimaComms.CUDADevice
-        Oceananigans.GPU()
+        OC.GPU()
     else
-        Oceananigans.CPU()
+        OC.CPU()
     end
 
     # Set up ocean grid (1 degree)
-    Nx = 90
-    Ny = 45
-    Nz = 15
+    Nx, Ny, Nz = resolution_points
     # Nx = 256
     # Ny = 128
     # Nz = 32
     z_faces = CO.exponential_z_faces(; Nz, depth = 6000, h = 34)
     # underlying_grid = TripolarGrid(arch; size = (Nx, Ny, Nz), z = z_faces)
 
-    grid = Oceananigans.LatitudeLongitudeGrid(arch;
+    grid = OC.LatitudeLongitudeGrid(arch;
                                               size = (Nx, Ny, Nz),
                                               longitude = (0, 360),
                                               latitude = (-85, 85),
@@ -72,14 +78,14 @@ function OceananigansSimulation(
     # TODO: Remove this. It is here right now to add interfaces to Oceananigans
     sea_ice = CO.OceanSeaIceModels.FreezingLimitedOceanTemperature(eltype(ocean.model))
 
-    ocean_sea_ice = CO.OceanSeaIceModel(ocean, sea_ice)
+    ocean_sea_ice = CO.OceanSeaIceModel(ocean, sea_ice; atmosphere)
 
     # Set up initial conditions for temperature and salinity
     Tᵢ(λ, φ, z) = 30 * (1 - tanh((abs(φ) - 30) / 5)) / 2 + rand()
     Sᵢ(λ, φ, z) = 30 - 5e-3 * z + rand()
-    Oceananigans.set!(ocean.model, T = Tᵢ, S = Sᵢ)
+    OC.set!(ocean.model, T = Tᵢ, S = Sᵢ)
 
-    return OceananigansSimulation(ocean, area_fraction)
+    return OceananigansSimulation(ocean_sea_ice, area_fraction)
 end
 
 Interfacer.name(::OceananigansSimulation) = "OceananigansSimulation"
@@ -89,10 +95,16 @@ Interfacer.name(::OceananigansSimulation) = "OceananigansSimulation"
 ###############################################################################
 
 # Timestep the simulation forward to time `t`
-Interfacer.step!(sim::OceananigansSimulation, t) = Oceananigans.time_step!(sim.model, t - sim.model.clock.time)
+Interfacer.step!(sim::OceananigansSimulation, t) = OC.time_step!(sim.sim, t - sim.sim.clock.time)
 
 # Reset prognostic state and current time to initial conditions
 Interfacer.reinit!(sim::OceananigansSimulation, t) = nothing # TODO fill this out
+
+function OC.time_step!(atmos::ClimaAtmosSimulation, Δt)
+    # It is not Oceananigans job to step the model
+    return nothing
+end
+
 
 # """
 #     Interfacer.get_field(sim::OceananigansSimulation, ::Val{:_})
@@ -100,13 +112,14 @@ Interfacer.reinit!(sim::OceananigansSimulation, t) = nothing # TODO fill this ou
 # Get the value of the specified field in the ocean simulation.
 # This is used to exchange properties from the ocean to the coupler and other components.
 # """
-# Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction
 # Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_buoyancy}) = return nothing # TODO fill this out
 # Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_momentum}) = return nothing # TODO fill this out
 # Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) = return nothing # TODO fill this out
 # Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) = return nothing # TODO fill this out
 # Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_humidity}) = return nothing # TODO fill this out
-# Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) = return nothing # TODO fill this out
+# Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) = sim.sim.ocean.model.tracers.T
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) = nothing
 
 # # These two methods are used to track conservation of the coupled system, so it's okay to leave them empty for now
 # function Interfacer.get_field(sim::OceananigansSimulation, ::Val{:energy}, level)
@@ -351,9 +364,9 @@ function interpolate_atmosphere_state!(interfaces,
     # TODO: can we avoid allocating for Ta, pa, qa?
     tsa = CC.Spaces.level(atmosphere.integrator.p.precomputed.ᶜts, 1)
     ℂa = atmosphere.integrator.p.params.thermodynamics_params
-    Ta = Thermodynamics.air_temperature.(ℂa, tsa)
-    pa = Thermodynamics.air_pressure.(ℂa, tsa)
-    qa = Thermodynamics.total_specific_humidity.(ℂa, tsa)
+    Ta = TD.air_temperature.(ℂa, tsa)
+    pa = TD.air_pressure.(ℂa, tsa)
+    qa = TD.total_specific_humidity.(ℂa, tsa)
 
     #=
     # TODO: make this work without allocation
@@ -383,8 +396,8 @@ function interpolate_atmosphere_state!(interfaces,
 end
 
 # Note: this just copies, for now.
-@kernel function _interpolate_atmosphere_state!(exchange_state, atmos_state)
-    i, j = @index(Global, NTuple)
+KA.@kernel function _interpolate_atmosphere_state!(exchange_state, atmos_state)
+    i, j = KA.@index(Global, NTuple)
     @inbounds begin
         exchange_state.u[i, j, 1] = atmos_state.u[i, j]
         exchange_state.v[i, j, 1] = atmos_state.v[i, j]
@@ -402,10 +415,10 @@ end
 =#
 
 function atmosphere_exchanger(atmosphere::ClimaAtmosSimulation, exchange_grid)
-    λ = λnodes(exchange_grid, Center(), Center(), Center(), with_halos=true)
-    φ = φnodes(exchange_grid, Center(), Center(), Center(), with_halos=true)
+    λ = OC.λnodes(exchange_grid, OC.Center(), OC.Center(), OC.Center(), with_halos=true)
+    φ = OC.φnodes(exchange_grid, OC.Center(), OC.Center(), OC.Center(), with_halos=true)
 
-    if exchange_grid isa LatitudeLongitudeGrid
+    if exchange_grid isa OC.LatitudeLongitudeGrid
         λ = reshape(λ, length(λ), 1)
         φ = reshape(φ, 1, length(φ))
     end
@@ -489,43 +502,43 @@ function map_interpolate!(cc_field, points, oc_field::OC.Field)
     return nothing
 end
 
-function compute_net_atmosphere_fluxes!(coupled_model::ClimaCoupledModel)
-    atmosphere = coupled_model.atmosphere
-    ocean = coupled_model.ocean
-    ocean_grid = ocean.model.grid
-    interfaces = coupled_model.interfaces
-    exchanger = interfaces.exchanger
+# function compute_net_atmosphere_fluxes!(coupled_model::ClimaCoupledModel)
+#     atmosphere = coupled_model.atmosphere
+#     ocean = coupled_model.ocean
+#     ocean_grid = ocean.model.grid
+#     interfaces = coupled_model.interfaces
+#     exchanger = interfaces.exchanger
 
-    atmos_surface_points = exchanger.atmosphere_exchanger.atmos_surface_points
-    (; Qc_a, Qv_a, Fv_a, ρτx_a, ρτy_a) = exchanger.atmosphere_exchanger.turbulent_atmosphere_surface_fluxes
+#     atmos_surface_points = exchanger.atmosphere_exchanger.atmos_surface_points
+#     (; Qc_a, Qv_a, Fv_a, ρτx_a, ρτy_a) = exchanger.atmosphere_exchanger.turbulent_atmosphere_surface_fluxes
 
-    Qv_e = interfaces.atmosphere_ocean_interface.fluxes.latent_heat
-    Qc_e = interfaces.atmosphere_ocean_interface.fluxes.sensible_heat
-    Fv_e = interfaces.atmosphere_ocean_interface.fluxes.water_vapor
-    ρτx_e = interfaces.atmosphere_ocean_interface.fluxes.x_momentum
-    ρτy_e = interfaces.atmosphere_ocean_interface.fluxes.y_momentum
+#     Qv_e = interfaces.atmosphere_ocean_interface.fluxes.latent_heat
+#     Qc_e = interfaces.atmosphere_ocean_interface.fluxes.sensible_heat
+#     Fv_e = interfaces.atmosphere_ocean_interface.fluxes.water_vapor
+#     ρτx_e = interfaces.atmosphere_ocean_interface.fluxes.x_momentum
+#     ρτy_e = interfaces.atmosphere_ocean_interface.fluxes.y_momentum
 
-    map_interpolate!(Qc_a,  atmos_surface_points, Qc_e)
-    map_interpolate!(Qv_a,  atmos_surface_points, Qv_e)
-    map_interpolate!(Fv_a,  atmos_surface_points, Fv_e)
-    map_interpolate!(ρτx_a, atmos_surface_points, ρτx_e)
-    map_interpolate!(ρτy_a, atmos_surface_points, ρτy_e)
+#     map_interpolate!(Qc_a,  atmos_surface_points, Qc_e)
+#     map_interpolate!(Qv_a,  atmos_surface_points, Qv_e)
+#     map_interpolate!(Fv_a,  atmos_surface_points, Fv_e)
+#     map_interpolate!(ρτx_a, atmos_surface_points, ρτx_e)
+#     map_interpolate!(ρτy_a, atmos_surface_points, ρτy_e)
 
-    # Project onto a vector...
-    # :eyes https://github.com/CliMA/ClimaEarth.jl/pull/5/files
-    c = atmosphere.integrator.p.scratch.ᶠtemp_scalar
-    𝒢 = CC.Fields.level(CC.Fields.local_geometry_field(c), half)
-    ρwh = atmosphere.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot
-    @. ρwh = CA.SurfaceConditions.vector_from_component(Qv_a, 𝒢) +
-             CA.SurfaceConditions.vector_from_component(Qc_a, 𝒢)
+#     # Project onto a vector...
+#     # :eyes https://github.com/CliMA/ClimaEarth.jl/pull/5/files
+#     c = atmosphere.integrator.p.scratch.ᶠtemp_scalar
+#     𝒢 = CC.Fields.level(CC.Fields.local_geometry_field(c), half)
+#     ρwh = atmosphere.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot
+#     @. ρwh = CA.SurfaceConditions.vector_from_component(Qv_a, 𝒢) +
+#              CA.SurfaceConditions.vector_from_component(Qc_a, 𝒢)
 
-    # Mass or volume flux: check units
-    ρwq = atmosphere.integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot
-    @. ρwq = CA.SurfaceConditions.vector_from_component(Fv_a, 𝒢)
+#     # Mass or volume flux: check units
+#     ρwq = atmosphere.integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot
+#     @. ρwq = CA.SurfaceConditions.vector_from_component(Fv_a, 𝒢)
 
-    # TODO: validate this?
-    ρτ = atmosphere.integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ
-    @. ρτ = tensor_from_uv_components(ρτx_a, ρτy_a, 𝒢)
+#     # TODO: validate this?
+#     ρτ = atmosphere.integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ
+#     @. ρτ = tensor_from_uv_components(ρτx_a, ρτy_a, 𝒢)
 
-    return nothing
-end
+#     return nothing
+# end

@@ -2,7 +2,7 @@
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "b128b4b3c921eda6ebd10795a43db24e86ebb375"
+project_hash = "a6b727ee8a2506c47fabb82909c682490f07c2f7"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -348,7 +348,9 @@ version = "0.2.13"
 
 [[deps.ClimaLand]]
 deps = ["ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "08d08423e0a955180d3eea39c340b81603a00585"
+git-tree-sha1 = "d5ba1073aa5c015f6d25ee9ace265d63ac421197"
+repo-rev = "tr/add-energy_per_area-bucket"
+repo-url = "https://github.com/CliMA/ClimaLand.jl.git"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
 version = "0.15.14"
 

@@ -161,7 +161,8 @@ end
         :turbulent_energy_flux,
         :turbulent_moisture_flux,
         :thermo_state_int,
-        :uv_int,
+        :u_int,
+        :v_int,
     )
         val = Val(value)
         @test_throws ErrorException("undefined field `$value` for " * Interfacer.name(sim)) Interfacer.get_field(

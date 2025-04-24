@@ -536,17 +536,19 @@ function FluxCalculator.compute_surface_fluxes!(
 
     # `_int` refers to atmos state of center level 1
     z_int = Interfacer.get_field(atmos_sim, Val(:height_int))
-    uₕ_int = Interfacer.get_field(atmos_sim, Val(:uv_int))
+    u_int = Interfacer.get_field(atmos_sim, Val(:u_int))
+    v_int = Interfacer.get_field(atmos_sim, Val(:v_int))
     thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
 
-    # We use `field_values` here because of the mismatch between the lowest atmos level
-    #  and the boundary space, even though the horizontal grids are the same.
-    @assert axes(coupled_atmos.u).grid == axes(uₕ_int).grid.full_grid.horizontal_grid
-    @assert axes(coupled_atmos.thermal_state).grid == axes(thermo_state_int).grid.full_grid.horizontal_grid
-    @assert axes(coupled_atmos.h).grid == axes(z_int).grid.full_grid.horizontal_grid
-    Fields.field_values(coupled_atmos.u) .= Fields.field_values(uₕ_int)
-    Fields.field_values(coupled_atmos.thermal_state) .= Fields.field_values(thermo_state_int)
-    Fields.field_values(coupled_atmos.h) .= Fields.field_values(z_int)
+    # remap atmosphere fields to the exchange grid for flux calculation
+    u_atmos = zeros(axes(csf.F_turb_ρτxz))
+    v_atmos = zeros(axes(csf.F_turb_ρτxz))
+    FieldExchanger.dummmy_remap!(u_atmos, u_int)
+    FieldExchanger.dummmy_remap!(v_atmos, v_int)
+    @. coupled_atmos.u = StaticArrays.SVector(u_atmos, v_atmos)
+
+    FieldExchanger.dummmy_remap!(coupled_atmos.h, z_int)
+    FieldExchanger.dummmy_remap!(coupled_atmos.thermal_state, thermo_state_int)
 
     # set the same atmosphere state for all sub-components
     @assert sim.model.soil.boundary_conditions.top.atmos ===

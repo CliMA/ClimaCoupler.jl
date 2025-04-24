@@ -32,9 +32,7 @@ export CoupledSimulation,
     AMIPMode,
     SlabplanetMode,
     SlabplanetAquaMode,
-    SlabplanetTerraMode,
-    SlabplanetEisenmanMode
-
+    SlabplanetTerraMode
 
 """
     AbstractSimulation
@@ -60,7 +58,6 @@ struct CoupledSimulation{
     NTMS <: NamedTuple,
     NTC <: NamedTuple,
     NTP <: NamedTuple,
-    TF,
     TP,
     DH,
 }
@@ -75,7 +72,6 @@ struct CoupledSimulation{
     model_sims::NTMS
     callbacks::NTC
     dirs::NTP
-    turbulent_fluxes::TF
     thermo_params::TP
     diags_handler::DH
 end
@@ -194,7 +190,6 @@ get_field(
         Val{:height_sfc},
         Val{:liquid_precipitation},
         Val{:radiative_energy_flux_sfc},
-        Val{:radiative_energy_flux_toa},
         Val{:snow_precipitation},
         Val{:turblent_energy_flux},
         Val{:turbulent_moisture_flux},
@@ -381,14 +376,5 @@ and only once surface model, a ClimaLand.jl bucket land model, which is evaluate
 entire surface. There are no ocean or sea ice models.
 """
 abstract type SlabplanetTerraMode <: AbstractSlabplanetSimulationMode end
-
-"""
-    SlabplanetEisenmanMode
-
-An abstract type representing the slabplanet simulation mode with a ClimaAtmos.jl atmosphere model,
-a ClimaLand.jl bucket land model, and Eisenman sea ice model. The ocean model
-is included in the Eisenman sea ice model.
-"""
-abstract type SlabplanetEisenmanMode <: AbstractSlabplanetSimulationMode end
 
 end # module

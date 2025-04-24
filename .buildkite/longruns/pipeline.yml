@@ -1,7 +1,7 @@
 agents:
   queue: new-central
   slurm_time: 24:00:00
-  modules: climacommon/2025_01_27
+  modules: climacommon/2025_03_18
 
 env:
   JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
@@ -48,7 +48,7 @@ steps:
       - "julia --project=experiments/calibration/ -e 'using Pkg; Pkg.instantiate(;verbose=true); Pkg.develop(;path=\".\")'"
     agents:
       queue: clima
-      modules: climacommon/2025_01_27
+      modules: climacommon/2025_03_18
     env:
       JULIA_NUM_PRECOMPILE_TASKS: 8
       JULIA_MAX_NUM_PRECOMPILE_FILES: 50
@@ -254,7 +254,7 @@ steps:
 
       - label: "MPI AMIP FINE: new target amip: topo + diagedmf"
         key: "amip_target_topo_diagedmf_cpu"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf_cpu.yml --job_id amip_target_topo_diagedmf_cpu"
+        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf.yml --job_id amip_target_topo_diagedmf_cpu"
         artifact_paths: "experiments/ClimaEarth/output/amip_target_topo_diagedmf_cpu/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
@@ -286,7 +286,7 @@ steps:
         key: "amip_target_topo_diagedmf_gpu"
         command:
           - echo "--- Run simulation"
-          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf_gpu.yml --job_id amip_target_topo_diagedmf_gpu"
+          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf.yml --job_id amip_target_topo_diagedmf_gpu"
         artifact_paths: "experiments/ClimaEarth/output/amip_target_topo_diagedmf_gpu/artifacts/*"
         timeout_in_minutes: 1440
         env:
@@ -298,7 +298,7 @@ steps:
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
           slurm_mem: 30GB
-          modules: climacommon/2025_01_27
+          modules: climacommon/2025_03_18
         soft_fail: true
 
   # DYAMOND AMIP: 1 day (convection resolving)
@@ -314,7 +314,7 @@ steps:
       queue: clima
       slurm_mem: 20GB
       slurm_gpus: 1
-      modules: climacommon/2025_01_27
+      modules: climacommon/2025_03_18
     soft_fail: true
 
   - label: "Perfect model calibration test"
@@ -328,11 +328,11 @@ steps:
     agents:
       queue: clima
       slurm_mem: 96GB
-      slurm_ntasks: 5
+      slurm_ntasks: 3
       slurm_gpus_per_task: 1
       slurm_cpus_per_task: 4
       slurm_time: 05:00:00
-      modules: climacommon/2025_01_27
+      modules: climacommon/2025_03_18
 
   - wait
 

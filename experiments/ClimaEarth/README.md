@@ -93,26 +93,6 @@ only surface model is the ocean, which is evaluated over the entire surface. The
 This configuration is similar to the general "Slabplanet" configuration, except that the
 only surface model is the land, which is evaluated over the entire surface. There are no ocean or sea ice models.
 
-### Slabplanet Eisenman
-This configuration is similar to the general "Slabplanet" configuration, except that the ocean model
-is included in the Eisenman sea ice model.
-
-#### Eisenman Sea Ice and Ocean
-Thermodynamics: 0-layer model, based on the Semtner 1976 model and later refined by
-Eisenman & Wettlaufer (2009) and Zhang et al. (2021).
-
-Prognostic variables: ice height (`h_i`), ocean mixed layer depth (`T_ml`) and surface air temperature (`T_s`).
-
-Note that Eisenman sea ice assumes gray radiation, no snow coverage, and
-PartitionedStateFluxes for the surface flux calculation.
-
-#### References: Eisenman sea ice formulation
-[Semtner 1976](https://journals.ametsoc.org/view/journals/phoc/6/3/1520-0485_1976_006_0379_amfttg_2_0_co_2.xml): A Model for the Thermodynamic Growth of Sea Ice in Numerical Investigations of Climate
-
-[Eisenman & Wettlaufer 2009](https://eisenman.ucsd.edu/papers/Eisenman-Wettlaufer-2009.pdf): Nonlinear threshold behavior during the loss of Arctic sea ice
-
-[Zhang et al. 2021](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2020JC016686): Sea Ice Properties in High-Resoluation Sea Ice Models
-
 ## Configuration files
 We use configuration files to specify all of the options used to set up our simulations.
 We currently use the following configuration files specified in ClimaAtmos.jl, which

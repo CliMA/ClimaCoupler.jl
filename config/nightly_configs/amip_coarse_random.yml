@@ -13,7 +13,6 @@ energy_check: false
 h_elem: 8
 land_albedo_type: "map_temporal"
 mode_name: "amip"
-mono_surface: false
 netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
 output_default_diagnostics: true
@@ -23,7 +22,6 @@ surface_setup: "PrescribedSurface"
 t_end: "465days"
 topo_smoothing: true
 topography: "Earth"
-turb_flux_partition: "PartitionedStateFluxes"
 unique_seed: true
 viscous_sponge: true
 z_elem: 39

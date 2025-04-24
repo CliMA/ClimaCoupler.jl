@@ -6,6 +6,59 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Test AMIP with integrated land model. PR[#1254](https://github.com/CliMA/ClimaCoupler.jl/pull/1254)
+
+The integrated ClimaLand model can now be used in coupled simulations.
+A short run of AMIP using the full land model is now tested in our regular
+Buildkite pipeline, and the restarts test uses the full land model
+rather than the bucket.
+
+This PR adds the config option `land_model`, which can be set to either
+`bucket` or `integrated` to choose which land model to run with.
+
+#### Remove `nans_to_zero`. PR[#1278](https://github.com/CliMA/ClimaCoupler.jl/pull/1278)
+
+Instead of zeroing out all NaNs in a surface field, we zero out all values
+where the area fraction is 0, which is logically what we want to do.
+
+#### Removed `SurfaceScheme`. PR[#1280](https://github.com/CliMA/ClimaCoupler.jl/pull/1280)
+
+The `BulkScheme` option for computing fluxes was removed. Now, fluxes
+are always computed with the `MoninObukhovScheme`.
+
+#### Removed `CombinedStateFluxes`. PR[#1276](https://github.com/CliMA/ClimaCoupler.jl/pull/1276)
+
+The `CombinedStateFluxes` option for computing fluxes was removed. Now, fluxes
+are always computed with the option formerly known as `PartitionedStateFluxes`
+(no longer an option). Related code was also removed, such as the
+`atmos_turbulent_fluxes_most!` or `combined_turbulent_fluxes!` functions,
+and the `TurbulentFluxPartition` types.
+
+The `partitioned_turbulent_fluxes!` function was renamed to `turbulent_fluxes!`.
+
+As a result of this, the signature of certain functions has changed:
+`update_sim`, `update_model_sims!`, `import_atmos_fields!`, and
+`import_combined_surface_fields!` no longer take the `turbulent_fluxes` argument.
+
+
+#### Remove `area_mask`, `binary_mask`, `mono_surface`. [PR#1268](https://github.com/CliMA/ClimaCoupler.jl/pull/1268/files)
+Removes all uses of `area_mask`, as multiplying quantities by both `area_fraction`
+and `area_mask` will potentially lead to physically inaccurate results.
+It also defeats the purpose of maintaining that the sum of surface models'
+area fractions is 1 at all points. See issue [#1255](https://github.com/CliMA/ClimaCoupler.jl/issues/1255) for more details.
+The function `Utilities.binary_mask` is also removed, as it's now unused.
+The option `mono_surface` is no longer supported, as it was rarely exercised
+and did not do what it was documented to do. All simulations now have
+behavior equivalent to using `mono_surface: false` previously.
+
+#### Remove `EisenmanSeaIce`. PR[#1284](https://github.com/CliMA/ClimaCoupler.jl/pull/1284)
+
+The `EisenmanSeaIce` was removed. The last commit that contains this model is
+[a3b32d1](https://github.com/CliMA/ClimaCoupler.jl/commit/a3b32d169137f7dad2edf33fd2f5e29ebd6d5356).
+Please refer to this commit if you are interested in running this model. The
+function `FluxCalculator.differentiate_turbulent_fluxes!` was no longer needed
+and was removed.
+
 #### Removed hierarchy experiments. PR[#1277](https://github.com/CliMA/ClimaCoupler.jl/pull/1277)
 
 The hierarchy experiments have been removed. The last commit that contains them
@@ -17,7 +70,7 @@ is
 Fixed `PartitionedStateFluxes` option. Now `PartitionedStateFluxes` is the
 default: instead of combining the surface states and computing fluxes once, we
 compute surface fluxes for each component and combine them. Results might be
-different. The `CombinedStateFluxes` option will be removed very soon.
+different.
 
 #### Split `setup_and_run` in multiple functions. PR[#1251](https://github.com/CliMA/ClimaCoupler.jl/pull/1251)
 
@@ -223,7 +276,6 @@ The available simulation modes are now represented by the following abstract typ
 - `ClimaCoupler.Interfacer.SlabplanetMode`
 - `ClimaCoupler.Interfacer.SlabplanetAquaMode`
 - `ClimaCoupler.Interfacer.SlabplanetTerraMode`
-- `ClimaCoupler.Interfacer.SlabplanetEisenmanMode`
 
 All of the above types are subtypes of the abstract
 `ClimaCoupler.Interfacer.AbstractSlabplanetSimulationMode`, and all of them except

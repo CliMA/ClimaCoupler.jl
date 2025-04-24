@@ -64,7 +64,6 @@ end
         thermo_params,
         comms_ctx,
         start_date,
-        mono_surface,
         land_fraction,
         stepper = CTS.RK4()
     ) where {FT}
@@ -86,7 +85,6 @@ function PrescribedIceSimulation(
     thermo_params,
     comms_ctx,
     start_date,
-    mono_surface,
     land_fraction,
     stepper = CTS.RK4(),
 ) where {FT}
@@ -112,11 +110,10 @@ function PrescribedIceSimulation(
     # Get initial SIC values and use them to calculate ice fraction
     SIC_init = CC.Fields.zeros(space)
     evaluate!(SIC_init, SIC_timevaryinginput, tspan[1])
-    ice_fraction = get_ice_fraction.(SIC_init, mono_surface)
 
     # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
     #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-    @. ice_fraction = max(min(ice_fraction, FT(1) - land_fraction), FT(0))
+    ice_fraction = @. max(min(SIC_init, FT(1) - land_fraction), FT(0))
 
     params = IceSlabParameters{FT}()
 
@@ -200,7 +197,6 @@ function Interfacer.add_coupler_fields!(coupler_field_names, ::PrescribedIceSimu
     push!(coupler_field_names, ice_coupler_fields...)
 end
 
-# extensions required by FluxCalculator (partitioned fluxes)
 function FluxCalculator.update_turbulent_fluxes!(sim::PrescribedIceSimulation, fields::NamedTuple)
     (; F_turb_energy) = fields
     @. sim.integrator.p.F_turb_energy = F_turb_energy
@@ -218,9 +214,6 @@ end
 ###
 ### Sea ice model-specific functions (not explicitly required by ClimaCoupler.jl)
 ###
-# setting that SIC < 0.5 is counted as ocean if binary remapping.
-get_ice_fraction(h_ice::FT, mono::Bool, threshold = 0.5) where {FT} =
-    mono ? h_ice : Utilities.binary_mask(h_ice, threshold)
 
 """
     ice_rhs!(dY, Y, p, t)
@@ -243,13 +236,13 @@ function ice_rhs!(dY, Y, p, t)
     #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
     @. p.area_fraction = max(min(p.area_fraction, FT(1) - p.land_fraction), FT(0))
 
+    # Calculate the conductive flux, and set it to zero if the area fraction is zero
     F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc) # fluxes are defined to be positive when upward
+    @. F_conductive = ifelse(p.area_fraction ≈ 0, zero(F_conductive), F_conductive)
+
     rhs = @. (-p.F_turb_energy - p.F_radiative + F_conductive) / (params.h * params.ρ * params.c)
     # If tendencies lead to temperature above freezing, set temperature to freezing
-    @. rhs = min(rhs, (params.T_freeze - Y.T_sfc) / float(p.dt))
-    # mask out no-ice areas
-    area_mask = Utilities.binary_mask.(p.area_fraction)
-    dY.T_sfc .= rhs .* area_mask
+    @. dY.T_sfc = min(rhs, (params.T_freeze - Y.T_sfc) / float(p.dt))
 
     @. p.q_sfc = TD.q_vap_saturation_generic.(p.thermo_params, Y.T_sfc, p.ρ_sfc, TD.Ice())
 end

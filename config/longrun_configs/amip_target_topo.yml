@@ -12,7 +12,6 @@ energy_check: false
 insolation: "timevarying"
 land_albedo_type: "map_temporal"
 mode_name: "amip"
-mono_surface: false
 netcdf_interpolate_z_over_msl: true
 prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 prescribe_ozone: true
@@ -21,4 +20,3 @@ surface_setup: "PrescribedSurface"
 t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
-turb_flux_partition: "PartitionedStateFluxes"

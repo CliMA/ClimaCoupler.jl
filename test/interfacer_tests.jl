@@ -2,7 +2,7 @@ import Test: @test, @testset, @test_throws, @test_logs
 import ClimaCore as CC
 import ClimaParams as CP
 import ClimaComms
-@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+ClimaComms.@import_required_backends
 import Dates
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
@@ -41,7 +41,6 @@ for FT in (Float32, Float64)
             (;), # model_sims
             (;), # callbacks
             (;), # dirs
-            nothing, # turbulent_fluxes
             nothing, # thermo_params
             nothing, # diags_handler
         )

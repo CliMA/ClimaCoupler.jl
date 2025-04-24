@@ -11,11 +11,9 @@ energy_check: false
 insolation: "timevarying"
 land_albedo_type: "map_temporal"
 mode_name: "amip"
-mono_surface: false
 prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 prescribe_ozone: true
 rad: "allskywithclear"
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "366days"
-turb_flux_partition: "PartitionedStateFluxes"

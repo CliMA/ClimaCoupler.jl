@@ -16,9 +16,6 @@ include("climaland_helpers.jl")
     ClimaLandSimulation{M, I, A}
 
 The integrated ClimaLand model simulation object.
-Note that this model must be run with the partitioned surface fluxes option;
-combined surface fluxes are not currently supported with the integrated/full
-land model.
 
 It contains the following objects:
 - `model::M`: The `ClimaLand.LandModel`.
@@ -57,13 +54,13 @@ soil CO2 model. Specific details about the complexity of the model
 can be found in the ClimaLand.jl documentation.
 """
 function ClimaLandSimulation(
-    ::Type{FT},
+    ::Type{FT};
     dt::TT,
     tspan::Tuple{TT, TT},
     start_date::Dates.DateTime,
     output_dir::String,
     boundary_space,
-    area_fraction;
+    area_fraction,
     saveat::Vector{TT} = [tspan[1], tspan[2]],
     surface_elevation = CC.Fields.zeros(boundary_space),
     land_temperature_anomaly::String = "amip",
@@ -163,7 +160,6 @@ function ClimaLandSimulation(
     exp_tendency! = CL.make_exp_tendency(model)
     imp_tendency! = CL.make_imp_tendency(model)
     jacobian! = CL.make_jacobian(model)
-    set_initial_cache!(p, Y, tspan[1])
 
     # set up jacobian info
     jac_kwargs = (; jac_prototype = CL.FieldMatrixWithSolver(Y), Wfact = jacobian!)
@@ -182,7 +178,7 @@ function ClimaLandSimulation(
             model,
             start_date,
             output_writer = output_writer,
-            output_vars = :short,
+            output_vars = :long,
             average_period = :monthly,
         )
         diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)
@@ -433,9 +429,9 @@ function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:cos_zenith_an
 end
 
 Interfacer.step!(sim::ClimaLandSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
-Interfacer.reinit!(sim::ClimaLandSimulation, t) = Interfacer.reinit!(sim.integrator, t)
+Interfacer.reinit!(sim::ClimaLandSimulation) = Interfacer.reinit!(sim.integrator)
 
-function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, turbulent_fluxes, area_fraction)
+function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, area_fraction)
     # update fields for radiative transfer
     Interfacer.update_field!(sim, Val(:diffuse_fraction), csf.diffuse_fraction)
     Interfacer.update_field!(sim, Val(:sw_d), csf.SW_d)
@@ -453,7 +449,7 @@ function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, turbulent_flu
     Interfacer.update_field!(sim, Val(:snow_precipitation), csf.P_snow)
 end
 
-function FieldExchanger.import_atmos_fields!(csf, sim::ClimaLandSimulation, atmos_sim, turbulent_fluxes)
+function FieldExchanger.import_atmos_fields!(csf, sim::ClimaLandSimulation, atmos_sim)
     FieldExchanger.dummmy_remap!(csf.diffuse_fraction, Interfacer.get_field(atmos_sim, Val(:diffuse_fraction)))
     FieldExchanger.dummmy_remap!(csf.SW_d, Interfacer.get_field(atmos_sim, Val(:SW_d)))
     FieldExchanger.dummmy_remap!(csf.LW_d, Interfacer.get_field(atmos_sim, Val(:LW_d)))
@@ -489,7 +485,22 @@ function Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaLandSimulati
 end
 
 function Checkpointer.get_model_prog_state(sim::ClimaLandSimulation)
-    error("get_model_prog_state not implemented")
+    return sim.integrator.u
+end
+
+function Checkpointer.get_model_cache(sim::ClimaLandSimulation)
+    return sim.integrator.p
+end
+
+function Checkpointer.restore_cache!(sim::ClimaLandSimulation, new_cache)
+    old_cache = Checkpointer.get_model_cache(sim)
+    comms_ctx = ClimaComms.context(sim.model.soil)
+    restore!(
+        old_cache,
+        new_cache,
+        comms_ctx,
+        ignore = Set([:dss_buffer_2d, :dss_buffer_3d, :scratch1, :scratch2, :scratch3, :sfc_scratch, :subsfc_scratch]),
+    )
 end
 
 Interfacer.name(::ClimaLandSimulation) = "ClimaLandSimulation"
@@ -500,7 +511,6 @@ Interfacer.name(::ClimaLandSimulation) = "ClimaLandSimulation"
 
 This function computes surface fluxes between the integrated land model
 simulation and the atmosphere.
-This is intended to be used with the partitioned fluxes option.
 
 Update the input coupler surface fields `csf` in-place with the computed fluxes
 for this model. These are then summed using area-weighting across all surface

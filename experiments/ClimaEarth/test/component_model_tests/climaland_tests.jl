@@ -5,7 +5,7 @@ import ClimaCoupler
 import ClimaCoupler: FluxCalculator, Interfacer
 import Dates
 import ClimaComms
-@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+ClimaComms.@import_required_backends
 
 exp_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth")
 
@@ -23,7 +23,7 @@ FT = Float32
     area_fraction = CC.Fields.ones(boundary_space)
 
     # Construct simulation object
-    land_sim = ClimaLandSimulation(FT, dt, tspan, start_date, output_dir, boundary_space, area_fraction)
+    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, boundary_space, area_fraction)
 
     # Try taking a timestep
     Interfacer.step!(land_sim, dt)
@@ -65,7 +65,7 @@ end
 
     boundary_space = ClimaCore.Spaces.horizontal_space(atmos_sim.domain.face_space)
     area_fraction = ClimaCore.Fields.ones(boundary_space)
-    land_sim = ClimaLandSimulation(FT, dt, tspan, start_date, output_dir, boundary_space, area_fraction)
+    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, boundary_space, area_fraction)
     model_sims = (; land_sim = land_sim, atmos_sim = atmos_sim)
 
     # Construct a coupler fields object
@@ -82,20 +82,22 @@ end
     coupler_field_names = Interfacer.default_coupler_fields()
     map(sim -> Interfacer.add_coupler_fields!(coupler_field_names, sim), values(model_sims))
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
-    flux_type = FluxCalculator.PartitionedStateFluxes()
 
-    # Step the atmosphere once to get non-zero wind and humidity
+    # Step the atmosphere once to get non-zero wind and humidity so the fluxes are non-zero
     Interfacer.step!(atmos_sim, dt)
 
     # Exchange the initial conditions between atmosphere and land
     # This also tests the `get_field`, `update_field!` and `update_model_sims!` methods for `ClimaLandSimulation`
-    FieldExchanger.import_combined_surface_fields!(coupler_fields, model_sims, flux_type)
-    FieldExchanger.import_atmos_fields!(coupler_fields, model_sims, flux_type)
-    FieldExchanger.update_model_sims!(model_sims, coupler_fields, flux_type)
+    FieldExchanger.import_combined_surface_fields!(coupler_fields, model_sims)
+    FieldExchanger.import_atmos_fields!(coupler_fields, model_sims)
+    FieldExchanger.update_model_sims!(model_sims, coupler_fields)
 
     # Update land cache variables with the updated drivers in the cache after the exchange
     update_aux! = ClimaLand.make_update_aux(land_sim.model)
     update_aux!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
+
+    update_boundary_fluxes! = ClimaLand.make_update_boundary_fluxes(land_sim.model)
+    update_boundary_fluxes!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
 
     # Compute the surface fluxes
     FluxCalculator.compute_surface_fluxes!(coupler_fluxes, land_sim, atmos_sim, boundary_space, nothing, nothing)
@@ -112,4 +114,12 @@ end
     @test !any(isnan, coupler_fluxes.F_turb_ρτyz)
     @test !any(isnan, coupler_fluxes.F_turb_energy)
     @test !any(isnan, coupler_fluxes.F_turb_moisture)
+
+    # Check that drivers in cache got updated
+    for driver in propertynames(land_sim.integrator.p.drivers)
+        # Snow and liquid precipitation are zero with this setup
+        if !(driver in [:P_liq, :P_snow])
+            @test getproperty(land_sim.integrator.p.drivers, driver) != zero_field
+        end
+    end
 end

@@ -54,40 +54,33 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
 end
 
 """
-    import_atmos_fields!(csf, model_sims, turbulent_fluxes)
+    import_atmos_fields!(csf, model_sims)
 
 Update the coupler with the atmospheric fluxes. The `Interfacer.get_field` functions
 (`:turbulent_energy_flux`, `:turbulent_moisture_flux`, `:radiative_energy_flux_sfc`, `:liquid_precipitation`, `:snow_precipitation`)
-have to be defined for the amtospheric component model type.
+have to be defined for the atmospheric component model type.
 
 # Arguments
 - `csf`: [NamedTuple] containing coupler fields.
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
-- `turbulent_fluxes`: [TurbulentFluxPartition] denotes a flag for turbulent flux calculation.
 """
-function import_atmos_fields!(csf, model_sims, turbulent_fluxes)
+function import_atmos_fields!(csf, model_sims)
     for sim in model_sims
-        import_atmos_fields!(csf, sim, model_sims.atmos_sim, turbulent_fluxes)
+        import_atmos_fields!(csf, sim, model_sims.atmos_sim)
     end
 end
 
 """
-    import_atmos_fields!(csf, ::Interfacer.SurfaceModelSimulation, atmos_sim, turbulent_fluxes)
+    import_atmos_fields!(csf, ::Interfacer.SurfaceModelSimulation, atmos_sim)
 
 Updates the coupler simulation fields with atmospheric fluxes from the atmosphere simulation.
 This is the default function to be used for most surface model simulations, as
     are computed by the coupler or atmosphere
 and passed to the surfaces.
 """
-function import_atmos_fields!(csf, ::Interfacer.SurfaceModelSimulation, atmos_sim, turbulent_fluxes)
-    # turbulent fluxes
-    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
-        dummmy_remap!(csf.F_turb_energy, Interfacer.get_field(atmos_sim, Val(:turbulent_energy_flux)))
-        dummmy_remap!(csf.F_turb_moisture, Interfacer.get_field(atmos_sim, Val(:turbulent_moisture_flux)))
-    end
-
+function import_atmos_fields!(csf, ::Interfacer.SurfaceModelSimulation, atmos_sim)
     # surface density - needed for q_sat and requires atmos and sfc states, so it is calculated and saved in the coupler
-    dummmy_remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_sfc)) # TODO: generalize for PartitionedStateFluxes (#445) (use individual T_sfc)
+    dummmy_remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_sfc)) # TODO: generalize to use individual T_sfc, (#445)
 
     # radiative fluxes
     dummmy_remap!(csf.F_radiative, Interfacer.get_field(atmos_sim, Val(:radiative_energy_flux_sfc)))
@@ -97,23 +90,20 @@ function import_atmos_fields!(csf, ::Interfacer.SurfaceModelSimulation, atmos_si
     dummmy_remap!(csf.P_snow, Interfacer.get_field(atmos_sim, Val(:snow_precipitation)))
 end
 
-import_atmos_fields!(csf, ::Interfacer.AtmosModelSimulation, atmos_sim, turbulent_fluxes) = nothing
+import_atmos_fields!(csf, ::Interfacer.AtmosModelSimulation, atmos_sim) = nothing
 
 """
-    import_combined_surface_fields!(csf, model_sims, turbulent_fluxes)
+    import_combined_surface_fields!(csf, model_sims)
 
-Updates the coupler with the surface properties. The `Interfacer.get_field` functions for
-(`:surface_temperature`, `:surface_direct_albedo`, `:surface_diffuse_albedo`, `:roughness_momentum`, `:roughness_buoyancy`, `:beta`)
-need to be specified for each surface model.
+Updates the coupler with the surface properties. The `Interfacer.get_field`
+functions for (`:surface_temperature`, `:surface_direct_albedo`,
+`:surface_diffuse_albedo`) need to be specified for each surface model.
 
 # Arguments
 - `csf`: [NamedTuple] containing coupler fields.
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
-- `turbulent_fluxes`: [TurbulentFluxPartition] denotes a flag for turbulent flux calculation.
-
 """
-function import_combined_surface_fields!(csf, model_sims, turbulent_fluxes)
-
+function import_combined_surface_fields!(csf, model_sims)
     combined_field = csf.temp1
 
     # surface fields
@@ -125,21 +115,6 @@ function import_combined_surface_fields!(csf, model_sims, turbulent_fluxes)
 
     combine_surfaces!(combined_field, model_sims, Val(:surface_diffuse_albedo))
     dummmy_remap!(csf.surface_diffuse_albedo, combined_field)
-
-    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
-        combine_surfaces!(combined_field, model_sims, Val(:roughness_momentum))
-        dummmy_remap!(csf.z0m_sfc, combined_field)
-
-        combine_surfaces!(combined_field, model_sims, Val(:roughness_buoyancy))
-        dummmy_remap!(csf.z0b_sfc, combined_field)
-
-        combine_surfaces!(combined_field, model_sims, Val(:beta))
-        dummmy_remap!(csf.beta, combined_field)
-
-        combine_surfaces!(combined_field, model_sims, Val(:surface_humidity))
-        dummmy_remap!(csf.q_sfc, combined_field)
-    end
-
 end
 
 """
@@ -151,21 +126,11 @@ Updates the surface fields for temperature, roughness length, albedo, and specif
 - `atmos_sim`: [Interfacer.AtmosModelSimulation] containing an atmospheric model simulation object.
 - `csf`: [NamedTuple] containing coupler fields.
 """
-function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf, turbulent_fluxes)
-
+function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf)
     Interfacer.update_field!(atmos_sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
     Interfacer.update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
-    Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf.T_sfc)
-
-    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
-        Interfacer.update_field!(atmos_sim, Val(:roughness_momentum), csf.z0m_sfc)
-        Interfacer.update_field!(atmos_sim, Val(:roughness_buoyancy), csf.z0b_sfc)
-        Interfacer.update_field!(atmos_sim, Val(:beta), csf.beta) # not in this version of atmos
-    end
-
-    if turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
-        Interfacer.update_field!(atmos_sim, Val(:turbulent_fluxes), csf)
-    end
+    Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf)
+    Interfacer.update_field!(atmos_sim, Val(:turbulent_fluxes), csf)
 end
 
 """
@@ -177,24 +142,14 @@ Updates the surface component model cache with the current coupler fields of F_t
 - `sim`: [Interfacer.SurfaceModelSimulation] containing a surface model simulation object.
 - `csf`: [NamedTuple] containing coupler fields.
 """
-function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, turbulent_fluxes, area_fraction)
+function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, area_fraction)
     FT = eltype(area_fraction)
 
     # atmospheric surface density
     Interfacer.update_field!(sim, Val(:air_density), csf.ρ_sfc)
 
-    # turbulent fluxes
-    mask = Utilities.binary_mask.(area_fraction)
-
-    # when PartitionedStateFluxes, turbulent fluxes are updated during the flux calculation
-    if turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
-        F_turb_energy_masked = FT.(mask .* csf.F_turb_energy)
-        Interfacer.update_field!(sim, Val(:turbulent_energy_flux), F_turb_energy_masked)
-        Interfacer.update_field!(sim, Val(:turbulent_moisture_flux), FT.(mask .* csf.F_turb_moisture))
-    end
-
     # radiative fluxes
-    Interfacer.update_field!(sim, Val(:radiative_energy_flux_sfc), FT.(mask .* csf.F_radiative))
+    Interfacer.update_field!(sim, Val(:radiative_energy_flux_sfc), FT.(area_fraction .* csf.F_radiative))
 
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)
@@ -202,22 +157,20 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, turbulent_flux
 end
 
 """
-    update_model_sims!(model_sims, csf, turbulent_fluxes)
+    update_model_sims!(model_sims, csf)
 
 Iterates `update_sim!` over all component model simulations saved in `cs.model_sims`.
 
 # Arguments
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
 - `csf`: [NamedTuple] containing coupler fields.
-- `turbulent_fluxes`: [TurbulentFluxPartition] denotes a flag for turbulent flux calculation.
-
 """
-function update_model_sims!(model_sims, csf, turbulent_fluxes)
+function update_model_sims!(model_sims, csf)
     for sim in model_sims
         if sim isa Interfacer.SurfaceModelSimulation
-            update_sim!(sim, csf, turbulent_fluxes, Interfacer.get_field(sim, Val(:area_fraction)))
+            update_sim!(sim, csf, Interfacer.get_field(sim, Val(:area_fraction)))
         else
-            update_sim!(sim, csf, turbulent_fluxes)
+            update_sim!(sim, csf)
         end
     end
 end
@@ -268,13 +221,6 @@ function dummmy_remap!(target, source)
 end
 
 """
-    nans_to_zero(v)
-
-Replaces NaNs with zeros, otherwise returns the value.
-"""
-nans_to_zero(v) = isnan(v) ? typeof(v)(0) : v
-
-"""
     combine_surfaces!(combined_field::CC.Fields.Field, sims, field_name::Val)
 
 Sums the fields, specified by `field_name`, weighted by the respective area fractions of all
@@ -289,11 +235,15 @@ surface simulations. THe result is saved in `combined_field`.
 - `combine_surfaces!(temp_field, cs.model_sims, Val(:surface_temperature))`
 """
 function combine_surfaces!(combined_field, sims, field_name)
-    combined_field .= eltype(combined_field)(0)
+    combined_field .= 0
     for sim in sims
         if sim isa Interfacer.SurfaceModelSimulation
+            # Zero out the contribution from this surface if the area fraction is zero
+            # Note that multiplying by `area_fraction` is not sufficient in the case of NaNs
+            area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
             combined_field .+=
-                Interfacer.get_field(sim, Val(:area_fraction)) .* nans_to_zero.(Interfacer.get_field(sim, field_name)) # this ensures that unitialized (masked) areas do not affect (TODO: move to mask / remove)
+                area_fraction .*
+                ifelse.(area_fraction .≈ 0, zero(combined_field), Interfacer.get_field(sim, field_name))
         end
     end
 end

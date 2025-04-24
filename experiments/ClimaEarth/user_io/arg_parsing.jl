@@ -5,7 +5,6 @@ mode_name_dict = Dict(
     "slabplanet" => SlabplanetMode,
     "slabplanet_aqua" => SlabplanetAquaMode,
     "slabplanet_terra" => SlabplanetTerraMode,
-    "slabplanet_eisenman" => SlabplanetEisenmanMode,
 )
 
 """
@@ -103,8 +102,6 @@ function get_coupler_args(config_dict::Dict)
 
     # Physical simulation information
     evolving_ocean = config_dict["evolving_ocean"]
-    mono_surface = config_dict["mono_surface"]
-    turb_flux_partition = config_dict["turb_flux_partition"]
 
     # Conservation information
     energy_check = config_dict["energy_check"]
@@ -114,6 +111,7 @@ function get_coupler_args(config_dict::Dict)
     output_dir_root = joinpath(config_dict["coupler_output_dir"], job_id)
 
     # ClimaLand-specific information
+    land_model = config_dict["land_model"]
     land_albedo_type = config_dict["land_albedo_type"]
     land_initial_condition = config_dict["land_initial_condition"]
     land_temperature_anomaly = config_dict["land_temperature_anomaly"]
@@ -136,11 +134,10 @@ function get_coupler_args(config_dict::Dict)
         use_coupler_diagnostics,
         diagnostics_dt,
         evolving_ocean,
-        mono_surface,
-        turb_flux_partition,
         energy_check,
         conservation_softfail,
         output_dir_root,
+        land_model,
         land_albedo_type,
         land_initial_condition,
         land_temperature_anomaly,

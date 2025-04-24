@@ -7,7 +7,6 @@ energy_check: true
 h_elem: 4
 mode_name: "slabplanet"
 moist: "dry"
-mono_surface: true
 output_default_diagnostics: false
 precip_model: nothing
 rad: nothing

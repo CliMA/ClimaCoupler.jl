@@ -6,7 +6,6 @@ dt: 120secs
 dt_cloud_fraction: 1hours
 dt_rad: 1hours
 dt_save_state_to_disk: "Inf"
-dt_save_to_sol: "Inf"
 dz_bottom: 30.0
 dz_top: 3000.0
 h_elem: 30
@@ -20,7 +19,6 @@ prescribe_ozone: true
 rad: allskywithclear
 surface_setup: DefaultMoninObukhov
 t_end: 12hours
-turb_flux_partition: "PartitionedStateFluxes"
 vert_diff: "DecayWithHeightDiffusion"
 z_elem: 63
 z_max: 55000.0

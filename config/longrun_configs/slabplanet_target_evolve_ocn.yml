@@ -9,9 +9,7 @@ energy_check: false
 evolving_ocean: true
 land_albedo_type: "function"
 mode_name: "slabplanet"
-mono_surface: false
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "120days"
-turb_flux_partition: "PartitionedStateFluxes"
 vert_diff: "true"

@@ -17,7 +17,7 @@ function argparse_settings()
         arg_type = Bool
         default = true
         "--mode_name"
-        help = "Mode of coupled simulation. [`amip` (default), `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`, `slabplanet_eisenman`]"
+        help = "Mode of coupled simulation. [`amip` (default), `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`]"
         arg_type = String
         default = "amip"
         "--coupler_toml"
@@ -97,14 +97,6 @@ function argparse_settings()
         help = "Boolean flag indicating whether to use a dynamic slab ocean model, as opposed to constant surface temperatures [`true` (default), `false`]"
         arg_type = Bool
         default = true
-        "--mono_surface"
-        help = "Boolean flag indicating whether (1st order) monotone and conservative remapping is applied. [`false` (default), `true`]"
-        arg_type = Bool
-        default = false
-        "--turb_flux_partition"
-        help = "Method to partition turbulent fluxes. [`PartitionedStateFluxes`, `CombinedStateFluxesMOST` (default)]"
-        arg_type = String
-        default = "PartitionedStateFluxes"
         # Conservation information
         "--energy_check"
         help = "Boolean flag indicating whether to check energy conservation [`false` (default), `true`]"
@@ -139,6 +131,10 @@ function argparse_settings()
         arg_type = Vector{Dict{Any, Any}}
         default = []
         ### ClimaLand specific
+        "--land_model"
+        help = "Land model to use. [`bucket` (default), `integrated`]"
+        arg_type = String
+        default = "bucket"
         "--land_albedo_type"
         help = "Access land surface albedo information from data file. [`map_static` (default), `function`, `map_temporal`]"
         arg_type = String

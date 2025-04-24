@@ -6,6 +6,7 @@ This module contains functions that check global conservation of energy and wate
 module ConservationChecker
 
 import ..Interfacer, ..Utilities
+import ..Utilities: integral
 import ClimaCore as CC
 
 export AbstractConservationCheck, EnergyConservationCheck, WaterConservationCheck, check_conservation!
@@ -83,15 +84,13 @@ function check_conservation!(
     for sim in model_sims
         sim_name = Symbol(Interfacer.name(sim))
         if sim isa Interfacer.AtmosModelSimulation
-            radiative_energy_flux_toa = coupler_sim.fields.radiative_energy_flux_toa
-            # save radiation source
-            parent(radiative_energy_flux_toa) .= parent(Interfacer.get_field(sim, Val(:radiative_energy_flux_toa)))
+            radiative_energy_flux_toa = Interfacer.get_field(sim, Val(:radiative_energy_flux_toa))
 
             if isempty(ccs.toa_net_source)
-                radiation_sources_accum = sum(radiative_energy_flux_toa .* FT(float(coupler_sim.Δt_cpl))) # ∫ J / m^2 dA
+                radiation_sources_accum = integral(radiative_energy_flux_toa) * FT(float(coupler_sim.Δt_cpl)) # ∫ J / m^2 dA
             else
                 radiation_sources_accum =
-                    sum(radiative_energy_flux_toa .* FT(float(coupler_sim.Δt_cpl))) .+ ccs.toa_net_source[end] # ∫ J / m^2 dA
+                    integral(radiative_energy_flux_toa) * FT(float(coupler_sim.Δt_cpl)) + ccs.toa_net_source[end] # ∫ J / m^2 dA
             end
             push!(ccs.toa_net_source, radiation_sources_accum)
 
@@ -101,7 +100,6 @@ function check_conservation!(
 
             push!(previous, current)
             total += current + radiation_sources_accum
-
         elseif sim isa Interfacer.SurfaceModelSimulation
             # save surfaces
             area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
@@ -110,7 +108,7 @@ function check_conservation!(
                 current = FT(0)
             else
                 previous = getproperty(ccs, sim_name)
-                current = sum(Interfacer.get_field(sim, Val(:energy)) .* area_fraction) # # ∫ J / m^3 dV
+                current = integral(Interfacer.get_field(sim, Val(:energy)) .* area_fraction) # # ∫ J / m^3 dV
             end
             push!(previous, current)
             total += current
@@ -120,7 +118,7 @@ function check_conservation!(
     push!(ccs.total, total)
 
     if runtime_check
-        @assert abs((total[end] - total[1]) / total[end]) < 1e-4
+        @assert abs((ccs.total[end] - ccs.total[1]) / ccs.total[end]) < 1e-4
     end
     return total
 
@@ -162,7 +160,7 @@ function check_conservation!(
 
             # save atmos
             previous = getproperty(ccs, sim_name)
-            current = sum(Interfacer.get_field(sim, Val(:water))) # kg (∫kg of water / m^3 dV)
+            current = integral(Interfacer.get_field(sim, Val(:water))) # kg (∫kg of water / m^3 dV)
             push!(previous, current)
 
         elseif sim isa Interfacer.SurfaceModelSimulation
@@ -170,11 +168,11 @@ function check_conservation!(
             area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
             if isnothing(Interfacer.get_field(sim, Val(:water)))
                 previous = getproperty(ccs, sim_name)
-                current = sum(PE_net .* area_fraction) # kg (∫kg of water / m^3 dV)
+                current = integral(PE_net .* area_fraction) # kg (∫kg of water / m^3 dV)
                 push!(previous, current)
             else
                 previous = getproperty(ccs, sim_name)
-                current = sum(Interfacer.get_field(sim, Val(:water)) .* area_fraction) # kg (∫kg of water / m^3 dV)
+                current = integral(Interfacer.get_field(sim, Val(:water)) .* area_fraction) # kg (∫kg of water / m^3 dV)
                 push!(previous, current)
             end
         end
@@ -185,7 +183,7 @@ function check_conservation!(
     push!(ccs.total, total)
 
     if runtime_check
-        @assert abs((total[end] - total[1]) / total[end]) < 1e-4
+        @assert abs((ccs.total[end] - ccs.total[1]) / ccs.total[end]) < 1e-4
     end
 
     return total
@@ -194,7 +192,7 @@ end
 """
     surface_water_gain_from_rates(cs::Interfacer.CoupledSimulation)
 
-Determines the total water content gain/loss of a surface from the begining of the simulation based on evaporation and precipitation rates.
+Determines the total water content gain/loss of a surface from the beginning of the simulation based on evaporation and precipitation rates.
 """
 function surface_water_gain_from_rates(cs::Interfacer.CoupledSimulation)
     evaporation = cs.fields.F_turb_moisture # kg / m^2 / s / layer depth

@@ -11,30 +11,7 @@ import ClimaCore as CC
 import Logging
 import ClimaUtilities.OutputPathGenerator: generate_output_path
 
-export binary_mask, swap_space!, get_device, get_comms_context, show_memory_usage, setup_output_dirs, time_to_seconds
-
-"""
-    binary_mask(var, threshold)
-
-Converts a number `var` to 1, if `var` is greater or equal than a given `threshold` value,
-or 0 otherwise, keeping the same type.
-
-# Arguments
-- `var`: [FT] value to be converted.
-- `threshold`: [FT] cutoff value for conversions.
-"""
-binary_mask(var, threshold) = var >= threshold ? one(var) : zero(var)
-
-"""
-    binary_mask(var)
-
-Converts a number `var` to 1, if `var` is greater or equal than `eps(FT)`,
-or 0 otherwise, keeping the same type.
-
-# Arguments
-- `var`: [FT] value to be converted.
-"""
-binary_mask(var) = binary_mask(var, eps(eltype(var)))
+export swap_space!, get_device, get_comms_context, show_memory_usage, setup_output_dirs, time_to_seconds, integral
 
 """
     swap_space!(space_out::CC.Spaces.AbstractSpace, field_in::CC.Fields.Field)
@@ -210,5 +187,35 @@ function time_to_seconds(s::String)
     error("Uncaught case in computing time from given string.")
 end
 
+
+"""
+    integral(field)
+
+Return the integral (a scalar) for `field` along its spatial dimensions.
+"""
+function integral(field::CC.Fields.Field)
+    if axes(field) isa CC.Spaces.SpectralElementSpace2D
+        # ClimaCore #1578, if field comes from Fields.level
+        # TODO: This should be fixed in ClimaCore
+        rad_grid = CC.Spaces.grid(axes(field))
+        if rad_grid isa CC.Grids.LevelGrid
+            if rad_grid.level isa CC.Utilities.PlusHalf
+                # FaceSpace
+                return sum(field ./ CC.Fields.Δz_field(field) .* 2)
+            else
+                # Center
+                return sum(field ./ CC.Fields.Δz_field(field))
+            end
+        else
+            return sum(field)
+        end
+    else
+        return sum(field)
+    end
+end
+
+function integral(field::AbstractArray)
+    return sum(field)
+end
 
 end # module

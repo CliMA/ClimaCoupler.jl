@@ -7,11 +7,9 @@ h_elem: 6
 land_albedo_type: "function"
 mode_name: "slabplanet"
 moist: "equil"
-mono_surface: true
 precip_model: "0M"
 rad: "gray"
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "20days"
-turb_flux_partition: "PartitionedStateFluxes"
 vert_diff: "true"

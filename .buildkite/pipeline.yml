@@ -1,7 +1,7 @@
 agents:
   queue: new-central
   slurm_time: 4:00:00
-  modules: climacommon/2025_01_27
+  modules: climacommon/2025_03_18
 
 env:
   JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
@@ -146,27 +146,6 @@ steps:
         agents:
           slurm_mem: 20GB
 
-      - label: "Slabplanet: partitioned turbulent fluxes"
-        key: "slabplanet_partitioned_fluxes"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_partitioned_fluxes.yml --job_id slabplanet_partitioned_fluxes"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_partitioned_fluxes/artifacts/*"
-        agents:
-          slurm_mem: 20GB
-
-      - label: "Slabplanet: non-monotonous surface remap"
-        key: "slabplanet_nonmono"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_nonmono.yml --job_id slabplanet_nonmono"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_nonmono/artifacts/*"
-        agents:
-          slurm_mem: 20GB
-
-      - label: "Slabplanet: eisenman sea ice"
-        key: "slabplanet_eisenman"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_eisenman.yml --job_id slabplanet_eisenman"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_eisenman/artifacts/*"
-        agents:
-          slurm_mem: 20GB
-
       - label: "Slabplanet: extra atmos diagnostics"
         key: "slabplanet_atmos_diags"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_atmos_diags.yml --job_id slabplanet_atmos_diags"
@@ -187,6 +166,20 @@ steps:
         key: "amip_default"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl"
         artifact_paths: "experiments/ClimaEarth/output/amip_default/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "AMIP: DecayWithHeight + integrated land"
+        key: "amip_integrated_land"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decay_with_height_integrated_land.yml --job_id amip_integrated_land"
+        artifact_paths: "experiments/ClimaEarth/output/amip_integrated_land/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "AMIP: DecayWithHeight + bucket"
+        key: "amip_decay_with_height_bucket"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decay_with_height_bucket.yml --job_id amip_decay_with_height_bucket"
+        artifact_paths: "experiments/ClimaEarth/output/amip_decay_with_height_bucket/artifacts/*"
         agents:
           slurm_mem: 20GB
 
@@ -291,6 +284,26 @@ steps:
         key: "gpu_amip_default"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_default.yml --job_id gpu_amip_default"
         artifact_paths: "experiments/ClimaEarth/output/gpu_amip_default/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
+
+      - label: "GPU AMIP: DecayWithHeight + integrated land"
+        key: "gpu_amip_integrated_land"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decay_with_height_integrated_land.yml --job_id gpu_amip_integrated_land"
+        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_integrated_land/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
+
+      - label: "GPU AMIP: DecayWithHeight + bucket"
+        key: "gpu_amip_decay_with_height_bucket"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decay_with_height_bucket.yml --job_id gpu_amip_decay_with_height_bucket"
+        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_decay_with_height_bucket/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

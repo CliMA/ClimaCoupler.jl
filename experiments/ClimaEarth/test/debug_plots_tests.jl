@@ -3,7 +3,7 @@ import Test: @test, @testset, @test_logs
 import ClimaCore as CC
 import ClimaCoupler: Interfacer
 import ClimaComms
-@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+ClimaComms.@import_required_backends
 
 # Prevent GKS headless operation mode warning
 ENV["GKSwstype"] = "nul"
@@ -20,13 +20,20 @@ struct BucketSimulation{C} <: Interfacer.SurfaceModelSimulation
 end
 Interfacer.name(sim::BucketSimulation) = "BucketSimulation"
 
+struct ClimaLandSimulation{C} <: Interfacer.SurfaceModelSimulation
+    cache::C
+end
+Interfacer.name(sim::ClimaLandSimulation) = "ClimaLandSimulation"
+
 include("../user_io/debug_plots.jl")
 
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_field}) = sim.cache.surface_field
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_field}) = sim.cache.surface_field
 Interfacer.get_field(sim::Interfacer.SurfaceStub, ::Val{:stub_field}) = sim.cache.stub_field
 
 plot_field_names(sim::ClimaAtmosSimulation) = (:atmos_field,)
 plot_field_names(sim::BucketSimulation) = (:surface_field,)
+plot_field_names(sim::ClimaLandSimulation) = (:surface_field,)
 plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
 
 @testset "import_atmos_fields!" begin
@@ -48,7 +55,6 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
         :beta,
         :z0b_sfc,
         :z0m_sfc,
-        :radiative_energy_flux_toa,
     ]
     atmos_names = (:atmos_field,)
     surface_names = (:surface_field,)
@@ -62,6 +68,7 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
     model_sims = (;
         atmos_sim = ClimaAtmosSimulation(atmos_fields),
         surface_sim = BucketSimulation(surface_fields),
+        surface_sim2 = ClimaLandSimulation(surface_fields),
         ice_sim = Interfacer.SurfaceStub(stub_fields),
     )
     cs = Interfacer.CoupledSimulation{FT}(
@@ -76,7 +83,6 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
         model_sims, # model_sims
         (;), # callbacks
         (;), # dirs
-        nothing, # turbulent_fluxes
         nothing, # thermo_params
         nothing, # diags_handler
     )
@@ -85,6 +91,7 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
     @test_logs (:info, "plotting debug in test_debug") match_mode = :any debug(cs, output_plots)
     @test isfile("test_debug/debug_ClimaAtmosSimulation.png")
     @test isfile("test_debug/debug_BucketSimulation.png")
+    @test isfile("test_debug/debug_ClimaLandSimulation.png")
     @test isfile("test_debug/debug_SurfaceStub.png")
     @test isfile("test_debug/debug_coupler.png")
 

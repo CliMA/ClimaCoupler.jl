@@ -27,15 +27,18 @@ It contains the following objects:
 - `model::M`: The `ClimaLand.Bucket.BucketModel`.
 - `integrator::I`: The integrator used in timestepping this model.
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model.
+- `output_writer`: The diagnostic file writer.
 """
 struct BucketSimulation{
     M <: ClimaLand.Bucket.BucketModel,
     I <: SciMLBase.AbstractODEIntegrator,
     A <: CC.Fields.Field,
+    OW,
 } <: Interfacer.LandModelSimulation
     model::M
     integrator::I
     area_fraction::A
+    output_writer::OW
 end
 Interfacer.name(::BucketSimulation) = "BucketSimulation"
 
@@ -214,14 +217,15 @@ function BucketSimulation(
 
     # Add diagnostics
     if use_land_diagnostics
-        netcdf_writer = CD.Writers.NetCDFWriter(domain.space.subsurface, output_dir)
+        output_writer = CD.Writers.NetCDFWriter(domain.space.subsurface, output_dir)
         scheduled_diagnostics =
-            CL.default_diagnostics(model, start_date, output_writer = netcdf_writer, average_period = :monthly)
+            CL.default_diagnostics(model, start_date, output_writer = output_writer, average_period = :monthly)
 
         diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)
         diag_cb = CD.DiagnosticsCallback(diagnostic_handler)
     else
         diag_cb = nothing
+        output_writer = nothing
     end
 
     integrator = SciMLBase.init(
@@ -233,7 +237,7 @@ function BucketSimulation(
         callback = SciMLBase.CallbackSet(diag_cb),
     )
 
-    return BucketSimulation(model, integrator, area_fraction)
+    return BucketSimulation(model, integrator, area_fraction, output_writer)
 end
 
 # extensions required by Interfacer

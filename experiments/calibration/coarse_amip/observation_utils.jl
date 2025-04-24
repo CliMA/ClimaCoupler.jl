@@ -26,9 +26,9 @@ Start date is set to `DateTime(2000, 3, 1)`. All OutputVars are resampled to the
 function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
     diagnostic_var3d = limit_pressure_dim_to_era5_range(diagnostic_var3d)
 
-    resample_2d(output_var) = resampled_as(output_var, diagnostic_var2d, dim_names = ["longitude", "latitude"])
-    resample_3d(output_var) =
-        resampled_as(output_var, diagnostic_var3d, dim_names = ["longitude", "latitude", "pressure_level"])
+    resample_2d(ov) = resampled_as(shift_longitude(ov, -180.0, 180.0), diagnostic_var2d, dim_names = ["longitude", "latitude"])
+    resample_3d(ov) =
+        resampled_as(shift_longitude(ov, -180.0, 180.0), diagnostic_var3d, dim_names = ["longitude", "latitude", "pressure_level"])
     resample(ov) = has_pressure(ov) ? resample_3d(ov) : resample_2d(ov)
 
     era5_outputvar(path) = OutputVar(path; new_start_date = start_date, shift_by = Dates.firstdayofmonth)
@@ -88,7 +88,7 @@ function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
     ql = resample(reverse_dim(reverse_dim(ql, latitude_name(ql)), pressure_name(ql)))
     qi = resample(reverse_dim(reverse_dim(qi, latitude_name(qi)), pressure_name(qi)))
 
-    return (; rlut, rsut, rsutcs, rlutcs, pr, net_rad, cre, shf, ts, ta, hur, hus)#, ql, qi)
+    return (; net_rad, cre, rlut, rsut, rsutcs, rlutcs, pr, shf, ts, ta, hur, hus, ql, qi)
 end
 
 # The ERA5 pressure range is not as large as the ClimaAtmos default pressure levels,
@@ -213,8 +213,6 @@ function create_observation_vector(nt, nyears = 19)
     t_start = Second(first_year_start_date - start_date).value
     rsut = window(nt.rsut, "time"; left = t_start);
     rlut = window(nt.rlut, "time"; left = t_start);
-    rsutcs = window(nt.rsutcs, "time"; left = t_start);
-    rlutcs = window(nt.rlutcs, "time"; left = t_start);
     cre = window(nt.cre, "time"; left = t_start);
 
     # Compute yearly net radiative flux separately
@@ -251,7 +249,7 @@ function create_observation_vector(nt, nyears = 19)
         ql_obs = make_single_year_of_seasonal_observations(ql, yr);
         qi_obs = make_single_year_of_seasonal_observations(qi, yr);
 
-        EKP.combine_observations([net_rad_obs, rsut_obs, rlut_obs, cre_obs, pr_obs, shf_obs, ts_obs, ta_obs, hur_obs, hus_obs, ql_obs, qi_obs]);
+        EKP.combine_observations([net_rad_obs, cre_obs, rsut_obs, rlut_obs, pr_obs, shf_obs, ts_obs, ta_obs, hur_obs, hus_obs, ql_obs, qi_obs]);
     end
 
     return all_observations # NOT an EKP.ObservationSeries

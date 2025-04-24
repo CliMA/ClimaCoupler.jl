@@ -1,5 +1,5 @@
 FLOAT_TYPE: "Float32"
-# use_itime: true
+use_itime: true
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
 checkpoint_dt: "99999days"
@@ -32,21 +32,6 @@ z_elem: 39
 z_max: 60000.0
 extra_atmos_diagnostics:
   - reduction_time: average
-    short_name: 
-      - rsut
-      - rlut
-      - rsdt
-      - rsutcs
-      - rlutcs
-      - pr
-      - ts
-      - ta
-      - hur
-      - hus
-      - clw
-      - cli
-      - pfull
-      - clw
-      - cli
+    short_name: [rsut,rlut, rsdt, rsutcs, rlutcs, pr, ts, ta, hur, hus, clw, cli, pfull, clw, cli,]
     period: 1months
     writer: nc

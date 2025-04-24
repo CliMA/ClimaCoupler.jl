@@ -46,6 +46,7 @@ function process_member_data(simdir::SimDir)
     clw = process_outputvar(simdir, "clw")
     cli = process_outputvar(simdir, "cli")
 
+
     # Map over each year
     year_observations = map(1:4:length(rsut)) do year_start
         year_end = min(year_start + 3, length(rsut))
@@ -65,8 +66,7 @@ function process_member_data(simdir::SimDir)
         hus_yr = downsample_and_vectorize(hus[yr_ind])
         clw_yr = downsample_and_vectorize(clw[yr_ind])
         cli_yr = downsample_and_vectorize(cli[yr_ind])
-
-        vcat(net_rad_yr, rsut_yr, rlut_yr, cre_yr, pr_yr, shf_yr, ts_yr, ta_yr, hur_yr, hus_yr, clw_yr, cli_yr)
+        vcat(net_rad_yr, cre_yr, rsut_yr, rlut_yr, pr_yr, shf_yr, ts_yr, ta_yr, hur_yr, hus_yr, clw_yr, cli_yr)
     end
     return vcat(year_observations...)
 end
@@ -89,6 +89,11 @@ end
 # Preprocess monthly averages to the right dimensions and dates, remove NaNs
 function preprocess_monthly_averages(simdir, name)
     monthly_avgs = get_monthly_averages(simdir, name)
+    # The BucketSimulation has a different grid, so we resample
+    if name == "shf"
+        rsut = get_monthly_averages(simdir, "rsut")
+        monthly_avgs = resampled_as(monthly_avgs, rsut; dim_names = ["lon", "lat"])
+    end
     # Interpolate to pressure coordinates to match observations
     pressure = get_monthly_averages(simdir, "pfull")
     if has_altitude(monthly_avgs)

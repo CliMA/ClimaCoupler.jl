@@ -10,7 +10,6 @@ import EnsembleKalmanProcesses as EKP
 
 include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_map.jl"))
 
-# addprocs(CAL.SlurmManager(30); partition = "a3", gpus_per_task = 1, cpus_per_task = 4, time = "08:00:00")
 addprocs(CAL.SlurmManager())
 
 # Make variables and the forward model available on the worker sessions
@@ -49,8 +48,8 @@ observation_series = EKP.ObservationSeries(observation_vec, minibatcher, series_
 eki = EKP.EnsembleKalmanProcess(
     EKP.construct_initial_ensemble(prior, ensemble_size),
     observation_series,
-    EKP.TransformInversion(),
+    EKP.TransformInversion(prior),
     verbose=true
 )
 
-eki = CAL.calibrate(CAL.WorkerBackend, eki, ensemble_size, n_iterations, prior, output_dir)
+eki = CAL.calibrate(CAL.WorkerBackend, eki, n_iterations, prior, output_dir)

@@ -41,7 +41,7 @@ include("setup_run.jl")
 
 # Get the configuration file from the command line (or manually set it here)
 # config_file = parse_commandline(argparse_settings())["config_file"]
-config_file = "config/nightly_configs/amip_coarse_edonly.yml"
+config_file = "../../config/nightly_configs/amip_coarse_edonly.yml"
 
 # Set up and run the coupled simulation
 cs = CoupledSimulation(config_file)

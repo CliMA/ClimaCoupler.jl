@@ -118,8 +118,7 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.a
 # Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) = return nothing # TODO fill this out
 # Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) = return nothing # TODO fill this out
 # Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_humidity}) = return nothing # TODO fill this out
-# Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) = sim.sim.ocean.model.tracers.T
-Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) = nothing
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) = sim.sim.ocean.model.tracers.T
 
 # # These two methods are used to track conservation of the coupled system, so it's okay to leave them empty for now
 # function Interfacer.get_field(sim::OceananigansSimulation, ::Val{:energy}, level)

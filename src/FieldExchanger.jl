@@ -236,6 +236,8 @@ surface simulations. THe result is saved in `combined_field`.
 """
 function combine_surfaces!(combined_field, sims, field_name)
     combined_field .= 0
+    target_space = axes(combined_field)
+
     for sim in sims
         if sim isa Interfacer.SurfaceModelSimulation
             # Zero out the contribution from this surface if the area fraction is zero
@@ -243,7 +245,7 @@ function combine_surfaces!(combined_field, sims, field_name)
             area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
             combined_field .+=
                 area_fraction .*
-                ifelse.(area_fraction .≈ 0, zero(combined_field), Interfacer.get_field(sim, field_name))
+                ifelse.(area_fraction .≈ 0, zero(combined_field), Interfacer.remap(Interfacer.get_field(sim, field_name), target_space))
         end
     end
 end

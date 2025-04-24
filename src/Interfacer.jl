@@ -176,11 +176,6 @@ function Base.show(io::IO, @nospecialize(sim::ComponentModelSimulation))
     return println(io, "I am simulation object and I do not have a specialized `Base.show` method")
 end
 
-function Base.summary(@nospecialize(sim::ComponentModelSimulation))
-    return nameof(typeof(sim))
-end
-
-
 """
     get_field(sim::AtmosModelSimulation, val::Val)
 
@@ -359,7 +354,7 @@ abstract type AMIPMode <: AbstractSimulationMode end
 """
     SlabplanetMode
 
-An abstract type represeting the slabplanet simulation mode with a ClimaAtmos.jl atmosphere model,
+An abstract type representing the slabplanet simulation mode with a ClimaAtmos.jl atmosphere model,
 a ClimaLand.jl bucket land model, a thermal slab ocean model, and no sea ice model. Instead
 of using a sea ice model, the ocean is evaluated in areas that would be covered in ice.
 """
@@ -382,5 +377,11 @@ and only once surface model, a ClimaLand.jl bucket land model, which is evaluate
 entire surface. There are no ocean or sea ice models.
 """
 abstract type SlabplanetTerraMode <: AbstractSlabplanetSimulationMode end
+
+function remap end
+
+function remap(field::CC.Fields.Field)
+    return field
+end
 
 end # module

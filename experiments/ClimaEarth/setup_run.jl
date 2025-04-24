@@ -67,6 +67,7 @@ include("components/land/climaland_integrated.jl")
 include("components/ocean/slab_ocean.jl")
 include("components/ocean/prescr_ocean.jl")
 include("components/ocean/prescr_seaice.jl")
+include("components/ocean/oceananigans.jl")
 
 #=
 ### Configuration Dictionaries
@@ -315,8 +316,10 @@ function CoupledSimulation(config_dict::AbstractDict)
         ## ocean model using prescribed data
         ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
         ocean_fraction = FT(1) .- ice_fraction .- land_fraction
-        ocean_sim =
-            PrescribedOceanSimulation(FT, boundary_space, start_date, t_start, ocean_fraction, thermo_params, comms_ctx)
+        # ocean_sim =
+        #     PrescribedOceanSimulation(FT, boundary_space, start_date, t_start, ocean_fraction, thermo_params, comms_ctx)
+
+        ocean_sim = OceananigansSimulation(area_fraction, comms_ctx)
 
         Utilities.show_memory_usage()
 

@@ -30,7 +30,8 @@ Interfacer.name(sim::TestAtmos2) = "TestAtmos2"
 
 Interfacer.get_field(sim::TestAtmos, ::Val{:height_int}) = sim.integrator.p.z
 Interfacer.get_field(sim::TestAtmos, ::Val{:height_sfc}) = sim.integrator.p.z_sfc
-Interfacer.get_field(sim::TestAtmos, ::Val{:uv_int}) = @. StaticArrays.SVector(sim.integrator.p.u, sim.integrator.p.v)
+Interfacer.get_field(sim::TestAtmos, ::Val{:u_int}) = sim.integrator.p.u
+Interfacer.get_field(sim::TestAtmos, ::Val{:v_int}) = sim.integrator.p.v
 Interfacer.get_field(sim::TestAtmos, ::Val{:thermo_state_int}) =
     TD.PhaseEquil_ρTq.(get_thermo_params(sim), sim.integrator.ρ, sim.integrator.T, sim.integrator.q)
 

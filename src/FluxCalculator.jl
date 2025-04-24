@@ -295,7 +295,9 @@ function compute_surface_fluxes!(
 )
     # `_int` refers to atmos state of center level 1
     z_int = Interfacer.get_field(atmos_sim, Val(:height_int))
-    uₕ_int = Interfacer.get_field(atmos_sim, Val(:uv_int))
+    u_int = Interfacer.get_field(atmos_sim, Val(:u_int))
+    v_int = Interfacer.get_field(atmos_sim, Val(:v_int))
+    uₕ_int = @. StaticArrays.SVector(u_int, v_int)
     thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
     z_sfc = Interfacer.get_field(atmos_sim, Val(:height_sfc))
 

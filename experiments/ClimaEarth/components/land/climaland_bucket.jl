@@ -250,8 +250,6 @@ Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_direct_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_diffuse_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
-Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_humidity}) =
-    CL.surface_specific_humidity(nothing, sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_temperature}) =
     CL.surface_temperature(sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
 
@@ -336,16 +334,27 @@ end
 function FluxCalculator.surface_thermo_state(
     sim::BucketSimulation,
     thermo_params::TD.Parameters.ThermodynamicsParameters,
-    thermo_state_int,
+    atmos_sim::Interfacer.AtmosModelSimulation,
 )
-
     T_sfc = Interfacer.get_field(sim, Val(:surface_temperature))
+    FieldExchanger.compute_surface_humidity!(
+        sim.integrator.p.bucket.q_sfc,
+        Interfacer.get_field(atmos_sim, Val(:air_temperature)),
+        Interfacer.get_field(atmos_sim, Val(:specific_humidity)),
+        Interfacer.get_field(atmos_sim, Val(:air_density)),
+        T_sfc,
+        thermo_params,
+    )
     # Note that the surface air density, ρ_sfc, is computed using the atmospheric state at the first level and making ideal gas
     # and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
     # a reasonable stand-in.
-    ρ_sfc = FluxCalculator.extrapolate_ρ_to_sfc.(thermo_params, thermo_state_int, T_sfc) # ideally the # calculate elsewhere, here just getter...
-    q_sfc = Interfacer.get_field(sim, Val(:surface_humidity)) # already calculated in rhs! (cache)
-    @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
+    ρ_sfc =
+        FluxCalculator.extrapolate_ρ_to_sfc.(
+            thermo_params,
+            Interfacer.get_field(atmos_sim, Val(:thermo_state_int)),
+            T_sfc,
+        )
+    return @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, sim.integrator.p.bucket.q_sfc)
 end
 
 """

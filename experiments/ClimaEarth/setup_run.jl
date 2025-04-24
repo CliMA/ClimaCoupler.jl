@@ -496,16 +496,15 @@ function CoupledSimulation(config_dict::AbstractDict)
         The concrete steps for proper initialization are:
         =#
 
-        # 1.coupler updates surface model area fractions
+        # 1. Coupler updates surface model area fractions
         FieldExchanger.update_surface_fractions!(cs)
 
-        # 2.surface density (`ρ_sfc`): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface.
-        # For this, we need to import surface and atmospheric fields. The model sims are then updated with the new surface density.
+        # 2. Import atmospheric and surface fields into the coupler fields, then broadcast them back out to all components.
         FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims)
         FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims)
         FieldExchanger.update_model_sims!(cs.model_sims, cs.fields)
 
-        # Set all initial cache values for the land model, now that we have updated drivers
+        # 3. Set all initial cache values for the land model, now that we have updated drivers
         land_set_initial_cache! = CL.make_set_initial_cache(cs.model_sims.land_sim.model)
         land_set_initial_cache!(
             cs.model_sims.land_sim.integrator.p,
@@ -513,29 +512,18 @@ function CoupledSimulation(config_dict::AbstractDict)
             cs.model_sims.land_sim.integrator.t,
         )
 
-        # 3.surface vapor specific humidity (`q_sfc`): step surface models with the new surface density to calculate their respective `q_sfc` internally
-        ## TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step! (#331)
-        Interfacer.step!(land_sim, tspan[1] + Δt_cpl)
-        Interfacer.step!(ocean_sim, tspan[1] + Δt_cpl)
-        Interfacer.step!(ice_sim, tspan[1] + Δt_cpl)
+        # 4. Compute radiative fluxes and update the coupler fields and model simulations with the new fluxes
+        # Any other callbacks that modify a model's cache should be called here as well.
+        if hasradiation(cs.model_sims.atmos_sim.integrator)
+            CA.rrtmgp_model_callback!(cs.model_sims.atmos_sim.integrator)
+            FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims)
+            FieldExchanger.update_model_sims!(cs.model_sims, cs.fields)
+        end
 
-        # 4.turbulent fluxes: now we have all information needed for calculating the initial
-        # turbulent surface fluxes
-
-        ## calculate turbulent fluxes in surface models and save the weighted average in coupler fields
+        # 5.turbulent fluxes: Now we have all information needed for calculating the initial
+        # turbulent surface fluxes. Calculate and update turbulent fluxes for each surface model,
+        # and save the weighted average in coupler fields
         FluxCalculator.turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, cs.thermo_params)
-
-        # Updating only surface temperature because it is required by the RRTGMP callback (
-        # called below at reinit). Turbulent fluxes in atmos are updated in `update_model_sims`.
-        Interfacer.update_field!(atmos_sim, Val(:surface_temperature), cs.fields)
-
-
-        # 5.reinitialize models + radiative flux: prognostic states and time are set to their initial conditions. For atmos, this also triggers the callbacks and sets a nonzero radiation flux (given the new sfc_conditions)
-        FieldExchanger.reinit_model_sims!(cs.model_sims)
-
-        # 6.update all fluxes.
-        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims)
-        FieldExchanger.update_model_sims!(cs.model_sims, cs.fields)
     end
     return cs
 end
@@ -681,29 +669,25 @@ function step!(cs::CoupledSimulation)
     !isnothing(cs.conservation_checks) && ConservationChecker.check_conservation!(cs)
     ClimaComms.barrier(comms_ctx)
 
-    ## update water albedo from wind at dt_water_albedo
-    ## (this will be extended to a radiation callback from the coupler)
-    TimeManager.maybe_trigger_callback(cs.callbacks.water_albedo, cs)
-
-    ## update the surface fractions for surface models,
-    ## and update all component model simulations with the current fluxes stored in the coupler
-    FieldExchanger.update_surface_fractions!(cs)
-    FieldExchanger.update_model_sims!(cs.model_sims, cs.fields)
-
     ## step component model simulations sequentially for one coupling timestep (Δt_cpl)
     FieldExchanger.step_model_sims!(cs.model_sims, cs.t[])
 
-    ## update the coupler with the new surface properties and calculate the turbulent fluxes
-    FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims) # i.e. T_sfc, surface_albedo, z0, beta
-    ## calculate turbulent fluxes in surfaces and save the weighted average in coupler fields
+    ## update the surface fractions for surface models
+    FieldExchanger.update_surface_fractions!(cs)
+
+    ## update the coupler with the new surface properties
+    FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims)
+    ## update the coupler with the new atmospheric properties
+    FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims)
+    ## update the model simulations with the new coupler fields
+    FieldExchanger.update_model_sims!(cs.model_sims, cs.fields)
+
+    ## calculate turbulent fluxes in the coupler and update the model simulations with them
     FluxCalculator.turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, cs.thermo_params)
 
-    Interfacer.update_field!(atmos_sim, Val(:surface_temperature), cs.fields)
-
-
-    ## update the coupler with the new atmospheric properties
-    FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims) # radiative and/or turbulent
-
+    ## update water albedo from wind at dt_water_albedo
+    ## (this will be extended to a radiation callback from the coupler)
+    TimeManager.maybe_trigger_callback(cs.callbacks.water_albedo, cs)
     ## callback to checkpoint model state
     TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs)
 

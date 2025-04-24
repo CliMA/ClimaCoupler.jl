@@ -215,7 +215,7 @@ moisture_flux(::CA.DryModel, integrator) = StaticArrays.SVector(eltype(integrato
 moisture_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
     CC.Geometry.WVector.(integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot)
 
-ρq_tot(::CA.DryModel, integrator) = StaticArrays.SVector(eltype(integrator.u)(0))
+ρq_tot(::CA.DryModel, integrator) = zeros(axes(integrator.u.c.uₕ))
 ρq_tot(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) = integrator.u.c.ρq_tot
 
 # extensions required by the Interfacer
@@ -270,7 +270,8 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:LW_d})
     )
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:specific_humidity}) =
-    CC.Fields.level(sim.integrator.u.c.ρq_tot ./ sim.integrator.u.c.ρ, 1)
+    CC.Fields.level(ρq_tot(sim.integrator.p.atmos.moisture_model, sim.integrator) ./ sim.integrator.u.c.ρ, 1)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) = CC.Fields.level(sim.integrator.u.c.ρ, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
     surface_radiation_flux(sim.integrator.p.atmos.radiation_mode, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =

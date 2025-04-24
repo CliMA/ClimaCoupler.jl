@@ -43,11 +43,6 @@ Interfacer.get_field(sim::TestSurfaceSimulation1, ::Val{:area_fraction}) = sim.c
 Interfacer.get_field(sim::TestSurfaceSimulation2, ::Val{:area_fraction}) =
     sim.cache_field .* CC.Spaces.undertype(axes(sim.cache_field))(0.5)
 
-Interfacer.get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:surface_humidity}) =
-    sim.cache_field .* 0
-Interfacer.get_field(sim::Union{TestSurfaceSimulation2, TestSurfaceSimulation2}, ::Val{:surface_humidity}) =
-    sim.cache_field .* 0
-
 Interfacer.reinit!(::TestSurfaceSimulation1) = nothing
 Interfacer.step!(::TestSurfaceSimulation1, _) = nothing
 

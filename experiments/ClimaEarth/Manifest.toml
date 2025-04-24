@@ -370,7 +370,7 @@ version = "0.4.6"
 
 [[deps.ClimaCoupler]]
 deps = ["ClimaComms", "ClimaCore", "ClimaUtilities", "Dates", "JLD2", "Logging", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "c098c71b71f6dad8499a8668ad09ecbbda8500cd"
+git-tree-sha1 = "70eff0c0e7400733f4a1c736aba670fcfcc1e699"
 repo-rev = "as/debug-amip"
 repo-url = "https://github.com/CliMA/ClimaCoupler.jl.git"
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
@@ -384,7 +384,7 @@ version = "0.2.13"
 
 [[deps.ClimaLand]]
 deps = ["ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "2b8f33e841659b8dd73d964c1ad4400d83da4393"
+git-tree-sha1 = "3847c7bea186d24256257c3865b58aefeebf3cd9"
 repo-rev = "main"
 repo-url = "https://github.com/CliMA/ClimaLand.jl.git"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"

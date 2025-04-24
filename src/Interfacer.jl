@@ -380,8 +380,13 @@ abstract type SlabplanetTerraMode <: AbstractSlabplanetSimulationMode end
 
 function remap end
 
-function remap(field::CC.Fields.Field)
+function remap(field::CC.Fields.Field, target_space)
+    # axes(field) == target_space || error("Space is inconsistent")
     return field
+end
+
+function remap(num::Number, target_space)
+    return num
 end
 
 end # module

@@ -81,7 +81,7 @@ function OceananigansSimulation(
     ocean_sea_ice = CO.OceanSeaIceModel(ocean, sea_ice; atmosphere)
 
     # Set up initial conditions for temperature and salinity
-    Tᵢ(λ, φ, z) = 30 * (1 - tanh((abs(φ) - 30) / 5)) / 2 + rand()
+    Tᵢ(λ, φ, z) = 150 #273 + 30 * (1 - tanh((abs(φ) - 30) / 5)) / 2 + rand()
     Sᵢ(λ, φ, z) = 30 - 5e-3 * z + rand()
     OC.set!(ocean.model, T = Tᵢ, S = Sᵢ)
 
@@ -95,16 +95,37 @@ Interfacer.name(::OceananigansSimulation) = "OceananigansSimulation"
 ###############################################################################
 
 # Timestep the simulation forward to time `t`
-Interfacer.step!(sim::OceananigansSimulation, t) = OC.time_step!(sim.sim, t - sim.sim.clock.time)
+Interfacer.step!(sim::OceananigansSimulation, t) = OC.time_step!(sim.sim, float(t) - sim.sim.clock.time)
 
 # Reset prognostic state and current time to initial conditions
-Interfacer.reinit!(sim::OceananigansSimulation, t) = nothing # TODO fill this out
+Interfacer.reinit!(sim::OceananigansSimulation) = nothing # TODO fill this out
 
 function OC.time_step!(atmos::ClimaAtmosSimulation, Δt)
     # It is not Oceananigans job to step the model
     return nothing
 end
 
+@inline to_node(pt::CA.ClimaCore.Geometry.LatLongPoint) = pt.long, pt.lat, zero(pt.lat)
+
+@inline to_node(pt::CA.ClimaCore.Geometry.LatLongZPoint) = pt.long, pt.lat, pt.z
+
+instantiate(L) = L()
+
+function map_interpolate(points, oc_field::OC.Field) #, loc, grid)
+    loc = map(instantiate, OC.Fields.location(oc_field))
+    grid = oc_field.grid
+    data = oc_field.data
+
+    map(points) do pt
+        FT = eltype(pt)
+        fᵢ = OC.Fields.interpolate(to_node(pt), data, loc, grid)
+        convert(FT, fᵢ)
+    end
+end
+
+function Interfacer.remap(field::OC.Field, target_space)
+    return map_interpolate(CC.Fields.coordinate_field(target_space), field)
+end
 
 # """
 #     Interfacer.get_field(sim::OceananigansSimulation, ::Val{:_})
@@ -113,12 +134,24 @@ end
 # This is used to exchange properties from the ocean to the coupler and other components.
 # """
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction
-# Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_buoyancy}) = return nothing # TODO fill this out
-# Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_momentum}) = return nothing # TODO fill this out
-# Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) = return nothing # TODO fill this out
-# Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) = return nothing # TODO fill this out
+
+# FIXME! Don't hardcode this
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_buoyancy}) = Float32(1e-3)
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_momentum}) = Float32(1e-3)
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:beta}) = Float32(0.1)
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) = Float32(0.38)
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) = Float32(0.38)
 # Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_humidity}) = return nothing # TODO fill this out
+
+# This is 3D, but it will be remapped to 2D
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) = sim.sim.ocean.model.tracers.T
+#
+
+function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fields)
+    # Left for later
+    return nothing
+end
+
 
 # # These two methods are used to track conservation of the coupled system, so it's okay to leave them empty for now
 # function Interfacer.get_field(sim::OceananigansSimulation, ::Val{:energy}, level)
@@ -470,22 +503,6 @@ end
 
 using ClimaUtilities
 using ClimaCore.Utilities: half
-
-@inline to_node(pt::CA.ClimaCore.Geometry.LatLongPoint) = pt.long, pt.lat
-
-instantiate(L) = L()
-
-function map_interpolate(points, oc_field::OC.Field) #, loc, grid)
-    loc = map(instantiate, OC.Fields.location(oc_field))
-    grid = oc_field.grid
-    data = oc_field.data
-
-    map(points) do pt
-        FT = eltype(pt)
-        fᵢ = OC.Fields.interpolate(to_node(pt), data, loc, grid)
-        convert(FT, fᵢ)
-    end
-end
 
 function map_interpolate!(cc_field, points, oc_field::OC.Field)
     loc = map(instantiate, OC.Fields.location(oc_field))

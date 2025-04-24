@@ -142,7 +142,9 @@ function surface_thermo_state(
 )
     FT = eltype(parent(thermo_state_int))
 
-    T_sfc = Interfacer.get_field(sim, Val(:surface_temperature))
+    level_space = axes(thermo_state_int)
+    T_sfc = Interfacer.remap(Interfacer.get_field(sim, Val(:surface_temperature)), level_space)
+
     # Note that the surface air density, ρ_sfc, is computed using the atmospheric state at the first level and making ideal gas
     # and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
     # a reasonable stand-in.
@@ -220,7 +222,7 @@ end
 
 Updates the fluxes in the surface model simulation `sim` with the fluxes in `fields`.
 """
-function update_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, fields::NamedTuple)
+function update_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, fields)
     return error(
         "update_turbulent_fluxes! is required to be dispatched on" * Interfacer.name(sim) * ", but no method defined",
     )

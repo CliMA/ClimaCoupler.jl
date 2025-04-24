@@ -43,20 +43,6 @@ end
 Interfacer.name(::BucketSimulation) = "BucketSimulation"
 
 """
-    get_new_cache(p, Y, energy_check)
-Returns a new `p` with an updated field to store e_per_area if energy conservation
-    checks are turned on.
-"""
-function get_new_cache(p, Y, energy_check)
-    if energy_check
-        e_per_area_field = CC.Fields.zeros(axes(Y.bucket.W))
-        return merge(p, (; e_per_area = e_per_area_field))
-    else
-        return p
-    end
-end
-
-"""
     bucket_init
 
 Initializes the bucket model variables.
@@ -76,7 +62,6 @@ function BucketSimulation(
     stepper = CTS.RK4(),
     albedo_type::String = "map_static",
     land_initial_condition::String = "",
-    energy_check::Bool = false,
     parameter_files = [],
 ) where {FT, TT <: Union{Float64, ITime}}
     α_snow = FT(0.8) # snow albedo
@@ -133,9 +118,6 @@ function BucketSimulation(
 
     # Initial conditions with no moisture
     Y, p, coords = CL.initialize(model)
-
-    # Add space in the cache for the energy if energy checks are enabled
-    p = get_new_cache(p, Y, energy_check)
 
     # Get temperature anomaly function
     T_functions = Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
@@ -254,23 +236,7 @@ Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_humidity}) =
     CL.surface_specific_humidity(nothing, sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_temperature}) =
     CL.surface_temperature(sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
-
-"""
-    Interfacer.get_field(sim::BucketSimulation, ::Val{:energy})
-
-Extension of Interfacer.get_field that provides the total energy contained in the bucket, including the latent heat due to snow melt.
-"""
-function Interfacer.get_field(sim::BucketSimulation, ::Val{:energy})
-    # required by ConservationChecker
-    e_per_area = sim.integrator.p.e_per_area .= 0
-    CC.Operators.column_integral_definite!(e_per_area, sim.model.parameters.ρc_soil .* sim.integrator.u.bucket.T)
-
-    e_per_area .+=
-        -LP.LH_f0(sim.model.parameters.earth_param_set) .* LP.ρ_cloud_liq(sim.model.parameters.earth_param_set) .*
-        sim.integrator.u.bucket.σS
-
-    return e_per_area
-end
+Interfacer.get_field(sim::BucketSimulation, ::Val{:energy}) = sim.integrator.p.e_per_area
 
 """
     Interfacer.get_field(sim::BucketSimulation, ::Val{:water})

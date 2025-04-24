@@ -278,7 +278,6 @@ function CoupledSimulation(config_dict::AbstractDict)
                 use_land_diagnostics,
                 albedo_type = land_albedo_type,
                 land_initial_condition,
-                energy_check,
                 parameter_files,
             )
         elseif land_model == "integrated"
@@ -341,7 +340,6 @@ function CoupledSimulation(config_dict::AbstractDict)
             use_land_diagnostics,
             albedo_type = land_albedo_type,
             land_initial_condition,
-            energy_check,
             parameter_files,
         )
 

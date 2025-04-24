@@ -34,7 +34,7 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 [compat]
 ArgParse = "1.1"
 ClimaAnalysis = "0.5.10"
-ClimaAtmos = "0.27, 0.28, 0.29"
+ClimaAtmos = "0.27, 0.28, 0.29, 0.30"
 ClimaDiagnostics = "0.2.6"
 ClimaLand = "0.14, 0.15"
 ClimaParams = "0.10"

@@ -381,6 +381,7 @@ function compute_surface_fluxes!(
 
     # NOTE: This is essentially setting q_sfc to the Atmos q_sfc (because we compute the
     # thermo_state_sfc by extrapolating the atmos properties onto the surface)
+    Main.@infiltrate
     @. csf.q_sfc += TD.total_specific_humidity.(thermo_params, thermo_state_sfc) * area_fraction
     return nothing
 end

@@ -81,7 +81,8 @@ function OceananigansSimulation(
     ocean_sea_ice = CO.OceanSeaIceModel(ocean, sea_ice; atmosphere)
 
     # Set up initial conditions for temperature and salinity
-    Tᵢ(λ, φ, z) = 150 #273 + 30 * (1 - tanh((abs(φ) - 30) / 5)) / 2 + rand()
+    Tᵢ(λ, φ, z) = 300
+    #273 + 30 * (1 - tanh((abs(φ) - 30) / 5)) / 2 + rand()
     Sᵢ(λ, φ, z) = 30 - 5e-3 * z + rand()
     OC.set!(ocean.model, T = Tᵢ, S = Sᵢ)
 

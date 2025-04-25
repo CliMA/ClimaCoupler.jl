@@ -388,9 +388,6 @@ Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water}) = CL.total_water(s
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_temperature}) = sim.integrator.p.T_sfc
 
 # Update fields stored in land model sub-components
-function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:area_fraction}, field)
-    parent(sim.area_fraction) .= parent(field)
-end
 function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:diffuse_fraction}, field)
     parent(sim.integrator.p.drivers.frac_diff) .= parent(field)
 end

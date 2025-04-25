@@ -232,6 +232,9 @@ properties needed by a component model.
 | `turbulent_energy_flux`                       | aerodynamic turbulent surface fluxes of energy (sensible and latent heat)    | W m⁻²      |
 | `turbulent_moisture_flux`                     | aerodynamic turbulent surface fluxes of energy (evaporation)                 | kg m⁻² s⁻¹ |
 
+Note: `update_field!(::SurfaceModelSimulation, ::Val{:area_fraction}, field)` is
+not required to be extended for land models, since they're assumed to have a
+constant area fraction.
 
 ### SurfaceModelSimulation - optional functions
 - `get_field(::SurfaceModelSimulation, ::Val{property})`:

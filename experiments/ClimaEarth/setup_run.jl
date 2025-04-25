@@ -319,7 +319,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         # ocean_sim =
         #     PrescribedOceanSimulation(FT, boundary_space, start_date, t_start, ocean_fraction, thermo_params, comms_ctx)
 
-        ocean_sim = OceananigansSimulation(atmos_sim, ocean_fraction; comms_ctx)
+        ocean_sim = OceananigansSimulation(ocean_fraction; comms_ctx)
 
         Utilities.show_memory_usage()
 
@@ -698,6 +698,7 @@ function step!(cs::CoupledSimulation)
 
     ## update the coupler with the new surface properties and calculate the turbulent fluxes
     FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims) # i.e. T_sfc, surface_albedo, z0, beta
+
     ## calculate turbulent fluxes in surfaces and save the weighted average in coupler fields
     FluxCalculator.turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, cs.thermo_params)
 

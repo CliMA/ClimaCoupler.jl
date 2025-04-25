@@ -245,7 +245,11 @@ function combine_surfaces!(combined_field, sims, field_name)
             area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
             combined_field .+=
                 area_fraction .*
-                ifelse.(area_fraction .≈ 0, zero(combined_field), Interfacer.remap(Interfacer.get_field(sim, field_name), target_space))
+                ifelse.(
+                    area_fraction .≈ 0,
+                    zero(combined_field),
+                    Interfacer.remap(Interfacer.get_field(sim, field_name), target_space),
+                )
         end
     end
 end

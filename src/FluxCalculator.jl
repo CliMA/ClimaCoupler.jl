@@ -305,6 +305,7 @@ function compute_surface_fluxes!(
 
     # get area fraction (min = 0, max = 1)
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
+    @assert axes(area_fraction) == boundary_space
 
     thermo_state_sfc = FluxCalculator.surface_thermo_state(sim, thermo_params, thermo_state_int)
 
@@ -323,7 +324,6 @@ function compute_surface_fluxes!(
     # calculate the surface fluxes
     fluxes = FluxCalculator.get_surface_fluxes!(inputs, surface_params)
     (; F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture, L_MO, ustar, buoyancy_flux) = fluxes
-
 
     # Zero out fluxes where the area fraction is zero
     # Multiplying by `area_fraction` is not sufficient because the fluxes may
@@ -381,8 +381,11 @@ function compute_surface_fluxes!(
 
     # NOTE: This is essentially setting q_sfc to the Atmos q_sfc (because we compute the
     # thermo_state_sfc by extrapolating the atmos properties onto the surface)
-    Main.@infiltrate
-    @. csf.q_sfc += TD.total_specific_humidity.(thermo_params, thermo_state_sfc) * area_fraction
+    @. csf.q_sfc += ifelse(
+        area_fraction ≈ 0,
+        zero(csf.q_sfc),
+        TD.total_specific_humidity.(thermo_params, thermo_state_sfc) * area_fraction,
+    )
     return nothing
 end
 

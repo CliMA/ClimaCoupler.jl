@@ -38,6 +38,10 @@ function argparse_settings()
         arg_type = String
         default = "auto"
         # Time information
+        "--use_itime"
+        help = "Boolean flag indicating whether to use ITime (integer time) or not (will use Float64) [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
         "--t_end"
         help = "End time of the simulation [\"800secs\"; allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Inf\"]"
         arg_type = String
@@ -135,26 +139,23 @@ function argparse_settings()
         help = "Land model to use. [`bucket` (default), `integrated`]"
         arg_type = String
         default = "bucket"
-        "--land_albedo_type"
-        help = "Access land surface albedo information from data file. [`map_static` (default), `function`, `map_temporal`]"
-        arg_type = String
-        default = "map_static" # to be replaced by land config file, when available
-        "--land_initial_condition"
-        help = "A file path for a NetCDF file (read documentation about requirements)"
-        arg_type = String
-        default = ""
         "--land_temperature_anomaly"
-        help = "Type of temperature anomaly for bucket model. [`amip`, `aquaplanet` (default)]"
+        help = "Type of temperature anomaly for land model. [`amip`, `aquaplanet` (default)]"
         arg_type = String
         default = "aquaplanet"
         "--use_land_diagnostics"
         help = "Boolean flag indicating whether to compute and output land model diagnostics [`true` (default), `false`]"
         arg_type = Bool
         default = true
-        "--use_itime"
-        help = "Boolean flag indicating whether to use ITime (integer time) or not (will use Float64) [`true` (default), `false`]"
-        arg_type = Bool
-        default = true
+        # BucketModel specific
+        "--bucket_albedo_type"
+        help = "Access bucket surface albedo information from data file. [`map_static` (default), `function`, `map_temporal`]"
+        arg_type = String
+        default = "map_static" # to be replaced by land config file, when available
+        "--bucket_initial_condition"
+        help = "A file path for a NetCDF file (read documentation about requirements)"
+        arg_type = String
+        default = ""
     end
     return s
 end

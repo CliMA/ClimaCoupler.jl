@@ -11,7 +11,7 @@ dt_rad: "1hours"
 dt_save_state_to_disk: "20days"
 energy_check: false
 insolation: "timevarying"
-land_albedo_type: "map_temporal"
+bucket_albedo_type: "map_temporal"
 mode_name: "amip"
 netcdf_output_at_levels: true
 output_default_diagnostics: true

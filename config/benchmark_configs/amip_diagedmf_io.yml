@@ -7,7 +7,7 @@ dt_cpl: "120secs"
 dt_save_state_to_disk: "12hours"
 dt_save_to_sol: "12hours"
 energy_check: false
-land_albedo_type: "map_temporal"
+bucket_albedo_type: "map_temporal"
 mode_name: "amip"
 monthly_checkpoint: false
 prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]

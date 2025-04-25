@@ -6,7 +6,7 @@ dt_save_to_sol: "1days"
 dz_bottom: 30
 dz_top: 3000
 h_elem: 16
-land_albedo_type: "function"
+bucket_albedo_type: "function"
 mode_name: "amip"
 moist: "equil"
 precip_model: "0M"

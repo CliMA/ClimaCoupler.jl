@@ -75,7 +75,7 @@ function BucketSimulation(
     use_land_diagnostics::Bool = true,
     stepper = CTS.RK4(),
     albedo_type::String = "map_static",
-    land_initial_condition::String = "",
+    bucket_initial_condition::String = "",
     energy_check::Bool = false,
     parameter_files = [],
 ) where {FT, TT <: Union{Float64, ITime}}
@@ -166,8 +166,8 @@ function BucketSimulation(
     # - `T`, for soil temperature (3D),
     # - `S`, for snow water equivalent (2D).
 
-    if !isempty(land_initial_condition)
-        ds = NCDataset(land_initial_condition)
+    if !isempty(bucket_initial_condition)
+        ds = NCDataset(bucket_initial_condition)
         has_all_variables = all(key -> haskey(ds, key), ["W", "Ws", "T", "S"])
         @assert has_all_variables "The land iniital condition file is expected to contain the variables W, Ws, T, and S (read documentation about requirements)."
         close(ds)
@@ -177,28 +177,28 @@ function BucketSimulation(
         regridder_type = :InterpolationsRegridder
         extrapolation_bc = (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
         Y.bucket.W .= SpaceVaryingInput(
-            land_initial_condition,
+            bucket_initial_condition,
             "W",
             surface_space;
             regridder_type,
             regridder_kwargs = (; extrapolation_bc,),
         )
         Y.bucket.Ws .= SpaceVaryingInput(
-            land_initial_condition,
+            bucket_initial_condition,
             "Ws",
             surface_space;
             regridder_type,
             regridder_kwargs = (; extrapolation_bc,),
         )
         Y.bucket.T .= SpaceVaryingInput(
-            land_initial_condition,
+            bucket_initial_condition,
             "T",
             subsurface_space;
             regridder_type,
             regridder_kwargs = (; extrapolation_bc,),
         )
         Y.bucket.σS .= SpaceVaryingInput(
-            land_initial_condition,
+            bucket_initial_condition,
             "S",
             surface_space;
             regridder_type,

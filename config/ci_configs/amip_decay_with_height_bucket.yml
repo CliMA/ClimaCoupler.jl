@@ -10,7 +10,7 @@ dt_save_to_sol: "12hours"
 dz_bottom: 100.0
 energy_check: false
 h_elem: 8
-land_albedo_type: "map_temporal"
+bucket_albedo_type: "map_temporal"
 land_model: "bucket"
 mode_name: "amip"
 moist: equil

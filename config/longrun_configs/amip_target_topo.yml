@@ -10,7 +10,7 @@ dt_rad: "1hours"
 dt_save_state_to_disk: "20days"
 energy_check: false
 insolation: "timevarying"
-land_albedo_type: "map_temporal"
+bucket_albedo_type: "map_temporal"
 mode_name: "amip"
 netcdf_interpolate_z_over_msl: true
 prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]

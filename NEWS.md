@@ -6,6 +6,9 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Rename bucket-specific options. PR[#1306](https://github.com/CliMA/ClimaCoupler.jl/pull/1306)
+`land_albedo_type` is now `bucket_albedo_type`, and `land_initial_condition` is now `bucket_initial_condition`.
+
 #### Test AMIP with integrated land model. PR[#1254](https://github.com/CliMA/ClimaCoupler.jl/pull/1254)
 
 The integrated ClimaLand model can now be used in coupled simulations.

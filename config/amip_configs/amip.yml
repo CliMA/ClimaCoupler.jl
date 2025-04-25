@@ -11,7 +11,7 @@ dt_save_to_sol: "30days"
 dz_bottom: 30.0
 energy_check: false
 h_elem: 16
-land_albedo_type: "map_temporal"
+bucket_albedo_type: "map_temporal"
 mode_name: "amip"
 netcdf_output_at_levels: true
 output_default_diagnostics: true

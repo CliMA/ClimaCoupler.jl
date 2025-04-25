@@ -370,8 +370,8 @@ version = "0.4.6"
 
 [[deps.ClimaCoupler]]
 deps = ["ClimaComms", "ClimaCore", "ClimaUtilities", "Dates", "JLD2", "Logging", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "70eff0c0e7400733f4a1c736aba670fcfcc1e699"
-repo-rev = "as/debug-amip"
+git-tree-sha1 = "48264682c981c73a6d2e12980d07ca89b2348815"
+repo-rev = "as/nightly-compat"
 repo-url = "https://github.com/CliMA/ClimaCoupler.jl.git"
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.1.2"

@@ -32,7 +32,8 @@ object's fluxes fields.
 
 [`FluxCalculator.compute_surface_fluxes!`](@ref) sets:
 - the flux of momenta, `F_turb_ρτxz`, `F_turb_ρτyz`;
-- the flux of energy, `F_turb_energy`;
+- the flux of energy due to latent heat, `F_lh`;
+- the flux of energy due to sensible heat, `F_sh`;
 - the flux of moisture, `F_turb_moisture`;
 - the Obukhov length, `L_MO`;
 - the buoyancy flux, `buoyancy_flux`;

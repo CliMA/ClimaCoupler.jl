@@ -56,9 +56,9 @@ end
 """
     import_atmos_fields!(csf, model_sims)
 
-Update the coupler with the atmospheric fluxes. The `Interfacer.get_field` functions
-(`:turbulent_energy_flux`, `:turbulent_moisture_flux`, `:radiative_energy_flux_sfc`, `:liquid_precipitation`, `:snow_precipitation`)
-have to be defined for the atmospheric component model type.
+Update the coupler with the atmospheric fluxes. By default, this updates the coupler fields for
+the surface air density, radiative fluxes, and precipitation. This function should be
+extended for any model that requires additional fields from the atmosphere.
 
 # Arguments
 - `csf`: [NamedTuple] containing coupler fields.
@@ -136,7 +136,7 @@ end
 """
     update_sim!(sim::SurfaceModelSimulation, csf, area_fraction)
 
-Updates the surface component model cache with the current coupler fields of F_turb_energy, F_radiative, F_turb_moisture, P_liq, and ρ_sfc.
+Updates the surface component model cache with the current coupler fields besides turbulent fluxes.
 
 # Arguments
 - `sim`: [Interfacer.SurfaceModelSimulation] containing a surface model simulation object.

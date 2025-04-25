@@ -7,8 +7,6 @@ struct DummySimulation{C} <: Interfacer.AtmosModelSimulation
     cache::C
 end
 Interfacer.name(::DummySimulation) = "DummySimulation"
-Interfacer.get_field(sim::DummySimulation, ::Val{:turbulent_energy_flux}) = sim.cache.turbulent_energy_flux
-Interfacer.get_field(sim::DummySimulation, ::Val{:turbulent_moisture_flux}) = sim.cache.turbulent_moisture_flux
 Interfacer.get_field(sim::DummySimulation, ::Val{:radiative_energy_flux_sfc}) = sim.cache.radiative_energy_flux_sfc
 Interfacer.get_field(sim::DummySimulation, ::Val{:liquid_precipitation}) = sim.cache.liquid_precipitation
 Interfacer.get_field(sim::DummySimulation, ::Val{:snow_precipitation}) = sim.cache.snow_precipitation
@@ -203,14 +201,8 @@ for FT in (Float32, Float64)
 
     @testset "import_atmos_fields! for FT=$FT" begin
         boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
-        coupler_names = (:F_turb_energy, :F_turb_moisture, :F_radiative, :P_liq, :P_snow, :ρ_sfc, :T_sfc)
-        component_names = (
-            :turbulent_energy_flux,
-            :turbulent_moisture_flux,
-            :radiative_energy_flux_sfc,
-            :liquid_precipitation,
-            :snow_precipitation,
-        )
+        coupler_names = (:F_lh, :F_sh, :F_turb_moisture, :F_radiative, :P_liq, :P_snow, :ρ_sfc, :T_sfc)
+        component_names = (:radiative_energy_flux_sfc, :liquid_precipitation, :snow_precipitation)
         component_fields =
             NamedTuple{component_names}(ntuple(i -> CC.Fields.ones(boundary_space), length(component_names)))
 
@@ -219,7 +211,8 @@ for FT in (Float32, Float64)
 
         coupler_fields = NamedTuple{coupler_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_names)))
         FieldExchanger.import_atmos_fields!(coupler_fields, model_sims)
-        @test Array(parent(coupler_fields.F_turb_energy))[1] == FT(0)
+        @test Array(parent(coupler_fields.F_lh))[1] == FT(0)
+        @test Array(parent(coupler_fields.F_sh))[1] == FT(0)
         @test Array(parent(coupler_fields.F_turb_moisture))[1] == FT(0)
         @test coupler_fields.F_radiative == model_sims.atmos_sim.cache.radiative_energy_flux_sfc
         @test coupler_fields.P_liq == model_sims.atmos_sim.cache.liquid_precipitation
@@ -266,7 +259,8 @@ for FT in (Float32, Float64)
             :surface_direct_albedo,
             :surface_diffuse_albedo,
             :beta,
-            :F_turb_energy,
+            :F_lh,
+            :F_sh,
             :F_turb_moisture,
             :F_radiative,
             :P_liq,

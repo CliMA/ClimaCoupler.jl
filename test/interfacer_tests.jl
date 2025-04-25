@@ -158,8 +158,6 @@ end
         :radiative_energy_flux_sfc,
         :radiative_energy_flux_toa,
         :snow_precipitation,
-        :turbulent_energy_flux,
-        :turbulent_moisture_flux,
         :thermo_state_int,
         :u_int,
         :v_int,

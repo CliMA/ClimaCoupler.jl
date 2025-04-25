@@ -159,8 +159,8 @@ function Interfacer.add_coupler_fields!(coupler_field_names, ::SlabOceanSimulati
 end
 
 function FluxCalculator.update_turbulent_fluxes!(sim::SlabOceanSimulation, fields::NamedTuple)
-    (; F_turb_energy) = fields
-    @. sim.integrator.p.F_turb_energy = F_turb_energy
+    (; F_lh, F_sh) = fields
+    @. sim.integrator.p.F_turb_energy = F_lh + F_sh
 end
 
 """

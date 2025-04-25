@@ -66,7 +66,8 @@ function turbulent_fluxes!(
     # area-weighted averages
     csf.F_turb_ρτxz .*= FT(0)
     csf.F_turb_ρτyz .*= FT(0)
-    csf.F_turb_energy .*= FT(0)
+    csf.F_lh .*= FT(0)
+    csf.F_sh .*= FT(0)
     csf.F_turb_moisture .*= FT(0)
     csf.z0m_sfc .*= FT(0)
     csf.z0b_sfc .*= FT(0)
@@ -187,8 +188,8 @@ function get_surface_fluxes!(inputs, surface_params::SF.Parameters.SurfaceFluxes
     F_turb_ρτyz = outputs.ρτyz
 
     # energy fluxes
-    F_shf = outputs.shf
-    F_lhf = outputs.lhf
+    F_sh = outputs.shf
+    F_lh = outputs.lhf
 
     # moisture
     F_turb_moisture = SF.evaporation.(surface_params, inputs, outputs.Ch)
@@ -197,7 +198,7 @@ function get_surface_fluxes!(inputs, surface_params::SF.Parameters.SurfaceFluxes
     ustar = outputs.ustar
     buoyancy_flux = outputs.buoy_flux
 
-    return (; F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture, L_MO, ustar, buoyancy_flux)
+    return (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux)
 end
 
 """
@@ -269,7 +270,7 @@ Since the fluxes are computed between the input model and the atmosphere, this
 function does nothing if called on an atmosphere model simulation.
 
 # Arguments
-- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_turb_energy`, `F_turb_moisture`.
+- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
 - `sim`: [Interfacer.ComponentModelSimulation] the surface simulation to compute fluxes for.
 - `atmos_sim`: [Interfacer.AtmosModelSimulation] the atmosphere simulation to compute fluxes with.
 - `boundary_space`: [CC.Spaces.AbstractSpace] the space of the coupler surface.
@@ -320,7 +321,7 @@ function compute_surface_fluxes!(
 
     # calculate the surface fluxes
     fluxes = FluxCalculator.get_surface_fluxes!(inputs, surface_params)
-    (; F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture, L_MO, ustar, buoyancy_flux) = fluxes
+    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux) = fluxes
 
 
     # Zero out fluxes where the area fraction is zero
@@ -328,8 +329,8 @@ function compute_surface_fluxes!(
     # be NaN where the area fraction is zero.
     @. F_turb_ρτxz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτxz), F_turb_ρτxz)
     @. F_turb_ρτyz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτyz), F_turb_ρτyz)
-    @. F_shf = ifelse(area_fraction ≈ 0, zero(F_shf), F_shf)
-    @. F_lhf = ifelse(area_fraction ≈ 0, zero(F_lhf), F_lhf)
+    @. F_sh = ifelse(area_fraction ≈ 0, zero(F_sh), F_sh)
+    @. F_lh = ifelse(area_fraction ≈ 0, zero(F_lh), F_lh)
     @. F_turb_moisture = ifelse(area_fraction ≈ 0, zero(F_turb_moisture), F_turb_moisture)
     @. L_MO = ifelse(area_fraction ≈ 0, zero(L_MO), L_MO)
     @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
@@ -338,17 +339,12 @@ function compute_surface_fluxes!(
     # multiply fluxes by area fraction
     F_turb_ρτxz .*= area_fraction
     F_turb_ρτyz .*= area_fraction
-    F_shf .*= area_fraction
-    F_lhf .*= area_fraction
+    F_sh .*= area_fraction
+    F_lh .*= area_fraction
     F_turb_moisture .*= area_fraction
 
     # update the fluxes, which are now area-weighted, of this surface model
-    fields = (;
-        F_turb_ρτxz = F_turb_ρτxz,
-        F_turb_ρτyz = F_turb_ρτyz,
-        F_turb_energy = F_shf .+ F_lhf,
-        F_turb_moisture = F_turb_moisture,
-    )
+    fields = (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
     FluxCalculator.update_turbulent_fluxes!(sim, fields)
 
     # update fluxes in the coupler fields
@@ -357,7 +353,8 @@ function compute_surface_fluxes!(
     #  not present at a point, the fluxes are zero
     @. csf.F_turb_ρτxz += F_turb_ρτxz
     @. csf.F_turb_ρτyz += F_turb_ρτyz
-    @. csf.F_turb_energy += (F_shf .+ F_lhf)
+    @. csf.F_lh += F_lh
+    @. csf.F_sh += F_sh
     @. csf.F_turb_moisture += F_turb_moisture
 
     # NOTE: This is still an area weighted contribution, which maybe doesn't make

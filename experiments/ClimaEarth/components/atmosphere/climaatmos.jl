@@ -282,10 +282,6 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d})
         CC.Utilities.half,
     )
 end
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_energy_flux}) =
-    CC.Geometry.WVector.(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot)
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_moisture_flux}) =
-    moisture_flux(sim.integrator.p.atmos.moisture_model, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_state_int}) =
     CC.Spaces.level(sim.integrator.p.precomputed.ᶜts, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:water}) =
@@ -340,7 +336,7 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_diff
 end
 
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fluxes}, fields)
-    (; F_turb_energy, F_turb_moisture, F_turb_ρτxz, F_turb_ρτyz) = fields
+    (; F_lh, F_sh, F_turb_moisture, F_turb_ρτxz, F_turb_ρτyz) = fields
 
     Y = sim.integrator.u
     surface_local_geometry = CC.Fields.level(CC.Fields.local_geometry_field(Y.f), CC.Utilities.half)
@@ -360,7 +356,8 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fl
         )
     )
 
-    parent(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot) .= parent(F_turb_energy) .* parent(surface_normal) # (shf + lhf)
+    parent(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot) .=
+        (parent(F_lh) + parent(F_sh)) .* parent(surface_normal) # (shf + lhf)
     parent(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot) .=
         parent(F_turb_moisture) .* parent(surface_normal) # (evap)
 

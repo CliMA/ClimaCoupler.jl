@@ -323,9 +323,10 @@ end
 
 # extensions required by FluxCalculator
 function FluxCalculator.update_turbulent_fluxes!(sim::BucketSimulation, fields::NamedTuple)
-    (; F_turb_energy, F_turb_moisture) = fields
+    (; F_lh, F_sh, F_turb_moisture) = fields
     turbulent_fluxes = sim.integrator.p.bucket.turbulent_fluxes
-    turbulent_fluxes.shf .= F_turb_energy
+    turbulent_fluxes.lhf .= F_lh
+    turbulent_fluxes.shf .= F_sh
     earth_params = sim.model.parameters.earth_param_set
     turbulent_fluxes.vapor_flux .= F_turb_moisture ./ LP.ρ_cloud_liq(earth_params)
     return nothing

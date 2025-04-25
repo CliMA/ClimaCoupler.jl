@@ -518,7 +518,7 @@ fluxes are computed for each sub-component and then combined to get the total fo
 The land model cache is updated with the computed fluxes for each sub-component.
 
 # Arguments
-- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_turb_energy`, `F_turb_moisture`.
+- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
 - `sim`: [ClimaLandSimulation] the integrated land simulation to compute fluxes for.
 - `atmos_sim`: [Interfacer.AtmosModelSimulation] the atmosphere simulation to compute fluxes with.
 - unused arguments: `boundary_space`, `thermo_params`, `surface_scheme`
@@ -579,7 +579,8 @@ function FluxCalculator.compute_surface_fluxes!(
     @. csf.temp2 = ifelse(area_fraction == 0, zero(csf.temp2), csf.temp2)
 
     # Update the coupler field in-place
-    @. csf.F_turb_energy += (csf.temp1 .+ csf.temp2) * area_fraction
+    @. csf.F_lh += csf.temp1 * area_fraction
+    @. csf.F_sh += csf.temp2 * area_fraction
 
     # Combine turbulent moisture fluxes from each component of the land model
     @. csf.temp1 =

@@ -117,7 +117,8 @@ default_coupler_fields() = [
     :beta,
     :emissivity,
     # fields used for flux exchange
-    :F_turb_energy,
+    :F_lh,
+    :F_sh,
     :F_turb_moisture,
     :F_turb_ρτxz,
     :F_turb_ρτyz,

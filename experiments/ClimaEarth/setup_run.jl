@@ -689,10 +689,10 @@ function postprocess(cs, conservation_softfail)
     - Plots of useful coupler and component model fields for debugging
     =#
 
-    if ClimaComms.iamroot(cs.comms_ctx) && !isnothing(cs.diags_handler)
-        postprocessing_vars = (; conservation_softfail)
-        postprocess_sim(cs, postprocessing_vars)
-    end
+    # if ClimaComms.iamroot(cs.comms_ctx) && !isnothing(cs.diags_handler)
+    #     postprocessing_vars = (; conservation_softfail)
+    #     postprocess_sim(cs, postprocessing_vars)
+    # end
     return nothing
 end
 

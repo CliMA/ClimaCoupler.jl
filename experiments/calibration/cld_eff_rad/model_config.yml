@@ -17,7 +17,7 @@ mode_name: "amip"
 mono_surface: false
 prescribe_clouds_in_radiation: true
 netcdf_output_at_levels: true
-output_default_diagnostics: true
+output_default_diagnostics: false 
 use_coupler_diagnostics: true
 radiation_reset_rng_seed: true
 rayleigh_sponge: true

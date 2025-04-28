@@ -24,7 +24,6 @@ const days_in_secs = 86_400
 const month = 32 * days_in_secs
 
 if FULL_CALIBRATION
-    # covariance_mat = Diagonal(repeat(vec(auto_covariance(cre)), 12))
     covariance_mat = compute_covariance(cre)
     cre_window = window(cre, "time"; left = 93days_in_secs, right = 426days_in_secs)
     # Observations info: https://clima.github.io/EnsembleKalmanProcesses.jl/dev/observations/
@@ -40,4 +39,4 @@ end
 observations = EKP.combine_observations([cre_obs])
 observation_series = EKP.ObservationSeries(observations; metadata = cre_window)
 
-JLD2.save_object("experiments/calibration/cld_eff_rad/sep_obs_series.jld2", observation_series)
+JLD2.save_object("experiments/calibration/cld_eff_rad/obs_series_test.jld2", observation_series)

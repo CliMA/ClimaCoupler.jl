@@ -28,20 +28,7 @@ function process_member_data(simdir::SimDir)
     rsut = preprocess_monthly_averages(simdir, "rsut")
     rsutcs = preprocess_monthly_averages(simdir, "rsutcs")
     cre = rsutcs - rsut
-
-    lon = [-20.0]
-    lat = [-30.0]
-    time = [0.0]
-    data = [1.0]
-    dims = OrderedDict(["lon" => lon, "lat" => lat, "time" => time])
-    attribs = Dict("long_name" => "hi")
-    dim_attribs = OrderedDict([
-        "lon" => Dict("units" => "deg"),
-        "lat" => Dict("units" => "deg"),
-        "time" => Dict("units" => "s"),
-    ])
-    dummy_var = ClimaAnalysis.OutputVar(attribs, dims, dim_attribs, data)
-    cre = ClimaAnalysis.reordered_as(cre, dummy_var)
+    cre = ClimaAnalysis.permutedims(cre, ("longitude", "latitude", "time"))
     return vec(cre.data)
 end
 
@@ -57,7 +44,7 @@ function preprocess_monthly_averages(simdir, name)
     monthly_avgs = ClimaAnalysis.shift_to_start_of_previous_month(monthly_avgs)
     # Remove spinup time
     monthly_avgs = window(monthly_avgs, "time"; left = spinup_time)
-    global_mean = monthly_avgs |> average_lat |> average_lon |> average_time # average_time(average_lon(average_lat(monthly_avgs)))
+    global_mean = monthly_avgs |> average_lat |> average_lon |> average_time
     monthly_avgs = ClimaAnalysis.replace(monthly_avgs, NaN => first(global_mean.data))
     return monthly_avgs
 end

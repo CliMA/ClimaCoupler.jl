@@ -52,6 +52,7 @@ function plot_cre!(fig, iteration_dir, spinup)
     sim_var = ClimaAnalysis.average_time(sim_var)
     obs_var = ClimaAnalysis.average_time(obs_var)
 
+    # TODO: Add color range here...
     ClimaAnalysis.Visualize.plot_bias_on_globe!(fig, sim_var, obs_var)
     supertitle = CairoMakie.Label(fig[0, :], last(splitpath(iteration_dir)), fontsize = 30, tellheight = true)
 end

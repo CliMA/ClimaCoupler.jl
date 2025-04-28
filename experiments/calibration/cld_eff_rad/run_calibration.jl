@@ -43,7 +43,7 @@ n_iterations = 10
 # ]
 
 priors = [
-    # constrained_gaussian("ice_cloud_effective_radius", 25e-6, 1e-5, 5e-6, 9e-5), # r_eff ice
+    constrained_gaussian("ice_cloud_effective_radius", 25e-6, 1e-5, 5e-6, 9e-5), # r_eff ice
     constrained_gaussian("prescribed_cloud_droplet_number_concentration", 1e8, 5e7, 1e7, 1e9), # q₀_liq
     constrained_gaussian("reference_liquid_water_specific_humidity", 0.1, 0.05, 0.01, 0.3), # q₀_liq
     constrained_gaussian("liquid_water_specific_humidity_calibration_coefficent", 0.0, 1.0, -3.0, 3.0) # α_q_liq

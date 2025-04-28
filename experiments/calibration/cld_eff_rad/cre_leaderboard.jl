@@ -123,9 +123,10 @@ end
 Plot leaderboard for each iteration in a square and a seasonal leaderboard.
 """
 function plot_cre_leaderboard_from_iters(output_dir, spinup, iters)
+    @info "Plotting CRE leaderboard from $iters iterations in $output_dir"
     iter_paths = readdir(output_dir, join = true)
-    iter_paths = iter_paths[1:iters]
     filter!(x -> occursin("iteration", x), iter_paths)
+    iter_paths = iter_paths[1:iters]
     sort!(iter_paths)
 
     # Plot time average for each iteration

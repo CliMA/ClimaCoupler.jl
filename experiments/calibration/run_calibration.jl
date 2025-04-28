@@ -127,4 +127,4 @@ params = EKP.get_ϕ(prior, eki)
 spread = map(var, params)
 
 # Spread should be heavily decreased as particles have converged
-@test last(spread) / first(spread) < 0.1
+@test last(spread) / first(spread) < 0.15

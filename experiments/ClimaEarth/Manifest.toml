@@ -332,8 +332,8 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "NullBroadcasts", "RRTMGP", "Random", "SciMLBase", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
-git-tree-sha1 = "bd9fc6f999125368a1e2b9fbacbc0761dc904cb5"
-repo-rev = "as/debug-amip"
+git-tree-sha1 = "e05902b9514598a7d7674e6bfbf6d73e72fda862"
+repo-rev = "as/test-rad-update"
 repo-url = "https://github.com/CliMA/ClimaAtmos.jl.git"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
 version = "0.30.0"
@@ -370,8 +370,8 @@ version = "0.4.6"
 
 [[deps.ClimaCoupler]]
 deps = ["ClimaComms", "ClimaCore", "ClimaUtilities", "Dates", "JLD2", "Logging", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "48264682c981c73a6d2e12980d07ca89b2348815"
-repo-rev = "as/nightly-compat"
+git-tree-sha1 = "760ba13932edc449a923356916d170cba5278bf1"
+repo-rev = "as/debug-amip"
 repo-url = "https://github.com/CliMA/ClimaCoupler.jl.git"
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.1.2"
@@ -384,7 +384,7 @@ version = "0.2.13"
 
 [[deps.ClimaLand]]
 deps = ["ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "3847c7bea186d24256257c3865b58aefeebf3cd9"
+git-tree-sha1 = "5397d08db3eb021cf73e083380d6fbe1fa555de6"
 repo-rev = "main"
 repo-url = "https://github.com/CliMA/ClimaLand.jl.git"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
@@ -2044,7 +2044,7 @@ version = "1.11.0"
 
 [[deps.RRTMGP]]
 deps = ["Adapt", "Artifacts", "ClimaComms", "DocStringExtensions", "Random"]
-git-tree-sha1 = "5591b6600f321cb4162cd3dbe447b99d056770b8"
+git-tree-sha1 = "4d8e3cfb707ee172ef66224d862c56a46172da0d"
 repo-rev = "as/scaled-metrics"
 repo-url = "https://github.com/CliMA/RRTMGP.jl.git"
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"

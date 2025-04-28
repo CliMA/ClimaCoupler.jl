@@ -3,14 +3,15 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
 checkpoint_dt: "720hours"
 coupler_toml: ["toml/amip.toml"]
-dt: "240secs"
-dt_cpl: "240secs"
+dt: "90secs"
+dt_cpl: "90secs"
+deep_atmosphere: true
 dt_save_state_to_disk: "30days"
 dt_save_to_sol: "30days"
 dz_bottom: 100.0
 deep_atmosphere: true
 energy_check: false
-h_elem: 8
+h_elem: 30
 land_albedo_type: "map_temporal"
 mesh_warp_type: "SLEVE"
 mode_name: "amip"
@@ -25,7 +26,7 @@ t_end: "465days"
 topography: "Earth"
 topo_smoothing: true
 viscous_sponge: true
-z_elem: 39
+z_elem: 63
 z_max: 60000.0
 extra_atmos_diagnostics:
   - short_name: [od550aer, odsc550aer]

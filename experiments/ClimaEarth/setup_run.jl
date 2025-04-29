@@ -579,7 +579,7 @@ function run!(cs::CoupledSimulation; precompile = (cs.tspan[end] > 2 * cs.Δt_cp
     @info "Simulation took $(walltime) seconds"
 
     simulated_seconds_per_second = float(cs.tspan[end] - cs.tspan[begin]) / walltime
-    simulated_years_per_day = simulated_seconds_per_second / (365.25 * walltime)
+    simulated_years_per_day = simulated_seconds_per_second / 365.25
     sypd = simulated_years_per_day
     n_coupling_steps = (cs.tspan[end] - cs.tspan[begin]) / cs.Δt_cpl
     walltime_per_coupling_step = walltime / n_coupling_steps

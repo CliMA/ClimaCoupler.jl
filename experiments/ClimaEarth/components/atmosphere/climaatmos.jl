@@ -398,7 +398,9 @@ function Interfacer.add_coupler_fields!(coupler_field_names, atmos_sim::ClimaAtm
     push!(coupler_field_names, atmos_coupler_fields...)
 end
 
-function FieldExchanger.update_sim!(sim::ClimaAtmosSimulation, csf, turbulent_fluxes)
+function FieldExchanger.update_sim!(sim::ClimaAtmosSimulation, csf)
+    # TODO: This function should be removed once we remove cos_zenith_angle as
+    # one of the exchange fields (and use the default method in FieldExchanger)
 
     u = sim.integrator.u
     p = sim.integrator.p
@@ -406,7 +408,7 @@ function FieldExchanger.update_sim!(sim::ClimaAtmosSimulation, csf, turbulent_fl
 
     # Perform radiation-specific updates
     if hasradiation(sim.integrator)
-        !(p.atmos.insolation isa CA.IdealizedInsolation) && CA.set_insolation_variables!(u, p, t, p.atmos.insolation)
+        CA.set_insolation_variables!(u, p, t, p.atmos.insolation)
         Interfacer.update_field!(sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
         Interfacer.update_field!(sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
         Interfacer.update_field!(sim, Val(:surface_temperature), csf)

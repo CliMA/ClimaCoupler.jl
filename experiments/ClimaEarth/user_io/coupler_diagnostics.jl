@@ -15,7 +15,7 @@ function coupler_diagnostics_setup(fields, output_dir, start_date, t_start, diag
     # Create schedules and writer
     schedule_everystep = CD.Schedules.EveryStepSchedule()
     schedule_calendar_dt = CD.Schedules.EveryCalendarDtSchedule(diagnostics_dt; start_date)
-    netcdf_writer = CD.Writers.NetCDFWriter(axes(fields.F_turb_energy), output_dir)
+    netcdf_writer = CD.Writers.NetCDFWriter(axes(fields.F_sh), output_dir)
 
     # Create the diagnostic for turbulent energy fluxes
     F_turb_energy_diag = CD.DiagnosticVariable(;
@@ -27,9 +27,9 @@ function coupler_diagnostics_setup(fields, output_dir, start_date, t_start, diag
                     weighted by surface simulation area.",
         compute! = (out, state, cache, time) -> begin
             if isnothing(out)
-                return state.F_turb_energy
+                return state.F_sh .+ state.F_lh
             else
-                out .= state.F_turb_energy
+                out .= state.F_sh .+ state.F_lh
             end
         end,
     )

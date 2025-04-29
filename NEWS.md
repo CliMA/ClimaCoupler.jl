@@ -6,6 +6,12 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Turbulent energy flux is split into LHF, SHF. PR[#1309](https://github.com/CliMA/ClimaCoupler.jl/pull/1309)
+Previously, we have exchanged the combined turbulent energy flux `F_turb_energy`;
+This PR splits up the exchanged quantity into `F_lh` and `F_sh`.
+This is helpful because some component models store the two fluxes separately,
+and those that use the combined quantity can easily be updated with the sum.
+
 #### Rename bucket-specific options. PR[#1306](https://github.com/CliMA/ClimaCoupler.jl/pull/1306)
 `land_albedo_type` is now `bucket_albedo_type`, and `land_initial_condition` is now `bucket_initial_condition`.
 

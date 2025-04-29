@@ -38,7 +38,7 @@ units, any comments, and the function to compute it. This is then used to create
 Once we have created a `ScheduledDiagnostic` for each variable we're interested in,
 we collect them in a vector and pass this to our `DiagnosticsHandler` object.
 
-An example of this process for the variable `F_turb_energy` can be found in
+An example of this process for the combined turbulent energy flux, `F_turb_energy`, can be found in
 `experiments/ClimaEarth/user_io/coupler_diagnostics.jl`.
 
 For more information about this process, please see the

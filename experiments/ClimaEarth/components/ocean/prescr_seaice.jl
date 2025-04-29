@@ -198,8 +198,8 @@ function Interfacer.add_coupler_fields!(coupler_field_names, ::PrescribedIceSimu
 end
 
 function FluxCalculator.update_turbulent_fluxes!(sim::PrescribedIceSimulation, fields::NamedTuple)
-    (; F_turb_energy) = fields
-    @. sim.integrator.p.F_turb_energy = F_turb_energy
+    (; F_lh, F_sh) = fields
+    @. sim.integrator.p.F_turb_energy = F_lh + F_sh
 end
 
 """

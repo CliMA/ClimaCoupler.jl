@@ -36,11 +36,11 @@ Interfacer.get_field(sim::TestAtmos, ::Val{:thermo_state_int}) =
     TD.PhaseEquil_ρTq.(get_thermo_params(sim), sim.integrator.ρ, sim.integrator.T, sim.integrator.q)
 
 function FieldExchanger.update_sim!(sim::TestAtmos, fields, _)
-    (; F_turb_ρτxz, F_turb_energy, F_turb_moisture) = fields
+    (; F_turb_ρτxz, F_lh, F_sh, F_turb_moisture) = fields
     ρ_int = sim.integrator.ρ
-    @. sim.integrator.p.energy_bc = -(F_turb_energy)
-    @. sim.integrator.p.ρq_tot_bc = -F_turb_moisture
-    @. sim.integrator.p.uₕ_bc = -(F_turb_ρτxz / ρ_int) # x-compoennt only for this test
+    @. sim.integrator.p.energy_bc = F_lh + F_sh
+    @. sim.integrator.p.ρq_tot_bc = F_turb_moisture
+    @. sim.integrator.p.uₕ_bc = F_turb_ρτxz / ρ_int # x-component only for this test
 end
 
 function get_thermo_params(sim::TestAtmos)
@@ -82,8 +82,8 @@ function FluxCalculator.surface_thermo_state(sim::TestOcean, thermo_params::Ther
 end
 
 function FluxCalculator.update_turbulent_fluxes!(sim::TestOcean, fields::NamedTuple)
-    (; F_turb_energy) = fields
-    @. sim.integrator.p.F_aero = F_turb_energy
+    (; F_lh, F_sh) = fields
+    @. sim.integrator.p.F_aero = F_lh + F_sh
 end
 
 # simple surface sim object and extensions
@@ -172,7 +172,8 @@ for FT in (Float32, Float64)
             :P_liq,
             :P_snow,
             :P_net,
-            :F_turb_energy,
+            :F_lh,
+            :F_sh,
             :F_turb_ρτxz,
             :F_turb_ρτyz,
             :F_turb_moisture,

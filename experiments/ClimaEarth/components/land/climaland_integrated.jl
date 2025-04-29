@@ -421,7 +421,7 @@ end
 function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:sw_d}, field)
     parent(sim.integrator.p.drivers.SW_d) .= parent(field)
 end
-function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:cos_zenith_angle}, field)
+function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:cos_zenith}, field)
     parent(sim.integrator.p.drivers.cosθs) .= parent(field)
 end
 
@@ -433,7 +433,7 @@ function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, area_fraction
     Interfacer.update_field!(sim, Val(:diffuse_fraction), csf.diffuse_fraction)
     Interfacer.update_field!(sim, Val(:sw_d), csf.SW_d)
     Interfacer.update_field!(sim, Val(:lw_d), csf.LW_d)
-    Interfacer.update_field!(sim, Val(:cos_zenith_angle), csf.cos_zenith_angle)
+    Interfacer.update_field!(sim, Val(:cos_zenith), csf.cos_zenith)
 
     # update fields for canopy conductance and photosynthesis
     Interfacer.update_field!(sim, Val(:c_co2), csf.c_co2)
@@ -450,7 +450,7 @@ function FieldExchanger.import_atmos_fields!(csf, sim::ClimaLandSimulation, atmo
     FieldExchanger.dummmy_remap!(csf.diffuse_fraction, Interfacer.get_field(atmos_sim, Val(:diffuse_fraction)))
     FieldExchanger.dummmy_remap!(csf.SW_d, Interfacer.get_field(atmos_sim, Val(:SW_d)))
     FieldExchanger.dummmy_remap!(csf.LW_d, Interfacer.get_field(atmos_sim, Val(:LW_d)))
-    FieldExchanger.dummmy_remap!(csf.cos_zenith_angle, Interfacer.get_field(atmos_sim, Val(:cos_zenith)))
+    FieldExchanger.dummmy_remap!(csf.cos_zenith, Interfacer.get_field(atmos_sim, Val(:cos_zenith)))
     FieldExchanger.dummmy_remap!(csf.P_air, Interfacer.get_field(atmos_sim, Val(:air_pressure)))
     FieldExchanger.dummmy_remap!(csf.T_air, Interfacer.get_field(atmos_sim, Val(:air_temperature)))
     FieldExchanger.dummmy_remap!(csf.q_air, Interfacer.get_field(atmos_sim, Val(:specific_humidity)))
@@ -466,7 +466,7 @@ Extend Interfacer.add_coupler_fields! to add the fields required for ClimaLandSi
 The fields added are:
 - `:SW_d` (for radiative transfer)
 - `:LW_d` (for radiative transfer)
-- `:cos_zenith_angle` (for radiative transfer)
+- `:cos_zenith` (for radiative transfer)
 - `:diffuse_fraction` (for radiative transfer)
 - `:c_co2` (for photosynthesis, biogeochemistry)
 - `:P_air` (for canopy conductance)
@@ -477,7 +477,7 @@ The fields added are:
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaLandSimulation)
     land_coupler_fields =
-        [:SW_d, :LW_d, :cos_zenith_angle, :diffuse_fraction, :c_co2, :P_air, :T_air, :q_air, :P_liq, :P_snow]
+        [:SW_d, :LW_d, :cos_zenith, :diffuse_fraction, :c_co2, :P_air, :T_air, :q_air, :P_liq, :P_snow]
     push!(coupler_field_names, land_coupler_fields...)
 end
 

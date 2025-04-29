@@ -18,7 +18,6 @@ struct SlabOceanSimulation{P, I} <: Interfacer.OceanModelSimulation
     params::P
     integrator::I
 end
-Interfacer.name(::SlabOceanSimulation) = "SlabOceanSimulation"
 
 # ocean parameters
 Base.@kwdef struct OceanSlabParameters{FT <: AbstractFloat}

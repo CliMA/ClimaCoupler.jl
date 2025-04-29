@@ -70,14 +70,6 @@ update_field!(::AbstractSurfaceStub, ::Val{:snow_precipitation}, field) = nothin
 update_field!(::AbstractSurfaceStub, ::Val{:turbulent_energy_flux}, field) = nothing
 update_field!(::AbstractSurfaceStub, ::Val{:turbulent_moisture_flux}, field) = nothing
 
-"""
-    name(::ComponentModelSimulation)
-
-Returns simulation name, if defined, or `Unnamed` if not.
-"""
-name(::AbstractSurfaceStub) = "SurfaceStub"
-
-
 ## Extensions of FieldExchanger.jl functions
 
 """

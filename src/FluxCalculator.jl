@@ -26,7 +26,7 @@ export calculate_surface_air_density,
 Extension for this  to to calculate surface density.
 """
 function calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_sfc::CC.Fields.Field)
-    error("this function is required to be dispatched on" * Interfacer.name(atmos_sim) * ", but no method defined")
+    error("this function is required to be dispatched on $(nameof(atmos_sim)), but no method defined")
 end
 
 """
@@ -211,9 +211,7 @@ here retaining the dependency until we know how EDMF boundary conditions will
 be handled (for consistency of parameters).
 """
 function get_surface_params(atmos_sim::Interfacer.AtmosModelSimulation)
-    return error(
-        "get_surface_params is required to be dispatched on" * Interfacer.name(atmos_sim) * ", but no method defined",
-    )
+    return error("get_surface_params is required to be dispatched on $(nameof(atmos_sim)), but no method defined")
 end
 
 """
@@ -222,9 +220,7 @@ end
 Updates the fluxes in the surface model simulation `sim` with the fluxes in `fields`.
 """
 function update_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, fields::NamedTuple)
-    return error(
-        "update_turbulent_fluxes! is required to be dispatched on" * Interfacer.name(sim) * ", but no method defined",
-    )
+    return error("update_turbulent_fluxes! is required to be dispatched on $(nameof(sim)), but no method defined")
 end
 
 update_turbulent_fluxes!(sim::Interfacer.AbstractSurfaceStub, fields::NamedTuple) = nothing
@@ -253,7 +249,7 @@ end
 Placeholder for the water albedo calculation from the atmosphere. It returns an error if not extended.
 """
 function water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulation, ::CC.Fields.Field, ::CC.Fields.Field)
-    error("this function is required to be dispatched on" * Interfacer.name(atmos_sim) * ", but no method defined")
+    error("this function is required to be dispatched on $(nameof(atmos_sim)), but no method defined")
 end
 
 """

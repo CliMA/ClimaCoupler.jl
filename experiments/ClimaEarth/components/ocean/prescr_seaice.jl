@@ -31,7 +31,6 @@ struct PrescribedIceSimulation{P, I} <: Interfacer.SeaIceModelSimulation
     params::P
     integrator::I
 end
-Interfacer.name(::PrescribedIceSimulation) = "PrescribedIceSimulation"
 
 # sea-ice parameters
 Base.@kwdef struct IceSlabParameters{FT <: AbstractFloat}
@@ -45,8 +44,6 @@ Base.@kwdef struct IceSlabParameters{FT <: AbstractFloat}
     k_ice::FT = 2           # thermal conductivity of sea ice [W / m / K] (less in HM71)
     α::FT = 0.65            # albedo of sea ice, roughly tuned to match observations
 end
-
-Interfacer.name(::IceSlabParameters) = "IceSlabParameters"
 
 # init simulation
 function slab_ice_space_init(::Type{FT}, space, params) where {FT}

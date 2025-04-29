@@ -12,18 +12,15 @@ FT = Float64
 struct ClimaAtmosSimulation{C} <: Interfacer.AtmosModelSimulation
     cache::C
 end
-Interfacer.name(sim::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:atmos_field}) = sim.cache.atmos_field
 
 struct BucketSimulation{C} <: Interfacer.SurfaceModelSimulation
     cache::C
 end
-Interfacer.name(sim::BucketSimulation) = "BucketSimulation"
 
 struct ClimaLandSimulation{C} <: Interfacer.SurfaceModelSimulation
     cache::C
 end
-Interfacer.name(sim::ClimaLandSimulation) = "ClimaLandSimulation"
 
 include("../user_io/debug_plots.jl")
 

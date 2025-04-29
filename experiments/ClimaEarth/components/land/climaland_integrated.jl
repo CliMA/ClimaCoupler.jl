@@ -500,8 +500,6 @@ function Checkpointer.restore_cache!(sim::ClimaLandSimulation, new_cache)
     )
 end
 
-Interfacer.name(::ClimaLandSimulation) = "ClimaLandSimulation"
-
 ## Extend functions for land-specific flux calculation
 """
     compute_surface_fluxes!(csf, sim::ClimaLandSimulation, atmos_sim, boundary_space, thermo_params, surface_scheme)

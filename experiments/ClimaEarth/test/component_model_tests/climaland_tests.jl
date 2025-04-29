@@ -29,7 +29,7 @@ FT = Float32
     Interfacer.step!(land_sim, dt)
 
     # Check that the simulation object is correctly initialized
-    @test Interfacer.name(land_sim) == "ClimaLandSimulation"
+    @test nameof(land_sim) == "ClimaLandSimulation"
     @test land_sim.area_fraction == area_fraction
 
     # Check that the state is correctly initialized

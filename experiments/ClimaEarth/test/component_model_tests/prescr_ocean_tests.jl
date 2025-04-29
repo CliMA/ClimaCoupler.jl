@@ -11,7 +11,7 @@ FT = Float32
 
 @testset "PrescribedOceanSimulation name" begin
     sim = PrescribedOceanSimulation((;))
-    @test Interfacer.name(sim) == "PrescribedOceanSimulation"
+    @test nameof(sim) == "PrescribedOceanSimulation"
 end
 
 @testset "PrescribedOceanSimulation constructor" begin

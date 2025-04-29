@@ -37,13 +37,13 @@ function plot_global_conservation(
     # evolution of energy of each component relative to initial value
     total = ccs.total  # total
 
-    var_name = Interfacer.name(cc)
+    var_name = nameof(cc)
     cum_total = [0.0]
     f = Makie.Figure()
     ax = Makie.Axis(f[1, 1], xlabel = "time [days]", ylabel = "$var_name: (t) - (t=0)")
     Makie.lines!(ax, days, total .- total[1], label = "total"; linewidth = 3)
     for sim in model_sims
-        sim_name = Interfacer.name(sim)
+        sim_name = nameof(sim)
         global_field = getproperty(ccs, Symbol(sim_name))
         diff_global_field = (global_field .- global_field[1])
         Makie.lines!(ax, days, diff_global_field[1:length(days)], label = sim_name)
@@ -204,7 +204,7 @@ function debug(sim::Interfacer.ComponentModelSimulation, dir)
             end
         end
     end
-    Makie.save(joinpath(dir, "debug_$(Interfacer.name(sim)).png"), fig)
+    Makie.save(joinpath(dir, "debug_$(nameof(sim)).png"), fig)
 end
 
 """

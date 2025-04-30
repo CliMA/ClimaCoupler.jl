@@ -63,10 +63,11 @@ function ClimaLandSimulation(
     start_date::Dates.DateTime,
     output_dir::String,
     area_fraction,
-    nelements::Tuple{Int, Int} = (101, 10),
+    nelements::Tuple{Int, Int} = (101, 15),
     depth::FT = FT(50),
     dz_tuple::Tuple{FT, FT} = FT.((10.0, 0.05)),
     shared_surface_space = nothing,
+    land_spun_up_ic::Bool = true,
     saveat::Vector{TT} = [tspan[1], tspan[2]],
     surface_elevation = nothing,
     land_temperature_anomaly::String = "amip",
@@ -171,19 +172,34 @@ function ClimaLandSimulation(
     orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, subsurface_space)
     orog_adjusted_T_surface = CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
 
-    # Set initial conditions for the state
-    θ_r, ν, ρc_ds = soil_params.θ_r, soil_params.ν, soil_params.ρc_ds
-    @. Y.soil.ϑ_l = θ_r + (ν - θ_r) / 2
-    Y.soil.θ_i .= FT(0.0)
-    ρc_s = CL.Soil.volumetric_heat_capacity.(Y.soil.ϑ_l, Y.soil.θ_i, ρc_ds, earth_param_set)
-    Y.soil.ρe_int .= CL.Soil.volumetric_internal_energy.(Y.soil.θ_i, ρc_s, orog_adjusted_T, earth_param_set)
+    # Set initial conditions that aren't read in from file
     Y.soilco2.C .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
     Y.canopy.hydraulics.ϑ_l.:1 .= canopy_component_args.hydraulics.parameters.ν
     @. Y.canopy.energy.T = orog_adjusted_T_surface
 
-    Y.snow.S .= FT(0)
-    Y.snow.S_l .= FT(0)
-    Y.snow.U .= FT(0)
+    # Read in initial conditions for snow and soil from file, if requested
+    θ_r, ν, ρc_ds = soil_params.θ_r, soil_params.ν, soil_params.ρc_ds
+    if land_spun_up_ic
+        # Set snow T first to use in computing snow internal energy
+        @. p.snow.T = orog_adjusted_T_surface
+
+        # Read in initial conditions for snow and soil
+        ic_path = CL.Artifacts.soil_ic_2008_50m_path()
+        CL.Simulations.set_snow_initial_conditions!(Y, p, surface_space, ic_path, model.snow.parameters)
+
+        T_bounds = extrema(Y.canopy.energy.T)
+        CL.Simulations.set_soil_initial_conditions!(Y, ν, θ_r, subsurface_space, ic_path, model.soil, T_bounds)
+    else
+        # Set initial conditions for the state
+        @. Y.soil.ϑ_l = θ_r + (ν - θ_r) / 2
+        Y.soil.θ_i .= FT(0.0)
+        ρc_s = CL.Soil.volumetric_heat_capacity.(Y.soil.ϑ_l, Y.soil.θ_i, ρc_ds, earth_param_set)
+        Y.soil.ρe_int .= CL.Soil.volumetric_internal_energy.(Y.soil.θ_i, ρc_s, orog_adjusted_T, earth_param_set)
+
+        Y.snow.S .= FT(0)
+        Y.snow.S_l .= FT(0)
+        Y.snow.U .= FT(0)
+    end
 
     # Initialize the surface temperature so the atmosphere can compute radiation.
     # This cache variable is normally computed using `p.drivers.LW_d`, which is

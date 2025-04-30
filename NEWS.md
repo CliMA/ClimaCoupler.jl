@@ -6,6 +6,13 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Add option for integrated land spun up IC. PR[#1318](https://github.com/CliMA/ClimaCoupler.jl/pull/1318)
+
+Adds a boolean flag `land_spun_up_ic` that allows the user to request reading integrated land
+initial conditions from a saved simulation, rather than setting them with default values.
+If this option is true, the land/sea mask must be used, since the spun-up ICs are only defined
+over land (i.e. this cannot be used in the `slabplanet_terra` mode). The default is true.
+
 #### Use EN4 dataset for ocean initial conditions and forcing PR[#1425](https://github.com/CliMA/ClimaCoupler.jl/pull/1425)
 
 Use EN4 instead of ECCO for ocean initial conditions and forcing, to avoid

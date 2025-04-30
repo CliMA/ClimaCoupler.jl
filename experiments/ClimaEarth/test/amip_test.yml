@@ -10,6 +10,7 @@ h_elem: 8
 checkpoint_dt: "720hours"
 bucket_albedo_type: "map_temporal"
 land_model: "integrated"
+land_spun_up_ic: false
 mode_name: "amip"
 netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true

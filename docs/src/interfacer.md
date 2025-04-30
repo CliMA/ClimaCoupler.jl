@@ -38,10 +38,6 @@ and perform all initialization. This function should return a simulation that
 is ready to be stepped in the coupled simulation. The interface for this
 function varies across component models.
 
-- `name(::ComponentModelSimulation)`: return a string containing the name of
-this `ComponentModelSimulation`, which is used for printing information about
-component models and writing to checkpoint files.
-
 - `step!(::ComponentModelSimulation, t)`: A function to update the
 simulation in-place with values calculate for time `t`. For the
 models we currently have implemented, this is a simple wrapper around
@@ -294,7 +290,6 @@ end
     ClimaCoupler.Interfacer.AbstractSurfaceStub
     ClimaCoupler.Interfacer.SurfaceStub
     ClimaCoupler.Interfacer.float_type
-    ClimaCoupler.Interfacer.name
     ClimaCoupler.Interfacer.get_field
     ClimaCoupler.Interfacer.update_field!
     ClimaCoupler.Interfacer.AbstractSlabplanetSimulationMode

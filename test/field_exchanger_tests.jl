@@ -6,7 +6,8 @@ import ClimaCoupler: Interfacer, FieldExchanger, FluxCalculator
 struct DummySimulation{C} <: Interfacer.AtmosModelSimulation
     cache::C
 end
-Interfacer.name(::DummySimulation) = "DummySimulation"
+Interfacer.get_field(sim::DummySimulation, ::Val{:turbulent_energy_flux}) = sim.cache.turbulent_energy_flux
+Interfacer.get_field(sim::DummySimulation, ::Val{:turbulent_moisture_flux}) = sim.cache.turbulent_moisture_flux
 Interfacer.get_field(sim::DummySimulation, ::Val{:radiative_energy_flux_sfc}) = sim.cache.radiative_energy_flux_sfc
 Interfacer.get_field(sim::DummySimulation, ::Val{:liquid_precipitation}) = sim.cache.liquid_precipitation
 Interfacer.get_field(sim::DummySimulation, ::Val{:snow_precipitation}) = sim.cache.snow_precipitation
@@ -21,11 +22,9 @@ end
 struct TestSurfaceSimulation1{C} <: Interfacer.SurfaceModelSimulation
     cache_field::C
 end
-Interfacer.name(::TestSurfaceSimulation1) = "TestSurfaceSimulation1"
 struct TestSurfaceSimulation2{C} <: Interfacer.SurfaceModelSimulation
     cache_field::C
 end
-Interfacer.name(::TestSurfaceSimulation2) = "TestSurfaceSimulation2"
 
 Interfacer.get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:surface_temperature}) =
     sim.cache_field
@@ -78,7 +77,6 @@ end
 struct TestAtmosSimulation{C} <: Interfacer.AtmosModelSimulation
     cache::C
 end
-Interfacer.name(::TestAtmosSimulation) = "TestAtmosSimulation"
 function Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:surface_direct_albedo}, field)
     parent(sim.cache.albedo_direct) .= parent(field)
 end
@@ -97,7 +95,6 @@ Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:turbulent_fluxes}, fie
 struct TestSurfaceSimulationLand{C} <: Interfacer.SurfaceModelSimulation
     cache::C
 end
-Interfacer.name(::TestSurfaceSimulationLand) = "TestSurfaceSimulationLand"
 function Interfacer.get_field(sim::TestSurfaceSimulationLand, ::Val{:area_fraction})
     FT = CC.Spaces.undertype(axes(sim.cache.turbulent_energy_flux))
     return FT(0.5)

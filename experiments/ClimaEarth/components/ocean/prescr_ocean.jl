@@ -28,7 +28,6 @@ The cache is expected to contain the following variables:
 struct PrescribedOceanSimulation{C} <: Interfacer.AbstractSurfaceStub
     cache::C
 end
-Interfacer.name(::PrescribedOceanSimulation) = "PrescribedOceanSimulation"
 
 """
     PrescribedOceanSimulation(

@@ -24,9 +24,7 @@ struct TestAtmos{P, D, I} <: Interfacer.AtmosModelSimulation
     domain::D
     integrator::I
 end
-Interfacer.name(sim::TestAtmos) = "TestAtmos"
 struct TestAtmos2 <: Interfacer.AtmosModelSimulation end
-Interfacer.name(sim::TestAtmos2) = "TestAtmos2"
 
 Interfacer.get_field(sim::TestAtmos, ::Val{:height_int}) = sim.integrator.p.z
 Interfacer.get_field(sim::TestAtmos, ::Val{:height_sfc}) = sim.integrator.p.z_sfc
@@ -61,7 +59,6 @@ struct TestOcean{M, I} <: Interfacer.SurfaceModelSimulation
     model::M
     integrator::I
 end
-Interfacer.name(sim::TestOcean) = "TestOcean"
 
 Interfacer.get_field(sim::TestOcean, ::Val{:surface_temperature}) = sim.integrator.T
 Interfacer.get_field(sim::TestOcean, ::Val{:air_humidity}) = sim.integrator.p.q
@@ -91,7 +88,6 @@ struct DummySurfaceSimulation3{M, I} <: Interfacer.SurfaceModelSimulation
     model::M
     integrator::I
 end
-Interfacer.name(sim::DummySurfaceSimulation3) = "DummySurfaceSimulation3"
 
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:surface_temperature}) = sim.integrator.T
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
@@ -216,16 +212,14 @@ for FT in (Float32, Float64)
         @test FluxCalculator.get_surface_params(TestAtmos((; FT = FT), [], [])) == sf_params
         sim = DummySimulation([], [])
         @test_throws ErrorException(
-            "get_surface_params is required to be dispatched on" * Interfacer.name(sim) * ", but no method defined",
+            "get_surface_params is required to be dispatched on $(nameof(sim)), but no method defined",
         ) FluxCalculator.get_surface_params(DummySimulation([], []))
     end
 
     @testset "update_turbulent_fluxes! for FT=$FT" begin
         sim = DummySurfaceSimulation3([], [])
         @test_throws ErrorException(
-            "update_turbulent_fluxes! is required to be dispatched on" *
-            Interfacer.name(sim) *
-            ", but no method defined",
+            "update_turbulent_fluxes! is required to be dispatched on $(nameof(sim)), but no method defined",
         ) FluxCalculator.update_turbulent_fluxes!(sim, (;)) == ErrorException
     end
 
@@ -267,7 +261,7 @@ for FT in (Float32, Float64)
 
         atmos_sim2 = TestAtmos2()
         @test_throws ErrorException(
-            "this function is required to be dispatched on" * Interfacer.name(atmos_sim2) * ", but no method defined",
+            "this function is required to be dispatched on $(nameof(atmos_sim2)), but no method defined",
         ) FluxCalculator.water_albedo_from_atmosphere!(atmos_sim2, ones(boundary_space), ones(boundary_space))
     end
 end

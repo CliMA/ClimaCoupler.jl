@@ -32,7 +32,6 @@ struct ClimaAtmosSimulation{P, D, I, OW} <: Interfacer.AtmosModelSimulation
     integrator::I
     output_writers::OW
 end
-Interfacer.name(::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
 
 function hasradiation(integrator)
     return !isnothing(integrator.p.atmos.radiation_mode)

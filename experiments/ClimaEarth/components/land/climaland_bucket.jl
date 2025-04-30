@@ -40,7 +40,6 @@ struct BucketSimulation{
     area_fraction::A
     output_writer::OW
 end
-Interfacer.name(::BucketSimulation) = "BucketSimulation"
 
 """
     get_new_cache(p, Y, energy_check)

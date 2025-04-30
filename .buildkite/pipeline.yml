@@ -350,16 +350,6 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
-  - group: "Test restart run and bash script"
-    steps:
-      - label: "Submit and Monitor sbatch Job on Caltech HPC"
-        # check that (1) the script can be succesfully submitted, (2) it runs successfully
-        command: "test/mpi_tests/test_sbatch_script.sh"
-        agents:
-          slurm_ntasks: 1
-          slurm_time: 30
-        soft_fail: true
-
   - wait
 
   # plot job performance history

@@ -6,6 +6,13 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Add option for integrated land spun up IC. PR[#1318](https://github.com/CliMA/ClimaCoupler.jl/pull/1318)
+
+Adds a boolean flag `land_spun_up_ic` that allows the user to request reading
+integrated land initial conditions from a saved simulation, rather than setting
+them with default values. If this option is true, the land/sea mask must be used,
+since the spun-up ICs are only defined over land.
+
 #### Remove intermediate checkpoints PR[#1397](https://github.com/CliMA/ClimaCoupler.jl/pull/1397)
 
 Throughout the simulation, the previous checkpoint is now deleted whenever a new

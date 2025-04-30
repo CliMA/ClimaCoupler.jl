@@ -71,9 +71,18 @@ Interfacer.get_field(sim::TestOcean, ::Val{:drag_coefficient}) = sim.integrator.
 Interfacer.get_field(sim::TestOcean, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) =
     sim.integrator.p.α
 
-function FluxCalculator.surface_thermo_state(sim::TestOcean, thermo_params::ThermodynamicsParameters, thermo_state_int)
+function FluxCalculator.surface_thermo_state(
+    sim::TestOcean,
+    thermo_params::ThermodynamicsParameters,
+    atmos_sim::Interfacer.AtmosModelSimulation,
+)
     T_sfc = Interfacer.get_field(sim, Val(:surface_temperature))
-    ρ_sfc = thermo_state_int.ρ # arbitrary
+    ρ_sfc =
+        FluxCalculator.extrapolate_ρ_to_sfc.(
+            thermo_params,
+            Interfacer.get_field(atmos_sim, Val(:thermo_state_int)),
+            T_sfc,
+        )
     q_sfc = Interfacer.get_field(sim, Val(:air_humidity)) # read from cache
     @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
 end
@@ -98,7 +107,7 @@ Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:beta}) = sim.integrato
 function FluxCalculator.surface_thermo_state(
     sim::DummySurfaceSimulation3,
     thermo_params::ThermodynamicsParameters,
-    thermo_state_int,
+    atmos_sim::Interfacer.AtmosModelSimulation,
 )
     T_sfc = Interfacer.get_field(sim, Val(:surface_temperature))
     FT = eltype(T_sfc)
@@ -194,10 +203,8 @@ for FT in (Float32, Float64)
         windspeed = @. hypot(atmos_sim.integrator.p.u, atmos_sim.integrator.p.v)
 
         thermo_params = get_thermo_params(atmos_sim)
-        thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
 
-        surface_thermo_states = similar(thermo_state_int)
-        surface_thermo_states .= FluxCalculator.surface_thermo_state(ocean_sim, thermo_params, thermo_state_int)
+        surface_thermo_states = FluxCalculator.surface_thermo_state(ocean_sim, thermo_params, atmos_sim)
 
         # NOTE: This test is very weak! We should add more stringent tests
         @test Array(parent(fields.F_turb_moisture))[1] ≈ FT(0)
@@ -231,7 +238,8 @@ for FT in (Float32, Float64)
         atmos_sim = TestAtmos((; FT = FT), [], (; T = _ones .* FT(300), ρ = _ones .* FT(1.2), q = _ones .* FT(0.01)))
         thermo_params = get_thermo_params(atmos_sim)
         thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
-        @test FluxCalculator.surface_thermo_state(surface_sim, thermo_params, thermo_state_int).ρ == thermo_state_int.ρ
+        ρ_expected = FluxCalculator.extrapolate_ρ_to_sfc.(thermo_params, thermo_state_int, surface_sim.integrator.T)
+        @test FluxCalculator.surface_thermo_state(surface_sim, thermo_params, atmos_sim).ρ == ρ_expected
     end
 
     @testset "water_albedo_from_atmosphere!" begin

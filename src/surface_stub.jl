@@ -40,8 +40,6 @@ get_field(sim::AbstractSurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_direct_albedo}) = sim.cache.α_direct
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_diffuse_albedo}) = sim.cache.α_diffuse
-get_field(sim::AbstractSurfaceStub, ::Val{:surface_humidity}) =
-    TD.q_vap_saturation_generic.(sim.cache.thermo_params, sim.cache.T_sfc, sim.cache.ρ_sfc, sim.cache.phase)
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_temperature}) = sim.cache.T_sfc
 
 """

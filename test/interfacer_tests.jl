@@ -79,7 +79,6 @@ for FT in (Float32, Float64)
         @test Interfacer.get_field(stub, Val(:roughness_momentum)) == 4
         @test Interfacer.get_field(stub, Val(:roughness_buoyancy)) == 5
         @test Interfacer.get_field(stub, Val(:beta)) == 6
-        @test ≈(Interfacer.get_field(stub, Val(:surface_humidity))[1], FT(0.0076), atol = FT(1e-4))
     end
 
     @testset "update_field! the SurfaceStub area_fraction for FT=$FT" begin
@@ -132,7 +131,6 @@ end
         :roughness_momentum,
         :surface_direct_albedo,
         :surface_diffuse_albedo,
-        :surface_humidity,
         :surface_temperature,
     )
         val = Val(value)

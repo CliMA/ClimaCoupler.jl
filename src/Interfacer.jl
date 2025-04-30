@@ -214,7 +214,6 @@ get_field(
         Val{:roughness_momentum},
         Val{:surface_direct_albedo},
         Val{:surface_diffuse_albedo},
-        Val{:surface_humidity},
         Val{:surface_temperature},
     },
 ) = get_field_error(sim, val)

@@ -6,6 +6,14 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Simplify initial component model exchange. PR[#1305](https://github.com/CliMA/ClimaCoupler.jl/pull/1305)
+
+Surface humidity is now computed from the atmosphere state and surface temperature,
+rather than sometimes computing it and sometimes retrieving it from a model cache.
+This allows us to simplify the initial component exchange, since we don't need
+to `step!` component models to get them to compute humidity. Without `step!`,
+we can also remove `reinit!`.
+
 #### Turbulent energy flux is split into LHF, SHF. PR[#1309](https://github.com/CliMA/ClimaCoupler.jl/pull/1309)
 Previously, we have exchanged the combined turbulent energy flux `F_turb_energy`;
 This PR splits up the exchanged quantity into `F_lh` and `F_sh`.

@@ -82,6 +82,11 @@ function turbulent_fluxes!(
         compute_surface_fluxes!(csf, sim, atmos_sim, boundary_space, thermo_params)
     end
 
+    # Update the atmosphere with the fluxes across all surface models
+    # The surface models have already been updated with the fluxes in `compute_surface_fluxes!`
+    # TODO this should be `update_turbulent_fluxes` to match the surface models
+    Interfacer.update_field!(atmos_sim, Val(:turbulent_fluxes), csf)
+
     # TODO: add allowable bounds here, check explicitly that all fluxes are equal
     return nothing
 end
@@ -128,7 +133,7 @@ end
 """
     surface_thermo_state(sim::Interfacer.SurfaceModelSimulation,
                          thermo_params::TD.Parameters.ThermodynamicsParameters,
-                         thermo_state_int)
+                         atmos_sim::Interfacer.AtmosModelSimulation)
 
 Return the surface thermo state the surface model simulation `sim`.
 
@@ -139,9 +144,9 @@ default, is computed assuming a liquid phase).
 function surface_thermo_state(
     sim::Interfacer.SurfaceModelSimulation,
     thermo_params::TD.Parameters.ThermodynamicsParameters,
-    thermo_state_int,
+    atmos_sim::Interfacer.AtmosModelSimulation,
 )
-    FT = eltype(parent(thermo_state_int))
+    FT = eltype(atmos_sim.integrator.u)
 
     T_sfc = Interfacer.get_field(sim, Val(:surface_temperature))
     # Note that the surface air density, ρ_sfc, is computed using the atmospheric state at the first level and making ideal gas
@@ -149,7 +154,12 @@ function surface_thermo_state(
     # a reasonable stand-in.
     #
     # NOTE: This allocates! Fix me!
-    ρ_sfc = FluxCalculator.extrapolate_ρ_to_sfc.(thermo_params, thermo_state_int, T_sfc) # ideally the # calculate elsewhere, here just getter...
+    ρ_sfc =
+        FluxCalculator.extrapolate_ρ_to_sfc.(
+            thermo_params,
+            Interfacer.get_field(atmos_sim, Val(:thermo_state_int)),
+            T_sfc,
+        ) # ideally the # calculate elsewhere, here just getter...
 
     # For SurfaceStabs, this is just liquid phase
     q_sfc = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid()) # default: saturated liquid surface
@@ -301,7 +311,7 @@ function compute_surface_fluxes!(
     # get area fraction (min = 0, max = 1)
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
-    thermo_state_sfc = FluxCalculator.surface_thermo_state(sim, thermo_params, thermo_state_int)
+    thermo_state_sfc = FluxCalculator.surface_thermo_state(sim, thermo_params, atmos_sim)
 
     surface_params = FluxCalculator.get_surface_params(atmos_sim)
 

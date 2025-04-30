@@ -61,6 +61,7 @@ function ClimaLandSimulation(
     output_dir::String,
     boundary_space,
     area_fraction,
+    land_spun_up_ic::Bool = true,
     saveat::Vector{TT} = [tspan[1], tspan[2]],
     surface_elevation = CC.Fields.zeros(boundary_space),
     land_temperature_anomaly::String = "amip",
@@ -143,20 +144,30 @@ function ClimaLandSimulation(
     orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, subsurface_space)
     orog_adjusted_T_surface = CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
 
-    # Set initial conditions for the state
-    @. Y.soil.ϑ_l = θ_r + (ν - θ_r) / 2
-    Y.soil.θ_i .= FT(0.0)
-    ρc_s = CL.Soil.volumetric_heat_capacity.(Y.soil.ϑ_l, Y.soil.θ_i, soil_args.parameters.ρc_ds, earth_param_set)
-    Y.soil.ρe_int .= CL.Soil.volumetric_internal_energy.(Y.soil.θ_i, ρc_s, orog_adjusted_T, earth_param_set)
+    # Set initial conditions that aren't read in from file
     Y.soilco2.C .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
     Y.canopy.hydraulics.ϑ_l.:1 .= canopy_component_args.hydraulics.parameters.ν
     @. Y.canopy.energy.T = orog_adjusted_T_surface
 
-    Y.snow.S .= FT(0)
-    Y.snow.S_l .= FT(0)
-    Y.snow.U .= FT(0)
+    # Read in initial conditions for snow and soil from file, if requested
+    if land_spun_up_ic
+        ic_path = ClimaLand.Artifacts.soil_ic_2008_50m_path()
+        ClimaLand.set_snow_initial_conditions!(Y, p, surface_space, ic_path, model.snow.parameters)
 
-    set_initial_cache! = CL.make_set_initial_cache(model)
+        T_bounds = extrema(Y.canopy.energy.T)
+        ClimaLand.set_soil_initial_conditions!(Y, ν, θ_r, subsurface_space, ic_path, model.soil, T_bounds)
+    else
+        # Set initial conditions for the state
+        @. Y.soil.ϑ_l = θ_r + (ν - θ_r) / 2
+        Y.soil.θ_i .= FT(0.0)
+        ρc_s = CL.Soil.volumetric_heat_capacity.(Y.soil.ϑ_l, Y.soil.θ_i, soil_args.parameters.ρc_ds, earth_param_set)
+        Y.soil.ρe_int .= CL.Soil.volumetric_internal_energy.(Y.soil.θ_i, ρc_s, orog_adjusted_T, earth_param_set)
+
+        Y.snow.S .= FT(0)
+        Y.snow.S_l .= FT(0)
+        Y.snow.U .= FT(0)
+    end
+
     exp_tendency! = CL.make_exp_tendency(model)
     imp_tendency! = CL.make_imp_tendency(model)
     jacobian! = CL.make_jacobian(model)
@@ -559,6 +570,7 @@ function FluxCalculator.compute_surface_fluxes!(
     soil_dest = p.soil.turbulent_fluxes
     ClimaLand.coupler_compute_turbulent_fluxes!(soil_dest, coupled_atmos, model.soil, Y, p, t)
 
+    # TODO computed snow temp is 0 here
     snow_dest = p.snow.turbulent_fluxes
     ClimaLand.coupler_compute_turbulent_fluxes!(snow_dest, coupled_atmos, model.snow, Y, p, t)
 

@@ -234,6 +234,18 @@ get_field(sim::SurfaceModelSimulation, ::Val{:beta}) = convert(eltype(sim.integr
 get_field(sim::SurfaceModelSimulation, ::Val{:emissivity}) = convert(eltype(sim.integrator.u), 1.0)
 get_field(sim::SurfaceModelSimulation, ::Val{:height_disp}) = convert(eltype(sim.integrator.u), 0.0)
 
+
+"""
+    get_field(sim, what, boundary_space)
+
+Return `what` in `sim` remapped onto the `boundary_space`
+
+This is equivalent to calling `get_field`, and then `remap`.
+"""
+function get_field(sim, what, boundary_space)
+    return remap(get_field(sim, what), boundary_space)
+end
+
 """
     update_field!(::AtmosModelSimulation, ::Val, _...)
 
@@ -376,5 +388,39 @@ and only once surface model, a ClimaLand.jl bucket land model, which is evaluate
 entire surface. There are no ocean or sea ice models.
 """
 abstract type SlabplanetTerraMode <: AbstractSlabplanetSimulationMode end
+
+"""
+    remap(field, target_space)
+
+Remap the given `field` onto the `target_space`.
+
+Non-ClimaCore fields should provide a method to this function.
+
+TODO: Add in-place option to make this non-allocating.
+"""
+function remap end
+
+function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
+    space = axes(field)
+    space_are_compatible =
+        space == target_space || CC.Spaces.issubspace(space, target_space) || CC.Spaces.issubspace(target_space, space)
+    space_are_compatible || error("Space is inconsistent")
+
+    # TODO: Handle remapping of Vectors correctly
+    if hasproperty(field, :components)
+        @assert length(field.components) == 1 "Can only work with simple vectors"
+        field = field.components.data.:1
+    end
+    return field
+end
+
+function remap(num::Number, target_space::CC.Spaces.AbstractSpace)
+    return num
+end
+
+# Used in tests
+function remap(field, ::Nothing)
+    return field
+end
 
 end # module

@@ -14,6 +14,14 @@ This allows us to simplify the initial component exchange, since we don't need
 to `step!` component models to get them to compute humidity. Without `step!`,
 we can also remove `reinit!`.
 
+#### Add `get_field` with `remap`. PR[#1314](https://github.com/CliMA/ClimaCoupler.jl/pull/1314)
+
+PR [#1314](https://github.com/CliMA/ClimaCoupler.jl/pull/1314) introduces a new
+method for `get_field`: `get_field(sim, Val(), target_space)`. This new method
+automatically remaps onto `target_space`. Currently, only trivial remapping is
+supported (ie, the same behavior as `dummmy_remap`).
+
+
 #### Turbulent energy flux is split into LHF, SHF. PR[#1309](https://github.com/CliMA/ClimaCoupler.jl/pull/1309)
 Previously, we have exchanged the combined turbulent energy flux `F_turb_energy`;
 This PR splits up the exchanged quantity into `F_lh` and `F_sh`.

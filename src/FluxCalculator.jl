@@ -301,23 +301,23 @@ function compute_surface_fluxes!(
     thermo_params,
 )
     # `_int` refers to atmos state of center level 1
-    z_int = Interfacer.get_field(atmos_sim, Val(:height_int))
-    u_int = Interfacer.get_field(atmos_sim, Val(:u_int))
-    v_int = Interfacer.get_field(atmos_sim, Val(:v_int))
+    z_int = Interfacer.get_field(atmos_sim, Val(:height_int), boundary_space)
+    u_int = Interfacer.get_field(atmos_sim, Val(:u_int), boundary_space)
+    v_int = Interfacer.get_field(atmos_sim, Val(:v_int), boundary_space)
     uₕ_int = @. StaticArrays.SVector(u_int, v_int)
-    thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
-    z_sfc = Interfacer.get_field(atmos_sim, Val(:height_sfc))
+    thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int), boundary_space)
+    z_sfc = Interfacer.get_field(atmos_sim, Val(:height_sfc), boundary_space)
 
     # get area fraction (min = 0, max = 1)
-    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
+    area_fraction = Interfacer.get_field(sim, Val(:area_fraction), boundary_space)
 
     thermo_state_sfc = FluxCalculator.surface_thermo_state(sim, thermo_params, atmos_sim)
 
     surface_params = FluxCalculator.get_surface_params(atmos_sim)
 
-    z0m = Interfacer.get_field(sim, Val(:roughness_momentum))
-    z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy))
-    beta = Interfacer.get_field(sim, Val(:beta))
+    z0m = Interfacer.get_field(sim, Val(:roughness_momentum), boundary_space)
+    z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy), boundary_space)
+    beta = Interfacer.get_field(sim, Val(:beta), boundary_space)
     FT = eltype(z0m)
     scheme_properties = (; z0b = z0b, z0m = z0m, Ch = FT(0), Cd = FT(0), beta = beta, gustiness = FT(1))
 
@@ -372,9 +372,9 @@ function compute_surface_fluxes!(
     @. csf.ustar += ustar * area_fraction
     @. csf.buoyancy_flux += buoyancy_flux * area_fraction
 
-    z0m = Interfacer.get_field(sim, Val(:roughness_momentum))
-    z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy))
-    beta = Interfacer.get_field(sim, Val(:beta))
+    z0m = Interfacer.get_field(sim, Val(:roughness_momentum), boundary_space)
+    z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy), boundary_space)
+    beta = Interfacer.get_field(sim, Val(:beta), boundary_space)
 
     @. csf.z0m_sfc += z0m * area_fraction
     @. csf.z0b_sfc += z0b * area_fraction

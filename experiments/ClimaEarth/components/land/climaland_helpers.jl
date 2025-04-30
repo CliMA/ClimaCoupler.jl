@@ -51,7 +51,8 @@ function make_land_domain(
     verttopology = CC.Topologies.IntervalTopology(vertmesh)
     vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(verttopology)
     subsurface_space = CC.Spaces.ExtrudedFiniteDifferenceSpace(atmos_boundary_space, vert_center_space)
-    space = (; surface = atmos_boundary_space, subsurface = subsurface_space)
+    subsurface_face_space = CC.Spaces.face_space(subsurface_space)
+    space = (; surface = atmos_boundary_space, subsurface = subsurface_space, subsurface_face = subsurface_face_space)
 
     fields = ClimaLand.Domains.get_additional_coordinate_field_data(subsurface_space)
 

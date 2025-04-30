@@ -108,15 +108,6 @@ Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:liquid_precipita
 Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:snow_precipitation}, field) = nothing
 
 for FT in (Float32, Float64)
-    @testset "test dummmy_remap!" begin
-        test_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
-        test_field_ones = CC.Fields.ones(test_space)
-        target_field = CC.Fields.zeros(test_space)
-
-        FieldExchanger.dummmy_remap!(target_field, test_field_ones)
-        @test parent(target_field) == parent(test_field_ones)
-    end
-
     @testset "test update_surface_fractions!" begin
         test_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
         # Construct land fraction of 0s in top half, 1s in bottom half

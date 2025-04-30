@@ -69,15 +69,8 @@ end
     model_sims = (; land_sim = land_sim, atmos_sim = atmos_sim)
 
     # Construct a coupler fields object
-    coupler_fluxes = (;
-        :F_turb_ρτxz => CC.Fields.zeros(boundary_space),
-        :F_turb_ρτyz => CC.Fields.zeros(boundary_space),
-        :F_lh => CC.Fields.zeros(boundary_space),
-        :F_sh => CC.Fields.zeros(boundary_space),
-        :F_turb_moisture => CC.Fields.zeros(boundary_space),
-        :temp1 => CC.Fields.zeros(boundary_space),
-        :temp2 => CC.Fields.zeros(boundary_space),
-    )
+    coupler_fluxes_names = [:F_turb_ρτxz, :F_turb_ρτyz, :F_lh, :F_sh, :F_turb_moisture, :temp1, :temp2]
+    coupler_fluxes = Interfacer.init_coupler_fields(FT, coupler_fluxes_names, boundary_space)
 
     # Initialize the coupler fields so we can perform exchange
     coupler_field_names = Interfacer.default_coupler_fields()

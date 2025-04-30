@@ -21,6 +21,7 @@ method for `get_field`: `get_field(sim, Val(), target_space)`. This new method
 automatically remaps onto `target_space`. Currently, only trivial remapping is
 supported (ie, the same behavior as `dummmy_remap`).
 
+Similarly, `get_field!(target_field, sim, Val())` gets the field in-place.
 
 #### Turbulent energy flux is split into LHF, SHF. PR[#1309](https://github.com/CliMA/ClimaCoupler.jl/pull/1309)
 Previously, we have exchanged the combined turbulent energy flux `F_turb_energy`;

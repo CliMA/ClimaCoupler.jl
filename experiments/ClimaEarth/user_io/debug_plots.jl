@@ -182,7 +182,7 @@ function debug(sim::Interfacer.ComponentModelSimulation, dir)
             ax = Makie.Axis(fig[i, j * 2 - 1], title = string(field_name) * print_extrema(field))
             if field isa AbstractArray
                 lin = Makie.lines!(ax, Array(field))
-            else
+            elseif field isa CC.Fields.Field
                 # Copy field onto cpu space if necessary
                 cpu_field = CC.to_cpu(field)
                 if cpu_field isa CC.Fields.ExtrudedCubedSphereSpectralElementField3D
@@ -216,6 +216,12 @@ function print_extrema(field::Union{CC.Fields.Field, Vector, StaticArrays.SVecto
     ext_vals = extrema(field)
     min = Printf.@sprintf("%.2E", ext_vals[1])
     max = Printf.@sprintf("%.2E", ext_vals[2])
+    return " [$min, $max]"
+end
+
+function print_extrema(num::Number)
+    min = Printf.@sprintf("%.2E", num)
+    max = Printf.@sprintf("%.2E", num)
     return " [$min, $max]"
 end
 

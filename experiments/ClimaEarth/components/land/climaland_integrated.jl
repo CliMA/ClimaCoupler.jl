@@ -447,17 +447,18 @@ function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, area_fraction
 end
 
 function FieldExchanger.import_atmos_fields!(csf, sim::ClimaLandSimulation, atmos_sim)
-    FieldExchanger.dummmy_remap!(csf.diffuse_fraction, Interfacer.get_field(atmos_sim, Val(:diffuse_fraction)))
-    FieldExchanger.dummmy_remap!(csf.SW_d, Interfacer.get_field(atmos_sim, Val(:SW_d)))
-    FieldExchanger.dummmy_remap!(csf.LW_d, Interfacer.get_field(atmos_sim, Val(:LW_d)))
-    FieldExchanger.dummmy_remap!(csf.cos_zenith, Interfacer.get_field(atmos_sim, Val(:cos_zenith)))
-    FieldExchanger.dummmy_remap!(csf.P_air, Interfacer.get_field(atmos_sim, Val(:air_pressure)))
-    FieldExchanger.dummmy_remap!(csf.T_air, Interfacer.get_field(atmos_sim, Val(:air_temperature)))
-    FieldExchanger.dummmy_remap!(csf.q_air, Interfacer.get_field(atmos_sim, Val(:specific_humidity)))
-    FieldExchanger.dummmy_remap!(csf.P_liq, Interfacer.get_field(atmos_sim, Val(:liquid_precipitation)))
-    FieldExchanger.dummmy_remap!(csf.P_snow, Interfacer.get_field(atmos_sim, Val(:snow_precipitation)))
+    Interfacer.get_field!(csf.diffuse_fraction, atmos_sim, Val(:diffuse_fraction))
+    Interfacer.get_field!(csf.SW_d, atmos_sim, Val(:SW_d))
+    Interfacer.get_field!(csf.LW_d, atmos_sim, Val(:LW_d))
+    Interfacer.get_field!(csf.cos_zenith, atmos_sim, Val(:cos_zenith))
+    Interfacer.get_field!(csf.P_air, atmos_sim, Val(:air_pressure))
+    Interfacer.get_field!(csf.T_air, atmos_sim, Val(:air_temperature))
+    Interfacer.get_field!(csf.q_air, atmos_sim, Val(:specific_humidity))
+    Interfacer.get_field!(csf.P_liq, atmos_sim, Val(:liquid_precipitation))
+    Interfacer.get_field!(csf.P_snow, atmos_sim, Val(:snow_precipitation))
     # CO2 is a scalar for now so it doesn't need remapping
     csf.c_co2 .= Interfacer.get_field(atmos_sim, Val(:co2))
+    return nothing
 end
 
 """
@@ -527,23 +528,17 @@ function FluxCalculator.compute_surface_fluxes!(
     atmos_sim::Interfacer.AtmosModelSimulation,
     _...,
 )
+    # We should change this to be on the boundary_space
+    land_space = axes(sim.integrator.p.soil.turbulent_fluxes)
     coupled_atmos = sim.model.soil.boundary_conditions.top.atmos
 
     # `_int` refers to atmos state of center level 1
-    z_int = Interfacer.get_field(atmos_sim, Val(:height_int))
-    u_int = Interfacer.get_field(atmos_sim, Val(:u_int))
-    v_int = Interfacer.get_field(atmos_sim, Val(:v_int))
-    thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
+    z_int = Interfacer.get_field!(coupled_atmos.h, atmos_sim, Val(:height_int))
+    u_atmos = Interfacer.get_field(atmos_sim, Val(:u_int), land_space)
+    v_atmos = Interfacer.get_field(atmos_sim, Val(:v_int), land_space)
+    Interfacer.get_field!(coupled_atmos.thermal_state, atmos_sim, Val(:thermo_state_int))
 
-    # remap atmosphere fields to the exchange grid for flux calculation
-    u_atmos = zeros(axes(csf.F_turb_ρτxz))
-    v_atmos = zeros(axes(csf.F_turb_ρτxz))
-    FieldExchanger.dummmy_remap!(u_atmos, u_int)
-    FieldExchanger.dummmy_remap!(v_atmos, v_int)
     @. coupled_atmos.u = StaticArrays.SVector(u_atmos, v_atmos)
-
-    FieldExchanger.dummmy_remap!(coupled_atmos.h, z_int)
-    FieldExchanger.dummmy_remap!(coupled_atmos.thermal_state, thermo_state_int)
 
     # set the same atmosphere state for all sub-components
     @assert sim.model.soil.boundary_conditions.top.atmos ===

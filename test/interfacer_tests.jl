@@ -8,6 +8,10 @@ import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
 import ClimaCoupler: Interfacer
 
+function Interfacer.remap(field, ::Nothing)
+    return field
+end
+
 # test for a simple generic surface model
 struct DummySimulation{S} <: Interfacer.SeaIceModelSimulation
     space::S

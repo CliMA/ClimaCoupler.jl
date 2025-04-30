@@ -236,14 +236,24 @@ get_field(sim::SurfaceModelSimulation, ::Val{:height_disp}) = convert(eltype(sim
 
 
 """
-    get_field(sim, what, boundary_space)
+    get_field(sim, what, target_space)
 
-Return `what` in `sim` remapped onto the `boundary_space`
+Return `quantity` in `sim` remapped onto the `target_space`
 
 This is equivalent to calling `get_field`, and then `remap`.
 """
-function get_field(sim, what, boundary_space)
-    return remap(get_field(sim, what), boundary_space)
+function get_field(sim, quantity, target_space)
+    return remap(get_field(sim, quantity), target_space)
+end
+
+"""
+    get_field!(target_field, sim, quantity)
+
+Remap `quantity` in `sim` remapped onto the `target_field`.
+"""
+function get_field!(target_field, sim, quantity)
+    remap!(target_field, get_field(sim, quantity))
+    return nothing
 end
 
 """
@@ -396,7 +406,7 @@ Remap the given `field` onto the `target_space`.
 
 Non-ClimaCore fields should provide a method to this function.
 
-TODO: Add in-place option to make this non-allocating.
+TODO: Add support for different source and target fields
 """
 function remap end
 
@@ -418,9 +428,17 @@ function remap(num::Number, target_space::CC.Spaces.AbstractSpace)
     return num
 end
 
-# Used in tests
-function remap(field, ::Nothing)
-    return field
+"""
+    remap!(target_field, source)
+
+Remap the given `source` onto the `target_field`.
+
+Non-ClimaCore fields should provide a method to [`Interfacer.remap`](@ref), or directly to this
+function.
+"""
+function remap!(target_field, source)
+    target_field .= remap(source, axes(target_field))
+    return nothing
 end
 
 end # module

@@ -83,17 +83,16 @@ This is the default function to be used for most surface model simulations, as
 and passed to the surfaces.
 """
 function import_atmos_fields!(csf, ::Interfacer.SurfaceModelSimulation, atmos_sim)
-    boundary_space = axes(csf)
-
     # surface density - needed for q_sat and requires atmos and sfc states, so it is calculated and saved in the coupler
-    dummmy_remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_sfc)) # TODO: generalize to use individual T_sfc, (#445)
+    Interfacer.remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_sfc)) # TODO: generalize to use individual T_sfc, (#445)
 
     # radiative fluxes
-    csf.F_radiative .= Interfacer.get_field(atmos_sim, Val(:radiative_energy_flux_sfc), boundary_space)
+    Interfacer.get_field!(csf.F_radiative, atmos_sim, Val(:radiative_energy_flux_sfc))
 
     # precipitation
-    csf.P_liq .= Interfacer.get_field(atmos_sim, Val(:liquid_precipitation), boundary_space)
-    csf.P_snow .= Interfacer.get_field(atmos_sim, Val(:snow_precipitation), boundary_space)
+    Interfacer.get_field!(csf.P_liq, atmos_sim, Val(:liquid_precipitation))
+    Interfacer.get_field!(csf.P_snow, atmos_sim, Val(:snow_precipitation))
+    return nothing
 end
 
 import_atmos_fields!(csf, ::Interfacer.AtmosModelSimulation, atmos_sim) = nothing
@@ -110,17 +109,10 @@ functions for (`:surface_temperature`, `:surface_direct_albedo`,
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
 """
 function import_combined_surface_fields!(csf, model_sims)
-    combined_field = csf.temp1
-
-    # surface fields
-    combine_surfaces!(combined_field, model_sims, Val(:surface_temperature))
-    dummmy_remap!(csf.T_sfc, combined_field)
-
-    combine_surfaces!(combined_field, model_sims, Val(:surface_direct_albedo))
-    dummmy_remap!(csf.surface_direct_albedo, combined_field)
-
-    combine_surfaces!(combined_field, model_sims, Val(:surface_diffuse_albedo))
-    dummmy_remap!(csf.surface_diffuse_albedo, combined_field)
+    combine_surfaces!(csf.T_sfc, model_sims, Val(:surface_temperature))
+    combine_surfaces!(csf.surface_direct_albedo, model_sims, Val(:surface_direct_albedo))
+    combine_surfaces!(csf.surface_diffuse_albedo, model_sims, Val(:surface_diffuse_albedo))
+    return nothing
 end
 
 """
@@ -137,6 +129,7 @@ function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf)
     Interfacer.update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
     Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf)
     Interfacer.update_field!(atmos_sim, Val(:turbulent_fluxes), csf)
+    return nothing
 end
 
 """
@@ -160,6 +153,7 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, area_fraction)
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)
     Interfacer.update_field!(sim, Val(:snow_precipitation), csf.P_snow)
+    return nothing
 end
 
 """
@@ -210,21 +204,6 @@ function step_model_sims!(model_sims, t)
     for sim in model_sims
         Interfacer.step!(sim, t)
     end
-end
-
-"""
-    dummmy_remap!(target, source)
-
-Simple stand-in function for remapping.
-For AMIP we don't need regridding of surface model CC.Fields.
-When we do, we re-introduce the ClimaCoreTempestRemap remapping functions.
-
-# Arguments
-- `target`: [CC.Fields.Field] destination of remapping.
-- `source`: [CC.Fields.Field] source of remapping.
-"""
-function dummmy_remap!(target, source)
-    parent(target) .= parent(source)
 end
 
 """

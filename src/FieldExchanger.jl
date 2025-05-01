@@ -10,8 +10,7 @@ import ..Interfacer, ..FluxCalculator, ..Utilities
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
 
-export import_atmos_fields!,
-    update_surface_fractions!, import_combined_surface_fields!, update_sim!, update_model_sims!, step_model_sims!
+export update_sim!, update_model_sims!, step_model_sims!, exchange!
 
 """
     update_surface_fractions!(cs::Interfacer.CoupledSimulation)
@@ -240,6 +239,27 @@ function compute_surface_humidity!(q_sfc, T_atmos, q_atmos, ρ_atmos, T_sfc, the
         TD.q_vap_saturation_generic(thermo_params, T_sfc, ρ_sfc, TD.Liquid()),
         TD.q_vap_saturation_generic(thermo_params, T_sfc, ρ_sfc, TD.Ice()),
     )
+    return nothing
+end
+
+"""
+    exchange!(cs::Interfacer.CoupledSimulation)
+
+Exchange fields between the surface and atmosphere models.
+This is done in 2 steps:
+1. Import the atmosphere fields and surface fields into the coupler.
+2. Update the component model simulations with the coupler fields.
+
+The order of these steps is important, as importing the surface fields requires
+the atmosphere fields to be updated so that surface humidity can be computed.
+"""
+function exchange!(cs::Interfacer.CoupledSimulation)
+    # Import the atmosphere fields and surface fields into the coupler
+    import_atmos_fields!(cs.fields, cs.model_sims)
+    import_combined_surface_fields!(cs.fields, cs.model_sims)
+
+    # Update the component model simulations with the coupler fields
+    update_model_sims!(cs.model_sims, cs.fields)
     return nothing
 end
 

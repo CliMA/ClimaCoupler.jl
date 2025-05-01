@@ -13,8 +13,7 @@ Interfacer.get_field(sim::DummySimulation, ::Val{:liquid_precipitation}) = sim.c
 Interfacer.get_field(sim::DummySimulation, ::Val{:snow_precipitation}) = sim.cache.snow_precipitation
 
 function FluxCalculator.calculate_surface_air_density(atmos_sim::DummySimulation, T_sfc::CC.Fields.Field)
-    FT = CC.Spaces.undertype(axes(T_sfc))
-    return T_sfc .* FT(0.0) .+ FT(1.0)
+    return CC.Fields.ones(axes(T_sfc))
 end
 
 
@@ -71,6 +70,10 @@ end
 struct TestAtmosSimulation{C} <: Interfacer.AtmosModelSimulation
     cache::C
 end
+
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) = sim.cache.radiative_energy_flux_sfc
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:liquid_precipitation}) = sim.cache.liquid_precipitation
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:snow_precipitation}) = sim.cache.snow_precipitation
 function Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:surface_direct_albedo}, field)
     parent(sim.cache.albedo_direct) .= parent(field)
 end
@@ -84,15 +87,20 @@ Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:surface_temperature}, 
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:roughness_buoyancy}, field) = nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:beta}, field) = nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:turbulent_fluxes}, field) = nothing
+function FluxCalculator.calculate_surface_air_density(::TestAtmosSimulation, T_sfc::CC.Fields.Field)
+    return CC.Fields.ones(axes(T_sfc))
+end
 
 #surface sim
 struct TestSurfaceSimulationLand{C} <: Interfacer.SurfaceModelSimulation
     cache::C
 end
 function Interfacer.get_field(sim::TestSurfaceSimulationLand, ::Val{:area_fraction})
-    FT = CC.Spaces.undertype(axes(sim.cache.turbulent_energy_flux))
-    return FT(0.5)
+    return CC.Fields.ones(axes(sim.cache.liquid_precipitation))
 end
+Interfacer.get_field(sim::TestSurfaceSimulationLand, ::Val{:surface_direct_albedo}) = sim.cache.albedo_direct
+Interfacer.get_field(sim::TestSurfaceSimulationLand, ::Val{:surface_diffuse_albedo}) = sim.cache.albedo_diffuse
+Interfacer.get_field(sim::TestSurfaceSimulationLand, ::Val{:surface_temperature}) = sim.cache.surface_temperature
 function Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:turbulent_energy_flux}, field)
     parent(sim.cache.turbulent_energy_flux) .= parent(field)
 end
@@ -103,8 +111,12 @@ function Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:air_den
     parent(sim.cache.air_density) .= parent(field)
 end
 Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:radiative_energy_flux_sfc}, field) = nothing
-Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:liquid_precipitation}, field) = nothing
-Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:snow_precipitation}, field) = nothing
+function Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:liquid_precipitation}, field)
+    parent(sim.cache.liquid_precipitation) .= parent(field)
+end
+function Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:snow_precipitation}, field)
+    parent(sim.cache.snow_precipitation) .= parent(field)
+end
 
 for FT in (Float32, Float64)
     @testset "test update_surface_fractions!" begin
@@ -127,7 +139,7 @@ for FT in (Float32, Float64)
         cs = Interfacer.CoupledSimulation{FT}(
             nothing, # comms_ctx
             nothing, # dates
-            nothing, # boundary_space
+            test_space, # boundary_space
             nothing, # fields
             nothing, # conservation_checks
             (Int(0), Int(1000)), # tspan
@@ -207,16 +219,6 @@ for FT in (Float32, Float64)
         coupler_names =
             [:T_sfc, :z0m_sfc, :z0b_sfc, :surface_direct_albedo, :surface_diffuse_albedo, :beta, :q_sfc, :temp1]
 
-        # coupler cache setup
-        exchanged_fields = (
-            :surface_temperature,
-            :surface_direct_albedo,
-            :surface_diffuse_albedo,
-            :roughness_momentum,
-            :roughness_buoyancy,
-            :beta,
-        )
-
         sims = (; a = TestSurfaceSimulation1(ones(boundary_space)), b = TestSurfaceSimulation2(ones(boundary_space)))
 
         coupler_fields = Interfacer.init_coupler_fields(FT, coupler_names, boundary_space)
@@ -295,10 +297,12 @@ for FT in (Float32, Float64)
         @test Array(parent(model_sims.atmos_sim.cache.beta))[1] == results[1]
         @test Array(parent(model_sims.atmos_sim.cache.roughness_buoyancy))[1] == results[1]
 
+        # test land updates
+        @test Array(parent(model_sims.land_sim.cache.liquid_precipitation))[1] == results[2]
+        @test Array(parent(model_sims.land_sim.cache.snow_precipitation))[1] == results[2]
+
         # test variables without updates
         @test Array(parent(model_sims.land_sim.cache.radiative_energy_flux_sfc))[1] == results[1]
-        @test Array(parent(model_sims.land_sim.cache.liquid_precipitation))[1] == results[1]
-        @test Array(parent(model_sims.land_sim.cache.snow_precipitation))[1] == results[1]
 
         # test stub - albedo should be updated by update_sim!
         @test Array(parent(model_sims.stub_sim.cache.albedo_direct))[1] == results[2]
@@ -307,5 +311,78 @@ for FT in (Float32, Float64)
 
     @testset "step_model_sims! for FT=$FT" begin
         @test FieldExchanger.step_model_sims!((; stub = TestSurfaceSimulation1(FT(0))), 1) === nothing
+    end
+
+    @testset "exchange! for FT=$FT" begin
+        # Here we exchange two albedo fields from the surface to the atmos,
+        #  and two precipitation fields from the atmos to the surface.
+        # coupler cache setup
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+        coupler_field_names =
+            [:surface_direct_albedo, :surface_diffuse_albedo, :P_liq, :P_snow, :ρ_sfc, :T_sfc, :F_radiative, :temp1]
+        # Initialize coupler fields with 0.5
+        key_types = (coupler_field_names...,)
+        val_types = Tuple{(FT for _ in 1:length(coupler_field_names))...}
+        coupler_fields = zeros(NamedTuple{key_types, val_types}, boundary_space) .+ FT(0.5)
+
+        # model cache setup
+        atmos_names =
+            [:albedo_direct, :albedo_diffuse, :liquid_precipitation, :snow_precipitation, :radiative_energy_flux_sfc]
+        # Initialize atmos fields with 1
+        key_types = (atmos_names...,)
+        val_types = Tuple{(FT for _ in 1:length(atmos_names))...}
+        atmos_fields = ones(NamedTuple{key_types, val_types}, boundary_space)
+
+        land_names = [
+            :albedo_direct,
+            :albedo_diffuse,
+            :liquid_precipitation,
+            :snow_precipitation,
+            :surface_temperature,
+            :air_density,
+        ]
+        # Here we initialize with `init_coupler_fields` because we want fields of zeros
+        land_fields = Interfacer.init_coupler_fields(FT, land_names, boundary_space)
+
+        model_sims =
+            (; atmos_sim = TestAtmosSimulation(atmos_fields), land_sim = TestSurfaceSimulationLand(land_fields))
+
+        # construct the CoupledSimulation object
+        cs = Interfacer.CoupledSimulation{FT}(
+            nothing, # comms_ctx
+            nothing, # start_date
+            boundary_space,
+            coupler_fields,
+            nothing, # conservation_checks
+            nothing, # tspan
+            nothing, # dt
+            nothing, # t_start
+            model_sims,
+            (;), # callbacks
+            (;), # dirs
+            nothing, # thermo_params
+            nothing, # diags_handler
+        )
+
+        # perform the exchange
+        FieldExchanger.exchange!(cs)
+
+        surface_init_field = CC.Fields.zeros(boundary_space)
+        atmos_init_field = CC.Fields.ones(boundary_space)
+
+        # test atmos is updated with surface fields
+        @test model_sims.atmos_sim.cache.albedo_direct == surface_init_field
+        @test model_sims.atmos_sim.cache.albedo_diffuse == surface_init_field
+
+        # test land is updated with atmos fields
+        @test model_sims.land_sim.cache.liquid_precipitation == atmos_init_field
+        @test model_sims.land_sim.cache.snow_precipitation == atmos_init_field
+
+        # test coupler fields were updated by atmos and surface
+        @test cs.fields.surface_direct_albedo == surface_init_field
+        @test cs.fields.surface_diffuse_albedo == surface_init_field
+        @test cs.fields.F_radiative == atmos_init_field
+        @test cs.fields.P_liq == atmos_init_field
+        @test cs.fields.P_snow == atmos_init_field
     end
 end

@@ -498,9 +498,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         FieldExchanger.update_surface_fractions!(cs)
 
         # 2. Import atmospheric and surface fields into the coupler fields, then broadcast them back out to all components.
-        FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims)
-        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims)
-        FieldExchanger.update_model_sims!(cs.model_sims, cs.fields)
+        FieldExchanger.exchange!(cs)
 
         # 3. Set all initial cache values for the land model, now that we have updated drivers
         land_set_initial_cache! = CL.make_set_initial_cache(cs.model_sims.land_sim.model)
@@ -511,14 +509,13 @@ function CoupledSimulation(config_dict::AbstractDict)
         )
 
         # 4. Compute radiative fluxes and update the coupler fields and model simulations with the new fluxes
-        # Any other callbacks that modify a model's cache should be called here as well.
+        # Any other callbacks that modify a model's cache should be called here and propagated to the other models.
         if hasradiation(cs.model_sims.atmos_sim.integrator)
             CA.rrtmgp_model_callback!(cs.model_sims.atmos_sim.integrator)
-            FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims)
-            FieldExchanger.update_model_sims!(cs.model_sims, cs.fields)
+            FieldExchanger.exchange!(cs)
         end
 
-        # 5.turbulent fluxes: Now we have all information needed for calculating the initial
+        # 5. Now we have all information needed for calculating the initial
         # turbulent surface fluxes. Calculate and update turbulent fluxes for each surface model,
         # and save the weighted average in coupler fields
         FluxCalculator.turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, cs.thermo_params)
@@ -673,12 +670,8 @@ function step!(cs::CoupledSimulation)
     ## update the surface fractions for surface models
     FieldExchanger.update_surface_fractions!(cs)
 
-    ## update the coupler with the new surface properties
-    FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims)
-    ## update the coupler with the new atmospheric properties
-    FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims)
-    ## update the model simulations with the new coupler fields
-    FieldExchanger.update_model_sims!(cs.model_sims, cs.fields)
+    ## exchange all non-turbulent flux fields between models
+    FieldExchanger.exchange!(cs)
 
     ## calculate turbulent fluxes in the coupler and update the model simulations with them
     FluxCalculator.turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, cs.thermo_params)

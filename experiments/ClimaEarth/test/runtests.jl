@@ -2,8 +2,6 @@ using SafeTestsets
 import ClimaComms
 ClimaComms.@import_required_backends
 
-gpu_broken = ClimaComms.device() isa ClimaComms.CUDADevice
-
 @safetestset "component model test: ClimaAtmos" begin
     include("component_model_tests/climaatmos_tests.jl")
 end

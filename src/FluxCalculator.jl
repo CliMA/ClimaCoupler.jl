@@ -179,7 +179,7 @@ end
 
 Updates the fluxes in the surface model simulation `sim` with the fluxes in `fields`.
 """
-function update_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, fields::NamedTuple)
+function update_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, fields)
     return error("update_turbulent_fluxes! is required to be dispatched on $(nameof(sim)), but no method defined")
 end
 

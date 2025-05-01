@@ -30,6 +30,7 @@ export CoupledSimulation,
     remap!,
     AbstractSlabplanetSimulationMode,
     AMIPMode,
+    CMIPMode,
     SlabplanetMode,
     SlabplanetAquaMode,
     SlabplanetTerraMode
@@ -365,16 +366,25 @@ abstract type AbstractSlabplanetSimulationMode <: AbstractSimulationMode end
 """
     AMIPMode
 
-An abstract type representing the AMIP simulation mode. AMIP is currently the most complex
-configuration of the ClimaEarth model. It runs a ClimaAtmos.jl atmosphere model,
+An abstract type representing the AMIP simulation mode. It runs a ClimaAtmos.jl atmosphere model,
 ClimaLand.jl bucket land model, a prescribed ocean model, and a simple thermal sea ice model.
 """
 abstract type AMIPMode <: AbstractSimulationMode end
 
+
+"""
+    CMIPMode
+
+An abstract type representing the CMIP simulation mode. CMIP is currently the most complex
+configuration of the ClimaEarth model. It runs a ClimaAtmos.jl atmosphere model,
+ClimaLand.jl bucket land model, a ClimaOcean ocean model, and a simple thermal sea ice model.
+"""
+abstract type CMIPMode <: AbstractSimulationMode end
+
 """
     SlabplanetMode
 
-An abstract type represeting the slabplanet simulation mode with a ClimaAtmos.jl atmosphere model,
+An abstract type representing the slabplanet simulation mode with a ClimaAtmos.jl atmosphere model,
 a ClimaLand.jl bucket land model, a thermal slab ocean model, and no sea ice model. Instead
 of using a sea ice model, the ocean is evaluated in areas that would be covered in ice.
 """

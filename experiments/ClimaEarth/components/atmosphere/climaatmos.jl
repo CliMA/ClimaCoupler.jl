@@ -32,7 +32,6 @@ struct ClimaAtmosSimulation{P, D, I, OW} <: Interfacer.AtmosModelSimulation
     integrator::I
     output_writers::OW
 end
-Interfacer.name(::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
 
 function hasradiation(integrator)
     return !isnothing(integrator.p.atmos.radiation_mode)
@@ -215,7 +214,7 @@ moisture_flux(::CA.DryModel, integrator) = StaticArrays.SVector(eltype(integrato
 moisture_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
     CC.Geometry.WVector.(integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot)
 
-ρq_tot(::CA.DryModel, integrator) = StaticArrays.SVector(eltype(integrator.u)(0))
+ρq_tot(::CA.DryModel, integrator) = zeros(axes(integrator.u.c.uₕ))
 ρq_tot(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) = integrator.u.c.ρq_tot
 
 # extensions required by the Interfacer
@@ -270,7 +269,8 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:LW_d})
     )
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:specific_humidity}) =
-    CC.Fields.level(sim.integrator.u.c.ρq_tot ./ sim.integrator.u.c.ρ, 1)
+    CC.Fields.level(ρq_tot(sim.integrator.p.atmos.moisture_model, sim.integrator) ./ sim.integrator.u.c.ρ, 1)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) = CC.Fields.level(sim.integrator.u.c.ρ, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
     surface_radiation_flux(sim.integrator.p.atmos.radiation_mode, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =
@@ -282,10 +282,6 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d})
         CC.Utilities.half,
     )
 end
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_energy_flux}) =
-    CC.Geometry.WVector.(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot)
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:turbulent_moisture_flux}) =
-    moisture_flux(sim.integrator.p.atmos.moisture_model, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:thermo_state_int}) =
     CC.Spaces.level(sim.integrator.p.precomputed.ᶜts, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:water}) =
@@ -340,7 +336,7 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_diff
 end
 
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fluxes}, fields)
-    (; F_turb_energy, F_turb_moisture, F_turb_ρτxz, F_turb_ρτyz) = fields
+    (; F_lh, F_sh, F_turb_moisture, F_turb_ρτxz, F_turb_ρτyz) = fields
 
     Y = sim.integrator.u
     surface_local_geometry = CC.Fields.level(CC.Fields.local_geometry_field(Y.f), CC.Utilities.half)
@@ -360,7 +356,8 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fl
         )
     )
 
-    parent(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot) .= parent(F_turb_energy) .* parent(surface_normal) # (shf + lhf)
+    parent(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot) .=
+        (parent(F_lh) + parent(F_sh)) .* parent(surface_normal) # (shf + lhf)
     parent(sim.integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot) .=
         parent(F_turb_moisture) .* parent(surface_normal) # (evap)
 
@@ -398,7 +395,9 @@ function Interfacer.add_coupler_fields!(coupler_field_names, atmos_sim::ClimaAtm
     push!(coupler_field_names, atmos_coupler_fields...)
 end
 
-function FieldExchanger.update_sim!(sim::ClimaAtmosSimulation, csf, turbulent_fluxes)
+function FieldExchanger.update_sim!(sim::ClimaAtmosSimulation, csf)
+    # TODO: This function should be removed once we remove cos_zenith_angle as
+    # one of the exchange fields (and use the default method in FieldExchanger)
 
     u = sim.integrator.u
     p = sim.integrator.p
@@ -406,7 +405,7 @@ function FieldExchanger.update_sim!(sim::ClimaAtmosSimulation, csf, turbulent_fl
 
     # Perform radiation-specific updates
     if hasradiation(sim.integrator)
-        !(p.atmos.insolation isa CA.IdealizedInsolation) && CA.set_insolation_variables!(u, p, t, p.atmos.insolation)
+        CA.set_insolation_variables!(u, p, t, p.atmos.insolation)
         Interfacer.update_field!(sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
         Interfacer.update_field!(sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
         Interfacer.update_field!(sim, Val(:surface_temperature), csf)

@@ -6,7 +6,6 @@ import ClimaCoupler: Interfacer, FieldExchanger, FluxCalculator
 struct DummySimulation{C} <: Interfacer.AtmosModelSimulation
     cache::C
 end
-Interfacer.name(::DummySimulation) = "DummySimulation"
 Interfacer.get_field(sim::DummySimulation, ::Val{:turbulent_energy_flux}) = sim.cache.turbulent_energy_flux
 Interfacer.get_field(sim::DummySimulation, ::Val{:turbulent_moisture_flux}) = sim.cache.turbulent_moisture_flux
 Interfacer.get_field(sim::DummySimulation, ::Val{:radiative_energy_flux_sfc}) = sim.cache.radiative_energy_flux_sfc
@@ -23,11 +22,9 @@ end
 struct TestSurfaceSimulation1{C} <: Interfacer.SurfaceModelSimulation
     cache_field::C
 end
-Interfacer.name(::TestSurfaceSimulation1) = "TestSurfaceSimulation1"
 struct TestSurfaceSimulation2{C} <: Interfacer.SurfaceModelSimulation
     cache_field::C
 end
-Interfacer.name(::TestSurfaceSimulation2) = "TestSurfaceSimulation2"
 
 Interfacer.get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:surface_temperature}) =
     sim.cache_field
@@ -44,11 +41,6 @@ Interfacer.get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2},
 Interfacer.get_field(sim::TestSurfaceSimulation1, ::Val{:area_fraction}) = sim.cache_field .* 0
 Interfacer.get_field(sim::TestSurfaceSimulation2, ::Val{:area_fraction}) =
     sim.cache_field .* CC.Spaces.undertype(axes(sim.cache_field))(0.5)
-
-Interfacer.get_field(sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2}, ::Val{:surface_humidity}) =
-    sim.cache_field .* 0
-Interfacer.get_field(sim::Union{TestSurfaceSimulation2, TestSurfaceSimulation2}, ::Val{:surface_humidity}) =
-    sim.cache_field .* 0
 
 Interfacer.reinit!(::TestSurfaceSimulation1) = nothing
 Interfacer.step!(::TestSurfaceSimulation1, _) = nothing
@@ -80,7 +72,6 @@ end
 struct TestAtmosSimulation{C} <: Interfacer.AtmosModelSimulation
     cache::C
 end
-Interfacer.name(::TestAtmosSimulation) = "TestAtmosSimulation"
 function Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:surface_direct_albedo}, field)
     parent(sim.cache.albedo_direct) .= parent(field)
 end
@@ -99,7 +90,6 @@ Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:turbulent_fluxes}, fie
 struct TestSurfaceSimulationLand{C} <: Interfacer.SurfaceModelSimulation
     cache::C
 end
-Interfacer.name(::TestSurfaceSimulationLand) = "TestSurfaceSimulationLand"
 function Interfacer.get_field(sim::TestSurfaceSimulationLand, ::Val{:area_fraction})
     FT = CC.Spaces.undertype(axes(sim.cache.turbulent_energy_flux))
     return FT(0.5)
@@ -203,14 +193,8 @@ for FT in (Float32, Float64)
 
     @testset "import_atmos_fields! for FT=$FT" begin
         boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
-        coupler_names = (:F_turb_energy, :F_turb_moisture, :F_radiative, :P_liq, :P_snow, :ρ_sfc, :T_sfc)
-        component_names = (
-            :turbulent_energy_flux,
-            :turbulent_moisture_flux,
-            :radiative_energy_flux_sfc,
-            :liquid_precipitation,
-            :snow_precipitation,
-        )
+        coupler_names = (:F_lh, :F_sh, :F_turb_moisture, :F_radiative, :P_liq, :P_snow, :ρ_sfc, :T_sfc)
+        component_names = (:radiative_energy_flux_sfc, :liquid_precipitation, :snow_precipitation)
         component_fields =
             NamedTuple{component_names}(ntuple(i -> CC.Fields.ones(boundary_space), length(component_names)))
 
@@ -219,7 +203,8 @@ for FT in (Float32, Float64)
 
         coupler_fields = NamedTuple{coupler_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(coupler_names)))
         FieldExchanger.import_atmos_fields!(coupler_fields, model_sims)
-        @test Array(parent(coupler_fields.F_turb_energy))[1] == FT(0)
+        @test Array(parent(coupler_fields.F_lh))[1] == FT(0)
+        @test Array(parent(coupler_fields.F_sh))[1] == FT(0)
         @test Array(parent(coupler_fields.F_turb_moisture))[1] == FT(0)
         @test coupler_fields.F_radiative == model_sims.atmos_sim.cache.radiative_energy_flux_sfc
         @test coupler_fields.P_liq == model_sims.atmos_sim.cache.liquid_precipitation
@@ -266,7 +251,8 @@ for FT in (Float32, Float64)
             :surface_direct_albedo,
             :surface_diffuse_albedo,
             :beta,
-            :F_turb_energy,
+            :F_lh,
+            :F_sh,
             :F_turb_moisture,
             :F_radiative,
             :P_liq,

@@ -46,8 +46,8 @@ function checkpoint_model_state(
     Y = get_model_prog_state(sim)
     day = floor(Int, t / (60 * 60 * 24))
     sec = floor(Int, t % (60 * 60 * 24))
-    @info "Saving checkpoint " * Interfacer.name(sim) * " model state to HDF5 on day $day second $sec"
-    output_file = joinpath(output_dir, "checkpoint_" * Interfacer.name(sim) * "_$t.hdf5")
+    @info "Saving checkpoint $(nameof(sim)) model state to HDF5 on day $day second $sec"
+    output_file = joinpath(output_dir, "checkpoint_$(nameof(sim))_$t.hdf5")
     checkpoint_writer = CC.InputOutput.HDF5Writer(output_file, comms_ctx)
     CC.InputOutput.HDF5.write_attribute(checkpoint_writer.file, "time", t)
     CC.InputOutput.write!(checkpoint_writer, Y, "model_state")
@@ -75,9 +75,9 @@ function checkpoint_model_cache(
     p = CC.Adapt.adapt(Array, get_model_cache(sim))
     day = floor(Int, t / (60 * 60 * 24))
     sec = floor(Int, t % (60 * 60 * 24))
-    @info "Saving checkpoint " * Interfacer.name(sim) * " model cache to JLD2 on day $day second $sec"
+    @info "Saving checkpoint $(nameof(sim)) model cache to JLD2 on day $day second $sec"
     pid = ClimaComms.mypid(comms_ctx)
-    output_file = joinpath(output_dir, "checkpoint_cache_$(pid)_" * Interfacer.name(sim) * "_$t.jld2")
+    output_file = joinpath(output_dir, "checkpoint_cache_$(pid)_$(nameof(sim))_$t.jld2")
     JLD2.jldsave(output_file, cache = p)
     return nothing
 end
@@ -133,13 +133,11 @@ function restart!(cs, checkpoint_dir, checkpoint_t)
     pid = ClimaComms.mypid(cs.comms_ctx)
     for sim in cs.model_sims
         if !isnothing(Checkpointer.get_model_prog_state(sim))
-            input_file_state =
-                output_file = joinpath(checkpoint_dir, "checkpoint_$(Interfacer.name(sim))_$(checkpoint_t).hdf5")
+            input_file_state = output_file = joinpath(checkpoint_dir, "checkpoint_$(nameof(sim))_$(checkpoint_t).hdf5")
             restart_model_state!(sim, input_file_state, cs.comms_ctx)
         end
         if !isnothing(Checkpointer.get_model_cache(sim))
-            input_file_cache =
-                joinpath(checkpoint_dir, "checkpoint_cache_$(pid)_$(Interfacer.name(sim))_$(checkpoint_t).jld2")
+            input_file_cache = joinpath(checkpoint_dir, "checkpoint_cache_$(pid)_$(nameof(sim))_$(checkpoint_t).jld2")
             restart_model_cache!(sim, input_file_cache)
         end
     end

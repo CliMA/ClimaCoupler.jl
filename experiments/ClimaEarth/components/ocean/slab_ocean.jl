@@ -18,7 +18,6 @@ struct SlabOceanSimulation{P, I} <: Interfacer.OceanModelSimulation
     params::P
     integrator::I
 end
-Interfacer.name(::SlabOceanSimulation) = "SlabOceanSimulation"
 
 # ocean parameters
 Base.@kwdef struct OceanSlabParameters{FT <: AbstractFloat}
@@ -111,7 +110,6 @@ Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:roughness_buoyancy}) = sim
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_direct_albedo}) = sim.integrator.p.α_direct
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_diffuse_albedo}) = sim.integrator.p.α_diffuse
-Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_humidity}) = sim.integrator.p.q_sfc
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
 
 """
@@ -159,8 +157,8 @@ function Interfacer.add_coupler_fields!(coupler_field_names, ::SlabOceanSimulati
 end
 
 function FluxCalculator.update_turbulent_fluxes!(sim::SlabOceanSimulation, fields::NamedTuple)
-    (; F_turb_energy) = fields
-    @. sim.integrator.p.F_turb_energy = F_turb_energy
+    (; F_lh, F_sh) = fields
+    @. sim.integrator.p.F_turb_energy = F_lh + F_sh
 end
 
 """

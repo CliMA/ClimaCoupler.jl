@@ -24,9 +24,7 @@ struct TestAtmos{P, D, I} <: Interfacer.AtmosModelSimulation
     domain::D
     integrator::I
 end
-Interfacer.name(sim::TestAtmos) = "TestAtmos"
 struct TestAtmos2 <: Interfacer.AtmosModelSimulation end
-Interfacer.name(sim::TestAtmos2) = "TestAtmos2"
 
 Interfacer.get_field(sim::TestAtmos, ::Val{:height_int}) = sim.integrator.p.z
 Interfacer.get_field(sim::TestAtmos, ::Val{:height_sfc}) = sim.integrator.p.z_sfc
@@ -36,11 +34,11 @@ Interfacer.get_field(sim::TestAtmos, ::Val{:thermo_state_int}) =
     TD.PhaseEquil_ρTq.(get_thermo_params(sim), sim.integrator.ρ, sim.integrator.T, sim.integrator.q)
 
 function FieldExchanger.update_sim!(sim::TestAtmos, fields, _)
-    (; F_turb_ρτxz, F_turb_energy, F_turb_moisture) = fields
+    (; F_turb_ρτxz, F_lh, F_sh, F_turb_moisture) = fields
     ρ_int = sim.integrator.ρ
-    @. sim.integrator.p.energy_bc = -(F_turb_energy)
-    @. sim.integrator.p.ρq_tot_bc = -F_turb_moisture
-    @. sim.integrator.p.uₕ_bc = -(F_turb_ρτxz / ρ_int) # x-compoennt only for this test
+    @. sim.integrator.p.energy_bc = F_lh + F_sh
+    @. sim.integrator.p.ρq_tot_bc = F_turb_moisture
+    @. sim.integrator.p.uₕ_bc = F_turb_ρτxz / ρ_int # x-component only for this test
 end
 
 function get_thermo_params(sim::TestAtmos)
@@ -61,7 +59,6 @@ struct TestOcean{M, I} <: Interfacer.SurfaceModelSimulation
     model::M
     integrator::I
 end
-Interfacer.name(sim::TestOcean) = "TestOcean"
 
 Interfacer.get_field(sim::TestOcean, ::Val{:surface_temperature}) = sim.integrator.T
 Interfacer.get_field(sim::TestOcean, ::Val{:air_humidity}) = sim.integrator.p.q
@@ -74,16 +71,25 @@ Interfacer.get_field(sim::TestOcean, ::Val{:drag_coefficient}) = sim.integrator.
 Interfacer.get_field(sim::TestOcean, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) =
     sim.integrator.p.α
 
-function FluxCalculator.surface_thermo_state(sim::TestOcean, thermo_params::ThermodynamicsParameters, thermo_state_int)
+function FluxCalculator.surface_thermo_state(
+    sim::TestOcean,
+    thermo_params::ThermodynamicsParameters,
+    atmos_sim::Interfacer.AtmosModelSimulation,
+)
     T_sfc = Interfacer.get_field(sim, Val(:surface_temperature))
-    ρ_sfc = thermo_state_int.ρ # arbitrary
+    ρ_sfc =
+        FluxCalculator.extrapolate_ρ_to_sfc.(
+            thermo_params,
+            Interfacer.get_field(atmos_sim, Val(:thermo_state_int)),
+            T_sfc,
+        )
     q_sfc = Interfacer.get_field(sim, Val(:air_humidity)) # read from cache
     @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
 end
 
 function FluxCalculator.update_turbulent_fluxes!(sim::TestOcean, fields::NamedTuple)
-    (; F_turb_energy) = fields
-    @. sim.integrator.p.F_aero = F_turb_energy
+    (; F_lh, F_sh) = fields
+    @. sim.integrator.p.F_aero = F_lh + F_sh
 end
 
 # simple surface sim object and extensions
@@ -91,7 +97,6 @@ struct DummySurfaceSimulation3{M, I} <: Interfacer.SurfaceModelSimulation
     model::M
     integrator::I
 end
-Interfacer.name(sim::DummySurfaceSimulation3) = "DummySurfaceSimulation3"
 
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:surface_temperature}) = sim.integrator.T
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
@@ -102,7 +107,7 @@ Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:beta}) = sim.integrato
 function FluxCalculator.surface_thermo_state(
     sim::DummySurfaceSimulation3,
     thermo_params::ThermodynamicsParameters,
-    thermo_state_int,
+    atmos_sim::Interfacer.AtmosModelSimulation,
 )
     T_sfc = Interfacer.get_field(sim, Val(:surface_temperature))
     FT = eltype(T_sfc)
@@ -172,7 +177,8 @@ for FT in (Float32, Float64)
             :P_liq,
             :P_snow,
             :P_net,
-            :F_turb_energy,
+            :F_lh,
+            :F_sh,
             :F_turb_ρτxz,
             :F_turb_ρτyz,
             :F_turb_moisture,
@@ -197,10 +203,8 @@ for FT in (Float32, Float64)
         windspeed = @. hypot(atmos_sim.integrator.p.u, atmos_sim.integrator.p.v)
 
         thermo_params = get_thermo_params(atmos_sim)
-        thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
 
-        surface_thermo_states = similar(thermo_state_int)
-        surface_thermo_states .= FluxCalculator.surface_thermo_state(ocean_sim, thermo_params, thermo_state_int)
+        surface_thermo_states = FluxCalculator.surface_thermo_state(ocean_sim, thermo_params, atmos_sim)
 
         # NOTE: This test is very weak! We should add more stringent tests
         @test Array(parent(fields.F_turb_moisture))[1] ≈ FT(0)
@@ -215,16 +219,14 @@ for FT in (Float32, Float64)
         @test FluxCalculator.get_surface_params(TestAtmos((; FT = FT), [], [])) == sf_params
         sim = DummySimulation([], [])
         @test_throws ErrorException(
-            "get_surface_params is required to be dispatched on" * Interfacer.name(sim) * ", but no method defined",
+            "get_surface_params is required to be dispatched on $(nameof(sim)), but no method defined",
         ) FluxCalculator.get_surface_params(DummySimulation([], []))
     end
 
     @testset "update_turbulent_fluxes! for FT=$FT" begin
         sim = DummySurfaceSimulation3([], [])
         @test_throws ErrorException(
-            "update_turbulent_fluxes! is required to be dispatched on" *
-            Interfacer.name(sim) *
-            ", but no method defined",
+            "update_turbulent_fluxes! is required to be dispatched on $(nameof(sim)), but no method defined",
         ) FluxCalculator.update_turbulent_fluxes!(sim, (;)) == ErrorException
     end
 
@@ -236,7 +238,8 @@ for FT in (Float32, Float64)
         atmos_sim = TestAtmos((; FT = FT), [], (; T = _ones .* FT(300), ρ = _ones .* FT(1.2), q = _ones .* FT(0.01)))
         thermo_params = get_thermo_params(atmos_sim)
         thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
-        @test FluxCalculator.surface_thermo_state(surface_sim, thermo_params, thermo_state_int).ρ == thermo_state_int.ρ
+        ρ_expected = FluxCalculator.extrapolate_ρ_to_sfc.(thermo_params, thermo_state_int, surface_sim.integrator.T)
+        @test FluxCalculator.surface_thermo_state(surface_sim, thermo_params, atmos_sim).ρ == ρ_expected
     end
 
     @testset "water_albedo_from_atmosphere!" begin
@@ -266,7 +269,7 @@ for FT in (Float32, Float64)
 
         atmos_sim2 = TestAtmos2()
         @test_throws ErrorException(
-            "this function is required to be dispatched on" * Interfacer.name(atmos_sim2) * ", but no method defined",
+            "this function is required to be dispatched on $(nameof(atmos_sim2)), but no method defined",
         ) FluxCalculator.water_albedo_from_atmosphere!(atmos_sim2, ones(boundary_space), ones(boundary_space))
     end
 end

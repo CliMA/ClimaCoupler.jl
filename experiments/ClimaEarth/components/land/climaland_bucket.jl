@@ -40,7 +40,6 @@ struct BucketSimulation{
     area_fraction::A
     output_writer::OW
 end
-Interfacer.name(::BucketSimulation) = "BucketSimulation"
 
 """
     get_new_cache(p, Y, energy_check)
@@ -75,7 +74,7 @@ function BucketSimulation(
     use_land_diagnostics::Bool = true,
     stepper = CTS.RK4(),
     albedo_type::String = "map_static",
-    land_initial_condition::String = "",
+    bucket_initial_condition::String = "",
     energy_check::Bool = false,
     parameter_files = [],
 ) where {FT, TT <: Union{Float64, ITime}}
@@ -166,8 +165,8 @@ function BucketSimulation(
     # - `T`, for soil temperature (3D),
     # - `S`, for snow water equivalent (2D).
 
-    if !isempty(land_initial_condition)
-        ds = NCDataset(land_initial_condition)
+    if !isempty(bucket_initial_condition)
+        ds = NCDataset(bucket_initial_condition)
         has_all_variables = all(key -> haskey(ds, key), ["W", "Ws", "T", "S"])
         @assert has_all_variables "The land iniital condition file is expected to contain the variables W, Ws, T, and S (read documentation about requirements)."
         close(ds)
@@ -177,28 +176,28 @@ function BucketSimulation(
         regridder_type = :InterpolationsRegridder
         extrapolation_bc = (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
         Y.bucket.W .= SpaceVaryingInput(
-            land_initial_condition,
+            bucket_initial_condition,
             "W",
             surface_space;
             regridder_type,
             regridder_kwargs = (; extrapolation_bc,),
         )
         Y.bucket.Ws .= SpaceVaryingInput(
-            land_initial_condition,
+            bucket_initial_condition,
             "Ws",
             surface_space;
             regridder_type,
             regridder_kwargs = (; extrapolation_bc,),
         )
         Y.bucket.T .= SpaceVaryingInput(
-            land_initial_condition,
+            bucket_initial_condition,
             "T",
             subsurface_space;
             regridder_type,
             regridder_kwargs = (; extrapolation_bc,),
         )
         Y.bucket.σS .= SpaceVaryingInput(
-            land_initial_condition,
+            bucket_initial_condition,
             "S",
             surface_space;
             regridder_type,
@@ -250,8 +249,6 @@ Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_direct_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_diffuse_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
-Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_humidity}) =
-    CL.surface_specific_humidity(nothing, sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_temperature}) =
     CL.surface_temperature(sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
 
@@ -323,9 +320,10 @@ end
 
 # extensions required by FluxCalculator
 function FluxCalculator.update_turbulent_fluxes!(sim::BucketSimulation, fields::NamedTuple)
-    (; F_turb_energy, F_turb_moisture) = fields
+    (; F_lh, F_sh, F_turb_moisture) = fields
     turbulent_fluxes = sim.integrator.p.bucket.turbulent_fluxes
-    turbulent_fluxes.shf .= F_turb_energy
+    turbulent_fluxes.lhf .= F_lh
+    turbulent_fluxes.shf .= F_sh
     earth_params = sim.model.parameters.earth_param_set
     turbulent_fluxes.vapor_flux .= F_turb_moisture ./ LP.ρ_cloud_liq(earth_params)
     return nothing
@@ -335,16 +333,27 @@ end
 function FluxCalculator.surface_thermo_state(
     sim::BucketSimulation,
     thermo_params::TD.Parameters.ThermodynamicsParameters,
-    thermo_state_int,
+    atmos_sim::Interfacer.AtmosModelSimulation,
 )
-
     T_sfc = Interfacer.get_field(sim, Val(:surface_temperature))
+    FieldExchanger.compute_surface_humidity!(
+        sim.integrator.p.bucket.q_sfc,
+        Interfacer.get_field(atmos_sim, Val(:air_temperature)),
+        Interfacer.get_field(atmos_sim, Val(:specific_humidity)),
+        Interfacer.get_field(atmos_sim, Val(:air_density)),
+        T_sfc,
+        thermo_params,
+    )
     # Note that the surface air density, ρ_sfc, is computed using the atmospheric state at the first level and making ideal gas
     # and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
     # a reasonable stand-in.
-    ρ_sfc = FluxCalculator.extrapolate_ρ_to_sfc.(thermo_params, thermo_state_int, T_sfc) # ideally the # calculate elsewhere, here just getter...
-    q_sfc = Interfacer.get_field(sim, Val(:surface_humidity)) # already calculated in rhs! (cache)
-    @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
+    ρ_sfc =
+        FluxCalculator.extrapolate_ρ_to_sfc.(
+            thermo_params,
+            Interfacer.get_field(atmos_sim, Val(:thermo_state_int)),
+            T_sfc,
+        )
+    return @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, sim.integrator.p.bucket.q_sfc)
 end
 
 """

@@ -38,10 +38,6 @@ and perform all initialization. This function should return a simulation that
 is ready to be stepped in the coupled simulation. The interface for this
 function varies across component models.
 
-- `name(::ComponentModelSimulation)`: return a string containing the name of
-this `ComponentModelSimulation`, which is used for printing information about
-component models and writing to checkpoint files.
-
 - `step!(::ComponentModelSimulation, t)`: A function to update the
 simulation in-place with values calculate for time `t`. For the
 models we currently have implemented, this is a simple wrapper around
@@ -97,7 +93,8 @@ The default coupler exchange fields are the following, defined in
 | `z0b_sfc`         | buoyancy roughness length                           | m          |
 | `beta`            | factor to scale evaporation from the surface        | -          |
 | `emissivity`      | surface emissivity                                  | -          |
-| `F_turb_energy`   | turbulent energy flux                               | W m⁻²      |
+| `F_lh`            | latent heat flux                                    | W m⁻²      |
+| `F_sh`            | sensible heat flux                                  | W m⁻²      |
 | `F_turb_moisture` | turbulent moisture flux                             | kg m⁻² s⁻¹ |
 | `F_turb_ρτxz`     | turbulent momentum flux in the zonal direction      | kg m⁻¹ s⁻² |
 | `F_turb_ρτyz`     | turbulent momentum flux in the meridional direction | kg m⁻¹ s⁻² |
@@ -232,6 +229,9 @@ properties needed by a component model.
 | `turbulent_energy_flux`                       | aerodynamic turbulent surface fluxes of energy (sensible and latent heat)    | W m⁻²      |
 | `turbulent_moisture_flux`                     | aerodynamic turbulent surface fluxes of energy (evaporation)                 | kg m⁻² s⁻¹ |
 
+Note: `update_field!(::SurfaceModelSimulation, ::Val{:area_fraction}, field)` is
+not required to be extended for land models, since they're assumed to have a
+constant area fraction.
 
 ### SurfaceModelSimulation - optional functions
 - `get_field(::SurfaceModelSimulation, ::Val{property})`:
@@ -265,7 +265,6 @@ get_field(sim::AbstractSurfaceStub, ::Val{:beta}) = sim.cache.beta
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m
 get_field(sim::AbstractSurfaceStub, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) = sim.cache.α
-get_field(sim::AbstractSurfaceStub, ::Val{:surface_humidity}) = TD.q_vap_saturation_generic.(sim.cache.thermo_params, sim.cache.T_sfc, sim.cache.ρ_sfc, sim.cache.phase)
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_temperature}) = sim.cache.T_sfc
 ```
 and with the corresponding `update_field!` functions
@@ -290,7 +289,6 @@ end
     ClimaCoupler.Interfacer.AbstractSurfaceStub
     ClimaCoupler.Interfacer.SurfaceStub
     ClimaCoupler.Interfacer.float_type
-    ClimaCoupler.Interfacer.name
     ClimaCoupler.Interfacer.get_field
     ClimaCoupler.Interfacer.update_field!
     ClimaCoupler.Interfacer.AbstractSlabplanetSimulationMode

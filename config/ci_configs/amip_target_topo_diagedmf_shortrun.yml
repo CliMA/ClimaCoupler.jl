@@ -1,4 +1,5 @@
 FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
 apply_limiter: false
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_diagedmf_0M.yml"
 co2: "maunaloa"
@@ -10,7 +11,7 @@ dt_save_state_to_disk: "1days"
 dt_save_to_sol: "1days"
 energy_check: false
 insolation: "timevarying"
-land_albedo_type: "map_temporal"
+bucket_albedo_type: "map_temporal"
 mode_name: "amip"
 netcdf_output_at_levels: true
 start_date: "20100101"

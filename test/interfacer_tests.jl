@@ -18,11 +18,9 @@ end
 struct DummySimulation3{S} <: Interfacer.LandModelSimulation
     space::S
 end
-Interfacer.name(::DummySimulation3) = "DummySimulation3"
 struct DummySimulation4{S} <: Interfacer.AtmosModelSimulation
     space::S
 end
-Interfacer.name(::DummySimulation4) = "DummySimulation4"
 
 Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var}) = ones(sim.space)
 Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var_float}) = CC.Spaces.undertype(sim.space)(2)
@@ -81,7 +79,6 @@ for FT in (Float32, Float64)
         @test Interfacer.get_field(stub, Val(:roughness_momentum)) == 4
         @test Interfacer.get_field(stub, Val(:roughness_buoyancy)) == 5
         @test Interfacer.get_field(stub, Val(:beta)) == 6
-        @test ≈(Interfacer.get_field(stub, Val(:surface_humidity))[1], FT(0.0076), atol = FT(1e-4))
     end
 
     @testset "update_field! the SurfaceStub area_fraction for FT=$FT" begin
@@ -109,9 +106,9 @@ for FT in (Float32, Float64)
     end
 end
 
-@testset "name(::SurfaceStub)" begin
+@testset "nameof(::SurfaceStub)" begin
     stub = Interfacer.SurfaceStub((;))
-    @test Interfacer.name(stub) == "SurfaceStub"
+    @test nameof(stub) == "SurfaceStub"
 end
 
 @testset "undefined get_field for generic val" begin
@@ -119,7 +116,7 @@ end
     space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
     sim = DummySimulation(space)
     val = Val(:v)
-    @test_throws ErrorException("undefined field `v` for " * Interfacer.name(sim)) Interfacer.get_field(sim, val)
+    @test_throws ErrorException("undefined field `v` for $(nameof(sim))") Interfacer.get_field(sim, val)
 end
 
 @testset "undefined get_field for SurfaceModelSimulation" begin
@@ -134,14 +131,10 @@ end
         :roughness_momentum,
         :surface_direct_albedo,
         :surface_diffuse_albedo,
-        :surface_humidity,
         :surface_temperature,
     )
         val = Val(value)
-        @test_throws ErrorException("undefined field `$value` for " * Interfacer.name(sim)) Interfacer.get_field(
-            sim,
-            val,
-        )
+        @test_throws ErrorException("undefined field `$value` for $(nameof(sim))") Interfacer.get_field(sim, val)
     end
 end
 
@@ -158,17 +151,12 @@ end
         :radiative_energy_flux_sfc,
         :radiative_energy_flux_toa,
         :snow_precipitation,
-        :turbulent_energy_flux,
-        :turbulent_moisture_flux,
         :thermo_state_int,
         :u_int,
         :v_int,
     )
         val = Val(value)
-        @test_throws ErrorException("undefined field `$value` for " * Interfacer.name(sim)) Interfacer.get_field(
-            sim,
-            val,
-        )
+        @test_throws ErrorException("undefined field `$value` for $(nameof(sim))") Interfacer.get_field(sim, val)
     end
 end
 
@@ -189,14 +177,12 @@ end
         :turbulent_moisture_flux,
     )
         val = Val(value)
-        @test_logs (
-            :warn,
-            "`update_field!` is not extended for the `$value` field of " * Interfacer.name(sim) * ": skipping update.",
-        ) Interfacer.update_field!(sim, val, dummy_field)
-        @test_throws ErrorException("undefined field `$value` for " * Interfacer.name(sim)) Interfacer.get_field(
+        @test_logs (:warn, "`update_field!` is not extended for the `$value` field of $(nameof(sim)): skipping update.") Interfacer.update_field!(
             sim,
             val,
+            dummy_field,
         )
+        @test_throws ErrorException("undefined field `$value` for $(nameof(sim))") Interfacer.get_field(sim, val)
     end
 end
 
@@ -209,27 +195,25 @@ end
     # Test that update_field! gives correct warnings for unextended fields
     for value in (:emissivity, :surface_direct_albedo, :surface_diffuse_albedo, :surface_temperature, :turbulent_fluxes)
         val = Val(value)
-        @test_logs (
-            :warn,
-            "`update_field!` is not extended for the `$value` field of " * Interfacer.name(sim) * ": skipping update.",
-        ) Interfacer.update_field!(sim, val, dummy_field)
-        @test_throws ErrorException("undefined field `$value` for " * Interfacer.name(sim)) Interfacer.get_field(
+        @test_logs (:warn, "`update_field!` is not extended for the `$value` field of $(nameof(sim)): skipping update.") Interfacer.update_field!(
             sim,
             val,
+            dummy_field,
         )
+        @test_throws ErrorException("undefined field `$value` for $(nameof(sim))") Interfacer.get_field(sim, val)
     end
 end
 
 @testset "undefined step! error" begin
     FT = Float32
     sim = DummySimulation3(nothing)
-    @test_throws ErrorException("undefined step! for " * Interfacer.name(sim)) Interfacer.step!(sim, 1)
+    @test_throws ErrorException("undefined step! for $(nameof(sim))") Interfacer.step!(sim, 1)
 end
 
 @testset "undefined reinit! error" begin
     FT = Float32
     sim = DummySimulation3(nothing)
-    @test_throws ErrorException("undefined reinit! for " * Interfacer.name(sim)) Interfacer.reinit!(sim)
+    @test_throws ErrorException("undefined reinit! for $(nameof(sim))") Interfacer.reinit!(sim)
 end
 
 @testset "SurfaceStub step!" begin

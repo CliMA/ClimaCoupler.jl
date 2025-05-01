@@ -29,7 +29,7 @@ FT = Float32
     Interfacer.step!(land_sim, dt)
 
     # Check that the simulation object is correctly initialized
-    @test Interfacer.name(land_sim) == "ClimaLandSimulation"
+    @test nameof(land_sim) == "ClimaLandSimulation"
     @test land_sim.area_fraction == area_fraction
 
     # Check that the state is correctly initialized
@@ -72,7 +72,8 @@ end
     coupler_fluxes = (;
         :F_turb_ρτxz => CC.Fields.zeros(boundary_space),
         :F_turb_ρτyz => CC.Fields.zeros(boundary_space),
-        :F_turb_energy => CC.Fields.zeros(boundary_space),
+        :F_lh => CC.Fields.zeros(boundary_space),
+        :F_sh => CC.Fields.zeros(boundary_space),
         :F_turb_moisture => CC.Fields.zeros(boundary_space),
         :temp1 => CC.Fields.zeros(boundary_space),
         :temp2 => CC.Fields.zeros(boundary_space),
@@ -106,13 +107,15 @@ end
     zero_field = CC.Fields.zeros(boundary_space)
     @test coupler_fluxes.F_turb_ρτxz != zero_field
     @test coupler_fluxes.F_turb_ρτyz != zero_field
-    @test coupler_fluxes.F_turb_energy != zero_field
+    @test coupler_fluxes.F_lh != zero_field
+    @test coupler_fluxes.F_sh != zero_field
     @test coupler_fluxes.F_turb_moisture != zero_field
 
     # Check that the fluxes don't contain any NaNs
     @test !any(isnan, coupler_fluxes.F_turb_ρτxz)
     @test !any(isnan, coupler_fluxes.F_turb_ρτyz)
-    @test !any(isnan, coupler_fluxes.F_turb_energy)
+    @test !any(isnan, coupler_fluxes.F_lh)
+    @test !any(isnan, coupler_fluxes.F_sh)
     @test !any(isnan, coupler_fluxes.F_turb_moisture)
 
     # Check that drivers in cache got updated

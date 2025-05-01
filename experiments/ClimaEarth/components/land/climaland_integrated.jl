@@ -388,9 +388,6 @@ Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water}) = CL.total_water(s
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_temperature}) = sim.integrator.p.T_sfc
 
 # Update fields stored in land model sub-components
-function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:area_fraction}, field)
-    parent(sim.area_fraction) .= parent(field)
-end
 function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:diffuse_fraction}, field)
     parent(sim.integrator.p.drivers.frac_diff) .= parent(field)
 end
@@ -424,7 +421,7 @@ end
 function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:sw_d}, field)
     parent(sim.integrator.p.drivers.SW_d) .= parent(field)
 end
-function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:cos_zenith_angle}, field)
+function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:cos_zenith}, field)
     parent(sim.integrator.p.drivers.cosθs) .= parent(field)
 end
 
@@ -436,7 +433,7 @@ function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, area_fraction
     Interfacer.update_field!(sim, Val(:diffuse_fraction), csf.diffuse_fraction)
     Interfacer.update_field!(sim, Val(:sw_d), csf.SW_d)
     Interfacer.update_field!(sim, Val(:lw_d), csf.LW_d)
-    Interfacer.update_field!(sim, Val(:cos_zenith_angle), csf.cos_zenith_angle)
+    Interfacer.update_field!(sim, Val(:cos_zenith), csf.cos_zenith)
 
     # update fields for canopy conductance and photosynthesis
     Interfacer.update_field!(sim, Val(:c_co2), csf.c_co2)
@@ -453,7 +450,7 @@ function FieldExchanger.import_atmos_fields!(csf, sim::ClimaLandSimulation, atmo
     FieldExchanger.dummmy_remap!(csf.diffuse_fraction, Interfacer.get_field(atmos_sim, Val(:diffuse_fraction)))
     FieldExchanger.dummmy_remap!(csf.SW_d, Interfacer.get_field(atmos_sim, Val(:SW_d)))
     FieldExchanger.dummmy_remap!(csf.LW_d, Interfacer.get_field(atmos_sim, Val(:LW_d)))
-    FieldExchanger.dummmy_remap!(csf.cos_zenith_angle, Interfacer.get_field(atmos_sim, Val(:cos_zenith)))
+    FieldExchanger.dummmy_remap!(csf.cos_zenith, Interfacer.get_field(atmos_sim, Val(:cos_zenith)))
     FieldExchanger.dummmy_remap!(csf.P_air, Interfacer.get_field(atmos_sim, Val(:air_pressure)))
     FieldExchanger.dummmy_remap!(csf.T_air, Interfacer.get_field(atmos_sim, Val(:air_temperature)))
     FieldExchanger.dummmy_remap!(csf.q_air, Interfacer.get_field(atmos_sim, Val(:specific_humidity)))
@@ -469,7 +466,7 @@ Extend Interfacer.add_coupler_fields! to add the fields required for ClimaLandSi
 The fields added are:
 - `:SW_d` (for radiative transfer)
 - `:LW_d` (for radiative transfer)
-- `:cos_zenith_angle` (for radiative transfer)
+- `:cos_zenith` (for radiative transfer)
 - `:diffuse_fraction` (for radiative transfer)
 - `:c_co2` (for photosynthesis, biogeochemistry)
 - `:P_air` (for canopy conductance)
@@ -480,7 +477,7 @@ The fields added are:
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaLandSimulation)
     land_coupler_fields =
-        [:SW_d, :LW_d, :cos_zenith_angle, :diffuse_fraction, :c_co2, :P_air, :T_air, :q_air, :P_liq, :P_snow]
+        [:SW_d, :LW_d, :cos_zenith, :diffuse_fraction, :c_co2, :P_air, :T_air, :q_air, :P_liq, :P_snow]
     push!(coupler_field_names, land_coupler_fields...)
 end
 
@@ -503,8 +500,6 @@ function Checkpointer.restore_cache!(sim::ClimaLandSimulation, new_cache)
     )
 end
 
-Interfacer.name(::ClimaLandSimulation) = "ClimaLandSimulation"
-
 ## Extend functions for land-specific flux calculation
 """
     compute_surface_fluxes!(csf, sim::ClimaLandSimulation, atmos_sim, boundary_space, thermo_params, surface_scheme)
@@ -521,7 +516,7 @@ fluxes are computed for each sub-component and then combined to get the total fo
 The land model cache is updated with the computed fluxes for each sub-component.
 
 # Arguments
-- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_turb_energy`, `F_turb_moisture`.
+- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
 - `sim`: [ClimaLandSimulation] the integrated land simulation to compute fluxes for.
 - `atmos_sim`: [Interfacer.AtmosModelSimulation] the atmosphere simulation to compute fluxes with.
 - unused arguments: `boundary_space`, `thermo_params`, `surface_scheme`
@@ -582,7 +577,8 @@ function FluxCalculator.compute_surface_fluxes!(
     @. csf.temp2 = ifelse(area_fraction == 0, zero(csf.temp2), csf.temp2)
 
     # Update the coupler field in-place
-    @. csf.F_turb_energy += (csf.temp1 .+ csf.temp2) * area_fraction
+    @. csf.F_lh += csf.temp1 * area_fraction
+    @. csf.F_sh += csf.temp2 * area_fraction
 
     # Combine turbulent moisture fluxes from each component of the land model
     @. csf.temp1 =

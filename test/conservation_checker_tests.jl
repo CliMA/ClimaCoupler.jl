@@ -14,7 +14,6 @@ get_slab_energy(slab_sim, T_sfc) =
 struct TestAtmos{I} <: Interfacer.AtmosModelSimulation
     i::I
 end
-Interfacer.name(s::TestAtmos) = "TestAtmos"
 Interfacer.get_field(s::TestAtmos, ::Val{:radiative_energy_flux_toa}) = ones(s.i.space) .* 200
 Interfacer.get_field(s::TestAtmos, ::Val{:water}) = s.i.water
 Interfacer.get_field(s::TestAtmos, ::Val{:energy}) = s.i.energy
@@ -22,7 +21,6 @@ Interfacer.get_field(s::TestAtmos, ::Val{:energy}) = s.i.energy
 struct TestOcean{I} <: Interfacer.SurfaceModelSimulation
     i::I
 end
-Interfacer.name(s::TestOcean) = "TestOcean"
 Interfacer.get_field(s::TestOcean, ::Val{:water}) = zeros(s.i.space)
 Interfacer.get_field(s::TestOcean, ::Val{:energy}) = ones(s.i.space) .* CC.Spaces.undertype(s.i.space)(1e6)
 Interfacer.get_field(s::TestOcean, ::Val{:area_fraction}) = ones(s.i.space) .* CC.Spaces.undertype(s.i.space)(0.25)
@@ -30,7 +28,6 @@ Interfacer.get_field(s::TestOcean, ::Val{:area_fraction}) = ones(s.i.space) .* C
 struct TestLand{I} <: Interfacer.SurfaceModelSimulation
     i::I
 end
-Interfacer.name(s::TestLand) = "TestLand"
 Interfacer.get_field(s::TestLand, ::Val{:energy}) = zeros(s.i.space)
 Interfacer.get_field(s::TestLand, ::Val{:water}) = zeros(s.i.space)
 Interfacer.get_field(s::TestLand, ::Val{:area_fraction}) = ones(s.i.space) .* CC.Spaces.undertype(s.i.space)(0.25)
@@ -125,7 +122,7 @@ for FT in (Float32, Float64)
         for sim in values(model_sims)
             for checker in values(cc)
                 ccs = checker.sums
-                @test length(ccs.total) == length(getfield(ccs, Symbol(Interfacer.name(sim))))
+                @test length(ccs.total) == length(getfield(ccs, Symbol(nameof(sim))))
             end
         end
 

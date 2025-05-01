@@ -7,7 +7,7 @@ dt_save_state_to_disk: "20days"
 dt_save_to_sol: "10days"
 energy_check: false
 evolving_ocean: false
-land_albedo_type: "function"
+bucket_albedo_type: "function"
 mode_name: "slabplanet_aqua"
 start_date: "20100101"
 surface_setup: "DefaultMoninObukhov"

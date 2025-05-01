@@ -12,18 +12,15 @@ FT = Float64
 struct ClimaAtmosSimulation{C} <: Interfacer.AtmosModelSimulation
     cache::C
 end
-Interfacer.name(sim::ClimaAtmosSimulation) = "ClimaAtmosSimulation"
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:atmos_field}) = sim.cache.atmos_field
 
 struct BucketSimulation{C} <: Interfacer.SurfaceModelSimulation
     cache::C
 end
-Interfacer.name(sim::BucketSimulation) = "BucketSimulation"
 
 struct ClimaLandSimulation{C} <: Interfacer.SurfaceModelSimulation
     cache::C
 end
-Interfacer.name(sim::ClimaLandSimulation) = "ClimaLandSimulation"
 
 include("../user_io/debug_plots.jl")
 
@@ -43,7 +40,8 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
         :surface_direct_albedo,
         :surface_diffuse_albedo,
         :F_radiative,
-        :F_turb_energy,
+        :F_lh,
+        :F_sh,
         :F_turb_moisture,
         :F_turb_ρτxz,
         :F_turb_ρτyz,

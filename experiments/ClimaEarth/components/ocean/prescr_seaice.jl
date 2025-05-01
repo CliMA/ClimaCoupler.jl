@@ -31,7 +31,6 @@ struct PrescribedIceSimulation{P, I} <: Interfacer.SeaIceModelSimulation
     params::P
     integrator::I
 end
-Interfacer.name(::PrescribedIceSimulation) = "PrescribedIceSimulation"
 
 # sea-ice parameters
 Base.@kwdef struct IceSlabParameters{FT <: AbstractFloat}
@@ -45,8 +44,6 @@ Base.@kwdef struct IceSlabParameters{FT <: AbstractFloat}
     k_ice::FT = 2           # thermal conductivity of sea ice [W / m / K] (less in HM71)
     α::FT = 0.65            # albedo of sea ice, roughly tuned to match observations
 end
-
-Interfacer.name(::IceSlabParameters) = "IceSlabParameters"
 
 # init simulation
 function slab_ice_space_init(::Type{FT}, space, params) where {FT}
@@ -155,7 +152,6 @@ Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_buoyancy}) =
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) =
     sim.integrator.p.params.α
-Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_humidity}) = sim.integrator.p.q_sfc
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
 
 """
@@ -198,8 +194,8 @@ function Interfacer.add_coupler_fields!(coupler_field_names, ::PrescribedIceSimu
 end
 
 function FluxCalculator.update_turbulent_fluxes!(sim::PrescribedIceSimulation, fields::NamedTuple)
-    (; F_turb_energy) = fields
-    @. sim.integrator.p.F_turb_energy = F_turb_energy
+    (; F_lh, F_sh) = fields
+    @. sim.integrator.p.F_turb_energy = F_lh + F_sh
 end
 
 """

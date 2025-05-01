@@ -23,13 +23,13 @@ mutable struct EnergyConservationCheck <: AbstractConservationCheck
     function EnergyConservationCheck(sums)
         all_sims = (;)
         for sim in sums
-            all_sims = merge(all_sims, [Symbol(Interfacer.name(sim)) => []])
+            all_sims = merge(all_sims, [Base.nameof(typeof(sim)) => []])
         end
         all_sims = (all_sims..., toa_net_source = [], total = [])
         return new(all_sims)
     end
 end
-Interfacer.name(::EnergyConservationCheck) = "energy [J]"
+Base.nameof(::EnergyConservationCheck) = "energy [J]"
 
 """
     WaterConservationCheck{A} <: AbstractConservationCheck
@@ -41,13 +41,13 @@ mutable struct WaterConservationCheck <: AbstractConservationCheck
     function WaterConservationCheck(sums)
         all_sims = (;)
         for sim in sums
-            all_sims = merge(all_sims, [Symbol(Interfacer.name(sim)) => []])
+            all_sims = merge(all_sims, [Base.nameof(typeof(sim)) => []])
         end
         all_sims = (all_sims..., total = [])
         return new(all_sims)
     end
 end
-Interfacer.name(::WaterConservationCheck) = "water [kg]"
+Base.nameof(::WaterConservationCheck) = "water [kg]"
 
 """
     check_conservation!(coupler_sim::Interfacer.CoupledSimulation; runtime_check = false)
@@ -82,7 +82,7 @@ function check_conservation!(
 
     # save surfaces
     for sim in model_sims
-        sim_name = Symbol(Interfacer.name(sim))
+        sim_name = Symbol(Base.nameof(sim))
         if sim isa Interfacer.AtmosModelSimulation
             radiative_energy_flux_toa = Interfacer.get_field(sim, Val(:radiative_energy_flux_toa))
 
@@ -155,7 +155,7 @@ function check_conservation!(
 
     # save surfaces
     for sim in model_sims
-        sim_name = Symbol(Interfacer.name(sim))
+        sim_name = Symbol(Base.nameof(sim))
         if sim isa Interfacer.AtmosModelSimulation
 
             # save atmos

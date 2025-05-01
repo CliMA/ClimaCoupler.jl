@@ -37,13 +37,13 @@ function plot_global_conservation(
     # evolution of energy of each component relative to initial value
     total = ccs.total  # total
 
-    var_name = Interfacer.name(cc)
+    var_name = nameof(cc)
     cum_total = [0.0]
     f = Makie.Figure()
     ax = Makie.Axis(f[1, 1], xlabel = "time [days]", ylabel = "$var_name: (t) - (t=0)")
     Makie.lines!(ax, days, total .- total[1], label = "total"; linewidth = 3)
     for sim in model_sims
-        sim_name = Interfacer.name(sim)
+        sim_name = nameof(sim)
         global_field = getproperty(ccs, Symbol(sim_name))
         diff_global_field = (global_field .- global_field[1])
         Makie.lines!(ax, days, diff_global_field[1:length(days)], label = sim_name)
@@ -204,7 +204,7 @@ function debug(sim::Interfacer.ComponentModelSimulation, dir)
             end
         end
     end
-    Makie.save(joinpath(dir, "debug_$(Interfacer.name(sim)).png"), fig)
+    Makie.save(joinpath(dir, "debug_$(nameof(sim)).png"), fig)
 end
 
 """
@@ -249,7 +249,7 @@ Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_water_equiv}) = sim.i
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_liquid_water}) = sim.integrator.u.snow.S_l
 
 # currently selected plot fields
-plot_field_names(sim::Interfacer.SurfaceModelSimulation) = (:area_fraction, :surface_temperature, :surface_humidity)
+plot_field_names(sim::Interfacer.SurfaceModelSimulation) = (:area_fraction, :surface_temperature)
 plot_field_names(sim::ClimaLandSimulation) = (
     :area_fraction,
     :surface_direct_albedo,
@@ -264,5 +264,5 @@ plot_field_names(sim::ClimaLandSimulation) = (
     :snow_water_equiv,
     :snow_liquid_water,
 )
-plot_field_names(sim::BucketSimulation) = (:area_fraction, :surface_temperature, :surface_humidity, :σS, :Ws, :W)
+plot_field_names(sim::BucketSimulation) = (:area_fraction, :surface_temperature, :σS, :Ws, :W)
 plot_field_names(sim::ClimaAtmosSimulation) = (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)

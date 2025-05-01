@@ -7,6 +7,8 @@ atmospheric and surface component models.
 module FieldExchanger
 
 import ..Interfacer, ..FluxCalculator, ..Utilities
+import Thermodynamics as TD
+import Thermodynamics.Parameters as TDP
 
 export import_atmos_fields!,
     update_surface_fractions!,
@@ -56,9 +58,9 @@ end
 """
     import_atmos_fields!(csf, model_sims)
 
-Update the coupler with the atmospheric fluxes. The `Interfacer.get_field` functions
-(`:turbulent_energy_flux`, `:turbulent_moisture_flux`, `:radiative_energy_flux_sfc`, `:liquid_precipitation`, `:snow_precipitation`)
-have to be defined for the atmospheric component model type.
+Update the coupler with the atmospheric fluxes. By default, this updates the coupler fields for
+the surface air density, radiative fluxes, and precipitation. This function should be
+extended for any model that requires additional fields from the atmosphere.
 
 # Arguments
 - `csf`: [NamedTuple] containing coupler fields.
@@ -136,7 +138,7 @@ end
 """
     update_sim!(sim::SurfaceModelSimulation, csf, area_fraction)
 
-Updates the surface component model cache with the current coupler fields of F_turb_energy, F_radiative, F_turb_moisture, P_liq, and ρ_sfc.
+Updates the surface component model cache with the current coupler fields besides turbulent fluxes.
 
 # Arguments
 - `sim`: [Interfacer.SurfaceModelSimulation] containing a surface model simulation object.
@@ -247,5 +249,34 @@ function combine_surfaces!(combined_field, sims, field_name)
         end
     end
 end
+
+"""
+    compute_surface_humidity!(q_sfc, T_atmos, q_atmos, ρ_atmos, T_sfc, thermo_params)
+
+Compute the surface specific humidity based on the atmospheric state and surface temperature.
+The phase of the surface is determined by the surface temperature, and the saturation
+specific humidity is computed accordingly.
+All fields should be on the exchange grid.
+# Arguments
+- `q_sfc`: [CC.Fields.Field] output field for surface specific humidity.
+- `T_atmos`: [CC.Fields.Field] atmospheric temperature.
+- `q_atmos`: [CC.Fields.Field] atmospheric specific humidity.
+- `ρ_atmos`: [CC.Fields.Field] atmospheric air density.
+- `T_sfc`: [CC.Fields.Field] surface temperature.
+- `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
+"""
+function compute_surface_humidity!(q_sfc, T_atmos, q_atmos, ρ_atmos, T_sfc, thermo_params)
+    thermo_state_atmos = TD.PhaseEquil_ρTq.(thermo_params, ρ_atmos, T_atmos, q_atmos)
+    ρ_sfc = FluxCalculator.extrapolate_ρ_to_sfc.(thermo_params, thermo_state_atmos, T_sfc)
+
+    T_freeze = TDP.T_freeze(thermo_params)
+    @. q_sfc = ifelse(
+        T_sfc .> T_freeze,
+        TD.q_vap_saturation_generic(thermo_params, T_sfc, ρ_sfc, TD.Liquid()),
+        TD.q_vap_saturation_generic(thermo_params, T_sfc, ρ_sfc, TD.Ice()),
+    )
+    return nothing
+end
+
 
 end # module

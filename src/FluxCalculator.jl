@@ -26,7 +26,7 @@ export calculate_surface_air_density,
 Extension for this  to to calculate surface density.
 """
 function calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_sfc::CC.Fields.Field)
-    error("this function is required to be dispatched on" * Interfacer.name(atmos_sim) * ", but no method defined")
+    error("this function is required to be dispatched on $(nameof(atmos_sim)), but no method defined")
 end
 
 """
@@ -66,7 +66,8 @@ function turbulent_fluxes!(
     # area-weighted averages
     csf.F_turb_ρτxz .*= FT(0)
     csf.F_turb_ρτyz .*= FT(0)
-    csf.F_turb_energy .*= FT(0)
+    csf.F_lh .*= FT(0)
+    csf.F_sh .*= FT(0)
     csf.F_turb_moisture .*= FT(0)
     csf.z0m_sfc .*= FT(0)
     csf.z0b_sfc .*= FT(0)
@@ -80,6 +81,11 @@ function turbulent_fluxes!(
     for sim in model_sims
         compute_surface_fluxes!(csf, sim, atmos_sim, boundary_space, thermo_params)
     end
+
+    # Update the atmosphere with the fluxes across all surface models
+    # The surface models have already been updated with the fluxes in `compute_surface_fluxes!`
+    # TODO this should be `update_turbulent_fluxes` to match the surface models
+    Interfacer.update_field!(atmos_sim, Val(:turbulent_fluxes), csf)
 
     # TODO: add allowable bounds here, check explicitly that all fluxes are equal
     return nothing
@@ -127,7 +133,7 @@ end
 """
     surface_thermo_state(sim::Interfacer.SurfaceModelSimulation,
                          thermo_params::TD.Parameters.ThermodynamicsParameters,
-                         thermo_state_int)
+                         atmos_sim::Interfacer.AtmosModelSimulation)
 
 Return the surface thermo state the surface model simulation `sim`.
 
@@ -138,9 +144,9 @@ default, is computed assuming a liquid phase).
 function surface_thermo_state(
     sim::Interfacer.SurfaceModelSimulation,
     thermo_params::TD.Parameters.ThermodynamicsParameters,
-    thermo_state_int,
+    atmos_sim::Interfacer.AtmosModelSimulation,
 )
-    FT = eltype(parent(thermo_state_int))
+    FT = eltype(atmos_sim.integrator.u)
 
     T_sfc = Interfacer.get_field(sim, Val(:surface_temperature))
     # Note that the surface air density, ρ_sfc, is computed using the atmospheric state at the first level and making ideal gas
@@ -148,7 +154,12 @@ function surface_thermo_state(
     # a reasonable stand-in.
     #
     # NOTE: This allocates! Fix me!
-    ρ_sfc = FluxCalculator.extrapolate_ρ_to_sfc.(thermo_params, thermo_state_int, T_sfc) # ideally the # calculate elsewhere, here just getter...
+    ρ_sfc =
+        FluxCalculator.extrapolate_ρ_to_sfc.(
+            thermo_params,
+            Interfacer.get_field(atmos_sim, Val(:thermo_state_int)),
+            T_sfc,
+        ) # ideally the # calculate elsewhere, here just getter...
 
     # For SurfaceStabs, this is just liquid phase
     q_sfc = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid()) # default: saturated liquid surface
@@ -187,8 +198,8 @@ function get_surface_fluxes!(inputs, surface_params::SF.Parameters.SurfaceFluxes
     F_turb_ρτyz = outputs.ρτyz
 
     # energy fluxes
-    F_shf = outputs.shf
-    F_lhf = outputs.lhf
+    F_sh = outputs.shf
+    F_lh = outputs.lhf
 
     # moisture
     F_turb_moisture = SF.evaporation.(surface_params, inputs, outputs.Ch)
@@ -197,7 +208,7 @@ function get_surface_fluxes!(inputs, surface_params::SF.Parameters.SurfaceFluxes
     ustar = outputs.ustar
     buoyancy_flux = outputs.buoy_flux
 
-    return (; F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture, L_MO, ustar, buoyancy_flux)
+    return (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux)
 end
 
 """
@@ -210,9 +221,7 @@ here retaining the dependency until we know how EDMF boundary conditions will
 be handled (for consistency of parameters).
 """
 function get_surface_params(atmos_sim::Interfacer.AtmosModelSimulation)
-    return error(
-        "get_surface_params is required to be dispatched on" * Interfacer.name(atmos_sim) * ", but no method defined",
-    )
+    return error("get_surface_params is required to be dispatched on $(nameof(atmos_sim)), but no method defined")
 end
 
 """
@@ -221,9 +230,7 @@ end
 Updates the fluxes in the surface model simulation `sim` with the fluxes in `fields`.
 """
 function update_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, fields::NamedTuple)
-    return error(
-        "update_turbulent_fluxes! is required to be dispatched on" * Interfacer.name(sim) * ", but no method defined",
-    )
+    return error("update_turbulent_fluxes! is required to be dispatched on $(nameof(sim)), but no method defined")
 end
 
 update_turbulent_fluxes!(sim::Interfacer.AbstractSurfaceStub, fields::NamedTuple) = nothing
@@ -252,7 +259,7 @@ end
 Placeholder for the water albedo calculation from the atmosphere. It returns an error if not extended.
 """
 function water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulation, ::CC.Fields.Field, ::CC.Fields.Field)
-    error("this function is required to be dispatched on" * Interfacer.name(atmos_sim) * ", but no method defined")
+    error("this function is required to be dispatched on $(nameof(atmos_sim)), but no method defined")
 end
 
 """
@@ -269,7 +276,7 @@ Since the fluxes are computed between the input model and the atmosphere, this
 function does nothing if called on an atmosphere model simulation.
 
 # Arguments
-- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_turb_energy`, `F_turb_moisture`.
+- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
 - `sim`: [Interfacer.ComponentModelSimulation] the surface simulation to compute fluxes for.
 - `atmos_sim`: [Interfacer.AtmosModelSimulation] the atmosphere simulation to compute fluxes with.
 - `boundary_space`: [CC.Spaces.AbstractSpace] the space of the coupler surface.
@@ -304,7 +311,7 @@ function compute_surface_fluxes!(
     # get area fraction (min = 0, max = 1)
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
-    thermo_state_sfc = FluxCalculator.surface_thermo_state(sim, thermo_params, thermo_state_int)
+    thermo_state_sfc = FluxCalculator.surface_thermo_state(sim, thermo_params, atmos_sim)
 
     surface_params = FluxCalculator.get_surface_params(atmos_sim)
 
@@ -320,7 +327,7 @@ function compute_surface_fluxes!(
 
     # calculate the surface fluxes
     fluxes = FluxCalculator.get_surface_fluxes!(inputs, surface_params)
-    (; F_turb_ρτxz, F_turb_ρτyz, F_shf, F_lhf, F_turb_moisture, L_MO, ustar, buoyancy_flux) = fluxes
+    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux) = fluxes
 
 
     # Zero out fluxes where the area fraction is zero
@@ -328,8 +335,8 @@ function compute_surface_fluxes!(
     # be NaN where the area fraction is zero.
     @. F_turb_ρτxz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτxz), F_turb_ρτxz)
     @. F_turb_ρτyz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτyz), F_turb_ρτyz)
-    @. F_shf = ifelse(area_fraction ≈ 0, zero(F_shf), F_shf)
-    @. F_lhf = ifelse(area_fraction ≈ 0, zero(F_lhf), F_lhf)
+    @. F_sh = ifelse(area_fraction ≈ 0, zero(F_sh), F_sh)
+    @. F_lh = ifelse(area_fraction ≈ 0, zero(F_lh), F_lh)
     @. F_turb_moisture = ifelse(area_fraction ≈ 0, zero(F_turb_moisture), F_turb_moisture)
     @. L_MO = ifelse(area_fraction ≈ 0, zero(L_MO), L_MO)
     @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
@@ -338,17 +345,12 @@ function compute_surface_fluxes!(
     # multiply fluxes by area fraction
     F_turb_ρτxz .*= area_fraction
     F_turb_ρτyz .*= area_fraction
-    F_shf .*= area_fraction
-    F_lhf .*= area_fraction
+    F_sh .*= area_fraction
+    F_lh .*= area_fraction
     F_turb_moisture .*= area_fraction
 
     # update the fluxes, which are now area-weighted, of this surface model
-    fields = (;
-        F_turb_ρτxz = F_turb_ρτxz,
-        F_turb_ρτyz = F_turb_ρτyz,
-        F_turb_energy = F_shf .+ F_lhf,
-        F_turb_moisture = F_turb_moisture,
-    )
+    fields = (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
     FluxCalculator.update_turbulent_fluxes!(sim, fields)
 
     # update fluxes in the coupler fields
@@ -357,7 +359,8 @@ function compute_surface_fluxes!(
     #  not present at a point, the fluxes are zero
     @. csf.F_turb_ρτxz += F_turb_ρτxz
     @. csf.F_turb_ρτyz += F_turb_ρτyz
-    @. csf.F_turb_energy += (F_shf .+ F_lhf)
+    @. csf.F_lh += F_lh
+    @. csf.F_sh += F_sh
     @. csf.F_turb_moisture += F_turb_moisture
 
     # NOTE: This is still an area weighted contribution, which maybe doesn't make

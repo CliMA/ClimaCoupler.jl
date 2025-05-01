@@ -21,7 +21,6 @@ export CoupledSimulation,
     SeaIceModelSimulation,
     LandModelSimulation,
     OceanModelSimulation,
-    name,
     get_field,
     update_field!,
     AbstractSurfaceStub,
@@ -117,7 +116,8 @@ default_coupler_fields() = [
     :beta,
     :emissivity,
     # fields used for flux exchange
-    :F_turb_energy,
+    :F_lh,
+    :F_sh,
     :F_turb_moisture,
     :F_turb_ρτxz,
     :F_turb_ρτyz,
@@ -173,7 +173,7 @@ abstract type OceanModelSimulation <: SurfaceModelSimulation end
 
 # Simulation objects tend to be very big, so it is best to make sure they are not printed in the REPL
 function Base.show(io::IO, @nospecialize(sim::ComponentModelSimulation))
-    return println(io, "I am simulation object and I do not have a specialized `Base.show` method")
+    return println(io, "$(nameof(sim)) without a specialized `Base.show` method")
 end
 
 """
@@ -214,7 +214,6 @@ get_field(
         Val{:roughness_momentum},
         Val{:surface_direct_albedo},
         Val{:surface_diffuse_albedo},
-        Val{:surface_humidity},
         Val{:surface_temperature},
     },
 ) = get_field_error(sim, val)
@@ -226,7 +225,7 @@ Generic fallback for `get_field` that raises an error.
 """
 get_field(sim::ComponentModelSimulation, val::Val) = get_field_error(sim, val)
 
-get_field_error(sim, val::Val{X}) where {X} = error("undefined field `$X` for " * name(sim))
+get_field_error(sim, val::Val{X}) where {X} = error("undefined field `$X` for $(nameof(sim))")
 
 # Set default values for fields that are not defined in all component models
 get_field(::ComponentModelSimulation, ::Val{:energy}) = nothing
@@ -278,7 +277,7 @@ update_field!(
 ) = update_field_warning(sim, val)
 
 update_field_warning(sim, val::Val{X}) where {X} =
-    @warn("`update_field!` is not extended for the `$X` field of " * name(sim) * ": skipping update.", maxlog = 1)
+    @warn("`update_field!` is not extended for the `$X` field of $(nameof(sim)): skipping update.", maxlog = 1)
 
 
 """
@@ -292,11 +291,11 @@ If this function isn't extended, no additional fields will be added.
 add_coupler_fields!(coupler_fields, sim::ComponentModelSimulation) = nothing
 
 """
-    name(::ComponentModelSimulation)
+    Base.nameof(::ComponentModelSimulation)
 
-Returns simulation name, if defined, or `Unnamed` if not.
+Return the simulation name, if defined, or the type name if not.
 """
-name(::ComponentModelSimulation) = "Unnamed"
+Base.nameof(sim::ComponentModelSimulation) = string(nameof(typeof(sim)))
 
 """
     step!(sim::ComponentModelSimulation, t)
@@ -308,7 +307,7 @@ the `step!` function implemented in SciMLBase.jl.
 This must be extended for all component models - otherwise this default
 function will be called and an error will be raised.
 """
-step!(sim::ComponentModelSimulation, t) = error("undefined step! for " * name(sim))
+step!(sim::ComponentModelSimulation, t) = error("undefined step! for $(nameof(sim))")
 
 """
     reinit!(sim::ComponentModelSimulation)
@@ -320,7 +319,7 @@ around the `reinit!` function of SciMLBase.jl.
 This must be extended for all component models - otherwise this default
 function will be called and an error will be raised.
 """
-reinit!(sim::ComponentModelSimulation) = error("undefined reinit! for " * name(sim))
+reinit!(sim::ComponentModelSimulation) = error("undefined reinit! for $(nameof(sim))")
 
 
 # Include file containing the surface stub simulation type.

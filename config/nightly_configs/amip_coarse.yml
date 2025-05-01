@@ -9,7 +9,6 @@ deep_atmosphere: true
 dt_save_state_to_disk: "30days"
 dt_save_to_sol: "30days"
 dz_bottom: 100.0
-deep_atmosphere: true
 energy_check: false
 h_elem: 30
 land_albedo_type: "map_temporal"

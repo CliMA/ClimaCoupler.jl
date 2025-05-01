@@ -86,11 +86,15 @@ function check_conservation!(
         if sim isa Interfacer.AtmosModelSimulation
             radiative_energy_flux_toa = Interfacer.get_field(sim, Val(:radiative_energy_flux_toa))
 
-            if isempty(ccs.toa_net_source)
-                radiation_sources_accum = integral(radiative_energy_flux_toa) * FT(float(coupler_sim.Δt_cpl)) # ∫ J / m^2 dA
+            if radiative_energy_flux_toa isa Number # Case with no radiation. TODO: Handle this better
+                radiation_sources_accum = 0
             else
-                radiation_sources_accum =
-                    integral(radiative_energy_flux_toa) * FT(float(coupler_sim.Δt_cpl)) + ccs.toa_net_source[end] # ∫ J / m^2 dA
+                if isempty(ccs.toa_net_source)
+                    radiation_sources_accum = integral(radiative_energy_flux_toa) * FT(float(coupler_sim.Δt_cpl)) # ∫ J / m^2 dA
+                else
+                    radiation_sources_accum =
+                        integral(radiative_energy_flux_toa) * FT(float(coupler_sim.Δt_cpl)) + ccs.toa_net_source[end] # ∫ J / m^2 dA
+                end
             end
             push!(ccs.toa_net_source, radiation_sources_accum)
 
@@ -160,7 +164,12 @@ function check_conservation!(
 
             # save atmos
             previous = getproperty(ccs, sim_name)
-            current = integral(Interfacer.get_field(sim, Val(:water))) # kg (∫kg of water / m^3 dV)
+            water = Interfacer.get_field(sim, Val(:water))
+            if water isa Number  # Case with no moisture. TODO: Handle this better
+                current = 0
+            else
+                current = integral(Interfacer.get_field(sim, Val(:water))) # kg (∫kg of water / m^3 dV)
+            end
             push!(previous, current)
 
         elseif sim isa Interfacer.SurfaceModelSimulation

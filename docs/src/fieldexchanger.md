@@ -36,5 +36,4 @@ liquid precipitation, and snow precipitation.
 
 ```@docs
     ClimaCoupler.FieldExchanger.combine_surfaces!
-    ClimaCoupler.FieldExchanger.dummmy_remap!
 ```

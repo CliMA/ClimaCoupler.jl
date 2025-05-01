@@ -25,25 +25,27 @@ Maintains the invariant that the sum of area fractions is 1 at all points.
 function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     FT = Interfacer.float_type(cs)
 
+    boundary_space = cs.boundary_space
+
     # land fraction is static
-    land_fraction = Interfacer.get_field(cs.model_sims.land_sim, Val(:area_fraction))
+    land_fraction = Interfacer.get_field(cs.model_sims.land_sim, Val(:area_fraction), boundary_space)
 
     # ice and ocean fractions are dynamic
-    ice_fraction_before = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction))
+    ice_fraction_before = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction), boundary_space)
     # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
     Interfacer.update_field!(
         cs.model_sims.ice_sim,
         Val(:area_fraction),
         max.(min.(ice_fraction_before, FT(1) .- land_fraction), FT(0)),
     )
-    ice_fraction = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction))
+    ice_fraction = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction), boundary_space)
 
     Interfacer.update_field!(
         cs.model_sims.ocean_sim,
         Val(:area_fraction),
         max.(FT(1) .- ice_fraction .- land_fraction, FT(0)),
     )
-    ocean_fraction = Interfacer.get_field(cs.model_sims.ocean_sim, Val(:area_fraction))
+    ocean_fraction = Interfacer.get_field(cs.model_sims.ocean_sim, Val(:area_fraction), boundary_space)
 
     # check that the sum of area fractions is 1
     @assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
@@ -77,14 +79,15 @@ and passed to the surfaces.
 """
 function import_atmos_fields!(csf, ::Interfacer.SurfaceModelSimulation, atmos_sim)
     # surface density - needed for q_sat and requires atmos and sfc states, so it is calculated and saved in the coupler
-    dummmy_remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_sfc)) # TODO: generalize to use individual T_sfc, (#445)
+    Interfacer.remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_sfc)) # TODO: generalize to use individual T_sfc, (#445)
 
     # radiative fluxes
-    dummmy_remap!(csf.F_radiative, Interfacer.get_field(atmos_sim, Val(:radiative_energy_flux_sfc)))
+    Interfacer.get_field!(csf.F_radiative, atmos_sim, Val(:radiative_energy_flux_sfc))
 
     # precipitation
-    dummmy_remap!(csf.P_liq, Interfacer.get_field(atmos_sim, Val(:liquid_precipitation)))
-    dummmy_remap!(csf.P_snow, Interfacer.get_field(atmos_sim, Val(:snow_precipitation)))
+    Interfacer.get_field!(csf.P_liq, atmos_sim, Val(:liquid_precipitation))
+    Interfacer.get_field!(csf.P_snow, atmos_sim, Val(:snow_precipitation))
+    return nothing
 end
 
 import_atmos_fields!(csf, ::Interfacer.AtmosModelSimulation, atmos_sim) = nothing
@@ -101,17 +104,10 @@ functions for (`:surface_temperature`, `:surface_direct_albedo`,
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
 """
 function import_combined_surface_fields!(csf, model_sims)
-    combined_field = csf.temp1
-
-    # surface fields
-    combine_surfaces!(combined_field, model_sims, Val(:surface_temperature))
-    dummmy_remap!(csf.T_sfc, combined_field)
-
-    combine_surfaces!(combined_field, model_sims, Val(:surface_direct_albedo))
-    dummmy_remap!(csf.surface_direct_albedo, combined_field)
-
-    combine_surfaces!(combined_field, model_sims, Val(:surface_diffuse_albedo))
-    dummmy_remap!(csf.surface_diffuse_albedo, combined_field)
+    combine_surfaces!(csf.T_sfc, model_sims, Val(:surface_temperature))
+    combine_surfaces!(csf.surface_direct_albedo, model_sims, Val(:surface_direct_albedo))
+    combine_surfaces!(csf.surface_diffuse_albedo, model_sims, Val(:surface_diffuse_albedo))
+    return nothing
 end
 
 """
@@ -128,6 +124,7 @@ function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf)
     Interfacer.update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
     Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf)
     Interfacer.update_field!(atmos_sim, Val(:turbulent_fluxes), csf)
+    return nothing
 end
 
 """
@@ -151,6 +148,7 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, area_fraction)
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)
     Interfacer.update_field!(sim, Val(:snow_precipitation), csf.P_snow)
+    return nothing
 end
 
 """
@@ -163,9 +161,10 @@ Iterates `update_sim!` over all component model simulations saved in `cs.model_s
 - `csf`: [NamedTuple] containing coupler fields.
 """
 function update_model_sims!(model_sims, csf)
+    boundary_space = axes(csf)
     for sim in model_sims
         if sim isa Interfacer.SurfaceModelSimulation
-            update_sim!(sim, csf, Interfacer.get_field(sim, Val(:area_fraction)))
+            update_sim!(sim, csf, Interfacer.get_field(sim, Val(:area_fraction), boundary_space))
         else
             update_sim!(sim, csf)
         end
@@ -188,21 +187,6 @@ function step_model_sims!(model_sims, t)
 end
 
 """
-    dummmy_remap!(target, source)
-
-Simple stand-in function for remapping.
-For AMIP we don't need regridding of surface model CC.Fields.
-When we do, we re-introduce the ClimaCoreTempestRemap remapping functions.
-
-# Arguments
-- `target`: [CC.Fields.Field] destination of remapping.
-- `source`: [CC.Fields.Field] source of remapping.
-"""
-function dummmy_remap!(target, source)
-    parent(target) .= parent(source)
-end
-
-"""
     combine_surfaces!(combined_field::CC.Fields.Field, sims, field_name::Val)
 
 Sums the fields, specified by `field_name`, weighted by the respective area fractions of all
@@ -217,15 +201,16 @@ surface simulations. THe result is saved in `combined_field`.
 - `combine_surfaces!(temp_field, cs.model_sims, Val(:surface_temperature))`
 """
 function combine_surfaces!(combined_field, sims, field_name)
+    boundary_space = axes(combined_field)
     combined_field .= 0
     for sim in sims
         if sim isa Interfacer.SurfaceModelSimulation
             # Zero out the contribution from this surface if the area fraction is zero
             # Note that multiplying by `area_fraction` is not sufficient in the case of NaNs
-            area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
+            area_fraction = Interfacer.get_field(sim, Val(:area_fraction), boundary_space)
             combined_field .+=
                 area_fraction .*
-                ifelse.(area_fraction .≈ 0, zero(combined_field), Interfacer.get_field(sim, field_name))
+                ifelse.(area_fraction .≈ 0, zero(combined_field), Interfacer.get_field(sim, field_name, boundary_space))
         end
     end
 end

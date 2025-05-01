@@ -233,6 +233,28 @@ get_field(sim::SurfaceModelSimulation, ::Val{:beta}) = convert(eltype(sim.integr
 get_field(sim::SurfaceModelSimulation, ::Val{:emissivity}) = convert(eltype(sim.integrator.u), 1.0)
 get_field(sim::SurfaceModelSimulation, ::Val{:height_disp}) = convert(eltype(sim.integrator.u), 0.0)
 
+
+"""
+    get_field(sim, what, target_space)
+
+Return `quantity` in `sim` remapped onto the `target_space`
+
+This is equivalent to calling `get_field`, and then `remap`.
+"""
+function get_field(sim, quantity, target_space)
+    return remap(get_field(sim, quantity), target_space)
+end
+
+"""
+    get_field!(target_field, sim, quantity)
+
+Remap `quantity` in `sim` remapped onto the `target_field`.
+"""
+function get_field!(target_field, sim, quantity)
+    remap!(target_field, get_field(sim, quantity))
+    return nothing
+end
+
 """
     update_field!(::AtmosModelSimulation, ::Val, _...)
 
@@ -363,5 +385,47 @@ and only once surface model, a ClimaLand.jl bucket land model, which is evaluate
 entire surface. There are no ocean or sea ice models.
 """
 abstract type SlabplanetTerraMode <: AbstractSlabplanetSimulationMode end
+
+"""
+    remap(field, target_space)
+
+Remap the given `field` onto the `target_space`.
+
+Non-ClimaCore fields should provide a method to this function.
+
+TODO: Add support for different source and target fields
+"""
+function remap end
+
+function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
+    space = axes(field)
+    space_are_compatible =
+        space == target_space || CC.Spaces.issubspace(space, target_space) || CC.Spaces.issubspace(target_space, space)
+    space_are_compatible || error("Space is inconsistent")
+
+    # TODO: Handle remapping of Vectors correctly
+    if hasproperty(field, :components)
+        @assert length(field.components) == 1 "Can only work with simple vectors"
+        field = field.components.data.:1
+    end
+    return field
+end
+
+function remap(num::Number, target_space::CC.Spaces.AbstractSpace)
+    return num
+end
+
+"""
+    remap!(target_field, source)
+
+Remap the given `source` onto the `target_field`.
+
+Non-ClimaCore fields should provide a method to [`Interfacer.remap`](@ref), or directly to this
+function.
+"""
+function remap!(target_field, source)
+    target_field .= remap(source, axes(target_field))
+    return nothing
+end
 
 end # module

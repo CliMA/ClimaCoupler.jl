@@ -188,7 +188,7 @@ end
 
 # helpers for get_field extensions, dipatchable on different moisture model options and radiation modes
 
-surface_rain_flux(::CA.DryModel, integrator) = StaticArrays.SVector(eltype(integrator.u)(0))
+surface_rain_flux(::CA.DryModel, integrator) = eltype(integrator.u)(0)
 function surface_rain_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator)
     if pkgversion(CA) >= v"0.29.0"
         return integrator.p.precomputed.surface_rain_flux
@@ -197,7 +197,7 @@ function surface_rain_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, i
     end
 end
 
-surface_snow_flux(::CA.DryModel, integrator) = StaticArrays.SVector(eltype(integrator.u)(0))
+surface_snow_flux(::CA.DryModel, integrator) = eltype(integrator.u)(0)
 function surface_snow_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator)
     if pkgversion(CA) >= v"0.29.0"
         return integrator.p.precomputed.surface_snow_flux
@@ -206,15 +206,15 @@ function surface_snow_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, i
     end
 end
 
-surface_radiation_flux(::Nothing, integrator) = StaticArrays.SVector(eltype(integrator.u)(0))
+surface_radiation_flux(::Nothing, integrator) = eltype(integrator.u)(0)
 surface_radiation_flux(::CA.RRTMGPI.AbstractRRTMGPMode, integrator) =
     CC.Fields.level(integrator.p.radiation.ᶠradiation_flux, CC.Utilities.half)
 
-moisture_flux(::CA.DryModel, integrator) = StaticArrays.SVector(eltype(integrator.u)(0))
+moisture_flux(::CA.DryModel, integrator) = eltype(integrator.u)(0)
 moisture_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
     CC.Geometry.WVector.(integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot)
 
-ρq_tot(::CA.DryModel, integrator) = zeros(axes(integrator.u.c.uₕ))
+ρq_tot(::CA.DryModel, integrator) = eltype(integrator.u)(0)
 ρq_tot(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) = integrator.u.c.ρq_tot
 
 # extensions required by the Interfacer

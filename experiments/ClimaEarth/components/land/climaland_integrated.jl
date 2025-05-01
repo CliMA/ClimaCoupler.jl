@@ -426,7 +426,6 @@ function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:cos_zenith}, 
 end
 
 Interfacer.step!(sim::ClimaLandSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
-Interfacer.reinit!(sim::ClimaLandSimulation) = Interfacer.reinit!(sim.integrator)
 
 function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, area_fraction)
     # update fields for radiative transfer

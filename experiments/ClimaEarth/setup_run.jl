@@ -491,8 +491,6 @@ function CoupledSimulation(config_dict::AbstractDict)
         #=
         ## Initialize Component Model Exchange
 
-        We need to ensure all models' initial conditions are shared to enable the coupler to calculate the first instance of surface fluxes. Some auxiliary variables (namely surface humidity and radiation fluxes)
-        depend on initial conditions of other component models than those in which the variables are calculated, which is why we need to step these models in time and/or reinitialize them.
         The concrete steps for proper initialization are:
         =#
 

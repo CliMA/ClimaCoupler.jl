@@ -28,7 +28,6 @@ liquid precipitation, and snow precipitation.
     ClimaCoupler.FieldExchanger.import_combined_surface_fields!
     ClimaCoupler.FieldExchanger.update_model_sims!
     ClimaCoupler.FieldExchanger.update_sim!
-    ClimaCoupler.FieldExchanger.reinit_model_sims!
     ClimaCoupler.FieldExchanger.step_model_sims!
     ClimaCoupler.FieldExchanger.update_surface_fractions!
 ```

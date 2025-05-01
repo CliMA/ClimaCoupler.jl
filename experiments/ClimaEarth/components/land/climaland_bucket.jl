@@ -304,7 +304,6 @@ end
 
 # extensions required by FieldExchanger
 Interfacer.step!(sim::BucketSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
-Interfacer.reinit!(sim::BucketSimulation) = Interfacer.reinit!(sim.integrator)
 
 """
 Extend Interfacer.add_coupler_fields! to add the fields required for BucketSimulation.

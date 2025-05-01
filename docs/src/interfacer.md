@@ -43,11 +43,6 @@ simulation in-place with values calculate for time `t`. For the
 models we currently have implemented, this is a simple wrapper around
 the `step!` function implemented in SciMLBase.jl.
 
-- `reinit!(::ComponentModelSimulation)`: A function to restart a simulation
-after solving of the simulation has been paused or interrupted. Like
-`step!`, this is currently a simple wrapper around the `reinit!` function
-of SciMLBase.jl.
-
 ### ComponentModelSimulation - optional functions
 - `Checkpointer.get_model_prog_state(::ComponentModelSimulation)`:
 A function that returns the state vector of the simulation at its current

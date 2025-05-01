@@ -376,8 +376,6 @@ function Interfacer.step!(sim::ClimaAtmosSimulation, t::ITime)
     return nothing
 end
 
-Interfacer.reinit!(sim::ClimaAtmosSimulation) = Interfacer.reinit!(sim.integrator)
-
 """
 Extend Interfacer.add_coupler_fields! to add the fields required for ClimaAtmosSimulation.
 

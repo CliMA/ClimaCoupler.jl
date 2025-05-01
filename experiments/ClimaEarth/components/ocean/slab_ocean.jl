@@ -142,7 +142,6 @@ end
 
 # extensions required by FieldExchanger
 Interfacer.step!(sim::SlabOceanSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
-Interfacer.reinit!(sim::SlabOceanSimulation) = Interfacer.reinit!(sim.integrator)
 
 """
 Extend Interfacer.add_coupler_fields! to add the fields required for SlabOceanSimulation.

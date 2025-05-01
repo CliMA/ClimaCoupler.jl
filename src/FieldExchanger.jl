@@ -11,12 +11,7 @@ import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
 
 export import_atmos_fields!,
-    update_surface_fractions!,
-    import_combined_surface_fields!,
-    update_sim!,
-    update_model_sims!,
-    reinit_model_sims!,
-    step_model_sims!
+    update_surface_fractions!, import_combined_surface_fields!, update_sim!, update_model_sims!, step_model_sims!
 
 """
     update_surface_fractions!(cs::Interfacer.CoupledSimulation)
@@ -174,21 +169,6 @@ function update_model_sims!(model_sims, csf)
         else
             update_sim!(sim, csf)
         end
-    end
-end
-
-"""
-    reinit_model_sims!(model_sims)
-
-Iterates `reinit!` over all component model simulations saved in `cs.model_sims`.
-
-# Arguments
-- `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
-
-"""
-function reinit_model_sims!(model_sims)
-    for sim in model_sims
-        Interfacer.reinit!(sim)
     end
 end
 

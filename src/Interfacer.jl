@@ -10,7 +10,7 @@ import ClimaComms
 import ClimaCore as CC
 import Dates
 import Thermodynamics as TD
-import SciMLBase: step!, reinit! # explicitly import to extend these functions
+import SciMLBase: step!
 import ClimaUtilities.TimeManager: ITime, date
 
 export CoupledSimulation,
@@ -26,7 +26,6 @@ export CoupledSimulation,
     AbstractSurfaceStub,
     SurfaceStub,
     step!,
-    reinit!,
     AbstractSlabplanetSimulationMode,
     AMIPMode,
     SlabplanetMode,
@@ -308,18 +307,6 @@ This must be extended for all component models - otherwise this default
 function will be called and an error will be raised.
 """
 step!(sim::ComponentModelSimulation, t) = error("undefined step! for $(nameof(sim))")
-
-"""
-    reinit!(sim::ComponentModelSimulation)
-
-A function to restart a simulation after solving of the simulation has been
-paused or interrupted. Like `step!`, this is currently a simple wrapper
-around the `reinit!` function of SciMLBase.jl.
-
-This must be extended for all component models - otherwise this default
-function will be called and an error will be raised.
-"""
-reinit!(sim::ComponentModelSimulation) = error("undefined reinit! for $(nameof(sim))")
 
 
 # Include file containing the surface stub simulation type.

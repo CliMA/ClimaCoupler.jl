@@ -42,7 +42,6 @@ Interfacer.get_field(sim::TestSurfaceSimulation1, ::Val{:area_fraction}) = sim.c
 Interfacer.get_field(sim::TestSurfaceSimulation2, ::Val{:area_fraction}) =
     sim.cache_field .* CC.Spaces.undertype(axes(sim.cache_field))(0.5)
 
-Interfacer.reinit!(::TestSurfaceSimulation1) = nothing
 Interfacer.step!(::TestSurfaceSimulation1, _) = nothing
 
 struct TestSurfaceSimulationA <: Interfacer.SurfaceModelSimulation end
@@ -311,9 +310,6 @@ for FT in (Float32, Float64)
         # test stub - albedo should be updated by update_sim!
         @test Array(parent(model_sims.stub_sim.cache.albedo_direct))[1] == results[2]
         @test Array(parent(model_sims.stub_sim.cache.albedo_diffuse))[1] == results[2]
-    end
-    @testset "reinit_model_sims! for FT=$FT" begin
-        @test FieldExchanger.reinit_model_sims!((; stub = TestSurfaceSimulation1(FT(0)))) === nothing
     end
 
     @testset "step_model_sims! for FT=$FT" begin

@@ -210,18 +210,7 @@ end
     @test_throws ErrorException("undefined step! for $(nameof(sim))") Interfacer.step!(sim, 1)
 end
 
-@testset "undefined reinit! error" begin
-    FT = Float32
-    sim = DummySimulation3(nothing)
-    @test_throws ErrorException("undefined reinit! for $(nameof(sim))") Interfacer.reinit!(sim)
-end
-
 @testset "SurfaceStub step!" begin
     FT = Float32
     @test isnothing(Interfacer.step!(Interfacer.SurfaceStub(FT(0)), 1))
-end
-
-@testset "SurfaceStub reinit!" begin
-    FT = Float32
-    @test isnothing(Interfacer.reinit!(Interfacer.SurfaceStub(FT(0))))
 end

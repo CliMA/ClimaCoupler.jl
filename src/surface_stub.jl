@@ -80,13 +80,6 @@ function update_sim!(sim::AbstractSurfaceStub, csf, area_fraction)
 end
 
 """
-    reinit!(cs::AbstractSurfaceStub)
-
-The stub surface simulation is not updated by this function. Extends `SciMLBase.reinit!`.
-"""
-reinit!(::AbstractSurfaceStub) = nothing
-
-"""
 Extend Interfacer.add_coupler_fields! to add the fields required for AbstractSurfaceStub.
 
 The fields added are:

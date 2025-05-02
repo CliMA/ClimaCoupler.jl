@@ -542,7 +542,7 @@ function FluxCalculator.water_albedo_from_atmosphere!(
     p = sim.integrator.p
     t = sim.integrator.t
 
-    rrtmgp_model = sim.integrator.p.radiation.rrtmgp_model
+    rrtmgp_model = p.radiation.rrtmgp_model
     FT = eltype(Y)
     λ = FT(0) # spectral wavelength (not used for now)
 
@@ -550,9 +550,8 @@ function FluxCalculator.water_albedo_from_atmosphere!(
     bottom_coords = CC.Fields.coordinate_field(CC.Spaces.level(Y.c, 1))
     # call to set_insolation_variables! can be removed after ClimaAtmos version > v0.30.0
     # see ClimaAtmos PR #3788 for details
-    CA.set_insolation_variables!(u, p, t, p.atmos.insolation)
+    CA.set_insolation_variables!(Y, p, t, p.atmos.insolation)
     μ = CC.Fields.array2field(rrtmgp_model.cos_zenith, axes(bottom_coords))
-    FT = eltype(sim.integrator.u)
     α_model = CA.RegressionFunctionAlbedo{FT}()
 
     # set the direct and diffuse surface albedos

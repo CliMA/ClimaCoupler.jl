@@ -77,14 +77,28 @@ end
     map(sim -> Interfacer.add_coupler_fields!(coupler_field_names, sim), values(model_sims))
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
 
+    cs = Interfacer.CoupledSimulation{FT}(
+        nothing, # comms_ctx
+        nothing, # start_date
+        boundary_space,
+        coupler_fields,
+        nothing, # conservation_checks
+        tspan,
+        dt,
+        tspan[1],
+        model_sims,
+        (;), # callbacks
+        (;), # dirs
+        nothing, # thermo_params
+        nothing, # diags_handler
+    )
+
     # Step the atmosphere once to get non-zero wind and humidity so the fluxes are non-zero
     Interfacer.step!(atmos_sim, dt)
 
     # Exchange the initial conditions between atmosphere and land
     # This also tests the `get_field`, `update_field!` and `update_model_sims!` methods for `ClimaLandSimulation`
-    FieldExchanger.import_combined_surface_fields!(coupler_fields, model_sims)
-    FieldExchanger.import_atmos_fields!(coupler_fields, model_sims)
-    FieldExchanger.update_model_sims!(model_sims, coupler_fields)
+    FieldExchanger.exchange!(cs)
 
     # Update land cache variables with the updated drivers in the cache after the exchange
     update_aux! = ClimaLand.make_update_aux(land_sim.model)

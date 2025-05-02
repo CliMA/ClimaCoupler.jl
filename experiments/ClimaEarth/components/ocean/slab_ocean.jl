@@ -86,7 +86,6 @@ function SlabOceanSimulation(
         thermo_params = thermo_params,
         α_direct = CC.Fields.ones(space) .* params.α,
         α_diffuse = CC.Fields.ones(space) .* params.α,
-        cos_zenith = CC.Fields.zeros(space),
         u_atmos = CC.Fields.zeros(space),
         v_atmos = CC.Fields.zeros(space),
         start_date = start_date,
@@ -279,29 +278,18 @@ function set_albedos!(sim::SlabOceanSimulation, t)
     insolation_params = InsolationParameters(FT)
     d, δ, η_UTC = FT.(Insolation.helper_instantaneous_zenith_angle(current_date, date0, insolation_params))
 
+    # Get the atmospheric wind vector and the cosine of the zenith angle
     surface_coords = Fields.coordinate_field(CC.Spaces.level(u.T_sfc, CC.Spaces.nlevels(u.T_sfc)))
-    # if eltype(bottom_coords) <: Geometry.LatLongZPoint
     (zenith_angle, _, _) = @. instantaneous_zenith_angle(d, δ, η_UTC, surface_coords.long, surface_coords.lat) # the tuple is (zenith angle, azimuthal angle, earth-sun distance)
-    # else
-    #     # assume that the latitude and longitude are both 0 for flat space,
-    #     # so that insolation_tuple is a constant Field
-    # (zenith_angle, _, _) .=
-    #     Ref(instantaneous_zenith_angle(d, δ, η_UTC, FT(0), FT(0)))
-    # end
-
-    # Update the cosine of the zenith angle in the ocean cache
-    max_zenith_angle = FT(π) / 2 - eps(FT)
-    @. p.cos_zenith = cos(min(zenith_angle, max_zenith_angle))
-
-    # Use the cosine of the zenith angle to calculate the direct and diffuse albedo
     wind_atmos = SA.SVector{2, FT}(p.u_atmos, p.v_atmos) # wind vector from components
     λ = FT(0) # spectral wavelength (not used for now)
-    μ = CC.Fields.array2field(p.cos_zenith, axes(u))
+    max_zenith_angle = FT(π) / 2 - eps(FT)
+    cos_zenith = CC.Fields.array2field(cos(min(zenith_angle, max_zenith_angle)), axes(u)) # cosine of the zenith angle, as a ClimaCore field
 
     # Use the albedo model from ClimaAtmos
     α_model = CA.RegressionFunctionAlbedo{FT}()
-    update_field!(sim, Val(:surface_direct_albedo), CA.surface_albedo_direct(α_model).(λ, μ, wind_atmos))
-    update_field!(sim, Val(:surface_diffuse_albedo), CA.surface_albedo_diffuse(α_model).(λ, μ, wind_atmos))
+    update_field!(sim, Val(:surface_direct_albedo), CA.surface_albedo_direct(α_model).(λ, cos_zenith, wind_atmos))
+    update_field!(sim, Val(:surface_diffuse_albedo), CA.surface_albedo_diffuse(α_model).(λ, cos_zenith, wind_atmos))
 
     return nothing
 end

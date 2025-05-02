@@ -31,10 +31,12 @@ Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var_float}) 
 
 for FT in (Float32, Float64)
     @testset "test CoupledSim construction, float_type for FT=$FT" begin
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+
         cs = Interfacer.CoupledSimulation{FT}(
-            nothing, # comms_ctx
+            ClimaComms.context(boundary_space),
             nothing, # dates
-            nothing, # boundary_space
+            boundary_space,
             nothing, # fields
             nothing, # conservation_checks
             (Int(0), Int(1000)), # tspan
@@ -46,8 +48,8 @@ for FT in (Float32, Float64)
             nothing, # thermo_params
             nothing, # diags_handler
         )
+        @test CC.Spaces.undertype(cs.boundary_space) == FT
 
-        @test Interfacer.float_type(cs) == FT
     end
 
     @testset "get_field indexing for FT=$FT" begin

@@ -6,6 +6,8 @@ atmospheric and surface component models.
 """
 module FieldExchanger
 
+import ClimaCore as CC
+
 import ..Interfacer, ..FluxCalculator, ..Utilities
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
@@ -22,9 +24,8 @@ Maintains the invariant that the sum of area fractions is 1 at all points.
 - `cs`: [Interfacer.CoupledSimulation] containing area fraction information.
 """
 function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
-    FT = Interfacer.float_type(cs)
-
     boundary_space = cs.boundary_space
+    FT = CC.Spaces.undertype(boundary_space)
 
     # land fraction is static
     land_fraction = Interfacer.get_field(cs.model_sims.land_sim, Val(:area_fraction), boundary_space)

@@ -494,13 +494,10 @@ function CoupledSimulation(config_dict::AbstractDict)
         The concrete steps for proper initialization are:
         =#
 
-        # 1. Coupler updates surface model area fractions
-        FieldExchanger.update_surface_fractions!(cs)
-
-        # 2. Import atmospheric and surface fields into the coupler fields, then broadcast them back out to all components.
+        # 1. Import atmospheric and surface fields into the coupler fields, then broadcast them back out to all components.
         FieldExchanger.exchange!(cs)
 
-        # 3. Set all initial cache values for the land model, now that we have updated drivers
+        # 2. Set all initial cache values for the land model, now that we have updated drivers
         land_set_initial_cache! = CL.make_set_initial_cache(cs.model_sims.land_sim.model)
         land_set_initial_cache!(
             cs.model_sims.land_sim.integrator.p,
@@ -508,14 +505,15 @@ function CoupledSimulation(config_dict::AbstractDict)
             cs.model_sims.land_sim.integrator.t,
         )
 
-        # 4. Compute radiative fluxes and update the coupler fields and model simulations with the new fluxes
-        # Any other callbacks that modify a model's cache should be called here and propagated to the other models.
+        # 3. Compute radiative fluxes and update the coupler fields and model simulations with the new fluxes
+        # Any other callbacks that modify a model's cache should be called here as well.
         if hasradiation(cs.model_sims.atmos_sim.integrator)
             CA.rrtmgp_model_callback!(cs.model_sims.atmos_sim.integrator)
+            pkgversion(CA) >= v"0.30" && CA.nogw_model_callback!(cs.model_sims.atmos_sim.integrator)
             FieldExchanger.exchange!(cs)
         end
 
-        # 5. Now we have all information needed for calculating the initial
+        # 4.turbulent fluxes: Now we have all information needed for calculating the initial
         # turbulent surface fluxes. Calculate and update turbulent fluxes for each surface model,
         # and save the weighted average in coupler fields
         FluxCalculator.turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, cs.thermo_params)

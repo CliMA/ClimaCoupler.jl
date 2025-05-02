@@ -3,8 +3,6 @@ import ClimaComms
 ClimaComms.@import_required_backends
 import Pkg, Artifacts
 
-gpu_broken = ClimaComms.device() isa ClimaComms.CUDADevice
-
 # Download test-only artifacts
 #
 # (Currently not natively supported by Julia)

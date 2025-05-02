@@ -181,8 +181,7 @@ function ClimaLandSimulation(
     #  code itself requires a surface temperature as input.
     @. p.T_sfc = orog_adjusted_T_surface
 
-
-    updateat = Array(tspan[1]:dt:tspan[2])
+    updateat = [promote(tspan[1]:dt:(tspan[2] + dt)...)...] # add an extra time at end in case sim steps over end
     updatefunc = ClimaLand.make_update_drivers(ClimaLand.get_drivers(model))
     driver_cb = ClimaLand.DriverUpdateCallback(updateat, updatefunc)
 

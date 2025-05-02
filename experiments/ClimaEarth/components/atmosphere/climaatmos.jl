@@ -235,13 +235,6 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
     )
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) =
     TD.air_density.(sim.integrator.p.params.thermodynamics_params, CC.Fields.level(sim.integrator.p.precomputed.ᶜts, 1))
-function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:cos_zenith})
-    hasradiation(sim.integrator) || return nothing
-    return CC.Fields.array2field(
-        sim.integrator.p.radiation.rrtmgp_model.cos_zenith,
-        CC.Fields.level(axes(sim.integrator.u.c), 1),
-    )
-end
 # When using the `FixedCO2` option, CO2 is stored as that struct type,
 # so we access its value (a scalar) from the struct.
 # When using the `MaunaLoa` option, CO2 is stored as a 1D Array in the tracers
@@ -442,23 +435,6 @@ Close all output writers used by the atmos simulation.
 Interfacer.close_output_writers(sim::ClimaAtmosSimulation) =
     isnothing(sim.output_writers) || foreach(close, sim.output_writers)
 
-function FieldExchanger.update_sim!(sim::ClimaAtmosSimulation, csf)
-    # TODO: This function should be removed once we remove cos_zenith_angle as
-    # one of the exchange fields (and use the default method in FieldExchanger)
-    u = sim.integrator.u
-    p = sim.integrator.p
-    t = sim.integrator.t
-
-    # Perform radiation-specific updates
-    if hasradiation(sim.integrator)
-        CA.set_insolation_variables!(u, p, t, p.atmos.insolation)
-        Interfacer.update_field!(sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
-        Interfacer.update_field!(sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
-        Interfacer.update_field!(sim, Val(:surface_temperature), csf)
-    end
-
-    Interfacer.update_field!(sim, Val(:turbulent_fluxes), csf)
-end
 
 # FluxCalculator.get_surface_params required by FluxCalculator (partitioned fluxes)
 FluxCalculator.get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxes_params(sim.integrator.p.params)

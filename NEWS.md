@@ -6,6 +6,12 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Allow < 3 surface models. PR[#1286](https://github.com/CliMA/ClimaCoupler.jl/pull/1286)
+
+Previously, land, ocean, and sea ice were all required to be defined, and the
+area fraction of a model would be set to 0 to exclude it. Now, a `CoupledSimulation`
+can be created with fewer than 4 components in `model_sims`.
+
 #### Change signature for `turbulent_fluxes!`. PR[#1327](https://github.com/CliMA/ClimaCoupler.jl/pull/1327)
 
 `FluxCalculator.turbulent_fluxes!` can now be called in two ways:
@@ -21,7 +27,7 @@ The new signature simplifies calling the function, ensures that the mutating
 convention is respected (`turbulent_fluxes!` mutates `coupler_fields`), and
 removes unnecessary arguments and type restrictions.
 
-Similarly, `get_surface_fluxes!` was renamed to `get_surface_fluxes`. 
+Similarly, `get_surface_fluxes!` was renamed to `get_surface_fluxes`.
 
 #### Simplify initial component model exchange. PR[#1305](https://github.com/CliMA/ClimaCoupler.jl/pull/1305)
 

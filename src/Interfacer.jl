@@ -14,7 +14,6 @@ import SciMLBase: step!
 import ClimaUtilities.TimeManager: ITime, date
 
 export CoupledSimulation,
-    float_type,
     ComponentModelSimulation,
     AtmosModelSimulation,
     SurfaceModelSimulation,
@@ -95,13 +94,6 @@ Return the model date at the current timestep.
 - `cs`: [CoupledSimulation] containing info about the simulation
 """
 current_date(cs::Interfacer.CoupledSimulation) = cs.t[] isa ITime ? date(cs.t[]) : cs.start_date + Dates.second(cs.t[])
-
-"""
-    float_type(::CoupledSimulation)
-
-Return the floating point type backing `T`: `T` can either be an object or a type.
-"""
-float_type(::CoupledSimulation{FT}) where {FT} = FT
 
 """
     default_coupler_fields()

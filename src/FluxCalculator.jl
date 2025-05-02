@@ -29,11 +29,13 @@ function calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulatio
     error("this function is required to be dispatched on $(nameof(atmos_sim)), but no method defined")
 end
 
+function turbulent_fluxes!(cs::Interfacer.CoupledSimulation)
+    return turbulent_fluxes!(cs.fields, cs.model_sims, cs.thermo_params)
+end
+
 """
-    turbulent_fluxes!(model_sims::NamedTuple,
-                                  csf::CC.Fields.Field,
-                                  boundary_space::CC.Spaces.AbstractSpace,
-                                  thermo_params::TD.Parameters.ThermodynamicsParameters)
+    turbulent_fluxes!(cs::CoupledSimulation)
+    turbulent_fluxes!(fields, model_sims, thermo_params)
 
 Compute turbulent fluxes and associated quantities. Store the results in `fields` as
 area-weighted sums.
@@ -41,9 +43,8 @@ area-weighted sums.
 This function uses `SurfaceFluxes.jl` under the hood.
 
 Args:
+- `csf`: [Field of NamedTuple] containing coupler fields.
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
-- `fields`: [NamedTuple] containing coupler fields.
-- `boundary_space`: [CC.Spaces.AbstractSpace] the space of the coupler surface.
 - `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
 
 TODO:
@@ -53,12 +54,8 @@ TODO:
 
 (NB: Radiation surface fluxes are calculated by the atmosphere.)
 """
-function turbulent_fluxes!(
-    model_sims::NamedTuple,
-    csf::CC.Fields.Field,
-    boundary_space::CC.Spaces.AbstractSpace,
-    thermo_params::TD.Parameters.ThermodynamicsParameters,
-)
+function turbulent_fluxes!(csf, model_sims, thermo_params)
+    boundary_space = axes(csf)
     atmos_sim = model_sims.atmos_sim
     FT = CC.Spaces.undertype(boundary_space)
 
@@ -182,14 +179,14 @@ function extrapolate_ρ_to_sfc(thermo_params, ts_in, T_sfc)
 end
 
 """
-    get_surface_fluxes!(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters)
+    get_surface_fluxes(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters)
 
 Uses SurfaceFluxes.jl to calculate turbulent surface fluxes. It should be atmos model agnostic, and columnwise.
 Fluxes are computed over the entire surface, even where the relevant surface model is not present.
 
 When available, it also computes ancillary quantities, such as the Monin-Obukov lengthscale.
 """
-function get_surface_fluxes!(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters)
+function get_surface_fluxes(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters)
     # calculate all fluxes (saturated surface conditions)
     outputs = SF.surface_conditions.(surface_params, inputs)
 
@@ -326,7 +323,7 @@ function compute_surface_fluxes!(
     inputs = FluxCalculator.surface_inputs(input_args)
 
     # calculate the surface fluxes
-    fluxes = FluxCalculator.get_surface_fluxes!(inputs, surface_params)
+    fluxes = FluxCalculator.get_surface_fluxes(inputs, surface_params)
     (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux) = fluxes
 
 

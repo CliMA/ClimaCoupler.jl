@@ -194,11 +194,11 @@ for FT in (Float32, Float64)
 
         # calculate turbulent fluxes
         thermo_params = get_thermo_params(atmos_sim)
-        FluxCalculator.turbulent_fluxes!(model_sims, fields, boundary_space, thermo_params)
+        FluxCalculator.turbulent_fluxes!(fields, model_sims, thermo_params)
 
         # calculating the fluxes twice ensures that no accumulation occurred (i.e. fluxes are reset to zero each time)
         # TODO: this will need to be extended once flux accumulation is re-enabled
-        FluxCalculator.turbulent_fluxes!(model_sims, fields, boundary_space, thermo_params)
+        FluxCalculator.turbulent_fluxes!(fields, model_sims, thermo_params)
 
         windspeed = @. hypot(atmos_sim.integrator.p.u, atmos_sim.integrator.p.v)
 

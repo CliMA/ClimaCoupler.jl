@@ -19,7 +19,7 @@ The final result of `turbulent_fluxes!` is an area-weighted sum of
 all the contributions of the various surfaces.
 
 The default method of [`FluxCalculator.compute_surface_fluxes!`](@ref), in turn,
-calls [`FluxCalculator.get_surface_fluxes!`](@ref). This function uses a thermal
+calls [`FluxCalculator.get_surface_fluxes`](@ref). This function uses a thermal
 state obtained by using the model surface temperature, extrapolates atmospheric
 density adiabatically to the surface, and with the surface humidity (if
 available, if not, assuming a saturation specific humidity for liquid phase).
@@ -54,6 +54,6 @@ within the atmospheric model.
 ```@docs
     ClimaCoupler.FluxCalculator.turbulent_fluxes!
     ClimaCoupler.FluxCalculator.compute_surface_fluxes!
-    ClimaCoupler.FluxCalculator.get_surface_fluxes!
+    ClimaCoupler.FluxCalculator.get_surface_fluxes
     ClimaCoupler.FluxCalculator.update_turbulent_fluxes!
 ```

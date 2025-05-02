@@ -6,6 +6,23 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Change signature for `turbulent_fluxes!`. PR[#1327](https://github.com/CliMA/ClimaCoupler.jl/pull/1327)
+
+`FluxCalculator.turbulent_fluxes!` can now be called in two ways:
+```julia
+turbulent_fluxes!(coupled_simulation::CoupledSimulation)
+turbulent_fluxes!(coupler_fields, model_sims, thermo_params)
+```
+The previous signature was
+```julia
+turbulent_fluxes!(model_sims, coupler_fields, boundary_space, thermo_params)
+```
+The new signature simplifies calling the function, ensures that the mutating
+convention is respected (`turbulent_fluxes!` mutates `coupler_fields`), and
+removes unnecessary arguments and type restrictions.
+
+Similarly, `get_surface_fluxes!` was renamed to `get_surface_fluxes`. 
+
 #### Simplify initial component model exchange. PR[#1305](https://github.com/CliMA/ClimaCoupler.jl/pull/1305)
 
 Surface humidity is now computed from the atmosphere state and surface temperature,

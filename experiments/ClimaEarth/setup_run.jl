@@ -516,7 +516,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         # 4.turbulent fluxes: Now we have all information needed for calculating the initial
         # turbulent surface fluxes. Calculate and update turbulent fluxes for each surface model,
         # and save the weighted average in coupler fields
-        FluxCalculator.turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, cs.thermo_params)
+        FluxCalculator.turbulent_fluxes!(cs)
     end
     return cs
 end
@@ -672,7 +672,7 @@ function step!(cs::CoupledSimulation)
     FieldExchanger.exchange!(cs)
 
     ## calculate turbulent fluxes in the coupler and update the model simulations with them
-    FluxCalculator.turbulent_fluxes!(cs.model_sims, cs.fields, cs.boundary_space, cs.thermo_params)
+    FluxCalculator.turbulent_fluxes!(cs)
 
     ## update water albedo from wind at dt_water_albedo
     ## (this will be extended to a radiation callback from the coupler)

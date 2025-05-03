@@ -1,8 +1,11 @@
 import SciMLBase
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
+import ClimaUtilities.TimeManager: date
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities, FieldExchanger
+import Insolation
 import Insolation.Parameters.InsolationParameters
+import StaticArrays as SA
 import Dates
 import ClimaAtmos as CA # for albedo calculation
 
@@ -222,13 +225,13 @@ dss_state!(sim::SlabOceanSimulation) = CC.Spaces.weighted_dss!(sim.integrator.u,
 """
     FieldExchanger.update_sim!(::SlabOceanSimulation, csf, area_fraction)
 
-Updates the air density (needed for the turbulent flux calculation)
+Update the air density and wind velocity (needed for the turbulent flux calculation),
 and the direct and diffuse albedos of the ocean.
 """
 function FieldExchanger.update_sim!(sim::SlabOceanSimulation, csf, area_fraction)
-    update_field!(sim, Val(:air_density), csf.ρ_sfc)
-    update_field!(sim, Val(:u_atmos), csf.u_int)
-    update_field!(sim, Val(:v_atmos), csf.v_int)
+    Interfacer.update_field!(sim, Val(:air_density), csf.ρ_sfc)
+    Interfacer.update_field!(sim, Val(:u_atmos), csf.u_int)
+    Interfacer.update_field!(sim, Val(:v_atmos), csf.v_int)
 
     # Update the direct and diffuse albedos with the new atmospheric wind
     set_albedos!(sim, sim.integrator.t)
@@ -237,7 +240,7 @@ end
 """
     FieldExchanger.import_atmos_fields!(csf, sim::SlabOceanSimulation, atmos_sim)
 
-Imports quantities from the coupled simulation fields into the ocean simulation.
+Import quantities from the coupled simulation fields into the ocean simulation.
 This is similar to the default method defined in FieldExchanger.jl, but it also
 includes atmospheric wind, which is required to compute the ocean albedo.
 """
@@ -246,15 +249,15 @@ function FieldExchanger.import_atmos_fields!(csf, sim::SlabOceanSimulation, atmo
     Interfacer.remap!(csf.ρ_sfc, FluxCalculator.calculate_surface_air_density(atmos_sim, csf.T_sfc)) # TODO: generalize for PartitionedStateFluxes (#445) (use individual T_sfc)
 
     # radiative fluxes
-    Interfacer.get_field(csf.F_radiative, atmos_sim, Val(:radiative_energy_flux_sfc))
+    Interfacer.get_field!(csf.F_radiative, atmos_sim, Val(:radiative_energy_flux_sfc))
 
     # precipitation
-    Interfacer.get_field(csf.P_liq, atmos_sim, Val(:liquid_precipitation))
-    Interfacer.get_field(csf.P_snow, atmos_sim, Val(:snow_precipitation))
+    Interfacer.get_field!(csf.P_liq, atmos_sim, Val(:liquid_precipitation))
+    Interfacer.get_field!(csf.P_snow, atmos_sim, Val(:snow_precipitation))
 
     # wind
-    Interfacer.get_field(csf.u_int, atmos_sim, Val(:u_int))
-    Interfacer.get_field(csf.v_int, atmos_sim, Val(:v_int))
+    Interfacer.get_field!(csf.u_int, atmos_sim, Val(:u_int))
+    Interfacer.get_field!(csf.v_int, atmos_sim, Val(:v_int))
 end
 
 """
@@ -268,28 +271,37 @@ is dependent on running with `ClimaAtmosSimulation` as the atmosphere simulation
 function set_albedos!(sim::SlabOceanSimulation, t)
     u = sim.integrator.u
     p = sim.integrator.p
-    FT = eltype(u)
+    FT = CC.Spaces.undertype(axes(u.T_sfc))
 
     # Compute the current date
     current_date = t isa ITime ? date(t) : p.start_date + Dates.second(t)
 
     # TODO: Where does this date0 come from?
-    date0 = DateTime("2000-01-01T11:58:56.816")
+    date0 = Dates.DateTime("2000-01-01T11:58:56.816")
     insolation_params = InsolationParameters(FT)
     d, δ, η_UTC = FT.(Insolation.helper_instantaneous_zenith_angle(current_date, date0, insolation_params))
 
     # Get the atmospheric wind vector and the cosine of the zenith angle
-    surface_coords = Fields.coordinate_field(CC.Spaces.level(u.T_sfc, CC.Spaces.nlevels(u.T_sfc)))
-    (zenith_angle, _, _) = @. instantaneous_zenith_angle(d, δ, η_UTC, surface_coords.long, surface_coords.lat) # the tuple is (zenith angle, azimuthal angle, earth-sun distance)
-    wind_atmos = SA.SVector{2, FT}(p.u_atmos, p.v_atmos) # wind vector from components
+    surface_coords = CC.Fields.coordinate_field(axes(u.T_sfc))
+    insolation_tuple = Insolation.instantaneous_zenith_angle.(d, δ, η_UTC, surface_coords.long, surface_coords.lat) # the tuple is (zenith angle, azimuthal angle, earth-sun distance)
+    zenith_angle = insolation_tuple.:1
+    wind_atmos = LinearAlgebra.norm.(CC.Geometry.Covariant12Vector.(p.u_atmos, p.v_atmos)) # wind vector from components
     λ = FT(0) # spectral wavelength (not used for now)
     max_zenith_angle = FT(π) / 2 - eps(FT)
-    cos_zenith = CC.Fields.array2field(cos(min(zenith_angle, max_zenith_angle)), axes(u)) # cosine of the zenith angle, as a ClimaCore field
+    cos_zenith = @. cos(min(zenith_angle, max_zenith_angle)) # cosine of the zenith angle
 
     # Use the albedo model from ClimaAtmos
     α_model = CA.RegressionFunctionAlbedo{FT}()
-    update_field!(sim, Val(:surface_direct_albedo), CA.surface_albedo_direct(α_model).(λ, cos_zenith, wind_atmos))
-    update_field!(sim, Val(:surface_diffuse_albedo), CA.surface_albedo_diffuse(α_model).(λ, cos_zenith, wind_atmos))
+    Interfacer.update_field!(
+        sim,
+        Val(:surface_direct_albedo),
+        CA.surface_albedo_direct(α_model).(λ, cos_zenith, wind_atmos),
+    )
+    Interfacer.update_field!(
+        sim,
+        Val(:surface_diffuse_albedo),
+        CA.surface_albedo_diffuse(α_model).(λ, cos_zenith, wind_atmos),
+    )
 
     return nothing
 end

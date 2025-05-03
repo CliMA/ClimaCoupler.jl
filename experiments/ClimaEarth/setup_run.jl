@@ -368,11 +368,10 @@ function CoupledSimulation(config_dict::AbstractDict)
     global `CoupledSimulation` struct, `cs`, below.
     =#
 
-    ## model simulations
+    ## collect component model simulations that have been initialized
     model_sims = (; atmos_sim, ice_sim, land_sim, ocean_sim)
-
-    # remove models that are not used
-    model_sims = filter(sim -> !isnothing(sim), model_sims)
+    model_sims = NamedTuple{filter(key -> !isnothing(model_sims[key]), keys(model_sims))}(model_sims)
+    @info "Component models initialized: $(keys(model_sims))"
 
     ## coupler exchange fields
     coupler_field_names = Interfacer.default_coupler_fields()
@@ -562,7 +561,7 @@ function run!(cs::CoupledSimulation; precompile = (cs.tspan[end] > 2 * cs.Δt_cp
 
     # Close all diagnostics file writers
     isnothing(cs.diags_handler) || foreach(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
-    foreach(Interfacer.close_output_writers!, cs.model_sims)
+    foreach(Interfacer.close_output_writers, cs.model_sims)
 
     return nothing
 end
@@ -629,7 +628,6 @@ require multiple steps in some of the component models.
 """
 function step!(cs::CoupledSimulation)
     (; model_sims, Δt_cpl, tspan, comms_ctx) = cs
-    (; atmos_sim, land_sim, ocean_sim, ice_sim) = model_sims
 
     # Update the current time
     cs.t[] += Δt_cpl

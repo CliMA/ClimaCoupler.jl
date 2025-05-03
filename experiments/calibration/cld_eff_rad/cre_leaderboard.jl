@@ -92,7 +92,7 @@ function plot_cre_ann_seasons!(fig, iteration_dir, spinup; plot_season_names = f
     for (sim, obs) in zip(sim_ann_seasons, obs_ann_seasons)
         isempty(sim) && continue
         layout = fig[1, i] = CairoMakie.GridLayout()
-        ClimaAnalysis.Visualize.plot_bias_on_globe!(layout, sim_var, obs_var)
+        ClimaAnalysis.Visualize.plot_bias_on_globe!(layout, sim, obs)
         if plot_season_names
             CairoMakie.Label(layout[0, 1], season_names[i], fontsize = 30, tellwidth = false, justification = :center)
         end

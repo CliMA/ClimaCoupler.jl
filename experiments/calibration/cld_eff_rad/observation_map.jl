@@ -29,6 +29,12 @@ function process_member_data(simdir::SimDir)
     rsutcs = preprocess_monthly_averages(simdir, "rsutcs")
     cre = rsutcs - rsut
     cre = ClimaAnalysis.permutedims(cre, ("longitude", "latitude", "time"))
+
+    # Exotropics
+    cre_bottom = window(cre, "lat", left = -90.0, right = -30.0)
+    cre_top = window(cre, "lat", left = 30.0, right = 90.0)
+    cre = cat(cre_bottom, cre_top, dim = "latitude")
+
     return vec(cre.data)
 end
 

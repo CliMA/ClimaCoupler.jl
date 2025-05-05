@@ -483,21 +483,21 @@ function CoupledSimulation(config_dict::AbstractDict)
         # 1. Import atmospheric and surface fields into the coupler fields, then broadcast them back out to all components.
         FieldExchanger.exchange!(cs)
 
-        # 2. Set all initial cache values for the land model, now that we have updated drivers
-        land_set_initial_cache! = CL.make_set_initial_cache(cs.model_sims.land_sim.model)
-        land_set_initial_cache!(
-            cs.model_sims.land_sim.integrator.p,
-            cs.model_sims.land_sim.integrator.u,
-            cs.model_sims.land_sim.integrator.t,
-        )
-
-        # 3. Compute radiative fluxes and update the coupler fields and model simulations with the new fluxes
+        # 2. Compute radiative fluxes and update the coupler fields and model simulations with these fluxes
         # Any other callbacks that modify a model's cache should be called here as well.
         if hasradiation(cs.model_sims.atmos_sim.integrator)
             CA.rrtmgp_model_callback!(cs.model_sims.atmos_sim.integrator)
             pkgversion(CA) >= v"0.30" && CA.nogw_model_callback!(cs.model_sims.atmos_sim.integrator)
             FieldExchanger.exchange!(cs)
         end
+
+        # 3. Set all initial cache values for the land model, now that we have updated drivers and radiative fluxes
+        land_set_initial_cache! = CL.make_set_initial_cache(cs.model_sims.land_sim.model)
+        land_set_initial_cache!(
+            cs.model_sims.land_sim.integrator.p,
+            cs.model_sims.land_sim.integrator.u,
+            cs.model_sims.land_sim.integrator.t,
+        )
 
         # 4.turbulent fluxes: Now we have all information needed for calculating the initial
         # turbulent surface fluxes. Calculate and update turbulent fluxes for each surface model,

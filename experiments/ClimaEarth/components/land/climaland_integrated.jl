@@ -156,7 +156,9 @@ function ClimaLandSimulation(
     Y.snow.S_l .= FT(0)
     Y.snow.U .= FT(0)
 
-    set_initial_cache! = CL.make_set_initial_cache(model)
+    # Initialize the surface temperature so the atmosphere can compute radiation
+    @. p.T_sfc = orog_adjusted_T_surface
+
     exp_tendency! = CL.make_exp_tendency(model)
     imp_tendency! = CL.make_imp_tendency(model)
     jacobian! = CL.make_jacobian(model)
@@ -536,10 +538,10 @@ function FluxCalculator.compute_surface_fluxes!(
     coupled_atmos = sim.model.soil.boundary_conditions.top.atmos
 
     # Update the land simulation's coupled atmosphere state
+    Interfacer.get_field!(coupled_atmos.h, atmos_sim, Val(:height_int))
     u_atmos = Interfacer.get_field(atmos_sim, Val(:u_int), land_space)
     v_atmos = Interfacer.get_field(atmos_sim, Val(:v_int), land_space)
     @. coupled_atmos.u = StaticArrays.SVector(u_atmos, v_atmos)
-    Interfacer.get_field!(coupled_atmos.h, atmos_sim, Val(:height_int))
     Interfacer.remap!(
         coupled_atmos.thermal_state,
         TD.PhaseEquil_ρTq.(thermo_params, csf.ρ_atmos, csf.T_atmos, csf.q_atmos),

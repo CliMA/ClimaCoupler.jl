@@ -302,8 +302,8 @@ function Interfacer.update_field!(sim::BucketSimulation, ::Val{:turbulent_moistu
     parent(sim.integrator.p.bucket.turbulent_fluxes.vapor_flux) .= parent(field ./ ρ_liq) # TODO: account for sublimation
 end
 
-# extensions required by FieldExchanger
 Interfacer.step!(sim::BucketSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+Interfacer.close_output_writers(sim::BucketSimulation) = isnothing(sim.output_writer) || close(sim.output_writer)
 
 """
 Extend Interfacer.add_coupler_fields! to add the fields required for BucketSimulation.

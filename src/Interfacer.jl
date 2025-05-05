@@ -322,6 +322,16 @@ function will be called and an error will be raised.
 """
 step!(sim::ComponentModelSimulation, t) = error("undefined step! for $(nameof(sim))")
 
+"""
+    close_output_writers(sim::ComponentModelSimulation)
+
+A function to close all output writers associated with the given
+component model, at the end of a simulation.
+
+This should be extended for any component model that uses
+an output writer.
+"""
+close_output_writers(sim::ComponentModelSimulation) = nothing
 
 # Include file containing the surface stub simulation type.
 include("surface_stub.jl")

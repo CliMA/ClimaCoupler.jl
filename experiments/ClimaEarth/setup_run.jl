@@ -509,7 +509,14 @@ function CoupledSimulation(config_dict::AbstractDict)
         # Any other callbacks that modify a model's cache should be called here as well.
         if hasradiation(cs.model_sims.atmos_sim.integrator)
             CA.rrtmgp_model_callback!(cs.model_sims.atmos_sim.integrator)
-            pkgversion(CA) >= v"0.30" && CA.nogw_model_callback!(cs.model_sims.atmos_sim.integrator)
+            if pkgversion(CA) == v"0.30" &&
+               !isnothing(cs.model_sims.atmos_sim.integrator.p.atmos.non_orographic_gravity_wave)
+                # In version 0.30, nogw_model_callback crashes when there are no gravity waves,
+                # see CA #3792
+                CA.nogw_model_callback!(cs.model_sims.atmos_sim.integrator)
+            else
+                pkgversion(CA) > v"0.30" && CA.nogw_model_callback!(cs.model_sims.atmos_sim.integrator)
+            end
             FieldExchanger.exchange!(cs)
         end
 

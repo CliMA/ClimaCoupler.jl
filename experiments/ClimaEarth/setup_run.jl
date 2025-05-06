@@ -206,13 +206,10 @@ function CoupledSimulation(config_dict::AbstractDict)
     This uses the `ClimaAtmos.jl` model, with parameterization options specified in the `atmos_config_object` dictionary.
     =#
 
-    Utilities.show_memory_usage()
-
     ## init atmos model component
     atmos_sim = ClimaAtmosSimulation(CA.AtmosConfig(atmos_config_dict))
     # Get surface elevation from `atmos` coordinate field
     surface_elevation = CC.Fields.level(CC.Fields.coordinate_field(atmos_sim.integrator.u.f).z, CC.Utilities.half)
-    Utilities.show_memory_usage()
 
     thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models #342
 
@@ -318,8 +315,6 @@ function CoupledSimulation(config_dict::AbstractDict)
         ocean_sim =
             PrescribedOceanSimulation(FT, boundary_space, start_date, t_start, ocean_fraction, thermo_params, comms_ctx)
 
-        Utilities.show_memory_usage()
-
     elseif (sim_mode <: AbstractSlabplanetSimulationMode)
 
         land_fraction = sim_mode <: SlabplanetAquaMode ? land_fraction .* 0 : land_fraction
@@ -355,8 +350,6 @@ function CoupledSimulation(config_dict::AbstractDict)
             thermo_params = thermo_params,
             evolving = evolving_ocean,
         )
-
-        Utilities.show_memory_usage()
     end
 
     #=
@@ -464,7 +457,6 @@ function CoupledSimulation(config_dict::AbstractDict)
         thermo_params,
         diags_handler,
     )
-    Utilities.show_memory_usage()
 
     #=
     ## Restart component model states if specified
@@ -511,6 +503,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         # and save the weighted average in coupler fields
         FluxCalculator.turbulent_fluxes!(cs)
     end
+    Utilities.show_memory_usage()
     return cs
 end
 

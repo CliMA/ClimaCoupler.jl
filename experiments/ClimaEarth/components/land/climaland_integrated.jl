@@ -107,7 +107,7 @@ function ClimaLandSimulation(
 
     land_input = (
         atmos = CL.CoupledAtmosphere{FT}(boundary_space),
-        radiation = CL.CoupledRadiativeFluxes{FT}(),
+        radiation = CL.CoupledRadiativeFluxes{FT}(start_date, LP.insolation_parameters(earth_param_set)),
         runoff = runoff_model,
         soil_organic_carbon = Csom,
     )
@@ -157,6 +157,10 @@ function ClimaLandSimulation(
     Y.snow.U .= FT(0)
 
     set_initial_cache! = CL.make_set_initial_cache(model)
+    updateat = [promote(tspan[1]:dt:(tspan[2] + dt)...)...] # add an extra time at end in case sim steps over end
+    updatefunc = ClimaLand.make_update_drivers(ClimaLand.get_drivers(model))
+    driver_cb = ClimaLand.DriverUpdateCallback(updateat, updatefunc)
+
     exp_tendency! = CL.make_exp_tendency(model)
     imp_tendency! = CL.make_imp_tendency(model)
     jacobian! = CL.make_jacobian(model)
@@ -197,7 +201,7 @@ function ClimaLandSimulation(
         dt = dt,
         saveat = saveat,
         adaptive = false,
-        callback = SciMLBase.CallbackSet(diag_cb),
+        callback = SciMLBase.CallbackSet(driver_cb, diag_cb),
     )
 
     return ClimaLandSimulation(model, integrator, area_fraction, output_writer)
@@ -421,9 +425,6 @@ end
 function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:sw_d}, field)
     parent(sim.integrator.p.drivers.SW_d) .= parent(field)
 end
-function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:cos_zenith}, field)
-    parent(sim.integrator.p.drivers.cosθs) .= parent(field)
-end
 
 Interfacer.step!(sim::ClimaLandSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 Interfacer.close_output_writers(sim::ClimaLandSimulation) = isnothing(sim.output_writer) || close(sim.output_writer)
@@ -433,7 +434,6 @@ function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, area_fraction
     Interfacer.update_field!(sim, Val(:diffuse_fraction), csf.diffuse_fraction)
     Interfacer.update_field!(sim, Val(:sw_d), csf.SW_d)
     Interfacer.update_field!(sim, Val(:lw_d), csf.LW_d)
-    Interfacer.update_field!(sim, Val(:cos_zenith), csf.cos_zenith)
 
     # update fields for canopy conductance and photosynthesis
     Interfacer.update_field!(sim, Val(:c_co2), csf.c_co2)
@@ -450,7 +450,6 @@ function FieldExchanger.import_atmos_fields!(csf, sim::ClimaLandSimulation, atmo
     Interfacer.get_field!(csf.diffuse_fraction, atmos_sim, Val(:diffuse_fraction))
     Interfacer.get_field!(csf.SW_d, atmos_sim, Val(:SW_d))
     Interfacer.get_field!(csf.LW_d, atmos_sim, Val(:LW_d))
-    Interfacer.get_field!(csf.cos_zenith, atmos_sim, Val(:cos_zenith))
     Interfacer.get_field!(csf.P_air, atmos_sim, Val(:air_pressure))
     Interfacer.get_field!(csf.T_air, atmos_sim, Val(:air_temperature))
     Interfacer.get_field!(csf.q_air, atmos_sim, Val(:specific_humidity))
@@ -467,7 +466,6 @@ Extend Interfacer.add_coupler_fields! to add the fields required for ClimaLandSi
 The fields added are:
 - `:SW_d` (for radiative transfer)
 - `:LW_d` (for radiative transfer)
-- `:cos_zenith` (for radiative transfer)
 - `:diffuse_fraction` (for radiative transfer)
 - `:c_co2` (for photosynthesis, biogeochemistry)
 - `:P_air` (for canopy conductance)
@@ -477,8 +475,7 @@ The fields added are:
 - `P_snow` (for moisture fluxes)
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaLandSimulation)
-    land_coupler_fields =
-        [:SW_d, :LW_d, :cos_zenith, :diffuse_fraction, :c_co2, :P_air, :T_air, :q_air, :P_liq, :P_snow]
+    land_coupler_fields = [:SW_d, :LW_d, :diffuse_fraction, :c_co2, :P_air, :T_air, :q_air, :P_liq, :P_snow]
     push!(coupler_field_names, land_coupler_fields...)
 end
 

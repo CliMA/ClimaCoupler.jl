@@ -64,18 +64,18 @@ function turbulent_fluxes!(
 
     # Reset the coupler fields will compute. We need to do this because we will compute
     # area-weighted averages
-    csf.F_turb_ρτxz .*= FT(0)
-    csf.F_turb_ρτyz .*= FT(0)
-    csf.F_lh .*= FT(0)
-    csf.F_sh .*= FT(0)
-    csf.F_turb_moisture .*= FT(0)
-    csf.z0m_sfc .*= FT(0)
-    csf.z0b_sfc .*= FT(0)
-    csf.beta .*= FT(0)
-    csf.q_sfc .*= FT(0)
-    csf.L_MO .*= FT(0)
-    csf.ustar .*= FT(0)
-    csf.buoyancy_flux .*= FT(0)
+    fill!(csf.F_turb_ρτxz, 0)
+    fill!(csf.F_turb_ρτyz, 0)
+    fill!(csf.F_lh, 0) 
+    fill!(csf.F_sh, 0) 
+    fill!(csf.F_turb_moisture, 0)
+    fill!(csf.z0m_sfc, 0)
+    fill!(csf.z0b_sfc, 0) 
+    fill!(csf.beta, 0) 
+    fill!(csf.q_sfc, 0)
+    fill!(csf.L_MO, 0)
+    fill!(csf.ustar, 0)
+    fill!(csf.buoyancy_flux, 0)
 
     # Compute the surface fluxes for each surface model and add them to `csf`
     for sim in model_sims
@@ -299,7 +299,8 @@ function compute_surface_fluxes!(
     atmos_sim::Interfacer.AtmosModelSimulation,
     boundary_space,
     thermo_params,
-)
+)       
+
     # `_int` refers to atmos state of center level 1
     z_int = Interfacer.get_field(atmos_sim, Val(:height_int))
     u_int = Interfacer.get_field(atmos_sim, Val(:u_int))
@@ -341,7 +342,7 @@ function compute_surface_fluxes!(
     @. L_MO = ifelse(area_fraction ≈ 0, zero(L_MO), L_MO)
     @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
     @. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(buoyancy_flux), buoyancy_flux)
-
+    
     # multiply fluxes by area fraction
     F_turb_ρτxz .*= area_fraction
     F_turb_ρτyz .*= area_fraction

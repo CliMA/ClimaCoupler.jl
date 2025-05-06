@@ -2,7 +2,7 @@
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "638646b6ea969d2da6827d4eb9b9b6d80abd9955"
+project_hash = "61a29b6774a706980c27387f7792d748eac5f404"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -374,11 +374,15 @@ git-tree-sha1 = "e1e82d32ba993a18fc760d5cbd7db3bcabd1f3c8"
 uuid = "908f55d8-4145-4867-9c14-5dad1a479e4d"
 version = "0.4.6"
 
+[[deps.ClimaCorePlots]]
+deps = ["ClimaComms", "ClimaCore", "RecipesBase", "StaticArrays", "TriplotBase"]
+git-tree-sha1 = "6430644d60158055458075bf32e5ac24741b1ab9"
+uuid = "cf7c7e5a-b407-4c48-9047-11a94a308626"
+version = "0.2.11"
+
 [[deps.ClimaCoupler]]
 deps = ["ClimaComms", "ClimaCore", "ClimaUtilities", "Dates", "JLD2", "Logging", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "8ceab159ea5af83e568086ea5522f4b13cc46a47"
-repo-rev = "main"
-repo-url = "https://github.com/CliMA/ClimaCoupler.jl.git"
+path = "../.."
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.1.2"
 

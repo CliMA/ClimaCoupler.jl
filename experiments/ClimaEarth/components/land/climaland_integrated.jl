@@ -156,7 +156,12 @@ function ClimaLandSimulation(
     Y.snow.S_l .= FT(0)
     Y.snow.U .= FT(0)
 
-    set_initial_cache! = CL.make_set_initial_cache(model)
+    # Initialize the surface temperature so the atmosphere can compute radiation.
+    # This cache variable is normally computed using `p.drivers.LW_d`, which is
+    #  set after the radiation calculation and exchange, but the radiation
+    #  code itself requires a surface temperature as input.
+    @. p.T_sfc = orog_adjusted_T_surface
+
     exp_tendency! = CL.make_exp_tendency(model)
     imp_tendency! = CL.make_imp_tendency(model)
     jacobian! = CL.make_jacobian(model)
@@ -437,9 +442,9 @@ function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, area_fraction
 
     # update fields for canopy conductance and photosynthesis
     Interfacer.update_field!(sim, Val(:c_co2), csf.c_co2)
-    Interfacer.update_field!(sim, Val(:air_temperature), csf.T_air)
-    Interfacer.update_field!(sim, Val(:air_pressure), csf.P_air)
-    Interfacer.update_field!(sim, Val(:air_humidity), csf.q_air)
+    Interfacer.update_field!(sim, Val(:air_temperature), csf.T_atmos)
+    Interfacer.update_field!(sim, Val(:air_pressure), csf.P_atmos)
+    Interfacer.update_field!(sim, Val(:air_humidity), csf.q_atmos)
 
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)
@@ -451,9 +456,10 @@ function FieldExchanger.import_atmos_fields!(csf, sim::ClimaLandSimulation, atmo
     Interfacer.get_field!(csf.SW_d, atmos_sim, Val(:SW_d))
     Interfacer.get_field!(csf.LW_d, atmos_sim, Val(:LW_d))
     Interfacer.get_field!(csf.cos_zenith, atmos_sim, Val(:cos_zenith))
-    Interfacer.get_field!(csf.P_air, atmos_sim, Val(:air_pressure))
-    Interfacer.get_field!(csf.T_air, atmos_sim, Val(:air_temperature))
-    Interfacer.get_field!(csf.q_air, atmos_sim, Val(:specific_humidity))
+    Interfacer.get_field!(csf.P_atmos, atmos_sim, Val(:air_pressure))
+    Interfacer.get_field!(csf.T_atmos, atmos_sim, Val(:air_temperature))
+    Interfacer.get_field!(csf.q_atmos, atmos_sim, Val(:specific_humidity))
+    Interfacer.get_field!(csf.ρ_atmos, atmos_sim, Val(:air_density))
     Interfacer.get_field!(csf.P_liq, atmos_sim, Val(:liquid_precipitation))
     Interfacer.get_field!(csf.P_snow, atmos_sim, Val(:snow_precipitation))
     # CO2 is a scalar for now so it doesn't need remapping
@@ -470,15 +476,15 @@ The fields added are:
 - `:cos_zenith` (for radiative transfer)
 - `:diffuse_fraction` (for radiative transfer)
 - `:c_co2` (for photosynthesis, biogeochemistry)
-- `:P_air` (for canopy conductance)
-- `:T_air` (for canopy conductance)
-- `:q_air` (for canopy conductance)
+- `:P_atmos` (for canopy conductance)
+- `:T_atmos` (for canopy conductance)
+- `:q_atmos` (for canopy conductance)
 - `P_liq` (for moisture fluxes)
 - `P_snow` (for moisture fluxes)
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaLandSimulation)
     land_coupler_fields =
-        [:SW_d, :LW_d, :cos_zenith, :diffuse_fraction, :c_co2, :P_air, :T_air, :q_air, :P_liq, :P_snow]
+        [:SW_d, :LW_d, :cos_zenith, :diffuse_fraction, :c_co2, :P_atmos, :T_atmos, :q_atmos, :P_liq, :P_snow]
     push!(coupler_field_names, land_coupler_fields...)
 end
 
@@ -503,7 +509,7 @@ end
 
 ## Extend functions for land-specific flux calculation
 """
-    compute_surface_fluxes!(csf, sim::ClimaLandSimulation, atmos_sim, boundary_space, thermo_params, surface_scheme)
+    compute_surface_fluxes!(csf, sim::ClimaLandSimulation, atmos_sim, thermo_params)
 
 This function computes surface fluxes between the integrated land model
 simulation and the atmosphere.
@@ -520,25 +526,25 @@ The land model cache is updated with the computed fluxes for each sub-component.
 - `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
 - `sim`: [ClimaLandSimulation] the integrated land simulation to compute fluxes for.
 - `atmos_sim`: [Interfacer.AtmosModelSimulation] the atmosphere simulation to compute fluxes with.
-- unused arguments: `boundary_space`, `thermo_params`, `surface_scheme`
+- `thermo_params`: [ClimaParams.ThermodynamicParameters] the thermodynamic parameters for the simulation.
 """
 function FluxCalculator.compute_surface_fluxes!(
     csf,
     sim::ClimaLandSimulation,
     atmos_sim::Interfacer.AtmosModelSimulation,
-    _...,
+    thermo_params,
 )
+    boundary_space = axes(csf)
     # We should change this to be on the boundary_space
     land_space = axes(sim.integrator.p.soil.turbulent_fluxes)
     coupled_atmos = sim.model.soil.boundary_conditions.top.atmos
 
-    # `_int` refers to atmos state of center level 1
-    z_int = Interfacer.get_field!(coupled_atmos.h, atmos_sim, Val(:height_int))
+    # Update the land simulation's coupled atmosphere state
+    Interfacer.get_field!(coupled_atmos.h, atmos_sim, Val(:height_int))
     u_atmos = Interfacer.get_field(atmos_sim, Val(:u_int), land_space)
     v_atmos = Interfacer.get_field(atmos_sim, Val(:v_int), land_space)
-    Interfacer.get_field!(coupled_atmos.thermal_state, atmos_sim, Val(:thermo_state_int))
-
     @. coupled_atmos.u = StaticArrays.SVector(u_atmos, v_atmos)
+    @. coupled_atmos.thermal_state = TD.PhaseEquil_ρTq(thermo_params, csf.ρ_atmos, csf.T_atmos, csf.q_atmos)
 
     # set the same atmosphere state for all sub-components
     @assert sim.model.soil.boundary_conditions.top.atmos ===
@@ -591,5 +597,22 @@ function FluxCalculator.compute_surface_fluxes!(
     @. csf.temp1 = soil_dest.ρτyz * (1 - p.snow.snow_cover_fraction) + p.snow.snow_cover_fraction * snow_dest.ρτyz
     @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
     @. csf.F_turb_ρτyz += csf.temp1 * area_fraction
+    return nothing
+end
+
+"""
+    Interfacer.set_cache!(sim::ClimaLandSimulation)
+
+Set cache variables that cannot be initialized before the initial exchange.
+This must be called after radiation, so that `p.drivers`
+is filled with the initial radiation fluxes, and these can be propagated
+to the rest of the cache (e.g. in canopy radative transfer).
+
+This function does not set all the cache variables, because many are computed
+as part of the tendendencies.
+"""
+function Interfacer.set_cache!(sim::ClimaLandSimulation)
+    land_set_initial_cache! = CL.make_set_initial_cache(sim.model)
+    land_set_initial_cache!(sim.integrator.p, sim.integrator.u, sim.integrator.t)
     return nothing
 end

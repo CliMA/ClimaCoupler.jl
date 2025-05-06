@@ -472,35 +472,15 @@ function CoupledSimulation(config_dict::AbstractDict)
         The concrete steps for proper initialization are:
         =#
 
-        # 1. Import atmospheric and surface fields into the coupler fields, then broadcast them back out to all components.
+        # 1. Import atmospheric and surface fields into the coupler fields,
+        #  then broadcast them back out to all components.
         FieldExchanger.exchange!(cs)
 
-        # 2. Set all initial cache values for the land model, now that we have updated drivers
-        land_set_initial_cache! = CL.make_set_initial_cache(cs.model_sims.land_sim.model)
-        land_set_initial_cache!(
-            cs.model_sims.land_sim.integrator.p,
-            cs.model_sims.land_sim.integrator.u,
-            cs.model_sims.land_sim.integrator.t,
-        )
+        # 2. Update any fields in the model caches that can only be filled after the initial exchange.
+        FieldExchanger.set_caches!(cs)
 
-        # 3. Compute radiative fluxes and update the coupler fields and model simulations with the new fluxes
-        # Any other callbacks that modify a model's cache should be called here as well.
-        if hasradiation(cs.model_sims.atmos_sim.integrator)
-            CA.rrtmgp_model_callback!(cs.model_sims.atmos_sim.integrator)
-            if pkgversion(CA) == v"0.30" &&
-               !isnothing(cs.model_sims.atmos_sim.integrator.p.atmos.non_orographic_gravity_wave)
-                # In version 0.30, nogw_model_callback crashes when there are no gravity waves,
-                # see CA #3792
-                CA.nogw_model_callback!(cs.model_sims.atmos_sim.integrator)
-            else
-                pkgversion(CA) > v"0.30" && CA.nogw_model_callback!(cs.model_sims.atmos_sim.integrator)
-            end
-            FieldExchanger.exchange!(cs)
-        end
-
-        # 4.turbulent fluxes: Now we have all information needed for calculating the initial
-        # turbulent surface fluxes. Calculate and update turbulent fluxes for each surface model,
-        # and save the weighted average in coupler fields
+        # 3. Calculate and update turbulent fluxes for each surface model,
+        #  and save the weighted average in coupler fields
         FluxCalculator.turbulent_fluxes!(cs)
     end
     Utilities.show_memory_usage()

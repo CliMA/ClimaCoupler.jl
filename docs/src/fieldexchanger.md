@@ -28,6 +28,7 @@ If an `update_field!` function is not defined for a particular component model, 
     ClimaCoupler.FieldExchanger.step_model_sims!
     ClimaCoupler.FieldExchanger.update_surface_fractions!
     ClimaCoupler.FieldExchanger.exchange!
+    ClimaCoupler.FieldExchanger.set_caches!
 ```
 
 ## FieldExchanger Internal Functions

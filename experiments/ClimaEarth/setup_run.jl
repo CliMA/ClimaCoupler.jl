@@ -291,6 +291,7 @@ function CoupledSimulation(config_dict::AbstractDict)
                 surface_elevation,
                 land_temperature_anomaly,
                 use_land_diagnostics,
+                parameter_files,
             )
         else
             error("Invalid land model specified: $(land_model)")

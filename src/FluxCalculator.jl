@@ -61,18 +61,22 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
 
     # Reset the coupler fields will compute. We need to do this because we will compute
     # area-weighted averages
-    csf.F_turb_ρτxz .*= FT(0)
-    csf.F_turb_ρτyz .*= FT(0)
-    csf.F_lh .*= FT(0)
-    csf.F_sh .*= FT(0)
-    csf.F_turb_moisture .*= FT(0)
-    csf.z0m_sfc .*= FT(0)
-    csf.z0b_sfc .*= FT(0)
-    csf.beta .*= FT(0)
-    csf.q_sfc .*= FT(0)
-    csf.L_MO .*= FT(0)
-    csf.ustar .*= FT(0)
-    csf.buoyancy_flux .*= FT(0)
+    for p in (
+        :F_turb_ρτxz,
+        :F_turb_ρτyz,
+        :F_lh,
+        :F_sh,
+        :F_turb_moisture,
+        :z0m_sfc,
+        :z0b_sfc,
+        :beta,
+        :q_sfc,
+        :L_MO,
+        :ustar,
+        :buoyancy_flux,
+    )
+        fill!(getproperty(csf, p), 0)
+    end
 
     # Compute the surface fluxes for each surface model and add them to `csf`
     for sim in model_sims

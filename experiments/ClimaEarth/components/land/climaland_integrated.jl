@@ -1,4 +1,4 @@
-import ClimaParams
+import ClimaParams as CP
 import ClimaLand as CL
 import ClimaLand.Parameters as LP
 import Dates
@@ -44,6 +44,7 @@ end
         land_temperature_anomaly::String = "amip",
         use_land_diagnostics::Bool = true,
         stepper = CTS.ARS111(),
+        parameter_files = [],
     )
 
 Creates a ClimaLandSimulation object containing a land domain,
@@ -66,6 +67,7 @@ function ClimaLandSimulation(
     land_temperature_anomaly::String = "amip",
     use_land_diagnostics::Bool = true,
     stepper = CTS.ARS111(),
+    parameter_files = [],
 ) where {FT, TT <: Union{Float64, ITime}}
     # Set up domain
     depth = FT(50) # soil depth
@@ -75,7 +77,9 @@ function ClimaLandSimulation(
     subsurface_space = domain.space.subsurface
 
     # Set up spatially-varying parameters
-    earth_param_set = CL.Parameters.LandParameters(FT)
+    earth_param_set = CL.Parameters.LandParameters(
+        CP.create_toml_dict(FT; override_file = CP.merge_toml_files(parameter_files; override = true)),
+    )
     spatially_varying_soil_params = CL.default_spatially_varying_soil_parameters(subsurface_space, surface_space, FT)
     # Set up the soil model args
     soil_model_type = CL.Soil.EnergyHydrology{FT}

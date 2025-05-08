@@ -142,8 +142,7 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spi
     end
 
     # Add RMSE for the CliMA model and for each season
-    is_in_sim_vars(k) = k in keys(sim_var_dict)
-    rmse_var_dict = Dict(k => v for (k, v) in rmse_var_dict if is_in_sim_vars(k))
+    rmse_var_dict = filter(((k, _),) -> k in keys(sim_var_dict), rmse_var_dict)
     rmse_var_names = keys(rmse_var_dict)
     for short_name in rmse_var_names
         for season in seasons

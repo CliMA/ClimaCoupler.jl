@@ -52,10 +52,12 @@ Base.nameof(::WaterConservationCheck) = "water [kg]"
 """
     check_conservation!(coupler_sim::Interfacer.CoupledSimulation; runtime_check = false)
 
-itertes over all specified conservation checks.
+itertes over all specified conservation checks and returns values.
 """
-check_conservation!(coupler_sim::Interfacer.CoupledSimulation; runtime_check = false) =
-    map(x -> check_conservation!(x, coupler_sim, runtime_check), coupler_sim.conservation_checks)
+function check_conservation!(coupler_sim::Interfacer.CoupledSimulation; runtime_check = false)
+    isnothing(coupler_sim.conservation_checks) && return nothing
+    return map(x -> check_conservation!(x, coupler_sim, runtime_check), coupler_sim.conservation_checks)
+end
 
 """
         check_conservation!(

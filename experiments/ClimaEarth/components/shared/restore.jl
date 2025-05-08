@@ -90,12 +90,9 @@ function restore!(
     comms_ctx;
     name,
     ignore,
-) where {
-    T1 <: Union{Dates.DateTime, Dates.UTInstant, Dates.Millisecond},
-    T2 <: Union{Dates.DateTime, Dates.UTInstant, Dates.Millisecond},
-}
+) where {T1 <: Union{Dates.DateTime, Dates.UTInstant, Dates.Millisecond}, T2 <: Union{Dates.DateTime, Dates.UTInstant, Dates.Millisecond}}
     if v1 != v2
-        @warn "Time value differs in restart" field = name original = v2 new = v1
+        @warn "Time value differs in restart" field=name original=v2 new=v1
     end
     return nothing
 end

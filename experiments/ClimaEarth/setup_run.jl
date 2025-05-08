@@ -618,15 +618,12 @@ calculates fluxes using the selected turbulent fluxes option. Note, one coupling
 require multiple steps in some of the component models.
 """
 function step!(cs::CoupledSimulation)
-    (; model_sims, Δt_cpl, tspan, comms_ctx) = cs
-
     # Update the current time
-    cs.t[] += Δt_cpl
+    cs.t[] += cs.Δt_cpl
 
     ## compute global energy and water conservation checks
     ## (only for slabplanet if tracking conservation is enabled)
-    !isnothing(cs.conservation_checks) && ConservationChecker.check_conservation!(cs)
-    ClimaComms.barrier(comms_ctx)
+    ConservationChecker.check_conservation!(cs)
 
     ## step component model simulations sequentially for one coupling timestep (Δt_cpl)
     FieldExchanger.step_model_sims!(cs.model_sims, cs.t[])
@@ -648,7 +645,7 @@ function step!(cs::CoupledSimulation)
 
     ## compute/output AMIP diagnostics if scheduled for this timestep
     ## wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface
-    cs_nt = (; u = cs.fields, p = nothing, t = cs.t[], step = round(cs.t[] / Δt_cpl))
+    cs_nt = (; u = cs.fields, p = nothing, t = cs.t[], step = round(cs.t[] / cs.Δt_cpl))
     !isnothing(cs.diags_handler) && CD.orchestrate_diagnostics(cs_nt, cs.diags_handler)
     return nothing
 end

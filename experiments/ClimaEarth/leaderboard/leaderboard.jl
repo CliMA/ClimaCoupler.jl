@@ -85,7 +85,11 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
 
     # Plot annual plots
     for compare_vars_biases in compare_vars_biases_groups
-        fig_bias = CairoMakie.Figure(; size = (600, 300 * length(compare_vars_biases)))
+        # Plot all the variables that we can
+        compare_vars_biases = filter(x -> x in keys(sim_obs_comparsion_dict), compare_vars_biases)
+        length(compare_vars_biases) > 0 || continue
+
+        fig_bias = CairoMakie.Figure(; size = (600, 75.0 + 300 * length(compare_vars_biases)))
         for (row, short_name) in enumerate(compare_vars_biases)
             sim_var = sim_obs_comparsion_dict[short_name]["ANN"][1]
             if !ClimaAnalysis.isempty(sim_var)
@@ -108,7 +112,12 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
     # Plot plots with all the seasons (not annual)
     seasons_no_ann = filter(season -> season != "ANN", seasons)
     for compare_vars_biases in compare_vars_biases_groups
-        fig_all_seasons = CairoMakie.Figure(; size = (600 * length(seasons_no_ann), 300 * length(compare_vars_biases)))
+        # Plot all the variables that we can
+        compare_vars_biases = filter(x -> x in keys(sim_obs_comparsion_dict), compare_vars_biases)
+        length(compare_vars_biases) > 0 || continue
+
+        fig_all_seasons =
+            CairoMakie.Figure(; size = (600 * length(seasons_no_ann), 75.0 + 300 * length(compare_vars_biases)))
         for (col, season) in enumerate(seasons_no_ann)
             # Plot at 2 * col - 1 because a bias plot takes up 1 x 2 space
             CairoMakie.Label(fig_all_seasons[0, 2 * col - 1], season, tellwidth = false, fontsize = 30)
@@ -136,6 +145,8 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
     end
 
     # Add RMSE for the CliMA model and for each season
+    is_in_sim_vars(k) = k in keys(sim_var_dict)
+    rmse_var_dict = Dict(k => v for (k, v) in rmse_var_dict if is_in_sim_vars(k))
     rmse_var_names = keys(rmse_var_dict)
     for short_name in rmse_var_names
         for season in seasons

@@ -285,9 +285,9 @@ weakdeps = ["SparseArrays"]
 
 [[deps.ClimaAnalysis]]
 deps = ["Artifacts", "Dates", "Interpolations", "NCDatasets", "NaNStatistics", "OrderedCollections", "Reexport", "Statistics", "Unitful"]
-git-tree-sha1 = "0a9f4a6de147d0a9dc09f2e8f702f76dd6777e07"
+git-tree-sha1 = "810e7bf67726ab1a3a3d7fc25fc5e07ff35b2f8e"
 uuid = "29b5916a-a76c-4e73-9657-3c8fd22e65e6"
-version = "0.5.16"
+version = "0.5.17"
 weakdeps = ["GeoMakie", "Makie"]
 
     [deps.ClimaAnalysis.extensions]

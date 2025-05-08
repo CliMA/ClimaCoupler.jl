@@ -82,7 +82,7 @@ function get_sim_var_dict(diagnostics_folder_path)
     sim_var_dict = Dict{String, Any}()
     # Dict for loading in simulation data
     "pr" in available_short_names && (
-        sim_var_dict["pr"] =
+        sim_var_dict["pr"] = (
             () -> begin
                 sim_var = get(
                     ClimaAnalysis.SimDir(diagnostics_folder_path),
@@ -97,7 +97,8 @@ function get_sim_var_dict(diagnostics_folder_path)
                 )
                 sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
                 return sim_var
-            end
+            end,
+        )
     )
 
     # Add "pr" and the necessary preprocessing

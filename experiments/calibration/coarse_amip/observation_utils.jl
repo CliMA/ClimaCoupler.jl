@@ -24,7 +24,7 @@ Return a NamedTuple of OutputVars containing all initial coarse AMIP observation
 Start date is set to `DateTime(2000, 3, 1)`. All OutputVars are resampled to the model diagnostic grid.
 """
 function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
-    diagnostic_var3d = limit_pressure_dim_to_era5_range(diagnostic_var3d)
+    # diagnostic_var3d = limit_pressure_dim_to_era5_range(diagnostic_var3d)
 
     resample_2d(ov) = resampled_as(shift_longitude(ov, -180.0, 180.0), diagnostic_var2d, dim_names = ["longitude", "latitude"])
     resample_3d(ov) =
@@ -50,14 +50,15 @@ function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
     # cloud radiative effect
     cre = rsut + rlut - rsutcs - rlutcs
     pr = resample(rad_and_pr_obs_dict["pr"](start_date))
-    ta = resample(era5_outputvar(joinpath(obs_dir, "era5_monthly_avg_pressure_level_t.nc")))
+    # ta = resample(era5_outputvar(joinpath(obs_dir, "era5_monthly_avg_pressure_level_t.nc")))
+    ts = resample(OutputVar(joinpath(obs_dir, "era5_monthly_avg_ts.nc"); new_start_date = start_date, shift_by = Dates.firstdayofmonth))
 
     lwp = OutputVar(joinpath(pkgdir(ClimaCoupler),"modis_lwp_iwp.nc"), "lwp", new_start_date = start_date)
     lwp = resample(lwp)
     lwp = window(lwp, "latitude"; left = -60, right = 60)
     lwp = replace(lwp, NaN => NaNStatistics.nanmean(lwp.data))
 
-    return (; net_rad, cre, rlut, rsut, rsutcs, rlutcs, pr, ta, lwp)
+    return (; net_rad, cre, rlut, rsut, rsutcs, rlutcs, pr, ts, lwp)
 end
 
 # The ERA5 pressure range is not as large as the ClimaAtmos default pressure levels,
@@ -174,7 +175,7 @@ function create_observation_vector(nt, nyears = 17)
     net_rad_stdev = std(cat(net_rad..., dims = 3), dims = 3)
     net_rad_covariance = Diagonal(vec(net_rad_stdev) .^ 2);
 
-    ta = window(nt.ta, "time"; left = first_year_start_date);
+    ts = window(nt.ts, "time"; left = first_year_start_date);
     pr = window(nt.pr, "time"; left = first_year_start_date);
     lwp = window(nt.lwp, "time"; left = first_year_start_date);
 
@@ -186,11 +187,10 @@ function create_observation_vector(nt, nyears = 17)
         rlut_obs = make_single_year_of_seasonal_observations(rlut, yr);
         cre_obs = make_single_year_of_seasonal_observations(cre, yr);
         pr_obs = make_single_year_of_seasonal_observations(pr, yr);
-        ta_obs = make_single_year_of_seasonal_observations(ta, yr);
+        ts_obs = make_single_year_of_seasonal_observations(ts, yr);
         lwp_obs = make_single_year_of_seasonal_observations(lwp, yr);
 
-
-        return EKP.combine_observations([net_rad_obs, cre_obs, rsut_obs, rlut_obs, pr_obs, ta_obs, lwp_obs]);
+        return EKP.combine_observations([net_rad_obs, cre_obs, rsut_obs, rlut_obs, pr_obs, ts_obs, lwp_obs]);
     end
 
     return all_observations # NOT an EKP.ObservationSeries
@@ -203,6 +203,8 @@ possible issues
 
 TODO:
 - deal with possible issues
+- add IWP
+- use GCPBackend
 - add leaderboard-style plotting for observations 
 =#
 

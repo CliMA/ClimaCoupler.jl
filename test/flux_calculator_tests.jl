@@ -206,8 +206,8 @@ for FT in (Float32, Float64)
         @test fields.F_lh ≈ fluxes_expected.F_lh
         @test fields.F_sh ≈ fluxes_expected.F_sh
         # The ClimaCore DataLayout underlying the expected moisture flux uses
-        # Array instead of SubArray, so we can't compare the fields directly.
-        @test all(parent(fields.F_turb_moisture) .≈ parent(fluxes_expected.F_turb_moisture))
+        # Array instead of SubArray, so we can't compare the fields directly without copy.
+        @test copy(fields.F_turb_moisture) ≈ fluxes_expected.F_turb_moisture
     end
 
     @testset "get_surface_params for FT=$FT" begin

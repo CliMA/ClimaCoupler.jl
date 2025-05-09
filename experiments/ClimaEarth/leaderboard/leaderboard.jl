@@ -49,7 +49,8 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spi
         obs_var = obs_var_dict[short_name](sim_var.attributes["start_date"])
 
         # Remove first spin_up_months from simulation
-        spinup_cutoff = spinup * 31 * 86400.0
+        spinup_months = spinup
+        spinup_cutoff = spinup_months * 31 * 86400.0
         ClimaAnalysis.times(sim_var)[end] >= spinup_cutoff &&
             (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff))
 
@@ -333,7 +334,9 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     if length(ARGS) < 2
-        error("Usage: julia leaderboard.jl <Filepath to save leaderboard and bias plots> <Filepath to simulation data>")
+        error(
+            "Usage: julia leaderboard.jl <Filepath to save leaderboard and bias plots> <Filepath to simulation data>",
+        )
     end
     leaderboard_base_path = ARGS[begin]
     diagnostics_folder_path = ARGS[begin + 1]

@@ -99,15 +99,8 @@ function CoupledSimulation(config_file = joinpath(pkgdir(ClimaCoupler), "config/
 end
 
 function CoupledSimulation(config_dict::AbstractDict)
-    # Make a copy so that we don't modify the original input
-    config_dict = copy(config_dict)
-
     # Initialize communication context (do this first so all printing is only on root)
     comms_ctx = Utilities.get_comms_context(config_dict)
-    # Select the correct timestep for each component model based on which are available
-    parse_component_dts!(config_dict)
-    # Add extra diagnostics if specified
-    add_extra_diagnostics!(config_dict)
 
     (;
         job_id,
@@ -160,7 +153,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     ## get component model dictionaries (if applicable)
     ## Note this step must come after parsing the coupler config dictionary, since
     ##  some parameters are passed from the coupler config to the component model configs
-    atmos_config_dict = get_atmos_config_dict(config_dict, job_id, atmos_output_dir)
+    atmos_config_dict = get_atmos_config_dict(config_dict, atmos_output_dir)
     (; dt_rad) = get_atmos_args(atmos_config_dict)
 
     ## set unique random seed if desired, otherwise use default
@@ -212,6 +205,7 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     ## init atmos model component
     atmos_sim = ClimaAtmosSimulation(CA.AtmosConfig(atmos_config_dict))
+
     # Get surface elevation from `atmos` coordinate field
     surface_elevation = CC.Fields.level(CC.Fields.coordinate_field(atmos_sim.integrator.u.f).z, CC.Utilities.half)
 

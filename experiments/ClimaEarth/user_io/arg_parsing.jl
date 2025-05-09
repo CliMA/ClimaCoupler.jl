@@ -28,6 +28,12 @@ function get_coupler_config_dict(config_file)
     # Read in config dictionary from file, overriding the defaults in `parsed_args`
     config_dict = merge(parsed_args, YAML.load_file(config_file))
     config_dict["job_id"] = job_id
+
+    # Select the correct timestep for each component model based on which are available
+    parse_component_dts!(config_dict)
+
+    # Add any extra diagnostics
+    add_extra_diagnostics!(config_dict)
     return config_dict
 end
 

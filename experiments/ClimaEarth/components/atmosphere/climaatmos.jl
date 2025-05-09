@@ -455,7 +455,7 @@ end
 ### ClimaAtmos.jl model-specific functions (not explicitly required by ClimaCoupler.jl)
 ###
 """
-    get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_dir)
+    get_atmos_config_dict(coupler_dict::Dict, atmos_output_dir)
 
 Returns the specified atmospheric configuration (`atmos_config`) overwitten by arguments
 in the coupler dictionary (`config_dict`).
@@ -475,7 +475,7 @@ The TOML parameter file to use is chosen using the following priority:
 If a coupler TOML file is provided, it is used. Otherwise we use an atmos TOML
 file if it's provided. If neither is provided, we use a default coupler TOML file.
 """
-function get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_dir)
+function get_atmos_config_dict(coupler_dict::Dict, atmos_output_dir)
     atmos_config_file = coupler_dict["atmos_config_file"]
     atmos_config_repo = coupler_dict["atmos_config_repo"]
     # override default or specified configs with coupler arguments, and set the correct atmos config_file
@@ -526,10 +526,9 @@ function get_atmos_config_dict(coupler_dict::Dict, job_id::String, atmos_output_
     atmos_config["dt_save_state_to_disk"] = coupler_dict["checkpoint_dt"]
 
     # Add all extra atmos diagnostic entries into the vector of atmos diagnostics
-    # If atmos doesn't have any diagnostics, use the extra_atmos_diagnostics from the coupler
     atmos_config["diagnostics"] =
         haskey(atmos_config, "diagnostics") ?
-        collect([atmos_config["diagnostics"], coupler_dict["extra_atmos_diagnostics"]]) :
+        vcat(atmos_config["diagnostics"], coupler_dict["extra_atmos_diagnostics"]) :
         coupler_dict["extra_atmos_diagnostics"]
 
     # The Atmos `get_simulation` function expects the atmos config to contains its timestep size

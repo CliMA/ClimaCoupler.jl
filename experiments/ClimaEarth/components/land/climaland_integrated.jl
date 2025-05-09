@@ -25,7 +25,7 @@ It contains the following objects:
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model.
 - `output_writer::OW`: The diagnostic output writer.
 """
-struct ClimaLandSimulation{M <: ClimaLand.LandModel, I <: SciMLBase.AbstractODEIntegrator, A <: CC.Fields.Field, OW} <:
+struct ClimaLandSimulation{M <: CL.LandModel, I <: SciMLBase.AbstractODEIntegrator, A <: CC.Fields.Field, OW} <:
        Interfacer.LandModelSimulation
     model::M
     integrator::I
@@ -564,13 +564,13 @@ function FluxCalculator.compute_surface_fluxes!(
 
     # compute the fluxes for each sub-component and update the land model cache
     soil_dest = p.soil.turbulent_fluxes
-    ClimaLand.coupler_compute_turbulent_fluxes!(soil_dest, coupled_atmos, model.soil, Y, p, t)
+    CL.coupler_compute_turbulent_fluxes!(soil_dest, coupled_atmos, model.soil, Y, p, t)
 
     snow_dest = p.snow.turbulent_fluxes
-    ClimaLand.coupler_compute_turbulent_fluxes!(snow_dest, coupled_atmos, model.snow, Y, p, t)
+    CL.coupler_compute_turbulent_fluxes!(snow_dest, coupled_atmos, model.snow, Y, p, t)
 
     canopy_dest = p.canopy.turbulent_fluxes
-    ClimaLand.coupler_compute_turbulent_fluxes!(canopy_dest, coupled_atmos, model.canopy, Y, p, t)
+    CL.coupler_compute_turbulent_fluxes!(canopy_dest, coupled_atmos, model.canopy, Y, p, t)
 
     # Combine turbulent energy fluxes from each component of the land model
     # Use temporary variables to avoid allocating

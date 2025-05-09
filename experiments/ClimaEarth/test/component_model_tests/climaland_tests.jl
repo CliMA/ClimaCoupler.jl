@@ -100,10 +100,10 @@ end
     FieldExchanger.exchange!(cs)
 
     # Update land cache variables with the updated drivers in the cache after the exchange
-    update_aux! = ClimaLand.make_update_aux(land_sim.model)
+    update_aux! = CL.make_update_aux(land_sim.model)
     update_aux!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
 
-    update_boundary_fluxes! = ClimaLand.make_update_boundary_fluxes(land_sim.model)
+    update_boundary_fluxes! = CL.make_update_boundary_fluxes(land_sim.model)
     update_boundary_fluxes!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
 
     # Compute the surface fluxes

@@ -1,5 +1,5 @@
 import ClimaCore as CC
-import ClimaLand
+import ClimaLand as CL
 """
     temp_anomaly_aquaplanet(coord)
 
@@ -54,15 +54,19 @@ function make_land_domain(
     subsurface_face_space = CC.Spaces.face_space(subsurface_space)
     space = (; surface = atmos_boundary_space, subsurface = subsurface_space, subsurface_face = subsurface_face_space)
 
-    fields = ClimaLand.Domains.get_additional_coordinate_field_data(subsurface_space)
+    fields = CL.Domains.get_additional_coordinate_field_data(subsurface_space)
 
-    return ClimaLand.Domains.SphericalShell{FT, typeof(space), typeof(fields)}(
-        radius,
-        depth,
-        nothing,
-        nelements,
-        npolynomial,
-        space,
-        fields,
-    )
+    if pkgversion(CL) < v"0.16.0"
+        return CL.Domains.SphericalShell{FT}(radius, depth, nothing, nelements, npolynomial, space, fields)
+    else
+        return CL.Domains.SphericalShell{FT, typeof(space), typeof(fields)}(
+            radius,
+            depth,
+            nothing,
+            nelements,
+            npolynomial,
+            space,
+            fields,
+        )
+    end
 end

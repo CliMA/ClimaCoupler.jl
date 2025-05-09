@@ -6,6 +6,14 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Misc. interface cleanup
+
+Including:
+- Remove `ρ_sfc` from surface model caches
+- Remove `F_radiative` from `add_coupler_fields` since it's a default
+- Remove atmosphere `get_field` method for `thermo_state_int`, since it's now constructed on the boundary space
+- Update Interfacer docs
+
 #### Construct thermo states from exchanged T, q, ρ. PR[#1293](https://github.com/CliMA/ClimaCoupler.jl/pull/1293)
 
 Instead of exchanging atmosphere and surface thermo states, exchange T, q, ρ

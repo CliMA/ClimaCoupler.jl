@@ -175,17 +175,6 @@ Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_moisture
 # extensions required by FieldExchanger
 Interfacer.step!(sim::PrescribedIceSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 
-"""
-Extend Interfacer.add_coupler_fields! to add the fields required for PrescribedIceSimulation.
-
-The fields added are:
-- `:F_radiative` (for radiation input)
-"""
-function Interfacer.add_coupler_fields!(coupler_field_names, ::PrescribedIceSimulation)
-    ice_coupler_fields = [:F_radiative]
-    push!(coupler_field_names, ice_coupler_fields...)
-end
-
 function FluxCalculator.update_turbulent_fluxes!(sim::PrescribedIceSimulation, fields::NamedTuple)
     (; F_lh, F_sh) = fields
     @. sim.integrator.p.F_turb_energy = F_lh + F_sh

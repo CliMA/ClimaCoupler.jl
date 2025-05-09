@@ -6,13 +6,14 @@ import Dates
 include("data_sources.jl")
 
 """
-    compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
+    compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spinup)
 
 Plot the biases and a leaderboard of various variables defined over longitude, latitude, and
 time.
 
-The parameter `leaderboard_base_path` is the path to save the leaderboards and bias plots,
-and `diagnostics_folder_path` is the path to the simulation data.
+The argument `leaderboard_base_path` is the path to save the leaderboards and bias plots,
+`diagnostics_folder_path` is the path to the simulation data, and `spinup` is the number
+of months to remove from the beginning of the simulation.
 
 Loading and preprocessing simulation data is done by `get_sim_var_dict`. Loading and
 preprocessing observational data is done by `get_obs_var_dict`. The ranges of the bias plots
@@ -20,7 +21,7 @@ are determined by `get_compare_vars_biases_plot_extrema`. The groups of variable
 the bias plots are determined by `get_compare_vars_biases_groups()`. Loading the RMSEs from
 other models is done by `get_rmse_var_dict`. See the functions defined in data_sources.jl.
 """
-function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
+function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spinup)
     @info "Error against observations"
 
     # Get everything we need from data_sources.jl
@@ -49,8 +50,8 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
         obs_var = obs_var_dict[short_name](sim_var.attributes["start_date"])
 
         # Remove first spin_up_months from simulation
-        spin_up_months = 3
-        spinup_cutoff = spin_up_months * 31 * 86400.0
+        spinup_months = spinup
+        spinup_cutoff = spinup_months * 31 * 86400.0
         ClimaAnalysis.times(sim_var)[end] >= spinup_cutoff &&
             (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff))
 
@@ -179,23 +180,21 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
 end
 
 """
-    compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path)
+    compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path, spinup)
 
 Plot the biases and a leaderboard of various variables defined over longitude, latitude,
 time, and pressure levels.
 
-The parameter `leaderboard_base_path` is the path to save the leaderboards and bias plots,
-and `diagnostics_folder_path` is the path to the simulation data.
-
-The parameter `leaderboard_base_path` is the path to save the leaderboards and bias plots,
-and `diagnostics_folder_path` is the path to the simulation data.
+The argument `leaderboard_base_path` is the path to save the leaderboards and bias plots,
+`diagnostics_folder_path` is the path to the simulation data, and `spinup` is the number
+of months to remove from the beginning of the simulation.
 
 Loading and preprocessing simulation data is done by `get_sim_var_in_pfull_dict`. Loading
 and preprocessing observational data is done by `get_obs_var_in_pfull_dict`. The ranges of
 the bias plots is defined by `get_compare_vars_biases_plot_extrema_pfull`. See the functions
 defined in data_sources.jl for more information.
 """
-function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path)
+function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path, spinup)
     @info "Error against observations for variables in pressure coordinates"
 
     sim_var_pfull_dict = get_sim_var_in_pfull_dict(diagnostics_folder_path)
@@ -222,8 +221,7 @@ function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_pat
             error("Units of pressure should be hPa for $short_name simulation data")
 
         # Remove first spin_up_months from simulation
-        spin_up_months = 6
-        spinup_cutoff = spin_up_months * 31 * 86400.0
+        spinup_cutoff = spinup * 31 * 86400.0
         ClimaAnalysis.times(sim_var)[end] >= spinup_cutoff &&
             (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff))
 
@@ -347,6 +345,6 @@ if abspath(PROGRAM_FILE) == @__FILE__
     end
     leaderboard_base_path = ARGS[begin]
     diagnostics_folder_path = ARGS[begin + 1]
-    compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
-    compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path)
+    compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, 3)
+    compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path, 6)
 end

@@ -36,8 +36,8 @@ function postprocess_sim(cs, postprocessing_vars)
         t_end = times[end]
         if t_end > 84600 * 31 * 3 # 3 months for spin up
             leaderboard_base_path = artifact_dir
-            compute_leaderboard(leaderboard_base_path, atmos_output_dir)
-            compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir)
+            compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
+            compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 6)
         end
     end
 

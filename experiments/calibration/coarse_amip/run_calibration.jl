@@ -2,31 +2,25 @@ using Distributed
 import ClimaCalibrate as CAL
 using ClimaCalibrate
 using ClimaAnalysis
-import ClimaAnalysis: SimDir, get, slice, average_xy
+import ClimaAnalysis: SimDir, get, slice
 import ClimaComms
 import ClimaCoupler
 using EnsembleKalmanProcesses.ParameterDistributions
 import EnsembleKalmanProcesses as EKP
+import JLD2
 
 include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_map.jl"))
 
-addprocs(CAL.SlurmManager())
-
-# Make variables and the forward model available on the worker sessions
-@everywhere begin
-    import ClimaCoupler
-    experiment_dir = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/")
-    model_interface = joinpath(experiment_dir, "model_interface.jl")
-    include(model_interface)
-end
-
+experiment_dir = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/")
+model_interface = joinpath(experiment_dir, "coarse_amip", "model_interface.jl")
 # Experiment Configuration
-output_dir = "experiments/calibration/coarse_amip/output"
+# output_dir = "experiments/calibration/coarse_amip/output"
+output_dir = "experiments/calibration/coarse_amip/output_4gpus"
 n_iterations = 9
 priors = [
     constrained_gaussian("liquid_cloud_effective_radius", 14e-6, 6e-6, 2.5e-6, 21.5e-6),
     constrained_gaussian("ice_cloud_effective_radius", 25e-6, 6e-6, 2.5e-6, 33e-6),
-    constrained_gaussian("precipitation_timescale", 400, 150, 0, 625),
+    # constrained_gaussian("precipitation_timescale", 600, 400, 0, 1200),
 ]
 prior = combine_distributions(priors)
 observation_path = joinpath(experiment_dir, "observations.jld2")
@@ -50,4 +44,7 @@ eki = EKP.EnsembleKalmanProcess(observation_series, EKP.TransformUnscented(prior
 )
 ensemble_size = EKP.get_N_ens(eki)
 
-eki = CAL.calibrate(CAL.WorkerBackend, eki, n_iterations, prior, output_dir)
+# Slurm resources for a single model run
+hpc_kwargs = CAL.kwargs(time = 60*5, ntasks = 8, gpus_per_task = 1, cpus_per_task = 4, partition = "a3")
+
+eki = CAL.calibrate(CAL.GCPBackend, eki, n_iterations, prior, output_dir; model_interface, hpc_kwargs)

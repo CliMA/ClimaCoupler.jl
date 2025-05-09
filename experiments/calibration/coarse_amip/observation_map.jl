@@ -4,6 +4,7 @@ import ClimaCoupler
 import JLD2
 import EnsembleKalmanProcesses as EKP
 import NaNStatistics
+import CairoMakie
 include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_utils.jl"))
 
 function ClimaCalibrate.observation_map(iteration)
@@ -52,9 +53,9 @@ function process_member_data(simdir::SimDir)
     cre = rsut + rlut - rsutcs - rlutcs
 
     pr = process_outputvar(simdir, "pr")
-    ta = process_outputvar(simdir, "ta")
+    ts = process_outputvar(simdir, "ts")
     lwp = process_outputvar(simdir, "lwp")
-    lwp = window.(lwp, "latitude"; left = -60.0, right = 60)
+    lwp = window.(lwp, "latitude"; left = -60, right = 60)
 
     # Map over each year
     year_observations = map(1:4:length(rsut)) do year_start
@@ -67,10 +68,10 @@ function process_member_data(simdir::SimDir)
         rlut_yr = vectorize(rlut[yr_ind])
         cre_yr = vectorize(cre[yr_ind])
         pr_yr = vectorize(pr[yr_ind])
-        ta_yr = vectorize(ta[yr_ind])
+        ts_yr = vectorize(ts[yr_ind])
         lwp_yr = vectorize(lwp[yr_ind])
 
-        vcat(net_rad_yr, cre_yr, rsut_yr, rlut_yr, pr_yr, ta_yr, lwp_yr)
+        vcat(net_rad_yr, cre_yr, rsut_yr, rlut_yr, pr_yr, ts_yr, lwp_yr)
     end
     return vcat(year_observations...)
 end
@@ -95,6 +96,7 @@ function preprocess_monthly_averages(simdir, name)
     # Interpolate to pressure coordinates to match observations
     pressure = get_monthly_averages(simdir, "pfull")
     if has_altitude(monthly_avgs)
+        # This fails sometimes
         monthly_avgs = ClimaAnalysis.Atmos.to_pressure_coordinates(monthly_avgs, pressure)
         monthly_avgs = limit_pressure_dim_to_era5_range(monthly_avgs)
     end

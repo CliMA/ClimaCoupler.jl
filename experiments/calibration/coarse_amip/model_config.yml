@@ -5,14 +5,14 @@ atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
 checkpoint_dt: "99999days"
 coupler_toml: ["toml/amip_no_precipitation_timescale.toml"]
 print_config_dict: true
-coupler_output_dir: "experiments/calibration/coarse_amip/output"
-dt: "600secs"
-dt_cpl: "600secs"
+coupler_output_dir: "experiments/calibration/coarse_amip/output_4gpus"
+dt: "400secs"
+dt_cpl: "400secs"
 dt_save_state_to_disk: "99999days"
 dt_save_to_sol: "99999days"
 dz_bottom: 100.0
 energy_check: false
-h_elem: 3
+h_elem: 8
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 mono_surface: false
@@ -32,6 +32,6 @@ z_elem: 39
 z_max: 60000.0
 extra_atmos_diagnostics:
   - reduction_time: average
-    short_name: [rsut, rlut, rsdt, rsutcs, rlutcs, pr, ta, lwp]
+    short_name: [rsut, rlut, rsdt, rsutcs, rlutcs, pr, ta, ts, lwp, pfull]
     period: 1months
     writer: nc

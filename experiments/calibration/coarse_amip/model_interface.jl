@@ -3,7 +3,6 @@ import ClimaCalibrate
 import CUDA
 import EnsembleKalmanProcesses as EKP
 ENV["CLIMACOMMS_DEVICE"] = "CUDA"
-ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
 import JLD2
 include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.jl"))
 
@@ -29,6 +28,7 @@ function ClimaCalibrate.forward_model(iter, member)
     # Set member output directory
     member_output_dir = ClimaCalibrate.path_to_ensemble_member(output_dir_root, iter, member)
     config_dict["coupler_output_dir"] = member_output_dir
+    @show config_dict
     sim = try
         setup_and_run(config_dict)
     catch e

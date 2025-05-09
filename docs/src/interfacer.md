@@ -157,10 +157,6 @@ properties needed by a component model.
 | `surface_temperature`    | temperature over the combined surface space              | K     |
 | `turbulent_fluxes`       | turbulent fluxes                                         | W m⁻² |
 
-- `calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_sfc::ClimaCore.Fields.Field)`:
-A function to return the air density of the atmosphere simulation
-extrapolated to the surface, with units of [kg m⁻³].
-
 ClimaAtmos should also add the following coupler fields for Monin-Obukhov similarity theory:
 | Coupler name    | Description       | Units  |
 |-----------------+-------------------+--------|

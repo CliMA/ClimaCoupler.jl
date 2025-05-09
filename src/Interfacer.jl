@@ -56,7 +56,7 @@ struct CoupledSimulation{
     DTI,
     TT,
     NTMS <: NamedTuple,
-    NTC <: NamedTuple,
+    CALLBACKS,
     NTP <: NamedTuple,
     TP,
     DH,
@@ -70,7 +70,7 @@ struct CoupledSimulation{
     Δt_cpl::DTI
     t::TT
     model_sims::NTMS
-    callbacks::NTC
+    callbacks::CALLBACKS
     dirs::NTP
     thermo_params::TP
     diags_handler::DH

@@ -58,9 +58,10 @@ for FT in (Float32, Float64)
 
     @testset "get_field indexing for FT=$FT" begin
         space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
+        field_of_ones = ones(space)
         for sim in (DummySimulation(space), DummySimulation2(space), DummySimulation3(space))
             # field
-            @test Array(parent(Interfacer.get_field(sim, Val(:var))))[1] == FT(1)
+            @test Interfacer.get_field(sim, Val(:var)) == field_of_ones
             # float
             @test Interfacer.get_field(sim, Val(:var_float)) == FT(2)
         end
@@ -109,10 +110,10 @@ for FT in (Float32, Float64)
         Interfacer.update_field!(stub, Val(:surface_direct_albedo), ones(boundary_space) .* 3)
         Interfacer.update_field!(stub, Val(:surface_diffuse_albedo), ones(boundary_space) .* 4)
 
-        @test Array(parent(Interfacer.get_field(stub, Val(:area_fraction))))[1] == FT(1)
-        @test Array(parent(Interfacer.get_field(stub, Val(:surface_temperature))))[1] == FT(2)
-        @test Array(parent(Interfacer.get_field(stub, Val(:surface_direct_albedo))))[1] == FT(3)
-        @test Array(parent(Interfacer.get_field(stub, Val(:surface_diffuse_albedo))))[1] == FT(4)
+        @test Interfacer.get_field(stub, Val(:area_fraction)) == fill(FT(1), boundary_space)
+        @test Interfacer.get_field(stub, Val(:surface_temperature)) == fill(FT(2), boundary_space)
+        @test Interfacer.get_field(stub, Val(:surface_direct_albedo)) == fill(FT(3), boundary_space)
+        @test Interfacer.get_field(stub, Val(:surface_diffuse_albedo)) == fill(FT(4), boundary_space)
     end
 end
 

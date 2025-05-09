@@ -121,18 +121,16 @@ end
 for FT in (Float32, Float64)
     @testset "test update_surface_fractions!" begin
         test_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
-        # Construct land fraction of 0s in top half, 1s in bottom half
+        # Construct land fraction of 0s in first half, 1s in second half
         land_fraction = CC.Fields.ones(test_space)
-        dims = size(parent(land_fraction))
-        m = dims[1]
-        n = dims[2]
-        parent(land_fraction)[1:(m ÷ 2), :, :, :] .= FT(0)
+        nelements = length(CC.Fields.field2array(land_fraction))
+        CC.Fields.field2array(land_fraction)[1:(nelements ÷ 2)] .= FT(0)
 
-        # Construct ice fraction of 0s on left, 0.5s on right
+        # Construct ice fraction of 0.5s on first half, 0s on second half
         ice_d = CC.Fields.zeros(test_space)
-        parent(ice_d)[:, (n ÷ 2 + 1):n, :, :] .= FT(0.5)
+        CC.Fields.field2array(ice_d)[1:(nelements ÷ 2)] .= FT(0.5)
 
-        # Construct ice fraction of 0s on left, 0.5s on right
+        # Construct ice fraction of 0s. During the update, the first half should be set to 0.5
         ocean_d = CC.Fields.zeros(test_space)
 
         # Fill in only the necessary parts of the simulation
@@ -161,7 +159,10 @@ for FT in (Float32, Float64)
         # Test that sum of fractions is 1 everywhere
         ice_fraction = Interfacer.get_field(cs.model_sims.ice_sim, Val(:area_fraction))
         ocean_fraction = Interfacer.get_field(cs.model_sims.ocean_sim, Val(:area_fraction))
-        @test all(parent(ice_fraction .+ ocean_fraction .+ land_fraction) .== FT(1))
+        @test ice_fraction .+ ocean_fraction .+ land_fraction == ones(test_space)
+        # Test that fractions updated correctly (ice and land unchanged, ocean updated)
+        @test all(CC.Fields.field2array(ice_fraction)[1:(nelements ÷ 2)] .== FT(0.5))
+        @test all(CC.Fields.field2array(ocean_fraction)[1:(nelements ÷ 2)] .== FT(0.5))
     end
 
     @testset "test combine_surfaces" begin
@@ -190,7 +191,7 @@ for FT in (Float32, Float64)
         )
 
         FieldExchanger.combine_surfaces!(combined_field, sims, var_name)
-        @test all(parent(combined_field) .== FT(sum(fractions .* fields)))
+        @test combined_field == fill(FT(sum(fractions .* fields)), test_space)
     end
 
     @testset "import_atmos_fields! for FT=$FT" begin
@@ -215,9 +216,10 @@ for FT in (Float32, Float64)
             (; atmos_sim = DummySimulation(component_fields), land_sim = TestSurfaceSimulation1(component_fields))
 
         FieldExchanger.import_atmos_fields!(coupler_fields, model_sims)
-        @test Array(parent(coupler_fields.F_lh))[1] == FT(0)
-        @test Array(parent(coupler_fields.F_sh))[1] == FT(0)
-        @test Array(parent(coupler_fields.F_turb_moisture))[1] == FT(0)
+        zero_field = zeros(boundary_space)
+        @test coupler_fields.F_lh == zero_field
+        @test coupler_fields.F_sh == zero_field
+        @test coupler_fields.F_turb_moisture == zero_field
         @test coupler_fields.F_radiative == model_sims.atmos_sim.cache.radiative_energy_flux_sfc
         @test coupler_fields.P_liq == model_sims.atmos_sim.cache.liquid_precipitation
         @test coupler_fields.P_snow == model_sims.atmos_sim.cache.snow_precipitation
@@ -297,24 +299,30 @@ for FT in (Float32, Float64)
         FieldExchanger.update_model_sims!(model_sims, coupler_fields)
 
         # test atmos
-        @test Array(parent(model_sims.atmos_sim.cache.albedo_direct))[1] == results[2]
-        @test Array(parent(model_sims.atmos_sim.cache.albedo_diffuse))[1] == results[3]
+        expected_field = fill(results[2], boundary_space)
+        @test model_sims.atmos_sim.cache.albedo_direct == expected_field
+        expected_field .= results[3]
+        @test model_sims.atmos_sim.cache.albedo_diffuse == expected_field
 
         # test variables without updates
-        @test Array(parent(model_sims.atmos_sim.cache.surface_temperature))[1] == results[1]
-        @test Array(parent(model_sims.atmos_sim.cache.beta))[1] == results[1]
-        @test Array(parent(model_sims.atmos_sim.cache.roughness_buoyancy))[1] == results[1]
+        expected_field .= results[1]
+        @test model_sims.atmos_sim.cache.surface_temperature == expected_field
+        @test model_sims.atmos_sim.cache.beta == expected_field
+        @test model_sims.atmos_sim.cache.roughness_buoyancy == expected_field
 
         # test land updates
-        @test Array(parent(model_sims.land_sim.cache.liquid_precipitation))[1] == results[2]
-        @test Array(parent(model_sims.land_sim.cache.snow_precipitation))[1] == results[2]
+        expected_field .= results[2]
+        @test model_sims.land_sim.cache.liquid_precipitation == expected_field
+        @test model_sims.land_sim.cache.snow_precipitation == expected_field
 
         # test variables without updates
-        @test Array(parent(model_sims.land_sim.cache.radiative_energy_flux_sfc))[1] == results[1]
+        expected_field .= results[1]
+        @test model_sims.land_sim.cache.radiative_energy_flux_sfc == expected_field
 
         # test stub - albedo should be updated by update_sim!
-        @test Array(parent(model_sims.stub_sim.cache.albedo_direct))[1] == results[2]
-        @test Array(parent(model_sims.stub_sim.cache.albedo_diffuse))[1] == results[2]
+        expected_field .= results[2]
+        @test model_sims.stub_sim.cache.albedo_direct == expected_field
+        @test model_sims.stub_sim.cache.albedo_diffuse == expected_field
     end
 
     @testset "step_model_sims! for FT=$FT" begin

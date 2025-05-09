@@ -39,12 +39,10 @@ minibatcher = EKP.FixedMinibatcher(batches)
 series_names = string.(1:length(observation_vec))
 observation_series = EKP.ObservationSeries(observation_vec, minibatcher, series_names)
 
-eki = EKP.EnsembleKalmanProcess(observation_series, EKP.TransformUnscented(prior),
-    verbose=true,
-)
+eki = EKP.EnsembleKalmanProcess(observation_series, EKP.TransformUnscented(prior), verbose = true)
 ensemble_size = EKP.get_N_ens(eki)
 
 # Slurm resources for a single model run
-hpc_kwargs = CAL.kwargs(time = 60*5, ntasks = 8, gpus_per_task = 1, cpus_per_task = 4, partition = "a3")
+hpc_kwargs = CAL.kwargs(time = 60 * 5, ntasks = 8, gpus_per_task = 1, cpus_per_task = 4, partition = "a3")
 
 eki = CAL.calibrate(CAL.GCPBackend, eki, n_iterations, prior, output_dir; model_interface, hpc_kwargs)

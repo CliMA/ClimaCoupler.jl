@@ -1,12 +1,17 @@
 # Generate and save experiment observations to disk
 using ClimaAnalysis, JLD2, ClimaCoupler
-include(joinpath(pkgdir(ClimaCoupler),"experiments/calibration/coarse_amip/observation_utils.jl"))
+include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_utils.jl"))
 
 const obs_dir = "/home/ext_nefrathe_caltech_edu/calibration_obs"
-const simdir = SimDir(joinpath(pkgdir(ClimaCoupler),"experiments/calibration/coarse_amip/output_4gpus/iteration_000/member_001/model_config/output_active"))
+const simdir = SimDir(
+    joinpath(
+        pkgdir(ClimaCoupler),
+        "experiments/calibration/coarse_amip/output_4gpus/iteration_000/member_001/model_config/output_active",
+    ),
+)
 
 diagnostic_var2d = get_monthly_averages(simdir, "rsut")
-# pressure = get_monthly_averages(simdir, "pfull")
+
 # diagnostic_var3d = get_monthly_averages(simdir, "ta")
 # diagnostic_var3d = ClimaAnalysis.Atmos.to_pressure_coordinates(diagnostic_var3d, pressure)
 

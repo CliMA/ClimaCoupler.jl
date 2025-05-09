@@ -19,7 +19,7 @@ function ClimaCalibrate.observation_map(iteration)
             G_ensemble[:, m] .= process_member_data(SimDir(simdir_path))
 
         catch e
-            @error "Error processing member $m, filling observation map entry with NaNs" exception = e 
+            @error "Error processing member $m, filling observation map entry with NaNs" exception = e
             G_ensemble[:, m] .= NaN
         end
     end
@@ -32,7 +32,7 @@ end
 
 function plot_constrained_params_and_errors(output_dir, ekp, priors)
     dim_size = sum(length.(EKP.batch(prior)))
-    fig = CairoMakie.Figure(size = ((dim_size + 1) * 500, 500));
+    fig = CairoMakie.Figure(size = ((dim_size + 1) * 500, 500))
     for i in 1:dim_size
         EKP.Visualize.plot_ϕ_over_iters(fig[1, i], ekp, prior, i)
     end
@@ -83,7 +83,7 @@ end
 # Process an outputvar into a vector of seasonal averages
 function process_outputvar(simdir, name)
     monthly_avgs = preprocess_monthly_averages(simdir, name)
-    seasons = split_monthly_averages_into_seasons(monthly_avgs)
+    seasons = split_monthly_averages_into_seasons(monthly_avgs) # replace with split_by_season after testing
     # Ensure each season has three months
     @assert all(map(x -> length(times(x)) == 3, seasons))
     seasonal_avgs = average_time.(seasons)

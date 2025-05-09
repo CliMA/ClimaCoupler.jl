@@ -9,6 +9,8 @@ import SciMLBase
 import ClimaTimeSteppers as CTS
 import ClimaDiagnostics as CD
 import ClimaUtilities.TimeManager: ITime
+import SurfaceFluxes as SF
+import SurfaceFluxes.Parameters as SFP
 
 include("climaland_helpers.jl")
 
@@ -594,6 +596,8 @@ function FluxCalculator.compute_surface_fluxes!(
     @. csf.F_turb_moisture += csf.temp1 * area_fraction
 
     # Combine turbulent momentum fluxes from each component of the land model
+    # Note that we exclude the canopy component here for now, since we can have nonzero momentum fluxes
+    #  where there is zero LAI. This should be fixed in ClimaLand.
     @. csf.temp1 = soil_dest.ρτxz * (1 - p.snow.snow_cover_fraction) + p.snow.snow_cover_fraction * snow_dest.ρτxz
     @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
     @. csf.F_turb_ρτxz += csf.temp1 * area_fraction
@@ -601,6 +605,29 @@ function FluxCalculator.compute_surface_fluxes!(
     @. csf.temp1 = soil_dest.ρτyz * (1 - p.snow.snow_cover_fraction) + p.snow.snow_cover_fraction * snow_dest.ρτyz
     @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
     @. csf.F_turb_ρτyz += csf.temp1 * area_fraction
+
+    # Combine the buoyancy flux from each component of the land model
+    # Note that we exclude the canopy component here for now, since ClimaLand doesn't
+    #  include its extra resistance term in the buoyancy flux calculation.
+    @. csf.temp1 =
+        soil_dest.buoy_flux * (1 - p.snow.snow_cover_fraction) + p.snow.snow_cover_fraction * snow_dest.buoy_flux
+    @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
+    @. csf.buoyancy_flux += csf.temp1 * area_fraction
+
+    # Compute ustar from the momentum fluxes and surface air density
+    #  ustar = sqrt(ρτ / ρ)
+    @. csf.temp1 = sqrt(sqrt(csf.F_turb_ρτxz^2 + csf.F_turb_ρτyz^2) / csf.ρ_atmos)
+    @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
+    @. csf.ustar += csf.temp1 * area_fraction
+
+    # Compute the Monin-Obukhov length from ustar and the buoyancy flux
+    #  L_MO = -u^3 / (k * buoyancy_flux)
+    sf_param_set = LP.surface_fluxes_parameters(sim.model.soil.parameters.earth_param_set)
+    @. csf.temp1 = -csf.ustar^3 / SFP.von_karman_const(sf_param_set) / csf.buoyancy_flux
+    @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
+    # When L_MO is infinite, avoid multiplication by zero to prevent NaN
+    @. csf.L_MO += ifelse(isinf(csf.temp1), csf.temp1, csf.temp1 * area_fraction)
+
     return nothing
 end
 

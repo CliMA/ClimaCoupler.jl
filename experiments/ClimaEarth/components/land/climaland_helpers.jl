@@ -56,5 +56,13 @@ function make_land_domain(
 
     fields = ClimaLand.Domains.get_additional_coordinate_field_data(subsurface_space)
 
-    return ClimaLand.Domains.SphericalShell{FT}(radius, depth, nothing, nelements, npolynomial, space, fields)
+    return ClimaLand.Domains.SphericalShell{FT, typeof(space), typeof(fields)}(
+        radius,
+        depth,
+        nothing,
+        nelements,
+        npolynomial,
+        space,
+        fields,
+    )
 end

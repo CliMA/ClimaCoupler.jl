@@ -6,7 +6,7 @@ import Dates
 include("data_sources.jl")
 
 """
-    compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
+    compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spinup)
 
 Plot the biases and a leaderboard of various variables defined over longitude, latitude, and
 time.
@@ -20,7 +20,7 @@ are determined by `get_compare_vars_biases_plot_extrema`. The groups of variable
 the bias plots are determined by `get_compare_vars_biases_groups()`. Loading the RMSEs from
 other models is done by `get_rmse_var_dict`. See the functions defined in data_sources.jl.
 """
-function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
+function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spinup)
     @info "Error against observations"
 
     # Get everything we need from data_sources.jl
@@ -49,8 +49,8 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
         obs_var = obs_var_dict[short_name](sim_var.attributes["start_date"])
 
         # Remove first spin_up_months from simulation
-        spin_up_months = 3
-        spinup_cutoff = spin_up_months * 31 * 86400.0
+        spinup_months = spinup
+        spinup_cutoff = spinup_months * 31 * 86400.0
         ClimaAnalysis.times(sim_var)[end] >= spinup_cutoff &&
             (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff))
 
@@ -194,7 +194,7 @@ and preprocessing observational data is done by `get_obs_var_in_pfull_dict`. The
 the bias plots is defined by `get_compare_vars_biases_plot_extrema_pfull`. See the functions
 defined in data_sources.jl for more information.
 """
-function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path)
+function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path, spinup)
     @info "Error against observations for variables in pressure coordinates"
 
     sim_var_pfull_dict = get_sim_var_in_pfull_dict(diagnostics_folder_path)
@@ -221,8 +221,7 @@ function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_pat
             error("Units of pressure should be hPa for $short_name simulation data")
 
         # Remove first spin_up_months from simulation
-        spin_up_months = 6
-        spinup_cutoff = spin_up_months * 31 * 86400.0
+        spinup_cutoff = spinup * 31 * 86400.0
         ClimaAnalysis.times(sim_var)[end] >= spinup_cutoff &&
             (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff))
 
@@ -342,10 +341,12 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     if length(ARGS) < 2
-        error("Usage: julia leaderboard.jl <Filepath to save leaderboard and bias plots> <Filepath to simulation data>")
+        error(
+            "Usage: julia leaderboard.jl <Filepath to save leaderboard and bias plots> <Filepath to simulation data>",
+        )
     end
     leaderboard_base_path = ARGS[begin]
     diagnostics_folder_path = ARGS[begin + 1]
-    compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
-    compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path)
+    compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, 3)
+    compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path, 6)
 end

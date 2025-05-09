@@ -14,7 +14,6 @@ Ocean roughness follows the https://github.com/NOAA-GFDL/ice_param/blob/main/oce
 
 The cache is expected to contain the following variables:
 - `T_sfc` (surface temperature [K])
-- `ρ_sfc` (surface air density [kg / m3])
 - `z0m` (roughness length for momentum [m])
 - `z0b` (roughness length for tracers [m])
 - `beta` (evaporation scaling factor)
@@ -86,7 +85,6 @@ function PrescribedOceanSimulation(
     # Create the cache
     cache = (;
         T_sfc = SST_init,
-        ρ_sfc = zeros(space),
         z0m = z0m,
         z0b = z0b,
         beta = beta,

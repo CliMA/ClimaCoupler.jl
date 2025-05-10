@@ -646,8 +646,10 @@ function FluxCalculator.compute_surface_fluxes!(
     # Combine the buoyancy flux from each component of the land model
     # Note that we exclude the canopy component here for now, since ClimaLand doesn't
     #  include its extra resistance term in the buoyancy flux calculation.
-    @. csf.temp1 =
-        soil_dest.buoy_flux * (1 - p.snow.snow_cover_fraction) + p.snow.snow_cover_fraction * snow_dest.buoy_flux
+    Interfacer.remap!(
+        csf.temp1,
+        soil_dest.buoy_flux .* (1 .- p.snow.snow_cover_fraction) .+ p.snow.snow_cover_fraction .* snow_dest.buoy_flux,
+    )
     @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
     @. csf.buoyancy_flux += csf.temp1 * area_fraction
 

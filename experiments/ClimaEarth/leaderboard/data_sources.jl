@@ -29,6 +29,7 @@ function get_compare_vars_biases_groups()
         ["pr", "rsdt", "rsut", "rlut"],
         ["rsds", "rsus", "rlds", "rlus"],
         ["rsutcs", "rlutcs", "rsdscs", "rsuscs", "rldscs"],
+        ["cre"],
     ]
     return compare_vars_biases_groups
 end
@@ -47,7 +48,7 @@ is the lower bound and the last element is the upper bound for the bias plots.
 function get_compare_vars_biases_plot_extrema()
     compare_vars_biases_plot_extrema = Dict(
         "pr" => (-5.0, 5.0),
-        "rsdt" => (-2.0, 2.0),
+        "rsdt" => (-10.0, 10.0),
         "rsut" => (-50.0, 50.0),
         "rlut" => (-50.0, 50.0),
         "rsutcs" => (-20.0, 20.0),
@@ -59,6 +60,7 @@ function get_compare_vars_biases_plot_extrema()
         "rsdscs" => (-10.0, 10.0),
         "rsuscs" => (-10.0, 10.0),
         "rldscs" => (-20.0, 20.0),
+        "cre" => (-110.0, 110.0),
     )
     return compare_vars_biases_plot_extrema
 end
@@ -83,7 +85,7 @@ function get_sim_var_dict(diagnostics_folder_path)
     sim_var_dict = Dict{String, Any}()
     # Dict for loading in simulation data
     "pr" in available_short_names && (
-        sim_var_dict["pr"] = (
+        sim_var_dict["pr"] =
             () -> begin
                 sim_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = "pr")
                 sim_var = ClimaAnalysis.convert_units(
@@ -93,9 +95,23 @@ function get_sim_var_dict(diagnostics_folder_path)
                 )
                 sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
                 return sim_var
-            end,
-        )
+            end
     )
+
+    if ["rsut", "rsutcs", "rlut", "rlutcs"] ⊆ available_short_names
+        sim_var_dict["cre"] = (() -> begin
+            rsut = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = "rsut")
+            rsutcs = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = "rsutcs")
+            rlut = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = "rlut")
+            rlutcs = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = "rlutcs")
+
+            # TODO: check units are equal
+            sim_var = rsut + rlut - rsutcs - rlutcs
+            sim_var = ClimaAnalysis.set_units(sim_var, "W m^-2")
+            sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
+            return sim_var
+        end)
+    end
 
     # Add "pr" and the necessary preprocessing
     for (short_name, _) in sim_obs_short_names_no_pr
@@ -159,6 +175,13 @@ function get_obs_var_dict()
                 return obs_var
             end
     end
+    obs_var_dict["cre"] =
+        (start_date) -> begin
+            cre =
+                obs_var_dict["rsut"](start_date) - obs_var_dict["rsutcs"](start_date) +
+                obs_var_dict["rlut"](start_date) - obs_var_dict["rlutcs"](start_date)
+            return set_units(cre, "W m^-2")
+        end
     return obs_var_dict
 end
 

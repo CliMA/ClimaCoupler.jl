@@ -5,7 +5,7 @@ atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
 checkpoint_dt: "99999days"
 coupler_toml: ["toml/amip_no_precipitation_timescale.toml"]
 print_config_dict: true
-coupler_output_dir: "experiments/calibration/coarse_amip/output_4gpus"
+coupler_output_dir: "experiments/calibration/coarse_amip/output"
 dt: "400secs"
 dt_cpl: "400secs"
 dt_save_state_to_disk: "99999days"

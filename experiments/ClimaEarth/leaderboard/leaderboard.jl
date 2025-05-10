@@ -334,9 +334,7 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     if length(ARGS) < 2
-        error(
-            "Usage: julia leaderboard.jl <Filepath to save leaderboard and bias plots> <Filepath to simulation data>",
-        )
+        error("Usage: julia leaderboard.jl <Filepath to save leaderboard and bias plots> <Filepath to simulation data>")
     end
     leaderboard_base_path = ARGS[begin]
     diagnostics_folder_path = ARGS[begin + 1]

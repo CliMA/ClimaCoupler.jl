@@ -6,7 +6,7 @@ const obs_dir = "/home/ext_nefrathe_caltech_edu/calibration_obs"
 const simdir = SimDir(
     joinpath(
         pkgdir(ClimaCoupler),
-        "experiments/calibration/coarse_amip/output_4gpus/iteration_000/member_001/model_config/output_active",
+        "experiments/calibration/coarse_amip/output/iteration_000/member_001/model_config/output_active",
     ),
 )
 

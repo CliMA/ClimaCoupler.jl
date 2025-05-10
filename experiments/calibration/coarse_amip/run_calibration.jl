@@ -14,8 +14,7 @@ include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/obse
 experiment_dir = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/")
 model_interface = joinpath(experiment_dir, "coarse_amip", "model_interface.jl")
 # Experiment Configuration
-# output_dir = "experiments/calibration/coarse_amip/output"
-output_dir = "experiments/calibration/coarse_amip/output_4gpus"
+output_dir = "experiments/calibration/coarse_amip/output"
 n_iterations = 9
 priors = [
     constrained_gaussian("liquid_cloud_effective_radius", 14e-6, 6e-6, 2.5e-6, 21.5e-6),
@@ -43,6 +42,6 @@ eki = EKP.EnsembleKalmanProcess(observation_series, EKP.TransformUnscented(prior
 ensemble_size = EKP.get_N_ens(eki)
 
 # Slurm resources for a single model run
-hpc_kwargs = CAL.kwargs(time = 60 * 5, ntasks = 8, gpus_per_task = 1, cpus_per_task = 4, partition = "a3")
-
-eki = CAL.calibrate(CAL.GCPBackend, eki, n_iterations, prior, output_dir; model_interface, hpc_kwargs)
+hpc_kwargs = CAL.kwargs(time = 60 * 5, ntasks = 4, gpus_per_task = 1, cpus_per_task = 4, partition = "a3")
+exeflags = "--threads=4"
+eki = CAL.calibrate(CAL.GCPBackend, eki, n_iterations, prior, output_dir; model_interface, hpc_kwargs, exeflags)

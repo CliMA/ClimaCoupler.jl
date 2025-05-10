@@ -6,6 +6,7 @@ import EnsembleKalmanProcesses as EKP
 import NaNStatistics
 import CairoMakie
 include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_utils.jl"))
+include(joinpath(pkgdir(ClimaCoupler), "experiments/ClimaEarth/leaderboard/leaderboard.jl"))
 
 function ClimaCalibrate.observation_map(iteration)
     observation_vec = JLD2.load_object(observation_path)
@@ -27,10 +28,16 @@ function ClimaCalibrate.observation_map(iteration)
 end
 
 function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, iteration)
-    plot_constrained_params_and_errors(output_dir, ekp, priors)
+    plot_output_path = ClimaCalibrate.path_to_iteration(output_dir, iteration)
+    plot_constrained_params_and_errors(plot_output_path, ekp, prior)
+    for m in 1:EKP.get_N_ens(ekp)
+        output_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
+        diagnostics_folder_path = joinpath(output_path, "model_config", "output_active")
+        compute_leaderboard(output_path, diagnostics_folder_path, 3)
+    end
 end
 
-function plot_constrained_params_and_errors(output_dir, ekp, priors)
+function plot_constrained_params_and_errors(output_dir, ekp, prior)
     dim_size = sum(length.(EKP.batch(prior)))
     fig = CairoMakie.Figure(size = ((dim_size + 1) * 500, 500))
     for i in 1:dim_size
@@ -87,6 +94,9 @@ function process_outputvar(simdir, name)
     # Ensure each season has three months
     @assert all(map(x -> length(times(x)) == 3, seasons))
     seasonal_avgs = average_time.(seasons)
+    seasonal_avgs = map(seasonal_avgs) do output_var
+        permutedims(output_var, ("longitude", "latitude"))
+    end
     return seasonal_avgs
 end
 

@@ -93,15 +93,9 @@ end
 
 get_monthly_averages(simdir, var_name) = get(simdir; short_name = var_name, reduction = "average", period = "1M")
 
-get_seasonal_averages(var) = average_time.(split_by_season_across_time(var))
-
-function get_seasonal_averages(simdir, var_name)
-    var = get(simdir; short_name = var_name, reduction = "average", period = "1M")
-    get_seasonal_averages(var)
-end
-
 function get_yearly_averages(var)
-    seasonal_avgs = get_seasonal_averages(var)
+    # Get seasonal averages
+    seasonal_avgs = average_time.(split_by_season_across_time(var))
     nyears = fld(length(seasonal_avgs), 4)
     matrices = getproperty.(seasonal_avgs, :data)
     year_averaged_matrices = map(1:nyears) do i
@@ -116,36 +110,37 @@ function get_yearly_averages(var)
     return year_averaged_matrices
 end
 
-function get_seasonal_stdevs(output_var)
-    all_seasonal_averages = get_seasonal_averages(output_var)
+function get_seasonal_covariance(output_var; model_error_scale = nothing, regularization = nothing)
+    # Split by season
+    seasons = split_by_season(output_var)
 
-    # Group the data by season and calculate standard deviation for each season
-    num_seasons = 4
-    return map(1:num_seasons) do season
-        # Get all data for this season across years
-        season_data =
-            [getproperty(all_seasonal_averages[i], :data) for i in season:num_seasons:length(all_seasonal_averages)]
-
-        # Determine dimensionality of the data
-        dims = length(output_var.dims)
-        season_matrix = cat(season_data...; dims)
-        # Calculate standard deviation for this season
-        season_stdev = std(season_matrix; dims)
-        dropdims(season_stdev; dims)
+    # Calculate temporal variance of seasonal averages
+    variances_per_season = map(seasons) do season
+        # Average each season over its months to get one value per year
+        season_across_time = split_by_season_across_time(season)
+        season_across_time = filter(!isempty, season_across_time)
+        seasonal_means_per_year = average_time.(season_across_time)
+        # Ensure dimensions are consistent - this will need to be generalized for 3D fields
+        seasonal_means_per_year = permutedims.(seasonal_means_per_year, Ref(["longitude", "latitude"]))
+        seasonal_means_per_year_matrix = cat(getproperty.(seasonal_means_per_year, :data)..., dims = 3)
+        time_mean_over_years = mean(seasonal_means_per_year_matrix, dims = 3)
+        # Take variance over time of the seasonal means
+        variance = var(seasonal_means_per_year_matrix, dims = 3)
+        # Add model error if applicable
+        if !isnothing(model_error_scale)
+            @. variance += (model_error_scale * time_mean_over_years)^2
+        end
+        return variance
     end
-end
 
+    diag_cov = vcat(vec.(variances_per_season)...)
 
-# Given an outputvar, compute the covariance for each season.
-function get_seasonal_covariance(output_var)
-    stdevs = get_seasonal_stdevs(output_var)
-    stdev_vec = vcat(vec.(stdevs)...)
-    # If 0.0 in diagonal, we need to add some small noise
-    if 0.0 in stdev_vec
-        mean_variance_without_zeros = mean(filter(x -> x != 0, stdev_vec))
-        replace!(stdev_vec, (0.0 => mean_variance_without_zeros))
+    # Add regularization if applicable
+    if !isnothing(regularization)
+        diag_cov .+= regularization
     end
-    return Diagonal(stdev_vec .^ 2)
+
+    return Diagonal(diag_cov)
 end
 
 # Given a year, return the indices of that year within a seasonal array
@@ -158,14 +153,25 @@ end
 
 # Make an EKP.Observation of a single year of seasonal averages from an OutputVar
 function make_single_year_of_seasonal_observations(output_var, yr)
-    seasonal_avgs = get_seasonal_averages(output_var)
-    all_year_indices = vcat(get_year_indices.(yr)...)
+    # Split by season first to get 4 OutputVars per year
+    seasons = split_by_season_across_time(output_var)
 
-    obs_vec = collect(Iterators.flatten((getproperty.(seasonal_avgs, :data))[all_year_indices]))
+    # Average each season over its months
+    seasonal_means_per_year = average_time.(seasons)
 
+    # Ensure dimensions are consistent for all seasons
+    seasonal_means_per_year = permutedims.(seasonal_means_per_year, Ref(["longitude", "latitude"]))
+
+    # Get data for the specific year requested
+    year_ind = get_year_indices.(yr)
+    year_seasonal_data = seasonal_means_per_year[year_ind]
+    seasons = map(x -> x.attributes["season"], year_seasonal_data)
+    @assert seasons == ["DJF", "MAM", "JJA", "SON"]
+    obs_vec = vcat(vec.(getproperty.(year_seasonal_data, :data))...)
+
+    cov = get_seasonal_covariance(output_var; model_error_scale = 0.05, regularization = 1e-3)
     name = get(output_var.attributes, "CF_name", get(output_var.attributes, "long_name", ""))
-    cov = get_seasonal_covariance(output_var)
-    return EKP.Observation(obs_vec, cov, "$(yr)_$name", )
+    return EKP.Observation(obs_vec, cov, "$(yr)_$name")
 end
 
 """
@@ -210,11 +216,4 @@ end
 possible issues
 - to_pressure_coordinates using wrong units (should be using Pa)
 - inconsistent flattening: OutputVar dimensions ordered differently before flattening, different methods of flattening
-- TA being overrepresented
-
-TODO:
-- deal with possible issues
-- add IWP
-- use GCPBackend
-- add leaderboard-style plotting for observations 
 =#

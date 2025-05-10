@@ -218,3 +218,20 @@ end
     FT = Float32
     @test isnothing(Interfacer.step!(Interfacer.SurfaceStub(FT(0)), 1))
 end
+
+@testset "remap" begin
+    FT = Float32
+    source_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+    field = CC.Fields.coordinate_field(source_space).lat
+
+    # Remap field to target space
+    target_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 6)
+    field_target_space = Interfacer.remap(field, target_space)
+
+    # remap back to source space
+    field_source_space = Interfacer.remap(field_target_space, source_space)
+
+    # The ClimaCore DataLayout underlying the remapped field uses
+    # Array instead of SubArray, so we can't compare the fields directly without Copy
+    @test field_source_space ≈ copy(field)
+end

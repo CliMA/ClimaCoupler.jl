@@ -420,11 +420,14 @@ Non-ClimaCore fields should provide a method to this function.
 function remap end
 
 function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
-    space = axes(field)
-    spaces_are_compatible =
-        space == target_space || CC.Spaces.issubspace(space, target_space) || CC.Spaces.issubspace(target_space, space)
+    source_space = axes(field)
+    comms_ctx = ClimaComms.context(source_space)
 
-    @assert spaces_are_compatible || ClimaComms.context(space) isa ClimaComms.SingletonCommsContext "Remapping is not currently supported with MPI"
+    # Check if the source and target spaces are compatible
+    spaces_are_compatible =
+        source_space == target_space ||
+        CC.Spaces.issubspace(source_space, target_space) ||
+        CC.Spaces.issubspace(target_space, source_space)
 
     # TODO: Handle remapping of Vectors correctly
     if hasproperty(field, :components)
@@ -436,18 +439,35 @@ function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
     spaces_are_compatible && return field
 
     # Get vector of LatLongPoints for the target space to get the hcoords
-    # Copy fields onto CPU so we regrid on the CPU
-    field_lat = CC.to_cpu(CC.Fields.coordinate_field(target_space).lat)
-    arr_lat = CC.Fields.field2array(field_lat)
-    field_long = CC.to_cpu(CC.Fields.coordinate_field(target_space).long)
-    arr_long = CC.Fields.field2array(field_long)
-    hcoords = CC.Geometry.LatLongPoint.(arr_lat, arr_long)
+    # Copy target coordinates to CPU if they are on GPU
+    coords = CC.to_cpu(CC.Fields.coordinate_field(target_space))
+    lats = CC.Fields.field2array(coords.lat)
+    lons = CC.Fields.field2array(coords.long)
+    hcoords = CC.Geometry.LatLongPoint.(lats, lons)
 
-    # Remap source field to target space as an array
-    remapped_array = CC.Remapping.interpolate(field, hcoords, [])
+    # Remap the field, using MPI if applicable
+    if comms_ctx isa ClimaComms.SingletonCommsContext
+        # Remap source field to target space as an array
+        remapped_array = CC.Remapping.interpolate(field, hcoords, [])
 
-    # Convert remapped array to a field in the target space
-    return CC.Fields.array2field(remapped_array, target_space)
+        # Convert remapped array to a field in the target space
+        return CC.Fields.array2field(remapped_array, target_space)
+    else
+        # Gather then broadcast the global hcoords and offsets
+        offset = [length(hcoords)]
+        all_hcoords = ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, hcoords))
+        all_offsets = ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, offset))
+
+        # Interpolate on root and broadcast to all processes
+        remapper = CC.Remapping.Remapper(source_space; target_hcoords = all_hcoords)
+        remapped_array = ClimaComms.bcast(comms_ctx, CC.Remapping.interpolate(remapper, field))
+
+        my_ending_offset = sum(all_offsets[1:ClimaComms.mypid(comms_ctx)])
+        my_starting_offset = my_ending_offset - offset[]
+
+        # Convert remapped array to a field in the target space on each process
+        return CC.Fields.array2field(remapped_array[(1 + my_starting_offset):my_ending_offset], target_space)
+    end
 end
 
 function remap(num::Number, target_space::CC.Spaces.AbstractSpace)

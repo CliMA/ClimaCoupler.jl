@@ -7,5 +7,6 @@ mode_name: "amip"
 moist: "equil"
 precip_model: "0M"
 rad: "allskywithclear"
+share_surface_space: false
 t_end: "10days"
 vert_diff: "true"

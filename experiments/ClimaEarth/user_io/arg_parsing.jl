@@ -2,6 +2,7 @@ import YAML
 
 mode_name_dict = Dict(
     "amip" => AMIPMode,
+    "cmip" => CMIPMode,
     "slabplanet" => SlabplanetMode,
     "slabplanet_aqua" => SlabplanetAquaMode,
     "slabplanet_terra" => SlabplanetTerraMode,

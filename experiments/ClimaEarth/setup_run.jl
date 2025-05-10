@@ -35,6 +35,7 @@ import ClimaCoupler:
 import ClimaCoupler.Interfacer:
     AbstractSlabplanetSimulationMode,
     AMIPMode,
+    CMIPMode,
     CoupledSimulation,
     SlabplanetAquaMode,
     SlabplanetMode,
@@ -67,6 +68,7 @@ include("components/land/climaland_integrated.jl")
 include("components/ocean/slab_ocean.jl")
 include("components/ocean/prescr_ocean.jl")
 include("components/ocean/prescr_seaice.jl")
+include("components/ocean/oceananigans.jl")
 
 #=
 ### Configuration Dictionaries
@@ -151,6 +153,8 @@ function CoupledSimulation(config_dict::AbstractDict)
     isdir(atmos_output_dir) || mkpath(atmos_output_dir)
     land_output_dir = joinpath(dir_paths.output, "clima_land")
     isdir(land_output_dir) || mkpath(land_output_dir)
+    ocean_output_dir = joinpath(dir_paths.output, "clima_ocean")
+    isdir(ocean_output_dir) || mkpath(ocean_output_dir)
 
 
     ## get component model dictionaries (if applicable)
@@ -256,8 +260,8 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     @info(sim_mode)
     land_sim = ice_sim = ocean_sim = nothing
-    if sim_mode <: AMIPMode
-        @info("AMIP boundary conditions - do not expect energy conservation")
+    if sim_mode <: AMIPMode || sim_mode <: CMIPMode
+        @info("AMIP/CMIP boundary conditions - do not expect energy conservation")
 
         ## land model
         if land_model == "bucket"
@@ -313,8 +317,20 @@ function CoupledSimulation(config_dict::AbstractDict)
         ## ocean model using prescribed data
         ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
         ocean_fraction = FT(1) .- ice_fraction .- land_fraction
-        ocean_sim =
-            PrescribedOceanSimulation(FT, boundary_space, start_date, t_start, ocean_fraction, thermo_params, comms_ctx)
+
+        if sim_mode <: CMIPMode
+            ocean_sim = OceananigansSimulation(ocean_fraction; output_dir = ocean_output_dir, comms_ctx)
+        else
+            ocean_sim = PrescribedOceanSimulation(
+                FT,
+                boundary_space,
+                start_date,
+                t_start,
+                ocean_fraction,
+                thermo_params,
+                comms_ctx,
+            )
+        end
 
     elseif (sim_mode <: AbstractSlabplanetSimulationMode)
 

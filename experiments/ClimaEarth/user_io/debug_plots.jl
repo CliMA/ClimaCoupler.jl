@@ -5,6 +5,7 @@ import ClimaCoreMakie
 import CairoMakie
 import ClimaCoupler: Interfacer, ConservationChecker
 import ClimaAtmos as CA
+import Oceananigans as OC
 import StaticArrays
 
 """
@@ -180,8 +181,14 @@ function debug(sim::Interfacer.ComponentModelSimulation, dir)
             field_name = field_names[field_index]
             field = Interfacer.get_field(sim, Val(field_name))
             ax = Makie.Axis(fig[i, j * 2 - 1], title = string(field_name) * print_extrema(field))
-            if field isa AbstractArray
-                lin = Makie.lines!(ax, Array(field))
+            if field isa OC.Field || field isa OC.AbstractOperations.AbstractOperation
+                if field isa OC.AbstractOperations.AbstractOperation
+                    field = OC.Field(field)
+                    OC.compute!(field)
+                end
+                grid = field.grid
+                hm = CairoMakie.heatmap!(ax, view(field, :, :, grid.Nz))
+                Makie.Colorbar(fig[i, j * 2], hm)
             elseif field isa CC.Fields.Field
                 # Copy field onto cpu space if necessary
                 cpu_field = CC.to_cpu(field)
@@ -201,6 +208,8 @@ function debug(sim::Interfacer.ComponentModelSimulation, dir)
                     (field_valid_min, field_valid_max)
                 hm = ClimaCoreMakie.fieldheatmap!(ax, cpu_field, colorrange = colorrange)
                 Makie.Colorbar(fig[i, j * 2], hm)
+            elseif field isa AbstractArray
+                lin = Makie.lines!(ax, Array(field))
             end
         end
     end
@@ -222,6 +231,18 @@ end
 function print_extrema(num::Number)
     min = Printf.@sprintf("%.2E", num)
     max = Printf.@sprintf("%.2E", num)
+    return " [$min, $max]"
+end
+
+function print_extrema(operation::OC.AbstractOperations.AbstractOperation)
+    evaluated_field = OC.Field(operation)
+    OC.compute!(evaluated_field)
+    return print_extrema(evaluated_field)
+end
+
+function print_extrema(field::OC.Field)
+    min = Printf.@sprintf("%.2E", minimum(field))
+    max = Printf.@sprintf("%.2E", maximum(field))
     return " [$min, $max]"
 end
 

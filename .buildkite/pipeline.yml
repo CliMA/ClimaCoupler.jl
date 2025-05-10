@@ -32,19 +32,19 @@ steps:
       - "julia --project -e 'using Pkg; Pkg.precompile()'"
       - "julia --project -e 'using Pkg; Pkg.status()'"
 
-      - echo "--- Instantiate ClimaCore experiments env"
-      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\")'"
-      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.status()'"
-      - "julia --project=experiments/ClimaCore/ -e 'using CUDA; CUDA.precompile_runtime()'"
-
       - echo "--- Instantiate ClimaEarth experiments env"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.develop(path=\".\")'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\");'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
+
+      - echo "--- Instantiate ClimaCore experiments env"
+      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.develop(path=\".\")'"
+      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\");'"
+      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate test env"
       - "julia --project=test/ -e 'using Pkg; Pkg.develop(path=\".\")'"
@@ -344,6 +344,19 @@ steps:
         key: "gpu_amip_albedo_temporal_map_1M"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_albedo_temporal_map_1M.yml --job_id gpu_amip_albedo_temporal_map_1M"
         artifact_paths: "experiments/ClimaEarth/output/gpu_amip_albedo_temporal_map_1M/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
+
+  - group: "CMIP"
+    steps:
+
+      - label: "GPU CMIP"
+        key: "gpu_my_first_cmip"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/my_first_cmip.yml --job_id my_first_cmip"
+        artifact_paths: "experiments/ClimaEarth/output/my_first_cmip/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

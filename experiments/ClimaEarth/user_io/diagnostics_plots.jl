@@ -199,3 +199,24 @@ function make_diagnostics_plots(output_path::AbstractString, plot_path::Abstract
         output_name = output_prefix * "summary_2D",
     )
 end
+
+# TODO: Extend this function to not hardcode that we are looking only at temperature
+"""
+    make_ocean_diagnostics_plots(output_path::AbstractString, plot_path::AbstractString; output_prefix = "")
+
+Plot the surface values for the latest snapshot containing temperature in `ocean_diagnostics.nc` in `output_path`.
+
+Save the output to `plot_path` in `ocean.pdf`
+"""
+function make_ocean_diagnostics_plots(output_path::AbstractString, plot_path::AbstractString; output_prefix = "")
+    expected_output_path = joinpath(output_path, "ocean_diagnostics.nc")
+    isfile(expected_output_path) || return nothing
+    ocean_diagnostics = NCDataset(expected_output_path)
+    temperature = ocean_diagnostics["T"][:, :, 1, end]
+    lats, logs = ocean_diagnostics["φ_aca"][:], ocean_diagnostics["λ_faa"][:]
+    fig, ax, hm = CairoMakie.heatmap(logs, lats, temperature)
+    ax.xlabel = "lon"
+    ax.ylabel = "lat"
+    CairoMakie.Colorbar(fig[:, end + 1], hm, label = "T [C]")
+    CairoMakie.save(joinpath(plot_path, "ocean.pdf"), fig)
+end

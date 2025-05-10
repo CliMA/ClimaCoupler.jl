@@ -26,7 +26,7 @@ The bucket model simulation object.
 It contains the following objects:
 - `model::M`: The `ClimaLand.Bucket.BucketModel`.
 - `integrator::I`: The integrator used in timestepping this model.
-- `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model.
+- `area_fraction::A`: A ClimaCore Field on the boundary space representing the surface area fraction of this component model.
 - `output_writer`: The diagnostic file writer.
 """
 struct BucketSimulation{M <: CL.Bucket.BucketModel, I <: SciMLBase.AbstractODEIntegrator, A <: CC.Fields.Field, OW} <:
@@ -62,10 +62,13 @@ function BucketSimulation(
     tspan::Tuple{TT, TT},
     start_date::Dates.DateTime,
     output_dir::String,
-    boundary_space,
     area_fraction,
+    nelements::Tuple{Int, Int} = (50, 10),
+    depth::FT = FT(3.5),
+    dz_tuple::Tuple{FT, FT} = FT.((1, 0.05)),
+    shared_surface_space = nothing,
     saveat::Vector{TT} = [tspan[1], tspan[2]],
-    surface_elevation = CC.Fields.zeros(boundary_space),
+    surface_elevation = nothing,
     land_temperature_anomaly::String = "amip",
     use_land_diagnostics::Bool = true,
     stepper = CTS.RK4(),
@@ -74,18 +77,35 @@ function BucketSimulation(
     energy_check::Bool = false,
     parameter_files = [],
 ) where {FT, TT <: Union{Float64, ITime}}
+    # Note that this does not take into account topography of the surface, which is OK for this land model.
+    # But it must be taken into account when computing surface fluxes, for Δz.
+    if isnothing(shared_surface_space)
+        domain = make_land_domain(depth; nelements, dz_tuple)
+    else
+        domain = make_land_domain(shared_surface_space, depth)
+    end
+    surface_space = domain.space.surface
+    subsurface_space = domain.space.subsurface
+
+    # If provided, interpolate surface elevation field to surface space; otherwise use zero elevation
+    if isnothing(surface_elevation)
+        surface_elevation = CC.Fields.zeros(surface_space)
+    else
+        surface_elevation = Interfacer.remap(surface_elevation, surface_space)
+    end
+
     α_snow = FT(0.8) # snow albedo
     if albedo_type == "map_static" # Read in albedo from static data file (default type)
         # By default, this uses a file containing bareground albedo without a time component. Snow albedo is specified separately.
-        albedo = CL.Bucket.PrescribedBaregroundAlbedo{FT}(α_snow, boundary_space)
+        albedo = CL.Bucket.PrescribedBaregroundAlbedo{FT}(α_snow, surface_space)
     elseif albedo_type == "map_temporal" # Read in albedo from data file containing data over time
         # By default, this uses a file containing linearly-interpolated monthly data of clear-sky albedo, generated from CERES.
         if pkgversion(CL) < v"0.15"
-            albedo = CL.Bucket.PrescribedSurfaceAlbedo{FT}(start_date, tspan[1], boundary_space)
+            albedo = CL.Bucket.PrescribedSurfaceAlbedo{FT}(start_date, tspan[1], surface_space)
         else
             albedo = CL.Bucket.PrescribedSurfaceAlbedo{FT}(
                 start_date,
-                boundary_space;
+                surface_space;
                 albedo_file_path = CL.Artifacts.ceres_albedo_dataset_path(),
                 varname = "sw_alb_clr",
             )
@@ -95,12 +115,11 @@ function BucketSimulation(
             (; lat, long) = coordinate_point
             return typeof(lat)(0.38)
         end
-        albedo = CL.Bucket.PrescribedBaregroundAlbedo{FT}(α_snow, α_bareground, boundary_space)
+        albedo = CL.Bucket.PrescribedBaregroundAlbedo{FT}(α_snow, α_bareground, surface_space)
     else
         error("invalid albedo type $albedo_type")
     end
 
-    d_soil = FT(3.5) # soil depth
     z_0m = FT(1e-3) # roughness length for momentum over smooth bare soil
     z_0b = FT(1e-3) # roughness length for tracers over smooth bare soil
     τc = FT(float(dt)) # This is the timescale on which snow exponentially damps to zero, in the case where all
@@ -119,10 +138,6 @@ function BucketSimulation(
         CL.Bucket.BucketModelParameters(toml_dict; z_0m, z_0b, albedo, τc)
     end
 
-    n_vertical_elements = 7
-    # Note that this does not take into account topography of the surface, which is OK for this land model.
-    # But it must be taken into account when computing surface fluxes, for Δz.
-    domain = make_land_domain(boundary_space, (-d_soil, FT(0.0)), n_vertical_elements)
     args = (params, CL.CoupledAtmosphere{FT}(), CL.CoupledRadiativeFluxes{FT}(), domain)
     model = CL.Bucket.BucketModel{FT, typeof.(args)...}(args...)
 
@@ -277,25 +292,26 @@ function Interfacer.get_field(sim::BucketSimulation, ::Val{:water})
 end
 
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_density}, field)
-    parent(sim.integrator.p.bucket.ρ_sfc) .= parent(field)
+    Interfacer.remap!(sim.integrator.p.bucket.ρ_sfc, field)
 end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:liquid_precipitation}, field)
-    ρ_liq = (LP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
-    parent(sim.integrator.p.drivers.P_liq) .= parent(field ./ ρ_liq)
+    ρ_liq = LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
+    Interfacer.remap!(sim.integrator.p.drivers.P_liq, field ./ ρ_liq)
 end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:radiative_energy_flux_sfc}, field)
-    parent(sim.integrator.p.bucket.R_n) .= parent(field)
+    Interfacer.remap!(sim.integrator.p.bucket.R_n, field)
 end
-function Interfacer.update_field!(sim::BucketSimulation, ::Val{:turbulent_energy_flux}, field)
-    parent(sim.integrator.p.bucket.turbulent_fluxes.shf) .= parent(field)
+function Interfacer.update_field!(sim::BucketSimulation, ::Val{:turbulent_energy_flux}, fields)
+    Interfacer.remap!(sim.integrator.p.bucket.turbulent_fluxes.lhf, fields.F_lh)
+    Interfacer.remap!(sim.integrator.p.bucket.turbulent_fluxes.shf, fields.F_sh)
 end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:snow_precipitation}, field)
-    ρ_liq = (LP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
-    parent(sim.integrator.p.drivers.P_snow) .= parent(field ./ ρ_liq)
+    ρ_liq = LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
+    Interfacer.remap!(sim.integrator.p.drivers.P_snow, field ./ ρ_liq)
 end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:turbulent_moisture_flux}, field)
-    ρ_liq = (LP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
-    parent(sim.integrator.p.bucket.turbulent_fluxes.vapor_flux) .= parent(field ./ ρ_liq) # TODO: account for sublimation
+    ρ_liq = LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
+    Interfacer.remap!(sim.integrator.p.bucket.turbulent_fluxes.vapor_flux, field ./ ρ_liq) # TODO: account for sublimation
 end
 
 Interfacer.step!(sim::BucketSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
@@ -315,11 +331,8 @@ end
 # extensions required by FluxCalculator
 function FluxCalculator.update_turbulent_fluxes!(sim::BucketSimulation, fields::NamedTuple)
     (; F_lh, F_sh, F_turb_moisture) = fields
-    turbulent_fluxes = sim.integrator.p.bucket.turbulent_fluxes
-    turbulent_fluxes.lhf .= F_lh
-    turbulent_fluxes.shf .= F_sh
-    earth_params = sim.model.parameters.earth_param_set
-    turbulent_fluxes.vapor_flux .= F_turb_moisture ./ LP.ρ_cloud_liq(earth_params)
+    Interfacer.update_field!(sim, Val(:turbulent_energy_flux), (; F_lh, F_sh))
+    Interfacer.update_field!(sim, Val(:turbulent_moisture_flux), F_turb_moisture)
     return nothing
 end
 

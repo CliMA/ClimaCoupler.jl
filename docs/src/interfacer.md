@@ -208,6 +208,8 @@ for the following properties:
 | `surface_diffuse albedo` | bulk diffuse surface albedo                                    |         |
 | `surface_temperature`    | surface temperature                                            | K       |
 
+Note: `area_fraction` is expected to be defined on the boundary space of the simulation,
+while all other fields will likely be on the simulation's own space.
 
 - `update_field!(::SurfaceModelSimulation, ::Val{property}, field)`:
 A function to update the value of property in the component model

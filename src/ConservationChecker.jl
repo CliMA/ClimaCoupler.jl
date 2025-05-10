@@ -114,7 +114,8 @@ function check_conservation!(
                 current = FT(0)
             else
                 previous = getproperty(ccs, sim_name)
-                current = integral(Interfacer.get_field(sim, Val(:energy)) .* area_fraction) # # ∫ J / m^3 dV
+                # regrid each field onto the boundary space
+                current = integral(Interfacer.get_field(sim, Val(:energy), coupler_sim.boundary_space) .* area_fraction) # # ∫ J / m^3 dV
             end
             push!(previous, current)
             total += current
@@ -156,8 +157,7 @@ function check_conservation!(
     total = 0
 
     # net precipitation (for surfaces that don't collect water)
-    PE_net =
-        coupler_sim.fields.P_net .+= Utilities.swap_space!(boundary_space, surface_water_gain_from_rates(coupler_sim))
+    PE_net = coupler_sim.fields.P_net .+= Interfacer.remap(surface_water_gain_from_rates(coupler_sim), boundary_space)
 
     # save surfaces
     for sim in model_sims
@@ -183,7 +183,7 @@ function check_conservation!(
                 push!(previous, current)
             else
                 previous = getproperty(ccs, sim_name)
-                current = integral(Interfacer.get_field(sim, Val(:water)) .* area_fraction) # kg (∫kg of water / m^3 dV)
+                current = integral(Interfacer.get_field(sim, Val(:water), coupler_sim.boundary_space) .* area_fraction) # kg (∫kg of water / m^3 dV)
                 push!(previous, current)
             end
         end

@@ -48,7 +48,7 @@ function slab_ocean_space_init(space, params)
     # prognostic variable
     Y = CC.Fields.FieldVector(; T_sfc = T_sfc)
 
-    return Y, space
+    return Y
 end
 
 """
@@ -71,7 +71,7 @@ function SlabOceanSimulation(
     evolving_switch = evolving ? FT(1) : FT(0)
     params = OceanSlabParameters{FT}(evolving_switch = evolving_switch)
 
-    Y, space = slab_ocean_space_init(space, params)
+    Y = slab_ocean_space_init(space, params)
     cache = (
         params = params,
         F_turb_energy = CC.Fields.zeros(space),
@@ -120,27 +120,27 @@ Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:energy}) =
     sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h
 
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:area_fraction}, field::CC.Fields.Field)
-    sim.integrator.p.area_fraction .= field
+    Interfacer.remap!(sim.integrator.p.area_fraction, field)
 end
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:radiative_energy_flux_sfc}, field)
-    parent(sim.integrator.p.F_radiative) .= parent(field)
+    Interfacer.remap!(sim.integrator.p.F_radiative, field)
 end
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:turbulent_energy_flux}, field)
-    parent(sim.integrator.p.F_turb_energy) .= parent(field)
+    Interfacer.remap!(sim.integrator.p.F_turb_energy, field)
 end
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:surface_direct_albedo}, field::CC.Fields.Field)
-    sim.integrator.p.α_direct .= field
+    Interfacer.remap!(sim.integrator.p.α_direct, field)
 end
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:surface_diffuse_albedo}, field::CC.Fields.Field)
-    sim.integrator.p.α_diffuse .= field
+    Interfacer.remap!(sim.integrator.p.α_diffuse, field)
 end
 
 # extensions required by FieldExchanger
 Interfacer.step!(sim::SlabOceanSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 
 function FluxCalculator.update_turbulent_fluxes!(sim::SlabOceanSimulation, fields::NamedTuple)
-    (; F_lh, F_sh) = fields
-    @. sim.integrator.p.F_turb_energy = F_lh + F_sh
+    Interfacer.update_field!(sim, Val(:turbulent_energy_flux), fields.F_lh .+ fields.F_sh)
+    return nothing
 end
 
 """

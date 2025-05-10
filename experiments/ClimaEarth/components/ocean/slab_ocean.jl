@@ -76,7 +76,6 @@ function SlabOceanSimulation(
         params = params,
         F_turb_energy = CC.Fields.zeros(space),
         F_radiative = CC.Fields.zeros(space),
-        ρ_sfc = CC.Fields.zeros(space),
         area_fraction = area_fraction,
         thermo_params = thermo_params,
         # add dss_buffer to cache to avoid runtime dss allocation
@@ -123,9 +122,6 @@ Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:energy}) =
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:area_fraction}, field::CC.Fields.Field)
     sim.integrator.p.area_fraction .= field
 end
-function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:air_density}, field)
-    parent(sim.integrator.p.ρ_sfc) .= parent(field)
-end
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:radiative_energy_flux_sfc}, field)
     parent(sim.integrator.p.F_radiative) .= parent(field)
 end
@@ -141,18 +137,6 @@ end
 
 # extensions required by FieldExchanger
 Interfacer.step!(sim::SlabOceanSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
-
-"""
-Extend Interfacer.add_coupler_fields! to add the fields required for SlabOceanSimulation.
-
-The fields added are:
-- `:ρ_sfc` (for humidity calculation)
-- `:F_radiative` (for radiation input)
-"""
-function Interfacer.add_coupler_fields!(coupler_field_names, ::SlabOceanSimulation)
-    ocean_coupler_fields = [:ρ_sfc, :F_radiative]
-    push!(coupler_field_names, ocean_coupler_fields...)
-end
 
 function FluxCalculator.update_turbulent_fluxes!(sim::SlabOceanSimulation, fields::NamedTuple)
     (; F_lh, F_sh) = fields

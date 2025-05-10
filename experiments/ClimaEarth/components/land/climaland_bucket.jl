@@ -306,10 +306,9 @@ Extend Interfacer.add_coupler_fields! to add the fields required for BucketSimul
 
 The fields added are:
 - `:ρ_sfc`
-- `:F_radiative` (for radiation input)
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::BucketSimulation)
-    bucket_coupler_fields = [:ρ_sfc, :F_radiative]
+    bucket_coupler_fields = [:ρ_sfc]
     push!(coupler_field_names, bucket_coupler_fields...)
 end
 

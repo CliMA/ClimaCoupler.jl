@@ -74,7 +74,6 @@ for FT in (Float32, Float64)
             z0m = 4,
             z0b = 5,
             beta = 6,
-            ρ_sfc = FT(1),
             phase = TD.Liquid(),
             thermo_params = thermo_params,
         ))
@@ -157,7 +156,6 @@ end
         :radiative_energy_flux_sfc,
         :radiative_energy_flux_toa,
         :snow_precipitation,
-        :thermo_state_int,
         :u_int,
         :v_int,
     )

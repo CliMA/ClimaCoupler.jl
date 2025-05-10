@@ -34,8 +34,6 @@ Interfacer.get_field(sim::TestAtmos, ::Val{:height_int}) = sim.integrator.p.z
 Interfacer.get_field(sim::TestAtmos, ::Val{:height_sfc}) = sim.integrator.p.z_sfc
 Interfacer.get_field(sim::TestAtmos, ::Val{:u_int}) = sim.integrator.p.u
 Interfacer.get_field(sim::TestAtmos, ::Val{:v_int}) = sim.integrator.p.v
-Interfacer.get_field(sim::TestAtmos, ::Val{:thermo_state_int}) =
-    TD.PhaseEquil_ρTq.(get_thermo_params(sim), sim.integrator.ρ, sim.integrator.T, sim.integrator.q)
 
 function FieldExchanger.import_atmos_fields!(csf, sim::TestAtmos, atmos_sim)
     # update atmos properties in coupler fields needed to compute surface fluxes
@@ -170,7 +168,6 @@ for FT in (Float32, Float64)
             )
         thermo_state_atmos =
             TD.PhaseEquil_ρTq.(thermo_params, atmos_sim.integrator.ρ, atmos_sim.integrator.T, atmos_sim.integrator.q)
-        thermo_state_atmos = Interfacer.get_field(atmos_sim, Val(:thermo_state_int))
 
         # Get surface properties
         z_sfc = Interfacer.get_field(atmos_sim, Val(:height_sfc))

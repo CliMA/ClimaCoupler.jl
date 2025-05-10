@@ -194,7 +194,6 @@ get_field(
         Val{:snow_precipitation},
         Val{:turblent_energy_flux},
         Val{:turbulent_moisture_flux},
-        Val{:thermo_state_int},
         Val{:u_int},
         Val{:v_int},
     },

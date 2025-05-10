@@ -118,7 +118,6 @@ function PrescribedIceSimulation(
     cache = (;
         F_turb_energy = CC.Fields.zeros(space),
         F_radiative = CC.Fields.zeros(space),
-        ρ_sfc = CC.Fields.zeros(space),
         area_fraction = ice_fraction,
         SIC_timevaryinginput = SIC_timevaryinginput,
         land_fraction = land_fraction,
@@ -162,9 +161,6 @@ It multiplies the the slab temperature by the heat capacity, density, and depth.
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:energy}) =
     sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h
 
-function Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:air_density}, field)
-    parent(sim.integrator.p.ρ_sfc) .= parent(field)
-end
 function Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:area_fraction}, field::CC.Fields.Field)
     sim.integrator.p.area_fraction .= field
 end
@@ -178,18 +174,6 @@ Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_moisture
 
 # extensions required by FieldExchanger
 Interfacer.step!(sim::PrescribedIceSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
-
-"""
-Extend Interfacer.add_coupler_fields! to add the fields required for PrescribedIceSimulation.
-
-The fields added are:
-- `:ρ_sfc` (for humidity calculation)
-- `:F_radiative` (for radiation input)
-"""
-function Interfacer.add_coupler_fields!(coupler_field_names, ::PrescribedIceSimulation)
-    ice_coupler_fields = [:ρ_sfc, :F_radiative]
-    push!(coupler_field_names, ice_coupler_fields...)
-end
 
 function FluxCalculator.update_turbulent_fluxes!(sim::PrescribedIceSimulation, fields::NamedTuple)
     (; F_lh, F_sh) = fields

@@ -285,7 +285,6 @@ for FT in (Float32, Float64)
             land_sim = TestSurfaceSimulationLand(land_fields),
             stub_sim = Interfacer.SurfaceStub((;
                 area_fraction = CC.Fields.ones(boundary_space),
-                ρ_sfc = CC.Fields.ones(boundary_space),
                 albedo_direct = CC.Fields.ones(boundary_space),
                 albedo_diffuse = CC.Fields.ones(boundary_space),
             )),

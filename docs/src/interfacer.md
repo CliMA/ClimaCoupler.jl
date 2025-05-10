@@ -7,11 +7,9 @@ be implemented to use a component model with ClimaCoupler.jl
 ## Coupled simulation
 A `CoupledSimulation` stores info for ESM run and contains each of the
 component model simulations. We currently require that each `CoupledSimulation`
-contains four components: `atmos_sim`, `land_sim`, `ocean_sim` and `ice_sim`.
-If a simulation surface type is not needed for a given run, it should be
-initialized with `SurfaceStub` with a zero `area_fracion`.
-The `atmos_sim` should always be specified.
-
+contains one `atmos_sim`, and at least one surface simulation (`land_sim`,
+`ocean_sim`, and/or `ice_sim`). If a simulation surface type is not needed
+for a given run, it may be omitted.
 
 ## Component simulations
 Individual component model simulations fall under `ComponentModelSimulation`,
@@ -75,9 +73,10 @@ be required. For example, the integrated land model requires the concentration
 of atmospheric CO2 for photosynthesis calculations, but the slab ocean does not.
 `add_coupler_fields!` is extended for any component model simulation that requires
 coupler fields in addition to the defaults, allowing us to allocate space for and
-exchange the extra fields only when necessary.
+exchange the extra fields only when necessary. All coupler fields are defined on the
+boundary space.
   - Any additional fields specified here will likely also require an `update_field!`
-method for this component model to pass the value from the coupler to the component.
+method defined for this component model, so the coupler can update the component.
 
 The default coupler exchange fields are the following, defined in
 `default_coupler_fields()` in the Interfacer module:
@@ -88,11 +87,17 @@ The default coupler exchange fields are the following, defined in
 | `z0b_sfc`         | buoyancy roughness length                           | m          |
 | `beta`            | factor to scale evaporation from the surface        | -          |
 | `emissivity`      | surface emissivity                                  | -          |
+| `T_atmos`         | atmosphere temperature at the bottom layer          | K          |
+| `q_atmos`         | atmosphere humidity at the bottom layer             | kg kg⁻¹    |
+| `ρ_atmos`         | atmosphere air density at the bottom layer          | kg m⁻³     |
+| `T_sfc`           | surface temperature, averaged across components     | K          |
+| `q_sfc`           | surface humidity                                    | kg kg⁻¹    |
 | `F_lh`            | latent heat flux                                    | W m⁻²      |
 | `F_sh`            | sensible heat flux                                  | W m⁻²      |
 | `F_turb_moisture` | turbulent moisture flux                             | kg m⁻² s⁻¹ |
 | `F_turb_ρτxz`     | turbulent momentum flux in the zonal direction      | kg m⁻¹ s⁻² |
 | `F_turb_ρτyz`     | turbulent momentum flux in the meridional direction | kg m⁻¹ s⁻² |
+| `F_radiative`     | net radiative flux at the surface                   | W m⁻²      |
 | `P_liq`           | liquid precipitation                                | kg m⁻² s⁻¹ |
 | `P_snow`          | snow precipitation                                  | kg m⁻² s⁻¹ |
 | `temp1`           | a surface field used for intermediate calculations  | -          |
@@ -133,9 +138,9 @@ for the following properties:
 | `radiative_energy_flux_sfc` | net radiative flux at the surface                                         | W m⁻²      |
 | `radiative_energy_flux_toa` | net radiative flux at the top of the atmosphere                           | W m⁻²      |
 | `snow_precipitation`        | snow precipitation at the surface                                         | kg m⁻² s⁻¹ |
+| `specific_humidity`         | specific humidity at the bottom cell centers of the atmosphere            | kg kg⁻¹    |
 | `turbulent_energy_flux`     | aerodynamic turbulent surface fluxes of energy (sensible and latent heat) | W m⁻²      |
 | `turbulent_moisture_flux`   | aerodynamic turbulent surface fluxes of energy (evaporation)              | kg m⁻² s⁻¹ |
-| `thermo_state_int`          | thermodynamic state at the first internal model level                     |            |
 | `u_int`                     | zonal wind velocity vector at the first internal model level              | m s⁻¹      |
 | `v_int`                     | meridional wind velocity vector at the first internal model level         | m s⁻¹      |
 
@@ -156,10 +161,6 @@ properties needed by a component model.
 | `surface_diffuse_albedo` | bulk diffuse surface albedo over the whole surface space |       |
 | `surface_temperature`    | temperature over the combined surface space              | K     |
 | `turbulent_fluxes`       | turbulent fluxes                                         | W m⁻² |
-
-- `calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_sfc::ClimaCore.Fields.Field)`:
-A function to return the air density of the atmosphere simulation
-extrapolated to the surface, with units of [kg m⁻³].
 
 ClimaAtmos should also add the following coupler fields for Monin-Obukhov similarity theory:
 | Coupler name    | Description       | Units  |
@@ -183,7 +184,6 @@ for the following properties:
 | `cos_zenith`        | cosine of the zenith angle                                     |         |
 | `co2`               | global mean co2                                                | ppm     |
 | `diffuse_fraction`  | fraction of downwards shortwave flux that is direct            |         |
-| `specific_humidity` | specific humidity at the bottom cell centers of the atmosphere | kg kg⁻¹ |
 | `LW_d`              | downwards longwave flux                                        | W m⁻²   |
 | `SW_d`              | downwards shortwave flux                                       | W m⁻²   |
 
@@ -222,7 +222,6 @@ properties needed by a component model.
 
 | Coupler name                                  | Description                                                                  | Units      |
 |-----------------------------------------------+------------------------------------------------------------------------------+------------|
-| `air_density`                                 | surface air density                                                          | kg m⁻³     |
 | `area_fraction`                               | fraction of the simulation grid surface area this model covers               |            |
 | `liquid_precipitation`                        | liquid precipitation at the surface                                          | kg m⁻² s⁻¹ |
 | `radiative_energy_flux_sfc` OR `LW_d`, `SW_d` | net radiative flux at the surface OR downward longwave, shortwave radiation  | W m⁻²      |
@@ -253,31 +252,34 @@ and moisture turbulent fluxes stored in fields which are calculated by the
 coupler.
 
 ### Prescribed surface conditions - SurfaceStub
-- `SurfaceStub` is a `SurfaceModelSimulation`, but it only contains
-required data in `<surface_stub>.cache`, e.g., for the calculation
-of surface fluxes through a prescribed surface state. The above
-adapter functions are already predefined for `AbstractSurfaceStub`,
-which is extended by `SurfaceStub`
-in the `surface_stub.jl` file, with
-the cache variables specified as:
+- `SurfaceStub` is a `SurfaceModelSimulation`, but it only contains required
+data in `<surface_stub>.cache`, e.g., for the calculation of surface fluxes
+through a prescribed surface state. This model is intended to be used for testing
+or as a simple stand-in model. The above adapter functions are already
+predefined for `AbstractSurfaceStub`, which is extended by `SurfaceStub`
+in the `surface_stub.jl` file, with the cache variables specified as:
 ```
 get_field(sim::AbstractSurfaceStub, ::Val{:area_fraction}) = sim.cache.area_fraction
 get_field(sim::AbstractSurfaceStub, ::Val{:beta}) = sim.cache.beta
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m
-get_field(sim::AbstractSurfaceStub, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) = sim.cache.α
+get_field(sim::AbstractSurfaceStub, ::Val{:surface_direct_albedo}) = sim.cache.α_direct
+get_field(sim::AbstractSurfaceStub, ::Val{:surface_diffuse_albedo}) = sim.cache.α_diffuse
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_temperature}) = sim.cache.T_sfc
 ```
 and with the corresponding `update_field!` functions
 ```
-function update_field!(sim::AbstractSurfaceStub, ::Val{:air_density}, field)
-    sim.cache.ρ_sfc .= field
-end
 function update_field!(sim::AbstractSurfaceStub, ::Val{:area_fraction}, field::ClimaCore.Fields.Field)
-    sim.cache.area_fraction .= field
+    sim.cache.area_fraction .= field # `area_fraction` is on the boundary space, so it doesn't need remapping
 end
 function update_field!(sim::AbstractSurfaceStub, ::Val{:surface_temperature}, field::ClimaCore.Fields.Field)
-    sim.cache.T_sfc .= field
+    Interfacer.remap!(sim.cache.T_sfc, field)
+end
+function update_field!(sim::AbstractSurfaceStub, ::Val{:surface_direct_albedo}, field::CC.Fields.Field)
+    Interfacer.remap!(sim.cache.α_direct, field)
+end
+function update_field!(sim::AbstractSurfaceStub, ::Val{:surface_diffuse_albedo}, field::CC.Fields.Field)
+    Interfacer.remap!(sim.cache.α_diffuse, field)
 end
 ```
 

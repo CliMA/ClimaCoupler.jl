@@ -1,7 +1,9 @@
 import SciMLBase
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
-import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
+import ClimaUtilities
+import ClimaUtilities.TimeManager: date
+import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities, FieldExchanger
 
 ###
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
@@ -78,10 +80,12 @@ function SlabOceanSimulation(
         F_radiative = CC.Fields.zeros(space),
         area_fraction = area_fraction,
         thermo_params = thermo_params,
-        # add dss_buffer to cache to avoid runtime dss allocation
-        dss_buffer = CC.Spaces.create_dss_buffer(Y),
         α_direct = CC.Fields.ones(space) .* params.α,
         α_diffuse = CC.Fields.ones(space) .* params.α,
+        u_atmos = CC.Fields.zeros(space),
+        v_atmos = CC.Fields.zeros(space),
+        # add dss_buffer to cache to avoid runtime dss allocation
+        dss_buffer = CC.Spaces.create_dss_buffer(Y),
     )
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
@@ -120,19 +124,19 @@ Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:energy}) =
     sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h
 
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:area_fraction}, field::CC.Fields.Field)
-    sim.integrator.p.area_fraction .= field
+    Interfacer.remap!(sim.integrator.p.area_fraction, field)
 end
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:radiative_energy_flux_sfc}, field)
-    parent(sim.integrator.p.F_radiative) .= parent(field)
+    Interfacer.remap!(sim.integrator.p.F_radiative, field)
 end
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:turbulent_energy_flux}, field)
-    parent(sim.integrator.p.F_turb_energy) .= parent(field)
+    Interfacer.remap!(sim.integrator.p.F_turb_energy, field)
 end
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:surface_direct_albedo}, field::CC.Fields.Field)
-    sim.integrator.p.α_direct .= field
+    Interfacer.remap!(sim.integrator.p.α_direct, field)
 end
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:surface_diffuse_albedo}, field::CC.Fields.Field)
-    sim.integrator.p.α_diffuse .= field
+    Interfacer.remap!(sim.integrator.p.α_diffuse, field)
 end
 
 # extensions required by FieldExchanger

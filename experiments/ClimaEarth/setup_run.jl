@@ -421,21 +421,10 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     The currently implemented callbacks are:
     - `checkpoint_cb`: generates a checkpoint of all model states at a specified interval. This is mainly used for restarting simulations.
-    - `albedo_cb`: for the amip mode, the water albedo is time varying (since the reflectivity of water depends on insolation and wave characteristics, with the latter
-    being approximated from wind speed). It is updated at the same frequency as the atmospheric radiation.
-    NB: Eventually, we will call all of radiation from the coupler, in addition to the albedo calculation.
     =#
     schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date)
     checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
-
-    if sim_mode <: AMIPMode
-        schedule_albedo = EveryCalendarDtSchedule(TimeManager.time_to_period(dt_rad); start_date)
-    else
-        schedule_albedo = TimeManager.NeverSchedule()
-    end
-    albedo_cb = TimeManager.Callback(schedule_albedo, FluxCalculator.water_albedo_from_atmosphere!)
-
-    callbacks = (; checkpoint = checkpoint_cb, water_albedo = albedo_cb)
+    callbacks = (checkpoint_cb,)
 
     #= Set up default AMIP diagnostics
     Use ClimaDiagnostics for default AMIP diagnostics, which currently include turbulent energy fluxes.
@@ -653,11 +642,8 @@ function step!(cs::CoupledSimulation)
     ## calculate turbulent fluxes in the coupler and update the model simulations with them
     FluxCalculator.turbulent_fluxes!(cs)
 
-    ## update water albedo from wind at dt_water_albedo
-    ## (this will be extended to a radiation callback from the coupler)
-    TimeManager.maybe_trigger_callback(cs.callbacks.water_albedo, cs)
-    ## callback to checkpoint model state
-    TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs)
+    ## Maybe call the callbacks
+    foreach(c -> TimeManager.maybe_trigger_callback(c, cs), cs.callbacks)
 
     ## compute/output AMIP diagnostics if scheduled for this timestep
     ## wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface

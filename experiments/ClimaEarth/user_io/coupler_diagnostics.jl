@@ -3,6 +3,18 @@ import ClimaCoupler: Interfacer
 import Dates
 
 """
+    ClimaDiagnostics.orchestrate_diagnostics(cs::CoupledSimulation)
+
+Compute and output coupled diagnostics.
+"""
+function CD.orchestrate_diagnostics(cs::CoupledSimulation)
+    ## wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface
+    cs_nt = (; u = cs.fields, p = nothing, t = cs.t[], step = round(cs.t[] / cs.Δt_cpl))
+    !isnothing(cs.diags_handler) && CD.orchestrate_diagnostics(cs_nt, cs.diags_handler)
+    return nothing
+end
+
+"""
     coupler_diagnostics_setup(fields, output_dir, start_date, t_start, diagnostics_dt)
 
 Set up the default diagnostics for an AMIP simulation, using ClimaDiagnostics.

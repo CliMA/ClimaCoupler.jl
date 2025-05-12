@@ -93,11 +93,6 @@ Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:surface_temperature}) 
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:beta}) = sim.integrator.p.beta
 
-function FluxCalculator.water_albedo_from_atmosphere!(::TestAtmos, temp1::CC.Fields.Field, temp2::CC.Fields.Field)
-    temp1 .*= 2
-    temp2 .*= 3
-end
-
 for FT in (Float32, Float64)
     @testset "calculate correct fluxes: dry for FT=$FT" begin
         boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
@@ -230,37 +225,6 @@ for FT in (Float32, Float64)
         @test_throws ErrorException(
             "update_turbulent_fluxes! is required to be dispatched on $(nameof(sim)), but no method defined",
         ) FluxCalculator.update_turbulent_fluxes!(sim, (;)) == ErrorException
-    end
-
-    @testset "water_albedo_from_atmosphere!" begin
-        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
-        ocean_sim = Interfacer.SurfaceStub((; α_direct = zeros(boundary_space), α_diffuse = zeros(boundary_space)))
-        atmos_sim = TestAtmos(1, 2, 3)
-        coupler_fields = (; temp1 = ones(boundary_space), temp2 = ones(boundary_space))
-        model_sims = (; atmos_sim, ocean_sim)
-        cs = Interfacer.CoupledSimulation{FT}(
-            nothing, # comms_ctx
-            nothing, # dates
-            nothing, # boundary_space
-            coupler_fields, # fields
-            nothing, # conservation_checks
-            (Int(0), Int(1)), # tspan
-            0, # Δt_cpl
-            Ref(Int(0)), # t
-            model_sims, # model_sims
-            (;), # callbacks
-            (;), # dirs
-            nothing, # thermo_params
-            nothing, # diags_handler
-        )
-        FluxCalculator.water_albedo_from_atmosphere!(cs)
-        @test sum(parent(cs.model_sims.ocean_sim.cache.α_direct) .- parent(ones(boundary_space)) .* 2) == 0
-        @test sum(parent(cs.model_sims.ocean_sim.cache.α_diffuse) .- parent(ones(boundary_space)) .* 3) == 0
-
-        atmos_sim2 = TestAtmos2()
-        @test_throws ErrorException(
-            "this function is required to be dispatched on $(nameof(atmos_sim2)), but no method defined",
-        ) FluxCalculator.water_albedo_from_atmosphere!(atmos_sim2, ones(boundary_space), ones(boundary_space))
     end
 end
 

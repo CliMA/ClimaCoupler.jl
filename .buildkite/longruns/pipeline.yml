@@ -196,6 +196,39 @@ steps:
           slurm_mem_per_cpu: 16G
           slurm_reservation: "false"
 
+  - group: "CMIP simulations"
+
+    steps:
+      - label: "ClimaAtmos + ClimaLand + ClimaOcean + PrescribedSeaIce"
+        key: "cmip_land"
+        command:
+            - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_land.yml --job_id cmip_target"
+        artifact_paths: "experiments/ClimaEarth/output/cmip_land/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+          CLIMACOMMS_CONTEXT: "SINGLETON"
+        agents:
+          queue: clima
+          slurm_mem: 32GB
+          slurm_gpus: 1
+          slurm_time: 12:00:00
+          modules: climacommon/2025_05_15
+
+      - label: "ClimaAtmos + Bucket + ClimaOcean + PrescribedSeaIce"
+        key: "cmip_bucket"
+        command:
+            - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_bucket.yml --job_id cmip_bucket"
+        artifact_paths: "experiments/ClimaEarth/output/cmip_bucket/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+          CLIMACOMMS_CONTEXT: "SINGLETON"
+        agents:
+          queue: clima
+          slurm_mem: 32GB
+          slurm_gpus: 1
+          slurm_time: 12:00:00
+          modules: climacommon/2025_05_15
+
   - group: "Current target tests on GPU: AMIP surface"
 
     steps:

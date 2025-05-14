@@ -79,6 +79,25 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
     return nothing
 end
 
+function new_surface_inputs(input_args::NamedTuple)
+    # Unpack stuff
+    (; thermo_state_sfc, thermo_state_atmos, uₕ_int, z_int, z_sfc, scheme_properties, boundary_space) = input_args
+    # Floattype
+    FT = CC.Spaces.undertype(boundary_space)
+    # Unpack roughness
+    (; z0b, z0m, beta, gustiness) = scheme_properties
+    z_int_fv = maybe_fv(z_int)
+    uₕ_int_fv = maybe_fv(uₕ_int)
+    thermo_state_atmos_fv = maybe_fv(thermo_state_atmos)
+    z_sfc_fv = maybe_fv(z_sfc)
+    thermo_state_sfc_fv = maybe_fv(thermo_state_sfc)
+    beta_fv = maybe_fv(beta)
+    z0m_fv = maybe_fv(z0m)
+    z0b_fv = maybe_fv(z0b)
+    gustiness_fv = maybe_fv(gustiness)
+    return input_args
+end
+
 
 function surface_inputs(input_args::NamedTuple)
     (; thermo_state_sfc, thermo_state_atmos, uₕ_int, z_int, z_sfc, scheme_properties, boundary_space) = input_args
@@ -139,23 +158,100 @@ Fluxes are computed over the entire surface, even where the relevant surface mod
 
 When available, it also computes ancillary quantities, such as the Monin-Obukov lengthscale.
 """
-function get_surface_fluxes(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters)
+function get_surface_fluxes(inputs, input_args, surface_params::SF.Parameters.SurfaceFluxesParameters)
     # calculate all fluxes (saturated surface conditions)
-    outputs = SF.surface_conditions.(surface_params, inputs)
+    #outputs = SF.surface_conditions.(surface_params, inputs)
 
+    ### TODO ######################################
+    ### Attempt to use new surface flux formulation
+    ts_sfc = input_args.thermo_state_sfc
+    ts_atmos = input_args.thermo_state_atmos
+    thermo_params = input_args.thermo_params
+    u_int = input_args.u_int
+    v_int = input_args.v_int
+    z_int = input_args.z_int
+    z_sfc = input_args.z_sfc
+    ρ_sfc = input_args.ρ_sfc
+    FT = eltype(u_int)
+ 
+    ρ_atmos = TD.air_density.(thermo_params, ts_atmos)
+    θ_sfc = TD.virtual_pottemp.(thermo_params, ts_sfc)
+    θ_atmos = TD.virtual_pottemp.(thermo_params, ts_atmos)
+    surface_params = input_args.surface_params
+    
+    # Testing with non-constant roughness length
+    function z0test(surface_args, similarity_scales, atmos_state, surface_params)
+        u★ = similarity_scales.momentum
+        FT = eltype(u★)
+        return FT.(0.015 .* u★ .^ 2 ./ 9.81)
+    end
+
+    # Property containers 
+    atmos_state = SF.AtmosState(
+                      u_int,
+                      v_int,
+                      TD.total_specific_humidity.(thermo_params, ts_atmos),
+                      TD.virtual_pottemp.(thermo_params, ts_atmos),
+                      z_int,
+                      FT(1), # gustiness needs to be a function of u,v, ustar
+                      FT(1000),
+                      (ρ=ρ_atmos, arg𝑏=(0.01), arg𝑐=FT(0.001)),
+                   )
+ 
+    surface_state = SF.SurfaceState(
+                      (𝑧0m=FT(0.01), 𝑧0θ=FT(0.01), 𝑧0q=z0test),
+                      zero(u_int),
+                      zero(v_int),
+                      TD.total_specific_humidity.(thermo_params, ts_sfc),
+                      TD.virtual_pottemp.(thermo_params, ts_sfc),
+                      zero(z_int),
+                      (arg𝑏=FT(0.01), arg𝑐=FT(0.001)),
+                    )
+ 
+    gustiness = atmos_state.gustiness_parameter
+    (; 𝑧0m, 𝑧0θ, 𝑧0q) = surface_state.roughness_lengths
+
+    # Initial guesses
+    ζ₀ = fill!(similar(u_int), FT(10))
+    var★ = fill!(similar(ζ₀), FT(1e-4))
+    Σ₀ = SF.SimilarityScales(var★,var★,var★,var★)
+    Δstate = SF.state_differences(surface_state, atmos_state, Σ₀, surface_params);
+    L★ = Δstate.Δh ./ ζ₀
+    Σ_est = Σ₀
+    ΔU_est = fill!(similar(ζ₀), FT(10))
+
+    # Similarity profiles
+    UF = SF.UniversalFunctions
+    param_set = SF.Parameters.SurfaceFluxesParameters(FT, UF.BusingerParams)
+    similarity_theory = SF.Parameters.universal_func_type(param_set)
+    sfc_params = SF.Parameters.uf_params(param_set)
+    ufunc = SF.UniversalFunctions.universal_func.(Ref(similarity_theory), L★, Ref(sfc_params))
+    
+    #similarity_scales = SF.refine_similarity_variables(Σ_est, ΔU_est, 
+    #                                                 ufunc, 
+    #                                                 surface_state, atmos_state, 
+    #                                                 param_set)
+
+    outputs = SF.compute_similarity_theory_fluxes(ufunc, surface_state, atmos_state, param_set)
+    ### TODO : End new surface flux formulation
+    
     # drag
-    F_turb_ρτxz = outputs.ρτxz
-    F_turb_ρτyz = outputs.ρτyz
+    F_turb_ρτxz = outputs.x_momentum
+    F_turb_ρτyz = outputs.y_momentum
 
     # energy fluxes
-    F_sh = outputs.shf
-    F_lh = outputs.lhf
+    F_sh = outputs.sensible_heat
+    F_lh = outputs.latent_heat
 
     # moisture
-    F_turb_moisture = SF.evaporation.(surface_params, inputs, outputs.Ch)
+    #F_turb_moisture = SF.evaporation.(surface_params, inputs, outputs.Ch)
+    F_turb_moisture = outputs.water_vapor
 
-    L_MO = outputs.L_MO
-    ustar = outputs.ustar
+    # scale variables
+    (u★, θ★, q★, b★) = outputs.scale_vars
+
+    L_MO = outputs.l_mo
+    ustar = u★
     buoyancy_flux = outputs.buoy_flux
 
     return (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux)
@@ -286,13 +382,16 @@ function compute_surface_fluxes!(
         scheme_properties,
         boundary_space,
         surface_params,
+        thermo_params,
+        u_int,
+        v_int,
+        ρ_sfc,
     )
     inputs = FluxCalculator.surface_inputs(input_args)
 
     # calculate the surface fluxes
-    fluxes = FluxCalculator.get_surface_fluxes(inputs, surface_params)
+    fluxes = FluxCalculator.get_surface_fluxes(inputs, input_args, surface_params)
     (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux) = fluxes
-
 
     # Zero out fluxes where the area fraction is zero
     # Multiplying by `area_fraction` is not sufficient because the fluxes may

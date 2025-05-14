@@ -169,17 +169,17 @@ steps:
         agents:
           slurm_mem: 20GB
 
-      - label: "AMIP: DecayWithHeight + integrated land"
-        key: "amip_integrated_land"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decay_with_height_integrated_land.yml --job_id amip_integrated_land"
-        artifact_paths: "experiments/ClimaEarth/output/amip_integrated_land/artifacts/*"
+      - label: "AMIP: ED only + integrated land"
+        key: "amip_edonly_integrated_land"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_integrated_land.yml --job_id amip_edonly_integrated_land"
+        artifact_paths: "experiments/ClimaEarth/output/amip_edonly_integrated_land/artifacts/*"
         agents:
           slurm_mem: 20GB
 
-      - label: "AMIP: DecayWithHeight + bucket"
-        key: "amip_decay_with_height_bucket"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decay_with_height_bucket.yml --job_id amip_decay_with_height_bucket"
-        artifact_paths: "experiments/ClimaEarth/output/amip_decay_with_height_bucket/artifacts/*"
+      - label: "AMIP: ED only + bucket"
+        key: "amip_edonly_bucket"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_bucket.yml --job_id amip_edonly_bucket"
+        artifact_paths: "experiments/ClimaEarth/output/amip_edonly_bucket/artifacts/*"
         agents:
           slurm_mem: 20GB
 
@@ -290,20 +290,40 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
-      - label: "GPU AMIP: DecayWithHeight + integrated land"
-        key: "gpu_amip_integrated_land"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decay_with_height_integrated_land.yml --job_id gpu_amip_integrated_land"
-        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_integrated_land/artifacts/*"
+      - label: "GPU AMIP: ED only + integrated land"
+        key: "gpu_amip_edonly_integrated_land"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_integrated_land.yml --job_id gpu_amip_edonly_integrated_land"
+        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_edonly_integrated_land/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
 
-      - label: "GPU AMIP: DecayWithHeight + bucket"
-        key: "gpu_amip_decay_with_height_bucket"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decay_with_height_bucket.yml --job_id gpu_amip_decay_with_height_bucket"
-        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_decay_with_height_bucket/artifacts/*"
+      - label: "GPU AMIP: ED only + bucket"
+        key: "gpu_amip_edonly_bucket"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_bucket.yml --job_id gpu_amip_edonly_bucket"
+        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_edonly_bucket/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
+
+      - label: "GPU AMIP: diag. EDMF + integrated land"
+        key: "gpu_amip_diagedmf_integrated_land"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf_integrated_land.yml --job_id gpu_amip_diagedmf_integrated_land"
+        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_diagedmf_integrated_land/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
+
+      - label: "GPU AMIP: diag. EDMF + bucket"
+        key: "gpu_amip_diagedmf_bucket"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf_bucket.yml --job_id gpu_amip_diagedmf_bucket"
+        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_diagedmf_bucket/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

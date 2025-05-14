@@ -11,6 +11,7 @@ import ClimaDiagnostics as CD
 import ClimaUtilities.TimeManager: ITime
 import SurfaceFluxes as SF
 import SurfaceFluxes.Parameters as SFP
+import Thermodynamics as TD
 
 include("climaland_helpers.jl")
 
@@ -541,6 +542,7 @@ function FluxCalculator.compute_surface_fluxes!(
     thermo_params,
 )
     boundary_space = axes(csf)
+    FT = CC.Spaces.undertype(boundary_space)
     # We should change this to be on the boundary_space
     land_space = axes(sim.integrator.p.soil.turbulent_fluxes)
     coupled_atmos = sim.model.soil.boundary_conditions.top.atmos
@@ -618,12 +620,18 @@ function FluxCalculator.compute_surface_fluxes!(
     #  ustar = sqrt(ρτ / ρ)
     @. csf.temp1 = sqrt(sqrt(csf.F_turb_ρτxz^2 + csf.F_turb_ρτyz^2) / csf.ρ_atmos)
     @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
-    @. csf.ustar += csf.temp1 * area_fraction
+    # If ustar is zero, set it to eps to avoid division by zero in the atmosphere
+    @. csf.ustar += max(csf.temp1 * area_fraction, eps(FT))
 
     # Compute the Monin-Obukhov length from ustar and the buoyancy flux
     #  L_MO = -u^3 / (k * buoyancy_flux)
-    sf_param_set = LP.surface_fluxes_parameters(sim.model.soil.parameters.earth_param_set)
-    @. csf.temp1 = -csf.ustar^3 / SFP.von_karman_const(sf_param_set) / csf.buoyancy_flux
+    # Prevent dividing by zero in the case of zero buoyancy flux
+    function non_zero(v::FT) where {FT}
+        sign_of_v = v == 0 ? 1 : sign(v)
+        return abs(v) < eps(FT) ? eps(FT) * sign_of_v : v
+    end
+    surface_params = LP.surface_fluxes_parameters(sim.model.soil.parameters.earth_param_set)
+    @. csf.temp1 = -csf.ustar^3 / SFP.von_karman_const(surface_params) / non_zero(csf.buoyancy_flux)
     @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
     # When L_MO is infinite, avoid multiplication by zero to prevent NaN
     @. csf.L_MO += ifelse(isinf(csf.temp1), csf.temp1, csf.temp1 * area_fraction)

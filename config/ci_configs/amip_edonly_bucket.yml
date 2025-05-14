@@ -9,9 +9,9 @@ dt_save_state_to_disk: "12hours"
 dt_save_to_sol: "12hours"
 dz_bottom: 100.0
 energy_check: false
-h_elem: 8
+h_elem: 6
 bucket_albedo_type: "map_temporal"
-land_model: "integrated"
+land_model: "bucket"
 mode_name: "amip"
 moist: equil
 netcdf_interpolation_num_points: [90, 45, 31]
@@ -25,12 +25,6 @@ surface_setup: "PrescribedSurface"
 t_end: "480secs"
 topography: "Earth"
 topo_smoothing: true
-turbconv: ~
-vert_diff: "DecayWithHeightDiffusion"
 viscous_sponge: true
 z_elem: 39
 z_max: 60000.0
-extra_atmos_diagnostics:
-  - short_name: [pr, rhoa, uas, vas, thetaa, hussfc, ts]
-    reduction_time: average
-    period: 1days

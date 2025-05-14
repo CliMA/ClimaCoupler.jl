@@ -78,9 +78,12 @@ includes unit conversion and shifting the dates.
 The variable should have only three dimensions: latitude, longitude, and time.
 """
 function get_sim_var_dict(diagnostics_folder_path)
+    # List of short names
+    available_short_names = ClimaAnalysis.available_vars(ClimaAnalysis.SimDir(diagnostics_folder_path))
+    sim_var_dict = Dict{String, Any}()
     # Dict for loading in simulation data
-    sim_var_dict = Dict{String, Any}(
-        "pr" =>
+    "pr" in available_short_names && (
+        sim_var_dict["pr"] =
             () -> begin
                 sim_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = "pr")
                 sim_var = ClimaAnalysis.convert_units(
@@ -90,17 +93,19 @@ function get_sim_var_dict(diagnostics_folder_path)
                 )
                 sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
                 return sim_var
-            end,
+            end
     )
 
     # Add "pr" and the necessary preprocessing
     for (short_name, _) in sim_obs_short_names_no_pr
-        sim_var_dict[short_name] =
-            () -> begin
-                sim_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = short_name)
-                sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
-                return sim_var
-            end
+        short_name in available_short_names && (
+            sim_var_dict[short_name] =
+                () -> begin
+                    sim_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = short_name)
+                    sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
+                    return sim_var
+                end
+        )
     end
     return sim_var_dict
 end
@@ -212,30 +217,33 @@ The variable should have only four dimensions: latitude, longitude, time, and
 pressure. The units of pressure should be in hPa.
 """
 function get_sim_var_in_pfull_dict(diagnostics_folder_path)
-    simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)
+    available_short_names = ClimaAnalysis.available_vars(ClimaAnalysis.SimDir(diagnostics_folder_path))
     sim_var_pfull_dict = Dict{String, Any}()
 
     short_names = ["ta", "hur", "hus"]
     for short_name in short_names
-        sim_var_pfull_dict[short_name] =
-            () -> begin
-                sim_var = get(simdir, short_name = short_name)
-                pfull_var = get(simdir, short_name = "pfull")
+        short_name in available_short_names && (
+            sim_var_pfull_dict[short_name] =
+                () -> begin
+                    sim_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = short_name)
+                    pfull_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = "pfull")
 
-                (ClimaAnalysis.units(sim_var) == "") && (sim_var = ClimaAnalysis.set_units(sim_var, "unitless"))
-                (ClimaAnalysis.units(sim_var) == "kg kg^-1") &&
-                    (sim_var = ClimaAnalysis.set_units(sim_var, "unitless"))
+                    (ClimaAnalysis.units(sim_var) == "") &&
+                        (sim_var = ClimaAnalysis.set_units(sim_var, "unitless"))
+                    (ClimaAnalysis.units(sim_var) == "kg kg^-1") &&
+                        (sim_var = ClimaAnalysis.set_units(sim_var, "unitless"))
 
-                sim_in_pfull_var = ClimaAnalysis.Atmos.to_pressure_coordinates(sim_var, pfull_var)
-                sim_in_pfull_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_in_pfull_var)
-                sim_in_pfull_var = ClimaAnalysis.convert_dim_units(
-                    sim_in_pfull_var,
-                    "pfull",
-                    "hPa";
-                    conversion_function = x -> 0.01 * x,
-                )
-                return sim_in_pfull_var
-            end
+                    sim_in_pfull_var = ClimaAnalysis.Atmos.to_pressure_coordinates(sim_var, pfull_var)
+                    sim_in_pfull_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_in_pfull_var)
+                    sim_in_pfull_var = ClimaAnalysis.convert_dim_units(
+                        sim_in_pfull_var,
+                        "pfull",
+                        "hPa";
+                        conversion_function = x -> 0.01 * x,
+                    )
+                    return sim_in_pfull_var
+                end
+        )
     end
     return sim_var_pfull_dict
 end

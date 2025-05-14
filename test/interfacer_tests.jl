@@ -29,12 +29,16 @@ end
 Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var}) = ones(sim.space)
 Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var_float}) = CC.Spaces.undertype(sim.space)(2)
 
+context = ClimaComms.context()
+ClimaComms.init(context)
+
 for FT in (Float32, Float64)
     @testset "test CoupledSim construction, float_type for FT=$FT" begin
-        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+        boundary_space =
+            CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
 
         cs = Interfacer.CoupledSimulation{FT}(
-            ClimaComms.context(boundary_space),
+            context,
             nothing, # dates
             boundary_space,
             nothing, # fields
@@ -53,7 +57,7 @@ for FT in (Float32, Float64)
     end
 
     @testset "get_field indexing for FT=$FT" begin
-        space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+        space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
         for sim in (DummySimulation(space), DummySimulation2(space), DummySimulation3(space))
             # field
             @test Array(parent(Interfacer.get_field(sim, Val(:var))))[1] == FT(1)
@@ -87,7 +91,8 @@ for FT in (Float32, Float64)
     end
 
     @testset "update_field! the SurfaceStub area_fraction for FT=$FT" begin
-        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+        boundary_space =
+            CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
 
         stub = Interfacer.SurfaceStub((;
             area_fraction = zeros(boundary_space),
@@ -118,7 +123,7 @@ end
 
 @testset "undefined get_field for generic val" begin
     FT = Float32
-    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
     sim = DummySimulation(space)
     val = Val(:v)
     @test_throws ErrorException("undefined field `v` for $(nameof(sim))") Interfacer.get_field(sim, val)
@@ -126,7 +131,7 @@ end
 
 @testset "undefined get_field for SurfaceModelSimulation" begin
     FT = Float32
-    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
     sim = DummySimulation3(space)
 
     # Test that get_field gives correct warnings for unextended fields
@@ -145,7 +150,7 @@ end
 
 @testset "undefined get_field for AtmosModelSimulation" begin
     FT = Float32
-    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
     sim = DummySimulation4(space)
 
     # Test that get_field gives correct warnings for unextended fields
@@ -166,7 +171,7 @@ end
 
 @testset "update_field! warnings for SurfaceModelSimulation" begin
     FT = Float32
-    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
     dummy_field = CC.Fields.ones(space)
     sim = DummySimulation3(space)
 
@@ -192,7 +197,7 @@ end
 
 @testset "undefined update_field! warnings for AtmosModelSimulation" begin
     FT = Float32
-    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
     dummy_field = CC.Fields.ones(space)
     sim = DummySimulation4(space)
 
@@ -221,11 +226,11 @@ end
 
 @testset "remap" begin
     FT = Float32
-    source_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+    source_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
     field = CC.Fields.coordinate_field(source_space).lat
 
     # Remap field to target space
-    target_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 6)
+    target_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 6, context)
     field_target_space = Interfacer.remap(field, target_space)
 
     # remap back to source space

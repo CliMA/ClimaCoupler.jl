@@ -70,7 +70,17 @@ steps:
       - label: "MPI Utilities unit tests"
         key: "utilities_mpi_tests"
         command: "srun julia --color=yes --project=test/ test/utilities_tests.jl"
-        timeout_in_minutes: 20
+        timeout_in_minutes: 5
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
+        agents:
+          slurm_ntasks: 2
+          slurm_mem: 16GB
+
+      - label: "MPI Interfacer unit tests"
+        key: "interfacer_mpi_tests"
+        command: "srun julia --color=yes --project=test/ test/interfacer_tests.jl"
+        timeout_in_minutes: 5
         env:
           CLIMACOMMS_CONTEXT: "MPI"
         agents:

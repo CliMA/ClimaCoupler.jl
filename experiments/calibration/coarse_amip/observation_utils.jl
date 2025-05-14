@@ -4,8 +4,6 @@ using ClimaAnalysis, ClimaCoupler
 using Dates, LinearAlgebra, Statistics
 import EnsembleKalmanProcesses as EKP
 import NaNStatistics
-# Workaround to read ql, qi from file nicely
-push!(ClimaAnalysis.Var.TIME_NAMES, "valid_time")
 
 # Constants
 const days_in_seconds = 86_400
@@ -122,6 +120,7 @@ function get_seasonal_covariance(output_var; model_error_scale = nothing, regula
         seasonal_means_per_year = average_time.(season_across_time)
         # Ensure dimensions are consistent - this will need to be generalized for 3D fields
         seasonal_means_per_year = permutedims.(seasonal_means_per_year, Ref(["longitude", "latitude"]))
+        # Concatenate the outputvars into a matrix
         seasonal_means_per_year_matrix = cat(getproperty.(seasonal_means_per_year, :data)..., dims = 3)
         time_mean_over_years = mean(seasonal_means_per_year_matrix, dims = 3)
         # Take variance over time of the seasonal means
@@ -151,9 +150,7 @@ function get_year_indices(year)
     return start_index:end_index
 end
 
-# Make an EKP.Observation of a single year of seasonal averages from an OutputVar
-function make_single_year_of_seasonal_observations(output_var, yr)
-    # Split by season first to get 4 OutputVars per year
+function year_of_seasonal_averages(output_var, yr)
     seasons = split_by_season_across_time(output_var)
 
     # Average each season over its months
@@ -163,12 +160,18 @@ function make_single_year_of_seasonal_observations(output_var, yr)
     seasonal_means_per_year = permutedims.(seasonal_means_per_year, Ref(["longitude", "latitude"]))
 
     # Get data for the specific year requested
-    year_ind = get_year_indices.(yr)
+    year_ind = get_year_indices(yr)
     year_seasonal_data = seasonal_means_per_year[year_ind]
     seasons = map(x -> x.attributes["season"], year_seasonal_data)
     @assert seasons == ["DJF", "MAM", "JJA", "SON"]
     obs_vec = vcat(vec.(getproperty.(year_seasonal_data, :data))...)
+    return obs_vec
+end
 
+# Make an EKP.Observation of a single year of seasonal averages from an OutputVar
+function make_single_year_of_seasonal_observations(output_var, yr)
+    # Split by season first to get 4 OutputVars per year
+    obs_vec = year_of_seasonal_averages(output_var, yr)
     cov = get_seasonal_covariance(output_var; model_error_scale = 0.05, regularization = 1e-3)
     name = get(output_var.attributes, "CF_name", get(output_var.attributes, "long_name", ""))
     return EKP.Observation(obs_vec, cov, "$(yr)_$name")
@@ -181,7 +184,6 @@ Given a NamedTuple, produce a vector of `EKP.Observation`s, where each observati
 consists of seasonally averaged fields, with the exception of globally averaged yearly radiative balance
 """
 function create_observation_vector(nt, nyears = 17)
-    # Starting year is 2000-12 to 2001-11
     rsut = window(nt.rsut, "time"; left = first_year_start_date)
     rlut = window(nt.rlut, "time"; left = first_year_start_date)
     cre = window(nt.cre, "time"; left = first_year_start_date)

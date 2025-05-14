@@ -9,15 +9,20 @@ include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/obse
 include(joinpath(pkgdir(ClimaCoupler), "experiments/ClimaEarth/leaderboard/leaderboard.jl"))
 
 function ClimaCalibrate.observation_map(iteration)
-    observation_vec = JLD2.load_object(observation_path)
-    single_member_dims = length(EKP.get_obs(first(observation_vec))) * batch_size
+    ekp = JLD2.load_object(ClimaCalibrate.ekp_path(output_dir, iteration))
+    current_minibatch = EKP.get_current_minibatch(ekp)
+
+    observation_vec = EKP.get_obs(ekp)
+    single_member_dims = length(observation_vec) * length(current_minibatch)
+    ensemble_size = EKP.get_N_ens(ekp)
     G_ensemble = Array{Float64}(undef, single_member_dims, ensemble_size)
     for m in 1:ensemble_size
         member_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
         simdir_path = joinpath(member_path, "model_config/output_active")
         @info "Processing member $m: $simdir_path"
         try
-            G_ensemble[:, m] .= process_member_data(SimDir(simdir_path))
+            @show process_member_data(SimDir(simdir_path), current_minibatch) |> size
+            G_ensemble[:, m] .= process_member_data(SimDir(simdir_path), current_minibatch)
 
         catch e
             @error "Error processing member $m, filling observation map entry with NaNs" exception = e
@@ -49,59 +54,35 @@ function plot_constrained_params_and_errors(output_dir, ekp, prior)
 end
 
 # Process a single ensemble member's data into a vector
-function process_member_data(simdir::SimDir)
-    rsut = process_outputvar(simdir, "rsut")
-    rlut = process_outputvar(simdir, "rlut")
-    rsutcs = process_outputvar(simdir, "rsutcs")
-    rlutcs = process_outputvar(simdir, "rlutcs")
-    rsdt = process_outputvar(simdir, "rsdt")
-    # This needs to be averaged over lat, lon, and seasons
-    net_rad = rlut + rsut - rsdt
-    cre = rsut + rlut - rsutcs - rlutcs
+function process_member_data(simdir::SimDir, current_minibatch)
+    rsdt = preprocess_diagnostic_monthly_averages(simdir, "rsdt")
+    rsut = preprocess_diagnostic_monthly_averages(simdir, "rsut")
+    rlut = preprocess_diagnostic_monthly_averages(simdir, "rlut")
+    rsutcs = preprocess_diagnostic_monthly_averages(simdir, "rsutcs")
+    rlutcs = preprocess_diagnostic_monthly_averages(simdir, "rlutcs")
 
-    pr = process_outputvar(simdir, "pr")
-    ts = process_outputvar(simdir, "ts")
-    lwp = process_outputvar(simdir, "lwp")
-    lwp = window.(lwp, "latitude"; left = -60, right = 60)
+    net_rad = rlut + rsut - rsdt  |> average_lat |> average_lon |> get_yearly_averages
+    pr = preprocess_diagnostic_monthly_averages(simdir, "pr")
+    ts = preprocess_diagnostic_monthly_averages(simdir, "ts")
+    lwp = preprocess_diagnostic_monthly_averages(simdir, "lwp")
+    lwp = window(lwp, "latitude"; left = -60, right = 60)
 
-    # Map over each year
-    year_observations = map(1:4:length(rsut)) do year_start
-        year_end = min(year_start + 3, length(rsut))
-        yr_ind = year_start:year_end
+    year_observations = map(current_minibatch) do yr
+        rsut_yr = year_of_seasonal_averages(rsut, yr)
+        rlut_yr = year_of_seasonal_averages(rlut, yr)
+        # This needs to be averaged over lat, lon, and seasons
+        cre_yr = year_of_seasonal_averages(rsut + rlut - rsutcs - rlutcs, yr)
 
-        net_rad_yr = mean(mean.(getproperty.(net_rad[yr_ind], :data)))
-
-        rsut_yr = vectorize(rsut[yr_ind])
-        rlut_yr = vectorize(rlut[yr_ind])
-        cre_yr = vectorize(cre[yr_ind])
-        pr_yr = vectorize(pr[yr_ind])
-        ts_yr = vectorize(ts[yr_ind])
-        lwp_yr = vectorize(lwp[yr_ind])
-
-        vcat(net_rad_yr, cre_yr, rsut_yr, rlut_yr, pr_yr, ts_yr, lwp_yr)
+        pr_yr = year_of_seasonal_averages(pr, yr)
+        ts_yr = year_of_seasonal_averages(ts, yr)
+        lwp_yr = year_of_seasonal_averages(lwp, yr)
+        return vcat([vec(net_rad[yr]), cre_yr, rsut_yr, rlut_yr, pr_yr, ts_yr, lwp_yr]...)
     end
     return vcat(year_observations...)
 end
 
-function vectorize(seasonal_avgs)
-    return vcat(vec.(getproperty.(seasonal_avgs, :data))...)
-end
-
-# Process an outputvar into a vector of seasonal averages
-function process_outputvar(simdir, name)
-    monthly_avgs = preprocess_monthly_averages(simdir, name)
-    seasons = split_monthly_averages_into_seasons(monthly_avgs) # replace with split_by_season after testing
-    # Ensure each season has three months
-    @assert all(map(x -> length(times(x)) == 3, seasons))
-    seasonal_avgs = average_time.(seasons)
-    seasonal_avgs = map(seasonal_avgs) do output_var
-        permutedims(output_var, ("longitude", "latitude"))
-    end
-    return seasonal_avgs
-end
-
 # Preprocess monthly averages to the right dimensions and dates, remove NaNs
-function preprocess_monthly_averages(simdir, name)
+function preprocess_diagnostic_monthly_averages(simdir, name)
     monthly_avgs = get_monthly_averages(simdir, name)
     # Interpolate to pressure coordinates to match observations
     pressure = get_monthly_averages(simdir, "pfull")
@@ -120,15 +101,4 @@ function preprocess_monthly_averages(simdir, name)
     # Replace NaNs with global mean
     monthly_avgs = ClimaAnalysis.replace(monthly_avgs, NaN => FT(NaNStatistics.nanmean(global_mean.data)))
     return monthly_avgs
-end
-
-function split_monthly_averages_into_seasons(monthly_avgs)
-    all_times = times(monthly_avgs)
-    @assert length(all_times) % 3 == 0
-
-    # Window over 3 months at a time to create seasonal outputvars
-    split_by_seasons = map(all_times[1:3:end]) do t
-        window(monthly_avgs, "time"; left = t, right = t + 2months)
-    end
-    return split_by_seasons
 end

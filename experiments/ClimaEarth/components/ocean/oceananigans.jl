@@ -79,33 +79,14 @@ function OceananigansSimulation(area_fraction; output_dir, comms_ctx = ClimaComm
 
     # TODO: Go from 0 to Nx+1, Ny+1 (for halos) (for LatLongGrid)
 
-    # Construct three remappers, one to Center, Center fields, one
-    # to Center, Face fields, and one to Face, Center fields.
+    # Construct a remapper from the exchange grid to `Center, Center` fields
     long_cc = reshape(long_cc, length(long_cc), 1)
     lat_cc = reshape(lat_cc, 1, length(lat_cc))
     target_points_cc = @. CC.Geometry.LatLongPoint(lat_cc, long_cc)
     remapper_cc = CC.Remapping.Remapper(axes(area_fraction), target_points_cc, nothing)
-
-    # TODO: Get rid of this and remap to cc
-    long_cf = OC.λnodes(grid, OC.Center(), OC.Face(), OC.Center())
-    lat_cf = OC.φnodes(grid, OC.Center(), OC.Face(), OC.Center())
-
-    long_cf = reshape(long_cf, length(long_cf), 1)
-    lat_cf = reshape(lat_cf, 1, length(lat_cf))
-    target_points_cf = @. CC.Geometry.LatLongPoint(lat_cf, long_cf)
-    remapper_cf = CC.Remapping.Remapper(axes(area_fraction), target_points_cf, nothing)
-
-    long_fc = OC.λnodes(grid, OC.Face(), OC.Center(), OC.Center())
-    lat_fc = OC.φnodes(grid, OC.Face(), OC.Center(), OC.Center())
-
-    long_fc = reshape(long_fc, length(long_fc), 1)
-    lat_fc = reshape(lat_fc, 1, length(lat_fc))
-    target_points_fc = @. CC.Geometry.LatLongPoint(lat_fc, long_fc)
-    remapper_fc = CC.Remapping.Remapper(axes(area_fraction), target_points_fc, nothing)
+    remapping = (; remapper_cc)
 
     ocean_properties = (; ocean_reference_density = 1020, ocean_heat_capacity = 3991, ocean_fresh_water_density = 999.8)
-
-    remapping = (; remapper_cc, remapper_fc, remapper_cf)
 
     # Before version 0.96.22, the NetCDFWriter was broken on GPU
     if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
@@ -220,28 +201,27 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
 
     # TODO: Starting ClimaCore > 0.14.33 we can use interpolate!
-    remapped_F_turb_ρτxz = CC.Remapping.interpolate(sim.remapping.remapper_fc, F_turb_ρτxz)
-    remapped_F_turb_ρτyz = CC.Remapping.interpolate(sim.remapping.remapper_cf, F_turb_ρτyz)
+    remapped_F_turb_ρτxz = CC.Remapping.interpolate(sim.remapping.remapper_cc, F_turb_ρτxz)
+    remapped_F_turb_ρτyz = CC.Remapping.interpolate(sim.remapping.remapper_cc, F_turb_ρτyz)
 
     # TODO: Remap to Center Center. Instead of dealing with separate fields, we can remap everything
     # onto Center, Center fields on the Oceananingans side, and then remap from ClimaCoupler to this
     # See also comment below next to the function
 
-    # set_from_extrinsic_vectors!((; u = oc_flux_u, v = oc_flux_v),
-    #                             sim.model.grid,
-    #                             remapped_F_turb_ρτxz,
-    #                             remapped_F_turb_ρτyz
-    #                             )
-
     oc_flux_u = surface_flux(sim.sim.model.velocities.u)
     oc_flux_v = surface_flux(sim.sim.model.velocities.v)
 
-    view(oc_flux_u, :, :, 1) .= remapped_F_turb_ρτxz
-    view(oc_flux_v, :, :, 1) .= remapped_F_turb_ρτyz
+    # Set the momentum flux BCs at the correct locations
+    set_from_extrinsic_vectors!(
+        (; u = oc_flux_u, v = oc_flux_v),
+        sim.model.grid,
+        remapped_F_turb_ρτxz,
+        remapped_F_turb_ρτyz,
+    )
 
-    # TODO: Handle this directly when interpolating
-    OC.fill_halo_regions!(oc_flux_u)
-    OC.fill_halo_regions!(oc_flux_v)
+
+    # view(oc_flux_u, :, :, 1) .= remapped_F_turb_ρτxz
+    # view(oc_flux_v, :, :, 1) .= remapped_F_turb_ρτyz
 
     (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) = sim.ocean_properties
     remapped_F_lh = CC.Remapping.interpolate(sim.remapping.remapper_cc, F_lh)
@@ -255,7 +235,6 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     oc_flux_T = surface_flux(sim.sim.model.tracers.T)
     view(oc_flux_T, :, :, 1) .=
         OC.interior(oc_flux_T, :, :, 1) .+ remapped_F_turb_energy ./ (ocean_reference_density * ocean_heat_capacity)
-    OC.fill_halo_regions!(oc_flux_T)
 
     # Add the part of the salinity flux that comes from the moisture flux, we also need to
     # add the component due to precipitation (that was done with the radiative fluxes)
@@ -264,28 +243,33 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     surface_salinity = OC.interior(sim.sim.model.tracers.S, :, :, 1)
     moisture_fresh_water_flux = remapped_F_turb_moisture ./ ocean_fresh_water_density
     view(oc_flux_S, :, :, 1) .= OC.interior(oc_flux_S, :, :, 1) .- surface_salinity .* moisture_fresh_water_flux
-
-    OC.fill_halo_regions!(oc_flux_S)
     return nothing
 end
 
+"""
+    set_from_extrinsic_vectors!(vectors, grid, u_cc, v_cc)
+
+Given the extrinsic vector components `u_cc` and `v_cc` as `Center, Center`
+fields, rotate them onto the target grid and remap to `Face, Center` and
+`Center, Face` fields, respectively.
+"""
 # TODO: This commented out function works with 3D fields and allocates fields internally, we
 # need preallocate the fields and make it compatible with 2D.
-# function set_from_extrinsic_vectors!(vectors, grid, u, v)
-#     grid = grid
-#     arch = grid.architecture
-#     # TODO: Move this outside
-#     uᶜᶜᶜ = CenterField(grid)
-#     vᶜᶜᶜ = CenterField(grid)
-#     set!(uᶜᶜᶜ, u)
-#     set!(vᶜᶜᶜ, v)
+function set_from_extrinsic_vectors!(vectors, grid, u_cc, v_cc)
+    arch = grid.architecture
 
-#     # TODO: Change these kernels to be 2D
-#     launch!(arch, grid, :xyz, _rotate_vectors!, uᶜᶜᶜ, vᶜᶜᶜ, grid)
-#     launch!(arch, grid, :xyz, _interpolate_vectors!,
-#             vectors.u, vectors.v, grid, uᶜᶜᶜ, vᶜᶜᶜ)
-#     return nothing
-# end
+    # TODO: Change these kernels to be 2D
+    # Rotate vectors onto the grid
+    launch!(arch, grid, :xy, _rotate_vectors!, u_cc, v_cc, grid)
+
+    # Fill halo regions with the rotated vectors so we can use them to interpolate
+    OC.fill_halo_regions!(u_cc)
+    OC.fill_halo_regions!(v_cc)
+
+    # Interpolate the vectors to face/center and center/face respectively
+    launch!(arch, grid, :xy, _interpolate_vectors!, vectors.u, vectors.v, grid, u_cc, v_cc)
+    return nothing
+end
 
 function Interfacer.update_field!(sim::OceananigansSimulation, ::Val{:area_fraction}, field)
     sim.area_fraction .= field

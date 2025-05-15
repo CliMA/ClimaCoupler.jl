@@ -3,6 +3,7 @@ import ClimaOcean as CO
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms
 import Thermodynamics as TD
+using KernelAbstractions: @kernel, @index, @inbounds
 
 """
     OceananigansSimulation{SIM, A, OPROP, REMAP}
@@ -231,6 +232,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     # everything on the surface, but later we will need to account for this.
     # One way we can do this is using directly ClimaOcean
 
+    # TODO try removing views and setting directly
     oc_flux_T = surface_flux(sim.sim.model.tracers.T)
     view(oc_flux_T, :, :, 1) .=
         OC.interior(oc_flux_T, :, :, 1) .+ remapped_F_turb_energy ./ (ocean_reference_density * ocean_heat_capacity)
@@ -257,17 +259,39 @@ fields, rotate them onto the target grid and remap to `Face, Center` and
 function set_from_extrinsic_vectors!(vectors, grid, u_cc, v_cc)
     arch = grid.architecture
 
+    # TODO u_cc and v_cc are Matrices, we need to convert them to Fields to be able to fill halo regions
+    # u_center_field = OC.Field{OC.Center, OC.Center, OC.Center}(sim.sim.model.grid)
+    # v_center_field = OC.Field{OC.Center, OC.Center, OC.Center}(sim.sim.model.grid)
+
     # TODO: Change these kernels to be 2D
     # Rotate vectors onto the grid
-    OC.Utils.launch!(arch, grid, :xy, _rotate_vectors!, u_cc, v_cc, grid)
+    OC.Utils.launch!(arch, grid, :xy, _rotate_velocities!, u_cc, v_cc, grid)
 
     # Fill halo regions with the rotated vectors so we can use them to interpolate
     OC.fill_halo_regions!(u_cc)
     OC.fill_halo_regions!(v_cc)
 
     # Interpolate the vectors to face/center and center/face respectively
-    OC.Utils.launch!(arch, grid, :xy, _interpolate_vectors!, vectors.u, vectors.v, grid, u_cc, v_cc)
+    OC.Utils.launch!(arch, grid, :xy, _interpolate_velocities!, vectors.u, vectors.v, grid, u_cc, v_cc)
     return nothing
+end
+
+@kernel function _rotate_velocities!(u, v, grid)
+    i, j = @index(Global, NTuple)
+    # Rotate u, v from extrinsic to intrinsic coordinate system
+    ur, vr = OC.Operators.intrinsic_vector(i, j, 1, grid, u, v)
+    @inbounds begin
+        u[i, j] = ur
+        v[i, j] = vr
+    end
+end
+
+@kernel function _interpolate_velocities!(u, v, grid, u_cc, v_cc)
+    i, j = @index(Global, NTuple)
+    @inbounds begin
+        u[i, j] = ℑxyᶠᶜ(i, j, grid, u_cc)
+        v[i, j] = ℑxyᶜᶠ(i, j, grid, v_cc)
+    end
 end
 
 function Interfacer.update_field!(sim::OceananigansSimulation, ::Val{:area_fraction}, field)

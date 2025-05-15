@@ -214,11 +214,10 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     # Set the momentum flux BCs at the correct locations
     set_from_extrinsic_vectors!(
         (; u = oc_flux_u, v = oc_flux_v),
-        sim.model.grid,
+        sim.sim.model.grid,
         remapped_F_turb_ρτxz,
         remapped_F_turb_ρτyz,
     )
-
 
     # view(oc_flux_u, :, :, 1) .= remapped_F_turb_ρτxz
     # view(oc_flux_v, :, :, 1) .= remapped_F_turb_ρτyz
@@ -260,14 +259,14 @@ function set_from_extrinsic_vectors!(vectors, grid, u_cc, v_cc)
 
     # TODO: Change these kernels to be 2D
     # Rotate vectors onto the grid
-    launch!(arch, grid, :xy, _rotate_vectors!, u_cc, v_cc, grid)
+    OC.Utils.launch!(arch, grid, :xy, _rotate_vectors!, u_cc, v_cc, grid)
 
     # Fill halo regions with the rotated vectors so we can use them to interpolate
     OC.fill_halo_regions!(u_cc)
     OC.fill_halo_regions!(v_cc)
 
     # Interpolate the vectors to face/center and center/face respectively
-    launch!(arch, grid, :xy, _interpolate_vectors!, vectors.u, vectors.v, grid, u_cc, v_cc)
+    OC.Utils.launch!(arch, grid, :xy, _interpolate_vectors!, vectors.u, vectors.v, grid, u_cc, v_cc)
     return nothing
 end
 
@@ -302,7 +301,7 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf, area_fract
     oc_flux_S = surface_flux(sim.sim.model.tracers.S)
     precipitating_fresh_water_flux = (remapped_P_liq .+ remapped_P_snow) ./ ocean_fresh_water_density
     surface_salinity_flux = OC.interior(sim.sim.model.tracers.S, :, :, 1) .* precipitating_fresh_water_flux
-    view(oc_flux_S, :, :, 1) .= .-surface_salinity_flux
+    oc_flux_S .= .-surface_salinity_flux
     return nothing
 end
 

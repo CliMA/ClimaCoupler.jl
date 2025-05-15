@@ -2,7 +2,7 @@ FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
 checkpoint_dt: "720hours"
-co2: "maunaloa"
+co2_model: "maunaloa"
 coupler_toml: ["toml/amip.toml"]
 dt: "120secs"
 dt_cpl: "120secs"

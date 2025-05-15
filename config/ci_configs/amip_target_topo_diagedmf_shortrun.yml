@@ -2,7 +2,7 @@ FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 apply_limiter: false
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_diagedmf_0M.yml"
-co2: "maunaloa"
+co2_model: "maunaloa"
 dt: "100secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: "100secs"

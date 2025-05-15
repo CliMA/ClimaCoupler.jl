@@ -1,7 +1,7 @@
 FLOAT_TYPE: "Float32"
 aerosol_radiation: true
 approximate_linear_solve_iters: 2
-co2: "maunaloa"
+co2_model: "maunaloa"
 dt: 120secs
 dt_cloud_fraction: 1hours
 dt_rad: 1hours

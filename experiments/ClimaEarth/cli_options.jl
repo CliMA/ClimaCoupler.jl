@@ -17,7 +17,7 @@ function argparse_settings()
         arg_type = Bool
         default = true
         "--mode_name"
-        help = "Mode of coupled simulation. [`amip` (default), `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`]"
+        help = "Mode of coupled simulation. [`cmip`, `amip` (default), `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`]"
         arg_type = String
         default = "amip"
         "--coupler_toml"
@@ -82,6 +82,11 @@ function argparse_settings()
         help = "Time interval for checkpointing [\"20days\" (default)]"
         arg_type = String
         default = "20days"
+        # Space information
+        "--share_surface_space"
+        help = "Boolean flag indicating whether to share the surface space between the surface models, atmosphere, and boundary [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
         # Restart information
         "--restart_dir"
         help = "Directory containing restart files"

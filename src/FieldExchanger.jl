@@ -19,6 +19,8 @@ export update_sim!, update_model_sims!, step_model_sims!, exchange!, set_caches!
 
 Updates dynamically changing area fractions.
 Maintains the invariant that the sum of area fractions is 1 at all points.
+Area fractions are expected to be defined on the boundary space of the coupled simulation,
+since they are used by the coupler.
 
 If a surface model is not present, the area fraction is set to 0.
 
@@ -31,7 +33,7 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
 
     # land fraction is static
     if haskey(cs.model_sims, :land_sim)
-        land_fraction = Interfacer.get_field(cs.model_sims.land_sim, Val(:area_fraction), boundary_space)
+        land_fraction = Interfacer.get_field(cs.model_sims.land_sim, Val(:area_fraction))
     else
         cs.fields.temp1 .= 0
         land_fraction = cs.fields.temp1
@@ -40,14 +42,14 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     # ice and ocean fractions are dynamic
     if haskey(cs.model_sims, :ice_sim)
         ice_sim = cs.model_sims.ice_sim
-        ice_fraction_before = Interfacer.get_field(ice_sim, Val(:area_fraction), boundary_space)
+        ice_fraction_before = Interfacer.get_field(ice_sim, Val(:area_fraction))
         # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
         Interfacer.update_field!(
             ice_sim,
             Val(:area_fraction),
             max.(min.(ice_fraction_before, FT(1) .- land_fraction), FT(0)),
         )
-        ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction), boundary_space)
+        ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
     else
         cs.fields.temp1 .= 0
         ice_fraction = cs.fields.temp1
@@ -56,7 +58,7 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     if haskey(cs.model_sims, :ocean_sim)
         ocean_sim = cs.model_sims.ocean_sim
         Interfacer.update_field!(ocean_sim, Val(:area_fraction), max.(FT(1) .- ice_fraction .- land_fraction, FT(0)))
-        ocean_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction), boundary_space)
+        ocean_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction))
     else
         cs.fields.temp1 .= 0
         ocean_fraction = cs.fields.temp1
@@ -217,7 +219,7 @@ function update_model_sims!(model_sims, csf)
     boundary_space = axes(csf)
     for sim in model_sims
         if sim isa Interfacer.SurfaceModelSimulation
-            update_sim!(sim, csf, Interfacer.get_field(sim, Val(:area_fraction), boundary_space))
+            update_sim!(sim, csf, Interfacer.get_field(sim, Val(:area_fraction)))
         else
             update_sim!(sim, csf)
         end
@@ -260,7 +262,7 @@ function combine_surfaces!(combined_field, sims, field_name)
         if sim isa Interfacer.SurfaceModelSimulation
             # Zero out the contribution from this surface if the area fraction is zero
             # Note that multiplying by `area_fraction` is not sufficient in the case of NaNs
-            area_fraction = Interfacer.get_field(sim, Val(:area_fraction), boundary_space)
+            area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
             combined_field .+=
                 area_fraction .*
                 ifelse.(area_fraction .≈ 0, zero(combined_field), Interfacer.get_field(sim, field_name, boundary_space))

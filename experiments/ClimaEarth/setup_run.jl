@@ -35,6 +35,7 @@ import ClimaCoupler:
 import ClimaCoupler.Interfacer:
     AbstractSlabplanetSimulationMode,
     AMIPMode,
+    CMIPMode,
     CoupledSimulation,
     SlabplanetAquaMode,
     SlabplanetMode,
@@ -67,6 +68,7 @@ include("components/land/climaland_integrated.jl")
 include("components/ocean/slab_ocean.jl")
 include("components/ocean/prescr_ocean.jl")
 include("components/ocean/prescr_seaice.jl")
+include("components/ocean/oceananigans.jl")
 
 #=
 ### Configuration Dictionaries
@@ -97,15 +99,8 @@ function CoupledSimulation(config_file = joinpath(pkgdir(ClimaCoupler), "config/
 end
 
 function CoupledSimulation(config_dict::AbstractDict)
-    # Make a copy so that we don't modify the original input
-    config_dict = copy(config_dict)
-
     # Initialize communication context (do this first so all printing is only on root)
     comms_ctx = Utilities.get_comms_context(config_dict)
-    # Select the correct timestep for each component model based on which are available
-    parse_component_dts!(config_dict)
-    # Add extra diagnostics if specified
-    add_extra_diagnostics!(config_dict)
 
     (;
         job_id,
@@ -117,6 +112,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         start_date,
         Δt_cpl,
         component_dt_dict,
+        share_surface_space,
         saveat,
         checkpoint_dt,
         restart_dir,
@@ -151,12 +147,14 @@ function CoupledSimulation(config_dict::AbstractDict)
     isdir(atmos_output_dir) || mkpath(atmos_output_dir)
     land_output_dir = joinpath(dir_paths.output, "clima_land")
     isdir(land_output_dir) || mkpath(land_output_dir)
+    ocean_output_dir = joinpath(dir_paths.output, "clima_ocean")
+    isdir(ocean_output_dir) || mkpath(ocean_output_dir)
 
 
     ## get component model dictionaries (if applicable)
     ## Note this step must come after parsing the coupler config dictionary, since
     ##  some parameters are passed from the coupler config to the component model configs
-    atmos_config_dict = get_atmos_config_dict(config_dict, job_id, atmos_output_dir)
+    atmos_config_dict = get_atmos_config_dict(config_dict, atmos_output_dir)
     (; dt_rad) = get_atmos_args(atmos_config_dict)
 
     ## set unique random seed if desired, otherwise use default
@@ -208,6 +206,7 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     ## init atmos model component
     atmos_sim = ClimaAtmosSimulation(CA.AtmosConfig(atmos_config_dict))
+
     # Get surface elevation from `atmos` coordinate field
     surface_elevation = CC.Fields.level(CC.Fields.coordinate_field(atmos_sim.integrator.u.f).z, CC.Utilities.half)
 
@@ -224,7 +223,18 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
 
     ## init a 2D boundary space at the surface
-    boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space) # TODO: specify this in the coupler and pass it to all component models #665
+    # TODO get radius from ClimaParams
+    # toml_dict = CP.create_toml_dict(FT, override_file=parameter_files[1])
+    # (; radius) = CP.get_parameter_values(toml_dict, "planet_radius")
+    if share_surface_space
+        boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
+    else
+        h_elem = config_dict["h_elem"]
+        n_quad_points = CC.Spaces.Quadratures.polynomial_degree(
+            CC.Spaces.quadrature_style(CC.Spaces.horizontal_space(atmos_sim.domain.face_space)),
+        )
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points, h_elem)
+    end
 
     #=
     ### Land-sea Fraction
@@ -256,10 +266,12 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     @info(sim_mode)
     land_sim = ice_sim = ocean_sim = nothing
-    if sim_mode <: AMIPMode
-        @info("AMIP boundary conditions - do not expect energy conservation")
+    if sim_mode <: AMIPMode || sim_mode <: CMIPMode
+        @info("AMIP/CMIP boundary conditions - do not expect energy conservation")
 
         ## land model
+        # Determine whether to use a shared surface space
+        shared_surface_space = share_surface_space ? boundary_space : nothing
         if land_model == "bucket"
             land_sim = BucketSimulation(
                 FT;
@@ -267,9 +279,9 @@ function CoupledSimulation(config_dict::AbstractDict)
                 tspan,
                 start_date,
                 output_dir = land_output_dir,
-                boundary_space,
                 area_fraction = land_fraction,
                 saveat,
+                shared_surface_space,
                 surface_elevation,
                 land_temperature_anomaly,
                 use_land_diagnostics,
@@ -285,9 +297,9 @@ function CoupledSimulation(config_dict::AbstractDict)
                 tspan,
                 start_date,
                 output_dir = land_output_dir,
-                boundary_space,
                 area_fraction = land_fraction,
                 saveat,
+                shared_surface_space,
                 surface_elevation,
                 land_temperature_anomaly,
                 use_land_diagnostics,
@@ -313,8 +325,20 @@ function CoupledSimulation(config_dict::AbstractDict)
         ## ocean model using prescribed data
         ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
         ocean_fraction = FT(1) .- ice_fraction .- land_fraction
-        ocean_sim =
-            PrescribedOceanSimulation(FT, boundary_space, start_date, t_start, ocean_fraction, thermo_params, comms_ctx)
+
+        if sim_mode <: CMIPMode
+            ocean_sim = OceananigansSimulation(ocean_fraction; output_dir = ocean_output_dir, comms_ctx)
+        else
+            ocean_sim = PrescribedOceanSimulation(
+                FT,
+                boundary_space,
+                start_date,
+                t_start,
+                ocean_fraction,
+                thermo_params,
+                comms_ctx,
+            )
+        end
 
     elseif (sim_mode <: AbstractSlabplanetSimulationMode)
 
@@ -328,7 +352,6 @@ function CoupledSimulation(config_dict::AbstractDict)
             tspan,
             start_date,
             output_dir = land_output_dir,
-            boundary_space,
             area_fraction = land_fraction,
             saveat,
             surface_elevation,
@@ -389,7 +412,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     conservation_checks = nothing
     if energy_check
         @assert(
-            sim_mode <: AbstractSlabplanetSimulationMode && !CA.is_distributed(ClimaComms.context(boundary_space)),
+            sim_mode <: AbstractSlabplanetSimulationMode && comms_ctx isa ClimaComms.SingletonCommsContext,
             "Only non-distributed slabplanet allowable for energy_check"
         )
         conservation_checks = (;
@@ -405,21 +428,10 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     The currently implemented callbacks are:
     - `checkpoint_cb`: generates a checkpoint of all model states at a specified interval. This is mainly used for restarting simulations.
-    - `albedo_cb`: for the amip mode, the water albedo is time varying (since the reflectivity of water depends on insolation and wave characteristics, with the latter
-    being approximated from wind speed). It is updated at the same frequency as the atmospheric radiation.
-    NB: Eventually, we will call all of radiation from the coupler, in addition to the albedo calculation.
     =#
     schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date)
     checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
-
-    if sim_mode <: AMIPMode
-        schedule_albedo = EveryCalendarDtSchedule(TimeManager.time_to_period(dt_rad); start_date)
-    else
-        schedule_albedo = TimeManager.NeverSchedule()
-    end
-    albedo_cb = TimeManager.Callback(schedule_albedo, FluxCalculator.water_albedo_from_atmosphere!)
-
-    callbacks = (; checkpoint = checkpoint_cb, water_albedo = albedo_cb)
+    callbacks = (checkpoint_cb,)
 
     #= Set up default AMIP diagnostics
     Use ClimaDiagnostics for default AMIP diagnostics, which currently include turbulent energy fluxes.
@@ -637,11 +649,8 @@ function step!(cs::CoupledSimulation)
     ## calculate turbulent fluxes in the coupler and update the model simulations with them
     FluxCalculator.turbulent_fluxes!(cs)
 
-    ## update water albedo from wind at dt_water_albedo
-    ## (this will be extended to a radiation callback from the coupler)
-    TimeManager.maybe_trigger_callback(cs.callbacks.water_albedo, cs)
-    ## callback to checkpoint model state
-    TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs)
+    ## Maybe call the callbacks
+    foreach(c -> TimeManager.maybe_trigger_callback(c, cs), cs.callbacks)
 
     ## compute/output AMIP diagnostics if scheduled for this timestep
     ## wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface

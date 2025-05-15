@@ -18,12 +18,15 @@ function postprocess_sim(cs, postprocessing_vars)
     coupler_output_dir = joinpath(output_dir, "coupler")
     atmos_output_dir = joinpath(output_dir, "clima_atmos")
     land_output_dir = joinpath(output_dir, "clima_land")
+    ocean_output_dir = joinpath(output_dir, "clima_ocean")
 
     # Plot generic diagnostics
-    @info "Plotting diagnostics for coupler, atmos, and land"
+    @info "Plotting diagnostics for coupler, atmos, land, and ocean"
     make_diagnostics_plots(coupler_output_dir, artifact_dir, output_prefix = "coupler_")
     make_diagnostics_plots(atmos_output_dir, artifact_dir, output_prefix = "atmos_")
     make_diagnostics_plots(land_output_dir, artifact_dir, output_prefix = "land_")
+    # TODO: Uniform ocean plotting
+    make_ocean_diagnostics_plots(ocean_output_dir, artifact_dir, output_prefix = "ocean_")
 
     # Plot all model states and coupler fields (useful for debugging)
     !CA.is_distributed(cs.comms_ctx) && debug(cs, artifact_dir)
@@ -36,8 +39,8 @@ function postprocess_sim(cs, postprocessing_vars)
         t_end = times[end]
         if t_end > 84600 * 31 * 3 # 3 months for spin up
             leaderboard_base_path = artifact_dir
-            compute_leaderboard(leaderboard_base_path, atmos_output_dir)
-            compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir)
+            compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
+            compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 6)
         end
     end
 

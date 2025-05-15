@@ -35,13 +35,12 @@ tmpdir = ClimaComms.bcast(comms_ctx, tmpdir)
 # synced across MPI processes. Let's add an additional check here.
 maybe_wait_filesystem(ClimaComms.context(), tmpdir)
 
-default_config = parse_commandline(argparse_settings())
-base_config_file = joinpath(@__DIR__, "amip_test.yml")
-base_config = YAML.load_file(base_config_file)
-merge!(default_config, base_config)
+# Parse the input config file as a dictionary
+config_file = joinpath(@__DIR__, "amip_test.yml")
+config_dict = get_coupler_config_dict(config_file)
 
 # Four steps
-four_steps = deepcopy(default_config)
+four_steps = deepcopy(config_dict)
 
 four_steps["dt"] = "180secs"
 four_steps["dt_cpl"] = "180secs"
@@ -69,7 +68,7 @@ cs_four_steps_reading = setup_and_run(four_steps_reading)
 end
 
 # Now, two steps plus one
-two_steps = deepcopy(default_config)
+two_steps = deepcopy(config_dict)
 
 two_steps["dt"] = "180secs"
 two_steps["dt_cpl"] = "180secs"

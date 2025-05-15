@@ -49,7 +49,6 @@ end
     @test sim isa Interfacer.AbstractSurfaceStub
     # Check that the cache is correctly initialized
     @test sim.cache.T_sfc == SST_expected
-    @test sim.cache.ρ_sfc == zeros(space)
     @test sim.cache.z0m == FT(5.8e-5)
     @test sim.cache.z0b == FT(5.8e-5)
     @test sim.cache.beta == FT(1)

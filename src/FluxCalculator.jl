@@ -12,12 +12,7 @@ import Thermodynamics as TD
 import ClimaCore as CC
 import ..Interfacer, ..Utilities
 
-export extrapolate_ρ_to_sfc,
-    turbulent_fluxes!,
-    get_surface_params,
-    update_turbulent_fluxes!,
-    water_albedo_from_atmosphere!,
-    compute_surface_fluxes!
+export extrapolate_ρ_to_sfc, turbulent_fluxes!, get_surface_params, update_turbulent_fluxes!, compute_surface_fluxes!
 
 function turbulent_fluxes!(cs::Interfacer.CoupledSimulation)
     return turbulent_fluxes!(cs.fields, cs.model_sims, cs.thermo_params)
@@ -270,38 +265,11 @@ end
 
 Updates the fluxes in the surface model simulation `sim` with the fluxes in `fields`.
 """
-function update_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, fields::NamedTuple)
+function update_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, fields)
     return error("update_turbulent_fluxes! is required to be dispatched on $(nameof(sim)), but no method defined")
 end
 
 update_turbulent_fluxes!(sim::Interfacer.AbstractSurfaceStub, fields::NamedTuple) = nothing
-
-"""
-    water_albedo_from_atmosphere!(cs::Interfacer.CoupledSimulation)
-
-Callback to calculate the water albedo from atmospheric state. This is a placeholder for the full radiation callback.
-"""
-function water_albedo_from_atmosphere!(cs::Interfacer.CoupledSimulation)
-    atmos_sim = cs.model_sims.atmos_sim
-    ocean_sim = cs.model_sims.ocean_sim
-    cf = cs.fields
-
-    # use temp fields
-    water_albedo_from_atmosphere!(atmos_sim, cf.temp1, cf.temp2)
-
-    Interfacer.update_field!(ocean_sim, Val(:surface_direct_albedo), cf.temp1)
-    Interfacer.update_field!(ocean_sim, Val(:surface_diffuse_albedo), cf.temp2)
-    return nothing
-end
-
-"""
-    water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulation, ::CC.Fields.Field, ::CC.Fields.Field)
-
-Placeholder for the water albedo calculation from the atmosphere. It returns an error if not extended.
-"""
-function water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulation, ::CC.Fields.Field, ::CC.Fields.Field)
-    error("this function is required to be dispatched on $(nameof(atmos_sim)), but no method defined")
-end
 
 """
     compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params)
@@ -358,7 +326,7 @@ function compute_surface_fluxes!(
     thermo_state_sfc = TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, csf.T_sfc, csf.q_sfc)
 
     # get area fraction (min = 0, max = 1)
-    area_fraction = Interfacer.get_field(sim, Val(:area_fraction), boundary_space)
+    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
     surface_params = FluxCalculator.get_surface_params(atmos_sim)
 

@@ -2,6 +2,7 @@ import YAML
 
 mode_name_dict = Dict(
     "amip" => AMIPMode,
+    "cmip" => CMIPMode,
     "slabplanet" => SlabplanetMode,
     "slabplanet_aqua" => SlabplanetAquaMode,
     "slabplanet_terra" => SlabplanetTerraMode,
@@ -27,6 +28,12 @@ function get_coupler_config_dict(config_file)
     # Read in config dictionary from file, overriding the defaults in `parsed_args`
     config_dict = merge(parsed_args, YAML.load_file(config_file))
     config_dict["job_id"] = job_id
+
+    # Select the correct timestep for each component model based on which are available
+    parse_component_dts!(config_dict)
+
+    # Add any extra diagnostics
+    add_extra_diagnostics!(config_dict)
     return config_dict
 end
 
@@ -88,6 +95,9 @@ function get_coupler_args(config_dict::Dict)
         saveat = typeof(t_start)[]
     end
 
+    # Space information
+    share_surface_space = config_dict["share_surface_space"]
+
     # Checkpointing information
     checkpoint_dt = config_dict["checkpoint_dt"]
 
@@ -127,6 +137,7 @@ function get_coupler_args(config_dict::Dict)
         start_date,
         Δt_cpl,
         component_dt_dict,
+        share_surface_space,
         saveat,
         checkpoint_dt,
         restart_dir,

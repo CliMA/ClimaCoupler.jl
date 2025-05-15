@@ -2,7 +2,7 @@
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "28ea7363c84f1ee767b36c8d72de00767b10a136"
+project_hash = "3fa349639cb82dc90d212fdadf3804a09222422e"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -366,6 +366,12 @@ deps = ["ClimaCore", "Makie"]
 git-tree-sha1 = "e1e82d32ba993a18fc760d5cbd7db3bcabd1f3c8"
 uuid = "908f55d8-4145-4867-9c14-5dad1a479e4d"
 version = "0.4.6"
+
+[[deps.ClimaCorePlots]]
+deps = ["ClimaComms", "ClimaCore", "RecipesBase", "StaticArrays", "TriplotBase"]
+git-tree-sha1 = "6430644d60158055458075bf32e5ac24741b1ab9"
+uuid = "cf7c7e5a-b407-4c48-9047-11a94a308626"
+version = "0.2.11"
 
 [[deps.ClimaCoupler]]
 deps = ["ClimaComms", "ClimaCore", "ClimaUtilities", "Dates", "JLD2", "Logging", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]

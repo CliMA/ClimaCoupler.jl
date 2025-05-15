@@ -227,11 +227,6 @@ function get_surface_fluxes(inputs, input_args, surface_params::SF.Parameters.Su
     sfc_params = SF.Parameters.uf_params(param_set)
     ufunc = SF.UniversalFunctions.universal_func.(Ref(similarity_theory), L★, Ref(sfc_params))
     
-    #similarity_scales = SF.refine_similarity_variables(Σ_est, ΔU_est, 
-    #                                                 ufunc, 
-    #                                                 surface_state, atmos_state, 
-    #                                                 param_set)
-
     outputs = SF.compute_similarity_theory_fluxes(ufunc, surface_state, atmos_state, param_set)
     ### TODO : End new surface flux formulation
     

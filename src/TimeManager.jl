@@ -75,6 +75,19 @@ function maybe_trigger_callback(callback, cs)
     return nothing
 end
 
+"""
+    callback!(cs)
+
+Run the callbacks that need to be run.
+
+This is marked as mutating function because in general callbacks are going to change
+the state of the simulation
+"""
+function callbacks!(cs)
+    foreach(c -> TimeManager.maybe_trigger_callback(c, cs), cs.callbacks)
+    return nothing
+end
+
 
 """
 A schedule that is never true. Useful to disable something.

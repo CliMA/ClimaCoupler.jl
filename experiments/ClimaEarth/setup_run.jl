@@ -51,7 +51,7 @@ import Interpolations # triggers InterpolationsExt in ClimaUtilities
 import Random
 
 # TODO: Move to ClimaUtilities once we move the Schedules to ClimaUtilities
-import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
+import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule, EveryStepSchedule
 
 pkg_dir = pkgdir(ClimaCoupler)
 
@@ -424,13 +424,14 @@ function CoupledSimulation(config_dict::AbstractDict)
     #=
     ## Initialize Callbacks
     Callbacks are used to update at a specified interval. The callbacks are initialized here and
-    saved in a global `Callbacks` struct, `callbacks`. The `trigger_callback!` function is used to call the callback during the simulation below.
+    saved in a global `Callbacks` struct, `callbacks`. The `callbacks!` function is used to call the callback during the simulation below.
 
     The currently implemented callbacks are:
     - `checkpoint_cb`: generates a checkpoint of all model states at a specified interval. This is mainly used for restarting simulations.
     =#
     schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date)
     checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
+
     callbacks = (checkpoint_cb,)
 
     #= Set up default AMIP diagnostics
@@ -538,29 +539,11 @@ function run!(cs::CoupledSimulation; precompile = (cs.tspan[end] > 2 * cs.Δt_cp
     end
     @info "Simulation took $(walltime) seconds"
 
-    simulated_seconds_per_second = float(cs.tspan[end] - cs.tspan[begin]) / walltime
-    simulated_years_per_day = simulated_seconds_per_second / 365.25
-    sypd = simulated_years_per_day
-    n_coupling_steps = (cs.tspan[end] - cs.tspan[begin]) / cs.Δt_cpl
-    walltime_per_coupling_step = walltime / n_coupling_steps
+    sypd = simulated_years_per_day(cs, walltime)
+    walltime_per_step = walltime_per_coupling_step(cs, walltime)
     @info "SYPD: $sypd"
-    @info "Walltime per coupling step: $(walltime_per_coupling_step)"
-
-    ## Save the SYPD and allocation information
-    if ClimaComms.iamroot(cs.comms_ctx)
-        open(joinpath(cs.dirs.artifacts, "sypd.txt"), "w") do sypd_filename
-            println(sypd_filename, "$sypd")
-        end
-
-        open(joinpath(cs.dirs.artifacts, "walltime_per_step.txt"), "w") do walltime_per_step_filename
-            println(walltime_per_step_filename, "$(walltime_per_coupling_step)")
-        end
-
-        open(joinpath(cs.dirs.artifacts, "max_rss_cpu.txt"), "w") do cpu_max_rss_filename
-            cpu_max_rss_GB = Utilities.show_memory_usage()
-            println(cpu_max_rss_filename, cpu_max_rss_GB)
-        end
-    end
+    @info "Walltime per coupling step: $(walltime_per_step)"
+    save_sypd_walltime_to_disk(cs, walltime)
 
     # Close all diagnostics file writers
     isnothing(cs.diags_handler) || foreach(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
@@ -638,7 +621,7 @@ function step!(cs::CoupledSimulation)
     ConservationChecker.check_conservation!(cs)
 
     ## step component model simulations sequentially for one coupling timestep (Δt_cpl)
-    FieldExchanger.step_model_sims!(cs.model_sims, cs.t[])
+    FieldExchanger.step_model_sims!(cs)
 
     ## update the surface fractions for surface models
     FieldExchanger.update_surface_fractions!(cs)
@@ -650,11 +633,9 @@ function step!(cs::CoupledSimulation)
     FluxCalculator.turbulent_fluxes!(cs)
 
     ## Maybe call the callbacks
-    foreach(c -> TimeManager.maybe_trigger_callback(c, cs), cs.callbacks)
+    TimeManager.callbacks!(cs)
 
-    ## compute/output AMIP diagnostics if scheduled for this timestep
-    ## wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface
-    cs_nt = (; u = cs.fields, p = nothing, t = cs.t[], step = round(cs.t[] / cs.Δt_cpl))
-    !isnothing(cs.diags_handler) && CD.orchestrate_diagnostics(cs_nt, cs.diags_handler)
+    # Compute coupler diagnostics
+    CD.orchestrate_diagnostics(cs)
     return nothing
 end

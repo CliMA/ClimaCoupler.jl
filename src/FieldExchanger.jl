@@ -228,17 +228,23 @@ end
 
 """
     step_model_sims!(model_sims, t)
+    step_model_sims!(cs::CoupledSimulation)
 
 Iterates `step!` over all component model simulations saved in `cs.model_sims`.
 
 # Arguments
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
-- `t`: [AbstractFloat] denoting the simulation time.
+- `t`: [AbstractFloat or ITime] denoting the simulation time.
 """
 function step_model_sims!(model_sims, t)
     for sim in model_sims
         Interfacer.step!(sim, t)
     end
+    return nothing
+end
+
+function step_model_sims!(cs::Interfacer.CoupledSimulation)
+    step_model_sims!(cs.model_sims, cs.t[])
 end
 
 """

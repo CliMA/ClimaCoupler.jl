@@ -1,6 +1,6 @@
 FLOAT_TYPE: "Float32"
 apply_limiter: false
-co2: "maunaloa"
+co2_model: "maunaloa"
 dt_save_state_to_disk: "Inf"
 dt_save_to_sol: "Inf"
 energy_check: false

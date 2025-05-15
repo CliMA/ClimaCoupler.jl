@@ -1,5 +1,5 @@
 apply_limiter: false
-co2: "maunaloa"
+co2_model: "maunaloa"
 checkpoint_dt: "400secs"
 dt_save_to_sol: "1days"
 energy_check: false

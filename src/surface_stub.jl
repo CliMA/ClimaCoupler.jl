@@ -48,15 +48,16 @@ Updates the specified value in the cache of `SurfaceStub`.
 """
 function update_field!(sim::AbstractSurfaceStub, ::Val{:area_fraction}, field::CC.Fields.Field)
     sim.cache.area_fraction .= field
+    return nothing
 end
 function update_field!(sim::AbstractSurfaceStub, ::Val{:surface_temperature}, field::CC.Fields.Field)
-    sim.cache.T_sfc .= field
+    Interfacer.remap!(sim.cache.T_sfc, field)
 end
 function update_field!(sim::AbstractSurfaceStub, ::Val{:surface_direct_albedo}, field::CC.Fields.Field)
-    sim.cache.α_direct .= field
+    Interfacer.remap!(sim.cache.α_direct, field)
 end
 function update_field!(sim::AbstractSurfaceStub, ::Val{:surface_diffuse_albedo}, field::CC.Fields.Field)
-    sim.cache.α_diffuse .= field
+    Interfacer.remap!(sim.cache.α_diffuse, field)
 end
 update_field!(::AbstractSurfaceStub, ::Val{:liquid_precipitation}, field) = nothing
 update_field!(::AbstractSurfaceStub, ::Val{:radiative_energy_flux_sfc}, field) = nothing

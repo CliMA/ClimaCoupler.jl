@@ -50,7 +50,7 @@ function slab_ocean_space_init(space, params)
     # prognostic variable
     Y = CC.Fields.FieldVector(; T_sfc = T_sfc)
 
-    return Y, space
+    return Y
 end
 
 """
@@ -73,7 +73,7 @@ function SlabOceanSimulation(
     evolving_switch = evolving ? FT(1) : FT(0)
     params = OceanSlabParameters{FT}(evolving_switch = evolving_switch)
 
-    Y, space = slab_ocean_space_init(space, params)
+    Y = slab_ocean_space_init(space, params)
     cache = (
         params = params,
         F_turb_energy = CC.Fields.zeros(space),
@@ -124,7 +124,8 @@ Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:energy}) =
     sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h
 
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:area_fraction}, field::CC.Fields.Field)
-    Interfacer.remap!(sim.integrator.p.area_fraction, field)
+    sim.integrator.p.area_fraction .= field
+    return nothing
 end
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:radiative_energy_flux_sfc}, field)
     Interfacer.remap!(sim.integrator.p.F_radiative, field)
@@ -143,8 +144,8 @@ end
 Interfacer.step!(sim::SlabOceanSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 
 function FluxCalculator.update_turbulent_fluxes!(sim::SlabOceanSimulation, fields::NamedTuple)
-    (; F_lh, F_sh) = fields
-    @. sim.integrator.p.F_turb_energy = F_lh + F_sh
+    Interfacer.update_field!(sim, Val(:turbulent_energy_flux), fields.F_lh .+ fields.F_sh)
+    return nothing
 end
 
 """

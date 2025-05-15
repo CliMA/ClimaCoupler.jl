@@ -11,21 +11,7 @@ import ClimaCore as CC
 import Logging
 import ClimaUtilities.OutputPathGenerator: generate_output_path
 
-export swap_space!, get_device, get_comms_context, show_memory_usage, setup_output_dirs, time_to_seconds, integral
-
-"""
-    swap_space!(space_out::CC.Spaces.AbstractSpace, field_in::CC.Fields.Field)
-
-Remap the values of a field onto a new space.
-
-# Arguments
-- `space_out`: [CC.Spaces.AbstractSpace] The axes of the space we want to remap onto
-- `field_in`: [CC.Fields.Field] to be remapped to new space.
-"""
-function swap_space!(space_out::CC.Spaces.AbstractSpace, field_in::CC.Fields.Field)
-    field_out = CC.Fields.Field(CC.Fields.field_values(field_in), space_out)
-    return field_out
-end
+export get_device, get_comms_context, show_memory_usage, setup_output_dirs, time_to_seconds, integral
 
 """
     get_device(config_dict)
@@ -186,7 +172,6 @@ function time_to_seconds(s::String)
     end
     error("Uncaught case in computing time from given string.")
 end
-
 
 """
     integral(field)

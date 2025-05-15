@@ -235,7 +235,7 @@ function compute_surface_fluxes!(
     thermo_state_sfc = TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, csf.T_sfc, csf.q_sfc)
 
     # get area fraction (min = 0, max = 1)
-    area_fraction = Interfacer.get_field(sim, Val(:area_fraction), boundary_space)
+    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
     surface_params = FluxCalculator.get_surface_params(atmos_sim)
 

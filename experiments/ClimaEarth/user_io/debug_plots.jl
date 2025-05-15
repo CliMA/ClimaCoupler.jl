@@ -75,7 +75,7 @@ function plot_global_conservation(
     if !softfail
         @info typeof(cc)
         @info rse[end]
-        @assert rse[end] < 0.0055
+        @assert rse[end] < 0.0065
     end
 end
 

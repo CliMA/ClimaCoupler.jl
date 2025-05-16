@@ -29,7 +29,7 @@ function postprocess_sim(cs, postprocessing_vars)
     make_ocean_diagnostics_plots(ocean_output_dir, artifact_dir, output_prefix = "ocean_")
 
     # Plot all model states and coupler fields (useful for debugging)
-    !CA.is_distributed(cs.comms_ctx) && debug(cs, artifact_dir)
+    ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext && debug(cs, artifact_dir)
 
     # If we have enough data (in time, but also enough variables), plot the leaderboard.
     # We need pressure to compute the leaderboard.

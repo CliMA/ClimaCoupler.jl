@@ -259,7 +259,10 @@ for FT in (Float32, Float64)
     @testset "update_model_sims! for FT=$FT" begin
         # coupler cache setup
         boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
-        coupler_field_names = [Interfacer.default_coupler_fields(); [:surface_direct_albedo, :surface_diffuse_albedo]]
+        coupler_field_names = [
+            Interfacer.default_coupler_fields()
+            [:surface_direct_albedo, :surface_diffuse_albedo]
+        ]
         coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
         # Initialize with ones
         for p in propertynames(coupler_fields)
@@ -334,7 +337,10 @@ for FT in (Float32, Float64)
         #  and two precipitation fields from the atmos to the surface.
         # coupler cache setup
         boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
-        coupler_field_names = [Interfacer.default_coupler_fields(); [:surface_direct_albedo, :surface_diffuse_albedo]]
+        coupler_field_names = [
+            Interfacer.default_coupler_fields()
+            [:surface_direct_albedo, :surface_diffuse_albedo]
+        ]
         # Initialize coupler fields with 0.5
         key_types = (coupler_field_names...,)
         val_types = Tuple{(FT for _ in 1:length(coupler_field_names))...}

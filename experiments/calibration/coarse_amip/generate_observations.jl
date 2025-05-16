@@ -6,16 +6,17 @@ const obs_dir = "/home/ext_nefrathe_caltech_edu/calibration_obs"
 const simdir = SimDir(
     joinpath(
         pkgdir(ClimaCoupler),
-        "experiments/calibration/coarse_amip/output/iteration_000/member_001/model_config/output_active",
+        "experiments/calibration/coarse_amip/output_old/iteration_000/member_003/model_config/output_active",
     ),
 )
 
 diagnostic_var2d = get_monthly_averages(simdir, "rsut")
 
-# diagnostic_var3d = get_monthly_averages(simdir, "ta")
-# diagnostic_var3d = ClimaAnalysis.Atmos.to_pressure_coordinates(diagnostic_var3d, pressure)
+diagnostic_var3d = get_monthly_averages(simdir, "ta")
+pressure = get_monthly_averages(simdir, "pfull")
+diagnostic_var3d = ClimaAnalysis.Atmos.to_pressure_coordinates(diagnostic_var3d, pressure)
 
-nt = get_all_output_vars(obs_dir, diagnostic_var2d, nothing)
+nt = get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
 JLD2.save_object("experiments/calibration/nt_obs.jld2", nt)
 observation_vec = create_observation_vector(nt)
 JLD2.save_object("experiments/calibration/observations.jld2", observation_vec)

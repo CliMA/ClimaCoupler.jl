@@ -32,7 +32,7 @@ function ClimaCalibrate.forward_model(iter, member)
     sim = try
         setup_and_run(config_dict)
     catch e
-        @info e
+        @error e
         println(catch_backtrace())
         rethrow(e)
     end
@@ -42,7 +42,7 @@ function ClimaCalibrate.forward_model(iter, member)
 end
 
 function minibatch_to_start_date(batch)
-    start_year = minimum(batch) + 2001
-    @assert start_year >= 2002
+    start_year = minimum(batch) + 2009
+    @assert start_year >= 2010
     return "$(start_year)0901"
 end

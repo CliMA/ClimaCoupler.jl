@@ -21,7 +21,6 @@ function ClimaCalibrate.observation_map(iteration)
         simdir_path = joinpath(member_path, "model_config/output_active")
         @info "Processing member $m: $simdir_path"
         try
-            @show process_member_data(SimDir(simdir_path), current_minibatch) |> size
             G_ensemble[:, m] .= process_member_data(SimDir(simdir_path), current_minibatch)
 
         catch e
@@ -38,7 +37,7 @@ function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, it
     for m in 1:EKP.get_N_ens(ekp)
         output_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
         diagnostics_folder_path = joinpath(output_path, "model_config", "output_active")
-        compute_leaderboard(output_path, diagnostics_folder_path, 3)
+        compute_leaderboard(output_path, diagnostics_folder_path, )
     end
 end
 
@@ -67,7 +66,7 @@ function process_member_data(simdir::SimDir, current_minibatch)
     lwp = preprocess_diagnostic_monthly_averages(simdir, "lwp")
     lwp = window(lwp, "latitude"; left = -60, right = 60)
 
-    year_observations = map(current_minibatch) do yr
+    year_observations = map(1:length(current_minibatch)) do yr
         rsut_yr = year_of_seasonal_averages(rsut, yr)
         rlut_yr = year_of_seasonal_averages(rlut, yr)
         # This needs to be averaged over lat, lon, and seasons

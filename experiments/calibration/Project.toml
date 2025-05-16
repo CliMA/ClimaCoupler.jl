@@ -33,7 +33,7 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
 ClimaAnalysis = "0.5.17"
-ClimaCalibrate = "0.0.16"
+ClimaCalibrate = "0.1"
 ClimaCore = "0.14.26"
 ClimaLand = "0.15.11"
 ClimaTimeSteppers = "0.8.2"

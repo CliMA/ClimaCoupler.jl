@@ -1,0 +1,22 @@
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
+bucket_albedo_type: "map_temporal"
+checkpoint_dt: "30days"
+coupler_toml: ["toml/amip.toml"]
+dt: "120secs"
+dt_cpl: "120secs"
+dt_save_to_sol: "30days"
+energy_check: false
+h_elem: 16
+land_model: "bucket"
+mode_name: "amip"
+moist: equil
+netcdf_interpolation_num_points: [90, 45, 31]
+radiation_reset_rng_seed: true
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+t_end: "366days"
+topography: "Earth"
+topo_smoothing: true
+z_elem: 39

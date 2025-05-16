@@ -42,6 +42,6 @@ eki = EKP.EnsembleKalmanProcess(observation_series, EKP.TransformUnscented(prior
 ensemble_size = EKP.get_N_ens(eki)
 
 # Slurm resources for a single model run
-hpc_kwargs = CAL.kwargs(time = 60 * 5, ntasks = 4, gpus_per_task = 1, cpus_per_task = 4, partition = "a3")
+hpc_kwargs = CAL.kwargs(time = 60 * 15, ntasks = 2, gpus_per_task = 1, cpus_per_task = 4, partition = "a3")
 exeflags = "--threads=4"
 eki = CAL.calibrate(CAL.GCPBackend, eki, n_iterations, prior, output_dir; model_interface, hpc_kwargs, exeflags)

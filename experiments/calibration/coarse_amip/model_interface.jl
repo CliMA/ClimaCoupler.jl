@@ -28,11 +28,11 @@ function ClimaCalibrate.forward_model(iter, member)
     # Set member output directory
     member_output_dir = ClimaCalibrate.path_to_ensemble_member(output_dir_root, iter, member)
     config_dict["coupler_output_dir"] = member_output_dir
-    @show config_dict
+
     sim = try
         setup_and_run(config_dict)
     catch e
-        @info e
+        @error e
         println(catch_backtrace())
         rethrow(e)
     end

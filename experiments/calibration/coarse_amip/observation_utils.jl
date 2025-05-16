@@ -9,7 +9,8 @@ import NaNStatistics
 const days_in_seconds = 86_400
 const months = 31days_in_seconds
 const years = 365days_in_seconds
-const spinup_time = 3months
+const spinup_months = 3
+const spinup_time = spinup_months * months
 const start_date = DateTime(2000, 3, 1)
 const first_year_start_date = DateTime(2002, 12, 1)
 
@@ -66,7 +67,12 @@ function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
     lwp = window(lwp, "latitude"; left = -60, right = 60)
     lwp = replace(lwp, NaN => NaNStatistics.nanmean(lwp.data))
 
-    return (; net_rad, cre, rlut, rsut, rsutcs, rlutcs, pr, ts, lwp)
+    iwp = OutputVar(joinpath(pkgdir(ClimaCoupler), "modis_lwp_iwp.nc"), "iwp", new_start_date = start_date)
+    iwp = resample(iwp)
+    iwp = window(iwp, "latitude"; left = -60, right = 60)
+    iwp = replace(iwp, NaN => NaNStatistics.nanmean(iwp.data))
+
+    return (; net_rad, cre, rlut, rsut, rsutcs, rlutcs, rsdt, pr, ts, lwp, iwp)
 end
 
 # The ERA5 pressure range is not as large as the ClimaAtmos default pressure levels,
@@ -118,8 +124,9 @@ function get_seasonal_covariance(output_var; model_error_scale = nothing, regula
         season_across_time = split_by_season_across_time(season)
         season_across_time = filter(!isempty, season_across_time)
         seasonal_means_per_year = average_time.(season_across_time)
-        # Ensure dimensions are consistent - this will need to be generalized for 3D fields
-        seasonal_means_per_year = permutedims.(seasonal_means_per_year, Ref(["longitude", "latitude"]))
+        dims = ["longitude", "latitude"]
+        has_pressure(season) && push!(dims, "pressure")
+        seasonal_means_per_year = permutedims.(seasonal_means_per_year, Ref(dims))
         # Concatenate the outputvars into a matrix
         seasonal_means_per_year_matrix = cat(getproperty.(seasonal_means_per_year, :data)..., dims = 3)
         time_mean_over_years = mean(seasonal_means_per_year_matrix, dims = 3)
@@ -150,21 +157,25 @@ function get_year_indices(year)
     return start_index:end_index
 end
 
+# Todo: use dates instead of year indices
 function year_of_seasonal_averages(output_var, yr)
+    year_ind = get_year_indices(yr)
     seasons = split_by_season_across_time(output_var)
-
+    @debug long_name(output_var), dates.(seasons[year_ind])
     # Average each season over its months
     seasonal_means_per_year = average_time.(seasons)
 
     # Ensure dimensions are consistent for all seasons
-    seasonal_means_per_year = permutedims.(seasonal_means_per_year, Ref(["longitude", "latitude"]))
+    dims = ["longitude", "latitude"]
+    has_pressure(output_var) && push!(dims, "pressure")
+    seasonal_means_per_year = permutedims.(seasonal_means_per_year, Ref(dims))
 
     # Get data for the specific year requested
-    year_ind = get_year_indices(yr)
     year_seasonal_data = seasonal_means_per_year[year_ind]
     seasons = map(x -> x.attributes["season"], year_seasonal_data)
     @assert seasons == ["DJF", "MAM", "JJA", "SON"]
     obs_vec = vcat(vec.(getproperty.(year_seasonal_data, :data))...)
+    @debug length(obs_vec)
     return obs_vec
 end
 
@@ -183,10 +194,15 @@ end
 Given a NamedTuple, produce a vector of `EKP.Observation`s, where each observation
 consists of seasonally averaged fields, with the exception of globally averaged yearly radiative balance
 """
-function create_observation_vector(nt, nyears = 17)
+function create_observation_vector(nt,year_range = 1:17)
     rsut = window(nt.rsut, "time"; left = first_year_start_date)
     rlut = window(nt.rlut, "time"; left = first_year_start_date)
     cre = window(nt.cre, "time"; left = first_year_start_date)
+
+    ts = window(nt.ts, "time"; left = first_year_start_date)
+    pr = window(nt.pr, "time"; left = first_year_start_date)
+    lwp = window(nt.lwp, "time"; left = first_year_start_date)
+    iwp = window(nt.iwp, "time"; left = first_year_start_date)
 
     # Compute yearly net radiative flux separately
     net_rad = window(nt.net_rad, "time"; left = first_year_start_date) |> average_lat |> average_lon
@@ -194,11 +210,7 @@ function create_observation_vector(nt, nyears = 17)
     net_rad_stdev = std(cat(net_rad..., dims = 3), dims = 3)
     net_rad_covariance = Diagonal(vec(net_rad_stdev) .^ 2)
 
-    ts = window(nt.ts, "time"; left = first_year_start_date)
-    pr = window(nt.pr, "time"; left = first_year_start_date)
-    lwp = window(nt.lwp, "time"; left = first_year_start_date)
-
-    all_observations = map(1:nyears) do yr
+    all_observations = map(year_range) do yr
         @info "Creating observations for year $yr"
         net_rad_obs = EKP.Observation(vec(net_rad[yr]), net_rad_covariance, "$(yr)_net_rad")
 
@@ -208,6 +220,7 @@ function create_observation_vector(nt, nyears = 17)
         pr_obs = make_single_year_of_seasonal_observations(pr, yr)
         ts_obs = make_single_year_of_seasonal_observations(ts, yr)
         lwp_obs = make_single_year_of_seasonal_observations(lwp, yr)
+        iwp_obs = make_single_year_of_seasonal_observations(iwp, yr)
 
         return EKP.combine_observations([net_rad_obs, cre_obs, rsut_obs, rlut_obs, pr_obs, ts_obs, lwp_obs])
     end

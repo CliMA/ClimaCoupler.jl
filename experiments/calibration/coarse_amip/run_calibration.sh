@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --partition=a3
-#SBATCH --output="run_calibration_4gpus.txt"
+#SBATCH --output="run_calibration.txt"
 #SBATCH --time=24:00:00
 #SBATCH --cpus-per-task=1
 

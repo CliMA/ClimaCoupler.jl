@@ -457,9 +457,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
 
     cs = CoupledSimulation{FT}(
-        comms_ctx,
         Ref(start_date),
-        boundary_space,
         coupler_fields,
         conservation_checks,
         [tspan[1], tspan[2]],
@@ -530,7 +528,7 @@ function run!(cs::CoupledSimulation; precompile = (cs.tspan[end] > 2 * cs.Δt_cp
     value to calculate the simulated years per day (SYPD) of the simulation.
     =#
     @info "Starting coupling loop"
-    walltime = ClimaComms.@elapsed cs.comms_ctx.device begin
+    walltime = ClimaComms.@elapsed ClimaComms.device(cs) begin
         s = CA.@timed_str begin
             while cs.t[] <= cs.tspan[end]
                 step!(cs)
@@ -576,7 +574,7 @@ function postprocess(cs, conservation_softfail)
     - Plots of useful coupler and component model fields for debugging
     =#
 
-    if ClimaComms.iamroot(cs.comms_ctx) && !isnothing(cs.diags_handler)
+    if ClimaComms.iamroot(ClimaComms.context(cs)) && !isnothing(cs.diags_handler)
         postprocessing_vars = (; conservation_softfail)
         postprocess_sim(cs, postprocessing_vars)
     end

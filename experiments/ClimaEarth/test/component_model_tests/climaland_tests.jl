@@ -77,9 +77,7 @@ end
     thermo_params = TDP.ThermodynamicsParameters(FT)
 
     cs = Interfacer.CoupledSimulation{FT}(
-        nothing, # comms_ctx
         nothing, # start_date
-        boundary_space,
         coupler_fields,
         nothing, # conservation_checks
         tspan,

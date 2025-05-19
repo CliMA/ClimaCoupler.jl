@@ -46,25 +46,8 @@ abstract type AbstractSimulation{FT} end
     CoupledSimulation
 Stores information needed to run a simulation with the coupler.
 """
-struct CoupledSimulation{
-    FT <: Real,
-    X,
-    D,
-    B,
-    FV,
-    E,
-    TS,
-    DTI,
-    TT,
-    NTMS <: NamedTuple,
-    CALLBACKS,
-    NTP <: NamedTuple,
-    TP,
-    DH,
-}
-    comms_ctx::X
+struct CoupledSimulation{FT <: Real, D, FV, E, TS, DTI, TT, NTMS <: NamedTuple, CALLBACKS, NTP <: NamedTuple, TP, DH}
     start_date::D
-    boundary_space::B
     fields::FV
     conservation_checks::E
     tspan::TS
@@ -496,5 +479,33 @@ after the initial exchange.
 This is not required to be extended, but may be necessary for some models.
 """
 set_cache!(sim::ComponentModelSimulation) = nothing
+
+"""
+    boundary_space(sim::CoupledSimulation)
+
+Return the `ClimaCore.Field` over which the exchange fields are defined.
+"""
+function boundary_space(sim::CoupledSimulation)
+    return axes(sim.fields)
+end
+
+"""
+    ClimaComms.context(sim::CoupledSimulation)
+
+Return the `ClimaComms.context` associated to the simulation.
+"""
+function ClimaComms.context(sim::CoupledSimulation)
+    return ClimaComms.context(sim.fields)
+end
+
+"""
+    ClimaComms.device(sim::CoupledSimulation)
+
+Return the `ClimaComms.device` associated to the simulation.
+"""
+function ClimaComms.device(sim::CoupledSimulation)
+    return ClimaComms.device(sim.fields)
+end
+
 
 end # module

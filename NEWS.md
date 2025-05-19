@@ -13,6 +13,7 @@ Including:
 - Remove `F_radiative` from `add_coupler_fields` since it's a default
 - Remove atmosphere `get_field` method for `thermo_state_int`, since it's now constructed on the boundary space
 - Update Interfacer docs
+- `comms_ctx` and `boundary_space` are no longer in the `CoupledSimulation` object. Use accessor functions instead.
 
 #### Construct thermo states from exchanged T, q, ρ. PR[#1293](https://github.com/CliMA/ClimaCoupler.jl/pull/1293)
 

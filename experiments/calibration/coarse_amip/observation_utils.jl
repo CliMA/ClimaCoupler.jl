@@ -51,7 +51,8 @@ function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
     # TOA net radiative flux
     net_rad = rlut + rsut - rsdt
     # cloud radiative effect
-    cre = rsut + rlut - rsutcs - rlutcs
+    sw_cre = rsut - rsutcs
+    lw_cre = rlut - rlutcs
     pr = resample(rad_and_pr_obs_dict["pr"](start_date))
     # ta = resample(era5_outputvar(joinpath(obs_dir, "era5_monthly_avg_pressure_level_t.nc")))
     ts = resample(
@@ -72,7 +73,7 @@ function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
     iwp = window(iwp, "latitude"; left = -60, right = 60)
     iwp = replace(iwp, NaN => NaNStatistics.nanmean(iwp.data))
 
-    return (; net_rad, cre, rlut, rsut, rsutcs, rlutcs, rsdt, pr, ts, lwp, iwp)
+    return (; net_rad, sw_cre, lw_cre, rlut, rsut, rsutcs, rlutcs, rsdt, pr, ts, lwp, iwp)
 end
 
 # The ERA5 pressure range is not as large as the ClimaAtmos default pressure levels,
@@ -194,10 +195,11 @@ end
 Given a NamedTuple, produce a vector of `EKP.Observation`s, where each observation
 consists of seasonally averaged fields, with the exception of globally averaged yearly radiative balance
 """
-function create_observation_vector(nt,year_range = 1:17)
+function create_observation_vector(nt, year_range = 1:17)
     rsut = window(nt.rsut, "time"; left = first_year_start_date)
     rlut = window(nt.rlut, "time"; left = first_year_start_date)
-    cre = window(nt.cre, "time"; left = first_year_start_date)
+    sw_cre = window(nt.sw_cre, "time"; left = first_year_start_date)
+    lw_cre = window(nt.lw_cre, "time"; left = first_year_start_date)
 
     ts = window(nt.ts, "time"; left = first_year_start_date)
     pr = window(nt.pr, "time"; left = first_year_start_date)
@@ -216,13 +218,25 @@ function create_observation_vector(nt,year_range = 1:17)
 
         rsut_obs = make_single_year_of_seasonal_observations(rsut, yr)
         rlut_obs = make_single_year_of_seasonal_observations(rlut, yr)
-        cre_obs = make_single_year_of_seasonal_observations(cre, yr)
+        sw_cre_obs = make_single_year_of_seasonal_observations(sw_cre, yr)
+        lw_cre_obs = make_single_year_of_seasonal_observations(lw_cre, yr)
+
         pr_obs = make_single_year_of_seasonal_observations(pr, yr)
         ts_obs = make_single_year_of_seasonal_observations(ts, yr)
         lwp_obs = make_single_year_of_seasonal_observations(lwp, yr)
         iwp_obs = make_single_year_of_seasonal_observations(iwp, yr)
 
-        return EKP.combine_observations([net_rad_obs, cre_obs, rsut_obs, rlut_obs, pr_obs, ts_obs, lwp_obs])
+        return EKP.combine_observations([
+            net_rad_obs,
+            sw_cre_obs,
+            lw_cre_obs,
+            rsut_obs,
+            rlut_obs,
+            pr_obs,
+            ts_obs,
+            lwp_obs,
+            iwp_obs,
+        ])
     end
 
     return all_observations # NOT an EKP.ObservationSeries

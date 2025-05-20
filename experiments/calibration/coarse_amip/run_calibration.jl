@@ -6,20 +6,36 @@ import ClimaAnalysis: SimDir, get, slice
 import ClimaComms
 import ClimaCoupler
 using EnsembleKalmanProcesses.ParameterDistributions
+using Distributions
 import EnsembleKalmanProcesses as EKP
 import JLD2
 
 include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_map.jl"))
-
 experiment_dir = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/")
 model_interface = joinpath(experiment_dir, "coarse_amip", "model_interface.jl")
+
 # Experiment Configuration
 output_dir = "experiments/calibration/coarse_amip/output"
 n_iterations = 9
+
+# Prior distribution 
+
+# constrained_gaussian(
+#     "entr_param_vec",
+#     [20.8, -11.6, -21.5, 16.5, -5.1, 0.024],
+#     [5.0, 5.0, 5.0, 5.0, 5.0, 0.003],
+#     [0.0, -30.0, -40.0, 0, -20, 0.0],
+#     [40., 5, 0, 40, 15, 0.1],
+# ),
+# Vector of (mean, stdev) for vector parameter `entr_param_vec`
+vec_distributions = [(20.8, 5.0), (-11.6, 5.0), (-21.5, 5.0), (16.5, 5.0), (-5.1, 5.0), (0.024, 0.003)]
+vec_distributions = map(x -> Normal(x...), vec_distributions)
+vec_constraints = [(0.0, 40.0), (-30.0, 5), (-40, 0), (0, 40), (-20, 15), (0.0, 0.1)]
+vec_constraints = map(x -> bounded(x...), vec_constraints)
 priors = [
-    constrained_gaussian("liquid_cloud_effective_radius", 14e-6, 6e-6, 2.5e-6, 21.5e-6),
-    constrained_gaussian("ice_cloud_effective_radius", 25e-6, 6e-6, 2.5e-6, 33e-6),
-    # constrained_gaussian("precipitation_timescale", 600, 400, 0, 1200),
+    ParameterDistribution(VectorOfParameterized(vec_distributions), vec_constraints, "entr_param_vec"),
+    constrained_gaussian("entr_mult_limiter_coeff", 1.09, 0.2, 0.0, 2.0),
+    constrained_gaussian("EDMF_surface_area", 0.075, 0.02, 0.05, 0.1),
 ]
 prior = combine_distributions(priors)
 observation_path = joinpath(experiment_dir, "observations.jld2")

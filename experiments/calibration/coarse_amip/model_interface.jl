@@ -5,10 +5,10 @@ import EnsembleKalmanProcesses as EKP
 ENV["CLIMACOMMS_DEVICE"] = "CUDA"
 import JLD2
 include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.jl"))
+const config_file = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "coarse_amip", "model_config.yml")
 
 function ClimaCalibrate.forward_model(iter, member)
 
-    config_file = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "coarse_amip", "model_config.yml")
     config_dict = get_coupler_config_dict(config_file)
 
     output_dir_root = config_dict["coupler_output_dir"]
@@ -45,4 +45,19 @@ function minibatch_to_start_date(batch)
     start_year = minimum(batch) + 2001
     @assert start_year >= 2002
     return "$(start_year)0901"
+end
+
+import ClimaCore: Spaces
+CS() = CoupledSimulation(config_file)
+
+function get_resample_func()
+    cs = CS()
+    center_space = cs.model_sims.atmos_sim.domain.center_space
+    (lon_nlevels, lat_nlevels, z_nlevels) = ClimaDiagnostics.Writers.default_num_points(center_space)
+    longitudes = range(-180, 180, lon_nlevels)
+    latitudes = range(-90, 90, lat_nlevels)
+    stretch = center_space.grid.vertical_grid.topology.mesh.stretch
+    # TODO: account for stretch for 3D variables and interpolate to pressure?
+    z_levels = range(dz_bottom, Spaces.z_max(center_space), z_nlevels)
+    return var -> resampled_to(var; lon = longitudes, lat = latitudes)
 end

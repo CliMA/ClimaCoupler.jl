@@ -30,7 +30,6 @@ function ClimaCalibrate.observation_map(iteration)
     return G_ensemble
 end
 
-
 function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, iteration)
     try
         plot_output_path = ClimaCalibrate.path_to_iteration(output_dir, iteration)
@@ -60,35 +59,47 @@ end
 
 # Process a single ensemble member's data into a vector
 function process_member_data(simdir::SimDir, current_minibatch)
-    rsdt = preprocess_diagnostic_monthly_averages(simdir, "rsdt")
-    rsut = preprocess_diagnostic_monthly_averages(simdir, "rsut")
-    rlut = preprocess_diagnostic_monthly_averages(simdir, "rlut")
-    rsutcs = preprocess_diagnostic_monthly_averages(simdir, "rsutcs")
-    rlutcs = preprocess_diagnostic_monthly_averages(simdir, "rlutcs")
+    # Define standard diagnostic fields to preprocess
+    diagnostic_var_names = ["rsdt", "rsut", "rlut", "rsutcs", "rlutcs", "pr", "ts", "lwp", "clivi"]
 
-    net_rad = rlut + rsut - rsdt |> average_lat |> average_lon |> get_yearly_averages
-    pr = preprocess_diagnostic_monthly_averages(simdir, "pr")
-    ts = preprocess_diagnostic_monthly_averages(simdir, "ts")
-    lwp = preprocess_diagnostic_monthly_averages(simdir, "lwp")
-    lwp = window(lwp, "latitude"; left = -60, right = 60)
-
-    iwp = preprocess_diagnostic_monthly_averages(simdir, "clivi")
-    iwp = window(iwp, "latitude"; left = -60, right = 60)
-
-    year_observations = map(1:length(current_minibatch)) do yr
-        rsut_yr = year_of_seasonal_averages(rsut, yr)
-        rlut_yr = year_of_seasonal_averages(rlut, yr)
-        # This needs to be averaged over lat, lon, and seasons
-        sw_cre_yr = year_of_seasonal_averages(rsut - rsutcs, yr)
-        lw_cre_yr = year_of_seasonal_averages(rlut - rlutcs, yr)
-
-        pr_yr = year_of_seasonal_averages(pr, yr)
-        ts_yr = year_of_seasonal_averages(ts, yr)
-        lwp_yr = year_of_seasonal_averages(lwp, yr)
-        iwp_yr = year_of_seasonal_averages(iwp, yr)
-
-        return vcat([vec(net_rad[yr]), sw_cre_yr, lw_cre_yr, rsut_yr, rlut_yr, pr_yr, ts_yr, lwp_yr, iwp_yr]...)
+    # Preprocess all diagnostic fields
+    processed_data = Dict{String, Any}()
+    for name in diagnostic_var_names
+        processed_data[name] = preprocess_diagnostic_monthly_averages(simdir, name)
     end
+
+    # Calculate derived fields
+    processed_data["sw_cre"] = processed_data["rsut"] - processed_data["rsutcs"]
+    processed_data["lw_cre"] = processed_data["rlut"] - processed_data["rlutcs"]
+    processed_data["net_rad"] =
+        processed_data["rlut"] + processed_data["rsut"] - processed_data["rsdt"] |>
+        average_lat |>
+        average_lon
+
+
+    # Apply latitude window to IWP/LWP
+    processed_data["iwp"] = processed_data["clivi"]
+    for field in ["lwp", "iwp"]
+        processed_data[field] = window(processed_data[field], "latitude"; left = -60, right = 60)
+    end
+
+    # Fields to include in yearly processing (order matters for final concatenation)
+    seasonal_vars = ["rsut", "rlut", "sw_cre", "lw_cre", "ts","pr", "lwp", "iwp"]
+    year_range = 2003:(2003 + length(current_minibatch) - 1)
+
+    year_observations = map(year_range) do yr
+        # Handle net_rad separately first
+        net_rad = seasonally_aligned_yearly_average(processed_data["net_rad"], yr).data
+
+        # Process seasonal data consistently
+        seasonal_data = map(seasonal_vars) do var
+            year_averages = year_of_seasonal_averages(processed_data[var], yr)
+            flatten_seasonal_averages(year_averages)
+        end
+
+        return vcat(net_rad, seasonal_data...)
+    end
+
     return vcat(year_observations...)
 end
 

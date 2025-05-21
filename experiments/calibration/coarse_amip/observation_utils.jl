@@ -78,116 +78,88 @@ end
 
 # The ERA5 pressure range is not as large as the ClimaAtmos default pressure levels,
 # so we need to limit outputvars to the ERA5 pressure range (100.0 - 100_000.0 Pa) 
-function limit_pressure_dim_to_era5_range(diagnostic_var3d)
-    @assert has_pressure(diagnostic_var3d)
-    era5_pressure_min = 100.0
-    era5_pressure_max = 100_000.0
-    pressure_dims = diagnostic_var3d.dims[pressure_name(diagnostic_var3d)]
+limit_pressure_dim_to_era5_range(v) = limit_pressure_dim(v, 100.0, 100_000.0)
+
+function limit_pressure_dim(output_var, min_pressure, max_pressure)
+    @assert has_pressure(output_var)
+    pressure_dims = output_var.dims[pressure_name(output_var)]
     valid_pressure_levels = filter(pressure_dims) do pressure
-        era5_pressure_min <= pressure <= era5_pressure_max
+        min_pressure <= pressure <= max_pressure
     end
     lowest_valid_level = minimum(valid_pressure_levels)
     highest_valid_level = maximum(valid_pressure_levels)
 
-    return window(diagnostic_var3d, "pfull"; left = lowest_valid_level, right = highest_valid_level)
+    return window(output_var, "pfull"; left = lowest_valid_level, right = highest_valid_level)
 end
-
-#####
-# Processing to create EKP.ObservationSeries
-#####
 
 get_monthly_averages(simdir, var_name) = get(simdir; short_name = var_name, reduction = "average", period = "1M")
 
-function get_yearly_averages(var)
-    # Get seasonal averages
-    seasonal_avgs = average_time.(split_by_season_across_time(var))
-    nyears = fld(length(seasonal_avgs), 4)
-    matrices = getproperty.(seasonal_avgs, :data)
-    year_averaged_matrices = map(1:nyears) do i
-        start_idx = (i - 1) * 4 + 1
-        end_idx = i * 4
-        group = matrices[start_idx:end_idx]
+"""
+    seasonally_aligned_yearly_average(var, yr)
 
-        # Compute the average matrix for this group
-        averaged_matrix = sum(group) / 4
-        averaged_matrix
-    end
-    return year_averaged_matrices
+Return the yearly average of `var` for the specified year `yr`, using a seasonal 
+alignment from December of the previous year to November of the given year.
+"""
+function seasonally_aligned_yearly_average(var, yr)
+    year_window = window(var, "time"; left = DateTime(yr - 1, 12, 1), right = DateTime(yr, 11, 30))
+    return average_time(year_window)
 end
 
-function get_seasonal_covariance(output_var; model_error_scale = nothing, regularization = nothing)
-    # Split by season
-    seasons = split_by_season(output_var)
+"""
+    get_seasonal_covariance(output_var; model_error_scale = nothing, regularization = nothing)
 
-    # Calculate temporal variance of seasonal averages
-    variances_per_season = map(seasons) do season
-        # Average each season over its months to get one value per year
-        season_across_time = split_by_season_across_time(season)
-        season_across_time = filter(!isempty, season_across_time)
-        seasonal_means_per_year = average_time.(season_across_time)
-        dims = ["longitude", "latitude"]
-        has_pressure(season) && push!(dims, "pressure")
-        seasonal_means_per_year = permutedims.(seasonal_means_per_year, Ref(dims))
-        # Concatenate the outputvars into a matrix
-        seasonal_means_per_year_matrix = cat(getproperty.(seasonal_means_per_year, :data)..., dims = 3)
-        time_mean_over_years = mean(seasonal_means_per_year_matrix, dims = 3)
-        # Take variance over time of the seasonal means
-        variance = var(seasonal_means_per_year_matrix, dims = 3)
-        # Add model error if applicable
+Computes the diagonal covariance matrix of seasonal averages of `output_var`.
+
+# Arguments
+- `output_var`: Climate variable data (OutputVar or similar)
+- `model_error_scale`: Optional scaling factor for model error, applied as a fraction of the mean
+- `regularization`: Optional regularization term added to variance values
+"""
+function get_seasonal_covariance(output_var; model_error_scale = nothing, regularization = nothing)
+    seasonal_averages = average_season_across_time(output_var)
+    variance_per_season = map(split_by_season(seasonal_averages)) do season
+        variance = flatten(variance_time(season)).data
         if !isnothing(model_error_scale)
-            @. variance += (model_error_scale * time_mean_over_years)^2
+            variance .+= (model_error_scale .* flatten(average_time(season)).data) .^ 2
         end
         return variance
     end
-
-    diag_cov = vcat(vec.(variances_per_season)...)
-
-    # Add regularization if applicable
-    if !isnothing(regularization)
-        diag_cov .+= regularization
-    end
-
+    diag_cov = vcat(variance_per_season...)
+    !isnothing(regularization) && (diag_cov .+= regularization)
     return Diagonal(diag_cov)
 end
 
-# Given a year, return the indices of that year within a seasonal array
-# Assume each year has 4 seasons and starts at index % 4 == 1
-function get_year_indices(year)
-    start_index = (year * 4) - 3
-    end_index = year * 4
-    return start_index:end_index
-end
+"""
+    year_of_seasonal_averages(output_var, yr)
 
-# Todo: use dates instead of year indices
+Compute seasonal averages for a specific year `yr` from the `output_var`.
+"""
 function year_of_seasonal_averages(output_var, yr)
-    year_ind = get_year_indices(yr)
-    seasons = split_by_season_across_time(output_var)
-    @debug long_name(output_var), dates.(seasons[year_ind])
-    # Average each season over its months
-    seasonal_means_per_year = average_time.(seasons)
-
-    # Ensure dimensions are consistent for all seasons
-    dims = ["longitude", "latitude"]
-    has_pressure(output_var) && push!(dims, "pressure")
-    seasonal_means_per_year = permutedims.(seasonal_means_per_year, Ref(dims))
-
-    # Get data for the specific year requested
-    year_seasonal_data = seasonal_means_per_year[year_ind]
-    seasons = map(x -> x.attributes["season"], year_seasonal_data)
-    @assert seasons == ["DJF", "MAM", "JJA", "SON"]
-    obs_vec = vcat(vec.(getproperty.(year_seasonal_data, :data))...)
-    @debug length(obs_vec)
-    return obs_vec
+    seasonal_averages = average_season_across_time(output_var)
+    season_and_years = map(ClimaAnalysis.Utils.find_season_and_year, dates(seasonal_averages))
+    indices = findall(s -> s[2] == yr, season_and_years)
+    isempty(indices) && error("No data found in $(long_name(output_var)) for the given year: $yr")
+    min_idx, max_idx = extrema(indices)
+    left = dates(seasonal_averages)[min_idx]
+    right = dates(seasonal_averages)[max_idx]
+    return window(seasonal_averages, "time"; left, right)
 end
 
-# Make an EKP.Observation of a single year of seasonal averages from an OutputVar
+"""
+    make_single_year_of_seasonal_observations(output_var, yr)
+
+Create an `EKP.Observation` for a specific year `yr` from the `output_var`.
+"""
 function make_single_year_of_seasonal_observations(output_var, yr)
-    # Split by season first to get 4 OutputVars per year
-    obs_vec = year_of_seasonal_averages(output_var, yr)
-    cov = get_seasonal_covariance(output_var; model_error_scale = 0.05, regularization = 1e-3)
+    seasonal_averages = year_of_seasonal_averages(output_var, yr)
+    # Split into four OutputVars to get the same format as the covariance matrix
+    obs_vec = flatten_seasonal_averages(seasonal_averages)
+    obs_cov = get_seasonal_covariance(output_var; model_error_scale = 0.05, regularization = 1e-3)
     name = get(output_var.attributes, "CF_name", get(output_var.attributes, "long_name", ""))
-    return EKP.Observation(obs_vec, cov, "$(yr)_$name")
+    return EKP.Observation(obs_vec, obs_cov, "$(yr)_$name")
 end
+
+flatten_seasonal_averages(seasonal_averages) = vcat(map(x -> flatten(x).data, split_by_season(seasonal_averages))...)
 
 """
     create_observation_vector(nt, yrs = 17)
@@ -195,54 +167,32 @@ end
 Given a NamedTuple, produce a vector of `EKP.Observation`s, where each observation
 consists of seasonally averaged fields, with the exception of globally averaged yearly radiative balance
 """
-function create_observation_vector(nt, year_range = 1:17)
-    rsut = window(nt.rsut, "time"; left = first_year_start_date)
-    rlut = window(nt.rlut, "time"; left = first_year_start_date)
-    sw_cre = window(nt.sw_cre, "time"; left = first_year_start_date)
-    lw_cre = window(nt.lw_cre, "time"; left = first_year_start_date)
+function create_observation_vector(nt, year_range = 2003:2019)
+    # Define standard fields to process (excluding net_rad for special handling)
+    seasonal_vars = [:rsut, :rlut, :sw_cre, :lw_cre, :ts, :pr, :lwp, :iwp]
 
-    ts = window(nt.ts, "time"; left = first_year_start_date)
-    pr = window(nt.pr, "time"; left = first_year_start_date)
-    lwp = window(nt.lwp, "time"; left = first_year_start_date)
-    iwp = window(nt.iwp, "time"; left = first_year_start_date)
+    # Create a dictionary of windowed data for each field (including net_rad)
+    all_fields = [seasonal_vars..., :net_rad]
+    windowed_data =
+        Dict(field => window(getproperty(nt, field), "time"; left = first_year_start_date) for field in all_fields)
 
-    # Compute yearly net radiative flux separately
-    net_rad = window(nt.net_rad, "time"; left = first_year_start_date) |> average_lat |> average_lon
-    net_rad = get_yearly_averages(net_rad)
-    net_rad_stdev = std(cat(net_rad..., dims = 3), dims = 3)
-    net_rad_covariance = Diagonal(vec(net_rad_stdev) .^ 2)
+    # Compute yearly net radiative flux separately (specific processing for net_rad)
+    net_rad = windowed_data[:net_rad] |> average_lat |> average_lon
+    net_rad_yearly_avgs = map(yr -> seasonally_aligned_yearly_average(net_rad, yr), year_range)
+    net_rad_variance = var(vcat(getproperty.(net_rad_yearly_avgs, :data)...))
 
     all_observations = map(year_range) do yr
         @info "Creating observations for year $yr"
-        net_rad_obs = EKP.Observation(vec(net_rad[yr]), net_rad_covariance, "$(yr)_net_rad")
 
-        rsut_obs = make_single_year_of_seasonal_observations(rsut, yr)
-        rlut_obs = make_single_year_of_seasonal_observations(rlut, yr)
-        sw_cre_obs = make_single_year_of_seasonal_observations(sw_cre, yr)
-        lw_cre_obs = make_single_year_of_seasonal_observations(lw_cre, yr)
+        # Special case for net_rad (direct data)
+        net_rad_data = seasonally_aligned_yearly_average(net_rad, yr).data[1]
+        net_rad_obs = EKP.Observation([net_rad_data], Diagonal([net_rad_variance]), "$(yr)_net_rad")
 
-        pr_obs = make_single_year_of_seasonal_observations(pr, yr)
-        ts_obs = make_single_year_of_seasonal_observations(ts, yr)
-        lwp_obs = make_single_year_of_seasonal_observations(lwp, yr)
-        iwp_obs = make_single_year_of_seasonal_observations(iwp, yr)
-
-        return EKP.combine_observations([
-            net_rad_obs,
-            sw_cre_obs,
-            lw_cre_obs,
-            rsut_obs,
-            rlut_obs,
-            pr_obs,
-            ts_obs,
-            lwp_obs,
-            iwp_obs,
-        ])
+        seasonal_observations = map(seasonal_vars) do var
+            make_single_year_of_seasonal_observations(windowed_data[var], yr)
+        end
+        return EKP.combine_observations([net_rad_obs, seasonal_observations...])
     end
 
     return all_observations # NOT an EKP.ObservationSeries
 end
-#= 
-possible issues
-- to_pressure_coordinates using wrong units (should be using Pa)
-- inconsistent flattening: OutputVar dimensions ordered differently before flattening, different methods of flattening
-=#

@@ -3,6 +3,7 @@ import ClimaOcean as CO
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms
 import Thermodynamics as TD
+import ClimaOcean.ECCO: download_dataset
 
 """
     OceananigansSimulation{SIM, A, OPROP, REMAP}
@@ -35,8 +36,19 @@ dispatch in coupling.
 Specific details about the complexity of the model
 can be found in the Oceananigans.jl documentation.
 """
-function OceananigansSimulation(area_fraction; output_dir, comms_ctx = ClimaComms.context())
+function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir, comms_ctx = ClimaComms.context())
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
+
+    use_ecco = start_date + Dates.Month(1) < stop_date
+    if use_ecco
+        # Retrieve ECCO data (monthly)
+        # (It requires username and password)
+        dates = range(start_date, step = Dates.Month(1), stop = stop_date)
+        ecco_temperature = CO.Metadata(:temperature; dates, dataset = CO.ECCO.ECCO4Monthly())
+        ecco_salinity = CO.Metadata(:salinity; dates, dataset = CO.ECCO.ECCO4Monthly())
+        download_dataset(ecco_temperature)
+        download_dataset(ecco_salinity)
+    end
 
     # Set up ocean grid (1 degree)
     resolution_points = (360, 160, 32)
@@ -62,14 +74,27 @@ function OceananigansSimulation(area_fraction; output_dir, comms_ctx = ClimaComm
 
     grid = OC.ImmersedBoundaryGrid(underlying_grid, OC.GridFittedBottom(bottom_height); active_cells_map = true)
 
+    if use_ecco
+        # When we use ecco data, the forcing takes care of everything, including
+        # the initial conditions
+        restoring_rate = 1 / (3 * 86400)
+        mask = CO.LinearlyTaperedPolarMask(southern = (-80, -70), northern = (70, 90), z = (z_faces[1], 0))
+
+        forcing_T = CO.DatasetRestoring(ecco_temperature, grid; mask, rate = restoring_rate)
+        forcing_S = CO.DatasetRestoring(ecco_salinity, grid; mask, rate = restoring_rate)
+        forcing = (T = forcing_T, S = forcing_S)
+    else
+        forcing = (;)
+    end
+
     # Create ocean simulation
-    ocean = CO.ocean_simulation(grid)
+    ocean = CO.ocean_simulation(grid; forcing)
 
-    # Set up initial conditions for temperature and salinity
-    T_init(λ, φ, z) = 30 * (1 - tanh((abs(φ) - 30) / 5)) / 2 + rand()
-    S_init(λ, φ, z) = 30 - 5e-3 * z + rand()
-    OC.set!(ocean.model, T = T_init, S = S_init)
-
+    if !use_ecco
+        T_init(λ, φ, z) = 30 * (1 - tanh((abs(φ) - 30) / 5)) / 2 + rand()
+        S_init(λ, φ, z) = 30 - 5e-3 * z + rand()
+        OC.set!(ocean.model, T = T_init, S = S_init)
+    end
 
     # TODO: Handle halos directly here instead of filling them later
     long_cc = OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center())

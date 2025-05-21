@@ -45,7 +45,7 @@ import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.Utils: period_to_seconds_float
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
-import ClimaUtilities.TimeManager: ITime
+import ClimaUtilities.TimeManager: ITime, date
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
 # Random is used by RRMTGP for some cloud properties
 import Random
@@ -327,7 +327,9 @@ function CoupledSimulation(config_dict::AbstractDict)
         ocean_fraction = FT(1) .- ice_fraction .- land_fraction
 
         if sim_mode <: CMIPMode
-            ocean_sim = OceananigansSimulation(ocean_fraction; output_dir = ocean_output_dir, comms_ctx)
+            stop_date = date(tspan[end] - tspan[begin])
+            ocean_sim =
+                OceananigansSimulation(ocean_fraction, start_date, stop_date; output_dir = ocean_output_dir, comms_ctx)
         else
             ocean_sim = PrescribedOceanSimulation(
                 FT,

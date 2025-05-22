@@ -5,11 +5,10 @@ dt_cpl: "120secs"
 dt_rad: "1hours"
 dt_save_state_to_disk: "20days"
 dt_save_to_sol: "10days"
-energy_check: false
-evolving_ocean: true
+energy_check: true
+evolving_ocean: false
 bucket_albedo_type: "function"
-mode_name: "slabplanet_aqua"
+mode_name: "slabplanet"
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "120days"
-use_land_diagnostics: false
+t_end: "90days"

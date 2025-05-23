@@ -23,7 +23,3 @@ end
 @safetestset "AMIP test" begin
     include("amip_test.jl")
 end
-
-@safetestset "Restart test" begin
-    include("restart.jl")
-end

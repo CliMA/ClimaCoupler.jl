@@ -99,8 +99,13 @@ steps:
           slurm_gres: "gpu:1"
           slurm_mem: 24GB
 
-  - group: "GPU: experiments/ClimaEarth/ unit tests and global bucket"
+  - group: "ClimaEarth tests"
     steps:
+      - label: "ClimaEarth runtests"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/runtests.jl"
+        agents:
+          slurm_mem: 16GB
+
       - label: "GPU ClimaEarth runtests"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/runtests.jl"
         env:
@@ -110,26 +115,27 @@ steps:
           slurm_gres: "gpu:1"
           slurm_mem: 32GB
 
-  - group: "ClimaEarth test"
-    steps:
-      - label: "ClimaEarth test"
-        key: "restarts"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/runtests.jl"
-        agents:
-          slurm_mem: 16GB
-
       - label: "MPI restarts"
         key: "mpi_restarts"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/restart.jl"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
-        timeout_in_minutes: 40
+        timeout_in_minutes: 50
         soft_fail:
           - exit_status: -1
           - exit_status: 255
         agents:
           slurm_ntasks: 2
-          slurm_mem: 32G
+          slurm_mem: 32GB
+
+      - label: "GPU restarts"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/restart.jl"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_ntasks: 1
+          slurm_gres: "gpu:1"
+          slurm_mem: 32GB
 
   - group: "Integration Tests"
     steps:

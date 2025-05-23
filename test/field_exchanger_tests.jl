@@ -135,10 +135,8 @@ for FT in (Float32, Float64)
 
         # Fill in only the necessary parts of the simulation
         cs = Interfacer.CoupledSimulation{FT}(
-            nothing, # comms_ctx
             nothing, # dates
-            test_space, # boundary_space
-            nothing, # fields
+            ones(test_space), # fields
             nothing, # conservation_checks
             (Int(0), Int(1000)), # tspan
             Int(200), # Δt_cpl
@@ -379,9 +377,7 @@ for FT in (Float32, Float64)
 
         # construct the CoupledSimulation object
         cs = Interfacer.CoupledSimulation{FT}(
-            nothing, # comms_ctx
             nothing, # start_date
-            boundary_space,
             coupler_fields,
             nothing, # conservation_checks
             nothing, # tspan

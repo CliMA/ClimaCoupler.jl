@@ -303,6 +303,7 @@ end
     ClimaCoupler.Interfacer.set_cache!
     ClimaCoupler.Interfacer.remap
     ClimaCoupler.Interfacer.remap!
+    ClimaCoupler.Interfacer.boundary_space
 ```
 
 ## Interfacer Internal Functions and Types

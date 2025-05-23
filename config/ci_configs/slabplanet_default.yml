@@ -8,7 +8,7 @@ mode_name: "slabplanet"
 moist: "equil"
 precip_model: "0M"
 rad: "gray"
-t_end: "10days"
+t_end: "1days"
 vert_diff: "true"
 output_default_diagnostics: false
 extra_atmos_diagnostics:

@@ -98,16 +98,25 @@ and includes diagnostic EDMF in the atmosphere. It is run on 1 GPU.
 
 This pipeline provides a set of simulations of increasing physical and computational complexity.
 
-The simplest setup is a `slabplanet_aqua` simulation, running an atmosphere model with a constant-temperature
-thermal slab ocean model as the only surface model, and
-with each model running independently
-(i.e. no flux exchange by the coupler). Complexity increases include
-evolving the surface model, adding in flux exchange, using multiple surface models,
-using more complex parameterizations (e.g. diagnostic EDMF), and increasing spatial resolution.
-Including these degrees of complexity one at a time allows us to track the stability of our
-coupled model across different setups.
+The simpler setups use the Slabplanet mode and check conservation of the system.
+These include a standalone atmosphere run (meant to provide a direct
+comparison to runs in ClimaAtmos.jl), an aquaplanet run (atmosphere and slab ocean),
+and a couple more complex runs.
 
-The resolutions of runs in this pipeline vary from 4 to 16 horizontal elements.
-The simplest simulations are only run on CPU, but some of the more complex
-simulations are run on GPU in addition to CPU.
+We also have a set of AMIP mode simulations, which run the atmosphere, slab ocean,
+prescribed sea ice, and either bucket or integrated land model. Unless stated otherwise,
+they are using the bucket land model. They also test a various complexities in the
+atmosphere configuration, which affects the stability and SYPD of the simulations, among
+other things.
 
+Next we have a set of CMIP simulations. These are similar to the AMIP simulations, but
+use the Oceananigans.jl ocean model instead of a slab ocean.
+
+Finally, we have a calibration longrun experiment, which exercises the calibration
+pipeline for the coupled system.
+
+The resolution of runs in this pipeline is typically 16 horizontal elements,
+unless otherwise specified. The slabplanet runs use 8 horizontal elements,
+and the high resolution DYAMOND run uses 60 horizontal elements.
+The simplest simulations are only run on CPU, but the more complex
+simulations are mostly run on GPU.

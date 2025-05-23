@@ -169,6 +169,20 @@ steps:
         agents:
           slurm_mem: 20GB
 
+      - label: "Slabplanet terra: atmos and bucket"
+        key: "slabplanet_terra"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_terra.yml --job_id slabplanet_terra"
+        artifact_paths: "experiments/ClimaEarth/output/slabplanet_terra/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "Slabplanet aqua: atmos and slab ocean"
+        key: "slabplanet_aqua"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_aqua.yml --job_id slabplanet_aqua"
+        artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
       # AMIP EXPERIMENTS
 
       # Test default behavior with no config file or job ID provided

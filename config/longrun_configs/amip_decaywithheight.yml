@@ -16,4 +16,5 @@ prescribe_ozone: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "1098days"
+turbconv: ~
 vert_diff: "DecayWithHeightDiffusion"

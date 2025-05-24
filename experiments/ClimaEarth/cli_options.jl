@@ -83,6 +83,10 @@ function argparse_settings()
         arg_type = String
         default = "20days"
         # Space information
+        "--h_elem"
+        help = "Number of horizontal elements to use for the boundary space [16 (default)]"
+        arg_type = Int
+        default = 16
         "--share_surface_space"
         help = "Boolean flag indicating whether to share the surface space between the surface models, atmosphere, and boundary [`true` (default), `false`]"
         arg_type = Bool

@@ -10,5 +10,5 @@ moist: "equil"
 precip_model: "0M"
 rad: "gray"
 share_surface_space: false
-t_end: "10days"
+t_end: "1days"
 vert_diff: "true"

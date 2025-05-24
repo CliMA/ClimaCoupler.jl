@@ -10,5 +10,5 @@ moist: "dry"
 output_default_diagnostics: false
 precip_model: nothing
 rad: nothing
-t_end: "10days"
+t_end: "1days"
 vert_diff: "true"

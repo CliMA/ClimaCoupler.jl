@@ -214,25 +214,25 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     #=
     ### Boundary Space
-    We use a common `Space` for all global surfaces. This enables the MPI processes to operate on the same columns in both
-    the atmospheric and surface components, so exchanges are parallelized. Note this is only possible when the
-    atmosphere and surface are of the same horizontal resolution.
+    We use a 2D boundary space at the surface for coupling operations.
+    The boundary space is used to remap exchanged fields and compute fluxes between component models.
 
-    Currently, we use the 2D surface space from the atmosphere model as our shared space,
-    but ultimately we want this to specified within the coupler and passed to all component models. (see issue #665)
+    We currently have two options for the boundary space:
+    - `share_surface_space: true`: If `true`, we use the horizontal space of the atmosphere model as the boundary space.
+      This is useful when the atmosphere and surface models are of the same resolution;
+      this case makes remapping trivial, as the coupler can directly exchange fields and fluxes.
+    - `share_surface_space: false`: If `false`, we create a boundary space independent of the component models,
+      using the `ClimaCommonSpaces.CubedSphereSpace` constructor. This is useful when the
+      atmosphere and surface models are of different resolutions or grid types. In this case,
+      we need to remap exchanged fields and fluxes between component and boundary spaces.
     =#
 
     ## init a 2D boundary space at the surface
-    # TODO get radius from ClimaParams
-    # toml_dict = CP.create_toml_dict(FT, override_file=parameter_files[1])
-    # (; radius) = CP.get_parameter_values(toml_dict, "planet_radius")
     if share_surface_space
         boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
     else
         h_elem = config_dict["h_elem"]
-        n_quad_points = CC.Spaces.Quadratures.polynomial_degree(
-            CC.Spaces.quadrature_style(CC.Spaces.horizontal_space(atmos_sim.domain.face_space)),
-        )
+        n_quad_points = 4
         boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points, h_elem)
     end
 

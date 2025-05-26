@@ -4,9 +4,9 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_diagedmf_0M.yml"
 checkpoint_dt: "300days"
 coupler_toml: ["toml/amip_target_topo_diagedmf.toml"]
-dt: "120secs"
+dt: "90secs"
 dt_cloud_fraction: "1hours"
-dt_cpl: "120secs"
+dt_cpl: "90secs"
 dt_rad: "1hours"
 dt_save_state_to_disk: "20days"
 energy_check: false

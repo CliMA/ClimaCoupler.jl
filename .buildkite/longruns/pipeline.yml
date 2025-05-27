@@ -59,56 +59,31 @@ steps:
     steps:
       - label: "ClimaAtmos standalone: aquaplanet, allsky rad, TV insol, 0M"
         key: "longrun_aquaplanet_allsky_tvinsol_0M_slabocean" # tests atmosphere driver, can compare to ClimaAtmos.jl longruns
-        command:
-          - srun julia --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $CONFIG_PATH/longrun_aquaplanet_allsky_tvinsol_0M_slabocean.yml --job_id longrun_aquaplanet_allsky_tvinsol_0M_slabocean
-        artifact_paths: "longrun_aquaplanet_allsky_tvinsol_0M_slabocean/*"
-        env:
-          BUILD_HISTORY_HANDLE: ""
-          CLIMACOMMS_CONTEXT: "MPI"
+        command: "julia --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $CONFIG_PATH/longrun_aquaplanet_allsky_tvinsol_0M_slabocean.yml --job_id longrun_aquaplanet_allsky_tvinsol_0M_slabocean"
+        artifact_paths: "experiments/ClimaEarth/output/longrun_aquaplanet_allsky_tvinsol_0M_slabocean/artifacts/*"
         agents:
-          slurm_ntasks_per_node: 16
-          slurm_nodes: 4
-          slurm_mem_per_cpu: 16G
-          slurm_reservation: "false"
+          slurm_mem: 20GB
 
       - label: "Slabplanet aqua: evolving slab ocean"
         key: "slabplanet_aqua_evolve_ocean"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_aqua_evolve_ocean.yml --job_id slabplanet_aqua_evolve_ocean"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_aqua_evolve_ocean.yml --job_id slabplanet_aqua_evolve_ocean"
         artifact_paths: "experiments/ClimaEarth/output/slabplanet_aqua_evolve_ocean/artifacts/*"
-        env:
-          CLIMACOMMS_CONTEXT: "MPI"
-          BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks_per_node: 16
-          slurm_nodes: 4
-          slurm_mem_per_cpu: 16G
-          slurm_reservation: "false"
+          slurm_mem: 32GB
 
       - label: "Slabplanet: fixed ocean T, bucket"
         key: "slabplanet_fixed_ocean"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_fixed_ocean.yml --job_id slabplanet_fixed_ocean"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_fixed_ocean.yml --job_id slabplanet_fixed_ocean"
         artifact_paths: "experiments/ClimaEarth/output/slabplanet_fixed_ocean/artifacts/*"
-        env:
-          CLIMACOMMS_CONTEXT: "MPI"
-          BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks_per_node: 16
-          slurm_nodes: 4
-          slurm_mem_per_cpu: 16G
-          slurm_reservation: "false"
+          slurm_mem: 32GB
 
       - label: "Slabplanet: evolving slab ocean, bucket"
         key: "slabplanet_evolve_ocean"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_evolve_ocean.yml --job_id slabplanet_evolve_ocean"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_evolve_ocean.yml --job_id slabplanet_evolve_ocean"
         artifact_paths: "experiments/ClimaEarth/output/slabplanet_evolve_ocean/artifacts/*"
-        env:
-          CLIMACOMMS_CONTEXT: "MPI"
-          BUILD_HISTORY_HANDLE: ""
         agents:
-          slurm_ntasks_per_node: 16
-          slurm_nodes: 4
-          slurm_mem_per_cpu: 16G
-          slurm_reservation: "false"
+          slurm_mem: 32GB
 
   - group: "AMIP simulations"
 

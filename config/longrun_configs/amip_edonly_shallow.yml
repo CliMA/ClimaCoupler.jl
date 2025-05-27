@@ -1,7 +1,7 @@
 FLOAT_TYPE: "Float32"
 aerosol_radiation: true
-deep_atmosphere: true
-mesh_warp_type: "Linear"
+deep_atmosphere: false
+mesh_warp_type: "SLEVE"
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_0M.yml"
 co2_model: "maunaloa"
 dt: "120secs"

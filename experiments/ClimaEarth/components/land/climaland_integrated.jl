@@ -182,8 +182,8 @@ function ClimaLandSimulation(
     @. p.T_sfc = orog_adjusted_T_surface
 
     updateat = [promote(tspan[1]:dt:(tspan[2] + dt)...)...] # add an extra time at end in case sim steps over end
-    updatefunc = ClimaLand.make_update_drivers(ClimaLand.get_drivers(model))
-    driver_cb = ClimaLand.DriverUpdateCallback(updateat, updatefunc)
+    updatefunc = CL.make_update_drivers(CL.get_drivers(model))
+    driver_cb = CL.DriverUpdateCallback(updateat, updatefunc)
 
     exp_tendency! = CL.make_exp_tendency(model)
     imp_tendency! = CL.make_imp_tendency(model)

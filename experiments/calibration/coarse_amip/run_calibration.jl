@@ -36,6 +36,7 @@ priors = [
     ParameterDistribution(VectorOfParameterized(vec_distributions), vec_constraints, "entr_param_vec"),
     constrained_gaussian("entr_mult_limiter_coeff", 1.09, 0.2, 0.0, 2.0),
     constrained_gaussian("EDMF_surface_area", 0.075, 0.02, 0.05, 0.1),
+    constrained_gaussian("mixing_length_tke_surf_flux_coeff", 4, 1, 0, 8)
 ]
 prior = combine_distributions(priors)
 observation_path = joinpath(experiment_dir, "observations.jld2")
@@ -58,6 +59,6 @@ eki = EKP.EnsembleKalmanProcess(observation_series, EKP.TransformUnscented(prior
 ensemble_size = EKP.get_N_ens(eki)
 
 # Slurm resources for a single model run
-hpc_kwargs = CAL.kwargs(time = 60 * 15, ntasks = 2, gpus_per_task = 1, cpus_per_task = 4, partition = "a3")
+hpc_kwargs = CAL.kwargs(time = 60 * 15, ntasks = 1, gpus_per_task = 1, cpus_per_task = 4, partition = "a3")
 exeflags = "--threads=4"
 eki = CAL.calibrate(CAL.GCPBackend, eki, n_iterations, prior, output_dir; model_interface, hpc_kwargs, exeflags)

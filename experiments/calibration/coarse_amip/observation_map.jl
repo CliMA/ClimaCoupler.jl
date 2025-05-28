@@ -27,6 +27,10 @@ function ClimaCalibrate.observation_map(iteration)
             G_ensemble[:, m] .= NaN
         end
     end
+    total_elements = length(G_ensemble)
+    nan_count = count(isnan, G_ensemble)
+    # Check for 50% nans
+    @assert nan_count < total_elements / 2
     return G_ensemble
 end
 
@@ -72,9 +76,7 @@ function process_member_data(simdir::SimDir, current_minibatch)
     processed_data["sw_cre"] = processed_data["rsut"] - processed_data["rsutcs"]
     processed_data["lw_cre"] = processed_data["rlut"] - processed_data["rlutcs"]
     processed_data["net_rad"] =
-        processed_data["rlut"] + processed_data["rsut"] - processed_data["rsdt"] |>
-        average_lat |>
-        average_lon
+        processed_data["rlut"] + processed_data["rsut"] - processed_data["rsdt"] |> average_lat |> average_lon
 
 
     # Apply latitude window to IWP/LWP
@@ -84,8 +86,9 @@ function process_member_data(simdir::SimDir, current_minibatch)
     end
 
     # Fields to include in yearly processing (order matters for final concatenation)
-    seasonal_vars = ["rsut", "rlut", "sw_cre", "lw_cre", "ts","pr", "lwp", "iwp"]
-    year_range = 2003:(2003 + length(current_minibatch) - 1)
+    seasonal_vars = ["rsut", "rlut", "sw_cre", "lw_cre", "ts", "pr", "lwp", "iwp"]
+    start_year = minimum(current_minibatch) + 2002
+    year_range = (start_year):(start_year + length(current_minibatch) - 1)
 
     year_observations = map(year_range) do yr
         # Handle net_rad separately first

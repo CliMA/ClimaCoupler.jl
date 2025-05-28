@@ -79,9 +79,9 @@ function argparse_settings()
         arg_type = String
         default = "10days"
         "--checkpoint_dt"
-        help = "Time interval for checkpointing [\"20days\" (default)]"
+        help = "Time interval for checkpointing [\"90days\" (default)]"
         arg_type = String
-        default = "20days"
+        default = "90days"
         # Space information
         "--h_elem"
         help = "Number of horizontal elements to use for the boundary space [16 (default)]"

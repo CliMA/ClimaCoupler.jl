@@ -1,7 +1,7 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
-checkpoint_dt: "720hours"
+checkpoint_dt: "12months"
 coupler_toml: ["toml/amip.toml"]
 dt: "240secs"
 dt_cpl: "240secs"

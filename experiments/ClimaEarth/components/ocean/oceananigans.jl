@@ -97,7 +97,6 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
         OC.set!(ocean.model, T = T_init, S = S_init)
     end
 
-    # TODO: Handle halos directly here instead of filling them later
     long_cc = OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center())
     lat_cc = OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center())
 
@@ -118,13 +117,16 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
     if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
         # TODO: Add more diagnostics, make them dependent on simulation duration, take
         # monthly averages
-        diagnostics = Dict("T" => ocean.model.tracers.T)
+        # Save all tracers and velocities to a NetCDF file at daily frequency
+        outputs = merge(ocean.model.tracers, ocean.model.velocities)
         netcdf_writer = OC.NetCDFWriter(
             ocean.model,
-            diagnostics,
-            indices = (:, :, grid.Nz),
+            outputs;
+            schedule = OC.TimeInterval(86400), # Daily output
             filename = joinpath(output_dir, "ocean_diagnostics.nc"),
-            schedule = OC.TimeInterval(86400),
+            indices = (:, :, grid.Nz),
+            overwrite_existing = true,
+            array_type = Array{Float32},
         )
         ocean.output_writers[:diagnostics] = netcdf_writer
     end

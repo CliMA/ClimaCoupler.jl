@@ -181,13 +181,12 @@ for the following properties:
 
 | Coupler name        | Description                                                    | Units   |
 |---------------------+----------------------------------------------------------------+---------|
-| `cos_zenith`        | cosine of the zenith angle                                     |         |
 | `co2`               | global mean co2                                                | ppm     |
 | `diffuse_fraction`  | fraction of downwards shortwave flux that is direct            |         |
 | `LW_d`              | downwards longwave flux                                        | W m⁻²   |
 | `SW_d`              | downwards shortwave flux                                       | W m⁻²   |
 
-Note that `cos_zenith`, `co2`, `diffuse_fraction`, `LW_d` and
+Note that `co2`, `diffuse_fraction`, `LW_d` and
 `SW_d` will not be present in a `ClimaAtmosSimulation` if the model is setup with no radiation.
 Because of this, a `ClimaAtmosSimulation` must have radiation if running with the full `ClimaLand` model.
 

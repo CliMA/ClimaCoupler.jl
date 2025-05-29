@@ -23,7 +23,7 @@ steps:
 
       - echo "--- Instantiate AMIP env"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\")'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
 
@@ -40,12 +40,10 @@ steps:
 
       - echo "--- Instantiate AMIP env"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\"); Pkg.add(\"CUDA\")'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
 
-      - echo "--- Instantiate calibration env"
-      - "julia --project=experiments/calibration/ -e 'using Pkg; Pkg.instantiate(;verbose=true); Pkg.develop(;path=\".\")'"
     agents:
       queue: clima
     env:
@@ -252,7 +250,7 @@ steps:
       - label: "Perfect model calibration test"
         key: "amip_pm_calibration"
         command:
-          - "julia --color=yes --project=experiments/calibration/ experiments/calibration/run_calibration.jl"
+          - "julia --color=yes --project=experiments/ClimaEarth experiments/calibration/run_calibration.jl"
         artifact_paths: "experiments/calibration/output/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"

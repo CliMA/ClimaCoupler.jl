@@ -46,13 +46,28 @@ abstract type AbstractSimulation{FT} end
     CoupledSimulation
 Stores information needed to run a simulation with the coupler.
 """
-struct CoupledSimulation{FT <: Real, D, FV, E, TS, DTI, TT, NTMS <: NamedTuple, CALLBACKS, NTP <: NamedTuple, TP, DH}
+struct CoupledSimulation{
+    FT <: Real,
+    D,
+    FV,
+    E,
+    TS,
+    DTI,
+    TT,
+    CTT,
+    NTMS <: NamedTuple,
+    CALLBACKS,
+    NTP <: NamedTuple,
+    TP,
+    DH,
+}
     start_date::D
     fields::FV
     conservation_checks::E
     tspan::TS
     Δt_cpl::DTI
     t::TT
+    prev_checkpoint_t::CTT
     model_sims::NTMS
     callbacks::CALLBACKS
     dirs::NTP
@@ -63,7 +78,7 @@ end
 CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args)...}(args...)
 
 function Base.show(io::IO, sim::CoupledSimulation)
-    device_type = nameof(typeof(ClimaComms.device(sim.comms_ctx)))
+    device_type = nameof(typeof(ClimaComms.device(sim)))
     return print(
         io,
         "Coupled Simulation\n",

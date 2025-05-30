@@ -2,8 +2,6 @@ aerosol_radiation: true
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_dyamond.yml"
 dt: "30secs"
 dt_cpl: "30secs"
-dt_save_state_to_disk: "0.5days"
-dt_save_to_sol: "0.5days"
 energy_check: false
 bucket_albedo_type: "map_temporal"
 mode_name: "amip"

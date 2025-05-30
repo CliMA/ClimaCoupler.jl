@@ -3,7 +3,6 @@ co2_model: "maunaloa"
 dt: "150secs"
 dt_cpl: "150secs"
 dt_rad: "1hours"
-dt_save_to_sol: "1days"
 dz_bottom: 30
 dz_top: 3000
 energy_check: false

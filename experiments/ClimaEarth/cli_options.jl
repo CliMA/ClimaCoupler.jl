@@ -74,10 +74,6 @@ function argparse_settings()
         "--dt_seaice"
         help = "Sea ice simulation time step (alternative to `dt`; no default) [allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Inf\"]"
         arg_type = String
-        "--dt_save_to_sol"
-        help = "Time interval for saving output [\"10days\" (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Inf\"]"
-        arg_type = String
-        default = "10days"
         "--checkpoint_dt"
         help = "Time interval for checkpointing [\"90days\" (default)]"
         arg_type = String

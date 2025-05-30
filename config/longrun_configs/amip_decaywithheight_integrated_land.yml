@@ -1,13 +1,12 @@
 FLOAT_TYPE: "Float32"
 aerosol_radiation: true
 atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_0M.yml"
-checkpoint_dt: "12months"
+checkpoint_dt: "93days"
 co2_model: "maunaloa"
 dt: "120secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: "120secs"
 dt_rad: "1hours"
-dt_save_state_to_disk: "20days"
 energy_check: false
 insolation: "timevarying"
 land_model: "integrated"

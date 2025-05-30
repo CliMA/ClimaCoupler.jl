@@ -4,8 +4,6 @@ dt: "120secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: "120secs"
 dt_rad: "1hours"
-dt_save_state_to_disk: "20days"
-dt_save_to_sol: "10days"
 energy_check: true
 evolving_ocean: true
 h_elem: 8

@@ -76,7 +76,7 @@ function get_coupler_args(config_dict::Dict)
     t_start = Float64(Utilities.time_to_seconds(config_dict["t_start"]))
     start_date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
     Δt_cpl = Float64(Utilities.time_to_seconds(config_dict["dt_cpl"]))
-    saveat = Float64(Utilities.time_to_seconds(config_dict["dt_save_to_sol"]))
+
     if use_itime
         t_end = ITime(t_end, epoch = start_date)
         t_start = ITime(t_start, epoch = start_date)
@@ -88,12 +88,8 @@ function get_coupler_args(config_dict::Dict)
     else
         component_dt_dict = config_dict["component_dt_dict"]
     end
-    if saveat != Inf
-        use_itime && (saveat = ITime(saveat))
-        saveat = [promote([t_start:saveat:t_end..., t_end]...)...]
-    else
-        saveat = typeof(t_start)[]
-    end
+    # Save solution to integrator.sol at the beginning and end
+    saveat = [t_start, t_end]
 
     # Space information
     share_surface_space = config_dict["share_surface_space"]

@@ -6,6 +6,13 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Remove `dt_save_state_to_disk` and `dt_save_to_sol` options
+
+`dt_save_state_to_disk` was unused and is removed from all configs in this
+commit. Note that ClimaAtmos does have an option with this name, but we
+pass `checkpoint_dt` to it. `dt_save_to_sol` is also removed as an option,
+in favor of using our more robust checkpointing infrastructure via `checkpoint_dt`.
+
 #### Misc. interface cleanup
 
 Including:

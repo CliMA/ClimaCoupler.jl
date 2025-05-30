@@ -123,10 +123,14 @@ function ClimaLandSimulation(
         CL.Soil.Runoff.TOPMODELRunoff{FT}(; f_over = f_over, f_max = spatially_varying_soil_params.f_max, R_sb = R_sb)
 
     Csom = CL.PrescribedSoilOrganicCarbon{FT}(TimeVaryingInput((t) -> 5))
-
     land_input = (
         atmos = CL.CoupledAtmosphere{FT}(surface_space),
-        radiation = CL.CoupledRadiativeFluxes{FT}(start_date, LP.insolation_parameters(earth_param_set)),
+        radiation = CL.CoupledRadiativeFluxes{FT}(
+            start_date;
+            insol_params = LP.insolation_parameters(earth_param_set),
+            latitude = ClimaCore.Fields.coordinate_field(domain.space.surface).lat,
+            longitude = ClimaCore.Fields.coordinate_field(domain.space.surface).long,
+        ),
         runoff = runoff_model,
         soil_organic_carbon = Csom,
     )

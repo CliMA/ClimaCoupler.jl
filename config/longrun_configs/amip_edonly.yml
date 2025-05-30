@@ -1,4 +1,5 @@
 FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
 aerosol_radiation: true
 deep_atmosphere: true
 mesh_warp_type: "Linear"
@@ -13,7 +14,8 @@ energy_check: false
 insolation: "timevarying"
 bucket_albedo_type: "map_temporal"
 mode_name: "amip"
-prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
+prescribed_aerosols: ["CB1", "CB2", "DST01", "DST02", "DST03", "DST04", "DST05", "OC1", "OC2", "SO4", "SSLT01", "SSLT02", "SSLT03", "SSLT04", "SSLT05"]
+surface_setup: "DefaultMoninObukhov"
 prescribe_ozone: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"

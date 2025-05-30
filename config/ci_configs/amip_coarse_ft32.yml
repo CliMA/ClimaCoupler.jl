@@ -1,8 +1,6 @@
 FLOAT_TYPE: "Float32"
 apply_limiter: false
 co2_model: "maunaloa"
-dt_save_state_to_disk: "Inf"
-dt_save_to_sol: "Inf"
 energy_check: false
 h_elem: 6
 mode_name: "amip"

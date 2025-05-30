@@ -5,7 +5,6 @@ dt_cpl: "150secs"
 dt_land: "50secs"
 dt_ocean: "30secs"
 dt_rad: "1hours"
-dt_save_to_sol: "1days"
 dt_seaice: "37.5secs"
 dz_bottom: 30
 dz_top: 3000

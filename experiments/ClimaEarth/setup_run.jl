@@ -534,7 +534,7 @@ function run!(cs::CoupledSimulation; precompile = (cs.tspan[end] > 2 * cs.Δt_cp
     @info "Starting coupling loop"
     walltime = ClimaComms.@elapsed cs.comms_ctx.device begin
         s = CA.@timed_str begin
-            while cs.t[] < cs.tspan[end]
+            while cs.t[] <= cs.tspan[end]
                 step!(cs)
             end
         end

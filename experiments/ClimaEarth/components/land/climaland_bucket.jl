@@ -19,7 +19,7 @@ include("../shared/restore.jl")
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###
 """
-    BucketSimulation{M, I, A}
+    BucketSimulation{M, I, A, OW}
 
 The bucket model simulation object.
 
@@ -28,13 +28,20 @@ It contains the following objects:
 - `integrator::I`: The integrator used in timestepping this model.
 - `area_fraction::A`: A ClimaCore Field on the boundary space representing the surface area fraction of this component model.
 - `output_writer`: The diagnostic file writer.
+- `prev_checkpoint_t::TT`: The time of the most recent checkpoint, in seconds. -1 if no checkpoint has been taken yet.
 """
-struct BucketSimulation{M <: CL.Bucket.BucketModel, I <: SciMLBase.AbstractODEIntegrator, A <: CC.Fields.Field, OW} <:
-       Interfacer.LandModelSimulation
+struct BucketSimulation{
+    M <: CL.Bucket.BucketModel,
+    I <: SciMLBase.AbstractODEIntegrator,
+    A <: CC.Fields.Field,
+    OW,
+    TT <: Union{Float64, ITime},
+} <: Interfacer.LandModelSimulation
     model::M
     integrator::I
     area_fraction::A
     output_writer::OW
+    prev_checkpoint_t::TT
 end
 
 """
@@ -246,8 +253,9 @@ function BucketSimulation(
         adaptive = false,
         callback = SciMLBase.CallbackSet(diag_cb),
     )
+    prev_checkpoint_t = Ref(-1) # no checkpoint taken yet
 
-    return BucketSimulation(model, integrator, area_fraction, output_writer)
+    return BucketSimulation(model, integrator, area_fraction, output_writer, prev_checkpoint_t)
 end
 
 # extensions required by Interfacer

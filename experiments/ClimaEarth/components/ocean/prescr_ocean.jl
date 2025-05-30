@@ -32,9 +32,13 @@ The cache is expected to contain the following variables:
 - `thermo_params` (thermodynamic parameters)
 - `SST_timevaryinginput` (TimeVaryingInput object containing SST data)
 - `t` (the current time)
+
+The simulation also contains:
+- `prev_checkpoint_t::TT`: The time of the most recent checkpoint, in seconds. -1 if no checkpoint has been taken yet.
 """
-struct PrescribedOceanSimulation{C} <: Interfacer.AbstractSurfaceStub
+struct PrescribedOceanSimulation{C, TT <: Union{Float64, ITime}} <: Interfacer.AbstractSurfaceStub
     cache::C
+    prev_checkpoint_t::TT
 end
 
 """
@@ -108,7 +112,9 @@ function PrescribedOceanSimulation(
         start_date = start_date,
         t = Ref(t_start),
     )
-    return PrescribedOceanSimulation(cache)
+    prev_checkpoint_t = Ref(-1) # no checkpoint taken yet
+
+    return PrescribedOceanSimulation(cache, prev_checkpoint_t)
 end
 
 ## Extensions of Interfacer and FieldExchanger functions

@@ -56,6 +56,7 @@ struct CoupledSimulation{
     TS,
     DTI,
     TT,
+    CTT,
     NTMS <: NamedTuple,
     CALLBACKS,
     NTP <: NamedTuple,
@@ -70,6 +71,7 @@ struct CoupledSimulation{
     tspan::TS
     Δt_cpl::DTI
     t::TT
+    prev_checkpoint_t::CTT
     model_sims::NTMS
     callbacks::CALLBACKS
     dirs::NTP

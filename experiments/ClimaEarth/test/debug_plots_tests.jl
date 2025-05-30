@@ -78,6 +78,7 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
         (Int(0), Int(1)), # tspan
         Int(200), # Δt_cpl
         Ref(Int(0)), # t
+        Ref(-1), # prev_checkpoint_t
         model_sims, # model_sims
         (;), # callbacks
         (;), # dirs

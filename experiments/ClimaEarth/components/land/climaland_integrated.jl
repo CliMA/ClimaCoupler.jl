@@ -16,7 +16,7 @@ import Thermodynamics as TD
 include("climaland_helpers.jl")
 
 """
-    ClimaLandSimulation{M, I, A}
+    ClimaLandSimulation{M, I, A, OW}
 
 The integrated ClimaLand model simulation object.
 
@@ -25,13 +25,20 @@ It contains the following objects:
 - `integrator::I`: The integrator used in timestepping this model.
 - `area_fraction::A`: A ClimaCore Field on the boundary space representing the surface area fraction of this component model.
 - `output_writer::OW`: The diagnostic output writer.
+- `prev_checkpoint_t::TT`: The time of the most recent checkpoint, in seconds. -1 if no checkpoint has been taken yet.
 """
-struct ClimaLandSimulation{M <: CL.LandModel, I <: SciMLBase.AbstractODEIntegrator, A <: CC.Fields.Field, OW} <:
-       Interfacer.LandModelSimulation
+struct ClimaLandSimulation{
+    M <: CL.LandModel,
+    I <: SciMLBase.AbstractODEIntegrator,
+    A <: CC.Fields.Field,
+    OW,
+    TT <: Union{Float64, ITime},
+} <: Interfacer.LandModelSimulation
     model::M
     integrator::I
     area_fraction::A
     output_writer::OW
+    prev_checkpoint_t::TT
 end
 
 """
@@ -223,8 +230,9 @@ function ClimaLandSimulation(
         adaptive = false,
         callback = SciMLBase.CallbackSet(diag_cb),
     )
+    prev_checkpoint_t = Ref(-1) # no checkpoint taken yet
 
-    return ClimaLandSimulation(model, integrator, area_fraction, output_writer)
+    return ClimaLandSimulation(model, integrator, area_fraction, output_writer, prev_checkpoint_t)
 end
 
 ###############################################################################

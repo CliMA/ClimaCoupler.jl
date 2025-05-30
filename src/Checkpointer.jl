@@ -36,6 +36,9 @@ get_model_cache(sim::Interfacer.ComponentModelSimulation) = nothing
     checkpoint_model_state(sim::Interfacer.ComponentModelSimulation, comms_ctx::ClimaComms.AbstractCommsContext, t::Int; output_dir = "output")
 
 Checkpoint the model state of a simulation to a HDF5 file at a given time, t (in seconds).
+
+If a previous checkpoint exists, it is removed. This is to avoid accumulating
+many checkpoint files in the output directory.
 """
 function checkpoint_model_state(
     sim::Interfacer.ComponentModelSimulation,
@@ -52,8 +55,19 @@ function checkpoint_model_state(
     CC.InputOutput.HDF5.write_attribute(checkpoint_writer.file, "time", t)
     CC.InputOutput.write!(checkpoint_writer, Y, "model_state")
     Base.close(checkpoint_writer)
-    return nothing
 
+    # Remove previous checkpoint if it exists
+    if sim.prev_checkpoint_t[] != -1
+        prev_checkpoint_file = joinpath(output_dir, "checkpoint_$(nameof(sim))_$(sim.prev_checkpoint_t[]).hdf5")
+        if isfile(prev_checkpoint_file)
+            @info "Removing previous checkpoint file: $prev_checkpoint_file"
+            rm(prev_checkpoint_file)
+        end
+    end
+
+    # Update previous checkpoint time stored in the simulation
+    sim.prev_checkpoint_t[] = t
+    return nothing
 end
 
 """
@@ -79,6 +93,19 @@ function checkpoint_model_cache(
     pid = ClimaComms.mypid(comms_ctx)
     output_file = joinpath(output_dir, "checkpoint_cache_$(pid)_$(nameof(sim))_$t.jld2")
     JLD2.jldsave(output_file, cache = p)
+
+    # Remove previous checkpoint if it exists
+    if sim.prev_checkpoint_t[] != -1
+        prev_checkpoint_file =
+            joinpath(output_dir, "checkpoint_cache_$(pid)_$(nameof(sim))_$(sim.prev_checkpoint_t[]).jld2")
+        if isfile(prev_checkpoint_file)
+            @info "Removing previous checkpoint file: $prev_checkpoint_file"
+            rm(prev_checkpoint_file)
+        end
+    end
+
+    # Update previous checkpoint time stored in the simulation
+    sim.prev_checkpoint_t[] = t
     return nothing
 end
 
@@ -113,12 +140,25 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
             Checkpointer.checkpoint_model_cache(sim, comms_ctx, time; output_dir)
         end
     end
+
     # Checkpoint the Coupler fields
     pid = ClimaComms.mypid(comms_ctx)
     @info "Saving coupler fields to JLD2 on day $day second $sec"
     output_file = joinpath(output_dir, "checkpoint_coupler_fields_$(pid)_$time.jld2")
     # Adapt to Array move fields to the CPU
     JLD2.jldsave(output_file, coupler_fields = CC.Adapt.adapt(Array, cs.fields))
+
+    # Remove previous Coupler fields checkpoint if it exists
+    if sim.prev_checkpoint_t[] != -1
+        prev_checkpoint_file = joinpath(output_dir, "checkpoint_coupler_fields_$(pid)_$(cs.prev_checkpoint_t[]).jld2")
+        if isfile(prev_checkpoint_file)
+            @info "Removing previous checkpoint file: $prev_checkpoint_file"
+            rm(prev_checkpoint_file)
+        end
+    end
+
+    # Update previous checkpoint time stored in the simulation
+    cs.prev_checkpoint_t[] = t
 end
 
 """

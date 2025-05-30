@@ -15,10 +15,13 @@ Equation:
 
     (h * ρ * c) dTdt = -(F_turb_energy + F_radiative)
 
+In addition to parameters and the integrator, this simulation contains:
+- `prev_checkpoint_t::TT`: The time of the most recent checkpoint, in seconds. -1 if no checkpoint has been taken yet.
 """
-struct SlabOceanSimulation{P, I} <: Interfacer.OceanModelSimulation
+struct SlabOceanSimulation{P, I, TT <: Union{Float64, ITime}} <: Interfacer.OceanModelSimulation
     params::P
     integrator::I
+    prev_checkpoint_t::TT
 end
 
 # ocean parameters
@@ -98,8 +101,9 @@ function SlabOceanSimulation(
     end
     problem = SciMLBase.ODEProblem(ode_function, Y, tspan, cache)
     integrator = SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
+    prev_checkpoint_t = Ref(-1) # no checkpoint taken yet
 
-    sim = SlabOceanSimulation(params, integrator)
+    sim = SlabOceanSimulation(params, integrator, prev_checkpoint_t)
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)

@@ -24,9 +24,6 @@ import SciMLBase #hide
 import ClimaCore as CC #hide
 import ClimaTimeSteppers as CTS #hide
 
-## enable broadcasting with mismatched spaces #hide
-CC.Operators.allow_mismatched_fd_spaces() = true #hide
-
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", "..")) #hide
 const FT = Float64 #hide
 

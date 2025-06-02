@@ -1,7 +1,6 @@
 apply_limiter: false
 dt: "200secs"
 dt_cpl: "200secs"
-dt_save_to_sol: "3600secs"
 energy_check: true
 h_elem: 4
 bucket_albedo_type: "function"

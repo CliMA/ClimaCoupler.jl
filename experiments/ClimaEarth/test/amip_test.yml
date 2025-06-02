@@ -4,8 +4,6 @@ atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
 coupler_toml: ["toml/amip.toml"]
 dt: "180secs"
 dt_cpl: "180secs"
-dt_save_state_to_disk: "30days"
-dt_save_to_sol: "30days"
 dz_bottom: 100.0
 energy_check: false
 h_elem: 8

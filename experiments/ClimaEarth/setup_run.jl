@@ -455,6 +455,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     specifics, the callbacks, the directory paths, and diagnostics for AMIP simulations.
     =#
 
+    prev_checkpoint_t = Ref(-1) # no checkpoint taken yet
     cs = CoupledSimulation{FT}(
         comms_ctx,
         Ref(start_date),
@@ -464,6 +465,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         [tspan[1], tspan[2]],
         Δt_cpl,
         Ref(tspan[1]),
+        prev_checkpoint_t,
         model_sims,
         callbacks,
         dir_paths,

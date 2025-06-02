@@ -26,11 +26,12 @@ include("../shared/restore.jl")
 ###
 ### Functions required by ClimaCoupler.jl for an AtmosModelSimulation
 ###
-struct ClimaAtmosSimulation{P, D, I, OW} <: Interfacer.AtmosModelSimulation
+struct ClimaAtmosSimulation{P, D, I, OW, TT <: Union{Float64, ITime}} <: Interfacer.AtmosModelSimulation
     params::P
     domain::D
     integrator::I
     output_writers::OW
+    prev_checkpoint_t::TT
 end
 
 function hasradiation(integrator)
@@ -88,7 +89,8 @@ function ClimaAtmosSimulation(atmos_config)
         @. ᶠradiation_flux = CC.Geometry.WVector(FT(0))
     end
 
-    sim = ClimaAtmosSimulation(integrator.p.params, spaces, integrator, output_writers)
+    prev_checkpoint_t = Ref(-1) # no checkpoint taken yet
+    sim = ClimaAtmosSimulation(integrator.p.params, spaces, integrator, output_writers, prev_checkpoint_t)
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)

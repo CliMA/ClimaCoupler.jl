@@ -4,14 +4,14 @@ use_itime: true
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
 bucket_albedo_type: "map_temporal"
-checkpoint_dt: "180days"
+checkpoint_dt: "4months"
 coupler_toml: ["toml/amip.toml"]
 coupler_output_dir: "experiments/calibration/coarse_amip/output"
 dt: "240secs"
 dt_cpl: "240secs"
 dt_save_state_to_disk: "365days"
 dt_save_to_sol: "99999days"
-dz_bottom: 100.0
+dz_bottom: 50.0
 energy_check: false
 h_elem: 8
 land_albedo_type: "map_temporal"
@@ -22,7 +22,7 @@ output_default_diagnostics: false
 use_coupler_diagnostics: false
 rayleigh_sponge: true
 # restart_dir: "restart_checkpoints"
-# restart_t: 31536000
+# restart_t: 31104000
 edmfx_entr_model: "PiGroups"
 edmfx_detr_model: "SmoothArea"
 surface_setup: "PrescribedSurface"
@@ -30,8 +30,9 @@ t_end: "465days"
 topography: "Earth"
 topo_smoothing: true
 viscous_sponge: true
-z_elem: 39
 z_max: 60000.0
+z_elem: 63
+z_stretch: true
 extra_atmos_diagnostics:
   - reduction_time: average
     short_name: [rsut, rlut, rsdt, rsutcs, rlutcs, pr, ta, ts, lwp, clivi, pfull]

@@ -29,7 +29,7 @@ function get_compare_vars_biases_groups()
         ["pr", "rsdt", "rsut", "rlut"],
         ["rsds", "rsus", "rlds", "rlus"],
         ["rsutcs", "rlutcs", "rsdscs", "rsuscs", "rldscs"],
-        ["sw_cre", "lw_cre", "ts"],
+        ["sw_cre", "lw_cre", "ts", "lwp", "clivi"],
     ]
     return compare_vars_biases_groups
 end
@@ -49,7 +49,7 @@ function get_compare_vars_biases_plot_extrema()
     compare_vars_biases_plot_extrema = Dict(
         "pr" => (-5.0, 5.0),
         "rsdt" => (-10.0, 10.0),
-        "rsut" => (-50.0, 50.0),
+        "rsut" => (-80.0, 80.0),
         "rlut" => (-50.0, 50.0),
         "rsutcs" => (-20.0, 20.0),
         "rlutcs" => (-20.0, 20.0),
@@ -60,9 +60,11 @@ function get_compare_vars_biases_plot_extrema()
         "rsdscs" => (-10.0, 10.0),
         "rsuscs" => (-10.0, 10.0),
         "rldscs" => (-20.0, 20.0),
-        "sw_cre" => (-110.0, 110.0),
-        "lw_cre" => (-110.0, 110.0),
-        "ts" => (-50.0, 50.0)
+        "sw_cre" => (-80.0, 80.0),
+        "lw_cre" => (-40.0, 40.0),
+        "ts" => (-10.0, 10.0),
+        "lwp" => (-0.2, 0.2),
+        "clivi" => (-0.4, 0.4),
     )
     return compare_vars_biases_plot_extrema
 end
@@ -130,6 +132,16 @@ function get_sim_var_dict(diagnostics_folder_path)
         end
     end
 
+    var_names = ["lwp", "clivi"]
+    foreach(var_names) do var
+        if [var] ⊆ available_short_names
+            sim_var_dict[var] = () -> begin
+                sim_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = var)
+                sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
+                return sim_var
+            end
+        end
+    end
 
     # Add "pr" and the necessary preprocessing
     for (short_name, _) in sim_obs_short_names_no_pr
@@ -207,10 +219,36 @@ function get_obs_var_dict()
     obs_var_dict["ts"] = 
         (start_date) -> begin
             obs_var = ClimaAnalysis.OutputVar(
+                # TODO: Make this an artifact
                 joinpath("/home/ext_nefrathe_caltech_edu/calibration_obs", "era5_monthly_avg_ts.nc"),
                 new_start_date = start_date,
                 shift_by = Dates.firstdayofmonth,
             )
+            return obs_var
+        end
+    
+    obs_var_dict["lwp"] = 
+        (start_date) -> begin
+            obs_var = ClimaAnalysis.OutputVar(
+                # TODO: Make this an artifact
+                joinpath(pkgdir(ClimaCoupler), "modis_lwp_iwp.nc"), 
+                "lwp",
+                new_start_date = start_date,
+                shift_by = Dates.firstdayofmonth,
+            )
+            obs_var = ClimaAnalysis.Var.convert_units(obs_var, "kg m-2"; conversion_function = x -> x/1000)
+            return obs_var
+        end
+    obs_var_dict["clivi"] = 
+        (start_date) -> begin
+            obs_var = ClimaAnalysis.OutputVar(
+                # TODO: Make this an artifact
+                joinpath(pkgdir(ClimaCoupler), "modis_lwp_iwp.nc"), 
+                "iwp",
+                new_start_date = start_date,
+                shift_by = Dates.firstdayofmonth,
+            )
+            obs_var = ClimaAnalysis.Var.convert_units(obs_var, "kg m-2"; conversion_function = x -> x/1000)
             return obs_var
         end
     return obs_var_dict

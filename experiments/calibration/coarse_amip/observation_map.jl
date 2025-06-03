@@ -4,23 +4,26 @@ import ClimaCoupler
 import JLD2
 import EnsembleKalmanProcesses as EKP
 import NaNStatistics
-import CairoMakie
+# import CairoMakie
 include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_utils.jl"))
 include(joinpath(pkgdir(ClimaCoupler), "experiments/ClimaEarth/leaderboard/leaderboard.jl"))
 
 function ClimaCalibrate.observation_map(iteration)
     ekp = JLD2.load_object(ClimaCalibrate.ekp_path(output_dir, iteration))
     current_minibatch = EKP.get_current_minibatch(ekp)
-    single_obs_len = sum(length(EKP.get_obs(ekp)))
+    obs = EKP.get_obs(ekp)
+    single_obs_len = sum(length(obs))
     single_member_len = single_obs_len * length(current_minibatch)
     ensemble_size = EKP.get_N_ens(ekp)
+    short_names = split(obs_series.observations[1].names[1], ";") # This relies on the naming convention
+
     G_ensemble = Array{Float64}(undef, single_member_len, ensemble_size)
     for m in 1:ensemble_size
         member_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
-        simdir_path = joinpath(member_path, "model_config/output_active")
+        simdir_path = joinpath(member_path, "model_config")
         @info "Processing member $m: $simdir_path"
         try
-            G_ensemble[:, m] .= process_member_data(SimDir(simdir_path), current_minibatch)
+            G_ensemble[:, m] .= process_member_data(SimDir(simdir_path), short_names, current_minibatch)
 
         catch e
             @error "Error processing member $m, filling observation map entry with NaNs" exception = e
@@ -31,21 +34,22 @@ function ClimaCalibrate.observation_map(iteration)
     nan_count = count(isnan, G_ensemble)
     # Check for 50% nans
     @assert nan_count < total_elements / 2
+    @info "Mean bias y - G, averaged across the ensemble" bias = mean(G_ensemble, dims = 2) - obs |> mean
     return G_ensemble
 end
 
 function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, iteration)
-    try
-        plot_output_path = ClimaCalibrate.path_to_iteration(output_dir, iteration)
-        plot_constrained_params_and_errors(plot_output_path, ekp, prior)
+    plot_output_path = ClimaCalibrate.path_to_iteration(output_dir, iteration)
+    plot_constrained_params_and_errors(plot_output_path, ekp, prior)
 
-        for m in 1:EKP.get_N_ens(ekp)
-            output_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
-            diagnostics_folder_path = joinpath(output_path, "model_config", "output_active")
+    for m in 1:EKP.get_N_ens(ekp)
+        output_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
+        diagnostics_folder_path = joinpath(output_path, "model_config")
+        try
             compute_leaderboard(output_path, diagnostics_folder_path, spinup_months)
+        catch e
+            @error "Error in `analyze_iteration`" exception = catch_backtrace()
         end
-    catch e
-        @error "Error in `analyze_iteration`" exception = catch_backtrace()
     end
 end
 
@@ -62,7 +66,7 @@ function plot_constrained_params_and_errors(output_dir, ekp, prior)
 end
 
 # Process a single ensemble member's data into a vector
-function process_member_data(simdir::SimDir, current_minibatch)
+function process_member_data(simdir::SimDir, short_names, current_minibatch)
     # Define standard diagnostic fields to preprocess
     diagnostic_var_names = ["rsdt", "rsut", "rlut", "rsutcs", "rlutcs", "pr", "ts", "lwp", "clivi"]
 
@@ -78,31 +82,24 @@ function process_member_data(simdir::SimDir, current_minibatch)
     processed_data["net_rad"] =
         processed_data["rlut"] + processed_data["rsut"] - processed_data["rsdt"] |> average_lat |> average_lon
 
-
     # Apply latitude window to IWP/LWP
     processed_data["iwp"] = processed_data["clivi"]
     for field in ["lwp", "iwp"]
         processed_data[field] = window(processed_data[field], "latitude"; left = -60, right = 60)
     end
 
-    # Fields to include in yearly processing (order matters for final concatenation)
-    seasonal_vars = ["rsut", "rlut", "sw_cre", "lw_cre", "ts", "pr", "lwp", "iwp"]
     start_year = minimum(current_minibatch) + 2002
     year_range = (start_year):(start_year + length(current_minibatch) - 1)
 
     year_observations = map(year_range) do yr
-        # Handle net_rad separately first
-        net_rad = seasonally_aligned_yearly_average(processed_data["net_rad"], yr).data
-
         # Process seasonal data consistently
-        seasonal_data = map(seasonal_vars) do var
-            year_averages = year_of_seasonal_averages(processed_data[var], yr)
-            flatten_seasonal_averages(year_averages)
+        seasonal_data = map(short_names) do short_name
+            # TODO: Replace this with ClimaAnalysis/ClimaAnalysisExt
+            year_averages = year_of_seasonal_averages(processed_data[short_name], yr)
+            ClimaAnalysis.flatten(year_averages).data
         end
-
-        return vcat(net_rad, seasonal_data...)
+        return vcat(seasonal_data...)
     end
-
     return vcat(year_observations...)
 end
 

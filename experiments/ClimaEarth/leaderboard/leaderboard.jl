@@ -84,7 +84,7 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spi
     # Plot annual plots
     for compare_vars_biases in compare_vars_biases_groups
         # Plot all the variables that we can
-        compare_vars_biases = filter(x -> x in keys(sim_obs_comparsion_dict), compare_vars_biases)
+    compare_vars_biases = filter(x -> x in keys(sim_obs_comparsion_dict), compare_vars_biases)
         length(compare_vars_biases) > 0 || continue
 
         fig_bias = CairoMakie.Figure(; size = (600, 75.0 + 300 * length(compare_vars_biases)))
@@ -119,18 +119,22 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spi
         for (col, season) in enumerate(seasons_no_ann)
             CairoMakie.Label(fig_all_seasons[0, col], season, tellwidth = false, fontsize = 30)
             for (row, short_name) in enumerate(compare_vars_biases)
-                sim_var = sim_obs_comparsion_dict[short_name][season][1]
-                if !ClimaAnalysis.isempty(sim_var)
-                    cmap_extrema = get(compare_vars_biases_plot_extrema, short_name) do
-                        extrema(ClimaAnalysis.bias(sim_obs_comparsion_dict[short_name][season]...).data)
+                try
+                    sim_var = sim_obs_comparsion_dict[short_name][season][1]
+                    if !ClimaAnalysis.isempty(sim_var)
+                        cmap_extrema = get(compare_vars_biases_plot_extrema, short_name) do
+                            extrema(ClimaAnalysis.bias(sim_obs_comparsion_dict[short_name][season]...).data)
+                        end
+                        # Add "mean " for plotting the title
+                        sim_var.attributes["short_name"] = "mean $(ClimaAnalysis.short_name(sim_var))"
+                        ClimaAnalysis.Visualize.plot_bias_on_globe!(
+                            fig_all_seasons[row, col],
+                            sim_obs_comparsion_dict[short_name][season]...,
+                            cmap_extrema = cmap_extrema,
+                        )
                     end
-                    # Add "mean " for plotting the title
-                    sim_var.attributes["short_name"] = "mean $(ClimaAnalysis.short_name(sim_var))"
-                    ClimaAnalysis.Visualize.plot_bias_on_globe!(
-                        fig_all_seasons[row, col],
-                        sim_obs_comparsion_dict[short_name][season]...,
-                        cmap_extrema = cmap_extrema,
-                    )
+                catch e
+                    @error "Error during leaderboard plots" exception = catch_backtrace()
                 end
             end
         end
@@ -177,7 +181,7 @@ end
     compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path)
 
 Plot the biases and a leaderboard of various variables defined over longitude, latitude,
-time, and pressure levels.
+time, and pressure levels.sou
 
 The parameter `leaderboard_base_path` is the path to save the leaderboards and bias plots,
 and `diagnostics_folder_path` is the path to the simulation data.

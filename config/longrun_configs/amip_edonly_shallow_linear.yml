@@ -18,3 +18,6 @@ prescribe_ozone: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "100days"
+diagnostics:
+  - short_name: [ts, ta, thetaa, ha, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, hussfc, evspsbl, pr]
+    period: 5days

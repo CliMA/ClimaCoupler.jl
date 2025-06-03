@@ -12,7 +12,7 @@ dt_rad: "1hours"
 dt_save_state_to_disk: "20days"
 energy_check: false
 dt_save_state_to_disk: "10days"
-restart_t: "6912000"
+restart_t: 6912000
 restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-longruns/888/climacoupler-longruns/experiments/ClimaEarth/output/amip_edonly_gpu/checkpoints"
 insolation: "timevarying"
 bucket_albedo_type: "map_temporal"

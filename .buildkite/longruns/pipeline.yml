@@ -59,7 +59,7 @@ steps:
 
       - label: "GPU AMIP + ED only (Linear Meshwarp)"
         key: "amip_edonly_gpu"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly.yml --job_id amip_edonly_gpu"
+        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_restart.yml --job_id amip_edonly_gpu"
         artifact_paths: "experiments/ClimaEarth/output/amip_edonly_gpu/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"

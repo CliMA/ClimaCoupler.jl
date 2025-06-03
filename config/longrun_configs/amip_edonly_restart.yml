@@ -1,0 +1,27 @@
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+aerosol_radiation: true
+deep_atmosphere: true
+mesh_warp_type: "Linear"
+atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_0M.yml"
+co2_model: "maunaloa"
+dt: "120secs"
+dt_cloud_fraction: "1hours"
+dt_cpl: "120secs"
+dt_rad: "1hours"
+dt_save_state_to_disk: "20days"
+energy_check: false
+dt_save_state_to_disk: "10days"
+restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-longruns/888/climacoupler-longruns/experiments/ClimaEarth/output/amip_edonly_gpu/checkpoints"
+insolation: "timevarying"
+bucket_albedo_type: "map_temporal"
+mode_name: "amip"
+prescribed_aerosols: ["CB1", "CB2", "DST01", "DST02", "DST03", "DST04", "DST05", "OC1", "OC2", "SO4", "SSLT01", "SSLT02", "SSLT03", "SSLT04", "SSLT05"]
+surface_setup: "DefaultMoninObukhov"
+prescribe_ozone: true
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+t_end: "100days"
+diagnostics:
+  - short_name: [ts, ta, thetaa, ha, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, hussfc, evspsbl, pr]
+    period: 5days

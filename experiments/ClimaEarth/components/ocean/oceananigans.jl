@@ -392,3 +392,16 @@ TODO extend this for non-ClimaCore states.
 function Checkpointer.get_model_prog_state(sim::OceananigansSimulation)
     @warn "get_model_prog_state not implemented for OceananigansSimulation"
 end
+
+import Downloads
+# TODO: Remove this workaround once the change has been made to ClimaOcean
+function CO.DataWrangling.netrc_downloader(username, password, machine, dir)
+    netrc_file = CO.DataWrangling.netrc_permission_file(username, password, machine, dir)
+    downloader = Downloads.Downloader()
+    easy_hook = (easy, *) -> begin
+        Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_NETRC_FILE, netrc_file)
+        Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_SSL_VERIFYPEER, false)
+    end
+    downloader.easy_hook = easy_hook
+    return downloader
+end

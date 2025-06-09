@@ -25,7 +25,6 @@ function postprocess_sim(cs, postprocessing_vars)
     make_diagnostics_plots(coupler_output_dir, artifact_dir, output_prefix = "coupler_")
     make_diagnostics_plots(atmos_output_dir, artifact_dir, output_prefix = "atmos_")
     make_diagnostics_plots(land_output_dir, artifact_dir, output_prefix = "land_")
-    # TODO: Uniform ocean plotting
     make_ocean_diagnostics_plots(ocean_output_dir, artifact_dir, output_prefix = "ocean_")
 
     # Plot all model states and coupler fields (useful for debugging)

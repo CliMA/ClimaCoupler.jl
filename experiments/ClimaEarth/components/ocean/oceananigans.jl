@@ -2,6 +2,7 @@ import Oceananigans as OC
 import ClimaOcean as CO
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms
+import ClimaCore as CC
 import Thermodynamics as TD
 import ClimaOcean.ECCO: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
@@ -97,7 +98,6 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
         OC.set!(ocean.model, T = T_init, S = S_init)
     end
 
-    # TODO: Handle halos directly here instead of filling them later
     long_cc = OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center())
     lat_cc = OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center())
 
@@ -110,7 +110,20 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
     target_points_cc = @. CC.Geometry.LatLongPoint(lat_cc, long_cc)
     # TODO: We can remove the `nothing` after CC > 0.14.33
     remapper_cc = CC.Remapping.Remapper(axes(area_fraction), target_points_cc, nothing)
-    remapping = (; remapper_cc)
+
+    # Construct two 2D Center/Center fields to use as scratch space while remapping
+    scratch_cc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    scratch_cc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+
+    # Construct two scratch arrays to use while remapping
+    # We get the array type, float type, and dimensions from the remapper object to maintain consistency
+    ArrayType = ClimaComms.array_type(remapper_cc.space)
+    FT = CC.Spaces.undertype(remapper_cc.space)
+    interpolated_values_dim..., _buffer_length = size(remapper_cc._interpolated_values)
+    scratch_arr1 = ArrayType(zeros(FT, interpolated_values_dim...))
+    scratch_arr2 = ArrayType(zeros(FT, interpolated_values_dim...))
+
+    remapping = (; remapper_cc, scratch_cc1, scratch_cc2, scratch_arr1, scratch_arr2)
 
     ocean_properties = (; ocean_reference_density = 1020, ocean_heat_capacity = 3991, ocean_fresh_water_density = 999.8)
 
@@ -118,13 +131,16 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
     if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
         # TODO: Add more diagnostics, make them dependent on simulation duration, take
         # monthly averages
-        diagnostics = Dict("T" => ocean.model.tracers.T)
+        # Save all tracers and velocities to a NetCDF file at daily frequency
+        outputs = merge(ocean.model.tracers, ocean.model.velocities)
         netcdf_writer = OC.NetCDFWriter(
             ocean.model,
-            diagnostics,
-            indices = (:, :, grid.Nz),
+            outputs;
+            schedule = OC.TimeInterval(86400), # Daily output
             filename = joinpath(output_dir, "ocean_diagnostics.nc"),
-            schedule = OC.TimeInterval(86400),
+            indices = (:, :, grid.Nz),
+            overwrite_existing = true,
+            array_type = Array{Float32},
         )
         ocean.output_writers[:diagnostics] = netcdf_writer
     end
@@ -227,38 +243,45 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
     grid = sim.ocean.model.grid
 
-    # Remap momentum fluxes onto reduced 2D Center, Center fields
-    remapped_F_turb_ρτxz = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-    F_turb_ρτxz_cc = CC.Remapping.interpolate(sim.remapping.remapper_cc, F_turb_ρτxz)
-    OC.set!(remapped_F_turb_ρτxz, F_turb_ρτxz_cc)
-    remapped_F_turb_ρτyz = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-    F_turb_ρτyz_cc = CC.Remapping.interpolate(sim.remapping.remapper_cc, F_turb_ρτyz)
-    OC.set!(remapped_F_turb_ρτyz, F_turb_ρτyz_cc)
+    # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
+    CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, F_turb_ρτxz)
+    OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
+    CC.Remapping.interpolate!(sim.remapping.scratch_arr2, sim.remapping.remapper_cc, F_turb_ρτyz)
+    OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
 
+    # Rename for clarity; these are now Center, Center Oceananigans fields
+    F_turb_ρτxz_cc = sim.remapping.scratch_cc1
+    F_turb_ρτyz_cc = sim.remapping.scratch_cc2
+
+    # Set the momentum flux BCs at the correct locations using the remapped scratch fields
     oc_flux_u = surface_flux(sim.ocean.model.velocities.u)
     oc_flux_v = surface_flux(sim.ocean.model.velocities.v)
-
-    # Set the momentum flux BCs at the correct locations
-    set_from_extrinsic_vectors!((; u = oc_flux_u, v = oc_flux_v), grid, remapped_F_turb_ρτxz, remapped_F_turb_ρτyz)
+    set_from_extrinsic_vectors!((; u = oc_flux_u, v = oc_flux_v), grid, F_turb_ρτxz_cc, F_turb_ρτyz_cc)
 
     (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) = sim.ocean_properties
-    remapped_F_lh = CC.Remapping.interpolate(sim.remapping.remapper_cc, F_lh)
-    remapped_F_sh = CC.Remapping.interpolate(sim.remapping.remapper_cc, F_sh)
-    remapped_F_turb_energy = remapped_F_lh + remapped_F_sh
+
+    # Remap the latent and sensible heat fluxes using scratch arrays
+    CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, F_lh) # latent heat flux
+    CC.Remapping.interpolate!(sim.remapping.scratch_arr2, sim.remapping.remapper_cc, F_sh) # sensible heat flux
+
+    # Rename for clarity; recall F_turb_energy = F_lh + F_sh
+    remapped_F_lh = sim.remapping.scratch_arr1
+    remapped_F_sh = sim.remapping.scratch_arr2
 
     # TODO: Note, SW radiation penetrates the surface. Right now, we just put
     # everything on the surface, but later we will need to account for this.
     # One way we can do this is using directly ClimaOcean
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
     OC.interior(oc_flux_T, :, :, 1) .=
-        OC.interior(oc_flux_T, :, :, 1) .+ remapped_F_turb_energy ./ (ocean_reference_density * ocean_heat_capacity)
+        OC.interior(oc_flux_T, :, :, 1) .+
+        (remapped_F_lh .+ remapped_F_sh) ./ (ocean_reference_density * ocean_heat_capacity)
 
     # Add the part of the salinity flux that comes from the moisture flux, we also need to
     # add the component due to precipitation (that was done with the radiative fluxes)
-    remapped_F_turb_moisture = CC.Remapping.interpolate(sim.remapping.remapper_cc, F_turb_moisture)
+    CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, F_turb_moisture)
+    moisture_fresh_water_flux = sim.remapping.scratch_arr1 ./ ocean_fresh_water_density
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, 1)
-    moisture_fresh_water_flux = remapped_F_turb_moisture ./ ocean_fresh_water_density
     OC.interior(oc_flux_S, :, :, 1) .= OC.interior(oc_flux_S, :, :, 1) .- surface_salinity .* moisture_fresh_water_flux
     return nothing
 end
@@ -334,15 +357,20 @@ precipitation. The rest will be updated in `update_turbulent_fluxes!`.
 function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf, area_fraction)
     (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) = sim.ocean_properties
 
-    remapped_F_radiative = CC.Remapping.interpolate(sim.remapping.remapper_cc, csf.F_radiative)
+    # Remap radiative flux onto scratch array; rename for clarity
+    CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, csf.F_radiative)
+    remapped_F_radiative = sim.remapping.scratch_arr1
 
     # Update only the part due to radiative fluxes. For the full update, the component due
     # to latent and sensible heat is missing and will be updated in update_turbulent_fluxes.
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
     OC.interior(oc_flux_T, :, :, 1) .= remapped_F_radiative ./ (ocean_reference_density * ocean_heat_capacity)
 
-    remapped_P_liq = CC.Remapping.interpolate(sim.remapping.remapper_cc, csf.P_liq)
-    remapped_P_snow = CC.Remapping.interpolate(sim.remapping.remapper_cc, csf.P_snow)
+    # Remap precipitation fields onto scratch arrays; rename for clarity
+    CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, csf.P_liq)
+    CC.Remapping.interpolate!(sim.remapping.scratch_arr2, sim.remapping.remapper_cc, csf.P_snow)
+    remapped_P_liq = sim.remapping.scratch_arr1
+    remapped_P_snow = sim.remapping.scratch_arr2
 
     # Virtual salt flux
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
@@ -363,4 +391,17 @@ TODO extend this for non-ClimaCore states.
 """
 function Checkpointer.get_model_prog_state(sim::OceananigansSimulation)
     @warn "get_model_prog_state not implemented for OceananigansSimulation"
+end
+
+import Downloads
+# TODO: Remove this workaround once the change has been made to ClimaOcean
+function CO.DataWrangling.netrc_downloader(username, password, machine, dir)
+    netrc_file = CO.DataWrangling.netrc_permission_file(username, password, machine, dir)
+    downloader = Downloads.Downloader()
+    easy_hook = (easy, *) -> begin
+        Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_NETRC_FILE, netrc_file)
+        Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_SSL_VERIFYPEER, false)
+    end
+    downloader.easy_hook = easy_hook
+    return downloader
 end

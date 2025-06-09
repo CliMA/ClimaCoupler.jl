@@ -1,6 +1,5 @@
 apply_limiter: false
 co2_model: "maunaloa"
-dt_save_to_sol: "10days"
 energy_check: false
 h_elem: 4
 mode_name: "amip"
@@ -8,5 +7,5 @@ moist: "equil"
 precip_model: "0M"
 rad: "allskywithclear"
 share_surface_space: false
-t_end: "10days"
+t_end: "1days"
 vert_diff: "true"

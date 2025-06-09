@@ -4,6 +4,7 @@ import CairoMakie.Makie
 import ClimaAnalysis as CAN
 using Poppler_jll: pdfunite
 import Base.Filesystem
+import NCDatasets
 
 const LARGE_NUM = typemax(Int)
 const LAST_SNAP = LARGE_NUM
@@ -200,23 +201,57 @@ function make_diagnostics_plots(output_path::AbstractString, plot_path::Abstract
     )
 end
 
-# TODO: Extend this function to not hardcode that we are looking only at temperature
 """
     make_ocean_diagnostics_plots(output_path::AbstractString, plot_path::AbstractString; output_prefix = "")
 
-Plot the surface values for the latest snapshot containing temperature in `ocean_diagnostics.nc` in `output_path`.
+Create plots for diagnostics. The plots are saved to `ocean_summary_2D.pdf` in `plot_path`.
+This function will plot the following variables, if they have been saved in `output_path`:
+    - Temperature (`T`)
+    - Salinity (`S`)
+    - Zonal velocity (`u`)
+    - Meridional velocity (`v`)
 
-Save the output to `plot_path` in `ocean.pdf`
+For each variable, take the surface level (top level) of the variable
+and create a 2D plot. The plots will be saved in a single PDF file.
 """
 function make_ocean_diagnostics_plots(output_path::AbstractString, plot_path::AbstractString; output_prefix = "")
     expected_output_path = joinpath(output_path, "ocean_diagnostics.nc")
     isfile(expected_output_path) || return nothing
-    ocean_diagnostics = NCDataset(expected_output_path)
-    temperature = ocean_diagnostics["T"][:, :, 1, end]
-    lats, logs = ocean_diagnostics["φ_aca"][:], ocean_diagnostics["λ_faa"][:]
-    fig, ax, hm = CairoMakie.heatmap(logs, lats, temperature)
-    ax.xlabel = "lon"
-    ax.ylabel = "lat"
-    CairoMakie.Colorbar(fig[:, end + 1], hm, label = "T [C]")
-    CairoMakie.save(joinpath(plot_path, "ocean.pdf"), fig)
+
+    # Create an OutputVar for each diagnostic, so we can use ClimaAnalysis to plot
+    var_names = ["T", "S", "u", "v"]
+    vars = Array{Union{CAN.OutputVar, Nothing}}(undef, length(var_names))
+    for (i, var_name) in enumerate(var_names)
+        # Create an OutputVar if the variable is available in the output file
+        try
+            output_var = CAN.OutputVar(expected_output_path, var_name)
+        catch e
+            if e isa NCDatasets.NetCDFError
+                @warn "NetCDF error with diagnostic $var_name; check that diagnostic is correctly saved"
+                vars[i] = nothing
+                continue
+            else
+                rethrow(e)
+            end
+        end
+        output_var.attributes["short_name"] = var_name
+
+        # Take the top level (surface) of the variable
+        output_var = CAN.slice(output_var, z_aac = output_var.dims["z_aac"][1])
+
+        vars[i] = output_var
+    end
+
+    # Filter out any variables that are not available
+    vars = filter(!isnothing, vars)
+
+    # Make plots for each variable, saved in one PDF file
+    !isempty(vars) && make_plots_generic(
+        expected_output_path, # file_path
+        plot_path,
+        vars,
+        time = LAST_SNAP,
+        output_name = output_prefix * "summary_2D",
+    )
+    return nothing
 end

@@ -7,8 +7,6 @@ dt: "100secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: "100secs"
 dt_rad: "1hours"
-dt_save_state_to_disk: "1days"
-dt_save_to_sol: "1days"
 energy_check: false
 insolation: "timevarying"
 bucket_albedo_type: "map_temporal"

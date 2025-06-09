@@ -7,7 +7,7 @@
 #SBATCH --gpus-per-task=1
 #SBATCH --cpus-per-task=4
 
-julia --project=experiments/calibration -e 'using Pkg; Pkg.develop(;path="."); Pkg.instantiate(;verbose=true)'
+julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.develop(;path="."); Pkg.instantiate(;verbose=true)'
 
-julia --project=experiments/calibration experiments/calibration/run_calibration.jl
+julia --project=experiments/ClimaEarth experiments/calibration/run_calibration.jl
 

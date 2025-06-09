@@ -11,19 +11,6 @@ import ClimaCore as CC
 ClimaComms.init(ClimaComms.context())
 
 for FT in (Float32, Float64)
-    @testset "test swap_space!" begin
-        space1 = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
-        space2 = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
-
-        field1 = ones(space1)
-        field2 = ones(space2)
-
-        field2 = Utilities.swap_space!(space2, field1)
-
-        @test parent(field1) == parent(field2)
-        @test axes(field2) == space2
-    end
-
     @testset "test comms_ctx" begin
         parsed_args = Dict("device" => "auto")
 

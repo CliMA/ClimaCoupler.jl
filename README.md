@@ -109,7 +109,7 @@ this process must be done on each machine you want to run on.
 
 This can be done using the following command in the terminal from any directory:
 ```julia
-julia -E "using Pkg; Pkg.add(\"CUDA\"); Pkg.add(\"MPI\")"
+julia -E "using Pkg; Pkg.add(\"MPI\")"
 ```
 
 Now, if you enter your base environment by running `julia` and then check the packages with `] st`, you should see something like:

@@ -3,7 +3,6 @@ conservation_softfail: true
 dt: "200secs"
 dt_cpl: "3600secs"
 dt_rad: "6hours"
-dt_save_to_sol: "3600secs"
 energy_check: true
 h_elem: 6
 insolation: "timevarying"
@@ -12,5 +11,5 @@ moist: "equil"
 precip_model: "0M"
 rad: "gray"
 rayleigh_sponge: true
-t_end: "10days"
+t_end: "1days"
 vert_diff: "true"

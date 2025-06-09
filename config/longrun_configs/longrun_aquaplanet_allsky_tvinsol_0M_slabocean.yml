@@ -1,0 +1,3 @@
+atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_tvinsol_0M_slabocean.yml"
+output_default_diagnostics: false
+t_end: "120days"

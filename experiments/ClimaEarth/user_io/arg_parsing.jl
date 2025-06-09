@@ -2,6 +2,7 @@ import YAML
 
 mode_name_dict = Dict(
     "amip" => AMIPMode,
+    "cmip" => CMIPMode,
     "slabplanet" => SlabplanetMode,
     "slabplanet_aqua" => SlabplanetAquaMode,
     "slabplanet_terra" => SlabplanetTerraMode,
@@ -27,6 +28,12 @@ function get_coupler_config_dict(config_file)
     # Read in config dictionary from file, overriding the defaults in `parsed_args`
     config_dict = merge(parsed_args, YAML.load_file(config_file))
     config_dict["job_id"] = job_id
+
+    # Select the correct timestep for each component model based on which are available
+    parse_component_dts!(config_dict)
+
+    # Add any extra diagnostics
+    add_extra_diagnostics!(config_dict)
     return config_dict
 end
 
@@ -69,7 +76,7 @@ function get_coupler_args(config_dict::Dict)
     t_start = Float64(Utilities.time_to_seconds(config_dict["t_start"]))
     start_date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
     Δt_cpl = Float64(Utilities.time_to_seconds(config_dict["dt_cpl"]))
-    saveat = Float64(Utilities.time_to_seconds(config_dict["dt_save_to_sol"]))
+
     if use_itime
         t_end = ITime(t_end, epoch = start_date)
         t_start = ITime(t_start, epoch = start_date)
@@ -81,12 +88,11 @@ function get_coupler_args(config_dict::Dict)
     else
         component_dt_dict = config_dict["component_dt_dict"]
     end
-    if saveat != Inf
-        use_itime && (saveat = ITime(saveat))
-        saveat = [promote([t_start:saveat:t_end..., t_end]...)...]
-    else
-        saveat = typeof(t_start)[]
-    end
+    # Save solution to integrator.sol at the beginning and end
+    saveat = [t_start, t_end]
+
+    # Space information
+    share_surface_space = config_dict["share_surface_space"]
 
     # Checkpointing information
     checkpoint_dt = config_dict["checkpoint_dt"]
@@ -127,6 +133,7 @@ function get_coupler_args(config_dict::Dict)
         start_date,
         Δt_cpl,
         component_dt_dict,
+        share_surface_space,
         saveat,
         checkpoint_dt,
         restart_dir,

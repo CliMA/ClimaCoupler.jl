@@ -6,13 +6,14 @@ import Dates
 include("data_sources.jl")
 
 """
-    compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
+    compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spinup)
 
 Plot the biases and a leaderboard of various variables defined over longitude, latitude, and
 time.
 
-The parameter `leaderboard_base_path` is the path to save the leaderboards and bias plots,
-and `diagnostics_folder_path` is the path to the simulation data.
+The argument `leaderboard_base_path` is the path to save the leaderboards and bias plots,
+`diagnostics_folder_path` is the path to the simulation data, and `spinup` is the number
+of months to remove from the beginning of the simulation.
 
 Loading and preprocessing simulation data is done by `get_sim_var_dict`. Loading and
 preprocessing observational data is done by `get_obs_var_dict`. The ranges of the bias plots
@@ -20,7 +21,7 @@ are determined by `get_compare_vars_biases_plot_extrema`. The groups of variable
 the bias plots are determined by `get_compare_vars_biases_groups()`. Loading the RMSEs from
 other models is done by `get_rmse_var_dict`. See the functions defined in data_sources.jl.
 """
-function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
+function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spinup)
     @info "Error against observations"
 
     # Get everything we need from data_sources.jl
@@ -37,9 +38,8 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
     # Print dates for debugging
     _, var_func = first(sim_var_dict)
     var = var_func()
-    output_dates = Dates.DateTime(var.attributes["start_date"]) .+ Dates.Second.(ClimaAnalysis.times(var))
     @info "Working with dates:"
-    @info output_dates
+    @info ClimaAnalysis.dates(var)
 
     for short_name in keys(sim_var_dict)
         # Simulation data
@@ -49,8 +49,7 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
         obs_var = obs_var_dict[short_name](sim_var.attributes["start_date"])
 
         # Remove first spin_up_months from simulation
-        spin_up_months = 3
-        spinup_cutoff = spin_up_months * 31 * 86400.0
+        spinup_cutoff = spinup * 31 * 86400.0
         ClimaAnalysis.times(sim_var)[end] >= spinup_cutoff &&
             (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff))
 
@@ -85,7 +84,11 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
 
     # Plot annual plots
     for compare_vars_biases in compare_vars_biases_groups
-        fig_bias = CairoMakie.Figure(; size = (600, 300 * length(compare_vars_biases)))
+        # Plot all the variables that we can
+        compare_vars_biases = filter(x -> x in keys(sim_obs_comparsion_dict), compare_vars_biases)
+        length(compare_vars_biases) > 0 || continue
+
+        fig_bias = CairoMakie.Figure(; size = (600, 75.0 + 300 * length(compare_vars_biases)))
         for (row, short_name) in enumerate(compare_vars_biases)
             sim_var = sim_obs_comparsion_dict[short_name]["ANN"][1]
             if !ClimaAnalysis.isempty(sim_var)
@@ -108,10 +111,14 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
     # Plot plots with all the seasons (not annual)
     seasons_no_ann = filter(season -> season != "ANN", seasons)
     for compare_vars_biases in compare_vars_biases_groups
-        fig_all_seasons = CairoMakie.Figure(; size = (600 * length(seasons_no_ann), 300 * length(compare_vars_biases)))
+        # Plot all the variables that we can
+        compare_vars_biases = filter(x -> x in keys(sim_obs_comparsion_dict), compare_vars_biases)
+        length(compare_vars_biases) > 0 || continue
+
+        fig_all_seasons =
+            CairoMakie.Figure(; size = (600 * length(seasons_no_ann), 75.0 + 300 * length(compare_vars_biases)))
         for (col, season) in enumerate(seasons_no_ann)
-            # Plot at 2 * col - 1 because a bias plot takes up 1 x 2 space
-            CairoMakie.Label(fig_all_seasons[0, 2 * col - 1], season, tellwidth = false, fontsize = 30)
+            CairoMakie.Label(fig_all_seasons[0, col], season, tellwidth = false, fontsize = 30)
             for (row, short_name) in enumerate(compare_vars_biases)
                 sim_var = sim_obs_comparsion_dict[short_name][season][1]
                 if !ClimaAnalysis.isempty(sim_var)
@@ -121,10 +128,9 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
                     # Add "mean " for plotting the title
                     sim_var.attributes["short_name"] = "mean $(ClimaAnalysis.short_name(sim_var))"
                     ClimaAnalysis.Visualize.plot_bias_on_globe!(
-                        fig_all_seasons,
+                        fig_all_seasons[row, col],
                         sim_obs_comparsion_dict[short_name][season]...,
                         cmap_extrema = cmap_extrema,
-                        p_loc = (row, 2 * col - 1),
                     )
                 end
             end
@@ -136,6 +142,8 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
     end
 
     # Add RMSE for the CliMA model and for each season
+    is_in_sim_vars(k) = k in keys(sim_var_dict)
+    rmse_var_dict = Dict(k => v for (k, v) in rmse_var_dict if is_in_sim_vars(k))
     rmse_var_names = keys(rmse_var_dict)
     for short_name in rmse_var_names
         for season in seasons
@@ -168,23 +176,21 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
 end
 
 """
-    compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path)
+    compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path, spinup)
 
 Plot the biases and a leaderboard of various variables defined over longitude, latitude,
 time, and pressure levels.
 
-The parameter `leaderboard_base_path` is the path to save the leaderboards and bias plots,
-and `diagnostics_folder_path` is the path to the simulation data.
-
-The parameter `leaderboard_base_path` is the path to save the leaderboards and bias plots,
-and `diagnostics_folder_path` is the path to the simulation data.
+The argument `leaderboard_base_path` is the path to save the leaderboards and bias plots,
+`diagnostics_folder_path` is the path to the simulation data, and `spinup` is the number
+of months to remove from the beginning of the simulation.
 
 Loading and preprocessing simulation data is done by `get_sim_var_in_pfull_dict`. Loading
 and preprocessing observational data is done by `get_obs_var_in_pfull_dict`. The ranges of
 the bias plots is defined by `get_compare_vars_biases_plot_extrema_pfull`. See the functions
 defined in data_sources.jl for more information.
 """
-function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path)
+function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path, spinup)
     @info "Error against observations for variables in pressure coordinates"
 
     sim_var_pfull_dict = get_sim_var_in_pfull_dict(diagnostics_folder_path)
@@ -193,9 +199,8 @@ function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_pat
     # Print dates for debugging
     _, get_var = first(sim_var_pfull_dict)
     var = get_var()
-    output_dates = Dates.DateTime(var.attributes["start_date"]) .+ Dates.Second.(ClimaAnalysis.times(var))
     @info "Working with dates:"
-    @info output_dates
+    @info ClimaAnalysis.dates(var)
 
     # Set up dict for storing simulation and observational data after processing
     sim_obs_comparsion_dict = Dict()
@@ -211,8 +216,7 @@ function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_pat
             error("Units of pressure should be hPa for $short_name simulation data")
 
         # Remove first spin_up_months from simulation
-        spin_up_months = 6
-        spinup_cutoff = spin_up_months * 31 * 86400.0
+        spinup_cutoff = spinup * 31 * 86400.0
         ClimaAnalysis.times(sim_var)[end] >= spinup_cutoff &&
             (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff))
 
@@ -250,7 +254,6 @@ function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_pat
         # Plot label for variable name
         CairoMakie.Label(fig_bias_pfull_vars[row_idx, 0], short_name, tellheight = false, fontsize = 30)
         for (col_idx, p_lvl) in enumerate(target_p_lvls)
-            layout = fig_bias_pfull_vars[row_idx, col_idx] = CairoMakie.GridLayout()
             sim_var = sim_obs_comparsion_dict[short_name].sim
             obs_var = sim_obs_comparsion_dict[short_name].obs
 
@@ -266,7 +269,7 @@ function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_pat
 
             # Plot bias
             ClimaAnalysis.Visualize.plot_bias_on_globe!(
-                layout,
+                fig_bias_pfull_vars[row_idx, col_idx],
                 sim_var,
                 obs_var,
                 cmap_extrema = compare_vars_biases_plot_extrema_pfull[short_name],
@@ -281,7 +284,7 @@ function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_pat
 
     # Define figure with at most four columns and the necessary number of rows for
     # all the variables
-    num_vars = length(compare_vars_biases_plot_extrema_pfull)
+    num_vars = length(sim_obs_comparsion_dict)
     num_cols = min(4, num_vars)
     num_rows = ceil(Int, num_vars / 4)
     fig_lat_pres = CairoMakie.Figure(size = (650 * num_cols, 450 * num_rows))
@@ -296,7 +299,6 @@ function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_pat
         # for idx -> (col_idx, row_idx)
         row_idx = div(idx - 1, 4) + 1
         col_idx = 1 + rem(idx - 1, 4)
-        layout = fig_lat_pres[row_idx, col_idx] = CairoMakie.GridLayout()
 
         # Load data
         sim_var = sim_obs_comparsion_dict[short_name].sim
@@ -312,7 +314,7 @@ function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_pat
         bias_var.attributes["short_name"] = "sim-obs_$(ClimaAnalysis.short_name(sim_var))"
         bias_var.attributes["long_name"] = "SIM-OBS_$(ClimaAnalysis.long_name(sim_var))"
         ClimaAnalysis.Visualize.heatmap2D!(
-            layout,
+            fig_lat_pres[row_idx, col_idx],
             bias_var,
             more_kwargs = Dict(
                 :axis => Dict([:yreversed => true]),
@@ -336,6 +338,6 @@ if abspath(PROGRAM_FILE) == @__FILE__
     end
     leaderboard_base_path = ARGS[begin]
     diagnostics_folder_path = ARGS[begin + 1]
-    compute_leaderboard(leaderboard_base_path, diagnostics_folder_path)
-    compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path)
+    compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, 3)
+    compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path, 6)
 end

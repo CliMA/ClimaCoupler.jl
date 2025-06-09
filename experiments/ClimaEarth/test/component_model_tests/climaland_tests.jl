@@ -4,6 +4,8 @@ import ClimaAtmos as CA
 import ClimaCoupler
 import ClimaCoupler: FluxCalculator, Interfacer
 import Dates
+import Thermodynamics.Parameters as TDP
+import ClimaParams # to load TDP extension
 import ClimaComms
 ClimaComms.@import_required_backends
 
@@ -23,7 +25,7 @@ FT = Float32
     area_fraction = CC.Fields.ones(boundary_space)
 
     # Construct simulation object
-    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, boundary_space, area_fraction)
+    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction)
 
     # Try taking a timestep
     Interfacer.step!(land_sim, dt)
@@ -65,17 +67,14 @@ end
 
     boundary_space = ClimaCore.Spaces.horizontal_space(atmos_sim.domain.face_space)
     area_fraction = ClimaCore.Fields.ones(boundary_space)
-    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, boundary_space, area_fraction)
+    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction)
     model_sims = (; land_sim = land_sim, atmos_sim = atmos_sim)
-
-    # Construct a coupler fields object
-    coupler_fluxes_names = [:F_turb_ρτxz, :F_turb_ρτyz, :F_lh, :F_sh, :F_turb_moisture, :temp1, :temp2]
-    coupler_fluxes = Interfacer.init_coupler_fields(FT, coupler_fluxes_names, boundary_space)
 
     # Initialize the coupler fields so we can perform exchange
     coupler_field_names = Interfacer.default_coupler_fields()
     map(sim -> Interfacer.add_coupler_fields!(coupler_field_names, sim), values(model_sims))
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
+    thermo_params = TDP.ThermodynamicsParameters(FT)
 
     cs = Interfacer.CoupledSimulation{FT}(
         nothing, # comms_ctx
@@ -89,7 +88,7 @@ end
         model_sims,
         (;), # callbacks
         (;), # dirs
-        nothing, # thermo_params
+        thermo_params, # thermo_params
         nothing, # diags_handler
     )
 
@@ -101,29 +100,29 @@ end
     FieldExchanger.exchange!(cs)
 
     # Update land cache variables with the updated drivers in the cache after the exchange
-    update_aux! = ClimaLand.make_update_aux(land_sim.model)
+    update_aux! = CL.make_update_aux(land_sim.model)
     update_aux!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
 
-    update_boundary_fluxes! = ClimaLand.make_update_boundary_fluxes(land_sim.model)
+    update_boundary_fluxes! = CL.make_update_boundary_fluxes(land_sim.model)
     update_boundary_fluxes!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
 
     # Compute the surface fluxes
-    FluxCalculator.compute_surface_fluxes!(coupler_fluxes, land_sim, atmos_sim, boundary_space, nothing, nothing)
+    FluxCalculator.compute_surface_fluxes!(coupler_fields, land_sim, atmos_sim, thermo_params)
 
     # Check that the fluxes have been changed
     zero_field = CC.Fields.zeros(boundary_space)
-    @test coupler_fluxes.F_turb_ρτxz != zero_field
-    @test coupler_fluxes.F_turb_ρτyz != zero_field
-    @test coupler_fluxes.F_lh != zero_field
-    @test coupler_fluxes.F_sh != zero_field
-    @test coupler_fluxes.F_turb_moisture != zero_field
+    @test coupler_fields.F_turb_ρτxz != zero_field
+    @test coupler_fields.F_turb_ρτyz != zero_field
+    @test coupler_fields.F_lh != zero_field
+    @test coupler_fields.F_sh != zero_field
+    @test coupler_fields.F_turb_moisture != zero_field
 
     # Check that the fluxes don't contain any NaNs
-    @test !any(isnan, coupler_fluxes.F_turb_ρτxz)
-    @test !any(isnan, coupler_fluxes.F_turb_ρτyz)
-    @test !any(isnan, coupler_fluxes.F_lh)
-    @test !any(isnan, coupler_fluxes.F_sh)
-    @test !any(isnan, coupler_fluxes.F_turb_moisture)
+    @test !any(isnan, coupler_fields.F_turb_ρτxz)
+    @test !any(isnan, coupler_fields.F_turb_ρτyz)
+    @test !any(isnan, coupler_fields.F_lh)
+    @test !any(isnan, coupler_fields.F_sh)
+    @test !any(isnan, coupler_fields.F_turb_moisture)
 
     # Check that drivers in cache got updated
     for driver in propertynames(land_sim.integrator.p.drivers)

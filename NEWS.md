@@ -6,6 +6,27 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Remove `dt_save_state_to_disk` and `dt_save_to_sol` options
+
+`dt_save_state_to_disk` was unused and is removed from all configs in this
+commit. Note that ClimaAtmos does have an option with this name, but we
+pass `checkpoint_dt` to it. `dt_save_to_sol` is also removed as an option,
+in favor of using our more robust checkpointing infrastructure via `checkpoint_dt`.
+
+#### Misc. interface cleanup
+
+Including:
+- Remove `ρ_sfc` from surface model caches
+- Remove `F_radiative` from `add_coupler_fields` since it's a default
+- Remove atmosphere `get_field` method for `thermo_state_int`, since it's now constructed on the boundary space
+- Update Interfacer docs
+
+#### Construct thermo states from exchanged T, q, ρ. PR[#1293](https://github.com/CliMA/ClimaCoupler.jl/pull/1293)
+
+Instead of exchanging atmosphere and surface thermo states, exchange T, q, ρ
+and use these to construct the thermo states. This will be necessary as we
+run with models on different grids and require real remapping.
+
 #### Allow < 3 surface models. PR[#1286](https://github.com/CliMA/ClimaCoupler.jl/pull/1286)
 
 Previously, land, ocean, and sea ice were all required to be defined, and the

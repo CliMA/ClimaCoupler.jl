@@ -1,7 +1,9 @@
 import SciMLBase
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
-import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
+import ClimaUtilities
+import ClimaUtilities.TimeManager: date
+import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities, FieldExchanger
 
 ###
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
@@ -48,7 +50,7 @@ function slab_ocean_space_init(space, params)
     # prognostic variable
     Y = CC.Fields.FieldVector(; T_sfc = T_sfc)
 
-    return Y, space
+    return Y
 end
 
 """
@@ -71,19 +73,19 @@ function SlabOceanSimulation(
     evolving_switch = evolving ? FT(1) : FT(0)
     params = OceanSlabParameters{FT}(evolving_switch = evolving_switch)
 
-    Y, space = slab_ocean_space_init(space, params)
+    Y = slab_ocean_space_init(space, params)
     cache = (
         params = params,
         F_turb_energy = CC.Fields.zeros(space),
         F_radiative = CC.Fields.zeros(space),
-        q_sfc = CC.Fields.zeros(space),
-        ρ_sfc = CC.Fields.zeros(space),
         area_fraction = area_fraction,
         thermo_params = thermo_params,
-        # add dss_buffer to cache to avoid runtime dss allocation
-        dss_buffer = CC.Spaces.create_dss_buffer(Y),
         α_direct = CC.Fields.ones(space) .* params.α,
         α_diffuse = CC.Fields.ones(space) .* params.α,
+        u_atmos = CC.Fields.zeros(space),
+        v_atmos = CC.Fields.zeros(space),
+        # add dss_buffer to cache to avoid runtime dss allocation
+        dss_buffer = CC.Spaces.create_dss_buffer(Y),
     )
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
@@ -123,41 +125,27 @@ Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:energy}) =
 
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:area_fraction}, field::CC.Fields.Field)
     sim.integrator.p.area_fraction .= field
-end
-function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:air_density}, field)
-    parent(sim.integrator.p.ρ_sfc) .= parent(field)
+    return nothing
 end
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:radiative_energy_flux_sfc}, field)
-    parent(sim.integrator.p.F_radiative) .= parent(field)
+    Interfacer.remap!(sim.integrator.p.F_radiative, field)
 end
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:turbulent_energy_flux}, field)
-    parent(sim.integrator.p.F_turb_energy) .= parent(field)
+    Interfacer.remap!(sim.integrator.p.F_turb_energy, field)
 end
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:surface_direct_albedo}, field::CC.Fields.Field)
-    sim.integrator.p.α_direct .= field
+    Interfacer.remap!(sim.integrator.p.α_direct, field)
 end
 function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:surface_diffuse_albedo}, field::CC.Fields.Field)
-    sim.integrator.p.α_diffuse .= field
+    Interfacer.remap!(sim.integrator.p.α_diffuse, field)
 end
 
 # extensions required by FieldExchanger
 Interfacer.step!(sim::SlabOceanSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 
-"""
-Extend Interfacer.add_coupler_fields! to add the fields required for SlabOceanSimulation.
-
-The fields added are:
-- `:ρ_sfc` (for humidity calculation)
-- `:F_radiative` (for radiation input)
-"""
-function Interfacer.add_coupler_fields!(coupler_field_names, ::SlabOceanSimulation)
-    ocean_coupler_fields = [:ρ_sfc, :F_radiative]
-    push!(coupler_field_names, ocean_coupler_fields...)
-end
-
 function FluxCalculator.update_turbulent_fluxes!(sim::SlabOceanSimulation, fields::NamedTuple)
-    (; F_lh, F_sh) = fields
-    @. sim.integrator.p.F_turb_energy = F_lh + F_sh
+    Interfacer.update_field!(sim, Val(:turbulent_energy_flux), fields.F_lh .+ fields.F_sh)
+    return nothing
 end
 
 """
@@ -180,7 +168,6 @@ function slab_ocean_rhs!(dY, Y, cache, t)
     # Note that the area fraction has already been applied to the fluxes,
     #  so we don't need to multiply by it here.
     @. dY.T_sfc = rhs * p.evolving_switch
-    @. cache.q_sfc = TD.q_vap_saturation_generic.(cache.thermo_params, Y.T_sfc, cache.ρ_sfc, TD.Liquid())
 end
 
 """

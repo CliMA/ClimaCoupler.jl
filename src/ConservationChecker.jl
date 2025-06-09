@@ -52,10 +52,12 @@ Base.nameof(::WaterConservationCheck) = "water [kg]"
 """
     check_conservation!(coupler_sim::Interfacer.CoupledSimulation; runtime_check = false)
 
-itertes over all specified conservation checks.
+itertes over all specified conservation checks and returns values.
 """
-check_conservation!(coupler_sim::Interfacer.CoupledSimulation; runtime_check = false) =
-    map(x -> check_conservation!(x, coupler_sim, runtime_check), coupler_sim.conservation_checks)
+function check_conservation!(coupler_sim::Interfacer.CoupledSimulation; runtime_check = false)
+    isnothing(coupler_sim.conservation_checks) && return nothing
+    return map(x -> check_conservation!(x, coupler_sim, runtime_check), coupler_sim.conservation_checks)
+end
 
 """
         check_conservation!(
@@ -112,7 +114,8 @@ function check_conservation!(
                 current = FT(0)
             else
                 previous = getproperty(ccs, sim_name)
-                current = integral(Interfacer.get_field(sim, Val(:energy)) .* area_fraction) # # ∫ J / m^3 dV
+                # regrid each field onto the boundary space
+                current = integral(Interfacer.get_field(sim, Val(:energy), coupler_sim.boundary_space) .* area_fraction) # # ∫ J / m^3 dV
             end
             push!(previous, current)
             total += current
@@ -154,8 +157,7 @@ function check_conservation!(
     total = 0
 
     # net precipitation (for surfaces that don't collect water)
-    PE_net =
-        coupler_sim.fields.P_net .+= Utilities.swap_space!(boundary_space, surface_water_gain_from_rates(coupler_sim))
+    PE_net = coupler_sim.fields.P_net .+= Interfacer.remap(surface_water_gain_from_rates(coupler_sim), boundary_space)
 
     # save surfaces
     for sim in model_sims
@@ -181,7 +183,7 @@ function check_conservation!(
                 push!(previous, current)
             else
                 previous = getproperty(ccs, sim_name)
-                current = integral(Interfacer.get_field(sim, Val(:water)) .* area_fraction) # kg (∫kg of water / m^3 dV)
+                current = integral(Interfacer.get_field(sim, Val(:water), coupler_sim.boundary_space) .* area_fraction) # kg (∫kg of water / m^3 dV)
                 push!(previous, current)
             end
         end

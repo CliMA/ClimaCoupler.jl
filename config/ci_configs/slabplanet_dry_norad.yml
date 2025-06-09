@@ -2,7 +2,6 @@ apply_limiter: false
 conservation_softfail: true
 dt: "200secs"
 dt_cpl: "200secs"
-dt_save_to_sol: "9days"
 energy_check: true
 h_elem: 4
 mode_name: "slabplanet"
@@ -10,5 +9,5 @@ moist: "dry"
 output_default_diagnostics: false
 precip_model: nothing
 rad: nothing
-t_end: "10days"
+t_end: "1days"
 vert_diff: "true"

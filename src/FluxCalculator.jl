@@ -12,22 +12,7 @@ import Thermodynamics as TD
 import ClimaCore as CC
 import ..Interfacer, ..Utilities
 
-export calculate_surface_air_density,
-    extrapolate_ρ_to_sfc,
-    turbulent_fluxes!,
-    get_surface_params,
-    update_turbulent_fluxes!,
-    water_albedo_from_atmosphere!,
-    compute_surface_fluxes!
-
-"""
-    calculate_surface_air_density(atmos_sim::ClimaAtmosSimulation, T_sfc::CC.Fields.Field)
-
-Extension for this  to to calculate surface density.
-"""
-function calculate_surface_air_density(atmos_sim::Interfacer.AtmosModelSimulation, T_sfc::CC.Fields.Field)
-    error("this function is required to be dispatched on $(nameof(atmos_sim)), but no method defined")
-end
+export extrapolate_ρ_to_sfc, turbulent_fluxes!, get_surface_params, update_turbulent_fluxes!, compute_surface_fluxes!
 
 function turbulent_fluxes!(cs::Interfacer.CoupledSimulation)
     return turbulent_fluxes!(cs.fields, cs.model_sims, cs.thermo_params)
@@ -70,7 +55,6 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
         :z0m_sfc,
         :z0b_sfc,
         :beta,
-        :q_sfc,
         :L_MO,
         :ustar,
         :buoyancy_flux,
@@ -80,21 +64,19 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
 
     # Compute the surface fluxes for each surface model and add them to `csf`
     for sim in model_sims
-        compute_surface_fluxes!(csf, sim, atmos_sim, boundary_space, thermo_params)
+        compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params)
     end
 
     # Update the atmosphere with the fluxes across all surface models
     # The surface models have already been updated with the fluxes in `compute_surface_fluxes!`
     # TODO this should be `update_turbulent_fluxes` to match the surface models
     Interfacer.update_field!(atmos_sim, Val(:turbulent_fluxes), csf)
-
-    # TODO: add allowable bounds here, check explicitly that all fluxes are equal
     return nothing
 end
 
 
 function surface_inputs(input_args::NamedTuple)
-    (; thermo_state_sfc, thermo_state_int, uₕ_int, z_int, z_sfc, scheme_properties, boundary_space) = input_args
+    (; thermo_state_sfc, thermo_state_atmos, uₕ_int, z_int, z_sfc, scheme_properties, boundary_space) = input_args
     FT = CC.Spaces.undertype(boundary_space)
     (; z0b, z0m, beta, gustiness) = scheme_properties
 
@@ -105,7 +87,7 @@ function surface_inputs(input_args::NamedTuple)
 
     z_int_fv = maybe_fv(z_int)
     uₕ_int_fv = maybe_fv(uₕ_int)
-    thermo_state_int_fv = maybe_fv(thermo_state_int)
+    thermo_state_atmos_fv = maybe_fv(thermo_state_atmos)
     z_sfc_fv = maybe_fv(z_sfc)
     thermo_state_sfc_fv = maybe_fv(thermo_state_sfc)
     beta_fv = maybe_fv(beta)
@@ -115,7 +97,7 @@ function surface_inputs(input_args::NamedTuple)
 
     # Compute state values
     result = @. SF.ValuesOnly(
-        SF.StateValues(z_int_fv, uₕ_int_fv, thermo_state_int_fv), # state_in
+        SF.StateValues(z_int_fv, uₕ_int_fv, thermo_state_atmos_fv), # state_in
         SF.StateValues(                                  # state_sfc
             z_sfc_fv,
             StaticArrays.SVector(FT(0), FT(0)),
@@ -129,44 +111,6 @@ function surface_inputs(input_args::NamedTuple)
 
     # Put the result data layout back onto the surface space
     return CC.Fields.Field(result, boundary_space)
-end
-
-"""
-    surface_thermo_state(sim::Interfacer.SurfaceModelSimulation,
-                         thermo_params::TD.Parameters.ThermodynamicsParameters,
-                         atmos_sim::Interfacer.AtmosModelSimulation)
-
-Return the surface thermo state the surface model simulation `sim`.
-
-This is obtained by using the model surface temperature in `sim`, extrapolating atmospheric
-density adiabatically to the surface, and using the model surface humidity (which, by
-default, is computed assuming a liquid phase).
-"""
-function surface_thermo_state(
-    sim::Interfacer.SurfaceModelSimulation,
-    thermo_params::TD.Parameters.ThermodynamicsParameters,
-    atmos_sim::Interfacer.AtmosModelSimulation,
-)
-    FT = eltype(atmos_sim.integrator.u)
-
-    T_sfc = Interfacer.get_field(sim, Val(:surface_temperature))
-    # Note that the surface air density, ρ_sfc, is computed using the atmospheric state at the first level and making ideal gas
-    # and hydrostatic balance assumptions. The land model does not compute the surface air density so this is
-    # a reasonable stand-in.
-    #
-    # NOTE: This allocates! Fix me!
-    ρ_sfc =
-        FluxCalculator.extrapolate_ρ_to_sfc.(
-            thermo_params,
-            Interfacer.get_field(atmos_sim, Val(:thermo_state_int)),
-            T_sfc,
-        ) # ideally the # calculate elsewhere, here just getter...
-
-    # For SurfaceStabs, this is just liquid phase
-    q_sfc = TD.q_vap_saturation_generic.(thermo_params, T_sfc, ρ_sfc, TD.Liquid()) # default: saturated liquid surface
-
-    # NOTE: This allocates! Fix me!
-    return @. TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
 end
 
 # TODO: (an equivalent of) this function also lives in Atmos and Land - should move to general utilities
@@ -230,41 +174,14 @@ end
 
 Updates the fluxes in the surface model simulation `sim` with the fluxes in `fields`.
 """
-function update_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, fields::NamedTuple)
+function update_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, fields)
     return error("update_turbulent_fluxes! is required to be dispatched on $(nameof(sim)), but no method defined")
 end
 
 update_turbulent_fluxes!(sim::Interfacer.AbstractSurfaceStub, fields::NamedTuple) = nothing
 
 """
-    water_albedo_from_atmosphere!(cs::Interfacer.CoupledSimulation)
-
-Callback to calculate the water albedo from atmospheric state. This is a placeholder for the full radiation callback.
-"""
-function water_albedo_from_atmosphere!(cs::Interfacer.CoupledSimulation)
-    atmos_sim = cs.model_sims.atmos_sim
-    ocean_sim = cs.model_sims.ocean_sim
-    cf = cs.fields
-
-    # use temp fields
-    water_albedo_from_atmosphere!(atmos_sim, cf.temp1, cf.temp2)
-
-    Interfacer.update_field!(ocean_sim, Val(:surface_direct_albedo), cf.temp1)
-    Interfacer.update_field!(ocean_sim, Val(:surface_diffuse_albedo), cf.temp2)
-    return nothing
-end
-
-"""
-    water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulation, ::CC.Fields.Field, ::CC.Fields.Field)
-
-Placeholder for the water albedo calculation from the atmosphere. It returns an error if not extended.
-"""
-function water_albedo_from_atmosphere!(atmos_sim::Interfacer.AtmosModelSimulation, ::CC.Fields.Field, ::CC.Fields.Field)
-    error("this function is required to be dispatched on $(nameof(atmos_sim)), but no method defined")
-end
-
-"""
-    compute_surface_fluxes!(csf, sim, atmos_sim, boundary_space, thermo_params)
+    compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params)
 
 This function computes surface fluxes between the input component model
 simulation and the atmosphere.
@@ -280,14 +197,12 @@ function does nothing if called on an atmosphere model simulation.
 - `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
 - `sim`: [Interfacer.ComponentModelSimulation] the surface simulation to compute fluxes for.
 - `atmos_sim`: [Interfacer.AtmosModelSimulation] the atmosphere simulation to compute fluxes with.
-- `boundary_space`: [CC.Spaces.AbstractSpace] the space of the coupler surface.
 - `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
 """
 function compute_surface_fluxes!(
     csf,
     sim::Interfacer.AtmosModelSimulation,
     atmos_sim::Interfacer.AtmosModelSimulation,
-    boundary_space,
     thermo_params,
 )
     # do nothing for atmos model
@@ -298,21 +213,29 @@ function compute_surface_fluxes!(
     csf,
     sim::Interfacer.SurfaceModelSimulation,
     atmos_sim::Interfacer.AtmosModelSimulation,
-    boundary_space,
     thermo_params,
 )
+    boundary_space = axes(csf)
+    # TODO lots of allocations here
     # `_int` refers to atmos state of center level 1
     z_int = Interfacer.get_field(atmos_sim, Val(:height_int), boundary_space)
     u_int = Interfacer.get_field(atmos_sim, Val(:u_int), boundary_space)
     v_int = Interfacer.get_field(atmos_sim, Val(:v_int), boundary_space)
     uₕ_int = @. StaticArrays.SVector(u_int, v_int)
-    thermo_state_int = Interfacer.get_field(atmos_sim, Val(:thermo_state_int), boundary_space)
     z_sfc = Interfacer.get_field(atmos_sim, Val(:height_sfc), boundary_space)
 
-    # get area fraction (min = 0, max = 1)
-    area_fraction = Interfacer.get_field(sim, Val(:area_fraction), boundary_space)
+    # construct the atmospheric thermo states
+    thermo_state_atmos = TD.PhaseEquil_ρTq.(thermo_params, csf.ρ_atmos, csf.T_atmos, csf.q_atmos)
 
-    thermo_state_sfc = FluxCalculator.surface_thermo_state(sim, thermo_params, atmos_sim)
+    # construct the surface thermo state
+    # get surface air density by extrapolating atmospheric density to the surface
+    ρ_sfc = extrapolate_ρ_to_sfc.(thermo_params, thermo_state_atmos, csf.T_sfc)
+
+    # compute surface humidity from the surface temperature, surface density, and phase
+    thermo_state_sfc = TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, csf.T_sfc, csf.q_sfc)
+
+    # get area fraction (min = 0, max = 1)
+    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
     surface_params = FluxCalculator.get_surface_params(atmos_sim)
 
@@ -322,8 +245,16 @@ function compute_surface_fluxes!(
     FT = eltype(z0m)
     scheme_properties = (; z0b = z0b, z0m = z0m, Ch = FT(0), Cd = FT(0), beta = beta, gustiness = FT(1))
 
-    input_args =
-        (; thermo_state_sfc, thermo_state_int, uₕ_int, z_int, z_sfc, scheme_properties, boundary_space, surface_params)
+    input_args = (;
+        thermo_state_sfc,
+        thermo_state_atmos,
+        uₕ_int,
+        z_int,
+        z_sfc,
+        scheme_properties,
+        boundary_space,
+        surface_params,
+    )
     inputs = FluxCalculator.surface_inputs(input_args)
 
     # calculate the surface fluxes
@@ -380,10 +311,6 @@ function compute_surface_fluxes!(
     @. csf.z0m_sfc += z0m * area_fraction
     @. csf.z0b_sfc += z0b * area_fraction
     @. csf.beta += beta * area_fraction
-
-    # NOTE: This is essentially setting q_sfc to the Atmos q_sfc (because we compute the
-    # thermo_state_sfc by extrapolating the atmos properties onto the surface)
-    @. csf.q_sfc += TD.total_specific_humidity.(thermo_params, thermo_state_sfc) * area_fraction
     return nothing
 end
 

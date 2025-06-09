@@ -1,11 +1,11 @@
 apply_limiter: false
-co2: "maunaloa"
-dt_save_to_sol: "10days"
+co2_model: "maunaloa"
 energy_check: false
 h_elem: 4
 mode_name: "amip"
 moist: "equil"
 precip_model: "0M"
 rad: "allskywithclear"
-t_end: "10days"
+share_surface_space: false
+t_end: "1days"
 vert_diff: "true"

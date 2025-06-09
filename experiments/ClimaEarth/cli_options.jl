@@ -17,7 +17,7 @@ function argparse_settings()
         arg_type = Bool
         default = true
         "--mode_name"
-        help = "Mode of coupled simulation. [`amip` (default), `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`]"
+        help = "Mode of coupled simulation. [`cmip`, `amip` (default), `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`]"
         arg_type = String
         default = "amip"
         "--coupler_toml"
@@ -74,14 +74,19 @@ function argparse_settings()
         "--dt_seaice"
         help = "Sea ice simulation time step (alternative to `dt`; no default) [allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Inf\"]"
         arg_type = String
-        "--dt_save_to_sol"
-        help = "Time interval for saving output [\"10days\" (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Inf\"]"
-        arg_type = String
-        default = "10days"
         "--checkpoint_dt"
-        help = "Time interval for checkpointing [\"20days\" (default)]"
+        help = "Time interval for checkpointing [\"90days\" (default)]"
         arg_type = String
-        default = "20days"
+        default = "90days"
+        # Space information
+        "--h_elem"
+        help = "Number of horizontal elements to use for the boundary space [16 (default)]"
+        arg_type = Int
+        default = 16
+        "--share_surface_space"
+        help = "Boolean flag indicating whether to share the surface space between the surface models, atmosphere, and boundary [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
         # Restart information
         "--restart_dir"
         help = "Directory containing restart files"

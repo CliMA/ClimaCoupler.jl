@@ -71,6 +71,7 @@ for FT in (Float32, Float64)
             (Int(0), Int(1000)), # tspan
             Int(200), # Δt_cpl
             Ref(Int(0)), # t
+            Ref(-1), # prev_checkpoint_t
             model_sims, # model_sims
             (;), # callbacks
             (;), # dirs
@@ -166,6 +167,7 @@ for FT in (Float32, Float64)
             (Int(0), Int(1000)), # tspan
             Int(200), # Δt_cpl
             Ref(Int(0)), # t
+            Ref(-1), # prev_checkpoint_t
             model_sims, # model_sims
             (;), # callbacks
             (;), # dirs

@@ -8,7 +8,7 @@
 trap 'handle_exit' EXIT
 
 handle_exit() {
-if [ ! -f "output/surface_fluxes_perfect_model/iteration_008/eki_file.jld2" ]; then
+if [ ! -f "output/surface_fluxes_perfect_model/iteration_002/eki_file.jld2" ]; then
 	echo "Resubmitting due to incomplete calibration..."
 	sbatch "$0"
 else

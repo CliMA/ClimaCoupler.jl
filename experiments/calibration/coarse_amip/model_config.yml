@@ -9,9 +9,11 @@ coupler_toml: ["toml/amip.toml"]
 coupler_output_dir: "experiments/calibration/coarse_amip/output"
 dt: "240secs"
 dt_cpl: "240secs"
-dt_save_state_to_disk: "365days"
+dt_save_state_to_disk: "99999days"
 dt_save_to_sol: "99999days"
-dz_bottom: 50.0
+dz_bottom: 30.0
+edmfx_entr_model: "PiGroups"
+edmfx_detr_model: "SmoothArea"
 energy_check: false
 h_elem: 8
 land_albedo_type: "map_temporal"
@@ -21,12 +23,9 @@ netcdf_output_at_levels: true
 output_default_diagnostics: false
 use_coupler_diagnostics: false
 rayleigh_sponge: true
-# restart_dir: "restart_checkpoints"
-# restart_t: 31104000
-edmfx_entr_model: "PiGroups"
-edmfx_detr_model: "SmoothArea"
+restart_dir: "restart_checkpoints/checkpoints"
+restart_t: 31536000
 surface_setup: "PrescribedSurface"
-t_end: "465days"
 topography: "Earth"
 topo_smoothing: true
 viscous_sponge: true

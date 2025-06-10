@@ -21,33 +21,23 @@ output_dir = "experiments/calibration/coarse_amip/output"
 n_iterations = 9
 
 # Prior distribution 
-
-# constrained_gaussian(
-#     "entr_param_vec",
-#     [20.8, -11.6, -21.5, 16.5, -5.1, 0.024],
-#     [5.0, 5.0, 5.0, 5.0, 5.0, 0.003],
-#     [0.0, -30.0, -40.0, 0, -20, 0.0],
-#     [40., 5, 0, 40, 15, 0.1],
-# ),
-# Vector of (mean, stdev) for vector parameter `entr_param_vec`
-vec_distributions = [(0.0, 0.5),(0.0, 0.5),(0.0, 0.5),(0.0, 0.5),(0.0, 0.5),(0.0, 0.3), ]
-vec_distributions = map(x -> Normal(x...), vec_distributions)
-vec_constraints = [(0.0, 40.0), (-30.0, 5), (-40, 0), (0, 40), (-20, 15), (0.0, 0.1)]
-vec_constraints = map(x -> bounded(x...), vec_constraints)
 priors = [
-    ParameterDistribution(VectorOfParameterized(vec_distributions), vec_constraints, "entr_param_vec"),
-    constrained_gaussian("entr_mult_limiter_coeff", 1.09, 0.2, 0.0, 2.0),
-    constrained_gaussian("EDMF_surface_area", 0.075, 0.02, 0.0, 0.15),
-    constrained_gaussian("mixing_length_tke_surf_flux_coeff", 4, 1, 0, 8)
+    constrained_gaussian("pi_groups_coeff", 1.0, 0.3, 0, Inf),
+    constrained_gaussian("entr_pi_const", 0.7319794747190422, 0.15, 0, 10),
+    constrained_gaussian("mixing_length_tke_surf_flux_coeff", 9.233650392728526, 1.5, 0, Inf),
+    constrained_gaussian("precipitation_timescale", 919.3827604731249, 150.0, 0, Inf),
+    constrained_gaussian("EDMF_surface_area", 0.10928882001604676, 0.03, 0, Inf)
 ]
 prior = combine_distributions(priors)
 
 batch_size = 1
 nt = JLD2.load_object("experiments/calibration/nt_obs.jld2")
 short_names = filter(x -> x != :rsdt, keys(nt))
-obs_series = create_observation_series(nt; short_names, batch_size)
+model_error_scale = 0.10
+regularization = 1e-3
+obs_series = create_observation_series(nt;model_error_scale, regularization, short_names, batch_size)
 
-eki = EKP.EnsembleKalmanProcess(obs_series, EKP.TransformUnscented(prior), verbose = true)
+eki = EKP.EnsembleKalmanProcess(obs_series, EKP.TransformUnscented(prior, impose_prior = true), verbose = true)
 ensemble_size = EKP.get_N_ens(eki)
 
 # Slurm resources for a single model run

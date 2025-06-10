@@ -18,7 +18,7 @@ function ClimaCalibrate.forward_model(iter, member)
     @info "Current minibatch: $minibatch"
     @info "Current start date: $(minibatch_to_start_date(minibatch))"
     spinup_days = 92
-    nyears = length(minibatch)
+    nyears = length(minibatch) + 1
     t_end_days = spinup_days + 365 * nyears
     config_dict["t_end"] = "$(t_end_days)days"
 
@@ -42,8 +42,8 @@ function ClimaCalibrate.forward_model(iter, member)
 end
 
 function minibatch_to_start_date(batch)
-    start_year = minimum(batch) + 2001
-    @assert start_year >= 2002
+    start_year = minimum(batch) + 2000
+    @assert start_year >= 2001
     return "$(start_year)0901"
 end
 

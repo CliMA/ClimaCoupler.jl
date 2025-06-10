@@ -34,6 +34,7 @@ function ClimaCalibrate.observation_map(iteration)
     nan_count = count(isnan, G_ensemble)
     # Check for 50% nans
     @assert nan_count < total_elements / 2
+    # TODO: use nanmean
     @info "Mean bias y - G, averaged across the ensemble" bias = mean(G_ensemble, dims = 2) - obs |> mean
     return G_ensemble
 end

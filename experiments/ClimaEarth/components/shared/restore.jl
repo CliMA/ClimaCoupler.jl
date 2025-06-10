@@ -10,6 +10,7 @@ import ClimaCore.Spaces: AbstractSpace
 import ClimaUtilities.TimeVaryingInputs: AbstractTimeVaryingInput
 import StaticArrays
 import NCDatasets
+import Dates
 
 """
     restore!(v1, v2, comms_ctx; ignore)
@@ -75,5 +76,26 @@ end
 function restore!(v1::Dict, v2::Dict, comms_ctx; name, ignore)
     # RRTGMP has some internal dictionaries
     v1 == v2 || error("$name is inconsistent")
+    return nothing
+end
+
+"""
+    restore!(v1::T1, v2::T2, comms_ctx; name = "", ignore) where {T1 <: Union{Dates.DateTime, Dates.UTInstant, Dates.Millisecond}, T2 <: Union{Dates.DateTime, Dates.UTInstant, Dates.Millisecond}}
+
+Special case for time-related types to allow different timestamps during restore.
+"""
+function restore!(
+    v1::T1,
+    v2::T2,
+    comms_ctx;
+    name,
+    ignore,
+) where {
+    T1 <: Union{Dates.DateTime, Dates.UTInstant, Dates.Millisecond},
+    T2 <: Union{Dates.DateTime, Dates.UTInstant, Dates.Millisecond},
+}
+    if v1 != v2
+        @warn "Time value differs in restart" field = name original = v2 new = v1
+    end
     return nothing
 end

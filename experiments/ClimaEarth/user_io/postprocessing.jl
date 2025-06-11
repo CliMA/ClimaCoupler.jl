@@ -2,6 +2,7 @@
 include("debug_plots.jl")
 include("diagnostics_plots.jl")
 include("../leaderboard/leaderboard.jl")
+include("../leaderboard/test_rmses.jl")
 
 """
     postprocess_sim(cs, postprocessing_vars)
@@ -32,15 +33,15 @@ function postprocess_sim(cs, postprocessing_vars)
 
     # If we have enough data (in time, but also enough variables), plot the leaderboard.
     # We need pressure to compute the leaderboard.
-    pressure_in_output = "pfull" in CAN.available_vars(CAN.SimDir(atmos_output_dir))
-    if pressure_in_output
-        times = CAN.times(get(CAN.SimDir(atmos_output_dir), "pfull"))
-        t_end = times[end]
-        if t_end > 84600 * 31 * 3 # 3 months for spin up
-            leaderboard_base_path = artifact_dir
-            compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
-            compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 6)
-        end
+    simdir = CAN.SimDir(atmos_output_dir)
+    pressure_in_output = "pfull" in CAN.available_vars(simdir)
+    times = CAN.times(get(CAN.SimDir(atmos_output_dir), first(CAN.available_vars(simdir))))
+    t_end = times[end]
+    if t_end > 84600 * 31 * 3 # 3 months for spin up
+        leaderboard_base_path = artifact_dir
+        compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
+        test_rmse_thresholds(atmos_output_dir, 3)
+        pressure_in_output && compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 6)
     end
 
     # Perform conservation checks if they exist

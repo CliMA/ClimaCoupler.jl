@@ -79,7 +79,7 @@ function check_conservation!(
     ccs = cc.sums
     (; model_sims) = coupler_sim
 
-    FT = CC.Spaces.undertype(coupler_sim.boundary_space)
+    FT = CC.Spaces.undertype(Interfacer.boundary_space(coupler_sim))
     total = FT(0)
 
     # save surfaces
@@ -115,7 +115,9 @@ function check_conservation!(
             else
                 previous = getproperty(ccs, sim_name)
                 # regrid each field onto the boundary space
-                current = integral(Interfacer.get_field(sim, Val(:energy), coupler_sim.boundary_space) .* area_fraction) # # ∫ J / m^3 dV
+                current = integral(
+                    Interfacer.get_field(sim, Val(:energy), Interfacer.boundary_space(coupler_sim)) .* area_fraction,
+                ) # # ∫ J / m^3 dV
             end
             push!(previous, current)
             total += current
@@ -152,12 +154,14 @@ function check_conservation!(
     ccs = cc.sums
     (; model_sims) = coupler_sim
 
-    boundary_space = coupler_sim.boundary_space # thin shell approx (boundary_space[z=0] = boundary_space[z_top])
+    # thin shell approx (boundary_space[z=0] = boundary_space[z_top])
 
     total = 0
 
     # net precipitation (for surfaces that don't collect water)
-    PE_net = coupler_sim.fields.P_net .+= Interfacer.remap(surface_water_gain_from_rates(coupler_sim), boundary_space)
+    PE_net =
+        coupler_sim.fields.P_net .+=
+            Interfacer.remap(surface_water_gain_from_rates(coupler_sim), Interfacer.boundary_space(coupler_sim))
 
     # save surfaces
     for sim in model_sims
@@ -183,7 +187,9 @@ function check_conservation!(
                 push!(previous, current)
             else
                 previous = getproperty(ccs, sim_name)
-                current = integral(Interfacer.get_field(sim, Val(:water), coupler_sim.boundary_space) .* area_fraction) # kg (∫kg of water / m^3 dV)
+                current = integral(
+                    Interfacer.get_field(sim, Val(:water), Interfacer.boundary_space(coupler_sim)) .* area_fraction,
+                ) # kg (∫kg of water / m^3 dV)
                 push!(previous, current)
             end
         end

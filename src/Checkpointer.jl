@@ -104,7 +104,7 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
     day = floor(Int, time / (60 * 60 * 24))
     sec = floor(Int, time % (60 * 60 * 24))
     output_dir = cs.dirs.checkpoints
-    comms_ctx = cs.comms_ctx
+    comms_ctx = ClimaComms.context(cs)
     for sim in cs.model_sims
         if !isnothing(Checkpointer.get_model_prog_state(sim))
             Checkpointer.checkpoint_model_state(sim, comms_ctx, time; output_dir)
@@ -130,11 +130,11 @@ Return a true if the simulation was restarted.
 """
 function restart!(cs, checkpoint_dir, checkpoint_t)
     @info "Restarting from time $(checkpoint_t) and directory $(checkpoint_dir)"
-    pid = ClimaComms.mypid(cs.comms_ctx)
+    pid = ClimaComms.mypid(ClimaComms.context(cs))
     for sim in cs.model_sims
         if !isnothing(Checkpointer.get_model_prog_state(sim))
             input_file_state = output_file = joinpath(checkpoint_dir, "checkpoint_$(nameof(sim))_$(checkpoint_t).hdf5")
-            restart_model_state!(sim, input_file_state, cs.comms_ctx)
+            restart_model_state!(sim, input_file_state, ClimaComms.context(cs))
         end
         if !isnothing(Checkpointer.get_model_cache(sim))
             input_file_cache = joinpath(checkpoint_dir, "checkpoint_cache_$(pid)_$(nameof(sim))_$(checkpoint_t).jld2")
@@ -190,7 +190,7 @@ function restart_coupler_fields!(cs, input_file)
     JLD2.jldopen(input_file) do file
         fields_read = file["coupler_fields"]
         for name in propertynames(cs.fields)
-            ArrayType = ClimaComms.array_type(ClimaComms.device(cs.comms_ctx))
+            ArrayType = ClimaComms.array_type(ClimaComms.device(cs))
             parent(getproperty(cs.fields, name)) .= ArrayType(parent(getproperty(fields_read, name)))
         end
     end

@@ -70,9 +70,7 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
         ice_sim = Interfacer.SurfaceStub(stub_fields),
     )
     cs = Interfacer.CoupledSimulation{FT}(
-        nothing, # comms_ctx
         nothing, # dates
-        nothing, # boundary_space
         coupler_fields, # fields
         nothing, # conservation_checks
         (Int(0), Int(1)), # tspan

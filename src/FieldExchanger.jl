@@ -28,8 +28,7 @@ If a surface model is not present, the area fraction is set to 0.
 - `cs`: [Interfacer.CoupledSimulation] containing area fraction information.
 """
 function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
-    boundary_space = cs.boundary_space
-    FT = CC.Spaces.undertype(boundary_space)
+    FT = CC.Spaces.undertype(Interfacer.boundary_space(cs))
 
     # land fraction is static
     if haskey(cs.model_sims, :land_sim)

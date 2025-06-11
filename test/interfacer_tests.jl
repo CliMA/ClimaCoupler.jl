@@ -34,14 +34,14 @@ ClimaComms.init(context)
 
 for FT in (Float32, Float64)
     @testset "test CoupledSim construction, float_type for FT=$FT" begin
-        boundary_space =
+        boundary_space_ =
             CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
 
+        fields = ones(boundary_space_)
+
         cs = Interfacer.CoupledSimulation{FT}(
-            context,
             nothing, # dates
-            boundary_space,
-            nothing, # fields
+            fields,
             nothing, # conservation_checks
             (Int(0), Int(1000)), # tspan
             Int(200), # Δt_cpl
@@ -52,8 +52,7 @@ for FT in (Float32, Float64)
             nothing, # thermo_params
             nothing, # diags_handler
         )
-        @test CC.Spaces.undertype(cs.boundary_space) == FT
-
+        @test CC.Spaces.undertype(Interfacer.boundary_space(cs)) == FT
     end
 
     @testset "get_field indexing for FT=$FT" begin

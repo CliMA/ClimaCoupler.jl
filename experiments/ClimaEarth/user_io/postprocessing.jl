@@ -2,6 +2,7 @@
 include("debug_plots.jl")
 include("diagnostics_plots.jl")
 include("../leaderboard/leaderboard.jl")
+include("../leaderboard/test_rmses.jl")
 
 """
     postprocess_sim(cs, postprocessing_vars)
@@ -40,6 +41,7 @@ function postprocess_sim(cs, postprocessing_vars)
             leaderboard_base_path = artifact_dir
             compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
             compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 6)
+            test_rmse_thresholds(atmos_output_dir, 3)
         end
     end
 

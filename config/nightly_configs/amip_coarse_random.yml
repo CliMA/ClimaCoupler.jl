@@ -6,7 +6,7 @@ coupler_toml: ["toml/amip.toml"]
 deep_atmosphere: false
 dt: "240secs"
 dt_cpl: "240secs"
-dz_bottom: 100.0
+dz_bottom: 30.0
 energy_check: false
 h_elem: 8
 bucket_albedo_type: "map_temporal"
@@ -21,6 +21,7 @@ t_end: "465days"
 topo_smoothing: true
 topography: "Earth"
 unique_seed: true
+vert_diff: "DecayWithHeightDiffusion"
 viscous_sponge: true
 z_elem: 39
 z_max: 60000.0

@@ -1,6 +1,7 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
+cloud_model: "quadrature"
 checkpoint_dt: "366days"
 coupler_toml: ["toml/amip.toml"]
 dt: "240secs"
@@ -20,6 +21,8 @@ surface_setup: "PrescribedSurface"
 t_end: "465days"
 topography: "Earth"
 topo_smoothing: true
+turbconv: ~
+vert_diff: "DecayWithHeightDiffusion"
 viscous_sponge: true
 z_elem: 39
 z_max: 60000.0

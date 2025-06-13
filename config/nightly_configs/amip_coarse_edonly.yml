@@ -4,6 +4,7 @@ atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
 cloud_model: "quadrature"
 checkpoint_dt: "366days"
 coupler_toml: ["toml/amip.toml"]
+deep_atmosphere: false
 dt: "240secs"
 dt_cpl: "240secs"
 dz_bottom: 30.0

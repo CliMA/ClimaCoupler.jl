@@ -42,13 +42,13 @@ end
 addprocs(CAL.SlurmManager())
 # Make variables and the forward model available on the worker sessions
 @everywhere begin
-    import ClimaComms, CUDA
+    import ClimaComms, CUDA, ClimaCoupler
     ENV["CLIMACOMMS_DEVICE"] = "CUDA"
     ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
     import ClimaCalibrate as CAL
     import JLD2
 
-    experiment_dir = CAL.project_dir()
+    experiment_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration")
     include(joinpath(experiment_dir, "model_interface.jl"))
     output_dir = joinpath(experiment_dir, "output")
     obs_path = joinpath(experiment_dir, "observations.jld2")

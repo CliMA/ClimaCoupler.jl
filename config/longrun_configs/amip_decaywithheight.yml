@@ -15,6 +15,6 @@ prescribe_ozone: true
 prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "1098days"
+t_end: "732days"
 turbconv: ~
 vert_diff: "DecayWithHeightDiffusion"

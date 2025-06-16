@@ -3,7 +3,7 @@ import ClimaCalibrate
 include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.jl"))
 
 function ClimaCalibrate.forward_model(iter, member)
-    config_file = joinpath(ClimaCalibrate.project_dir(), "model_config.yml")
+    config_file = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "model_config.yml")
     config_dict = get_coupler_config_dict(config_file)
 
     output_dir_root = config_dict["coupler_output_dir"]

@@ -33,15 +33,21 @@ end
 function process_member_data(simdir::SimDir)
     output = zeros(single_member_dims)
     days = 86_400
+    minutes = 3_600
 
-    rsut = get(simdir; short_name = "rsut", reduction = "average", period = "30d")
-    rsut_slice = slice(average_lon(average_lat(rsut)); time = 30days).data
+    period = SHORT_RUN ? "8m" : "30d"
+    time = SHORT_RUN ? 8minutes : 30days
+    rsut = get(simdir; short_name = "rsut", reduction = "average", period)
+    rsut_slice = slice(average_lon(average_lat(rsut)); time).data
     return rsut_slice
 end
 
 addprocs(CAL.SlurmManager())
 # Make variables and the forward model available on the worker sessions
 @everywhere begin
+    # Run for a shorter time if SHORT_RUN is set
+    const SHORT_RUN = haskey(ENV, "SHORT_RUN") ? true : false
+
     import ClimaComms, CUDA, ClimaCoupler
     ENV["CLIMACOMMS_DEVICE"] = "CUDA"
     ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
@@ -81,7 +87,12 @@ eki = EKP.EnsembleKalmanProcess(
 )
 ensemble_size = EKP.get_N_ens(eki)
 
-eki = CAL.calibrate(CAL.WorkerBackend, eki, n_iterations, prior, output_dir)
+# Allow 100% failure rate for short run testing
+if SHORT_RUN
+    eki = CAL.calibrate(CAL.WorkerBackend, eki, n_iterations, prior, output_dir; failure_rate = 1)
+else
+    eki = CAL.calibrate(CAL.WorkerBackend, eki, n_iterations, prior, output_dir)
+end
 
 # Postprocessing
 import EnsembleKalmanProcesses as EKP
@@ -127,4 +138,4 @@ params = EKP.get_ϕ(prior, eki)
 spread = map(var, params)
 
 # Spread should be heavily decreased as particles have converged
-@test last(spread) / first(spread) < 0.15
+SHORT_RUN || @test last(spread) / first(spread) < 0.15

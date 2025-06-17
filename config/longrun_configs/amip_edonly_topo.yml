@@ -1,7 +1,7 @@
 FLOAT_TYPE: "Float32"
 aerosol_radiation: true
 albedo_model: "CouplerAlbedo"
-atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_0M_earth.yml"
+atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
 checkpoint_dt: "93days"
 co2_model: "maunaloa"
 dt: "120secs"

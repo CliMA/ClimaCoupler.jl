@@ -1,4 +1,4 @@
-atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_0M.yml"
+atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
 bucket_albedo_type: "function"
 dt: "120secs"
 dt_cloud_fraction: "1hours"

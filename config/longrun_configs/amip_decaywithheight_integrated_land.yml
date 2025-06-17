@@ -10,8 +10,8 @@ dt_rad: "1hours"
 energy_check: false
 insolation: "timevarying"
 land_model: "integrated"
-prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 prescribe_ozone: true
+prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "732days"

@@ -19,8 +19,8 @@ rayleigh_sponge: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "480secs"
-topography: "Earth"
 topo_smoothing: true
+topography: "Earth"
 viscous_sponge: true
 z_elem: 39
 z_max: 60000.0

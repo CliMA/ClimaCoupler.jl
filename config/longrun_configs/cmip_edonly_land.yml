@@ -8,13 +8,13 @@ dt_cloud_fraction: "1hours"
 dt_cpl: "120secs"
 dt_rad: "1hours"
 energy_check: false
-land_model: "integrated"
 insolation: "timevarying"
+land_model: "integrated"
 mode_name: "cmip"
-prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 prescribe_ozone: true
+prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "93days"
-topography: "Earth"
 topo_smoothing: true
+topography: "Earth"

@@ -1,6 +1,7 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
+bucket_albedo_type: "map_temporal"
 checkpoint_dt: "366days"
 coupler_toml: ["toml/amip.toml"]
 deep_atmosphere: false
@@ -9,7 +10,6 @@ dt_cpl: "240secs"
 dz_bottom: 100.0
 energy_check: false
 h_elem: 8
-bucket_albedo_type: "map_temporal"
 mode_name: "amip"
 netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
@@ -26,5 +26,5 @@ z_elem: 39
 z_max: 60000.0
 extra_atmos_diagnostics:
   - short_name: [od550aer, odsc550aer]
-    reduction_time: average
     period: "1months"
+    reduction_time: average

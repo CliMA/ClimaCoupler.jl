@@ -100,16 +100,12 @@ function BucketSimulation(
         albedo = CL.Bucket.PrescribedBaregroundAlbedo{FT}(α_snow, surface_space)
     elseif albedo_type == "map_temporal" # Read in albedo from data file containing data over time
         # By default, this uses a file containing linearly-interpolated monthly data of clear-sky albedo, generated from CERES.
-        if pkgversion(CL) < v"0.15"
-            albedo = CL.Bucket.PrescribedSurfaceAlbedo{FT}(start_date, tspan[1], surface_space)
-        else
-            albedo = CL.Bucket.PrescribedSurfaceAlbedo{FT}(
-                start_date,
-                surface_space;
-                albedo_file_path = CL.Artifacts.ceres_albedo_dataset_path(),
-                varname = "sw_alb_clr",
-            )
-        end
+        albedo = CL.Bucket.PrescribedSurfaceAlbedo{FT}(
+            start_date,
+            surface_space;
+            albedo_file_path = CL.Artifacts.ceres_albedo_dataset_path(),
+            varname = "sw_alb_clr",
+        )
     elseif albedo_type == "function" # Use prescribed function of lat/lon for surface albedo
         function α_bareground(coordinate_point)
             (; lat, long) = coordinate_point

@@ -72,17 +72,13 @@ function make_land_domain(
 
     fields = CL.Domains.get_additional_coordinate_field_data(subsurface_space)
 
-    if pkgversion(CL) < v"0.16.0"
-        return CL.Domains.SphericalShell{FT}(radius, depth, dz_tuple, nelements, npolynomial, space, fields)
-    else
-        return CL.Domains.SphericalShell{FT, typeof(space), typeof(fields)}(
-            radius,
-            depth,
-            dz_tuple,
-            nelements,
-            npolynomial,
-            space,
-            fields,
-        )
-    end
+    return CL.Domains.SphericalShell{FT, typeof(space), typeof(fields)}(
+        radius,
+        depth,
+        dz_tuple,
+        nelements,
+        npolynomial,
+        space,
+        fields,
+    )
 end

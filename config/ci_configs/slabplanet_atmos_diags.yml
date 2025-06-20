@@ -11,5 +11,5 @@ t_end: "1days"
 vert_diff: "true"
 extra_atmos_diagnostics:
   - short_name: [mse, lr, edt, evu, ts, mass_strf, stab, vt, egr, toa_fluxes_net]
-    reduction_time: average
     period: 1days
+    reduction_time: average

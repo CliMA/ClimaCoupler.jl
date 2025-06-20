@@ -1,3 +1,10 @@
-atmos_config_file: "config/longrun_configs/longrun_aquaplanet_allsky_tvinsol_0M_slabocean.yml"
+albedo_model: "RegressionFunctionAlbedo"
+approximate_linear_solve_iters: 2
+atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
+check_conservation: true
+implicit_diffusion: true
+mode_name: "slabplanet_aqua"
 output_default_diagnostics: false
+prognostic_surface: "PrognosticSurfaceTemperature"
 t_end: "120days"
+vert_diff: "DecayWithHeightDiffusion"

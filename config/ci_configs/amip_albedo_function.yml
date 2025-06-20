@@ -1,11 +1,11 @@
 apply_limiter: false
+bucket_albedo_type: "function"
 dt: "150secs"
 dt_cpl: "150secs"
 dt_rad: "1hours"
 dz_bottom: 30
 dz_top: 3000
 h_elem: 16
-bucket_albedo_type: "function"
 mode_name: "amip"
 moist: "equil"
 precip_model: "0M"

@@ -5,11 +5,11 @@ energy_check: true
 h_elem: 4
 mode_name: "slabplanet"
 moist: "equil"
+output_default_diagnostics: false
 precip_model: "0M"
 rad: "gray"
 t_end: "1days"
 vert_diff: "true"
-output_default_diagnostics: false
 extra_atmos_diagnostics:
  - short_name: [mse, lr, edt, evu, hfes, evspsbl, ts]
    period: 1days

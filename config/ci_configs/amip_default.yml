@@ -12,7 +12,7 @@ precip_model: "0M"
 rad: "gray"
 rayleigh_sponge: true
 t_end: "300secs"
+use_itime: true
 vert_diff: "true"
 z_elem: 50
 z_stretch: false
-use_itime: true

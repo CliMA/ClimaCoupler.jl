@@ -1,4 +1,6 @@
+
 FLOAT_TYPE: "Float32"
+aerosol_radiation: true
 approximate_linear_solve_iters: 2
 co2_model: "maunaloa"
 dt: 120secs
@@ -14,11 +16,14 @@ edmfx_sgs_diffusive_flux: true
 edmfx_sgs_mass_flux: true
 edmfx_upwinding: first_order
 h_elem: 30
-insolation: "timevarying"
 implicit_diffusion: true
+insolation: "timevarying"
 moist: equil
 ode_algo: ARS343
+output_default_diagnostics: false
 precip_model: 0M
+prescribe_ozone: true
+prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 prognostic_tke: true
 rad: allskywithclear
 surface_setup: DefaultMoninObukhov
@@ -27,10 +32,6 @@ toml: [toml/diagnostic_edmfx.toml]
 turbconv: diagnostic_edmfx
 z_elem: 63
 z_max: 55000.0
-output_default_diagnostics: false
-prescribe_ozone: true
-aerosol_radiation: true
-prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 extra_atmos_diagnostics:
   - short_name: [pfull, rsut, rlut, pr, hus, rv]
     period: 10hours

@@ -1,13 +1,13 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
+bucket_albedo_type: "map_temporal"
 coupler_toml: ["toml/amip.toml"]
 dt: "120secs"
 dt_cpl: "120secs"
 dz_bottom: 100.0
 energy_check: false
 h_elem: 8
-bucket_albedo_type: "map_temporal"
 mode_name: "cmip"
 netcdf_output_at_levels: true
 output_default_diagnostics: true
@@ -16,8 +16,8 @@ rayleigh_sponge: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "1days"
-topography: "Earth"
 topo_smoothing: true
+topography: "Earth"
 viscous_sponge: true
 z_elem: 39
 z_max: 60000.0

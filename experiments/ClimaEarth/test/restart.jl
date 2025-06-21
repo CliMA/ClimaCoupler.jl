@@ -46,7 +46,7 @@ four_steps["dt"] = "180secs"
 four_steps["dt_cpl"] = "180secs"
 four_steps["t_end"] = "720secs"
 four_steps["dt_rad"] = "180secs"
-four_steps["checkpoint_dt"] = "720secs"
+four_steps["checkpoint_dt"] = "360secs"
 four_steps["coupler_output_dir"] = tmpdir
 four_steps["job_id"] = "four_steps"
 

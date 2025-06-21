@@ -10,7 +10,7 @@ include(joinpath("..", "..", "components", "ocean", "prescr_ocean.jl"))
 FT = Float32
 
 @testset "PrescribedOceanSimulation name" begin
-    sim = PrescribedOceanSimulation((;))
+    sim = PrescribedOceanSimulation((;), nothing)
     @test nameof(sim) == "PrescribedOceanSimulation"
 end
 

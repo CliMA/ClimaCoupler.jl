@@ -116,7 +116,6 @@ Finally, we have a calibration longrun experiment, which exercises the calibrati
 pipeline for the coupled system.
 
 The resolution of runs in this pipeline is typically 16 horizontal elements,
-unless otherwise specified. The slabplanet runs use 8 horizontal elements,
-and the high resolution DYAMOND run uses 60 horizontal elements.
+unless otherwise specified (e.g. the slabplanet runs use 8 horizontal elements).
 The simplest simulations are only run on CPU, but the more complex
 simulations are mostly run on GPU.

@@ -200,19 +200,6 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 32GB
 
-      # DYAMOND AMIP: 1 day (convection resolving)
-      - label: "GPU AMIP high res. (h_elem 60): DYAMOND"
-        key: "longrun_amip_dyamond_gpu"
-        command:
-          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/longrun_amip_dyamond.yml --job_id longrun_amip_dyamond_gpu"
-        artifact_paths: "experiments/ClimaEarth/output/longrun_amip_dyamond_gpu/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          queue: clima
-          slurm_mem: 40GB
-          slurm_gpus: 1
-
   - group: "CMIP simulations"
 
     steps:

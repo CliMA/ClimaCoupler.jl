@@ -101,5 +101,4 @@ are subject to change in the future:
 - config/longrun_configs/longrun_aquaplanet_allsky_0M_earth.yml
 - config/longrun_configs/longrun_aquaplanet_allsky_0M.yml
 - config/longrun_configs/longrun_aquaplanet_allsky_1M.yml
-- config/longrun_configs/longrun_aquaplanet_dyamond.yml
 - config/longrun_configs/amip_target_diagedmf.yml

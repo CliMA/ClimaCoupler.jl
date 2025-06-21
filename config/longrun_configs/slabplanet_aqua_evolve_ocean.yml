@@ -1,8 +1,8 @@
 atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
 bucket_albedo_type: "function"
-dt: "120secs"
+dt: "240secs"
 dt_cloud_fraction: "1hours"
-dt_cpl: "120secs"
+dt_cpl: "240secs"
 dt_rad: "1hours"
 energy_check: true
 evolving_ocean: true
@@ -10,5 +10,5 @@ h_elem: 8
 mode_name: "slabplanet_aqua"
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "90days"
+t_end: "10days"
 use_land_diagnostics: false

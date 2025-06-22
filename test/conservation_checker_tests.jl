@@ -53,19 +53,12 @@ for FT in (Float32, Float64)
         )
 
         # coupler fields
-        cf = (;
-            P_net = CC.Fields.zeros(space),
-            P_liq = CC.Fields.zeros(space),
-            P_snow = CC.Fields.zeros(space),
-            F_turb_moisture = CC.Fields.zeros(space),
-        )
+        cf = Interfacer.init_coupler_fields(FT, [:P_net, :P_liq, :P_snow, :F_turb_moisture], space)
         @. cf.P_liq = -100
 
         # init
         cs = Interfacer.CoupledSimulation{FT}(
-            nothing, # comms_ctx
             nothing, # dates
-            space, # boundary_space
             cf, # fields
             cc, # conservation_checks
             (Int(0), Int(1000)), # tspan
@@ -148,19 +141,12 @@ for FT in (Float32, Float64)
         )
 
         # coupler fields
-        cf = (;
-            P_net = CC.Fields.zeros(space),
-            P_liq = CC.Fields.zeros(space),
-            P_snow = CC.Fields.zeros(space),
-            F_turb_moisture = CC.Fields.zeros(space),
-        )
+        cf = Interfacer.init_coupler_fields(FT, [:P_net, :P_liq, :P_snow, :F_turb_moisture], space)
         @. cf.P_liq = -100
 
         # init
         cs = Interfacer.CoupledSimulation{FT}(
-            nothing, # comms_ctx
             nothing, # dates
-            space, # boundary_space
             cf, # fields
             cc, # conservation_checks
             (Int(0), Int(1000)), # tspan

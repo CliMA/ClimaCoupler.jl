@@ -28,7 +28,7 @@ function postprocess_sim(cs, postprocessing_vars)
     make_ocean_diagnostics_plots(ocean_output_dir, artifact_dir, output_prefix = "ocean_")
 
     # Plot all model states and coupler fields (useful for debugging)
-    !CA.is_distributed(cs.comms_ctx) && debug(cs, artifact_dir)
+    ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext && debug(cs, artifact_dir)
 
     # If we have enough data (in time, but also enough variables), plot the leaderboard.
     # We need pressure to compute the leaderboard.
@@ -95,7 +95,7 @@ end
 Save the computed `sypd`, `walltime_per_coupling_step`, and memory usage to text files.
 """
 function save_sypd_walltime_to_disk(cs, walltime)
-    if ClimaComms.iamroot(cs.comms_ctx)
+    if ClimaComms.iamroot(ClimaComms.context(cs))
         sypd = simulated_years_per_day(cs, walltime)
         walltime_per_step = walltime_per_coupling_step(cs, walltime)
 

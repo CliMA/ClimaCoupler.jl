@@ -52,28 +52,15 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
         download_dataset(ecco_salinity)
     end
 
-    # Set up ocean grid (1 degree)
-    resolution_points = (360, 160, 32)
-    Nz = last(resolution_points)
-    z_faces = CO.exponential_z_faces(; Nz, depth = 6000, h = 34)
+    # Set up tripolar ocean grid (1 degree)
+    Nx = 360
+    Ny = 180
+    Nz = 40
 
-    # Regular LatLong because we know how to do interpolation there
-
-    # TODO: When moving to TripolarGrid, note that we need to be careful about
-    # ensuring the coordinate systems align (ie, rotate vectors on the OC grid)
-
-    underlying_grid = OC.LatitudeLongitudeGrid(
-        arch;
-        size = resolution_points,
-        longitude = (-180, 180),
-        latitude = (-80, 80),   # NOTE: Don't goo to high up when using LatLongGrid, or the cells will be too small
-        z = z_faces,
-        halo = (7, 7, 7),
-    )
-
+    z = CO.exponential_z_faces(; Nz, depth = 4000, h = 34)
+    underlying_grid = OC.TripolarGrid(arch; size = (Nx, Ny, Nz), halo = (7, 7, 3), z)
     bottom_height =
         CO.regrid_bathymetry(underlying_grid; minimum_depth = 30, interpolation_passes = 20, major_basins = 1)
-
     grid = OC.ImmersedBoundaryGrid(underlying_grid, OC.GridFittedBottom(bottom_height); active_cells_map = true)
 
     if use_ecco
@@ -98,13 +85,9 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
         OC.set!(ocean.model, T = T_init, S = S_init)
     end
 
+    # Construct a remapper from the exchange grid to `Center, Center` fields
     long_cc = OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center())
     lat_cc = OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center())
-
-
-    # TODO: Go from 0 to Nx+1, Ny+1 (for halos) (for LatLongGrid)
-
-    # Construct a remapper from the exchange grid to `Center, Center` fields
     long_cc = reshape(long_cc, length(long_cc), 1)
     lat_cc = reshape(lat_cc, 1, length(lat_cc))
     target_points_cc = @. CC.Geometry.LatLongPoint(lat_cc, long_cc)

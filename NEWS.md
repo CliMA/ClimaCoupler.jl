@@ -6,6 +6,9 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Use TripolarGrid with OceananigansSimulation PR[#1409](https://github.com/CliMA/ClimaCoupler.jl/pull/1409)
+Switch from using the Oceananigans.jl `LatitudeLongitudeGrid` to `TripolarGrid`.
+
 #### Use `update_turbulent_fluxes!` instead of `update_field!` for atmosphere PR[#1511](https://github.com/CliMA/ClimaCoupler.jl/pull/1511)
 Instead of using an `update_field!` method that dispatches on `::Val{:turbulent_fluxes}`
 to update turbulent fluxes in the atmosphere, we switch to using a function `update_turbulent_fluxes!`.

@@ -6,6 +6,10 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Use TripolarGrid with OceananigansSimulation PR[#1409](https://github.com/CliMA/ClimaCoupler.jl/pull/1409)
+
+Switch from using the Oceananigans.jl `LatitudeLongitudeGrid` to `TripolarGrid`.
+
 #### Don't plot constant fields in debug plots PR[#1417](https://github.com/CliMA/ClimaCoupler.jl/pull/1417)
 
 Heatmaps are no longer generated for spatially constant fields in our debug plots.

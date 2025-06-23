@@ -6,6 +6,10 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Use TripolarGrid with OceananigansSimulation PR[#1409](https://github.com/CliMA/ClimaCoupler.jl/pull/1409)
+
+Switch from using the Oceananigans.jl `LatitudeLongitudeGrid` to `TripolarGrid`.
+
 #### Remove bucket `get_new_cache` PR[#1437](https://github.com/CliMA/ClimaCoupler.jl/pull/1437)
 
 As of ClimaLand v0.16.2, total energy and and water are always stored in the bucket cache.

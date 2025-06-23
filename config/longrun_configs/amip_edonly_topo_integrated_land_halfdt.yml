@@ -1,0 +1,22 @@
+FLOAT_TYPE: "Float32"
+aerosol_radiation: true
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
+checkpoint_dt: "31days"
+co2_model: "maunaloa"
+dt: "60secs"
+dt_cloud_fraction: "1hours"
+dt_cpl: "60secs"
+dt_rad: "1hours"
+energy_check: false
+insolation: "timevarying"
+land_model: "integrated"
+mode_name: "amip"
+netcdf_interpolate_z_over_msl: true
+prescribe_ozone: true
+prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+t_end: "366days"
+topo_smoothing: true
+topography: "Earth"

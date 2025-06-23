@@ -63,29 +63,20 @@ function OceananigansSimulation(
     download_dataset(en4_temperature)
     download_dataset(en4_salinity)
 
-    # Set up ocean grid (1 degree)
-    resolution_points = (360, 160, 32)
-    Nz = last(resolution_points)
+    # Set up tripolar ocean grid (1 degree)
+    Nx = 360
+    Ny = 180
+    Nz = 40
     depth = 4000 # meters
     z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 0.85 * depth)
 
-    # Regular LatLong because we know how to do interpolation there
-    underlying_grid = OC.LatitudeLongitudeGrid(
-        arch;
-        size = resolution_points,
-        longitude = (-180, 180),
-        latitude = (-80, 80),   # NOTE: Don't goo to high up when using LatLongGrid, or the cells will be too small
-        z,
-        halo = (7, 7, 7),
-    )
-
+    underlying_grid = OC.TripolarGrid(arch; size = (Nx, Ny, Nz), halo = (7, 7, 4), z)
     bottom_height = CO.regrid_bathymetry(
         underlying_grid;
         minimum_depth = 30,
         interpolation_passes = 20,
         major_basins = 1,
     )
-
     grid = OC.ImmersedBoundaryGrid(
         underlying_grid,
         OC.GridFittedBottom(bottom_height);
@@ -137,17 +128,19 @@ function OceananigansSimulation(
     # Set initial condition to EN4 state estimate at start_date
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
 
+    # Construct a remapper from the exchange grid to `Center, Center` fields
     long_cc = OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center())
     lat_cc = OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center())
 
-    # TODO: Go from 0 to Nx+1, Ny+1 (for halos) (for LatLongGrid)
+    # Create a 2D matrix containing each lat/long combination as a LatLongPoint
+    # Note this must be done on CPU since the CC.Remapper module is not GPU-compatible
+    target_points_cc = Array(CC.Geometry.LatLongPoint.(lat_cc, long_cc))
 
-    # Construct a remapper from the exchange grid to `Center, Center` fields
-    long_cc = reshape(long_cc, length(long_cc), 1)
-    lat_cc = reshape(lat_cc, 1, length(lat_cc))
-    target_points_cc = @. CC.Geometry.LatLongPoint(lat_cc, long_cc)
-    # TODO: We can remove the `nothing` after CC > 0.14.33
-    remapper_cc = CC.Remapping.Remapper(boundary_space, target_points_cc, nothing)
+    if pkgversion(CC) >= v"0.14.34"
+        remapper_cc = CC.Remapping.Remapper(axes(area_fraction), target_points_cc)
+    else
+        remapper_cc = CC.Remapping.Remapper(axes(area_fraction), target_points_cc, nothing)
+    end
 
     # Construct two 2D Center/Center fields to use as scratch space while remapping
     scratch_cc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid)

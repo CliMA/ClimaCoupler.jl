@@ -242,7 +242,7 @@ function get_sim_var_in_pfull_dict(diagnostics_folder_path)
                     # pressure and altitude. To avoid that, we exclude everything below 80m.
                     # NOTE: This was empirically found.
                     pfull_var_windowed = ClimaAnalysis.window(pfull_var, "z", left = 80)
-                    sim_var_windowed = ClimaAnalysis.window(pfull_var, "z", left = 80)
+                    sim_var_windowed = ClimaAnalysis.window(sim_var, "z", left = 80)
 
                     sim_in_pfull_var =
                         ClimaAnalysis.Atmos.to_pressure_coordinates(sim_var_windowed, pfull_var_windowed)

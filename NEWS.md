@@ -6,14 +6,21 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
-#### Remove `dt_save_state_to_disk` and `dt_save_to_sol` options
+#### Remove intermediate checkpoints PR[#1397](https://github.com/CliMA/ClimaCoupler.jl/pull/1397)
+
+Throughout the simulation, the previous checkpoint is now deleted whenever a new
+one is saved. The most recent checkpoint will always be available, so restarting
+is still supported. The field `prev_checkpoint_t` in the CoupledSimulation object
+is used to remove intermediate checkpoints.
+
+#### Remove `dt_save_state_to_disk` and `dt_save_to_sol` options PR[#1394](https://github.com/CliMA/ClimaCoupler.jl/pull/1394)
 
 `dt_save_state_to_disk` was unused and is removed from all configs in this
 commit. Note that ClimaAtmos does have an option with this name, but we
 pass `checkpoint_dt` to it. `dt_save_to_sol` is also removed as an option,
 in favor of using our more robust checkpointing infrastructure via `checkpoint_dt`.
 
-#### Misc. interface cleanup
+#### Misc. interface cleanup PR[#1341](https://github.com/CliMA/ClimaCoupler.jl/pull/1341)
 
 Including:
 - Remove `ρ_sfc` from surface model caches

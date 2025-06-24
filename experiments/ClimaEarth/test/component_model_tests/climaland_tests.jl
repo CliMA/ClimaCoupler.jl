@@ -83,6 +83,7 @@ end
         tspan,
         dt,
         tspan[1],
+        Ref(-1), # prev_checkpoint_t
         model_sims,
         (;), # callbacks
         (;), # dirs

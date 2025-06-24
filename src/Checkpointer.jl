@@ -33,14 +33,24 @@ This is a template function that should be implemented for each component model.
 get_model_cache(sim::Interfacer.ComponentModelSimulation) = nothing
 
 """
-    checkpoint_model_state(sim::Interfacer.ComponentModelSimulation, comms_ctx::ClimaComms.AbstractCommsContext, t::Int; output_dir = "output")
+    checkpoint_model_state(
+        sim::Interfacer.ComponentModelSimulation,
+        comms_ctx::ClimaComms.AbstractCommsContext,
+        t::Int,
+        prev_checkpoint_t::Int;
+        output_dir = "output")
 
 Checkpoint the model state of a simulation to a HDF5 file at a given time, t (in seconds).
+
+If a previous checkpoint exists, it is removed. This is to avoid accumulating
+many checkpoint files in the output directory. A value of -1 for `prev_checkpoint_t`
+is used to indicate that there is no previous checkpoint to remove.
 """
 function checkpoint_model_state(
     sim::Interfacer.ComponentModelSimulation,
     comms_ctx::ClimaComms.AbstractCommsContext,
-    t::Int;
+    t::Int,
+    prev_checkpoint_t::Int;
     output_dir = "output",
 )
     Y = get_model_prog_state(sim)
@@ -52,23 +62,36 @@ function checkpoint_model_state(
     CC.InputOutput.HDF5.write_attribute(checkpoint_writer.file, "time", t)
     CC.InputOutput.write!(checkpoint_writer, Y, "model_state")
     Base.close(checkpoint_writer)
-    return nothing
 
+    # Remove previous checkpoint if it exists
+    prev_checkpoint_file = joinpath(output_dir, "checkpoint_$(nameof(sim))_$(prev_checkpoint_t).hdf5")
+    remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
+    return nothing
 end
 
 """
-    checkpoint_model_cache(sim::Interfacer.ComponentModelSimulation, comms_ctx::ClimaComms.AbstractCommsContext, t::Int; output_dir = "output")
+    checkpoint_model_cache(
+        sim::Interfacer.ComponentModelSimulation,
+        comms_ctx::ClimaComms.AbstractCommsContext,
+        t::Int,
+        prev_checkpoint_t::Int;
+        output_dir = "output")
 
 Checkpoint the model cache to N JLD2 files at a given time, t (in seconds),
 where N is the number of MPI ranks.
 
 Objects are saved to JLD2 files because caches are generally not ClimaCore
 objects (and ClimaCore.InputOutput can only save `Field`s or `FieldVector`s).
+
+If a previous checkpoint exists, it is removed. This is to avoid accumulating
+many checkpoint files in the output directory. A value of -1 for `prev_checkpoint_t`
+is used to indicate that there is no previous checkpoint to remove.
 """
 function checkpoint_model_cache(
     sim::Interfacer.ComponentModelSimulation,
     comms_ctx::ClimaComms.AbstractCommsContext,
-    t::Int;
+    t::Int,
+    prev_checkpoint_t::Int;
     output_dir = "output",
 )
     # Move p to CPU (because we cannot save CUArrays)
@@ -79,6 +102,10 @@ function checkpoint_model_cache(
     pid = ClimaComms.mypid(comms_ctx)
     output_file = joinpath(output_dir, "checkpoint_cache_$(pid)_$(nameof(sim))_$t.jld2")
     JLD2.jldsave(output_file, cache = p)
+
+    # Remove previous checkpoint if it exists
+    prev_checkpoint_file = joinpath(output_dir, "checkpoint_cache_$(pid)_$(nameof(sim))_$(prev_checkpoint_t).jld2")
+    remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
     return nothing
 end
 
@@ -104,21 +131,31 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
     day = floor(Int, time / (60 * 60 * 24))
     sec = floor(Int, time % (60 * 60 * 24))
     output_dir = cs.dirs.checkpoints
+    prev_checkpoint_t = cs.prev_checkpoint_t[]
     comms_ctx = ClimaComms.context(cs)
+
     for sim in cs.model_sims
         if !isnothing(Checkpointer.get_model_prog_state(sim))
-            Checkpointer.checkpoint_model_state(sim, comms_ctx, time; output_dir)
+            Checkpointer.checkpoint_model_state(sim, comms_ctx, time, prev_checkpoint_t; output_dir)
         end
         if !isnothing(Checkpointer.get_model_cache(sim))
-            Checkpointer.checkpoint_model_cache(sim, comms_ctx, time; output_dir)
+            Checkpointer.checkpoint_model_cache(sim, comms_ctx, time, prev_checkpoint_t; output_dir)
         end
     end
+
     # Checkpoint the Coupler fields
     pid = ClimaComms.mypid(comms_ctx)
     @info "Saving coupler fields to JLD2 on day $day second $sec"
     output_file = joinpath(output_dir, "checkpoint_coupler_fields_$(pid)_$time.jld2")
     # Adapt to Array move fields to the CPU
     JLD2.jldsave(output_file, coupler_fields = CC.Adapt.adapt(Array, cs.fields))
+
+    # Remove previous Coupler fields checkpoint if it exists
+    prev_checkpoint_file = joinpath(output_dir, "checkpoint_coupler_fields_$(pid)_$(prev_checkpoint_t).jld2")
+    remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
+
+    # Update previous checkpoint time stored in the coupled simulation
+    cs.prev_checkpoint_t[] = time
 end
 
 """
@@ -209,6 +246,21 @@ function t_start_from_checkpoint(checkpoint_dir)
     isempty(restarts) && return nothing
     latest_restart = last(sort_by_creation_time(restarts))
     return parse(Int, match(restart_file_rx, latest_restart)[2])
+end
+
+"""
+    remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
+
+Delete the provided checkpoint file on the root process and print a helpful
+info message. This can be used to remove intermediate checkpoints, to prevent
+saving excessively large amounts of output.
+"""
+function remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
+    if ClimaComms.iamroot(comms_ctx) && prev_checkpoint_t != -1 && isfile(prev_checkpoint_file)
+        @info "Removing previous checkpoint file: $prev_checkpoint_file"
+        rm(prev_checkpoint_file)
+    end
+    return nothing
 end
 
 end # module

@@ -12,7 +12,6 @@ env:
   JULIA_MAX_NUM_PRECOMPILE_FILES: 100
   GKSwstype: 100
   SLURM_KILL_BAD_EXIT: 1
-
   CONFIG_PATH: "config/ci_configs"
 
 timeout_in_minutes: 240
@@ -425,7 +424,7 @@ steps:
           CLIMACOMMS_CONTEXT: "SINGLETON"
           SHORT_RUN: ""
         agents:
-          slurm_mem: 32GB
+          slurm_mem: 64GB
           slurm_ntasks: 3
           slurm_gpus_per_task: 1
           slurm_cpus_per_task: 4

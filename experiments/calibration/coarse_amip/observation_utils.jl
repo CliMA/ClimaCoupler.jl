@@ -117,61 +117,6 @@ function seasonally_aligned_yearly_average(var, yr)
     return average_time(year_window)
 end
 
-"""
-    get_seasonal_covariance(output_var; model_error_scale = nothing, regularization = nothing)
-
-Computes the diagonal covariance matrix of seasonal averages of `output_var`.
-
-# Arguments
-- `output_var`: Climate variable data (OutputVar or similar)
-- `model_error_scale`: Optional scaling factor for model error, applied as a fraction of the mean
-- `regularization`: Optional regularization term added to variance values
-"""
-function get_seasonal_covariance(output_var; model_error_scale = nothing, regularization = nothing)
-    seasonal_averages = average_season_across_time(output_var)
-    variance_per_season = map(split_by_season(seasonal_averages)) do season
-        variance = flatten(variance_time(season)).data
-        if !isnothing(model_error_scale)
-            variance .+= (model_error_scale .* flatten(average_time(season)).data) .^ 2
-        end
-        return variance
-    end
-    diag_cov = vcat(variance_per_season...)
-    !isnothing(regularization) && (diag_cov .+= regularization)
-    return Diagonal(diag_cov)
-end
-
-"""
-    year_of_seasonal_averages(output_var, yr)
-
-Compute seasonal averages for a specific year `yr` from the `output_var`.
-"""
-function year_of_seasonal_averages(output_var, yr)
-    seasonal_averages = average_season_across_time(output_var)
-    season_and_years = map(ClimaAnalysis.Utils.find_season_and_year, dates(seasonal_averages))
-    indices = findall(s -> s[2] == yr, season_and_years)
-    isempty(indices) && error("No data found in $(long_name(output_var)) for the given year: $yr")
-    min_idx, max_idx = extrema(indices)
-    left = dates(seasonal_averages)[min_idx]
-    right = dates(seasonal_averages)[max_idx]
-    return window(seasonal_averages, "time"; left, right)
-end
-
-"""
-    make_single_year_of_seasonal_observations(output_var, yr)
-
-Create an `EKP.Observation` for a specific year `yr` from the `output_var`.
-"""
-function make_single_year_of_seasonal_observations(output_var, yr)
-    seasonal_averages = year_of_seasonal_averages(output_var, yr)
-    # Split into four OutputVars to get the same format as the covariance matrix
-    obs_vec = flatten_seasonal_averages(seasonal_averages)
-    obs_cov = get_seasonal_covariance(output_var; model_error_scale = 0.05, regularization = 1e-3)
-    name = get(output_var.attributes, "CF_name", get(output_var.attributes, "long_name", ""))
-    return EKP.Observation(obs_vec, obs_cov, "$(yr)_$name")
-end
-
-flatten_seasonal_averages(seasonal_averages) = vcat(map(x -> flatten(x).data, split_by_season(seasonal_averages))...)
 # TODO: Add exception for net rad
 """
     create_observation_vector(nt, yrs = 17)
@@ -179,7 +124,9 @@ flatten_seasonal_averages(seasonal_averages) = vcat(map(x -> flatten(x).data, sp
 Given a NamedTuple, produce a vector of `EKP.Observation`s, where each observation
 consists of seasonally averaged fields, with the exception of globally averaged yearly radiative balance
 """
-function create_observation_series(nt; short_names = keys(nt), model_error_scale = 0.05, regularization = 1e-6, year_range = 2002:2018, batch_size = 1)
+function create_observation_series(nt; short_names = keys(nt), model_error_scale = 0.05, regularization = 1e-6, year_range = 2002:2017, batch_size = 1)
+    net_rad = nt.net_rad
+    net_rad_var = [variance_time(net_rad).data...;;]
     nt = (;filter(p -> p.first in short_names, pairs(nt))...)
     vars = average_season_across_time.(values(nt))
     sample_dates = [
@@ -187,7 +134,12 @@ function create_observation_series(nt; short_names = keys(nt), model_error_scale
     ]
     cov = ClimaCalibrate.ObservationRecipe.SVDplusDCovariance(sample_dates; model_error_scale, regularization)
     obs_vec = map(sample_dates) do (start_date, end_date)
+        @info "Creating observations for year starting at $start_date" 
+        net_rad_year = window(net_rad, "time"; left = start_date, right = start_date + Month(11))
+        @assert length(dates(net_rad_year)) == 12
+        net_rad_obs = EKP.Observation(flatten(average_time(net_rad_year)).data, net_rad_var, "net_rad_$(string(start_date))")
         obs = ClimaCalibrate.ObservationRecipe.observation(cov, vars, start_date, end_date)
+        obs = EKP.combine_observations([net_rad_obs, obs])
     end
     observation_series = ClimaCalibrate.observation_series_from_samples(obs_vec,batch_size)
     return observation_series

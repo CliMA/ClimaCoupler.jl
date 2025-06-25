@@ -15,7 +15,7 @@ function ClimaCalibrate.observation_map(iteration)
     single_obs_len = sum(length(obs))
     single_member_len = single_obs_len * length(current_minibatch)
     ensemble_size = EKP.get_N_ens(ekp)
-    short_names = split(obs_series.observations[1].names[1], ";") # This relies on the naming convention
+    short_names = split(obs_series.observations[1].names[2], ";") # This relies on the naming convention
 
     G_ensemble = Array{Float64}(undef, single_member_len, ensemble_size)
     for m in 1:ensemble_size
@@ -104,7 +104,8 @@ function process_member_data(simdir::SimDir, short_names, current_minibatch)
             @show short_name, length(ClimaAnalysis.flatten(year_averages).data )
             ClimaAnalysis.flatten(year_averages).data 
         end
-        return vcat(seasonal_data...)
+        net_rad = processed_data["net_rad"] |> average_time 
+        return vcat(net_rad.data, seasonal_data...)
     end
     return vcat(year_observations...)
 end

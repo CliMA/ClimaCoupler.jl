@@ -2,7 +2,7 @@
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "c29cd6751916a6b43bf20ace8d164107d37e55e5"
+project_hash = "4852e0ab1e6707f0ddd29118aa11c846f772469e"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -394,7 +394,7 @@ version = "0.30.3"
 
 [[deps.ClimaCalibrate]]
 deps = ["Dates", "Distributed", "Distributions", "EnsembleKalmanProcesses", "JLD2", "Logging", "Random", "TOML", "YAML"]
-git-tree-sha1 = "269016a43659a60b35e1724d3c9321a715317893"
+git-tree-sha1 = "2408ba55a30ac0f67550ef9d87cebfc372af3cca"
 repo-rev = "kp/observation"
 repo-url = "https://github.com/CliMA/ClimaCalibrate.jl.git"
 uuid = "4347a170-ebd6-470c-89d3-5c705c0cacc2"

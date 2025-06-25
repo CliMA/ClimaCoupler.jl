@@ -4,7 +4,7 @@ use_itime: true
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
 bucket_albedo_type: "map_temporal"
-checkpoint_dt: "1months"
+checkpoint_dt: "2months"
 coupler_toml: ["toml/amip.toml"]
 coupler_output_dir: "experiments/calibration/coarse_amip/output_32_h_elem"
 dt: "120secs"

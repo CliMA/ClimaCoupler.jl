@@ -32,7 +32,7 @@ prior = combine_distributions(priors)
 
 batch_size = 1
 nt = JLD2.load_object("experiments/calibration/nt_obs_32_h_elem.jld2")
-short_names = filter(x -> x != :rsdt, keys(nt))
+short_names = filter(x -> !(x ∈ [:rsdt, :net_rad]), keys(nt))
 model_error_scale = 0.10
 regularization = 1e-3
 obs_series = create_observation_series(nt;model_error_scale, regularization, short_names, batch_size)
@@ -41,6 +41,6 @@ eki = EKP.EnsembleKalmanProcess(obs_series, EKP.TransformUnscented(prior, impose
 ensemble_size = EKP.get_N_ens(eki)
 
 # Slurm resources for a single model run
-hpc_kwargs = CAL.kwargs(time = 60 * 15, ntasks = 4, gpus_per_task = 1, cpus_per_task = 4, partition = "a3")
+hpc_kwargs = CAL.kwargs(time = 60 * 36, ntasks = 4, gpus_per_task = 1, cpus_per_task = 4, partition = "a3")
 exeflags = "--threads=4"
 eki = CAL.calibrate(CAL.GCPBackend, eki, n_iterations, prior, output_dir; model_interface, hpc_kwargs, exeflags)

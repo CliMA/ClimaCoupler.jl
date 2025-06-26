@@ -6,6 +6,12 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Add aquaplanets; longrun fixes PR[#1411](https://github.com/CliMA/ClimaCoupler.jl/pull/1411)
+
+Add 2 aquaplanet longruns using slab ocean and atmosphere with ED only and diag.
+EDMF respectively. Also removes the atmos standalone longrun, and increases
+the conservation RSE threshold.
+
 #### Remove intermediate checkpoints PR[#1397](https://github.com/CliMA/ClimaCoupler.jl/pull/1397)
 
 Throughout the simulation, the previous checkpoint is now deleted whenever a new

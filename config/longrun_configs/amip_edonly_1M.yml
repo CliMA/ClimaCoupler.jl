@@ -11,6 +11,7 @@ dt_rad: "1hours"
 energy_check: false
 insolation: "timevarying"
 mode_name: "amip"
+moist: "nonequil"
 precip_model: "1M"
 prescribe_ozone: true
 prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]

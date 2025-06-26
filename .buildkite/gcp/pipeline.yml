@@ -1,0 +1,51 @@
+agents:
+  queue: gcp
+
+env:
+  JULIA_DEPOT_PATH: "${BUILDKITE_BUILD_PATH}/${BUILDKITE_PIPELINE_SLUG}/depot/default"
+
+steps:
+  - label: "init :GPU:"
+    key: "init_gpu_env"
+    command:
+      - "echo $$JULIA_DEPOT_PATH"
+
+      - echo "--- Instantiate AMIP env"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+
+      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add("MPI")'
+      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add("CUDA"); using CUDA; CUDA.set_runtime_version!(local_toolkit=true)'
+      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add("MPIPreferences"); using MPIPreferences; use_system_binary(library_names="/sw/openmpi-5.0.5/lib/libmpi", mpiexec="/sw/openmpi-5.0.5/bin/mpiexec", force=true)'
+
+      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'
+      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'
+
+    agents:
+      slurm_gpus: 1
+      slurm_cpus_per_task: 8
+    env:
+      JULIA_NUM_PRECOMPILE_TASKS: 8
+      JULIA_MAX_NUM_PRECOMPILE_FILES: 50
+
+  - wait
+
+  - group: "High-resolution AMIPs and CMIPs"
+
+    steps:
+
+      - label: "30 h_elem current AMIP: diagedmf + 0M + bucket land"
+        key: "amip"
+        command:
+
+          - echo "--- Run simulation"
+          - "mpiexec -n 8 julia --threads=4 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file config/longrun_configs/amip_diagedmf_10years.yml --job_id amip_30_h_elem"
+        artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+          CLIMACOMMS_CONTEXT: "MPI"
+        agents:
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 8
+          slurm_mem: 0GB
+          slurm_time: "144:00:00"

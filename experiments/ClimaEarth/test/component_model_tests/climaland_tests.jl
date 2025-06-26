@@ -67,7 +67,8 @@ end
 
     boundary_space = ClimaCore.Spaces.horizontal_space(atmos_sim.domain.face_space)
     area_fraction = ClimaCore.Fields.ones(boundary_space)
-    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction)
+    land_spun_up_ic = false
+    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction, land_spun_up_ic)
     model_sims = (; land_sim = land_sim, atmos_sim = atmos_sim)
 
     # Initialize the coupler fields so we can perform exchange

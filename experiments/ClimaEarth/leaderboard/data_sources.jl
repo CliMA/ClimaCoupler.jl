@@ -78,14 +78,18 @@ includes unit conversion and shifting the dates.
 The variable should have only three dimensions: latitude, longitude, and time.
 """
 function get_sim_var_dict(diagnostics_folder_path)
-    # List of short names
-    available_short_names = ClimaAnalysis.available_vars(ClimaAnalysis.SimDir(diagnostics_folder_path))
+    available_short_names = get_short_names_monthly_averages(diagnostics_folder_path)
     sim_var_dict = Dict{String, Any}()
     # Dict for loading in simulation data
     "pr" in available_short_names && (
         sim_var_dict["pr"] =
             () -> begin
-                sim_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = "pr")
+                sim_var = get(
+                    ClimaAnalysis.SimDir(diagnostics_folder_path),
+                    short_name = "pr",
+                    reduction = "average",
+                    period = "1M",
+                )
                 sim_var = ClimaAnalysis.convert_units(
                     sim_var,
                     "mm/day",
@@ -101,7 +105,12 @@ function get_sim_var_dict(diagnostics_folder_path)
         short_name in available_short_names && (
             sim_var_dict[short_name] =
                 () -> begin
-                    sim_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = short_name)
+                    sim_var = get(
+                        ClimaAnalysis.SimDir(diagnostics_folder_path),
+                        short_name = short_name,
+                        reduction = "average",
+                        period = "1M",
+                    )
                     sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
                     return sim_var
                 end
@@ -224,13 +233,24 @@ function get_sim_var_in_pfull_dict(diagnostics_folder_path)
     available_short_names = ClimaAnalysis.available_vars(ClimaAnalysis.SimDir(diagnostics_folder_path))
     sim_var_pfull_dict = Dict{String, Any}()
 
-    short_names = ["ta", "hur", "hus"]
+    short_names = get_short_names_monthly_averages(diagnostics_folder_path)
+    available_short_names = intersect(short_names, Set(["ta", "hur", "hus"]))
     for short_name in short_names
         short_name in available_short_names && (
             sim_var_pfull_dict[short_name] =
                 () -> begin
-                    sim_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = short_name)
-                    pfull_var = get(ClimaAnalysis.SimDir(diagnostics_folder_path), short_name = "pfull")
+                    sim_var = get(
+                        ClimaAnalysis.SimDir(diagnostics_folder_path),
+                        short_name = short_name,
+                        reduction = "average",
+                        period = "1M",
+                    )
+                    pfull_var = get(
+                        ClimaAnalysis.SimDir(diagnostics_folder_path),
+                        short_name = "pfull",
+                        reduction = "average",
+                        period = "1M",
+                    )
 
                     (ClimaAnalysis.units(sim_var) == "") &&
                         (sim_var = ClimaAnalysis.set_units(sim_var, "unitless"))
@@ -359,4 +379,24 @@ element is the upper bound for the bias plots.
 function get_compare_vars_biases_heatmap_extrema_pfull()
     compare_vars_biases_heatmap_extrema = Dict("ta" => (-10.0, 10.0), "hur" => (-0.4, 0.4), "hus" => (-0.001, 0.001))
     return compare_vars_biases_heatmap_extrema
+end
+
+"""
+    get_short_names_of_monthly_averages(diagnostics_folder_path)
+
+Get all the short names of the monthly averages.
+"""
+function get_short_names_monthly_averages(diagnostics_folder_path)
+    available_short_names = Set{String}()
+    simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)
+    for short_name in ClimaAnalysis.available_vars(simdir)
+        for reduction in ClimaAnalysis.available_reductions(simdir, short_name = short_name)
+            for period in ClimaAnalysis.available_periods(simdir, short_name = short_name, reduction = reduction)
+                if reduction == "average" && period == "1M"
+                    push!(available_short_names, short_name)
+                end
+            end
+        end
+    end
+    return available_short_names
 end

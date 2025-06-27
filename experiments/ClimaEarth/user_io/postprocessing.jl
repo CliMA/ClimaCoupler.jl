@@ -34,14 +34,16 @@ function postprocess_sim(cs, postprocessing_vars)
     # If we have enough data (in time, but also enough variables), plot the leaderboard.
     # We need pressure to compute the leaderboard.
     simdir = CAN.SimDir(atmos_output_dir)
-    pressure_in_output = "pfull" in CAN.available_vars(simdir)
-    times = CAN.times(get(CAN.SimDir(atmos_output_dir), first(CAN.available_vars(simdir))))
-    t_end = times[end]
-    if t_end > 84600 * 31 * 3 # 3 months for spin up
-        leaderboard_base_path = artifact_dir
-        compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
-        test_rmse_thresholds(atmos_output_dir, 3)
-        pressure_in_output && compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 6)
+    if !isempty(simdir)
+        pressure_in_output = "pfull" in CAN.available_vars(simdir)
+        times = CAN.times(get(simdir, first(CAN.available_vars(simdir))))
+        t_end = times[end]
+        if t_end > 84600 * 31 * 3 # 3 months for spin up
+            leaderboard_base_path = artifact_dir
+            compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
+            test_rmse_thresholds(atmos_output_dir, 3)
+            pressure_in_output && compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 6)
+        end
     end
 
     # Perform conservation checks if they exist

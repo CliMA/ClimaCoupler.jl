@@ -5,11 +5,11 @@ bucket_albedo_type: "map_temporal"
 checkpoint_dt: "366days"
 co2_model: "maunaloa"
 coupler_toml: ["toml/amip.toml"]
-dt: "240secs"
-dt_cpl: "240secs"
+dt: "120secs"
+dt_cpl: "120secs"
 dz_bottom: 30.0
 energy_check: false
-h_elem: 16
+h_elem: 32
 mode_name: "amip"
 netcdf_output_at_levels: true
 output_default_diagnostics: true

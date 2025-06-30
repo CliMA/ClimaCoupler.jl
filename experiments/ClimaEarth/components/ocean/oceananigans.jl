@@ -52,7 +52,8 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
     # Set up ocean grid (1 degree)
     resolution_points = (360, 160, 32)
     Nz = last(resolution_points)
-    z_faces = CO.exponential_z_faces(; Nz, depth = 6000, h = 34)
+    depth = 4000 # meters
+    z = CO.ExponentialCoordinate(Nz, -depth; scale = 0.85 * depth)
 
     # Regular LatLong because we know how to do interpolation there
 
@@ -64,7 +65,7 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
         size = resolution_points,
         longitude = (-180, 180),
         latitude = (-80, 80),   # NOTE: Don't goo to high up when using LatLongGrid, or the cells will be too small
-        z = z_faces,
+        z,
         halo = (7, 7, 7),
     )
 
@@ -79,7 +80,7 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
         # When we use ecco data, the forcing takes care of everything, including
         # the initial conditions
         restoring_rate = 1 / (3 * 86400)
-        mask = CO.LinearlyTaperedPolarMask(southern = (-80, -70), northern = (70, 90), z = (z_faces[1], 0))
+        mask = CO.LinearlyTaperedPolarMask(southern = (-80, -70), northern = (70, 90), z = (z[1], 0))
 
         forcing_T = CO.DatasetRestoring(ecco_temperature, grid; mask, rate = restoring_rate)
         forcing_S = CO.DatasetRestoring(ecco_salinity, grid; mask, rate = restoring_rate)

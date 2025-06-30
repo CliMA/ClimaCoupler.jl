@@ -99,6 +99,7 @@ steps:
           queue: clima
           slurm_mem: 32GB
           slurm_gpus: 1
+        timeout_in_minutes: 2160 # 36 hours
 
   - group: "AMIP simulations"
 

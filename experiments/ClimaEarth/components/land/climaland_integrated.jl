@@ -185,7 +185,9 @@ function ClimaLandSimulation(
     #  code itself requires a surface temperature as input.
     @. p.T_sfc = orog_adjusted_T_surface
 
-    updateat = [promote(tspan[1]:dt:(tspan[2] + dt)...)...] # add an extra time at end in case sim steps over end
+    # Update cos(zenith angle) within land model every hour
+    update_dt = dt isa ITime ? ITime(3600) : 3600
+    updateat = [promote(tspan[1]:update_dt:(tspan[2] + dt)...)...] # add an extra time at end in case sim steps over end
     updatefunc = CL.make_update_drivers(CL.get_drivers(model))
     driver_cb = CL.DriverUpdateCallback(updateat, updatefunc)
 

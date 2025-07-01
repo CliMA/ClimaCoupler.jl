@@ -113,6 +113,12 @@ function make_plots_generic(
             vars_left_to_plot -= 1
             continue
         end
+        if minimum(var.data) == maximum(var.data)
+            @warn "$(short_name(var)) diagnostic is spatially constant - skipping plot"
+            vars_left_to_plot -= 1
+            continue
+        end
+
         if grid_pos > MAX_PLOTS_PER_PAGE
             fig = makefig()
             grid = gridlayout()
@@ -132,6 +138,9 @@ function make_plots_generic(
             page += 1
         end
     end
+
+    # Return early if there are no plots to save
+    isempty(summary_files) && return nothing
 
     # Save plots
     output_file = joinpath(plot_path, "$(output_name).pdf")

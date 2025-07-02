@@ -5,11 +5,11 @@ bucket_albedo_type: "map_temporal"
 checkpoint_dt: "366days"
 co2_model: "maunaloa"
 coupler_toml: ["toml/amip.toml"]
-dt: "120secs"
-dt_cpl: "120secs"
+dt: "240secs"
+dt_cpl: "240secs"
 dz_bottom: 30.0
 energy_check: false
-h_elem: 32
+h_elem: 16
 mode_name: "amip"
 netcdf_output_at_levels: true
 output_default_diagnostics: true
@@ -17,7 +17,7 @@ radiation_reset_rng_seed: true
 rayleigh_sponge: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "3670days"
+t_end: "7340days"
 topo_smoothing: true
 topography: "Earth"
 viscous_sponge: true

@@ -24,7 +24,6 @@ steps:
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"SurfaceFluxes\", rev=\"main\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"RRTMGP\", rev=\"main\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"Oceananigans\", rev=\"main\"))'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaOcean\", rev=\"main\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.resolve()'"
 
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"
@@ -53,15 +52,14 @@ steps:
         command:
 
           - echo "--- Run simulation"
-          - "mpiexec -n 16 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file config/amip_configs/amip.yml --job_id amip_16_h_elem"
+          - "mpiexec -n 8 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file config/amip_configs/amip.yml --job_id amip_16_h_elem"
         artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"
-        timeout_in_minutes: 2880
         env:
           CLIMACOMMS_DEVICE: "CUDA"
           CLIMACOMMS_CONTEXT: "MPI"
         agents:
           slurm_gpus_per_task: 1
           slurm_cpus_per_task: 4
-          slurm_ntasks: 16
+          slurm_ntasks: 8
           slurm_mem: 0GB
-          slurm_time: "96:00:00"
+          slurm_time: "144:00:00"

@@ -54,6 +54,7 @@ steps:
 
   - group: "AMIP simulations"
 
+    steps:
       - label: "GPU AMIP + ED only + Earth topography + integrated land"
         key: "amip_edonly_topo_integrated_land_gpu" # runs for 4 months only because of instability after that time
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_topo_integrated_land.yml --job_id amip_edonly_topo_integrated_land_gpu"

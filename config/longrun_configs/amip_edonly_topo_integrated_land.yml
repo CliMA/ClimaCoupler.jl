@@ -2,7 +2,7 @@ FLOAT_TYPE: "Float32"
 aerosol_radiation: true
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
-checkpoint_dt: "31days"
+checkpoint_dt: "1days"
 co2_model: "maunaloa"
 dt: "120secs"
 dt_cloud_fraction: "1hours"
@@ -15,8 +15,13 @@ mode_name: "amip"
 netcdf_interpolate_z_over_msl: true
 prescribe_ozone: true
 prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
+restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-longruns/908/climacoupler-longruns/experiments/ClimaEarth/output/amip_edonly_topo_integrated_land_gpu/checkpoints/"
+restart_t: 18748800
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
+diagnostics:
+  - short_name: [ts, ta, thetaa, ha, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, hussfc, evspsbl, pr, edt, evu, rv, hfes]
+    period: 6hours

@@ -112,22 +112,7 @@ function debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing)
         if field_index <= length(field_names)
             field_name = field_names[field_index]
             field = getproperty(cs_fields, field_name)
-
-            # Copy field onto cpu space if necessary
-            cpu_field = CC.to_cpu(field)
-
-            # ClimaCoreMakie doesn't support NaNs/Infs, so we substitute them with 100max
-            FT = CC.Spaces.undertype(axes(cpu_field))
-            isinvalid = (x) -> isnan(x) || isinf(x)
-
-            field_valid_min, field_valid_max = extrema(map(x -> isinvalid(x) ? FT(0) : x, parent(cpu_field)))
-            map!(x -> isinvalid(x) ? 100field_valid_max : x, parent(cpu_field), parent(cpu_field))
-            colorrange =
-                isapprox(field_valid_min, field_valid_max) ? (field_valid_min - 1, field_valid_max + 1) :
-                (field_valid_min, field_valid_max)
-            ax = Makie.Axis(fig[i, j * 2 - 1], title = string(field_name) * print_extrema(field))
-            hm = ClimaCoreMakie.fieldheatmap!(ax, cpu_field, colorrange = colorrange)
-            Makie.Colorbar(fig[i, j * 2], hm)
+            _heatmap_cc_field!(fig, field, i, j, field_name)
         end
     end
     Makie.save(joinpath(dir, "debug_coupler.png"), fig)
@@ -139,27 +124,7 @@ function debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing)
             if field_index <= length(field_names)
                 field_name = field_names[field_index]
                 field = getproperty(cs_fields, field_name)
-                # Copy field onto cpu space if necessary
-
-                cpu_field = CC.to_cpu(field)
-
-                # ClimaCoreMakie doesn't support NaNs/Infs, so we substitute them with 100max
-                FT = CC.Spaces.undertype(axes(cpu_field))
-                isinvalid = (x) -> isnan(x) || isinf(x)
-
-                field_valid_min, field_valid_max = extrema(map(x -> isinvalid(x) ? FT(0) : x, parent(cpu_field)))
-                map!(x -> isinvalid(x) ? 100field_valid_max : x, parent(cpu_field), parent(cpu_field))
-                colorrange =
-                    isapprox(field_valid_min, field_valid_max) ? (field_valid_min - 1, field_valid_max + 1) :
-                    (field_valid_min, field_valid_max)
-
-                ax = Makie.Axis(fig[i, j * 2 - 1], title = string(field_name) * print_extrema(field))
-                hm = ClimaCoreMakie.fieldheatmap!(
-                    ax,
-                    cpu_field .- getproperty(cs_fields_ref, field_name),
-                    colorrange = colorrange,
-                )
-                Makie.Colorbar(fig[i, j * 2], hm)
+                _heatmap_cc_field!(fig, field, i, j, field_name)
             end
         end
         Makie.save(joinpath(dir, "debug_coupler_anomalies.png"), fig)
@@ -190,30 +155,47 @@ function debug(sim::Interfacer.ComponentModelSimulation, dir)
                 hm = CairoMakie.heatmap!(ax, view(field, :, :, grid.Nz))
                 Makie.Colorbar(fig[i, j * 2], hm)
             elseif field isa CC.Fields.Field
-                # Copy field onto cpu space if necessary
-                cpu_field = CC.to_cpu(field)
-                if cpu_field isa CC.Fields.ExtrudedCubedSphereSpectralElementField3D
-                    cpu_field = CC.Fields.level(cpu_field, 1)
-                end
-                FT = CC.Spaces.undertype(axes(cpu_field))
-                vals = CC.Fields.field_values(cpu_field)
-                isinvalid = (x) -> isnan(x) || isinf(x)
-                # ClimaCoreMakie doesn't support NaNs or Infs, so we make them
-                # stand out by replacing them with 100max
-
-                field_valid_min, field_valid_max = extrema(map(x -> isinvalid(x) ? FT(0) : x, parent(cpu_field)))
-                map!(x -> isinvalid(x) ? 100field_max : x, parent(cpu_field), parent(cpu_field))
-                colorrange =
-                    isapprox(field_valid_min, field_valid_max) ? (field_valid_min - 1, field_valid_max + 1) :
-                    (field_valid_min, field_valid_max)
-                hm = ClimaCoreMakie.fieldheatmap!(ax, cpu_field, colorrange = colorrange)
-                Makie.Colorbar(fig[i, j * 2], hm)
+                _heatmap_cc_field!(fig, field, i, j, field_name)
             elseif field isa AbstractArray
                 lin = Makie.lines!(ax, Array(field))
             end
         end
     end
     Makie.save(joinpath(dir, "debug_$(nameof(sim)).png"), fig)
+end
+
+"""
+    _heatmap_cc_field!(fig, field::CC.Fields.Field, i, j, field_name)
+
+Helper function to plot a heatmap of a ClimaCore field in the given figure at position (i, j).
+If the field is constant, skip plotting it to avoid heatmap errors.
+"""
+function _heatmap_cc_field!(fig, field::CC.Fields.Field, i, j, field_name)
+    # Copy field onto cpu space if necessary
+    cpu_field = CC.to_cpu(field)
+    if cpu_field isa CC.Fields.ExtrudedCubedSphereSpectralElementField3D
+        cpu_field = CC.Fields.level(cpu_field, 1)
+    end
+
+    # ClimaCoreMakie doesn't support NaNs/Infs, so we substitute them with 100max
+    FT = CC.Spaces.undertype(axes(cpu_field))
+    isinvalid = (x) -> isnan(x) || isinf(x)
+    field_valid_min, field_valid_max = extrema(map(x -> isinvalid(x) ? FT(0) : x, parent(cpu_field)))
+    map!(x -> isinvalid(x) ? 100field_valid_max : x, parent(cpu_field), parent(cpu_field))
+
+    # If the values are too small, `isapprox` can't be computed accurately because of floating point precision issues.
+    is_toosmall = (x) -> log10(abs(x)) < log10(floatmin(Float64)) / 2
+
+    # If the field is constant, skip plotting it to avoid heatmap errors.
+    if isapprox(field_valid_min, field_valid_max) || (is_toosmall(field_valid_min) && is_toosmall(field_valid_max))
+        ax = Makie.Axis(fig[i, j * 2 - 1], title = string(field_name) * print_extrema(cpu_field))
+    else
+        colorrange = (field_valid_min, field_valid_max)
+        ax = Makie.Axis(fig[i, j * 2 - 1], title = string(field_name) * print_extrema(cpu_field))
+        hm = ClimaCoreMakie.fieldheatmap!(ax, cpu_field, colorrange = colorrange)
+        Makie.Colorbar(fig[i, j * 2], hm)
+    end
+    return nothing
 end
 
 """

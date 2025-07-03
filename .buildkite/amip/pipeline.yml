@@ -43,7 +43,7 @@ steps:
         key: "amip"
         command:
           - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip.yml --job_id amip"
+          - nsys profile --delay 200 --trace=nvtx,mpi,cuda,osrt --output=experiments/ClimaEarth/output/amip/report julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip.yml --job_id amip
         artifact_paths: "experiments/ClimaEarth/output/amip/artifacts/*"
         timeout_in_minutes: 5760
         env:

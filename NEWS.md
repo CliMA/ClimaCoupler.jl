@@ -6,6 +6,11 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Don't plot constant fields in debug plots PR[#1417](https://github.com/CliMA/ClimaCoupler.jl/pull/1417)
+
+Heatmaps are no longer generated for spatially constant fields in our debug plots.
+This is done to avoid errors when generating the plots.
+
 #### Add aquaplanets; longrun fixes PR[#1411](https://github.com/CliMA/ClimaCoupler.jl/pull/1411)
 
 Add 2 aquaplanet longruns using slab ocean and atmosphere with ED only and diag.

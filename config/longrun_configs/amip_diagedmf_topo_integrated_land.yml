@@ -16,8 +16,13 @@ netcdf_output_at_levels: true
 output_default_diagnostics: true
 prescribe_ozone: true
 prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
+restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-longruns/908/climacoupler-longruns/experiments/ClimaEarth/output/amip_diagedmf_topo_integrated_land_gpu/checkpoints/"
+restart_t: 2678400
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
+diagnostics:
+  - short_name: [ts, ta, thetaa, ha, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, hussfc, evspsbl, pr, rv, hfes, edt, evu]
+    period: 30mins

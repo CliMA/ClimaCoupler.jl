@@ -34,7 +34,6 @@ function ClimaCalibrate.observation_map(iteration)
     nan_count = count(isnan, G_ensemble)
     # Check for 50% nans
     @assert nan_count < total_elements / 2
-    # TODO: use nanmean
     @info "Mean bias y - G, averaged across the ensemble" bias = mean(G_ensemble, dims = 2) - obs |> mean
     return G_ensemble
 end
@@ -69,7 +68,7 @@ end
 # Process a single ensemble member's data into a vector
 function process_member_data(simdir::SimDir, short_names, current_minibatch)
     # Define standard diagnostic fields to preprocess
-    diagnostic_var_names = ["rsdt", "rsut", "rlut", "rsutcs", "rlutcs", "pr", "ts", "lwp", "clivi"]
+    diagnostic_var_names = ["rsdt", "rsut", "rlut", "rsutcs", "rlutcs", "pr", "ta", "lwp", "cl", "clivi"]
 
     # Preprocess all diagnostic fields
     processed_data = Dict{String, Any}()

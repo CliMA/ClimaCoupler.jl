@@ -1,6 +1,9 @@
 # Utilities for processing observations/OutputVars
 # Used to generate observations and compute the observation map
+push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
 using ClimaAnalysis, ClimaCoupler
+using OrderedCollections
+import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import ClimaCalibrate
 using Dates, LinearAlgebra, Statistics
 import EnsembleKalmanProcesses as EKP
@@ -27,7 +30,7 @@ Start date is set to `DateTime(2000, 3, 1)`. All OutputVars are resampled to the
 """
 function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
     if !isnothing(diagnostic_var3d)
-        diagnostic_var3d = limit_pressure_dim_to_era5_range(diagnostic_var3d)
+        diagnostic_var3d = limit_pressure_to_era5_range(diagnostic_var3d)
     end
 
     resample_2d(ov) =
@@ -67,15 +70,15 @@ function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
     set_short_name!(lw_cre, "lw_cre")
     pr = resample(rad_and_pr_obs_dict["pr"](start_date))
     set_short_name!(pr, "pr")
-    # ta = resample(era5_outputvar(joinpath(obs_dir, "era5_monthly_avg_pressure_level_t.nc")))
-    ts = resample(
-        OutputVar(
-            joinpath(obs_dir, "era5_monthly_avg_ts.nc");
-            new_start_date = start_date,
-            shift_by = Dates.firstdayofmonth,
-        ),
-    )
-    set_short_name!(ts, "ts")
+    ta = resample(era5_outputvar(joinpath(obs_dir, "era5_monthly_avg_pressure_level_t.nc")))
+    # ts = resample(
+    #     OutputVar(
+    #         joinpath(obs_dir, "era5_monthly_avg_ts.nc");
+    #         new_start_date = start_date,
+    #         shift_by = Dates.firstdayofmonth,
+    #     ),
+    # )
+    # set_short_name!(ts, "ts")
 
     lwp, iwp = map(["lwp", "iwp"]) do short_name
         out_var = OutputVar(joinpath(pkgdir(ClimaCoupler), "modis_lwp_iwp.nc"), short_name, new_start_date = start_date)
@@ -86,14 +89,24 @@ function get_all_output_vars(obs_dir, diagnostic_var2d, diagnostic_var3d)
         set_short_name!(out_var, short_name)
         out_var
     end
-    return (; net_rad, sw_cre, lw_cre, rlut, rsut, rsutcs, rlutcs, rsdt, pr, ts, lwp, iwp)
+
+    cl = OutputVar(joinpath(@clima_artifact("calipso_cloudsat"), "radarlidar_seasonal_2.5x2.5.nc"), "cloud_fraction_on_levels", new_start_date = start_date)
+    cl = replace(cl, missing => NaN)
+    @assert size(cl.data)[4] == 2
+    new_dims = OrderedDict(k => v for (k, v) in cl.dims if k != "doop")
+    new_dim_attributes = OrderedDict(k => v for (k, v) in cl.dim_attributes if k != "doop")
+    # TODO: use the `by` keyword argument for `slice` using `ClimaAnalysis.Index()`to slice out the doop dimension
+    cl = remake(cl; data = cl.data[:, :, :, 1, :], dims = new_dims, dim_attributes = new_dim_attributes)
+    cl = resample(cl)
+    set_short_name!(cl, "cl")
+    return (; net_rad, sw_cre, lw_cre, rlut, rsut, rsutcs, rlutcs, rsdt, pr, cl, ta, lwp, iwp)
 end
 
 # The ERA5 pressure range is not as large as the ClimaAtmos default pressure levels,
 # so we need to limit outputvars to the ERA5 pressure range (100.0 - 100_000.0 Pa) 
-limit_pressure_dim_to_era5_range(v) = limit_pressure_dim(v, 100.0, 100_000.0)
+limit_pressure_to_era5_range(v) = limit_pressure_range(v, 100.0, 100_000.0)
 
-function limit_pressure_dim(output_var, min_pressure, max_pressure)
+function limit_pressure_range(output_var, min_pressure, max_pressure)
     @assert has_pressure(output_var)
     pressure_dims = output_var.dims[pressure_name(output_var)]
     valid_pressure_levels = filter(pressure_dims) do pressure
@@ -101,7 +114,18 @@ function limit_pressure_dim(output_var, min_pressure, max_pressure)
     end
     lowest_valid_level = minimum(valid_pressure_levels)
     highest_valid_level = maximum(valid_pressure_levels)
-    return window(output_var, "pfull"; left = lowest_valid_level, right = highest_valid_level)
+    return window(output_var, pressure_name(output_var); left = lowest_valid_level, right = highest_valid_level)
+end
+
+function limit_altitude_range(output_var, min_level = 100.0)
+    @assert has_altitude(output_var)
+    z_name = altitude_name(output_var)
+    altitude_dims = output_var.dims[z_name]
+
+    valid_pressure_levels = filter(a -> min_level <= a, altitude_dims)
+
+    lowest_valid_level = minimum(valid_pressure_levels)
+    return window(output_var, z_name; left = lowest_valid_level)
 end
 
 get_monthly_averages(simdir, var_name) = get(simdir; short_name = var_name, reduction = "average", period = "1M")
@@ -124,7 +148,7 @@ end
 Given a NamedTuple, produce a vector of `EKP.Observation`s, where each observation
 consists of seasonally averaged fields, with the exception of globally averaged yearly radiative balance
 """
-function create_observation_series(nt; short_names = keys(nt), model_error_scale = 0.05, regularization = 1e-6, year_range = 2002:2017, batch_size = 1)
+function create_observation_series(nt; short_names = keys(nt), model_error_scale = 0.05, regularization = 1e-6, year_range = 2006:2017, batch_size = 1)
     net_rad = nt.net_rad
     net_rad_var = [variance_time(net_rad).data...;;]
     nt = (;filter(p -> p.first in short_names, pairs(nt))...)
@@ -137,7 +161,7 @@ function create_observation_series(nt; short_names = keys(nt), model_error_scale
         @info "Creating observations for year starting at $start_date" 
         net_rad_year = window(net_rad, "time"; left = start_date, right = start_date + Month(11))
         @assert length(dates(net_rad_year)) == 12
-        net_rad_obs = EKP.Observation(flatten(average_time(net_rad_year)).data, net_rad_var, "net_rad_$(string(start_date))")
+        net_rad_obs = EKP.Observation(ClimaAnalysis.flatten(average_time(net_rad_year)).data, net_rad_var, "net_rad_$(string(start_date))")
         obs = ClimaCalibrate.ObservationRecipe.observation(cov, vars, start_date, end_date)
         obs = EKP.combine_observations([net_rad_obs, obs])
     end

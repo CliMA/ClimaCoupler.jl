@@ -51,8 +51,8 @@ function ClimaCalibrate.forward_model(iter, member)
 end
 
 function minibatch_to_start_date(batch)
-    start_year = minimum(batch) + 2000
-    @assert start_year >= 2001
+    start_year = minimum(batch) + 2005
+    @assert start_year >= 2006
     return "$(start_year)0901"
 end
 

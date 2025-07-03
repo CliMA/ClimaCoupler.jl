@@ -4,18 +4,18 @@ use_itime: true
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
 bucket_albedo_type: "map_temporal"
-checkpoint_dt: "2months"
+checkpoint_dt: "6months"
 coupler_toml: ["toml/amip.toml"]
-coupler_output_dir: "experiments/calibration/coarse_amip/output_32_h_elem"
-dt: "120secs"
-dt_cpl: "120secs"
+coupler_output_dir: "experiments/calibration/coarse_amip/output"
+dt: "240secs"
+dt_cpl: "240secs"
 dt_save_state_to_disk: "99999days"
 dt_save_to_sol: "99999days"
 dz_bottom: 30.0
 edmfx_entr_model: "PiGroups"
 edmfx_detr_model: "SmoothArea"
 energy_check: false
-h_elem: 32
+h_elem: 16
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 netcdf_interpolation_num_points: [90, 45, 31]
@@ -23,7 +23,7 @@ netcdf_output_at_levels: true
 output_default_diagnostics: false
 use_coupler_diagnostics: false
 rayleigh_sponge: true
-# restart_dir: "output/32_h_elem/model_config/checkpoints"
+# restart_dir: "restart_checkpoints"
 # restart_t: 31536000
 surface_setup: "PrescribedSurface"
 topography: "Earth"
@@ -34,6 +34,12 @@ z_elem: 63
 z_stretch: true
 extra_atmos_diagnostics:
   - reduction_time: average
-    short_name: [rsut, rlut, rsdt, rsutcs, rlutcs, pr, ta, ts, lwp, clivi, pfull]
+    short_name: [rsut, rlut, rsdt, rsutcs, rlutcs, pr, ta, lwp, clivi, cl, pfull]
     period: 1months
     writer: nc
+  - short_name: pr
+    reduction_time: binned
+    period: 1days
+    writer: nc
+    bin_period: 1months
+    bin_edges: [ 0.0, 2.1855036891338386e-7, 2.8759241104125977e-6, 9.98377799987793e-6, 3.421306610107422e-5, 0.008536423556506634]

@@ -23,5 +23,5 @@ t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
 diagnostics:
-  - short_name: [ts, ta, thetaa, ha, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, hussfc, evspsbl, pr, edt, evu, rv, hfes]
+  - short_name: [ts, ta, thetaa, ha, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, hussfc, evspsbl, pr, rv, hfes]
     period: 6hours

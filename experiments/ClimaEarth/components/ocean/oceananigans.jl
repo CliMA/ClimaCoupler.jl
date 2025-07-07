@@ -4,7 +4,7 @@ import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, U
 import ClimaComms
 import ClimaCore as CC
 import Thermodynamics as TD
-import ClimaOcean.ECCO: download_dataset
+import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
 
 """
@@ -41,13 +41,13 @@ can be found in the documentation for `ClimaOcean.ocean_simulation`.
 function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir, comms_ctx = ClimaComms.context())
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
 
-    # Retrieve ECCO data (monthly)
+    # Retrieve EN4 data (monthly)
     # (It requires username and password)
     dates = range(start_date, step = Dates.Month(1), stop = stop_date)
-    ecco_temperature = CO.Metadata(:temperature; dates, dataset = CO.ECCO.ECCO4Monthly())
-    ecco_salinity = CO.Metadata(:salinity; dates, dataset = CO.ECCO.ECCO4Monthly())
-    download_dataset(ecco_temperature)
-    download_dataset(ecco_salinity)
+    en4_temperature = CO.Metadata(:temperature; dates, dataset = CO.EN4.EN4Monthly())
+    en4_salinity = CO.Metadata(:salinity; dates, dataset = CO.EN4.EN4Monthly())
+    download_dataset(en4_temperature)
+    download_dataset(en4_salinity)
 
     # Set up ocean grid (1 degree)
     resolution_points = (360, 160, 32)
@@ -77,13 +77,13 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
     use_restoring = start_date + Dates.Month(1) < stop_date
 
     if use_restoring
-        # When we use ecco data, the forcing takes care of everything, including
+        # When we use EN4 data, the forcing takes care of everything, including
         # the initial conditions
         restoring_rate = 1 / (3 * 86400)
         mask = CO.LinearlyTaperedPolarMask(southern = (-80, -70), northern = (70, 90), z = (z[1], 0))
 
-        forcing_T = CO.DatasetRestoring(ecco_temperature, grid; mask, rate = restoring_rate)
-        forcing_S = CO.DatasetRestoring(ecco_salinity, grid; mask, rate = restoring_rate)
+        forcing_T = CO.DatasetRestoring(en4_temperature, grid; mask, rate = restoring_rate)
+        forcing_S = CO.DatasetRestoring(en4_salinity, grid; mask, rate = restoring_rate)
         forcing = (T = forcing_T, S = forcing_S)
     else
         forcing = (;)
@@ -92,8 +92,8 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
     # Create ocean simulation
     ocean = CO.ocean_simulation(grid; forcing)
 
-    # Set initial condition to ECCO state estimate at start_date
-    OC.set!(ocean.model, T = ecco_temperature[1], S = ecco_salinity[1])
+    # Set initial condition to EN4 state estimate at start_date
+    OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
 
     long_cc = OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center())
     lat_cc = OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center())

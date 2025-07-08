@@ -70,7 +70,7 @@ function ClimaAtmosSimulation(atmos_config)
         surface_rain_flux .= FT(0)
         surface_snow_flux .= FT(0)
     end
-    if integrator.p.atmos.precip_model isa CA.Microphysics0Moment
+    if integrator.p.atmos.microphysics_model isa CA.Microphysics0Moment
         if pkgversion(CA) >= v"0.29.0"
             ᶜS_ρq_tot = integrator.p.precomputed.ᶜS_ρq_tot
             ᶜS_ρq_tot .= FT(0)
@@ -177,7 +177,7 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:energy})
 
 
     # return total energy and (if Microphysics0Moment) the energy lost due to precipitation removal
-    if p.atmos.precip_model isa CA.Microphysics0Moment
+    if p.atmos.microphysics_model isa CA.Microphysics0Moment
         ᶜts = p.precomputed.ᶜts
         ᶜΦ = p.core.ᶜΦ
         if pkgversion(CA) >= v"0.29.0"

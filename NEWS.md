@@ -6,6 +6,11 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Use EN4 dataset for ocean initial conditions and forcing PR[#1425](https://github.com/CliMA/ClimaCoupler.jl/pull/1425)
+
+Use EN4 instead of ECCO for ocean initial conditions and forcing, to avoid
+authentication requirements.
+
 #### Don't plot constant fields in debug plots PR[#1417](https://github.com/CliMA/ClimaCoupler.jl/pull/1417)
 
 Heatmaps are no longer generated for spatially constant fields in our debug plots.

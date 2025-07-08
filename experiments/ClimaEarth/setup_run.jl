@@ -552,15 +552,18 @@ function run!(cs::CoupledSimulation; precompile = (cs.tspan[end] > 2 * cs.Δt_cp
 end
 
 """
-    postprocess(cs, conservation_softfail)
+    postprocess(cs; conservation_softfail = false, rmse_check = false)
 
 Process the results after a simulation has completed, including generating
 plots, checking conservation, and other diagnostics.
 
 When `conservation_softfail` is true, throw an error if conservation is not
 respected.
+
+When `rmse_check` is true, compute the RMSE against observations and test
+that it is below a certain threshold.
 """
-function postprocess(cs, conservation_softfail)
+function postprocess(cs; conservation_softfail = false, rmse_check = false)
     #=
     ## Postprocessing
     All postprocessing is performed using the root process only, if applicable.
@@ -576,7 +579,7 @@ function postprocess(cs, conservation_softfail)
     =#
 
     if ClimaComms.iamroot(ClimaComms.context(cs)) && !isnothing(cs.diags_handler)
-        postprocessing_vars = (; conservation_softfail)
+        postprocessing_vars = (; conservation_softfail, rmse_check)
         postprocess_sim(cs, postprocessing_vars)
     end
     return nothing

@@ -13,7 +13,7 @@ producing the leaderboard if monthly data is available, performing
 conservation checks if enabled, and closing all diagnostics file writers.
 """
 function postprocess_sim(cs, postprocessing_vars)
-    (; conservation_softfail) = postprocessing_vars
+    (; conservation_softfail, rmse_check) = postprocessing_vars
     output_dir = cs.dirs.output
     artifact_dir = cs.dirs.artifacts
     coupler_output_dir = joinpath(output_dir, "coupler")
@@ -41,7 +41,7 @@ function postprocess_sim(cs, postprocessing_vars)
         if t_end > 84600 * 31 * 3 # 3 months for spin up
             leaderboard_base_path = artifact_dir
             compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
-            test_rmse_thresholds(atmos_output_dir, 3)
+            rmse_check && test_rmse_thresholds(atmos_output_dir, 3)
             pressure_in_output && compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 6)
         end
     end

@@ -112,6 +112,7 @@ function get_coupler_args(config_dict::Dict)
     # Conservation information
     energy_check = config_dict["energy_check"]
     conservation_softfail = config_dict["conservation_softfail"]
+    rmse_check = config_dict["rmse_check"]
 
     # Output information
     output_dir_root = joinpath(config_dict["coupler_output_dir"], job_id)
@@ -143,6 +144,7 @@ function get_coupler_args(config_dict::Dict)
         evolving_ocean,
         energy_check,
         conservation_softfail,
+        rmse_check,
         output_dir_root,
         land_model,
         bucket_albedo_type,

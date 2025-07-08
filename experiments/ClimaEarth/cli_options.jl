@@ -106,13 +106,17 @@ function argparse_settings()
         help = "Boolean flag indicating whether to use a dynamic slab ocean model, as opposed to constant surface temperatures [`true` (default), `false`]"
         arg_type = Bool
         default = true
-        # Conservation information
+        # Conservation and RMSE check information
         "--energy_check"
         help = "Boolean flag indicating whether to check energy conservation [`false` (default), `true`]"
         arg_type = Bool
         default = false
         "--conservation_softfail"
         help = "Boolean flag indicating whether to soft fail on conservation errors [`false` (default), `true`]"
+        arg_type = Bool
+        default = false
+        "--rmse_check"
+        help = "Boolean flag indicating whether to check RMSE of some physical fields [`false` (default), `true`]"
         arg_type = Bool
         default = false
         # Output information

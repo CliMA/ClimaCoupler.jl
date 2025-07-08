@@ -47,6 +47,6 @@ cs = CoupledSimulation(config_file)
 run!(cs)
 
 # Postprocessing
-# TODO: Remove this option?
 conservation_softfail = get_coupler_config_dict(config_file)["conservation_softfail"]
-postprocess(cs, conservation_softfail)
+rmse_check = get_coupler_config_dict(config_file)["rmse_check"]
+postprocess(cs; conservation_softfail, rmse_check)

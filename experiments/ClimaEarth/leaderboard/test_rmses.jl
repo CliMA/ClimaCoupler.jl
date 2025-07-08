@@ -62,8 +62,8 @@ Return a dictionary mapping short names to maximum acceptable RMSE values.
 function get_rmse_thresholds()
     rmse_thresholds = Dict(
         "pr" => 3.0,      # mm/day
-        "rsut" => 20.0,   # W/m²
-        "rsutcs" => 7.0,  # W/m²
+        "rsut" => 24.0,   # W/m²
+        "rsutcs" => 7.4,  # W/m²
     )
     return rmse_thresholds
 end

@@ -156,6 +156,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to compute and output land model diagnostics [`true` (default), `false`]"
         arg_type = Bool
         default = true
+        "--land_spun_up_ic"
+        help = "Boolean flag to indicate whether to use integrated land initial conditions from spun up state [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
         # BucketModel specific
         "--bucket_albedo_type"
         help = "Access bucket surface albedo information from data file. [`map_static` (default), `function`, `map_temporal`]"

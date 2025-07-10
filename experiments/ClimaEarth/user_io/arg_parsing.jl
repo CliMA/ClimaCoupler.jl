@@ -119,10 +119,11 @@ function get_coupler_args(config_dict::Dict)
 
     # ClimaLand-specific information
     land_model = config_dict["land_model"]
-    bucket_albedo_type = config_dict["bucket_albedo_type"]
-    bucket_initial_condition = config_dict["bucket_initial_condition"]
     land_temperature_anomaly = config_dict["land_temperature_anomaly"]
     use_land_diagnostics = config_dict["use_land_diagnostics"]
+    land_spun_up_ic = config_dict["land_spun_up_ic"]
+    bucket_albedo_type = config_dict["bucket_albedo_type"]
+    bucket_initial_condition = config_dict["bucket_initial_condition"]
 
     return (;
         job_id,
@@ -147,10 +148,11 @@ function get_coupler_args(config_dict::Dict)
         rmse_check,
         output_dir_root,
         land_model,
+        land_temperature_anomaly,
+        land_spun_up_ic,
+        use_land_diagnostics,
         bucket_albedo_type,
         bucket_initial_condition,
-        land_temperature_anomaly,
-        use_land_diagnostics,
         parameter_files,
     )
 end

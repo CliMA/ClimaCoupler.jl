@@ -4,7 +4,7 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "93days"
-coupler_toml: ["toml/amip_target_topo_diagedmf.toml"]
+coupler_toml: ["toml/amip.toml"]
 dt: "120secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: "120secs"

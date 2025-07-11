@@ -95,13 +95,15 @@ function ClimaLandSimulation(
     earth_param_set = CL.Parameters.LandParameters(
         CP.create_toml_dict(FT; override_file = CP.merge_toml_files(parameter_files; override = true)),
     )
-    spatially_varying_soil_params = CL.default_spatially_varying_soil_parameters(subsurface_space, surface_space, FT)
+
     # Set up the soil model args
     soil_model_type = CL.Soil.EnergyHydrology{FT}
-    soil_args = create_soil_args(FT, domain, spatially_varying_soil_params)
+    soil_params = create_soil_params(FT, domain)
+
     # Set up the soil microbes model args
     soilco2_type = CL.Soil.Biogeochemistry.SoilCO2Model{FT}
-    soilco2_args = create_soilco2_args(FT, domain)
+    soilco2_params = CL.Soil.Biogeochemistry.SoilCO2ModelParameters(FT)
+
     # Set up the canopy model args
     canopy_model_args, canopy_component_args = create_canopy_args(FT, domain, earth_param_set, start_date)
     canopy_component_types = (;
@@ -112,15 +114,19 @@ function ClimaLandSimulation(
         hydraulics = CL.Canopy.PlantHydraulicsModel{FT},
         energy = CL.Canopy.BigLeafEnergyModel{FT},
     )
-    # setup snow model args
-    snow_args = create_snow_args(FT, domain, earth_param_set, dt)
+
+    # Set up the snow model args
     snow_model_type = CL.Snow.SnowModel
+    snow_params = CL.Snow.SnowParameters{FT}(dt; earth_param_set)
 
     # Setup overall land model
     f_over = FT(3.28) # 1/m
     R_sb = FT(1.484e-4 / 1000) # m/s
-    runoff_model =
-        CL.Soil.Runoff.TOPMODELRunoff{FT}(; f_over = f_over, f_max = spatially_varying_soil_params.f_max, R_sb = R_sb)
+    runoff_model = CL.Soil.Runoff.TOPMODELRunoff{FT}(;
+        f_over = f_over,
+        f_max = CL.Soil.topmodel_fmax(surface_space, FT),
+        R_sb = R_sb,
+    )
 
     Csom = CL.PrescribedSoilOrganicCarbon{FT}(TimeVaryingInput((t) -> 5))
     land_input = (
@@ -137,21 +143,20 @@ function ClimaLandSimulation(
 
     model = CL.LandModel{FT}(;
         soilco2_type = soilco2_type,
-        soilco2_args = soilco2_args,
+        soilco2_args = (; domain = domain, parameters = soilco2_params),
         land_args = land_input,
         soil_model_type = soil_model_type,
-        soil_args = soil_args,
+        soil_args = (domain = domain, parameters = soil_params),
         canopy_component_types = canopy_component_types,
         canopy_component_args = canopy_component_args,
         canopy_model_args = canopy_model_args,
-        snow_args = snow_args,
         snow_model_type = snow_model_type,
+        snow_args = (; domain = CL.obtain_surface_domain(domain), parameters = snow_params),
     )
 
     Y, p, coords = CL.initialize(model)
 
     # Set initial conditions
-    (; θ_r, ν) = spatially_varying_soil_params
 
     # Apply temperature anomaly function to initial temperature
     T_functions = Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
@@ -167,9 +172,10 @@ function ClimaLandSimulation(
     orog_adjusted_T_surface = CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
 
     # Set initial conditions for the state
+    θ_r, ν, ρc_ds = soil_params.θ_r, soil_params.ν, soil_params.ρc_ds
     @. Y.soil.ϑ_l = θ_r + (ν - θ_r) / 2
     Y.soil.θ_i .= FT(0.0)
-    ρc_s = CL.Soil.volumetric_heat_capacity.(Y.soil.ϑ_l, Y.soil.θ_i, soil_args.parameters.ρc_ds, earth_param_set)
+    ρc_s = CL.Soil.volumetric_heat_capacity.(Y.soil.ϑ_l, Y.soil.θ_i, ρc_ds, earth_param_set)
     Y.soil.ρe_int .= CL.Soil.volumetric_internal_energy.(Y.soil.θ_i, ρc_s, orog_adjusted_T, earth_param_set)
     Y.soilco2.C .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
     Y.canopy.hydraulics.ϑ_l.:1 .= canopy_component_args.hydraulics.parameters.ν
@@ -252,8 +258,13 @@ Creates the arguments for the canopy model.
 """
 function create_canopy_args(::Type{FT}, domain, earth_param_set, start_date) where {FT}
     surface_space = domain.space.surface
-    (; Ω, rooting_depth, is_c3, Vcmax25, g1, G_Function, α_PAR_leaf, τ_PAR_leaf, α_NIR_leaf, τ_NIR_leaf) =
-        CL.clm_canopy_parameters(surface_space)
+
+    # Spatially varying canopy parameters from CLM
+    g1 = CL.Canopy.clm_medlyn_g1(surface_space)
+    rooting_depth = CL.Canopy.clm_rooting_depth(surface_space)
+    (; is_c3, Vcmax25) = CL.Canopy.clm_photosynthesis_parameters(surface_space)
+    (; Ω, G_Function, α_PAR_leaf, τ_PAR_leaf, α_NIR_leaf, τ_NIR_leaf) =
+        CL.Canopy.clm_canopy_radiation_parameters(surface_space)
 
     # Energy Balance model
     ac_canopy = FT(2.5e3)
@@ -336,46 +347,21 @@ function create_canopy_args(::Type{FT}, domain, earth_param_set, start_date) whe
     return canopy_model_args, canopy_component_args
 end
 
-"""
-    create_soilco2_args(::Type{FT}, domain)
-
-Creates the arguments for the soil CO2 model.
-"""
-function create_soilco2_args(::Type{FT}, domain) where {FT}
-    soilco2_ps = CL.Soil.Biogeochemistry.SoilCO2ModelParameters(FT)
-    soilco2_top_bc = CL.Soil.Biogeochemistry.AtmosCO2StateBC()
-    soilco2_bot_bc = CL.Soil.Biogeochemistry.SoilCO2FluxBC((p, t) -> 0.0) # no flux
-    soilco2_sources = (CL.Soil.Biogeochemistry.MicrobeProduction{FT}(),)
-    soilco2_boundary_conditions = (; top = soilco2_top_bc, bottom = soilco2_bot_bc)
-    return (;
-        boundary_conditions = soilco2_boundary_conditions,
-        sources = soilco2_sources,
-        domain = domain,
-        parameters = soilco2_ps,
-    )
-end
 
 """
-    create_soil_args(::Type{FT}, domain, spatially_varying_soil_params)
+    create_soil_params(::Type{FT}, domain)
 
-Creates the arguments for the soil model.
+Creates the parameters struct for the soil model.
 """
-function create_soil_args(::Type{FT}, domain, spatially_varying_soil_params) where {FT}
-    (;
-        ν,
-        ν_ss_om,
-        ν_ss_quartz,
-        ν_ss_gravel,
-        hydrology_cm,
-        K_sat,
-        S_s,
-        θ_r,
-        PAR_albedo_dry,
-        NIR_albedo_dry,
-        PAR_albedo_wet,
-        NIR_albedo_wet,
-        f_max,
-    ) = spatially_varying_soil_params
+function create_soil_params(::Type{FT}, domain) where {FT}
+    subsurface_space = domain.space.subsurface
+    surface_space = domain.space.surface
+
+    (; ν_ss_om, ν_ss_quartz, ν_ss_gravel) = CL.Soil.soil_composition_parameters(subsurface_space, FT)
+    (; ν, hydrology_cm, K_sat, θ_r) = CL.Soil.soil_vangenuchten_parameters(subsurface_space, FT)
+    soil_albedo = CL.Soil.CLMTwoBandSoilAlbedo{FT}(; CL.Soil.clm_soil_albedo_parameters(surface_space)...)
+    S_s = ClimaCore.Fields.zeros(subsurface_space) .+ FT(1e-3)
+
 
     soil_params = CL.Soil.EnergyHydrologyParameters(
         FT;
@@ -387,22 +373,9 @@ function create_soil_args(::Type{FT}, domain, spatially_varying_soil_params) whe
         K_sat,
         S_s,
         θ_r,
-        PAR_albedo_dry = PAR_albedo_dry,
-        NIR_albedo_dry = NIR_albedo_dry,
-        PAR_albedo_wet = PAR_albedo_wet,
-        NIR_albedo_wet = NIR_albedo_wet,
+        albedo = soil_albedo,
     )
-    return (domain = domain, parameters = soil_params)
-end
-
-"""
-    create_snow_args(::Type{FT}, domain, earth_param_set, dt)
-
-Creates the arguments for the snow model.
-"""
-function create_snow_args(::Type{FT}, domain, earth_param_set, dt) where {FT}
-    snow_parameters = CL.Snow.SnowParameters{FT}(dt; earth_param_set = earth_param_set)
-    return (; parameters = snow_parameters, domain = CL.obtain_surface_domain(domain))
+    return soil_params
 end
 
 ###############################################################################

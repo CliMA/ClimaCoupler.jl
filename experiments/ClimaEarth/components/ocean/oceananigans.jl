@@ -80,7 +80,7 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
         # When we use EN4 data, the forcing takes care of everything, including
         # the initial conditions
         restoring_rate = 1 / (3 * 86400)
-        mask = CO.LinearlyTaperedPolarMask(southern = (-80, -70), northern = (70, 90), z = (z[1], 0))
+        mask = CO.LinearlyTaperedPolarMask(southern = (-80, -70), northern = (70, 90), z = (z(1), 0))
 
         forcing_T = CO.DatasetRestoring(en4_temperature, grid; mask, rate = restoring_rate)
         forcing_S = CO.DatasetRestoring(en4_salinity, grid; mask, rate = restoring_rate)

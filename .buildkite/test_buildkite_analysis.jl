@@ -10,9 +10,11 @@ using .BuildkiteAnalysis:
     format_simulation_time
 
 # Test configuration
-current_build_id = "577"
-previous_build_id = "576"
-job_ids = [("computer-hydrostatic-balance", "GPU Long Run Test")]
+pipeline = "climacoupler-longruns"
+current_build_id = "915"
+previous_build_id = "914"
+job_id_step_names = [("amip_diagedmf_topo_integrated_land_gpu", "GPU AMIP + diag. EDMF + Earth topography + integrated land"),
+("amip_edonly_topo_integrated_land_gpu", "GPU AMIP + ED only + Earth topography + integrated land")]
 
 # Function to set up offline test environment with actual log file
 function setup_offline_test()
@@ -43,14 +45,17 @@ function cleanup_test()
 end
 
 # Run the analysis with actual log file
-function run_analysis()
-    setup_offline_test()
+function run_analysis(is_offline::Bool = true)
+    is_offline && setup_offline_test()
+
+    pipeline = "climacoupler-longruns"
 
     try
         summary = summarize_buildkite_errors(
+            pipeline,
             current_build_id,
             previous_build_id,
-            job_ids,
+            job_id_step_names,
         )
         println("\nBuildkite Analysis Summary:")
         println("=================================")
@@ -64,4 +69,4 @@ function run_analysis()
 end
 
 # Run the analysis
-run_analysis()
+run_analysis(false)

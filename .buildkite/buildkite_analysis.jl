@@ -23,7 +23,7 @@ struct BuildkiteError
     build_id::String
     step_name::String
     timestamp::DateTime
-    clima_job_id::String  # ClimaAtmos job identifier
+    clima_job_id::String  # ClimaCoupler job identifier
     sypd::Union{Float64, Nothing}  # Simulated Years Per Day
     build_status::String  # Success/Failure/Cancelled status
 end
@@ -54,7 +54,7 @@ function generate_build_report(
     # Build Information
     push!(report, "Build Information:")
     push!(report, "─" * repeat("─", 30))
-    push!(report, "ClimaAtmos Job ID: $(current.clima_job_id)")
+    push!(report, "ClimaCoupler Job ID: $(current.clima_job_id)")
     push!(
         report,
         "Current Build: $(current.build_id) $(get(status_emoji, current.build_status, "❓")) ($(current.build_status))",
@@ -160,11 +160,11 @@ function generate_build_report(
 end
 
 """
-    fetch_buildkite_log(build_id::String, job_id::String)
+    fetch_buildkite_log(pipeline::String, build_id::String, job_id::String)
 
 Fetch log content from Buildkite API or local file system depending on mode.
 """
-function fetch_buildkite_log(build_id::String, job_id::String)
+function fetch_buildkite_log(pipeline::String, build_id::String, job_id::String)
     if GLOBAL_CONFIG.offline_mode
         log_file = joinpath(
             GLOBAL_CONFIG.log_directory,
@@ -180,12 +180,45 @@ function fetch_buildkite_log(build_id::String, job_id::String)
             )
         end
 
-        # Note: This API endpoint is specifically for a single job's logs
-        api_url = "https://api.buildkite.com/v2/organizations/clima/pipelines/climaatmos-gpulongruns/builds/$build_id/jobs/$job_id/log"
-        @info "Fetching log for specific job" build_id job_id api_url
+        # # Fetch all jobs for this build
+        # job_list_url = "https://api.buildkite.com/v2/organizations/clima/pipelines/climacoupler-longruns/builds/915/jobs"
+        # headers = headers = [
+        #     "Authorization" => "Bearer $token",
+        #     "Accept" => "application/json"
+        # ]
 
-        headers = Dict("Authorization" => "Bearer $token")
+
+        # @info "fetching jobs list"
+        # response = HTTP.get(job_list_url, headers)
+        # jobs = JSON3.read(String(response.body))
+
+        # for job in jobs
+        #     println("Job ID: ", job["id"])
+        #     println("Type: ", job["type"])
+        #     println("Command: ", get(job, "command", "N/A"))
+        #     println("---")
+        # end
+
+        # @assert false
+
+        # Note: This API endpoint is specifically for a single job's logs
+        api_url = "https://api.buildkite.com/v2/organizations/clima/pipelines/$pipeline/builds/$build_id/jobs/$job_id/log"
+        @show "Fetching log for specific job" build_id job_id api_url
+
+        headers = [
+            "Authorization" => "Bearer $token",
+            "Accept" => "application/json"
+        ]
+
+
+        @info "Final API URL: $api_url"
+        @info "Headers: $headers"
+
         response = HTTP.get(api_url, headers)
+
+        @info "Response: $(response.status) $(String(response.body))"
+        println("Status: ", response.status)
+        println("Body: ", String(response.body))
         content = String(response.body)
 
         # Save the job-specific log locally for future offline use
@@ -200,18 +233,19 @@ function fetch_buildkite_log(build_id::String, job_id::String)
 end
 
 """
-    analyze_buildkite_log(build_id::String, job_id::String, step_name::String)
+    analyze_buildkite_log(pipeline::String, build_id::String, job_id::String, step_name::String)
 
 Analyze a single Buildkite job log and return structured error information.
 """
 function analyze_buildkite_log(
+    pipeline::String,
     build_id::String,
     job_id::String,
     step_name::String,
 )
     @info "Analyzing specific job log" build_id job_id step_name
 
-    log_content = fetch_buildkite_log(build_id, job_id)
+    log_content = fetch_buildkite_log(pipeline, build_id, job_id)
 
     # Verify we have the correct job's log by checking for job_id in the content
     if !isnothing(match(r"job_id = \"([^\"]+)\"", log_content))
@@ -243,7 +277,7 @@ end
 """
     format_simulation_time(seconds::Float64)
 
-Convert simulation time to weeks and days format as used in ClimaAtmos.
+Convert simulation time to weeks and days format as used in ClimaCoupler.
 """
 function format_simulation_time(seconds::Float64)
     total_days = seconds / 86400  # Convert seconds to days
@@ -262,11 +296,12 @@ function format_simulation_time(seconds::Float64)
 end
 
 """
-    summarize_buildkite_errors(current_build::String, previous_build::String, job_ids::Vector{Tuple{String,String}})
+    summarize_buildkite_errors(pipeline::String, current_build::String, previous_build::String, job_ids::Vector{Tuple{String,String}})
 
 Generate summary reports for multiple jobs, comparing current and previous builds.
 """
 function summarize_buildkite_errors(
+    pipeline::String,
     current_build::String,
     previous_build::String,
     job_ids::Vector{Tuple{String, String}},
@@ -275,14 +310,16 @@ function summarize_buildkite_errors(
     current_logger = Logging.global_logger()
     Logging.global_logger(Logging.SimpleLogger(stderr, Logging.Warn))
 
+    @info "Summarizing errors for pipeline" pipeline current_build previous_build
+
     try
         summaries = String[]
         for (job_id, step_name) in job_ids
             try
                 current_error =
-                    analyze_buildkite_log(current_build, job_id, step_name)
+                    analyze_buildkite_log(pipeline, current_build, job_id, step_name)
                 previous_error = try
-                    analyze_buildkite_log(previous_build, job_id, step_name)
+                    analyze_buildkite_log(pipeline, previous_build, job_id, step_name)
                 catch e
                     isa(e, SystemError) ||
                         contains(string(e), "Log file not found") ?
@@ -313,7 +350,7 @@ end
 """
     extract_sim_time(log_text::String)
 
-Extract the simulation time from ClimaAtmos progress reports.
+Extract the simulation time from ClimaCoupler progress reports.
 Returns the time in seconds if found, nothing otherwise.
 """
 function extract_sim_time(log_text::String)
@@ -387,7 +424,7 @@ end
 """
     extract_job_id(log_text::String)
 
-Extract the ClimaAtmos job identifier from the log.
+Extract the ClimaCoupler job identifier from the log.
 Returns the job_id string if found, "unknown" otherwise.
 """
 function extract_job_id(log_text::String)
@@ -497,7 +534,7 @@ function extract_build_status(log_text::String)
         end
     end
 
-    # For ClimaAtmos, if we see progress reports with high completion percentage
+    # For ClimaCoupler, if we see progress reports with high completion percentage
     # and no critical failures, consider it a success
     if occursin(r"percent_complete = \"[0-9]+\.?[0-9]*%\"", log_text) &&
        !any(p -> occursin(p, log_text), critical_failure_patterns)

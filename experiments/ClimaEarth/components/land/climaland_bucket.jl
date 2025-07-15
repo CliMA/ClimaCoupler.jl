@@ -38,20 +38,6 @@ struct BucketSimulation{M <: CL.Bucket.BucketModel, I <: SciMLBase.AbstractODEIn
 end
 
 """
-    get_new_cache(p, Y, energy_check)
-Returns a new `p` with an updated field to store e_per_area if energy conservation
-    checks are turned on.
-"""
-function get_new_cache(p, Y, energy_check)
-    if energy_check
-        e_per_area_field = CC.Fields.zeros(axes(Y.bucket.W))
-        return merge(p, (; e_per_area = e_per_area_field))
-    else
-        return p
-    end
-end
-
-"""
     bucket_init
 
 Initializes the bucket model variables.
@@ -139,9 +125,6 @@ function BucketSimulation(
 
     # Initial conditions with no moisture
     Y, p, coords = CL.initialize(model)
-
-    # Add space in the cache for the energy if energy checks are enabled
-    p = get_new_cache(p, Y, energy_check)
 
     # Get temperature anomaly function
     T_functions = Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
@@ -262,29 +245,26 @@ Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_temperature}) =
 """
     Interfacer.get_field(sim::BucketSimulation, ::Val{:energy})
 
-Extension of Interfacer.get_field that provides the total energy contained in the bucket, including the latent heat due to snow melt.
+Extension of Interfacer.get_field that provides the total energy contained in the bucket,
+computed from the temperature of the bucket and also including the latent heat of fusion
+of frozen water in the snow.
+
+This method is required by the ConservationChecker to check energy conservation.
 """
-function Interfacer.get_field(sim::BucketSimulation, ::Val{:energy})
-    # required by ConservationChecker
-    e_per_area = sim.integrator.p.e_per_area .= 0
-    CC.Operators.column_integral_definite!(e_per_area, sim.model.parameters.ρc_soil .* sim.integrator.u.bucket.T)
-
-    e_per_area .+=
-        -LP.LH_f0(sim.model.parameters.earth_param_set) .* LP.ρ_cloud_liq(sim.model.parameters.earth_param_set) .*
-        sim.integrator.u.bucket.σS
-
-    return e_per_area
-end
+Interfacer.get_field(sim::BucketSimulation, ::Val{:energy}) = sim.integrator.p.bucket.total_energy
 
 """
     Interfacer.get_field(sim::BucketSimulation, ::Val{:water})
 
-Extension of Interfacer.get_field that provides the total water contained in the bucket, including the liquid water in snow.
+Extension of Interfacer.get_field that provides the total water contained in the bucket.
+The total water contained in the bucket is the sum of the subsurface water storage `W`,
+the snow water equivalent `σS`, and surface water content `Ws`.
+
+This method is required by the ConservationChecker to check water conservation.
 """
 function Interfacer.get_field(sim::BucketSimulation, ::Val{:water})
     ρ_cloud_liq = CL.LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
-    return
-    @. (sim.integrator.u.bucket.σS + sim.integrator.u.bucket.W + sim.integrator.u.bucket.Ws) * ρ_cloud_liq  # kg water / m2
+    return sim.integrator.p.bucket.total_water .* ρ_cloud_liq # kg water / m2
 end
 
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_density}, field)

@@ -6,6 +6,12 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Remove bucket `get_new_cache` PR[#1437](https://github.com/CliMA/ClimaCoupler.jl/pull/1437)
+
+As of ClimaLand v0.16.2, total energy and and water are always stored in the bucket cache.
+This PR removes the `get_new_cache`, which allocated space for the energy field,
+and instead accesses the cached fields directly.
+
 #### Add option for integrated land spun up IC. PR[#1318](https://github.com/CliMA/ClimaCoupler.jl/pull/1318)
 
 Adds a boolean flag `land_spun_up_ic` that allows the user to request reading integrated land

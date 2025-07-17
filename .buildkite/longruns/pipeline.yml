@@ -78,7 +78,7 @@ steps:
 
       - label: "GPU Aquaplanet: ED only atmosphere + slab ocean"
         key: "aquaplanet_edonly"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/aquaplanet_edonly.yml --job_id aquaplanet_edonly"
+        command: "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/aquaplanet_edonly.yml --job_id aquaplanet_edonly"
         artifact_paths: "experiments/ClimaEarth/output/aquaplanet_edonly/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -92,7 +92,7 @@ steps:
 
       - label: "GPU Aquaplanet: diag. EDMF atmosphere + slab ocean"
         key: "aquaplanet_diagedmf"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/aquaplanet_diagedmf.yml --job_id aquaplanet_diagedmf"
+        command: "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/aquaplanet_diagedmf.yml --job_id aquaplanet_diagedmf"
         artifact_paths: "experiments/ClimaEarth/output/aquaplanet_diagedmf/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"

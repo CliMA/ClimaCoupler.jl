@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.9"
+julia_version = "1.10.10"
 manifest_format = "2.0"
-project_hash = "1754a7c9ed667b47a6df8199d5b5fe777a3ca462"
+project_hash = "8be0db6837f659a6beaaabe1167071904a205734"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "be7ae030256b8ef14a441726c4c37766b90b93a3"
@@ -473,9 +473,9 @@ version = "0.17.1"
 
 [[deps.ClimaOcean]]
 deps = ["Adapt", "CFTime", "CUDA", "ClimaSeaIce", "CubicSplines", "DataDeps", "Dates", "DocStringExtensions", "Downloads", "ImageMorphology", "JLD2", "KernelAbstractions", "MPI", "NCDatasets", "Oceananigans", "OffsetArrays", "PrecompileTools", "Printf", "Scratch", "SeawaterPolynomials", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "ZipFile"]
-git-tree-sha1 = "537f8e721597a4730a12be4cbed7775ce49a290a"
+git-tree-sha1 = "909ce2b14c49b80b5e9d3fd7e2941f31c78fd69b"
 uuid = "0376089a-ecfe-4b0e-a64f-9c555d74d754"
-version = "0.7.1"
+version = "0.7.3"
 
     [deps.ClimaOcean.extensions]
     ClimaOceanPythonCallExt = ["PythonCall", "CondaPkg"]
@@ -2136,13 +2136,14 @@ uuid = "510215fc-4207-5dde-b226-833fc4488ee2"
 version = "0.5.5"
 
 [[deps.Oceananigans]]
-deps = ["Adapt", "CUDA", "Crayons", "CubedSphere", "Dates", "Distances", "DocStringExtensions", "FFTW", "GPUArrays", "Glob", "InteractiveUtils", "IterativeSolvers", "JLD2", "KernelAbstractions", "Krylov", "KrylovPreconditioners", "LinearAlgebra", "Logging", "MPI", "MuladdMacro", "OffsetArrays", "OrderedCollections", "Pkg", "Printf", "Random", "ReactantCore", "Rotations", "SeawaterPolynomials", "SparseArrays", "StaticArrays", "Statistics", "StructArrays"]
-git-tree-sha1 = "af96495374438b175a677bbe7383a8ee3ce8cde4"
+deps = ["Adapt", "Crayons", "CubedSphere", "Dates", "Distances", "DocStringExtensions", "FFTW", "GPUArrays", "GPUArraysCore", "Glob", "InteractiveUtils", "IterativeSolvers", "JLD2", "KernelAbstractions", "Krylov", "KrylovPreconditioners", "LinearAlgebra", "Logging", "MPI", "MuladdMacro", "OffsetArrays", "OrderedCollections", "Pkg", "Printf", "Random", "ReactantCore", "Rotations", "SeawaterPolynomials", "SparseArrays", "StaticArrays", "Statistics", "StructArrays"]
+git-tree-sha1 = "d4cae4137e09b70431f46060119235bb719bb1c3"
 uuid = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
-version = "0.96.35"
+version = "0.97.1"
 
     [deps.Oceananigans.extensions]
     OceananigansAMDGPUExt = "AMDGPU"
+    OceananigansCUDAExt = "CUDA"
     OceananigansEnzymeExt = "Enzyme"
     OceananigansMakieExt = ["MakieCore", "Makie"]
     OceananigansMetalExt = "Metal"
@@ -2152,6 +2153,7 @@ version = "0.96.35"
 
     [deps.Oceananigans.weakdeps]
     AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
     ConstructionBase = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
     Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
     Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
@@ -2214,7 +2216,7 @@ version = "2.5.4+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+4"
+version = "0.8.5+0"
 
 [[deps.OpenMPI_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Hwloc_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "TOML", "Zlib_jll"]

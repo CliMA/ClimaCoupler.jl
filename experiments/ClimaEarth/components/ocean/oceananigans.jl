@@ -53,7 +53,7 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
     resolution_points = (360, 160, 32)
     Nz = last(resolution_points)
     depth = 4000 # meters
-    z = CO.ExponentialCoordinate(Nz, -depth; scale = 0.85 * depth)
+    z = CO.ExponentialCoordinate(Nz, -depth, 0; scale = 0.85 * depth)
 
     # Regular LatLong because we know how to do interpolation there
 

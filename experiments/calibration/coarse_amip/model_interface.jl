@@ -18,7 +18,7 @@ function ClimaCalibrate.forward_model(iter, member)
     @info "Current minibatch: $minibatch"
     @info "Current start date: $(minibatch_to_start_date(minibatch))"
     spinup_days = 92
-    nyears = length(minibatch) + 1
+    nyears = length(minibatch)
     t_end_days = spinup_days + 365 * nyears
     config_dict["t_end"] = "$(t_end_days)days"
 
@@ -46,7 +46,7 @@ function ClimaCalibrate.forward_model(iter, member)
 
     @info "Completed member $member"
     @info "Removing checkpoints"
-    rm(joinpath(member_output_dir, "model_config", "checkpoints"), recursive=true)
+    rm(joinpath(member_output_dir, "model_config", "checkpoints"), recursive = true)
     return sim
 end
 

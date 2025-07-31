@@ -24,7 +24,6 @@ function ClimaCalibrate.observation_map(iteration)
         @info "Processing member $m: $simdir_path"
         try
             G_ensemble[:, m] .= process_member_data(SimDir(simdir_path), short_names, current_minibatch)
-
         catch e
             @error "Error processing member $m, filling observation map entry with NaNs" exception = e
             G_ensemble[:, m] .= NaN
@@ -62,14 +61,15 @@ function plot_constrained_params_and_errors(output_dir, ekp, prior)
     EKP.Visualize.plot_error_over_iters(fig[1, dim_size + 1], ekp)
     EKP.Visualize.plot_error_over_time(fig[1, dim_size + 2], ekp)
     CairoMakie.save(joinpath(output_dir, "constrained_params_and_error.png"), fig)
-    return nothing
+    return fig
 end
 
 # Process a single ensemble member's data into a vector
 function process_member_data(simdir::SimDir, short_names, current_minibatch)
     # Define standard diagnostic fields to preprocess
     diagnostic_var_names = ["rsdt", "rsut", "rlut", "rsutcs", "rlutcs", "pr", "ta", "lwp", "cl", "clivi"]
-
+    pr_bin_names = ["pr_binned_bin_1", "pr_binned_bin_2", "pr_binned_bin_3", "pr_binned_bin_4", "pr_binned_bin_5"]
+    append!(diagnostic_var_names, pr_bin_names)
     # Preprocess all diagnostic fields
     processed_data = Dict{String, Any}()
     for name in diagnostic_var_names
@@ -100,10 +100,10 @@ function process_member_data(simdir::SimDir, short_names, current_minibatch)
         seasonal_data = map(short_names) do short_name
             # TODO: Replace this with ClimaAnalysis/ClimaAnalysisExt
             year_averages = year_of_seasonal_averages(processed_data[short_name], yr)
-            @show short_name, length(ClimaAnalysis.flatten(year_averages).data )
-            ClimaAnalysis.flatten(year_averages).data 
+            @show short_name, length(ClimaAnalysis.flatten(year_averages).data)
+            ClimaAnalysis.flatten(year_averages).data
         end
-        net_rad = processed_data["net_rad"] |> average_time 
+        net_rad = processed_data["net_rad"] |> average_time
         return vcat(net_rad.data, seasonal_data...)
     end
     return vcat(year_observations...)

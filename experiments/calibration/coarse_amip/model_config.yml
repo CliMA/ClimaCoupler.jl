@@ -7,15 +7,15 @@ bucket_albedo_type: "map_temporal"
 checkpoint_dt: "6months"
 coupler_toml: ["toml/amip.toml"]
 coupler_output_dir: "experiments/calibration/coarse_amip/output"
-dt: "240secs"
-dt_cpl: "240secs"
+dt: "120secs"
+dt_cpl: "120secs"
 dt_save_state_to_disk: "99999days"
 dt_save_to_sol: "99999days"
 dz_bottom: 30.0
 edmfx_entr_model: "PiGroups"
 edmfx_detr_model: "SmoothArea"
 energy_check: false
-h_elem: 16
+h_elem: 8
 land_albedo_type: "map_temporal"
 mode_name: "amip"
 netcdf_interpolation_num_points: [90, 45, 31]

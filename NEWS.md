@@ -6,6 +6,10 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Remove `atmos_config_repo` PR[#1448](https://github.com/CliMA/ClimaCoupler.jl/pull/1448)
+ClimaCoupler doesn't depend on configuration files in ClimaAtmos anymore. All the atmosphere
+configuration files are now specified in ClimaCoupler.
+
 #### Remove bucket `get_new_cache` PR[#1437](https://github.com/CliMA/ClimaCoupler.jl/pull/1437)
 
 As of ClimaLand v0.16.2, total energy and and water are always stored in the bucket cache.

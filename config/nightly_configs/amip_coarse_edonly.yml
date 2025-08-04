@@ -1,6 +1,6 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
-atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
+atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "366days"
 coupler_toml: ["toml/amip.toml"]
@@ -14,15 +14,12 @@ netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
-rayleigh_sponge: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "825days"
 topo_smoothing: true
 topography: "Earth"
-viscous_sponge: true
 z_elem: 39
-z_max: 60000.0
 extra_atmos_diagnostics:
   - short_name: [od550aer, odsc550aer]
     period: "1months"

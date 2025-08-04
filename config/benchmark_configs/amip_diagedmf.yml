@@ -1,7 +1,6 @@
 FLOAT_TYPE: "Float32"
 aerosol_radiation: true
 atmos_config_file: "config/benchmark_configs/climaatmos_diagedmf.yml"
-atmos_config_repo: "ClimaCoupler"
 bucket_albedo_type: "map_temporal"
 dt: "120secs"
 dt_cpl: "120secs"

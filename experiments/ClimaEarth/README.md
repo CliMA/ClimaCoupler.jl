@@ -94,11 +94,9 @@ This configuration is similar to the general "Slabplanet" configuration, except 
 only surface model is the land, which is evaluated over the entire surface. There are no ocean or sea ice models.
 
 ## Configuration files
-We use configuration files to specify all of the options used to set up our simulations.
-We currently use the following configuration files specified in ClimaAtmos.jl, which
-are subject to change in the future:
-- config/longrun_configs/longrun_aquaplanet_allsky_diagedmf_0M.yml
-- config/longrun_configs/longrun_aquaplanet_allsky_0M_earth.yml
-- config/longrun_configs/longrun_aquaplanet_allsky_0M.yml
-- config/longrun_configs/longrun_aquaplanet_allsky_1M.yml
-- config/longrun_configs/amip_target_diagedmf.yml
+We use configuration files to specify all simulation parameters and options. The configuration files are organized hierarchically:
+
+- **Atmosphere configurations**: Located in `config/atmos_configs/`, these files contain atmosphere-specific settings
+- **Coupler configurations**: Located in other `config/` subdirectories, these files reference atmosphere configurations and add settings for the land model and the coupling system
+
+The coupler configuration takes precedence over any conflicting settings from the atmosphere configuration.

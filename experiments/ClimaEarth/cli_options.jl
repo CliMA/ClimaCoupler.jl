@@ -135,10 +135,6 @@ function argparse_settings()
         help = "Type of albedo model. [`ConstantAlbedo`, `RegressionFunctionAlbedo`, `CouplerAlbedo` (default)]"
         arg_type = String
         default = "CouplerAlbedo"
-        "--atmos_config_repo"
-        help = "The repository containing the ClimaAtmos configuration file to use [`ClimaAtmos` (default), `ClimaCoupler`]"
-        arg_type = String
-        default = "ClimaAtmos"
         "--extra_atmos_diagnostics"
         help = "List of dictionaries containing information about additional atmosphere diagnostics to output [nothing (default)]"
         arg_type = Vector{Dict{Any, Any}}

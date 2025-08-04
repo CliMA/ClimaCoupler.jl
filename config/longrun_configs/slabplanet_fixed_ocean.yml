@@ -1,4 +1,4 @@
-atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
+atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "function"
 dt: "240secs"
 dt_cloud_fraction: "1hours"

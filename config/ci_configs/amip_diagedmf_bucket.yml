@@ -1,6 +1,6 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
-atmos_config_file: "config/longrun_configs/amip_target_diagedmf.yml"
+atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
 bucket_albedo_type: "map_temporal"
 co2: "maunaloa"
 coupler_toml: ["toml/amip.toml"]

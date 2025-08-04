@@ -1,6 +1,6 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
-atmos_config_file: "config/longrun_configs/amip_target_edonly.yml"
+atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "map_temporal"
 coupler_toml: ["toml/amip.toml"]
 dt: "120secs"

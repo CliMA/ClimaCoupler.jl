@@ -479,10 +479,6 @@ Returns the specified atmospheric configuration (`atmos_config`) overwitten by a
 in the coupler dictionary (`config_dict`).
 The returned `atmos_config` dictionary will then be used to set up the atmosphere simulation.
 
-The `atmos_config_repo` flag allows us to use a configuration specified within
-either the ClimaCoupler or ClimaAtmos repos, which is useful for direct
-coupled/atmos-only comparisons.
-
 In this function, parameters are overwritten in a specific order, from lowest to highest priority:
     1. Default atmos config
     2. Provided atmos config file (if any)
@@ -495,31 +491,17 @@ file if it's provided. If neither is provided, we use a default coupler TOML fil
 """
 function get_atmos_config_dict(coupler_dict::Dict, atmos_output_dir)
     atmos_config_file = coupler_dict["atmos_config_file"]
-    atmos_config_repo = coupler_dict["atmos_config_repo"]
     # override default or specified configs with coupler arguments, and set the correct atmos config_file
-    if atmos_config_repo == "ClimaCoupler"
-        @assert !isnothing(atmos_config_file) "Must specify `atmos_config_file` within ClimaCoupler."
-
+    if isnothing(atmos_config_file)
+        @info "Using Atmos default configuration"
+        atmos_config = merge(CA.default_config_dict(), coupler_dict, Dict("config_file" => atmos_config_file))
+    else
         @info "Using Atmos configuration from ClimaCoupler in $atmos_config_file"
         atmos_config = merge(
             CA.override_default_config(joinpath(pkgdir(ClimaCoupler), atmos_config_file)),
             coupler_dict,
             Dict("config_file" => atmos_config_file),
         )
-    elseif atmos_config_repo == "ClimaAtmos"
-        if isnothing(atmos_config_file)
-            @info "Using Atmos default configuration"
-            atmos_config = merge(CA.default_config_dict(), coupler_dict, Dict("config_file" => atmos_config_file))
-        else
-            @info "Using Atmos configuration from $atmos_config_file"
-            atmos_config = merge(
-                CA.override_default_config(joinpath(pkgdir(CA), atmos_config_file)),
-                coupler_dict,
-                Dict("config_file" => atmos_config_file),
-            )
-        end
-    else
-        error("Invalid `atmos_config_repo`; please use \"ClimaCoupler\" or \"ClimaAtmos\"")
     end
 
     # use atmos toml if coupler toml is not defined

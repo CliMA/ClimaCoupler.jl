@@ -233,6 +233,19 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}
 # NOTE: This is 3D, but it will be remapped to 2D
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) = 273.15 + sim.ocean.model.tracers.T
 
+"""
+    FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fields)
+
+Update the turbulent fluxes in the simulation using the values stored in the coupler fields.
+These include latent heat flux, sensible heat flux, momentum fluxes, and moisture flux.
+
+A note on sign conventions:
+SurfaceFluxes and Oceananigans both use the convention that a positive flux is an upward flux.
+No sign change is needed during the exchange, except for moisture/salinity fluxes:
+SurfaceFluxes provides moisture moving from atmosphere to ocean as a negative flux at the surface,
+and Oceananigans represents moisture moving from atmosphere to ocean as a positive salinity flux,
+so a sign change is needed when we convert from moisture to salinity flux.
+"""
 function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fields)
     # Only LatitudeLongitudeGrid are supported because otherwise we have to rotate the vectors
 
@@ -349,6 +362,13 @@ by the coupler.
 
 Update the portion of the surface_fluxes for T and S that is due to radiation and
 precipitation. The rest will be updated in `update_turbulent_fluxes!`.
+
+A note on sign conventions:
+ClimaAtmos and Oceananigans both use the convention that a positive flux is an upward flux.
+No sign change is needed during the exchange, except for precipitation/salinity fluxes.
+ClimaAtmos provides precipitation as a negative flux at the surface, and
+Oceananigans represents precipitation as a positive salinity flux,
+so a sign change is needed when we convert from precipitation to salinity flux.
 """
 function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf, area_fraction)
     (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) = sim.ocean_properties

@@ -31,8 +31,6 @@ steps:
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"RRTMGP\", rev=\"main\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"Oceananigans\", rev=\"main\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaOcean\", rev=\"main\"))'"
-      # RootSolvers v0.4.5 is not working correctly so we'll use v0.4.4 until it's fixed
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"RootSolvers\", version=\"0.4.4\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.resolve()'"
 
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"

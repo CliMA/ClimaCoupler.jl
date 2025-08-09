@@ -65,12 +65,12 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 30GB
 
-      - label: "Coarse current AMIP: diagedmf + 0M + bucket land (unique seed)"
+      - label: "Coarse current AMIP: progedmf + 0M + bucket land"
         key: "amip_random1"
         command:
           - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_random.yml --job_id amip_coarse_random1"
-        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_random1/artifacts/*"
+          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_progedmf.yml --job_id amip_coarse_progedmf"
+        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_progedmf/artifacts/*"
         timeout_in_minutes: 840
         env:
           CLIMACOMMS_DEVICE: "CUDA"

@@ -6,7 +6,6 @@ import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
 import Thermodynamics as TD
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
-
 ###
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###

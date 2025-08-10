@@ -14,6 +14,7 @@ import ClimaUtilities.TimeManager: ITime
 import SurfaceFluxes as SF
 import SurfaceFluxes.Parameters as SFP
 import Thermodynamics as TD
+import JLD2
 
 include("climaland_helpers.jl")
 
@@ -321,7 +322,8 @@ function ClimaLandSimulation(
 
     # Set up diagnostics
     if use_land_diagnostics
-        output_writer = CD.Writers.NetCDFWriter(subsurface_space, output_dir; start_date)
+        @show "Outputting land diagnostics"
+        output_writer = CD.Writers.NetCDFWriter(subsurface_space, output_dir)#; start_date)
         scheduled_diagnostics = CL.default_diagnostics(
             model,
             start_date,

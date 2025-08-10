@@ -90,7 +90,7 @@ We can additionally pass the configuration dictionary to the component model ini
 
 include("cli_options.jl")
 include("user_io/arg_parsing.jl")
-include("user_io/postprocessing.jl")
+# include("user_io/postprocessing.jl")
 include("user_io/coupler_diagnostics.jl")
 
 """
@@ -328,6 +328,7 @@ function CoupledSimulation(config_dict::AbstractDict)
                 coupled_param_dict,
             )
         elseif land_model == "integrated"
+            @show "Initializing land model"
             land_sim = ClimaLandSimulation(
                 FT;
                 dt = component_dt_dict["dt_land"],

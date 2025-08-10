@@ -1,0 +1,50 @@
+[zd_rayleigh]
+value = 40000.0
+
+[min_area_limiter_scale]
+value = 0
+
+[zd_viscous]
+value = 40000.0
+
+[max_area_limiter_scale]
+value = 0
+
+[entr_param_vec]
+value = [-45.97815905276861, -20.29437694493032, -22.269204417686513, 3.470895262420817, 0.8421581647335002, -0.8534958362066539]
+type = "float"
+
+[alpha_rayleigh_w]
+value = 10.0
+
+[pressure_normalmode_drag_coeff]
+value = 0.22685176632582243
+type = "float"
+
+[mixing_length_Prandtl_number_0]
+value = 2.909243754318121
+type = "float"
+
+[entr_mult_limiter_coeff]
+value = 0.4641383877134538
+type = "float"
+
+[entr_inv_tau]
+value = 0.008362201402729065
+type = "float"
+
+[mixing_length_static_stab_coeff]
+value = 0.29736273245468714
+type = "float"
+
+[pressure_normalmode_buoy_coeff1]
+value = 0.024795188237279258
+type = "float"
+
+[mixing_length_Prandtl_maximum]
+value = 4.2
+type = "float"
+
+[land_bucket_capacity]
+value = 0.8
+type = "float"

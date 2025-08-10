@@ -1,21 +1,15 @@
 import ClimaAnalysis
 import ClimaAnalysis: OutputVar
 import ClimaCalibrate
-import ClimaCoupler
 import Dates
 import EnsembleKalmanProcesses as EKP
 import JLD2
 import ClimaDiagnostics
 import ClimaCore
 import ClimaUtilities.ClimaArtifacts.@clima_artifact
-import Pkg.Artifacts
 # Access CalibrateConfig
 include(joinpath(@__DIR__, "run_calibration.jl"))
 include(joinpath(@__DIR__, "observation_utils.jl"))
-
-# Path to the ClimaEarth Artifacts.toml file
-const CLIMAEARTH_ARTIFACTS_TOML =
-    joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "Artifacts.toml")
 
 """
     load_var(filepath, short_name; varname=nothing, flip_sign=false, transform_dates=false)
@@ -54,21 +48,13 @@ end
 Load NetCDF files belonging to `short_names` in `obsdir` as `OutputVar`s.
 """
 function load_vars()
-    # Use Artifacts API directly with explicit path to ClimaEarth Artifacts.toml
-    # This is necessary because @clima_artifact searches upward from the source
-    # file, which won't find experiments/ClimaEarth/Artifacts.toml
-
-    artifact_path = Artifacts.ensure_artifact_installed(
-        "era5_monthly_averages_surface_single_level_1979_2024",
-        CLIMAEARTH_ARTIFACTS_TOML,
-    )
     flux_file = joinpath(
-        artifact_path,
+        @clima_artifact("era5_monthly_averages_surface_single_level_1979_2024"),
         "era5_monthly_averages_surface_single_level_197901-202410.nc",
     )
 
-    lhf = load_var(flux_file, "hfls"; varname = "mslhf", flip_sign = true)
-    shf = load_var(flux_file, "hfss"; varname = "msshf", flip_sign = true)
+    lhf = load_var(flux_file, "hfls"; varname = "mslhf")
+    shf = load_var(flux_file, "hfss"; varname = "msshf")
     rsus = load_var(flux_file, "rsus"; varname = "msuwswrf")
     rlus = load_var(flux_file, "rlus"; varname = "msuwlwrf")
 
@@ -114,7 +100,7 @@ Return a function to resample longitude and latitudes according to the model
 grid specified by `config_file`.
 """
 function resampled_lonlat(config_file)
-    config_dict = ClimaCoupler.Input.get_coupler_config_dict(CALIBRATE_CONFIG.config_file)
+    config_dict = get_coupler_config_dict(CALIBRATE_CONFIG.config_file)
     if !isnothing(config_dict["netcdf_interpolation_num_points"])
         (nlon, nlat, nlev) = tuple(config_dict["netcdf_interpolation_num_points"]...)
     else
@@ -144,10 +130,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     preprocessed_vars = preprocess_vars(unprocessed_vars)
 
     JLD2.save_object(
-        joinpath(
-            pkgdir(ClimaCoupler),
-            "experiments/calibration/subseasonal/preprocessed_vars.jld2",
-        ),
+        joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/preprocessed_vars.jld2"),
         preprocessed_vars,
     )
     observation_vector = make_observation_vector(preprocessed_vars, sample_date_ranges)

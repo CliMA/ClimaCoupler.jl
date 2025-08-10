@@ -187,8 +187,21 @@ steps:
       - label: "Subseasonal calibration test"
         key: "subseasonal_calibration"
         command:
+          - "julia --color=yes --project=experiments/ClimaEarth experiments/calibration/perfect_model/run_perfect_model_calibration.jl"
+        artifact_paths: "experiments/calibration/output/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+          CLIMACOMMS_CONTEXT: "SINGLETON"
+        agents:
+          queue: clima
+          slurm_time: 24:00:00
+
+    steps:
+      - label: "ERA5 surface fluxes calibration test"
+        key: "era5_surface_fluxes_calibration"
+        command:
           - julia --color=yes --project=experiments/ClimaEarth experiments/calibration/subseasonal/generate_observations.jl
-          - julia --color=yes --project=experiments/ClimaEarth experiments/calibration/subseasonal/run_calibration.jl
+          - julia --color=yes --project=experiments/ClimaEarth experiments/calibration/subseasonal/run_subseasonal_calibration.jl
         artifact_paths: "experiments/calibration/subseasonal/output/*"
         agents:
           queue: clima

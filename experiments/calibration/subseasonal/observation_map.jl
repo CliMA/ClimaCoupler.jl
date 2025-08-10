@@ -113,6 +113,7 @@ function preprocess_var(var, sample_date_range)
     var = set_units(var, var_units[short_name(var)])
     # TODO: Match dates instead of just windowing
     var = window(var, "time"; left = sample_date_range[1], right = sample_date_range[2])
+
     return var
 end
 

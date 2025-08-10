@@ -38,12 +38,12 @@ const CALIBRATE_CONFIG = CalibrateConfig(;
     sample_date_ranges,
     extend = Dates.Month(1),
     spinup = Dates.Month(0),
-    output_dir = "output/subseasonal",
+    output_dir = "output/output_quick",
     rng_seed = 42,
 )
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    priors = [PD.constrained_gaussian("precipitation_timescale", 600, 300, 100, 1000)]
+    priors = [PD.constrained_gaussian("entr_inv_tau", 0.1, 0.08, 0, 1)]
     prior = EKP.combine_distributions(priors)
 
     observation_vector = JLD2.load_object(
@@ -52,7 +52,6 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges
     minibatch_size = CALIBRATE_CONFIG.minibatch_size
-    # Structure observations into an ObservationSeries
     obs_series = EKP.ObservationSeries(
         Dict(
             "observations" => observation_vector,
@@ -83,6 +82,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         model_interface,
         verbose = true,
     )
+    
 
     eki = ClimaCalibrate.calibrate(
         backend,

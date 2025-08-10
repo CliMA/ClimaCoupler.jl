@@ -17,7 +17,7 @@ include(
 using Pkg
 function ClimaCalibrate.forward_model(iter, member)
     Pkg.status()
-    config_dict = ClimaCoupler.Input.get_coupler_config_dict(CALIBRATE_CONFIG.config_file)
+    config_dict = get_coupler_config_dict(CALIBRATE_CONFIG.config_file)
     output_dir_root = CALIBRATE_CONFIG.output_dir
     start_date =
         first(CALIBRATE_CONFIG.sample_date_ranges[iter + 1]) - CALIBRATE_CONFIG.spinup
@@ -28,9 +28,6 @@ function ClimaCalibrate.forward_model(iter, member)
     config_dict["start_date"] = start_date_str
     config_dict["bucket_initial_condition"] = "/net/sampo/data1/wxquest_data/initial_conditions/era5_bucket_processed_$(start_date_str)_0000.nc"
     config_dict["t_end"] = "$(sim_length.value)secs"
-    config_dict["checkpoint_dt"] = "900days"
-    config_dict["dt"] = "90secs"
-    config_dict["dt_cpl"] = "90secs"
 
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)

@@ -6,7 +6,7 @@ import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
 import Thermodynamics as TD
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
-
+using Dates
 ###
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###
@@ -148,27 +148,26 @@ function PrescribedIceSimulation(
     sic_path::Union{Nothing, String} = nothing,
 ) where {FT}
     # Set up prescribed sea ice concentration object
-    sic_data =
-        isnothing(sic_path) ?
-        try
-            joinpath(
-                @clima_artifact("historical_sst_sic", comms_ctx),
-                "MODEL.ICE.HAD187001-198110.OI198111-202206.nc",
-            )
-        catch error
-            @warn "Using lowres SIC. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
-            joinpath(
-                @clima_artifact("historical_sst_sic_lowres", comms_ctx),
-                "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
-            )
-        end : sic_path
-    @info "PrescribedIce: using SIC file" sic_data
+    # sic_data = try
+    #     joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.ICE.HAD187001-198110.OI198111-202206.nc")
+    # catch error
+    #     @warn "Using lowres SIC. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
+    #     joinpath(
+    #         @clima_artifact("historical_sst_sic_lowres", comms_ctx),
+    #         "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
+    #     )
+    # end
 
+    start_date_str = Dates.format(Date(start_date), "yyyymmdd")   
+    @show start_date_str 
+    sic_data = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/sic_processed_$(start_date_str)_0000.nc"
     SIC_timevaryinginput = TimeVaryingInput(
         sic_data,
         "SEAICE",
         space,
         reference_date = start_date,
+        # TODO: Add linearinterpolation for ERA5 ICs
+        method = LinearInterpolation(),
         file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
     )
 

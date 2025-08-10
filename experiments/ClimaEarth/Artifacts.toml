@@ -65,3 +65,13 @@ git-tree-sha1 = "6cddb07eeee2dd46dc5a19e9b2f706302ddba2c9"
     [[era5_monthly_averages_surface_single_level_1979_2024.download]]
     sha256 = "46b422722d98c89c6bc0b8641bff259db1caee253f45389ddf9eb9c2d31ed605"
     url = "https://caltech.box.com/shared/static/jbgtyt6oq9lxvk8il5zzck6k581q7f3k.gz"
+
+[calipso_cloudsat]
+git-tree-sha1 = "dae77bc4ff79194ee6e794c1181bec1bebd67ea9"
+
+[calipso_cloudsat_lowres]
+git-tree-sha1 = "a76ee4474873a2cf366fb0755f7fbac647987082"
+
+    [[calipso_cloudsat_lowres.download]]
+    sha256 = "deb774f613c4c3668cb1b7b272711dcef699c318ff03f5b8f3ea83d5a3d50926"
+    url = "https://caltech.box.com/shared/static/ywx8ssv70d7b7t6bdp148su955tbrkoq.gz"

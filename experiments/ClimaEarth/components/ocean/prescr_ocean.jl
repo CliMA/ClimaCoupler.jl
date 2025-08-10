@@ -77,21 +77,20 @@ function PrescribedOceanSimulation(
     sst_path::Union{Nothing, String} = nothing,
 ) where {FT}
     # Read in initial SST data
-    sst_data =
-        isnothing(sst_path) ?
-        try
-            joinpath(
-                @clima_artifact("historical_sst_sic", comms_ctx),
-                "MODEL.SST.HAD187001-198110.OI198111-202206.nc",
-            )
-        catch error
-            @warn "Using lowres SST. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
-            joinpath(
-                @clima_artifact("historical_sst_sic_lowres", comms_ctx),
-                "MODEL.SST.HAD187001-198110.OI198111-202206_lowres.nc",
-            )
-        end : sst_path
-    @info "PrescribedOcean: using SST file" sst_data
+    # sst_data = try
+    #     joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.SST.HAD187001-198110.OI198111-202206.nc")
+    # catch error
+    #     @warn "Using lowres SST. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
+    #     joinpath(
+    #         @clima_artifact("historical_sst_sic_lowres", comms_ctx),
+    #         "MODEL.SST.HAD187001-198110.OI198111-202206_lowres.nc",
+    #     )
+    # end
+    @show "Loading SST from file"
+    start_date_str = Dates.format(Date(start_date), "yyyymmdd")    
+    @show start_date_str
+    sst_data = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/sst_processed_$(start_date_str)_0000.nc"
+    # sst_data = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/sst_processed_20250810_0000.nc"
 
     C_to_K = coupled_param_dict["temperature_water_freeze"]
     SST_timevaryinginput = TimeVaryingInput(

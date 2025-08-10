@@ -75,6 +75,11 @@ function BucketSimulation(
 
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
+    # if isnothing(shared_surface_space)
+    #     domain = make_land_domain(depth; nelements, dz_tuple)
+    # else
+    #     domain = make_land_domain(shared_surface_space, depth)
+    # end
     if isnothing(shared_surface_space)
         domain = make_land_domain(depth, toml_dict; nelements, dz_tuple)
     else
@@ -103,8 +108,8 @@ function BucketSimulation(
         albedo = CL.Bucket.PrescribedSurfaceAlbedo{FT}(
             start_date,
             surface_space;
-            albedo_file_path = CL.Artifacts.ceres_albedo_dataset_path(),
-            varname = "sw_alb_clr",
+            albedo_file_path = "/glade/u/home/nefrathe/clima/ClimaCoupler.jl/era5_monthly_fal_2017_2024_025deg.nc",
+            varname = "fal",
         )
     elseif albedo_type == "function" # Use prescribed function of lat/lon for surface albedo
         function α_bareground(coordinate_point)
@@ -117,6 +122,8 @@ function BucketSimulation(
     else
         error("invalid albedo type $albedo_type")
     end
+    # Main.@infiltrate
+    @show typeof(albedo)
 
     # This is the timescale on which snow exponentially damps to zero, in the case where all
     # the snow would melt in time `τc`. It prevents us from having to specially time step in cases where
@@ -124,7 +131,7 @@ function BucketSimulation(
     τc = FT(float(dt))
     params = CL.Bucket.BucketModelParameters(toml_dict; albedo, τc)
 
-    args = (params, CL.CoupledAtmosphere{FT}(), CL.CoupledRadiativeFluxes{FT}(), domain)
+    args = (params, CL.CoupledAtmosphere{FT}(), radiation, domain)
     model = CL.Bucket.BucketModel{FT, typeof.(args)...}(args...)
 
     # Initial conditions with no moisture
@@ -208,6 +215,7 @@ function BucketSimulation(
 
     # Set initial aux variable values
     set_initial_cache! = CL.make_set_initial_cache(model)
+    Main.@infiltrate
     set_initial_cache!(p, Y, tspan[1])
 
     exp_tendency! = CL.make_exp_tendency(model)
@@ -231,6 +239,7 @@ function BucketSimulation(
     else
         output_writer = nothing
         diag_cb = nothing
+        output_writer = nothing
     end
 
     integrator = SciMLBase.init(

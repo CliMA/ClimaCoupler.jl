@@ -333,6 +333,7 @@ function CoupledSimulation(config_dict::AbstractDict)
                 coupled_param_dict,
             )
         elseif land_model == "integrated"
+            @show "Initializing land model"
             land_sim = ClimaLandSimulation(
                 FT;
                 dt = component_dt_dict["dt_land"],

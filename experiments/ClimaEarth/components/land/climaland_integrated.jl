@@ -14,6 +14,7 @@ import ClimaUtilities.TimeManager: ITime
 import SurfaceFluxes as SF
 import SurfaceFluxes.Parameters as SFP
 import Thermodynamics as TD
+import JLD2
 
 include("climaland_helpers.jl")
 
@@ -183,7 +184,11 @@ function ClimaLandSimulation(
 
     if !land_spun_up_ic && !isnothing(land_ic_path)
         # Subseasonal setup: land_spun_up_ic false, but a land_ic_path is provided
-        ic_path = land_ic_path
+        # Read in initial conditions for snow and soil
+        # ic_path = CL.Artifacts.soil_ic_2008_50m_path()
+        start_date_str = Dates.format(Date(start_date), "yyyymmdd")    
+        @show start_date_str
+        ic_path = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/era5_land_processed_$(start_date_str)_0000.nc"
         @info "ClimaLand: using land IC file" ic_path
 
         regridder_type = :InterpolationsRegridder
@@ -321,7 +326,8 @@ function ClimaLandSimulation(
 
     # Set up diagnostics
     if use_land_diagnostics
-        output_writer = CD.Writers.NetCDFWriter(subsurface_space, output_dir; start_date)
+        @show "Outputting land diagnostics"
+        output_writer = CD.Writers.NetCDFWriter(subsurface_space, output_dir)#; start_date)
         scheduled_diagnostics = CL.default_diagnostics(
             model,
             start_date,
@@ -580,6 +586,14 @@ function FluxCalculator.compute_surface_fluxes!(
 
     canopy_dest = p.canopy.turbulent_fluxes
     CL.coupler_compute_turbulent_fluxes!(canopy_dest, coupled_atmos, model.canopy, Y, p, t)
+
+    # Log extrema of individual component fluxes
+    # @info "Soil LHF extrema" extrema=extrema(soil_dest.lhf)
+    # @info "Soil SHF extrema" extrema=extrema(soil_dest.shf)
+    # @info "Snow LHF extrema" extrema=extrema(snow_dest.lhf)
+    # @info "Snow SHF extrema" extrema=extrema(snow_dest.shf)
+    # @info "Canopy LHF extrema" extrema=extrema(canopy_dest.lhf)
+    # @info "Canopy SHF extrema" extrema=extrema(canopy_dest.shf)
 
     # Get area fraction of the land model (min = 0, max = 1)
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))

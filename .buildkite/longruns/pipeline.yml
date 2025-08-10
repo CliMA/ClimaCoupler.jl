@@ -184,21 +184,15 @@ steps:
   - group: "Calibration experiments"
 
     steps:
-      - label: "Perfect model calibration test"
-        key: "amip_pm_calibration"
+      - label: "Subseasonal calibration test"
+        key: "subseasonal_calibration"
         command:
-          - "julia --color=yes --project=experiments/ClimaEarth experiments/calibration/run_calibration.jl"
-        artifact_paths: "experiments/calibration/output/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-          CLIMACOMMS_CONTEXT: "MPI"
+          - julia --color=yes --project=experiments/ClimaEarth experiments/calibration/subseasonal/generate_observations.jl
+          - julia --color=yes --project=experiments/ClimaEarth experiments/calibration/subseasonal/run_calibration.jl
+        artifact_paths: "experiments/calibration/subseasonal/output/*"
         agents:
           queue: clima
-          slurm_mem: 96GB
-          slurm_ntasks: 3
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_time: 05:00:00
+          slurm_time: 24:00:00
 
   - wait
 

@@ -27,7 +27,6 @@ land_model: "integrated"
 
 land_spun_up_ic: false
 land_temperature_anomaly: "nothing"
-use_land_diagnostics: true
 radiation_reset_rng_seed: true
 # start_date: "19750101"
 start_date: "20230115"

@@ -45,7 +45,8 @@ import ClimaCoupler.Interfacer:
     CoupledSimulation,
     SlabplanetAquaMode,
     SlabplanetMode,
-    SlabplanetTerraMode
+    SlabplanetTerraMode,
+    SubseasonalMode
 
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
@@ -138,6 +139,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         use_coupler_diagnostics,
         output_dir_root,
         parameter_files,
+        era5_initial_condition_dir,
     ) = get_coupler_args(config_dict)
 
     #=
@@ -293,8 +295,25 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     @info(sim_mode)
     land_sim = ice_sim = ocean_sim = nothing
-    if sim_mode <: AMIPMode || sim_mode <: CMIPMode
+    if sim_mode <: AMIPMode || sim_mode <: CMIPMode || sim_mode <: SubseasonalMode
         @info("AMIP/CMIP boundary conditions - do not expect energy conservation")
+
+        # Build ERA5-based file paths if subseasonal mode is selected
+        subseasonal_sst = subseasonal_sic = subseasonal_land_ic = nothing
+        if sim_mode <: SubseasonalMode
+            isnothing(era5_initial_condition_dir) &&
+                error("subseasonal mode requires --era5_initial_condition_dir")
+            # Filenames inferred from start_date, which is YYYYMMDD
+            datestr = Dates.format(start_date, Dates.dateformat"yyyymmdd")
+            subseasonal_sst =
+                joinpath(era5_initial_condition_dir, "sst_processed_$(datestr)_0000.nc")
+            subseasonal_sic =
+                joinpath(era5_initial_condition_dir, "sic_processed_$(datestr)_0000.nc")
+            subseasonal_land_ic = joinpath(
+                era5_initial_condition_dir,
+                "era5_land_processed_$(datestr)_0000.nc",
+            )
+        end
 
         ## land model
         # Determine whether to use a shared surface space
@@ -332,6 +351,7 @@ function CoupledSimulation(config_dict::AbstractDict)
                 land_temperature_anomaly,
                 use_land_diagnostics,
                 parameter_files,
+                land_ic_path = subseasonal_land_ic,
             )
         else
             error("Invalid land model specified: $(land_model)")
@@ -348,6 +368,7 @@ function CoupledSimulation(config_dict::AbstractDict)
             comms_ctx,
             start_date,
             land_fraction,
+            sic_path = subseasonal_sic,
         )
 
         ## ocean model using prescribed data
@@ -371,7 +392,8 @@ function CoupledSimulation(config_dict::AbstractDict)
                 t_start,
                 ocean_fraction,
                 thermo_params,
-                comms_ctx,
+                comms_ctx;
+                sst_path = subseasonal_sst,
             )
         end
 

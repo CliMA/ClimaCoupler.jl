@@ -143,25 +143,27 @@ function BucketSimulation(
     # Initial conditions with no moisture
     Y, p, coords = CL.initialize(model)
 
-    # Get temperature anomaly function
-    T_functions = Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
-    haskey(T_functions, land_temperature_anomaly) ||
-        error("land temp anomaly function $land_temperature_anomaly not supported")
-    temp_anomaly = T_functions[land_temperature_anomaly]
+    if land_temperature_anomaly != "nothing"
+        T_functions =
+            Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
+        haskey(T_functions, land_temperature_anomaly) ||
+            error("land temp anomaly function $land_temperature_anomaly not supported")
+        temp_anomaly = T_functions[land_temperature_anomaly]
 
-    # Set temperature IC including anomaly, based on atmospheric setup
-    # Bucket surface temperature is in `p.bucket.T_sfc` (ClimaLand.jl)
-    lapse_rate = FT(6.5e-3)
-    T_sfc_0 = FT(271)
-    @. Y.bucket.T = T_sfc_0 + temp_anomaly(coords.subsurface)
-    # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
-    orog_adjusted_T_data =
-        CC.Fields.field_values(Y.bucket.T) .-
-        lapse_rate .* CC.Fields.field_values(surface_elevation)
-    orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, domain.space.subsurface)
-    # Adjust T based on surface elevation (p.bucket.T_sfc is then set using the
-    # set_initial_cache! function)
-    Y.bucket.T .= orog_adjusted_T
+        # Set temperature IC including anomaly, based on atmospheric setup
+        # Bucket surface temperature is in `p.bucket.T_sfc` (ClimaLand.jl)
+        lapse_rate = FT(6.5e-3)
+        T_sfc_0 = FT(271)
+        @. Y.bucket.T = T_sfc_0 + temp_anomaly(coords.subsurface)
+        # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
+        orog_adjusted_T_data =
+            CC.Fields.field_values(Y.bucket.T) .-
+            lapse_rate .* CC.Fields.field_values(surface_elevation)
+        orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, domain.space.subsurface)
+        # Adjust T based on surface elevation (p.bucket.T_sfc is then set using the
+        # set_initial_cache! function)
+        Y.bucket.T .= orog_adjusted_T
+    end
 
     Y.bucket.W .= 0.15
     Y.bucket.Ws .= 0.0
@@ -175,6 +177,7 @@ function BucketSimulation(
     # - `S`, for snow water equivalent (2D).
 
     if !isempty(bucket_initial_condition)
+        @info "ClimaLand Bucket using land IC file" bucket_initial_condition
         ds = NCDataset(bucket_initial_condition)
         has_all_variables = all(key -> haskey(ds, key), ["W", "Ws", "T", "S"])
         @assert has_all_variables "The land iniital condition file is expected to contain the variables W, Ws, T, and S (read documentation about requirements)."
@@ -185,6 +188,7 @@ function BucketSimulation(
         regridder_type = :InterpolationsRegridder
         extrapolation_bc =
             (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
+
         Y.bucket.W .= SpaceVaryingInput(
             bucket_initial_condition,
             "W",

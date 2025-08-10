@@ -70,15 +70,17 @@ function PrescribedOceanSimulation(
     α_diffuse_val = FT(0.06),
 ) where {FT}
     # Read in initial SST data
-    sst_data = try
-        joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.SST.HAD187001-198110.OI198111-202206.nc")
-    catch error
-        @warn "Using lowres SST. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
-        joinpath(
-            @clima_artifact("historical_sst_sic_lowres", comms_ctx),
-            "MODEL.SST.HAD187001-198110.OI198111-202206_lowres.nc",
-        )
-    end
+    # sst_data = try
+    #     joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.SST.HAD187001-198110.OI198111-202206.nc")
+    # catch error
+    #     @warn "Using lowres SST. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
+    #     joinpath(
+    #         @clima_artifact("historical_sst_sic_lowres", comms_ctx),
+    #         "MODEL.SST.HAD187001-198110.OI198111-202206_lowres.nc",
+    #     )
+    # end
+    @show "Loading SST from file"
+    sst_data = "/net/sampo/data1/cchristo/clima/WeatherQuest/processing/data/sst_processed_20250701_1200.nc"
 
     SST_timevaryinginput = TimeVaryingInput(
         sst_data,

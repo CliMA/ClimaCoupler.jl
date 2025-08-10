@@ -1,0 +1,41 @@
+dt: 120secs
+t_end: 12hours
+# start_date: "20250627-0000"
+start_date: "20250701"
+initial_condition: "WeatherModel"
+discrete_hydrostatic_balance: false # TODO: change to true once we fix discrete hydrostatic balance to work with orography
+topo_smoothing: true
+topography: "Earth"
+rayleigh_sponge: true
+viscous_sponge: true
+hyperdiff: ClimaHyperdiffusion
+divergence_damping_factor: 50.0 # large value to damp IC waves
+scalar_hyperdiffusion_coefficient: 0.929738
+vorticity_hyperdiffusion_coefficient: 0.1857
+insolation: "timevarying"
+rad: allskywithclear
+call_cloud_diagnostics_per_stage: true
+dt_cloud_fraction: "1hours"
+dt_rad: "1hours"
+co2_model: fixed
+# prescribe_ozone: true
+# prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
+turbconv: diagnostic_edmfx
+implicit_diffusion: true
+approximate_linear_solve_iters: 2
+prognostic_tke: true
+edmfx_upwinding: first_order
+h_elem: 15
+z_max: 48000.0
+z_elem: 63
+dz_bottom: 30.0
+edmfx_entr_model: "Generalized"
+edmfx_detr_model: "Generalized"
+edmfx_nh_pressure: true
+edmfx_sgs_mass_flux: true
+edmfx_sgs_diffusive_flux: true
+moist: equil
+cloud_model: "grid_scale"
+precip_model: 0M
+toml: [toml/diagnostic_edmfx_era5_ic.toml]
+use_itime: true

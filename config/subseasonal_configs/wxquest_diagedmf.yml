@@ -1,0 +1,36 @@
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
+initial_condition: "WeatherModel"
+checkpoint_dt: "7days"
+co2_model: "fixed"
+coupler_toml: ["toml/amip.toml"]
+dt: "30secs"
+dt_cpl: "30secs"
+energy_check: false
+h_elem: 32
+mode_name: "amip"
+land_model: "integrated"
+radiation_reset_rng_seed: true
+# start_date: "20250701-1200"
+start_date: "20250701"
+surface_setup: "PrescribedSurface"
+topo_smoothing: true
+topography: "Earth"
+t_end: "30days"
+netcdf_output_at_levels: true
+output_default_diagnostics: true
+
+extra_atmos_diagnostics:
+  - short_name: [ta, ua, wa, va, rhoa, pfull, hur, hus, clw, cli, arup, tke]
+    period: 1hours
+  - short_name: [rsut, rlut, ts, cl, pr, tas, lwp]
+    period: 1hours
+  - short_name: [tas] #TODO: add MSLP
+    period: 7days
+    reduction_time: average
+  # - short_name: [pr]  #TODO: add support for accum operations in diagnostics 
+  #   period: 7days
+  #   reduction_time: accum
+
+

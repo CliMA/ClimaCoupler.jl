@@ -27,7 +27,6 @@ land_model: "integrated"
 
 land_spun_up_ic: false
 land_temperature_anomaly: "nothing"
-use_land_diagnostics: true
 radiation_reset_rng_seed: true
 # start_date: "19750101"
 start_date: "20230115"
@@ -36,7 +35,9 @@ topo_smoothing: true
 topography: "Earth"
 t_end: "40days"
 netcdf_output_at_levels: true
-use_coupler_diagnostics: true
+output_default_diagnostics: false
+use_coupler_diagnostics: false
+use_land_diagnostics: false
 extra_atmos_diagnostics:
   - short_name: [zg, orog, tas, ta, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cl, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, wa, waup]
     period: 24hours

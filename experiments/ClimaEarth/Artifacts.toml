@@ -45,3 +45,10 @@ git-tree-sha1 = "7f14ef1c7859da1363b8973743b2a376c008f29f"
     [[era5_land_fraction.download]]
     sha256 = "1d6acf98656b50f1a324ee3daa267281fb017314d2169dbfda25208299f44870"
     url = "https://caltech.box.com/shared/static/glqlyb626j3szcjltyuwp534yzzhf770.gz"
+
+[era5_monthly_averages_surface_single_level_1979_2024]
+git-tree-sha1 = "6cddb07eeee2dd46dc5a19e9b2f706302ddba2c9"
+
+    [[era5_monthly_averages_surface_single_level_1979_2024.download]]
+    sha256 = "46b422722d98c89c6bc0b8641bff259db1caee253f45389ddf9eb9c2d31ed605"
+    url = "https://caltech.box.com/shared/static/jbgtyt6oq9lxvk8il5zzck6k581q7f3k.gz"

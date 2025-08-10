@@ -207,8 +207,9 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
 
     ## init atmos model component
+    @show "Initializing atmos model"
     atmos_sim = ClimaAtmosSimulation(CA.AtmosConfig(atmos_config_dict))
-
+    @show "Atmos model initialized"
     # Get surface elevation from `atmos` coordinate field
     surface_elevation = CC.Fields.level(CC.Fields.coordinate_field(atmos_sim.integrator.u.f).z, CC.Utilities.half)
 
@@ -292,6 +293,7 @@ function CoupledSimulation(config_dict::AbstractDict)
                 parameter_files,
             )
         elseif land_model == "integrated"
+            @show "Initializing land model"
             land_sim = ClimaLandSimulation(
                 FT;
                 dt = component_dt_dict["dt_land"],

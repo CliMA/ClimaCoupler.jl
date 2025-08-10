@@ -179,12 +179,14 @@ function ClimaLandSimulation(
 
     # Read in initial conditions for snow and soil from file, if requested
     θ_r, ν, ρc_ds = soil_params.θ_r, soil_params.ν, soil_params.ρc_ds
+
     if land_spun_up_ic
         # Set snow T first to use in computing snow internal energy
         @. p.snow.T = orog_adjusted_T_surface
-
+        @show "Using land IC from file"
         # Read in initial conditions for snow and soil
-        ic_path = CL.Artifacts.soil_ic_2008_50m_path()
+        # ic_path = CL.Artifacts.soil_ic_2008_50m_path()
+        ic_path = "/net/sampo/data1/cchristo/clima/WeatherQuest/processing/data/era5_land_processed_20250701_1200.nc"
         CL.Simulations.set_snow_initial_conditions!(Y, p, surface_space, ic_path, model.snow.parameters)
 
         T_bounds = extrema(Y.canopy.energy.T)

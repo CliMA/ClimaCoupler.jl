@@ -377,6 +377,25 @@ abstract type AMIPMode <: AbstractSimulationMode end
 
 
 """
+    SubseasonalMode
+
+An abstract type representing the subseasonal simulation mode. This mode is similar to AMIP
+but uses different data sources and initialization pathways tailored for subseasonal runs.
+
+Inputs are ERA5-derived netcdfs with initial conditions produced by `https://github.com/CliMA/WeatherQuest`. Given `start_date` (YYYYMMDD)
+and directory `era5_initial_condition_dir`, filenames containing the initial conditions are inferred as:
+- `sst_processed_YYYYMMDD_0000.nc` (variable `SST`)
+- `sic_processed_YYYYMMDD_0000.nc` (variable `SEAICE`)
+- Land IC (integrated land): `era5_land_processed_YYYYMMDD_0000.nc`, with fields
+  - `skt` (K), `tsn` (K),`swe` (m), `swvl` (m^3/m^3), `si` (m^3/m^3), `sie` (J/m^3), `stl` (K)
+- Land IC (bucket land): `era5_bucket_processed_YYYYMMDD_0000.nc`, with fields
+  - `W` (m), `Ws` (m), `S` (m), `T` (K), `tsn` (K), `skt` (K); dims `(lat, lon)`
+and are used to initialize the coupler components.
+
+"""
+abstract type SubseasonalMode <: AbstractSimulationMode end
+
+"""
     CMIPMode
 
 An abstract type representing the CMIP simulation mode. CMIP is currently the most complex

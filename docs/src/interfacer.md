@@ -296,6 +296,7 @@ end
     ClimaCoupler.Interfacer.update_field!
     ClimaCoupler.Interfacer.AbstractSlabplanetSimulationMode
     ClimaCoupler.Interfacer.AMIPMode
+    ClimaCoupler.Interfacer.SubseasonalMode
     ClimaCoupler.Interfacer.SlabplanetMode
     ClimaCoupler.Interfacer.SlabplanetAquaMode
     ClimaCoupler.Interfacer.SlabplanetTerraMode

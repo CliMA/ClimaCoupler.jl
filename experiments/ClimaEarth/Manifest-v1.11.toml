@@ -453,9 +453,9 @@ version = "0.34.0"
 
 [[deps.ClimaCalibrate]]
 deps = ["Dates", "Distributed", "Distributions", "EnsembleKalmanProcesses", "JLD2", "Logging", "Random", "TOML", "YAML"]
-git-tree-sha1 = "0d7ff225f8cfe2f6adad34ed7ed6f32438d4a772"
+git-tree-sha1 = "a0c8232f78f6136f223629cfc4abf7df5c292374"
 uuid = "4347a170-ebd6-470c-89d3-5c705c0cacc2"
-version = "0.1.4"
+version = "0.2.0"
 
     [deps.ClimaCalibrate.extensions]
     CESExt = "CalibrateEmulateSample"

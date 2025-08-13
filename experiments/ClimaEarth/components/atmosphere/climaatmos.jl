@@ -44,9 +44,7 @@ end
 function ClimaAtmosSimulation(atmos_config)
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
     FT = atmos_config.parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
-    @show "Getting simulation"
     simulation = CA.get_simulation(atmos_config)
-    @show "Got simulation"
     (; integrator, output_writers) = simulation
     Y = integrator.u
     center_space = axes(Y.c.ρe_tot)

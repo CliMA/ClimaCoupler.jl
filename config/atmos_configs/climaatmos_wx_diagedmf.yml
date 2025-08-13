@@ -14,7 +14,6 @@ scalar_hyperdiffusion_coefficient: 0.929738
 vorticity_hyperdiffusion_coefficient: 0.1857
 insolation: "timevarying"
 rad: allskywithclear
-call_cloud_diagnostics_per_stage: true
 dt_cloud_fraction: "1hours"
 dt_rad: "1hours"
 co2_model: fixed
@@ -26,7 +25,8 @@ approximate_linear_solve_iters: 2
 prognostic_tke: true
 edmfx_upwinding: first_order
 h_elem: 15
-z_max: 48000.0
+# z_max: 48000.0
+z_max: 60000.0
 z_elem: 63
 dz_bottom: 30.0
 edmfx_entr_model: "Generalized"
@@ -35,7 +35,11 @@ edmfx_nh_pressure: true
 edmfx_sgs_mass_flux: true
 edmfx_sgs_diffusive_flux: true
 moist: equil
-cloud_model: "grid_scale"
+# moist: "nonequil"
+# cloud_model: "grid_scale"
+cloud_model: "quadrature_sgs"
 precip_model: 0M
+# precip_model: "1M"
 toml: [toml/diagnostic_edmfx_era5_ic.toml]
+# toml: [toml/diagnostic_edmfx_1M.toml]
 use_itime: true

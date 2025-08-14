@@ -96,7 +96,8 @@ function PrescribedIceSimulation(
     #     )
     # end
 
-    sic_data = "/net/sampo/data1/cchristo/clima/WeatherQuest/processing/data/sic_processed_20250701_0000.nc"
+    sic_data = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/sic_processed_20250701_0000.nc"
+    # sic_data = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/sic_processed_20250810_0000.nc"
 
     SIC_timevaryinginput = TimeVaryingInput(
         sic_data,

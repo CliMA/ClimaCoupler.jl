@@ -191,7 +191,8 @@ function ClimaLandSimulation(
         @show "Using land IC from file"
         # Read in initial conditions for snow and soil
         # ic_path = CL.Artifacts.soil_ic_2008_50m_path()
-        ic_path = "/net/sampo/data1/cchristo/clima/WeatherQuest/processing/data/era5_land_processed_20250701_0000.nc"
+        ic_path = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/era5_land_processed_20250701_0000.nc"
+        # ic_path = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/era5_land_processed_20250810_0000.nc"
 
         # Save variables to JLD2 file
         # JLD2.@save "highlighted_variables.jld2" ic_path surface_space subsurface_space Y p model
@@ -209,6 +210,7 @@ function ClimaLandSimulation(
 
         # JLD2.@save "highlighted_variables_new.jld2" res
 
+        
         CL.Simulations.set_snow_initial_conditions!(Y, p, surface_space, ic_path, model.snow.parameters)
 
         T_bounds = extrema(Y.canopy.energy.T)

@@ -612,11 +612,15 @@ function FluxCalculator.compute_surface_fluxes!(
     @. csf.F_sh += csf.temp2 * area_fraction
 
     # Combine turbulent moisture fluxes from each component of the land model
+    # Note that we multiply by ρ_liq to convert from m s-1 to kg m-2 s-1
+    ρ_liq = (LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set))
     Interfacer.remap!(
         csf.temp1,
-        canopy_dest.transpiration .+
-        (soil_dest.vapor_flux_liq .+ soil_dest.vapor_flux_ice) .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.vapor_flux,
+        (
+            canopy_dest.transpiration .+
+            (soil_dest.vapor_flux_liq .+ soil_dest.vapor_flux_ice) .* (1 .- p.snow.snow_cover_fraction) .+
+            p.snow.snow_cover_fraction .* snow_dest.vapor_flux
+        ) .* ρ_liq,
     )
     @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
     @. csf.F_turb_moisture += csf.temp1 * area_fraction

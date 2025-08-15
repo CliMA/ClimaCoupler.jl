@@ -44,16 +44,14 @@ end
 
 addprocs(CAL.SlurmManager())
 # Make variables and the forward model available on the worker sessions
+@everywhere import ClimaComms, CUDA, ClimaCoupler
+@everywhere import ClimaCalibrate as CAL
+@everywhere import JLD2
 @everywhere begin
     # Run for a shorter time if SHORT_RUN is set
     const SHORT_RUN = haskey(ENV, "SHORT_RUN") ? true : false
-
-    import ClimaComms, CUDA, ClimaCoupler
     ENV["CLIMACOMMS_DEVICE"] = "CUDA"
     ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
-    import ClimaCalibrate as CAL
-    import JLD2
-
     experiment_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration")
     include(joinpath(experiment_dir, "model_interface.jl"))
     output_dir = joinpath(experiment_dir, "output")

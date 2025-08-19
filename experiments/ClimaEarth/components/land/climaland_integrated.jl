@@ -80,7 +80,7 @@ function ClimaLandSimulation(
     if isnothing(shared_surface_space)
         domain = make_land_domain(depth; nelements, dz_tuple)
     else
-        domain = make_land_domain(shared_surface_space, depth)
+        domain = make_land_domain(shared_surface_space, depth; nelements_vert = nelements[2], dz_tuple)
     end
     surface_space = domain.space.surface
     subsurface_space = domain.space.subsurface

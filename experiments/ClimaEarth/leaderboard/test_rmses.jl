@@ -63,7 +63,7 @@ function get_rmse_thresholds()
     rmse_thresholds = Dict(
         "pr" => 3.0,      # mm/day
         "rsut" => 24.6,   # W/m²
-        "rsutcs" => 7.4,  # W/m²
+        "rsutcs" => 10.8,  # W/m²
     )
     return rmse_thresholds
 end

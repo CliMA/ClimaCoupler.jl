@@ -6,6 +6,11 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Remove ED/EDMF aquaplanet longruns PR[#1461](https://github.com/CliMA/ClimaCoupler.jl/pull/1461)
+Removes the ED-only and diag. EDMF aquaplanet longruns.
+These can be run manually as needed for debugging, rather than running every week.
+Also increases the RMSE limit for `rsutcs` from 7.4 to 10.8.
+
 #### Remove `atmos_config_repo` PR[#1448](https://github.com/CliMA/ClimaCoupler.jl/pull/1448)
 ClimaCoupler doesn't depend on configuration files in ClimaAtmos anymore. All the atmosphere
 configuration files are now specified in ClimaCoupler.

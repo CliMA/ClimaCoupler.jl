@@ -79,10 +79,14 @@ function ClimaLandSimulation(
 ) where {FT, TT <: Union{Float64, ITime}}
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
+    
+    @show depth, nelements, dz_tuple
+
     if isnothing(shared_surface_space)
         domain = make_land_domain(depth; nelements, dz_tuple)
     else
-        domain = make_land_domain(shared_surface_space, depth)
+        @show "Using shared surface space!!"
+        domain = make_land_domain(shared_surface_space, depth; dz_tuple, nelements_vert = nelements[2])
     end
     surface_space = domain.space.surface
     subsurface_space = domain.space.subsurface
@@ -305,7 +309,8 @@ function create_canopy_args(::Type{FT}, domain, earth_param_set, start_date) whe
 
     # Energy Balance model
     # ac_canopy = FT(2.5e3)
-    ac_canopy = FT(2.0e5)
+    # ac_canopy = FT(2.0e5)
+    ac_canopy = FT(5.0e4)
     # Plant Hydraulics and general plant parameters
     SAI = FT(0.0) # m2/m2
     f_root_to_shoot = FT(3.5)
@@ -314,7 +319,8 @@ function create_canopy_args(::Type{FT}, domain, earth_param_set, start_date) whe
     K_sat_plant = FT(5e-7) # m/s
     ψ63 = FT(-4 / 0.0098) # / MPa to m, Holtzman's original parameter value is -4 MPa
     Weibull_param = FT(4) # unitless, Holtzman's original c param value
-    a = FT(0.05 * 0.0098) # Holtzman's original parameter for the bulk modulus of elasticity
+    # a = FT(0.05 * 0.0098) # Holtzman's original parameter for the bulk modulus of elasticity
+    a = FT(0.3 * 0.0098)
     conductivity_model = CL.Canopy.PlantHydraulics.Weibull{FT}(K_sat_plant, ψ63, Weibull_param)
     retention_model = CL.Canopy.PlantHydraulics.LinearRetentionCurve{FT}(a)
     plant_ν = FT(1.44e-4)
@@ -341,16 +347,18 @@ function create_canopy_args(::Type{FT}, domain, earth_param_set, start_date) whe
     # Set up conductance
     conductance_args = (; parameters = CL.Canopy.MedlynConductanceParameters(FT; g1))
     # Set up photosynthesis
-    photosynthesis_args = (; parameters = CL.Canopy.FarquharParameters(FT, is_c3; Vcmax25 = Vcmax25))
+    # photosynthesis_args = (; parameters = CL.Canopy.FarquharParameters(FT, is_c3; Vcmax25 = Vcmax25))
+    photosynthesis_args = (; parameters = CL.Canopy.FarquharParameters(FT, is_c3; Vcmax25 = Vcmax25, sc =  FT(0)))
     # Set up plant hydraulics
     modis_lai_artifact_path = CL.Artifacts.modis_lai_forcing_data_path()
     modis_lai_ncdata_path = joinpath(modis_lai_artifact_path, "Yuan_et_al_2008_1x1.nc")
-    LAIfunction = CL.prescribed_lai_modis(
-        modis_lai_ncdata_path,
-        surface_space,
-        start_date;
-        time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
-    )
+    # LAIfunction = CL.prescribed_lai_modis(
+    #     modis_lai_ncdata_path,
+    #     surface_space,
+    #     start_date;
+    #     time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
+    # )
+    LAIfunction = TimeVaryingInput((t) -> FT(0.0))
     ai_parameterization = CL.Canopy.PrescribedSiteAreaIndex{FT}(LAIfunction, SAI, RAI)
 
     plant_hydraulics_ps = CL.Canopy.PlantHydraulics.PlantHydraulicsParameters(;
@@ -610,6 +618,14 @@ function FluxCalculator.compute_surface_fluxes!(
     canopy_dest = p.canopy.turbulent_fluxes
     CL.coupler_compute_turbulent_fluxes!(canopy_dest, coupled_atmos, model.canopy, Y, p, t)
 
+    # Log extrema of individual component fluxes
+    # @info "Soil LHF extrema" extrema=extrema(soil_dest.lhf)
+    # @info "Soil SHF extrema" extrema=extrema(soil_dest.shf)
+    # @info "Snow LHF extrema" extrema=extrema(snow_dest.lhf)
+    # @info "Snow SHF extrema" extrema=extrema(snow_dest.shf)
+    # @info "Canopy LHF extrema" extrema=extrema(canopy_dest.lhf)
+    # @info "Canopy SHF extrema" extrema=extrema(canopy_dest.shf)
+
     # Get area fraction of the land model (min = 0, max = 1)
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
@@ -646,6 +662,10 @@ function FluxCalculator.compute_surface_fluxes!(
         ) .* ρ_liq,
     )
     @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
+    
+    # Log extrema of combined turbulent moisture flux
+    # @info "Combined turbulent moisture flux extrema" extrema=extrema(csf.temp1)
+    
     @. csf.F_turb_moisture += csf.temp1 * area_fraction
 
     # Combine turbulent momentum fluxes from each component of the land model
@@ -672,6 +692,7 @@ function FluxCalculator.compute_surface_fluxes!(
         csf.temp1,
         soil_dest.buoy_flux .* (1 .- p.snow.snow_cover_fraction) .+ p.snow.snow_cover_fraction .* snow_dest.buoy_flux,
     )
+    # @info "Buoyancy flux extrema" extrema=extrema(soil_dest.buoy_flux)
     @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
     @. csf.buoyancy_flux += csf.temp1 * area_fraction
 

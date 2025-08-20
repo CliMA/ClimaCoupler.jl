@@ -63,6 +63,11 @@ function make_land_domain(
         boundary_names = (:bottom, :top),
     )
 
+    vertmesh = CC.Meshes.IntervalMesh(vertdomain, ClimaCore.Meshes.GeneralizedExponentialStretching{FT}(
+        dz_tuple[1],
+        dz_tuple[2],
+    ); nelems = nelements[2], reverse_mode = true)
+
     vertmesh = CC.Meshes.IntervalMesh(vertdomain, CC.Meshes.Uniform(), nelems = nelements[2])
     verttopology = CC.Topologies.IntervalTopology(vertmesh)
     vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(verttopology)

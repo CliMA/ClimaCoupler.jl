@@ -3,19 +3,24 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
 # atmos_config_file: "config/atmos_configs/climaatmos_wx_progedmf.yml"
 initial_condition: "WeatherModel"
-# checkpoint_dt: "7days"
 checkpoint_dt: "12hours"
 co2_model: "fixed"
 coupler_toml: ["toml/amip.toml"]
 dt: "20secs"
 dt_cpl: "20secs"
-# dt: "10secs"
-# dt_cpl: "10secs"
 energy_check: false
-h_elem: 32
-# h_elem: 16
+# h_elem: 32
+h_elem: 16
 mode_name: "amip"
+
+### integrated land
 land_model: "integrated"
+### bucket land
+# land_model: "bucket"
+# bucket_albedo_type: "map_temporal"
+# # bucket_albedo_type: "map_static"
+# bucket_initial_condition: "/net/sampo/data1/cchristo/clima/WeatherQuest/processing/data/era5_bucket_processed_20250701_1200.nc"
+
 use_land_diagnostics: true
 radiation_reset_rng_seed: true
 # start_date: "20250701-1200"
@@ -23,18 +28,18 @@ start_date: "20250701"
 surface_setup: "PrescribedSurface"
 topo_smoothing: true
 topography: "Earth"
-t_end: "12hours"
+t_end: "23hours"
 netcdf_output_at_levels: true
 # output_default_diagnostics: true
 
 extra_atmos_diagnostics:
-  - short_name: [ta, ua, wa, va, rhoa, pfull, hur, hus, clw, cli, arup, tke]
+  - short_name: [ta, ua, wa, va, rhoa, pfull, hur, hus, clw, cli, arup, tke] # prsn, prra, hussn, husra]
     period: 1hours
-  - short_name: [rsut, rlut, rsds, rsus, ts, cl, pr, tas, lwp,] # breaks? hfes]
+  - short_name: [rsut, rlut, rsds, rsus, rsucs, rsuscs, rsd, rlu, rlucs, ts, cl, pr, tas, lwp, mslp, hfes]
     period: 1hours
-  - short_name: [tas] #TODO: add MSLP
-    period: 1hours
-    reduction_time: average
+  # - short_name: [tas, mslp, pr]
+  #   period: 20secs
+  #   reduction_time: average
   # - short_name: [pr]  #TODO: add support for accum operations in diagnostics 
   #   period: 7days
   #   reduction_time: accum

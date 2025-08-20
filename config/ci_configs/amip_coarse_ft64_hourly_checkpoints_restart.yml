@@ -1,6 +1,7 @@
 apply_limiter: false
 checkpoint_dt: "400secs"
 co2_model: "maunaloa"
+detect_restart_files: true
 energy_check: false
 h_elem: 6
 mode_name: "amip"

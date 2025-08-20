@@ -98,6 +98,7 @@ function get_coupler_args(config_dict::Dict)
     checkpoint_dt = config_dict["checkpoint_dt"]
 
     # Restart information
+    detect_restart_files = config_dict["detect_restart_files"]
     restart_dir = config_dict["restart_dir"]
     restart_t = config_dict["restart_t"]
 
@@ -138,6 +139,7 @@ function get_coupler_args(config_dict::Dict)
         share_surface_space,
         saveat,
         checkpoint_dt,
+        detect_restart_files,
         restart_dir,
         restart_t,
         use_coupler_diagnostics,

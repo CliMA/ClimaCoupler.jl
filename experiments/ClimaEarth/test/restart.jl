@@ -58,6 +58,7 @@ println("Simulating four steps, options from command line")
 four_steps_reading = deepcopy(four_steps)
 
 four_steps_reading["t_end"] = "900secs"
+four_steps_reading["detect_restart_files"] = true
 four_steps_reading["restart_dir"] = cs_four_steps.dirs.checkpoints
 four_steps_reading["restart_t"] = 720
 four_steps_reading["job_id"] = "four_steps_reading"
@@ -85,6 +86,7 @@ cs_two_steps1 = setup_and_run(two_steps)
 println("Reading and simulating last two steps")
 # Two additional steps
 two_steps["t_end"] = "720secs"
+two_steps["detect_restart_files"] = true
 cs_two_steps2 = setup_and_run(two_steps)
 
 @testset "Restarts" begin

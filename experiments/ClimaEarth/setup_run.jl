@@ -115,6 +115,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         share_surface_space,
         saveat,
         checkpoint_dt,
+        detect_restart_files,
         restart_dir,
         restart_t,
         use_land_diagnostics,
@@ -164,7 +165,7 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     isnothing(restart_t) && (restart_t = Checkpointer.t_start_from_checkpoint(dir_paths.checkpoints))
     isnothing(restart_dir) && (restart_dir = dir_paths.checkpoints)
-    should_restart = !isnothing(restart_t) && !isnothing(restart_dir)
+    should_restart = detect_restart_files && !isnothing(restart_t) && !isnothing(restart_dir)
     if should_restart
         if t_start isa ITime
             t_start, _ = promote(ITime(restart_t), t_start)

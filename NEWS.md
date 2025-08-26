@@ -6,6 +6,12 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Add option `detect_restart_files` PR[#1463](https://github.com/CliMA/ClimaCoupler.jl/pull/1463)
+Add a CLI option to signal whether restart files should be automatically used
+to restart a simulation. This is true by default, but can be set to false if a
+user wishes to run a simulation from the beginning, ignoring present restart files.
+
+
 #### Remove ED/EDMF aquaplanet longruns PR[#1461](https://github.com/CliMA/ClimaCoupler.jl/pull/1461)
 Removes the ED-only and diag. EDMF aquaplanet longruns.
 These can be run manually as needed for debugging, rather than running every week.

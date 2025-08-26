@@ -88,6 +88,10 @@ function argparse_settings()
         arg_type = Bool
         default = true
         # Restart information
+        "--detect_restart_files"
+        help = "Boolean flag indicating whether to automatically use restart files if available [`false` (default), `true`]"
+        arg_type = Bool
+        default = false
         "--restart_dir"
         help = "Directory containing restart files"
         arg_type = String

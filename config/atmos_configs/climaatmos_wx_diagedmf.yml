@@ -37,10 +37,11 @@ edmfx_sgs_diffusive_flux: true
 moist: equil
 # moist: "nonequil"
 # cloud_model: "grid_scale"
+deep_atmosphere: false
 cloud_model: "quadrature_sgs"
 precip_model: 0M
 # precip_model: "1M"
 toml: [toml/diagnostic_edmfx_era5_ic.toml]
 # toml: [toml/diagnostic_edmfx_1M.toml]
 # use_itime: true
-use_itime: false
+use_itime: true

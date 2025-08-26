@@ -86,6 +86,7 @@ function ClimaLandSimulation(
         domain = make_land_domain(depth; nelements, dz_tuple)
     else
         @show "Using shared surface space!!"
+        dz_tuple = (FT(10.0), FT(2.0))
         domain = make_land_domain(shared_surface_space, depth; dz_tuple, nelements_vert = nelements[2])
     end
     surface_space = domain.space.surface
@@ -190,7 +191,7 @@ function ClimaLandSimulation(
         @show "Using land IC from file"
         # Read in initial conditions for snow and soil
         # ic_path = CL.Artifacts.soil_ic_2008_50m_path()
-        ic_path = "/net/sampo/data1/cchristo/clima/WeatherQuest/processing/data/era5_land_processed_20250701_1200.nc"
+        ic_path = "/net/sampo/data1/cchristo/clima/WeatherQuest/processing/data/era5_land_processed_20250701_0000.nc"
 
         # Save variables to JLD2 file
         # JLD2.@save "highlighted_variables.jld2" ic_path surface_space subsurface_space Y p model
@@ -320,7 +321,7 @@ function create_canopy_args(::Type{FT}, domain, earth_param_set, start_date) whe
     ψ63 = FT(-4 / 0.0098) # / MPa to m, Holtzman's original parameter value is -4 MPa
     Weibull_param = FT(4) # unitless, Holtzman's original c param value
     # a = FT(0.05 * 0.0098) # Holtzman's original parameter for the bulk modulus of elasticity
-    a = FT(0.3 * 0.0098)
+    a = FT(0.2 * 0.0098)
     conductivity_model = CL.Canopy.PlantHydraulics.Weibull{FT}(K_sat_plant, ψ63, Weibull_param)
     retention_model = CL.Canopy.PlantHydraulics.LinearRetentionCurve{FT}(a)
     plant_ν = FT(1.44e-4)
@@ -347,18 +348,18 @@ function create_canopy_args(::Type{FT}, domain, earth_param_set, start_date) whe
     # Set up conductance
     conductance_args = (; parameters = CL.Canopy.MedlynConductanceParameters(FT; g1))
     # Set up photosynthesis
-    # photosynthesis_args = (; parameters = CL.Canopy.FarquharParameters(FT, is_c3; Vcmax25 = Vcmax25))
-    photosynthesis_args = (; parameters = CL.Canopy.FarquharParameters(FT, is_c3; Vcmax25 = Vcmax25, sc =  FT(0)))
+    photosynthesis_args = (; parameters = CL.Canopy.FarquharParameters(FT, is_c3; Vcmax25 = Vcmax25))
+    # photosynthesis_args = (; parameters = CL.Canopy.FarquharParameters(FT, is_c3; Vcmax25 = Vcmax25, sc =  FT(0)))
     # Set up plant hydraulics
     modis_lai_artifact_path = CL.Artifacts.modis_lai_forcing_data_path()
     modis_lai_ncdata_path = joinpath(modis_lai_artifact_path, "Yuan_et_al_2008_1x1.nc")
-    # LAIfunction = CL.prescribed_lai_modis(
-    #     modis_lai_ncdata_path,
-    #     surface_space,
-    #     start_date;
-    #     time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
-    # )
-    LAIfunction = TimeVaryingInput((t) -> FT(0.0))
+    LAIfunction = CL.prescribed_lai_modis(
+        modis_lai_ncdata_path,
+        surface_space,
+        start_date;
+        time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
+    )
+    # LAIfunction = TimeVaryingInput((t) -> FT(0.0))
     ai_parameterization = CL.Canopy.PrescribedSiteAreaIndex{FT}(LAIfunction, SAI, RAI)
 
     plant_hydraulics_ps = CL.Canopy.PlantHydraulics.PlantHydraulicsParameters(;
@@ -692,7 +693,7 @@ function FluxCalculator.compute_surface_fluxes!(
         csf.temp1,
         soil_dest.buoy_flux .* (1 .- p.snow.snow_cover_fraction) .+ p.snow.snow_cover_fraction .* snow_dest.buoy_flux,
     )
-    # @info "Buoyancy flux extrema" extrema=extrema(soil_dest.buoy_flux)
+
     @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
     @. csf.buoyancy_flux += csf.temp1 * area_fraction
 

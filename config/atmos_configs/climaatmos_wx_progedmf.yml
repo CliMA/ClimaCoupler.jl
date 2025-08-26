@@ -37,14 +37,20 @@ z_elem: 63
 dz_bottom: 30.0
 edmfx_entr_model: "Generalized"
 edmfx_detr_model: "Generalized"
+# edmfx_entr_model: "PiGroups"
+# edmfx_detr_model: "SmoothArea"
+
 edmfx_nh_pressure: true
 edmfx_sgs_mass_flux: true
 edmfx_sgs_diffusive_flux: true
 
+deep_atmosphere: false
+
 # 0M
 precip_model: 0M
 moist: equil
-toml: [toml/diagnostic_edmfx_era5_ic.toml]
+# toml: [toml/longrun_aquaplanet_progedmf.toml]
+# toml: [toml/diagnostic_edmfx_era5_ic.toml]
 
 # 1M
 # precip_model: "1M"
@@ -54,4 +60,4 @@ toml: [toml/diagnostic_edmfx_era5_ic.toml]
 # cloud_model: "grid_scale"
 cloud_model: "quadrature_sgs"
 # toml: [toml/longrun_aquaplanet_progedmf.toml]
-use_itime: false
+use_itime: true

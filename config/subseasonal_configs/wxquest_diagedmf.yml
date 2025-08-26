@@ -1,13 +1,23 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
-atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
-# atmos_config_file: "config/atmos_configs/climaatmos_wx_progedmf.yml"
+
+
+# atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
+atmos_config_file: "config/atmos_configs/climaatmos_wx_progedmf.yml"
+
+# coupler_toml: ["toml/amip.toml"]
+coupler_toml: ["toml/amip_progedmf_dev.toml"]
+# coupler_toml: ["toml/amip_calibrated_coarse_v1.toml"]
+
 initial_condition: "WeatherModel"
 checkpoint_dt: "12hours"
 co2_model: "fixed"
-coupler_toml: ["toml/amip.toml"]
-dt: "20secs"
-dt_cpl: "20secs"
+
+# dt: "20secs"
+# dt_cpl: "20secs"
+dt: "5secs"
+dt_cpl: "5secs"
+
 energy_check: false
 # h_elem: 32
 h_elem: 16
@@ -35,8 +45,10 @@ netcdf_output_at_levels: true
 extra_atmos_diagnostics:
   - short_name: [ta, ua, wa, va, rhoa, pfull, hur, hus, clw, cli, arup, tke] # prsn, prra, hussn, husra]
     period: 1hours
-  - short_name: [rsut, rlut, rsds, rsus, rsucs, rsuscs, rsd, rlu, rlucs, ts, cl, pr, tas, lwp, mslp, hfes]
+    reduction_time: average
+  - short_name: [rsut, rlut, rsds, rsus, rsucs, rsuscs, rsd, rlu, rlucs, ts, cl, pr, tas, lwp, mslp, hfes, evspsbl]
     period: 1hours
+    reduction_time: average
   # - short_name: [tas, mslp, pr]
   #   period: 20secs
   #   reduction_time: average

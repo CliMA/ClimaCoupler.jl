@@ -115,7 +115,14 @@ function BucketSimulation(
     params = if isempty(parameter_files)
         CL.Bucket.BucketModelParameters(FT; albedo, z_0m, z_0b, τc, σS_c, W_f, κ_soil, ρc_soil)
     else
-        toml_dict = CP.create_toml_dict(FT; override_file = CP.merge_toml_files(parameter_files; override = true))
+        # this is a temporary hack and should be updated properly
+        toml_dict = CP.create_toml_dict(
+            FT;
+            override_file = CP.merge_toml_files(
+                [CL.Parameters.DEFAULT_PARAMS_FILEPATH, parameter_files...];
+                override = true,
+            ),
+        )
         # τc should be the only exception, it depends on `dt`
         CL.Bucket.BucketModelParameters(toml_dict; z_0m, z_0b, albedo, τc)
     end

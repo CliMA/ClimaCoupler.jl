@@ -22,15 +22,15 @@ steps:
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
 
       # For this pipeline, use the main branches of certain upstream packages
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaOcean\", rev=\"main\"))'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaLand\", rev=\"js/cp-up\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaAtmos\", rev=\"main\"))'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaLand\", rev=\"main\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaCore\", rev=\"main\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaTimeSteppers\", rev=\"main\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"Thermodynamics\", rev=\"main\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"SurfaceFluxes\", rev=\"main\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"RRTMGP\", rev=\"main\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"Oceananigans\", rev=\"main\"))'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaOcean\", rev=\"main\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.resolve()'"
 
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"

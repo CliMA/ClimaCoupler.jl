@@ -106,7 +106,8 @@ function ClimaLandSimulation(
     soilco2_params = CL.Soil.Biogeochemistry.SoilCO2ModelParameters(FT)
 
     # Set up the canopy model args
-    canopy_model_args, canopy_component_args = create_canopy_args(FT, domain, earth_param_set, start_date)
+    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+    canopy_model_args, canopy_component_args = create_canopy_args(FT, domain, earth_param_set, start_date, stop_date)
     canopy_component_types = (;
         autotrophic_respiration = CL.Canopy.AutotrophicRespirationModel{FT},
         radiative_transfer = CL.Canopy.TwoStreamModel{FT},
@@ -272,7 +273,7 @@ end
 
 Creates the arguments for the canopy model.
 """
-function create_canopy_args(::Type{FT}, domain, earth_param_set, start_date) where {FT}
+function create_canopy_args(::Type{FT}, domain, earth_param_set, start_date, stop_date) where {FT}
     surface_space = domain.space.surface
 
     # Spatially varying canopy parameters from CLM
@@ -320,12 +321,10 @@ function create_canopy_args(::Type{FT}, domain, earth_param_set, start_date) whe
     # Set up photosynthesis
     photosynthesis_args = (; parameters = CL.Canopy.FarquharParameters(FT, is_c3; Vcmax25 = Vcmax25))
     # Set up plant hydraulics
-    modis_lai_artifact_path = CL.Artifacts.modis_lai_forcing_data_path()
-    modis_lai_ncdata_path = joinpath(modis_lai_artifact_path, "Yuan_et_al_2008_1x1.nc")
     LAIfunction = CL.prescribed_lai_modis(
-        modis_lai_ncdata_path,
         surface_space,
-        start_date;
+        start_date,
+        stop_date;
         time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
     )
     ai_parameterization = CL.Canopy.PrescribedSiteAreaIndex{FT}(LAIfunction, SAI, RAI)

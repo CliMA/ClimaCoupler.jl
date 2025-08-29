@@ -203,7 +203,7 @@ function set_albedos!(sim::PrescribedOceanSimulation, t)
     # TODO: Where does this date0 come from?
     date0 = Dates.DateTime("2000-01-01T11:58:56.816")
     insolation_params = InsolationParameters(FT)
-    d, δ, η_UTC = FT.(Insolation.helper_instantaneous_zenith_angle(current_date, date0, insolation_params))
+    d, δ, η_UTC = FT.(Insolation.helper_instantaneous_zenith_angle(current_date, insolation_params))
 
     # Get the atmospheric wind vector and the cosine of the zenith angle
     surface_coords = CC.Fields.coordinate_field(axes(sim.cache.T_sfc))

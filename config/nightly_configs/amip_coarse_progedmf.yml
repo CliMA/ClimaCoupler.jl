@@ -20,3 +20,5 @@ t_end: "186days"
 topo_smoothing: true
 topography: "Earth"
 z_elem: 39
+use_auto_jacobian: true
+update_jacobian_every: dt

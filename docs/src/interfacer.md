@@ -62,7 +62,7 @@ return `nothing`. To check conservation throughout a simulation, these
 functions must be extended for all models being run.
 
 | Coupler name | Description                                   | Units  | Default value |
-|--------------+-----------------------------------------------+--------+---------------|
+|--------------|-----------------------------------------------|--------|---------------|
 | `energy`     | vertically integrated energy per surface area | J m⁻²  | `nothing`     |
 | `water`      | vertically integrated water per surface area  | kg m⁻² | `nothing`     |
 
@@ -82,7 +82,7 @@ The default coupler exchange fields are the following, defined in
 `default_coupler_fields()` in the Interfacer module:
 
 | Coupler name      | Description                                         | Units      |
-|-------------------+-----------------------------------------------------+------------|
+|-------------------|-----------------------------------------------------|------------|
 | `z0m_sfc`         | momentum roughness length                           | m          |
 | `z0b_sfc`         | buoyancy roughness length                           | m          |
 | `beta`            | factor to scale evaporation from the surface        | -          |
@@ -128,7 +128,7 @@ in its current state. For an `AtmosModelSimulation`, it must be extended
 for the following properties:
 
 | Coupler name                | Description                                                               | Units      |
-|-----------------------------+---------------------------------------------------------------------------+------------|
+|-----------------------------|---------------------------------------------------------------------------|------------|
 | `air_density`               | air density at the bottom cell centers of the atmosphere                  | kg m⁻³     |
 | `air_pressure`              | air pressure at the bottom cell centers of the atmosphere                 | Pa         |
 | `air_temperature`           | air temperature at the bottom cell centers of the atmosphere              | K          |
@@ -155,7 +155,7 @@ following properties, and may also be extended for any additional
 properties needed by a component model.
 
 | Coupler name             | Description                                              | Units |
-|--------------------------+----------------------------------------------------------+-------|
+|--------------------------|----------------------------------------------------------|-------|
 | `emissivity`             | surface emissivity                                       |       |
 | `surface_direct_albedo`  | bulk direct surface albedo over the whole surface space  |       |
 | `surface_diffuse_albedo` | bulk diffuse surface albedo over the whole surface space |       |
@@ -164,7 +164,7 @@ properties needed by a component model.
 
 ClimaAtmos should also add the following coupler fields for Monin-Obukhov similarity theory:
 | Coupler name    | Description       | Units  |
-|-----------------+-------------------+--------|
+|-----------------|-------------------|--------|
 | `ustar`         | friction velocity | m s⁻¹  |
 | `L_MO`          | Obukhov length    | m      |
 | `buoyancy_flux` | flux of buoyancy  | m⁻²s⁻³ |
@@ -180,7 +180,7 @@ This getter function must be extended
 for the following properties:
 
 | Coupler name        | Description                                                    | Units   |
-|---------------------+----------------------------------------------------------------+---------|
+|---------------------|----------------------------------------------------------------|---------|
 | `co2`               | global mean co2                                                | ppm     |
 | `diffuse_fraction`  | fraction of downwards shortwave flux that is direct            |         |
 | `LW_d`              | downwards longwave flux                                        | W m⁻²   |
@@ -199,7 +199,7 @@ the current time. For a `SurfaceModelSimulation`, it must be extended
 for the following properties:
 
 | Coupler name             | Description                                                    | Units   |
-|--------------------------+----------------------------------------------------------------+---------|
+|--------------------------|----------------------------------------------------------------|---------|
 | `area_fraction`          | fraction of the simulation grid surface area this model covers |         |
 | `roughness_buoyancy`     | aerodynamic roughness length for buoyancy                      | m       |
 | `roughness_momentum`     | aerodynamic roughness length for momentum                      | m       |
@@ -222,7 +222,7 @@ following properties, and may also be extended for any additional
 properties needed by a component model.
 
 | Coupler name                                  | Description                                                                  | Units      |
-|-----------------------------------------------+------------------------------------------------------------------------------+------------|
+|-----------------------------------------------|------------------------------------------------------------------------------|------------|
 | `area_fraction`                               | fraction of the simulation grid surface area this model covers               |            |
 | `liquid_precipitation`                        | liquid precipitation at the surface                                          | kg m⁻² s⁻¹ |
 | `radiative_energy_flux_sfc` OR `LW_d`, `SW_d` | net radiative flux at the surface OR downward longwave, shortwave radiation  | W m⁻²      |
@@ -240,7 +240,7 @@ For some quantities, default `get_field` functions are provided, which may be
 overwritten or used as-is. These currently include the following:
 
 | Coupler name  | Description                                                               | Units | Default value |
-|---------------+---------------------------------------------------------------------------+-------+---------------|
+|---------------|---------------------------------------------------------------------------|-------|---------------|
 | `beta`        | factor that scales evaporation based on its estimated level of saturation |       |             1 |
 | `emissivity`  | measure of how much energy a surface radiates                             |       |             1 |
 | `height_disp` | displacement height relative to the surface                               | m     |             0 |

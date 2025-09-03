@@ -3,6 +3,7 @@ import ClimaLand as CL
 import ClimaLand.Parameters as LP
 import Dates
 import ClimaUtilities.TimeVaryingInputs: LinearInterpolation, PeriodicCalendar, TimeVaryingInput
+import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaCore as CC
 import SciMLBase
@@ -12,6 +13,7 @@ import ClimaUtilities.TimeManager: ITime
 import SurfaceFluxes as SF
 import SurfaceFluxes.Parameters as SFP
 import Thermodynamics as TD
+import JLD2
 
 include("climaland_helpers.jl")
 
@@ -77,10 +79,15 @@ function ClimaLandSimulation(
 ) where {FT, TT <: Union{Float64, ITime}}
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
+    
+    @show depth, nelements, dz_tuple
+
     if isnothing(shared_surface_space)
         domain = make_land_domain(depth; nelements, dz_tuple)
     else
-        domain = make_land_domain(shared_surface_space, depth)
+        @show "Using shared surface space!!"
+        dz_tuple = (FT(10.0), FT(2.0))
+        domain = make_land_domain(shared_surface_space, depth; dz_tuple, nelements_vert = nelements[2])
     end
     surface_space = domain.space.surface
     subsurface_space = domain.space.subsurface
@@ -161,31 +168,48 @@ function ClimaLandSimulation(
     # Set initial conditions
 
     # Apply temperature anomaly function to initial temperature
-    T_functions = Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
-    haskey(T_functions, land_temperature_anomaly) ||
-        error("land temp anomaly function $land_temperature_anomaly not supported")
-    temp_anomaly = T_functions[land_temperature_anomaly]
-    T_sfc0 = FT(276.85) .+ temp_anomaly.(coords.subsurface)
-    lapse_rate = FT(6.5e-3)
-    # Adjust initial temperature to account for orography of the surface
-    # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
-    orog_adjusted_T_data = CC.Fields.field_values(T_sfc0) .- lapse_rate .* CC.Fields.field_values(surface_elevation)
-    orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, subsurface_space)
-    orog_adjusted_T_surface = CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
+    # T_functions = Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
+    # haskey(T_functions, land_temperature_anomaly) ||
+    #     error("land temp anomaly function $land_temperature_anomaly not supported")
+    # temp_anomaly = T_functions[land_temperature_anomaly]
+    # T_sfc0 = FT(276.85) .+ temp_anomaly.(coords.subsurface)
+    # lapse_rate = FT(6.5e-3)
+    # # Adjust initial temperature to account for orography of the surface
+    # # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
+    # orog_adjusted_T_data = CC.Fields.field_values(T_sfc0) .- lapse_rate .* CC.Fields.field_values(surface_elevation)
+    # orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, subsurface_space)
+    # orog_adjusted_T_surface = CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
 
     # Set initial conditions that aren't read in from file
     Y.soilco2.C .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
     Y.canopy.hydraulics.ϑ_l.:1 .= canopy_component_args.hydraulics.parameters.ν
-    @. Y.canopy.energy.T = orog_adjusted_T_surface
+    # @. Y.canopy.energy.T = orog_adjusted_T_surface
 
     # Read in initial conditions for snow and soil from file, if requested
     θ_r, ν, ρc_ds = soil_params.θ_r, soil_params.ν, soil_params.ρc_ds
-    if land_spun_up_ic
-        # Set snow T first to use in computing snow internal energy
-        @. p.snow.T = orog_adjusted_T_surface
 
+    if land_spun_up_ic
+        @show "Using land IC from file"
         # Read in initial conditions for snow and soil
-        ic_path = CL.Artifacts.soil_ic_2008_50m_path()
+        # ic_path = CL.Artifacts.soil_ic_2008_50m_path()
+        ic_path = "/net/sampo/data1/cchristo/clima/WeatherQuest/processing/data/era5_land_processed_20250701_0000.nc"
+
+        # Save variables to JLD2 file
+        # JLD2.@save "highlighted_variables.jld2" ic_path surface_space subsurface_space Y p model
+
+        regridder_type = :InterpolationsRegridder
+        extrapolation_bc =
+            (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
+        interpolation_method = Interpolations.Linear()
+
+        # Set snow T first to use in computing snow internal energy
+        p.snow.T .= SpaceVaryingInput(ic_path, "tsn", surface_space; regridder_type, regridder_kwargs = (; extrapolation_bc, interpolation_method))
+
+        # Set canopy temperature to skin temperature
+        Y.canopy.energy.T .= SpaceVaryingInput(ic_path, "skt", surface_space; regridder_type, regridder_kwargs = (; extrapolation_bc, interpolation_method))
+
+        # JLD2.@save "highlighted_variables_new.jld2" res
+
         CL.Simulations.set_snow_initial_conditions!(Y, p, surface_space, ic_path, model.snow.parameters)
 
         T_bounds = extrema(Y.canopy.energy.T)
@@ -206,7 +230,8 @@ function ClimaLandSimulation(
     # This cache variable is normally computed using `p.drivers.LW_d`, which is
     #  set after the radiation calculation and exchange, but the radiation
     #  code itself requires a surface temperature as input.
-    @. p.T_sfc = orog_adjusted_T_surface
+    # @. p.T_sfc = orog_adjusted_T_surface
+    p.T_sfc .= SpaceVaryingInput(ic_path, "skt", surface_space; regridder_type, regridder_kwargs = (; extrapolation_bc, interpolation_method))
 
     # Update cos(zenith angle) within land model every hour
     update_dt = dt isa ITime ? ITime(3600) : 3600
@@ -230,13 +255,14 @@ function ClimaLandSimulation(
 
     # Set up diagnostics
     if use_land_diagnostics
-        output_writer = CD.Writers.NetCDFWriter(subsurface_space, output_dir; start_date)
+        @show "Outputting land diagnostics"
+        output_writer = CD.Writers.NetCDFWriter(subsurface_space, output_dir)#; start_date)
         scheduled_diagnostics = CL.default_diagnostics(
             model,
             start_date,
             output_writer = output_writer,
             output_vars = :long,
-            average_period = :monthly,
+            average_period = :hourly,
         )
         diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)
         diag_cb = CD.DiagnosticsCallback(diagnostic_handler)
@@ -284,15 +310,19 @@ function create_canopy_args(::Type{FT}, domain, earth_param_set, start_date, sto
         CL.Canopy.clm_canopy_radiation_parameters(surface_space)
 
     # Energy Balance model
-    ac_canopy = FT(2.5e3)
+    # ac_canopy = FT(2.5e3)
+    # ac_canopy = FT(2.0e5)
+    ac_canopy = FT(5.0e4)
     # Plant Hydraulics and general plant parameters
     SAI = FT(0.0) # m2/m2
     f_root_to_shoot = FT(3.5)
     RAI = FT(1.0)
-    K_sat_plant = FT(5e-9) # m/s # seems much too small?
+    # K_sat_plant = FT(5e-9) # m/s # seems much too small?
+    K_sat_plant = FT(5e-7) # m/s
     ψ63 = FT(-4 / 0.0098) # / MPa to m, Holtzman's original parameter value is -4 MPa
     Weibull_param = FT(4) # unitless, Holtzman's original c param value
-    a = FT(0.05 * 0.0098) # Holtzman's original parameter for the bulk modulus of elasticity
+    # a = FT(0.05 * 0.0098) # Holtzman's original parameter for the bulk modulus of elasticity
+    a = FT(0.2 * 0.0098)
     conductivity_model = CL.Canopy.PlantHydraulics.Weibull{FT}(K_sat_plant, ψ63, Weibull_param)
     retention_model = CL.Canopy.PlantHydraulics.LinearRetentionCurve{FT}(a)
     plant_ν = FT(1.44e-4)
@@ -320,6 +350,7 @@ function create_canopy_args(::Type{FT}, domain, earth_param_set, start_date, sto
     conductance_args = (; parameters = CL.Canopy.MedlynConductanceParameters(FT; g1))
     # Set up photosynthesis
     photosynthesis_args = (; parameters = CL.Canopy.FarquharParameters(FT, is_c3; Vcmax25 = Vcmax25))
+    # photosynthesis_args = (; parameters = CL.Canopy.FarquharParameters(FT, is_c3; Vcmax25 = Vcmax25, sc =  FT(0)))
     # Set up plant hydraulics
     LAIfunction = CL.prescribed_lai_modis(
         surface_space,
@@ -327,6 +358,7 @@ function create_canopy_args(::Type{FT}, domain, earth_param_set, start_date, sto
         stop_date;
         time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
     )
+    # LAIfunction = TimeVaryingInput((t) -> FT(0.0))
     ai_parameterization = CL.Canopy.PrescribedSiteAreaIndex{FT}(LAIfunction, SAI, RAI)
 
     plant_hydraulics_ps = CL.Canopy.PlantHydraulics.PlantHydraulicsParameters(;
@@ -586,6 +618,14 @@ function FluxCalculator.compute_surface_fluxes!(
     canopy_dest = p.canopy.turbulent_fluxes
     CL.coupler_compute_turbulent_fluxes!(canopy_dest, coupled_atmos, model.canopy, Y, p, t)
 
+    # Log extrema of individual component fluxes
+    # @info "Soil LHF extrema" extrema=extrema(soil_dest.lhf)
+    # @info "Soil SHF extrema" extrema=extrema(soil_dest.shf)
+    # @info "Snow LHF extrema" extrema=extrema(snow_dest.lhf)
+    # @info "Snow SHF extrema" extrema=extrema(snow_dest.shf)
+    # @info "Canopy LHF extrema" extrema=extrema(canopy_dest.lhf)
+    # @info "Canopy SHF extrema" extrema=extrema(canopy_dest.shf)
+
     # Get area fraction of the land model (min = 0, max = 1)
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
@@ -622,6 +662,10 @@ function FluxCalculator.compute_surface_fluxes!(
         ) .* ρ_liq,
     )
     @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
+    
+    # Log extrema of combined turbulent moisture flux
+    # @info "Combined turbulent moisture flux extrema" extrema=extrema(csf.temp1)
+    
     @. csf.F_turb_moisture += csf.temp1 * area_fraction
 
     # Combine turbulent momentum fluxes from each component of the land model
@@ -648,6 +692,7 @@ function FluxCalculator.compute_surface_fluxes!(
         csf.temp1,
         soil_dest.buoy_flux .* (1 .- p.snow.snow_cover_fraction) .+ p.snow.snow_cover_fraction .* snow_dest.buoy_flux,
     )
+
     @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
     @. csf.buoyancy_flux += csf.temp1 * area_fraction
 

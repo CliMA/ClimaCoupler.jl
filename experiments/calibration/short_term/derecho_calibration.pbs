@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -A UCIT0011
+#PBS -q main
+#PBS -N pbs_calibration
+#PBS -j oe
+#PBS -o amip_calibration.txt
+#PBS -l walltime=11:00:00
+#PBS -l select=1:ncpus=1:ngpus=1
+
+# Load required modules
+module load climacommon
+# Build and run the Julia code
+julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate(;verbose=true)'
+julia --project=experiments/ClimaEarth experiments/calibration/short_term/run_calibration.jl

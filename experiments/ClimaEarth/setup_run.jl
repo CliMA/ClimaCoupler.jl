@@ -301,7 +301,6 @@ function CoupledSimulation(config_dict::AbstractDict)
                 area_fraction = land_fraction,
                 shared_surface_space,
                 land_spun_up_ic,
-                saveat,
                 surface_elevation,
                 land_temperature_anomaly,
                 use_land_diagnostics,

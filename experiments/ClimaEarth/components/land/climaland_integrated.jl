@@ -95,7 +95,11 @@ function ClimaLandSimulation(
     end
 
     # Set up spatially-varying parameters
-    toml_dict = CP.create_toml_dict(FT; override_file = CP.merge_toml_files(parameter_files; override = true))
+    default_parameter_file = joinpath(@__DIR__, "climaland_default_parameters.toml")
+    toml_dict = CP.create_toml_dict(
+        FT;
+        override_file = CP.merge_toml_files([default_parameter_file, parameter_files...]; override = true),
+    )
     earth_param_set = CL.Parameters.LandParameters(toml_dict)
 
     # Set up atmosphere and radiation forcing
@@ -118,7 +122,7 @@ function ClimaLandSimulation(
         time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
     )
 
-    model = LandModel{FT}(forcing, LAI, toml_dict, domain, dt)
+    model = CL.LandModel{FT}(forcing, LAI, toml_dict, domain, dt)
 
     # Define a function to set initial conditions
     function set_ic!(Y, p, t0, model)
@@ -195,16 +199,16 @@ function ClimaLandSimulation(
 
     # Create the LandSimulation object, which will also create and initialize the state vectors,
     # the cache, the driver callbacks, and set the initial conditions.
-    simulation = LandSimulation(
+    simulation = CL.Simulations.LandSimulation(
         start_date,
         stop_date,
         dt,
-        canopy;
+        model;
+        outdir = output_dir,
         set_ic!,
-        updateat,
-        timestepper = ode_algo,
         user_callbacks = (),
         diagnostics,
+        updateat,
     )
 
     return ClimaLandSimulation(simulation.model, simulation._integrator, area_fraction, output_writer)

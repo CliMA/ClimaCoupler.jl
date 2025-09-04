@@ -208,10 +208,6 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     ## init atmos model component
     atmos_sim = ClimaAtmosSimulation(CA.AtmosConfig(atmos_config_dict))
-
-    # Get surface elevation from `atmos` coordinate field
-    surface_elevation = CC.Fields.level(CC.Fields.coordinate_field(atmos_sim.integrator.u.f).z, CC.Utilities.half)
-
     thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models #342
 
     #=
@@ -237,6 +233,19 @@ function CoupledSimulation(config_dict::AbstractDict)
         n_quad_points = 4
         boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points, h_elem)
     end
+
+    # Get surface elevation on the boundary space from `atmos` coordinate field
+    surface_elevation = Interfacer.get_field(atmos_sim, Val(:height_sfc), boundary_space) # on surface space
+
+    # Get atmospheric height on the boundary space
+    # Since the atmospheric height is defined on centers, we need to copy the values onto the boundary space
+    # to be able to subtract the surface elevation
+    # Note: This pattern is not reliable and should not be reused.
+    atmos_h =
+        ClimaCore.Fields.Field(
+            ClimaCore.Fields.field_values(Interfacer.get_field(atmos_sim, Val(:height_int))),
+            boundary_space,
+        ) .- surface_elevation # atmos height relative to the surface, on the surface space
 
     #=
     ### Land-sea Fraction
@@ -303,6 +312,7 @@ function CoupledSimulation(config_dict::AbstractDict)
                 land_spun_up_ic,
                 saveat,
                 surface_elevation,
+                atmos_h,
                 land_temperature_anomaly,
                 use_land_diagnostics,
                 parameter_files,

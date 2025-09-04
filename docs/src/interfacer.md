@@ -132,8 +132,8 @@ for the following properties:
 | `air_density`               | air density at the bottom cell centers of the atmosphere                  | kg m⁻³     |
 | `air_pressure`              | air pressure at the bottom cell centers of the atmosphere                 | Pa         |
 | `air_temperature`           | air temperature at the bottom cell centers of the atmosphere              | K          |
-| `height_int`                | height at the first internal model level                                  | m          |
-| `height_sfc`                | height at the surface                                                     | m          |
+| `height_int`                | height at the bottom cell center of the atmosphere space                  | m          |
+| `height_sfc`                | height at the bottom face of the atmosphere space                         | m          |
 | `liquid_precipitation`      | liquid precipitation at the surface                                       | kg m⁻² s⁻¹ |
 | `radiative_energy_flux_sfc` | net radiative flux at the surface                                         | W m⁻²      |
 | `radiative_energy_flux_toa` | net radiative flux at the top of the atmosphere                           | W m⁻²      |

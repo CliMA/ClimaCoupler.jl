@@ -13,7 +13,7 @@ env:
   SLURM_KILL_BAD_EXIT: 1
   CONFIG_PATH: "config/longrun_configs"
 
-timeout_in_minutes: 1440 # 24 hours
+timeout_in_minutes: 1800 # 30 hours
 
 steps:
   - label: "init :computer:"
@@ -196,7 +196,7 @@ steps:
   - group: "CMIP simulations"
 
     steps:
-      - label: "ClimaAtmos + ClimaLand + ClimaOcean + PrescribedSeaIce"
+      - label: "GPU CMIP: ClimaAtmos + ClimaLand + ClimaOcean + PrescribedSeaIce"
         key: "cmip_edonly_land"
         command:
             - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_land.yml --job_id cmip_edonly_land"
@@ -210,7 +210,7 @@ steps:
           slurm_gpus: 1
           slurm_time: 12:00:00
 
-      - label: "ClimaAtmos + Bucket + ClimaOcean + PrescribedSeaIce"
+      - label: "GPU CMIP: ClimaAtmos + Bucket + ClimaOcean + PrescribedSeaIce"
         key: "cmip_edonly_bucket"
         command:
             - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_bucket.yml --job_id cmip_edonly_bucket"

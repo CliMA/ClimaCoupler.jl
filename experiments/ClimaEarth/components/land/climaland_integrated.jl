@@ -321,12 +321,7 @@ function create_canopy_args(::Type{FT}, domain, earth_param_set, start_date, sto
     # Set up photosynthesis
     photosynthesis_args = (; parameters = CL.Canopy.FarquharParameters(FT, is_c3; Vcmax25 = Vcmax25))
     # Set up plant hydraulics
-    LAIfunction = CL.prescribed_lai_modis(
-        surface_space,
-        start_date,
-        stop_date;
-        time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
-    )
+    LAIfunction = CL.prescribed_lai_modis(surface_space, start_date, stop_date)
     ai_parameterization = CL.Canopy.PrescribedSiteAreaIndex{FT}(LAIfunction, SAI, RAI)
 
     plant_hydraulics_ps = CL.Canopy.PlantHydraulics.PlantHydraulicsParameters(;

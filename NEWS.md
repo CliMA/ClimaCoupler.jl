@@ -6,11 +6,14 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Correctly set land domain with `share_surface_space = true` PR[#1464](https://github.com/CliMA/ClimaCoupler.jl/pull/1464)
+Previously, we passed but did not use arguments related to the vertical resolution
+in `make_land_domain`. Now we correctly use the provided `dz_tuple` and `n_elements_vert`.
+
 #### Add option `detect_restart_files` PR[#1463](https://github.com/CliMA/ClimaCoupler.jl/pull/1463)
 Add a CLI option to signal whether restart files should be automatically used
 to restart a simulation. This is true by default, but can be set to false if a
 user wishes to run a simulation from the beginning, ignoring present restart files.
-
 
 #### Remove ED/EDMF aquaplanet longruns PR[#1461](https://github.com/CliMA/ClimaCoupler.jl/pull/1461)
 Removes the ED-only and diag. EDMF aquaplanet longruns.

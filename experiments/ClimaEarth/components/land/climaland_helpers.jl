@@ -40,6 +40,7 @@ end
          shared_surface_space::CC.Spaces.SpectralElementSpace2D,
          depth::FT;
          nelements_vert::Int = 15,
+         dz_tuple::Tuple{FT, FT} = FT.((10.0, 0.05)),
          ) where {FT}
 
  Creates the land model domain from the input shared surface space and information
@@ -63,7 +64,12 @@ function make_land_domain(
         boundary_names = (:bottom, :top),
     )
 
-    vertmesh = CC.Meshes.IntervalMesh(vertdomain, CC.Meshes.Uniform(), nelems = nelements[2])
+    vertmesh = CC.Meshes.IntervalMesh(
+        vertdomain,
+        ClimaCore.Meshes.GeneralizedExponentialStretching{FT}(dz_tuple[1], dz_tuple[2]);
+        nelems = nelements_vert,
+        reverse_mode = true,
+    )
     verttopology = CC.Topologies.IntervalTopology(vertmesh)
     vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(verttopology)
     subsurface_space = CC.Spaces.ExtrudedFiniteDifferenceSpace(shared_surface_space, vert_center_space)

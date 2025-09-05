@@ -23,9 +23,10 @@ FT = Float32
     output_dir = pwd()
     boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
     area_fraction = CC.Fields.ones(boundary_space)
+    atmos_h = CC.Fields.zeros(boundary_space) .+ 2
 
     # Construct simulation object
-    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction)
+    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction, atmos_h)
 
     # Try taking a timestep
     Interfacer.step!(land_sim, dt)
@@ -67,7 +68,8 @@ end
 
     boundary_space = ClimaCore.Spaces.horizontal_space(atmos_sim.domain.face_space)
     area_fraction = ClimaCore.Fields.ones(boundary_space)
-    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction)
+    atmos_h = CC.Fields.zeros(boundary_space) .+ 2
+    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction, atmos_h)
     model_sims = (; land_sim = land_sim, atmos_sim = atmos_sim)
 
     # Initialize the coupler fields so we can perform exchange

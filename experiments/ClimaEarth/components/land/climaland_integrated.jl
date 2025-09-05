@@ -48,6 +48,7 @@ end
         shared_surface_space = nothing,
         land_spun_up_ic::Bool = true,
         surface_elevation = nothing,
+        atmos_h,
         land_temperature_anomaly::String = "amip",
         use_land_diagnostics::Bool = true,
         parameter_files = [],
@@ -73,6 +74,7 @@ function ClimaLandSimulation(
     shared_surface_space = nothing,
     land_spun_up_ic::Bool = true,
     surface_elevation = nothing,
+    atmos_h,
     land_temperature_anomaly::String = "amip",
     use_land_diagnostics::Bool = true,
     parameter_files = [],
@@ -93,6 +95,9 @@ function ClimaLandSimulation(
     else
         surface_elevation = Interfacer.remap(surface_elevation, surface_space)
     end
+    # Interpolate atmosphere height field to surface space of land model,
+    #  since that's where we compute fluxes for this land model
+    atmos_h = Interfacer.remap(atmos_h, surface_space)
 
     # Set up spatially-varying parameters
     default_parameter_file = joinpath(@__DIR__, "climaland_default_parameters.toml")
@@ -104,7 +109,7 @@ function ClimaLandSimulation(
 
     # Set up atmosphere and radiation forcing
     forcing = (;
-        atmos = CL.CoupledAtmosphere{FT}(surface_space),
+        atmos = CL.CoupledAtmosphere{FT}(surface_space, atmos_h),
         radiation = CL.CoupledRadiativeFluxes{FT}(
             start_date;
             insol_params = LP.insolation_parameters(earth_param_set),
@@ -263,7 +268,12 @@ function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:sw_d}, field)
     Interfacer.remap!(sim.integrator.p.drivers.SW_d, field)
 end
 
-Interfacer.step!(sim::ClimaLandSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+function Interfacer.step!(sim::ClimaLandSimulation, t)
+    while float(sim.integrator.t) < t
+        Interfacer.step!(sim.integrator)
+    end
+    return nothing
+end
 Interfacer.close_output_writers(sim::ClimaLandSimulation) = isnothing(sim.output_writer) || close(sim.output_writer)
 
 function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, area_fraction)

@@ -210,7 +210,8 @@ function CoupledSimulation(config_dict::AbstractDict)
     atmos_sim = ClimaAtmosSimulation(CA.AtmosConfig(atmos_config_dict))
 
     # Get surface elevation from `atmos` coordinate field
-    surface_elevation = CC.Fields.level(CC.Fields.coordinate_field(atmos_sim.integrator.u.f).z, CC.Utilities.half)
+    surface_elevation = Interfacer.get_field(atmos_sim, Val(:height_sfc))
+    atmos_h = Interfacer.get_field(atmos_sim, Val(:height_int))
 
     thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models #342
 
@@ -302,6 +303,7 @@ function CoupledSimulation(config_dict::AbstractDict)
                 shared_surface_space,
                 land_spun_up_ic,
                 surface_elevation,
+                atmos_h,
                 land_temperature_anomaly,
                 use_land_diagnostics,
                 parameter_files,

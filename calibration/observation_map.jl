@@ -1,13 +1,13 @@
 import ClimaAnalysis
 import Dates
 import ClimaCalibrate
+import GeoMakie
+import Makie
 
-include(joinpath(pkgdir(ClimaLand), "experiments/calibration/observation_utils.jl"))
+import ClimaCalibrate: EnsembleBuilder
 
-using CairoMakie, GeoMakie, Printf, StatsBase
+include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/observation_utils.jl"))
 
-# Need access to get_era5_obs_var_dict and get_sim_var_dict
-ext = Base.get_extension(ClimaLand, :LandSimulationVisualizationExt)
 """
     ClimaCalibrate.observation_map(iteration)
 
@@ -21,15 +21,8 @@ ensemble member that has been matched to the corresponding observational data.
 function ClimaCalibrate.observation_map(iteration)
     output_dir = CALIBRATE_CONFIG.output_dir
     ekp = JLD2.load_object(ClimaCalibrate.ekp_path(output_dir, iteration))
-    current_minibatch = EKP.get_current_minibatch(ekp)
-    obs = EKP.get_obs(ekp)
-    single_obs_len = sum(length(obs))
-    ensemble_size = EKP.get_N_ens(ekp)
 
-    obs_series = EKP.get_observation_series(ekp)
-    # Determine which observation is used by the short names
-    short_names =
-        ClimaCalibrate.ObservationRecipe.short_names(first(obs_series.observations))
+    g_ens_builder = EnsembleBuilder.GEnsembleBuilder(ekp)
 
     G_ensemble = Array{Float64}(undef, single_obs_len, ensemble_size)
     for m = 1:ensemble_size
@@ -37,9 +30,7 @@ function ClimaCalibrate.observation_map(iteration)
         simdir_path = joinpath(member_path, "global_diagnostics/output_active")
         @info "Processing member $m: $simdir_path"
         try
-            G_ensemble[:, m] .=
-                process_member_data(simdir_path, short_names, current_minibatch)
-
+                process_member_data(g_ens_builder, simdir_path, col_idx)
         catch e
             @error "Error processing member $m, filling observation map entry with NaNs" exception =
                 e
@@ -56,71 +47,52 @@ end
 Process the data of a single ensemble member and return a single column of the
 G ensemble matrix.
 """
-function process_member_data(diagnostics_folder_path, short_names, current_minibatch)
+function process_member_data(g_ens_builder, diagnostics_folder_path, col_idx)
+    short_names = EnsembleBuilder.missing_short_names(g_ens_builder)
     sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges
     nelements = CALIBRATE_CONFIG.nelements
     @info "Short names: $short_names"
-    era5_obs_vars = ext.get_era5_obs_var_dict()
+
+    # For now, hard code the data to daily data since it seems the simplest
+    # TODO: Fetch daily data from simdir
+    simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)
     for short_name in short_names
-        short_name in keys(era5_obs_vars) || error(
-            "Variable $short_name does not appear in the observation dataset. Add the variable to get_era5_obs_var_dict",
-        )
+        # This assumes that there are not multiple reductions for the same
+        # variable!
+        var = get(simdir, short_name)
+        var = preprocess_var(var, first(first(sample_date_ranges)))
+        EnsembleBuilder.fill_g_ens_col!(g_ens_builder, col_idx, var)
     end
 
-    sim_var_dict = ext.get_sim_var_dict(diagnostics_folder_path)
-    vars = map(short_names) do short_name
-        var = sim_var_dict[short_name]()
-        var = ClimaAnalysis.average_season_across_time(var, ignore_nan = false)
+    return nothing
+end
 
-        ocean_mask = make_ocean_mask(nelements)
-        var = ocean_mask(var)
+"""
+    preprocess_var(var::ClimaAnalysis.OutputVar, reference_date)
 
-        # Replace all NaNs on land with the mean value
-        # This is needed to stop small NaN values from stopping the calibration
-        nanmean_land_val = mean(!isnan, var.data)
-        var = ClimaAnalysis.replace(val -> isnan(val) ? nanmean_land_val : val, var)
-        var = ocean_mask(var)
+Preprocess `var` before flattening for G ensemble matrix.
 
-        # To prevent double counting along the longitudes since -180 and 180
-        # degrees are the same point
-        lons = ClimaAnalysis.longitudes(var)
-        var = ClimaAnalysis.window(
-            var,
-            "longitude",
-            right = length(lons) - 1,
-            by = ClimaAnalysis.Index(),
-        )
+For "pr", weekly sums are computed. For "tas" and "mslp", weekly means are
+computed from daily means. The daily means are computing starting from
+`reference_date`.
 
-        # Exclude the poles
-        lats = ClimaAnalysis.latitudes(var)
-        var = ClimaAnalysis.window(
-            var,
-            "latitude",
-            left = 2,
-            right = length(lats) - 1,
-            by = ClimaAnalysis.Index(),
-        )
+This function assumes that the data is daily.
+"""
+function preprocess_var(var::ClimaAnalysis.OutputVar, reference_date)
+    # TODO: Check for sign of pr
+    # TODO: Check for units of everything
+    var = shift_to_previous_day(var)
+    var = ClimaAnalysis.window(var, "time", left = reference_date)
+    if ClimaAnalysis.short_name(var) == "pr"
+        # TODO: Check that the sign are the same as the observational data
+        return compute_weekly_sum_from_daily_mean(var, reference_date)
+    elseif ClimaAnalysis.short_name(var) == "tas"
+        return compute_weekly_mean_from_daily_mean(var, reference_date)
+    elseif ClimaAnalysis.short_name(var) == "mslp"
+        return compute_weekly_mean_from_daily_mean(var, reference_date)
+    else
+        error("Do not know how to preprocess OutputVar with short name $(ClimaAnalysis.short_name(var))")
     end
-    # Flatten and concatenate the data for each minibatch
-    # Note that we implicitly remove spinup when windowing is done
-    @info "Current minibatch is $current_minibatch"
-    flattened_data = map(current_minibatch) do idx
-        start_date, stop_date = sample_date_ranges[idx]
-        flat_data = map(vars) do var
-            var = ClimaAnalysis.window(
-                var,
-                "time",
-                left = start_date,
-                right = stop_date,
-                by = ClimaAnalysis.MatchValue(),
-            )
-            ClimaAnalysis.flatten(var).data
-        end
-        flat_data
-    end
-    member = vcat(vcat(flattened_data...)...)
-    @info "Size of member is $(length(member))"
-    return member
 end
 
 """
@@ -142,11 +114,7 @@ function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, it
     # We choose the first ensemble member because the parameters for the first
     # ensemble member are supposed to be the mean of the parameters of the
     # ensemble members if it is EKP.TransformUnscented
-    output_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, 1)
-
-    diagnostics_folder_path = joinpath(output_path, "global_diagnostics", "output_active")
-    ext.compute_monthly_leaderboard(output_path, diagnostics_folder_path, "ERA5")
-    ext.compute_seasonal_leaderboard(output_path, diagnostics_folder_path, "ERA5")
+    # TODO: Add plotting here for the first ensemble member!
 end
 
 """

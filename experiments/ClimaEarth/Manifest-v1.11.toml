@@ -381,7 +381,9 @@ weakdeps = ["SparseArrays"]
 
 [[deps.ClimaAnalysis]]
 deps = ["Artifacts", "Dates", "Interpolations", "NCDatasets", "NaNStatistics", "OrderedCollections", "Reexport", "Statistics", "Unitful"]
-git-tree-sha1 = "2488781691ad571f17dc40b02e5380296a80cd2e"
+git-tree-sha1 = "f50e53df563b487a4cde37ce7c7b24943c060f9c"
+repo-rev = "kp/flatten-metadata"
+repo-url = "https://github.com/CliMA/ClimaAnalysis.jl.git"
 uuid = "29b5916a-a76c-4e73-9657-3c8fd22e65e6"
 version = "0.5.19"
 weakdeps = ["GeoMakie", "Makie"]
@@ -398,7 +400,9 @@ version = "0.31.3"
 
 [[deps.ClimaCalibrate]]
 deps = ["Dates", "Distributed", "Distributions", "EnsembleKalmanProcesses", "JLD2", "Logging", "Random", "TOML", "YAML"]
-git-tree-sha1 = "2ba8eb38b9b4b1db74f7ac9ba4eddc92cdc44fef"
+git-tree-sha1 = "4daddfc464e46542d2b59fa4a547d750563668bb"
+repo-rev = "kp/g_ens_col"
+repo-url = "https://github.com/CliMA/ClimaCalibrate.jl.git"
 uuid = "4347a170-ebd6-470c-89d3-5c705c0cacc2"
 version = "0.1.3"
 

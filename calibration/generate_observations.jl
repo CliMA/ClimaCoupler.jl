@@ -7,15 +7,7 @@ import JLD2
 
 # Access CalibrateConfig
 include(joinpath(@__DIR__, "run_calibration.jl"))
-
 include(joinpath(@__DIR__, "observation_utils.jl"))
-
-
-# TODO: Figure out how to the load the three variables
-# TODO: Window for the correct times
-# TODO: Resample onto the correct lonlat grid
-# TODO: Check for units too!
-# TODO: Shove into the TSVD matrix
 
 function make_observation_vector(
     short_names,
@@ -48,12 +40,19 @@ function load_vars(obsdir, short_names)
     return vars
 end
 
+"""
+    preprocess_vars(vars, sample_date_ranges, config_file)
+
+Preprocess each OutputVar in `vars` by keeping the relevant dates in
+`sample_date_ranges`.
+
+
+"""
 function preprocess_vars(vars, sample_date_ranges, config_file)
     weekly_dates = find_weekly_dates(vars, sample_date_ranges)
-    # resample_var = resampled_lonlat(config_file)
     vars = map(vars) do var
         # resample_var(select_dates(var, weekly_dates))
-        select_dates(var, weekly_dates)
+        var = select_dates(var, weekly_dates)
         # TODO: Do any additional preprocessing here for units...
     end
     return vars
@@ -92,7 +91,7 @@ function find_weekly_dates(vars, sample_date_ranges)
     for range in sample_date_ranges
         if ((last(range) - first(range)) % Dates.Week(1)).value != 0
             error(
-                "The dates in $sample_date_ranges should be in different by the number of weeks",
+                "The dates in $sample_date_ranges should differ by weeks",
             )
         end
         append!(dates, collect(first(range):Dates.Week(1):last(range)))
@@ -139,6 +138,7 @@ end
 Select `dates` in `var`.
 """
 function select_dates(var::OutputVar, dates)
+    # TODO: This function can be simplfied with select
     # Metadata comes from observational data and var is simulation data
     # when calibrating
     sim_dates = ClimaAnalysis.dates(var)
@@ -160,24 +160,13 @@ function select_dates(var::OutputVar, dates)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    # TODO: Change sample_date_ranges to be as many years that I can
-    # These should be as many weeks that I can supply without running out of
-    # memory
-    # TODO: weekly_ranges should be sample_date_ranges but extending the start
-    # and ends with many weeks
-    obsdir = joinpath(@__DIR__, "../../weekly_data/weekly")
+    obsdir = joinpath(@__DIR__, "../../weekly")
     sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges
     short_names = CALIBRATE_CONFIG.short_names
     config_file = CALIBRATE_CONFIG.config_file
 
     @info "The number of samples is $(length(sample_date_ranges))"
 
-    # observation_vector = make_observation_vector(
-    #     short_names,
-    #     sample_date_ranges,
-    #     obsdir,
-    #     config_file,
-    # )
     vars = load_vars(obsdir, short_names)
     vars = preprocess_vars(vars, sample_date_ranges, config_file)
     observation_vector = make_observation_vector(vars, sample_date_ranges)

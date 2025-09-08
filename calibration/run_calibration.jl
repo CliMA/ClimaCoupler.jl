@@ -11,13 +11,13 @@ import JLD2
 include(joinpath(@__DIR__, "api.jl"))
 
 const CALIBRATE_CONFIG = CalibrateConfig(;
-    config_file = joinpath(@__DIR__, "model_config.yml"),
+    config_file = joinpath(@__DIR__, "model_config.yml"), # TODO: Change this
     short_names = ["pr", "tas", "mslp"],
     minibatch_size = 1,
     n_iterations = 7,
-    sample_date_ranges = [("2024-09-16", "2024-09-23"), ("2024-09-30", "2024-10-07")],
+    sample_date_ranges = [("2024-09-16", "2024-09-23"), ("2024-09-30", "2024-10-07")], # TODO: Change this
     extend = Dates.Week(1),
-    spinup = Dates.Week(1),
+    spinup = Dates.Day(18), # TODO: Change this
     output_dir = "calibration/weatherquest",
     rng_seed = 42,
 )

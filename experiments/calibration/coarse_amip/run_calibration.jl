@@ -19,7 +19,7 @@ experiment_dir = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/")
 model_interface = joinpath(experiment_dir, "coarse_amip", "model_interface.jl")
 
 # Experiment Configuration
-output_dir = "experiments/calibration/coarse_amip/output_simple"
+output_dir = joinpath(ENV["TMPDIR"],"output_simple")
 mkpath(output_dir)
 n_iterations = 9
 
@@ -33,19 +33,16 @@ priors = [
 prior = combine_distributions(priors)
 
 batch_size = 1
-nt = JLD2.load_object("experiments/calibration/nt_obs_3d_8_h_elem.jld2")
+nt = JLD2.load_object("/glade/u/home/nefrathe/clima/ClimaCoupler.jl/experiments/calibration/nt_obs_3d_8_h_elem.jld2")
 short_names = [:rsut, :sw_cre, :lwp]
 model_error_scale = 0.10
 regularization = 1e-3
 obs_series = create_observation_series(nt; model_error_scale, regularization, short_names, batch_size)
 
-# module_load_str = ClimaCalibrate.module_load_str(get_backend())
-# ClimaCalibrate.slurm_model_run(0, 1, output_dir, experiment_dir, model_interface; module_load_str, exeflags)
 eki = EKP.EnsembleKalmanProcess(obs_series, EKP.TransformUnscented(prior, impose_prior = true), verbose = true)
 ensemble_size = EKP.get_N_ens(eki)
-
 # Slurm resources for a single model run
-hpc_kwargs = CAL.kwargs(time = 60 * 12, ntasks = 2, gpus_per_task = 1, cpus_per_task = 4, M = "nat.henrici@gmail.com", m = "ea")
+hpc_kwargs = CAL.kwargs(time = 660, ntasks = 8, gpus_per_task = 1, cpus_per_task = 4, M = "nat.henrici@gmail.com", q = "preempt")
 exeflags = "--threads=4"
-reruns = 2
-eki = CAL.calibrate(CAL.DerechoBackend, eki, n_iterations, prior, output_dir; model_interface, hpc_kwargs, exeflags, reruns)
+eki = CAL.calibrate(CAL.DerechoBackend, eki, n_iterations, prior, output_dir; model_interface, hpc_kwargs, exeflags)
+   

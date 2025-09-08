@@ -9,6 +9,8 @@ const config_file = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration",
 function ClimaCalibrate.forward_model(iter, member)
 
     config_dict = get_coupler_config_dict(config_file)
+    println("tmpdir")
+    println(ENV["TMPDIR"])
 
     output_dir_root = config_dict["coupler_output_dir"]
     eki = ClimaCalibrate.load_ekp_struct(output_dir_root, iter)
@@ -27,13 +29,6 @@ function ClimaCalibrate.forward_model(iter, member)
     # Set member output directory
     member_output_dir = ClimaCalibrate.path_to_ensemble_member(output_dir_root, iter, member)
     config_dict["coupler_output_dir"] = member_output_dir
-
-    checkpoint_dir = joinpath(member_output_dir, "model_config", "checkpoints")
-    # Use the model's own previous checkpoints if they exist
-    if isdir(checkpoint_dir) && !isempty(readdir(checkpoint_dir))
-        config_dict["restart_t"] = nothing
-        config_dict["restart_dir"] = nothing
-    end
 
     sim = try
         # Ensure that the most recent `setup_and_run` method is used, preventing

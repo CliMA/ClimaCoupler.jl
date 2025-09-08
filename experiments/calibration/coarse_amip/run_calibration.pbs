@@ -1,0 +1,37 @@
+#!/bin/bash
+#PBS -A UCIT0011
+#PBS -q preempt
+#PBS -N pbs_calibration
+#PBS -j oe
+#PBS -o amip_calibration.txt
+#PBS -l walltime=12:00:00
+#PBS -l select=1:ncpus=1:ngpus=1
+
+module load climacommon
+
+echo "=== Job ${PBS_JOBID} started at $(date) ==="
+
+# Trap-based self-requeue
+RUNSCRIPT="/glade/u/home/nefrathe/clima/ClimaCoupler.jl/experiments/calibration/coarse_amip/run_calibration.pbs"
+handle_termination() {
+    echo "=== Job ${PBS_JOBID} received termination signal at $(date) ==="
+    # Check if the target file doesn't exist
+    if [[ ! -f "/glade/derecho/scratch/nefrathe/tmp/output_simple/iteration_005/eki_file.jld2" ]]; then
+        echo "=== Job ${PBS_JOBID} terminated, requeuing... ==="
+        qsub "$RUNSCRIPT" 
+    fi
+    exit 0
+}
+# trap handle_termination SIGTERM SIGINT SIGUSR1 SIGUSR2
+
+# Build and run the Julia code
+echo "Starting Julia package instantiation..."
+julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate(;verbose=true)'
+
+julia --project=experiments/ClimeEarth -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaAtmos", rev="cc/test_wxquest_ic_dev_derecho"))'
+julia --project=experiments/ClimeEarth -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaLand", rev="cc/start_time_fix"))'
+
+
+echo "Starting calibration run..."
+julia --project=experiments/ClimaEarth experiments/calibration/coarse_amip/run_calibration.jl
+echo "=== Job ${PBS_JOBID} completed at $(date) ==="

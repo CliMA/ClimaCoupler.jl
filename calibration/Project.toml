@@ -1,0 +1,7 @@
+[deps]
+ClimaAnalysis = "29b5916a-a76c-4e73-9657-3c8fd22e65e6"
+ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
+ClimaCoupler = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
+EnsembleKalmanProcesses = "aa8a2aa5-91d8-4396-bcef-d4f2ec43552d"
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"

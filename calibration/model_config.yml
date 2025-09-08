@@ -1,0 +1,36 @@
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
+checkpoint_dt: "90000days"
+coupler_toml: ["toml/amip.toml"]
+deep_atmosphere: false
+dt: "480secs"
+dt_cpl: "480secs"
+dz_bottom: 100.0
+energy_check: false
+h_elem: 4
+bucket_albedo_type: "map_temporal"
+mode_name: "amip"
+netcdf_interpolation_num_points: [90, 45, 31]
+netcdf_output_at_levels: true
+output_default_diagnostics: false
+use_coupler_diagnostics: false
+override_precip_timescale: false
+rayleigh_sponge: true
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+coupler_output_dir: "experiments/calibration/output"
+t_end: "30days"
+topo_smoothing: true
+topography: "Earth"
+viscous_sponge: true
+z_elem: 39
+z_max: 60000.0
+insolation: timevarying
+dt_rad: 6hours
+rad: clearsky
+extra_atmos_diagnostics:
+  - reduction_time: average
+    short_name: rsut
+    period: 30days
+    writer: nc

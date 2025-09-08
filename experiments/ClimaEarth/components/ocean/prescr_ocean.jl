@@ -80,7 +80,7 @@ function PrescribedOceanSimulation(
     #     )
     # end
     @show "Loading SST from file"
-    sst_data = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/sst_processed_20250701_0000.nc"
+    sst_data = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/sst_processed_20250831_0000.nc"
     # sst_data = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/sst_processed_20250810_0000.nc"
 
     SST_timevaryinginput = TimeVaryingInput(

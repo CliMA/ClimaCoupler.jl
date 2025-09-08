@@ -65,10 +65,17 @@ function BucketSimulation(
 ) where {FT, TT <: Union{Float64, ITime}}
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
+    # if isnothing(shared_surface_space)
+    #     domain = make_land_domain(depth; nelements, dz_tuple)
+    # else
+    #     domain = make_land_domain(shared_surface_space, depth)
+    # end
     if isnothing(shared_surface_space)
         domain = make_land_domain(depth; nelements, dz_tuple)
     else
-        domain = make_land_domain(shared_surface_space, depth)
+        @show "Using shared surface space!!"
+        dz_tuple = (FT(1.0), FT(0.2))
+        domain = make_land_domain(shared_surface_space, depth; dz_tuple, nelements_vert = nelements[2])
     end
     surface_space = domain.space.surface
     subsurface_space = domain.space.subsurface

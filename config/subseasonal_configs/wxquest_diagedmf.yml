@@ -2,21 +2,23 @@ FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 
 
-# atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
-atmos_config_file: "config/atmos_configs/climaatmos_wx_progedmf.yml"
+atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
+# atmos_config_file: "config/atmos_configs/climaatmos_wx_progedmf.yml"
 
-# coupler_toml: ["toml/amip.toml"]
-coupler_toml: ["toml/amip_progedmf_dev.toml"]
+coupler_toml: ["toml/amip.toml"]
+# coupler_toml: ["toml/amip_progedmf_dev.toml"]
 # coupler_toml: ["toml/amip_calibrated_coarse_v1.toml"]
 
 initial_condition: "WeatherModel"
-checkpoint_dt: "12hours"
+checkpoint_dt: "60days"
 co2_model: "fixed"
 
-# dt: "20secs"
-# dt_cpl: "20secs"
-dt: "5secs"
-dt_cpl: "5secs"
+coupler_output_dir: "/glade/campaign/univ/ucit0011/cchristo/coupler_runs"
+
+dt: "20secs"
+dt_cpl: "20secs"
+# dt: "5secs"
+# dt_cpl: "5secs"
 
 energy_check: false
 # h_elem: 32
@@ -24,31 +26,38 @@ h_elem: 16
 mode_name: "amip"
 
 ### integrated land
-land_model: "integrated"
+# land_model: "integrated"
 ### bucket land
-# land_model: "bucket"
-# bucket_albedo_type: "map_temporal"
-# # bucket_albedo_type: "map_static"
-# bucket_initial_condition: "/net/sampo/data1/cchristo/clima/WeatherQuest/processing/data/era5_bucket_processed_20250701_1200.nc"
+land_model: "bucket"
+bucket_albedo_type: "map_temporal"
+# bucket_albedo_type: "map_static"
+bucket_initial_condition: "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/era5_bucket_processed_20250831_0000.nc"
 
-use_land_diagnostics: true
+# use_land_diagnostics: true
+use_land_diagnostics: false
 radiation_reset_rng_seed: true
-# start_date: "20250701-1200"
-start_date: "20250701"
+# start_date: "20250831-1200"
+start_date: "20250831"
 surface_setup: "PrescribedSurface"
 topo_smoothing: true
 topography: "Earth"
-t_end: "23hours"
+t_end: "40days"
 netcdf_output_at_levels: true
 # output_default_diagnostics: true
 
 extra_atmos_diagnostics:
-  - short_name: [ta, ua, wa, va, rhoa, pfull, hur, hus, clw, cli, arup, tke] # prsn, prra, hussn, husra]
-    period: 1hours
+  - short_name: [pr, tas, mslp, rsds, ts, lwp, clivi, clwvi, mslp, hfes, hussfc, evspsbl, vas, uas]
+    period: 24hours
     reduction_time: average
-  - short_name: [rsut, rlut, rsds, rsus, rsucs, rsuscs, rsd, rlu, rlucs, ts, cl, pr, tas, lwp, mslp, hfes, evspsbl]
-    period: 1hours
-    reduction_time: average
+  # - short_name: [ta, ua, wa, va, rhoa, pfull, hur, hus, clw, cli, cl,] # prsn, prra, hussn, husra]
+  #   period: 24hours
+  #   reduction_time: average
+  # - short_name: [ta, ua, wa, va, rhoa, pfull, hur, hus, clw, cli, arup, tke] # prsn, prra, hussn, husra]
+  #   period: 1hours
+  #   reduction_time: average
+  # - short_name: [rsut, rlut, rsds, rsus, rsucs, rsuscs, rsd, rlu, rlucs, ts, cl, pr, tas, lwp, mslp, hfes, evspsbl]
+  #   period: 1hours
+  #   reduction_time: average
   # - short_name: [tas, mslp, pr]
   #   period: 20secs
   #   reduction_time: average

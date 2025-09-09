@@ -81,8 +81,7 @@ This function assumes that the data is daily.
 function preprocess_var(var::ClimaAnalysis.OutputVar, reference_date)
     # TODO: Check for sign of pr
     # TODO: Check for units of everything
-    var = shift_to_previous_day(var)
-    var = ClimaAnalysis.window(var, "time", left = reference_date)
+    var = shift_to_previous_week(var)
     if ClimaAnalysis.short_name(var) == "pr"
         # TODO: Check that the sign are the same as the observational data
         return compute_weekly_sum_from_daily_mean(var, reference_date)

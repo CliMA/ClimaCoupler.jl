@@ -24,6 +24,10 @@ function resampled_lonlat(config_file)
     return var -> resampled_to(var; lon = longitudes, lat = latitudes)
 end
 
+
+# TODO: Don't need the functions below since we are assuming that the
+# diagnostics are producing weekly means, but we may need them in the future
+
 """
     compute_weekly_mean_from_daily_mean(var::OutputVar, reference_date)
 

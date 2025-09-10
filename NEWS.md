@@ -6,6 +6,9 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Use TripolarGrid with OceananigansSimulation PR[#1409](https://github.com/CliMA/ClimaCoupler.jl/pull/1409)
+Switch from using the Oceananigans.jl `LatitudeLongitudeGrid` to `TripolarGrid`.
+
 #### Correctly set land domain with `share_surface_space = true` PR[#1464](https://github.com/CliMA/ClimaCoupler.jl/pull/1464)
 Previously, we passed but did not use arguments related to the vertical resolution
 in `make_land_domain`. Now we correctly use the provided `dz_tuple` and `n_elements_vert`.

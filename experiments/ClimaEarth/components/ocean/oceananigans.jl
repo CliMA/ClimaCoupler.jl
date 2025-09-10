@@ -167,21 +167,18 @@ function OceananigansSimulation(
         C_to_K = coupled_param_dict["temperature_water_freeze"],
     )
 
-    # Before version 0.96.22, the NetCDFWriter was broken on GPU
-    if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
-        # Save all tracers and velocities to a NetCDF file at daily frequency
-        outputs = merge(ocean.model.tracers, ocean.model.velocities)
-        netcdf_writer = OC.NetCDFWriter(
-            ocean.model,
-            outputs;
-            schedule = OC.TimeInterval(86400), # Daily output
-            filename = joinpath(output_dir, "ocean_diagnostics.nc"),
-            indices = (:, :, grid.Nz),
-            overwrite_existing = true,
-            array_type = Array{Float32},
-        )
-        ocean.output_writers[:diagnostics] = netcdf_writer
-    end
+    # Save all tracers and velocities to a JLD2 file at daily frequency
+    outputs = merge(ocean.model.tracers, ocean.model.velocities)
+    jld2_writer = OC.JLD2Writer(
+        ocean.model,
+        outputs;
+        schedule = OC.TimeInterval(86400), # Daily output
+        filename = joinpath(output_dir, "ocean_diagnostics"),
+        indices = (:, :, grid.Nz),
+        overwrite_existing = true,
+        array_type = Array{Float32},
+    )
+    ocean.output_writers[:diagnostics] = jld2_writer
 
     # Initialize with 0 ice concentration; this will be updated in `resolve_area_fractions!`
     # if the ocean is coupled to a non-prescribed sea ice model.

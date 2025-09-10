@@ -134,23 +134,18 @@ function OceananigansSimulation(
         ocean_fresh_water_density = 999.8,
     )
 
-    # Before version 0.96.22, the NetCDFWriter was broken on GPU
-    if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
-        # TODO: Add more diagnostics, make them dependent on simulation duration, take
-        # monthly averages
-        # Save all tracers and velocities to a NetCDF file at daily frequency
-        outputs = merge(ocean.model.tracers, ocean.model.velocities)
-        netcdf_writer = OC.NetCDFWriter(
-            ocean.model,
-            outputs;
-            schedule = OC.TimeInterval(86400), # Daily output
-            filename = joinpath(output_dir, "ocean_diagnostics.nc"),
-            indices = (:, :, grid.Nz),
-            overwrite_existing = true,
-            array_type = Array{Float32},
-        )
-        ocean.output_writers[:diagnostics] = netcdf_writer
-    end
+    # Save all tracers and velocities to a JLD2 file at daily frequency
+    outputs = merge(ocean.model.tracers, ocean.model.velocities)
+    jld2_writer = OC.JLD2Writer(
+        ocean.model,
+        outputs;
+        schedule = OC.TimeInterval(86400), # Daily output
+        filename = joinpath(output_dir, "ocean_diagnostics"),
+        indices = (:, :, grid.Nz),
+        overwrite_existing = true,
+        array_type = Array{Float32},
+    )
+    ocean.output_writers[:diagnostics] = jld2_writer
 
     sim = OceananigansSimulation(ocean, area_fraction, ocean_properties, remapping)
     return sim

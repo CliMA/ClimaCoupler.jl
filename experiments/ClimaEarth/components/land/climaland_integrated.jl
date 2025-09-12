@@ -36,16 +36,22 @@ end
 
 """
     ClimaLandSimulation(
-        ::Type{FT},
+        ::Type{FT};
         dt::TT,
         tspan::Tuple{TT, TT},
         start_date::Dates.DateTime,
         output_dir::String,
-        area_fraction;
+        area_fraction,
+        nelements::Tuple{Int, Int} = (101, 15),
+        depth::FT = FT(50),
+        dz_tuple::Tuple{FT, FT} = FT.((10.0, 0.05)),
+        shared_surface_space = nothing,
+        land_spun_up_ic::Bool = true,
         saveat::Vector{TT} = [tspan[1], tspan[2]],
+        surface_elevation = nothing,
+        atmos_h,
         land_temperature_anomaly::String = "amip",
         use_land_diagnostics::Bool = true,
-        stepper = CTS.ARS111(),
         parameter_files = [],
     )
 
@@ -70,9 +76,9 @@ function ClimaLandSimulation(
     land_spun_up_ic::Bool = true,
     saveat::Vector{TT} = [tspan[1], tspan[2]],
     surface_elevation = nothing,
+    atmos_h,
     land_temperature_anomaly::String = "amip",
     use_land_diagnostics::Bool = true,
-    stepper = CTS.ARS111(),
     parameter_files = [],
 ) where {FT, TT <: Union{Float64, ITime}}
     # Note that this does not take into account topography of the surface, which is OK for this land model.
@@ -91,70 +97,39 @@ function ClimaLandSimulation(
     else
         surface_elevation = Interfacer.remap(surface_elevation, surface_space)
     end
+    # Interpolate atmosphere height field to surface space of land model,
+    #  since that's where we compute fluxes for this land model
+    atmos_h = Interfacer.remap(atmos_h, surface_space)
 
     # Set up spatially-varying parameters
-    earth_param_set = CL.Parameters.LandParameters(
-        CP.create_toml_dict(FT; override_file = CP.merge_toml_files(parameter_files; override = true)),
+    default_parameter_file = joinpath(pkgdir(CL), "toml", "default_parameters.toml")
+    toml_dict = CP.create_toml_dict(
+        FT;
+        override_file = CP.merge_toml_files([default_parameter_file, parameter_files...]; override = true),
     )
+    earth_param_set = CL.Parameters.LandParameters(toml_dict)
 
-    # Set up the soil model args
-    soil_model_type = CL.Soil.EnergyHydrology{FT}
-    soil_params = create_soil_params(FT, domain)
-
-    # Set up the soil microbes model args
-    soilco2_type = CL.Soil.Biogeochemistry.SoilCO2Model{FT}
-    soilco2_params = CL.Soil.Biogeochemistry.SoilCO2ModelParameters(FT)
-
-    # Set up the canopy model args
-    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
-    canopy_model_args, canopy_component_args = create_canopy_args(FT, domain, earth_param_set, start_date, stop_date)
-    canopy_component_types = (;
-        autotrophic_respiration = CL.Canopy.AutotrophicRespirationModel{FT},
-        radiative_transfer = CL.Canopy.TwoStreamModel{FT},
-        photosynthesis = CL.Canopy.FarquharModel{FT},
-        conductance = CL.Canopy.MedlynConductanceModel{FT},
-        hydraulics = CL.Canopy.PlantHydraulicsModel{FT},
-        energy = CL.Canopy.BigLeafEnergyModel{FT},
-    )
-
-    # Set up the snow model args
-    snow_model_type = CL.Snow.SnowModel
-    snow_params = CL.Snow.SnowParameters{FT}(dt; earth_param_set)
-
-    # Setup overall land model
-    f_over = FT(3.28) # 1/m
-    R_sb = FT(1.484e-4 / 1000) # m/s
-    runoff_model = CL.Soil.Runoff.TOPMODELRunoff{FT}(;
-        f_over = f_over,
-        f_max = CL.Soil.topmodel_fmax(surface_space, FT),
-        R_sb = R_sb,
-    )
-
-    Csom = CL.PrescribedSoilOrganicCarbon{FT}(TimeVaryingInput((t) -> 5))
-    land_input = (
-        atmos = CL.CoupledAtmosphere{FT}(surface_space),
+    # Set up atmosphere and radiation forcing
+    forcing = (;
+        atmos = CL.CoupledAtmosphere{FT}(surface_space, atmos_h),
         radiation = CL.CoupledRadiativeFluxes{FT}(
             start_date;
             insol_params = LP.insolation_parameters(earth_param_set),
             latitude = ClimaCore.Fields.coordinate_field(domain.space.surface).lat,
             longitude = ClimaCore.Fields.coordinate_field(domain.space.surface).long,
         ),
-        runoff = runoff_model,
-        soil_organic_carbon = Csom,
     )
 
-    model = CL.LandModel{FT}(;
-        soilco2_type = soilco2_type,
-        soilco2_args = (; domain = domain, parameters = soilco2_params),
-        land_args = land_input,
-        soil_model_type = soil_model_type,
-        soil_args = (domain = domain, parameters = soil_params),
-        canopy_component_types = canopy_component_types,
-        canopy_component_args = canopy_component_args,
-        canopy_model_args = canopy_model_args,
-        snow_model_type = snow_model_type,
-        snow_args = (; domain = CL.obtain_surface_domain(domain), parameters = snow_params),
+    # Set up leaf area index (LAI)
+    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+    LAI = CL.prescribed_lai_modis(
+        surface_space,
+        start_date,
+        stop_date;
+        time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
     )
+
+    model = CL.LandModel{FT}(forcing, LAI, toml_dict, domain, dt)
 
     Y, p, coords = CL.initialize(model)
 
@@ -175,11 +150,11 @@ function ClimaLandSimulation(
 
     # Set initial conditions that aren't read in from file
     Y.soilco2.C .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
-    Y.canopy.hydraulics.ϑ_l.:1 .= canopy_component_args.hydraulics.parameters.ν
+    Y.canopy.hydraulics.ϑ_l.:1 .= model.canopy.hydraulics.parameters.ν
     @. Y.canopy.energy.T = orog_adjusted_T_surface
 
     # Read in initial conditions for snow and soil from file, if requested
-    θ_r, ν, ρc_ds = soil_params.θ_r, soil_params.ν, soil_params.ρc_ds
+    (; θ_r, ν, ρc_ds) = model.soil.parameters
     if land_spun_up_ic
         # Set snow T first to use in computing snow internal energy
         @. p.snow.T = orog_adjusted_T_surface
@@ -246,146 +221,19 @@ function ClimaLandSimulation(
     end
 
     # Set up time stepper and integrator
+    stepper = CTS.ARS111()
     ode_algo =
         CTS.IMEXAlgorithm(stepper, CTS.NewtonsMethod(max_iters = 3, update_j = CTS.UpdateEvery(CTS.NewNewtonIteration)))
     integrator = SciMLBase.init(
         prob,
         ode_algo;
-        dt = dt,
-        saveat = saveat,
+        dt,
+        saveat,
         adaptive = false,
         callback = SciMLBase.CallbackSet(driver_cb, diag_cb),
     )
 
     return ClimaLandSimulation(model, integrator, area_fraction, output_writer)
-end
-
-###############################################################################
-# Helper functions for constructing the land model
-###############################################################################
-"""
-    create_canopy_args(
-        ::Type{FT},
-        domain,
-        earth_param_set,
-        start_date,
-    )
-
-Creates the arguments for the canopy model.
-"""
-function create_canopy_args(::Type{FT}, domain, earth_param_set, start_date, stop_date) where {FT}
-    surface_space = domain.space.surface
-
-    # Spatially varying canopy parameters from CLM
-    g1 = CL.Canopy.clm_medlyn_g1(surface_space)
-    rooting_depth = CL.Canopy.clm_rooting_depth(surface_space)
-    (; is_c3, Vcmax25) = CL.Canopy.clm_photosynthesis_parameters(surface_space)
-    (; Ω, G_Function, α_PAR_leaf, τ_PAR_leaf, α_NIR_leaf, τ_NIR_leaf) =
-        CL.Canopy.clm_canopy_radiation_parameters(surface_space)
-
-    # Energy Balance model
-    ac_canopy = FT(2.5e3)
-    # Plant Hydraulics and general plant parameters
-    SAI = FT(0.0) # m2/m2
-    f_root_to_shoot = FT(3.5)
-    RAI = FT(1.0)
-    K_sat_plant = FT(5e-9) # m/s # seems much too small?
-    ψ63 = FT(-4 / 0.0098) # / MPa to m, Holtzman's original parameter value is -4 MPa
-    Weibull_param = FT(4) # unitless, Holtzman's original c param value
-    a = FT(0.05 * 0.0098) # Holtzman's original parameter for the bulk modulus of elasticity
-    conductivity_model = CL.Canopy.PlantHydraulics.Weibull{FT}(K_sat_plant, ψ63, Weibull_param)
-    retention_model = CL.Canopy.PlantHydraulics.LinearRetentionCurve{FT}(a)
-    plant_ν = FT(1.44e-4)
-    plant_S_s = FT(1e-2 * 0.0098) # m3/m3/MPa to m3/m3/m
-    n_stem = 0
-    n_leaf = 1
-    h_stem = FT(0.0)
-    h_leaf = FT(1.0)
-    zmax = FT(0.0)
-    h_canopy = h_stem + h_leaf
-    compartment_midpoints = n_stem > 0 ? [h_stem / 2, h_stem + h_leaf / 2] : [h_leaf / 2]
-    compartment_surfaces = n_stem > 0 ? [zmax, h_stem, h_canopy] : [zmax, h_leaf]
-
-    z0_m = FT(0.13) * h_canopy
-    z0_b = FT(0.1) * z0_m
-
-    # Individual Component arguments
-    # Set up autotrophic respiration
-    autotrophic_respiration_args = (; parameters = CL.Canopy.AutotrophicRespirationParameters(FT))
-    # Set up radiative transfer
-    radiative_transfer_args = (;
-        parameters = CL.Canopy.TwoStreamParameters(FT; Ω, α_PAR_leaf, τ_PAR_leaf, α_NIR_leaf, τ_NIR_leaf, G_Function)
-    )
-    # Set up conductance
-    conductance_args = (; parameters = CL.Canopy.MedlynConductanceParameters(FT; g1))
-    # Set up photosynthesis
-    photosynthesis_args = (; parameters = CL.Canopy.FarquharParameters(FT, is_c3; Vcmax25 = Vcmax25))
-    # Set up plant hydraulics
-    LAIfunction = CL.prescribed_lai_modis(surface_space, start_date, stop_date)
-    ai_parameterization = CL.Canopy.PrescribedSiteAreaIndex{FT}(LAIfunction, SAI, RAI)
-
-    plant_hydraulics_ps = CL.Canopy.PlantHydraulics.PlantHydraulicsParameters(;
-        ai_parameterization = ai_parameterization,
-        ν = plant_ν,
-        S_s = plant_S_s,
-        rooting_depth = rooting_depth,
-        conductivity_model = conductivity_model,
-        retention_model = retention_model,
-    )
-    plant_hydraulics_args = (
-        parameters = plant_hydraulics_ps,
-        n_stem = n_stem,
-        n_leaf = n_leaf,
-        compartment_midpoints = compartment_midpoints,
-        compartment_surfaces = compartment_surfaces,
-    )
-
-    energy_args = (parameters = CL.Canopy.BigLeafEnergyParameters{FT}(ac_canopy),)
-
-    canopy_component_args = (;
-        autotrophic_respiration = autotrophic_respiration_args,
-        radiative_transfer = radiative_transfer_args,
-        photosynthesis = photosynthesis_args,
-        conductance = conductance_args,
-        hydraulics = plant_hydraulics_args,
-        energy = energy_args,
-    )
-
-    shared_params = CL.Canopy.SharedCanopyParameters{FT, typeof(earth_param_set)}(z0_m, z0_b, earth_param_set)
-
-    canopy_model_args = (; parameters = shared_params, domain = CL.obtain_surface_domain(domain))
-    return canopy_model_args, canopy_component_args
-end
-
-
-"""
-    create_soil_params(::Type{FT}, domain)
-
-Creates the parameters struct for the soil model.
-"""
-function create_soil_params(::Type{FT}, domain) where {FT}
-    subsurface_space = domain.space.subsurface
-    surface_space = domain.space.surface
-
-    (; ν_ss_om, ν_ss_quartz, ν_ss_gravel) = CL.Soil.soil_composition_parameters(subsurface_space, FT)
-    (; ν, hydrology_cm, K_sat, θ_r) = CL.Soil.soil_vangenuchten_parameters(subsurface_space, FT)
-    soil_albedo = CL.Soil.CLMTwoBandSoilAlbedo{FT}(; CL.Soil.clm_soil_albedo_parameters(surface_space)...)
-    S_s = ClimaCore.Fields.zeros(subsurface_space) .+ FT(1e-3)
-
-
-    soil_params = CL.Soil.EnergyHydrologyParameters(
-        FT;
-        ν,
-        ν_ss_om,
-        ν_ss_quartz,
-        ν_ss_gravel,
-        hydrology_cm,
-        K_sat,
-        S_s,
-        θ_r,
-        albedo = soil_albedo,
-    )
-    return soil_params
 end
 
 ###############################################################################
@@ -437,7 +285,12 @@ function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:sw_d}, field)
     Interfacer.remap!(sim.integrator.p.drivers.SW_d, field)
 end
 
-Interfacer.step!(sim::ClimaLandSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+function Interfacer.step!(sim::ClimaLandSimulation, t)
+    while float(sim.integrator.t) < float(t)
+        Interfacer.step!(sim.integrator)
+    end
+    return nothing
+end
 Interfacer.close_output_writers(sim::ClimaLandSimulation) = isnothing(sim.output_writer) || close(sim.output_writer)
 
 function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, area_fraction)

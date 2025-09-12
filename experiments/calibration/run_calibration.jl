@@ -1,141 +1,93 @@
+using Dates
 using Distributed
-import ClimaCalibrate as CAL
-using ClimaCalibrate
-using ClimaAnalysis
-import ClimaAnalysis: SimDir, get, slice, average_xy
+import Random
+import ClimaCalibrate
+import ClimaAnalysis
 import ClimaComms
-import EnsembleKalmanProcesses: I, ParameterDistributions.constrained_gaussian
+import ClimaCoupler
 import EnsembleKalmanProcesses as EKP
-using Statistics
+import EnsembleKalmanProcesses.ParameterDistributions as PD
+import JLD2
 
-# Ensure ClimaComms doesn't use MPI
-ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
-ClimaComms.@import_required_backends
+include(joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "api.jl"))
+include(joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "coarse_amip", "observation_map.jl"))
+model_interface = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "coarse_amip", "model_interface.jl")
 
-single_member_dims = 1
-function CAL.observation_map(iteration)
-    G_ensemble = Array{Float64}(undef, single_member_dims, ensemble_size)
+years = string.(2018:2024)
+sample_date_ranges = [("$yr-09-29", "$yr-09-29") for yr in years]
 
-    for m in 1:ensemble_size
-        member_path = CAL.path_to_ensemble_member(output_dir, iteration, m)
-        simdir_path = joinpath(member_path, "model_config/output_active/clima_atmos")
-        if isdir(simdir_path)
-            simdir = SimDir(simdir_path)
-            G_ensemble[:, m] .= process_member_data(simdir)
-        else
-            @info "No data found for member $m."
-            G_ensemble[:, m] .= NaN
-        end
-    end
-    return G_ensemble
-end
-
-function process_member_data(simdir::SimDir)
-    output = zeros(single_member_dims)
-    days = 86_400
-    minutes = 3_600
-
-    period = SHORT_RUN ? "8m" : "30d"
-    time = SHORT_RUN ? 8minutes : 30days
-    rsut = get(simdir; short_name = "rsut", reduction = "average", period)
-    rsut_slice = slice(average_lon(average_lat(rsut)); time).data
-    return rsut_slice
-end
-
-addprocs(CAL.SlurmManager())
-# Make variables and the forward model available on the worker sessions
-@everywhere import ClimaComms, CUDA, ClimaCoupler
-@everywhere import ClimaCalibrate as CAL
-@everywhere import JLD2
-@everywhere begin
-    # Run for a shorter time if SHORT_RUN is set
-    const SHORT_RUN = haskey(ENV, "SHORT_RUN") ? true : false
-
-    ENV["CLIMACOMMS_DEVICE"] = "CUDA"
-    ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
-
-    experiment_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration")
-    include(joinpath(experiment_dir, "model_interface.jl"))
-    output_dir = joinpath(experiment_dir, "output")
-    obs_path = joinpath(experiment_dir, "observations.jld2")
-end
-
-# Experiment Configuration
-n_iterations = 5
-noise = 0.1 * I
-prior = constrained_gaussian("total_solar_irradiance", 1000, 500, 250, 2000)
-
-# Generate observations if needed
-if !isfile(obs_path)
-    import JLD2
-    @info "Generating observations"
-    obs_output_dir = CAL.path_to_ensemble_member(output_dir, 0, 0)
-    mkpath(obs_output_dir)
-    touch(joinpath(obs_output_dir, "parameters.toml"))
-    CAL.forward_model(0, 0)
-    observations = Vector{Float64}(undef, 1)
-    observations .= process_member_data(SimDir(joinpath(obs_output_dir, "model_config/output_active/clima_atmos")))
-    JLD2.save_object(obs_path, observations)
-end
-observations = JLD2.load_object(obs_path)
-@show observations
-u0_mean = [mean(prior)]
-uu0_cov = cov(prior)
-eki = EKP.EnsembleKalmanProcess(
-    EKP.ObservationSeries(EKP.Observation(observations, noise, "rsut")),
-    EKP.Unscented(u0_mean, uu0_cov),
+const CALIBRATE_CONFIG = CalibrateConfig(;
+config_file = joinpath(pkgdir(ClimaCoupler), "config/subseasonal_configs/wxquest_diagedmf.yml"),
+    short_names = ["pr", "tas", "mslp"],
+    minibatch_size = 1,
+    n_iterations = 7,
+    sample_date_ranges,
+    extend = Dates.Week(1),
+    spinup = Dates.Day(28),
+    output_dir = "/glade/derecho/scratch/nefrathe/tmp/output_quick",
+    rng_seed = 42,
 )
-ensemble_size = EKP.get_N_ens(eki)
 
-# Allow 100% failure rate for short run testing
-if SHORT_RUN
-    eki = CAL.calibrate(CAL.WorkerBackend, eki, n_iterations, prior, output_dir; failure_rate = 1)
-else
-    eki = CAL.calibrate(CAL.WorkerBackend, eki, n_iterations, prior, output_dir)
-end
 
-# Postprocessing
-import EnsembleKalmanProcesses as EKP
-import Statistics: var, mean
-using Test
-import CairoMakie
+# if abspath(PROGRAM_FILE) == @__FILE__
+    include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_map.jl"))
 
-function scatter_plot(eki::EKP.EnsembleKalmanProcess)
-    f = CairoMakie.Figure(resolution = (800, 600))
-    ax = CairoMakie.Axis(f[1, 1], ylabel = "Parameter Value", xlabel = "Top of atmosphere radiative SW flux")
+    priors = [
+        PD.constrained_gaussian("mixing_length_diss_coeff", 0.22, 0.07, 0, 1),
+        PD.constrained_gaussian("precipitation_timescale", 919.3827604731249, 150.0, 0, Inf),
+        PD.constrained_gaussian("EDMF_surface_area", 0.10928882001604676, 0.03, 0, Inf),
+    ]
+    prior = EKP.combine_distributions(priors)
 
-    g = vec.(EKP.get_g(eki; return_array = true))
-    params = vec.((EKP.get_ϕ(prior, eki)))
+    observation_vector =
+        JLD2.load_object(joinpath(pkgdir(ClimaCoupler),"experiments/calibration/weatherquest_obs_vec.jld2"))
 
-    for (gg, uu) in zip(g, params)
-        CairoMakie.scatter!(ax, gg, uu)
-    end
+    sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges
+    minibatch_size = CALIBRATE_CONFIG.minibatch_size
+    obs_series = EKP.ObservationSeries(
+        Dict(
+            "observations" => observation_vector,
+            "names" => [
+                string(Dates.year(start_date)) for
+                (start_date, stop_date) in sample_date_ranges
+            ],
+            "minibatcher" => ClimaCalibrate.minibatcher_over_samples(
+                length(observation_vector),
+                minibatch_size,
+            ),
+        ),
+    )
 
-    CairoMakie.vlines!(ax, observations, linestyle = :dash)
+    rng_seed = CALIBRATE_CONFIG.rng_seed
+    rng = Random.MersenneTwister(rng_seed)
 
-    output = joinpath(output_dir, "scatter.png")
-    CairoMakie.save(output, f)
-    return output
-end
+    # Note: You should check that the ensemble size is the same as the number of
+    # tasks in the batch script
+    # For example, if you are calibrating 3 parameters and are using
+    # EKP.TransformUnscented, then the number of tasks should be 7, since
+    # 3 * 2 + 1 = 7
+    ekp = EKP.EnsembleKalmanProcess(
+        obs_series,
+        EKP.TransformUnscented(prior, impose_prior = true);
+        verbose = true,
+        rng,
+        scheduler = EKP.DataMisfitController(terminate_at = 100),
+    )
+    # ClimaCalibrate.initialize(ekp, prior, CALIBRATE_CONFIG.output_dir)
 
-function param_versus_iter_plot(eki::EKP.EnsembleKalmanProcess)
-    f = CairoMakie.Figure(resolution = (800, 600))
-    ax = CairoMakie.Axis(f[1, 1], ylabel = "Parameter Value", xlabel = "Iteration")
-    params = EKP.get_ϕ(prior, eki)
-    for (i, param) in enumerate(params)
-        CairoMakie.scatter!(ax, fill(i, length(param)), vec(param))
-    end
+    hpc_kwargs = ClimaCalibrate.kwargs(time = 60*8,
+        ntasks = 8,
+        gpus_per_task = 1,
+        cpus_per_task = 4,
+        l_job_priority = "premium",
+        q = "main")
+    exeflags = "--threads=4"
+    eki = ClimaCalibrate.calibrate(ClimaCalibrate.DerechoBackend,
+        ekp,
+        CALIBRATE_CONFIG.n_iterations,
+        prior,
+        CALIBRATE_CONFIG.output_dir; 
+        model_interface, hpc_kwargs, exeflags
+    )
 
-    output = joinpath(output_dir, "param_vs_iter.png")
-    CairoMakie.save(output, f)
-    return output
-end
-
-scatter_plot(eki)
-param_versus_iter_plot(eki)
-
-params = EKP.get_ϕ(prior, eki)
-spread = map(var, params)
-
-# Spread should be heavily decreased as particles have converged
-SHORT_RUN || @test last(spread) / first(spread) < 0.15
+# end

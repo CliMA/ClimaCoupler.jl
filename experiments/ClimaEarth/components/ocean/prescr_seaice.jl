@@ -6,7 +6,7 @@ import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
 import Thermodynamics as TD
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
-
+using Dates
 ###
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###
@@ -96,7 +96,9 @@ function PrescribedIceSimulation(
     #     )
     # end
 
-    sic_data = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/sic_processed_20250831_0000.nc"
+    start_date_str = Dates.format(Date(start_date), "yyyymmdd")   
+    @show start_date_str 
+    sic_data = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/sic_processed_$(start_date_str)_0000.nc"
     # sic_data = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/sic_processed_20250810_0000.nc"
 
     SIC_timevaryinginput = TimeVaryingInput(
@@ -104,6 +106,8 @@ function PrescribedIceSimulation(
         "SEAICE",
         space,
         reference_date = start_date,
+        # TODO: Add linearinterpolation for ERA5 ICs
+        # method = LinearInterpolation(PeriodicCalendar(period = Dates.Month(1), repeat_date = start_date)),
         file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
     )
 

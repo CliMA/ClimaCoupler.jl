@@ -4,7 +4,7 @@ import ClimaCalibrate
 import CUDA
 import EnsembleKalmanProcesses as EKP
 include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.jl"))
-const config_file = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "coarse_amip", "model_config.yml")
+const config_file = joinpath(pkgdir(ClimaCoupler), "config/subseasonal_configs/wxquest_diagedmf.yml")
 
 function ClimaCalibrate.forward_model(iter, member)
 
@@ -15,13 +15,12 @@ function ClimaCalibrate.forward_model(iter, member)
     output_dir_root = config_dict["coupler_output_dir"]
     eki = ClimaCalibrate.load_ekp_struct(output_dir_root, iter)
     minibatch = EKP.get_current_minibatch(eki)
+    
     config_dict["start_date"] = minibatch_to_start_date(minibatch)
     @info "Current minibatch: $minibatch"
     @info "Current start date: $(minibatch_to_start_date(minibatch))"
-    spinup_days = 92
-    nyears = length(minibatch)
-    t_end_days = spinup_days + 365 * nyears
-    config_dict["t_end"] = "$(t_end_days)days"
+
+    config_dict["t_end"] = "39days"
 
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)
@@ -47,8 +46,8 @@ function ClimaCalibrate.forward_model(iter, member)
 end
 
 function minibatch_to_start_date(batch)
-    start_year = minimum(batch) + 2005
-    @assert start_year >= 2006
+    start_year = minimum(batch) + 2017
+    @assert start_year >= 2018
     return "$(start_year)0901"
 end
 

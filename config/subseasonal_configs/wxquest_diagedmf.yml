@@ -13,10 +13,10 @@ initial_condition: "WeatherModel"
 checkpoint_dt: "60days"
 co2_model: "fixed"
 
-coupler_output_dir: "/glade/campaign/univ/ucit0011/cchristo/coupler_runs"
+coupler_output_dir: "/glade/derecho/scratch/nefrathe/tmp/output_quick"
 
-dt: "20secs"
-dt_cpl: "20secs"
+dt: "50secs"
+dt_cpl: "50secs"
 # dt: "5secs"
 # dt_cpl: "5secs"
 
@@ -31,23 +31,25 @@ mode_name: "amip"
 land_model: "bucket"
 bucket_albedo_type: "map_temporal"
 # bucket_albedo_type: "map_static"
-bucket_initial_condition: "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/era5_bucket_processed_20250831_0000.nc"
+bucket_initial_condition: "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/era5_bucket_processed_20240901_0000.nc"
 
 # use_land_diagnostics: true
 use_land_diagnostics: false
 radiation_reset_rng_seed: true
-# start_date: "20250831-1200"
-start_date: "20250831"
+# start_date: "20250701"
+start_date: "20240901"
 surface_setup: "PrescribedSurface"
 topo_smoothing: true
 topography: "Earth"
-t_end: "40days"
+t_end: "700days"
 netcdf_output_at_levels: true
-# output_default_diagnostics: true
+
+output_default_diagnostics: false
+use_coupler_diagnostics: false
 
 extra_atmos_diagnostics:
-  - short_name: [pr, tas, mslp, rsds, ts, lwp, clivi, clwvi, mslp, hfes, hussfc, evspsbl, vas, uas]
-    period: 24hours
+  - short_name: [rsut, rsutcs, lwp, mslp, ta, pr]
+    period: 7days
     reduction_time: average
   # - short_name: [ta, ua, wa, va, rhoa, pfull, hur, hus, clw, cli, cl,] # prsn, prra, hussn, husra]
   #   period: 24hours

@@ -42,10 +42,11 @@ function create_observation_series(
     net_rad_var = [variance_time(net_rad).data...;;]
     nt = (; filter(p -> p.first in short_names, pairs(nt))...)
     vars = average_season_across_time.(values(nt))
+    # TODO: Change this to monthly averages
     sample_dates = [(DateTime(i, 12, 1), DateTime(i + 1, 9, 1)) for i in year_range]
     cov = ClimaCalibrate.ObservationRecipe.SVDplusDCovariance(sample_dates; model_error_scale, regularization)
     obs_vec = map(sample_dates) do (start_date, end_date)
-        @info "Creating observations for year starting at $start_date"
+        @info "Creating observations for $(start_date, end_date)"
         # net_rad_year = window(net_rad, "time"; left = start_date, right = start_date + Month(11))
         # @assert length(dates(net_rad_year)) == 12
         # net_rad_obs = EKP.Observation(
@@ -222,3 +223,7 @@ end
 get_monthly_averages(simdir, var_name) = get(simdir; short_name = var_name, reduction = "average", period = "1M")
 
 set_short_name!(var, short_name) = (var.attributes["short_name"] = short_name)
+
+
+weekly = OutputVar("weekly/tas_sevenday_WEEKLYMEAN_2005.nc"; new_start_date = start_date)
+weekly.attributes["start_date"] = string(start_date)

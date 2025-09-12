@@ -1,139 +1,131 @@
-using ClimaAnalysis, Dates
+import ClimaAnalysis
+import Dates
 import ClimaCalibrate
-import ClimaCoupler
-import JLD2
-import EnsembleKalmanProcesses as EKP
-import NaNStatistics
-# import CairoMakie
-include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_utils.jl"))
-include(joinpath(pkgdir(ClimaCoupler), "experiments/ClimaEarth/leaderboard/leaderboard.jl"))
+import GeoMakie
+import Makie
 
+import ClimaCalibrate: EnsembleBuilder
+
+include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/observation_utils.jl"))
+
+"""
+    ClimaCalibrate.observation_map(iteration)
+
+Return G ensemble for an `iteration`.
+
+G ensemble represents the concatenated forward model evaluations from all
+ensemble members, arranged horizontally. Each individual forward model
+evaluation corresponds to preprocessed, flattened simulation data from a single
+ensemble member that has been matched to the corresponding observational data.
+"""
 function ClimaCalibrate.observation_map(iteration)
+    output_dir = CALIBRATE_CONFIG.output_dir
     ekp = JLD2.load_object(ClimaCalibrate.ekp_path(output_dir, iteration))
-    current_minibatch = EKP.get_current_minibatch(ekp)
-    obs = EKP.get_obs(ekp)
-    ensemble_size = EKP.get_N_ens(ekp)
-    short_names = split(obs_series.observations[1].names[1], ";") # This relies on the naming convention
 
-    G_ensemble = Array{Float64}(undef, length(obs), ensemble_size)
-    for m in 1:ensemble_size
+    g_ens_builder = EnsembleBuilder.GEnsembleBuilder(ekp)
+
+    for m = 1:EKP.get_N_ens(ekp)
         member_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
-        simdir_path = joinpath(member_path, "model_config")
+        simdir_path = joinpath(member_path, "wxquest_diagedmf/output_active")
         @info "Processing member $m: $simdir_path"
-        try
-            G_ensemble[:, m] .= process_member_data(SimDir(simdir_path), short_names, current_minibatch)
-        catch e
-            @error "Error processing member $m, filling observation map entry with NaNs" exception = e
-            G_ensemble[:, m] .= NaN
-        end
+        process_member_data(g_ens_builder, simdir_path, m, iteration)
     end
-    total_elements = length(G_ensemble)
-    nan_count = count(isnan, G_ensemble)
-    # Check for 50% nans
-    # @assert nan_count < total_elements / 2
-    @info "Mean bias y - G, averaged across the ensemble" bias = mean(G_ensemble, dims = 2) - obs |> mean
-    return G_ensemble
+
+    return 
 end
 
+"""
+    process_member_data(diagnostics_folder_path, short_names, current_minibatch)
+
+Process the data of a single ensemble member and return a single column of the
+G ensemble matrix.
+"""
+function process_member_data(g_ens_builder, diagnostics_folder_path, col_idx, iteration)
+    short_names = EnsembleBuilder.missing_short_names(g_ens_builder, col_idx)
+    sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges
+    @info "Short names: $short_names"
+
+    # For now, hard code the data to daily data since it seems the simplest
+    # TODO: Fetch daily data from simdir
+    simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)
+    for short_name in short_names
+        # This assumes that there are not multiple reductions for the same
+        # variable!
+        short_name = short_name * "_1week"
+        short_name == "tas_1week" && (short_name = "ta_1week")
+        var = get(simdir, short_name)
+        var.attributes["short_name"] = replace(var.attributes["short_name"], "_1week" => "")
+        # var = preprocess_var(var, first(sample_date_ranges[iteration+1]))
+        var = preprocess_var(var, DateTime(2024,9,29))
+        EnsembleBuilder.fill_g_ens_col!(g_ens_builder, col_idx, var)
+    end
+
+    return nothing
+end
+
+"""
+    preprocess_var(var::ClimaAnalysis.OutputVar, reference_date)
+
+Preprocess `var` before flattening for G ensemble matrix.
+
+For "pr", weekly sums are computed. For "tas" and "mslp", weekly means are
+computed from daily means. The daily means are computing starting from
+`reference_date`.
+
+This function assumes that the data is daily.
+"""
+function preprocess_var(var::ClimaAnalysis.OutputVar, reference_date)
+    # TODO: Check for sign of pr
+    # TODO: Check for units of everything
+    var = shift_to_previous_week(var)
+    @show var |> dates
+    # @assert ClimaAnalysis.short_name(var) in CALIBRATE_CONFIG.short_names
+    if ClimaAnalysis.short_name(var) == "pr"
+        # Turn weekly average into sum
+        var.data .*= 7
+    end
+    @show reference_date
+    var = window(var, "time"; left = reference_date, right = reference_date)
+    @show var |> dates
+    return var
+end
+
+"""
+    ClimaCalibrate.analyze_iteration(ekp,
+                                     g_ensemble,
+                                     prior,
+                                     output_dir,
+                                     iteration)
+
+Analyze an iteration by plotting the bias plots, constrained parameters over
+iterations, and errors over iterations and time.
+"""
 function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, iteration)
     plot_output_path = ClimaCalibrate.path_to_iteration(output_dir, iteration)
     plot_constrained_params_and_errors(plot_output_path, ekp, prior)
 
-    for m in 1:EKP.get_N_ens(ekp)
-        output_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
-        diagnostics_folder_path = joinpath(output_path, "model_config")
-        try
-            compute_leaderboard(output_path, diagnostics_folder_path, spinup_months)
-        catch e
-            @error "Error in `analyze_iteration`" error = e
-        end
-    end
+    # Plot ERA5 bias plots for only the first ensemble member
+    # This can take a while to plot, so we plot only one of the members.
+    # We choose the first ensemble member because the parameters for the first
+    # ensemble member are supposed to be the mean of the parameters of the
+    # ensemble members if it is EKP.TransformUnscented
+    # TODO: Add plotting here for the first ensemble member!
 end
 
+"""
+    plot_constrained_params_and_errors(output_dir, ekp, prior)
+
+Plot the constrained parameters and errors from `ekp` and `prior` and save
+them to `output_dir`.
+"""
 function plot_constrained_params_and_errors(output_dir, ekp, prior)
     dim_size = sum(length.(EKP.batch(prior)))
     fig = CairoMakie.Figure(size = ((dim_size + 1) * 500, 500))
-    for i in 1:dim_size
+    for i = 1:dim_size
         EKP.Visualize.plot_ϕ_over_iters(fig[1, i], ekp, prior, i)
     end
-    EKP.Visualize.plot_error_over_iters(fig[1, dim_size + 1], ekp)
-    EKP.Visualize.plot_error_over_time(fig[1, dim_size + 2], ekp)
+    EKP.Visualize.plot_error_over_iters(fig[1, dim_size+1], ekp, error_metric = "loss")
+    EKP.Visualize.plot_error_over_time(fig[1, dim_size+2], ekp, error_metric = "loss")
     CairoMakie.save(joinpath(output_dir, "constrained_params_and_error.png"), fig)
-    return fig
-end
-
-# Process a single ensemble member's data into a vector
-function process_member_data(simdir::SimDir, short_names, current_minibatch)
-    # Define standard diagnostic fields to preprocess
-    diagnostic_var_names = ["rsut", "rsutcs",]
-    # pr_bin_names = ["pr_binned_bin_1", "pr_binned_bin_2", "pr_binned_bin_3", "pr_binned_bin_4", "pr_binned_bin_5"]
-    # append!(diagnostic_var_names, pr_bin_names)
-    # Preprocess all diagnostic fields
-    processed_data = Dict{String, Any}()
-    for name in diagnostic_var_names
-        processed_data[name] = preprocess_diagnostic_monthly_averages(simdir, name)
-    end
-
-    # Calculate derived fields
-    processed_data["sw_cre"] = processed_data["rsut"] - processed_data["rsutcs"]
-    # processed_data["lw_cre"] = processed_data["rlut"] - processed_data["rlutcs"]
-    # processed_data["net_rad"] =
-    #     processed_data["rlut"] + processed_data["rsut"] - processed_data["rsdt"] |> average_lat |> average_lon
-
-
-    # Apply latitude window and rsdt weighting to IWP/LWP
-    # rsdt_mask = remake(processed_data["rsdt"], data = processed_data["rsdt"].data .> 0)
-    # rsdt_mask = window(rsdt_mask, "latitude"; left = -60, right = 60)
-    # processed_data["iwp"] = processed_data["clivi"]
-    # for field in ["lwp", "iwp"]
-    #     processed_data[field] = window(processed_data[field], "latitude"; left = -60, right = 60)
-    #     processed_data[field] = processed_data[field] * rsdt_mask
-    # end
-
-    start_year = minimum(current_minibatch) + 2005
-    year_range = (start_year):(start_year + length(current_minibatch) - 1)
-
-    year_observations = map(year_range) do yr
-        # Process seasonal data consistently
-        seasonal_data = map(short_names) do short_name
-            # TODO: Replace this with ClimaAnalysis/ClimaAnalysisExt
-            year_averages = average_season_across_time(processed_data[short_name])
-            # Main.@infiltrate
-            single_year = window(year_averages, "time"; left = DateTime(yr, 12, 1), right = DateTime(yr+1,9,1 ))
-            @assert length(times(single_year)) == 4
-            flattened = ClimaAnalysis.flatten(single_year).data
-            @show short_name, length(flattened)
-            flattened
-        end
-        # net_rad = processed_data["net_rad"] |> average_time
-        return vcat(seasonal_data...)
-    end
-    return vcat(year_observations...)
-end
-
-# Preprocess monthly averages to the right dimensions and dates, remove NaNs
-function preprocess_diagnostic_monthly_averages(simdir, name)
-    monthly_avgs = get_monthly_averages(simdir, name)
-
-    # Interpolate to pressure coordinates to match observations
-    # pressure = get_monthly_averages(simdir, "pfull")
-    # if has_altitude(monthly_avgs)
-    #     # This fails sometimes
-    #     monthly_avgs = ClimaAnalysis.Atmos.to_pressure_coordinates(monthly_avgs, pressure)
-    #     monthly_avgs = limit_pressure_dim_to_era5_range(monthly_avgs)
-    # end
-    # monthly_avgs.attributes["start_date"] = pressure.attributes["start_date"]
-
-    # Line up dates for monthly averages
-    monthly_avgs = ClimaAnalysis.shift_to_start_of_previous_month(monthly_avgs)
-
-    # Remove spinup time
-    start_date = DateTime(monthly_avgs.attributes["start_date"], dateformat"yyyy-mm-ddTHH:MM:SS")
-    monthly_avgs = window(monthly_avgs, "time"; left = DateTime(Year(start_date).value, 12, 1))
-    global_mean = monthly_avgs |> average_lat |> average_lon |> average_time
-    FT = monthly_avgs.data |> eltype
-
-    # Replace NaNs with global mean
-    monthly_avgs = ClimaAnalysis.replace(monthly_avgs, NaN => FT(NaNStatistics.nanmean(global_mean.data)))
-    return monthly_avgs
+    return nothing
 end

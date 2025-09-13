@@ -215,7 +215,7 @@ function BucketSimulation(
     if use_land_diagnostics
         output_writer = CD.Writers.NetCDFWriter(domain.space.subsurface, output_dir)
         scheduled_diagnostics =
-            CL.default_diagnostics(model, start_date, output_writer = output_writer, average_period = :monthly)
+            CL.default_diagnostics(model, start_date, output_writer = output_writer, reduction_period = :monthly)
 
         diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)
         diag_cb = CD.DiagnosticsCallback(diagnostic_handler)

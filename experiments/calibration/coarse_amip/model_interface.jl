@@ -20,6 +20,8 @@ function ClimaCalibrate.forward_model(iter, member)
     @info "Current minibatch: $minibatch"
     @info "Current start date: $(minibatch_to_start_date(minibatch))"
 
+    config_dict["bucket_initial_condition"] = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/era5_bucket_processed_$(start_date)_0000.nc"
+
     config_dict["t_end"] = "39days"
 
     # Set member parameter file
@@ -41,7 +43,7 @@ function ClimaCalibrate.forward_model(iter, member)
 
     @info "Completed member $member"
     @info "Removing checkpoints"
-    rm(joinpath(member_output_dir, "model_config", "checkpoints"), recursive = true)
+    # rm(joinpath(member_output_dir, "model_config", "checkpoints"), recursive = true)
     return sim
 end
 

@@ -1,11 +1,12 @@
 #!/bin/bash
 #PBS -A UCIT0011
-#PBS -q preempt
+#PBS -q main
 #PBS -N pbs_calibration
 #PBS -j oe
 #PBS -o amip_calibration.txt
 #PBS -l walltime=12:00:00
 #PBS -l select=1:ncpus=1:ngpus=1
+#PBS -l job_priority=premium
 
 module load climacommon
 
@@ -22,16 +23,16 @@ handle_termination() {
     fi
     exit 0
 }
-# trap handle_termination SIGTERM SIGINT SIGUSR1 SIGUSR2
+trap handle_termination SIGTERM SIGINT SIGUSR1 SIGUSR2
 
 # Build and run the Julia code
 echo "Starting Julia package instantiation..."
 julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate(;verbose=true)'
 
-julia --project=experiments/ClimeEarth -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaAtmos", rev="cc/test_wxquest_ic_dev_derecho"))'
-julia --project=experiments/ClimeEarth -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaLand", rev="cc/start_time_fix"))'
+# julia --project=experiments/ClimeEarth -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaAtmos", rev="cc/test_wxquest_ic_dev_derecho"))'
+# julia --project=experiments/ClimeEarth -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaLand", rev="cc/start_time_fix"))'
 
 
 echo "Starting calibration run..."
-julia --project=experiments/ClimaEarth experiments/calibration/coarse_amip/run_calibration.jl
+julia --project=experiments/ClimaEarth experiments/calibration/run_calibration.jl
 echo "=== Job ${PBS_JOBID} completed at $(date) ==="

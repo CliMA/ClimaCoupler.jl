@@ -62,6 +62,7 @@ function BucketSimulation(
     bucket_initial_condition::String = "",
     energy_check::Bool = false,
     parameter_files = [],
+    albedo_coefficient = 1.0,
 ) where {FT, TT <: Union{Float64, ITime}}
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
@@ -86,7 +87,14 @@ function BucketSimulation(
     else
         surface_elevation = Interfacer.remap(surface_elevation, surface_space)
     end
-
+    toml_dict = CP.create_toml_dict(FT; override_file = CP.merge_toml_files(parameter_files; override = true))
+    (; albedo_coefficient) = 
+    try 
+        CP.get_parameter_values(toml_dict, "albedo_coefficient", "Land")
+    catch e
+        @warn e
+        (;albedo_coefficient =FT(1.0) )
+    end
     α_snow = FT(0.8) # snow albedo
     if albedo_type == "map_static" # Read in albedo from static data file (default type)
         # By default, this uses a file containing bareground albedo without a time component. Snow albedo is specified separately.
@@ -98,6 +106,7 @@ function BucketSimulation(
             surface_space;
             albedo_file_path = CL.Artifacts.ceres_albedo_dataset_path(),
             varname = "sw_alb_clr",
+            coefficient = albedo_coefficient
         )
     elseif albedo_type == "function" # Use prescribed function of lat/lon for surface albedo
         function α_bareground(coordinate_point)
@@ -118,14 +127,14 @@ function BucketSimulation(
     W_f = FT(0.2) # bucket capacity
     κ_soil = FT(1.5) # soil conductivity
     ρc_soil = FT(2e6) # soil volumetric heat capacity
-
+    @show parameter_files
     params = if isempty(parameter_files)
         CL.Bucket.BucketModelParameters(FT; albedo, z_0m, z_0b, τc, σS_c, W_f, κ_soil, ρc_soil)
     else
-        toml_dict = CP.create_toml_dict(FT; override_file = CP.merge_toml_files(parameter_files; override = true))
         # τc should be the only exception, it depends on `dt`
         CL.Bucket.BucketModelParameters(toml_dict; z_0m, z_0b, albedo, τc)
     end
+
 
     args = (params, CL.CoupledAtmosphere{FT}(), CL.CoupledRadiativeFluxes{FT}(), domain)
     model = CL.Bucket.BucketModel{FT, typeof.(args)...}(args...)

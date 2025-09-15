@@ -392,9 +392,7 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaInterpolations", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "ForwardDiff", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "NullBroadcasts", "RRTMGP", "Random", "SciMLBase", "SparseMatrixColorings", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
-git-tree-sha1 = "bc45f5fa041b4cde586ca5dce950941f3db21b02"
-repo-rev = "cc/test_wxquest_ic_dev_derecho"
-repo-url = "https://github.com/CliMA/ClimaAtmos.jl.git"
+path = "../../../ClimaAtmos.jl"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
 version = "0.31.2"
 
@@ -467,9 +465,7 @@ weakdeps = ["CUDA"]
 
 [[deps.ClimaLand]]
 deps = ["ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "d84b3587db17d58f98a0e9199c0ecfee78682cdf"
-repo-rev = "cc/start_time_fix"
-repo-url = "https://github.com/CliMA/ClimaLand.jl.git"
+path = "../../../ClimaLand.jl"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
 version = "0.18.0"
 

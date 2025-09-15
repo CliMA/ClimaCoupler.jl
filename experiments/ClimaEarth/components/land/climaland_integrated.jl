@@ -210,8 +210,8 @@ function ClimaLandSimulation(
             model,
             start_date,
             output_writer = output_writer,
-            output_vars = :long,
-            average_period = :monthly,
+            output_vars = :short,
+            reduction_period = :monthly,
         )
         diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)
         diag_cb = CD.DiagnosticsCallback(diagnostic_handler)

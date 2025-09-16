@@ -80,7 +80,7 @@ function PrescribedOceanSimulation(
     #     )
     # end
     @show "Loading SST from file"
-    sst_data = "/net/sampo/data1/cchristo/clima/WeatherQuest/processing/data/sst_processed_20250701_0000.nc"
+    sst_data = "/net/sampo/data1/wxquest_data/initial_conditions/sst_processed_20250831_0000.nc"
 
     SST_timevaryinginput = TimeVaryingInput(
         sst_data,

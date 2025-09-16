@@ -162,7 +162,7 @@ function ClimaLandSimulation(
     if land_spun_up_ic
         # Read in initial conditions for snow and soil
         # ic_path = CL.Artifacts.soil_ic_2008_50m_path()
-        ic_path = "/net/sampo/data1/cchristo/clima/WeatherQuest/processing/data/era5_land_processed_20250701_0000.nc"
+        ic_path = "/net/sampo/data1/wxquest_data/initial_conditions/era5_land_processed_20250831_0000.nc"
 
         # Save variables to JLD2 file
         # JLD2.@save "highlighted_variables.jld2" ic_path surface_space subsurface_space Y p model

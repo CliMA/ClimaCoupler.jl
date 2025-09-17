@@ -54,7 +54,8 @@ end
         land_temperature_anomaly::String = "amip",
         use_land_diagnostics::Bool = true,
         parameter_files = [],
-    )
+        land_ic_path::Union{Nothing,String} = nothing,
+    ) where {FT, TT <: Union{Float64, ITime}}
 
 Creates a ClimaLandSimulation object containing a land domain,
 a ClimaLand.LandModel, and an integrator.
@@ -81,6 +82,7 @@ function ClimaLandSimulation(
     land_temperature_anomaly::String = "amip",
     use_land_diagnostics::Bool = true,
     parameter_files = [],
+    land_ic_path::Union{Nothing, String} = nothing,
 ) where {FT, TT <: Union{Float64, ITime}}
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
@@ -138,47 +140,71 @@ function ClimaLandSimulation(
 
     # Set initial conditions
 
-    # Apply temperature anomaly function to initial temperature
-    # T_functions = Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
-    # haskey(T_functions, land_temperature_anomaly) ||
-    #     error("land temp anomaly function $land_temperature_anomaly not supported")
-    # temp_anomaly = T_functions[land_temperature_anomaly]
-    # T_sfc0 = FT(276.85) .+ temp_anomaly.(coords.subsurface)
-    # lapse_rate = FT(6.5e-3)
-    # # Adjust initial temperature to account for orography of the surface
-    # # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
-    # orog_adjusted_T_data = CC.Fields.field_values(T_sfc0) .- lapse_rate .* CC.Fields.field_values(surface_elevation)
-    # orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, subsurface_space)
-    # orog_adjusted_T_surface = CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
+    # Apply temperature anomaly function to initial temperature only if specified
+    T_base = FT(276.85)
+    if lowercase(land_temperature_anomaly) != "nothing"
+        T_functions = Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
+        haskey(T_functions, land_temperature_anomaly) ||
+            error("land temp anomaly function $land_temperature_anomaly not supported")
+        temp_anomaly = T_functions[land_temperature_anomaly]
+        T_sfc0 = T_base .+ temp_anomaly.(coords.subsurface)
+    else
+        # constant field on subsurface space
+        T_sfc0 = CC.Fields.Field(T_base .* CC.Fields.ones(subsurface_space))
+    end
+    lapse_rate = FT(6.5e-3)
+    # Adjust initial temperature to account for orography of the surface
+    # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
+    orog_adjusted_T_data = CC.Fields.field_values(T_sfc0) .- lapse_rate .* CC.Fields.field_values(surface_elevation)
+    orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, subsurface_space)
+    orog_adjusted_T_surface = CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
 
     # Set initial conditions that aren't read in from file
     Y.soilco2.C .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
     Y.canopy.hydraulics.ϑ_l.:1 .= model.canopy.hydraulics.parameters.ν
+    @. Y.canopy.energy.T = orog_adjusted_T_surface
 
     # Read in initial conditions for snow and soil from file, if requested
     (; θ_r, ν, ρc_ds) = model.soil.parameters
 
 
-    if land_spun_up_ic
-        # Read in initial conditions for snow and soil
-        # ic_path = CL.Artifacts.soil_ic_2008_50m_path()
-        ic_path = "/net/sampo/data1/wxquest_data/initial_conditions/era5_land_processed_20250831_0000.nc"
-
-        # Save variables to JLD2 file
-        # JLD2.@save "highlighted_variables.jld2" ic_path surface_space subsurface_space Y p model
+    if !isnothing(land_ic_path)
+        # Subseasonal setup: land_spun_up_ic false, but a land_ic_path is provided
+        ic_path = land_ic_path
+        @info "ClimaLand: using land IC file" ic_path
 
         regridder_type = :InterpolationsRegridder
-        extrapolation_bc =
-            (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
+        extrapolation_bc = (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
         interpolation_method = Interpolations.Linear()
 
-        # Set snow T first to use in computing snow internal energy
-        p.snow.T .= SpaceVaryingInput(ic_path, "tsn", surface_space; regridder_type, regridder_kwargs = (; extrapolation_bc, interpolation_method))
-
+        # Set snow T first to use in computing snow internal energy from IC file
+        p.snow.T .= SpaceVaryingInput(
+            ic_path,
+            "tsn",
+            surface_space;
+            regridder_type,
+            regridder_kwargs = (; extrapolation_bc, interpolation_method),
+        )
         # Set canopy temperature to skin temperature
-        Y.canopy.energy.T .= SpaceVaryingInput(ic_path, "skt", surface_space; regridder_type, regridder_kwargs = (; extrapolation_bc, interpolation_method))
+        Y.canopy.energy.T .= SpaceVaryingInput(
+            ic_path,
+            "skt",
+            surface_space;
+            regridder_type,
+            regridder_kwargs = (; extrapolation_bc, interpolation_method),
+        )
 
-        # JLD2.@save "highlighted_variables_new.jld2" res
+        CL.Simulations.set_snow_initial_conditions!(Y, p, surface_space, ic_path, model.snow.parameters)
+
+        T_bounds = extrema(Y.canopy.energy.T)
+        CL.Simulations.set_soil_initial_conditions!(Y, ν, θ_r, subsurface_space, ic_path, model.soil, T_bounds)
+    elseif land_spun_up_ic
+        # Use artifact spun-up initial conditions
+        ic_path = CL.Artifacts.soil_ic_2008_50m_path()
+        @info "ClimaLand: using land IC file" ic_path
+
+        # Set snow T to orography-adjusted surface temperature before computing internal energy
+        p.snow.T .= orog_adjusted_T_surface
 
         CL.Simulations.set_snow_initial_conditions!(Y, p, surface_space, ic_path, model.snow.parameters)
 
@@ -200,8 +226,20 @@ function ClimaLandSimulation(
     # This cache variable is normally computed using `p.drivers.LW_d`, which is
     #  set after the radiation calculation and exchange, but the radiation
     #  code itself requires a surface temperature as input.
-    # @. p.T_sfc = orog_adjusted_T_surface
-    p.T_sfc .= SpaceVaryingInput(ic_path, "skt", surface_space; regridder_type, regridder_kwargs = (; extrapolation_bc, interpolation_method))
+    if !land_spun_up_ic && !isnothing(land_ic_path)
+        regridder_type = :InterpolationsRegridder
+        extrapolation_bc = (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
+        interpolation_method = Interpolations.Linear()
+        p.T_sfc .= SpaceVaryingInput(
+            ic_path,
+            "skt",
+            surface_space;
+            regridder_type,
+            regridder_kwargs = (; extrapolation_bc, interpolation_method),
+        )
+    else
+        @. p.T_sfc = orog_adjusted_T_surface
+    end
 
     # Update cos(zenith angle) within land model every hour
     update_dt = dt isa ITime ? ITime(3600) : 3600
@@ -225,14 +263,13 @@ function ClimaLandSimulation(
 
     # Set up diagnostics
     if use_land_diagnostics
-        @show "Outputting land diagnostics"
-        output_writer = CD.Writers.NetCDFWriter(subsurface_space, output_dir)#; start_date)
+        output_writer = CD.Writers.NetCDFWriter(subsurface_space, output_dir; start_date)
         scheduled_diagnostics = CL.default_diagnostics(
             model,
             start_date,
             output_writer = output_writer,
-            output_vars = :long,
-            average_period = :hourly,
+            output_vars = :short,
+            reduction_period = :monthly,
         )
         diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)
         diag_cb = CD.DiagnosticsCallback(diagnostic_handler)

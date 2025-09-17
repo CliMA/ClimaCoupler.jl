@@ -1,16 +1,16 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
-atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
-coupler_toml: ["toml/amip.toml"]
+atmos_config_file: "config/atmos_configs/climaatmos_wx_progedmf.yml"
+coupler_toml: ["toml/amip_progedmf.toml"]
 mode_name: "subseasonal"
 era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions"
 initial_condition: "WeatherModel"
 checkpoint_dt: "7days"
 co2_model: "fixed"
-dt: "30secs"
-dt_cpl: "30secs"
+dt: "10secs"
+dt_cpl: "10secs"
 energy_check: false
-h_elem: 16
+h_elem: 32
 
 ### integrated land ###
 # land_model: "integrated"

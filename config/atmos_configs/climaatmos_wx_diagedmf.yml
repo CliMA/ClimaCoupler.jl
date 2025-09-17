@@ -1,15 +1,14 @@
 dt: 120secs
 t_end: 12hours
-# start_date: "20250627-0000"
 start_date: "20250831"
 initial_condition: "WeatherModel"
-discrete_hydrostatic_balance: false # TODO: change to true once we fix discrete hydrostatic balance to work with orography
+discrete_hydrostatic_balance: false
 topo_smoothing: true
 topography: "Earth"
 rayleigh_sponge: true
 viscous_sponge: true
 hyperdiff: ClimaHyperdiffusion
-divergence_damping_factor: 50.0 # large value to damp IC waves
+divergence_damping_factor: 50.0
 scalar_hyperdiffusion_coefficient: 0.929738
 vorticity_hyperdiffusion_coefficient: 0.1857
 insolation: "timevarying"
@@ -26,7 +25,6 @@ prognostic_tke: true
 edmfx_upwinding: first_order
 h_elem: 15
 z_max: 48000.0
-# z_max: 60000.0
 z_elem: 63
 dz_bottom: 30.0
 edmfx_entr_model: "Generalized"
@@ -35,18 +33,16 @@ edmfx_nh_pressure: true
 edmfx_sgs_mass_flux: true
 edmfx_sgs_diffusive_flux: true
 
-deep_atmosphere: false
-
-# cloud_model: "grid_scale"
-cloud_model: "quadrature_sgs"
-
+### 0M Microphysics ###
 precip_model: 0M
 moist: equil
+toml: [toml/diagnostic_edmfx_era5_ic.toml]
 
+### 1M Microphysics ###
 # precip_model: "1M"
 # moist: "nonequil"
-
-toml: [toml/diagnostic_edmfx_era5_ic.toml]
 # toml: [toml/diagnostic_edmfx_1M.toml]
-# use_itime: true
+
+cloud_model: "quadrature_sgs"
 use_itime: true
+deep_atmosphere: false

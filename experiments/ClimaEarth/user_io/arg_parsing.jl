@@ -6,6 +6,7 @@ mode_name_dict = Dict(
     "slabplanet" => SlabplanetMode,
     "slabplanet_aqua" => SlabplanetAquaMode,
     "slabplanet_terra" => SlabplanetTerraMode,
+    "subseasonal" => SubseasonalMode,
 )
 
 """
@@ -126,6 +127,8 @@ function get_coupler_args(config_dict::Dict)
     bucket_albedo_type = config_dict["bucket_albedo_type"]
     bucket_initial_condition = config_dict["bucket_initial_condition"]
 
+    era5_initial_condition_dir = get(config_dict, "era5_initial_condition_dir", nothing)
+
     return (;
         job_id,
         sim_mode,
@@ -156,6 +159,7 @@ function get_coupler_args(config_dict::Dict)
         bucket_albedo_type,
         bucket_initial_condition,
         parameter_files,
+        era5_initial_condition_dir,
     )
 end
 

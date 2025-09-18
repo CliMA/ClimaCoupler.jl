@@ -84,17 +84,24 @@ function PrescribedIceSimulation(
     start_date,
     land_fraction,
     stepper = CTS.RK4(),
+    sic_path::Union{Nothing, String} = nothing,
 ) where {FT}
     # Set up prescribed sea ice concentration object
-    sic_data = try
-        joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.ICE.HAD187001-198110.OI198111-202206.nc")
-    catch error
-        @warn "Using lowres SIC. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
-        joinpath(
-            @clima_artifact("historical_sst_sic_lowres", comms_ctx),
-            "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
-        )
-    end
+    sic_data =
+        isnothing(sic_path) ?
+        try
+            joinpath(
+                @clima_artifact("historical_sst_sic", comms_ctx),
+                "MODEL.ICE.HAD187001-198110.OI198111-202206.nc",
+            )
+        catch error
+            @warn "Using lowres SIC. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
+            joinpath(
+                @clima_artifact("historical_sst_sic_lowres", comms_ctx),
+                "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
+            )
+        end : sic_path
+    @info "PrescribedIce: using SIC file" sic_data
 
     SIC_timevaryinginput = TimeVaryingInput(
         sic_data,

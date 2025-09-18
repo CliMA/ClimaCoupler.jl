@@ -68,17 +68,24 @@ function PrescribedOceanSimulation(
     beta = FT(1),
     α_direct_val = FT(0.06),
     α_diffuse_val = FT(0.06),
+    sst_path::Union{Nothing, String} = nothing,
 ) where {FT}
     # Read in initial SST data
-    sst_data = try
-        joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.SST.HAD187001-198110.OI198111-202206.nc")
-    catch error
-        @warn "Using lowres SST. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
-        joinpath(
-            @clima_artifact("historical_sst_sic_lowres", comms_ctx),
-            "MODEL.SST.HAD187001-198110.OI198111-202206_lowres.nc",
-        )
-    end
+    sst_data =
+        isnothing(sst_path) ?
+        try
+            joinpath(
+                @clima_artifact("historical_sst_sic", comms_ctx),
+                "MODEL.SST.HAD187001-198110.OI198111-202206.nc",
+            )
+        catch error
+            @warn "Using lowres SST. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
+            joinpath(
+                @clima_artifact("historical_sst_sic_lowres", comms_ctx),
+                "MODEL.SST.HAD187001-198110.OI198111-202206_lowres.nc",
+            )
+        end : sst_path
+    @info "PrescribedOcean: using SST file" sst_data
 
     SST_timevaryinginput = TimeVaryingInput(
         sst_data,

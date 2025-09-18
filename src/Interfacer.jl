@@ -370,6 +370,14 @@ abstract type AMIPMode <: AbstractSimulationMode end
 
 
 """
+    SubseasonalMode
+
+An abstract type representing the subseasonal simulation mode. This mode is similar to AMIP
+but uses different data sources and initialization pathways tailored for subseasonal runs.
+"""
+abstract type SubseasonalMode <: AbstractSimulationMode end
+
+"""
     CMIPMode
 
 An abstract type representing the CMIP simulation mode. CMIP is currently the most complex

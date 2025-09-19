@@ -10,15 +10,18 @@ import EnsembleKalmanProcesses.ParameterDistributions as PD
 import JLD2
 
 include(joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "api.jl"))
+include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_map.jl"))
 model_interface = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "coarse_amip", "model_interface.jl")
 
-years = string.(2018:2024)
-# sample_date_ranges = [("$yr-09-29", "$yr-09-29") for yr in years]
-sample_date_ranges = [("$yr-12-01", "$yr-12-01") for yr in years]
+years = 2018:2024
+sample_date_ranges = [(DateTime(yr, 9, 29), DateTime(yr, 10, 6)) for yr in years]
+# sample_date_ranges = [(DateTime(yr, 9, 29), DateTime(yr, 9, 29)) for yr in years]
+
+# sample_date_ranges = [("$yr-12-01", "$yr-12-01") for yr in years]
 
 const CALIBRATE_CONFIG = CalibrateConfig(;
 config_file = joinpath(pkgdir(ClimaCoupler), "config/subseasonal_configs/wxquest_diagedmf.yml"),
-    short_names = ["pr", "tas", "mslp"],
+    short_names = ["tas", "mslp"],
     minibatch_size = 1,
     n_iterations = 7,
     sample_date_ranges,
@@ -30,13 +33,11 @@ config_file = joinpath(pkgdir(ClimaCoupler), "config/subseasonal_configs/wxquest
 
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_map.jl"))
 
     priors = [
-        # TODO: Add bucket albedo parameter
-        PD.constrained_gaussian("albedo_coefficient", 1.0, 0.4, 0, 3),
+        # PD.constrained_gaussian("albedo_coefficient", 1.0, 0.4, 0, 3),
         PD.constrained_gaussian("mixing_length_diss_coeff", 0.22, 0.07, 0, 1),
-        PD.constrained_gaussian("precipitation_timescale", 919.3827604731249, 150.0, 0, Inf),
+        # PD.constrained_gaussian("precipitation_timescale", 919.3827604731249, 150.0, 0, Inf),
         PD.constrained_gaussian("EDMF_surface_area", 0.10928882001604676, 0.03, 0, Inf),
     ]
     prior = EKP.combine_distributions(priors)
@@ -63,11 +64,6 @@ if abspath(PROGRAM_FILE) == @__FILE__
     rng_seed = CALIBRATE_CONFIG.rng_seed
     rng = Random.MersenneTwister(rng_seed)
 
-    # Note: You should check that the ensemble size is the same as the number of
-    # tasks in the batch script
-    # For example, if you are calibrating 3 parameters and are using
-    # EKP.TransformUnscented, then the number of tasks should be 7, since
-    # 3 * 2 + 1 = 7
     ekp = EKP.EnsembleKalmanProcess(
         obs_series,
         EKP.TransformUnscented(prior, impose_prior = true);
@@ -77,8 +73,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
     )
     ClimaCalibrate.initialize(ekp, prior, CALIBRATE_CONFIG.output_dir)
 
-    hpc_kwargs = ClimaCalibrate.kwargs(time = 60*4,
-        ntasks = 8,
+    hpc_kwargs = ClimaCalibrate.kwargs(time = 60*5,
+        ntasks = 4,
         gpus_per_task = 1,
         cpus_per_task = 4,
         l_job_priority = "premium",

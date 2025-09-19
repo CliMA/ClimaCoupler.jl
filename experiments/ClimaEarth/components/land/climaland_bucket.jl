@@ -9,6 +9,7 @@ import ClimaLand as CL
 import ClimaLand.Parameters as LP
 import ClimaParams as CP
 import ClimaDiagnostics as CD
+import Insolation
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer
 using NCDatasets
 include("climaland_helpers.jl")
@@ -134,9 +135,14 @@ function BucketSimulation(
         # τc should be the only exception, it depends on `dt`
         CL.Bucket.BucketModelParameters(toml_dict; z_0m, z_0b, albedo, τc)
     end
+    radiation = CL.CoupledRadiativeFluxes{FT}(
+                start_date;
+                insol_params = Insolation.Parameters.InsolationParameters(toml_dict),
+                latitude = ClimaCore.Fields.coordinate_field(domain.space.surface).lat,
+                longitude = ClimaCore.Fields.coordinate_field(domain.space.surface).long,
+            )
 
-
-    args = (params, CL.CoupledAtmosphere{FT}(), CL.CoupledRadiativeFluxes{FT}(), domain)
+    args = (params, CL.CoupledAtmosphere{FT}(), radiation, domain)
     model = CL.Bucket.BucketModel{FT, typeof.(args)...}(args...)
 
     # Initial conditions with no moisture
@@ -228,7 +234,7 @@ function BucketSimulation(
     if use_land_diagnostics
         output_writer = CD.Writers.NetCDFWriter(domain.space.subsurface, output_dir)
         scheduled_diagnostics =
-            CL.default_diagnostics(model, start_date, output_writer = output_writer, average_period = :monthly)
+            CL.default_diagnostics(model, start_date, output_writer = output_writer, average_period = :weekly)
 
         diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)
         diag_cb = CD.DiagnosticsCallback(diagnostic_handler)

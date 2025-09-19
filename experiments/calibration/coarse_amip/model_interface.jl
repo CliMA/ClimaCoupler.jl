@@ -7,22 +7,19 @@ include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.j
 const config_file = joinpath(pkgdir(ClimaCoupler), "config/subseasonal_configs/wxquest_diagedmf.yml")
 
 function ClimaCalibrate.forward_model(iter, member)
-
     config_dict = get_coupler_config_dict(config_file)
-    println("tmpdir")
-    println(ENV["TMPDIR"])
 
     output_dir_root = config_dict["coupler_output_dir"]
     eki = ClimaCalibrate.load_ekp_struct(output_dir_root, iter)
     minibatch = EKP.get_current_minibatch(eki)
-    
-    config_dict["start_date"] = minibatch_to_start_date(minibatch)
+    start_date = minibatch_to_start_date(minibatch)
+    config_dict["start_date"] = start_date
     @info "Current minibatch: $minibatch"
-    @info "Current start date: $(minibatch_to_start_date(minibatch))"
+    @info "Current start date: $start_date"
 
     config_dict["bucket_initial_condition"] = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/era5_bucket_processed_$(start_date)_0000.nc"
 
-    config_dict["t_end"] = "39days"
+    config_dict["t_end"] = "46days"
 
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)
@@ -42,8 +39,6 @@ function ClimaCalibrate.forward_model(iter, member)
     end
 
     @info "Completed member $member"
-    @info "Removing checkpoints"
-    # rm(joinpath(member_output_dir, "model_config", "checkpoints"), recursive = true)
     return sim
 end
 

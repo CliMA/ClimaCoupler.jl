@@ -11,14 +11,14 @@ steps:
       - "echo $$JULIA_DEPOT_PATH"
 
       - echo "--- Instantiate AMIP env"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
 
-      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add("MPI")'
-      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add("CUDA"); using CUDA; CUDA.set_runtime_version!(local_toolkit=true)'
-      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add("MPIPreferences"); using MPIPreferences; use_system_binary(library_names="/sw/openmpi-5.0.5/lib/libmpi", mpiexec="/sw/openmpi-5.0.5/bin/mpiexec", force=true)'
+      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add("MPI")'
+      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add("CUDA"); using CUDA; CUDA.set_runtime_version!(local_toolkit=true)'
+      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add("MPIPreferences"); using MPIPreferences; use_system_binary(library_names="/sw/openmpi-5.0.5/lib/libmpi", mpiexec="/sw/openmpi-5.0.5/bin/mpiexec", force=true)'
 
-      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'
-      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'
+      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'
+      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'
 
     agents:
       slurm_gpus: 1
@@ -38,7 +38,7 @@ steps:
         command:
 
           - echo "--- Run simulation"
-          - "mpiexec -n 8 julia --threads=4 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file config/longrun_configs/amip_diagedmf_10years.yml --job_id amip_30_h_elem"
+          - "mpiexec -n 8 julia --threads=4 --color=yes --project=experiments/AMIP/ experiments/ClimaEarth/run_amip.jl --config_file config/longrun_configs/amip_diagedmf_10years.yml --job_id amip_30_h_elem"
         artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"

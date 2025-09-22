@@ -28,7 +28,8 @@ docs/src/generated/
 !docs/src/images/*.png
 
 # Experiments
-!experiments/ClimaEarth/**/Manifest.toml
+!experiments/AMIP/**/Manifest.toml
+!experiments/CMIP/**/Manifest.toml
 !experiments/ClimaCore/**/Manifest.toml
 
 # Output

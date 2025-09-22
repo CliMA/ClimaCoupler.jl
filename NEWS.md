@@ -6,6 +6,11 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Add AMIP, CMIP environments PR
+Split the `experiments/ClimaEarth/` environment into two which are
+specific to the AMIP and CMIP setups. These are located in `experiments/AMIP/`
+and `experiments/CMIP/`.
+
 #### Correctly set land domain with `share_surface_space = true` PR[#1464](https://github.com/CliMA/ClimaCoupler.jl/pull/1464)
 Previously, we passed but did not use arguments related to the vertical resolution
 in `make_land_domain`. Now we correctly use the provided `dz_tuple` and `n_elements_vert`.

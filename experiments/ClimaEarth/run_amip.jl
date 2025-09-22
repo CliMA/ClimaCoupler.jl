@@ -15,7 +15,7 @@ For more information, see the PCMDI's specifications for [AMIP I](https://pcmdi.
 To run a coupled simulation in the default AMIP configuration, run the
 following command from the root directory of the repository:
 ```bash
-julia --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl
+julia --project=experiments/AMIP experiments/ClimaEarth/run_amip.jl
 ```
 
 ## Configuration
@@ -26,7 +26,7 @@ A set of example configuration files can be found in the `config/ci_configs/` di
 
 For example, to run the coupled simulation with a different configuration file:
 ```bash
-julia --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file="path/to/config.toml"
+julia --project=experiments/AMIP experiments/ClimaEarth/run_amip.jl --config_file="path/to/config.toml"
 ```
 
 To run the coupled simulation interactively with a different configuration file,

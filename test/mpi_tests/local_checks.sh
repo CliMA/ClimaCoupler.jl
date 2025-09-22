@@ -18,11 +18,11 @@ export OPENBLAS_NUM_THREADS=1
 export JULIA_MAX_NUM_PRECOMPILE_FILES=100
 export SLURM_KILL_BAD_EXIT=1
 
-julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'
-julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'
-julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'
+julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'
+julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'
+julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'
 
-srun -K julia --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_FILE --job_id $JOB_ID
+srun -K julia --project=experiments/AMIP/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_FILE --job_id $JOB_ID
 
 # restart from simulation time of 400 seconds
 export RESTART_T=400
@@ -33,7 +33,7 @@ cp $CONFIG_FILE $RESTART_CONFIG_FILE
 sed -i 's/t_end: \"800secs\"/t_end: \"3600secs\"/g' $RESTART_CONFIG_FILE
 
 # rerun the model
-srun -K julia --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $RESTART_CONFIG_FILE --job_id $JOB_ID --restart_dir $RESTART_DIR --restart_t $RESTART_T
+srun -K julia --project=experiments/AMIP/ experiments/ClimaEarth/run_amip.jl --config_file $RESTART_CONFIG_FILE --job_id $JOB_ID --restart_dir $RESTART_DIR --restart_t $RESTART_T
 
 # throw an error if no restart checkpoint files are found
 if [ $(ls -1 $RESTART_DIR/checkpoint | wc -l) -lt 5 ]; then

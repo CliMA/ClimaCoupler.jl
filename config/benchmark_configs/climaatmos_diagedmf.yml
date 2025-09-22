@@ -7,7 +7,6 @@ dt_cloud_fraction: 1hours
 dt_rad: 1hours
 dt_save_state_to_disk: "Inf"
 dz_bottom: 30.0
-dz_top: 3000.0
 edmfx_detr_model: "Generalized"
 edmfx_entr_model: "Generalized"
 edmfx_nh_pressure: true

@@ -473,10 +473,10 @@ end
 ### ClimaAtmos.jl model-specific functions (not explicitly required by ClimaCoupler.jl)
 ###
 """
-    get_atmos_config_dict(coupler_dict::Dict, atmos_output_dir)
+    get_atmos_config_dict(coupler_config::Dict, atmos_output_dir)
 
 Returns the specified atmospheric configuration (`atmos_config`) overwitten by arguments
-in the coupler dictionary (`config_dict`).
+in the coupler dictionary (`coupler_config`).
 The returned `atmos_config` dictionary will then be used to set up the atmosphere simulation.
 
 In this function, parameters are overwritten in a specific order, from lowest to highest priority:
@@ -489,20 +489,11 @@ The TOML parameter file to use is chosen using the following priority:
 If a coupler TOML file is provided, it is used. Otherwise we use an atmos TOML
 file if it's provided. If neither is provided, we use a default coupler TOML file.
 """
-function get_atmos_config_dict(coupler_dict::Dict, atmos_output_dir)
-    atmos_config_file = coupler_dict["atmos_config_file"]
-    # override default or specified configs with coupler arguments, and set the correct atmos config_file
-    if isnothing(atmos_config_file)
-        @info "Using Atmos default configuration"
-        atmos_config = merge(CA.default_config_dict(), coupler_dict, Dict("config_file" => atmos_config_file))
-    else
-        @info "Using Atmos configuration from ClimaCoupler in $atmos_config_file"
-        atmos_config = merge(
-            CA.override_default_config(joinpath(pkgdir(ClimaCoupler), atmos_config_file)),
-            coupler_dict,
-            Dict("config_file" => atmos_config_file),
-        )
-    end
+function get_atmos_config_dict(coupler_config::Dict, atmos_output_dir)
+    atmos_config = deepcopy(coupler_config)
+
+    # Rename atmosphere config file from ClimaCoupler convention to ClimaAtmos convention
+    atmos_config["config_file"] = coupler_config["atmos_config_file"]
 
     # use atmos toml if coupler toml is not defined
     # If we can't find the file at the relative path, prepend pkgdir(ClimaAtmos)
@@ -523,17 +514,17 @@ function get_atmos_config_dict(coupler_dict::Dict, atmos_output_dir)
     # Ensure Atmos's own checkpoints are synced up with ClimaCoupler, so that we
     # can pick up from where we have left. NOTE: This should not be needed, but
     # there is no easy way to initialize ClimaAtmos with a different t_start
-    atmos_config["dt_save_state_to_disk"] = coupler_dict["checkpoint_dt"]
+    atmos_config["dt_save_state_to_disk"] = coupler_config["checkpoint_dt"]
 
     # Add all extra atmos diagnostic entries into the vector of atmos diagnostics
     atmos_config["diagnostics"] =
         haskey(atmos_config, "diagnostics") ?
-        vcat(atmos_config["diagnostics"], coupler_dict["extra_atmos_diagnostics"]) :
-        coupler_dict["extra_atmos_diagnostics"]
+        vcat(atmos_config["diagnostics"], coupler_config["extra_atmos_diagnostics"]) :
+        coupler_config["extra_atmos_diagnostics"]
 
     # The Atmos `get_simulation` function expects the atmos config to contains its timestep size
-    # in the `dt` field. If there is a `dt_atmos` field in coupler_dict, we add it to the atmos config as `dt`
-    dt_atmos = haskey(coupler_dict, "dt_atmos") ? coupler_dict["dt_atmos"] : coupler_dict["dt"]
+    # in the `dt` field. If there is a `dt_atmos` field in coupler_config, we add it to the atmos config as `dt`
+    dt_atmos = haskey(coupler_config, "dt_atmos") ? coupler_config["dt_atmos"] : coupler_config["dt"]
     atmos_config["dt"] = dt_atmos
 
     # set restart file to the initial file saved in this location if it is not nothing
@@ -541,7 +532,7 @@ function get_atmos_config_dict(coupler_dict::Dict, atmos_output_dir)
     if !isnothing(atmos_config["restart_file"])
         atmos_config["restart_file"] = replace(atmos_config["restart_file"], "active" => "0000")
     end
-    return atmos_config
+    return CA.AtmosConfig(atmos_config)
 end
 
 """

@@ -95,7 +95,7 @@ Return the model date at the current timestep.
 # Arguments
 - `cs`: [CoupledSimulation] containing info about the simulation
 """
-current_date(cs::CoupledSimulation) = cs.t[] isa ITime ? date(cs.t[]) : cs.start_date + Dates.second(cs.t[])
+current_date(cs::CoupledSimulation) = cs.t[] isa ITime ? date(cs.t[]) : cs.start_date[] + Dates.Second(cs.t[])
 
 """
     default_coupler_fields()

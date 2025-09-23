@@ -198,10 +198,8 @@ function set_albedos!(sim::PrescribedOceanSimulation, t)
     FT = CC.Spaces.undertype(axes(sim.cache.T_sfc))
 
     # Compute the current date
-    current_date = t isa ClimaUtilities.TimeManager.ITime ? date(t) : p.start_date + Dates.second(t)
+    current_date = t isa ClimaUtilities.TimeManager.ITime ? date(t) : p.start_date + Dates.Second(t)
 
-    # TODO: Where does this date0 come from?
-    date0 = Dates.DateTime("2000-01-01T11:58:56.816")
     insolation_params = InsolationParameters(FT)
     d, δ, η_UTC = FT.(Insolation.helper_instantaneous_zenith_angle(current_date, insolation_params))
 

@@ -14,20 +14,49 @@ mode_name_dict = Dict(
 Read in the configuration file and job ID from the command line.
 A dictionary is constructed from the input configuration file and returned.
 
+Since the atmosphere model also uses a configuration file, we read in the atmosphere
+configuration file specified in the coupler configuration file (if any), and overwrite
+it with the coupler configuration.
+
+The order of priority for overwriting configuration options from lowest to highest is:
+    1. ClimaAtmos defaults
+    2. ClimaCoupler defaults (defined in `experiments/ClimaEarth/cli_options.jl`)
+    3. Command line arguments provided to ClimaCoupler
+    4. ClimaAtmos configuration file (if specified in coupler config file)
+    5. ClimaCoupler configuration file
+
 # Returns
 - `config_dict`: A dictionary mapping configuration keys to the specified settings
 """
 function get_coupler_config_dict(config_file)
-    # Extract the job ID from the command line arguments
-    parsed_args = parse_commandline(argparse_settings())
-    job_id = parsed_args["job_id"]
+    # Get the coupler default configuration dictionary, overwritten by any command line arguments
+    # Typically the command line arguments are only `config_file` and `job_id`
+    coupler_default_cli = parse_commandline(argparse_settings())
 
-    # Get the job ID from the config file string if not provided
-    job_id = isnothing(job_id) ? string(split(split(config_file, '/')[end], '.')[1]) : job_id
+    # Extract the job ID from the command line arguments, or from the config file name if not provided
+    job_id = coupler_default_cli["job_id"]
+    coupler_default_cli["job_id"] = isnothing(job_id) ? string(split(split(config_file, '/')[end], '.')[1]) : job_id
 
-    # Read in config dictionary from file, overriding the defaults in `parsed_args`
-    config_dict = merge(parsed_args, YAML.load_file(config_file))
-    config_dict["job_id"] = job_id
+    # Load the coupler config file into a dictionary
+    coupler_config_dict = YAML.load_file(config_file)
+
+    # Get ClimaAtmos default configuration dictionary
+    atmos_default = CA.default_config_dict()
+    atmos_config_file = merge(coupler_default_cli, coupler_config_dict)["atmos_config_file"]
+    if isnothing(atmos_config_file)
+        @info "Using Atmos default configuration"
+
+        # Merge the atmos default config, coupler default config + command line inputs,
+        #  and user-provided coupler config
+        config_dict = merge(atmos_default, coupler_default_cli, coupler_config_dict)
+    else
+        @info "Using Atmos configuration from ClimaCoupler in $atmos_config_file"
+        atmos_config_dict = YAML.load_file(joinpath(pkgdir(ClimaCoupler), atmos_config_file))
+
+        # Merge the atmos default config, coupler default config + command line inputs,
+        #  user-provided atmos config, and user-provided coupler config
+        config_dict = merge(atmos_default, coupler_default_cli, atmos_config_dict, coupler_config_dict)
+    end
 
     # Select the correct timestep for each component model based on which are available
     parse_component_dts!(config_dict)
@@ -158,23 +187,6 @@ function get_coupler_args(config_dict::Dict)
         parameter_files,
     )
 end
-
-"""
-    get_atmos_args(atmos_config_dict)
-
-Extract the necessary arguments from the atmosphere configuration dictionary.
-
-# Arguments
-- `atmos_config_dict`: A dictionary mapping atmosphere configuration keys to the specified settings
-
-# Returns
-- All arguments needed for the atmosphere simulation
-"""
-function get_atmos_args(atmos_config_dict)
-    dt_rad = atmos_config_dict["dt_rad"]
-    return (; dt_rad)
-end
-
 
 ### Helper functions used in argument parsing ###
 

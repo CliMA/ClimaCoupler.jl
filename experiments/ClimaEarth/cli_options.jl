@@ -135,6 +135,8 @@ function argparse_settings()
         default = "PrescribedSurface"
         "--atmos_config_file"
         help = "An optional YAML file used to overwrite the default model parameters."
+        arg_type = String
+        default = nothing
         "--albedo_model"
         help = "Type of albedo model. [`ConstantAlbedo`, `RegressionFunctionAlbedo`, `CouplerAlbedo` (default)]"
         arg_type = String

@@ -157,7 +157,6 @@ function CoupledSimulation(config_dict::AbstractDict)
     ## Note this step must come after parsing the coupler config dictionary, since
     ##  some parameters are passed from the coupler config to the component model configs
     atmos_config_dict = get_atmos_config_dict(config_dict, atmos_output_dir)
-    (; dt_rad) = get_atmos_args(atmos_config_dict)
 
     ## set unique random seed if desired, otherwise use default
     Random.seed!(random_seed)
@@ -177,12 +176,12 @@ function CoupledSimulation(config_dict::AbstractDict)
             # We only support a round number of seconds
             isinteger(float(t_start)) || error("Cannot restart from a non integer number of seconds")
             t_start_int = Int(float(t_start))
-            atmos_config_dict["t_start"] = "$(t_start_int)secs"
+            atmos_config_dict.parsed_args["t_start"] = "$(t_start_int)secs"
         else
             # There was no `t_start`, so we have to use a workaround for this.
             # This does not support passing the command-line arguments (unless
             # restart_dir is exactly the same as output_dir_root)
-            atmos_config_dict["restart_file"] = climaatmos_restart_path(output_dir_root, restart_t)
+            atmos_config_dict.parsed_args["restart_file"] = climaatmos_restart_path(output_dir_root, restart_t)
         end
 
         @info "Starting from t_start $(t_start)"
@@ -207,7 +206,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
 
     ## init atmos model component
-    atmos_sim = ClimaAtmosSimulation(CA.AtmosConfig(atmos_config_dict))
+    atmos_sim = ClimaAtmosSimulation(atmos_config_dict)
     thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models #342
 
     #=

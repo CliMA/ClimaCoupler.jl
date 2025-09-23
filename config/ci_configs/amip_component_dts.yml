@@ -7,7 +7,6 @@ dt_ocean: "30secs"
 dt_rad: "1hours"
 dt_seaice: "37.5secs"
 dz_bottom: 30
-dz_top: 3000
 energy_check: false
 h_elem: 16
 mode_name: "amip"

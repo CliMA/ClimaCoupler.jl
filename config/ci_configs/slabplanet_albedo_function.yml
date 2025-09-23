@@ -10,4 +10,5 @@ precip_model: "0M"
 rad: "gray"
 share_surface_space: false
 t_end: "1days"
+use_itime: false
 vert_diff: "true"

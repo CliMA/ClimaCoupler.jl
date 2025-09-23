@@ -6,6 +6,10 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Remove coarse nightly CMIP PR[#1485](https://github.com/CliMA/ClimaCoupler.jl/pull/1485)
+To avoid depending on the main branch of too many packages in the nightly pipeline,
+we remove the CMIP nightly run and will only test AMIP nightly.
+
 #### Use JuliaFormatter; remove .dev folder PR[#1484](https://github.com/CliMA/ClimaCoupler.jl/pull/1484)
 Use JuliaFormatter to format the repo, rather than the previous `.dev/juliaformat.jl`.
 The `.dev/` folder is removed, and a documentation page about contributing to

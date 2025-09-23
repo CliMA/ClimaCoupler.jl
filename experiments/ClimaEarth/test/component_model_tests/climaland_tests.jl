@@ -21,12 +21,18 @@ FT = Float32
     tspan = (Float64(0), 3.0dt)
     start_date = Dates.DateTime(2008)
     output_dir = pwd()
-    boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+    boundary_space = CC.CommonSpaces.CubedSphereSpace(
+        FT;
+        radius = FT(6371e3),
+        n_quad_points = 4,
+        h_elem = 4,
+    )
     area_fraction = CC.Fields.ones(boundary_space)
     atmos_h = CC.Fields.zeros(boundary_space) .+ 2
 
     # Construct simulation object
-    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction, atmos_h)
+    land_sim =
+        ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction, atmos_h)
 
     # Try taking a timestep
     Interfacer.step!(land_sim, dt)
@@ -52,7 +58,8 @@ FT = Float32
 
     # Check that the drivers are correctly initialized
     driver_names = propertynames(land_sim.integrator.p.drivers)
-    @test driver_names == (:P_liq, :P_snow, :c_co2, :T, :P, :q, :SW_d, :LW_d, :cosθs, :frac_diff, :soc)
+    @test driver_names ==
+          (:P_liq, :P_snow, :c_co2, :T, :P, :q, :SW_d, :LW_d, :cosθs, :frac_diff, :soc)
 end
 
 @testset "ClimaLandSimulation flux calculations" begin
@@ -62,14 +69,16 @@ end
     output_dir = pwd()
 
     # Construct atmos and land simulation objects
-    atmos_config_file = joinpath(exp_dir, "test", "component_model_tests", "climaatmos_coarse_short.yml")
+    atmos_config_file =
+        joinpath(exp_dir, "test", "component_model_tests", "climaatmos_coarse_short.yml")
     atmos_config = CA.AtmosConfig(atmos_config_file; job_id = "atmos_land_flux_test")
     atmos_sim = ClimaAtmosSimulation(atmos_config)
 
     boundary_space = ClimaCore.Spaces.horizontal_space(atmos_sim.domain.face_space)
     area_fraction = ClimaCore.Fields.ones(boundary_space)
     atmos_h = CC.Fields.zeros(boundary_space) .+ 2
-    land_sim = ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction, atmos_h)
+    land_sim =
+        ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction, atmos_h)
     model_sims = (; land_sim = land_sim, atmos_sim = atmos_sim)
 
     # Initialize the coupler fields so we can perform exchange
@@ -105,10 +114,19 @@ end
     update_aux!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
 
     update_boundary_fluxes! = CL.make_update_boundary_fluxes(land_sim.model)
-    update_boundary_fluxes!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
+    update_boundary_fluxes!(
+        land_sim.integrator.p,
+        land_sim.integrator.u,
+        land_sim.integrator.t,
+    )
 
     # Compute the surface fluxes
-    FluxCalculator.compute_surface_fluxes!(coupler_fields, land_sim, atmos_sim, thermo_params)
+    FluxCalculator.compute_surface_fluxes!(
+        coupler_fields,
+        land_sim,
+        atmos_sim,
+        thermo_params,
+    )
 
     # Check that the fluxes have been changed
     zero_field = CC.Fields.zeros(boundary_space)

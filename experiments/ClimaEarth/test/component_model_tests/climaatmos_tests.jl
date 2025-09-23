@@ -6,11 +6,19 @@ include(joinpath("..", "..", "components", "atmosphere", "climaatmos.jl"))
 
 for FT in (Float32, Float64)
     @testset "dss_state! ClimaAtmosSimulation for FT=$FT" begin
-        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius = FT(6371e3),
+            n_quad_points = 4,
+            h_elem = 4,
+        )
 
         # set up objects for test
         integrator = (;
-            u = (; state_field1 = CC.Fields.ones(boundary_space), state_field2 = CC.Fields.zeros(boundary_space)),
+            u = (;
+                state_field1 = CC.Fields.ones(boundary_space),
+                state_field2 = CC.Fields.zeros(boundary_space),
+            ),
             p = (; cache_field = CC.Fields.zeros(boundary_space)),
         )
         sim = ClimaAtmosSimulation(nothing, nothing, integrator, nothing)

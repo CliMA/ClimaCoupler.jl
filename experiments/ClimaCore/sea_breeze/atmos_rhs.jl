@@ -128,8 +128,11 @@ function hvspace_2D(xlim = (-π, π), zlim = (0, 4π), helem = 20, velem = 20, n
         vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(vertmesh)
     end
 
-    horzdomain =
-        CC.Domains.IntervalDomain(CC.Geometry.XPoint{FT}(xlim[1]), CC.Geometry.XPoint{FT}(xlim[2]), periodic = true)
+    horzdomain = CC.Domains.IntervalDomain(
+        CC.Geometry.XPoint{FT}(xlim[1]),
+        CC.Geometry.XPoint{FT}(xlim[2]),
+        periodic = true,
+    )
     horzmesh = CC.Meshes.IntervalMesh(horzdomain; nelems = helem)
     horztopology = CC.Topologies.IntervalTopology(horzmesh)
 
@@ -203,7 +206,10 @@ function atm_rhs!(dY, Y, params, t)
         bottom = CC.Operators.SetValue(CC.Geometry.WVector(0.0) ⊗ CC.Geometry.UVector(0.0)),
         top = CC.Operators.SetValue(CC.Geometry.WVector(0.0) ⊗ CC.Geometry.UVector(0.0)),
     )
-    If = CC.Operators.InterpolateC2F(bottom = CC.Operators.Extrapolate(), top = CC.Operators.Extrapolate())
+    If = CC.Operators.InterpolateC2F(
+        bottom = CC.Operators.Extrapolate(),
+        top = CC.Operators.Extrapolate(),
+    )
     Ic = CC.Operators.InterpolateF2C()
     ∂ = CC.Operators.DivergenceF2C(
         bottom = CC.Operators.SetValue(CC.Geometry.WVector(0.0)),
@@ -250,13 +256,21 @@ function atm_rhs!(dY, Y, params, t)
     @. dYc.ρθ -= hdiv(uₕ * Yc.ρθ)
 
     ## horizontal momentum
-    Ih = Ref(CC.Geometry.Axis2Tensor((CC.Geometry.UAxis(), CC.Geometry.UAxis()), StaticArrays.@SMatrix [1.0]))
+    Ih = Ref(
+        CC.Geometry.Axis2Tensor(
+            (CC.Geometry.UAxis(), CC.Geometry.UAxis()),
+            StaticArrays.@SMatrix [1.0]
+        ),
+    )
     @. dYc.ρuₕ += -uvdivf2c(ρw ⊗ If(uₕ))
     @. dYc.ρuₕ -= hdiv(Yc.ρuₕ ⊗ uₕ + p * Ih)
 
     ## vertical momentum
     @. dρw += B(
-        CC.Geometry.transform(CC.Geometry.WAxis(), -(∂f(p)) - If(Yc.ρ) * ∂f(Φ(center_coords.z))) - vvdivc2f(Ic(ρw ⊗ w)),
+        CC.Geometry.transform(
+            CC.Geometry.WAxis(),
+            -(∂f(p)) - If(Yc.ρ) * ∂f(Φ(center_coords.z)),
+        ) - vvdivc2f(Ic(ρw ⊗ w)),
     )
     uₕf = @. If(Yc.ρuₕ / Yc.ρ) # requires boundary conditions
     @. dρw -= hdiv(uₕf ⊗ ρw)
@@ -284,10 +298,20 @@ function atm_rhs!(dY, Y, params, t)
 end
 
 ## init simulation
-function atm_init(; xmin = -500, xmax = 500, zmin = 0, zmax = 1000, npoly = 3, helem = 20, velem = 20, bc = nothing)
+function atm_init(;
+    xmin = -500,
+    xmax = 500,
+    zmin = 0,
+    zmax = 1000,
+    npoly = 3,
+    helem = 20,
+    velem = 20,
+    bc = nothing,
+)
 
     ## construct domain spaces
-    hv_center_space, hv_face_space = hvspace_2D((xmin, xmax), (zmin, zmax), helem, velem, npoly) # [m]
+    hv_center_space, hv_face_space =
+        hvspace_2D((xmin, xmax), (zmin, zmax), helem, velem, npoly) # [m]
     center_coords = CC.Fields.coordinate_field(hv_center_space)
     face_coords = CC.Fields.coordinate_field(hv_face_space)
     domain = (hv_center_space = hv_center_space, hv_face_space = hv_face_space)
@@ -321,7 +345,16 @@ struct AtmosSim{T} <: AbstractAtmosSim
     integrator::T
 end
 
-function AtmosSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
+function AtmosSim(
+    Y_init,
+    t_start,
+    dt,
+    t_end,
+    timestepper,
+    p,
+    saveat,
+    callbacks = CallbackSet(),
+)
     ode_algo = CTS.ExplicitAlgorithm(timestepper)
     ode_function = CTS.ClimaODEFunction(T_exp! = atm_rhs!)
 
@@ -372,7 +405,10 @@ function bc_divF2C_bottom!(::CoupledFlux, dY, Y, p, t)
     uₕ = Yc.ρuₕ ./ Yc.ρ
     ρw = Y.ρw
     If2c = CC.Operators.InterpolateF2C()
-    Ic2f = CC.Operators.InterpolateC2F(bottom = CC.Operators.Extrapolate(), top = CC.Operators.Extrapolate())
+    Ic2f = CC.Operators.InterpolateC2F(
+        bottom = CC.Operators.Extrapolate(),
+        top = CC.Operators.Extrapolate(),
+    )
     w = If2c.(ρw) ./ Yc.ρ
     cuv = @. CC.Geometry.UWVector(uₕ)
     windspeed = @. LinearAlgebra.norm(cuv)
@@ -381,7 +417,8 @@ function bc_divF2C_bottom!(::CoupledFlux, dY, Y, p, t)
     ρ_boundary = CC.Fields.level(Yc.ρ, 1)
 
     ## build atmos face fields on surface boundary space to enable broadcasting
-    windspeed_boundary = CC.Fields.Field(CC.Fields.field_values(windspeed_boundary), axes(p.T_sfc))
+    windspeed_boundary =
+        CC.Fields.Field(CC.Fields.field_values(windspeed_boundary), axes(p.T_sfc))
     θ_boundary = CC.Fields.Field(CC.Fields.field_values(θ_boundary), axes(p.T_sfc))
     ρ_boundary = CC.Fields.Field(CC.Fields.field_values(ρ_boundary), axes(p.T_sfc))
 

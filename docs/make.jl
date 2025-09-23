@@ -53,8 +53,14 @@ map(
 
 # pages layout
 experiment_pages = [
-    "Sea Breeze" => map(s -> "generated/sea_breeze/$(s)", readdir(joinpath(@__DIR__, "src/generated/sea_breeze"))),
-    "AMIP" => map(s -> "generated/amip/$(s)", readdir(joinpath(@__DIR__, "src/generated/amip"))),
+    "Sea Breeze" => map(
+        s -> "generated/sea_breeze/$(s)",
+        readdir(joinpath(@__DIR__, "src/generated/sea_breeze")),
+    ),
+    "AMIP" => map(
+        s -> "generated/amip/$(s)",
+        readdir(joinpath(@__DIR__, "src/generated/amip")),
+    ),
 ]
 interface_pages = [
     "checkpointer.md",
@@ -75,9 +81,20 @@ pages = Any[
     "Coupler Interface" => interface_pages,
     "Performance" => performance_pages,
     "Model Output" => output_pages,
+    "Contributing" => "contributing.md",
 ]
 
 
-makedocs(sitename = "ClimaCoupler.jl", format = Documenter.HTML(), modules = [ClimaCoupler], pages = pages)
+makedocs(
+    sitename = "ClimaCoupler.jl",
+    format = Documenter.HTML(),
+    modules = [ClimaCoupler],
+    pages = pages,
+)
 
-deploydocs(repo = "<github.com/CliMA/ClimaCoupler.jl.git>", push_preview = true, devbranch = "main", forcepush = true)
+deploydocs(
+    repo = "<github.com/CliMA/ClimaCoupler.jl.git>",
+    push_preview = true,
+    devbranch = "main",
+    forcepush = true,
+)

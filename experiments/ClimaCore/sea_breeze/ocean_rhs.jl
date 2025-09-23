@@ -35,8 +35,10 @@ end
 function hspace_1D(xlim = (-π, π), npoly = 0, helem = 10)
     FT = Float64
 
-    domain =
-        CC.Domains.IntervalDomain(CC.Geometry.XPoint{FT}(xlim[1]) .. CC.Geometry.XPoint{FT}(xlim[2]), periodic = true)
+    domain = CC.Domains.IntervalDomain(
+        CC.Geometry.XPoint{FT}(xlim[1]) .. CC.Geometry.XPoint{FT}(xlim[2]),
+        periodic = true,
+    )
     mesh = CC.Meshes.IntervalMesh(domain; nelems = helem)
     topology = CC.Topologies.IntervalTopology(mesh)
 
@@ -72,12 +74,28 @@ struct OceanSim <: AbstractOceanSim
     integrator::Any
 end
 
-function OceanSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = DiffEqCallbacks.CallbackSet())
+function OceanSim(
+    Y_init,
+    t_start,
+    dt,
+    t_end,
+    timestepper,
+    p,
+    saveat,
+    callbacks = DiffEqCallbacks.CallbackSet(),
+)
     ode_algo = CTS.ExplicitAlgorithm(timestepper)
     ode_function = CTS.ClimaODEFunction(T_exp! = ocn_rhs!)
 
     problem = SciMLBase.ODEProblem(ode_function, Y_init, (t_start, t_end), p)
-    ocn_integ = SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false, callback = callbacks)
+    ocn_integ = SciMLBase.init(
+        problem,
+        ode_algo,
+        dt = dt,
+        saveat = saveat,
+        adaptive = false,
+        callback = callbacks,
+    )
 
     return OceanSim(ocn_integ)
 end

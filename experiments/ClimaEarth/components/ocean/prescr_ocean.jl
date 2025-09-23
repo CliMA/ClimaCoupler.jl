@@ -71,7 +71,10 @@ function PrescribedOceanSimulation(
 ) where {FT}
     # Read in initial SST data
     sst_data = try
-        joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.SST.HAD187001-198110.OI198111-202206.nc")
+        joinpath(
+            @clima_artifact("historical_sst_sic", comms_ctx),
+            "MODEL.SST.HAD187001-198110.OI198111-202206.nc",
+        )
     catch error
         @warn "Using lowres SST. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
         joinpath(
@@ -113,14 +116,24 @@ end
 
 ## Extensions of Interfacer and FieldExchanger functions
 
-Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:surface_direct_albedo}) = sim.cache.α_direct
-Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:surface_diffuse_albedo}) = sim.cache.α_diffuse
+Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:surface_direct_albedo}) =
+    sim.cache.α_direct
+Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:surface_diffuse_albedo}) =
+    sim.cache.α_diffuse
 
-function Interfacer.update_field!(sim::PrescribedOceanSimulation, ::Val{:u_int}, field::CC.Fields.Field)
+function Interfacer.update_field!(
+    sim::PrescribedOceanSimulation,
+    ::Val{:u_int},
+    field::CC.Fields.Field,
+)
     Interfacer.remap!(sim.cache.u_int, field)
 end
 
-function Interfacer.update_field!(sim::PrescribedOceanSimulation, ::Val{:v_int}, field::CC.Fields.Field)
+function Interfacer.update_field!(
+    sim::PrescribedOceanSimulation,
+    ::Val{:v_int},
+    field::CC.Fields.Field,
+)
     Interfacer.remap!(sim.cache.v_int, field)
 end
 
@@ -156,7 +169,8 @@ function Checkpointer.restore_cache!(sim::PrescribedOceanSimulation, new_cache)
     for p in propertynames(old_cache)
         if getproperty(old_cache, p) isa Field
             ArrayType = ClimaComms.array_type(getproperty(old_cache, p))
-            parent(getproperty(old_cache, p)) .= ArrayType(parent(getproperty(new_cache, p)))
+            parent(getproperty(old_cache, p)) .=
+                ArrayType(parent(getproperty(new_cache, p)))
         end
     end
 end
@@ -198,14 +212,23 @@ function set_albedos!(sim::PrescribedOceanSimulation, t)
     FT = CC.Spaces.undertype(axes(sim.cache.T_sfc))
 
     # Compute the current date
-    current_date = t isa ClimaUtilities.TimeManager.ITime ? date(t) : p.start_date + Dates.Second(t)
+    current_date =
+        t isa ClimaUtilities.TimeManager.ITime ? date(t) : p.start_date + Dates.Second(t)
 
     insolation_params = InsolationParameters(FT)
-    d, δ, η_UTC = FT.(Insolation.helper_instantaneous_zenith_angle(current_date, insolation_params))
+    d, δ, η_UTC =
+        FT.(Insolation.helper_instantaneous_zenith_angle(current_date, insolation_params))
 
     # Get the atmospheric wind vector and the cosine of the zenith angle
     surface_coords = CC.Fields.coordinate_field(axes(sim.cache.T_sfc))
-    insolation_tuple = Insolation.instantaneous_zenith_angle.(d, δ, η_UTC, surface_coords.long, surface_coords.lat) # the tuple is (zenith angle, azimuthal angle, earth-sun distance)
+    insolation_tuple =
+        Insolation.instantaneous_zenith_angle.(
+            d,
+            δ,
+            η_UTC,
+            surface_coords.long,
+            surface_coords.lat,
+        ) # the tuple is (zenith angle, azimuthal angle, earth-sun distance)
     zenith_angle = insolation_tuple.:1
     wind_atmos = LinearAlgebra.norm.(CC.Geometry.Covariant12Vector.(p.u_int, p.v_int)) # wind vector from components
     λ = FT(0) # spectral wavelength (not used for now)

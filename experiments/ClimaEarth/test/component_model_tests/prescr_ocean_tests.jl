@@ -15,7 +15,12 @@ FT = Float32
 end
 
 @testset "PrescribedOceanSimulation constructor" begin
-    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+    space = CC.CommonSpaces.CubedSphereSpace(
+        FT;
+        radius = FT(6371e3),
+        n_quad_points = 4,
+        h_elem = 4,
+    )
     start_date = Dates.DateTime(2000, 1, 1)
     t_start = 0.0
     area_fraction = CC.Fields.ones(space)
@@ -23,11 +28,22 @@ end
     comms_ctx = nothing
 
     # Construct simulation object
-    sim = PrescribedOceanSimulation(FT, space, start_date, t_start, area_fraction, thermo_params, comms_ctx)
+    sim = PrescribedOceanSimulation(
+        FT,
+        space,
+        start_date,
+        t_start,
+        area_fraction,
+        thermo_params,
+        comms_ctx,
+    )
 
     # Read in initial SST data
     sst_data = try
-        joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.SST.HAD187001-198110.OI198111-202206.nc")
+        joinpath(
+            @clima_artifact("historical_sst_sic", comms_ctx),
+            "MODEL.SST.HAD187001-198110.OI198111-202206.nc",
+        )
     catch error
         @warn "Using lowres SST. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
         joinpath(

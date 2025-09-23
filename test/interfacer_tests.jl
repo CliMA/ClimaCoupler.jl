@@ -27,15 +27,21 @@ struct DummySimulation4{S} <: Interfacer.AtmosModelSimulation
 end
 
 Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var}) = ones(sim.space)
-Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var_float}) = CC.Spaces.undertype(sim.space)(2)
+Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var_float}) =
+    CC.Spaces.undertype(sim.space)(2)
 
 context = ClimaComms.context()
 ClimaComms.init(context)
 
 for FT in (Float32, Float64)
     @testset "test CoupledSim construction, float_type for FT=$FT" begin
-        boundary_space_ =
-            CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
+        boundary_space_ = CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius = FT(6371e3),
+            n_quad_points = 4,
+            h_elem = 4,
+            context,
+        )
 
         fields = ones(boundary_space_)
 
@@ -57,9 +63,16 @@ for FT in (Float32, Float64)
     end
 
     @testset "get_field indexing for FT=$FT" begin
-        space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
+        space = CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius = FT(6371e3),
+            n_quad_points = 4,
+            h_elem = 4,
+            context,
+        )
         field_of_ones = ones(space)
-        for sim in (DummySimulation(space), DummySimulation2(space), DummySimulation3(space))
+        for sim in
+            (DummySimulation(space), DummySimulation2(space), DummySimulation3(space))
             # field
             @test Interfacer.get_field(sim, Val(:var)) == field_of_ones
             # float
@@ -92,8 +105,13 @@ for FT in (Float32, Float64)
     end
 
     @testset "update_field! the SurfaceStub area_fraction for FT=$FT" begin
-        boundary_space =
-            CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius = FT(6371e3),
+            n_quad_points = 4,
+            h_elem = 4,
+            context,
+        )
 
         stub = Interfacer.SurfaceStub((;
             area_fraction = zeros(boundary_space),
@@ -107,13 +125,24 @@ for FT in (Float32, Float64)
 
         Interfacer.update_field!(stub, Val(:area_fraction), ones(boundary_space))
         Interfacer.update_field!(stub, Val(:surface_temperature), ones(boundary_space) .* 2)
-        Interfacer.update_field!(stub, Val(:surface_direct_albedo), ones(boundary_space) .* 3)
-        Interfacer.update_field!(stub, Val(:surface_diffuse_albedo), ones(boundary_space) .* 4)
+        Interfacer.update_field!(
+            stub,
+            Val(:surface_direct_albedo),
+            ones(boundary_space) .* 3,
+        )
+        Interfacer.update_field!(
+            stub,
+            Val(:surface_diffuse_albedo),
+            ones(boundary_space) .* 4,
+        )
 
         @test Interfacer.get_field(stub, Val(:area_fraction)) == fill(FT(1), boundary_space)
-        @test Interfacer.get_field(stub, Val(:surface_temperature)) == fill(FT(2), boundary_space)
-        @test Interfacer.get_field(stub, Val(:surface_direct_albedo)) == fill(FT(3), boundary_space)
-        @test Interfacer.get_field(stub, Val(:surface_diffuse_albedo)) == fill(FT(4), boundary_space)
+        @test Interfacer.get_field(stub, Val(:surface_temperature)) ==
+              fill(FT(2), boundary_space)
+        @test Interfacer.get_field(stub, Val(:surface_direct_albedo)) ==
+              fill(FT(3), boundary_space)
+        @test Interfacer.get_field(stub, Val(:surface_diffuse_albedo)) ==
+              fill(FT(4), boundary_space)
     end
 end
 
@@ -124,15 +153,30 @@ end
 
 @testset "undefined get_field for generic val" begin
     FT = Float32
-    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
+    space = CC.CommonSpaces.CubedSphereSpace(
+        FT;
+        radius = FT(6371e3),
+        n_quad_points = 4,
+        h_elem = 4,
+        context,
+    )
     sim = DummySimulation(space)
     val = Val(:v)
-    @test_throws ErrorException("undefined field `v` for $(nameof(sim))") Interfacer.get_field(sim, val)
+    @test_throws ErrorException("undefined field `v` for $(nameof(sim))") Interfacer.get_field(
+        sim,
+        val,
+    )
 end
 
 @testset "undefined get_field for SurfaceModelSimulation" begin
     FT = Float32
-    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
+    space = CC.CommonSpaces.CubedSphereSpace(
+        FT;
+        radius = FT(6371e3),
+        n_quad_points = 4,
+        h_elem = 4,
+        context,
+    )
     sim = DummySimulation3(space)
 
     # Test that get_field gives correct warnings for unextended fields
@@ -145,13 +189,22 @@ end
         :surface_temperature,
     )
         val = Val(value)
-        @test_throws ErrorException("undefined field `$value` for $(nameof(sim))") Interfacer.get_field(sim, val)
+        @test_throws ErrorException("undefined field `$value` for $(nameof(sim))") Interfacer.get_field(
+            sim,
+            val,
+        )
     end
 end
 
 @testset "undefined get_field for AtmosModelSimulation" begin
     FT = Float32
-    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
+    space = CC.CommonSpaces.CubedSphereSpace(
+        FT;
+        radius = FT(6371e3),
+        n_quad_points = 4,
+        h_elem = 4,
+        context,
+    )
     sim = DummySimulation4(space)
 
     # Test that get_field gives correct warnings for unextended fields
@@ -166,13 +219,22 @@ end
         :v_int,
     )
         val = Val(value)
-        @test_throws ErrorException("undefined field `$value` for $(nameof(sim))") Interfacer.get_field(sim, val)
+        @test_throws ErrorException("undefined field `$value` for $(nameof(sim))") Interfacer.get_field(
+            sim,
+            val,
+        )
     end
 end
 
 @testset "update_field! warnings for SurfaceModelSimulation" begin
     FT = Float32
-    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
+    space = CC.CommonSpaces.CubedSphereSpace(
+        FT;
+        radius = FT(6371e3),
+        n_quad_points = 4,
+        h_elem = 4,
+        context,
+    )
     dummy_field = CC.Fields.ones(space)
     sim = DummySimulation3(space)
 
@@ -187,37 +249,56 @@ end
         :turbulent_moisture_flux,
     )
         val = Val(value)
-        @test_logs (:warn, "`update_field!` is not extended for the `$value` field of $(nameof(sim)): skipping update.") Interfacer.update_field!(
+        @test_logs (
+            :warn,
+            "`update_field!` is not extended for the `$value` field of $(nameof(sim)): skipping update.",
+        ) Interfacer.update_field!(sim, val, dummy_field)
+        @test_throws ErrorException("undefined field `$value` for $(nameof(sim))") Interfacer.get_field(
             sim,
             val,
-            dummy_field,
         )
-        @test_throws ErrorException("undefined field `$value` for $(nameof(sim))") Interfacer.get_field(sim, val)
     end
 end
 
 @testset "undefined update_field! warnings for AtmosModelSimulation" begin
     FT = Float32
-    space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
+    space = CC.CommonSpaces.CubedSphereSpace(
+        FT;
+        radius = FT(6371e3),
+        n_quad_points = 4,
+        h_elem = 4,
+        context,
+    )
     dummy_field = CC.Fields.ones(space)
     sim = DummySimulation4(space)
 
     # Test that update_field! gives correct warnings for unextended fields
-    for value in (:emissivity, :surface_direct_albedo, :surface_diffuse_albedo, :surface_temperature, :turbulent_fluxes)
+    for value in (
+        :emissivity,
+        :surface_direct_albedo,
+        :surface_diffuse_albedo,
+        :surface_temperature,
+        :turbulent_fluxes,
+    )
         val = Val(value)
-        @test_logs (:warn, "`update_field!` is not extended for the `$value` field of $(nameof(sim)): skipping update.") Interfacer.update_field!(
+        @test_logs (
+            :warn,
+            "`update_field!` is not extended for the `$value` field of $(nameof(sim)): skipping update.",
+        ) Interfacer.update_field!(sim, val, dummy_field)
+        @test_throws ErrorException("undefined field `$value` for $(nameof(sim))") Interfacer.get_field(
             sim,
             val,
-            dummy_field,
         )
-        @test_throws ErrorException("undefined field `$value` for $(nameof(sim))") Interfacer.get_field(sim, val)
     end
 end
 
 @testset "undefined step! error" begin
     FT = Float32
     sim = DummySimulation3(nothing)
-    @test_throws ErrorException("undefined step! for $(nameof(sim))") Interfacer.step!(sim, 1)
+    @test_throws ErrorException("undefined step! for $(nameof(sim))") Interfacer.step!(
+        sim,
+        1,
+    )
 end
 
 @testset "SurfaceStub step!" begin
@@ -227,11 +308,23 @@ end
 
 @testset "remap" begin
     FT = Float32
-    source_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4, context)
+    source_space = CC.CommonSpaces.CubedSphereSpace(
+        FT;
+        radius = FT(6371e3),
+        n_quad_points = 4,
+        h_elem = 4,
+        context,
+    )
     field = CC.Fields.coordinate_field(source_space).lat
 
     # Remap field to target space
-    target_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 6, context)
+    target_space = CC.CommonSpaces.CubedSphereSpace(
+        FT;
+        radius = FT(6371e3),
+        n_quad_points = 4,
+        h_elem = 6,
+        context,
+    )
     field_target_space = Interfacer.remap(field, target_space)
 
     # remap back to source space

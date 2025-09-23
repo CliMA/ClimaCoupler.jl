@@ -74,7 +74,9 @@ if !isfile(obs_path)
     touch(joinpath(obs_output_dir, "parameters.toml"))
     CAL.forward_model(0, 0)
     observations = Vector{Float64}(undef, 1)
-    observations .= process_member_data(SimDir(joinpath(obs_output_dir, "model_config/output_active/clima_atmos")))
+    observations .= process_member_data(
+        SimDir(joinpath(obs_output_dir, "model_config/output_active/clima_atmos")),
+    )
     JLD2.save_object(obs_path, observations)
 end
 observations = JLD2.load_object(obs_path)
@@ -89,7 +91,14 @@ ensemble_size = EKP.get_N_ens(eki)
 
 # Allow 100% failure rate for short run testing
 if SHORT_RUN
-    eki = CAL.calibrate(CAL.WorkerBackend, eki, n_iterations, prior, output_dir; failure_rate = 1)
+    eki = CAL.calibrate(
+        CAL.WorkerBackend,
+        eki,
+        n_iterations,
+        prior,
+        output_dir;
+        failure_rate = 1,
+    )
 else
     eki = CAL.calibrate(CAL.WorkerBackend, eki, n_iterations, prior, output_dir)
 end
@@ -102,7 +111,11 @@ import CairoMakie
 
 function scatter_plot(eki::EKP.EnsembleKalmanProcess)
     f = CairoMakie.Figure(resolution = (800, 600))
-    ax = CairoMakie.Axis(f[1, 1], ylabel = "Parameter Value", xlabel = "Top of atmosphere radiative SW flux")
+    ax = CairoMakie.Axis(
+        f[1, 1],
+        ylabel = "Parameter Value",
+        xlabel = "Top of atmosphere radiative SW flux",
+    )
 
     g = vec.(EKP.get_g(eki; return_array = true))
     params = vec.((EKP.get_ϕ(prior, eki)))

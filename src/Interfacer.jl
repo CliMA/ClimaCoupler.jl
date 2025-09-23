@@ -95,7 +95,8 @@ Return the model date at the current timestep.
 # Arguments
 - `cs`: [CoupledSimulation] containing info about the simulation
 """
-current_date(cs::CoupledSimulation) = cs.t[] isa ITime ? date(cs.t[]) : cs.start_date[] + Dates.Second(cs.t[])
+current_date(cs::CoupledSimulation) =
+    cs.t[] isa ITime ? date(cs.t[]) : cs.start_date[] + Dates.Second(cs.t[])
 
 """
     default_coupler_fields()
@@ -224,14 +225,18 @@ Generic fallback for `get_field` that raises an error.
 """
 get_field(sim::ComponentModelSimulation, val::Val) = get_field_error(sim, val)
 
-get_field_error(sim, val::Val{X}) where {X} = error("undefined field `$X` for $(nameof(sim))")
+get_field_error(sim, val::Val{X}) where {X} =
+    error("undefined field `$X` for $(nameof(sim))")
 
 # Set default values for fields that are not defined in all component models
 get_field(::ComponentModelSimulation, ::Val{:energy}) = nothing
 get_field(::ComponentModelSimulation, ::Val{:water}) = nothing
-get_field(sim::SurfaceModelSimulation, ::Val{:beta}) = convert(eltype(sim.integrator.u), 1.0)
-get_field(sim::SurfaceModelSimulation, ::Val{:emissivity}) = convert(eltype(sim.integrator.u), 1.0)
-get_field(sim::SurfaceModelSimulation, ::Val{:height_disp}) = convert(eltype(sim.integrator.u), 0.0)
+get_field(sim::SurfaceModelSimulation, ::Val{:beta}) =
+    convert(eltype(sim.integrator.u), 1.0)
+get_field(sim::SurfaceModelSimulation, ::Val{:emissivity}) =
+    convert(eltype(sim.integrator.u), 1.0)
+get_field(sim::SurfaceModelSimulation, ::Val{:height_disp}) =
+    convert(eltype(sim.integrator.u), 0.0)
 
 
 """
@@ -297,8 +302,10 @@ update_field!(
     _,
 ) = update_field_warning(sim, val)
 
-update_field_warning(sim, val::Val{X}) where {X} =
-    @warn("`update_field!` is not extended for the `$X` field of $(nameof(sim)): skipping update.", maxlog = 1)
+update_field_warning(sim, val::Val{X}) where {X} = @warn(
+    "`update_field!` is not extended for the `$X` field of $(nameof(sim)): skipping update.",
+    maxlog = 1
+)
 
 
 """
@@ -458,13 +465,17 @@ function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
 
         # Interpolate on root and broadcast to all processes
         remapper = CC.Remapping.Remapper(source_space; target_hcoords = all_hcoords)
-        remapped_array = ClimaComms.bcast(comms_ctx, CC.Remapping.interpolate(remapper, field))
+        remapped_array =
+            ClimaComms.bcast(comms_ctx, CC.Remapping.interpolate(remapper, field))
 
         my_ending_offset = sum(all_offsets[1:ClimaComms.mypid(comms_ctx)])
         my_starting_offset = my_ending_offset - offset[]
 
         # Convert remapped array to a field in the target space on each process
-        return CC.Fields.array2field(remapped_array[(1 + my_starting_offset):my_ending_offset], target_space)
+        return CC.Fields.array2field(
+            remapped_array[(1 + my_starting_offset):my_ending_offset],
+            target_space,
+        )
     end
 end
 

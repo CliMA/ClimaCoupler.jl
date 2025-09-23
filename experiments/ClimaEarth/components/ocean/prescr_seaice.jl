@@ -87,7 +87,10 @@ function PrescribedIceSimulation(
 ) where {FT}
     # Set up prescribed sea ice concentration object
     sic_data = try
-        joinpath(@clima_artifact("historical_sst_sic", comms_ctx), "MODEL.ICE.HAD187001-198110.OI198111-202206.nc")
+        joinpath(
+            @clima_artifact("historical_sst_sic", comms_ctx),
+            "MODEL.ICE.HAD187001-198110.OI198111-202206.nc",
+        )
     catch error
         @warn "Using lowres SIC. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
         joinpath(
@@ -128,14 +131,18 @@ function PrescribedIceSimulation(
     )
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
-    ode_function = CTS.ClimaODEFunction(T_exp! = ice_rhs!, dss! = (Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer))
+    ode_function = CTS.ClimaODEFunction(
+        T_exp! = ice_rhs!,
+        dss! = (Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer),
+    )
     if typeof(dt) isa Number
         dt = Float64(dt)
         tspan = Float64.(tspan)
         saveat = Float64.(saveat)
     end
     problem = SciMLBase.ODEProblem(ode_function, Y, tspan, (; cache..., params = params))
-    integrator = SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
+    integrator =
+        SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
 
     sim = PrescribedIceSimulation(params, integrator)
 
@@ -145,12 +152,18 @@ function PrescribedIceSimulation(
 end
 
 # extensions required by Interfacer
-Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
-Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
-Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
-Interfacer.get_field(sim::PrescribedIceSimulation, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) =
-    sim.integrator.p.params.α
-Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) =
+    sim.integrator.p.area_fraction
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_buoyancy}) =
+    sim.integrator.p.params.z0b
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_momentum}) =
+    sim.integrator.p.params.z0m
+Interfacer.get_field(
+    sim::PrescribedIceSimulation,
+    ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}},
+) = sim.integrator.p.params.α
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) =
+    sim.integrator.u.T_sfc
 
 """
     Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:energy})
@@ -159,24 +172,45 @@ Extension of Interfacer.get_field to get the energy of the ocean.
 It multiplies the the slab temperature by the heat capacity, density, and depth.
 """
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:energy}) =
-    sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h
+    sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .*
+    sim.integrator.p.params.h
 
-function Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:area_fraction}, field::CC.Fields.Field)
+function Interfacer.update_field!(
+    sim::PrescribedIceSimulation,
+    ::Val{:area_fraction},
+    field::CC.Fields.Field,
+)
     sim.integrator.p.area_fraction .= field
     return nothing
 end
-function Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:radiative_energy_flux_sfc}, field)
+function Interfacer.update_field!(
+    sim::PrescribedIceSimulation,
+    ::Val{:radiative_energy_flux_sfc},
+    field,
+)
     Interfacer.remap!(sim.integrator.p.F_radiative, field)
 end
-function Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_energy_flux}, field)
+function Interfacer.update_field!(
+    sim::PrescribedIceSimulation,
+    ::Val{:turbulent_energy_flux},
+    field,
+)
     Interfacer.remap!(sim.integrator.p.F_turb_energy, field)
 end
-Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:turbulent_moisture_flux}, field) = nothing
+Interfacer.update_field!(
+    sim::PrescribedIceSimulation,
+    ::Val{:turbulent_moisture_flux},
+    field,
+) = nothing
 
 # extensions required by FieldExchanger
-Interfacer.step!(sim::PrescribedIceSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+Interfacer.step!(sim::PrescribedIceSimulation, t) =
+    Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 
-function FluxCalculator.update_turbulent_fluxes!(sim::PrescribedIceSimulation, fields::NamedTuple)
+function FluxCalculator.update_turbulent_fluxes!(
+    sim::PrescribedIceSimulation,
+    fields::NamedTuple,
+)
     Interfacer.update_field!(sim, Val(:turbulent_energy_flux), fields.F_lh .+ fields.F_sh)
     return nothing
 end
@@ -219,7 +253,8 @@ function ice_rhs!(dY, Y, p, t)
     F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc) # fluxes are defined to be positive when upward
     @. F_conductive = ifelse(p.area_fraction ≈ 0, zero(F_conductive), F_conductive)
 
-    rhs = @. (-p.F_turb_energy - p.F_radiative + F_conductive) / (params.h * params.ρ * params.c)
+    rhs = @. (-p.F_turb_energy - p.F_radiative + F_conductive) /
+       (params.h * params.ρ * params.c)
     # If tendencies lead to temperature above freezing, set temperature to freezing
     @. dY.T_sfc = min(rhs, (params.T_freeze - Y.T_sfc) / float(p.dt))
 end
@@ -230,7 +265,8 @@ end
 Perform DSS on the state of a component simulation, intended to be used
 before the initial step of a run. This method acts on prescribed ice simulations.
 """
-dss_state!(sim::PrescribedIceSimulation) = CC.Spaces.weighted_dss!(sim.integrator.u, sim.integrator.p.dss_buffer)
+dss_state!(sim::PrescribedIceSimulation) =
+    CC.Spaces.weighted_dss!(sim.integrator.u, sim.integrator.p.dss_buffer)
 
 function Checkpointer.get_model_cache(sim::PrescribedIceSimulation)
     return sim.integrator.p
@@ -241,7 +277,8 @@ function Checkpointer.restore_cache!(sim::PrescribedIceSimulation, new_cache)
     for p in propertynames(old_cache)
         if getproperty(old_cache, p) isa Field
             ArrayType = ClimaComms.array_type(getproperty(old_cache, p))
-            parent(getproperty(old_cache, p)) .= ArrayType(parent(getproperty(new_cache, p)))
+            parent(getproperty(old_cache, p)) .=
+                ArrayType(parent(getproperty(new_cache, p)))
         end
     end
 end

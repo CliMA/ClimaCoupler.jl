@@ -56,7 +56,9 @@ function make_land_domain(
 
     radius = mesh.domain.radius
     nelements_horz = mesh.ne
-    npolynomial = CC.Spaces.Quadratures.polynomial_degree(CC.Spaces.quadrature_style(shared_surface_space))
+    npolynomial = CC.Spaces.Quadratures.polynomial_degree(
+        CC.Spaces.quadrature_style(shared_surface_space),
+    )
     nelements = (nelements_horz, nelements_vert)
     vertdomain = CC.Domains.IntervalDomain(
         CC.Geometry.ZPoint(FT(-depth)),
@@ -72,9 +74,14 @@ function make_land_domain(
     )
     verttopology = CC.Topologies.IntervalTopology(vertmesh)
     vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(verttopology)
-    subsurface_space = CC.Spaces.ExtrudedFiniteDifferenceSpace(shared_surface_space, vert_center_space)
+    subsurface_space =
+        CC.Spaces.ExtrudedFiniteDifferenceSpace(shared_surface_space, vert_center_space)
     subsurface_face_space = CC.Spaces.face_space(subsurface_space)
-    space = (; surface = shared_surface_space, subsurface = subsurface_space, subsurface_face = subsurface_face_space)
+    space = (;
+        surface = shared_surface_space,
+        subsurface = subsurface_space,
+        subsurface_face = subsurface_face_space,
+    )
 
     fields = CL.Domains.get_additional_coordinate_field_data(subsurface_space)
 

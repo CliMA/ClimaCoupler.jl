@@ -69,7 +69,13 @@ function _compare(pass, v1::T, v2::T; name, ignore) where {T}
     else
         # Recursive case
         for p in properties
-            pass &= _compare(pass, getproperty(v1, p), getproperty(v2, p); name = "$(name).$(p)", ignore)
+            pass &= _compare(
+                pass,
+                getproperty(v1, p),
+                getproperty(v2, p);
+                name = "$(name).$(p)",
+                ignore,
+            )
         end
     end
     return pass
@@ -103,11 +109,22 @@ function _compare(pass, v1::T, v2::T; name, ignore) where {T <: AbstractData}
 end
 
 # Handle views
-function _compare(pass, v1::SubArray{FT}, v2::SubArray{FT}; name, ignore) where {FT <: AbstractFloat}
+function _compare(
+    pass,
+    v1::SubArray{FT},
+    v2::SubArray{FT};
+    name,
+    ignore,
+) where {FT <: AbstractFloat}
     return pass && _compare(collect(v1), collect(v2); name, ignore)
 end
 
-function _compare(v1::AbstractArray{FT}, v2::AbstractArray{FT}; name, ignore) where {FT <: AbstractFloat}
+function _compare(
+    v1::AbstractArray{FT},
+    v2::AbstractArray{FT};
+    name,
+    ignore,
+) where {FT <: AbstractFloat}
     error = maximum(_error(v1, v2); init = zero(eltype(v1)))
     return print_maybe(error <= 100eps(eltype(v1)), "$name error: $error")
 end

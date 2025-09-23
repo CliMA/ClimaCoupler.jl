@@ -29,8 +29,9 @@ function test_rmse_thresholds(diagnostics_folder_path, spinup)
     rmse_thresholds = get_rmse_thresholds()
 
     sim_vars = (sim_var_dict[short_name]() for short_name in keys(rmse_thresholds))
-    obs_vars =
-        (obs_var_dict[ClimaAnalysis.short_name(sim_var)](sim_var.attributes["start_date"]) for sim_var in sim_vars)
+    obs_vars = (
+        obs_var_dict[ClimaAnalysis.short_name(sim_var)](sim_var.attributes["start_date"]) for sim_var in sim_vars
+    )
     short_names = (ClimaAnalysis.short_name(var) for var in sim_vars)
 
     rmses = map(sim_vars, obs_vars) do sim_var, obs_var

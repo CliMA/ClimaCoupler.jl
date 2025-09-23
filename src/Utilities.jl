@@ -11,7 +11,8 @@ import ClimaCore as CC
 import Logging
 import ClimaUtilities.OutputPathGenerator: generate_output_path
 
-export get_device, get_comms_context, show_memory_usage, setup_output_dirs, time_to_seconds, integral
+export get_device,
+    get_comms_context, show_memory_usage, setup_output_dirs, time_to_seconds, integral
 
 """
     get_device(config_dict)
@@ -63,7 +64,8 @@ function get_comms_context(config_dict)
     if comms_ctx isa ClimaComms.SingletonCommsContext
         @info "Setting up single-process ClimaCoupler run on device: $(nameof(typeof(device)))."
     else
-        @info "Setting up distributed ClimaCoupler run on " nprocs = ClimaComms.nprocs(comms_ctx) device = "$(nameof(typeof(device)))"
+        @info "Setting up distributed ClimaCoupler run on " nprocs =
+            ClimaComms.nprocs(comms_ctx) device = "$(nameof(typeof(device)))"
     end
 
     return comms_ctx
@@ -142,11 +144,18 @@ function setup_output_dirs(;
         mkpath(artifacts_dir)
         mkpath(checkpoints_dir)
         # If no regrid_dir is provided, create a temporary directory
-        regrid_dir = isnothing(regrid_dir) ? mktempdir(output_dir, prefix = "regrid_tmp_") : mkpath(regrid_dir)
+        regrid_dir =
+            isnothing(regrid_dir) ? mktempdir(output_dir, prefix = "regrid_tmp_") :
+            mkpath(regrid_dir)
     end
     regrid_dir = ClimaComms.bcast(comms_ctx, regrid_dir)
 
-    return (; output = output_dir, artifacts = artifacts_dir, regrid = regrid_dir, checkpoints = checkpoints_dir)
+    return (;
+        output = output_dir,
+        artifacts = artifacts_dir,
+        regrid = regrid_dir,
+        checkpoints = checkpoints_dir,
+    )
 end
 
 """

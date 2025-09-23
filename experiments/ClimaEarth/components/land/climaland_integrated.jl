@@ -2,7 +2,8 @@ import ClimaParams as CP
 import ClimaLand as CL
 import ClimaLand.Parameters as LP
 import Dates
-import ClimaUtilities.TimeVaryingInputs: LinearInterpolation, PeriodicCalendar, TimeVaryingInput
+import ClimaUtilities.TimeVaryingInputs:
+    LinearInterpolation, PeriodicCalendar, TimeVaryingInput
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaCore as CC
 import SciMLBase
@@ -26,8 +27,12 @@ It contains the following objects:
 - `area_fraction::A`: A ClimaCore Field on the boundary space representing the surface area fraction of this component model.
 - `output_writer::OW`: The diagnostic output writer.
 """
-struct ClimaLandSimulation{M <: CL.LandModel, I <: SciMLBase.AbstractODEIntegrator, A <: CC.Fields.Field, OW} <:
-       Interfacer.LandModelSimulation
+struct ClimaLandSimulation{
+    M <: CL.LandModel,
+    I <: SciMLBase.AbstractODEIntegrator,
+    A <: CC.Fields.Field,
+    OW,
+} <: Interfacer.LandModelSimulation
     model::M
     integrator::I
     area_fraction::A
@@ -86,7 +91,12 @@ function ClimaLandSimulation(
     if isnothing(shared_surface_space)
         domain = make_land_domain(depth; nelements, dz_tuple)
     else
-        domain = make_land_domain(shared_surface_space, depth; nelements_vert = nelements[2], dz_tuple)
+        domain = make_land_domain(
+            shared_surface_space,
+            depth;
+            nelements_vert = nelements[2],
+            dz_tuple,
+        )
     end
     surface_space = domain.space.surface
     subsurface_space = domain.space.subsurface
@@ -105,7 +115,10 @@ function ClimaLandSimulation(
     default_parameter_file = joinpath(pkgdir(CL), "toml", "default_parameters.toml")
     toml_dict = CP.create_toml_dict(
         FT;
-        override_file = CP.merge_toml_files([default_parameter_file, parameter_files...]; override = true),
+        override_file = CP.merge_toml_files(
+            [default_parameter_file, parameter_files...];
+            override = true,
+        ),
     )
     earth_param_set = CL.Parameters.LandParameters(toml_dict)
 
@@ -144,9 +157,12 @@ function ClimaLandSimulation(
     lapse_rate = FT(6.5e-3)
     # Adjust initial temperature to account for orography of the surface
     # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
-    orog_adjusted_T_data = CC.Fields.field_values(T_sfc0) .- lapse_rate .* CC.Fields.field_values(surface_elevation)
+    orog_adjusted_T_data =
+        CC.Fields.field_values(T_sfc0) .-
+        lapse_rate .* CC.Fields.field_values(surface_elevation)
     orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, subsurface_space)
-    orog_adjusted_T_surface = CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
+    orog_adjusted_T_surface =
+        CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
 
     # Set initial conditions that aren't read in from file
     Y.soilco2.C .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
@@ -161,16 +177,42 @@ function ClimaLandSimulation(
 
         # Read in initial conditions for snow and soil
         ic_path = CL.Artifacts.soil_ic_2008_50m_path()
-        CL.Simulations.set_snow_initial_conditions!(Y, p, surface_space, ic_path, model.snow.parameters)
+        CL.Simulations.set_snow_initial_conditions!(
+            Y,
+            p,
+            surface_space,
+            ic_path,
+            model.snow.parameters,
+        )
 
         T_bounds = extrema(Y.canopy.energy.T)
-        CL.Simulations.set_soil_initial_conditions!(Y, ν, θ_r, subsurface_space, ic_path, model.soil, T_bounds)
+        CL.Simulations.set_soil_initial_conditions!(
+            Y,
+            ν,
+            θ_r,
+            subsurface_space,
+            ic_path,
+            model.soil,
+            T_bounds,
+        )
     else
         # Set initial conditions for the state
         @. Y.soil.ϑ_l = θ_r + (ν - θ_r) / 2
         Y.soil.θ_i .= FT(0.0)
-        ρc_s = CL.Soil.volumetric_heat_capacity.(Y.soil.ϑ_l, Y.soil.θ_i, ρc_ds, earth_param_set)
-        Y.soil.ρe_int .= CL.Soil.volumetric_internal_energy.(Y.soil.θ_i, ρc_s, orog_adjusted_T, earth_param_set)
+        ρc_s =
+            CL.Soil.volumetric_heat_capacity.(
+                Y.soil.ϑ_l,
+                Y.soil.θ_i,
+                ρc_ds,
+                earth_param_set,
+            )
+        Y.soil.ρe_int .=
+            CL.Soil.volumetric_internal_energy.(
+                Y.soil.θ_i,
+                ρc_s,
+                orog_adjusted_T,
+                earth_param_set,
+            )
 
         Y.snow.S .= FT(0)
         Y.snow.S_l .= FT(0)
@@ -197,7 +239,10 @@ function ClimaLandSimulation(
     jac_kwargs = (; jac_prototype = CL.FieldMatrixWithSolver(Y), Wfact = jacobian!)
 
     prob = SciMLBase.ODEProblem(
-        CTS.ClimaODEFunction(T_exp! = exp_tendency!, T_imp! = SciMLBase.ODEFunction(imp_tendency!; jac_kwargs...)),
+        CTS.ClimaODEFunction(
+            T_exp! = exp_tendency!,
+            T_imp! = SciMLBase.ODEFunction(imp_tendency!; jac_kwargs...),
+        ),
         Y,
         tspan,
         p,
@@ -213,7 +258,8 @@ function ClimaLandSimulation(
             output_vars = :short,
             reduction_period = :monthly,
         )
-        diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)
+        diagnostic_handler =
+            CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)
         diag_cb = CD.DiagnosticsCallback(diagnostic_handler)
     else
         output_writer = nothing
@@ -222,8 +268,13 @@ function ClimaLandSimulation(
 
     # Set up time stepper and integrator
     stepper = CTS.ARS111()
-    ode_algo =
-        CTS.IMEXAlgorithm(stepper, CTS.NewtonsMethod(max_iters = 3, update_j = CTS.UpdateEvery(CTS.NewNewtonIteration)))
+    ode_algo = CTS.IMEXAlgorithm(
+        stepper,
+        CTS.NewtonsMethod(
+            max_iters = 3,
+            update_j = CTS.UpdateEvery(CTS.NewNewtonIteration),
+        ),
+    )
     integrator = SciMLBase.init(
         prob,
         ode_algo;
@@ -244,13 +295,16 @@ Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:area_fraction}) = sim.area
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:beta}) =
     CL.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:emissivity}) = sim.integrator.p.ϵ_sfc
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:energy}) = CL.total_energy(sim.integrator.u, sim.integrator.p)
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:energy}) =
+    CL.total_energy(sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_direct_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_diffuse_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water}) = CL.total_water(sim.integrator.u, sim.integrator.p)
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_temperature}) = sim.integrator.p.T_sfc
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water}) =
+    CL.total_water(sim.integrator.u, sim.integrator.p)
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_temperature}) =
+    sim.integrator.p.T_sfc
 
 # Update fields stored in land drivers
 function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:diffuse_fraction}, field)
@@ -268,12 +322,20 @@ end
 function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:c_co2}, field)
     Interfacer.remap!(sim.integrator.p.drivers.c_co2, field)
 end
-function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:liquid_precipitation}, field)
+function Interfacer.update_field!(
+    sim::ClimaLandSimulation,
+    ::Val{:liquid_precipitation},
+    field,
+)
     # Arbitrarily take parameters from the soil (they are the same for all land sub-components)
     ρ_liq = (LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set))
     Interfacer.remap!(sim.integrator.p.drivers.P_liq, field ./ ρ_liq)
 end
-function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:snow_precipitation}, field)
+function Interfacer.update_field!(
+    sim::ClimaLandSimulation,
+    ::Val{:snow_precipitation},
+    field,
+)
     # Arbitrarily take parameters from the soil (they are the same for all land sub-components)
     ρ_liq = (LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set))
     Interfacer.remap!(sim.integrator.p.drivers.P_snow, field ./ ρ_liq)
@@ -291,7 +353,8 @@ function Interfacer.step!(sim::ClimaLandSimulation, t)
     end
     return nothing
 end
-Interfacer.close_output_writers(sim::ClimaLandSimulation) = isnothing(sim.output_writer) || close(sim.output_writer)
+Interfacer.close_output_writers(sim::ClimaLandSimulation) =
+    isnothing(sim.output_writer) || close(sim.output_writer)
 
 function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, area_fraction)
     # update fields for radiative transfer
@@ -340,7 +403,17 @@ The fields added are:
 - `P_snow` (for moisture fluxes)
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaLandSimulation)
-    land_coupler_fields = [:SW_d, :LW_d, :diffuse_fraction, :c_co2, :P_atmos, :T_atmos, :q_atmos, :P_liq, :P_snow]
+    land_coupler_fields = [
+        :SW_d,
+        :LW_d,
+        :diffuse_fraction,
+        :c_co2,
+        :P_atmos,
+        :T_atmos,
+        :q_atmos,
+        :P_liq,
+        :P_snow,
+    ]
     push!(coupler_field_names, land_coupler_fields...)
 end
 
@@ -359,7 +432,15 @@ function Checkpointer.restore_cache!(sim::ClimaLandSimulation, new_cache)
         old_cache,
         new_cache,
         comms_ctx,
-        ignore = Set([:dss_buffer_2d, :dss_buffer_3d, :scratch1, :scratch2, :scratch3, :sfc_scratch, :subsfc_scratch]),
+        ignore = Set([
+            :dss_buffer_2d,
+            :dss_buffer_3d,
+            :scratch1,
+            :scratch2,
+            :scratch3,
+            :sfc_scratch,
+            :subsfc_scratch,
+        ]),
     )
 end
 
@@ -416,7 +497,8 @@ function FluxCalculator.compute_surface_fluxes!(
     Interfacer.remap!(p.scratch1, csf.ρ_atmos)
     Interfacer.remap!(p.scratch2, csf.T_atmos)
     Interfacer.remap!(p.scratch3, csf.q_atmos)
-    @. coupled_atmos.thermal_state = TD.PhaseEquil_ρTq(thermo_params, p.scratch1, p.scratch2, p.scratch3)
+    @. coupled_atmos.thermal_state =
+        TD.PhaseEquil_ρTq(thermo_params, p.scratch1, p.scratch2, p.scratch3)
 
     # set the same atmosphere state for all sub-components
     @assert sim.model.soil.boundary_conditions.top.atmos ===
@@ -465,7 +547,8 @@ function FluxCalculator.compute_surface_fluxes!(
         csf.temp1,
         (
             canopy_dest.transpiration .+
-            (soil_dest.vapor_flux_liq .+ soil_dest.vapor_flux_ice) .* (1 .- p.snow.snow_cover_fraction) .+
+            (soil_dest.vapor_flux_liq .+ soil_dest.vapor_flux_ice) .*
+            (1 .- p.snow.snow_cover_fraction) .+
             p.snow.snow_cover_fraction .* snow_dest.vapor_flux
         ) .* ρ_liq,
     )
@@ -477,14 +560,16 @@ function FluxCalculator.compute_surface_fluxes!(
     #  where there is zero LAI. This should be fixed in ClimaLand.
     Interfacer.remap!(
         csf.temp1,
-        soil_dest.ρτxz .* (1 .- p.snow.snow_cover_fraction) .+ p.snow.snow_cover_fraction .* snow_dest.ρτxz,
+        soil_dest.ρτxz .* (1 .- p.snow.snow_cover_fraction) .+
+        p.snow.snow_cover_fraction .* snow_dest.ρτxz,
     )
     @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
     @. csf.F_turb_ρτxz += csf.temp1 * area_fraction
 
     Interfacer.remap!(
         csf.temp1,
-        soil_dest.ρτyz .* (1 .- p.snow.snow_cover_fraction) .+ p.snow.snow_cover_fraction .* snow_dest.ρτyz,
+        soil_dest.ρτyz .* (1 .- p.snow.snow_cover_fraction) .+
+        p.snow.snow_cover_fraction .* snow_dest.ρτyz,
     )
     @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
     @. csf.F_turb_ρτyz += csf.temp1 * area_fraction
@@ -494,7 +579,8 @@ function FluxCalculator.compute_surface_fluxes!(
     #  include its extra resistance term in the buoyancy flux calculation.
     Interfacer.remap!(
         csf.temp1,
-        soil_dest.buoy_flux .* (1 .- p.snow.snow_cover_fraction) .+ p.snow.snow_cover_fraction .* snow_dest.buoy_flux,
+        soil_dest.buoy_flux .* (1 .- p.snow.snow_cover_fraction) .+
+        p.snow.snow_cover_fraction .* snow_dest.buoy_flux,
     )
     @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
     @. csf.buoyancy_flux += csf.temp1 * area_fraction
@@ -514,7 +600,8 @@ function FluxCalculator.compute_surface_fluxes!(
         return abs(v) < eps(FT) ? eps(FT) * sign_of_v : v
     end
     surface_params = LP.surface_fluxes_parameters(sim.model.soil.parameters.earth_param_set)
-    @. csf.temp1 = -csf.ustar^3 / SFP.von_karman_const(surface_params) / non_zero(csf.buoyancy_flux)
+    @. csf.temp1 =
+        -csf.ustar^3 / SFP.von_karman_const(surface_params) / non_zero(csf.buoyancy_flux)
     @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
     # When L_MO is infinite, avoid multiplication by zero to prevent NaN
     @. csf.L_MO += ifelse(isinf(csf.temp1), csf.temp1, csf.temp1 * area_fraction)

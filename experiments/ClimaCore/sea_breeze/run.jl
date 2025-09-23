@@ -163,9 +163,19 @@ and the time-stepping information (solver, step size, etc). Sims are the standar
 structures that the coupler works with, enabling dispatch of coupler methods.
 Here, we create three simulations: `AtmosSim`, `OceanSim`, and `LandSim`.
 =#
-atm_Y = CC.Fields.FieldVector(Yc = atm_Y_default.Yc, ρw = atm_Y_default.ρw, F_sfc = atm_F_sfc)
+atm_Y =
+    CC.Fields.FieldVector(Yc = atm_Y_default.Yc, ρw = atm_Y_default.ρw, F_sfc = atm_F_sfc)
 atm_p = (cpl_p = cpl_parameters, T_sfc = atm_T_sfc, bc = atm_bc)
-atmos = AtmosSim(atm_Y, t_start, Δt_coupled / atm_nsteps, t_end, CTS.RK4(), atm_p, saveat, dss_callback)
+atmos = AtmosSim(
+    atm_Y,
+    t_start,
+    Δt_coupled / atm_nsteps,
+    t_end,
+    CTS.RK4(),
+    atm_p,
+    saveat,
+    dss_callback,
+)
 
 ocn_Y = CC.Fields.FieldVector(T_sfc = ocn_Y_default.T_sfc)
 ocn_p = (cpl_parameters, F_sfc = ocn_F_sfc)
@@ -177,7 +187,8 @@ land = LandSim(lnd_Y, t_start, Δt_coupled / lnd_nsteps, t_end, CTS.RK4(), lnd_p
 
 # Additionally, we create a coupled simulation that contains the component simulations
 # and the coupled time-stepping information.
-struct AOLCoupledSim{A <: AtmosSim, O <: OceanSim, L <: LandSim, C <: CouplerState} <: AbstractCoupledSim
+struct AOLCoupledSim{A <: AtmosSim, O <: OceanSim, L <: LandSim, C <: CouplerState} <:
+       AbstractCoupledSim
     ## Atmosphere Simulation
     atmos::A
     ## Ocean Simulation
@@ -305,9 +316,14 @@ theta_ax = Makie.Axis(theta_fig[1, 1])
 # initial plot to setup axis and make consistent levels
 theta_plot = ClimaCoreMakie.fieldcontourf!(theta_ax, sol.u[end].Yc.ρθ ./ sol.u[end].Yc.ρ)
 theta_cb = Makie.Colorbar(theta_fig[1, 2], theta_plot)
-theta_levels = [k for k in range(theta_cb.limits[][1], theta_cb.limits[][2], theta_plot.levels[])]
+theta_levels =
+    [k for k in range(theta_cb.limits[][1], theta_cb.limits[][2], theta_plot.levels[])]
 Makie.record(theta_fig, joinpath(path, "theta.mp4"), 1:length(sol.u); framerate = 20) do i
-    ClimaCoreMakie.fieldcontourf!(theta_ax, sol.u[i].Yc.ρθ ./ sol.u[i].Yc.ρ, levels = theta_levels)
+    ClimaCoreMakie.fieldcontourf!(
+        theta_ax,
+        sol.u[i].Yc.ρθ ./ sol.u[i].Yc.ρ,
+        levels = theta_levels,
+    )
 end
 
 If2c = CC.Operators.InterpolateF2C() #hide
@@ -315,11 +331,17 @@ If2c = CC.Operators.InterpolateF2C() #hide
 vel_w_fig = Makie.Figure();
 vel_w_ax = Makie.Axis(vel_w_fig[1, 1])
 # initial plot to setup axis and make consistent levels
-vel_w_plot = ClimaCoreMakie.fieldcontourf!(vel_w_ax, If2c.(sol.u[end].ρw) ./ sol.u[end].Yc.ρ)
+vel_w_plot =
+    ClimaCoreMakie.fieldcontourf!(vel_w_ax, If2c.(sol.u[end].ρw) ./ sol.u[end].Yc.ρ)
 vel_w_cb = Makie.Colorbar(vel_w_fig[1, 2], vel_w_plot)
-vel_w_levels = [k for k in range(vel_w_cb.limits[][1], vel_w_cb.limits[][2], vel_w_plot.levels[])]
+vel_w_levels =
+    [k for k in range(vel_w_cb.limits[][1], vel_w_cb.limits[][2], vel_w_plot.levels[])]
 Makie.record(vel_w_fig, joinpath(path, "vel_w.mp4"), 1:length(sol.u); framerate = 20) do i
-    ClimaCoreMakie.fieldcontourf!(vel_w_ax, If2c.(sol.u[i].ρw) ./ sol.u[i].Yc.ρ, levels = vel_w_levels)
+    ClimaCoreMakie.fieldcontourf!(
+        vel_w_ax,
+        If2c.(sol.u[i].ρw) ./ sol.u[i].Yc.ρ,
+        levels = vel_w_levels,
+    )
 end
 
 # Plot atmospheric longitudinal velocity [m/s] throughout the simulation
@@ -328,7 +350,12 @@ vel_u_ax = Makie.Axis(vel_u_fig[1, 1])
 # initial plot to setup axis and make consistent levels
 vel_u_plot = ClimaCoreMakie.fieldcontourf!(vel_u_ax, sol.u[end].Yc.ρuₕ ./ sol.u[end].Yc.ρ)
 vel_u_cb = Makie.Colorbar(vel_u_fig[1, 2], vel_u_plot)
-vel_u_levels = [k for k in range(vel_u_cb.limits[][1], vel_u_cb.limits[][2], vel_u_plot.levels[])]
+vel_u_levels =
+    [k for k in range(vel_u_cb.limits[][1], vel_u_cb.limits[][2], vel_u_plot.levels[])]
 Makie.record(vel_u_fig, joinpath(path, "vel_u.mp4"), 1:length(sol.u); framerate = 20) do i
-    ClimaCoreMakie.fieldcontourf!(vel_u_ax, sol.u[i].Yc.ρuₕ ./ sol.u[i].Yc.ρ, levels = vel_u_levels)
+    ClimaCoreMakie.fieldcontourf!(
+        vel_u_ax,
+        sol.u[i].Yc.ρuₕ ./ sol.u[i].Yc.ρ,
+        levels = vel_u_levels,
+    )
 end

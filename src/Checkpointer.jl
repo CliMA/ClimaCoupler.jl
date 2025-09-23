@@ -64,7 +64,8 @@ function checkpoint_model_state(
     Base.close(checkpoint_writer)
 
     # Remove previous checkpoint if it exists
-    prev_checkpoint_file = joinpath(output_dir, "checkpoint_$(nameof(sim))_$(prev_checkpoint_t).hdf5")
+    prev_checkpoint_file =
+        joinpath(output_dir, "checkpoint_$(nameof(sim))_$(prev_checkpoint_t).hdf5")
     remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
     return nothing
 end
@@ -104,7 +105,10 @@ function checkpoint_model_cache(
     JLD2.jldsave(output_file, cache = p)
 
     # Remove previous checkpoint if it exists
-    prev_checkpoint_file = joinpath(output_dir, "checkpoint_cache_$(pid)_$(nameof(sim))_$(prev_checkpoint_t).jld2")
+    prev_checkpoint_file = joinpath(
+        output_dir,
+        "checkpoint_cache_$(pid)_$(nameof(sim))_$(prev_checkpoint_t).jld2",
+    )
     remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
     return nothing
 end
@@ -136,10 +140,22 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
 
     for sim in cs.model_sims
         if !isnothing(Checkpointer.get_model_prog_state(sim))
-            Checkpointer.checkpoint_model_state(sim, comms_ctx, time, prev_checkpoint_t; output_dir)
+            Checkpointer.checkpoint_model_state(
+                sim,
+                comms_ctx,
+                time,
+                prev_checkpoint_t;
+                output_dir,
+            )
         end
         if !isnothing(Checkpointer.get_model_cache(sim))
-            Checkpointer.checkpoint_model_cache(sim, comms_ctx, time, prev_checkpoint_t; output_dir)
+            Checkpointer.checkpoint_model_cache(
+                sim,
+                comms_ctx,
+                time,
+                prev_checkpoint_t;
+                output_dir,
+            )
         end
     end
 
@@ -151,7 +167,8 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
     JLD2.jldsave(output_file, coupler_fields = CC.Adapt.adapt(Array, cs.fields))
 
     # Remove previous Coupler fields checkpoint if it exists
-    prev_checkpoint_file = joinpath(output_dir, "checkpoint_coupler_fields_$(pid)_$(prev_checkpoint_t).jld2")
+    prev_checkpoint_file =
+        joinpath(output_dir, "checkpoint_coupler_fields_$(pid)_$(prev_checkpoint_t).jld2")
     remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
 
     # Update previous checkpoint time stored in the coupled simulation
@@ -170,15 +187,23 @@ function restart!(cs, checkpoint_dir, checkpoint_t)
     pid = ClimaComms.mypid(ClimaComms.context(cs))
     for sim in cs.model_sims
         if !isnothing(Checkpointer.get_model_prog_state(sim))
-            input_file_state = output_file = joinpath(checkpoint_dir, "checkpoint_$(nameof(sim))_$(checkpoint_t).hdf5")
+            input_file_state =
+                output_file = joinpath(
+                    checkpoint_dir,
+                    "checkpoint_$(nameof(sim))_$(checkpoint_t).hdf5",
+                )
             restart_model_state!(sim, input_file_state, ClimaComms.context(cs))
         end
         if !isnothing(Checkpointer.get_model_cache(sim))
-            input_file_cache = joinpath(checkpoint_dir, "checkpoint_cache_$(pid)_$(nameof(sim))_$(checkpoint_t).jld2")
+            input_file_cache = joinpath(
+                checkpoint_dir,
+                "checkpoint_cache_$(pid)_$(nameof(sim))_$(checkpoint_t).jld2",
+            )
             restart_model_cache!(sim, input_file_cache)
         end
     end
-    input_file_coupler_fields = joinpath(checkpoint_dir, "checkpoint_coupler_fields_$(pid)_$(checkpoint_t).jld2")
+    input_file_coupler_fields =
+        joinpath(checkpoint_dir, "checkpoint_coupler_fields_$(pid)_$(checkpoint_t).jld2")
     restart_coupler_fields!(cs, input_file_coupler_fields)
     return true
 end
@@ -228,7 +253,8 @@ function restart_coupler_fields!(cs, input_file)
         fields_read = file["coupler_fields"]
         for name in propertynames(cs.fields)
             ArrayType = ClimaComms.array_type(ClimaComms.device(cs))
-            parent(getproperty(cs.fields, name)) .= ArrayType(parent(getproperty(fields_read, name)))
+            parent(getproperty(cs.fields, name)) .=
+                ArrayType(parent(getproperty(fields_read, name)))
         end
     end
 end
@@ -256,7 +282,9 @@ info message. This can be used to remove intermediate checkpoints, to prevent
 saving excessively large amounts of output.
 """
 function remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
-    if ClimaComms.iamroot(comms_ctx) && prev_checkpoint_t != -1 && isfile(prev_checkpoint_file)
+    if ClimaComms.iamroot(comms_ctx) &&
+       prev_checkpoint_t != -1 &&
+       isfile(prev_checkpoint_file)
         @info "Removing previous checkpoint file: $prev_checkpoint_file"
         rm(prev_checkpoint_file)
     end

@@ -12,7 +12,8 @@ import Thermodynamics as TD
 import ClimaCore as CC
 import ..Interfacer, ..Utilities
 
-export extrapolate_ρ_to_sfc, turbulent_fluxes!, get_surface_params, update_turbulent_fluxes!, compute_surface_fluxes!
+export extrapolate_ρ_to_sfc,
+    turbulent_fluxes!, get_surface_params, update_turbulent_fluxes!, compute_surface_fluxes!
 
 function turbulent_fluxes!(cs::Interfacer.CoupledSimulation)
     return turbulent_fluxes!(cs.fields, cs.model_sims, cs.thermo_params)
@@ -76,7 +77,15 @@ end
 
 
 function surface_inputs(input_args::NamedTuple)
-    (; thermo_state_sfc, thermo_state_atmos, uₕ_int, z_int, z_sfc, scheme_properties, boundary_space) = input_args
+    (;
+        thermo_state_sfc,
+        thermo_state_atmos,
+        uₕ_int,
+        z_int,
+        z_sfc,
+        scheme_properties,
+        boundary_space,
+    ) = input_args
     FT = CC.Spaces.undertype(boundary_space)
     (; z0b, z0m, beta, gustiness) = scheme_properties
 
@@ -153,7 +162,16 @@ function get_surface_fluxes(inputs, surface_params::SF.Parameters.SurfaceFluxesP
     ustar = outputs.ustar
     buoyancy_flux = outputs.buoy_flux
 
-    return (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux)
+    return (;
+        F_turb_ρτxz,
+        F_turb_ρτyz,
+        F_sh,
+        F_lh,
+        F_turb_moisture,
+        L_MO,
+        ustar,
+        buoyancy_flux,
+    )
 end
 
 """
@@ -166,7 +184,9 @@ here retaining the dependency until we know how EDMF boundary conditions will
 be handled (for consistency of parameters).
 """
 function get_surface_params(atmos_sim::Interfacer.AtmosModelSimulation)
-    return error("get_surface_params is required to be dispatched on $(nameof(atmos_sim)), but no method defined")
+    return error(
+        "get_surface_params is required to be dispatched on $(nameof(atmos_sim)), but no method defined",
+    )
 end
 
 """
@@ -175,7 +195,9 @@ end
 Updates the fluxes in the surface model simulation `sim` with the fluxes in `fields`.
 """
 function update_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, fields)
-    return error("update_turbulent_fluxes! is required to be dispatched on $(nameof(sim)), but no method defined")
+    return error(
+        "update_turbulent_fluxes! is required to be dispatched on $(nameof(sim)), but no method defined",
+    )
 end
 
 update_turbulent_fluxes!(sim::Interfacer.AbstractSurfaceStub, fields::NamedTuple) = nothing
@@ -225,7 +247,8 @@ function compute_surface_fluxes!(
     z_sfc = Interfacer.get_field(atmos_sim, Val(:height_sfc), boundary_space)
 
     # construct the atmospheric thermo states
-    thermo_state_atmos = TD.PhaseEquil_ρTq.(thermo_params, csf.ρ_atmos, csf.T_atmos, csf.q_atmos)
+    thermo_state_atmos =
+        TD.PhaseEquil_ρTq.(thermo_params, csf.ρ_atmos, csf.T_atmos, csf.q_atmos)
 
     # construct the surface thermo state
     # get surface air density by extrapolating atmospheric density to the surface
@@ -243,7 +266,8 @@ function compute_surface_fluxes!(
     z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy), boundary_space)
     beta = Interfacer.get_field(sim, Val(:beta), boundary_space)
     FT = eltype(z0m)
-    scheme_properties = (; z0b = z0b, z0m = z0m, Ch = FT(0), Cd = FT(0), beta = beta, gustiness = FT(1))
+    scheme_properties =
+        (; z0b = z0b, z0m = z0m, Ch = FT(0), Cd = FT(0), beta = beta, gustiness = FT(1))
 
     input_args = (;
         thermo_state_sfc,
@@ -259,7 +283,8 @@ function compute_surface_fluxes!(
 
     # calculate the surface fluxes
     fluxes = FluxCalculator.get_surface_fluxes(inputs, surface_params)
-    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux) = fluxes
+    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux) =
+        fluxes
 
 
     # Zero out fluxes where the area fraction is zero

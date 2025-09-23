@@ -29,8 +29,12 @@ It contains the following objects:
 - `area_fraction::A`: A ClimaCore Field on the boundary space representing the surface area fraction of this component model.
 - `output_writer`: The diagnostic file writer.
 """
-struct BucketSimulation{M <: CL.Bucket.BucketModel, I <: SciMLBase.AbstractODEIntegrator, A <: CC.Fields.Field, OW} <:
-       Interfacer.LandModelSimulation
+struct BucketSimulation{
+    M <: CL.Bucket.BucketModel,
+    I <: SciMLBase.AbstractODEIntegrator,
+    A <: CC.Fields.Field,
+    OW,
+} <: Interfacer.LandModelSimulation
     model::M
     integrator::I
     area_fraction::A
@@ -68,7 +72,12 @@ function BucketSimulation(
     if isnothing(shared_surface_space)
         domain = make_land_domain(depth; nelements, dz_tuple)
     else
-        domain = make_land_domain(shared_surface_space, depth; nelements_vert = nelements[2], dz_tuple)
+        domain = make_land_domain(
+            shared_surface_space,
+            depth;
+            nelements_vert = nelements[2],
+            dz_tuple,
+        )
     end
     surface_space = domain.space.surface
     subsurface_space = domain.space.subsurface
@@ -97,7 +106,8 @@ function BucketSimulation(
             (; lat, long) = coordinate_point
             return typeof(lat)(0.38)
         end
-        albedo = CL.Bucket.PrescribedBaregroundAlbedo{FT}(α_snow, α_bareground, surface_space)
+        albedo =
+            CL.Bucket.PrescribedBaregroundAlbedo{FT}(α_snow, α_bareground, surface_space)
     else
         error("invalid albedo type $albedo_type")
     end
@@ -145,7 +155,9 @@ function BucketSimulation(
     T_sfc_0 = FT(271)
     @. Y.bucket.T = T_sfc_0 + temp_anomaly(coords.subsurface)
     # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
-    orog_adjusted_T_data = CC.Fields.field_values(Y.bucket.T) .- lapse_rate .* CC.Fields.field_values(surface_elevation)
+    orog_adjusted_T_data =
+        CC.Fields.field_values(Y.bucket.T) .-
+        lapse_rate .* CC.Fields.field_values(surface_elevation)
     orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, domain.space.subsurface)
     # Adjust T based on surface elevation (p.bucket.T_sfc is then set using the
     # set_initial_cache! function)
@@ -171,7 +183,8 @@ function BucketSimulation(
         surface_space = domain.space.surface
         subsurface_space = domain.space.subsurface
         regridder_type = :InterpolationsRegridder
-        extrapolation_bc = (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
+        extrapolation_bc =
+            (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
         Y.bucket.W .= SpaceVaryingInput(
             bucket_initial_condition,
             "W",
@@ -214,10 +227,15 @@ function BucketSimulation(
     # Add diagnostics
     if use_land_diagnostics
         output_writer = CD.Writers.NetCDFWriter(domain.space.subsurface, output_dir)
-        scheduled_diagnostics =
-            CL.default_diagnostics(model, start_date, output_writer = output_writer, reduction_period = :monthly)
+        scheduled_diagnostics = CL.default_diagnostics(
+            model,
+            start_date,
+            output_writer = output_writer,
+            reduction_period = :monthly,
+        )
 
-        diagnostic_handler = CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)
+        diagnostic_handler =
+            CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)
         diag_cb = CD.DiagnosticsCallback(diagnostic_handler)
     else
         output_writer = nothing
@@ -240,8 +258,10 @@ end
 Interfacer.get_field(sim::BucketSimulation, ::Val{:area_fraction}) = sim.area_fraction
 Interfacer.get_field(sim::BucketSimulation, ::Val{:beta}) =
     CL.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
-Interfacer.get_field(sim::BucketSimulation, ::Val{:roughness_buoyancy}) = sim.model.parameters.z_0b
-Interfacer.get_field(sim::BucketSimulation, ::Val{:roughness_momentum}) = sim.model.parameters.z_0m
+Interfacer.get_field(sim::BucketSimulation, ::Val{:roughness_buoyancy}) =
+    sim.model.parameters.z_0b
+Interfacer.get_field(sim::BucketSimulation, ::Val{:roughness_momentum}) =
+    sim.model.parameters.z_0m
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_direct_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_diffuse_albedo}) =
@@ -258,7 +278,8 @@ of frozen water in the snow.
 
 This method is required by the ConservationChecker to check energy conservation.
 """
-Interfacer.get_field(sim::BucketSimulation, ::Val{:energy}) = sim.integrator.p.bucket.total_energy
+Interfacer.get_field(sim::BucketSimulation, ::Val{:energy}) =
+    sim.integrator.p.bucket.total_energy
 
 """
     Interfacer.get_field(sim::BucketSimulation, ::Val{:water})
@@ -277,14 +298,26 @@ end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_density}, field)
     Interfacer.remap!(sim.integrator.p.bucket.ρ_sfc, field)
 end
-function Interfacer.update_field!(sim::BucketSimulation, ::Val{:liquid_precipitation}, field)
+function Interfacer.update_field!(
+    sim::BucketSimulation,
+    ::Val{:liquid_precipitation},
+    field,
+)
     ρ_liq = LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
     Interfacer.remap!(sim.integrator.p.drivers.P_liq, field ./ ρ_liq)
 end
-function Interfacer.update_field!(sim::BucketSimulation, ::Val{:radiative_energy_flux_sfc}, field)
+function Interfacer.update_field!(
+    sim::BucketSimulation,
+    ::Val{:radiative_energy_flux_sfc},
+    field,
+)
     Interfacer.remap!(sim.integrator.p.bucket.R_n, field)
 end
-function Interfacer.update_field!(sim::BucketSimulation, ::Val{:turbulent_energy_flux}, fields)
+function Interfacer.update_field!(
+    sim::BucketSimulation,
+    ::Val{:turbulent_energy_flux},
+    fields,
+)
     Interfacer.remap!(sim.integrator.p.bucket.turbulent_fluxes.lhf, fields.F_lh)
     Interfacer.remap!(sim.integrator.p.bucket.turbulent_fluxes.shf, fields.F_sh)
 end
@@ -292,13 +325,19 @@ function Interfacer.update_field!(sim::BucketSimulation, ::Val{:snow_precipitati
     ρ_liq = LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
     Interfacer.remap!(sim.integrator.p.drivers.P_snow, field ./ ρ_liq)
 end
-function Interfacer.update_field!(sim::BucketSimulation, ::Val{:turbulent_moisture_flux}, field)
+function Interfacer.update_field!(
+    sim::BucketSimulation,
+    ::Val{:turbulent_moisture_flux},
+    field,
+)
     ρ_liq = LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
     Interfacer.remap!(sim.integrator.p.bucket.turbulent_fluxes.vapor_flux, field ./ ρ_liq) # TODO: account for sublimation
 end
 
-Interfacer.step!(sim::BucketSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
-Interfacer.close_output_writers(sim::BucketSimulation) = isnothing(sim.output_writer) || close(sim.output_writer)
+Interfacer.step!(sim::BucketSimulation, t) =
+    Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+Interfacer.close_output_writers(sim::BucketSimulation) =
+    isnothing(sim.output_writer) || close(sim.output_writer)
 
 """
 Extend Interfacer.add_coupler_fields! to add the fields required for BucketSimulation.

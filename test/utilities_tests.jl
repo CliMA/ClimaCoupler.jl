@@ -44,7 +44,12 @@ for FT in (Float32, Float64)
     end
 
     @testset "integral" begin
-        space2d = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+        space2d = CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius = FT(6371e3),
+            n_quad_points = 4,
+            h_elem = 4,
+        )
         ones2d = ones(space2d)
 
         space3d = CC.CommonSpaces.ExtrudedCubedSphereSpace(
@@ -59,7 +64,11 @@ for FT in (Float32, Float64)
         )
         ones3d_level = CC.Fields.level(ones(space3d), 1)
 
-        @test isapprox(Utilities.integral(ones3d_level), Utilities.integral(ones2d), rtol = 1e-5)
+        @test isapprox(
+            Utilities.integral(ones3d_level),
+            Utilities.integral(ones2d),
+            rtol = 1e-5,
+        )
         @test Utilities.integral(ones(space3d)) == sum(ones(space3d))
     end
 end

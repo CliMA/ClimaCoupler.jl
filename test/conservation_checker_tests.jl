@@ -9,12 +9,14 @@ import ClimaCoupler: ConservationChecker, Interfacer
 import ClimaCoupler.Utilities: integral
 
 get_slab_energy(slab_sim, T_sfc) =
-    slab_sim.integrator.p.params.ρ .* slab_sim.integrator.p.params.c .* T_sfc .* slab_sim.integrator.p.params.h
+    slab_sim.integrator.p.params.ρ .* slab_sim.integrator.p.params.c .* T_sfc .*
+    slab_sim.integrator.p.params.h
 
 struct TestAtmos{I} <: Interfacer.AtmosModelSimulation
     i::I
 end
-Interfacer.get_field(s::TestAtmos, ::Val{:radiative_energy_flux_toa}) = ones(s.i.space) .* 200
+Interfacer.get_field(s::TestAtmos, ::Val{:radiative_energy_flux_toa}) =
+    ones(s.i.space) .* 200
 Interfacer.get_field(s::TestAtmos, ::Val{:water}) = s.i.water
 Interfacer.get_field(s::TestAtmos, ::Val{:energy}) = s.i.energy
 
@@ -22,19 +24,27 @@ struct TestOcean{I} <: Interfacer.SurfaceModelSimulation
     i::I
 end
 Interfacer.get_field(s::TestOcean, ::Val{:water}) = zeros(s.i.space)
-Interfacer.get_field(s::TestOcean, ::Val{:energy}) = ones(s.i.space) .* CC.Spaces.undertype(s.i.space)(1e6)
-Interfacer.get_field(s::TestOcean, ::Val{:area_fraction}) = ones(s.i.space) .* CC.Spaces.undertype(s.i.space)(0.25)
+Interfacer.get_field(s::TestOcean, ::Val{:energy}) =
+    ones(s.i.space) .* CC.Spaces.undertype(s.i.space)(1e6)
+Interfacer.get_field(s::TestOcean, ::Val{:area_fraction}) =
+    ones(s.i.space) .* CC.Spaces.undertype(s.i.space)(0.25)
 
 struct TestLand{I} <: Interfacer.SurfaceModelSimulation
     i::I
 end
 Interfacer.get_field(s::TestLand, ::Val{:energy}) = zeros(s.i.space)
 Interfacer.get_field(s::TestLand, ::Val{:water}) = zeros(s.i.space)
-Interfacer.get_field(s::TestLand, ::Val{:area_fraction}) = ones(s.i.space) .* CC.Spaces.undertype(s.i.space)(0.25)
+Interfacer.get_field(s::TestLand, ::Val{:area_fraction}) =
+    ones(s.i.space) .* CC.Spaces.undertype(s.i.space)(0.25)
 
 for FT in (Float32, Float64)
     @testset "test check_conservation for conservation for FT=$FT" begin
-        space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+        space = CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius = FT(6371e3),
+            n_quad_points = 4,
+            h_elem = 4,
+        )
 
         # set up model simulations
         initial_energy = ones(space) .* CC.Spaces.undertype(space)(1e6)
@@ -44,7 +54,8 @@ for FT in (Float32, Float64)
         land = TestOcean((; space = space))
         ocean = TestLand((; space = space))
         ice = Interfacer.SurfaceStub((; area_fraction = CC.Fields.ones(space) .* FT(0.5)))
-        model_sims = (; atmos_sim = atmos, land_sim = land, ocean_sim = ocean, ice_sim = ice)
+        model_sims =
+            (; atmos_sim = atmos, land_sim = land, ocean_sim = ocean, ice_sim = ice)
 
         # conservation checkers
         cc = (;
@@ -53,7 +64,11 @@ for FT in (Float32, Float64)
         )
 
         # coupler fields
-        cf = Interfacer.init_coupler_fields(FT, [:P_net, :P_liq, :P_snow, :F_turb_moisture], space)
+        cf = Interfacer.init_coupler_fields(
+            FT,
+            [:P_net, :P_liq, :P_snow, :F_turb_moisture],
+            space,
+        )
         @. cf.P_liq = -100
 
         # init
@@ -80,7 +95,8 @@ for FT in (Float32, Float64)
         volume = integral(ones(space))
 
         area_fraction_scaling =
-            Interfacer.get_field(land, Val(:area_fraction)) .+ Interfacer.get_field(ocean, Val(:area_fraction))
+            Interfacer.get_field(land, Val(:area_fraction)) .+
+            Interfacer.get_field(ocean, Val(:area_fraction))
         water_from_precipitation = integral(P .* area_fraction_scaling) .* FT(Δt)
         energy_from_radiation = integral(F_r) .* FT(Δt)
         energy_per_unit_cell = CC.Fields.ones(space) .* energy_from_radiation ./ volume
@@ -88,8 +104,10 @@ for FT in (Float32, Float64)
 
         # analytical solution
         # Only ocean and atmos have energy
-        area_fraction_scaling = CC.Fields.ones(space) .+ Interfacer.get_field(ocean, Val(:area_fraction))
-        tot_energy_an = integral(area_fraction_scaling .* FT.(initial_energy)) + energy_from_radiation
+        area_fraction_scaling =
+            CC.Fields.ones(space) .+ Interfacer.get_field(ocean, Val(:area_fraction))
+        tot_energy_an =
+            integral(area_fraction_scaling .* FT.(initial_energy)) + energy_from_radiation
         tot_water_an = integral(FT.(initial_water)) - water_from_precipitation
 
         # run check_conservation!
@@ -123,7 +141,12 @@ for FT in (Float32, Float64)
     end
 
     @testset "test plot_global_conservation with dummy models for FT=$FT" begin
-        space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+        space = CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius = FT(6371e3),
+            n_quad_points = 4,
+            h_elem = 4,
+        )
 
         # set up model simulations
         initial_energy = ones(space) .* CC.Spaces.undertype(space)(1e6)
@@ -133,7 +156,8 @@ for FT in (Float32, Float64)
         land = TestOcean((; space = space))
         ocean = TestLand((; space = space))
         ice = Interfacer.SurfaceStub((; area_fraction = CC.Fields.ones(space) .* FT(0.5)))
-        model_sims = (; atmos_sim = atmos, land_sim = land, ocean_sim = ocean, ice_sim = ice)
+        model_sims =
+            (; atmos_sim = atmos, land_sim = land, ocean_sim = ocean, ice_sim = ice)
 
         # conservation checkers
         cc = (;
@@ -142,7 +166,11 @@ for FT in (Float32, Float64)
         )
 
         # coupler fields
-        cf = Interfacer.init_coupler_fields(FT, [:P_net, :P_liq, :P_snow, :F_turb_moisture], space)
+        cf = Interfacer.init_coupler_fields(
+            FT,
+            [:P_net, :P_liq, :P_snow, :F_turb_moisture],
+            space,
+        )
         @. cf.P_liq = -100
 
         # init

@@ -9,7 +9,8 @@ import ..Interfacer, ..Utilities
 import ..Utilities: integral
 import ClimaCore as CC
 
-export AbstractConservationCheck, EnergyConservationCheck, WaterConservationCheck, check_conservation!
+export AbstractConservationCheck,
+    EnergyConservationCheck, WaterConservationCheck, check_conservation!
 
 abstract type AbstractConservationCheck end
 
@@ -54,9 +55,15 @@ Base.nameof(::WaterConservationCheck) = "water [kg]"
 
 itertes over all specified conservation checks and returns values.
 """
-function check_conservation!(coupler_sim::Interfacer.CoupledSimulation; runtime_check = false)
+function check_conservation!(
+    coupler_sim::Interfacer.CoupledSimulation;
+    runtime_check = false,
+)
     isnothing(coupler_sim.conservation_checks) && return nothing
-    return map(x -> check_conservation!(x, coupler_sim, runtime_check), coupler_sim.conservation_checks)
+    return map(
+        x -> check_conservation!(x, coupler_sim, runtime_check),
+        coupler_sim.conservation_checks,
+    )
 end
 
 """
@@ -86,16 +93,19 @@ function check_conservation!(
     for sim in model_sims
         sim_name = Symbol(Base.nameof(sim))
         if sim isa Interfacer.AtmosModelSimulation
-            radiative_energy_flux_toa = Interfacer.get_field(sim, Val(:radiative_energy_flux_toa))
+            radiative_energy_flux_toa =
+                Interfacer.get_field(sim, Val(:radiative_energy_flux_toa))
 
             if radiative_energy_flux_toa isa Number # Case with no radiation. TODO: Handle this better
                 radiation_sources_accum = 0
             else
                 if isempty(ccs.toa_net_source)
-                    radiation_sources_accum = integral(radiative_energy_flux_toa) * FT(float(coupler_sim.Δt_cpl)) # ∫ J / m^2 dA
+                    radiation_sources_accum =
+                        integral(radiative_energy_flux_toa) * FT(float(coupler_sim.Δt_cpl)) # ∫ J / m^2 dA
                 else
                     radiation_sources_accum =
-                        integral(radiative_energy_flux_toa) * FT(float(coupler_sim.Δt_cpl)) + ccs.toa_net_source[end] # ∫ J / m^2 dA
+                        integral(radiative_energy_flux_toa) *
+                        FT(float(coupler_sim.Δt_cpl)) + ccs.toa_net_source[end] # ∫ J / m^2 dA
                 end
             end
             push!(ccs.toa_net_source, radiation_sources_accum)
@@ -116,7 +126,11 @@ function check_conservation!(
                 previous = getproperty(ccs, sim_name)
                 # regrid each field onto the boundary space
                 current = integral(
-                    Interfacer.get_field(sim, Val(:energy), Interfacer.boundary_space(coupler_sim)) .* area_fraction,
+                    Interfacer.get_field(
+                        sim,
+                        Val(:energy),
+                        Interfacer.boundary_space(coupler_sim),
+                    ) .* area_fraction,
                 ) # # ∫ J / m^3 dV
             end
             push!(previous, current)
@@ -160,8 +174,10 @@ function check_conservation!(
 
     # net precipitation (for surfaces that don't collect water)
     PE_net =
-        coupler_sim.fields.P_net .+=
-            Interfacer.remap(surface_water_gain_from_rates(coupler_sim), Interfacer.boundary_space(coupler_sim))
+        coupler_sim.fields.P_net .+= Interfacer.remap(
+            surface_water_gain_from_rates(coupler_sim),
+            Interfacer.boundary_space(coupler_sim),
+        )
 
     # save surfaces
     for sim in model_sims
@@ -188,7 +204,11 @@ function check_conservation!(
             else
                 previous = getproperty(ccs, sim_name)
                 current = integral(
-                    Interfacer.get_field(sim, Val(:water), Interfacer.boundary_space(coupler_sim)) .* area_fraction,
+                    Interfacer.get_field(
+                        sim,
+                        Val(:water),
+                        Interfacer.boundary_space(coupler_sim),
+                    ) .* area_fraction,
                 ) # kg (∫kg of water / m^3 dV)
                 push!(previous, current)
             end

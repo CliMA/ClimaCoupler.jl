@@ -25,7 +25,8 @@ end
 include("../user_io/debug_plots.jl")
 
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_field}) = sim.cache.surface_field
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_field}) = sim.cache.surface_field
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_field}) =
+    sim.cache.surface_field
 Interfacer.get_field(sim::Interfacer.SurfaceStub, ::Val{:stub_field}) = sim.cache.stub_field
 
 plot_field_names(sim::ClimaAtmosSimulation) = (:atmos_field,)
@@ -35,7 +36,12 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
 
 @testset "import_atmos_fields!" begin
 
-    boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+    boundary_space = CC.CommonSpaces.CubedSphereSpace(
+        FT;
+        radius = FT(6371e3),
+        n_quad_points = 4,
+        h_elem = 4,
+    )
     coupler_names = [
         :surface_direct_albedo,
         :surface_diffuse_albedo,
@@ -58,9 +64,15 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
     surface_names = (:surface_field,)
     stub_names = (:stub_field,)
 
-    atmos_fields = NamedTuple{atmos_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(atmos_names)))
-    surface_fields = NamedTuple{surface_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(surface_names)))
-    stub_fields = NamedTuple{stub_names}(ntuple(i -> CC.Fields.zeros(boundary_space), length(stub_names)))
+    atmos_fields = NamedTuple{atmos_names}(
+        ntuple(i -> CC.Fields.zeros(boundary_space), length(atmos_names)),
+    )
+    surface_fields = NamedTuple{surface_names}(
+        ntuple(i -> CC.Fields.zeros(boundary_space), length(surface_names)),
+    )
+    stub_fields = NamedTuple{stub_names}(
+        ntuple(i -> CC.Fields.zeros(boundary_space), length(stub_names)),
+    )
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_names, boundary_space)
 
     model_sims = (;
@@ -85,7 +97,10 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
     )
 
     output_plots = "test_debug"
-    @test_logs (:info, "plotting debug in test_debug") match_mode = :any debug(cs, output_plots)
+    @test_logs (:info, "plotting debug in test_debug") match_mode = :any debug(
+        cs,
+        output_plots,
+    )
     @test isfile("test_debug/debug_ClimaAtmosSimulation.png")
     @test isfile("test_debug/debug_BucketSimulation.png")
     @test isfile("test_debug/debug_ClimaLandSimulation.png")

@@ -39,7 +39,8 @@ function get_coupler_config_dict(config_file)
         isnothing(job_id) ? string(split(split(config_file, '/')[end], '.')[1]) : job_id
 
     # Load the coupler config file into a dictionary
-    coupler_config_dict = YAML.load_file(config_file)
+    @show config_file
+    coupler_config_dict = config_file isa String ? YAML.load_file(config_file) : merge(YAML.load_file.(config_file)...)
 
     # Get ClimaAtmos default configuration dictionary
     atmos_default = CA.default_config_dict()

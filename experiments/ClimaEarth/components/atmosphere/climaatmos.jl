@@ -479,23 +479,40 @@ Returns the specified atmospheric configuration (`atmos_config`) overwitten by a
 in the coupler dictionary (`coupler_config`).
 The returned `atmos_config` dictionary will then be used to set up the atmosphere simulation.
 
-In this function, parameters are overwritten in a specific order, from lowest to highest priority:
-    1. Default atmos config
-    2. Provided atmos config file (if any)
-    3. TOML parameter file
-    5. Output directory and timestep are set explicitly based on the coupler config
+The `atmos_config` is mostly a copy of the `coupler_config`, which has already been created
+by combining the default and provided atmosphere and coupler configuration files.
+Please see the documentation of `get_coupler_config_dict` for more details about how that is done.
+
+This function makes the following changes to `coupler_config` when creating `atmos_config`:
+- Renaming for consistency with ClimaAtmos.jl
+- TOML parameter file selection (see details below)
+- Setting the atmos output directory to the provided `atmos_output_dir`
+- Adding extra atmosphere diagnostics
+- Manually setting the restart file suffix
 
 The TOML parameter file to use is chosen using the following priority:
-If a coupler TOML file is provided, it is used. Otherwise we use an atmos TOML
-file if it's provided. If neither is provided, we use a default coupler TOML file.
+If a coupler TOML file is provided, it is used.
+Otherwise we use an atmos TOML file if it's provided.
+If neither file is provided, the default ClimaAtmos parameters are used.
 """
 function get_atmos_config_dict(coupler_config::Dict, atmos_output_dir)
     atmos_config = deepcopy(coupler_config)
 
+    # Rename parameters for consistency with ClimaAtmos.jl
     # Rename atmosphere config file from ClimaCoupler convention to ClimaAtmos convention
     atmos_config["config_file"] = coupler_config["atmos_config_file"]
 
-    # use atmos toml if coupler toml is not defined
+    # Ensure Atmos's own checkpoints are synced up with ClimaCoupler, so that we
+    # can pick up from where we have left. NOTE: This should not be needed, but
+    # there is no easy way to initialize ClimaAtmos with a different t_start
+    atmos_config["dt_save_state_to_disk"] = coupler_config["checkpoint_dt"]
+
+    # The Atmos `get_simulation` function expects the atmos config to contains its timestep size
+    # in the `dt` field. If there is a `dt_atmos` field in coupler_config, we add it to the atmos config as `dt`
+    dt_atmos = haskey(coupler_config, "dt_atmos") ? coupler_config["dt_atmos"] : coupler_config["dt"]
+    atmos_config["dt"] = dt_atmos
+
+    # Use atmos toml if coupler toml is not defined
     # If we can't find the file at the relative path, prepend pkgdir(ClimaAtmos)
     atmos_toml = map(atmos_config["toml"]) do file
         isfile(file) ? file : joinpath(pkgdir(CA), file)
@@ -511,21 +528,11 @@ function get_atmos_config_dict(coupler_config::Dict, atmos_output_dir)
     atmos_config["output_dir_style"] = "RemovePreexisting"
     atmos_config["output_dir"] = atmos_output_dir
 
-    # Ensure Atmos's own checkpoints are synced up with ClimaCoupler, so that we
-    # can pick up from where we have left. NOTE: This should not be needed, but
-    # there is no easy way to initialize ClimaAtmos with a different t_start
-    atmos_config["dt_save_state_to_disk"] = coupler_config["checkpoint_dt"]
-
     # Add all extra atmos diagnostic entries into the vector of atmos diagnostics
     atmos_config["diagnostics"] =
         haskey(atmos_config, "diagnostics") ?
         vcat(atmos_config["diagnostics"], coupler_config["extra_atmos_diagnostics"]) :
         coupler_config["extra_atmos_diagnostics"]
-
-    # The Atmos `get_simulation` function expects the atmos config to contains its timestep size
-    # in the `dt` field. If there is a `dt_atmos` field in coupler_config, we add it to the atmos config as `dt`
-    dt_atmos = haskey(coupler_config, "dt_atmos") ? coupler_config["dt_atmos"] : coupler_config["dt"]
-    atmos_config["dt"] = dt_atmos
 
     # set restart file to the initial file saved in this location if it is not nothing
     # TODO this is hardcoded and should be fixed once we have a better restart system

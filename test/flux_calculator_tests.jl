@@ -73,8 +73,10 @@ Interfacer.get_field(sim::TestOcean, ::Val{:roughness_momentum}) = sim.integrato
 Interfacer.get_field(sim::TestOcean, ::Val{:roughness_buoyancy}) = sim.integrator.p.z0b
 Interfacer.get_field(sim::TestOcean, ::Val{:beta}) = sim.integrator.p.beta
 Interfacer.get_field(sim::TestOcean, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
-Interfacer.get_field(sim::TestOcean, ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}}) =
-    sim.integrator.p.α
+Interfacer.get_field(
+    sim::TestOcean,
+    ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}},
+) = sim.integrator.p.α
 
 FieldExchanger.import_atmos_fields!(csf, sim::TestOcean, atmos_sim) = nothing
 
@@ -89,13 +91,20 @@ struct DummySurfaceSimulation3{M, I} <: Interfacer.SurfaceModelSimulation
     integrator::I
 end
 
-Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:surface_temperature}) = sim.integrator.T
-Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
+Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:surface_temperature}) =
+    sim.integrator.T
+Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:area_fraction}) =
+    sim.integrator.p.area_fraction
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:beta}) = sim.integrator.p.beta
 
 for FT in (Float32, Float64)
     @testset "calculate correct fluxes: dry for FT=$FT" begin
-        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius = FT(6371e3),
+            n_quad_points = 4,
+            h_elem = 4,
+        )
 
         params = (; FT = FT)
 
@@ -109,7 +118,11 @@ for FT in (Float32, Float64)
             u = ones(boundary_space),
             v = ones(boundary_space),
         )
-        Y_init = (; ρ = ones(boundary_space) .* FT(1.2), T = ones(boundary_space) .* FT(310), q = zeros(boundary_space))
+        Y_init = (;
+            ρ = ones(boundary_space) .* FT(1.2),
+            T = ones(boundary_space) .* FT(310),
+            q = zeros(boundary_space),
+        )
         integrator = (; Y_init..., p = p)
         atmos_sim = TestAtmos(params, nothing, integrator)
 
@@ -132,8 +145,14 @@ for FT in (Float32, Float64)
 
         model_sims = (; atmos_sim, ocean_sim, ocean_sim2)
 
-        coupler_cache_additional =
-            [:surface_direct_albedo, :surface_diffuse_albedo, :P_net, :L_MO, :ustar, :buoyancy_flux]
+        coupler_cache_additional = [
+            :surface_direct_albedo,
+            :surface_diffuse_albedo,
+            :P_net,
+            :L_MO,
+            :ustar,
+            :buoyancy_flux,
+        ]
 
         coupler_cache_names = Interfacer.default_coupler_fields()
         push!(coupler_cache_names, coupler_cache_additional...)
@@ -162,7 +181,12 @@ for FT in (Float32, Float64)
                 Interfacer.get_field(atmos_sim, Val(:v_int)),
             )
         thermo_state_atmos =
-            TD.PhaseEquil_ρTq.(thermo_params, atmos_sim.integrator.ρ, atmos_sim.integrator.T, atmos_sim.integrator.q)
+            TD.PhaseEquil_ρTq.(
+                thermo_params,
+                atmos_sim.integrator.ρ,
+                atmos_sim.integrator.T,
+                atmos_sim.integrator.q,
+            )
 
         # Get surface properties
         z_sfc = Interfacer.get_field(atmos_sim, Val(:height_sfc))
@@ -181,7 +205,8 @@ for FT in (Float32, Float64)
             T_sfc,
             thermo_params,
         )
-        ρ_sfc = FluxCalculator.extrapolate_ρ_to_sfc.(thermo_params, thermo_state_atmos, T_sfc)
+        ρ_sfc =
+            FluxCalculator.extrapolate_ρ_to_sfc.(thermo_params, thermo_state_atmos, T_sfc)
         thermo_state_sfc = TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
 
         # Use SurfaceFluxes.jl to compute the expected fluxes
@@ -230,5 +255,7 @@ end
 
 @testset "SurfaceStub update_turbulent_fluxes!" begin
     FT = Float32
-    @test isnothing(FluxCalculator.update_turbulent_fluxes!(Interfacer.SurfaceStub(FT(0)), (;)))
+    @test isnothing(
+        FluxCalculator.update_turbulent_fluxes!(Interfacer.SurfaceStub(FT(0)), (;)),
+    )
 end

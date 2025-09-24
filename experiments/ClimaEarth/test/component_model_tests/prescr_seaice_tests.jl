@@ -11,7 +11,12 @@ include(joinpath("..", "..", "components", "ocean", "prescr_seaice.jl"))
 for FT in (Float32, Float64)
     @testset "test sea-ice energy slab for FT=$FT" begin
         function test_sea_ice_rhs(; F_radiative = 0.0, T_base = 271.2)
-            space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+            space = CC.CommonSpaces.CubedSphereSpace(
+                FT;
+                radius = FT(6371e3),
+                n_quad_points = 4,
+                h_elem = 4,
+            )
             params = IceSlabParameters{FT}(T_base = T_base)
 
             Y = slab_ice_space_init(FT, space, params)
@@ -24,7 +29,10 @@ for FT in (Float32, Float64)
 
             # Set up prescribed sea ice concentration object
             sic_data = try
-                joinpath(@clima_artifact("historical_sst_sic"), "MODEL.ICE.HAD187001-198110.OI198111-202206.nc")
+                joinpath(
+                    @clima_artifact("historical_sst_sic"),
+                    "MODEL.ICE.HAD187001-198110.OI198111-202206.nc",
+                )
             catch error
                 @warn "Using lowres SIC. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
                 joinpath(
@@ -76,13 +84,19 @@ for FT in (Float32, Float64)
 
         # check that the correct tendency was added due to basal flux
         dY, Y, p = test_sea_ice_rhs(F_radiative = 0.0, T_base = 269.2)
-        dT_expected = -2.0 * p.params.k_ice / (p.params.h * p.params.h * p.params.ρ * p.params.c)
+        dT_expected =
+            -2.0 * p.params.k_ice / (p.params.h * p.params.h * p.params.ρ * p.params.c)
         @test minimum(dY) ≈ FT(dT_expected)
         @test maximum(dY) ≈ FT(0)
     end
 
     @testset "dss_state! SeaIceModelSimulation for FT=$FT" begin
-        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius = FT(6371e3),
+            n_quad_points = 4,
+            h_elem = 4,
+        )
 
         # construct dss buffer to put in cache
         dss_buffer = CC.Spaces.create_dss_buffer(CC.Fields.zeros(boundary_space))
@@ -92,7 +106,10 @@ for FT in (Float32, Float64)
             state_field1 = CC.Fields.ones(boundary_space),
             state_field2 = CC.Fields.zeros(boundary_space),
         )
-        p = (; cache_field = CC.Fields.zeros(boundary_space), dss_buffer = CC.Spaces.create_dss_buffer(u))
+        p = (;
+            cache_field = CC.Fields.zeros(boundary_space),
+            dss_buffer = CC.Spaces.create_dss_buffer(u),
+        )
         integrator = (; u, p)
         sim = PrescribedIceSimulation(nothing, integrator)
 

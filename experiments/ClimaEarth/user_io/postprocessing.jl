@@ -42,7 +42,8 @@ function postprocess_sim(cs, postprocessing_vars)
             leaderboard_base_path = artifact_dir
             compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
             rmse_check && test_rmse_thresholds(atmos_output_dir, 3)
-            pressure_in_output && compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 6)
+            pressure_in_output &&
+                compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 6)
         end
     end
 
@@ -66,7 +67,8 @@ function postprocess_sim(cs, postprocessing_vars)
     end
 
     # Close all diagnostics file writers
-    !isnothing(cs.diags_handler) && map(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
+    !isnothing(cs.diags_handler) &&
+        map(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
 end
 
 """
@@ -106,7 +108,10 @@ function save_sypd_walltime_to_disk(cs, walltime)
             println(sypd_filename, "$sypd")
         end
 
-        open(joinpath(cs.dirs.artifacts, "walltime_per_step.txt"), "w") do walltime_per_step_filename
+        open(
+            joinpath(cs.dirs.artifacts, "walltime_per_step.txt"),
+            "w",
+        ) do walltime_per_step_filename
             println(walltime_per_step_filename, "$(walltime_per_step)")
         end
 

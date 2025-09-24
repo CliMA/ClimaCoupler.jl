@@ -23,7 +23,14 @@ diagnostic for turbulent energy fluxes.
 
 Return a DiagnosticsHandler object to coordinate the diagnostics.
 """
-function coupler_diagnostics_setup(fields, output_dir, start_date, t_start, diagnostics_dt, coupled_dt)
+function coupler_diagnostics_setup(
+    fields,
+    output_dir,
+    start_date,
+    t_start,
+    diagnostics_dt,
+    coupled_dt,
+)
     # Create schedules and writer
     schedule_everystep = CD.Schedules.EveryStepSchedule()
     schedule_calendar_dt = CD.Schedules.EveryCalendarDtSchedule(diagnostics_dt; start_date)
@@ -58,6 +65,7 @@ function coupler_diagnostics_setup(fields, output_dir, start_date, t_start, diag
 
     # Create the diagnostics handler containing the scheduled diagnostics
     scheduled_diags = [F_turb_energy_diag_sched]
-    diags_handler = CD.DiagnosticsHandler(scheduled_diags, fields, nothing, t_start, dt = coupled_dt)
+    diags_handler =
+        CD.DiagnosticsHandler(scheduled_diags, fields, nothing, t_start, dt = coupled_dt)
     return diags_handler
 end

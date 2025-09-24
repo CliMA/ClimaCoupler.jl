@@ -91,9 +91,15 @@ cs_two_steps2 = setup_and_run(two_steps)
 
 @testset "Restarts" begin
     # We put cs_four_steps.fields in a NamedTuple so that we can start the recursion in compare
-    @test compare((; coupler_fields = cs_four_steps.fields), (; coupler_fields = cs_two_steps2.fields))
+    @test compare(
+        (; coupler_fields = cs_four_steps.fields),
+        (; coupler_fields = cs_two_steps2.fields),
+    )
 
-    @test compare(cs_four_steps.model_sims.atmos_sim.integrator.u, cs_two_steps2.model_sims.atmos_sim.integrator.u)
+    @test compare(
+        cs_four_steps.model_sims.atmos_sim.integrator.u,
+        cs_two_steps2.model_sims.atmos_sim.integrator.u,
+    )
 
     @test compare(
         cs_four_steps.model_sims.atmos_sim.integrator.p,
@@ -111,9 +117,15 @@ cs_two_steps2 = setup_and_run(two_steps)
         ],
     )
 
-    @test compare(cs_four_steps.model_sims.ice_sim.integrator.u, cs_two_steps2.model_sims.ice_sim.integrator.u)
+    @test compare(
+        cs_four_steps.model_sims.ice_sim.integrator.u,
+        cs_two_steps2.model_sims.ice_sim.integrator.u,
+    )
 
-    @test compare(cs_four_steps.model_sims.land_sim.integrator.u, cs_two_steps2.model_sims.land_sim.integrator.u)
+    @test compare(
+        cs_four_steps.model_sims.land_sim.integrator.u,
+        cs_two_steps2.model_sims.land_sim.integrator.u,
+    )
     @test compare(
         cs_four_steps.model_sims.land_sim.integrator.p,
         cs_two_steps2.model_sims.land_sim.integrator.p,
@@ -127,8 +139,10 @@ cs_two_steps2 = setup_and_run(two_steps)
         return (; filter(p -> !(first(p) in fieldnames), collect(pairs(nt)))...)
     end
 
-    ocean_cache_four = delete(cs_four_steps.model_sims.ocean_sim.cache, :SST_timevaryinginput)
-    ocean_cache_two2 = delete(cs_two_steps2.model_sims.ocean_sim.cache, :SST_timevaryinginput)
+    ocean_cache_four =
+        delete(cs_four_steps.model_sims.ocean_sim.cache, :SST_timevaryinginput)
+    ocean_cache_two2 =
+        delete(cs_two_steps2.model_sims.ocean_sim.cache, :SST_timevaryinginput)
 
     @test compare(ocean_cache_four, ocean_cache_two2)
 end

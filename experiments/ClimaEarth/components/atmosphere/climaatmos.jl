@@ -72,7 +72,8 @@ function ClimaAtmosSimulation(atmos_config)
     end
 
     microphysics_model =
-        pkgversion(CA) < v"0.31.0" ? integrator.p.atmos.precip_model : integrator.p.atmos.microphysics_model
+        pkgversion(CA) < v"0.31.0" ? integrator.p.atmos.precip_model :
+        integrator.p.atmos.microphysics_model
     if microphysics_model isa CA.Microphysics0Moment
         if pkgversion(CA) >= v"0.29.0"
             ᶜS_ρq_tot = integrator.p.precomputed.ᶜS_ρq_tot
@@ -104,7 +105,8 @@ function CA.set_surface_albedo!(Y, p, t, ::CA.CouplerAlbedo)
     if float(t) == 0
         FT = eltype(Y)
         # set initial insolation initial conditions
-        !(p.atmos.insolation isa CA.IdealizedInsolation) && CA.set_insolation_variables!(Y, p, t, p.atmos.insolation)
+        !(p.atmos.insolation isa CA.IdealizedInsolation) &&
+            CA.set_insolation_variables!(Y, p, t, p.atmos.insolation)
         # set surface albedo to 0.38
         @warn "Setting surface albedo to 0.38 at the beginning of the simulation"
         p.radiation.rrtmgp_model.direct_sw_surface_albedo .= FT(0.38)
@@ -120,8 +122,9 @@ end
 Get the surface space of the atmosphere simulation, which is the bottom
 level of the face space.
 """
-get_surface_space(sim::ClimaAtmosSimulation) =
-    axes(CC.Spaces.level(CC.Fields.coordinate_field(sim.domain.face_space).z, CC.Utilities.half))
+get_surface_space(sim::ClimaAtmosSimulation) = axes(
+    CC.Spaces.level(CC.Fields.coordinate_field(sim.domain.face_space).z, CC.Utilities.half),
+)
 
 """
     Checkpointer.get_model_prog_state(sim::ClimaAtmosSimulation)
@@ -142,7 +145,14 @@ function Checkpointer.restore_cache!(sim::ClimaAtmosSimulation, new_cache)
         Checkpointer.get_model_cache(sim),
         new_cache,
         comms_ctx;
-        ignore = Set([:rc, :params, :ghost_buffer, :hyperdiffusion_ghost_buffer, :data_handler, :graph_context]),
+        ignore = Set([
+            :rc,
+            :params,
+            :ghost_buffer,
+            :hyperdiffusion_ghost_buffer,
+            :data_handler,
+            :graph_context,
+        ]),
     )
     return nothing
 end
@@ -161,12 +171,25 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy
         face_space = axes(sim.integrator.u.f)
         nz_faces = length(CC.Spaces.vertical_topology(face_space).mesh.faces)
 
-        (; face_lw_flux_dn, face_lw_flux_up, face_sw_flux_dn, face_sw_flux_up) = sim.integrator.p.radiation.rrtmgp_model
+        (; face_lw_flux_dn, face_lw_flux_up, face_sw_flux_dn, face_sw_flux_up) =
+            sim.integrator.p.radiation.rrtmgp_model
 
-        LWd_TOA = CC.Fields.level(CC.Fields.array2field(FT.(face_lw_flux_dn), face_space), nz_faces - CC.Utilities.half)
-        LWu_TOA = CC.Fields.level(CC.Fields.array2field(FT.(face_lw_flux_up), face_space), nz_faces - CC.Utilities.half)
-        SWd_TOA = CC.Fields.level(CC.Fields.array2field(FT.(face_sw_flux_dn), face_space), nz_faces - CC.Utilities.half)
-        SWu_TOA = CC.Fields.level(CC.Fields.array2field(FT.(face_sw_flux_up), face_space), nz_faces - CC.Utilities.half)
+        LWd_TOA = CC.Fields.level(
+            CC.Fields.array2field(FT.(face_lw_flux_dn), face_space),
+            nz_faces - CC.Utilities.half,
+        )
+        LWu_TOA = CC.Fields.level(
+            CC.Fields.array2field(FT.(face_lw_flux_up), face_space),
+            nz_faces - CC.Utilities.half,
+        )
+        SWd_TOA = CC.Fields.level(
+            CC.Fields.array2field(FT.(face_sw_flux_dn), face_space),
+            nz_faces - CC.Utilities.half,
+        )
+        SWu_TOA = CC.Fields.level(
+            CC.Fields.array2field(FT.(face_sw_flux_up), face_space),
+            nz_faces - CC.Utilities.half,
+        )
 
         return @. -(LWd_TOA + SWd_TOA - LWu_TOA - SWu_TOA)
     else
@@ -181,7 +204,8 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:energy})
 
     # return total energy and (if Microphysics0Moment) the energy lost due to precipitation removal
     microphysics_model =
-        pkgversion(CA) < v"0.31.0" ? integrator.p.atmos.precip_model : integrator.p.atmos.microphysics_model
+        pkgversion(CA) < v"0.31.0" ? integrator.p.atmos.precip_model :
+        integrator.p.atmos.microphysics_model
     if microphysics_model isa CA.Microphysics0Moment
         ᶜts = p.precomputed.ᶜts
         ᶜΦ = p.core.ᶜΦ
@@ -192,7 +216,8 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:energy})
         end
         thermo_params = get_thermo_params(sim)
         return integrator.u.c.ρe_tot .-
-               ᶜS_ρq_tot .* CA.e_tot_0M_precipitation_sources_helper.(Ref(thermo_params), ᶜts, ᶜΦ) .*
+               ᶜS_ρq_tot .*
+               CA.e_tot_0M_precipitation_sources_helper.(Ref(thermo_params), ᶜts, ᶜΦ) .*
                float(integrator.dt)
     else
         return integrator.u.c.ρe_tot
@@ -228,7 +253,8 @@ moisture_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
     CC.Geometry.WVector.(integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot)
 
 ρq_tot(::CA.DryModel, integrator) = eltype(integrator.u)(0)
-ρq_tot(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) = integrator.u.c.ρq_tot
+ρq_tot(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
+    integrator.u.c.ρq_tot
 
 # extensions required by the Interfacer
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_pressure}) =
@@ -239,13 +265,17 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
         CC.Fields.level(sim.integrator.p.precomputed.ᶜts, 1),
     )
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) =
-    TD.air_density.(sim.integrator.p.params.thermodynamics_params, CC.Fields.level(sim.integrator.p.precomputed.ᶜts, 1))
+    TD.air_density.(
+        sim.integrator.p.params.thermodynamics_params,
+        CC.Fields.level(sim.integrator.p.precomputed.ᶜts, 1),
+    )
 # When using the `FixedCO2` option, CO2 is stored as that struct type,
 # so we access its value (a scalar) from the struct.
 # When using the `MaunaLoa` option, CO2 is stored as a 1D Array in the tracers
 # cache, so we access it from there.
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:co2}) =
-    sim.integrator.p.atmos.co2 isa CA.FixedCO2 ? sim.integrator.p.atmos.co2.value : sim.integrator.p.tracers.co2[1]
+    sim.integrator.p.atmos.co2 isa CA.FixedCO2 ? sim.integrator.p.atmos.co2.value :
+    sim.integrator.p.tracers.co2[1]
 
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:diffuse_fraction})
     hasradiation(sim.integrator) || return nothing
@@ -260,7 +290,9 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:diffuse_fraction
         FT = eltype(total_flux_dn)
         diffuse_fraction =
             clamp.(
-                ((x, y) -> y > zero(y) ? x / y : zero(y)).(total_flux_dn .- direct_flux_dn, total_flux_dn),
+                (
+                    (x, y) -> y > zero(y) ? x / y : zero(y)
+                ).(total_flux_dn .- direct_flux_dn, total_flux_dn),
                 zero(FT),
                 one(FT),
             )
@@ -272,12 +304,19 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) =
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:LW_d})
     hasradiation(sim.integrator) || return nothing
     return CC.Fields.level(
-        CC.Fields.array2field(sim.integrator.p.radiation.rrtmgp_model.face_lw_flux_dn, axes(sim.integrator.u.f)),
+        CC.Fields.array2field(
+            sim.integrator.p.radiation.rrtmgp_model.face_lw_flux_dn,
+            axes(sim.integrator.u.f),
+        ),
         CC.Utilities.half,
     )
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:specific_humidity}) =
-    CC.Fields.level(ρq_tot(sim.integrator.p.atmos.moisture_model, sim.integrator) ./ sim.integrator.u.c.ρ, 1)
+    CC.Fields.level(
+        ρq_tot(sim.integrator.p.atmos.moisture_model, sim.integrator) ./
+        sim.integrator.u.c.ρ,
+        1,
+    )
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
     surface_radiation_flux(sim.integrator.p.atmos.radiation_mode, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =
@@ -285,13 +324,20 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d})
     hasradiation(sim.integrator) || return nothing
     return CC.Fields.level(
-        CC.Fields.array2field(sim.integrator.p.radiation.rrtmgp_model.face_sw_flux_dn, axes(sim.integrator.u.f)),
+        CC.Fields.array2field(
+            sim.integrator.p.radiation.rrtmgp_model.face_sw_flux_dn,
+            axes(sim.integrator.u.f),
+        ),
         CC.Utilities.half,
     )
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:water}) =
     ρq_tot(sim.integrator.p.atmos.moisture_model, sim.integrator)
-function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_temperature}, csf)
+function Interfacer.update_field!(
+    sim::ClimaAtmosSimulation,
+    ::Val{:surface_temperature},
+    csf,
+)
     # NOTE: This update_field! takes as argument the entire coupler fields struct, instead
     # of a single field. This is unlike most of other functions, so we may want to revisit
     # it.
@@ -334,13 +380,15 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_sfc}) =
     CC.Spaces.level(CC.Fields.coordinate_field(sim.integrator.u.f).z, CC.Utilities.half)
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:u_int})
     # NOTE: This calculation is copied from ClimaAtmos (and is allocating! Fix me if you can!)
-    int_local_geometry_values = Fields.level(Fields.local_geometry_field(sim.integrator.u.c), 1)
+    int_local_geometry_values =
+        Fields.level(Fields.local_geometry_field(sim.integrator.u.c), 1)
     int_u_values = CC.Spaces.level(sim.integrator.p.precomputed.ᶜu, 1)
     return CA.projected_vector_data.(CA.CT1, int_u_values, int_local_geometry_values)
 end
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:v_int})
     # NOTE: This calculation is copied from ClimaAtmos (and is allocating! Fix me if you can!)
-    int_local_geometry_values = Fields.level(Fields.local_geometry_field(sim.integrator.u.c), 1)
+    int_local_geometry_values =
+        Fields.level(Fields.local_geometry_field(sim.integrator.u.c), 1)
     int_u_values = CC.Spaces.level(sim.integrator.p.precomputed.ᶜu, 1)
     return CA.projected_vector_data.(CA.CT2, int_u_values, int_local_geometry_values)
 end
@@ -352,66 +400,106 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:emissivity},
     temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
     Interfacer.remap!(temp_field_surface, field)
     # sets all 16 bands (rows) to the same values
-    sim.integrator.p.radiation.rrtmgp_model.surface_emissivity .=
-        reshape(CC.Fields.field2array(temp_field_surface), 1, length(parent(temp_field_surface)))
+    sim.integrator.p.radiation.rrtmgp_model.surface_emissivity .= reshape(
+        CC.Fields.field2array(temp_field_surface),
+        1,
+        length(parent(temp_field_surface)),
+    )
 end
-function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_direct_albedo}, field)
+function Interfacer.update_field!(
+    sim::ClimaAtmosSimulation,
+    ::Val{:surface_direct_albedo},
+    field,
+)
     hasradiation(sim.integrator) || return nothing
     # Remap field onto the atmosphere surface space in scratch field
     temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
     Interfacer.remap!(temp_field_surface, field)
-    sim.integrator.p.radiation.rrtmgp_model.direct_sw_surface_albedo .=
-        reshape(CC.Fields.field2array(temp_field_surface), 1, length(parent(temp_field_surface)))
+    sim.integrator.p.radiation.rrtmgp_model.direct_sw_surface_albedo .= reshape(
+        CC.Fields.field2array(temp_field_surface),
+        1,
+        length(parent(temp_field_surface)),
+    )
 end
 
-function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_diffuse_albedo}, field)
+function Interfacer.update_field!(
+    sim::ClimaAtmosSimulation,
+    ::Val{:surface_diffuse_albedo},
+    field,
+)
     hasradiation(sim.integrator) || return nothing
     # Remap field onto the atmosphere surface space in scratch field
     temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
     Interfacer.remap!(temp_field_surface, field)
-    sim.integrator.p.radiation.rrtmgp_model.diffuse_sw_surface_albedo .=
-        reshape(CC.Fields.field2array(temp_field_surface), 1, length(parent(temp_field_surface)))
+    sim.integrator.p.radiation.rrtmgp_model.diffuse_sw_surface_albedo .= reshape(
+        CC.Fields.field2array(temp_field_surface),
+        1,
+        length(parent(temp_field_surface)),
+    )
 end
 
-function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:turbulent_fluxes}, fields)
+function Interfacer.update_field!(
+    sim::ClimaAtmosSimulation,
+    ::Val{:turbulent_fluxes},
+    fields,
+)
     (; F_lh, F_sh, F_turb_moisture, F_turb_ρτxz, F_turb_ρτyz) = fields
     atmos_surface_space = get_surface_space(sim)
     temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
 
     Y = sim.integrator.u
-    surface_local_geometry = CC.Fields.level(CC.Fields.local_geometry_field(Y.f), CC.Utilities.half)
+    surface_local_geometry =
+        CC.Fields.level(CC.Fields.local_geometry_field(Y.f), CC.Utilities.half)
     surface_normal = @. CA.C3(CA.unit_basis_vector_data(CA.C3, surface_local_geometry))
 
     # get template objects for the contravariant components of the momentum fluxes (required by Atmos boundary conditions)
     # NOTE: This is allocating! Fix me if you can!
-    vec_ct12_ct1 = @. CA.CT12(CA.CT1(CA.unit_basis_vector_data(CA.CT1, surface_local_geometry)), surface_local_geometry)
-    vec_ct12_ct2 = @. CA.CT12(CA.CT2(CA.unit_basis_vector_data(CA.CT2, surface_local_geometry)), surface_local_geometry)
+    vec_ct12_ct1 = @. CA.CT12(
+        CA.CT1(CA.unit_basis_vector_data(CA.CT1, surface_local_geometry)),
+        surface_local_geometry,
+    )
+    vec_ct12_ct2 = @. CA.CT12(
+        CA.CT2(CA.unit_basis_vector_data(CA.CT2, surface_local_geometry)),
+        surface_local_geometry,
+    )
 
     # NOTE: This is allocating (F_turb_ρτyz_atmos)! If we had 1 more scratch field, we could avoid this
     Interfacer.remap!(temp_field_surface, F_turb_ρτxz) # F_turb_ρτxz_atmos
     F_turb_ρτyz_atmos = Interfacer.remap(F_turb_ρτyz, atmos_surface_space) # F_turb_ρτyz_atmos
     sim.integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ .= (
         surface_normal .⊗
-        CA.C12.(temp_field_surface .* vec_ct12_ct1 .+ F_turb_ρτyz_atmos .* vec_ct12_ct2, surface_local_geometry)
+        CA.C12.(
+            temp_field_surface .* vec_ct12_ct1 .+ F_turb_ρτyz_atmos .* vec_ct12_ct2,
+            surface_local_geometry,
+        )
     )
 
     # Remap summed turbulent energy fluxes into the scratch field
     Interfacer.remap!(temp_field_surface, F_lh .+ F_sh)
-    sim.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot .= temp_field_surface .* surface_normal # (shf + lhf)
+    sim.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot .=
+        temp_field_surface .* surface_normal # (shf + lhf)
 
     # Remap turbulent moisture flux into the scratch field
     Interfacer.remap!(temp_field_surface, F_turb_moisture)
-    sim.integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot .= temp_field_surface .* surface_normal # (evap)
+    sim.integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot .=
+        temp_field_surface .* surface_normal # (evap)
 
-    Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.obukhov_length, fields.L_MO)
+    Interfacer.remap!(
+        sim.integrator.p.precomputed.sfc_conditions.obukhov_length,
+        fields.L_MO,
+    )
     Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.ustar, fields.ustar)
-    Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.buoyancy_flux, fields.buoyancy_flux)
+    Interfacer.remap!(
+        sim.integrator.p.precomputed.sfc_conditions.buoyancy_flux,
+        fields.buoyancy_flux,
+    )
 
     return nothing
 end
 
 # extensions required by FieldExchanger
-Interfacer.step!(sim::ClimaAtmosSimulation, t::Real) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+Interfacer.step!(sim::ClimaAtmosSimulation, t::Real) =
+    Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 function Interfacer.step!(sim::ClimaAtmosSimulation, t::ITime)
     while sim.integrator.t < t
         Interfacer.step!(sim.integrator)
@@ -427,8 +515,12 @@ The fields added are:
 - `:surface_diffuse_albedo` (for radiation)
 - `:ustar`, `:L_MO`, `:buoyancy_flux` (for EDMF boundary conditions)
 """
-function Interfacer.add_coupler_fields!(coupler_field_names, atmos_sim::ClimaAtmosSimulation)
-    atmos_coupler_fields = [:surface_direct_albedo, :surface_diffuse_albedo, :ustar, :L_MO, :buoyancy_flux]
+function Interfacer.add_coupler_fields!(
+    coupler_field_names,
+    atmos_sim::ClimaAtmosSimulation,
+)
+    atmos_coupler_fields =
+        [:surface_direct_albedo, :surface_diffuse_albedo, :ustar, :L_MO, :buoyancy_flux]
     push!(coupler_field_names, atmos_coupler_fields...)
 end
 
@@ -442,7 +534,8 @@ Interfacer.close_output_writers(sim::ClimaAtmosSimulation) =
 
 
 # FluxCalculator.get_surface_params required by FluxCalculator (partitioned fluxes)
-FluxCalculator.get_surface_params(sim::ClimaAtmosSimulation) = CAP.surface_fluxes_params(sim.integrator.p.params)
+FluxCalculator.get_surface_params(sim::ClimaAtmosSimulation) =
+    CAP.surface_fluxes_params(sim.integrator.p.params)
 
 """
     Interfacer.set_cache!(sim::ClimaAtmosSimulation)
@@ -458,7 +551,8 @@ as part of the tendendencies.
 function Interfacer.set_cache!(sim::ClimaAtmosSimulation)
     if hasradiation(sim.integrator)
         CA.rrtmgp_model_callback!(sim.integrator)
-        if pkgversion(CA) == v"0.30" && !isnothing(sim.integrator.p.atmos.non_orographic_gravity_wave)
+        if pkgversion(CA) == v"0.30" &&
+           !isnothing(sim.integrator.p.atmos.non_orographic_gravity_wave)
             # In version 0.30, nogw_model_callback crashes when there are no gravity waves,
             # see CA #3792
             CA.nogw_model_callback!(sim.integrator)
@@ -509,7 +603,9 @@ function get_atmos_config_dict(coupler_config::Dict, atmos_output_dir)
 
     # The Atmos `get_simulation` function expects the atmos config to contains its timestep size
     # in the `dt` field. If there is a `dt_atmos` field in coupler_config, we add it to the atmos config as `dt`
-    dt_atmos = haskey(coupler_config, "dt_atmos") ? coupler_config["dt_atmos"] : coupler_config["dt"]
+    dt_atmos =
+        haskey(coupler_config, "dt_atmos") ? coupler_config["dt_atmos"] :
+        coupler_config["dt"]
     atmos_config["dt"] = dt_atmos
 
     # Use atmos toml if coupler toml is not defined
@@ -537,7 +633,8 @@ function get_atmos_config_dict(coupler_config::Dict, atmos_output_dir)
     # set restart file to the initial file saved in this location if it is not nothing
     # TODO this is hardcoded and should be fixed once we have a better restart system
     if !isnothing(atmos_config["restart_file"])
-        atmos_config["restart_file"] = replace(atmos_config["restart_file"], "active" => "0000")
+        atmos_config["restart_file"] =
+            replace(atmos_config["restart_file"], "active" => "0000")
     end
     return CA.AtmosConfig(atmos_config)
 end
@@ -547,7 +644,8 @@ end
 
 Returns the thermodynamic parameters from the atmospheric model simulation object.
 """
-get_thermo_params(sim::ClimaAtmosSimulation) = CAP.thermodynamics_params(sim.integrator.p.params)
+get_thermo_params(sim::ClimaAtmosSimulation) =
+    CAP.thermodynamics_params(sim.integrator.p.params)
 
 """
     dss_state!(sim::ClimaAtmosSimulation)

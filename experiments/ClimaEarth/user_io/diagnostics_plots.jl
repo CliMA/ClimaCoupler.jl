@@ -16,7 +16,8 @@ function Makie.get_tickvalues(yticks::Int, ymin, ymax)
     return range(ymin, ymax, yticks)
 end
 
-YLINEARSCALE = Dict(:axis => CAN.Utils.kwargs(dim_on_y = true, yticks = 10, ytickformat = "{:.3e}"))
+YLINEARSCALE =
+    Dict(:axis => CAN.Utils.kwargs(dim_on_y = true, yticks = 10, ytickformat = "{:.3e}"))
 
 long_name(var) = var.attributes["long_name"]
 short_name(var) = var.attributes["short_name"]
@@ -86,7 +87,8 @@ function make_plots_generic(
                 # Here we normalize the length so that all the columns have the same width.
                 LABEL_LENGTH = 40
                 path = convert(Vector{Float64}, path)
-                normalized_path = lpad(path, LABEL_LENGTH + 1, " ")[(end - LABEL_LENGTH):end]
+                normalized_path =
+                    lpad(path, LABEL_LENGTH + 1, " ")[(end - LABEL_LENGTH):end]
 
                 CairoMakie.Label(fig[0, col], path)
             end
@@ -168,7 +170,11 @@ Create plots for diagnostics. The plots are saved to `plot_path`.
 This function will plot all variables that have been saved in `output_path`.
 The `reduction` keyword argument should be consistent with the reduction used to save the diagnostics.
 """
-function make_diagnostics_plots(output_path::AbstractString, plot_path::AbstractString; output_prefix = "")
+function make_diagnostics_plots(
+    output_path::AbstractString,
+    plot_path::AbstractString;
+    output_prefix = "",
+)
     simdir = CAN.SimDir(output_path)
     short_names = CAN.available_vars(simdir)
 
@@ -189,7 +195,8 @@ function make_diagnostics_plots(output_path::AbstractString, plot_path::Abstract
     # Filter vars into 2D and 3D variable diagnostics vectors
     # 3D fields are zonally averaged platted on the lat-z plane
     # 2D fields are plotted on the lon-lat plane
-    vars_3D = map(var_3D -> CAN.average_lon(var_3D), filter(var -> CAN.has_altitude(var), vars))
+    vars_3D =
+        map(var_3D -> CAN.average_lon(var_3D), filter(var -> CAN.has_altitude(var), vars))
     vars_2D = filter(var -> !CAN.has_altitude(var), vars)
 
     # Generate plots and save in `plot_path`
@@ -223,7 +230,11 @@ This function will plot the following variables, if they have been saved in `out
 For each variable, take the surface level (top level) of the variable
 and create a 2D plot. The plots will be saved in a single PDF file.
 """
-function make_ocean_diagnostics_plots(output_path::AbstractString, plot_path::AbstractString; output_prefix = "")
+function make_ocean_diagnostics_plots(
+    output_path::AbstractString,
+    plot_path::AbstractString;
+    output_prefix = "",
+)
     expected_output_path = joinpath(output_path, "ocean_diagnostics.nc")
     isfile(expected_output_path) || return nothing
 

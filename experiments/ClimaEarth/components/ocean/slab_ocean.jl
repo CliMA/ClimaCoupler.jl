@@ -89,15 +89,18 @@ function SlabOceanSimulation(
     )
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
-    ode_function =
-        CTS.ClimaODEFunction(; T_exp! = slab_ocean_rhs!, dss! = (Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer))
+    ode_function = CTS.ClimaODEFunction(;
+        T_exp! = slab_ocean_rhs!,
+        dss! = (Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer),
+    )
     if typeof(dt) isa Number
         dt = Float64(dt)
         tspan = Float64.(tspan)
         saveat = Float64.(saveat)
     end
     problem = SciMLBase.ODEProblem(ode_function, Y, tspan, cache)
-    integrator = SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
+    integrator =
+        SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
 
     sim = SlabOceanSimulation(params, integrator)
 
@@ -107,12 +110,18 @@ function SlabOceanSimulation(
 end
 
 # extensions required by Interfacer
-Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
-Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:roughness_buoyancy}) = sim.integrator.p.params.z0b
-Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:roughness_momentum}) = sim.integrator.p.params.z0m
-Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_direct_albedo}) = sim.integrator.p.α_direct
-Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_diffuse_albedo}) = sim.integrator.p.α_diffuse
-Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_temperature}) = sim.integrator.u.T_sfc
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:area_fraction}) =
+    sim.integrator.p.area_fraction
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:roughness_buoyancy}) =
+    sim.integrator.p.params.z0b
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:roughness_momentum}) =
+    sim.integrator.p.params.z0m
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_direct_albedo}) =
+    sim.integrator.p.α_direct
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_diffuse_albedo}) =
+    sim.integrator.p.α_diffuse
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_temperature}) =
+    sim.integrator.u.T_sfc
 
 """
     Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:energy})
@@ -121,29 +130,54 @@ Extension of Interfacer.get_field to get the energy of the ocean.
 It multiplies the the slab temperature by the heat capacity, density, and depth.
 """
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:energy}) =
-    sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .* sim.integrator.p.params.h
+    sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .*
+    sim.integrator.p.params.h
 
-function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:area_fraction}, field::CC.Fields.Field)
+function Interfacer.update_field!(
+    sim::SlabOceanSimulation,
+    ::Val{:area_fraction},
+    field::CC.Fields.Field,
+)
     sim.integrator.p.area_fraction .= field
     return nothing
 end
-function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:radiative_energy_flux_sfc}, field)
+function Interfacer.update_field!(
+    sim::SlabOceanSimulation,
+    ::Val{:radiative_energy_flux_sfc},
+    field,
+)
     Interfacer.remap!(sim.integrator.p.F_radiative, field)
 end
-function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:turbulent_energy_flux}, field)
+function Interfacer.update_field!(
+    sim::SlabOceanSimulation,
+    ::Val{:turbulent_energy_flux},
+    field,
+)
     Interfacer.remap!(sim.integrator.p.F_turb_energy, field)
 end
-function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:surface_direct_albedo}, field::CC.Fields.Field)
+function Interfacer.update_field!(
+    sim::SlabOceanSimulation,
+    ::Val{:surface_direct_albedo},
+    field::CC.Fields.Field,
+)
     Interfacer.remap!(sim.integrator.p.α_direct, field)
 end
-function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:surface_diffuse_albedo}, field::CC.Fields.Field)
+function Interfacer.update_field!(
+    sim::SlabOceanSimulation,
+    ::Val{:surface_diffuse_albedo},
+    field::CC.Fields.Field,
+)
     Interfacer.remap!(sim.integrator.p.α_diffuse, field)
 end
 
 # extensions required by FieldExchanger
-Interfacer.step!(sim::SlabOceanSimulation, t) = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+Interfacer.step!(sim::SlabOceanSimulation, t) =
+    Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 
-function FluxCalculator.update_turbulent_fluxes!(sim::SlabOceanSimulation, fields::NamedTuple)
+function FluxCalculator.update_turbulent_fluxes!(
+    sim::SlabOceanSimulation,
+    fields::NamedTuple,
+)
     Interfacer.update_field!(sim, Val(:turbulent_energy_flux), fields.F_lh .+ fields.F_sh)
     return nothing
 end
@@ -189,4 +223,5 @@ end
 Perform DSS on the state of a component simulation, intended to be used
 before the initial step of a run. This method acts on slab ocean model sims.
 """
-dss_state!(sim::SlabOceanSimulation) = CC.Spaces.weighted_dss!(sim.integrator.u, sim.integrator.p.dss_buffer)
+dss_state!(sim::SlabOceanSimulation) =
+    CC.Spaces.weighted_dss!(sim.integrator.u, sim.integrator.p.dss_buffer)

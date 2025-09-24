@@ -56,7 +56,11 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
 
     if haskey(cs.model_sims, :ocean_sim)
         ocean_sim = cs.model_sims.ocean_sim
-        Interfacer.update_field!(ocean_sim, Val(:area_fraction), max.(FT(1) .- ice_fraction .- land_fraction, FT(0)))
+        Interfacer.update_field!(
+            ocean_sim,
+            Val(:area_fraction),
+            max.(FT(1) .- ice_fraction .- land_fraction, FT(0)),
+        )
         ocean_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction))
     else
         cs.fields.temp1 .= 0
@@ -133,7 +137,14 @@ function import_combined_surface_fields!(csf, model_sims, thermo_params)
 
     # q_sfc is computed from the atmosphere state and surface temperature, so it's handled differently
     # This is computed on the exchange grid, so there's no need to remap
-    compute_surface_humidity!(csf.q_sfc, csf.T_atmos, csf.q_atmos, csf.ρ_atmos, csf.T_sfc, thermo_params)
+    compute_surface_humidity!(
+        csf.q_sfc,
+        csf.T_atmos,
+        csf.q_atmos,
+        csf.ρ_atmos,
+        csf.T_sfc,
+        thermo_params,
+    )
     return nothing
 end
 
@@ -177,8 +188,16 @@ Updates the surface fields for temperature, roughness length, albedo, and specif
 - `csf`: [NamedTuple] containing coupler fields.
 """
 function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf)
-    Interfacer.update_field!(atmos_sim, Val(:surface_direct_albedo), csf.surface_direct_albedo)
-    Interfacer.update_field!(atmos_sim, Val(:surface_diffuse_albedo), csf.surface_diffuse_albedo)
+    Interfacer.update_field!(
+        atmos_sim,
+        Val(:surface_direct_albedo),
+        csf.surface_direct_albedo,
+    )
+    Interfacer.update_field!(
+        atmos_sim,
+        Val(:surface_diffuse_albedo),
+        csf.surface_diffuse_albedo,
+    )
     Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf)
     Interfacer.update_field!(atmos_sim, Val(:turbulent_fluxes), csf)
     return nothing
@@ -197,7 +216,11 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, area_fraction)
     FT = eltype(area_fraction)
 
     # radiative fluxes
-    Interfacer.update_field!(sim, Val(:radiative_energy_flux_sfc), FT.(area_fraction .* csf.F_radiative))
+    Interfacer.update_field!(
+        sim,
+        Val(:radiative_energy_flux_sfc),
+        FT.(area_fraction .* csf.F_radiative),
+    )
 
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)
@@ -270,7 +293,11 @@ function combine_surfaces!(combined_field, sims, field_name)
             area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
             combined_field .+=
                 area_fraction .*
-                ifelse.(area_fraction .≈ 0, zero(combined_field), Interfacer.get_field(sim, field_name, boundary_space))
+                ifelse.(
+                    area_fraction .≈ 0,
+                    zero(combined_field),
+                    Interfacer.get_field(sim, field_name, boundary_space),
+                )
         end
     end
 end

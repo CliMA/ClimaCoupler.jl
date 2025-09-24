@@ -143,7 +143,14 @@ end
 
 Append data for a given setup to the table data.
 """
-function append_table_data(table_data, setup_id, cpu_job_id, gpu_job_id, cpu_artifacts_dir, gpu_artifacts_dir)
+function append_table_data(
+    table_data,
+    setup_id,
+    cpu_job_id,
+    gpu_job_id,
+    cpu_artifacts_dir,
+    gpu_artifacts_dir,
+)
     # Get SYPD and allocation info for both input runs
     cpu_sypd, cpu_max_rss = get_run_data(cpu_artifacts_dir)
     gpu_sypd, gpu_cpu_max_rss = get_run_data(gpu_artifacts_dir)
@@ -177,7 +184,8 @@ run_info_atmos_diagedmf = get_run_info(parsed_args, "atmos_diagedmf")
 run_info_atmos = get_run_info(parsed_args, "atmos")
 
 # Set up info for PrettyTables.jl
-headers = [build_id_str, "Horiz. res.: 30 elems", "CPU Run [64 processes]", "GPU Run [2 A100s]"]
+headers =
+    [build_id_str, "Horiz. res.: 30 elems", "CPU Run [64 processes]", "GPU Run [2 A100s]"]
 data = [
     ["" "Vert. res.: 63 levels" "" ""]
     ["" "dt: 120secs" "" ""]

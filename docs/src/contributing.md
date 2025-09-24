@@ -1,0 +1,67 @@
+# Contributing
+
+Thank you for contributing to `ClimaCoupler`! We encourage Pull Requests (PRs).
+Please do not hesitate to ask questions, or to open issues if something seems amiss
+or you'd like a new feature.
+
+## Some useful tips
+- When developing code it's best to work on a branch off of the most recent main.
+This can be done by running the following commands, where "initials" corresponds to the first and last initial of the person starting the branch.
+```
+git checkout main
+git pull
+git checkout -b initials/branch_name
+```
+
+- Make sure you add tests for your code in `test/`, appropriate documentation in `docs/`,
+  and descriptive inline comments throughout the code.
+  All exported functions and structs must have docstrings.
+- When your PR is ready for review, clean up your commit history by squashing to 1 commit per PR
+  and make sure your code is current with the main branch by rebasing.
+
+## Continuous integration
+
+After rebasing your branch, you can ask for review. Fill out the template and
+provide a clear summary of what your PR does. When a PR is created or
+updated, a set of automated tests are run on the PR in our continuous
+integration (CI) system.
+
+ClimaCoupler.jl's continuous integration contains both unit tests and integration
+tests (coupled simulations).
+
+### Formatting check
+
+The `JuliaFormatter` test checks if the PR is correctly formatted according to
+the project's style guidelines. The previous `.dev/climaformat.jl` script has
+been discontinued in favor of using the JuliaFormatter package directly.
+
+To format your code, first add JuliaFormatter to your base environment:
+
+```sh
+julia -e 'using Pkg; Pkg.add(PackageSpec("JuliaFormatter", v"1.0.62"))'
+```
+
+Then, in a Julia REPL, run:
+
+```julia
+using JuliaFormatter; format(".")
+```
+
+
+### Documentation
+
+The `Documentation` test rebuilds the documentation for the PR and checks if the docs
+are consistent and generate valid output.
+
+To add internal references, for example to another documentation page or API, see the relevant
+`Documenter.jl` `@ref` [documentation page](@extref Documenter Named-@refs), example syntax:
+`[see contributor guide](@ref "Contributing")` for a page or
+`[CoupledSimulation object and constructors](@ref ClimaCoupler.Interfacer.CoupledSimulation)` for an API.
+
+To add external references, for example to another package documentation page or API, see
+the documentation of [DocumenterInterLinks](https://juliadocs.org/DocumenterInterLinks.jl/stable/).
+Example syntax: `[how to us @ref](@extref Documenter Named-@refs)`.
+
+To add a reference from the literature, see the documentation of
+[DocumenterCitations.jl](https://juliadocs.org/DocumenterCitations.jl/stable/), in short, add your reference
+to `docs/src/refs.bib` and then refer to it with this syntax `[authors1999](@citet)`.

@@ -2,7 +2,13 @@ import PrettyTables
 import ClimaCore as CC
 
 export CouplerState,
-    coupler_push!, coupler_pull!, coupler_put!, coupler_get, coupler_get!, coupler_add_field!, coupler_add_map!
+    coupler_push!,
+    coupler_pull!,
+    coupler_put!,
+    coupler_get,
+    coupler_get!,
+    coupler_add_field!,
+    coupler_add_map!
 
 
 """
@@ -115,7 +121,11 @@ etc... can be embeded in the intermdediate coupling layer.
 A field is exported by one component and imported by one or more other components.
 """
 function CouplerState(Δt_coupled)
-    return CouplerState(Dict{Symbol, CplFieldInfo}(), Dict{Symbol, CC.Operators.LinearRemap}(), Δt_coupled)
+    return CouplerState(
+        Dict{Symbol, CplFieldInfo}(),
+        Dict{Symbol, CC.Operators.LinearRemap}(),
+        Δt_coupled,
+    )
 end
 
 """
@@ -139,7 +149,10 @@ function coupler_add_field!(
     write_sim::AbstractSim,
     metadata = nothing,
 )
-    push!(coupler.coupled_fields, fieldname => CplFieldInfo(fieldvalue, name(write_sim), metadata))
+    push!(
+        coupler.coupled_fields,
+        fieldname => CplFieldInfo(fieldvalue, name(write_sim), metadata),
+    )
 end
 
 """
@@ -156,7 +169,11 @@ Add a map to the coupler that is accessible with key `mapname`.
 - `mapname`: key to access the map in the coupler's map list.
 - `map`: a remap operator.
 """
-function coupler_add_map!(coupler::CouplerState, map_name::Symbol, map::CC.Operators.LinearRemap)
+function coupler_add_map!(
+    coupler::CouplerState,
+    map_name::Symbol,
+    map::CC.Operators.LinearRemap,
+)
     push!(coupler.remap_operators, map_name => map)
 end
 
@@ -165,7 +182,12 @@ end
 
 Sets coupler field `fieldname` to `fieldvalue`.
 """
-function coupler_put!(coupler::CouplerState, fieldname::Symbol, fieldvalue, source_sim::AbstractSim)
+function coupler_put!(
+    coupler::CouplerState,
+    fieldname::Symbol,
+    fieldvalue,
+    source_sim::AbstractSim,
+)
     cplfield = coupler.coupled_fields[fieldname]
     @assert cplfield.write_sim == name(source_sim) "$fieldname can only be written to by $(cplfield.write_sim)."
 
@@ -191,7 +213,12 @@ function coupler_push!(coupler::CouplerState, model) end
 
 Retrieve data array corresponding to `fieldname`, remap and store in `target_field`.
 """
-function coupler_get!(target_field::CC.Fields.Field, coupler::CouplerState, fieldname::Symbol, target_sim::AbstractSim)
+function coupler_get!(
+    target_field::CC.Fields.Field,
+    coupler::CouplerState,
+    fieldname::Symbol,
+    target_sim::AbstractSim,
+)
     cplfield = coupler.coupled_fields[fieldname]
     map = get_remap_operator(coupler, name(target_sim), cplfield.write_sim)
     CC.Operators.remap!(target_field, map, cplfield.data)

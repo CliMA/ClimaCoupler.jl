@@ -40,7 +40,8 @@ julia> time_to_period("2.5hours")
 function time_to_period(s::String)
     if occursin("months", s)
         months = match(r"^(\d+)months$", s)
-        isnothing(months) && error("$(s) has to be of the form <NUM>months, e.g. 2months for 2 months")
+        isnothing(months) &&
+            error("$(s) has to be of the form <NUM>months, e.g. 2months for 2 months")
         return Dates.Month(parse(Int, first(months)))
     else
         # Milliseconds to support fractional seconds

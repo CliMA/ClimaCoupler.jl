@@ -6,6 +6,11 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Use JuliaFormatter; remove .dev folder PR[#1484](https://github.com/CliMA/ClimaCoupler.jl/pull/1484)
+Use JuliaFormatter to format the repo, rather than the previous `.dev/juliaformat.jl`.
+The `.dev/` folder is removed, and a documentation page about contributing to
+ClimaCoupler.jl is added.
+
 #### Correctly set land domain with `share_surface_space = true` PR[#1464](https://github.com/CliMA/ClimaCoupler.jl/pull/1464)
 Previously, we passed but did not use arguments related to the vertical resolution
 in `make_land_domain`. Now we correctly use the provided `dz_tuple` and `n_elements_vert`.

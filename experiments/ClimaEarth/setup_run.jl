@@ -31,7 +31,13 @@ import ClimaCore as CC
 # ## Coupler specific imports
 import ClimaCoupler
 import ClimaCoupler:
-    ConservationChecker, Checkpointer, FieldExchanger, FluxCalculator, Interfacer, TimeManager, Utilities
+    ConservationChecker,
+    Checkpointer,
+    FieldExchanger,
+    FluxCalculator,
+    Interfacer,
+    TimeManager,
+    Utilities
 import ClimaCoupler.Interfacer:
     AbstractSlabplanetSimulationMode,
     AMIPMode,
@@ -93,7 +99,9 @@ This struct is defined in the Interfacer module and contains all information
 about component models, diagnostics, timestepping, output directories, etc
 needed to run a coupled simulation.
 """
-function CoupledSimulation(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
+function CoupledSimulation(
+    config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"),
+)
     config_dict = get_coupler_config_dict(config_file)
     return CoupledSimulation(config_dict)
 end
@@ -140,7 +148,8 @@ function CoupledSimulation(config_dict::AbstractDict)
     #and `dir_paths.checkpoints`, where restart files are saved.
     =#
 
-    dir_paths = Utilities.setup_output_dirs(output_dir = output_dir_root, comms_ctx = comms_ctx)
+    dir_paths =
+        Utilities.setup_output_dirs(output_dir = output_dir_root, comms_ctx = comms_ctx)
     @info "Coupler output directory $(dir_paths.output)"
     @info "Coupler artifacts directory $(dir_paths.artifacts)"
     @info "Coupler checkpoint directory $(dir_paths.checkpoints)"
@@ -162,9 +171,11 @@ function CoupledSimulation(config_dict::AbstractDict)
     Random.seed!(random_seed)
     @info "Random seed set to $(random_seed)"
 
-    isnothing(restart_t) && (restart_t = Checkpointer.t_start_from_checkpoint(dir_paths.checkpoints))
+    isnothing(restart_t) &&
+        (restart_t = Checkpointer.t_start_from_checkpoint(dir_paths.checkpoints))
     isnothing(restart_dir) && (restart_dir = dir_paths.checkpoints)
-    should_restart = detect_restart_files && !isnothing(restart_t) && !isnothing(restart_dir)
+    should_restart =
+        detect_restart_files && !isnothing(restart_t) && !isnothing(restart_dir)
     if should_restart
         if t_start isa ITime
             t_start, _ = promote(ITime(restart_t), t_start)
@@ -174,14 +185,16 @@ function CoupledSimulation(config_dict::AbstractDict)
 
         if pkgversion(CA) >= v"0.29.1"
             # We only support a round number of seconds
-            isinteger(float(t_start)) || error("Cannot restart from a non integer number of seconds")
+            isinteger(float(t_start)) ||
+                error("Cannot restart from a non integer number of seconds")
             t_start_int = Int(float(t_start))
             atmos_config_dict.parsed_args["t_start"] = "$(t_start_int)secs"
         else
             # There was no `t_start`, so we have to use a workaround for this.
             # This does not support passing the command-line arguments (unless
             # restart_dir is exactly the same as output_dir_root)
-            atmos_config_dict.parsed_args["restart_file"] = climaatmos_restart_path(output_dir_root, restart_t)
+            atmos_config_dict.parsed_args["restart_file"] =
+                climaatmos_restart_path(output_dir_root, restart_t)
         end
 
         @info "Starting from t_start $(t_start)"
@@ -192,7 +205,8 @@ function CoupledSimulation(config_dict::AbstractDict)
     #=
     ## Data File Paths
     =#
-    land_mask_data = joinpath(@clima_artifact("landsea_mask_60arcseconds", comms_ctx), "landsea_mask.nc")
+    land_mask_data =
+        joinpath(@clima_artifact("landsea_mask_60arcseconds", comms_ctx), "landsea_mask.nc")
 
     #=
     ## Component Model Initialization
@@ -230,7 +244,8 @@ function CoupledSimulation(config_dict::AbstractDict)
     else
         h_elem = config_dict["h_elem"]
         n_quad_points = 4
-        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points, h_elem)
+        boundary_space =
+            CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points, h_elem)
     end
 
     # Get surface elevation on the boundary space from `atmos` coordinate field
@@ -242,7 +257,9 @@ function CoupledSimulation(config_dict::AbstractDict)
     # Note: This pattern is not reliable and should not be reused.
     atmos_h =
         ClimaCore.Fields.Field(
-            ClimaCore.Fields.field_values(Interfacer.get_field(atmos_sim, Val(:height_int))),
+            ClimaCore.Fields.field_values(
+                Interfacer.get_field(atmos_sim, Val(:height_int)),
+            ),
             boundary_space,
         ) .- surface_elevation # atmos height relative to the surface, on the surface space
 
@@ -339,8 +356,13 @@ function CoupledSimulation(config_dict::AbstractDict)
 
         if sim_mode <: CMIPMode
             stop_date = date(tspan[end] - tspan[begin])
-            ocean_sim =
-                OceananigansSimulation(ocean_fraction, start_date, stop_date; output_dir = ocean_output_dir, comms_ctx)
+            ocean_sim = OceananigansSimulation(
+                ocean_fraction,
+                start_date,
+                stop_date;
+                output_dir = ocean_output_dir,
+                comms_ctx,
+            )
         else
             ocean_sim = PrescribedOceanSimulation(
                 FT,
@@ -356,7 +378,8 @@ function CoupledSimulation(config_dict::AbstractDict)
     elseif (sim_mode <: AbstractSlabplanetSimulationMode)
 
         land_fraction = sim_mode <: SlabplanetAquaMode ? land_fraction .* 0 : land_fraction
-        land_fraction = sim_mode <: SlabplanetTerraMode ? land_fraction .* 0 .+ 1 : land_fraction
+        land_fraction =
+            sim_mode <: SlabplanetTerraMode ? land_fraction .* 0 .+ 1 : land_fraction
 
         ## land model
         land_sim = BucketSimulation(
@@ -398,7 +421,8 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     ## collect component model simulations that have been initialized
     model_sims = (; atmos_sim, ice_sim, land_sim, ocean_sim)
-    model_sims = NamedTuple{filter(key -> !isnothing(model_sims[key]), keys(model_sims))}(model_sims)
+    model_sims =
+        NamedTuple{filter(key -> !isnothing(model_sims[key]), keys(model_sims))}(model_sims)
     @info "Component models initialized: $(keys(model_sims))"
 
     ## coupler exchange fields
@@ -424,7 +448,8 @@ function CoupledSimulation(config_dict::AbstractDict)
     conservation_checks = nothing
     if energy_check
         @assert(
-            sim_mode <: AbstractSlabplanetSimulationMode && comms_ctx isa ClimaComms.SingletonCommsContext,
+            sim_mode <: AbstractSlabplanetSimulationMode &&
+            comms_ctx isa ClimaComms.SingletonCommsContext,
             "Only non-distributed slabplanet allowable for energy_check"
         )
         conservation_checks = (;
@@ -441,7 +466,8 @@ function CoupledSimulation(config_dict::AbstractDict)
     The currently implemented callbacks are:
     - `checkpoint_cb`: generates a checkpoint of all model states at a specified interval. This is mainly used for restarting simulations.
     =#
-    schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date)
+    schedule_checkpoint =
+        EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date)
     checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
 
     callbacks = (checkpoint_cb,)
@@ -453,8 +479,14 @@ function CoupledSimulation(config_dict::AbstractDict)
         @info "Using default coupler diagnostics"
         coupler_diags_path = joinpath(dir_paths.output, "coupler")
         isdir(coupler_diags_path) || mkpath(coupler_diags_path)
-        diags_handler =
-            coupler_diagnostics_setup(coupler_fields, coupler_diags_path, start_date, tspan[1], diagnostics_dt, Δt_cpl)
+        diags_handler = coupler_diagnostics_setup(
+            coupler_fields,
+            coupler_diags_path,
+            start_date,
+            tspan[1],
+            diagnostics_dt,
+            Δt_cpl,
+        )
     else
         diags_handler = nothing
     end
@@ -524,7 +556,10 @@ Keyword arguments
 `precompile`: If `true`, run the coupled simulations for two steps, so that most functions
               are precompiled and subsequent timing will be more accurate.
 """
-function run!(cs::CoupledSimulation; precompile = (cs.tspan[end] > 2 * cs.Δt_cpl + cs.tspan[begin]))
+function run!(
+    cs::CoupledSimulation;
+    precompile = (cs.tspan[end] > 2 * cs.Δt_cpl + cs.tspan[begin]),
+)
 
     ## Precompilation of Coupling Loop
     # Here we run the entire coupled simulation for two timesteps to precompile several
@@ -558,7 +593,8 @@ function run!(cs::CoupledSimulation; precompile = (cs.tspan[end] > 2 * cs.Δt_cp
     save_sypd_walltime_to_disk(cs, walltime)
 
     # Close all diagnostics file writers
-    isnothing(cs.diags_handler) || foreach(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
+    isnothing(cs.diags_handler) ||
+        foreach(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
     foreach(Interfacer.close_output_writers, cs.model_sims)
 
     return nothing
@@ -606,7 +642,9 @@ This function sets up and runs the coupled model simulation specified by the
 input config file or dict. It initializes the component models, all coupler objects,
 diagnostics, and conservation checks, and then runs the simulation.
 """
-function setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
+function setup_and_run(
+    config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"),
+)
     cs = CoupledSimulation(config_file)
     run!(cs)
     return cs

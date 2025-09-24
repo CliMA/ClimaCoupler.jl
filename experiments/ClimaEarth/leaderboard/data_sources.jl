@@ -156,13 +156,17 @@ function get_obs_var_dict()
         obs_var_dict[sim_name] =
             (start_date) -> begin
                 obs_var = ClimaAnalysis.OutputVar(
-                    joinpath(@clima_artifact("radiation_obs"), "CERES_EBAF_Ed4.2_Subset_200003-201910.nc"),
+                    joinpath(
+                        @clima_artifact("radiation_obs"),
+                        "CERES_EBAF_Ed4.2_Subset_200003-201910.nc",
+                    ),
                     obs_name,
                     new_start_date = start_date,
                     shift_by = Dates.firstdayofmonth,
                 )
                 # Convert from W m-2 to W m^-2
-                ClimaAnalysis.units(obs_var) == "W m-2" ? obs_var = ClimaAnalysis.set_units(obs_var, "W m^-2") :
+                ClimaAnalysis.units(obs_var) == "W m-2" ?
+                obs_var = ClimaAnalysis.set_units(obs_var, "W m^-2") :
                 error("Did not expect $(ClimaAnalysis.units(obs_var)) for the units")
                 return obs_var
             end
@@ -206,7 +210,11 @@ function get_rmse_var_dict()
     ClimaAnalysis.add_unit!(rmse_var_rlut, "CliMA", "W m^-2")
 
     # Store the rmse vars in a dictionary
-    rmse_var_dict = ClimaAnalysis.Var.OrderedDict("pr" => rmse_var_pr, "rsut" => rmse_var_rsut, "rlut" => rmse_var_rlut)
+    rmse_var_dict = ClimaAnalysis.Var.OrderedDict(
+        "pr" => rmse_var_pr,
+        "rsut" => rmse_var_rsut,
+        "rlut" => rmse_var_rlut,
+    )
     return rmse_var_dict
 end
 
@@ -230,7 +238,8 @@ conversion to pressure coordiantes. This function discards everything below 80 m
 elevation to avoid that.
 """
 function get_sim_var_in_pfull_dict(diagnostics_folder_path)
-    available_short_names = ClimaAnalysis.available_vars(ClimaAnalysis.SimDir(diagnostics_folder_path))
+    available_short_names =
+        ClimaAnalysis.available_vars(ClimaAnalysis.SimDir(diagnostics_folder_path))
     sim_var_pfull_dict = Dict{String, Any}()
 
     short_names = get_short_names_monthly_averages(diagnostics_folder_path)
@@ -261,12 +270,16 @@ function get_sim_var_in_pfull_dict(diagnostics_folder_path)
                     # inversions at low elevation, which prevents the conversion between
                     # pressure and altitude. To avoid that, we exclude everything below 80m.
                     # NOTE: This was empirically found.
-                    pfull_var_windowed = ClimaAnalysis.window(pfull_var, "z", left = 80)
+                    pfull_var_windowed =
+                        ClimaAnalysis.window(pfull_var, "z", left = 80)
                     sim_var_windowed = ClimaAnalysis.window(sim_var, "z", left = 80)
 
+                    sim_in_pfull_var = ClimaAnalysis.Atmos.to_pressure_coordinates(
+                        sim_var_windowed,
+                        pfull_var_windowed,
+                    )
                     sim_in_pfull_var =
-                        ClimaAnalysis.Atmos.to_pressure_coordinates(sim_var_windowed, pfull_var_windowed)
-                    sim_in_pfull_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_in_pfull_var)
+                        ClimaAnalysis.shift_to_start_of_previous_month(sim_in_pfull_var)
                     sim_in_pfull_var = ClimaAnalysis.convert_dim_units(
                         sim_in_pfull_var,
                         "pfull",
@@ -341,7 +354,11 @@ function get_obs_var_in_pfull_dict()
                 conversion_function = x -> 0.01 * x,
             )
             # Convert from percentages (e.g. 120%) to decimal (1.20)
-            obs_var = ClimaAnalysis.Var.convert_units(obs_var, "unitless", conversion_function = x -> 0.01 * x)
+            obs_var = ClimaAnalysis.Var.convert_units(
+                obs_var,
+                "unitless",
+                conversion_function = x -> 0.01 * x,
+            )
             return obs_var
         end
     return obs_var_dict
@@ -360,7 +377,8 @@ the value is a tuple, where the first element is the lower bound and the last
 element is the upper bound for the bias plots.
 """
 function get_compare_vars_biases_plot_extrema_pfull()
-    compare_vars_biases_plot_extrema = Dict("ta" => (-5.0, 5.0), "hur" => (-0.4, 0.4), "hus" => (-0.0015, 0.0015))
+    compare_vars_biases_plot_extrema =
+        Dict("ta" => (-5.0, 5.0), "hur" => (-0.4, 0.4), "hus" => (-0.0015, 0.0015))
     return compare_vars_biases_plot_extrema
 end
 
@@ -377,7 +395,8 @@ the value is a tuple, where the first element is the lower bound and the last
 element is the upper bound for the bias plots.
 """
 function get_compare_vars_biases_heatmap_extrema_pfull()
-    compare_vars_biases_heatmap_extrema = Dict("ta" => (-10.0, 10.0), "hur" => (-0.4, 0.4), "hus" => (-0.001, 0.001))
+    compare_vars_biases_heatmap_extrema =
+        Dict("ta" => (-10.0, 10.0), "hur" => (-0.4, 0.4), "hus" => (-0.001, 0.001))
     return compare_vars_biases_heatmap_extrema
 end
 
@@ -391,7 +410,11 @@ function get_short_names_monthly_averages(diagnostics_folder_path)
     simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)
     for short_name in ClimaAnalysis.available_vars(simdir)
         for reduction in ClimaAnalysis.available_reductions(simdir, short_name = short_name)
-            for period in ClimaAnalysis.available_periods(simdir, short_name = short_name, reduction = reduction)
+            for period in ClimaAnalysis.available_periods(
+                simdir,
+                short_name = short_name,
+                reduction = reduction,
+            )
                 if reduction == "average" && period == "1M"
                     push!(available_short_names, short_name)
                 end

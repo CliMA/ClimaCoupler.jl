@@ -30,7 +30,13 @@ function restore!(v1::T1, v2::T2, comms_ctx; name = "", ignore) where {T1, T2}
     else
         # Recursive case
         for p in fields
-            restore!(getfield(v1, p), getfield(v2, p), comms_ctx; name = "$(name).$(p)", ignore)
+            restore!(
+                getfield(v1, p),
+                getfield(v2, p),
+                comms_ctx;
+                name = "$(name).$(p)",
+                ignore,
+            )
         end
     end
     return nothing
@@ -39,8 +45,20 @@ end
 # Ignoring certain types that don't need to be restored
 # UnionAll and DataType are infinitely recursive, so we also ignore those
 function restore!(
-    v1::Union{AbstractTimeVaryingInput, ClimaComms.AbstractCommsContext, ClimaComms.AbstractDevice, UnionAll, DataType},
-    v2::Union{AbstractTimeVaryingInput, ClimaComms.AbstractCommsContext, ClimaComms.AbstractDevice, UnionAll, DataType},
+    v1::Union{
+        AbstractTimeVaryingInput,
+        ClimaComms.AbstractCommsContext,
+        ClimaComms.AbstractDevice,
+        UnionAll,
+        DataType,
+    },
+    v2::Union{
+        AbstractTimeVaryingInput,
+        ClimaComms.AbstractCommsContext,
+        ClimaComms.AbstractDevice,
+        UnionAll,
+        DataType,
+    },
     _comms_ctx;
     name,
     ignore,
@@ -55,7 +73,8 @@ function restore!(
     name,
     ignore,
 )
-    ArrayType = parent(v1) isa Array ? Array : ClimaComms.array_type(ClimaComms.device(comms_ctx))
+    ArrayType =
+        parent(v1) isa Array ? Array : ClimaComms.array_type(ClimaComms.device(comms_ctx))
     moved_to_device = ArrayType(parent(v2))
 
     parent(v1) .= moved_to_device

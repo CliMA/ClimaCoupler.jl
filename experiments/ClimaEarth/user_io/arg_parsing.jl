@@ -35,7 +35,8 @@ function get_coupler_config_dict(config_file)
 
     # Extract the job ID from the command line arguments, or from the config file name if not provided
     job_id = coupler_default_cli["job_id"]
-    coupler_default_cli["job_id"] = isnothing(job_id) ? string(split(split(config_file, '/')[end], '.')[1]) : job_id
+    coupler_default_cli["job_id"] =
+        isnothing(job_id) ? string(split(split(config_file, '/')[end], '.')[1]) : job_id
 
     # Load the coupler config file into a dictionary
     coupler_config_dict = YAML.load_file(config_file)
@@ -51,11 +52,17 @@ function get_coupler_config_dict(config_file)
         config_dict = merge(atmos_default, coupler_default_cli, coupler_config_dict)
     else
         @info "Using Atmos configuration from ClimaCoupler in $atmos_config_file"
-        atmos_config_dict = YAML.load_file(joinpath(pkgdir(ClimaCoupler), atmos_config_file))
+        atmos_config_dict =
+            YAML.load_file(joinpath(pkgdir(ClimaCoupler), atmos_config_file))
 
         # Merge the atmos default config, coupler default config + command line inputs,
         #  user-provided atmos config, and user-provided coupler config
-        config_dict = merge(atmos_default, coupler_default_cli, atmos_config_dict, coupler_config_dict)
+        config_dict = merge(
+            atmos_default,
+            coupler_default_cli,
+            atmos_config_dict,
+            coupler_config_dict,
+        )
     end
 
     # Select the correct timestep for each component model based on which are available
@@ -110,10 +117,17 @@ function get_coupler_args(config_dict::Dict)
         t_end = ITime(t_end, epoch = start_date)
         t_start = ITime(t_start, epoch = start_date)
         Δt_cpl = ITime(Δt_cpl, epoch = start_date)
-        times = promote(t_end, t_start, Δt_cpl, ITime.(values(config_dict["component_dt_dict"]))...)
+        times = promote(
+            t_end,
+            t_start,
+            Δt_cpl,
+            ITime.(values(config_dict["component_dt_dict"]))...,
+        )
         t_end, t_start, Δt_cpl = (times[1], times[2], times[3])
-        component_dt_dict =
-            Dict(component => first(promote(ITime(dt), t_end)) for (component, dt) in config_dict["component_dt_dict"])
+        component_dt_dict = Dict(
+            component => first(promote(ITime(dt), t_end)) for
+            (component, dt) in config_dict["component_dt_dict"]
+        )
     else
         component_dt_dict = config_dict["component_dt_dict"]
     end
@@ -314,7 +328,11 @@ function add_extra_diagnostics!(config_dict)
             (config_dict["extra_atmos_diagnostics"] = Vector{Dict{Any, Any}}())
         push!(
             config_dict["extra_atmos_diagnostics"],
-            Dict("short_name" => ["toa_fluxes_net"], "reduction_time" => "average", "period" => period),
+            Dict(
+                "short_name" => ["toa_fluxes_net"],
+                "reduction_time" => "average",
+                "period" => period,
+            ),
         )
     end
     config_dict["diagnostics_dt"] = diagnostics_dt

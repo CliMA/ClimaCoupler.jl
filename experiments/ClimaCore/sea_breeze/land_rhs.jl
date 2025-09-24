@@ -35,8 +35,11 @@ end
 function hspace_1D(xlim = (-π, π), npoly = 0, helem = 10)
     FT = Float64
 
-    domain =
-        CC.Domains.IntervalDomain(CC.Geometry.XPoint{FT}(xlim[1]), CC.Geometry.XPoint{FT}(xlim[2]), periodic = true)
+    domain = CC.Domains.IntervalDomain(
+        CC.Geometry.XPoint{FT}(xlim[1]),
+        CC.Geometry.XPoint{FT}(xlim[2]),
+        periodic = true,
+    )
     mesh = CC.Meshes.IntervalMesh(domain; nelems = helem)
     topology = CC.Topologies.IntervalTopology(mesh)
 
@@ -72,12 +75,28 @@ struct LandSim <: AbstractLandSim
     integrator::Any
 end
 
-function LandSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = DiffEqCallbacks.CallbackSet())
+function LandSim(
+    Y_init,
+    t_start,
+    dt,
+    t_end,
+    timestepper,
+    p,
+    saveat,
+    callbacks = DiffEqCallbacks.CallbackSet(),
+)
     ode_algo = CTS.ExplicitAlgorithm(timestepper)
     ode_function = CTS.ClimaODEFunction(T_exp! = lnd_rhs!)
 
     problem = SciMLBase.ODEProblem(ode_function, Y_init, (t_start, t_end), p)
-    lnd_integ = SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false, callback = callbacks)
+    lnd_integ = SciMLBase.init(
+        problem,
+        ode_algo,
+        dt = dt,
+        saveat = saveat,
+        adaptive = false,
+        callback = callbacks,
+    )
 
     return LandSim(lnd_integ)
 end

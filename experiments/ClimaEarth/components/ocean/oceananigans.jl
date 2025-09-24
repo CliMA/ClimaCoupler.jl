@@ -38,7 +38,13 @@ dispatch in coupling.
 Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
 """
-function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir, comms_ctx = ClimaComms.context())
+function OceananigansSimulation(
+    area_fraction,
+    start_date,
+    stop_date;
+    output_dir,
+    comms_ctx = ClimaComms.context(),
+)
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
 
     # Retrieve EN4 data (monthly)
@@ -69,10 +75,18 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
         halo = (7, 7, 7),
     )
 
-    bottom_height =
-        CO.regrid_bathymetry(underlying_grid; minimum_depth = 30, interpolation_passes = 20, major_basins = 1)
+    bottom_height = CO.regrid_bathymetry(
+        underlying_grid;
+        minimum_depth = 30,
+        interpolation_passes = 20,
+        major_basins = 1,
+    )
 
-    grid = OC.ImmersedBoundaryGrid(underlying_grid, OC.GridFittedBottom(bottom_height); active_cells_map = true)
+    grid = OC.ImmersedBoundaryGrid(
+        underlying_grid,
+        OC.GridFittedBottom(bottom_height);
+        active_cells_map = true,
+    )
 
     use_restoring = start_date + Dates.Month(1) < stop_date
 
@@ -80,7 +94,11 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
         # When we use EN4 data, the forcing takes care of everything, including
         # the initial conditions
         restoring_rate = 1 / (3 * 86400)
-        mask = CO.LinearlyTaperedPolarMask(southern = (-80, -70), northern = (70, 90), z = (z(1), 0))
+        mask = CO.LinearlyTaperedPolarMask(
+            southern = (-80, -70),
+            northern = (70, 90),
+            z = (z(1), 0),
+        )
 
         forcing_T = CO.DatasetRestoring(en4_temperature, grid; mask, rate = restoring_rate)
         forcing_S = CO.DatasetRestoring(en4_salinity, grid; mask, rate = restoring_rate)
@@ -121,7 +139,11 @@ function OceananigansSimulation(area_fraction, start_date, stop_date; output_dir
 
     remapping = (; remapper_cc, scratch_cc1, scratch_cc2, scratch_arr1, scratch_arr2)
 
-    ocean_properties = (; ocean_reference_density = 1020, ocean_heat_capacity = 3991, ocean_fresh_water_density = 999.8)
+    ocean_properties = (;
+        ocean_reference_density = 1020,
+        ocean_heat_capacity = 3991,
+        ocean_fresh_water_density = 999.8,
+    )
 
     # Before version 0.96.22, the NetCDFWriter was broken on GPU
     if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
@@ -150,7 +172,8 @@ end
 ###############################################################################
 
 # Timestep the simulation forward to time `t`
-Interfacer.step!(sim::OceananigansSimulation, t) = OC.time_step!(sim.ocean, float(t) - sim.ocean.model.clock.time)
+Interfacer.step!(sim::OceananigansSimulation, t) =
+    OC.time_step!(sim.ocean, float(t) - sim.ocean.model.clock.time)
 
 # We always want the surface, so we always set zero(pt.lat) for z
 """
@@ -224,14 +247,19 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.a
 # Oceananingans with Float64, so we have no way to know the float type here. Sticking with
 # Float32 ensures that nothing is accidentally promoted to Float64. We will need to change
 # this anyway.
-Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_buoyancy}) = Float32(5.8e-5)
-Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_momentum}) = Float32(5.8e-5)
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_buoyancy}) =
+    Float32(5.8e-5)
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_momentum}) =
+    Float32(5.8e-5)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:beta}) = Float32(1)
-Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) = Float32(0.06)
-Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) = Float32(0.06)
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) =
+    Float32(0.06)
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) =
+    Float32(0.06)
 
 # NOTE: This is 3D, but it will be remapped to 2D
-Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) = 273.15 + sim.ocean.model.tracers.T
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
+    273.15 + sim.ocean.model.tracers.T
 
 """
     FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fields)
@@ -253,9 +281,17 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     grid = sim.ocean.model.grid
 
     # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
-    CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, F_turb_ρτxz)
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr1,
+        sim.remapping.remapper_cc,
+        F_turb_ρτxz,
+    )
     OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
-    CC.Remapping.interpolate!(sim.remapping.scratch_arr2, sim.remapping.remapper_cc, F_turb_ρτyz)
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr2,
+        sim.remapping.remapper_cc,
+        F_turb_ρτyz,
+    )
     OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
 
     # Rename for clarity; these are now Center, Center Oceananigans fields
@@ -265,9 +301,15 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
     oc_flux_u = surface_flux(sim.ocean.model.velocities.u)
     oc_flux_v = surface_flux(sim.ocean.model.velocities.v)
-    set_from_extrinsic_vectors!((; u = oc_flux_u, v = oc_flux_v), grid, F_turb_ρτxz_cc, F_turb_ρτyz_cc)
+    set_from_extrinsic_vectors!(
+        (; u = oc_flux_u, v = oc_flux_v),
+        grid,
+        F_turb_ρτxz_cc,
+        F_turb_ρτyz_cc,
+    )
 
-    (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) = sim.ocean_properties
+    (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) =
+        sim.ocean_properties
 
     # Remap the latent and sensible heat fluxes using scratch arrays
     CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, F_lh) # latent heat flux
@@ -287,11 +329,16 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
 
     # Add the part of the salinity flux that comes from the moisture flux, we also need to
     # add the component due to precipitation (that was done with the radiative fluxes)
-    CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, F_turb_moisture)
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr1,
+        sim.remapping.remapper_cc,
+        F_turb_moisture,
+    )
     moisture_fresh_water_flux = sim.remapping.scratch_arr1 ./ ocean_fresh_water_density
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, 1)
-    OC.interior(oc_flux_S, :, :, 1) .= OC.interior(oc_flux_S, :, :, 1) .- surface_salinity .* moisture_fresh_water_flux
+    OC.interior(oc_flux_S, :, :, 1) .=
+        OC.interior(oc_flux_S, :, :, 1) .- surface_salinity .* moisture_fresh_water_flux
     return nothing
 end
 
@@ -313,7 +360,17 @@ function set_from_extrinsic_vectors!(vectors, grid, u_cc, v_cc)
     OC.fill_halo_regions!(v_cc)
 
     # Interpolate the vectors to face/center and center/face respectively
-    OC.Utils.launch!(arch, grid, :xy, _interpolate_velocities!, vectors.u, vectors.v, grid, u_cc, v_cc)
+    OC.Utils.launch!(
+        arch,
+        grid,
+        :xy,
+        _interpolate_velocities!,
+        vectors.u,
+        vectors.v,
+        grid,
+        u_cc,
+        v_cc,
+    )
     return nothing
 end
 
@@ -371,27 +428,43 @@ Oceananigans represents precipitation as a positive salinity flux,
 so a sign change is needed when we convert from precipitation to salinity flux.
 """
 function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf, area_fraction)
-    (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) = sim.ocean_properties
+    (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) =
+        sim.ocean_properties
 
     # Remap radiative flux onto scratch array; rename for clarity
-    CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, csf.F_radiative)
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr1,
+        sim.remapping.remapper_cc,
+        csf.F_radiative,
+    )
     remapped_F_radiative = sim.remapping.scratch_arr1
 
     # Update only the part due to radiative fluxes. For the full update, the component due
     # to latent and sensible heat is missing and will be updated in update_turbulent_fluxes.
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
-    OC.interior(oc_flux_T, :, :, 1) .= remapped_F_radiative ./ (ocean_reference_density * ocean_heat_capacity)
+    OC.interior(oc_flux_T, :, :, 1) .=
+        remapped_F_radiative ./ (ocean_reference_density * ocean_heat_capacity)
 
     # Remap precipitation fields onto scratch arrays; rename for clarity
-    CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, csf.P_liq)
-    CC.Remapping.interpolate!(sim.remapping.scratch_arr2, sim.remapping.remapper_cc, csf.P_snow)
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr1,
+        sim.remapping.remapper_cc,
+        csf.P_liq,
+    )
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr2,
+        sim.remapping.remapper_cc,
+        csf.P_snow,
+    )
     remapped_P_liq = sim.remapping.scratch_arr1
     remapped_P_snow = sim.remapping.scratch_arr2
 
     # Virtual salt flux
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
-    precipitating_fresh_water_flux = (remapped_P_liq .+ remapped_P_snow) ./ ocean_fresh_water_density
-    surface_salinity_flux = OC.interior(sim.ocean.model.tracers.S, :, :, 1) .* precipitating_fresh_water_flux
+    precipitating_fresh_water_flux =
+        (remapped_P_liq .+ remapped_P_snow) ./ ocean_fresh_water_density
+    surface_salinity_flux =
+        OC.interior(sim.ocean.model.tracers.S, :, :, 1) .* precipitating_fresh_water_flux
     OC.interior(oc_flux_S, :, :, 1) .= .-surface_salinity_flux
     return nothing
 end

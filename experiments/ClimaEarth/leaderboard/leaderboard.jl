@@ -63,18 +63,16 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spi
 
         # Take time average
         obs_var_seasons = (
-            !ClimaAnalysis.isempty(obs_var) ? ClimaAnalysis.average_time(obs_var) : obs_var for
-            obs_var in obs_var_seasons
+            !ClimaAnalysis.isempty(obs_var) ? ClimaAnalysis.average_time(obs_var) : obs_var for obs_var in obs_var_seasons
         )
         sim_var_seasons = (
-            !ClimaAnalysis.isempty(sim_var) ? ClimaAnalysis.average_time(sim_var) : sim_var for
-            sim_var in sim_var_seasons
+            !ClimaAnalysis.isempty(sim_var) ? ClimaAnalysis.average_time(sim_var) : sim_var for sim_var in sim_var_seasons
         )
 
         # Save observation and simulation data
         sim_obs_comparsion_dict[short_name] = Dict(
-            season => (sim_var_s, obs_var_s) for
-            (season, sim_var_s, obs_var_s) in zip(seasons, sim_var_seasons, obs_var_seasons)
+            season => (sim_var_s, obs_var_s) for (season, sim_var_s, obs_var_s) in
+            zip(seasons, sim_var_seasons, obs_var_seasons)
         )
     end
 
@@ -85,17 +83,23 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spi
     # Plot annual plots
     for compare_vars_biases in compare_vars_biases_groups
         # Plot all the variables that we can
-        compare_vars_biases = filter(x -> x in keys(sim_obs_comparsion_dict), compare_vars_biases)
+        compare_vars_biases =
+            filter(x -> x in keys(sim_obs_comparsion_dict), compare_vars_biases)
         length(compare_vars_biases) > 0 || continue
 
-        fig_bias = CairoMakie.Figure(; size = (600, 75.0 + 300 * length(compare_vars_biases)))
+        fig_bias =
+            CairoMakie.Figure(; size = (600, 75.0 + 300 * length(compare_vars_biases)))
         for (row, short_name) in enumerate(compare_vars_biases)
             sim_var = sim_obs_comparsion_dict[short_name]["ANN"][1]
             if !ClimaAnalysis.isempty(sim_var)
                 # Add "mean " for plotting the title
                 sim_var.attributes["short_name"] = "mean $(ClimaAnalysis.short_name(sim_var))"
                 cmap_extrema = get(compare_vars_biases_plot_extrema, short_name) do
-                    extrema(ClimaAnalysis.bias(sim_obs_comparsion_dict[short_name]["ANN"]...).data)
+                    extrema(
+                        ClimaAnalysis.bias(
+                            sim_obs_comparsion_dict[short_name]["ANN"]...,
+                        ).data,
+                    )
                 end
                 ClimaAnalysis.Visualize.plot_bias_on_globe!(
                     fig_bias,
@@ -105,25 +109,39 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spi
                 )
             end
         end
-        CairoMakie.save(joinpath(leaderboard_base_path, "bias_$(first(compare_vars_biases))_ANN.png"), fig_bias)
+        CairoMakie.save(
+            joinpath(leaderboard_base_path, "bias_$(first(compare_vars_biases))_ANN.png"),
+            fig_bias,
+        )
     end
 
     # Plot plots with all the seasons (not annual)
     seasons_no_ann = filter(season -> season != "ANN", seasons)
     for compare_vars_biases in compare_vars_biases_groups
         # Plot all the variables that we can
-        compare_vars_biases = filter(x -> x in keys(sim_obs_comparsion_dict), compare_vars_biases)
+        compare_vars_biases =
+            filter(x -> x in keys(sim_obs_comparsion_dict), compare_vars_biases)
         length(compare_vars_biases) > 0 || continue
 
-        fig_all_seasons =
-            CairoMakie.Figure(; size = (600 * length(seasons_no_ann), 75.0 + 300 * length(compare_vars_biases)))
+        fig_all_seasons = CairoMakie.Figure(;
+            size = (600 * length(seasons_no_ann), 75.0 + 300 * length(compare_vars_biases)),
+        )
         for (col, season) in enumerate(seasons_no_ann)
-            CairoMakie.Label(fig_all_seasons[0, col], season, tellwidth = false, fontsize = 30)
+            CairoMakie.Label(
+                fig_all_seasons[0, col],
+                season,
+                tellwidth = false,
+                fontsize = 30,
+            )
             for (row, short_name) in enumerate(compare_vars_biases)
                 sim_var = sim_obs_comparsion_dict[short_name][season][1]
                 if !ClimaAnalysis.isempty(sim_var)
                     cmap_extrema = get(compare_vars_biases_plot_extrema, short_name) do
-                        extrema(ClimaAnalysis.bias(sim_obs_comparsion_dict[short_name][season]...).data)
+                        extrema(
+                            ClimaAnalysis.bias(
+                                sim_obs_comparsion_dict[short_name][season]...,
+                            ).data,
+                        )
                     end
                     # Add "mean " for plotting the title
                     sim_var.attributes["short_name"] = "mean $(ClimaAnalysis.short_name(sim_var))"
@@ -136,7 +154,10 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spi
             end
         end
         CairoMakie.save(
-            joinpath(leaderboard_base_path, "bias_$(first(compare_vars_biases))_all_seasons.png"),
+            joinpath(
+                leaderboard_base_path,
+                "bias_$(first(compare_vars_biases))_all_seasons.png",
+            ),
             fig_all_seasons,
         )
     end
@@ -148,14 +169,16 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spi
     for short_name in rmse_var_names
         for season in seasons
             !ClimaAnalysis.isempty(sim_obs_comparsion_dict[short_name][season][1]) && (
-                rmse_var_dict[short_name]["CliMA", season] =
-                    ClimaAnalysis.global_rmse(sim_obs_comparsion_dict[short_name][season]...)
+                rmse_var_dict[short_name]["CliMA", season] = ClimaAnalysis.global_rmse(
+                    sim_obs_comparsion_dict[short_name][season]...,
+                )
             )
         end
     end
 
     # Plot box plots
-    fig_leaderboard = CairoMakie.Figure(; size = (800, 300 * length(rmse_var_dict) + 400), fontsize = 20)
+    fig_leaderboard =
+        CairoMakie.Figure(; size = (800, 300 * length(rmse_var_dict) + 400), fontsize = 20)
     for (loc, short_name) in enumerate(rmse_var_names)
         ClimaAnalysis.Visualize.plot_boxplot!(
             fig_leaderboard,
@@ -172,7 +195,10 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spi
         best_category_name = "ANN",
         ploc = (length(rmse_var_dict) + 1, 1),
     )
-    CairoMakie.save(joinpath(leaderboard_base_path, "bias_leaderboard.png"), fig_leaderboard)
+    CairoMakie.save(
+        joinpath(leaderboard_base_path, "bias_leaderboard.png"),
+        fig_leaderboard,
+    )
 end
 
 """
@@ -224,7 +250,11 @@ function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_pat
         min_pfull = ClimaAnalysis.pressures(obs_var)[1]
         sim_pressures = ClimaAnalysis.pressures(sim_var)
         greater_than_min_pfull_idx = findfirst(x -> x > min_pfull, sim_pressures)
-        sim_var = ClimaAnalysis.window(sim_var, "pfull", left = sim_pressures[greater_than_min_pfull_idx])
+        sim_var = ClimaAnalysis.window(
+            sim_var,
+            "pfull",
+            left = sim_pressures[greater_than_min_pfull_idx],
+        )
 
         # Resample over lat, lon, time, and pressures
         obs_var = ClimaAnalysis.resampled_as(obs_var, sim_var)
@@ -247,12 +277,19 @@ function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_pat
 
     # Initialize ranges for colorbar and figure whose columns are pressure levels and rows are variables
     compare_vars_biases_plot_extrema_pfull = get_compare_vars_biases_plot_extrema_pfull()
-    fig_bias_pfull_vars = CairoMakie.Figure(size = (650 * length(target_p_lvls), 450 * length(sim_obs_comparsion_dict)))
+    fig_bias_pfull_vars = CairoMakie.Figure(
+        size = (650 * length(target_p_lvls), 450 * length(sim_obs_comparsion_dict)),
+    )
 
     # Plot bias at the pressure levels in p_lvls
     for (row_idx, short_name) in enumerate(keys(sim_obs_comparsion_dict))
         # Plot label for variable name
-        CairoMakie.Label(fig_bias_pfull_vars[row_idx, 0], short_name, tellheight = false, fontsize = 30)
+        CairoMakie.Label(
+            fig_bias_pfull_vars[row_idx, 0],
+            short_name,
+            tellheight = false,
+            fontsize = 30,
+        )
         for (col_idx, p_lvl) in enumerate(target_p_lvls)
             sim_var = sim_obs_comparsion_dict[short_name].sim
             obs_var = sim_obs_comparsion_dict[short_name].obs
@@ -279,7 +316,12 @@ function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_pat
 
     # Plot label for the pressure levels
     for (col_idx, p_lvl) in enumerate(real_p_lvls[begin:length(target_p_lvls)])
-        CairoMakie.Label(fig_bias_pfull_vars[0, col_idx], "$p_lvl $p_units", tellwidth = false, fontsize = 30)
+        CairoMakie.Label(
+            fig_bias_pfull_vars[0, col_idx],
+            "$p_lvl $p_units",
+            tellwidth = false,
+            fontsize = 30,
+        )
     end
 
     # Define figure with at most four columns and the necessary number of rows for
@@ -290,7 +332,8 @@ function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_pat
     fig_lat_pres = CairoMakie.Figure(size = (650 * num_cols, 450 * num_rows))
 
     # Initialize ranges for colorbar
-    compare_vars_biases_heatmap_extrema_pfull = get_compare_vars_biases_heatmap_extrema_pfull()
+    compare_vars_biases_heatmap_extrema_pfull =
+        get_compare_vars_biases_heatmap_extrema_pfull()
 
     # Take zonal mean and plot lat - pressure heatmap
     for (idx, short_name) in enumerate(keys(sim_obs_comparsion_dict))
@@ -320,7 +363,8 @@ function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_pat
                 :axis => Dict([:yreversed => true]),
                 :plot => Dict(
                     :colormap => :vik,
-                    :colorrange => compare_vars_biases_heatmap_extrema_pfull[short_name],
+                    :colorrange =>
+                        compare_vars_biases_heatmap_extrema_pfull[short_name],
                     :colormap => CairoMakie.cgrad(:vik, 11, categorical = true),
                 ),
             ),
@@ -328,13 +372,21 @@ function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_pat
     end
 
     # Save figures
-    CairoMakie.save(joinpath(leaderboard_base_path, "bias_vars_in_pfull.png"), fig_bias_pfull_vars)
-    CairoMakie.save(joinpath(leaderboard_base_path, "bias_lat_pfull_heatmaps.png"), fig_lat_pres)
+    CairoMakie.save(
+        joinpath(leaderboard_base_path, "bias_vars_in_pfull.png"),
+        fig_bias_pfull_vars,
+    )
+    CairoMakie.save(
+        joinpath(leaderboard_base_path, "bias_lat_pfull_heatmaps.png"),
+        fig_lat_pres,
+    )
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     if length(ARGS) < 2
-        error("Usage: julia leaderboard.jl <Filepath to save leaderboard and bias plots> <Filepath to simulation data>")
+        error(
+            "Usage: julia leaderboard.jl <Filepath to save leaderboard and bias plots> <Filepath to simulation data>",
+        )
     end
     leaderboard_base_path = ARGS[begin]
     diagnostics_folder_path = ARGS[begin + 1]

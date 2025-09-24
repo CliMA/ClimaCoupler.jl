@@ -6,7 +6,12 @@ include(joinpath("..", "..", "components", "ocean", "slab_ocean.jl"))
 
 for FT in (Float32, Float64)
     @testset "dss_state! SlabOceanSimulation for FT=$FT" begin
-        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points = 4, h_elem = 4)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius = FT(6371e3),
+            n_quad_points = 4,
+            h_elem = 4,
+        )
 
         # construct dss buffer to put in cache
         dss_buffer = CC.Spaces.create_dss_buffer(CC.Fields.zeros(boundary_space))
@@ -16,7 +21,10 @@ for FT in (Float32, Float64)
             state_field1 = CC.Fields.ones(boundary_space),
             state_field2 = CC.Fields.zeros(boundary_space),
         )
-        p = (; cache_field = CC.Fields.zeros(boundary_space), dss_buffer = CC.Spaces.create_dss_buffer(u))
+        p = (;
+            cache_field = CC.Fields.zeros(boundary_space),
+            dss_buffer = CC.Spaces.create_dss_buffer(u),
+        )
         integrator = (; u, p)
         sim = SlabOceanSimulation(nothing, integrator)
 

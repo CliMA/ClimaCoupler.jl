@@ -145,7 +145,10 @@ function debug(sim::Interfacer.ComponentModelSimulation, dir)
         if field_index <= length(field_names)
             field_name = field_names[field_index]
             field = Interfacer.get_field(sim, Val(field_name))
-            ax = Makie.Axis(fig[i, j * 2 - 1], title = string(field_name) * print_extrema(field))
+            ax = Makie.Axis(
+                fig[i, j * 2 - 1],
+                title = string(field_name) * print_extrema(field),
+            )
             if field isa OC.Field || field isa OC.AbstractOperations.AbstractOperation
                 if field isa OC.AbstractOperations.AbstractOperation
                     field = OC.Field(field)
@@ -180,18 +183,26 @@ function _heatmap_cc_field!(fig, field::CC.Fields.Field, i, j, field_name)
     # ClimaCoreMakie doesn't support NaNs/Infs, so we substitute them with 100max
     FT = CC.Spaces.undertype(axes(cpu_field))
     isinvalid = (x) -> isnan(x) || isinf(x)
-    field_valid_min, field_valid_max = extrema(map(x -> isinvalid(x) ? FT(0) : x, parent(cpu_field)))
+    field_valid_min, field_valid_max =
+        extrema(map(x -> isinvalid(x) ? FT(0) : x, parent(cpu_field)))
     map!(x -> isinvalid(x) ? 100field_valid_max : x, parent(cpu_field), parent(cpu_field))
 
     # If the values are too small, `isapprox` can't be computed accurately because of floating point precision issues.
     is_toosmall = (x) -> log10(abs(x)) < log10(floatmin(Float64)) / 2
 
     # If the field is constant, skip plotting it to avoid heatmap errors.
-    if isapprox(field_valid_min, field_valid_max) || (is_toosmall(field_valid_min) && is_toosmall(field_valid_max))
-        ax = Makie.Axis(fig[i, j * 2 - 1], title = string(field_name) * print_extrema(cpu_field))
+    if isapprox(field_valid_min, field_valid_max) ||
+       (is_toosmall(field_valid_min) && is_toosmall(field_valid_max))
+        ax = Makie.Axis(
+            fig[i, j * 2 - 1],
+            title = string(field_name) * print_extrema(cpu_field),
+        )
     else
         colorrange = (field_valid_min, field_valid_max)
-        ax = Makie.Axis(fig[i, j * 2 - 1], title = string(field_name) * print_extrema(cpu_field))
+        ax = Makie.Axis(
+            fig[i, j * 2 - 1],
+            title = string(field_name) * print_extrema(cpu_field),
+        )
         hm = ClimaCoreMakie.fieldheatmap!(ax, cpu_field, colorrange = colorrange)
         Makie.Colorbar(fig[i, j * 2], hm)
     end
@@ -233,11 +244,17 @@ end
 # additional ClimaAtmos model debug fields
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:w})
     w_c = ones(CC.Spaces.horizontal_space(sim.domain.face_space))
-    parent(w_c) .= parent(CC.Fields.level(CC.Geometry.WVector.(sim.integrator.u.f.u₃), 5 .+ CC.Utilities.half))
+    parent(w_c) .= parent(
+        CC.Fields.level(
+            CC.Geometry.WVector.(sim.integrator.u.f.u₃),
+            5 .+ CC.Utilities.half,
+        ),
+    )
     return w_c
 end
 specific_humidity(::CA.DryModel, integrator) = [eltype(integrator.u)(0)]
-specific_humidity(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) = integrator.u.c.ρq_tot
+specific_humidity(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
+    integrator.u.c.ρq_tot
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρq_tot}) =
     specific_humidity(sim.integrator.p.atmos.moisture_model, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrator.u.c.ρe_tot
@@ -248,17 +265,25 @@ Interfacer.get_field(sim::BucketSimulation, ::Val{:Ws}) = sim.integrator.u.bucke
 Interfacer.get_field(sim::BucketSimulation, ::Val{:W}) = sim.integrator.u.bucket.W
 
 # additional ClimaLand model debug fields
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_water}) = sim.integrator.u.soil.ϑ_l
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_water}) =
+    sim.integrator.u.soil.ϑ_l
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_ice}) = sim.integrator.u.soil.θ_i
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_energy}) = sim.integrator.u.soil.ρe_int
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:canopy_temp}) = sim.integrator.u.canopy.energy.T
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:canopy_water}) = sim.integrator.u.canopy.hydraulics.ϑ_l.:1
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_energy}) = sim.integrator.u.snow.U
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_water_equiv}) = sim.integrator.u.snow.S
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_liquid_water}) = sim.integrator.u.snow.S_l
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_energy}) =
+    sim.integrator.u.soil.ρe_int
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:canopy_temp}) =
+    sim.integrator.u.canopy.energy.T
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:canopy_water}) =
+    sim.integrator.u.canopy.hydraulics.ϑ_l.:1
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_energy}) =
+    sim.integrator.u.snow.U
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_water_equiv}) =
+    sim.integrator.u.snow.S
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_liquid_water}) =
+    sim.integrator.u.snow.S_l
 
 # currently selected plot fields
-plot_field_names(sim::Interfacer.SurfaceModelSimulation) = (:area_fraction, :surface_temperature)
+plot_field_names(sim::Interfacer.SurfaceModelSimulation) =
+    (:area_fraction, :surface_temperature)
 plot_field_names(sim::ClimaLandSimulation) = (
     :area_fraction,
     :surface_direct_albedo,
@@ -273,5 +298,7 @@ plot_field_names(sim::ClimaLandSimulation) = (
     :snow_water_equiv,
     :snow_liquid_water,
 )
-plot_field_names(sim::BucketSimulation) = (:area_fraction, :surface_temperature, :σS, :Ws, :W)
-plot_field_names(sim::ClimaAtmosSimulation) = (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)
+plot_field_names(sim::BucketSimulation) =
+    (:area_fraction, :surface_temperature, :σS, :Ws, :W)
+plot_field_names(sim::ClimaAtmosSimulation) =
+    (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)

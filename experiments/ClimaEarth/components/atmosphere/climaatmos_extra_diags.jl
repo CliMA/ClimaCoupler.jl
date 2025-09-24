@@ -2,7 +2,10 @@
 import ClimaAtmos.Diagnostics as CAD
 
 const ᶜgradᵥ_ = CC.Operators.GradientF2C()
-const ᶠinterp_ = CC.Operators.InterpolateC2F(bottom = CC.Operators.Extrapolate(), top = CC.Operators.Extrapolate())
+const ᶠinterp_ = CC.Operators.InterpolateC2F(
+    bottom = CC.Operators.Extrapolate(),
+    top = CC.Operators.Extrapolate(),
+)
 
 """
     add_diagnostic_variable!(short_name::String, long_name::String, standard_name::String, units::String, comments::String, compute!::Function)
@@ -145,16 +148,34 @@ CAD.add_diagnostic_variable!(
     compute! = (out, state, cache, time) -> begin
         # Perform sum of radiation fluxes (rsu + rlu - rsd - rld)
         if isnothing(out)
-            return CC.Fields.array2field(cache.radiation.rrtmgp_model.face_sw_flux_up, axes(state.f)) .+
-                   CC.Fields.array2field(cache.radiation.rrtmgp_model.face_lw_flux_up, axes(state.f)) .-
-                   CC.Fields.array2field(cache.radiation.rrtmgp_model.face_sw_flux_dn, axes(state.f)) .-
-                   CC.Fields.array2field(cache.radiation.rrtmgp_model.face_lw_flux_dn, axes(state.f)) |> copy
+            return CC.Fields.array2field(
+                cache.radiation.rrtmgp_model.face_sw_flux_up,
+                axes(state.f),
+            ) .+ CC.Fields.array2field(
+                cache.radiation.rrtmgp_model.face_lw_flux_up,
+                axes(state.f),
+            ) .- CC.Fields.array2field(
+                cache.radiation.rrtmgp_model.face_sw_flux_dn,
+                axes(state.f),
+            ) .- CC.Fields.array2field(
+                cache.radiation.rrtmgp_model.face_lw_flux_dn,
+                axes(state.f),
+            ) |> copy
         else
             out .=
-                CC.Fields.array2field(cache.radiation.rrtmgp_model.face_sw_flux_up, axes(state.f)) .+
-                CC.Fields.array2field(cache.radiation.rrtmgp_model.face_lw_flux_up, axes(state.f)) .-
-                CC.Fields.array2field(cache.radiation.rrtmgp_model.face_sw_flux_dn, axes(state.f)) .-
-                CC.Fields.array2field(cache.radiation.rrtmgp_model.face_lw_flux_dn, axes(state.f))
+                CC.Fields.array2field(
+                    cache.radiation.rrtmgp_model.face_sw_flux_up,
+                    axes(state.f),
+                ) .+ CC.Fields.array2field(
+                    cache.radiation.rrtmgp_model.face_lw_flux_up,
+                    axes(state.f),
+                ) .- CC.Fields.array2field(
+                    cache.radiation.rrtmgp_model.face_sw_flux_dn,
+                    axes(state.f),
+                ) .- CC.Fields.array2field(
+                    cache.radiation.rrtmgp_model.face_lw_flux_dn,
+                    axes(state.f),
+                )
         end
     end,
 )

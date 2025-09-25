@@ -49,7 +49,7 @@ steps:
             --config_file $CONFIG_PATH/{{matrix.jacobian}}.yml \
             --job_id {{matrix.microphysics}}_{{matrix.edmf}}_{{matrix.land_model}}_{{matrix.jacobian}}
         env:
-          CLIMACOMMS_CONTEXT: "MPI"
+          CLIMACOMMS_CONTEXT: "SINGLETON"
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_gpus_per_task: 1

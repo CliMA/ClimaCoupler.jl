@@ -30,8 +30,6 @@ steps:
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
 
-    agents:
-      queue: clima
     env:
       JULIA_NUM_PRECOMPILE_TASKS: 8
       JULIA_MAX_NUM_PRECOMPILE_FILES: 50
@@ -54,7 +52,6 @@ steps:
           CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
-          queue: clima
           slurm_gpus_per_task: 1
           slurm_cpus_per_task: 4
           slurm_ntasks: 1

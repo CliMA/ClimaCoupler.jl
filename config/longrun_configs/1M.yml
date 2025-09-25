@@ -1,1 +1,2 @@
 precip_model: 1M
+moist: "nonequil"

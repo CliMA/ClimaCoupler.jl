@@ -22,4 +22,4 @@ surface_setup: "PrescribedSurface"
 t_end: "300days"
 topo_smoothing: true
 topography: "Earth"
-vert_diff: "true"
+vert_diff: false

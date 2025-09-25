@@ -5,9 +5,9 @@ atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "93days"
 coupler_toml: ["toml/amip.toml"]
-dt: "120secs"
+dt: "80secs"
 dt_cloud_fraction: "1hours"
-dt_cpl: "120secs"
+dt_cpl: "80secs"
 dt_rad: "1hours"
 energy_check: false
 insolation: "timevarying"

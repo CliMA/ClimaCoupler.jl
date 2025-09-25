@@ -39,15 +39,15 @@ steps:
   - group: "Sprint simulations"
 
     steps:
-      - label: "{{matrix.setup.microphysics}} {{matrix.setup.edmf}} AMIP with {{matrix.setup.land_model}} model and {{matrix.setup.jacobian}}"
+      - label: "{{matrix.microphysics}} {{matrix.edmf}} AMIP with {{matrix.land_model}} model and {{matrix.jacobian}}"
         command: |
           srun julia --color=yes --threads=4 --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl \
             --config_file $CONFIG_PATH/amip_diagedmf_topo.yml \
-            --config_file $CONFIG_PATH/{{matrix.setup.microphysics}}.yml \
-            --config_file $CONFIG_PATH/{{matrix.setup.land_model}}.yml \
-            --config_file $CONFIG_PATH/{{matrix.setup.edmf}}.yml \
-            --config_file $CONFIG_PATH/{{matrix.setup.jacobian}}.yml \
-            --job_id {{matrix.setup.microphysics}}_{{matrix.setup.edmf}}_{{matrix.setup.land_model}}_{{matrix.setup.jacobian}}
+            --config_file $CONFIG_PATH/{{matrix.microphysics}}.yml \
+            --config_file $CONFIG_PATH/{{matrix.land_model}}.yml \
+            --config_file $CONFIG_PATH/{{matrix.edmf}}.yml \
+            --config_file $CONFIG_PATH/{{matrix.jacobian}}.yml \
+            --job_id {{matrix.microphysics}}_{{matrix.edmf}}_{{matrix.land_model}}_{{matrix.jacobian}}
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"

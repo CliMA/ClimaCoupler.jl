@@ -25,6 +25,8 @@ steps:
       - echo "--- Instantiate AMIP env"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaAtmos\", rev=\"main\"))'"
+
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
 

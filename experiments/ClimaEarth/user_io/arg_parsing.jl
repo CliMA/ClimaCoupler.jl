@@ -6,6 +6,7 @@ mode_name_dict = Dict(
     "slabplanet" => SlabplanetMode,
     "slabplanet_aqua" => SlabplanetAquaMode,
     "slabplanet_terra" => SlabplanetTerraMode,
+    "subseasonal" => SubseasonalMode,
 )
 
 """
@@ -163,11 +164,13 @@ function get_coupler_args(config_dict::Dict)
 
     # ClimaLand-specific information
     land_model = config_dict["land_model"]
-    land_temperature_anomaly = config_dict["land_temperature_anomaly"]
+    land_temperature_anomaly = lowercase(config_dict["land_temperature_anomaly"])
     use_land_diagnostics = config_dict["use_land_diagnostics"]
     land_spun_up_ic = config_dict["land_spun_up_ic"]
     bucket_albedo_type = config_dict["bucket_albedo_type"]
     bucket_initial_condition = config_dict["bucket_initial_condition"]
+
+    era5_initial_condition_dir = config_dict["era5_initial_condition_dir"]
 
     return (;
         job_id,
@@ -199,6 +202,7 @@ function get_coupler_args(config_dict::Dict)
         bucket_albedo_type,
         bucket_initial_condition,
         parameter_files,
+        era5_initial_condition_dir,
     )
 end
 

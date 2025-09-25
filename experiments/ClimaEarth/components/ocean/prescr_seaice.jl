@@ -62,7 +62,8 @@ end
         comms_ctx,
         start_date,
         land_fraction,
-        stepper = CTS.RK4()
+        stepper = CTS.RK4(),
+        sic_path::Union{Nothing, String} = nothing,
     ) where {FT}
 
 Initializes the `DiffEq` problem, and creates a Simulation-type object
@@ -71,6 +72,9 @@ containing the necessary information for `Interfacer.step!` in the coupling loop
 This model reads in prescribed sea ice concentration data and solves the energy equation
 for the surface temperature of the sea ice. The sea ice concentration is updated
 at each timestep.
+
+The sea ice concentration is read from the file specified by `sic_path`. If `sic_path` is `nothing`,
+the model will use the default path from `ClimaArtifacts`.
 
 """
 function PrescribedIceSimulation(
@@ -84,20 +88,24 @@ function PrescribedIceSimulation(
     start_date,
     land_fraction,
     stepper = CTS.RK4(),
+    sic_path::Union{Nothing, String} = nothing,
 ) where {FT}
     # Set up prescribed sea ice concentration object
-    sic_data = try
-        joinpath(
-            @clima_artifact("historical_sst_sic", comms_ctx),
-            "MODEL.ICE.HAD187001-198110.OI198111-202206.nc",
-        )
-    catch error
-        @warn "Using lowres SIC. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
-        joinpath(
-            @clima_artifact("historical_sst_sic_lowres", comms_ctx),
-            "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
-        )
-    end
+    sic_data =
+        isnothing(sic_path) ?
+        try
+            joinpath(
+                @clima_artifact("historical_sst_sic", comms_ctx),
+                "MODEL.ICE.HAD187001-198110.OI198111-202206.nc",
+            )
+        catch error
+            @warn "Using lowres SIC. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
+            joinpath(
+                @clima_artifact("historical_sst_sic_lowres", comms_ctx),
+                "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
+            )
+        end : sic_path
+    @info "PrescribedIce: using SIC file" sic_data
 
     SIC_timevaryinginput = TimeVaryingInput(
         sic_data,

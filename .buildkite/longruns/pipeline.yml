@@ -20,7 +20,7 @@ steps:
   - label: "init :computer:"
     key: "init"
     command: |
-      srun -n 1 bash -lc "julia -e '
+      srun -n 1 bash -lc "julia --project=experiments/ClimaEarth -e '
         using CUDA
         A = CUDA.fill(1.0f0, 1024, 1024)
         B = similar(v)

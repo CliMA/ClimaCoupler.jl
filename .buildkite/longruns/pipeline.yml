@@ -1,7 +1,7 @@
 agents:
-  queue: gcp
+  queue: clima
   slurm_time: 24:00:00
-  # modules: climacommon/2025_05_15
+  modules: climacommon/2025_05_15
 
 env:
   JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
@@ -19,11 +19,55 @@ steps:
 
   - label: "init :computer:"
     key: "init"
-    command: |
-      srun -n 1 bash -lc "julia --project=experiments/ClimaEarth -e '
-        using CUDA
-        A = CUDA.fill(1.0f0, 1024, 1024)
-        B = similar(v)
-        copy!(B, v)
-        synchronize(); println(\"OK\")
-      '"
+    command:
+      - "echo $$JULIA_DEPOT_PATH"
+
+      - echo "--- Instantiate AMIP env"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaAtmos\", rev=\"main\"))'"
+
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
+
+    env:
+      JULIA_NUM_PRECOMPILE_TASKS: 8
+      JULIA_MAX_NUM_PRECOMPILE_FILES: 50
+
+  - wait
+
+  - group: "Sprint simulations"
+
+    steps:
+      - label: "{{matrix.microphysics}} {{matrix.edmf}} AMIP with {{matrix.land_model}} model and {{matrix.jacobian}}"
+        command: |
+          srun julia --color=yes --threads=4 --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl \
+            --config_file $CONFIG_PATH/amip_diagedmf_topo.yml \
+            --config_file $CONFIG_PATH/{{matrix.microphysics}}.yml \
+            --config_file $CONFIG_PATH/{{matrix.land_model}}.yml \
+            --config_file $CONFIG_PATH/{{matrix.edmf}}.yml \
+            --config_file $CONFIG_PATH/{{matrix.jacobian}}.yml \
+            --job_id {{matrix.microphysics}}_{{matrix.edmf}}_{{matrix.land_model}}_{{matrix.jacobian}}
+        env:
+          CLIMACOMMS_CONTEXT: "SINGLETON"
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 1
+          slurm_mem: 32GB
+        matrix:
+          setup:
+            microphysics:
+              - "0M"
+              - "1M"
+            land_model:
+              - "bucket"
+              - "full_land"
+            edmf:
+              - "progedmf"
+              - "diagedmf"
+            jacobian:
+              - "autosparse_jacobian"
+              - "manual_jacobian"
+

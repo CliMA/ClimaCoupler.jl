@@ -69,7 +69,7 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
         )
         ocean_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction))
 
-        # ensure that ocean and ice fractions are consistent
+        # Apply any additional constraints on the ocean and ice fractions if necessary
         if haskey(cs.model_sims, :ice_sim)
             resolve_area_fractions!(ocean_sim, cs.model_sims.ice_sim, land_fraction)
         end
@@ -208,6 +208,11 @@ end
 
 Updates the surface component model cache with the current coupler fields
 *besides turbulent fluxes*, which are updated in `update_turbulent_fluxes`.
+
+Note that upwelling longwave and shortwave radiation are not computed here,
+and are expected to be computed internally by the surface model.
+Some component models extend this function and compute the upwelling longwave
+and shortwave radiation in their methods of `update_sim!`.
 
 # Arguments
 - `sim`: [Interfacer.SurfaceModelSimulation] containing a surface model simulation object.

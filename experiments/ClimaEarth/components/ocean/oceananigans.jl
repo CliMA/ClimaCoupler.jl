@@ -76,7 +76,7 @@ function OceananigansSimulation(
     bottom_height = CO.regrid_bathymetry(
         underlying_grid;
         minimum_depth = 30,
-        interpolation_passes = 20,
+        interpolation_passes = 1, # TODO revert
         major_basins = 1,
     )
 
@@ -86,6 +86,7 @@ function OceananigansSimulation(
         active_cells_map = true,
     )
 
+    # TODO use_restoring only if not using ClimaSeaIce
     use_restoring = start_date + Dates.Month(1) < stop_date
 
     if use_restoring
@@ -223,7 +224,6 @@ Interfacer.step!(sim::OceananigansSimulation, t) =
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction
 
 # TODO: Better values for this
-
 # At the moment, we return always Float32. This is because we always want to run
 # Oceananingans with Float64, so we have no way to know the float type here. Sticking with
 # Float32 ensures that nothing is accidentally promoted to Float64. We will need to change
@@ -246,8 +246,10 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
 """
     FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fields)
 
-Update the turbulent fluxes in the simulation using the values stored in the coupler fields.
+Update the turbulent fluxes in the simulation using the values computed at this time step.
 These include latent heat flux, sensible heat flux, momentum fluxes, and moisture flux.
+
+The input `fields` are already area-weighted, so there's no need to weight them again.
 
 A note on sign conventions:
 SurfaceFluxes and Oceananigans both use the convention that a positive flux is an upward flux.
@@ -258,6 +260,7 @@ so a sign change is needed when we convert from moisture to salinity flux.
 """
 function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fields)
     (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
+
     grid = sim.ocean.model.grid
 
     # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
@@ -318,7 +321,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, 1)
     OC.interior(oc_flux_S, :, :, 1) .=
-        OC.interior(oc_flux_S, :, :, 1) .- surface_salinity .* moisture_fresh_water_flux
+        OC.interior(oc_flux_S, :, :, 1) .- (surface_salinity .* moisture_fresh_water_flux)
     return nothing
 end
 
@@ -336,6 +339,10 @@ by the coupler.
 Update the portion of the surface_fluxes for T and S that is due to radiation and
 precipitation. The rest will be updated in `update_turbulent_fluxes!`.
 
+Unlike the turbulent fluxes, the radiative and precipitation fluxes need to be
+weighted by the ocean area fraction, since they provided from the atmosphere
+without any weighting.
+
 A note on sign conventions:
 ClimaAtmos and Oceananigans both use the convention that a positive flux is an upward flux.
 No sign change is needed during the exchange, except for precipitation/salinity fluxes.
@@ -346,6 +353,7 @@ so a sign change is needed when we convert from precipitation to salinity flux.
 function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) =
         sim.ocean_properties
+    ocean_fraction = sim.area_fraction
 
     # Remap radiative flux onto scratch array; rename for clarity
     CC.Remapping.interpolate!(
@@ -369,7 +377,7 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     σ = 5.67e-8
     α = Interfacer.get_field(sim, Val(:surface_direct_albedo)) # scalar
     ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
-    OC.interior(oc_flux_T, :, :, 1) .=
+    OC.interior(oc_flux_T, :, :, 1) .= OC.interior(oc_flux_T, :, :, 1) .+
         (
             -(1 - α) .* remapped_SW_d .-
             ϵ * (
@@ -382,12 +390,12 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr1,
         sim.remapping.remapper_cc,
-        csf.P_liq,
+        ocean_fraction .* csf.P_liq,
     )
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr2,
         sim.remapping.remapper_cc,
-        csf.P_snow,
+        ocean_fraction .* csf.P_snow,
     )
     remapped_P_liq = sim.remapping.scratch_arr1
     remapped_P_snow = sim.remapping.scratch_arr2
@@ -398,7 +406,8 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
         (remapped_P_liq .+ remapped_P_snow) ./ ocean_fresh_water_density
     surface_salinity_flux =
         OC.interior(sim.ocean.model.tracers.S, :, :, 1) .* precipitating_fresh_water_flux
-    OC.interior(oc_flux_S, :, :, 1) .= .-surface_salinity_flux
+    OC.interior(oc_flux_S, :, :, 1) .=
+        OC.interior(oc_flux_S, :, :, 1) .- surface_salinity_flux
     return nothing
 end
 

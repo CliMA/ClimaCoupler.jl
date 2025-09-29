@@ -179,6 +179,11 @@ function argparse_settings()
         help = "Directory containing ERA5 initial condition files (subseasonal mode). Filenames inferred from start_date [none (default)]. Generated with `https://github.com/CliMA/WeatherQuest`"
         arg_type = String
         default = nothing
+        # Ice model specific
+        "--ice_model"
+        help = "Sea ice model to use. [`prescribed` (default), `clima_seaice`]"
+        arg_type = String
+        default = "prescribed"
     end
     return s
 end

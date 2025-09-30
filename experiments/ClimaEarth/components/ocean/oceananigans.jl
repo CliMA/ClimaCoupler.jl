@@ -6,6 +6,7 @@ import ClimaCore as CC
 import Thermodynamics as TD
 import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
+using XESMF # to load Oceananigans regridding extension
 
 """
     OceananigansSimulation{SIM, A, OPROP, REMAP}

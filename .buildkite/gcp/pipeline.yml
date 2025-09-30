@@ -38,14 +38,17 @@ steps:
         command:
 
           - echo "--- Run simulation"
-          - "mpiexec -n 8 julia --threads=4 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file config/longrun_configs/amip_diagedmf_10years.yml --job_id amip_30_h_elem"
+          - | 
+            srun -n 1 julia --project=experiments/ClimaEarth -e '
+            using CUDA
+            A = CUDA.fill(1.0f0, 1024, 1024)
+            B = similar(v)
+            copy!(B, v)
+            synchronize(); println("OK")
+            '
         artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
           CLIMACOMMS_CONTEXT: "MPI"
         agents:
           slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 8
-          slurm_mem: 0GB
-          slurm_time: "144:00:00"

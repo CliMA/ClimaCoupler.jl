@@ -42,8 +42,8 @@ steps:
             srun -n 1 julia --project=experiments/ClimaEarth -e '
             using CUDA
             A = CUDA.fill(1.0f0, 1024, 1024)
-            B = similar(v)
-            copy!(B, v)
+            B = similar(A)
+            copy!(B, A)
             synchronize(); println("OK")
             '
         artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"

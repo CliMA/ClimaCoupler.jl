@@ -37,17 +37,20 @@ manually triggered to reset the depot.
 # [ClimaCoupler - Coarse Nightly AMIP](https://buildkite.com/clima/climacoupler-coarse-nightly-amip)
 - Scheduled daily Sunday-Thursday at 6pm PST (2am UTC +1 day)
 - Walltime (approx.): 12 hours
-- Runs on Caltech Clima node (4 GPUs)
+- Runs on Caltech Clima node (3 GPUs)
 - Configuration file location: `config/nightly_configs/`
 
-This pipeline runs nightly on weekdays and uses one configuration which specifies
-a coarse AMIP running for 1+ years. The pipeline triggers 4 runs using this configuration,
-each on 1 GPU.
-Each run sets its own random seed so the simulations vary slightly, which allows us to more
-robustly test the stability of the simulations. The random seed of each simulation
-is printed so they can be reproduced, and 1 of the 4 runs always uses the same seed.
+This pipeline runs nightly on Monday - Thursday (4x per week), and uses 3 atmospheric
+configurations of interest:
+- diagnostic EDMF
+- prognostic EDMF
+- ED only (no convection)
+All configurations use 0-moment microphysics and bucket land.
+They run for 15 months, 6 months, and 27 months, respectively.
+These simulation lengths are chosen with the goal of each simulation finishing
+within 14 hours of wallclock time, so they can successfully run overnight.
 
-This pipeline runs with the main branches of all major CliMA packages and its main goal is
+This pipeline uses the main branches of many CliMA packages and its main goal is
 the goal to monitor stability of a coarse AMIP simulation and to catch potential problems
 early. This pipeline is scheduled, but it can also be used to test out configuration changes
 in a smaller test case before running higher resolution global AMIP runs.

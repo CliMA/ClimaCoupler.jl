@@ -22,3 +22,6 @@ surface_setup: "PrescribedSurface"
 t_end: "365days"
 topo_smoothing: true
 topography: "Earth"
+diagnostics:
+  - period: 1months
+    short_name: ["pr", "rsut", "rlut", "rsds", "rlds", "rsus", "rlus", "rlucs", "rsucs", "rsuscs", "rsutcs", "rlutcs", "rsdscs", "rldscs", "rsdt", "ta", "ts", "clivi", "lwp", "pfull"]

@@ -37,17 +37,12 @@ steps:
         key: "amip"
         command:
 
+          
+        command:
           - echo "--- Run simulation"
-          - | 
-            /sw/openmpi-5.0.5/bin/mpiexec -n 2 julia --project=experiments/ClimaEarth -e '
-            using MPI
-            MPI.Init()
-            using CUDA
-            A = CUDA.fill(1.0f0, 1024, 1024)
-            B = similar(A)
-            copy!(B, A)
-            synchronize(); println("OK")
-            '
+          - env | sort
+          - nvidia-smi -q
+          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip.yml --job_id amip"
         artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"

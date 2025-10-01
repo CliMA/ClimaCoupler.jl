@@ -82,7 +82,7 @@ function PrescribedOceanSimulation(
     @show "Loading SST from file"
     start_date_str = Dates.format(Date(start_date), "yyyymmdd")    
     @show start_date_str
-    sst_data = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/sst_processed_$(start_date_str)_0000.nc"
+    sst_data = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/sst_data/historic_SST_daily.nc"
     # sst_data = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/sst_processed_20250810_0000.nc"
 
     SST_timevaryinginput = TimeVaryingInput(

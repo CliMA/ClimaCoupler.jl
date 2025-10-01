@@ -41,7 +41,6 @@ function ClimaCalibrate.observation_map(iteration)
             mean(g_ens_builder.g_ens[:, m]) ≈ 0 && (g_ens_builder.g_ens[:, m] .= NaN)
         end
     end
-
     return g_ens_builder.g_ens
 end
 
@@ -112,16 +111,17 @@ function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, it
     plot_output_path = ClimaCalibrate.path_to_iteration(output_dir, iteration)
     plot_constrained_params_and_errors(plot_output_path, ekp, prior)
 
-    # Plot ERA5 bias plots for only the first ensemble member
-    # This can take a while to plot, so we plot only one of the members.
-    # We choose the first ensemble member because the parameters for the first
-    # ensemble member are supposed to be the mean of the parameters of the
-    # ensemble members if it is EKP.TransformUnscented
     simdir = SimDir(ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, 1))
-
-    plot_bias(simdir; output_dir = plot_output_path)
+    plot_bias(simdir, iteration; output_dir = plot_output_path)
     plot_variables(simdir; output_dir = plot_output_path)
-    plot_spread_in_variables(iteration, ekp)
+    plot_pointwise_spread_per_variable(ekp, iteration)
+    try 
+        plot_surface_fluxes(simdir; output_dir = plot_output_path)
+    catch e
+        @error e
+    end
+
+    @info "Ensemble spread: $(scalar_spread(ekp, iteration))" 
 end
 
 """
@@ -154,7 +154,8 @@ function plot_variables(simdir; output_dir = simdir.simulation_path)
     GeoMakie.save(joinpath(output_dir, "vars.png"), fig)
 end
 
-function plot_bias(simdir; output_dir = simdir.simulation_path)
+# TODO: Generalize this 
+function plot_bias(simdir, iteration; output_dir = simdir.simulation_path)
     vars = Dict()
     for short_name in CALIBRATE_CONFIG.short_names
         vars[short_name] = get(simdir, short_name * "_1week")
@@ -164,73 +165,145 @@ function plot_bias(simdir; output_dir = simdir.simulation_path)
 
     era5_pr = preprocessed_vars[findfirst(v -> ClimaAnalysis.short_name(v) == "pr", preprocessed_vars)]
     era5_tas = preprocessed_vars[findfirst(v -> ClimaAnalysis.short_name(v) == "tas", preprocessed_vars)]
-    era5_mslp = preprocessed_vars[findfirst(v -> ClimaAnalysis.short_name(v) == "mslp", preprocessed_vars)]
+    # era5_mslp = preprocessed_vars[findfirst(v -> ClimaAnalysis.short_name(v) == "mslp", preprocessed_vars)]
 
-    era5_mslp.attributes["long_name"] = "Mean sea level pressure, average within 1 Week"
+    # era5_mslp.attributes["long_name"] = "Mean sea level pressure, average within 1 Week"
     era5_tas.attributes["long_name"] = "Surface temperature, average within 1 Week"
+    era5_pr.attributes["long_name"] = "Surface precipitation, average within 1 Week"
 
     var_pairs = (
         (vars["pr"], era5_pr),
-        (vars["mslp"], era5_mslp),
+        # (vars["mslp"], era5_mslp),
         (vars["tas"], era5_tas)
     )
     plot_extrema = Dict(
-        "tas" => (-3, 3), 
+        "tas" => (-6, 6), 
         "mslp" => (-1000, 1000),
         "pr" => (-1e-4, 1e-4),
     )
-
-    fig = GeoMakie.Figure(size = (1000, 500 * length(var_pairs)))
+    fig = GeoMakie.Figure(size = (1500, 500 * length(var_pairs)))
     for (i, (var, era5_var)) in enumerate(var_pairs)
-        last_date = last(dates(var))
-        var = slice(var, time = last_date)
-        era5_var = slice(era5_var, time = last_date)
-        global_bias = ClimaAnalysis.global_bias(var, era5_var)
-        global_mean = weighted_average_lonlat(var).data[1]
-        @info " $(short_name(var)): Global bias = $global_bias, mean = $global_mean"
+        for (j, date) in enumerate(CALIBRATE_CONFIG.sample_date_ranges[iteration+1])
+            var_t = slice(var, time = date)
+            era5_var_t = slice(era5_var, time = date)
+            global_bias = ClimaAnalysis.global_bias(var_t, era5_var_t)
+            global_mean = weighted_average_lonlat(var_t).data[1]
+            relative_global_bias = global_bias / global_mean
 
-        global_bias = ClimaAnalysis.global_bias(var, era5_var; mask = ClimaAnalysis.apply_oceanmask)
-        land_mean = weighted_average_lonlat(ClimaAnalysis.apply_oceanmask(var)).data[1]
-        @info " $(short_name(var)): Land bias = $global_bias, mean = $land_mean"
+            land_bias = ClimaAnalysis.global_bias(var_t, era5_var_t; mask = ClimaAnalysis.apply_oceanmask)
+            land_mean = weighted_average_lonlat(ClimaAnalysis.apply_oceanmask(var_t)).data[1]
+            relative_land_bias = land_bias / land_mean
 
-        global_bias = ClimaAnalysis.global_bias(var, era5_var; mask = ClimaAnalysis.apply_landmask)
-        ocean_mean = weighted_average_lonlat(ClimaAnalysis.apply_landmask(var)).data[1]
-        @info " $(short_name(var)): Ocean bias = $global_bias, mean = $ocean_mean"
-        ClimaAnalysis.Visualize.plot_bias_on_globe!(fig[i,1], var, era5_var; cmap_extrema = plot_extrema[short_name(var)])
+            ocean_bias = ClimaAnalysis.global_bias(var_t, era5_var_t; mask = ClimaAnalysis.apply_landmask)
+            ocean_mean = weighted_average_lonlat(ClimaAnalysis.apply_landmask(var_t)).data[1]
+            relative_ocean_bias = ocean_bias / ocean_mean
+            @info short_name(var_t) relative_global_bias global_bias global_mean
+            @info short_name(var_t) relative_land_bias land_bias land_mean
+            @info short_name(var_t) relative_ocean_bias ocean_bias ocean_mean
+            # relative_global_bias relative_land_bias relative_ocean_bias
+            ClimaAnalysis.Visualize.plot_bias_on_globe!(fig[i, j], var_t, era5_var_t; cmap_extrema = plot_extrema[short_name(var_t)])
+        end
     end
-    GeoMakie.save(joinpath("bias_redsblues.png"), fig)
+    GeoMakie.save(joinpath(ClimaCalibrate.path_to_iteration(CALIBRATE_CONFIG.output_dir, iteration), "bias_sample_dates.png"), fig)
 end
 
-function absolute_global_bias(sim_var, obs_var)
-    global_bias = abs(ClimaAnalysis.global_bias(sim_var, obs_var).data[1])
-    global_mean = abs(ClimaAnalysis.average_lonlat(sim_var).data[1])
-    return (global_bias, global_mean)
+using Statistics
+
+
+function plot_pointwise_spread_per_variable(ekp, iteration)
+    ensemble_vars = get_ensemble_of_vars(ekp, iteration)
+    fig = GeoMakie.Figure(size = (1000, length(CALIBRATE_CONFIG.short_names) * 500))
+    for (i, short_name) in enumerate(CALIBRATE_CONFIG.short_names)
+        ensemble_data = getproperty.(ensemble_vars[short_name], :data)
+        data = std(ensemble_data; corrected = false)
+        plot_var = remake(ensemble_vars[short_name][1]; data)
+        last_slice = slice(plot_var, time = last(dates(plot_var)))
+        # TODO: Don't just use the last slice
+        ClimaAnalysis.Visualize.heatmap2D_on_globe!(fig[i,1], last_slice; more_kwargs = Dict( :axis => ca_kwargs(title = "Stdev $(short_name)")))
+        # TODO: Set titles
+    end
+    GeoMakie.save(joinpath(ClimaCalibrate.path_to_iteration(CALIBRATE_CONFIG.output_dir, iteration), "ensemble_stdev.png"), fig)
+
 end
 
-function plot_spread_in_variables(iteration, ekp)
+
+function scalar_spread(ekp, iteration)
+    g_mean_final = EKP.get_g_mean_final(ekp)
+    g_final = EKP.get_g_final(ekp)
+    sq_dists = [sum((col .- g_mean_final).^2) for col in eachcol(g_final)]
+    return mean(sq_dists) 
+end
+
+function get_ensemble_of_vars(ekp, iteration)
     short_names = CALIBRATE_CONFIG.short_names
-    var_spread = Dict(short_name => [] for short_name in short_names)
+    ensemble_vars = Dict(short_name => [] for short_name in short_names)
     for m in 1:EKP.get_N_ens(ekp)
         member_path = ClimaCalibrate.path_to_ensemble_member(CALIBRATE_CONFIG.output_dir, iteration, m)
         simdir = SimDir(member_path)
         for short_name in short_names
             try
                 var = get(simdir, short_name * "_1week")
-                var_spread[short_name] = [var_spread[short_name]..., var]
+                ensemble_vars[short_name] = [ensemble_vars[short_name]..., var]
             catch e
                 @warn e
             end
         end
     end
-    fig = GeoMakie.Figure(size = (1000, length(short_names) * 500))
-    for (i, short_name) in enumerate(short_names)
-        ensemble_data = getproperty.(var_spread[short_name], :data)
-        plot_var = remake(var_spread[short_name][1]; data = std(ensemble_data))
-        last_slice = slice(plot_var, time = last(dates(plot_var)))
-        # TODO: Don't just use the last slice
-        ClimaAnalysis.Visualize.heatmap2D_on_globe!(fig[i,1], last_slice; more_kwargs = Dict( :axis => ca_kwargs(title = "Standard Deviation $(short_name)")))
-        # TODO: Set titles
+    return ensemble_vars
+end
+
+
+cmap_extrema = Dict(
+    "lhf" => (0, 220),
+    "shf" => (0, 80 ),
+    "rsds - rsus" => (0, 300),
+    "rlds - rlus" => (-120, 0)
+)
+
+function plot_surface_fluxes(simdir; output_dir = simdir.simulation_path)
+
+    latent_heat_vaporization_at_reference = 2500800  # J kg^-1
+    # LHF units: W m^-2 = ( J  kg^-1 ) * ( kg m^-2 s^-1 )
+    lhf = convert_units(get(simdir, "evspsbl"), "W m^-2"; conversion_function = x -> x * latent_heat_vaporization_at_reference)
+    lhf.attributes["long_name"] = "Latent Heat Flux at the surface, avg 1mon"
+    lhf.attributes["short_name"] = "lhf"
+    shf = get(simdir, "hfes") - lhf
+    shf.attributes["long_name"] = "Sensible Heat Flux at the surface, avg 1mon"
+    shf.attributes["short_name"] = "shf"
+
+    rsds = get(simdir, "rsds")
+    rsus = get(simdir, "rsus")
+    
+    rsns = rsds - rsus
+    rsns.attributes["long_name"] = "Net SW Flux at the surface, avg 1mon"
+
+    rlds = get(simdir, "rlds")
+    rlus = get(simdir, "rlus")
+    rlns = rlds - rlus
+    rlns.attributes["long_name"] = "Net LW Flux at the surface, avg 1mon"
+
+    vars = [lhf, shf, rsns, rlns]
+
+    fig = GeoMakie.Figure(size = (1000, length(vars)*500))
+    for (i, var) in enumerate(vars)
+        var = slice(var, time = last(dates(var)))
+        min_val, max_val = cmap_extrema[short_name(var)]
+        
+        # Create levels between min and max
+        levels = collect(range(min_val, max_val, length = 11))  # 11 levels
+        
+        ClimaAnalysis.Visualize.contour2D_on_globe!(
+            fig[i, 1], 
+            var;
+            more_kwargs = Dict(
+                :plot => merge(
+                    ca_kwargs(colormap = :viridis, extendhigh = :auto, extendlow = :auto),
+                    Dict(:levels => levels)
+                )
+            )
+        )
     end
-    GeoMakie.save(joinpath(ClimaCalibrate.path_to_iteration(CALIBRATE_CONFIG.output_dir, iteration), "ensemble_stdev.png"), fig)
+
+    GeoMakie.save(joinpath(output_dir, "surface_fluxes.png"), fig)
 
 end

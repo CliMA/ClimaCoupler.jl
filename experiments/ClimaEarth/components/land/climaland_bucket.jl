@@ -97,6 +97,7 @@ function BucketSimulation(
         (;albedo_coefficient =FT(1.0) )
     end
     α_snow = FT(0.8) # snow albedo
+
     if albedo_type == "map_static" # Read in albedo from static data file (default type)
         # By default, this uses a file containing bareground albedo without a time component. Snow albedo is specified separately.
         albedo = CL.Bucket.PrescribedBaregroundAlbedo{FT}(α_snow, surface_space)
@@ -105,9 +106,8 @@ function BucketSimulation(
         albedo = CL.Bucket.PrescribedSurfaceAlbedo{FT}(
             start_date,
             surface_space;
-            albedo_file_path = CL.Artifacts.ceres_albedo_dataset_path(),
-            varname = "sw_alb_clr",
-            coefficient = albedo_coefficient
+            albedo_file_path = "/glade/u/home/nefrathe/clima/ClimaCoupler.jl/era5_monthly_fal_2017_2024_025deg.nc",
+            varname = "fal",
         )
     elseif albedo_type == "function" # Use prescribed function of lat/lon for surface albedo
         function α_bareground(coordinate_point)
@@ -118,6 +118,8 @@ function BucketSimulation(
     else
         error("invalid albedo type $albedo_type")
     end
+    # Main.@infiltrate
+    @show typeof(albedo)
 
     z_0m = FT(1e-3) # roughness length for momentum over smooth bare soil
     z_0b = FT(1e-3) # roughness length for tracers over smooth bare soil
@@ -125,7 +127,7 @@ function BucketSimulation(
     # the snow would melt in time `τc`. It prevents us from having to specially time step in cases where
     # all the snow melts in a single timestep.
     σS_c = FT(0.2) # critical snow water equivalent
-    W_f = FT(0.2) # bucket capacity
+         = FT(0.2) # bucket capacity
     κ_soil = FT(1.5) # soil conductivity
     ρc_soil = FT(2e6) # soil volumetric heat capacity
     @show parameter_files

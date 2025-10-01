@@ -19,7 +19,7 @@ function ClimaCalibrate.forward_model(iter, member)
 
     config_dict["bucket_initial_condition"] = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/era5_bucket_processed_$(start_date)_0000.nc"
 
-    config_dict["t_end"] = "46days"
+    config_dict["t_end"] = "365days"
 
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)
@@ -50,15 +50,3 @@ end
 
 import ClimaCore: Spaces
 CS() = CoupledSimulation(config_file)
-
-function get_resample_func()
-    cs = CS()
-    center_space = cs.model_sims.atmos_sim.domain.center_space
-    (lon_nlevels, lat_nlevels, z_nlevels) = ClimaDiagnostics.Writers.default_num_points(center_space)
-    longitudes = range(-180, 180, lon_nlevels)
-    latitudes = range(-90, 90, lat_nlevels)
-    stretch = center_space.grid.vertical_grid.topology.mesh.stretch
-    # TODO: account for stretch for 3D variables and interpolate to pressure?
-    z_levels = range(dz_bottom, Spaces.z_max(center_space), z_nlevels)
-    return var -> resampled_to(var; lon = longitudes, lat = latitudes)
-end

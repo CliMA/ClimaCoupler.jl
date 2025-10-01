@@ -46,8 +46,6 @@ end
 
 Preprocess each OutputVar in `vars` by keeping the relevant dates in
 `sample_date_ranges`.
-
-
 """
 function preprocess_vars(vars, sample_date_ranges, config_file)
     weekly_dates = find_weekly_dates(vars, sample_date_ranges)
@@ -185,8 +183,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
     sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges
     short_names = CALIBRATE_CONFIG.short_names
     config_file = CALIBRATE_CONFIG.config_file
-
-    @info "The number of samples is $(length(sample_date_ranges))"
+    @info "Generating observations for $short_names"
+    @info "The number of samples is $(length(sample_date_ranges)) over $sample_date_ranges"
 
     diagnostic_var2d = OutputVar("/glade/derecho/scratch/nefrathe/tmp/output_quick_1/iteration_000/member_001/wxquest_diagedmf/output_active/clima_atmos/mslp_1week_average.nc")
 

@@ -14,19 +14,19 @@ include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/obse
 model_interface = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "coarse_amip", "model_interface.jl")
 
 years = 2018:2024
-sample_date_ranges = [(DateTime(yr, 9, 29), DateTime(yr, 10, 6)) for yr in years]
+sample_date_ranges = [(DateTime(yr, 9, 22), DateTime(yr, 9, 29)) for yr in years]
 # sample_date_ranges = [(DateTime(yr, 9, 29), DateTime(yr, 9, 29)) for yr in years]
 
 # sample_date_ranges = [("$yr-12-01", "$yr-12-01") for yr in years]
 
 const CALIBRATE_CONFIG = CalibrateConfig(;
 config_file = joinpath(pkgdir(ClimaCoupler), "config/subseasonal_configs/wxquest_diagedmf.yml"),
-    short_names = ["tas", "mslp"],
+    short_names = ["tas", "pr", ],
     minibatch_size = 1,
     n_iterations = 7,
     sample_date_ranges,
-    extend = Dates.Week(1),
-    spinup = Dates.Day(28),
+    extend = Dates.Week(7),
+    spinup = Dates.Day(14),
     output_dir = "/glade/derecho/scratch/nefrathe/tmp/output_quick",
     rng_seed = 42,
 )
@@ -71,10 +71,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
         rng,
         scheduler = EKP.DataMisfitController(terminate_at = 100),
     )
-    ClimaCalibrate.initialize(ekp, prior, CALIBRATE_CONFIG.output_dir)
+    # ClimaCalibrate.initialize(ekp, prior, CALIBRATE_CONFIG.output_dir)
 
-    hpc_kwargs = ClimaCalibrate.kwargs(time = 60*5,
-        ntasks = 4,
+    hpc_kwargs = ClimaCalibrate.kwargs(time = 60*4,
+        ntasks = 2,
         gpus_per_task = 1,
         cpus_per_task = 4,
         l_job_priority = "premium",

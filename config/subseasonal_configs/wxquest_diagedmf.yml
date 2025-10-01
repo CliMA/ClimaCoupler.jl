@@ -15,8 +15,8 @@ co2_model: "fixed"
 
 coupler_output_dir: "/glade/derecho/scratch/nefrathe/tmp/output_quick"
 
-dt: "90secs"
-dt_cpl: "90secs"
+dt: "80secs"
+dt_cpl: "80secs"
 # dt: "5secs"
 # dt_cpl: "5secs"
 
@@ -48,8 +48,11 @@ use_coupler_diagnostics: false
 use_land_diagnostics: true
 
 extra_atmos_diagnostics:
-  - short_name: [mslp, tas, pr, ta, pfull, hur, rsut, rsut, rlut, rsds, rsus, rsucs, rsuscs, rsd, rlu, rlucs, ts, ]
+  - short_name: [mslp, tas, pr, ta, pfull, hur, rsut,  rsds, rsus, rsuscs, rlut,  rlds, rlus, rlucs, ts, evspsbl, hfes]
     period: 7days
+    reduction_time: average
+  - short_name: [mslp, tas, pr, ta, pfull, hur, rsut,  rsds, rsus, rsuscs, rlut,  rlds, rlus, rlucs, ts, evspsbl, hfes]
+    period: 1months
     reduction_time: average
   # - short_name: [ta, ua, wa, va, rhoa, pfull, hur, hus, clw, cli, cl,] # prsn, prra, hussn, husra]
   #   period: 24hours

@@ -17,7 +17,7 @@ function argparse_settings()
         arg_type = Bool
         default = true
         "--mode_name"
-        help = "Mode of coupled simulation. [`cmip`, `amip` (default), `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`]"
+        help = "Mode of coupled simulation. [`cmip`, `amip` (default), `subseasonal`, `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`]"
         arg_type = String
         default = "amip"
         "--coupler_toml"
@@ -151,7 +151,7 @@ function argparse_settings()
         arg_type = String
         default = "bucket"
         "--land_temperature_anomaly"
-        help = "Type of temperature anomaly for land model. [`amip`, `aquaplanet` (default)]"
+        help = "Type of temperature anomaly for land model. [`amip`, `aquaplanet` (default), `nothing`]"
         arg_type = String
         default = "aquaplanet"
         "--use_land_diagnostics"
@@ -171,6 +171,10 @@ function argparse_settings()
         help = "A file path for a NetCDF file (read documentation about requirements)"
         arg_type = String
         default = ""
+        "--era5_initial_condition_dir"
+        help = "Directory containing ERA5 initial condition files (subseasonal mode). Filenames inferred from start_date [none (default)]. Generated with `https://github.com/CliMA/WeatherQuest`"
+        arg_type = String
+        default = nothing
     end
     return s
 end

@@ -47,7 +47,9 @@ end
 
 # init simulation
 function slab_ice_space_init(::Type{FT}, space, params) where {FT}
-    Y = CC.Fields.FieldVector(T_sfc = ones(space) .* params.T_freeze)
+    # bulk temperatures commonly 10-20 K below freezing for sea ice 2m thick in winter,
+    # and closer to freezing in summer and when melting.
+    Y = CC.Fields.FieldVector(T_sfc = ones(space) .* params.T_freeze .- FT(5.0))
     return Y
 end
 
@@ -170,8 +172,17 @@ Interfacer.get_field(
     sim::PrescribedIceSimulation,
     ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}},
 ) = sim.integrator.p.params.α
+# approximates the surface temperature of the sea ice
+# assuming sim.integrator.u.T_sfc represents the vertically-averaged (bulk) temperature
+# and the ice temperature varies linearly between the ice surface and the base.
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) =
-    sim.integrator.u.T_sfc
+    2 .* sim.integrator.u.T_sfc .- sim.integrator.p.params.T_base
+
+function Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:beta})
+    # assume no LHF over sea ice
+    FT = eltype(sim.integrator.u)
+    return FT(0)
+end
 
 """
     Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:energy})

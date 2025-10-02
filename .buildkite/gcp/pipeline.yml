@@ -42,7 +42,10 @@ steps:
           - echo "--- Run simulation"
           - env | sort
           - nvidia-smi -q
-          - "srun --mpi=pmix -n 2 --gpus-per-task=1 --gpu-bind=single:1 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file config/amip_configs/amip.yml --job_id amip"
+          - "/sw/openmpi-5.0.5/bin/mpiexec -n 2 \
+            julia --threads=3 --color=yes --project=experiments/ClimaEarth/ \
+            experiments/ClimaEarth/run_amip.jl \
+            --config_file config/amip_configs/amip.yml --job_id amip"
         artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"

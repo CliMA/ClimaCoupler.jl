@@ -40,7 +40,7 @@ steps:
           
         command:
           - echo "--- Run simulation"
-          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file config/amip_configs/amip.yml --job_id amip"
+          - "/sw/openmpi-5.0.5/bin/mpiexec -n 2 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file config/amip_configs/amip.yml --job_id amip"
         artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -48,5 +48,4 @@ steps:
         agents:
           slurm_ntasks: 2
           slurm_gpus_per_task: 1
-          slurm_gpu_bind: single:1
 

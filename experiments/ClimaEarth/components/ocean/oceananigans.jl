@@ -1,5 +1,6 @@
 import Oceananigans as OC
 import ClimaOcean as CO
+import ClimaAtmos as CA
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms
 import ClimaCore as CC
@@ -46,6 +47,9 @@ function OceananigansSimulation(
     output_dir,
     comms_ctx = ClimaComms.context(),
 )
+    # using Dates
+    # start_date = Dates.DateTime(2008)
+    # stop_date = Dates.DateTime(2008, 1, 2)
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
 
     # Retrieve EN4 data (monthly)
@@ -102,13 +106,84 @@ function OceananigansSimulation(
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
 
     # Construct a remapper from the exchange grid to `Center, Center` fields
-    long_cc = OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center())
-    lat_cc = OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center())
+
+    # Tripolar to cubed sphere (fails currently)
+    # long_oc = OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center())
+    # lat_oc = OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center())
+
+    T = OC.CenterField(grid) # field on tripolar grid
+    OC.set!(T, en4_temperature[1])
+    coords_tripolar, _ = XESMF.extract_xesmf_coordinates_structure(T, T)
 
     # Create a 2D matrix containing each lat/long combination as a LatLongPoint
     # Note this must be done on CPU since the CC.Remapper module is not GPU-compatible
-    target_points_cc = Array(CC.Geometry.LatLongPoint.(lat_cc, long_cc))
+    # target_points_oc = Array(CC.Geometry.LatLongPoint.(lat_oc, long_oc))
 
+    # TODO double check these coords are on centers, get lat/lon bounds for each element
+    # boundary_space = axes(area_fraction)
+    boundary_space = CC.CommonSpaces.CubedSphereSpace(
+        Float32;
+        radius = 1.0,
+        n_quad_points = 2,
+        h_elem = 10,
+    )
+    boundary_coords = CC.Fields.coordinate_field(boundary_space)
+    boundary_lat_arr = CC.Fields.field2array(boundary_coords.lat)
+    boundary_long_arr = CC.Fields.field2array(boundary_coords.long)
+    coords_cubedsphere = Dict("lat" => boundary_lat_arr, "lon" => boundary_long_arr)
+
+    regridder_tripolar_to_cubedsphere =
+        XESMF.Regridder(coords_cubedsphere, coords_tripolar; method = "conservative")
+    regridder_cubedsphere_to_tripolar =
+        XESMF.Regridder(coords_tripolar, coords_cubedsphere; method = "conservative")
+
+    # Tripolar to LatLon
+    T = OC.CenterField(grid) # field on tripolar grid
+    OC.set!(T, en4_temperature[1])
+
+    grid_latlon = OC.LatitudeLongitudeGrid(
+        arch;
+        size = (Nx, Ny, Nz),
+        longitude = (0, 360),
+        latitude = (-81, 90),
+        z,
+    )
+    field_latlon = OC.CenterField(grid_latlon)
+    remapper_tripolar_to_latlon = XESMF.Regridder(T, field_latlon; method = "conservative")
+    remapper_tripolar_to_latlon(
+        vec(OC.interior(field_latlon, :, :, Nz)),
+        vec(OC.interior(T, :, :, Nz)),
+    )
+    OC.fill_halo_regions!(field_latlon)
+    # heatmap(field_latlon) # using GeoMakie, using CairoMakie
+
+    # LatLon to cubed sphere
+    boundary_space = CC.CommonSpaces.CubedSphereSpace(
+        Float32;
+        radius = 1.0,
+        n_quad_points = 2,
+        h_elem = 10,
+    )
+    field_cubedsphere = Interfacer.remap(field_latlon, boundary_space)
+    # fieldheatmap(field_cubedsphere) # using ClimaCoreMakie
+
+    # Cubed sphere to LatLon
+    long_oc = OC.λnodes(grid_latlon, OC.Center(), OC.Center(), OC.Center())
+    lat_oc = OC.φnodes(grid_latlon, OC.Center(), OC.Center(), OC.Center())
+    long_oc = reshape(long_oc, length(long_oc), 1)
+    lat_oc = reshape(lat_oc, 1, length(lat_oc))
+    target_points_oc = @. CC.Geometry.LatLongPoint(lat_oc, long_oc)
+
+    remapper_cubedsphere_to_latlon = CC.Remapping.Remapper(boundary_space, target_points_oc)
+    field_cubedsphere = CC.Fields.zeros(boundary_space)
+    CC.Remapping.interpolate!(
+        field_cubedsphere,
+        remapper_cubedsphere_to_latlon,
+        field_latlon,
+    )
+
+
+    # Previous remapper for LatLon
     if pkgversion(CC) >= v"0.14.34"
         remapper_cc = CC.Remapping.Remapper(axes(area_fraction), target_points_cc)
     else
@@ -194,14 +269,14 @@ Interfacer.step!(sim::OceananigansSimulation, t) =
 
 # We always want the surface, so we always set zero(pt.lat) for z
 """
-    to_node(pt::CA.ClimaCore.Geometry.LatLongPoint)
+    to_node(pt::CCGeometry.LatLongPoint)
 
 Transform `LatLongPoint` into a tuple (long, lat, 0), where the 0 is needed because we only
 care about the surface.
 """
-@inline to_node(pt::CA.ClimaCore.Geometry.LatLongPoint) = pt.long, pt.lat, zero(pt.lat)
+@inline to_node(pt::CC.Geometry.LatLongPoint) = pt.long, pt.lat, zero(pt.lat)
 # This next one is needed if we have "LevelGrid"
-@inline to_node(pt::CA.ClimaCore.Geometry.LatLongZPoint) = pt.long, pt.lat, zero(pt.lat)
+@inline to_node(pt::CC.Geometry.LatLongZPoint) = pt.long, pt.lat, zero(pt.lat)
 
 """
     map_interpolate(points, oc_field::OC.Field)

@@ -40,6 +40,8 @@ steps:
           
         command:
           - echo "--- Run simulation"
+          - env | sort
+          - nvidia-smi -q
           - "/sw/openmpi-5.0.5/bin/mpiexec -n 2 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file config/amip_configs/amip.yml --job_id amip"
         artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"
         env:

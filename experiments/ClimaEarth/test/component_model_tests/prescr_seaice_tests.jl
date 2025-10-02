@@ -68,12 +68,13 @@ for FT in (Float32, Float64)
             return dY, Y, p
         end
 
-        # check that nothing changes with no fluxes
-        dY, Y, p = test_sea_ice_rhs()
+        # check that nothing changes with no fluxes (zero conduction when T_base == initial T_sfc)
+        T_base_eq = IceSlabParameters{FT}().T_freeze - FT(5.0)
+        dY, Y, p = test_sea_ice_rhs(T_base = T_base_eq)
         @test all([i for i in extrema(dY)] .≈ [FT(0.0), FT(0.0)])
 
-        # check that extracting expected T due to input atmopsheric fluxes
-        dY, Y, p = test_sea_ice_rhs(F_radiative = 1.0)
+        # check expected dT due to radiative flux only (again set T_base == initial T_sfc)
+        dY, Y, p = test_sea_ice_rhs(F_radiative = 1.0, T_base = T_base_eq)
         dT_expected = -1.0 / (p.params.h * p.params.ρ * p.params.c)
         @test all(extrema(dY) .≈ FT(dT_expected))
 
@@ -82,12 +83,13 @@ for FT in (Float32, Float64)
         dT_maximum = @. (p.params.T_freeze - Y.T_sfc) / p.dt
         @test minimum(dT_maximum .- dY.T_sfc) >= FT(0.0)
 
-        # check that the correct tendency was added due to basal flux
+        # check that the correct tendency was added due to basal conductive flux
         dY, Y, p = test_sea_ice_rhs(F_radiative = 0.0, T_base = 269.2)
         dT_expected =
-            -2.0 * p.params.k_ice / (p.params.h * p.params.h * p.params.ρ * p.params.c)
-        @test minimum(dY) ≈ FT(dT_expected)
-        @test maximum(dY) ≈ FT(0)
+            (p.params.k_ice / (p.params.h * p.params.h * p.params.ρ * p.params.c)) *
+            (p.params.T_base - minimum(Y.T_sfc))
+        @test minimum(dY) ≈ FT(0)
+        @test maximum(dY) ≈ FT(dT_expected)
     end
 
     @testset "dss_state! SeaIceModelSimulation for FT=$FT" begin

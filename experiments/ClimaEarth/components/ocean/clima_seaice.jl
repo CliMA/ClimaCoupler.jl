@@ -7,6 +7,8 @@ import Thermodynamics as TD
 import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
 
+include("climaocean_helpers.jl")
+
 """
     ClimaSeaIceSimulation{SIM, A, OPROP, REMAP}
 
@@ -19,8 +21,11 @@ It contains the following objects:
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
 - `melting_speed::MS`: An constant characteristic speed for melting/freezing.
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
+TODO add skin_temperature field, for now set skin temperature to top layer sea ice temperature
+alt: compute skin temp from bulk temp and ocean surface temp, assuming linear profile in the top layer,
+  might need to limit min sea ice thickness to avoid crazy gradients
 """
-struct ClimaSeaIceSimulation{SIM,A,MS,REMAP} <: Interfacer.SeaIceModelSimulation
+struct ClimaSeaIceSimulation{SIM, A, MS, REMAP} <: Interfacer.SeaIceModelSimulation
     sea_ice::SIM
     area_fraction::A
     melting_speed::MS
@@ -30,7 +35,7 @@ end
 """
     ClimaSeaIceSimulation()
 
-Creates an OceananigansSimulation object containing a model, an integrator, and
+Creates an ClimaSeaIceSimulation object containing a model, an integrator, and
 a surface area fraction field.
 This type is used to indicate that this simulation is an ocean simulation for
 dispatch in coupling.
@@ -46,6 +51,8 @@ function ClimaSeaIceSimulation(area_fraction, ocean; output_dir)
     sea_ice = CO.sea_ice_simulation(grid, ocean.ocean; advection)
 
     melting_speed = 1e-4
+
+    # Since ocean and sea ice share the same grid, we can also share the remapping objects
     remapping = ocean.remapping
 
     # Before version 0.96.22, the NetCDFWriter was broken on GPU
@@ -67,4 +74,211 @@ function ClimaSeaIceSimulation(area_fraction, ocean; output_dir)
 
     sim = ClimaSeaIceSimulation(sea_ice, area_fraction, melting_speed, remapping)
     return sim
+end
+
+###############################################################################
+### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
+###############################################################################
+
+# Timestep the simulation forward to time `t`
+Interfacer.step!(sim::ClimaSeaIceSimulation, t) =
+    OC.time_step!(sim.sea_ice, float(t) - sim.sea_ice.model.clock.time)
+
+
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:area_fraction}) = sim.area_fraction
+
+# TODO: Better values for this
+# At the moment, we return always Float32. This is because we always want to run
+# Oceananingans with Float64, so we have no way to know the float type here. Sticking with
+# Float32 ensures that nothing is accidentally promoted to Float64. We will need to change
+# this anyway.
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_buoyancy}) =
+    Float32(5.8e-5)
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_momentum}) =
+    Float32(5.8e-5)
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:beta}) = Float32(1)
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_direct_albedo}) =
+    Float32(0.011)
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_diffuse_albedo}) =
+    Float32(0.069)
+
+# TODO approximate surface temp from bulk temp and ocean surface temp, assuming linear profile in the top layer
+# TODO how to get ocean surface temp here? Is it in the sea ice or do we need to pass the ocean sim too?
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
+    273.15 + sim.ocean.model.tracers.T
+
+"""
+    FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fields)
+
+Update the turbulent fluxes in the simulation using the values stored in the coupler fields.
+These include latent heat flux, sensible heat flux, momentum fluxes, and moisture flux.
+
+A note on sign conventions:
+SurfaceFluxes and ClimaSeaIce both use the convention that a positive flux is an upward flux.
+No sign change is needed during the exchange, except for moisture/salinity fluxes:
+SurfaceFluxes provides moisture moving from atmosphere to ocean as a negative flux at the surface,
+and ClimaSeaIce represents moisture moving from atmosphere to ocean as a positive salinity flux,
+so a sign change is needed when we convert from moisture to salinity flux.
+"""
+function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fields)
+    # Only LatitudeLongitudeGrid are supported because otherwise we have to rotate the vectors
+
+    (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
+    grid = sim.sea_ice.model.grid
+
+    # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr1,
+        sim.remapping.remapper_cc,
+        F_turb_ρτxz,
+    )
+    OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr2,
+        sim.remapping.remapper_cc,
+        F_turb_ρτyz,
+    )
+    OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
+
+    # Rename for clarity; these are now Center, Center Oceananigans fields
+    F_turb_ρτxz_cc = sim.remapping.scratch_cc1
+    F_turb_ρτyz_cc = sim.remapping.scratch_cc2
+
+    # Set the momentum flux BCs at the correct locations using the remapped scratch fields
+    oc_flux_u = surface_flux(sim.sea_ice.model.velocities.u)
+    oc_flux_v = surface_flux(sim.sea_ice.model.velocities.v)
+    set_from_extrinsic_vectors!(
+        (; u = oc_flux_u, v = oc_flux_v),
+        grid,
+        F_turb_ρτxz_cc,
+        F_turb_ρτyz_cc,
+    )
+
+    # Remap the latent and sensible heat fluxes using scratch arrays
+    CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, F_lh) # latent heat flux
+    CC.Remapping.interpolate!(sim.remapping.scratch_arr2, sim.remapping.remapper_cc, F_sh) # sensible heat flux
+
+    # Rename for clarity; recall F_turb_energy = F_lh + F_sh
+    remapped_F_lh = sim.remapping.scratch_arr1
+    remapped_F_sh = sim.remapping.scratch_arr2
+
+
+    # TODO what is sim.sea_ice.model.ice_thermodynamics.top_surface_temperature? where is it set?
+    # TODO ocean_reference_density -> sea_ice.model.ice_density ?
+    oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
+    OC.interior(oc_flux_T, :, :, 1) .=
+        OC.interior(oc_flux_T, :, :, 1) .+
+        (remapped_F_lh .+ remapped_F_sh) ./ (ocean_reference_density * ocean_heat_capacity)
+
+    # Add the part of the salinity flux that comes from the moisture flux. We also need to
+    # add the component due to precipitation (that was done with the radiative fluxes)
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr1,
+        sim.remapping.remapper_cc,
+        F_turb_moisture,
+    )
+    moisture_fresh_water_flux = sim.remapping.scratch_arr1 ./ ocean_fresh_water_density # TODO do we need this for sea ice too?
+    oc_flux_S = surface_flux(sim.sea_ice.model.tracers.S)
+    surface_salinity = OC.interior(sim.sea_ice.model.tracers.S, :, :, 1)
+    OC.interior(oc_flux_S, :, :, 1) .=
+        OC.interior(oc_flux_S, :, :, 1) .- surface_salinity .* moisture_fresh_water_flux
+    return nothing
+end
+
+function Interfacer.update_field!(sim::OceananigansSimulation, ::Val{:area_fraction}, field)
+    sim.area_fraction .= field
+    return nothing
+end
+
+"""
+    FieldExchanger.update_sim!(sim::OceananigansSimulation, csf, area_fraction)
+
+Update the ocean simulation with the provided fields, which have been filled in
+by the coupler.
+
+Update the portion of the surface_fluxes for T and S that is due to radiation and
+precipitation. The rest will be updated in `update_turbulent_fluxes!`.
+
+A note on sign conventions:
+ClimaAtmos and Oceananigans both use the convention that a positive flux is an upward flux.
+No sign change is needed during the exchange, except for precipitation/salinity fluxes.
+ClimaAtmos provides precipitation as a negative flux at the surface, and
+Oceananigans represents precipitation as a positive salinity flux,
+so a sign change is needed when we convert from precipitation to salinity flux.
+"""
+function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf, area_fraction)
+    (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) =
+        sim.ocean_properties
+
+    # Remap radiative flux onto scratch array; rename for clarity
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr1,
+        sim.remapping.remapper_cc,
+        csf.F_radiative,
+    )
+    remapped_F_radiative = sim.remapping.scratch_arr1
+
+    # Update only the part due to radiative fluxes. For the full update, the component due
+    # to latent and sensible heat is missing and will be updated in update_turbulent_fluxes.
+    oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
+    OC.interior(oc_flux_T, :, :, 1) .=
+        remapped_F_radiative ./ (ocean_reference_density * ocean_heat_capacity)
+
+    # Remap precipitation fields onto scratch arrays; rename for clarity
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr1,
+        sim.remapping.remapper_cc,
+        csf.P_liq,
+    )
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr2,
+        sim.remapping.remapper_cc,
+        csf.P_snow,
+    )
+    remapped_P_liq = sim.remapping.scratch_arr1
+    remapped_P_snow = sim.remapping.scratch_arr2
+
+    # Virtual salt flux
+    oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
+    precipitating_fresh_water_flux =
+        (remapped_P_liq .+ remapped_P_snow) ./ ocean_fresh_water_density
+    surface_salinity_flux =
+        OC.interior(sim.ocean.model.tracers.S, :, :, 1) .* precipitating_fresh_water_flux
+    OC.interior(oc_flux_S, :, :, 1) .= .-surface_salinity_flux
+    return nothing
+end
+
+# TODO add stub to FluxCalculator
+# TODO fill this in using ClimaOcean: https://github.com/CliMA/ClimaOcean.jl/pull/627
+# TODO instead of cs we can take in the ocean and sea ice sims, dispatch on them to do nothing for other sea ice models
+# TODO docstring
+function ocean_seaice_fluxes!(cs)
+    seaice_sim = cs.models.sea_ice
+    ocean_sim = cs.models.ocean
+
+    melting_speed = seaice_sim.melting_speed
+    ocean_properties = ocean_sim.ocean_properties
+
+    # TODO what should fluxes be here?
+    OC.compute_sea_ice_ocean_fluxes!(
+        fluxes,
+        ocean_sim.ocean,
+        seaice_sim.sea_ice,
+        melting_speed,
+        ocean_properties,
+    )
+    return nothing
+end
+
+"""
+    get_model_prog_state(sim::ClimaSeaIceSimulation)
+
+Returns the model state of a simulation as a `ClimaCore.FieldVector`.
+It's okay to leave this unimplemented for now, but we won't be able to use the
+restart system.
+
+TODO extend this for non-ClimaCore states.
+"""
+function Checkpointer.get_model_prog_state(sim::ClimaSeaIceSimulation)
+    @warn "get_model_prog_state not implemented for ClimaSeaIceSimulation"
 end

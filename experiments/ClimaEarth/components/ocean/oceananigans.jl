@@ -7,6 +7,8 @@ import Thermodynamics as TD
 import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
 
+include("climaocean_helpers.jl")
+
 """
     OceananigansSimulation{SIM, A, OPROP, REMAP}
 
@@ -109,12 +111,15 @@ function OceananigansSimulation(
     end
 
     # Create ocean simulation
-    free_surface = SplitExplicitFreeSurface(grid; substeps = 70)
-    momentum_advection = WENOVectorInvariant(order = 5)
-    tracer_advection = WENO(order = 5)
-    eddy_closure = Oceananigans.TurbulenceClosures.IsopycnalSkewSymmetricDiffusivity(κ_skew = 2e3, κ_symmetric = 2e3)
-    vertical_mixing = ClimaOcean.OceanSimulations.default_ocean_closure()
-    horizontal_viscosity = HorizontalScalarDiffusivity(ν = 4000)
+    free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 70)
+    momentum_advection = OC.WENOVectorInvariant(order = 5)
+    tracer_advection = OC.WENO(order = 5)
+    eddy_closure = OC.TurbulenceClosures.IsopycnalSkewSymmetricDiffusivity(
+        κ_skew = 2e3,
+        κ_symmetric = 2e3,
+    )
+    vertical_mixing = CO.OceanSimulations.default_ocean_closure()
+    horizontal_viscosity = OC.HorizontalScalarDiffusivity(ν = 4000)
 
     ocean = CO.ocean_simulation(
         grid;
@@ -188,74 +193,9 @@ end
 Interfacer.step!(sim::OceananigansSimulation, t) =
     OC.time_step!(sim.ocean, float(t) - sim.ocean.model.clock.time)
 
-# We always want the surface, so we always set zero(pt.lat) for z
-"""
-    to_node(pt::CA.ClimaCore.Geometry.LatLongPoint)
-
-Transform `LatLongPoint` into a tuple (long, lat, 0), where the 0 is needed because we only
-care about the surface.
-"""
-@inline to_node(pt::CA.ClimaCore.Geometry.LatLongPoint) = pt.long, pt.lat, zero(pt.lat)
-# This next one is needed if we have "LevelGrid"
-@inline to_node(pt::CA.ClimaCore.Geometry.LatLongZPoint) = pt.long, pt.lat, zero(pt.lat)
-
-"""
-    map_interpolate(points, oc_field::OC.Field)
-
-Interpolate the given 3D field onto the target points.
-
-If the underlying grid does not contain a given point, return 0 instead.
-
-TODO: Use a non-allocating version of this function (simply replace `map` with `map!`)
-"""
-function map_interpolate(points, oc_field::OC.Field)
-    loc = map(L -> L(), OC.Fields.location(oc_field))
-    grid = oc_field.grid
-    data = oc_field.data
-
-    # TODO: There has to be a better way
-    min_lat, max_lat = extrema(OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center()))
-
-    map(points) do pt
-        FT = eltype(pt)
-
-        # The oceananigans grid does not cover the entire globe, so we should not
-        # interpolate outside of its latitude bounds. Instead we return 0
-        min_lat < pt.lat < max_lat || return FT(0)
-
-        fᵢ = OC.Fields.interpolate(to_node(pt), data, loc, grid)
-        convert(FT, fᵢ)::FT
-    end
-end
-
-"""
-    surface_flux(f::OC.AbstractField)
-
-Extract the top boundary conditions for the given field.
-"""
-function surface_flux(f::OC.AbstractField)
-    top_bc = f.boundary_conditions.top
-    if top_bc isa OC.BoundaryCondition{<:OC.BoundaryConditions.Flux}
-        return top_bc.condition
-    else
-        return nothing
-    end
-end
-
-function Interfacer.remap(field::OC.Field, target_space)
-    return map_interpolate(CC.Fields.coordinate_field(target_space), field)
-end
-
-function Interfacer.remap(operation::OC.AbstractOperations.AbstractOperation, target_space)
-    evaluated_field = OC.Field(operation)
-    OC.compute!(evaluated_field)
-    return Interfacer.remap(evaluated_field, target_space)
-end
-
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction
 
 # TODO: Better values for this
-
 # At the moment, we return always Float32. This is because we always want to run
 # Oceananingans with Float64, so we have no way to know the float type here. Sticking with
 # Float32 ensures that nothing is accidentally promoted to Float64. We will need to change
@@ -265,8 +205,10 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_buoyancy}) =
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_momentum}) =
     Float32(5.8e-5)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:beta}) = Float32(1)
-Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) = Float32(0.011)
-Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) = Float32(0.069)
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) =
+    Float32(0.011)
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) =
+    Float32(0.069)
 
 # NOTE: This is 3D, but it will be remapped to 2D
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
@@ -351,70 +293,6 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     OC.interior(oc_flux_S, :, :, 1) .=
         OC.interior(oc_flux_S, :, :, 1) .- surface_salinity .* moisture_fresh_water_flux
     return nothing
-end
-
-"""
-    set_from_extrinsic_vectors!(vectors, grid, u_cc, v_cc)
-
-Given the extrinsic vector components `u_cc` and `v_cc` as `Center, Center`
-fields, rotate them onto the target grid and remap to `Face, Center` and
-`Center, Face` fields, respectively.
-"""
-function set_from_extrinsic_vectors!(vectors, grid, u_cc, v_cc)
-    arch = grid.architecture
-
-    # Rotate vectors onto the grid
-    OC.Utils.launch!(arch, grid, :xy, _rotate_velocities!, u_cc, v_cc, grid)
-
-    # Fill halo regions with the rotated vectors so we can use them to interpolate
-    OC.fill_halo_regions!(u_cc)
-    OC.fill_halo_regions!(v_cc)
-
-    # Interpolate the vectors to face/center and center/face respectively
-    OC.Utils.launch!(
-        arch,
-        grid,
-        :xy,
-        _interpolate_velocities!,
-        vectors.u,
-        vectors.v,
-        grid,
-        u_cc,
-        v_cc,
-    )
-    return nothing
-end
-
-"""
-    _rotate_velocities!(u, v, grid)
-
-Rotate the velocities from the extrinsic coordinate system to the intrinsic
-coordinate system.
-"""
-@kernel function _rotate_velocities!(u, v, grid)
-    # Use `k = 1` to index into the reduced Fields
-    i, j = @index(Global, NTuple)
-    # Rotate u, v from extrinsic to intrinsic coordinate system
-    ur, vr = OC.Operators.intrinsic_vector(i, j, 1, grid, u, v)
-    @inbounds begin
-        u[i, j, 1] = ur
-        v[i, j, 1] = vr
-    end
-end
-
-"""
-    _interpolate_velocities!(u, v, grid, u_cc, v_cc)
-
-Interpolate the input velocities `u_cc` and `v_cc`, which are Center/Center
-Fields to Face/Center and Center/Face coordinates, respectively.
-"""
-@kernel function _interpolate_velocities!(u, v, grid, u_cc, v_cc)
-    # Use `k = 1` to index into the reduced Fields
-    i, j = @index(Global, NTuple)
-    @inbounds begin
-        u[i, j, 1] = OC.Operators.ℑxyᶠᶜᵃ(i, j, 1, grid, u_cc)
-        v[i, j, 1] = OC.Operators.ℑxyᶜᶠᵃ(i, j, 1, grid, v_cc)
-    end
 end
 
 function Interfacer.update_field!(sim::OceananigansSimulation, ::Val{:area_fraction}, field)

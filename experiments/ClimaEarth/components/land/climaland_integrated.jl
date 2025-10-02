@@ -144,7 +144,7 @@ function ClimaLandSimulation(
         surface_space,
         start_date,
         stop_date;
-        time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
+        time_interpolation_method = LinearInterpolation(),
     )
 
     model = CL.LandModel{FT}(forcing, LAI, toml_dict, domain, dt)

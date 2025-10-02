@@ -286,7 +286,7 @@ function plot_surface_fluxes(simdir; output_dir = simdir.simulation_path)
 
     fig = GeoMakie.Figure(size = (1000, length(vars)*500))
     for (i, var) in enumerate(vars)
-        var = slice(var, time = last(dates(var)))
+        var = average_time(var)
         min_val, max_val = cmap_extrema[short_name(var)]
         
         # Create levels between min and max

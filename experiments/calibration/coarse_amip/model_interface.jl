@@ -17,7 +17,7 @@ function ClimaCalibrate.forward_model(iter, member)
     @info "Current minibatch: $minibatch"
     @info "Current start date: $start_date"
 
-    config_dict["bucket_initial_condition"] = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/era5_bucket_processed_$(start_date)_0000.nc"
+    config_dict["bucket_initial_condition"] = "/glade/campaign/univ/ucit0011/cchristo/initial_conditions_v_0.5/era5_bucket_processed_$(start_date)_0000.nc"
 
     config_dict["t_end"] = "365days"
 

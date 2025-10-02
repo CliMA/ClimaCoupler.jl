@@ -193,7 +193,7 @@ function ClimaLandSimulation(
         # ic_path = CL.Artifacts.soil_ic_2008_50m_path()
         start_date_str = Dates.format(Date(start_date), "yyyymmdd")    
         @show start_date_str
-        ic_path = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/era5_land_processed_$(start_date_str)_0000.nc"
+        ic_path = "/glade/campaign/univ/ucit0011/cchristo/initial_conditions_v_0.5/era5_land_processed_$(start_date_str)_0000.nc"
         # ic_path = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/era5_land_processed_20250810_0000.nc"
 
         # Save variables to JLD2 file

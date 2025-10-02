@@ -10,13 +10,13 @@ coupler_toml: ["toml/amip.toml"]
 # coupler_toml: ["toml/amip_calibrated_coarse_v1.toml"]
 
 initial_condition: "WeatherModel"
-checkpoint_dt: "60days"
+checkpoint_dt: "93days"
 co2_model: "fixed"
 
-coupler_output_dir: "/glade/derecho/scratch/nefrathe/tmp/output_quick"
+coupler_output_dir: "/glade/derecho/scratch/nefrathe/tmp/output/model_run"
 
-dt: "80secs"
-dt_cpl: "80secs"
+dt: "90secs"
+dt_cpl: "90secs"
 # dt: "5secs"
 # dt_cpl: "5secs"
 
@@ -31,12 +31,12 @@ mode_name: "amip"
 land_model: "bucket"
 bucket_albedo_type: "map_temporal"
 # bucket_albedo_type: "map_static"
-bucket_initial_condition: "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/era5_bucket_processed_20240901_0000.nc"
+bucket_initial_condition: "/glade/campaign/univ/ucit0011/cchristo/initial_conditions_v_0.5/era5_bucket_processed_20180901_0000.nc"
 
 # use_land_diagnostics: true
 radiation_reset_rng_seed: true
 # start_date: "20250701"
-start_date: "20240901"
+start_date: "20180901"
 surface_setup: "PrescribedSurface"
 topo_smoothing: true
 topography: "Earth"

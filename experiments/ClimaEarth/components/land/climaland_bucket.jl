@@ -127,7 +127,7 @@ function BucketSimulation(
     # the snow would melt in time `τc`. It prevents us from having to specially time step in cases where
     # all the snow melts in a single timestep.
     σS_c = FT(0.2) # critical snow water equivalent
-         = FT(0.2) # bucket capacity
+    W_f = FT(0.8) # bucket capacity
     κ_soil = FT(1.5) # soil conductivity
     ρc_soil = FT(2e6) # soil volumetric heat capacity
     @show parameter_files

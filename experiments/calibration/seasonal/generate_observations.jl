@@ -148,7 +148,10 @@ Return a function to resample longitude and latitudes according to the model
 grid specified by `config_file`.
 """
 function resampled_lonlat(config_file)
+    ENV["CLIMACOMMS_DEVICE"] = "CPU"
+
     cs = CoupledSimulation(config_file)
+    ENV["CLIMACOMMS_DEVICE"] = "CUDA"
     center_space = cs.model_sims.atmos_sim.domain.center_space
     (lon_nlevels, lat_nlevels, z_nlevels) =
         ClimaDiagnostics.Writers.default_num_points(center_space)

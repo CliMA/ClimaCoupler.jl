@@ -1,4 +1,4 @@
-ENV["CLIMACOMMS_DEVICE"] = "CPU"
+ENV["CLIMACOMMS_DEVICE"] = "CUDA"
 import ClimaCoupler
 import ClimaCalibrate
 import CUDA

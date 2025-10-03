@@ -3,9 +3,9 @@
 #PBS -q main
 #PBS -N model_run
 #PBS -j oe
-#PBS -o model_run_8.txt
+#PBS -o model_run.txt
 #PBS -l walltime=11:00:00
-#PBS -l select=8:ncpus=4:ngpus=1
+#PBS -l select=2:ncpus=4:ngpus=1
 #PBS -l job_priority=premium
 
 module load climacommon
@@ -18,5 +18,5 @@ mkdir -p ${TMPDIR}
 echo "Starting Julia package instantiation..."
 julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate(;verbose=true)'
 echo "Starting calibration run..."
-$MPITRAMPOLINE_MPIEXEC -np 8 set_gpu_rank julia --threads=4 --project=experiments/ClimaEarth experiments/calibration/coarse_amip/model_run.jl
+$MPITRAMPOLINE_MPIEXEC -np 2 set_gpu_rank julia --threads=4 --project=experiments/ClimaEarth experiments/calibration/coarse_amip/model_run.jl
 echo "=== Job ${PBS_JOBID} completed at $(date) ==="

@@ -107,7 +107,7 @@ function PrescribedIceSimulation(
         space,
         reference_date = start_date,
         # TODO: Add linearinterpolation for ERA5 ICs
-        method = LinearInterpolation(PeriodicCalendar()),
+        method = LinearInterpolation(PeriodicCalendar(Dates.Month(1), Dates.DateTime(2018,9,1,0,0,0))),
         file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
     )
 

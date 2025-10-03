@@ -32,8 +32,8 @@ function load_vars(obsdir, short_names)
     rad_and_pr_obs_dict = get_obs_var_dict()
     rsut = rad_and_pr_obs_dict["rsut"](start_date)
     rsutcs = rad_and_pr_obs_dict["rsutcs"](start_date)
-    sw_cre = [rsutcs - rsut]
-    set_short_name!(sw_cre)
+    sw_cre = rsutcs - rsut
+    set_short_name!(sw_cre, "sw_cre")
     return [sw_cre]
 end
 
@@ -43,20 +43,7 @@ Preprocess each OutputVar in `vars` by keeping the relevant dates in
 `sample_date_ranges`.
 """
 function preprocess_vars(vars, sample_date_ranges, config_file)
-    weekly_dates = find_weekly_dates(vars, sample_date_ranges)
-    weekly_dates = unique(weekly_dates)
-    vars = map(vars) do var
-        var = ClimaAnalysis.select(var; by = ClimaAnalysis.MatchValue(), time = weekly_dates)
-        # TODO: Do any additional preprocessing here for units...
-        if !issorted(var.dims[ClimaAnalysis.latitude_name(var)])
-            ClimaAnalysis.reverse_dim!(var, ClimaAnalysis.latitude_name(var))
-        end
-        @assert issorted(var.dims[ClimaAnalysis.latitude_name(var)])
-        var = resample_var(var)
-
-        var.attributes["units"] = var_units[ClimaAnalysis.short_name(var)]
-        var
-    end
+    vars = resample_var.(vars)
     return vars
 end
 
@@ -70,7 +57,7 @@ var_units = Dict(
 
 function make_observation_vector(vars, sample_date_ranges)
     obs_vec = map(sample_date_ranges) do sample_date_range
-        weekly_range = find_weekly_ranges(vars, sample_date_range)
+            vars = window.(vars, "time", left = sample_date_range[1], right =  sample_date_range[2])
 
         covar_estimator = ClimaCalibrate.ObservationRecipe.SVDplusDCovariance(
             weekly_range;
@@ -164,7 +151,7 @@ function resampled_lonlat(config_file)
     return var -> resampled_to(var; lon = longitudes, lat = latitudes)
 end
 
-# resample_var = resampled_lonlat("experiments/calibration/seasonal/amip_config.yml")
+resample_var = resampled_lonlat("experiments/calibration/seasonal/amip_config.yml")
 
 if abspath(PROGRAM_FILE) == @__FILE__
     sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges

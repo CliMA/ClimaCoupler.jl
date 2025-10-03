@@ -13,11 +13,11 @@ module load climacommon
 echo "=== Job ${PBS_JOBID} started at $(date) ==="
 
 # Trap-based self-requeue
-RUNSCRIPT="/glade/u/home/nefrathe/clima/ClimaCoupler.jl/experiments/calibration/coarse_amip/run_calibration.pbs"
+RUNSCRIPT="/glade/u/home/nefrathe/clima/ClimaCoupler.jl/experiments/calibration/seasonal/run_calibration.pbs"
 handle_termination() {
     echo "=== Job ${PBS_JOBID} received termination signal at $(date) ==="
     # Check if the target file doesn't exist
-    if [[ ! -f "/glade/derecho/scratch/nefrathe/tmp/output_simple/iteration_003/eki_file.jld2" ]]; then
+    if [[ ! -f "/glade/derecho/scratch/nefrathe/tmp/output_simple/iteration_004/eki_file.jld2" ]]; then
         echo "=== Job ${PBS_JOBID} terminated, requeuing... ==="
         qsub "$RUNSCRIPT" 
     fi
@@ -32,5 +32,5 @@ julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate(;verbose=t
 julia --project=experiments/ClimaEarth experiments/calibration/seasonal/generate_observations.jl
 
 echo "Starting calibration run..."
-julia --project=experiments/ClimaEarth experiments/calibration/run_calibration.jl
+julia --project=experiments/ClimaEarth experiments/calibration/seasonal/run_calibration.jl
 echo "=== Job ${PBS_JOBID} completed at $(date) ==="

@@ -43,6 +43,7 @@ Preprocess each OutputVar in `vars` by keeping the relevant dates in
 `sample_date_ranges`.
 """
 function preprocess_vars(vars, sample_date_ranges, config_file)
+    resample_var = resampled_lonlat("experiments/calibration/seasonal/amip_config.yml")
     vars = resample_var.(vars)
     return vars
 end
@@ -55,12 +56,10 @@ var_units = Dict(
 )
 
 
-function make_observation_vector(vars, sample_date_ranges)
-    obs_vec = map(sample_date_ranges) do sample_date_range
-            vars = window.(vars, "time", left = sample_date_range[1], right =  sample_date_range[2])
-
+function make_observation_vector(vars, covariance_sample_ranges)
+    obs_vec = map(CALIBRATE_CONFIG.sample_date_ranges) do sample_date_range
         covar_estimator = ClimaCalibrate.ObservationRecipe.SVDplusDCovariance(
-            weekly_range;
+            covariance_sample_ranges;
             model_error_scale = 0.05,
             regularization = 1e-5,
         )
@@ -73,61 +72,6 @@ function make_observation_vector(vars, sample_date_ranges)
     end
     return obs_vec
 end
-
-"""
-    find_weekly_dates(sample_date_range)
-Find weekly dates for the purpose of preprocessing the `OutputVar`s.
-"""
-function find_weekly_dates(vars, sample_date_ranges)
-    # Find the earliest and latest years that can be used
-    earliest_year = min((first(ClimaAnalysis.dates(var)) for var in vars)...)
-    latest_year = max((last(ClimaAnalysis.dates(var)) for var in vars)...)
-
-    # Check conversion is possible
-    dates = Dates.DateTime[]
-    for range in sample_date_ranges
-        if ((last(range) - first(range)) % Dates.Week(1)).value != 0
-            error(
-                "The dates in $sample_date_ranges should differ by weeks",
-            )
-        end
-        append!(dates, collect(first(range):Dates.Week(1):last(range)))
-    end
-
-    # Find all weekly dates
-    min_year, max_year = extrema(year.(dates))
-
-    alldates = Dates.DateTime[]
-    for curr_date in dates
-        for curr_year = year(earliest_year):year(latest_year)
-            diff_year = year(curr_date) - curr_year
-            push!(alldates, curr_date - Year(diff_year))
-        end
-    end
-    return sort!(alldates)
-end
-
-"""
-    find_weekly_ranges(sample_date_range)
-Find the weekly ranges for the purpose of constructing the TSVD covariance
-matrix.
-"""
-function find_weekly_ranges(vars, sample_date_range)
-    var_dates = union([ClimaAnalysis.dates(var) for var in vars]...)
-    min_year, max_year = year.(extrema(var_dates))
-    curr_year = minimum(year.(extrema(var_dates)))
-
-    date_ranges = typeof(sample_date_range)[]
-    for curr_year = min_year:max_year
-        delta_year = year(first(sample_date_range)) - curr_year
-        date_range = sample_date_range .- Year(delta_year)
-        if first(date_range) in var_dates && last(date_range) in var_dates
-            push!(date_ranges, date_range)
-        end
-    end
-    return sort!(date_ranges)
-end
-
 
 """
     resampled_lonlat(config_file)
@@ -148,10 +92,9 @@ function resampled_lonlat(config_file)
     # TODO: Account for stretch for 3D variables and interpolate to pressure?
     dz_bottom = center_space.grid.vertical_grid.topology.mesh.faces[2].z
     z_levels = range(dz_bottom, ClimaCore.Spaces.z_max(center_space), z_nlevels)
-    return var -> resampled_to(var; lon = longitudes, lat = latitudes)
+    return var -> resampled_as(var; lon = longitudes, lat = latitudes)
 end
 
-resample_var = resampled_lonlat("experiments/calibration/seasonal/amip_config.yml")
 
 if abspath(PROGRAM_FILE) == @__FILE__
     sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges
@@ -169,7 +112,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
         joinpath(pkgdir(ClimaCoupler),"experiments/calibration/era5_preprocessed_vars.jld2"),
         preprocessed_vars,
     )
-    observation_vector = make_observation_vector(preprocessed_vars, sample_date_ranges)
+    covariance_sample_ranges = [(DateTime(yr, 1, 1), DateTime(yr, 3, 1)) for yr in 2001:2019]
+    observation_vector = make_observation_vector(preprocessed_vars, covariance_sample_ranges)
     JLD2.save_object(
         joinpath(pkgdir(ClimaCoupler),"experiments/calibration/weatherquest_obs_vec.jld2"),
         observation_vector,

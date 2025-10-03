@@ -24,7 +24,8 @@ config_file = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/seasonal/a
     sample_date_ranges,
     extend = Dates.Week(7),
     spinup = Dates.Day(14),
-    output_dir = "/glade/derecho/scratch/nefrathe/tmp/output_quick",
+    # TODO: Use this in the model_interface
+    output_dir = "/glade/derecho/scratch/nefrathe/tmp/output_seasonal",
     rng_seed = 42,
 )
 
@@ -66,16 +67,14 @@ if abspath(PROGRAM_FILE) == @__FILE__
         rng,
         scheduler = EKP.DataMisfitController(terminate_at = 100),
     )
-    # ClimaCalibrate.initialize(ekp, prior, CALIBRATE_CONFIG.output_dir)
 
-    hpc_kwargs = ClimaCalibrate.kwargs(time = 60*4,
+    hpc_kwargs = ClimaCalibrate.kwargs(time = 60*12,
         ntasks = 2,
         gpus_per_task = 1,
         cpus_per_task = 4,
         l_job_priority = "premium",
         q = "main")
     exeflags = "--threads=4"
-    ekp = ClimaCalibrate.load_latest_ekp(CALIBRATE_CONFIG.output_dir)
     eki = ClimaCalibrate.calibrate(ClimaCalibrate.DerechoBackend,
         ekp,
         CALIBRATE_CONFIG.n_iterations,

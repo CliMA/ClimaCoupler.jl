@@ -40,6 +40,13 @@ steps:
           
         command:
           - echo "--- Run simulation"
+          - cat /proc/self/cgroup
+          - ls -la /dev/nvidia* 
+          - /sw/openmpi-5.0.5/bin/mpiexec -n 2 bash -c '
+              echo "=== Rank $OMPI_COMM_WORLD_RANK ==="
+              ls -la /dev/nvidia$OMPI_COMM_WORLD_RANK 2>&1
+              nvidia-smi -L 2>&1
+            '
           - env | sort
           - nvidia-smi -q
           - "/sw/openmpi-5.0.5/bin/mpiexec -n 2 \

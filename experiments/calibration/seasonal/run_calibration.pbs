@@ -13,17 +13,19 @@ module load climacommon
 echo "=== Job ${PBS_JOBID} started at $(date) ==="
 
 # Trap-based self-requeue
-RUNSCRIPT="/glade/u/home/nefrathe/clima/ClimaCoupler.jl/experiments/calibration/seasonal/run_calibration.pbs"
+RUNSCRIPT="/glade/u/home/zhaoyi/clima/ClimaCoupler.jl/experiments/calibration/seasonal/run_calibration.pbs"
 handle_termination() {
     echo "=== Job ${PBS_JOBID} received termination signal at $(date) ==="
     # Check if the target file doesn't exist
-    if [[ ! -f "/glade/derecho/scratch/nefrathe/tmp/output_simple/iteration_004/eki_file.jld2" ]]; then
+    if [[ ! -f "/glade/derecho/scratch/zhaoyi/tmp/output_simple/iteration_004/eki_file.jld2" ]]; then
         echo "=== Job ${PBS_JOBID} terminated, requeuing... ==="
         qsub "$RUNSCRIPT" 
     fi
     exit 0
 }
 trap handle_termination SIGTERM SIGINT SIGUSR1 SIGUSR2
+
+cd /glade/u/home/zhaoyi/ClimaCoupler.jl
 
 # Build and run the Julia code
 echo "Starting Julia package instantiation..."

@@ -24,7 +24,7 @@ function ClimaCalibrate.observation_map(iteration)
 
     for m in 1:EKP.get_N_ens(ekp)
         member_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
-        simdir_path = joinpath(member_path, "wxquest_diagedmf/output_active")
+        simdir_path = joinpath(member_path, "amip_config/output_active")
         @info "Processing member $m: $simdir_path"
         try
             process_member_data!(g_ens_builder, simdir_path, m, iteration)
@@ -61,7 +61,7 @@ function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, i
     var = shift_to_start_of_previous_month(var)
     dates = sample_date_ranges[iteration+1]
     # TODO: window var
-    window(var, "time", left = dates[1], right = dates[2])
+    var = window(var, "time", left = dates[1], right = dates[2])
     EnsembleBuilder.fill_g_ens_col!(g_ens_builder, col_idx, var)
 
     return nothing
@@ -81,7 +81,7 @@ function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, it
     plot_constrained_params_and_errors(plot_output_path, ekp, prior)
 
     simdir = SimDir(ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, 1))
-    plot_bias(simdir, iteration; output_dir = plot_output_path)
+    #plot_bias(simdir, iteration; output_dir = plot_output_path)
     plot_variables(simdir; output_dir = plot_output_path)
     plot_pointwise_spread_per_variable(ekp, iteration)
     # try 

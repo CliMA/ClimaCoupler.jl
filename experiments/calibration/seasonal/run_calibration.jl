@@ -14,14 +14,14 @@ include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/seasonal/observa
 model_interface = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "seasonal", "model_interface.jl")
 include(model_interface)
 years = 2010
-sample_date_ranges = repeat([(DateTime(yr, 1, 1), DateTime(yr, 3, 1)) for yr in years], 3)
+sample_date_ranges = repeat([(DateTime(yr, 1, 1), DateTime(yr, 3, 1)) for yr in years], 5)
 
 const CALIBRATE_CONFIG = CalibrateConfig(;
 config_file = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/seasonal/amip_config.yml"),
     short_names = ["sw_cre", ],
     minibatch_size = 1,
-    n_iterations = 7,
-    sample_date_ranges = [(DateTime(2010, 1,1), DateTime(2010,12,1),)],
+    n_iterations = 5,
+    sample_date_ranges,
     extend = Dates.Week(7),
     spinup = Dates.Day(14),
     output_dir = "/glade/derecho/scratch/nefrathe/tmp/output_quick",

@@ -314,9 +314,26 @@ update_field_warning(sim, val::Val{X}) where {X} = @warn(
 A function to add fields to the set of coupler fields. This should be extended
 by component models that require coupler fields beyond the defaults.
 
+This should also be extended by all surface models to add individual surface
+temperatures, which are used to compute radiative and turbulent fluxes.
+The naming convention shown here must be used.
+
 If this function isn't extended, no additional fields will be added.
+
 """
 add_coupler_fields!(coupler_fields, sim::ComponentModelSimulation) = nothing
+function Interfacer.add_coupler_fields!(coupler_field_names, ::SeaIceModelSimulation)
+    seaice_coupler_fields = [:T_seaice]
+    push!(coupler_field_names, seaice_coupler_fields...)
+end
+function Interfacer.add_coupler_fields!(coupler_field_names, ::LandModelSimulation)
+    land_coupler_fields = [:T_land]
+    push!(coupler_field_names, land_coupler_fields...)
+end
+function Interfacer.add_coupler_fields!(coupler_field_names, ::OceanModelSimulation)
+    ocean_coupler_fields = [:T_ocean]
+    push!(coupler_field_names, ocean_coupler_fields...)
+end
 
 """
     Base.nameof(::ComponentModelSimulation)

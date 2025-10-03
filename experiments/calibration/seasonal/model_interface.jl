@@ -9,7 +9,7 @@ const config_file = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/seas
 function ClimaCalibrate.forward_model(iter, member)
     config_dict = get_coupler_config_dict(config_file)
 
-    output_dir_root = "/glade/derecho/scratch/nefrathe/tmp/output_seasonal"
+    output_dir_root = "/glade/derecho/scratch/zhaoyi/tmp/amip_calibration"
     eki = ClimaCalibrate.load_ekp_struct(output_dir_root, iter)
     minibatch = EKP.get_current_minibatch(eki)
     start_date = minibatch_to_start_date(minibatch)

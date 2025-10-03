@@ -25,7 +25,7 @@ config_file = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/seasonal/a
     extend = Dates.Week(7),
     spinup = Dates.Day(14),
     # TODO: Use this in the model_interface
-    output_dir = "/glade/derecho/scratch/nefrathe/tmp/output_seasonal",
+    output_dir = "/glade/derecho/scratch/zhaoyi/tmp/amip_calibration",
     rng_seed = 42,
 )
 

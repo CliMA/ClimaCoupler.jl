@@ -61,7 +61,7 @@ function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, i
     var = shift_to_start_of_previous_month(var)
     dates = sample_date_ranges[iteration+1]
     # TODO: window var
-    window(var, "time", left = dates[1], right = dates[2])
+    var = window(var, "time", left = dates[1], right = dates[2])
     EnsembleBuilder.fill_g_ens_col!(g_ens_builder, col_idx, var)
 
     return nothing

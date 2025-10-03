@@ -104,11 +104,6 @@ current_date(cs::CoupledSimulation) =
 Return a list of default coupler fields needed to run a simulation.
 """
 default_coupler_fields() = [
-    # fields needed for flux calculations
-    :z0m_sfc,
-    :z0b_sfc,
-    :beta,
-    :emissivity,
     # fields used to compute fluxes
     :T_atmos,
     :q_atmos,
@@ -122,6 +117,8 @@ default_coupler_fields() = [
     :F_turb_ρτxz,
     :F_turb_ρτyz,
     :F_radiative,
+    # fields used to compute radiation in the atmosphere
+    :emissivity,
     # fields used to track water conservation, and for water fluxes
     :P_liq,
     :P_snow,

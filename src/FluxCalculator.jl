@@ -53,9 +53,6 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
         :F_lh,
         :F_sh,
         :F_turb_moisture,
-        :z0m_sfc,
-        :z0b_sfc,
-        :beta,
         :L_MO,
         :ustar,
         :buoyancy_flux,
@@ -265,6 +262,7 @@ function compute_surface_fluxes!(
 
     surface_params = FluxCalculator.get_surface_params(atmos_sim)
 
+    # TODO put these in temp fields
     z0m = Interfacer.get_field(sim, Val(:roughness_momentum), boundary_space)
     z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy), boundary_space)
     beta = Interfacer.get_field(sim, Val(:beta), boundary_space)
@@ -331,10 +329,6 @@ function compute_surface_fluxes!(
     @. csf.L_MO += ifelse(isinf(L_MO), L_MO, L_MO * area_fraction)
     @. csf.ustar += ustar * area_fraction
     @. csf.buoyancy_flux += buoyancy_flux * area_fraction
-
-    @. csf.z0m_sfc += z0m * area_fraction
-    @. csf.z0b_sfc += z0b * area_fraction
-    @. csf.beta += beta * area_fraction
     return nothing
 end
 

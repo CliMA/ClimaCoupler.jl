@@ -447,16 +447,21 @@ function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, area_fraction
     Interfacer.update_field!(sim, Val(:snow_precipitation), csf.P_snow)
 end
 
+"""
+   FieldExchanger.import_atmos_fields!(csf, sim::ClimaLandSimulation, atmos_sim)
+
+Import non-default coupler fields from the atmosphere simulation into the coupler fields.
+These include the diffuse fraction of light, shortwave and longwave downwelling radiation,
+air pressure, and CO2 concentration.
+
+The default coupler fields will be imported by the default method implemented in
+FieldExchanger.jl.
+"""
 function FieldExchanger.import_atmos_fields!(csf, sim::ClimaLandSimulation, atmos_sim)
     Interfacer.get_field!(csf.diffuse_fraction, atmos_sim, Val(:diffuse_fraction))
     Interfacer.get_field!(csf.SW_d, atmos_sim, Val(:SW_d))
     Interfacer.get_field!(csf.LW_d, atmos_sim, Val(:LW_d))
     Interfacer.get_field!(csf.P_atmos, atmos_sim, Val(:air_pressure))
-    Interfacer.get_field!(csf.T_atmos, atmos_sim, Val(:air_temperature))
-    Interfacer.get_field!(csf.q_atmos, atmos_sim, Val(:specific_humidity))
-    Interfacer.get_field!(csf.ρ_atmos, atmos_sim, Val(:air_density))
-    Interfacer.get_field!(csf.P_liq, atmos_sim, Val(:liquid_precipitation))
-    Interfacer.get_field!(csf.P_snow, atmos_sim, Val(:snow_precipitation))
     # CO2 is a scalar for now so it doesn't need remapping
     csf.c_co2 .= Interfacer.get_field(atmos_sim, Val(:co2))
     return nothing
@@ -596,29 +601,31 @@ function FluxCalculator.compute_surface_fluxes!(
     # Combine turbulent energy fluxes from each component of the land model
     # Use temporary variables to avoid allocating
     Interfacer.remap!(
-        csf.temp1,
+        csf.scalar_temp1,
         canopy_dest.lhf .+ soil_dest.lhf .* (1 .- p.snow.snow_cover_fraction) .+
         p.snow.snow_cover_fraction .* snow_dest.lhf,
     )
     Interfacer.remap!(
-        csf.temp2,
+        csf.scalar_temp2,
         canopy_dest.shf .+ soil_dest.shf .* (1 .- p.snow.snow_cover_fraction) .+
         p.snow.snow_cover_fraction .* snow_dest.shf,
     )
 
     # Zero out the fluxes where the area fraction is zero
-    @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
-    @. csf.temp2 = ifelse(area_fraction == 0, zero(csf.temp2), csf.temp2)
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    @. csf.scalar_temp2 =
+        ifelse(area_fraction == 0, zero(csf.scalar_temp2), csf.scalar_temp2)
 
     # Update the coupler field in-place
-    @. csf.F_lh += csf.temp1 * area_fraction
-    @. csf.F_sh += csf.temp2 * area_fraction
+    @. csf.F_lh += csf.scalar_temp1 * area_fraction
+    @. csf.F_sh += csf.scalar_temp2 * area_fraction
 
     # Combine turbulent moisture fluxes from each component of the land model
     # Note that we multiply by ρ_liq to convert from m s-1 to kg m-2 s-1
     ρ_liq = (LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set))
     Interfacer.remap!(
-        csf.temp1,
+        csf.scalar_temp1,
         (
             canopy_dest.transpiration .+
             (soil_dest.vapor_flux_liq .+ soil_dest.vapor_flux_ice) .*
@@ -626,45 +633,50 @@ function FluxCalculator.compute_surface_fluxes!(
             p.snow.snow_cover_fraction .* snow_dest.vapor_flux
         ) .* ρ_liq,
     )
-    @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
-    @. csf.F_turb_moisture += csf.temp1 * area_fraction
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    @. csf.F_turb_moisture += csf.scalar_temp1 * area_fraction
 
     # Combine turbulent momentum fluxes from each component of the land model
     # Note that we exclude the canopy component here for now, since we can have nonzero momentum fluxes
     #  where there is zero LAI. This should be fixed in ClimaLand.
     Interfacer.remap!(
-        csf.temp1,
+        csf.scalar_temp1,
         soil_dest.ρτxz .* (1 .- p.snow.snow_cover_fraction) .+
         p.snow.snow_cover_fraction .* snow_dest.ρτxz,
     )
-    @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
-    @. csf.F_turb_ρτxz += csf.temp1 * area_fraction
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    @. csf.F_turb_ρτxz += csf.scalar_temp1 * area_fraction
 
     Interfacer.remap!(
-        csf.temp1,
+        csf.scalar_temp1,
         soil_dest.ρτyz .* (1 .- p.snow.snow_cover_fraction) .+
         p.snow.snow_cover_fraction .* snow_dest.ρτyz,
     )
-    @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
-    @. csf.F_turb_ρτyz += csf.temp1 * area_fraction
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    @. csf.F_turb_ρτyz += csf.scalar_temp1 * area_fraction
 
     # Combine the buoyancy flux from each component of the land model
     # Note that we exclude the canopy component here for now, since ClimaLand doesn't
     #  include its extra resistance term in the buoyancy flux calculation.
     Interfacer.remap!(
-        csf.temp1,
+        csf.scalar_temp1,
         soil_dest.buoy_flux .* (1 .- p.snow.snow_cover_fraction) .+
         p.snow.snow_cover_fraction .* snow_dest.buoy_flux,
     )
-    @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
-    @. csf.buoyancy_flux += csf.temp1 * area_fraction
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    @. csf.buoyancy_flux += csf.scalar_temp1 * area_fraction
 
     # Compute ustar from the momentum fluxes and surface air density
     #  ustar = sqrt(ρτ / ρ)
-    @. csf.temp1 = sqrt(sqrt(csf.F_turb_ρτxz^2 + csf.F_turb_ρτyz^2) / csf.ρ_atmos)
-    @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
+    @. csf.scalar_temp1 = sqrt(sqrt(csf.F_turb_ρτxz^2 + csf.F_turb_ρτyz^2) / csf.ρ_atmos)
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
     # If ustar is zero, set it to eps to avoid division by zero in the atmosphere
-    @. csf.ustar += max(csf.temp1 * area_fraction, eps(FT))
+    @. csf.ustar += max(csf.scalar_temp1 * area_fraction, eps(FT))
 
     # Compute the Monin-Obukhov length from ustar and the buoyancy flux
     #  L_MO = -u^3 / (k * buoyancy_flux)
@@ -674,11 +686,13 @@ function FluxCalculator.compute_surface_fluxes!(
         return abs(v) < eps(FT) ? eps(FT) * sign_of_v : v
     end
     surface_params = LP.surface_fluxes_parameters(sim.model.soil.parameters.earth_param_set)
-    @. csf.temp1 =
+    @. csf.scalar_temp1 =
         -csf.ustar^3 / SFP.von_karman_const(surface_params) / non_zero(csf.buoyancy_flux)
-    @. csf.temp1 = ifelse(area_fraction == 0, zero(csf.temp1), csf.temp1)
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
     # When L_MO is infinite, avoid multiplication by zero to prevent NaN
-    @. csf.L_MO += ifelse(isinf(csf.temp1), csf.temp1, csf.temp1 * area_fraction)
+    @. csf.L_MO +=
+        ifelse(isinf(csf.scalar_temp1), csf.scalar_temp1, csf.scalar_temp1 * area_fraction)
 
     return nothing
 end

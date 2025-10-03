@@ -240,7 +240,6 @@ end
 
     # Test that update_field! gives correct warnings for unextended fields
     for value in (
-        :air_density,
         :area_fraction,
         :liquid_precipitation,
         :radiative_energy_flux_sfc,

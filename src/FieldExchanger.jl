@@ -131,9 +131,19 @@ after `import_atmos_fields!` in a timestep.
 - `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
 """
 function import_combined_surface_fields!(csf, model_sims, thermo_params)
-    combine_surfaces!(csf.T_sfc, model_sims, Val(:surface_temperature))
-    combine_surfaces!(csf.surface_direct_albedo, model_sims, Val(:surface_direct_albedo))
-    combine_surfaces!(csf.surface_diffuse_albedo, model_sims, Val(:surface_diffuse_albedo))
+    combine_surfaces!(csf.T_sfc, model_sims, Val(:surface_temperature), csf.temp1)
+    combine_surfaces!(
+        csf.surface_direct_albedo,
+        model_sims,
+        Val(:surface_direct_albedo),
+        csf.temp1,
+    )
+    combine_surfaces!(
+        csf.surface_diffuse_albedo,
+        model_sims,
+        Val(:surface_diffuse_albedo),
+        csf.temp1,
+    )
 
     # q_sfc is computed from the atmosphere state and surface temperature, so it's handled differently
     # This is computed on the exchange grid, so there's no need to remap
@@ -270,35 +280,70 @@ function step_model_sims!(cs::Interfacer.CoupledSimulation)
 end
 
 """
-    combine_surfaces!(combined_field::CC.Fields.Field, sims, field_name::Val)
+    combine_surfaces!(combined_field::CC.Fields.Field, sims, field_name::Val, csf.temp1)
 
 Sums the fields, specified by `field_name`, weighted by the respective area fractions of all
 surface simulations. THe result is saved in `combined_field`.
+
+For surface temperature, upward longwave radiation is computed from the temperatures
+of each surface, weighted by their area fractions, and then the combined temperature
+is computed from the combined upward longwave radiation.
 
 # Arguments
 - `combined_field`: [CC.Fields.Field] output object containing weighted values.
 - `sims`: [NamedTuple] containing simulations .
 - `field_name`: [Val] containing the name Symbol of the field t be extracted by the `Interfacer.get_field` functions.
+- `temp1`: [CC.Fields.Field] temporary field for intermediate calculations.
 
 # Example
 - `combine_surfaces!(temp_field, cs.model_sims, Val(:surface_temperature))`
 """
-function combine_surfaces!(combined_field, sims, field_name)
+function combine_surfaces!(combined_field, sims, field_name, temp1)
     boundary_space = axes(combined_field)
     combined_field .= 0
     for sim in sims
         if sim isa Interfacer.SurfaceModelSimulation
+            # Store the area fraction of this simulation in `temp1`
+            Interfacer.get_field!(temp1, sim, Val(:area_fraction))
             # Zero out the contribution from this surface if the area fraction is zero
             # Note that multiplying by `area_fraction` is not sufficient in the case of NaNs
-            area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
             combined_field .+=
-                area_fraction .*
+                temp1 .*
                 ifelse.(
-                    area_fraction .≈ 0,
+                    temp1 .≈ 0,
                     zero(combined_field),
                     Interfacer.get_field(sim, field_name, boundary_space),
                 )
+            return nothing
         end
+    end
+end
+function combine_surfaces!(
+    combined_field,
+    sims,
+    field_name::Val{:surface_temperature},
+    temp1,
+)
+    boundary_space = axes(combined_field)
+    combined_field .= 0
+    for sim in sims
+        if sim isa Interfacer.SurfaceModelSimulation
+            # Store the area fraction of this simulation in `temp1`
+            Interfacer.get_field!(temp1, sim, Val(:area_fraction))
+            # Zero out the contribution from this surface if the area fraction is zero
+            # Note that multiplying by `area_fraction` is not sufficient in the case of NaNs
+            # Compute upward longwave radiation from surface temperature for this simulation
+            combined_field .+=
+                temp1 .*
+                ifelse.(
+                    temp1 .≈ 0,
+                    zero(combined_field),
+                    Interfacer.get_field(sim, field_name, boundary_space),
+                ) .^ 4
+        end
+        # Convert the combined upward longwave radiation into a surface temperature
+        @. combined_field = combined_field^(1 / 4)
+        return nothing
     end
 end
 

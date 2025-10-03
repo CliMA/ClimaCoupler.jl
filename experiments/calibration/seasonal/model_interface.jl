@@ -1,10 +1,10 @@
-ENV["CLIMACOMMS_DEVICE"] = "CUDA"
+ENV["CLIMACOMMS_DEVICE"] = "CPU"
 import ClimaCoupler
 import ClimaCalibrate
 import CUDA
 import EnsembleKalmanProcesses as EKP
 include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.jl"))
-const config_file = joinpath(pkgdir(ClimaCoupler), "config/subseasonal_configs/wxquest_diagedmf.yml")
+const config_file = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/seasonal/amip_config.yml")
 
 function ClimaCalibrate.forward_model(iter, member)
     config_dict = get_coupler_config_dict(config_file)
@@ -17,9 +17,7 @@ function ClimaCalibrate.forward_model(iter, member)
     @info "Current minibatch: $minibatch"
     @info "Current start date: $start_date"
 
-    config_dict["bucket_initial_condition"] = "/glade/campaign/univ/ucit0011/cchristo/initial_conditions_v_0.5/era5_bucket_processed_$(start_date)_0000.nc"
-
-    config_dict["t_end"] = "365days"
+    config_dict["t_end"] = "190days"
 
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)
@@ -43,9 +41,8 @@ function ClimaCalibrate.forward_model(iter, member)
 end
 
 function minibatch_to_start_date(batch)
-    start_year = minimum(batch) + 2017
-    @assert start_year >= 2018
-    return "$(start_year)0901"
+    start_year = minimum(batch) + 2008
+    return "20090901"
 end
 
 import ClimaCore: Spaces

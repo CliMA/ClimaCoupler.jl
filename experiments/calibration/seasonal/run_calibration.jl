@@ -10,21 +10,18 @@ import EnsembleKalmanProcesses.ParameterDistributions as PD
 import JLD2
 
 include(joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "api.jl"))
-include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/observation_map.jl"))
-model_interface = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "coarse_amip", "model_interface.jl")
-
-years = 2018:2024
-sample_date_ranges = [(DateTime(yr, 9, 22), DateTime(yr, 9, 29)) for yr in years]
-# sample_date_ranges = [(DateTime(yr, 9, 29), DateTime(yr, 9, 29)) for yr in years]
-
-# sample_date_ranges = [("$yr-12-01", "$yr-12-01") for yr in years]
+include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/seasonal/observation_map.jl"))
+model_interface = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "seasonal", "model_interface.jl")
+include(model_interface)
+years = 2010
+sample_date_ranges = repeat([(DateTime(yr, 1, 1), DateTime(yr, 3, 1)) for yr in years], 3)
 
 const CALIBRATE_CONFIG = CalibrateConfig(;
-config_file = joinpath(pkgdir(ClimaCoupler), "config/subseasonal_configs/wxquest_diagedmf.yml"),
-    short_names = ["tas", "pr", ],
+config_file = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/seasonal/amip_config.yml"),
+    short_names = ["sw_cre", ],
     minibatch_size = 1,
     n_iterations = 7,
-    sample_date_ranges,
+    sample_date_ranges = [(DateTime(2010, 1,1), DateTime(2010,12,1),)],
     extend = Dates.Week(7),
     spinup = Dates.Day(14),
     output_dir = "/glade/derecho/scratch/nefrathe/tmp/output_quick",
@@ -35,10 +32,8 @@ config_file = joinpath(pkgdir(ClimaCoupler), "config/subseasonal_configs/wxquest
 if abspath(PROGRAM_FILE) == @__FILE__
 
     priors = [
-        # PD.constrained_gaussian("albedo_coefficient", 1.0, 0.4, 0, 3),
-        PD.constrained_gaussian("mixing_length_diss_coeff", 0.22, 0.07, 0, 1),
-        # PD.constrained_gaussian("precipitation_timescale", 919.3827604731249, 150.0, 0, Inf),
-        PD.constrained_gaussian("EDMF_surface_area", 0.10928882001604676, 0.03, 0, Inf),
+        EKP.constrained_gaussian("prescribed_cloud_droplet_number_concentration", 3e8, 5e7, 1e7, 1e9),
+        EKP.constrained_gaussian("ice_cloud_effective_radius", 15e-6, 5e-6, 5e-6, 9e-5)
     ]
     prior = EKP.combine_distributions(priors)
 

@@ -1,53 +1,28 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
-
-
-atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
-# atmos_config_file: "config/atmos_configs/climaatmos_wx_progedmf.yml"
-
-coupler_toml: ["toml/amip.toml"]
-# coupler_toml: ["toml/amip_progedmf_dev.toml"]
-# coupler_toml: ["toml/amip_calibrated_coarse_v1.toml"]
-
-initial_condition: "WeatherModel"
-checkpoint_dt: "93days"
-co2_model: "fixed"
-
-coupler_output_dir: "/glade/derecho/scratch/nefrathe/tmp/output/model_run"
-
-dt: "90secs"
-dt_cpl: "90secs"
-# dt: "5secs"
-# dt_cpl: "5secs"
-
-energy_check: false
-# h_elem: 32
-h_elem: 16
-mode_name: "amip"
-
-### integrated land
-# land_model: "integrated"
-### bucket land
-land_model: "bucket"
+atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
 bucket_albedo_type: "map_temporal"
-# bucket_albedo_type: "map_static"
-bucket_initial_condition: "/glade/campaign/univ/ucit0011/cchristo/initial_conditions_v_0.5/era5_bucket_processed_20180901_0000.nc"
-
-# use_land_diagnostics: true
-radiation_reset_rng_seed: true
-# start_date: "20250701"
-start_date: "20180901"
-surface_setup: "PrescribedSurface"
-topo_smoothing: true
-topography: "Earth"
-t_end: "700days"  
+checkpoint_dt: "366days"
+coupler_toml: ["toml/amip.toml"]
+dt: "240secs"
+dt_cpl: "240secs"
+dz_bottom: 100.0
+energy_check: false
+h_elem: 8
+mode_name: "amip"
+netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
-
 output_default_diagnostics: false
 use_coupler_diagnostics: false
-use_land_diagnostics: true
-
+prescribe_clouds_in_radiation: true
+radiation_reset_rng_seed: true
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+t_end: "465days"
+topo_smoothing: true
+topography: "Earth"
+z_elem: 39
 extra_atmos_diagnostics:
-  - short_name: [mslp, tas, pr, ta, pfull, hur, rsut,  rsds, rsus, rsuscs, rlut,  rlds, rlus, rlucs, ts, evspsbl, hfes]
-    period: 1months
+  - short_name: [rsut, rsutcs, ]
+    period: "1months"
     reduction_time: average

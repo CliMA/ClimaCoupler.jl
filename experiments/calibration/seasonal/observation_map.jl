@@ -7,7 +7,6 @@ import ClimaAnalysis.Utils: kwargs as ca_kwargs
 import ClimaCoupler
 import ClimaCalibrate: EnsembleBuilder
 
-include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/observation_utils.jl"))
 
 """
     ClimaCalibrate.observation_map(iteration)
@@ -54,41 +53,18 @@ function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, i
 
     # For now, hard code the data to daily data since it seems the simplest
     simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)
-    for short_name in short_names
-        # This assumes that there are not multiple reductions for the same
-        # variable!
-        short_name = short_name * "_1week" # TODO: Don't hardcode this
-        var = get(simdir, short_name)
-        var.attributes["short_name"] = replace(short_name, "_1week" => "")
 
-        var = preprocess_var(var, sample_date_ranges[iteration+1] )
-
-        EnsembleBuilder.fill_g_ens_col!(g_ens_builder, col_idx, var)
-    end
+    rsut = get(simdir, "rsut")
+    rsutcs = get(simdir, "rsutcs")
+    var = rsutcs - rsut
+    var.attributes["short_name"] = "sw_cre"
+    var = shift_to_start_of_previous_month(var)
+    dates = sample_date_ranges[iteration+1]
+    # TODO: window var
+    window(var, "time", left = dates[1], right = dates[2])
+    EnsembleBuilder.fill_g_ens_col!(g_ens_builder, col_idx, var)
 
     return nothing
-end
-
-"""
-    preprocess_var(var::ClimaAnalysis.OutputVar, reference_date)
-Preprocess `var` before flattening for G ensemble matrix.
-For "pr", weekly sums are computed. For "tas" and "mslp", weekly means are
-computed from daily means. The daily means are computing starting from
-`reference_date`.
-This function assumes that the data is daily.
-"""
-function preprocess_var(var::ClimaAnalysis.OutputVar, sample_date_range)
-    # TODO: Check for sign of pr
-    # TODO: Check for units of everything
-    var = shift_to_previous_week(var)
-    @assert ClimaAnalysis.short_name(var) in CALIBRATE_CONFIG.short_names
-
-    if ClimaAnalysis.short_name(var) in ("pr", "tas")
-        var = ClimaAnalysis.apply_oceanmask(var)
-    end
-
-    var = window(var, "time"; left = sample_date_range[1], right = sample_date_range[2])
-    return var
 end
 
 """
@@ -108,11 +84,11 @@ function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, it
     plot_bias(simdir, iteration; output_dir = plot_output_path)
     plot_variables(simdir; output_dir = plot_output_path)
     plot_pointwise_spread_per_variable(ekp, iteration)
-    try 
-        plot_surface_fluxes(simdir; output_dir = plot_output_path)
-    catch e
-        @error e
-    end
+    # try 
+    #     plot_surface_fluxes(simdir; output_dir = plot_output_path)
+    # catch e
+    #     @error e
+    # end
 
     @info "Ensemble spread: $(scalar_spread(ekp, iteration))" 
 end
@@ -135,44 +111,22 @@ function plot_constrained_params_and_errors(output_dir, ekp, prior)
 end
 
 function plot_variables(simdir; output_dir = simdir.simulation_path)
-    vars = map(x -> get(simdir, x * "_1week"), CALIBRATE_CONFIG.short_names)
-    fig = GeoMakie.Figure(size = (1000, length(vars)*500))
+    # vars = map(x -> get(simdir, x * "_1week"), CALIBRATE_CONFIG.short_names)
+    # fig = GeoMakie.Figure(size = (1000, length(vars)*500))
+    fig = GeoMakie.Figure(size = (1000, 500))
+    simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)
 
-    for (i, var) in enumerate(vars)
-        var = slice(var, time = last(dates(var)))
-        ClimaAnalysis.Visualize.heatmap2D_on_globe!(fig[i, 1], var; more_kwargs = Dict(:plot => ca_kwargs(colormap = :viridis)))
-    end
-
+    rsut = get(simdir, "rsut")
+    rsutcs = get(simdir, "rsutcs")
+    var = rsutcs - rsut
+    var.attributes["short_name"] = "sw_cre"
+    ClimaAnalysis.Visualize.heatmap2D_on_globe!(fig[i, 1], var; more_kwargs = Dict(:plot => ca_kwargs(colormap = :viridis)))
     GeoMakie.save(joinpath(output_dir, "vars.png"), fig)
 end
 
 # TODO: Generalize this 
 function plot_bias(simdir, iteration; output_dir = simdir.simulation_path)
-    vars = Dict()
-    for short_name in CALIBRATE_CONFIG.short_names
-        vars[short_name] = get(simdir, short_name * "_1week")
-    end
-    # TODO: Get observations from EKP object
-    preprocessed_vars = JLD2.load_object("experiments/calibration/era5_preprocessed_vars.jld2")
-
-    era5_pr = preprocessed_vars[findfirst(v -> ClimaAnalysis.short_name(v) == "pr", preprocessed_vars)]
-    era5_tas = preprocessed_vars[findfirst(v -> ClimaAnalysis.short_name(v) == "tas", preprocessed_vars)]
-    # era5_mslp = preprocessed_vars[findfirst(v -> ClimaAnalysis.short_name(v) == "mslp", preprocessed_vars)]
-
-    # era5_mslp.attributes["long_name"] = "Mean sea level pressure, average within 1 Week"
-    era5_tas.attributes["long_name"] = "Surface temperature, average within 1 Week"
-    era5_pr.attributes["long_name"] = "Surface precipitation, average within 1 Week"
-
-    var_pairs = (
-        (vars["pr"], era5_pr),
-        # (vars["mslp"], era5_mslp),
-        (vars["tas"], era5_tas)
-    )
-    plot_extrema = Dict(
-        "tas" => (-6, 6), 
-        "mslp" => (-1000, 1000),
-        "pr" => (-1e-4, 1e-4),
-    )
+    
     fig = GeoMakie.Figure(size = (1500, 500 * length(var_pairs)))
     for (i, (var, era5_var)) in enumerate(var_pairs)
         for (j, date) in enumerate(CALIBRATE_CONFIG.sample_date_ranges[iteration+1])

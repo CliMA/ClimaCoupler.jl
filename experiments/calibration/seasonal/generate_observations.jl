@@ -8,7 +8,8 @@ import ClimaDiagnostics
 import ClimaCore
 # Access CalibrateConfig
 include(joinpath(@__DIR__, "run_calibration.jl"))
-include(joinpath(@__DIR__, "observation_utils.jl"))
+
+include(joinpath(pkgdir(ClimaCoupler), "experiments/ClimaEarth/leaderboard/data_sources.jl"))
 
 function make_observation_vector(
     short_names,
@@ -21,23 +22,19 @@ function make_observation_vector(
     return make_observation_vector(vars, sample_date_ranges)
 end
 
+set_short_name!(var, short_name) = (var.attributes["short_name"] = short_name)
+
 """
     load_vars(obsdir, short_names)
 Load NetCDF files belonging to `short_names` in `obsdir` as `OutputVar`s.
 """
 function load_vars(obsdir, short_names)
-    # Missing years at the end
-    available_short_names = ("pr", "mslp", "tas") # pr and tas over land
-    all(short_name -> short_name in available_short_names, short_names) ||
-        error("Variable names must be in $(keys(varname_to_filepath))")
-    allfiles = readdir(obsdir, join = true)
-    vars = map(short_names) do short_name
-        files = sort(filter(file -> occursin(short_name, file), allfiles))
-        var = ClimaAnalysis.OutputVar(files, short_name)
-        var.attributes["short_name"] = short_name
-        var
-    end
-    return vars
+    rad_and_pr_obs_dict = get_obs_var_dict()
+    rsut = rad_and_pr_obs_dict["rsut"](start_date)
+    rsutcs = rad_and_pr_obs_dict["rsutcs"](start_date)
+    sw_cre = [rsutcs - rsut]
+    set_short_name!(sw_cre)
+    return [sw_cre]
 end
 
 """
@@ -55,17 +52,7 @@ function preprocess_vars(vars, sample_date_ranges, config_file)
             ClimaAnalysis.reverse_dim!(var, ClimaAnalysis.latitude_name(var))
         end
         @assert issorted(var.dims[ClimaAnalysis.latitude_name(var)])
-        var = resampled_as(shift_longitude(var, -180.0, 180.0), diagnostic_var2d, dim_names = ["longitude", "latitude"])
-        # apply ocean mask
-        if ClimaAnalysis.short_name(var) in ("pr", "tas")
-            var = ClimaAnalysis.apply_oceanmask(var)
-        end
-
-        if ClimaAnalysis.short_name(var) == "pr"
-            # Change sign and convert
-            # 1 mm / week= (1 kg m-2) / 604_800 s
-            var = ClimaAnalysis.convert_units(var, "mm", conversion_function = x -> -x/604_800)
-        end
+        var = resample_var(var)
 
         var.attributes["units"] = var_units[ClimaAnalysis.short_name(var)]
         var
@@ -77,13 +64,14 @@ var_units = Dict(
     "pr" => "kg m^-2 s^-1",
     "mslp" => "Pa",
     "tas" => "K",
+    "sw_cre" => "W m^-2"
 )
 
-resample_var() = resampled_lonlat()
 
 function make_observation_vector(vars, sample_date_ranges)
     obs_vec = map(sample_date_ranges) do sample_date_range
         weekly_range = find_weekly_ranges(vars, sample_date_range)
+
         covar_estimator = ClimaCalibrate.ObservationRecipe.SVDplusDCovariance(
             weekly_range;
             model_error_scale = 0.05,
@@ -173,8 +161,9 @@ function resampled_lonlat(config_file)
     return var -> resampled_to(var; lon = longitudes, lat = latitudes)
 end
 
+# resample_var = resampled_lonlat("experiments/calibration/seasonal/amip_config.yml")
+
 if abspath(PROGRAM_FILE) == @__FILE__
-    obsdir = "weekly"
     sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges
     short_names = CALIBRATE_CONFIG.short_names
     config_file = CALIBRATE_CONFIG.config_file
@@ -182,9 +171,9 @@ if abspath(PROGRAM_FILE) == @__FILE__
     @info "The number of samples is $(length(sample_date_ranges)) over $sample_date_ranges"
 
     # TODO: Use resample func
-    diagnostic_var2d = OutputVar("/glade/derecho/scratch/nefrathe/tmp/output_quick_1/iteration_000/member_001/wxquest_diagedmf/output_active/clima_atmos/mslp_1week_average.nc")
+    start_date = DateTime(2009,9,1)
 
-    unprocessed_vars = load_vars(obsdir, short_names)
+    unprocessed_vars = load_vars(nothing, short_names)
     preprocessed_vars = preprocess_vars(unprocessed_vars, sample_date_ranges, config_file)
     JLD2.save_object(
         joinpath(pkgdir(ClimaCoupler),"experiments/calibration/era5_preprocessed_vars.jld2"),

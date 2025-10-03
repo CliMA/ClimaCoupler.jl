@@ -104,17 +104,12 @@ current_date(cs::CoupledSimulation) =
 Return a list of default coupler fields needed to run a simulation.
 """
 default_coupler_fields() = [
-    # fields needed for flux calculations
-    :z0m_sfc,
-    :z0b_sfc,
-    :beta,
-    :emissivity,
-    # fields used to compute fluxes
+    # fields used to compute turbulent fluxes
     :T_atmos,
     :q_atmos,
     :ρ_atmos,
-    :T_sfc,
-    :q_sfc,
+    :z_int,
+    :z_sfc,
     # fields used for flux exchange
     :F_lh,
     :F_sh,
@@ -122,12 +117,17 @@ default_coupler_fields() = [
     :F_turb_ρτxz,
     :F_turb_ρτyz,
     :F_radiative,
-    # fields used to track water conservation, and for water fluxes
+    # fields used to compute radiation in the atmosphere
+    :emissivity,
+    :T_sfc,
+    # fields used for water fluxes and tracking water conservation
     :P_liq,
     :P_snow,
     # fields used for temporary storage during calculations
-    :temp1,
-    :temp2,
+    :scalar_temp1,
+    :scalar_temp2,
+    :scalar_temp3,
+    :scalar_temp4,
 ]
 
 """
@@ -142,6 +142,7 @@ function init_coupler_fields(FT, coupler_field_names, boundary_space)
 
     key_types = (coupler_field_names...,)
     val_types = Tuple{(FT for _ in 1:length(coupler_field_names))...}
+
     nt_type = NamedTuple{key_types, val_types}
     coupler_fields = zeros(nt_type, boundary_space)
     return coupler_fields
@@ -289,15 +290,12 @@ If it isn't extended, the field won't be updated and a warning will be raised.
 update_field!(
     sim::SurfaceModelSimulation,
     val::Union{
-        Val{:air_density},
         Val{:area_fraction},
         Val{:liquid_precipitation},
         Val{:radiative_energy_flux_sfc},
         Val{:snow_precipitation},
         Val{:turbulent_energy_flux},
         Val{:turbulent_moisture_flux},
-        Val{:surface_direct_albedo},
-        Val{:surface_diffuse_albedo},
     },
     _,
 ) = update_field_warning(sim, val)

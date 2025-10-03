@@ -77,31 +77,47 @@ exchange the extra fields only when necessary. All coupler fields are defined on
 boundary space.
   - Any additional fields specified here will likely also require an `update_field!`
 method defined for this component model, so the coupler can update the component.
+They may also require a new method of `import_atmos_fields!` or `combine_surfaces!`
+to update the coupler fields from the component model that computes the field.
 
 The default coupler exchange fields are the following, defined in
 `default_coupler_fields()` in the Interfacer module:
 
-| Coupler name      | Description                                         | Units      |
-|-------------------|-----------------------------------------------------|------------|
-| `z0m_sfc`         | momentum roughness length                           | m          |
-| `z0b_sfc`         | buoyancy roughness length                           | m          |
-| `beta`            | factor to scale evaporation from the surface        | -          |
-| `emissivity`      | surface emissivity                                  | -          |
-| `T_atmos`         | atmosphere temperature at the bottom layer          | K          |
-| `q_atmos`         | atmosphere humidity at the bottom layer             | kg kg⁻¹    |
-| `ρ_atmos`         | atmosphere air density at the bottom layer          | kg m⁻³     |
-| `T_sfc`           | surface temperature, averaged across components     | K          |
-| `q_sfc`           | surface humidity                                    | kg kg⁻¹    |
-| `F_lh`            | latent heat flux                                    | W m⁻²      |
-| `F_sh`            | sensible heat flux                                  | W m⁻²      |
-| `F_turb_moisture` | turbulent moisture flux                             | kg m⁻² s⁻¹ |
-| `F_turb_ρτxz`     | turbulent momentum flux in the zonal direction      | kg m⁻¹ s⁻² |
-| `F_turb_ρτyz`     | turbulent momentum flux in the meridional direction | kg m⁻¹ s⁻² |
-| `F_radiative`     | net radiative flux at the surface                   | W m⁻²      |
-| `P_liq`           | liquid precipitation                                | kg m⁻² s⁻¹ |
-| `P_snow`          | snow precipitation                                  | kg m⁻² s⁻¹ |
-| `temp1`           | a surface field used for intermediate calculations  | -          |
-| `temp2`           | a surface field used for intermediate calculations  | -          |
+| Coupler name      | Description                                                 | Units      |
+|-------------------|-------------------------------------------------------------|------------|
+| `T_atmos`         | atmosphere temperature at the bottom layer                  | K          |
+| `q_atmos`         | atmosphere humidity at the bottom layer                     | kg kg⁻¹    |
+| `ρ_atmos`         | atmosphere air density at the bottom layer                  | kg m⁻³     |
+| `z_int`           | height of the first internal atmosphere level (center)      | m          |
+| `z_sfc`           | height of the bottom atmosphere layer (face)                | m          |
+| `F_lh`            | latent heat flux                                            | W m⁻²      |
+| `F_sh`            | sensible heat flux                                          | W m⁻²      |
+| `F_turb_moisture` | turbulent moisture flux                                     | kg m⁻² s⁻¹ |
+| `F_turb_ρτxz`     | turbulent momentum flux in the zonal direction              | kg m⁻¹ s⁻² |
+| `F_turb_ρτyz`     | turbulent momentum flux in the meridional direction         | kg m⁻¹ s⁻² |
+| `F_radiative`     | net radiative flux at the surface                           | W m⁻²      |
+| `emissivity`      | surface emissivity                                          | -          |
+| `T_sfc`           | surface temperature, averaged across components             | K          |
+| `P_liq`           | liquid precipitation                                        | kg m⁻² s⁻¹ |
+| `P_snow`          | snow precipitation                                          | kg m⁻² s⁻¹ |
+| `scalar_temp1`    | a surface scalar field used for intermediate calculations   | -          |
+| `scalar_temp2`    | a surface scalar field used for intermediate calculations   | -          |
+| `scalar_temp3`    | a surface scalar field used for intermediate calculations   | -          |
+| `scalar_temp4`    | a surface scalar field used for intermediate calculations   | -          |
+
+!!! note "What should be stored in the coupler exchange fields?"
+    In general, the coupler fields should contain exchange fields for fluxes, including
+    turbulent fluxes, radiative fluxes, and precipitation. They also hold any quantities
+    that a component model requires from another component. For example, the atmosphere needs
+    surface temperature and emissivity from the surface models to compute radiation, so the
+    coupler allocates space to exchange them.
+    The coupler exchange fields may also hold quantities from components that are used to
+    compute turbulent fluxes. As a general rule, we tend to store such quantities that come
+    from the atmosphere model, but access them when needed for surface models. This is because we
+    compute fluxes indvidually for the interface between each surface and the atmosphere
+    model. As a result, the atmosphere quantities are used for each of these calculations,
+    so storing them in the coupler fields allows us to avoid regridding them to the coupler
+    space multiple times per coupling timestep.
 
 - `update_sim!(::ComponentModelSimulation, csf)`: A
 function to update each of the fields of the component model simulation
@@ -186,9 +202,10 @@ for the following properties:
 | `LW_d`              | downwards longwave flux                                        | W m⁻²   |
 | `SW_d`              | downwards shortwave flux                                       | W m⁻²   |
 
-Note that `co2`, `diffuse_fraction`, `LW_d` and
-`SW_d` will not be present in a `ClimaAtmosSimulation` if the model is setup with no radiation.
-Because of this, a `ClimaAtmosSimulation` must have radiation if running with the full `ClimaLand` model.
+!!! note
+    `co2`, `diffuse_fraction`, `LW_d` and `SW_d` will not be present in a `ClimaAtmosSimulation`
+    if the model is setup with no radiation. Because of this, a `ClimaAtmosSimulation` must have
+    radiation enabled if running with the full `ClimaLand` model.
 
 ### SurfaceModelSimulation - required functions
 Analogously to the `AtmosModelSimulation`, a `SurfaceModelSimulation`
@@ -207,8 +224,9 @@ for the following properties:
 | `surface_diffuse albedo` | bulk diffuse surface albedo                                    |         |
 | `surface_temperature`    | surface temperature                                            | K       |
 
-Note: `area_fraction` is expected to be defined on the boundary space of the simulation,
-while all other fields will likely be on the simulation's own space.
+!!! note
+    `area_fraction` is expected to be defined on the boundary space of the simulation,
+    while all other fields will likely be on the simulation's own space.
 
 - `update_field!(::SurfaceModelSimulation, ::Val{property}, field)`:
 A function to update the value of property in the component model
@@ -230,9 +248,10 @@ properties needed by a component model.
 | `turbulent_energy_flux`                       | aerodynamic turbulent surface fluxes of energy (sensible and latent heat)    | W m⁻²      |
 | `turbulent_moisture_flux`                     | aerodynamic turbulent surface fluxes of energy (evaporation)                 | kg m⁻² s⁻¹ |
 
-Note: `update_field!(::SurfaceModelSimulation, ::Val{:area_fraction}, field)` is
-not required to be extended for land models, since they're assumed to have a
-constant area fraction.
+!!! note
+    `update_field!(::SurfaceModelSimulation, ::Val{:area_fraction}, field)` is
+    not required to be extended for land models, since they're assumed to have a
+    constant area fraction.
 
 ### SurfaceModelSimulation - optional functions
 - `get_field(::SurfaceModelSimulation, ::Val{property})`:

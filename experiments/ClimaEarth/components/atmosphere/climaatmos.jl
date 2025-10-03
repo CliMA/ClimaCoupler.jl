@@ -399,12 +399,9 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:emissivity},
     # Remap field onto the atmosphere surface space in scratch field
     temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
     Interfacer.remap!(temp_field_surface, field)
-    # sets all 16 bands (rows) to the same values
-    sim.integrator.p.radiation.rrtmgp_model.surface_emissivity .= reshape(
-        CC.Fields.field2array(temp_field_surface),
-        1,
-        length(parent(temp_field_surface)),
-    )
+    # Set each row (band) of the emissivity matrix by transposing the vector returned from `field2array`
+    sim.integrator.p.radiation.rrtmgp_model.surface_emissivity .=
+        CC.Fields.field2array(temp_field_surface)'
 end
 function Interfacer.update_field!(
     sim::ClimaAtmosSimulation,
@@ -415,11 +412,9 @@ function Interfacer.update_field!(
     # Remap field onto the atmosphere surface space in scratch field
     temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
     Interfacer.remap!(temp_field_surface, field)
-    sim.integrator.p.radiation.rrtmgp_model.direct_sw_surface_albedo .= reshape(
-        CC.Fields.field2array(temp_field_surface),
-        1,
-        length(parent(temp_field_surface)),
-    )
+    # Set each row (band) of the albedo matrix by transposing the vector returned from `field2array`
+    sim.integrator.p.radiation.rrtmgp_model.direct_sw_surface_albedo .=
+        CC.Fields.field2array(temp_field_surface)'
 end
 
 function Interfacer.update_field!(
@@ -431,11 +426,9 @@ function Interfacer.update_field!(
     # Remap field onto the atmosphere surface space in scratch field
     temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
     Interfacer.remap!(temp_field_surface, field)
-    sim.integrator.p.radiation.rrtmgp_model.diffuse_sw_surface_albedo .= reshape(
-        CC.Fields.field2array(temp_field_surface),
-        1,
-        length(parent(temp_field_surface)),
-    )
+    # Set each row (band) of the albedo matrix by transposing the vector returned from `field2array`
+    sim.integrator.p.radiation.rrtmgp_model.diffuse_sw_surface_albedo .=
+        CC.Fields.field2array(temp_field_surface)'
 end
 
 function Interfacer.update_field!(

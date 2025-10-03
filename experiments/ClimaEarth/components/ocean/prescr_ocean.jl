@@ -129,6 +129,8 @@ Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:surface_direct_albed
     sim.cache.α_direct
 Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:surface_diffuse_albedo}) =
     sim.cache.α_diffuse
+Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:emissivity}) =
+    eltype(sim.cache.T_sfc)(1)
 
 function Interfacer.update_field!(
     sim::PrescribedOceanSimulation,

@@ -252,6 +252,7 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_buoyancy}) =
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_momentum}) =
     Float32(5.8e-5)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:beta}) = Float32(1)
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:emissivity}) = Float32(0.97)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) =
     Float32(0.06)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) =

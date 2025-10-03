@@ -77,6 +77,7 @@ Interfacer.get_field(
     sim::TestOcean,
     ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}},
 ) = sim.integrator.p.α
+Interfacer.get_field(sim::TestOcean, ::Val{:emissivity}) = eltype(sim.integrator.T)(1)
 
 FieldExchanger.import_atmos_fields!(csf, sim::TestOcean, atmos_sim) = nothing
 
@@ -96,6 +97,8 @@ Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:surface_temperature}) 
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:area_fraction}) =
     sim.integrator.p.area_fraction
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:beta}) = sim.integrator.p.beta
+Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:emissivity}) =
+    eltype(sim.integrator.T)(1)
 
 for FT in (Float32, Float64)
     @testset "calculate correct fluxes: dry for FT=$FT" begin

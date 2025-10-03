@@ -52,11 +52,15 @@ Interfacer.get_field(
     sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2},
     ::Val{:beta},
 ) = sim.cache_field
+Interfacer.get_field(
+    sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2},
+    ::Val{:emissivity},
+) = eltype(sim.cache_field)(1)
 
 Interfacer.get_field(sim::TestSurfaceSimulation1, ::Val{:area_fraction}) =
-    sim.cache_field .* 0
+    sim.cache_field .* CC.Spaces.undertype(axes(sim.cache_field))(0.25)
 Interfacer.get_field(sim::TestSurfaceSimulation2, ::Val{:area_fraction}) =
-    sim.cache_field .* CC.Spaces.undertype(axes(sim.cache_field))(0.5)
+    sim.cache_field .* CC.Spaces.undertype(axes(sim.cache_field))(0.75)
 
 Interfacer.step!(::TestSurfaceSimulation1, _) = nothing
 
@@ -145,6 +149,8 @@ Interfacer.get_field(sim::TestSurfaceSimulationLand, ::Val{:surface_diffuse_albe
     sim.cache.albedo_diffuse
 Interfacer.get_field(sim::TestSurfaceSimulationLand, ::Val{:surface_temperature}) =
     sim.cache.surface_temperature
+Interfacer.get_field(sim::TestSurfaceSimulationLand, ::Val{:emissivity}) =
+    eltype(sim.cache.surface_temperature)(1)
 function Interfacer.update_field!(
     sim::TestSurfaceSimulationLand,
     ::Val{:turbulent_energy_flux},
@@ -266,8 +272,9 @@ for FT in (Float32, Float64)
             Interfacer.get_field(sims.c, var_name),
             Interfacer.get_field(sims.d, var_name),
         )
+        temp_field = CC.Fields.zeros(test_space)
 
-        FieldExchanger.combine_surfaces!(combined_field, sims, var_name)
+        FieldExchanger.combine_surfaces!(combined_field, sims, var_name, temp_field)
         @test combined_field == fill(FT(sum(fractions .* fields)), test_space)
     end
 
@@ -322,30 +329,31 @@ for FT in (Float32, Float64)
         coupler_names_additional = [:surface_direct_albedo, :surface_diffuse_albedo]
         coupler_names =
             push!(Interfacer.default_coupler_fields(), coupler_names_additional...)
-
-        # coupler cache setup
-        exchanged_fields = (
-            :surface_temperature,
-            :surface_direct_albedo,
-            :surface_diffuse_albedo,
-            :roughness_momentum,
-            :roughness_buoyancy,
-            :beta,
-        )
+        coupler_fields = Interfacer.init_coupler_fields(FT, coupler_names, boundary_space)
 
         sims = (;
             a = TestSurfaceSimulation1(ones(boundary_space)),
             b = TestSurfaceSimulation2(ones(boundary_space)),
         )
 
-        coupler_fields = Interfacer.init_coupler_fields(FT, coupler_names, boundary_space)
-
         thermo_params = TDP.ThermodynamicsParameters(FT)
         FieldExchanger.import_combined_surface_fields!(coupler_fields, sims, thermo_params)
+
+        # Analytically compute expected values and compare
+        expected_field_temp =
+            (
+                Interfacer.get_field(sims.a, Val(:area_fraction)) .*
+                Interfacer.get_field(sims.a, Val(:emissivity)) .*
+                sims.a.cache_field .^ FT(4) .+
+                Interfacer.get_field(sims.b, Val(:area_fraction)) .*
+                Interfacer.get_field(sims.b, Val(:emissivity)) .*
+                sims.b.cache_field .^ FT(4)
+            ) .^ FT(1 / 4)
+        @test coupler_fields.T_sfc == expected_field_temp
+
         expected_field =
             Interfacer.get_field(sims.a, Val(:area_fraction)) .* sims.a.cache_field .+
             Interfacer.get_field(sims.b, Val(:area_fraction)) .* sims.b.cache_field
-        @test coupler_fields.T_sfc == expected_field
         @test coupler_fields.surface_direct_albedo == expected_field
         @test coupler_fields.surface_diffuse_albedo == expected_field
     end

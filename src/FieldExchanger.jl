@@ -121,9 +121,12 @@ Updates the coupler with the surface properties. The `Interfacer.get_field`
 functions for (`:surface_temperature`, `:surface_direct_albedo`,
 `:surface_diffuse_albedo`) need to be specified for each surface model.
 
-Note: The calculation of surface humidity uses atmospheric properties stored in
+Note: The calculation of surface humidity done here uses atmospheric properties stored in
 the coupled fields. For these values to be correct, this function should be called
 after `import_atmos_fields!` in a timestep.
+
+Note 2: Not all surface fields are imported here. Some quantities are retrieved
+from each surface model when surface fluxes are computed, in `compute_surface_fluxes!`.
 
 # Arguments
 - `csf`: [NamedTuple] containing coupler fields.
@@ -131,9 +134,21 @@ after `import_atmos_fields!` in a timestep.
 - `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
 """
 function import_combined_surface_fields!(csf, model_sims, thermo_params)
-    combine_surfaces!(csf.T_sfc, model_sims, Val(:surface_temperature))
-    combine_surfaces!(csf.surface_direct_albedo, model_sims, Val(:surface_direct_albedo))
-    combine_surfaces!(csf.surface_diffuse_albedo, model_sims, Val(:surface_diffuse_albedo))
+    combine_surfaces!(csf.emissivity, model_sims, Val(:emissivity), csf.temp1)
+    combine_surfaces!(
+        csf.surface_direct_albedo,
+        model_sims,
+        Val(:surface_direct_albedo),
+        csf.temp1,
+    )
+    combine_surfaces!(
+        csf.surface_diffuse_albedo,
+        model_sims,
+        Val(:surface_diffuse_albedo),
+        csf.temp1,
+    )
+    # Temperature requires emissivity, so we provide all the coupler fields
+    combine_surfaces!(csf, model_sims, Val(:surface_temperature))
 
     # q_sfc is computed from the atmosphere state and surface temperature, so it's handled differently
     # This is computed on the exchange grid, so there's no need to remap
@@ -181,7 +196,8 @@ end
 """
     update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf)
 
-Updates the surface fields for temperature, roughness length, albedo, and specific humidity.
+Updates the atmosphere's fields for surface direct and diffuse albedos, emissivity, and temperature,
+as well as the turbulent fluxes.
 
 # Arguments
 - `atmos_sim`: [Interfacer.AtmosModelSimulation] containing an atmospheric model simulation object.
@@ -198,6 +214,7 @@ function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf)
         Val(:surface_diffuse_albedo),
         csf.surface_diffuse_albedo,
     )
+    Interfacer.update_field!(atmos_sim, Val(:emissivity), csf.emissivity)
     Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf)
     Interfacer.update_field!(atmos_sim, Val(:turbulent_fluxes), csf)
     return nothing
@@ -270,36 +287,79 @@ function step_model_sims!(cs::Interfacer.CoupledSimulation)
 end
 
 """
-    combine_surfaces!(combined_field::CC.Fields.Field, sims, field_name::Val)
+    combine_surfaces!(combined_field::CC.Fields.Field, sims, field_name::Val, temp1)
 
 Sums the fields, specified by `field_name`, weighted by the respective area fractions of all
 surface simulations. THe result is saved in `combined_field`.
 
+For surface temperature, upward longwave radiation is computed from the temperatures
+of each surface, weighted by their area fractions, and then the combined temperature
+is computed from the combined upward longwave radiation.
+
 # Arguments
 - `combined_field`: [CC.Fields.Field] output object containing weighted values.
+    Note: For the surface temperature, all coupler fields are passed in a NamedTuple.
 - `sims`: [NamedTuple] containing simulations .
 - `field_name`: [Val] containing the name Symbol of the field t be extracted by the `Interfacer.get_field` functions.
+- `temp1`: [CC.Fields.Field] temporary field for intermediate calculations.
+    Omitted for surface temperature method.
 
 # Example
 - `combine_surfaces!(temp_field, cs.model_sims, Val(:surface_temperature))`
 """
-function combine_surfaces!(combined_field, sims, field_name)
+function combine_surfaces!(combined_field, sims, field_name, temp1)
     boundary_space = axes(combined_field)
     combined_field .= 0
     for sim in sims
         if sim isa Interfacer.SurfaceModelSimulation
-            # Zero out the contribution from this surface if the area fraction is zero
+            # Store the area fraction of this simulation in `temp1`
+            Interfacer.get_field!(temp1, sim, Val(:area_fraction))
+            # Zero out the contribution from this surface if the area fraction is zero.
             # Note that multiplying by `area_fraction` is not sufficient in the case of NaNs
-            area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
             combined_field .+=
-                area_fraction .*
+                temp1 .*
                 ifelse.(
-                    area_fraction .≈ 0,
+                    temp1 .≈ 0,
                     zero(combined_field),
                     Interfacer.get_field(sim, field_name, boundary_space),
                 )
         end
     end
+    return nothing
+end
+function combine_surfaces!(csf, sims, field_name::Val{:surface_temperature})
+    # extract the coupler fields we need to get the surface temperature
+    T_sfc = csf.T_sfc
+    emissivity_sfc = csf.emissivity
+
+    boundary_space = axes(T_sfc)
+    FT = CC.Spaces.undertype(boundary_space)
+
+    T_sfc .= FT(0)
+    for sim in sims
+        if sim isa Interfacer.SurfaceModelSimulation
+            # Store the area fraction and emissivity of this simulation in temp fields
+            Interfacer.get_field!(csf.temp1, sim, Val(:area_fraction))
+            area_fraction = csf.temp1
+            Interfacer.get_field!(csf.temp2, sim, Val(:emissivity))
+            emissivity_sim = csf.temp2
+
+            # Zero out the contribution from this surface if the area fraction is zero.
+            # Note that multiplying by `area_fraction` is not sufficient in the case of NaNs
+            # Compute upward longwave radiation from surface temperature for this simulation
+            T_sfc .+=
+                area_fraction .*
+                ifelse.(
+                    area_fraction .≈ 0,
+                    zero(T_sfc),
+                    emissivity_sim .*
+                    Interfacer.get_field(sim, field_name, boundary_space) .^ FT(4),
+                )
+        end
+    end
+    # Convert the combined upward longwave radiation into a surface temperature
+    @. T_sfc = (T_sfc / emissivity_sfc)^FT(1 / 4)
+    return nothing
 end
 
 """

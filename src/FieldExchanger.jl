@@ -121,9 +121,12 @@ Updates the coupler with the surface properties. The `Interfacer.get_field`
 functions for (`:surface_temperature`, `:surface_direct_albedo`,
 `:surface_diffuse_albedo`) need to be specified for each surface model.
 
-Note: The calculation of surface humidity uses atmospheric properties stored in
+Note: The calculation of surface humidity done here uses atmospheric properties stored in
 the coupled fields. For these values to be correct, this function should be called
 after `import_atmos_fields!` in a timestep.
+
+Note 2: Not all surface fields are imported here. Some quantities are retrieved
+from each surface model when surface fluxes are computed, in `compute_surface_fluxes!`.
 
 # Arguments
 - `csf`: [NamedTuple] containing coupler fields.
@@ -191,7 +194,8 @@ end
 """
     update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf)
 
-Updates the surface fields for temperature, roughness length, albedo, and specific humidity.
+Updates the atmosphere's fields for surface direct and diffuse albedos, emissivity, and temperature,
+as well as the turbulent fluxes.
 
 # Arguments
 - `atmos_sim`: [Interfacer.AtmosModelSimulation] containing an atmospheric model simulation object.
@@ -208,6 +212,7 @@ function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf)
         Val(:surface_diffuse_albedo),
         csf.surface_diffuse_albedo,
     )
+    Interfacer.update_field!(atmos_sim, Val(:emissivity), csf.emissivity)
     Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf)
     Interfacer.update_field!(atmos_sim, Val(:turbulent_fluxes), csf)
     return nothing

@@ -1,0 +1,38 @@
+#!/bin/bash
+#PBS -A UCIT0011
+#PBS -q main
+#PBS -N pbs_calibration
+#PBS -j oe
+#PBS -o amip_calibration.txt
+#PBS -l walltime=12:00:00
+#PBS -l select=1:ncpus=1:ngpus=1
+#PBS -l job_priority=premium
+
+module load climacommon/2025_02_25
+
+echo "=== Job ${PBS_JOBID} started at $(date) ==="
+
+# Trap-based self-requeue
+#RUNSCRIPT="/glade/u/home/zhaoyi/ClimaCoupler.jl/experiments/calibration/seasonal/run_calibration.pbs"
+#handle_termination() {
+#    echo "=== Job ${PBS_JOBID} received termination signal at $(date) ==="
+#    # Check if the target file doesn't exist
+#    if [[ ! -f "/glade/derecho/scratch/zhaoyi/tmp/output_simple/iteration_004/eki_file.jld2" ]]; then
+#        echo "=== Job ${PBS_JOBID} terminated, requeuing... ==="
+#        qsub "$RUNSCRIPT" 
+#    fi
+#    exit 0
+#}
+#trap handle_termination SIGTERM SIGINT SIGUSR1 SIGUSR2
+
+cd /glade/u/home/zhaoyi/ClimaCoupler.jl
+
+# Build and run the Julia code
+echo "Starting Julia package instantiation..."
+julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate(;verbose=true)'
+
+julia --project=experiments/ClimaEarth experiments/calibration/seasonal/generate_observations.jl
+
+echo "Starting calibration run..."
+julia --project=experiments/ClimaEarth experiments/calibration/seasonal/run_calibration.jl
+echo "=== Job ${PBS_JOBID} completed at $(date) ==="

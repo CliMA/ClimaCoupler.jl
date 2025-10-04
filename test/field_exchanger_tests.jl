@@ -266,8 +266,9 @@ for FT in (Float32, Float64)
             Interfacer.get_field(sims.c, var_name),
             Interfacer.get_field(sims.d, var_name),
         )
+        temp_field = CC.Fields.zeros(test_space)
 
-        FieldExchanger.combine_surfaces!(combined_field, sims, var_name)
+        FieldExchanger.combine_surfaces!(combined_field, sims, var_name, temp_field)
         @test combined_field == fill(FT(sum(fractions .* fields)), test_space)
     end
 

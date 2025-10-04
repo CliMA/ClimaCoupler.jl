@@ -104,11 +104,6 @@ current_date(cs::CoupledSimulation) =
 Return a list of default coupler fields needed to run a simulation.
 """
 default_coupler_fields() = [
-    # fields needed for flux calculations
-    :z0m_sfc,
-    :z0b_sfc,
-    :beta,
-    :emissivity,
     # fields used to compute fluxes
     :T_atmos,
     :q_atmos,
@@ -122,6 +117,8 @@ default_coupler_fields() = [
     :F_turb_ρτxz,
     :F_turb_ρτyz,
     :F_radiative,
+    # fields used to compute radiation in the atmosphere
+    :emissivity,
     # fields used to track water conservation, and for water fluxes
     :P_liq,
     :P_snow,
@@ -314,9 +311,26 @@ update_field_warning(sim, val::Val{X}) where {X} = @warn(
 A function to add fields to the set of coupler fields. This should be extended
 by component models that require coupler fields beyond the defaults.
 
+This should also be extended by all surface models to add individual surface
+temperatures, which are used to compute radiative and turbulent fluxes.
+The naming convention shown here must be used.
+
 If this function isn't extended, no additional fields will be added.
+
 """
 add_coupler_fields!(coupler_fields, sim::ComponentModelSimulation) = nothing
+function Interfacer.add_coupler_fields!(coupler_field_names, ::SeaIceModelSimulation)
+    seaice_coupler_fields = [:T_seaice]
+    push!(coupler_field_names, seaice_coupler_fields...)
+end
+function Interfacer.add_coupler_fields!(coupler_field_names, ::LandModelSimulation)
+    land_coupler_fields = [:T_land]
+    push!(coupler_field_names, land_coupler_fields...)
+end
+function Interfacer.add_coupler_fields!(coupler_field_names, ::OceanModelSimulation)
+    ocean_coupler_fields = [:T_ocean]
+    push!(coupler_field_names, ocean_coupler_fields...)
+end
 
 """
     Base.nameof(::ComponentModelSimulation)

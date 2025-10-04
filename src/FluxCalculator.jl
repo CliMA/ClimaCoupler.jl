@@ -53,9 +53,6 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
         :F_lh,
         :F_sh,
         :F_turb_moisture,
-        :z0m_sfc,
-        :z0b_sfc,
-        :beta,
         :L_MO,
         :ustar,
         :buoyancy_flux,
@@ -237,7 +234,9 @@ function compute_surface_fluxes!(
     atmos_sim::Interfacer.AtmosModelSimulation,
     thermo_params,
 )
+    # TODO we need temp fields for: T_sfc, q_sfc, ρ_sfc, uh_int (SVector-valued Field), area_fraction, z0m, z0b, beta
     boundary_space = axes(csf)
+    # TODO store atmos fields in coupler fields so we only regrid once per timestep instead of 3x
     # TODO lots of allocations here
     # `_int` refers to atmos state of center level 1
     z_int = Interfacer.get_field(atmos_sim, Val(:height_int), boundary_space)
@@ -252,6 +251,7 @@ function compute_surface_fluxes!(
 
     # construct the surface thermo state
     # get surface air density by extrapolating atmospheric density to the surface
+    # TODO store T_sfc in a temp field so we get it per-component
     ρ_sfc = extrapolate_ρ_to_sfc.(thermo_params, thermo_state_atmos, csf.T_sfc)
 
     # compute surface humidity from the surface temperature, surface density, and phase
@@ -262,6 +262,7 @@ function compute_surface_fluxes!(
 
     surface_params = FluxCalculator.get_surface_params(atmos_sim)
 
+    # TODO put these in temp fields
     z0m = Interfacer.get_field(sim, Val(:roughness_momentum), boundary_space)
     z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy), boundary_space)
     beta = Interfacer.get_field(sim, Val(:beta), boundary_space)
@@ -328,14 +329,6 @@ function compute_surface_fluxes!(
     @. csf.L_MO += ifelse(isinf(L_MO), L_MO, L_MO * area_fraction)
     @. csf.ustar += ustar * area_fraction
     @. csf.buoyancy_flux += buoyancy_flux * area_fraction
-
-    z0m = Interfacer.get_field(sim, Val(:roughness_momentum), boundary_space)
-    z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy), boundary_space)
-    beta = Interfacer.get_field(sim, Val(:beta), boundary_space)
-
-    @. csf.z0m_sfc += z0m * area_fraction
-    @. csf.z0b_sfc += z0b * area_fraction
-    @. csf.beta += beta * area_fraction
     return nothing
 end
 

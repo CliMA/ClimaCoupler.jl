@@ -129,6 +129,8 @@ Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:surface_direct_albed
     sim.cache.α_direct
 Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:surface_diffuse_albedo}) =
     sim.cache.α_diffuse
+Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:surface_temperature}) =
+    sim.cache.T_sfc
 
 function Interfacer.update_field!(
     sim::PrescribedOceanSimulation,
@@ -167,9 +169,10 @@ Extend Interfacer.add_coupler_fields! to add the fields required for PrescribedO
 The fields added are:
 - `:u_int` (for water albedo calculation)
 - `:v_int` (for water albedo calculation)
+- `:T_ocean` (for atmospheric radiation)
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::PrescribedOceanSimulation)
-    ocean_coupler_fields = [:u_int, :v_int]
+    ocean_coupler_fields = [:u_int, :v_int, :T_ocean]
     push!(coupler_field_names, ocean_coupler_fields...)
 end
 

@@ -472,6 +472,7 @@ The fields added are:
 - `:q_atmos` (for canopy conductance)
 - `P_liq` (for moisture fluxes)
 - `P_snow` (for moisture fluxes)
+- `:T_land` (for atmospheric radiation)
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaLandSimulation)
     land_coupler_fields = [
@@ -484,6 +485,7 @@ function Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaLandSimulati
         :q_atmos,
         :P_liq,
         :P_snow,
+        :T_land,
     ]
     push!(coupler_field_names, land_coupler_fields...)
 end

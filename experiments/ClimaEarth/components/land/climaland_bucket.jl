@@ -348,9 +348,10 @@ Extend Interfacer.add_coupler_fields! to add the fields required for BucketSimul
 
 The fields added are:
 - `:ρ_sfc`
+- `:T_land`
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::BucketSimulation)
-    bucket_coupler_fields = [:ρ_sfc]
+    bucket_coupler_fields = [:ρ_sfc, :T_land]
     push!(coupler_field_names, bucket_coupler_fields...)
 end
 

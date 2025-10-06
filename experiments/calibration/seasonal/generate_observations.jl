@@ -43,7 +43,7 @@ Preprocess each OutputVar in `vars` by keeping the relevant dates in
 `sample_date_ranges`.
 """
 function preprocess_vars(vars, sample_date_ranges, config_file)
-    out_var = OutputVar("/glade/derecho/scratch/nefrathe/tmp/output_seasonal/iteration_000/member_001/amip_config/output_0000/clima_atmos/rsut_1M_average.nc")
+    out_var = OutputVar("/glade/u/home/zhaoyi/clima_output/rsut_1M_average.nc")
     resample_var(x) = ClimaAnalysis.resampled_as(x, out_var ; dim_names = ["lon", "lat"])
     vars = resample_var.(vars)
     vars = map(vars) do var
@@ -116,7 +116,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         joinpath(pkgdir(ClimaCoupler),"experiments/calibration/era5_preprocessed_vars.jld2"),
         preprocessed_vars,
     )
-    covariance_sample_ranges = [(DateTime(yr, 1, 1), DateTime(yr, 3, 1)) for yr in 2001:2019]
+    covariance_sample_ranges = [(DateTime(yr, 3, 1), DateTime(yr, 5, 1)) for yr in 2001:2019]
     observation_vector = make_observation_vector(preprocessed_vars, covariance_sample_ranges)
     JLD2.save_object(
         joinpath(pkgdir(ClimaCoupler),"experiments/calibration/weatherquest_obs_vec.jld2"),

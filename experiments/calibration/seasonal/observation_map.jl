@@ -129,6 +129,7 @@ end
 function plot_bias(simdir, iteration; output_dir = simdir.simulation_path)
     var = get(simdir, "rsutcs") - get(simdir, "rsut")
     var = set_units(var, "W m^-2")
+    var = shift_to_start_of_previous_month(var)
     obs_var = JLD2.load_object(joinpath(pkgdir(ClimaCoupler),"experiments/calibration/era5_preprocessed_vars.jld2"))[1]
     fig = GeoMakie.Figure(size = (1500, 500))
     for (j, date) in enumerate(CALIBRATE_CONFIG.sample_date_ranges[iteration+1])

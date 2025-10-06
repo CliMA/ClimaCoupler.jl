@@ -17,7 +17,7 @@ function ClimaCalibrate.forward_model(iter, member)
     @info "Current minibatch: $minibatch"
     @info "Current start date: $start_date"
 
-    config_dict["t_end"] = "190days"
+    config_dict["t_end"] = "124days"
 
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)
@@ -42,7 +42,7 @@ end
 
 function minibatch_to_start_date(batch)
     start_year = minimum(batch) + 2008
-    return "20090901"
+    return "20100201"
 end
 
 import ClimaCore: Spaces

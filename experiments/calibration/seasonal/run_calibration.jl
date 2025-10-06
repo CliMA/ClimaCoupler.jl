@@ -14,7 +14,7 @@ include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/seasonal/observa
 model_interface = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "seasonal", "model_interface.jl")
 include(model_interface)
 years = 2010
-sample_date_ranges = repeat([(DateTime(yr, 1, 1), DateTime(yr, 3, 1)) for yr in years], 5)
+sample_date_ranges = repeat([(DateTime(yr, 3, 1), DateTime(yr, 5, 1)) for yr in years], 5)
 
 const CALIBRATE_CONFIG = CalibrateConfig(;
 config_file = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/seasonal/amip_config.yml"),
@@ -33,8 +33,8 @@ config_file = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/seasonal/a
 if abspath(PROGRAM_FILE) == @__FILE__
 
     priors = [
-        EKP.constrained_gaussian("prescribed_cloud_droplet_number_concentration", 3e8, 5e7, 1e7, 1e9),
-        EKP.constrained_gaussian("ice_cloud_effective_radius", 15e-6, 5e-6, 5e-6, 9e-5)
+        EKP.constrained_gaussian("prescribed_cloud_droplet_number_concentration", 3e8, 5e7, 1e7, 1e9)
+        #EKP.constrained_gaussian("ice_cloud_effective_radius", 4e-5, 5e-6, 5e-6, 9e-5)
     ]
     prior = EKP.combine_distributions(priors)
 
@@ -67,6 +67,17 @@ if abspath(PROGRAM_FILE) == @__FILE__
         rng,
         scheduler = EKP.DataMisfitController(terminate_at = 100),
     )
+
+    # Using ETKI
+    # initial_ensemble = EKP.construct_initial_ensemble(rng, prior, 10)
+    # ekp = EKP.EnsembleKalmanProcess(
+    #     initial_ensemble,
+    #     obs_series,
+    #     EKP.TransformInversion(prior);
+    #     verbose = true,
+    #     rng,
+    #     scheduler = EKP.DataMisfitController(terminate_at = 100),
+    # )
 
     hpc_kwargs = ClimaCalibrate.kwargs(time = 60*12,
         ntasks = 2,

@@ -58,11 +58,12 @@ function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, i
     rsutcs = get(simdir, "rsutcs")
     var = rsutcs - rsut
     var.attributes["short_name"] = "sw_cre"
+    var = set_units(var, "W m^-2")
     var = shift_to_start_of_previous_month(var)
     dates = sample_date_ranges[iteration+1]
     # TODO: window var
     var = window(var, "time", left = dates[1], right = dates[2])
-    EnsembleBuilder.fill_g_ens_col!(g_ens_builder, col_idx, var)
+    EnsembleBuilder.fill_g_ens_col!(g_ens_builder, col_idx, var; verbose = true )
 
     return nothing
 end
@@ -81,7 +82,7 @@ function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, it
     plot_constrained_params_and_errors(plot_output_path, ekp, prior)
 
     simdir = SimDir(ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, 1))
-    #plot_bias(simdir, iteration; output_dir = plot_output_path)
+    plot_bias(simdir, iteration; output_dir = plot_output_path)
     plot_variables(simdir; output_dir = plot_output_path)
     plot_pointwise_spread_per_variable(ekp, iteration)
     # try 
@@ -126,29 +127,29 @@ end
 
 # TODO: Generalize this 
 function plot_bias(simdir, iteration; output_dir = simdir.simulation_path)
-    
-    fig = GeoMakie.Figure(size = (1500, 500 * length(var_pairs)))
-    for (i, (var, era5_var)) in enumerate(var_pairs)
-        for (j, date) in enumerate(CALIBRATE_CONFIG.sample_date_ranges[iteration+1])
-            var_t = slice(var, time = date)
-            era5_var_t = slice(era5_var, time = date)
-            global_bias = ClimaAnalysis.global_bias(var_t, era5_var_t)
-            global_mean = weighted_average_lonlat(var_t).data[1]
-            relative_global_bias = global_bias / global_mean
+    var = get(simdir, "rsutcs") - get(simdir, "rsut")
+    var = set_units(var, "W m^-2")
+    obs_var = JLD2.load_object(joinpath(pkgdir(ClimaCoupler),"experiments/calibration/era5_preprocessed_vars.jld2"))[1]
+    fig = GeoMakie.Figure(size = (1500, 500))
+    for (j, date) in enumerate(CALIBRATE_CONFIG.sample_date_ranges[iteration+1])
+        var_t = slice(var, time = date)
+        era5_var_t = slice(obs_var, time = date)
+        global_bias = ClimaAnalysis.global_bias(var_t, era5_var_t)
+        global_mean = weighted_average_lonlat(var_t).data[1]
+        relative_global_bias = global_bias / global_mean
 
-            land_bias = ClimaAnalysis.global_bias(var_t, era5_var_t; mask = ClimaAnalysis.apply_oceanmask)
-            land_mean = weighted_average_lonlat(ClimaAnalysis.apply_oceanmask(var_t)).data[1]
-            relative_land_bias = land_bias / land_mean
+        land_bias = ClimaAnalysis.global_bias(var_t, era5_var_t; mask = ClimaAnalysis.apply_oceanmask)
+        land_mean = weighted_average_lonlat(ClimaAnalysis.apply_oceanmask(var_t)).data[1]
+        relative_land_bias = land_bias / land_mean
 
-            ocean_bias = ClimaAnalysis.global_bias(var_t, era5_var_t; mask = ClimaAnalysis.apply_landmask)
-            ocean_mean = weighted_average_lonlat(ClimaAnalysis.apply_landmask(var_t)).data[1]
-            relative_ocean_bias = ocean_bias / ocean_mean
-            @info short_name(var_t) relative_global_bias global_bias global_mean
-            @info short_name(var_t) relative_land_bias land_bias land_mean
-            @info short_name(var_t) relative_ocean_bias ocean_bias ocean_mean
-            # relative_global_bias relative_land_bias relative_ocean_bias
-            ClimaAnalysis.Visualize.plot_bias_on_globe!(fig[i, j], var_t, era5_var_t; cmap_extrema = plot_extrema[short_name(var_t)])
-        end
+        ocean_bias = ClimaAnalysis.global_bias(var_t, era5_var_t; mask = ClimaAnalysis.apply_landmask)
+        ocean_mean = weighted_average_lonlat(ClimaAnalysis.apply_landmask(var_t)).data[1]
+        relative_ocean_bias = ocean_bias / ocean_mean
+        @info short_name(var_t) relative_global_bias global_bias global_mean
+        @info short_name(var_t) relative_land_bias land_bias land_mean
+        @info short_name(var_t) relative_ocean_bias ocean_bias ocean_mean
+        # relative_global_bias relative_land_bias relative_ocean_bias
+        ClimaAnalysis.Visualize.plot_bias_on_globe!(fig[1, j], var_t, era5_var_t;)
     end
     GeoMakie.save(joinpath(ClimaCalibrate.path_to_iteration(CALIBRATE_CONFIG.output_dir, iteration), "bias_sample_dates.png"), fig)
 end

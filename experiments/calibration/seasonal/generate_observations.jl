@@ -43,8 +43,12 @@ Preprocess each OutputVar in `vars` by keeping the relevant dates in
 `sample_date_ranges`.
 """
 function preprocess_vars(vars, sample_date_ranges, config_file)
-    resample_var = resampled_lonlat("experiments/calibration/seasonal/amip_config.yml")
+    out_var = OutputVar("/glade/derecho/scratch/nefrathe/tmp/output_seasonal/iteration_000/member_001/amip_config/output_0000/clima_atmos/rsut_1M_average.nc")
+    resample_var(x) = ClimaAnalysis.resampled_as(x, out_var ; dim_names = ["lon", "lat"])
     vars = resample_var.(vars)
+    vars = map(vars) do var
+        set_units(var, "W m^-2")
+    end
     return vars
 end
 

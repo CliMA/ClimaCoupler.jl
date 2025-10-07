@@ -16,11 +16,11 @@ output_default_diagnostics: true
 radiation_reset_rng_seed: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "465days"
+t_end: "190days"
 topo_smoothing: true
 topography: "Earth"
 z_elem: 39
 extra_atmos_diagnostics:
-  - short_name: [od550aer, odsc550aer]
+  - short_name: [edt, evu]
     period: "1months"
     reduction_time: average

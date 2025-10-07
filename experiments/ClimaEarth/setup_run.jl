@@ -371,7 +371,7 @@ function CoupledSimulation(config_dict::AbstractDict)
             sic_path = subseasonal_sic,
         )
 
-        ## ocean model using prescribed data
+        ## ocean model
         ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
         ocean_fraction = FT(1) .- ice_fraction .- land_fraction
 

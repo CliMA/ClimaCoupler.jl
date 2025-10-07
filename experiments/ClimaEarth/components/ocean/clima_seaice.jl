@@ -47,6 +47,7 @@ function ClimaSeaIceSimulation(area_fraction, ocean; output_dir)
     # Initialize the sea ice with the same grid as the ocean
     # Initially no sea ice is present
     grid = ocean.ocean.model.grid
+    arch = grid.architecture
     advection = ocean.ocean.model.advection.T
     sea_ice = CO.sea_ice_simulation(grid, ocean.ocean; advection)
 
@@ -56,21 +57,21 @@ function ClimaSeaIceSimulation(area_fraction, ocean; output_dir)
     remapping = ocean.remapping
 
     # Before version 0.96.22, the NetCDFWriter was broken on GPU
-    if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
-        # TODO maybe this is broken
-        # Save all tracers and velocities to a NetCDF file at daily frequency
-        outputs = prognostic_fields(sea_ice.model)
-        netcdf_writer = OC.NetCDFWriter(
-            sea_ice.model,
-            outputs;
-            schedule = OC.TimeInterval(86400), # Daily output
-            filename = joinpath(output_dir, "seaice_diagnostics.nc"),
-            indices = (:, :, grid.Nz),
-            overwrite_existing = true,
-            array_type = Array{Float32},
-        )
-        sea_ice.output_writers[:diagnostics] = netcdf_writer
-    end
+    # TODO this fails with OC Field MethodError
+    # if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
+    #     # Save all tracers and velocities to a NetCDF file at daily frequency
+    #     outputs = OC.prognostic_fields(sea_ice.model)
+    #     netcdf_writer = OC.NetCDFWriter(
+    #         sea_ice.model,
+    #         outputs;
+    #         schedule = OC.TimeInterval(86400), # Daily output
+    #         filename = joinpath(output_dir, "seaice_diagnostics.nc"),
+    #         indices = (:, :, grid.Nz),
+    #         overwrite_existing = true,
+    #         array_type = Array{Float32},
+    #     )
+    #     sea_ice.output_writers[:diagnostics] = netcdf_writer
+    # end
 
     sim = ClimaSeaIceSimulation(sea_ice, area_fraction, melting_speed, remapping)
     return sim
@@ -83,7 +84,6 @@ end
 # Timestep the simulation forward to time `t`
 Interfacer.step!(sim::ClimaSeaIceSimulation, t) =
     OC.time_step!(sim.sea_ice, float(t) - sim.sea_ice.model.clock.time)
-
 
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:area_fraction}) = sim.area_fraction
 
@@ -102,7 +102,8 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_direct_albedo}) 
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_diffuse_albedo}) =
     Float32(0.069)
 
-# TODO approximate surface temp from bulk temp and ocean surface temp, assuming linear profile in the top layer
+# Approximate the sea ice surface temperature from the bulk temperature and ocean surface temperature,
+#  assuming a linear profile in the top layer
 # TODO how to get ocean surface temp here? Is it in the sea ice or do we need to pass the ocean sim too?
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
     273.15 + sim.ocean.model.tracers.T

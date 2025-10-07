@@ -43,7 +43,7 @@ steps:
           - echo "--- Run simulation"
           - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip.yml --job_id amip"
         artifact_paths: "experiments/ClimaEarth/output/amip/artifacts/*"
-        timeout_in_minutes: 5760
+        timeout_in_minutes: 1440
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
@@ -54,13 +54,13 @@ steps:
 
   - wait
 
-  - group: "Job analysis and reporting"
+  # - group: "Job analysis and reporting"
 
-    steps:
+  #   steps:
 
-      - label: ":envelope: Slack report: current AMIP"
-        command:
-          - |
-            find experiments/ClimaEarth/output/amip/artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
-              slack-upload -c "#coupler-report" -f "$$file" -m png -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
-            done
+  #     - label: ":envelope: Slack report: current AMIP"
+  #       command:
+  #         - |
+  #           find experiments/ClimaEarth/output/amip/artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
+  #             slack-upload -c "#coupler-report" -f "$$file" -m png -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
+  #           done

@@ -295,6 +295,9 @@ function ClimaLandSimulation(
         # Initialize the surface temperature so the atmosphere can compute radiation.
         @. p.T_sfc = orog_adjusted_T_surface
     end
+    # Initialize the surface emissivity so the atmosphere can compute radiation.
+    # Otherwise, it's initialized to 0 which causes NaNs in the radiation calculation.
+    @. p.ϵ_sfc = FT(1)
 
     # Update cos(zenith angle) within land model every hour
     update_dt = dt isa ITime ? ITime(3600) : 3600

@@ -40,28 +40,15 @@ steps:
           - echo "--- Run simulation"
           - srun --mpi=list 
           - >
-            srun --mpi=pmix -n 4 --gpus-per-task=1 --gpu-bind=single:1 \
-            julia --project=experiments/ClimaEarth/ -e '
-              using MPI, Libdl; MPI.Init()
-              rank = MPI.Comm_rank(MPI.COMM_WORLD)
-              host = gethostname()
-              ver  = MPI.library_version()
-              # Find the loaded libmpi path from Julia’s dynamic loader table
-              libs = Base.loaded_libs()
-              libmpi_paths = [name for (name, _) in libs if occursin("libmpi", name)]
-              println("rank=$rank host=$host libmpi=$(get(libmpi_paths, 1, "UNKNOWN")) version=$(ver.version_string)")
-              MPI.Finalize()
-            '
-          - >
-            srun --mpi=pmix -n 8
-                 --gpus-per-task=1
-                 --gpu-bind=single:1
-                 --cpus-per-task=4
-                 --cpu-bind=cores
-                 julia --threads=4 --color=yes
-                       --project=experiments/ClimaEarth/
-                       experiments/ClimaEarth/run_amip.jl
-                       --config_file config/longrun_configs/amip_diagedmf_10years.yml
+            srun --mpi=pmix -n 8 \
+                 --gpus-per-task=1 \
+                 --gpu-bind=single:1 \
+                 --cpus-per-task=4 \
+                 --cpu-bind=cores \
+                 julia --threads=4 --color=yes \
+                       --project=experiments/ClimaEarth/ \
+                       experiments/ClimaEarth/run_amip.jl \
+                       --config_file config/longrun_configs/amip_diagedmf_10years.yml \
                        --job_id amip_30_h_elem
         artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"
         env:

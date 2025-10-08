@@ -58,10 +58,10 @@ function preprocess_vars(vars, sample_date_ranges, config_file)
         end
         @assert issorted(var.dims[ClimaAnalysis.latitude_name(var)])
         var = resampled_as(shift_longitude(var, -180.0, 180.0), diagnostic_var2d, dim_names = ["longitude", "latitude"])
-        # apply ocean mask
-        if ClimaAnalysis.short_name(var) in ("pr", "tas")
-            var = ClimaAnalysis.apply_oceanmask(var)
-        end
+        # # apply land mask
+        # if ClimaAnalysis.short_name(var) in ("pr", "tas")
+        #     var = ClimaAnalysis.apply_landmask(var)
+        # end
 
         if ClimaAnalysis.short_name(var) == "pr"
             # Change sign and convert
@@ -200,21 +200,3 @@ if abspath(PROGRAM_FILE) == @__FILE__
         observation_vector,
     )
 end
-
-#= TODO: 
-- add ocean mask for tas, pr: ClimaAnalysis.apply_oceanmask(...)
-- check sign and units of era5 precip data
-- use 2+ weeks of data
-- verify land radiation start date
-- plot spread of loss
-- exclude precip
-- compute cov weighted bias per variable
-- change plotted loss
-- use is_complete function for gensemblebuilder, overwrite failed columns with nans
-- sanity check: simplify observations to use spatial avg, e.g. mean surface temp in northern hemisphere
-=#
-
-# Different Septembers over the years for a single iteration
-# Geopotential height or specific humidity or clouds
-# Use average but for pr, convert average to sum
-# precipation time scale

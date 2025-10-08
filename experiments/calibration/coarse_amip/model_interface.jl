@@ -4,22 +4,22 @@ import ClimaCalibrate
 import CUDA
 import EnsembleKalmanProcesses as EKP
 include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.jl"))
-const config_file = joinpath(pkgdir(ClimaCoupler), "config/subseasonal_configs/wxquest_diagedmf.yml")
+include(joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "run_calibration.jl"))
 
 function ClimaCalibrate.forward_model(iter, member)
-    config_dict = get_coupler_config_dict(config_file)
 
-    output_dir_root = config_dict["coupler_output_dir"]
+    config_dict = get_coupler_config_dict(CALIBRATE_CONFIG.config_file)
+    output_dir_root = CALIBRATE_CONFIG.output_dir
     eki = ClimaCalibrate.load_ekp_struct(output_dir_root, iter)
     minibatch = EKP.get_current_minibatch(eki)
-    start_date = minibatch_to_start_date(minibatch)
-    config_dict["start_date"] = start_date
-    @info "Current minibatch: $minibatch"
-    @info "Current start date: $start_date"
+    start_date = first(CALIBRATE_CONFIG.sample_date_ranges[iter+1]) - CALIBRATE_CONFIG.spinup
+    start_date_str = replace(string(Date(start_date)), "-" => "")
+    end_date = last(CALIBRATE_CONFIG.sample_date_ranges[iter+1]) + CALIBRATE_CONFIG.extend
+    sim_length = Second(end_date - start_date)
 
-    config_dict["bucket_initial_condition"] = "/glade/campaign/univ/ucit0011/cchristo/initial_conditions_v_0.5/era5_bucket_processed_$(start_date)_0000.nc"
-
-    config_dict["t_end"] = "365days"
+    config_dict["start_date"] = start_date_str
+    config_dict["bucket_initial_condition"] = "/glade/campaign/univ/ucit0011/cchristo/initial_conditions_v_0.5/era5_bucket_processed_$(start_date_str)_0000.nc"
+    config_dict["t_end"] = "$(sim_length)secs"
 
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)
@@ -27,6 +27,9 @@ function ClimaCalibrate.forward_model(iter, member)
     # Set member output directory
     member_output_dir = ClimaCalibrate.path_to_ensemble_member(output_dir_root, iter, member)
     config_dict["coupler_output_dir"] = member_output_dir
+
+    @info "Current minibatch: $minibatch"
+    @info "Simulation dates" start_date end_date
 
     sim = try
         # Ensure that the most recent `setup_and_run` method is used, preventing

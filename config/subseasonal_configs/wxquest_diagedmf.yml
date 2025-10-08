@@ -13,7 +13,7 @@ initial_condition: "WeatherModel"
 checkpoint_dt: "93days"
 co2_model: "fixed"
 
-coupler_output_dir: "/glade/derecho/scratch/nefrathe/tmp/output/model_run"
+coupler_output_dir: "/glade/derecho/scratch/nefrathe/tmp/output_quick"
 
 dt: "90secs"
 dt_cpl: "90secs"
@@ -31,7 +31,6 @@ mode_name: "amip"
 land_model: "bucket"
 bucket_albedo_type: "map_temporal"
 # bucket_albedo_type: "map_static"
-bucket_initial_condition: "/glade/campaign/univ/ucit0011/cchristo/initial_conditions_v_0.5/era5_bucket_processed_20180901_0000.nc"
 
 # use_land_diagnostics: true
 radiation_reset_rng_seed: true
@@ -48,26 +47,9 @@ use_coupler_diagnostics: false
 use_land_diagnostics: true
 
 extra_atmos_diagnostics:
-  - short_name: [mslp, tas, pr, ta, pfull, hur, rsut,  rsds, rsus, rsuscs, rlut,  rlds, rlus, rlucs, ts, evspsbl, hfes]
+  - short_name: [mslp, tas, pr, ta, pfull, hur, rsut, rsds, rsus, rsuscs, rsutcs, rlutcs, rlut, rlds, rlus, rlucs, ts, evspsbl, hfes]
     period: 7days
     reduction_time: average
-  - short_name: [mslp, tas, pr, ta, pfull, hur, rsut,  rsds, rsus, rsuscs, rlut,  rlds, rlus, rlucs, ts, evspsbl, hfes]
+  - short_name: [mslp, tas, pr, ta, pfull, hur, rsut, rsds, rsus, rsuscs, rsutcs, rlutcs, rlut, rlds, rlus, rlucs, ts, evspsbl, hfes]
     period: 1months
     reduction_time: average
-  # - short_name: [ta, ua, wa, va, rhoa, pfull, hur, hus, clw, cli, cl,] # prsn, prra, hussn, husra]
-  #   period: 24hours
-  #   reduction_time: average
-  # - short_name: [ta, ua, wa, va, rhoa, pfull, hur, hus, clw, cli, arup, tke] # prsn, prra, hussn, husra]
-  #   period: 1hours
-  #   reduction_time: average
-  # - short_name: [rsut, rlut, rsds, rsus, rsucs, rsuscs, rsd, rlu, rlucs, ts, cl, pr, tas, lwp, mslp, hfes, evspsbl]
-  #   period: 1hours
-  #   reduction_time: average
-  # - short_name: [tas, mslp, pr]
-  #   period: 20secs
-  #   reduction_time: average
-  # - short_name: [pr]  #TODO: add support for accum operations in diagnostics 
-  #   period: 7days
-  #   reduction_time: accum
-
-

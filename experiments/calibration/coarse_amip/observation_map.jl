@@ -34,12 +34,11 @@ function ClimaCalibrate.observation_map(iteration)
         catch e
             @error "Ensemble member $m failed" exception =
             (e, catch_backtrace())
+            (g_ens_builder.g_ens[:, m] .= NaN)
         end
     end
-    if !ClimaCalibrate.EnsembleBuilder.is_complete(g_ens_builder)
-        for m in 1:EKP.get_N_ens(ekp)
-            mean(g_ens_builder.g_ens[:, m]) ≈ 0 && (g_ens_builder.g_ens[:, m] .= NaN)
-        end
+    if count(isnan, g_ens_builder.g_ens) > 0.9 * length(g_ens_builder.g_ens)
+        error("Too many NaNs")
     end
     return g_ens_builder.g_ens
 end
@@ -52,24 +51,37 @@ G ensemble matrix.
 """
 function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, iteration)
     short_names = EnsembleBuilder.missing_short_names(g_ens_builder, col_idx)
-    sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges
+    sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges[iteration+1]
     @info "Short names: $short_names"
 
-    # For now, hard code the data to daily data since it seems the simplest
     simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)
     for short_name in short_names
-        # This assumes that there are not multiple reductions for the same
-        # variable!
-        short_name = short_name * "_1week" # TODO: Don't hardcode this
-        var = get(simdir, short_name)
-        var.attributes["short_name"] = replace(short_name, "_1week" => "")
-
-        var = preprocess_var(var, sample_date_ranges[iteration+1] )
+        var = get_var(short_name, simdir)
+        var = preprocess_var(var, sample_date_ranges )
 
         EnsembleBuilder.fill_g_ens_col!(g_ens_builder, col_idx, var)
     end
 
     return nothing
+end
+
+const period = "1W"
+
+function get_var(short_name, simdir)
+    # TODO: detect period from the sample date range
+    if short_name == "sw_cre"
+        var = get(simdir; short_name = "rsutcs", period, reduction = "average") - 
+                get(simdir; short_name = "rsut", period, reduction = "average")
+        var.attributes["short_name"] = "sw_cre"
+    else
+        if period == "1W"
+            var = get(simdir, "$(short_name)_1week")
+            var.attributes["short_name"] = short_name
+            var
+        else
+            var = get(simdir; short_name, period, reduction = "average")
+        end
+    end
 end
 
 """
@@ -81,18 +93,25 @@ For "pr", weekly sums are computed. For "tas" and "mslp", weekly means are
 computed from daily means. The daily means are computing starting from
 `reference_date`.
 
-This function assumes that the data is daily.
+This function assumes that the data is monthly.
 """
-function preprocess_var(var::ClimaAnalysis.OutputVar, sample_date_range)
-    # TODO: Check for sign of pr
-    # TODO: Check for units of everything
-    var = shift_to_previous_week(var)
-    @assert ClimaAnalysis.short_name(var) in CALIBRATE_CONFIG.short_names
-
-    if ClimaAnalysis.short_name(var) in ("pr", "tas")
-        var = ClimaAnalysis.apply_oceanmask(var)
+function preprocess_var(var, sample_date_range)
+    @assert short_name(var) in CALIBRATE_CONFIG.short_names
+    var = if period == "1M"
+       shift_to_start_of_previous_month(var)
+    elseif period == "1W"
+       shift_to_previous_week(var)
     end
-    
+    # # apply land mask
+    # if ClimaAnalysis.short_name(var) in ("pr", "tas")
+    #     var = ClimaAnalysis.apply_landmask(var)
+    # end
+
+    if short_name(var) == "sw_cre"
+        var = set_units(var, "W m^-2")
+    end
+
+    # TODO: Make this match dates exactly
     var = window(var, "time"; left = sample_date_range[1], right = sample_date_range[2])
     return var
 end
@@ -163,18 +182,18 @@ function plot_bias(simdir, iteration; output_dir = simdir.simulation_path)
     # TODO: Get observations from EKP object
     preprocessed_vars = JLD2.load_object("experiments/calibration/era5_preprocessed_vars.jld2")
 
-    era5_pr = preprocessed_vars[findfirst(v -> ClimaAnalysis.short_name(v) == "pr", preprocessed_vars)]
+    # era5_pr = preprocessed_vars[findfirst(v -> ClimaAnalysis.short_name(v) == "pr", preprocessed_vars)]
     era5_tas = preprocessed_vars[findfirst(v -> ClimaAnalysis.short_name(v) == "tas", preprocessed_vars)]
     # era5_mslp = preprocessed_vars[findfirst(v -> ClimaAnalysis.short_name(v) == "mslp", preprocessed_vars)]
 
     # era5_mslp.attributes["long_name"] = "Mean sea level pressure, average within 1 Week"
     era5_tas.attributes["long_name"] = "Surface temperature, average within 1 Week"
-    era5_pr.attributes["long_name"] = "Surface precipitation, average within 1 Week"
+    # era5_pr.attributes["long_name"] = "Surface precipitation, average within 1 Week"
 
     var_pairs = (
-        (vars["pr"], era5_pr),
+        # (vars["pr"], era5_pr),
         # (vars["mslp"], era5_mslp),
-        (vars["tas"], era5_tas)
+        (vars["tas"], era5_tas),
     )
     plot_extrema = Dict(
         "tas" => (-6, 6), 
@@ -202,6 +221,7 @@ function plot_bias(simdir, iteration; output_dir = simdir.simulation_path)
             @info short_name(var_t) relative_ocean_bias ocean_bias ocean_mean
             # relative_global_bias relative_land_bias relative_ocean_bias
             ClimaAnalysis.Visualize.plot_bias_on_globe!(fig[i, j], var_t, era5_var_t; cmap_extrema = plot_extrema[short_name(var_t)])
+
         end
     end
     GeoMakie.save(joinpath(ClimaCalibrate.path_to_iteration(CALIBRATE_CONFIG.output_dir, iteration), "bias_sample_dates.png"), fig)

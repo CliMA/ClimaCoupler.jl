@@ -99,15 +99,13 @@ function PrescribedIceSimulation(
     start_date_str = Dates.format(Date(start_date), "yyyymmdd")   
     @show start_date_str 
     sic_data = "/glade/campaign/univ/ucit0011/cchristo/initial_conditions_v_0.5/sic_processed_$(start_date_str)_0000.nc"
-    # sic_data = "/glade/campaign/univ/ucit0011/cchristo/wxquest_ics/sic_processed_20250810_0000.nc"
-
     SIC_timevaryinginput = TimeVaryingInput(
         sic_data,
         "SEAICE",
         space,
         reference_date = start_date,
         # TODO: Add linearinterpolation for ERA5 ICs
-        method = LinearInterpolation(PeriodicCalendar(Dates.Month(1), Dates.DateTime(2018,9,1,0,0,0))),
+        method = LinearInterpolation(),
         file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
     )
 

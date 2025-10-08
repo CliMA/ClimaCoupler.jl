@@ -6,7 +6,6 @@
 #PBS -o amip_calibration.txt
 #PBS -l walltime=12:00:00
 #PBS -l select=1:ncpus=1:ngpus=1
-#PBS -l job_priority=premium
 
 module load climacommon
 
@@ -17,7 +16,7 @@ RUNSCRIPT="/glade/u/home/nefrathe/clima/ClimaCoupler.jl/experiments/calibration/
 handle_termination() {
     echo "=== Job ${PBS_JOBID} received termination signal at $(date) ==="
     # Check if the target file doesn't exist
-    if [[ ! -f "/glade/derecho/scratch/nefrathe/tmp/output_simple/iteration_005/eki_file.jld2" ]]; then
+    if [[ ! -f "/glade/derecho/scratch/nefrathe/tmp/output_quick/iteration_005/eki_file.jld2" ]]; then
         echo "=== Job ${PBS_JOBID} terminated, requeuing... ==="
         qsub "$RUNSCRIPT" 
     fi
@@ -29,8 +28,8 @@ trap handle_termination SIGTERM SIGINT SIGUSR1 SIGUSR2
 echo "Starting Julia package instantiation..."
 julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate(;verbose=true)'
 
-# julia --project=experiments/ClimeEarth -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaAtmos", rev="cc/test_wxquest_ic_dev_derecho"))'
-# julia --project=experiments/ClimeEarth -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaLand", rev="cc/start_time_fix"))'
+julia --project=experiments/ClimeEarth -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaAtmos", rev="cc/test_wxquest_ic_dev_derecho"))'
+julia --project=experiments/ClimeEarth -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaLand", rev="cc/start_time_fix"))'
 
 
 echo "Starting calibration run..."

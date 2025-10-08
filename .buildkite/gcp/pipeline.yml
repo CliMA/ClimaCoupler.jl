@@ -8,17 +8,17 @@ steps:
   - label: "init :GPU:"
     key: "init_gpu_env"
     command:
-      - "echo $$JULIA_DEPOT_PATH"
-
-      - echo "--- Instantiate AMIP env"
+      - "echo --- Depot: $JULIA_DEPOT_PATH"
+      - "julia --version && which julia"
+      - "which mpiexec && mpiexec --version || true"
+      - "echo --- Instantiate AMIP env"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"CUDA\"); using CUDA; CUDA.set_runtime_version!(local_toolkit=true)'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPIPreferences\"); using MPIPreferences; use_system_binary(library_names=\"/sw/openmpi-5.0.5/lib/libmpi\", mpiexec=\"/sw/openmpi-5.0.5/bin/mpiexec\", force=true)'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
 
-      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add("MPI")'
-      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add("CUDA"); using CUDA; CUDA.set_runtime_version!(local_toolkit=true)'
-      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add("MPIPreferences"); using MPIPreferences; use_system_binary(library_names="/sw/openmpi-5.0.5/lib/libmpi", mpiexec="/sw/openmpi-5.0.5/bin/mpiexec", force=true)'
-
-      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'
-      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'
 
     agents:
       slurm_gpus: 1
@@ -37,26 +37,39 @@ steps:
         key: "amip"
         command:
 
-          
-        command:
           - echo "--- Run simulation"
-          - cat /proc/self/cgroup
-          - ls -la /dev/nvidia* 
-          - /sw/openmpi-5.0.5/bin/mpiexec -n 2 bash -c '
-              echo "=== Rank $OMPI_COMM_WORLD_RANK ==="
-              ls -la /dev/nvidia$OMPI_COMM_WORLD_RANK 2>&1
-              nvidia-smi -L 2>&1
+          - srun --mpi=list 
+          - >
+            srun --mpi=pmix -n 4 --gpus-per-task=1 --gpu-bind=single:1 \
+            julia --project=experiments/ClimaEarth/ -e '
+              using MPI, Libdl; MPI.Init()
+              rank = MPI.Comm_rank(MPI.COMM_WORLD)
+              host = gethostname()
+              ver  = MPI.library_version()
+              # Find the loaded libmpi path from Julia’s dynamic loader table
+              libs = Base.loaded_libs()
+              libmpi_paths = [name for (name, _) in libs if occursin("libmpi", name)]
+              println("rank=$rank host=$host libmpi=$(get(libmpi_paths, 1, "UNKNOWN")) version=$(ver.version_string)")
+              MPI.Finalize()
             '
-          - "/sw/openmpi-5.0.5/bin/mpiexec -n 1 \
-            julia --threads=3 --color=yes --project=experiments/ClimaEarth/ \
-            experiments/ClimaEarth/run_amip.jl \
-            --config_file config/amip_configs/amip.yml --job_id amip"
+          - >
+            srun --mpi=pmix -n 8
+                 --gpus-per-task=1
+                 --gpu-bind=single:1
+                 --cpus-per-task=4
+                 --cpu-bind=cores
+                 julia --threads=4 --color=yes
+                       --project=experiments/ClimaEarth/
+                       experiments/ClimaEarth/run_amip.jl
+                       --config_file config/longrun_configs/amip_diagedmf_10years.yml
+                       --job_id amip_30_h_elem
         artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
-          CLIMACOMMS_CONTEXT: "SINGLETON"
+          CLIMACOMMS_CONTEXT: "MPI"
         agents:
-          slurm_ntasks: 1
           slurm_gpus_per_task: 1
-
-
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 8
+          slurm_mem: 0GB
+          slurm_time: "144:00:00"

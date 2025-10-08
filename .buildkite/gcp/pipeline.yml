@@ -47,18 +47,16 @@ steps:
               ls -la /dev/nvidia$OMPI_COMM_WORLD_RANK 2>&1
               nvidia-smi -L 2>&1
             '
-          - env | sort
-          - nvidia-smi -q
-          - "/sw/openmpi-5.0.5/bin/mpiexec -n 2 \
+          - "/sw/openmpi-5.0.5/bin/mpiexec -n 1 \
             julia --threads=3 --color=yes --project=experiments/ClimaEarth/ \
             experiments/ClimaEarth/run_amip.jl \
             --config_file config/amip_configs/amip.yml --job_id amip"
         artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
-          CLIMACOMMS_CONTEXT: "MPI"
+          CLIMACOMMS_CONTEXT: "SINGLETON"
         agents:
-          slurm_ntasks: 2
+          slurm_ntasks: 1
           slurm_gpus_per_task: 1
 
 

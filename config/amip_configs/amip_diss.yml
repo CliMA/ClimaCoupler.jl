@@ -1,0 +1,26 @@
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
+bucket_albedo_type: "map_temporal"
+checkpoint_dt: "366days"
+coupler_toml: ["toml/amip_diss.toml"]
+dt: "240secs"
+dt_cpl: "240secs"
+dz_bottom: 100.0
+energy_check: false
+h_elem: 8
+mode_name: "amip"
+netcdf_interpolation_num_points: [90, 45, 31]
+netcdf_output_at_levels: true
+output_default_diagnostics: true
+radiation_reset_rng_seed: true
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+t_end: "190days"
+topo_smoothing: true
+topography: "Earth"
+z_elem: 39
+extra_atmos_diagnostics:
+  - short_name: [edt, evu]
+    period: "1months"
+    reduction_time: average

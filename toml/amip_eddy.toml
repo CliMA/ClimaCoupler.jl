@@ -33,3 +33,6 @@ value = 0
 
 [mixing_length_Prandtl_maximum]
 value = 4.2
+
+[mixing_length_eddy_viscosity_coefficient]
+value = 0.28

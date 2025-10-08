@@ -39,16 +39,16 @@ steps:
 
           - echo "--- Run simulation"
           - srun --mpi=list 
-          - >
-            srun --mpi=pmix -n 8
-                 --gpus-per-task=1
-                 --gpu-bind=single:1
-                 --cpus-per-task=4
-                 --cpu-bind=cores
-                 julia --threads=4 --color=yes
-                       --project=experiments/ClimaEarth/
-                       experiments/ClimaEarth/run_amip.jl
-                       --config_file config/longrun_configs/amip_diagedmf_10years.yml
+          - |
+            srun --mpi=pmix -n 8 \
+                 --gpus-per-task=1 \
+                 --gpu-bind=single:1 \
+                 --cpus-per-task=4 \
+                 --cpu-bind=cores \
+                 julia --threads=4 --color=yes \
+                       --project=experiments/ClimaEarth/ \
+                       experiments/ClimaEarth/run_amip.jl \
+                       --config_file config/longrun_configs/amip_diagedmf_10years.yml \
                        --job_id amip_30_h_elem
         artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"
         env:

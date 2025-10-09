@@ -21,12 +21,14 @@ It contains the following objects:
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
 - `ocean_properties::OPROP`: A NamedTuple of ocean properties and parameters
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
+- `ocean_sea_ice_fluxes::NT`: A NamedTuple of fluxes between the ocean and sea ice, computed at each coupling step.
 """
-struct OceananigansSimulation{SIM, A, OPROP, REMAP} <: Interfacer.OceanModelSimulation
+struct OceananigansSimulation{SIM, A, OPROP, REMAP, NT} <: Interfacer.OceanModelSimulation
     ocean::SIM
     area_fraction::A
     ocean_properties::OPROP
     remapping::REMAP
+    ocean_sea_ice_fluxes::NT
 end
 
 """
@@ -181,7 +183,29 @@ function OceananigansSimulation(
         ocean.output_writers[:diagnostics] = netcdf_writer
     end
 
-    sim = OceananigansSimulation(ocean, area_fraction, ocean_properties, remapping)
+    # TODO make this depend on sea ice model type
+    # Allocate space for the sea ice-ocean (io) fluxes
+    io_bottom_heat_flux = OC.Field{Center, Center, Nothing}(grid)
+    io_frazil_heat_flux = OC.Field{Center, Center, Nothing}(grid)
+    io_salt_flux = OC.Field{Center, Center, Nothing}(grid)
+    x_momentum = OC.Field{Face, Center, Nothing}(grid)
+    y_momentum = OC.Field{Center, Face, Nothing}(grid)
+
+    ocean_sea_ice_fluxes = (
+        interface_heat = io_bottom_heat_flux,
+        frazil_heat = io_frazil_heat_flux,
+        salt = io_salt_flux,
+        x_momentum = x_momentum,
+        y_momentum = y_momentum,
+    )
+
+    sim = OceananigansSimulation(
+        ocean,
+        area_fraction,
+        ocean_properties,
+        remapping,
+        ocean_sea_ice_fluxes,
+    )
     return sim
 end
 

@@ -12,7 +12,7 @@ include("climaocean_helpers.jl")
 """
     ClimaSeaIceSimulation{SIM, A, OPROP, REMAP}
 
-The ClimaCoupler simulation object used to run with Oceananigans.
+The ClimaCoupler simulation object used to run with ClimaSeaIce.
 This type is used by the coupler to indicate that this simulation
 is an surface/ocean simulation for dispatch.
 
@@ -21,15 +21,14 @@ It contains the following objects:
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
 - `melting_speed::MS`: An constant characteristic speed for melting/freezing.
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
-TODO add skin_temperature field, for now set skin temperature to top layer sea ice temperature
-alt: compute skin temp from bulk temp and ocean surface temp, assuming linear profile in the top layer,
-  might need to limit min sea ice thickness to avoid crazy gradients
+- `ocean_sea_ice_fluxes::NT`: A NamedTuple of fluxes between the ocean and sea ice, computed at each coupling step.
 """
-struct ClimaSeaIceSimulation{SIM, A, MS, REMAP} <: Interfacer.SeaIceModelSimulation
+struct ClimaSeaIceSimulation{SIM, A, MS, REMAP, NT} <: Interfacer.SeaIceModelSimulation
     sea_ice::SIM
     area_fraction::A
     melting_speed::MS
     remapping::REMAP
+    ocean_sea_ice_fluxes::NT
 end
 
 """
@@ -73,7 +72,28 @@ function ClimaSeaIceSimulation(area_fraction, ocean; output_dir)
     #     sea_ice.output_writers[:diagnostics] = netcdf_writer
     # end
 
-    sim = ClimaSeaIceSimulation(sea_ice, area_fraction, melting_speed, remapping)
+    # Allocate space for the sea ice-ocean (io) fluxes
+    io_bottom_heat_flux = OC.Field{Center, Center, Nothing}(grid)
+    io_frazil_heat_flux = OC.Field{Center, Center, Nothing}(grid)
+    io_salt_flux = OC.Field{Center, Center, Nothing}(grid)
+    x_momentum = OC.Field{Face, Center, Nothing}(grid)
+    y_momentum = OC.Field{Center, Face, Nothing}(grid)
+
+    ocean_sea_ice_fluxes = (
+        interface_heat = io_bottom_heat_flux,
+        frazil_heat = io_frazil_heat_flux,
+        salt = io_salt_flux,
+        x_momentum = x_momentum,
+        y_momentum = y_momentum,
+    )
+
+    sim = ClimaSeaIceSimulation(
+        sea_ice,
+        area_fraction,
+        melting_speed,
+        remapping,
+        ocean_sea_ice_fluxes,
+    )
     return sim
 end
 
@@ -164,6 +184,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     remapped_F_sh = sim.remapping.scratch_arr2
 
 
+    # TODO update this for sea ice
     # TODO what is sim.sea_ice.model.ice_thermodynamics.top_surface_temperature? where is it set?
     # TODO ocean_reference_density -> sea_ice.model.ice_density ?
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
@@ -186,28 +207,29 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     return nothing
 end
 
-function Interfacer.update_field!(sim::OceananigansSimulation, ::Val{:area_fraction}, field)
+function Interfacer.update_field!(sim::ClimaSeaIceSimulation, ::Val{:area_fraction}, field)
     sim.area_fraction .= field
     return nothing
 end
 
 """
-    FieldExchanger.update_sim!(sim::OceananigansSimulation, csf, area_fraction)
+    FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf, area_fraction)
 
-Update the ocean simulation with the provided fields, which have been filled in
+Update the sea ice simulation with the provided fields, which have been filled in
 by the coupler.
 
 Update the portion of the surface_fluxes for T and S that is due to radiation and
 precipitation. The rest will be updated in `update_turbulent_fluxes!`.
 
 A note on sign conventions:
-ClimaAtmos and Oceananigans both use the convention that a positive flux is an upward flux.
+ClimaAtmos and ClimaSeaIce both use the convention that a positive flux is an upward flux.
 No sign change is needed during the exchange, except for precipitation/salinity fluxes.
 ClimaAtmos provides precipitation as a negative flux at the surface, and
-Oceananigans represents precipitation as a positive salinity flux,
+ClimaSeaIce represents precipitation as a positive salinity flux,
 so a sign change is needed when we convert from precipitation to salinity flux.
 """
-function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf, area_fraction)
+function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf, area_fraction)
+    # TODO update this for sea ice
     (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) =
         sim.ocean_properties
 
@@ -249,27 +271,34 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf, area_fract
     return nothing
 end
 
-# TODO add stub to FluxCalculator
-# TODO fill this in using ClimaOcean: https://github.com/CliMA/ClimaOcean.jl/pull/627
-# TODO instead of cs we can take in the ocean and sea ice sims, dispatch on them to do nothing for other sea ice models
-# TODO docstring
-function ocean_seaice_fluxes!(cs)
-    seaice_sim = cs.models.sea_ice
-    ocean_sim = cs.models.ocean
+"""
+    ocean_seaice_fluxes!(ocean_sim, ice_sim)
 
-    melting_speed = seaice_sim.melting_speed
+Compute the fluxes between the ocean and sea ice, storing them in the `ocean_sea_ice_fluxes`
+fields of the ocean and sea ice simulations.
+"""
+function FluxCalculator.ocean_seaice_fluxes!(
+    ocean_sim::OceananigansSimulation,
+    ice_sim::ClimaSeaIceSimulation,
+)
+    # TODO unify sea_ice vs ice naming convention in this file
+    melting_speed = ice_sim.melting_speed
     ocean_properties = ocean_sim.ocean_properties
 
-    # TODO what should fluxes be here?
+    # Compute the fluxes and store them in the both simulations
     OC.compute_sea_ice_ocean_fluxes!(
-        fluxes,
+        ice_sim.ocean_sea_ice_fluxes,
         ocean_sim.ocean,
-        seaice_sim.sea_ice,
+        ice_sim.sea_ice,
         melting_speed,
         ocean_properties,
     )
+    ocean_sim.ocean_sea_ice_fluxes = ice_sim.ocean_sea_ice_fluxes
+
+    # TODO what do we do with these fluxes now? They need to be passed to the component sims somehow
     return nothing
 end
+
 
 """
     get_model_prog_state(sim::ClimaSeaIceSimulation)

@@ -76,6 +76,7 @@ include("components/ocean/slab_ocean.jl")
 include("components/ocean/prescr_ocean.jl")
 include("components/ocean/prescr_seaice.jl")
 include("components/ocean/oceananigans.jl")
+include("components/ocean/clima_seaice.jl")
 
 #=
 ### Configuration Dictionaries
@@ -162,6 +163,8 @@ function CoupledSimulation(config_dict::AbstractDict)
     isdir(land_output_dir) || mkpath(land_output_dir)
     ocean_output_dir = joinpath(dir_paths.output, "clima_ocean")
     isdir(ocean_output_dir) || mkpath(ocean_output_dir)
+    ice_output_dir = joinpath(dir_paths.output, "clima_seaice")
+    isdir(ice_output_dir) || mkpath(ice_output_dir)
 
 
     ## get component model dictionaries (if applicable)
@@ -357,6 +360,7 @@ function CoupledSimulation(config_dict::AbstractDict)
             error("Invalid land model specified: $(land_model)")
         end
 
+        # TODO separate drivers to clean this up
         ## sea ice model
         ice_sim = PrescribedIceSimulation(
             FT;
@@ -375,7 +379,40 @@ function CoupledSimulation(config_dict::AbstractDict)
         ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
         ocean_fraction = FT(1) .- ice_fraction .- land_fraction
 
+
         if sim_mode <: CMIPMode
+            ########### TODO CLEAN UP ############
+            # TODO how should we initialize ocean fraction when using ClimaSeaIce?
+            # Set up prescribed sea ice concentration object
+            sic_data = try
+                joinpath(
+                    @clima_artifact("historical_sst_sic", comms_ctx),
+                    "MODEL.ICE.HAD187001-198110.OI198111-202206.nc",
+                )
+            catch error
+                @warn "Using lowres SIC. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
+                joinpath(
+                    @clima_artifact("historical_sst_sic_lowres", comms_ctx),
+                    "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
+                )
+            end
+            @info "Using initial condition prescribed SIC file: " sic_data
+
+            SIC_timevaryinginput = TimeVaryingInput(
+                sic_data,
+                "SEAICE",
+                boundary_space,
+                reference_date = start_date,
+                file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
+            )
+
+            # Get initial SIC values and use them to calculate ice fraction
+            ice_fraction = CC.Fields.zeros(space)
+            evaluate!(ice_fraction, SIC_timevaryinginput, tspan[1])
+            ########### TODO CLEAN UP ############
+
+            ocean_fraction = FT(1) .- ice_fraction .- land_fraction
+
             stop_date = date(tspan[end] - tspan[begin])
             ocean_sim = OceananigansSimulation(
                 ocean_fraction,
@@ -384,6 +421,9 @@ function CoupledSimulation(config_dict::AbstractDict)
                 output_dir = ocean_output_dir,
                 comms_ctx,
             )
+
+            ice_sim = ClimaSeaIceSimulation(ice_fraction, ocean_sim; output_dir)
+
         else
             ocean_sim = PrescribedOceanSimulation(
                 FT,
@@ -562,6 +602,9 @@ function CoupledSimulation(config_dict::AbstractDict)
         # 3. Calculate and update turbulent fluxes for each surface model,
         #  and save the weighted average in coupler fields
         FluxCalculator.turbulent_fluxes!(cs)
+
+        # 4. Compute any ocean-sea ice fluxes
+        FluxCalculator.ocean_seaice_fluxes!(cs)
     end
     Utilities.show_memory_usage()
     return cs

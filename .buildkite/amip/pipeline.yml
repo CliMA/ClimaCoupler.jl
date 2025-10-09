@@ -42,7 +42,7 @@ steps:
         command:
           - echo "--- Run simulation"
           - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip.yml --job_id amip"
-        artifact_paths: "experiments/ClimaEarth/output/amip_diss/artifacts/*"
+        artifact_paths: "experiments/ClimaEarth/output/amip/artifacts/*"
         timeout_in_minutes: 1440
         env:
           CLIMACOMMS_DEVICE: "CUDA"

@@ -34,8 +34,5 @@ value = 0
 [mixing_length_Prandtl_maximum]
 value = 4.2
 
-[mixing_length_diss_coeff]
-value = 0.11
-
 [mixing_length_eddy_viscosity_coefficient]
-value = 0.07
+value = 0.035

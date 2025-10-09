@@ -55,15 +55,21 @@ steps:
               bash -lc 'ldd $(which julia) | egrep "libcuda|libnvrtc|libnvJitLink" || true'
           - |
             srun --mpi=pmix -n 8 \
-                 --gpus-per-task=1 \
-                 --gpu-bind=single:1 \
-                 --cpus-per-task=4 \
-                 --cpu-bind=cores \
-                 julia --threads=4 --color=yes \
-                       --project=experiments/ClimaEarth/ \
-                       experiments/ClimaEarth/run_amip.jl \
-                       --config_file config/longrun_configs/amip_diagedmf_10years.yml \
-                       --job_id amip_30_h_elem
+                --gpus-per-task=1 --gpu-bind=single:1 \
+                --cpus-per-task=4 --cpu-bind=cores \
+                bash -lc '
+                  set -euo pipefail
+                  export CUDA_CACHE_PATH="${SLURM_TMPDIR:-/tmp}/cuda-cache/${SLURM_PROCID}"
+                  mkdir -p "$CUDA_CACHE_PATH"
+                  export CUDA_CACHE_MAXSIZE=$((4*1024*1024*1024))   # 4 GiB
+                  export CUDA_MODULE_LOADING=EAGER                  # avoid lazy loads
+                  export CUDA_FORCE_PTX_JIT=1                      # avoid stale cubins
+                  exec julia --threads=4 --color=yes \
+                    --project=experiments/ClimaEarth/ \
+                    experiments/ClimaEarth/run_amip.jl \
+                    --config_file config/longrun_configs/amip_diagedmf_10years.yml \
+                    --job_id amip_30_h_elem
+                '
         artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"

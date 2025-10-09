@@ -391,5 +391,5 @@ if abspath(PROGRAM_FILE) == @__FILE__
     leaderboard_base_path = ARGS[begin]
     diagnostics_folder_path = ARGS[begin + 1]
     compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, 3)
-    compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path, 6)
+    compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path, 3)
 end

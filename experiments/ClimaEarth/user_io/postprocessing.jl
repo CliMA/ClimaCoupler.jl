@@ -43,7 +43,7 @@ function postprocess_sim(cs, postprocessing_vars)
             compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
             rmse_check && test_rmse_thresholds(atmos_output_dir, 3)
             pressure_in_output &&
-                compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 6)
+                compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
         end
     end
 

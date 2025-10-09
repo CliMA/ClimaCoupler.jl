@@ -598,13 +598,14 @@ function CoupledSimulation(config_dict::AbstractDict)
 
         # 2. Update any fields in the model caches that can only be filled after the initial exchange.
         FieldExchanger.set_caches!(cs)
+        # TODO add a step "update area fractions" to avoid ordering between steps 3/4
+
+        # 4. Compute any ocean-sea ice fluxes
+        FluxCalculator.ocean_seaice_fluxes!(cs)
 
         # 3. Calculate and update turbulent fluxes for each surface model,
         #  and save the weighted average in coupler fields
         FluxCalculator.turbulent_fluxes!(cs)
-
-        # 4. Compute any ocean-sea ice fluxes
-        FluxCalculator.ocean_seaice_fluxes!(cs)
     end
     Utilities.show_memory_usage()
     return cs

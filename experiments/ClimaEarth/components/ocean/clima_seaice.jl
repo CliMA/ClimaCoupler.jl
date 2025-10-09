@@ -39,16 +39,26 @@ a surface area fraction field.
 This type is used to indicate that this simulation is an ocean simulation for
 dispatch in coupling.
 
+Initially, no sea ice is present.
+
+Since this model does not solve for prognostic temperature, we use a
+prescribed heat flux boundary condition at the top, which is used to solve for
+temperature at the surface of the sea ice. The surface temperature from the
+previous step is provided to the coupler to be used in computing fluxes.
+
 Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
 """
-function ClimaSeaIceSimulation(area_fraction, ocean; output_dir)
+function ClimaSeaIceSimulation(land_fraction, ocean; output_dir)
     # Initialize the sea ice with the same grid as the ocean
-    # Initially no sea ice is present
     grid = ocean.ocean.model.grid
     arch = grid.architecture
     advection = ocean.ocean.model.advection.T
-    sea_ice = CO.sea_ice_simulation(grid, ocean.ocean; advection)
+    top_heat_boundary_condition = CO.MeltingConstrainedFluxBalance()
+
+    # TODO use branch ss-js/top-heat-bc for this constructor
+    sea_ice =
+        CO.sea_ice_simulation(grid, ocean.ocean; advection, top_heat_boundary_condition)
 
     melting_speed = 1e-4
 
@@ -56,45 +66,48 @@ function ClimaSeaIceSimulation(area_fraction, ocean; output_dir)
     remapping = ocean.remapping
 
     # Before version 0.96.22, the NetCDFWriter was broken on GPU
-    # TODO this fails with OC Field MethodError
-    # if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
-    #     # Save all tracers and velocities to a NetCDF file at daily frequency
-    #     outputs = OC.prognostic_fields(sea_ice.model)
-    #     netcdf_writer = OC.NetCDFWriter(
-    #         sea_ice.model,
-    #         outputs;
-    #         schedule = OC.TimeInterval(86400), # Daily output
-    #         filename = joinpath(output_dir, "seaice_diagnostics.nc"),
-    #         indices = (:, :, grid.Nz),
-    #         overwrite_existing = true,
-    #         array_type = Array{Float32},
-    #     )
-    #     sea_ice.output_writers[:diagnostics] = netcdf_writer
-    # end
+    if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
+        # Save all tracers and velocities to a NetCDF file at daily frequency
+        outputs = OC.prognostic_fields(sea_ice.model)
+        jld_writer = OC.JLDWriter(
+            sea_ice.model,
+            outputs;
+            schedule = OC.TimeInterval(86400), # Daily output
+            filename = joinpath(output_dir, "seaice_diagnostics.jld2"),
+            overwrite_existing = true,
+            array_type = Array{Float32},
+        )
+        sea_ice.output_writers[:diagnostics] = jld_writer
+    end
 
     # Allocate space for the sea ice-ocean (io) fluxes
-    io_bottom_heat_flux = OC.Field{Center, Center, Nothing}(grid)
-    io_frazil_heat_flux = OC.Field{Center, Center, Nothing}(grid)
-    io_salt_flux = OC.Field{Center, Center, Nothing}(grid)
-    x_momentum = OC.Field{Face, Center, Nothing}(grid)
-    y_momentum = OC.Field{Center, Face, Nothing}(grid)
+    ocean_sea_ice_fluxes = ocean.ocean_sea_ice_fluxes
 
-    ocean_sea_ice_fluxes = (
-        interface_heat = io_bottom_heat_flux,
-        frazil_heat = io_frazil_heat_flux,
-        salt = io_salt_flux,
-        x_momentum = x_momentum,
-        y_momentum = y_momentum,
-    )
+    # TODO clean this up
+    # Get the area fraction from the fractional sea ice concentration
+    area_fraction = sea_ice.model.ice_concentration
+
+    # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
+    #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
+    boundary_space = axes(ocean.area_fraction)
+    FT = CC.Spaces.undertype(boundary_space)
+
+    area_fraction_boundary_space = Interfacer.remap(area_fraction, boundary_space)
+    @. area_fraction_boundary_space =
+        max(min(area_fraction_boundary_space, FT(1) - land_fraction), FT(0))
 
     sim = ClimaSeaIceSimulation(
         sea_ice,
-        area_fraction,
+        area_fraction_boundary_space,
         melting_speed,
         remapping,
         ocean_sea_ice_fluxes,
     )
     return sim
+end
+
+function update_sic!(area_fraction, sea_ice)
+    # TODO
 end
 
 ###############################################################################
@@ -106,8 +119,9 @@ Interfacer.step!(sim::ClimaSeaIceSimulation, t) =
     OC.time_step!(sim.sea_ice, float(t) - sim.sea_ice.model.clock.time)
 
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:area_fraction}) = sim.area_fraction
+Interfacer.get_field(sim::ClimaSeaIceSimulation, Val(:sea_ice_concentration)) =
+    sim.sea_ice.model.ice_concentration
 
-# TODO: Better values for this
 # At the moment, we return always Float32. This is because we always want to run
 # Oceananingans with Float64, so we have no way to know the float type here. Sticking with
 # Float32 ensures that nothing is accidentally promoted to Float64. We will need to change
@@ -118,21 +132,24 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_momentum}) =
     Float32(5.8e-5)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:beta}) = Float32(1)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_direct_albedo}) =
-    Float32(0.011)
+    Float32(0.7)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_diffuse_albedo}) =
-    Float32(0.069)
+    Float32(0.7)
 
-# Approximate the sea ice surface temperature from the bulk temperature and ocean surface temperature,
-#  assuming a linear profile in the top layer
-# TODO how to get ocean surface temp here? Is it in the sea ice or do we need to pass the ocean sim too?
+# Approximate the sea ice surface temperature as the temperature computed from the
+#  fluxes at the previous timestep.
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
-    273.15 + sim.ocean.model.tracers.T
+    273.15 .+
+    OC.interior(sim.sea_ice.model.ice_thermodynamics.top_surface_temperature, :, :, 1)
 
 """
     FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fields)
 
 Update the turbulent fluxes in the simulation using the values stored in the coupler fields.
 These include latent heat flux, sensible heat flux, momentum fluxes, and moisture flux.
+
+Note that currently the moisture flux has no effect on the sea ice model, which has
+constant salinity.
 
 A note on sign conventions:
 SurfaceFluxes and ClimaSeaIce both use the convention that a positive flux is an upward flux.
@@ -166,10 +183,11 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     F_turb_ρτyz_cc = sim.remapping.scratch_cc2
 
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
-    oc_flux_u = surface_flux(sim.sea_ice.model.velocities.u)
-    oc_flux_v = surface_flux(sim.sea_ice.model.velocities.v)
+    # Note that this requires the sea ice model to always be run with dynamics turned on
+    si_flux_u = sim.sea_ice.model.dynamics.external_stresses.top.u
+    si_flux_v = sim.sea_ice.model.dynamics.external_stresses.top.v
     set_from_extrinsic_vectors!(
-        (; u = oc_flux_u, v = oc_flux_v),
+        (; u = si_flux_u, v = si_flux_v),
         grid,
         F_turb_ρτxz_cc,
         F_turb_ρτyz_cc,
@@ -183,27 +201,14 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     remapped_F_lh = sim.remapping.scratch_arr1
     remapped_F_sh = sim.remapping.scratch_arr2
 
+    # Update the sea ice only where the concentration is greater than zero.
+    si_flux_heat = ice_sim.sea_ice.model.external_heat_fluxes.top
+    OC.interior(si_flux_heat, :, :, 1) .=
+        OC.interior(si_flux_heat, :, :, 1) .+ (
+            (OC.interior(sim.sea_ice.model.ice_concentration, :, :, 1) .> 0) .*
+            (remapped_F_lh .+ remapped_F_sh)
+        )
 
-    # TODO update this for sea ice
-    # TODO what is sim.sea_ice.model.ice_thermodynamics.top_surface_temperature? where is it set?
-    # TODO ocean_reference_density -> sea_ice.model.ice_density ?
-    oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
-    OC.interior(oc_flux_T, :, :, 1) .=
-        OC.interior(oc_flux_T, :, :, 1) .+
-        (remapped_F_lh .+ remapped_F_sh) ./ (ocean_reference_density * ocean_heat_capacity)
-
-    # Add the part of the salinity flux that comes from the moisture flux. We also need to
-    # add the component due to precipitation (that was done with the radiative fluxes)
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
-        F_turb_moisture,
-    )
-    moisture_fresh_water_flux = sim.remapping.scratch_arr1 ./ ocean_fresh_water_density # TODO do we need this for sea ice too?
-    oc_flux_S = surface_flux(sim.sea_ice.model.tracers.S)
-    surface_salinity = OC.interior(sim.sea_ice.model.tracers.S, :, :, 1)
-    OC.interior(oc_flux_S, :, :, 1) .=
-        OC.interior(oc_flux_S, :, :, 1) .- surface_salinity .* moisture_fresh_water_flux
     return nothing
 end
 
@@ -221,6 +226,9 @@ by the coupler.
 Update the portion of the surface_fluxes for T and S that is due to radiation and
 precipitation. The rest will be updated in `update_turbulent_fluxes!`.
 
+Note that currently precipitation has no effect on the sea ice model, which has
+constant salinity.
+
 A note on sign conventions:
 ClimaAtmos and ClimaSeaIce both use the convention that a positive flux is an upward flux.
 No sign change is needed during the exchange, except for precipitation/salinity fluxes.
@@ -229,10 +237,6 @@ ClimaSeaIce represents precipitation as a positive salinity flux,
 so a sign change is needed when we convert from precipitation to salinity flux.
 """
 function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf, area_fraction)
-    # TODO update this for sea ice
-    (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) =
-        sim.ocean_properties
-
     # Remap radiative flux onto scratch array; rename for clarity
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr1,
@@ -243,31 +247,12 @@ function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf, area_fracti
 
     # Update only the part due to radiative fluxes. For the full update, the component due
     # to latent and sensible heat is missing and will be updated in update_turbulent_fluxes.
-    oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
-    OC.interior(oc_flux_T, :, :, 1) .=
-        remapped_F_radiative ./ (ocean_reference_density * ocean_heat_capacity)
+    # Update the sea ice only where the concentration is greater than zero.
+    si_flux_heat = sim.sea_ice.model.external_heat_fluxes.top
+    OC.interior(si_flux_heat, :, :, 1) .=
+        (OC.interior(sim.sea_ice.model.ice_concentration, :, :, 1) .> 0) .*
+        remapped_F_radiative
 
-    # Remap precipitation fields onto scratch arrays; rename for clarity
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
-        csf.P_liq,
-    )
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr2,
-        sim.remapping.remapper_cc,
-        csf.P_snow,
-    )
-    remapped_P_liq = sim.remapping.scratch_arr1
-    remapped_P_snow = sim.remapping.scratch_arr2
-
-    # Virtual salt flux
-    oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
-    precipitating_fresh_water_flux =
-        (remapped_P_liq .+ remapped_P_snow) ./ ocean_fresh_water_density
-    surface_salinity_flux =
-        OC.interior(sim.ocean.model.tracers.S, :, :, 1) .* precipitating_fresh_water_flux
-    OC.interior(oc_flux_S, :, :, 1) .= .-surface_salinity_flux
     return nothing
 end
 
@@ -286,7 +271,7 @@ function FluxCalculator.ocean_seaice_fluxes!(
     ocean_properties = ocean_sim.ocean_properties
 
     # Compute the fluxes and store them in the both simulations
-    OC.compute_sea_ice_ocean_fluxes!(
+    CO.compute_sea_ice_ocean_fluxes!(
         ice_sim.ocean_sea_ice_fluxes,
         ocean_sim.ocean,
         ice_sim.sea_ice,
@@ -295,7 +280,27 @@ function FluxCalculator.ocean_seaice_fluxes!(
     )
     ocean_sim.ocean_sea_ice_fluxes = ice_sim.ocean_sea_ice_fluxes
 
-    # TODO what do we do with these fluxes now? They need to be passed to the component sims somehow
+    ## Update the internals of the sea ice model
+    # Set the bottom heat flux to the sum of the frazil and interface heat fluxes
+    bottom_heat_flux = ice_sim.sea_ice.model.external_heat_fluxes.bottom
+
+    Qf = sea_ice_ocean_fluxes.frazil_heat        # frazil heat flux
+    Qi = sea_ice_ocean_fluxes.interface_heat     # interfacial heat flux
+    bottom_heat_flux .= Qf .+ Qi
+
+    ## Update the internals of the ocean model
+    ρₒ⁻¹ = 1 / ocean_sim.ocean_properties.reference_density
+    cₒ = ocean_sim.ocean_properties.heat_capacity
+
+    Jᵀio = Qio * ρₒ⁻¹ / cₒ
+    Jˢio = sea_ice_ocean_fluxes.salt[i, j, 1] * ℵᵢ
+
+    # ℑxᶠᵃᵃ: interpolate faces to centers
+    τxio = ρτxio[i, j, 1] * ρₒ⁻¹ * ℑxᶠᵃᵃ(i, j, 1, grid, ℵ)
+    τyio = ρτyio[i, j, 1] * ρₒ⁻¹ * ℑyᵃᶠᵃ(i, j, 1, grid, ℵ)
+
+    # TODO finish this
+
     return nothing
 end
 

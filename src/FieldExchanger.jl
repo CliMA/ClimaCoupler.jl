@@ -41,12 +41,13 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     # ice and ocean fractions are dynamic
     if haskey(cs.model_sims, :ice_sim)
         ice_sim = cs.model_sims.ice_sim
-        ice_fraction_before = Interfacer.get_field(ice_sim, Val(:area_fraction))
+        Interfacer.get_field!(cs.fields.temp1, ice_sim, Val(:sea_ice_concentration)) # TODO extend for non-ClimaSeaIce, add to Interfacer
+        sea_ice_concentration = cs.fields.temp1
         # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
         Interfacer.update_field!(
             ice_sim,
             Val(:area_fraction),
-            max.(min.(ice_fraction_before, FT(1) .- land_fraction), FT(0)),
+            max.(min.(sea_ice_concentration, FT(1) .- land_fraction), FT(0)),
         )
         ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
     else
@@ -65,6 +66,15 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     else
         cs.fields.temp1 .= 0
         ocean_fraction = cs.fields.temp1
+    end
+
+    if haskey(cs.model_sims, :ocean_sim) && haskey(cs.model_sims, :ice_sim)
+        # TODO add this update_field to interfacer
+        Interfacer.update_field!(
+            ocean_sim,
+            Val(:sea_ice_concentration),
+            sea_ice_concentration,
+        )
     end
 
     # check that the sum of area fractions is 1

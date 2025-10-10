@@ -35,7 +35,7 @@ function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, it
     try
         # TODO: Make a plots directory if it doesn't exist and use that instead of output_dir
         plots_dir = joinpath(output_dir, "plots")
-        ispath(plots) || mkdir(plots)
+        ispath(plots) || mkdir(plots_dir)
         plot_cre_leaderboard_from_iters(plots_dir, SPINUP, iteration + 1)
         plot_constrained_params_and_errors(plots_dir, ekp, prior)
     catch e

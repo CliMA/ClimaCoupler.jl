@@ -12,18 +12,28 @@ function get_sim_cre_var(iteration_dir)
     # Need to recursively go through each iteration and get the diagnostics
     # corresponding to rsut and rsutcs
     member_paths = readdir(iteration_dir, join = true)
-    filter!(x -> occursin("member", x), member_paths)
+    filter!(x -> occursin("member_001", x), member_paths)
     member_paths = joinpath.(member_paths, "model_config", "output_active", "clima_atmos")
-    simdirs = ClimaAnalysis.SimDir.(member_paths)
-    rsut_vars = [get(simdir; short_name = "rsut", reduction = "average", period = "1M") for simdir in simdirs]
-    rsutcs_vars = [get(simdir; short_name = "rsutcs", reduction = "average", period = "1M") for simdir in simdirs]
-    @assert length(rsut_vars) == length(rsutcs_vars)
-    cre_vars = [rsutcs_var - rsut_var for (rsutcs_var, rsut_var) in zip(rsutcs_vars, rsut_vars)]
-    mean_cre_data = sum(cre_var.data for cre_var in cre_vars) ./ length(cre_vars)
-    cre_var = ClimaAnalysis.remake(first(cre_vars), data = mean_cre_data)
-    cre_var = ClimaAnalysis.shift_to_start_of_previous_month(cre_var)
-    cre_var = ClimaAnalysis.set_units(cre_var, "W m^-2")
-    return cre_var
+
+    # Code below is for taking average over all the iterations
+    # simdirs = ClimaAnalysis.SimDir.(member_paths)
+    # rsut_vars = [get(simdir; short_name = "rsut", reduction = "average", period = "1M") for simdir in simdirs]
+    # rsutcs_vars = [get(simdir; short_name = "rsutcs", reduction = "average", period = "1M") for simdir in simdirs]
+    # @assert length(rsut_vars) == length(rsutcs_vars)
+    # cre_vars = [rsutcs_var - rsut_var for (rsutcs_var, rsut_var) in zip(rsutcs_vars, rsut_vars)]
+    # mean_cre_data = sum(cre_var.data for cre_var in cre_vars) ./ length(cre_vars)
+    # cre_var = ClimaAnalysis.remake(first(cre_vars), data = mean_cre_data)
+    # cre_var = ClimaAnalysis.shift_to_start_of_previous_month(cre_var)
+    # cre_var = ClimaAnalysis.set_units(cre_var, "W m^-2")
+    # return cre_var
+
+    simdir = ClimaAnalysis.SimDir(first(member_paths))
+    sim_var_rsut = get(simdir, short_name = "rsut")
+    sim_var_rsutcs = get(simdir, short_name = "rsutcs")
+    sim_var_cre = sim_var_rsutcs - sim_var_rsut
+    sim_var_cre = ClimaAnalysis.shift_to_start_of_previous_month(sim_var_cre)
+    sim_var_cre = ClimaAnalysis.set_units(sim_var_cre, "W m^-2")
+    return sim_var_cre
 end
 
 function get_obs_cre_var(start_date)

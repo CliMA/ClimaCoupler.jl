@@ -4,9 +4,9 @@ using Statistics, Dates, LinearAlgebra, OrderedCollections, NaNStatistics
 function compute_covariance(var; full = true)
     monthly_cre = ClimaAnalysis.split_by_month(var)
     if !full # hard coding months here
-        monthly_cre = [monthly_cre[9]]
+        monthly_cre = [monthly_cre[9], monthly_cre[10], monthly_cre[11], monthly_cre[12]]
     end
-    monthly_covariances = vec.(Float32.(covariance_var.data) for covariance)
+    monthly_covariances = vec.(Float32.(covariance_var.data) for covariance_var in variance_time.(monthly_cre))
     covariance_vec = vcat(monthly_covariances...)
     size_of_vec = length(covariance_vec)
     covariance_mat = Diagonal(covariance_vec)
@@ -20,7 +20,7 @@ function compute_covariance(var; full = true)
     return lat_weights .* (covariance_mat .+ discrepancy .+ regularization)
 end
 
-# Maybe move this function to ClimaAnalysis
+# TODO: Move this function to ClimaAnalysis
 function lat_weight_mat(output_var::OutputVar)
     lon_size, lat_size = size(output_var.data)[1:2]
     lat_weights = zeros(Float32, lon_size, lat_size)

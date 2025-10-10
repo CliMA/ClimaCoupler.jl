@@ -138,7 +138,7 @@ from each surface model when surface fluxes are computed, in `compute_surface_fl
 """
 function import_combined_surface_fields!(csf, model_sims)
     combine_surfaces!(csf.emissivity, model_sims, Val(:emissivity), csf.scalar_temp1)
-    combine_surfaces!(csf.T_sfc, model_sims, Val(:surface_temperature), csf.scalar_temp1)
+    combine_surfaces!(csf, model_sims, Val(:surface_temperature))
     combine_surfaces!(
         csf.surface_direct_albedo,
         model_sims,
@@ -262,25 +262,25 @@ is computed from the combined upward longwave radiation.
     Note: For the surface temperature, all coupler fields are passed in a NamedTuple.
 - `sims`: [NamedTuple] containing simulations .
 - `field_name`: [Val] containing the name Symbol of the field t be extracted by the `Interfacer.get_field` functions.
-- `temp1`: [CC.Fields.Field] temporary field for intermediate calculations.
+- `scalar_temp`: [CC.Fields.Field] temporary scalar-valued field for intermediate calculations.
     Omitted for surface temperature method.
 
 # Example
-- `combine_surfaces!(temp_field, cs.model_sims, Val(:surface_temperature))`
+- `combine_surfaces!(temp_field, cs.model_sims, Val(:emissivity))`
 """
-function combine_surfaces!(combined_field, sims, field_name, temp1)
+function combine_surfaces!(combined_field, sims, field_name, scalar_temp)
     boundary_space = axes(combined_field)
     combined_field .= 0
     for sim in sims
         if sim isa Interfacer.SurfaceModelSimulation
-            # Store the area fraction of this simulation in `temp1`
-            Interfacer.get_field!(temp1, sim, Val(:area_fraction))
+            # Store the area fraction of this simulation in `scalar_temp`
+            Interfacer.get_field!(scalar_temp, sim, Val(:area_fraction))
             # Zero out the contribution from this surface if the area fraction is zero.
             # Note that multiplying by `area_fraction` is not sufficient in the case of NaNs
             combined_field .+=
-                temp1 .*
+                scalar_temp .*
                 ifelse.(
-                    temp1 .≈ 0,
+                    scalar_temp .≈ 0,
                     zero(combined_field),
                     Interfacer.get_field(sim, field_name, boundary_space),
                 )
@@ -300,10 +300,10 @@ function combine_surfaces!(csf, sims, field_name::Val{:surface_temperature})
     for sim in sims
         if sim isa Interfacer.SurfaceModelSimulation
             # Store the area fraction and emissivity of this simulation in temp fields
-            Interfacer.get_field!(csf.temp1, sim, Val(:area_fraction))
-            area_fraction = csf.temp1
-            Interfacer.get_field!(csf.temp2, sim, Val(:emissivity))
-            emissivity_sim = csf.temp2
+            Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))
+            area_fraction = csf.scalar_temp1
+            Interfacer.get_field!(csf.scalar_temp2, sim, Val(:emissivity))
+            emissivity_sim = csf.scalar_temp2
 
             # Zero out the contribution from this surface if the area fraction is zero.
             # Note that multiplying by `area_fraction` is not sufficient in the case of NaNs

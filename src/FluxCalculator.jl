@@ -9,6 +9,7 @@ module FluxCalculator
 import StaticArrays
 import SurfaceFluxes as SF
 import Thermodynamics as TD
+import Thermodynamics.Parameters as TDP
 import ClimaCore as CC
 import ..Interfacer, ..Utilities
 
@@ -53,9 +54,6 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
         :F_lh,
         :F_sh,
         :F_turb_moisture,
-        :z0m_sfc,
-        :z0b_sfc,
-        :beta,
         :L_MO,
         :ustar,
         :buoyancy_flux,
@@ -203,6 +201,36 @@ end
 update_turbulent_fluxes!(sim::Interfacer.AbstractSurfaceStub, fields::NamedTuple) = nothing
 
 """
+    compute_surface_humidity!(q_sfc, T_atmos, q_atmos, ρ_atmos, T_sfc, thermo_params)
+
+Computes the surface specific humidity based on the atmospheric state and surface temperature.
+The phase of the surface is determined by the surface temperature, and the saturation
+specific humidity is computed accordingly.
+
+All fields should be on the exchange grid.
+
+# Arguments
+- `q_sfc`: [CC.Fields.Field] output field for surface specific humidity.
+- `T_atmos`: [CC.Fields.Field] atmospheric temperature.
+- `q_atmos`: [CC.Fields.Field] atmospheric specific humidity.
+- `ρ_atmos`: [CC.Fields.Field] atmospheric air density.
+- `T_sfc`: [CC.Fields.Field] surface temperature.
+- `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
+"""
+function compute_surface_humidity!(q_sfc, T_atmos, q_atmos, ρ_atmos, T_sfc, thermo_params)
+    thermo_state_atmos = TD.PhaseEquil_ρTq.(thermo_params, ρ_atmos, T_atmos, q_atmos)
+    ρ_sfc = FluxCalculator.extrapolate_ρ_to_sfc.(thermo_params, thermo_state_atmos, T_sfc)
+
+    T_freeze = TDP.T_freeze(thermo_params)
+    @. q_sfc = ifelse(
+        T_sfc .> T_freeze,
+        TD.q_vap_saturation_generic(thermo_params, T_sfc, ρ_sfc, TD.Liquid()),
+        TD.q_vap_saturation_generic(thermo_params, T_sfc, ρ_sfc, TD.Ice()),
+    )
+    return nothing
+end
+
+"""
     compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params)
 
 This function computes surface fluxes between the input component model
@@ -238,34 +266,55 @@ function compute_surface_fluxes!(
     thermo_params,
 )
     boundary_space = axes(csf)
-    # TODO lots of allocations here
-    # `_int` refers to atmos state of center level 1
-    z_int = Interfacer.get_field(atmos_sim, Val(:height_int), boundary_space)
-    u_int = Interfacer.get_field(atmos_sim, Val(:u_int), boundary_space)
-    v_int = Interfacer.get_field(atmos_sim, Val(:v_int), boundary_space)
-    uₕ_int = @. StaticArrays.SVector(u_int, v_int)
-    z_sfc = Interfacer.get_field(atmos_sim, Val(:height_sfc), boundary_space)
+    FT = CC.Spaces.undertype(boundary_space)
 
-    # construct the atmospheric thermo states
+    # Store atmosphere fields in coupler temp fields so we only regrid them once per timestep
+    # `_int` refers to atmos state of center level 1
+
+    # After constructing `uₕ_int`, we can reuse `scalar_temp1` and `scalar_temp2`
+    Interfacer.get_field!(csf.scalar_temp1, atmos_sim, Val(:u_int))
+    Interfacer.get_field!(csf.scalar_temp2, atmos_sim, Val(:v_int))
+    # We allocate `uₕ_int` without a temp field since no regridding is required
+    uₕ_int = StaticArrays.SVector.(csf.scalar_temp1, csf.scalar_temp2)
+
+    # construct the atmospheric thermo state
     thermo_state_atmos =
         TD.PhaseEquil_ρTq.(thermo_params, csf.ρ_atmos, csf.T_atmos, csf.q_atmos)
 
-    # construct the surface thermo state
-    # get surface air density by extrapolating atmospheric density to the surface
-    ρ_sfc = extrapolate_ρ_to_sfc.(thermo_params, thermo_state_atmos, csf.T_sfc)
-
     # compute surface humidity from the surface temperature, surface density, and phase
-    thermo_state_sfc = TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, csf.T_sfc, csf.q_sfc)
+    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
+    T_sfc = csf.scalar_temp1
+    compute_surface_humidity!(
+        csf.scalar_temp2,
+        csf.T_atmos,
+        csf.q_atmos,
+        csf.ρ_atmos,
+        T_sfc,
+        thermo_params,
+    )
+    q_sfc = csf.scalar_temp2
+
+    # get surface air density by extrapolating atmospheric density to the surface
+    ρ_sfc = extrapolate_ρ_to_sfc.(thermo_params, thermo_state_atmos, T_sfc)
+
+    # construct the surface thermo state
+    # after this we can reuse `scalar_temp1` and `scalar_temp2` again
+    thermo_state_sfc = TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
 
     # get area fraction (min = 0, max = 1)
-    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
+    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))
+    area_fraction = csf.scalar_temp1
 
     surface_params = FluxCalculator.get_surface_params(atmos_sim)
 
-    z0m = Interfacer.get_field(sim, Val(:roughness_momentum), boundary_space)
-    z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy), boundary_space)
-    beta = Interfacer.get_field(sim, Val(:beta), boundary_space)
-    FT = eltype(z0m)
+    # get roughness lengths and beta from surface simulation
+    Interfacer.get_field!(csf.scalar_temp2, sim, Val(:roughness_momentum))
+    z0m = csf.scalar_temp2
+    Interfacer.get_field!(csf.scalar_temp3, sim, Val(:roughness_buoyancy))
+    z0b = csf.scalar_temp3
+    Interfacer.get_field!(csf.scalar_temp4, sim, Val(:beta))
+    beta = csf.scalar_temp4
+
     scheme_properties =
         (; z0b = z0b, z0m = z0m, Ch = FT(0), Cd = FT(0), beta = beta, gustiness = FT(1))
 
@@ -273,8 +322,8 @@ function compute_surface_fluxes!(
         thermo_state_sfc,
         thermo_state_atmos,
         uₕ_int,
-        z_int,
-        z_sfc,
+        csf.z_int,
+        csf.z_sfc,
         scheme_properties,
         boundary_space,
         surface_params,
@@ -285,7 +334,6 @@ function compute_surface_fluxes!(
     fluxes = FluxCalculator.get_surface_fluxes(inputs, surface_params)
     (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux) =
         fluxes
-
 
     # Zero out fluxes where the area fraction is zero
     # Multiplying by `area_fraction` is not sufficient because the fluxes may
@@ -328,14 +376,6 @@ function compute_surface_fluxes!(
     @. csf.L_MO += ifelse(isinf(L_MO), L_MO, L_MO * area_fraction)
     @. csf.ustar += ustar * area_fraction
     @. csf.buoyancy_flux += buoyancy_flux * area_fraction
-
-    z0m = Interfacer.get_field(sim, Val(:roughness_momentum), boundary_space)
-    z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy), boundary_space)
-    beta = Interfacer.get_field(sim, Val(:beta), boundary_space)
-
-    @. csf.z0m_sfc += z0m * area_fraction
-    @. csf.z0b_sfc += z0b * area_fraction
-    @. csf.beta += beta * area_fraction
     return nothing
 end
 

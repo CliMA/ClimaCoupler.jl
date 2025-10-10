@@ -350,28 +350,49 @@ function Interfacer.update_field!(
     temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
     @assert axes(temp_field_surface) == atmos_surface_space
 
+    # Compute surface humidity on the coupler space, then remap to atmosphere surface space
+    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:air_temperature))
+    T_atmos = csf.scalar_temp1
+    Interfacer.get_field!(csf.scalar_temp2, sim, Val(:specific_humidity))
+    q_atmos = csf.scalar_temp2
+    Interfacer.get_field!(csf.scalar_temp3, sim, Val(:air_density))
+    ρ_atmos = csf.scalar_temp3
+
+    thermo_params = get_thermo_params(sim)
+    FluxCalculator.compute_surface_humidity!(
+        csf.scalar_temp4,
+        T_atmos,
+        q_atmos,
+        ρ_atmos,
+        csf.T_sfc,
+        thermo_params,
+    )
+
+    # Remap surface temperature and humidity to atmosphere surface space
     # NOTE: This is allocating! If we had 2 more scratch fields, we could avoid this
     T_sfc_atmos = Interfacer.remap(csf.T_sfc, atmos_surface_space)
-    q_sfc_atmos = Interfacer.remap(csf.q_sfc, atmos_surface_space)
+    q_sfc_atmos = Interfacer.remap(csf.scalar_temp4, atmos_surface_space)
+
     # Store `ρ_sfc_atmos` in an atmosphere scratch field on the surface space
     temp_field_surface =
         FluxCalculator.extrapolate_ρ_to_sfc.(
-            get_thermo_params(sim),
+            thermo_params,
             sim.integrator.p.precomputed.sfc_conditions.ts,
             T_sfc_atmos,
-        ) # ρ_sfc_atmos
+        )
+    ρ_sfc_atmos = temp_field_surface
 
     if sim.integrator.p.atmos.moisture_model isa CA.DryModel
         sim.integrator.p.precomputed.sfc_conditions.ts .=
-            TD.PhaseDry_ρT.(get_thermo_params(sim), temp_field_surface, T_sfc_atmos) # temp_field_surface = ρ_sfc_atmos
+            TD.PhaseDry_ρT.(thermo_params, ρ_sfc_atmos, T_sfc_atmos)
     else
         sim.integrator.p.precomputed.sfc_conditions.ts .=
             TD.PhaseNonEquil_ρTq.(
-                get_thermo_params(sim),
-                temp_field_surface,
+                thermo_params,
+                ρ_sfc_atmos,
                 T_sfc_atmos,
                 TD.PhasePartition.(q_sfc_atmos),
-            ) # temp_field_surface = ρ_sfc_atmos
+            )
     end
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =

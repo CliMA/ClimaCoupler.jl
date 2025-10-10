@@ -35,4 +35,4 @@ value = 0
 value = 4.2
 
 [mixing_length_eddy_viscosity_coefficient]
-value = 0.035
+value = 0.014

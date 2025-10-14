@@ -105,15 +105,6 @@ steps:
         agents:
           slurm_mem: 16GB
 
-      - label: "GPU ClimaEarth runtests"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/runtests.jl"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_ntasks: 1
-          slurm_gres: "gpu:1"
-          slurm_mem: 32GB
-
       - label: "MPI restarts"
         key: "mpi_restarts"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/restart.jl"

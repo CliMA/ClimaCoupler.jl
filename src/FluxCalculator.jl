@@ -218,7 +218,8 @@ All fields should be on the exchange grid.
 - `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
 """
 function compute_surface_humidity!(q_sfc, T_atmos, q_atmos, ρ_atmos, T_sfc, thermo_params)
-    thermo_state_atmos = TD.PhaseEquil_ρTq.(thermo_params, ρ_atmos, T_atmos, q_atmos)
+    thermo_state_atmos =
+        TD.PhaseNonEquil_ρTq.(thermo_params, ρ_atmos, T_atmos, TD.PhasePartition.(q_atmos))
     ρ_sfc = FluxCalculator.extrapolate_ρ_to_sfc.(thermo_params, thermo_state_atmos, T_sfc)
 
     T_freeze = TDP.T_freeze(thermo_params)
@@ -279,7 +280,12 @@ function compute_surface_fluxes!(
 
     # construct the atmospheric thermo state
     thermo_state_atmos =
-        TD.PhaseEquil_ρTq.(thermo_params, csf.ρ_atmos, csf.T_atmos, csf.q_atmos)
+        TD.PhaseNonEquil_ρTq.(
+            thermo_params,
+            csf.ρ_atmos,
+            csf.T_atmos,
+            TD.PhasePartition.(csf.q_atmos),
+        )
 
     # compute surface humidity from the surface temperature, surface density, and phase
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
@@ -299,7 +305,8 @@ function compute_surface_fluxes!(
 
     # construct the surface thermo state
     # after this we can reuse `scalar_temp1` and `scalar_temp2` again
-    thermo_state_sfc = TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
+    thermo_state_sfc =
+        TD.PhaseNonEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, TD.PhasePartition.(q_sfc))
 
     # get area fraction (min = 0, max = 1)
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))

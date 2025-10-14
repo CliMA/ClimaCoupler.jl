@@ -6,6 +6,9 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Replace `TD.PhaseEquil_ρTq` with `TD.PhaseNonEquil_ρTq` PR[#1506](https://github.com/CliMA/ClimaCoupler.jl/pull/1506)
+This should be more physically correct.
+
 #### Use individual surface model temperatures to compute turbulent fluxes PR[#1498](https://github.com/CliMA/ClimaCoupler.jl/pull/1498)
 We use a partitioned approach to computing turbulent fluxes, so we should be using
 the individual surface temperature (and humidity, air density, etc) for each component

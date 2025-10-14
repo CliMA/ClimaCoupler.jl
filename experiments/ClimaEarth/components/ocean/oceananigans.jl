@@ -167,6 +167,38 @@ function OceananigansSimulation(
     return sim
 end
 
+"""
+    FieldExchanger.resolve_ocean_ice_fractions!(ocean_sim, ice_sim, land_fraction)
+
+Ensure the ocean and ice area fractions are consistent with each other.
+This matters in the case of a LatitudeLongitudeGrid, which is only
+defined between -80 and 80 degrees latitude. In this case, we want to
+set the ice fraction to `1 - land_fraction` on [-90, -80] and [80, 90]
+degrees latitude, and make sure the ocean fraction is 0 there.
+"""
+function FieldExchanger.resolve_ocean_ice_fractions!(
+    ocean_sim::OceananigansSimulation,
+    ice_sim,
+    land_fraction,
+)
+    if ocean_sim.ocean.model.grid.underlying_grid isa OC.LatitudeLongitudeGrid
+        ocean_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction))
+        ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
+
+        # Create a "polar" mask that's 1 at latitudes in [-90, -80] and [80, 90] degrees
+        boundary_space = axes(ocean_fraction)
+        FT = CC.Spaces.undertype(boundary_space)
+        lat = CC.Fields.coordinate_field(boundary_space).lat
+        polar_mask = CC.Fields.zeros(boundary_space)
+        polar_mask .= abs.(lat) .>= FT(80)
+
+        # Set ice fraction to 1 - land_fraction and ocean fraction to 0 where polar_mask is 1
+        @. ice_fraction = ifelse.(polar_mask == FT(1), FT(1) - land_fraction, ice_fraction)
+        @. ocean_fraction = ifelse.(polar_mask == FT(1), FT(0), ocean_fraction)
+    end
+    return nothing
+end
+
 ###############################################################################
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
 ###############################################################################

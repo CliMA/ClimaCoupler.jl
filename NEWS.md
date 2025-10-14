@@ -6,6 +6,24 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Use individual surface model temperatures to compute turbulent fluxes PR[#1498](https://github.com/CliMA/ClimaCoupler.jl/pull/1498)
+We use a partitioned approach to computing turbulent fluxes, so we should be using
+the individual surface temperature (and humidity, air density, etc) for each component
+model. Previously we were using a combined surface temperature across all surface models.
+This change doesn't affect simulations using integer area fractions, but will affect simulations
+with fractional area fractions.
+
+This PR also adds ensures that the area fraction of an OceananigansSimulation
+never exceeds the latitude limits when using a LatitudeLongitudeGrid. Note that
+this simulation requires running with an ice model, which is used to fill in
+the polar regions.
+
+#### Combine LW fluxes to get surface temperature for radiation PR[#1492](https://github.com/CliMA/ClimaCoupler.jl/issues/1492)
+Previously, we combined the temperatures of each surface models directly using an
+area-weighted sum. Now, we instead compute the longwave flux for each component, compute
+the area fraction-weighted sum of those, and then convert the total flux back to get
+surface temperature. This temperature is then provided to the atmosphere for radiation.
+
 #### Remove coarse nightly CMIP PR[#1485](https://github.com/CliMA/ClimaCoupler.jl/pull/1485)
 To avoid depending on the main branch of too many packages in the nightly pipeline,
 we remove the CMIP nightly run and will only test AMIP nightly.

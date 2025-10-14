@@ -552,14 +552,17 @@ function CoupledSimulation(config_dict::AbstractDict)
         The concrete steps for proper initialization are:
         =#
 
-        # 1. Import atmospheric and surface fields into the coupler fields,
+        # 1. Make sure surface model area fractions sum to 1 everywhere.
+        FieldExchanger.update_surface_fractions!(cs)
+
+        # 2. Import atmospheric and surface fields into the coupler fields,
         #  then broadcast them back out to all components.
         FieldExchanger.exchange!(cs)
 
-        # 2. Update any fields in the model caches that can only be filled after the initial exchange.
+        # 3. Update any fields in the model caches that can only be filled after the initial exchange.
         FieldExchanger.set_caches!(cs)
 
-        # 3. Calculate and update turbulent fluxes for each surface model,
+        # 4. Calculate and update turbulent fluxes for each surface model,
         #  and save the weighted average in coupler fields
         FluxCalculator.turbulent_fluxes!(cs)
     end

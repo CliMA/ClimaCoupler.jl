@@ -34,6 +34,13 @@ Interfacer.get_field(sim::TestAtmos, ::Val{:height_int}) = sim.integrator.p.z
 Interfacer.get_field(sim::TestAtmos, ::Val{:height_sfc}) = sim.integrator.p.z_sfc
 Interfacer.get_field(sim::TestAtmos, ::Val{:u_int}) = sim.integrator.p.u
 Interfacer.get_field(sim::TestAtmos, ::Val{:v_int}) = sim.integrator.p.v
+Interfacer.get_field(sim::TestAtmos, ::Val{:radiative_energy_flux_sfc}) =
+    CC.Fields.zeros(axes(sim.integrator.T))
+Interfacer.get_field(sim::TestAtmos, ::Val{:liquid_precipitation}) =
+    CC.Fields.zeros(axes(sim.integrator.T))
+Interfacer.get_field(sim::TestAtmos, ::Val{:snow_precipitation}) =
+    CC.Fields.zeros(axes(sim.integrator.T))
+
 
 function FieldExchanger.import_atmos_fields!(csf, sim::TestAtmos, atmos_sim)
     # update atmos properties in coupler fields needed to compute surface fluxes
@@ -165,10 +172,10 @@ for FT in (Float32, Float64)
         FieldExchanger.import_atmos_fields!(fields, model_sims)
 
         # import surface properties into coupler fields
-        thermo_params = get_thermo_params(atmos_sim)
-        FieldExchanger.import_combined_surface_fields!(fields, model_sims, thermo_params)
+        FieldExchanger.import_combined_surface_fields!(fields, model_sims)
 
         # calculate turbulent fluxes
+        thermo_params = get_thermo_params(atmos_sim)
         FluxCalculator.turbulent_fluxes!(fields, model_sims, thermo_params)
 
         # calculating the fluxes twice ensures that no accumulation occurred (i.e. fluxes are reset to zero each time)
@@ -200,7 +207,7 @@ for FT in (Float32, Float64)
 
         T_sfc = Interfacer.get_field(ocean_sim, Val(:surface_temperature))
         q_sfc = zeros(boundary_space)
-        FieldExchanger.compute_surface_humidity!(
+        FluxCalculator.compute_surface_humidity!(
             q_sfc,
             fields.T_atmos,
             fields.q_atmos,

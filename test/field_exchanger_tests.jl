@@ -4,26 +4,6 @@ import ClimaCoupler: Interfacer, FieldExchanger, FluxCalculator
 import Thermodynamics.Parameters as TDP
 import ClimaParams # to load TDP extension
 
-# test for a simple generic atmos model
-struct DummySimulation{C} <: Interfacer.AtmosModelSimulation
-    cache::C
-end
-Interfacer.get_field(sim::DummySimulation, ::Val{:air_density}) = sim.cache.air_density
-Interfacer.get_field(sim::DummySimulation, ::Val{:air_temperature}) =
-    sim.cache.air_temperature
-Interfacer.get_field(sim::DummySimulation, ::Val{:specific_humidity}) =
-    sim.cache.specific_humidity
-Interfacer.get_field(sim::DummySimulation, ::Val{:turbulent_energy_flux}) =
-    sim.cache.turbulent_energy_flux
-Interfacer.get_field(sim::DummySimulation, ::Val{:turbulent_moisture_flux}) =
-    sim.cache.turbulent_moisture_flux
-Interfacer.get_field(sim::DummySimulation, ::Val{:radiative_energy_flux_sfc}) =
-    sim.cache.radiative_energy_flux_sfc
-Interfacer.get_field(sim::DummySimulation, ::Val{:liquid_precipitation}) =
-    sim.cache.liquid_precipitation
-Interfacer.get_field(sim::DummySimulation, ::Val{:snow_precipitation}) =
-    sim.cache.snow_precipitation
-
 # surface field exchange tests
 struct TestSurfaceSimulation1{C} <: Interfacer.SurfaceModelSimulation
     cache_field::C
@@ -101,12 +81,20 @@ Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:air_temperature}) =
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:air_density}) = sim.cache.air_density
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:specific_humidity}) =
     sim.cache.specific_humidity
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:turbulent_energy_flux}) =
+    sim.cache.turbulent_energy_flux
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:turbulent_moisture_flux}) =
+    sim.cache.turbulent_moisture_flux
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
     sim.cache.radiative_energy_flux_sfc
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:liquid_precipitation}) =
     sim.cache.liquid_precipitation
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:snow_precipitation}) =
     sim.cache.snow_precipitation
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:height_int}) =
+    CC.Fields.ones(axes(sim.cache.air_temperature))
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:height_sfc}) =
+    CC.Fields.zeros(axes(sim.cache.air_temperature))
 function Interfacer.update_field!(
     sim::TestAtmosSimulation,
     ::Val{:surface_direct_albedo},
@@ -302,7 +290,7 @@ for FT in (Float32, Float64)
         component_fields = ones(NamedTuple{key_types, val_types}, boundary_space)
 
         model_sims = (;
-            atmos_sim = DummySimulation(component_fields),
+            atmos_sim = TestAtmosSimulation(component_fields),
             land_sim = TestSurfaceSimulation1(component_fields),
         )
 
@@ -336,8 +324,7 @@ for FT in (Float32, Float64)
             b = TestSurfaceSimulation2(ones(boundary_space)),
         )
 
-        thermo_params = TDP.ThermodynamicsParameters(FT)
-        FieldExchanger.import_combined_surface_fields!(coupler_fields, sims, thermo_params)
+        FieldExchanger.import_combined_surface_fields!(coupler_fields, sims)
 
         # Analytically compute expected values and compare
         expected_field_temp =

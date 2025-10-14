@@ -191,11 +191,11 @@ for FT in (Float32, Float64)
                 Interfacer.get_field(atmos_sim, Val(:v_int)),
             )
         thermo_state_atmos =
-            TD.PhaseEquil_ρTq.(
+            TD.PhaseNonEquil_ρTq.(
                 thermo_params,
                 atmos_sim.integrator.ρ,
                 atmos_sim.integrator.T,
-                atmos_sim.integrator.q,
+                TD.PhasePartition.(atmos_sim.integrator.q),
             )
 
         # Get surface properties
@@ -217,7 +217,8 @@ for FT in (Float32, Float64)
         )
         ρ_sfc =
             FluxCalculator.extrapolate_ρ_to_sfc.(thermo_params, thermo_state_atmos, T_sfc)
-        thermo_state_sfc = TD.PhaseEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, q_sfc)
+        thermo_state_sfc =
+            TD.PhaseNonEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, TD.PhasePartition.(q_sfc))
 
         # Use SurfaceFluxes.jl to compute the expected fluxes
         inputs = @. SF.ValuesOnly(

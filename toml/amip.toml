@@ -8,7 +8,7 @@ value = 40000.0
 value = 40000.0
 
 [precipitation_timescale]
-value = 1200
+value = 2400
 
 [entr_inv_tau]
 value = 0.002

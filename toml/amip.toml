@@ -11,7 +11,7 @@ value = 40000.0
 value = 2400
 
 [entr_inv_tau]
-value = 0.001
+value = 0.004
 
 [entr_coeff]
 value = 0

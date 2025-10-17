@@ -187,12 +187,12 @@ function Checkpointer.restore_cache!(sim::PrescribedOceanSimulation, new_cache)
 end
 
 """
-    FieldExchanger.update_sim!(::PrescribedOceanSimulation, csf, area_fraction)
+    FieldExchanger.update_sim!(::PrescribedOceanSimulation, csf)
 
 Update the wind velocity (needed for the turbulent flux calculation) and the
 direct and diffuse albedos of the ocean.
 """
-function FieldExchanger.update_sim!(sim::PrescribedOceanSimulation, csf, area_fraction)
+function FieldExchanger.update_sim!(sim::PrescribedOceanSimulation, csf)
     Interfacer.update_field!(sim, Val(:u_int), csf.u_int)
     Interfacer.update_field!(sim, Val(:v_int), csf.v_int)
 

@@ -420,7 +420,7 @@ end
 Interfacer.close_output_writers(sim::ClimaLandSimulation) =
     isnothing(sim.output_writer) || close(sim.output_writer)
 
-function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf, area_fraction)
+function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf)
     # update fields for radiative transfer
     Interfacer.update_field!(sim, Val(:diffuse_fraction), csf.diffuse_fraction)
     Interfacer.update_field!(sim, Val(:sw_d), csf.SW_d)

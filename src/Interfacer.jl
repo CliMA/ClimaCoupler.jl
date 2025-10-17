@@ -275,7 +275,6 @@ update_field!(
         Val{:surface_direct_albedo},
         Val{:surface_diffuse_albedo},
         Val{:surface_temperature},
-        Val{:turbulent_fluxes},
     },
     _,
 ) = update_field_warning(sim, val)

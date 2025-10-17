@@ -68,8 +68,7 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
 
     # Update the atmosphere with the fluxes across all surface models
     # The surface models have already been updated with the fluxes in `compute_surface_fluxes!`
-    # TODO this should be `update_turbulent_fluxes` to match the surface models
-    Interfacer.update_field!(atmos_sim, Val(:turbulent_fluxes), csf)
+    FluxCalculator.update_turbulent_fluxes!(atmos_sim, csf)
     return nothing
 end
 
@@ -188,11 +187,14 @@ function get_surface_params(atmos_sim::Interfacer.AtmosModelSimulation)
 end
 
 """
-    update_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, fields::NamedTuple)
+    update_turbulent_fluxes!(sim::Interfacer.ComponentModelSimulation, fields::NamedTuple)
 
-Updates the fluxes in the surface model simulation `sim` with the fluxes in `fields`.
+Updates the fluxes in the simulation `sim` with the fluxes in `fields`.
+
+For surface models, this should be the fluxes computed between the surface model and the atmosphere.
+For atmosphere models, this should be the area-weighted sum of fluxes across all surface models.
 """
-function update_turbulent_fluxes!(sim::Interfacer.SurfaceModelSimulation, fields)
+function update_turbulent_fluxes!(sim::Interfacer.ComponentModelSimulation, fields)
     return error(
         "update_turbulent_fluxes! is required to be dispatched on $(nameof(sim)), but no method defined",
     )

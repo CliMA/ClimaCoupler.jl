@@ -272,13 +272,8 @@ end
     sim = DummySimulation4(space)
 
     # Test that update_field! gives correct warnings for unextended fields
-    for value in (
-        :emissivity,
-        :surface_direct_albedo,
-        :surface_diffuse_albedo,
-        :surface_temperature,
-        :turbulent_fluxes,
-    )
+    for value in
+        (:emissivity, :surface_direct_albedo, :surface_diffuse_albedo, :surface_temperature)
         val = Val(value)
         @test_logs (
             :warn,

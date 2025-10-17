@@ -121,8 +121,6 @@ Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:surface_temperature}, 
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:roughness_buoyancy}, field) =
     nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:beta}, field) = nothing
-Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:turbulent_fluxes}, field) =
-    nothing
 
 #surface sim
 struct TestSurfaceSimulationLand{C} <: Interfacer.SurfaceModelSimulation

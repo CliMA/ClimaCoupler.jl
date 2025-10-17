@@ -67,6 +67,9 @@ function BucketSimulation(
     energy_check::Bool = false,
     parameter_files = [],
 ) where {FT, TT <: Union{Float64, ITime}}
+    # Construct the parameter dictionary based on the float type and any parameter files
+    toml_dict = LP.create_toml_dict(FT; override_files = parameter_files)
+
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
     if isnothing(shared_surface_space)
@@ -89,10 +92,9 @@ function BucketSimulation(
         surface_elevation = Interfacer.remap(surface_elevation, surface_space)
     end
 
-    α_snow = FT(0.8) # snow albedo
     if albedo_type == "map_static" # Read in albedo from static data file (default type)
         # By default, this uses a file containing bareground albedo without a time component. Snow albedo is specified separately.
-        albedo = CL.Bucket.PrescribedBaregroundAlbedo{FT}(α_snow, surface_space)
+        albedo = CL.Bucket.PrescribedBaregroundAlbedo(toml_dict, surface_space)
     elseif albedo_type == "map_temporal" # Read in albedo from data file containing data over time
         # By default, this uses a file containing linearly-interpolated monthly data of clear-sky albedo, generated from CERES.
         albedo = CL.Bucket.PrescribedSurfaceAlbedo{FT}(
@@ -106,36 +108,18 @@ function BucketSimulation(
             (; lat, long) = coordinate_point
             return typeof(lat)(0.38)
         end
+        α_snow = toml_dict["alpha_snow"] # snow albedo
         albedo =
             CL.Bucket.PrescribedBaregroundAlbedo{FT}(α_snow, α_bareground, surface_space)
     else
         error("invalid albedo type $albedo_type")
     end
 
-    z_0m = FT(1e-3) # roughness length for momentum over smooth bare soil
-    z_0b = FT(1e-3) # roughness length for tracers over smooth bare soil
-    τc = FT(float(dt)) # This is the timescale on which snow exponentially damps to zero, in the case where all
+    # This is the timescale on which snow exponentially damps to zero, in the case where all
     # the snow would melt in time `τc`. It prevents us from having to specially time step in cases where
     # all the snow melts in a single timestep.
-    σS_c = FT(0.2) # critical snow water equivalent
-    W_f = FT(0.2) # bucket capacity
-    κ_soil = FT(1.5) # soil conductivity
-    ρc_soil = FT(2e6) # soil volumetric heat capacity
-
-    params = if isempty(parameter_files)
-        CL.Bucket.BucketModelParameters(FT; albedo, z_0m, z_0b, τc, σS_c, W_f, κ_soil, ρc_soil)
-    else
-        # this is a temporary hack and should be updated properly
-        toml_dict = CP.create_toml_dict(
-            FT;
-            override_file = CP.merge_toml_files(
-                [CL.Parameters.DEFAULT_PARAMS_FILEPATH, parameter_files...];
-                override = true,
-            ),
-        )
-        # τc should be the only exception, it depends on `dt`
-        CL.Bucket.BucketModelParameters(toml_dict; z_0m, z_0b, albedo, τc)
-    end
+    τc = FT(float(dt))
+    params = CL.Bucket.BucketModelParameters(toml_dict; albedo, τc)
 
     args = (params, CL.CoupledAtmosphere{FT}(), CL.CoupledRadiativeFluxes{FT}(), domain)
     model = CL.Bucket.BucketModel{FT, typeof.(args)...}(args...)

@@ -8,10 +8,10 @@ value = 40000.0
 value = 40000.0
 
 [precipitation_timescale]
-value = 2400
+value = 1200
 
 [entr_inv_tau]
-value = 0.004
+value = 0.0005
 
 [entr_coeff]
 value = 0

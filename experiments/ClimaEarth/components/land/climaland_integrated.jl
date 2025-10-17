@@ -91,8 +91,6 @@ function ClimaLandSimulation(
 ) where {FT, TT <: Union{Float64, ITime}}
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
-
-
     if isnothing(shared_surface_space)
         domain = make_land_domain(depth; nelements, dz_tuple)
     else
@@ -117,14 +115,7 @@ function ClimaLandSimulation(
     atmos_h = Interfacer.remap(atmos_h, surface_space)
 
     # Set up spatially-varying parameters
-    default_parameter_file = joinpath(pkgdir(CL), "toml", "default_parameters.toml")
-    toml_dict = CP.create_toml_dict(
-        FT;
-        override_file = CP.merge_toml_files(
-            [default_parameter_file, parameter_files...];
-            override = true,
-        ),
-    )
+    toml_dict = LP.create_toml_dict(FT; override_files = parameter_files)
     earth_param_set = CL.Parameters.LandParameters(toml_dict)
 
     # Set up atmosphere and radiation forcing
@@ -132,9 +123,9 @@ function ClimaLandSimulation(
         atmos = CL.CoupledAtmosphere{FT}(surface_space, atmos_h),
         radiation = CL.CoupledRadiativeFluxes{FT}(
             start_date;
-            insol_params = LP.insolation_parameters(earth_param_set),
             latitude = ClimaCore.Fields.coordinate_field(domain.space.surface).lat,
             longitude = ClimaCore.Fields.coordinate_field(domain.space.surface).long,
+            toml_dict,
         ),
     )
 
@@ -301,9 +292,8 @@ function ClimaLandSimulation(
 
     # Update cos(zenith angle) within land model every hour
     update_dt = dt isa ITime ? ITime(3600) : 3600
-    updateat = [promote(tspan[1]:update_dt:(tspan[2] + dt)...)...] # add an extra time at end in case sim steps over end
     updatefunc = CL.make_update_drivers(CL.get_drivers(model))
-    driver_cb = CL.DriverUpdateCallback(updateat, updatefunc)
+    driver_cb = CL.DriverUpdateCallback(updatefunc, update_dt, tspan[1])
 
     exp_tendency! = CL.make_exp_tendency(model)
     imp_tendency! = CL.make_imp_tendency(model)

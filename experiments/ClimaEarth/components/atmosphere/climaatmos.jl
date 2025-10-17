@@ -452,11 +452,7 @@ function Interfacer.update_field!(
         CC.Fields.field2array(temp_field_surface)'
 end
 
-function Interfacer.update_field!(
-    sim::ClimaAtmosSimulation,
-    ::Val{:turbulent_fluxes},
-    fields,
-)
+function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fields)
     (; F_lh, F_sh, F_turb_moisture, F_turb_ρτxz, F_turb_ρτyz) = fields
     atmos_surface_space = get_surface_space(sim)
     temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level

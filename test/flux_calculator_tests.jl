@@ -40,21 +40,15 @@ Interfacer.get_field(sim::TestAtmos, ::Val{:liquid_precipitation}) =
     CC.Fields.zeros(axes(sim.integrator.T))
 Interfacer.get_field(sim::TestAtmos, ::Val{:snow_precipitation}) =
     CC.Fields.zeros(axes(sim.integrator.T))
+FieldExchanger.update_sim!(sim::TestAtmos, fields, _) = nothing
 
-
-function FieldExchanger.import_atmos_fields!(csf, sim::TestAtmos, atmos_sim)
-    # update atmos properties in coupler fields needed to compute surface fluxes
-    Interfacer.get_field!(csf.T_atmos, atmos_sim, Val(:air_temperature))
-    Interfacer.get_field!(csf.q_atmos, atmos_sim, Val(:specific_humidity))
-    Interfacer.get_field!(csf.ρ_atmos, atmos_sim, Val(:air_density))
-end
-
-function FieldExchanger.update_sim!(sim::TestAtmos, fields, _)
+function FluxCalculator.update_turbulent_fluxes!(sim::TestAtmos, fields)
     (; F_turb_ρτxz, F_lh, F_sh, F_turb_moisture) = fields
     ρ_int = sim.integrator.ρ
     @. sim.integrator.p.energy_bc = F_lh + F_sh
     @. sim.integrator.p.ρq_tot_bc = F_turb_moisture
     @. sim.integrator.p.uₕ_bc = F_turb_ρτxz / ρ_int # x-component only for this test
+    return nothing
 end
 
 function get_thermo_params(sim::TestAtmos)
@@ -85,8 +79,6 @@ Interfacer.get_field(
     ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}},
 ) = sim.integrator.p.α
 Interfacer.get_field(sim::TestOcean, ::Val{:emissivity}) = eltype(sim.integrator.T)(1)
-
-FieldExchanger.import_atmos_fields!(csf, sim::TestOcean, atmos_sim) = nothing
 
 function FluxCalculator.update_turbulent_fluxes!(sim::TestOcean, fields::NamedTuple)
     (; F_lh, F_sh) = fields

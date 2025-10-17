@@ -6,6 +6,14 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Use `update_turbulent_fluxes!` instead of `update_field!` for atmosphere PR[#1511](https://github.com/CliMA/ClimaCoupler.jl/pull/1511)
+Instead of using an `update_field!` method that dispatches on `::Val{:turbulent_fluxes}`
+to update turbulent fluxes in the atmosphere, we switch to using a function `update_turbulent_fluxes!`.
+This is consistent with what we do for surface models.
+
+This PR also removes area fraction weighting in the default radiative flux update
+in FluxCalculator.jl.
+
 #### Replace `TD.PhaseEquil_ρTq` with `TD.PhaseNonEquil_ρTq` PR[#1506](https://github.com/CliMA/ClimaCoupler.jl/pull/1506)
 This should be more physically correct.
 

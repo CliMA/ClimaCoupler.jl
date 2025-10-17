@@ -145,10 +145,11 @@ function debug(sim::Interfacer.ComponentModelSimulation, dir)
         if field_index <= length(field_names)
             field_name = field_names[field_index]
             field = Interfacer.get_field(sim, Val(field_name))
-            ax = Makie.Axis(
-                fig[i, j * 2 - 1],
-                title = string(field_name) * print_extrema(field),
-            )
+            # If field is a ClimaCore field, then _heatmap_cc_field! will add a
+            # title to the axis
+            title =
+                field isa CC.Fields.Field ? "" : string(field_name) * print_extrema(field)
+            ax = Makie.Axis(fig[i, j * 2 - 1]; title)
             if field isa OC.Field || field isa OC.AbstractOperations.AbstractOperation
                 if field isa OC.AbstractOperations.AbstractOperation
                     field = OC.Field(field)

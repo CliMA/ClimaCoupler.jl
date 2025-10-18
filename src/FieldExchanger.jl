@@ -199,7 +199,7 @@ function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf)
 end
 
 """
-    update_sim!(sim::SurfaceModelSimulation, csf, area_fraction)
+    update_sim!(sim::SurfaceModelSimulation, csf)
 
 Updates the surface component model cache with the current coupler fields besides turbulent fluxes.
 
@@ -207,7 +207,7 @@ Updates the surface component model cache with the current coupler fields beside
 - `sim`: [Interfacer.SurfaceModelSimulation] containing a surface model simulation object.
 - `csf`: [NamedTuple] containing coupler fields.
 """
-function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf, area_fraction)
+function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf)
     # radiative fluxes
     Interfacer.update_field!(sim, Val(:radiative_energy_flux_sfc), csf.F_radiative)
 
@@ -227,13 +227,8 @@ Iterates `update_sim!` over all component model simulations saved in `cs.model_s
 - `csf`: [NamedTuple] containing coupler fields.
 """
 function update_model_sims!(model_sims, csf)
-    boundary_space = axes(csf)
     for sim in model_sims
-        if sim isa Interfacer.SurfaceModelSimulation
-            update_sim!(sim, csf, Interfacer.get_field(sim, Val(:area_fraction)))
-        else
-            update_sim!(sim, csf)
-        end
+        update_sim!(sim, csf)
     end
 end
 

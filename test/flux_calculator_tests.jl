@@ -40,7 +40,7 @@ Interfacer.get_field(sim::TestAtmos, ::Val{:liquid_precipitation}) =
     CC.Fields.zeros(axes(sim.integrator.T))
 Interfacer.get_field(sim::TestAtmos, ::Val{:snow_precipitation}) =
     CC.Fields.zeros(axes(sim.integrator.T))
-FieldExchanger.update_sim!(sim::TestAtmos, fields, _) = nothing
+FieldExchanger.update_sim!(sim::TestAtmos, fields) = nothing
 
 function FluxCalculator.update_turbulent_fluxes!(sim::TestAtmos, fields)
     (; F_turb_ρτxz, F_lh, F_sh, F_turb_moisture) = fields

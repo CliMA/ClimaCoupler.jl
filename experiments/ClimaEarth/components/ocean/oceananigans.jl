@@ -445,7 +445,7 @@ function Interfacer.update_field!(sim::OceananigansSimulation, ::Val{:area_fract
 end
 
 """
-    FieldExchanger.update_sim!(sim::OceananigansSimulation, csf, area_fraction)
+    FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
 
 Update the ocean simulation with the provided fields, which have been filled in
 by the coupler.
@@ -460,7 +460,7 @@ ClimaAtmos provides precipitation as a negative flux at the surface, and
 Oceananigans represents precipitation as a positive salinity flux,
 so a sign change is needed when we convert from precipitation to salinity flux.
 """
-function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf, area_fraction)
+function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) =
         sim.ocean_properties
 

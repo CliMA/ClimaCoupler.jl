@@ -20,7 +20,13 @@ t_end: "465days"
 topo_smoothing: true
 topography: "Earth"
 z_elem: 39
+detect_restart_files: true
+restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-coarse-nightly-amip/511/climacoupler-coarse-nightly-amip/experiments/ClimaEarth/output/amip_coarse/checkpoints/"
+restart_t: 31622400
 extra_atmos_diagnostics:
-  - short_name: [od550aer, odsc550aer]
-    period: "1months"
-    reduction_time: average
+  - short_name: [ta, hus, hur, pfull, rhoa, ua, va, wa, cl, clw, cli]
+    period: 1days
+  - short_name: [ts, hussfc, evspsbl, pr, hfls, hfss, rsdt, rsut, rlut, rsds, rsus, rlds, rlus]
+    period: 1days
+  - short_name: [arup, waup, taup, husup, hurup, clwup, cliup, waen, tke, lmix, edt, evu]
+    period: 1days

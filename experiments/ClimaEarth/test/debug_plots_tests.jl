@@ -45,7 +45,8 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
     coupler_names = [
         :surface_direct_albedo,
         :surface_diffuse_albedo,
-        :F_radiative,
+        :SW_d,
+        :LW_d,
         :F_lh,
         :F_sh,
         :F_turb_moisture,

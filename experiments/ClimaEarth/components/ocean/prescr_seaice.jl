@@ -15,7 +15,7 @@ import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
 
 Ice concentration is prescribed, and we solve the following energy equation:
 
-    (h * ρ * c) d T_sfc dt = -(F_turb_energy + F_radiative) + F_conductive
+    (h * ρ * c) d T_sfc dt = (-F_turb_energy + (1 - α) * SW_d + LW_d - LW_u) + F_conductive
 
     with
     F_conductive = k_ice (T_base - T_sfc) / (h)
@@ -43,6 +43,7 @@ Base.@kwdef struct IceSlabParameters{FT <: AbstractFloat}
     T_freeze::FT = 271.2    # freezing temperature of sea water [K]
     k_ice::FT = 2           # thermal conductivity of sea ice [W / m / K] (less in HM71)
     α::FT = 0.65            # albedo of sea ice, roughly tuned to match observations
+    ϵ::FT = 1               # emissivity of sea ice
 end
 
 # init simulation
@@ -131,7 +132,8 @@ function PrescribedIceSimulation(
     Y = slab_ice_space_init(FT, space, params)
     cache = (;
         F_turb_energy = CC.Fields.zeros(space),
-        F_radiative = CC.Fields.zeros(space),
+        SW_d = CC.Fields.zeros(space),
+        LW_d = CC.Fields.zeros(space),
         area_fraction = ice_fraction,
         SIC_timevaryinginput = SIC_timevaryinginput,
         land_fraction = land_fraction,
@@ -165,6 +167,8 @@ end
 # extensions required by Interfacer
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) =
     sim.integrator.p.area_fraction
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:emissivity}) =
+    sim.integrator.p.params.ϵ
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_buoyancy}) =
     sim.integrator.p.params.z0b
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_momentum}) =
@@ -203,12 +207,11 @@ function Interfacer.update_field!(
     sim.integrator.p.area_fraction .= field
     return nothing
 end
-function Interfacer.update_field!(
-    sim::PrescribedIceSimulation,
-    ::Val{:radiative_energy_flux_sfc},
-    field,
-)
-    Interfacer.remap!(sim.integrator.p.F_radiative, field)
+function Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:SW_d}, field)
+    Interfacer.remap!(sim.integrator.p.SW_d, field)
+end
+function Interfacer.update_field!(sim::PrescribedIceSimulation, ::Val{:LW_d}, field)
+    Interfacer.remap!(sim.integrator.p.LW_d, field)
 end
 function Interfacer.update_field!(
     sim::PrescribedIceSimulation,
@@ -260,7 +263,7 @@ for temperature (curbed at the freezing point).
 """
 function ice_rhs!(dY, Y, p, t)
     FT = eltype(Y)
-    params = p.params
+    (; k_ice, h, T_base, ρ, c, ϵ, α, T_freeze) = p.params
 
     # Update the cached area fraction with the current SIC
     evaluate!(p.area_fraction, p.SIC_timevaryinginput, t)
@@ -271,15 +274,19 @@ function ice_rhs!(dY, Y, p, t)
     @. p.area_fraction = max(min(p.area_fraction, FT(1) - p.land_fraction), FT(0))
 
     # Calculate the conductive flux, and set it to zero if the area fraction is zero
-    F_conductive = @. params.k_ice / (params.h) * (params.T_base - Y.T_sfc) # fluxes are defined to be positive when upward
-    rhs = @. (-p.F_turb_energy - p.F_radiative + F_conductive) /
-       (params.h * params.ρ * params.c)
+    F_conductive = @. k_ice / (h) * (T_base - Y.T_sfc) # fluxes are defined to be positive when upward
+
+    # TODO: get sigma from parameters
+    σ = FT(5.67e-8)
+    rhs = @. (
+        -p.F_turb_energy + (1 - α) * p.SW_d + ϵ * (p.LW_d - σ * Y.T_sfc^4) + F_conductive
+    ) / (h * ρ * c)
 
     # Zero out tendencies where there is no ice, so that ice temperature remains constant there
     @. rhs = ifelse(p.area_fraction ≈ 0, zero(rhs), rhs)
 
     # If tendencies lead to temperature above freezing, set temperature to freezing
-    @. dY.T_sfc = min(rhs, (params.T_freeze - Y.T_sfc) / float(p.dt))
+    @. dY.T_sfc = min(rhs, (T_freeze - Y.T_sfc) / float(p.dt))
 end
 
 """

@@ -13,7 +13,7 @@ import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities, FieldE
 
 Equation:
 
-    (h * ρ * c) dTdt = -(F_turb_energy + F_radiative)
+    (h * ρ * c) dTdt = (-F_turb_energy + (1 - α) * SW_d + LW_d - LW_u)
 
 """
 struct SlabOceanSimulation{P, I} <: Interfacer.OceanModelSimulation
@@ -31,6 +31,7 @@ Base.@kwdef struct OceanSlabParameters{FT <: AbstractFloat}
     z0b::FT = 5e-4          # roughness length for heat [m]
     α::FT = 0.38            # albedo of the ocean [0, 1]
     evolving_switch::FT = 1 # switch to turn off the evolution of the ocean temperature [0 or 1]
+    ϵ::FT = 1               # emissivity of the ocean
 end
 
 """
@@ -77,7 +78,8 @@ function SlabOceanSimulation(
     cache = (
         params = params,
         F_turb_energy = CC.Fields.zeros(space),
-        F_radiative = CC.Fields.zeros(space),
+        SW_d = CC.Fields.zeros(space),
+        LW_d = CC.Fields.zeros(space),
         area_fraction = area_fraction,
         thermo_params = thermo_params,
         α_direct = CC.Fields.ones(space) .* params.α,
@@ -141,12 +143,11 @@ function Interfacer.update_field!(
     sim.integrator.p.area_fraction .= field
     return nothing
 end
-function Interfacer.update_field!(
-    sim::SlabOceanSimulation,
-    ::Val{:radiative_energy_flux_sfc},
-    field,
-)
-    Interfacer.remap!(sim.integrator.p.F_radiative, field)
+function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:SW_d}, field)
+    Interfacer.remap!(sim.integrator.p.SW_d, field)
+end
+function Interfacer.update_field!(sim::SlabOceanSimulation, ::Val{:LW_d}, field)
+    Interfacer.remap!(sim.integrator.p.LW_d, field)
 end
 function Interfacer.update_field!(
     sim::SlabOceanSimulation,
@@ -196,15 +197,19 @@ end
 ###
 # ode
 function slab_ocean_rhs!(dY, Y, cache, t)
-    p, F_turb_energy, F_radiative = cache
-    rhs = @. -(F_turb_energy + F_radiative) / (p.h * p.ρ * p.c)
+    params, F_turb_energy, SW_d, LW_d = cache
+    # TODO: get sigma from parameters
+    FT = eltype(F_turb_energy)
+    σ = FT(5.67e-8)
+    rhs = @. (-F_turb_energy + (1 - params.α) * SW_d + params.ϵ * (LW_d - σ * Y.T_sfc^4)) /
+       (params.h * params.ρ * params.c)
 
     # Zero out tendencies where there is no ocean, so that temperature remains constant there
     @. rhs = ifelse(cache.area_fraction ≈ 0, zero(rhs), rhs)
 
     # Note that the area fraction has already been applied to the fluxes,
     #  so we don't need to multiply by it here.
-    @. dY.T_sfc = rhs * p.evolving_switch
+    @. dY.T_sfc = rhs * params.evolving_switch
 end
 
 """

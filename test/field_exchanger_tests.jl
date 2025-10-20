@@ -85,8 +85,8 @@ Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:turbulent_energy_flux}) =
     sim.cache.turbulent_energy_flux
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:turbulent_moisture_flux}) =
     sim.cache.turbulent_moisture_flux
-Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
-    sim.cache.radiative_energy_flux_sfc
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:SW_d}) = sim.cache.SW_d
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:LW_d}) = sim.cache.LW_d
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:liquid_precipitation}) =
     sim.cache.liquid_precipitation
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:snow_precipitation}) =
@@ -158,11 +158,8 @@ function Interfacer.update_field!(
 )
     parent(sim.cache.air_density) .= parent(field)
 end
-Interfacer.update_field!(
-    sim::TestSurfaceSimulationLand,
-    ::Val{:radiative_energy_flux_sfc},
-    field,
-) = nothing
+Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:SW_d}, field) = nothing
+Interfacer.update_field!(sim::TestSurfaceSimulationLand, ::Val{:LW_d}, field) = nothing
 function Interfacer.update_field!(
     sim::TestSurfaceSimulationLand,
     ::Val{:liquid_precipitation},
@@ -279,7 +276,8 @@ for FT in (Float32, Float64)
             :air_density,
             :air_temperature,
             :specific_humidity,
-            :radiative_energy_flux_sfc,
+            :SW_d,
+            :LW_d,
             :liquid_precipitation,
             :snow_precipitation,
         ]
@@ -297,8 +295,8 @@ for FT in (Float32, Float64)
         @test coupler_fields.F_lh == zero_field
         @test coupler_fields.F_sh == zero_field
         @test coupler_fields.F_turb_moisture == zero_field
-        @test coupler_fields.F_radiative ==
-              model_sims.atmos_sim.cache.radiative_energy_flux_sfc
+        @test coupler_fields.SW_d == model_sims.atmos_sim.cache.SW_d
+        @test coupler_fields.LW_d == model_sims.atmos_sim.cache.LW_d
         @test coupler_fields.P_liq == model_sims.atmos_sim.cache.liquid_precipitation
         @test coupler_fields.P_snow == model_sims.atmos_sim.cache.snow_precipitation
 
@@ -378,7 +376,8 @@ for FT in (Float32, Float64)
             :turbulent_energy_flux,
             :turbulent_moisture_flux,
             :air_density,
-            :radiative_energy_flux_sfc,
+            :SW_d,
+            :LW_d,
             :liquid_precipitation,
             :snow_precipitation,
         ]
@@ -419,7 +418,8 @@ for FT in (Float32, Float64)
 
         # test variables without updates
         expected_field .= results[1]
-        @test model_sims.land_sim.cache.radiative_energy_flux_sfc == expected_field
+        @test model_sims.land_sim.cache.SW_d == expected_field
+        @test model_sims.land_sim.cache.LW_d == expected_field
 
         # test stub - albedo should be updated by update_sim!
         expected_field .= results[2]
@@ -459,7 +459,8 @@ for FT in (Float32, Float64)
             :albedo_diffuse,
             :liquid_precipitation,
             :snow_precipitation,
-            :radiative_energy_flux_sfc,
+            :SW_d,
+            :LW_d,
             :air_temperature,
             :specific_humidity,
             :air_density,
@@ -519,7 +520,8 @@ for FT in (Float32, Float64)
         # test coupler fields were updated by atmos and surface
         @test cs.fields.surface_direct_albedo == surface_init_field
         @test cs.fields.surface_diffuse_albedo == surface_init_field
-        @test cs.fields.F_radiative == atmos_init_field
+        @test cs.fields.SW_d == atmos_init_field
+        @test cs.fields.LW_d == atmos_init_field
         @test cs.fields.P_liq == atmos_init_field
         @test cs.fields.P_snow == atmos_init_field
     end

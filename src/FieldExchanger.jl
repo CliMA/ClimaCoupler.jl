@@ -110,11 +110,8 @@ function import_atmos_fields!(csf, model_sims)
     Interfacer.get_field!(csf.z_sfc, model_sims.atmos_sim, Val(:height_sfc))
 
     # radiative fluxes
-    Interfacer.get_field!(
-        csf.F_radiative,
-        model_sims.atmos_sim,
-        Val(:radiative_energy_flux_sfc),
-    )
+    Interfacer.get_field!(csf.SW_d, model_sims.atmos_sim, Val(:SW_d))
+    Interfacer.get_field!(csf.LW_d, model_sims.atmos_sim, Val(:LW_d))
 
     # precipitation
     Interfacer.get_field!(csf.P_liq, model_sims.atmos_sim, Val(:liquid_precipitation))
@@ -209,7 +206,8 @@ Updates the surface component model cache with the current coupler fields beside
 """
 function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf)
     # radiative fluxes
-    Interfacer.update_field!(sim, Val(:radiative_energy_flux_sfc), csf.F_radiative)
+    Interfacer.update_field!(sim, Val(:SW_d), csf.SW_d)
+    Interfacer.update_field!(sim, Val(:LW_d), csf.LW_d)
 
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)

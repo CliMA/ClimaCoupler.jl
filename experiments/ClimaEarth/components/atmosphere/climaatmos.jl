@@ -278,7 +278,10 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:co2}) =
     sim.integrator.p.tracers.co2[1]
 
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:diffuse_fraction})
-    hasradiation(sim.integrator) || return nothing
+    # Diffuse fraction doesn't matter when we don't have radiation, so return zero
+    FT = eltype(sim.integrator.u)
+    hasradiation(sim.integrator) || return zero(FT)
+
     radiation_model = sim.integrator.p.radiation.rrtmgp_model
     # only take the first level
     total_flux_dn = radiation_model.face_sw_flux_dn[1, :]
@@ -302,7 +305,10 @@ end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) =
     surface_rain_flux(sim.integrator.p.atmos.moisture_model, sim.integrator)
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:LW_d})
-    hasradiation(sim.integrator) || return nothing
+    # If we don't have radiation, downwelling LW is zero
+    FT = eltype(sim.integrator.u)
+    hasradiation(sim.integrator) || return zero(FT)
+
     return CC.Fields.level(
         CC.Fields.array2field(
             sim.integrator.p.radiation.rrtmgp_model.face_lw_flux_dn,
@@ -317,12 +323,13 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:specific_humidity}) =
         sim.integrator.u.c.ρ,
         1,
     )
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_sfc}) =
-    surface_radiation_flux(sim.integrator.p.atmos.radiation_mode, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =
     surface_snow_flux(sim.integrator.p.atmos.moisture_model, sim.integrator)
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d})
-    hasradiation(sim.integrator) || return nothing
+    # If we don't have radiation, downwelling SW is zero
+    FT = eltype(sim.integrator.u)
+    hasradiation(sim.integrator) || return zero(FT)
+
     return CC.Fields.level(
         CC.Fields.array2field(
             sim.integrator.p.radiation.rrtmgp_model.face_sw_flux_dn,
@@ -416,26 +423,30 @@ end
 
 # extensions required by the Interfacer
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:emissivity}, field)
-    hasradiation(sim.integrator) || return nothing
-    # Remap field onto the atmosphere surface space in scratch field
-    temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
-    Interfacer.remap!(temp_field_surface, field)
-    # Set each row (band) of the emissivity matrix by transposing the vector returned from `field2array`
-    sim.integrator.p.radiation.rrtmgp_model.surface_emissivity .=
-        CC.Fields.field2array(temp_field_surface)'
+    if hasradiation(sim.integrator)
+        # Remap field onto the atmosphere surface space in scratch field
+        temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
+        Interfacer.remap!(temp_field_surface, field)
+        # Set each row (band) of the emissivity matrix by transposing the vector returned from `field2array`
+        sim.integrator.p.radiation.rrtmgp_model.surface_emissivity .=
+            CC.Fields.field2array(temp_field_surface)'
+    end
+    return nothing
 end
 function Interfacer.update_field!(
     sim::ClimaAtmosSimulation,
     ::Val{:surface_direct_albedo},
     field,
 )
-    hasradiation(sim.integrator) || return nothing
-    # Remap field onto the atmosphere surface space in scratch field
-    temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
-    Interfacer.remap!(temp_field_surface, field)
-    # Set each row (band) of the albedo matrix by transposing the vector returned from `field2array`
-    sim.integrator.p.radiation.rrtmgp_model.direct_sw_surface_albedo .=
-        CC.Fields.field2array(temp_field_surface)'
+    if hasradiation(sim.integrator)
+        # Remap field onto the atmosphere surface space in scratch field
+        temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
+        Interfacer.remap!(temp_field_surface, field)
+        # Set each row (band) of the albedo matrix by transposing the vector returned from `field2array`
+        sim.integrator.p.radiation.rrtmgp_model.direct_sw_surface_albedo .=
+            CC.Fields.field2array(temp_field_surface)'
+    end
+    return nothing
 end
 
 function Interfacer.update_field!(
@@ -443,13 +454,15 @@ function Interfacer.update_field!(
     ::Val{:surface_diffuse_albedo},
     field,
 )
-    hasradiation(sim.integrator) || return nothing
-    # Remap field onto the atmosphere surface space in scratch field
-    temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
-    Interfacer.remap!(temp_field_surface, field)
-    # Set each row (band) of the albedo matrix by transposing the vector returned from `field2array`
-    sim.integrator.p.radiation.rrtmgp_model.diffuse_sw_surface_albedo .=
-        CC.Fields.field2array(temp_field_surface)'
+    if hasradiation(sim.integrator)
+        # Remap field onto the atmosphere surface space in scratch field
+        temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
+        Interfacer.remap!(temp_field_surface, field)
+        # Set each row (band) of the albedo matrix by transposing the vector returned from `field2array`
+        sim.integrator.p.radiation.rrtmgp_model.diffuse_sw_surface_albedo .=
+            CC.Fields.field2array(temp_field_surface)'
+    end
+    return nothing
 end
 
 function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fields)

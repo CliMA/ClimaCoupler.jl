@@ -76,7 +76,8 @@ function update_field!(
     Interfacer.remap!(sim.cache.α_diffuse, field)
 end
 update_field!(::AbstractSurfaceStub, ::Val{:liquid_precipitation}, field) = nothing
-update_field!(::AbstractSurfaceStub, ::Val{:radiative_energy_flux_sfc}, field) = nothing
+update_field!(::AbstractSurfaceStub, ::Val{:SW_d}, field) = nothing
+update_field!(::AbstractSurfaceStub, ::Val{:LW_d}, field) = nothing
 update_field!(::AbstractSurfaceStub, ::Val{:snow_precipitation}, field) = nothing
 update_field!(::AbstractSurfaceStub, ::Val{:turbulent_energy_flux}, field) = nothing
 update_field!(::AbstractSurfaceStub, ::Val{:turbulent_moisture_flux}, field) = nothing

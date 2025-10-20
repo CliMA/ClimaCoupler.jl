@@ -404,10 +404,10 @@ function Interfacer.update_field!(
     ρ_liq = (LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set))
     Interfacer.remap!(sim.integrator.p.drivers.P_snow, field ./ ρ_liq)
 end
-function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:lw_d}, field)
+function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:LW_d}, field)
     Interfacer.remap!(sim.integrator.p.drivers.LW_d, field)
 end
-function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:sw_d}, field)
+function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:SW_d}, field)
     Interfacer.remap!(sim.integrator.p.drivers.SW_d, field)
 end
 
@@ -423,8 +423,8 @@ Interfacer.close_output_writers(sim::ClimaLandSimulation) =
 function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf)
     # update fields for radiative transfer
     Interfacer.update_field!(sim, Val(:diffuse_fraction), csf.diffuse_fraction)
-    Interfacer.update_field!(sim, Val(:sw_d), csf.SW_d)
-    Interfacer.update_field!(sim, Val(:lw_d), csf.LW_d)
+    Interfacer.update_field!(sim, Val(:SW_d), csf.SW_d)
+    Interfacer.update_field!(sim, Val(:LW_d), csf.LW_d)
 
     # update fields for canopy conductance and photosynthesis
     Interfacer.update_field!(sim, Val(:c_co2), csf.c_co2)
@@ -461,8 +461,6 @@ end
 Extend Interfacer.add_coupler_fields! to add the fields required for ClimaLandSimulation.
 
 The fields added are:
-- `:SW_d` (for radiative transfer)
-- `:LW_d` (for radiative transfer)
 - `:diffuse_fraction` (for radiative transfer)
 - `:c_co2` (for photosynthesis, biogeochemistry)
 - `:P_atmos` (for canopy conductance)
@@ -472,17 +470,8 @@ The fields added are:
 - `P_snow` (for moisture fluxes)
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaLandSimulation)
-    land_coupler_fields = [
-        :SW_d,
-        :LW_d,
-        :diffuse_fraction,
-        :c_co2,
-        :P_atmos,
-        :T_atmos,
-        :q_atmos,
-        :P_liq,
-        :P_snow,
-    ]
+    land_coupler_fields =
+        [:diffuse_fraction, :c_co2, :P_atmos, :T_atmos, :q_atmos, :P_liq, :P_snow]
     push!(coupler_field_names, land_coupler_fields...)
 end
 

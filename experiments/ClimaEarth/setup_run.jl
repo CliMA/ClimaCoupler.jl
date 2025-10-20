@@ -374,6 +374,7 @@ function CoupledSimulation(config_dict::AbstractDict)
 
         ## ocean model using prescribed data
         ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
+        ice_fraction = ifelse.(ice_fraction .> FT(0.5), FT(1), FT(0))
         ocean_fraction = FT(1) .- ice_fraction .- land_fraction
 
         if sim_mode <: CMIPMode

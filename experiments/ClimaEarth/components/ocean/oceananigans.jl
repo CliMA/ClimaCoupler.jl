@@ -1,11 +1,13 @@
 import Oceananigans as OC
 import ClimaOcean as CO
+import ClimaAtmos as CA
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms
 import ClimaCore as CC
 import Thermodynamics as TD
 import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
+using XESMF # to load Oceananigans regridding extension
 
 """
     OceananigansSimulation{SIM, A, OPROP, REMAP}
@@ -45,6 +47,9 @@ function OceananigansSimulation(
     output_dir,
     comms_ctx = ClimaComms.context(),
 )
+    # using Dates
+    # start_date = Dates.DateTime(2008)
+    # stop_date = Dates.DateTime(2008, 1, 2)
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
 
     # Retrieve EN4 data (monthly)
@@ -55,33 +60,20 @@ function OceananigansSimulation(
     download_dataset(en4_temperature)
     download_dataset(en4_salinity)
 
-    # Set up ocean grid (1 degree)
-    resolution_points = (360, 160, 32)
-    Nz = last(resolution_points)
+    # Set up tripolar ocean grid (1 degree)
+    Nx = 360
+    Ny = 180
+    Nz = 40
     depth = 4000 # meters
     z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 0.85 * depth)
 
-    # Regular LatLong because we know how to do interpolation there
-
-    # TODO: When moving to TripolarGrid, note that we need to be careful about
-    # ensuring the coordinate systems align (ie, rotate vectors on the OC grid)
-
-    underlying_grid = OC.LatitudeLongitudeGrid(
-        arch;
-        size = resolution_points,
-        longitude = (-180, 180),
-        latitude = (-80, 80),   # NOTE: Don't goo to high up when using LatLongGrid, or the cells will be too small
-        z,
-        halo = (7, 7, 7),
-    )
-
+    underlying_grid = OC.TripolarGrid(arch; size = (Nx, Ny, Nz), halo = (7, 7, 4), z)
     bottom_height = CO.regrid_bathymetry(
         underlying_grid;
         minimum_depth = 30,
         interpolation_passes = 20,
         major_basins = 1,
     )
-
     grid = OC.ImmersedBoundaryGrid(
         underlying_grid,
         OC.GridFittedBottom(bottom_height);
@@ -113,17 +105,90 @@ function OceananigansSimulation(
     # Set initial condition to EN4 state estimate at start_date
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
 
-    long_cc = OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center())
-    lat_cc = OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center())
-
-    # TODO: Go from 0 to Nx+1, Ny+1 (for halos) (for LatLongGrid)
-
     # Construct a remapper from the exchange grid to `Center, Center` fields
-    long_cc = reshape(long_cc, length(long_cc), 1)
-    lat_cc = reshape(lat_cc, 1, length(lat_cc))
-    target_points_cc = @. CC.Geometry.LatLongPoint(lat_cc, long_cc)
-    # TODO: We can remove the `nothing` after CC > 0.14.33
-    remapper_cc = CC.Remapping.Remapper(axes(area_fraction), target_points_cc, nothing)
+
+    # Tripolar to cubed sphere (fails currently)
+    # long_oc = OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center())
+    # lat_oc = OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center())
+
+    T = OC.CenterField(grid) # field on tripolar grid
+    OC.set!(T, en4_temperature[1])
+    coords_tripolar, _ = XESMF.extract_xesmf_coordinates_structure(T, T)
+
+    # Create a 2D matrix containing each lat/long combination as a LatLongPoint
+    # Note this must be done on CPU since the CC.Remapper module is not GPU-compatible
+    # target_points_oc = Array(CC.Geometry.LatLongPoint.(lat_oc, long_oc))
+
+    # TODO double check these coords are on centers, get lat/lon bounds for each element
+    # boundary_space = axes(area_fraction)
+    boundary_space = CC.CommonSpaces.CubedSphereSpace(
+        Float32;
+        radius = 1.0,
+        n_quad_points = 2,
+        h_elem = 10,
+    )
+    boundary_coords = CC.Fields.coordinate_field(boundary_space)
+    boundary_lat_arr = CC.Fields.field2array(boundary_coords.lat)
+    boundary_long_arr = CC.Fields.field2array(boundary_coords.long)
+    coords_cubedsphere = Dict("lat" => boundary_lat_arr, "lon" => boundary_long_arr)
+
+    regridder_tripolar_to_cubedsphere =
+        XESMF.Regridder(coords_cubedsphere, coords_tripolar; method = "conservative")
+    regridder_cubedsphere_to_tripolar =
+        XESMF.Regridder(coords_tripolar, coords_cubedsphere; method = "conservative")
+
+    # Tripolar to LatLon
+    T = OC.CenterField(grid) # field on tripolar grid
+    OC.set!(T, en4_temperature[1])
+
+    grid_latlon = OC.LatitudeLongitudeGrid(
+        arch;
+        size = (Nx, Ny, Nz),
+        longitude = (0, 360),
+        latitude = (-81, 90),
+        z,
+    )
+    field_latlon = OC.CenterField(grid_latlon)
+    remapper_tripolar_to_latlon = XESMF.Regridder(T, field_latlon; method = "conservative")
+    remapper_tripolar_to_latlon(
+        vec(OC.interior(field_latlon, :, :, Nz)),
+        vec(OC.interior(T, :, :, Nz)),
+    )
+    OC.fill_halo_regions!(field_latlon)
+    # heatmap(field_latlon) # using GeoMakie, using CairoMakie
+
+    # LatLon to cubed sphere
+    boundary_space = CC.CommonSpaces.CubedSphereSpace(
+        Float32;
+        radius = 1.0,
+        n_quad_points = 2,
+        h_elem = 10,
+    )
+    field_cubedsphere = Interfacer.remap(field_latlon, boundary_space)
+    # fieldheatmap(field_cubedsphere) # using ClimaCoreMakie
+
+    # Cubed sphere to LatLon
+    long_oc = OC.λnodes(grid_latlon, OC.Center(), OC.Center(), OC.Center())
+    lat_oc = OC.φnodes(grid_latlon, OC.Center(), OC.Center(), OC.Center())
+    long_oc = reshape(long_oc, length(long_oc), 1)
+    lat_oc = reshape(lat_oc, 1, length(lat_oc))
+    target_points_oc = @. CC.Geometry.LatLongPoint(lat_oc, long_oc)
+
+    remapper_cubedsphere_to_latlon = CC.Remapping.Remapper(boundary_space, target_points_oc)
+    field_cubedsphere = CC.Fields.zeros(boundary_space)
+    CC.Remapping.interpolate!(
+        field_cubedsphere,
+        remapper_cubedsphere_to_latlon,
+        field_latlon,
+    )
+
+
+    # Previous remapper for LatLon
+    if pkgversion(CC) >= v"0.14.34"
+        remapper_cc = CC.Remapping.Remapper(axes(area_fraction), target_points_cc)
+    else
+        remapper_cc = CC.Remapping.Remapper(axes(area_fraction), target_points_cc, nothing)
+    end
 
     # Construct two 2D Center/Center fields to use as scratch space while remapping
     scratch_cc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid)
@@ -145,23 +210,18 @@ function OceananigansSimulation(
         ocean_fresh_water_density = 999.8,
     )
 
-    # Before version 0.96.22, the NetCDFWriter was broken on GPU
-    if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
-        # TODO: Add more diagnostics, make them dependent on simulation duration, take
-        # monthly averages
-        # Save all tracers and velocities to a NetCDF file at daily frequency
-        outputs = merge(ocean.model.tracers, ocean.model.velocities)
-        netcdf_writer = OC.NetCDFWriter(
-            ocean.model,
-            outputs;
-            schedule = OC.TimeInterval(86400), # Daily output
-            filename = joinpath(output_dir, "ocean_diagnostics.nc"),
-            indices = (:, :, grid.Nz),
-            overwrite_existing = true,
-            array_type = Array{Float32},
-        )
-        ocean.output_writers[:diagnostics] = netcdf_writer
-    end
+    # Save all tracers and velocities to a JLD2 file at daily frequency
+    outputs = merge(ocean.model.tracers, ocean.model.velocities)
+    jld2_writer = OC.JLD2Writer(
+        ocean.model,
+        outputs;
+        schedule = OC.TimeInterval(86400), # Daily output
+        filename = joinpath(output_dir, "ocean_diagnostics"),
+        indices = (:, :, grid.Nz),
+        overwrite_existing = true,
+        array_type = Array{Float32},
+    )
+    ocean.output_writers[:diagnostics] = jld2_writer
 
     sim = OceananigansSimulation(ocean, area_fraction, ocean_properties, remapping)
     return sim
@@ -209,14 +269,14 @@ Interfacer.step!(sim::OceananigansSimulation, t) =
 
 # We always want the surface, so we always set zero(pt.lat) for z
 """
-    to_node(pt::CA.ClimaCore.Geometry.LatLongPoint)
+    to_node(pt::CCGeometry.LatLongPoint)
 
 Transform `LatLongPoint` into a tuple (long, lat, 0), where the 0 is needed because we only
 care about the surface.
 """
-@inline to_node(pt::CA.ClimaCore.Geometry.LatLongPoint) = pt.long, pt.lat, zero(pt.lat)
+@inline to_node(pt::CC.Geometry.LatLongPoint) = pt.long, pt.lat, zero(pt.lat)
 # This next one is needed if we have "LevelGrid"
-@inline to_node(pt::CA.ClimaCore.Geometry.LatLongZPoint) = pt.long, pt.lat, zero(pt.lat)
+@inline to_node(pt::CC.Geometry.LatLongZPoint) = pt.long, pt.lat, zero(pt.lat)
 
 """
     map_interpolate(points, oc_field::OC.Field)

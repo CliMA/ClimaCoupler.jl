@@ -6,6 +6,10 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Change the behavior of `detect_restart_file` PR[#1515](https://github.com/CliMA/ClimaCoupler.jl/pull/1515)
+Users now only need to specify `restart_dir` and `restart_t` to restart a simulation from a specific file, and do
+not need to set `detect_restart_file` to true. `detect_restart_file` is used for detecting restart file automatically.
+
 #### Use `update_turbulent_fluxes!` instead of `update_field!` for atmosphere PR[#1511](https://github.com/CliMA/ClimaCoupler.jl/pull/1511)
 Instead of using an `update_field!` method that dispatches on `::Val{:turbulent_fluxes}`
 to update turbulent fluxes in the atmosphere, we switch to using a function `update_turbulent_fluxes!`.
@@ -50,8 +54,7 @@ in `make_land_domain`. Now we correctly use the provided `dz_tuple` and `n_eleme
 
 #### Add option `detect_restart_files` PR[#1463](https://github.com/CliMA/ClimaCoupler.jl/pull/1463)
 Add a CLI option to signal whether restart files should be automatically used
-to restart a simulation. This is true by default, but can be set to false if a
-user wishes to run a simulation from the beginning, ignoring present restart files.
+to restart a simulation. This is false by default.
 
 #### Remove ED/EDMF aquaplanet longruns PR[#1461](https://github.com/CliMA/ClimaCoupler.jl/pull/1461)
 Removes the ED-only and diag. EDMF aquaplanet longruns.

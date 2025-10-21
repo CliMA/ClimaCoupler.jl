@@ -173,11 +173,12 @@ function CoupledSimulation(config_dict::AbstractDict)
     Random.seed!(random_seed)
     @info "Random seed set to $(random_seed)"
 
-    isnothing(restart_t) &&
-        (restart_t = Checkpointer.t_start_from_checkpoint(dir_paths.checkpoints))
-    isnothing(restart_dir) && (restart_dir = dir_paths.checkpoints)
-    should_restart =
-        detect_restart_files && !isnothing(restart_t) && !isnothing(restart_dir)
+    if detect_restart_files
+        isnothing(restart_t) &&
+            (restart_t = Checkpointer.t_start_from_checkpoint(dir_paths.checkpoints))
+        isnothing(restart_dir) && (restart_dir = dir_paths.checkpoints)
+    end
+    should_restart = !isnothing(restart_t) && !isnothing(restart_dir)
     if should_restart
         if t_start isa ITime
             t_start, _ = promote(ITime(restart_t), t_start)

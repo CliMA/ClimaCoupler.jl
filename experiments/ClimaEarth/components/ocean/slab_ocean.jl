@@ -199,6 +199,9 @@ function slab_ocean_rhs!(dY, Y, cache, t)
     p, F_turb_energy, F_radiative = cache
     rhs = @. -(F_turb_energy + F_radiative) / (p.h * p.ρ * p.c)
 
+    # Zero out tendencies where there is no ocean, so that temperature remains constant there
+    @. rhs = ifelse(cache.area_fraction ≈ 0, zero(rhs), rhs)
+
     # Note that the area fraction has already been applied to the fluxes,
     #  so we don't need to multiply by it here.
     @. dY.T_sfc = rhs * p.evolving_switch

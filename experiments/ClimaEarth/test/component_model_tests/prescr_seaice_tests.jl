@@ -71,12 +71,12 @@ for FT in (Float32, Float64)
         # check that nothing changes with no fluxes (zero conduction when T_base == initial T_sfc)
         T_base_eq = IceSlabParameters{FT}().T_freeze - FT(5.0)
         dY, Y, p = test_sea_ice_rhs(T_base = T_base_eq)
-        @test all([i for i in extrema(dY)] .≈ [FT(0.0), FT(0.0)])
+        @test all(T -> T == FT(0), Array(parent(dY.T_sfc)))
 
         # check expected dT due to radiative flux only (again set T_base == initial T_sfc)
         dY, Y, p = test_sea_ice_rhs(F_radiative = 1.0, T_base = T_base_eq)
         dT_expected = -1.0 / (p.params.h * p.params.ρ * p.params.c)
-        @test all(extrema(dY) .≈ FT(dT_expected))
+        @test all(T -> T == FT(0) || T ≈ dT_expected, Array(parent(dY.T_sfc)))
 
         # check that tendency will not result in above freezing T
         dY, Y, p = test_sea_ice_rhs(F_radiative = 0.0, T_base = 330.0) # Float32 requires a large number here!

@@ -356,26 +356,18 @@ function compute_surface_fluxes!(
     @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
     @. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(buoyancy_flux), buoyancy_flux)
 
-    # multiply fluxes by area fraction
-    F_turb_ρτxz .*= area_fraction
-    F_turb_ρτyz .*= area_fraction
-    F_sh .*= area_fraction
-    F_lh .*= area_fraction
-    F_turb_moisture .*= area_fraction
-
     # update the fluxes, which are now area-weighted, of this surface model
     fields = (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
     FluxCalculator.update_turbulent_fluxes!(sim, fields)
 
     # update fluxes in the coupler fields
     # add the flux contributing from this surface to the coupler field
-    # note that the fluxes area-weighted, so if a surface model is
-    #  not present at a point, the fluxes are zero
-    @. csf.F_turb_ρτxz += F_turb_ρτxz
-    @. csf.F_turb_ρτyz += F_turb_ρτyz
-    @. csf.F_lh += F_lh
-    @. csf.F_sh += F_sh
-    @. csf.F_turb_moisture += F_turb_moisture
+    # note that the fluxes are area-weighted here when we provide them to the atmosphere
+    @. csf.F_turb_ρτxz += F_turb_ρτxz * area_fraction
+    @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction
+    @. csf.F_lh += F_lh * area_fraction
+    @. csf.F_sh += F_sh * area_fraction
+    @. csf.F_turb_moisture += F_turb_moisture * area_fraction
 
     # NOTE: This is still an area weighted contribution, which maybe doesn't make
     # too much sense for these quantities...

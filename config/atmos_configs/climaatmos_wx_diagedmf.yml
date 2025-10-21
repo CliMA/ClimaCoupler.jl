@@ -29,6 +29,8 @@ z_elem: 63
 dz_bottom: 30.0
 edmfx_entr_model: "Generalized"
 edmfx_detr_model: "Generalized"
+# edmfx_entr_model: "PiGroups"
+# edmfx_detr_model: "SmoothArea"
 edmfx_nh_pressure: true
 edmfx_sgs_mass_flux: true
 edmfx_sgs_diffusive_flux: true
@@ -45,4 +47,4 @@ toml: [toml/diagnostic_edmfx_era5_ic.toml]
 
 cloud_model: "quadrature"
 use_itime: true
-deep_atmosphere: false
+deep_atmosphere: true

@@ -51,4 +51,4 @@ moist: equil
 
 cloud_model: "quadrature"
 use_itime: true
-deep_atmosphere: false
+deep_atmosphere: true

@@ -1,7 +1,6 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
-bucket_albedo_type: "map_temporal"
 checkpoint_dt: "366days"
 coupler_toml: ["toml/amip.toml"]
 dt: "240secs"
@@ -9,6 +8,7 @@ dt_cpl: "240secs"
 dz_bottom: 100.0
 energy_check: false
 h_elem: 8
+land_model: "integrated"
 mode_name: "amip"
 netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true

@@ -3,14 +3,15 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_wx_progedmf.yml"
 coupler_toml: ["toml/amip_progedmf.toml"]
 mode_name: "subseasonal"
-era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions"
+# era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions"
+era5_initial_condition_dir : "/net/sampo/data1/cchristo/WeatherQuest_data/archive"
 initial_condition: "WeatherModel"
 checkpoint_dt: "7days"
 co2_model: "fixed"
-dt: "10secs"
-dt_cpl: "10secs"
+dt: "5secs"
+dt_cpl: "5secs"
 energy_check: false
-h_elem: 32
+h_elem: 16
 
 ### integrated land ###
 # land_model: "integrated"
@@ -18,13 +19,13 @@ h_elem: 32
 ### bucket land ###
 land_model: "bucket"
 bucket_albedo_type: "map_temporal"
-bucket_initial_condition: "/net/sampo/data1/wxquest_data/initial_conditions/era5_bucket_processed_20250907_0000.nc"
+bucket_initial_condition:  "/net/sampo/data1/cchristo/WeatherQuest_data/archive/era5_bucket_processed_20250831_0000.nc"
 
 land_spun_up_ic: false
 land_temperature_anomaly: "nothing"
 use_land_diagnostics: true
 radiation_reset_rng_seed: true
-start_date: "20250907"
+start_date: "20250831"
 surface_setup: "PrescribedSurface"
 topo_smoothing: true
 topography: "Earth"
@@ -32,5 +33,11 @@ t_end: "7days"
 netcdf_output_at_levels: true
 extra_atmos_diagnostics:
   - short_name: [tas, mslp, pr, ua, va, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke]
-    period: 1hours
+    period: 3hours
     reduction_time: average
+  - short_name: [ta, hfss, hfls, hussfc]
+    period: 3hours
+    reduction_time: average
+  - short_name: [tas, ta, hfss, hfls, hussfc]
+    period: 3hours
+    reduction: inst

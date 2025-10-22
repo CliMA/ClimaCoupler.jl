@@ -108,7 +108,24 @@ function OceananigansSimulation(
     end
 
     # Create ocean simulation
-    ocean = CO.ocean_simulation(grid; forcing)
+    free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 70)
+    momentum_advection = OC.WENOVectorInvariant(order = 5)
+    tracer_advection = OC.WENO(order = 5)
+    eddy_closure = OC.TurbulenceClosures.IsopycnalSkewSymmetricDiffusivity(
+        κ_skew = 1e3,
+        κ_symmetric = 1e3,
+    )
+    vertical_mixing = CO.OceanSimulations.default_ocean_closure()
+    horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν = 1e11)
+
+    ocean = CO.ocean_simulation(
+        grid;
+        forcing,
+        momentum_advection,
+        tracer_advection,
+        free_surface,
+        closure = (eddy_closure, horizontal_viscosity, vertical_mixing),
+    )
 
     # Set initial condition to EN4 state estimate at start_date
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
@@ -147,8 +164,6 @@ function OceananigansSimulation(
 
     # Before version 0.96.22, the NetCDFWriter was broken on GPU
     if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
-        # TODO: Add more diagnostics, make them dependent on simulation duration, take
-        # monthly averages
         # Save all tracers and velocities to a NetCDF file at daily frequency
         outputs = merge(ocean.model.tracers, ocean.model.velocities)
         netcdf_writer = OC.NetCDFWriter(
@@ -286,9 +301,9 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_momentum}) =
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:beta}) = Float32(1)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:emissivity}) = Float32(0.97)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) =
-    Float32(0.06)
+    Float32(0.011)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) =
-    Float32(0.06)
+    Float32(0.069)
 
 # NOTE: This is 3D, but it will be remapped to 2D
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =

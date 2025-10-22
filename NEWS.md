@@ -6,6 +6,9 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Change some closures used in the Oceananigans model PR[#1524](https://github.com/CliMA/ClimaCoupler.jl/pull/1524)
+Per ocean team recommendation, we changed some closures to be non-default.
+
 #### Change the behavior of `detect_restart_file` PR[#1515](https://github.com/CliMA/ClimaCoupler.jl/pull/1515)
 Users now only need to specify `restart_dir` and `restart_t` to restart a simulation from a specific file, and do
 not need to set `detect_restart_file` to true. `detect_restart_file` is used for detecting restart file automatically.

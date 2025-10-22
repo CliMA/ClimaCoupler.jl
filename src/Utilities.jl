@@ -85,7 +85,7 @@ function show_memory_usage()
 end
 
 """
-    setup_output_dirs(output_dir = pwd(),
+    setup_output_dirs(output_dir_root = pwd(),
         artifacts_dir = joinpath(output_dir, "artifacts"),
         checkpoints_dir = joinpath(output_dir, "checkpoints"),
         regrid_dir = nothing,
@@ -94,11 +94,10 @@ end
 
 Create output directories for the experiment. If `comms_ctx` is provided,
 only the root process will create the directories.
-By default, the artifacts and checkpoints directories are created inside the output
-directory with the names `artifacts/` and `checkpoints/`.
-The regrid directory is by default created as a temporary directory inside the output
-directory and is automatically deleted when the process exits.
-
+By default, the artifacts and checkpoints directories are created inside the
+root output directory with the names `artifacts/` and `checkpoints/`.
+The regrid directory is by default created as a temporary directory inside the
+root output directory and is automatically deleted when the process exits.
 
 `ClimaUtilities.OutputPathGenerator` is used so that simulations can be re-run and re-started.
 The output path looks like:
@@ -123,38 +122,63 @@ coupler_output_dir_amip/
 ```
 
 # Arguments
-- `output_dir::String`: The directory where the output files will be stored. Default is the current directory.
-- `regrid_dir::String`: The directory where the regridded files will be stored. Default is `output_dir/regrid_tmp_<random_tempdir>/`.
-- `checkpoint_dir::String`: The directory where the checkpoint files will be stored. Default is `output_dir/checkpoints/`.
-- `artifacts_dir::String`: The directory where the artifacts will be stored. Default is `output_dir/artifacts/`.
-- `comms_ctx::Union{Nothing, ClimaComms.AbstractCommsContext}`: The communicator context. If provided, only the root process will create the directories.
+- `output_dir::String`: The directory where the output files will be stored.
+        Default is the current directory.
+- `artifacts_dir::String`: The directory where plots (from postprocessing and conservation checks) will be stored.
+        Default is `output_dir/artifacts/`.
+- `checkpoint_dir::String`: The directory where the checkpoint files will be stored.
+        Default is `output_dir/checkpoints/`.
+- `regrid_dir::String`: The directory where the regridded files will be stored.
+        Default is `output_dir/regrid_tmp_<random_tempdir>/`.
+- `comms_ctx::Union{Nothing, ClimaComms.AbstractCommsContext}`: The communicator context.
+        If provided, only the root process will create the directories.
 
 # Returns
-- A tuple with the paths to the output, artifacts, regrid, and checkpoints directories.
+- A NamedTuple with the paths to output directories for each component and the coupler,
+as well as paths toartifacts, regrid, and checkpoints directories.
 """
 function setup_output_dirs(;
-    output_dir = pwd(),
-    artifacts_dir = joinpath(output_dir, "artifacts"),
-    checkpoints_dir = joinpath(output_dir, "checkpoints"),
+    output_dir_root = pwd(),
+    artifacts_dir = joinpath(output_dir_root, "artifacts"),
+    checkpoints_dir = joinpath(output_dir_root, "checkpoints"),
     regrid_dir = nothing,
     comms_ctx,
 )
-    output_dir = generate_output_path(output_dir, context = comms_ctx)
+    output_dir_root = generate_output_path(output_dir_root, context = comms_ctx)
+
+    # Make component-specific output directories, and one for the coupler
+    atmos_output_dir = joinpath(output_dir_root, "clima_atmos")
+    land_output_dir = joinpath(output_dir_root, "clima_land")
+    ocean_output_dir = joinpath(output_dir_root, "clima_ocean")
+    coupler_output_dir = joinpath(output_dir_root, "clima_coupler")
+
     if ClimaComms.iamroot(comms_ctx)
+        mkpath(atmos_output_dir)
+        mkpath(land_output_dir)
+        mkpath(ocean_output_dir)
+        mkpath(coupler_output_dir)
+
         mkpath(artifacts_dir)
         mkpath(checkpoints_dir)
         # If no regrid_dir is provided, create a temporary directory
+        # Note this must be done on the root process because `mktempdir` chooses a random name
         regrid_dir =
-            isnothing(regrid_dir) ? mktempdir(output_dir, prefix = "regrid_tmp_") :
-            mkpath(regrid_dir)
+            isnothing(regrid_dir) ? mktempdir(; prefix = "regrid_tmp_") : mkpath(regrid_dir)
     end
     regrid_dir = ClimaComms.bcast(comms_ctx, regrid_dir)
 
+    @info "Output directories $(output_dir_root)"
+    @info "Coupler artifacts directory $(artifacts_dir)"
+    @info "Coupler checkpoint directory $(checkpoints_dir)"
     return (;
-        output = output_dir,
-        artifacts = artifacts_dir,
-        regrid = regrid_dir,
-        checkpoints = checkpoints_dir,
+        output_dir_root,
+        atmos_output_dir,
+        land_output_dir,
+        ocean_output_dir,
+        coupler_output_dir,
+        artifacts_dir,
+        regrid_dir,
+        checkpoints_dir,
     )
 end
 

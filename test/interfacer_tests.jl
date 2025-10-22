@@ -55,7 +55,7 @@ for FT in (Float32, Float64)
             Ref(-1), # prev_checkpoint_t
             (;), # model_sims
             (;), # callbacks
-            (;), # dirs
+            (;), # dir_paths
             nothing, # thermo_params
             nothing, # diags_handler
         )

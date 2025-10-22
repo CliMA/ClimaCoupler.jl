@@ -64,6 +64,7 @@ struct DummyStub{C} <: Interfacer.SurfaceModelSimulation
     cache::C
 end
 Interfacer.get_field(sim::DummyStub, ::Val{:area_fraction}) = sim.cache.area_fraction
+Interfacer.get_field(sim::DummyStub, ::Val{:ice_concentration}) = sim.cache.area_fraction
 function Interfacer.update_field!(
     sim::DummyStub,
     ::Val{:area_fraction},
@@ -195,10 +196,16 @@ for FT in (Float32, Float64)
         # Construct ice fraction of 0s. During the update, the first half should be set to 0.5
         ocean_d = CC.Fields.zeros(test_space)
 
+
         # Fill in only the necessary parts of the simulation
+        coupler_fields = Interfacer.init_coupler_fields(
+            FT,
+            Interfacer.default_coupler_fields(),
+            test_space,
+        )
         cs = Interfacer.CoupledSimulation{FT}(
             nothing, # dates
-            ones(test_space), # fields
+            coupler_fields, # fields
             nothing, # conservation_checks
             (Int(0), Int(1000)), # tspan
             Int(200), # Δt_cpl

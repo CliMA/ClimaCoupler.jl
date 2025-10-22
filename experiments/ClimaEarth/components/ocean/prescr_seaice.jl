@@ -167,6 +167,8 @@ end
 # extensions required by Interfacer
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:area_fraction}) =
     sim.integrator.p.area_fraction
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:ice_concentration}) =
+    sim.integrator.p.area_fraction
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:emissivity}) =
     sim.integrator.p.params.ϵ
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_buoyancy}) =

@@ -221,6 +221,10 @@ get_field(
     },
 ) = get_field_error(sim, val)
 
+# Sea ice models need to provide ice concentration
+get_field(sim::SeaIceModelSimulation, val::Val{:ice_concentration}) =
+    get_field_error(sim, val)
+
 """
     get_field(sim::ComponentModelSimulation, val::Val)
 

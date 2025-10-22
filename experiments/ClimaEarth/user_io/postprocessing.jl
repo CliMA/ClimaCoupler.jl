@@ -14,22 +14,23 @@ conservation checks if enabled, and closing all diagnostics file writers.
 """
 function postprocess_sim(cs, postprocessing_vars)
     (; conservation_softfail, rmse_check) = postprocessing_vars
-    output_dir = cs.dirs.output
-    artifact_dir = cs.dirs.artifacts
-    coupler_output_dir = joinpath(output_dir, "coupler")
-    atmos_output_dir = joinpath(output_dir, "clima_atmos")
-    land_output_dir = joinpath(output_dir, "clima_land")
-    ocean_output_dir = joinpath(output_dir, "clima_ocean")
+    (;
+        coupler_output_dir,
+        atmos_output_dir,
+        land_output_dir,
+        ocean_output_dir,
+        artifacts_dir,
+    ) = cs.dir_paths
 
     # Plot generic diagnostics
     @info "Plotting diagnostics for coupler, atmos, land, and ocean"
-    make_diagnostics_plots(coupler_output_dir, artifact_dir, output_prefix = "coupler_")
-    make_diagnostics_plots(atmos_output_dir, artifact_dir, output_prefix = "atmos_")
-    make_diagnostics_plots(land_output_dir, artifact_dir, output_prefix = "land_")
-    make_ocean_diagnostics_plots(ocean_output_dir, artifact_dir, output_prefix = "ocean_")
+    make_diagnostics_plots(coupler_output_dir, artifacts_dir, output_prefix = "coupler_")
+    make_diagnostics_plots(atmos_output_dir, artifacts_dir, output_prefix = "atmos_")
+    make_diagnostics_plots(land_output_dir, artifacts_dir, output_prefix = "land_")
+    make_ocean_diagnostics_plots(ocean_output_dir, artifacts_dir, output_prefix = "ocean_")
 
     # Plot all model states and coupler fields (useful for debugging)
-    ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext && debug(cs, artifact_dir)
+    ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext && debug(cs, artifacts_dir)
 
     # If we have enough data (in time, but also enough variables), plot the leaderboard.
     # We need pressure to compute the leaderboard.
@@ -39,7 +40,7 @@ function postprocess_sim(cs, postprocessing_vars)
         times = CAN.times(get(simdir, first(CAN.available_vars(simdir))))
         t_end = times[end]
         if t_end > 84600 * 31 * 3 # 3 months for spin up
-            leaderboard_base_path = artifact_dir
+            leaderboard_base_path = artifacts_dir
             compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
             rmse_check && test_rmse_thresholds(atmos_output_dir, 3)
             pressure_in_output &&
@@ -54,15 +55,15 @@ function postprocess_sim(cs, postprocessing_vars)
             cs.conservation_checks.energy,
             cs,
             conservation_softfail,
-            figname1 = joinpath(cs.dirs.artifacts, "total_energy_bucket.png"),
-            figname2 = joinpath(cs.dirs.artifacts, "total_energy_log_bucket.png"),
+            figname1 = joinpath(artifacts_dir, "total_energy_bucket.png"),
+            figname2 = joinpath(artifacts_dir, "total_energy_log_bucket.png"),
         )
         plot_global_conservation(
             cs.conservation_checks.water,
             cs,
             conservation_softfail,
-            figname1 = joinpath(cs.dirs.artifacts, "total_water_bucket.png"),
-            figname2 = joinpath(cs.dirs.artifacts, "total_water_log_bucket.png"),
+            figname1 = joinpath(artifacts_dir, "total_water_bucket.png"),
+            figname2 = joinpath(artifacts_dir, "total_water_log_bucket.png"),
         )
     end
 
@@ -97,25 +98,29 @@ end
 """
     save_sypd_walltime_to_disk(cs, walltime)
 
-Save the computed `sypd`, `walltime_per_coupling_step`, and memory usage to text files.
+Save the computed `sypd`, `walltime_per_coupling_step`,
+and memory usage to text files in the `artifacts` directory.
 """
 function save_sypd_walltime_to_disk(cs, walltime)
     if ClimaComms.iamroot(ClimaComms.context(cs))
         sypd = simulated_years_per_day(cs, walltime)
         walltime_per_step = walltime_per_coupling_step(cs, walltime)
 
-        open(joinpath(cs.dirs.artifacts, "sypd.txt"), "w") do sypd_filename
+        open(joinpath(cs.dir_paths.artifacts_dir, "sypd.txt"), "w") do sypd_filename
             println(sypd_filename, "$sypd")
         end
 
         open(
-            joinpath(cs.dirs.artifacts, "walltime_per_step.txt"),
+            joinpath(cs.dir_paths.artifacts_dir, "walltime_per_step.txt"),
             "w",
         ) do walltime_per_step_filename
             println(walltime_per_step_filename, "$(walltime_per_step)")
         end
 
-        open(joinpath(cs.dirs.artifacts, "max_rss_cpu.txt"), "w") do cpu_max_rss_filename
+        open(
+            joinpath(cs.dir_paths.artifacts_dir, "max_rss_cpu.txt"),
+            "w",
+        ) do cpu_max_rss_filename
             cpu_max_rss_GB = Utilities.show_memory_usage()
             println(cpu_max_rss_filename, cpu_max_rss_GB)
         end

@@ -97,7 +97,7 @@ end
         Ref(-1), # prev_checkpoint_t
         model_sims,
         (;), # callbacks
-        (;), # dirs
+        (;), # dir_paths
         thermo_params, # thermo_params
         nothing, # diags_handler
     )

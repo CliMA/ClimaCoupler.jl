@@ -59,7 +59,7 @@ four_steps_reading = deepcopy(four_steps)
 
 four_steps_reading["t_end"] = "900secs"
 four_steps_reading["detect_restart_files"] = true
-four_steps_reading["restart_dir"] = cs_four_steps.dirs.checkpoints
+four_steps_reading["restart_dir"] = cs_four_steps.dir_paths.checkpoints_dir
 four_steps_reading["restart_t"] = 720
 four_steps_reading["job_id"] = "four_steps_reading"
 

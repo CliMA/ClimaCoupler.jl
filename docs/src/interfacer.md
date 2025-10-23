@@ -95,7 +95,8 @@ The default coupler exchange fields are the following, defined in
 | `F_turb_moisture` | turbulent moisture flux                                     | kg m⁻² s⁻¹ |
 | `F_turb_ρτxz`     | turbulent momentum flux in the zonal direction              | kg m⁻¹ s⁻² |
 | `F_turb_ρτyz`     | turbulent momentum flux in the meridional direction         | kg m⁻¹ s⁻² |
-| `F_radiative`     | net radiative flux at the surface                           | W m⁻²      |
+| `SW_d`            | downward SW flux at the surface                             | W m⁻²      |
+| `LW_d`            | downward LW flux at the surface                             | W m⁻²      |
 | `emissivity`      | surface emissivity                                          | -          |
 | `T_sfc`           | surface temperature, averaged across components             | K          |
 | `P_liq`           | liquid precipitation                                        | kg m⁻² s⁻¹ |
@@ -151,7 +152,8 @@ for the following properties:
 | `height_int`                | height at the bottom cell center of the atmosphere space                  | m          |
 | `height_sfc`                | height at the bottom face of the atmosphere space                         | m          |
 | `liquid_precipitation`      | liquid precipitation at the surface                                       | kg m⁻² s⁻¹ |
-| `radiative_energy_flux_sfc` | net radiative flux at the surface                                         | W m⁻²      |
+| `SW_d`                      | downwelling shortwave radiation at the surface                            | W m⁻²      |
+| `LW_d`                      | downwelling longwave radiation at the surface                             | W m⁻²      |
 | `radiative_energy_flux_toa` | net radiative flux at the top of the atmosphere                           | W m⁻²      |
 | `snow_precipitation`        | snow precipitation at the surface                                         | kg m⁻² s⁻¹ |
 | `specific_humidity`         | specific humidity at the bottom cell centers of the atmosphere            | kg kg⁻¹    |
@@ -243,7 +245,8 @@ properties needed by a component model.
 |-----------------------------------------------|------------------------------------------------------------------------------|------------|
 | `area_fraction`                               | fraction of the simulation grid surface area this model covers               |            |
 | `liquid_precipitation`                        | liquid precipitation at the surface                                          | kg m⁻² s⁻¹ |
-| `radiative_energy_flux_sfc` OR `LW_d`, `SW_d` | net radiative flux at the surface OR downward longwave, shortwave radiation  | W m⁻²      |
+| `SW_d`                                        | downwelling shortwave radiation at the surface                               | W m⁻²      |
+| `LW_d`                                        | downwelling longwave radiation at the surface                                | W m⁻²      |
 | `snow_precipitation`                          | snow precipitation at the surface                                            | kg m⁻² s⁻¹ |
 | `turbulent_energy_flux`                       | aerodynamic turbulent surface fluxes of energy (sensible and latent heat)    | W m⁻²      |
 | `turbulent_moisture_flux`                     | aerodynamic turbulent surface fluxes of energy (evaporation)                 | kg m⁻² s⁻¹ |

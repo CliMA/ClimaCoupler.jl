@@ -6,12 +6,24 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Provide `SW_d`, `LW_d` to surface models instead of `F_radiative` PR[#1518](https://github.com/CliMA/ClimaCoupler.jl/pull/1518)
+This allows us to correctly compute radiative flux over surface models by
+computing each contribution individually (`SW_u, SW_d, LW_u, LW_d`).
+
 #### Change some closures used in the Oceananigans model PR[#1524](https://github.com/CliMA/ClimaCoupler.jl/pull/1524)
 Per ocean team recommendation, we changed some closures to be non-default.
 
 #### Change the behavior of `detect_restart_file` PR[#1515](https://github.com/CliMA/ClimaCoupler.jl/pull/1515)
 Users now only need to specify `restart_dir` and `restart_t` to restart a simulation from a specific file, and do
 not need to set `detect_restart_file` to true. `detect_restart_file` is used for detecting restart file automatically.
+
+#### Fixes for sea ice PR[#1519](https://github.com/CliMA/ClimaCoupler.jl/pull/1519)
+Don't weight fluxes by area fraction when passing them to the surface models,
+only when providing them to the atmosphere.
+Zero out tendencies of prescribed sea ice and slab ocean where the area
+fraction is zero.
+For now, use binary area fractions for all surface models, until we correctly
+handle area fraction weighting.
 
 #### Use `update_turbulent_fluxes!` instead of `update_field!` for atmosphere PR[#1511](https://github.com/CliMA/ClimaCoupler.jl/pull/1511)
 Instead of using an `update_field!` method that dispatches on `::Val{:turbulent_fluxes}`

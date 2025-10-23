@@ -34,11 +34,13 @@ struct BucketSimulation{
     I <: SciMLBase.AbstractODEIntegrator,
     A <: CC.Fields.Field,
     OW,
+    RF,
 } <: Interfacer.LandModelSimulation
     model::M
     integrator::I
     area_fraction::A
     output_writer::OW
+    radiative_fluxes::RF
 end
 
 """
@@ -239,13 +241,25 @@ function BucketSimulation(
         callback = SciMLBase.CallbackSet(diag_cb),
     )
 
-    return BucketSimulation(model, integrator, area_fraction, output_writer)
+    # TODO move these to ClimaLand.jl as part of CoupledRadiativeFluxes
+    radiative_fluxes =
+        (; SW_d = CC.Fields.zeros(surface_space), LW_d = CC.Fields.zeros(surface_space))
+
+    return BucketSimulation(
+        model,
+        integrator,
+        area_fraction,
+        output_writer,
+        radiative_fluxes,
+    )
 end
 
 # extensions required by Interfacer
 Interfacer.get_field(sim::BucketSimulation, ::Val{:area_fraction}) = sim.area_fraction
 Interfacer.get_field(sim::BucketSimulation, ::Val{:beta}) =
     CL.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
+Interfacer.get_field(sim::BucketSimulation, ::Val{:emissivity}) =
+    CL.surface_emissivity(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:roughness_buoyancy}) =
     sim.model.parameters.z_0b
 Interfacer.get_field(sim::BucketSimulation, ::Val{:roughness_momentum}) =
@@ -294,12 +308,11 @@ function Interfacer.update_field!(
     ρ_liq = LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
     Interfacer.remap!(sim.integrator.p.drivers.P_liq, field ./ ρ_liq)
 end
-function Interfacer.update_field!(
-    sim::BucketSimulation,
-    ::Val{:radiative_energy_flux_sfc},
-    field,
-)
-    Interfacer.remap!(sim.integrator.p.bucket.R_n, field)
+function Interfacer.update_field!(sim::BucketSimulation, ::Val{:SW_d}, field)
+    Interfacer.remap!(sim.radiative_fluxes.SW_d, field)
+end
+function Interfacer.update_field!(sim::BucketSimulation, ::Val{:LW_d}, field)
+    Interfacer.remap!(sim.radiative_fluxes.LW_d, field)
 end
 function Interfacer.update_field!(
     sim::BucketSimulation,
@@ -343,6 +356,39 @@ function FluxCalculator.update_turbulent_fluxes!(sim::BucketSimulation, fields::
     (; F_lh, F_sh, F_turb_moisture) = fields
     Interfacer.update_field!(sim, Val(:turbulent_energy_flux), (; F_lh, F_sh))
     Interfacer.update_field!(sim, Val(:turbulent_moisture_flux), F_turb_moisture)
+    return nothing
+end
+
+"""
+    update_sim!(sim::BucketSimulation, csf)
+
+Updates the surface component model cache with the current coupler fields besides turbulent fluxes.
+
+# Arguments
+- `sim`: [Interfacer.SurfaceModelSimulation] containing a surface model simulation object.
+- `csf`: [NamedTuple] containing coupler fields.
+"""
+function update_sim!(sim::BucketSimulation, csf)
+    # radiative fluxes
+    # TODO add SW_d, LW_d fields to BucketSimulation and update there instead
+    Interfacer.update_field!(sim, Val(:SW_d), csf.SW_d)
+    Interfacer.update_field!(sim, Val(:LW_d), csf.LW_d)
+
+    model = sim.model
+    Y = sim.integrator.U
+    p = sim.integrator.p
+    t = sim.integrator.t
+
+    # TODO: get sigma from parameters
+    σ = FT(5.67e-8)
+    @. sim.integrator.p.bucket.R_n =
+        (1 - CL.surface_albedo(model, Y, p)) * sim.radiative_fluxes.SW_d +
+        Interfacer.get_field(sim, Val(:emissivity)) *
+        (sim.radiative_fluxes.LW_d - σ * CL.surface_temperature(model, Y, p, t)^4)
+
+    # precipitation
+    Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)
+    Interfacer.update_field!(sim, Val(:snow_precipitation), csf.P_snow)
     return nothing
 end
 

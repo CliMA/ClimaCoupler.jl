@@ -483,15 +483,32 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr1,
         sim.remapping.remapper_cc,
-        csf.F_radiative,
+        csf.SW_d,
     )
-    remapped_F_radiative = sim.remapping.scratch_arr1
+    remapped_SW_d = sim.remapping.scratch_arr1
+
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr2,
+        sim.remapping.remapper_cc,
+        csf.LW_d,
+    )
+    remapped_LW_d = sim.remapping.scratch_arr2
 
     # Update only the part due to radiative fluxes. For the full update, the component due
     # to latent and sensible heat is missing and will be updated in update_turbulent_fluxes.
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
+    # TODO: get sigma from parameters
+    σ = 5.67e-8
+    α = Interfacer.get_field(sim, Val(:surface_direct_albedo)) # scalar
+    ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
     OC.interior(oc_flux_T, :, :, 1) .=
-        remapped_F_radiative ./ (ocean_reference_density * ocean_heat_capacity)
+        (
+            -(1 - α) .* remapped_SW_d .-
+            ϵ * (
+                remapped_LW_d .-
+                σ .* (273.15 .+ OC.interior(sim.ocean.model.tracers.T, :, :, 1)) .^ 4
+            )
+        ) ./ (ocean_reference_density * ocean_heat_capacity)
 
     # Remap precipitation fields onto scratch arrays; rename for clarity
     CC.Remapping.interpolate!(

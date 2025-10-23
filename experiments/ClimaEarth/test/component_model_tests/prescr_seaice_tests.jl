@@ -10,7 +10,7 @@ include(joinpath("..", "..", "components", "ocean", "prescr_seaice.jl"))
 
 for FT in (Float32, Float64)
     @testset "test sea-ice energy slab for FT=$FT" begin
-        function test_sea_ice_rhs(; F_radiative = 0.0, T_base = 271.2)
+        function test_sea_ice_rhs(; SW_d = 0.0, LW_d = 0.0, T_base = 271.2)
             space = CC.CommonSpaces.CubedSphereSpace(
                 FT;
                 radius = FT(6371e3),
@@ -53,7 +53,8 @@ for FT in (Float32, Float64)
 
             cache = (;
                 F_turb_energy = CC.Fields.zeros(space),
-                F_radiative = CC.Fields.zeros(space) .+ FT(F_radiative),
+                SW_d = CC.Fields.zeros(space) .+ FT(SW_d),
+                LW_d = CC.Fields.zeros(space) .+ FT(LW_d),
                 area_fraction = SIC_init,
                 SIC_timevaryinginput = SIC_timevaryinginput,
                 land_fraction = CC.Fields.zeros(space),
@@ -68,28 +69,47 @@ for FT in (Float32, Float64)
             return dY, Y, p
         end
 
-        # check that nothing changes with no fluxes (zero conduction when T_base == initial T_sfc)
+        # TODO: get sigma from parameters
+        σ = FT(5.67e-8)
+
+        # check expected dT due to upwelling longwave flux only
+        # (zero conduction when T_base == initial T_sfc)
         T_base_eq = IceSlabParameters{FT}().T_freeze - FT(5.0)
         dY, Y, p = test_sea_ice_rhs(T_base = T_base_eq)
-        @test all(T -> T == FT(0), Array(parent(dY.T_sfc)))
+        dT_expected =
+            (-p.params.ϵ * σ * T_base_eq^4) / (p.params.h * p.params.ρ * p.params.c)
+        @test all(T -> T == FT(0) || T ≈ dT_expected, Array(parent(dY.T_sfc)))
 
-        # check expected dT due to radiative flux only (again set T_base == initial T_sfc)
-        dY, Y, p = test_sea_ice_rhs(F_radiative = 1.0, T_base = T_base_eq)
-        dT_expected = -1.0 / (p.params.h * p.params.ρ * p.params.c)
+        # check expected dT due to downwelling shortwave flux and upwelling longwave flux
+        # (again set T_base == initial T_sfc)
+        dY, Y, p = test_sea_ice_rhs(SW_d = 1.0, LW_d = 0.0, T_base = T_base_eq)
+        dT_expected =
+            ((1 - p.params.α) * 1.0 - p.params.ϵ * σ * T_base_eq^4) /
+            (p.params.h * p.params.ρ * p.params.c)
+        @test all(T -> T == FT(0) || T ≈ dT_expected, Array(parent(dY.T_sfc)))
+
+        # check expected dT due to downwelling and upwelling longwave flux
+        # (again set T_base == initial T_sfc)
+        dY, Y, p = test_sea_ice_rhs(SW_d = 0.0, LW_d = 2.0, T_base = T_base_eq)
+        @show extrema(Y.T_sfc)
+        dT_expected =
+            (p.params.ϵ * (2.0 - σ * T_base_eq^4)) / (p.params.h * p.params.ρ * p.params.c)
         @test all(T -> T == FT(0) || T ≈ dT_expected, Array(parent(dY.T_sfc)))
 
         # check that tendency will not result in above freezing T
-        dY, Y, p = test_sea_ice_rhs(F_radiative = 0.0, T_base = 330.0) # Float32 requires a large number here!
+        dY, Y, p = test_sea_ice_rhs(SW_d = 0.0, LW_d = 0.0, T_base = 330.0) # Float32 requires a large number here!
         dT_maximum = @. (p.params.T_freeze - Y.T_sfc) / p.dt
         @test minimum(dT_maximum .- dY.T_sfc) >= FT(0.0)
 
-        # check that the correct tendency was added due to basal conductive flux
-        dY, Y, p = test_sea_ice_rhs(F_radiative = 0.0, T_base = 269.2)
+        # check that the correct tendency was added due to basal conductive flux and upwelling longwave flux
+        T_base = 269.2
+        dY, Y, p = test_sea_ice_rhs(SW_d = 0.0, LW_d = 0.0, T_base = T_base)
+        T_sfc = minimum(Y.T_sfc) # get the non-zero temperature value
+        (; k_ice, h, ρ, c, T_base, ϵ) = p.params
         dT_expected =
-            (p.params.k_ice / (p.params.h * p.params.h * p.params.ρ * p.params.c)) *
-            (p.params.T_base - minimum(Y.T_sfc))
-        @test minimum(dY) ≈ FT(0)
-        @test maximum(dY) ≈ FT(dT_expected)
+            (k_ice / (h * h * ρ * c)) * (T_base - T_sfc) - (ϵ * σ * T_sfc^4) / (h * ρ * c)
+        @test minimum(dY) ≈ FT(dT_expected)
+        @test maximum(dY) ≈ FT(0)
     end
 
     @testset "dss_state! SeaIceModelSimulation for FT=$FT" begin

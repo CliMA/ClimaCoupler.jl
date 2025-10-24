@@ -217,7 +217,7 @@ for FT in (Float32, Float64)
                 land_sim = DummyStub((; area_fraction = land_fraction)),
             ), # model_sims
             (;), # callbacks
-            (;), # dirs
+            (;), # dir_paths
             nothing, # thermo_params
             nothing, # diags_handler
         )
@@ -505,7 +505,7 @@ for FT in (Float32, Float64)
             Ref(-1), # prev_checkpoint_t
             model_sims,
             (;), # callbacks
-            (;), # dirs
+            (;), # dir_paths
             thermo_params, # thermo_params
             nothing, # diags_handler
         )

@@ -70,7 +70,7 @@ struct CoupledSimulation{
     prev_checkpoint_t::CTT
     model_sims::NTMS
     callbacks::CALLBACKS
-    dirs::NTP
+    dir_paths::NTP
     thermo_params::TP
     diags_handler::DH
 end
@@ -83,7 +83,7 @@ function Base.show(io::IO, sim::CoupledSimulation)
         io,
         "Coupled Simulation\n",
         "├── Running on: $(device_type)\n",
-        "├── Output folder: $(sim.dirs.output)\n",
+        "├── Output folder: $(sim.dir_paths.output_dir_root)\n",
         "└── Current date: $(current_date(sim))\n",
     )
 end

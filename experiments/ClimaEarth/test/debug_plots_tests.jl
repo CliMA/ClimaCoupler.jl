@@ -87,7 +87,7 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
         Ref(-1), # prev_checkpoint_t
         model_sims, # model_sims
         (;), # callbacks
-        (;), # dirs
+        (;), # dir_paths
         nothing, # thermo_params
         nothing, # diags_handler
     )

@@ -62,13 +62,6 @@ steps:
         agents:
           slurm_mem: 32GB
 
-      - label: "Slabplanet: fixed ocean T, bucket"
-        key: "slabplanet_fixed_ocean"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_fixed_ocean.yml --job_id slabplanet_fixed_ocean"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_fixed_ocean/artifacts/*"
-        agents:
-          slurm_mem: 32GB
-
       - label: "Slabplanet: evolving slab ocean, bucket"
         key: "slabplanet_evolve_ocean"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_evolve_ocean.yml --job_id slabplanet_evolve_ocean"
@@ -79,33 +72,6 @@ steps:
   - group: "AMIP simulations"
 
     steps:
-      - label: "GPU AMIP + DecayWithHeight diffusion"
-        key: "amip_decaywithheight_gpu"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decaywithheight.yml --job_id amip_decaywithheight_gpu"
-        artifact_paths: "experiments/ClimaEarth/output/amip_decaywithheight_gpu/artifacts/*"
-        env:
-          CLIMACOMMS_CONTEXT: "MPI"
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          queue: clima
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 32GB
-
-      - label: "GPU AMIP + DecayWithHeight diffusion + integrated land"
-        key: "amip_decaywithheight_integrated_land_gpu"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_decaywithheight_integrated_land.yml --job_id amip_decaywithheight_integrated_land_gpu"
-        artifact_paths: "experiments/ClimaEarth/output/amip_decaywithheight_integrated_land_gpu/artifacts/*"
-        env:
-          CLIMACOMMS_CONTEXT: "MPI"
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          queue: clima
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 32GB
 
       - label: "GPU AMIP + ED only"
         key: "amip_edonly_gpu"
@@ -120,7 +86,7 @@ steps:
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
           slurm_mem: 32GB
-
+      
       - label: "GPU AMIP + ED only + 1M microphysics"
         key: "amip_edonly_1M_gpu"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_1M.yml --job_id amip_edonly_1M_gpu"
@@ -135,10 +101,10 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 32GB
 
-      - label: "GPU AMIP + ED only + Earth topography"
-        key: "amip_edonly_topo_gpu"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_topo.yml --job_id amip_edonly_topo_gpu"
-        artifact_paths: "experiments/ClimaEarth/output/amip_edonly_topo_gpu/artifacts/*"
+      - label: "GPU AMIP + ED only + integrated land"
+        key: "amip_edonly_integrated_land_gpu" # runs for 4 months only because of instability after that time
+        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_integrated_land.yml --job_id amip_edonly_integrated_land_gpu"
+        artifact_paths: "experiments/ClimaEarth/output/amip_edonly_integrated_land_gpu/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"
@@ -149,25 +115,11 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 32GB
 
-      - label: "GPU AMIP + ED only + Earth topography + integrated land"
-        key: "amip_edonly_topo_integrated_land_gpu" # runs for 4 months only because of instability after that time
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_topo_integrated_land.yml --job_id amip_edonly_topo_integrated_land_gpu"
-        artifact_paths: "experiments/ClimaEarth/output/amip_edonly_topo_integrated_land_gpu/artifacts/*"
-        env:
-          CLIMACOMMS_CONTEXT: "MPI"
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          queue: clima
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 32GB
-
-      - label: "GPU AMIP + diag. EDMF + Earth topography"
-        key: "amip_diagedmf_topo_gpu"
+      - label: "GPU AMIP + diag. EDMF"
+        key: "amip_diagedmf_gpu"
         command:
-          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf_topo.yml --job_id amip_diagedmf_topo_gpu"
-        artifact_paths: "experiments/ClimaEarth/output/amip_diagedmf_topo_gpu/artifacts/*"
+          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf.yml --job_id amip_diagedmf_gpu"
+        artifact_paths: "experiments/ClimaEarth/output/amip_diagedmf_gpu/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"
@@ -178,11 +130,11 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 32GB
 
-      - label: "GPU AMIP + diag. EDMF + Earth topography + integrated land"
-        key: "amip_diagedmf_topo_integrated_land_gpu" # runs for 2 months only because of instability after that time
+      - label: "GPU AMIP + diag. EDMF + integrated land"
+        key: "amip_diagedmf_integrated_land_gpu" # runs for 2 months only because of instability after that time
         command:
-          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf_topo_integrated_land.yml --job_id amip_diagedmf_topo_integrated_land_gpu"
-        artifact_paths: "experiments/ClimaEarth/output/amip_diagedmf_topo_integrated_land_gpu/artifacts/*"
+          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf_integrated_land.yml --job_id amip_diagedmf_integrated_land_gpu"
+        artifact_paths: "experiments/ClimaEarth/output/amip_diagedmf_integrated_land_gpu/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"

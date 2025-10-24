@@ -19,3 +19,5 @@ rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "366days"
+topo_smoothing: true
+topography: "Earth"

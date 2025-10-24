@@ -3,6 +3,7 @@ conservation_softfail: true
 dt: "200secs"
 dt_cpl: "200secs"
 energy_check: true
+evolving_ocean: false
 h_elem: 4
 mode_name: "slabplanet"
 moist: "dry"

@@ -20,7 +20,3 @@ t_end: "465days"
 topo_smoothing: true
 topography: "Earth"
 z_elem: 39
-extra_atmos_diagnostics:
-  - short_name: [od550aer, odsc550aer]
-    period: "1months"
-    reduction_time: average

@@ -192,7 +192,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     # Note that this requires the sea ice model to always be run with dynamics turned on
     si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
     si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
-    set_from_extrinsic_vectors!(
+    set_from_extrinsic_vector!(
         (; u = si_flux_u, v = si_flux_v),
         grid,
         F_turb_ρτxz_cc,
@@ -208,7 +208,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     remapped_F_sh = sim.remapping.scratch_arr2
 
     # Update the sea ice only where the concentration is greater than zero.
-    si_flux_heat = ice_sim.ice.model.external_heat_fluxes.top
+    si_flux_heat = sim.ice.model.external_heat_fluxes.top
     OC.interior(si_flux_heat, :, :, 1) .=
         OC.interior(si_flux_heat, :, :, 1) .+ (remapped_F_lh .+ remapped_F_sh)
 

@@ -5,7 +5,7 @@
 #SBATCH --mem-per-cpu=16G
 #SBATCH --partition=expansion
 
-export MODULEPATH="/groups/esm/modules:$MODULEPATH"
+export MODULEPATH="/resnick/groups/esm/modules:$MODULEPATH"
 module purge
 module load climacommon/2024_10_09
 

@@ -52,12 +52,11 @@ can be found in the documentation for `ClimaOcean.ocean_simulation`.
 """
 function ClimaSeaIceSimulation(land_fraction, ocean; output_dir)
     # Initialize the sea ice with the same grid as the ocean
-    grid = ocean.ocean.model.grid # TODO can't use lat/lon grid at poles for ice, need to fill with bucket
+    grid = ocean.ocean.model.grid
     arch = OC.Architectures.architecture(grid)
     advection = ocean.ocean.model.advection.T
     top_heat_boundary_condition = CSI.MeltingConstrainedFluxBalance()
 
-    # TODO use ClimaOcean 0.8.6
     ice = CO.sea_ice_simulation(grid, ocean.ocean; advection, top_heat_boundary_condition)
 
     melting_speed = 1e-4
@@ -262,6 +261,12 @@ end
 Compute the fluxes between the ocean and sea ice, storing them in the `ocean_ice_fluxes`
 fields of the ocean and sea ice simulations.
 
+This function assumes both simulations share the same grid, so no remapping is done.
+
+Both simulations have had their atmospheric fluxes updated already in this timestep
+(see `update_sim!` and `update_turbulent_fluxes!`), so we add the contributions from the
+ocean-sea ice interactions to the existing fluxes, rather than overwriting all fluxes.
+
 !!! note
     This function must be called after the turbulent fluxes have been updated in both
     simulations. Here only the contributions from the sea ice/ocean interactions
@@ -275,11 +280,10 @@ function FluxCalculator.ocean_seaice_fluxes!(
     ocean_properties = ocean_sim.ocean_properties
     ice_concentration = Interfacer.get_field(ice_sim, Val(:ice_concentration))
 
+    # Update the sea ice concentration in the ocean simulation
+    ocean_sim.ice_concentration .= ice_concentration
+
     # Compute the fluxes and store them in the both simulations
-    ocean_properties = (;
-        reference_density = ocean_properties.ocean_reference_density,
-        heat_capacity = ocean_properties.ocean_heat_capacity,
-    ) # TODO rename in constructor
     CO.OceanSeaIceModels.InterfaceComputations.compute_sea_ice_ocean_fluxes!(
         ice_sim.ocean_ice_fluxes,
         ocean_sim.ocean,
@@ -297,8 +301,8 @@ function FluxCalculator.ocean_seaice_fluxes!(
     bottom_heat_flux .= Qf .+ Qi
 
     ## Update the internals of the ocean model
-    ρₒ⁻¹ = 1 / ocean_sim.ocean_properties.ocean_reference_density
-    cₒ = ocean_sim.ocean_properties.ocean_heat_capacity
+    ρₒ⁻¹ = 1 / ocean_sim.ocean_properties.reference_density
+    cₒ = ocean_sim.ocean_properties.heat_capacity
 
     # Compute fluxes for u, v, T, and S from momentum, heat, and freshwater fluxes
     oc_flux_u = surface_flux(ocean_sim.ocean.model.velocities.u)

@@ -398,7 +398,7 @@ function CoupledSimulation(config_dict::AbstractDict)
             )
 
             # Get initial SIC values and use them to calculate ice fraction
-            ice_fraction = CC.Fields.zeros(space)
+            ice_fraction = CC.Fields.zeros(boundary_space)
             evaluate!(ice_fraction, SIC_timevaryinginput, tspan[1])
         else
             error("Invalid ice model specified: $(ice_model)")

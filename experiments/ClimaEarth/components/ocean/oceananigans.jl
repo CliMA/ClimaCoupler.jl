@@ -22,7 +22,7 @@ It contains the following objects:
 - `ocean_properties::OPROP`: A NamedTuple of ocean properties and parameters
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 """
-struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC} <: Interfacer.OceanModelSimulation
+struct OceananigansSimulation{SIM, A, OPROP, REMAP} <: Interfacer.OceanModelSimulation
     ocean::SIM
     area_fraction::A
     ocean_properties::OPROP
@@ -152,8 +152,9 @@ function OceananigansSimulation(
     interpolated_values_dim..., _buffer_length = size(remapper_cc._interpolated_values)
     scratch_arr1 = ArrayType(zeros(FT, interpolated_values_dim...))
     scratch_arr2 = ArrayType(zeros(FT, interpolated_values_dim...))
+    scratch_arr3 = ArrayType(zeros(FT, interpolated_values_dim...))
 
-    remapping = (; remapper_cc, scratch_cc1, scratch_cc2, scratch_arr1, scratch_arr2)
+    remapping = (; remapper_cc, scratch_cc1, scratch_cc2, scratch_arr1, scratch_arr2, scratch_arr3)
 
     ocean_properties = (;
         ocean_reference_density = 1020,
@@ -267,7 +268,14 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     # TODO clarify where we need to add and where we set fluxes directly
     (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
     grid = sim.ocean.model.grid
-    area_fraction = sim.area_fraction
+
+    # Remap the area fraction from the boundary space to the Oceananigans grid
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr3,
+        sim.remapping.remapper_cc,
+        sim.area_fraction,
+    )
+    area_fraction = sim.remapping.scratch_arr3
 
     # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
     CC.Remapping.interpolate!(
@@ -361,7 +369,14 @@ so a sign change is needed when we convert from precipitation to salinity flux.
 function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) =
         sim.ocean_properties
-    area_fraction = sim.area_fraction # TODO use sea ice instead?
+    # TODO use SIC instead?
+    # Remap the area fraction from the boundary space to the Oceananigans grid
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr3,
+        sim.remapping.remapper_cc,
+        sim.area_fraction,
+    )
+    area_fraction = sim.remapping.scratch_arr3
 
     # Remap radiative flux onto scratch array; rename for clarity
     CC.Remapping.interpolate!(
@@ -398,12 +413,12 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr1,
         sim.remapping.remapper_cc,
-        area_fraction .* csf.P_liq,
+        sim.area_fraction .* csf.P_liq,
     )
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr2,
         sim.remapping.remapper_cc,
-        area_fraction .* csf.P_snow,
+        sim.area_fraction .* csf.P_snow,
     )
     remapped_P_liq = sim.remapping.scratch_arr1
     remapped_P_snow = sim.remapping.scratch_arr2

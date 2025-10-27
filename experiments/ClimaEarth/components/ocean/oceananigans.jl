@@ -22,7 +22,7 @@ It contains the following objects:
 - `ocean_properties::OPROP`: A NamedTuple of ocean properties and parameters
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 """
-struct OceananigansSimulation{SIM, A, OPROP, REMAP} <: Interfacer.OceanModelSimulation
+struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC} <: Interfacer.OceanModelSimulation
     ocean::SIM
     area_fraction::A
     ocean_properties::OPROP
@@ -189,6 +189,9 @@ This matters in the case of a LatitudeLongitudeGrid, which is only
 defined between -80 and 80 degrees latitude. In this case, we want to
 set the ice fraction to `1 - land_fraction` on [-90, -80] and [80, 90]
 degrees latitude, and make sure the ocean fraction is 0 there.
+
+The land fraction is expected to be set to 1 at the poles before calling this function,
+and doesn't need to be set again since its fraction is static.
 """
 function FieldExchanger.resolve_ocean_ice_fractions!(
     ocean_sim::OceananigansSimulation,
@@ -206,6 +209,7 @@ function FieldExchanger.resolve_ocean_ice_fractions!(
         polar_mask = CC.Fields.zeros(boundary_space)
         polar_mask .= abs.(lat) .>= FT(80)
 
+        # TODO do we want both to be 0 since we use capped lat/lon?
         # Set ice fraction to 1 - land_fraction and ocean fraction to 0 where polar_mask is 1
         @. ice_fraction = ifelse.(polar_mask == FT(1), FT(1) - land_fraction, ice_fraction)
         @. ocean_fraction = ifelse.(polar_mask == FT(1), FT(0), ocean_fraction)
@@ -259,9 +263,11 @@ and Oceananigans represents moisture moving from atmosphere to ocean as a positi
 so a sign change is needed when we convert from moisture to salinity flux.
 """
 function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fields)
+    # TODO multiply all fluxes by 1 - SIC
+    # TODO clarify where we need to add and where we set fluxes directly
     (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
-
     grid = sim.ocean.model.grid
+    area_fraction = sim.area_fraction
 
     # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
     CC.Remapping.interpolate!(
@@ -289,7 +295,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
         grid,
         F_turb_ρτxz_cc,
         F_turb_ρτyz_cc,
-    )
+    ) # TODO multiply by area_fraction?
 
     (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) =
         sim.ocean_properties
@@ -308,7 +314,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
     OC.interior(oc_flux_T, :, :, 1) .=
         OC.interior(oc_flux_T, :, :, 1) .+
-        (remapped_F_lh .+ remapped_F_sh) ./ (ocean_reference_density * ocean_heat_capacity)
+        area_fraction .* (remapped_F_lh .+ remapped_F_sh) ./
+        (ocean_reference_density * ocean_heat_capacity)
 
     # Add the part of the salinity flux that comes from the moisture flux, we also need to
     # add the component due to precipitation (that was done with the radiative fluxes)
@@ -321,7 +328,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, 1)
     OC.interior(oc_flux_S, :, :, 1) .=
-        OC.interior(oc_flux_S, :, :, 1) .- (surface_salinity .* moisture_fresh_water_flux)
+        OC.interior(oc_flux_S, :, :, 1) .-
+        area_fraction .* surface_salinity .* moisture_fresh_water_flux
     return nothing
 end
 
@@ -353,7 +361,7 @@ so a sign change is needed when we convert from precipitation to salinity flux.
 function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) =
         sim.ocean_properties
-    ocean_fraction = sim.area_fraction
+    area_fraction = sim.area_fraction # TODO use sea ice instead?
 
     # Remap radiative flux onto scratch array; rename for clarity
     CC.Remapping.interpolate!(
@@ -377,8 +385,8 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     σ = 5.67e-8
     α = Interfacer.get_field(sim, Val(:surface_direct_albedo)) # scalar
     ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
-    OC.interior(oc_flux_T, :, :, 1) .= OC.interior(oc_flux_T, :, :, 1) .+
-        (
+    OC.interior(oc_flux_T, :, :, 1) .=
+        area_fraction .* (
             -(1 - α) .* remapped_SW_d .-
             ϵ * (
                 remapped_LW_d .-
@@ -390,12 +398,12 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr1,
         sim.remapping.remapper_cc,
-        ocean_fraction .* csf.P_liq,
+        area_fraction .* csf.P_liq,
     )
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr2,
         sim.remapping.remapper_cc,
-        ocean_fraction .* csf.P_snow,
+        area_fraction .* csf.P_snow,
     )
     remapped_P_liq = sim.remapping.scratch_arr1
     remapped_P_snow = sim.remapping.scratch_arr2
@@ -403,7 +411,7 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     # Virtual salt flux
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     precipitating_fresh_water_flux =
-        (remapped_P_liq .+ remapped_P_snow) ./ ocean_fresh_water_density
+        area_fraction .* (remapped_P_liq .+ remapped_P_snow) ./ ocean_fresh_water_density
     surface_salinity_flux =
         OC.interior(sim.ocean.model.tracers.S, :, :, 1) .* precipitating_fresh_water_flux
     OC.interior(oc_flux_S, :, :, 1) .=

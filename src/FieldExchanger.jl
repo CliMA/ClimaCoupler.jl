@@ -212,7 +212,6 @@ Updates the surface component model cache with the current coupler fields
 # Arguments
 - `sim`: [Interfacer.SurfaceModelSimulation] containing a surface model simulation object.
 - `csf`: [NamedTuple] containing coupler fields.
-- `area_fraction`: [CC.Fields.Field] containing the area fraction of this surface model.
 """
 function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf)
     # radiative fluxes

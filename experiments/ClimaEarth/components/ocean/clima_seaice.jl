@@ -50,7 +50,7 @@ previous step is provided to the coupler to be used in computing fluxes.
 Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
 """
-function ClimaSeaIceSimulation(land_fraction, ocean; output_dir)
+function ClimaSeaIceSimulation(land_fraction, ocean; output_dir, start_date = nothing)
     # Initialize the sea ice with the same grid as the ocean
     grid = ocean.ocean.model.grid
     arch = OC.Architectures.architecture(grid)
@@ -58,6 +58,23 @@ function ClimaSeaIceSimulation(land_fraction, ocean; output_dir)
     top_heat_boundary_condition = CSI.MeltingConstrainedFluxBalance()
 
     ice = CO.sea_ice_simulation(grid, ocean.ocean; advection, top_heat_boundary_condition)
+
+    # Initialize nonzero sea ice if start date provided
+    if !isnothing(start_date)
+        sic_metadata = CO.DataWrangling.Metadatum(
+            :sea_ice_concentration,
+            dataset = CO.DataWrangling.ECCO.ECCO4Monthly(),
+            date = start_date,
+        )
+        h_metadata = CO.DataWrangling.Metadatum(
+            :sea_ice_thickness,
+            dataset = CO.DataWrangling.ECCO.ECCO4Monthly(),
+            date = start_date,
+        )
+
+        OC.set!(ice.model.ice_concentration, sic_metadata)
+        OC.set!(ice.model.ice_thickness, h_metadata)
+    end
 
     melting_speed = 1e-4
 
@@ -168,6 +185,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
 
     (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
     grid = sim.ice.model.grid
+    ice_concentration = sim.ice.model.ice_concentration
 
     # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
     CC.Remapping.interpolate!(
@@ -208,8 +226,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
 
     # Update the sea ice only where the concentration is greater than zero.
     si_flux_heat = sim.ice.model.external_heat_fluxes.top
-    OC.interior(si_flux_heat, :, :, 1) .=
-        OC.interior(si_flux_heat, :, :, 1) .+ (remapped_F_lh .+ remapped_F_sh)
+    OC.interior(si_flux_heat, :, :, 1) .+=
+        (OC.interior(ice_concentration, :, :, 1) .> 0) .* (remapped_F_lh .+ remapped_F_sh)
 
     return nothing
 end
@@ -220,7 +238,7 @@ function Interfacer.update_field!(sim::ClimaSeaIceSimulation, ::Val{:area_fracti
 end
 
 """
-    FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf, area_fraction)
+    FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
 
 Update the sea ice simulation with the provided fields, which have been filled in
 by the coupler.
@@ -238,20 +256,47 @@ ClimaAtmos provides precipitation as a negative flux at the surface, and
 ClimaSeaIce represents precipitation as a positive salinity flux,
 so a sign change is needed when we convert from precipitation to salinity flux.
 """
-function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf, area_fraction)
+function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
+    ice_concentration = sim.ice.model.ice_concentration
+
     # Remap radiative flux onto scratch array; rename for clarity
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr1,
         sim.remapping.remapper_cc,
-        csf.F_radiative,
+        csf.SW_d,
     )
-    remapped_F_radiative = sim.remapping.scratch_arr1
+    remapped_SW_d = sim.remapping.scratch_arr1
+
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr2,
+        sim.remapping.remapper_cc,
+        csf.LW_d,
+    )
+    remapped_LW_d = sim.remapping.scratch_arr2
 
     # Update only the part due to radiative fluxes. For the full update, the component due
     # to latent and sensible heat is missing and will be updated in update_turbulent_fluxes.
     si_flux_heat = sim.ice.model.external_heat_fluxes.top
-    OC.interior(si_flux_heat, :, :, 1) .= remapped_F_radiative
+    # TODO: get sigma from parameters
+    σ = 5.67e-8
+    α = Interfacer.get_field(sim, Val(:surface_direct_albedo)) # scalar
+    ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
 
+    # Update only where ice concentration is greater than zero.
+    OC.interior(si_flux_heat, :, :, 1) .=
+        (OC.interior(ice_concentration, :, :, 1) .> 0) .* .-(1 .- α) .* remapped_SW_d .-
+        ϵ .* (
+            remapped_LW_d .-
+            σ .*
+            (
+                273.15 .+ OC.interior(
+                    sim.ice.model.ice_thermodynamics.top_surface_temperature,
+                    :,
+                    :,
+                    1,
+                )
+            ) .^ 4
+        )
     return nothing
 end
 
@@ -352,9 +397,9 @@ end
     i, j = @index(Global, NTuple)
 
     # ℑxᶠᵃᵃ: interpolate faces to centers
-    oc_flux_u +=
+    oc_flux_u[i, j, 1] +=
         ρτxio[i, j, 1] * ρₒ⁻¹ * OC.Operators.ℑxᶠᵃᵃ(i, j, 1, grid, ice_concentration)
-    oc_flux_v +=
+    oc_flux_v[i, j, 1] +=
         ρτyio[i, j, 1] * ρₒ⁻¹ * OC.Operators.ℑyᵃᶠᵃ(i, j, 1, grid, ice_concentration)
 end
 

@@ -125,7 +125,6 @@ function PrescribedIceSimulation(
     # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
     #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
     ice_fraction = @. max(min(SIC_init, FT(1) - land_fraction), FT(0))
-    ice_fraction = ifelse.(ice_fraction .> FT(0.5), FT(1), FT(0))
 
     params = IceSlabParameters{FT}()
 
@@ -269,7 +268,6 @@ function ice_rhs!(dY, Y, p, t)
 
     # Update the cached area fraction with the current SIC
     evaluate!(p.area_fraction, p.SIC_timevaryinginput, t)
-    @. p.area_fraction = ifelse(p.area_fraction > FT(0.5), FT(1), FT(0))
 
     # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
     #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)

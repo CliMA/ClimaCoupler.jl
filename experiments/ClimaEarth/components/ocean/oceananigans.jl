@@ -229,7 +229,10 @@ function FieldExchanger.resolve_ocean_ice_fractions!(
     end
 
     # Update the ice concentration field in the ocean simulation
-    ocean_sim.ice_concentration .= Interfacer.get_field(ice_sim, Val(:ice_concentration))
+    ice_sim isa ClimaSeaIceSimulation && (
+        ocean_sim.ice_concentration .=
+            Interfacer.get_field(ice_sim, Val(:ice_concentration))
+    )
     return nothing
 end
 

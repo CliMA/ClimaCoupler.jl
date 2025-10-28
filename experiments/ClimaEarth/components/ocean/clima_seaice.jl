@@ -10,6 +10,9 @@ using KernelAbstractions: @kernel, @index, @inbounds
 
 include("climaocean_helpers.jl")
 
+# Rename ECCO password env variable to match ClimaOcean.jl
+haskey(ENV, "ECCO_PASSWORD") && (ENV["ECCO_WEBDAV_PASSWORD"] = ENV["ECCO_PASSWORD"])
+
 """
     ClimaSeaIceSimulation{SIM, A, OPROP, REMAP}
 

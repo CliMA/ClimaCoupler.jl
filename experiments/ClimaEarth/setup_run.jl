@@ -308,7 +308,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         shared_surface_space = share_surface_space ? boundary_space : nothing
         if land_model == "bucket"
 
-            # TODO only for cmip
+            # TODO move this into resolve_area_fractions and call after init, think about restarts
             polar_mask = CC.Fields.zeros(boundary_space)
             lat = CC.Fields.coordinate_field(boundary_space).lat
             polar_mask .= abs.(lat) .>= FT(80)
@@ -375,6 +375,7 @@ function CoupledSimulation(config_dict::AbstractDict)
             @assert sim_mode <: CMIPMode
 
             # TODO how should we initialize ocean fraction when using ClimaSeaIce?
+            # TODO init everything with AF=1, then resolve after getting sea ice
             sic_data = try
                 joinpath(
                     @clima_artifact("historical_sst_sic", comms_ctx),
@@ -423,6 +424,14 @@ function CoupledSimulation(config_dict::AbstractDict)
                     ice_fraction,
                     ocean_sim;
                     output_dir = dir_paths.ice_output_dir,
+                    start_date,
+                )
+                # TODO don't need to initialize ocean fraction correctly if we do this
+                # TODO can rename to `resolve_area_fractions!` and also make land_fraction cover poles here instead of in driver
+                FieldExchanger.resolve_ocean_ice_fractions!(
+                    ocean_sim,
+                    ice_sim,
+                    land_fraction,
                 )
             end
         else
@@ -599,6 +608,8 @@ function CoupledSimulation(config_dict::AbstractDict)
 
         # 3. Update any fields in the model caches that can only be filled after the initial exchange.
         FieldExchanger.set_caches!(cs)
+
+        # TODO think about calling exchange again here to provide correct rad fluxes to surfaces
 
         # 4. Calculate and update turbulent fluxes for each surface model,
         #  and save the weighted average in coupler fields

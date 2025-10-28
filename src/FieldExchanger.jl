@@ -217,6 +217,7 @@ function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf)
     # radiative fluxes
     Interfacer.update_field!(sim, Val(:SW_d), csf.SW_d)
     Interfacer.update_field!(sim, Val(:LW_d), csf.LW_d)
+    # TODO need to compute SWU, LWU here too
 
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)

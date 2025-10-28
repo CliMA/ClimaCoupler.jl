@@ -136,7 +136,7 @@ needed to run CliMA code on Caltech's clusters.
 
 On Central, you can load the appropriate module package by running the following in the terminal:
 ```
-export MODULEPATH="/groups/esm/modules:$MODULEPATH"
+export MODULEPATH="/resnick/groups/esm/modules:$MODULEPATH"
 module load climacommon
 ```
 

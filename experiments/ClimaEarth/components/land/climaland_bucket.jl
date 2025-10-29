@@ -382,7 +382,7 @@ function update_sim!(sim::BucketSimulation, csf)
     # TODO: get sigma from parameters
     σ = FT(5.67e-8)
     @. sim.integrator.p.bucket.R_n =
-        (1 - CL.surface_albedo(model, Y, p)) * sim.radiative_fluxes.SW_d +
+        -(1 - CL.surface_albedo(model, Y, p)) * sim.radiative_fluxes.SW_d -
         Interfacer.get_field(sim, Val(:emissivity)) *
         (sim.radiative_fluxes.LW_d - σ * CL.surface_temperature(model, Y, p, t)^4)
 

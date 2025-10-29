@@ -308,16 +308,6 @@ function CoupledSimulation(config_dict::AbstractDict)
         # Determine whether to use a shared surface space
         shared_surface_space = share_surface_space ? boundary_space : nothing
         if land_model == "bucket"
-
-            # TODO move this into resolve_area_fractions and call after init, think about restarts
-            polar_mask = CC.Fields.zeros(boundary_space)
-            lat = CC.Fields.coordinate_field(boundary_space).lat
-            polar_mask .= abs.(lat) .>= FT(80)
-
-            # Set land fraction to 1 where polar_mask is 1
-            @. land_fraction = ifelse.(polar_mask == FT(1), FT(1), land_fraction)
-
-
             land_sim = BucketSimulation(
                 FT;
                 dt = component_dt_dict["dt_land"],
@@ -356,9 +346,36 @@ function CoupledSimulation(config_dict::AbstractDict)
             error("Invalid land model specified: $(land_model)")
         end
 
-        # TODO separate drivers to clean this up
+        ## ocean model
+        if sim_mode <: CMIPMode
+            stop_date = date(tspan[end] - tspan[begin])
+            ocean_sim = OceananigansSimulation(
+                boundary_space,
+                start_date,
+                stop_date;
+                output_dir = dir_paths.ocean_output_dir,
+                comms_ctx,
+            )
+        else
+            ocean_sim = PrescribedOceanSimulation(
+                FT,
+                boundary_space,
+                start_date,
+                t_start,
+                thermo_params,
+                comms_ctx;
+                sst_path = subseasonal_sst,
+            )
+        end
         ## sea ice model
-        if ice_model == "prescribed"
+        if ice_model == "clima_seaice"
+            ice_sim = ClimaSeaIceSimulation(
+                ice_fraction,
+                ocean_sim;
+                output_dir = dir_paths.ice_output_dir,
+                start_date,
+            )
+        elseif ice_model == "prescribed"
             ice_sim = PrescribedIceSimulation(
                 FT;
                 tspan = tspan,
@@ -371,82 +388,8 @@ function CoupledSimulation(config_dict::AbstractDict)
                 land_fraction,
                 sic_path = subseasonal_sic,
             )
-            ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
-        elseif ice_model == "clima_seaice"
-            @assert sim_mode <: CMIPMode
-
-            # TODO how should we initialize ocean fraction when using ClimaSeaIce?
-            # TODO init everything with AF=1, then resolve after getting sea ice
-            sic_data = try
-                joinpath(
-                    @clima_artifact("historical_sst_sic", comms_ctx),
-                    "MODEL.ICE.HAD187001-198110.OI198111-202206.nc",
-                )
-            catch error
-                @warn "Using lowres SIC. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
-                joinpath(
-                    @clima_artifact("historical_sst_sic_lowres", comms_ctx),
-                    "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
-                )
-            end
-            @info "Using initial condition prescribed SIC file: " sic_data
-
-            SIC_timevaryinginput = TimeVaryingInput(
-                sic_data,
-                "SEAICE",
-                boundary_space,
-                reference_date = start_date,
-                file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
-            )
-
-            # Get initial SIC values and use them to calculate ice fraction
-            ice_fraction = CC.Fields.zeros(boundary_space)
-            evaluate!(ice_fraction, SIC_timevaryinginput, tspan[1])
         else
             error("Invalid ice model specified: $(ice_model)")
-        end
-
-        ## ocean model using prescribed data
-        ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
-        ice_fraction = ifelse.(ice_fraction .> FT(0.5), FT(1), FT(0))
-        ocean_fraction = FT(1) .- ice_fraction .- land_fraction
-
-        if sim_mode <: CMIPMode
-            stop_date = date(tspan[end] - tspan[begin])
-            ocean_sim = OceananigansSimulation(
-                ocean_fraction,
-                start_date,
-                stop_date;
-                output_dir = dir_paths.ocean_output_dir,
-                comms_ctx,
-            )
-
-            if ice_model == "clima_seaice"
-                ice_sim = ClimaSeaIceSimulation(
-                    ice_fraction,
-                    ocean_sim;
-                    output_dir = dir_paths.ice_output_dir,
-                    start_date,
-                )
-                # TODO don't need to initialize ocean fraction correctly if we do this
-                # TODO can rename to `resolve_area_fractions!` and also make land_fraction cover poles here instead of in driver
-                FieldExchanger.resolve_ocean_ice_fractions!(
-                    ocean_sim,
-                    ice_sim,
-                    land_fraction,
-                )
-            end
-        else
-            ocean_sim = PrescribedOceanSimulation(
-                FT,
-                boundary_space,
-                start_date,
-                t_start,
-                ocean_fraction,
-                thermo_params,
-                comms_ctx;
-                sst_path = subseasonal_sst,
-            )
         end
 
     elseif (sim_mode <: AbstractSlabplanetSimulationMode)
@@ -479,7 +422,6 @@ function CoupledSimulation(config_dict::AbstractDict)
             dt = component_dt_dict["dt_ocean"],
             space = boundary_space,
             saveat = saveat,
-            area_fraction = (FT(1) .- land_fraction), ## NB: this ocean fraction includes areas covered by sea ice (unlike the one contained in the cs)
             thermo_params = thermo_params,
             evolving = evolving_ocean,
         )
@@ -607,8 +549,8 @@ function CoupledSimulation(config_dict::AbstractDict)
 
         The concrete steps for proper initialization are:
         =#
-
         # 1. Make sure surface model area fractions sum to 1 everywhere.
+        #  Note that ocean and ice fractions are not accurate until after this call.
         FieldExchanger.update_surface_fractions!(cs)
 
         # 2. Import atmospheric and surface fields into the coupler fields,

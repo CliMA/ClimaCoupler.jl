@@ -39,6 +39,6 @@ the atmosphere and each surface model.
 
 ```@docs
     ClimaCoupler.FieldExchanger.combine_surfaces!
-    ClimaCoupler.FieldExchanger.resolve_ocean_ice_fractions!
+    ClimaCoupler.FieldExchanger.resolve_area_fractions!
     ClimaCoupler.FieldExchanger.import_atmos_fields!
 ```

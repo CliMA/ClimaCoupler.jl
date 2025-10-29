@@ -65,7 +65,6 @@ function PrescribedOceanSimulation(
     space,
     start_date,
     t_start,
-    area_fraction,
     thermo_params,
     comms_ctx;
     z0m = FT(5.8e-5),
@@ -113,7 +112,7 @@ function PrescribedOceanSimulation(
         α_diffuse = ones(space) .* α_diffuse_val,
         u_int = zeros(space),
         v_int = zeros(space),
-        area_fraction = area_fraction,
+        area_fraction = ones(space),
         phase = TD.Liquid(),
         thermo_params = thermo_params,
         SST_timevaryinginput = SST_timevaryinginput,

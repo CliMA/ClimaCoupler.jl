@@ -9,7 +9,7 @@ import ClimaLand as CL
 import ClimaLand.Parameters as LP
 import ClimaParams as CP
 import ClimaDiagnostics as CD
-import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer
+import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, FieldExchanger
 using NCDatasets
 include("climaland_helpers.jl")
 
@@ -368,23 +368,26 @@ Updates the surface component model cache with the current coupler fields beside
 - `sim`: [Interfacer.SurfaceModelSimulation] containing a surface model simulation object.
 - `csf`: [NamedTuple] containing coupler fields.
 """
-function update_sim!(sim::BucketSimulation, csf)
+function FieldExchanger.update_sim!(sim::BucketSimulation, csf)
     # radiative fluxes
     # TODO add SW_d, LW_d fields to BucketSimulation and update there instead
     Interfacer.update_field!(sim, Val(:SW_d), csf.SW_d)
     Interfacer.update_field!(sim, Val(:LW_d), csf.LW_d)
 
     model = sim.model
-    Y = sim.integrator.U
+    Y = sim.integrator.u
     p = sim.integrator.p
     t = sim.integrator.t
 
     # TODO: get sigma from parameters
+    FT = eltype(Y)
     σ = FT(5.67e-8)
-    @. sim.integrator.p.bucket.R_n =
-        (1 - CL.surface_albedo(model, Y, p)) * sim.radiative_fluxes.SW_d +
-        Interfacer.get_field(sim, Val(:emissivity)) *
-        (sim.radiative_fluxes.LW_d - σ * CL.surface_temperature(model, Y, p, t)^4)
+    # Note: here we add negative signs to account for a difference in sign convention
+    #  between ClimaLand.jl and ClimaCoupler.jl in SW_d and LW_d.
+    sim.integrator.p.bucket.R_n .=
+        .-(1 .- CL.surface_albedo(model, Y, p)) .* sim.radiative_fluxes.SW_d .-
+        Interfacer.get_field(sim, Val(:emissivity)) .*
+        (sim.radiative_fluxes.LW_d .- σ .* CL.surface_temperature(model, Y, p, t) .^ 4)
 
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)

@@ -143,31 +143,20 @@ function CoupledSimulation(config_dict::AbstractDict)
     ) = get_coupler_args(config_dict)
 
     #=
-    ### I/O Directory Setup `setup_output_dirs` returns `dir_paths.output =
-    COUPLER_OUTPUT_DIR`, which is the directory where the output of the simulation
-    will be saved, `dir_paths.artifacts` is the directory where the plots (from
-    postprocessing and the conservation checks) of the simulation will be saved,
-    #and `dir_paths.checkpoints`, where restart files are saved.
+    ### I/O Directory Setup
+    `setup_output_dirs` returns a NamedTuple with the paths to
+    output directories for each component and the coupler,
+    as well as paths to artifacts, regrid, and checkpoints directories.
     =#
-
-    dir_paths =
-        Utilities.setup_output_dirs(output_dir = output_dir_root, comms_ctx = comms_ctx)
-    @info "Coupler output directory $(dir_paths.output)"
-    @info "Coupler artifacts directory $(dir_paths.artifacts)"
-    @info "Coupler checkpoint directory $(dir_paths.checkpoints)"
-
-    atmos_output_dir = joinpath(dir_paths.output, "clima_atmos")
-    isdir(atmos_output_dir) || mkpath(atmos_output_dir)
-    land_output_dir = joinpath(dir_paths.output, "clima_land")
-    isdir(land_output_dir) || mkpath(land_output_dir)
-    ocean_output_dir = joinpath(dir_paths.output, "clima_ocean")
-    isdir(ocean_output_dir) || mkpath(ocean_output_dir)
-
+    dir_paths = Utilities.setup_output_dirs(
+        output_dir_root = output_dir_root,
+        comms_ctx = comms_ctx,
+    )
 
     ## get component model dictionaries (if applicable)
     ## Note this step must come after parsing the coupler config dictionary, since
     ##  some parameters are passed from the coupler config to the component model configs
-    atmos_config_dict = get_atmos_config_dict(config_dict, atmos_output_dir)
+    atmos_config_dict = get_atmos_config_dict(config_dict, dir_paths.atmos_output_dir)
 
     ## set unique random seed if desired, otherwise use default
     Random.seed!(random_seed)
@@ -175,8 +164,8 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     if detect_restart_files
         isnothing(restart_t) &&
-            (restart_t = Checkpointer.t_start_from_checkpoint(dir_paths.checkpoints))
-        isnothing(restart_dir) && (restart_dir = dir_paths.checkpoints)
+            (restart_t = Checkpointer.t_start_from_checkpoint(dir_paths.checkpoints_dir))
+        isnothing(restart_dir) && (restart_dir = dir_paths.checkpoints_dir)
     end
     should_restart = !isnothing(restart_t) && !isnothing(restart_dir)
     if should_restart
@@ -204,12 +193,6 @@ function CoupledSimulation(config_dict::AbstractDict)
     end
 
     tspan = (t_start, t_end)
-
-    #=
-    ## Data File Paths
-    =#
-    land_mask_data =
-        joinpath(@clima_artifact("landsea_mask_60arcseconds", comms_ctx), "landsea_mask.nc")
 
     #=
     ## Component Model Initialization
@@ -275,6 +258,8 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
 
     # Preprocess the file to be 1s and 0s before remapping into onto the grid
+    land_mask_data =
+        joinpath(@clima_artifact("landsea_mask_60arcseconds", comms_ctx), "landsea_mask.nc")
     land_fraction = SpaceVaryingInput(land_mask_data, "landsea", boundary_space)
     land_fraction = ifelse.(land_fraction .> eps(FT), FT(1), FT(0))
 
@@ -325,7 +310,7 @@ function CoupledSimulation(config_dict::AbstractDict)
                 dt = component_dt_dict["dt_land"],
                 tspan,
                 start_date,
-                output_dir = land_output_dir,
+                output_dir = dir_paths.land_output_dir,
                 area_fraction = land_fraction,
                 shared_surface_space,
                 surface_elevation,
@@ -342,7 +327,7 @@ function CoupledSimulation(config_dict::AbstractDict)
                 dt = component_dt_dict["dt_land"],
                 tspan,
                 start_date,
-                output_dir = land_output_dir,
+                output_dir = dir_paths.land_output_dir,
                 area_fraction = land_fraction,
                 shared_surface_space,
                 land_spun_up_ic,
@@ -382,7 +367,7 @@ function CoupledSimulation(config_dict::AbstractDict)
                 ocean_fraction,
                 start_date,
                 stop_date;
-                output_dir = ocean_output_dir,
+                output_dir = dir_paths.ocean_output_dir,
                 comms_ctx,
             )
         else
@@ -410,7 +395,7 @@ function CoupledSimulation(config_dict::AbstractDict)
             dt = component_dt_dict["dt_land"],
             tspan,
             start_date,
-            output_dir = land_output_dir,
+            output_dir = dir_paths.land_output_dir,
             area_fraction = land_fraction,
             surface_elevation,
             land_temperature_anomaly,
@@ -450,9 +435,8 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     ## coupler exchange fields
     coupler_field_names = Interfacer.default_coupler_fields()
-    for sim in model_sims
-        Interfacer.add_coupler_fields!(coupler_field_names, sim)
-    end
+    foreach(sim -> Interfacer.add_coupler_fields!(coupler_field_names, sim), model_sims)
+
     # add coupler fields required to track conservation, if specified
     energy_check && push!(coupler_field_names, :P_net)
 
@@ -500,11 +484,9 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
     if use_coupler_diagnostics
         @info "Using default coupler diagnostics"
-        coupler_diags_path = joinpath(dir_paths.output, "coupler")
-        isdir(coupler_diags_path) || mkpath(coupler_diags_path)
         diags_handler = coupler_diagnostics_setup(
             coupler_fields,
-            coupler_diags_path,
+            dir_paths.coupler_output_dir,
             start_date,
             tspan[1],
             diagnostics_dt,
@@ -631,28 +613,23 @@ end
 
 Process the results after a simulation has completed, including generating
 plots, checking conservation, and other diagnostics.
+All postprocessing is performed using the root process only, if applicable.
 
 When `conservation_softfail` is true, throw an error if conservation is not
 respected.
 
 When `rmse_check` is true, compute the RMSE against observations and test
 that it is below a certain threshold.
+
+The postprocessing includes:
+- Energy and water conservation checks (if running SlabPlanet with checks enabled)
+- Animations (if not running in MPI)
+- AMIP plots of the final state of the model
+- Error against observations
+- Optional additional atmosphere diagnostics plots
+- Plots of useful coupler and component model fields for debugging
 """
 function postprocess(cs; conservation_softfail = false, rmse_check = false)
-    #=
-    ## Postprocessing
-    All postprocessing is performed using the root process only, if applicable.
-    Our postprocessing consists of outputting a number of plots to visualize the model output.
-
-    The postprocessing includes:
-    - Energy and water conservation checks (if running SlabPlanet with checks enabled)
-    - Animations (if not running in MPI)
-    - AMIP plots of the final state of the model
-    - Error against observations
-    - Optional additional atmosphere diagnostics plots
-    - Plots of useful coupler and component model fields for debugging
-    =#
-
     if ClimaComms.iamroot(ClimaComms.context(cs)) && !isnothing(cs.diags_handler)
         postprocessing_vars = (; conservation_softfail, rmse_check)
         postprocess_sim(cs, postprocessing_vars)

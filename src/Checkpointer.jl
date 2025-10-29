@@ -134,7 +134,7 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
     time = Int(round(float(cs.t[])))
     day = floor(Int, time / (60 * 60 * 24))
     sec = floor(Int, time % (60 * 60 * 24))
-    output_dir = cs.dirs.checkpoints
+    output_dir = cs.dir_paths.checkpoints_dir
     prev_checkpoint_t = cs.prev_checkpoint_t[]
     comms_ctx = ClimaComms.context(cs)
 

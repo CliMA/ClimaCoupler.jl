@@ -1,5 +1,5 @@
 agents:
-  queue: new-central
+  queue: central
   slurm_time: 4:00:00
   modules: climacommon/2025_05_15
 
@@ -145,7 +145,7 @@ steps:
         agents:
           slurm_mem: 20GB
 
-      - label: "Slabplanet: dry, no radiation"
+      - label: "Slabplanet: dry, no radiation, fixed ocean T"
         key: "slabplanet_dry_norad"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_dry_norad.yml --job_id slabplanet_dry_norad"
         artifact_paths: "experiments/ClimaEarth/output/slabplanet_dry_norad/artifacts/*"
@@ -156,12 +156,6 @@ steps:
         key: "slabplanet_atmos_diags"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_atmos_diags.yml --job_id slabplanet_atmos_diags"
         artifact_paths: "experiments/ClimaEarth/output/slabplanet_atmos_diags/artifacts/*"
-        agents:
-          slurm_mem: 20GB
-
-      - label: "Slabplanet: timevarying insolation + rayleigh sponge"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_realinsol_rayleigh.yml --job_id slabplanet_realinsol_rayleigh"
-        artifact_paths: "experiments/ClimaEarth/output/slabplanet_realinsol_rayleigh/artifacts/total_energy*.png"
         agents:
           slurm_mem: 20GB
 
@@ -189,20 +183,6 @@ steps:
         agents:
           slurm_mem: 20GB
 
-      - label: "AMIP: ED only + integrated land"
-        key: "amip_edonly_integrated_land"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_integrated_land.yml --job_id amip_edonly_integrated_land"
-        artifact_paths: "experiments/ClimaEarth/output/amip_edonly_integrated_land/artifacts/*"
-        agents:
-          slurm_mem: 20GB
-
-      - label: "AMIP: ED only + bucket"
-        key: "amip_edonly_bucket"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_bucket.yml --job_id amip_edonly_bucket"
-        artifact_paths: "experiments/ClimaEarth/output/amip_edonly_bucket/artifacts/*"
-        agents:
-          slurm_mem: 20GB
-
       - label: "AMIP: bucket initial condition test"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_bucket_ic.yml --job_id amip_bucket_ic"
         artifact_paths: "experiments/ClimaEarth/output/amip_bucket_ic/artifacts/*"
@@ -224,13 +204,6 @@ steps:
         env:
           FLAME_PLOT: ""
           BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_ntasks: 1
-          slurm_mem: 20GB
-
-      - label: "AMIP - Float32 test"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_ft32.yml --job_id amip_coarse_ft32"
-        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_ft32/artifacts/*"
         agents:
           slurm_ntasks: 1
           slurm_mem: 20GB
@@ -279,13 +252,6 @@ steps:
   - group: "GPU integration tests"
     steps:
       # GPU RUNS: slabplanet
-      - label: "GPU Slabplanet: default"
-        key: "gpu_slabplanet_default"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_default.yml --job_id gpu_slabplanet_default"
-        artifact_paths: "experiments/ClimaEarth/output/gpu_slabplanet_default/artifacts/*"
-        agents:
-          slurm_mem: 20GB
-
       - label: "GPU Slabplanet: albedo from function"
         key: "gpu_slabplanet_albedo_function"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_albedo_function.yml --job_id gpu_slabplanet_albedo_function"
@@ -296,27 +262,7 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
-      - label: "GPU Slabplanet: extra atmos diagnostics"
-        key: "gpu_slabplanet_atmos_diags"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_atmos_diags.yml --job_id gpu_slabplanet_atmos_diags"
-        artifact_paths: "experiments/ClimaEarth/output/gpu_slabplanet_atmos_diags/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
-
       # GPU RUNS: AMIP
-      - label: "GPU AMIP: default"
-        key: "gpu_amip_default"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_default.yml --job_id gpu_amip_default"
-        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_default/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
-
       - label: "GPU AMIP: ED only + integrated land"
         key: "gpu_amip_edonly_integrated_land"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_integrated_land.yml --job_id gpu_amip_edonly_integrated_land"
@@ -361,16 +307,6 @@ steps:
         key: "gpu_amip_albedo_function"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_albedo_function.yml --job_id gpu_amip_albedo_function"
         artifact_paths: "experiments/ClimaEarth/output/gpu_amip_albedo_function/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
-
-      - label: "GPU AMIP target: topography and diagnostic EDMF"
-        key: "gpu_amip_target_topo_diagedmf_shortrun"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_target_topo_diagedmf_shortrun.yml --job_id gpu_amip_target_topo_diagedmf_shortrun"
-        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_target_topo_diagedmf_shortrun/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

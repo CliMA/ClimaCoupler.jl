@@ -225,10 +225,25 @@ for the following properties:
 | `surface_direct albedo`  | bulk direct surface albedo                                     |         |
 | `surface_diffuse albedo` | bulk diffuse surface albedo                                    |         |
 | `surface_temperature`    | surface temperature                                            | K       |
+| `ice_concentration`      | sea ice concentration (*sea ice models only*)                  |         |
 
 !!! note
     `area_fraction` is expected to be defined on the boundary space of the simulation,
     while all other fields will likely be on the simulation's own space.
+
+!!! note "Sea ice concentration vs. area fraction"
+Sea ice models are expected to provide both `area_fraction` and `ice_concentration`.
+This may seem redundant, but there are subtle differences between the two.
+`ice_concentration` is internal to the ice model and may be determined
+via a prognostic variable, prescribed data, etc. `area_fraction` is defined
+at the coupler level and may follow some constraints that don't apply to `ice_concentration`.
+For example, we require that surface model area fractions sum to 1 at all points;
+this constraint is enforced for `area_fraction`, but not for `ice_concentration`.
+Additionally, since `area_fraction` is a coupler-defined concept, it is defined on
+the coupler boundary space, whereas `ice_concentration` exists on the model's space.
+Generally, `ice_concentration` and `area_fraction` should largely agree,
+with differences only arising from `area_fraction` corrections and
+the fields existing on different spaces.
 
 - `update_field!(::SurfaceModelSimulation, ::Val{property}, field)`:
 A function to update the value of property in the component model

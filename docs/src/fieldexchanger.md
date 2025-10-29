@@ -12,7 +12,7 @@ The specific fields that are exchanged depend on the requirements of the compone
 The fields imported from the atmosphere to the coupler are specified by extending `FieldExchanger.import_atmos_fields!`
 The default `import_atmos_fields!` imports radiative fluxes, liquid precipitation, and snow precipitation.
 
-The fields of a component model that get updated by the coupler are specified by extending `FieldExchanger.update_sim!`
+The fields of a component model that get updated by the coupler are specified by extending `FieldExchanger.update_sim!`.
 The default `update_sim!` for an atmosphere model updates the direct and diffuse surface albedos,
 the surface temperature, and the turbulent fluxes.
 The default `update_sim!` for a surface model updates the air density, radiative fluxes,
@@ -21,13 +21,17 @@ These updates are done via the `update_field!` function, which must be extended 
 particular variable and component model.
 If an `update_field!` function is not defined for a particular component model, it will be ignored.
 
+Note that turbulent fluxes are not updated in `update_sim!`, but rather via
+`FluxCalculator.update_turbulent_fluxes!`, where fluxes are computed between
+the atmosphere and each surface model.
+
 ## FieldExchanger API
 
 ```@docs
+    ClimaCoupler.FieldExchanger.exchange!
     ClimaCoupler.FieldExchanger.update_sim!
     ClimaCoupler.FieldExchanger.step_model_sims!
     ClimaCoupler.FieldExchanger.update_surface_fractions!
-    ClimaCoupler.FieldExchanger.exchange!
     ClimaCoupler.FieldExchanger.set_caches!
 ```
 
@@ -35,4 +39,6 @@ If an `update_field!` function is not defined for a particular component model, 
 
 ```@docs
     ClimaCoupler.FieldExchanger.combine_surfaces!
+    ClimaCoupler.FieldExchanger.resolve_ocean_ice_fractions!
+    ClimaCoupler.FieldExchanger.import_atmos_fields!
 ```

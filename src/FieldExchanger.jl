@@ -71,7 +71,7 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
 
         # Apply any additional constraints on the ocean and ice fractions if necessary
         if haskey(cs.model_sims, :ice_sim)
-            resolve_area_fractions!(ocean_sim, cs.model_sims.ice_sim, land_fraction)
+            FieldExchanger.resolve_area_fractions!(ocean_sim, cs.model_sims.ice_sim, land_fraction)
         end
     else
         cs.fields.scalar_temp1 .= 0

@@ -53,7 +53,7 @@ previous step is provided to the coupler to be used in computing fluxes.
 Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
 """
-function ClimaSeaIceSimulation(land_fraction, ocean; output_dir, start_date = nothing)
+function ClimaSeaIceSimulation(ocean; output_dir, start_date = nothing)
     # Initialize the sea ice with the same grid as the ocean
     grid = ocean.ocean.model.grid
     arch = OC.Architectures.architecture(grid)
@@ -118,10 +118,6 @@ function ClimaSeaIceSimulation(land_fraction, ocean; output_dir, start_date = no
     boundary_space = axes(ocean.area_fraction)
     FT = CC.Spaces.undertype(boundary_space)
     area_fraction = Interfacer.remap(ice.model.ice_concentration, boundary_space)
-
-    # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
-    #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-    @. area_fraction = max(min(area_fraction, FT(1) - land_fraction), FT(0))
 
     sim = ClimaSeaIceSimulation(
         ice,

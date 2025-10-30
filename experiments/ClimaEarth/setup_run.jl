@@ -370,7 +370,6 @@ function CoupledSimulation(config_dict::AbstractDict)
         ## sea ice model
         if ice_model == "clima_seaice"
             ice_sim = ClimaSeaIceSimulation(
-                ice_fraction,
                 ocean_sim;
                 output_dir = dir_paths.ice_output_dir,
                 start_date,

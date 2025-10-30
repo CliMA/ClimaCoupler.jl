@@ -15,12 +15,12 @@ import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
 
 Ice concentration is prescribed, and we solve the following energy equation:
 
-    (h * ρ * c) d T_sfc dt = (-F_turb_energy + (1 - α) * SW_d + LW_d - LW_u) + F_conductive
+    (h * ρ * c) d T_bulk dt = (-F_turb_energy + (1 - α) * SW_d + LW_d - LW_u) + F_conductive
 
     with
-    F_conductive = k_ice (T_base - T_sfc) / (h)
+    F_conductive = k_ice (T_base - T_bulk) / (h)
 
-    The surface temperature (`T_sfc`) is the prognostic variable which is being
+    The bulk temperature (`T_bulk`) is the prognostic variable which is being
     modified by turbulent aerodynamic (`F_turb_energy`) and radiative (`F_turb_energy`) fluxes,
     as well as a conductive flux that depends on the temperature difference
     across the ice layer (with `T_base` being prescribed).
@@ -50,7 +50,7 @@ end
 function slab_ice_space_init(::Type{FT}, space, params) where {FT}
     # bulk temperatures commonly 10-20 K below freezing for sea ice 2m thick in winter,
     # and closer to freezing in summer and when melting.
-    Y = CC.Fields.FieldVector(T_sfc = ones(space) .* params.T_freeze .- FT(5.0))
+    Y = CC.Fields.FieldVector(T_bulk = ones(space) .* params.T_freeze .- FT(5.0))
     return Y
 end
 
@@ -125,6 +125,7 @@ function PrescribedIceSimulation(
     # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
     #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
     ice_fraction = @. max(min(SIC_init, FT(1) - land_fraction), FT(0))
+    ice_fraction = ifelse.(ice_fraction .> FT(0.5), FT(1), FT(0))
 
     params = IceSlabParameters{FT}()
 
@@ -178,17 +179,18 @@ Interfacer.get_field(
     sim::PrescribedIceSimulation,
     ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}},
 ) = sim.integrator.p.params.α
-# approximates the surface temperature of the sea ice
-# assuming sim.integrator.u.T_sfc represents the vertically-averaged (bulk) temperature
-# and the ice temperature varies linearly between the ice surface and the base.
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) =
-    2 .* sim.integrator.u.T_sfc .- sim.integrator.p.params.T_base
+    ice_surface_temperature.(sim.integrator.u.T_bulk, sim.integrator.p.params.T_base)
 
 function Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:beta})
     # assume no LHF over sea ice
     FT = eltype(sim.integrator.u)
     return FT(0)
 end
+
+# Approximates the surface temperature of the sea ice assuming
+# the ice temperature varies linearly between the ice surface and the base
+ice_surface_temperature(T_bulk, T_base) = 2 * T_bulk - T_base
 
 """
     Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:energy})
@@ -197,7 +199,7 @@ Extension of Interfacer.get_field to get the energy of the ocean.
 It multiplies the the slab temperature by the heat capacity, density, and depth.
 """
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:energy}) =
-    sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .*
+    sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_bulk .*
     sim.integrator.p.params.h
 
 function Interfacer.update_field!(
@@ -268,25 +270,28 @@ function ice_rhs!(dY, Y, p, t)
 
     # Update the cached area fraction with the current SIC
     evaluate!(p.area_fraction, p.SIC_timevaryinginput, t)
+    @. p.area_fraction = ifelse(p.area_fraction > FT(0.5), FT(1), FT(0))
 
     # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
     #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
     @. p.area_fraction = max(min(p.area_fraction, FT(1) - p.land_fraction), FT(0))
 
     # Calculate the conductive flux, and set it to zero if the area fraction is zero
-    F_conductive = @. k_ice / (h) * (T_base - Y.T_sfc) # fluxes are defined to be positive when upward
+    F_conductive = @. k_ice / (h) * (T_base - Y.T_bulk) # fluxes are defined to be positive when upward
 
     # TODO: get sigma from parameters
     σ = FT(5.67e-8)
     rhs = @. (
-        -p.F_turb_energy + (1 - α) * p.SW_d + ϵ * (p.LW_d - σ * Y.T_sfc^4) + F_conductive
+        -p.F_turb_energy +
+        (1 - α) * p.SW_d +
+        ϵ * (p.LW_d - σ * ice_surface_temperature(Y.T_bulk, T_base)^4) +
+        F_conductive
     ) / (h * ρ * c)
-
     # Zero out tendencies where there is no ice, so that ice temperature remains constant there
     @. rhs = ifelse(p.area_fraction ≈ 0, zero(rhs), rhs)
 
     # If tendencies lead to temperature above freezing, set temperature to freezing
-    @. dY.T_sfc = min(rhs, (T_freeze - Y.T_sfc) / float(p.dt))
+    @. dY.T_bulk = min(rhs, (T_freeze - Y.T_bulk) / float(p.dt))
 end
 
 """

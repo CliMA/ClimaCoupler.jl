@@ -14,7 +14,6 @@ insolation: "timevarying"
 mode_name: "amip"
 netcdf_output_at_levels: true
 output_default_diagnostics: true
-prescribe_ozone: true
 prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 rmse_check: true
 start_date: "20100101"

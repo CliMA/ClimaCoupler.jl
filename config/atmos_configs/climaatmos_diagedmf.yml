@@ -2,7 +2,7 @@
 aerosol_radiation: true
 approximate_linear_solve_iters: 2
 cloud_model: "quadrature"
-co2_model: maunaloa
+time_varying_trace_gases: ["CO2", "O3"]
 dt: "120secs"
 dt_cloud_fraction: "1hours"
 dt_rad: "1hours"
@@ -20,7 +20,6 @@ insolation: "timevarying"
 moist: "equil"
 netcdf_output_at_levels: true
 precip_model: "0M"
-prescribe_ozone: true
 prescribed_aerosols: ["CB1", "CB2", "DST01", "DST02", "DST03", "DST04", "DST05", "OC1", "OC2", "SO4", "SSLT01", "SSLT02", "SSLT03", "SSLT04", "SSLT05"]
 prognostic_tke: true
 rad: "allskywithclear"

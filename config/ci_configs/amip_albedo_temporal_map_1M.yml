@@ -1,6 +1,5 @@
 apply_limiter: false
 bucket_albedo_type: "map_temporal"
-co2_model: "maunaloa"
 dt: "150secs"
 dt_cpl: "150secs"
 dt_rad: "1hours"
@@ -13,6 +12,7 @@ rad: "gray"
 rayleigh_sponge: true
 start_date: "20100101"
 t_end: "300secs"
+time_varying_trace_gases: ["CO2"]
 vert_diff: "true"
 z_elem: 50
 z_stretch: false

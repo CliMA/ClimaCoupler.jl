@@ -42,7 +42,7 @@ end
         ::Type{FT},
         space,
         start_date,
-        area_fraction,
+        t_start,
         thermo_params,
         comms_ctx;
         z0m = FT(5.8e-5),
@@ -65,7 +65,6 @@ function PrescribedOceanSimulation(
     space,
     start_date,
     t_start,
-    area_fraction,
     thermo_params,
     comms_ctx;
     z0m = FT(5.8e-5),

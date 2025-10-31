@@ -16,7 +16,7 @@ export update_sim!,
     exchange!,
     set_caches!,
     update_surface_fractions!,
-    resolve_ocean_ice_fractions!
+    resolve_area_fractions!
 
 """
     update_surface_fractions!(cs::Interfacer.CoupledSimulation)
@@ -71,7 +71,7 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
 
         # ensure that ocean and ice fractions are consistent
         if haskey(cs.model_sims, :ice_sim)
-            resolve_ocean_ice_fractions!(ocean_sim, cs.model_sims.ice_sim, land_fraction)
+            resolve_area_fractions!(ocean_sim, cs.model_sims.ice_sim, land_fraction)
         end
     else
         cs.fields.scalar_temp1 .= 0
@@ -84,7 +84,7 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
 end
 
 """
-    resolve_ocean_ice_fractions!(ocean_sim, ice_sim, land_fraction)
+    resolve_area_fractions!(ocean_sim, ice_sim, land_fraction)
 
 Ensure that the ocean and ice fractions are consistent with each other.
 For most ocean and ice models, this does nothing since the ocean fraction is
@@ -92,7 +92,7 @@ defined as `1 - ice_fraction - land_fraction`. However, some models may have
 additional constraints on the ice and ocean fractions that need to be enforced.
 This function can be extended for such models.
 """
-function resolve_ocean_ice_fractions!(ocean_sim, ice_sim, land_fraction)
+function resolve_area_fractions!(ocean_sim, ice_sim, land_fraction)
     return nothing
 end
 

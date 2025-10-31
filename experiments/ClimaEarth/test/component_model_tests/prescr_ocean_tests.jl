@@ -33,7 +33,6 @@ end
         space,
         start_date,
         t_start,
-        area_fraction,
         thermo_params,
         comms_ctx,
     )

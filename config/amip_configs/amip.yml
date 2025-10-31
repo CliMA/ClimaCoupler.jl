@@ -11,6 +11,8 @@ mode_name: "amip"
 netcdf_output_at_levels: true
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
+restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-amip/195/climacoupler-amip/experiments/ClimaEarth/output/amip/checkpoints/"
+restart_t: 13046400
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "366days"
@@ -18,9 +20,9 @@ topo_smoothing: true
 topography: "Earth"
 extra_atmos_diagnostics:
   - short_name: [ta, pfull, rhoa, ua, va, wa, hur, hus, cl, clw, cli, edt, evu]
-    period: 1days
+    period: 30mins
   - short_name: [ts, hfss, hfls, lwp, clwvi, evspsbl, pr, rsdt, rsut, rlut, rlus, rlds, rlus]
-    period: 1days
+    period: 30mins
   # - short_name: [arup, waup, rhoaup, taup, thetaaup, haup, husup, hurup, clwup, cliup, tke, lmix]
   #   period: 1days
   # - short_name: [waen, taen, thetaaen, haen, husen, huren, clwen, clien]

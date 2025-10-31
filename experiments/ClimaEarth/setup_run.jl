@@ -357,14 +357,11 @@ function CoupledSimulation(config_dict::AbstractDict)
             sic_path = subseasonal_sic,
         )
 
-        ## ocean model using prescribed data
-        ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
-        ocean_fraction = FT(1) .- ice_fraction .- land_fraction
-
+        ## ocean model
         if sim_mode <: CMIPMode
             stop_date = date(tspan[end] - tspan[begin])
             ocean_sim = OceananigansSimulation(
-                ocean_fraction,
+                boundary_space,
                 start_date,
                 stop_date;
                 output_dir = dir_paths.ocean_output_dir,
@@ -376,7 +373,6 @@ function CoupledSimulation(config_dict::AbstractDict)
                 boundary_space,
                 start_date,
                 t_start,
-                ocean_fraction,
                 thermo_params,
                 comms_ctx;
                 sst_path = subseasonal_sst,
@@ -413,7 +409,6 @@ function CoupledSimulation(config_dict::AbstractDict)
             dt = component_dt_dict["dt_ocean"],
             space = boundary_space,
             saveat = saveat,
-            area_fraction = (FT(1) .- land_fraction), ## NB: this ocean fraction includes areas covered by sea ice (unlike the one contained in the cs)
             thermo_params = thermo_params,
             evolving = evolving_ocean,
         )
@@ -428,6 +423,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
 
     ## collect component model simulations that have been initialized
+    @assert (ocean_sim isa SlabOceanSimulation && isnothing(ice_sim)) "SlabOceanSimulation should not be used with sea ice, got $(ice_sim)"
     model_sims = (; atmos_sim, ice_sim, land_sim, ocean_sim)
     model_sims =
         NamedTuple{filter(key -> !isnothing(model_sims[key]), keys(model_sims))}(model_sims)
@@ -536,6 +532,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         =#
 
         # 1. Make sure surface model area fractions sum to 1 everywhere.
+        #  Note that ocean and ice fractions are not accurate until after this call.
         FieldExchanger.update_surface_fractions!(cs)
 
         # 2. Import atmospheric and surface fields into the coupler fields,

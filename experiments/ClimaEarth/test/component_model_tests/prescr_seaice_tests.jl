@@ -73,41 +73,41 @@ for FT in (Float32, Float64)
         σ = FT(5.67e-8)
 
         # check expected dT due to upwelling longwave flux only
-        # (zero conduction when T_base == initial T_sfc)
+        # (zero conduction when T_base == initial T_bulk)
         T_base_eq = IceSlabParameters{FT}().T_freeze - FT(5.0)
         dY, Y, p = test_sea_ice_rhs(T_base = T_base_eq)
         dT_expected =
             (-p.params.ϵ * σ * T_base_eq^4) / (p.params.h * p.params.ρ * p.params.c)
-        @test all(T -> T == FT(0) || T ≈ dT_expected, Array(parent(dY.T_sfc)))
+        @test all(T -> T == FT(0) || T ≈ dT_expected, Array(parent(dY.T_bulk)))
 
         # check expected dT due to downwelling shortwave flux and upwelling longwave flux
-        # (again set T_base == initial T_sfc)
+        # (again set T_base == initial T_bulk)
         dY, Y, p = test_sea_ice_rhs(SW_d = 1.0, LW_d = 0.0, T_base = T_base_eq)
         dT_expected =
             ((1 - p.params.α) * 1.0 - p.params.ϵ * σ * T_base_eq^4) /
             (p.params.h * p.params.ρ * p.params.c)
-        @test all(T -> T == FT(0) || T ≈ dT_expected, Array(parent(dY.T_sfc)))
+        @test all(T -> T == FT(0) || T ≈ dT_expected, Array(parent(dY.T_bulk)))
 
         # check expected dT due to downwelling and upwelling longwave flux
-        # (again set T_base == initial T_sfc)
+        # (again set T_base == initial T_bulk)
         dY, Y, p = test_sea_ice_rhs(SW_d = 0.0, LW_d = 2.0, T_base = T_base_eq)
-        @show extrema(Y.T_sfc)
         dT_expected =
             (p.params.ϵ * (2.0 - σ * T_base_eq^4)) / (p.params.h * p.params.ρ * p.params.c)
-        @test all(T -> T == FT(0) || T ≈ dT_expected, Array(parent(dY.T_sfc)))
+        @test all(T -> T == FT(0) || T ≈ dT_expected, Array(parent(dY.T_bulk)))
 
         # check that tendency will not result in above freezing T
         dY, Y, p = test_sea_ice_rhs(SW_d = 0.0, LW_d = 0.0, T_base = 330.0) # Float32 requires a large number here!
-        dT_maximum = @. (p.params.T_freeze - Y.T_sfc) / p.dt
-        @test minimum(dT_maximum .- dY.T_sfc) >= FT(0.0)
+        dT_maximum = @. (p.params.T_freeze - Y.T_bulk) / p.dt
+        @test minimum(dT_maximum .- dY.T_bulk) >= FT(0.0)
 
         # check that the correct tendency was added due to basal conductive flux and upwelling longwave flux
         T_base = 269.2
         dY, Y, p = test_sea_ice_rhs(SW_d = 0.0, LW_d = 0.0, T_base = T_base)
-        T_sfc = minimum(Y.T_sfc) # get the non-zero temperature value
+        T_bulk = minimum(Y.T_bulk) # get the non-zero temperature value
         (; k_ice, h, ρ, c, T_base, ϵ) = p.params
         dT_expected =
-            (k_ice / (h * h * ρ * c)) * (T_base - T_sfc) - (ϵ * σ * T_sfc^4) / (h * ρ * c)
+            (k_ice / (h * h * ρ * c)) * (T_base - T_bulk) -
+            (ϵ * σ * ice_surface_temperature(T_bulk, T_base)^4) / (h * ρ * c)
         @test minimum(dY) ≈ FT(dT_expected)
         @test maximum(dY) ≈ FT(0)
     end

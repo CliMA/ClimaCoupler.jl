@@ -9,6 +9,12 @@ import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
 using XESMF # to load Oceananigans regridding extension
 
+OceananigansXESMFExt =
+    Base.get_extension(
+        OC,
+        :OceananigansXESMFExt,
+    ).OceananigansXESMFExt;
+
 """
     OceananigansSimulation{SIM, A, OPROP, REMAP}
 
@@ -113,29 +119,38 @@ function OceananigansSimulation(
 
     T = OC.CenterField(grid) # field on tripolar grid
     OC.set!(T, en4_temperature[1])
-    coords_tripolar, _ = XESMF.extract_xesmf_coordinates_structure(T, T)
+    coords_tripolar = OceananigansXESMFExt.xesmf_coordinates(T)
 
+    # Put everything on CPU
+    coords_tripolar = Dict(k => Array(v) for (k, v) in coords_tripolar)
     # Create a 2D matrix containing each lat/long combination as a LatLongPoint
     # Note this must be done on CPU since the CC.Remapper module is not GPU-compatible
     # target_points_oc = Array(CC.Geometry.LatLongPoint.(lat_oc, long_oc))
 
-    # TODO double check these coords are on centers, get lat/lon bounds for each element
-    # boundary_space = axes(area_fraction)
-    boundary_space = CC.CommonSpaces.CubedSphereSpace(
-        Float32;
-        radius = 1.0,
-        n_quad_points = 2,
-        h_elem = 10,
-    )
-    boundary_coords = CC.Fields.coordinate_field(boundary_space)
-    boundary_lat_arr = CC.Fields.field2array(boundary_coords.lat)
-    boundary_long_arr = CC.Fields.field2array(boundary_coords.long)
-    coords_cubedsphere = Dict("lat" => boundary_lat_arr, "lon" => boundary_long_arr)
+    # Get the latitude and longitude of each node on the boundary space
+    boundary_space = axes(area_fraction)
+    # CC.CommonSpaces.CubedSphereSpace(
+    #     Float32;
+    #     radius = 1.0,
+    #     n_quad_points = 2,
+    #     h_elem = 10,
+    # )
+    cubedsphere_coords = CC.Fields.coordinate_field(boundary_space)
+    # Put everything on CPU
+    cubedsphere_lat_arr = Array(CC.Fields.field2array(cubedsphere_coords.lat))
+    cubedsphere_long_arr = Array(CC.Fields.field2array(cubedsphere_coords.long))
+
+    # lon2d varies along cols (dim 2) — x direction
+    cubedsphere_lon2d = repeat(cubedsphere_long_arr', length(cubedsphere_lat_arr), 1)  # transpose lon to make it row vector
+    # lat2d varies along rows (dim 1) — y direction
+    cubedsphere_lat2d = repeat(cubedsphere_lat_arr, 1, length(cubedsphere_long_arr))   # column vector repeated across
+
+    coords_cubedsphere = Dict("lat" => cubedsphere_lat2d, "lon" => cubedsphere_lon2d)
 
     regridder_tripolar_to_cubedsphere =
-        XESMF.Regridder(coords_cubedsphere, coords_tripolar; method = "conservative")
+        XESMF.Regridder(coords_cubedsphere, coords_tripolar; method = "bilinear")
     regridder_cubedsphere_to_tripolar =
-        XESMF.Regridder(coords_tripolar, coords_cubedsphere; method = "conservative")
+        XESMF.Regridder(coords_tripolar, coords_cubedsphere; method = "bilinear")
 
     # Tripolar to LatLon
     T = OC.CenterField(grid) # field on tripolar grid

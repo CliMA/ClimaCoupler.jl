@@ -278,8 +278,13 @@ function ice_rhs!(dY, Y, p, t)
 
     # TODO: get sigma from parameters
     σ = FT(5.67e-8)
+
+    T_flux_calc = 2 .* Y.T_sfc .- T_base
     rhs = @. (
-        -p.F_turb_energy + (1 - α) * p.SW_d + ϵ * (p.LW_d - σ * Y.T_sfc^4) + F_conductive
+        -p.F_turb_energy +
+        (1 - α) * p.SW_d +
+        ϵ * (p.LW_d - σ * T_flux_calc^4) +
+        F_conductive
     ) / (h * ρ * c)
 
     # Zero out tendencies where there is no ice, so that ice temperature remains constant there

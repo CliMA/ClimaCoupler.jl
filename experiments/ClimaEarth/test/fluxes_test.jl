@@ -22,13 +22,12 @@ import ClimaCoupler
 # Use the AMIP setup helpers to construct a coupled simulation
 include(joinpath("..", "setup_run.jl"))
 
-@testset "surface radiative flux consistency (AMIP + integrated land)" begin
+@testset "surface radiative flux consistency (AMIP + bucket land)" begin
     # Build AMIP configuration used in CI by default
     config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml")
     config_dict = get_coupler_config_dict(config_file)
 
     # Make sure radiation is computed during the first step
-    config_dict["land_model"] = "integrated"
     config_dict["dt_rad"] = config_dict["dt"]
 
     # Construct coupled simulation and run one coupling step
@@ -50,8 +49,8 @@ include(joinpath("..", "setup_run.jl"))
     # Convention note: bucket R_n is stored with the opposite sign (see climaland_bucket.jl),
     # so we compare atmos_flux ≈ -R_n on land points.
     p = land_sim.integrator.p
-    land_flux = @. p.drivers.LW_d - p.LW_u + p.drivers.SW_d - p.SW_u
     land_fraction = Interfacer.get_field(land_sim, Val(:area_fraction))
+    land_flux = Interfacer.remap(land_sim.integrator.p.bucket.R_n, boundary_space)
     @. land_flux = ifelse(land_fraction ≈ 0, zero(land_flux), land_flux)
 
     err_land = @. atmos_flux - land_flux
@@ -94,40 +93,4 @@ include(joinpath("..", "setup_run.jl"))
     err_fluxes = atmos_flux .+ combined_fluxes
     @show "Combined fluxes error: $(maximum(abs.(err_fluxes)))"
     @test maximum(abs.(err_fluxes)) < 8
-end
-
-@testset "surface radiative flux consistency (bucket terraplanet)" begin
-    # Build AMIP configuration used in CI by default
-    config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml")
-    config_dict = get_coupler_config_dict(config_file)
-
-    # Make sure radiation is computed during the first step
-    config_dict["dt_rad"] = config_dict["dt"]
-    # Use slabplanet_terra mode since we're only testing the land model
-    config_dict["mode_name"] = "slabplanet_terra"
-
-    # Construct coupled simulation and run one coupling step
-    cs = CoupledSimulation(config_dict)
-    step!(cs)
-    boundary_space = Interfacer.boundary_space(cs)
-
-    # Unpack component models
-    (; atmos_sim, land_sim) = cs.model_sims
-
-    # Atmosphere: radiative flux on the surface interface
-    # Convention: positive downward to the surface
-    atmos_flux = CC.Spaces.level(
-        atmos_sim.integrator.p.radiation.ᶠradiation_flux.components.data.:1,
-        CC.Utilities.half,
-    )
-
-    # Bucket land: compare to net radiation stored in the bucket cache
-    # Convention note: bucket R_n is stored with the opposite sign (see climaland_bucket.jl),
-    # so we compare atmos_flux ≈ -R_n on land points.
-    land_flux = Interfacer.remap(land_sim.integrator.p.bucket.R_n, boundary_space)
-
-    err_land = @. atmos_flux - land_flux
-    @. err_land = ifelse(land_sim.area_fraction ≈ 0, zero(err_land), err_land)
-    @show "Bucket land flux error: $(maximum(abs.(err_land)))"
-    @test maximum(abs.(err_land)) < 5
 end

@@ -34,16 +34,68 @@ end
 
 # sea-ice parameters
 Base.@kwdef struct IceSlabParameters{FT <: AbstractFloat}
-    h::FT = 2               # ice thickness [m]
-    ρ::FT = 900             # density of sea ice [kg / m3]
-    c::FT = 2100            # specific heat of sea ice [J / kg / K]
-    T_base::FT = 271.2      # temperature of sea water at the ice base
-    z0m::FT = 1e-4          # roughness length for momentum [m]
-    z0b::FT = 1e-4          # roughness length for tracers [m]
-    T_freeze::FT = 271.2    # freezing temperature of sea water [K]
-    k_ice::FT = 2           # thermal conductivity of sea ice [W / m / K] (less in HM71)
-    α::FT = 0.65            # albedo of sea ice, roughly tuned to match observations
-    ϵ::FT = 1               # emissivity of sea ice
+    h::FT                   # ice thickness [m]
+    ρ::FT                   # density of sea ice [kg / m3]
+    c::FT                   # specific heat of sea ice [J / kg / K]
+    T_base::FT              # temperature of sea water at the ice base
+    z0m::FT                 # roughness length for momentum [m]
+    z0b::FT                 # roughness length for tracers [m]
+    T_freeze::FT            # freezing temperature of sea water [K]
+    k_ice::FT               # thermal conductivity of sea ice [W / m / K] (less in HM71)
+    α::FT                   # albedo of sea ice, roughly tuned to match observations
+    ϵ::FT                   # emissivity of sea ice
+    σ::FT                   # Stefan-Boltzmann constant [W / m2 / K4]
+end
+
+"""
+    IceSlabParameters{FT}(coupled_param_dict; h = FT(2), ρ = FT(900), c = FT(2100),
+                          T_base = FT(271.2), z0m = FT(1e-4), z0b = FT(1e-4),
+                          T_freeze = FT(271.2), k_ice = FT(2), α = FT(0.65), ϵ = FT(1))
+
+Initialize the `IceSlabParameters` object with the coupled parameters.
+
+# Arguments
+- `coupled_param_dict`: a dictionary of coupled parameters (required)
+- `h`: ice thickness [m] (default: 2)
+- `ρ`: density of sea ice [kg / m3] (default: 900)
+- `c`: specific heat of sea ice [J / kg / K] (default: 2100)
+- `T_base`: temperature of sea water at the ice base [K] (default: 271.2)
+- `z0m`: roughness length for momentum [m] (default: 1e-4)
+- `z0b`: roughness length for tracers [m] (default: 1e-4)
+- `T_freeze`: freezing temperature of sea water [K] (default: 271.2)
+- `k_ice`: thermal conductivity of sea ice [W / m / K] (default: 2)
+- `α`: albedo of sea ice (default: 0.65)
+- `ϵ`: emissivity of sea ice (default: 1)
+
+# Returns
+- `IceSlabParameters{FT}`: an `IceSlabParameters` object
+"""
+function IceSlabParameters{FT}(
+    coupled_param_dict;
+    h = FT(2),
+    ρ = FT(900),
+    c = FT(2100),
+    T_base = FT(271.2),
+    z0m = FT(1e-4),
+    z0b = FT(1e-4),
+    T_freeze = FT(271.2),
+    k_ice = FT(2),
+    α = FT(0.65),
+    ϵ = FT(1),
+) where {FT}
+    return IceSlabParameters{FT}(;
+        h,
+        ρ,
+        c,
+        T_base,
+        z0m,
+        z0b,
+        T_freeze,
+        k_ice,
+        α,
+        ϵ,
+        σ = coupled_param_dict["stefan_boltzmann_constant"],
+    )
 end
 
 # init simulation
@@ -86,6 +138,7 @@ function PrescribedIceSimulation(
     dt,
     saveat,
     space,
+    coupled_param_dict,
     thermo_params,
     comms_ctx,
     start_date,
@@ -127,7 +180,7 @@ function PrescribedIceSimulation(
     ice_fraction = @. max(min(SIC_init, FT(1) - land_fraction), FT(0))
     ice_fraction = ifelse.(ice_fraction .> FT(0.5), FT(1), FT(0))
 
-    params = IceSlabParameters{FT}()
+    params = IceSlabParameters{FT}(coupled_param_dict)
 
     Y = slab_ice_space_init(FT, space, params)
     cache = (;
@@ -266,7 +319,7 @@ for temperature (curbed at the freezing point).
 """
 function ice_rhs!(dY, Y, p, t)
     FT = eltype(Y)
-    (; k_ice, h, T_base, ρ, c, ϵ, α, T_freeze) = p.params
+    (; k_ice, h, T_base, ρ, c, ϵ, α, T_freeze, σ) = p.params
 
     # Update the cached area fraction with the current SIC
     evaluate!(p.area_fraction, p.SIC_timevaryinginput, t)
@@ -278,9 +331,6 @@ function ice_rhs!(dY, Y, p, t)
 
     # Calculate the conductive flux, and set it to zero if the area fraction is zero
     F_conductive = @. k_ice / (h) * (T_base - Y.T_bulk) # fluxes are defined to be positive when upward
-
-    # TODO: get sigma from parameters
-    σ = FT(5.67e-8)
     rhs = @. (
         -p.F_turb_energy +
         (1 - α) * p.SW_d +

@@ -1,6 +1,7 @@
 # testing functions used to produce user-defined debugging plots for AMIP experiments
 import Test: @test, @testset, @test_logs
 import ClimaCore as CC
+import ClimaParams as CP
 import ClimaCoupler: Interfacer
 import ClimaComms
 ClimaComms.@import_required_backends
@@ -35,10 +36,11 @@ plot_field_names(sim::ClimaLandSimulation) = (:surface_field,)
 plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
 
 @testset "import_atmos_fields!" begin
+    coupled_param_dict = CP.create_toml_dict(FT)
 
     boundary_space = CC.CommonSpaces.CubedSphereSpace(
         FT;
-        radius = FT(6371e3),
+        radius = coupled_param_dict["planet_radius"], # in meters
         n_quad_points = 4,
         h_elem = 4,
     )

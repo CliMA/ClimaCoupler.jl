@@ -23,15 +23,65 @@ end
 
 # ocean parameters
 Base.@kwdef struct OceanSlabParameters{FT <: AbstractFloat}
-    h::FT = 20              # depth of the ocean [m]
-    ρ::FT = 1500            # density of the ocean [kg / m3]
-    c::FT = 800             # specific heat of the ocean [J / kg / K]
-    T_init::FT = 271        # initial temperature of the ocean [K]
-    z0m::FT = 5e-4          # roughness length for momentum [m]
-    z0b::FT = 5e-4          # roughness length for heat [m]
-    α::FT = 0.38            # albedo of the ocean [0, 1]
-    evolving_switch::FT = 1 # switch to turn off the evolution of the ocean temperature [0 or 1]
-    ϵ::FT = 1               # emissivity of the ocean
+    h::FT                   # depth of the ocean [m]
+    ρ::FT                   # density of the ocean [kg / m3]
+    c::FT                   # specific heat of the ocean [J / kg / K]
+    T_init::FT              # initial temperature of the ocean [K]
+    z0m::FT                 # roughness length for momentum [m]
+    z0b::FT                 # roughness length for heat [m]
+    α::FT                   # albedo of the ocean [0, 1]
+    ϵ::FT                   # emissivity of the ocean
+    σ::FT                   # Stefan-Boltzmann constant [W / m2 / K4]
+    evolving_switch::FT     # switch to turn off the evolution of the ocean temperature [0 or 1]
+end
+
+"""
+    OceanSlabParameters{FT}(coupled_param_dict; h = FT(20), ρ = FT(1500),
+                            c = FT(800), T_init = FT(271), z0m = FT(5e-4),
+                            z0b = FT(5e-4), α = FT(0.38), ϵ = FT(1),
+                            evolving_switch = FT(1))
+
+Initialize the `OceanSlabParameters` object with the coupled parameters.
+
+# Arguments
+- `coupled_param_dict`: a dictionary of coupled parameters (required)
+- `h`: depth of the ocean [m] (default: 20)
+- `ρ`: density of the ocean [kg / m3] (default: 1500)
+- `c`: specific heat of the ocean [J / kg / K] (default: 800)
+- `T_init`: initial temperature of the ocean [K] (default: 271)
+- `z0m`: roughness length for momentum [m] (default: 5e-4)
+- `z0b`: roughness length for heat [m] (default: 5e-4)
+- `α`: albedo of the ocean [0, 1] (default: 0.38)
+- `ϵ`: emissivity of the ocean (default: 1)
+- `evolving_switch`: switch to turn off the evolution of the ocean temperature [0 or 1] (default: 1)
+
+# Returns
+- `OceanSlabParameters{FT}`: an `OceanSlabParameters` object
+"""
+function OceanSlabParameters{FT}(
+    coupled_param_dict;
+    h = FT(20),
+    ρ = FT(1500),
+    c = FT(800),
+    T_init = FT(271),
+    z0m = FT(5e-4),
+    z0b = FT(5e-4),
+    α = FT(0.38),
+    ϵ = FT(1),
+    evolving_switch = FT(1),
+) where {FT}
+    return OceanSlabParameters{FT}(;
+        h,
+        ρ,
+        c,
+        T_init,
+        z0m,
+        z0b,
+        α,
+        ϵ,
+        σ = coupled_param_dict["stefan_boltzmann_constant"],
+        evolving_switch,
+    )
 end
 
 """
@@ -66,13 +116,14 @@ function SlabOceanSimulation(
     saveat,
     space,
     area_fraction,
+    coupled_param_dict,
     thermo_params,
     stepper = CTS.RK4(),
     evolving = true,
 ) where {FT}
-
+    # Create params with evolving_switch override
     evolving_switch = evolving ? FT(1) : FT(0)
-    params = OceanSlabParameters{FT}(evolving_switch = evolving_switch)
+    params = OceanSlabParameters{FT}(coupled_param_dict; evolving_switch)
 
     Y = slab_ocean_space_init(space, params)
     cache = (
@@ -198,11 +249,8 @@ end
 # ode
 function slab_ocean_rhs!(dY, Y, cache, t)
     params, F_turb_energy, SW_d, LW_d = cache
-    # TODO: get sigma from parameters
-    FT = eltype(F_turb_energy)
-    σ = FT(5.67e-8)
-    rhs = @. (-F_turb_energy + (1 - params.α) * SW_d + params.ϵ * (LW_d - σ * Y.T_sfc^4)) /
-       (params.h * params.ρ * params.c)
+    (; α, ϵ, σ, h, ρ, c) = params
+    rhs = @. (-F_turb_energy + (1 - α) * SW_d + ϵ * (LW_d - σ * Y.T_sfc^4)) / (h * ρ * c)
 
     # Zero out tendencies where there is no ocean, so that temperature remains constant there
     @. rhs = ifelse(cache.area_fraction ≈ 0, zero(rhs), rhs)

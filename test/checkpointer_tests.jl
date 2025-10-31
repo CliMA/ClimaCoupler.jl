@@ -14,7 +14,7 @@ Checkpointer.get_model_prog_state(sim::DummySimulation) = sim.state
 @testset "get_model_prog_state" begin
     boundary_space = CC.CommonSpaces.CubedSphereSpace(
         FT;
-        radius = FT(6371e3),
+        radius = FT(6.371e6), # in meters
         n_quad_points = 4,
         h_elem = 4,
     )
@@ -30,7 +30,7 @@ end
     boundary_space = CC.CommonSpaces.CubedSphereSpace(
         FT;
         comms_ctx,
-        radius = FT(6371e3),
+        radius = FT(6.371e6), # in meters
         n_quad_points = 4,
         h_elem = 4,
     )

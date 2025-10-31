@@ -103,7 +103,7 @@ for FT in (Float32, Float64)
     @testset "calculate correct fluxes: dry for FT=$FT" begin
         boundary_space = CC.CommonSpaces.CubedSphereSpace(
             FT;
-            radius = FT(6371e3),
+            radius = FT(6.371e6), # in meters
             n_quad_points = 4,
             h_elem = 4,
         )

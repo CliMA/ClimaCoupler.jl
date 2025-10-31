@@ -41,7 +41,7 @@ for FT in (Float32, Float64)
     @testset "test check_conservation for conservation for FT=$FT" begin
         space = CC.CommonSpaces.CubedSphereSpace(
             FT;
-            radius = FT(6371e3),
+            radius = FT(6.371e6), # in meters
             n_quad_points = 4,
             h_elem = 4,
         )
@@ -143,7 +143,7 @@ for FT in (Float32, Float64)
     @testset "test plot_global_conservation with dummy models for FT=$FT" begin
         space = CC.CommonSpaces.CubedSphereSpace(
             FT;
-            radius = FT(6371e3),
+            radius = FT(6.371e6), # in meters
             n_quad_points = 4,
             h_elem = 4,
         )

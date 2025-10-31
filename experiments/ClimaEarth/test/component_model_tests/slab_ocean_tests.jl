@@ -1,14 +1,17 @@
 import Test: @test, @testset
 import ClimaCore as CC
+import ClimaParams as CP
 import ClimaCoupler
 
 include(joinpath("..", "..", "components", "ocean", "slab_ocean.jl"))
 
 for FT in (Float32, Float64)
     @testset "dss_state! SlabOceanSimulation for FT=$FT" begin
+        coupled_param_dict = CP.create_toml_dict(FT)
+
         boundary_space = CC.CommonSpaces.CubedSphereSpace(
             FT;
-            radius = FT(6371e3),
+            radius = coupled_param_dict["planet_radius"], # in meters
             n_quad_points = 4,
             h_elem = 4,
         )

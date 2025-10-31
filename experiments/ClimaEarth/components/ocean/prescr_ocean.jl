@@ -66,6 +66,7 @@ function PrescribedOceanSimulation(
     start_date,
     t_start,
     area_fraction,
+    coupled_param_dict,
     thermo_params,
     comms_ctx;
     z0m = FT(5.8e-5),
@@ -92,12 +93,13 @@ function PrescribedOceanSimulation(
         end : sst_path
     @info "PrescribedOcean: using SST file" sst_data
 
+    C_to_K = coupled_param_dict["temperature_water_freeze"]
     SST_timevaryinginput = TimeVaryingInput(
         sst_data,
         "SST",
         space,
         reference_date = start_date,
-        file_reader_kwargs = (; preprocess_func = (data) -> data + FT(273.15),), ## convert to Kelvin
+        file_reader_kwargs = (; preprocess_func = (data) -> data + C_to_K,), ## convert Celsius to Kelvin
     )
 
     SST_init = zeros(space)

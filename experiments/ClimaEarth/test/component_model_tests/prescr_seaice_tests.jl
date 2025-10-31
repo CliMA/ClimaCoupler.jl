@@ -3,29 +3,38 @@ import Dates
 import NCDatasets
 import ClimaCore as CC
 import Thermodynamics.Parameters as TDP
-import ClimaParams # required for TDP
+import ClimaParams as CP # required for TDP
 import ClimaCoupler
 
 include(joinpath("..", "..", "components", "ocean", "prescr_seaice.jl"))
 
 for FT in (Float32, Float64)
     @testset "test sea-ice energy slab for FT=$FT" begin
-        function test_sea_ice_rhs(; SW_d = 0.0, LW_d = 0.0, T_base = 271.2)
-            space = CC.CommonSpaces.CubedSphereSpace(
-                FT;
-                radius = FT(6371e3),
-                n_quad_points = 4,
-                h_elem = 4,
-            )
-            params = IceSlabParameters{FT}(T_base = T_base)
+        coupled_param_dict = CP.create_toml_dict(FT)
+        thermo_params = TDP.ThermodynamicsParameters(coupled_param_dict)
+
+        space = CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius = coupled_param_dict["planet_radius"], # in meters
+            n_quad_points = 4,
+            h_elem = 4,
+        )
+
+        function test_sea_ice_rhs(
+            coupled_param_dict,
+            thermo_params,
+            space;
+            SW_d = 0.0,
+            LW_d = 0.0,
+            T_base = 271.2,
+        )
+            params = IceSlabParameters{FT}(coupled_param_dict; T_base)
 
             Y = slab_ice_space_init(FT, space, params)
             dY = slab_ice_space_init(FT, space, params) .* FT(0.0)
 
             dt = FT(1.0)
             t_start = 0.0
-
-            thermo_params = TDP.ThermodynamicsParameters(FT)
 
             # Set up prescribed sea ice concentration object
             sic_data = try
@@ -69,20 +78,26 @@ for FT in (Float32, Float64)
             return dY, Y, p
         end
 
-        # TODO: get sigma from parameters
-        σ = FT(5.67e-8)
-
         # check expected dT due to upwelling longwave flux only
         # (zero conduction when T_base == initial T_bulk)
-        T_base_eq = IceSlabParameters{FT}().T_freeze - FT(5.0)
-        dY, Y, p = test_sea_ice_rhs(T_base = T_base_eq)
+        T_base_eq = IceSlabParameters{FT}(coupled_param_dict).T_freeze - FT(5.0)
+        dY, Y, p =
+            test_sea_ice_rhs(coupled_param_dict, thermo_params, space, T_base = T_base_eq)
+        σ = coupled_param_dict["stefan_boltzmann_constant"]
         dT_expected =
             (-p.params.ϵ * σ * T_base_eq^4) / (p.params.h * p.params.ρ * p.params.c)
         @test all(T -> T == FT(0) || T ≈ dT_expected, Array(parent(dY.T_bulk)))
 
         # check expected dT due to downwelling shortwave flux and upwelling longwave flux
         # (again set T_base == initial T_bulk)
-        dY, Y, p = test_sea_ice_rhs(SW_d = 1.0, LW_d = 0.0, T_base = T_base_eq)
+        dY, Y, p = test_sea_ice_rhs(
+            coupled_param_dict,
+            thermo_params,
+            space,
+            SW_d = 1.0,
+            LW_d = 0.0,
+            T_base = T_base_eq,
+        )
         dT_expected =
             ((1 - p.params.α) * 1.0 - p.params.ϵ * σ * T_base_eq^4) /
             (p.params.h * p.params.ρ * p.params.c)
@@ -90,19 +105,40 @@ for FT in (Float32, Float64)
 
         # check expected dT due to downwelling and upwelling longwave flux
         # (again set T_base == initial T_bulk)
-        dY, Y, p = test_sea_ice_rhs(SW_d = 0.0, LW_d = 2.0, T_base = T_base_eq)
+        dY, Y, p = test_sea_ice_rhs(
+            coupled_param_dict,
+            thermo_params,
+            space,
+            SW_d = 0.0,
+            LW_d = 2.0,
+            T_base = T_base_eq,
+        )
         dT_expected =
             (p.params.ϵ * (2.0 - σ * T_base_eq^4)) / (p.params.h * p.params.ρ * p.params.c)
         @test all(T -> T == FT(0) || T ≈ dT_expected, Array(parent(dY.T_bulk)))
 
         # check that tendency will not result in above freezing T
-        dY, Y, p = test_sea_ice_rhs(SW_d = 0.0, LW_d = 0.0, T_base = 330.0) # Float32 requires a large number here!
+        dY, Y, p = test_sea_ice_rhs(
+            coupled_param_dict,
+            thermo_params,
+            space,
+            SW_d = 0.0,
+            LW_d = 0.0,
+            T_base = 330.0,
+        ) # Float32 requires a large number here!
         dT_maximum = @. (p.params.T_freeze - Y.T_bulk) / p.dt
         @test minimum(dT_maximum .- dY.T_bulk) >= FT(0.0)
 
         # check that the correct tendency was added due to basal conductive flux and upwelling longwave flux
         T_base = 269.2
-        dY, Y, p = test_sea_ice_rhs(SW_d = 0.0, LW_d = 0.0, T_base = T_base)
+        dY, Y, p = test_sea_ice_rhs(
+            coupled_param_dict,
+            thermo_params,
+            space,
+            SW_d = 0.0,
+            LW_d = 0.0,
+            T_base = T_base,
+        )
         T_bulk = minimum(Y.T_bulk) # get the non-zero temperature value
         (; k_ice, h, ρ, c, T_base, ϵ) = p.params
         dT_expected =
@@ -113,9 +149,10 @@ for FT in (Float32, Float64)
     end
 
     @testset "dss_state! SeaIceModelSimulation for FT=$FT" begin
+        coupled_param_dict = CP.create_toml_dict(FT)
         boundary_space = CC.CommonSpaces.CubedSphereSpace(
             FT;
-            radius = FT(6371e3),
+            radius = coupled_param_dict["planet_radius"], # in meters
             n_quad_points = 4,
             h_elem = 4,
         )

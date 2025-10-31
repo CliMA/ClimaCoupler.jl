@@ -2,7 +2,7 @@ using Test
 import Dates
 import ClimaCore as CC
 import Thermodynamics.Parameters as TDP
-import ClimaParams # required for TDP
+import ClimaParams as CP # required for TDP
 import ClimaCoupler
 
 include(joinpath("..", "..", "components", "ocean", "prescr_ocean.jl"))
@@ -15,16 +15,18 @@ FT = Float32
 end
 
 @testset "PrescribedOceanSimulation constructor" begin
+    coupled_param_dict = CP.create_toml_dict(FT)
+    thermo_params = TDP.ThermodynamicsParameters(coupled_param_dict)
+
     space = CC.CommonSpaces.CubedSphereSpace(
         FT;
-        radius = FT(6371e3),
+        radius = coupled_param_dict["planet_radius"], # in meters
         n_quad_points = 4,
         h_elem = 4,
     )
     start_date = Dates.DateTime(2000, 1, 1)
     t_start = 0.0
     area_fraction = CC.Fields.ones(space)
-    thermo_params = TDP.ThermodynamicsParameters(FT)
     comms_ctx = nothing
 
     # Construct simulation object
@@ -34,6 +36,7 @@ end
         start_date,
         t_start,
         area_fraction,
+        coupled_param_dict,
         thermo_params,
         comms_ctx,
     )
@@ -52,12 +55,13 @@ end
         )
     end
 
+    C_to_K = coupled_param_dict["temperature_water_freeze"]
     SST_timevaryinginput = TimeVaryingInput(
         sst_data,
         "SST",
         space,
         reference_date = start_date,
-        file_reader_kwargs = (; preprocess_func = (data) -> data + FT(273.15),), ## convert to Kelvin
+        file_reader_kwargs = (; preprocess_func = (data) -> data + C_to_K,), ## convert Celsius to Kelvin
     )
     SST_expected = zeros(space)
     evaluate!(SST_expected, SST_timevaryinginput, t_start)

@@ -155,7 +155,7 @@ function ClimaLandSimulation(
         T_sfc0 = T_base .+ temp_anomaly.(coords.subsurface)
     else
         # constant field on subsurface space
-        T_sfc0 = CC.Fields.Field(T_base .* CC.Fields.ones(subsurface_space))
+        T_sfc0 = T_base .* CC.Fields.ones(subsurface_space)
     end
     lapse_rate = FT(6.5e-3)
     # Adjust initial temperature to account for orography of the surface
@@ -218,18 +218,20 @@ function ClimaLandSimulation(
             p,
             surface_space,
             ic_path,
-            model.snow.parameters,
+            model.snow.parameters;
+            regridder_type = regridder_type,
+            extrapolation_bc = extrapolation_bc,
+            interpolation_method = interpolation_method,
         )
 
-        T_bounds = extrema(Y.canopy.energy.T)
-        CL.Simulations.set_soil_initial_conditions!(
+        CL.Simulations.set_soil_initial_conditions_from_temperature_and_total_water!(
             Y,
-            ν,
-            θ_r,
             subsurface_space,
             ic_path,
-            model.soil,
-            T_bounds,
+            model.soil;
+            regridder_type = regridder_type,
+            extrapolation_bc = extrapolation_bc,
+            interpolation_method = interpolation_method,
         )
     elseif land_spun_up_ic
         # Use artifact spun-up initial conditions

@@ -66,16 +66,17 @@ function BucketSimulation(
     stepper = CTS.RK4(),
     albedo_type::String = "map_static",
     bucket_initial_condition::String = "",
-    energy_check::Bool = false,
-    parameter_files = [],
+    coupled_param_dict = CP.create_toml_dict(FT),
 ) where {FT, TT <: Union{Float64, ITime}}
-    # Construct the parameter dictionary based on the float type and any parameter files
-    toml_dict = LP.create_toml_dict(FT; override_files = parameter_files)
+    # Get default land parameters from ClimaLand.LandParameters
+    land_toml_dict = LP.create_toml_dict(FT)
+    # Override land parameters with coupled parameters
+    toml_dict = CP.merge_override_default_values(coupled_param_dict, land_toml_dict)
 
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
     if isnothing(shared_surface_space)
-        domain = make_land_domain(depth; nelements, dz_tuple)
+        domain = make_land_domain(depth, toml_dict; nelements, dz_tuple)
     else
         domain = make_land_domain(
             shared_surface_space,
@@ -379,11 +380,9 @@ function FieldExchanger.update_sim!(sim::BucketSimulation, csf)
     p = sim.integrator.p
     t = sim.integrator.t
 
-    # TODO: get sigma from parameters
-    FT = eltype(Y)
-    σ = FT(5.67e-8)
     # Note: here we add negative signs to account for a difference in sign convention
     #  between ClimaLand.jl and ClimaCoupler.jl in SW_d and LW_d.
+    σ = model.parameters.earth_param_set.Stefan
     sim.integrator.p.bucket.R_n .=
         .-(1 .- CL.surface_albedo(model, Y, p)) .* sim.radiative_fluxes.SW_d .-
         Interfacer.get_field(sim, Val(:emissivity)) .*

@@ -110,9 +110,10 @@ function surface_inputs(input_args::NamedTuple)
             thermo_state_sfc_fv,
         ),
         z0m_fv,
-        z0b_fv,
+        z0b_fv;
         gustiness_fv,
         beta_fv,
+        SF.ScalarRoughness()
     )
 
     # Put the result data layout back onto the surface space

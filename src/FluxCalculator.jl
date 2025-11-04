@@ -72,53 +72,6 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
     return nothing
 end
 
-
-function surface_inputs(input_args::NamedTuple)
-    (;
-        thermo_state_sfc,
-        thermo_state_atmos,
-        uₕ_int,
-        z_int,
-        z_sfc,
-        scheme_properties,
-        boundary_space,
-    ) = input_args
-    FT = CC.Spaces.undertype(boundary_space)
-    (; z0b, z0m, beta, gustiness) = scheme_properties
-
-    # Extract the underlying data layouts of each field
-    # Note: this is a bit "dangerous" because it circumvents ClimaCore, but
-    #  it allows us to broadcast over fields on slightly different spaces
-    maybe_fv = (x) -> x isa CC.Fields.Field ? CC.Fields.field_values(x) : x
-
-    z_int_fv = maybe_fv(z_int)
-    uₕ_int_fv = maybe_fv(uₕ_int)
-    thermo_state_atmos_fv = maybe_fv(thermo_state_atmos)
-    z_sfc_fv = maybe_fv(z_sfc)
-    thermo_state_sfc_fv = maybe_fv(thermo_state_sfc)
-    beta_fv = maybe_fv(beta)
-    z0m_fv = maybe_fv(z0m)
-    z0b_fv = maybe_fv(z0b)
-    gustiness_fv = maybe_fv(gustiness)
-
-    # Compute state values
-    result = @. SF.ValuesOnly(
-        SF.StateValues(z_int_fv, uₕ_int_fv, thermo_state_atmos_fv), # state_in
-        SF.StateValues(                                  # state_sfc
-            z_sfc_fv,
-            StaticArrays.SVector(FT(0), FT(0)),
-            thermo_state_sfc_fv,
-        ),
-        z0m_fv,
-        z0b_fv,
-        gustiness_fv,
-        beta_fv,
-    )
-
-    # Put the result data layout back onto the surface space
-    return CC.Fields.Field(result, boundary_space)
-end
-
 # TODO: (an equivalent of) this function also lives in Atmos and Land - should move to general utilities
 """
     extrapolate_ρ_to_sfc(thermo_params, ts_int, T_sfc)
@@ -324,20 +277,22 @@ function compute_surface_fluxes!(
     Interfacer.get_field!(csf.scalar_temp4, sim, Val(:beta))
     beta = csf.scalar_temp4
 
-    scheme_properties =
-        (; z0b = z0b, z0m = z0m, Ch = FT(0), Cd = FT(0), beta = beta, gustiness = FT(1))
+    # Set some scalars that we hardcode for now
+    gustiness = FT(1)
 
-    input_args = (;
-        thermo_state_sfc,
-        thermo_state_atmos,
-        uₕ_int,
-        csf.z_int,
-        csf.z_sfc,
-        scheme_properties,
-        boundary_space,
-        surface_params,
+    # Construct the SurfaceFluxes.jl container of inputs
+    inputs = @. SF.ValuesOnly(
+        SF.StateValues(csf.z_int, uₕ_int, thermo_state_atmos), # state_in
+        SF.StateValues(                                  # state_sfc
+            csf.z_sfc,
+            StaticArrays.SVector(FT(0), FT(0)),
+            thermo_state_sfc,
+        ),
+        z0m,
+        z0b,
+        gustiness,
+        beta,
     )
-    inputs = FluxCalculator.surface_inputs(input_args)
 
     # calculate the surface fluxes
     fluxes = FluxCalculator.get_surface_fluxes(inputs, surface_params)

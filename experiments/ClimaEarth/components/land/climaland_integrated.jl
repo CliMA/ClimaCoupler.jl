@@ -581,15 +581,17 @@ function FluxCalculator.compute_surface_fluxes!(
 
     # Combine turbulent energy fluxes from each component of the land model
     # Use temporary variables to avoid allocating
+    @. p.scratch1 = canopy_dest.lhf + soil_dest.lhf * (1 .- p.snow.snow_cover_fraction) +
+        p.snow.snow_cover_fraction * snow_dest.lhf
     Interfacer.remap!(
         csf.scalar_temp1,
-        canopy_dest.lhf .+ soil_dest.lhf .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.lhf,
+        p.scratch1,
     )
+    @. p.scratch1 = canopy_dest.shf + soil_dest.shf * (1 - p.snow.snow_cover_fraction) +
+        p.snow.snow_cover_fraction * snow_dest.shf
     Interfacer.remap!(
         csf.scalar_temp2,
-        canopy_dest.shf .+ soil_dest.shf .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.shf,
+        p.scratch1
     )
 
     # Zero out the fluxes where the area fraction is zero
@@ -605,14 +607,14 @@ function FluxCalculator.compute_surface_fluxes!(
     # Combine turbulent moisture fluxes from each component of the land model
     # Note that we multiply by ρ_liq to convert from m s-1 to kg m-2 s-1
     ρ_liq = (LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set))
+    @. p.scratch1 = (canopy_dest.transpiration +
+                     (soil_dest.vapor_flux_liq + soil_dest.vapor_flux_ice) *
+                     (1 - p.snow.snow_cover_fraction) +
+                     p.snow.snow_cover_fraction * snow_dest.vapor_flux
+                     ) * ρ_liq
     Interfacer.remap!(
         csf.scalar_temp1,
-        (
-            canopy_dest.transpiration .+
-            (soil_dest.vapor_flux_liq .+ soil_dest.vapor_flux_ice) .*
-            (1 .- p.snow.snow_cover_fraction) .+
-            p.snow.snow_cover_fraction .* snow_dest.vapor_flux
-        ) .* ρ_liq,
+        p.scratch1
     )
     @. csf.scalar_temp1 =
         ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
@@ -621,19 +623,21 @@ function FluxCalculator.compute_surface_fluxes!(
     # Combine turbulent momentum fluxes from each component of the land model
     # Note that we exclude the canopy component here for now, since we can have nonzero momentum fluxes
     #  where there is zero LAI. This should be fixed in ClimaLand.
+    @. p.scratch1 = soil_dest.ρτxz * (1 - p.snow.snow_cover_fraction) +
+        p.snow.snow_cover_fraction * snow_dest.ρτxz
     Interfacer.remap!(
         csf.scalar_temp1,
-        soil_dest.ρτxz .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.ρτxz,
+        p.scratch1,
     )
     @. csf.scalar_temp1 =
         ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
     @. csf.F_turb_ρτxz += csf.scalar_temp1 * area_fraction
 
+    @. p.scratch1 = soil_dest.ρτyz * (1 - p.snow.snow_cover_fraction) +
+        p.snow.snow_cover_fraction * snow_dest.ρτyz
     Interfacer.remap!(
         csf.scalar_temp1,
-        soil_dest.ρτyz .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.ρτyz,
+        p.scratch1
     )
     @. csf.scalar_temp1 =
         ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
@@ -642,10 +646,11 @@ function FluxCalculator.compute_surface_fluxes!(
     # Combine the buoyancy flux from each component of the land model
     # Note that we exclude the canopy component here for now, since ClimaLand doesn't
     #  include its extra resistance term in the buoyancy flux calculation.
+    @. p.scratch1 =  soil_dest.buoy_flux * (1 - p.snow.snow_cover_fraction) +
+        p.snow.snow_cover_fraction * snow_dest.buoy_flux
     Interfacer.remap!(
         csf.scalar_temp1,
-        soil_dest.buoy_flux .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.buoy_flux,
+        p.scratch1
     )
     @. csf.scalar_temp1 =
         ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)

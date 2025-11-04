@@ -1,6 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.6"
+julia_version = "1.11.5"
 manifest_format = "2.0"
 project_hash = "bf902fbe4cdfe69d6bdc0c99b12a9c00c5aa28ee"
 
@@ -415,9 +415,9 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaInterpolations", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "ForwardDiff", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "NullBroadcasts", "RRTMGP", "Random", "SciMLBase", "SparseMatrixColorings", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
-git-tree-sha1 = "ed7a6ccef8745d5b13b95318268bdb05e75be87e"
+path = "../../../ClimaAtmos.jl"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.31.6"
+version = "0.31.7"
 
 [[deps.ClimaCalibrate]]
 deps = ["Dates", "Distributed", "Distributions", "EnsembleKalmanProcesses", "JLD2", "Logging", "Random", "TOML", "YAML"]
@@ -3116,7 +3116,7 @@ version = "7.7.0+0"
 
 [[deps.SurfaceFluxes]]
 deps = ["DocStringExtensions", "RootSolvers", "Thermodynamics"]
-git-tree-sha1 = "4a28939fa34ce9b45f693f33bbe956d1b2903ba2"
+path = "../../../SurfaceFluxes.jl"
 uuid = "49b00bb7-8bd4-4f2b-b78c-51cd0450215f"
 version = "0.13.1"
 weakdeps = ["ClimaParams"]

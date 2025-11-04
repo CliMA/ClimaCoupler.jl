@@ -111,9 +111,9 @@ function surface_inputs(input_args::NamedTuple)
         ),
         z0m_fv,
         z0b_fv;
-        gustiness_fv,
-        beta_fv,
-        SF.ScalarRoughness()
+        gustiness=gustiness_fv,
+        beta=beta_fv,
+        roughness_model=SF.ScalarRoughness()
     )
 
     # Put the result data layout back onto the surface space

@@ -21,6 +21,7 @@ export CoupledSimulation,
     LandModelSimulation,
     OceanModelSimulation,
     get_field,
+    get_remapper_to_cc,
     update_field!,
     AbstractSurfaceStub,
     SurfaceStub,
@@ -241,25 +242,41 @@ get_field(sim::SurfaceModelSimulation, ::Val{:height_disp}) =
 
 
 """
-    get_field(sim, what, target_space)
+    get_field(sim, quantity, target_space)
 
 Return `quantity` in `sim` remapped onto the `target_space`
 
 This is equivalent to calling `get_field`, and then `remap`.
 """
 function get_field(sim, quantity, target_space)
-    return remap(get_field(sim, quantity), target_space)
+    return remap(get_field(sim, quantity), target_space, get_remapper_to_cc(sim))
 end
 
 """
     get_field!(target_field, sim, quantity)
 
-Remap `quantity` in `sim` remapped onto the `target_field`.
+Remap `quantity` in `sim` remapped onto the `target_field.
+If this component model uses a remapper object to remap quantities onto
+the boundary space, `Interfacer.get_remapper_to_cc` should be extended to return
+the remapper object.
 """
 function get_field!(target_field, sim, quantity)
-    remap!(target_field, get_field(sim, quantity))
+    remap!(target_field, get_field(sim, quantity), get_remapper_to_cc(sim))
     return nothing
 end
+
+"""
+    get_remapper_to_cc(::ComponentModelSimulation)
+
+Return the remapper object used to remap quantities from this component
+model onto the boundary space.
+
+Components that use the default remapping functions (i.e. components using
+ClimaCore Fields) do not need to extend this function. Components that require
+an alternative remapper should extend this function and likely `remap` and
+`remap!` as well.
+"""
+get_remapper_to_cc(::ComponentModelSimulation) = nothing
 
 """
     update_field!(::AtmosModelSimulation, ::Val, _...)
@@ -440,7 +457,13 @@ Non-ClimaCore fields should provide a method to this function.
 """
 function remap end
 
-function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
+# We don't need a remapper object to remap a ClimaCore field onto a ClimaCore space
+remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace) =
+    remap(field, target_space, nothing)
+remap!(target_field::CC.Fields.Field, source::Union{CC.Fields.Field, Number}) =
+    remap!(target_field, source, nothing)
+
+function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace, _)
     source_space = axes(field)
     comms_ctx = ClimaComms.context(source_space)
 
@@ -495,20 +518,24 @@ function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
     end
 end
 
-function remap(num::Number, target_space::CC.Spaces.AbstractSpace)
+function remap(num::Number, target_space::CC.Spaces.AbstractSpace, _)
     return num
 end
 
 """
-    remap!(target_field, source)
+    remap!(target_field::CC.Fields.Field, source::Union{CC.Fields.Field, Number}, remapper)
 
-Remap the given `source` onto the `target_field`.
+Remap the given ClimaCore `source` field onto the ClimaCore `target_field`.
 
 Non-ClimaCore fields should provide a method to [`Interfacer.remap`](@ref), or directly to this
 function.
 """
-function remap!(target_field, source)
-    target_field .= remap(source, axes(target_field))
+function remap!(
+    target_field::CC.Fields.Field,
+    source::Union{CC.Fields.Field, Number},
+    remapper,
+)
+    target_field .= remap(source, axes(target_field), remapper)
     return nothing
 end
 

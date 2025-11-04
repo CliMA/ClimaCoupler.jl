@@ -303,6 +303,71 @@ function update_field!(sim::AbstractSurfaceStub, ::Val{:surface_diffuse_albedo},
 end
 ```
 
+## Remapping functions
+
+For component models that don't use ClimaCore Fields, some additional functions
+must be extended to enable remapping between the component model's grid
+and the boundary space of the coupled simulation.
+
+### `remap(field, target_space, remapper)`
+
+Remap the given `field` onto the `target_space`. If the field is already
+on the target space or a compatible one, it is returned unchanged.
+
+For ClimaCore Fields, this function is implemented by default and does not require
+a remapper object. Component models that use non-ClimaCore fields (such as Oceananigans)
+must extend this function to provide a method that handles remapping from their
+native field type to a ClimaCore Field on the target space.
+
+!!! note "Performance"
+    The `remap` method allocates a new field and is not efficient for
+    performance-critical code. For better performance, use the in-place option
+    `remap!` instead.
+
+**Signature:**
+- `field`: The source field to be remapped
+- `target_space`: The target space (typically the boundary space) onto which the field should be remapped
+- `remapper`: An optional remapper object returned by `get_remapper_to_cc(sim)`. For ClimaCore Fields, this can be `nothing`.
+
+**Returns:** A new field remapped onto the target space
+
+### `remap!(target_field, source, remapper)`
+
+Remap the given `source` field onto the `target_field` in place. This is
+the preferred method for remapping when performance is important, as it avoids
+allocating a new field.
+
+For ClimaCore Fields, this function is implemented by default. Component models
+that use non-ClimaCore fields must extend this function to provide a method that
+handles remapping from their native field type into the provided `target_field`.
+
+**Signature:**
+- `target_field`: The destination field (must be a ClimaCore Field) where remapped data will be stored
+- `source`: The source field to be remapped (can be a ClimaCore Field or a non-ClimaCore field type)
+- `remapper`: An optional remapper object returned by `get_remapper_to_cc(sim)`. For ClimaCore Fields, this can be `nothing`.
+
+**Returns:** `nothing` (updates `target_field` in place)
+
+### `get_remapper_to_cc(sim::ComponentModelSimulation)`
+
+Return the remapper object used to remap quantities from this component model's grid
+onto the boundary space.
+
+By default, this function returns `nothing`, which is intended for use with components that
+use the default remapping functions (i.e. components using ClimaCore Fields).
+Components that require an alternative remapper (such as the XESMF regridder for Oceananigans)
+should extend this function to return their remapper object. If this function is extended,
+the component model will also need to extend `remap` and `remap!` to use the remapper object.
+
+**Signature:**
+- `sim`: The component model simulation
+
+**Returns:** A remapper object (or `nothing` for ClimaCore-based models)
+
+**Example:** For an Oceananigans simulation, this returns a NamedTuple containing an
+XESMF regridder object with an initialized weight matrix, as well as scratch space
+to be used during remapping.
+
 ## Interfacer API
 ```@docs
     ClimaCoupler.Interfacer.CoupledSimulation

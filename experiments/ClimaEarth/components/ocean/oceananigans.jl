@@ -422,13 +422,13 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
+        sim.remapping.remapper_cc_to_oc,
         F_turb_ρτxz,
     )
     OC.set!(sim.remapping.scratch_oc1, sim.remapping.scratch_arr1) # zonal momentum flux
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr2,
-        sim.remapping.remapper_cc,
+        sim.remapping.remapper_cc_to_oc,
         F_turb_ρτyz,
     )
     OC.set!(sim.remapping.scratch_oc2, sim.remapping.scratch_arr2) # meridional momentum flux
@@ -451,8 +451,16 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
         sim.ocean_properties
 
     # Remap the latent and sensible heat fluxes using scratch arrays
-    CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, F_lh) # latent heat flux
-    CC.Remapping.interpolate!(sim.remapping.scratch_arr2, sim.remapping.remapper_cc, F_sh) # sensible heat flux
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr1,
+        sim.remapping.remapper_cc_to_oc,
+        F_lh,
+    ) # latent heat flux
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr2,
+        sim.remapping.remapper_cc_to_oc,
+        F_sh,
+    ) # sensible heat flux
 
     # Rename for clarity; recall F_turb_energy = F_lh + F_sh
     remapped_F_lh = sim.remapping.scratch_arr1
@@ -470,7 +478,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     # add the component due to precipitation (that was done with the radiative fluxes)
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
+        sim.remapping.remapper_cc_to_oc,
         F_turb_moisture,
     )
     moisture_fresh_water_flux = sim.remapping.scratch_arr1 ./ ocean_fresh_water_density
@@ -573,7 +581,7 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     # Remap radiative flux onto scratch array; rename for clarity
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
+        sim.remapping.remapper_cc_to_oc,
         csf.F_radiative,
     )
     remapped_F_radiative = sim.remapping.scratch_arr1
@@ -587,12 +595,12 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     # Remap precipitation fields onto scratch arrays; rename for clarity
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
+        sim.remapping.remapper_cc_to_oc,
         csf.P_liq,
     )
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr2,
-        sim.remapping.remapper_cc,
+        sim.remapping.remapper_cc_to_oc,
         csf.P_snow,
     )
     remapped_P_liq = sim.remapping.scratch_arr1

@@ -9,11 +9,7 @@ import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
 using XESMF # to load Oceananigans regridding extension
 
-OceananigansXESMFExt =
-    Base.get_extension(
-        OC,
-        :OceananigansXESMFExt,
-    ).OceananigansXESMFExt;
+OceananigansXESMFExt = Base.get_extension(OC, :OceananigansXESMFExt).OceananigansXESMFExt;
 
 """
     OceananigansSimulation{SIM, A, OPROP, REMAP}
@@ -53,9 +49,6 @@ function OceananigansSimulation(
     output_dir,
     comms_ctx = ClimaComms.context(),
 )
-    # using Dates
-    # start_date = Dates.DateTime(2008)
-    # stop_date = Dates.DateTime(2008, 1, 2)
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
 
     # Retrieve EN4 data (monthly)
@@ -111,6 +104,11 @@ function OceananigansSimulation(
     # Set initial condition to EN4 state estimate at start_date
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
 
+
+    # Set up the XESMF regridder from tripolar to cubedsphere
+    ## TODO keep using ClimaCore remapper for cubedsphere to tripolar because it uses
+    # all the information we have about the grid
+
     # Construct a remapper from the exchange grid to `Center, Center` fields
 
     # Tripolar to cubed sphere (fails currently)
@@ -123,6 +121,7 @@ function OceananigansSimulation(
 
     # Put everything on CPU
     coords_tripolar = Dict(k => Array(v) for (k, v) in coords_tripolar)
+
     # Create a 2D matrix containing each lat/long combination as a LatLongPoint
     # Note this must be done on CPU since the CC.Remapper module is not GPU-compatible
     # target_points_oc = Array(CC.Geometry.LatLongPoint.(lat_oc, long_oc))
@@ -136,21 +135,84 @@ function OceananigansSimulation(
     #     h_elem = 10,
     # )
     cubedsphere_coords = CC.Fields.coordinate_field(boundary_space)
-    # Put everything on CPU
-    cubedsphere_lat_arr = Array(CC.Fields.field2array(cubedsphere_coords.lat))
-    cubedsphere_long_arr = Array(CC.Fields.field2array(cubedsphere_coords.long))
 
-    # lon2d varies along cols (dim 2) — x direction
-    cubedsphere_lon2d = repeat(cubedsphere_long_arr', length(cubedsphere_lat_arr), 1)  # transpose lon to make it row vector
-    # lat2d varies along rows (dim 1) — y direction
-    cubedsphere_lat2d = repeat(cubedsphere_lat_arr, 1, length(cubedsphere_long_arr))   # column vector repeated across
+    # (Ni, Nj, _, Nh) = size(parent(cubedsphere_coords.lat))
+    # cubedsphere_lat2d = Array(reshape(parent(cubedsphere_coords.lat), Ni*Nj, Nh))
+    # cubedsphere_lon2d = Array(reshape(parent(cubedsphere_coords.long), Ni*Nj, Nh))
 
-    coords_cubedsphere = Dict("lat" => cubedsphere_lat2d, "lon" => cubedsphere_lon2d)
+    flat_lat = Array(reshape(vec(parent(cubedsphere_coords.lat)), :, 1))
+    flat_lon = Array(reshape(vec(parent(cubedsphere_coords.long)), :, 1))
+    # squareish_lat_dim_i = floor(Int, sqrt(length(flat_lat)))
+    # squareish_lat_dim_j = cld(length(flat_lat), squareish_lat_dim_i)
+    # lat_arr = similar(flat_lat, squareish_lat_dim_i, squareish_lat_dim_j)
+
+    # for i in 1:length(flat_lat)
+    #     lat_arr[i] = flat_lat[i]
+    # end
+    # for i in (length(flat_lat) + 1):length(lat_arr)
+    #     lat_arr[i] = 0
+    # end
+
+    # flat_lon = vec(parent(cubedsphere_coords.long))
+    # squareish_lon_dim_i = floor(Int, sqrt(length(flat_lon)))
+    # squareish_lon_dim_j = cld(length(flat_lon), squareish_lon_dim_i)
+    # lon_arr = similar(flat_lon, squareish_lon_dim_i, squareish_lon_dim_j)
+
+    # for i in 1:length(flat_lon)
+    #     lon_arr[i] = flat_lon[i]
+    # end
+    # for i in (length(flat_lon) + 1):length(lon_arr)
+    #     lon_arr[i] = 0
+    # end
+
+
+    # # Put everything on CPU
+    # cubedsphere_lat_arr = Array(CC.Fields.field2array(cubedsphere_coords.lat))
+    # cubedsphere_long_arr = Array(CC.Fields.field2array(cubedsphere_coords.long))
+
+    # # lon2d varies along cols (dim 2) — x direction
+    # cubedsphere_lon2d = collect(repeat(cubedsphere_long_arr', length(cubedsphere_lat_arr), 1))  # transpose lon to make it row vector
+    # # lat2d varies along rows (dim 1) — y direction
+    # cubedsphere_lat2d = collect(repeat(cubedsphere_lat_arr, 1, length(cubedsphere_long_arr)))   # column vector repeated across
+
+    coords_cubedsphere = Dict("lat" => flat_lat, "lon" => flat_lon)
+
+    GC.gc()
+
+    # ## Contents of XESMF.Regridder constructor
+    # method = "bilinear"
+    # regridder_tripolar_to_cubedsphere = XESMF.xesmf.Regridder(coords_cubedsphere, coords_tripolar, method; periodic = false)
+    # method = uppercasefirst(string(method))
+
+    # weights = XESMF.sparse_regridder_weights(regridder)
+
+    # Ndst, Nsrc = size(weights)
+
+    # temp_src = zeros(Nsrc)
+    # temp_dst = zeros(Ndst)
+
+    # return Regridder(method, weights, temp_src, temp_dst)
+
 
     regridder_tripolar_to_cubedsphere =
-        XESMF.Regridder(coords_cubedsphere, coords_tripolar; method = "bilinear")
-    regridder_cubedsphere_to_tripolar =
-        XESMF.Regridder(coords_tripolar, coords_cubedsphere; method = "bilinear")
+        XESMF.Regridder(coords_tripolar, coords_cubedsphere; method = "bilinear") # src, dest, method
+
+    src_vec = vec(OC.interior(T, :, :, Nz)) # tripolar source
+    dst_vec = vec(parent(CC.Fields.zeros(boundary_space))) # cubedsphere dest
+
+    regridder_tripolar_to_cubedsphere(dst_vec, src_vec) # REGRID MATRIX MULT
+
+    # LinearAlgebra.mul!(dst_vec, regridder_tripolar_to_cubedsphere.weights, src_vec)
+
+    dst_arr = reshape(dst_vec, size(parent(cubedsphere_coords.lat))...)
+    dst_field = CC.Fields.array2field(dst_arr, boundary_space)
+
+    using ClimaCoreMakie
+    fieldheatmap(dst_field)
+
+
+    # regridder_cubedsphere_to_tripolar =
+    #     XESMF.Regridder(coords_tripolar, coords_cubedsphere; method = "bilinear")
 
     # Tripolar to LatLon
     T = OC.CenterField(grid) # field on tripolar grid

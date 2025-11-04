@@ -152,6 +152,7 @@ function Checkpointer.restore_cache!(sim::ClimaAtmosSimulation, new_cache)
             :hyperdiffusion_ghost_buffer,
             :data_handler,
             :graph_context,
+            :dt,
         ]),
     )
     return nothing

@@ -22,13 +22,16 @@ It contains the following objects:
 - `ocean::SIM`: The Oceananigans simulation object.
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
 - `ocean_properties::OPROP`: A NamedTuple of ocean properties and parameters
-- `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
+- `remapper_oc_to_cs::REMAP1`: Objects needed to remap from the Oceananigans space to the exchange (spectral) grid.
+- `remapper_cs_to_oc::REMAP2`: Objects needed to remap from the exchange (spectral) grid to the Oceananigans space.
 """
-struct OceananigansSimulation{SIM, A, OPROP, REMAP} <: Interfacer.OceanModelSimulation
+struct OceananigansSimulation{SIM, A, OPROP, REMAP1, REMAP2} <:
+       Interfacer.OceanModelSimulation
     ocean::SIM
     area_fraction::A
     ocean_properties::OPROP
-    remapping::REMAP
+    remapper_oc_to_cs::REMAP1
+    remapper_cs_to_oc::REMAP2
 end
 
 """
@@ -104,182 +107,9 @@ function OceananigansSimulation(
     # Set initial condition to EN4 state estimate at start_date
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
 
-
-    # Set up the XESMF regridder from tripolar to cubedsphere
-    ## TODO keep using ClimaCore remapper for cubedsphere to tripolar because it uses
-    # all the information we have about the grid
-
-    # Construct a remapper from the exchange grid to `Center, Center` fields
-
-    # Tripolar to cubed sphere (fails currently)
-    # long_oc = OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center())
-    # lat_oc = OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center())
-
-    T = OC.CenterField(grid) # field on tripolar grid
-    OC.set!(T, en4_temperature[1])
-    coords_tripolar = OceananigansXESMFExt.xesmf_coordinates(T)
-
-    # Put everything on CPU
-    coords_tripolar = Dict(k => Array(v) for (k, v) in coords_tripolar)
-
-    # Create a 2D matrix containing each lat/long combination as a LatLongPoint
-    # Note this must be done on CPU since the CC.Remapper module is not GPU-compatible
-    # target_points_oc = Array(CC.Geometry.LatLongPoint.(lat_oc, long_oc))
-
-    # Get the latitude and longitude of each node on the boundary space
+    # Get the remapper objects to go in both directions between the Oceananigans and Cubed sphere grids
     boundary_space = axes(area_fraction)
-    # CC.CommonSpaces.CubedSphereSpace(
-    #     Float32;
-    #     radius = 1.0,
-    #     n_quad_points = 2,
-    #     h_elem = 10,
-    # )
-    cubedsphere_coords = CC.Fields.coordinate_field(boundary_space)
-
-    # (Ni, Nj, _, Nh) = size(parent(cubedsphere_coords.lat))
-    # cubedsphere_lat2d = Array(reshape(parent(cubedsphere_coords.lat), Ni*Nj, Nh))
-    # cubedsphere_lon2d = Array(reshape(parent(cubedsphere_coords.long), Ni*Nj, Nh))
-
-    flat_lat = Array(reshape(vec(parent(cubedsphere_coords.lat)), :, 1))
-    flat_lon = Array(reshape(vec(parent(cubedsphere_coords.long)), :, 1))
-    # squareish_lat_dim_i = floor(Int, sqrt(length(flat_lat)))
-    # squareish_lat_dim_j = cld(length(flat_lat), squareish_lat_dim_i)
-    # lat_arr = similar(flat_lat, squareish_lat_dim_i, squareish_lat_dim_j)
-
-    # for i in 1:length(flat_lat)
-    #     lat_arr[i] = flat_lat[i]
-    # end
-    # for i in (length(flat_lat) + 1):length(lat_arr)
-    #     lat_arr[i] = 0
-    # end
-
-    # flat_lon = vec(parent(cubedsphere_coords.long))
-    # squareish_lon_dim_i = floor(Int, sqrt(length(flat_lon)))
-    # squareish_lon_dim_j = cld(length(flat_lon), squareish_lon_dim_i)
-    # lon_arr = similar(flat_lon, squareish_lon_dim_i, squareish_lon_dim_j)
-
-    # for i in 1:length(flat_lon)
-    #     lon_arr[i] = flat_lon[i]
-    # end
-    # for i in (length(flat_lon) + 1):length(lon_arr)
-    #     lon_arr[i] = 0
-    # end
-
-
-    # # Put everything on CPU
-    # cubedsphere_lat_arr = Array(CC.Fields.field2array(cubedsphere_coords.lat))
-    # cubedsphere_long_arr = Array(CC.Fields.field2array(cubedsphere_coords.long))
-
-    # # lon2d varies along cols (dim 2) — x direction
-    # cubedsphere_lon2d = collect(repeat(cubedsphere_long_arr', length(cubedsphere_lat_arr), 1))  # transpose lon to make it row vector
-    # # lat2d varies along rows (dim 1) — y direction
-    # cubedsphere_lat2d = collect(repeat(cubedsphere_lat_arr, 1, length(cubedsphere_long_arr)))   # column vector repeated across
-
-    coords_cubedsphere = Dict("lat" => flat_lat, "lon" => flat_lon)
-
-    GC.gc()
-
-    # ## Contents of XESMF.Regridder constructor
-    # method = "bilinear"
-    # regridder_tripolar_to_cubedsphere = XESMF.xesmf.Regridder(coords_cubedsphere, coords_tripolar, method; periodic = false)
-    # method = uppercasefirst(string(method))
-
-    # weights = XESMF.sparse_regridder_weights(regridder)
-
-    # Ndst, Nsrc = size(weights)
-
-    # temp_src = zeros(Nsrc)
-    # temp_dst = zeros(Ndst)
-
-    # return Regridder(method, weights, temp_src, temp_dst)
-
-
-    regridder_tripolar_to_cubedsphere =
-        XESMF.Regridder(coords_tripolar, coords_cubedsphere; method = "bilinear") # src, dest, method
-
-    src_vec = vec(OC.interior(T, :, :, Nz)) # tripolar source
-    dst_vec = vec(parent(CC.Fields.zeros(boundary_space))) # cubedsphere dest
-
-    regridder_tripolar_to_cubedsphere(dst_vec, src_vec) # REGRID MATRIX MULT
-
-    # LinearAlgebra.mul!(dst_vec, regridder_tripolar_to_cubedsphere.weights, src_vec)
-
-    dst_arr = reshape(dst_vec, size(parent(cubedsphere_coords.lat))...)
-    dst_field = CC.Fields.array2field(dst_arr, boundary_space)
-
-    using ClimaCoreMakie
-    fieldheatmap(dst_field)
-
-
-    # regridder_cubedsphere_to_tripolar =
-    #     XESMF.Regridder(coords_tripolar, coords_cubedsphere; method = "bilinear")
-
-    # Tripolar to LatLon
-    T = OC.CenterField(grid) # field on tripolar grid
-    OC.set!(T, en4_temperature[1])
-
-    grid_latlon = OC.LatitudeLongitudeGrid(
-        arch;
-        size = (Nx, Ny, Nz),
-        longitude = (0, 360),
-        latitude = (-81, 90),
-        z,
-    )
-    field_latlon = OC.CenterField(grid_latlon)
-    remapper_tripolar_to_latlon = XESMF.Regridder(T, field_latlon; method = "conservative")
-    remapper_tripolar_to_latlon(
-        vec(OC.interior(field_latlon, :, :, Nz)),
-        vec(OC.interior(T, :, :, Nz)),
-    )
-    OC.fill_halo_regions!(field_latlon)
-    # heatmap(field_latlon) # using GeoMakie, using CairoMakie
-
-    # LatLon to cubed sphere
-    boundary_space = CC.CommonSpaces.CubedSphereSpace(
-        Float32;
-        radius = 1.0,
-        n_quad_points = 2,
-        h_elem = 10,
-    )
-    field_cubedsphere = Interfacer.remap(field_latlon, boundary_space)
-    # fieldheatmap(field_cubedsphere) # using ClimaCoreMakie
-
-    # Cubed sphere to LatLon
-    long_oc = OC.λnodes(grid_latlon, OC.Center(), OC.Center(), OC.Center())
-    lat_oc = OC.φnodes(grid_latlon, OC.Center(), OC.Center(), OC.Center())
-    long_oc = reshape(long_oc, length(long_oc), 1)
-    lat_oc = reshape(lat_oc, 1, length(lat_oc))
-    target_points_oc = @. CC.Geometry.LatLongPoint(lat_oc, long_oc)
-
-    remapper_cubedsphere_to_latlon = CC.Remapping.Remapper(boundary_space, target_points_oc)
-    field_cubedsphere = CC.Fields.zeros(boundary_space)
-    CC.Remapping.interpolate!(
-        field_cubedsphere,
-        remapper_cubedsphere_to_latlon,
-        field_latlon,
-    )
-
-
-    # Previous remapper for LatLon
-    if pkgversion(CC) >= v"0.14.34"
-        remapper_cc = CC.Remapping.Remapper(axes(area_fraction), target_points_cc)
-    else
-        remapper_cc = CC.Remapping.Remapper(axes(area_fraction), target_points_cc, nothing)
-    end
-
-    # Construct two 2D Center/Center fields to use as scratch space while remapping
-    scratch_cc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-    scratch_cc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-
-    # Construct two scratch arrays to use while remapping
-    # We get the array type, float type, and dimensions from the remapper object to maintain consistency
-    ArrayType = ClimaComms.array_type(remapper_cc.space)
-    FT = CC.Spaces.undertype(remapper_cc.space)
-    interpolated_values_dim..., _buffer_length = size(remapper_cc._interpolated_values)
-    scratch_arr1 = ArrayType(zeros(FT, interpolated_values_dim...))
-    scratch_arr2 = ArrayType(zeros(FT, interpolated_values_dim...))
-
-    remapping = (; remapper_cc, scratch_cc1, scratch_cc2, scratch_arr1, scratch_arr2)
+    remapper_oc_to_cs, remapper_cs_to_oc = construct_remappers(grid, boundary_space)
 
     ocean_properties = (;
         ocean_reference_density = 1020,
@@ -300,8 +130,129 @@ function OceananigansSimulation(
     )
     ocean.output_writers[:diagnostics] = jld2_writer
 
-    sim = OceananigansSimulation(ocean, area_fraction, ocean_properties, remapping)
+    sim = OceananigansSimulation(
+        ocean,
+        area_fraction,
+        ocean_properties,
+        remapper_oc_to_cs,
+        remapper_cs_to_oc,
+    )
     return sim
+end
+
+"""
+    _construct_remappers(grid, boundary_space)
+
+Construct the remapper objects to go in both directions between the Oceananigans and Cubed sphere grids.
+Both objects contain a remapper object and relevant scratch space.
+
+- Oceananigans to ClimaCore
+In this direction we use XESMF bilinear interpolation.
+
+    Example: remap the Oceananigans field `T` to the ClimaCore field `T_cubedsphere`
+
+    # Convert the Oceananigans field to a flat vector
+    remapper_oc_to_cs.src_vec .= Array(vec(OC.interior(T, :, :, Nz))) # Oceananigans source vector
+
+    # Apply the XESMF regridder (matrix multiply)
+    remapper_oc_to_cs.remapper(remapper_oc_to_cs.dest_vec, remapper_oc_to_cs.src_vec)
+
+    # Convert the output vector to a 2D array and then to a ClimaCore field
+    remapper_oc_to_cs.dest_arr .= reshape(remapper_oc_to_cs.dest_vec, size(remapper_oc_to_cs.dest_arr)...)
+
+    # Copy the remapped data to the ClimaCore field
+    # Note: in general we avoid accessing the parent of a field, but here we make an exception
+    # since we're using the underlying array to remap.
+    parent(T_cubedsphere) .= remapper_oc_to_cs.dest_arr
+
+- ClimaCore to Oceananigans
+In this direction we use the ClimaCore remapper for this because it uses all the information
+we have about the spectral element cubed sphere grid, which XESMF does not support.
+
+    Example: remap the ClimaCore field `F_turb_ρτxz_cs` to the Oceananigans field `F_turb_ρτxz_oc`:
+
+    # Remap the ClimaCore momentum flux to a Oceananigans field using scratch arrays and fields
+    CC.Remapping.interpolate!(
+        remapper_cs_to_oc.scratch_arr1,
+        remapper_cs_to_oc.remapper,
+        F_turb_ρτxz_cs, # ClimaCore field
+    )
+    OC.set!(remapper_cs_to_oc.scratch_oc1, remapper_cs_to_oc.scratch_arr1) # zonal momentum flux
+    F_turb_ρτxz_oc = remapper_cs_to_oc.scratch_oc1 # Oceananigans field
+
+Arguments:
+- `grid`: The Oceananigans grid (TripolarGrid or LatitudeLongitudeGrid).
+- `boundary_space`: The boundary space (ClimaCore SpectralElementSpace2D).
+
+Returns:
+- `remapper_oc_to_cs`: The remapper object to go from the Oceananigans grid to the Cubed sphere nodes.
+"""
+function _construct_remappers(grid, boundary_space)
+    ## Remapper: Oceananigans `Center, Center` to Cubed sphere nodes
+    # Get the Oceananigans coordinates and put them on CPU
+    coords_oc = OceananigansXESMFExt.xesmf_coordinates(grid)
+    coords_oc = Dict(k => Array(v) for (k, v) in coords_oc)
+
+    # Get the latitude and longitude of each node on the boundary space
+    cubedsphere_coords = CC.Fields.coordinate_field(boundary_space)
+
+    # Get the cubed sphere latitude and longitude, each as an Nx1 Matrix
+    cubedsphere_lat = Array(reshape(vec(parent(cubedsphere_coords.lat)), :, 1))
+    cubedsphere_lon = Array(reshape(vec(parent(cubedsphere_coords.long)), :, 1))
+
+    coords_cubedsphere = Dict("lat" => cubedsphere_lat, "lon" => cubedsphere_lon)
+
+    # Construct the XESMF regridder object
+    regridder_oceananigans_to_cubedsphere =
+        XESMF.Regridder(coords_oc, coords_cubedsphere; method = "bilinear")
+
+    # Allocate space for source an destination vectors to use as intermediate storage
+    src_vec_oc = Array(vec(OC.Field{OC.Center, OC.Center, Nothing}(grid))) # 2D field on Center/Center
+    field_cubedsphere = CC.Fields.zeros(boundary_space) # 2D field on boundary space (cubed sphere)
+    dest_vec_cubedsphere = vec(parent(field_cubedsphere))
+    dest_arr_cubedsphere =
+        deepcopy(reshape(dest_vec_cubedsphere, size(parent(field_cubedsphere))...))
+
+    remapper_oc_to_cs = (;
+        remapper = regridder_oceananigans_to_cubedsphere,
+        src_vec = src_vec_oc,
+        dest_vec = dest_vec_cubedsphere,
+        dest_arr = dest_arr_cubedsphere,
+    )
+
+    ## Remapper: Cubed sphere nodes to Oceananigans grid `Center, Center`
+    long_oc = OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center())
+    lat_oc = OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center())
+    long_oc = reshape(long_oc, length(long_oc), 1)
+    lat_oc = reshape(lat_oc, 1, length(lat_oc))
+    target_points_oc = @. CC.Geometry.LatLongPoint(lat_oc, long_oc)
+
+    # Construct the ClimaCore remapper object
+    remapper_cubedsphere_to_oceananigans =
+        CC.Remapping.Remapper(boundary_space, target_points_oc)
+
+    # Construct two 2D Center/Center fields to use as scratch space while remapping
+    scratch_oc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    scratch_oc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+
+    # Construct two scratch arrays to use while remapping
+    # We get the array type, float type, and dimensions from the remapper object to maintain consistency
+    ArrayType = ClimaComms.array_type(remapper_cs_to_oc.space)
+    FT = CC.Spaces.undertype(remapper_cs_to_oc.space)
+    interpolated_values_dim..., _buffer_length =
+        size(remapper_cs_to_oc._interpolated_values)
+    scratch_arr1 = ArrayType(zeros(FT, interpolated_values_dim...))
+    scratch_arr2 = ArrayType(zeros(FT, interpolated_values_dim...))
+
+    remapper_cs_to_oc = (;
+        remapper = remapper_cubedsphere_to_oceananigans,
+        scratch_oc1,
+        scratch_oc2,
+        scratch_arr1,
+        scratch_arr2,
+    )
+
+    return remapper_oc_to_cs, remapper_cs_to_oc
 end
 
 """
@@ -456,17 +407,17 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
         sim.remapping.remapper_cc,
         F_turb_ρτxz,
     )
-    OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
+    OC.set!(sim.remapping.scratch_oc1, sim.remapping.scratch_arr1) # zonal momentum flux
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr2,
         sim.remapping.remapper_cc,
         F_turb_ρτyz,
     )
-    OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
+    OC.set!(sim.remapping.scratch_oc2, sim.remapping.scratch_arr2) # meridional momentum flux
 
     # Rename for clarity; these are now Center, Center Oceananigans fields
-    F_turb_ρτxz_cc = sim.remapping.scratch_cc1
-    F_turb_ρτyz_cc = sim.remapping.scratch_cc2
+    F_turb_ρτxz_cc = sim.remapping.scratch_oc1
+    F_turb_ρτyz_cc = sim.remapping.scratch_oc2
 
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
     oc_flux_u = surface_flux(sim.ocean.model.velocities.u)

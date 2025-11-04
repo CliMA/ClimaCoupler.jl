@@ -303,11 +303,20 @@ function update_field!(sim::AbstractSurfaceStub, ::Val{:surface_diffuse_albedo},
 end
 ```
 
-## Remapping functions
+## Remapping interface
 
 For component models that don't use ClimaCore Fields, some additional functions
 must be extended to enable remapping between the component model's grid
-and the boundary space of the coupled simulation.
+and the boundary space of the coupled simulation. These are described below.
+
+To regrid from a component model's grid to the boundary space, we can typically
+use ClimaCore's Remapping module. Users may want to create a remapping object
+containing both the ClimaCore.Remapping.Remapper object and scratch space to
+reduce allocations during the remapping.
+This has been done for the OceananigansSimulation in
+`experiments/ClimaEarth/components/ocean/oceananigans.jl`.
+This direction simply requires supplying a matrix of ClimaCore.Geometry.LatLongPoint
+objects containing latitude/longitude pairs at each point of the source grid.
 
 ### `remap(field, target_space, remapper)`
 

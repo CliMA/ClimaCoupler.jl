@@ -237,10 +237,10 @@ function _construct_remappers(grid, boundary_space)
 
     # Construct two scratch arrays to use while remapping
     # We get the array type, float type, and dimensions from the remapper object to maintain consistency
-    ArrayType = ClimaComms.array_type(remapper_cc_to_oc.space)
-    FT = CC.Spaces.undertype(remapper_cc_to_oc.space)
+    ArrayType = ClimaComms.array_type(boundary_space)
+    FT = CC.Spaces.undertype(boundary_space)
     interpolated_values_dim..., _buffer_length =
-        size(remapper_cc_to_oc._interpolated_values)
+        size(remapper_climacore_to_oceananigans._interpolated_values)
     scratch_arr1 = ArrayType(zeros(FT, interpolated_values_dim...))
     scratch_arr2 = ArrayType(zeros(FT, interpolated_values_dim...))
 

@@ -141,7 +141,7 @@ function OceananigansSimulation(
 end
 
 """
-    _construct_remappers(grid, boundary_space)
+    construct_remappers(grid, boundary_space)
 
 Construct the remapper objects to go in both directions between the Oceananigans and Cubed sphere grids.
 Both objects contain a remapper object and relevant scratch space.
@@ -187,7 +187,7 @@ Arguments:
 Returns:
 - `remapper_oc_to_cc`: The remapper object to go from the Oceananigans grid to the Cubed sphere nodes.
 """
-function _construct_remappers(grid, boundary_space)
+function construct_remappers(grid, boundary_space)
     ## Remapper: Oceananigans `Center, Center` to Cubed sphere nodes
     # Get the Oceananigans coordinates and put them on CPU
     coords_oc = OceananigansXESMFExt.xesmf_coordinates(grid)

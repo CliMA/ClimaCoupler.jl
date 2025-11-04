@@ -103,17 +103,20 @@ function surface_inputs(input_args::NamedTuple)
 
     # Compute state values
     result = @. SF.ValuesOnly(
-        SF.StateValues(z_int_fv, uₕ_int_fv, thermo_state_atmos_fv), # state_in
+        SF.StateValues(
+            z_int_fv, 
+            uₕ_int_fv, 
+            thermo_state_atmos_fv
+        ), # state_in
         SF.StateValues(                                  # state_sfc
             z_sfc_fv,
             StaticArrays.SVector(FT(0), FT(0)),
             thermo_state_sfc_fv,
         ),
         z0m_fv,
-        z0b_fv;
+        z0b_fv,
         gustiness=gustiness_fv,
         beta=beta_fv,
-        roughness_model=SF.ScalarRoughness()
     )
 
     # Put the result data layout back onto the surface space

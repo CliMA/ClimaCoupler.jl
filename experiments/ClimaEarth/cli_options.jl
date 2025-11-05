@@ -100,6 +100,10 @@ function argparse_settings()
         help = "Time in seconds rounded to the nearest index to use at `t_start` for restarted simulation [nothing (default)]"
         arg_type = Int
         default = nothing
+        "--restart_cache"
+        help = "Boolean flag indicating whether to read the cache from the restart file if available [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
         # Diagnostics information
         "--use_coupler_diagnostics"
         help = "Boolean flag indicating whether to compute and output coupler diagnostics [`true` (default), `false`]"

@@ -6,6 +6,11 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Add an option `restart_cache` PR[#1548](https://github.com/CliMA/ClimaCoupler.jl/pull/1548)
+Adds an option so that if restart files are available, we can choose to
+restart the state only (`restart_cache` false), or to restart both the state
+and the cache (`restart_cache` true). `restart_cache` is true by default.
+
 #### Remove `FluxCalculator.surface_inputs` helper function PR[#1543](https://github.com/CliMA/ClimaCoupler.jl/pull/1543)
 We can simplify the flux calculation by calling `SF.ValuesOnly` directly.
 Since we now remap all quantities onto the boundary space when we compute

@@ -2,7 +2,7 @@ import ClimaAnalysis
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 
 # Tuple of short names for loading simulation and observational data
-sim_obs_short_names_no_pr = [
+sim_obs_short_names_rad = [
     ("rsdt", "solar_mon"),
     ("rsut", "toa_sw_all_mon"),
     ("rlut", "toa_lw_all_mon"),
@@ -17,6 +17,8 @@ sim_obs_short_names_no_pr = [
     ("rldscs", "sfc_lw_down_clr_t_mon"),
 ]
 
+sim_obs_short_names_sf = [("hfss", "msshf"), ("hfls", "mslhf")]
+
 """
     get_compare_vars_biases_groups()
 
@@ -29,6 +31,7 @@ function get_compare_vars_biases_groups()
         ["pr", "rsdt", "rsut", "rlut"],
         ["rsds", "rsus", "rlds", "rlus"],
         ["rsutcs", "rlutcs", "rsdscs", "rsuscs", "rldscs"],
+        ["hfss", "hfls"],
     ]
     return compare_vars_biases_groups
 end
@@ -59,6 +62,8 @@ function get_compare_vars_biases_plot_extrema()
         "rsdscs" => (-10.0, 10.0),
         "rsuscs" => (-10.0, 10.0),
         "rldscs" => (-20.0, 20.0),
+        "hfss" => (-50.0, 50.0),
+        "hfls" => (-50.0, 50.0),
     )
     return compare_vars_biases_plot_extrema
 end
@@ -79,8 +84,9 @@ The variable should have only three dimensions: latitude, longitude, and time.
 """
 function get_sim_var_dict(diagnostics_folder_path)
     available_short_names = get_short_names_monthly_averages(diagnostics_folder_path)
-    sim_var_dict = Dict{String, Any}()
     # Dict for loading in simulation data
+    sim_var_dict = Dict{String, Any}()
+    # Add "pr" and the necessary preprocessing
     "pr" in available_short_names && (
         sim_var_dict["pr"] =
             () -> begin
@@ -100,8 +106,7 @@ function get_sim_var_dict(diagnostics_folder_path)
             end
     )
 
-    # Add "pr" and the necessary preprocessing
-    for (short_name, _) in sim_obs_short_names_no_pr
+    for (short_name, _) in vcat(sim_obs_short_names_rad, sim_obs_short_names_sf)
         short_name in available_short_names && (
             sim_var_dict[short_name] =
                 () -> begin
@@ -137,22 +142,44 @@ dates.
 The variable should have only three dimensions: latitude, longitude, and time.
 """
 function get_obs_var_dict()
-    # Add "pr" and the necessary preprocessing
-    obs_var_dict = Dict{String, Any}(
-        "pr" =>
+    obs_var_dict = Dict{String, Any}()
+    obs_var_dict["pr"] =
+        (start_date) -> begin
+            obs_var = ClimaAnalysis.OutputVar(
+                joinpath(@clima_artifact("precipitation_obs"), "precip.mon.mean.nc"),
+                "precip",
+                new_start_date = start_date,
+                shift_by = Dates.firstdayofmonth,
+            )
+            return obs_var
+        end
+
+    for (sim_name, obs_name) in sim_obs_short_names_sf
+        obs_var_dict[sim_name] =
             (start_date) -> begin
                 obs_var = ClimaAnalysis.OutputVar(
-                    joinpath(@clima_artifact("precipitation_obs"), "precip.mon.mean.nc"),
-                    "precip",
+                    joinpath(
+                        @clima_artifact(
+                            "era5_monthly_averages_surface_single_level_1979_2024"
+                        ),
+                        "era5_monthly_averages_surface_single_level_197901-202410.nc",
+                    ),
+                    obs_name,
                     new_start_date = start_date,
                     shift_by = Dates.firstdayofmonth,
                 )
+                (ClimaAnalysis.units(obs_var) == "W m**-2") && (
+                    obs_var = ClimaAnalysis.convert_units(
+                        obs_var,
+                        "W m^-2",
+                        conversion_function = units -> units * -1.0,
+                    )
+                )
                 return obs_var
-            end,
-    )
+            end
+    end
 
-    # Loop to load the rest of the observational data and the necessary preprocessing
-    for (sim_name, obs_name) in sim_obs_short_names_no_pr
+    for (sim_name, obs_name) in sim_obs_short_names_rad
         obs_var_dict[sim_name] =
             (start_date) -> begin
                 obs_var = ClimaAnalysis.OutputVar(

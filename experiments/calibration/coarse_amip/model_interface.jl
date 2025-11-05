@@ -1,4 +1,4 @@
-ENV["CLIMACOMMS_DEVICE"] = "CPU"
+ENV["CLIMACOMMS_DEVICE"] = "CUDA"
 import ClimaCoupler
 import ClimaCalibrate
 import CUDA
@@ -21,7 +21,11 @@ function ClimaCalibrate.forward_model(iter, member)
 
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)
-    config_dict["coupler_toml"] = [sampled_parameter_file]
+    if haskey(config_dict, "coupler_toml")
+        config_dict["coupler_toml"] = [config_dict["coupler_toml"]..., sampled_parameter_file]
+    else
+        config_dict["coupler_toml"] = [sampled_parameter_file]
+    end
     # Set member output directory
     member_output_dir = ClimaCalibrate.path_to_ensemble_member(output_dir_root, iter, member)
     config_dict["coupler_output_dir"] = member_output_dir
@@ -35,7 +39,7 @@ function ClimaCalibrate.forward_model(iter, member)
     catch e
         @error e
         println(catch_backtrace())
-        rethrow(e)
+        # rethrow(e)
     end
 
     @info "Completed member $member"

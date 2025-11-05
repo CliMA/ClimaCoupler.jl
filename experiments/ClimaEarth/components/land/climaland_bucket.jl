@@ -122,8 +122,6 @@ function BucketSimulation(
     else
         error("invalid albedo type $albedo_type")
     end
-    # Main.@infiltrate
-    @show typeof(albedo)
 
     # This is the timescale on which snow exponentially damps to zero, in the case where all
     # the snow would melt in time `τc`. It prevents us from having to specially time step in cases where
@@ -215,7 +213,6 @@ function BucketSimulation(
 
     # Set initial aux variable values
     set_initial_cache! = CL.make_set_initial_cache(model)
-    Main.@infiltrate
     set_initial_cache!(p, Y, tspan[1])
 
     exp_tendency! = CL.make_exp_tendency(model)

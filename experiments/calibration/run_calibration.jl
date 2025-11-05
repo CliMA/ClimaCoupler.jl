@@ -14,15 +14,15 @@ include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/coarse_amip/obse
 model_interface = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "coarse_amip", "model_interface.jl")
 
 years = 2018:2024
-sample_date_ranges = [(DateTime(yr, 9, 1), DateTime(yr, 9, 1)) for yr in years]
+sample_date_ranges = [(DateTime(yr, 10, 1), DateTime(yr, 10, 1)) for yr in years]
 const CALIBRATE_CONFIG = CalibrateConfig(;
 config_file = joinpath(pkgdir(ClimaCoupler), "config/subseasonal_configs/wxquest_diagedmf.yml"),
-    short_names = ["tas", "tas - ta"],
+    short_names = ["tas", "tas - ta", "hfls", "hfss", "rsns", "rlns"],
     minibatch_size = 1,
     n_iterations = 7,
     sample_date_ranges,
-    extend = Dates.Week(5),
-    spinup = Dates.Week(0),
+    extend = Dates.Month(1),
+    spinup = Dates.Month(1),
     output_dir = "/glade/derecho/scratch/nefrathe/tmp/output_quick",
     rng_seed = 42,
 )
@@ -30,10 +30,13 @@ config_file = joinpath(pkgdir(ClimaCoupler), "config/subseasonal_configs/wxquest
 if abspath(PROGRAM_FILE) == @__FILE__
 
     priors = [
+        PD.constrained_gaussian("bucket_soil_heat_capacity", 5e6, 2.5e6, 1e6, 10e6),
+        PD.constrained_gaussian("bucket_capacity_fraction", 2, 1.5, 0, 10),
+        PD.constrained_gaussian("bucket_beta_decay_exponent", 2, 1.5, 0, 10),
         PD.constrained_gaussian("mixing_length_diss_coeff", 0.25, 0.1, 0, 1),
-        PD.constrained_gaussian("EDMF_surface_area", 0.14, 0.05, 0, Inf),
-        PD.constrained_gaussian("mixing_length_eddy_viscosity_coefficient", 0.22, 0.1, 0, Inf),
-        PD.constrained_gaussian("mixing_length_tke_surf_flux_coeff", 7, 3, 0, Inf),
+        PD.constrained_gaussian("EDMF_surface_area", 0.14, 0.05, 0, 1),
+        PD.constrained_gaussian("mixing_length_eddy_viscosity_coefficient", 0.22, 0.1, 0, 1),
+        PD.constrained_gaussian("mixing_length_tke_surf_flux_coeff", 7, 3, 0, 20),
     ]
     prior = EKP.combine_distributions(priors)
 

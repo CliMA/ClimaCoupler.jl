@@ -49,8 +49,7 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spi
         obs_var = obs_var_dict[short_name](sim_var.attributes["start_date"])
 
         # Remove first spin_up_months from simulation
-        spinup_months = spinup
-        spinup_cutoff = spinup_months * 31 * 86400.0
+        spinup_cutoff = spinup * 31 * 86400.0
         ClimaAnalysis.times(sim_var)[end] >= spinup_cutoff &&
             (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff))
 
@@ -144,8 +143,13 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spi
                             ).data,
                         )
                     end
-                catch e
-                    @error "Error during leaderboard plots" exception = catch_backtrace()
+                    # Add "mean " for plotting the title
+                    sim_var.attributes["short_name"] = "mean $(ClimaAnalysis.short_name(sim_var))"
+                    ClimaAnalysis.Visualize.plot_bias_on_globe!(
+                        fig_all_seasons[row, col],
+                        sim_obs_comparsion_dict[short_name][season]...,
+                        cmap_extrema = cmap_extrema,
+                    )
                 end
             end
         end
@@ -159,7 +163,8 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spi
     end
 
     # Add RMSE for the CliMA model and for each season
-    rmse_var_dict = filter(((k, _),) -> k in keys(sim_var_dict), rmse_var_dict)
+    is_in_sim_vars(k) = k in keys(sim_var_dict)
+    rmse_var_dict = Dict(k => v for (k, v) in rmse_var_dict if is_in_sim_vars(k))
     rmse_var_names = keys(rmse_var_dict)
     for short_name in rmse_var_names
         for season in seasons
@@ -200,7 +205,7 @@ end
     compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path, spinup)
 
 Plot the biases and a leaderboard of various variables defined over longitude, latitude,
-time, and pressure levels.sou
+time, and pressure levels.
 
 The argument `leaderboard_base_path` is the path to save the leaderboards and bias plots,
 `diagnostics_folder_path` is the path to the simulation data, and `spinup` is the number

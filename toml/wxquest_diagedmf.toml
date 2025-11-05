@@ -7,28 +7,14 @@ value = 0
 [zd_viscous]
 value = 40000.0
 
-[mixing_length_tke_surf_flux_coeff]
-value = 0.3331950998157493
-type = "float"
-
 [max_area_limiter_scale]
 value = 0
 
-[mixing_length_diss_coeff]
-value = 0.04640288100600733
-type = "float"
 
 [entr_param_vec]
 value = [-45.97815905276861, -20.29437694493032, -22.269204417686513, 3.470895262420817, 0.8421581647335002, -0.8534958362066539]
 type = "float"
 
-[EDMF_surface_area]
-value = 0.06399178163606391
-type = "float"
-
-[mixing_length_eddy_viscosity_coefficient]
-value = 0.5892594727125273
-type = "float"
 
 [alpha_rayleigh_w]
 value = 10.0
@@ -59,4 +45,8 @@ type = "float"
 
 [mixing_length_Prandtl_maximum]
 value = 4.2
+type = "float"
+
+[land_bucket_capacity]
+value = 0.8
 type = "float"

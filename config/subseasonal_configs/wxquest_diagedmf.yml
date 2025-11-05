@@ -24,7 +24,7 @@ energy_check: false
 # h_elem: 32
 h_elem: 16
 mode_name: "amip"
-
+era5_initial_condition_dir: /glade/campaign/univ/ucit0011/cchristo/wxquest_ics/
 ### integrated land
 # land_model: "integrated"
 ### bucket land
@@ -33,10 +33,8 @@ bucket_albedo_type: "map_temporal"
 # bucket_albedo_type: "map_static"
 land_spun_up_ic: false
 land_temperature_anomaly: "nothing"
-use_land_diagnostics: true
 radiation_reset_rng_seed: true
 # use_land_diagnostics: true
-radiation_reset_rng_seed: true
 # start_date: "20250701"
 start_date: "20180901"
 surface_setup: "PrescribedSurface"
@@ -50,9 +48,9 @@ use_coupler_diagnostics: false
 use_land_diagnostics: true
 
 extra_atmos_diagnostics:
-  - short_name: [mslp, tas, pr, ta, pfull, hur, rsut, rsds, rsus, rsuscs, rsutcs, rlutcs, rlut, rlds, rlus, rlucs, ts, evspsbl, hfes]
-    period: 7days
-    reduction_time: average
-  - short_name: [mslp, tas, pr, ta, pfull, hur, rsut, rsds, rsus, rsuscs, rsutcs, rlutcs, rlut, rlds, rlus, rlucs, ts, evspsbl, hfes]
+  # - short_name: [mslp, tas, pr, ta, pfull, hur, rsut, rsds, rsus, rsuscs, rsutcs, rlutcs, rlut, rlds, rlus, rlucs, ts, evspsbl, hfes]
+  #   period: 7days
+  #   reduction_time: average
+  - short_name: [hfls, hfss, mslp, tas, pr, ta, pfull, hur, rsut, rsds, rsus, rsuscs, rsutcs, rlutcs, rlut, rlds, rlus, rlucs, ts, evspsbl, hfes]
     period: 1months
     reduction_time: average

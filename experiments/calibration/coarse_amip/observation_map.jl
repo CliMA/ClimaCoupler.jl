@@ -36,7 +36,7 @@ function ClimaCalibrate.observation_map(iteration)
         catch e
             @error "Ensemble member $m failed" exception =
             (e, catch_backtrace())
-            g_ens_builder.g_ens[:, m] .= NaN
+            EnsembleBuilder.fill_g_ens_col!(g_ens_builder, m, NaN)
         end
     end
     if count(isnan, g_ens_builder.g_ens) > 0.9 * length(g_ens_builder.g_ens)
@@ -71,6 +71,8 @@ end
 const period = "1M"
 
 function get_var(short_name, simdir)
+    latent_heat_vaporization_at_reference = 2500800  # J kg^-1
+
     # TODO: detect period from the sample date range
     if short_name == "tas - ta"
         tas = get(simdir; short_name = "tas")
@@ -78,10 +80,29 @@ function get_var(short_name, simdir)
         # pfull = get(simdir; short_name = "pfull")
         # ta_900 = ClimaAnalysis.Atmos.to_pressure_coordinates(ta, pfull; target_pressure=[900])
         ta_900 = slice(ta; z = 1000)
-        
         var = tas - ta_900
     elseif short_name == "tas"
         var = get(simdir; short_name = "tas")
+    elseif short_name == "rlns"
+        rlus = get(simdir; short_name = "rlus")
+        rlds = get(simdir; short_name = "rlds")
+        var = rlus - rlds
+    elseif short_name == "rsns"
+        rsus = get(simdir; short_name = "rsus")
+        rsds = get(simdir; short_name = "rsds")
+        var = rsus - rsds
+    elseif short_name == "hfls"
+        var = convert_units(get(simdir, "evspsbl"), "W m^-2"; conversion_function = x -> x * latent_heat_vaporization_at_reference)
+        var.attributes["long_name"] = "Latent Heat Flux at the surface, average within 1 month"
+    elseif short_name == "hfss"
+        lhf = convert_units(get(simdir, "evspsbl"), "W m^-2"; conversion_function = x -> x * latent_heat_vaporization_at_reference)
+        lhf.attributes["long_name"] = "Latent Heat Flux at the surface, average within 1 month"
+        var = get(simdir, "hfes") - lhf
+        var.attributes["long_name"] = "Sensible Heat Flux at the surface, average within 1 month"
+    else
+    
+        # TODO: support multiple periods/reductions of same variable
+        var = get(simdir; short_name)
     end
 
     var.attributes["short_name"] = short_name
@@ -100,17 +121,19 @@ computed from daily means. The daily means are computing starting from
 This function assumes that the data is monthly.
 """
 function preprocess_var(var, sample_date_range)
+    @show short_name(var)
     @assert short_name(var) in CALIBRATE_CONFIG.short_names
     var = if period == "1M"
        shift_to_start_of_previous_month(var)
     elseif period == "1W"
        shift_to_previous_week(var)
     end
-    if short_name(var) == "sw_cre"
+    if short_name(var) in ("sw_cre","hfss", "hfls", "rlns", "rsns")
         var = set_units(var, "W m^-2")
     elseif short_name(var) in ("tas", "tas - ta", "ta")
         var = set_units(var, "K")
     end
+    @show units(var)
 
     var = window(var, "time"; left = sample_date_range[1], right = sample_date_range[2])
     return var
@@ -132,10 +155,10 @@ function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, it
 
     simdir = SimDir(ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, 1))
     plot_bias(simdir, iteration; output_dir = plot_output_path)
-    plot_variables(simdir; output_dir = plot_output_path)
-    plot_pointwise_spread_per_variable(ekp, iteration)
+    # plot_variables(simdir; output_dir = plot_output_path)
+    # plot_pointwise_spread_per_variable(ekp, iteration)
     try 
-        plot_surface_fluxes(simdir; output_dir = plot_output_path)
+        plot_surface_fluxes_bias(simdir; output_dir = plot_output_path)
     catch e
         @error e
     end
@@ -331,8 +354,8 @@ function preprocess_era5(var_name)
     short_name_map = Dict(
         "avg_slhtf" => "lhf",
         "avg_ishf" => "shf",
-        "avg_snswrf" => "rsds - rsus",
-        "avg_snlwrf" => "rlds - rlus",
+        "avg_snswrf" => "rsns",
+        "avg_snlwrf" => "rlns",
     )
     var = OutputVar("era5_monthly_mean_surface_fluxes.nc", var_name)
     reverse_dim!(var, latitude_name(var))
@@ -360,9 +383,6 @@ function plot_surface_fluxes_bias(simdir; output_dir = joinpath(simdir.simulatio
         "rsds - rsus" => (-50, 50),
         "rlds - rlus" => (-50, 50)
     )
-
-    
-
     latent_heat_vaporization_at_reference = 2500800  # J kg^-1
     # LHF units: W m^-2 = ( J  kg^-1 ) * ( kg m^-2 s^-1 )
     lhf = convert_units(get(simdir, "evspsbl"), "W m^-2"; conversion_function = x -> x * latent_heat_vaporization_at_reference)

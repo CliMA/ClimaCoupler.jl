@@ -148,6 +148,7 @@ Both objects contain a remapper object and relevant scratch space.
 
 - Oceananigans to ClimaCore
 In this direction we use XESMF bilinear interpolation.
+Note that we assume the Oceananigans Field is on Center, Center, Center.
 
     Example: remap the Oceananigans field `T` to the ClimaCore field `T_climacore`
 
@@ -190,7 +191,8 @@ Returns:
 function construct_remappers(grid, boundary_space)
     ## Remapper: Oceananigans `Center, Center` to Cubed sphere nodes
     # Get the Oceananigans coordinates and put them on CPU
-    coords_oc = OceananigansXESMFExt.xesmf_coordinates(grid)
+    coords_oc =
+        OceananigansXESMFExt.xesmf_coordinates(grid, OC.Center(), OC.Center(), OC.Center())
     coords_oc = Dict(k => Array(v) for (k, v) in coords_oc)
 
     # Get the latitude and longitude of each node on the boundary space

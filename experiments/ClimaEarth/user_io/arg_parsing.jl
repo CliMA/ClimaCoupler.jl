@@ -69,8 +69,6 @@ function get_coupler_config_dict(config_file)
     # Select the correct timestep for each component model based on which are available
     parse_component_dts!(config_dict)
 
-    # Add any extra diagnostics
-    add_extra_diagnostics!(config_dict)
     return config_dict
 end
 
@@ -300,47 +298,5 @@ function parse_component_dts!(config_dict)
         end
     end
     config_dict["component_dt_dict"] = component_dt_dict
-    return nothing
-end
-
-"""
-    add_extra_diagnostics!(config_dict)
-
-Conditionally add extra diagnostics to the config dictionary based on the
-simulation type and flag to use diagnostics. Currently, the only extra
-diagnostic is the atmosphere TOA net flux for AMIP simulations, but more diagnostics
-can be added for any component by following the structure in `climaatmos_extra_diags.jl`.
-
-The added atmosphere diagnostics are added to the `extra_atmos_diagnostics` field
-of the config dict. The `diagnostics_dt` field is also added to the config dict to
-coordinate the output frequency of the diagnostics.
-
-# Arguments
-- `config_dict`: A dictionary mapping configuration keys to the specified settings
-"""
-function add_extra_diagnostics!(config_dict)
-    # Diagnostics information
-    mode_name = config_dict["mode_name"]
-    use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
-    t_end = Float64(Utilities.time_to_seconds(config_dict["t_end"]))
-    t_start = Float64(Utilities.time_to_seconds(config_dict["t_start"]))
-    diagnostics_dt = nothing
-    if mode_name == "amip" && use_coupler_diagnostics
-        @info "Using default AMIP diagnostics"
-        (period, diagnostics_dt) = get_diag_period(t_start, t_end)
-
-        # Additional atmosphere diagnostics
-        !haskey(config_dict, "extra_atmos_diagnostics") &&
-            (config_dict["extra_atmos_diagnostics"] = Vector{Dict{Any, Any}}())
-        push!(
-            config_dict["extra_atmos_diagnostics"],
-            Dict(
-                "short_name" => ["toa_fluxes_net"],
-                "reduction_time" => "average",
-                "period" => period,
-            ),
-        )
-    end
-    config_dict["diagnostics_dt"] = diagnostics_dt
     return nothing
 end

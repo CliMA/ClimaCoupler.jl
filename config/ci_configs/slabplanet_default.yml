@@ -10,6 +10,3 @@ precip_model: "0M"
 rad: "gray"
 t_end: "1days"
 vert_diff: "true"
-extra_atmos_diagnostics:
- - short_name: [mse, lr, edt, evu, hfes, evspsbl, ts]
-   period: 1days

@@ -17,6 +17,9 @@ end
 @safetestset "component model test: slab ocean" begin
     include("component_model_tests/slab_ocean_tests.jl")
 end
+@safetestset "surface radiative flux consistency tests" begin
+    include("fluxes_test.jl")
+end
 @safetestset "debug diagnostics: debug plots" begin
     include("debug_plots_tests.jl")
 end

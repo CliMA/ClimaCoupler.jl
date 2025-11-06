@@ -35,6 +35,41 @@ struct ClimaSeaIceSimulation{SIM, A, MS, REMAP, NT} <: Interfacer.SeaIceModelSim
     ocean_ice_fluxes::NT
 end
 
+@inline function CSI.SeaIceThermodynamics.HeatBoundaryConditions.top_surface_temperature(
+    i,
+    j,
+    grid,
+    top_heat_bc::CSI.SeaIceThermodynamics.HeatBoundaryConditions.MeltingConstrainedFluxBalance{
+        <:CSI.SeaIceThermodynamics.HeatBoundaryConditions.LinearizedSurfaceTemperatureSolver,
+    },
+    current_top_surface_temperature,
+    internal_fluxes,
+    external_fluxes,
+    clock,
+    model_fields,
+)
+    # Compute the bottom temperature
+    bc_bottom = internal_fluxes.parameters.bottom_heat_boundary_condition
+    liquidus = internal_fluxes.parameters.liquidus
+    Tb = CSI.SeaIceThermodynamics.HeatBoundaryConditions.bottom_temperature(
+        i,
+        j,
+        grid,
+        bc_bottom,
+        liquidus,
+    )
+
+    # Compute the top surface temperature
+    Qe = CSI.SeaIceThermodynamics.HeatBoundaryConditions.getflux(external_fluxes, i, j, grid, current_top_surface_temperature, clock, model_fields)
+    K = internal_fluxes.parameters.flux.conductivity
+    h = model_fields.h[i, j, 1]
+    Tu = Tb - Qe * h / K
+
+    # Limit Tu to be greater than -100C to try to improve stability
+    Tu = ifelse(Tu < -50.0, -50.0, Tu)
+    return Tu
+end
+
 """
     ClimaSeaIceSimulation()
 
@@ -58,7 +93,11 @@ function ClimaSeaIceSimulation(ocean; output_dir, start_date = nothing)
     grid = ocean.ocean.model.grid
     arch = OC.Architectures.architecture(grid)
     advection = ocean.ocean.model.advection.T
-    top_heat_boundary_condition = CSI.MeltingConstrainedFluxBalance()
+    top_heat_boundary_condition =
+        CSI.SeaIceThermodynamics.HeatBoundaryConditions.MeltingConstrainedFluxBalance(
+            CSI.SeaIceThermodynamics.HeatBoundaryConditions.LinearizedSurfaceTemperatureSolver(),
+        )
+    # top_heat_boundary_condition = CSI.SeaIceThermodynamics.HeatBoundaryConditions.LinearizedSurfaceTemperatureSolver()
 
     ice = CO.sea_ice_simulation(grid, ocean.ocean; advection, top_heat_boundary_condition)
 
@@ -126,6 +165,9 @@ function ClimaSeaIceSimulation(ocean; output_dir, start_date = nothing)
         remapping,
         ocean_ice_fluxes,
     )
+
+    # Ensure ocean temperature is above freezing where there is sea ice
+    CO.OceanSeaIceModels.above_freezing_ocean_temperature!(ocean.ocean, ice)
     return sim
 end
 

@@ -63,10 +63,10 @@ end
     Qe = CSI.SeaIceThermodynamics.HeatBoundaryConditions.getflux(external_fluxes, i, j, grid, current_top_surface_temperature, clock, model_fields)
     K = internal_fluxes.parameters.flux.conductivity
     h = model_fields.h[i, j, 1]
-    Tu = Tb - Qe * h / K
 
-    # Limit Tu to be greater than -100C to try to improve stability
-    Tu = ifelse(Tu < -50.0, -50.0, Tu)
+    # Limit ice thickness to be less than 1 meter to try to improve stability
+    h = ifelse(h > 1, 1, h)
+    Tu = Tb - Qe * h / K
     return Tu
 end
 

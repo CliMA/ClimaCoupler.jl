@@ -359,13 +359,6 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
-      - label: "CPU CMIP: ClimaAtmos + bucket land + Oceananigans + ClimaSeaIce"
-        key: "cmip_oceananigans_climaseaice"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice.yml --job_id cmip_oceananigans_climaseaice"
-        artifact_paths: "experiments/ClimaEarth/output/cmip_oceananigans_climaseaice/artifacts/*"
-        agents:
-          slurm_mem: 20GB
-
       - label: "GPU CMIP: ClimaAtmos + bucket land + Oceananigans + ClimaSeaIce"
         key: "gpu_cmip_oceananigans_climaseaice"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice.yml --job_id gpu_cmip_oceananigans_climaseaice"

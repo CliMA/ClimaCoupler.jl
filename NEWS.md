@@ -6,6 +6,11 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Remove `FluxCalculator.surface_inputs` helper function PR[#1543](https://github.com/CliMA/ClimaCoupler.jl/pull/1543)
+We can simplify the flux calculation by calling `SF.ValuesOnly` directly.
+Since we now remap all quantities onto the boundary space when we compute
+fluxes, there's no need to access the underlying data layouts of ClimaCore Fields.
+
 #### Provide `SW_d`, `LW_d` to surface models instead of `F_radiative` PR[#1518](https://github.com/CliMA/ClimaCoupler.jl/pull/1518)
 This allows us to correctly compute radiative flux over surface models by
 computing each contribution individually (`SW_u, SW_d, LW_u, LW_d`).

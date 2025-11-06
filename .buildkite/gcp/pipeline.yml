@@ -70,4 +70,4 @@ steps:
           slurm_cpus_per_task: 4
           slurm_ntasks: 8
           slurm_mem: 0GB
-          slurm_time: "144:00:00"
+          slurm_time: "336:00:00"

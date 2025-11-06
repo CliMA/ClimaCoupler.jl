@@ -176,13 +176,16 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
 end
 
 """
-    restart!(cs::CoupledSimulation, checkpoint_dir, checkpoint_t)
+    restart!(cs::CoupledSimulation, checkpoint_dir, checkpoint_t, restart_cache)
 
 Overwrite the content of `cs` with checkpoints in `checkpoint_dir` at time `checkpoint_t`.
 
+If `restart_cache` is true, the cache will be read from the restart file using `restore_cache!`.
+Otherwise, the cache will be left unchanged.
+
 Return a true if the simulation was restarted.
 """
-function restart!(cs, checkpoint_dir, checkpoint_t)
+function restart!(cs, checkpoint_dir, checkpoint_t, restart_cache)
     @info "Restarting from time $(checkpoint_t) and directory $(checkpoint_dir)"
     pid = ClimaComms.mypid(ClimaComms.context(cs))
     for sim in cs.model_sims
@@ -194,7 +197,7 @@ function restart!(cs, checkpoint_dir, checkpoint_t)
                 )
             restart_model_state!(sim, input_file_state, ClimaComms.context(cs))
         end
-        if !isnothing(Checkpointer.get_model_cache(sim))
+        if !isnothing(Checkpointer.get_model_cache(sim)) && restart_cache
             input_file_cache = joinpath(
                 checkpoint_dir,
                 "checkpoint_cache_$(pid)_$(nameof(sim))_$(checkpoint_t).jld2",

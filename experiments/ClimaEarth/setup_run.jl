@@ -127,6 +127,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         detect_restart_files,
         restart_dir,
         restart_t,
+        restart_cache,
         use_land_diagnostics,
         diagnostics_dt,
         evolving_ocean,
@@ -524,12 +525,19 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     #=
     ## Restart component model states if specified
-    If a restart directory is specified and contains output files from the `checkpoint_cb` callback, the component model states are restarted from those files. The restart directory
-    is specified in the `config_dict` dictionary. The `restart_t` field specifies the time step at which the restart is performed.
-    =#
-    should_restart && Checkpointer.restart!(cs, restart_dir, restart_t)
+    If a restart directory is specified and contains output files from the `checkpoint_cb` callback,
+    the component model states are restarted from those files. The restart directory is specified in
+    the `config_dict` dictionary. The `restart_t` field specifies the time step at which the restart
+    is performed.
 
-    if !should_restart
+    If `restart_cache` is true, the caches will be read from the restart file using `restore_cache!`.
+    Otherwise, the caches will be initialized in each component model's constructor.
+    When the caches are not read from the restart file, we have to perform the initial component
+    model exchange so that `set_caches!` can be called to initialize the caches.
+    =#
+    should_restart && Checkpointer.restart!(cs, restart_dir, restart_t, restart_cache)
+
+    if !should_restart || !restart_cache
         #=
         ## Initialize Component Model Exchange
 

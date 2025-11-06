@@ -12,8 +12,6 @@ import Thermodynamics as TD
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaUtilities.TimeManager: ITime
 
-include("climaatmos_extra_diags.jl")
-
 if pkgversion(CA) < v"0.28.6"
     # Allow cache to be moved to CPU (this is a little bit of type piracy, but we
     # allow it in this particular file)

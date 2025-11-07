@@ -18,14 +18,15 @@ Ice concentration is prescribed, and we solve the following energy equation:
     (h * ρ * c) d T_bulk dt = (-F_turb_energy + (1 - α) * SW_d + LW_d - LW_u) + F_conductive
 
     with
-    F_conductive = k_ice (T_base - T_bulk) / (h)
+    F_conductive = k_ice (T_base - T_sfc) / (h)
 
     The bulk temperature (`T_bulk`) is the prognostic variable which is being
     modified by turbulent aerodynamic (`F_turb_energy`) and radiative (`F_turb_energy`) fluxes,
     as well as a conductive flux that depends on the temperature difference
     across the ice layer (with `T_base` being prescribed).
 
-In the current version, the sea ice has a prescribed thickness.
+In the current version, the sea ice has a prescribed thickness. T_sfc is extrapolated from T_base
+and T_bulk assuming the ice temperature varies linearly between the ice surface and the base.
 """
 struct PrescribedIceSimulation{P, I} <: Interfacer.SeaIceModelSimulation
     params::P
@@ -330,7 +331,7 @@ function ice_rhs!(dY, Y, p, t)
     @. p.area_fraction = max(min(p.area_fraction, FT(1) - p.land_fraction), FT(0))
 
     # Calculate the conductive flux, and set it to zero if the area fraction is zero
-    F_conductive = @. k_ice / (h) * (T_base - Y.T_bulk) # fluxes are defined to be positive when upward
+    F_conductive = @. k_ice / (h) * (T_base - ice_surface_temperature(Y.T_bulk, T_base)) # fluxes are defined to be positive when upward
     rhs = @. (
         -p.F_turb_energy +
         (1 - α) * p.SW_d +

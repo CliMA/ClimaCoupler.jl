@@ -169,7 +169,11 @@ function get_coupler_args(config_dict::Dict)
     bucket_albedo_type = config_dict["bucket_albedo_type"]
     bucket_initial_condition = config_dict["bucket_initial_condition"]
 
+    # Initial condition setting
     era5_initial_condition_dir = config_dict["era5_initial_condition_dir"]
+
+    # Ice model-specific information
+    ice_model = config_dict["ice_model"]
 
     return (;
         job_id,
@@ -203,6 +207,7 @@ function get_coupler_args(config_dict::Dict)
         bucket_initial_condition,
         parameter_files,
         era5_initial_condition_dir,
+        ice_model,
     )
 end
 

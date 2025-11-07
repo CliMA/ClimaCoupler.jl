@@ -119,12 +119,8 @@ function PrescribedIceSimulation(
     )
 
     # Get initial SIC values and use them to calculate ice fraction
-    SIC_init = CC.Fields.zeros(space)
-    evaluate!(SIC_init, SIC_timevaryinginput, tspan[1])
-
-    # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
-    #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-    ice_fraction = @. max(min(SIC_init, FT(1) - land_fraction), FT(0))
+    ice_fraction = zeros(space)
+    evaluate!(ice_fraction, SIC_timevaryinginput, tspan[1])
     ice_fraction = ifelse.(ice_fraction .> FT(0.5), FT(1), FT(0))
 
     params = IceSlabParameters{FT}()

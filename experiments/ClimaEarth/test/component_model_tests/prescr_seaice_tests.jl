@@ -142,7 +142,7 @@ for FT in (Float32, Float64)
         T_bulk = minimum(Y.T_bulk) # get the non-zero temperature value
         (; k_ice, h, ρ, c, T_base, ϵ) = p.params
         dT_expected =
-            (k_ice / (h * h * ρ * c)) * (T_base - T_bulk) -
+            (k_ice / (h * h * ρ * c)) * (T_base - ice_surface_temperature(T_bulk, T_base)) -
             (ϵ * σ * ice_surface_temperature(T_bulk, T_base)^4) / (h * ρ * c)
         @test minimum(dY) ≈ FT(dT_expected)
         @test maximum(dY) ≈ FT(0)

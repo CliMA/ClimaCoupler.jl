@@ -86,13 +86,19 @@ function ClimaLandSimulation(
     atmos_h,
     land_temperature_anomaly::String = "amip",
     use_land_diagnostics::Bool = true,
-    parameter_files = [],
+    coupled_param_dict = CP.create_toml_dict(FT),
     land_ic_path::Union{Nothing, String} = nothing,
 ) where {FT, TT <: Union{Float64, ITime}}
+    # Get default land parameters from ClimaLand.LandParameters
+    land_toml_dict = LP.create_toml_dict(FT)
+    # Override land parameters with coupled parameters
+    toml_dict = CP.merge_override_default_values(coupled_param_dict, land_toml_dict)
+    earth_param_set = CL.Parameters.LandParameters(toml_dict)
+
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
     if isnothing(shared_surface_space)
-        domain = make_land_domain(depth; nelements, dz_tuple)
+        domain = make_land_domain(depth, toml_dict; nelements, dz_tuple)
     else
         domain = make_land_domain(
             shared_surface_space,
@@ -113,10 +119,6 @@ function ClimaLandSimulation(
     # Interpolate atmosphere height field to surface space of land model,
     #  since that's where we compute fluxes for this land model
     atmos_h = Interfacer.remap(atmos_h, surface_space)
-
-    # Set up spatially-varying parameters
-    toml_dict = LP.create_toml_dict(FT; override_files = parameter_files)
-    earth_param_set = CL.Parameters.LandParameters(toml_dict)
 
     # Set up atmosphere and radiation forcing
     forcing = (;

@@ -46,7 +46,7 @@ for FT in (Float32, Float64)
     @testset "integral" begin
         space2d = CC.CommonSpaces.CubedSphereSpace(
             FT;
-            radius = FT(6371e3),
+            radius = FT(6.371e6), # in meters
             n_quad_points = 4,
             h_elem = 4,
         )
@@ -57,7 +57,7 @@ for FT in (Float32, Float64)
             z_elem = 10,
             z_min = 0,
             z_max = 1,
-            radius = FT(6371e3),
+            radius = FT(6.371e6), # in meters
             h_elem = 10,
             n_quad_points = 4,
             staggering = CC.CommonSpaces.CellCenter(),

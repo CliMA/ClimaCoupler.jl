@@ -37,7 +37,7 @@ for FT in (Float32, Float64)
     @testset "test CoupledSim construction, float_type for FT=$FT" begin
         boundary_space_ = CC.CommonSpaces.CubedSphereSpace(
             FT;
-            radius = FT(6371e3),
+            radius = FT(6.371e6), # in meters
             n_quad_points = 4,
             h_elem = 4,
             context,
@@ -65,7 +65,7 @@ for FT in (Float32, Float64)
     @testset "get_field indexing for FT=$FT" begin
         space = CC.CommonSpaces.CubedSphereSpace(
             FT;
-            radius = FT(6371e3),
+            radius = FT(6.371e6), # in meters
             n_quad_points = 4,
             h_elem = 4,
             context,
@@ -107,7 +107,7 @@ for FT in (Float32, Float64)
     @testset "update_field! the SurfaceStub area_fraction for FT=$FT" begin
         boundary_space = CC.CommonSpaces.CubedSphereSpace(
             FT;
-            radius = FT(6371e3),
+            radius = FT(6.371e6), # in meters
             n_quad_points = 4,
             h_elem = 4,
             context,
@@ -155,7 +155,7 @@ end
     FT = Float32
     space = CC.CommonSpaces.CubedSphereSpace(
         FT;
-        radius = FT(6371e3),
+        radius = FT(6.371e6), # in meters
         n_quad_points = 4,
         h_elem = 4,
         context,
@@ -172,7 +172,7 @@ end
     FT = Float32
     space = CC.CommonSpaces.CubedSphereSpace(
         FT;
-        radius = FT(6371e3),
+        radius = FT(6.371e6), # in meters
         n_quad_points = 4,
         h_elem = 4,
         context,
@@ -200,7 +200,7 @@ end
     FT = Float32
     space = CC.CommonSpaces.CubedSphereSpace(
         FT;
-        radius = FT(6371e3),
+        radius = FT(6.371e6), # in meters
         n_quad_points = 4,
         h_elem = 4,
         context,
@@ -231,7 +231,7 @@ end
     FT = Float32
     space = CC.CommonSpaces.CubedSphereSpace(
         FT;
-        radius = FT(6371e3),
+        radius = FT(6.371e6), # in meters
         n_quad_points = 4,
         h_elem = 4,
         context,
@@ -265,7 +265,7 @@ end
     FT = Float32
     space = CC.CommonSpaces.CubedSphereSpace(
         FT;
-        radius = FT(6371e3),
+        radius = FT(6.371e6), # in meters
         n_quad_points = 4,
         h_elem = 4,
         context,
@@ -306,7 +306,7 @@ end
     FT = Float32
     source_space = CC.CommonSpaces.CubedSphereSpace(
         FT;
-        radius = FT(6371e3),
+        radius = FT(6.371e6), # in meters
         n_quad_points = 4,
         h_elem = 4,
         context,
@@ -316,7 +316,7 @@ end
     # Remap field to target space
     target_space = CC.CommonSpaces.CubedSphereSpace(
         FT;
-        radius = FT(6371e3),
+        radius = FT(6.371e6), # in meters
         n_quad_points = 4,
         h_elem = 6,
         context,

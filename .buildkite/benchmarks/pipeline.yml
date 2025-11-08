@@ -4,7 +4,6 @@ agents:
   modules: climacommon/2025_05_15
 
 env:
-  JULIA_NVTX_CALLBACKS: gc
   OPENBLAS_NUM_THREADS: 1
   OMPI_MCA_opal_warn_on_missing_libcuda: 0
   SLURM_KILL_BAD_EXIT: 1

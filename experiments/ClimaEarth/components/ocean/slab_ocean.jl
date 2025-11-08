@@ -105,9 +105,19 @@ function slab_ocean_space_init(space, params)
 end
 
 """
-    SlabOceanSimulation(::Type{FT}; tspan, dt, saveat, space, area_fraction, stepper = CTS.RK4()) where {FT}
+    SlabOceanSimulation(::Type{FT};
+        tspan,
+        dt,
+        saveat,
+        space,
+        coupled_param_dict,
+        thermo_params,
+        stepper = CTS.RK4(),
+        evolving = true,
+    ) where {FT}
 
-Initializes the `DiffEq` problem, and creates a Simulation-type object containing the necessary information for `step!` in the coupling loop.
+Initializes the `DiffEq` problem, and creates a Simulation-type object containing the
+necessary information for `step!` in the coupling loop.
 """
 function SlabOceanSimulation(
     ::Type{FT};
@@ -115,7 +125,6 @@ function SlabOceanSimulation(
     dt,
     saveat,
     space,
-    area_fraction,
     coupled_param_dict,
     thermo_params,
     stepper = CTS.RK4(),
@@ -131,7 +140,7 @@ function SlabOceanSimulation(
         F_turb_energy = CC.Fields.zeros(space),
         SW_d = CC.Fields.zeros(space),
         LW_d = CC.Fields.zeros(space),
-        area_fraction = area_fraction,
+        area_fraction = ones(space),
         thermo_params = thermo_params,
         α_direct = CC.Fields.ones(space) .* params.α,
         α_diffuse = CC.Fields.ones(space) .* params.α,

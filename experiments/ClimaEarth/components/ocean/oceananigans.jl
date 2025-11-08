@@ -42,7 +42,7 @@ Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
 """
 function OceananigansSimulation(
-    area_fraction,
+    boundary_space,
     start_date,
     stop_date;
     output_dir,
@@ -140,7 +140,7 @@ function OceananigansSimulation(
     lat_cc = reshape(lat_cc, 1, length(lat_cc))
     target_points_cc = @. CC.Geometry.LatLongPoint(lat_cc, long_cc)
     # TODO: We can remove the `nothing` after CC > 0.14.33
-    remapper_cc = CC.Remapping.Remapper(axes(area_fraction), target_points_cc, nothing)
+    remapper_cc = CC.Remapping.Remapper(boundary_space, target_points_cc, nothing)
 
     # Construct two 2D Center/Center fields to use as scratch space while remapping
     scratch_cc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid)
@@ -181,12 +181,15 @@ function OceananigansSimulation(
         ocean.output_writers[:diagnostics] = netcdf_writer
     end
 
+    # Create a dummy area fraction that will get overwritten in `update_surface_fractions!`
+    area_fraction = ones(boundary_space)
+
     sim = OceananigansSimulation(ocean, area_fraction, ocean_properties, remapping)
     return sim
 end
 
 """
-    FieldExchanger.resolve_ocean_ice_fractions!(ocean_sim, ice_sim, land_fraction)
+    FieldExchanger.resolve_area_fractions!(ocean_sim, ice_sim, land_fraction)
 
 Ensure the ocean and ice area fractions are consistent with each other.
 This matters in the case of a LatitudeLongitudeGrid, which is only
@@ -194,7 +197,7 @@ defined between -80 and 80 degrees latitude. In this case, we want to
 set the ice fraction to `1 - land_fraction` on [-90, -80] and [80, 90]
 degrees latitude, and make sure the ocean fraction is 0 there.
 """
-function FieldExchanger.resolve_ocean_ice_fractions!(
+function FieldExchanger.resolve_area_fractions!(
     ocean_sim::OceananigansSimulation,
     ice_sim,
     land_fraction,
@@ -210,8 +213,9 @@ function FieldExchanger.resolve_ocean_ice_fractions!(
         polar_mask = CC.Fields.zeros(boundary_space)
         polar_mask .= abs.(lat) .>= FT(80)
 
-        # Set ice fraction to 1 - land_fraction and ocean fraction to 0 where polar_mask is 1
-        @. ice_fraction = ifelse.(polar_mask == FT(1), FT(1) - land_fraction, ice_fraction)
+        # Set land fraction to 1, and ice and ocean fractions to 0 where polar_mask is 1
+        @. land_fraction = ifelse.(polar_mask == FT(1), FT(1), land_fraction)
+        @. ice_fraction = ifelse.(polar_mask == FT(1), FT(0), ice_fraction)
         @. ocean_fraction = ifelse.(polar_mask == FT(1), FT(0), ocean_fraction)
     end
     return nothing

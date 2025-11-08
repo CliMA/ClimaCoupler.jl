@@ -35,7 +35,6 @@ end
         space,
         start_date,
         t_start,
-        area_fraction,
         coupled_param_dict,
         thermo_params,
         comms_ctx,

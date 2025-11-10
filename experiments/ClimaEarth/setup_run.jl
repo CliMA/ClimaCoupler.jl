@@ -553,7 +553,6 @@ function CoupledSimulation(config_dict::AbstractDict)
 
         # 3. Update any fields in the model caches that can only be filled after the initial exchange.
         FieldExchanger.set_caches!(cs)
-
         # 4. Calculate and update turbulent fluxes for each surface model,
         #  and save the weighted average in coupler fields
         FluxCalculator.turbulent_fluxes!(cs)

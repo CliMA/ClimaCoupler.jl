@@ -114,6 +114,8 @@ function import_atmos_fields!(csf, model_sims)
     Interfacer.get_field!(csf.T_atmos, model_sims.atmos_sim, Val(:air_temperature))
     Interfacer.get_field!(csf.q_atmos, model_sims.atmos_sim, Val(:specific_humidity))
     Interfacer.get_field!(csf.ρ_atmos, model_sims.atmos_sim, Val(:air_density))
+    Interfacer.get_field!(csf.u_int, model_sims.atmos_sim, Val(:u_int))
+    Interfacer.get_field!(csf.v_int, model_sims.atmos_sim, Val(:v_int))
 
     # radiative fluxes
     Interfacer.get_field!(csf.SW_d, model_sims.atmos_sim, Val(:SW_d))
@@ -268,7 +270,7 @@ function update_model_sims!(model_sims, csf)
 end
 
 """
-    step_model_sims!(model_sims, t)
+    step_model_sims!(model_sims, t, coupler_fields, thermo_params)
     step_model_sims!(cs::CoupledSimulation)
 
 Iterates `step!` over all component model simulations saved in `cs.model_sims`.
@@ -277,15 +279,33 @@ Iterates `step!` over all component model simulations saved in `cs.model_sims`.
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
 - `t`: [AbstractFloat or ITime] denoting the simulation time.
 """
-function step_model_sims!(model_sims, t)
+function step_model_sims!(model_sims, t, coupler_fields, thermo_params)
+    # Step all surface models (the ordering doesn't matter here)
     for sim in model_sims
-        Interfacer.step!(sim, t)
+        sim isa Interfacer.SurfaceModelSimulation && Interfacer.step!(sim, t)
+
+        # For an implicit flux simulation, `compute_surface_fluxes!` reads in the precomputed
+        # fluxes, and puts them into the coupler fields.
+        sim isa Interfacer.ImplicitFluxSimulation && FluxCalculator.compute_surface_fluxes!(
+            coupler_fields,
+            sim,
+            model_sims.atmos_sim,
+            thermo_params,
+        )
     end
+
+    # Update the atmosphere with the fluxes across all surface models
+    # The surface models have already been updated with the fluxes in `compute_surface_fluxes!`,
+    # or internally within the step in the case of the integrated land model.
+    FluxCalculator.update_turbulent_fluxes!(model_sims.atmos_sim, coupler_fields)
+
+    # Step the atmosphere model
+    Interfacer.step!(model_sims.atmos_sim, t)
     return nothing
 end
 
 function step_model_sims!(cs::Interfacer.CoupledSimulation)
-    step_model_sims!(cs.model_sims, cs.t[])
+    step_model_sims!(cs.model_sims, cs.t[], cs.fields, cs.thermo_params)
 end
 
 """

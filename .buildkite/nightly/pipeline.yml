@@ -62,7 +62,7 @@ steps:
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
           slurm_mem: 30GB
-      
+
       - label: "Coarse current AMIP: diagedmf + 0M + integrated land"
         key: "amip_land"
         command:

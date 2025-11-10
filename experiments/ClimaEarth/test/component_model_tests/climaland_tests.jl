@@ -60,8 +60,30 @@ FT = Float32
 
     # Check that the drivers are correctly initialized
     driver_names = propertynames(land_sim.integrator.p.drivers)
-    @test driver_names ==
-          (:P_liq, :P_snow, :c_co2, :T, :P, :q, :SW_d, :LW_d, :cosθs, :frac_diff, :soc)
+    @test driver_names == (
+        :P_liq,
+        :P_snow,
+        :c_co2,
+        :T,
+        :P,
+        :q,
+        :u,
+        :thermal_state,
+        :SW_d,
+        :LW_d,
+        :cosθs,
+        :frac_diff,
+        :soc,
+    )
+    atmos = land_sim.model.soil.boundary_conditions.top.atmos
+    @test atmos == land_sim.model.canopy.boundary_conditions.atmos
+    @test atmos == land_sim.model.snow.boundary_conditions.atmos
+    # Remap atmos_h to the same space as atmos.h for type comparison
+    atmos_h_remapped = Interfacer.remap(atmos_h, axes(atmos.h))
+    @test atmos.h == atmos_h_remapped
+    #@test typeof(atmos.h) == typeof(atmos_h_remapped)
+    @test atmos.gustiness == FT(1)
+    @test propertynames(atmos) == (:h, :gustiness)
 end
 
 @testset "ClimaLandSimulation flux calculations" begin
@@ -125,7 +147,34 @@ end
         land_sim.integrator.t,
     )
 
-    # Compute the surface fluxes
+    # Compute the turbulent fluxes for each sub-component
+    CL.turbulent_fluxes!(
+        land_sim.integrator.p.canopy.turbulent_fluxes,
+        land_sim.model.canopy.boundary_conditions.atmos,
+        land_sim.model.canopy.boundary_conditions.turbulent_flux_parameterization,
+        land_sim.model.canopy,
+        land_sim.integrator.u,
+        land_sim.integrator.p,
+        land_sim.integrator.t,
+    )
+    CL.turbulent_fluxes!(
+        land_sim.integrator.p.soil.turbulent_fluxes,
+        land_sim.model.soil.boundary_conditions.top.atmos,
+        land_sim.model.soil,
+        land_sim.integrator.u,
+        land_sim.integrator.p,
+        land_sim.integrator.t,
+    )
+    CL.turbulent_fluxes!(
+        land_sim.integrator.p.snow.turbulent_fluxes,
+        land_sim.model.snow.boundary_conditions.atmos,
+        land_sim.model.snow,
+        land_sim.integrator.u,
+        land_sim.integrator.p,
+        land_sim.integrator.t,
+    )
+
+    # Combine the surface fluxes from each sub-component and update the coupler fields
     FluxCalculator.compute_surface_fluxes!(
         coupler_fields,
         land_sim,

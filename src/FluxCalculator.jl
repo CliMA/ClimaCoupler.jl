@@ -279,7 +279,7 @@ function compute_surface_fluxes!(
 
     # Set some scalars that we hardcode for now
     gustiness = deepcopy(csf.scalar_temp4 ./ csf.scalar_temp4)
-    #roughness_model = Ref(SF.ScalarRoughness())
+    roughness_model = Ref(SF.ScalarRoughness())
 
     # Construct the SurfaceFluxes.jl container of inputs
     inputs = @. SF.ValuesOnly(
@@ -293,7 +293,7 @@ function compute_surface_fluxes!(
         z0b,
         gustiness,
         beta,
-    #    roughness_model,
+        roughness_model,
     )
 
     # calculate the surface fluxes

@@ -253,6 +253,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     # Since the atmospheric height is defined on centers, we need to copy the values onto the boundary space
     # to be able to subtract the surface elevation
     # Note: This pattern is not reliable and should not be reused.
+    # TODO use get_atmos_height_delta
     atmos_h =
         ClimaCore.Fields.Field(
             ClimaCore.Fields.field_values(

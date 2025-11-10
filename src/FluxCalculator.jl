@@ -223,14 +223,9 @@ function compute_surface_fluxes!(
     boundary_space = axes(csf)
     FT = CC.Spaces.undertype(boundary_space)
 
-    # Store atmosphere fields in coupler temp fields so we only regrid them once per timestep
+    # Atmosphere fields are stored in coupler fields so we only regrid them once per timestep
     # `_int` refers to atmos state of center level 1
-
-    # After constructing `uₕ_int`, we can reuse `scalar_temp1` and `scalar_temp2`
-    Interfacer.get_field!(csf.scalar_temp1, atmos_sim, Val(:u_int))
-    Interfacer.get_field!(csf.scalar_temp2, atmos_sim, Val(:v_int))
-    # We allocate `uₕ_int` without a temp field since no regridding is required
-    uₕ_int = StaticArrays.SVector.(csf.scalar_temp1, csf.scalar_temp2)
+    uₕ_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
 
     # construct the atmospheric thermo state
     thermo_state_atmos =

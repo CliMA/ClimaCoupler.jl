@@ -96,6 +96,10 @@ Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:height_int}) =
     CC.Fields.ones(axes(sim.cache.air_temperature))
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:height_sfc}) =
     CC.Fields.zeros(axes(sim.cache.air_temperature))
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:u_int}) =
+    CC.Fields.zeros(axes(sim.cache.air_temperature))
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:v_int}) =
+    CC.Fields.zeros(axes(sim.cache.air_temperature))
 function Interfacer.update_field!(
     sim::TestAtmosSimulation,
     ::Val{:surface_direct_albedo},

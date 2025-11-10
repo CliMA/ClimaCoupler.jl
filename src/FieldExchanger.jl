@@ -116,6 +116,8 @@ function import_atmos_fields!(csf, model_sims)
     Interfacer.get_field!(csf.ρ_atmos, model_sims.atmos_sim, Val(:air_density))
     Interfacer.get_field!(csf.z_int, model_sims.atmos_sim, Val(:height_int))
     Interfacer.get_field!(csf.z_sfc, model_sims.atmos_sim, Val(:height_sfc))
+    Interfacer.get_field!(csf.u_int, model_sims.atmos_sim, Val(:u_int))
+    Interfacer.get_field!(csf.v_int, model_sims.atmos_sim, Val(:v_int))
 
     # radiative fluxes
     Interfacer.get_field!(csf.SW_d, model_sims.atmos_sim, Val(:SW_d))

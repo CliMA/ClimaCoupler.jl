@@ -110,6 +110,8 @@ default_coupler_fields() = [
     :ρ_atmos,
     :z_int,
     :z_sfc,
+    :u_int,
+    :v_int,
     # fields used for flux exchange
     :F_lh,
     :F_sh,

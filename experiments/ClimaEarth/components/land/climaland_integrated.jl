@@ -133,12 +133,53 @@ function ClimaLandSimulation(
 
     # Set up leaf area index (LAI)
     stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
-    LAI = CL.prescribed_lai_modis(
-        surface_space,
-        start_date,
-        stop_date;
-        time_interpolation_method = LinearInterpolation(),
-    )
+
+    # function prescribed_lai_modis_local(
+    #     surface_space,
+    #     start_date,
+    #     stop_date;
+    #     time_interpolation_method = LinearInterpolation(),
+    #     regridder_type = :InterpolationsRegridder,
+    #     interpolation_method = Interpolations.Constant(),
+    #     context = ClimaComms.context(surface_space),
+    # )
+    #     # modis_lai_ncdata_path = ClimaLand.Artifacts.modis_lai_multiyear_paths(;
+    #     #     context,
+    #     #     start_date,
+    #     #     stop_date,
+    #     # )
+    #     modis_lai_ncdata_path = "/net/sampo/data1/ClimaArtifacts/artifacts/modis_lai/Yuan_et_al_2019_1x1.nc"
+    #     return TimeVaryingInput(
+    #         modis_lai_ncdata_path,
+    #         ["lai"],
+    #         surface_space;
+    #         start_date,
+    #         regridder_type,
+    #         regridder_kwargs = (; interpolation_method),
+    #         method = time_interpolation_method,
+    #     )
+    # end
+    # # Set up leaf area index (LAI)
+    # stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+
+    # LAI = prescribed_lai_modis_local(
+    #     surface_space,
+    #     start_date,
+    #     stop_date;
+    #     time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
+    # )
+
+    # LAI = CL.prescribed_lai_modis(
+    #     surface_space,
+    #     start_date,
+    #     stop_date;
+    #     time_interpolation_method = LinearInterpolation(),
+    # )
+    # For now we run without canopy by setting LAI to 0.
+    # We can add canopy back once it is treated implicitly.
+    LAI = TimeVaryingInput((t) -> 0)
+    #     time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
+    # )
 
     model = CL.LandModel{FT}(forcing, LAI, toml_dict, domain, dt)
 

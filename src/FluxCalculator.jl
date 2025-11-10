@@ -63,12 +63,11 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
 
     # Compute the surface fluxes for each surface model and add them to `csf`
     for sim in model_sims
-        compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params)
+        # If the simulation is an implicit flux simulation, the fluxes are computed in the
+        # component model's `step!` function, so we don't need to compute them here.
+        sim isa Interfacer.ImplicitFluxSimulation ||
+            compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params)
     end
-
-    # Update the atmosphere with the fluxes across all surface models
-    # The surface models have already been updated with the fluxes in `compute_surface_fluxes!`
-    FluxCalculator.update_turbulent_fluxes!(atmos_sim, csf)
     return nothing
 end
 

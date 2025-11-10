@@ -174,6 +174,18 @@ abstract type SeaIceModelSimulation <: SurfaceModelSimulation end
 abstract type LandModelSimulation <: SurfaceModelSimulation end
 abstract type OceanModelSimulation <: SurfaceModelSimulation end
 
+"""
+    ImplicitFluxSimulation
+
+An abstract type for surface model simulations that compute fluxes implicitly,
+rather than explicitly. At the moment, this means the fluxes are computed in the
+component model's `step!` function, rather than in the coupler's `compute_surface_fluxes!`
+function.
+
+Currently, the only implicit flux simulation is the integrated land model.
+"""
+abstract type ImplicitFluxSimulation <: SurfaceModelSimulation end
+
 # Simulation objects tend to be very big, so it is best to make sure they are not printed in the REPL
 function Base.show(io::IO, @nospecialize(sim::ComponentModelSimulation))
     return println(io, "$(nameof(sim)) without a specialized `Base.show` method")

@@ -91,16 +91,7 @@ function get_var(short_name, simdir)
         rsus = get(simdir; short_name = "rsus")
         rsds = get(simdir; short_name = "rsds")
         var = rsus - rsds
-    elseif short_name == "hfls"
-        var = convert_units(get(simdir, "evspsbl"), "W m^-2"; conversion_function = x -> x * latent_heat_vaporization_at_reference)
-        var.attributes["long_name"] = "Latent Heat Flux at the surface, average within 1 month"
-    elseif short_name == "hfss"
-        lhf = convert_units(get(simdir, "evspsbl"), "W m^-2"; conversion_function = x -> x * latent_heat_vaporization_at_reference)
-        lhf.attributes["long_name"] = "Latent Heat Flux at the surface, average within 1 month"
-        var = get(simdir, "hfes") - lhf
-        var.attributes["long_name"] = "Sensible Heat Flux at the surface, average within 1 month"
     else
-    
         # TODO: support multiple periods/reductions of same variable
         var = get(simdir; short_name)
     end
@@ -267,7 +258,7 @@ function plot_bias(ekp, simdir, iteration; output_dir = simdir.simulation_path)
     sample_dates = unique(CALIBRATE_CONFIG.sample_date_ranges[iteration + 1])
     
     # Create figure
-    fig = GeoMakie.Figure(size = (1500, 500 * length(var_pairs)))
+    fig = GeoMakie.Figure(size = (1500, 500 * length(var_pairs)));
     
     for (i, (sim_var, era5_var)) in enumerate(var_pairs)
         for (j, date) in enumerate(sample_dates)

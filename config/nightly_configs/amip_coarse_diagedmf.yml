@@ -17,7 +17,8 @@ radiation_reset_rng_seed: true
 start_date: "20100101"
 initial_condition: "AMIPFromERA5"
 surface_setup: "PrescribedSurface"
-t_end: "465days"
+t_end: "186days"
 topo_smoothing: true
 topography: "Earth"
 z_elem: 39
+ode_algo: ARS232

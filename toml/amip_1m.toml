@@ -1,0 +1,71 @@
+[alpha_rayleigh_w]
+value = 10.0
+
+[zd_rayleigh]
+value = 40000.0
+
+[zd_viscous]
+value = 40000.0
+
+[min_area_limiter_scale]
+value = 0
+
+[max_area_limiter_scale]
+value = 0
+
+[mixing_length_Prandtl_maximum]
+value = 4.2
+
+[detr_inv_tau]
+value = 0
+
+[pressure_normalmode_buoy_coeff1]
+value = 0.13117210632826784
+
+[mixing_length_tke_surf_flux_coeff]
+value = 5.982455500292997
+
+[rain_autoconversion_timescale]
+value = 4443.076527989186
+
+[mixing_length_diss_coeff]
+value = 0.14980733174544333
+
+[diagnostic_covariance_coeff]
+value = 2.3213611511276344
+
+[entr_param_vec]
+value = [-18.92446053705368, -32.583325215519594, -30.53212424860025, 6.323820906296655, 1.5157540776933665, -0.7501385304518009]
+
+[EDMF_surface_area]
+value = 0.2
+
+[mixing_length_eddy_viscosity_coefficient]
+value = 3.085809595193029
+
+[snow_autoconversion_timescale]
+value = 3223.6330212367375
+
+[pressure_normalmode_drag_coeff]
+value = 10.28833498496755
+
+[mixing_length_Prandtl_number_0]
+value = 0.4051293639543521
+
+[snow_apparent_density]
+value = 158.94773791120224
+
+[entr_mult_limiter_coeff]
+value = 1.0640988755408831
+
+[entr_inv_tau]
+value = 0.004014155237896772
+
+[mixing_length_static_stab_coeff]
+value = 0.233434507424803
+
+[condensation_evaporation_timescale]
+value = 300
+
+[sublimation_deposition_timescale]
+value = 300

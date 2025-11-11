@@ -10,9 +10,11 @@ dz_bottom: 100.0
 energy_check: false
 h_elem: 8
 mode_name: "amip"
+moist: "nonequil"
 netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
 output_default_diagnostics: true
+precip_model: "1M"
 radiation_reset_rng_seed: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"

@@ -70,11 +70,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
         scheduler = EKP.DataMisfitController(terminate_at = 100),
     )
 
-    hpc_kwargs = ClimaCalibrate.kwargs(time = 60*4,
+    hpc_kwargs = ClimaCalibrate.kwargs(time = 60*6,
         ntasks = 2,
         gpus_per_task = 1,
         cpus_per_task = 4,
-        l_job_priority = "premium",
         q = "main")
     exeflags = "--threads=4"
     eki = ClimaCalibrate.calibrate(ClimaCalibrate.DerechoBackend,

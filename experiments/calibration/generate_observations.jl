@@ -9,8 +9,6 @@ import ClimaCore
 # Access CalibrateConfig
 include(joinpath(@__DIR__, "run_calibration.jl"))
 
-const seconds_in_october = 2_678_400
-
 """
     load_vars(obsdir, short_names)
 
@@ -31,23 +29,28 @@ function load_vars()
     tas_minus_ta_900hpa = tas - ta_900hpa
     tas_minus_ta_900hpa.attributes["short_name"] = "tas - ta"
 
-    lhf = OutputVar("era5_oct_2017_2024_surfacefluxes.nc", "slhf")
+    lhf = OutputVar("era5_oct_2017_2024_surface_fluxes.nc", "avg_slhtf")
     lhf = reverse_dim(lhf, latitude_name(lhf))
+    lhf = -lhf # Flip to positive upward to match simulation
     lhf.attributes["short_name"] = "hfls"
+
     lhf = ClimaAnalysis.Var._shift_by(lhf, date -> date - Dates.Hour(6))
 
-    shf = OutputVar("era5_oct_2017_2024_surfacefluxes.nc", "sshf")
+    shf = OutputVar("era5_oct_2017_2024_surface_fluxes.nc", "avg_ishf")
     shf = reverse_dim(shf, latitude_name(shf))
+    shf = -shf # Flip to positive upward to match simulation
     shf.attributes["short_name"] = "hfss"
     shf = ClimaAnalysis.Var._shift_by(shf, date -> date - Dates.Hour(6))
 
-    rsns = OutputVar("era5_oct_2017_2024_surfacefluxes.nc", "ssr")
+    rsns = OutputVar("era5_oct_2017_2024_surface_fluxes.nc", "avg_snswrf")
     rsns = reverse_dim(rsns, latitude_name(rsns))
+    rsns = -rsns # Flip to positive upward to match simulation
     rsns.attributes["short_name"] = "rsns"
     rsns = ClimaAnalysis.Var._shift_by(rsns, date -> date - Dates.Hour(6))
 
-    rlns = OutputVar("era5_oct_2017_2024_surfacefluxes.nc", "str")
+    rlns = OutputVar("era5_oct_2017_2024_surface_fluxes.nc", "avg_snlwrf")
     rlns = reverse_dim(rlns, latitude_name(ta_900hpa))
+    rlns = -rlns # Flip to positive upward to match simulation
     rlns.attributes["short_name"] = "rlns"
     rlns = ClimaAnalysis.Var._shift_by(rlns, date -> date - Dates.Hour(6))
 
@@ -61,16 +64,17 @@ Preprocess each OutputVar in `vars` by keeping the relevant dates in
 `sample_date_ranges`.
 """
 function preprocess_vars(vars)
-    out_var = OutputVar("/glade/derecho/scratch/nefrathe/tmp/output_quick_1/iteration_000/member_001/wxquest_diagedmf/output_active/clima_atmos/mslp_1week_average.nc")
-    resample_var(x) = ClimaAnalysis.resampled_as(x, out_var ; dim_names = ["lon", "lat"])
-    vars = resample_var.(vars)
+    diagnostic_var = "/glade/derecho/scratch/nefrathe/tmp/output_quick_1/iteration_000/member_001/wxquest_diagedmf/output_active/clima_atmos/mslp_1week_average.nc"
+    if isfile(diagnostic_var)
+        out_var = OutputVar(diagnostic_var)
+        resample_var(x) = ClimaAnalysis.resampled_as(x, out_var ; dim_names = ["lon", "lat"])
+    else
+        resample_var(x) = resampled_lonlat(CALIBRATE_CONFIG.config_file)
+    end
 
     vars = map(vars) do var
-        if short_name(var) in ("hfss", "hfls", "rlns", "rsns")
-            convert_units(var, "W m^-2"; conversion_function = x -> x / seconds_in_october)
-        else
-            set_units(var, var_units[short_name(var)])
-        end
+        resample_var(var)
+        set_units(var, var_units[short_name(var)])
     end
 
     return vars
@@ -81,9 +85,12 @@ var_units = Dict(
     "mslp" => "Pa",
     "tas" => "K",
     "tas - ta" => "K",
+    "hfls" => "W m^-2",
+    "hfss" => "W m^-2",
+    "rsns" => "W m^-2",
+    "rlns" => "W m^-2",
     )
 
-resample_var() = resampled_lonlat()
 
 function make_observation_vector(vars, sample_date_ranges)
     covar_estimator =  ClimaCalibrate.ObservationRecipe.ScalarCovariance(; scalar = 5.0, use_latitude_weights = true)
@@ -99,80 +106,28 @@ function make_observation_vector(vars, sample_date_ranges)
 end
 
 """
-    find_weekly_dates(sample_date_range)
-
-Find weekly dates for the purpose of preprocessing the `OutputVar`s.
-"""
-function find_weekly_dates(vars, sample_date_ranges)
-    # Find the earliest and latest years that can be used
-    earliest_year = min((first(ClimaAnalysis.dates(var)) for var in vars)...)
-    latest_year = max((last(ClimaAnalysis.dates(var)) for var in vars)...)
-
-    # Check conversion is possible
-    dates = Dates.DateTime[]
-    for range in sample_date_ranges
-        if ((last(range) - first(range)) % Dates.Week(1)).value != 0
-            error(
-                "The dates in $sample_date_ranges should differ by weeks",
-            )
-        end
-        append!(dates, collect(first(range):Dates.Week(1):last(range)))
-    end
-
-    # Find all weekly dates
-    min_year, max_year = extrema(year.(dates))
-
-    alldates = Dates.DateTime[]
-    for curr_date in dates
-        for curr_year = year(earliest_year):year(latest_year)
-            diff_year = year(curr_date) - curr_year
-            push!(alldates, curr_date - Year(diff_year))
-        end
-    end
-    return sort!(alldates)
-end
-
-"""
-    find_weekly_ranges(sample_date_range)
-
-Find the weekly ranges for the purpose of constructing the TSVD covariance
-matrix.
-"""
-function find_weekly_ranges(vars, sample_date_range)
-    var_dates = union([ClimaAnalysis.dates(var) for var in vars]...)
-    min_year, max_year = year.(extrema(var_dates))
-    curr_year = minimum(year.(extrema(var_dates)))
-
-    date_ranges = typeof(sample_date_range)[]
-    for curr_year = min_year:max_year
-        delta_year = year(first(sample_date_range)) - curr_year
-        date_range = sample_date_range .- Year(delta_year)
-        if first(date_range) in var_dates && last(date_range) in var_dates
-            push!(date_ranges, date_range)
-        end
-    end
-    return sort!(date_ranges)
-end
-
-
-"""
     resampled_lonlat(config_file)
 
 Return a function to resample longitude and latitudes according to the model
 grid specified by `config_file`.
 """
 function resampled_lonlat(config_file)
-    cs = CoupledSimulation(config_file)
-    center_space = cs.model_sims.atmos_sim.domain.center_space
-    (lon_nlevels, lat_nlevels, z_nlevels) =
-        ClimaDiagnostics.Writers.default_num_points(center_space)
-    longitudes = range(-180, 180, lon_nlevels)
-    latitudes = range(-90, 90, lat_nlevels)
-    stretch = center_space.grid.vertical_grid.topology.mesh.stretch
-    # TODO: Account for stretch for 3D variables and interpolate to pressure?
-    dz_bottom = center_space.grid.vertical_grid.topology.mesh.faces[2].z
-    z_levels = range(dz_bottom, ClimaCore.Spaces.z_max(center_space), z_nlevels)
-    return var -> resampled_to(var; lon = longitudes, lat = latitudes)
+    config_dict = get_coupler_config_dict(CALIBRATE_CONFIG.config_file)
+    if !isnothing(config_dict["netcdf_interpolation_num_points"])
+        (nlon, nlat, nlev) = tuple(config_dict["netcdf_interpolation_num_points"]...)
+    else
+        cs = CoupledSimulation(config_file)
+        center_space = cs.model_sims.atmos_sim.domain.center_space
+        (nlon, nlat, nlev) =
+            ClimaDiagnostics.Writers.default_num_points(center_space)
+        stretch = center_space.grid.vertical_grid.topology.mesh.stretch
+        dz_bottom = center_space.grid.vertical_grid.topology.mesh.faces[2].z
+        z = range(dz_bottom, ClimaCore.Spaces.z_max(center_space), nlev)
+    end
+    lon = range(-180, 180, nlon)
+    lat = range(-90, 90, nlat)
+    # TODO: Account for stretch for 3D variables
+    return var -> resampled_as(var; lon, lat)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

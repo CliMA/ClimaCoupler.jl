@@ -42,7 +42,6 @@ topo_smoothing: true
 topography: "Earth"
 t_end: "700days"  
 netcdf_output_at_levels: true
-
 output_default_diagnostics: false
 use_coupler_diagnostics: false
 use_land_diagnostics: true

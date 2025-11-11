@@ -2,7 +2,7 @@
 
 julia_version = "1.11.3"
 manifest_format = "2.0"
-project_hash = "bf902fbe4cdfe69d6bdc0c99b12a9c00c5aa28ee"
+project_hash = "6b0865d48f07e2a913cf662e79d8f1cb20b9ddad"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "27cecae79e5cc9935255f90c53bb831cc3c870d7"
@@ -417,9 +417,9 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaInterpolations", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "ForwardDiff", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "NullBroadcasts", "RRTMGP", "Random", "SciMLBase", "SparseMatrixColorings", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
-path = "../../../ClimaAtmos.jl"
+git-tree-sha1 = "8f049d5ff9ed7ad02c11840d1bc392879de96279"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.31.7"
+version = "0.31.8"
 
 [[deps.ClimaCalibrate]]
 deps = ["Dates", "Distributed", "Distributions", "EnsembleKalmanProcesses", "JLD2", "Logging", "Random", "TOML", "YAML"]
@@ -492,7 +492,7 @@ weakdeps = ["CUDA"]
 
 [[deps.ClimaLand]]
 deps = ["ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-path = "../../../ClimaLand.jl"
+git-tree-sha1 = "ed31db195c9cab83d1ba2e2dab2003e578010e67"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
 version = "1.0.1"
 
@@ -556,7 +556,7 @@ git-tree-sha1 = "2fa65c8aeeb2d24008b0b37f53aa7971117be168"
 repo-rev = "main"
 repo-url = "https://github.com/CliMA/ClimaUtilities.jl.git"
 uuid = "b3f4f4ca-9299-4f7f-bd9b-81e1242a7513"
-version = "0.1.27"
+version = "0.1.26"
 
     [deps.ClimaUtilities.extensions]
     ClimaUtilitiesClimaCoreExt = "ClimaCore"

@@ -27,6 +27,8 @@ export TMPDIR=$SCRATCH/tmp
 # Build and run the Julia code
 echo "Starting Julia package instantiation..."
 julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate(;verbose=true)'
+julia --project=experiments/ClimaEarth -e 'using CUDA; CUDA.set_runtime_version(v"12.2")'
+
 
 echo "Starting calibration run..."
 julia --project=experiments/ClimaEarth experiments/calibration/run_calibration.jl

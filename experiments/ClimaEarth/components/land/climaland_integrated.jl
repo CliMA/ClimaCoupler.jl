@@ -133,15 +133,15 @@ function ClimaLandSimulation(
 
     # Set up leaf area index (LAI)
     stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
-    # LAI = CL.prescribed_lai_modis(
-    #     surface_space,
-    #     start_date,
-    #     stop_date;
-    #     time_interpolation_method = LinearInterpolation(),
-    # )
+    LAI = CL.prescribed_lai_modis(
+        surface_space,
+        start_date,
+        stop_date;
+        time_interpolation_method = LinearInterpolation(),
+    )
     # For now we run without canopy by setting LAI to 0.
     # We can add canopy back once it is treated implicitly.
-    LAI = TimeVaryingInput((t) -> 0)
+    # LAI = TimeVaryingInput((t) -> 0)
 
     model = CL.LandModel{FT}(forcing, LAI, toml_dict, domain, dt)
 
@@ -327,7 +327,8 @@ function ClimaLandSimulation(
             start_date,
             output_writer = output_writer,
             output_vars = :short,
-            reduction_period = :monthly,
+            reduction_period = :daily,
+            reduction_type = :max,
         )
         diagnostic_handler =
             CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)

@@ -1,35 +1,51 @@
-[alpha_rayleigh_w]
-value = 10.0
-
 [zd_rayleigh]
 value = 40000.0
-
-[zd_viscous]
-value = 40000.0
-
-[precipitation_timescale]
-value = 600
-
-[entr_inv_tau]
-value = 0.002
-
-[entr_coeff]
-value = 0
-
-[detr_inv_tau]
-value = 0
-
-[detr_buoy_coeff]
-value = 0.12
-
-[detr_vertdiv_coeff]
-value = 0.6
+type = "float"
 
 [min_area_limiter_scale]
 value = 0
+type = "float"
+
+[zd_viscous]
+value = 40000.0
+type = "float"
 
 [max_area_limiter_scale]
 value = 0
+type = "float"
+
+[detr_buoy_coeff]
+value = 0.12
+type = "float"
+
+[precipitation_timescale]
+value = 729.4300450978492
+type = "float"
+
+[entr_coeff]
+value = 0
+type = "float"
+
+[mixing_length_eddy_viscosity_coefficient]
+value = 0.7990993087577812
+type = "float"
 
 [mixing_length_Prandtl_maximum]
 value = 4.2
+type = "float"
+
+[alpha_rayleigh_w]
+value = 10.0
+type = "float"
+
+[detr_vertdiv_coeff]
+value = 0.6
+type = "float"
+
+[detr_inv_tau]
+value = 0
+type = "float"
+
+[entr_inv_tau]
+value = 0.0012306537001369189
+type = "float"

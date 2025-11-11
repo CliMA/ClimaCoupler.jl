@@ -488,9 +488,7 @@ weakdeps = ["CUDA"]
 
 [[deps.ClimaLand]]
 deps = ["ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "8922fe425275a9851c496b9c6e4415705ba54735"
-repo-rev = "js/coupled-imp-fluxes"
-repo-url = "https://github.com/CliMA/ClimaLand.jl.git"
+git-tree-sha1 = "ed31db195c9cab83d1ba2e2dab2003e578010e67"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
 version = "1.0.1"
 

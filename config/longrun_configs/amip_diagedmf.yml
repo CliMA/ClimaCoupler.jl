@@ -4,9 +4,9 @@ atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "1months"
 coupler_toml: ["toml/amip_diagedmf.toml"]
-dt: "120secs"
+dt: "180secs"
 dt_cloud_fraction: "1hours"
-dt_cpl: "120secs"
+dt_cpl: "180secs"
 dt_rad: "1hours"
 energy_check: false
 insolation: "timevarying"
@@ -16,6 +16,19 @@ output_default_diagnostics: true
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "366days"
+t_end: "62days"
 topo_smoothing: true
 topography: "Earth"
+edmfx_entr_model: "PiGroups"
+ode_algo: "ARS232"
+h_elem: 12
+initial_condition: "AMIPFromERA5"
+prescribed_aerosols: []
+aerosol_radiation: false
+extra_atmos_diagnostics:
+  - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls]
+    period: 1months
+    reduction_time: average
+  - short_name: [ta, hus, hur]
+    period: 1months
+    reduction_time: average

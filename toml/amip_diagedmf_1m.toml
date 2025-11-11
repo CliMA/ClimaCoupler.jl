@@ -7,11 +7,8 @@ value = 40000.0
 [zd_viscous]
 value = 40000.0
 
-[precipitation_timescale]
-value = 600
-
 [entr_inv_tau]
-value = 0.002
+value = 0.001
 
 [entr_coeff]
 value = 0
@@ -48,3 +45,21 @@ value = 1e3
 
 [rain_autoconversion_timescale]
 value = 150
+
+[Variable_time_scale_autoconversion_coeff_alpha]
+value = 2.09
+
+#[rain_terminal_velocity_size_relation_coefficient_chiv]
+#value = 0.213
+
+#[rain_terminal_velocity_size_relation_coefficient_delv]
+#value = 0.351
+
+[rain_cross_section_size_relation_coefficient_chia]
+value = 6.41
+
+[rain_cross_section_size_relation_coefficient_dela]
+value = 0.01
+
+[rain_ventilation_coefficient_b]
+value = 1.48

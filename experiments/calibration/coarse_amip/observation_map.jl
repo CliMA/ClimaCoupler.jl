@@ -9,7 +9,7 @@ import ClimaCoupler
 import ClimaCalibrate: EnsembleBuilder
 using OrderedCollections
 
-include(joinpath(pkgdir(ClimaCoupler), "experiments/calibration/observation_utils.jl"))
+include(joinpath(@__DIR__, "observation_utils.jl"))
 
 """
     ClimaCalibrate.observation_map(iteration)
@@ -122,6 +122,7 @@ This function assumes that the data is monthly.
 function preprocess_var(var, sample_date_range)
     period = largest_period(sample_date_range)
     var = ClimaAnalysis.Var._shift_by(var, date -> date - period)
+    # TODO: Share units with generate_observations.jl
     if short_name(var) in ("sw_cre","hfss", "hfls", "rlns", "rsns")
         var = set_units(var, "W m^-2")
     elseif short_name(var) in ("tas", "tas - ta", "ta")
@@ -129,6 +130,9 @@ function preprocess_var(var, sample_date_range)
     end
     # TODO: Match dates instead of just windowing
     var = window(var, "time"; left = sample_date_range[1], right = sample_date_range[2])
+
+    var = apply_landmask(var)
+    var = remove_global_mean(var)
     return var
 end
 

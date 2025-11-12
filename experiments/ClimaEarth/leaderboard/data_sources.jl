@@ -104,7 +104,7 @@ function get_sim_var_dict(diagnostics_folder_path)
                 sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
                 return sim_var
             end
-    end
+    )
 
     if ["rsut", "rsutcs"] ⊆ available_short_names
         sim_var_dict["sw_cre"] = () -> begin

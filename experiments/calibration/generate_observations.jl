@@ -8,6 +8,7 @@ import ClimaDiagnostics
 import ClimaCore
 # Access CalibrateConfig
 include(joinpath(@__DIR__, "run_calibration.jl"))
+include(joinpath(@__DIR__, "coarse_amip", "observation_utils.jl"))
 
 """
     load_vars(obsdir, short_names)
@@ -76,7 +77,7 @@ function preprocess_vars(vars)
         var = resample_var(var)
         var = set_units(var, var_units[short_name(var)])
         var = apply_landmask(var)
-        remove_global_mean(var)
+        var = remove_global_mean(var)
     end
 
     return vars

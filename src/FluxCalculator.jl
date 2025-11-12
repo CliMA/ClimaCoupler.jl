@@ -63,12 +63,11 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
 
     # Compute the surface fluxes for each surface model and add them to `csf`
     for sim in model_sims
-        compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params)
+        # If the simulation is an implicit flux simulation, the fluxes are computed in the
+        # component model's `step!` function, so we don't need to compute them here.
+        sim isa Interfacer.ImplicitFluxSimulation ||
+            compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params)
     end
-
-    # Update the atmosphere with the fluxes across all surface models
-    # The surface models have already been updated with the fluxes in `compute_surface_fluxes!`
-    FluxCalculator.update_turbulent_fluxes!(atmos_sim, csf)
     return nothing
 end
 
@@ -224,14 +223,9 @@ function compute_surface_fluxes!(
     boundary_space = axes(csf)
     FT = CC.Spaces.undertype(boundary_space)
 
-    # Store atmosphere fields in coupler temp fields so we only regrid them once per timestep
+    # Atmosphere fields are stored in coupler fields so we only regrid them once per timestep
     # `_int` refers to atmos state of center level 1
-
-    # After constructing `uₕ_int`, we can reuse `scalar_temp1` and `scalar_temp2`
-    Interfacer.get_field!(csf.scalar_temp1, atmos_sim, Val(:u_int))
-    Interfacer.get_field!(csf.scalar_temp2, atmos_sim, Val(:v_int))
-    # We allocate `uₕ_int` without a temp field since no regridding is required
-    uₕ_int = StaticArrays.SVector.(csf.scalar_temp1, csf.scalar_temp2)
+    uₕ_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
 
     # construct the atmospheric thermo state
     thermo_state_atmos =

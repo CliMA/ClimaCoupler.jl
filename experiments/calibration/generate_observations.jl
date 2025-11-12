@@ -73,8 +73,10 @@ function preprocess_vars(vars)
     end
 
     vars = map(vars) do var
-        resample_var(var)
-        set_units(var, var_units[short_name(var)])
+        var = resample_var(var)
+        var = set_units(var, var_units[short_name(var)])
+        var = apply_landmask(var)
+        remove_global_mean(var)
     end
 
     return vars

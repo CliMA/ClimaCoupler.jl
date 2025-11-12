@@ -23,7 +23,7 @@ config_file = joinpath(pkgdir(ClimaCoupler), "config/subseasonal_configs/wxquest
     sample_date_ranges,
     extend = Dates.Month(1),
     spinup = Dates.Month(1),
-    output_dir = "/glade/derecho/scratch/nefrathe/tmp/output_quick",
+    output_dir = "output_landmask",
     rng_seed = 42,
 )
 

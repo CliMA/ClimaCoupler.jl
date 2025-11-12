@@ -8,7 +8,6 @@ import Thermodynamics as TD
 import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
 using XESMF # to load Oceananigans regridding extension
-using PythonCall
 
 OceananigansXESMFExt = Base.get_extension(OC, :OceananigansXESMFExt).OceananigansXESMFExt;
 
@@ -195,6 +194,10 @@ function construct_remappers(grid, boundary_space)
     coords_oc =
         OceananigansXESMFExt.xesmf_coordinates(grid, OC.Center(), OC.Center(), OC.Center())
     coords_oc = Dict(k => Array(v) for (k, v) in coords_oc)
+    if grid.underlying_grid isa OC.TripolarGrid
+        # TripolarGrid is defined on [0, 360], so we to convert to [-180, 180] to match ClimaCore
+        coords_oc["lon"] .-= 180
+    end
 
     # Get the latitude and longitude of each node on the boundary space
     climacore_coords = CC.Fields.coordinate_field(boundary_space)
@@ -205,20 +208,9 @@ function construct_remappers(grid, boundary_space)
 
     coords_climacore = Dict("lat" => climacore_lat, "lon" => climacore_lon)
 
-    # Make arrays F-contiguous (column major) using `np.asfortranarray` to reduce memory footprint and
-    # prevent segfaults since XESMF works more efficiently with F-contiguous arrays.
-    np = pyimport("numpy")
-    coords_oc_contiguous =
-        Dict(k => pyconvert(Array, np.asfortranarray(v)) for (k, v) in coords_oc)
-    coords_climacore_contiguous =
-        Dict(k => pyconvert(Array, np.asfortranarray(v)) for (k, v) in coords_climacore)
-
     # Construct the XESMF regridder object
-    regridder_oceananigans_to_climacore = XESMF.Regridder(
-        coords_oc_contiguous,
-        coords_climacore_contiguous;
-        method = "bilinear",
-    )
+    regridder_oceananigans_to_climacore =
+        XESMF.Regridder(coords_oc, coords_climacore; method = "bilinear")
 
     # Allocate space for source an destination vectors to use as intermediate storage
     src_vec_oc = Array(vec(OC.Field{OC.Center, OC.Center, Nothing}(grid))) # 2D field on Center/Center
@@ -242,9 +234,12 @@ function construct_remappers(grid, boundary_space)
 
     # For a LatitudeLongitudeGrid, latitude and longitude are 1D collections,
     # so we reshape them to 2D arrays.
-    if grid isa OC.LatitudeLongitudeGrid
+    if grid.underlying_grid isa OC.LatitudeLongitudeGrid
         long_oc = reshape(long_oc, length(long_oc), 1)
         lat_oc = reshape(lat_oc, 1, length(lat_oc))
+    else
+        # TripolarGrid is defined on [0, 360], so we to convert to [-180, 180] to match ClimaCore
+        long_oc .-= 180
     end
     target_points_oc = @. CC.Geometry.LatLongPoint(lat_oc, long_oc)
 

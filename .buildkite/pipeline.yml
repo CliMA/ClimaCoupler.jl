@@ -312,6 +312,17 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
+      - label: "GPU AMIP: prog. EDMF + bucket"
+        key: "gpu_amip_progedmf_bucket"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_progedmf_bucket.yml --job_id gpu_amip_progedmf_bucket"
+        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_progedmf_bucket/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
+      
+
       - label: "GPU AMIP test: albedo from function"
         key: "gpu_amip_albedo_function"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_albedo_function.yml --job_id gpu_amip_albedo_function"

@@ -27,6 +27,8 @@ import ClimaAtmos as CA
 import ClimaComms
 ClimaComms.@import_required_backends
 import ClimaCore as CC
+import ClimaParams as CP
+import Thermodynamics.Parameters as TDP
 
 # ## Coupler specific imports
 import ClimaCoupler
@@ -143,6 +145,11 @@ function CoupledSimulation(config_dict::AbstractDict)
         era5_initial_condition_dir,
     ) = get_coupler_args(config_dict)
 
+    # Get default shared parameters from ClimaParams.jl, overriding with any provided parameter files
+    override_file = CP.merge_toml_files(parameter_files; override = true)
+    coupled_param_dict = CP.create_toml_dict(FT; override_file)
+    thermo_params = TDP.ThermodynamicsParameters(coupled_param_dict)
+
     #=
     ### I/O Directory Setup
     `setup_output_dirs` returns a NamedTuple with the paths to
@@ -157,7 +164,12 @@ function CoupledSimulation(config_dict::AbstractDict)
     ## get component model dictionaries (if applicable)
     ## Note this step must come after parsing the coupler config dictionary, since
     ##  some parameters are passed from the coupler config to the component model configs
-    atmos_config_dict = get_atmos_config_dict(config_dict, dir_paths.atmos_output_dir)
+    atmos_config_dict = get_atmos_config_dict(
+        config_dict,
+        dir_paths.atmos_output_dir,
+        coupled_param_dict,
+        comms_ctx,
+    )
 
     ## set unique random seed if desired, otherwise use default
     Random.seed!(random_seed)
@@ -208,7 +220,6 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     ## init atmos model component
     atmos_sim = ClimaAtmosSimulation(atmos_config_dict)
-    thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models #342
 
     #=
     ### Boundary Space
@@ -231,8 +242,8 @@ function CoupledSimulation(config_dict::AbstractDict)
     else
         h_elem = config_dict["h_elem"]
         n_quad_points = 4
-        boundary_space =
-            CC.CommonSpaces.CubedSphereSpace(FT; radius = FT(6371e3), n_quad_points, h_elem)
+        radius = coupled_param_dict["planet_radius"] # in meters
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius, n_quad_points, h_elem)
     end
 
     # Get surface elevation on the boundary space from `atmos` coordinate field
@@ -319,8 +330,7 @@ function CoupledSimulation(config_dict::AbstractDict)
                 use_land_diagnostics,
                 albedo_type = bucket_albedo_type,
                 bucket_initial_condition,
-                energy_check,
-                parameter_files,
+                coupled_param_dict,
             )
         elseif land_model == "integrated"
             land_sim = ClimaLandSimulation(
@@ -337,7 +347,7 @@ function CoupledSimulation(config_dict::AbstractDict)
                 atmos_h,
                 land_temperature_anomaly,
                 use_land_diagnostics,
-                parameter_files,
+                coupled_param_dict,
                 land_ic_path = subseasonal_land_ic,
             )
         else
@@ -351,26 +361,24 @@ function CoupledSimulation(config_dict::AbstractDict)
             dt = component_dt_dict["dt_seaice"],
             saveat = saveat,
             space = boundary_space,
-            thermo_params = thermo_params,
+            coupled_param_dict,
+            thermo_params,
             comms_ctx,
             start_date,
             land_fraction,
             sic_path = subseasonal_sic,
         )
 
-        ## ocean model using prescribed data
-        ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
-        ice_fraction = ifelse.(ice_fraction .> FT(0.5), FT(1), FT(0))
-        ocean_fraction = FT(1) .- ice_fraction .- land_fraction
-
+        ## ocean model
         if sim_mode <: CMIPMode
             stop_date = date(tspan[end] - tspan[begin])
             ocean_sim = OceananigansSimulation(
-                ocean_fraction,
+                boundary_space,
                 start_date,
                 stop_date;
                 output_dir = dir_paths.ocean_output_dir,
                 comms_ctx,
+                coupled_param_dict,
             )
         else
             ocean_sim = PrescribedOceanSimulation(
@@ -378,7 +386,7 @@ function CoupledSimulation(config_dict::AbstractDict)
                 boundary_space,
                 start_date,
                 t_start,
-                ocean_fraction,
+                coupled_param_dict,
                 thermo_params,
                 comms_ctx;
                 sst_path = subseasonal_sst,
@@ -404,19 +412,18 @@ function CoupledSimulation(config_dict::AbstractDict)
             use_land_diagnostics,
             albedo_type = bucket_albedo_type,
             bucket_initial_condition,
-            energy_check,
-            parameter_files,
+            coupled_param_dict,
         )
 
         ## ocean model
         ocean_sim = SlabOceanSimulation(
             FT;
-            tspan = tspan,
+            tspan,
             dt = component_dt_dict["dt_ocean"],
             space = boundary_space,
-            saveat = saveat,
-            area_fraction = (FT(1) .- land_fraction), ## NB: this ocean fraction includes areas covered by sea ice (unlike the one contained in the cs)
-            thermo_params = thermo_params,
+            saveat,
+            coupled_param_dict,
+            thermo_params,
             evolving = evolving_ocean,
         )
     end
@@ -430,6 +437,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
 
     ## collect component model simulations that have been initialized
+    @assert !(ocean_sim isa SlabOceanSimulation) || isnothing(ice_sim) "SlabOceanSimulation should not be used with sea ice, got $(ice_sim)"
     model_sims = (; atmos_sim, ice_sim, land_sim, ocean_sim)
     model_sims =
         NamedTuple{filter(key -> !isnothing(model_sims[key]), keys(model_sims))}(model_sims)
@@ -537,6 +545,12 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
     should_restart && Checkpointer.restart!(cs, restart_dir, restart_t, restart_cache)
 
+    # Make sure surface model area fractions sum to 1 everywhere.
+    # Note that ocean and ice fractions are not accurate until after this call.
+    # Area fractions are not saved/read in when restarting, so we need to update them here
+    # whether or not we restart.
+    FieldExchanger.update_surface_fractions!(cs)
+
     if !should_restart || !restart_cache
         #=
         ## Initialize Component Model Exchange
@@ -544,16 +558,12 @@ function CoupledSimulation(config_dict::AbstractDict)
         The concrete steps for proper initialization are:
         =#
 
-        # 1. Make sure surface model area fractions sum to 1 everywhere.
-        FieldExchanger.update_surface_fractions!(cs)
-
-        # 2. Import atmospheric and surface fields into the coupler fields,
+        # 1. Import atmospheric and surface fields into the coupler fields,
         #  then broadcast them back out to all components.
         FieldExchanger.exchange!(cs)
 
-        # 3. Update any fields in the model caches that can only be filled after the initial exchange.
+        # 2. Update any fields in the model caches that can only be filled after the initial exchange.
         FieldExchanger.set_caches!(cs)
-        # 4. Calculate and update turbulent fluxes for each surface model,
         #  and save the weighted average in coupler fields
         FluxCalculator.turbulent_fluxes!(cs)
     end

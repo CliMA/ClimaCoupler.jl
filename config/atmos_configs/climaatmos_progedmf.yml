@@ -14,12 +14,14 @@ edmfx_nh_pressure: true
 edmfx_sgs_diffusive_flux: true
 edmfx_sgs_mass_flux: true
 edmfx_upwinding: "first_order"
+edmfx_vertical_diffusion: true
 h_elem: 16
 implicit_diffusion: true
 implicit_sgs_advection: true
 implicit_sgs_entr_detr: true
 implicit_sgs_mass_flux: true
 implicit_sgs_nh_pressure: true
+implicit_sgs_vertdiff: true
 insolation: "timevarying"
 max_newton_iters_ode: 3
 moist: "equil"

@@ -180,7 +180,7 @@ for FT in (Float32, Float64)
     @testset "test update_surface_fractions!" begin
         test_space = CC.CommonSpaces.CubedSphereSpace(
             FT;
-            radius = FT(6371e3),
+            radius = FT(6.371e6), # in meters
             n_quad_points = 4,
             h_elem = 4,
         )
@@ -236,7 +236,7 @@ for FT in (Float32, Float64)
     @testset "test combine_surfaces" begin
         test_space = CC.CommonSpaces.CubedSphereSpace(
             FT;
-            radius = FT(6371e3),
+            radius = FT(6.371e6), # in meters
             n_quad_points = 4,
             h_elem = 4,
         )
@@ -271,7 +271,7 @@ for FT in (Float32, Float64)
     @testset "import_atmos_fields! for FT=$FT" begin
         boundary_space = CC.CommonSpaces.CubedSphereSpace(
             FT;
-            radius = FT(6371e3),
+            radius = FT(6.371e6), # in meters
             n_quad_points = 4,
             h_elem = 4,
         )
@@ -313,7 +313,7 @@ for FT in (Float32, Float64)
         # coupler cache setup
         boundary_space = CC.CommonSpaces.CubedSphereSpace(
             FT;
-            radius = FT(6371e3),
+            radius = FT(6.371e6), # in meters
             n_quad_points = 4,
             h_elem = 4,
         )
@@ -352,7 +352,7 @@ for FT in (Float32, Float64)
         # coupler cache setup
         boundary_space = CC.CommonSpaces.CubedSphereSpace(
             FT;
-            radius = FT(6371e3),
+            radius = FT(6.371e6), # in meters
             n_quad_points = 4,
             h_elem = 4,
         )
@@ -447,7 +447,7 @@ for FT in (Float32, Float64)
         # coupler cache setup
         boundary_space = CC.CommonSpaces.CubedSphereSpace(
             FT;
-            radius = FT(6371e3),
+            radius = FT(6.371e6), # in meters
             n_quad_points = 4,
             h_elem = 4,
         )

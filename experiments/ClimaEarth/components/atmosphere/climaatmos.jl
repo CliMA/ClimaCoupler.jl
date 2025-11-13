@@ -5,6 +5,7 @@ import LinearAlgebra
 import ClimaAtmos as CA
 import ClimaAtmos: set_surface_albedo!
 import ClimaAtmos.Parameters as CAP
+import ClimaParams as CP
 import ClimaCore as CC
 import ClimaCore.Geometry: ⊗
 import SurfaceFluxes as SF
@@ -610,13 +611,16 @@ The TOML parameter file to use is chosen using the following priority:
 If a coupler TOML file is provided, it is used.
 Otherwise we use an atmos TOML file if it's provided.
 If neither file is provided, the default ClimaAtmos parameters are used.
+This is analogous to the logic in `get_coupler_config_dict` for selecting
+the coupler configuration TOML file.
 """
-function get_atmos_config_dict(coupler_config::Dict, atmos_output_dir)
+function get_atmos_config_dict(
+    coupler_config::Dict,
+    atmos_output_dir,
+    coupled_param_dict::CP.ParamDict,
+    comms_ctx,
+)
     atmos_config = deepcopy(coupler_config)
-
-    # Rename parameters for consistency with ClimaAtmos.jl
-    # Rename atmosphere config file from ClimaCoupler convention to ClimaAtmos convention
-    atmos_config["config_file"] = coupler_config["atmos_config_file"]
 
     # Ensure Atmos's own checkpoints are synced up with ClimaCoupler, so that we
     # can pick up from where we have left. NOTE: This should not be needed, but
@@ -630,17 +634,24 @@ function get_atmos_config_dict(coupler_config::Dict, atmos_output_dir)
         coupler_config["dt"]
     atmos_config["dt"] = dt_atmos
 
-    # Use atmos toml if coupler toml is not defined
-    # If we can't find the file at the relative path, prepend pkgdir(ClimaAtmos)
+    # Set up the atmosphere parameter dictionary (`toml_dict`)
+    # If we can't find the atmos TOML file at the relative path, prepend pkgdir(ClimaAtmos)
     atmos_toml = map(atmos_config["toml"]) do file
         isfile(file) ? file : joinpath(pkgdir(CA), file)
     end
+    # Use atmos toml only if coupler toml is not defined
     coupler_toml = atmos_config["coupler_toml"]
     toml = isempty(coupler_toml) ? atmos_toml : coupler_toml
     if !isempty(toml)
         @info "Overwriting Atmos parameters from input TOML file(s): $toml"
         atmos_config["toml"] = toml
     end
+
+    # Override atmos parameters with coupled parameters
+    FT = atmos_config["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
+    override_file = CP.merge_toml_files(atmos_config["toml"], override = true)
+    atmos_toml = CP.create_toml_dict(FT; override_file)
+    toml_dict = CP.merge_override_default_values(coupled_param_dict, atmos_toml)
 
     # Specify atmos output directory to be inside the coupler output directory
     atmos_config["output_dir_style"] = "RemovePreexisting"
@@ -658,7 +669,23 @@ function get_atmos_config_dict(coupler_config::Dict, atmos_output_dir)
         atmos_config["restart_file"] =
             replace(atmos_config["restart_file"], "active" => "0000")
     end
-    return CA.AtmosConfig(atmos_config)
+
+    # Construct the AtmosConfig object
+    config_files = atmos_config["toml"]
+    job_id = atmos_config["job_id"]
+    config = CA.override_default_config(atmos_config)
+
+    TD = typeof(toml_dict)
+    PA = typeof(config)
+    C = typeof(comms_ctx)
+    CF = typeof(config_files)
+    return CA.AtmosConfig{FT, TD, PA, C, CF}(
+        toml_dict,
+        config,
+        comms_ctx,
+        config_files,
+        job_id,
+    )
 end
 
 """

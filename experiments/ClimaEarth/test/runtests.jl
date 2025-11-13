@@ -11,7 +11,7 @@ end
 @safetestset "component model test: prescr. sea ice" begin
     include("component_model_tests/prescr_seaice_tests.jl")
 end
-@safetestset "component model test: prescr. sea ice" begin
+@safetestset "component model test: prescr. ocean" begin
     include("component_model_tests/prescr_ocean_tests.jl")
 end
 @safetestset "component model test: slab ocean" begin

@@ -5,7 +5,7 @@ import ClimaCoupler
 import ClimaCoupler: FluxCalculator, Interfacer
 import Dates
 import Thermodynamics.Parameters as TDP
-import ClimaParams # to load TDP extension
+import ClimaParams as CP # to load TDP extension
 import ClimaComms
 ClimaComms.@import_required_backends
 
@@ -17,13 +17,15 @@ include(joinpath(exp_dir, "components", "atmosphere", "climaatmos.jl"))
 FT = Float32
 
 @testset "ClimaLandSimulation constructor" begin
+    coupled_param_dict = CP.create_toml_dict(FT)
+
     dt = Float64(450)
     tspan = (Float64(0), 3.0dt)
     start_date = Dates.DateTime(2008)
     output_dir = pwd()
     boundary_space = CC.CommonSpaces.CubedSphereSpace(
         FT;
-        radius = FT(6371e3),
+        radius = coupled_param_dict["planet_radius"], # in meters
         n_quad_points = 4,
         h_elem = 4,
     )
@@ -63,6 +65,9 @@ FT = Float32
 end
 
 @testset "ClimaLandSimulation flux calculations" begin
+    coupled_param_dict = CP.create_toml_dict(FT)
+    thermo_params = TDP.ThermodynamicsParameters(coupled_param_dict)
+
     dt = Float64(120)
     tspan = (Float64(0), 3.0dt)
     start_date = Dates.DateTime(2008)
@@ -85,7 +90,6 @@ end
     coupler_field_names = Interfacer.default_coupler_fields()
     map(sim -> Interfacer.add_coupler_fields!(coupler_field_names, sim), values(model_sims))
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
-    thermo_params = TDP.ThermodynamicsParameters(FT)
 
     cs = Interfacer.CoupledSimulation{FT}(
         nothing, # start_date

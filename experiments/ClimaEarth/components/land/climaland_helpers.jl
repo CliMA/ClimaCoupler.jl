@@ -1,5 +1,7 @@
 import ClimaCore as CC
 import ClimaLand as CL
+import ClimaParams as CP
+
 """
     temp_anomaly_aquaplanet(coord)
 
@@ -19,17 +21,22 @@ and result in stable simulations.
 temp_anomaly_amip(coord) = 40 * cosd(coord.lat)^4
 
 """
-    make_land_domain(nelements::Tuple{Int, Int}, depth::FT) where {FT}
-
+    make_land_domain(
+        depth::FT,
+        toml_dict::CP.ParamDict;
+        nelements::Tuple{Int, Int} = (101, 15),
+        dz_tuple::Tuple{FT, FT} = FT.((10.0, 0.05)),
+    ) where {FT}
 Creates a land model domain with the given number of vertical elements
 and vertical depth.
 """
 function make_land_domain(
-    depth::FT;
+    depth::FT,
+    toml_dict::CP.ParamDict;
     nelements::Tuple{Int, Int} = (101, 15),
     dz_tuple::Tuple{FT, FT} = FT.((10.0, 0.05)),
 ) where {FT}
-    radius = FT(6378.1e3)
+    radius = toml_dict["planet_radius"] # in meters
     npolynomial = 0
     domain = CL.Domains.SphericalShell(; radius, depth, nelements, npolynomial, dz_tuple)
     return domain

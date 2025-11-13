@@ -4,6 +4,7 @@ import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, U
 import ClimaComms
 import ClimaCore as CC
 import Thermodynamics as TD
+import ClimaParams as CP
 import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
 
@@ -41,11 +42,12 @@ Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
 """
 function OceananigansSimulation(
-    area_fraction,
+    boundary_space,
     start_date,
     stop_date;
     output_dir,
     comms_ctx = ClimaComms.context(),
+    coupled_param_dict = CP.create_toml_dict(eltype(area_fraction)),
 )
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
 
@@ -138,7 +140,7 @@ function OceananigansSimulation(
     lat_cc = reshape(lat_cc, 1, length(lat_cc))
     target_points_cc = @. CC.Geometry.LatLongPoint(lat_cc, long_cc)
     # TODO: We can remove the `nothing` after CC > 0.14.33
-    remapper_cc = CC.Remapping.Remapper(axes(area_fraction), target_points_cc, nothing)
+    remapper_cc = CC.Remapping.Remapper(boundary_space, target_points_cc, nothing)
 
     # Construct two 2D Center/Center fields to use as scratch space while remapping
     scratch_cc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid)
@@ -154,10 +156,13 @@ function OceananigansSimulation(
 
     remapping = (; remapper_cc, scratch_cc1, scratch_cc2, scratch_arr1, scratch_arr2)
 
+    # Get some ocean properties and parameters
     ocean_properties = (;
         ocean_reference_density = 1020,
         ocean_heat_capacity = 3991,
         ocean_fresh_water_density = 999.8,
+        σ = coupled_param_dict["stefan_boltzmann_constant"],
+        C_to_K = coupled_param_dict["temperature_water_freeze"],
     )
 
     # Before version 0.96.22, the NetCDFWriter was broken on GPU
@@ -176,12 +181,15 @@ function OceananigansSimulation(
         ocean.output_writers[:diagnostics] = netcdf_writer
     end
 
+    # Create a dummy area fraction that will get overwritten in `update_surface_fractions!`
+    area_fraction = ones(boundary_space)
+
     sim = OceananigansSimulation(ocean, area_fraction, ocean_properties, remapping)
     return sim
 end
 
 """
-    FieldExchanger.resolve_ocean_ice_fractions!(ocean_sim, ice_sim, land_fraction)
+    FieldExchanger.resolve_area_fractions!(ocean_sim, ice_sim, land_fraction)
 
 Ensure the ocean and ice area fractions are consistent with each other.
 This matters in the case of a LatitudeLongitudeGrid, which is only
@@ -189,7 +197,7 @@ defined between -80 and 80 degrees latitude. In this case, we want to
 set the ice fraction to `1 - land_fraction` on [-90, -80] and [80, 90]
 degrees latitude, and make sure the ocean fraction is 0 there.
 """
-function FieldExchanger.resolve_ocean_ice_fractions!(
+function FieldExchanger.resolve_area_fractions!(
     ocean_sim::OceananigansSimulation,
     ice_sim,
     land_fraction,
@@ -205,8 +213,9 @@ function FieldExchanger.resolve_ocean_ice_fractions!(
         polar_mask = CC.Fields.zeros(boundary_space)
         polar_mask .= abs.(lat) .>= FT(80)
 
-        # Set ice fraction to 1 - land_fraction and ocean fraction to 0 where polar_mask is 1
-        @. ice_fraction = ifelse.(polar_mask == FT(1), FT(1) - land_fraction, ice_fraction)
+        # Set land fraction to 1, and ice and ocean fractions to 0 where polar_mask is 1
+        @. land_fraction = ifelse.(polar_mask == FT(1), FT(1), land_fraction)
+        @. ice_fraction = ifelse.(polar_mask == FT(1), FT(0), ice_fraction)
         @. ocean_fraction = ifelse.(polar_mask == FT(1), FT(0), ocean_fraction)
     end
     return nothing
@@ -241,7 +250,7 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}
 
 # NOTE: This is 3D, but it will be remapped to 2D
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
-    273.15 + sim.ocean.model.tracers.T
+    sim.ocean.model.tracers.T + sim.ocean_properties.C_to_K # convert from Celsius to Kelvin
 
 """
     FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fields)
@@ -365,8 +374,7 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     # Update only the part due to radiative fluxes. For the full update, the component due
     # to latent and sensible heat is missing and will be updated in update_turbulent_fluxes.
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
-    # TODO: get sigma from parameters
-    σ = 5.67e-8
+    (; σ, C_to_K) = sim.ocean_properties
     α = Interfacer.get_field(sim, Val(:surface_direct_albedo)) # scalar
     ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
     OC.interior(oc_flux_T, :, :, 1) .=
@@ -374,7 +382,7 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
             -(1 - α) .* remapped_SW_d .-
             ϵ * (
                 remapped_LW_d .-
-                σ .* (273.15 .+ OC.interior(sim.ocean.model.tracers.T, :, :, 1)) .^ 4
+                σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T, :, :, 1)) .^ 4
             )
         ) ./ (ocean_reference_density * ocean_heat_capacity)
 

@@ -121,29 +121,35 @@ function ClimaLandSimulation(
     atmos_h = Interfacer.remap(atmos_h, surface_space)
 
     # Set up atmosphere and radiation forcing
-    forcing = (;
-        atmos = CL.CoupledAtmosphere{FT}(surface_space, atmos_h),
-        radiation = CL.CoupledRadiativeFluxes{FT}(
-            start_date;
-            latitude = ClimaCore.Fields.coordinate_field(domain.space.surface).lat,
-            longitude = ClimaCore.Fields.coordinate_field(domain.space.surface).long,
-            toml_dict,
-        ),
+    atmos = CL.CoupledAtmosphere{FT}(surface_space, atmos_h),
+    radiation = CL.CoupledRadiativeFluxes{FT}(
+        start_date;
+        latitude = ClimaCore.Fields.coordinate_field(domain.space.surface).lat,
+        longitude = ClimaCore.Fields.coordinate_field(domain.space.surface).long,
+        toml_dict,
     )
+    forcing = (;atmos, radiation)
 
     # Set up leaf area index (LAI)
     stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
-    # LAI = CL.prescribed_lai_modis(
-    #     surface_space,
-    #     start_date,
-    #     stop_date;
-    #     time_interpolation_method = LinearInterpolation(),
-    # )
-    # For now we run without canopy by setting LAI to 0.
-    # We can add canopy back once it is treated implicitly.
-    LAI = TimeVaryingInput((t) -> 0)
-
-    model = CL.LandModel{FT}(forcing, LAI, toml_dict, domain, dt)
+    LAI = CL.prescribed_lai_modis(
+        surface_space,
+        start_date,
+        stop_date;
+        time_interpolation_method = LinearInterpolation(),
+    )
+    ground = CL.PrognosticGroundConditions{FT}()
+    canopy_forcing = (; atmos, radiation, ground)
+    energy = CL.Canopy.PrescribedCanopyTempModel{FT}();
+    canopy = CL.Canopy.CanopyModel{FT}(
+        surface_domain,
+        canopy_forcing,
+        LAI,
+        toml_dict;
+        prognostic_land_components = (:canopy, :snow, :soil, :soilco2),
+        energy,
+    )
+    model = CL.LandModel{FT}(forcing, LAI, toml_dict, domain, dt; canopy)
 
     Y, p, coords = CL.initialize(model)
 
@@ -175,7 +181,7 @@ function ClimaLandSimulation(
     # Set initial conditions that aren't read in from file
     Y.soilco2.C .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
     Y.canopy.hydraulics.ϑ_l.:1 .= model.canopy.hydraulics.parameters.ν
-    @. Y.canopy.energy.T = orog_adjusted_T_surface
+#    @. Y.canopy.energy.T = orog_adjusted_T_surface
 
     # Read in initial conditions for snow and soil from file, if requested
     (; θ_r, ν, ρc_ds) = model.soil.parameters
@@ -200,13 +206,13 @@ function ClimaLandSimulation(
             regridder_kwargs = (; extrapolation_bc, interpolation_method),
         )
         # Set canopy temperature to skin temperature
-        Y.canopy.energy.T .= SpaceVaryingInput(
-            ic_path,
-            "skt",
-            surface_space;
-            regridder_type,
-            regridder_kwargs = (; extrapolation_bc, interpolation_method),
-        )
+#        Y.canopy.energy.T .= SpaceVaryingInput(
+#            ic_path,
+#            "skt",
+#            surface_space;
+#            regridder_type,
+#            regridder_kwargs = (; extrapolation_bc, interpolation_method),
+#        )
 
         # Initialize the surface temperature so the atmosphere can compute radiation.
         # Set surface temperature to skin temperature
@@ -244,7 +250,7 @@ function ClimaLandSimulation(
         @info "ClimaLand: using land IC file" ic_path
 
         # Set snow T to orography-adjusted surface temperature before computing internal energy
-        p.snow.T .= orog_adjusted_T_surface
+        p.snow.T .= max(FT.(273.1), orog_adjusted_T_surface)
 
         CL.Simulations.set_snow_initial_conditions!(
             Y,
@@ -254,7 +260,7 @@ function ClimaLandSimulation(
             model.snow.parameters,
         )
 
-        T_bounds = extrema(Y.canopy.energy.T)
+        T_bounds = extrema(orog_adjusted_T_surface)
         CL.Simulations.set_soil_initial_conditions!(
             Y,
             ν,

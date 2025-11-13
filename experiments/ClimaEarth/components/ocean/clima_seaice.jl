@@ -1,5 +1,7 @@
 import Oceananigans as OC
 import ClimaSeaIce as CSI
+using ClimaSeaIce.SeaIceThermodynamics.HeatBoundaryConditions:
+    IceWaterThermalEquilibrium, MeltingConstrainedFluxBalance, RadiativeEmission, get_tracer
 import ClimaOcean as CO
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms
@@ -7,6 +9,7 @@ import ClimaCore as CC
 import Thermodynamics as TD
 import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
+using RootSolvers: find_zero, SecantMethod, CompactSolution
 
 include("climaocean_helpers.jl")
 
@@ -39,9 +42,7 @@ end
     i,
     j,
     grid,
-    top_heat_bc::CSI.SeaIceThermodynamics.HeatBoundaryConditions.MeltingConstrainedFluxBalance{
-        <:CSI.SeaIceThermodynamics.HeatBoundaryConditions.LinearizedSurfaceTemperatureSolver,
-    },
+    top_heat_bc::MeltingConstrainedFluxBalance,
     current_top_surface_temperature,
     internal_fluxes,
     external_fluxes,
@@ -60,14 +61,33 @@ end
     )
 
     # Compute the top surface temperature
-    Qe = CSI.SeaIceThermodynamics.HeatBoundaryConditions.getflux(external_fluxes, i, j, grid, current_top_surface_temperature, clock, model_fields)
+    Qe = CSI.SeaIceThermodynamics.HeatBoundaryConditions.getflux(
+        external_fluxes,
+        i,
+        j,
+        grid,
+        current_top_surface_temperature,
+        clock,
+        model_fields,
+    )
     K = internal_fluxes.parameters.flux.conductivity
     h = model_fields.h[i, j, 1]
 
-    # Limit ice thickness to be less than 1 meter to try to improve stability
-    h = ifelse(h > 1, 1, h)
-    Tu = Tb - Qe * h / K
-    return Tu
+    # TODO don't hardcode these
+    ϵ = Float32(1)
+    σ = Float32(5.67e-8)
+
+    Tu = get_tracer(i, j, 1, grid, current_top_surface_temperature)
+    flux_balance(Tu) = (Tb - Tu) * K / h - (Qe + ϵ * σ * (273.15 + Tu)^4)
+
+    T₁ = Tu - 3
+    T₂ = Tu + 3
+    FT = eltype(grid)
+    method = SecantMethod{FT}(T₁, T₂)
+    solution_type = CompactSolution()
+
+    solution = find_zero(flux_balance, method, solution_type)
+    return solution.root
 end
 
 """
@@ -87,19 +107,16 @@ previous step is provided to the coupler to be used in computing fluxes.
 
 Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
+
+TODO pass in dt
 """
 function ClimaSeaIceSimulation(ocean; output_dir, start_date = nothing)
     # Initialize the sea ice with the same grid as the ocean
     grid = ocean.ocean.model.grid
     arch = OC.Architectures.architecture(grid)
     advection = ocean.ocean.model.advection.T
-    top_heat_boundary_condition =
-        CSI.SeaIceThermodynamics.HeatBoundaryConditions.MeltingConstrainedFluxBalance(
-            CSI.SeaIceThermodynamics.HeatBoundaryConditions.LinearizedSurfaceTemperatureSolver(),
-        )
-    # top_heat_boundary_condition = CSI.SeaIceThermodynamics.HeatBoundaryConditions.LinearizedSurfaceTemperatureSolver()
 
-    ice = CO.sea_ice_simulation(grid, ocean.ocean; advection, top_heat_boundary_condition)
+    ice = sea_ice_simulation(grid, ocean.ocean; advection)
 
     # Initialize nonzero sea ice if start date provided
     if !isnothing(start_date)
@@ -169,6 +186,57 @@ function ClimaSeaIceSimulation(ocean; output_dir, start_date = nothing)
     # Ensure ocean temperature is above freezing where there is sea ice
     CO.OceanSeaIceModels.above_freezing_ocean_temperature!(ocean.ocean, ice)
     return sim
+end
+
+function sea_ice_simulation(
+    grid,
+    ocean = nothing;
+    Δt = 5 * 60., # 5 minutes
+    ice_salinity = 4, # psu
+    advection = nothing, # for the moment
+    tracers = (),
+    ice_heat_capacity = 2100, # J kg⁻¹ K⁻¹
+    ice_consolidation_thickness = 0.05, # m
+    ice_density = 900, # kg m⁻³
+    dynamics = CO.SeaIceSimulations.sea_ice_dynamics(grid, ocean),
+    phase_transitions = CSI.PhaseTransitions(; ice_heat_capacity, ice_density),
+    conductivity = 2, # kg m s⁻³ K⁻¹
+    internal_heat_flux = CSI.ConductiveFlux(; conductivity),
+)
+
+    top_surface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    top_heat_boundary_condition = MeltingConstrainedFluxBalance()
+    kᴺ = size(grid, 3)
+    surface_ocean_salinity = OC.interior(ocean.model.tracers.S, :, :, kᴺ:kᴺ)
+    bottom_heat_boundary_condition = IceWaterThermalEquilibrium(surface_ocean_salinity)
+
+    ice_thermodynamics = CSI.SlabSeaIceThermodynamics(
+        grid;
+        internal_heat_flux,
+        phase_transitions,
+        top_heat_boundary_condition,
+        bottom_heat_boundary_condition,
+    )
+
+    bottom_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    top_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    top_heat_flux = (top_heat_flux, RadiativeEmission())
+
+    # Build the sea ice model
+    sea_ice_model = CSI.SeaIceModel(
+        grid;
+        ice_salinity,
+        advection,
+        tracers,
+        ice_consolidation_thickness,
+        ice_thermodynamics,
+        dynamics,
+        bottom_heat_flux,
+        top_heat_flux,
+    )
+
+    # Build the simulation
+    return OC.Simulation(sea_ice_model; Δt)
 end
 
 ###############################################################################
@@ -266,7 +334,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     remapped_F_sh = sim.remapping.scratch_arr2
 
     # Update the sea ice only where the concentration is greater than zero.
-    si_flux_heat = sim.ice.model.external_heat_fluxes.top
+    si_flux_heat = sim.ice.model.external_heat_fluxes.top[1]
     OC.interior(si_flux_heat, :, :, 1) .+=
         (OC.interior(ice_concentration, :, :, 1) .> 0) .* (remapped_F_lh .+ remapped_F_sh)
 
@@ -317,27 +385,14 @@ function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
 
     # Update only the part due to radiative fluxes. For the full update, the component due
     # to latent and sensible heat is missing and will be updated in update_turbulent_fluxes.
-    si_flux_heat = sim.ice.model.external_heat_fluxes.top
-    # TODO: get sigma from parameters
-    σ = 5.67e-8
+    si_flux_heat = sim.ice.model.external_heat_fluxes.top[1]
     α = Interfacer.get_field(sim, Val(:surface_direct_albedo)) # scalar
     ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
 
     # Update only where ice concentration is greater than zero.
     OC.interior(si_flux_heat, :, :, 1) .=
         (OC.interior(ice_concentration, :, :, 1) .> 0) .* .-(1 .- α) .* remapped_SW_d .-
-        ϵ .* (
-            remapped_LW_d .-
-            σ .*
-            (
-                273.15 .+ OC.interior(
-                    sim.ice.model.ice_thermodynamics.top_surface_temperature,
-                    :,
-                    :,
-                    1,
-                )
-            ) .^ 4
-        )
+        ϵ .* remapped_LW_d
     return nothing
 end
 

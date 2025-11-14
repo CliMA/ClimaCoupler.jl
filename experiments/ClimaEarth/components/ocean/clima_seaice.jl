@@ -1,7 +1,7 @@
 import Oceananigans as OC
 import ClimaSeaIce as CSI
 using ClimaSeaIce.SeaIceThermodynamics.HeatBoundaryConditions:
-    IceWaterThermalEquilibrium, MeltingConstrainedFluxBalance, RadiativeEmission, get_tracer
+    IceWaterThermalEquilibrium, MeltingConstrainedFluxBalance, get_tracer
 import ClimaOcean as CO
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms
@@ -220,7 +220,6 @@ function sea_ice_simulation(
 
     bottom_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     top_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-    top_heat_flux = (top_heat_flux, RadiativeEmission())
 
     # Build the sea ice model
     sea_ice_model = CSI.SeaIceModel(
@@ -334,7 +333,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     remapped_F_sh = sim.remapping.scratch_arr2
 
     # Update the sea ice only where the concentration is greater than zero.
-    si_flux_heat = sim.ice.model.external_heat_fluxes.top[1]
+    si_flux_heat = sim.ice.model.external_heat_fluxes.top
     OC.interior(si_flux_heat, :, :, 1) .+=
         (OC.interior(ice_concentration, :, :, 1) .> 0) .* (remapped_F_lh .+ remapped_F_sh)
 
@@ -385,7 +384,7 @@ function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
 
     # Update only the part due to radiative fluxes. For the full update, the component due
     # to latent and sensible heat is missing and will be updated in update_turbulent_fluxes.
-    si_flux_heat = sim.ice.model.external_heat_fluxes.top[1]
+    si_flux_heat = sim.ice.model.external_heat_fluxes.top
     α = Interfacer.get_field(sim, Val(:surface_direct_albedo)) # scalar
     ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
 

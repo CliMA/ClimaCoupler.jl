@@ -121,7 +121,7 @@ function ClimaLandSimulation(
     atmos_h = Interfacer.remap(atmos_h, surface_space)
 
     # Set up atmosphere and radiation forcing
-    atmos = CL.CoupledAtmosphere{FT}(surface_space, atmos_h),
+    atmos = CL.CoupledAtmosphere{FT}(surface_space, atmos_h)
     radiation = CL.CoupledRadiativeFluxes{FT}(
         start_date;
         latitude = ClimaCore.Fields.coordinate_field(domain.space.surface).lat,
@@ -333,7 +333,8 @@ function ClimaLandSimulation(
             start_date,
             output_writer = output_writer,
             output_vars = :short,
-            reduction_period = :monthly,
+            reduction_period = :daily,
+            reduction_time = :max,
         )
         diagnostic_handler =
             CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)

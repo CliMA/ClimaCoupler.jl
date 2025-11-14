@@ -67,9 +67,4 @@ if ClimaComms.iamroot(comms_ctx)
     open(joinpath(output_dir, "sypd.txt"), "w") do sypd_filename
         println(sypd_filename, "$sypd")
     end
-
-    open(joinpath(output_dir, "max_rss_cpu.txt"), "w") do cpu_max_rss_filename
-        cpu_max_rss_GB = Utilities.show_memory_usage()
-        println(cpu_max_rss_filename, cpu_max_rss_GB)
-    end
 end

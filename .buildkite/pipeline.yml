@@ -192,13 +192,6 @@ steps:
         agents:
           slurm_mem: 20GB
 
-      - label: "AMIP: bucket initial condition test"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_bucket_ic.yml --job_id amip_bucket_ic"
-        artifact_paths: "experiments/ClimaEarth/output/amip_bucket_ic/artifacts/*"
-        agents:
-          slurm_ntasks: 1
-          slurm_mem: 20GB
-
       - label: "AMIP: integrated land non-spun up initial condition test"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_land_ic.yml --job_id amip_land_ic"
         artifact_paths: "experiments/ClimaEarth/output/amip_land_ic/artifacts/*"
@@ -321,7 +314,7 @@ steps:
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
-      
+
 
       - label: "GPU AMIP test: albedo from function"
         key: "gpu_amip_albedo_function"

@@ -116,14 +116,6 @@ function save_sypd_walltime_to_disk(cs, walltime)
         ) do walltime_per_step_filename
             println(walltime_per_step_filename, "$(walltime_per_step)")
         end
-
-        open(
-            joinpath(cs.dir_paths.artifacts_dir, "max_rss_cpu.txt"),
-            "w",
-        ) do cpu_max_rss_filename
-            cpu_max_rss_GB = Utilities.show_memory_usage()
-            println(cpu_max_rss_filename, cpu_max_rss_GB)
-        end
     end
     return nothing
 end

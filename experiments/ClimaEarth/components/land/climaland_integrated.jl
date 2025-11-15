@@ -140,7 +140,8 @@ function ClimaLandSimulation(
     )
     ground = CL.PrognosticGroundConditions{FT}()
     canopy_forcing = (; atmos, radiation, ground)
-    energy = CL.Canopy.PrescribedCanopyTempModel{FT}();
+    energy = CL.Canopy.PrescribedCanopyTempModel{FT}()
+    surface_domain = CL.Domains.obtain_surface_domain(domain)
     canopy = CL.Canopy.CanopyModel{FT}(
         surface_domain,
         canopy_forcing,

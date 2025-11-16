@@ -251,7 +251,7 @@ function ClimaLandSimulation(
         @info "ClimaLand: using land IC file" ic_path
 
         # Set snow T to orography-adjusted surface temperature before computing internal energy
-        p.snow.T .= max(FT.(273.1), orog_adjusted_T_surface)
+        p.snow.T .= max.(FT.(273.1), orog_adjusted_T_surface)
 
         CL.Simulations.set_snow_initial_conditions!(
             Y,

@@ -251,7 +251,7 @@ function ClimaLandSimulation(
         @info "ClimaLand: using land IC file" ic_path
 
         # Set snow T to orography-adjusted surface temperature before computing internal energy
-        p.snow.T .= max(FT.(273.1), orog_adjusted_T_surface)
+        p.snow.T .= max.(FT.(273.1), orog_adjusted_T_surface)
 
         CL.Simulations.set_snow_initial_conditions!(
             Y,
@@ -335,7 +335,7 @@ function ClimaLandSimulation(
             output_writer = output_writer,
             output_vars = :short,
             reduction_period = :daily,
-            reduction_time = :max,
+            reduction_type = :max,
         )
         diagnostic_handler =
             CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)

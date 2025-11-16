@@ -18,6 +18,6 @@ surface_setup: "PrescribedSurface"
 t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
-#max_newton_iters_ode: 1
-update_jacobian_every: stage
+max_newton_iters_ode: 1
+#update_jacobian_every: stage
 z_elem: 63

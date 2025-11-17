@@ -550,6 +550,13 @@ function FluxCalculator.compute_surface_fluxes!(
     land_space = axes(p.soil.turbulent_fluxes)
     coupled_atmos = sim.model.soil.boundary_conditions.top.atmos
 
+    # Check if spaces are compatible to avoid unnecessary remapping
+    spaces_compatible = (
+        land_space == boundary_space ||
+        CC.Spaces.issubspace(land_space, boundary_space) ||
+        CC.Spaces.issubspace(boundary_space, land_space)
+    )
+
     # Update the land simulation's coupled atmosphere state
     Interfacer.get_field!(coupled_atmos.h, atmos_sim, Val(:height_int))
 
@@ -559,9 +566,18 @@ function FluxCalculator.compute_surface_fluxes!(
     @. coupled_atmos.u = StaticArrays.SVector(p.scratch1, p.scratch2)
 
     # Use scratch space for remapped atmospheric fields to avoid allocations
-    Interfacer.remap!(p.scratch1, csf.ρ_atmos)
-    Interfacer.remap!(p.scratch2, csf.T_atmos)
-    Interfacer.remap!(p.scratch3, csf.q_atmos)
+    # Optimize atmospheric field remapping based on space compatibility
+    if spaces_compatible
+        # Direct assignment - no remapping needed, avoids device-to-host memory copies
+        @. p.scratch1 = csf.ρ_atmos
+        @. p.scratch2 = csf.T_atmos
+        @. p.scratch3 = csf.q_atmos
+    else
+        # Remap when spaces differ
+        Interfacer.remap!(p.scratch1, csf.ρ_atmos)
+        Interfacer.remap!(p.scratch2, csf.T_atmos)
+        Interfacer.remap!(p.scratch3, csf.q_atmos)
+    end
     @. coupled_atmos.thermal_state =
         TD.PhaseEquil_ρTq(thermo_params, p.scratch1, p.scratch2, p.scratch3)
 
@@ -586,16 +602,29 @@ function FluxCalculator.compute_surface_fluxes!(
 
     # Combine turbulent energy fluxes from each component of the land model
     # Use temporary variables to avoid allocating
-    Interfacer.remap!(
-        csf.scalar_temp1,
-        canopy_dest.lhf .+ soil_dest.lhf .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.lhf,
-    )
-    Interfacer.remap!(
-        csf.scalar_temp2,
-        canopy_dest.shf .+ soil_dest.shf .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.shf,
-    )
+    if spaces_compatible
+        # Direct assignment - no remapping needed
+        @. csf.scalar_temp1 =
+            canopy_dest.lhf +
+            soil_dest.lhf * (1 - p.snow.snow_cover_fraction) +
+            p.snow.snow_cover_fraction * snow_dest.lhf
+        @. csf.scalar_temp2 =
+            canopy_dest.shf +
+            soil_dest.shf * (1 - p.snow.snow_cover_fraction) +
+            p.snow.snow_cover_fraction * snow_dest.shf
+    else
+        # Remap when spaces differ
+        Interfacer.remap!(
+            csf.scalar_temp1,
+            canopy_dest.lhf .+ soil_dest.lhf .* (1 .- p.snow.snow_cover_fraction) .+
+            p.snow.snow_cover_fraction .* snow_dest.lhf,
+        )
+        Interfacer.remap!(
+            csf.scalar_temp2,
+            canopy_dest.shf .+ soil_dest.shf .* (1 .- p.snow.snow_cover_fraction) .+
+            p.snow.snow_cover_fraction .* snow_dest.shf,
+        )
+    end
 
     # Zero out the fluxes where the area fraction is zero
     @. csf.scalar_temp1 =
@@ -610,15 +639,27 @@ function FluxCalculator.compute_surface_fluxes!(
     # Combine turbulent moisture fluxes from each component of the land model
     # Note that we multiply by ρ_liq to convert from m s-1 to kg m-2 s-1
     ρ_liq = (LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set))
-    Interfacer.remap!(
-        csf.scalar_temp1,
-        (
-            canopy_dest.transpiration .+
-            (soil_dest.vapor_flux_liq .+ soil_dest.vapor_flux_ice) .*
-            (1 .- p.snow.snow_cover_fraction) .+
-            p.snow.snow_cover_fraction .* snow_dest.vapor_flux
-        ) .* ρ_liq,
-    )
+    if spaces_compatible
+        # Direct assignment - no remapping needed
+        @. csf.scalar_temp1 =
+            (
+                canopy_dest.transpiration +
+                (soil_dest.vapor_flux_liq + soil_dest.vapor_flux_ice) *
+                (1 - p.snow.snow_cover_fraction) +
+                p.snow.snow_cover_fraction * snow_dest.vapor_flux
+            ) * ρ_liq
+    else
+        # Remap when spaces differ
+        Interfacer.remap!(
+            csf.scalar_temp1,
+            (
+                canopy_dest.transpiration .+
+                (soil_dest.vapor_flux_liq .+ soil_dest.vapor_flux_ice) .*
+                (1 .- p.snow.snow_cover_fraction) .+
+                p.snow.snow_cover_fraction .* snow_dest.vapor_flux
+            ) .* ρ_liq,
+        )
+    end
     @. csf.scalar_temp1 =
         ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
     @. csf.F_turb_moisture += csf.scalar_temp1 * area_fraction
@@ -626,20 +667,36 @@ function FluxCalculator.compute_surface_fluxes!(
     # Combine turbulent momentum fluxes from each component of the land model
     # Note that we exclude the canopy component here for now, since we can have nonzero momentum fluxes
     #  where there is zero LAI. This should be fixed in ClimaLand.
-    Interfacer.remap!(
-        csf.scalar_temp1,
-        soil_dest.ρτxz .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.ρτxz,
-    )
+    if spaces_compatible
+        # Direct assignment - no remapping needed
+        @. csf.scalar_temp1 =
+            soil_dest.ρτxz * (1 - p.snow.snow_cover_fraction) +
+            p.snow.snow_cover_fraction * snow_dest.ρτxz
+    else
+        # Remap when spaces differ
+        Interfacer.remap!(
+            csf.scalar_temp1,
+            soil_dest.ρτxz .* (1 .- p.snow.snow_cover_fraction) .+
+            p.snow.snow_cover_fraction .* snow_dest.ρτxz,
+        )
+    end
     @. csf.scalar_temp1 =
         ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
     @. csf.F_turb_ρτxz += csf.scalar_temp1 * area_fraction
 
-    Interfacer.remap!(
-        csf.scalar_temp1,
-        soil_dest.ρτyz .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.ρτyz,
-    )
+    if spaces_compatible
+        # Direct assignment - no remapping needed
+        @. csf.scalar_temp1 =
+            soil_dest.ρτyz * (1 - p.snow.snow_cover_fraction) +
+            p.snow.snow_cover_fraction * snow_dest.ρτyz
+    else
+        # Remap when spaces differ
+        Interfacer.remap!(
+            csf.scalar_temp1,
+            soil_dest.ρτyz .* (1 .- p.snow.snow_cover_fraction) .+
+            p.snow.snow_cover_fraction .* snow_dest.ρτyz,
+        )
+    end
     @. csf.scalar_temp1 =
         ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
     @. csf.F_turb_ρτyz += csf.scalar_temp1 * area_fraction
@@ -647,11 +704,19 @@ function FluxCalculator.compute_surface_fluxes!(
     # Combine the buoyancy flux from each component of the land model
     # Note that we exclude the canopy component here for now, since ClimaLand doesn't
     #  include its extra resistance term in the buoyancy flux calculation.
-    Interfacer.remap!(
-        csf.scalar_temp1,
-        soil_dest.buoy_flux .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.buoy_flux,
-    )
+    if spaces_compatible
+        # Direct assignment - no remapping needed
+        @. csf.scalar_temp1 =
+            soil_dest.buoy_flux * (1 - p.snow.snow_cover_fraction) +
+            p.snow.snow_cover_fraction * snow_dest.buoy_flux
+    else
+        # Remap when spaces differ
+        Interfacer.remap!(
+            csf.scalar_temp1,
+            soil_dest.buoy_flux .* (1 .- p.snow.snow_cover_fraction) .+
+            p.snow.snow_cover_fraction .* snow_dest.buoy_flux,
+        )
+    end
     @. csf.scalar_temp1 =
         ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
     @. csf.buoyancy_flux += csf.scalar_temp1 * area_fraction

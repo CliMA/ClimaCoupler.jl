@@ -550,12 +550,6 @@ function FluxCalculator.compute_surface_fluxes!(
     land_space = axes(p.soil.turbulent_fluxes)
     coupled_atmos = sim.model.soil.boundary_conditions.top.atmos
 
-    # Only treat spaces as the same if they are the identical object.
-    # Previous heuristic (== or issubspace) caused broadcasts mixing different spaces,
-    # triggering large device->host memcopies. We therefore restrict short-circuit logic
-    # to exact identity and otherwise always use explicit remap! operations.
-    spaces_same = (land_space === boundary_space)
-
     # Update the land simulation's coupled atmosphere state
     Interfacer.get_field!(coupled_atmos.h, atmos_sim, Val(:height_int))
 
@@ -565,16 +559,9 @@ function FluxCalculator.compute_surface_fluxes!(
     @. coupled_atmos.u = StaticArrays.SVector(p.scratch1, p.scratch2)
 
     # Use scratch space for remapped atmospheric fields to avoid allocations
-    if spaces_same
-        # If spaces are truly identical, we can assign directly.
-        @. p.scratch1 = csf.ρ_atmos
-        @. p.scratch2 = csf.T_atmos
-        @. p.scratch3 = csf.q_atmos
-    else
-        Interfacer.remap!(p.scratch1, csf.ρ_atmos)
-        Interfacer.remap!(p.scratch2, csf.T_atmos)
-        Interfacer.remap!(p.scratch3, csf.q_atmos)
-    end
+    Interfacer.remap!(p.scratch1, csf.ρ_atmos)
+    Interfacer.remap!(p.scratch2, csf.T_atmos)
+    Interfacer.remap!(p.scratch3, csf.q_atmos)
     @. coupled_atmos.thermal_state =
         TD.PhaseEquil_ρTq(thermo_params, p.scratch1, p.scratch2, p.scratch3)
 
@@ -598,7 +585,7 @@ function FluxCalculator.compute_surface_fluxes!(
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
     # Combine turbulent energy fluxes from each component of the land model
-    # Always compute on land space then remap to boundary space (avoids mixed-space broadcast).
+    # Use temporary variables to avoid allocating
     Interfacer.remap!(
         csf.scalar_temp1,
         canopy_dest.lhf .+ soil_dest.lhf .* (1 .- p.snow.snow_cover_fraction) .+

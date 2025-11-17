@@ -8,6 +8,7 @@ module Interfacer
 import SciMLBase
 import ClimaComms
 import ClimaCore as CC
+import NVTX
 import Dates
 import Thermodynamics as TD
 import SciMLBase: step!
@@ -515,7 +516,9 @@ Non-ClimaCore fields should provide a method to [`Interfacer.remap`](@ref), or d
 function.
 """
 function remap!(target_field, source)
-    target_field .= remap(source, axes(target_field))
+    NVTX.@range "Interfacer.remap!" begin
+        target_field .= remap(source, axes(target_field))
+    end
     return nothing
 end
 

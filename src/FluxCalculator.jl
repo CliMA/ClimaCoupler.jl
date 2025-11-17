@@ -279,6 +279,7 @@ function compute_surface_fluxes!(
 
     # Set some scalars that we hardcode for now
     gustiness = FT(1)
+    roughness_model = Ref(SF.ScalarRoughness())
 
     # Construct the SurfaceFluxes.jl container of inputs
     inputs = @. SF.ValuesOnly(
@@ -292,6 +293,7 @@ function compute_surface_fluxes!(
         z0b,
         gustiness,
         beta,
+        roughness_model
     )
 
     # calculate the surface fluxes

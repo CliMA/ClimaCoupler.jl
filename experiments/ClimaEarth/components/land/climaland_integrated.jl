@@ -555,6 +555,8 @@ function FluxCalculator.compute_surface_fluxes!(
     # triggering large device->host memcopies. We therefore restrict short-circuit logic
     # to exact identity and otherwise always use explicit remap! operations.
     spaces_same = (land_space === boundary_space)
+    println("FluxCalculator: land_space === boundary_space = ", spaces_same)
+    println("FluxCalculator: land_space == boundary_space = ", land_space == boundary_space)
 
     # Update the land simulation's coupled atmosphere state
     Interfacer.get_field!(coupled_atmos.h, atmos_sim, Val(:height_int))

@@ -8,9 +8,9 @@ topography: "Earth"
 rayleigh_sponge: true
 viscous_sponge: true
 hyperdiff: ClimaHyperdiffusion
-divergence_damping_factor: 50.0
-scalar_hyperdiffusion_coefficient: 0.929738
-vorticity_hyperdiffusion_coefficient: 0.1857
+divergence_damping_factor: 1.0
+scalar_hyperdiffusion_coefficient: 0.5
+vorticity_hyperdiffusion_coefficient: 0.1
 insolation: "timevarying"
 rad: allskywithclear
 dt_cloud_fraction: "1hours"

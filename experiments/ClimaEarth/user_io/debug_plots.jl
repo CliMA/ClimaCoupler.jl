@@ -5,7 +5,7 @@ import ClimaCoreMakie
 import CairoMakie
 import ClimaCoupler: Interfacer, ConservationChecker
 import ClimaAtmos as CA
-import Oceananigans as OC
+# import Oceananigans as OC
 import StaticArrays
 
 """
@@ -160,15 +160,16 @@ function debug(sim::Interfacer.ComponentModelSimulation, dir)
             title =
                 field isa CC.Fields.Field ? "" : string(field_name) * print_extrema(field)
             ax = Makie.Axis(fig[i, j * 2 - 1]; title)
-            if field isa OC.Field || field isa OC.AbstractOperations.AbstractOperation
-                if field isa OC.AbstractOperations.AbstractOperation
-                    field = OC.Field(field)
-                    OC.compute!(field)
-                end
-                grid = field.grid
-                hm = CairoMakie.heatmap!(ax, view(field, :, :, grid.Nz))
-                Makie.Colorbar(fig[i, j * 2], hm)
-            elseif field isa CC.Fields.Field
+            # if field isa OC.Field || field isa OC.AbstractOperations.AbstractOperation
+            #     if field isa OC.AbstractOperations.AbstractOperation
+            #         field = OC.Field(field)
+            #         OC.compute!(field)
+            #     end
+            #     grid = field.grid
+            #     hm = CairoMakie.heatmap!(ax, view(field, :, :, grid.Nz))
+            #     Makie.Colorbar(fig[i, j * 2], hm)
+            # elseif field isa CC.Fields.Field
+            if field isa CC.Fields.Field
                 _heatmap_cc_field!(fig, field, i, j, field_name)
             elseif field isa AbstractArray
                 lin = Makie.lines!(ax, Array(field))
@@ -238,17 +239,17 @@ function print_extrema(num::Number)
     return " [$min, $max]"
 end
 
-function print_extrema(operation::OC.AbstractOperations.AbstractOperation)
-    evaluated_field = OC.Field(operation)
-    OC.compute!(evaluated_field)
-    return print_extrema(evaluated_field)
-end
-
-function print_extrema(field::OC.Field)
-    min = Printf.@sprintf("%.2E", minimum(field))
-    max = Printf.@sprintf("%.2E", maximum(field))
-    return " [$min, $max]"
-end
+# function print_extrema(operation::OC.AbstractOperations.AbstractOperation)
+#     evaluated_field = OC.Field(operation)
+#     OC.compute!(evaluated_field)
+#     return print_extrema(evaluated_field)
+# end
+#
+# function print_extrema(field::OC.Field)
+#     min = Printf.@sprintf("%.2E", minimum(field))
+#     max = Printf.@sprintf("%.2E", maximum(field))
+#     return " [$min, $max]"
+# end
 
 # below are additional fields specific to this experiment (ourside of the required coupler fields) that we are interested in plotting for debugging purposes
 

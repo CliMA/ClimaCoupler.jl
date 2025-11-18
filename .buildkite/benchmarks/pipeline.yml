@@ -29,60 +29,6 @@ steps:
 
   - wait
 
-  - group: "CPU benchmarks"
-    steps:
-      - label: "CPU ClimaAtmos without diagnostic EDMF"
-        key: "climaatmos"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos.yml --job_id climaatmos"
-        artifact_paths: "experiments/ClimaEarth/output/climaatmos/artifacts/*"
-        env:
-          CLIMACOMMS_CONTEXT: "MPI"
-          BUILD_HISTORY_HANDLE: ""
-          CLIMACOMMS_DEVICE: "CPU"
-        agents:
-          slurm_ntasks_per_node: 64
-          slurm_nodes: 1
-          slurm_mem_per_cpu: 4GB
-
-      - label: "CPU ClimaAtmos with diagnostic EDMF"
-        key: "climaatmos_diagedmf"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos_diagedmf.yml --job_id climaatmos_diagedmf"
-        artifact_paths: "experiments/ClimaEarth/output/climaatmos_diagedmf/artifacts/*"
-        env:
-          CLIMACOMMS_CONTEXT: "MPI"
-          BUILD_HISTORY_HANDLE: ""
-          CLIMACOMMS_DEVICE: "CPU"
-        agents:
-          slurm_ntasks_per_node: 64
-          slurm_nodes: 1
-          slurm_mem_per_cpu: 4GB
-
-      - label: "CPU AMIP with diagnostic EDMF"
-        key: "amip_diagedmf"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $BENCHMARK_CONFIG_PATH/amip_diagedmf.yml --job_id amip_diagedmf"
-        artifact_paths: "experiments/ClimaEarth/output/amip_diagedmf/artifacts/*"
-        env:
-          CLIMACOMMS_CONTEXT: "MPI"
-          BUILD_HISTORY_HANDLE: ""
-          CLIMACOMMS_DEVICE: "CPU"
-        agents:
-          slurm_ntasks_per_node: 64
-          slurm_nodes: 1
-          slurm_mem_per_cpu: 4GB
-
-      - label: "CPU AMIP with diagnostic EDMF and io"
-        key: "amip_diagedmf_io"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $BENCHMARK_CONFIG_PATH/amip_diagedmf_io.yml --job_id amip_diagedmf_io"
-        artifact_paths: "experiments/ClimaEarth/output/amip_diagedmf_io/artifacts/*"
-        env:
-          CLIMACOMMS_CONTEXT: "MPI"
-          BUILD_HISTORY_HANDLE: ""
-          CLIMACOMMS_DEVICE: "CPU"
-        agents:
-          slurm_ntasks_per_node: 64
-          slurm_nodes: 1
-          slurm_mem_per_cpu: 4GB
-
   - group: "GPU benchmarks"
     steps:
       - label: "GPU ClimaAtmos without diagnostic EDMF"
@@ -141,13 +87,9 @@ steps:
     steps:
       - label: "Compare AMIP/Atmos-only with diagnostic EDMF"
         key: "compare_amip_climaatmos_amip_diagedmf"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/user_io/benchmarks.jl --cpu_job_id_coupled amip_diagedmf --cpu_job_id_coupled_io amip_diagedmf_io --cpu_job_id_atmos_diagedmf climaatmos_diagedmf --cpu_job_id_atmos climaatmos --build_id $BUILDKITE_BUILD_NUMBER"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/user_io/benchmarks.jl --gpu_job_id_coupled gpu_amip_diagedmf --gpu_job_id_coupled_io gpu_amip_diagedmf_io --gpu_job_id_atmos_diagedmf gpu_climaatmos_diagedmf --gpu_job_id_atmos gpu_climaatmos --build_id $BUILDKITE_BUILD_NUMBER"
         artifact_paths: "experiments/ClimaEarth/output/compare_amip_climaatmos_amip_diagedmf/*"
         depends_on:
-          - "climaatmos"
-          - "climaatmos_diagedmf"
-          - "amip_diagedmf"
-          - "amip_diagedmf_io"
           - "gpu_climaatmos"
           - "gpu_climaatmos_diagedmf"
           - "gpu_amip_diagedmf"

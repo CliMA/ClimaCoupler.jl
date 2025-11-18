@@ -457,7 +457,12 @@ function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
         source_space == target_space ||
         CC.Spaces.issubspace(source_space, target_space) ||
         CC.Spaces.issubspace(target_space, source_space)
-    println("Spaces are compatible: ", spaces_are_compatible)
+    if !spaces_are_compatible
+        @info (
+            "Remapping field from source space:\n$source_space\n" *
+            "to target space:\n$target_space"
+        )
+    end
 
     # TODO: Handle remapping of Vectors correctly
     if hasproperty(field, :components)

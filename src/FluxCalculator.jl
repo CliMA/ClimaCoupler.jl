@@ -281,18 +281,35 @@ function compute_surface_fluxes!(
     gustiness = FT(1)
 
     # Construct the SurfaceFluxes.jl container of inputs
-    inputs = @. SF.ValuesOnly(
-        SF.StateValues(csf.z_int, uₕ_int, thermo_state_atmos), # state_in
-        SF.StateValues(                                  # state_sfc
-            csf.z_sfc,
-            StaticArrays.SVector(FT(0), FT(0)),
-            thermo_state_sfc,
-        ),
-        z0m,
-        z0b,
-        gustiness,
-        beta,
-    )
+    if pkgversion(SF) ≥ v"0.14.0"
+        roughness_model = Ref(SF.ScalarRoughness())
+        inputs = @. SF.ValuesOnly(
+            SF.StateValues(csf.z_int, uₕ_int, thermo_state_atmos), # state_in
+            SF.StateValues(                                  # state_sfc
+                csf.z_sfc,
+                StaticArrays.SVector(FT(0), FT(0)),
+                thermo_state_sfc,
+            ),
+            z0m,
+            z0b,
+            gustiness,
+            beta,
+            roughness_model,
+        )
+    else
+        inputs = @. SF.ValuesOnly(
+            SF.StateValues(csf.z_int, uₕ_int, thermo_state_atmos), # state_in
+            SF.StateValues(                                  # state_sfc
+                csf.z_sfc,
+                StaticArrays.SVector(FT(0), FT(0)),
+                thermo_state_sfc,
+            ),
+            z0m,
+            z0b,
+            gustiness,
+            beta,
+        )
+    end
 
     # calculate the surface fluxes
     fluxes = FluxCalculator.get_surface_fluxes(inputs, surface_params)

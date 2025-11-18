@@ -457,9 +457,11 @@ function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
         source_space == target_space ||
         CC.Spaces.issubspace(source_space, target_space) ||
         CC.Spaces.issubspace(target_space, source_space)
+    println("Spaces are compatible: ", spaces_are_compatible)
 
     # TODO: Handle remapping of Vectors correctly
     if hasproperty(field, :components)
+        println("Field has components")
         @assert length(field.components) == 1 "Can only work with simple vectors"
         field = field.components.data.:1
     end

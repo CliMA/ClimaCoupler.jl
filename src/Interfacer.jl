@@ -448,7 +448,69 @@ Non-ClimaCore fields should provide a method to this function.
 """
 function remap end
 
-function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
+# Pretty descriptions for debugging remaps
+function describe_space(space)
+    topo = try
+        CC.Spaces.topology(space)
+    catch
+        nothing
+    end
+    mesh = isnothing(topo) ? nothing : (
+        try
+            topo.mesh
+        catch
+            nothing
+        end
+    )
+    quad = try
+        CC.Spaces.quadrature_style(space)
+    catch
+        nothing
+    end
+    deg = try
+        isnothing(quad) ? nothing : CC.Spaces.Quadratures.polynomial_degree(quad)
+    catch
+        nothing
+    end
+    return (
+        type = typeof(space),
+        id = objectid(space),
+        quad_degree = deg,
+        topo_type = isnothing(topo) ? nothing : typeof(topo),
+        mesh_type = isnothing(mesh) ? nothing : typeof(mesh),
+    )
+end
+
+function describe_field(f)
+    vals = CC.Fields.field_values(f)
+    storage_t = typeof(vals)
+    # Avoid hard dependency on CUDA
+    on_gpu = occursin("CuArray", string(storage_t))
+    sz = try
+        size(vals)
+    catch
+        ()
+    end
+    return (eltype = eltype(vals), size = sz, on_gpu = on_gpu, storage_type = storage_t)
+end
+
+# A short, filtered callsite snapshot (skip Interfacer frames)
+function short_callsite(; max_frames = 3)
+    bt = Base.backtrace()
+    frames = Base.stacktrace(bt)
+    keep = filter(fr -> !occursin("Interfacer.jl", String(fr.file)), frames)
+    n = min(length(keep), max_frames)
+    return [
+        (; file = String(keep[i].file), line = keep[i].line, func = keep[i].func) for
+        i in 1:n
+    ]
+end
+
+function remap(
+    field::CC.Fields.Field,
+    target_space::CC.Spaces.AbstractSpace;
+    label::Union{Nothing, String, Symbol} = nothing,
+)
     source_space = axes(field)
     comms_ctx = ClimaComms.context(source_space)
 
@@ -460,8 +522,10 @@ function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
     if !spaces_are_compatible
         @info (
             "Remapping field from source space:\n$source_space\n" *
-            "to target space:\n$target_space"
+            "to incompatible target space:\n$target_space"
         )
+        cs = short_callsite()
+        @info "Interfacer.remap: incompatible spaces" label callsite = cs
     end
 
     # TODO: Handle remapping of Vectors correctly
@@ -481,36 +545,46 @@ function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
     lons = CC.Fields.field2array(coords.long)
     hcoords = CC.Geometry.LatLongPoint.(lats, lons)
 
-    # Remap the field, using MPI if applicable
-    if comms_ctx isa ClimaComms.SingletonCommsContext
-        # Remap source field to target space as an array
-        remapped_array = CC.Remapping.interpolate(field, hcoords, [])
-
-        # Convert remapped array to a field in the target space
-        return CC.Fields.array2field(remapped_array, target_space)
-    else
-        # Gather then broadcast the global hcoords and offsets
-        offset = [length(hcoords)]
-        all_hcoords = ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, hcoords))
-        all_offsets = ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, offset))
-
-        # Interpolate on root and broadcast to all processes
-        remapper = CC.Remapping.Remapper(source_space; target_hcoords = all_hcoords)
-        remapped_array =
-            ClimaComms.bcast(comms_ctx, CC.Remapping.interpolate(remapper, field))
-
-        my_ending_offset = sum(all_offsets[1:ClimaComms.mypid(comms_ctx)])
-        my_starting_offset = my_ending_offset - offset[]
-
-        # Convert remapped array to a field in the target space on each process
-        return CC.Fields.array2field(
-            remapped_array[(1 + my_starting_offset):my_ending_offset],
-            target_space,
-        )
+    # Remap the field, using MPI if applicable, NVTX-labeled
+    range_name =
+        isnothing(label) ? "Interfacer.remap:interpolate" :
+        "Interfacer.remap:interpolate (" * String(label) * ")"
+    NVTX.range_push(; message = range_name)
+    out_field = begin
+        if comms_ctx isa ClimaComms.SingletonCommsContext
+            # Remap source field to target space as an array
+            remapped_array = CC.Remapping.interpolate(field, hcoords, [])
+            # Convert remapped array to a field in the target space
+            CC.Fields.array2field(remapped_array, target_space)
+        else
+            # Gather then broadcast the global hcoords and offsets
+            offset = [length(hcoords)]
+            all_hcoords =
+                ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, hcoords))
+            all_offsets =
+                ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, offset))
+            # Interpolate on root and broadcast to all processes
+            remapper = CC.Remapping.Remapper(source_space; target_hcoords = all_hcoords)
+            remapped_array =
+                ClimaComms.bcast(comms_ctx, CC.Remapping.interpolate(remapper, field))
+            my_ending_offset = sum(all_offsets[1:ClimaComms.mypid(comms_ctx)])
+            my_starting_offset = my_ending_offset - offset[]
+            # Convert remapped array to a field in the target space on each process
+            CC.Fields.array2field(
+                remapped_array[(1 + my_starting_offset):my_ending_offset],
+                target_space,
+            )
+        end
     end
+    NVTX.range_pop()
+    return out_field
 end
 
-function remap(num::Number, target_space::CC.Spaces.AbstractSpace)
+function remap(
+    num::Number,
+    target_space::CC.Spaces.AbstractSpace;
+    label::Union{Nothing, String, Symbol} = nothing,
+)
     return num
 end
 
@@ -522,9 +596,11 @@ Remap the given `source` onto the `target_field`.
 Non-ClimaCore fields should provide a method to [`Interfacer.remap`](@ref), or directly to this
 function.
 """
-function remap!(target_field, source)
-    NVTX.@range "Interfacer.remap!" begin
-        target_field .= remap(source, axes(target_field))
+function remap!(target_field, source; label::Union{Nothing, String, Symbol} = nothing)
+    range_name =
+        isnothing(label) ? "Interfacer.remap!" : "Interfacer.remap! (" * String(label) * ")"
+    NVTX.@range range_name begin
+        target_field .= remap(source, axes(target_field); label)
     end
     return nothing
 end

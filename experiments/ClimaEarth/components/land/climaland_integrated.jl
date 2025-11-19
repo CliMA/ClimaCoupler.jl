@@ -557,6 +557,7 @@ function FluxCalculator.compute_surface_fluxes!(
     spaces_same = (land_space === boundary_space)
 
     # Update the land simulation's coupled atmosphere state
+    @info "Getting height_int from atmosphere simulation"
     Interfacer.get_field!(coupled_atmos.h, atmos_sim, Val(:height_int))
 
     # Use scratch space for remapped wind vector components to avoid allocations

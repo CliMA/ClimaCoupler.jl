@@ -212,5 +212,5 @@ steps:
 
       - label: ":envelope: Slack report: Slabplanet"
         command:
-          - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/slabplanet_evolve_ocean/artifacts/total_energy_bucket.png -m png -n slab_coarse -x "Slabplanet energy conservation"
-          - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/slabplanet_evolve_ocean/artifacts/total_water_bucket.png -m png -n slab_coarse_w -x "Slabplanet water conservation"
+          - slack-upload -c C04S6MBSDC4 -f experiments/ClimaEarth/output/slabplanet_evolve_ocean/artifacts/total_energy_bucket.png -n slab_coarse -x "Slabplanet energy conservation"
+          - slack-upload -c C04S6MBSDC4 -f experiments/ClimaEarth/output/slabplanet_evolve_ocean/artifacts/total_water_bucket.png -n slab_coarse_w -x "Slabplanet water conservation"

@@ -62,5 +62,5 @@ steps:
         command:
           - |
             find experiments/ClimaEarth/output/amip/artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
-              slack-upload -c "#coupler-report" -f "$$file" -m png -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
+              slack-upload -c C04S6MBSDC4 -f "$$file" -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
             done

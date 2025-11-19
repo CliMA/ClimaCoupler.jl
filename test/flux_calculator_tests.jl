@@ -213,18 +213,35 @@ for FT in (Float32, Float64)
             TD.PhaseNonEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, TD.PhasePartition.(q_sfc))
 
         # Use SurfaceFluxes.jl to compute the expected fluxes
-        inputs = @. SF.ValuesOnly(
-            SF.StateValues(z_int, uₕ_int, thermo_state_atmos), # state_in
-            SF.StateValues(                                  # state_sfc
-                z_sfc,
-                StaticArrays.SVector(FT(0), FT(0)),
-                thermo_state_sfc,
-            ),
-            z0m,
-            z0b,
-            gustiness,
-            beta,
-        )
+        if pkgversion(SF) ≥ v"0.14.0"
+            roughness_model = Ref(SF.ScalarRoughness())
+            inputs = @. SF.ValuesOnly(
+                SF.StateValues(z_int, uₕ_int, thermo_state_atmos), # state_in
+                SF.StateValues(                                  # state_sfc
+                    z_sfc,
+                    StaticArrays.SVector(FT(0), FT(0)),
+                    thermo_state_sfc,
+                ),
+                z0m,
+                z0b,
+                gustiness,
+                beta,
+                roughness_model,
+            )
+        else
+            inputs = @. SF.ValuesOnly(
+                SF.StateValues(z_int, uₕ_int, thermo_state_atmos), # state_in
+                SF.StateValues(                                  # state_sfc
+                    z_sfc,
+                    StaticArrays.SVector(FT(0), FT(0)),
+                    thermo_state_sfc,
+                ),
+                z0m,
+                z0b,
+                gustiness,
+                beta,
+            )
+        end
         surface_params = FluxCalculator.get_surface_params(atmos_sim)
         fluxes_expected = FluxCalculator.get_surface_fluxes(inputs, surface_params)
 

@@ -524,7 +524,7 @@ function remap(
             "Remapping field from source space:\n$source_space\n" *
             "to incompatible target space:\n$target_space"
         )
-        cs = short_callsite()
+        cs = short_callsite(max_frames = 5)
         @info "Interfacer.remap: incompatible spaces" label callsite = cs
     end
 

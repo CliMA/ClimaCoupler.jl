@@ -125,8 +125,8 @@ function ClimaLandSimulation(
         atmos = CL.CoupledAtmosphere{FT}(surface_space, atmos_h),
         radiation = CL.CoupledRadiativeFluxes{FT}(
             start_date;
-            latitude = ClimaCore.Fields.coordinate_field(domain.space.surface).lat,
-            longitude = ClimaCore.Fields.coordinate_field(domain.space.surface).long,
+            latitude = CC.Fields.coordinate_field(domain.space.surface).lat,
+            longitude = CC.Fields.coordinate_field(domain.space.surface).long,
             toml_dict,
         ),
     )
@@ -551,7 +551,7 @@ function FluxCalculator.compute_surface_fluxes!(
     coupled_atmos = sim.model.soil.boundary_conditions.top.atmos
 
     # Update the land simulation's coupled atmosphere state
-    Interfacer.get_field!(coupled_atmos.h, atmos_sim, Val(:height_int))
+    Interfacer.remap!(coupled_atmos.h, Interfacer.get_atmos_height_delta(csf))
 
     # Use scratch space for remapped wind vector components to avoid allocations
     Interfacer.get_field!(p.scratch1, atmos_sim, Val(:u_int)) # u_atmos

@@ -99,4 +99,4 @@ steps:
         depends_on:
           - "compare_amip_climaatmos_amip_diagedmf"
         command:
-          - slack-upload -c "#coupler-report" -f experiments/ClimaEarth/output/compare_amip_climaatmos_amip_diagedmf/table.txt -m txt -n compare_amip_climaatmos_amip_diagedmf_table -x "Coupler CPU/GPU Comparison Table"
+          - slack-upload -c C04S6MBSDC4 -f experiments/ClimaEarth/output/compare_amip_climaatmos_amip_diagedmf/table.txt -n compare_amip_climaatmos_amip_diagedmf_table -x "Coupler CPU/GPU Comparison Table"

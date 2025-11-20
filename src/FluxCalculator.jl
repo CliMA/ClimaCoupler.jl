@@ -11,6 +11,7 @@ import SurfaceFluxes as SF
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
 import ClimaCore as CC
+import NVTX
 import ..Interfacer, ..Utilities
 
 export extrapolate_ρ_to_sfc,
@@ -216,6 +217,17 @@ function compute_surface_fluxes!(
 end
 
 function compute_surface_fluxes!(
+    csf,
+    sim::Interfacer.SurfaceModelSimulation,
+    atmos_sim::Interfacer.AtmosModelSimulation,
+    thermo_params,
+)
+    NVTX.@range "FluxCalculator.compute_surface_fluxes!(surface)" begin
+        return _compute_surface_fluxes_surface_impl!(csf, sim, atmos_sim, thermo_params)
+    end
+end
+
+function _compute_surface_fluxes_surface_impl!(
     csf,
     sim::Interfacer.SurfaceModelSimulation,
     atmos_sim::Interfacer.AtmosModelSimulation,

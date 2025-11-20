@@ -279,7 +279,8 @@ function compute_surface_fluxes!(
 
     # Set some scalars that we hardcode for now
     gustiness = ones(boundary_space)
-    roughness_model = Ref(SF.ScalarRoughness())
+    #roughness_model = Ref(SF.ScalarRoughness())
+    roughness_model = Ref(SF.CharnockRoughness())
 
     # Construct the SurfaceFluxes.jl container of inputs
     inputs = @. SF.ValuesOnly(

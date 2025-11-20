@@ -561,7 +561,7 @@ FluxCalculator.get_surface_params(sim::ClimaAtmosSimulation) =
     CAP.surface_fluxes_params(sim.integrator.p.params)
 
 """
-    Interfacer.set_cache!(sim::ClimaAtmosSimulation)
+    Interfacer.set_cache!(sim::ClimaAtmosSimulation, csf)
 
 Set cache variables that cannot be initialized before the initial exchange.
 Radiation must be called here because it requires the surface model initial
@@ -571,7 +571,7 @@ Any other callbacks which modify the cache should be called here as well.
 This function does not set all the cache variables, because many are computed
 as part of the tendendencies.
 """
-function Interfacer.set_cache!(sim::ClimaAtmosSimulation)
+function Interfacer.set_cache!(sim::ClimaAtmosSimulation, csf)
     if hasradiation(sim.integrator)
         CA.rrtmgp_model_callback!(sim.integrator)
         if pkgversion(CA) == v"0.30" &&
@@ -583,6 +583,9 @@ function Interfacer.set_cache!(sim::ClimaAtmosSimulation)
             pkgversion(CA) > v"0.30" && CA.nogw_model_callback!(sim.integrator)
         end
     end
+
+    # Update the surface emissivity field, which is static over the simulation.
+    Interfacer.update_field!(sim, Val(:emissivity), csf.emissivity)
     return nothing
 end
 

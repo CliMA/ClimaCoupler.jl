@@ -547,12 +547,9 @@ function FluxCalculator.compute_surface_fluxes!(
     Y, p, t, model = sim.integrator.u, sim.integrator.p, sim.integrator.t, sim.model
 
     # We should change this to be on the boundary_space
-    land_space = axes(p.soil.turbulent_fluxes)
     coupled_atmos = sim.model.soil.boundary_conditions.top.atmos
 
     # Update the land simulation's coupled atmosphere state
-    Interfacer.remap!(coupled_atmos.h, Interfacer.get_atmos_height_delta(csf))
-
     # Use scratch space for remapped wind vector components to avoid allocations
     Interfacer.get_field!(p.scratch1, atmos_sim, Val(:u_int)) # u_atmos
     Interfacer.get_field!(p.scratch2, atmos_sim, Val(:v_int)) # v_atmos
@@ -684,7 +681,7 @@ function FluxCalculator.compute_surface_fluxes!(
 end
 
 """
-    Interfacer.set_cache!(sim::ClimaLandSimulation)
+    Interfacer.set_cache!(sim::ClimaLandSimulation, csf)
 
 Set cache variables that cannot be initialized before the initial exchange.
 This must be called after radiation, so that `p.drivers`
@@ -694,8 +691,14 @@ to the rest of the cache (e.g. in canopy radative transfer).
 This function does not set all the cache variables, because many are computed
 as part of the tendendencies.
 """
-function Interfacer.set_cache!(sim::ClimaLandSimulation)
+function Interfacer.set_cache!(sim::ClimaLandSimulation, csf)
     land_set_initial_cache! = CL.make_set_initial_cache(sim.model)
     land_set_initial_cache!(sim.integrator.p, sim.integrator.u, sim.integrator.t)
+
+    # Set the land model's coupled atmosphere height to the atmospheric height delta,
+    # which is constant over the simulation.
+    Interfacer.remap!(sim.model.soil.boundary_conditions.top.atmos.h, csf.height_delta)
+    Interfacer.remap!(sim.model.canopy.boundary_conditions.atmos.h, csf.height_delta)
+    Interfacer.remap!(sim.model.snow.boundary_conditions.atmos.h, csf.height_delta)
     return nothing
 end

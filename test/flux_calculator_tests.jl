@@ -160,6 +160,9 @@ for FT in (Float32, Float64)
         push!(coupler_cache_names, coupler_cache_additional...)
         fields = Interfacer.init_coupler_fields(FT, coupler_cache_names, boundary_space)
 
+        # import static fields into the coupler fields
+        FieldExchanger.import_static_fields!(fields, model_sims)
+
         # import atmosphere properties into coupler fields
         FieldExchanger.import_atmos_fields!(fields, model_sims)
 

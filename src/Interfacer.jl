@@ -108,8 +108,9 @@ default_coupler_fields() = [
     :T_atmos,
     :q_atmos,
     :ρ_atmos,
-    :z_int,
-    :z_sfc,
+    :height_int,
+    :height_sfc,
+    :height_delta,
     # fields used for flux exchange
     :F_lh,
     :F_sh,
@@ -521,13 +522,13 @@ end
 
 
 """
-    set_cache!(sim::ComponentModelSimulation)
+    set_cache!(sim::ComponentModelSimulation, csf)
 
 Perform any initialization of the component model cache that must be done
 after the initial exchange.
 This is not required to be extended, but may be necessary for some models.
 """
-set_cache!(sim::ComponentModelSimulation) = nothing
+set_cache!(sim::ComponentModelSimulation, csf) = nothing
 
 """
     boundary_space(sim::CoupledSimulation)
@@ -556,5 +557,31 @@ function ClimaComms.device(sim::CoupledSimulation)
     return ClimaComms.device(sim.fields)
 end
 
+"""
+    get_atmos_height_delta(height_int, height_sfc)
+
+Return a Field of the height delta between the atmosphere bottom cell center
+and bottom face, defined on the boundary space.
+This is used to compute turbulent fluxes.
+
+Since the atmospheric height is defined on centers, we need to copy the values onto
+the boundary space to be able to subtract the surface elevation.
+This pattern is not reliable and should not be reused.
+
+Note this function allocates a new field, and the atmosphere heights won't change
+during a simulation, so it should only be called at initialization.
+
+# Arguments
+- `csf`: [NamedTuple] containing coupler fields.
+
+# Returns
+- [CC.Fields.Field] defined on the boundary space containing the height delta.
+"""
+function get_atmos_height_delta(height_int, height_sfc)
+    return CC.Fields.Field(
+        CC.Fields.field_values(height_int),
+        axes(height_sfc), # boundary space
+    ) .- height_sfc
+end
 
 end # module

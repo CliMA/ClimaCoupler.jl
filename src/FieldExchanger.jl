@@ -114,8 +114,6 @@ function import_atmos_fields!(csf, model_sims)
     Interfacer.get_field!(csf.T_atmos, model_sims.atmos_sim, Val(:air_temperature))
     Interfacer.get_field!(csf.q_atmos, model_sims.atmos_sim, Val(:specific_humidity))
     Interfacer.get_field!(csf.ρ_atmos, model_sims.atmos_sim, Val(:air_density))
-    Interfacer.get_field!(csf.z_int, model_sims.atmos_sim, Val(:height_int))
-    Interfacer.get_field!(csf.z_sfc, model_sims.atmos_sim, Val(:height_sfc))
 
     # radiative fluxes
     Interfacer.get_field!(csf.SW_d, model_sims.atmos_sim, Val(:SW_d))
@@ -178,10 +176,35 @@ function import_combined_surface_fields!(csf, model_sims)
 end
 
 """
+    import_static_fields!(csf, model_sims)
+
+Import static fields into the coupler fields.
+This is used to import fields that are not updated during a simulation,
+so it is only called at initialization.
+
+Fields imported here are:
+- the bottom cell center and face heights of the atmosphere
+
+Any fields imported into the coupler fields here that need to be sent to
+component models should be updated in the `set_cache!` function
+of the receiving component model.
+
+# Arguments
+- `csf`: [NamedTuple] containing coupler fields.
+- `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
+"""
+function import_static_fields!(csf, model_sims)
+    Interfacer.get_field!(csf.height_int, model_sims.atmos_sim, Val(:height_int))
+    Interfacer.get_field!(csf.height_sfc, model_sims.atmos_sim, Val(:height_sfc))
+    csf.height_delta .= Interfacer.get_atmos_height_delta(csf.height_int, csf.height_sfc)
+
+    return nothing
+end
+
+"""
     update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf)
 
-Updates the atmosphere's fields for surface direct and diffuse albedos, emissivity, and temperature,
-as well as the turbulent fluxes.
+Updates the atmosphere's fields for surface direct and diffuse albedos, emissivity,and temperature.
 
 # Arguments
 - `atmos_sim`: [Interfacer.AtmosModelSimulation] containing an atmospheric model simulation object.
@@ -369,12 +392,15 @@ initialized with the surface temperatures, which are only available after the
 initial exchange. The integrated land, in turn, requires its drivers in the
 cache to be filled with the initial radiation fluxes, so that it can propagate
 these to the rest of its cache (e.g. in canopy radative transfer).
+
+This function can also be used to set exchanged fields that are static over the
+simulation, since it is only called at initialization.
 """
 function set_caches!(cs::Interfacer.CoupledSimulation)
-    Interfacer.set_cache!(cs.model_sims.atmos_sim)
+    Interfacer.set_cache!(cs.model_sims.atmos_sim, cs.fields)
     exchange!(cs)
     for sim in cs.model_sims
-        sim isa Interfacer.SurfaceModelSimulation && Interfacer.set_cache!(sim)
+        sim isa Interfacer.SurfaceModelSimulation && Interfacer.set_cache!(sim, cs.fields)
     end
     return nothing
 end

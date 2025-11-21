@@ -249,19 +249,12 @@ function CoupledSimulation(config_dict::AbstractDict)
     end
 
     # Get surface elevation on the boundary space from `atmos` coordinate field
-    surface_elevation = Interfacer.get_field(atmos_sim, Val(:height_sfc), boundary_space) # on surface space
-
-    # Get atmospheric height on the boundary space
-    # Since the atmospheric height is defined on centers, we need to copy the values onto the boundary space
-    # to be able to subtract the surface elevation
-    # Note: This pattern is not reliable and should not be reused.
-    atmos_h =
-        ClimaCore.Fields.Field(
-            ClimaCore.Fields.field_values(
-                Interfacer.get_field(atmos_sim, Val(:height_int)),
-            ),
-            boundary_space,
-        ) .- surface_elevation # atmos height relative to the surface, on the surface space
+    surface_elevation = Interfacer.get_field(atmos_sim, Val(:height_sfc), boundary_space) # on boundary space
+    # Get atmospheric height relative to the surface directly from the atmosphere
+    atmos_h = Interfacer.get_atmos_height_delta(
+        Interfacer.get_field(atmos_sim, Val(:height_int)),
+        surface_elevation,
+    )
 
     #=
     ### Land-sea Fraction
@@ -573,14 +566,17 @@ function CoupledSimulation(config_dict::AbstractDict)
         The concrete steps for proper initialization are:
         =#
 
-        # 1. Import atmospheric and surface fields into the coupler fields,
+        # 1. Import static fields into the coupler fields
+        FieldExchanger.import_static_fields!(cs.fields, cs.model_sims)
+
+        # 2. Import atmospheric and surface fields into the coupler fields,
         #  then broadcast them back out to all components.
         FieldExchanger.exchange!(cs)
 
-        # 2. Update any fields in the model caches that can only be filled after the initial exchange.
+        # 3. Update any fields in the model caches that can only be filled after the initial exchange.
         FieldExchanger.set_caches!(cs)
 
-        # 3. Calculate and update turbulent fluxes for each surface model,
+        # 4. Calculate and update turbulent fluxes for each surface model,
         #  and save the weighted average in coupler fields
         FluxCalculator.turbulent_fluxes!(cs)
 

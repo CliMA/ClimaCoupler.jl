@@ -288,9 +288,9 @@ function compute_surface_fluxes!(
     if pkgversion(SF) ≥ v"0.14.0"
         roughness_model = Ref(SF.ScalarRoughness())
         inputs = @. SF.ValuesOnly(
-            SF.StateValues(csf.z_int, uₕ_int, thermo_state_atmos), # state_in
+            SF.StateValues(csf.height_int, uₕ_int, thermo_state_atmos), # state_in
             SF.StateValues(                                  # state_sfc
-                csf.z_sfc,
+                csf.height_sfc,
                 StaticArrays.SVector(FT(0), FT(0)),
                 thermo_state_sfc,
             ),
@@ -302,9 +302,9 @@ function compute_surface_fluxes!(
         )
     else
         inputs = @. SF.ValuesOnly(
-            SF.StateValues(csf.z_int, uₕ_int, thermo_state_atmos), # state_in
+            SF.StateValues(csf.height_int, uₕ_int, thermo_state_atmos), # state_in
             SF.StateValues(                                  # state_sfc
-                csf.z_sfc,
+                csf.height_sfc,
                 StaticArrays.SVector(FT(0), FT(0)),
                 thermo_state_sfc,
             ),

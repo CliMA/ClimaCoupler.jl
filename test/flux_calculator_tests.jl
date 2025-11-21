@@ -31,7 +31,7 @@ Interfacer.get_field(sim::TestAtmos, ::Val{:air_temperature}) = sim.integrator.T
 Interfacer.get_field(sim::TestAtmos, ::Val{:specific_humidity}) = sim.integrator.q
 Interfacer.get_field(sim::TestAtmos, ::Val{:air_density}) = sim.integrator.ρ
 Interfacer.get_field(sim::TestAtmos, ::Val{:height_int}) = sim.integrator.p.z
-Interfacer.get_field(sim::TestAtmos, ::Val{:height_sfc}) = sim.integrator.p.z_sfc
+Interfacer.get_field(sim::TestAtmos, ::Val{:height_sfc}) = sim.integrator.p.height_sfc
 Interfacer.get_field(sim::TestAtmos, ::Val{:u_int}) = sim.integrator.p.u
 Interfacer.get_field(sim::TestAtmos, ::Val{:v_int}) = sim.integrator.p.v
 Interfacer.get_field(sim::TestAtmos, ::Val{:SW_d}) = CC.Fields.zeros(axes(sim.integrator.T))
@@ -116,7 +116,7 @@ for FT in (Float32, Float64)
             ρq_tot_bc = zeros(boundary_space),
             uₕ_bc = ones(boundary_space),
             z = ones(boundary_space),
-            z_sfc = zeros(boundary_space),
+            height_sfc = zeros(boundary_space),
             u = ones(boundary_space),
             v = ones(boundary_space),
         )
@@ -160,6 +160,9 @@ for FT in (Float32, Float64)
         push!(coupler_cache_names, coupler_cache_additional...)
         fields = Interfacer.init_coupler_fields(FT, coupler_cache_names, boundary_space)
 
+        # import static fields into the coupler fields
+        FieldExchanger.import_static_fields!(fields, model_sims)
+
         # import atmosphere properties into coupler fields
         FieldExchanger.import_atmos_fields!(fields, model_sims)
 
@@ -176,7 +179,7 @@ for FT in (Float32, Float64)
 
         # Compute expected fluxes
         # Get atmosphere properties
-        z_int = Interfacer.get_field(atmos_sim, Val(:height_int))
+        height_int = Interfacer.get_field(atmos_sim, Val(:height_int))
         uₕ_int =
             StaticArrays.SVector.(
                 Interfacer.get_field(atmos_sim, Val(:u_int)),
@@ -191,7 +194,7 @@ for FT in (Float32, Float64)
             )
 
         # Get surface properties
-        z_sfc = Interfacer.get_field(atmos_sim, Val(:height_sfc))
+        height_sfc = Interfacer.get_field(atmos_sim, Val(:height_sfc))
         z0m = Interfacer.get_field(ocean_sim, Val(:roughness_momentum))
         z0b = Interfacer.get_field(ocean_sim, Val(:roughness_buoyancy))
         gustiness = FT(1)
@@ -216,9 +219,9 @@ for FT in (Float32, Float64)
         if pkgversion(SF) ≥ v"0.14.0"
             roughness_model = Ref(SF.ScalarRoughness())
             inputs = @. SF.ValuesOnly(
-                SF.StateValues(z_int, uₕ_int, thermo_state_atmos), # state_in
+                SF.StateValues(height_int, uₕ_int, thermo_state_atmos), # state_in
                 SF.StateValues(                                  # state_sfc
-                    z_sfc,
+                    height_sfc,
                     StaticArrays.SVector(FT(0), FT(0)),
                     thermo_state_sfc,
                 ),
@@ -230,9 +233,9 @@ for FT in (Float32, Float64)
             )
         else
             inputs = @. SF.ValuesOnly(
-                SF.StateValues(z_int, uₕ_int, thermo_state_atmos), # state_in
+                SF.StateValues(height_int, uₕ_int, thermo_state_atmos), # state_in
                 SF.StateValues(                                  # state_sfc
-                    z_sfc,
+                    height_sfc,
                     StaticArrays.SVector(FT(0), FT(0)),
                     thermo_state_sfc,
                 ),

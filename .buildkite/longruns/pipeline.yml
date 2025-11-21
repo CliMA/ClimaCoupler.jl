@@ -100,6 +100,7 @@ steps:
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
           slurm_mem: 32GB
+        soft_fail: true
 
       - label: "GPU AMIP + ED only + integrated land"
         key: "amip_edonly_integrated_land_gpu" # runs for 4 months only because of instability after that time

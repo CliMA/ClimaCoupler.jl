@@ -1,6 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.5"
+julia_version = "1.11.6"
 manifest_format = "2.0"
 project_hash = "bf902fbe4cdfe69d6bdc0c99b12a9c00c5aa28ee"
 
@@ -3129,8 +3129,8 @@ version = "7.7.0+0"
 
 [[deps.SurfaceFluxes]]
 deps = ["DocStringExtensions", "RootSolvers", "Thermodynamics"]
-git-tree-sha1 = "48f55ad80f67697ef988e87a6d41d453b2a6e5a3"
-repo-rev = "as/charnock-roughness-2"
+git-tree-sha1 = "9b15cd5bcbe6c17b42e39d2b04e512d294a20584"
+repo-rev = "as/z0-function"
 repo-url = "https://github.com/CliMA/SurfaceFluxes.jl.git"
 uuid = "49b00bb7-8bd4-4f2b-b78c-51cd0450215f"
 version = "0.13.1"

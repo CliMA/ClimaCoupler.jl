@@ -124,7 +124,33 @@ end
         land_sim.integrator.t,
     )
 
-    # Compute the surface fluxes
+    # Compute the turbulent fluxes for each sub-component
+    CL.turbulent_fluxes!(
+        land_sim.integrator.p.canopy.turbulent_fluxes,
+        land_sim.model.canopy.boundary_conditions.atmos,
+        land_sim.model.canopy,
+        land_sim.integrator.u,
+        land_sim.integrator.p,
+        land_sim.integrator.t,
+    )
+    CL.turbulent_fluxes!(
+        land_sim.integrator.p.soil.turbulent_fluxes,
+        land_sim.model.soil.boundary_conditions.top.atmos,
+        land_sim.model.soil,
+        land_sim.integrator.u,
+        land_sim.integrator.p,
+        land_sim.integrator.t,
+    )
+    CL.turbulent_fluxes!(
+        land_sim.integrator.p.snow.turbulent_fluxes,
+        land_sim.model.snow.boundary_conditions.atmos,
+        land_sim.model.snow,
+        land_sim.integrator.u,
+        land_sim.integrator.p,
+        land_sim.integrator.t,
+    )
+
+    # Combine the surface fluxes from each sub-component and update the coupler fields
     FluxCalculator.compute_surface_fluxes!(
         coupler_fields,
         land_sim,

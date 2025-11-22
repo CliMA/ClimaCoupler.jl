@@ -5,13 +5,17 @@ coupler_toml: ["toml/amip.toml"]
 # coupler_toml: ["toml/diagnostic_cal.toml"]
 mode_name: "subseasonal"
 # era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions"
-era5_initial_condition_dir : "/net/sampo/data1/cchristo/WeatherQuest_data/archive"
+# era5_initial_condition_dir : "/net/sampo/data1/cchristo/WeatherQuest_data/archive"
+era5_initial_condition_dir : "/net/sampo/data1/cchristo/WeatherQuest_data/archive_dev"
+
+# coupler_output_dir: ""
+
 initial_condition: "WeatherModel"
 checkpoint_dt: "7days"
 co2_model: "fixed"
-dt: "50secs"
-dt_cpl: "50secs"
-dt_seaice: "50secs"
+dt: "100secs"
+dt_cpl: "100secs"
+dt_seaice: "100secs"
 energy_check: false
 # h_elem: 32
 h_elem: 16
@@ -23,7 +27,7 @@ h_elem: 16
 land_model: "bucket"
 bucket_albedo_type: "map_temporal"
 # bucket_initial_condition: "/net/sampo/data1/wxquest_data/initial_conditions/era5_bucket_processed_20250831_0000.nc"
-bucket_initial_condition:  "/net/sampo/data1/cchristo/WeatherQuest_data/archive/era5_bucket_processed_20250831_0000.nc"
+bucket_initial_condition:  "/net/sampo/data1/cchristo/WeatherQuest_data/archive_dev/era5_bucket_processed_20250831_0000.nc"
 
 land_spun_up_ic: false
 land_temperature_anomaly: "nothing"
@@ -35,15 +39,17 @@ topo_smoothing: true
 # topo_smoothing: false
 topography: "Earth"
 t_end: "7days"
-# t_end: "1days"
+# t_end: "25hours"
+# t_end: "31days"
 netcdf_output_at_levels: true
-use_coupler_diagnostics: True
 # netcdf_output_at_levels: false
+use_coupler_diagnostics: True
+
 extra_atmos_diagnostics:
-  - short_name: [tas, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke, hfss, hfls, evspsbl, hussfc]
+  - short_name: [zg, orog, tas, ta, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, wa, waup]
     period: 3hours
     reduction_time: average
-  - short_name: [tas, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke, hfss, hfls, evspsbl, hussfc]
+  - short_name: [zg, orog, tas, ta, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, wa, waup]
     period: 3hours
     reduction: inst
     

@@ -126,11 +126,13 @@ function restore_cache!(sim::Interfacer.ComponentModelSimulation, new_cache)
 end
 
 """
-    checkpoint_sims(cs::CoupledSimulation)
+    checkpoint_sims(cs::CoupledSimulation, save_cache)
 
-This is a callback function that checkpoints all simulations defined in the current coupled simulation.
+This is a callback function that checkpoints all simulations defined in the
+current coupled simulation. The argument `save_cache` determines whether to save
+the cache or not.
 """
-function checkpoint_sims(cs::Interfacer.CoupledSimulation)
+function checkpoint_sims(cs::Interfacer.CoupledSimulation, save_cache)
     time = Int(round(float(cs.t[])))
     day = floor(Int, time / (60 * 60 * 24))
     sec = floor(Int, time % (60 * 60 * 24))
@@ -148,7 +150,7 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
                 output_dir,
             )
         end
-        if !isnothing(Checkpointer.get_model_cache(sim))
+        if !isnothing(Checkpointer.get_model_cache(sim)) && save_cache
             Checkpointer.checkpoint_model_cache(
                 sim,
                 comms_ctx,

@@ -123,6 +123,9 @@ function get_coupler_args(config_dict::Dict)
             ITime.(values(config_dict["component_dt_dict"]))...,
         )
         t_end, t_start, Δt_cpl = (times[1], times[2], times[3])
+        # TODO: Use date for ocean instead?
+        # TODO: Find a simple configuration that call this with ocean / seaice
+        # Main.@infiltrate
         component_dt_dict = Dict(
             component => first(promote(ITime(dt), t_end)) for
             (component, dt) in config_dict["component_dt_dict"]

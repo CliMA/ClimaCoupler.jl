@@ -77,7 +77,8 @@ include("components/land/climaland_integrated.jl")
 include("components/ocean/slab_ocean.jl")
 include("components/ocean/prescr_ocean.jl")
 include("components/ocean/prescr_seaice.jl")
-# include("components/ocean/oceananigans.jl")
+include("components/ocean/oceananigans.jl")
+include("components/ocean/clima_seaice.jl")
 
 #=
 ### Configuration Dictionaries
@@ -143,6 +144,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         output_dir_root,
         parameter_files,
         era5_initial_condition_dir,
+        ice_model,
     ) = get_coupler_args(config_dict)
 
     # Get default shared parameters from ClimaParams.jl, overriding with any provided parameter files
@@ -247,19 +249,12 @@ function CoupledSimulation(config_dict::AbstractDict)
     end
 
     # Get surface elevation on the boundary space from `atmos` coordinate field
-    surface_elevation = Interfacer.get_field(atmos_sim, Val(:height_sfc), boundary_space) # on surface space
-
-    # Get atmospheric height on the boundary space
-    # Since the atmospheric height is defined on centers, we need to copy the values onto the boundary space
-    # to be able to subtract the surface elevation
-    # Note: This pattern is not reliable and should not be reused.
-    atmos_h =
-        ClimaCore.Fields.Field(
-            ClimaCore.Fields.field_values(
-                Interfacer.get_field(atmos_sim, Val(:height_int)),
-            ),
-            boundary_space,
-        ) .- surface_elevation # atmos height relative to the surface, on the surface space
+    surface_elevation = Interfacer.get_field(atmos_sim, Val(:height_sfc), boundary_space) # on boundary space
+    # Get atmospheric height relative to the surface directly from the atmosphere
+    atmos_h = Interfacer.get_atmos_height_delta(
+        Interfacer.get_field(atmos_sim, Val(:height_int)),
+        surface_elevation,
+    )
 
     #=
     ### Land-sea Fraction
@@ -354,31 +349,18 @@ function CoupledSimulation(config_dict::AbstractDict)
             error("Invalid land model specified: $(land_model)")
         end
 
-        ## sea ice model
-        ice_sim = PrescribedIceSimulation(
-            FT;
-            tspan = tspan,
-            dt = component_dt_dict["dt_seaice"],
-            saveat = saveat,
-            space = boundary_space,
-            coupled_param_dict,
-            thermo_params,
-            comms_ctx,
-            start_date,
-            land_fraction,
-            sic_path = subseasonal_sic,
-        )
-
         ## ocean model
         if sim_mode <: CMIPMode
-            stop_date = date(tspan[end] - tspan[begin])
+            stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
             ocean_sim = OceananigansSimulation(
                 boundary_space,
                 start_date,
                 stop_date;
+                Δt = component_dt_dict["dt_ocean"],
                 output_dir = dir_paths.ocean_output_dir,
                 comms_ctx,
                 coupled_param_dict,
+                ice_model,
             )
         else
             ocean_sim = PrescribedOceanSimulation(
@@ -391,6 +373,32 @@ function CoupledSimulation(config_dict::AbstractDict)
                 comms_ctx;
                 sst_path = subseasonal_sst,
             )
+        end
+        ## sea ice model
+        if ice_model == "clima_seaice"
+            ice_sim = ClimaSeaIceSimulation(
+                ocean_sim;
+                output_dir = dir_paths.ice_output_dir,
+                start_date,
+                coupled_param_dict,
+                Δt = component_dt_dict["dt_seaice"],
+            )
+        elseif ice_model == "prescribed"
+            ice_sim = PrescribedIceSimulation(
+                FT;
+                tspan = tspan,
+                dt = component_dt_dict["dt_seaice"],
+                saveat = saveat,
+                space = boundary_space,
+                coupled_param_dict,
+                thermo_params = thermo_params,
+                comms_ctx,
+                start_date,
+                land_fraction,
+                sic_path = subseasonal_sic,
+            )
+        else
+            error("Invalid ice model specified: $(ice_model)")
         end
 
     elseif (sim_mode <: AbstractSlabplanetSimulationMode)
@@ -558,16 +566,22 @@ function CoupledSimulation(config_dict::AbstractDict)
         The concrete steps for proper initialization are:
         =#
 
-        # 1. Import atmospheric and surface fields into the coupler fields,
+        # 1. Import static fields into the coupler fields
+        FieldExchanger.import_static_fields!(cs.fields, cs.model_sims)
+
+        # 2. Import atmospheric and surface fields into the coupler fields,
         #  then broadcast them back out to all components.
         FieldExchanger.exchange!(cs)
 
-        # 2. Update any fields in the model caches that can only be filled after the initial exchange.
+        # 3. Update any fields in the model caches that can only be filled after the initial exchange.
         FieldExchanger.set_caches!(cs)
 
-        # 3. Calculate and update turbulent fluxes for each surface model,
+        # 4. Calculate and update turbulent fluxes for each surface model,
         #  and save the weighted average in coupler fields
         FluxCalculator.turbulent_fluxes!(cs)
+
+        # 4. Compute any ocean-sea ice fluxes
+        FluxCalculator.ocean_seaice_fluxes!(cs)
     end
     Utilities.show_memory_usage()
     return cs
@@ -702,11 +716,14 @@ function step!(cs::CoupledSimulation)
     ## update the surface fractions for surface models
     FieldExchanger.update_surface_fractions!(cs)
 
-    ## exchange all non-turbulent flux fields between models
+    ## exchange all non-turbulent flux fields between models, including radiative and precipitation fluxes
     FieldExchanger.exchange!(cs)
 
     ## calculate turbulent fluxes in the coupler and update the model simulations with them
     FluxCalculator.turbulent_fluxes!(cs)
+
+    ## compute any ocean-sea ice fluxes
+    FluxCalculator.ocean_seaice_fluxes!(cs)
 
     ## Maybe call the callbacks
     TimeManager.callbacks!(cs)

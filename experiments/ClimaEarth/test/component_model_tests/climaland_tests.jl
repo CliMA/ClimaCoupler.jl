@@ -79,8 +79,8 @@ end
     atmos_config = CA.AtmosConfig(atmos_config_file; job_id = "atmos_land_flux_test")
     atmos_sim = ClimaAtmosSimulation(atmos_config)
 
-    boundary_space = ClimaCore.Spaces.horizontal_space(atmos_sim.domain.face_space)
-    area_fraction = ClimaCore.Fields.ones(boundary_space)
+    boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
+    area_fraction = CC.Fields.ones(boundary_space)
     atmos_h = CC.Fields.zeros(boundary_space) .+ 2
     land_sim =
         ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction, atmos_h)
@@ -111,6 +111,7 @@ end
 
     # Exchange the initial conditions between atmosphere and land
     # This also tests the `get_field`, `update_field!` and `update_model_sims!` methods for `ClimaLandSimulation`
+    FieldExchanger.import_static_fields!(coupler_fields, model_sims)
     FieldExchanger.exchange!(cs)
 
     # Update land cache variables with the updated drivers in the cache after the exchange

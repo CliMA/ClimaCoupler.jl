@@ -15,7 +15,11 @@ import NVTX
 import ..Interfacer, ..Utilities
 
 export extrapolate_ρ_to_sfc,
-    turbulent_fluxes!, get_surface_params, update_turbulent_fluxes!, compute_surface_fluxes!
+    turbulent_fluxes!,
+    get_surface_params,
+    update_turbulent_fluxes!,
+    compute_surface_fluxes!,
+    ocean_seaice_fluxes!
 
 function turbulent_fluxes!(cs::Interfacer.CoupledSimulation)
     return turbulent_fluxes!(cs.fields, cs.model_sims, cs.thermo_params)
@@ -293,18 +297,35 @@ function _compute_surface_fluxes_surface_impl!(
     gustiness = FT(1)
 
     # Construct the SurfaceFluxes.jl container of inputs
-    inputs = @. SF.ValuesOnly(
-        SF.StateValues(csf.z_int, uₕ_int, thermo_state_atmos), # state_in
-        SF.StateValues(                                  # state_sfc
-            csf.z_sfc,
-            StaticArrays.SVector(FT(0), FT(0)),
-            thermo_state_sfc,
-        ),
-        z0m,
-        z0b,
-        gustiness,
-        beta,
-    )
+    if pkgversion(SF) ≥ v"0.14.0"
+        roughness_model = Ref(SF.ScalarRoughness())
+        inputs = @. SF.ValuesOnly(
+            SF.StateValues(csf.height_int, uₕ_int, thermo_state_atmos), # state_in
+            SF.StateValues(                                  # state_sfc
+                csf.height_sfc,
+                StaticArrays.SVector(FT(0), FT(0)),
+                thermo_state_sfc,
+            ),
+            z0m,
+            z0b,
+            gustiness,
+            beta,
+            roughness_model,
+        )
+    else
+        inputs = @. SF.ValuesOnly(
+            SF.StateValues(csf.height_int, uₕ_int, thermo_state_atmos), # state_in
+            SF.StateValues(                                  # state_sfc
+                csf.height_sfc,
+                StaticArrays.SVector(FT(0), FT(0)),
+                thermo_state_sfc,
+            ),
+            z0m,
+            z0b,
+            gustiness,
+            beta,
+        )
+    end
 
     # calculate the surface fluxes
     fluxes = FluxCalculator.get_surface_fluxes(inputs, surface_params)
@@ -344,6 +365,27 @@ function _compute_surface_fluxes_surface_impl!(
     @. csf.L_MO += ifelse(isinf(L_MO), L_MO, L_MO * area_fraction)
     @. csf.ustar += ustar * area_fraction
     @. csf.buoyancy_flux += buoyancy_flux * area_fraction
+    return nothing
+end
+
+"""
+    ocean_seaice_fluxes!(cs::CoupledSimulation)
+    ocean_seaice_fluxes!(ocean_sim, ice_sim)
+
+Compute the fluxes between the ocean and sea ice simulations.
+This function does nothing by default - it should be extended
+for any ocean and sea ice models that support flux calculations.
+"""
+function ocean_seaice_fluxes!(cs::Interfacer.CoupledSimulation)
+    haskey(cs.model_sims, :ocean_sim) &&
+        haskey(cs.model_sims, :ice_sim) &&
+        ocean_seaice_fluxes!(cs.model_sims.ocean_sim, cs.model_sims.ice_sim)
+    return nothing
+end
+function ocean_seaice_fluxes!(
+    ocean_sim::Union{Interfacer.OceanModelSimulation, Interfacer.AbstractSurfaceStub},
+    ice_sim::Union{Interfacer.SeaIceModelSimulation, Interfacer.AbstractSurfaceStub},
+)
     return nothing
 end
 

@@ -93,8 +93,9 @@ makedocs(
 )
 
 deploydocs(
-    repo = "<github.com/CliMA/ClimaCoupler.jl.git>",
+    repo = "github.com/CliMA/ClimaCoupler.jl.git",
     push_preview = true,
     devbranch = "main",
     forcepush = true,
+    versions = ["stable" => "v^", "v#.#.#", "dev" => "main"],
 )

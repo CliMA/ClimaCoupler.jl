@@ -88,8 +88,8 @@ The default coupler exchange fields are the following, defined in
 | `T_atmos`         | atmosphere temperature at the bottom layer                  | K          |
 | `q_atmos`         | atmosphere humidity at the bottom layer                     | kg kg⁻¹    |
 | `ρ_atmos`         | atmosphere air density at the bottom layer                  | kg m⁻³     |
-| `z_int`           | height of the first internal atmosphere level (center)      | m          |
-| `z_sfc`           | height of the bottom atmosphere layer (face)                | m          |
+| `height_int`      | height at the bottom cell center of the atmosphere space    | m          |
+| `height_sfc`      | height at the bottom face of the atmosphere space           | m          |
 | `F_lh`            | latent heat flux                                            | W m⁻²      |
 | `F_sh`            | sensible heat flux                                          | W m⁻²      |
 | `F_turb_moisture` | turbulent moisture flux                                     | kg m⁻² s⁻¹ |
@@ -341,6 +341,7 @@ end
     ClimaCoupler.Interfacer.remap
     ClimaCoupler.Interfacer.remap!
     ClimaCoupler.Interfacer.boundary_space
+    ClimaCoupler.Interfacer.get_atmos_height_delta
 ```
 
 ## Interfacer Internal Functions and Types

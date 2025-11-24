@@ -264,7 +264,11 @@ end
 Remap `quantity` in `sim` remapped onto the `target_field`.
 """
 function get_field!(target_field, sim, quantity)
-    remap!(target_field, get_field(sim, quantity))
+    # Extract the symbol from Val{:symbol} if needed
+    label_str =
+        quantity isa Val ? "get_field! $(typeof(quantity).parameters[1])" :
+        "get_field! $quantity"
+    remap!(target_field, get_field(sim, quantity), label = label_str)
     return nothing
 end
 

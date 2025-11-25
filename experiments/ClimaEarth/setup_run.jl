@@ -497,7 +497,13 @@ function CoupledSimulation(config_dict::AbstractDict)
     checkpoint_cb =
         TimeManager.Callback(schedule_checkpoint, sim -> Checkpointer.checkpoint_sims(sim))
 
-    callbacks = (checkpoint_cb,)
+    # Don't use coupler walltime logging if atmos is using its own walltime logging is true
+    if config_dict["atmos_log_progress"]
+        callbacks = (checkpoint_cb,)
+    else
+        walltime_cb = TimeManager.capped_geometric_walltime_cb(t_start, t_end, Δt_cpl)
+        callbacks = (checkpoint_cb, walltime_cb)
+    end
 
     #= Set up default AMIP diagnostics
     Use ClimaDiagnostics for default AMIP diagnostics, which currently include turbulent energy fluxes.

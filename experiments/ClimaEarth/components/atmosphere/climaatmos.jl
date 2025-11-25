@@ -626,6 +626,7 @@ function get_atmos_config_dict(
     # can pick up from where we have left. NOTE: This should not be needed, but
     # there is no easy way to initialize ClimaAtmos with a different t_start
     atmos_config["dt_save_state_to_disk"] = coupler_config["checkpoint_dt"]
+    atmos_config["log_progress"] = coupler_config["atmos_log_progress"]
 
     # The Atmos `get_simulation` function expects the atmos config to contains its timestep size
     # in the `dt` field. If there is a `dt_atmos` field in coupler_config, we add it to the atmos config as `dt`

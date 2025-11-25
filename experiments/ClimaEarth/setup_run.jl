@@ -77,7 +77,7 @@ include("components/land/climaland_integrated.jl")
 include("components/ocean/slab_ocean.jl")
 include("components/ocean/prescr_ocean.jl")
 include("components/ocean/prescr_seaice.jl")
-include("components/ocean/oceananigans.jl")
+# include("components/ocean/oceananigans.jl")
 include("components/ocean/clima_seaice.jl")
 
 #=

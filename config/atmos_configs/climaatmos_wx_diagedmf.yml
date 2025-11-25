@@ -12,6 +12,7 @@ divergence_damping_factor: 50.0
 scalar_hyperdiffusion_coefficient: 0.929738
 vorticity_hyperdiffusion_coefficient: 0.1857
 insolation: "timevarying"
+log_progress: false
 rad: allskywithclear
 dt_cloud_fraction: "1hours"
 dt_rad: "1hours"

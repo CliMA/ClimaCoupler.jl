@@ -11,9 +11,9 @@ edmfx_sgs_diffusive_flux: true
 h_elem: 16
 implicit_diffusion: true
 insolation: "timevarying"
-moist: "equil"
+moist: "nonequil"
 netcdf_output_at_levels: true
-precip_model: "0M"
+precip_model: "1M"
 prescribe_ozone: true
 prescribed_aerosols: ["CB1", "CB2", "DST01", "DST02", "DST03", "DST04", "DST05", "OC1", "OC2", "SO4", "SSLT01", "SSLT02", "SSLT03", "SSLT04", "SSLT05"]
 rad: "allskywithclear"

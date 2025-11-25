@@ -141,6 +141,10 @@ function argparse_settings()
         help = "An optional YAML file used to overwrite the default model parameters."
         arg_type = String
         default = nothing
+        "--atmos_log_progress"
+        help = "Use the ClimaAtmos walltime logging callback instead of the default ClimaCoupler one [`false` (default), `true`]"
+        arg_type = Bool
+        default = false
         "--albedo_model"
         help = "Type of albedo model. [`ConstantAlbedo`, `RegressionFunctionAlbedo`, `CouplerAlbedo` (default)]"
         arg_type = String

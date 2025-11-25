@@ -9,6 +9,7 @@ module TimeManager
 import Dates
 import ..Interfacer
 import ..Utilities: time_to_seconds
+import ClimaUtilities.OnlineLogging: WallTimeInfo, report_walltime
 
 """
     time_to_period(s::String)
@@ -98,6 +99,30 @@ TODO: Move this to ClimaUtilities once we move Schedules there
 struct NeverSchedule end
 function (::NeverSchedule)(args...)
     return false
+end
+
+"""
+    capped_geometric_walltime_cb(t_start, t_end, Δt_cpl)
+
+Create a callback that reports walltime at when the number of steps taken is a power of 2, or
+when the percent of the simulation that is completed is a multiple of 5. This skips the
+first two steps to avoid compilation time noise.
+"""
+function capped_geometric_walltime_cb(t_start, t_end, Δt_cpl)
+    tot_steps = Int(ceil(float(t_end - t_start) / float(Δt_cpl)))
+    five_percent_steps = ceil(Int, 0.05 * tot_steps)
+    steps_taken = (integrator) -> float(integrator.t - t_start) / float(Δt_cpl)
+    walltime_report_cond =
+        (integrator) -> begin
+            nsteps = steps_taken(integrator)
+            # skip first two steps for compilation
+            (nsteps <= 2) && return false
+            return nsteps % five_percent_steps == 0 || ispow2(nsteps)
+        end
+    walltime_affect! = let wt = WallTimeInfo()
+        (coupled_sim) -> report_walltime(wt, coupled_sim.model_sims.atmos_sim.integrator)
+    end
+    return TimeManager.Callback(walltime_report_cond, walltime_affect!)
 end
 
 end

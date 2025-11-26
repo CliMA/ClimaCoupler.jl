@@ -34,11 +34,7 @@ steps:
         key: "amip"
         command:
           - echo "--- Run simulation"
-          - |
-            julia --threads=3 --color=yes --project=experiments/ClimaEarth/ \
-            experiments/ClimaEarth/run_amip.jl \
-            --config_file $CONFIG_PATH/amip.yml \
-            --job_id amip
+          - .buildkite/gcp/run_amip_with_tmp_checkpoints.sh $CONFIG_PATH/amip.yml amip
         artifact_paths: "experiments/ClimaEarth/output/amip/artifacts/*"
         timeout_in_minutes: 7220
         env:
@@ -47,18 +43,14 @@ steps:
           slurm_gpus: 1
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
-          slurm_mem: 30GB
+          slurm_mem: 0GB
           slurm_time: "120:00:00"
       
       - label: "Current AMIP: diagedmf + 0M + integrated land"
         key: "amip_land"
         command:
           - echo "--- Run simulation"
-          - |
-            julia --threads=3 --color=yes --project=experiments/ClimaEarth/ \
-            experiments/ClimaEarth/run_amip.jl \
-            --config_file $CONFIG_PATH/amip_land.yml \
-            --job_id amip_land
+          - .buildkite/gcp/run_amip_with_tmp_checkpoints.sh $CONFIG_PATH/amip_land.yml amip_land
         artifact_paths: "experiments/ClimaEarth/output/amip_land/artifacts/*"
         timeout_in_minutes: 7220
         env:
@@ -67,5 +59,5 @@ steps:
           slurm_gpus: 1
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
-          slurm_mem: 30GB
+          slurm_mem: 0GB
           slurm_time: "120:00:00"

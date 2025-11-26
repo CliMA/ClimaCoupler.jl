@@ -34,11 +34,7 @@ steps:
         key: "amip"
         command:
           - echo "--- Run simulation"
-          - |
-            julia --threads=3 --color=yes --project=experiments/ClimaEarth/ \
-            experiments/ClimaEarth/run_amip.jl \
-            --config_file $CONFIG_PATH/amip.yml \
-            --job_id amip
+          - .buildkite/gcp/run_amip_with_tmp_checkpoints.sh $CONFIG_PATH/amip.yml amip
         artifact_paths: "experiments/ClimaEarth/output/amip/artifacts/*"
         timeout_in_minutes: 7220
         env:
@@ -54,11 +50,7 @@ steps:
         key: "amip_land"
         command:
           - echo "--- Run simulation"
-          - |
-            julia --threads=3 --color=yes --project=experiments/ClimaEarth/ \
-            experiments/ClimaEarth/run_amip.jl \
-            --config_file $CONFIG_PATH/amip_land.yml \
-            --job_id amip_land
+          - .buildkite/gcp/run_amip_with_tmp_checkpoints.sh $CONFIG_PATH/amip_land.yml amip_land
         artifact_paths: "experiments/ClimaEarth/output/amip_land/artifacts/*"
         timeout_in_minutes: 7220
         env:

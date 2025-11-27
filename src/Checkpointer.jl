@@ -102,7 +102,8 @@ function checkpoint_model_cache(
     @info "Saving checkpoint $(nameof(sim)) model cache to JLD2 on day $day second $sec"
     pid = ClimaComms.mypid(comms_ctx)
     output_file = joinpath(output_dir, "checkpoint_cache_$(pid)_$(nameof(sim))_$t.jld2")
-    JLD2.jldsave(output_file, cache = p)
+    filters = [JLD2.Shuffle(), JLD2.ZstdFilter(1)]
+    JLD2.jldsave(output_file, filters, cache = p)
 
     # Remove previous checkpoint if it exists
     prev_checkpoint_file = joinpath(
@@ -163,8 +164,12 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
     pid = ClimaComms.mypid(comms_ctx)
     @info "Saving coupler fields to JLD2 on day $day second $sec"
     output_file = joinpath(output_dir, "checkpoint_coupler_fields_$(pid)_$time.jld2")
+    # Apply shuffle filter to groups same-order bytes together to improve
+    # compression
+    # Apply ZstdFilter with level 1 to priortize speed over compression
+    filters = [JLD2.Shuffle(), JLD2.ZstdFilter(1)]
     # Adapt to Array move fields to the CPU
-    JLD2.jldsave(output_file, coupler_fields = CC.Adapt.adapt(Array, cs.fields))
+    JLD2.jldsave(output_file, filters, coupler_fields = CC.Adapt.adapt(Array, cs.fields))
 
     # Remove previous Coupler fields checkpoint if it exists
     prev_checkpoint_file =

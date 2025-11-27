@@ -49,9 +49,17 @@ two_steps["dt_rad"] = "180secs"
 two_steps["checkpoint_dt"] = "360secs"
 two_steps["coupler_output_dir"] = tmpdir
 two_steps["job_id"] = "two_steps"
+two_steps["save_cache"] = false
 
 println("Simulating two steps")
 cs_two_steps = setup_and_run(two_steps)
+
+@testset "Cache files should not exist" begin
+    checkpoints_dir = joinpath(tmpdir, two_steps["job_id"], "checkpoints")
+    checkpoint_files = filter!(isfile, readdir(checkpoints_dir, join = true))
+    are_not_cache_files = .!occursin.("cache", basename.(checkpoint_files))
+    @test all(are_not_cache_files)
+end
 
 # Check that we can pick up a simulation by providing t_restart and restart_dir
 println("Simulating two steps, options from command line")
@@ -63,6 +71,7 @@ two_steps_reading["restart_dir"] = cs_two_steps.dir_paths.checkpoints_dir
 two_steps_reading["restart_t"] = 360
 two_steps_reading["restart_cache"] = false
 two_steps_reading["job_id"] = "two_steps_reading"
+two_steps_reading["save_cache"] = false
 
 cs_two_steps_reading = setup_and_run(two_steps_reading)
 @testset "Restarts from command line arguments" begin

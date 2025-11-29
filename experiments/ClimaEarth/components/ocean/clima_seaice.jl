@@ -1,7 +1,7 @@
 import Oceananigans as OC
-import ClimaSeaIce as CSI
-using ClimaSeaIce.SeaIceThermodynamics.HeatBoundaryConditions:
-    IceWaterThermalEquilibrium, MeltingConstrainedFluxBalance, get_tracer, RadiativeEmission
+# import ClimaSeaIce as CSI
+# using ClimaSeaIce.SeaIceThermodynamics.HeatBoundaryConditions:
+#     IceWaterThermalEquilibrium, MeltingConstrainedFluxBalance, get_tracer, RadiativeEmission
 import ClimaOcean as CO
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms

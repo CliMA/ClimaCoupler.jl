@@ -134,6 +134,14 @@ function ClimaLandSimulation(
     # Set up leaf area index (LAI)
     stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
 
+    LAI = CL.prescribed_lai_modis(
+        surface_space,
+        start_date,
+        stop_date;
+        modis_lai_ncdata_path = "/net/sampo/data1/ClimaArtifacts/artifacts/modis_lai/Yuan_et_al_2019_1x1.nc",
+        time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
+    )
+
     # function prescribed_lai_modis_local(
     #     surface_space,
     #     start_date,
@@ -169,15 +177,9 @@ function ClimaLandSimulation(
     #     time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
     # )
 
-    # LAI = CL.prescribed_lai_modis(
-    #     surface_space,
-    #     start_date,
-    #     stop_date;
-    #     time_interpolation_method = LinearInterpolation(),
-    # )
     # For now we run without canopy by setting LAI to 0.
     # We can add canopy back once it is treated implicitly.
-    LAI = TimeVaryingInput((t) -> 0)
+    # LAI = TimeVaryingInput((t) -> 0)
     #     time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
     # )
 

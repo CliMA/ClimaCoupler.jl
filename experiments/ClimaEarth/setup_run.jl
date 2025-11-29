@@ -52,6 +52,7 @@ import ClimaCoupler.Interfacer:
 
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
+import ClimaUtilities.OnlineLogging: WallTimeInfo, report_walltime
 import ClimaUtilities.Utils: period_to_seconds_float
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import ClimaUtilities.TimeManager: ITime, date
@@ -495,7 +496,21 @@ function CoupledSimulation(config_dict::AbstractDict)
         EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date)
     checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
 
-    callbacks = (checkpoint_cb,)
+    tot_steps = Int(ceil(float(tspan[2] - tspan[1]) / float(Δt_cpl)))
+    five_percent_steps = ceil(Int, 0.05 * tot_steps)
+    steps_taken = (integrator) -> float(integrator.t - t_start) / float(Δt_cpl)
+    walltime_report_cond =
+        (integrator) -> begin
+            nsteps = steps_taken(integrator)
+            # skip first two steps for compilation
+            (nsteps == 1 || nsteps == 2) && return false
+            return nsteps % five_percent_steps == 0 || ispow2(nsteps)
+        end
+    walltime_affect! = let wt = WallTimeInfo()
+        (coupled_sim) -> report_walltime(wt, coupled_sim.model_sims.atmos_sim.integrator)
+    end
+    walltime_cb = TimeManager.Callback(walltime_report_cond, walltime_affect!)
+    callbacks = (checkpoint_cb, walltime_cb)
 
     #= Set up default AMIP diagnostics
     Use ClimaDiagnostics for default AMIP diagnostics, which currently include turbulent energy fluxes.

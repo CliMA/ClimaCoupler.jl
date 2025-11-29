@@ -23,6 +23,7 @@ implicit_sgs_mass_flux: true
 implicit_sgs_nh_pressure: true
 implicit_sgs_vertdiff: true
 insolation: "timevarying"
+log_progress: false
 max_newton_iters_ode: 3
 moist: "equil"
 netcdf_output_at_levels: true

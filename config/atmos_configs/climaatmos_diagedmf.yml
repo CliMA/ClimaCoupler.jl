@@ -17,6 +17,7 @@ edmfx_upwinding: "first_order"
 h_elem: 16
 implicit_diffusion: true
 insolation: "timevarying"
+log_progress: false
 moist: "equil"
 netcdf_output_at_levels: true
 precip_model: "0M"

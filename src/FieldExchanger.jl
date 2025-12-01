@@ -69,7 +69,7 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
         )
         ocean_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction))
 
-        # ensure that ocean and ice fractions are consistent
+        # Apply any additional constraints on the ocean and ice fractions if necessary
         if haskey(cs.model_sims, :ice_sim)
             resolve_area_fractions!(ocean_sim, cs.model_sims.ice_sim, land_fraction)
         end
@@ -114,8 +114,8 @@ function import_atmos_fields!(csf, model_sims)
     Interfacer.get_field!(csf.T_atmos, model_sims.atmos_sim, Val(:air_temperature))
     Interfacer.get_field!(csf.q_atmos, model_sims.atmos_sim, Val(:specific_humidity))
     Interfacer.get_field!(csf.ρ_atmos, model_sims.atmos_sim, Val(:air_density))
-    Interfacer.get_field!(csf.z_int, model_sims.atmos_sim, Val(:height_int))
-    Interfacer.get_field!(csf.z_sfc, model_sims.atmos_sim, Val(:height_sfc))
+    Interfacer.get_field!(csf.u_int, model_sims.atmos_sim, Val(:u_int))
+    Interfacer.get_field!(csf.v_int, model_sims.atmos_sim, Val(:v_int))
 
     # radiative fluxes
     Interfacer.get_field!(csf.SW_d, model_sims.atmos_sim, Val(:SW_d))
@@ -178,10 +178,35 @@ function import_combined_surface_fields!(csf, model_sims)
 end
 
 """
+    import_static_fields!(csf, model_sims)
+
+Import static fields into the coupler fields.
+This is used to import fields that are not updated during a simulation,
+so it is only called at initialization.
+
+Fields imported here are:
+- the bottom cell center and face heights of the atmosphere
+
+Any fields imported into the coupler fields here that need to be sent to
+component models should be updated in the `set_cache!` function
+of the receiving component model.
+
+# Arguments
+- `csf`: [NamedTuple] containing coupler fields.
+- `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
+"""
+function import_static_fields!(csf, model_sims)
+    Interfacer.get_field!(csf.height_int, model_sims.atmos_sim, Val(:height_int))
+    Interfacer.get_field!(csf.height_sfc, model_sims.atmos_sim, Val(:height_sfc))
+    csf.height_delta .= Interfacer.get_atmos_height_delta(csf.height_int, csf.height_sfc)
+
+    return nothing
+end
+
+"""
     update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf)
 
-Updates the atmosphere's fields for surface direct and diffuse albedos, emissivity, and temperature,
-as well as the turbulent fluxes.
+Updates the atmosphere's fields for surface direct and diffuse albedos, emissivity,and temperature.
 
 # Arguments
 - `atmos_sim`: [Interfacer.AtmosModelSimulation] containing an atmospheric model simulation object.
@@ -208,6 +233,11 @@ end
 
 Updates the surface component model cache with the current coupler fields
 *besides turbulent fluxes*, which are updated in `update_turbulent_fluxes`.
+
+Note that upwelling longwave and shortwave radiation are not computed here,
+and are expected to be computed internally by the surface model.
+Some component models extend this function and compute the upwelling longwave
+and shortwave radiation in their methods of `update_sim!`.
 
 # Arguments
 - `sim`: [Interfacer.SurfaceModelSimulation] containing a surface model simulation object.
@@ -240,7 +270,7 @@ function update_model_sims!(model_sims, csf)
 end
 
 """
-    step_model_sims!(model_sims, t)
+    step_model_sims!(model_sims, t, coupler_fields, thermo_params)
     step_model_sims!(cs::CoupledSimulation)
 
 Iterates `step!` over all component model simulations saved in `cs.model_sims`.
@@ -249,15 +279,33 @@ Iterates `step!` over all component model simulations saved in `cs.model_sims`.
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
 - `t`: [AbstractFloat or ITime] denoting the simulation time.
 """
-function step_model_sims!(model_sims, t)
+function step_model_sims!(model_sims, t, coupler_fields, thermo_params)
+    # Step all surface models (the ordering doesn't matter here)
     for sim in model_sims
-        Interfacer.step!(sim, t)
+        sim isa Interfacer.SurfaceModelSimulation && Interfacer.step!(sim, t)
+
+        # For an implicit flux simulation, `compute_surface_fluxes!` reads in the precomputed
+        # fluxes, and puts them into the coupler fields.
+        sim isa Interfacer.ImplicitFluxSimulation && FluxCalculator.compute_surface_fluxes!(
+            coupler_fields,
+            sim,
+            model_sims.atmos_sim,
+            thermo_params,
+        )
     end
+
+    # Update the atmosphere with the fluxes across all surface models
+    # The surface models have already been updated with the fluxes in `compute_surface_fluxes!`,
+    # or internally within the step in the case of the integrated land model.
+    FluxCalculator.update_turbulent_fluxes!(model_sims.atmos_sim, coupler_fields)
+
+    # Step the atmosphere model
+    Interfacer.step!(model_sims.atmos_sim, t)
     return nothing
 end
 
 function step_model_sims!(cs::Interfacer.CoupledSimulation)
-    step_model_sims!(cs.model_sims, cs.t[])
+    step_model_sims!(cs.model_sims, cs.t[], cs.fields, cs.thermo_params)
 end
 
 """
@@ -369,12 +417,15 @@ initialized with the surface temperatures, which are only available after the
 initial exchange. The integrated land, in turn, requires its drivers in the
 cache to be filled with the initial radiation fluxes, so that it can propagate
 these to the rest of its cache (e.g. in canopy radative transfer).
+
+This function can also be used to set exchanged fields that are static over the
+simulation, since it is only called at initialization.
 """
 function set_caches!(cs::Interfacer.CoupledSimulation)
-    Interfacer.set_cache!(cs.model_sims.atmos_sim)
+    Interfacer.set_cache!(cs.model_sims.atmos_sim, cs.fields)
     exchange!(cs)
     for sim in cs.model_sims
-        sim isa Interfacer.SurfaceModelSimulation && Interfacer.set_cache!(sim)
+        sim isa Interfacer.SurfaceModelSimulation && Interfacer.set_cache!(sim, cs.fields)
     end
     return nothing
 end

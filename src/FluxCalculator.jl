@@ -11,11 +11,14 @@ import SurfaceFluxes as SF
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
 import ClimaCore as CC
-import NVTX
 import ..Interfacer, ..Utilities
 
 export extrapolate_ρ_to_sfc,
-    turbulent_fluxes!, get_surface_params, update_turbulent_fluxes!, compute_surface_fluxes!
+    turbulent_fluxes!,
+    get_surface_params,
+    update_turbulent_fluxes!,
+    compute_surface_fluxes!,
+    ocean_seaice_fluxes!
 
 function turbulent_fluxes!(cs::Interfacer.CoupledSimulation)
     return turbulent_fluxes!(cs.fields, cs.model_sims, cs.thermo_params)
@@ -64,12 +67,11 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
 
     # Compute the surface fluxes for each surface model and add them to `csf`
     for sim in model_sims
-        compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params)
+        # If the simulation is an implicit flux simulation, the fluxes are computed in the
+        # component model's `step!` function, so we don't need to compute them here.
+        sim isa Interfacer.ImplicitFluxSimulation ||
+            compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params)
     end
-
-    # Update the atmosphere with the fluxes across all surface models
-    # The surface models have already been updated with the fluxes in `compute_surface_fluxes!`
-    FluxCalculator.update_turbulent_fluxes!(atmos_sim, csf)
     return nothing
 end
 
@@ -200,6 +202,11 @@ models to get the total fluxes.
 Since the fluxes are computed between the input model and the atmosphere, this
 function does nothing if called on an atmosphere model simulation.
 
+The function for ImplicitFluxSimulation is a placeholder that does nothing. Currently,
+the only ImplicitFluxSimulation is ClimaLandSimulation, for which compute_surface_fluxes!
+is defined in the component model. We can extend this function for other ImplicitFluxSimulation
+in the future.
+
 # Arguments
 - `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
 - `sim`: [Interfacer.ComponentModelSimulation] the surface simulation to compute fluxes for.
@@ -218,16 +225,15 @@ end
 
 function compute_surface_fluxes!(
     csf,
-    sim::Interfacer.SurfaceModelSimulation,
+    sim::Interfacer.ImplicitFluxSimulation,
     atmos_sim::Interfacer.AtmosModelSimulation,
     thermo_params,
 )
-    NVTX.@range "FluxCalculator.compute_surface_fluxes!(surface)" begin
-        return _compute_surface_fluxes_surface_impl!(csf, sim, atmos_sim, thermo_params)
-    end
+    # do nothing for implicit flux surface model
+    return nothing
 end
 
-function _compute_surface_fluxes_surface_impl!(
+function compute_surface_fluxes!(
     csf,
     sim::Interfacer.SurfaceModelSimulation,
     atmos_sim::Interfacer.AtmosModelSimulation,
@@ -236,14 +242,9 @@ function _compute_surface_fluxes_surface_impl!(
     boundary_space = axes(csf)
     FT = CC.Spaces.undertype(boundary_space)
 
-    # Store atmosphere fields in coupler temp fields so we only regrid them once per timestep
+    # Atmosphere fields are stored in coupler fields so we only regrid them once per timestep
     # `_int` refers to atmos state of center level 1
-
-    # After constructing `uₕ_int`, we can reuse `scalar_temp1` and `scalar_temp2`
-    Interfacer.get_field!(csf.scalar_temp1, atmos_sim, Val(:u_int))
-    Interfacer.get_field!(csf.scalar_temp2, atmos_sim, Val(:v_int))
-    # We allocate `uₕ_int` without a temp field since no regridding is required
-    uₕ_int = StaticArrays.SVector.(csf.scalar_temp1, csf.scalar_temp2)
+    uₕ_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
 
     # construct the atmospheric thermo state
     thermo_state_atmos =
@@ -293,18 +294,35 @@ function _compute_surface_fluxes_surface_impl!(
     gustiness = FT(1)
 
     # Construct the SurfaceFluxes.jl container of inputs
-    inputs = @. SF.ValuesOnly(
-        SF.StateValues(csf.z_int, uₕ_int, thermo_state_atmos), # state_in
-        SF.StateValues(                                  # state_sfc
-            csf.z_sfc,
-            StaticArrays.SVector(FT(0), FT(0)),
-            thermo_state_sfc,
-        ),
-        z0m,
-        z0b,
-        gustiness,
-        beta,
-    )
+    if pkgversion(SF) ≥ v"0.14.0"
+        roughness_model = Ref(SF.ScalarRoughness())
+        inputs = @. SF.ValuesOnly(
+            SF.StateValues(csf.height_int, uₕ_int, thermo_state_atmos), # state_in
+            SF.StateValues(                                  # state_sfc
+                csf.height_sfc,
+                StaticArrays.SVector(FT(0), FT(0)),
+                thermo_state_sfc,
+            ),
+            z0m,
+            z0b,
+            gustiness,
+            beta,
+            roughness_model,
+        )
+    else
+        inputs = @. SF.ValuesOnly(
+            SF.StateValues(csf.height_int, uₕ_int, thermo_state_atmos), # state_in
+            SF.StateValues(                                  # state_sfc
+                csf.height_sfc,
+                StaticArrays.SVector(FT(0), FT(0)),
+                thermo_state_sfc,
+            ),
+            z0m,
+            z0b,
+            gustiness,
+            beta,
+        )
+    end
 
     # calculate the surface fluxes
     fluxes = FluxCalculator.get_surface_fluxes(inputs, surface_params)
@@ -344,6 +362,27 @@ function _compute_surface_fluxes_surface_impl!(
     @. csf.L_MO += ifelse(isinf(L_MO), L_MO, L_MO * area_fraction)
     @. csf.ustar += ustar * area_fraction
     @. csf.buoyancy_flux += buoyancy_flux * area_fraction
+    return nothing
+end
+
+"""
+    ocean_seaice_fluxes!(cs::CoupledSimulation)
+    ocean_seaice_fluxes!(ocean_sim, ice_sim)
+
+Compute the fluxes between the ocean and sea ice simulations.
+This function does nothing by default - it should be extended
+for any ocean and sea ice models that support flux calculations.
+"""
+function ocean_seaice_fluxes!(cs::Interfacer.CoupledSimulation)
+    haskey(cs.model_sims, :ocean_sim) &&
+        haskey(cs.model_sims, :ice_sim) &&
+        ocean_seaice_fluxes!(cs.model_sims.ocean_sim, cs.model_sims.ice_sim)
+    return nothing
+end
+function ocean_seaice_fluxes!(
+    ocean_sim::Union{Interfacer.OceanModelSimulation, Interfacer.AbstractSurfaceStub},
+    ice_sim::Union{Interfacer.SeaIceModelSimulation, Interfacer.AbstractSurfaceStub},
+)
     return nothing
 end
 

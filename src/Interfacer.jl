@@ -8,7 +8,6 @@ module Interfacer
 import SciMLBase
 import ClimaComms
 import ClimaCore as CC
-import NVTX
 import Dates
 import Thermodynamics as TD
 import SciMLBase: step!
@@ -109,8 +108,11 @@ default_coupler_fields() = [
     :T_atmos,
     :q_atmos,
     :ρ_atmos,
-    :z_int,
-    :z_sfc,
+    :height_int,
+    :height_sfc,
+    :height_delta,
+    :u_int,
+    :v_int,
     # fields used for flux exchange
     :F_lh,
     :F_sh,
@@ -174,6 +176,18 @@ abstract type SurfaceModelSimulation <: ComponentModelSimulation end
 abstract type SeaIceModelSimulation <: SurfaceModelSimulation end
 abstract type LandModelSimulation <: SurfaceModelSimulation end
 abstract type OceanModelSimulation <: SurfaceModelSimulation end
+
+"""
+    ImplicitFluxSimulation
+
+An abstract type for surface model simulations that compute fluxes implicitly,
+rather than explicitly. At the moment, this means the fluxes are computed in the
+component model's `step!` function, rather than in the coupler's `compute_surface_fluxes!`
+function.
+
+Currently, the only implicit flux simulation is the integrated land model.
+"""
+abstract type ImplicitFluxSimulation <: SurfaceModelSimulation end
 
 # Simulation objects tend to be very big, so it is best to make sure they are not printed in the REPL
 function Base.show(io::IO, @nospecialize(sim::ComponentModelSimulation))
@@ -264,11 +278,7 @@ end
 Remap `quantity` in `sim` remapped onto the `target_field`.
 """
 function get_field!(target_field, sim, quantity)
-    # Extract the symbol from Val{:symbol} if needed
-    label_str =
-        quantity isa Val ? "get_field! $(typeof(quantity).parameters[1])" :
-        "get_field! $quantity"
-    remap!(target_field, get_field(sim, quantity), label = label_str)
+    remap!(target_field, get_field(sim, quantity))
     return nothing
 end
 
@@ -452,69 +462,7 @@ Non-ClimaCore fields should provide a method to this function.
 """
 function remap end
 
-# Pretty descriptions for debugging remaps
-function describe_space(space)
-    topo = try
-        CC.Spaces.topology(space)
-    catch
-        nothing
-    end
-    mesh = isnothing(topo) ? nothing : (
-        try
-            topo.mesh
-        catch
-            nothing
-        end
-    )
-    quad = try
-        CC.Spaces.quadrature_style(space)
-    catch
-        nothing
-    end
-    deg = try
-        isnothing(quad) ? nothing : CC.Spaces.Quadratures.polynomial_degree(quad)
-    catch
-        nothing
-    end
-    return (
-        type = typeof(space),
-        id = objectid(space),
-        quad_degree = deg,
-        topo_type = isnothing(topo) ? nothing : typeof(topo),
-        mesh_type = isnothing(mesh) ? nothing : typeof(mesh),
-    )
-end
-
-function describe_field(f)
-    vals = CC.Fields.field_values(f)
-    storage_t = typeof(vals)
-    # Avoid hard dependency on CUDA
-    on_gpu = occursin("CuArray", string(storage_t))
-    sz = try
-        size(vals)
-    catch
-        ()
-    end
-    return (eltype = eltype(vals), size = sz, on_gpu = on_gpu, storage_type = storage_t)
-end
-
-# A short, filtered callsite snapshot (skip Interfacer frames)
-function short_callsite(; max_frames = 3)
-    bt = Base.backtrace()
-    frames = Base.stacktrace(bt)
-    keep = filter(fr -> !occursin("Interfacer.jl", String(fr.file)), frames)
-    n = min(length(keep), max_frames)
-    return [
-        (; file = String(keep[i].file), line = keep[i].line, func = keep[i].func) for
-        i in 1:n
-    ]
-end
-
-function remap(
-    field::CC.Fields.Field,
-    target_space::CC.Spaces.AbstractSpace;
-    label::Union{Nothing, String, Symbol} = nothing,
-)
+function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
     source_space = axes(field)
     comms_ctx = ClimaComms.context(source_space)
 
@@ -523,18 +471,9 @@ function remap(
         source_space == target_space ||
         CC.Spaces.issubspace(source_space, target_space) ||
         CC.Spaces.issubspace(target_space, source_space)
-    if !spaces_are_compatible
-        @info (
-            "Remapping field from source space:\n$source_space\n" *
-            "to incompatible target space:\n$target_space"
-        )
-        cs = short_callsite()
-        @info "Interfacer.remap: incompatible spaces" label callsite = cs
-    end
 
     # TODO: Handle remapping of Vectors correctly
     if hasproperty(field, :components)
-        println("Field has components")
         @assert length(field.components) == 1 "Can only work with simple vectors"
         field = field.components.data.:1
     end
@@ -549,46 +488,36 @@ function remap(
     lons = CC.Fields.field2array(coords.long)
     hcoords = CC.Geometry.LatLongPoint.(lats, lons)
 
-    # Remap the field, using MPI if applicable, NVTX-labeled
-    range_name =
-        isnothing(label) ? "Interfacer.remap:interpolate" :
-        "Interfacer.remap:interpolate (" * String(label) * ")"
-    NVTX.range_push(; message = range_name)
-    out_field = begin
-        if comms_ctx isa ClimaComms.SingletonCommsContext
-            # Remap source field to target space as an array
-            remapped_array = CC.Remapping.interpolate(field, hcoords, [])
-            # Convert remapped array to a field in the target space
-            CC.Fields.array2field(remapped_array, target_space)
-        else
-            # Gather then broadcast the global hcoords and offsets
-            offset = [length(hcoords)]
-            all_hcoords =
-                ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, hcoords))
-            all_offsets =
-                ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, offset))
-            # Interpolate on root and broadcast to all processes
-            remapper = CC.Remapping.Remapper(source_space; target_hcoords = all_hcoords)
-            remapped_array =
-                ClimaComms.bcast(comms_ctx, CC.Remapping.interpolate(remapper, field))
-            my_ending_offset = sum(all_offsets[1:ClimaComms.mypid(comms_ctx)])
-            my_starting_offset = my_ending_offset - offset[]
-            # Convert remapped array to a field in the target space on each process
-            CC.Fields.array2field(
-                remapped_array[(1 + my_starting_offset):my_ending_offset],
-                target_space,
-            )
-        end
+    # Remap the field, using MPI if applicable
+    if comms_ctx isa ClimaComms.SingletonCommsContext
+        # Remap source field to target space as an array
+        remapped_array = CC.Remapping.interpolate(field, hcoords, [])
+
+        # Convert remapped array to a field in the target space
+        return CC.Fields.array2field(remapped_array, target_space)
+    else
+        # Gather then broadcast the global hcoords and offsets
+        offset = [length(hcoords)]
+        all_hcoords = ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, hcoords))
+        all_offsets = ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, offset))
+
+        # Interpolate on root and broadcast to all processes
+        remapper = CC.Remapping.Remapper(source_space; target_hcoords = all_hcoords)
+        remapped_array =
+            ClimaComms.bcast(comms_ctx, CC.Remapping.interpolate(remapper, field))
+
+        my_ending_offset = sum(all_offsets[1:ClimaComms.mypid(comms_ctx)])
+        my_starting_offset = my_ending_offset - offset[]
+
+        # Convert remapped array to a field in the target space on each process
+        return CC.Fields.array2field(
+            remapped_array[(1 + my_starting_offset):my_ending_offset],
+            target_space,
+        )
     end
-    NVTX.range_pop()
-    return out_field
 end
 
-function remap(
-    num::Number,
-    target_space::CC.Spaces.AbstractSpace;
-    label::Union{Nothing, String, Symbol} = nothing,
-)
+function remap(num::Number, target_space::CC.Spaces.AbstractSpace)
     return num
 end
 
@@ -600,24 +529,20 @@ Remap the given `source` onto the `target_field`.
 Non-ClimaCore fields should provide a method to [`Interfacer.remap`](@ref), or directly to this
 function.
 """
-function remap!(target_field, source; label::Union{Nothing, String, Symbol} = nothing)
-    range_name =
-        isnothing(label) ? "Interfacer.remap!" : "Interfacer.remap! (" * String(label) * ")"
-    NVTX.@range range_name begin
-        target_field .= remap(source, axes(target_field); label)
-    end
+function remap!(target_field, source)
+    target_field .= remap(source, axes(target_field))
     return nothing
 end
 
 
 """
-    set_cache!(sim::ComponentModelSimulation)
+    set_cache!(sim::ComponentModelSimulation, csf)
 
 Perform any initialization of the component model cache that must be done
 after the initial exchange.
 This is not required to be extended, but may be necessary for some models.
 """
-set_cache!(sim::ComponentModelSimulation) = nothing
+set_cache!(sim::ComponentModelSimulation, csf) = nothing
 
 """
     boundary_space(sim::CoupledSimulation)
@@ -646,5 +571,31 @@ function ClimaComms.device(sim::CoupledSimulation)
     return ClimaComms.device(sim.fields)
 end
 
+"""
+    get_atmos_height_delta(height_int, height_sfc)
+
+Return a Field of the height delta between the atmosphere bottom cell center
+and bottom face, defined on the boundary space.
+This is used to compute turbulent fluxes.
+
+Since the atmospheric height is defined on centers, we need to copy the values onto
+the boundary space to be able to subtract the surface elevation.
+This pattern is not reliable and should not be reused.
+
+Note this function allocates a new field, and the atmosphere heights won't change
+during a simulation, so it should only be called at initialization.
+
+# Arguments
+- `csf`: [NamedTuple] containing coupler fields.
+
+# Returns
+- [CC.Fields.Field] defined on the boundary space containing the height delta.
+"""
+function get_atmos_height_delta(height_int, height_sfc)
+    return CC.Fields.Field(
+        CC.Fields.field_values(height_int),
+        axes(height_sfc), # boundary space
+    ) .- height_sfc
+end
 
 end # module

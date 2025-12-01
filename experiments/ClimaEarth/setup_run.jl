@@ -621,7 +621,7 @@ function run!(
     @info "Starting coupling loop"
     walltime = ClimaComms.@elapsed ClimaComms.device(cs) begin
         s = CA.@timed_str begin
-            while cs.t[] <= cs.tspan[end]
+            while cs.t[] < cs.tspan[end]
                 step!(cs)
             end
         end

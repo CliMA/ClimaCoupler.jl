@@ -3,10 +3,13 @@ aerosol_radiation: true
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 checkpoint_dt: "720hours"
 co2: "maunaloa"
-dt: "120secs"
+dt_atmos: "120secs" # 2 minutes
 dt_cloud_fraction: "1hours"
-dt_cpl: "120secs"
+dt_cpl: "900secs" # 15 minutes
+dt_land: "450secs" # 7.5 minutes
+dt_ocean: "900secs" # 15 minutes
 dt_rad: "1hours"
+dt_seaice: "900secs" # 15 minutes
 energy_check: false
 insolation: "timevarying"
 land_model: "integrated"
@@ -19,3 +22,4 @@ surface_setup: "PrescribedSurface"
 t_end: "186days"
 topo_smoothing: true
 topography: "Earth"
+use_itime: false

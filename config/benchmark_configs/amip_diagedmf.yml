@@ -1,10 +1,10 @@
 FLOAT_TYPE: "Float32"
 aerosol_radiation: true
 atmos_config_file: "config/benchmark_configs/climaatmos_diagedmf.yml"
-bucket_albedo_type: "map_temporal"
 dt: "120secs"
 dt_cpl: "120secs"
 energy_check: false
+land_model: "integrated"
 mode_name: "amip"
 monthly_checkpoint: false
 prescribe_ozone: true

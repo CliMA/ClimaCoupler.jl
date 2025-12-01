@@ -323,10 +323,12 @@ for FT in (Float32, Float64)
         coupler_fields = Interfacer.init_coupler_fields(FT, coupler_names, boundary_space)
 
         sims = (;
+            atmos_sim = TestAtmosSimulation((; air_temperature = ones(boundary_space),)),
             a = TestSurfaceSimulation1(ones(boundary_space)),
             b = TestSurfaceSimulation2(ones(boundary_space)),
         )
 
+        FieldExchanger.import_static_fields!(coupler_fields, sims)
         FieldExchanger.import_combined_surface_fields!(coupler_fields, sims)
 
         # Analytically compute expected values and compare

@@ -150,12 +150,14 @@ function setup_output_dirs(;
     atmos_output_dir = joinpath(output_dir_root, "clima_atmos")
     land_output_dir = joinpath(output_dir_root, "clima_land")
     ocean_output_dir = joinpath(output_dir_root, "clima_ocean")
+    ice_output_dir = joinpath(output_dir_root, "clima_seaice")
     coupler_output_dir = joinpath(output_dir_root, "clima_coupler")
 
     if ClimaComms.iamroot(comms_ctx)
         mkpath(atmos_output_dir)
         mkpath(land_output_dir)
         mkpath(ocean_output_dir)
+        mkpath(ice_output_dir)
         mkpath(coupler_output_dir)
 
         mkpath(artifacts_dir)
@@ -175,6 +177,7 @@ function setup_output_dirs(;
         atmos_output_dir,
         land_output_dir,
         ocean_output_dir,
+        ice_output_dir,
         coupler_output_dir,
         artifacts_dir,
         regrid_dir,

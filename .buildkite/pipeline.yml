@@ -32,7 +32,6 @@ steps:
       - "julia --project -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate ClimaEarth experiments env"
-      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaCore", rev="main"))'
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.develop(path=\".\")'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"
@@ -193,13 +192,6 @@ steps:
         agents:
           slurm_mem: 20GB
 
-      - label: "AMIP: bucket initial condition test"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_bucket_ic.yml --job_id amip_bucket_ic"
-        artifact_paths: "experiments/ClimaEarth/output/amip_bucket_ic/artifacts/*"
-        agents:
-          slurm_ntasks: 1
-          slurm_mem: 20GB
-
       - label: "AMIP: integrated land non-spun up initial condition test"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_land_ic.yml --job_id amip_land_ic"
         artifact_paths: "experiments/ClimaEarth/output/amip_land_ic/artifacts/*"
@@ -322,7 +314,7 @@ steps:
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
-      
+
 
       - label: "GPU AMIP test: albedo from function"
         key: "gpu_amip_albedo_function"
@@ -357,10 +349,20 @@ steps:
   - group: "CMIP"
     steps:
 
-      - label: "GPU CMIP"
-        key: "gpu_my_first_cmip"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/my_first_cmip.yml --job_id my_first_cmip"
-        artifact_paths: "experiments/ClimaEarth/output/my_first_cmip/artifacts/*"
+      - label: "GPU CMIP: ClimaAtmos + bucket land + Oceananigans + PrescribedSeaIce"
+        key: "gpu_cmip_oceananigans_prescrseaice"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_oceananigans_prescrseaice.yml --job_id gpu_cmip_oceananigans_prescrseaice"
+        artifact_paths: "experiments/ClimaEarth/output/gpu_cmip_oceananigans_prescrseaice/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
+
+      - label: "GPU CMIP: ClimaAtmos + bucket land + Oceananigans + ClimaSeaIce"
+        key: "gpu_cmip_oceananigans_climaseaice"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice.yml --job_id gpu_cmip_oceananigans_climaseaice"
+        artifact_paths: "experiments/ClimaEarth/output/gpu_cmip_oceananigans_climaseaice/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

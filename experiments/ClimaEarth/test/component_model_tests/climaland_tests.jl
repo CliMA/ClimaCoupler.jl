@@ -60,8 +60,30 @@ FT = Float32
 
     # Check that the drivers are correctly initialized
     driver_names = propertynames(land_sim.integrator.p.drivers)
-    @test driver_names ==
-          (:P_liq, :P_snow, :c_co2, :T, :P, :q, :SW_d, :LW_d, :cosθs, :frac_diff, :soc)
+    @test driver_names == (
+        :P_liq,
+        :P_snow,
+        :c_co2,
+        :T,
+        :P,
+        :q,
+        :u,
+        :thermal_state,
+        :SW_d,
+        :LW_d,
+        :cosθs,
+        :frac_diff,
+        :soc,
+    )
+    atmos = land_sim.model.soil.boundary_conditions.top.atmos
+    @test atmos == land_sim.model.canopy.boundary_conditions.atmos
+    @test atmos == land_sim.model.snow.boundary_conditions.atmos
+    # Remap atmos_h to the same space as atmos.h for type comparison
+    atmos_h_remapped = Interfacer.remap(atmos_h, axes(atmos.h))
+    @test atmos.h == atmos_h_remapped
+    #@test typeof(atmos.h) == typeof(atmos_h_remapped)
+    @test atmos.gustiness == FT(1)
+    @test propertynames(atmos) == (:h, :gustiness)
 end
 
 @testset "ClimaLandSimulation flux calculations" begin
@@ -79,8 +101,8 @@ end
     atmos_config = CA.AtmosConfig(atmos_config_file; job_id = "atmos_land_flux_test")
     atmos_sim = ClimaAtmosSimulation(atmos_config)
 
-    boundary_space = ClimaCore.Spaces.horizontal_space(atmos_sim.domain.face_space)
-    area_fraction = ClimaCore.Fields.ones(boundary_space)
+    boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
+    area_fraction = CC.Fields.ones(boundary_space)
     atmos_h = CC.Fields.zeros(boundary_space) .+ 2
     land_sim =
         ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction, atmos_h)
@@ -111,6 +133,7 @@ end
 
     # Exchange the initial conditions between atmosphere and land
     # This also tests the `get_field`, `update_field!` and `update_model_sims!` methods for `ClimaLandSimulation`
+    FieldExchanger.import_static_fields!(coupler_fields, model_sims)
     FieldExchanger.exchange!(cs)
 
     # Update land cache variables with the updated drivers in the cache after the exchange
@@ -124,7 +147,34 @@ end
         land_sim.integrator.t,
     )
 
-    # Compute the surface fluxes
+    # Compute the turbulent fluxes for each sub-component
+    CL.turbulent_fluxes!(
+        land_sim.integrator.p.canopy.turbulent_fluxes,
+        land_sim.model.canopy.boundary_conditions.atmos,
+        land_sim.model.canopy.boundary_conditions.turbulent_flux_parameterization,
+        land_sim.model.canopy,
+        land_sim.integrator.u,
+        land_sim.integrator.p,
+        land_sim.integrator.t,
+    )
+    CL.turbulent_fluxes!(
+        land_sim.integrator.p.soil.turbulent_fluxes,
+        land_sim.model.soil.boundary_conditions.top.atmos,
+        land_sim.model.soil,
+        land_sim.integrator.u,
+        land_sim.integrator.p,
+        land_sim.integrator.t,
+    )
+    CL.turbulent_fluxes!(
+        land_sim.integrator.p.snow.turbulent_fluxes,
+        land_sim.model.snow.boundary_conditions.atmos,
+        land_sim.model.snow,
+        land_sim.integrator.u,
+        land_sim.integrator.p,
+        land_sim.integrator.t,
+    )
+
+    # Combine the surface fluxes from each sub-component and update the coupler fields
     FluxCalculator.compute_surface_fluxes!(
         coupler_fields,
         land_sim,

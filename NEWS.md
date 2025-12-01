@@ -6,6 +6,17 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Update interfaces to surface-flux calculator to support dynamic roughness.
+Adds the `roughness_model` argument to the surface-flux input constructor. Default
+behaviour is the `SF.ScalarRoughness()` type. Upcoming changes will account for the
+value of the `roughness_model` to be inferred from the mask value (e.g. prescribed
+aerodynamic roughness over land, and computed as a function of shear over oceans).
+
+#### Remove the `bucket_ic_august.nc` initial condition file PR[#1564](https://github.com/CliMA/ClimaCoupler.jl/pull/1564)
+Remove the file `experiments/ClimaEarth/input/bucket_ic_august.nc`, which
+was originally added for DYAMOND simulations and is no longer needed.
+We still keep the config file option `bucket_initial_condition`.
+
 #### Add an option `restart_cache` PR[#1548](https://github.com/CliMA/ClimaCoupler.jl/pull/1548)
 Adds an option so that if restart files are available, we can choose to
 restart the state only (`restart_cache` false), or to restart both the state

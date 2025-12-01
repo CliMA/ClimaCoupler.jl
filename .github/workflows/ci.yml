@@ -17,6 +17,9 @@ jobs:
   test:
     name: ci ${{ matrix.version }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    env:
+      ECCO_USERNAME: ${{ secrets.ECCO_USERNAME }}
+      ECCO_WEBDAV_PASSWORD: ${{ secrets.ECCO_WEBDAV_PASSWORD }}
     strategy:
       fail-fast: false
       matrix:

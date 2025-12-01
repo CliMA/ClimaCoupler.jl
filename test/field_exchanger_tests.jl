@@ -96,6 +96,10 @@ Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:height_int}) =
     CC.Fields.ones(axes(sim.cache.air_temperature))
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:height_sfc}) =
     CC.Fields.zeros(axes(sim.cache.air_temperature))
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:u_int}) =
+    CC.Fields.zeros(axes(sim.cache.air_temperature))
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:v_int}) =
+    CC.Fields.zeros(axes(sim.cache.air_temperature))
 function Interfacer.update_field!(
     sim::TestAtmosSimulation,
     ::Val{:surface_direct_albedo},
@@ -122,6 +126,8 @@ Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:surface_temperature}, 
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:roughness_buoyancy}, field) =
     nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:beta}, field) = nothing
+FluxCalculator.update_turbulent_fluxes!(sim::TestAtmosSimulation, fields) = nothing
+Interfacer.step!(sim::TestAtmosSimulation, t) = nothing
 
 #surface sim
 struct TestSurfaceSimulationLand{C} <: Interfacer.SurfaceModelSimulation
@@ -323,10 +329,12 @@ for FT in (Float32, Float64)
         coupler_fields = Interfacer.init_coupler_fields(FT, coupler_names, boundary_space)
 
         sims = (;
+            atmos_sim = TestAtmosSimulation((; air_temperature = ones(boundary_space),)),
             a = TestSurfaceSimulation1(ones(boundary_space)),
             b = TestSurfaceSimulation2(ones(boundary_space)),
         )
 
+        FieldExchanger.import_static_fields!(coupler_fields, sims)
         FieldExchanger.import_combined_surface_fields!(coupler_fields, sims)
 
         # Analytically compute expected values and compare
@@ -436,8 +444,13 @@ for FT in (Float32, Float64)
 
     @testset "step_model_sims! for FT=$FT" begin
         @test FieldExchanger.step_model_sims!(
-            (; stub = TestSurfaceSimulation1(FT(0))),
+            (;
+                stub = TestSurfaceSimulation1(FT(0)),
+                atmos_sim = TestAtmosSimulation(FT(0)),
+            ),
             1,
+            nothing,
+            nothing,
         ) === nothing
     end
 

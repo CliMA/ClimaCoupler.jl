@@ -1,8 +1,10 @@
 FLOAT_TYPE: "Float32"
 aerosol_radiation: true
+albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "map_temporal"
-checkpoint_dt: "31days"
+checkpoint_dt: "1days"
+coupler_toml: ["toml/amip.toml"]
 co2_model: "maunaloa"
 dt: "120secs"
 dt_cloud_fraction: "1hours"
@@ -18,6 +20,9 @@ prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "366days"
+t_end: "7days"
 topo_smoothing: true
 topography: "Earth"
+extra_atmos_diagnostics:
+  - short_name: [ts, ta, pfull, rhoa, ua, va, wa, hfss, hfls, hur, hus, cl, clw, cli, husra, hussn, pr, tke]
+    period: 1days

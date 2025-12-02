@@ -226,6 +226,7 @@ for FT in (Float32, Float64)
             (;), # dir_paths
             nothing, # thermo_params
             nothing, # diags_handler
+            true, # save_cache
         )
 
         FieldExchanger.update_surface_fractions!(cs)
@@ -521,6 +522,7 @@ for FT in (Float32, Float64)
             (;), # dir_paths
             thermo_params, # thermo_params
             nothing, # diags_handler
+            true, # save_cache
         )
 
         # perform the exchange

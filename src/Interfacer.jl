@@ -60,6 +60,7 @@ struct CoupledSimulation{
     NTP <: NamedTuple,
     TP,
     DH,
+    SC <: Bool,
 }
     start_date::D
     fields::FV
@@ -73,6 +74,7 @@ struct CoupledSimulation{
     dir_paths::NTP
     thermo_params::TP
     diags_handler::DH
+    save_cache::SC
 end
 
 CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args)...}(args...)

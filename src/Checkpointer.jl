@@ -128,7 +128,8 @@ end
 """
     checkpoint_sims(cs::CoupledSimulation)
 
-This is a callback function that checkpoints all simulations defined in the current coupled simulation.
+This is a callback function that checkpoints all simulations defined in the
+current coupled simulation.
 """
 function checkpoint_sims(cs::Interfacer.CoupledSimulation)
     time = Int(round(float(cs.t[])))
@@ -148,7 +149,7 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
                 output_dir,
             )
         end
-        if !isnothing(Checkpointer.get_model_cache(sim))
+        if !isnothing(Checkpointer.get_model_cache(sim)) && cs.save_cache
             Checkpointer.checkpoint_model_cache(
                 sim,
                 comms_ctx,

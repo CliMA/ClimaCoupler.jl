@@ -85,6 +85,7 @@ for FT in (Float32, Float64)
             (;), # dir_paths
             nothing, # thermo_params
             nothing, # diags_handler
+            true, # save_cache
         )
 
         # set non-zero radiation and precipitation
@@ -187,6 +188,7 @@ for FT in (Float32, Float64)
             (;), # dir_paths
             nothing, # thermo_params
             nothing, # diags_handler
+            true, # save_cache
         )
 
         tot_energy, tot_water = ConservationChecker.check_conservation!(cs)

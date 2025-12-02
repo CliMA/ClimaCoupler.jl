@@ -1,5 +1,4 @@
 FLOAT_TYPE: "Float32"
-albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
 coupler_toml: ["toml/amip.toml"]
 mode_name: "subseasonal"

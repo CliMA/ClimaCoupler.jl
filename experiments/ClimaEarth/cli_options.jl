@@ -141,10 +141,6 @@ function argparse_settings()
         help = "An optional YAML file used to overwrite the default model parameters."
         arg_type = String
         default = nothing
-        "--albedo_model"
-        help = "Type of albedo model. [`ConstantAlbedo`, `RegressionFunctionAlbedo`, `CouplerAlbedo` (default)]"
-        arg_type = String
-        default = "CouplerAlbedo"
         "--extra_atmos_diagnostics"
         help = "List of dictionaries containing information about additional atmosphere diagnostics to output [nothing (default)]"
         arg_type = Vector{Dict{Any, Any}}

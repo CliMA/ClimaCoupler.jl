@@ -92,6 +92,7 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
         (;), # dir_paths
         nothing, # thermo_params
         nothing, # diags_handler
+        true, # save_cache
     )
 
     output_plots = "test_debug"

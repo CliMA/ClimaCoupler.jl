@@ -131,6 +131,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         restart_dir,
         restart_t,
         restart_cache,
+        save_cache,
         use_land_diagnostics,
         diagnostics_dt,
         evolving_ocean,
@@ -493,7 +494,8 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
     schedule_checkpoint =
         EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date)
-    checkpoint_cb = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
+    checkpoint_cb =
+        TimeManager.Callback(schedule_checkpoint, sim -> Checkpointer.checkpoint_sims(sim))
 
     callbacks = (checkpoint_cb,)
 
@@ -537,6 +539,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         dir_paths,
         thermo_params,
         diags_handler,
+        save_cache,
     )
 
     #=

@@ -58,6 +58,7 @@ for FT in (Float32, Float64)
             (;), # dir_paths
             nothing, # thermo_params
             nothing, # diags_handler
+            true, # save_cache
         )
         @test CC.Spaces.undertype(Interfacer.boundary_space(cs)) == FT
     end

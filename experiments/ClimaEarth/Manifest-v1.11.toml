@@ -540,7 +540,9 @@ version = "0.3.10"
 
 [[deps.ClimaTimeSteppers]]
 deps = ["ClimaComms", "DataStructures", "DiffEqBase", "KernelAbstractions", "Krylov", "LinearAlgebra", "LinearOperators", "NVTX", "SciMLBase", "StaticArrays"]
-git-tree-sha1 = "23c8346606e165aa8805f25063f24e39bd8e148d"
+git-tree-sha1 = "e47cea2cd6daa92f8c1fc2a15eaad64f71e6655e"
+repo-rev = "pb/rm-nvtx"
+repo-url = "https://github.com/CliMA/ClimaTimesteppers.jl"
 uuid = "595c0a79-7f3d-439a-bc5a-b232dc3bde79"
 version = "0.8.5"
 weakdeps = ["BenchmarkTools", "CUDA", "OrderedCollections", "PrettyTables", "StatsBase"]

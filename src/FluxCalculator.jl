@@ -291,7 +291,7 @@ function compute_surface_fluxes!(
     beta = csf.scalar_temp4
 
     # Set some scalars that we hardcode for now
-    gustiness = FT(1)
+    gustiness = ones(boundary_space)
 
     # Construct the SurfaceFluxes.jl container of inputs
     if pkgversion(SF) ≥ v"0.14.0"

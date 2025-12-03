@@ -415,7 +415,9 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaInterpolations", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "ForwardDiff", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "NullBroadcasts", "RRTMGP", "Random", "SciMLBase", "SparseMatrixColorings", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
-git-tree-sha1 = "dcfc73f58cc8c261f6eaf85ea4a01ae8e1c88ce3"
+git-tree-sha1 = "fe6452802a1510512910472e88e9e406f23ece2e"
+repo-rev = "pb/rm-nvtx"
+repo-url = "https://github.com/CliMA/ClimaAtmos.jl"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
 version = "0.31.9"
 

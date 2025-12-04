@@ -61,7 +61,14 @@ steps:
       - label: "Send simulation output to Azure VM for visualization"
         command:
           - rsync -avz experiments/ClimaEarth/output/amip/output_active/* azure-arenchon:/home/arenchon/GitHub/ClimaViz.jl/data/climacoupler-amip/
-          - sudo systemctl restart climaviz.service
+
+      - label: "Trigger ClimaViz restart"
+        command: |
+          curl -X POST \
+            -H "Authorization: Bearer ${GITHUB_TOKEN_CLIMAVIZ}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/CliMA/ClimaViz.jl/dispatches \
+            -d '{"event_type": "restart_climaviz"}'
 
       - label: ":envelope: Slack report: current AMIP"
         command:

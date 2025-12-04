@@ -451,7 +451,7 @@ weakdeps = ["CUDA", "MPI"]
 
 [[deps.ClimaCore]]
 deps = ["Adapt", "BandedMatrices", "BlockArrays", "ClimaComms", "CubedSphere", "DataStructures", "ForwardDiff", "GaussQuadrature", "GilbertCurves", "HDF5", "InteractiveUtils", "IntervalSets", "KrylovKit", "LazyBroadcast", "LinearAlgebra", "MultiBroadcastFusion", "NVTX", "PkgVersion", "RecursiveArrayTools", "RootSolvers", "SparseArrays", "StaticArrays", "Statistics", "UnrolledUtilities"]
-path = "../../../ClimaCore.jl"
+path = "../../../ClimaCore.jl-mod"
 uuid = "d414da3d-4745-48bb-8d80-42e94e092884"
 version = "0.14.43"
 weakdeps = ["CUDA", "Krylov"]

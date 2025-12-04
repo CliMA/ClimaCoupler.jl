@@ -47,7 +47,7 @@ steps:
           slurm_gpus: 1
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
-          slurm_mem: 30GB
+          slurm_mem: 0GB
           slurm_time: "120:00:00"
       
       - label: "Current AMIP: diagedmf + 0M + integrated land"
@@ -67,5 +67,5 @@ steps:
           slurm_gpus: 1
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
-          slurm_mem: 30GB
+          slurm_mem: 0GB
           slurm_time: "120:00:00"

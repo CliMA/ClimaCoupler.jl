@@ -1,6 +1,7 @@
 import Oceananigans as OC
 import ClimaOcean as CO
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
+import Interfacer: remap, remap!, get_field
 import ClimaComms
 import ClimaCore as CC
 import Thermodynamics as TD
@@ -182,9 +183,7 @@ To regrid from ClimaCore to Oceananigans, use `CR.regrid!(dest_vector, transpose
 """
 function construct_remappers(grid_oc, boundary_space)
     # Get the vector of polygons for Oceananigans and ClimaCore spaces
-    # TODO write compute_cell_matrix for OC grid (not field)
-    field_oc = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
-    vertices_oc = compute_cell_matrix(field_oc)
+    vertices_oc = compute_cell_matrix(grid_oc)
     vertices_cc = CC.Remapping.get_element_vertices(boundary_space)
 
     remapper_oc_to_cc = CR.Regridder(vertices_cc, vertices_oc)
@@ -194,33 +193,51 @@ function construct_remappers(grid_oc, boundary_space)
     # Allocate a vector with length equal to the number of elements in the target space
     # To be used as a temp field for remapping
     # TODO think about name
-    values_cc = zeros(Float64, CC.Meshes.nelements(boundary_space.grid.topology.mesh))
-    return (; remapper_oc_to_cc, field_ones_cc, values_cc)
+    value_per_element_cc =
+        zeros(Float64, CC.Meshes.nelements(boundary_space.grid.topology.mesh))
+    return (; remapper_oc_to_cc, field_ones_cc, value_per_element_cc)
 end
 
 # Non-allocating ClimaCore -> Oceananigans remap
-function remap!(dst_field::OC.Field, src_field::CC.Fields.Field, remapping)
-    values_cc = CC.Remappping.get_value_per_element(src_field, remapping.field_ones_cc)
-    CR.regrid!(vec(interior(dst_field)), transpose(remapping.remapper_oc_to_cc), values_cc)
+function Interfacer.remap!(dst_field::OC.Field, src_field::CC.Fields.Field, remapping)
+    value_per_element_cc =
+        CC.Remappping.get_value_per_element(src_field, remapping.field_ones_cc)
+    CR.regrid!(
+        vec(interior(dst_field)),
+        transpose(remapping.remapper_oc_to_cc),
+        value_per_element_cc,
+    )
     return nothing
 end
 # Allocating ClimaCore -> Oceananigans remap
-function remap(src_field::CC.Fields.Field, remapping, dst_space::OC.Grid)
-    dst_field = OC.Field{Center, Center, Nothing}(dst_space)
+function Interfacer.remap(
+    src_field::CC.Fields.Field,
+    remapping,
+    dst_space::Union{OC.OrthogonalSphericalShellGrid, OC.LatitudeLongitudeGrid},
+)
+    dst_field = OC.Field{OC.Center, OC.Center, Nothing}(dst_space)
     remap!(dst_field, src_field, remapping)
     return dst_field
 end
 
 # Non-allocating Oceananigans -> ClimaCore remap
-function remap!(dst_field::CC.Fields.Field, src_field::OC.Field, remapping)
-    CR.regrid!(remapping.values_cc, remapping.remapper_oc_to_cc, vec(interior(src_field)))
+function Interfacer.remap!(dst_field::CC.Fields.Field, src_field::OC.Field, remapping)
+    CR.regrid!(
+        remapping.value_per_element_cc,
+        remapping.remapper_oc_to_cc,
+        vec(interior(src_field)),
+    )
 
     # Convert the vector of remapped values to a ClimaCore Field with one value per element
-    CC.Remapping.set_value_per_element!(dst_field, remapping.values_cc)
+    CC.Remapping.set_value_per_element!(dst_field, remapping.value_per_element_cc)
     return nothing
 end
 # Allocating Oceananigans -> ClimaCore remap
-function remap(src_field::OC.Field, remapping, dst_space::CC.Spaces.AbstractSpace)
+function Interfacer.remap(
+    src_field::OC.Field,
+    remapping,
+    dst_space::CC.Spaces.AbstractSpace,
+)
     dst_field = CC.Fields.zeros(dst_space)
     remap!(dst_field, src_field, remapping)
     return dst_field

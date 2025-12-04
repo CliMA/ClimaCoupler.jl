@@ -86,15 +86,17 @@ end
 
 ### Helper functions to use ConservativeRemapping.jl with Oceananigans.jl
 """
-    compute_cell_matrix(field::AbstractField)
+    compute_cell_matrix(grid::Union{OC.OrthogonalSphericalShellGrid, OC.LatitudeLongitudeGrid})
 
 Get a vector of vector of coordinate tuples, of the format expected by the
 ConservativeRemapping.jl regridder.
 """
-function compute_cell_matrix(field::AbstractField)
-    Fx, Fy, _ = size(field)
-    LX, LY, _ = Oceananigans.Fields.location(field)
-    ℓx, ℓy = LX(), LY()
+function compute_cell_matrix(
+    grid::Union{OC.OrthogonalSphericalShellGrid, OC.LatitudeLongitudeGrid},
+)
+    Fx, Fy, _ = size(grid)
+    # TODO is it ok to hardcode Center? Regridder is specifically for Center, Center fields so I think it's ok
+    ℓx, ℓy = OC.Center(), OC.Center()
 
     if isnothing(ℓx) || isnothing(ℓy)
         error(
@@ -102,7 +104,6 @@ function compute_cell_matrix(field::AbstractField)
         )
     end
 
-    grid = field.grid
     arch = grid.architecture
     FT = eltype(grid)
 

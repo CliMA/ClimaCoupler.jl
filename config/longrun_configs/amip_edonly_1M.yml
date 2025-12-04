@@ -17,14 +17,14 @@ moist: "nonequil"
 precip_model: "1M"
 prescribe_ozone: true
 prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
-restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-longruns/980/climacoupler-longruns/experiments/ClimaEarth/output/amip_edonly_1M_gpu/checkpoints/"
-restart_t: 172800
+# restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-longruns/980/climacoupler-longruns/experiments/ClimaEarth/output/amip_edonly_1M_gpu/checkpoints/"
+# restart_t: 172800
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "7days"
+t_end: "31days"
 topo_smoothing: true
 topography: "Earth"
 extra_atmos_diagnostics:
   - short_name: [ts, ta, pfull, rhoa, ua, va, wa, hfss, hfls, hur, hus, cl, clw, cli, husra, hussn, pr, tke]
-    period: 120secs
+    period: 1days

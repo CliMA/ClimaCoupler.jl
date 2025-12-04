@@ -22,7 +22,7 @@ steps:
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
 
       # For this pipeline, use the main branches of certain upstream packages
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaAtmos\", rev=\"main\"))'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaAtmos\", rev=\"as/gryanik\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaLand\", rev=\"main\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaCore\", rev=\"main\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaTimeSteppers\", rev=\"main\"))'"
@@ -48,21 +48,6 @@ steps:
 
     steps:
 
-      - label: "Coarse current AMIP: diagedmf + 0M + bucket land"
-        key: "amip"
-        command:
-          - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse.yml --job_id amip_coarse"
-        artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"
-        timeout_in_minutes: 840
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 30GB
-
       - label: "Coarse current AMIP: diagedmf + 0M + integrated land"
         key: "amip_land"
         command:
@@ -84,21 +69,6 @@ steps:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_progedmf.yml --job_id amip_coarse_progedmf"
         artifact_paths: "experiments/ClimaEarth/output/amip_coarse_progedmf/artifacts/*"
-        timeout_in_minutes: 840
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 30GB
-
-      - label: "Coarse current AMIP without convection: edonly + 0M + bucket land"
-        key: "amip_edonly"
-        command:
-          - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_edonly.yml --job_id amip_coarse_edonly"
-        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_edonly/artifacts/*"
         timeout_in_minutes: 840
         env:
           CLIMACOMMS_DEVICE: "CUDA"

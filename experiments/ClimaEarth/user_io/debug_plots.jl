@@ -66,8 +66,18 @@ function plot_global_conservation(
     lp = Makie.lines(days, l_rse, label = "rs error")
     lp.axis.xlabel = "time [days]"
     lp.axis.ylabel = "log( |x(t) - x(t=0)| / Σx(t=T) )"
-    filter_l_rse = filter(x -> !isinf(x) && !isnan(x), l_rse)
-    !isempty(filter_l_rse) && Makie.ylims!(minimum(filter_l_rse), maximum(filter_l_rse))
+    l_rse_valid = filter(x -> !isinf(x) && !isnan(x), l_rse)
+    if !isempty(l_rse_valid)
+        y_min = minimum(l_rse_valid)
+        y_max = maximum(l_rse_valid)
+        if y_min != y_max
+            Makie.ylims!(y_min, y_max)
+        else
+            # If all values are the same, add a small padding to avoid Makie error
+            padding = max(abs(y_min) * 0.01, 0.1)
+            Makie.ylims!(y_min - padding, y_max + padding)
+        end
+    end
     Makie.axislegend(position = :lt)
     Makie.save(figname2, lp)
 

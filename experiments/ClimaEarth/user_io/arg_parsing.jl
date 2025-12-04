@@ -144,6 +144,7 @@ function get_coupler_args(config_dict::Dict)
     restart_dir = config_dict["restart_dir"]
     restart_t = config_dict["restart_t"]
     restart_cache = config_dict["restart_cache"]
+    save_cache = config_dict["save_cache"]
 
     # Diagnostics information
     use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
@@ -192,6 +193,7 @@ function get_coupler_args(config_dict::Dict)
         restart_dir,
         restart_t,
         restart_cache,
+        save_cache,
         use_coupler_diagnostics,
         diagnostics_dt,
         evolving_ocean,

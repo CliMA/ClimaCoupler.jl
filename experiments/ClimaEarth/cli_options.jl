@@ -104,6 +104,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to read the cache from the restart file if available [`true` (default), `false`]"
         arg_type = Bool
         default = true
+        "--save_cache"
+        help = "Boolean flag indicating whether to save the state and cache or only the state when checkpointing [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
         # Diagnostics information
         "--use_coupler_diagnostics"
         help = "Boolean flag indicating whether to compute and output coupler diagnostics [`true` (default), `false`]"

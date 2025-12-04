@@ -39,3 +39,5 @@ turbconv: "prognostic_edmfx"
 viscous_sponge: true
 z_elem: 63
 z_max: 60000.0
+enable_diagnostics: false
+output_default_diagnostics: false

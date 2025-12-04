@@ -188,14 +188,24 @@ function construct_remappers(grid_oc, boundary_space)
 
     remapper_oc_to_cc = CR.Regridder(vertices_cc, vertices_oc)
 
+    # Create a field of ones on the boundary space so we can compute element areas
     field_ones_cc = CC.Fields.ones(boundary_space)
 
     # Allocate a vector with length equal to the number of elements in the target space
     # To be used as a temp field for remapping
-    # TODO think about name
     value_per_element_cc =
         zeros(Float64, CC.Meshes.nelements(boundary_space.grid.topology.mesh))
-    return (; remapper_oc_to_cc, field_ones_cc, value_per_element_cc)
+
+    # Construct two 2D Oceananigans Center/Center fields to use as scratch space while remapping
+    scratch_field_oc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
+    scratch_field_oc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
+    return (;
+        remapper_oc_to_cc,
+        field_ones_cc,
+        value_per_element_cc,
+        scratch_field_oc1,
+        scratch_field_oc2,
+    )
 end
 
 # Non-allocating ClimaCore -> Oceananigans remap
@@ -239,7 +249,7 @@ function Interfacer.remap(
     dst_space::CC.Spaces.AbstractSpace,
 )
     dst_field = CC.Fields.zeros(dst_space)
-    remap!(dst_field, src_field, remapping)
+    Interfacer.remap!(dst_field, src_field, remapping)
     return dst_field
 end
 
@@ -348,30 +358,17 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     grid = sim.ocean.model.grid
     ice_concentration = sim.ice_concentration
 
-    # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
-    # TODO replace these with remap! calls
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
-        F_turb_ρτxz,
-    )
-    OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr2,
-        sim.remapping.remapper_cc,
-        F_turb_ρτyz,
-    )
-    OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
+    # Remap momentum fluxes onto scratch 2D Center, Center fields
+    Interfacer.remap!(sim.remapping.scratch_field_oc1, F_turb_ρτxz, sim.remapping) # zonal momentum flux
+    Interfacer.remap!(sim.remapping.scratch_field_oc2, F_turb_ρτyz, sim.remapping) # meridional momentum flux
 
     # Rename for clarity; these are now Center, Center Oceananigans fields
-    F_turb_ρτxz_cc = sim.remapping.scratch_cc1
-    F_turb_ρτyz_cc = sim.remapping.scratch_cc2
+    F_turb_ρτxz_oc = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
+    F_turb_ρτyz_oc = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
 
     # Weight by (1 - sea ice concentration)
-    OC.interior(F_turb_ρτxz_cc, :, :, 1) .=
-        OC.interior(F_turb_ρτxz_cc, :, :, 1) .* (1.0 .- ice_concentration)
-    OC.interior(F_turb_ρτyz_cc, :, :, 1) .=
-        OC.interior(F_turb_ρτyz_cc, :, :, 1) .* (1.0 .- ice_concentration)
+    OC.interior(F_turb_ρτxz_oc, :, :, 1) .= F_turb_ρτxz_oc .* (1.0 .- ice_concentration)
+    OC.interior(F_turb_ρτyz_oc, :, :, 1) .= F_turb_ρτyz_oc .* (1.0 .- ice_concentration)
 
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
     oc_flux_u = surface_flux(sim.ocean.model.velocities.u)
@@ -386,12 +383,11 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     (; reference_density, heat_capacity, fresh_water_density) = sim.ocean_properties
 
     # Remap the latent and sensible heat fluxes using scratch arrays
-    CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, F_lh) # latent heat flux
-    CC.Remapping.interpolate!(sim.remapping.scratch_arr2, sim.remapping.remapper_cc, F_sh) # sensible heat flux
+    Interfacer.remap!(sim.remapping.scratch_field_oc1, F_lh, sim.remapping) # latent heat flux
+    Interfacer.remap!(sim.remapping.scratch_field_oc2, F_sh, sim.remapping) # sensible heat flux
 
-    # Rename for clarity; recall F_turb_energy = F_lh + F_sh
-    remapped_F_lh = sim.remapping.scratch_arr1
-    remapped_F_sh = sim.remapping.scratch_arr2
+    remapped_F_lh = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
+    remapped_F_sh = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
 
     # TODO: Note, SW radiation penetrates the surface. Right now, we just put
     # everything on the surface, but later we will need to account for this.
@@ -404,12 +400,9 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
 
     # Add the part of the salinity flux that comes from the moisture flux, we also need to
     # add the component due to precipitation (that was done with the radiative fluxes)
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
-        F_turb_moisture,
-    )
-    moisture_fresh_water_flux = sim.remapping.scratch_arr1 ./ fresh_water_density
+    Interfacer.remap!(sim.remapping.scratch_field_oc1, F_turb_moisture, sim.remapping) # moisture flux
+    moisture_fresh_water_flux =
+        OC.interior(sim.remapping.scratch_field_oc1, :, :, 1) ./ fresh_water_density
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, 1)
     OC.interior(oc_flux_S, :, :, 1) .=
@@ -446,20 +439,12 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     (; reference_density, heat_capacity, fresh_water_density) = sim.ocean_properties
     ice_concentration = sim.ice_concentration
 
-    # Remap radiative flux onto scratch array; rename for clarity
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
-        csf.SW_d,
-    )
-    remapped_SW_d = sim.remapping.scratch_arr1
+    # Remap radiative flux onto scratch fields; rename for clarity
+    Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.SW_d, sim.remapping) # shortwave radiation
+    remapped_SW_d = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
 
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr2,
-        sim.remapping.remapper_cc,
-        csf.LW_d,
-    )
-    remapped_LW_d = sim.remapping.scratch_arr2
+    Interfacer.remap!(sim.remapping.scratch_field_oc2, csf.LW_d, sim.remapping) # longwave radiation
+    remapped_LW_d = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
 
     # Update only the part due to radiative fluxes. For the full update, the component due
     # to latent and sensible heat is missing and will be updated in update_turbulent_fluxes.
@@ -477,18 +462,11 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
         ) ./ (reference_density * heat_capacity)
 
     # Remap precipitation fields onto scratch arrays; rename for clarity
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
-        csf.P_liq,
-    )
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr2,
-        sim.remapping.remapper_cc,
-        csf.P_snow,
-    )
-    remapped_P_liq = sim.remapping.scratch_arr1
-    remapped_P_snow = sim.remapping.scratch_arr2
+    Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.P_liq, sim.remapping) # liquid precipitation
+    remapped_P_liq = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
+
+    Interfacer.remap!(sim.remapping.scratch_field_oc2, csf.P_snow, sim.remapping) # snow precipitation
+    remapped_P_snow = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
 
     # Virtual salt flux
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)

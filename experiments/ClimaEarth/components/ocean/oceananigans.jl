@@ -7,6 +7,7 @@ import Thermodynamics as TD
 import ClimaParams as CP
 import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
+import ConservativeRemapping as CR
 
 include("climaocean_helpers.jl")
 
@@ -128,35 +129,8 @@ function OceananigansSimulation(
     # Set initial condition to EN4 state estimate at start_date
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
 
-    # Construct a remapper from the exchange grid to `Center, Center` fields
-    long_cc = OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center())
-    lat_cc = OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center())
-
-    # Create a 2D matrix containing each lat/long combination as a LatLongPoint
-    # Note this must be done on CPU since the CC.Remapper module is not GPU-compatible
-    target_points_cc = Array(CC.Geometry.LatLongPoint.(lat_cc, long_cc))
-
-    if pkgversion(CC) >= v"0.14.34"
-        remapper_cc = CC.Remapping.Remapper(axes(area_fraction), target_points_cc)
-    else
-        remapper_cc = CC.Remapping.Remapper(axes(area_fraction), target_points_cc, nothing)
-    end
-
-    # Construct two 2D Center/Center fields to use as scratch space while remapping
-    scratch_cc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-    scratch_cc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-
-    # Construct two scratch arrays to use while remapping
-    # We get the array type, float type, and dimensions from the remapper object to maintain consistency
-    ArrayType = ClimaComms.array_type(remapper_cc.space)
-    FT = CC.Spaces.undertype(remapper_cc.space)
-    interpolated_values_dim..., _buffer_length = size(remapper_cc._interpolated_values)
-    scratch_arr1 = ArrayType(zeros(FT, interpolated_values_dim...))
-    scratch_arr2 = ArrayType(zeros(FT, interpolated_values_dim...))
-    scratch_arr3 = ArrayType(zeros(FT, interpolated_values_dim...))
-
-    remapping =
-        (; remapper_cc, scratch_cc1, scratch_cc2, scratch_arr1, scratch_arr2, scratch_arr3)
+    # Construct a remapper between the exchange grid and `Center, Center` fields
+    remapping = construct_remappers(grid, boundary_space)
 
     # Get some ocean properties and parameters
     ocean_properties = (;
@@ -194,6 +168,68 @@ function OceananigansSimulation(
         remapping,
         ice_concentration,
     )
+end
+
+"""
+    construct_remappers(grid_oc, boundary_space)
+
+Given an Oceananigans grid and a ClimaCore boundary space, construct the
+remappers needed to remap between the two grids in both directions.
+
+Returns a remapper from the Oceananigans grid to the ClimaCore boundary space.
+To regrid from Oceananigans to ClimaCore, use `CR.regrid!(dest_vector, remapper_oc_to_cc, src_vector)`.
+To regrid from ClimaCore to Oceananigans, use `CR.regrid!(dest_vector, transpose(remapper_oc_to_cc), src_vector)`.
+"""
+function construct_remappers(grid_oc, boundary_space)
+    # Get the vector of polygons for Oceananigans and ClimaCore spaces
+    # TODO write compute_cell_matrix for OC grid (not field)
+    field_oc = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
+    vertices_oc = compute_cell_matrix(field_oc)
+    vertices_cc = CC.Remapping.get_element_vertices(boundary_space)
+
+    remapper_oc_to_cc = CR.Regridder(vertices_cc, vertices_oc)
+
+    field_ones_cc = CC.Fields.ones(boundary_space)
+
+    # Allocate a vector with length equal to the number of elements in the target space
+    # To be used as a temp field for remapping
+    # TODO think about name
+    values_cc = zeros(Float64, CC.Meshes.nelements(boundary_space.grid.topology.mesh))
+    return (; remapper_oc_to_cc, field_ones_cc, values_cc)
+end
+
+# Non-allocating ClimaCore -> Oceananigans remap
+function remap!(dst_field::OC.Field, src_field::CC.Fields.Field, remapping)
+    values_cc = CC.Remappping.get_value_per_element(src_field, remapping.field_ones_cc)
+    CR.regrid!(vec(interior(dst_field)), transpose(remapping.remapper_oc_to_cc), values_cc)
+    return nothing
+end
+# Allocating ClimaCore -> Oceananigans remap
+function remap(src_field::CC.Fields.Field, remapping, dst_space::OC.Grid)
+    dst_field = OC.Field{Center, Center, Nothing}(dst_space)
+    remap!(dst_field, src_field, remapping)
+    return dst_field
+end
+
+# Non-allocating Oceananigans -> ClimaCore remap
+function remap!(dst_field::CC.Fields.Field, src_field::OC.Field, remapping)
+    CR.regrid!(remapping.values_cc, remapping.remapper_oc_to_cc, vec(interior(src_field)))
+
+    # Convert the vector of remapped values to a ClimaCore Field with one value per element
+    CC.Remapping.set_value_per_element!(dst_field, remapping.values_cc)
+    return nothing
+end
+# Allocating Oceananigans -> ClimaCore remap
+function remap(src_field::OC.Field, remapping, dst_space::CC.Spaces.AbstractSpace)
+    dst_field = CC.Fields.zeros(dst_space)
+    remap!(dst_field, src_field, remapping)
+    return dst_field
+end
+
+# Extend Interfacer.get_field to allow automatic remapping to the target space
+# TODO see if we can remove this
+function Interfacer.get_field(sim, quantity, target_space)
+    return remap(Interfacer.get_field(sim, quantity), sim.remapping, target_space)
 end
 
 """
@@ -296,6 +332,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     ice_concentration = sim.ice_concentration
 
     # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
+    # TODO replace these with remap! calls
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr1,
         sim.remapping.remapper_cc,

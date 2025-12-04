@@ -11,14 +11,14 @@ era5_initial_condition_dir : "/net/sampo/data1/cchristo/WeatherQuest_data/archiv
 # coupler_output_dir: ""
 
 initial_condition: "WeatherModel"
-checkpoint_dt: "7days"
+checkpoint_dt: "60days"
 co2_model: "fixed"
-dt: "100secs"
-dt_cpl: "100secs"
-dt_seaice: "100secs"
+dt: "120secs"
+dt_cpl: "120secs"
+dt_seaice: "120secs"
 energy_check: false
-# h_elem: 32
-h_elem: 16
+h_elem: 32
+# h_elem: 16
 
 ### integrated land ###
 # land_model: "integrated"

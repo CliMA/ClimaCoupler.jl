@@ -458,14 +458,56 @@ abstract type SlabplanetTerraMode <: AbstractSlabplanetSimulationMode end
 Remap the given `field` onto the `target_space`. If the field is already
 on the target space or a compatible one, it is returned unchanged.
 
-Note that this method has a lot of allocations and is not efficient.
+This is a convenience wrapper around `remap!` that allocates the output field.
 
 Non-ClimaCore fields should provide a method to this function.
 """
 function remap end
 
-function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
-    source_space = axes(field)
+function remap(source_field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
+    source_space = axes(source_field)
+
+    # Check if the source and target spaces are compatible
+    spaces_are_compatible =
+        source_space == target_space ||
+        CC.Spaces.issubspace(source_space, target_space) ||
+        CC.Spaces.issubspace(target_space, source_space)
+
+    # TODO: Handle remapping of Vectors correctly
+    if hasproperty(source_field, :components)
+        @assert length(source_field.components) == 1 "Can only work with simple vectors"
+        source_field = source_field.components.data.:1
+    end
+
+    # If the spaces are the same or one is a subspace of the other, we can just return the input field
+    spaces_are_compatible && return source_field
+
+    # Allocate target field and call remap!
+    target_field = CC.Fields.zeros(target_space)
+    remap!(target_field, source_field)
+    return target_field
+end
+
+function remap(source_field::Number, target_space::CC.Spaces.AbstractSpace)
+    # Allocate target field and call remap!
+    target_field = CC.Fields.zeros(target_space)
+    remap!(target_field, source_field)
+    return target_field
+end
+
+"""
+    remap!(target_field, source_field)
+
+Remap the given `source_field` onto the `target_field`. This is the core non-allocating
+implementation.
+
+Non-ClimaCore fields should provide a method to this function.
+"""
+function remap! end
+
+function remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field)
+    source_space = axes(source_field)
+    target_space = axes(target_field)
     comms_ctx = ClimaComms.context(source_space)
 
     # Check if the source and target spaces are compatible
@@ -475,13 +517,16 @@ function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
         CC.Spaces.issubspace(target_space, source_space)
 
     # TODO: Handle remapping of Vectors correctly
-    if hasproperty(field, :components)
-        @assert length(field.components) == 1 "Can only work with simple vectors"
-        field = field.components.data.:1
+    if hasproperty(source_field, :components)
+        @assert length(source_field.components) == 1 "Can only work with simple vectors"
+        source_field = source_field.components.data.:1
     end
 
-    # If the spaces are the same or one is a subspace of the other, we can just return the input field
-    spaces_are_compatible && return field
+    # If the spaces are the same or one is a subspace of the other, we can just copy
+    if spaces_are_compatible
+        target_field .= source_field
+        return nothing
+    end
 
     # Get vector of LatLongPoints for the target space to get the hcoords
     # Copy target coordinates to CPU if they are on GPU
@@ -493,10 +538,10 @@ function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
     # Remap the field, using MPI if applicable
     if comms_ctx isa ClimaComms.SingletonCommsContext
         # Remap source field to target space as an array
-        remapped_array = CC.Remapping.interpolate(field, hcoords, [])
+        remapped_array = CC.Remapping.interpolate(source_field, hcoords, [])
 
-        # Convert remapped array to a field in the target space
-        return CC.Fields.array2field(remapped_array, target_space)
+        # Copy remapped array into target field
+        target_field .= CC.Fields.array2field(remapped_array, target_space)
     else
         # Gather then broadcast the global hcoords and offsets
         offset = [length(hcoords)]
@@ -506,33 +551,22 @@ function remap(field::CC.Fields.Field, target_space::CC.Spaces.AbstractSpace)
         # Interpolate on root and broadcast to all processes
         remapper = CC.Remapping.Remapper(source_space; target_hcoords = all_hcoords)
         remapped_array =
-            ClimaComms.bcast(comms_ctx, CC.Remapping.interpolate(remapper, field))
+            ClimaComms.bcast(comms_ctx, CC.Remapping.interpolate(remapper, source_field))
 
         my_ending_offset = sum(all_offsets[1:ClimaComms.mypid(comms_ctx)])
         my_starting_offset = my_ending_offset - offset[]
 
-        # Convert remapped array to a field in the target space on each process
-        return CC.Fields.array2field(
+        # Copy remapped array into target field on each process
+        target_field .= CC.Fields.array2field(
             remapped_array[(1 + my_starting_offset):my_ending_offset],
             target_space,
         )
     end
+    return nothing
 end
 
-function remap(num::Number, target_space::CC.Spaces.AbstractSpace)
-    return num
-end
-
-"""
-    remap!(target_field, source)
-
-Remap the given `source` onto the `target_field`.
-
-Non-ClimaCore fields should provide a method to [`Interfacer.remap`](@ref), or directly to this
-function.
-"""
-function remap!(target_field, source)
-    target_field .= remap(source, axes(target_field))
+function remap!(target_field::CC.Fields.Field, source::Number)
+    fill!(target_field, source)
     return nothing
 end
 

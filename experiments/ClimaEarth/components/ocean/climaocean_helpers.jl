@@ -14,10 +14,44 @@ function surface_flux(f::OC.AbstractField)
     end
 end
 
-function Interfacer.remap(operation::OC.AbstractOperations.AbstractOperation, target_space)
+function Interfacer.remap(
+    operation::OC.AbstractOperations.AbstractOperation,
+    remapping,
+    target_space,
+)
     evaluated_field = OC.Field(operation)
     OC.compute!(evaluated_field)
-    return Interfacer.remap(evaluated_field, target_space)
+    return Interfacer.remap(evaluated_field, remapping, target_space)
+end
+
+function Interfacer.remap!(
+    target_field,
+    operation::OC.AbstractOperations.AbstractOperation,
+    remapping,
+)
+    evaluated_field = OC.Field(operation)
+    OC.compute!(evaluated_field)
+    return Interfacer.remap!(target_field, evaluated_field, remapping)
+end
+
+# Handle the case when remap is called on an operation without remapping argument
+# This happens when the generic remap! calls remap(source, target_space)
+# This should not happen for Oceananigans - operations always need remapping
+function Interfacer.remap(operation::OC.AbstractOperations.AbstractOperation, target_space)
+    error(
+        "Cannot remap Oceananigans AbstractOperation to target space without remapping object. " *
+        "Use the specialized get_field! method for OceananigansSimulation instead.",
+    )
+end
+
+# Handle the case when remap is called on an Oceananigans Field without remapping argument
+# This happens when the generic remap! calls remap(source, target_space)
+function Interfacer.remap(src_field::OC.Field, target_space)
+    error(
+        "Cannot remap Oceananigans Field to target space without remapping object. " *
+        "Oceananigans Fields require a remapping object to convert to ClimaCore spaces. " *
+        "Use the specialized get_field! method for OceananigansSimulation instead.",
+    )
 end
 
 """
@@ -108,11 +142,11 @@ function compute_cell_matrix(
     FT = eltype(grid)
 
     vertices_per_cell = 5 # convention: [sw, nw, ne, se, sw]
-    ArrayType = Oceananigans.Architectures.array_type(arch)
+    ArrayType = OC.Architectures.array_type(arch)
     cell_matrix = ArrayType{Tuple{FT, FT}}(undef, vertices_per_cell, Fx * Fy)
 
     arch = grid.architecture
-    Oceananigans.Utils.launch!(
+    OC.Utils.launch!(
         arch,
         grid,
         (Fx, Fy),
@@ -127,13 +161,13 @@ function compute_cell_matrix(
     return cell_matrix
 end
 
-flip(::Face) = Center()
-flip(::Center) = Face()
+flip(::OC.Face) = OC.Center()
+flip(::OC.Center) = OC.Face()
 
-left_index(i, ::Center) = i
-left_index(i, ::Face) = i - 1
-right_index(i, ::Center) = i + 1
-right_index(i, ::Face) = i
+left_index(i, ::OC.Center) = i
+left_index(i, ::OC.Face) = i - 1
+right_index(i, ::OC.Center) = i + 1
+right_index(i, ::OC.Face) = i
 
 @kernel function _compute_cell_matrix!(cell_matrix, Fx, ℓx, ℓy, grid)
     i, j = @index(Global, NTuple)
@@ -153,17 +187,17 @@ right_index(i, ::Face) = i
     ise = right_index(i, ℓx)
     jse = left_index(j, ℓy)
 
-    xsw = ξnode(isw, jsw, 1, grid, vx, vy, nothing)
-    ysw = ηnode(isw, jsw, 1, grid, vx, vy, nothing)
+    xsw = OC.ξnode(isw, jsw, 1, grid, vx, vy, nothing)
+    ysw = OC.ηnode(isw, jsw, 1, grid, vx, vy, nothing)
 
-    xnw = ξnode(inw, jnw, 1, grid, vx, vy, nothing)
-    ynw = ηnode(inw, jnw, 1, grid, vx, vy, nothing)
+    xnw = OC.ξnode(inw, jnw, 1, grid, vx, vy, nothing)
+    ynw = OC.ηnode(inw, jnw, 1, grid, vx, vy, nothing)
 
-    xne = ξnode(ine, jne, 1, grid, vx, vy, nothing)
-    yne = ηnode(ine, jne, 1, grid, vx, vy, nothing)
+    xne = OC.ξnode(ine, jne, 1, grid, vx, vy, nothing)
+    yne = OC.ηnode(ine, jne, 1, grid, vx, vy, nothing)
 
-    xse = ξnode(ise, jse, 1, grid, vx, vy, nothing)
-    yse = ηnode(ise, jse, 1, grid, vx, vy, nothing)
+    xse = OC.ξnode(ise, jse, 1, grid, vx, vy, nothing)
+    yse = OC.ηnode(ise, jse, 1, grid, vx, vy, nothing)
 
     linear_idx = i + (j - 1) * Fx
     @inbounds begin

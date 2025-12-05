@@ -29,74 +29,28 @@ steps:
 
   - wait
 
-  - group: "GPU benchmarks"
+  - group: "GPU benchmarks for flagship amip"
     steps:
-      - label: "GPU ClimaAtmos without diagnostic EDMF"
-        key: "gpu_climaatmos"
-        command: "srun julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos.yml --job_id gpu_climaatmos"
-        artifact_paths: "experiments/ClimaEarth/output/gpu_climaatmos/artifacts/*"
+      - label: "GPU AMIP with prognostic EDMF + 1M + integrated land (16 helems)"
+        key: "gpu_amip_progedmf_1M_land_he16"
+        command: "srun julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $BENCHMARK_CONFIG_PATH/amip_progedmf_1m_land_he16.yml --job_id gpu_amip_progedmf_1M_land_he16"
+        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_progedmf_1M_land_he16/artifacts/*"
         env:
-          CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_gpus_per_task: 1
           slurm_cpus_per_task: 4
-          slurm_ntasks: 2
-          slurm_mem: 16GB
+          slurm_ntasks: 1
+          slurm_mem: 16GB 
 
-      - label: "GPU ClimaAtmos with diagnostic EDMF"
-        key: "gpu_climaatmos_diagedmf"
-        command: "srun julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/component_model_tests/climaatmos_standalone/atmos_driver.jl --config_file $BENCHMARK_CONFIG_PATH/climaatmos_diagedmf.yml --job_id gpu_climaatmos_diagedmf"
-        artifact_paths: "experiments/ClimaEarth/output/gpu_climaatmos_diagedmf/artifacts/*"
+      - label: "GPU AMIP with prognostic EDMF + 1M + integrated land (30 helems)"
+        key: "gpu_amip_progedmf_1M_land_he30"
+        command: "srun julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $BENCHMARK_CONFIG_PATH/amip_progedmf_1m_land_he30.yml --job_id gpu_amip_progedmf_1M_land_he30"
+        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_progedmf_1M_land_he30/artifacts/*"
         env:
-          CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_gpus_per_task: 1
           slurm_cpus_per_task: 4
-          slurm_ntasks: 2
+          slurm_ntasks: 1
           slurm_mem: 16GB
-
-      - label: "GPU AMIP with diagnostic EDMF"
-        key: "gpu_amip_diagedmf"
-        command: "srun julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $BENCHMARK_CONFIG_PATH/amip_diagedmf.yml --job_id gpu_amip_diagedmf"
-        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_diagedmf/artifacts/*"
-        env:
-          CLIMACOMMS_CONTEXT: "MPI"
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 2
-          slurm_mem: 16GB
-
-      - label: "GPU AMIP with diagnostic EDMF and IO"
-        key: "gpu_amip_diagedmf_io"
-        command: "srun julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $BENCHMARK_CONFIG_PATH/amip_diagedmf_io.yml --job_id gpu_amip_diagedmf_io"
-        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_diagedmf_io/artifacts/*"
-        env:
-          CLIMACOMMS_CONTEXT: "MPI"
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 2
-          slurm_mem: 16GB
-
-  - group: "Generate output table"
-    steps:
-      - label: "Compare AMIP/Atmos-only with diagnostic EDMF"
-        key: "compare_amip_climaatmos_amip_diagedmf"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/user_io/benchmarks.jl --gpu_job_id_coupled gpu_amip_diagedmf --gpu_job_id_coupled_io gpu_amip_diagedmf_io --gpu_job_id_atmos_diagedmf gpu_climaatmos_diagedmf --gpu_job_id_atmos gpu_climaatmos --build_id $BUILDKITE_BUILD_NUMBER"
-        artifact_paths: "experiments/ClimaEarth/output/compare_amip_climaatmos_amip_diagedmf/*"
-        depends_on:
-          - "gpu_climaatmos"
-          - "gpu_climaatmos_diagedmf"
-          - "gpu_amip_diagedmf"
-          - "gpu_amip_diagedmf_io"
-
-      - label: ":envelope: Slack report: CPU/GPU AMIP/Atmos-only table"
-        depends_on:
-          - "compare_amip_climaatmos_amip_diagedmf"
-        command:
-          - slack-upload -c C04S6MBSDC4 -f experiments/ClimaEarth/output/compare_amip_climaatmos_amip_diagedmf/table.txt -n compare_amip_climaatmos_amip_diagedmf_table -x "Coupler CPU/GPU Comparison Table"

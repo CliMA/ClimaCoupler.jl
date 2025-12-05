@@ -136,7 +136,7 @@ function ClimaSeaIceSimulation(
 
     # Get the initial area fraction from the fractional ice concentration
     boundary_space = axes(ocean.area_fraction)
-    area_fraction = Interfacer.remap(ice.model.ice_concentration, boundary_space)
+    area_fraction = Interfacer.remap(boundary_space, ice.model.ice_concentration)
 
     sim = ClimaSeaIceSimulation(
         ice,

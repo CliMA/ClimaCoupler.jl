@@ -343,7 +343,7 @@ function combine_surfaces!(combined_field, sims, field_name, scalar_temp)
                 ifelse.(
                     scalar_temp .≈ 0,
                     zero(combined_field),
-                    Interfacer.get_field(sim, field_name, boundary_space),
+                    Interfacer.get_field(boundary_space, sim, field_name),
                 )
         end
     end
@@ -375,7 +375,7 @@ function combine_surfaces!(csf, sims, field_name::Val{:surface_temperature})
                     area_fraction .≈ 0,
                     zero(T_sfc),
                     emissivity_sim .*
-                    Interfacer.get_field(sim, field_name, boundary_space) .^ FT(4),
+                    Interfacer.get_field(boundary_space, sim, field_name) .^ FT(4),
                 )
         end
     end

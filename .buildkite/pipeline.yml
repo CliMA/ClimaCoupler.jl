@@ -32,18 +32,11 @@ steps:
       - "julia --project -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate ClimaEarth experiments env"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.develop(path=\".\")'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaOcean\", rev=\"main\"))'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
-
-      - echo "--- Instantiate ClimaCore experiments env"
-      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.develop(path=\".\")'"
-      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.add(\"MPI\")'"
-      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate test env"
       - "julia --project=test/ -e 'using Pkg; Pkg.develop(path=\".\")'"

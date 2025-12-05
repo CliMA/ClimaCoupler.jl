@@ -66,7 +66,7 @@ for FT in (Float32, Float64)
         # coupler fields
         cf = Interfacer.init_coupler_fields(
             FT,
-            [:P_net, :P_liq, :P_snow, :F_turb_moisture],
+            [:P_net, :P_liq, :P_snow, :F_turb_moisture, :scalar_temp1],
             space,
         )
         @. cf.P_liq = -100
@@ -169,7 +169,7 @@ for FT in (Float32, Float64)
         # coupler fields
         cf = Interfacer.init_coupler_fields(
             FT,
-            [:P_net, :P_liq, :P_snow, :F_turb_moisture],
+            [:P_net, :P_liq, :P_snow, :F_turb_moisture, :scalar_temp1],
             space,
         )
         @. cf.P_liq = -100

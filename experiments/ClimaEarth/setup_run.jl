@@ -250,7 +250,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     end
 
     # Get surface elevation on the boundary space from `atmos` coordinate field
-    surface_elevation = Interfacer.get_field(atmos_sim, Val(:height_sfc), boundary_space) # on boundary space
+    surface_elevation = Interfacer.get_field(boundary_space, atmos_sim, Val(:height_sfc)) # on boundary space
     # Get atmospheric height relative to the surface directly from the atmosphere
     atmos_h = Interfacer.get_atmos_height_delta(
         Interfacer.get_field(atmos_sim, Val(:height_int)),

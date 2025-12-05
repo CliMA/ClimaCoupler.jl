@@ -1,44 +1,4 @@
-"""
-    to_node(pt::CC.Geometry.LatLongPoint)
 
-Transform `LatLongPoint` into a tuple (long, lat, 0), where the 0 is needed because we only
-care about the surface.
-"""
-@inline to_node(pt::CC.Geometry.LatLongPoint) = pt.long, pt.lat, zero(pt.lat)
-# This next one is needed if we have "LevelGrid"
-@inline to_node(pt::CC.Geometry.LatLongZPoint) = pt.long, pt.lat, zero(pt.lat)
-
-"""
-    map_interpolate(points, oc_field::OC.Field)
-
-Interpolate the given 3D field onto the target points.
-
-If the underlying grid does not contain a given point, return 0 instead.
-
-Note: `map_interpolate` does not support interpolation from `Field`s defined on
-`OrthogononalSphericalShellGrids` such as the `TripolarGrid`.
-
-TODO: Use a non-allocating version of this function (simply replace `map` with `map!`)
-"""
-function map_interpolate(points, oc_field::OC.Field)
-    loc = map(L -> L(), OC.Fields.location(oc_field))
-    grid = oc_field.grid
-    data = oc_field.data
-
-    # TODO: There has to be a better way
-    min_lat, max_lat = extrema(OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center()))
-
-    map(points) do pt
-        FT = eltype(pt)
-
-        # The oceananigans grid does not cover the entire globe, so we should not
-        # interpolate outside of its latitude bounds. Instead we return 0
-        min_lat < pt.lat < max_lat || return FT(0)
-
-        fᵢ = OC.Fields.interpolate(to_node(pt), data, loc, grid)
-        convert(FT, fᵢ)::FT
-    end
-end
 
 """
     surface_flux(f::OC.AbstractField)
@@ -54,14 +14,44 @@ function surface_flux(f::OC.AbstractField)
     end
 end
 
-function Interfacer.remap(field::OC.Field, target_space)
-    return map_interpolate(CC.Fields.coordinate_field(target_space), field)
-end
-
-function Interfacer.remap(operation::OC.AbstractOperations.AbstractOperation, target_space)
+function Interfacer.remap(
+    operation::OC.AbstractOperations.AbstractOperation,
+    remapping,
+    target_space,
+)
     evaluated_field = OC.Field(operation)
     OC.compute!(evaluated_field)
-    return Interfacer.remap(evaluated_field, target_space)
+    return Interfacer.remap(evaluated_field, remapping, target_space)
+end
+
+function Interfacer.remap!(
+    target_field,
+    operation::OC.AbstractOperations.AbstractOperation,
+    remapping,
+)
+    evaluated_field = OC.Field(operation)
+    OC.compute!(evaluated_field)
+    return Interfacer.remap!(target_field, evaluated_field, remapping)
+end
+
+# Handle the case when remap is called on an operation without remapping argument
+# This happens when the generic remap! calls remap(source, target_space)
+# This should not happen for Oceananigans - operations always need remapping
+function Interfacer.remap(operation::OC.AbstractOperations.AbstractOperation, target_space)
+    error(
+        "Cannot remap Oceananigans AbstractOperation to target space without remapping object. " *
+        "Use the specialized get_field! method for OceananigansSimulation instead.",
+    )
+end
+
+# Handle the case when remap is called on an Oceananigans Field without remapping argument
+# This happens when the generic remap! calls remap(source, target_space)
+function Interfacer.remap(src_field::OC.Field, target_space)
+    error(
+        "Cannot remap Oceananigans Field to target space without remapping object. " *
+        "Oceananigans Fields require a remapping object to convert to ClimaCore spaces. " *
+        "Use the specialized get_field! method for OceananigansSimulation instead.",
+    )
 end
 
 """
@@ -125,5 +115,96 @@ Fields to Face/Center and Center/Face coordinates, respectively.
     @inbounds begin
         τx[i, j, 1] = OC.Operators.ℑxᶠᵃᵃ(i, j, 1, grid, τx_cc)
         τy[i, j, 1] = OC.Operators.ℑyᵃᶠᵃ(i, j, 1, grid, τy_cc)
+    end
+end
+
+### Helper functions to use ConservativeRemapping.jl with Oceananigans.jl
+"""
+    compute_cell_matrix(grid::Union{OC.OrthogonalSphericalShellGrid, OC.LatitudeLongitudeGrid})
+
+Get a vector of vector of coordinate tuples, of the format expected by the
+ConservativeRemapping.jl regridder.
+"""
+function compute_cell_matrix(
+    grid::Union{OC.OrthogonalSphericalShellGrid, OC.LatitudeLongitudeGrid},
+)
+    Fx, Fy, _ = size(grid)
+    # TODO is it ok to hardcode Center? Regridder is specifically for Center, Center fields so I think it's ok
+    ℓx, ℓy = OC.Center(), OC.Center()
+
+    if isnothing(ℓx) || isnothing(ℓy)
+        error(
+            "cell_matrix can only be computed for fields with non-nothing horizontal location.",
+        )
+    end
+
+    arch = grid.architecture
+    FT = eltype(grid)
+
+    vertices_per_cell = 5 # convention: [sw, nw, ne, se, sw]
+    ArrayType = OC.Architectures.array_type(arch)
+    cell_matrix = ArrayType{Tuple{FT, FT}}(undef, vertices_per_cell, Fx * Fy)
+
+    arch = grid.architecture
+    OC.Utils.launch!(
+        arch,
+        grid,
+        (Fx, Fy),
+        _compute_cell_matrix!,
+        cell_matrix,
+        Fx,
+        ℓx,
+        ℓy,
+        grid,
+    )
+
+    return cell_matrix
+end
+
+flip(::OC.Face) = OC.Center()
+flip(::OC.Center) = OC.Face()
+
+left_index(i, ::OC.Center) = i
+left_index(i, ::OC.Face) = i - 1
+right_index(i, ::OC.Center) = i + 1
+right_index(i, ::OC.Face) = i
+
+@kernel function _compute_cell_matrix!(cell_matrix, Fx, ℓx, ℓy, grid)
+    i, j = @index(Global, NTuple)
+
+    vx = flip(ℓx)
+    vy = flip(ℓy)
+
+    isw = left_index(i, ℓx)
+    jsw = left_index(j, ℓy)
+
+    inw = left_index(i, ℓx)
+    jnw = right_index(j, ℓy)
+
+    ine = right_index(i, ℓx)
+    jne = right_index(j, ℓy)
+
+    ise = right_index(i, ℓx)
+    jse = left_index(j, ℓy)
+
+    xsw = OC.ξnode(isw, jsw, 1, grid, vx, vy, nothing)
+    ysw = OC.ηnode(isw, jsw, 1, grid, vx, vy, nothing)
+
+    xnw = OC.ξnode(inw, jnw, 1, grid, vx, vy, nothing)
+    ynw = OC.ηnode(inw, jnw, 1, grid, vx, vy, nothing)
+
+    xne = OC.ξnode(ine, jne, 1, grid, vx, vy, nothing)
+    yne = OC.ηnode(ine, jne, 1, grid, vx, vy, nothing)
+
+    xse = OC.ξnode(ise, jse, 1, grid, vx, vy, nothing)
+    yse = OC.ηnode(ise, jse, 1, grid, vx, vy, nothing)
+
+    linear_idx = i + (j - 1) * Fx
+    @inbounds begin
+        cell_matrix[1, linear_idx] = (xsw, ysw)
+        cell_matrix[2, linear_idx] = (xnw, ynw)
+        cell_matrix[3, linear_idx] = (xne, yne)
+        cell_matrix[4, linear_idx] = (xse, yse)
+        cell_matrix[5, linear_idx] = (xsw, ysw)
     end
 end

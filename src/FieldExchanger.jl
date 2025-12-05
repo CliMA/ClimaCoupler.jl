@@ -295,10 +295,10 @@ function step_model_sims!(cs::Interfacer.CoupledSimulation)
 end
 
 """
-    combine_surfaces!(csf, sims, field_name_val::Val{field_name}) where {field_name}
+    combine_surfaces!(csf, sims, ::Val{field_name}) where {field_name}
 
-Sums the surface fields specified by `field_name_val`, weighted by the respective area fractions
-of all surface simulations. The result is saved in the coupler field specified by `field_name_val`.
+Sums the surface fields specified by `field_name`, weighted by the respective area fractions
+of all surface simulations. The result is saved in the coupler field specified by `field_name`.
 
 For surface temperature, upward longwave radiation is computed from the temperatures
 of each surface, weighted by their area fractions, and then the combined temperature
@@ -313,7 +313,7 @@ is computed from the combined upward longwave radiation.
 # Example
 - `combine_surfaces!(temp_field, cs.model_sims, Val(:emissivity))`
 """
-function combine_surfaces!(csf, sims, field_name_val::Val{field_name}) where {field_name}
+function combine_surfaces!(csf, sims, ::Val{field_name}) where {field_name}
     # Extract the coupler field we are updating
     combined_field = getproperty(csf, field_name)
     combined_field .= 0
@@ -325,7 +325,7 @@ function combine_surfaces!(csf, sims, field_name_val::Val{field_name}) where {fi
             area_fraction = csf.scalar_temp1
 
             # Remap the surface field onto a coupler temporary field to avoid allocation
-            Interfacer.get_field!(csf.scalar_temp2, sim, field_name_val)
+            Interfacer.get_field!(csf.scalar_temp2, sim, Val(field_name))
             surface_field = csf.scalar_temp2
 
             # Zero out the contribution from this surface if the area fraction is zero.
@@ -337,7 +337,7 @@ function combine_surfaces!(csf, sims, field_name_val::Val{field_name}) where {fi
     end
     return nothing
 end
-function combine_surfaces!(csf, sims, field_name_val::Val{:surface_temperature})
+function combine_surfaces!(csf, sims, ::Val{:surface_temperature})
     # extract the coupler fields we need to get the surface temperature
     T_sfc = csf.T_sfc
     emissivity_sfc = csf.emissivity

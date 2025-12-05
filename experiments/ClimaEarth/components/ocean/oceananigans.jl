@@ -1,14 +1,14 @@
 import Oceananigans as OC
 import ClimaOcean as CO
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
-import Interfacer: remap, remap!, get_field
+import ClimaCoupler.Interfacer: remap, remap!, get_field
 import ClimaComms
 import ClimaCore as CC
 import Thermodynamics as TD
 import ClimaParams as CP
 import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
-import ConservativeRemapping as CR
+import ConservativeRegridding as CR
 
 include("climaocean_helpers.jl")
 
@@ -76,7 +76,7 @@ function OceananigansSimulation(
     bottom_height = CO.regrid_bathymetry(
         underlying_grid;
         minimum_depth = 30,
-        interpolation_passes = 20,
+        interpolation_passes = 1,
         major_basins = 1,
     )
     grid = OC.ImmersedBoundaryGrid(
@@ -183,7 +183,7 @@ To regrid from ClimaCore to Oceananigans, use `CR.regrid!(dest_vector, transpose
 """
 function construct_remappers(grid_oc, boundary_space)
     # Get the vector of polygons for Oceananigans and ClimaCore spaces
-    vertices_oc = compute_cell_matrix(grid_oc)
+    vertices_oc = compute_cell_matrix(grid_oc.underlying_grid)
     vertices_cc = CC.Remapping.get_element_vertices(boundary_space)
 
     remapper_oc_to_cc = CR.Regridder(vertices_cc, vertices_oc)
@@ -210,12 +210,15 @@ end
 
 # Non-allocating ClimaCore -> Oceananigans remap
 function Interfacer.remap!(dst_field::OC.Field, src_field::CC.Fields.Field, remapping)
-    value_per_element_cc =
-        CC.Remappping.get_value_per_element(src_field, remapping.field_ones_cc)
+    CC.Remapping.get_value_per_element!(
+        remapping.value_per_element_cc,
+        src_field,
+        remapping.field_ones_cc,
+    )
     CR.regrid!(
-        vec(interior(dst_field)),
+        vec(OC.interior(dst_field, :, :, 1)),
         transpose(remapping.remapper_oc_to_cc),
-        value_per_element_cc,
+        remapping.value_per_element_cc,
     )
     return nothing
 end
@@ -235,13 +238,18 @@ function Interfacer.remap!(dst_field::CC.Fields.Field, src_field::OC.Field, rema
     CR.regrid!(
         remapping.value_per_element_cc,
         remapping.remapper_oc_to_cc,
-        vec(interior(src_field)),
+        vec(OC.interior(src_field, :, :, 1)),
     )
 
     # Convert the vector of remapped values to a ClimaCore Field with one value per element
     CC.Remapping.set_value_per_element!(dst_field, remapping.value_per_element_cc)
     return nothing
 end
+# Handle the case of remapping the area fraction field, which is a ClimaCore Field
+Interfacer.remap!(dst_field::CC.Fields.Field, src_field::CC.Fields.Field, remapping) =
+    Interfacer.remap!(dst_field, src_field)
+Interfacer.remap!(dst_field::CC.Fields.Field, src_field::Number, remapping) =
+    Interfacer.remap!(dst_field, src_field)
 # Allocating Oceananigans -> ClimaCore remap
 function Interfacer.remap(
     src_field::OC.Field,
@@ -253,10 +261,22 @@ function Interfacer.remap(
     return dst_field
 end
 
+# Handle the case of remapping a scalar number to a ClimaCore space
+Interfacer.remap(num::Number, remapping, target_space::CC.Spaces.AbstractSpace) =
+    Interfacer.remap(num, target_space)
+
 # Extend Interfacer.get_field to allow automatic remapping to the target space
 # TODO see if we can remove this
-function Interfacer.get_field(sim, quantity, target_space)
-    return remap(Interfacer.get_field(sim, quantity), sim.remapping, target_space)
+function Interfacer.get_field(sim::OceananigansSimulation, quantity, target_space)
+    return Interfacer.remap(
+        Interfacer.get_field(sim, quantity),
+        sim.remapping,
+        target_space,
+    )
+end
+function Interfacer.get_field!(target_field, sim::OceananigansSimulation, quantity)
+    Interfacer.remap!(target_field, Interfacer.get_field(sim, quantity), sim.remapping)
+    return nothing
 end
 
 """
@@ -363,12 +383,14 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     Interfacer.remap!(sim.remapping.scratch_field_oc2, F_turb_ρτyz, sim.remapping) # meridional momentum flux
 
     # Rename for clarity; these are now Center, Center Oceananigans fields
-    F_turb_ρτxz_oc = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
-    F_turb_ρτyz_oc = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
+    oc_F_turb_ρτxz = sim.remapping.scratch_field_oc1
+    oc_F_turb_ρτyz = sim.remapping.scratch_field_oc2
 
     # Weight by (1 - sea ice concentration)
-    OC.interior(F_turb_ρτxz_oc, :, :, 1) .= F_turb_ρτxz_oc .* (1.0 .- ice_concentration)
-    OC.interior(F_turb_ρτyz_oc, :, :, 1) .= F_turb_ρτyz_oc .* (1.0 .- ice_concentration)
+    OC.interior(oc_F_turb_ρτxz, :, :, 1) .=
+        OC.interior(oc_F_turb_ρτxz, :, :, 1) .* (1.0 .- ice_concentration)
+    OC.interior(oc_F_turb_ρτyz, :, :, 1) .=
+        OC.interior(oc_F_turb_ρτyz, :, :, 1) .* (1.0 .- ice_concentration)
 
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
     oc_flux_u = surface_flux(sim.ocean.model.velocities.u)
@@ -376,8 +398,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     set_from_extrinsic_vector!(
         (; u = oc_flux_u, v = oc_flux_v),
         grid,
-        F_turb_ρτxz_cc,
-        F_turb_ρτyz_cc,
+        oc_F_turb_ρτxz,
+        oc_F_turb_ρτyz,
     )
 
     (; reference_density, heat_capacity, fresh_water_density) = sim.ocean_properties

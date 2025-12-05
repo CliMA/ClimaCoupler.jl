@@ -277,7 +277,7 @@ for FT in (Float32, Float64)
             scalar_temp2 = CC.Fields.zeros(test_space),
         )
 
-        FieldExchanger.combine_surfaces!(csf, sims, var_name)
+        FieldExchanger.combine_surfaces!(csf.random, csf, sims, var_name)
         @test combined_field == fill(FT(sum(fractions .* fields)), test_space)
     end
 

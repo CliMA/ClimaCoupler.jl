@@ -156,10 +156,20 @@ from each surface model when surface fluxes are computed, in `compute_surface_fl
 - `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
 """
 function import_combined_surface_fields!(csf, model_sims)
-    combine_surfaces!(csf, model_sims, Val(:emissivity))
-    combine_surfaces!(csf, model_sims, Val(:surface_temperature))
-    combine_surfaces!(csf, model_sims, Val(:surface_direct_albedo))
-    combine_surfaces!(csf, model_sims, Val(:surface_diffuse_albedo))
+    combine_surfaces!(csf.emissivity, csf, model_sims, Val(:emissivity))
+    combine_surfaces!(
+        csf.surface_direct_albedo,
+        csf,
+        model_sims,
+        Val(:surface_direct_albedo),
+    )
+    combine_surfaces!(
+        csf.surface_diffuse_albedo,
+        csf,
+        model_sims,
+        Val(:surface_diffuse_albedo),
+    )
+    combine_surfaces_temperature!(csf.T_sfc, csf, model_sims)
     return nothing
 end
 
@@ -295,27 +305,26 @@ function step_model_sims!(cs::Interfacer.CoupledSimulation)
 end
 
 """
-    combine_surfaces!(csf, sims, ::Val{field_name}) where {field_name}
+    combine_surfaces!(combined_field, csf, sims, field_name)
 
 Sums the surface fields specified by `field_name`, weighted by the respective area fractions
 of all surface simulations. The result is saved in the coupler field specified by `field_name`.
 
-For surface temperature, upward longwave radiation is computed from the temperatures
-of each surface, weighted by their area fractions, and then the combined temperature
-is computed from the combined upward longwave radiation.
+Note that even though `combined_field` is contained in `csf`, it is passed as a separate
+argument to avoid runtime dispatch on the field name when accessing the `csf` NamedTuple.
 
 # Arguments
+- `combined_field`: [Field] coupler field save the combined surface fields to.
 - `csf`: [NamedTuple] containing coupler fields.
     Note: For the surface temperature, all coupler fields are passed in a NamedTuple.
 - `sims`: [NamedTuple] containing simulations.
-- `field_name_val`: [Val] containing the name Symbol of the field to be extracted by the `Interfacer.get_field` functions.
+- `field_name`: [Val] containing the name Symbol of the field to be extracted by the `Interfacer.get_field` functions.
 
 # Example
 - `combine_surfaces!(temp_field, cs.model_sims, Val(:emissivity))`
 """
-function combine_surfaces!(csf, sims, ::Val{field_name}) where {field_name}
-    # Extract the coupler field we are updating
-    combined_field = getproperty(csf, field_name)
+function combine_surfaces!(combined_field, csf, sims, field_name)
+    # Set the combined field to zero before accumulating across all surface models
     combined_field .= 0
 
     for sim in sims
@@ -325,7 +334,7 @@ function combine_surfaces!(csf, sims, ::Val{field_name}) where {field_name}
             area_fraction = csf.scalar_temp1
 
             # Remap the surface field onto a coupler temporary field to avoid allocation
-            Interfacer.get_field!(csf.scalar_temp2, sim, Val(field_name))
+            Interfacer.get_field!(csf.scalar_temp2, sim, field_name)
             surface_field = csf.scalar_temp2
 
             # Zero out the contribution from this surface if the area fraction is zero.
@@ -337,9 +346,26 @@ function combine_surfaces!(csf, sims, ::Val{field_name}) where {field_name}
     end
     return nothing
 end
-function combine_surfaces!(csf, sims, ::Val{:surface_temperature})
+
+"""
+    combine_surfaces_temperature!(combined_field, csf, sims)
+
+Computes the combined surface temperature from the combined upward longwave radiation.
+
+Upward longwave radiation is computed from the temperatures of each surface, weighted by
+their area fractions, and then the combined temperature is computed from the combined
+upward longwave radiation.
+
+We have a separate function for surface temperature to avoid runtime dispatch on the field name.
+
+# Arguments
+- `combined_field`: [Field] coupler field save the combined surface temperature to.
+- `csf`: [NamedTuple] containing coupler fields.
+- `sims`: [NamedTuple] containing simulations.
+"""
+function combine_surfaces_temperature!(combined_field, csf, sims)
     # extract the coupler fields we need to get the surface temperature
-    T_sfc = csf.T_sfc
+    T_sfc = combined_field
     emissivity_sfc = csf.emissivity
 
     FT = eltype(T_sfc)

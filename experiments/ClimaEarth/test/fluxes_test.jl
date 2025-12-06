@@ -29,6 +29,7 @@ include(joinpath("..", "setup_run.jl"))
     cs = CoupledSimulation(config_dict)
     step!(cs)
     boundary_space = Interfacer.boundary_space(cs)
+    FT = CC.Spaces.undertype(boundary_space)
 
     # Unpack component models
     (; atmos_sim, land_sim, ocean_sim, ice_sim) = cs.model_sims
@@ -46,10 +47,10 @@ include(joinpath("..", "setup_run.jl"))
     p = land_sim.integrator.p
     land_fraction = Interfacer.get_field(land_sim, Val(:area_fraction))
     land_flux = Interfacer.remap(land_sim.integrator.p.bucket.R_n, boundary_space)
-    @. land_flux = ifelse(land_fraction ≈ 0, zero(land_flux), land_flux)
+    @. land_flux = ifelse(land_fraction ≈ 0, zero(FT), land_flux)
 
     err_land = @. atmos_flux - land_flux
-    @. err_land = ifelse(land_fraction ≈ 0, zero(err_land), err_land)
+    @. err_land = ifelse(land_fraction ≈ 0, zero(FT), err_land)
     @show "Bucket flux error: $(maximum(abs.(err_land)))"
     @test maximum(abs.(err_land)) < 5
 
@@ -65,7 +66,7 @@ include(joinpath("..", "setup_run.jl"))
     ice_rad_flux =
         (1 .- α) .* p.SW_d .+
         ϵ .* (p.LW_d .- σ .* Interfacer.get_field(ice_sim, Val(:surface_temperature)) .^ 4)
-    @. ice_rad_flux = ifelse(p.area_fraction ≈ 0, zero(ice_rad_flux), ice_rad_flux)
+    @. ice_rad_flux = ifelse(p.area_fraction ≈ 0, zero(FT), ice_rad_flux)
     ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
 
     # Prescribed ocean: SST is prescribed, but for this test we can still compute
@@ -79,7 +80,7 @@ include(joinpath("..", "setup_run.jl"))
             σ .* Interfacer.get_field(ocean_sim, Val(:surface_temperature)) .^ 4
         )
     ocean_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction))
-    @. ocean_rad_flux = ifelse(ocean_fraction ≈ 0, zero(ocean_rad_flux), ocean_rad_flux)
+    @. ocean_rad_flux = ifelse(ocean_fraction ≈ 0, zero(FT), ocean_rad_flux)
 
     # Combine component fluxes by area-weighted sum (incl. bucket sign convention):
     combined_fluxes =

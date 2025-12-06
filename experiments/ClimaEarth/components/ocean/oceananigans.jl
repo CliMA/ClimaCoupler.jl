@@ -238,9 +238,9 @@ function FieldExchanger.resolve_area_fractions!(
         polar_mask .= abs.(lat) .>= FT(80)
 
         # Set land fraction to 1 and ice/ocean fraction to 0 where polar_mask is 1
-        @. land_fraction = ifelse.(polar_mask == FT(1), FT(1), land_fraction)
-        @. ice_fraction = ifelse.(polar_mask == FT(1), FT(0), ice_fraction)
-        @. ocean_fraction = ifelse.(polar_mask == FT(1), FT(0), ocean_fraction)
+        @. land_fraction = ifelse(polar_mask == FT(1), one(FT), land_fraction)
+        @. ice_fraction = ifelse(polar_mask == FT(1), zero(FT), ice_fraction)
+        @. ocean_fraction = ifelse(polar_mask == FT(1), zero(FT), ocean_fraction)
     end
 
     # Update the ice concentration field in the ocean simulation

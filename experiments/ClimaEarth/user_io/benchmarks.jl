@@ -39,6 +39,14 @@ function argparse_settings()
         help = "The name of the GPU atmos-only run we want to compare."
         arg_type = String
         default = nothing
+        "--gpu_job_id_coupled_progedmf_coarse"
+        help = "The name of the coarser GPU coupled with prognostic EDMF + 1M run we want to compare."
+        arg_type = String
+        default = nothing
+        "--gpu_job_id_coupled_progedmf_fine"
+        help = "The name of the finer GPU coupled with prognostic EDMF + 1M run we want to compare."
+        arg_type = String
+        default = nothing
         "--coupler_output_dir"
         help = "Directory to save output files."
         arg_type = String
@@ -73,6 +81,12 @@ function get_run_info(parsed_args, run_type)
     elseif run_type == "atmos"
         gpu_job_id = parsed_args["gpu_job_id_atmos"]
         mode_name = "climaatmos"
+    elseif run_type == "coupled_progedmf_coarse"
+        gpu_job_id = parsed_args["gpu_job_id_coupled_progedmf_coarse"]
+        mode_name = "amip"
+    elseif run_type == "coupled_progedmf_fine"
+        gpu_job_id = parsed_args["gpu_job_id_coupled_progedmf_fine"]
+        mode_name = "amip"
     else
         error("Invalid run type: $run_type")
     end
@@ -131,8 +145,10 @@ else
 end
 
 # Read in run info for each of the cases we want to compare
-run_info_coupled = get_run_info(parsed_args, "coupled")
+run_info_coupled_progedmf_coarse = get_run_info(parsed_args, "coupled_progedmf_coarse")
+run_info_coupled_progedmf_fine = get_run_info(parsed_args, "coupled_progedmf_fine")
 run_info_coupled_io = get_run_info(parsed_args, "coupled_io")
+run_info_coupled = get_run_info(parsed_args, "coupled")
 run_info_atmos_diagedmf = get_run_info(parsed_args, "atmos_diagedmf")
 run_info_atmos = get_run_info(parsed_args, "atmos")
 
@@ -144,6 +160,16 @@ data = [
 ]
 
 # Append data to the table for each of the cases we want to compare
+data = append_table_data(
+    data,
+    "Coupled with progedmf + 1M (16 helem)",
+    run_info_coupled_progedmf_coarse...,
+)
+data = append_table_data(
+    data,
+    "Coupled with progedmf + 1M (30 helem)",
+    run_info_coupled_progedmf_fine...,
+)
 data = append_table_data(data, "Coupled with diag. EDMF + IO", run_info_coupled_io...)
 data = append_table_data(data, "Coupled with diag. EDMF", run_info_coupled...)
 data = append_table_data(data, "Atmos with diag. EDMF", run_info_atmos_diagedmf...)
@@ -155,5 +181,10 @@ mkpath(table_output_dir)
 table_path = joinpath(table_output_dir, "table.txt")
 open(table_path, "w") do f
     # Output the table, including lines before and after the header
-    PrettyTables.pretty_table(f, data, header = headers, hlines = [0, 3, 5, 7, 9, 11])
+    PrettyTables.pretty_table(
+        f,
+        data,
+        header = headers,
+        hlines = [0, 3, 5, 7, 9, 11, 13, 15],
+    )
 end

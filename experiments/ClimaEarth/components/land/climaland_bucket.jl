@@ -152,9 +152,9 @@ function BucketSimulation(
         Y.bucket.T .= orog_adjusted_T
     end
 
-    Y.bucket.W .= 0.15
-    Y.bucket.Ws .= 0.0
-    Y.bucket.σS .= 0.0
+    Y.bucket.W .= FT(0.15)
+    Y.bucket.Ws .= zero(FT)
+    Y.bucket.σS .= zero(FT)
 
     # Overwrite initial conditions with interpolated values from a netcdf file using
     # the `SpaceVaryingInputs` tool. We expect the file to contain the following variables:

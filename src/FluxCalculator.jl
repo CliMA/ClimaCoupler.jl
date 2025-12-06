@@ -332,14 +332,14 @@ function compute_surface_fluxes!(
     # Zero out fluxes where the area fraction is zero
     # Multiplying by `area_fraction` is not sufficient because the fluxes may
     # be NaN where the area fraction is zero.
-    @. F_turb_ρτxz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτxz), F_turb_ρτxz)
-    @. F_turb_ρτyz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτyz), F_turb_ρτyz)
-    @. F_sh = ifelse(area_fraction ≈ 0, zero(F_sh), F_sh)
-    @. F_lh = ifelse(area_fraction ≈ 0, zero(F_lh), F_lh)
-    @. F_turb_moisture = ifelse(area_fraction ≈ 0, zero(F_turb_moisture), F_turb_moisture)
-    @. L_MO = ifelse(area_fraction ≈ 0, zero(L_MO), L_MO)
-    @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
-    @. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(buoyancy_flux), buoyancy_flux)
+    @. F_turb_ρτxz = ifelse(area_fraction ≈ 0, zero(FT), F_turb_ρτxz)
+    @. F_turb_ρτyz = ifelse(area_fraction ≈ 0, zero(FT), F_turb_ρτyz)
+    @. F_sh = ifelse(area_fraction ≈ 0, zero(FT), F_sh)
+    @. F_lh = ifelse(area_fraction ≈ 0, zero(FT), F_lh)
+    @. F_turb_moisture = ifelse(area_fraction ≈ 0, zero(FT), F_turb_moisture)
+    @. L_MO = ifelse(area_fraction ≈ 0, zero(FT), L_MO)
+    @. ustar = ifelse(area_fraction ≈ 0, zero(FT), ustar)
+    @. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(FT), buoyancy_flux)
 
     # update the fluxes, which are now area-weighted, of this surface model
     fields = (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)

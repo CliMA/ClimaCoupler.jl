@@ -259,10 +259,11 @@ end
 function slab_ocean_rhs!(dY, Y, cache, t)
     params, F_turb_energy, SW_d, LW_d = cache
     (; α, ϵ, σ, h, ρ, c) = params
+    FT = eltype(Y)
     rhs = @. (-F_turb_energy + (1 - α) * SW_d + ϵ * (LW_d - σ * Y.T_sfc^4)) / (h * ρ * c)
 
     # Zero out tendencies where there is no ocean, so that temperature remains constant there
-    @. rhs = ifelse(cache.area_fraction ≈ 0, zero(rhs), rhs)
+    @. rhs = ifelse(cache.area_fraction ≈ 0, zero(FT), rhs)
 
     # Note that the area fraction has already been applied to the fluxes,
     #  so we don't need to multiply by it here.

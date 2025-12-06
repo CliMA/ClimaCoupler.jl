@@ -269,9 +269,15 @@ for FT in (Float32, Float64)
             Interfacer.get_field(sims.c, var_name),
             Interfacer.get_field(sims.d, var_name),
         )
-        temp_field = CC.Fields.zeros(test_space)
 
-        FieldExchanger.combine_surfaces!(combined_field, sims, var_name, temp_field)
+        # Create a coupler fields NamedTuple with the field we want to combine
+        csf = (;
+            random = combined_field,
+            scalar_temp1 = CC.Fields.zeros(test_space),
+            scalar_temp2 = CC.Fields.zeros(test_space),
+        )
+
+        FieldExchanger.combine_surfaces!(csf, sims, var_name)
         @test combined_field == fill(FT(sum(fractions .* fields)), test_space)
     end
 

@@ -92,7 +92,7 @@ function BucketSimulation(
     if isnothing(surface_elevation)
         surface_elevation = CC.Fields.zeros(surface_space)
     else
-        surface_elevation = Interfacer.remap(surface_elevation, surface_space)
+        surface_elevation = Interfacer.remap(surface_space, surface_elevation)
     end
 
     if albedo_type == "map_static" # Read in albedo from static data file (default type)

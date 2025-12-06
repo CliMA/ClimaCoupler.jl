@@ -269,7 +269,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     land_mask_data =
         joinpath(@clima_artifact("landsea_mask_60arcseconds", comms_ctx), "landsea_mask.nc")
     land_fraction = SpaceVaryingInput(land_mask_data, "landsea", boundary_space)
-    land_fraction = ifelse.(land_fraction .> eps(FT), FT(1), FT(0))
+    @. land_fraction = ifelse(land_fraction > eps(FT), one(FT), zero(FT))
 
     #=
     ### Surface Models: AMIP and SlabPlanet Modes

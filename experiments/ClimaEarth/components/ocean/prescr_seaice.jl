@@ -177,7 +177,7 @@ function PrescribedIceSimulation(
     evaluate!(ice_fraction, SIC_timevaryinginput, tspan[1])
 
     # Make ice fraction binary rather than fractional
-    ice_fraction = ifelse.(ice_fraction .> FT(0.5), FT(1), FT(0))
+    @. ice_fraction = ifelse(ice_fraction > FT(0.5), one(FT), zero(FT))
 
     params = IceSlabParameters{FT}(coupled_param_dict)
 
@@ -322,7 +322,7 @@ function ice_rhs!(dY, Y, p, t)
 
     # Update the cached area fraction with the current SIC
     evaluate!(p.area_fraction, p.SIC_timevaryinginput, t)
-    @. p.area_fraction = ifelse(p.area_fraction > FT(0.5), FT(1), FT(0))
+    @. p.area_fraction = ifelse(p.area_fraction > FT(0.5), one(FT), zero(FT))
 
     # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
     #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
@@ -337,7 +337,7 @@ function ice_rhs!(dY, Y, p, t)
         F_conductive
     ) / (h * ρ * c)
     # Zero out tendencies where there is no ice, so that ice temperature remains constant there
-    @. rhs = ifelse(p.area_fraction ≈ 0, zero(rhs), rhs)
+    @. rhs = ifelse(p.area_fraction ≈ 0, zero(FT), rhs)
 
     # If tendencies lead to temperature above freezing, set temperature to freezing
     @. dY.T_bulk = min(rhs, (T_freeze - Y.T_bulk) / float(p.dt))

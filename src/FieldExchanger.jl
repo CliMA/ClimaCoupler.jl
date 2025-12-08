@@ -38,7 +38,7 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     if haskey(cs.model_sims, :land_sim)
         land_fraction = Interfacer.get_field(cs.model_sims.land_sim, Val(:area_fraction))
     else
-        cs.fields.scalar_temp1 .= 0
+        cs.fields.scalar_temp1 .= zero(FT)
         land_fraction = cs.fields.scalar_temp1
     end
 
@@ -56,7 +56,7 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
         )
         ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
     else
-        cs.fields.scalar_temp1 .= 0
+        cs.fields.scalar_temp1 .= zero(FT)
         ice_fraction = cs.fields.scalar_temp1
     end
 
@@ -74,7 +74,7 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
             resolve_area_fractions!(ocean_sim, cs.model_sims.ice_sim, land_fraction)
         end
     else
-        cs.fields.scalar_temp1 .= 0
+        cs.fields.scalar_temp1 .= zero(FT)
         ocean_fraction = cs.fields.scalar_temp1
     end
 
@@ -331,7 +331,8 @@ is computed from the combined upward longwave radiation.
 """
 function combine_surfaces!(combined_field, sims, field_name, scalar_temp)
     boundary_space = axes(combined_field)
-    combined_field .= 0
+    FT = CC.Spaces.undertype(boundary_space)
+    combined_field .= zero(FT)
     for sim in sims
         if sim isa Interfacer.SurfaceModelSimulation
             # Store the area fraction of this simulation in `scalar_temp`
@@ -342,7 +343,7 @@ function combine_surfaces!(combined_field, sims, field_name, scalar_temp)
                 scalar_temp .*
                 ifelse.(
                     scalar_temp .≈ 0,
-                    zero(combined_field),
+                    zero(FT),
                     Interfacer.get_field(sim, field_name, boundary_space),
                 )
         end
@@ -357,7 +358,7 @@ function combine_surfaces!(csf, sims, field_name::Val{:surface_temperature})
     boundary_space = axes(T_sfc)
     FT = CC.Spaces.undertype(boundary_space)
 
-    T_sfc .= FT(0)
+    T_sfc .= zero(FT)
     for sim in sims
         if sim isa Interfacer.SurfaceModelSimulation
             # Store the area fraction and emissivity of this simulation in temp fields
@@ -373,7 +374,7 @@ function combine_surfaces!(csf, sims, field_name::Val{:surface_temperature})
                 area_fraction .*
                 ifelse.(
                     area_fraction .≈ 0,
-                    zero(T_sfc),
+                    zero(FT),
                     emissivity_sim .*
                     Interfacer.get_field(sim, field_name, boundary_space) .^ FT(4),
                 )

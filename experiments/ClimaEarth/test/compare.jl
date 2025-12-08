@@ -26,7 +26,7 @@ function _error(arr1::AbstractArray, arr2::AbstractArray; ABS_TOL = 100eps(eltyp
     arr2 = Array(arr2) .* isfinite.(Array(arr2))
     diff = abs.(arr1 .- arr2)
     denominator = abs.(arr1)
-    error = ifelse.(denominator .> ABS_TOL, diff ./ denominator, diff)
+    error = @. ifelse(denominator > ABS_TOL, diff ./ denominator, diff)
     return error
 end
 

@@ -214,8 +214,11 @@ function Interfacer.remap!(dst_field::OC.Field, src_field::CC.Fields.Field, rema
         src_field,
         remapping.field_ones_cc,
     )
+
+    # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
+    z = size(dst_field, 3)
     CR.regrid!(
-        vec(OC.interior(dst_field, :, :, 1)),
+        vec(OC.interior(dst_field, :, :, z)),
         transpose(remapping.remapper_oc_to_cc),
         remapping.value_per_element_cc,
     )
@@ -425,7 +428,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     moisture_fresh_water_flux =
         OC.interior(sim.remapping.scratch_field_oc1, :, :, 1) ./ fresh_water_density
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
-    surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, 1)
+    surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, grid.Nz)
     OC.interior(oc_flux_S, :, :, 1) .=
         OC.interior(oc_flux_S, :, :, 1) .-
         (1.0 .- ice_concentration) .* surface_salinity .* moisture_fresh_water_flux
@@ -459,6 +462,7 @@ so a sign change is needed when we convert from precipitation to salinity flux.
 function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     (; reference_density, heat_capacity, fresh_water_density) = sim.ocean_properties
     ice_concentration = sim.ice_concentration
+    grid = sim.ocean.model.grid
 
     # Remap radiative flux onto scratch fields; rename for clarity
     Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.SW_d, sim.remapping) # shortwave radiation
@@ -478,7 +482,7 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
             -(1 - α) .* remapped_SW_d .-
             ϵ * (
                 remapped_LW_d .-
-                σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T, :, :, 1)) .^ 4
+                σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T, :, :, grid.Nz)) .^ 4
             )
         ) ./ (reference_density * heat_capacity)
 
@@ -493,8 +497,9 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     OC.interior(oc_flux_S, :, :, 1) .=
         OC.interior(oc_flux_S, :, :, 1) .-
-        OC.interior(sim.ocean.model.tracers.S, :, :, 1) .* (1.0 .- ice_concentration) .*
-        (remapped_P_liq .+ remapped_P_snow) ./ fresh_water_density
+        OC.interior(sim.ocean.model.tracers.S, :, :, grid.Nz) .*
+        (1.0 .- ice_concentration) .* (remapped_P_liq .+ remapped_P_snow) ./
+        fresh_water_density
     return nothing
 end
 

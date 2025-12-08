@@ -166,7 +166,7 @@ function debug(sim::Interfacer.ComponentModelSimulation, dir)
                     OC.compute!(field)
                 end
                 grid = field.grid
-                hm = CairoMakie.heatmap!(ax, view(field, :, :, grid.Nz))
+                hm = CairoMakie.heatmap!(ax, OC.interior(field, :, :, grid.Nz))
                 Makie.Colorbar(fig[i, j * 2], hm)
             elseif field isa CC.Fields.Field
                 _heatmap_cc_field!(fig, field, i, j, field_name)

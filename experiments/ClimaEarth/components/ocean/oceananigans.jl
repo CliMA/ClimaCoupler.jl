@@ -1,7 +1,6 @@
 import Oceananigans as OC
 import ClimaOcean as CO
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
-import ClimaCoupler.Interfacer: remap, remap!, get_field
 import ClimaComms
 import ClimaCore as CC
 import Thermodynamics as TD

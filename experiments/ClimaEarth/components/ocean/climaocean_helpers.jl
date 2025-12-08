@@ -34,26 +34,6 @@ function Interfacer.remap!(
     return Interfacer.remap!(target_field, evaluated_field, remapping)
 end
 
-# Handle the case when remap is called on an operation without remapping argument
-# This happens when the generic remap! calls remap(source, target_space)
-# This should not happen for Oceananigans - operations always need remapping
-function Interfacer.remap(operation::OC.AbstractOperations.AbstractOperation, target_space)
-    error(
-        "Cannot remap Oceananigans AbstractOperation to target space without remapping object. " *
-        "Use the specialized get_field! method for OceananigansSimulation instead.",
-    )
-end
-
-# Handle the case when remap is called on an Oceananigans Field without remapping argument
-# This happens when the generic remap! calls remap(source, target_space)
-function Interfacer.remap(src_field::OC.Field, target_space)
-    error(
-        "Cannot remap Oceananigans Field to target space without remapping object. " *
-        "Oceananigans Fields require a remapping object to convert to ClimaCore spaces. " *
-        "Use the specialized get_field! method for OceananigansSimulation instead.",
-    )
-end
-
 """
     set_from_extrinsic_vector!(vector, grid, u_cc, v_cc)
 

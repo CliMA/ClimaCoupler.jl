@@ -76,7 +76,7 @@ function OceananigansSimulation(
     bottom_height = CO.regrid_bathymetry(
         underlying_grid;
         minimum_depth = 30,
-        interpolation_passes = 1,
+        interpolation_passes = 20,
         major_basins = 1,
     )
     grid = OC.ImmersedBoundaryGrid(

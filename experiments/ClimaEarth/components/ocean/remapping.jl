@@ -100,14 +100,14 @@ function Interfacer.remap!(dst_field::OC.Field, src_field::CC.Fields.Field, rema
 
     # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
     z = size(dst_field, 3)
-    CR.regrid!(
-        vec(OC.interior(dst_field, :, :, z)),
-        transpose(remapping.remapper_oc_to_cc),
-        remapping.value_per_element_cc,
-    )
+    dst = vec(OC.interior(dst_field, :, :, z))
+    src = remapping.value_per_element_cc
 
-    # Normalize by the destination element areas
-    vec(OC.interior(dst_field, :, :, z)) ./= remapping.remapper_oc_to_cc.src_areas # Oceananigans areas are source areas
+    # Multiply by transpose of the matrix of intersection areas
+    LinearAlgebra.mul!(dst, transpose(remapping.remapper_oc_to_cc.intersections), src)
+
+    # Normalize by the destination (Oceananigans) element areas
+    dst ./= remapping.remapper_oc_to_cc.src_areas # Oceananigans areas are source areas
     return nothing
 end
 # Allocating ClimaCore -> Oceananigans remap
@@ -126,17 +126,15 @@ function Interfacer.remap!(dst_field::CC.Fields.Field, src_field::OC.Field, rema
     # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
     z = size(src_field, 3)
     # Store the remapped FV values in a vector of length equal to the number of elements in the target space
-    CR.regrid!(
-        remapping.value_per_element_cc,
-        remapping.remapper_oc_to_cc,
-        vec(OC.interior(src_field, :, :, z)),
-    )
+    dst = remapping.value_per_element_cc
+    src = vec(OC.interior(src_field, :, :, z))
+    LinearAlgebra.mul!(dst, remapping.remapper_oc_to_cc.intersections, src)
 
-    # Normalize by the destination element areas
-    remapping.value_per_element_cc ./= remapping.remapper_oc_to_cc.dst_areas # ClimaCore areas are destination areas
+    # Normalize by the destination (ClimaCore) element areas
+    dst ./= remapping.remapper_oc_to_cc.dst_areas # ClimaCore areas are destination areas
 
     # Convert the vector of remapped values to a ClimaCore Field with one value per element
-    CC.Remapping.set_value_per_element!(dst_field, remapping.value_per_element_cc)
+    CC.Remapping.set_value_per_element!(dst_field, dst)
     return nothing
 end
 # Handle the case of remapping the area fraction field, which is a ClimaCore Field

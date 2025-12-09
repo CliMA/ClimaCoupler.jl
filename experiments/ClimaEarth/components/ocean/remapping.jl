@@ -105,6 +105,9 @@ function Interfacer.remap!(dst_field::OC.Field, src_field::CC.Fields.Field, rema
         transpose(remapping.remapper_oc_to_cc),
         remapping.value_per_element_cc,
     )
+
+    # Normalize by the destination element areas
+    vec(OC.interior(dst_field, :, :, z)) ./= remapping.remapper_oc_to_cc.src_areas # Oceananigans areas are source areas
     return nothing
 end
 # Allocating ClimaCore -> Oceananigans remap
@@ -128,6 +131,9 @@ function Interfacer.remap!(dst_field::CC.Fields.Field, src_field::OC.Field, rema
         remapping.remapper_oc_to_cc,
         vec(OC.interior(src_field, :, :, z)),
     )
+
+    # Normalize by the destination element areas
+    remapping.value_per_element_cc ./= remapping.remapper_oc_to_cc.dst_areas # ClimaCore areas are destination areas
 
     # Convert the vector of remapped values to a ClimaCore Field with one value per element
     CC.Remapping.set_value_per_element!(dst_field, remapping.value_per_element_cc)

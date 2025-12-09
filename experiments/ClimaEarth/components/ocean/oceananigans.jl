@@ -186,7 +186,7 @@ function construct_remappers(grid_oc, boundary_space)
     vertices_oc = compute_cell_matrix(grid_oc.underlying_grid)
     vertices_cc = CC.Remapping.get_element_vertices(boundary_space)
 
-    remapper_oc_to_cc = CR.Regridder(vertices_cc, vertices_oc)
+    remapper_oc_to_cc = CR.Regridder(vertices_cc, vertices_oc; normalize = false)
 
     # Create a field of ones on the boundary space so we can compute element areas
     field_ones_cc = CC.Fields.ones(boundary_space)

@@ -6,6 +6,9 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Use TripolarGrid with OceananigansSimulation PR[#1409](https://github.com/CliMA/ClimaCoupler.jl/pull/1409)
+Switch from using the Oceananigans.jl `LatitudeLongitudeGrid` to `TripolarGrid`.
+
 #### Update interfaces to surface-flux calculator to support dynamic roughness.
 Adds the `roughness_model` argument to the surface-flux input constructor. Default
 behaviour is the `SF.ScalarRoughness()` type. Upcoming changes will account for the

@@ -1,6 +1,6 @@
 agents:
   queue: clima
-  slurm_time: 96:00:00
+  slurm_time: 3:00:00
   modules: climacommon/2025_05_15
 
 env:
@@ -9,7 +9,7 @@ env:
   SLURM_KILL_BAD_EXIT: 1
   CONFIG_PATH: "config/amip_configs"
 
-timeout_in_minutes: 5760
+timeout_in_minutes: 360
 
 steps:
 
@@ -43,7 +43,7 @@ steps:
           - echo "--- Run simulation"
           - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_land.yml --job_id amip"
         artifact_paths: "experiments/ClimaEarth/output/amip/artifacts/*"
-        timeout_in_minutes: 5760
+        timeout_in_minutes: 360
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
@@ -52,19 +52,19 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 30GB
 
-  - wait
+  # - wait
 
-  - group: "Job analysis and reporting"
+  # - group: "Job analysis and reporting"
 
-    steps:
+  #   steps:
 
-      - label: "Send simulation output to Azure VM for visualization"
-        command:
-          - rsync -avz experiments/ClimaEarth/output/amip/output_active/* azure-arenchon:/home/arenchon/GitHub/ClimaViz.jl/data/climacoupler-amip/
+  #     - label: "Send simulation output to Azure VM for visualization"
+  #       command:
+  #         - rsync -avz experiments/ClimaEarth/output/amip/output_active/* azure-arenchon:/home/arenchon/GitHub/ClimaViz.jl/data/climacoupler-amip/
 
-      - label: ":envelope: Slack report: current AMIP"
-        command:
-          - |
-            find experiments/ClimaEarth/output/amip/artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
-              slack-upload -c C04S6MBSDC4 -f "$$file" -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
-            done
+  #     - label: ":envelope: Slack report: current AMIP"
+  #       command:
+  #         - |
+  #           find experiments/ClimaEarth/output/amip/artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
+  #             slack-upload -c C04S6MBSDC4 -f "$$file" -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
+  #           done

@@ -114,11 +114,11 @@ function ClimaLandSimulation(
     if isnothing(surface_elevation)
         surface_elevation = CC.Fields.zeros(surface_space)
     else
-        surface_elevation = Interfacer.remap(surface_elevation, surface_space)
+        surface_elevation = Interfacer.remap(surface_space, surface_elevation)
     end
     # Interpolate atmosphere height field to surface space of land model,
     #  since that's where we compute fluxes for this land model
-    atmos_h = Interfacer.remap(atmos_h, surface_space)
+    atmos_h = Interfacer.remap(surface_space, atmos_h)
 
     # Set up atmosphere and radiation forcing
     forcing = (;

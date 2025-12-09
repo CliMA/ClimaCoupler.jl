@@ -45,7 +45,7 @@ include(joinpath("..", "setup_run.jl"))
     # see climaland_bucket.jl), so we compare atmos_flux ≈ R_n at land-dominant points.
     p = land_sim.integrator.p
     land_fraction = Interfacer.get_field(land_sim, Val(:area_fraction))
-    land_flux = Interfacer.remap(land_sim.integrator.p.bucket.R_n, boundary_space)
+    land_flux = Interfacer.remap(boundary_space, land_sim.integrator.p.bucket.R_n)
     @. land_flux = ifelse(land_fraction ≈ 0, zero(land_flux), land_flux)
 
     err_land = @. atmos_flux - land_flux

@@ -10,6 +10,7 @@ using KernelAbstractions: @kernel, @index, @inbounds
 import ConservativeRegridding as CR
 
 include("climaocean_helpers.jl")
+include("remapping.jl")
 
 """
     OceananigansSimulation{SIM, A, OPROP, REMAP, SIC}
@@ -207,79 +208,6 @@ function construct_remappers(grid_oc, boundary_space)
     )
 end
 
-# Non-allocating ClimaCore -> Oceananigans remap
-function Interfacer.remap!(dst_field::OC.Field, src_field::CC.Fields.Field, remapping)
-    CC.Remapping.get_value_per_element!(
-        remapping.value_per_element_cc,
-        src_field,
-        remapping.field_ones_cc,
-    )
-
-    # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
-    z = size(dst_field, 3)
-    CR.regrid!(
-        vec(OC.interior(dst_field, :, :, z)),
-        transpose(remapping.remapper_oc_to_cc),
-        remapping.value_per_element_cc,
-    )
-    return nothing
-end
-# Allocating ClimaCore -> Oceananigans remap
-function Interfacer.remap(
-    src_field::CC.Fields.Field,
-    remapping,
-    dst_space::Union{OC.OrthogonalSphericalShellGrid, OC.LatitudeLongitudeGrid},
-)
-    dst_field = OC.Field{OC.Center, OC.Center, Nothing}(dst_space)
-    remap!(dst_field, src_field, remapping)
-    return dst_field
-end
-
-# Non-allocating Oceananigans -> ClimaCore remap
-function Interfacer.remap!(dst_field::CC.Fields.Field, src_field::OC.Field, remapping)
-    CR.regrid!(
-        remapping.value_per_element_cc,
-        remapping.remapper_oc_to_cc,
-        vec(OC.interior(src_field, :, :, 1)),
-    )
-
-    # Convert the vector of remapped values to a ClimaCore Field with one value per element
-    CC.Remapping.set_value_per_element!(dst_field, remapping.value_per_element_cc)
-    return nothing
-end
-# Handle the case of remapping the area fraction field, which is a ClimaCore Field
-Interfacer.remap!(dst_field::CC.Fields.Field, src_field::CC.Fields.Field, remapping) =
-    Interfacer.remap!(dst_field, src_field)
-Interfacer.remap!(dst_field::CC.Fields.Field, src_field::Number, remapping) =
-    Interfacer.remap!(dst_field, src_field)
-# Allocating Oceananigans -> ClimaCore remap
-function Interfacer.remap(
-    src_field::OC.Field,
-    remapping,
-    dst_space::CC.Spaces.AbstractSpace,
-)
-    dst_field = CC.Fields.zeros(dst_space)
-    Interfacer.remap!(dst_field, src_field, remapping)
-    return dst_field
-end
-
-# Handle the case of remapping a scalar number to a ClimaCore space
-Interfacer.remap(num::Number, remapping, target_space::CC.Spaces.AbstractSpace) =
-    Interfacer.remap(num, target_space)
-
-# Extend Interfacer.get_field to allow automatic remapping to the target space
-# TODO see if we can remove this
-function Interfacer.get_field(sim::OceananigansSimulation, quantity, target_space)
-    return Interfacer.remap(
-        Interfacer.get_field(sim, quantity),
-        sim.remapping,
-        target_space,
-    )
-end
-function Interfacer.get_field!(target_field, sim::OceananigansSimulation, quantity)
-    Interfacer.remap!(target_field, Interfacer.get_field(sim, quantity), sim.remapping)
-    return nothing
-end
 
 """
     FieldExchanger.resolve_area_fractions!(ocean_sim, ice_sim, land_fraction)

@@ -37,7 +37,7 @@ steps:
 
     steps:
 
-      - label: "Current AMIP: diagedmf + 0M + bucket land"
+      - label: "Current AMIP: diagedmf + 0M + integrated land"
         key: "amip"
         command:
           - echo "--- Run simulation"

@@ -20,7 +20,6 @@ if pkgversion(CA) < v"0.28.6"
     CC.Adapt.@adapt_structure CA.RRTMGPInterface.RRTMGPModel
 end
 
-include("../shared/restore.jl")
 
 ###
 ### Functions required by ClimaCoupler.jl for an AtmosModelSimulation
@@ -140,7 +139,7 @@ end
 
 function Checkpointer.restore_cache!(sim::ClimaAtmosSimulation, new_cache)
     comms_ctx = ClimaComms.context(sim.integrator.u.c)
-    restore!(
+    Checkpointer.restore!(
         Checkpointer.get_model_cache(sim),
         new_cache,
         comms_ctx;
@@ -734,4 +733,24 @@ function climaatmos_restart_path(output_dir_root, t)
         ispath(restart_file) && return restart_file
     end
     error("Restart file for time $t not found")
+end
+
+###
+### Additional accessor functions for debugging ClimaAtmosSimulation
+###
+
+# Helper function for specific humidity
+specific_humidity(::CA.DryModel, integrator) = [eltype(integrator.u)(0)]
+specific_humidity(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
+    integrator.u.c.ρq_tot
+
+# Additional debug fields for ClimaAtmosSimulation
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρq_tot}) =
+    specific_humidity(sim.integrator.p.atmos.moisture_model, sim.integrator)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrator.u.c.ρe_tot
+
+# Plot field names for ClimaAtmosSimulation
+# TODO is this the right name? where is this used?
+function plot_field_names(sim::ClimaAtmosSimulation)
+    return (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)
 end

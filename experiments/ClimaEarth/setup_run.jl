@@ -250,7 +250,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     end
 
     # Get surface elevation on the boundary space from `atmos` coordinate field
-    surface_elevation = Interfacer.get_field(atmos_sim, Val(:height_sfc), boundary_space) # on boundary space
+    surface_elevation = Interfacer.get_field(boundary_space, atmos_sim, Val(:height_sfc)) # on boundary space
     # Get atmospheric height relative to the surface directly from the atmosphere
     atmos_h = Interfacer.get_atmos_height_delta(
         Interfacer.get_field(atmos_sim, Val(:height_int)),
@@ -497,7 +497,13 @@ function CoupledSimulation(config_dict::AbstractDict)
     checkpoint_cb =
         TimeManager.Callback(schedule_checkpoint, sim -> Checkpointer.checkpoint_sims(sim))
 
-    callbacks = (checkpoint_cb,)
+    # Don't use coupler walltime logging if atmos is using its own walltime logging is true
+    if config_dict["atmos_log_progress"]
+        callbacks = (checkpoint_cb,)
+    else
+        walltime_cb = TimeManager.capped_geometric_walltime_cb(t_start, t_end, Δt_cpl)
+        callbacks = (checkpoint_cb, walltime_cb)
+    end
 
     #= Set up default AMIP diagnostics
     Use ClimaDiagnostics for default AMIP diagnostics, which currently include turbulent energy fluxes.

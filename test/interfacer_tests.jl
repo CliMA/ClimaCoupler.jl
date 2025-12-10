@@ -8,7 +8,7 @@ import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
 import ClimaCoupler: Interfacer
 
-function Interfacer.remap(field, ::Nothing)
+function Interfacer.remap(::Nothing, field)
     return field
 end
 
@@ -322,10 +322,10 @@ end
         h_elem = 6,
         context,
     )
-    field_target_space = Interfacer.remap(field, target_space)
+    field_target_space = Interfacer.remap(target_space, field)
 
     # remap back to source space
-    field_source_space = Interfacer.remap(field_target_space, source_space)
+    field_source_space = Interfacer.remap(source_space, field_target_space)
 
     # The ClimaCore DataLayout underlying the remapped field uses
     # Array instead of SubArray, so we can't compare the fields directly without Copy

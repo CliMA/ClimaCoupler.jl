@@ -114,11 +114,11 @@ function ClimaLandSimulation(
     if isnothing(surface_elevation)
         surface_elevation = CC.Fields.zeros(surface_space)
     else
-        surface_elevation = Interfacer.remap(surface_elevation, surface_space)
+        surface_elevation = Interfacer.remap(surface_space, surface_elevation)
     end
     # Interpolate atmosphere height field to surface space of land model,
     #  since that's where we compute fluxes for this land model
-    atmos_h = Interfacer.remap(atmos_h, surface_space)
+    atmos_h = Interfacer.remap(surface_space, atmos_h)
 
     # Set up atmosphere and radiation forcing
     forcing = (;
@@ -170,7 +170,10 @@ function ClimaLandSimulation(
         CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
 
     # Set initial conditions that aren't read in from file
-    Y.soilco2.C .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
+    Y.soilco2.CO2 .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
+    Y.soilco2.O2_f .= FT(0.21)    # atmospheric O2 volumetric fraction
+    Y.soilco2.SOC .= FT(5.0)      # default SOC concentration (kg C/m³)
+
     Y.canopy.hydraulics.ϑ_l.:1 .= model.canopy.hydraulics.parameters.ν
     @. Y.canopy.energy.T = orog_adjusted_T_surface
 

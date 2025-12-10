@@ -1,12 +1,11 @@
 agents:
   queue: central
-  slurm_time: 24:00:00
+  slurm_time: 30:00:00
   modules: climacommon/2025_05_15
 
 env:
   JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
   OPENBLAS_NUM_THREADS: 1
-  JULIA_NVTX_CALLBACKS: gc
   OMPI_MCA_opal_warn_on_missing_libcuda: 0
   JULIA_MAX_NUM_PRECOMPILE_FILES: 100
   GKSwstype: 100
@@ -161,7 +160,6 @@ steps:
           queue: clima
           slurm_mem: 32GB
           slurm_gpus: 1
-          slurm_time: 12:00:00
 
       - label: "GPU CMIP: ClimaAtmos + Bucket + ClimaOcean + PrescribedSeaIce"
         key: "cmip_edonly_bucket"
@@ -175,7 +173,6 @@ steps:
           queue: clima
           slurm_mem: 32GB
           slurm_gpus: 1
-          slurm_time: 12:00:00
 
   - group: "Calibration experiments"
 

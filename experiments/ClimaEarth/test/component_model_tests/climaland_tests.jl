@@ -73,13 +73,12 @@ FT = Float32
         :LW_d,
         :cosθs,
         :frac_diff,
-        :soc,
     )
     atmos = land_sim.model.soil.boundary_conditions.top.atmos
     @test atmos == land_sim.model.canopy.boundary_conditions.atmos
     @test atmos == land_sim.model.snow.boundary_conditions.atmos
     # Remap atmos_h to the same space as atmos.h for type comparison
-    atmos_h_remapped = Interfacer.remap(atmos_h, axes(atmos.h))
+    atmos_h_remapped = Interfacer.remap(axes(atmos.h), atmos_h)
     @test atmos.h == atmos_h_remapped
     #@test typeof(atmos.h) == typeof(atmos_h_remapped)
     @test atmos.gustiness == FT(1)

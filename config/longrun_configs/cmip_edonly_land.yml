@@ -5,11 +5,11 @@ checkpoint_dt: "720hours"
 co2: "maunaloa"
 dt_atmos: "120secs" # 2 minutes
 dt_cloud_fraction: "1hours"
-dt_cpl: "960secs" # 16 minutes
-dt_land: "480secs" # 8 minutes
-dt_ocean: "960secs" # 16 minutes
+dt_cpl: "240secs" # 4 minutes
+dt_land: "240secs" # 4 minutes
+dt_ocean: "240secs" # 4 minutes
 dt_rad: "1hours"
-dt_seaice: "960secs" # 16 minutes
+dt_seaice: "240secs" # 4 minutes
 energy_check: false
 insolation: "timevarying"
 land_model: "integrated"

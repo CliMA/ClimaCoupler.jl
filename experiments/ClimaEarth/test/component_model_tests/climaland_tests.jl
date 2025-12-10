@@ -73,7 +73,6 @@ FT = Float32
         :LW_d,
         :cosθs,
         :frac_diff,
-        :soc,
     )
     atmos = land_sim.model.soil.boundary_conditions.top.atmos
     @test atmos == land_sim.model.canopy.boundary_conditions.atmos

@@ -23,6 +23,13 @@ h_elem: 32
 ### integrated land ###
 # land_model: "integrated"
 
+## gravity waves
+# orographic_gravity_wave: "raw_topo"
+# orographic_gravity_wave: "gfdl_restart"
+# orographic_gravity_wave: ~
+# non_orographic_gravity_wave: true
+# non_orographic_gravity_wave: false
+
 ### bucket land ###
 land_model: "bucket"
 bucket_albedo_type: "map_temporal"

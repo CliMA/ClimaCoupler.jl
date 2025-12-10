@@ -5,6 +5,7 @@ import Test: @testset, @test
 import ClimaComms
 ClimaComms.@import_required_backends
 import ClimaCoupler: Utilities
+import ClimaCoupler: TimeManager
 import ClimaCore as CC
 
 # Initialize MPI context, in case
@@ -70,5 +71,32 @@ for FT in (Float32, Float64)
             rtol = 1e-5,
         )
         @test Utilities.integral(ones(space3d)) == sum(ones(space3d))
+    end
+
+    @testset "WallTime Callback" begin
+        t_start = 0.0
+        t_end = 10.0
+        Δt_cpl = 0.1
+
+        cb = TimeManager.capped_geometric_walltime_cb(t_start, t_end, Δt_cpl)
+
+        # First two steps should not trigger
+        fake_integrator = (; t = t_start + Δt_cpl)
+        @test !cb.schedule(fake_integrator)
+        fake_integrator = (; t = t_start + Δt_cpl * 2)
+        @test !cb.schedule(fake_integrator)
+        # step 4, 8, 16 should trigger
+        fake_integrator = (; t = t_start + Δt_cpl * 4)
+        @test cb.schedule(fake_integrator)
+        fake_integrator = (; t = t_start + Δt_cpl * 8)
+        @test cb.schedule(fake_integrator)
+        fake_integrator = (; t = t_start + Δt_cpl * 14)
+        @test !cb.schedule(fake_integrator)
+        fake_integrator = (; t = t_start + Δt_cpl * 16)
+        @test cb.schedule(fake_integrator)
+
+        # 20% should trigger
+        fake_integrator = (; t = t_start + Δt_cpl * 20)
+        @test cb.schedule(fake_integrator)
     end
 end

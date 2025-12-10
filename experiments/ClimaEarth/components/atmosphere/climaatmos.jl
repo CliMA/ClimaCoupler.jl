@@ -377,8 +377,8 @@ function Interfacer.update_field!(
 
     # Remap surface temperature and humidity to atmosphere surface space
     # NOTE: This is allocating! If we had 2 more scratch fields, we could avoid this
-    T_sfc_atmos = Interfacer.remap(csf.T_sfc, atmos_surface_space)
-    q_sfc_atmos = Interfacer.remap(csf.scalar_temp4, atmos_surface_space)
+    T_sfc_atmos = Interfacer.remap(atmos_surface_space, csf.T_sfc)
+    q_sfc_atmos = Interfacer.remap(atmos_surface_space, csf.scalar_temp4)
 
     # Store `ρ_sfc_atmos` in an atmosphere scratch field on the surface space
     temp_field_surface =
@@ -488,7 +488,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fiel
 
     # NOTE: This is allocating (F_turb_ρτyz_atmos)! If we had 1 more scratch field, we could avoid this
     Interfacer.remap!(temp_field_surface, F_turb_ρτxz) # F_turb_ρτxz_atmos
-    F_turb_ρτyz_atmos = Interfacer.remap(F_turb_ρτyz, atmos_surface_space) # F_turb_ρτyz_atmos
+    F_turb_ρτyz_atmos = Interfacer.remap(atmos_surface_space, F_turb_ρτyz) # F_turb_ρτyz_atmos
     sim.integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ .= (
         surface_normal .⊗
         CA.C12.(
@@ -626,6 +626,7 @@ function get_atmos_config_dict(
     # can pick up from where we have left. NOTE: This should not be needed, but
     # there is no easy way to initialize ClimaAtmos with a different t_start
     atmos_config["dt_save_state_to_disk"] = coupler_config["checkpoint_dt"]
+    atmos_config["log_progress"] = coupler_config["atmos_log_progress"]
 
     # The Atmos `get_simulation` function expects the atmos config to contains its timestep size
     # in the `dt` field. If there is a `dt_atmos` field in coupler_config, we add it to the atmos config as `dt`

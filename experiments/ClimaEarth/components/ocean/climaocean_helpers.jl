@@ -9,26 +9,26 @@ care about the surface.
 @inline to_node(pt::CC.Geometry.LatLongZPoint) = pt.long, pt.lat, zero(pt.lat)
 
 """
-    map_interpolate(points, oc_field::OC.Field)
+    map_interpolate!(target_field::CC.Fields.Field, source_field::OC.Field)
 
-Interpolate the given 3D field onto the target points.
+Interpolate the given 3D field onto the target field, modifying the target field in place.
 
-If the underlying grid does not contain a given point, return 0 instead.
+If the underlying grid does not contain a given point, writes 0 instead.
 
-Note: `map_interpolate` does not support interpolation from `Field`s defined on
+Note: `map_interpolate!` does not support interpolation from `Field`s defined on
 `OrthogononalSphericalShellGrids` such as the `TripolarGrid`.
-
-TODO: Use a non-allocating version of this function (simply replace `map` with `map!`)
 """
-function map_interpolate(points, oc_field::OC.Field)
-    loc = map(L -> L(), OC.Fields.location(oc_field))
-    grid = oc_field.grid
-    data = oc_field.data
+function map_interpolate!(target_field::CC.Fields.Field, source_field::OC.Field)
+    points = CC.Fields.coordinate_field(axes(target_field))
+    loc = map(L -> L(), OC.Fields.location(source_field))
+    grid = source_field.grid
+    data = source_field.data
 
     # TODO: There has to be a better way
     min_lat, max_lat = extrema(OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center()))
 
-    map(points) do pt
+    # Use map! on the field directly, which handles complex data layouts correctly
+    map!(target_field, points) do pt
         FT = eltype(pt)
 
         # The oceananigans grid does not cover the entire globe, so we should not
@@ -36,8 +36,9 @@ function map_interpolate(points, oc_field::OC.Field)
         min_lat < pt.lat < max_lat || return FT(0)
 
         fᵢ = OC.Fields.interpolate(to_node(pt), data, loc, grid)
-        convert(FT, fᵢ)::FT
+        return convert(FT, fᵢ)::FT
     end
+    return nothing
 end
 
 """
@@ -54,14 +55,33 @@ function surface_flux(f::OC.AbstractField)
     end
 end
 
-function Interfacer.remap(field::OC.Field, target_space)
-    return map_interpolate(CC.Fields.coordinate_field(target_space), field)
+function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field)
+    map_interpolate!(target_field, source_field)
+    return nothing
 end
 
-function Interfacer.remap(operation::OC.AbstractOperations.AbstractOperation, target_space)
+function Interfacer.remap!(
+    target_field::CC.Fields.Field,
+    operation::OC.AbstractOperations.AbstractOperation,
+)
     evaluated_field = OC.Field(operation)
     OC.compute!(evaluated_field)
-    return Interfacer.remap(evaluated_field, target_space)
+    Interfacer.remap!(target_field, evaluated_field)
+    return nothing
+end
+
+function Interfacer.remap(target_space, field::OC.Field)
+    # Allocate target field and call remap!
+    target_field = CC.Fields.zeros(target_space)
+    Interfacer.remap!(target_field, field)
+    return target_field
+end
+
+function Interfacer.remap(target_space, operation::OC.AbstractOperations.AbstractOperation)
+    # Allocate target field and call remap!
+    target_field = CC.Fields.zeros(target_space)
+    Interfacer.remap!(target_field, operation)
+    return target_field
 end
 
 """

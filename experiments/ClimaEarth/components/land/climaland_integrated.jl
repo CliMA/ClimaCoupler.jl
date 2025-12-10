@@ -533,7 +533,7 @@ end
 function Checkpointer.restore_cache!(sim::ClimaLandSimulation, new_cache)
     old_cache = Checkpointer.get_model_cache(sim)
     comms_ctx = ClimaComms.context(sim.model.soil)
-    restore!(
+    Checkpointer.restore!(
         old_cache,
         new_cache,
         comms_ctx,

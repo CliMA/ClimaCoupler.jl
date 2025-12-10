@@ -9,10 +9,11 @@ Checkpoints are a mix of HDF5 and JLD2 files and are typically saved in a
 `checkpoints` folder in the simulation output. See
 [`Utilities.setup_output_dirs`](@ref) for more information.
 
-!!! known limitations
+!!! warning "Known limitations"
 
     - The number of MPI processes has to remain the same across checkpoints
-    - Restart files are generally not portable across machines, julia versions, and package versions
+    - Restart files are generally not portable across machines, julia versions, 
+      and package versions
     - Adding/changing new component models will probably require adding/changing code
 
 ### Saving checkpoints
@@ -31,7 +32,7 @@ assuming you have a `start_date`
 import Dates
 
 import ClimaCoupler: Checkpointer, TimeManager
-import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule 
+import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
 
 schedule = EveryCalendarDtSchedule(Dates.Hour(1); start_date)
 checkpoint_callback = TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
@@ -94,15 +95,15 @@ saved to JLD2 files.
 serialization methods for every struct. `JLD2` allows us to take a big step
 forward, but there are still several challenges that need to be solved:
 1. `JLD2` does not support CUDA natively. To go around this, we have to move
-  everything onto the CPU first. Then, when the data is read back, we have to
-  move it back to the GPU.
+   everything onto the CPU first. Then, when the data is read back, we have to
+   move it back to the GPU.
 2. `JLD2` does not support MPI natively. To go around this, each process writes
-  its `jld2` checkpoint and reads it back. This introduces the constraint that
-  the number of MPI processes cannot change across restarts.
+   its `jld2` checkpoint and reads it back. This introduces the constraint that
+   the number of MPI processes cannot change across restarts.
 3. Some quantities are best not saved and read (for example, anything with
-  pointers). For this, we write a recursive function that traverses the cache
-  and only restores quantities of a certain type (typically, `ClimaCore`
-  objects)
+   pointers). For this, we write a recursive function that traverses the cache
+   and only restores quantities of a certain type (typically, `ClimaCore`
+   objects)
 
 Point 3. adds significant amount of code and requires component models to
 specify how their cache has to be restored.
@@ -113,7 +114,7 @@ Checkpointer.get_model_prog_state
 Checkpointer.get_model_cache
 Checkpointer.restore_cache!
 ```
-methods. 
+methods.
 
 `ClimaCoupler` moves objects to the CPU with `Adapt(Array, x)`. `Adapt`
 traverses the object recursively, and proper `Adapt` methods have to be defined

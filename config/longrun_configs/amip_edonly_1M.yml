@@ -3,7 +3,7 @@ aerosol_radiation: true
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "map_temporal"
-checkpoint_dt: "1days"
+checkpoint_dt: "6days"
 coupler_toml: ["toml/amip.toml"]
 co2_model: "maunaloa"
 dt: "120secs"

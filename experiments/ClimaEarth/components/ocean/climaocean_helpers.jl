@@ -1,44 +1,3 @@
-"""
-    to_node(pt::CC.Geometry.LatLongPoint)
-
-Transform `LatLongPoint` into a tuple (long, lat, 0), where the 0 is needed because we only
-care about the surface.
-"""
-@inline to_node(pt::CC.Geometry.LatLongPoint) = pt.long, pt.lat, zero(pt.lat)
-# This next one is needed if we have "LevelGrid"
-@inline to_node(pt::CC.Geometry.LatLongZPoint) = pt.long, pt.lat, zero(pt.lat)
-
-"""
-    map_interpolate(points, oc_field::OC.Field)
-
-Interpolate the given 3D field onto the target points.
-
-If the underlying grid does not contain a given point, return 0 instead.
-
-Note: `map_interpolate` does not support interpolation from `Field`s defined on
-`OrthogononalSphericalShellGrids` such as the `TripolarGrid`.
-
-TODO: Use a non-allocating version of this function (simply replace `map` with `map!`)
-"""
-function map_interpolate(points, oc_field::OC.Field)
-    loc = map(L -> L(), OC.Fields.location(oc_field))
-    grid = oc_field.grid
-    data = oc_field.data
-
-    # TODO: There has to be a better way
-    min_lat, max_lat = extrema(OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center()))
-
-    map(points) do pt
-        FT = eltype(pt)
-
-        # The oceananigans grid does not cover the entire globe, so we should not
-        # interpolate outside of its latitude bounds. Instead we return 0
-        min_lat < pt.lat < max_lat || return FT(0)
-
-        fᵢ = OC.Fields.interpolate(to_node(pt), data, loc, grid)
-        convert(FT, fᵢ)::FT
-    end
-end
 
 """
     surface_flux(f::OC.AbstractField)
@@ -52,16 +11,6 @@ function surface_flux(f::OC.AbstractField)
     else
         return nothing
     end
-end
-
-function Interfacer.remap(field::OC.Field, target_space)
-    return map_interpolate(CC.Fields.coordinate_field(target_space), field)
-end
-
-function Interfacer.remap(operation::OC.AbstractOperations.AbstractOperation, target_space)
-    evaluated_field = OC.Field(operation)
-    OC.compute!(evaluated_field)
-    return Interfacer.remap(evaluated_field, target_space)
 end
 
 """

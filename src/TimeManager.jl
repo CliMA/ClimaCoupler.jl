@@ -69,7 +69,7 @@ end
 """
     maybe_trigger_callback(callback, cs)
 
-Check if it time to call `callback`, if yes, call its function on `cs`.
+Check if it is time to call `callback`, if yes, call its function on `cs`.
 """
 function maybe_trigger_callback(callback, cs)
     t = cs.t[]

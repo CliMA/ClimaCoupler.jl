@@ -232,18 +232,19 @@ for the following properties:
     while all other fields will likely be on the simulation's own space.
 
 !!! note "Sea ice concentration vs. area fraction"
-Sea ice models are expected to provide both `area_fraction` and `ice_concentration`.
-This may seem redundant, but there are subtle differences between the two.
-`ice_concentration` is internal to the ice model and may be determined
-via a prognostic variable, prescribed data, etc. `area_fraction` is defined
-at the coupler level and may follow some constraints that don't apply to `ice_concentration`.
-For example, we require that surface model area fractions sum to 1 at all points;
-this constraint is enforced for `area_fraction`, but not for `ice_concentration`.
-Additionally, since `area_fraction` is a coupler-defined concept, it is defined on
-the coupler boundary space, whereas `ice_concentration` exists on the model's space.
-Generally, `ice_concentration` and `area_fraction` should largely agree,
-with differences only arising from `area_fraction` corrections and
-the fields existing on different spaces.
+    Sea ice models are expected to provide both `area_fraction` and
+    `ice_concentration`. This may seem redundant, but there are subtle
+    differences between the two. `ice_concentration` is internal to the ice
+    model and may be determined via a prognostic variable, prescribed data, etc.
+    `area_fraction` is defined at the coupler level and may follow some
+    constraints that don't apply to `ice_concentration`. For example, we require
+    that surface model area fractions sum to 1 at all points; this constraint is
+    enforced for `area_fraction`, but not for `ice_concentration`. Additionally,
+    since `area_fraction` is a coupler-defined concept, it is defined on the
+    coupler boundary space, whereas `ice_concentration` exists on the model's
+    space. Generally, `ice_concentration` and `area_fraction` should largely
+    agree, with differences only arising from `area_fraction` corrections and
+    the fields existing on different spaces.
 
 - `update_field!(::SurfaceModelSimulation, ::Val{property}, field)`:
 A function to update the value of property in the component model
@@ -291,11 +292,12 @@ coupler.
 
 ### Prescribed surface conditions - SurfaceStub
 - `SurfaceStub` is a `SurfaceModelSimulation`, but it only contains required
-data in `<surface_stub>.cache`, e.g., for the calculation of surface fluxes
-through a prescribed surface state. This model is intended to be used for testing
-or as a simple stand-in model. The above adapter functions are already
-predefined for `AbstractSurfaceStub`, which is extended by `SurfaceStub`
-in the `surface_stub.jl` file, with the cache variables specified as:
+  data in `<surface_stub>.cache`, e.g., for the calculation of surface fluxes
+  through a prescribed surface state. This model is intended to be used for
+  testing or as a simple stand-in model. The above adapter functions are already
+  predefined for `AbstractSurfaceStub`, which is extended by `SurfaceStub` in
+  the `surface_stub.jl` file, with the cache variables specified as:
+
 ```
 get_field(sim::AbstractSurfaceStub, ::Val{:area_fraction}) = sim.cache.area_fraction
 get_field(sim::AbstractSurfaceStub, ::Val{:beta}) = sim.cache.beta

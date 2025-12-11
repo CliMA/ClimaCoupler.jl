@@ -367,7 +367,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     )
     moisture_fresh_water_flux = sim.remapping.scratch_arr1 ./ fresh_water_density
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
-    surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, 1)
+    surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, grid.Nz)
     OC.interior(oc_flux_S, :, :, 1) .=
         OC.interior(oc_flux_S, :, :, 1) .-
         (1.0 .- ice_concentration) .* surface_salinity .* moisture_fresh_water_flux
@@ -401,6 +401,7 @@ so a sign change is needed when we convert from precipitation to salinity flux.
 function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     (; reference_density, heat_capacity, fresh_water_density) = sim.ocean_properties
     ice_concentration = sim.ice_concentration
+    Nz = sim.ocean.model.grid.Nz
 
     # Remap radiative flux onto scratch array; rename for clarity
     CC.Remapping.interpolate!(
@@ -428,7 +429,7 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
             -(1 - α) .* remapped_SW_d .-
             ϵ * (
                 remapped_LW_d .-
-                σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T, :, :, 1)) .^ 4
+                σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T, :, :, Nz)) .^ 4
             )
         ) ./ (reference_density * heat_capacity)
 
@@ -450,7 +451,7 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     OC.interior(oc_flux_S, :, :, 1) .=
         OC.interior(oc_flux_S, :, :, 1) .-
-        OC.interior(sim.ocean.model.tracers.S, :, :, 1) .* (1.0 .- ice_concentration) .*
+        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* (1.0 .- ice_concentration) .*
         (remapped_P_liq .+ remapped_P_snow) ./ fresh_water_density
     return nothing
 end

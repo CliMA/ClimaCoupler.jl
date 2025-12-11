@@ -20,7 +20,7 @@ include(joinpath("..", "setup_run.jl"))
 @testset "surface radiative flux consistency (AMIP + bucket land)" begin
     # Build AMIP configuration used in CI by default
     config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml")
-    config_dict = get_coupler_config_dict(config_file)
+    config_dict = Input.get_coupler_config_dict(config_file)
 
     # Make sure radiation is computed during the first step
     config_dict["dt_rad"] = config_dict["dt"]

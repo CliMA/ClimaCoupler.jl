@@ -63,6 +63,7 @@ experiment_pages = [
     ),
 ]
 interface_pages = [
+    "input.md",
     "checkpointer.md",
     "conservation.md",
     "fieldexchanger.md",

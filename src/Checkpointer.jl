@@ -115,6 +115,47 @@ function checkpoint_model_cache(
     return nothing
 end
 
+"""
+    checkpoint_model_cache(
+        sim::Interfacer.AtmosModelSimulation,
+        comms_ctx::ClimaComms.AbstractCommsContext,
+        t::Int,
+        prev_checkpoint_t::Int;
+        output_dir = "output")
+
+Checkpoint the atmos cache.
+
+To optimize the space of the atmos cache, only data that need to be saved are
+saved as opposed to saving the entire atmos cache.
+"""
+function checkpoint_model_cache(
+    sim::Interfacer.AtmosModelSimulation,
+    comms_ctx::ClimaComms.AbstractCommsContext,
+    t::Int,
+    prev_checkpoint_t::Int;
+    output_dir = "output",
+)
+    cache_vec = make_atmos_cache(get_model_cache(sim))
+    day = floor(Int, t / (60 * 60 * 24))
+    sec = floor(Int, t % (60 * 60 * 24))
+    @info "Saving checkpoint $(nameof(sim)) model cache to JLD2 on day $day second $sec"
+
+    pid = ClimaComms.mypid(comms_ctx)
+    output_file = joinpath(output_dir, "checkpoint_cache_$(pid)_$(nameof(sim))_$t.jld2")
+
+    # Due to the space saved from not unnecessarily copying all of the atmos
+    # cache, it does not take too long to compress the cache
+    filters = [JLD2.Shuffle(), JLD2.ZstdFilter(1)]
+    JLD2.jldsave(output_file, filters, cache = cache_vec)
+
+    # Remove previous checkpoint if it exists
+    prev_checkpoint_file = joinpath(
+        output_dir,
+        "checkpoint_cache_$(pid)_$(nameof(sim))_$(prev_checkpoint_t).jld2",
+    )
+    remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
+    return nothing
+end
 
 """
     restore_cache!(sim::Interfacer.ComponentModelSimulation, new_cache)
@@ -466,6 +507,189 @@ function restore!(
         @warn "Time value differs in restart" field = name original = v2 new = v1
     end
     return nothing
+end
+
+# Needed, because calling adapt on a StaticArray makes it into an array
+function restore!(v1::StaticArrays.StaticArray, v2::Array, comms_ctx; name, ignore)
+    v1 == v2 || error("$name is a immutable but it inconsistent ($(v1) != $(v2))")
+    return nothing
+end
+
+# include("checkpointer_helper.jl")
+"""
+    FieldIterator{F, G}
+
+An iterator that recursively iterate through the object's field hierarchy.
+"""
+struct FieldIterator{F, G}
+    """A vector to hold the objects during depth first search of the object's
+    field hierarchy"""
+    stack::Vector
+
+    """A callable that takes in an object and return `true` if it is a leaf and
+    false otherwise."""
+    is_leaf::F
+
+    """A callable that takes in an object and return `true` to stop recursing at
+    the given object and `false` to continue recursing through through the
+    fields of the object."""
+    stop::G
+
+    """A set of field names (as `Symbols`s) to exclude from traversal."""
+    ignore::Set{Symbol}
+end
+
+"""
+    FieldIterator(
+        obj,
+        is_leaf;
+        stop = Returns(false),
+        ignore::Set{Symbol} = Set{Symbol}(),
+    )
+
+A stateful iterator for recursively traversing the fields of `obj` using reverse
+inorder traversal.
+
+# Arguments
+- `obj`: The root object to traverse.
+- `is_leaf`: Predicate function that returns `true` for leaf nodes that should
+  be yielded.
+- `stop`: Optional predicate function that returns `true` to halt traversal at
+  a object. This is not returned by the iterator.
+- `ignore`: Optional set of field names (as `Symbol`s) to skip during traversal.
+
+# Returns
+An iterator that yields only the leaf nodes as determined by `is_leaf`.
+
+# Notes
+- Objects returned by the iterator may reference the same memory.
+- The `stop` predicate allows early termination of recursion without treating
+  the object as a leaf node.
+- Fields listed in `ignore` are not traversed.
+"""
+function FieldIterator(
+    obj,
+    is_leaf;
+    stop = Returns(false),
+    ignore::Set{Symbol} = Set{Symbol}(),
+)
+    stack = []
+    push!(stack, obj)
+    return FieldIterator{typeof(is_leaf), typeof(stop)}(stack, is_leaf, stop, ignore)
+end
+
+"""
+    iterate(itr::FieldIterator)
+
+Advance the iterator to obtain the next field in the field hierarchy of the
+object. If no fields remain, `nothing` is returned. Otherwise, a 2-tuple of the
+next element and the new iteration state is returned.
+"""
+function Base.iterate(itr::FieldIterator)
+    stack = itr.stack
+    ignore = itr.ignore
+    while !isempty(stack)
+        obj = pop!(stack)
+        itr.stop(obj) && continue
+        itr.is_leaf(obj) && return (obj, nothing)
+        T = typeof(obj)
+        fields = filter(x -> !(x in ignore), fieldnames(T))
+        for p in fields
+            push!(stack, getfield(obj, p))
+        end
+    end
+    return nothing
+end
+
+# Functions needed to implement the iterator interface
+# see https://docs.julialang.org/en/v1/manual/interfaces/#man-interface-iteration
+Base.iterate(iter::FieldIterator, _) = iterate(iter)
+Base.IteratorEltype(::FieldIterator) = Base.EltypeUnknown()
+Base.IteratorSize(::FieldIterator) = Base.SizeUnknown()
+Base.isdone(itr::FieldIterator, state...) = isempty(itr.stack)
+
+function stop(
+    ::Union{
+        AbstractTimeVaryingInput,
+        ClimaComms.AbstractCommsContext,
+        ClimaComms.AbstractDevice,
+        UnionAll,
+        DataType,
+    },
+)
+    return true # Stop recursing here
+end
+
+# Catch all for everything else
+stop(obj) = false
+
+# Needed for saving data
+is_leaf(::Union{CC.DataLayouts.AbstractData, AbstractArray}) = true
+
+# Needed for error handling
+is_leaf(::Union{StaticArrays.StaticArray, Number, UnitRange, LinRange, Symbol}) = true
+
+# Needed for error handling
+is_leaf(::Dict) = true
+
+# Needed for error handling
+is_leaf(::Union{Dates.DateTime, Dates.UTInstant, Dates.Millisecond}) = true
+
+# Catch all for everything else
+is_leaf(::Any) = false
+
+"""
+    create_atmos_cache_itr(cache)
+
+Create an iterator over the atmos cache of objects that should be saved.
+"""
+function create_atmos_cache_itr(cache)
+    return FieldIterator(
+        cache,
+        is_leaf;
+        stop = stop,
+        ignore = Set([
+            :rc,
+            :params,
+            :ghost_buffer,
+            :hyperdiffusion_ghost_buffer,
+            :data_handler,
+            :graph_context,
+            :dt,
+        ]),
+    )
+end
+
+"""
+    make_atmos_cache(cache)
+
+Collect the data in the `cache` that is needed for restarting the atmos cache.
+
+Objects that share the same object ID are not copied, but a reference to the
+object is used instead.
+"""
+function make_atmos_cache(cache)
+    atmos_cache_itr = create_atmos_cache_itr(cache)
+    cache_vec = [] # Elements of the vector can be any type
+    obj_id_to_idx = Dict{UInt64, Int}()
+    for (i, obj) in enumerate(atmos_cache_itr)
+        obj_id = objectid(obj)
+        if obj_id in keys(obj_id_to_idx)
+            # Reuse the same object
+            push!(cache_vec, cache_vec[obj_id_to_idx[obj_id]])
+        else
+            # Instead of calling adapt on the entire atmos cache, we call adapt
+            # on each individual object instead instead. Due to how the adapt
+            # function is implemented for the atmos cache, moving from GPU to
+            # CPU results in unnecessary duplicate memory.
+            # If obj is on GPU, then it is moved to CPU and otherwise, it does
+            # no operation and return obj
+            data = CC.Adapt.adapt(Array, obj)
+            push!(cache_vec, data)
+            obj_id_to_idx[obj_id] = i
+        end
+    end
+    return cache_vec
 end
 
 end # module

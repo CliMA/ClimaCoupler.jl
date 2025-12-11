@@ -137,22 +137,14 @@ function Checkpointer.get_model_cache(sim::ClimaAtmosSimulation)
     return sim.integrator.p
 end
 
-function Checkpointer.restore_cache!(sim::ClimaAtmosSimulation, new_cache)
+function Checkpointer.restore_cache!(sim::ClimaAtmosSimulation, cache_vec)
     comms_ctx = ClimaComms.context(sim.integrator.u.c)
-    Checkpointer.restore!(
-        Checkpointer.get_model_cache(sim),
-        new_cache,
-        comms_ctx;
-        ignore = Set([
-            :rc,
-            :params,
-            :ghost_buffer,
-            :hyperdiffusion_ghost_buffer,
-            :data_handler,
-            :graph_context,
-            :dt,
-        ]),
-    )
+    atmos_cache_itr = Checkpointer.create_atmos_cache_itr(Checkpointer.get_model_cache(sim))
+    # This assumes that the traversals over the two atmos caches are the same
+    for (i, obj) in enumerate(atmos_cache_itr)
+        cache_obj = cache_vec[i]
+        Checkpointer.restore!(obj, cache_obj, comms_ctx; name = "", ignore = Set())
+    end
     return nothing
 end
 

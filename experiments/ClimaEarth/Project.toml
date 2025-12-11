@@ -35,7 +35,7 @@ Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
-ArgParse = "1.1"
+ArgParse = "1"
 CUDA = "5"
 ClimaAnalysis = "0.5.10"
 ClimaAtmos = "0.27, 0.28, 0.29, 0.30, 0.31"

@@ -98,7 +98,7 @@ function checkpoint_model_cache(
     output_dir = "output",
 )
     # Move p to CPU (because we cannot save CUArrays)
-    p = CC.Adapt.adapt(Array, get_model_cache(sim))
+    p = get_model_cache_to_checkpoint(sim)
     day = floor(Int, t / (60 * 60 * 24))
     sec = floor(Int, t % (60 * 60 * 24))
     @info "Saving checkpoint $(nameof(sim)) model cache to JLD2 on day $day second $sec"
@@ -115,6 +115,63 @@ function checkpoint_model_cache(
     return nothing
 end
 
+"""
+    get_model_cache_to_checkpoint(sim::Interfacer.ComponentModelSimulation)
+
+Prepare the cache for checkpointing by moving the entire cache to CPU.
+"""
+function get_model_cache_to_checkpoint(sim::Interfacer.ComponentModelSimulation)
+    return CC.Adapt.adapt(Array, get_model_cache(sim))
+end
+
+"""
+    get_model_cache_to_checkpoint(sim::Interfacer.AtmosModelSimulation)
+
+Prepare the atmos cache for checkpoint by selectively moving parts of the atmos
+cache to CPU instead of moving the entire atmos cache to CPU, resulting in a
+much smaller saved file.
+
+# Implementation Details
+
+When moving the cache from GPU to CPU, calling `adapt` on the entire cache
+creates unnecessary duplicate objects because `adapt` is not properly defined
+for the entire cache structure. This function addresses three key issues:
+
+1. **Individual adaptation**: On GPU, `adapt` is called on each object
+   separately rather than on the entire cache at once.
+
+2. **Deduplication**: Objects sharing the same object ID are not duplicated.
+   Instead, references to already-processed objects are reused.
+
+3. **Selective saving**: Only the parts of the cache needed for restoration are
+   saved.
+
+# Returns
+A vector of objects from the cache. Elements may reference the same underlying
+data if they share object IDs. The order of the objects in the vector is
+determined by `CacheIterator`.
+"""
+function get_model_cache_to_checkpoint(sim::Interfacer.AtmosModelSimulation)
+    atmos_cache_itr = CacheIterator(sim)
+    cache_vec = [] # Elements of the vector can be any type
+    # Keep track of the object ID and its index in the vector while iterating
+    # through the fields of the cache
+    obj_id_to_idx_map = Dict{UInt64, Int}()
+    for (i, obj_saved) in enumerate(atmos_cache_itr)
+        obj_id = objectid(obj_saved)
+        if obj_id in keys(obj_id_to_idx_map)
+            # Reuse the same object if we encountered the same object ID while
+            # traversing the object
+            push!(cache_vec, cache_vec[obj_id_to_idx_map[obj_id]])
+        else
+            # Call adapt on each individual object
+            data = CC.Adapt.adapt(Array, obj_saved)
+            push!(cache_vec, data)
+            obj_id_to_idx_map[obj_id] = i
+        end
+    end
+    return cache_vec
+end
 
 """
     restore_cache!(sim::Interfacer.ComponentModelSimulation, new_cache)
@@ -496,6 +553,170 @@ function restore!(
         @warn "Time value differs in restart" field = name original = v2 new = v1
     end
     return nothing
+end
+
+# Needed for CacheIterator, because calling adapt on a StaticArray makes it into
+# an array
+function restore!(v1::StaticArrays.StaticArray, v2::Array, comms_ctx; name, ignore)
+    v1 == v2 || error("$name is a immutable but it inconsistent ($(v1) != $(v2))")
+    return nothing
+end
+
+"""
+    CacheIterator{F, G}
+
+An iterator that recursively iterate through the object's field hierarchy.
+"""
+struct CacheIterator
+    """A vector to hold the objects during depth first search of the object's
+    field hierarchy"""
+    stack::Vector
+
+    """A set of field names (as `Symbols`s) to exclude from traversal."""
+    ignore::Set{Symbol}
+end
+
+"""
+    CacheIterator(cache, ignore::Set{Symbol})
+
+A stateful iterator for recursively traversing the fields of `cache` by reverse
+preorder traversal.
+
+# Arguments
+- `cache `: The cache object to traverse.
+- `ignore`: A set of field names (as `Symbol`s) to skip during traversal.
+
+# Returns
+An iterator that yields objects that should be saved.
+
+# Notes
+- Objects returned by the iterator may reference the same memory.
+- Fields listed in `ignore` are not traversed.
+"""
+function CacheIterator(cache, ignore::Set{Symbol})
+    stack = []
+    push!(stack, cache)
+    return CacheIterator(stack, ignore)
+end
+
+"""
+    iterate(itr::CacheIterator)
+
+Advance the iterator to obtain the next field in the field hierarchy of the
+object. If no fields remain, `nothing` is returned. Otherwise, a 2-tuple of the
+next element and the new iteration state is returned.
+"""
+function Base.iterate(itr::CacheIterator)
+    stack = itr.stack
+    ignore = itr.ignore
+    while !isempty(stack)
+        obj = pop!(stack)
+        stop(obj) && continue
+        is_leaf(obj) && return (obj, nothing)
+        T = typeof(obj)
+        fields = filter(x -> !(x in ignore), fieldnames(T))
+        for p in fields
+            push!(stack, getfield(obj, p))
+        end
+    end
+    return nothing
+end
+
+# Functions needed to implement the iterator interface
+# see https://docs.julialang.org/en/v1/manual/interfaces/#man-interface-iteration
+Base.iterate(iter::CacheIterator, _) = iterate(iter)
+Base.IteratorEltype(::CacheIterator) = Base.EltypeUnknown()
+Base.IteratorSize(::CacheIterator) = Base.SizeUnknown()
+Base.isdone(itr::CacheIterator, state...) = isempty(itr.stack)
+
+"""
+    stop(::Type)
+
+Returns `true` to stop recursing at the given object and `false` to continue
+recursing through the fields of the object.
+
+This function is used by `CacheIterator`. This is useful to stop recursing and
+not return the object.
+"""
+function stop(
+    ::Union{
+        AbstractTimeVaryingInput,
+        ClimaComms.AbstractCommsContext,
+        ClimaComms.AbstractDevice,
+        UnionAll,
+        DataType,
+    },
+)
+    return true # Stop recursing here
+end
+
+# Catch all for everything else
+stop(obj) = false
+
+"""
+    is_leaf(::Type)
+
+Returns `true` if the object should be saved and `false` otherwise.
+
+This function is used by `CacheIterator`.
+"""
+is_leaf(::Union{CC.DataLayouts.AbstractData, AbstractArray}) = true # Needed for saving data
+
+# Needed for error handling
+is_leaf(
+    ::Union{
+        StaticArrays.StaticArray,
+        Number,
+        UnitRange,
+        LinRange,
+        Symbol,
+        Dict,
+        Dates.DateTime,
+        Dates.UTInstant,
+        Dates.Millisecond,
+    },
+) = true
+
+# Catch all for everything else
+is_leaf(::Any) = false
+
+"""
+    CacheIterator(sim::Interfacer.ComponentModelSimulation)
+
+Create an iterator over the cache in `sim` of objects that should be
+saved.
+
+To use this constructor, the function `get_cache_ignore` must be implemented
+for `sim` which takes in `sim` and returns a set of symbols to ignore while
+iterating through the fields of the cache.
+"""
+function CacheIterator(sim::Interfacer.ComponentModelSimulation)
+    cache = get_model_cache(sim)
+    return CacheIterator(cache, get_cache_ignore(sim))
+end
+
+"""
+    get_cache_ignore(::Interfacer.AtmosModelSimulation)
+
+Return a set of symbols that should be ignored when iterating the fields of the
+atmos cache. These fields will not be saved when checkpointing.
+"""
+function get_cache_ignore(::Interfacer.AtmosModelSimulation)
+    return Set([
+        :rc,
+        :params,
+        :ghost_buffer,
+        :hyperdiffusion_ghost_buffer,
+        :data_handler,
+        :graph_context,
+        :dt,
+    ])
+end
+
+function get_cache_ignore(::Interfacer.ComponentModelSimulation)
+    return error("List of symbols to ignore when iterating the fields of the
+    cache is not supported for this model. Checkpoint by saving the entire
+    cache instead or define get_cache_ignore to use CacheIterator.")
 end
 
 end # module

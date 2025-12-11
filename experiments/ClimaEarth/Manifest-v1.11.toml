@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.5"
+julia_version = "1.11.6"
 manifest_format = "2.0"
-project_hash = "852a15681768a4d23e0721f8dff18926f2f950bd"
+project_hash = "d502ec36505df261b2f120a7277a749ea8bcd37a"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "f7304359109c768cf32dc5fa2d371565bb63b68a"
@@ -503,7 +503,7 @@ uuid = "908f55d8-4145-4867-9c14-5dad1a479e4d"
 version = "0.4.6"
 
 [[deps.ClimaCoupler]]
-deps = ["ArgParse", "ClimaAnalysis", "ClimaAtmos", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaUtilities", "Dates", "JLD2", "Logging", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics", "YAML"]
+deps = ["ArgParse", "ClimaAtmos", "ClimaComms", "ClimaCore", "ClimaUtilities", "Dates", "JLD2", "Logging", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics", "YAML"]
 path = "../.."
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.1.2"

@@ -148,8 +148,6 @@ function CoupledSimulation(config_dict::AbstractDict)
         parameter_files,
         era5_initial_condition_dir,
         ice_model,
-        land_fraction_source,
-        binary_area_fraction,
     ) = Input.get_coupler_args(config_dict)
 
     # Get default shared parameters from ClimaParams.jl, overriding with any provided parameter files

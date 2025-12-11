@@ -36,6 +36,7 @@ Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
+ArgParse = "1"
 CUDA = "5"
 ClimaCalibrate = "0.2"
 ClimaLand = "1.3"

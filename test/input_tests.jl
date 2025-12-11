@@ -16,7 +16,7 @@ import YAML
 
     parsed = Input.parse_commandline(settings)
     @test parsed["config_file"] ==
-          joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml")
+          joinpath(pkgdir(ClimaCoupler), "config", "ci_configs", "amip_default.yml")
     @test parsed["FLOAT_TYPE"] == "Float64"
     @test parsed["mode_name"] == "amip"  # default value
 
@@ -47,7 +47,8 @@ end
         @test config_dict["job_id"] == "input_test_config" # default to file name
 
         # Test that atmos config file is overwritten by coupler config file
-        @test config_dict["atmos_config_file"] == "test/config/input_test_atmos_config.yml"
+        @test config_dict["atmos_config_file"] ==
+              joinpath("test", "config", "input_test_atmos_config.yml")
         @test config_dict["h_elem"] == 6 # 6 in coupler config, 16 in atmos config
     finally
         empty!(ARGS)
@@ -89,8 +90,6 @@ end
         "coupler_toml" => [],
         "era5_initial_condition_dir" => nothing,
         "ice_model" => "prescribed",
-        "land_fraction_source" => "etopo",
-        "binary_area_fraction" => true,
         "component_dt_dict" => Dict(
             "dt_atmos" => 400.0,
             "dt_land" => 400.0,
@@ -116,7 +115,6 @@ end
     @test args.sim_mode == ClimaCoupler.Interfacer.AMIPMode
     @test args.land_model == "bucket"
     @test args.ice_model == "prescribed"
-    @test args.land_fraction_source == "etopo"
 
     # Test that component_dt_dict is preserved
     @test args.component_dt_dict isa Dict

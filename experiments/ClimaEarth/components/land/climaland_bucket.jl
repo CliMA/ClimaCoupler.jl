@@ -13,7 +13,6 @@ import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, FieldExchanger
 using NCDatasets
 include("climaland_helpers.jl")
 
-include("../shared/restore.jl")
 
 ###
 ### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
@@ -411,7 +410,7 @@ end
 function Checkpointer.restore_cache!(sim::BucketSimulation, new_cache)
     old_cache = Checkpointer.get_model_cache(sim)
     comms_ctx = ClimaComms.context(sim.model)
-    restore!(
+    Checkpointer.restore!(
         old_cache,
         new_cache,
         comms_ctx,

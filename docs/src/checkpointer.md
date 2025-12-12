@@ -12,7 +12,7 @@ Checkpoints are a mix of HDF5 and JLD2 files and are typically saved in a
 !!! warning "Known limitations"
 
     - The number of MPI processes has to remain the same across checkpoints
-    - Restart files are generally not portable across machines, julia versions, 
+    - Restart files are generally not portable across machines, julia versions,
       and package versions
     - Adding/changing new component models will probably require adding/changing code
 
@@ -56,7 +56,7 @@ If the model does not support directly reading a checkpoint, the `Checkpointer`
 module provides a straightforward way to add this feature.
 [`Checkpointer.restart!`](@ref) takes a coupled simulation, a `restart_dir`, and
 a `restart_t` and overwrites the content of the coupled simulation with what is
-in the checkpoint. 
+in the checkpoint.
 
 ## Developer notes
 
@@ -135,4 +135,5 @@ Types to watch for:
     ClimaCoupler.Checkpointer.restart!
     ClimaCoupler.Checkpointer.checkpoint_sims
     ClimaCoupler.Checkpointer.t_start_from_checkpoint
+    ClimaCoupler.Checkpointer.restore!
 ```

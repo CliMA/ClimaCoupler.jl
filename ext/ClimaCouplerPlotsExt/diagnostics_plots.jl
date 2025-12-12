@@ -1,4 +1,3 @@
-# this file follows the ClimaAtmos.Diagnostics and ci_plots interfaces
 import CairoMakie
 import CairoMakie.Makie
 import ClimaAnalysis as CAN
@@ -6,21 +5,133 @@ using Poppler_jll: pdfunite
 import Base.Filesystem
 import NCDatasets
 
+export make_diagnostics_plots, make_ocean_diagnostics_plots
+
 const LARGE_NUM = typemax(Int)
 const LAST_SNAP = LARGE_NUM
 const FIRST_SNAP = -LARGE_NUM
 const BOTTOM_LVL = -LARGE_NUM
 const TOP_LVL = LARGE_NUM
 
-function Makie.get_tickvalues(yticks::Int, ymin, ymax)
-    return range(ymin, ymax, yticks)
+"""
+    make_diagnostics_plots(
+        output_path::AbstractString,
+        plot_path::AbstractString;
+        output_prefix = "",
+    )
+Create plots for diagnostics. The plots are saved to `plot_path`.
+This function will plot all variables that have been saved in `output_path`.
+The `reduction` keyword argument should be consistent with the reduction used to save the diagnostics.
+"""
+function make_diagnostics_plots(
+    output_path::AbstractString,
+    plot_path::AbstractString;
+    output_prefix = "",
+)
+    simdir = CAN.SimDir(output_path)
+    short_names = CAN.available_vars(simdir)
+
+    # Return if there are no variables to plot
+    isempty(short_names) && return
+
+    # Create a CAN.OutputVar for each input field
+    vars = Array{CAN.OutputVar}(undef, length(short_names))
+    for (i, short_name) in enumerate(short_names)
+        # Use "average" if available, otherwise use the first reduction
+        reductions = CAN.available_reductions(simdir; short_name)
+        "average" in reductions ? (reduction = "average") : (reduction = first(reductions))
+        periods = CAN.available_periods(simdir; short_name, reduction)
+        "1d" in periods ? (period = "1d") : (period = first(periods))
+        vars[i] = get(simdir; short_name, reduction, period)
+    end
+
+    # Filter vars into 2D and 3D variable diagnostics vectors
+    # 3D fields are zonally averaged platted on the lat-z plane
+    # 2D fields are plotted on the lon-lat plane
+    vars_3D =
+        map(var_3D -> CAN.average_lon(var_3D), filter(var -> CAN.has_altitude(var), vars))
+    vars_2D = filter(var -> !CAN.has_altitude(var), vars)
+
+    # Generate plots and save in `plot_path`
+    y_linear_scale = Dict(
+        :axis => CAN.Utils.kwargs(dim_on_y = true, yticks = 10, ytickformat = "{:.3e}"),
+    )
+    !isempty(vars_3D) && make_plots_generic(
+        output_path,
+        plot_path,
+        vars_3D,
+        time = LAST_SNAP,
+        output_name = output_prefix * "summary_3D",
+        more_kwargs = y_linear_scale,
+    )
+    !isempty(vars_2D) && make_plots_generic(
+        output_path,
+        plot_path,
+        vars_2D,
+        time = LAST_SNAP,
+        output_name = output_prefix * "summary_2D",
+    )
 end
 
-YLINEARSCALE =
-    Dict(:axis => CAN.Utils.kwargs(dim_on_y = true, yticks = 10, ytickformat = "{:.3e}"))
+"""
+    make_ocean_diagnostics_plots(output_path::AbstractString, plot_path::AbstractString; output_prefix = "")
 
-long_name(var) = var.attributes["long_name"]
-short_name(var) = var.attributes["short_name"]
+Create plots for diagnostics. The plots are saved to `ocean_summary_2D.pdf` in `plot_path`.
+This function will plot the following variables, if they have been saved in `output_path`:
+    - Temperature (`T`)
+    - Salinity (`S`)
+    - Zonal velocity (`u`)
+    - Meridional velocity (`v`)
+
+For each variable, take the surface level (top level) of the variable
+and create a 2D plot. The plots will be saved in a single PDF file.
+"""
+function make_ocean_diagnostics_plots(
+    output_path::AbstractString,
+    plot_path::AbstractString;
+    output_prefix = "",
+)
+    expected_output_path = joinpath(output_path, "ocean_diagnostics.nc")
+    isfile(expected_output_path) || return nothing
+
+    # Create an OutputVar for each diagnostic, so we can use ClimaAnalysis to plot
+    var_names = ["T", "S", "u", "v"]
+    vars = Array{Union{CAN.OutputVar, Nothing}}(undef, length(var_names))
+    for (i, var_name) in enumerate(var_names)
+        # Create an OutputVar if the variable is available in the output file
+        try
+            output_var = CAN.OutputVar(expected_output_path, var_name)
+        catch e
+            if e isa NCDatasets.NetCDFError
+                @warn "NetCDF error with diagnostic $var_name; check that diagnostic is correctly saved"
+                vars[i] = nothing
+                continue
+            else
+                rethrow(e)
+            end
+        end
+        output_var.attributes["short_name"] = var_name
+
+        # Take the top level (surface) of the variable
+        output_var = CAN.slice(output_var, z_aac = output_var.dims["z_aac"][1])
+
+        vars[i] = output_var
+    end
+
+    # Filter out any variables that are not available
+    vars = filter(!isnothing, vars)
+
+    # Make plots for each variable, saved in one PDF file
+    !isempty(vars) && make_plots_generic(
+        expected_output_path, # file_path
+        plot_path,
+        vars,
+        time = LAST_SNAP,
+        output_name = output_prefix * "summary_2D",
+    )
+    return nothing
+end
+
 
 """
     make_plots_generic(
@@ -156,122 +267,6 @@ function make_plots_generic(
     return output_file
 end
 
-function map_comparison(func, simdirs, args)
-    return vcat([[func(simdir, arg) for simdir in simdirs] for arg in args]...)
-end
-
-"""
-    make_diagnostics_plots(
-        output_path::AbstractString,
-        plot_path::AbstractString;
-        output_prefix = "",
-    )
-Create plots for diagnostics. The plots are saved to `plot_path`.
-This function will plot all variables that have been saved in `output_path`.
-The `reduction` keyword argument should be consistent with the reduction used to save the diagnostics.
-"""
-function make_diagnostics_plots(
-    output_path::AbstractString,
-    plot_path::AbstractString;
-    output_prefix = "",
-)
-    simdir = CAN.SimDir(output_path)
-    short_names = CAN.available_vars(simdir)
-
-    # Return if there are no variables to plot
-    isempty(short_names) && return
-
-    # Create a CAN.OutputVar for each input field
-    vars = Array{CAN.OutputVar}(undef, length(short_names))
-    for (i, short_name) in enumerate(short_names)
-        # Use "average" if available, otherwise use the first reduction
-        reductions = CAN.available_reductions(simdir; short_name)
-        "average" in reductions ? (reduction = "average") : (reduction = first(reductions))
-        periods = CAN.available_periods(simdir; short_name, reduction)
-        "1d" in periods ? (period = "1d") : (period = first(periods))
-        vars[i] = get(simdir; short_name, reduction, period)
-    end
-
-    # Filter vars into 2D and 3D variable diagnostics vectors
-    # 3D fields are zonally averaged platted on the lat-z plane
-    # 2D fields are plotted on the lon-lat plane
-    vars_3D =
-        map(var_3D -> CAN.average_lon(var_3D), filter(var -> CAN.has_altitude(var), vars))
-    vars_2D = filter(var -> !CAN.has_altitude(var), vars)
-
-    # Generate plots and save in `plot_path`
-    !isempty(vars_3D) && make_plots_generic(
-        output_path,
-        plot_path,
-        vars_3D,
-        time = LAST_SNAP,
-        output_name = output_prefix * "summary_3D",
-        more_kwargs = YLINEARSCALE,
-    )
-    !isempty(vars_2D) && make_plots_generic(
-        output_path,
-        plot_path,
-        vars_2D,
-        time = LAST_SNAP,
-        output_name = output_prefix * "summary_2D",
-    )
-end
-
-"""
-    make_ocean_diagnostics_plots(output_path::AbstractString, plot_path::AbstractString; output_prefix = "")
-
-Create plots for diagnostics. The plots are saved to `ocean_summary_2D.pdf` in `plot_path`.
-This function will plot the following variables, if they have been saved in `output_path`:
-    - Temperature (`T`)
-    - Salinity (`S`)
-    - Zonal velocity (`u`)
-    - Meridional velocity (`v`)
-
-For each variable, take the surface level (top level) of the variable
-and create a 2D plot. The plots will be saved in a single PDF file.
-"""
-function make_ocean_diagnostics_plots(
-    output_path::AbstractString,
-    plot_path::AbstractString;
-    output_prefix = "",
-)
-    expected_output_path = joinpath(output_path, "ocean_diagnostics.nc")
-    isfile(expected_output_path) || return nothing
-
-    # Create an OutputVar for each diagnostic, so we can use ClimaAnalysis to plot
-    var_names = ["T", "S", "u", "v"]
-    vars = Array{Union{CAN.OutputVar, Nothing}}(undef, length(var_names))
-    for (i, var_name) in enumerate(var_names)
-        # Create an OutputVar if the variable is available in the output file
-        try
-            output_var = CAN.OutputVar(expected_output_path, var_name)
-        catch e
-            if e isa NCDatasets.NetCDFError
-                @warn "NetCDF error with diagnostic $var_name; check that diagnostic is correctly saved"
-                vars[i] = nothing
-                continue
-            else
-                rethrow(e)
-            end
-        end
-        output_var.attributes["short_name"] = var_name
-
-        # Take the top level (surface) of the variable
-        output_var = CAN.slice(output_var, z_aac = output_var.dims["z_aac"][1])
-
-        vars[i] = output_var
-    end
-
-    # Filter out any variables that are not available
-    vars = filter(!isnothing, vars)
-
-    # Make plots for each variable, saved in one PDF file
-    !isempty(vars) && make_plots_generic(
-        expected_output_path, # file_path
-        plot_path,
-        vars,
-        time = LAST_SNAP,
-        output_name = output_prefix * "summary_2D",
-    )
-    return nothing
+function Makie.get_tickvalues(yticks::Int, ymin, ymax)
+    return range(ymin, ymax, yticks)
 end

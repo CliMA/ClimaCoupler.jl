@@ -734,3 +734,31 @@ function climaatmos_restart_path(output_dir_root, t)
     end
     error("Restart file for time $t not found")
 end
+
+###### Additional fields for debugging
+function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:w})
+    w_c = ones(CC.Spaces.horizontal_space(sim.domain.face_space))
+    parent(w_c) .= parent(
+        CC.Fields.level(
+            CC.Geometry.WVector.(sim.integrator.u.f.u₃),
+            5 .+ CC.Utilities.half,
+        ),
+    )
+    return w_c
+end
+
+function specific_humidity(::CA.DryModel, integrator)
+    return [eltype(integrator.u)(0)]
+end
+function specific_humidity(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator)
+    return integrator.u.c.ρq_tot
+end
+
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρq_tot}) =
+    specific_humidity(sim.integrator.p.atmos.moisture_model, sim.integrator)
+
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrator.u.c.ρe_tot
+
+function plot_field_names(sim::ClimaAtmosSimulation)
+    return (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)
+end

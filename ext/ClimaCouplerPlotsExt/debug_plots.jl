@@ -8,89 +8,8 @@ import ClimaAtmos as CA
 import Oceananigans as OC
 import StaticArrays
 
-"""
-    plot_global_conservation(
-        cc::AbstractConservationCheck,
-        coupler_sim::Interfacer.CoupledSimulation,
-        softfail = false;
-        figname1 = "total.png",
-        figname2 = "total_log.png",
-    )
+export debug
 
-Creates two plots of the globally integrated quantity (energy, ``\\rho e``):
-1. global quantity of each model component as a function of time,
-relative to the initial value;
-2. fractional change in the sum of all components over time on a log scale.
-"""
-function plot_global_conservation(
-    cc::ConservationChecker.AbstractConservationCheck,
-    coupler_sim::Interfacer.CoupledSimulation,
-    softfail = false;
-    figname1 = "total.png",
-    figname2 = "total_log.png",
-)
-
-    model_sims = coupler_sim.model_sims
-    ccs = cc.sums
-
-    days = collect(1:length(ccs[1])) * float(coupler_sim.Δt_cpl) / 86400
-
-    # evolution of energy of each component relative to initial value
-    total = ccs.total  # total
-
-    var_name = nameof(cc)
-    cum_total = [0.0]
-    f = Makie.Figure()
-    ax = Makie.Axis(f[1, 1], xlabel = "time [days]", ylabel = "$var_name: (t) - (t=0)")
-    Makie.lines!(ax, days, total .- total[1], label = "total"; linewidth = 3)
-    for sim in model_sims
-        sim_name = nameof(sim)
-        global_field = getproperty(ccs, Symbol(sim_name))
-        diff_global_field = (global_field .- global_field[1])
-        Makie.lines!(ax, days, diff_global_field[1:length(days)], label = sim_name)
-        cum_total .+= abs.(global_field[end])
-    end
-    if cc isa ConservationChecker.EnergyConservationCheck
-        global_field = ccs.toa_net_source
-        diff_global_field = (global_field .- global_field[1])
-        Makie.lines!(ax, days, diff_global_field[1:length(days)], label = "toa_net")
-        cum_total .+= abs.(global_field[end])
-    end
-    Makie.axislegend(ax, position = :lb)
-    Makie.save(figname1, f)
-
-    # use the cumulative global sum at the final time step as a reference for the error calculation
-    rse = abs.((total .- total[1]) ./ cum_total)
-    l_rse = log.(rse)
-    # evolution of log error of total
-    lp = Makie.lines(days, l_rse, label = "rs error")
-    lp.axis.xlabel = "time [days]"
-    lp.axis.ylabel = "log( |x(t) - x(t=0)| / Σx(t=T) )"
-    l_rse_valid = filter(x -> !isinf(x) && !isnan(x), l_rse)
-    if !isempty(l_rse_valid)
-        y_min = minimum(l_rse_valid)
-        y_max = maximum(l_rse_valid)
-        if y_min != y_max
-            Makie.ylims!(y_min, y_max)
-        else
-            # If all values are the same, add a small padding to avoid Makie error
-            padding = max(abs(y_min) * 0.01, 0.1)
-            Makie.ylims!(y_min - padding, y_max + padding)
-        end
-    end
-    Makie.axislegend(position = :lt)
-    Makie.save(figname2, lp)
-
-    # check that the relative error is small (TODO: reduce this to sqrt(eps(FT)))
-    if !softfail
-        @info typeof(cc)
-        @info rse[end]
-        @assert rse[end] < 0.035
-    end
-end
-
-
-# plotting functions for the coupled simulation
 """
     debug(cs::Interfacer.CoupledSimulation, dir = "debug", cs_fields_ref = nothing)
 
@@ -250,66 +169,6 @@ function print_extrema(field::OC.Field)
     return " [$min, $max]"
 end
 
-# below are additional fields specific to this experiment (ourside of the required coupler fields) that we are interested in plotting for debugging purposes
-
-# additional ClimaAtmos model debug fields
-function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:w})
-    w_c = ones(CC.Spaces.horizontal_space(sim.domain.face_space))
-    parent(w_c) .= parent(
-        CC.Fields.level(
-            CC.Geometry.WVector.(sim.integrator.u.f.u₃),
-            5 .+ CC.Utilities.half,
-        ),
-    )
-    return w_c
-end
-specific_humidity(::CA.DryModel, integrator) = [eltype(integrator.u)(0)]
-specific_humidity(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
-    integrator.u.c.ρq_tot
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρq_tot}) =
-    specific_humidity(sim.integrator.p.atmos.moisture_model, sim.integrator)
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrator.u.c.ρe_tot
-
-# additional BucketSimulation debug fields
-Interfacer.get_field(sim::BucketSimulation, ::Val{:σS}) = sim.integrator.u.bucket.σS
-Interfacer.get_field(sim::BucketSimulation, ::Val{:Ws}) = sim.integrator.u.bucket.Ws
-Interfacer.get_field(sim::BucketSimulation, ::Val{:W}) = sim.integrator.u.bucket.W
-
-# additional ClimaLand model debug fields
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_water}) =
-    sim.integrator.u.soil.ϑ_l
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_ice}) = sim.integrator.u.soil.θ_i
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_energy}) =
-    sim.integrator.u.soil.ρe_int
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:canopy_temp}) =
-    sim.integrator.u.canopy.energy.T
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:canopy_water}) =
-    sim.integrator.u.canopy.hydraulics.ϑ_l.:1
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_energy}) =
-    sim.integrator.u.snow.U
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_water_equiv}) =
-    sim.integrator.u.snow.S
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_liquid_water}) =
-    sim.integrator.u.snow.S_l
-
 # currently selected plot fields
 plot_field_names(sim::Interfacer.SurfaceModelSimulation) =
     (:area_fraction, :surface_temperature)
-plot_field_names(sim::ClimaLandSimulation) = (
-    :area_fraction,
-    :surface_direct_albedo,
-    :surface_diffuse_albedo,
-    :surface_temperature,
-    :soil_water,
-    :soil_ice,
-    :soil_energy,
-    :canopy_temp,
-    :canopy_water,
-    :snow_energy,
-    :snow_water_equiv,
-    :snow_liquid_water,
-)
-plot_field_names(sim::BucketSimulation) =
-    (:area_fraction, :surface_temperature, :σS, :Ws, :W)
-plot_field_names(sim::ClimaAtmosSimulation) =
-    (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)

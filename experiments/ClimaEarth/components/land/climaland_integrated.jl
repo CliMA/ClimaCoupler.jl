@@ -717,3 +717,37 @@ function Interfacer.set_cache!(sim::ClimaLandSimulation, csf)
     Interfacer.remap!(sim.model.snow.boundary_conditions.atmos.h, csf.height_delta)
     return nothing
 end
+
+###### Additional fields for debugging
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_water}) =
+    sim.integrator.u.soil.ϑ_l
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_ice}) = sim.integrator.u.soil.θ_i
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_energy}) =
+    sim.integrator.u.soil.ρe_int
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:canopy_temp}) =
+    sim.integrator.u.canopy.energy.T
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:canopy_water}) =
+    sim.integrator.u.canopy.hydraulics.ϑ_l.:1
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_energy}) =
+    sim.integrator.u.snow.U
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_water_equiv}) =
+    sim.integrator.u.snow.S
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_liquid_water}) =
+    sim.integrator.u.snow.S_l
+
+function plot_field_names(sim::ClimaLandSimulation)
+    return (
+        :area_fraction,
+        :surface_direct_albedo,
+        :surface_diffuse_albedo,
+        :surface_temperature,
+        :soil_water,
+        :soil_ice,
+        :soil_energy,
+        :canopy_temp,
+        :canopy_water,
+        :snow_energy,
+        :snow_water_equiv,
+        :snow_liquid_water,
+    )
+end

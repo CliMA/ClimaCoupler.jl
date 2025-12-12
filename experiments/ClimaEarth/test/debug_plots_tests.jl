@@ -23,7 +23,9 @@ struct ClimaLandSimulation{C} <: Interfacer.SurfaceModelSimulation
     cache::C
 end
 
-include("../user_io/debug_plots.jl")
+# Import the extension module (Makie must be loaded first to trigger the extension)
+import Makie
+import ClimaCoupler: ClimaCouplerPlotsExt
 
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_field}) = sim.cache.surface_field
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_field}) =
@@ -96,7 +98,7 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
     )
 
     output_plots = "test_debug"
-    @test_logs (:info, "plotting debug in test_debug") match_mode = :any debug(
+    @test_logs (:info, "plotting debug in test_debug") match_mode = :any ClimaCouplerPlotsExt.debug(
         cs,
         output_plots,
     )

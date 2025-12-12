@@ -417,3 +417,12 @@ function Checkpointer.restore_cache!(sim::BucketSimulation, new_cache)
         ignore = Set([:rc, :params, :dss_buffer_2d, :dss_buffer_3d, :graph_context]),
     )
 end
+
+###### Additional fields for debugging
+Interfacer.get_field(sim::BucketSimulation, ::Val{:σS}) = sim.integrator.u.bucket.σS
+Interfacer.get_field(sim::BucketSimulation, ::Val{:Ws}) = sim.integrator.u.bucket.Ws
+Interfacer.get_field(sim::BucketSimulation, ::Val{:W}) = sim.integrator.u.bucket.W
+
+function plot_field_names(sim::BucketSimulation)
+    return (:area_fraction, :surface_temperature, :σS, :Ws, :W)
+end

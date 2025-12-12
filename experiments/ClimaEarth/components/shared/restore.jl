@@ -82,8 +82,8 @@ function restore!(
 end
 
 function restore!(
-    v1::Union{StaticArrays.StaticArray, Number, UnitRange, LinRange, Symbol},
-    v2::Union{StaticArrays.StaticArray, Number, UnitRange, LinRange, Symbol},
+    v1::Union{StaticArrays.StaticArray, Number, UnitRange, LinRange, Symbol, CartesianIndices},
+    v2::Union{StaticArrays.StaticArray, Number, UnitRange, LinRange, Symbol, CartesianIndices},
     comms_ctx;
     name,
     ignore,

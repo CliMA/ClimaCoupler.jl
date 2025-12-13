@@ -75,7 +75,7 @@ function make_land_domain(
 
     vertmesh = CC.Meshes.IntervalMesh(
         vertdomain,
-        ClimaCore.Meshes.GeneralizedExponentialStretching{FT}(dz_tuple[1], dz_tuple[2]);
+        CC.Meshes.GeneralizedExponentialStretching{FT}(dz_tuple[1], dz_tuple[2]);
         nelems = nelements_vert,
         reverse_mode = true,
     )

@@ -359,7 +359,7 @@ end
 function Checkpointer.restore_cache!(sim::PrescribedIceSimulation, new_cache)
     old_cache = Checkpointer.get_model_cache(sim)
     for p in propertynames(old_cache)
-        if getproperty(old_cache, p) isa Field
+        if getproperty(old_cache, p) isa CC.Fields.Field
             ArrayType = ClimaComms.array_type(getproperty(old_cache, p))
             parent(getproperty(old_cache, p)) .=
                 ArrayType(parent(getproperty(new_cache, p)))

@@ -3,12 +3,7 @@
 
 import ClimaComms
 import ClimaAtmos as CA
-import ClimaCore
-import ClimaCore: DataLayouts, Fields, Geometry
-import ClimaCore.Fields: Field, FieldVector, field_values
-import ClimaCore.DataLayouts: AbstractData
-import ClimaCore.Geometry: AxisTensor
-import ClimaCore.Spaces: AbstractSpace
+import ClimaCore as CC
 import NCDatasets
 
 """
@@ -55,8 +50,8 @@ function compare(
     name = "",
     ignore = Set([:rc]),
 ) where {
-    T1 <: Union{FieldVector, AbstractSpace, NamedTuple, CA.AtmosCache},
-    T2 <: Union{FieldVector, AbstractSpace, NamedTuple, CA.AtmosCache},
+    T1 <: Union{CC.Fields.FieldVector, CC.Spaces.AbstractSpace, NamedTuple, CA.AtmosCache},
+    T2 <: Union{CC.Fields.FieldVector, CC.Spaces.AbstractSpace, NamedTuple, CA.AtmosCache},
 }
     pass = true
     return _compare(pass, v1, v2; name, ignore)
@@ -100,11 +95,16 @@ function _compare(pass, v1::T, v2::T; name, ignore) where {T <: NCDatasets.NCDat
     return pass
 end
 
-function _compare(v1::T, v2::T; name, ignore) where {T <: Field{<:AbstractData{<:Real}}}
+function _compare(
+    v1::T,
+    v2::T;
+    name,
+    ignore,
+) where {T <: CC.Fields.Field{<:CC.DataLayouts.AbstractData{<:Real}}}
     return _compare(parent(v1), parent(v2); name, ignore)
 end
 
-function _compare(pass, v1::T, v2::T; name, ignore) where {T <: AbstractData}
+function _compare(pass, v1::T, v2::T; name, ignore) where {T <: CC.DataLayouts.AbstractData}
     return pass && _compare(parent(v1), parent(v2); name, ignore)
 end
 

@@ -20,7 +20,6 @@ if pkgversion(CA) < v"0.28.6"
     CC.Adapt.@adapt_structure CA.RRTMGPInterface.RRTMGPModel
 end
 
-include("../shared/restore.jl")
 
 ###
 ### Functions required by ClimaCoupler.jl for an AtmosModelSimulation
@@ -140,7 +139,7 @@ end
 
 function Checkpointer.restore_cache!(sim::ClimaAtmosSimulation, new_cache)
     comms_ctx = ClimaComms.context(sim.integrator.u.c)
-    restore!(
+    Checkpointer.restore!(
         Checkpointer.get_model_cache(sim),
         new_cache,
         comms_ctx;
@@ -409,14 +408,14 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_sfc}) =
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:u_int})
     # NOTE: This calculation is copied from ClimaAtmos (and is allocating! Fix me if you can!)
     int_local_geometry_values =
-        Fields.level(Fields.local_geometry_field(sim.integrator.u.c), 1)
+        CC.Fields.level(CC.Fields.local_geometry_field(sim.integrator.u.c), 1)
     int_u_values = CC.Spaces.level(sim.integrator.p.precomputed.ᶜu, 1)
     return CA.projected_vector_data.(CA.CT1, int_u_values, int_local_geometry_values)
 end
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:v_int})
     # NOTE: This calculation is copied from ClimaAtmos (and is allocating! Fix me if you can!)
     int_local_geometry_values =
-        Fields.level(Fields.local_geometry_field(sim.integrator.u.c), 1)
+        CC.Fields.level(CC.Fields.local_geometry_field(sim.integrator.u.c), 1)
     int_u_values = CC.Spaces.level(sim.integrator.p.precomputed.ᶜu, 1)
     return CA.projected_vector_data.(CA.CT2, int_u_values, int_local_geometry_values)
 end

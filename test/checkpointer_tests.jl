@@ -184,3 +184,47 @@ end
     @test v1.b != v2.b # Int doesn't get restored
     @test v1.c == v2.c
 end
+
+@testset "Field iterator" begin
+    struct A
+        B::Any
+        C::Any
+        D::Any
+        ignore_this::Any
+    end
+    struct StopThis
+        a::Any
+    end
+    cache = A(A([4], [3], [2], [42]), [1], StopThis([1]), [1])
+    is_leaf_node(x::AbstractArray) = true
+    is_leaf_node(x::Any) = false
+    stop_this(x::StopThis) = true
+    stop_this(x::Any) = false
+    itr = Checkpointer.FieldIterator(
+        cache,
+        is_leaf_node;
+        stop = stop_this,
+        ignore = Set([:ignore_this]),
+    )
+    @test !isempty(itr)
+    cache_vec = collect(itr)
+    @test cache_vec == [[1], [2], [3], [4]]
+    @test isempty(itr)
+end
+
+@testset "Atmos cache iterator" begin
+    struct IgnoreFields
+        rc::Any
+        params::Any
+        ghost_buffer::Any
+        hyperdiffusion_ghost_buffer::Any
+        data_handler::Any
+        graph_context::Any
+        dt::Any
+    end
+
+    ignore_cache = IgnoreFields([1], [1], [1], [1], [1], [1], [1])
+    itr = Checkpointer.create_atmos_cache_itr(ignore_cache)
+    cache_vec = collect(itr)
+    @test isempty(cache_vec)
+end

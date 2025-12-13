@@ -2,12 +2,14 @@ import ClimaDiagnostics as CD
 import ClimaCoupler: Interfacer
 import Dates
 
+export diagnostics_setup
+
 """
-    ClimaDiagnostics.orchestrate_diagnostics(cs::CoupledSimulation)
+    CD.orchestrate_diagnostics(cs::CoupledSimulation)
 
 Compute and output coupled diagnostics.
 """
-function CD.orchestrate_diagnostics(cs::CoupledSimulation)
+function CD.orchestrate_diagnostics(cs::Interfacer.CoupledSimulation)
     ## wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface
     cs_nt = (; u = cs.fields, p = nothing, t = cs.t[], step = round(cs.t[] / cs.Δt_cpl))
     !isnothing(cs.diags_handler) && CD.orchestrate_diagnostics(cs_nt, cs.diags_handler)
@@ -15,7 +17,7 @@ function CD.orchestrate_diagnostics(cs::CoupledSimulation)
 end
 
 """
-    coupler_diagnostics_setup(fields, output_dir, start_date, t_start, diagnostics_dt)
+    diagnostics_setup(fields, output_dir, start_date, t_start, diagnostics_dt)
 
 Set up the default diagnostics for an AMIP simulation, using ClimaDiagnostics.
 The diagnostics are saved to NetCDF files. Currently, this just includes a
@@ -23,7 +25,7 @@ diagnostic for turbulent energy fluxes.
 
 Return a DiagnosticsHandler object to coordinate the diagnostics.
 """
-function coupler_diagnostics_setup(
+function diagnostics_setup(
     fields,
     output_dir,
     start_date,

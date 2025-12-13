@@ -39,7 +39,8 @@ import ClimaCoupler:
     FluxCalculator,
     Interfacer,
     TimeManager,
-    Utilities
+    Utilities,
+    Postprocessor
 import ClimaCoupler.Interfacer:
     AbstractSlabplanetSimulationMode,
     AMIPMode,
@@ -59,7 +60,7 @@ import Interpolations # triggers InterpolationsExt in ClimaUtilities
 # Random is used by RRMTGP for some cloud properties
 import Random
 
-# TODO: Move to ClimaUtilities once we move the Schedules to ClimaUtilities
+import ClimaDiagnostics as CD
 import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule, EveryStepSchedule
 
 pkg_dir = pkgdir(ClimaCoupler)
@@ -91,7 +92,6 @@ We can additionally pass the configuration dictionary to the component model ini
 include("cli_options.jl")
 include("user_io/arg_parsing.jl")
 include("user_io/postprocessing.jl")
-include("user_io/coupler_diagnostics.jl")
 
 """
     CoupledSimulation(config_file)
@@ -510,7 +510,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
     if use_coupler_diagnostics
         @info "Using default coupler diagnostics"
-        diags_handler = coupler_diagnostics_setup(
+        diags_handler = Postprocessor.diagnostics_setup(
             coupler_fields,
             dir_paths.coupler_output_dir,
             start_date,

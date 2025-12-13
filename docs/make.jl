@@ -73,7 +73,7 @@ interface_pages = [
 ]
 performance_pages = ["performance.md"]
 
-output_pages = ["diagnostics.md", "leaderboard.md"]
+output_pages = ["diagnostics.md", "leaderboard.md", "postprocessor.md"]
 
 pages = Any[
     "Home" => "index.md",

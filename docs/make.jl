@@ -71,6 +71,7 @@ interface_pages = [
     "interfacer.md",
     "timemanager.md",
     "utilities.md",
+    "simoutput.md",
 ]
 performance_pages = ["performance.md"]
 

@@ -37,7 +37,7 @@ maybe_wait_filesystem(ClimaComms.context(), tmpdir)
 
 # Parse the input config file as a dictionary
 config_file = joinpath(@__DIR__, "amip_test.yml")
-config_dict = get_coupler_config_dict(config_file)
+config_dict = Input.get_coupler_config_dict(config_file)
 
 # Four steps
 two_steps = deepcopy(config_dict)

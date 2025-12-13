@@ -1,0 +1,4 @@
+atmos_config_file: "test/config/input_test_atmos_config.yml"
+dt_cpl: "120secs"
+h_elem: 6
+mode_name: "amip"

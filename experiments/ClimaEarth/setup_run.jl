@@ -37,6 +37,7 @@ import ClimaCoupler:
     Checkpointer,
     FieldExchanger,
     FluxCalculator,
+    Input,
     Interfacer,
     TimeManager,
     Utilities
@@ -88,8 +89,6 @@ dictionary and the simulation-specific configuration dictionary, which allows th
 We can additionally pass the configuration dictionary to the component model initializers, which will then override the default settings of the component models.
 =#
 
-include("cli_options.jl")
-include("user_io/arg_parsing.jl")
 include("user_io/postprocessing.jl")
 include("user_io/coupler_diagnostics.jl")
 
@@ -106,7 +105,7 @@ needed to run a coupled simulation.
 function CoupledSimulation(
     config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"),
 )
-    config_dict = get_coupler_config_dict(config_file)
+    config_dict = Input.get_coupler_config_dict(config_file)
     return CoupledSimulation(config_dict)
 end
 
@@ -146,7 +145,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         parameter_files,
         era5_initial_condition_dir,
         ice_model,
-    ) = get_coupler_args(config_dict)
+    ) = Input.get_coupler_args(config_dict)
 
     # Get default shared parameters from ClimaParams.jl, overriding with any provided parameter files
     override_file = CP.merge_toml_files(parameter_files; override = true)

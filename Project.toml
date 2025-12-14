@@ -1,7 +1,7 @@
 name = "ClimaCoupler"
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
-authors = ["CliMA Contributors <clima-software@caltech.edu>"]
 version = "0.1.2"
+authors = ["CliMA Contributors <clima-software@caltech.edu>"]
 
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
@@ -20,7 +20,7 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
 ArgParse = "1"
-ClimaAtmos = "0.27, 0.28, 0.29, 0.30, 0.31"
+ClimaAtmos = "0.27, 0.28, 0.29, 0.30, 0.31, 0.32"
 ClimaComms = "0.6.2"
 ClimaCore = "0.14.25"
 ClimaUtilities = "0.1.22"

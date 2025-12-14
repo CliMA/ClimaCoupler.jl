@@ -1,7 +1,7 @@
 # This inherits from config/common_configs/numerics_sphere_he16ze63.yml and config/longrun_configs/amip_target_diagedmf.yml in ClimaAtmos.jl
 aerosol_radiation: true
 approximate_linear_solve_iters: 2
-cloud_model: "quadrature_sgs"
+cloud_model: "quadrature"
 co2_model: maunaloa
 dt: "120secs"
 dt_cloud_fraction: "1hours"

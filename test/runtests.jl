@@ -31,3 +31,6 @@ end
 @safetestset "FluxCalculator tests" begin
     include("flux_calculator_tests.jl")
 end
+@safetestset "Input tests" begin
+    include("input_tests.jl")
+end

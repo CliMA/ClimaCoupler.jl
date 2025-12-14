@@ -43,6 +43,6 @@ toml: [toml/diagnostic_edmfx_era5_ic.toml]
 # moist: "nonequil"
 # toml: [toml/diagnostic_edmfx_1M.toml]
 
-cloud_model: "quadrature_sgs"
+cloud_model: "quadrature"
 use_itime: true
 deep_atmosphere: false

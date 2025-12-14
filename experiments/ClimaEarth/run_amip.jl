@@ -40,13 +40,13 @@ Slabplanet configuration, please see our [README.md](https://github.com/CliMA/Cl
 include("setup_run.jl")
 
 # Get the configuration file from the command line (or manually set it here)
-config_file = parse_commandline(argparse_settings())["config_file"]
+config_file = Input.parse_commandline(Input.argparse_settings())["config_file"]
 
 # Set up and run the coupled simulation
 cs = CoupledSimulation(config_file)
 run!(cs)
 
 # Postprocessing
-conservation_softfail = get_coupler_config_dict(config_file)["conservation_softfail"]
-rmse_check = get_coupler_config_dict(config_file)["rmse_check"]
+conservation_softfail = Input.get_coupler_config_dict(config_file)["conservation_softfail"]
+rmse_check = Input.get_coupler_config_dict(config_file)["rmse_check"]
 postprocess(cs; conservation_softfail, rmse_check)

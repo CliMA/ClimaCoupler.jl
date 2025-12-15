@@ -16,7 +16,7 @@ import YAML
 
     parsed = Input.parse_commandline(settings)
     @test parsed["config_file"] ==
-          joinpath(pkgdir(ClimaCoupler), "config", "ci_configs", "amip_default.yml")
+          joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml")
     @test parsed["FLOAT_TYPE"] == "Float64"
     @test parsed["mode_name"] == "amip"  # default value
 
@@ -47,8 +47,7 @@ end
         @test config_dict["job_id"] == "input_test_config" # default to file name
 
         # Test that atmos config file is overwritten by coupler config file
-        @test config_dict["atmos_config_file"] ==
-              joinpath("test", "config", "input_test_atmos_config.yml")
+        @test config_dict["atmos_config_file"] == "test/config/input_test_atmos_config.yml"
         @test config_dict["h_elem"] == 6 # 6 in coupler config, 16 in atmos config
     finally
         empty!(ARGS)

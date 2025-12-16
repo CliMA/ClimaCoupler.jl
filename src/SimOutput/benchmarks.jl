@@ -59,6 +59,15 @@ function argparse_settings_benchmarks()
     end
     return s
 end
+
+"""
+    get_benchmark_args()
+
+Parse command-line arguments for the benchmarks script.
+
+# Returns
+- A dictionary of parsed command-line arguments
+"""
 get_benchmark_args() = ArgParse.parse_args(ARGS, argparse_settings_benchmarks())
 
 """

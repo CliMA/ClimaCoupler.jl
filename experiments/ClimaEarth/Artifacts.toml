@@ -1,23 +1,6 @@
 [land_mask]
 git-tree-sha1 = "e41bc8c44124f867b64a9d70f1599515ae27f38a"
 
-[cmip_model_rmse]
-git-tree-sha1 = "53a27731c0a2ec60756af24e4c60ac37da4a32bc"
-
-    [[cmip_model_rmse.download]]
-    sha256 = "3e8fa41df226dda9d375f8cb9dbeee3e10f9fceabcad2c7b91c9633b489b0437"
-    url = "https://caltech.box.com/shared/static/lmzvnjkxctlb0fanieeqxll0vdrbei9e.gz"
-
-[precipitation_obs]
-git-tree-sha1 = "5f0075f042bc83b580d2c4f725f851d8e0b9c20a"
-
-    [[precipitation_obs.download]]
-    sha256 = "1aea361ee1c2636bd5c4cc343202dab814d246a7e0356a9caac9fd9c7cf3821c"
-    url = "https://caltech.box.com/shared/static/j63uak557kw7tlzb3dgwifoaeczekzm4.gz"
-
-[radiation_obs]
-git-tree-sha1 = "945e31f8028a581f7e8435cb691462124484567a"
-
 [historical_sst_sic]
 git-tree-sha1 = "0d30d71a6f9b6548fe7395ca647e853ec36d1699"
 
@@ -55,13 +38,3 @@ git-tree-sha1 = "cbbc6b3752d9cb9b667ec33cfbeb46819f8db418"
     [[landsea_mask_1deg.download]]
     sha256 = "3722b553c2fdf28a6574aea2e0b167d16ab050f34e5969ada45625b3a3ecb6da"
     url = "https://caltech.box.com/shared/static/b3u4dv0dsoswvqgp8y63bzj7awbhwztd.gz"
-
-[era5_monthly_averages_pressure_levels_1979_2024]
-git-tree-sha1 = "dd7ee9500805f590f8fc4c00bfc373eeb7a01587"
-
-[era5_monthly_averages_surface_single_level_1979_2024]
-git-tree-sha1 = "6cddb07eeee2dd46dc5a19e9b2f706302ddba2c9"
-
-    [[era5_monthly_averages_surface_single_level_1979_2024.download]]
-    sha256 = "46b422722d98c89c6bc0b8641bff259db1caee253f45389ddf9eb9c2d31ed605"
-    url = "https://caltech.box.com/shared/static/jbgtyt6oq9lxvk8il5zzck6k581q7f3k.gz"

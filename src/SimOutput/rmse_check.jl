@@ -1,13 +1,12 @@
 import ClimaAnalysis
 import Dates
-import Test: @test, @testset
 
-include("data_sources.jl")
+export test_rmse_thresholds, get_rmse_thresholds
 
 """
     test_rmse_thresholds(diagnostics_folder_path, spinup)
 
-Test that the annual RMSE values for specific variables have not increased
+Check that the annual RMSE values for specific variables have not increased
 beyond acceptable thresholds. The variables tested are:
 - pr (precipitation)
 - rsut (top of atmosphere outgoing shortwave radiation)
@@ -47,11 +46,9 @@ function test_rmse_thresholds(diagnostics_folder_path, spinup)
         ClimaAnalysis.global_rmse(sim_var, obs_var)
     end
 
-    @testset "RMSE thresholds" begin
-        for (short_name, rmse) in zip(short_names, rmses)
-            @info "RMSE for $short_name: $rmse"
-            @warn rmse < rmse_thresholds[short_name]
-        end
+    for (short_name, rmse) in zip(short_names, rmses)
+        @info "RMSE for $short_name: $rmse"
+        @warn rmse < rmse_thresholds[short_name]
     end
 end
 
@@ -67,13 +64,4 @@ function get_rmse_thresholds()
         "rsutcs" => 10.8,  # W/m²
     )
     return rmse_thresholds
-end
-
-if abspath(PROGRAM_FILE) == @__FILE__
-    if length(ARGS) != 1
-        error("Usage: julia test_rmses.jl <Filepath to simulation data>")
-    end
-    leaderboard_base_path = ARGS[begin]
-    spinup = 3
-    test_rmse_thresholds(leaderboard_base_path, spinup)
 end

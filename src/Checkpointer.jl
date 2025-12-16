@@ -406,6 +406,22 @@ function restore!(
 end
 
 """
+    restore!(v1::LinearIndices, v2::AbstractArray, comms_ctx; name = "", ignore = Set())
+
+Special case to compare LinearIndices to AbstractArray, which is needed for ClimaAtmos v0.32.
+"""
+function restore!(
+    v1::LinearIndices,
+    v2::AbstractArray,
+    comms_ctx;
+    name = "",
+    ignore = Set(),
+)
+    v1 == v2 || error("$name is immutable but it inconsistent ($(v1) != $(v2))")
+    return nothing
+end
+
+"""
     restore!(
         v1::Union{StaticArrays.StaticArray, Number, UnitRange, LinRange, Symbol},
         v2::Union{StaticArrays.StaticArray, Number, UnitRange, LinRange, Symbol},

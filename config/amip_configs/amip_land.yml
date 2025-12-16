@@ -19,5 +19,4 @@ topography: "Earth"
 detect_restart_files: true
 restart_dir: "/scratch/kphan2/checkpoints"
 restart_t: 604800
-restart_cache: false
-save_cache: false
+restart_cache: true

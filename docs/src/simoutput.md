@@ -14,7 +14,7 @@ variables to save, how often, and with which reductions, see the [Diagnostics](@
 ### Functions
 
 ```@docs
-SimOutput.diagnostics_setup
+ClimaCoupler.SimOutput.diagnostics_setup
 ```
 
 ## Benchmarking Analysis
@@ -26,7 +26,22 @@ PrettyTables.jl, and is sent to Slack automatically each time the "benchmarks" b
 ### Functions
 
 ```@docs
-SimOutput.get_benchmark_args
-SimOutput.get_run_info
-SimOutput.append_table_data
+ClimaCoupler.SimOutput.get_benchmark_args
+ClimaCoupler.SimOutput.get_run_info
+ClimaCoupler.SimOutput.append_table_data
+```
+
+## Simulation and Observation Data
+
+These functions provide dictionaries mapping diagnostic variable names to preprocessed simulation and observational
+data for use in leaderboard comparisons. They are used by [`compute_leaderboard`](@ref) to load
+and prepare variables for comparison against observations.
+
+For more information about adding variables to the leaderboard, see the [Leaderboard](@ref) documentation.
+
+### Functions
+
+```@docs
+ClimaCoupler.SimOutput.get_sim_var_dict
+ClimaCoupler.SimOutput.get_obs_var_dict
 ```

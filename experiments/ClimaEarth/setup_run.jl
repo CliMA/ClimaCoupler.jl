@@ -64,6 +64,9 @@ import Random
 import ClimaDiagnostics as CD
 import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule, EveryStepSchedule
 
+# Trigger ClimaCouplerMakieExt extension
+using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, NCDatasets, Poppler_jll
+
 pkg_dir = pkgdir(ClimaCoupler)
 
 #=

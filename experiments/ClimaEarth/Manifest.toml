@@ -412,9 +412,9 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaInterpolations", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "ForwardDiff", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "NullBroadcasts", "RRTMGP", "Random", "SciMLBase", "SparseMatrixColorings", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
-git-tree-sha1 = "528398fe7a4c5e067eea4f5ac3925d1c491d0ab7"
+git-tree-sha1 = "336439045af7c9e1a5f7fc925261dbf909e3ed21"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.32.0"
+version = "0.33.0"
 
 [[deps.ClimaCalibrate]]
 deps = ["Dates", "Distributed", "Distributions", "EnsembleKalmanProcesses", "JLD2", "Logging", "Random", "TOML", "YAML"]

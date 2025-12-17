@@ -3,7 +3,6 @@ aerosol_radiation: true
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "720hours"
-co2: "maunaloa"
 dt_atmos: "120secs" # 2 minutes
 dt_cloud_fraction: "1hours"
 dt_cpl: "120secs" # 2 minutes
@@ -14,7 +13,6 @@ dt_seaice: "120secs" # 2 minutes
 energy_check: false
 insolation: "timevarying"
 mode_name: "cmip"
-prescribe_ozone: true
 prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 rmse_check: true
 start_date: "20100101"

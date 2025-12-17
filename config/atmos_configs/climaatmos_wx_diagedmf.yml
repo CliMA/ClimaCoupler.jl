@@ -15,8 +15,7 @@ insolation: "timevarying"
 rad: allskywithclear
 dt_cloud_fraction: "1hours"
 dt_rad: "1hours"
-co2_model: fixed
-# prescribe_ozone: true
+# time_varying_trace_gases: ["O3"]
 # prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 turbconv: diagnostic_edmfx
 implicit_diffusion: true

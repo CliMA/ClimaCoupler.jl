@@ -6,7 +6,6 @@ mode_name: "subseasonal"
 era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions"
 initial_condition: "WeatherModel"
 checkpoint_dt: "7days"
-co2_model: "fixed"
 dt: "30secs"
 dt_cpl: "30secs"
 energy_check: false

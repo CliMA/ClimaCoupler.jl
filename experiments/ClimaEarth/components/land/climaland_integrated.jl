@@ -257,12 +257,11 @@ function ClimaLandSimulation(
         T_bounds = extrema(Y.canopy.energy.T)
         CL.Simulations.set_soil_initial_conditions!(
             Y,
-            ν,
-            θ_r,
             subsurface_space,
             ic_path,
-            model.soil,
+            model.soil;
             T_bounds,
+            enforce_constraint=true
         )
 
         # Initialize the surface temperature so the atmosphere can compute radiation.

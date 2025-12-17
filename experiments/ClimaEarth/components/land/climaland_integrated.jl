@@ -169,19 +169,15 @@ function ClimaLandSimulation(
     orog_adjusted_T_surface =
         CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
 
-    # Set initial conditions that aren't read in from file
-    Y.soilco2.CO2 .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
-    Y.soilco2.O2_f .= FT(0.21)    # atmospheric O2 volumetric fraction
-    Y.soilco2.SOC .= FT(5.0)      # default SOC concentration (kg C/m³)
-
-    Y.canopy.hydraulics.ϑ_l.:1 .= model.canopy.hydraulics.parameters.ν
-    @. Y.canopy.energy.T = orog_adjusted_T_surface
-
     # Read in initial conditions for snow and soil from file, if requested
-    (; θ_r, ν, ρc_ds) = model.soil.parameters
-
-
     if !land_spun_up_ic && !isnothing(land_ic_path)
+        # Set initial conditions that aren't read in from file
+        Y.soilco2.CO2 .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
+        Y.soilco2.O2_f .= FT(0.21)    # atmospheric O2 volumetric fraction
+        Y.soilco2.SOC .= FT(5.0)      # default SOC concentration (kg C/m³)
+        
+        Y.canopy.hydraulics.ϑ_l.:1 .= model.canopy.hydraulics.parameters.ν
+        @. Y.canopy.energy.T = orog_adjusted_T_surface
         # Subseasonal setup: land_spun_up_ic false, but a land_ic_path is provided
         ic_path = land_ic_path
         @info "ClimaLand: using land IC file" ic_path
@@ -240,33 +236,23 @@ function ClimaLandSimulation(
         )
     elseif land_spun_up_ic
         # Use artifact spun-up initial conditions
-        ic_path = CL.Artifacts.soil_ic_2008_50m_path()
+        ic_path = CL.Artifacts.saturated_land_ic_path()
         @info "ClimaLand: using land IC file" ic_path
-
-        # Set snow T to orography-adjusted surface temperature before computing internal energy
-        p.snow.T .= orog_adjusted_T_surface
-
-        CL.Simulations.set_snow_initial_conditions!(
-            Y,
-            p,
-            surface_space,
-            ic_path,
-            model.snow.parameters,
-        )
-
-        T_bounds = extrema(Y.canopy.energy.T)
-        CL.Simulations.set_soil_initial_conditions!(
-            Y,
-            subsurface_space,
-            ic_path,
-            model.soil;
-            T_bounds,
-            enforce_constraint=true
-        )
-
+        set_ic! = CL.make_set_initial_conditions_from_file(ic_path, land)
+        p.drivers.T .= orog_adjusted_T_surface
+        t0 = tspan[1]
+        set_ic!(p,Y,t0, land)
         # Initialize the surface temperature so the atmosphere can compute radiation.
         @. p.T_sfc = orog_adjusted_T_surface
     else
+        (; θ_r, ν, ρc_ds) = model.soil.parameters
+        # Set initial conditions that aren't read in from file
+        Y.soilco2.CO2 .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
+        Y.soilco2.O2_f .= FT(0.21)    # atmospheric O2 volumetric fraction
+        Y.soilco2.SOC .= FT(5.0)      # default SOC concentration (kg C/m³)
+        
+        Y.canopy.hydraulics.ϑ_l.:1 .= model.canopy.hydraulics.parameters.ν
+        @. Y.canopy.energy.T = orog_adjusted_T_surface
         # Set initial conditions for the state
         @. Y.soil.ϑ_l = θ_r + (ν - θ_r) / 2
         Y.soil.θ_i .= FT(0.0)
@@ -288,7 +274,6 @@ function ClimaLandSimulation(
         Y.snow.S .= FT(0)
         Y.snow.S_l .= FT(0)
         Y.snow.U .= FT(0)
-
         # Initialize the surface temperature so the atmosphere can compute radiation.
         @. p.T_sfc = orog_adjusted_T_surface
     end

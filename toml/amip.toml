@@ -2,10 +2,10 @@
 value = 10.0
 
 [zd_rayleigh]
-value = 40000.0
+value = 45000.0
 
 [zd_viscous]
-value = 40000.0
+value = 45000.0
 
 [precipitation_timescale]
 value = 600
@@ -33,3 +33,6 @@ value = 0
 
 [mixing_length_Prandtl_maximum]
 value = 4.2
+
+[land_bucket_capacity]
+values = 0.8

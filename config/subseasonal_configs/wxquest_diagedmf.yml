@@ -3,10 +3,11 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
 coupler_toml: ["toml/amip.toml"]
 # coupler_toml: ["toml/diagnostic_cal.toml"]
+strict_params: false
 mode_name: "subseasonal"
 # era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions"
 # era5_initial_condition_dir : "/net/sampo/data1/cchristo/WeatherQuest_data/archive"
-era5_initial_condition_dir : "/net/sampo/data1/cchristo/WeatherQuest_data/archive_dev"
+era5_initial_condition_dir : "/net/sampo/data1/cchristo/WeatherQuest_data/archive_dev4"
 
 # coupler_output_dir: ""
 
@@ -24,10 +25,10 @@ h_elem: 32
 # land_model: "integrated"
 
 ## gravity waves
-# orographic_gravity_wave: "raw_topo"
+#orographic_gravity_wave: "raw_topo"
 # orographic_gravity_wave: "gfdl_restart"
-# orographic_gravity_wave: ~
-# non_orographic_gravity_wave: true
+orographic_gravity_wave: ~
+non_orographic_gravity_wave: true
 # non_orographic_gravity_wave: false
 
 ### bucket land ###

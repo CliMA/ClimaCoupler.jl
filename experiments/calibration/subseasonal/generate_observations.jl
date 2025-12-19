@@ -114,7 +114,7 @@ Return a function to resample longitude and latitudes according to the model
 grid specified by `config_file`.
 """
 function resampled_lonlat(config_file)
-    config_dict = get_coupler_config_dict(CALIBRATE_CONFIG.config_file)
+    config_dict = ClimaCoupler.Input.get_coupler_config_dict(CALIBRATE_CONFIG.config_file)
     if !isnothing(config_dict["netcdf_interpolation_num_points"])
         (nlon, nlat, nlev) = tuple(config_dict["netcdf_interpolation_num_points"]...)
     else

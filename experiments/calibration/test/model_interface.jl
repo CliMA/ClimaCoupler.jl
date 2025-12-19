@@ -4,8 +4,8 @@ include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.j
 
 function ClimaCalibrate.forward_model(iter, member)
     config_file =
-        joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "model_config.yml")
-    config_dict = Input.get_coupler_config_dict(config_file)
+        joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "test", "model_config.yml")
+    config_dict = ClimaCoupler.Input.get_coupler_config_dict(config_file)
 
     # Run for a shorter time if SHORT_RUN is set
     if SHORT_RUN

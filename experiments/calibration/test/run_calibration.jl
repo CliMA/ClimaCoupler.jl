@@ -55,7 +55,7 @@ addprocs(CAL.SlurmManager())
     ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
 
     experiment_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration")
-    include(joinpath(experiment_dir, "model_interface.jl"))
+    include(joinpath(experiment_dir, "test", "model_interface.jl"))
     output_dir = joinpath(experiment_dir, "output")
     obs_path = joinpath(experiment_dir, "observations.jld2")
 end

@@ -1,5 +1,4 @@
 apply_limiter: false
-co2_model: "maunaloa"
 dt_atmos: "150secs"
 dt_cpl: "150secs"
 dt_land: "50secs"
@@ -15,6 +14,7 @@ precip_model: "0M"
 rad: "gray"
 rayleigh_sponge: true
 t_end: "600secs"
+time_varying_trace_gases: ["CO2"]
 vert_diff: "true"
 z_elem: 50
 z_stretch: false

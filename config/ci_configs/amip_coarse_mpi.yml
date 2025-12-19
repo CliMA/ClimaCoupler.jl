@@ -1,5 +1,4 @@
 apply_limiter: false
-co2_model: "maunaloa"
 energy_check: false
 h_elem: 4
 mode_name: "amip"
@@ -8,4 +7,5 @@ precip_model: "0M"
 rad: "allskywithclear"
 share_surface_space: false
 t_end: "1days"
+time_varying_trace_gases: ["CO2"]
 vert_diff: "true"

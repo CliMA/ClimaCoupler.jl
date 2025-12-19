@@ -39,7 +39,7 @@ Once we have created a `ScheduledDiagnostic` for each variable we're interested 
 we collect them in a vector and pass this to our `DiagnosticsHandler` object.
 
 An example of this process for the combined turbulent energy flux, `F_turb_energy`, can be found in
-`experiments/ClimaEarth/user_io/coupler_diagnostics.jl`.
+`src/SimOutput/diagnostics.jl` in the [`SimOutput.diagnostics_setup`](@ref) function.
 
 For more information about this process, please see the
 ClimaDiagnostics.jl [documentation](https://clima.github.io/ClimaDiagnostics.jl/dev/).

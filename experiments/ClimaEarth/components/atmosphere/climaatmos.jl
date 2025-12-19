@@ -137,22 +137,26 @@ function Checkpointer.get_model_cache(sim::ClimaAtmosSimulation)
     return sim.integrator.p
 end
 
-function Checkpointer.restore_cache!(sim::ClimaAtmosSimulation, new_cache)
+"""
+    Checkpointer.restore_cache!(sim::ClimaAtmosSimulation, cache_vec)
+
+Restore the cache in `sim` using `cache_vec` saved from
+`checkpoint_model_cache`.
+
+The atmosphere cache is saved as a vector of objects instead of being saved as
+the entire cache, as is done for the other models. This reduces the file size of
+the saved cache. See `checkpoint_model_cache` and
+`get_model_cache_to_checkpoint` for more information on how the atmosphere cache
+is saved.
+"""
+function Checkpointer.restore_cache!(sim::ClimaAtmosSimulation, cache_vec)
     comms_ctx = ClimaComms.context(sim.integrator.u.c)
-    Checkpointer.restore!(
-        Checkpointer.get_model_cache(sim),
-        new_cache,
-        comms_ctx;
-        ignore = Set([
-            :rc,
-            :params,
-            :ghost_buffer,
-            :hyperdiffusion_ghost_buffer,
-            :data_handler,
-            :graph_context,
-            :dt,
-        ]),
-    )
+    atmos_cache_itr = Checkpointer.CacheIterator(sim)
+    # This assumes that the traversals over the two atmos caches are the same
+    for (i, obj_restored) in enumerate(atmos_cache_itr)
+        obj_saved = cache_vec[i]
+        Checkpointer.restore!(obj_restored, obj_saved, comms_ctx; name = "", ignore = Set())
+    end
     return nothing
 end
 
@@ -268,13 +272,11 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) =
         sim.integrator.p.params.thermodynamics_params,
         CC.Fields.level(sim.integrator.p.precomputed.ᶜts, 1),
     )
-# When using the `FixedCO2` option, CO2 is stored as that struct type,
-# so we access its value (a scalar) from the struct.
-# When using the `MaunaLoa` option, CO2 is stored as a 1D Array in the tracers
-# cache, so we access it from there.
+# When CO2 is stored as a 1D Array in the tracers cache, we access
+# it from there. Otherwise, we pull a fixed value from ClimaParams.
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:co2}) =
-    sim.integrator.p.atmos.co2 isa CA.FixedCO2 ? sim.integrator.p.atmos.co2.value :
-    sim.integrator.p.tracers.co2[1]
+    :co2 in propertynames(sim.integrator.p.tracers) ? sim.integrator.p.tracers.co2[1] :
+    CAP.trace_gas_params(sim.integrator.p.params).CO2_fixed_value
 
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:diffuse_fraction})
     # Diffuse fraction doesn't matter when we don't have radiation, so return zero

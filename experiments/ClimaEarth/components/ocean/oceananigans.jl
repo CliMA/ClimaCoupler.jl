@@ -10,6 +10,30 @@ using KernelAbstractions: @kernel, @index, @inbounds
 
 include("climaocean_helpers.jl")
 
+struct OMIPEvolvedInitialConditions end
+struct EN4InitialConditions end
+
+# Set the initial conditions from omip output after 20 years evolution (1992 - 2012)
+function OC.set!(model::HydrostaticFreeSurfaceModel, ::OMIPEvolvedInitialConditions)
+    
+    # Dowload the initialization file if not preset
+    if !isfile("omip_initialization.jld2")
+        download("https://www.dropbox.com/scl/fi/114xafnmoekgc2da3cco7/omip_initialization.jld2?rlkey=e3wnjgwbr2c2zaszysjbptgnh&st=9zagmgux&dl=0", "./")
+    end
+     
+    file = jldopen("omip_initialization.jld2")
+
+    set!(model, u=file["u"],
+                v=file["v"],
+                T=file["T"],
+                S=file["S"],
+                e=file["e"],
+                η=file["η"])
+
+    return nothing
+end
+
+
 """
     OceananigansSimulation{SIM, A, OPROP, REMAP, SIC}
 
@@ -52,28 +76,27 @@ function OceananigansSimulation(
     Δt = nothing,
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(eltype(area_fraction)),
+    initial_conditions = OMIPEvolvedInitialConditions(),
 )
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
 
     # Retrieve EN4 data (monthly)
-    # (It requires username and password)
     dates = range(start_date, step = Dates.Month(1), stop = stop_date)
     en4_temperature = CO.Metadata(:temperature; dates, dataset = CO.EN4.EN4Monthly())
     en4_salinity = CO.Metadata(:salinity; dates, dataset = CO.EN4.EN4Monthly())
     download_dataset(en4_temperature)
     download_dataset(en4_salinity)
 
-    # Set up ocean grid (1 degree)
-    resolution_points = (360, 160, 32)
+    # Set up ocean grid (0.5 degrees)
+    resolution_points = (720, 360, 100)
     Nz = last(resolution_points)
-    depth = 4000 # meters
-    z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 0.85 * depth)
+    z = OC.ExponentialDiscretization(Nz, -6000, 0; scale=1800)
 
     # Regular LatLong because we know how to do interpolation there
     underlying_grid = OC.LatitudeLongitudeGrid(
         arch;
         size = resolution_points,
-        longitude = (-180, 180),
+        longitude = (0, 360),
         latitude = (-80, 80),   # NOTE: Don't goo to high up when using LatLongGrid, or the cells will be too small
         z,
         halo = (7, 7, 7),
@@ -81,8 +104,8 @@ function OceananigansSimulation(
 
     bottom_height = CO.regrid_bathymetry(
         underlying_grid;
-        minimum_depth = 30,
-        interpolation_passes = 20,
+        minimum_depth = 20,
+        interpolation_passes = 25,
         major_basins = 1,
     )
 
@@ -109,33 +132,38 @@ function OceananigansSimulation(
         forcing_S = CO.DatasetRestoring(en4_salinity, grid; mask, rate = restoring_rate)
         forcing = (T = forcing_T, S = forcing_S)
     else
-        forcing = (;)
+        forcing = NamedTuple()
     end
 
     # Create ocean simulation
-    free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 70)
+    free_surface = OC.SplitExplicitFreeSurface(grid; cfl=0.8, fixed_Δt=40minutes)
     momentum_advection = OC.WENOVectorInvariant(order = 5)
-    tracer_advection = OC.WENO(order = 5)
-    eddy_closure = OC.TurbulenceClosures.IsopycnalSkewSymmetricDiffusivity(
-        κ_skew = 1e3,
-        κ_symmetric = 1e3,
-    )
-    vertical_mixing = CO.OceanSimulations.default_ocean_closure()
-    horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν = 1e11)
+    tracer_advection = OC.WENO(order = 7)
 
-    Δt = isnothing(Δt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : Δt
+    @inline Δ²ᵃᵃᵃ(i, j, k, grid, lx, ly, lz) =  2 * (1 / (1 / Δx(i, j, k, grid, lx, ly, lz)^2 + 1 / Δy(i, j, k, grid, lx, ly, lz)^2))
+    @inline geometric_νhb(i, j, k, grid, lx, ly, lz, clock, fields, λ) = Δ²ᵃᵃᵃ(i, j, k, grid, lx, ly, lz)^2 / λ
+
+    horizontal_viscosity = HorizontalScalarBiharmonicDiffusivity(ν=geometric_νhb, discrete_form=true, parameters=25days)
+    mixing_length = OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEMixingLength(Cᵇ=0.01)
+    turbulent_kinetic_energy_equation = OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEEquation(Cᵂϵ=1.0)
+    catke_closure = OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEVerticalDiffusivity(; mixing_length, turbulent_kinetic_energy_equation)
+    
+    # 30 minute timestep
+    Δt = isnothing(Δt) ? 30*60 : Δt
+
     ocean = CO.ocean_simulation(
         grid;
         Δt,
         forcing,
         momentum_advection,
+        timestepper = :SplitRungeKutta3,
         tracer_advection,
         free_surface,
-        closure = (eddy_closure, horizontal_viscosity, vertical_mixing),
+        closure = (catke_closure, horizontal_viscosity)
     )
 
     # Set initial condition to EN4 state estimate at start_date
-    OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
+    OC.set!(ocean.model, initial_conditions)
 
     long_cc = OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center())
     lat_cc = OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center())

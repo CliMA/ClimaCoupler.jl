@@ -1,5 +1,6 @@
 FLOAT_TYPE: "Float32"
 aerosol_radiation: true
+albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 checkpoint_dt: "720hours"
 dt_atmos: "120secs" # 2 minutes
@@ -14,7 +15,9 @@ ice_model: "clima_seaice"
 insolation: "timevarying"
 land_model: "integrated"
 mode_name: "cmip"
+output_default_diagnostics: true
 prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
+radiation_reset_rng_seed: true
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"

@@ -136,7 +136,7 @@ function OceananigansSimulation(
     end
 
     # Create ocean simulation
-    free_surface = OC.SplitExplicitFreeSurface(grid; cfl=0.8, fixed_Δt=40minutes)
+    free_surface = OC.SplitExplicitFreeSurface(grid; substeps=100)
     momentum_advection = OC.WENOVectorInvariant(order = 5)
     tracer_advection = OC.WENO(order = 7)
 

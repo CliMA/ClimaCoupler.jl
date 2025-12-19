@@ -14,7 +14,7 @@ struct OMIPEvolvedInitialConditions end
 struct EN4InitialConditions end
 
 # Set the initial conditions from omip output after 20 years evolution (1992 - 2012)
-function OC.set!(model::HydrostaticFreeSurfaceModel, ::OMIPEvolvedInitialConditions)
+function OC.set!(model::OC.HydrostaticFreeSurfaceModel, ::OMIPEvolvedInitialConditions)
     
     # Dowload the initialization file if not preset
     if !isfile("omip_initialization.jld2")
@@ -162,7 +162,8 @@ function OceananigansSimulation(
         closure = (catke_closure, horizontal_viscosity)
     )
 
-    # Set initial condition to EN4 state estimate at start_date
+    # Set initial condition to EN4 state estimate at start_date 
+    # or to pre-evolved ocean state ar 1st Jan 2012
     OC.set!(ocean.model, initial_conditions)
 
     long_cc = OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center())

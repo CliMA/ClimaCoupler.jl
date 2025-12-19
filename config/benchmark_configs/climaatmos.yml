@@ -1,7 +1,6 @@
 FLOAT_TYPE: "Float32"
 aerosol_radiation: true
 approximate_linear_solve_iters: 2
-co2_model: "maunaloa"
 dt: 120secs
 dt_cloud_fraction: 1hours
 dt_rad: 1hours
@@ -13,11 +12,11 @@ insolation: "timevarying"
 moist: equil
 output_default_diagnostics: false
 precip_model: 0M
-prescribe_ozone: true
 prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 rad: allskywithclear
 surface_setup: DefaultMoninObukhov
 t_end: 12hours
+time_varying_trace_gases: ["CO2", "O3"]
 vert_diff: "DecayWithHeightDiffusion"
 z_elem: 63
 z_max: 55000.0

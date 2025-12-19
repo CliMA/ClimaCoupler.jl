@@ -1,6 +1,5 @@
 apply_limiter: false
 checkpoint_dt: "400secs"
-co2_model: "maunaloa"
 detect_restart_files: true
 energy_check: false
 h_elem: 6
@@ -9,4 +8,5 @@ moist: "equil"
 precip_model: "0M"
 rad: "allskywithclear"
 t_end: "800secs"
+time_varying_trace_gases: ["CO2"]
 vert_diff: "true"

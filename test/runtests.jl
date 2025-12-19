@@ -34,3 +34,6 @@ end
 @safetestset "Input tests" begin
     include("input_tests.jl")
 end
+@safetestset "SimOutput tests" begin
+    include("sim_output_tests.jl")
+end

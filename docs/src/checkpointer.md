@@ -108,13 +108,12 @@ forward, but there are still several challenges that need to be solved:
 Point 3. adds significant amount of code and requires component models to
 specify how their cache has to be restored.
 
-If you are adding a component model, you have to extend the
+If you are adding a component model, you have to extend the methods.
 ```
 Checkpointer.get_model_prog_state
 Checkpointer.get_model_cache
 Checkpointer.restore_cache!
 ```
-methods.
 
 `ClimaCoupler` moves objects to the CPU with `Adapt(Array, x)`. `Adapt`
 traverses the object recursively, and proper `Adapt` methods have to be defined
@@ -127,11 +126,39 @@ Types to watch for:
 - `TimeVaryingInputs` (because they contain `NCDatasets`, which contain pointers
   to files)
 
+!!! warning "Adapt and references"
+    For objects that contain multiple fields referencing the same object, using
+    the `Adapt.@adapt_structure` macro leads to unnecessary copies of the same
+    object. This happens because `Adapt.@adapt_structure` defines a recursive
+    `Adapt` that does not account for the possibility that multiple fields could
+    be referencing the same object. As a result, this means that the same object
+    is recreated over and over again when calling `Adapt` on the cache. This can
+    easily make the file size of the saved cache much bigger than it needs to
+    be. Because of this, we've implemented a `CacheIterator` object - please see
+    the section below for details.
+
+### `CacheIterator`
+
+Instead of defining a proper `Adapt` method for the cache, an alternative
+approach is to recursively iterate over the cache fields and selectively save
+only the parts that need to be saved. This recursive iteration is performed by
+the `CacheIterator`. To initialize a `CacheIterator` for a component model, you
+must implement `get_cache_ignore`.
+
+Using the `CacheIterator` allows `adapt` to be called on each individual field
+instead of on the entire cache. Furthermore, the file size can be reduced by
+avoiding duplicate saves of fields that reference the same memory. This is
+accomplished by tracking object IDs and storing references to objects instead of
+creating copies when the same object is encountered multiple times.
+
+This approach allows for a signficant reducation in the file size of the cache.
+
 ## Checkpointer API
 
 ```@docs
     ClimaCoupler.Checkpointer.get_model_prog_state
     ClimaCoupler.Checkpointer.get_model_cache
+    ClimaCoupler.Checkpointer.get_model_cache_to_checkpoint
     ClimaCoupler.Checkpointer.restart!
     ClimaCoupler.Checkpointer.checkpoint_sims
     ClimaCoupler.Checkpointer.t_start_from_checkpoint

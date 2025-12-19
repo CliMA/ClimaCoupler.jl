@@ -16,7 +16,6 @@ steps:
     command:
       - echo "--- Instantiate experiments/ClimaEarth"
       - julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate(;verbose=true)'
-      - julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.add("MPI"); Pkg.add("CUDA")'
       - julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.precompile()'
       - julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.status()'
     agents:
@@ -115,12 +114,12 @@ steps:
         key: "compare_amip_climaatmos_amip_diagedmf"
         command: |
           julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/user_io/benchmarks.jl \
-            --gpu_job_id_coupled gpu_amip_diagedmf \
-            --gpu_job_id_coupled_io gpu_amip_diagedmf_io \
-            --gpu_job_id_atmos_diagedmf gpu_climaatmos_diagedmf \
-            --gpu_job_id_atmos gpu_climaatmos \
-            --gpu_job_id_coupled_progedmf_coarse gpu_amip_progedmf_1M_land_he16 \
-            --gpu_job_id_coupled_progedmf_fine gpu_amip_progedmf_1M_land_he30 \
+            --job_id_coupled gpu_amip_diagedmf \
+            --job_id_coupled_io gpu_amip_diagedmf_io \
+            --job_id_atmos_diagedmf gpu_climaatmos_diagedmf \
+            --job_id_atmos gpu_climaatmos \
+            --job_id_coupled_progedmf_coarse gpu_amip_progedmf_1M_land_he16 \
+            --job_id_coupled_progedmf_fine gpu_amip_progedmf_1M_land_he30 \
             --build_id $BUILDKITE_BUILD_NUMBER
         artifact_paths: "experiments/ClimaEarth/output/compare_amip_climaatmos_amip_diagedmf/*"
         depends_on:

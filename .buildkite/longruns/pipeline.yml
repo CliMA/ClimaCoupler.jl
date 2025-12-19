@@ -161,24 +161,11 @@ steps:
       #     slurm_mem: 32GB
       #     slurm_gpus: 1
 
-      # - label: "GPU CMIP: ClimaAtmos + Bucket + ClimaOcean + PrescribedSeaIce"
-      #   key: "cmip_edonly_bucket"
-      #   command:
-      #       - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_bucket.yml --job_id cmip_edonly_bucket"
-      #   artifact_paths: "experiments/ClimaEarth/output/cmip_edonly_bucket/artifacts/*"
-      #   env:
-      #     CLIMACOMMS_DEVICE: "CUDA"
-      #     CLIMACOMMS_CONTEXT: "SINGLETON"
-      #   agents:
-      #     queue: clima
-      #     slurm_mem: 32GB
-      #     slurm_gpus: 1
-
-      - label: "GPU CMIP: ClimaAtmos + ClimaLand + ClimaOcean + ClimaSeaIce"
-        key: "cmip_edonly_land_climaseaice"
+      - label: "GPU CMIP: ClimaAtmos + Bucket + ClimaOcean + PrescribedSeaIce"
+        key: "cmip_edonly_bucket"
         command:
-            - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_land_climaseaice.yml --job_id cmip_edonly_land_climaseaice"
-        artifact_paths: "experiments/ClimaEarth/output/cmip_edonly_land_climaseaice/artifacts/*"
+            - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_bucket.yml --job_id cmip_edonly_bucket"
+        artifact_paths: "experiments/ClimaEarth/output/cmip_edonly_bucket/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
           CLIMACOMMS_CONTEXT: "SINGLETON"
@@ -186,6 +173,19 @@ steps:
           queue: clima
           slurm_mem: 32GB
           slurm_gpus: 1
+
+      # - label: "GPU CMIP: ClimaAtmos + ClimaLand + ClimaOcean + ClimaSeaIce"
+      #   key: "cmip_edonly_land_climaseaice"
+      #   command:
+      #       - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_land_climaseaice.yml --job_id cmip_edonly_land_climaseaice"
+      #   artifact_paths: "experiments/ClimaEarth/output/cmip_edonly_land_climaseaice/artifacts/*"
+      #   env:
+      #     CLIMACOMMS_DEVICE: "CUDA"
+      #     CLIMACOMMS_CONTEXT: "SINGLETON"
+      #   agents:
+      #     queue: clima
+      #     slurm_mem: 32GB
+      #     slurm_gpus: 1
 
       - label: "GPU CMIP: ClimaAtmos + Bucket + ClimaOcean + ClimaSeaIce"
         key: "cmip_edonly_bucket_climaseaice"

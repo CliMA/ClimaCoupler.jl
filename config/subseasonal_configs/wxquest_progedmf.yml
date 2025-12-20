@@ -10,6 +10,8 @@ dt: "10secs"
 dt_cpl: "10secs"
 energy_check: false
 h_elem: 32
+land_fraction_source: "era5"
+binary_area_fraction: false
 
 ### integrated land ###
 # land_model: "integrated"

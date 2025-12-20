@@ -12,7 +12,7 @@ hyperdiff: ClimaHyperdiffusion
 # scalar_hyperdiffusion_coefficient: 0.5
 # vorticity_hyperdiffusion_coefficient: 0.1
 
-divergence_damping_factor: 25.0 # large value to damp IC waves
+divergence_damping_factor: 20.0 # large value to damp IC waves
 scalar_hyperdiffusion_coefficient: 0.929738
 vorticity_hyperdiffusion_coefficient: 0.1857
 

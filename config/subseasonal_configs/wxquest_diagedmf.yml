@@ -27,8 +27,8 @@ h_elem: 32
 ## gravity waves
 #orographic_gravity_wave: "raw_topo"
 # orographic_gravity_wave: "gfdl_restart"
-orographic_gravity_wave: ~
-non_orographic_gravity_wave: true
+# orographic_gravity_wave: ~
+# non_orographic_gravity_wave: true
 # non_orographic_gravity_wave: false
 
 ### bucket land ###

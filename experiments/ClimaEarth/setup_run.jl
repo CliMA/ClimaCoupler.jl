@@ -265,11 +265,15 @@ function CoupledSimulation(config_dict::AbstractDict)
     (masks are used internally by the coupler to indicate passive cells that are not populated by a given component model).
     =#
 
-    # Preprocess the file to be 1s and 0s before remapping into onto the grid
+    # Read and remap the land-sea field onto the coupler boundary grid.
     land_mask_data =
         joinpath(@clima_artifact("landsea_mask_60arcseconds", comms_ctx), "landsea_mask.nc")
     land_fraction = SpaceVaryingInput(land_mask_data, "landsea", boundary_space)
-    land_fraction = ifelse.(land_fraction .> eps(FT), FT(1), FT(0))
+    # avoid NaNs/Inf
+    land_fraction = ifelse.(isfinite.(land_fraction), land_fraction, FT(0))
+    # Handle regridding noise
+    land_fraction = ifelse.(land_fraction .> eps(FT), land_fraction, FT(0))
+    land_fraction = max.(min.(land_fraction, FT(1)), FT(0))
 
     #=
     ### Surface Models: AMIP and SlabPlanet Modes

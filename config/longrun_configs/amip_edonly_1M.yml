@@ -14,7 +14,7 @@ insolation: "timevarying"
 #max_newton_iters_ode: 3
 mode_name: "amip"
 moist: "nonequil"
-moisture_fixer: true
+#moisture_fixer: true
 precip_model: "1M"
 #prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 #restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-coarse-nightly-amip/678/climacoupler-coarse-nightly-amip/experiments/ClimaEarth/output/amip_edonly_1M_gpu/checkpoints/"

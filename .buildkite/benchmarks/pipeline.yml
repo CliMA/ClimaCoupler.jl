@@ -16,6 +16,7 @@ steps:
     command:
       - echo "--- Instantiate experiments/ClimaEarth"
       - julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate(;verbose=true)'
+      - julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.add("MPI");'
       - julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.precompile()'
       - julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.status()'
     agents:

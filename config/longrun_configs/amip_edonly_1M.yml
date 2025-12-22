@@ -3,7 +3,7 @@ FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "map_temporal"
-checkpoint_dt: "1months"
+checkpoint_dt: "1days"
 coupler_toml: ["toml/amip.toml"]
 dt: "120secs"
 dt_cloud_fraction: "1hours"
@@ -17,8 +17,8 @@ moist: "nonequil"
 #moisture_fixer: true
 precip_model: "1M"
 #prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
-#restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-coarse-nightly-amip/678/climacoupler-coarse-nightly-amip/experiments/ClimaEarth/output/amip_edonly_1M_gpu/checkpoints/"
-#restart_t: 1468800
+restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-coarse-nightly-amip/696/climacoupler-coarse-nightly-amip/experiments/ClimaEarth/output/amip_edonly_1M_gpu/checkpoints/"
+restart_t: 5097600
 radiation_reset_rng_seed: true
 rmse_check: true
 start_date: "20100101"
@@ -27,6 +27,6 @@ t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
 check_nan_every: 30
-# extra_atmos_diagnostics:
-#   - short_name: [ts, ta, pfull, rhoa, ua, va, wa, hfss, hfls, hur, hus, cl, clw, cli, husra, hussn, pr, tke]
-#     period: 1days
+extra_atmos_diagnostics:
+  - short_name: [ts, ta, pfull, rhoa, ua, va, wa, hfss, hfls, hur, hus, cl, clw, cli, husra, hussn, pr, tke]
+    period: 120secs

@@ -14,6 +14,8 @@ netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
+non_orographic_gravity_wave: true
+orographic_gravity_wave: "raw_topo"
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "465days"

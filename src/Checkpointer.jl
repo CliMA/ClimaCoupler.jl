@@ -146,6 +146,11 @@ for the entire cache structure. This function addresses three key issues:
 3. **Selective saving**: Only the parts of the cache needed for restoration are
    saved.
 
+4. **Recreated views**: Views are preserved by recreating the views with the
+   parent arrays on CPU. Otherwise, the arrays are unnecessarily duplicated when
+   `adapt` is called since checks using `objectid` fail for views, resulting in
+   a larger saved cache on GPU.
+
 # Returns
 A vector of objects from the cache. Elements may reference the same underlying
 data if they share object IDs. The order of the objects in the vector is
@@ -165,11 +170,33 @@ function get_model_cache_to_checkpoint(sim::Interfacer.AtmosModelSimulation)
             push!(cache_vec, cache_vec[obj_id_to_idx_map[obj_id]])
         else
             # Call adapt on each individual object
-            data = CC.Adapt.adapt(Array, obj_saved)
-            push!(cache_vec, data)
+            push!(cache_vec, CC.Adapt.adapt(Array, obj_saved))
             obj_id_to_idx_map[obj_id] = i
         end
     end
+
+    # Recreate views if needed
+    atmos_cache_itr = CacheIterator(sim)
+    for (i, (obj_cache, obj_saved)) in enumerate(zip(cache_vec, atmos_cache_itr))
+        obj_cache isa SubArray || continue
+        # When the SubArray is adapted to CPU, its parent array is lost. Here we
+        # look up the parent array's object ID in the cache, find the
+        # corresponding parent array that is on CPU, and reconstruct the view
+        # with the parent array.
+        parent_obj_saved = parent(obj_saved)
+        parent_obj_saved_obj_id = objectid(parent_obj_saved)
+        if parent_obj_saved_obj_id in keys(obj_id_to_idx_map)
+            parent_obj_cache = cache_vec[obj_id_to_idx_map[parent_obj_saved_obj_id]]
+            recreated_obj_saved = view(parent_obj_cache, parentindices(obj_cache)...)
+            if !isequal(obj_cache, recreated_obj_saved)
+                @warn("Object at index $i in the cache vector is not identical to the view")
+                continue
+            else
+                cache_vec[i] = recreated_obj_saved
+            end
+        end
+    end
+
     return cache_vec
 end
 

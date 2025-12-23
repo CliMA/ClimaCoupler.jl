@@ -11,25 +11,23 @@ using KernelAbstractions: @kernel, @index, @inbounds
 include("climaocean_helpers.jl")
 
 """
-    OceananigansSimulation{SIM, A, OPROP, REMAP, SIC}
+    OceananigansSimulation{SIM, A, OPROP, REMAP}
 
 The ClimaCoupler simulation object used to run with Oceananigans.
 This type is used by the coupler to indicate that this simulation
-is a surface/ocean simulation for dispatch.
+is an surface/ocean simulation for dispatch.
 
 It contains the following objects:
 - `ocean::SIM`: The Oceananigans simulation object.
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
 - `ocean_properties::OPROP`: A NamedTuple of ocean properties and parameters
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
-- `ice_concentration::SIC`: An Oceananigans Field representing the sea ice concentration on the ocean/sea ice grid.
 """
-struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC} <: Interfacer.OceanModelSimulation
+struct OceananigansSimulation{SIM, A, OPROP, REMAP} <: Interfacer.OceanModelSimulation
     ocean::SIM
     area_fraction::A
     ocean_properties::OPROP
     remapping::REMAP
-    ice_concentration::SIC
 end
 
 """
@@ -48,8 +46,6 @@ function OceananigansSimulation(
     start_date,
     stop_date;
     output_dir,
-    ice_model,
-    Δt = nothing,
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(eltype(area_fraction)),
 )
@@ -82,7 +78,7 @@ function OceananigansSimulation(
     bottom_height = CO.regrid_bathymetry(
         underlying_grid;
         minimum_depth = 30,
-        interpolation_passes = 20,
+        interpolation_passes = 1,
         major_basins = 1,
     )
 
@@ -92,8 +88,7 @@ function OceananigansSimulation(
         active_cells_map = true,
     )
 
-    # Restore the ocean to the EN4 state periodically if running for more than one month and not using ClimaSeaIce
-    use_restoring = start_date + Dates.Month(1) < stop_date && ice_model != "clima_seaice"
+    use_restoring = start_date + Dates.Month(1) < stop_date
 
     if use_restoring
         # When we use EN4 data, the forcing takes care of everything, including
@@ -123,10 +118,8 @@ function OceananigansSimulation(
     vertical_mixing = CO.OceanSimulations.default_ocean_closure()
     horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν = 1e11)
 
-    Δt = isnothing(Δt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : Δt
     ocean = CO.ocean_simulation(
         grid;
-        Δt,
         forcing,
         momentum_advection,
         tracer_advection,
@@ -160,16 +153,14 @@ function OceananigansSimulation(
     interpolated_values_dim..., _buffer_length = size(remapper_cc._interpolated_values)
     scratch_arr1 = ArrayType(zeros(FT, interpolated_values_dim...))
     scratch_arr2 = ArrayType(zeros(FT, interpolated_values_dim...))
-    scratch_arr3 = ArrayType(zeros(FT, interpolated_values_dim...))
 
-    remapping =
-        (; remapper_cc, scratch_cc1, scratch_cc2, scratch_arr1, scratch_arr2, scratch_arr3)
+    remapping = (; remapper_cc, scratch_cc1, scratch_cc2, scratch_arr1, scratch_arr2)
 
     # Get some ocean properties and parameters
     ocean_properties = (;
-        reference_density = 1020,
-        heat_capacity = 3991,
-        fresh_water_density = 999.8,
+        ocean_reference_density = 1020,
+        ocean_heat_capacity = 3991,
+        ocean_fresh_water_density = 999.8,
         σ = coupled_param_dict["stefan_boltzmann_constant"],
         C_to_K = coupled_param_dict["temperature_water_freeze"],
     )
@@ -190,20 +181,11 @@ function OceananigansSimulation(
         ocean.output_writers[:diagnostics] = netcdf_writer
     end
 
-    # Initialize with 0 ice concentration; this will be updated in `resolve_area_fractions!`
-    # if the ocean is coupled to a non-prescribed sea ice model.
-    ice_concentration = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-
     # Create a dummy area fraction that will get overwritten in `update_surface_fractions!`
     area_fraction = ones(boundary_space)
 
-    return OceananigansSimulation(
-        ocean,
-        area_fraction,
-        ocean_properties,
-        remapping,
-        ice_concentration,
-    )
+    sim = OceananigansSimulation(ocean, area_fraction, ocean_properties, remapping)
+    return sim
 end
 
 """
@@ -214,12 +196,6 @@ This matters in the case of a LatitudeLongitudeGrid, which is only
 defined between -80 and 80 degrees latitude. In this case, we want to
 set the ice fraction to `1 - land_fraction` on [-90, -80] and [80, 90]
 degrees latitude, and make sure the ocean fraction is 0 there.
-
-The land fraction is expected to be set to 1 at the poles before calling this function,
-and doesn't need to be set again since its fraction is static.
-
-This function also updates the ice concentration field in the ocean simulation
-so that it can be used for weighting flux updates.
 """
 function FieldExchanger.resolve_area_fractions!(
     ocean_sim::OceananigansSimulation,
@@ -237,17 +213,11 @@ function FieldExchanger.resolve_area_fractions!(
         polar_mask = CC.Fields.zeros(boundary_space)
         polar_mask .= abs.(lat) .>= FT(80)
 
-        # Set land fraction to 1 and ice/ocean fraction to 0 where polar_mask is 1
+        # Set land fraction to 1, and ice and ocean fractions to 0 where polar_mask is 1
         @. land_fraction = ifelse.(polar_mask == FT(1), FT(1), land_fraction)
         @. ice_fraction = ifelse.(polar_mask == FT(1), FT(0), ice_fraction)
         @. ocean_fraction = ifelse.(polar_mask == FT(1), FT(0), ocean_fraction)
     end
-
-    # Update the ice concentration field in the ocean simulation
-    ice_sim isa ClimaSeaIceSimulation && (
-        ocean_sim.ice_concentration .=
-            Interfacer.get_field(ice_sim, Val(:ice_concentration))
-    )
     return nothing
 end
 
@@ -262,6 +232,7 @@ Interfacer.step!(sim::OceananigansSimulation, t) =
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction
 
 # TODO: Better values for this
+
 # At the moment, we return always Float32. This is because we always want to run
 # Oceananingans with Float64, so we have no way to know the float type here. Sticking with
 # Float32 ensures that nothing is accidentally promoted to Float64. We will need to change
@@ -284,14 +255,8 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
 """
     FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fields)
 
-Update the turbulent fluxes in the simulation using the values computed at this time step.
+Update the turbulent fluxes in the simulation using the values stored in the coupler fields.
 These include latent heat flux, sensible heat flux, momentum fluxes, and moisture flux.
-
-Rather than setting the surface fluxes and overwriting previous values, this function adds only
-the contributions from the turbulent fluxes. `update_sim!` sets the surface fluxes due to
-radiation and precipitation. Additional contributions may be made in `ocean_seaice_fluxes!`.
-An exception is the momentum fluxes, which are set directly here since they are not updated
-in `update_sim!`.
 
 A note on sign conventions:
 SurfaceFluxes and Oceananigans both use the convention that a positive flux is an upward flux.
@@ -303,7 +268,6 @@ so a sign change is needed when we convert from moisture to salinity flux.
 function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fields)
     (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
     grid = sim.ocean.model.grid
-    ice_concentration = sim.ice_concentration
 
     # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
     CC.Remapping.interpolate!(
@@ -323,12 +287,6 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     F_turb_ρτxz_cc = sim.remapping.scratch_cc1
     F_turb_ρτyz_cc = sim.remapping.scratch_cc2
 
-    # Weight by (1 - sea ice concentration)
-    OC.interior(F_turb_ρτxz_cc, :, :, 1) .=
-        OC.interior(F_turb_ρτxz_cc, :, :, 1) .* (1.0 .- ice_concentration)
-    OC.interior(F_turb_ρτyz_cc, :, :, 1) .=
-        OC.interior(F_turb_ρτyz_cc, :, :, 1) .* (1.0 .- ice_concentration)
-
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
     oc_flux_u = surface_flux(sim.ocean.model.velocities.u)
     oc_flux_v = surface_flux(sim.ocean.model.velocities.v)
@@ -339,7 +297,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
         F_turb_ρτyz_cc,
     )
 
-    (; reference_density, heat_capacity, fresh_water_density) = sim.ocean_properties
+    (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) =
+        sim.ocean_properties
 
     # Remap the latent and sensible heat fluxes using scratch arrays
     CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, F_lh) # latent heat flux
@@ -355,8 +314,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
     OC.interior(oc_flux_T, :, :, 1) .=
         OC.interior(oc_flux_T, :, :, 1) .+
-        (1.0 .- ice_concentration) .* (remapped_F_lh .+ remapped_F_sh) ./
-        (reference_density * heat_capacity)
+        (remapped_F_lh .+ remapped_F_sh) ./ (ocean_reference_density * ocean_heat_capacity)
 
     # Add the part of the salinity flux that comes from the moisture flux, we also need to
     # add the component due to precipitation (that was done with the radiative fluxes)
@@ -365,12 +323,11 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
         sim.remapping.remapper_cc,
         F_turb_moisture,
     )
-    moisture_fresh_water_flux = sim.remapping.scratch_arr1 ./ fresh_water_density
+    moisture_fresh_water_flux = sim.remapping.scratch_arr1 ./ ocean_fresh_water_density
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, grid.Nz)
     OC.interior(oc_flux_S, :, :, 1) .=
-        OC.interior(oc_flux_S, :, :, 1) .-
-        (1.0 .- ice_concentration) .* surface_salinity .* moisture_fresh_water_flux
+        OC.interior(oc_flux_S, :, :, 1) .- surface_salinity .* moisture_fresh_water_flux
     return nothing
 end
 
@@ -388,9 +345,6 @@ by the coupler.
 Update the portion of the surface_fluxes for T and S that is due to radiation and
 precipitation. The rest will be updated in `update_turbulent_fluxes!`.
 
-This function sets the surface fluxes directly, overwriting any previous values.
-Additional contributions will be made in `update_turbulent_fluxes!` and `ocean_seaice_fluxes!`.
-
 A note on sign conventions:
 ClimaAtmos and Oceananigans both use the convention that a positive flux is an upward flux.
 No sign change is needed during the exchange, except for precipitation/salinity fluxes.
@@ -399,8 +353,8 @@ Oceananigans represents precipitation as a positive salinity flux,
 so a sign change is needed when we convert from precipitation to salinity flux.
 """
 function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
-    (; reference_density, heat_capacity, fresh_water_density) = sim.ocean_properties
-    ice_concentration = sim.ice_concentration
+    (; ocean_reference_density, ocean_heat_capacity, ocean_fresh_water_density) = sim.ocean_properties
+    # ice_concentration = sim.ice_concentration
     Nz = sim.ocean.model.grid.Nz
 
     # Remap radiative flux onto scratch array; rename for clarity
@@ -425,13 +379,13 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     α = Interfacer.get_field(sim, Val(:surface_direct_albedo)) # scalar
     ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
     OC.interior(oc_flux_T, :, :, 1) .=
-        (1.0 .- ice_concentration) .* (
+        (
             -(1 - α) .* remapped_SW_d .-
             ϵ * (
                 remapped_LW_d .-
                 σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T, :, :, Nz)) .^ 4
             )
-        ) ./ (reference_density * heat_capacity)
+        ) ./ (ocean_reference_density * ocean_heat_capacity)
 
     # Remap precipitation fields onto scratch arrays; rename for clarity
     CC.Remapping.interpolate!(
@@ -451,8 +405,8 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     OC.interior(oc_flux_S, :, :, 1) .=
         OC.interior(oc_flux_S, :, :, 1) .-
-        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* (1.0 .- ice_concentration) .*
-        (remapped_P_liq .+ remapped_P_snow) ./ fresh_water_density
+        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .*
+        (remapped_P_liq .+ remapped_P_snow) ./ ocean_fresh_water_density
     return nothing
 end
 

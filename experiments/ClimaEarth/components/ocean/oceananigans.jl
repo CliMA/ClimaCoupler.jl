@@ -26,12 +26,12 @@ function OC.set!(model::OC.HydrostaticFreeSurfaceModel, ::OMIPEvolvedInitialCond
      
     file = jldopen("omip_initialization.jld2")
 
-    set!(model, u=file["u"],
-                v=file["v"],
-                T=file["T"],
-                S=file["S"],
-                e=file["e"],
-                η=file["η"])
+    OC.set!(model, u=file["u"],
+                   v=file["v"],
+                   T=file["T"],
+                   S=file["S"],
+                   e=file["e"],
+                   η=file["η"])
 
     return nothing
 end

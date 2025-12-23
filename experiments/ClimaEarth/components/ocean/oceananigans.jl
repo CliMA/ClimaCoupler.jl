@@ -144,7 +144,7 @@ function OceananigansSimulation(
     @inline geometric_νhb(i, j, k, grid, lx, ly, lz, clock, fields, λ) = Δ²ᵃᵃᵃ(i, j, k, grid, lx, ly, lz)^2 / λ
 
     timescale = 25 * 3600 * 24 # 25 days
-    horizontal_viscosity = HorizontalScalarBiharmonicDiffusivity(ν=geometric_νhb, discrete_form=true, parameters=timescale)
+    horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν=geometric_νhb, discrete_form=true, parameters=timescale)
     mixing_length = OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEMixingLength(Cᵇ=0.01)
     turbulent_kinetic_energy_equation = OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEEquation(Cᵂϵ=1.0)
     catke_closure = OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEVerticalDiffusivity(; mixing_length, turbulent_kinetic_energy_equation)

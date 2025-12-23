@@ -7,7 +7,7 @@ import Thermodynamics as TD
 import ClimaParams as CP
 import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
-using JLD2
+rusing JLD2
 
 include("climaocean_helpers.jl")
 
@@ -143,7 +143,8 @@ function OceananigansSimulation(
     momentum_advection = OC.WENOVectorInvariant(order = 5)
     tracer_advection = OC.WENO(order = 7)
 
-    @inline Δ²ᵃᵃᵃ(i, j, k, grid, lx, ly, lz) =  2 * (1 / (1 / Δx(i, j, k, grid, lx, ly, lz)^2 + 1 / Δy(i, j, k, grid, lx, ly, lz)^2))
+    @inline Δ²ᵃᵃᵃ(i, j, k, grid, lx, ly, lz) =  2 * (1 / (1 / OC.Operators.Δx(i, j, k, grid, lx, ly, lz)^2 + 
+                                                          1 / OC.Operators.Δy(i, j, k, grid, lx, ly, lz)^2))
     @inline geometric_νhb(i, j, k, grid, lx, ly, lz, clock, fields, λ) = Δ²ᵃᵃᵃ(i, j, k, grid, lx, ly, lz)^2 / λ
 
     timescale = 25 * 3600 * 24 # 25 days

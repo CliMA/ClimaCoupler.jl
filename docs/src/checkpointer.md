@@ -156,11 +156,11 @@ This approach allows for a signficant reducation in the file size of the cache.
 ## Checkpointer API
 
 ```@docs
-    ClimaCoupler.Checkpointer.get_model_prog_state
-    ClimaCoupler.Checkpointer.get_model_cache
-    ClimaCoupler.Checkpointer.get_model_cache_to_checkpoint
-    ClimaCoupler.Checkpointer.restart!
-    ClimaCoupler.Checkpointer.checkpoint_sims
-    ClimaCoupler.Checkpointer.t_start_from_checkpoint
-    ClimaCoupler.Checkpointer.restore!
+    Checkpointer.get_model_prog_state
+    Checkpointer.get_model_cache
+    Checkpointer.get_model_cache_to_checkpoint
+    Checkpointer.restart!
+    Checkpointer.checkpoint_sims
+    Checkpointer.t_start_from_checkpoint
+    Checkpointer.restore!
 ```

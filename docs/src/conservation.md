@@ -11,12 +11,7 @@ which assumes that kinetic energy is negligible in comparison with the moist sta
 ## ConservationChecker API
 
 ```@docs
-ClimaCoupler.ConservationChecker.EnergyConservationCheck
-ClimaCoupler.ConservationChecker.WaterConservationCheck
-ClimaCoupler.ConservationChecker.check_conservation!
-```
-
-## ConservationChecker Internal Functions
-```@docs
-ClimaCoupler.ConservationChecker.surface_water_gain_from_rates
+ConservationChecker.EnergyConservationCheck
+ConservationChecker.WaterConservationCheck
+ConservationChecker.check_conservation!
 ```

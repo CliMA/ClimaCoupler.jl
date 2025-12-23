@@ -325,30 +325,30 @@ end
 
 ## Interfacer API
 ```@docs
-    ClimaCoupler.Interfacer.CoupledSimulation
-    ClimaCoupler.Interfacer.AtmosModelSimulation
-    ClimaCoupler.Interfacer.SurfaceModelSimulation
-    ClimaCoupler.Interfacer.ComponentModelSimulation
-    ClimaCoupler.Interfacer.AbstractSurfaceStub
-    ClimaCoupler.Interfacer.SurfaceStub
-    ClimaCoupler.Interfacer.get_field
-    ClimaCoupler.Interfacer.update_field!
-    ClimaCoupler.Interfacer.AbstractSlabplanetSimulationMode
-    ClimaCoupler.Interfacer.AMIPMode
-    ClimaCoupler.Interfacer.SubseasonalMode
-    ClimaCoupler.Interfacer.SlabplanetMode
-    ClimaCoupler.Interfacer.SlabplanetAquaMode
-    ClimaCoupler.Interfacer.SlabplanetTerraMode
-    ClimaCoupler.Interfacer.set_cache!
-    ClimaCoupler.Interfacer.remap
-    ClimaCoupler.Interfacer.remap!
-    ClimaCoupler.Interfacer.boundary_space
-    ClimaCoupler.Interfacer.get_atmos_height_delta
+    Interfacer.CoupledSimulation
+    Interfacer.AtmosModelSimulation
+    Interfacer.SurfaceModelSimulation
+    Interfacer.ComponentModelSimulation
+    Interfacer.AbstractSurfaceStub
+    Interfacer.SurfaceStub
+    Interfacer.get_field
+    Interfacer.update_field!
+    Interfacer.AbstractSlabplanetSimulationMode
+    Interfacer.AMIPMode
+    Interfacer.SubseasonalMode
+    Interfacer.SlabplanetMode
+    Interfacer.SlabplanetAquaMode
+    Interfacer.SlabplanetTerraMode
+    Interfacer.set_cache!
+    Interfacer.remap
+    Interfacer.remap!
+    Interfacer.boundary_space
+    Interfacer.get_atmos_height_delta
 ```
 
 ## Interfacer Internal Functions and Types
 
 ```@docs
-    ClimaCoupler.Interfacer.AbstractSimulation
-    ClimaCoupler.Interfacer.AbstractSimulationMode
+    Interfacer.AbstractSimulation
+    Interfacer.AbstractSimulationMode
 ```

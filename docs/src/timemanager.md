@@ -7,7 +7,7 @@ functions from Julia's [Dates](https://docs.julialang.org/en/v1/stdlib/Dates/) m
 ## TimeManager API
 
 ```@docs
-ClimaCoupler.TimeManager.maybe_trigger_callback
+TimeManager.maybe_trigger_callback
 ```
 
 ## ITime

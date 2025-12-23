@@ -18,7 +18,9 @@ function OC.set!(model::OC.HydrostaticFreeSurfaceModel, ::OMIPEvolvedInitialCond
     
     # Dowload the initialization file if not preset
     if !isfile("omip_initialization.jld2")
-        download("https://www.dropbox.com/scl/fi/114xafnmoekgc2da3cco7/omip_initialization.jld2?rlkey=e3wnjgwbr2c2zaszysjbptgnh&st=9zagmgux&dl=0", "./")
+        url = "https://www.dropbox.com/scl/fi/114xafnmoekgc2da3cco7/omip_initialization.jld2?rlkey=e3wnjgwbr2c2zaszysjbptgnh&st=9zagmgux&dl=0"
+        path = "omip_initialization.jld2"
+        download(url, path)
     end
      
     file = jldopen("omip_initialization.jld2")

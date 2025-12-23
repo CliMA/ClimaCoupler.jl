@@ -14,7 +14,7 @@ variables to save, how often, and with which reductions, see the [Diagnostics](@
 ### Functions
 
 ```@docs
-ClimaCoupler.SimOutput.diagnostics_setup
+SimOutput.diagnostics_setup
 ```
 
 ## Benchmarking Analysis
@@ -26,9 +26,9 @@ PrettyTables.jl, and is sent to Slack automatically each time the "benchmarks" b
 ### Functions
 
 ```@docs
-ClimaCoupler.SimOutput.get_benchmark_args
-ClimaCoupler.SimOutput.get_run_info
-ClimaCoupler.SimOutput.append_table_data
+SimOutput.get_benchmark_args
+SimOutput.get_run_info
+SimOutput.append_table_data
 ```
 
 ## Simulation and Observation Data
@@ -42,6 +42,6 @@ For more information about adding variables to the leaderboard, see the [Leaderb
 ### Functions
 
 ```@docs
-ClimaCoupler.SimOutput.get_sim_var_dict
-ClimaCoupler.SimOutput.get_obs_var_dict
+SimOutput.get_sim_var_dict
+SimOutput.get_obs_var_dict
 ```

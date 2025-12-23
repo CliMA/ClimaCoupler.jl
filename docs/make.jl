@@ -1,6 +1,17 @@
 using ClimaCoupler
 using Documenter, Literate
 using CairoMakie, ClimaCoreMakie, GeoMakie, Makie, Poppler_jll, Printf, Oceananigans
+using ClimaCoupler:
+    Checkpointer,
+    ConservationChecker,
+    FieldExchanger,
+    FluxCalculator,
+    Input,
+    Interfacer,
+    SimOutput,
+    TimeManager,
+    Utilities,
+    Plotting
 
 const COUPLER_DIR = joinpath(@__DIR__, "..")
 const EXPERIMENTS_DIR = joinpath(@__DIR__, "..", "experiments")

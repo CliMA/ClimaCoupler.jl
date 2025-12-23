@@ -51,8 +51,8 @@ within the atmospheric model.
 ## FluxCalculator API
 
 ```@docs
-    ClimaCoupler.FluxCalculator.turbulent_fluxes!
-    ClimaCoupler.FluxCalculator.compute_surface_fluxes!
-    ClimaCoupler.FluxCalculator.get_surface_fluxes
-    ClimaCoupler.FluxCalculator.update_turbulent_fluxes!
+    FluxCalculator.turbulent_fluxes!
+    FluxCalculator.compute_surface_fluxes!
+    FluxCalculator.get_surface_fluxes
+    FluxCalculator.update_turbulent_fluxes!
 ```

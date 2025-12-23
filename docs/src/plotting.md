@@ -12,14 +12,14 @@ when the plotting packages and Oceananigans.jl are available.
 ## Plotting API
 
 ```@docs
-ClimaCoupler.Plotting.make_diagnostics_plots
-ClimaCoupler.Plotting.make_ocean_diagnostics_plots
-ClimaCoupler.Plotting.debug
-ClimaCoupler.Plotting.debug_plot_fields
-ClimaCoupler.Plotting.debug_plot!
-ClimaCoupler.Plotting.plot_global_conservation
-ClimaCoupler.Plotting.compute_leaderboard
-ClimaCoupler.Plotting.compute_pfull_leaderboard
+Plotting.make_diagnostics_plots
+Plotting.make_ocean_diagnostics_plots
+Plotting.debug
+Plotting.debug_plot_fields
+Plotting.debug_plot!
+Plotting.plot_global_conservation
+Plotting.compute_leaderboard
+Plotting.compute_pfull_leaderboard
 ```
 
 ## ClimaCouplerMakieExt Extension

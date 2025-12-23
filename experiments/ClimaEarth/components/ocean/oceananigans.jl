@@ -7,6 +7,7 @@ import Thermodynamics as TD
 import ClimaParams as CP
 import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
+using JLD2
 
 include("climaocean_helpers.jl")
 

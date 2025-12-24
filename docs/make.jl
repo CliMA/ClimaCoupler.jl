@@ -1,5 +1,17 @@
 using ClimaCoupler
 using Documenter, Literate
+using CairoMakie, ClimaCoreMakie, GeoMakie, Makie, Poppler_jll, Printf, Oceananigans
+using ClimaCoupler:
+    Checkpointer,
+    ConservationChecker,
+    FieldExchanger,
+    FluxCalculator,
+    Input,
+    Interfacer,
+    SimOutput,
+    TimeManager,
+    Utilities,
+    Plotting
 
 const COUPLER_DIR = joinpath(@__DIR__, "..")
 const EXPERIMENTS_DIR = joinpath(@__DIR__, "..", "experiments")
@@ -72,6 +84,7 @@ interface_pages = [
     "timemanager.md",
     "utilities.md",
     "simoutput.md",
+    "plotting.md",
 ]
 performance_pages = ["performance.md"]
 
@@ -88,9 +101,14 @@ pages = Any[
 
 
 makedocs(
+    modules = [
+        ClimaCoupler,
+        Base.get_extension(ClimaCoupler, :ClimaCouplerMakieExt),
+        Base.get_extension(ClimaCoupler, :ClimaCouplerOceananigansMakieExt),
+    ],
+    authors = "Climate Modelling Alliance",
     sitename = "ClimaCoupler.jl",
     format = Documenter.HTML(),
-    modules = [ClimaCoupler],
     pages = pages,
 )
 

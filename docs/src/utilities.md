@@ -7,9 +7,9 @@ modules in the coupler.
 ## Utilities API
 
 ```@docs
-ClimaCoupler.Utilities.get_comms_context
-ClimaCoupler.Utilities.get_device
-ClimaCoupler.Utilities.show_memory_usage
-ClimaCoupler.Utilities.setup_output_dirs
-ClimaCoupler.Utilities.time_to_seconds
+Utilities.get_comms_context
+Utilities.get_device
+Utilities.show_memory_usage
+Utilities.setup_output_dirs
+Utilities.time_to_seconds
 ```

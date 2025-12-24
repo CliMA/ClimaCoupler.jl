@@ -10,7 +10,8 @@ import ClimaCore as CC
 import ClimaCore.Geometry: ⊗
 import SurfaceFluxes as SF
 import Thermodynamics as TD
-import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
+import ClimaCoupler:
+    Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities, Plotting
 import ClimaUtilities.TimeManager: ITime
 
 if pkgversion(CA) < v"0.28.6"
@@ -736,3 +737,24 @@ function climaatmos_restart_path(output_dir_root, t)
     end
     error("Restart file for time $t not found")
 end
+
+# Additional ClimaAtmos getter methods for plotting debug fields
+function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:w})
+    w_c = ones(CC.Spaces.horizontal_space(sim.domain.face_space))
+    parent(w_c) .= parent(
+        CC.Fields.level(
+            CC.Geometry.WVector.(sim.integrator.u.f.u₃),
+            5 .+ CC.Utilities.half,
+        ),
+    )
+    return w_c
+end
+specific_humidity(::CA.DryModel, integrator) = [eltype(integrator.u)(0)]
+specific_humidity(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
+    integrator.u.c.ρq_tot
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρq_tot}) =
+    specific_humidity(sim.integrator.p.atmos.moisture_model, sim.integrator)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrator.u.c.ρe_tot
+
+Plotting.debug_plot_fields(sim::ClimaAtmosSimulation) =
+    (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)

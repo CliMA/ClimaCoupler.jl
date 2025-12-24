@@ -14,5 +14,6 @@ include("FieldExchanger.jl")
 include("Checkpointer.jl")
 include("Input.jl")
 include("SimOutput/SimOutput.jl")
+include("Plotting.jl")
 
 end

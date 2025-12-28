@@ -9,10 +9,9 @@ dt: "120secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: "120secs"
 dt_rad: "1hours"
-dz_bottom: 100.0
-z_elem: 39
 energy_check: false
 insolation: "timevarying"
+h_elem: 12
 #max_newton_iters_ode: 3
 mode_name: "amip"
 moist: "nonequil"

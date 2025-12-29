@@ -20,7 +20,7 @@ value = 150
 value = 150
 
 [snow_autoconversion_timescale]
-value = 5e4
+value = 1e4
 
 [rain_autoconversion_timescale]
 value = 150

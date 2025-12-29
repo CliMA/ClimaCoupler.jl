@@ -25,5 +25,5 @@ value = 1e4
 [rain_autoconversion_timescale]
 value = 150
 
-[latent_heat_sublimation_at_reference]
-value = 2500800
+[temperature_water_freeze]
+value = 100.0

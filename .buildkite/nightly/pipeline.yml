@@ -113,9 +113,20 @@ steps:
     steps:
 
       - label: "GPU AMIP + ED only + 1M microphysics"
-        key: "amip_edonly_1M_gpu"
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_1M.yml --job_id amip_edonly_1M_gpu"
         artifact_paths: "experiments/ClimaEarth/output/amip_edonly_1M_gpu/artifacts/*"
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 1
+          slurm_mem: 32GB
+      
+      - label: "GPU AMIP + ED only + 1M microphysics"
+        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_1M_tf.yml --job_id amip_edonly_1M_tf_gpu"
+        artifact_paths: "experiments/ClimaEarth/output/amip_edonly_1M_tf_gpu/artifacts/*"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"

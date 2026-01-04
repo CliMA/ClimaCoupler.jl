@@ -77,7 +77,6 @@ steps:
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly.yml --job_id amip_edonly_gpu"
         artifact_paths: "experiments/ClimaEarth/output/amip_edonly_gpu/artifacts/*"
         env:
-          CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
           queue: clima
@@ -91,7 +90,6 @@ steps:
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_1M.yml --job_id amip_edonly_1M_gpu"
         artifact_paths: "experiments/ClimaEarth/output/amip_edonly_1M_gpu/artifacts/*"
         env:
-          CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
           queue: clima
@@ -106,7 +104,6 @@ steps:
         command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_integrated_land.yml --job_id amip_edonly_integrated_land_gpu"
         artifact_paths: "experiments/ClimaEarth/output/amip_edonly_integrated_land_gpu/artifacts/*"
         env:
-          CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
           queue: clima
@@ -121,7 +118,6 @@ steps:
           - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf.yml --job_id amip_diagedmf_gpu"
         artifact_paths: "experiments/ClimaEarth/output/amip_diagedmf_gpu/artifacts/*"
         env:
-          CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
           queue: clima
@@ -136,7 +132,6 @@ steps:
           - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf_integrated_land.yml --job_id amip_diagedmf_integrated_land_gpu"
         artifact_paths: "experiments/ClimaEarth/output/amip_diagedmf_integrated_land_gpu/artifacts/*"
         env:
-          CLIMACOMMS_CONTEXT: "MPI"
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
           queue: clima
@@ -155,7 +150,6 @@ steps:
         artifact_paths: "experiments/ClimaEarth/output/cmip_edonly_land/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
-          CLIMACOMMS_CONTEXT: "SINGLETON"
         agents:
           queue: clima
           slurm_mem: 32GB
@@ -168,7 +162,6 @@ steps:
         artifact_paths: "experiments/ClimaEarth/output/cmip_edonly_bucket/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
-          CLIMACOMMS_CONTEXT: "SINGLETON"
         agents:
           queue: clima
           slurm_mem: 32GB
@@ -184,7 +177,7 @@ steps:
         artifact_paths: "experiments/calibration/output/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
-          CLIMACOMMS_CONTEXT: "SINGLETON"
+          CLIMACOMMS_CONTEXT: "MPI"
         agents:
           queue: clima
           slurm_mem: 96GB

@@ -96,9 +96,7 @@ function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spi
                 sim_var.attributes["short_name"] = "mean $(ClimaAnalysis.short_name(sim_var))"
                 cmap_extrema = get(compare_vars_biases_plot_extrema, short_name) do
                     extrema(
-                        ClimaAnalysis.bias(
-                            sim_obs_comparsion_dict[short_name]["ANN"]...,
-                        ).data,
+                        ClimaAnalysis.bias(sim_obs_comparsion_dict[short_name]["ANN"]...).data,
                     )
                 end
                 ClimaAnalysis.Visualize.plot_bias_on_globe!(

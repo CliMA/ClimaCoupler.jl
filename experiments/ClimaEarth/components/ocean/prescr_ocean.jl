@@ -234,14 +234,13 @@ function set_albedos!(sim::PrescribedOceanSimulation, t)
 
     # Get the atmospheric wind vector and the cosine of the zenith angle
     surface_coords = CC.Fields.coordinate_field(axes(sim.cache.T_sfc))
-    insolation_tuple =
-        Insolation.instantaneous_zenith_angle.(
-            d,
-            δ,
-            η_UTC,
-            surface_coords.long,
-            surface_coords.lat,
-        ) # the tuple is (zenith angle, azimuthal angle, earth-sun distance)
+    insolation_tuple = Insolation.instantaneous_zenith_angle.(
+        d,
+        δ,
+        η_UTC,
+        surface_coords.long,
+        surface_coords.lat,
+    ) # the tuple is (zenith angle, azimuthal angle, earth-sun distance)
     zenith_angle = insolation_tuple.:1
     wind_atmos = LinearAlgebra.norm.(CC.Geometry.Covariant12Vector.(p.u_int, p.v_int)) # wind vector from components
     λ = FT(0) # spectral wavelength (not used for now)

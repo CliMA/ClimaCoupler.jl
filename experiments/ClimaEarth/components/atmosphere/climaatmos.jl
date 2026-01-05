@@ -267,11 +267,10 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
         sim.integrator.p.params.thermodynamics_params,
         CC.Fields.level(sim.integrator.p.precomputed.ᶜts, 1),
     )
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) =
-    TD.air_density.(
-        sim.integrator.p.params.thermodynamics_params,
-        CC.Fields.level(sim.integrator.p.precomputed.ᶜts, 1),
-    )
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) = TD.air_density.(
+    sim.integrator.p.params.thermodynamics_params,
+    CC.Fields.level(sim.integrator.p.precomputed.ᶜts, 1),
+)
 # When CO2 is stored as a 1D Array in the tracers cache, we access
 # it from there. Otherwise, we pull a fixed value from ClimaParams.
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:co2}) =
@@ -292,14 +291,14 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:diffuse_fraction
     else
         direct_flux_dn = radiation_model.face_sw_direct_flux_dn[1, :]
         FT = eltype(total_flux_dn)
-        diffuse_fraction =
-            clamp.(
-                (
-                    (x, y) -> y > zero(y) ? x / y : zero(y)
-                ).(total_flux_dn .- direct_flux_dn, total_flux_dn),
-                zero(FT),
-                one(FT),
-            )
+        diffuse_fraction = clamp.(
+            ((x, y) -> y > zero(y) ? x / y : zero(y)).(
+                total_flux_dn .- direct_flux_dn,
+                total_flux_dn,
+            ),
+            zero(FT),
+            one(FT),
+        )
     end
     return CC.Fields.array2field(diffuse_fraction, lowest_face_space)
 end
@@ -382,25 +381,23 @@ function Interfacer.update_field!(
     q_sfc_atmos = Interfacer.remap(atmos_surface_space, csf.scalar_temp4)
 
     # Store `ρ_sfc_atmos` in an atmosphere scratch field on the surface space
-    temp_field_surface =
-        FluxCalculator.extrapolate_ρ_to_sfc.(
-            thermo_params,
-            sim.integrator.p.precomputed.sfc_conditions.ts,
-            T_sfc_atmos,
-        )
+    temp_field_surface = FluxCalculator.extrapolate_ρ_to_sfc.(
+        thermo_params,
+        sim.integrator.p.precomputed.sfc_conditions.ts,
+        T_sfc_atmos,
+    )
     ρ_sfc_atmos = temp_field_surface
 
     if sim.integrator.p.atmos.moisture_model isa CA.DryModel
         sim.integrator.p.precomputed.sfc_conditions.ts .=
             TD.PhaseDry_ρT.(thermo_params, ρ_sfc_atmos, T_sfc_atmos)
     else
-        sim.integrator.p.precomputed.sfc_conditions.ts .=
-            TD.PhaseNonEquil_ρTq.(
-                thermo_params,
-                ρ_sfc_atmos,
-                T_sfc_atmos,
-                TD.PhasePartition.(q_sfc_atmos),
-            )
+        sim.integrator.p.precomputed.sfc_conditions.ts .= TD.PhaseNonEquil_ρTq.(
+            thermo_params,
+            ρ_sfc_atmos,
+            T_sfc_atmos,
+            TD.PhasePartition.(q_sfc_atmos),
+        )
     end
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =
@@ -491,8 +488,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fiel
     Interfacer.remap!(temp_field_surface, F_turb_ρτxz) # F_turb_ρτxz_atmos
     F_turb_ρτyz_atmos = Interfacer.remap(atmos_surface_space, F_turb_ρτyz) # F_turb_ρτyz_atmos
     sim.integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ .= (
-        surface_normal .⊗
-        CA.C12.(
+        surface_normal .⊗ CA.C12.(
             temp_field_surface .* vec_ct12_ct1 .+ F_turb_ρτyz_atmos .* vec_ct12_ct2,
             surface_local_geometry,
         )

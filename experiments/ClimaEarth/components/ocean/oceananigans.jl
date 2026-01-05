@@ -16,22 +16,25 @@ struct EN4InitialConditions end
 
 # Set the initial conditions from omip output after 20 years evolution (1992 - 2012)
 function OC.set!(model::OC.HydrostaticFreeSurfaceModel, ::OMIPEvolvedInitialConditions)
-    
+
     # Dowload the initialization file if not preset
     if !isfile("omip_initialization.jld2")
         url = "https://www.dropbox.com/scl/fi/114xafnmoekgc2da3cco7/omip_initialization.jld2?rlkey=e3wnjgwbr2c2zaszysjbptgnh&st=9zagmgux&dl=0"
         path = "omip_initialization.jld2"
         download(url, path)
     end
-     
+
     file = jldopen("omip_initialization.jld2")
 
-    OC.set!(model, u=file["u"],
-                   v=file["v"],
-                   T=file["T"],
-                   S=file["S"],
-                   e=file["e"],
-                   η=file["η"])
+    OC.set!(
+        model,
+        u = file["u"],
+        v = file["v"],
+        T = file["T"],
+        S = file["S"],
+        e = file["e"],
+        η = file["η"],
+    )
 
     return nothing
 end
@@ -93,7 +96,7 @@ function OceananigansSimulation(
     # Set up ocean grid (0.5 degrees)
     resolution_points = (720, 360, 100)
     Nz = last(resolution_points)
-    z = OC.ExponentialDiscretization(Nz, -6000, 0; scale=1800)
+    z = OC.ExponentialDiscretization(Nz, -6000, 0; scale = 1800)
 
     # Regular LatLong because we know how to do interpolation there
     underlying_grid = OC.LatitudeLongitudeGrid(
@@ -139,20 +142,36 @@ function OceananigansSimulation(
     end
 
     # Create ocean simulation
-    free_surface = OC.SplitExplicitFreeSurface(grid; substeps=100)
+    free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 100)
     momentum_advection = OC.WENOVectorInvariant(order = 5)
     tracer_advection = OC.WENO(order = 7)
 
-    @inline Δ²ᵃᵃᵃ(i, j, k, grid, lx, ly, lz) =  2 * (1 / (1 / OC.Operators.Δx(i, j, k, grid, lx, ly, lz)^2 + 
-                                                          1 / OC.Operators.Δy(i, j, k, grid, lx, ly, lz)^2))
-    @inline geometric_νhb(i, j, k, grid, lx, ly, lz, clock, fields, λ) = Δ²ᵃᵃᵃ(i, j, k, grid, lx, ly, lz)^2 / λ
+    @inline Δ²ᵃᵃᵃ(i, j, k, grid, lx, ly, lz) =
+        2 * (
+            1 / (
+                1 / OC.Operators.Δx(i, j, k, grid, lx, ly, lz)^2 +
+                1 / OC.Operators.Δy(i, j, k, grid, lx, ly, lz)^2
+            )
+        )
+    @inline geometric_νhb(i, j, k, grid, lx, ly, lz, clock, fields, λ) =
+        Δ²ᵃᵃᵃ(i, j, k, grid, lx, ly, lz)^2 / λ
 
     timescale = 25 * 3600 * 24 # 25 days
-    horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν=geometric_νhb, discrete_form=true, parameters=timescale)
-    mixing_length = OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEMixingLength(Cᵇ=0.01)
-    turbulent_kinetic_energy_equation = OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEEquation(Cᵂϵ=1.0)
-    catke_closure = OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEVerticalDiffusivity(; mixing_length, turbulent_kinetic_energy_equation)
-    
+    horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(
+        ν = geometric_νhb,
+        discrete_form = true,
+        parameters = timescale,
+    )
+    mixing_length =
+        OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEMixingLength(Cᵇ = 0.01)
+    turbulent_kinetic_energy_equation =
+        OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEEquation(Cᵂϵ = 1.0)
+    catke_closure =
+        OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEVerticalDiffusivity(;
+            mixing_length,
+            turbulent_kinetic_energy_equation,
+        )
+
     # 30 minute timestep
     Δt = isnothing(Δt) ? 30*60 : Δt
 
@@ -164,7 +183,7 @@ function OceananigansSimulation(
         timestepper = :SplitRungeKutta3,
         tracer_advection,
         free_surface,
-        closure = (catke_closure, horizontal_viscosity)
+        closure = (catke_closure, horizontal_viscosity),
     )
 
     # Set initial condition to EN4 state estimate at start_date 
@@ -358,10 +377,10 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     F_turb_ρτyz_cc = sim.remapping.scratch_cc2
 
     # Weight by (1 - sea ice concentration)
-    OC.interior(F_turb_ρτxz_cc, :, :, 1) .=
-        OC.interior(F_turb_ρτxz_cc, :, :, 1) .* (1.0 .- ice_concentration)
-    OC.interior(F_turb_ρτyz_cc, :, :, 1) .=
-        OC.interior(F_turb_ρτyz_cc, :, :, 1) .* (1.0 .- ice_concentration)
+    OC.interior(F_turb_ρτxz_cc,:,:,1) .=
+        OC.interior(F_turb_ρτxz_cc,:,:,1) .* (1.0 .- ice_concentration)
+    OC.interior(F_turb_ρτyz_cc,:,:,1) .=
+        OC.interior(F_turb_ρτyz_cc,:,:,1) .* (1.0 .- ice_concentration)
 
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
     oc_flux_u = surface_flux(sim.ocean.model.velocities.u)
@@ -387,8 +406,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     # everything on the surface, but later we will need to account for this.
     # One way we can do this is using directly ClimaOcean
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
-    OC.interior(oc_flux_T, :, :, 1) .=
-        OC.interior(oc_flux_T, :, :, 1) .+
+    OC.interior(oc_flux_T,:,:,1) .=
+        OC.interior(oc_flux_T,:,:,1) .+
         (1.0 .- ice_concentration) .* (remapped_F_lh .+ remapped_F_sh) ./
         (reference_density * heat_capacity)
 
@@ -401,9 +420,9 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     )
     moisture_fresh_water_flux = sim.remapping.scratch_arr1 ./ fresh_water_density
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
-    surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, grid.Nz)
-    OC.interior(oc_flux_S, :, :, 1) .=
-        OC.interior(oc_flux_S, :, :, 1) .-
+    surface_salinity = OC.interior(sim.ocean.model.tracers.S,:,:,grid.Nz)
+    OC.interior(oc_flux_S,:,:,1) .=
+        OC.interior(oc_flux_S,:,:,1) .-
         (1.0 .- ice_concentration) .* surface_salinity .* moisture_fresh_water_flux
     return nothing
 end
@@ -458,12 +477,12 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     (; σ, C_to_K) = sim.ocean_properties
     α = Interfacer.get_field(sim, Val(:surface_direct_albedo)) # scalar
     ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
-    OC.interior(oc_flux_T, :, :, 1) .=
+    OC.interior(oc_flux_T,:,:,1) .=
         (1.0 .- ice_concentration) .* (
             -(1 - α) .* remapped_SW_d .-
             ϵ * (
                 remapped_LW_d .-
-                σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T, :, :, Nz)) .^ 4
+                σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T,:,:,Nz)) .^ 4
             )
         ) ./ (reference_density * heat_capacity)
 
@@ -483,9 +502,9 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
 
     # Virtual salt flux
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
-    OC.interior(oc_flux_S, :, :, 1) .=
-        OC.interior(oc_flux_S, :, :, 1) .-
-        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* (1.0 .- ice_concentration) .*
+    OC.interior(oc_flux_S,:,:,1) .=
+        OC.interior(oc_flux_S,:,:,1) .-
+        OC.interior(sim.ocean.model.tracers.S,:,:,Nz) .* (1.0 .- ice_concentration) .*
         (remapped_P_liq .+ remapped_P_snow) ./ fresh_water_density
     return nothing
 end

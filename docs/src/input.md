@@ -183,8 +183,8 @@ specific timesteps should be specified, rather than only `dt`.
 ## Input API
 
 ```@docs
-ClimaCoupler.Input.argparse_settings
-ClimaCoupler.Input.parse_commandline
-ClimaCoupler.Input.get_coupler_config_dict
-ClimaCoupler.Input.get_coupler_args
+Input.argparse_settings
+Input.parse_commandline
+Input.get_coupler_config_dict
+Input.get_coupler_args
 ```

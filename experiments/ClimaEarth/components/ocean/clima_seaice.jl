@@ -15,6 +15,26 @@ include("climaocean_helpers.jl")
 # Rename ECCO password env variable to match ClimaOcean.jl
 haskey(ENV, "ECCO_PASSWORD") && (ENV["ECCO_WEBDAV_PASSWORD"] = ENV["ECCO_PASSWORD"])
 
+function OC.set!(model::CSI.SeaIceModel, ::OMIPEvolvedInitialConditions)
+
+    # Dowload the initialization file if not preset
+    if !isfile("omip_initialization.jld2")
+        url = "https://www.dropbox.com/scl/fi/114xafnmoekgc2da3cco7/omip_initialization.jld2?rlkey=e3wnjgwbr2c2zaszysjbptgnh&st=9zagmgux&dl=0"
+        path = "omip_initialization.jld2"
+        download(url, path)
+    end
+
+    file = jldopen("omip_initialization.jld2")
+
+    OC.set!(
+        model,
+        h = file["hi"],
+        ℵ = file["ℵi"]
+    )
+
+    return nothing
+end
+
 """
     ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP}
 
@@ -67,6 +87,7 @@ function ClimaSeaIceSimulation(
     ocean;
     output_dir,
     start_date = nothing,
+    initial_conditions = OMIPEvolvedInitialConditions(),
     coupled_param_dict = CP.create_toml_dict(eltype(ocean.area_fraction)),
     Δt = 5 * 60.0, # 5 minutes
 )

@@ -28,12 +28,12 @@ function OC.set!(model::OC.HydrostaticFreeSurfaceModel, ::OMIPEvolvedInitialCond
 
     OC.set!(
         model,
-        u = file["u"],
-        v = file["v"],
-        T = file["T"],
-        S = file["S"],
-        e = file["e"],
-        η = file["η"],
+        u = file["uo"],
+        v = file["vo"],
+        T = file["To"],
+        S = file["So"],
+        e = file["eo"],
+        η = file["ηo"],
     )
 
     return nothing

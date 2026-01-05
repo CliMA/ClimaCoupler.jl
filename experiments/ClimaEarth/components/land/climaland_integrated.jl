@@ -140,8 +140,18 @@ function ClimaLandSimulation(
         stop_date;
         time_interpolation_method = LinearInterpolation(),
     )
-
-    model = CL.LandModel{FT}(forcing, LAI, toml_dict, domain, dt)
+    if pkgversion(CL) <= v"1.2.1" # remove this conditional when ClimaLand compat is updated
+        model = CL.LandModel{FT}(forcing, LAI, toml_dict, domain, dt)
+    else
+        model = CL.LandModel{FT}(
+            forcing,
+            LAI,
+            toml_dict,
+            domain,
+            dt;
+            prognostic_land_components = (:canopy, :snow, :soil, :soilco2),
+        )
+    end
 
     Y, p, coords = CL.initialize(model)
 

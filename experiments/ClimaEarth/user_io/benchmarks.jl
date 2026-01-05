@@ -51,7 +51,7 @@ run_names = [
 # For each run, get the run info and append it to the table
 for (run_name, description) in run_names
     run_info = SimOutput.get_run_info(parsed_args, run_name)
-    data = SimOutput.append_table_data(data, description, run_info...)
+    global data = SimOutput.append_table_data(data, description, run_info...)
 end
 
 # Output table to file, note that this must match the slack upload command in the pipeline.yml file

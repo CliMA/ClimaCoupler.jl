@@ -4,8 +4,11 @@ atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "366days"
 coupler_toml: ["toml/amip.toml"]
-dt: "240secs"
-dt_cpl: "240secs"
+dt_atmos: "240secs" # 4 minutes
+dt_cpl: "1920secs" # 32 minutes
+dt_land: "480secs" # 8 minutes
+dt_ocean: "480secs" # 8 minutes
+dt_seaice: "480secs" # 8 minutes
 dz_bottom: 100.0
 energy_check: false
 h_elem: 8

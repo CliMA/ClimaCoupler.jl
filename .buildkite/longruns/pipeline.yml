@@ -74,7 +74,7 @@ steps:
 
       - label: "GPU AMIP + ED only"
         key: "amip_edonly_gpu"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly.yml --job_id amip_edonly_gpu"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly.yml --job_id amip_edonly_gpu"
         artifact_paths: "experiments/ClimaEarth/output/amip_edonly_gpu/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -87,7 +87,7 @@ steps:
 
       - label: "GPU AMIP + ED only + 1M microphysics"
         key: "amip_edonly_1M_gpu"
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_1M.yml --job_id amip_edonly_1M_gpu"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_1M.yml --job_id amip_edonly_1M_gpu"
         artifact_paths: "experiments/ClimaEarth/output/amip_edonly_1M_gpu/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -101,7 +101,7 @@ steps:
 
       - label: "GPU AMIP + ED only + integrated land"
         key: "amip_edonly_integrated_land_gpu" # runs for 4 months only because of instability after that time
-        command: "srun julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_integrated_land.yml --job_id amip_edonly_integrated_land_gpu"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly_integrated_land.yml --job_id amip_edonly_integrated_land_gpu"
         artifact_paths: "experiments/ClimaEarth/output/amip_edonly_integrated_land_gpu/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -115,7 +115,7 @@ steps:
       - label: "GPU AMIP + diag. EDMF"
         key: "amip_diagedmf_gpu"
         command:
-          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf.yml --job_id amip_diagedmf_gpu"
+          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf.yml --job_id amip_diagedmf_gpu"
         artifact_paths: "experiments/ClimaEarth/output/amip_diagedmf_gpu/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -129,7 +129,7 @@ steps:
       - label: "GPU AMIP + diag. EDMF + integrated land"
         key: "amip_diagedmf_integrated_land_gpu" # runs for 2 months only because of instability after that time
         command:
-          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf_integrated_land.yml --job_id amip_diagedmf_integrated_land_gpu"
+          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf_integrated_land.yml --job_id amip_diagedmf_integrated_land_gpu"
         artifact_paths: "experiments/ClimaEarth/output/amip_diagedmf_integrated_land_gpu/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"

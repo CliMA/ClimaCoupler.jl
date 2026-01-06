@@ -1,7 +1,7 @@
 name = "ClimaCoupler"
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
-authors = ["CliMA Contributors <clima-software@caltech.edu>"]
 version = "0.1.2"
+authors = ["CliMA Contributors <clima-software@caltech.edu>"]
 
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
@@ -36,7 +36,7 @@ ClimaCouplerOceananigansMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", 
 
 [compat]
 ArgParse = "1"
-CairoMakie = "0.12"
+CairoMakie = "0.12, 0.15"
 ClimaAnalysis = "0.5.10"
 ClimaAtmos = "0.33"
 ClimaComms = "0.6.2"

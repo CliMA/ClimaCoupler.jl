@@ -26,11 +26,7 @@ function OC.set!(model::CSI.SeaIceModel, ::OMIPEvolvedInitialConditions)
 
     file = jldopen("omip_initialization.jld2")
 
-    OC.set!(
-        model,
-        h = file["hi"],
-        ℵ = file["ℵi"]
-    )
+    OC.set!(model, h = file["hi"], ℵ = file["ℵi"])
 
     return nothing
 end
@@ -129,10 +125,13 @@ function ClimaSeaIceSimulation(
     if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
         # Save all tracers and velocities to a NetCDF file at daily frequency
         outputs = OC.prognostic_fields(ice.model)
+        averages = NamedTuple{keys(outputs)}([
+            OC.Average(field, dims = (1, 2)) for field in values(outputs)
+        ])
         jld_writer = OC.JLD2Writer(
             ice.model,
-            outputs;
-            schedule = OC.TimeInterval(86400), # Daily output
+            averages;
+            schedule = OC.TimeInterval(864000), # 10-day averages
             filename = joinpath(output_dir, "seaice_diagnostics.jld2"),
             overwrite_existing = true,
             array_type = Array{Float32},
@@ -191,7 +190,7 @@ function sea_ice_simulation(
     top_surface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     top_heat_boundary_condition = MeltingConstrainedFluxBalance()
     kᴺ = size(grid, 3)
-    surface_ocean_salinity = OC.interior(ocean.model.tracers.S,:,:,(kᴺ:kᴺ))
+    surface_ocean_salinity = OC.interior(ocean.model.tracers.S, :, :, (kᴺ:kᴺ))
     bottom_heat_boundary_condition = IceWaterThermalEquilibrium(surface_ocean_salinity)
 
     ice_thermodynamics = CSI.SlabSeaIceThermodynamics(
@@ -319,8 +318,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
 
     # Update the sea ice only where the concentration is greater than zero.
     si_flux_heat = sim.ice.model.external_heat_fluxes.top[1]
-    OC.interior(si_flux_heat,:,:,1) .+=
-        (OC.interior(ice_concentration,:,:,1) .> 0) .* (remapped_F_lh .+ remapped_F_sh)
+    OC.interior(si_flux_heat, :, :, 1) .+=
+        (OC.interior(ice_concentration, :, :, 1) .> 0) .* (remapped_F_lh .+ remapped_F_sh)
 
     return nothing
 end
@@ -374,8 +373,8 @@ function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
     ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
 
     # Update only where ice concentration is greater than zero.
-    OC.interior(si_flux_heat,:,:,1) .=
-        (OC.interior(ice_concentration,:,:,1) .> 0) .*
+    OC.interior(si_flux_heat, :, :, 1) .=
+        (OC.interior(ice_concentration, :, :, 1) .> 0) .*
         (-(1 .- α) .* remapped_SW_d .- ϵ .* remapped_LW_d)
     return nothing
 end
@@ -454,13 +453,13 @@ function FluxCalculator.ocean_seaice_fluxes!(
     )
 
     oc_flux_T = surface_flux(ocean_sim.ocean.model.tracers.T)
-    OC.interior(oc_flux_T,:,:,1) .+=
-        OC.interior(ice_concentration,:,:,1) .* OC.interior(Qi,:,:,1) .* ρₒ⁻¹ ./ cₒ
+    OC.interior(oc_flux_T, :, :, 1) .+=
+        OC.interior(ice_concentration, :, :, 1) .* OC.interior(Qi, :, :, 1) .* ρₒ⁻¹ ./ cₒ
 
     oc_flux_S = surface_flux(ocean_sim.ocean.model.tracers.S)
-    OC.interior(oc_flux_S,:,:,1) .+=
-        OC.interior(ice_concentration,:,:,1) .*
-        OC.interior(ice_sim.ocean_ice_fluxes.salt,:,:,1)
+    OC.interior(oc_flux_S, :, :, 1) .+=
+        OC.interior(ice_concentration, :, :, 1) .*
+        OC.interior(ice_sim.ocean_ice_fluxes.salt, :, :, 1)
 
     return nothing
 end

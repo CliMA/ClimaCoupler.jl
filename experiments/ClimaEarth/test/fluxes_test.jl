@@ -83,7 +83,8 @@ include(joinpath("..", "setup_run.jl"))
 
     # Combine component fluxes by area-weighted sum (incl. bucket sign convention):
     combined_fluxes =
-        .-land_fraction .* land_flux .+ ice_fraction .* ice_rad_flux .+ ocean_fraction .* ocean_rad_flux
+        .-land_fraction .* land_flux .+ ice_fraction .* ice_rad_flux .+
+        ocean_fraction .* ocean_rad_flux
     err_fluxes = atmos_flux .+ combined_fluxes
     @show "Combined fluxes error: $(maximum(abs.(err_fluxes)))"
     @test maximum(abs.(err_fluxes)) < 8

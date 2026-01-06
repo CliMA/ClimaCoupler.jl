@@ -493,9 +493,9 @@ weakdeps = ["CUDA"]
 
 [[deps.ClimaLand]]
 deps = ["ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "dfc600500c1082aab4aef53442df90d025fee781"
+git-tree-sha1 = "6fe6b7648dae2874146d0500278ec88f45d540cf"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
-version = "1.2.1"
+version = "1.1.0"
 
     [deps.ClimaLand.extensions]
     FluxnetSimulationsExt = ["DelimitedFiles"]

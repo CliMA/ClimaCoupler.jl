@@ -223,13 +223,10 @@ function OceananigansSimulation(
     if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
         # Save all tracers and velocities to a NetCDF file at daily frequency
         outputs = merge(ocean.model.tracers, ocean.model.velocities)
-        averages = NamedTuple{keys(outputs)}([
-            OC.Average(field, dims = (1, 2)) for field in values(outputs)
-        ])
         netcdf_writer = OC.NetCDFWriter(
             ocean.model,
-            averages;
-            schedule = OC.TimeInterval(864000), # 10-day averages
+            outputs;
+            schedule = OC.AveragedTimeInterval(864000), # 10-day averages
             filename = joinpath(output_dir, "ocean_diagnostics.nc"),
             indices = (:, :, grid.Nz),
             overwrite_existing = true,

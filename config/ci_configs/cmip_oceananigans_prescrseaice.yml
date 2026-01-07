@@ -11,6 +11,7 @@ dz_bottom: 100.0
 energy_check: false
 h_elem: 8
 land_model: "integrated"
+land_spun_up_ic: false
 mode_name: "cmip"
 netcdf_output_at_levels: true
 output_default_diagnostics: true

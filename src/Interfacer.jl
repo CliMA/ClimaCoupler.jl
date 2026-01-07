@@ -255,8 +255,6 @@ get_field_error(sim, val::Val{X}) where {X} =
 # Set default values for fields that are not defined in all component models
 get_field(::ComponentModelSimulation, ::Val{:energy}) = nothing
 get_field(::ComponentModelSimulation, ::Val{:water}) = nothing
-get_field(sim::SurfaceModelSimulation, ::Val{:beta}) =
-    convert(eltype(sim.integrator.u), 1.0)
 get_field(sim::SurfaceModelSimulation, ::Val{:emissivity}) =
     convert(eltype(sim.integrator.u), 1.0)
 get_field(sim::SurfaceModelSimulation, ::Val{:height_disp}) =

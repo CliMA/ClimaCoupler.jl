@@ -279,7 +279,6 @@ overwritten or used as-is. These currently include the following:
 
 | Coupler name  | Description                                                               | Units | Default value |
 |---------------|---------------------------------------------------------------------------|-------|---------------|
-| `beta`        | factor that scales evaporation based on its estimated level of saturation |       |             1 |
 | `emissivity`  | measure of how much energy a surface radiates                             |       |             1 |
 | `height_disp` | displacement height relative to the surface                               | m     |             0 |
 
@@ -300,7 +299,6 @@ coupler.
 
 ```
 get_field(sim::AbstractSurfaceStub, ::Val{:area_fraction}) = sim.cache.area_fraction
-get_field(sim::AbstractSurfaceStub, ::Val{:beta}) = sim.cache.beta
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_direct_albedo}) = sim.cache.α_direct

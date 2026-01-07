@@ -280,7 +280,7 @@ function FieldExchanger.resolve_area_fractions!(
         FT = CC.Spaces.undertype(boundary_space)
         lat = CC.Fields.coordinate_field(boundary_space).lat
         polar_mask = CC.Fields.zeros(boundary_space)
-        polar_mask .= abs.(lat) .>= FT(80)
+        polar_mask .= abs.(lat) .>= FT(78)
 
         # Set land fraction to 1 and ice/ocean fraction to 0 where polar_mask is 1
         @. land_fraction = ifelse.(polar_mask == FT(1), FT(1), land_fraction)

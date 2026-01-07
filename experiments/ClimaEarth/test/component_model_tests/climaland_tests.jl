@@ -151,7 +151,6 @@ end
     CL.turbulent_fluxes!(
         land_sim.integrator.p.canopy.turbulent_fluxes,
         land_sim.model.canopy.boundary_conditions.atmos,
-        land_sim.model.canopy.boundary_conditions.turbulent_flux_parameterization,
         land_sim.model.canopy,
         land_sim.integrator.u,
         land_sim.integrator.p,

@@ -92,7 +92,6 @@ for FT in (Float32, Float64)
             α_diffuse = 3,
             z0m = 4,
             z0b = 5,
-            beta = 6,
             phase = TD.Liquid(),
             thermo_params = thermo_params,
         ))
@@ -102,7 +101,6 @@ for FT in (Float32, Float64)
         @test Interfacer.get_field(stub, Val(:surface_diffuse_albedo)) == 3
         @test Interfacer.get_field(stub, Val(:roughness_momentum)) == 4
         @test Interfacer.get_field(stub, Val(:roughness_buoyancy)) == 5
-        @test Interfacer.get_field(stub, Val(:beta)) == 6
     end
 
     @testset "update_field! the SurfaceStub area_fraction for FT=$FT" begin
@@ -121,7 +119,6 @@ for FT in (Float32, Float64)
             α_diffuse = zeros(boundary_space),
             z0m = zeros(boundary_space),
             z0b = zeros(boundary_space),
-            beta = zeros(boundary_space),
         ))
 
         Interfacer.update_field!(stub, Val(:area_fraction), ones(boundary_space))

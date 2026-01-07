@@ -37,7 +37,6 @@ fluxes and the CoupledSimulation object's fluxes fields.
 - the Obukhov length, `L_MO`;
 - the buoyancy flux, `buoyancy_flux`;
 - the roughness lengths for momentum and buoyancy, `z0m` and `z0b`;
-- the evaporation scaling factor, `beta`,
 - the frictional velocity `ustar`.
 
 !!! note

@@ -242,12 +242,6 @@ Interfacer.get_field(
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) =
     ice_surface_temperature.(sim.integrator.u.T_bulk, sim.integrator.p.params.T_base)
 
-function Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:beta})
-    # assume no LHF over sea ice
-    FT = eltype(sim.integrator.u)
-    return FT(0)
-end
-
 # Approximates the surface temperature of the sea ice assuming
 # the ice temperature varies linearly between the ice surface and the base
 ice_surface_temperature(T_bulk, T_base) = 2 * T_bulk - T_base

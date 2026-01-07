@@ -57,7 +57,7 @@ function coupler_diagnostics_setup(
     F_turb_energy_diag_sched = CD.ScheduledDiagnostic(
         variable = F_turb_energy_diag,
         output_writer = netcdf_writer,
-        reduction_time_func = (+),
+        reduction_time_func = nothing, #(+), instantaneous output
         compute_schedule_func = schedule_everystep,
         output_schedule_func = schedule_calendar_dt,
         pre_output_hook! = CD.average_pre_output_hook!,

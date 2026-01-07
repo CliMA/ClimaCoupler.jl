@@ -148,6 +148,8 @@ function CoupledSimulation(config_dict::AbstractDict)
         ice_model,
     ) = get_coupler_args(config_dict)
 
+    diagnostics_dt = Dates.Hour(1) # hourly diagnostics for debugging
+
     # Get default shared parameters from ClimaParams.jl, overriding with any provided parameter files
     override_file = CP.merge_toml_files(parameter_files; override = true)
     coupled_param_dict = CP.create_toml_dict(FT; override_file)

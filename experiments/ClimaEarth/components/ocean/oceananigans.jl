@@ -181,7 +181,7 @@ function OceananigansSimulation(
         netcdf_writer = OC.NetCDFWriter(
             ocean.model,
             outputs;
-            schedule = OC.TimeInterval(86400), # Daily output
+            schedule = OC.TimeInterval(3600), # Hourly output for debugging
             filename = joinpath(output_dir, "ocean_diagnostics.nc"),
             indices = (:, :, grid.Nz),
             overwrite_existing = true,

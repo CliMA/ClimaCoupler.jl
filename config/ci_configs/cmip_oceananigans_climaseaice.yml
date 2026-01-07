@@ -12,6 +12,7 @@ energy_check: false
 h_elem: 8
 ice_model: "clima_seaice"
 land_model: "integrated"
+land_spun_up_ic: false
 mode_name: "cmip"
 netcdf_output_at_levels: true
 output_default_diagnostics: true

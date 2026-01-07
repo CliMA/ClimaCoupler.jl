@@ -12,6 +12,7 @@ dt_seaice: "120secs" # 2 minutes
 energy_check: false
 insolation: "timevarying"
 land_model: "integrated"
+land_spun_up_ic: false
 mode_name: "cmip"
 prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 rmse_check: true

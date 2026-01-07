@@ -211,12 +211,10 @@ end
 
 Ensure the ocean and ice area fractions are consistent with each other.
 This matters in the case of a LatitudeLongitudeGrid, which is only
-defined between -80 and 80 degrees latitude. In this case, we want to
-set the ice fraction to `1 - land_fraction` on [-90, -80] and [80, 90]
-degrees latitude, and make sure the ocean fraction is 0 there.
-
-The land fraction is expected to be set to 1 at the poles before calling this function,
-and doesn't need to be set again since its fraction is static.
+defined between -80 and 80 degrees latitude. In this case, we set the ice
+and ocean area fractions to 0 and the land fraction to 1 on [78°S, 90°S]
+and on [78°N, 90°N]. Note the overlap between 78° and 80° to avoid any gaps
+introduced by the cubed sphere not aligning with latitude lines.
 
 This function also updates the ice concentration field in the ocean simulation
 so that it can be used for weighting flux updates.
@@ -235,7 +233,7 @@ function FieldExchanger.resolve_area_fractions!(
         FT = CC.Spaces.undertype(boundary_space)
         lat = CC.Fields.coordinate_field(boundary_space).lat
         polar_mask = CC.Fields.zeros(boundary_space)
-        polar_mask .= abs.(lat) .>= FT(80)
+        polar_mask .= abs.(lat) .>= FT(78)
 
         # Set land fraction to 1 and ice/ocean fraction to 0 where polar_mask is 1
         @. land_fraction = ifelse.(polar_mask == FT(1), FT(1), land_fraction)

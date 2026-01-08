@@ -26,4 +26,3 @@ use_itime: false
 extra_atmos_diagnostics:
   - short_name: [pfull, rsut, rlut, pr, hus, rv, tas, ua, va]
     period: 1hours
-    reduction_time: inst

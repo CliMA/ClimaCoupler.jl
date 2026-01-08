@@ -303,17 +303,20 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     grid = sim.ocean.model.grid
     ice_concentration = sim.ice_concentration
 
+    # Convert the momentum fluxes from contravariant to Cartesian basis
+    F_turb_ρτxz_uv, F_turb_ρτyz_uv = contravariant_to_cartesian(F_turb_ρτxz, F_turb_ρτyz)
+
     # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr1,
         sim.remapping.remapper_cc,
-        F_turb_ρτxz,
+        F_turb_ρτxz_uv,
     )
     OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr2,
         sim.remapping.remapper_cc,
-        F_turb_ρτyz,
+        F_turb_ρτyz_uv,
     )
     OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
 

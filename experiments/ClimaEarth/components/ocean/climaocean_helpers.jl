@@ -161,17 +161,13 @@ function contravariant_to_cartesian(ρτxz, ρτyz)
     # TODO broadcasting fails in tensor_from_components so we need to make local_geometry a Field
     boundary_space = axes(ρτxz)
     local_geometry = CC.Fields.Field(boundary_space.grid.local_geometry, boundary_space)
-    surface_ct3_unit =
-        CC.MatrixFields.CT3.(
-            CA.unit_basis_vector_data.(CC.MatrixFields.CT3, local_geometry)
-        )
 
     # Convert the contravariant tensor components to a contravariant tensor
     ρ_flux_uv_tensor =
         CA.SurfaceConditions.tensor_from_components.(ρτxz, ρτyz, local_geometry)
 
     # Convert the contravariant tensor to a UVVector
-    ρ_flux_uv_vector = CC.Geometry.UVVector.(adjoint.(ρ_flux_uv_tensor) .* surface_ct3_unit)
+    ρ_flux_uv_vector = CC.Geometry.UVVector.(ρ_flux_uv_tensor)
 
     # Return the u and v components individually
     return (;

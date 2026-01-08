@@ -147,3 +147,35 @@ Fields to Face/Center and Center/Face coordinates, respectively.
         τy[i, j, 1] = OC.Operators.ℑyᵃᶠᵃ(i, j, 1, grid, τy_cc)
     end
 end
+
+"""
+    contravariant_to_cartesian(ρτxz, ρτyz)
+
+Convert the contravariant tensor components `ρτxz` and `ρτyz`, which are
+output by the surface flux calculation, to UVVector components.
+These are now in a Cartesian coordinate system, which is an extrinsic coordinate system
+that can be rotated onto the ocean/sea ice grid by `_rotate_vector!`.
+"""
+function contravariant_to_cartesian(ρτxz, ρτyz)
+    # Get the local geometry of the boundary space
+    # TODO broadcasting fails in tensor_from_components so we need to make local_geometry a Field
+    boundary_space = axes(ρτxz)
+    local_geometry = CC.Fields.Field(boundary_space.grid.local_geometry, boundary_space)
+    surface_ct3_unit =
+        CC.MatrixFields.CT3.(
+            CA.unit_basis_vector_data.(CC.MatrixFields.CT3, local_geometry)
+        )
+
+    # Convert the contravariant tensor components to a contravariant tensor
+    ρ_flux_uv_tensor =
+        CA.SurfaceConditions.tensor_from_components.(ρτxz, ρτyz, local_geometry)
+
+    # Convert the contravariant tensor to a UVVector
+    ρ_flux_uv_vector = CC.Geometry.UVVector.(adjoint.(ρ_flux_uv_tensor) .* surface_ct3_unit)
+
+    # Return the u and v components individually
+    return (;
+        u = ρ_flux_uv_vector.components.data.:1,
+        v = ρ_flux_uv_vector.components.data.:2,
+    )
+end

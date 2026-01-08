@@ -14,6 +14,7 @@ insolation: "timevarying"
 land_model: "integrated"
 land_spun_up_ic: false
 mode_name: "cmip"
+output_default_diagnostics: true
 prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 rmse_check: true
 start_date: "20100101"

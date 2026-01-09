@@ -161,9 +161,11 @@ function OceananigansSimulation(
     scratch_arr1 = ArrayType(zeros(FT, interpolated_values_dim...))
     scratch_arr2 = ArrayType(zeros(FT, interpolated_values_dim...))
     scratch_arr3 = ArrayType(zeros(FT, interpolated_values_dim...))
+    # Allocate space for a Field of UVVectors, which we need for remapping momentum fluxes
+    temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
 
     remapping =
-        (; remapper_cc, scratch_cc1, scratch_cc2, scratch_arr1, scratch_arr2, scratch_arr3)
+        (; remapper_cc, scratch_cc1, scratch_cc2, scratch_arr1, scratch_arr2, scratch_arr3, temp_uv_vec)
 
     # Get some ocean properties and parameters
     ocean_properties = (;
@@ -303,8 +305,13 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     grid = sim.ocean.model.grid
     ice_concentration = sim.ice_concentration
 
+    # Get the local geometry of the boundary space
+    local_geometry = CC.Fields.local_geometry_field(axes(sim.area_fraction))
     # Convert the momentum fluxes from contravariant to Cartesian basis
-    F_turb_ρτxz_uv, F_turb_ρτyz_uv = contravariant_to_cartesian(F_turb_ρτxz, F_turb_ρτyz)
+    temp_uv_vec = sim.remapping.temp_uv_vec
+    contravariant_to_cartesian!(temp_uv_vec, F_turb_ρτxz, F_turb_ρτyz, local_geometry)
+    F_turb_ρτxz_uv = temp_uv_vec.components.data.:1
+    F_turb_ρτyz_uv = temp_uv_vec.components.data.:2
 
     # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
     CC.Remapping.interpolate!(

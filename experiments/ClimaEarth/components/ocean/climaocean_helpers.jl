@@ -149,35 +149,21 @@ Fields to Face/Center and Center/Face coordinates, respectively.
 end
 
 """
-    contravariant_to_cartesian(ρτxz, ρτyz)
+    contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz, local_geometry)
 
 Convert the contravariant tensor components `ρτxz` and `ρτyz`, which are
-output by the surface flux calculation, to UVVector components.
+output by the surface flux calculation, to a Cartesian UVVector.
 These are now in a Cartesian coordinate system, which is an extrinsic coordinate system
 that can be rotated onto the ocean/sea ice grid by `_rotate_vector!`.
 """
-function contravariant_to_cartesian(ρτxz, ρτyz)
-    # Get the local geometry of the boundary space
-    # TODO broadcasting fails in tensor_from_components so we need to make local_geometry a Field
-    boundary_space = axes(ρτxz)
-    local_geometry = CC.Fields.Field(boundary_space.grid.local_geometry, boundary_space)
-
+function contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz, local_geometry)
     # Convert the contravariant tensor components to a contravariant tensor
-    ρ_flux_uv_tensor =
-        CA.SurfaceConditions.tensor_from_components.(ρτxz, ρτyz, local_geometry)
+    ρτ_flux_uv_tensor = @. lazy(CA.SurfaceConditions.tensor_from_components(ρτxz, ρτyz, local_geometry))
 
-    # Convert the contravariant tensor to a UVVector
-    # TODO this fails with scalar indexing (but it's ok when we use adjoint and surface_ct3_unit)
-    # ρ_flux_uv_vector = CC.Geometry.UVVector.(ρ_flux_uv_tensor)
-    surface_ct3_unit =
-        CC.MatrixFields.CT3.(
-            CA.unit_basis_vector_data.(CC.MatrixFields.CT3, local_geometry)
-        )
-    ρ_flux_uv_vector = CC.Geometry.UVVector.(adjoint.(ρ_flux_uv_tensor) .* surface_ct3_unit)
-
-    # Return the u and v components individually
-    return (;
-        u = ρ_flux_uv_vector.components.data.:1,
-        v = ρ_flux_uv_vector.components.data.:2,
-    )
+    # Convert the contravariant tensor to a UVVector and return it
+    surface_ct3_unit = @. lazy(
+        CC.MatrixFields.CT3(
+            CA.unit_basis_vector_data(CC.MatrixFields.CT3, local_geometry)
+        ))
+    @. ρτ_flux_uv = CC.Geometry.UVVector(adjoint(ρτ_flux_uv_tensor) * surface_ct3_unit)
 end

@@ -259,8 +259,13 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     grid = sim.ice.model.grid
     ice_concentration = sim.ice.model.ice_concentration
 
+    # Get the local geometry of the boundary space
+    local_geometry = CC.Fields.local_geometry_field(axes(sim.area_fraction))
     # Convert the momentum fluxes from contravariant to Cartesian basis
-    F_turb_ρτxz_uv, F_turb_ρτyz_uv = contravariant_to_cartesian(F_turb_ρτxz, F_turb_ρτyz)
+    temp_uv_vec = sim.remapping.temp_uv_vec
+    contravariant_to_cartesian!(temp_uv_vec, F_turb_ρτxz, F_turb_ρτyz, local_geometry)
+    F_turb_ρτxz_uv = temp_uv_vec.components.data.:1
+    F_turb_ρτyz_uv = temp_uv_vec.components.data.:2
 
     # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
     CC.Remapping.interpolate!(

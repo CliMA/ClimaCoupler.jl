@@ -48,11 +48,11 @@ steps:
     steps:
 
       - label: "Coarse current AMIP: diagedmf + 0M + bucket land"
-        key: "amip"
+        key: "amip_diagedmf"
         command:
           - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse.yml --job_id amip_coarse"
-        artifact_paths: "experiments/ClimaEarth/output/amip_coarse/artifacts/*"
+          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_diagedmf.yml --job_id amip_coarse_diagedmf"
+        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_diagedmf/artifacts/*"
         timeout_in_minutes: 840
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -63,11 +63,11 @@ steps:
           slurm_mem: 30GB
 
       - label: "Coarse current AMIP: diagedmf + 0M + integrated land"
-        key: "amip_land"
+        key: "amip_diagedmf_land"
         command:
           - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_land.yml --job_id amip_coarse_land"
-        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_land/artifacts/*"
+          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_diagedmf_land.yml --job_id amip_coarse_diagedmf_land"
+        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_diagedmf_land/artifacts/*"
         timeout_in_minutes: 840
         env:
           CLIMACOMMS_DEVICE: "CUDA"

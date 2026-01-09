@@ -1,7 +1,7 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
-coupler_toml: ["toml/amip.toml"]
+coupler_toml: ["toml/amip_diagedmf.toml"]
 mode_name: "subseasonal"
 era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions"
 initial_condition: "WeatherModel"

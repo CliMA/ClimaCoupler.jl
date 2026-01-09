@@ -453,7 +453,7 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaInterpolations", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "Flux", "ForwardDiff", "Insolation", "Interpolations", "JLD2", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "NullBroadcasts", "RRTMGP", "Random", "SciMLBase", "SparseMatrixColorings", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
-git-tree-sha1 = "3a736aa0c9fb0474bf9a5e180b893c747ae7871f"
+git-tree-sha1 = "d22e2e85a5e7f9b103a1b5303c01a10c07b0b5c3"
 repo-rev = "kp/amip-pfull-test"
 repo-url = "https://github.com/CliMA/ClimaAtmos.jl.git"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
@@ -517,7 +517,7 @@ weakdeps = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans",
 
 [[deps.ClimaDiagnostics]]
 deps = ["Accessors", "ClimaComms", "ClimaCore", "ClimaInterpolations", "ClimaUtilities", "Dates", "NCDatasets", "NVTX", "OrderedCollections", "SciMLBase"]
-git-tree-sha1 = "f2b58c3e5c7a953654801e61ed132d01a3177a15"
+git-tree-sha1 = "628fc6b1746b0e4f06762ec9e198a3e2b8538d8f"
 repo-rev = "kp/pfull-coords"
 repo-url = "https://github.com/CliMA/ClimaDiagnostics.jl.git"
 uuid = "1ecacbb8-0713-4841-9a07-eb5aa8a2d53f"

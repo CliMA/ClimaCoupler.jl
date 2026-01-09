@@ -167,7 +167,13 @@ function contravariant_to_cartesian(ρτxz, ρτyz)
         CA.SurfaceConditions.tensor_from_components.(ρτxz, ρτyz, local_geometry)
 
     # Convert the contravariant tensor to a UVVector
-    ρ_flux_uv_vector = CC.Geometry.UVVector.(ρ_flux_uv_tensor)
+    # TODO this fails with scalar indexing (but it's ok when we use adjoint and surface_ct3_unit)
+    # ρ_flux_uv_vector = CC.Geometry.UVVector.(ρ_flux_uv_tensor)
+    surface_ct3_unit =
+        CC.MatrixFields.CT3.(
+            CA.unit_basis_vector_data.(CC.MatrixFields.CT3, local_geometry)
+        )
+    ρ_flux_uv_vector = CC.Geometry.UVVector.(adjoint.(ρ_flux_uv_tensor) .* surface_ct3_unit)
 
     # Return the u and v components individually
     return (;

@@ -453,7 +453,7 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaInterpolations", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "Flux", "ForwardDiff", "Insolation", "Interpolations", "JLD2", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "NullBroadcasts", "RRTMGP", "Random", "SciMLBase", "SparseMatrixColorings", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
-git-tree-sha1 = "d22e2e85a5e7f9b103a1b5303c01a10c07b0b5c3"
+git-tree-sha1 = "c27d45b8293ce96c75ee5b2ba019587f1406a4f2"
 repo-rev = "kp/amip-pfull-test"
 repo-url = "https://github.com/CliMA/ClimaAtmos.jl.git"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
@@ -534,15 +534,15 @@ weakdeps = ["CUDA"]
     ClimaInterpolationsCUDAExt = "CUDA"
 
 [[deps.ClimaLand]]
-deps = ["Adapt", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "9c21f533594b2a0c8ba80b9eee832bc7b41585e2"
+deps = ["ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "NCDatasets", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
+git-tree-sha1 = "dfc600500c1082aab4aef53442df90d025fee781"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
-version = "1.3.0"
+version = "1.2.1"
 
     [deps.ClimaLand.extensions]
     FluxnetSimulationsExt = ["DelimitedFiles"]
     LandSimulationVisualizationExt = ["CairoMakie", "ClimaAnalysis", "GeoMakie", "Printf", "StatsBase"]
-    NeuralSnowExt = ["Adapt", "CSV", "DataFrames", "HTTP", "Flux", "StatsBase", "BSON"]
+    NeuralSnowExt = ["CSV", "DataFrames", "HTTP", "Flux", "StatsBase", "BSON"]
 
     [deps.ClimaLand.weakdeps]
     BSON = "fbb218c0-5317-5bc6-957e-2ee96dd4b1f0"

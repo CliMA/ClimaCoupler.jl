@@ -18,7 +18,11 @@ import ..Interfacer
 import ..Utilities
 
 export argparse_settings,
-    parse_commandline, get_coupler_config_dict, get_coupler_args, get_land_fraction
+    parse_commandline,
+    get_coupler_config_dict,
+    get_coupler_args,
+    get_land_fraction,
+    get_era5_filepaths
 
 const MODE_NAME_DICT = Dict(
     "amip" => Interfacer.AMIPMode,
@@ -211,9 +215,13 @@ function argparse_settings()
         help = "Boolean flag to indicate whether to use integrated land initial conditions from spun up state [`true` (default), `false`]"
         arg_type = Bool
         default = true
+        "--lai_source"
+        help = "Source for leaf area index data. [`modis_monthly` (default), `modis_monthly_climatology`]"
+        arg_type = String
+        default = "modis_monthly"
         # BucketModel specific
         "--bucket_albedo_type"
-        help = "Access bucket surface albedo information from data file. [`map_static` (default), `function`, `map_temporal`]"
+        help = "Access bucket surface albedo information from data file. [`map_static` (default), `function`, `map_temporal`, `era5`]"
         arg_type = String
         default = "map_static" # to be replaced by land config file, when available
         "--bucket_initial_condition"
@@ -416,11 +424,20 @@ function get_coupler_args(config_dict::Dict)
     land_temperature_anomaly = lowercase(config_dict["land_temperature_anomaly"])
     use_land_diagnostics = config_dict["use_land_diagnostics"]
     land_spun_up_ic = config_dict["land_spun_up_ic"]
+    lai_source = config_dict["lai_source"]
     bucket_albedo_type = config_dict["bucket_albedo_type"]
     bucket_initial_condition = config_dict["bucket_initial_condition"]
 
     # Initial condition setting
     era5_initial_condition_dir = config_dict["era5_initial_condition_dir"]
+
+    # Build ERA5-based file paths (only populated for subseasonal mode)
+    era5_filepaths = get_era5_filepaths(
+        sim_mode,
+        era5_initial_condition_dir,
+        start_date,
+        bucket_initial_condition,
+    )
 
     # Ocean model-specific information
     ocean_model = Val(Symbol(config_dict["ocean_model"]))
@@ -466,11 +483,11 @@ function get_coupler_args(config_dict::Dict)
         land_model,
         land_temperature_anomaly,
         land_spun_up_ic,
+        lai_source,
         use_land_diagnostics,
         bucket_albedo_type,
-        bucket_initial_condition,
         parameter_files,
-        era5_initial_condition_dir,
+        era5_filepaths,
         ocean_model,
         ice_model,
         land_fraction_source,
@@ -716,5 +733,78 @@ function validate_model_types_for_mode(sim_mode, ocean_model, ice_model, land_mo
     return ocean_model, ice_model, land_model
 end
 
+
+"""
+    get_era5_filepaths(::Type{<:Interfacer.SubseasonalMode}, era5_initial_condition_dir, start_date, bucket_initial_condition)
+
+Build ERA5-based file paths for subseasonal mode simulations.
+Filenames are inferred from the start_date.
+
+# Arguments
+- `sim_mode`: The simulation mode type (must be SubseasonalMode)
+- `era5_initial_condition_dir`: Directory containing ERA5 initial condition files
+- `start_date`: The start date of the simulation (DateTime)
+- `bucket_initial_condition`: User-specified bucket IC path (empty string if not specified)
+
+# Returns
+A NamedTuple with fields:
+- `sst_path`: Path to SST file
+- `sic_path`: Path to sea ice concentration file
+- `land_ic_path`: Path to land initial condition file
+- `albedo_path`: Path to albedo file
+- `bucket_initial_condition`: Path to bucket IC (user-specified if provided, otherwise ERA5-derived)
+"""
+function get_era5_filepaths(
+    ::Type{<:Interfacer.SubseasonalMode},
+    era5_initial_condition_dir,
+    start_date,
+    bucket_initial_condition,
+)
+    isnothing(era5_initial_condition_dir) &&
+        error("subseasonal mode requires --era5_initial_condition_dir")
+    datestr = Dates.format(start_date, Dates.dateformat"yyyymmdd")
+
+    # Use ERA5-derived bucket IC if user didn't specify one
+    isempty(bucket_initial_condition) && (
+        bucket_initial_condition = joinpath(
+            era5_initial_condition_dir,
+            "era5_bucket_processed_$(datestr)_0000.nc",
+        )
+    )
+
+    return (
+        sst_path = joinpath(era5_initial_condition_dir, "sst_processed_$(datestr)_0000.nc"),
+        sic_path = joinpath(era5_initial_condition_dir, "sic_processed_$(datestr)_0000.nc"),
+        land_ic_path = joinpath(
+            era5_initial_condition_dir,
+            "era5_land_processed_$(datestr)_0000.nc",
+        ),
+        albedo_path = joinpath(
+            era5_initial_condition_dir,
+            "albedo_processed_$(datestr)_0000.nc",
+        ),
+        bucket_initial_condition,
+    )
+end
+
+"""
+    get_era5_filepaths(::Type{<:Interfacer.AbstractSimulationMode}, era5_initial_condition_dir, start_date, bucket_initial_condition)
+
+Fallback for non-subseasonal modes. Returns nothing for file paths, passes through bucket_initial_condition.
+"""
+function get_era5_filepaths(
+    ::Type{<:Interfacer.AbstractSimulationMode},
+    era5_initial_condition_dir,
+    start_date,
+    bucket_initial_condition,
+)
+    return (
+        sst_path = nothing,
+        sic_path = nothing,
+        land_ic_path = nothing,
+        albedo_path = nothing,
+        bucket_initial_condition = bucket_initial_condition,
+    )
+end
 
 end # module Input

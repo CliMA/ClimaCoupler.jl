@@ -415,6 +415,8 @@ and directory `era5_initial_condition_dir`, filenames containing the initial con
   - `skt` (K), `tsn` (K),`swe` (m), `swvl` (m^3/m^3), `si` (m^3/m^3), `sie` (J/m^3), `stl` (K)
 - Land IC (bucket land): `era5_bucket_processed_YYYYMMDD_0000.nc`, with fields
   - `W` (m), `Ws` (m), `S` (m), `T` (K), `tsn` (K), `skt` (K); dims `(lat, lon)`
+- Albedo (optional, when `bucket_albedo_type: "era5"`): `albedo_processed_YYYYMMDD_0000.nc`, with fields
+  - `sw_alb_clr` (clear-sky surface albedo, fraction 0-1); dims `(time, lat, lon)`
 and are used to initialize the coupler components.
 
 """

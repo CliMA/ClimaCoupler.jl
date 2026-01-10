@@ -10,6 +10,7 @@ import ClimaLand.Parameters as LP
 import ClimaParams as CP
 import ClimaDiagnostics as CD
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, FieldExchanger, Plotting
+import ClimaUtilities.TimeVaryingInputs: LinearInterpolation
 using NCDatasets
 include("climaland_helpers.jl")
 
@@ -75,6 +76,7 @@ function BucketSimulation(
     stepper = CTS.RK4(),
     albedo_type::String = "map_static",
     bucket_initial_condition::String = "",
+    era5_albedo_file_path::String = "",
     coupled_param_dict = CP.create_toml_dict(FT),
     extra_kwargs...,
 ) where {FT, TT <: Union{Float64, ITime}}
@@ -115,6 +117,18 @@ function BucketSimulation(
             surface_space;
             albedo_file_path = CL.Artifacts.ceres_albedo_dataset_path(),
             varname = "sw_alb_clr",
+        )
+    elseif albedo_type == "era5" # Read in albedo from ERA5 processed file
+        # File path is inferred from start_date following the naming convention: albedo_processed_YYYYMMDD_0000.nc
+        isempty(era5_albedo_file_path) &&
+            error("era5 albedo type requires era5_albedo_file_path to be specified")
+        @info "Using ERA5 albedo from" era5_albedo_file_path
+        albedo = CL.Bucket.PrescribedSurfaceAlbedo{FT}(
+            start_date,
+            surface_space;
+            albedo_file_path = era5_albedo_file_path,
+            varname = "sw_alb_clr",
+            time_interpolation_method = LinearInterpolation(),
         )
     elseif albedo_type == "function" # Use prescribed function of lat/lon for surface albedo
         function α_bareground(coordinate_point)
@@ -223,7 +237,14 @@ function BucketSimulation(
             regridder_type,
             regridder_kwargs = (; extrapolation_bc,),
         )
+        # clip negative values from horizontal regridding
+        Y.bucket.σS .= max.(Y.bucket.σS, FT(0))
+        Y.bucket.W .= max.(Y.bucket.W, FT(0))
+        Y.bucket.Ws .= max.(Y.bucket.Ws, FT(0))
     end
+
+    # ensure initial storage < bucket capacity
+    Y.bucket.W .= min.(Y.bucket.W, params.W_f)
 
     # Set initial aux variable values
     set_initial_cache! = CL.make_set_initial_cache(model)

@@ -72,8 +72,9 @@ include("components/land/climaland_integrated.jl")
 include("components/ocean/slab_ocean.jl")
 include("components/ocean/prescr_ocean.jl")
 include("components/ocean/prescr_seaice.jl")
-include("components/ocean/oceananigans.jl")
-include("components/ocean/clima_seaice.jl")
+# Commented out - not using Oceananigans/ClimaOcean
+# include("components/ocean/oceananigans.jl")
+# include("components/ocean/clima_seaice.jl")
 
 #=
 ### Configuration Dictionaries
@@ -270,19 +271,174 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     @info(sim_mode)
     land_sim = ice_sim = ocean_sim = nothing
-    # Build ERA5-based file paths if subseasonal mode is selected
-    subseasonal_sst = subseasonal_sic = subseasonal_land_ic = nothing
-    if sim_mode <: SubseasonalMode
-        isnothing(era5_initial_condition_dir) &&
-            error("subseasonal mode requires --era5_initial_condition_dir")
-        # Filenames inferred from start_date, which is YYYYMMDD
-        datestr = Dates.format(start_date, Dates.dateformat"yyyymmdd")
-        subseasonal_sst =
-            joinpath(era5_initial_condition_dir, "sst_processed_$(datestr)_0000.nc")
-        subseasonal_sic =
-            joinpath(era5_initial_condition_dir, "sic_processed_$(datestr)_0000.nc")
-        subseasonal_land_ic =
-            joinpath(era5_initial_condition_dir, "era5_land_processed_$(datestr)_0000.nc")
+    if sim_mode <: AMIPMode || sim_mode <: CMIPMode || sim_mode <: SubseasonalMode
+        @info("AMIP/CMIP boundary conditions - do not expect energy conservation")
+
+        # Build ERA5-based file paths if subseasonal mode is selected
+        subseasonal_sst = subseasonal_sic = subseasonal_land_ic = subseasonal_albedo =
+            subseasonal_bucket_ic = nothing
+        if sim_mode <: SubseasonalMode
+            isnothing(era5_initial_condition_dir) &&
+                error("subseasonal mode requires --era5_initial_condition_dir")
+            # Filenames inferred from start_date, which is YYYYMMDD
+            datestr = Dates.format(start_date, Dates.dateformat"yyyymmdd")
+            subseasonal_sst =
+                joinpath(era5_initial_condition_dir, "sst_processed_$(datestr)_0000.nc")
+            subseasonal_sic =
+                joinpath(era5_initial_condition_dir, "sic_processed_$(datestr)_0000.nc")
+            subseasonal_land_ic = joinpath(
+                era5_initial_condition_dir,
+                "era5_land_processed_$(datestr)_0000.nc",
+            )
+            subseasonal_albedo = joinpath(
+                era5_initial_condition_dir,
+                "albedo_processed_$(datestr)_0000.nc",
+            )
+            subseasonal_bucket_ic = joinpath(
+                era5_initial_condition_dir,
+                "era5_bucket_processed_$(datestr)_0000.nc",
+            )
+        end
+
+        ## land model
+        # Determine whether to use a shared surface space
+        shared_surface_space = share_surface_space ? boundary_space : nothing
+        if land_model == "bucket"
+            # Use subseasonal files if available and not explicitly specified
+            era5_albedo_file = isnothing(subseasonal_albedo) ? "" : subseasonal_albedo
+            # Use subseasonal bucket IC if bucket_initial_condition is not specified
+            bucket_ic = if isempty(bucket_initial_condition) && !isnothing(subseasonal_bucket_ic)
+                subseasonal_bucket_ic
+            else
+                bucket_initial_condition
+            end
+            land_sim = BucketSimulation(
+                FT;
+                dt = component_dt_dict["dt_land"],
+                tspan,
+                start_date,
+                output_dir = dir_paths.land_output_dir,
+                area_fraction = land_fraction,
+                shared_surface_space,
+                surface_elevation,
+                land_temperature_anomaly,
+                use_land_diagnostics,
+                albedo_type = bucket_albedo_type,
+                bucket_initial_condition = bucket_ic,
+                era5_albedo_file_path = era5_albedo_file,
+                coupled_param_dict,
+            )
+        elseif land_model == "integrated"
+            land_sim = ClimaLandSimulation(
+                FT;
+                dt = component_dt_dict["dt_land"],
+                tspan,
+                start_date,
+                output_dir = dir_paths.land_output_dir,
+                area_fraction = land_fraction,
+                shared_surface_space,
+                land_spun_up_ic,
+                saveat,
+                surface_elevation,
+                atmos_h,
+                land_temperature_anomaly,
+                use_land_diagnostics,
+                coupled_param_dict,
+                land_ic_path = subseasonal_land_ic,
+            )
+        else
+            error("Invalid land model specified: $(land_model)")
+        end
+
+        ## ocean model
+        # CMIPMode with OceananigansSimulation commented out - not using Oceananigans/ClimaOcean
+        # if sim_mode <: CMIPMode
+        #     stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+        #     ocean_sim = OceananigansSimulation(
+        #         boundary_space,
+        #         start_date,
+        #         stop_date;
+        #         Δt = component_dt_dict["dt_ocean"],
+        #         output_dir = dir_paths.ocean_output_dir,
+        #         comms_ctx,
+        #         coupled_param_dict,
+        #         ice_model,
+        #     )
+        # else
+            ocean_sim = PrescribedOceanSimulation(
+                FT,
+                boundary_space,
+                start_date,
+                t_start,
+                coupled_param_dict,
+                thermo_params,
+                comms_ctx;
+                sst_path = subseasonal_sst,
+            )
+        # end  # Commented out - if-else block removed since CMIPMode is disabled
+        ## sea ice model
+        # clima_seaice requires Oceananigans/ClimaOcean - commented out
+        # if ice_model == "clima_seaice"
+        #     ice_sim = ClimaSeaIceSimulation(
+        #         ocean_sim;
+        #         output_dir = dir_paths.ice_output_dir,
+        #         start_date,
+        #         coupled_param_dict,
+        #         Δt = component_dt_dict["dt_seaice"],
+        #     )
+        # elseif ice_model == "prescribed"
+        if ice_model == "prescribed"
+            ice_sim = PrescribedIceSimulation(
+                FT;
+                tspan = tspan,
+                dt = component_dt_dict["dt_seaice"],
+                saveat = saveat,
+                space = boundary_space,
+                coupled_param_dict,
+                thermo_params = thermo_params,
+                comms_ctx,
+                start_date,
+                land_fraction,
+                sic_path = subseasonal_sic,
+                binary_area_fraction = binary_area_fraction,
+            )
+        else
+            error("Invalid ice model specified: $(ice_model)")
+        end
+
+    elseif (sim_mode <: AbstractSlabplanetSimulationMode)
+
+        land_fraction = sim_mode <: SlabplanetAquaMode ? land_fraction .* 0 : land_fraction
+        land_fraction =
+            sim_mode <: SlabplanetTerraMode ? land_fraction .* 0 .+ 1 : land_fraction
+
+        ## land model
+        land_sim = BucketSimulation(
+            FT;
+            dt = component_dt_dict["dt_land"],
+            tspan,
+            start_date,
+            output_dir = dir_paths.land_output_dir,
+            area_fraction = land_fraction,
+            surface_elevation,
+            land_temperature_anomaly,
+            use_land_diagnostics,
+            albedo_type = bucket_albedo_type,
+            bucket_initial_condition,
+            coupled_param_dict,
+        )
+
+        ## ocean model
+        ocean_sim = SlabOceanSimulation(
+            FT;
+            tspan,
+            dt = component_dt_dict["dt_ocean"],
+            space = boundary_space,
+            saveat,
+            coupled_param_dict,
+            thermo_params,
+            evolving = evolving_ocean,
+        )
     end
 
     ## Construct the land model component

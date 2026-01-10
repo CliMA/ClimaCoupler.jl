@@ -8,14 +8,16 @@ topography: "Earth"
 rayleigh_sponge: true
 viscous_sponge: true
 hyperdiff: ClimaHyperdiffusion
-divergence_damping_factor: 50.0
+divergence_damping_factor: 20.0
 scalar_hyperdiffusion_coefficient: 0.929738
 vorticity_hyperdiffusion_coefficient: 0.1857
 insolation: "timevarying"
 rad: allskywithclear
 dt_cloud_fraction: "1hours"
 dt_rad: "1hours"
-# time_varying_trace_gases: ["O3"]
+time_varying_trace_gases: ["O3"]
+co2_model: fixed
+prescribe_ozone: true
 # prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 turbconv: diagnostic_edmfx
 implicit_diffusion: true
@@ -23,8 +25,8 @@ approximate_linear_solve_iters: 2
 prognostic_tke: true
 edmfx_upwinding: first_order
 h_elem: 15
-z_max: 48000.0
-z_elem: 63
+z_max: 70000.0
+z_elem: 70
 dz_bottom: 30.0
 edmfx_entr_model: "Generalized"
 edmfx_detr_model: "Generalized"
@@ -44,4 +46,4 @@ toml: [toml/diagnostic_edmfx_era5_ic.toml]
 
 cloud_model: "quadrature"
 use_itime: true
-deep_atmosphere: false
+deep_atmosphere: true

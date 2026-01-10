@@ -1,0 +1,80 @@
+#=
+Shared calibration configuration - priors and ensemble settings.
+This is the SINGLE SOURCE OF TRUTH for calibration parameters.
+
+Included by both run_calibration.jl and precompute_ekp_inputs.jl
+=#
+
+import EnsembleKalmanProcesses.ParameterDistributions as PD
+import EnsembleKalmanProcesses as EKP
+
+# ==========================================================================
+# PRIORS - Define your calibration parameters here
+# ==========================================================================
+const CALIBRATION_PRIORS = [
+    # Atmospheric parameters
+    PD.constrained_gaussian("entr_inv_tau", 0.002, 0.0015, 0.0, 0.01),
+    PD.constrained_gaussian("precipitation_timescale", 600, 300, 100, 2000),
+    # PD.constrained_gaussian("EDMF_surface_area", 0.1, 0.03, 0, Inf),
+    PD.constrained_gaussian("mixing_length_eddy_viscosity_coefficient", 0.2, 0.1, 0, 1.0),
+    # PD.constrained_gaussian("mixing_length_tke_surf_flux_coeff", 8.0, 4.0, 0, 100.0),
+    # Land parameters 
+    PD.constrained_gaussian("pmodel_cstar", 0.30, 0.15, 0.0, 1.0), 
+    PD.constrained_gaussian("leaf_Cd", 0.01, 0.006, 0.0, 0.1),
+
+    # sea ice parameters
+    PD.constrained_gaussian("ice_albedo", 0.7, 0.05, 0.4, 0.9),
+
+    # gravity wave parameters
+    PD.constrained_gaussian("nogw_Bt_0", 0.0043, 0.003, 0.001, 0.01),
+    PD.constrained_gaussian("ogw_mountain_height_width_exponent", 0.4, 0.3, 0.0, 1.0),
+]
+
+const CALIBRATION_PRIOR = EKP.combine_distributions(CALIBRATION_PRIORS)
+
+# ==========================================================================
+# ENSEMBLE SETTINGS
+# ==========================================================================
+# For TransformInversion/Inversion: set ensemble_size freely (typically 5-20)
+# For TransformUnscented: this is IGNORED (uses 2*n_params + 1 automatically)
+const CALIBRATION_ENSEMBLE_SIZE = 17  # For TransformUnscented: 2*n_params+1 = 2*8+1 = 17
+
+# Random seed for reproducibility
+const CALIBRATION_RNG_SEED = 42
+
+# Noise scalar for observation covariance
+# Used by both generate_observations.jl and precompute_ekp_inputs.jl
+# For normalized data (unit variance): this is the VARIANCE, not std
+# 0.1 = 10% variance (std ≈ 0.32), 0.5 = 50% variance (std ≈ 0.71)
+# Lower values make EKP more aggressive in fitting observations
+# NOTE: For NH averages mode (3 obs), use 0.1-0.5; for full gridpoints (113k obs), use 3.0+
+const CALIBRATION_NOISE_SCALAR = 3.0  # Used for full gridpoints mode
+
+# ==========================================================================
+# PER-VARIABLE NOISE (NH averages mode only)
+# ==========================================================================
+# Order MUST match short_names in run_calibration.jl: ["tas", "mslp", "pr"]
+# Higher noise = less weight on that variable
+# pr is down-weighted because:
+#   1. Model has structural bias in NH precipitation (~0.48 normalized)
+#   2. Precipitation is inherently noisy/chaotic on short timescales
+#   3. Prevents pr from dominating the objective (was 99.9% of error!)
+const CALIBRATION_NOISE_VARIANCES = Dict(
+    "tas" => 0.05,   # Temperature: tight constraint (model matches well)
+    "mslp" => 0.05,  # Pressure: tight constraint (model matches well)
+    "pr" => 1.0,    # Precipitation: loose constraint (10x less weight)
+)
+
+# ==========================================================================
+# OBSERVATION MODE: Choose between full gridpoint or hemisphere averages
+# ==========================================================================
+# USE_NH_AVERAGES = false: Full gridpoint mode (113k+ observations)
+#   - Each gridpoint is treated as an independent observation
+#   - Captures spatial patterns but overcounts information due to correlation
+#   - May cause rapid covariance collapse
+#
+# USE_NH_AVERAGES = true: Northern Hemisphere averages mode (3 observations)
+#   - Computes area-weighted NH averages: tas (land), mslp (everywhere), pr (land)
+#   - Removes spatial correlation issues, stable convergence
+#   - Only constrains parameters affecting bulk NH climate
+const USE_NH_AVERAGES = false

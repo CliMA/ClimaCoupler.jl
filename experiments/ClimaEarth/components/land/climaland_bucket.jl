@@ -203,7 +203,14 @@ function BucketSimulation(
             regridder_type,
             regridder_kwargs = (; extrapolation_bc,),
         )
+        # clip negative values from horizontal regridding
+        Y.bucket.σS .= max.(Y.bucket.σS, FT(0))
+        Y.bucket.W .= max.(Y.bucket.W, FT(0))
+        Y.bucket.Ws .= max.(Y.bucket.Ws, FT(0))
     end
+
+    # ensure initial storage < bucket capacity
+    Y.bucket.W .= min.(Y.bucket.W, params.W_f)
 
     # Set initial aux variable values
     set_initial_cache! = CL.make_set_initial_cache(model)

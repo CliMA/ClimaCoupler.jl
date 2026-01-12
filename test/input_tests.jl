@@ -89,6 +89,8 @@ end
         "coupler_toml" => [],
         "era5_initial_condition_dir" => nothing,
         "ice_model" => "prescribed",
+        "land_fraction_source" => "etopo",
+        "binary_area_fraction" => true,
         "component_dt_dict" => Dict(
             "dt_atmos" => 400.0,
             "dt_land" => 400.0,
@@ -114,6 +116,7 @@ end
     @test args.sim_mode == ClimaCoupler.Interfacer.AMIPMode
     @test args.land_model == "bucket"
     @test args.ice_model == "prescribed"
+    @test args.land_fraction_source == "etopo"
 
     # Test that component_dt_dict is preserved
     @test args.component_dt_dict isa Dict

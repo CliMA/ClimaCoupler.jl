@@ -118,7 +118,7 @@ function ClimaSeaIceSimulation(
     arch = OC.Architectures.architecture(grid)
     advection = ocean.ocean.model.advection.T
 
-    ice = sea_ice_simulation(grid, ocean.ocean; Δt, advection)
+    ice = sea_ice_simulation(grid, ocean.ocean; Δt, advection = nothing, dynamics = nothing)
 
     # Initialize nonzero sea ice if start date provided
     if !isnothing(start_date)

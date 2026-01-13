@@ -5,10 +5,10 @@ bucket_albedo_type: "map_temporal"
 checkpoint_dt: "31days"
 coupler_toml: ["toml/amip.toml"]
 dt_atmos: "120secs" # 2 minutes
-dt_cpl: "1800secs" # 30 minutes
-dt_land: "360secs" # 6 minutes
-dt_ocean: "1800secs" # 30 minutes
-dt_seaice: "1800secs" # 30 minutes
+dt_cpl: "120secs" # 2 minutes
+dt_land: "120secs" # 2 minutes
+dt_ocean: "120secs" # 2 minutes
+dt_seaice: "120secs" # 2 minutes
 energy_check: false
 ice_model: "clima_seaice"
 mode_name: "cmip"

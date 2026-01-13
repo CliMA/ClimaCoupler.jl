@@ -54,7 +54,7 @@ function postprocess_sim(cs, postprocessing_vars)
         if t_end > 84600 * 31 * 3 # 3 months for spin up
             leaderboard_base_path = artifacts_dir
             Plotting.compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
-            rmse_check && Plotting.test_rmse_thresholds(atmos_output_dir, 3)
+            rmse_check && SimOutput.test_rmse_thresholds(atmos_output_dir, 3)
             pressure_in_output && Plotting.compute_pfull_leaderboard(
                 leaderboard_base_path,
                 atmos_output_dir,

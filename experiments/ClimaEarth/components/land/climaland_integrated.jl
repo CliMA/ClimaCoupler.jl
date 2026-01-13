@@ -138,7 +138,9 @@ function ClimaLandSimulation(
         surface_space,
         start_date,
         stop_date;
-        time_interpolation_method = LinearInterpolation(),
+        modis_lai_ncdata_path = "/net/sampo/data1/ClimaArtifacts/artifacts/modis_lai/Yuan_et_al_2019_1x1.nc",
+        time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
+        # time_interpolation_method = LinearInterpolation(),
     )
 
     model = CL.LandModel{FT}(

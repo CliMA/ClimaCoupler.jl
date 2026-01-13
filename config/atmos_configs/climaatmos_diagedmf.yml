@@ -2,7 +2,6 @@
 aerosol_radiation: true
 approximate_linear_solve_iters: 2
 cloud_model: "quadrature"
-time_varying_trace_gases: ["CO2", "O3"]
 dt: "120secs"
 dt_cloud_fraction: "1hours"
 dt_rad: "1hours"
@@ -26,6 +25,7 @@ rad: "allskywithclear"
 rayleigh_sponge: true
 surface_setup: "DefaultMoninObukhov"
 t_end: "120days"
+time_varying_trace_gases: ["CO2", "O3"]
 toml: [toml/longrun_aquaplanet_diagedmf.toml]
 turbconv: "diagnostic_edmfx"
 viscous_sponge: true

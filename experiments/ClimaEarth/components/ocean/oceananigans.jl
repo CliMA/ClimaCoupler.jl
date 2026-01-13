@@ -350,42 +350,42 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     grid = sim.ocean.model.grid
     ice_concentration = sim.ice_concentration
 
-    # Convert the momentum fluxes from contravariant to Cartesian basis
-    F_turb_ρτxz_uv, F_turb_ρτyz_uv = contravariant_to_cartesian(F_turb_ρτxz, F_turb_ρτyz)
+    # # Convert the momentum fluxes from contravariant to Cartesian basis
+    # F_turb_ρτxz_uv, F_turb_ρτyz_uv = contravariant_to_cartesian(F_turb_ρτxz, F_turb_ρτyz)
 
-    # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
-        F_turb_ρτxz_uv,
-    )
-    OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr2,
-        sim.remapping.remapper_cc,
-        F_turb_ρτyz_uv,
-    )
-    OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
+    # # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
+    # CC.Remapping.interpolate!(
+    #     sim.remapping.scratch_arr1,
+    #     sim.remapping.remapper_cc,
+    #     F_turb_ρτxz_uv,
+    # )
+    # OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
+    # CC.Remapping.interpolate!(
+    #     sim.remapping.scratch_arr2,
+    #     sim.remapping.remapper_cc,
+    #     F_turb_ρτyz_uv,
+    # )
+    # OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
 
-    # Rename for clarity; these are now Center, Center Oceananigans fields
-    F_turb_ρτxz_cc = sim.remapping.scratch_cc1
-    F_turb_ρτyz_cc = sim.remapping.scratch_cc2
+    # # Rename for clarity; these are now Center, Center Oceananigans fields
+    # F_turb_ρτxz_cc = sim.remapping.scratch_cc1
+    # F_turb_ρτyz_cc = sim.remapping.scratch_cc2
 
-    # Weight by (1 - sea ice concentration)
-    OC.interior(F_turb_ρτxz_cc, :, :, 1) .=
-        OC.interior(F_turb_ρτxz_cc, :, :, 1) .* (1.0 .- ice_concentration)
-    OC.interior(F_turb_ρτyz_cc, :, :, 1) .=
-        OC.interior(F_turb_ρτyz_cc, :, :, 1) .* (1.0 .- ice_concentration)
+    # # Weight by (1 - sea ice concentration)
+    # OC.interior(F_turb_ρτxz_cc, :, :, 1) .=
+    #     OC.interior(F_turb_ρτxz_cc, :, :, 1) .* (1.0 .- ice_concentration)
+    # OC.interior(F_turb_ρτyz_cc, :, :, 1) .=
+    #     OC.interior(F_turb_ρτyz_cc, :, :, 1) .* (1.0 .- ice_concentration)
 
-    # Set the momentum flux BCs at the correct locations using the remapped scratch fields
-    oc_flux_u = surface_flux(sim.ocean.model.velocities.u)
-    oc_flux_v = surface_flux(sim.ocean.model.velocities.v)
-    set_from_extrinsic_vector!(
-        (; u = oc_flux_u, v = oc_flux_v),
-        grid,
-        F_turb_ρτxz_cc,
-        F_turb_ρτyz_cc,
-    )
+    # # Set the momentum flux BCs at the correct locations using the remapped scratch fields
+    # oc_flux_u = surface_flux(sim.ocean.model.velocities.u)
+    # oc_flux_v = surface_flux(sim.ocean.model.velocities.v)
+    # set_from_extrinsic_vector!(
+    #     (; u = oc_flux_u, v = oc_flux_v),
+    #     grid,
+    #     F_turb_ρτxz_cc,
+    #     F_turb_ρτyz_cc,
+    # )
 
     (; reference_density, heat_capacity, fresh_water_density) = sim.ocean_properties
 

@@ -8,6 +8,7 @@ env:
   GKSwstype: 100
   SLURM_KILL_BAD_EXIT: 1
   CONFIG_PATH: "config/nightly_configs"
+  BENCHMARK_CONFIG_PATH: "config/benchmark_configs"
 
 timeout_in_minutes: 840
 

@@ -67,15 +67,15 @@ function ConcentrationMaskedRadiativeEmission(FT=Float64;
                                               reference_temperature = 273.15)
 
     return ConcentrationMaskedRadiativeEmission(convert(FT, emissivity),
-                                                convert(FT, stefan_boltzmann_constant), 
+                                                convert(FT, stefan_boltzmann_constant),
                                                 convert(FT, reference_temperature))
 end
 
-function CSI.SeaIceThermodynamics.HeatBouundaryConditions.getflux(emission::ConcentrationMaskedRadiativeEmission, i, j, grid, T, clock, fields)
+function CSI.SeaIceThermodynamics.HeatBoundaryConditions.getflux(emission::ConcentrationMaskedRadiativeEmission, i, j, grid, T, clock, fields)
     ϵ = emission.emissivity
     σ = emission.stefan_boltzmann_constant
     Tᵣ = emission.reference_temperature
-    @inbounds ℵij = ℵ[i, j, 1]
+    @inbounds ℵij = fields.ℵ[i, j, 1]
     return ϵ * σ * (T + Tᵣ)^4 * (ℵij > 0)
 end
 
@@ -302,37 +302,39 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     grid = sim.ice.model.grid
     ice_concentration = sim.ice.model.ice_concentration
 
-    # Convert the momentum fluxes from contravariant to Cartesian basis
-    F_turb_ρτxz_uv, F_turb_ρτyz_uv = contravariant_to_cartesian(F_turb_ρτxz, F_turb_ρτyz)
+    if !isnothing(sim.ice.model.dynamics)
+        # Convert the momentum fluxes from contravariant to Cartesian basis
+        F_turb_ρτxz_uv, F_turb_ρτyz_uv = contravariant_to_cartesian(F_turb_ρτxz, F_turb_ρτyz)
 
-    # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
-        F_turb_ρτxz_uv,
-    )
-    OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr2,
-        sim.remapping.remapper_cc,
-        F_turb_ρτyz_uv,
-    )
-    OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
+        # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
+        CC.Remapping.interpolate!(
+            sim.remapping.scratch_arr1,
+            sim.remapping.remapper_cc,
+            F_turb_ρτxz_uv,
+        )
+        OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
+        CC.Remapping.interpolate!(
+            sim.remapping.scratch_arr2,
+            sim.remapping.remapper_cc,
+            F_turb_ρτyz_uv,
+        )
+        OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
 
-    # Rename for clarity; these are now Center, Center Oceananigans fields
-    F_turb_ρτxz_cc = sim.remapping.scratch_cc1
-    F_turb_ρτyz_cc = sim.remapping.scratch_cc2
+        # Rename for clarity; these are now Center, Center Oceananigans fields
+        F_turb_ρτxz_cc = sim.remapping.scratch_cc1
+        F_turb_ρτyz_cc = sim.remapping.scratch_cc2
 
-    # Set the momentum flux BCs at the correct locations using the remapped scratch fields
-    # Note that this requires the sea ice model to always be run with dynamics turned on
-    si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
-    si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
-    set_from_extrinsic_vector!(
-        (; u = si_flux_u, v = si_flux_v),
-        grid,
-        F_turb_ρτxz_cc,
-        F_turb_ρτyz_cc,
-    )for
+        # Set the momentum flux BCs at the correct locations using the remapped scratch fields
+        # Note that this requires the sea ice model to always be run with dynamics turned on
+        si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
+        si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
+        set_from_extrinsic_vector!(
+            (; u = si_flux_u, v = si_flux_v),
+            grid,
+            F_turb_ρτxz_cc,
+            F_turb_ρτyz_cc,
+        )
+    end
 
     # Remap the latent and sensible heat fluxes using scratch arrays
     CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, F_lh) # latent heat flux

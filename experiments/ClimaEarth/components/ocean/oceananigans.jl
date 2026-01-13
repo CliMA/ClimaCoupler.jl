@@ -107,6 +107,8 @@ function OceananigansSimulation(
         major_basins = 1,
     )
 
+    # bottom_height = OC.Architectures.on_architecture(arch, jldopen("bottom_height.jld2")["bottom"])
+
     grid = OC.ImmersedBoundaryGrid(
         underlying_grid,
         OC.GridFittedBottom(bottom_height);

@@ -226,7 +226,7 @@ function OceananigansSimulation(
         netcdf_writer = OC.NetCDFWriter(
             ocean.model,
             outputs;
-            schedule = OC.AveragedTimeInterval(864000), # 10-day averages
+            schedule = OC.TimeInterval(3600), # hourly snapshots
             filename = joinpath(output_dir, "ocean_diagnostics.nc"),
             indices = (:, :, grid.Nz),
             overwrite_existing = true,

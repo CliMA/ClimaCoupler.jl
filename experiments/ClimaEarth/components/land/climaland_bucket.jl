@@ -222,7 +222,9 @@ function BucketSimulation(
             model,
             start_date,
             output_writer = output_writer,
-            reduction_period = :tendaily,
+            reduction_period = :hourly,
+            reduction_type = :instantaneous,
+            dt,
         )
 
         diagnostic_handler =

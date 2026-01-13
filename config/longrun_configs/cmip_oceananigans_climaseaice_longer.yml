@@ -20,3 +20,7 @@ t_end: "1825days" # 5 years
 topo_smoothing: true
 topography: "Earth"
 use_itime: false
+extra_atmos_diagnostics:
+  - short_name: [tas, pr, ua, va, rhoa, hus]
+    period: 1hours
+    reduction_time: inst

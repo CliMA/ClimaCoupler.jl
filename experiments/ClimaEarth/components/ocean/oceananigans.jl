@@ -346,9 +346,11 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
 
     # Weight by (1 - sea ice concentration)
     OC.interior(F_turb_ρτxz_cc, :, :, 1) .=
-        OC.interior(F_turb_ρτxz_cc, :, :, 1) .* (1.0 .- ice_concentration) ./ reference_density
+        OC.interior(F_turb_ρτxz_cc, :, :, 1) .* (1.0 .- ice_concentration) ./
+        reference_density
     OC.interior(F_turb_ρτyz_cc, :, :, 1) .=
-        OC.interior(F_turb_ρτyz_cc, :, :, 1) .* (1.0 .- ice_concentration) ./ reference_density
+        OC.interior(F_turb_ρτyz_cc, :, :, 1) .* (1.0 .- ice_concentration) ./
+        reference_density
 
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
     oc_flux_u = surface_flux(sim.ocean.model.velocities.u)

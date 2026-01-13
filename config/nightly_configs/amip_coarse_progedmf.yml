@@ -4,8 +4,11 @@ atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "186days"
 coupler_toml: ["toml/amip_progedmf.toml"]
-dt: "60secs"
-dt_cpl: "60secs"
+dt_atmos: "1mins"
+dt_cpl: "10mins"
+dt_land: "5mins"
+dt_ocean: "5mins"
+dt_seaice: "5mins"
 dz_bottom: 100.0
 energy_check: false
 h_elem: 8

@@ -6,7 +6,11 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
-#### Update interfaces to surface-flux calculator to support dynamic roughness.
+#### Change default simulation output directory PRPR[#1653](https://github.com/CliMA/ClimaCoupler.jl/pull/1653)
+Changes the default output directory from `experiments/ClimaEarth/output/` to `output`.
+The internal structure within the output directory remains the same.
+
+#### Update interfaces to surface-flux calculator to support dynamic roughness PR[#1567](https://github.com/CliMA/ClimaCoupler.jl/pull/1567)
 Adds the `roughness_model` argument to the surface-flux input constructor. Default
 behaviour is the `SF.ScalarRoughness()` type. Upcoming changes will account for the
 value of the `roughness_model` to be inferred from the mask value (e.g. prescribed

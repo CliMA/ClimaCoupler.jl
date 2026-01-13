@@ -166,9 +166,9 @@ function argparse_settings()
         default = false
         # Output information
         "--coupler_output_dir"
-        help = "Directory to save output files. Note that TempestRemap fails if interactive and paths are too long. [\"experiments/ClimaEarth/output\" (default)]"
+        help = "Directory to save output files. Note that TempestRemap fails if interactive and paths are too long. [\"output\" (default)]"
         arg_type = String
-        default = "experiments/ClimaEarth/output"
+        default = "output"
         # ClimaAtmos specific
         "--surface_setup"
         help = "Triggers ClimaAtmos into the coupled mode [`PrescribedSurface` (default), `DefaultMoninObukhov`]" # retained here for standalone Atmos benchmarks

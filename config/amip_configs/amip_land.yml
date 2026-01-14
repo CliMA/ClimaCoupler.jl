@@ -11,6 +11,8 @@ mode_name: "amip"
 netcdf_output_at_levels: true
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
+orographic_gravity_wave: "raw_topo"
+non_orographic_gravity_wave: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "1098days"

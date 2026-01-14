@@ -4,11 +4,11 @@ atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "31days"
 coupler_toml: ["toml/amip.toml"]
-dt_atmos: "60secs" # 1 minutes
-dt_cpl: "120secs" # 2 minutes
-dt_land: "120secs" # 2 minutes
-dt_ocean: "120secs" # 2 minutes
-dt_seaice: "120secs" # 2 minutes
+dt_atmos: "30secs" # 0.5 minutes
+dt_cpl: "1200secs" # 20 minutes
+dt_land: "60secs" # 1 minutes
+dt_ocean: "1200secs" # 20 minutes
+dt_seaice: "1200secs" # 20 minutes
 energy_check: false
 ice_model: "clima_seaice"
 mode_name: "cmip"

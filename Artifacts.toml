@@ -24,3 +24,17 @@ git-tree-sha1 = "53a27731c0a2ec60756af24e4c60ac37da4a32bc"
     [[cmip_model_rmse.download]]
     sha256 = "3e8fa41df226dda9d375f8cb9dbeee3e10f9fceabcad2c7b91c9633b489b0437"
     url = "https://caltech.box.com/shared/static/lmzvnjkxctlb0fanieeqxll0vdrbei9e.gz"
+
+[landsea_mask_60arcseconds]
+git-tree-sha1 = "10ed7ec61def091c44545825cfb4d9599216c3c8"
+
+    [[landsea_mask_60arcseconds.download]]
+    sha256 = "eb88455a39a00bfadb77effbc31a4df561158c0ca1578476edb683d45e3c49da"
+    url = "https://caltech.box.com/shared/static/vivf36pih7e0ttahqarc2nd5jxb4q8jr.gz"
+
+[era5_land_fraction]
+git-tree-sha1 = "7f14ef1c7859da1363b8973743b2a376c008f29f"
+
+    [[era5_land_fraction.download]]
+    sha256 = "1d6acf98656b50f1a324ee3daa267281fb017314d2169dbfda25208299f44870"
+    url = "https://caltech.box.com/shared/static/glqlyb626j3szcjltyuwp534yzzhf770.gz"

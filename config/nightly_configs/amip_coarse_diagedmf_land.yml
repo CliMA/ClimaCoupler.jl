@@ -3,11 +3,8 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
 checkpoint_dt: "366days"
 coupler_toml: ["toml/amip_diagedmf.toml"]
-dt_atmos: "4mins"
-dt_cpl: "32mins"
-dt_land: "8mins"
-dt_ocean: "8mins"
-dt_seaice: "8mins"
+dt: "240secs"
+dt_cpl: "240secs"
 dz_bottom: 100.0
 energy_check: false
 h_elem: 8

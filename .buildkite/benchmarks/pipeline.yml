@@ -19,6 +19,7 @@ steps:
       - julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.add("MPI");'
       - julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.precompile()'
       - julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.status()'
+      - julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.add(url="https://github.com/CliMA/ClimaAtmos.jl", rev="he/sphere-spacefillingcurve")'
     agents:
       slurm_gpus: 1
       slurm_cpus_per_task: 8

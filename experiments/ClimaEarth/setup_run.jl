@@ -82,8 +82,8 @@ include("components/land/climaland_integrated.jl")
 include("components/ocean/slab_ocean.jl")
 include("components/ocean/prescr_ocean.jl")
 include("components/ocean/prescr_seaice.jl")
-include("components/ocean/oceananigans.jl")
-include("components/ocean/clima_seaice.jl")
+#include("components/ocean/oceananigans.jl")
+#include("components/ocean/clima_seaice.jl")
 
 #=
 ### Configuration Dictionaries
@@ -319,6 +319,7 @@ function CoupledSimulation(config_dict::AbstractDict)
                 area_fraction = land_fraction,
                 shared_surface_space,
                 surface_elevation,
+                atmos_h,
                 land_temperature_anomaly,
                 use_land_diagnostics,
                 albedo_type = bucket_albedo_type,

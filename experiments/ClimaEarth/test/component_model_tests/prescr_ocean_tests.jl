@@ -70,7 +70,6 @@ end
     @test sim.cache.T_sfc == SST_expected
     @test sim.cache.z0m == FT(5.8e-5)
     @test sim.cache.z0b == FT(5.8e-5)
-    @test sim.cache.beta == FT(1)
     @test sim.cache.α_direct == ones(space) .* FT(0.06)
     @test sim.cache.α_diffuse == ones(space) .* FT(0.06)
     @test sim.cache.area_fraction == area_fraction
@@ -80,7 +79,6 @@ end
 
     # Test `Interfacer.get_field` function
     @test Interfacer.get_field(sim, Val(:area_fraction)) == sim.cache.area_fraction
-    @test Interfacer.get_field(sim, Val(:beta)) == sim.cache.beta
     @test Interfacer.get_field(sim, Val(:roughness_buoyancy)) == sim.cache.z0b
     @test Interfacer.get_field(sim, Val(:roughness_momentum)) == sim.cache.z0m
     @test Interfacer.get_field(sim, Val(:surface_direct_albedo)) == sim.cache.α_direct

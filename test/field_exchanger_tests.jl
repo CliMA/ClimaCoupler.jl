@@ -30,10 +30,6 @@ Interfacer.get_field(
 ) = sim.cache_field
 Interfacer.get_field(
     sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2},
-    ::Val{:beta},
-) = sim.cache_field
-Interfacer.get_field(
-    sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2},
     ::Val{:emissivity},
 ) = eltype(sim.cache_field)(1)
 
@@ -125,7 +121,6 @@ Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:surface_temperature}, 
     nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:roughness_buoyancy}, field) =
     nothing
-Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:beta}, field) = nothing
 FluxCalculator.update_turbulent_fluxes!(sim::TestAtmosSimulation, fields) = nothing
 Interfacer.step!(sim::TestAtmosSimulation, t) = nothing
 
@@ -390,7 +385,6 @@ for FT in (Float32, Float64)
             :albedo_diffuse,
             :roughness_momentum,
             :roughness_buoyancy,
-            :beta,
         ]
         atmos_fields = Interfacer.init_coupler_fields(FT, atmos_names, boundary_space)
 
@@ -430,7 +424,6 @@ for FT in (Float32, Float64)
         # test variables without updates
         expected_field .= results[1]
         @test model_sims.atmos_sim.cache.surface_temperature == expected_field
-        @test model_sims.atmos_sim.cache.beta == expected_field
         @test model_sims.atmos_sim.cache.roughness_buoyancy == expected_field
 
         # test land updates

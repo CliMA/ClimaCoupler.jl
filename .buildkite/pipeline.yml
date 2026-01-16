@@ -393,7 +393,7 @@ steps:
       - label: "Perfect model calibration test"
         key: "amip_pm_calibration"
         command:
-          - "julia --color=yes --project=experiments/ClimaEarth experiments/calibration/run_calibration.jl"
+          - "julia --color=yes --project=experiments/ClimaEarth experiments/calibration/test/run_calibration.jl"
         artifact_paths: "experiments/calibration/output/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"

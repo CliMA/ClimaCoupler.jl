@@ -55,7 +55,7 @@ addprocs(CAL.SlurmManager())
     ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
 
     experiment_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration")
-    include(joinpath(experiment_dir, "model_interface.jl"))
+    include(joinpath(experiment_dir, "test", "model_interface.jl"))
     output_dir = joinpath(experiment_dir, "output")
     obs_path = joinpath(experiment_dir, "observations.jld2")
 end
@@ -92,7 +92,7 @@ ensemble_size = EKP.get_N_ens(eki)
 # Allow 100% failure rate for short run testing
 if SHORT_RUN
     eki = CAL.calibrate(
-        CAL.WorkerBackend,
+        CAL.WorkerBackend(),
         eki,
         n_iterations,
         prior,
@@ -100,7 +100,7 @@ if SHORT_RUN
         failure_rate = 1,
     )
 else
-    eki = CAL.calibrate(CAL.WorkerBackend, eki, n_iterations, prior, output_dir)
+    eki = CAL.calibrate(CAL.WorkerBackend(), eki, n_iterations, prior, output_dir)
 end
 
 # Postprocessing

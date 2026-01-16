@@ -37,7 +37,7 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
 CUDA = "5"
-ClimaCalibrate = "0.1"
+ClimaCalibrate = "0.2"
 ClimaLand = "1.3"
 ClimaOcean = "0.8.6"
 ClimaParams = "1.0"

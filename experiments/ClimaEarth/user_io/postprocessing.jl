@@ -49,8 +49,7 @@ function postprocess_sim(cs, postprocessing_vars)
     simdir = CAN.SimDir(atmos_output_dir)
     if !isempty(simdir)
         pressure_in_output = "pfull" in CAN.available_vars(simdir)
-        times = CAN.times(get(simdir, first(CAN.available_vars(simdir))))
-        t_end = times[end]
+        t_end = float(cs.t[])
         if t_end > 84600 * 31 * 3 # 3 months for spin up
             leaderboard_base_path = artifacts_dir
             Plotting.compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)

@@ -4,6 +4,7 @@ using ClimaCalibrate
 using ClimaAnalysis
 import ClimaAnalysis: SimDir, get, slice, average_xy
 import ClimaComms
+import ClimaDiagnostics
 import EnsembleKalmanProcesses: I, ParameterDistributions.constrained_gaussian
 import EnsembleKalmanProcesses as EKP
 using Statistics
@@ -36,7 +37,13 @@ function process_member_data(simdir::SimDir)
     minutes = 3_600
 
     period = SHORT_RUN ? "8m" : "30d"
-    time = SHORT_RUN ? 8minutes : 30days
+    # With ClimaDiagnostics v0.3, the diagnostics are saved at the start of the
+    # reduction period instead of at the end
+    if pkgversion(ClimaDiagnostics) < v"0.3"
+        time = SHORT_RUN ? 8minutes : 30days
+    else
+        time = 0
+    end
     rsut = get(simdir; short_name = "rsut", reduction = "average", period)
     rsut_slice = slice(average_lon(average_lat(rsut)); time).data
     return rsut_slice

@@ -290,7 +290,8 @@ function CoupledSimulation(config_dict::AbstractDict)
         @info("AMIP/CMIP boundary conditions - do not expect energy conservation")
 
         # Build ERA5-based file paths if subseasonal mode is selected
-        subseasonal_sst = subseasonal_sic = subseasonal_land_ic = nothing
+        subseasonal_sst = subseasonal_sic = subseasonal_land_ic = subseasonal_albedo =
+            subseasonal_bucket_ic = nothing
         if sim_mode <: SubseasonalMode
             isnothing(era5_initial_condition_dir) &&
                 error("subseasonal mode requires --era5_initial_condition_dir")
@@ -304,12 +305,28 @@ function CoupledSimulation(config_dict::AbstractDict)
                 era5_initial_condition_dir,
                 "era5_land_processed_$(datestr)_0000.nc",
             )
+            subseasonal_albedo = joinpath(
+                era5_initial_condition_dir,
+                "albedo_processed_$(datestr)_0000.nc",
+            )
+            subseasonal_bucket_ic = joinpath(
+                era5_initial_condition_dir,
+                "era5_bucket_processed_$(datestr)_0000.nc",
+            )
         end
 
         ## land model
         # Determine whether to use a shared surface space
         shared_surface_space = share_surface_space ? boundary_space : nothing
         if land_model == "bucket"
+            # Use subseasonal files if available and not explicitly specified
+            era5_albedo_file = isnothing(subseasonal_albedo) ? "" : subseasonal_albedo
+            # Use subseasonal bucket IC if bucket_initial_condition is not specified
+            bucket_ic = if isempty(bucket_initial_condition) && !isnothing(subseasonal_bucket_ic)
+                subseasonal_bucket_ic
+            else
+                bucket_initial_condition
+            end
             land_sim = BucketSimulation(
                 FT;
                 dt = component_dt_dict["dt_land"],
@@ -322,7 +339,8 @@ function CoupledSimulation(config_dict::AbstractDict)
                 land_temperature_anomaly,
                 use_land_diagnostics,
                 albedo_type = bucket_albedo_type,
-                bucket_initial_condition,
+                bucket_initial_condition = bucket_ic,
+                era5_albedo_file_path = era5_albedo_file,
                 coupled_param_dict,
             )
         elseif land_model == "integrated"

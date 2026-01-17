@@ -2,6 +2,7 @@ import ClimaParams as CP
 import ClimaLand as CL
 import ClimaLand.Parameters as LP
 import Dates
+import Interpolations
 import ClimaUtilities.TimeVaryingInputs:
     LinearInterpolation, PeriodicCalendar, TimeVaryingInput
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
@@ -61,6 +62,7 @@ end
         use_land_diagnostics::Bool = true,
         parameter_files = [],
         land_ic_path::Union{Nothing,String} = nothing,
+        lai_source::Symbol = :modis,
     ) where {FT, TT <: Union{Float64, ITime}}
 
 Creates a ClimaLandSimulation object containing a land domain,
@@ -69,6 +71,11 @@ a ClimaLand.LandModel, and an integrator.
 This type of model contains a canopy model, soil model, snow model, and
 soil CO2 model. Specific details about the complexity of the model
 can be found in the ClimaLand.jl documentation.
+
+# Arguments
+- `lai_source::Symbol = :modis`: Source for leaf area index data. Options:
+  - `:modis`: Time-varying LAI from MODIS data (default)
+  - `:era5_ic`: Constant LAI from the ERA5 land IC file (requires `land_ic_path`)
 """
 function ClimaLandSimulation(
     ::Type{FT};
@@ -89,6 +96,7 @@ function ClimaLandSimulation(
     use_land_diagnostics::Bool = true,
     coupled_param_dict = CP.create_toml_dict(FT),
     land_ic_path::Union{Nothing, String} = nothing,
+    lai_source::Symbol = :modis,
 ) where {FT, TT <: Union{Float64, ITime}}
     # Get default land parameters from ClimaLand.LandParameters
     land_toml_dict = LP.create_toml_dict(FT)
@@ -133,15 +141,36 @@ function ClimaLandSimulation(
     )
 
     # Set up leaf area index (LAI)
-    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
-    LAI = CL.prescribed_lai_modis(
-        surface_space,
-        start_date,
-        stop_date;
-        modis_lai_ncdata_path = "/net/sampo/data1/ClimaArtifacts/artifacts/modis_lai/Yuan_et_al_2019_1x1.nc",
-        time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
-        # time_interpolation_method = LinearInterpolation(),
-    )
+    # lai_source can be :modis (time-varying) or :era5_ic (constant from land IC file)
+    if lai_source == :modis
+        stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+        LAI = CL.prescribed_lai_modis(
+            surface_space,
+            start_date,
+            stop_date;
+            modis_lai_ncdata_path = "/net/sampo/data1/wxquest_data/static_fields/modis_lai_climatology.nc",
+            time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
+        )
+    elseif lai_source == :era5_ic
+        isnothing(land_ic_path) && error("land_ic_path must be provided when lai_source = :era5_ic")
+        @info "ClimaLand: using constant LAI from ERA5 land IC file" land_ic_path
+        regridder_type = :InterpolationsRegridder
+        extrapolation_bc = (Interpolations.Periodic(), Interpolations.Flat())
+        interpolation_method = Interpolations.Linear()
+        # Read constant LAI field from ERA5 land IC file
+        constant_lai_field = SpaceVaryingInput(
+            land_ic_path,
+            "lai",
+            surface_space;
+            regridder_type,
+            regridder_kwargs = (; extrapolation_bc, interpolation_method),
+        )
+        # Wrap in TimeVaryingInput using function form (required by CanopyModel)
+        # The function returns the constant field, ignoring time
+        LAI = TimeVaryingInput((time, args...; kwargs...) -> constant_lai_field)
+    else
+        error("Unknown lai_source: $lai_source. Must be :modis or :era5_ic")
+    end
 
     model = CL.LandModel{FT}(
         forcing,
@@ -321,8 +350,8 @@ function ClimaLandSimulation(
             model,
             start_date,
             output_writer = output_writer,
-            output_vars = :short,
-            reduction_period = :monthly,
+            output_vars = :long,
+            reduction_period = :hourly,
         )
         diagnostic_handler =
             CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)

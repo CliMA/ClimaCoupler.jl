@@ -1,0 +1,26 @@
+#!/bin/bash
+#PBS -N pbs_calibration
+#PBS -o calibration_${PBS_JOBID}.out
+#PBS -l walltime=12:00:00
+#PBS -l select=1:ncpus=1:mem=2GB
+
+# Assuming the script is run from the top level of ClimaCoupler.jl
+CLIMAEARTH_PATH='experiments/subseasonal/calibration/'
+DRIVER=${CLIMAEARTH_PATH}'run_calibration.jl'
+
+# Set environment variables for CliMA
+export CLIMACOMMS_DEVICE="CUDA"
+export CLIMACOMMS_CONTEXT="SINGLETON"
+
+# Set temporary directory
+export TMPDIR=$SCRATCH/tmp && mkdir -p $TMPDIR
+
+# Load required modules
+module load climacommon
+
+# Build and run the Julia code
+julia --project=calibration -e 'using Pkg; Pkg.instantiate(;verbose=true)'
+julia --project=$CLIMAEARTH_PATH -e 'using Pkg; Pkg.develop(Pkg.PackageSpec(;name="ClimaAtmos", path="/home/chew/git_repos/ClimaAtmos.jl"))'
+julia --project=$CLIMAEARTH_PATH -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaParams", rev="rc/gw"))'
+julia --project=$CLIMAEARTH_PATH -e 'using Pkg; Pkg.precompile()'
+julia --project=experiments/ClimaEarth $DRIVER

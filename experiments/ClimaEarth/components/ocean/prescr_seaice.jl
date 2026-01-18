@@ -142,7 +142,7 @@ function slab_ice_space_init_from_file(
     
     # Minimum allowed surface temperature - used to derive minimum T_bulk
     # This prevents unrealistically cold surface temperatures
-    T_sfc_min = FT(220)  # Minimum physically reasonable ice surface temperature
+    T_sfc_min = FT(235)  # Minimum physically reasonable ice surface temperature
     # From T_sfc = 2*T_bulk - T_base, we get T_bulk = (T_sfc + T_base) / 2
     T_bulk_min = (T_sfc_min + T_base) / FT(2)  # ~253K for T_base=271.2K
 
@@ -399,7 +399,7 @@ function Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_tempe
     # Clamp T_sfc to physically reasonable bounds
     # Minimum of 235K prevents numerical issues in atmosphere radiation calculations
     # Maximum of T_freeze (ice can't be warmer than freezing)
-    T_sfc_min_allowed = FT(220)
+    T_sfc_min_allowed = FT(235)
     T_sfc_vals = parent(T_sfc)
     n_too_cold = sum(T_sfc_vals .< T_sfc_min_allowed)
     if n_too_cold > 0
@@ -493,7 +493,7 @@ function Interfacer.step!(sim::PrescribedIceSimulation, t)
     # Clamp T_bulk to physically reasonable bounds after step:
     # - Cannot exceed T_freeze (ice would melt)
     # - Minimum consistent with T_sfc_min=235K: T_bulk = (T_sfc + T_base)/2 ≈ 253K
-    T_sfc_min = FT(220)
+    T_sfc_min = FT(235)
     T_bulk_min = (T_sfc_min + T_freeze) / FT(2)  # ~253K
     @. sim.integrator.u.T_bulk = clamp(sim.integrator.u.T_bulk, T_bulk_min, T_freeze)
     
@@ -605,7 +605,7 @@ function ice_rhs!(dY, Y, p, t)
     # This is critical because the ODE solver uses intermediate stages where T_bulk
     # can go outside the post-step clamped range, leading to extremely cold T_sfc
     # values (e.g., T_bulk=200K → T_sfc=128.8K) that can cause issues.
-    T_sfc_min = FT(220)  # Minimum physically reasonable ice surface temperature
+    T_sfc_min = FT(235)  # Minimum physically reasonable ice surface temperature
     T_sfc = @. clamp(ice_surface_temperature(Y.T_bulk, T_base), T_sfc_min, T_freeze)
     
     if do_debug || any(isnan, parent(T_sfc))

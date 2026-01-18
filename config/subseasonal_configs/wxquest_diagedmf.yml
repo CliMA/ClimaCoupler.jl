@@ -10,7 +10,7 @@ initial_condition: "WeatherModel"
 checkpoint_dt: "7days"
 dt: "120secs"
 dt_cpl: "120secs"
-dt_seaice: "60secs"
+dt_seaice: "120secs"
 energy_check: false
 h_elem: 32
 land_fraction_source: "era5"
@@ -37,6 +37,13 @@ t_end: "40days"
 netcdf_output_at_levels: true
 use_coupler_diagnostics: true
 extra_atmos_diagnostics:
-  - short_name: [zg, orog, tas, ta, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, wa, waup]
+  - short_name: [zg, orog, tas, ta, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cl, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, wa, waup]
+    period: 3hours
+    reduction_time: inst
+  - short_name: [hfss, hfls, evspsbl]
     period: 3hours
     reduction_time: average
+# extra_atmos_diagnostics:
+#   - short_name: [zg, orog, tas, ta, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, wa, waup]
+#     period: 3hours
+#     reduction_time: average

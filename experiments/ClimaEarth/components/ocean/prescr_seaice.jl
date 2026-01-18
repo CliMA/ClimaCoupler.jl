@@ -104,7 +104,7 @@ end
 function slab_ice_space_init(::Type{FT}, space, params) where {FT}
     # bulk temperatures commonly 10-20 K below freezing for sea ice 2m thick in winter,
     # and closer to freezing in summer and when melting.
-    Y = CC.Fields.FieldVector(T_bulk = ones(space) .* params.T_freeze .- FT(15.0))
+    Y = CC.Fields.FieldVector(T_bulk = ones(space) .* params.T_freeze .- FT(10.0))
     return Y
 end
 
@@ -136,64 +136,73 @@ function slab_ice_space_init_from_file(
     t_start,
     ice_fraction,
 ) where {FT}
-    T_fallback = params.T_freeze - FT(15.0)
+    T_fallback = params.T_freeze - FT(10.0)  # More conservative fallback (was -15)
+    T_base = params.T_base
+    T_freeze = params.T_freeze
+    
+    # Minimum allowed surface temperature - used to derive minimum T_bulk
+    # This prevents unrealistically cold surface temperatures
+    T_sfc_min = FT(220)  # Minimum physically reasonable ice surface temperature
+    # From T_sfc = 2*T_bulk - T_base, we get T_bulk = (T_sfc + T_base) / 2
+    T_bulk_min = (T_sfc_min + T_base) / FT(2)  # ~253K for T_base=271.2K
 
     T_bulk_init = try
-        # Read the 4 ice temperature layers from ERA5 using TimeVaryingInput
+        # Read the ice temperature layers from ERA5 using TimeVaryingInput
         # TimeVaryingInput is required because the ISTL data has a time dimension
-        @info "PrescribedIce: attempting to read ice temperature from ERA5 layers (ISTL1-4)"
+        @info "PrescribedIce: attempting to read ice temperature from ERA5 layer ISTL1 (0-7cm near-surface)"
         @info "PrescribedIce: reference_date=$start_date, t_start=$t_start"
 
+        # Use ISTL1 (0-7cm, near-surface layer) as a proxy for surface temperature
+        # This is more appropriate than averaging all layers because:
+        # 1. ISTL1 is closest to the actual surface
+        # 2. Averaging with deeper (warmer) layers gives a bulk T that's too cold
+        #    when extrapolated to surface via T_sfc = 2*T_bulk - T_base
         ISTL1_input = TimeVaryingInput(sic_data, "ISTL1", space; reference_date = start_date)
-        ISTL2_input = TimeVaryingInput(sic_data, "ISTL2", space; reference_date = start_date)
-        ISTL3_input = TimeVaryingInput(sic_data, "ISTL3", space; reference_date = start_date)
-        ISTL4_input = TimeVaryingInput(sic_data, "ISTL4", space; reference_date = start_date)
+        T_sfc_era5 = CC.Fields.zeros(space)
+        evaluate!(T_sfc_era5, ISTL1_input, t_start)
 
-        ISTL1 = CC.Fields.zeros(space)
-        ISTL2 = CC.Fields.zeros(space)
-        ISTL3 = CC.Fields.zeros(space)
-        ISTL4 = CC.Fields.zeros(space)
+        # Debug: log ISTL1 (surface layer) statistics
+        T_sfc_vals = parent(T_sfc_era5)
+        n_nan = sum(isnan.(T_sfc_vals))
+        n_inf = sum(isinf.(T_sfc_vals))
+        @info "PrescribedIce: ISTL1 (surface proxy) stats" minimum(T_sfc_vals) maximum(T_sfc_vals) mean(T_sfc_vals) n_nan n_inf
 
-        evaluate!(ISTL1, ISTL1_input, t_start)
-        evaluate!(ISTL2, ISTL2_input, t_start)
-        evaluate!(ISTL3, ISTL3_input, t_start)
-        evaluate!(ISTL4, ISTL4_input, t_start)
+        # Clamp T_sfc to reasonable bounds BEFORE computing T_bulk
+        # This prevents unrealistically cold surface temperatures from propagating
+        @. T_sfc_era5 = clamp(T_sfc_era5, T_sfc_min, T_freeze)
+        
+        @info "PrescribedIce: ISTL1 after clamping to [$T_sfc_min, $T_freeze]" minimum(parent(T_sfc_era5)) maximum(parent(T_sfc_era5))
 
-        # Debug: log individual layer statistics
-        for (name, field) in [("ISTL1", ISTL1), ("ISTL2", ISTL2), ("ISTL3", ISTL3), ("ISTL4", ISTL4)]
-            vals = parent(field)
-            n_nan = sum(isnan.(vals))
-            n_inf = sum(isinf.(vals))
-            @info "PrescribedIce: $name stats" minimum(vals) maximum(vals) mean(vals) n_nan n_inf
-        end
+        # Back-calculate T_bulk from T_sfc assuming linear temperature profile
+        # From: T_sfc = 2*T_bulk - T_base
+        # We get: T_bulk = (T_sfc + T_base) / 2
+        T_bulk = @. (T_sfc_era5 + T_base) / FT(2)
 
-        # Average the 4 layers for bulk temperature
-        T_avg = @. (ISTL1 + ISTL2 + ISTL3 + ISTL4) / 4
-
-        # Debug: log statistics of raw ERA5 ice temperatures
-        T_avg_vals = parent(T_avg)
-        n_nan_raw = sum(isnan.(T_avg_vals))
-        n_inf_raw = sum(isinf.(T_avg_vals))
-        @info "PrescribedIce: ERA5 ice temp stats (raw)" minimum(T_avg_vals) maximum(T_avg_vals) mean(T_avg_vals) n_nan_raw n_inf_raw
+        # Debug: log computed bulk temperature
+        T_bulk_vals = parent(T_bulk)
+        @info "PrescribedIce: T_bulk (derived from ISTL1)" minimum(T_bulk_vals) maximum(T_bulk_vals) mean(T_bulk_vals)
 
         # Only use ERA5 temperatures where there is ice; use fallback elsewhere
-        # This prevents using warm (~273K) values from ice-free ocean regions
-        @. T_avg = ifelse(ice_fraction > 0, T_avg, T_fallback)
+        # This prevents using values from ice-free ocean regions
+        @. T_bulk = ifelse(ice_fraction > 0, T_bulk, T_fallback)
 
         # Fall back to constant where data is not finite
-        @. T_avg = ifelse(isfinite(T_avg), T_avg, T_fallback)
+        @. T_bulk = ifelse(isfinite(T_bulk), T_bulk, T_fallback)
 
-        # Clamp temperature to be at most T_freeze to prevent numerical issues
-        # (ice temperature should never exceed the freezing point)
-        @. T_avg = min(T_avg, params.T_freeze)
+        # Clamp T_bulk to valid range: [T_bulk_min, T_freeze]
+        @. T_bulk = clamp(T_bulk, T_bulk_min, T_freeze)
 
         # Debug: log statistics after processing
-        T_avg_vals_processed = parent(T_avg)
-        n_nan_processed = sum(isnan.(T_avg_vals_processed))
-        @info "PrescribedIce: ice temp stats (after masking & clamping)" minimum(T_avg_vals_processed) maximum(T_avg_vals_processed) mean(T_avg_vals_processed) n_nan_processed
+        T_bulk_vals_processed = parent(T_bulk)
+        n_nan_processed = sum(isnan.(T_bulk_vals_processed))
+        @info "PrescribedIce: T_bulk (after masking & clamping)" minimum(T_bulk_vals_processed) maximum(T_bulk_vals_processed) mean(T_bulk_vals_processed) n_nan_processed
+        
+        # Verify the surface temperature we'll get from this T_bulk
+        T_sfc_check = @. 2 * T_bulk - T_base
+        @info "PrescribedIce: resulting T_sfc range" minimum(parent(T_sfc_check)) maximum(parent(T_sfc_check))
 
-        @info "PrescribedIce: initialized ice temperature from ERA5 data (average of ISTL1-4)"
-        T_avg
+        @info "PrescribedIce: initialized T_bulk from ERA5 ISTL1 (surface layer)"
+        T_bulk
     catch e
         @warn "PrescribedIce: could not read ice temperature from file, using constant initialization" exception =
             (e, catch_backtrace())
@@ -315,7 +324,7 @@ function PrescribedIceSimulation(
     
     # Extra safety: ensure no NaNs in Y after initialization
     if any(isnan, T_bulk_vals)
-        T_fallback = params.T_freeze - FT(15.0)
+        T_fallback = params.T_freeze - FT(5.0)
         @warn "PrescribedIce: POST-INIT found NaNs in Y.T_bulk, replacing with fallback=$T_fallback"
         @. Y.T_bulk = ifelse(isnan(Y.T_bulk), T_fallback, Y.T_bulk)
     end
@@ -384,17 +393,19 @@ Interfacer.get_field(
 ) = sim.integrator.p.params.α
 function Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature})
     FT = eltype(sim.integrator.u)
+    T_freeze = sim.integrator.p.params.T_freeze
     T_sfc = ice_surface_temperature.(sim.integrator.u.T_bulk, sim.integrator.p.params.T_base)
     
-    # Clamp T_sfc to a minimum of 200K to prevent numerical issues in atmosphere
-    # Very cold surface temps (< 200K) can cause issues in radiation calculations
-    T_sfc_min_allowed = FT(210)
+    # Clamp T_sfc to physically reasonable bounds
+    # Minimum of 235K prevents numerical issues in atmosphere radiation calculations
+    # Maximum of T_freeze (ice can't be warmer than freezing)
+    T_sfc_min_allowed = FT(220)
     T_sfc_vals = parent(T_sfc)
     n_too_cold = sum(T_sfc_vals .< T_sfc_min_allowed)
     if n_too_cold > 0
         @warn "PrescribedIce: clamping $n_too_cold T_sfc values below $T_sfc_min_allowed K" T_sfc_min=minimum(T_sfc_vals)
-        @. T_sfc = max(T_sfc, T_sfc_min_allowed)
     end
+    @. T_sfc = clamp(T_sfc, T_sfc_min_allowed, T_freeze)
     
     T_sfc_vals = parent(T_sfc)
     if any(isnan, T_sfc_vals)
@@ -481,8 +492,9 @@ function Interfacer.step!(sim::PrescribedIceSimulation, t)
     
     # Clamp T_bulk to physically reasonable bounds after step:
     # - Cannot exceed T_freeze (ice would melt)
-    # - Minimum of 200K (very cold but physically possible)
-    T_bulk_min = FT(210)
+    # - Minimum consistent with T_sfc_min=235K: T_bulk = (T_sfc + T_base)/2 ≈ 253K
+    T_sfc_min = FT(220)
+    T_bulk_min = (T_sfc_min + T_freeze) / FT(2)  # ~253K
     @. sim.integrator.u.T_bulk = clamp(sim.integrator.u.T_bulk, T_bulk_min, T_freeze)
     
     # Check state after stepping
@@ -589,11 +601,11 @@ function ice_rhs!(dY, Y, p, t)
     end
 
     # Calculate the surface temperature
-    # IMPORTANT: Clamp T_sfc to reasonable bounds (210K to T_freeze) INSIDE ice_rhs!
+    # IMPORTANT: Clamp T_sfc to reasonable bounds (235K to T_freeze) INSIDE ice_rhs!
     # This is critical because the ODE solver uses intermediate stages where T_bulk
     # can go outside the post-step clamped range, leading to extremely cold T_sfc
     # values (e.g., T_bulk=200K → T_sfc=128.8K) that can cause issues.
-    T_sfc_min = FT(210)  # Minimum physically reasonable ice surface temperature
+    T_sfc_min = FT(220)  # Minimum physically reasonable ice surface temperature
     T_sfc = @. clamp(ice_surface_temperature(Y.T_bulk, T_base), T_sfc_min, T_freeze)
     
     if do_debug || any(isnan, parent(T_sfc))

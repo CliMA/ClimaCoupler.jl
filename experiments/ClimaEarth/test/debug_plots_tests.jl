@@ -2,9 +2,11 @@
 import Test: @test, @testset, @test_logs
 import ClimaCore as CC
 import ClimaParams as CP
-import ClimaCoupler: Interfacer
+import ClimaCoupler: Interfacer, Plotting
 import ClimaComms
 ClimaComms.@import_required_backends
+
+using Makie, GeoMakie, CairoMakie, ClimaCoreMakie # trigger ClimaCouplerMakieExt extension
 
 # Prevent GKS headless operation mode warning
 ENV["GKSwstype"] = "nul"
@@ -23,17 +25,15 @@ struct ClimaLandSimulation{C} <: Interfacer.SurfaceModelSimulation
     cache::C
 end
 
-include("../user_io/debug_plots.jl")
-
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_field}) = sim.cache.surface_field
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_field}) =
     sim.cache.surface_field
 Interfacer.get_field(sim::Interfacer.SurfaceStub, ::Val{:stub_field}) = sim.cache.stub_field
 
-plot_field_names(sim::ClimaAtmosSimulation) = (:atmos_field,)
-plot_field_names(sim::BucketSimulation) = (:surface_field,)
-plot_field_names(sim::ClimaLandSimulation) = (:surface_field,)
-plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
+Plotting.debug_plot_fields(sim::ClimaAtmosSimulation) = (:atmos_field,)
+Plotting.debug_plot_fields(sim::BucketSimulation) = (:surface_field,)
+Plotting.debug_plot_fields(sim::ClimaLandSimulation) = (:surface_field,)
+Plotting.debug_plot_fields(sim::Interfacer.SurfaceStub) = (:stub_field,)
 
 @testset "import_atmos_fields!" begin
     coupled_param_dict = CP.create_toml_dict(FT)
@@ -96,7 +96,7 @@ plot_field_names(sim::Interfacer.SurfaceStub) = (:stub_field,)
     )
 
     output_plots = "test_debug"
-    @test_logs (:info, "plotting debug in test_debug") match_mode = :any debug(
+    @test_logs (:info, "plotting debug in test_debug") match_mode = :any Plotting.debug(
         cs,
         output_plots,
     )

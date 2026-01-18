@@ -19,6 +19,15 @@ It runs a [ClimaAtmos.jl](https://github.com/CliMA/ClimaAtmos.jl) atmosphere mod
 and either [ClimaSeaIce.jl](https://github.com/CliMA/ClimaSeaIce.jl) or a simple thermal sea ice model.
 Please find more details about each model below.
 
+!!! note Behavior at the poles with an ocean model on a capped latitude/longitude grid
+    The Oceananigans and ClimaSeaIce models currently run on a capped
+    latitude-longitude grid, which spans from 80°S to 80°N. To avoid having a gap
+    in surface models at the poles, we fill the poles with the selected land model
+    when running with the Oceananigans model. As a result, the land model cannot be
+    started from saved initial conditions when run in this configuration.
+    This will change in the near future when we switch to use a tripolar grid
+    for the Oceananigans and ClimaSeaIce models.
+
 ### Atmosphere
 Dynamical core:
 - Equation: non-hydrostatic and fully compressible

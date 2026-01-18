@@ -3,8 +3,8 @@ aerosol_radiation: true
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
 bucket_albedo_type: "map_temporal"
-checkpoint_dt: "93days"
-coupler_toml: ["toml/amip.toml"]
+checkpoint_dt: "1months"
+coupler_toml: ["toml/amip_diagedmf.toml"]
 dt: "120secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: "120secs"
@@ -18,6 +18,6 @@ prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "300days"
+t_end: "366days"
 topo_smoothing: true
 topography: "Earth"

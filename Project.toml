@@ -5,6 +5,7 @@ version = "0.1.2"
 
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
+ClimaAnalysis = "29b5916a-a76c-4e73-9657-3c8fd22e65e6"
 ClimaAtmos = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
 ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
 ClimaCore = "d414da3d-4745-48bb-8d80-42e94e092884"
@@ -19,18 +20,41 @@ SurfaceFluxes = "49b00bb7-8bd4-4f2b-b78c-51cd0450215f"
 Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
+[weakdeps]
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+ClimaCoreMakie = "908f55d8-4145-4867-9c14-5dad1a479e4d"
+GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+Oceananigans = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
+Poppler_jll = "759029c8-65f6-5f13-b93f-2d7e0a4cb77c"
+Printf = "366bfd08-7218-5ad0-9036-d27ba1f5fe54"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+
+[extensions]
+ClimaCouplerMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Poppler_jll", "Printf"]
+ClimaCouplerOceananigansMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
+
 [compat]
 ArgParse = "1"
+CairoMakie = "0.12"
+ClimaAnalysis = "0.5.10"
 ClimaAtmos = "0.33"
 ClimaComms = "0.6.2"
 ClimaCore = "0.14.25"
+ClimaCoreMakie = "0.4"
 ClimaDiagnostics = "0.2.6"
 ClimaUtilities = "0.1.22"
 Dates = "1"
+GeoMakie = "0.7"
 JLD2 = "0.5, 0.6"
 Logging = "1"
+Makie = "0.21"
+Oceananigans = "0.100"
+Poppler_jll = "24"
+Printf = "1"
 SciMLBase = "~2.110, ~2.111, ~2.112"
 StaticArrays = "1.9.8"
+Statistics = "1"
 SurfaceFluxes = "0.12.3, 0.13, 0.14.1"
 Thermodynamics = "0.14.1, 0.15"
 YAML = "0.4"

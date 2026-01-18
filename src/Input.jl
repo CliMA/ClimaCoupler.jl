@@ -10,11 +10,15 @@ import YAML
 import Dates
 import ClimaAtmos as CA
 import ClimaUtilities.TimeManager: ITime
+import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
+import ClimaUtilities.ClimaArtifacts: @clima_artifact
+import ClimaCore as CC
 import ClimaCoupler
 import ..Interfacer
 import ..Utilities
 
-export argparse_settings, parse_commandline, get_coupler_config_dict, get_coupler_args
+export argparse_settings,
+    parse_commandline, get_coupler_config_dict, get_coupler_args, get_land_fraction
 
 const MODE_NAME_DICT = Dict(
     "amip" => Interfacer.AMIPMode,
@@ -166,9 +170,9 @@ function argparse_settings()
         default = false
         # Output information
         "--coupler_output_dir"
-        help = "Directory to save output files. Note that TempestRemap fails if interactive and paths are too long. [\"experiments/ClimaEarth/output\" (default)]"
+        help = "Directory to save output files. Note that TempestRemap fails if interactive and paths are too long. [\"output\" (default)]"
         arg_type = String
-        default = "experiments/ClimaEarth/output"
+        default = "output"
         # ClimaAtmos specific
         "--surface_setup"
         help = "Triggers ClimaAtmos into the coupled mode [`PrescribedSurface` (default), `DefaultMoninObukhov`]" # retained here for standalone Atmos benchmarks
@@ -225,6 +229,14 @@ function argparse_settings()
         help = "Sea ice model to use. [`prescribed` (default), `clima_seaice`]"
         arg_type = String
         default = "prescribed"
+        "--land_fraction_source"
+        help = "Source for land fraction data. [`etopo` (default) uses ETOPO-derived landsea_mask artifact, `era5` uses ERA5 land fraction artifact]"
+        arg_type = String
+        default = "etopo"
+        "--binary_area_fraction"
+        help = "Boolean flag indicating whether to use binary (thresholded) area fractions for land and ice [`true` (default), `false`]. When true, land fraction > eps becomes 1, and ice fraction > 0.5 becomes 1."
+        arg_type = Bool
+        default = true
     end
     return s
 end
@@ -408,6 +420,12 @@ function get_coupler_args(config_dict::Dict)
     # Ice model-specific information
     ice_model = config_dict["ice_model"]
 
+    # Land fraction source
+    land_fraction_source = config_dict["land_fraction_source"]
+
+    # Binary area fraction
+    binary_area_fraction = config_dict["binary_area_fraction"]
+
     return (;
         job_id,
         sim_mode,
@@ -442,6 +460,8 @@ function get_coupler_args(config_dict::Dict)
         parameter_files,
         era5_initial_condition_dir,
         ice_model,
+        land_fraction_source,
+        binary_area_fraction,
     )
 end
 
@@ -542,6 +562,71 @@ function parse_component_dts!(config_dict)
 
     config_dict["component_dt_dict"] = component_dt_dict
     return nothing
+end
+
+
+"""
+    get_land_fraction(boundary_space, comms_ctx; land_fraction_source = "etopo", binary_area_fraction = true)
+
+Read and remap the land-sea fraction field onto the coupler boundary grid.
+
+# Arguments
+- `boundary_space`: The boundary space onto which to remap the land fraction.
+- `comms_ctx`: The communications context.
+- `land_fraction_source`: Source of land fraction data. Either "etopo" (default) or "era5".
+- `binary_area_fraction`: If true (default), threshold land fraction to binary (0 or 1).
+
+# Returns
+- A field containing land fraction values (0 to 1) on the boundary space.
+
+Note: 
+Land-sea Fraction
+    This is a static field that contains the area fraction of land and sea, ranging from 0 to 1.
+    If applicable, sea ice is included in the sea fraction at this stage.
+    Note that land-sea area fraction is different to the land-sea mask, which is a binary field
+    (masks are used internally by the coupler to indicate passive cells that are not populated by a given component model).
+
+    Two sources are supported via the `land_fraction_source` config option:
+    - "etopo": ETOPO-derived binary land-sea mask (landsea_mask_60arcseconds artifact)
+    - "era5": ERA5 land fraction field (era5_land_fraction artifact)
+"""
+function get_land_fraction(
+    boundary_space,
+    comms_ctx;
+    land_fraction_source::String = "etopo",
+    binary_area_fraction::Bool = true,
+)
+    FT = CC.Spaces.undertype(boundary_space)
+
+    if land_fraction_source == "era5"
+        land_fraction_data = joinpath(
+            @clima_artifact("era5_land_fraction", comms_ctx),
+            "era5_land_fraction.nc",
+        )
+        land_fraction = SpaceVaryingInput(land_fraction_data, "lsm", boundary_space)
+    elseif land_fraction_source == "etopo"
+        land_fraction_data = joinpath(
+            @clima_artifact("landsea_mask_60arcseconds", comms_ctx),
+            "landsea_mask.nc",
+        )
+        land_fraction = SpaceVaryingInput(land_fraction_data, "landsea", boundary_space)
+    else
+        error(
+            "Unknown land_fraction_source: $land_fraction_source. Must be \"etopo\" or \"era5\".",
+        )
+    end
+
+    # Ensure land fraction is finite/not NaN and clamp to [0, 1]
+    land_fraction = ifelse.(isfinite.(land_fraction), land_fraction, FT(0))
+    land_fraction = max.(min.(land_fraction, FT(1)), FT(0))
+
+    if binary_area_fraction
+        land_fraction = ifelse.(land_fraction .> eps(FT), FT(1), FT(0))
+    else
+        land_fraction = ifelse.(land_fraction .> eps(FT), land_fraction, FT(0))
+    end
+
+    return land_fraction
 end
 
 end # module Input

@@ -69,6 +69,7 @@ for FT in (Float32, Float64)
                 land_fraction = CC.Fields.zeros(space),
                 thermo_params = thermo_params,
                 dt = dt,
+                binary_area_fraction = true,
             )
 
             p = (; cache..., params = params)

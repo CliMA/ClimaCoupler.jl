@@ -1,8 +1,5 @@
-## helpers for user-specified IO
-include("debug_plots.jl")
-include("diagnostics_plots.jl")
-include("../leaderboard/leaderboard.jl")
-include("../leaderboard/test_rmses.jl")
+import ClimaCoupler: Plotting
+import ClimaAnalysis as CAN
 
 """
     postprocess_sim(cs, postprocessing_vars)
@@ -24,13 +21,28 @@ function postprocess_sim(cs, postprocessing_vars)
 
     # Plot generic diagnostics
     @info "Plotting diagnostics for coupler, atmos, land, and ocean"
-    make_diagnostics_plots(coupler_output_dir, artifacts_dir, output_prefix = "coupler_")
-    make_diagnostics_plots(atmos_output_dir, artifacts_dir, output_prefix = "atmos_")
-    make_diagnostics_plots(land_output_dir, artifacts_dir, output_prefix = "land_")
-    make_ocean_diagnostics_plots(ocean_output_dir, artifacts_dir, output_prefix = "ocean_")
+    Plotting.make_diagnostics_plots(
+        coupler_output_dir,
+        artifacts_dir,
+        output_prefix = "coupler_",
+    )
+    Plotting.make_diagnostics_plots(
+        atmos_output_dir,
+        artifacts_dir,
+        output_prefix = "atmos_",
+    )
+    Plotting.make_diagnostics_plots(land_output_dir, artifacts_dir, output_prefix = "land_")
+
+    # Note: slab ocean doesn't have diagnostics, so we only handle Oceananigans here
+    Plotting.make_ocean_diagnostics_plots(
+        ocean_output_dir,
+        artifacts_dir,
+        output_prefix = "ocean_",
+    )
 
     # Plot all model states and coupler fields (useful for debugging)
-    ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext && debug(cs, artifacts_dir)
+    ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext &&
+        Plotting.debug(cs, artifacts_dir)
 
     # If we have enough data (in time, but also enough variables), plot the leaderboard.
     # We need pressure to compute the leaderboard.
@@ -41,24 +53,27 @@ function postprocess_sim(cs, postprocessing_vars)
         t_end = times[end]
         if t_end > 84600 * 31 * 3 # 3 months for spin up
             leaderboard_base_path = artifacts_dir
-            compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
-            rmse_check && test_rmse_thresholds(atmos_output_dir, 3)
-            pressure_in_output &&
-                compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
+            Plotting.compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
+            rmse_check && SimOutput.test_rmse_thresholds(atmos_output_dir, 3)
+            pressure_in_output && Plotting.compute_pfull_leaderboard(
+                leaderboard_base_path,
+                atmos_output_dir,
+                3,
+            )
         end
     end
 
     # Perform conservation checks if they exist
     if !isnothing(cs.conservation_checks)
         @info "Conservation Check Plots"
-        plot_global_conservation(
+        Plotting.plot_global_conservation(
             cs.conservation_checks.energy,
             cs,
             conservation_softfail,
             figname1 = joinpath(artifacts_dir, "total_energy_bucket.png"),
             figname2 = joinpath(artifacts_dir, "total_energy_log_bucket.png"),
         )
-        plot_global_conservation(
+        Plotting.plot_global_conservation(
             cs.conservation_checks.water,
             cs,
             conservation_softfail,

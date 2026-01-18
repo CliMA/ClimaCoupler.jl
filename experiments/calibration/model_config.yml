@@ -2,7 +2,7 @@ FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
 checkpoint_dt: "90000days"
-coupler_toml: ["toml/amip.toml"]
+coupler_toml: ["toml/amip_diagedmf.toml"]
 deep_atmosphere: false
 dt: "480secs"
 dt_cpl: "480secs"

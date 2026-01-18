@@ -26,7 +26,7 @@ rad: allskywithclear
 surface_setup: DefaultMoninObukhov
 t_end: 12hours
 time_varying_trace_gases: ["CO2", "O3"]
-toml: [toml/amip.toml]
+toml: [toml/amip_diagedmf.toml]
 turbconv: diagnostic_edmfx
 z_elem: 63
 z_max: 55000.0

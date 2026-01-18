@@ -166,6 +166,8 @@ specific timesteps should be specified, rather than only `dt`.
 | `--bucket_albedo_type` | String | `"map_static"` | `map_static`, `function`, `map_temporal` | Access bucket surface albedo information from data file |
 | `--bucket_initial_condition` | String | `""` | Any valid file path | File path for a NetCDF file (read documentation about requirements) |
 | `--era5_initial_condition_dir` | String | `nothing` | Any valid directory path | Directory containing ERA5 initial condition files (subseasonal mode). Filenames inferred from `start_date`. Generated with `https://github.com/CliMA/WeatherQuest` |
+| `--land_fraction_source` | String | `"etopo"` | `etopo`, `era5` | Source for land fraction data. `etopo` uses ETOPO-derived landsea_mask artifact (binary), `era5` uses ERA5/IFS land fraction artifact (0.0 - 1.0), which includes large inland seas and lakes. |
+| `--binary_area_fraction` | Bool | `true` | `true`, `false` | Whether to use binary (thresholded) area fractions for land and ice. When true, land fraction > eps becomes 1, and ice fraction > 0.5 becomes 1 |
 
 #### Ice model specific
 
@@ -183,8 +185,9 @@ specific timesteps should be specified, rather than only `dt`.
 ## Input API
 
 ```@docs
-ClimaCoupler.Input.argparse_settings
-ClimaCoupler.Input.parse_commandline
-ClimaCoupler.Input.get_coupler_config_dict
-ClimaCoupler.Input.get_coupler_args
+Input.argparse_settings
+Input.parse_commandline
+Input.get_coupler_config_dict
+Input.get_coupler_args
+Input.get_land_fraction
 ```

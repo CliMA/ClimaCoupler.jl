@@ -79,7 +79,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     )
 
     backend = ClimaCalibrate.ClimaGPUBackend(;
-        hpc_kwargs = ClimaCalibrate.kwargs(gpus = 1, time = 60 * 6),
+        hpc_kwargs = ClimaCalibrate.kwargs(gpus = 1, gpus_per_task = 1, time = 60 * 6),
         model_interface,
         verbose = true,
     )

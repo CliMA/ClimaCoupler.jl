@@ -25,14 +25,13 @@ CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 ClimaCoreMakie = "908f55d8-4145-4867-9c14-5dad1a479e4d"
 GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
-Oceananigans = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
 Poppler_jll = "759029c8-65f6-5f13-b93f-2d7e0a4cb77c"
 Printf = "366bfd08-7218-5ad0-9036-d27ba1f5fe54"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [extensions]
 ClimaCouplerMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Poppler_jll", "Printf"]
-ClimaCouplerOceananigansMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
+# ClimaCouplerOceananigansMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]  # Removed
 
 [compat]
 ArgParse = "1"
@@ -49,7 +48,6 @@ GeoMakie = "0.7"
 JLD2 = "0.5, 0.6"
 Logging = "1"
 Makie = "0.21"
-Oceananigans = "0.100"
 Poppler_jll = "24"
 Printf = "1"
 SciMLBase = "~2.110, ~2.111, ~2.112"

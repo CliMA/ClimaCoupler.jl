@@ -82,8 +82,9 @@ include("components/land/climaland_integrated.jl")
 include("components/ocean/slab_ocean.jl")
 include("components/ocean/prescr_ocean.jl")
 include("components/ocean/prescr_seaice.jl")
-include("components/ocean/oceananigans.jl")
-include("components/ocean/clima_seaice.jl")
+# Commented out - not using Oceananigans/ClimaOcean
+# include("components/ocean/oceananigans.jl")
+# include("components/ocean/clima_seaice.jl")
 
 #=
 ### Configuration Dictionaries
@@ -366,19 +367,20 @@ function CoupledSimulation(config_dict::AbstractDict)
         end
 
         ## ocean model
-        if sim_mode <: CMIPMode
-            stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
-            ocean_sim = OceananigansSimulation(
-                boundary_space,
-                start_date,
-                stop_date;
-                Δt = component_dt_dict["dt_ocean"],
-                output_dir = dir_paths.ocean_output_dir,
-                comms_ctx,
-                coupled_param_dict,
-                ice_model,
-            )
-        else
+        # CMIPMode with OceananigansSimulation commented out - not using Oceananigans/ClimaOcean
+        # if sim_mode <: CMIPMode
+        #     stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+        #     ocean_sim = OceananigansSimulation(
+        #         boundary_space,
+        #         start_date,
+        #         stop_date;
+        #         Δt = component_dt_dict["dt_ocean"],
+        #         output_dir = dir_paths.ocean_output_dir,
+        #         comms_ctx,
+        #         coupled_param_dict,
+        #         ice_model,
+        #     )
+        # else
             ocean_sim = PrescribedOceanSimulation(
                 FT,
                 boundary_space,
@@ -389,17 +391,19 @@ function CoupledSimulation(config_dict::AbstractDict)
                 comms_ctx;
                 sst_path = subseasonal_sst,
             )
-        end
+        # end  # Commented out - if-else block removed since CMIPMode is disabled
         ## sea ice model
-        if ice_model == "clima_seaice"
-            ice_sim = ClimaSeaIceSimulation(
-                ocean_sim;
-                output_dir = dir_paths.ice_output_dir,
-                start_date,
-                coupled_param_dict,
-                Δt = component_dt_dict["dt_seaice"],
-            )
-        elseif ice_model == "prescribed"
+        # clima_seaice requires Oceananigans/ClimaOcean - commented out
+        # if ice_model == "clima_seaice"
+        #     ice_sim = ClimaSeaIceSimulation(
+        #         ocean_sim;
+        #         output_dir = dir_paths.ice_output_dir,
+        #         start_date,
+        #         coupled_param_dict,
+        #         Δt = component_dt_dict["dt_seaice"],
+        #     )
+        # elseif ice_model == "prescribed"
+        if ice_model == "prescribed"
             ice_sim = PrescribedIceSimulation(
                 FT;
                 tspan = tspan,

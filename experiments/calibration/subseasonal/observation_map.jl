@@ -8,6 +8,7 @@ import ClimaCalibrate
 import ClimaAnalysis.Utils: kwargs as ca_kwargs
 import ClimaCoupler
 import ClimaCalibrate: EnsembleBuilder
+import EnsembleKalmanProcesses as EKP
 
 include(joinpath(@__DIR__, "observation_utils.jl"))
 
@@ -29,7 +30,10 @@ function ClimaCalibrate.observation_map(iteration)
 
     for m in 1:EKP.get_N_ens(ekp)
         member_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
-        simdir_path = joinpath(member_path, "wxquest_diagedmf/output_active")
+        # Get the mode_name from config to find the correct output folder
+        config_dict = ClimaCoupler.Input.get_coupler_config_dict(CALIBRATE_CONFIG.config_file)
+        mode_name = get(config_dict, "mode_name", "subseasonal")
+        simdir_path = joinpath(member_path, mode_name, "output_active")
         @info "Processing member $m: $simdir_path"
         try
             process_member_data!(g_ens_builder, simdir_path, m, iteration)
@@ -69,12 +73,13 @@ end
 function largest_period(sample_date_range)
     span = maximum(sample_date_range) - minimum(sample_date_range)
     span = Millisecond(span)
-    span.value == 0 && return Month(1)
+    # For weekly data (6 days span = 7 day period including endpoints)
+    span.value == 0 && return Week(1)
     day_in_ms = 8.64e7
     period =
         span.value >= day_in_ms * 365 ? Year(1) :
-        span.value >= day_in_ms * 30 ? Month(1) :
-        span.value >= day_in_ms * 7 ? Week(1) : Day(1)
+        span.value >= day_in_ms * 28 ? Month(1) :
+        span.value >= day_in_ms * 6 ? Week(1) : Day(1)
     return period
 end
 

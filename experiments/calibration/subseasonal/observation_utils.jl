@@ -2,16 +2,16 @@ import ClimaCoupler
 using Statistics
 import Dates
 using ClimaAnalysis
+import ClimaCalibrate
 
-include(joinpath(pkgdir(ClimaCoupler), "experiments/ClimaEarth/setup_run.jl"))
-ext = Base.get_extension(ClimaCalibrate, :ClimaAnalysisExt)
-
-
-var_units = Dict(
+# Units for each short name used in calibration
+const var_units = Dict(
     "pr" => "kg m^-2 s^-1",
     "mslp" => "Pa",
     "tas" => "K",
     "tas - ta" => "K",
+    "ts" => "K",
+    "sp" => "Pa",
     "hfls" => "W m^-2",
     "hfss" => "W m^-2",
     "rsus" => "W m^-2",

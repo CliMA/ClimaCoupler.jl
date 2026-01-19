@@ -25,26 +25,64 @@ model_interface = joinpath(
     "model_interface.jl",
 )
 
-years = 2018:2021
-sample_date_ranges = [(DateTime(yr, 9, 1), DateTime(yr, 9, 1)) for yr in years]
+# Weekly sample date ranges (start_date, end_date) for calibration
+# Each range corresponds to a 7-day period matching the ERA5 weekly files
+sample_date_ranges = [
+    (DateTime(2023, 1, 15), DateTime(2023, 1, 21)),
+    # Add more weekly ranges as needed:
+    # (DateTime(2023, 1, 22), DateTime(2023, 1, 28)),
+]
+
+# Directory containing ERA5 weekly observation files
+const ERA5_OBS_DIR = "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/daily_weekly_stats/weekly"
+
 const CALIBRATE_CONFIG = CalibrateConfig(;
     config_file = joinpath(
         pkgdir(ClimaCoupler),
         "config/subseasonal_configs/wxquest_diagedmf.yml",
     ),
-    short_names = ["hfls", "hfss", "rsus", "rlus"],
+    short_names = ["tas"],  # Start with tas only
+    # short_names = ["tas", "mslp", "pr"],  # Uncomment to add more variables
     minibatch_size = 1,
-    n_iterations = 3,
+    n_iterations = 1,
     sample_date_ranges,
-    extend = Dates.Month(1),
-    spinup = Dates.Month(0),
+    extend = Dates.Day(0),  # No extension beyond observation period
+    spinup = Dates.Day(0),
     output_dir = "output/subseasonal",
+    obs_dir = ERA5_OBS_DIR,
     rng_seed = 42,
 )
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    priors = [PD.constrained_gaussian("precipitation_timescale", 600, 300, 100, 1000)]
+    # Priors for calibration parameters
+    priors = [
+        # Inverse entrainment timescale: mean=0.002, std=0.001, bounds=[0.0001, 0.01]
+        PD.constrained_gaussian("entr_inv_tau", 0.002, 0.001, 0.0001, 0.01),
+        # Precipitation timescale: mean=600, std=300, bounds=[100, 1000]
+        # PD.constrained_gaussian("precipitation_timescale", 600, 300, 100, 1000),
+    ]
     prior = EKP.combine_distributions(priors)
+    ensemble_size = 2 * length(priors) + 1  # TransformUnscented ensemble size
+
+    # Add PBS workers with GPU resources on Derecho
+    if nworkers() == 1
+        @info "Adding PBS workers with GPU resources..."
+        addprocs(
+            ClimaCalibrate.PBSManager(ensemble_size);
+            q = "main",
+            A = "UCIT0011",
+            l_select = "1:ncpus=12:ngpus=1",
+            l_walltime = "06:00:00",
+        )
+    end
+
+    # Load api.jl on all workers first (defines CalibrateConfig type)
+    api_file = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "api.jl")
+    @everywhere include($api_file)
+    
+    # Share CALIBRATE_CONFIG with workers and load model interface
+    @everywhere const CALIBRATE_CONFIG = $CALIBRATE_CONFIG
+    @everywhere include($model_interface)
 
     observation_vector = JLD2.load_object(
         joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/obs_vec.jld2"),
@@ -78,14 +116,9 @@ if abspath(PROGRAM_FILE) == @__FILE__
         scheduler = EKP.DataMisfitController(terminate_at = 100),
     )
 
-    backend = ClimaCalibrate.ClimaGPUBackend(;
-        hpc_kwargs = ClimaCalibrate.kwargs(gpus = 1, time = 60 * 6),
-        model_interface,
-        verbose = true,
-    )
-
+    # Use WorkerBackend with PBS workers
     eki = ClimaCalibrate.calibrate(
-        backend,
+        ClimaCalibrate.WorkerBackend(),
         ekp,
         CALIBRATE_CONFIG.n_iterations,
         prior,

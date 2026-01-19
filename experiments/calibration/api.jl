@@ -2,14 +2,15 @@ import Dates
 
 """
     struct CalibrateConfig{SPINUP <: Dates.Period, EXTEND <: Dates.Period}
+        config_file::String
         short_names::Vector{String}
         minibatch_size::Int64
         n_iterations::Int64
-        sample_date_ranges::Vector{NTuple{2, DATE}}
+        sample_date_ranges::Vector{NTuple{2, Dates.DateTime}}
         extend::EXTEND
         spinup::SPINUP
-        nelements::Tuple{Int64, Int64}
         output_dir::String
+        obs_dir::String
         rng_seed::Int64
     end
 
@@ -46,6 +47,9 @@ struct CalibrateConfig{SPINUP <: Dates.Period, EXTEND <: Dates.Period}
     "The directory to store the iterations and members of the calibration."
     output_dir::String
 
+    "The directory containing ERA5 observation files for calibration"
+    obs_dir::String
+
     "An integer value for ensuring calibrations are the same between multiple
     calibrations with the same settings"
     rng_seed::Int64
@@ -60,7 +64,8 @@ end
         spinup = Dates.Month(3),
         minibatch_size,
         n_iterations,
-        output_dir = "calibration/weatherquest",,
+        output_dir = "calibration/weatherquest",
+        obs_dir = "",
         rng_seed = 42,
     )
 
@@ -90,10 +95,9 @@ Keyword arguments
 - `spinup`: The amount of time to run the simulation before the start date
   determined by `sample_date_ranges`.
 
-- `nelements`: The resolution of the model. This is also used to determine the
-  mask of the observations.
-
 - `output_dir`: The location to save the calibration at.
+
+- `obs_dir`: The directory containing ERA5 observation files for calibration.
 
 - `rng_seed`: An integer to ensure that calibration runs with the same settings
   are the same.
@@ -107,6 +111,7 @@ function CalibrateConfig(;
     extend,
     spinup = Dates.Month(3),
     output_dir = "calibration/weatherquest",
+    obs_dir = "",
     rng_seed = 42,
 )
     isempty(short_names) && error("Cannot run calibration with no short names")
@@ -148,6 +153,7 @@ function CalibrateConfig(;
         extend,
         spinup,
         output_dir,
+        obs_dir,
         rng_seed,
     )
 

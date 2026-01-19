@@ -148,7 +148,7 @@ function ClimaLandSimulation(
             surface_space,
             start_date,
             stop_date;
-            modis_lai_ncdata_path = "/net/sampo/data1/wxquest_data/static_fields/modis_lai_climatology.nc",
+            modis_lai_ncdata_path = "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/static_fields/modis_lai_climatology.nc",
             time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
         )
     elseif lai_source == :era5_ic

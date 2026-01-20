@@ -2,7 +2,7 @@
 
 julia_version = "1.10.9"
 manifest_format = "2.0"
-project_hash = "804afb56e346f37ec0e6f0ce4b6482bf656c39d3"
+project_hash = "2007958b25fde1cb33bb3c160190e647bb26d3ed"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "f7304359109c768cf32dc5fa2d371565bb63b68a"
@@ -3434,10 +3434,10 @@ uuid = "b718987f-49a8-5099-9789-dcd902bef87d"
 version = "1.0.2"
 
 [[deps.Thermodynamics]]
-deps = ["ForwardDiff", "Random", "RootSolvers"]
-git-tree-sha1 = "91db9a9d846468a82b51f424f0efcdfeadf3c814"
+deps = ["DocStringExtensions", "ForwardDiff", "KernelAbstractions", "Random", "RootSolvers"]
+git-tree-sha1 = "b8203ebbcf1dd74ee13d84c52819fb159ac44b93"
 uuid = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
-version = "0.15.3"
+version = "0.15.2"
 weakdeps = ["ClimaParams"]
 
     [deps.Thermodynamics.extensions]

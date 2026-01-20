@@ -28,7 +28,9 @@ model_interface = joinpath(
 # Weekly sample date ranges (start_date, end_date) for calibration
 # Each range corresponds to a 7-day period matching the ERA5 weekly files
 sample_date_ranges = [
-    (DateTime(2023, 1, 15), DateTime(2023, 1, 21)),
+    # (DateTime(2023, 1, 15), DateTime(2023, 1, 21)),
+    # test a day 
+    (DateTime(2023, 1, 15), DateTime(2023, 1, 15)),
     # Add more weekly ranges as needed:
     # (DateTime(2023, 1, 22), DateTime(2023, 1, 28)),
 ]
@@ -44,9 +46,9 @@ const CALIBRATE_CONFIG = CalibrateConfig(;
     short_names = ["tas"],  # Start with tas only
     # short_names = ["tas", "mslp", "pr"],  # Uncomment to add more variables
     minibatch_size = 1,
-    n_iterations = 1,
+    n_iterations = 3,
     sample_date_ranges,
-    extend = Dates.Day(0),  # No extension beyond observation period
+    extend = Dates.Day(1),  # Add 1 day so simulation covers full 7-day diagnostic period
     spinup = Dates.Day(0),
     output_dir = "output/subseasonal",
     obs_dir = ERA5_OBS_DIR,
@@ -56,8 +58,8 @@ const CALIBRATE_CONFIG = CalibrateConfig(;
 if abspath(PROGRAM_FILE) == @__FILE__
     # Priors for calibration parameters
     priors = [
-        # Inverse entrainment timescale: mean=0.002, std=0.001, bounds=[0.0001, 0.01]
-        PD.constrained_gaussian("entr_inv_tau", 0.002, 0.001, 0.0001, 0.01),
+        # Inverse entrainment timescale: mean=0.002, std=0.001, bounds=[0.0, 0.01]
+        PD.constrained_gaussian("entr_inv_tau", 0.002, 0.0015, 0.0, 0.01),
         # Precipitation timescale: mean=600, std=300, bounds=[100, 1000]
         # PD.constrained_gaussian("precipitation_timescale", 600, 300, 100, 1000),
     ]

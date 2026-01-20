@@ -13,10 +13,12 @@ function ClimaCalibrate.forward_model(iter, member)
     Pkg.status()
     config_dict = ClimaCoupler.Input.get_coupler_config_dict(CALIBRATE_CONFIG.config_file)
     output_dir_root = CALIBRATE_CONFIG.output_dir
-    start_date =
-        first(CALIBRATE_CONFIG.sample_date_ranges[iter + 1]) - CALIBRATE_CONFIG.spinup
+    # Use the first (and typically only) sample date range for all iterations
+    # EKP updates parameters across iterations, but uses the same observation period
+    sample_date_range = first(CALIBRATE_CONFIG.sample_date_ranges)
+    start_date = first(sample_date_range) - CALIBRATE_CONFIG.spinup
     start_date_str = replace(string(Date(start_date)), "-" => "")
-    end_date = last(CALIBRATE_CONFIG.sample_date_ranges[iter + 1]) + CALIBRATE_CONFIG.extend
+    end_date = last(sample_date_range) + CALIBRATE_CONFIG.extend
     sim_length = Second(end_date - start_date)
 
     config_dict["start_date"] = start_date_str

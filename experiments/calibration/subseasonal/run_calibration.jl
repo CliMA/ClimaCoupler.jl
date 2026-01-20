@@ -46,11 +46,11 @@ const CALIBRATE_CONFIG = CalibrateConfig(;
     short_names = ["tas"],  # Start with tas only
     # short_names = ["tas", "mslp", "pr"],  # Uncomment to add more variables
     minibatch_size = 1,
-    n_iterations = 3,
+    n_iterations = 8,
     sample_date_ranges,
     extend = Dates.Day(1),  # Add 1 day so simulation covers full 7-day diagnostic period
     spinup = Dates.Day(0),
-    output_dir = "output/subseasonal",
+    output_dir = "output/subseasonal/exp4",
     obs_dir = ERA5_OBS_DIR,
     rng_seed = 42,
 )
@@ -115,7 +115,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         EKP.TransformUnscented(prior, impose_prior = true);
         verbose = true,
         rng,
-        scheduler = EKP.DataMisfitController(terminate_at = 100),
+        scheduler = EKP.DataMisfitController(terminate_at = 1000),
     )
 
     # Use WorkerBackend with PBS workers

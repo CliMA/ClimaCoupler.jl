@@ -82,6 +82,8 @@ end
 
 Process the data of a single ensemble member and return a G vector
 matching the observation vector format.
+
+Data is normalized using the same constants as the observations for consistent EKP comparison.
 """
 function process_member_to_g_vector(diagnostics_folder_path, iteration)
     short_names = CALIBRATE_CONFIG.short_names
@@ -93,7 +95,16 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
         joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/preprocessed_vars.jld2"),
     )
     
-    @info "Short names: $short_names"
+    # Load normalization constants (must match what was used for observations)
+    norm_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/normalization.jld2")
+    if !isfile(norm_path)
+        error("Normalization file not found at $norm_path. Run generate_observations.jl first.")
+    end
+    normalization = JLD2.load_object(norm_path)
+    data_mean = normalization.mean
+    data_std = normalization.std
+    
+    @info "Short names: $short_names, using normalization: mean=$data_mean, std=$data_std"
     simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)
     
     all_data = Float64[]
@@ -116,7 +127,10 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
         # Flatten and append, matching observation vector construction
         flat_data = vec(var.data)
         valid_data = filter(!isnan, collect(skipmissing(flat_data)))
-        append!(all_data, valid_data)
+        
+        # Apply the SAME normalization as observations
+        normalized_data = (valid_data .- data_mean) ./ data_std
+        append!(all_data, normalized_data)
     end
     
     return all_data

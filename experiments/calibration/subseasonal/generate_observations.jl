@@ -9,6 +9,7 @@ import ClimaDiagnostics
 import ClimaCore
 import NCDatasets
 import LinearAlgebra
+import Statistics
 using OrderedCollections: OrderedDict
 
 # Access CalibrateConfig (this also includes observation_utils.jl via observation_map.jl)
@@ -310,15 +311,41 @@ end
 Create the observation vector for EKP from the preprocessed variables.
 Each sample in the vector corresponds to one date range with all short_names.
 
-For 2D static data (no time dimension), we create observations manually
-by flattening the spatial data and using a scalar covariance.
+Data is normalized to zero mean and unit variance for stable EKP convergence.
+Normalization constants are saved for use in observation_map.jl.
 """
 function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
-    # Covariance scalar - adjust based on expected observation noise
-    noise_scalar = 5.0
+    # First pass: collect all data to compute mean/std for normalization
+    all_data_raw = Float64[]
+    for sample_date_range in sample_date_ranges
+        for short_name in short_names
+            key = (short_name, sample_date_range)
+            if haskey(vars_by_date, key)
+                var = vars_by_date[key]
+                flat_data, _ = flatten_var_with_latitude_weights(var)
+                valid_data = filter(!isnan, collect(skipmissing(flat_data)))
+                append!(all_data_raw, valid_data)
+            end
+        end
+    end
+    
+    # Compute normalization constants
+    data_mean = Statistics.mean(all_data_raw)
+    data_std = Statistics.std(all_data_raw)
+    
+    @info "Normalizing observations: mean=$data_mean, std=$data_std"
+    
+    # Save normalization constants for use in observation_map
+    JLD2.save_object(
+        joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/normalization.jld2"),
+        (mean=data_mean, std=data_std)
+    )
+    
+    # Noise scalar for normalized data (unit variance, so 1.0 = 100% of std)
+    # Use smaller value for tighter fit, larger for slower convergence
+    noise_scalar = 0.5  # 50% of unit variance - adjust to control convergence speed
     
     obs_vec = map(sample_date_ranges) do sample_date_range
-        # Collect and flatten all variables for this date range
         all_data = Float64[]
         all_names = String[]
         
@@ -327,25 +354,63 @@ function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
             if haskey(vars_by_date, key)
                 var = vars_by_date[key]
                 flat_data, _ = flatten_var_with_latitude_weights(var)
-                # Filter out NaN/missing values
-                valid_data = collect(skipmissing(flat_data))
-                valid_data = filter(!isnan, valid_data)
-                append!(all_data, valid_data)
+                valid_data = filter(!isnan, collect(skipmissing(flat_data)))
+                # Normalize the data
+                normalized_data = (valid_data .- data_mean) ./ data_std
+                append!(all_data, normalized_data)
                 push!(all_names, short_name)
             else
                 @warn "Missing variable for $key"
             end
         end
         
-        # Create observation with scalar covariance (diagonal matrix)
         obs_name = join(all_names, "_") * "_" * Dates.format(first(sample_date_range), "yyyymmdd")
         noise = noise_scalar * LinearAlgebra.I
         
-        @info "Creating observation '$obs_name' with $(length(all_data)) data points"
+        @info "Creating observation '$obs_name' with $(length(all_data)) normalized data points"
         EKP.Observation(all_data, noise, obs_name)
     end
     return obs_vec
 end
+
+# OLD VERSION (unnormalized) - kept for reference
+# """
+#     make_observation_vector_unnormalized(vars_by_date, sample_date_ranges, short_names)
+
+# # """
+# function make_observation_vector_unnormalized(vars_by_date, sample_date_ranges, short_names)
+#     # Covariance scalar - adjust based on expected observation noise
+#     noise_scalar = 5.0
+    
+#     obs_vec = map(sample_date_ranges) do sample_date_range
+#         # Collect and flatten all variables for this date range
+#         all_data = Float64[]
+#         all_names = String[]
+        
+#         for short_name in short_names
+#             key = (short_name, sample_date_range)
+#             if haskey(vars_by_date, key)
+#                 var = vars_by_date[key]
+#                 flat_data, _ = flatten_var_with_latitude_weights(var)
+#                 # Filter out NaN/missing values
+#                 valid_data = collect(skipmissing(flat_data))
+#                 valid_data = filter(!isnan, valid_data)
+#                 append!(all_data, valid_data)
+#                 push!(all_names, short_name)
+#             else
+#                 @warn "Missing variable for $key"
+#             end
+#         end
+        
+#         # Create observation with scalar covariance (diagonal matrix)
+#         obs_name = join(all_names, "_") * "_" * Dates.format(first(sample_date_range), "yyyymmdd")
+#         noise = noise_scalar * LinearAlgebra.I
+        
+#         @info "Creating observation '$obs_name' with $(length(all_data)) data points"
+#         EKP.Observation(all_data, noise, obs_name)
+#     end
+#     return obs_vec
+# end
 
 """
     resampled_lonlat(config_file)

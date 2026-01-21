@@ -1,11 +1,24 @@
 #!/bin/bash
 #PBS -N pbs_calibration
-#PBS -o calibration_${PBS_JOBID}.out
+#PBS -j oe
 #PBS -l walltime=12:00:00
-#PBS -l select=1:ncpus=1:mem=2GB
+#PBS -l select=1:ncpus=64:ngpus=4
+
+## Account number for CliMA
+#PBS -A UCIT0011
+#PBS -q main
+
+# Initialize Lmod module system
+source /glade/u/apps/derecho/23.09/spack/opt/spack/lmod/8.7.24/gcc/7.5.0/c645/lmod/lmod/init/bash
+
+# Add CliMA modules to module path
+module use /glade/campaign/univ/ucit0011/ClimaModules-Derecho
+
+# Load required modules
+module load climacommon/2025_02_25
 
 # Assuming the script is run from the top level of ClimaCoupler.jl
-CLIMAEARTH_PATH='experiments/subseasonal/calibration/'
+CLIMAEARTH_PATH='experiments/calibration/gravity_wave/'
 DRIVER=${CLIMAEARTH_PATH}'run_calibration.jl'
 
 # Set environment variables for CliMA
@@ -15,12 +28,9 @@ export CLIMACOMMS_CONTEXT="SINGLETON"
 # Set temporary directory
 export TMPDIR=$SCRATCH/tmp && mkdir -p $TMPDIR
 
-# Load required modules
-module load climacommon
-
 # Build and run the Julia code
 julia --project=calibration -e 'using Pkg; Pkg.instantiate(;verbose=true)'
-julia --project=$CLIMAEARTH_PATH -e 'using Pkg; Pkg.develop(Pkg.PackageSpec(;name="ClimaAtmos", path="/home/chew/git_repos/ClimaAtmos.jl"))'
+julia --project=$CLIMAEARTH_PATH -e 'using Pkg; Pkg.develop(Pkg.PackageSpec(;name="ClimaAtmos", path="/glade/u/home/chew/git-repos/ClimaAtmos.jl"))'
 julia --project=$CLIMAEARTH_PATH -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaParams", rev="rc/gw"))'
 julia --project=$CLIMAEARTH_PATH -e 'using Pkg; Pkg.precompile()'
 julia --project=experiments/ClimaEarth $DRIVER

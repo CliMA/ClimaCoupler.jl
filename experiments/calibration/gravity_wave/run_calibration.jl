@@ -26,7 +26,7 @@ model_interface = joinpath(
 )
 
 years = 2010:2012
-sample_date_ranges = [(DateTime(yr, 1, 1), DateTime(yr, 1, 1)) for yr in years]
+sample_date_ranges = [(DateTime(yr, 2, 1), DateTime(yr, 2, 1)) for yr in years]
 const CALIBRATE_CONFIG = CalibrateConfig(;
     config_file = joinpath(
         pkgdir(ClimaCoupler),
@@ -34,16 +34,16 @@ const CALIBRATE_CONFIG = CalibrateConfig(;
     ),
     short_names = ["ta", "ua", "va"],
     minibatch_size = 1,
-    n_iterations = 3,
+    n_iterations = 5,
     sample_date_ranges,
     extend = Dates.Month(1),
-    spinup = Dates.Month(0),
+    spinup = Dates.Month(1),
     output_dir = "output/gravity_wave",
     rng_seed = 42,
 )
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    priors = [PD.constrained_gaussian("precipitation_timescale", 600, 300, 100, 1000)]
+    priors = [PD.constrained_gaussian("nogw_Bt_0", 0.0043, 0.002, 0.001, 0.01)]
     prior = EKP.combine_distributions(priors)
 
     observation_vector = JLD2.load_object(

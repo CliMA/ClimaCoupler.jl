@@ -9,6 +9,10 @@ import EnsembleKalmanProcesses as EKP
 import EnsembleKalmanProcesses.ParameterDistributions as PD
 import JLD2
 
+# Override JLD2's default_iotype to use IOStream instead of MmapIO
+# This avoids Bus errors from memory-mapped files on Lustre filesystem
+JLD2.default_iotype() = IOStream
+
 
 include(joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "api.jl"))
 include(
@@ -46,11 +50,12 @@ const CALIBRATE_CONFIG = CalibrateConfig(;
     short_names = ["tas"],  # Start with tas only
     # short_names = ["tas", "mslp", "pr"],  # Uncomment to add more variables
     minibatch_size = 1,
-    n_iterations = 8,
+    n_iterations = 6,
     sample_date_ranges,
     extend = Dates.Day(1),  # Add 1 day so simulation covers full 7-day diagnostic period
     spinup = Dates.Day(0),
-    output_dir = "output/subseasonal/exp4",
+    # Use scratch filesystem - more reliable for JLD2/HDF5 on Lustre
+    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp8",
     obs_dir = ERA5_OBS_DIR,
     rng_seed = 42,
 )
@@ -59,9 +64,12 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # Priors for calibration parameters
     priors = [
         # Inverse entrainment timescale: mean=0.002, std=0.001, bounds=[0.0, 0.01]
+        ### atmos model
         PD.constrained_gaussian("entr_inv_tau", 0.002, 0.0015, 0.0, 0.01),
         # Precipitation timescale: mean=600, std=300, bounds=[100, 1000]
         # PD.constrained_gaussian("precipitation_timescale", 600, 300, 100, 1000),
+        ### land model
+        PD.constrained_gaussian("leaf_Cd", 0.01, 0.005, 0.0, 0.1),
     ]
     prior = EKP.combine_distributions(priors)
     ensemble_size = 2 * length(priors) + 1  # TransformUnscented ensemble size
@@ -117,6 +125,13 @@ if abspath(PROGRAM_FILE) == @__FILE__
         rng,
         scheduler = EKP.DataMisfitController(terminate_at = 1000),
     )
+    # ekp = EKP.EnsembleKalmanProcess(
+    #     obs_series,
+    #     EKP.Inversion(prior);
+    #     verbose = true,
+    #     rng,
+    #     scheduler = EKP.DataMisfitController(terminate_at = 1000),
+    # )
 
     # Use WorkerBackend with PBS workers
     eki = ClimaCalibrate.calibrate(

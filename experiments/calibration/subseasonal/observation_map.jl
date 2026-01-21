@@ -8,7 +8,35 @@ import ClimaAnalysis.Utils: kwargs as ca_kwargs
 import ClimaCoupler
 import EnsembleKalmanProcesses as EKP
 
+# Override JLD2's default_iotype to use IOStream instead of MmapIO
+# This avoids Bus errors from memory-mapped files on Lustre filesystem
+JLD2.default_iotype() = IOStream
+
 include(joinpath(@__DIR__, "observation_utils.jl"))
+
+"""
+    retry_on_error(f; max_retries=5, delay=2.0, backoff=2.0)
+
+Retry a function `f` on any error, with exponential backoff.
+Useful for handling transient filesystem errors on Lustre (NetCDF/HDF5 race conditions).
+"""
+function retry_on_error(f; max_retries=5, delay=2.0, backoff=2.0)
+    last_error = nothing
+    for attempt in 1:max_retries
+        try
+            return f()
+        catch e
+            last_error = e
+            if attempt < max_retries
+                wait_time = delay * backoff^(attempt - 1)
+                @warn "Attempt $attempt failed, retrying in $(wait_time)s..." exception=(e, catch_backtrace())
+                sleep(wait_time)
+            end
+        end
+    end
+    @error "All $max_retries attempts failed"
+    rethrow(last_error)
+end
 
 """
     ClimaCalibrate.observation_map(iteration)
@@ -30,26 +58,43 @@ function ClimaCalibrate.observation_map(iteration)
         joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/preprocessed_vars.jld2"),
     )
     
+    # Load land mask if it exists (for land-only calibration)
+    land_mask_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/land_mask.jld2")
+    land_mask = nothing
+    if isfile(land_mask_path)
+        land_mask_data = JLD2.load_object(land_mask_path)
+        land_mask = land_mask_data.mask
+        @info "Loaded land mask: $(count(land_mask)) land points"
+    end
+    
     # Get expected size from one observation variable
     # All iterations use the same observation window
     sample_date_range = first(CALIBRATE_CONFIG.sample_date_ranges)
     short_names = CALIBRATE_CONFIG.short_names
     
-    # Calculate expected G dimension based on observation vector construction
+    # Calculate expected G dimension based on observation vector construction (with land mask)
     expected_dim = 0
     for short_name in short_names
         key = (short_name, sample_date_range)
         if haskey(preprocessed_vars, key)
             var = preprocessed_vars[key]
             flat_data = vec(var.data)
+            # Apply land mask if present
+            if !isnothing(land_mask)
+                flat_mask = vec(land_mask)
+                flat_data = flat_data[findall(flat_mask)]
+            end
             valid_data = filter(!isnan, collect(skipmissing(flat_data)))
             expected_dim += length(valid_data)
         end
     end
     
-    @info "Expected G dimension: $expected_dim for $n_members members"
+    @info "Expected G dimension: $expected_dim for $n_members members (land-only: $(land_mask !== nothing))"
     g_ens = fill(NaN, expected_dim, n_members)
 
+    # Small delay to ensure all files are flushed to Lustre before reading
+    sleep(2.0)
+    
     for m in 1:n_members
         member_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
         # Find the job output folder (named after job_id, e.g., "wxquest_diagedmf")
@@ -84,6 +129,7 @@ Process the data of a single ensemble member and return a G vector
 matching the observation vector format.
 
 Data is normalized using the same constants as the observations for consistent EKP comparison.
+If land mask exists, only land points are included to match the observation vector.
 """
 function process_member_to_g_vector(diagnostics_folder_path, iteration)
     short_names = CALIBRATE_CONFIG.short_names
@@ -104,14 +150,28 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
     data_mean = normalization.mean
     data_std = normalization.std
     
-    @info "Short names: $short_names, using normalization: mean=$data_mean, std=$data_std"
-    simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)
+    # Load land mask if it exists (for land-only calibration)
+    land_mask_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/land_mask.jld2")
+    land_mask = nothing
+    if isfile(land_mask_path)
+        land_mask_data = JLD2.load_object(land_mask_path)
+        land_mask = land_mask_data.mask
+    end
+    
+    @info "Short names: $short_names, normalization: mean=$data_mean, std=$data_std, land_only=$(land_mask !== nothing)"
+    
+    # Wrap SimDir in retry logic to handle transient Lustre/NetCDF errors
+    simdir = retry_on_error() do
+        ClimaAnalysis.SimDir(diagnostics_folder_path)
+    end
     
     all_data = Float64[]
     
     for short_name in short_names
-        # Get simulation variable
-        var = get_var(short_name, simdir)
+        # Get simulation variable (with retry for NetCDF access)
+        var = retry_on_error() do
+            get_var(short_name, simdir)
+        end
         var = preprocess_var(var, sample_date_range)
         
         # Get corresponding observation variable for grid matching
@@ -126,13 +186,21 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
         
         # Flatten and append, matching observation vector construction
         flat_data = vec(var.data)
+        
+        # Apply land mask if present (MUST match observation vector construction)
+        if !isnothing(land_mask)
+            flat_mask = vec(land_mask)
+            land_indices = findall(flat_mask)
+            flat_data = flat_data[land_indices]
+        end
+        
         valid_data = filter(!isnan, collect(skipmissing(flat_data)))
         
         # Apply the SAME normalization as observations
         normalized_data = (valid_data .- data_mean) ./ data_std
         append!(all_data, normalized_data)
     end
-    
+
     return all_data
 end
 

@@ -2,6 +2,7 @@ import ClimaAnalysis
 import ClimaAnalysis: OutputVar
 import ClimaCalibrate
 import ClimaCoupler
+import ClimaComms
 import Dates
 import EnsembleKalmanProcesses as EKP
 import JLD2
@@ -10,10 +11,61 @@ import ClimaCore
 import NCDatasets
 import LinearAlgebra
 import Statistics
+import Interpolations
 using OrderedCollections: OrderedDict
 
 # Access CalibrateConfig (this also includes observation_utils.jl via observation_map.jl)
 include(joinpath(@__DIR__, "run_calibration.jl"))
+
+"""
+    load_land_mask(target_lons, target_lats; threshold=0.5)
+
+Load ERA5 land fraction and resample to target grid, returning a binary land mask.
+Points with land fraction > threshold are considered land (true).
+"""
+function load_land_mask(target_lons, target_lats; threshold=0.5)
+    # Get ERA5 land fraction artifact
+    artifact_path = ClimaCoupler.Input.@clima_artifact("era5_land_fraction", ClimaComms.context())
+    land_frac_file = joinpath(artifact_path, "era5_land_fraction.nc")
+    
+    @info "Loading land mask from $land_frac_file"
+    
+    land_mask = NCDatasets.Dataset(land_frac_file) do ds
+        # ERA5 land fraction: lsm(lat, lon)
+        lsm = ds["lsm"][:, :]  # (lat, lon) in file, but Julia reads as (lon, lat)
+        src_lons = ds["lon"][:]
+        src_lats = ds["lat"][:]
+        
+        # NCDatasets reads as (lon, lat) due to column-major ordering
+        # lsm is actually (lon, lat) in Julia memory
+        
+        # Create interpolation (need to handle lon wrapping)
+        # ERA5 lons are typically 0-360 or -180 to 180
+        # Make sure we handle the interpolation correctly
+        
+        # Simple bilinear interpolation
+        itp = Interpolations.interpolate(
+            (src_lons, src_lats), 
+            lsm, 
+            Interpolations.Gridded(Interpolations.Linear())
+        )
+        itp_extrap = Interpolations.extrapolate(itp, Interpolations.Flat())
+        
+        # Resample to target grid
+        resampled = [itp_extrap(lon, lat) for lon in target_lons, lat in target_lats]
+        
+        return resampled
+    end
+    
+    # Convert to binary mask (true = land)
+    binary_mask = land_mask .> threshold
+    
+    n_land = count(binary_mask)
+    n_total = length(binary_mask)
+    @info "Land mask: $n_land / $n_total points are land ($(round(100*n_land/n_total, digits=1))%)"
+    
+    return binary_mask
+end
 
 # Mapping from ERA5 file prefixes to short names used in calibration
 const ERA5_FILE_PREFIX_TO_SHORT_NAME = Dict(
@@ -276,12 +328,15 @@ function preprocess_vars(vars_by_date, config_file)
 end
 
 """
-    flatten_var_with_latitude_weights(var)
+    flatten_var_with_latitude_weights(var; land_mask=nothing)
 
 Flatten a 2D OutputVar to a vector, applying latitude (cosine) weights.
 Returns (flattened_data, weights).
+
+If `land_mask` is provided (a 2D boolean array matching var dimensions),
+only land points (where land_mask == true) are kept.
 """
-function flatten_var_with_latitude_weights(var)
+function flatten_var_with_latitude_weights(var; land_mask=nothing)
     lats = ClimaAnalysis.latitudes(var)
     lons = ClimaAnalysis.longitudes(var)
     
@@ -302,19 +357,48 @@ function flatten_var_with_latitude_weights(var)
     weight_matrix = repeat(weights', nlon, 1)
     flat_weights = vec(weight_matrix)
     
+    # Apply land mask if provided
+    if !isnothing(land_mask)
+        flat_mask = vec(land_mask)
+        land_indices = findall(flat_mask)
+        flat_data = flat_data[land_indices]
+        flat_weights = flat_weights[land_indices]
+    end
+    
     return flat_data, flat_weights
 end
 
 """
-    make_observation_vector(vars_by_date, sample_date_ranges, short_names)
+    make_observation_vector(vars_by_date, sample_date_ranges, short_names; land_only=true)
 
 Create the observation vector for EKP from the preprocessed variables.
 Each sample in the vector corresponds to one date range with all short_names.
 
 Data is normalized to zero mean and unit variance for stable EKP convergence.
-Normalization constants are saved for use in observation_map.jl.
+Normalization constants and land mask are saved for use in observation_map.jl.
+
+If `land_only=true`, only land points are included in the observation vector.
 """
-function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
+function make_observation_vector(vars_by_date, sample_date_ranges, short_names; land_only=true)
+    # Get grid from first variable to determine land mask resolution
+    first_key = first(keys(vars_by_date))
+    first_var = vars_by_date[first_key]
+    target_lons = ClimaAnalysis.longitudes(first_var)
+    target_lats = ClimaAnalysis.latitudes(first_var)
+    
+    # Load land mask if needed
+    land_mask = nothing
+    if land_only
+        land_mask = load_land_mask(target_lons, target_lats)
+        
+        # Save land mask for use in observation_map
+        JLD2.save_object(
+            joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/land_mask.jld2"),
+            (mask=land_mask, lons=collect(target_lons), lats=collect(target_lats))
+        )
+        @info "Saved land mask to land_mask.jld2"
+    end
+    
     # First pass: collect all data to compute mean/std for normalization
     all_data_raw = Float64[]
     for sample_date_range in sample_date_ranges
@@ -322,7 +406,7 @@ function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
             key = (short_name, sample_date_range)
             if haskey(vars_by_date, key)
                 var = vars_by_date[key]
-                flat_data, _ = flatten_var_with_latitude_weights(var)
+                flat_data, _ = flatten_var_with_latitude_weights(var; land_mask=land_mask)
                 valid_data = filter(!isnan, collect(skipmissing(flat_data)))
                 append!(all_data_raw, valid_data)
             end
@@ -333,17 +417,17 @@ function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
     data_mean = Statistics.mean(all_data_raw)
     data_std = Statistics.std(all_data_raw)
     
-    @info "Normalizing observations: mean=$data_mean, std=$data_std"
+    @info "Normalizing observations: mean=$data_mean, std=$data_std ($(length(all_data_raw)) land points)"
     
     # Save normalization constants for use in observation_map
     JLD2.save_object(
         joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/normalization.jld2"),
-        (mean=data_mean, std=data_std)
+        (mean=data_mean, std=data_std, land_only=land_only)
     )
     
     # Noise scalar for normalized data (unit variance, so 1.0 = 100% of std)
     # Use smaller value for tighter fit, larger for slower convergence
-    noise_scalar = 0.5  # 50% of unit variance - adjust to control convergence speed
+    noise_scalar = 0.15  # 50% of unit variance - adjust to control convergence speed
     
     obs_vec = map(sample_date_ranges) do sample_date_range
         all_data = Float64[]
@@ -353,7 +437,7 @@ function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
             key = (short_name, sample_date_range)
             if haskey(vars_by_date, key)
                 var = vars_by_date[key]
-                flat_data, _ = flatten_var_with_latitude_weights(var)
+                flat_data, _ = flatten_var_with_latitude_weights(var; land_mask=land_mask)
                 valid_data = filter(!isnan, collect(skipmissing(flat_data)))
                 # Normalize the data
                 normalized_data = (valid_data .- data_mean) ./ data_std
@@ -367,7 +451,7 @@ function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
         obs_name = join(all_names, "_") * "_" * Dates.format(first(sample_date_range), "yyyymmdd")
         noise = noise_scalar * LinearAlgebra.I
         
-        @info "Creating observation '$obs_name' with $(length(all_data)) normalized data points"
+        @info "Creating observation '$obs_name' with $(length(all_data)) normalized land-only data points"
         EKP.Observation(all_data, noise, obs_name)
     end
     return obs_vec

@@ -39,6 +39,50 @@ struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP} <: Interfacer.SeaIceModelSim
 end
 
 """
+    ConcentrationMaskedRadiativeEmission
+
+A heat boundary condition that emits radiation only where the sea ice
+concentration is greater than zero. This is needed to prevent radiative
+emission where we have no sea ice.
+"""
+struct ConcentrationMaskedRadiativeEmission{FT}
+    emissivity::FT
+    stefan_boltzmann_constant::FT
+    reference_temperature::FT
+end
+
+function ConcentrationMaskedRadiativeEmission(
+    FT = Float64;
+    emissivity = 1,
+    stefan_boltzmann_constant = 5.67e-8,
+    reference_temperature = 273.15,
+)
+
+    return ConcentrationMaskedRadiativeEmission(
+        convert(FT, emissivity),
+        convert(FT, stefan_boltzmann_constant),
+        convert(FT, reference_temperature),
+    )
+end
+
+function CSI.SeaIceThermodynamics.HeatBoundaryConditions.getflux(
+    emission::ConcentrationMaskedRadiativeEmission,
+    i,
+    j,
+    grid,
+    T,
+    clock,
+    fields,
+)
+    ϵ = emission.emissivity
+    σ = emission.stefan_boltzmann_constant
+    Tᵣ = emission.reference_temperature
+    @inbounds ℵij = fields.ℵ[i, j, 1]
+    return ϵ * σ * (T + Tᵣ)^4 * (ℵij > 0)
+end
+
+
+"""
     ClimaSeaIceSimulation()
 
 Creates an ClimaSeaIceSimulation object containing a model, an integrator, and
@@ -183,7 +227,7 @@ function sea_ice_simulation(
 
     bottom_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     top_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-    top_heat_flux = (top_heat_flux, RadiativeEmission())
+    top_heat_flux = (top_heat_flux, ConcentrationMaskedRadiativeEmission())
 
     # Build the sea ice model
     sea_ice_model = CSI.SeaIceModel(

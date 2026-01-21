@@ -169,7 +169,6 @@ function OceananigansSimulation(
     ocean_properties = (;
         reference_density = 1020,
         heat_capacity = 3991,
-        fresh_water_density = 999.8,
         σ = coupled_param_dict["stefan_boltzmann_constant"],
         C_to_K = coupled_param_dict["temperature_water_freeze"],
     )
@@ -178,7 +177,7 @@ function OceananigansSimulation(
     if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
         # Save all tracers and velocities to a NetCDF file at daily frequency
         outputs = merge(ocean.model.tracers, ocean.model.velocities)
-        netcdf_writer = OC.NetCDFWriter(
+        surface_writer = OC.NetCDFWriter(
             ocean.model,
             outputs;
             schedule = OC.TimeInterval(86400), # Daily output
@@ -187,7 +186,30 @@ function OceananigansSimulation(
             overwrite_existing = true,
             array_type = Array{Float32},
         )
-        ocean.output_writers[:diagnostics] = netcdf_writer
+        free_surface_writer = OC.NetCDFWriter(
+            ocean.model,
+            (; η = ocean.model.free_surface.η); # The free surface (.η) will change to .displacement after version 0.104.0
+            schedule = OC.TimeInterval(3600), # hourly snapshots
+            filename = joinpath(output_dir, "ocean_free_surface.nc"),
+            overwrite_existing = true,
+            array_type = Array{Float32},
+        )
+        Tflux = ocean.model.tracers.T.boundary_conditions.top.condition
+        Sflux = ocean.model.tracers.S.boundary_conditions.top.condition
+        uflux = ocean.model.velocities.u.boundary_conditions.top.condition
+        vflux = ocean.model.velocities.v.boundary_conditions.top.condition
+        fluxes_writer = OC.NetCDFWriter(
+            ocean.model,
+            (; Tflux, Sflux, uflux, vflux);
+            schedule = OC.TimeInterval(3600), # hourly snapshots
+            filename = joinpath(output_dir, "ocean_fluxes.nc"),
+            overwrite_existing = true,
+            array_type = Array{Float32},
+        )
+
+        ocean.output_writers[:surface] = surface_writer
+        ocean.output_writers[:free_surface] = free_surface_writer
+        ocean.output_writers[:fluxes] = fluxes_writer
     end
 
     # Initialize with 0 ice concentration; this will be updated in `resolve_area_fractions!`
@@ -300,6 +322,7 @@ so a sign change is needed when we convert from moisture to salinity flux.
 """
 function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fields)
     (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
+    (; reference_density, heat_capacity) = sim.ocean_properties
     grid = sim.ocean.model.grid
     ice_concentration = sim.ice_concentration
 
@@ -323,9 +346,11 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
 
     # Weight by (1 - sea ice concentration)
     OC.interior(F_turb_ρτxz_cc, :, :, 1) .=
-        OC.interior(F_turb_ρτxz_cc, :, :, 1) .* (1.0 .- ice_concentration)
+        OC.interior(F_turb_ρτxz_cc, :, :, 1) .* (1.0 .- ice_concentration) ./
+        reference_density
     OC.interior(F_turb_ρτyz_cc, :, :, 1) .=
-        OC.interior(F_turb_ρτyz_cc, :, :, 1) .* (1.0 .- ice_concentration)
+        OC.interior(F_turb_ρτyz_cc, :, :, 1) .* (1.0 .- ice_concentration) ./
+        reference_density
 
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
     oc_flux_u = surface_flux(sim.ocean.model.velocities.u)
@@ -336,8 +361,6 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
         F_turb_ρτxz_cc,
         F_turb_ρτyz_cc,
     )
-
-    (; reference_density, heat_capacity, fresh_water_density) = sim.ocean_properties
 
     # Remap the latent and sensible heat fluxes using scratch arrays
     CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, F_lh) # latent heat flux
@@ -363,7 +386,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
         sim.remapping.remapper_cc,
         F_turb_moisture,
     )
-    moisture_fresh_water_flux = sim.remapping.scratch_arr1 ./ fresh_water_density
+    moisture_fresh_water_flux = sim.remapping.scratch_arr1 ./ reference_density
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, grid.Nz)
     OC.interior(oc_flux_S, :, :, 1) .=
@@ -397,7 +420,7 @@ Oceananigans represents precipitation as a positive salinity flux,
 so a sign change is needed when we convert from precipitation to salinity flux.
 """
 function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
-    (; reference_density, heat_capacity, fresh_water_density) = sim.ocean_properties
+    (; reference_density, heat_capacity) = sim.ocean_properties
     ice_concentration = sim.ice_concentration
     Nz = sim.ocean.model.grid.Nz
 
@@ -450,7 +473,7 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     OC.interior(oc_flux_S, :, :, 1) .=
         OC.interior(oc_flux_S, :, :, 1) .-
         OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* (1.0 .- ice_concentration) .*
-        (remapped_P_liq .+ remapped_P_snow) ./ fresh_water_density
+        (remapped_P_liq .+ remapped_P_snow) ./ reference_density
     return nothing
 end
 

@@ -3,6 +3,7 @@
 # Temporary
 *.DS_Store
 *.swp
+*.swo
 *.jl.cov
 *.jl.*.cov
 *.jl.mem
@@ -51,8 +52,12 @@ experiments/ClimaEarth/output/*
 
 # internal tests
 slurm-*.out
+pbs_*.o*
 
 # ignore vscode artifacts
 *.vscode
 *.DS
 *.qodo
+
+
+

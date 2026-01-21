@@ -244,10 +244,13 @@ function ClimaLandSimulation(
         )
     elseif land_spun_up_ic
         # Use artifact spun-up initial conditions
-        ic_path = CL.Artifacts.saturated_land_ic_path()
+        ic_path = CL.Artifacts.soil_ic_2008_50m_path()
         @info "ClimaLand: using land IC file" ic_path
-
-        set_ic! = CL.Simulations.make_set_initial_state_from_file(ic_path, model)
+        set_ic! = CL.Simulations.make_set_initial_state_from_file(
+            ic_path,
+            model;
+            enforce_constraints = true,
+        )
         p.drivers.T .= orog_adjusted_T_surface
         t0 = tspan[1]
         set_ic!(Y, p, t0, model)

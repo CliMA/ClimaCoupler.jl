@@ -12,6 +12,7 @@ when the plotting packages and Oceananigans.jl are available.
 ## Plotting API
 
 ```@docs
+Plotting.postprocess
 Plotting.make_diagnostics_plots
 Plotting.make_ocean_diagnostics_plots
 Plotting.debug
@@ -21,6 +22,16 @@ Plotting.plot_global_conservation
 Plotting.compute_leaderboard
 Plotting.compute_pfull_leaderboard
 ```
+
+### Postprocessing
+
+The `postprocess` function coordinates all postprocessing operations after a simulation completes,
+including generating diagnostic plots, leaderboards, conservation plots, and debug visualizations.
+It also performs RMSE checks against observations and closes diagnostics file writers.
+
+**Note:** While `postprocess` can be called without the Makie extension loaded, it will not generate
+any plots. To produce visualizations, ensure the `ClimaCouplerMakieExt` extension is loaded by
+importing the required Makie packages (see [ClimaCouplerMakieExt Extension](@ref) below).
 
 ## ClimaCouplerMakieExt Extension
 

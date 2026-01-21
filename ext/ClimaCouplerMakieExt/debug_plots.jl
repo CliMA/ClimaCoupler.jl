@@ -19,6 +19,13 @@ Creates two plots of the globally integrated quantity (energy, ``\\rho e``):
 1. global quantity of each model component as a function of time,
 relative to the initial value;
 2. fractional change in the sum of all components over time on a log scale.
+
+Conservation checks are available for energy and water, and can be enabled by
+running a Slabplanet simulation with `energy_check` set to true.
+
+If `softfail` is false, asserts that the relative error in conservation of the
+provided quantity is less than a pre-determined threshold. This argument
+is controlled by the `conservation_softfail` simulation flag.
 """
 function Plotting.plot_global_conservation(
     cc::ConservationChecker.AbstractConservationCheck,

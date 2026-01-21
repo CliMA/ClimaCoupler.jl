@@ -359,16 +359,40 @@ Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:area_fraction}) = sim.area
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:beta}) =
     CL.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:emissivity}) = sim.integrator.p.ϵ_sfc
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:energy}) =
-    CL.total_energy(sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_direct_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_diffuse_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water}) =
-    CL.total_water(sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_temperature}) =
     sim.integrator.p.T_sfc
+function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:energy})
+    energy_per_area = sim.integrator.p.soil.sfc_scratch
+    CL.total_energy_per_area!(
+        energy_per_area,
+        sim.model,
+        sim.integrator.u,
+        sim.integrator.p,
+        sim.integrator.t,
+    )
+    # Zero out anywhere the area fraction is zero
+    @. energy_per_area =
+        ifelse(sim.area_fraction == 0, zero(energy_per_area), energy_per_area)
+    return sum(energy_per_area)
+end
+function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water})
+    water_per_area = sim.integrator.p.soil.sfc_scratch
+    CL.total_liq_water_vol_per_area!(
+        water_per_area,
+        sim.model,
+        sim.integrator.u,
+        sim.integrator.p,
+        sim.integrator.t,
+    )
+    # Convert volumetric water content to mass water content
+    ρ_liq = LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set)
+    @. water_per_area = ifelse(sim.area_fraction == 0, zero(water_per_area), water_per_area)
+    return ρ_liq * sum(water_per_area)
+end
 
 # Update fields stored in land drivers
 function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:diffuse_fraction}, field)

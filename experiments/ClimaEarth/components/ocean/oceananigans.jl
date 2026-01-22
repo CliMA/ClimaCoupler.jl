@@ -10,7 +10,6 @@ using KernelAbstractions: @kernel, @index, @inbounds
 import ConservativeRegridding as CR
 
 include("climaocean_helpers.jl")
-include("remapping.jl")
 
 """
     OceananigansSimulation{SIM, A, OPROP, REMAP, SIC}
@@ -70,29 +69,22 @@ function OceananigansSimulation(
     download_dataset(en4_temperature)
     download_dataset(en4_salinity)
 
-    # Set up ocean grid (1 degree)
-    resolution_points = (360, 160, 32)
-    Nz = last(resolution_points)
+    # Set up tripolar ocean grid (1 degree)
+    Nx = 360
+    Ny = 180
+    Nz = 40
     depth = 4000 # meters
     z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 0.85 * depth)
 
     # Regular LatLong because we know how to do interpolation there
-    underlying_grid = OC.LatitudeLongitudeGrid(
-        arch;
-        size = resolution_points,
-        longitude = (-180, 180),
-        latitude = (-80, 80),   # NOTE: Don't goo to high up when using LatLongGrid, or the cells will be too small
-        z,
-        halo = (7, 7, 7),
-    )
+    underlying_grid = OC.TripolarGrid(arch; size = (Nx, Ny, Nz), halo = (7, 7, 4), z)
 
     bottom_height = CO.regrid_bathymetry(
         underlying_grid;
         minimum_depth = 30,
-        interpolation_passes = 20,
+        interpolation_passes = 5,
         major_basins = 1,
     )
-
     grid = OC.ImmersedBoundaryGrid(
         underlying_grid,
         OC.GridFittedBottom(bottom_height);
@@ -153,44 +145,44 @@ function OceananigansSimulation(
         C_to_K = coupled_param_dict["temperature_water_freeze"],
     )
 
-    # Before version 0.96.22, the NetCDFWriter was broken on GPU
-    if arch isa OC.CPU
-        # Save all tracers and velocities to a NetCDF file at daily frequency
-        outputs = merge(ocean.model.tracers, ocean.model.velocities)
-        surface_writer = OC.NetCDFWriter(
-            ocean.model,
-            outputs;
-            schedule = OC.TimeInterval(86400), # Daily output
-            filename = joinpath(output_dir, "ocean_diagnostics.nc"),
-            indices = (:, :, grid.Nz),
-            overwrite_existing = true,
-            array_type = Array{Float32},
-        )
-        free_surface_writer = OC.NetCDFWriter(
-            ocean.model,
-            (; η = ocean.model.free_surface.η); # The free surface (.η) will change to .displacement after version 0.104.0
-            schedule = OC.TimeInterval(3600), # hourly snapshots
-            filename = joinpath(output_dir, "ocean_free_surface.nc"),
-            overwrite_existing = true,
-            array_type = Array{Float32},
-        )
-        Tflux = ocean.model.tracers.T.boundary_conditions.top.condition
-        Sflux = ocean.model.tracers.S.boundary_conditions.top.condition
-        uflux = ocean.model.velocities.u.boundary_conditions.top.condition
-        vflux = ocean.model.velocities.v.boundary_conditions.top.condition
-        fluxes_writer = OC.NetCDFWriter(
-            ocean.model,
-            (; Tflux, Sflux, uflux, vflux);
-            schedule = OC.TimeInterval(3600), # hourly snapshots
-            filename = joinpath(output_dir, "ocean_fluxes.nc"),
-            overwrite_existing = true,
-            array_type = Array{Float32},
-        )
+    # Save all tracers and velocities to a JLD2 file at daily frequency
+    outputs = merge(ocean.model.tracers, ocean.model.velocities)
+    surface_writer = OC.JLD2Writer(
+        ocean.model,
+        outputs;
+        schedule = OC.TimeInterval(86400), # Daily output
+        filename = joinpath(output_dir, "ocean_diagnostics.jld2"),
+        indices = (:, :, grid.Nz),
+        overwrite_existing = true,
+        array_type = Array{Float32},
+    )
 
-        ocean.output_writers[:surface] = surface_writer
-        ocean.output_writers[:free_surface] = free_surface_writer
-        ocean.output_writers[:fluxes] = fluxes_writer
-    end
+    # Save free surface to a JLD2 file at hourly frequency
+    free_surface_writer = OC.JLD2Writer(
+        ocean.model,
+        (; η = ocean.model.free_surface.η); # The free surface (.η) will change to .displacement after version 0.104.0
+        schedule = OC.TimeInterval(3600), # hourly snapshots
+        filename = joinpath(output_dir, "ocean_free_surface.jld2"),
+        overwrite_existing = true,
+        array_type = Array{Float32},
+    )
+
+    # Save fluxes to a JLD2 file at hourly frequency
+    Tflux = ocean.model.tracers.T.boundary_conditions.top.condition
+    Sflux = ocean.model.tracers.S.boundary_conditions.top.condition
+    uflux = ocean.model.velocities.u.boundary_conditions.top.condition
+    vflux = ocean.model.velocities.v.boundary_conditions.top.condition
+    fluxes_writer = OC.JLD2Writer(
+        ocean.model,
+        (; Tflux, Sflux, uflux, vflux);
+        schedule = OC.TimeInterval(3600), # hourly snapshots
+        filename = joinpath(output_dir, "ocean_fluxes.jld2"),
+        overwrite_existing = true,
+        array_type = Array{Float32},
+    )
+    ocean.output_writers[:surface] = surface_writer
+    ocean.output_writers[:free_surface] = free_surface_writer
+    ocean.output_writers[:fluxes] = fluxes_writer
 
     # Initialize with 0 ice concentration; this will be updated in `resolve_area_fractions!`
     # if the ocean is coupled to a non-prescribed sea ice model.
@@ -208,6 +200,7 @@ function OceananigansSimulation(
     )
 end
 
+include("remapping.jl")
 """
     construct_remappers(grid_oc, boundary_space)
 
@@ -220,8 +213,12 @@ To regrid from ClimaCore to Oceananigans, use `CR.regrid!(dest_vector, transpose
 """
 function construct_remappers(grid_oc, boundary_space)
     # Create the remapper from the Oceananigans grid to the ClimaCore boundary space
-    remapper_oc_to_cc =
-        CR.Regridder(boundary_space, grid_oc; normalize = false, threaded = false)
+    remapper_oc_to_cc = CR.Regridder(
+        boundary_space,
+        grid_oc.underlying_grid;
+        normalize = false,
+        threaded = false,
+    )
 
     # Create a field of ones on the boundary space so we can compute element areas
     field_ones_cc = CC.Fields.ones(boundary_space)

@@ -112,25 +112,31 @@ function OceananigansSimulation(
     end
 
     # Create ocean simulation
-    free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 70)
-    momentum_advection = OC.VectorInvariant()
-    tracer_advection = OC.WENO(order = 5)
-    horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν = 1e11)
+    free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 150)
+    momentum_advection = OC.WENOVectorInvariant(order = 5)
+    tracer_advection = OC.WENO(order = 7)
+    eddy_closure = OC.TurbulenceClosures.IsopycnalSkewSymmetricDiffusivity(
+        κ_skew = 500,
+        κ_symmetric = 100,
+    )
+    @inline νhb(i, j, k, grid, ℓx, ℓy, ℓz, clock, fields, λ) = Oceananigans.Operators.Az(i, j, k, grid, ℓx, ℓy, ℓz)^2 / λ
+
+    horizontal_viscosity = HorizontalScalarBiharmonicDiffusivity(ν=νhb, discrete_form=true, parameters=40days)
+    catke_closure = ClimaOcean.Oceans.default_ocean_closure()
+    eddy_closure = IsopycnalSkewSymmetricDiffusivity(κ_skew=500, κ_symmetric=100)
+    closure = (catke_closure, eddy_closure, horizontal_viscosity, VerticalScalarDiffusivity(ν=1e-5, κ=2e-6))
 
     # Use Float32 for the vertical mixing parameters to avoid parameter memory limits
     vertical_mixing = OC.CATKEVerticalDiffusivity(Float32)
 
     Δt = isnothing(Δt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : Δt
 
-    ocean = CO.ocean_simulation(
-        grid;
-        Δ,
-        momentum_advection,
-        tracer_advection,
-        timestepper = :SplitRungeKutta3,
-        free_surface,
-        closure = (horizontal_viscosity, vertical_mixing),
-    )
+    ocean = ocean_simulation(grid; Δ,
+                             momentum_advection,
+                             tracer_advection,
+                             timestepper = :SplitRungeKutta3,
+                             free_surface,
+                             closure)
 
     # Set initial condition to EN4 state estimate at start_date
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])

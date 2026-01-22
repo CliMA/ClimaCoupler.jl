@@ -65,19 +65,19 @@ function OceananigansSimulation(
     download_dataset(en4_salinity)
 
     # Set up tripolar ocean grid (1 degree)
-    Nx = 360
-    Ny = 180
-    Nz = 40
-    depth = 4000 # meters
-    z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 0.85 * depth)
+    Nx = 720
+    Ny = 360
+    Nz = 100
+    depth = 6000 # meters
+    z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 1800)
 
     # Regular LatLong because we know how to do interpolation there
-    underlying_grid = OC.TripolarGrid(arch; size = (Nx, Ny, Nz), halo = (7, 7, 4), z)
+    underlying_grid = OC.TripolarGrid(arch; size = (Nx, Ny, Nz), halo = (7, 7, 7), z)
 
     bottom_height = CO.regrid_bathymetry(
         underlying_grid;
-        minimum_depth = 30,
-        interpolation_passes = 5,
+        minimum_depth = 20,
+        interpolation_passes = 25,
         major_basins = 1,
     )
     grid = OC.ImmersedBoundaryGrid(
@@ -107,26 +107,28 @@ function OceananigansSimulation(
     end
 
     # Create ocean simulation
-    free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 70)
+    free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 150)
     momentum_advection = OC.WENOVectorInvariant(order = 5)
-    tracer_advection = OC.WENO(order = 5)
+    tracer_advection = OC.WENO(order = 7)
     eddy_closure = OC.TurbulenceClosures.IsopycnalSkewSymmetricDiffusivity(
-        κ_skew = 1e3,
-        κ_symmetric = 1e3,
+        κ_skew = 500,
+        κ_symmetric = 100,
     )
-    vertical_mixing = CO.OceanSimulations.default_ocean_closure()
-    horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν = 1e11)
+    @inline νhb(i, j, k, grid, ℓx, ℓy, ℓz, clock, fields, λ) = Oceananigans.Operators.Az(i, j, k, grid, ℓx, ℓy, ℓz)^2 / λ
+    
+    horizontal_viscosity = HorizontalScalarBiharmonicDiffusivity(ν=νhb, discrete_form=true, parameters=40days)
+    catke_closure = ClimaOcean.Oceans.default_ocean_closure()
+    eddy_closure = IsopycnalSkewSymmetricDiffusivity(κ_skew=500, κ_symmetric=100)
+    closure = (catke_closure, eddy_closure, horizontal_viscosity, VerticalScalarDiffusivity(ν=1e-5, κ=2e-6))
 
     Δt = isnothing(Δt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : Δt
-    ocean = CO.ocean_simulation(
-        grid;
-        Δt,
-        forcing,
-        momentum_advection,
-        tracer_advection,
-        free_surface,
-        closure = (eddy_closure, horizontal_viscosity, vertical_mixing),
-    )
+
+    ocean = ocean_simulation(grid; Δ,
+                             momentum_advection,
+                             tracer_advection,
+                             timestepper = :SplitRungeKutta3,
+                             free_surface,
+                             closure)
 
     # Set initial condition to EN4 state estimate at start_date
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])

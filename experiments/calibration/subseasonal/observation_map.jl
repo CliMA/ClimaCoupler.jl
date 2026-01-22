@@ -159,7 +159,7 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
     end
     
     @info "Short names: $short_names, normalization: mean=$data_mean, std=$data_std, land_only=$(land_mask !== nothing)"
-    
+
     # Wrap SimDir in retry logic to handle transient Lustre/NetCDF errors
     simdir = retry_on_error() do
         ClimaAnalysis.SimDir(diagnostics_folder_path)

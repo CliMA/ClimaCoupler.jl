@@ -1,5 +1,6 @@
 using Dates
 using Distributed
+using LinearAlgebra: I
 import Random
 import ClimaCalibrate
 import ClimaAnalysis
@@ -55,24 +56,19 @@ const CALIBRATE_CONFIG = CalibrateConfig(;
     extend = Dates.Day(1),  # Add 1 day so simulation covers full 7-day diagnostic period
     spinup = Dates.Day(0),
     # Use scratch filesystem - more reliable for JLD2/HDF5 on Lustre
-    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp8",
+    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp9",
     obs_dir = ERA5_OBS_DIR,
     rng_seed = 42,
 )
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    # Priors for calibration parameters
-    priors = [
-        # Inverse entrainment timescale: mean=0.002, std=0.001, bounds=[0.0, 0.01]
-        ### atmos model
-        PD.constrained_gaussian("entr_inv_tau", 0.002, 0.0015, 0.0, 0.01),
-        # Precipitation timescale: mean=600, std=300, bounds=[100, 1000]
-        # PD.constrained_gaussian("precipitation_timescale", 600, 300, 100, 1000),
-        ### land model
-        PD.constrained_gaussian("leaf_Cd", 0.01, 0.005, 0.0, 0.1),
-    ]
-    prior = EKP.combine_distributions(priors)
-    ensemble_size = 2 * length(priors) + 1  # TransformUnscented ensemble size
+    # Load priors from shared config (single source of truth)
+    include(joinpath(@__DIR__, "calibration_priors.jl"))
+    prior = CALIBRATION_PRIOR
+    # Ensemble size:
+    # - TransformUnscented/Unscented: automatically 2*n_params + 1 (determined by process)
+    # - TransformInversion/Inversion: uses CALIBRATION_ENSEMBLE_SIZE from calibration_priors.jl
+    ensemble_size = CALIBRATION_ENSEMBLE_SIZE
 
     # Add PBS workers with GPU resources on Derecho
     if nworkers() == 1
@@ -118,16 +114,58 @@ if abspath(PROGRAM_FILE) == @__FILE__
     rng_seed = CALIBRATE_CONFIG.rng_seed
     rng = Random.MersenneTwister(rng_seed)
 
+    # ==========================================================================
+    # OPTION 1: TransformUnscented (efficient, quick convergence) [KNOWN WORKING]
+    # - Uses ObservationSeries constructor
+    # - Ensemble size automatically 2*n_params + 1
+    # ==========================================================================
+    # ekp = EKP.EnsembleKalmanProcess(
+    #     obs_series,
+    #     EKP.TransformUnscented(prior, impose_prior = true);
+    #     verbose = true,
+    #     rng,
+    #     scheduler = EKP.DataMisfitController(terminate_at = 1000),
+    # )
+
+    # ==========================================================================
+    # OPTION 2: TransformInversion (robust to failures, flexible ensemble size)
+    # - Loads pre-computed inputs from ekp_inputs.jld2 (run precompute_ekp_inputs.jl first!)
+    # - To use: comment out OPTION 1 above, uncomment below
+    # ==========================================================================
+    ekp_inputs_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/ekp_inputs.jld2")
+    if !isfile(ekp_inputs_path)
+        error("ekp_inputs.jld2 not found! Run precompute_ekp_inputs.jl first (use: qsub precompute.pbs)")
+    end
+    @info "Loading pre-computed EKP inputs from $ekp_inputs_path"
+    ekp_inputs = JLD2.load(ekp_inputs_path)
+    y = ekp_inputs["y"]
+    noise_scalar = ekp_inputs["noise_scalar"]
+    initial_ensemble = ekp_inputs["initial_ensemble"]
+    @info "Loaded: y=$(length(y)) points, ensemble=$(size(initial_ensemble)), noise=$noise_scalar"
+    
+    # Use UniformScaling for noise covariance (efficient - no huge matrix!)
+    Γ = noise_scalar * I
+    
     ekp = EKP.EnsembleKalmanProcess(
-        obs_series,
-        EKP.TransformUnscented(prior, impose_prior = true);
+        initial_ensemble,
+        y,
+        Γ,
+        EKP.TransformInversion();
         verbose = true,
         rng,
         scheduler = EKP.DataMisfitController(terminate_at = 1000),
     )
+
+    # ==========================================================================
+    # OPTION 3: Basic Inversion (simple, flexible)
+    # - Same constructor as OPTION 2, just different process
+    # - To use: uncomment obs/y/Γ/initial_ensemble from OPTION 2, then uncomment below
+    # ==========================================================================
     # ekp = EKP.EnsembleKalmanProcess(
-    #     obs_series,
-    #     EKP.Inversion(prior);
+    #     initial_ensemble,
+    #     y,
+    #     Γ,
+    #     EKP.Inversion();
     #     verbose = true,
     #     rng,
     #     scheduler = EKP.DataMisfitController(terminate_at = 1000),

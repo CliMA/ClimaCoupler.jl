@@ -13,7 +13,7 @@
 
 set -e  # Exit on error
 
-cd /glade/u/home/cchristo/clima/copies/ClimaCoupler.jl
+cd /glade/u/home/cchristo/clima/copies3/ClimaCoupler.jl
 
 # Load modules
 export MODULEPATH="/glade/campaign/univ/ucit0011/ClimaModules-Derecho:$MODULEPATH"
@@ -61,7 +61,7 @@ while true; do
 done
 
 # Wait for Lustre filesystem to sync
-sleep 5
+sleep 10
 
 # Check if precompute succeeded
 if [ -f "experiments/calibration/subseasonal/ekp_inputs.jld2" ]; then

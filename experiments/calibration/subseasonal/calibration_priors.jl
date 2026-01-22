@@ -18,6 +18,10 @@ const CALIBRATION_PRIORS = [
     
     # Land parameters  
     PD.constrained_gaussian("leaf_Cd", 0.01, 0.005, 0.0, 0.1),
+
+    # gravity wave parameters
+    PD.constrained_gaussian("nogw_Bt_0", 0.0043, 0.002, 0.001, 0.01),
+    PD.constrained_gaussian("ogw_mountain_height_width_exponent", 0.4, 0.2, 0.0, 1.0),
 ]
 
 const CALIBRATION_PRIOR = EKP.combine_distributions(CALIBRATION_PRIORS)

@@ -8,7 +8,7 @@ Calibrate ClimaCoupler parameters using EnsembleKalmanProcesses against ERA5 obs
 ### Option A: TransformUnscented (recommended, simpler)
 
 ```bash
-cd /glade/u/home/cchristo/clima/copies/ClimaCoupler.jl
+cd /glade/u/home/cchristo/clima/copies3/ClimaCoupler.jl
 
 # 1. Generate observations (only needed once, or when changing obs settings)
 julia --project=experiments/ClimaEarth experiments/calibration/subseasonal/generate_observations.jl
@@ -20,7 +20,7 @@ julia --project=experiments/ClimaEarth experiments/calibration/subseasonal/run_c
 ### Option B: TransformInversion (more robust, needs precompute)
 
 ```bash
-cd /glade/u/home/cchristo/clima/copies/ClimaCoupler.jl
+cd /glade/u/home/cchristo/clima/copies3/ClimaCoupler.jl
 
 # 1. Generate observations (only needed once)
 julia --project=experiments/ClimaEarth experiments/calibration/subseasonal/generate_observations.jl

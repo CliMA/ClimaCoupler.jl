@@ -49,14 +49,14 @@ const CALIBRATE_CONFIG = CalibrateConfig(;
         "config/subseasonal_configs/wxquest_diagedmf.yml",
     ),
     short_names = ["tas"],  # Start with tas only
-    # short_names = ["tas", "mslp", "pr"],  # Uncomment to add more variables
+    # short_names = ["tas", "mslp", "pr"],
     minibatch_size = 1,
     n_iterations = 6,
     sample_date_ranges,
     extend = Dates.Day(1),  # Add 1 day so simulation covers full 7-day diagnostic period
     spinup = Dates.Day(0),
     # Use scratch filesystem - more reliable for JLD2/HDF5 on Lustre
-    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp9",
+    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp10",
     obs_dir = ERA5_OBS_DIR,
     rng_seed = 42,
 )

@@ -16,6 +16,10 @@ h_elem: 32
 land_fraction_source: "era5"
 binary_area_fraction: false
 
+### gravity waves 
+orographic_gravity_wave: "raw_topo"
+non_orographic_gravity_wave: true
+
 ### integrated land ###
 land_model: "integrated"
 

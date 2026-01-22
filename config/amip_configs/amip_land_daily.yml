@@ -1,0 +1,28 @@
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
+checkpoint_dt: "366days"
+coupler_toml: ["toml/amip_diagedmf.toml"]
+dt: "120secs"
+dt_cpl: "120secs"
+energy_check: false
+land_model: "bucket"
+mode_name: "subseasonal"
+era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+netcdf_output_at_levels: true
+output_default_diagnostics: true
+radiation_reset_rng_seed: true
+orographic_gravity_wave: "raw_topo"
+non_orographic_gravity_wave: true
+start_date: "20230115"
+surface_setup: "PrescribedSurface"
+t_end: "2days"
+topo_smoothing: true
+topography: "Earth"
+extra_atmos_diagnostics:
+  - short_name: [ta, ua, va, pfull]
+    period: 1months
+    reduction_time: average
+  - short_name: [tas, mslp]
+    period: 1days
+    reduction_time: average

@@ -64,6 +64,9 @@ import Random
 import ClimaDiagnostics as CD
 import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule, EveryStepSchedule
 
+# Trigger ClimaCouplerMakieExt extension
+using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, NCDatasets, Poppler_jll
+
 pkg_dir = pkgdir(ClimaCoupler)
 
 #=
@@ -145,6 +148,8 @@ function CoupledSimulation(config_dict::AbstractDict)
         parameter_files,
         era5_initial_condition_dir,
         ice_model,
+        land_fraction_source,
+        binary_area_fraction,
     ) = Input.get_coupler_args(config_dict)
 
     # Get default shared parameters from ClimaParams.jl, overriding with any provided parameter files
@@ -256,19 +261,12 @@ function CoupledSimulation(config_dict::AbstractDict)
         surface_elevation,
     )
 
-    #=
-    ### Land-sea Fraction
-    This is a static field that contains the area fraction of land and sea, ranging from 0 to 1.
-    If applicable, sea ice is included in the sea fraction at this stage.
-    Note that land-sea area fraction is different to the land-sea mask, which is a binary field
-    (masks are used internally by the coupler to indicate passive cells that are not populated by a given component model).
-    =#
-
-    # Preprocess the file to be 1s and 0s before remapping into onto the grid
-    land_mask_data =
-        joinpath(@clima_artifact("landsea_mask_60arcseconds", comms_ctx), "landsea_mask.nc")
-    land_fraction = SpaceVaryingInput(land_mask_data, "landsea", boundary_space)
-    land_fraction = ifelse.(land_fraction .> eps(FT), FT(1), FT(0))
+    land_fraction = Input.get_land_fraction(
+        boundary_space,
+        comms_ctx;
+        land_fraction_source,
+        binary_area_fraction,
+    )
 
     #=
     ### Surface Models: AMIP and SlabPlanet Modes
@@ -396,6 +394,7 @@ function CoupledSimulation(config_dict::AbstractDict)
                 start_date,
                 land_fraction,
                 sic_path = subseasonal_sic,
+                binary_area_fraction = binary_area_fraction,
             )
         else
             error("Invalid ice model specified: $(ice_model)")

@@ -9,7 +9,7 @@ import ClimaLand as CL
 import ClimaLand.Parameters as LP
 import ClimaParams as CP
 import ClimaDiagnostics as CD
-import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, FieldExchanger
+import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, FieldExchanger, Plotting
 using NCDatasets
 include("climaland_helpers.jl")
 
@@ -419,3 +419,11 @@ function Checkpointer.restore_cache!(sim::BucketSimulation, new_cache)
         ignore = Set([:rc, :params, :dss_buffer_2d, :dss_buffer_3d, :graph_context]),
     )
 end
+
+# Additional BucketSimulation getter methods for plotting debug fields
+Interfacer.get_field(sim::BucketSimulation, ::Val{:σS}) = sim.integrator.u.bucket.σS
+Interfacer.get_field(sim::BucketSimulation, ::Val{:Ws}) = sim.integrator.u.bucket.Ws
+Interfacer.get_field(sim::BucketSimulation, ::Val{:W}) = sim.integrator.u.bucket.W
+
+Plotting.debug_plot_fields(sim::BucketSimulation) =
+    (:area_fraction, :surface_temperature, :σS, :Ws, :W)

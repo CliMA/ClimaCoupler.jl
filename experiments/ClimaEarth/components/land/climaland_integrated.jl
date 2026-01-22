@@ -5,7 +5,8 @@ import Dates
 import ClimaUtilities.TimeVaryingInputs:
     LinearInterpolation, PeriodicCalendar, TimeVaryingInput
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
-import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
+import ClimaCoupler:
+    Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities, Plotting
 import ClimaCore as CC
 import SciMLBase
 import ClimaTimeSteppers as CTS
@@ -49,8 +50,8 @@ end
         output_dir::String,
         area_fraction,
         nelements::Tuple{Int, Int} = (101, 15),
-        depth::FT = FT(50),
-        dz_tuple::Tuple{FT, FT} = FT.((10.0, 0.05)),
+        depth::FT = FT(15),
+        dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
         shared_surface_space = nothing,
         land_spun_up_ic::Bool = true,
         saveat::Vector{TT} = [tspan[1], tspan[2]],
@@ -77,8 +78,8 @@ function ClimaLandSimulation(
     output_dir::String,
     area_fraction,
     nelements::Tuple{Int, Int} = (101, 15),
-    depth::FT = FT(50),
-    dz_tuple::Tuple{FT, FT} = FT.((10.0, 0.05)),
+    depth::FT = FT(15),
+    dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
     shared_surface_space = nothing,
     land_spun_up_ic::Bool = true,
     saveat::Vector{TT} = [tspan[1], tspan[2]],
@@ -140,7 +141,14 @@ function ClimaLandSimulation(
         time_interpolation_method = LinearInterpolation(),
     )
 
-    model = CL.LandModel{FT}(forcing, LAI, toml_dict, domain, dt)
+    model = CL.LandModel{FT}(
+        forcing,
+        LAI,
+        toml_dict,
+        domain,
+        dt;
+        prognostic_land_components = (:canopy, :snow, :soil, :soilco2),
+    )
 
     Y, p, coords = CL.initialize(model)
 
@@ -169,19 +177,15 @@ function ClimaLandSimulation(
     orog_adjusted_T_surface =
         CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
 
-    # Set initial conditions that aren't read in from file
-    Y.soilco2.CO2 .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
-    Y.soilco2.O2_f .= FT(0.21)    # atmospheric O2 volumetric fraction
-    Y.soilco2.SOC .= FT(5.0)      # default SOC concentration (kg C/m³)
-
-    Y.canopy.hydraulics.ϑ_l.:1 .= model.canopy.hydraulics.parameters.ν
-    @. Y.canopy.energy.T = orog_adjusted_T_surface
-
     # Read in initial conditions for snow and soil from file, if requested
-    (; θ_r, ν, ρc_ds) = model.soil.parameters
-
-
     if !land_spun_up_ic && !isnothing(land_ic_path)
+        # Set initial conditions that aren't read in from file
+        Y.soilco2.CO2 .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
+        Y.soilco2.O2_f .= FT(0.21)    # atmospheric O2 volumetric fraction
+        Y.soilco2.SOC .= FT(5.0)      # default SOC concentration (kg C/m³)
+
+        Y.canopy.hydraulics.ϑ_l.:1 .= model.canopy.hydraulics.parameters.ν
+        @. Y.canopy.energy.T = orog_adjusted_T_surface
         # Subseasonal setup: land_spun_up_ic false, but a land_ic_path is provided
         ic_path = land_ic_path
         @info "ClimaLand: using land IC file" ic_path
@@ -242,32 +246,25 @@ function ClimaLandSimulation(
         # Use artifact spun-up initial conditions
         ic_path = CL.Artifacts.soil_ic_2008_50m_path()
         @info "ClimaLand: using land IC file" ic_path
-
-        # Set snow T to orography-adjusted surface temperature before computing internal energy
-        p.snow.T .= orog_adjusted_T_surface
-
-        CL.Simulations.set_snow_initial_conditions!(
-            Y,
-            p,
-            surface_space,
+        set_ic! = CL.Simulations.make_set_initial_state_from_file(
             ic_path,
-            model.snow.parameters,
+            model;
+            enforce_constraints = true,
         )
-
-        T_bounds = extrema(Y.canopy.energy.T)
-        CL.Simulations.set_soil_initial_conditions!(
-            Y,
-            ν,
-            θ_r,
-            subsurface_space,
-            ic_path,
-            model.soil,
-            T_bounds,
-        )
-
+        p.drivers.T .= orog_adjusted_T_surface
+        t0 = tspan[1]
+        set_ic!(Y, p, t0, model)
         # Initialize the surface temperature so the atmosphere can compute radiation.
         @. p.T_sfc = orog_adjusted_T_surface
     else
+        (; θ_r, ν, ρc_ds) = model.soil.parameters
+        # Set initial conditions that aren't read in from file
+        Y.soilco2.CO2 .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
+        Y.soilco2.O2_f .= FT(0.21)    # atmospheric O2 volumetric fraction
+        Y.soilco2.SOC .= FT(5.0)      # default SOC concentration (kg C/m³)
+
+        Y.canopy.hydraulics.ϑ_l.:1 .= model.canopy.hydraulics.parameters.ν
+        @. Y.canopy.energy.T = orog_adjusted_T_surface
         # Set initial conditions for the state
         @. Y.soil.ϑ_l = θ_r + (ν - θ_r) / 2
         Y.soil.θ_i .= FT(0.0)
@@ -289,7 +286,6 @@ function ClimaLandSimulation(
         Y.snow.S .= FT(0)
         Y.snow.S_l .= FT(0)
         Y.snow.U .= FT(0)
-
         # Initialize the surface temperature so the atmosphere can compute radiation.
         @. p.T_sfc = orog_adjusted_T_surface
     end
@@ -717,3 +713,35 @@ function Interfacer.set_cache!(sim::ClimaLandSimulation, csf)
     Interfacer.remap!(sim.model.snow.boundary_conditions.atmos.h, csf.height_delta)
     return nothing
 end
+
+# Additional ClimaLand getter methods for plotting debug fields
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_water}) =
+    sim.integrator.u.soil.ϑ_l
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_ice}) = sim.integrator.u.soil.θ_i
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_energy}) =
+    sim.integrator.u.soil.ρe_int
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:canopy_temp}) =
+    sim.integrator.u.canopy.energy.T
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:canopy_water}) =
+    sim.integrator.u.canopy.hydraulics.ϑ_l.:1
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_energy}) =
+    sim.integrator.u.snow.U
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_water_equiv}) =
+    sim.integrator.u.snow.S
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_liquid_water}) =
+    sim.integrator.u.snow.S_l
+
+Plotting.debug_plot_fields(sim::ClimaLandSimulation) = (
+    :area_fraction,
+    :surface_direct_albedo,
+    :surface_diffuse_albedo,
+    :surface_temperature,
+    :soil_water,
+    :soil_ice,
+    :soil_energy,
+    :canopy_temp,
+    :canopy_water,
+    :snow_energy,
+    :snow_water_equiv,
+    :snow_liquid_water,
+)

@@ -149,22 +149,28 @@ Fields to Face/Center and Center/Face coordinates, respectively.
 end
 
 """
-    contravariant_to_cartesian(ρτxz, ρτyz)
+    contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz)
 
-Convert the contravariant tensor components `ρτxz` and `ρτyz`, which are
-output by the surface flux calculation, to UVVector components.
-These are now in a Cartesian coordinate system, which is an extrinsic coordinate system
+Convert the covariant vector components `ρτxz` and `ρτyz` from the
+contravariant basis (as they are output by the surface flux calculation)
+to the Cartesian basis. These are now in an extrinsic coordinate system
 that can be rotated onto the ocean/sea ice grid by `_rotate_vector!`.
 """
-function contravariant_to_cartesian(ρτxz, ρτyz)
+function contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz)
     # Get the local geometry of the boundary space
     local_geometry = CC.Fields.local_geometry_field(ρτxz)
 
     # Get the vector components in the CT1 and CT2 directions
-    xz = @. CA.CT12(CA.CT1(CA.unit_basis_vector_data(CA.CT1, local_geometry)), local_geometry)
-    yz = @. CA.CT12(CA.CT2(CA.unit_basis_vector_data(CA.CT2, local_geometry)), local_geometry)
+    xz = @. CA.CT12(
+        CA.CT1(CA.unit_basis_vector_data(CA.CT1, local_geometry)),
+        local_geometry,
+    )
+    yz = @. CA.CT12(
+        CA.CT2(CA.unit_basis_vector_data(CA.CT2, local_geometry)),
+        local_geometry,
+    )
 
-    # Convert the contravariant vector components to a UVVector
-    flux_uv = @. CC.Geometry.UVVector(ρτxz * xz + ρτyz * yz, local_geometry)
-    return (flux_uv.components.data.:1, flux_uv.components.data.:2)
+    # Convert the vector components to a UVVector on the Cartesian basis
+    @. ρτ_flux_uv = @. CC.Geometry.UVVector(ρτxz * xz + ρτyz * yz, local_geometry)
+    return nothing
 end

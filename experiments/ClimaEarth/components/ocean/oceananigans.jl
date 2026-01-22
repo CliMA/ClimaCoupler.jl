@@ -209,8 +209,18 @@ function OceananigansSimulation(
     scratch_arr2 = ArrayType(zeros(FT, interpolated_values_dim...))
     scratch_arr3 = ArrayType(zeros(FT, interpolated_values_dim...))
 
-    remapping =
-        (; remapper_cc, scratch_cc1, scratch_cc2, scratch_arr1, scratch_arr2, scratch_arr3)
+    # Allocate space for a Field of UVVectors, which we need for remapping momentum fluxes
+    temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
+
+    remapping = (;
+        remapper_cc,
+        scratch_cc1,
+        scratch_cc2,
+        scratch_arr1,
+        scratch_arr2,
+        scratch_arr3,
+        temp_uv_vec,
+    )
 
     # Get some ocean properties and parameters
     ocean_properties = (;
@@ -280,12 +290,10 @@ end
 
 Ensure the ocean and ice area fractions are consistent with each other.
 This matters in the case of a LatitudeLongitudeGrid, which is only
-defined between -80 and 80 degrees latitude. In this case, we want to
-set the ice fraction to `1 - land_fraction` on [-90, -80] and [80, 90]
-degrees latitude, and make sure the ocean fraction is 0 there.
-
-The land fraction is expected to be set to 1 at the poles before calling this function,
-and doesn't need to be set again since its fraction is static.
+defined between -80 and 80 degrees latitude. In this case, we set the ice
+and ocean area fractions to 0 and the land fraction to 1 on [78°S, 90°S]
+and on [78°N, 90°N]. Note the overlap between 78° and 80° to avoid any gaps
+introduced by the cubed sphere not aligning with latitude lines.
 
 This function also updates the ice concentration field in the ocean simulation
 so that it can be used for weighting flux updates.
@@ -376,7 +384,9 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     ice_concentration = sim.ice_concentration
 
     # Convert the momentum fluxes from contravariant to Cartesian basis
-    F_turb_ρτxz_uv, F_turb_ρτyz_uv = contravariant_to_cartesian(F_turb_ρτxz, F_turb_ρτyz)
+    contravariant_to_cartesian!(sim.remapping.temp_uv_vec, F_turb_ρτxz, F_turb_ρτyz)
+    F_turb_ρτxz_uv = sim.remapping.temp_uv_vec.components.data.:1
+    F_turb_ρτyz_uv = sim.remapping.temp_uv_vec.components.data.:2
 
     # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
     CC.Remapping.interpolate!(
@@ -398,9 +408,11 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
 
     # Weight by (1 - sea ice concentration)
     OC.interior(F_turb_ρτxz_cc, :, :, 1) .=
-        OC.interior(F_turb_ρτxz_cc, :, :, 1) .* (1.0 .- ice_concentration) ./ reference_density
+        OC.interior(F_turb_ρτxz_cc, :, :, 1) .* (1.0 .- ice_concentration) ./
+        reference_density
     OC.interior(F_turb_ρτyz_cc, :, :, 1) .=
-        OC.interior(F_turb_ρτyz_cc, :, :, 1) .* (1.0 .- ice_concentration) ./ reference_density
+        OC.interior(F_turb_ρτyz_cc, :, :, 1) .* (1.0 .- ice_concentration) ./
+        reference_density
 
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
     oc_flux_u = surface_flux(sim.ocean.model.velocities.u)

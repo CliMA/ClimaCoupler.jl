@@ -3,7 +3,7 @@ aerosol_radiation: true
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "map_temporal"
-checkpoint_dt: "93days"
+checkpoint_dt: "1months"
 dt: "120secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: "120secs"
@@ -17,5 +17,6 @@ rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "366days"
+toml: [toml/amip_edonly.toml]
 topo_smoothing: true
 topography: "Earth"

@@ -26,7 +26,7 @@ It contains the following objects:
 - `ice::SIM`: The ClimaSeaIce simulation object.
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
-- `ocean_ice_fluxes::NT`: A NamedTuple of fluxes between the ocean and sea ice, computed at each coupling step.
+- `ocean_ice_interface::NT`: A NamedTuple of fluxes between the ocean and sea ice, computed at each coupling step.
 - `ice_properties::IP`: A NamedTuple of sea ice properties, including melting speed, Stefan-Boltzmann constant,
     and the Celsius to Kelvin conversion constant.
 """
@@ -34,7 +34,7 @@ struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP} <: Interfacer.SeaIceModelSim
     ice::SIM
     area_fraction::A
     remapping::REMAP
-    ocean_ice_fluxes::NT
+    ocean_ice_interface::NT
     ice_properties::IP
 end
 
@@ -121,6 +121,10 @@ function ClimaSeaIceSimulation(
 
     ice = sea_ice_simulation(grid, ocean.ocean; Δt, advection)
 
+    ocean_ice_flux_formulation = CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(sea_ice)
+    interface_temperature = OC.Field{Center, Center, Nothing}(grid)
+    interface_salinity = OC.Field{Center, Center, Nothing}(grid)
+
     # Initialize nonzero sea ice if start date provided
     if !isnothing(start_date)
         sic_metadata = CO.DataWrangling.Metadatum(
@@ -140,7 +144,6 @@ function ClimaSeaIceSimulation(
 
     # Get sea ice properties from coupled parameters
     ice_properties = (;
-        melting_speed = 1e-4,
         σ = coupled_param_dict["stefan_boltzmann_constant"],
         C_to_K = coupled_param_dict["temperature_water_freeze"],
     )
@@ -178,6 +181,11 @@ function ClimaSeaIceSimulation(
         y_momentum = y_momentum,
     )
 
+    ocean_ice_interface = (; fluxes = ocean_ice_fluxes, 
+                             flux_formulation = ocean_ice_flux_formulation,
+                             temperature = interface_temperature,
+                             salinity = interface_salinity)
+
     # Build the ocean - sea ice interface object
 
     # Get the initial area fraction from the fractional ice concentration
@@ -188,7 +196,7 @@ function ClimaSeaIceSimulation(
         ice,
         area_fraction,
         remapping,
-        ocean_seaice_interface,
+        ocean_ice_interface,
         ice_properties,
     )
 
@@ -445,7 +453,7 @@ function FluxCalculator.ocean_seaice_fluxes!(
     # (a `ClimaOcean.OceanSeaIceModels.InterfaceComputation.ThreeEquationHeatFlux(sea_ice)`)
     # a .temperature and a .salinity (both `OC.Field{Center, Center, Nothing}(grid)`)
     CO.OceanSeaIceModels.InterfaceComputations.compute_sea_ice_ocean_fluxes!(
-        ice_sim.ocean_ice_fluxes, # ice_sim.interface
+        ice_sim.ocean_ice_interface, # ice_sim.interface
         ocean_sim.ocean,
         ice_sim.ice,
         melting_speed,
@@ -456,8 +464,8 @@ function FluxCalculator.ocean_seaice_fluxes!(
     # Set the bottom heat flux to the sum of the frazil and interface heat fluxes
     bottom_heat_flux = ice_sim.ice.model.external_heat_fluxes.bottom
 
-    Qf = ice_sim.ocean_ice_fluxes.frazil_heat        # frazil heat flux
-    Qi = ice_sim.ocean_ice_fluxes.interface_heat     # interfacial heat flux
+    Qf = ice_sim.ocean_ice_interface.fluxes.frazil_heat        # frazil heat flux
+    Qi = ice_sim.ocean_ice_interface.fluxes.interface_heat     # interfacial heat flux
     bottom_heat_flux .= Qf .+ Qi
 
     ## Update the internals of the ocean model
@@ -495,7 +503,7 @@ function FluxCalculator.ocean_seaice_fluxes!(
     oc_flux_S = surface_flux(ocean_sim.ocean.model.tracers.S)
     OC.interior(oc_flux_S, :, :, 1) .+=
         OC.interior(ice_concentration, :, :, 1) .*
-        OC.interior(ice_sim.ocean_ice_fluxes.salt, :, :, 1)
+        OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
 
     return nothing
 end

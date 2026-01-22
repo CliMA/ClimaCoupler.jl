@@ -78,14 +78,35 @@ if abspath(PROGRAM_FILE) == @__FILE__
         scheduler = EKP.DataMisfitController(terminate_at = 100),
     )
 
-    backend = ClimaCalibrate.ClimaGPUBackend(;
-        hpc_kwargs = ClimaCalibrate.kwargs(gpus = 1, gpus_per_task = 1, time = 60 * 6),
-        model_interface,
-        verbose = true,
-    )
+    # Calculate ensemble size for TransformUnscented
+    ensemble_size = 2 * length(priors) + 1
 
+    # Add local workers on the same node if not already present
+    if nworkers() == 1
+        @info "Adding $ensemble_size local workers with GPU assignments..."
+
+        # Add local workers
+        addprocs(ensemble_size; exeflags="--project=experiments/ClimaEarth")
+
+        # Assign each worker to a specific GPU
+        @everywhere begin
+            worker_id = myid() - 1  # Worker IDs start at 2, so subtract 1 to get 0-indexed
+            gpu_id = worker_id % 4  # Cycle through 4 GPUs (0, 1, 2, 3)
+            ENV["CUDA_VISIBLE_DEVICES"] = string(gpu_id)
+            @info "Worker $(myid()) assigned to GPU $gpu_id"
+        end
+    end
+
+    # Load model interface on all workers
+    api_file = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "api.jl")
+    @everywhere include($api_file)
+    @everywhere const CALIBRATE_CONFIG = $CALIBRATE_CONFIG
+    @everywhere using Dates
+    @everywhere include($model_interface)
+
+    # Use WorkerBackend for single-node calibration
     eki = ClimaCalibrate.calibrate(
-        backend,
+        ClimaCalibrate.WorkerBackend(),
         ekp,
         CALIBRATE_CONFIG.n_iterations,
         prior,

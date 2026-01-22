@@ -175,7 +175,8 @@ function resampled_lonlat(config_file; include_pressure = false)
 
     if include_pressure
         # Standard ERA5 pressure levels in hPa
-        pressure_level = [1000.0, 925.0, 850.0, 700.0, 600.0, 500.0, 400.0, 300.0, 250.0, 200.0]
+        # Note: 1000 and 925 hPa excluded because model z-windowing removes near-surface levels
+        pressure_level = [850.0, 700.0, 600.0, 500.0, 400.0, 300.0, 250.0, 200.0]
         return var -> resampled_as(var; lon, lat, pressure_level)
     else
         return var -> resampled_as(var; lon, lat)

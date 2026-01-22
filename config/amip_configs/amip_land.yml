@@ -22,3 +22,6 @@ extra_atmos_diagnostics:
   - short_name: [ta, ua, va, pfull]
     period: 1months
     reduction_time: average
+  - short_name: [tas, mslp]
+    period: 1days
+    reduction_time: average

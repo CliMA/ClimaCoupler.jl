@@ -4,16 +4,8 @@ import ClimaCoupler
 import ClimaCalibrate
 import CUDA
 import EnsembleKalmanProcesses as EKP
+using Dates
 include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.jl"))
-include(
-    joinpath(
-        pkgdir(ClimaCoupler),
-        "experiments",
-        "calibration",
-        "subseasonal",
-        "run_calibration.jl",
-    ),
-)
 using Pkg
 function ClimaCalibrate.forward_model(iter, member)
     Pkg.status()
@@ -26,7 +18,6 @@ function ClimaCalibrate.forward_model(iter, member)
     sim_length = Second(end_date - start_date)
 
     config_dict["start_date"] = start_date_str
-    config_dict["bucket_initial_condition"] = "/net/sampo/data1/wxquest_data/initial_conditions/era5_bucket_processed_$(start_date_str)_0000.nc"
     config_dict["t_end"] = "$(sim_length.value)secs"
     config_dict["checkpoint_dt"] = "900days"
     config_dict["dt"] = "90secs"

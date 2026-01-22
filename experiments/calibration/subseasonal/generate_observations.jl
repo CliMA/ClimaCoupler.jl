@@ -377,8 +377,9 @@ end
 Create the observation vector for EKP from the preprocessed variables.
 Each sample in the vector corresponds to one date range with all short_names.
 
-Data is normalized to zero mean and unit variance for stable EKP convergence.
-Normalization constants and land mask are saved for use in observation_map.jl.
+**PER-VARIABLE NORMALIZATION**: Each variable is normalized independently to zero mean
+and unit variance. This ensures all variables (tas, mslp, pr) contribute equally to 
+the calibration objective, regardless of their different physical scales.
 
 Land masking is applied per-variable based on LAND_ONLY_VARS:
 - Variables in LAND_ONLY_VARS (tas, pr): only land points included
@@ -401,10 +402,16 @@ function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
     )
     @info "Saved land mask to land_mask.jld2 (land-only vars: $(LAND_ONLY_VARS))"
     
-    # First pass: collect all data to compute mean/std for normalization
-    all_data_raw = Float64[]
-    for sample_date_range in sample_date_ranges
-        for short_name in short_names
+    # ==========================================================================
+    # PER-VARIABLE NORMALIZATION: Compute mean/std for EACH variable separately
+    # This ensures each variable contributes equally to the objective function
+    # ==========================================================================
+    var_normalization = Dict{String, NamedTuple{(:mean, :std), Tuple{Float64, Float64}}}()
+    
+    for short_name in short_names
+        # Collect all data for this variable across all date ranges
+        var_data_raw = Float64[]
+        for sample_date_range in sample_date_ranges
             key = (short_name, sample_date_range)
             if haskey(vars_by_date, key)
                 var = vars_by_date[key]
@@ -412,22 +419,25 @@ function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
                 var_land_mask = short_name in LAND_ONLY_VARS ? land_mask : nothing
                 flat_data, _ = flatten_var_with_latitude_weights(var; land_mask=var_land_mask)
                 valid_data = filter(!isnan, collect(skipmissing(flat_data)))
-                append!(all_data_raw, valid_data)
+                append!(var_data_raw, valid_data)
             end
         end
+        
+        # Compute per-variable normalization constants
+        var_mean = Statistics.mean(var_data_raw)
+        var_std = Statistics.std(var_data_raw)
+        var_normalization[short_name] = (mean=var_mean, std=var_std)
+        
+        mask_status = short_name in LAND_ONLY_VARS ? "land only" : "all points"
+        @info "  $short_name: mean=$(round(var_mean, sigdigits=6)), std=$(round(var_std, sigdigits=6)), $(length(var_data_raw)) points ($mask_status)"
     end
     
-    # Compute normalization constants
-    data_mean = Statistics.mean(all_data_raw)
-    data_std = Statistics.std(all_data_raw)
-    
-    @info "Normalizing observations: mean=$data_mean, std=$data_std ($(length(all_data_raw)) points)"
-    
-    # Save normalization constants for use in observation_map
+    # Save per-variable normalization constants for use in observation_map
     JLD2.save_object(
         joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/normalization.jld2"),
-        (mean=data_mean, std=data_std)
+        var_normalization
     )
+    @info "Saved per-variable normalization constants to normalization.jld2"
     
     # Load noise scalar from single source of truth (calibration_priors.jl)
     include(joinpath(@__DIR__, "calibration_priors.jl"))
@@ -446,13 +456,15 @@ function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
                 var_land_mask = short_name in LAND_ONLY_VARS ? land_mask : nothing
                 flat_data, _ = flatten_var_with_latitude_weights(var; land_mask=var_land_mask)
                 valid_data = filter(!isnan, collect(skipmissing(flat_data)))
-                # Normalize the data
-                normalized_data = (valid_data .- data_mean) ./ data_std
+                
+                # Apply PER-VARIABLE normalization
+                norm = var_normalization[short_name]
+                normalized_data = (valid_data .- norm.mean) ./ norm.std
                 append!(all_data, normalized_data)
                 push!(all_names, short_name)
                 
                 mask_status = isnothing(var_land_mask) ? "all points" : "land only"
-                @info "  $short_name: $(length(valid_data)) points ($mask_status)"
+                @info "    $short_name: $(length(valid_data)) points ($mask_status), normalized with mean=$(round(norm.mean, sigdigits=4)), std=$(round(norm.std, sigdigits=4))"
             else
                 @warn "Missing variable for $key"
             end
@@ -461,7 +473,7 @@ function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
         obs_name = join(all_names, "_") * "_" * Dates.format(first(sample_date_range), "yyyymmdd")
         noise = noise_scalar * LinearAlgebra.I
         
-        @info "Creating observation '$obs_name' with $(length(all_data)) normalized data points"
+        @info "Creating observation '$obs_name' with $(length(all_data)) normalized data points (per-variable normalization)"
         EKP.Observation(all_data, noise, obs_name)
     end
     return obs_vec

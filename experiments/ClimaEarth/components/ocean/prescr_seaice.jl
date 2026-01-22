@@ -52,7 +52,7 @@ end
 """
     IceSlabParameters{FT}(coupled_param_dict; h = FT(2), ρ = FT(900), c = FT(2100),
                           T_base = FT(271.2), z0m = FT(1e-4), z0b = FT(1e-4),
-                          T_freeze = FT(271.2), k_ice = FT(2), α = FT(0.65), ϵ = FT(1))
+                          T_freeze = FT(271.2), k_ice = FT(2), α = nothing, ϵ = FT(1))
 
 Initialize the `IceSlabParameters` object with the coupled parameters.
 
@@ -66,11 +66,18 @@ Initialize the `IceSlabParameters` object with the coupled parameters.
 - `z0b`: roughness length for tracers [m] (default: 1e-4)
 - `T_freeze`: freezing temperature of sea water [K] (default: 271.2)
 - `k_ice`: thermal conductivity of sea ice [W / m / K] (default: 2)
-- `α`: albedo of sea ice (default: 0.65)
+- `α`: albedo of sea ice (default: read from `coupled_param_dict["ice_albedo"]`, or 0.7 if not set)
 - `ϵ`: emissivity of sea ice (default: 1)
 
 # Returns
 - `IceSlabParameters{FT}`: an `IceSlabParameters` object
+
+# Calibration
+To calibrate the ice albedo, add the following to your TOML file:
+```toml
+[ice_albedo]
+value = 0.7
+```
 """
 function IceSlabParameters{FT}(
     coupled_param_dict;
@@ -82,9 +89,14 @@ function IceSlabParameters{FT}(
     z0b = FT(1e-4),
     T_freeze = FT(271.2),
     k_ice = FT(2),
-    α = FT(0.7),
+    α = nothing,  # Read from coupled_param_dict if not provided
     ϵ = FT(1),
 ) where {FT}
+    # Ice albedo: read from TOML if available, otherwise use default 0.7
+    α_default = FT(0.7)
+    if isnothing(α)
+        α = FT(get(coupled_param_dict, "ice_albedo", α_default))
+    end
     return IceSlabParameters{FT}(;
         h,
         ρ,

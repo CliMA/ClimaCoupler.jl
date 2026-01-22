@@ -138,7 +138,10 @@ end
 Process the data of a single ensemble member and return a G vector
 matching the observation vector format.
 
-Data is normalized using the same constants as the observations for consistent EKP comparison.
+**PER-VARIABLE NORMALIZATION**: Each variable is normalized using the SAME per-variable
+constants computed from observations. This ensures model output is compared consistently
+with observations, with each variable contributing equally to the objective.
+
 Land masking is applied per-variable to match observation vector construction:
 - Variables in land_only_vars (tas, pr): only land points included
 - Other variables (mslp): all points included
@@ -153,14 +156,12 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
         joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/preprocessed_vars.jld2"),
     )
     
-    # Load normalization constants (must match what was used for observations)
+    # Load per-variable normalization constants (must match what was used for observations)
     norm_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/normalization.jld2")
     if !isfile(norm_path)
         error("Normalization file not found at $norm_path. Run generate_observations.jl first.")
     end
-    normalization = JLD2.load_object(norm_path)
-    data_mean = normalization.mean
-    data_std = normalization.std
+    var_normalization = JLD2.load_object(norm_path)
     
     # Load land mask and land_only_vars info
     land_mask_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/land_mask.jld2")
@@ -173,7 +174,7 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
         land_only_vars = Set(get(land_mask_data, :land_only_vars, ["tas", "pr"]))
     end
     
-    @info "Short names: $short_names, normalization: mean=$data_mean, std=$data_std, land_only_vars=$land_only_vars"
+    @info "Short names: $short_names, per-variable normalization, land_only_vars=$land_only_vars"
 
     # Wrap SimDir in retry logic to handle transient Lustre/NetCDF errors
     simdir = retry_on_error() do
@@ -211,8 +212,9 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
         
         valid_data = filter(!isnan, collect(skipmissing(flat_data)))
         
-        # Apply the SAME normalization as observations
-        normalized_data = (valid_data .- data_mean) ./ data_std
+        # Apply PER-VARIABLE normalization (MUST match observation vector construction)
+        norm = var_normalization[short_name]
+        normalized_data = (valid_data .- norm.mean) ./ norm.std
         append!(all_data, normalized_data)
         
         mask_status = (!isnothing(land_mask) && short_name in land_only_vars) ? "land only" : "all points"

@@ -70,19 +70,19 @@ function OceananigansSimulation(
     download_dataset(en4_salinity)
 
     # Set up tripolar ocean grid (1 degree)
-    Nx = 360
-    Ny = 180
-    Nz = 40
-    depth = 4000 # meters
-    z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 0.85 * depth)
+    Nx = 720
+    Ny = 360
+    Nz = 100
+    depth = 6000 # meters
+    z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 1800)
 
     # Regular LatLong because we know how to do interpolation there
-    underlying_grid = OC.TripolarGrid(arch; size = (Nx, Ny, Nz), halo = (7, 7, 4), z)
+    underlying_grid = OC.TripolarGrid(arch; size = (Nx, Ny, Nz), halo = (7, 7, 7), z)
 
     bottom_height = CO.regrid_bathymetry(
         underlying_grid;
-        minimum_depth = 30,
-        interpolation_passes = 5,
+        minimum_depth = 20,
+        interpolation_passes = 25,
         major_basins = 1,
     )
     grid = OC.ImmersedBoundaryGrid(
@@ -121,12 +121,13 @@ function OceananigansSimulation(
     vertical_mixing = OC.CATKEVerticalDiffusivity(Float32)
 
     Δt = isnothing(Δt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : Δt
+
     ocean = CO.ocean_simulation(
         grid;
-        Δt,
-        forcing,
+        Δ,
         momentum_advection,
         tracer_advection,
+        timestepper = :SplitRungeKutta3,
         free_surface,
         closure = (horizontal_viscosity, vertical_mixing),
     )

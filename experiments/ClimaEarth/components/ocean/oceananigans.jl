@@ -10,7 +10,6 @@ using KernelAbstractions: @kernel, @index, @inbounds
 import ConservativeRegridding as CR
 
 include("climaocean_helpers.jl")
-include("remapping.jl")
 
 """
     OceananigansSimulation{SIM, A, OPROP, REMAP, SIC}
@@ -78,7 +77,7 @@ function OceananigansSimulation(
     bottom_height = CO.regrid_bathymetry(
         underlying_grid;
         minimum_depth = 30,
-        interpolation_passes = 20,
+        interpolation_passes = 5,
         major_basins = 1,
     )
     grid = OC.ImmersedBoundaryGrid(
@@ -198,6 +197,7 @@ function OceananigansSimulation(
     )
 end
 
+include("remapping.jl")
 """
     construct_remappers(grid_oc, boundary_space)
 
@@ -210,8 +210,12 @@ To regrid from ClimaCore to Oceananigans, use `CR.regrid!(dest_vector, transpose
 """
 function construct_remappers(grid_oc, boundary_space)
     # Create the remapper from the Oceananigans grid to the ClimaCore boundary space
-    remapper_oc_to_cc =
-        CR.Regridder(boundary_space, grid_oc; normalize = false, threaded = false)
+    remapper_oc_to_cc = CR.Regridder(
+        boundary_space,
+        grid_oc.underlying_grid;
+        normalize = false,
+        threaded = false,
+    )
 
     # Create a field of ones on the boundary space so we can compute element areas
     field_ones_cc = CC.Fields.ones(boundary_space)

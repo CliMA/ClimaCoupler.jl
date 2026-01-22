@@ -1,5 +1,5 @@
 const ConservativeRegriddingCCExt =
-    Base.get_extension(ConservativeRegridding, :ConservativeRegriddingClimaCoreExt)
+    Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
 
 ### Extensions of Interfacer.jl functions for Oceananigans fields/grids
 # Non-allocating ClimaCore -> Oceananigans remap
@@ -15,21 +15,22 @@ function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field
     dst = vec(OC.interior(target_field, :, :, z))
     src = remapping.value_per_element_cc
 
-    # Multiply by transpose of the matrix of intersection areas
-    LinearAlgebra.mul!(dst, transpose(remapping.remapper_oc_to_cc.intersections), src)
-
-    # Normalize by the destination (Oceananigans) element areas
-    dst ./= remapping.remapper_oc_to_cc.source_areas # Oceananigans areas are source areas
+    # Regrid the source field to the target field
+    CR.regrid!(dst, transpose(remapping.remapper_oc_to_cc), src)
     return nothing
 end
 # Allocating ClimaCore -> Oceananigans remap
 function Interfacer.remap(
-    target_space::Union{OC.OrthogonalSphericalShellGrid, OC.LatitudeLongitudeGrid},
+    target_space::Union{
+        OC.OrthogonalSphericalShellGrid,
+        OC.ImmersedBoundaryGrid,
+        OC.LatitudeLongitudeGrid,
+    },
     source_field::CC.Fields.Field,
     remapping,
 )
     target_field = OC.Field{OC.Center, OC.Center, Nothing}(target_space)
-    remap!(target_field, source_field, remapping)
+    Interfacer.remap!(target_field, source_field, remapping)
     return target_field
 end
 
@@ -38,12 +39,12 @@ function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field
     # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
     z = size(source_field, 3)
     src = vec(OC.interior(source_field, :, :, z))
+
     # Store the remapped FV values in a vector of length equal to the number of elements in the target space
     dst = remapping.value_per_element_cc
-    LinearAlgebra.mul!(dst, remapping.remapper_oc_to_cc.intersections, src)
 
-    # Normalize by the destination (ClimaCore) element areas
-    dst ./= remapping.remapper_oc_to_cc.target_areas # ClimaCore areas are destination areas
+    # Regrid the source field to the target field
+    CR.regrid!(dst, remapping.remapper_oc_to_cc, src)
 
     # Convert the vector of remapped values to a ClimaCore Field with one value per element
     ConservativeRegriddingCCExt.set_value_per_element!(target_field, dst)
@@ -56,7 +57,7 @@ function Interfacer.remap(
     remapping,
 )
     target_field = CC.Fields.zeros(target_space)
-    remap!(target_field, source_field, remapping)
+    Interfacer.remap!(target_field, source_field, remapping)
     return target_field
 end
 
@@ -78,7 +79,7 @@ function Interfacer.remap(
     remapping,
 )
     target_field = CC.Fields.zeros(target_space)
-    remap!(target_field, operation, remapping)
+    Interfacer.remap!(target_field, operation, remapping)
     return target_field
 end
 

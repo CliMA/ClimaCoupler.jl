@@ -48,15 +48,15 @@ const CALIBRATE_CONFIG = CalibrateConfig(;
         pkgdir(ClimaCoupler),
         "config/subseasonal_configs/wxquest_diagedmf.yml",
     ),
-    short_names = ["tas"],  # Start with tas only
-    # short_names = ["tas", "mslp", "pr"],
+    # short_names = ["tas"],  # Start with tas only
+    short_names = ["tas", "mslp", "pr"],
     minibatch_size = 1,
     n_iterations = 6,
     sample_date_ranges,
     extend = Dates.Day(1),  # Add 1 day so simulation covers full 7-day diagnostic period
     spinup = Dates.Day(0),
     # Use scratch filesystem - more reliable for JLD2/HDF5 on Lustre
-    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp10",
+    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp14",
     obs_dir = ERA5_OBS_DIR,
     rng_seed = 42,
 )
@@ -119,42 +119,42 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # - Uses ObservationSeries constructor
     # - Ensemble size automatically 2*n_params + 1
     # ==========================================================================
-    # ekp = EKP.EnsembleKalmanProcess(
-    #     obs_series,
-    #     EKP.TransformUnscented(prior, impose_prior = true);
-    #     verbose = true,
-    #     rng,
-    #     scheduler = EKP.DataMisfitController(terminate_at = 1000),
-    # )
-
-    # ==========================================================================
-    # OPTION 2: TransformInversion (robust to failures, flexible ensemble size)
-    # - Loads pre-computed inputs from ekp_inputs.jld2 (run precompute_ekp_inputs.jl first!)
-    # - To use: comment out OPTION 1 above, uncomment below
-    # ==========================================================================
-    ekp_inputs_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/ekp_inputs.jld2")
-    if !isfile(ekp_inputs_path)
-        error("ekp_inputs.jld2 not found! Run precompute_ekp_inputs.jl first (use: qsub precompute.pbs)")
-    end
-    @info "Loading pre-computed EKP inputs from $ekp_inputs_path"
-    ekp_inputs = JLD2.load(ekp_inputs_path)
-    y = ekp_inputs["y"]
-    noise_scalar = ekp_inputs["noise_scalar"]
-    initial_ensemble = ekp_inputs["initial_ensemble"]
-    @info "Loaded: y=$(length(y)) points, ensemble=$(size(initial_ensemble)), noise=$noise_scalar"
-    
-    # Use UniformScaling for noise covariance (efficient - no huge matrix!)
-    Γ = noise_scalar * I
-    
     ekp = EKP.EnsembleKalmanProcess(
-        initial_ensemble,
-        y,
-        Γ,
-        EKP.TransformInversion();
+        obs_series,
+        EKP.TransformUnscented(prior, impose_prior = true);
         verbose = true,
         rng,
-        scheduler = EKP.DataMisfitController(terminate_at = 1000),
+        scheduler = EKP.DataMisfitController(terminate_at = 100000),
     )
+
+    # # ==========================================================================
+    # # OPTION 2: TransformInversion (robust to failures, flexible ensemble size)
+    # # - Loads pre-computed inputs from ekp_inputs.jld2 (run precompute_ekp_inputs.jl first!)
+    # # - To use: comment out OPTION 1 above, uncomment below
+    # # ==========================================================================
+    # ekp_inputs_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/ekp_inputs.jld2")
+    # if !isfile(ekp_inputs_path)
+    #     error("ekp_inputs.jld2 not found! Run precompute_ekp_inputs.jl first (use: qsub precompute.pbs)")
+    # end
+    # @info "Loading pre-computed EKP inputs from $ekp_inputs_path"
+    # ekp_inputs = JLD2.load(ekp_inputs_path)
+    # y = ekp_inputs["y"]
+    # noise_scalar = ekp_inputs["noise_scalar"]
+    # initial_ensemble = ekp_inputs["initial_ensemble"]
+    # @info "Loaded: y=$(length(y)) points, ensemble=$(size(initial_ensemble)), noise=$noise_scalar"
+    
+    # # Use UniformScaling for noise covariance (efficient - no huge matrix!)
+    # Γ = noise_scalar * I
+    
+    # ekp = EKP.EnsembleKalmanProcess(
+    #     initial_ensemble,
+    #     y,
+    #     Γ,
+    #     EKP.TransformInversion();
+    #     verbose = true,
+    #     rng,
+    #     scheduler = EKP.DataMisfitController(terminate_at = 10000),
+    # )
 
     # ==========================================================================
     # OPTION 3: Basic Inversion (simple, flexible)

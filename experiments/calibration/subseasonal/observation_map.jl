@@ -35,7 +35,7 @@ function retry_on_error(f; max_retries=5, delay=2.0, backoff=2.0)
         end
     end
     @error "All $max_retries attempts failed"
-    rethrow(last_error)
+    throw(last_error)  # Use throw() not rethrow() outside catch block
 end
 
 """
@@ -47,6 +47,10 @@ G ensemble represents the concatenated forward model evaluations from all
 ensemble members, arranged horizontally. Each individual forward model
 evaluation corresponds to preprocessed, flattened simulation data from a single
 ensemble member that has been matched to the corresponding observational data.
+
+Land masking is applied per-variable:
+- Variables in land_only_vars (tas, pr): only land points included
+- Other variables (mslp): all points included (evaluated everywhere)
 """
 function ClimaCalibrate.observation_map(iteration)
     output_dir = CALIBRATE_CONFIG.output_dir
@@ -58,13 +62,16 @@ function ClimaCalibrate.observation_map(iteration)
         joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/preprocessed_vars.jld2"),
     )
     
-    # Load land mask if it exists (for land-only calibration)
+    # Load land mask and land_only_vars info
     land_mask_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/land_mask.jld2")
     land_mask = nothing
+    land_only_vars = Set{String}()
     if isfile(land_mask_path)
         land_mask_data = JLD2.load_object(land_mask_path)
         land_mask = land_mask_data.mask
-        @info "Loaded land mask: $(count(land_mask)) land points"
+        # Load land_only_vars if present, otherwise default to ["tas", "pr"]
+        land_only_vars = Set(get(land_mask_data, :land_only_vars, ["tas", "pr"]))
+        @info "Loaded land mask: $(count(land_mask)) land points, land-only vars: $land_only_vars"
     end
     
     # Get expected size from one observation variable
@@ -72,24 +79,27 @@ function ClimaCalibrate.observation_map(iteration)
     sample_date_range = first(CALIBRATE_CONFIG.sample_date_ranges)
     short_names = CALIBRATE_CONFIG.short_names
     
-    # Calculate expected G dimension based on observation vector construction (with land mask)
+    # Calculate expected G dimension based on observation vector construction (per-variable land mask)
     expected_dim = 0
     for short_name in short_names
         key = (short_name, sample_date_range)
         if haskey(preprocessed_vars, key)
             var = preprocessed_vars[key]
             flat_data = vec(var.data)
-            # Apply land mask if present
-            if !isnothing(land_mask)
+            # Apply land mask only for land-only variables
+            if !isnothing(land_mask) && short_name in land_only_vars
                 flat_mask = vec(land_mask)
                 flat_data = flat_data[findall(flat_mask)]
             end
             valid_data = filter(!isnan, collect(skipmissing(flat_data)))
             expected_dim += length(valid_data)
+            
+            mask_status = (!isnothing(land_mask) && short_name in land_only_vars) ? "land only" : "all points"
+            @info "  $short_name: $(length(valid_data)) points ($mask_status)"
         end
     end
     
-    @info "Expected G dimension: $expected_dim for $n_members members (land-only: $(land_mask !== nothing))"
+    @info "Expected G dimension: $expected_dim for $n_members members"
     g_ens = fill(NaN, expected_dim, n_members)
 
     # Small delay to ensure all files are flushed to Lustre before reading
@@ -129,7 +139,9 @@ Process the data of a single ensemble member and return a G vector
 matching the observation vector format.
 
 Data is normalized using the same constants as the observations for consistent EKP comparison.
-If land mask exists, only land points are included to match the observation vector.
+Land masking is applied per-variable to match observation vector construction:
+- Variables in land_only_vars (tas, pr): only land points included
+- Other variables (mslp): all points included
 """
 function process_member_to_g_vector(diagnostics_folder_path, iteration)
     short_names = CALIBRATE_CONFIG.short_names
@@ -150,15 +162,18 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
     data_mean = normalization.mean
     data_std = normalization.std
     
-    # Load land mask if it exists (for land-only calibration)
+    # Load land mask and land_only_vars info
     land_mask_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/land_mask.jld2")
     land_mask = nothing
+    land_only_vars = Set{String}()
     if isfile(land_mask_path)
         land_mask_data = JLD2.load_object(land_mask_path)
         land_mask = land_mask_data.mask
+        # Load land_only_vars if present, otherwise default to ["tas", "pr"]
+        land_only_vars = Set(get(land_mask_data, :land_only_vars, ["tas", "pr"]))
     end
     
-    @info "Short names: $short_names, normalization: mean=$data_mean, std=$data_std, land_only=$(land_mask !== nothing)"
+    @info "Short names: $short_names, normalization: mean=$data_mean, std=$data_std, land_only_vars=$land_only_vars"
 
     # Wrap SimDir in retry logic to handle transient Lustre/NetCDF errors
     simdir = retry_on_error() do
@@ -187,8 +202,8 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
         # Flatten and append, matching observation vector construction
         flat_data = vec(var.data)
         
-        # Apply land mask if present (MUST match observation vector construction)
-        if !isnothing(land_mask)
+        # Apply land mask only for land-only variables (MUST match observation vector construction)
+        if !isnothing(land_mask) && short_name in land_only_vars
             flat_mask = vec(land_mask)
             land_indices = findall(flat_mask)
             flat_data = flat_data[land_indices]
@@ -199,6 +214,9 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
         # Apply the SAME normalization as observations
         normalized_data = (valid_data .- data_mean) ./ data_std
         append!(all_data, normalized_data)
+        
+        mask_status = (!isnothing(land_mask) && short_name in land_only_vars) ? "land only" : "all points"
+        @info "  $short_name: $(length(valid_data)) points ($mask_status)"
     end
 
     return all_data

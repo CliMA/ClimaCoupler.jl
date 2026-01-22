@@ -15,6 +15,11 @@ set -e  # Exit on error
 
 cd /glade/u/home/cchristo/clima/copies3/ClimaCoupler.jl
 
+# Log to file AND terminal using tee
+LOGFILE="calibration_$(date +%Y%m%d_%H%M%S).log"
+exec > >(tee -a "$LOGFILE") 2>&1
+echo "Logging to: $LOGFILE"
+
 # Load modules
 export MODULEPATH="/glade/campaign/univ/ucit0011/ClimaModules-Derecho:$MODULEPATH"
 module purge

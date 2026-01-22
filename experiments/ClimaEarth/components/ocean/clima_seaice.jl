@@ -178,6 +178,8 @@ function ClimaSeaIceSimulation(
         y_momentum = y_momentum,
     )
 
+    # Build the ocean - sea ice interface object
+
     # Get the initial area fraction from the fractional ice concentration
     boundary_space = axes(ocean.area_fraction)
     area_fraction = Interfacer.remap(boundary_space, ice.model.ice_concentration)
@@ -186,7 +188,7 @@ function ClimaSeaIceSimulation(
         ice,
         area_fraction,
         remapping,
-        ocean_ice_fluxes,
+        ocean_seaice_interface,
         ice_properties,
     )
 
@@ -437,8 +439,13 @@ function FluxCalculator.ocean_seaice_fluxes!(
     ocean_sim.ice_concentration .= ice_concentration
 
     # Compute the fluxes and store them in the both simulations
+    # In ClimaOcean@0.9.0 the `compute_sea_oce_ocean_fluxes!` requires passing 
+    # an `interface` in place of the `ocean_seaice_interface`. This interface needs
+    # to contain `.fluxes` (what now is `ocean_ice_fluxes`), `.flux_formulation` 
+    # (a `ClimaOcean.OceanSeaIceModels.InterfaceComputation.ThreeEquationHeatFlux(sea_ice)`)
+    # a .temperature and a .salinity (both `OC.Field{Center, Center, Nothing}(grid)`)
     CO.OceanSeaIceModels.InterfaceComputations.compute_sea_ice_ocean_fluxes!(
-        ice_sim.ocean_ice_fluxes,
+        ice_sim.ocean_ice_fluxes, # ice_sim.interface
         ocean_sim.ocean,
         ice_sim.ice,
         melting_speed,

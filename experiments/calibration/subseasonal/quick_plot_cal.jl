@@ -6,7 +6,7 @@ using Makie  # Needed to load EKP's Makie extension
 using CairoMakie
 using JLD2
 
-output_dir = "/glade/derecho/scratch/cchristo/calibration/exp14_cp"
+output_dir = "/glade/derecho/scratch/cchristo/calibration/exp17"
 
 # Extract directory name for suffix
 exp_suffix = basename(output_dir)

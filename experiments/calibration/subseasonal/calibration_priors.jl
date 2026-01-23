@@ -44,5 +44,7 @@ const CALIBRATION_RNG_SEED = 42
 
 # Noise scalar for observation covariance
 # Used by both generate_observations.jl and precompute_ekp_inputs.jl
-# For normalized data (unit variance): 0.5 = 50% of std, 2.0 = 200% of std
-const CALIBRATION_NOISE_SCALAR = 0.5
+# For normalized data (unit variance): this is the VARIANCE, not std
+# 0.1 = 10% variance (std ≈ 0.32), 0.5 = 50% variance (std ≈ 0.71)
+# Lower values make EKP more aggressive in fitting observations
+const CALIBRATION_NOISE_SCALAR = 0.4  # Reduced from 0.5 to improve parameter sensitivity

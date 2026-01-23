@@ -6,6 +6,11 @@ type = "float"
 value = 45000.0
 type = "float"
 
+[ice_albedo]
+value = 0.7
+type = "float"
+description = "Albedo of ice (unitless)."
+
 [zd_viscous]
 value = 45000.0
 type = "float"

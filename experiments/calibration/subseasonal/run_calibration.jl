@@ -33,9 +33,8 @@ model_interface = joinpath(
 # Weekly sample date ranges (start_date, end_date) for calibration
 # Each range corresponds to a 7-day period matching the ERA5 weekly files
 sample_date_ranges = [
-    # (DateTime(2023, 1, 15), DateTime(2023, 1, 21)),
-    # test a day 
     (DateTime(2023, 1, 15), DateTime(2023, 1, 15)),
+    (DateTime(2023, 1, 15), DateTime(2023, 1, 21)),  # 7-day period
     # Add more weekly ranges as needed:
     # (DateTime(2023, 1, 22), DateTime(2023, 1, 28)),
 ]
@@ -56,7 +55,7 @@ const CALIBRATE_CONFIG = CalibrateConfig(;
     extend = Dates.Day(1),  # Add 1 day so simulation covers full 7-day diagnostic period
     spinup = Dates.Day(0),
     # Use scratch filesystem - more reliable for JLD2/HDF5 on Lustre
-    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp15",
+    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp18",  # 7-day calibration
     obs_dir = ERA5_OBS_DIR,
     rng_seed = 42,
 )

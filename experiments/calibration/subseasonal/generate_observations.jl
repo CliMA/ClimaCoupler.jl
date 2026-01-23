@@ -305,7 +305,11 @@ end
 """
     preprocess_vars(vars_by_date, config_file)
 
-Preprocess each OutputVar by resampling to the model grid and setting units.
+Preprocess each OutputVar by resampling to the model grid, applying unit conversions,
+and setting units metadata.
+
+**IMPORTANT**: Precipitation (pr) requires special handling:
+- ERA5 'tp' is in meters/hour, we convert to mm/day using ERA5_PR_CONVERSION
 """
 function preprocess_vars(vars_by_date, config_file)
     resample_var = resampled_lonlat(config_file)
@@ -317,6 +321,27 @@ function preprocess_vars(vars_by_date, config_file)
         start_date = date_range[1]
         
         var = resample_var(var)
+        
+        # Apply precipitation unit conversion for ERA5 data
+        if short_name == "pr"
+            # ERA5 'tp' is in meters/hour, convert to mm/day
+            raw_mean = Statistics.mean(filter(!isnan, vec(var.data)))
+            raw_min = minimum(filter(!isnan, vec(var.data)))
+            raw_max = maximum(filter(!isnan, vec(var.data)))
+            
+            new_data = var.data .* ERA5_PR_CONVERSION
+            
+            conv_mean = Statistics.mean(filter(!isnan, vec(new_data)))
+            conv_min = minimum(filter(!isnan, vec(new_data)))
+            conv_max = maximum(filter(!isnan, vec(new_data)))
+            
+            @info "ERA5 pr conversion (m/hour → mm/day, factor=$ERA5_PR_CONVERSION):"
+            @info "  Before: mean=$(round(raw_mean, sigdigits=4)), range=[$raw_min, $raw_max]"
+            @info "  After:  mean=$(round(conv_mean, sigdigits=4)), range=[$conv_min, $conv_max] mm/day"
+            
+            var = ClimaAnalysis.OutputVar(var.attributes, var.dims, var.dim_attributes, new_data)
+        end
+        
         if haskey(var_units, short_name)
             var = ClimaAnalysis.set_units(var, var_units[short_name])
         end

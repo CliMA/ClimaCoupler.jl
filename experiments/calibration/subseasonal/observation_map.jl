@@ -129,6 +129,47 @@ function ClimaCalibrate.observation_map(iteration)
     if count(isnan, g_ens) > 0.9 * length(g_ens)
         error("Too many NaNs in G ensemble")
     end
+    
+    # ==========================================================================
+    # DIAGNOSTIC: Compare G ensemble mean vs y (observations)
+    # This helps verify that model and observations are properly aligned
+    # ==========================================================================
+    obs_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/obs_vec.jld2")
+    if isfile(obs_path)
+        obs_vec = JLD2.load_object(obs_path)
+        if !isempty(obs_vec)
+            y = first(first(obs_vec).samples)  # Get the observation vector (samples is a Vector of Vectors)
+            g_mean = vec(Statistics.mean(g_ens, dims=2))
+            
+            if length(y) == length(g_mean)
+                # Compute per-variable statistics
+                tas_end = 24472
+                mslp_end = tas_end + 64800
+                pr_end = mslp_end + 24472
+                
+                if length(y) >= pr_end
+                    # Per-variable bias (G - y)
+                    tas_bias = Statistics.mean(g_mean[1:tas_end] .- y[1:tas_end])
+                    mslp_bias = Statistics.mean(g_mean[tas_end+1:mslp_end] .- y[tas_end+1:mslp_end])
+                    pr_bias = Statistics.mean(g_mean[mslp_end+1:pr_end] .- y[mslp_end+1:pr_end])
+                    
+                    # Per-variable RMSE
+                    tas_rmse = sqrt(Statistics.mean((g_mean[1:tas_end] .- y[1:tas_end]).^2))
+                    mslp_rmse = sqrt(Statistics.mean((g_mean[tas_end+1:mslp_end] .- y[tas_end+1:mslp_end]).^2))
+                    pr_rmse = sqrt(Statistics.mean((g_mean[mslp_end+1:pr_end] .- y[mslp_end+1:pr_end]).^2))
+                    
+                    @info "=== DIAGNOSTIC: G vs y comparison (normalized units) ==="
+                    @info "  tas:  bias=$(round(tas_bias, sigdigits=3)), RMSE=$(round(tas_rmse, sigdigits=3))"
+                    @info "  mslp: bias=$(round(mslp_bias, sigdigits=3)), RMSE=$(round(mslp_rmse, sigdigits=3))"
+                    @info "  pr:   bias=$(round(pr_bias, sigdigits=3)), RMSE=$(round(pr_rmse, sigdigits=3))"
+                    @info "  Overall RMSE: $(round(sqrt(Statistics.mean((g_mean .- y).^2)), sigdigits=3))"
+                end
+            else
+                @warn "Dimension mismatch: y=$(length(y)), G=$(length(g_mean))"
+            end
+        end
+    end
+    
     return g_ens
 end
 
@@ -197,7 +238,29 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
             # Resample simulation to observation grid
             obs_lons = ClimaAnalysis.longitudes(obs_var)
             obs_lats = ClimaAnalysis.latitudes(obs_var)
+            
+            # DIAGNOSTIC: Print grid info on first variable to verify axis ordering
+            if short_name == first(short_names)
+                model_lons = ClimaAnalysis.longitudes(var)
+                model_lats = ClimaAnalysis.latitudes(var)
+                @info "Grid check: model=$(size(var.data)), obs=$(size(obs_var.data))"
+                @info "  Model lons: [$(model_lons[1]), ..., $(model_lons[end])], n=$(length(model_lons))"
+                @info "  Model lats: [$(model_lats[1]), ..., $(model_lats[end])], n=$(length(model_lats))"
+                @info "  Obs lons: [$(obs_lons[1]), ..., $(obs_lons[end])], n=$(length(obs_lons))"
+                @info "  Obs lats: [$(obs_lats[1]), ..., $(obs_lats[end])], n=$(length(obs_lats))"
+            end
+            
             var = ClimaAnalysis.resampled_as(var; lon=obs_lons, lat=obs_lats)
+        end
+        
+        # Apply precipitation unit conversion for model data
+        # Model stores pr as NEGATIVE kg/m²/s, convert to positive mm/day
+        if short_name == "pr"
+            raw_mean = Statistics.mean(filter(!isnan, vec(var.data)))
+            converted_data = var.data .* MODEL_PR_CONVERSION
+            conv_mean = Statistics.mean(filter(!isnan, vec(converted_data)))
+            @info "  pr unit conversion: $(round(raw_mean, sigdigits=3)) kg/m²/s → $(round(conv_mean, sigdigits=3)) mm/day"
+            var = ClimaAnalysis.OutputVar(var.attributes, var.dims, var.dim_attributes, converted_data)
         end
         
         # Flatten and append, matching observation vector construction
@@ -219,6 +282,9 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
         
         mask_status = (!isnothing(land_mask) && short_name in land_only_vars) ? "land only" : "all points"
         @info "  $short_name: $(length(valid_data)) points ($mask_status)"
+        
+        # Diagnostic: print statistics for debugging alignment issues
+        @info "    G stats: mean=$(round(Statistics.mean(normalized_data), sigdigits=4)), std=$(round(Statistics.std(normalized_data), sigdigits=4)), range=[$(round(minimum(normalized_data), sigdigits=3)), $(round(maximum(normalized_data), sigdigits=3))]"
     end
 
     return all_data

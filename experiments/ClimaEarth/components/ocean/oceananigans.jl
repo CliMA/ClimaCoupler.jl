@@ -44,6 +44,7 @@ Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
 """
 function OceananigansSimulation(
+    ::Type{FT},
     boundary_space,
     start_date,
     stop_date;
@@ -52,8 +53,9 @@ function OceananigansSimulation(
     Δt = nothing,
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(eltype(area_fraction)),
-)
+) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
+    OC.Oceananigans.defaults.FloatType = FT
 
     # Retrieve EN4 data (monthly)
     # (It requires username and password)
@@ -154,9 +156,8 @@ function OceananigansSimulation(
     scratch_cc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 
     # Construct two scratch arrays to use while remapping
-    # We get the array type, float type, and dimensions from the remapper object to maintain consistency
+    # We get the array type and dimensions from the remapper object to maintain consistency
     ArrayType = ClimaComms.array_type(remapper_cc.space)
-    FT = CC.Spaces.undertype(remapper_cc.space)
     interpolated_values_dim..., _buffer_length = size(remapper_cc._interpolated_values)
     scratch_arr1 = ArrayType(zeros(FT, interpolated_values_dim...))
     scratch_arr2 = ArrayType(zeros(FT, interpolated_values_dim...))

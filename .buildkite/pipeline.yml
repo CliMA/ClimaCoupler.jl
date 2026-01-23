@@ -355,7 +355,6 @@ steps:
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
-        soft_fail: true
 
       - label: "GPU CMIP: ClimaAtmos + bucket land + Oceananigans + ClimaSeaIce"
         key: "gpu_cmip_oceananigans_climaseaice_bucket"
@@ -366,7 +365,6 @@ steps:
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
-        soft_fail: true
 
       - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + PrescribedSeaIce"
         key: "gpu_cmip_oceananigans_prescrseaice"
@@ -377,7 +375,6 @@ steps:
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
-        soft_fail: true
 
       - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce"
         key: "gpu_cmip_oceananigans_climaseaice"
@@ -388,7 +385,6 @@ steps:
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
-        soft_fail: true
 
   - group: "Calibration experiments"
     steps:

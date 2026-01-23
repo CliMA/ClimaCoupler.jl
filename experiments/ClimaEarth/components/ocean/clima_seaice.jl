@@ -53,7 +53,7 @@ struct ConcentrationMaskedRadiativeEmission{FT}
 end
 
 function ConcentrationMaskedRadiativeEmission(
-    FT = Float64;
+    FT;
     emissivity = 1,
     stefan_boltzmann_constant = 5.67e-8,
     reference_temperature = 273.15,
@@ -84,6 +84,15 @@ end
 
 
 """
+    Interfacer.SeaIceSimulation(::Type{FT}, ::Val{:clima_seaice}; kwargs...)
+
+Extension of the generic SeaIceSimulation constructor for ClimaSeaIce.
+"""
+function Interfacer.SeaIceSimulation(::Type{FT}, ::Val{:clima_seaice}; kwargs...) where {FT}
+    return ClimaSeaIceSimulation(FT; kwargs...)
+end
+
+"""
     ClimaSeaIceSimulation()
 
 Creates an ClimaSeaIceSimulation object containing a model, an integrator, and
@@ -106,21 +115,23 @@ can be found in the documentation for `ClimaSeaIce.sea_ice_simulation`.
 - `output_dir`: [String] the directory to save output files.
 - `start_date`: [Date] the start date to initialize the sea ice concentration and thickness.
 - `coupled_param_dict`: [Dict{String, Any}] the coupled parameters.
-- `Δt`: [Float64] the time step.
+- `dt`: [Float64] the time step.
 """
 function ClimaSeaIceSimulation(
-    ocean;
+    ::Type{FT};
+    ocean,
     output_dir,
     start_date = nothing,
-    coupled_param_dict = CP.create_toml_dict(eltype(ocean.area_fraction)),
-    Δt = 5 * 60.0, # 5 minutes
-)
+    coupled_param_dict = CP.create_toml_dict(FT),
+    dt = 5 * 60.0, # 5 minutes
+    extra_kwargs...,
+) where {FT}
     # Initialize the sea ice with the same grid as the ocean
     grid = ocean.ocean.model.grid
     arch = OC.Architectures.architecture(grid)
-    advection = ocean.ocean.model.advection.T
 
-    ice = sea_ice_simulation(grid, ocean.ocean; Δt, advection)
+    advection = ocean.ocean.model.advection.T
+    ice = sea_ice_simulation(grid, ocean.ocean; Δt = dt, advection)
 
     ocean_ice_flux_formulation =
         CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(ice)
@@ -163,7 +174,7 @@ function ClimaSeaIceSimulation(
             schedule = OC.TimeInterval(86400), # Daily output
             filename = joinpath(output_dir, "seaice_diagnostics.jld2"),
             overwrite_existing = true,
-            array_type = Array{Float32},
+            array_type = Array{FT},
         )
         ice.output_writers[:diagnostics] = jld_writer
     end
@@ -226,8 +237,8 @@ function sea_ice_simulation(
     conductivity = 2, # kg m s⁻³ K⁻¹
     internal_heat_flux = CSI.ConductiveFlux(; conductivity),
 )
+    FT = eltype(grid)
 
-    top_surface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     top_heat_boundary_condition = MeltingConstrainedFluxBalance()
     kᴺ = size(grid, 3)
     surface_ocean_salinity = OC.interior(ocean.model.tracers.S, :, :, (kᴺ:kᴺ))
@@ -243,7 +254,7 @@ function sea_ice_simulation(
 
     bottom_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     top_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-    top_heat_flux = (top_heat_flux, ConcentrationMaskedRadiativeEmission())
+    top_heat_flux = (top_heat_flux, ConcentrationMaskedRadiativeEmission(FT))
 
     # Build the sea ice model
     sea_ice_model = CSI.SeaIceModel(
@@ -274,19 +285,17 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:area_fraction}) = sim.ar
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_concentration}) =
     sim.ice.model.ice_concentration
 
-# At the moment, we return always Float32. This is because we always want to run
-# Oceananingans with Float64, so we have no way to know the float type here. Sticking with
-# Float32 ensures that nothing is accidentally promoted to Float64. We will need to change
-# this anyway.
+# TODO better values for this
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_buoyancy}) =
-    Float32(5.8e-5)
+    eltype(sim.ice.model)(5.8e-5)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_momentum}) =
-    Float32(5.8e-5)
-Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:emissivity}) = Float32(1)
+    eltype(sim.ice.model)(5.8e-5)
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:emissivity}) =
+    eltype(sim.ice.model)(1)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_direct_albedo}) =
-    Float32(0.7)
+    eltype(sim.ice.model)(0.7)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_diffuse_albedo}) =
-    Float32(0.7)
+    eltype(sim.ice.model)(0.7)
 
 # Approximate the sea ice surface temperature as the temperature computed from the
 #  fluxes at the previous timestep.

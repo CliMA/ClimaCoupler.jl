@@ -42,6 +42,15 @@ struct ClimaLandSimulation{
 end
 
 """
+    Interfacer.LandSimulation(::Type{FT}, ::Val{:integrated}; kwargs...)
+
+Extension of the generic LandSimulation constructor for the integrated ClimaLand model.
+"""
+function Interfacer.LandSimulation(::Type{FT}, ::Val{:integrated}; kwargs...) where {FT}
+    return ClimaLandSimulation(FT; kwargs...)
+end
+
+"""
     ClimaLandSimulation(
         ::Type{FT};
         dt::TT,
@@ -89,6 +98,7 @@ function ClimaLandSimulation(
     use_land_diagnostics::Bool = true,
     coupled_param_dict = CP.create_toml_dict(FT),
     land_ic_path::Union{Nothing, String} = nothing,
+    extra_kwargs...,
 ) where {FT, TT <: Union{Float64, ITime}}
     # Get default land parameters from ClimaLand.LandParameters
     land_toml_dict = LP.create_toml_dict(FT)

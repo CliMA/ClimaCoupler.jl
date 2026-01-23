@@ -25,16 +25,16 @@ end
         h_elem = 4,
     )
     start_date = Dates.DateTime(2000, 1, 1)
-    t_start = 0.0
+    tspan = (0.0, 1.0)
     area_fraction = CC.Fields.ones(space)
     comms_ctx = nothing
 
     # Construct simulation object
     sim = PrescribedOceanSimulation(
-        FT,
-        space,
+        FT;
+        boundary_space = space,
         start_date,
-        t_start,
+        tspan,
         coupled_param_dict,
         thermo_params,
         comms_ctx,
@@ -63,7 +63,7 @@ end
         file_reader_kwargs = (; preprocess_func = (data) -> data + C_to_K,), ## convert Celsius to Kelvin
     )
     SST_expected = zeros(space)
-    evaluate!(SST_expected, SST_timevaryinginput, t_start)
+    evaluate!(SST_expected, SST_timevaryinginput, tspan[1])
 
     @test sim isa Interfacer.AbstractSurfaceStub
     # Check that the cache is correctly initialized

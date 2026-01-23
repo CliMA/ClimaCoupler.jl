@@ -88,6 +88,7 @@ end
         "bucket_initial_condition" => "",
         "coupler_toml" => [],
         "era5_initial_condition_dir" => nothing,
+        "ocean_model" => "prescribed",
         "ice_model" => "prescribed",
         "land_fraction_source" => "etopo",
         "binary_area_fraction" => true,
@@ -114,8 +115,9 @@ end
     @test args.job_id == "test_job"
     @test args.FT == Float64
     @test args.sim_mode == ClimaCoupler.Interfacer.AMIPMode
-    @test args.land_model == "bucket"
-    @test args.ice_model == "prescribed"
+    @test args.land_model == Val(:bucket)
+    @test args.ocean_model == Val(:prescribed)
+    @test args.ice_model == Val(:prescribed)
     @test args.land_fraction_source == "etopo"
 
     # Test that component_dt_dict is preserved

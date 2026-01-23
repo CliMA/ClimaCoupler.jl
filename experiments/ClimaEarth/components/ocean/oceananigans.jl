@@ -120,10 +120,10 @@ function OceananigansSimulation(
         κ_skew = 1e3,
         κ_symmetric = 1e3,
     )
-    vertical_mixing = CO.OceanSimulations.default_ocean_closure()
+    vertical_mixing = CO.Oceans.default_ocean_closure()
     horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν = 1e11)
 
-    Δt = isnothing(Δt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : Δt
+    Δt = isnothing(Δt) ? CO.Oceans.estimate_maximum_Δt(grid) : Δt
     ocean = CO.ocean_simulation(
         grid;
         Δt,

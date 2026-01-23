@@ -216,7 +216,7 @@ function sea_ice_simulation(
     ice_heat_capacity = 2100, # J kg⁻¹ K⁻¹
     ice_consolidation_thickness = 0.05, # m
     ice_density = 900, # kg m⁻³
-    dynamics = CO.SeaIceSimulations.sea_ice_dynamics(grid, ocean),
+    dynamics = CO.SeaIces.sea_ice_dynamics(grid, ocean),
     phase_transitions = CSI.PhaseTransitions(; ice_heat_capacity, ice_density),
     conductivity = 2, # kg m s⁻³ K⁻¹
     internal_heat_flux = CSI.ConductiveFlux(; conductivity),

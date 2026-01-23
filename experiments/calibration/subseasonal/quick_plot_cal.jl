@@ -6,13 +6,13 @@ using Makie  # Needed to load EKP's Makie extension
 using CairoMakie
 using JLD2
 
-output_dir = "/glade/derecho/scratch/cchristo/calibration/exp17"
+output_dir = "/glade/derecho/scratch/cchristo/calibration/exp19_cp"
 
 # Extract directory name for suffix
 exp_suffix = basename(output_dir)
 
 # Load the final EKP object and prior
-last_iter = 4  # adjust to your final iteration
+last_iter = 1  # adjust to your final iteration
 ekp = JLD2.load(joinpath(output_dir, "iteration_00$(last_iter)", "eki_file.jld2"))["single_stored_object"]
 prior = JLD2.load(joinpath(output_dir, "iteration_000", "prior.jld2"))["single_stored_object"]
 

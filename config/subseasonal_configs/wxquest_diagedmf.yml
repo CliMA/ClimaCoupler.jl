@@ -43,12 +43,16 @@ output_default_diagnostics: false
 use_coupler_diagnostics: false
 use_land_diagnostics: false
 extra_atmos_diagnostics:
-  - short_name: [tas, ts, pr, mslp, ta, hus, hur, zg, orog, pfull, ua, va, wa, waup]
+  - short_name: [tas, pr, mslp]
     period: 1days
     reduction_time: average
-  - short_name: [hfss, hfls, evspsbl]
-    period: 1days
-    reduction_time: average
+  # - short_name: [tas, ts, pr, mslp, ta, hus, hur, zg, orog, pfull, ua, va, wa, waup]
+  #   period: 1days
+  #   reduction_time: average
+  # - short_name: [hfss, hfls, evspsbl]
+  #   period: 1days
+  #   reduction_time: average
+  ###############
   # - short_name: [tas, ts, pr, mslp, ta, hus, hur, zg, orog, pfull, ua, va, wa, waup]
   #   period: 24hours
   #   reduction_time: average

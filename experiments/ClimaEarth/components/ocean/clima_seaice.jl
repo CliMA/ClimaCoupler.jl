@@ -26,7 +26,8 @@ It contains the following objects:
 - `ice::SIM`: The ClimaSeaIce simulation object.
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
-- `ocean_ice_interface::NT`: A NamedTuple of fluxes between the ocean and sea ice, computed at each coupling step.
+- `ocean_ice_interface::NT`: A NamedTuple containing fluxes between the ocean and sea ice, computed at each coupling step,
+                             the interfacial temperature and salinity, and the flux formulation used to compute the fluxes.
 - `ice_properties::IP`: A NamedTuple of sea ice properties, including melting speed, Stefan-Boltzmann constant,
     and the Celsius to Kelvin conversion constant.
 """
@@ -439,7 +440,6 @@ function FluxCalculator.ocean_seaice_fluxes!(
     ocean_sim::OceananigansSimulation,
     ice_sim::ClimaSeaIceSimulation,
 )
-    melting_speed = ice_sim.ice_properties.melting_speed
     ocean_properties = ocean_sim.ocean_properties
     ice_concentration = Interfacer.get_field(ice_sim, Val(:ice_concentration))
 
@@ -456,7 +456,6 @@ function FluxCalculator.ocean_seaice_fluxes!(
         ice_sim.ocean_ice_interface, # ice_sim.interface
         ocean_sim.ocean,
         ice_sim.ice,
-        melting_speed,
         ocean_properties,
     )
 

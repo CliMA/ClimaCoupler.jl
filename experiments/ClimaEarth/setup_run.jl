@@ -352,6 +352,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         if sim_mode <: CMIPMode
             stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
             ocean_sim = OceananigansSimulation(
+                FT,
                 boundary_space,
                 start_date,
                 stop_date;

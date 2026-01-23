@@ -266,6 +266,8 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_buoyancy}) =
     Float32(5.8e-5)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_momentum}) =
     Float32(5.8e-5)
+# Specify constant roughness model for ClimaSeaIceSimulation (sea ice)
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_model}) = :constant
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:emissivity}) = Float32(1)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_direct_albedo}) =
     Float32(0.7)

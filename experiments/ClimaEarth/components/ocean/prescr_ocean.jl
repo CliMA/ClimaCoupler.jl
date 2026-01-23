@@ -129,6 +129,16 @@ Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:surface_diffuse_albe
     sim.cache.α_diffuse
 Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:emissivity}) =
     eltype(sim.cache.T_sfc)(1)
+Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:surface_temperature}) =
+    sim.cache.T_sfc
+Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:area_fraction}) =
+    sim.cache.area_fraction
+Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:roughness_momentum}) =
+    sim.cache.z0m
+Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:roughness_buoyancy}) =
+    sim.cache.z0b
+# Specify COARE3 roughness model for PrescribedOceanSimulation
+Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:roughness_model}) = :coare3
 
 function Interfacer.update_field!(
     sim::PrescribedOceanSimulation,

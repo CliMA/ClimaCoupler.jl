@@ -149,7 +149,7 @@ function ClimaSeaIceSimulation(
     remapping = ocean.remapping
 
     # Before version 0.96.22, the NetCDFWriter was broken on GPU
-    if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
+    if arch isa OC.CPU
         # Save all tracers and velocities to a NetCDF file at daily frequency
         outputs = OC.prognostic_fields(ice.model)
         jld_writer = OC.JLD2Writer(

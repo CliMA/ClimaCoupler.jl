@@ -195,19 +195,11 @@ function CoupledSimulation(config_dict::AbstractDict)
             t_start = restart_t
         end
 
-        if pkgversion(CA) >= v"0.29.1"
-            # We only support a round number of seconds
-            isinteger(float(t_start)) ||
-                error("Cannot restart from a non integer number of seconds")
-            t_start_int = Int(float(t_start))
-            atmos_config_dict.parsed_args["t_start"] = "$(t_start_int)secs"
-        else
-            # There was no `t_start`, so we have to use a workaround for this.
-            # This does not support passing the command-line arguments (unless
-            # restart_dir is exactly the same as output_dir_root)
-            atmos_config_dict.parsed_args["restart_file"] =
-                climaatmos_restart_path(output_dir_root, restart_t)
-        end
+        # We only support a round number of seconds
+        isinteger(float(t_start)) ||
+            error("Cannot restart from a non integer number of seconds")
+        t_start_int = Int(float(t_start))
+        atmos_config_dict.parsed_args["t_start"] = "$(t_start_int)secs"
 
         @info "Starting from t_start $(t_start)"
     end

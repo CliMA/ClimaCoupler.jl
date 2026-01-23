@@ -452,7 +452,7 @@ function FluxCalculator.ocean_seaice_fluxes!(
     # (a `ClimaOcean.OceanSeaIceModels.InterfaceComputation.ThreeEquationHeatFlux(sea_ice)`)
     # a .temperature and a .salinity (both `OC.Field{Center, Center, Nothing}(grid)`)
     CO.OceanSeaIceModels.InterfaceComputations.compute_sea_ice_ocean_fluxes!(
-        ice_sim.ocean_ice_interface, # ice_sim.interface
+        ice_sim.ocean_ice_interface,
         ocean_sim.ocean,
         ice_sim.ice,
         ocean_properties,

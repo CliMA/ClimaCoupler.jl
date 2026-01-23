@@ -6,7 +6,11 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
-#### Change default simulation output directory PRPR[#1653](https://github.com/CliMA/ClimaCoupler.jl/pull/1653)
+#### Update interfaces to surface flux calculator PR[#1646](https://github.com/CliMA/ClimaCoupler.jl/pull/1646)
+Uses new interface in SurfaceFluxes v0.15 to calculate surface fluxes. For the bucket model, call the
+turbulent_fluxes! function in ClimaLand directly for surface flux calculation.
+
+#### Change default simulation output directory PR[#1653](https://github.com/CliMA/ClimaCoupler.jl/pull/1653)
 Changes the default output directory from `experiments/ClimaEarth/output/` to `output`.
 The internal structure within the output directory remains the same.
 

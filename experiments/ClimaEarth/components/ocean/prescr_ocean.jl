@@ -22,7 +22,6 @@ The cache is expected to contain the following variables:
 - `T_sfc` (surface temperature [K])
 - `z0m` (roughness length for momentum [m])
 - `z0b` (roughness length for tracers [m])
-- `beta` (evaporation scaling factor)
 - `α_direct` (direct albedo)
 - `α_diffuse` (diffuse albedo)
 - `u_int`, `v_int` (the surface wind)
@@ -48,7 +47,6 @@ end
         comms_ctx;
         z0m = FT(5.8e-5),
         z0b = FT(5.8e-5),
-        beta = FT(1),
         α_direct_val = FT(0.06),
         α_diffuse_val = FT(0.06),
         sst_path::Union{Nothing, String} = nothing,
@@ -71,7 +69,6 @@ function PrescribedOceanSimulation(
     comms_ctx;
     z0m = FT(5.8e-5),
     z0b = FT(5.8e-5),
-    beta = FT(1),
     α_direct_val = FT(0.06),
     α_diffuse_val = FT(0.06),
     sst_path::Union{Nothing, String} = nothing,
@@ -110,7 +107,6 @@ function PrescribedOceanSimulation(
         T_sfc = SST_init,
         z0m = z0m,
         z0b = z0b,
-        beta = beta,
         α_direct = ones(space) .* α_direct_val,
         α_diffuse = ones(space) .* α_diffuse_val,
         u_int = zeros(space),

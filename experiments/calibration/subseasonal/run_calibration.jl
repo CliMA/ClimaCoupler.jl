@@ -30,13 +30,18 @@ model_interface = joinpath(
     "model_interface.jl",
 )
 
-# Weekly sample date ranges (start_date, end_date) for calibration
-# Each range corresponds to a 7-day period matching the ERA5 weekly files
+# Sample date ranges (start_date, end_date) for calibration
+# Uncomment ONE of the options below:
 sample_date_ranges = [
-    # (DateTime(2023, 1, 15), DateTime(2023, 1, 15)),
-    (DateTime(2023, 1, 15), DateTime(2023, 1, 21)),  # 7-day period
-    # Add more weekly ranges as needed:
-    # (DateTime(2023, 1, 22), DateTime(2023, 1, 28)),
+    # === OPTION 1: Single day (fast testing, ~30 min/iteration) ===
+    # (DateTime(2013, 3, 18), DateTime(2013, 3, 18)),
+    
+    # === OPTION 2: 7-day period (production, ~3 hours/iteration) ===
+    (DateTime(2023, 1, 15), DateTime(2023, 1, 21)),
+    # (DateTime(2013, 3, 18), DateTime(2013, 3, 24)),
+    
+    # Add more ranges as needed:
+    # (DateTime(2013, 3, 25), DateTime(2013, 3, 31)),
 ]
 
 # Directory containing ERA5 weekly observation files
@@ -48,14 +53,14 @@ const CALIBRATE_CONFIG = CalibrateConfig(;
         "config/subseasonal_configs/wxquest_diagedmf.yml",
     ),
     # short_names = ["tas"],  # Start with tas only
-    short_names = ["tas", "mslp", "pr"],
+    short_names = ["tas", "mslp"],# "pr"],
     minibatch_size = 1,
     n_iterations = 6,
     sample_date_ranges,
     extend = Dates.Day(1),  # Add 1 day so simulation covers full 7-day diagnostic period
     spinup = Dates.Day(0),
     # Use scratch filesystem - more reliable for JLD2/HDF5 on Lustre
-    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp19",  # 7-day calibration
+    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp25",  # Full gridpoint calibration
     obs_dir = ERA5_OBS_DIR,
     rng_seed = 42,
 )
@@ -123,7 +128,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         EKP.TransformUnscented(prior, impose_prior = true);
         verbose = true,
         rng,
-        scheduler = EKP.DataMisfitController(terminate_at = 100000),
+        scheduler = EKP.DataMisfitController(terminate_at = 1000000),
     )
 
     # # ==========================================================================

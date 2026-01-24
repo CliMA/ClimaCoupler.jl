@@ -118,10 +118,6 @@ function OceananigansSimulation(
     free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 70)
     momentum_advection = OC.WENOVectorInvariant(order = 5)
     tracer_advection = OC.WENO(order = 5)
-    eddy_closure = OC.TurbulenceClosures.IsopycnalSkewSymmetricDiffusivity(
-        κ_skew = 1e3,
-        κ_symmetric = 1e3,
-    )
     vertical_mixing = CO.OceanSimulations.default_ocean_closure()
     horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν = 1e11)
 
@@ -133,7 +129,7 @@ function OceananigansSimulation(
         momentum_advection,
         tracer_advection,
         free_surface,
-        closure = (eddy_closure, horizontal_viscosity, vertical_mixing),
+        closure = (horizontal_viscosity, vertical_mixing),
     )
 
     # Set initial condition to EN4 state estimate at start_date

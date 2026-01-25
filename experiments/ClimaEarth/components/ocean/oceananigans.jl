@@ -55,7 +55,10 @@ function OceananigansSimulation(
     coupled_param_dict = CP.create_toml_dict(eltype(area_fraction)),
 ) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
-    OC.Oceananigans.defaults.FloatType = FT
+
+    # Use Float64 for the ocean to avoid precision issues
+    FT_ocean = Float64
+    OC.Oceananigans.defaults.FloatType = FT_ocean
 
     # Retrieve EN4 data (monthly)
     # (It requires username and password)

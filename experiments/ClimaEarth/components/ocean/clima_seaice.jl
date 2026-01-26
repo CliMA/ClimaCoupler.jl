@@ -123,9 +123,9 @@ function ClimaSeaIceSimulation(
     ice = sea_ice_simulation(grid, ocean.ocean; Δt, advection)
 
     ocean_ice_flux_formulation =
-        CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(sea_ice)
-    interface_temperature = OC.Field{Center, Center, Nothing}(grid)
-    interface_salinity = OC.Field{Center, Center, Nothing}(grid)
+        CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(ice)
+    interface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    interface_salinity = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 
     # Initialize nonzero sea ice if start date provided
     if !isnothing(start_date)
@@ -205,7 +205,7 @@ function ClimaSeaIceSimulation(
     )
 
     # Ensure ocean temperature is above freezing where there is sea ice
-    CO.OceanSeaIceModels.above_freezing_ocean_temperature!(ocean.ocean, ice)
+    CO.OceanSeaIceModels.above_freezing_ocean_temperature!(ocean.ocean, grid, ice)
     return sim
 end
 
@@ -449,9 +449,9 @@ function FluxCalculator.ocean_seaice_fluxes!(
     ocean_sim.ice_concentration .= ice_concentration
 
     # Compute the fluxes and store them in the both simulations
-    # In ClimaOcean@0.9.0 the `compute_sea_oce_ocean_fluxes!` requires passing 
+    # In ClimaOcean@0.9.0 the `compute_sea_oce_ocean_fluxes!` requires passing
     # an `interface` in place of the `ocean_seaice_interface`. This interface needs
-    # to contain `.fluxes` (what now is `ocean_ice_fluxes`), `.flux_formulation` 
+    # to contain `.fluxes` (what now is `ocean_ice_fluxes`), `.flux_formulation`
     # (a `ClimaOcean.OceanSeaIceModels.InterfaceComputation.ThreeEquationHeatFlux(sea_ice)`)
     # a .temperature and a .salinity (both `OC.Field{Center, Center, Nothing}(grid)`)
     CO.OceanSeaIceModels.InterfaceComputations.compute_sea_ice_ocean_fluxes!(
@@ -477,8 +477,8 @@ function FluxCalculator.ocean_seaice_fluxes!(
     oc_flux_u = surface_flux(ocean_sim.ocean.model.velocities.u)
     oc_flux_v = surface_flux(ocean_sim.ocean.model.velocities.v)
 
-    ρτxio = ice_sim.ocean_ice_fluxes.x_momentum # sea_ice - ocean zonal momentum flux
-    ρτyio = ice_sim.ocean_ice_fluxes.y_momentum # sea_ice - ocean meridional momentum flux
+    ρτxio = ice_sim.ocean_ice_interface.fluxes.x_momentum # sea_ice - ocean zonal momentum flux
+    ρτyio = ice_sim.ocean_ice_interface.fluxes.y_momentum # sea_ice - ocean meridional momentum flux
 
     # Update the momentum flux contributions from ocean/sea ice fluxes
     grid = ocean_sim.ocean.model.grid

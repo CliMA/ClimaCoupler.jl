@@ -120,9 +120,11 @@ function OceananigansSimulation(
     # Create ocean simulation
     free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 70)
     momentum_advection = OC.WENOVectorInvariant(order = 5)
-    tracer_advection = OC.WENO(order = 5)
-    vertical_mixing = CO.OceanSimulations.default_ocean_closure()
+    tracer_advection = OC.WENO(order = 5, buffer_scheme = OC.Centered(order = 2))
     horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν = 1e11)
+
+    # Use Float32 for the vertical mixing parameters to avoid parameter memory limits
+    vertical_mixing = OC.CATKEVerticalDiffusivity(Float32)
 
     Δt = isnothing(Δt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : Δt
     ocean = CO.ocean_simulation(

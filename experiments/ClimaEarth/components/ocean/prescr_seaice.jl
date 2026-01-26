@@ -7,9 +7,6 @@ import Interpolations # triggers InterpolationsExt in ClimaUtilities
 import Thermodynamics as TD
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
 
-###
-### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
-###
 """
     PrescribedIceSimulation{P, I}
 
@@ -28,7 +25,7 @@ Ice concentration is prescribed, and we solve the following energy equation:
 In the current version, the sea ice has a prescribed thickness. T_sfc is extrapolated from T_base
 and T_bulk assuming the ice temperature varies linearly between the ice surface and the base.
 """
-struct PrescribedIceSimulation{P, I} <: Interfacer.SeaIceModelSimulation
+struct PrescribedIceSimulation{P, I} <: Interfacer.AbstractSeaIceSimulation
     params::P
     integrator::I
 end

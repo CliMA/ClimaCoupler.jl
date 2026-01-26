@@ -199,7 +199,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     #=
     ## Component Model Initialization
     Here we set initial and boundary conditions for each component model. Each component model is required to have an `init` function that
-    returns a `ComponentModelSimulation` object (see `Interfacer` docs for more details).
+    returns a `AbstractComponentSimulation` object (see `Interfacer` docs for more details).
     =#
 
     #=

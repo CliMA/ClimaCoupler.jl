@@ -12,16 +12,16 @@ using Makie, GeoMakie, CairoMakie, ClimaCoreMakie # trigger ClimaCouplerMakieExt
 ENV["GKSwstype"] = "nul"
 FT = Float64
 
-struct ClimaAtmosSimulation{C} <: Interfacer.AtmosModelSimulation
+struct ClimaAtmosSimulation{C} <: Interfacer.AbstractAtmosSimulation
     cache::C
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:atmos_field}) = sim.cache.atmos_field
 
-struct BucketSimulation{C} <: Interfacer.SurfaceModelSimulation
+struct BucketSimulation{C} <: Interfacer.AbstractSurfaceSimulation
     cache::C
 end
 
-struct ClimaLandSimulation{C} <: Interfacer.SurfaceModelSimulation
+struct ClimaLandSimulation{C} <: Interfacer.AbstractSurfaceSimulation
     cache::C
 end
 

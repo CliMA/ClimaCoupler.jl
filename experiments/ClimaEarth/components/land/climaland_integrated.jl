@@ -34,7 +34,7 @@ struct ClimaLandSimulation{
     I <: SciMLBase.AbstractODEIntegrator,
     A <: CC.Fields.Field,
     OW,
-} <: Interfacer.ImplicitFluxSimulation
+} <: Interfacer.AbstractImplicitFluxSimulation
     model::M
     integrator::I
     area_fraction::A
@@ -365,7 +365,7 @@ function ClimaLandSimulation(
 end
 
 ###############################################################################
-### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
+### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
 ###############################################################################
 
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:area_fraction}) = sim.area_fraction
@@ -579,13 +579,13 @@ The land model cache contains the computed fluxes for each sub-component.
 # Arguments
 - `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
 - `sim`: [ClimaLandSimulation] the integrated land simulation to compute fluxes for.
-- `atmos_sim`: [Interfacer.AtmosModelSimulation] the atmosphere simulation to compute fluxes with.
+- `atmos_sim`: [Interfacer.AbstractAtmosSimulation] the atmosphere simulation to compute fluxes with.
 - `thermo_params`: [ClimaParams.ThermodynamicParameters] the thermodynamic parameters for the simulation.
 """
 function FluxCalculator.compute_surface_fluxes!(
     csf,
     sim::ClimaLandSimulation,
-    atmos_sim::Interfacer.AtmosModelSimulation,
+    atmos_sim::Interfacer.AbstractAtmosSimulation,
     thermo_params,
 )
     boundary_space = axes(csf)

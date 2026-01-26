@@ -15,7 +15,7 @@ include("climaland_helpers.jl")
 
 
 ###
-### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
+### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
 ###
 """
     BucketSimulation{M, I, A}
@@ -34,7 +34,7 @@ struct BucketSimulation{
     A <: CC.Fields.Field,
     OW,
     RF,
-} <: Interfacer.LandModelSimulation
+} <: Interfacer.AbstractLandSimulation
     model::M
     integrator::I
     area_fraction::A
@@ -437,13 +437,13 @@ we may compute fluxes in the bucket model's internal `step!` function.
 # Arguments
 - `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
 - `sim`: [BucketSimulation] the bucket simulation to compute fluxes for.
-- `atmos_sim`: [Interfacer.AtmosModelSimulation] the atmosphere simulation to compute fluxes with.
+- `atmos_sim`: [Interfacer.AbstractAtmosSimulation] the atmosphere simulation to compute fluxes with.
 - `thermo_params`: [ClimaParams.ThermodynamicParameters] the thermodynamic parameters for the simulation.
 """
 function FluxCalculator.compute_surface_fluxes!(
     csf,
     sim::BucketSimulation,
-    atmos_sim::Interfacer.AtmosModelSimulation,
+    atmos_sim::Interfacer.AbstractAtmosSimulation,
     thermo_params,
 )
     boundary_space = axes(csf)
@@ -530,7 +530,7 @@ end
 Updates the surface component model cache with the current coupler fields besides turbulent fluxes.
 
 # Arguments
-- `sim`: [Interfacer.SurfaceModelSimulation] containing a surface model simulation object.
+- `sim`: [Interfacer.AbstractSurfaceSimulation] containing a surface model simulation object.
 - `csf`: [NamedTuple] containing coupler fields.
 """
 function FieldExchanger.update_sim!(sim::BucketSimulation, csf)

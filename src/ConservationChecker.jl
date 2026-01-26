@@ -92,7 +92,7 @@ function check_conservation!(
     # save surfaces
     for sim in model_sims
         sim_name = Symbol(Base.nameof(sim))
-        if sim isa Interfacer.AtmosModelSimulation
+        if sim isa Interfacer.AbstractAtmosSimulation
             radiative_energy_flux_toa =
                 Interfacer.get_field(sim, Val(:radiative_energy_flux_toa))
 
@@ -116,7 +116,7 @@ function check_conservation!(
 
             push!(previous, current)
             total += current + radiation_sources_accum
-        elseif sim isa Interfacer.SurfaceModelSimulation
+        elseif sim isa Interfacer.AbstractSurfaceSimulation
             # save surfaces
             area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
             if isnothing(Interfacer.get_field(sim, Val(:energy)))
@@ -183,7 +183,7 @@ function check_conservation!(
     # save surfaces
     for sim in model_sims
         sim_name = Symbol(Base.nameof(sim))
-        if sim isa Interfacer.AtmosModelSimulation
+        if sim isa Interfacer.AbstractAtmosSimulation
 
             # save atmos
             previous = getproperty(ccs, sim_name)
@@ -195,7 +195,7 @@ function check_conservation!(
             end
             push!(previous, current)
 
-        elseif sim isa Interfacer.SurfaceModelSimulation
+        elseif sim isa Interfacer.AbstractSurfaceSimulation
             # save surfaces
             area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
             if isnothing(Interfacer.get_field(sim, Val(:water)))

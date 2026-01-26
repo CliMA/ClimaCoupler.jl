@@ -6,6 +6,10 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Rename abstract component types PR[#1688](https://github.com/CliMA/ClimaCoupler.jl/pull/1688)
+To follow abstract type naming convention. For example, `XModelSimulation` is now
+`AbstractXSimulation`.
+
 #### Add generic component model constructors PR[#1683](https://github.com/CliMA/ClimaCoupler.jl/pull/1683)
 In preparation for adding extensions for each component model, generalize the component
 model constructor interface and extend it for each component. This PR also drops

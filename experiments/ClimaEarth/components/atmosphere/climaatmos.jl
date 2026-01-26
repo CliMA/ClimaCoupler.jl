@@ -15,9 +15,9 @@ import ClimaCoupler:
 import ClimaUtilities.TimeManager: ITime
 
 ###
-### Functions required by ClimaCoupler.jl for an AtmosModelSimulation
+### Functions required by ClimaCoupler.jl for an AbstractAtmosSimulation
 ###
-struct ClimaAtmosSimulation{P, D, I, OW} <: Interfacer.AtmosModelSimulation
+struct ClimaAtmosSimulation{P, D, I, OW} <: Interfacer.AbstractAtmosSimulation
     params::P
     domain::D
     integrator::I

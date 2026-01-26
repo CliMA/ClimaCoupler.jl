@@ -5,10 +5,10 @@ import Thermodynamics.Parameters as TDP
 import ClimaParams # to load TDP extension
 
 # surface field exchange tests
-struct TestSurfaceSimulation1{C} <: Interfacer.SurfaceModelSimulation
+struct TestSurfaceSimulation1{C} <: Interfacer.AbstractSurfaceSimulation
     cache_field::C
 end
-struct TestSurfaceSimulation2{C} <: Interfacer.SurfaceModelSimulation
+struct TestSurfaceSimulation2{C} <: Interfacer.AbstractSurfaceSimulation
     cache_field::C
 end
 
@@ -40,10 +40,10 @@ Interfacer.get_field(sim::TestSurfaceSimulation2, ::Val{:area_fraction}) =
 
 Interfacer.step!(::TestSurfaceSimulation1, _) = nothing
 
-struct TestSurfaceSimulationA <: Interfacer.SurfaceModelSimulation end
-struct TestSurfaceSimulationB <: Interfacer.SurfaceModelSimulation end
-struct TestSurfaceSimulationC <: Interfacer.SurfaceModelSimulation end
-struct TestSurfaceSimulationD <: Interfacer.SurfaceModelSimulation end
+struct TestSurfaceSimulationA <: Interfacer.AbstractSurfaceSimulation end
+struct TestSurfaceSimulationB <: Interfacer.AbstractSurfaceSimulation end
+struct TestSurfaceSimulationC <: Interfacer.AbstractSurfaceSimulation end
+struct TestSurfaceSimulationD <: Interfacer.AbstractSurfaceSimulation end
 
 # Initialize weights (fractions) and initial values (fields)
 Interfacer.get_field(::TestSurfaceSimulationA, ::Val{:random}) = 1.0
@@ -56,7 +56,7 @@ Interfacer.get_field(::TestSurfaceSimulationB, ::Val{:area_fraction}) = 0.5
 Interfacer.get_field(::TestSurfaceSimulationC, ::Val{:area_fraction}) = 2.0
 Interfacer.get_field(::TestSurfaceSimulationD, ::Val{:area_fraction}) = -10.0
 
-struct DummyStub{C} <: Interfacer.SurfaceModelSimulation
+struct DummyStub{C} <: Interfacer.AbstractSurfaceSimulation
     cache::C
 end
 Interfacer.get_field(sim::DummyStub, ::Val{:area_fraction}) = sim.cache.area_fraction
@@ -69,7 +69,7 @@ function Interfacer.update_field!(
     sim.cache.area_fraction .= field
 end
 # atmos sim
-struct TestAtmosSimulation{C} <: Interfacer.AtmosModelSimulation
+struct TestAtmosSimulation{C} <: Interfacer.AbstractAtmosSimulation
     cache::C
 end
 
@@ -125,7 +125,7 @@ FluxCalculator.update_turbulent_fluxes!(sim::TestAtmosSimulation, fields) = noth
 Interfacer.step!(sim::TestAtmosSimulation, t) = nothing
 
 #surface sim
-struct TestSurfaceSimulationLand{C} <: Interfacer.SurfaceModelSimulation
+struct TestSurfaceSimulationLand{C} <: Interfacer.AbstractSurfaceSimulation
     cache::C
 end
 function Interfacer.get_field(sim::TestSurfaceSimulationLand, ::Val{:area_fraction})

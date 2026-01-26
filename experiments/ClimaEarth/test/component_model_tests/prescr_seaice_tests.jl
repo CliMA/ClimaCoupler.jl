@@ -149,7 +149,7 @@ for FT in (Float32, Float64)
         @test maximum(dY) ≈ FT(0)
     end
 
-    @testset "dss_state! SeaIceModelSimulation for FT=$FT" begin
+    @testset "dss_state! AbstractSeaIceSimulation for FT=$FT" begin
         coupled_param_dict = CP.create_toml_dict(FT)
         boundary_space = CC.CommonSpaces.CubedSphereSpace(
             FT;

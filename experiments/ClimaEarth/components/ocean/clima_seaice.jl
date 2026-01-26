@@ -15,6 +15,22 @@ include("climaocean_helpers.jl")
 # Rename ECCO password env variable to match ClimaOcean.jl
 haskey(ENV, "ECCO_PASSWORD") && (ENV["ECCO_WEBDAV_PASSWORD"] = ENV["ECCO_PASSWORD"])
 
+function OC.set!(model::CSI.SeaIceModel, ::OMIPEvolvedInitialConditions)
+
+    # Dowload the initialization file if not preset
+    if !isfile("omip_initialization.jld2")
+        url = "https://www.dropbox.com/scl/fi/114xafnmoekgc2da3cco7/omip_initialization.jld2?rlkey=e3wnjgwbr2c2zaszysjbptgnh&st=9zagmgux&dl=0"
+        path = "omip_initialization.jld2"
+        download(url, path)
+    end
+
+    file = jldopen("omip_initialization.jld2")
+
+    OC.set!(model, h = file["hi"], ℵ = file["ℵi"])
+
+    return nothing
+end
+
 """
     ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP}
 
@@ -37,6 +53,32 @@ struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP} <: Interfacer.SeaIceModelSim
     ocean_ice_fluxes::NT
     ice_properties::IP
 end
+
+struct ConcentrationMaskedRadiativeEmission{FT}
+    emissivity :: FT
+    stefan_boltzmann_constant :: FT
+    reference_temperature :: FT
+end
+
+
+function ConcentrationMaskedRadiativeEmission(FT=Float64;
+                                              emissivity = 1,
+                                              stefan_boltzmann_constant = 5.67e-8,
+                                              reference_temperature = 273.15)
+
+    return ConcentrationMaskedRadiativeEmission(convert(FT, emissivity),
+                                                convert(FT, stefan_boltzmann_constant),
+                                                convert(FT, reference_temperature))
+end
+
+function CSI.SeaIceThermodynamics.HeatBoundaryConditions.getflux(emission::ConcentrationMaskedRadiativeEmission, i, j, grid, T, clock, fields)
+    ϵ = emission.emissivity
+    σ = emission.stefan_boltzmann_constant
+    Tᵣ = emission.reference_temperature
+    @inbounds ℵij = fields.ℵ[i, j, 1]
+    return ϵ * σ * (T + Tᵣ)^4 * (ℵij > 0)
+end
+
 
 """
     ConcentrationMaskedRadiativeEmission
@@ -111,6 +153,7 @@ function ClimaSeaIceSimulation(
     ocean;
     output_dir,
     start_date = nothing,
+    initial_conditions = OMIPEvolvedInitialConditions(),
     coupled_param_dict = CP.create_toml_dict(eltype(ocean.area_fraction)),
     Δt = 5 * 60.0, # 5 minutes
 )
@@ -119,7 +162,7 @@ function ClimaSeaIceSimulation(
     arch = OC.Architectures.architecture(grid)
     advection = ocean.ocean.model.advection.T
 
-    ice = sea_ice_simulation(grid, ocean.ocean; Δt, advection)
+    ice = sea_ice_simulation(grid, ocean.ocean; Δt, advection = nothing, dynamics = nothing)
 
     # Initialize nonzero sea ice if start date provided
     if !isnothing(start_date)
@@ -155,7 +198,7 @@ function ClimaSeaIceSimulation(
         jld_writer = OC.JLD2Writer(
             ice.model,
             outputs;
-            schedule = OC.TimeInterval(86400), # Daily output
+            schedule = OC.TimeInterval(3600), # hourly snapshots
             filename = joinpath(output_dir, "seaice_diagnostics.jld2"),
             overwrite_existing = true,
             array_type = Array{Float32},
@@ -214,7 +257,7 @@ function sea_ice_simulation(
     top_surface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     top_heat_boundary_condition = MeltingConstrainedFluxBalance()
     kᴺ = size(grid, 3)
-    surface_ocean_salinity = OC.interior(ocean.model.tracers.S, :, :, kᴺ:kᴺ)
+    surface_ocean_salinity = OC.interior(ocean.model.tracers.S, :, :, (kᴺ:kᴺ))
     bottom_heat_boundary_condition = IceWaterThermalEquilibrium(surface_ocean_salinity)
 
     ice_thermodynamics = CSI.SlabSeaIceThermodynamics(
@@ -302,39 +345,41 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     grid = sim.ice.model.grid
     ice_concentration = sim.ice.model.ice_concentration
 
-    # Convert the momentum fluxes from contravariant to Cartesian basis
-    contravariant_to_cartesian!(sim.remapping.temp_uv_vec, F_turb_ρτxz, F_turb_ρτyz)
-    F_turb_ρτxz_uv = sim.remapping.temp_uv_vec.components.data.:1
-    F_turb_ρτyz_uv = sim.remapping.temp_uv_vec.components.data.:2
+    if !isnothing(sim.ice.model.dynamics)
+        # Convert the momentum fluxes from contravariant to Cartesian basis
+        contravariant_to_cartesian!(sim.remapping.temp_uv_vec, F_turb_ρτxz, F_turb_ρτyz)
+        F_turb_ρτxz_uv = sim.remapping.temp_uv_vec.components.data.:1
+        F_turb_ρτyz_uv = sim.remapping.temp_uv_vec.components.data.:2
 
-    # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
-        F_turb_ρτxz_uv,
-    )
-    OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr2,
-        sim.remapping.remapper_cc,
-        F_turb_ρτyz_uv,
-    )
-    OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
+        # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
+        CC.Remapping.interpolate!(
+            sim.remapping.scratch_arr1,
+            sim.remapping.remapper_cc,
+            F_turb_ρτxz_uv,
+        )
+        OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
+        CC.Remapping.interpolate!(
+            sim.remapping.scratch_arr2,
+            sim.remapping.remapper_cc,
+            F_turb_ρτyz_uv,
+        )
+        OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
 
-    # Rename for clarity; these are now Center, Center Oceananigans fields
-    F_turb_ρτxz_cc = sim.remapping.scratch_cc1
-    F_turb_ρτyz_cc = sim.remapping.scratch_cc2
+        # Rename for clarity; these are now Center, Center Oceananigans fields
+        F_turb_ρτxz_cc = sim.remapping.scratch_cc1
+        F_turb_ρτyz_cc = sim.remapping.scratch_cc2
 
-    # Set the momentum flux BCs at the correct locations using the remapped scratch fields
-    # Note that this requires the sea ice model to always be run with dynamics turned on
-    si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
-    si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
-    set_from_extrinsic_vector!(
-        (; u = si_flux_u, v = si_flux_v),
-        grid,
-        F_turb_ρτxz_cc,
-        F_turb_ρτyz_cc,
-    )
+        # Set the momentum flux BCs at the correct locations using the remapped scratch fields
+        # Note that this requires the sea ice model to always be run with dynamics turned on
+        si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
+        si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
+        set_from_extrinsic_vector!(
+            (; u = si_flux_u, v = si_flux_v),
+            grid,
+            F_turb_ρτxz_cc,
+            F_turb_ρτyz_cc,
+        )
+    end
 
     # Remap the latent and sensible heat fluxes using scratch arrays
     CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, F_lh) # latent heat flux

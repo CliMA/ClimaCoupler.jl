@@ -43,6 +43,9 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     end
 
     # ice and ocean fractions are dynamic
+    # Here, the ice concentration (defined on the ice model's space) is retrieved
+    # from the ice model, used to compute the ice fraction, which is 0 anywhere we
+    # have land area. The ice fraction is then used to compute the ocean fraction.
     if haskey(cs.model_sims, :ice_sim)
         ice_sim = cs.model_sims.ice_sim
         Interfacer.get_field!(cs.fields.scalar_temp1, ice_sim, Val(:ice_concentration))

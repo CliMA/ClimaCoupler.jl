@@ -15,22 +15,22 @@ env:
 timeout_in_minutes: 1800 # 30 hours
 
 steps:
-  - label: "init :computer:"
-    key: "init_cpu_env"
-    command:
-      - "echo $$JULIA_DEPOT_PATH"
+  # - label: "init :computer:"
+  #   key: "init_cpu_env"
+  #   command:
+  #     - "echo $$JULIA_DEPOT_PATH"
 
-      - echo "--- Instantiate AMIP env"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
+  #     - echo "--- Instantiate AMIP env"
+  #     - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+  #     - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"
+  #     - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
+  #     - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
 
-    agents:
-      slurm_cpus_per_task: 8
-    env:
-      JULIA_NUM_PRECOMPILE_TASKS: 8
-      JULIA_MAX_NUM_PRECOMPILE_FILES: 50
+  #   agents:
+  #     slurm_cpus_per_task: 8
+  #   env:
+  #     JULIA_NUM_PRECOMPILE_TASKS: 8
+  #     JULIA_MAX_NUM_PRECOMPILE_FILES: 50
 
   - label: "init clima :computer:"
     key: "init_cpu_env_clima"
@@ -157,8 +157,34 @@ steps:
   - group: "CMIP simulations"
 
     steps:
-      - label: "GPU CMIP: ClimaAtmos + ClimaLand + ClimaOcean + PrescribedSeaIce"
-        key: "cmip_edonly_land"
+      # - label: "GPU CMIP: ClimaAtmos + ClimaLand + ClimaOcean + PrescribedSeaIce"
+      #   key: "cmip_edonly_land"
+      #   command:
+      #       - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_land.yml --job_id cmip_edonly_land"
+      #   artifact_paths: "experiments/ClimaEarth/output/cmip_edonly_land/artifacts/*"
+      #   env:
+      #     CLIMACOMMS_DEVICE: "CUDA"
+      #     CLIMACOMMS_CONTEXT: "SINGLETON"
+      #   agents:
+      #     queue: clima
+      #     slurm_mem: 32GB
+      #     slurm_gpus: 1
+
+      # - label: "GPU CMIP: ClimaAtmos + Bucket + ClimaOcean + PrescribedSeaIce"
+      #   key: "cmip_edonly_bucket"
+      #   command:
+      #       - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_bucket.yml --job_id cmip_edonly_bucket"
+      #   artifact_paths: "experiments/ClimaEarth/output/cmip_edonly_bucket/artifacts/*"
+      #   env:
+      #     CLIMACOMMS_DEVICE: "CUDA"
+      #     CLIMACOMMS_CONTEXT: "SINGLETON"
+      #   agents:
+      #     queue: clima
+      #     slurm_mem: 32GB
+      #     slurm_gpus: 1
+
+      - label: "GPU CMIP: ClimaAtmos + Bucket + ClimaOcean + ClimaSeaIce"
+        key: "cmip_climaseaice"
         command:
             - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_land.yml --job_id cmip_edonly_land"
         artifact_paths: "output/cmip_edonly_land/artifacts/*"

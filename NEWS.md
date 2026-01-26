@@ -6,6 +6,11 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Add a SimCoordinator module PR[#1676](https://github.com/CliMA/ClimaCoupler.jl/pull/1676)
+Move the functions `run!(cs)` and `step!(cs)` into a new module, SimCoordinator.
+These are exported at the top-level ClimaCoupler.jl, so they can continue to be used
+as before. This PR also moves `postprocess(cs)` into the Plotting module.
+
 #### Update interfaces to surface flux calculator PR[#1646](https://github.com/CliMA/ClimaCoupler.jl/pull/1646)
 Uses new interface in SurfaceFluxes v0.15 to calculate surface fluxes. For the bucket model, call the
 turbulent_fluxes! function in ClimaLand directly for surface flux calculation.

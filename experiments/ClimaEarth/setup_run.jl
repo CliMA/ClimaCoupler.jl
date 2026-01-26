@@ -31,17 +31,7 @@ import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
 
 # ## Coupler specific imports
-import ClimaCoupler
-import ClimaCoupler:
-    ConservationChecker,
-    Checkpointer,
-    FieldExchanger,
-    FluxCalculator,
-    Input,
-    Interfacer,
-    TimeManager,
-    Utilities,
-    SimOutput
+using ClimaCoupler
 import ClimaCoupler.Interfacer:
     AbstractSlabplanetSimulationMode,
     AMIPMode,
@@ -93,7 +83,6 @@ dictionary and the simulation-specific configuration dictionary, which allows th
 We can additionally pass the configuration dictionary to the component model initializers, which will then override the default settings of the component models.
 =#
 
-include("user_io/postprocessing.jl")
 
 """
     CoupledSimulation(config_file)
@@ -195,19 +184,11 @@ function CoupledSimulation(config_dict::AbstractDict)
             t_start = restart_t
         end
 
-        if pkgversion(CA) >= v"0.29.1"
-            # We only support a round number of seconds
-            isinteger(float(t_start)) ||
-                error("Cannot restart from a non integer number of seconds")
-            t_start_int = Int(float(t_start))
-            atmos_config_dict.parsed_args["t_start"] = "$(t_start_int)secs"
-        else
-            # There was no `t_start`, so we have to use a workaround for this.
-            # This does not support passing the command-line arguments (unless
-            # restart_dir is exactly the same as output_dir_root)
-            atmos_config_dict.parsed_args["restart_file"] =
-                climaatmos_restart_path(output_dir_root, restart_t)
-        end
+        # We only support a round number of seconds
+        isinteger(float(t_start)) ||
+            error("Cannot restart from a non integer number of seconds")
+        t_start_int = Int(float(t_start))
+        atmos_config_dict.parsed_args["t_start"] = "$(t_start_int)secs"
 
         @info "Starting from t_start $(t_start)"
     end
@@ -598,90 +579,6 @@ function CoupledSimulation(config_dict::AbstractDict)
 end
 
 """
-    run!(cs::CoupledSimulation)
-
-Evolve the given simulation, producing plots and other diagnostic information.
-
-Keyword arguments
-==================
-
-`precompile`: If `true`, run the coupled simulations for two steps, so that most functions
-              are precompiled and subsequent timing will be more accurate.
-"""
-function run!(
-    cs::CoupledSimulation;
-    precompile = (cs.tspan[end] > 2 * cs.Δt_cpl + cs.tspan[begin]),
-)
-
-    ## Precompilation of Coupling Loop
-    # Here we run the entire coupled simulation for two timesteps to precompile several
-    # functions for more accurate timing of the overall simulation.
-    precompile && (step!(cs); step!(cs))
-
-    ## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos
-    GC.gc()
-
-    #=
-    ## Solving and Timing the Full Simulation
-
-    This is where the full coupling loop, `solve_coupler!` is called for the full timespan of the simulation.
-    We use the `ClimaComms.@elapsed` macro to time the simulation on both CPU and GPU, and use this
-    value to calculate the simulated years per day (SYPD) of the simulation.
-    =#
-    @info "Starting coupling loop"
-    walltime = ClimaComms.@elapsed ClimaComms.device(cs) begin
-        s = CA.@timed_str begin
-            while cs.t[] < cs.tspan[end]
-                step!(cs)
-            end
-        end
-    end
-    @info "Simulation took $(walltime) seconds"
-
-    sypd = simulated_years_per_day(cs, walltime)
-    walltime_per_step = walltime_per_coupling_step(cs, walltime)
-    @info "SYPD: $sypd"
-    @info "Walltime per coupling step: $(walltime_per_step)"
-    save_sypd_walltime_to_disk(cs, walltime)
-
-    # Close all diagnostics file writers
-    isnothing(cs.diags_handler) ||
-        foreach(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
-    foreach(Interfacer.close_output_writers, cs.model_sims)
-
-    return nothing
-end
-
-"""
-    postprocess(cs; conservation_softfail = false, rmse_check = false)
-
-Process the results after a simulation has completed, including generating
-plots, checking conservation, and other diagnostics.
-All postprocessing is performed using the root process only, if applicable.
-
-When `conservation_softfail` is true, throw an error if conservation is not
-respected.
-
-When `rmse_check` is true, compute the RMSE against observations and test
-that it is below a certain threshold.
-
-The postprocessing includes:
-- Energy and water conservation checks (if running SlabPlanet with checks enabled)
-- Animations (if not running in MPI)
-- AMIP plots of the final state of the model
-- Error against observations
-- Optional additional atmosphere diagnostics plots
-- Plots of useful coupler and component model fields for debugging
-"""
-function postprocess(cs; conservation_softfail = false, rmse_check = false)
-    if ClimaComms.iamroot(ClimaComms.context(cs)) && !isnothing(cs.diags_handler)
-        postprocessing_vars = (; conservation_softfail, rmse_check)
-        postprocess_sim(cs, postprocessing_vars)
-    end
-    return nothing
-end
-
-"""
     setup_and_run(config_dict)
     setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
 
@@ -701,44 +598,4 @@ function setup_and_run(config_dict)
     cs = CoupledSimulation(config_dict)
     run!(cs)
     return cs
-end
-
-"""
-    step!(cs::CoupledSimulation)
-
-Take one coupling step forward in time.
-
-This function runs the component models sequentially, and exchanges combined fields and
-calculates fluxes using the selected turbulent fluxes option. Note, one coupling step might
-require multiple steps in some of the component models.
-"""
-function step!(cs::CoupledSimulation)
-    # Update the current time
-    cs.t[] += cs.Δt_cpl
-
-    ## compute global energy and water conservation checks
-    ## (only for slabplanet if tracking conservation is enabled)
-    ConservationChecker.check_conservation!(cs)
-
-    ## step component model simulations sequentially for one coupling timestep (Δt_cpl)
-    FieldExchanger.step_model_sims!(cs)
-
-    ## update the surface fractions for surface models
-    FieldExchanger.update_surface_fractions!(cs)
-
-    ## exchange all non-turbulent flux fields between models, including radiative and precipitation fluxes
-    FieldExchanger.exchange!(cs)
-
-    ## calculate turbulent fluxes in the coupler and update the model simulations with them
-    FluxCalculator.turbulent_fluxes!(cs)
-
-    ## compute any ocean-sea ice fluxes
-    FluxCalculator.ocean_seaice_fluxes!(cs)
-
-    ## Maybe call the callbacks
-    TimeManager.callbacks!(cs)
-
-    # Compute coupler diagnostics
-    CD.orchestrate_diagnostics(cs)
-    return nothing
 end

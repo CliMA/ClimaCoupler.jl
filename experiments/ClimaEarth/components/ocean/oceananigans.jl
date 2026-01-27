@@ -57,6 +57,10 @@ function OceananigansSimulation(
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
     OC.Oceananigans.defaults.FloatType = FT
 
+    # Use Float64 for the ocean to avoid precision issues
+    FT_ocean = Float64
+    OC.Oceananigans.defaults.FloatType = FT_ocean
+
     # Retrieve EN4 data (monthly)
     # (It requires username and password)
     dates = range(start_date, step = Dates.Month(1), stop = stop_date)
@@ -116,16 +120,14 @@ function OceananigansSimulation(
 
     # Create ocean simulation
     free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 70)
-    momentum_advection = OC.WENOVectorInvariant(order = 5)
+    momentum_advection = OC.VectorInvariant()
     tracer_advection = OC.WENO(order = 5)
-    eddy_closure = OC.TurbulenceClosures.IsopycnalSkewSymmetricDiffusivity(
-        κ_skew = 1e3,
-        κ_symmetric = 1e3,
-    )
-    vertical_mixing = CO.Oceans.default_ocean_closure()
     horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν = 1e11)
 
-    Δt = isnothing(Δt) ? CO.Oceans.estimate_maximum_Δt(grid) : Δt
+    # Use Float32 for the vertical mixing parameters to avoid parameter memory limits
+    vertical_mixing = OC.CATKEVerticalDiffusivity(Float32)
+
+    Δt = isnothing(Δt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : Δt
     ocean = CO.ocean_simulation(
         grid;
         Δt,
@@ -133,7 +135,7 @@ function OceananigansSimulation(
         momentum_advection,
         tracer_advection,
         free_surface,
-        closure = (eddy_closure, horizontal_viscosity, vertical_mixing),
+        closure = (horizontal_viscosity, vertical_mixing),
     )
 
     # Set initial condition to EN4 state estimate at start_date

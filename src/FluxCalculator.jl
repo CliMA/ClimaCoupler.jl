@@ -319,16 +319,8 @@ function compute_surface_fluxes!(
     # Determine roughness model to use
     # 1. Use provided roughness_model if specified
     # 2. Try to get it from the simulation via get_field
-    # 3. Fall back to automatic detection based on simulation type
-    if isnothing(roughness_model)
-        # Try to get roughness_model from the simulation
-        try
-            roughness_model = Interfacer.get_field(sim, Val(:roughness_model))
-        catch
-            # If get_field doesn't support :roughness_model, fall back to automatic detection
-            roughness_model = nothing
-        end
-    end
+    # Undefined roughness_model for a simulation is then treated as an erroneous configuration.
+    roughness_model = isnothing(roughness_model) ? Interface.get_field(sim, Val(:roughness_model)) : roughness_model
 
     # Automatic detection if still nothing
     if isnothing(roughness_model)

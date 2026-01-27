@@ -260,6 +260,11 @@ get_field(sim::SurfaceModelSimulation, ::Val{:emissivity}) =
 get_field(sim::SurfaceModelSimulation, ::Val{:height_disp}) =
     convert(eltype(sim.integrator.u), 0.0)
 
+# Default roughness model: COARE3 for ocean models, constant for others
+# Individual ocean model types can override this if needed
+get_field(::OceanModelSimulation, ::Val{:roughness_model}) = :coare3
+get_field(::SurfaceModelSimulation, ::Val{:roughness_model}) = :constant
+
 
 """
     get_field(target_space, sim, quantity)

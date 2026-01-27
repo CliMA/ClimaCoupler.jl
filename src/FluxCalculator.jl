@@ -311,6 +311,7 @@ function compute_surface_fluxes!(
 
     # Get roughness model from the simulation (ocean simulations return :coare3, others return :constant)
     roughness_model = Interfacer.get_field(sim, Val(:roughness_model))
+    
     # Get roughness lengths for constant roughness model
     if roughness_model == :constant
         Interfacer.get_field!(csf.scalar_temp2, sim, Val(:roughness_momentum))

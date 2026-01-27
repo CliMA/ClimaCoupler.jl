@@ -10,11 +10,13 @@ dt_ocean: "120secs" # 2 minutes
 dt_rad: "1hours"
 dt_seaice: "120secs" # 2 minutes
 energy_check: false
+h_elem: 64
 ice_model: "clima_seaice"
 insolation: "timevarying"
 land_model: "integrated"
 land_spun_up_ic: false
 mode_name: "cmip"
+nh_poly: 1
 ocean_model: "oceananigans"
 prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 rmse_check: true

@@ -307,6 +307,8 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo})
     Float32(0.011)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) =
     Float32(0.069)
+# Specify COARE3 roughness model for OceananigansSimulation
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_model}) = :coare3
 
 # NOTE: This is 3D, but it will be remapped to 2D
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =

@@ -184,6 +184,8 @@ Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_diffuse_albedo}) =
     sim.integrator.p.α_diffuse
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_temperature}) =
     sim.integrator.u.T_sfc
+# Specify COARE3 roughness model for SlabOceanSimulation
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:roughness_model}) = :coare3
 
 """
     Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:energy})

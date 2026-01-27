@@ -209,7 +209,7 @@ function compute_surface_humidity!(q_sfc, T_sfc, ρ_sfc, thermo_params)
 end
 
 """
-    compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params)
+    compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params; roughness_model = nothing)
 
 This function computes surface fluxes between the input component model
 simulation and the atmosphere.
@@ -231,6 +231,8 @@ in the future.
 - `sim`: [Interfacer.ComponentModelSimulation] the surface simulation to compute fluxes for.
 - `atmos_sim`: [Interfacer.AtmosModelSimulation] the atmosphere simulation to compute fluxes with.
 - `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
+The roughness model is obtained from the simulation via `get_field(sim, Val(:roughness_model))`.
+Ocean simulations return `:coare3`, while land and ice simulations return `:constant`.
 """
 function compute_surface_fluxes!(
     csf,
@@ -304,19 +306,33 @@ function compute_surface_fluxes!(
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))
     area_fraction = csf.scalar_temp1
 
-    # get roughness lengths from surface simulation
-    Interfacer.get_field!(csf.scalar_temp2, sim, Val(:roughness_momentum))
-    z0m = csf.scalar_temp2
-    Interfacer.get_field!(csf.scalar_temp3, sim, Val(:roughness_buoyancy))
-    z0b = csf.scalar_temp3
     # Set some scalars that we hardcode for now
     gustiness = ones(boundary_space)
+
+    # Get roughness model from the simulation (ocean simulations return :coare3, others return :constant)
+    roughness_model = Interfacer.get_field(sim, Val(:roughness_model))
+    
+    # Get roughness lengths for constant roughness model
+    if roughness_model == :constant
+        Interfacer.get_field!(csf.scalar_temp2, sim, Val(:roughness_momentum))
+        z0m = csf.scalar_temp2
+        Interfacer.get_field!(csf.scalar_temp3, sim, Val(:roughness_buoyancy))
+        z0b = csf.scalar_temp3
+    end
+
     # Set SurfaceFluxConfig containing models for roughness and gustiness
-    config =
-        SF.SurfaceFluxConfig.(
-            SF.ConstantRoughnessParams.(z0m, z0b),
-            SF.ConstantGustinessSpec.(gustiness),
-        )
+    roughness_params = if roughness_model == :coare3
+        # Create Field and fill with constant COARE3 params
+        roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
+        roughness_params .= SF.COARE3RoughnessParams{FT}()
+        roughness_params
+    elseif roughness_model == :constant
+        SF.ConstantRoughnessParams.(z0m, z0b)
+    else
+        error("Unknown roughness_model: $roughness_model. Must be :coare3 or :constant")
+    end
+
+    config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
 
     # calculate the surface fluxes
     fluxes =

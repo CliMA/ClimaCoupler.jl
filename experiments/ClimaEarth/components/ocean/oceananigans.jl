@@ -200,7 +200,7 @@ function OceananigansSimulation(
         )
         free_surface_writer = OC.NetCDFWriter(
             ocean.model,
-            (; η = ocean.model.free_surface.η); # The free surface (.η) will change to .displacement after version 0.104.0
+            (; η = ocean.model.free_surface.displacement);
             schedule = OC.TimeInterval(3600), # hourly snapshots
             filename = joinpath(output_dir, "ocean_free_surface.nc"),
             overwrite_existing = true,

@@ -44,6 +44,7 @@ Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
 """
 function OceananigansSimulation(
+    ::Type{FT},
     boundary_space,
     start_date,
     stop_date;
@@ -52,8 +53,12 @@ function OceananigansSimulation(
     Δt = nothing,
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(eltype(area_fraction)),
-)
+) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
+
+    # Use Float64 for the ocean to avoid precision issues
+    FT_ocean = Float64
+    OC.Oceananigans.defaults.FloatType = FT_ocean
 
     # Retrieve EN4 data (monthly)
     # (It requires username and password)
@@ -114,14 +119,12 @@ function OceananigansSimulation(
 
     # Create ocean simulation
     free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 70)
-    momentum_advection = OC.WENOVectorInvariant(order = 5)
+    momentum_advection = OC.VectorInvariant()
     tracer_advection = OC.WENO(order = 5)
-    eddy_closure = OC.TurbulenceClosures.IsopycnalSkewSymmetricDiffusivity(
-        κ_skew = 1e3,
-        κ_symmetric = 1e3,
-    )
-    vertical_mixing = CO.OceanSimulations.default_ocean_closure()
     horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν = 1e11)
+
+    # Use Float32 for the vertical mixing parameters to avoid parameter memory limits
+    vertical_mixing = OC.CATKEVerticalDiffusivity(Float32)
 
     Δt = isnothing(Δt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : Δt
     ocean = CO.ocean_simulation(
@@ -131,7 +134,7 @@ function OceananigansSimulation(
         momentum_advection,
         tracer_advection,
         free_surface,
-        closure = (eddy_closure, horizontal_viscosity, vertical_mixing),
+        closure = (horizontal_viscosity, vertical_mixing),
     )
 
     # Set initial condition to EN4 state estimate at start_date
@@ -154,9 +157,8 @@ function OceananigansSimulation(
     scratch_cc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 
     # Construct two scratch arrays to use while remapping
-    # We get the array type, float type, and dimensions from the remapper object to maintain consistency
+    # We get the array type and dimensions from the remapper object to maintain consistency
     ArrayType = ClimaComms.array_type(remapper_cc.space)
-    FT = CC.Spaces.undertype(remapper_cc.space)
     interpolated_values_dim..., _buffer_length = size(remapper_cc._interpolated_values)
     scratch_arr1 = ArrayType(zeros(FT, interpolated_values_dim...))
     scratch_arr2 = ArrayType(zeros(FT, interpolated_values_dim...))

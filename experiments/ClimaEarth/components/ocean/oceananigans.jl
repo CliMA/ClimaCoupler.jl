@@ -151,7 +151,7 @@ function OceananigansSimulation(
     Δt = isnothing(dt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : dt
     ocean = CO.ocean_simulation(
         grid;
-        Δ,
+        Δt,
         momentum_advection,
         tracer_advection,
         timestepper = :SplitRungeKutta3,

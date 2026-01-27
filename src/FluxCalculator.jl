@@ -231,19 +231,14 @@ in the future.
 - `sim`: [Interfacer.ComponentModelSimulation] the surface simulation to compute fluxes for.
 - `atmos_sim`: [Interfacer.AtmosModelSimulation] the atmosphere simulation to compute fluxes with.
 - `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
-- `roughness_model`: [Union{Nothing, Symbol}] Optional roughness model specification.
-  - `nothing` (default): Automatically determine based on simulation type (COARE3 for ocean, constant for others)
-  - `:coare3`: Use COARE3 roughness parameterization
-  - `:constant`: Use constant roughness (requires z0m and z0b from the simulation)
-  If not provided, the function will attempt to get it from `sim` via `get_field(sim, Val(:roughness_model))`,
-  and if that's also not available, falls back to automatic detection.
+The roughness model is obtained from the simulation via `get_field(sim, Val(:roughness_model))`.
+Ocean simulations return `:coare3`, while land and ice simulations return `:constant`.
 """
 function compute_surface_fluxes!(
     csf,
     sim::Interfacer.AtmosModelSimulation,
     atmos_sim::Interfacer.AtmosModelSimulation,
-    thermo_params;
-    roughness_model = nothing,
+    thermo_params,
 )
     # do nothing for atmos model
     return nothing
@@ -253,8 +248,7 @@ function compute_surface_fluxes!(
     csf,
     sim::Interfacer.ImplicitFluxSimulation,
     atmos_sim::Interfacer.AtmosModelSimulation,
-    thermo_params;
-    roughness_model = nothing,
+    thermo_params,
 )
     # do nothing for implicit flux surface model
     return nothing
@@ -264,8 +258,7 @@ function compute_surface_fluxes!(
     csf,
     sim::Interfacer.SurfaceModelSimulation,
     atmos_sim::Interfacer.AtmosModelSimulation,
-    thermo_params;
-    roughness_model = nothing,
+    thermo_params,
 )
     boundary_space = axes(csf)
     FT = CC.Spaces.undertype(boundary_space)
@@ -316,22 +309,8 @@ function compute_surface_fluxes!(
     # Set some scalars that we hardcode for now
     gustiness = ones(boundary_space)
 
-    # Determine roughness model to use
-    # 1. Use provided roughness_model if specified
-    # 2. Try to get it from the simulation via get_field
-    # Undefined roughness_model for a simulation is then treated as an erroneous configuration.
-    roughness_model = isnothing(roughness_model) ? Interface.get_field(sim, Val(:roughness_model)) : roughness_model
-
-    # Automatic detection if still nothing
-    if isnothing(roughness_model)
-        # Use COARE3 roughness for ocean surfaces, constant roughness for others
-        # NOTE: COARE3 is only used when `sim` is an `OceanModelSimulation` (or subtype).
-        # This ensures COARE3 is only applied over ocean areas. The `area_fraction` field
-        # (retrieved below) ensures fluxes are only applied where ocean exists (area_fraction > 0).
-        # Other surface types (LandModelSimulation, SeaIceModelSimulation) use constant roughness.
-        roughness_model = sim isa Interfacer.OceanModelSimulation ? :coare3 : :constant
-    end
-
+    # Get roughness model from the simulation (ocean simulations return :coare3, others return :constant)
+    roughness_model = Interfacer.get_field(sim, Val(:roughness_model))
     # Get roughness lengths for constant roughness model
     if roughness_model == :constant
         Interfacer.get_field!(csf.scalar_temp2, sim, Val(:roughness_momentum))
@@ -342,6 +321,7 @@ function compute_surface_fluxes!(
 
     # Set SurfaceFluxConfig containing models for roughness and gustiness
     roughness_params = if roughness_model == :coare3
+        # Create Field and fill with constant COARE3 params
         roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
         roughness_params .= SF.COARE3RoughnessParams{FT}()
         roughness_params

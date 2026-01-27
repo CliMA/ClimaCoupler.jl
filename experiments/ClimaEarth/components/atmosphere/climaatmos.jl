@@ -32,7 +32,19 @@ function hasmoisture(integrator)
     return !(integrator.p.atmos.moisture_model isa CA.DryModel)
 end
 
-function ClimaAtmosSimulation(atmos_config)
+"""
+    Interfacer.AtmosSimulation(::Val{:climaatmos}; kwargs...)
+
+Extension of the generic AtmosSimulation constructor for ClimaAtmos.
+
+Note that this is currently the only atmosphere model supported by
+ClimaCoupler.jl.
+"""
+function Interfacer.AtmosSimulation(::Val{:climaatmos}; atmos_config, kwargs...)
+    return ClimaAtmosSimulation(; atmos_config, kwargs...)
+end
+
+function ClimaAtmosSimulation(; atmos_config, extra_kwargs...)
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
     FT = atmos_config.parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
     simulation = CA.get_simulation(atmos_config)

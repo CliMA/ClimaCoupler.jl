@@ -105,6 +105,15 @@ function slab_ocean_space_init(space, params)
 end
 
 """
+    Interfacer.OceanSimulation(::Type{FT}, ::Val{:slab}; kwargs...)
+
+Extension of the generic OceanSimulation constructor for the slab ocean model.
+"""
+function Interfacer.OceanSimulation(::Type{FT}, ::Val{:slab}; kwargs...) where {FT}
+    return SlabOceanSimulation(FT; kwargs...)
+end
+
+"""
     SlabOceanSimulation(::Type{FT};
         tspan,
         dt,
@@ -124,28 +133,29 @@ function SlabOceanSimulation(
     tspan,
     dt,
     saveat,
-    space,
+    boundary_space,
     coupled_param_dict,
     thermo_params,
     stepper = CTS.RK4(),
     evolving = true,
+    extra_kwargs...,
 ) where {FT}
     # Create params with evolving_switch override
     evolving_switch = evolving ? FT(1) : FT(0)
     params = OceanSlabParameters{FT}(coupled_param_dict; evolving_switch)
 
-    Y = slab_ocean_space_init(space, params)
+    Y = slab_ocean_space_init(boundary_space, params)
     cache = (
         params = params,
-        F_turb_energy = CC.Fields.zeros(space),
-        SW_d = CC.Fields.zeros(space),
-        LW_d = CC.Fields.zeros(space),
-        area_fraction = ones(space),
+        F_turb_energy = CC.Fields.zeros(boundary_space),
+        SW_d = CC.Fields.zeros(boundary_space),
+        LW_d = CC.Fields.zeros(boundary_space),
+        area_fraction = ones(boundary_space),
         thermo_params = thermo_params,
-        α_direct = CC.Fields.ones(space) .* params.α,
-        α_diffuse = CC.Fields.ones(space) .* params.α,
-        u_atmos = CC.Fields.zeros(space),
-        v_atmos = CC.Fields.zeros(space),
+        α_direct = CC.Fields.ones(boundary_space) .* params.α,
+        α_diffuse = CC.Fields.ones(boundary_space) .* params.α,
+        u_atmos = CC.Fields.zeros(boundary_space),
+        v_atmos = CC.Fields.zeros(boundary_space),
         # add dss_buffer to cache to avoid runtime dss allocation
         dss_buffer = CC.Spaces.create_dss_buffer(Y),
     )

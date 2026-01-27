@@ -98,7 +98,7 @@ end
     atmos_config_file =
         joinpath(exp_dir, "test", "component_model_tests", "climaatmos_coarse_short.yml")
     atmos_config = CA.AtmosConfig(atmos_config_file; job_id = "atmos_land_flux_test")
-    atmos_sim = ClimaAtmosSimulation(atmos_config)
+    atmos_sim = ClimaAtmosSimulation(; atmos_config)
 
     boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
     area_fraction = CC.Fields.ones(boundary_space)

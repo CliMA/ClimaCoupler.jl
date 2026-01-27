@@ -43,7 +43,16 @@ struct BucketSimulation{
 end
 
 """
-    bucket_init
+    Interfacer.LandSimulation(::Type{FT}, ::Val{:bucket}; kwargs...)
+
+Extension of the generic LandSimulation constructor for the bucket model.
+"""
+function Interfacer.LandSimulation(::Type{FT}, ::Val{:bucket}; kwargs...) where {FT}
+    return BucketSimulation(FT; kwargs...)
+end
+
+"""
+    BucketSimulation
 
 Initializes the bucket model variables.
 """
@@ -67,6 +76,7 @@ function BucketSimulation(
     albedo_type::String = "map_static",
     bucket_initial_condition::String = "",
     coupled_param_dict = CP.create_toml_dict(FT),
+    extra_kwargs...,
 ) where {FT, TT <: Union{Float64, ITime}}
     # Get default land parameters from ClimaLand.LandParameters
     land_toml_dict = LP.create_toml_dict(FT)

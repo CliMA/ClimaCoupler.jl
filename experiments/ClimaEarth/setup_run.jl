@@ -136,6 +136,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         output_dir_root,
         parameter_files,
         era5_initial_condition_dir,
+        ocean_model,
         ice_model,
         land_fraction_source,
         binary_area_fraction,
@@ -207,7 +208,8 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
 
     ## init atmos model component
-    atmos_sim = ClimaAtmosSimulation(atmos_config_dict)
+    atmos_sim =
+        Interfacer.AtmosSimulation(Val(:climaatmos); atmos_config = atmos_config_dict)
 
     #=
     ### Boundary Space
@@ -247,6 +249,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         comms_ctx;
         land_fraction_source,
         binary_area_fraction,
+        sim_mode,
     )
 
     #=
@@ -267,157 +270,91 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     @info(sim_mode)
     land_sim = ice_sim = ocean_sim = nothing
-    if sim_mode <: AMIPMode || sim_mode <: CMIPMode || sim_mode <: SubseasonalMode
-        @info("AMIP/CMIP boundary conditions - do not expect energy conservation")
-
-        # Build ERA5-based file paths if subseasonal mode is selected
-        subseasonal_sst = subseasonal_sic = subseasonal_land_ic = nothing
-        if sim_mode <: SubseasonalMode
-            isnothing(era5_initial_condition_dir) &&
-                error("subseasonal mode requires --era5_initial_condition_dir")
-            # Filenames inferred from start_date, which is YYYYMMDD
-            datestr = Dates.format(start_date, Dates.dateformat"yyyymmdd")
-            subseasonal_sst =
-                joinpath(era5_initial_condition_dir, "sst_processed_$(datestr)_0000.nc")
-            subseasonal_sic =
-                joinpath(era5_initial_condition_dir, "sic_processed_$(datestr)_0000.nc")
-            subseasonal_land_ic = joinpath(
-                era5_initial_condition_dir,
-                "era5_land_processed_$(datestr)_0000.nc",
-            )
-        end
-
-        ## land model
-        # Determine whether to use a shared surface space
-        shared_surface_space = share_surface_space ? boundary_space : nothing
-        if land_model == "bucket"
-            land_sim = BucketSimulation(
-                FT;
-                dt = component_dt_dict["dt_land"],
-                tspan,
-                start_date,
-                output_dir = dir_paths.land_output_dir,
-                area_fraction = land_fraction,
-                shared_surface_space,
-                surface_elevation,
-                atmos_h,
-                land_temperature_anomaly,
-                use_land_diagnostics,
-                albedo_type = bucket_albedo_type,
-                bucket_initial_condition,
-                coupled_param_dict,
-            )
-        elseif land_model == "integrated"
-            land_sim = ClimaLandSimulation(
-                FT;
-                dt = component_dt_dict["dt_land"],
-                tspan,
-                start_date,
-                output_dir = dir_paths.land_output_dir,
-                area_fraction = land_fraction,
-                shared_surface_space,
-                land_spun_up_ic,
-                saveat,
-                surface_elevation,
-                atmos_h,
-                land_temperature_anomaly,
-                use_land_diagnostics,
-                coupled_param_dict,
-                land_ic_path = subseasonal_land_ic,
-            )
-        else
-            error("Invalid land model specified: $(land_model)")
-        end
-
-        ## ocean model
-        if sim_mode <: CMIPMode
-            stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
-            ocean_sim = OceananigansSimulation(
-                FT,
-                boundary_space,
-                start_date,
-                stop_date;
-                Δt = component_dt_dict["dt_ocean"],
-                output_dir = dir_paths.ocean_output_dir,
-                comms_ctx,
-                coupled_param_dict,
-                ice_model,
-            )
-        else
-            ocean_sim = PrescribedOceanSimulation(
-                FT,
-                boundary_space,
-                start_date,
-                t_start,
-                coupled_param_dict,
-                thermo_params,
-                comms_ctx;
-                sst_path = subseasonal_sst,
-            )
-        end
-        ## sea ice model
-        if ice_model == "clima_seaice"
-            ice_sim = ClimaSeaIceSimulation(
-                ocean_sim;
-                output_dir = dir_paths.ice_output_dir,
-                start_date,
-                coupled_param_dict,
-                Δt = component_dt_dict["dt_seaice"],
-            )
-        elseif ice_model == "prescribed"
-            ice_sim = PrescribedIceSimulation(
-                FT;
-                tspan = tspan,
-                dt = component_dt_dict["dt_seaice"],
-                saveat = saveat,
-                space = boundary_space,
-                coupled_param_dict,
-                thermo_params = thermo_params,
-                comms_ctx,
-                start_date,
-                land_fraction,
-                sic_path = subseasonal_sic,
-                binary_area_fraction = binary_area_fraction,
-            )
-        else
-            error("Invalid ice model specified: $(ice_model)")
-        end
-
-    elseif (sim_mode <: AbstractSlabplanetSimulationMode)
-
-        land_fraction = sim_mode <: SlabplanetAquaMode ? land_fraction .* 0 : land_fraction
-        land_fraction =
-            sim_mode <: SlabplanetTerraMode ? land_fraction .* 0 .+ 1 : land_fraction
-
-        ## land model
-        land_sim = BucketSimulation(
-            FT;
-            dt = component_dt_dict["dt_land"],
-            tspan,
-            start_date,
-            output_dir = dir_paths.land_output_dir,
-            area_fraction = land_fraction,
-            surface_elevation,
-            atmos_h,
-            land_temperature_anomaly,
-            use_land_diagnostics,
-            albedo_type = bucket_albedo_type,
-            bucket_initial_condition,
-            coupled_param_dict,
-        )
-
-        ## ocean model
-        ocean_sim = SlabOceanSimulation(
-            FT;
-            tspan,
-            dt = component_dt_dict["dt_ocean"],
-            space = boundary_space,
-            saveat,
-            coupled_param_dict,
-            thermo_params,
-            evolving = evolving_ocean,
-        )
+    # Build ERA5-based file paths if subseasonal mode is selected
+    subseasonal_sst = subseasonal_sic = subseasonal_land_ic = nothing
+    if sim_mode <: SubseasonalMode
+        isnothing(era5_initial_condition_dir) &&
+            error("subseasonal mode requires --era5_initial_condition_dir")
+        # Filenames inferred from start_date, which is YYYYMMDD
+        datestr = Dates.format(start_date, Dates.dateformat"yyyymmdd")
+        subseasonal_sst =
+            joinpath(era5_initial_condition_dir, "sst_processed_$(datestr)_0000.nc")
+        subseasonal_sic =
+            joinpath(era5_initial_condition_dir, "sic_processed_$(datestr)_0000.nc")
+        subseasonal_land_ic =
+            joinpath(era5_initial_condition_dir, "era5_land_processed_$(datestr)_0000.nc")
     end
+
+    ## Construct the land model component
+    # Determine whether to use a shared surface space
+    shared_surface_space = share_surface_space ? boundary_space : nothing
+    land_sim = Interfacer.LandSimulation(
+        FT,
+        land_model;
+        # Arguments used by multiple models
+        dt = component_dt_dict["dt_land"],
+        tspan,
+        start_date,
+        output_dir = dir_paths.land_output_dir,
+        area_fraction = land_fraction,
+        shared_surface_space,
+        saveat,
+        surface_elevation,
+        atmos_h,
+        land_temperature_anomaly,
+        use_land_diagnostics,
+        coupled_param_dict,
+        # Arguments used by bucket model
+        albedo_type = bucket_albedo_type,
+        bucket_initial_condition,
+        # Arguments used by integrated model
+        land_spun_up_ic,
+        land_ic_path = subseasonal_land_ic,
+    )
+
+    ## Construct the ocean model component
+    ocean_sim = Interfacer.OceanSimulation(
+        FT,
+        ocean_model;
+        # Arguments used by multiple models
+        dt = component_dt_dict["dt_ocean"],
+        start_date,
+        tspan,
+        coupled_param_dict,
+        thermo_params,
+        comms_ctx,
+        boundary_space,
+        # Arguments used by Oceananigans
+        output_dir = dir_paths.ocean_output_dir,
+        ice_model,
+        # Arguments used by prescribed ocean
+        sst_path = subseasonal_sst,
+        # Arguments used by slab ocean
+        saveat,
+        evolving = evolving_ocean,
+    )
+
+    ## Construct the sea ice model component (note this must be constructed after the ocean model)
+    ice_sim = Interfacer.SeaIceSimulation(
+        FT,
+        ice_model;
+        # Arguments used by multiple models
+        dt = component_dt_dict["dt_seaice"],
+        start_date,
+        coupled_param_dict,
+        output_dir = dir_paths.ice_output_dir,
+        # Arguments used by ClimaSeaIce model
+        ocean = ocean_sim,
+        # Arguments used by prescribed ice model
+        tspan,
+        saveat,
+        boundary_space,
+        thermo_params,
+        comms_ctx,
+        land_fraction,
+        sic_path = subseasonal_sic,
+        binary_area_fraction,
+    )
 
     #=
     ## Coupler Initialization

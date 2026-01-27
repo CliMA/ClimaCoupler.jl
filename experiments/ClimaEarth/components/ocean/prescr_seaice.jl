@@ -108,18 +108,29 @@ function slab_ice_space_init(::Type{FT}, space, params) where {FT}
 end
 
 """
+    Interfacer.SeaIceSimulation(::Type{FT}, ::Val{:prescribed}; kwargs...)
+
+Extension of the generic SeaIceSimulation constructor for the prescribed sea ice model.
+"""
+function Interfacer.SeaIceSimulation(::Type{FT}, ::Val{:prescribed}; kwargs...) where {FT}
+    return PrescribedIceSimulation(FT; kwargs...)
+end
+
+"""
     PrescribedIceSimulation(
         ::Type{FT};
         tspan,
         dt,
         saveat,
-        space,
+        boundary_space,
         thermo_params,
         comms_ctx,
         start_date,
         land_fraction,
         stepper = CTS.RK4(),
         sic_path::Union{Nothing, String} = nothing,
+        binary_area_fraction::Bool = true,
+        extra_kwargs...,
     ) where {FT}
 
 Initializes the `DiffEq` problem, and creates a Simulation-type object
@@ -138,7 +149,7 @@ function PrescribedIceSimulation(
     tspan,
     dt,
     saveat,
-    space,
+    boundary_space,
     coupled_param_dict,
     thermo_params,
     comms_ctx,
@@ -147,6 +158,7 @@ function PrescribedIceSimulation(
     stepper = CTS.RK4(),
     sic_path::Union{Nothing, String} = nothing,
     binary_area_fraction::Bool = true,
+    extra_kwargs...,
 ) where {FT}
     # Set up prescribed sea ice concentration object
     sic_data =
@@ -168,13 +180,13 @@ function PrescribedIceSimulation(
     SIC_timevaryinginput = TimeVaryingInput(
         sic_data,
         "SEAICE",
-        space,
+        boundary_space,
         reference_date = start_date,
         file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
     )
 
     # Get initial SIC values and use them to calculate ice fraction
-    ice_fraction = CC.Fields.zeros(space)
+    ice_fraction = CC.Fields.zeros(boundary_space)
     evaluate!(ice_fraction, SIC_timevaryinginput, tspan[1])
 
     # Ensure ice fraction is finite and not NaN
@@ -188,11 +200,11 @@ function PrescribedIceSimulation(
 
     params = IceSlabParameters{FT}(coupled_param_dict)
 
-    Y = slab_ice_space_init(FT, space, params)
+    Y = slab_ice_space_init(FT, boundary_space, params)
     cache = (;
-        F_turb_energy = CC.Fields.zeros(space),
-        SW_d = CC.Fields.zeros(space),
-        LW_d = CC.Fields.zeros(space),
+        F_turb_energy = CC.Fields.zeros(boundary_space),
+        SW_d = CC.Fields.zeros(boundary_space),
+        LW_d = CC.Fields.zeros(boundary_space),
         area_fraction = ice_fraction,
         SIC_timevaryinginput = SIC_timevaryinginput,
         land_fraction = land_fraction,

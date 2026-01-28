@@ -13,7 +13,7 @@ contains the necessary fields for the simulation, at minimum the following:
     - `phase` (phase of the water used to calculate surface humidity)
     - `thermo_params` (thermodynamic parameters)
 """
-abstract type AbstractSurfaceStub <: SurfaceModelSimulation end
+abstract type AbstractSurfaceStub <: AbstractSurfaceSimulation end
 
 """
     SurfaceStub

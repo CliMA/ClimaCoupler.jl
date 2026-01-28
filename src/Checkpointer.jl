@@ -19,24 +19,24 @@ import JLD2
 export get_model_prog_state, checkpoint_model_state, checkpoint_sims, restore!
 
 """
-    get_model_prog_state(sim::Interfacer.ComponentModelSimulation)
+    get_model_prog_state(sim::Interfacer.AbstractComponentSimulation)
 
 Returns the model state of a simulation as a `ClimaCore.FieldVector`.
 This is a template function that should be implemented for each component model.
 """
-get_model_prog_state(sim::Interfacer.ComponentModelSimulation) = nothing
+get_model_prog_state(sim::Interfacer.AbstractComponentSimulation) = nothing
 
 """
-    get_model_cache(sim::Interfacer.ComponentModelSimulation)
+    get_model_cache(sim::Interfacer.AbstractComponentSimulation)
 
 Returns the model cache of a simulation.
 This is a template function that should be implemented for each component model.
 """
-get_model_cache(sim::Interfacer.ComponentModelSimulation) = nothing
+get_model_cache(sim::Interfacer.AbstractComponentSimulation) = nothing
 
 """
     checkpoint_model_state(
-        sim::Interfacer.ComponentModelSimulation,
+        sim::Interfacer.AbstractComponentSimulation,
         comms_ctx::ClimaComms.AbstractCommsContext,
         t::Int,
         prev_checkpoint_t::Int;
@@ -49,7 +49,7 @@ many checkpoint files in the output directory. A value of -1 for `prev_checkpoin
 is used to indicate that there is no previous checkpoint to remove.
 """
 function checkpoint_model_state(
-    sim::Interfacer.ComponentModelSimulation,
+    sim::Interfacer.AbstractComponentSimulation,
     comms_ctx::ClimaComms.AbstractCommsContext,
     t::Int,
     prev_checkpoint_t::Int;
@@ -74,7 +74,7 @@ end
 
 """
     checkpoint_model_cache(
-        sim::Interfacer.ComponentModelSimulation,
+        sim::Interfacer.AbstractComponentSimulation,
         comms_ctx::ClimaComms.AbstractCommsContext,
         t::Int,
         prev_checkpoint_t::Int;
@@ -91,7 +91,7 @@ many checkpoint files in the output directory. A value of -1 for `prev_checkpoin
 is used to indicate that there is no previous checkpoint to remove.
 """
 function checkpoint_model_cache(
-    sim::Interfacer.ComponentModelSimulation,
+    sim::Interfacer.AbstractComponentSimulation,
     comms_ctx::ClimaComms.AbstractCommsContext,
     t::Int,
     prev_checkpoint_t::Int;
@@ -116,16 +116,16 @@ function checkpoint_model_cache(
 end
 
 """
-    get_model_cache_to_checkpoint(sim::Interfacer.ComponentModelSimulation)
+    get_model_cache_to_checkpoint(sim::Interfacer.AbstractComponentSimulation)
 
 Prepare the cache for checkpointing by moving the entire cache to CPU.
 """
-function get_model_cache_to_checkpoint(sim::Interfacer.ComponentModelSimulation)
+function get_model_cache_to_checkpoint(sim::Interfacer.AbstractComponentSimulation)
     return CC.Adapt.adapt(Array, get_model_cache(sim))
 end
 
 """
-    get_model_cache_to_checkpoint(sim::Interfacer.AtmosModelSimulation)
+    get_model_cache_to_checkpoint(sim::Interfacer.AbstractAtmosSimulation)
 
 Prepare the atmos cache for checkpoint by selectively moving parts of the atmos
 cache to CPU instead of moving the entire atmos cache to CPU, resulting in a
@@ -156,7 +156,7 @@ A vector of objects from the cache. Elements may reference the same underlying
 data if they share object IDs. The order of the objects in the vector is
 determined by `CacheIterator`.
 """
-function get_model_cache_to_checkpoint(sim::Interfacer.AtmosModelSimulation)
+function get_model_cache_to_checkpoint(sim::Interfacer.AbstractAtmosSimulation)
     atmos_cache_itr = CacheIterator(sim)
     cache_vec = [] # Elements of the vector can be any type
     # Keep track of the object ID and its index in the vector while iterating
@@ -201,13 +201,13 @@ function get_model_cache_to_checkpoint(sim::Interfacer.AtmosModelSimulation)
 end
 
 """
-    restore_cache!(sim::Interfacer.ComponentModelSimulation, new_cache)
+    restore_cache!(sim::Interfacer.AbstractComponentSimulation, new_cache)
 
 Replace the cache in `sim` with `new_cache`.
 
 Component models can define new methods for this to change how cache is restored.
 """
-function restore_cache!(sim::Interfacer.ComponentModelSimulation, new_cache)
+function restore_cache!(sim::Interfacer.AbstractComponentSimulation, new_cache)
     return nothing
 end
 
@@ -708,7 +708,7 @@ is_leaf(
 is_leaf(::Any) = false
 
 """
-    CacheIterator(sim::Interfacer.ComponentModelSimulation)
+    CacheIterator(sim::Interfacer.AbstractComponentSimulation)
 
 Create an iterator over the cache in `sim` of objects that should be
 saved.
@@ -717,18 +717,18 @@ To use this constructor, the function `get_cache_ignore` must be implemented
 for `sim` which takes in `sim` and returns a set of symbols to ignore while
 iterating through the fields of the cache.
 """
-function CacheIterator(sim::Interfacer.ComponentModelSimulation)
+function CacheIterator(sim::Interfacer.AbstractComponentSimulation)
     cache = get_model_cache(sim)
     return CacheIterator(cache, get_cache_ignore(sim))
 end
 
 """
-    get_cache_ignore(::Interfacer.AtmosModelSimulation)
+    get_cache_ignore(::Interfacer.AbstractAtmosSimulation)
 
 Return a set of symbols that should be ignored when iterating the fields of the
 atmos cache. These fields will not be saved when checkpointing.
 """
-function get_cache_ignore(::Interfacer.AtmosModelSimulation)
+function get_cache_ignore(::Interfacer.AbstractAtmosSimulation)
     return Set([
         :rc,
         :params,
@@ -740,7 +740,7 @@ function get_cache_ignore(::Interfacer.AtmosModelSimulation)
     ])
 end
 
-function get_cache_ignore(::Interfacer.ComponentModelSimulation)
+function get_cache_ignore(::Interfacer.AbstractComponentSimulation)
     return error("List of symbols to ignore when iterating the fields of the
     cache is not supported for this model. Checkpoint by saving the entire
     cache instead or define get_cache_ignore to use CacheIterator.")

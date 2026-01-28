@@ -31,7 +31,7 @@ It contains the following objects:
 - `ice_properties::IP`: A NamedTuple of sea ice properties, including melting speed, Stefan-Boltzmann constant,
     and the Celsius to Kelvin conversion constant.
 """
-struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP} <: Interfacer.SeaIceModelSimulation
+struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP} <: Interfacer.AbstractSeaIceSimulation
     ice::SIM
     area_fraction::A
     remapping::REMAP
@@ -274,7 +274,7 @@ function sea_ice_simulation(
 end
 
 ###############################################################################
-### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
+### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
 ###############################################################################
 
 # Timestep the simulation forward to time `t`

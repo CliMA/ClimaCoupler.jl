@@ -13,21 +13,22 @@ function Interfacer.remap(::Nothing, field)
 end
 
 # test for a simple generic surface model
-struct DummySimulation{S} <: Interfacer.SeaIceModelSimulation
+struct DummySimulation{S} <: Interfacer.AbstractSeaIceSimulation
     space::S
 end
-struct DummySimulation2{S} <: Interfacer.OceanModelSimulation
+struct DummySimulation2{S} <: Interfacer.AbstractOceanSimulation
     space::S
 end
-struct DummySimulation3{S} <: Interfacer.LandModelSimulation
+struct DummySimulation3{S} <: Interfacer.AbstractLandSimulation
     space::S
 end
-struct DummySimulation4{S} <: Interfacer.AtmosModelSimulation
+struct DummySimulation4{S} <: Interfacer.AbstractAtmosSimulation
     space::S
 end
 
-Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var}) = ones(sim.space)
-Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var_float}) =
+Interfacer.get_field(sim::Interfacer.AbstractSurfaceSimulation, ::Val{:var}) =
+    ones(sim.space)
+Interfacer.get_field(sim::Interfacer.AbstractSurfaceSimulation, ::Val{:var_float}) =
     CC.Spaces.undertype(sim.space)(2)
 
 context = ClimaComms.context()
@@ -166,7 +167,7 @@ end
     )
 end
 
-@testset "undefined get_field for SurfaceModelSimulation" begin
+@testset "undefined get_field for AbstractSurfaceSimulation" begin
     FT = Float32
     space = CC.CommonSpaces.CubedSphereSpace(
         FT;
@@ -194,7 +195,7 @@ end
     end
 end
 
-@testset "undefined get_field for AtmosModelSimulation" begin
+@testset "undefined get_field for AbstractAtmosSimulation" begin
     FT = Float32
     space = CC.CommonSpaces.CubedSphereSpace(
         FT;
@@ -225,7 +226,7 @@ end
     end
 end
 
-@testset "update_field! warnings for SurfaceModelSimulation" begin
+@testset "update_field! warnings for AbstractSurfaceSimulation" begin
     FT = Float32
     space = CC.CommonSpaces.CubedSphereSpace(
         FT;
@@ -259,7 +260,7 @@ end
     end
 end
 
-@testset "undefined update_field! warnings for AtmosModelSimulation" begin
+@testset "undefined update_field! warnings for AbstractAtmosSimulation" begin
     FT = Float32
     space = CC.CommonSpaces.CubedSphereSpace(
         FT;

@@ -107,7 +107,7 @@ from the atmosphere.
 
 # Arguments
 - `csf`: [NamedTuple] containing coupler fields.
-- `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
+- `model_sims`: [NamedTuple] containing `AbstractComponentSimulation`s.
 """
 function import_atmos_fields!(csf, model_sims)
     # get atmosphere properties used for flux calculations
@@ -131,7 +131,7 @@ function import_atmos_fields!(csf, model_sims)
 end
 
 """
-    import_atmos_fields!(csf, ::Interfacer.ComponentModelSimulation, atmos_sim)
+    import_atmos_fields!(csf, ::Interfacer.AbstractComponentSimulation, atmos_sim)
 
 Updates the coupler simulation fields with atmospheric fluxes from the atmosphere simulation.
 This function should be extended for any surface model that requires additional fields
@@ -139,7 +139,7 @@ from the atmosphere. Any fields added in a method of this function should also b
 in the corresponding method of `Interfacer.add_coupler_fields!`. The combination of these
 two functions defines any extra atmosphere fields provided to the surface.
 """
-import_atmos_fields!(csf, ::Interfacer.ComponentModelSimulation, atmos_sim) = nothing
+import_atmos_fields!(csf, ::Interfacer.AbstractComponentSimulation, atmos_sim) = nothing
 
 """
     import_combined_surface_fields!(csf, model_sims)
@@ -153,7 +153,7 @@ from each surface model when surface fluxes are computed, in `compute_surface_fl
 
 # Arguments
 - `csf`: [NamedTuple] containing coupler fields.
-- `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
+- `model_sims`: [NamedTuple] containing `AbstractComponentSimulation`s.
 """
 function import_combined_surface_fields!(csf, model_sims)
     combine_surfaces!(csf, model_sims, Val(:emissivity))
@@ -179,7 +179,7 @@ of the receiving component model.
 
 # Arguments
 - `csf`: [NamedTuple] containing coupler fields.
-- `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
+- `model_sims`: [NamedTuple] containing `AbstractComponentSimulation`s.
 """
 function import_static_fields!(csf, model_sims)
     Interfacer.get_field!(csf.height_int, model_sims.atmos_sim, Val(:height_int))
@@ -190,15 +190,15 @@ function import_static_fields!(csf, model_sims)
 end
 
 """
-    update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf)
+    update_sim!(atmos_sim::Interfacer.AbstractAtmosSimulation, csf)
 
 Updates the atmosphere's fields for surface direct and diffuse albedos, emissivity,and temperature.
 
 # Arguments
-- `atmos_sim`: [Interfacer.AtmosModelSimulation] containing an atmospheric model simulation object.
+- `atmos_sim`: [Interfacer.AbstractAtmosSimulation] containing an atmospheric model simulation object.
 - `csf`: [NamedTuple] containing coupler fields.
 """
-function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf)
+function update_sim!(atmos_sim::Interfacer.AbstractAtmosSimulation, csf)
     Interfacer.update_field!(
         atmos_sim,
         Val(:surface_direct_albedo),
@@ -215,7 +215,7 @@ function update_sim!(atmos_sim::Interfacer.AtmosModelSimulation, csf)
 end
 
 """
-    update_sim!(sim::SurfaceModelSimulation, csf)
+    update_sim!(sim::AbstractSurfaceSimulation, csf)
 
 Updates the surface component model cache with the current coupler fields
 *besides turbulent fluxes*, which are updated in `update_turbulent_fluxes`.
@@ -226,10 +226,10 @@ Some component models extend this function and compute the upwelling longwave
 and shortwave radiation in their methods of `update_sim!`.
 
 # Arguments
-- `sim`: [Interfacer.SurfaceModelSimulation] containing a surface model simulation object.
+- `sim`: [Interfacer.AbstractSurfaceSimulation] containing a surface model simulation object.
 - `csf`: [NamedTuple] containing coupler fields.
 """
-function update_sim!(sim::Interfacer.SurfaceModelSimulation, csf)
+function update_sim!(sim::Interfacer.AbstractSurfaceSimulation, csf)
     # radiative fluxes
     Interfacer.update_field!(sim, Val(:SW_d), csf.SW_d)
     Interfacer.update_field!(sim, Val(:LW_d), csf.LW_d)
@@ -246,7 +246,7 @@ end
 Iterates `update_sim!` over all component model simulations saved in `cs.model_sims`.
 
 # Arguments
-- `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
+- `model_sims`: [NamedTuple] containing `AbstractComponentSimulation`s.
 - `csf`: [NamedTuple] containing coupler fields.
 """
 function update_model_sims!(model_sims, csf)
@@ -262,22 +262,23 @@ end
 Iterates `step!` over all component model simulations saved in `cs.model_sims`.
 
 # Arguments
-- `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
+- `model_sims`: [NamedTuple] containing `AbstractComponentSimulation`s.
 - `t`: [AbstractFloat or ITime] denoting the simulation time.
 """
 function step_model_sims!(model_sims, t, coupler_fields, thermo_params)
     # Step all surface models (the ordering doesn't matter here)
     for sim in model_sims
-        sim isa Interfacer.SurfaceModelSimulation && Interfacer.step!(sim, t)
+        sim isa Interfacer.AbstractSurfaceSimulation && Interfacer.step!(sim, t)
 
         # For an implicit flux simulation, `compute_surface_fluxes!` reads in the precomputed
         # fluxes, and puts them into the coupler fields.
-        sim isa Interfacer.ImplicitFluxSimulation && FluxCalculator.compute_surface_fluxes!(
-            coupler_fields,
-            sim,
-            model_sims.atmos_sim,
-            thermo_params,
-        )
+        sim isa Interfacer.AbstractImplicitFluxSimulation &&
+            FluxCalculator.compute_surface_fluxes!(
+                coupler_fields,
+                sim,
+                model_sims.atmos_sim,
+                thermo_params,
+            )
     end
 
     # Update the atmosphere with the fluxes across all surface models
@@ -320,7 +321,7 @@ function combine_surfaces!(csf, sims, field_name_val::Val{field_name}) where {fi
     combined_field .= zero(FT)
 
     for sim in sims
-        if sim isa Interfacer.SurfaceModelSimulation
+        if sim isa Interfacer.AbstractSurfaceSimulation
             # Store the area fraction of this simulation in `scalar_temp` and rename for clarity
             Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))
             area_fraction = csf.scalar_temp1
@@ -345,7 +346,7 @@ function combine_surfaces!(csf, sims, ::Val{:surface_temperature})
     FT = eltype(T_sfc)
     T_sfc .= zero(FT)
     for sim in sims
-        if sim isa Interfacer.SurfaceModelSimulation
+        if sim isa Interfacer.AbstractSurfaceSimulation
             # Store the area fraction and emissivity of this simulation in temp fields
             Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))
             area_fraction = csf.scalar_temp1
@@ -410,7 +411,8 @@ function set_caches!(cs::Interfacer.CoupledSimulation)
     Interfacer.set_cache!(cs.model_sims.atmos_sim, cs.fields)
     exchange!(cs)
     for sim in cs.model_sims
-        sim isa Interfacer.SurfaceModelSimulation && Interfacer.set_cache!(sim, cs.fields)
+        sim isa Interfacer.AbstractSurfaceSimulation &&
+            Interfacer.set_cache!(sim, cs.fields)
     end
     return nothing
 end

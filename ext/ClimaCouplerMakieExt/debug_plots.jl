@@ -157,11 +157,11 @@ function Plotting.debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing
 end
 
 """
-    debug(sim::Interfacer.ComponentModelSimulation, dir)
+    debug(sim::Interfacer.AbstractComponentSimulation, dir)
 
 Plot the fields of a component model simulation and save plots to a directory.
 """
-function Plotting.debug(sim::Interfacer.ComponentModelSimulation, dir)
+function Plotting.debug(sim::Interfacer.AbstractComponentSimulation, dir)
     field_names = Plotting.debug_plot_fields(sim)
     fig = Makie.Figure(size = (1500, 800))
     min_square_len = ceil(Int, sqrt(length(field_names)))
@@ -238,11 +238,11 @@ function Plotting.print_extrema(
 end
 
 """
-    Plotting.debug_plot_fields(sim::Interfacer.SurfaceModelSimulation)
+    Plotting.debug_plot_fields(sim::Interfacer.AbstractSurfaceSimulation)
 
 Return the default fields to include in debug plots for a surface model.
 This should be extended for any atmosphere model, and any surface model
 that has additional fields to plot.
 """
-Plotting.debug_plot_fields(sim::Interfacer.SurfaceModelSimulation) =
+Plotting.debug_plot_fields(sim::Interfacer.AbstractSurfaceSimulation) =
     (:area_fraction, :surface_temperature)

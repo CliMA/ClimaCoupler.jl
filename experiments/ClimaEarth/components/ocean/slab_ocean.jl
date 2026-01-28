@@ -6,7 +6,7 @@ import ClimaUtilities.TimeManager: date
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities, FieldExchanger
 
 ###
-### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
+### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
 ###
 """
     SlabOceanSimulation{P, I}
@@ -16,7 +16,7 @@ Equation:
     (h * ρ * c) dTdt = (-F_turb_energy + (1 - α) * SW_d + LW_d - LW_u)
 
 """
-struct SlabOceanSimulation{P, I} <: Interfacer.OceanModelSimulation
+struct SlabOceanSimulation{P, I} <: Interfacer.AbstractOceanSimulation
     params::P
     integrator::I
 end

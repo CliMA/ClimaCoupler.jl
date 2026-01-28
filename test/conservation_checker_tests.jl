@@ -12,7 +12,7 @@ get_slab_energy(slab_sim, T_sfc) =
     slab_sim.integrator.p.params.ρ .* slab_sim.integrator.p.params.c .* T_sfc .*
     slab_sim.integrator.p.params.h
 
-struct TestAtmos{I} <: Interfacer.AtmosModelSimulation
+struct TestAtmos{I} <: Interfacer.AbstractAtmosSimulation
     i::I
 end
 Interfacer.get_field(s::TestAtmos, ::Val{:radiative_energy_flux_toa}) =
@@ -20,7 +20,7 @@ Interfacer.get_field(s::TestAtmos, ::Val{:radiative_energy_flux_toa}) =
 Interfacer.get_field(s::TestAtmos, ::Val{:water}) = s.i.water
 Interfacer.get_field(s::TestAtmos, ::Val{:energy}) = s.i.energy
 
-struct TestOcean{I} <: Interfacer.SurfaceModelSimulation
+struct TestOcean{I} <: Interfacer.AbstractSurfaceSimulation
     i::I
 end
 Interfacer.get_field(s::TestOcean, ::Val{:water}) = zeros(s.i.space)
@@ -29,7 +29,7 @@ Interfacer.get_field(s::TestOcean, ::Val{:energy}) =
 Interfacer.get_field(s::TestOcean, ::Val{:area_fraction}) =
     ones(s.i.space) .* CC.Spaces.undertype(s.i.space)(0.25)
 
-struct TestLand{I} <: Interfacer.SurfaceModelSimulation
+struct TestLand{I} <: Interfacer.AbstractSurfaceSimulation
     i::I
 end
 Interfacer.get_field(s::TestLand, ::Val{:energy}) = zeros(s.i.space)

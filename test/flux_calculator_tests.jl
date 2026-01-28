@@ -10,22 +10,22 @@ import SurfaceFluxes.UniversalFunctions as UF
 import ClimaCoupler: FieldExchanger, FluxCalculator, Interfacer
 
 # simple generic atmos model
-struct DummySimulation{S, C} <: Interfacer.AtmosModelSimulation
+struct DummySimulation{S, C} <: Interfacer.AbstractAtmosSimulation
     state::S
     cache::C
 end
 
-struct DummySimulation2{C} <: Interfacer.AtmosModelSimulation
+struct DummySimulation2{C} <: Interfacer.AbstractAtmosSimulation
     cache::C
 end
 
 # atmos sim object and extensions
-struct TestAtmos{P, D, I} <: Interfacer.AtmosModelSimulation
+struct TestAtmos{P, D, I} <: Interfacer.AbstractAtmosSimulation
     params::P
     domain::D
     integrator::I
 end
-struct TestAtmos2 <: Interfacer.AtmosModelSimulation end
+struct TestAtmos2 <: Interfacer.AbstractAtmosSimulation end
 
 Interfacer.get_field(sim::TestAtmos, ::Val{:air_temperature}) = sim.integrator.T
 Interfacer.get_field(sim::TestAtmos, ::Val{:specific_humidity}) = sim.integrator.q
@@ -64,7 +64,7 @@ function FluxCalculator.get_surface_params(sim::TestAtmos)
 end
 
 # ocean sim object and extensions
-struct TestOcean{M, I} <: Interfacer.SurfaceModelSimulation
+struct TestOcean{M, I} <: Interfacer.AbstractSurfaceSimulation
     model::M
     integrator::I
 end
@@ -85,7 +85,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::TestOcean, fields::NamedTu
 end
 
 # simple surface sim object and extensions
-struct DummySurfaceSimulation3{M, I} <: Interfacer.SurfaceModelSimulation
+struct DummySurfaceSimulation3{M, I} <: Interfacer.AbstractSurfaceSimulation
     model::M
     integrator::I
 end

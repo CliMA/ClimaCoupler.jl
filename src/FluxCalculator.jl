@@ -35,7 +35,7 @@ This function uses `SurfaceFluxes.jl` under the hood.
 
 Args:
 - `csf`: [Field of NamedTuple] containing coupler fields.
-- `model_sims`: [NamedTuple] containing `ComponentModelSimulation`s.
+- `model_sims`: [NamedTuple] containing `AbstractComponentSimulation`s.
 - `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
 
 TODO:
@@ -69,7 +69,7 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
     for sim in model_sims
         # If the simulation is an implicit flux simulation, the fluxes are computed in the
         # component model's `step!` function, so we don't need to compute them here.
-        sim isa Interfacer.ImplicitFluxSimulation ||
+        sim isa Interfacer.AbstractImplicitFluxSimulation ||
             compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params)
     end
     return nothing
@@ -152,7 +152,7 @@ function get_surface_fluxes(
 end
 
 """
-    get_surface_params(atmos_sim::Interfacer.AtmosModelSimulation)
+    get_surface_params(atmos_sim::Interfacer.AbstractAtmosSimulation)
 
 Returns the surface parameters of type `SF.Parameters.SurfaceFluxesParameters`.
 
@@ -160,21 +160,21 @@ TODO: in the future this may not need to depend on the atmos sim, but
 here retaining the dependency until we know how EDMF boundary conditions will
 be handled (for consistency of parameters).
 """
-function get_surface_params(atmos_sim::Interfacer.AtmosModelSimulation)
+function get_surface_params(atmos_sim::Interfacer.AbstractAtmosSimulation)
     return error(
         "get_surface_params is required to be dispatched on $(nameof(atmos_sim)), but no method defined",
     )
 end
 
 """
-    update_turbulent_fluxes!(sim::Interfacer.ComponentModelSimulation, fields::NamedTuple)
+    update_turbulent_fluxes!(sim::Interfacer.AbstractComponentSimulation, fields::NamedTuple)
 
 Updates the fluxes in the simulation `sim` with the fluxes in `fields`.
 
 For surface models, this should be the fluxes computed between the surface model and the atmosphere.
 For atmosphere models, this should be the area-weighted sum of fluxes across all surface models.
 """
-function update_turbulent_fluxes!(sim::Interfacer.ComponentModelSimulation, fields)
+function update_turbulent_fluxes!(sim::Interfacer.AbstractComponentSimulation, fields)
     return error(
         "update_turbulent_fluxes! is required to be dispatched on $(nameof(sim)), but no method defined",
     )
@@ -221,21 +221,21 @@ models to get the total fluxes.
 Since the fluxes are computed between the input model and the atmosphere, this
 function does nothing if called on an atmosphere model simulation.
 
-The function for ImplicitFluxSimulation is a placeholder that does nothing. Currently,
-the only ImplicitFluxSimulation is ClimaLandSimulation, for which compute_surface_fluxes!
-is defined in the component model. We can extend this function for other ImplicitFluxSimulation
+The function for AbstractImplicitFluxSimulation is a placeholder that does nothing. Currently,
+the only AbstractImplicitFluxSimulation is ClimaLandSimulation, for which compute_surface_fluxes!
+is defined in the component model. We can extend this function for other AbstractImplicitFluxSimulation
 in the future.
 
 # Arguments
 - `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
-- `sim`: [Interfacer.ComponentModelSimulation] the surface simulation to compute fluxes for.
-- `atmos_sim`: [Interfacer.AtmosModelSimulation] the atmosphere simulation to compute fluxes with.
+- `sim`: [Interfacer.AbstractComponentSimulation] the surface simulation to compute fluxes for.
+- `atmos_sim`: [Interfacer.AbstractAtmosSimulation] the atmosphere simulation to compute fluxes with.
 - `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
 """
 function compute_surface_fluxes!(
     csf,
-    sim::Interfacer.AtmosModelSimulation,
-    atmos_sim::Interfacer.AtmosModelSimulation,
+    sim::Interfacer.AbstractAtmosSimulation,
+    atmos_sim::Interfacer.AbstractAtmosSimulation,
     thermo_params,
 )
     # do nothing for atmos model
@@ -244,8 +244,8 @@ end
 
 function compute_surface_fluxes!(
     csf,
-    sim::Interfacer.ImplicitFluxSimulation,
-    atmos_sim::Interfacer.AtmosModelSimulation,
+    sim::Interfacer.AbstractImplicitFluxSimulation,
+    atmos_sim::Interfacer.AbstractAtmosSimulation,
     thermo_params,
 )
     # do nothing for implicit flux surface model
@@ -254,8 +254,8 @@ end
 
 function compute_surface_fluxes!(
     csf,
-    sim::Interfacer.SurfaceModelSimulation,
-    atmos_sim::Interfacer.AtmosModelSimulation,
+    sim::Interfacer.AbstractSurfaceSimulation,
+    atmos_sim::Interfacer.AbstractAtmosSimulation,
     thermo_params,
 )
     boundary_space = axes(csf)
@@ -385,8 +385,8 @@ function ocean_seaice_fluxes!(cs::Interfacer.CoupledSimulation)
     return nothing
 end
 function ocean_seaice_fluxes!(
-    ocean_sim::Union{Interfacer.OceanModelSimulation, Interfacer.AbstractSurfaceStub},
-    ice_sim::Union{Interfacer.SeaIceModelSimulation, Interfacer.AbstractSurfaceStub},
+    ocean_sim::Union{Interfacer.AbstractOceanSimulation, Interfacer.AbstractSurfaceStub},
+    ice_sim::Union{Interfacer.AbstractSeaIceSimulation, Interfacer.AbstractSurfaceStub},
 )
     return nothing
 end

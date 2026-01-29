@@ -8,6 +8,7 @@ import ClimaParams as CP
 import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
 import ConservativeRegridding as CR
+import Adapt # for ConservativeRegridding
 
 include("climaocean_helpers.jl")
 
@@ -188,7 +189,7 @@ function OceananigansSimulation(
     # Save free surface to a JLD2 file at hourly frequency
     free_surface_writer = OC.JLD2Writer(
         ocean.model,
-        (; η = ocean.model.free_surface.η); # The free surface (.η) will change to .displacement after version 0.104.0
+        (; η = ocean.model.free_surface.displacement);
         schedule = OC.TimeInterval(3600), # hourly snapshots
         filename = joinpath(output_dir, "ocean_free_surface.jld2"),
         overwrite_existing = true,
@@ -240,10 +241,14 @@ To regrid from Oceananigans to ClimaCore, use `CR.regrid!(dest_vector, remapper_
 To regrid from ClimaCore to Oceananigans, use `CR.regrid!(dest_vector, transpose(remapper_oc_to_cc), src_vector)`.
 """
 function construct_remappers(grid_oc, boundary_space)
+    # Move grids to CPU since ConservativeRegridding doesn't support GPU grids yet
+    grid_oc_underlying_cpu = Adapt.adapt_structure(Array, grid_oc.underlying_grid)
+    boundary_space_cpu = Adapt.adapt_structure(Array, boundary_space)
+
     # Create the remapper from the Oceananigans grid to the ClimaCore boundary space
     remapper_oc_to_cc = CR.Regridder(
-        boundary_space,
-        grid_oc.underlying_grid;
+        boundary_space_cpu,
+        grid_oc_underlying_cpu;
         normalize = false,
         threaded = false,
     )

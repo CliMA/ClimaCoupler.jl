@@ -20,30 +20,6 @@ export turbulent_fluxes!,
     compute_surface_fluxes!,
     ocean_seaice_fluxes!
 
-"""
-    has_cached_field(sim, field_name::Symbol)
-
-Check if a simulation has a cached field without triggering an error.
-Returns `true` if the field can be retrieved, `false` otherwise.
-
-For AbstractSurfaceStub, checks the cache propertynames directly.
-For other types, checks if a specific get_field method exists (not the generic fallback).
-"""
-function has_cached_field(sim, field_name::Symbol)
-    if sim isa Interfacer.AbstractSurfaceStub
-        # For AbstractSurfaceStub, check cache propertynames directly
-        return field_name in propertynames(sim.cache)
-    else
-        # For other types, check if a specific get_field method exists
-        # The generic fallback is get_field(::ComponentModelSimulation, ::Val)
-        # Specific methods will be more specific (e.g., get_field(::OceananigansSimulation, ::Val{:coare3_roughness_params}))
-        return hasmethod(
-            Interfacer.get_field,
-            Tuple{typeof(sim), Val{field_name}},
-        )
-    end
-end
-
 function turbulent_fluxes!(cs::Interfacer.CoupledSimulation)
     return turbulent_fluxes!(cs.fields, cs.model_sims, cs.thermo_params)
 end

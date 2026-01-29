@@ -350,13 +350,7 @@ function compute_surface_fluxes!(
         # All COARE3-using simulations cache coare3_roughness_params, so no allocation needed
         Interfacer.get_field(sim, Val(:coare3_roughness_params))
     elseif roughness_model == :constant
-        # Reuse cached constant roughness params when available; allocate if not cached
-        if has_cached_field(sim, :constant_roughness_params)
-            Interfacer.get_field(sim, Val(:constant_roughness_params))
-        else
-            # Fallback: allocate ConstantRoughnessParams Field from z0m and z0b
-            SF.ConstantRoughnessParams.(z0m, z0b)
-        end
+        SF.ConstantRoughnessParams.(z0m, z0b)
     else
         error("Unknown roughness_model: $roughness_model. Must be :coare3 or :constant")
     end

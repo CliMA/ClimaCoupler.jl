@@ -263,15 +263,9 @@ get_field(sim::SurfaceModelSimulation, ::Val{:height_disp}) =
 """
     get_field(sim::SurfaceModelSimulation, ::Val{:roughness_model})
 
-Return the roughness model to be used for surface flux calculations.
-Returns `:constant` by default. Ocean models should override this to return
-`:coare3` to use COARE3 roughness parameterization, which accounts for the
-dynamic response of ocean surface roughness to wind speed and wave state.
-The `:constant` roughness model uses fixed roughness lengths for momentum
-and buoyancy specified by the component model.
-
 This ensures COARE3 is applied over ocean surfaces where the area_fraction > 0,
-while land and sea ice surfaces use constant roughness parameterization.
+while land and sea ice surfaces use constant roughness parameterization. Ocean 
+models override this with the `coare3` roughness model.
 """
 get_field(::SurfaceModelSimulation, ::Val{:roughness_model}) = :constant
 

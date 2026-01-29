@@ -80,12 +80,11 @@ function OceananigansSimulation(
     extra_kwargs...,
 ) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
-    OC.Oceananigans.defaults.FloatType = FT
 
     # Compute stop_date for oceananigans (needed for EN4 data retrieval)
     stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
 
-    # Use Float64 for the ocean to avoid precision issues
+    # Use Float64 for the ocean to avoid memory access issues since ClimaSeaIce hardcodes Float64
     FT_ocean = Float64
     OC.Oceananigans.defaults.FloatType = FT_ocean
 
@@ -134,7 +133,7 @@ function OceananigansSimulation(
         horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(
             ν = νhb,
             discrete_form = true,
-            parameters = 40days,
+            parameters = 40 * 24 * 60 * 60, # 40 days
         )
         vertical_closure = OC.VerticalScalarDiffusivity(ν = 1e-5, κ = 2e-6)
         catke_closure = CO.Oceans.default_ocean_closure()
@@ -187,7 +186,7 @@ function OceananigansSimulation(
         filename = joinpath(output_dir, "ocean_diagnostics.jld2"),
         indices = (:, :, grid.Nz),
         overwrite_existing = true,
-        array_type = Array{Float32},
+        array_type = Array{FT},
     )
 
     # Save free surface to a JLD2 file at hourly frequency
@@ -197,7 +196,7 @@ function OceananigansSimulation(
         schedule = OC.TimeInterval(3600), # hourly snapshots
         filename = joinpath(output_dir, "ocean_free_surface.jld2"),
         overwrite_existing = true,
-        array_type = Array{Float32},
+        array_type = Array{FT},
     )
 
     # Save fluxes to a JLD2 file at hourly frequency
@@ -211,7 +210,7 @@ function OceananigansSimulation(
         schedule = OC.TimeInterval(3600), # hourly snapshots
         filename = joinpath(output_dir, "ocean_fluxes.jld2"),
         overwrite_existing = true,
-        array_type = Array{Float32},
+        array_type = Array{FT},
     )
     ocean.output_writers[:surface] = surface_writer
     ocean.output_writers[:free_surface] = free_surface_writer

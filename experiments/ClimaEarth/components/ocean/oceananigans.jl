@@ -57,7 +57,7 @@ dispatch in coupling.
 - `start_date`: Start date for the simulation
 - `stop_date`: Stop date for the simulation
 - `output_dir`: Directory for output files
-- `ice_model`: Ice model type (Val type)
+- `simple_ocean`: Whether to use a simpler ocean model setup (default: `false`)
 
 # Optional keyword arguments
 - `dt`: Time step (default: `nothing`)
@@ -73,6 +73,7 @@ function OceananigansSimulation(
     start_date,
     tspan,
     output_dir,
+    simple_ocean = false,
     dt = nothing,
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
@@ -120,27 +121,48 @@ function OceananigansSimulation(
 
     # Create ocean simulation
     free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 150)
-    momentum_advection = OC.WENOVectorInvariant(order = 5)
-    tracer_advection = OC.WENO(order = 7)
-    eddy_closure = OC.TurbulenceClosures.IsopycnalSkewSymmetricDiffusivity(
-        κ_skew = 500,
-        κ_symmetric = 100,
+    if !simple_ocean
+        momentum_advection = OC.WENOVectorInvariant(order = 5)
+        tracer_advection = OC.WENO(order = 7)
+        eddy_closure = OC.TurbulenceClosures.IsopycnalSkewSymmetricDiffusivity(
+            κ_skew = 500,
+            κ_symmetric = 100,
+        )
+        @inline νhb(i, j, k, grid, ℓx, ℓy, ℓz, clock, fields, λ) =
+            OC.Operators.Az(i, j, k, grid, ℓx, ℓy, ℓz)^2 / λ
+
+        horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(
+            ν = νhb,
+            discrete_form = true,
+            parameters = 40days,
+        )
+        vertical_closure = OC.VerticalScalarDiffusivity(ν = 1e-5, κ = 2e-6)
+        catke_closure = CO.Oceans.default_ocean_closure()
+        closure = (catke_closure, eddy_closure, horizontal_viscosity, vertical_closure)
+    else
+        # Simpler setup
+        momentum_advection = OC.VectorInvariant()
+        tracer_advection = OC.Centered()
+        eddy_closure = OC.HorizontalScalarDiffusivity(ν = 5000, κ = 500)
+        vertical_closure = OC.ConvectiveAdjustmentVerticalDiffusivity(
+            background_νz = 1e-3,
+            convective_νz = 1e-1,
+            background_κz = 2e-4,
+            convective_κz = 1e-1,
+        )
+        closure = (eddy_closure, vertical_closure)
+    end
+
+    Δt = isnothing(dt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : dt
+    ocean = ocean_simulation(
+        grid;
+        Δt,
+        momentum_advection,
+        tracer_advection,
+        timestepper = :SplitRungeKutta3,
+        free_surface,
+        closure,
     )
-    @inline νhb(i, j, k, grid, ℓx, ℓy, ℓz, clock, fields, λ) = Oceananigans.Operators.Az(i, j, k, grid, ℓx, ℓy, ℓz)^2 / λ
-
-    horizontal_viscosity = HorizontalScalarBiharmonicDiffusivity(ν=νhb, discrete_form=true, parameters=40days)
-    catke_closure = ClimaOcean.Oceans.default_ocean_closure()
-    eddy_closure = IsopycnalSkewSymmetricDiffusivity(κ_skew=500, κ_symmetric=100)
-    closure = (catke_closure, eddy_closure, horizontal_viscosity, VerticalScalarDiffusivity(ν=1e-5, κ=2e-6))
-
-    Δt = isnothing(Δt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : Δt
-
-    ocean = ocean_simulation(grid; Δ,
-                             momentum_advection,
-                             tracer_advection,
-                             timestepper = :SplitRungeKutta3,
-                             free_surface,
-                             closure)
 
     # Set initial condition to EN4 state estimate at start_date
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])

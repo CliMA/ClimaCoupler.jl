@@ -137,6 +137,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         parameter_files,
         era5_initial_condition_dir,
         ocean_model,
+        simple_ocean,
         ice_model,
         land_fraction_source,
         binary_area_fraction,
@@ -326,6 +327,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         boundary_space,
         # Arguments used by Oceananigans
         output_dir = dir_paths.ocean_output_dir,
+        simple_ocean,
         # Arguments used by prescribed ocean
         sst_path = subseasonal_sst,
         # Arguments used by slab ocean

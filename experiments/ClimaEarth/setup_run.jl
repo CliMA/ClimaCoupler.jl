@@ -326,7 +326,6 @@ function CoupledSimulation(config_dict::AbstractDict)
         boundary_space,
         # Arguments used by Oceananigans
         output_dir = dir_paths.ocean_output_dir,
-        ice_model,
         # Arguments used by prescribed ocean
         sst_path = subseasonal_sst,
         # Arguments used by slab ocean

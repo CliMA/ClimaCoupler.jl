@@ -73,7 +73,6 @@ function OceananigansSimulation(
     start_date,
     tspan,
     output_dir,
-    ice_model,
     dt = nothing,
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
@@ -119,27 +118,6 @@ function OceananigansSimulation(
         active_cells_map = true,
     )
 
-    # Restore the ocean to the EN4 state periodically if running for more than one month and not using ClimaSeaIce
-    use_restoring =
-        start_date + Dates.Month(1) < stop_date && ice_model != Val(:clima_seaice)
-
-    if use_restoring
-        # When we use EN4 data, the forcing takes care of everything, including
-        # the initial conditions
-        restoring_rate = 1 / (3 * 86400)
-        mask = CO.LinearlyTaperedPolarMask(
-            southern = (-80, -70),
-            northern = (70, 90),
-            z = (z(1), 0),
-        )
-
-        forcing_T = CO.DatasetRestoring(en4_temperature, grid; mask, rate = restoring_rate)
-        forcing_S = CO.DatasetRestoring(en4_salinity, grid; mask, rate = restoring_rate)
-        forcing = (T = forcing_T, S = forcing_S)
-    else
-        forcing = (;)
-    end
-
     # Create ocean simulation
     free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 150)
     momentum_advection = OC.WENOVectorInvariant(order = 5)
@@ -149,7 +127,7 @@ function OceananigansSimulation(
         κ_symmetric = 100,
     )
     @inline νhb(i, j, k, grid, ℓx, ℓy, ℓz, clock, fields, λ) = Oceananigans.Operators.Az(i, j, k, grid, ℓx, ℓy, ℓz)^2 / λ
-    
+
     horizontal_viscosity = HorizontalScalarBiharmonicDiffusivity(ν=νhb, discrete_form=true, parameters=40days)
     catke_closure = ClimaOcean.Oceans.default_ocean_closure()
     eddy_closure = IsopycnalSkewSymmetricDiffusivity(κ_skew=500, κ_symmetric=100)

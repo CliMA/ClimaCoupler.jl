@@ -17,9 +17,10 @@ export CoupledSimulation,
     ComponentModelSimulation,
     AtmosModelSimulation,
     SurfaceModelSimulation,
-    SeaIceModelSimulation,
-    LandModelSimulation,
-    OceanModelSimulation,
+    LandSimulation,
+    OceanSimulation,
+    SeaIceSimulation,
+    AtmosSimulation,
     get_field,
     update_field!,
     AbstractSurfaceStub,
@@ -255,8 +256,6 @@ get_field_error(sim, val::Val{X}) where {X} =
 # Set default values for fields that are not defined in all component models
 get_field(::ComponentModelSimulation, ::Val{:energy}) = nothing
 get_field(::ComponentModelSimulation, ::Val{:water}) = nothing
-get_field(sim::SurfaceModelSimulation, ::Val{:beta}) =
-    convert(eltype(sim.integrator.u), 1.0)
 get_field(sim::SurfaceModelSimulation, ::Val{:emissivity}) =
     convert(eltype(sim.integrator.u), 1.0)
 get_field(sim::SurfaceModelSimulation, ::Val{:height_disp}) =
@@ -581,6 +580,64 @@ after the initial exchange.
 This is not required to be extended, but may be necessary for some models.
 """
 set_cache!(sim::ComponentModelSimulation, csf) = nothing
+
+"""
+    LandSimulation(::Type{FT}, ::Val{model_type}; kwargs...)
+
+Generic constructor for land model simulations. Dispatches to specific implementations
+based on `model_type` (`:bucket`, `:integrated`, or `:nothing`).
+
+If `model_type` is `:nothing`, returns `nothing`.
+"""
+LandSimulation(::Type{FT}, ::Val{:nothing}; kwargs...) where {FT} = nothing
+function LandSimulation(::Type{FT}, ::Val{model_type}; kwargs...) where {FT, model_type}
+    error(
+        "Unknown land model type: $model_type. Valid options are: :bucket, :integrated, or :nothing",
+    )
+end
+
+"""
+    OceanSimulation(::Type{FT}, ::Val{model_type}; kwargs...)
+
+Generic constructor for ocean model simulations. Dispatches to specific implementations
+based on `model_type` (`:oceananigans`, `:slab`, `:prescribed`, or `:nothing`).
+
+If `model_type` is `:nothing`, returns `nothing`.
+Some ocean models (like `:oceananigans`) don't require FT as the first argument.
+"""
+OceanSimulation(::Type{FT}, ::Val{:nothing}; kwargs...) where {FT} = nothing
+function OceanSimulation(::Type{FT}, ::Val{model_type}; kwargs...) where {FT, model_type}
+    error(
+        "Unknown ocean model type: $model_type. Valid options are: :oceananigans, :slab, :prescribed, or :nothing",
+    )
+end
+
+"""
+    SeaIceSimulation(::Type{FT}, ::Val{model_type}; kwargs...)
+
+Generic constructor for sea ice model simulations. Dispatches to specific implementations
+based on `model_type` (`:clima_seaice`, `:prescribed`, or `:nothing`).
+
+If `model_type` is `:nothing`, returns `nothing`.
+FT is passed to all sea ice models, though some may ignore it.
+"""
+SeaIceSimulation(::Type{FT}, ::Val{:nothing}; kwargs...) where {FT} = nothing
+function SeaIceSimulation(::Type{FT}, ::Val{model_type}; kwargs...) where {FT, model_type}
+    error(
+        "Unknown sea ice model type: $model_type. Valid options are: :clima_seaice, :prescribed, or :nothing",
+    )
+end
+
+"""
+    AtmosSimulation(::Val{model_type}; kwargs...)
+
+Generic constructor for atmosphere model simulations. Dispatches to specific implementations
+based on `model_type` (`:climaatmos`).
+
+Note that the atmosphere model cannot be nothing.
+"""
+AtmosSimulation(::Val{model_type}; kwargs...) where {model_type} =
+    error("Unknown atmosphere model type: $model_type. Valid options are: :climaatmos")
 
 """
     boundary_space(sim::CoupledSimulation)

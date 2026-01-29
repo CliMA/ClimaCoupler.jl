@@ -15,5 +15,27 @@ include("Checkpointer.jl")
 include("Input.jl")
 include("SimOutput/SimOutput.jl")
 include("Plotting.jl")
+include("SimCoordinator.jl")
+
+# Import run! and step! from SimCoordinator to re-export at top level
+import ..SimCoordinator: run!, step!
+# Import postprocess from Plotting to re-export at top level
+import ..Plotting: postprocess
+
+# Export all modules and key functions
+export ConservationChecker,
+    Checkpointer,
+    FieldExchanger,
+    FluxCalculator,
+    Input,
+    Interfacer,
+    Plotting,
+    SimCoordinator,
+    SimOutput,
+    TimeManager,
+    Utilities,
+    run!,
+    step!,
+    postprocess
 
 end

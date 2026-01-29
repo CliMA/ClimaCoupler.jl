@@ -192,12 +192,8 @@ domain_atm = CC.Domains.IntervalDomain(
 );
 context = CC.ClimaComms.context()
 mesh_atm = CC.Meshes.IntervalMesh(domain_atm, nelems = parameters.n); # struct, allocates face boundaries to 5,6: atmos
-if pkgversion(CC) >= v"0.14.10"
-    device = CC.ClimaComms.device(context)
-    center_space_atm = CC.Spaces.CenterFiniteDifferenceSpace(device, mesh_atm) # collection of the above, discretises space into FD and provides coords
-else
-    center_space_atm = CC.Spaces.CenterFiniteDifferenceSpace(mesh_atm) # collection of the above, discretises space into FD and provides coords
-end
+device = CC.ClimaComms.device(context)
+center_space_atm = CC.Spaces.CenterFiniteDifferenceSpace(device, mesh_atm) # collection of the above, discretises space into FD and provides coords
 
 # - initialize prognostic variables, either as ClimaCore's Field objects or as Arrays
 T_atm_0 = CC.Fields.ones(FT, center_space_atm) .* parameters.T_atm_ini; # initiates a spatially uniform atm progostic var

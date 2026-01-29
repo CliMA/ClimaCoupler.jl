@@ -25,16 +25,16 @@ end
         h_elem = 4,
     )
     start_date = Dates.DateTime(2000, 1, 1)
-    t_start = 0.0
+    tspan = (0.0, 1.0)
     area_fraction = CC.Fields.ones(space)
     comms_ctx = nothing
 
     # Construct simulation object
     sim = PrescribedOceanSimulation(
-        FT,
-        space,
+        FT;
+        boundary_space = space,
         start_date,
-        t_start,
+        tspan,
         coupled_param_dict,
         thermo_params,
         comms_ctx,
@@ -63,14 +63,13 @@ end
         file_reader_kwargs = (; preprocess_func = (data) -> data + C_to_K,), ## convert Celsius to Kelvin
     )
     SST_expected = zeros(space)
-    evaluate!(SST_expected, SST_timevaryinginput, t_start)
+    evaluate!(SST_expected, SST_timevaryinginput, tspan[1])
 
     @test sim isa Interfacer.AbstractSurfaceStub
     # Check that the cache is correctly initialized
     @test sim.cache.T_sfc == SST_expected
     @test sim.cache.z0m == FT(5.8e-5)
     @test sim.cache.z0b == FT(5.8e-5)
-    @test sim.cache.beta == FT(1)
     @test sim.cache.α_direct == ones(space) .* FT(0.06)
     @test sim.cache.α_diffuse == ones(space) .* FT(0.06)
     @test sim.cache.area_fraction == area_fraction
@@ -80,7 +79,6 @@ end
 
     # Test `Interfacer.get_field` function
     @test Interfacer.get_field(sim, Val(:area_fraction)) == sim.cache.area_fraction
-    @test Interfacer.get_field(sim, Val(:beta)) == sim.cache.beta
     @test Interfacer.get_field(sim, Val(:roughness_buoyancy)) == sim.cache.z0b
     @test Interfacer.get_field(sim, Val(:roughness_momentum)) == sim.cache.z0m
     @test Interfacer.get_field(sim, Val(:surface_direct_albedo)) == sim.cache.α_direct

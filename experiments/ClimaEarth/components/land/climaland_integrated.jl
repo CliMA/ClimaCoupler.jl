@@ -42,6 +42,15 @@ struct ClimaLandSimulation{
 end
 
 """
+    Interfacer.LandSimulation(::Type{FT}, ::Val{:integrated}; kwargs...)
+
+Extension of the generic LandSimulation constructor for the integrated ClimaLand model.
+"""
+function Interfacer.LandSimulation(::Type{FT}, ::Val{:integrated}; kwargs...) where {FT}
+    return ClimaLandSimulation(FT; kwargs...)
+end
+
+"""
     ClimaLandSimulation(
         ::Type{FT};
         dt::TT,
@@ -89,6 +98,7 @@ function ClimaLandSimulation(
     use_land_diagnostics::Bool = true,
     coupled_param_dict = CP.create_toml_dict(FT),
     land_ic_path::Union{Nothing, String} = nothing,
+    extra_kwargs...,
 ) where {FT, TT <: Union{Float64, ITime}}
     # Get default land parameters from ClimaLand.LandParameters
     land_toml_dict = LP.create_toml_dict(FT)
@@ -244,10 +254,13 @@ function ClimaLandSimulation(
         )
     elseif land_spun_up_ic
         # Use artifact spun-up initial conditions
-        ic_path = CL.Artifacts.saturated_land_ic_path()
+        ic_path = CL.Artifacts.soil_ic_2008_50m_path()
         @info "ClimaLand: using land IC file" ic_path
-
-        set_ic! = CL.Simulations.make_set_initial_state_from_file(ic_path, model)
+        set_ic! = CL.Simulations.make_set_initial_state_from_file(
+            ic_path,
+            model;
+            enforce_constraints = true,
+        )
         p.drivers.T .= orog_adjusted_T_surface
         t0 = tspan[1]
         set_ic!(Y, p, t0, model)
@@ -356,8 +369,6 @@ end
 ###############################################################################
 
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:area_fraction}) = sim.area_fraction
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:beta}) =
-    CL.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:emissivity}) = sim.integrator.p.ϵ_sfc
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:energy}) =
     CL.total_energy(sim.integrator.u, sim.integrator.p)
@@ -466,7 +477,9 @@ function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf)
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)
     Interfacer.update_field!(sim, Val(:snow_precipitation), csf.P_snow)
 
-    # update fields for turbulent flux calculations
+    # Update fields for turbulent flux calculations
+    # For the IntegratedSimulation, the land step computes surface fluxes,
+    # so we need to update the following fields in p.drivers in the land cache.
     Interfacer.update_field!(sim, Val(:air_velocity), csf.u_int, csf.v_int)
     Interfacer.update_field!(
         sim,
@@ -618,7 +631,7 @@ function FluxCalculator.compute_surface_fluxes!(
     Interfacer.remap!(
         csf.scalar_temp1,
         (
-            canopy_dest.transpiration .+
+            canopy_dest.vapor_flux .+
             (soil_dest.vapor_flux_liq .+ soil_dest.vapor_flux_ice) .*
             (1 .- p.snow.snow_cover_fraction) .+
             p.snow.snow_cover_fraction .* snow_dest.vapor_flux
@@ -654,8 +667,8 @@ function FluxCalculator.compute_surface_fluxes!(
     #  include its extra resistance term in the buoyancy flux calculation.
     Interfacer.remap!(
         csf.scalar_temp1,
-        soil_dest.buoy_flux .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.buoy_flux,
+        soil_dest.buoyancy_flux .* (1 .- p.snow.snow_cover_fraction) .+
+        p.snow.snow_cover_fraction .* snow_dest.buoyancy_flux,
     )
     @. csf.scalar_temp1 =
         ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
@@ -671,14 +684,9 @@ function FluxCalculator.compute_surface_fluxes!(
 
     # Compute the Monin-Obukhov length from ustar and the buoyancy flux
     #  L_MO = -u^3 / (k * buoyancy_flux)
-    # Prevent dividing by zero in the case of zero buoyancy flux
-    function non_zero(v::FT) where {FT}
-        sign_of_v = v == 0 ? 1 : sign(v)
-        return abs(v) < eps(FT) ? eps(FT) * sign_of_v : v
-    end
     surface_params = LP.surface_fluxes_parameters(sim.model.soil.parameters.earth_param_set)
     @. csf.scalar_temp1 =
-        -csf.ustar^3 / SFP.von_karman_const(surface_params) / non_zero(csf.buoyancy_flux)
+        -csf.ustar^3 / SFP.von_karman_const(surface_params) / SF.non_zero(csf.buoyancy_flux)
     @. csf.scalar_temp1 =
         ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
     # When L_MO is infinite, avoid multiplication by zero to prevent NaN

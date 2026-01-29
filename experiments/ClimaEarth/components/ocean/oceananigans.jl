@@ -8,6 +8,7 @@ import ClimaParams as CP
 import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
 import ConservativeRegridding as CR
+import Adapt # for ConservativeRegridding
 
 include("climaocean_helpers.jl")
 
@@ -34,27 +35,59 @@ struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC} <: Interfacer.OceanMode
 end
 
 """
-    OceananigansSimulation()
+    Interfacer.OceanSimulation(::Type{FT}, ::Val{:oceananigans}; kwargs...)
+
+Extension of the generic OceanSimulation constructor for the Oceananigans ocean model.
+FT is accepted for consistency with other ocean models but is not used.
+"""
+function Interfacer.OceanSimulation(::Type{FT}, ::Val{:oceananigans}; kwargs...) where {FT}
+    return OceananigansSimulation(FT; kwargs...)
+end
+
+"""
+    OceananigansSimulation(; kwargs...)
 
 Creates an OceananigansSimulation object containing a model, an integrator, and
 a surface area fraction field.
 This type is used to indicate that this simulation is an ocean simulation for
 dispatch in coupling.
 
+# Required keyword arguments
+- `boundary_space`: The boundary space of the coupled simulation
+- `start_date`: Start date for the simulation
+- `stop_date`: Stop date for the simulation
+- `output_dir`: Directory for output files
+- `ice_model`: Ice model type (Val type)
+
+# Optional keyword arguments
+- `dt`: Time step (default: `nothing`)
+- `comms_ctx`: Communication context (default: `ClimaComms.context()`)
+- `coupled_param_dict`: Coupled parameter dictionary (default: created from `area_fraction`)
+
 Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
 """
 function OceananigansSimulation(
+    ::Type{FT};
     boundary_space,
     start_date,
-    stop_date;
+    tspan,
     output_dir,
     ice_model,
-    Δt = nothing,
+    dt = nothing,
     comms_ctx = ClimaComms.context(),
-    coupled_param_dict = CP.create_toml_dict(eltype(area_fraction)),
-)
+    coupled_param_dict = CP.create_toml_dict(FT),
+    extra_kwargs...,
+) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
+    OC.Oceananigans.defaults.FloatType = FT
+
+    # Compute stop_date for oceananigans (needed for EN4 data retrieval)
+    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+
+    # Use Float64 for the ocean to avoid precision issues
+    FT_ocean = Float64
+    OC.Oceananigans.defaults.FloatType = FT_ocean
 
     # Retrieve EN4 data (monthly)
     # (It requires username and password)
@@ -87,7 +120,8 @@ function OceananigansSimulation(
     )
 
     # Restore the ocean to the EN4 state periodically if running for more than one month and not using ClimaSeaIce
-    use_restoring = start_date + Dates.Month(1) < stop_date && ice_model != "clima_seaice"
+    use_restoring =
+        start_date + Dates.Month(1) < stop_date && ice_model != Val(:clima_seaice)
 
     if use_restoring
         # When we use EN4 data, the forcing takes care of everything, including
@@ -159,7 +193,7 @@ function OceananigansSimulation(
     # Save free surface to a JLD2 file at hourly frequency
     free_surface_writer = OC.JLD2Writer(
         ocean.model,
-        (; η = ocean.model.free_surface.η); # The free surface (.η) will change to .displacement after version 0.104.0
+        (; η = ocean.model.free_surface.displacement);
         schedule = OC.TimeInterval(3600), # hourly snapshots
         filename = joinpath(output_dir, "ocean_free_surface.jld2"),
         overwrite_existing = true,
@@ -211,10 +245,14 @@ To regrid from Oceananigans to ClimaCore, use `CR.regrid!(dest_vector, remapper_
 To regrid from ClimaCore to Oceananigans, use `CR.regrid!(dest_vector, transpose(remapper_oc_to_cc), src_vector)`.
 """
 function construct_remappers(grid_oc, boundary_space)
+    # Move grids to CPU since ConservativeRegridding doesn't support GPU grids yet
+    grid_oc_underlying_cpu = Adapt.adapt_structure(Array, grid_oc.underlying_grid)
+    boundary_space_cpu = Adapt.adapt_structure(Array, boundary_space)
+
     # Create the remapper from the Oceananigans grid to the ClimaCore boundary space
     remapper_oc_to_cc = CR.Regridder(
-        boundary_space,
-        grid_oc.underlying_grid;
+        boundary_space_cpu,
+        grid_oc_underlying_cpu;
         normalize = false,
         threaded = false,
     )
@@ -297,20 +335,16 @@ Interfacer.step!(sim::OceananigansSimulation, t) =
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction
 
 # TODO: Better values for this
-# At the moment, we return always Float32. This is because we always want to run
-# Oceananingans with Float64, so we have no way to know the float type here. Sticking with
-# Float32 ensures that nothing is accidentally promoted to Float64. We will need to change
-# this anyway.
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_buoyancy}) =
-    Float32(5.8e-5)
+    eltype(sim.ocean.model)(5.8e-5)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_momentum}) =
-    Float32(5.8e-5)
-Interfacer.get_field(sim::OceananigansSimulation, ::Val{:beta}) = Float32(1)
-Interfacer.get_field(sim::OceananigansSimulation, ::Val{:emissivity}) = Float32(0.97)
+    eltype(sim.ocean.model)(5.8e-5)
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:emissivity}) =
+    eltype(sim.ocean.model)(0.97)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) =
-    Float32(0.011)
+    eltype(sim.ocean.model)(0.011)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) =
-    Float32(0.069)
+    eltype(sim.ocean.model)(0.069)
 
 # NOTE: This is 3D, but it will be remapped to 2D
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =

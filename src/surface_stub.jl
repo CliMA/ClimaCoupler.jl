@@ -7,7 +7,6 @@ contains the necessary fields for the simulation, at minimum the following:
     - `T_sfc` (surface temperature [K])
     - `z0m` (roughness length for momentum [m])
     - `z0b` (roughness length for tracers [m])
-    - `beta` (evaporation scaling factor)
     - `α_direct` (direct albedo)
     - `α_diffuse` (diffuse albedo)
     - `area_fraction` (fraction of the grid cell covered by the ocean)
@@ -33,7 +32,6 @@ end
 A getter function, that should not allocate. If undefined, it returns a descriptive error.
 """
 get_field(sim::AbstractSurfaceStub, ::Val{:area_fraction}) = sim.cache.area_fraction
-get_field(sim::AbstractSurfaceStub, ::Val{:beta}) = sim.cache.beta
 get_field(sim::AbstractSurfaceStub, ::Val{:energy}) = nothing
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m

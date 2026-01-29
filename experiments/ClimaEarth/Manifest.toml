@@ -2,7 +2,7 @@
 
 julia_version = "1.10.9"
 manifest_format = "2.0"
-project_hash = "b6758675118500db19bc41873b8c8741b74a3997"
+project_hash = "6b7bac012d444043544ee6ea533d5321afdc5bde"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "f7304359109c768cf32dc5fa2d371565bb63b68a"
@@ -431,6 +431,11 @@ git-tree-sha1 = "34d9873079e4cb3d0c62926a225136824677073f"
 uuid = "55437552-ac27-4d47-9aa3-63184e8fd398"
 version = "1.0.0"
 
+[[deps.ChunkSplitters]]
+git-tree-sha1 = "63a3903063d035260f0f6eab00f517471c5dc784"
+uuid = "ae650224-84b6-46f8-82ea-d812ca08434e"
+version = "3.1.2"
+
 [[deps.ClimaAnalysis]]
 deps = ["Artifacts", "Dates", "Interpolations", "NCDatasets", "NaNStatistics", "OrderedCollections", "Reexport", "Statistics", "Unitful"]
 git-tree-sha1 = "6becd117214e883e0069455303c43060a4d5eed1"
@@ -737,6 +742,30 @@ deps = ["Serialization", "Sockets"]
 git-tree-sha1 = "d9d26935a0bcffc87d2613ce14c527c99fc543fd"
 uuid = "f0e56b4a-5159-44fe-b623-3e5288b988bb"
 version = "2.5.0"
+
+[[deps.ConservativeRegridding]]
+deps = ["ChunkSplitters", "DocStringExtensions", "Extents", "GeoInterface", "GeometryOps", "GeometryOpsCore", "LinearAlgebra", "ProgressMeter", "SciMLPublic", "SortTileRecursiveTree", "SparseArrays", "StableTasks", "StaticArrays"]
+git-tree-sha1 = "14be129cf6c44210906eef3fd017fd9ba57acd43"
+repo-rev = "main"
+repo-url = "https://github.com/JuliaGeo/ConservativeRegridding.jl.git"
+uuid = "8e50ac2c-eb48-49bc-a402-07c87b949343"
+version = "0.2.0"
+
+    [deps.ConservativeRegridding.extensions]
+    ConservativeRegriddingClimaCoreExt = "ClimaCore"
+    ConservativeRegriddingHealpixExt = "Healpix"
+    ConservativeRegriddingInterfacesExt = "Interfaces"
+    ConservativeRegriddingOceananigansExt = "Oceananigans"
+    ConservativeRegriddingRingGridsExt = "RingGrids"
+    ConservativeRegriddingSpeedyWeatherExt = ["RingGrids", "SpeedyWeather"]
+
+    [deps.ConservativeRegridding.weakdeps]
+    ClimaCore = "d414da3d-4745-48bb-8d80-42e94e092884"
+    Healpix = "9f4e344d-96bc-545a-84a3-ae6b9e1b672b"
+    Interfaces = "85a1e053-f937-4924-92a5-1367d23b7b87"
+    Oceananigans = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
+    RingGrids = "d1845624-ad4f-453b-8ff4-a8db365bf3a7"
+    SpeedyWeather = "9e226e20-d153-4fed-8a5b-493def4f21a9"
 
 [[deps.ConstructionBase]]
 git-tree-sha1 = "b4b092499347b18a015186eae3042f72267106cb"

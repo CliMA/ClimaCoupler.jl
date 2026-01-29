@@ -3,8 +3,8 @@ import ClimaCore as CC
 import ClimaTimeSteppers as CTS
 import ClimaUtilities
 import ClimaUtilities.TimeManager: date
-import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities, FieldExchanger
 import SurfaceFluxes as SF
+import ..Checkpointer, ..FluxCalculator, ..Interfacer, ..Utilities, ..FieldExchanger
 
 ###
 ### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation

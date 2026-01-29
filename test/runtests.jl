@@ -37,3 +37,12 @@ end
 @safetestset "SimOutput tests" begin
     include("sim_output_tests.jl")
 end
+@safetestset "Slab ocean model tests" begin
+    include("models/slab_ocean_tests.jl")
+end
+@safetestset "Prescribed ocean model tests" begin
+    include("models/prescr_ocean_tests.jl")
+end
+@safetestset "Prescribed sea ice model tests" begin
+    include("models/prescr_seaice_tests.jl")
+end

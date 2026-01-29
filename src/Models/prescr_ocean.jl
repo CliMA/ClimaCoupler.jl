@@ -1,5 +1,6 @@
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
+import ClimaUtilities.TimeManager: date
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
 import Thermodynamics as TD
 import ClimaCoupler: Checkpointer, FieldExchanger, Interfacer
@@ -11,6 +12,8 @@ import StaticArrays as SA
 import Dates
 import ClimaAtmos as CA # for albedo calculation
 import LinearAlgebra
+import ClimaComms
+import ..Checkpointer, ..FieldExchanger, ..Interfacer
 
 """
     PrescribedOceanSimulation{C}

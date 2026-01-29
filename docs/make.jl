@@ -70,6 +70,7 @@ interface_pages = [
     "fieldexchanger.md",
     "fluxcalculator.md",
     "interfacer.md",
+    "models.md",
     "simcoordinator.md",
     "timemanager.md",
     "utilities.md",

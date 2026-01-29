@@ -5,8 +5,12 @@ import ClimaCore as CC
 import Thermodynamics.Parameters as TDP
 import ClimaParams as CP # required for TDP
 import ClimaCoupler
+import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
+import ClimaUtilities.ClimaArtifacts: @clima_artifact
+import Interpolations, Insolation, LinearAlgebra, ClimaTimeSteppers  # Trigger ClimaCouplerModelsExt extension
 
-include(joinpath("..", "..", "components", "ocean", "prescr_seaice.jl"))
+# Load the ClimaCouplerModelsExt extension to access internal functions for testing
+const ClimaCouplerModelsExt = Base.get_extension(ClimaCoupler, :ClimaCouplerModelsExt)
 
 for FT in (Float32, Float64)
     @testset "test sea-ice energy slab for FT=$FT" begin
@@ -28,10 +32,10 @@ for FT in (Float32, Float64)
             LW_d = 0.0,
             T_base = 271.2,
         )
-            params = IceSlabParameters{FT}(coupled_param_dict; T_base)
+            params = ClimaCouplerModelsExt.IceSlabParameters{FT}(coupled_param_dict; T_base)
 
-            Y = slab_ice_space_init(FT, space, params)
-            dY = slab_ice_space_init(FT, space, params) .* FT(0.0)
+            Y = ClimaCouplerModelsExt.slab_ice_space_init(FT, space, params)
+            dY = ClimaCouplerModelsExt.slab_ice_space_init(FT, space, params) .* FT(0.0)
 
             dt = FT(1.0)
             t_start = 0.0
@@ -74,14 +78,16 @@ for FT in (Float32, Float64)
 
             p = (; cache..., params = params)
 
-            ice_rhs!(dY, Y, p, t_start)
+            ClimaCouplerModelsExt.ice_rhs!(dY, Y, p, t_start)
 
             return dY, Y, p
         end
 
         # check expected dT due to upwelling longwave flux only
         # (zero conduction when T_base == initial T_bulk)
-        T_base_eq = IceSlabParameters{FT}(coupled_param_dict).T_freeze - FT(5.0)
+        T_base_eq =
+            ClimaCouplerModelsExt.IceSlabParameters{FT}(coupled_param_dict).T_freeze -
+            FT(5.0)
         dY, Y, p =
             test_sea_ice_rhs(coupled_param_dict, thermo_params, space, T_base = T_base_eq)
         σ = coupled_param_dict["stefan_boltzmann_constant"]
@@ -143,8 +149,10 @@ for FT in (Float32, Float64)
         T_bulk = minimum(Y.T_bulk) # get the non-zero temperature value
         (; k_ice, h, ρ, c, T_base, ϵ) = p.params
         dT_expected =
-            (k_ice / (h * h * ρ * c)) * (T_base - ice_surface_temperature(T_bulk, T_base)) -
-            (ϵ * σ * ice_surface_temperature(T_bulk, T_base)^4) / (h * ρ * c)
+            (k_ice / (h * h * ρ * c)) *
+            (T_base - ClimaCouplerModelsExt.ice_surface_temperature(T_bulk, T_base)) -
+            (ϵ * σ * ClimaCouplerModelsExt.ice_surface_temperature(T_bulk, T_base)^4) /
+            (h * ρ * c)
         @test minimum(dY) ≈ FT(dT_expected)
         @test maximum(dY) ≈ FT(0)
     end
@@ -171,7 +179,7 @@ for FT in (Float32, Float64)
             dss_buffer = CC.Spaces.create_dss_buffer(u),
         )
         integrator = (; u, p)
-        sim = PrescribedIceSimulation(nothing, integrator)
+        sim = ClimaCouplerModelsExt.PrescribedIceSimulation(nothing, integrator)
 
         # make field non-constant to check the impact of the dss step
         coords_lat = CC.Fields.coordinate_field(sim.integrator.u.state_field2).lat
@@ -179,7 +187,7 @@ for FT in (Float32, Float64)
 
         # apply DSS
         integrator_copy = deepcopy(integrator)
-        dss_state!(sim)
+        ClimaCouplerModelsExt.dss_state!(sim)
 
         # test that uniform field and cache are unchanged, non-constant is changed
         # note: uniform field is changed slightly by dss

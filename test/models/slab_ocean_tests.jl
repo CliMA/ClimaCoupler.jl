@@ -2,8 +2,10 @@ import Test: @test, @testset
 import ClimaCore as CC
 import ClimaParams as CP
 import ClimaCoupler
+import Interpolations, Insolation, LinearAlgebra, ClimaUtilities, ClimaTimeSteppers  # Trigger ClimaCouplerModelsExt extension
 
-include(joinpath("..", "..", "components", "ocean", "slab_ocean.jl"))
+# Load the ClimaCouplerModelsExt extension to access internal functions for testing
+const ClimaCouplerModelsExt = Base.get_extension(ClimaCoupler, :ClimaCouplerModelsExt)
 
 for FT in (Float32, Float64)
     @testset "dss_state! SlabOceanSimulation for FT=$FT" begin
@@ -29,7 +31,7 @@ for FT in (Float32, Float64)
             dss_buffer = CC.Spaces.create_dss_buffer(u),
         )
         integrator = (; u, p)
-        sim = SlabOceanSimulation(nothing, integrator)
+        sim = ClimaCouplerModelsExt.SlabOceanSimulation(nothing, integrator)
 
         # make field non-constant to check the impact of the dss step
         coords_lat = CC.Fields.coordinate_field(sim.integrator.u.state_field2).lat
@@ -37,7 +39,7 @@ for FT in (Float32, Float64)
 
         # apply DSS
         integrator_copy = deepcopy(integrator)
-        dss_state!(sim)
+        ClimaCouplerModelsExt.dss_state!(sim)
 
         # test that uniform field and cache are unchanged, non-constant is changed
         # note: uniform field is changed slightly by dss

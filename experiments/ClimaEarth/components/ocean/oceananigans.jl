@@ -257,7 +257,7 @@ function construct_remappers(grid_oc, boundary_space)
         threaded = false,
     )
 
-remapper_oc_to_cc = OC.on_architecture(OC.architecture(grid_oc), remapper_oc_to_cc)
+    remapper_oc_to_cc = OC.on_architecture(OC.architecture(grid_oc), remapper_oc_to_cc)
 
     # Create a field of ones on the boundary space so we can compute element areas
     field_ones_cc = CC.Fields.ones(boundary_space)

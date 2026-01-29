@@ -20,6 +20,30 @@ export turbulent_fluxes!,
     compute_surface_fluxes!,
     ocean_seaice_fluxes!
 
+"""
+    has_cached_field(sim, field_name::Symbol)
+
+Check if a simulation has a cached field without triggering an error.
+Returns `true` if the field can be retrieved, `false` otherwise.
+
+For AbstractSurfaceStub, checks the cache propertynames directly.
+For other types, checks if a specific get_field method exists (not the generic fallback).
+"""
+function has_cached_field(sim, field_name::Symbol)
+    if sim isa Interfacer.AbstractSurfaceStub
+        # For AbstractSurfaceStub, check cache propertynames directly
+        return field_name in propertynames(sim.cache)
+    else
+        # For other types, check if a specific get_field method exists
+        # The generic fallback is get_field(::ComponentModelSimulation, ::Val)
+        # Specific methods will be more specific (e.g., get_field(::OceananigansSimulation, ::Val{:coare3_roughness_params}))
+        return hasmethod(
+            Interfacer.get_field,
+            Tuple{typeof(sim), Val{field_name}},
+        )
+    end
+end
+
 function turbulent_fluxes!(cs::Interfacer.CoupledSimulation)
     return turbulent_fluxes!(cs.fields, cs.model_sims, cs.thermo_params)
 end
@@ -209,7 +233,7 @@ function compute_surface_humidity!(q_sfc, T_sfc, ρ_sfc, thermo_params)
 end
 
 """
-    compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params; roughness_model = nothing)
+    compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params)
 
 This function computes surface fluxes between the input component model
 simulation and the atmosphere.
@@ -231,8 +255,9 @@ in the future.
 - `sim`: [Interfacer.ComponentModelSimulation] the surface simulation to compute fluxes for.
 - `atmos_sim`: [Interfacer.AtmosModelSimulation] the atmosphere simulation to compute fluxes with.
 - `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
+
 The roughness model is obtained from the simulation via `get_field(sim, Val(:roughness_model))`.
-Ocean simulations return `:coare3`, while land and ice simulations return `:constant`.
+Ocean simulations return `:coare3`, while land and ice simulations return `:constant` (the default).
 """
 function compute_surface_fluxes!(
     csf,
@@ -320,13 +345,18 @@ function compute_surface_fluxes!(
     end
 
     # Set SurfaceFluxConfig containing models for roughness and gustiness
+    # Reuse cached roughness params when available to avoid allocations
     roughness_params = if roughness_model == :coare3
-        # Create Field and fill with constant COARE3 params
-        roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
-        roughness_params .= SF.COARE3RoughnessParams{FT}()
-        roughness_params
+        # All COARE3-using simulations cache coare3_roughness_params, so no allocation needed
+        Interfacer.get_field(sim, Val(:coare3_roughness_params))
     elseif roughness_model == :constant
-        SF.ConstantRoughnessParams.(z0m, z0b)
+        # Reuse cached constant roughness params when available; allocate if not cached
+        if has_cached_field(sim, :constant_roughness_params)
+            Interfacer.get_field(sim, Val(:constant_roughness_params))
+        else
+            # Fallback: allocate ConstantRoughnessParams Field from z0m and z0b
+            SF.ConstantRoughnessParams.(z0m, z0b)
+        end
     else
         error("Unknown roughness_model: $roughness_model. Must be :coare3 or :constant")
     end

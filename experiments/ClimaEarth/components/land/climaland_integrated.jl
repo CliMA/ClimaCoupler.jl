@@ -370,7 +370,6 @@ Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water}) =
     CL.total_water(sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_temperature}) =
     sim.integrator.p.T_sfc
-# Specify constant roughness model for ClimaLandSimulation (land)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:roughness_model}) = :constant
 
 # Update fields stored in land drivers

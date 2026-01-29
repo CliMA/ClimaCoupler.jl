@@ -239,7 +239,6 @@ Interfacer.get_field(
     sim::PrescribedIceSimulation,
     ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}},
 ) = sim.integrator.p.params.α
-# Specify constant roughness model for PrescribedIceSimulation (sea ice)
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_model}) = :constant
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) =
     ice_surface_temperature.(sim.integrator.u.T_bulk, sim.integrator.p.params.T_base)

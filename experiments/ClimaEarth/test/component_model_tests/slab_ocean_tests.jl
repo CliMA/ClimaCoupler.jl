@@ -2,6 +2,7 @@ import Test: @test, @testset
 import ClimaCore as CC
 import ClimaParams as CP
 import ClimaCoupler
+import SurfaceFluxes as SF
 
 include(joinpath("..", "..", "components", "ocean", "slab_ocean.jl"))
 
@@ -29,7 +30,9 @@ for FT in (Float32, Float64)
             dss_buffer = CC.Spaces.create_dss_buffer(u),
         )
         integrator = (; u, p)
-        sim = SlabOceanSimulation(nothing, integrator)
+        coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
+        coare3_roughness_params .= SF.COARE3RoughnessParams{FT}()
+        sim = SlabOceanSimulation(nothing, integrator, coare3_roughness_params)
 
         # make field non-constant to check the impact of the dss step
         coords_lat = CC.Fields.coordinate_field(sim.integrator.u.state_field2).lat

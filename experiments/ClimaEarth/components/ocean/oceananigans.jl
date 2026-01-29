@@ -3,6 +3,7 @@ import ClimaOcean as CO
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms
 import ClimaCore as CC
+import SurfaceFluxes as SF
 import Thermodynamics as TD
 import ClimaParams as CP
 import ClimaOcean.EN4: download_dataset
@@ -11,7 +12,7 @@ using KernelAbstractions: @kernel, @index, @inbounds
 include("climaocean_helpers.jl")
 
 """
-    OceananigansSimulation{SIM, A, OPROP, REMAP, SIC}
+    OceananigansSimulation{SIM, A, OPROP, REMAP, SIC, COARE3}
 
 The ClimaCoupler simulation object used to run with Oceananigans.
 This type is used by the coupler to indicate that this simulation
@@ -23,13 +24,16 @@ It contains the following objects:
 - `ocean_properties::OPROP`: A NamedTuple of ocean properties and parameters
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 - `ice_concentration::SIC`: An Oceananigans Field representing the sea ice concentration on the ocean/sea ice grid.
+- `coare3_roughness_params::COARE3`: COARE3 roughness params Field on the exchange grid, allocated once for reuse.
 """
-struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC} <: Interfacer.OceanModelSimulation
+struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC, COARE3} <:
+       Interfacer.OceanModelSimulation
     ocean::SIM
     area_fraction::A
     ocean_properties::OPROP
     remapping::REMAP
     ice_concentration::SIC
+    coare3_roughness_params::COARE3
 end
 
 """
@@ -229,12 +233,18 @@ function OceananigansSimulation(
     # Create a dummy area fraction that will get overwritten in `update_surface_fractions!`
     area_fraction = ones(boundary_space)
 
+    # COARE3 roughness params (allocated once, reused each timestep)
+    FT = CC.Spaces.undertype(boundary_space)
+    coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
+    coare3_roughness_params .= SF.COARE3RoughnessParams{FT}()
+
     return OceananigansSimulation(
         ocean,
         area_fraction,
         ocean_properties,
         remapping,
         ice_concentration,
+        coare3_roughness_params,
     )
 end
 
@@ -300,8 +310,9 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_buoyancy}) =
     Float32(5.8e-5)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_momentum}) =
     Float32(5.8e-5)
-# Specify COARE3 roughness model for OceananigansSimulation
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_model}) = :coare3
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:coare3_roughness_params}) =
+    sim.coare3_roughness_params
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:emissivity}) = Float32(0.97)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) =
     Float32(0.011)

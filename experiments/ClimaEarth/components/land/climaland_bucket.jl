@@ -279,7 +279,6 @@ Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_diffuse_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_temperature}) =
     CL.component_temperature(sim.model, sim.integrator.u, sim.integrator.p)
-# Specify constant roughness model for BucketSimulation (land)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:roughness_model}) = :constant
 
 """

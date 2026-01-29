@@ -153,7 +153,7 @@ function OceananigansSimulation(
     end
 
     Δt = isnothing(dt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : dt
-    ocean = ocean_simulation(
+    ocean = CO.ocean_simulation(
         grid;
         Δt,
         momentum_advection,

@@ -246,7 +246,7 @@ To regrid from ClimaCore to Oceananigans, use `CR.regrid!(dest_vector, transpose
 """
 function construct_remappers(grid_oc, boundary_space)
     # Move grids to CPU since ConservativeRegridding doesn't support GPU grids yet
-    grid_oc_underlying_cpu = Adapt.adapt_structure(Array, grid_oc.underlying_grid)
+    grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), grid_oc.underlying_grid)
     boundary_space_cpu = Adapt.adapt_structure(Array, boundary_space)
 
     # Create the remapper from the Oceananigans grid to the ClimaCore boundary space

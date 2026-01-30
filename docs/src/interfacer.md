@@ -279,10 +279,15 @@ properties needed by a component model.
 For some quantities, default `get_field` functions are provided, which may be
 overwritten or used as-is. These currently include the following:
 
-| Coupler name  | Description                                                               | Units | Default value |
-|---------------|---------------------------------------------------------------------------|-------|---------------|
-| `emissivity`  | measure of how much energy a surface radiates                             |       |             1 |
-| `height_disp` | displacement height relative to the surface                               | m     |             0 |
+| Coupler name             | Description                                                                 | Units | Default value |
+|--------------------------|-----------------------------------------------------------------------------|-------|---------------|
+| `emissivity`             | measure of how much energy a surface radiates                              |       |             1 |
+| `height_disp`            | displacement height relative to the surface                                | m     |             0 |
+| `roughness_model`        | roughness parameterization for surface flux calculations                    |       | `:constant`   |
+| `coare3_roughness_params`| COARE3 roughness params Field on exchange grid (when `roughness_model` is `:coare3`) |       | -             |
+
+!!! note "Roughness model option"
+    Default is `:constant`. Use `:coare3` for dynamic ocean roughness; then provide `coare3_roughness_params` via `get_field`.
 
 
 - `update_turbulent_fluxes!(::AbstractComponentSimulation, fields::NamedTuple)`:

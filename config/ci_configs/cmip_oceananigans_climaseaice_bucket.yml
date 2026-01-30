@@ -1,4 +1,4 @@
-FLOAT_TYPE: "Float32"
+FLOAT_TYPE: "Float64"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "map_temporal"
@@ -10,14 +10,16 @@ dt_ocean: "1800secs" # 30 minutes
 dt_seaice: "1800secs" # 30 minutes
 dz_bottom: 100.0
 energy_check: false
-h_elem: 8
+h_elem: 32
 ice_model: "clima_seaice"
 mode_name: "cmip"
 netcdf_output_at_levels: true
+nh_poly: 1
 ocean_model: "oceananigans"
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
 rayleigh_sponge: true
+simple_ocean: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "1days"

@@ -89,6 +89,7 @@ end
         "coupler_toml" => [],
         "era5_initial_condition_dir" => nothing,
         "ocean_model" => "prescribed",
+        "simple_ocean" => false,
         "ice_model" => "prescribed",
         "land_fraction_source" => "etopo",
         "binary_area_fraction" => true,

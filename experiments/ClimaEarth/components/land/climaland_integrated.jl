@@ -432,25 +432,6 @@ function Interfacer.update_field!(
     sim.integrator.p.drivers.u .=
         StaticArrays.SVector.(sim.integrator.p.scratch1, sim.integrator.p.scratch2)
 end
-function Interfacer.update_field!(
-    sim::ClimaLandSimulation,
-    ::Val{:air_thermo_state},
-    ρ_atmos,
-    T_atmos,
-    q_atmos,
-)
-    thermo_params = sim.model.soil.parameters.earth_param_set.thermo_params
-    Interfacer.remap!(sim.integrator.p.scratch1, ρ_atmos)
-    Interfacer.remap!(sim.integrator.p.scratch2, T_atmos)
-    Interfacer.remap!(sim.integrator.p.scratch3, q_atmos)
-    sim.integrator.p.drivers.thermal_state .=
-        TD.PhaseEquil_ρTq.(
-            thermo_params,
-            sim.integrator.p.scratch1,
-            sim.integrator.p.scratch2,
-            sim.integrator.p.scratch3,
-        )
-end
 
 function Interfacer.step!(sim::ClimaLandSimulation, t)
     while float(sim.integrator.t) < float(t)
@@ -471,7 +452,7 @@ function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf)
     Interfacer.update_field!(sim, Val(:c_co2), csf.c_co2)
     Interfacer.update_field!(sim, Val(:air_temperature), csf.T_atmos)
     Interfacer.update_field!(sim, Val(:air_pressure), csf.P_atmos)
-    Interfacer.update_field!(sim, Val(:air_humidity), csf.q_atmos)
+    Interfacer.update_field!(sim, Val(:air_humidity), csf.q_tot_atmos)
 
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)
@@ -481,13 +462,6 @@ function FieldExchanger.update_sim!(sim::ClimaLandSimulation, csf)
     # For the IntegratedSimulation, the land step computes surface fluxes,
     # so we need to update the following fields in p.drivers in the land cache.
     Interfacer.update_field!(sim, Val(:air_velocity), csf.u_int, csf.v_int)
-    Interfacer.update_field!(
-        sim,
-        Val(:air_thermo_state),
-        csf.ρ_atmos,
-        csf.T_atmos,
-        csf.q_atmos,
-    )
 end
 
 """
@@ -518,13 +492,13 @@ The fields added are:
 - `:c_co2` (for photosynthesis, biogeochemistry)
 - `:P_atmos` (for canopy conductance)
 - `:T_atmos` (for canopy conductance)
-- `:q_atmos` (for canopy conductance)
+- `:q_tot_atmos` (for canopy conductance)
 - `P_liq` (for moisture fluxes)
 - `P_snow` (for moisture fluxes)
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::ClimaLandSimulation)
     land_coupler_fields =
-        [:diffuse_fraction, :c_co2, :P_atmos, :T_atmos, :q_atmos, :P_liq, :P_snow]
+        [:diffuse_fraction, :c_co2, :P_atmos, :T_atmos, :q_tot_atmos, :P_liq, :P_snow]
     push!(coupler_field_names, land_coupler_fields...)
 end
 

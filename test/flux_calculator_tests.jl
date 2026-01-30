@@ -28,7 +28,11 @@ end
 struct TestAtmos2 <: Interfacer.AbstractAtmosSimulation end
 
 Interfacer.get_field(sim::TestAtmos, ::Val{:air_temperature}) = sim.integrator.T
-Interfacer.get_field(sim::TestAtmos, ::Val{:specific_humidity}) = sim.integrator.q
+Interfacer.get_field(sim::TestAtmos, ::Val{:total_specific_humidity}) = sim.integrator.q
+Interfacer.get_field(sim::TestAtmos, ::Val{:liquid_specific_humidity}) =
+    CC.Fields.zeros(axes(sim.integrator.q))
+Interfacer.get_field(sim::TestAtmos, ::Val{:ice_specific_humidity}) =
+    CC.Fields.zeros(axes(sim.integrator.q))
 Interfacer.get_field(sim::TestAtmos, ::Val{:air_density}) = sim.integrator.ρ
 Interfacer.get_field(sim::TestAtmos, ::Val{:height_int}) = sim.integrator.p.z
 Interfacer.get_field(sim::TestAtmos, ::Val{:height_sfc}) = sim.integrator.p.height_sfc
@@ -182,13 +186,6 @@ for FT in (Float32, Float64)
                 Interfacer.get_field(atmos_sim, Val(:u_int)),
                 Interfacer.get_field(atmos_sim, Val(:v_int)),
             )
-        thermo_state_atmos =
-            TD.PhaseNonEquil_ρTq.(
-                thermo_params,
-                atmos_sim.integrator.ρ,
-                atmos_sim.integrator.T,
-                TD.PhasePartition.(atmos_sim.integrator.q),
-            )
         surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
 
         # Get surface properties
@@ -206,13 +203,11 @@ for FT in (Float32, Float64)
                 fields.ρ_atmos,
                 T_sfc,
                 height_int .- height_sfc,
-                fields.q_atmos,
+                fields.q_tot_atmos,
                 0, # q_liq
                 0, # q_ice
             )
-        FluxCalculator.compute_surface_humidity!(q_sfc, T_sfc, ρ_sfc, thermo_params)
-        thermo_state_sfc =
-            TD.PhaseNonEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, TD.PhasePartition.(q_sfc))
+        q_sfc .= TD.q_vap_saturation.(thermo_params, T_sfc, ρ_sfc, 0, 0)
 
         config =
             SF.SurfaceFluxConfig.(
@@ -224,10 +219,15 @@ for FT in (Float32, Float64)
             FluxCalculator.get_surface_fluxes.(
                 surface_fluxes_params,
                 uv_int,
-                thermo_state_atmos,
+                atmos_sim.integrator.T,
+                atmos_sim.integrator.q,
+                0, # q_liq
+                0, # q_ice
+                atmos_sim.integrator.ρ,
                 height_int,
                 StaticArrays.SVector.(0, 0), # uv_sfc
-                thermo_state_sfc,
+                T_sfc,
+                q_sfc,
                 height_sfc,
                 0, # d
                 Ref(config),

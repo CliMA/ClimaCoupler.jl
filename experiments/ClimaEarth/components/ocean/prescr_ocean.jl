@@ -242,24 +242,20 @@ function set_albedos!(sim::PrescribedOceanSimulation, t)
         t isa ClimaUtilities.TimeManager.ITime ? date(t) : p.start_date + Dates.Second(t)
 
     insolation_params = InsolationParameters(FT)
-    d, δ, η_UTC =
-        FT.(Insolation.helper_instantaneous_zenith_angle(current_date, insolation_params))
 
     # Get the atmospheric wind vector and the cosine of the zenith angle
     surface_coords = CC.Fields.coordinate_field(axes(sim.cache.T_sfc))
     insolation_tuple =
-        Insolation.instantaneous_zenith_angle.(
-            d,
-            δ,
-            η_UTC,
-            surface_coords.long,
+        Insolation.insolation.(
+            current_date,
             surface_coords.lat,
-        ) # the tuple is (zenith angle, azimuthal angle, earth-sun distance)
-    zenith_angle = insolation_tuple.:1
+            surface_coords.long,
+            insolation_params,
+        )
+    cos_zenith_angle = insolation_tuple.μ
     wind_atmos = LinearAlgebra.norm.(CC.Geometry.Covariant12Vector.(p.u_int, p.v_int)) # wind vector from components
     λ = FT(0) # spectral wavelength (not used for now)
-    max_zenith_angle = FT(π) / 2 - eps(FT)
-    cos_zenith = @. cos(min(zenith_angle, max_zenith_angle)) # cosine of the zenith angle
+    cos_zenith = @. max(cos_zenith_angle, 0)
 
     # Use the albedo model from ClimaAtmos
     α_model = CA.RegressionFunctionAlbedo{FT}()

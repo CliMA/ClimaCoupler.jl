@@ -3,6 +3,8 @@ import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
 import Thermodynamics as TD
 import ClimaCoupler: Checkpointer, FieldExchanger, Interfacer
+import ClimaCore as CC
+import SurfaceFluxes as SF
 import Insolation
 import Insolation.Parameters.InsolationParameters
 import StaticArrays as SA
@@ -31,6 +33,7 @@ The cache is expected to contain the following variables:
 - `thermo_params` (thermodynamic parameters)
 - `SST_timevaryinginput` (TimeVaryingInput object containing SST data)
 - `t` (the current time)
+- `coare3_roughness_params` (COARE3 roughness params Field, allocated once for reuse)
 """
 struct PrescribedOceanSimulation{C} <: Interfacer.AbstractSurfaceStub
     cache::C
@@ -119,6 +122,10 @@ function PrescribedOceanSimulation(
     t_start = first(tspan)
     evaluate!(SST_init, SST_timevaryinginput, t_start)
 
+    # COARE3 roughness params (allocated once, reused each timestep)
+    coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
+    coare3_roughness_params .= SF.COARE3RoughnessParams{FT}()
+
     # Create the cache
     cache = (;
         T_sfc = SST_init,
@@ -134,6 +141,7 @@ function PrescribedOceanSimulation(
         SST_timevaryinginput = SST_timevaryinginput,
         start_date = start_date,
         t = Ref(t_start),
+        coare3_roughness_params,
     )
     return PrescribedOceanSimulation(cache)
 end
@@ -146,6 +154,9 @@ Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:surface_diffuse_albe
     sim.cache.α_diffuse
 Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:emissivity}) =
     eltype(sim.cache.T_sfc)(1)
+Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:roughness_model}) = :coare3
+Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:coare3_roughness_params}) =
+    sim.cache.coare3_roughness_params
 
 function Interfacer.update_field!(
     sim::PrescribedOceanSimulation,

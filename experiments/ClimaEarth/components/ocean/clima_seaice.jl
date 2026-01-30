@@ -286,6 +286,7 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_concentration}) =
     sim.ice.model.ice_concentration
 
 # TODO better values for this
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_model}) = :constant
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_buoyancy}) =
     eltype(sim.ice.model)(5.8e-5)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_momentum}) =

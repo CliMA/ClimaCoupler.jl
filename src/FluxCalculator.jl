@@ -76,12 +76,17 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
 end
 
 """
-    get_surface_fluxes(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters)
+    get_surface_fluxes(surface_fluxes_params, u_int, thermo_state_atmos, ..., config [, solver_opts [, update_T_sfc]])
 
 Uses SurfaceFluxes.jl to calculate turbulent surface fluxes. It should be atmos model agnostic, and columnwise.
 Fluxes are computed over the entire surface, even where the relevant surface model is not present.
 
 When available, it also computes ancillary quantities, such as the Monin-Obukov lengthscale.
+
+Optional trailing arguments (for iterative skin temperature, e.g. sea ice):
+- `solver_opts`: SurfaceFluxes.SolverOptions for the internal MOST solver (tol, maxiter, etc.).
+- `update_T_sfc`: Callback `(T_sfc_default, ζ, param_set, thermo_params, inputs, scheme, u_star, z0m, z0h) -> T_sfc`
+  used by SurfaceFluxes during iteration to update surface temperature.
 """
 function get_surface_fluxes(
     surface_fluxes_params::SF.Parameters.SurfaceFluxesParameters,
@@ -93,6 +98,8 @@ function get_surface_fluxes(
     h_sfc,
     d,
     config,
+    solver_opts = nothing,
+    update_T_sfc = nothing,
 )
     # Get inputs to compute surface fluxes
     thermo_params = SFP.thermodynamics_params(surface_fluxes_params)
@@ -106,7 +113,7 @@ function get_surface_fluxes(
     Φ_sfc = SFP.grav(surface_fluxes_params) * h_sfc
     Δz = h_int - h_sfc
 
-    # Calculate surface fluxes
+    # Calculate surface fluxes (optionally with solver options and T_sfc callback from SurfaceFluxes)
     outputs = SF.surface_fluxes(
         surface_fluxes_params,
         T_int,
@@ -123,6 +130,11 @@ function get_surface_fluxes(
         u_sfc,
         nothing, # roughness_inputs
         config,
+        SF.PointValueScheme(),
+        solver_opts,
+        nothing, # flux_specs
+        update_T_sfc,
+        nothing, # update_q_vap_sfc
     )
 
     (; shf, lhf, evaporation, ρτxz, ρτyz, T_sfc, q_vap_sfc, L_MO, ustar) = outputs

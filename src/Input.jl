@@ -438,6 +438,9 @@ function get_coupler_args(config_dict::Dict)
     # Binary area fraction
     binary_area_fraction = config_dict["binary_area_fraction"]
 
+    # Sea ice: use iterative ice skin temperature (ClimaSeaIce only)
+    use_iterative_ice_skin = get(config_dict, "use_iterative_ice_skin", false)
+
     return (;
         job_id,
         sim_mode,
@@ -475,6 +478,7 @@ function get_coupler_args(config_dict::Dict)
         ice_model,
         land_fraction_source,
         binary_area_fraction,
+        use_iterative_ice_skin,
     )
 end
 

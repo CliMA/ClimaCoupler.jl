@@ -140,6 +140,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         ice_model,
         land_fraction_source,
         binary_area_fraction,
+        use_iterative_ice_skin,
     ) = Input.get_coupler_args(config_dict)
 
     # Get default shared parameters from ClimaParams.jl, overriding with any provided parameter files
@@ -345,6 +346,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         output_dir = dir_paths.ice_output_dir,
         # Arguments used by ClimaSeaIce model
         ocean = ocean_sim,
+        use_iterative_ice_skin,
         # Arguments used by prescribed ice model
         tspan,
         saveat,

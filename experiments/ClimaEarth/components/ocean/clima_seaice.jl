@@ -6,11 +6,69 @@ import ClimaOcean as CO
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms
 import ClimaCore as CC
+import StaticArrays
+import SurfaceFluxes as SF
 import Thermodynamics as TD
 import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
 
 include("climaocean_helpers.jl")
+
+"""
+    ice_flux_balance_temperature(T_sfc, Q_turb, SW_d, LW_d, α, ε, σ, h, k, T_base; T_melt, T_min)
+
+Single-step flux balance for ice skin temperature, mirroring ClimaOcean's
+`flux_balance_temperature(::SkinTemperature{ClimaSeaIce.ConductiveFlux}, ...)`.
+
+Conductive flux through the ice from base to surface equals the total flux out of
+the surface (turbulent + net radiative). So
+  k*(T_base - T_sfc)/h = Q_turb + εσT_sfc^4 - (1-α)*SW_d - LW_d
+⇒ T_sfc_new = T_base - (h/k) * (Q_turb + εσT_sfc^4 - (1-α)*SW_d - LW_d).
+
+All arguments are scalars (or broadcast over the boundary space when called with `.()`).
+Returns the new surface temperature (K), clamped to [T_min, T_melt].
+"""
+function ice_flux_balance_temperature(
+    T_sfc,
+    Q_turb,
+    SW_d,
+    LW_d,
+    α,
+    ε,
+    σ,
+    h,
+    k,
+    T_base;
+    T_melt = 273.15,
+    T_min = 200.0,
+)
+    Q_LW_out = ε * σ * T_sfc^4
+    Q_total = Q_turb + (Q_LW_out - (1 - α) * SW_d - LW_d)
+    h_eff = max(h, 1e-10)  # avoid division by zero
+    T_sfc_new = T_base - (h_eff / k) * Q_total
+    return clamp(T_sfc_new, T_min, T_melt)
+end
+
+"""
+    _fixed_point_iteration(x, step_fn, solver_opts)
+
+Run fixed-point iteration x_{n+1} = step_fn(x_n) until convergence or maxiter.
+Uses SurfaceFluxes.SolverOptions for maxiter and tolerance (absolute and relative).
+Same pattern as nested iterative solves (e.g. outer T_sfc loop, inner ζ in SurfaceFluxes).
+Returns the converged field (or last iterate if maxiter reached).
+"""
+function _fixed_point_iteration(x, step_fn, solver_opts::SF.SolverOptions)
+    for _ in 1:(solver_opts.maxiter)
+        x_new = step_fn(x)
+        converged =
+            all(abs.(x_new .- x) .< max.(solver_opts.tol, solver_opts.rtol .* abs.(x_new)))
+        if converged
+            return x_new
+        end
+        x = x_new
+    end
+    return x_new
+end
 
 # Rename ECCO password env variable to match ClimaOcean.jl
 haskey(ENV, "ECCO_PASSWORD") && (ENV["ECCO_WEBDAV_PASSWORD"] = ENV["ECCO_PASSWORD"])
@@ -124,6 +182,7 @@ function ClimaSeaIceSimulation(
     start_date = nothing,
     coupled_param_dict = CP.create_toml_dict(FT),
     dt = 5 * 60.0, # 5 minutes
+    use_iterative_ice_skin = false,
     extra_kwargs...,
 ) where {FT}
     # Initialize the sea ice with the same grid as the ocean
@@ -159,6 +218,7 @@ function ClimaSeaIceSimulation(
     ice_properties = (;
         σ = coupled_param_dict["stefan_boltzmann_constant"],
         C_to_K = coupled_param_dict["temperature_water_freeze"],
+        use_iterative_ice_skin = use_iterative_ice_skin,
     )
 
     # Since ocean and sea ice share the same grid, we can also share the remapping objects
@@ -302,6 +362,199 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_diffuse_albedo})
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
     sim.ice_properties.C_to_K + sim.ice.model.ice_thermodynamics.top_surface_temperature
 
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:use_iterative_ice_skin}) =
+    sim.ice_properties.use_iterative_ice_skin
+
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_thickness}) =
+    sim.ice.model.ice_thickness
+
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_consolidation_thickness}) =
+    eltype(sim.ice.model)(sim.ice.model.ice_consolidation_thickness)
+
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_conductivity}) =
+    eltype(sim.ice.model)(sim.ice.model.ice_thermodynamics.internal_heat_flux.conductivity)
+
+"""
+    FluxCalculator.compute_surface_fluxes!(csf, sim::ClimaSeaIceSimulation, atmos_sim, thermo_params)
+
+When `use_iterative_ice_skin` is true, iteratively solve for the ice surface temperature
+so that conductive flux through the ice balances turbulent and radiative fluxes at the surface.
+Iteration uses SurfaceFluxes.SolverOptions (maxiter, tol) so convergence is controlled by
+SurfaceFluxes.jl rather than hardcoded values. Otherwise invokes the base implementation.
+"""
+function FluxCalculator.compute_surface_fluxes!(
+    csf,
+    sim::ClimaSeaIceSimulation,
+    atmos_sim::Interfacer.AbstractAtmosSimulation,
+    thermo_params,
+)
+    if !Interfacer.get_field(sim, Val(:use_iterative_ice_skin))
+        return invoke(
+            FluxCalculator.compute_surface_fluxes!,
+            (Any, Interfacer.AbstractSurfaceSimulation, Interfacer.AbstractAtmosSimulation, Any),
+            csf,
+            sim,
+            atmos_sim,
+            thermo_params,
+        )
+    end
+
+    boundary_space = axes(csf)
+    FT = CC.Spaces.undertype(boundary_space)
+    surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
+    # Use SurfaceFluxes' SolverOptions for iteration control (maxiter, tol) instead of hardcoding
+    solver_opts = SF.SolverOptions(FT)
+    uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
+    thermo_state_atmos =
+        TD.PhaseNonEquil_ρTq.(
+            thermo_params,
+            csf.ρ_atmos,
+            csf.T_atmos,
+            TD.PhasePartition.(csf.q_atmos),
+        )
+
+    # Initial T_sfc and ice state on boundary space
+    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
+    Interfacer.get_field!(csf.scalar_temp2, sim, Val(:ice_thickness))
+    h = csf.scalar_temp2
+    k = Interfacer.get_field(sim, Val(:ice_conductivity))
+    T_base = sim.ice_properties.C_to_K
+    α = Interfacer.get_field(sim, Val(:surface_direct_albedo))
+    ε = Interfacer.get_field(sim, Val(:emissivity))
+    σ = sim.ice_properties.σ
+
+    # One step of the fixed-point iteration: T_sfc -> turbulent fluxes -> ice flux balance -> T_sfc_new
+    function ice_skin_step(T_sfc)
+        ρ_sfc =
+            SF.surface_density.(
+                surface_fluxes_params,
+                csf.T_atmos,
+                csf.ρ_atmos,
+                T_sfc,
+                csf.height_int .- csf.height_sfc,
+                csf.q_atmos,
+                0,
+                0,
+            )
+        FluxCalculator.compute_surface_humidity!(csf.scalar_temp3, T_sfc, ρ_sfc, thermo_params)
+        q_sfc = csf.scalar_temp3
+        thermo_state_sfc =
+            TD.PhaseNonEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, TD.PhasePartition.(q_sfc))
+        z0m = Interfacer.get_field(sim, Val(:roughness_momentum))
+        z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy))
+        config =
+            SF.SurfaceFluxConfig.(
+                SF.ConstantRoughnessParams.(z0m, z0b),
+                SF.ConstantGustinessSpec.(ones(boundary_space)),
+            )
+        fluxes =
+            FluxCalculator.get_surface_fluxes.(
+                surface_fluxes_params,
+                uv_int,
+                thermo_state_atmos,
+                csf.height_int,
+                StaticArrays.SVector.(0, 0),
+                thermo_state_sfc,
+                csf.height_sfc,
+                0,
+                config,
+                solver_opts,
+            )
+        (; F_sh, F_lh) = fluxes
+        Q_turb = F_sh .+ F_lh
+        T_sfc_new =
+            ice_flux_balance_temperature.(
+                T_sfc,
+                Q_turb,
+                csf.SW_d,
+                csf.LW_d,
+                α,
+                ε,
+                σ,
+                h,
+                k,
+                T_base,
+            )
+        csf.scalar_temp1 .= T_sfc_new
+        return csf.scalar_temp1
+    end
+
+    # Nested iterative solve: fixed-point iteration on T_sfc using SurfaceFluxes' solver options
+    T_sfc = _fixed_point_iteration(csf.scalar_temp1, ice_skin_step, solver_opts)
+
+    # Recompute fluxes at converged T_sfc for final outputs
+    ρ_sfc =
+        SF.surface_density.(
+            surface_fluxes_params,
+            csf.T_atmos,
+            csf.ρ_atmos,
+            T_sfc,
+            csf.height_int .- csf.height_sfc,
+            csf.q_atmos,
+            0,
+            0,
+        )
+    FluxCalculator.compute_surface_humidity!(csf.scalar_temp3, T_sfc, ρ_sfc, thermo_params)
+    q_sfc = csf.scalar_temp3
+    thermo_state_sfc =
+        TD.PhaseNonEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, TD.PhasePartition.(q_sfc))
+    Interfacer.get_field!(csf.scalar_temp2, sim, Val(:area_fraction))
+    area_fraction = csf.scalar_temp2
+    Interfacer.get_field!(csf.scalar_temp3, sim, Val(:roughness_momentum))
+    z0m = csf.scalar_temp3
+    z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy))
+    gustiness = ones(boundary_space)
+    config =
+        SF.SurfaceFluxConfig.(
+            SF.ConstantRoughnessParams.(z0m, z0b),
+            SF.ConstantGustinessSpec.(gustiness),
+        )
+    fluxes =
+        FluxCalculator.get_surface_fluxes.(
+            surface_fluxes_params,
+            uv_int,
+            thermo_state_atmos,
+            csf.height_int,
+            StaticArrays.SVector.(0, 0),
+            thermo_state_sfc,
+            csf.height_sfc,
+            0,
+            config,
+            solver_opts,
+        )
+    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux) =
+        fluxes
+
+    @. F_turb_ρτxz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτxz), F_turb_ρτxz)
+    @. F_turb_ρτyz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτyz), F_turb_ρτyz)
+    @. F_sh = ifelse(area_fraction ≈ 0, zero(F_sh), F_sh)
+    @. F_lh = ifelse(area_fraction ≈ 0, zero(F_lh), F_lh)
+    @. F_turb_moisture = ifelse(area_fraction ≈ 0, zero(F_turb_moisture), F_turb_moisture)
+    @. L_MO = ifelse(area_fraction ≈ 0, zero(L_MO), L_MO)
+    @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
+    @. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(buoyancy_flux), buoyancy_flux)
+
+    fields = (;
+        F_turb_ρτxz,
+        F_turb_ρτyz,
+        F_lh,
+        F_sh,
+        F_turb_moisture,
+        T_sfc_converged = csf.scalar_temp1,
+    )
+    FluxCalculator.update_turbulent_fluxes!(sim, fields)
+
+    @. csf.F_turb_ρτxz += F_turb_ρτxz * area_fraction
+    @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction
+    @. csf.F_lh += F_lh * area_fraction
+    @. csf.F_sh += F_sh * area_fraction
+    @. csf.F_turb_moisture += F_turb_moisture * area_fraction
+    @. csf.L_MO += ifelse(isinf(L_MO), L_MO, L_MO * area_fraction)
+    @. csf.ustar += ustar * area_fraction
+    @. csf.buoyancy_flux += buoyancy_flux * area_fraction
+    return nothing
+end
+
 """
     FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fields)
 
@@ -325,6 +578,22 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
 
     (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
     grid = sim.ice.model.grid
+
+    # If iterative ice skin was used, write back converged surface temperature (K) to the ice model
+    if haskey(fields, :T_sfc_converged)
+        T_sfc_K = fields.T_sfc_converged
+        CC.Remapping.interpolate!(
+            sim.remapping.scratch_arr1,
+            sim.remapping.remapper_cc,
+            T_sfc_K,
+        )
+        T_sfc_C = sim.remapping.scratch_arr1 .- sim.ice_properties.C_to_K
+        ice_concentration = sim.ice.model.ice_concentration
+        top_T = sim.ice.model.ice_thermodynamics.top_surface_temperature
+        # Only update where ice concentration > 0
+        OC.interior(top_T, :, :, 1) .=
+            ifelse.(OC.interior(ice_concentration, :, :, 1) .> 0, T_sfc_C, OC.interior(top_T, :, :, 1))
+    end
     ice_concentration = sim.ice.model.ice_concentration
 
     # Convert the momentum fluxes from contravariant to Cartesian basis

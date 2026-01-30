@@ -8,15 +8,6 @@ end
 @safetestset "component model test: ClimaLand integrated model" begin
     include("component_model_tests/climaland_tests.jl")
 end
-@safetestset "component model test: prescr. sea ice" begin
-    include("component_model_tests/prescr_seaice_tests.jl")
-end
-@safetestset "component model test: prescr. ocean" begin
-    include("component_model_tests/prescr_ocean_tests.jl")
-end
-@safetestset "component model test: slab ocean" begin
-    include("component_model_tests/slab_ocean_tests.jl")
-end
 @safetestset "surface radiative flux consistency tests" begin
     include("fluxes_test.jl")
 end

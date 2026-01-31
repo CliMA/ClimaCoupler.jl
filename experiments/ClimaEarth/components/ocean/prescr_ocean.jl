@@ -255,7 +255,8 @@ function set_albedos!(sim::PrescribedOceanSimulation, t)
     cos_zenith_angle = insolation_tuple.μ
     wind_atmos = LinearAlgebra.norm.(CC.Geometry.Covariant12Vector.(p.u_int, p.v_int)) # wind vector from components
     λ = FT(0) # spectral wavelength (not used for now)
-    cos_zenith = @. max(cos_zenith_angle, 0)
+    # TODO: We shouldn't need this, but without this the fluxes_test fail.
+    cos_zenith = @. max(cos_zenith_angle, eps(FT))
 
     # Use the albedo model from ClimaAtmos
     α_model = CA.RegressionFunctionAlbedo{FT}()

@@ -4,6 +4,7 @@ import ClimaTimeSteppers as CTS
 import ClimaUtilities
 import ClimaUtilities.TimeManager: date
 import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities, FieldExchanger
+import SurfaceFluxes as SF
 
 ###
 ### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
@@ -145,6 +146,10 @@ function SlabOceanSimulation(
     params = OceanSlabParameters{FT}(coupled_param_dict; evolving_switch)
 
     Y = slab_ocean_space_init(boundary_space, params)
+    # COARE3 roughness params (allocated once, reused each timestep)
+    coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
+    coare3_roughness_params .= SF.COARE3RoughnessParams{FT}()
+
     cache = (
         params = params,
         F_turb_energy = CC.Fields.zeros(boundary_space),
@@ -158,6 +163,7 @@ function SlabOceanSimulation(
         v_atmos = CC.Fields.zeros(boundary_space),
         # add dss_buffer to cache to avoid runtime dss allocation
         dss_buffer = CC.Spaces.create_dss_buffer(Y),
+        coare3_roughness_params,
     )
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
@@ -194,6 +200,9 @@ Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_diffuse_albedo}) =
     sim.integrator.p.α_diffuse
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_temperature}) =
     sim.integrator.u.T_sfc
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:roughness_model}) = :coare3
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:coare3_roughness_params}) =
+    sim.integrator.p.coare3_roughness_params
 
 """
     Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:energy})

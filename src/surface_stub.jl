@@ -40,6 +40,19 @@ get_field(sim::AbstractSurfaceStub, ::Val{:surface_diffuse_albedo}) = sim.cache.
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_temperature}) = sim.cache.T_sfc
 
 """
+    get_field(::AbstractSurfaceStub, ::Val{:coare3_roughness_params})
+
+Return cached COARE3 roughness params when present in the stub's cache (e.g. PrescribedOceanSimulation).
+"""
+function get_field(sim::AbstractSurfaceStub, ::Val{:coare3_roughness_params})
+    if :coare3_roughness_params in propertynames(sim.cache)
+        return getproperty(sim.cache, :coare3_roughness_params)
+    else
+        return get_field_error(sim, Val(:coare3_roughness_params))
+    end
+end
+
+"""
     update_field!(sim::AbstractSurfaceStub, ::Val{:area_fraction}, field::CC.Fields.Field)
 
 Updates the specified value in the cache of `SurfaceStub`.

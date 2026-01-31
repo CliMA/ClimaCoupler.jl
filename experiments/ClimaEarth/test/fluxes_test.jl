@@ -85,7 +85,7 @@ include(joinpath("..", "setup_run.jl"))
     combined_fluxes =
         .-land_fraction .* land_flux .+ ice_fraction .* ice_rad_flux .+
         ocean_fraction .* ocean_rad_flux
-    
+
     @info "Combined fluxes: $(combined_fluxes)"
     @info "Atmos flux: $(atmos_flux)"
     err_fluxes = atmos_flux .+ combined_fluxes

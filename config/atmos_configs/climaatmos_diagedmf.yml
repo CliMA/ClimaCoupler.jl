@@ -31,3 +31,9 @@ turbconv: "diagnostic_edmfx"
 viscous_sponge: true
 z_elem: 63
 z_max: 60000.0
+diagnostics:
+  - short_name: [ta, hur, hus, ua, va, pfull]
+    period: 1months
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 1hours

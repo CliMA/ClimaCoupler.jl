@@ -13,6 +13,6 @@ output_default_diagnostics: true
 radiation_reset_rng_seed: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "1098days"
+t_end: "400days"
 topo_smoothing: true
 topography: "Earth"

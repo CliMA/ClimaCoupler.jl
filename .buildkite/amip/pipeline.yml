@@ -37,11 +37,11 @@ steps:
 
     steps:
 
-      - label: "Current AMIP: diagedmf + 0M + integrated land"
+      - label: "Current AMIP: diagedmf + 0M + bucket"
         key: "amip"
         command:
           - echo "--- Run simulation"
-          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_land.yml --job_id amip"
+          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip.yml --job_id amip"
         artifact_paths: "output/amip/artifacts/*"
         timeout_in_minutes: 5760
         env:
@@ -51,20 +51,3 @@ steps:
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
           slurm_mem: 30GB
-
-  - wait
-
-  - group: "Job analysis and reporting"
-
-    steps:
-
-      - label: "Send simulation output to Azure VM for visualization"
-        command:
-          - rsync -avz experiments/ClimaEarth/output/amip/output_active/* azure-arenchon:/home/arenchon/GitHub/ClimaViz.jl/data/climacoupler-amip/
-
-      - label: ":envelope: Slack report: current AMIP"
-        command:
-          - |
-            find experiments/ClimaEarth/output/amip/artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
-              slack-upload -c C04S6MBSDC4 -f "$$file" -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
-            done

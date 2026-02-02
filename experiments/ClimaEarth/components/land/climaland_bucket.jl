@@ -578,15 +578,19 @@ function Checkpointer.get_model_cache(sim::BucketSimulation)
     return sim.integrator.p
 end
 
-function Checkpointer.restore_cache!(sim::BucketSimulation, new_cache)
-    old_cache = Checkpointer.get_model_cache(sim)
-    comms_ctx = ClimaComms.context(sim.model)
-    Checkpointer.restore!(
-        old_cache,
-        new_cache,
-        comms_ctx,
-        ignore = Set([:rc, :params, :dss_buffer_2d, :dss_buffer_3d, :graph_context]),
-    )
+function Checkpointer.restore_cache!(sim::BucketSimulation, cache_vec)
+    comms_ctx = ClimaComms.context(sim.integrator.u.c)
+    atmos_cache_itr = Checkpointer.CacheIterator(sim)
+    # This assumes that the traversals over the two bucket caches are the same
+    for (i, obj_restored) in enumerate(atmos_cache_itr)
+        obj_saved = cache_vec[i]
+        Checkpointer.restore!(obj_restored, obj_saved, comms_ctx; name = "", ignore = Set())
+    end
+    return nothing
+end
+
+function Checkpointer.get_cache_ignore(::BucketSimulation)
+    return Set([:rc, :params, :dss_buffer_2d, :dss_buffer_3d, :graph_context])
 end
 
 # Additional BucketSimulation getter methods for plotting debug fields

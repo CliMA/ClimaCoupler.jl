@@ -156,7 +156,9 @@ A vector of objects from the cache. Elements may reference the same underlying
 data if they share object IDs. The order of the objects in the vector is
 determined by `CacheIterator`.
 """
-function get_model_cache_to_checkpoint(sim::Interfacer.AbstractAtmosSimulation)
+function get_model_cache_to_checkpoint(
+    sim::Union{Interfacer.AbstractAtmosSimulation, Interfacer.AbstractLandSimulation},
+)
     atmos_cache_itr = CacheIterator(sim)
     cache_vec = [] # Elements of the vector can be any type
     # Keep track of the object ID and its index in the vector while iterating

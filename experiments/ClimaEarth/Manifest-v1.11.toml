@@ -527,8 +527,8 @@ weakdeps = ["CUDA"]
 
 [[deps.ClimaLand]]
 deps = ["Adapt", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "NCDatasets", "RootSolvers", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "25470b508040fd00e7b807b75d00fc4fc53a1fcb"
-repo-rev = "main"
+git-tree-sha1 = "cd98ff9979e9267e1554c800427acfd0a0377e0b"
+repo-rev = "kd/quick_fix"
 repo-url = "https://github.com/CliMA/ClimaLand.jl.git"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
 version = "1.5.1"

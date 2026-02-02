@@ -6,6 +6,8 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Debug checkpoint
+
 #### Rename abstract component types PR[#1688](https://github.com/CliMA/ClimaCoupler.jl/pull/1688)
 To follow abstract type naming convention. For example, `XModelSimulation` is now
 `AbstractXSimulation`.

@@ -18,7 +18,7 @@ radiation_reset_rng_seed: true
 rayleigh_sponge: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "480secs"
+t_end: "86400secs"
 topo_smoothing: true
 topography: "Earth"
 viscous_sponge: true

@@ -192,18 +192,21 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:energy})
     integrator = sim.integrator
     p = integrator.p
 
-
     # return total energy and (if Microphysics0Moment) the energy lost due to precipitation removal
     microphysics_model = integrator.p.atmos.microphysics_model
     if microphysics_model isa CA.Microphysics0Moment
-        ᶜts = p.precomputed.ᶜts
-        ᶜΦ = p.core.ᶜΦ
-        ᶜS_ρq_tot = p.precomputed.ᶜS_ρq_tot
+        (; ᶜT, ᶜq_liq_rai, ᶜq_ice_sno, ᶜS_ρq_tot) = p.precomputed
+        (; ᶜΦ) = p.core
         thermo_params = get_thermo_params(sim)
         return integrator.u.c.ρe_tot .-
                ᶜS_ρq_tot .*
-               CA.e_tot_0M_precipitation_sources_helper.(Ref(thermo_params), ᶜts, ᶜΦ) .*
-               float(integrator.dt)
+               CA.e_tot_0M_precipitation_sources_helper.(
+            Ref(thermo_params),
+            ᶜT,
+            ᶜq_liq_rai,
+            ᶜq_ice_sno,
+            ᶜΦ,
+        ) .* float(integrator.dt)
     else
         return integrator.u.c.ρe_tot
     end
@@ -237,15 +240,9 @@ moisture_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_pressure}) =
     CC.Fields.level(sim.integrator.p.precomputed.ᶜp, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_temperature}) =
-    TD.air_temperature.(
-        sim.integrator.p.params.thermodynamics_params,
-        CC.Fields.level(sim.integrator.p.precomputed.ᶜts, 1),
-    )
+    CC.Fields.level(sim.integrator.p.precomputed.ᶜT, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_density}) =
-    TD.air_density.(
-        sim.integrator.p.params.thermodynamics_params,
-        CC.Fields.level(sim.integrator.p.precomputed.ᶜts, 1),
-    )
+    CC.Fields.level(sim.integrator.u.c.ρ, 1)
 # When CO2 is stored as a 1D Array in the tracers cache, we access
 # it from there. Otherwise, we pull a fixed value from ClimaParams.
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:co2}) =
@@ -292,12 +289,12 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:LW_d})
         CC.Utilities.half,
     )
 end
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:specific_humidity}) =
-    CC.Fields.level(
-        ρq_tot(sim.integrator.p.atmos.moisture_model, sim.integrator) ./
-        sim.integrator.u.c.ρ,
-        1,
-    )
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:total_specific_humidity}) =
+    CC.Fields.level(sim.integrator.p.precomputed.ᶜq_tot_safe, 1)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_specific_humidity}) =
+    CC.Fields.level(sim.integrator.p.precomputed.ᶜq_liq_rai, 1)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ice_specific_humidity}) =
+    CC.Fields.level(sim.integrator.p.precomputed.ᶜq_ice_sno, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =
     surface_snow_flux(sim.integrator.p.atmos.moisture_model, sim.integrator)
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d})
@@ -315,17 +312,17 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d})
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:water}) =
     ρq_tot(sim.integrator.p.atmos.moisture_model, sim.integrator)
+
 function Interfacer.update_field!(
     sim::ClimaAtmosSimulation,
     ::Val{:surface_temperature},
-    csf,
+    field,
 )
+    Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.T_sfc, field)
+end
+function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_humidity}, csf)
     # NOTE: This update_field! takes as argument the entire coupler fields struct, instead
-    # of a single field. This is unlike most of other functions, so we may want to revisit
-    # it.
-    # The rrtmgp_model.surface_temperature field is updated by the RRTMGP callback using the
-    # sfc_conditions.ts, so all we need to do is update sfc_conditions.ts
-    # Note also that this method updates the entire thermo state, not just the temperature
+    # of a single field. This is unlike most of other functions, so we may want to revisit it.
 
     # Remap coupler fields onto the atmosphere surface space
     atmos_surface_space = get_surface_space(sim)
@@ -335,14 +332,15 @@ function Interfacer.update_field!(
     # Compute surface humidity on the coupler space, then remap to atmosphere surface space
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:air_temperature))
     T_atmos = csf.scalar_temp1
-    Interfacer.get_field!(csf.scalar_temp2, sim, Val(:specific_humidity))
-    q_atmos = csf.scalar_temp2
+    Interfacer.get_field!(csf.scalar_temp2, sim, Val(:total_specific_humidity))
+    q_tot_atmos = csf.scalar_temp2
     Interfacer.get_field!(csf.scalar_temp3, sim, Val(:air_density))
     ρ_atmos = csf.scalar_temp3
 
     surface_fluxes_params = FluxCalculator.get_surface_params(sim)
 
     # TODO: Is csf.height_int .- csf.height_sfc allocating?
+    # TODO: Add two scratch fields for q_liq_atmos and q_ice_atmos
     csf.scalar_temp4 .=
         SF.surface_density.(
             surface_fluxes_params,
@@ -350,41 +348,18 @@ function Interfacer.update_field!(
             ρ_atmos,
             csf.T_sfc,
             csf.height_int .- csf.height_sfc,
-            q_atmos,
+            q_tot_atmos,
             0, # q_liq
             0, # q_ice
         )
     ρ_sfc = csf.scalar_temp4
 
     thermo_params = get_thermo_params(sim)
-    FluxCalculator.compute_surface_humidity!(
-        csf.scalar_temp1,
-        csf.T_sfc,
-        ρ_sfc,
-        thermo_params,
-    )
+    csf.scalar_temp1 .= TD.q_vap_saturation.(thermo_params, csf.T_sfc, ρ_sfc, 0, 0)
 
     # Remap surface temperature and humidity to atmosphere surface space
-    # NOTE: This is allocating! If we had 2 more scratch fields, we could avoid this
-    T_sfc_atmos = Interfacer.remap(atmos_surface_space, csf.T_sfc)
     q_sfc_atmos = Interfacer.remap(atmos_surface_space, csf.scalar_temp1)
-
-    # Store `ρ_sfc_atmos` in an atmosphere scratch field on the surface space
-    temp_field_surface = Interfacer.remap(atmos_surface_space, ρ_sfc)
-    ρ_sfc_atmos = temp_field_surface
-
-    if sim.integrator.p.atmos.moisture_model isa CA.DryModel
-        sim.integrator.p.precomputed.sfc_conditions.ts .=
-            TD.PhaseDry_ρT.(thermo_params, ρ_sfc_atmos, T_sfc_atmos)
-    else
-        sim.integrator.p.precomputed.sfc_conditions.ts .=
-            TD.PhaseNonEquil_ρTq.(
-                thermo_params,
-                ρ_sfc_atmos,
-                T_sfc_atmos,
-                TD.PhasePartition.(q_sfc_atmos),
-            )
-    end
+    sim.integrator.p.precomputed.sfc_conditions.q_vap_sfc .= q_sfc_atmos
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =
     CC.Spaces.level(CC.Fields.coordinate_field(sim.integrator.u.c).z, 1)

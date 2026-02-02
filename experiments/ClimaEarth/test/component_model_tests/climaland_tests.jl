@@ -60,20 +60,8 @@ FT = Float32
 
     # Check that the drivers are correctly initialized
     driver_names = propertynames(land_sim.integrator.p.drivers)
-    @test driver_names == (
-        :P_liq,
-        :P_snow,
-        :c_co2,
-        :T,
-        :P,
-        :q,
-        :u,
-        :thermal_state,
-        :SW_d,
-        :LW_d,
-        :cosθs,
-        :frac_diff,
-    )
+    @test driver_names ==
+          (:P_liq, :P_snow, :c_co2, :T, :P, :q, :u, :SW_d, :LW_d, :cosθs, :frac_diff)
     atmos = land_sim.model.soil.boundary_conditions.top.atmos
     @test atmos == land_sim.model.canopy.boundary_conditions.atmos
     @test atmos == land_sim.model.snow.boundary_conditions.atmos

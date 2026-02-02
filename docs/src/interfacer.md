@@ -86,7 +86,9 @@ The default coupler exchange fields are the following, defined in
 | Coupler name      | Description                                                 | Units      |
 |-------------------|-------------------------------------------------------------|------------|
 | `T_atmos`         | atmosphere temperature at the bottom layer                  | K          |
-| `q_atmos`         | atmosphere humidity at the bottom layer                     | kg kg⁻¹    |
+| `q_tot_atmos`     | atmosphere total humidity at the bottom layer               | kg kg⁻¹    |
+| `q_liq_atmos`     | atmosphere liquid humidity at the bottom layer              | kg kg⁻¹    |
+| `q_ice_atmos`     | atmosphere ice humidity at the bottom layer                 | kg kg⁻¹    |
 | `ρ_atmos`         | atmosphere air density at the bottom layer                  | kg m⁻³     |
 | `height_int`      | height at the bottom cell center of the atmosphere space    | m          |
 | `height_sfc`      | height at the bottom face of the atmosphere space           | m          |

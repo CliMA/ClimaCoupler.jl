@@ -76,8 +76,12 @@ end
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:air_temperature}) =
     sim.cache.air_temperature
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:air_density}) = sim.cache.air_density
-Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:specific_humidity}) =
-    sim.cache.specific_humidity
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:total_specific_humidity}) =
+    sim.cache.total_specific_humidity
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:liquid_specific_humidity}) =
+    sim.cache.liquid_specific_humidity
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:ice_specific_humidity}) =
+    sim.cache.ice_specific_humidity
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:turbulent_energy_flux}) =
     sim.cache.turbulent_energy_flux
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:turbulent_moisture_flux}) =
@@ -118,6 +122,8 @@ function Interfacer.update_field!(
     parent(sim.cache.roughness_momentum) .= parent(field)
 end
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:surface_temperature}, field) =
+    nothing
+Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:surface_humidity}, field) =
     nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:roughness_buoyancy}, field) =
     nothing
@@ -290,7 +296,9 @@ for FT in (Float32, Float64)
         component_names = [
             :air_density,
             :air_temperature,
-            :specific_humidity,
+            :total_specific_humidity,
+            :liquid_specific_humidity,
+            :ice_specific_humidity,
             :SW_d,
             :LW_d,
             :liquid_precipitation,
@@ -381,6 +389,7 @@ for FT in (Float32, Float64)
 
         atmos_names = [
             :surface_temperature,
+            :surface_humidity,
             :albedo_direct,
             :albedo_diffuse,
             :roughness_momentum,
@@ -482,7 +491,9 @@ for FT in (Float32, Float64)
             :SW_d,
             :LW_d,
             :air_temperature,
-            :specific_humidity,
+            :total_specific_humidity,
+            :liquid_specific_humidity,
+            :ice_specific_humidity,
             :air_density,
         ]
         # Initialize atmos fields with 1

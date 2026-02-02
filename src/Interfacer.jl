@@ -112,7 +112,9 @@ Return a list of default coupler fields needed to run a simulation.
 default_coupler_fields() = [
     # fields used to compute turbulent fluxes
     :T_atmos,
-    :q_atmos,
+    :q_tot_atmos,
+    :q_liq_atmos,
+    :q_ice_atmos,
     :ρ_atmos,
     :height_int,
     :height_sfc,

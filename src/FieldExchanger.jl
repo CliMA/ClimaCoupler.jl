@@ -112,7 +112,21 @@ from the atmosphere.
 function import_atmos_fields!(csf, model_sims)
     # get atmosphere properties used for flux calculations
     Interfacer.get_field!(csf.T_atmos, model_sims.atmos_sim, Val(:air_temperature))
-    Interfacer.get_field!(csf.q_atmos, model_sims.atmos_sim, Val(:specific_humidity))
+    Interfacer.get_field!(
+        csf.q_tot_atmos,
+        model_sims.atmos_sim,
+        Val(:total_specific_humidity),
+    )
+    Interfacer.get_field!(
+        csf.q_liq_atmos,
+        model_sims.atmos_sim,
+        Val(:liquid_specific_humidity),
+    )
+    Interfacer.get_field!(
+        csf.q_ice_atmos,
+        model_sims.atmos_sim,
+        Val(:ice_specific_humidity),
+    )
     Interfacer.get_field!(csf.ρ_atmos, model_sims.atmos_sim, Val(:air_density))
     Interfacer.get_field!(csf.u_int, model_sims.atmos_sim, Val(:u_int))
     Interfacer.get_field!(csf.v_int, model_sims.atmos_sim, Val(:v_int))
@@ -210,7 +224,8 @@ function update_sim!(atmos_sim::Interfacer.AbstractAtmosSimulation, csf)
         csf.surface_diffuse_albedo,
     )
     Interfacer.update_field!(atmos_sim, Val(:emissivity), csf.emissivity)
-    Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf)
+    Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf.T_sfc)
+    Interfacer.update_field!(atmos_sim, Val(:surface_humidity), csf)
     return nothing
 end
 

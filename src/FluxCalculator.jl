@@ -86,23 +86,20 @@ When available, it also computes ancillary quantities, such as the Monin-Obukov 
 function get_surface_fluxes(
     surface_fluxes_params::SF.Parameters.SurfaceFluxesParameters,
     u_int,
-    thermo_state_atmos,
+    T_int,
+    q_tot_int,
+    q_liq_int,
+    q_ice_int,
+    ρ_int,
     h_int,
     u_sfc,
-    thermo_state_sfc,
+    T_sfc,
+    q_vap_sfc,
     h_sfc,
     d,
     config,
 )
     # Get inputs to compute surface fluxes
-    thermo_params = SFP.thermodynamics_params(surface_fluxes_params)
-    T_int = TD.air_temperature(thermo_params, thermo_state_atmos)
-    q_tot_int = TD.total_specific_humidity(thermo_params, thermo_state_atmos)
-    q_liq_int = TD.liquid_specific_humidity(thermo_params, thermo_state_atmos)
-    q_ice_int = TD.ice_specific_humidity(thermo_params, thermo_state_atmos)
-    ρ_int = TD.air_density(thermo_params, thermo_state_atmos)
-    T_sfc = TD.air_temperature(thermo_params, thermo_state_sfc)
-    q_vap_sfc = TD.vapor_specific_humidity(thermo_params, thermo_state_sfc)
     Φ_sfc = SFP.grav(surface_fluxes_params) * h_sfc
     Δz = h_int - h_sfc
 
@@ -183,32 +180,6 @@ end
 update_turbulent_fluxes!(sim::Interfacer.AbstractSurfaceStub, fields::NamedTuple) = nothing
 
 """
-    compute_surface_humidity!(q_sfc, T_sfc, ρ_sfc, thermo_params)
-
-Computes the surface specific humidity based on the atmospheric state and surface temperature.
-The phase of the surface is determined by the surface temperature, and the saturation
-specific humidity is computed accordingly.
-
-All fields should be on the exchange grid.
-
-# Arguments
-- `q_sfc`: [CC.Fields.Field] output field for surface specific humidity.
-- `T_sfc`: [CC.Fields.Field] surface temperature.
-- `ρ_sfc`: [CC.Fields.Field] surface air density.
-- `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
-"""
-# TODO: use TD.q_vap_saturation after updating to the latest Thermodynamics
-function compute_surface_humidity!(q_sfc, T_sfc, ρ_sfc, thermo_params)
-    T_freeze = TDP.T_freeze(thermo_params)
-    @. q_sfc = ifelse(
-        T_sfc .> T_freeze,
-        TD.q_vap_saturation_generic(thermo_params, T_sfc, ρ_sfc, TD.Liquid()),
-        TD.q_vap_saturation_generic(thermo_params, T_sfc, ρ_sfc, TD.Ice()),
-    )
-    return nothing
-end
-
-"""
     compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params)
 
 This function computes surface fluxes between the input component model
@@ -266,15 +237,6 @@ function compute_surface_fluxes!(
     # `_int` refers to atmos state of center level 1
     uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
 
-    # construct the atmospheric thermo state
-    thermo_state_atmos =
-        TD.PhaseNonEquil_ρTq.(
-            thermo_params,
-            csf.ρ_atmos,
-            csf.T_atmos,
-            TD.PhasePartition.(csf.q_atmos),
-        )
-
     # compute surface humidity from the surface temperature, surface density, and phase
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
     T_sfc = csf.scalar_temp1
@@ -287,28 +249,19 @@ function compute_surface_fluxes!(
             csf.ρ_atmos,
             T_sfc,
             csf.height_int .- csf.height_sfc,
-            csf.q_atmos,
+            csf.q_tot_atmos,
             0, # q_liq
             0, # q_ice
         )
 
-    compute_surface_humidity!(csf.scalar_temp2, T_sfc, ρ_sfc, thermo_params)
+    csf.scalar_temp2 .= TD.q_vap_saturation.(thermo_params, T_sfc, ρ_sfc, 0, 0)
     q_sfc = csf.scalar_temp2
 
-    # construct the surface thermo state
-    # after this we can reuse `scalar_temp1` and `scalar_temp2` again
-    thermo_state_sfc =
-        TD.PhaseNonEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, TD.PhasePartition.(q_sfc))
-
-    # get area fraction (min = 0, max = 1)
-    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))
-    area_fraction = csf.scalar_temp1
-
     # get roughness lengths from surface simulation
-    Interfacer.get_field!(csf.scalar_temp2, sim, Val(:roughness_momentum))
-    z0m = csf.scalar_temp2
-    Interfacer.get_field!(csf.scalar_temp3, sim, Val(:roughness_buoyancy))
-    z0b = csf.scalar_temp3
+    Interfacer.get_field!(csf.scalar_temp3, sim, Val(:roughness_momentum))
+    z0m = csf.scalar_temp3
+    Interfacer.get_field!(csf.scalar_temp4, sim, Val(:roughness_buoyancy))
+    z0b = csf.scalar_temp4
     # Set some scalars that we hardcode for now
     gustiness = ones(boundary_space)
     # Set SurfaceFluxConfig containing models for roughness and gustiness
@@ -323,10 +276,15 @@ function compute_surface_fluxes!(
         FluxCalculator.get_surface_fluxes.(
             surface_fluxes_params,
             uv_int,
-            thermo_state_atmos,
+            csf.T_atmos,
+            csf.q_tot_atmos,
+            csf.q_liq_atmos,
+            csf.q_ice_atmos,
+            csf.ρ_atmos,
             csf.height_int,
             StaticArrays.SVector.(0, 0), # uv_sfc
-            thermo_state_sfc,
+            T_sfc,
+            q_sfc,
             csf.height_sfc,
             0, # d
             config,
@@ -334,6 +292,10 @@ function compute_surface_fluxes!(
     (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux) =
         fluxes
 
+    # get area fraction (min = 0, max = 1)
+    # We can reuse scalar_temp1 after flux calculation
+    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))
+    area_fraction = csf.scalar_temp1
     # Zero out fluxes where the area fraction is zero
     # Multiplying by `area_fraction` is not sufficient because the fluxes may
     # be NaN where the area fraction is zero.

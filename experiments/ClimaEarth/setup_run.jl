@@ -45,7 +45,6 @@ import ClimaCoupler.Interfacer:
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.Utils: period_to_seconds_float
-import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import ClimaUtilities.TimeManager: ITime, date
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
 # Random is used by RRMTGP for some cloud properties
@@ -69,9 +68,6 @@ contain any internals of the ClimaCoupler source code, except extensions to the 
 include("components/atmosphere/climaatmos.jl")
 include("components/land/climaland_bucket.jl")
 include("components/land/climaland_integrated.jl")
-include("components/ocean/slab_ocean.jl")
-include("components/ocean/prescr_ocean.jl")
-include("components/ocean/prescr_seaice.jl")
 include("components/ocean/oceananigans.jl")
 include("components/ocean/clima_seaice.jl")
 
@@ -365,7 +361,6 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
 
     ## collect component model simulations that have been initialized
-    @assert !(ocean_sim isa SlabOceanSimulation) || isnothing(ice_sim) "SlabOceanSimulation should not be used with sea ice, got $(ice_sim)"
     model_sims = (; atmos_sim, ice_sim, land_sim, ocean_sim)
     model_sims =
         NamedTuple{filter(key -> !isnothing(model_sims[key]), keys(model_sims))}(model_sims)

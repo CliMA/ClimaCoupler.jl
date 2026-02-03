@@ -6,7 +6,12 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
-#### Enable COARE3 roughness parameterization PR[#1689](https://github.com/CliMA/ClimaCoupler.jl/pull/1689) Allows :constant (land, ice) or :coare3 (ocean) aerodynamic roughness parameterization. 
+#### Move simple component models into Models module PR[#1692](https://github.com/CliMA/ClimaCoupler.jl/pull/1692)
+Move slab ocean, prescribed ocean, and prescribed sea ice from experiments/
+into src/.
+
+#### Enable COARE3 roughness parameterization PR[#1689](https://github.com/CliMA/ClimaCoupler.jl/pull/1689)
+Allows :constant (land, ice) or :coare3 (ocean) aerodynamic roughness parameterization.
 
 #### Rename abstract component types PR[#1688](https://github.com/CliMA/ClimaCoupler.jl/pull/1688)
 To follow abstract type naming convention. For example, `XModelSimulation` is now

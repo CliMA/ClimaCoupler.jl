@@ -213,7 +213,7 @@ function argparse_settings()
         default = true
         # BucketModel specific
         "--bucket_albedo_type"
-        help = "Access bucket surface albedo information from data file. [`map_static` (default), `function`, `map_temporal`]"
+        help = "Access bucket surface albedo information from data file. [`map_static` (default), `function`, `map_temporal`, `era5`]"
         arg_type = String
         default = "map_static" # to be replaced by land config file, when available
         "--bucket_initial_condition"

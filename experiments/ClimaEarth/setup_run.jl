@@ -270,8 +270,10 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     @info(sim_mode)
     land_sim = ice_sim = ocean_sim = nothing
+
     # Build ERA5-based file paths if subseasonal mode is selected
-    subseasonal_sst = subseasonal_sic = subseasonal_land_ic = nothing
+    subseasonal_sst = subseasonal_sic = subseasonal_land_ic = subseasonal_albedo =
+        subseasonal_bucket_ic = nothing
     if sim_mode <: SubseasonalMode
         isnothing(era5_initial_condition_dir) &&
             error("subseasonal mode requires --era5_initial_condition_dir")
@@ -283,11 +285,23 @@ function CoupledSimulation(config_dict::AbstractDict)
             joinpath(era5_initial_condition_dir, "sic_processed_$(datestr)_0000.nc")
         subseasonal_land_ic =
             joinpath(era5_initial_condition_dir, "era5_land_processed_$(datestr)_0000.nc")
+        subseasonal_albedo =
+            joinpath(era5_initial_condition_dir, "albedo_processed_$(datestr)_0000.nc")
+        subseasonal_bucket_ic =
+            joinpath(era5_initial_condition_dir, "era5_bucket_processed_$(datestr)_0000.nc")
     end
 
     ## Construct the land model component
     # Determine whether to use a shared surface space
     shared_surface_space = share_surface_space ? boundary_space : nothing
+    # Use subseasonal bucket IC if bucket_initial_condition is not specified
+    bucket_ic = if isempty(bucket_initial_condition) && !isnothing(subseasonal_bucket_ic)
+        subseasonal_bucket_ic
+    else
+        bucket_initial_condition
+    end
+    # Use subseasonal albedo file if available
+    era5_albedo_file = isnothing(subseasonal_albedo) ? "" : subseasonal_albedo
     land_sim = Interfacer.LandSimulation(
         FT,
         land_model;
@@ -306,7 +320,8 @@ function CoupledSimulation(config_dict::AbstractDict)
         coupled_param_dict,
         # Arguments used by bucket model
         albedo_type = bucket_albedo_type,
-        bucket_initial_condition,
+        bucket_initial_condition = bucket_ic,
+        era5_albedo_file_path = era5_albedo_file,
         # Arguments used by integrated model
         land_spun_up_ic,
         land_ic_path = subseasonal_land_ic,

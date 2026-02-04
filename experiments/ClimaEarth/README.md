@@ -160,11 +160,13 @@ Generates 3-4 week forecasts from ERA5-derived initial conditions. Similar to `a
 - `era5_initial_condition_dir`: directory that contains files named like:
   - `sst_processed_YYYYMMDD_0000.nc`
   - `sic_processed_YYYYMMDD_0000.nc`
-  - `era5_land_processed_YYYYMMDD_0000.nc`
-  - `era5_bucket_processed_YYYYMMDD_0000.nc`
+  - `era5_land_processed_YYYYMMDD_0000.nc` (for integrated land model)
+  - `era5_bucket_processed_YYYYMMDD_0000.nc` (for bucket land model, auto-inferred if `bucket_initial_condition` not specified)
+  - `albedo_processed_YYYYMMDD_0000.nc` (optional, used when `bucket_albedo_type: "era5"`)
 
 - **How filename inference works**: given `start_date` formatted as `YYYYMMDD`, the model constructs paths
-  - `joinpath(era5_initial_condition_dir, "sst_processed_YYYYMMDD_0000.nc")` for the initial conditions.
+  - `joinpath(era5_initial_condition_dir, "sst_processed_YYYYMMDD_0000.nc")` for SST
+  - `joinpath(era5_initial_condition_dir, "era5_bucket_processed_YYYYMMDD_0000.nc")` for bucket IC (if not explicitly set)
 
 - **Contents and expected variables**:
   - `sst_processed_YYYYMMDD_0000.nc`:
@@ -194,6 +196,12 @@ Generates 3-4 week forecasts from ERA5-derived initial conditions. Similar to `a
       - `tsn` (K): temperature of snow layer, dims `(lat, lon)`
       - `skt` (K): skin temperature, dims `(lat, lon)`
     - era5 land level midpoints: 0.035, 0.175, 0.64, 1.945 (m)
+
+  - `albedo_processed_YYYYMMDD_0000.nc` (optional, for ERA5-derived albedo):
+    - Used when `bucket_albedo_type: "era5"` is specified
+    - Variable: `sw_alb_clr` (clear-sky surface albedo)
+    - Units: fraction (0–1)
+    - Dimensions: `(time, lat, lon)` - temporally interpolated monthly data
 
 ## Configuration files
 We use configuration files to specify all simulation parameters and options. The configuration files are organized hierarchically:

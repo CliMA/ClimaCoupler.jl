@@ -49,7 +49,7 @@ end
 """
     IceSlabParameters{FT}(coupled_param_dict; h = FT(2), ρ = FT(900), c = FT(2100),
                           T_base = FT(271.2), z0m = FT(1e-4), z0b = FT(1e-4),
-                          T_freeze = FT(271.2), k_ice = FT(2), α = FT(0.65), ϵ = FT(1))
+                          T_freeze = FT(271.2), k_ice = FT(2), α = nothing, ϵ = FT(1))
 
 Initialize the `IceSlabParameters` object with the coupled parameters.
 
@@ -63,11 +63,18 @@ Initialize the `IceSlabParameters` object with the coupled parameters.
 - `z0b`: roughness length for tracers [m] (default: 1e-4)
 - `T_freeze`: freezing temperature of sea water [K] (default: 271.2)
 - `k_ice`: thermal conductivity of sea ice [W / m / K] (default: 2)
-- `α`: albedo of sea ice (default: 0.65)
+- `α`: albedo of sea ice (default: read from `coupled_param_dict["ice_albedo"]`, or 0.7 if not set)
 - `ϵ`: emissivity of sea ice (default: 1)
 
 # Returns
 - `IceSlabParameters{FT}`: an `IceSlabParameters` object
+
+# Calibration
+To calibrate the ice albedo, add the following to your TOML file:
+```toml
+[ice_albedo]
+value = 0.7
+```
 """
 function IceSlabParameters{FT}(
     coupled_param_dict;
@@ -79,9 +86,19 @@ function IceSlabParameters{FT}(
     z0b = FT(1e-4),
     T_freeze = FT(271.2),
     k_ice = FT(2),
-    α = FT(0.65),
+    α = nothing,  # Read from coupled_param_dict if not provided
     ϵ = FT(1),
 ) where {FT}
+    # Ice albedo: read from TOML if available, otherwise use default 0.7
+    α_default = FT(0.7)
+    if isnothing(α)
+        α = try
+            FT(coupled_param_dict["ice_albedo"])
+        catch e
+            e isa KeyError || rethrow(e)
+            α_default
+        end
+    end
     return IceSlabParameters{FT}(;
         h,
         ρ,
@@ -101,7 +118,79 @@ end
 function slab_ice_space_init(::Type{FT}, space, params) where {FT}
     # bulk temperatures commonly 10-20 K below freezing for sea ice 2m thick in winter,
     # and closer to freezing in summer and when melting.
-    Y = CC.Fields.FieldVector(T_bulk = ones(space) .* params.T_freeze .- FT(5.0))
+    Y = CC.Fields.FieldVector(T_bulk = ones(space) .* params.T_freeze .- FT(10.0))
+    return Y
+end
+
+"""
+    slab_ice_space_init_from_file(::Type{FT}, space, params, sic_data, start_date, t_start, ice_fraction) where {FT}
+
+Initialize ice temperature from ERA5 ice layer temperatures (ISTL1-4) if available.
+Uses the average of the 4 IFS sea-ice slab layers:
+- Layer 1: 0-7cm
+- Layer 2: 7-28cm  
+- Layer 3: 28-100cm
+- Layer 4: 100-150cm
+
+Only uses ERA5 temperatures where there is ice (ice_fraction > 0). In ice-free regions,
+uses the fallback temperature to avoid initializing with values at/above freezing which
+can cause numerical issues.
+
+Falls back to constant initialization if the data is not available or not finite.
+
+Note: Uses TimeVaryingInput because the ISTL data has a time dimension in the NetCDF file.
+We evaluate at t_start to get the initial values.
+"""
+function slab_ice_space_init_from_file(
+    ::Type{FT},
+    space,
+    params,
+    sic_data,
+    start_date,
+    t_start,
+    ice_fraction,
+) where {FT}
+    T_fallback = params.T_freeze - FT(10.0)  # More conservative fallback (was -15)
+    T_base = params.T_base
+    T_freeze = params.T_freeze
+    
+    # Minimum allowed surface temperature - used to derive minimum T_bulk
+    # This prevents unrealistically cold surface temperatures
+    T_sfc_min = FT(235)  # Minimum physically reasonable ice surface temperature
+    # From T_sfc = 2*T_bulk - T_base, we get T_bulk = (T_sfc + T_base) / 2
+    T_bulk_min = (T_sfc_min + T_base) / FT(2)  # ~253K for T_base=271.2K
+
+    T_bulk_init = try
+        # Read ISTL1 (0-7cm, near-surface layer) as a proxy for surface temperature
+        ISTL1_input = TimeVaryingInput(sic_data, "ISTL1", space; reference_date = start_date)
+        T_sfc_era5 = CC.Fields.zeros(space)
+        evaluate!(T_sfc_era5, ISTL1_input, t_start)
+
+        # Clamp T_sfc to reasonable bounds BEFORE computing T_bulk
+        @. T_sfc_era5 = clamp(T_sfc_era5, T_sfc_min, T_freeze)
+
+        # Back-calculate T_bulk from T_sfc assuming linear temperature profile
+        # From: T_sfc = 2*T_bulk - T_base, we get: T_bulk = (T_sfc + T_base) / 2
+        T_bulk = @. (T_sfc_era5 + T_base) / FT(2)
+
+        # Only use ERA5 temperatures where there is ice; use fallback elsewhere
+        @. T_bulk = ifelse(ice_fraction > 0, T_bulk, T_fallback)
+
+        # Fall back to constant where data is not finite
+        @. T_bulk = ifelse(isfinite(T_bulk), T_bulk, T_fallback)
+
+        # Clamp T_bulk to valid range: [T_bulk_min, T_freeze]
+        @. T_bulk = clamp(T_bulk, T_bulk_min, T_freeze)
+
+        T_bulk
+    catch e
+        ones(space) .* T_fallback
+    end
+
+    # Replace any remaining NaNs with fallback
+    @. T_bulk_init = ifelse(isnan(T_bulk_init), T_fallback, T_bulk_init)
+
+    Y = CC.Fields.FieldVector(T_bulk = T_bulk_init)
     return Y
 end
 
@@ -173,8 +262,6 @@ function PrescribedIceSimulation(
                 "MODEL.ICE.HAD187001-198110.OI198111-202206_lowres.nc",
             )
         end : sic_path
-    @info "PrescribedIce: using SIC file" sic_data
-
     SIC_timevaryinginput = TimeVaryingInput(
         sic_data,
         "SEAICE",
@@ -198,7 +285,28 @@ function PrescribedIceSimulation(
 
     params = IceSlabParameters{FT}(coupled_param_dict)
 
-    Y = slab_ice_space_init(FT, boundary_space, params)
+    # Initialize ice temperature: use ERA5 ice layer data if available, otherwise constant
+    Y = if !isnothing(sic_path)
+        # Custom SIC file provided - try to read ERA5 ice temperatures
+        # Pass ice_fraction so we only use ERA5 temps where there's actually ice
+        slab_ice_space_init_from_file(
+            FT,
+            space,
+            params,
+            sic_data,
+            start_date,
+            tspan[1],
+            ice_fraction,
+        )
+    else
+        # Using default artifact - use constant initialization
+        slab_ice_space_init(FT, space, params)
+    end
+
+    # Ensure no NaNs in Y after initialization
+    T_fallback = params.T_freeze - FT(5.0)
+    @. Y.T_bulk = ifelse(isnan(Y.T_bulk), T_fallback, Y.T_bulk)
+
     cache = (;
         F_turb_energy = CC.Fields.zeros(boundary_space),
         SW_d = CC.Fields.zeros(boundary_space),
@@ -218,7 +326,7 @@ function PrescribedIceSimulation(
         T_exp! = ice_rhs!,
         dss! = (Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer),
     )
-    if typeof(dt) isa Number
+    if dt isa Number
         dt = Float64(dt)
         tspan = Float64.(tspan)
         saveat = Float64.(saveat)
@@ -231,6 +339,7 @@ function PrescribedIceSimulation(
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)
+
     return sim
 end
 
@@ -250,8 +359,20 @@ Interfacer.get_field(
     ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}},
 ) = sim.integrator.p.params.α
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_model}) = :constant
-Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) =
-    ice_surface_temperature.(sim.integrator.u.T_bulk, sim.integrator.p.params.T_base)
+
+function Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature})
+    FT = eltype(sim.integrator.u)
+    T_freeze = sim.integrator.p.params.T_freeze
+    T_sfc = ice_surface_temperature.(sim.integrator.u.T_bulk, sim.integrator.p.params.T_base)
+
+    # Clamp T_sfc to physically reasonable bounds
+    # Minimum of 235K prevents numerical issues in atmosphere radiation calculations
+    # Maximum of T_freeze (ice can't be warmer than freezing)
+    T_sfc_min_allowed = FT(235)
+    @. T_sfc = clamp(T_sfc, T_sfc_min_allowed, T_freeze)
+
+    return T_sfc
+end
 
 # Approximates the surface temperature of the sea ice assuming
 # the ice temperature varies linearly between the ice surface and the base
@@ -295,8 +416,21 @@ Interfacer.update_field!(
 ) = nothing
 
 # extensions required by FieldExchanger
-Interfacer.step!(sim::PrescribedIceSimulation, t) =
-    Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+function Interfacer.step!(sim::PrescribedIceSimulation, t)
+    FT = eltype(sim.integrator.u)
+    T_freeze = sim.integrator.p.params.T_freeze
+
+    result = Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+
+    # Clamp T_bulk to physically reasonable bounds after step:
+    # - Cannot exceed T_freeze (ice would melt)
+    # - Minimum consistent with T_sfc_min=235K: T_bulk = (T_sfc + T_base)/2 ≈ 253K
+    T_sfc_min = FT(235)
+    T_bulk_min = (T_sfc_min + T_freeze) / FT(2)  # ~253K
+    @. sim.integrator.u.T_bulk = clamp(sim.integrator.u.T_bulk, T_bulk_min, T_freeze)
+
+    return result
+end
 
 function FluxCalculator.update_turbulent_fluxes!(
     sim::PrescribedIceSimulation,
@@ -345,19 +479,34 @@ function ice_rhs!(dY, Y, p, t)
     #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
     @. p.area_fraction = max(min(p.area_fraction, FT(1) - p.land_fraction), FT(0))
 
-    # Calculate the conductive flux, and set it to zero if the area fraction is zero
-    F_conductive = @. k_ice / (h) * (T_base - ice_surface_temperature(Y.T_bulk, T_base)) # fluxes are defined to be positive when upward
+    # Calculate the surface temperature
+    # Clamp T_sfc to reasonable bounds (235K to T_freeze) because the ODE solver
+    # uses intermediate stages where T_bulk can go outside the post-step clamped range
+    T_sfc_min = FT(235)
+    T_sfc = @. clamp(ice_surface_temperature(Y.T_bulk, T_base), T_sfc_min, T_freeze)
+
+    # Calculate the conductive flux (positive when upward)
+    F_conductive = @. k_ice / h * (T_base - T_sfc)
+
+    # Compute LW emission term
+    LW_emission = @. σ * T_sfc^4
+
     rhs = @. (
         -p.F_turb_energy +
         (1 - α) * p.SW_d +
-        ϵ * (p.LW_d - σ * ice_surface_temperature(Y.T_bulk, T_base)^4) +
+        ϵ * (p.LW_d - LW_emission) +
         F_conductive
     ) / (h * ρ * c)
+
     # Zero out tendencies where there is no ice, so that ice temperature remains constant there
     @. rhs = ifelse(p.area_fraction ≈ 0, zero(rhs), rhs)
 
+    # Convert dt to the same float type as the fields (FT) to avoid Float64/Float32 mismatch
+    dt_val = FT(float(p.dt))
+    limiter = @. (T_freeze - Y.T_bulk) / dt_val
+
     # If tendencies lead to temperature above freezing, set temperature to freezing
-    @. dY.T_bulk = min(rhs, (T_freeze - Y.T_bulk) / float(p.dt))
+    @. dY.T_bulk = min(rhs, limiter)
 end
 
 """

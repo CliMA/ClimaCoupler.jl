@@ -15,6 +15,7 @@ edmfx_sgs_mass_flux: true
 edmfx_upwinding: "first_order"
 edmfx_vertical_diffusion: true
 h_elem: 16
+hyperdiffusion_prandtl_number: 1.0
 implicit_diffusion: true
 implicit_sgs_advection: true
 implicit_sgs_entr_detr: true

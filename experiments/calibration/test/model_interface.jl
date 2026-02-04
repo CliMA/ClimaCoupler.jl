@@ -5,14 +5,7 @@ include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.j
 function ClimaCalibrate.forward_model(iter, member)
     config_file = joinpath(
         pkgdir(ClimaCoupler),
-        "experiments",
-        "calibration",
-<<<<<<<< HEAD:experiments/calibration/perfect_model/model_interface.jl
-        "perfect_model",
-========
-        "test",
->>>>>>>> a1e25399 (Add subseasonal calibration pipeline):experiments/calibration/test/model_interface.jl
-        "model_config.yml",
+        "experiments/calibration/test/model_config.yml",
     )
     config_dict = ClimaCoupler.Input.get_coupler_config_dict(config_file)
 

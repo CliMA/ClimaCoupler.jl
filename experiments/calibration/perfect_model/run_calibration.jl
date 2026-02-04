@@ -62,11 +62,7 @@ addprocs(CAL.SlurmManager())
     ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
 
     experiment_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration")
-<<<<<<<< HEAD:experiments/calibration/perfect_model/run_calibration.jl
     include(joinpath(experiment_dir, "perfect_model", "model_interface.jl"))
-========
-    include(joinpath(experiment_dir, "test", "model_interface.jl"))
->>>>>>>> a1e25399 (Add subseasonal calibration pipeline):experiments/calibration/test/run_calibration.jl
     output_dir = joinpath(experiment_dir, "output")
     obs_path = joinpath(experiment_dir, "observations.jld2")
 end
@@ -102,18 +98,7 @@ ensemble_size = EKP.get_N_ens(eki)
 
 # Allow 100% failure rate for short run testing
 if SHORT_RUN
-<<<<<<<< HEAD:experiments/calibration/perfect_model/run_calibration.jl
     eki = CAL.calibrate(CAL.WorkerBackend(), eki, n_iterations, prior, output_dir)
-========
-    eki = CAL.calibrate(
-        CAL.WorkerBackend(),
-        eki,
-        n_iterations,
-        prior,
-        output_dir;
-        failure_rate = 1,
-    )
->>>>>>>> a1e25399 (Add subseasonal calibration pipeline):experiments/calibration/test/run_calibration.jl
 else
     eki = CAL.calibrate(CAL.WorkerBackend(), eki, n_iterations, prior, output_dir)
 end

@@ -16,3 +16,6 @@ surface_setup: "PrescribedSurface"
 t_end: "3600secs"
 topo_smoothing: true
 topography: "Earth"
+output_default_diagnostics: false
+use_coupler_diagnostics: false
+use_land_diagnostics: false

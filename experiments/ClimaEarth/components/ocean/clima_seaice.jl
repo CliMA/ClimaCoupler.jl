@@ -166,6 +166,7 @@ function ClimaSeaIceSimulation(
     start_date = nothing,
     initial_conditions = OMIPEvolvedInitialConditions(),
     dt = 5 * 60.0, # 5 minutes
+    coupled_param_dict = CP.create_toml_dict(FT),
     extra_kwargs...,
 ) where {FT}
     # Initialize the sea ice with the same grid as the ocean

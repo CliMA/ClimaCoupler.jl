@@ -202,7 +202,7 @@ function OceananigansSimulation(
         )
 
     # 30 minute timestep
-    Δt = isnothing(Δt) ? 30 * 60 : Δt
+    Δt = isnothing(dt) ? 30 * 60 : dt
 
     ocean = CO.ocean_simulation(
         grid;

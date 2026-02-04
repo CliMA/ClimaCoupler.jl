@@ -3,7 +3,7 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "31days"
-coupler_toml: ["toml/amip.toml"]
+coupler_toml: ["toml/amip_edonly.toml"]
 dt_atmos: "30secs" # 0.5 minutes
 dt_cpl: "1200secs" # 20 minutes
 dt_land: "60secs" # 1 minutes

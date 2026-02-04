@@ -137,6 +137,7 @@ function Plotting.debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing
     # Set up to rotate vector fields to the Cartesian basis
     local_geometry = CC.Fields.local_geometry_field(getproperty(cs_fields, field_names[1]))
 
+    has_nan = false
     for i in 1:min_square_len, j in 1:min_square_len
         field_index = (i - 1) * min_square_len + j
 
@@ -172,7 +173,9 @@ function Plotting.debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing
                 field = getproperty(cs_fields, field_name)
             end
 
-            title = string(field_name) * Plotting.print_extrema(field)
+            extrema_str, field_has_nan = Plotting.print_extrema(field)
+            has_nan = has_nan || field_has_nan
+            title = string(field_name) * extrema_str
             ax = Makie.Axis(fig[i, j * 2 - 1]; title)
             Plotting.debug_plot!(ax, fig, field, i, j)
         end
@@ -188,12 +191,19 @@ function Plotting.debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing
                 field_name = field_names[field_index]
                 field = getproperty(cs_fields, field_name)
 
-                title = string(field_name) * Plotting.print_extrema(field)
+                extrema_str, field_has_nan = Plotting.print_extrema(field)
+                has_nan = has_nan || field_has_nan
+                title = string(field_name) * extrema_str
                 ax = Makie.Axis(fig[i, j * 2 - 1]; title)
                 Plotting.debug_plot!(ax, fig, field, i, j)
             end
         end
         Makie.save(joinpath(dir, "debug_coupler_anomalies.png"), fig)
+    end
+
+    # Check for NaN errors after plots are saved
+    if has_nan
+        error("NaN values found in coupler fields extrema")
     end
 end
 
@@ -221,17 +231,25 @@ function Plotting.debug(sim::Interfacer.AbstractComponentSimulation, dir)
     field_names = Plotting.debug_plot_fields(sim)
     fig = Makie.Figure(size = (1500, 800))
     min_square_len = ceil(Int, sqrt(length(field_names)))
+    has_nan = false
     for i in 1:min_square_len, j in 1:min_square_len
         field_index = (i - 1) * min_square_len + j
         if field_index <= length(field_names)
             field_name = field_names[field_index]
             field = Interfacer.get_field(sim, Val(field_name))
-            title = string(field_name) * Plotting.print_extrema(field)
+            extrema_str, field_has_nan = Plotting.print_extrema(field)
+            has_nan = has_nan || field_has_nan
+            title = string(field_name) * extrema_str
             ax = Makie.Axis(fig[i, j * 2 - 1]; title)
             Plotting.debug_plot!(ax, fig, field, i, j)
         end
     end
     Makie.save(joinpath(dir, "debug_$(nameof(sim)).png"), fig)
+
+    # Check for NaN errors after plots are saved
+    if has_nan
+        error("NaN values found in field extrema of $(nameof(sim))")
+    end
 end
 
 """
@@ -355,15 +373,23 @@ Plotting.debug_plot!(ax, fig, field, i, j) = nothing # fallback method
 """
     Plotting.print_extrema(field::Union{CC.Fields.Field, Vector, StaticArrays.SVector, Number})
 
-Return the minimum and maximum values of a field as a string.
+Return a tuple `(string, has_nan::Bool)` where:
+- `string` is the minimum and maximum values of a field formatted as a string
+- `has_nan` is true if the extrema contain NaN values
 """
 function Plotting.print_extrema(
     field::Union{CC.Fields.Field, Vector, StaticArrays.SVector, Number},
 )
     ext_vals = extrema(field)
-    min = Printf.@sprintf("%.2E", ext_vals[1])
-    max = Printf.@sprintf("%.2E", ext_vals[2])
-    return " [$min, $max]"
+    min_val = ext_vals[1]
+    max_val = ext_vals[2]
+
+    # Check for NaN values
+    has_nan = isnan(min_val) || isnan(max_val)
+
+    min = Printf.@sprintf("%.2E", min_val)
+    max = Printf.@sprintf("%.2E", max_val)
+    return (" [$min, $max]", has_nan)
 end
 
 """

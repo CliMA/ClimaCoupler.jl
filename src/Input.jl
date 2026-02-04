@@ -398,7 +398,8 @@ function get_coupler_args(config_dict::Dict)
     # Diagnostics information
     use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
     use_land_diagnostics = config_dict["use_land_diagnostics"]
-    (_, diagnostics_dt) = get_diag_period(t_start, t_end)
+    # (_, diagnostics_dt) = get_diag_period(t_start, t_end)
+    diagnostics_dt = Dates.Day(10) # 10-day averages
 
     # Physical simulation information
     evolving_ocean = config_dict["evolving_ocean"]

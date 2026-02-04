@@ -15,22 +15,22 @@ env:
 timeout_in_minutes: 1800 # 30 hours
 
 steps:
-  - label: "init :computer:"
-    key: "init_cpu_env"
-    command:
-      - "echo $$JULIA_DEPOT_PATH"
+  # - label: "init :computer:"
+  #   key: "init_cpu_env"
+  #   command:
+  #     - "echo $$JULIA_DEPOT_PATH"
 
-      - echo "--- Instantiate AMIP env"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
+  #     - echo "--- Instantiate AMIP env"
+  #     - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+  #     - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"
+  #     - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
+  #     - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
 
-    agents:
-      slurm_cpus_per_task: 8
-    env:
-      JULIA_NUM_PRECOMPILE_TASKS: 8
-      JULIA_MAX_NUM_PRECOMPILE_FILES: 50
+  #   agents:
+  #     slurm_cpus_per_task: 8
+  #   env:
+  #     JULIA_NUM_PRECOMPILE_TASKS: 8
+  #     JULIA_MAX_NUM_PRECOMPILE_FILES: 50
 
   - label: "init clima :computer:"
     key: "init_cpu_env_clima"

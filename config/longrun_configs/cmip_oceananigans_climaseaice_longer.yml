@@ -1,0 +1,26 @@
+FLOAT_TYPE: "Float64"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
+bucket_albedo_type: "map_temporal"
+checkpoint_dt: "31days"
+coupler_toml: ["toml/amip_edonly.toml"]
+dt_atmos: "30secs" # 0.5 minutes
+dt_cpl: "1200secs" # 20 minutes
+dt_land: "60secs" # 1 minutes
+dt_ocean: "1200secs" # 20 minutes
+dt_seaice: "1200secs" # 20 minutes
+energy_check: false
+ice_model: "clima_seaice"
+mode_name: "cmip"
+output_default_diagnostics: true
+radiation_reset_rng_seed: true
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+t_end: "1825days" # 5 years
+topo_smoothing: true
+topography: "Earth"
+use_itime: false
+extra_atmos_diagnostics:
+  - short_name: [tas, pr, ua, va, rhoa, hus]
+    period: 1hours
+    reduction_time: inst

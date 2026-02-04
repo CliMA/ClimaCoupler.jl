@@ -259,6 +259,7 @@ function construct_remappers(grid_oc, boundary_space)
         threaded = false,
     )
 
+    # Move remapper to GPU if needed
     remapper_oc_to_cc = OC.on_architecture(OC.architecture(grid_oc), remapper_oc_to_cc)
 
     # Create a field of ones on the boundary space so we can compute element areas
@@ -267,7 +268,8 @@ function construct_remappers(grid_oc, boundary_space)
     # Allocate a vector with length equal to the number of elements in the target space
     # To be used as a temp field for remapping
     FT = CC.Spaces.undertype(boundary_space)
-    value_per_element_cc = zeros(FT, CC.Meshes.nelements(boundary_space.grid.topology.mesh))
+    ArrayType = ClimaComms.array_type(boundary_space)
+    value_per_element_cc = ArrayType(zeros(FT, CC.Meshes.nelements(boundary_space.grid.topology.mesh)))
 
     # Construct two 2D Oceananigans Center/Center fields to use as scratch space while remapping
     scratch_field_oc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)

@@ -10,16 +10,9 @@ import ClimaCore as CC
 import ClimaCore.Geometry: ⊗
 import SurfaceFluxes as SF
 import Thermodynamics as TD
-import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
+import ClimaCoupler:
+    Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities, Plotting
 import ClimaUtilities.TimeManager: ITime
-
-if pkgversion(CA) < v"0.28.6"
-    # Allow cache to be moved to CPU (this is a little bit of type piracy, but we
-    # allow it in this particular file)
-    CC.Adapt.@adapt_structure CA.AtmosCache
-    CC.Adapt.@adapt_structure CA.RRTMGPInterface.RRTMGPModel
-end
-
 
 ###
 ### Functions required by ClimaCoupler.jl for an AtmosModelSimulation
@@ -58,32 +51,15 @@ function ClimaAtmosSimulation(atmos_config)
     if hasmoisture(integrator)
         ρ_flux_q_tot = integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot
         @. ρ_flux_q_tot = CC.Geometry.Covariant3Vector(FT(0.0))
-        if pkgversion(CA) >= v"0.29.0"
-            surface_rain_flux = integrator.p.precomputed.surface_rain_flux
-            surface_snow_flux = integrator.p.precomputed.surface_snow_flux
-        else
-            surface_rain_flux = integrator.p.precipitation.surface_rain_flux
-            surface_snow_flux = integrator.p.precipitation.surface_snow_flux
-        end
-        surface_rain_flux .= FT(0)
-        surface_snow_flux .= FT(0)
+
+        integrator.p.precomputed.surface_rain_flux .= FT(0)
+        integrator.p.precomputed.surface_snow_flux .= FT(0)
     end
 
-    microphysics_model =
-        pkgversion(CA) < v"0.31.0" ? integrator.p.atmos.precip_model :
-        integrator.p.atmos.microphysics_model
+    microphysics_model = integrator.p.atmos.microphysics_model
     if microphysics_model isa CA.Microphysics0Moment
-        if pkgversion(CA) >= v"0.29.0"
-            ᶜS_ρq_tot = integrator.p.precomputed.ᶜS_ρq_tot
-            ᶜS_ρq_tot .= FT(0)
-        else
-            ᶜS_ρq_tot = integrator.p.precipitation.ᶜS_ρq_tot
-            ᶜ3d_rain = integrator.p.precipitation.ᶜ3d_rain
-            ᶜ3d_snow = integrator.p.precipitation.ᶜ3d_snow
-            ᶜS_ρq_tot .= FT(0)
-            ᶜ3d_rain .= FT(0)
-            ᶜ3d_snow .= FT(0)
-        end
+        ᶜS_ρq_tot = integrator.p.precomputed.ᶜS_ρq_tot
+        ᶜS_ρq_tot .= FT(0)
     end
     if hasradiation(integrator)
         ᶠradiation_flux = integrator.p.radiation.ᶠradiation_flux
@@ -206,17 +182,11 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:energy})
 
 
     # return total energy and (if Microphysics0Moment) the energy lost due to precipitation removal
-    microphysics_model =
-        pkgversion(CA) < v"0.31.0" ? integrator.p.atmos.precip_model :
-        integrator.p.atmos.microphysics_model
+    microphysics_model = integrator.p.atmos.microphysics_model
     if microphysics_model isa CA.Microphysics0Moment
         ᶜts = p.precomputed.ᶜts
         ᶜΦ = p.core.ᶜΦ
-        if pkgversion(CA) >= v"0.29.0"
-            ᶜS_ρq_tot = p.precomputed.ᶜS_ρq_tot
-        else
-            ᶜS_ρq_tot = p.precipitation.ᶜS_ρq_tot
-        end
+        ᶜS_ρq_tot = p.precomputed.ᶜS_ρq_tot
         thermo_params = get_thermo_params(sim)
         return integrator.u.c.ρe_tot .-
                ᶜS_ρq_tot .*
@@ -231,20 +201,12 @@ end
 
 surface_rain_flux(::CA.DryModel, integrator) = eltype(integrator.u)(0)
 function surface_rain_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator)
-    if pkgversion(CA) >= v"0.29.0"
-        return integrator.p.precomputed.surface_rain_flux
-    else
-        return integrator.p.precipitation.surface_rain_flux
-    end
+    return integrator.p.precomputed.surface_rain_flux
 end
 
 surface_snow_flux(::CA.DryModel, integrator) = eltype(integrator.u)(0)
 function surface_snow_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator)
-    if pkgversion(CA) >= v"0.29.0"
-        return integrator.p.precomputed.surface_snow_flux
-    else
-        return integrator.p.precipitation.surface_snow_flux
-    end
+    return integrator.p.precomputed.surface_snow_flux
 end
 
 surface_radiation_flux(::Nothing, integrator) = eltype(integrator.u)(0)
@@ -365,27 +327,37 @@ function Interfacer.update_field!(
     Interfacer.get_field!(csf.scalar_temp3, sim, Val(:air_density))
     ρ_atmos = csf.scalar_temp3
 
+    surface_fluxes_params = FluxCalculator.get_surface_params(sim)
+
+    # TODO: Is csf.height_int .- csf.height_sfc allocating?
+    csf.scalar_temp4 .=
+        SF.surface_density.(
+            surface_fluxes_params,
+            T_atmos,
+            ρ_atmos,
+            csf.T_sfc,
+            csf.height_int .- csf.height_sfc,
+            q_atmos,
+            0, # q_liq
+            0, # q_ice
+        )
+    ρ_sfc = csf.scalar_temp4
+
     thermo_params = get_thermo_params(sim)
     FluxCalculator.compute_surface_humidity!(
-        csf.scalar_temp4,
-        T_atmos,
-        q_atmos,
-        ρ_atmos,
+        csf.scalar_temp1,
         csf.T_sfc,
+        ρ_sfc,
         thermo_params,
     )
 
     # Remap surface temperature and humidity to atmosphere surface space
     # NOTE: This is allocating! If we had 2 more scratch fields, we could avoid this
     T_sfc_atmos = Interfacer.remap(atmos_surface_space, csf.T_sfc)
-    q_sfc_atmos = Interfacer.remap(atmos_surface_space, csf.scalar_temp4)
+    q_sfc_atmos = Interfacer.remap(atmos_surface_space, csf.scalar_temp1)
 
     # Store `ρ_sfc_atmos` in an atmosphere scratch field on the surface space
-    temp_field_surface = FluxCalculator.extrapolate_ρ_to_sfc.(
-        thermo_params,
-        sim.integrator.p.precomputed.sfc_conditions.ts,
-        T_sfc_atmos,
-    )
+    temp_field_surface = Interfacer.remap(atmos_surface_space, ρ_sfc)
     ρ_sfc_atmos = temp_field_surface
 
     if sim.integrator.p.atmos.moisture_model isa CA.DryModel
@@ -571,14 +543,7 @@ as part of the tendendencies.
 function Interfacer.set_cache!(sim::ClimaAtmosSimulation, csf)
     if hasradiation(sim.integrator)
         CA.rrtmgp_model_callback!(sim.integrator)
-        if pkgversion(CA) == v"0.30" &&
-           !isnothing(sim.integrator.p.atmos.non_orographic_gravity_wave)
-            # In version 0.30, nogw_model_callback crashes when there are no gravity waves,
-            # see CA #3792
-            CA.nogw_model_callback!(sim.integrator)
-        else
-            pkgversion(CA) > v"0.30" && CA.nogw_model_callback!(sim.integrator)
-        end
+        CA.nogw_model_callback!(sim.integrator)
     end
     return nothing
 end
@@ -732,3 +697,24 @@ function climaatmos_restart_path(output_dir_root, t)
     end
     error("Restart file for time $t not found")
 end
+
+# Additional ClimaAtmos getter methods for plotting debug fields
+function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:w})
+    w_c = ones(CC.Spaces.horizontal_space(sim.domain.face_space))
+    parent(w_c) .= parent(
+        CC.Fields.level(
+            CC.Geometry.WVector.(sim.integrator.u.f.u₃),
+            5 .+ CC.Utilities.half,
+        ),
+    )
+    return w_c
+end
+specific_humidity(::CA.DryModel, integrator) = [eltype(integrator.u)(0)]
+specific_humidity(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
+    integrator.u.c.ρq_tot
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρq_tot}) =
+    specific_humidity(sim.integrator.p.atmos.moisture_model, sim.integrator)
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrator.u.c.ρe_tot
+
+Plotting.debug_plot_fields(sim::ClimaAtmosSimulation) =
+    (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)

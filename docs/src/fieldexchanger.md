@@ -28,17 +28,17 @@ the atmosphere and each surface model.
 ## FieldExchanger API
 
 ```@docs
-    ClimaCoupler.FieldExchanger.exchange!
-    ClimaCoupler.FieldExchanger.update_sim!
-    ClimaCoupler.FieldExchanger.step_model_sims!
-    ClimaCoupler.FieldExchanger.update_surface_fractions!
-    ClimaCoupler.FieldExchanger.set_caches!
+    FieldExchanger.exchange!
+    FieldExchanger.update_sim!
+    FieldExchanger.step_model_sims!
+    FieldExchanger.update_surface_fractions!
+    FieldExchanger.set_caches!
 ```
 
 ## FieldExchanger Internal Functions
 
 ```@docs
-    ClimaCoupler.FieldExchanger.combine_surfaces!
-    ClimaCoupler.FieldExchanger.resolve_area_fractions!
-    ClimaCoupler.FieldExchanger.import_atmos_fields!
+    FieldExchanger.combine_surfaces!
+    FieldExchanger.resolve_area_fractions!
+    FieldExchanger.import_atmos_fields!
 ```

@@ -2,8 +2,7 @@ import ClimaAnalysis
 import GeoMakie
 import CairoMakie
 import Dates
-
-include("data_sources.jl")
+import ClimaCoupler: SimOutput
 
 """
     compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spinup)
@@ -21,12 +20,16 @@ are determined by `get_compare_vars_biases_plot_extrema`. The groups of variable
 the bias plots are determined by `get_compare_vars_biases_groups()`. Loading the RMSEs from
 other models is done by `get_rmse_var_dict`. See the functions defined in data_sources.jl.
 """
-function compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spinup)
+function Plotting.compute_leaderboard(
+    leaderboard_base_path,
+    diagnostics_folder_path,
+    spinup, # months
+)
     @info "Error against observations"
 
-    # Get everything we need from data_sources.jl
-    sim_var_dict = get_sim_var_dict(diagnostics_folder_path)
-    obs_var_dict = get_obs_var_dict()
+    # Get the comparison data from the simulation and observations
+    sim_var_dict = SimOutput.get_sim_var_dict(diagnostics_folder_path)
+    obs_var_dict = SimOutput.get_obs_var_dict()
     compare_vars_biases_plot_extrema = get_compare_vars_biases_plot_extrema()
     rmse_var_dict = get_rmse_var_dict()
     compare_vars_biases_groups = get_compare_vars_biases_groups()
@@ -214,7 +217,11 @@ and preprocessing observational data is done by `get_obs_var_in_pfull_dict`. The
 the bias plots is defined by `get_compare_vars_biases_plot_extrema_pfull`. See the functions
 defined in data_sources.jl for more information.
 """
-function compute_pfull_leaderboard(leaderboard_base_path, diagnostics_folder_path, spinup)
+function Plotting.compute_pfull_leaderboard(
+    leaderboard_base_path,
+    diagnostics_folder_path,
+    spinup,
+)
     @info "Error against observations for variables in pressure coordinates"
 
     sim_var_pfull_dict = get_sim_var_in_pfull_dict(diagnostics_folder_path)

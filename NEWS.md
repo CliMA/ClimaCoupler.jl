@@ -6,7 +6,20 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
-#### Update interfaces to surface-flux calculator to support dynamic roughness.
+#### Add a SimCoordinator module PR[#1676](https://github.com/CliMA/ClimaCoupler.jl/pull/1676)
+Move the functions `run!(cs)` and `step!(cs)` into a new module, SimCoordinator.
+These are exported at the top-level ClimaCoupler.jl, so they can continue to be used
+as before. This PR also moves `postprocess(cs)` into the Plotting module.
+
+#### Update interfaces to surface flux calculator PR[#1646](https://github.com/CliMA/ClimaCoupler.jl/pull/1646)
+Uses new interface in SurfaceFluxes v0.15 to calculate surface fluxes. For the bucket model, call the
+turbulent_fluxes! function in ClimaLand directly for surface flux calculation.
+
+#### Change default simulation output directory PR[#1653](https://github.com/CliMA/ClimaCoupler.jl/pull/1653)
+Changes the default output directory from `experiments/ClimaEarth/output/` to `output`.
+The internal structure within the output directory remains the same.
+
+#### Update interfaces to surface-flux calculator to support dynamic roughness PR[#1567](https://github.com/CliMA/ClimaCoupler.jl/pull/1567)
 Adds the `roughness_model` argument to the surface-flux input constructor. Default
 behaviour is the `SF.ScalarRoughness()` type. Upcoming changes will account for the
 value of the `roughness_model` to be inferred from the mask value (e.g. prescribed

@@ -2,8 +2,8 @@ FLOAT_TYPE: "Float32"
 aerosol_radiation: true
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
-checkpoint_dt: "31days"
-coupler_toml: ["toml/amip.toml"]
+checkpoint_dt: "1months"
+coupler_toml: ["toml/amip_diagedmf.toml"]
 dt: "120secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: "120secs"

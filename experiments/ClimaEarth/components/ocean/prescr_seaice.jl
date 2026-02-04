@@ -146,6 +146,7 @@ function PrescribedIceSimulation(
     land_fraction,
     stepper = CTS.RK4(),
     sic_path::Union{Nothing, String} = nothing,
+    binary_area_fraction::Bool = true,
 ) where {FT}
     # Set up prescribed sea ice concentration object
     sic_data =
@@ -176,8 +177,14 @@ function PrescribedIceSimulation(
     ice_fraction = CC.Fields.zeros(space)
     evaluate!(ice_fraction, SIC_timevaryinginput, tspan[1])
 
-    # Make ice fraction binary rather than fractional
-    ice_fraction = ifelse.(ice_fraction .> FT(0.5), FT(1), FT(0))
+    # Ensure ice fraction is finite and not NaN
+    @. ice_fraction = ifelse(isfinite(ice_fraction), ice_fraction, FT(0))
+    # binary ice fraction (threshold at 0.5)
+    if binary_area_fraction
+        @. ice_fraction = ifelse(ice_fraction > FT(0.5), FT(1), FT(0))
+    end
+    # max/min needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
+    @. ice_fraction = max(min(ice_fraction, FT(1) - land_fraction), FT(0))
 
     params = IceSlabParameters{FT}(coupled_param_dict)
 
@@ -189,6 +196,7 @@ function PrescribedIceSimulation(
         area_fraction = ice_fraction,
         SIC_timevaryinginput = SIC_timevaryinginput,
         land_fraction = land_fraction,
+        binary_area_fraction = binary_area_fraction,
         dt = dt,
         thermo_params = thermo_params,
         # add dss_buffer to cache to avoid runtime dss allocation
@@ -233,12 +241,6 @@ Interfacer.get_field(
 ) = sim.integrator.p.params.α
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) =
     ice_surface_temperature.(sim.integrator.u.T_bulk, sim.integrator.p.params.T_base)
-
-function Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:beta})
-    # assume no LHF over sea ice
-    FT = eltype(sim.integrator.u)
-    return FT(0)
-end
 
 # Approximates the surface temperature of the sea ice assuming
 # the ice temperature varies linearly between the ice surface and the base
@@ -322,7 +324,11 @@ function ice_rhs!(dY, Y, p, t)
 
     # Update the cached area fraction with the current SIC
     evaluate!(p.area_fraction, p.SIC_timevaryinginput, t)
-    @. p.area_fraction = ifelse(p.area_fraction > FT(0.5), FT(1), FT(0))
+    @. p.area_fraction = ifelse(isfinite(p.area_fraction), p.area_fraction, FT(0))
+    # binary ice fraction (threshold at 0.5)
+    if p.binary_area_fraction
+        @. p.area_fraction = ifelse(p.area_fraction > FT(0.5), FT(1), FT(0))
+    end
 
     # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
     #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)

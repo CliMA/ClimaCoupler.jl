@@ -1,8 +1,7 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
-bucket_albedo_type: "map_temporal"
-coupler_toml: ["toml/amip.toml"]
+coupler_toml: ["toml/amip_edonly.toml"]
 dt_atmos: "120secs" # 2 minutes
 dt_cpl: "1800secs" # 30 minutes
 dt_land: "360secs" # 6 minutes
@@ -12,6 +11,8 @@ dz_bottom: 100.0
 energy_check: false
 h_elem: 8
 ice_model: "clima_seaice"
+land_model: "integrated"
+land_spun_up_ic: false
 mode_name: "cmip"
 netcdf_output_at_levels: true
 output_default_diagnostics: true

@@ -37,7 +37,6 @@ fluxes and the CoupledSimulation object's fluxes fields.
 - the Obukhov length, `L_MO`;
 - the buoyancy flux, `buoyancy_flux`;
 - the roughness lengths for momentum and buoyancy, `z0m` and `z0b`;
-- the evaporation scaling factor, `beta`,
 - the frictional velocity `ustar`.
 
 !!! note
@@ -51,8 +50,8 @@ within the atmospheric model.
 ## FluxCalculator API
 
 ```@docs
-    ClimaCoupler.FluxCalculator.turbulent_fluxes!
-    ClimaCoupler.FluxCalculator.compute_surface_fluxes!
-    ClimaCoupler.FluxCalculator.get_surface_fluxes
-    ClimaCoupler.FluxCalculator.update_turbulent_fluxes!
+    FluxCalculator.turbulent_fluxes!
+    FluxCalculator.compute_surface_fluxes!
+    FluxCalculator.get_surface_fluxes
+    FluxCalculator.update_turbulent_fluxes!
 ```

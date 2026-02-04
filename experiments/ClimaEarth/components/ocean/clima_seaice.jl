@@ -59,6 +59,50 @@ struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP} <: Interfacer.SeaIceModelSim
 end
 
 """
+    ConcentrationMaskedRadiativeEmission
+
+A heat boundary condition that emits radiation only where the sea ice
+concentration is greater than zero. This is needed to prevent radiative
+emission where we have no sea ice.
+"""
+struct ConcentrationMaskedRadiativeEmission{FT}
+    emissivity::FT
+    stefan_boltzmann_constant::FT
+    reference_temperature::FT
+end
+
+function ConcentrationMaskedRadiativeEmission(
+    FT = Float64;
+    emissivity = 1,
+    stefan_boltzmann_constant = 5.67e-8,
+    reference_temperature = 273.15,
+)
+
+    return ConcentrationMaskedRadiativeEmission(
+        convert(FT, emissivity),
+        convert(FT, stefan_boltzmann_constant),
+        convert(FT, reference_temperature),
+    )
+end
+
+function CSI.SeaIceThermodynamics.HeatBoundaryConditions.getflux(
+    emission::ConcentrationMaskedRadiativeEmission,
+    i,
+    j,
+    grid,
+    T,
+    clock,
+    fields,
+)
+    ϵ = emission.emissivity
+    σ = emission.stefan_boltzmann_constant
+    Tᵣ = emission.reference_temperature
+    @inbounds ℵij = fields.ℵ[i, j, 1]
+    return ϵ * σ * (T + Tᵣ)^4 * (ℵij > 0)
+end
+
+
+"""
     ClimaSeaIceSimulation()
 
 Creates an ClimaSeaIceSimulation object containing a model, an integrator, and
@@ -126,7 +170,7 @@ function ClimaSeaIceSimulation(
     remapping = ocean.remapping
 
     # Before version 0.96.22, the NetCDFWriter was broken on GPU
-    if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
+    if arch isa OC.CPU
         # Save all tracers and velocities to a NetCDF file at daily frequency
         outputs = OC.prognostic_fields(ice.model)
         jld_writer = OC.JLD2Writer(
@@ -204,7 +248,7 @@ function sea_ice_simulation(
 
     bottom_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     top_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-    top_heat_flux = (top_heat_flux, RadiativeEmission())
+    top_heat_flux = (top_heat_flux, ConcentrationMaskedRadiativeEmission())
 
     # Build the sea ice model
     sea_ice_model = CSI.SeaIceModel(
@@ -243,7 +287,6 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_buoyancy}) =
     Float32(5.8e-5)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_momentum}) =
     Float32(5.8e-5)
-Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:beta}) = Float32(1)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:emissivity}) = Float32(1)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_direct_albedo}) =
     Float32(0.7)
@@ -280,17 +323,22 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     grid = sim.ice.model.grid
     ice_concentration = sim.ice.model.ice_concentration
 
+    # Convert the momentum fluxes from contravariant to Cartesian basis
+    contravariant_to_cartesian!(sim.remapping.temp_uv_vec, F_turb_ρτxz, F_turb_ρτyz)
+    F_turb_ρτxz_uv = sim.remapping.temp_uv_vec.components.data.:1
+    F_turb_ρτyz_uv = sim.remapping.temp_uv_vec.components.data.:2
+
     # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr1,
         sim.remapping.remapper_cc,
-        F_turb_ρτxz,
+        F_turb_ρτxz_uv,
     )
     OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr2,
         sim.remapping.remapper_cc,
-        F_turb_ρτyz,
+        F_turb_ρτyz_uv,
     )
     OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
 

@@ -13,6 +13,6 @@ mode_name: "amip"
 radiation_reset_rng_seed: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "1200secs"
+t_end: "3600secs"
 topo_smoothing: true
 topography: "Earth"

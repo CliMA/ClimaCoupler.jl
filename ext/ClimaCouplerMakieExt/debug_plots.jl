@@ -19,6 +19,13 @@ Creates two plots of the globally integrated quantity (energy, ``\\rho e``):
 1. global quantity of each model component as a function of time,
 relative to the initial value;
 2. fractional change in the sum of all components over time on a log scale.
+
+Conservation checks are available for energy and water, and can be enabled by
+running a Slabplanet simulation with `energy_check` set to true.
+
+If `softfail` is false, asserts that the relative error in conservation of the
+provided quantity is less than a pre-determined threshold. This argument
+is controlled by the `conservation_softfail` simulation flag.
 """
 function Plotting.plot_global_conservation(
     cc::ConservationChecker.AbstractConservationCheck,
@@ -150,11 +157,11 @@ function Plotting.debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing
 end
 
 """
-    debug(sim::Interfacer.ComponentModelSimulation, dir)
+    debug(sim::Interfacer.AbstractComponentSimulation, dir)
 
 Plot the fields of a component model simulation and save plots to a directory.
 """
-function Plotting.debug(sim::Interfacer.ComponentModelSimulation, dir)
+function Plotting.debug(sim::Interfacer.AbstractComponentSimulation, dir)
     field_names = Plotting.debug_plot_fields(sim)
     fig = Makie.Figure(size = (1500, 800))
     min_square_len = ceil(Int, sqrt(length(field_names)))
@@ -231,11 +238,11 @@ function Plotting.print_extrema(
 end
 
 """
-    Plotting.debug_plot_fields(sim::Interfacer.SurfaceModelSimulation)
+    Plotting.debug_plot_fields(sim::Interfacer.AbstractSurfaceSimulation)
 
 Return the default fields to include in debug plots for a surface model.
 This should be extended for any atmosphere model, and any surface model
 that has additional fields to plot.
 """
-Plotting.debug_plot_fields(sim::Interfacer.SurfaceModelSimulation) =
+Plotting.debug_plot_fields(sim::Interfacer.AbstractSurfaceSimulation) =
     (:area_fraction, :surface_temperature)

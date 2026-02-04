@@ -196,7 +196,7 @@ function argparse_settings()
         default = []
         ### ClimaLand specific
         "--land_model"
-        help = "Land model to use. [`bucket` (default), `integrated`]"
+        help = "Land model to use. [`bucket` (default), `integrated`, `nothing`]"
         arg_type = String
         default = "bucket"
         "--land_temperature_anomaly"
@@ -224,9 +224,14 @@ function argparse_settings()
         help = "Directory containing ERA5 initial condition files (subseasonal mode). Filenames inferred from start_date [none (default)]. Generated with `https://github.com/CliMA/WeatherQuest`"
         arg_type = String
         default = nothing
+        # Ocean model specific
+        "--ocean_model"
+        help = "Ocean model to use. [`prescribed` (default), `oceananigans`, `slab`, `nothing`]"
+        arg_type = String
+        default = "prescribed"
         # Ice model specific
         "--ice_model"
-        help = "Sea ice model to use. [`prescribed` (default), `clima_seaice`]"
+        help = "Sea ice model to use. [`prescribed` (default), `clima_seaice`, `nothing`]"
         arg_type = String
         default = "prescribed"
         "--land_fraction_source"
@@ -408,7 +413,7 @@ function get_coupler_args(config_dict::Dict)
     output_dir_root = joinpath(config_dict["coupler_output_dir"], job_id)
 
     # ClimaLand-specific information
-    land_model = config_dict["land_model"]
+    land_model = Val(Symbol(config_dict["land_model"]))
     land_temperature_anomaly = lowercase(config_dict["land_temperature_anomaly"])
     use_land_diagnostics = config_dict["use_land_diagnostics"]
     land_spun_up_ic = config_dict["land_spun_up_ic"]
@@ -418,8 +423,15 @@ function get_coupler_args(config_dict::Dict)
     # Initial condition setting
     era5_initial_condition_dir = config_dict["era5_initial_condition_dir"]
 
+    # Ocean model-specific information
+    ocean_model = Val(Symbol(config_dict["ocean_model"]))
+
     # Ice model-specific information
-    ice_model = config_dict["ice_model"]
+    ice_model = Val(Symbol(config_dict["ice_model"]))
+
+    # Validate and correct model types based on simulation mode
+    ocean_model, ice_model, land_model =
+        validate_model_types_for_mode(sim_mode, ocean_model, ice_model, land_model)
 
     # Land fraction source
     land_fraction_source = config_dict["land_fraction_source"]
@@ -460,6 +472,7 @@ function get_coupler_args(config_dict::Dict)
         bucket_initial_condition,
         parameter_files,
         era5_initial_condition_dir,
+        ocean_model,
         ice_model,
         land_fraction_source,
         binary_area_fraction,
@@ -576,11 +589,13 @@ Read and remap the land-sea fraction field onto the coupler boundary grid.
 - `comms_ctx`: The communications context.
 - `land_fraction_source`: Source of land fraction data. Either "etopo" (default) or "era5".
 - `binary_area_fraction`: If true (default), threshold land fraction to binary (0 or 1).
+- `mode_name`: The name of the simulation mode.
 
 # Returns
 - A field containing land fraction values (0 to 1) on the boundary space.
+  In the terraplanet mode, the land fraction is 1 over the entire surface.
 
-Note: 
+Note:
 Land-sea Fraction
     This is a static field that contains the area fraction of land and sea, ranging from 0 to 1.
     If applicable, sea ice is included in the sea fraction at this stage.
@@ -596,9 +611,11 @@ function get_land_fraction(
     comms_ctx;
     land_fraction_source::String = "etopo",
     binary_area_fraction::Bool = true,
+    sim_mode = Interfacer.AMIPMode,
 )
-    FT = CC.Spaces.undertype(boundary_space)
+    sim_mode <: Interfacer.SlabplanetTerraMode && return ones(boundary_space)
 
+    FT = CC.Spaces.undertype(boundary_space)
     if land_fraction_source == "era5"
         land_fraction_data = joinpath(
             @clima_artifact("era5_land_fraction", comms_ctx),
@@ -629,5 +646,76 @@ function get_land_fraction(
 
     return land_fraction
 end
+
+"""
+    validate_model_types_for_mode(sim_mode, ocean_model, ice_model, land_model)
+
+Validate and correct model types based on simulation mode requirements.
+Issues warnings and returns updated model types if they don't match the expected values.
+
+# Returns
+- `(ocean_model, ice_model, land_model)`: Tuple of validated model types
+"""
+function validate_model_types_for_mode(sim_mode, ocean_model, ice_model, land_model)
+    expected_ocean = ocean_model
+    expected_ice = ice_model
+    expected_land = land_model
+
+    if sim_mode <: Interfacer.AMIPMode
+        # AMIP: prescribed ocean, prescribed ice
+        expected_ocean = Val(:prescribed)
+        expected_ice = Val(:prescribed)
+    elseif sim_mode <: Interfacer.CMIPMode
+        # CMIP: Oceananigans ocean, ClimaSeaIce ice
+        expected_ocean = Val(:oceananigans)
+        expected_ice = Val(:clima_seaice)
+    elseif sim_mode <: Interfacer.SlabplanetMode
+        # slabplanet: slab ocean, no ice
+        expected_ocean = Val(:slab)
+        expected_ice = Val(:nothing)
+    elseif sim_mode <: Interfacer.SlabplanetAquaMode
+        # slabplanet_aqua: slab ocean, no ice, no land
+        expected_ocean = Val(:slab)
+        expected_ice = Val(:nothing)
+        expected_land = Val(:nothing)
+    elseif sim_mode <: Interfacer.SlabplanetTerraMode
+        # slabplanet_terra: no ocean, no ice
+        expected_ocean = Val(:nothing)
+        expected_ice = Val(:nothing)
+    end
+
+    # Check and update ocean model
+    if ocean_model != expected_ocean
+        exp_model_name = typeof(expected_ocean).parameters[1]
+        actual_model_name = typeof(ocean_model).parameters[1]
+        @warn "Simulation mode $(nameof(sim_mode)) requires ocean_model=$(exp_model_name), but got $(actual_model_name). Updating to required value."
+        ocean_model = expected_ocean
+    end
+
+    # Check and update ice model
+    if ice_model != expected_ice
+        exp_model_name = typeof(expected_ice).parameters[1]
+        actual_model_name = typeof(ice_model).parameters[1]
+        @warn "Simulation mode $(nameof(sim_mode)) requires ice_model=$(exp_model_name), but got $(actual_model_name). Updating to required value."
+        ice_model = expected_ice
+    end
+
+    # Check and update land model (only for slabplanet_aqua)
+    if land_model != expected_land
+        exp_model_name = typeof(expected_land).parameters[1]
+        actual_model_name = typeof(land_model).parameters[1]
+        @warn "Simulation mode $(nameof(sim_mode)) requires land_model=$(exp_model_name), but got $(actual_model_name). Updating to required value."
+        land_model = expected_land
+    end
+
+    # Perform some final model consistency checks
+    ocean_model == Val(:slab) &&
+        @assert ice_model == Val(:nothing) "Slab ocean model cannot be used with a sea ice model"
+    ice_model == Val(:clima_seaice) &&
+        @assert ocean_model == Val(:oceananigans) "ClimaSeaIce sea ice model requires Oceananigans ocean model"
+
+    return ocean_model, ice_model, land_model
+end
+
 
 end # module Input

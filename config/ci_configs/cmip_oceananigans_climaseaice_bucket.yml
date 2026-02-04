@@ -14,6 +14,7 @@ h_elem: 8
 ice_model: "clima_seaice"
 mode_name: "cmip"
 netcdf_output_at_levels: true
+ocean_model: "oceananigans"
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
 rayleigh_sponge: true

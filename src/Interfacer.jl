@@ -14,12 +14,16 @@ import SciMLBase: step!
 import ClimaUtilities.TimeManager: ITime, date
 
 export CoupledSimulation,
-    ComponentModelSimulation,
-    AtmosModelSimulation,
-    SurfaceModelSimulation,
-    SeaIceModelSimulation,
-    LandModelSimulation,
-    OceanModelSimulation,
+    LandSimulation,
+    OceanSimulation,
+    SeaIceSimulation,
+    AtmosSimulation,
+    AbstractComponentSimulation,
+    AbstractAtmosSimulation,
+    AbstractSurfaceSimulation,
+    AbstractSeaIceSimulation,
+    AbstractLandSimulation,
+    AbstractOceanSimulation,
     get_field,
     update_field!,
     AbstractSurfaceStub,
@@ -108,7 +112,9 @@ Return a list of default coupler fields needed to run a simulation.
 default_coupler_fields() = [
     # fields used to compute turbulent fluxes
     :T_atmos,
-    :q_atmos,
+    :q_tot_atmos,
+    :q_liq_atmos,
+    :q_ice_atmos,
     :ρ_atmos,
     :height_int,
     :height_sfc,
@@ -155,32 +161,32 @@ function init_coupler_fields(FT, coupler_field_names, boundary_space)
 end
 
 """
-    ComponentModelSimulation
+    AbstractComponentSimulation
 
 An abstract type encompassing all component model (and model stub) simulations.
 """
-abstract type ComponentModelSimulation end
+abstract type AbstractComponentSimulation end
 
 """
-    AtmosModelSimulation
+    AbstractAtmosSimulation
 
 An abstract type for an atmospheric model simulation.
 """
-abstract type AtmosModelSimulation <: ComponentModelSimulation end
+abstract type AbstractAtmosSimulation <: AbstractComponentSimulation end
 
 """
-    SurfaceModelSimulation
+    AbstractSurfaceSimulation
 
 An abstract type for surface model simulations.
 """
-abstract type SurfaceModelSimulation <: ComponentModelSimulation end
+abstract type AbstractSurfaceSimulation <: AbstractComponentSimulation end
 
-abstract type SeaIceModelSimulation <: SurfaceModelSimulation end
-abstract type LandModelSimulation <: SurfaceModelSimulation end
-abstract type OceanModelSimulation <: SurfaceModelSimulation end
+abstract type AbstractSeaIceSimulation <: AbstractSurfaceSimulation end
+abstract type AbstractLandSimulation <: AbstractSurfaceSimulation end
+abstract type AbstractOceanSimulation <: AbstractSurfaceSimulation end
 
 """
-    ImplicitFluxSimulation
+    AbstractImplicitFluxSimulation
 
 An abstract type for surface model simulations that compute fluxes implicitly,
 rather than explicitly. At the moment, this means the fluxes are computed in the
@@ -189,22 +195,22 @@ function.
 
 Currently, the only implicit flux simulation is the integrated land model.
 """
-abstract type ImplicitFluxSimulation <: SurfaceModelSimulation end
+abstract type AbstractImplicitFluxSimulation <: AbstractSurfaceSimulation end
 
 # Simulation objects tend to be very big, so it is best to make sure they are not printed in the REPL
-function Base.show(io::IO, @nospecialize(sim::ComponentModelSimulation))
+function Base.show(io::IO, @nospecialize(sim::AbstractComponentSimulation))
     return println(io, "$(nameof(sim)) without a specialized `Base.show` method")
 end
 
 """
-    get_field(sim::AtmosModelSimulation, val::Val)
+    get_field(sim::AbstractAtmosSimulation, val::Val)
 
 A getter function that should not allocate. Here we implement a default that
 will raise an error if `get_field` isn't defined for all required fields of
 an atmosphere component model.
 """
 get_field(
-    sim::AtmosModelSimulation,
+    sim::AbstractAtmosSimulation,
     val::Union{
         Val{:height_int},
         Val{:height_sfc},
@@ -220,14 +226,14 @@ get_field(
 ) = get_field_error(sim, val)
 
 """
-    get_field(sim::SurfaceModelSimulation, val::Val)
+    get_field(sim::AbstractSurfaceSimulation, val::Val)
 
 A getter function that should not allocate. Here we implement a default that
 will raise an error if `get_field` isn't defined for all required fields of
 a surface component model.
 """
 get_field(
-    sim::SurfaceModelSimulation,
+    sim::AbstractSurfaceSimulation,
     val::Union{
         Val{:area_fraction},
         Val{:roughness_buoyancy},
@@ -239,28 +245,41 @@ get_field(
 ) = get_field_error(sim, val)
 
 # Sea ice models need to provide ice concentration
-get_field(sim::SeaIceModelSimulation, val::Val{:ice_concentration}) =
+get_field(sim::AbstractSeaIceSimulation, val::Val{:ice_concentration}) =
     get_field_error(sim, val)
 
 """
-    get_field(sim::ComponentModelSimulation, val::Val)
+    get_field(sim::AbstractComponentSimulation, val::Val)
 
 Generic fallback for `get_field` that raises an error.
 """
-get_field(sim::ComponentModelSimulation, val::Val) = get_field_error(sim, val)
+get_field(sim::AbstractComponentSimulation, val::Val) = get_field_error(sim, val)
 
 get_field_error(sim, val::Val{X}) where {X} =
     error("undefined field `$X` for $(nameof(sim))")
 
 # Set default values for fields that are not defined in all component models
-get_field(::ComponentModelSimulation, ::Val{:energy}) = nothing
-get_field(::ComponentModelSimulation, ::Val{:water}) = nothing
-get_field(sim::SurfaceModelSimulation, ::Val{:beta}) =
+get_field(::AbstractComponentSimulation, ::Val{:energy}) = nothing
+get_field(::AbstractComponentSimulation, ::Val{:water}) = nothing
+get_field(sim::AbstractSurfaceSimulation, ::Val{:emissivity}) =
     convert(eltype(sim.integrator.u), 1.0)
-get_field(sim::SurfaceModelSimulation, ::Val{:emissivity}) =
-    convert(eltype(sim.integrator.u), 1.0)
-get_field(sim::SurfaceModelSimulation, ::Val{:height_disp}) =
+get_field(sim::AbstractSurfaceSimulation, ::Val{:height_disp}) =
     convert(eltype(sim.integrator.u), 0.0)
+
+"""
+    get_field(sim::AbstractSurfaceSimulation, ::Val{:roughness_model})
+
+Return the roughness model to be used for surface flux calculations.
+Returns `:constant` by default. Ocean models should override this to return
+`:coare3` to use COARE3 roughness parameterization, which accounts for the
+dynamic response of ocean surface roughness to wind speed and wave state.
+The `:constant` roughness model uses fixed roughness lengths for momentum
+and buoyancy specified by the component model.
+
+This ensures COARE3 is applied over ocean surfaces where the area_fraction > 0,
+while land and sea ice surfaces use constant roughness parameterization.
+"""
+get_field(::AbstractSurfaceSimulation, ::Val{:roughness_model}) = :constant
 
 
 """
@@ -285,14 +304,14 @@ function get_field!(target_field, sim, quantity)
 end
 
 """
-    update_field!(::AtmosModelSimulation, ::Val, _...)
+    update_field!(::AbstractAtmosSimulation, ::Val, _...)
 
 Default functions for updating fields at each timestep in an atmosphere
 component model simulation. This should be extended by component models.
 If it isn't extended, the field won't be updated and a warning will be raised.
 """
 update_field!(
-    sim::AtmosModelSimulation,
+    sim::AbstractAtmosSimulation,
     val::Union{
         Val{:emissivity},
         Val{:surface_direct_albedo},
@@ -303,14 +322,14 @@ update_field!(
 ) = update_field_warning(sim, val)
 
 """
-    update_field!(::SurfaceModelSimulation, ::Val, _...)
+    update_field!(::AbstractSurfaceSimulation, ::Val, _...)
 
 Default functions for updating fields at each timestep in an atmosphere
 component model simulation. This should be extended by component models.
 If it isn't extended, the field won't be updated and a warning will be raised.
 """
 update_field!(
-    sim::SurfaceModelSimulation,
+    sim::AbstractSurfaceSimulation,
     val::Union{
         Val{:area_fraction},
         Val{:liquid_precipitation},
@@ -330,24 +349,24 @@ update_field_warning(sim, val::Val{X}) where {X} = @warn(
 
 
 """
-    add_coupler_fields!(coupler_fields, sim::ComponentModelSimulation, fields)
+    add_coupler_fields!(coupler_fields, sim::AbstractComponentSimulation, fields)
 
 A function to add fields to the set of coupler fields. This should be extended
 by component models that require coupler fields beyond the defaults.
 
 If this function isn't extended, no additional fields will be added.
 """
-add_coupler_fields!(coupler_fields, sim::ComponentModelSimulation) = nothing
+add_coupler_fields!(coupler_fields, sim::AbstractComponentSimulation) = nothing
 
 """
-    Base.nameof(::ComponentModelSimulation)
+    Base.nameof(::AbstractComponentSimulation)
 
 Return the simulation name, if defined, or the type name if not.
 """
-Base.nameof(sim::ComponentModelSimulation) = string(nameof(typeof(sim)))
+Base.nameof(sim::AbstractComponentSimulation) = string(nameof(typeof(sim)))
 
 """
-    step!(sim::ComponentModelSimulation, t)
+    step!(sim::AbstractComponentSimulation, t)
 
 A function to update the simulation in-place with values calculate for time `t`.
 For the models we currently have implemented, this is a simple wrapper around
@@ -356,10 +375,10 @@ the `step!` function implemented in SciMLBase.jl.
 This must be extended for all component models - otherwise this default
 function will be called and an error will be raised.
 """
-step!(sim::ComponentModelSimulation, t) = error("undefined step! for $(nameof(sim))")
+step!(sim::AbstractComponentSimulation, t) = error("undefined step! for $(nameof(sim))")
 
 """
-    close_output_writers(sim::ComponentModelSimulation)
+    close_output_writers(sim::AbstractComponentSimulation)
 
 A function to close all output writers associated with the given
 component model, at the end of a simulation.
@@ -367,7 +386,7 @@ component model, at the end of a simulation.
 This should be extended for any component model that uses
 an output writer.
 """
-close_output_writers(sim::ComponentModelSimulation) = nothing
+close_output_writers(sim::AbstractComponentSimulation) = nothing
 
 # Include file containing the surface stub simulation type.
 include("surface_stub.jl")
@@ -574,13 +593,71 @@ end
 
 
 """
-    set_cache!(sim::ComponentModelSimulation, csf)
+    set_cache!(sim::AbstractComponentSimulation, csf)
 
 Perform any initialization of the component model cache that must be done
 after the initial exchange.
 This is not required to be extended, but may be necessary for some models.
 """
-set_cache!(sim::ComponentModelSimulation, csf) = nothing
+set_cache!(sim::AbstractComponentSimulation, csf) = nothing
+
+"""
+    LandSimulation(::Type{FT}, ::Val{model_type}; kwargs...)
+
+Generic constructor for land model simulations. Dispatches to specific implementations
+based on `model_type` (`:bucket`, `:integrated`, or `:nothing`).
+
+If `model_type` is `:nothing`, returns `nothing`.
+"""
+LandSimulation(::Type{FT}, ::Val{:nothing}; kwargs...) where {FT} = nothing
+function LandSimulation(::Type{FT}, ::Val{model_type}; kwargs...) where {FT, model_type}
+    error(
+        "Unknown land model type: $model_type. Valid options are: :bucket, :integrated, or :nothing",
+    )
+end
+
+"""
+    OceanSimulation(::Type{FT}, ::Val{model_type}; kwargs...)
+
+Generic constructor for ocean model simulations. Dispatches to specific implementations
+based on `model_type` (`:oceananigans`, `:slab`, `:prescribed`, or `:nothing`).
+
+If `model_type` is `:nothing`, returns `nothing`.
+Some ocean models (like `:oceananigans`) don't require FT as the first argument.
+"""
+OceanSimulation(::Type{FT}, ::Val{:nothing}; kwargs...) where {FT} = nothing
+function OceanSimulation(::Type{FT}, ::Val{model_type}; kwargs...) where {FT, model_type}
+    error(
+        "Unknown ocean model type: $model_type. Valid options are: :oceananigans, :slab, :prescribed, or :nothing",
+    )
+end
+
+"""
+    SeaIceSimulation(::Type{FT}, ::Val{model_type}; kwargs...)
+
+Generic constructor for sea ice model simulations. Dispatches to specific implementations
+based on `model_type` (`:clima_seaice`, `:prescribed`, or `:nothing`).
+
+If `model_type` is `:nothing`, returns `nothing`.
+FT is passed to all sea ice models, though some may ignore it.
+"""
+SeaIceSimulation(::Type{FT}, ::Val{:nothing}; kwargs...) where {FT} = nothing
+function SeaIceSimulation(::Type{FT}, ::Val{model_type}; kwargs...) where {FT, model_type}
+    error(
+        "Unknown sea ice model type: $model_type. Valid options are: :clima_seaice, :prescribed, or :nothing",
+    )
+end
+
+"""
+    AtmosSimulation(::Val{model_type}; kwargs...)
+
+Generic constructor for atmosphere model simulations. Dispatches to specific implementations
+based on `model_type` (`:climaatmos`).
+
+Note that the atmosphere model cannot be nothing.
+"""
+AtmosSimulation(::Val{model_type}; kwargs...) where {model_type} =
+    error("Unknown atmosphere model type: $model_type. Valid options are: :climaatmos")
 
 """
     boundary_space(sim::CoupledSimulation)

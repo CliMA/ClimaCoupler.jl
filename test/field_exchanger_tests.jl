@@ -5,10 +5,10 @@ import Thermodynamics.Parameters as TDP
 import ClimaParams # to load TDP extension
 
 # surface field exchange tests
-struct TestSurfaceSimulation1{C} <: Interfacer.SurfaceModelSimulation
+struct TestSurfaceSimulation1{C} <: Interfacer.AbstractSurfaceSimulation
     cache_field::C
 end
-struct TestSurfaceSimulation2{C} <: Interfacer.SurfaceModelSimulation
+struct TestSurfaceSimulation2{C} <: Interfacer.AbstractSurfaceSimulation
     cache_field::C
 end
 
@@ -30,10 +30,6 @@ Interfacer.get_field(
 ) = sim.cache_field
 Interfacer.get_field(
     sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2},
-    ::Val{:beta},
-) = sim.cache_field
-Interfacer.get_field(
-    sim::Union{TestSurfaceSimulation1, TestSurfaceSimulation2},
     ::Val{:emissivity},
 ) = eltype(sim.cache_field)(1)
 
@@ -44,10 +40,10 @@ Interfacer.get_field(sim::TestSurfaceSimulation2, ::Val{:area_fraction}) =
 
 Interfacer.step!(::TestSurfaceSimulation1, _) = nothing
 
-struct TestSurfaceSimulationA <: Interfacer.SurfaceModelSimulation end
-struct TestSurfaceSimulationB <: Interfacer.SurfaceModelSimulation end
-struct TestSurfaceSimulationC <: Interfacer.SurfaceModelSimulation end
-struct TestSurfaceSimulationD <: Interfacer.SurfaceModelSimulation end
+struct TestSurfaceSimulationA <: Interfacer.AbstractSurfaceSimulation end
+struct TestSurfaceSimulationB <: Interfacer.AbstractSurfaceSimulation end
+struct TestSurfaceSimulationC <: Interfacer.AbstractSurfaceSimulation end
+struct TestSurfaceSimulationD <: Interfacer.AbstractSurfaceSimulation end
 
 # Initialize weights (fractions) and initial values (fields)
 Interfacer.get_field(::TestSurfaceSimulationA, ::Val{:random}) = 1.0
@@ -60,7 +56,7 @@ Interfacer.get_field(::TestSurfaceSimulationB, ::Val{:area_fraction}) = 0.5
 Interfacer.get_field(::TestSurfaceSimulationC, ::Val{:area_fraction}) = 2.0
 Interfacer.get_field(::TestSurfaceSimulationD, ::Val{:area_fraction}) = -10.0
 
-struct DummyStub{C} <: Interfacer.SurfaceModelSimulation
+struct DummyStub{C} <: Interfacer.AbstractSurfaceSimulation
     cache::C
 end
 Interfacer.get_field(sim::DummyStub, ::Val{:area_fraction}) = sim.cache.area_fraction
@@ -73,15 +69,19 @@ function Interfacer.update_field!(
     sim.cache.area_fraction .= field
 end
 # atmos sim
-struct TestAtmosSimulation{C} <: Interfacer.AtmosModelSimulation
+struct TestAtmosSimulation{C} <: Interfacer.AbstractAtmosSimulation
     cache::C
 end
 
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:air_temperature}) =
     sim.cache.air_temperature
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:air_density}) = sim.cache.air_density
-Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:specific_humidity}) =
-    sim.cache.specific_humidity
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:total_specific_humidity}) =
+    sim.cache.total_specific_humidity
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:liquid_specific_humidity}) =
+    sim.cache.liquid_specific_humidity
+Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:ice_specific_humidity}) =
+    sim.cache.ice_specific_humidity
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:turbulent_energy_flux}) =
     sim.cache.turbulent_energy_flux
 Interfacer.get_field(sim::TestAtmosSimulation, ::Val{:turbulent_moisture_flux}) =
@@ -123,14 +123,15 @@ function Interfacer.update_field!(
 end
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:surface_temperature}, field) =
     nothing
+Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:surface_humidity}, field) =
+    nothing
 Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:roughness_buoyancy}, field) =
     nothing
-Interfacer.update_field!(sim::TestAtmosSimulation, ::Val{:beta}, field) = nothing
 FluxCalculator.update_turbulent_fluxes!(sim::TestAtmosSimulation, fields) = nothing
 Interfacer.step!(sim::TestAtmosSimulation, t) = nothing
 
 #surface sim
-struct TestSurfaceSimulationLand{C} <: Interfacer.SurfaceModelSimulation
+struct TestSurfaceSimulationLand{C} <: Interfacer.AbstractSurfaceSimulation
     cache::C
 end
 function Interfacer.get_field(sim::TestSurfaceSimulationLand, ::Val{:area_fraction})
@@ -295,7 +296,9 @@ for FT in (Float32, Float64)
         component_names = [
             :air_density,
             :air_temperature,
-            :specific_humidity,
+            :total_specific_humidity,
+            :liquid_specific_humidity,
+            :ice_specific_humidity,
             :SW_d,
             :LW_d,
             :liquid_precipitation,
@@ -386,11 +389,11 @@ for FT in (Float32, Float64)
 
         atmos_names = [
             :surface_temperature,
+            :surface_humidity,
             :albedo_direct,
             :albedo_diffuse,
             :roughness_momentum,
             :roughness_buoyancy,
-            :beta,
         ]
         atmos_fields = Interfacer.init_coupler_fields(FT, atmos_names, boundary_space)
 
@@ -430,7 +433,6 @@ for FT in (Float32, Float64)
         # test variables without updates
         expected_field .= results[1]
         @test model_sims.atmos_sim.cache.surface_temperature == expected_field
-        @test model_sims.atmos_sim.cache.beta == expected_field
         @test model_sims.atmos_sim.cache.roughness_buoyancy == expected_field
 
         # test land updates
@@ -489,7 +491,9 @@ for FT in (Float32, Float64)
             :SW_d,
             :LW_d,
             :air_temperature,
-            :specific_humidity,
+            :total_specific_humidity,
+            :liquid_specific_humidity,
+            :ice_specific_humidity,
             :air_density,
         ]
         # Initialize atmos fields with 1

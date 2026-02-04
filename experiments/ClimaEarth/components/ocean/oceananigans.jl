@@ -3,6 +3,7 @@ import ClimaOcean as CO
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms
 import ClimaCore as CC
+import SurfaceFluxes as SF
 import Thermodynamics as TD
 import ClimaParams as CP
 import ClimaOcean.EN4: download_dataset
@@ -42,11 +43,12 @@ is a surface/ocean simulation for dispatch.
 It contains the following objects:
 - `ocean::SIM`: The Oceananigans simulation object.
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
-- `ocean_properties::OPROP`: A NamedTuple of ocean properties and parameters
+- `ocean_properties::OPROP`: A NamedTuple of ocean properties and parameters (including COARE3 roughness params).
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 - `ice_concentration::SIC`: An Oceananigans Field representing the sea ice concentration on the ocean/sea ice grid.
 """
-struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC} <: Interfacer.OceanModelSimulation
+struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC} <:
+       Interfacer.AbstractOceanSimulation
     ocean::SIM
     area_fraction::A
     ocean_properties::OPROP
@@ -55,28 +57,60 @@ struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC} <: Interfacer.OceanMode
 end
 
 """
-    OceananigansSimulation()
+    Interfacer.OceanSimulation(::Type{FT}, ::Val{:oceananigans}; kwargs...)
+
+Extension of the generic OceanSimulation constructor for the Oceananigans ocean model.
+FT is accepted for consistency with other ocean models but is not used.
+"""
+function Interfacer.OceanSimulation(::Type{FT}, ::Val{:oceananigans}; kwargs...) where {FT}
+    return OceananigansSimulation(FT; kwargs...)
+end
+
+"""
+    OceananigansSimulation(; kwargs...)
 
 Creates an OceananigansSimulation object containing a model, an integrator, and
 a surface area fraction field.
 This type is used to indicate that this simulation is an ocean simulation for
 dispatch in coupling.
 
+# Required keyword arguments
+- `boundary_space`: The boundary space of the coupled simulation
+- `start_date`: Start date for the simulation
+- `stop_date`: Stop date for the simulation
+- `output_dir`: Directory for output files
+- `ice_model`: Ice model type (Val type)
+
+# Optional keyword arguments
+- `dt`: Time step (default: `nothing`)
+- `comms_ctx`: Communication context (default: `ClimaComms.context()`)
+- `coupled_param_dict`: Coupled parameter dictionary (default: created from `area_fraction`)
+
 Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
 """
 function OceananigansSimulation(
+    ::Type{FT};
     boundary_space,
     start_date,
-    stop_date;
+    tspan,
     output_dir,
     ice_model,
-    Δt = nothing,
+    dt = nothing,
     comms_ctx = ClimaComms.context(),
-    coupled_param_dict = CP.create_toml_dict(eltype(area_fraction)),
     initial_conditions = OMIPEvolvedInitialConditions(),
-)
+    coupled_param_dict = CP.create_toml_dict(FT),
+    extra_kwargs...,
+) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
+    OC.Oceananigans.defaults.FloatType = FT
+
+    # Compute stop_date for oceananigans (needed for EN4 data retrieval)
+    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+
+    # Use Float64 for the ocean to avoid precision issues
+    FT_ocean = Float64
+    OC.Oceananigans.defaults.FloatType = FT_ocean
 
     # Retrieve EN4 data (monthly)
     dates = range(start_date, step = Dates.Month(1), stop = stop_date)
@@ -116,7 +150,8 @@ function OceananigansSimulation(
     )
 
     # Restore the ocean to the EN4 state periodically if running for more than one month and not using ClimaSeaIce
-    use_restoring = start_date + Dates.Month(1) < stop_date && ice_model != "clima_seaice"
+    use_restoring =
+        start_date + Dates.Month(1) < stop_date && ice_model != Val(:clima_seaice)
 
     if use_restoring
         # When we use EN4 data, the forcing takes care of everything, including
@@ -201,10 +236,10 @@ function OceananigansSimulation(
     scratch_cc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 
     # Construct two scratch arrays to use while remapping
-    # We get the array type, float type, and dimensions from the remapper object to maintain consistency
+    # We get the array type and dimensions from the remapper object to maintain consistency
     ArrayType = ClimaComms.array_type(remapper_cc.space)
-    FT = CC.Spaces.undertype(remapper_cc.space)
     interpolated_values_dim..., _buffer_length = size(remapper_cc._interpolated_values)
+
     scratch_arr1 = ArrayType(zeros(FT, interpolated_values_dim...))
     scratch_arr2 = ArrayType(zeros(FT, interpolated_values_dim...))
     scratch_arr3 = ArrayType(zeros(FT, interpolated_values_dim...))
@@ -222,16 +257,21 @@ function OceananigansSimulation(
         temp_uv_vec,
     )
 
-    # Get some ocean properties and parameters
+    # COARE3 roughness params (allocated once, reused each timestep)
+    coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
+    coare3_roughness_params .= SF.COARE3RoughnessParams{FT}()
+
+    # Get some ocean properties and parameters (including COARE3 roughness params)
     ocean_properties = (;
         reference_density = 1020,
         heat_capacity = 3991,
         σ = coupled_param_dict["stefan_boltzmann_constant"],
         C_to_K = coupled_param_dict["temperature_water_freeze"],
+        coare3_roughness_params,
     )
 
     # Before version 0.96.22, the NetCDFWriter was broken on GPU
-    if arch isa OC.CPU || pkgversion(OC) >= v"0.96.22"
+    if arch isa OC.CPU
         # Save all tracers and velocities to a NetCDF file at daily frequency
         outputs = merge(ocean.model.tracers, ocean.model.velocities)
         surface_writer = OC.NetCDFWriter(
@@ -241,15 +281,15 @@ function OceananigansSimulation(
             filename = joinpath(output_dir, "ocean_diagnostics.nc"),
             indices = (:, :, grid.Nz),
             overwrite_existing = true,
-            array_type = Array{Float32},
+            array_type = Array{FT},
         )
         free_surface_writer = OC.NetCDFWriter(
             ocean.model,
-            (; η = ocean.model.free_surface.η); # The free surface (.η) will change to .displacement after version 0.104.0
+            (; η = ocean.model.free_surface.displacement);
             schedule = OC.TimeInterval(3600), # hourly snapshots
             filename = joinpath(output_dir, "ocean_free_surface.nc"),
             overwrite_existing = true,
-            array_type = Array{Float32},
+            array_type = Array{FT},
         )
         Tflux = ocean.model.tracers.T.boundary_conditions.top.condition
         Sflux = ocean.model.tracers.S.boundary_conditions.top.condition
@@ -261,7 +301,7 @@ function OceananigansSimulation(
             schedule = OC.TimeInterval(3600), # hourly snapshots
             filename = joinpath(output_dir, "ocean_fluxes.nc"),
             overwrite_existing = true,
-            array_type = Array{Float32},
+            array_type = Array{FT},
         )
 
         ocean.output_writers[:surface] = surface_writer
@@ -329,7 +369,7 @@ function FieldExchanger.resolve_area_fractions!(
 end
 
 ###############################################################################
-### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
+### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
 ###############################################################################
 
 # Timestep the simulation forward to time `t`
@@ -339,20 +379,19 @@ Interfacer.step!(sim::OceananigansSimulation, t) =
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction
 
 # TODO: Better values for this
-# At the moment, we return always Float32. This is because we always want to run
-# Oceananingans with Float64, so we have no way to know the float type here. Sticking with
-# Float32 ensures that nothing is accidentally promoted to Float64. We will need to change
-# this anyway.
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_model}) = :coare3
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:coare3_roughness_params}) =
+    sim.ocean_properties.coare3_roughness_params
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_buoyancy}) =
-    Float32(5.8e-5)
+    eltype(sim.ocean.model)(5.8e-5)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_momentum}) =
-    Float32(5.8e-5)
-Interfacer.get_field(sim::OceananigansSimulation, ::Val{:beta}) = Float32(1)
-Interfacer.get_field(sim::OceananigansSimulation, ::Val{:emissivity}) = Float32(0.97)
+    eltype(sim.ocean.model)(5.8e-5)
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:emissivity}) =
+    eltype(sim.ocean.model)(0.97)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) =
-    Float32(0.011)
+    eltype(sim.ocean.model)(0.011)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) =
-    Float32(0.069)
+    eltype(sim.ocean.model)(0.069)
 
 # NOTE: This is 3D, but it will be remapped to 2D
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =

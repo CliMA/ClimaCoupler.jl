@@ -121,12 +121,8 @@ function hvspace_2D(xlim = (-π, π), zlim = (0, 4π), helem = 20, velem = 20, n
     )
     context = ClimaComms.context()
     vertmesh = CC.Meshes.IntervalMesh(vertdomain, nelems = velem)
-    if pkgversion(CC) >= v"0.14.10"
-        device = ClimaComms.device(context)
-        vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(device, vertmesh)
-    else
-        vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(vertmesh)
-    end
+    device = ClimaComms.device(context)
+    vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(device, vertmesh)
 
     horzdomain = CC.Domains.IntervalDomain(
         CC.Geometry.XPoint{FT}(xlim[1]),

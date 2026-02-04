@@ -4,13 +4,16 @@ import ClimaCore as CC
 import Thermodynamics.Parameters as TDP
 import ClimaParams as CP # required for TDP
 import ClimaCoupler
-
-include(joinpath("..", "..", "components", "ocean", "prescr_ocean.jl"))
+import ClimaCoupler.Interfacer
+import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
+import ClimaUtilities.ClimaArtifacts: @clima_artifact
+import Thermodynamics as TD
+import ClimaCoupler.Models
 
 FT = Float32
 
 @testset "PrescribedOceanSimulation name" begin
-    sim = PrescribedOceanSimulation((;))
+    sim = Models.PrescribedOceanSimulation((;))
     @test nameof(sim) == "PrescribedOceanSimulation"
 end
 
@@ -30,7 +33,7 @@ end
     comms_ctx = nothing
 
     # Construct simulation object
-    sim = PrescribedOceanSimulation(
+    sim = Models.PrescribedOceanSimulation(
         FT;
         boundary_space = space,
         start_date,

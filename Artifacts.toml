@@ -38,3 +38,13 @@ git-tree-sha1 = "7f14ef1c7859da1363b8973743b2a376c008f29f"
     [[era5_land_fraction.download]]
     sha256 = "1d6acf98656b50f1a324ee3daa267281fb017314d2169dbfda25208299f44870"
     url = "https://caltech.box.com/shared/static/glqlyb626j3szcjltyuwp534yzzhf770.gz"
+
+[historical_sst_sic]
+git-tree-sha1 = "0d30d71a6f9b6548fe7395ca647e853ec36d1699"
+
+[historical_sst_sic_lowres]
+git-tree-sha1 = "7f7b6d4ae6055c4c2b6a6dfba5be8b4e6ca1b0be"
+
+    [[historical_sst_sic_lowres.download]]
+    sha256 = "b68c0ce6ea682c38e29cb87c9c6ced6736ecac32d0d32dbaba78beb66046a06c"
+    url = "https://caltech.box.com/shared/static/ufnesb00zkvlc3sxzhnnmqc3zbatxkb9.gz"

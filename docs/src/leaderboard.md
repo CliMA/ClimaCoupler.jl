@@ -23,13 +23,10 @@ dictionaries must use the same short names as the keys so that the right simulat
 observational data are compared.
 
 !!! tip "Preprocessing"
-    Observational and simulational data should be preprocessed for dates and units. For
-    simulation data, monthly averages correspond to the first day following the month.
-    For instance, the monthly average corresponding to January 2010 is on the date
-    2/1/2010. Preprocessing is done to shift this date to 1/1/2010. When preprocessing
-    data, we follow the convention that the first day corresponds to the monthly average
-    for that month. For observational data, you should check the convention being followed
-    and preprocess the dates if necessary.
+    Observational and simulational data should be preprocessed for dates and units. When
+    preprocessing data, we follow the convention that the first day corresponds to the
+    monthly average for that month. For observational data, you should check the convention
+    being followed and preprocess the dates if necessary.
 
     For `obs_var_dict`, the anonymous function must take in a start date. The start date is
     used in `leaderboard.jl` to adjust the seconds in the `OutputVar` to match between start

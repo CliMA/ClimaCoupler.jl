@@ -17,3 +17,4 @@ surface_setup: "PrescribedSurface"
 t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
+hyperdiffusion_prandtl_number: 0.2

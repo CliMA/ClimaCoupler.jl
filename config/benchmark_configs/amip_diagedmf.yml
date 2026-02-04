@@ -1,5 +1,4 @@
 FLOAT_TYPE: "Float32"
-aerosol_radiation: true
 atmos_config_file: "config/benchmark_configs/climaatmos_diagedmf.yml"
 dt: "120secs"
 dt_cpl: "120secs"
@@ -7,7 +6,6 @@ energy_check: false
 land_model: "integrated"
 mode_name: "amip"
 monthly_checkpoint: false
-prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "12hours"

@@ -1,5 +1,4 @@
 FLOAT_TYPE: "Float32"
-aerosol_radiation: true
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "720hours"
@@ -15,7 +14,6 @@ ice_model: "clima_seaice"
 insolation: "timevarying"
 mode_name: "cmip"
 ocean_model: "oceananigans"
-prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"

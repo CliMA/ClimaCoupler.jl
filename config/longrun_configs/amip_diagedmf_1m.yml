@@ -1,5 +1,4 @@
 FLOAT_TYPE: "Float32"
-aerosol_radiation: true
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
 bucket_albedo_type: "map_temporal"
@@ -16,7 +15,6 @@ moist: "nonequil"
 precip_model: "1M"
 netcdf_output_at_levels: true
 output_default_diagnostics: true
-prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"

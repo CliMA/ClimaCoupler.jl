@@ -6,6 +6,10 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
+#### Add an extension for CMIP models PR[#1704](https://github.com/CliMA/ClimaCoupler.jl/pull/1704)
+This extension contains the methods that extend the ClimaCoupler.jl interface
+for the Oceananigans and ClimaSeaIce models.
+
 #### Move simple component models into Models module PR[#1692](https://github.com/CliMA/ClimaCoupler.jl/pull/1692)
 Move slab ocean, prescribed ocean, and prescribed sea ice from experiments/
 into src/.

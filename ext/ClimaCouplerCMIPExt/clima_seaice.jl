@@ -1,16 +1,8 @@
-import Oceananigans as OC
-import ClimaSeaIce as CSI
 using ClimaSeaIce.SeaIceThermodynamics.HeatBoundaryConditions:
     IceWaterThermalEquilibrium, MeltingConstrainedFluxBalance, get_tracer, RadiativeEmission
-import ClimaOcean as CO
-import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms
-import ClimaCore as CC
 import Thermodynamics as TD
 import ClimaOcean.EN4: download_dataset
-using KernelAbstractions: @kernel, @index, @inbounds
-
-include("climaocean_helpers.jl")
 
 # Rename ECCO password env variable to match ClimaOcean.jl
 haskey(ENV, "ECCO_PASSWORD") && (ENV["ECCO_WEBDAV_PASSWORD"] = ENV["ECCO_PASSWORD"])

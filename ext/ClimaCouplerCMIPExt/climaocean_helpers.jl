@@ -161,16 +161,28 @@ function contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz)
     local_geometry = CC.Fields.local_geometry_field(ρτxz)
 
     # Get the vector components in the CT1 and CT2 directions
-    xz = @. CA.CT12(
-        CA.CT1(CA.unit_basis_vector_data(CA.CT1, local_geometry)),
-        local_geometry,
-    )
-    yz = @. CA.CT12(
-        CA.CT2(CA.unit_basis_vector_data(CA.CT2, local_geometry)),
-        local_geometry,
-    )
+    xz = @. CT12(CT1(unit_basis_vector_data(CT1, local_geometry)), local_geometry)
+    yz = @. CT12(CT2(unit_basis_vector_data(CT2, local_geometry)), local_geometry)
 
     # Convert the vector components to a UVVector on the Cartesian basis
     @. ρτ_flux_uv = @. CC.Geometry.UVVector(ρτxz * xz + ρτyz * yz, local_geometry)
     return nothing
+end
+
+# Define shorthands for ClimaCore types
+const CT1 = CC.Geometry.Contravariant1Vector
+const CT2 = CC.Geometry.Contravariant2Vector
+const CT12 = CC.Geometry.Contravariant12Vector
+
+"""
+    unit_basis_vector_data(type, local_geometry)
+
+The component of the vector of the specified type with length 1 in physical units.
+The type should correspond to a vector with only one component, i.e., a basis vector.
+
+Helper function used only in `contravariant_to_cartesian!`.
+"""
+function unit_basis_vector_data(::Type{V}, local_geometry) where {V}
+    FT = CC.Geometry.undertype(typeof(local_geometry))
+    return FT(1) / CC.Geometry._norm(V(FT(1)), local_geometry)
 end

@@ -4,6 +4,8 @@ using Documenter, Literate
 import CairoMakie, ClimaCoreMakie, GeoMakie, Makie, Poppler_jll, Printf, Oceananigans
 # Import packages for ClimaCouplerCMIPExt
 import ClimaOcean, ClimaSeaIce, KernelAbstractions
+# Import packages for ClimaCouplerClimaLandExt
+import ClimaLand, NCDatasets
 
 const COUPLER_DIR = joinpath(@__DIR__, "..")
 const EXPERIMENTS_DIR = joinpath(@__DIR__, "..", "experiments")
@@ -100,6 +102,7 @@ makedocs(
         Base.get_extension(ClimaCoupler, :ClimaCouplerMakieExt),
         Base.get_extension(ClimaCoupler, :ClimaCouplerOceananigansMakieExt),
         Base.get_extension(ClimaCoupler, :ClimaCouplerCMIPExt),
+        Base.get_extension(ClimaCoupler, :ClimaCouplerClimaLandExt),
     ],
     authors = "Climate Modelling Alliance",
     sitename = "ClimaCoupler.jl",

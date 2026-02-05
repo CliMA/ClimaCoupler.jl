@@ -60,6 +60,9 @@ using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, NCDatasets, Poppler_jll
 # Note we only need these if running CMIP, but for now we share one environment for all experiments
 import Oceananigans, ClimaOcean, ClimaSeaIce, KernelAbstractions
 
+#  Trigger ClimaCouplerClimaLandExt extension
+import ClimaLand, NCDatasets
+
 pkg_dir = pkgdir(ClimaCoupler)
 
 #=
@@ -70,8 +73,6 @@ contain any internals of the ClimaCoupler source code, except extensions to the 
 
 ## helpers for component models
 include("components/atmosphere/climaatmos.jl")
-include("components/land/climaland_bucket.jl")
-include("components/land/climaland_integrated.jl")
 
 #=
 ### Configuration Dictionaries

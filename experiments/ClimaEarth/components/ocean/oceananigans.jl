@@ -3,12 +3,15 @@ import ClimaOcean as CO
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms
 import ClimaCore as CC
+import StaticArrays
+import SurfaceFluxes as SF
 import Thermodynamics as TD
 import ClimaParams as CP
 import ClimaOcean.EN4: download_dataset
 using KernelAbstractions: @kernel, @index, @inbounds
 
 include("climaocean_helpers.jl")
+include("ocean_skin.jl")
 
 """
     OceananigansSimulation{SIM, A, OPROP, REMAP, SIC}
@@ -76,6 +79,9 @@ function OceananigansSimulation(
     dt = nothing,
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
+    use_iterative_ocean_skin = false,
+    skin_layer_thickness = FT(1e-3),
+    thermal_diffusivity = FT(1.4e-7),
     extra_kwargs...,
 ) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
@@ -207,12 +213,15 @@ function OceananigansSimulation(
         temp_uv_vec,
     )
 
-    # Get some ocean properties and parameters
+    # Get some ocean properties and parameters (skin params for iterative ocean skin)
     ocean_properties = (;
         reference_density = 1020,
         heat_capacity = 3991,
         σ = coupled_param_dict["stefan_boltzmann_constant"],
         C_to_K = coupled_param_dict["temperature_water_freeze"],
+        use_iterative_ocean_skin,
+        skin_layer_thickness,
+        thermal_diffusivity,
     )
 
     # Before version 0.96.22, the NetCDFWriter was broken on GPU
@@ -338,6 +347,192 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}
 # NOTE: This is 3D, but it will be remapped to 2D
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
     sim.ocean.model.tracers.T + sim.ocean_properties.C_to_K # convert from Celsius to Kelvin
+
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:use_iterative_ocean_skin}) =
+    sim.ocean_properties.use_iterative_ocean_skin
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:skin_layer_thickness}) =
+    sim.ocean_properties.skin_layer_thickness
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:thermal_diffusivity}) =
+    sim.ocean_properties.thermal_diffusivity
+
+"""
+    FluxCalculator.compute_surface_fluxes!(csf, sim::OceananigansSimulation, atmos_sim, thermo_params)
+
+When `use_iterative_ocean_skin` is true, iteratively solve for the ocean skin temperature
+(DiffusiveFlux, following ClimaOcean's SkinTemperature{<:DiffusiveFlux}) using RootSolvers:
+outer loop alternates (1) Q_turb = SurfaceFluxes(T_sfc), (2) T_sfc = find_zero(residual, BrentMethod(...))
+with Q_turb fixed. Otherwise invokes the base implementation.
+"""
+function FluxCalculator.compute_surface_fluxes!(
+    csf,
+    sim::OceananigansSimulation,
+    atmos_sim::Interfacer.AbstractAtmosSimulation,
+    thermo_params,
+)
+    if !Interfacer.get_field(sim, Val(:use_iterative_ocean_skin))
+        return invoke(
+            FluxCalculator.compute_surface_fluxes!,
+            (Any, Interfacer.AbstractSurfaceSimulation, Interfacer.AbstractAtmosSimulation, Any),
+            csf,
+            sim,
+            atmos_sim,
+            thermo_params,
+        )
+    end
+
+    boundary_space = axes(csf)
+    FT = CC.Spaces.undertype(boundary_space)
+    surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
+    uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
+    thermo_state_atmos =
+        TD.PhaseNonEquil_ρTq.(
+            thermo_params,
+            csf.ρ_atmos,
+            csf.T_atmos,
+            TD.PhasePartition.(csf.q_atmos),
+        )
+
+    # Bulk ocean T (top cell) and skin params on boundary space
+    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
+    T_ocean = csf.scalar_temp1
+    T_sfc = CC.Fields.zeros(boundary_space)
+    T_sfc .= T_ocean
+    δ = Interfacer.get_field(sim, Val(:skin_layer_thickness))
+    κ = Interfacer.get_field(sim, Val(:thermal_diffusivity))
+    α = Interfacer.get_field(sim, Val(:surface_direct_albedo))
+    ε = Interfacer.get_field(sim, Val(:emissivity))
+    σ = sim.ocean_properties.σ
+
+    # Nested root-solving pattern: fix T_sfc → Q_turb = SurfaceFluxes(T_sfc); fix Q_turb → T_sfc = find_zero(residual)
+    maxiter_outer = 15
+    tol_outer = 1e-6
+    for _ in 1:maxiter_outer
+        # (1) Given T_sfc, compute Q_turb = F_sh + F_lh
+        ρ_sfc =
+            SF.surface_density.(
+                surface_fluxes_params,
+                csf.T_atmos,
+                csf.ρ_atmos,
+                T_sfc,
+                csf.height_int .- csf.height_sfc,
+                csf.q_atmos,
+                0,
+                0,
+            )
+        FluxCalculator.compute_surface_humidity!(csf.scalar_temp3, T_sfc, ρ_sfc, thermo_params)
+        q_sfc = csf.scalar_temp3
+        thermo_state_sfc =
+            TD.PhaseNonEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, TD.PhasePartition.(q_sfc))
+        Interfacer.get_field!(csf.scalar_temp2, sim, Val(:roughness_momentum))
+        z0m = csf.scalar_temp2
+        Interfacer.get_field!(csf.scalar_temp3, sim, Val(:roughness_buoyancy))
+        z0b = csf.scalar_temp3
+        config =
+            SF.SurfaceFluxConfig.(
+                SF.ConstantRoughnessParams.(z0m, z0b),
+                SF.ConstantGustinessSpec.(ones(boundary_space)),
+            )
+        fluxes =
+            FluxCalculator.get_surface_fluxes.(
+                surface_fluxes_params,
+                uv_int,
+                thermo_state_atmos,
+                csf.height_int,
+                StaticArrays.SVector.(0, 0),
+                thermo_state_sfc,
+                csf.height_sfc,
+                0,
+                config,
+            )
+        (; F_sh, F_lh) = fluxes
+        Q_turb = F_sh .+ F_lh
+
+        # (2) Given Q_turb, solve flux balance for T_sfc using RootSolvers (Brent per column)
+        ρ = sim.ocean_properties.reference_density
+        c = sim.ocean_properties.heat_capacity
+        T_sfc_new =
+            ocean_skin_temperature_root.(
+                Q_turb,
+                csf.SW_d,
+                csf.LW_d,
+                α,
+                ε,
+                σ,
+                T_ocean,
+                δ,
+                κ,
+                ρ,
+                c,
+            )
+        converged = all(abs.(T_sfc_new .- T_sfc) .< tol_outer)
+        T_sfc .= T_sfc_new
+        converged && break
+    end
+
+    # Recompute fluxes at converged T_sfc and use same tail as base
+    ρ_sfc =
+        SF.surface_density.(
+            surface_fluxes_params,
+            csf.T_atmos,
+            csf.ρ_atmos,
+            T_sfc,
+            csf.height_int .- csf.height_sfc,
+            csf.q_atmos,
+            0,
+            0,
+        )
+    FluxCalculator.compute_surface_humidity!(csf.scalar_temp3, T_sfc, ρ_sfc, thermo_params)
+    q_sfc = csf.scalar_temp3
+    thermo_state_sfc =
+        TD.PhaseNonEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, TD.PhasePartition.(q_sfc))
+    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))
+    area_fraction = csf.scalar_temp1
+    Interfacer.get_field!(csf.scalar_temp2, sim, Val(:roughness_momentum))
+    z0m = csf.scalar_temp2
+    Interfacer.get_field!(csf.scalar_temp3, sim, Val(:roughness_buoyancy))
+    z0b = csf.scalar_temp3
+    config =
+        SF.SurfaceFluxConfig.(
+            SF.ConstantRoughnessParams.(z0m, z0b),
+            SF.ConstantGustinessSpec.(ones(boundary_space)),
+        )
+    fluxes =
+        FluxCalculator.get_surface_fluxes.(
+            surface_fluxes_params,
+            uv_int,
+            thermo_state_atmos,
+            csf.height_int,
+            StaticArrays.SVector.(0, 0),
+            thermo_state_sfc,
+            csf.height_sfc,
+            0,
+            config,
+        )
+    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux) =
+        fluxes
+
+    @. F_turb_ρτxz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτxz), F_turb_ρτxz)
+    @. F_turb_ρτyz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτyz), F_turb_ρτyz)
+    @. F_sh = ifelse(area_fraction ≈ 0, zero(F_sh), F_sh)
+    @. F_lh = ifelse(area_fraction ≈ 0, zero(F_lh), F_lh)
+    @. F_turb_moisture = ifelse(area_fraction ≈ 0, zero(F_turb_moisture), F_turb_moisture)
+    @. L_MO = ifelse(area_fraction ≈ 0, zero(L_MO), L_MO)
+    @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
+    @. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(buoyancy_flux), buoyancy_flux)
+
+    fields = (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
+    FluxCalculator.update_turbulent_fluxes!(sim, fields)
+
+    @. csf.F_turb_ρτxz += F_turb_ρτxz * area_fraction
+    @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction
+    @. csf.F_lh += F_lh * area_fraction
+    @. csf.F_sh += F_sh * area_fraction
+    @. csf.F_turb_moisture += F_turb_moisture * area_fraction
+    @. csf.L_MO += ifelse(isinf(L_MO), L_MO, L_MO * area_fraction)
+    @. csf.ustar += ustar * area_fraction
+    @. csf.buoyancy_flux += buoyancy_flux * area_fraction
+    return nothing
+end
 
 """
     FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fields)

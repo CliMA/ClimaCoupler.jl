@@ -141,6 +141,9 @@ function CoupledSimulation(config_dict::AbstractDict)
         land_fraction_source,
         binary_area_fraction,
         use_iterative_ice_skin,
+        use_iterative_ocean_skin,
+        skin_layer_thickness,
+        thermal_diffusivity,
     ) = Input.get_coupler_args(config_dict)
 
     # Get default shared parameters from ClimaParams.jl, overriding with any provided parameter files
@@ -328,6 +331,9 @@ function CoupledSimulation(config_dict::AbstractDict)
         # Arguments used by Oceananigans
         output_dir = dir_paths.ocean_output_dir,
         ice_model,
+        use_iterative_ocean_skin,
+        skin_layer_thickness,
+        thermal_diffusivity,
         # Arguments used by prescribed ocean
         sst_path = subseasonal_sst,
         # Arguments used by slab ocean

@@ -441,6 +441,11 @@ function get_coupler_args(config_dict::Dict)
     # Sea ice: use iterative ice skin temperature (ClimaSeaIce only)
     use_iterative_ice_skin = get(config_dict, "use_iterative_ice_skin", false)
 
+    # Ocean: use iterative ocean skin temperature (DiffusiveFlux, e.g. Oceananigans)
+    use_iterative_ocean_skin = get(config_dict, "use_iterative_ocean_skin", false)
+    skin_layer_thickness = get(config_dict, "skin_layer_thickness", 1e-3)  # m
+    thermal_diffusivity = get(config_dict, "thermal_diffusivity", 1.4e-7)  # m²/s
+
     return (;
         job_id,
         sim_mode,
@@ -479,6 +484,9 @@ function get_coupler_args(config_dict::Dict)
         land_fraction_source,
         binary_area_fraction,
         use_iterative_ice_skin,
+        use_iterative_ocean_skin,
+        skin_layer_thickness,
+        thermal_diffusivity,
     )
 end
 

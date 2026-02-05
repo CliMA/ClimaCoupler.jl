@@ -437,9 +437,8 @@ function FluxCalculator.compute_surface_fluxes!(
         )
 
     # Single SurfaceFluxes call with T_sfc_guess and update_T_sfc: skin T_sfc solved inside MOST iteration
-    # using `callback` functionality in SurfaceFluxes.jl source. 
     ocean_update_T_sfc_callbacks =
-        ocean_update_T_sfc.(
+        ocean_update_T_sfc_callback.(
             csf.SW_d,
             csf.LW_d,
             α,

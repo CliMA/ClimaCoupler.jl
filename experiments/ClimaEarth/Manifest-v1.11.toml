@@ -2,7 +2,7 @@
 
 julia_version = "1.11.8"
 manifest_format = "2.0"
-project_hash = "78cad974af02c387890df7cb74ac82b3bc39c4b6"
+project_hash = "76b63e9f35f0b2ff75169a3cd56a91d7c3f4cb54"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "f7304359109c768cf32dc5fa2d371565bb63b68a"
@@ -3393,7 +3393,7 @@ version = "7.7.0+0"
 
 [[deps.SurfaceFluxes]]
 deps = ["RootSolvers", "Thermodynamics"]
-git-tree-sha1 = "bfab829e51b2b3a1127d7aa7511e407af4849e25"
+path = "../../../SurfaceFluxes.jl"
 uuid = "49b00bb7-8bd4-4f2b-b78c-51cd0450215f"
 version = "0.15.0"
 weakdeps = ["ClimaParams"]

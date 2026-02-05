@@ -1,6 +1,9 @@
 using ClimaCoupler
 using Documenter, Literate
-using CairoMakie, ClimaCoreMakie, GeoMakie, Makie, Poppler_jll, Printf, Oceananigans
+# Import packages needed to load plotting extensions
+import CairoMakie, ClimaCoreMakie, GeoMakie, Makie, Poppler_jll, Printf, Oceananigans
+# Import packages for ClimaCouplerCMIPExt
+import ClimaOcean, ClimaSeaIce, KernelAbstractions
 
 const COUPLER_DIR = joinpath(@__DIR__, "..")
 const EXPERIMENTS_DIR = joinpath(@__DIR__, "..", "experiments")
@@ -96,6 +99,7 @@ makedocs(
         ClimaCoupler,
         Base.get_extension(ClimaCoupler, :ClimaCouplerMakieExt),
         Base.get_extension(ClimaCoupler, :ClimaCouplerOceananigansMakieExt),
+        Base.get_extension(ClimaCoupler, :ClimaCouplerCMIPExt),
     ],
     authors = "Climate Modelling Alliance",
     sitename = "ClimaCoupler.jl",

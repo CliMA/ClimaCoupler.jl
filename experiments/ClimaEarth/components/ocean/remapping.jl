@@ -94,7 +94,7 @@ Interfacer.remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field, 
     Interfacer.remap!(target_field, source_field)
 
 # Extend Interfacer.get_field to allow automatic remapping to the target space
-function Interfacer.get_field!(target_field, sim::OceananigansSimulation, quantity)
+function Interfacer.get_field!(target_field, sim::Union{OceananigansSimulation, ClimaSeaIceSimulation}, quantity)
     Interfacer.remap!(target_field, Interfacer.get_field(sim, quantity), sim.remapping)
     return nothing
 end

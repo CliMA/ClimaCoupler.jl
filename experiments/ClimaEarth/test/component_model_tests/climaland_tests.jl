@@ -11,8 +11,11 @@ ClimaComms.@import_required_backends
 
 exp_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth")
 
-include(joinpath(exp_dir, "components", "land", "climaland_integrated.jl"))
 include(joinpath(exp_dir, "components", "atmosphere", "climaatmos.jl"))
+
+# To load ClimaCouplerClimaLandExt
+import ClimaLand as CL
+import NCDatasets
 
 FT = Float32
 
@@ -33,8 +36,16 @@ FT = Float32
     atmos_h = CC.Fields.zeros(boundary_space) .+ 2
 
     # Construct simulation object
-    land_sim =
-        ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction, atmos_h)
+    land_sim = Interfacer.LandSimulation(
+        FT,
+        Val(:integrated);
+        dt,
+        tspan,
+        start_date,
+        output_dir,
+        area_fraction,
+        atmos_h,
+    )
 
     # Try taking a timestep
     Interfacer.step!(land_sim, dt)
@@ -91,8 +102,16 @@ end
     boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
     area_fraction = CC.Fields.ones(boundary_space)
     atmos_h = CC.Fields.zeros(boundary_space) .+ 2
-    land_sim =
-        ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction, atmos_h)
+    land_sim = Interfacer.LandSimulation(
+        FT,
+        Val(:integrated);
+        dt,
+        tspan,
+        start_date,
+        output_dir,
+        area_fraction,
+        atmos_h,
+    )
     model_sims = (; land_sim = land_sim, atmos_sim = atmos_sim)
 
     # Initialize the coupler fields so we can perform exchange

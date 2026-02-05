@@ -746,8 +746,8 @@ version = "2.5.0"
 
 [[deps.ConservativeRegridding]]
 deps = ["ChunkSplitters", "DocStringExtensions", "Extents", "GeoInterface", "GeometryOps", "GeometryOpsCore", "LinearAlgebra", "ProgressMeter", "SciMLPublic", "SortTileRecursiveTree", "SparseArrays", "StableTasks", "StaticArrays"]
-git-tree-sha1 = "14be129cf6c44210906eef3fd017fd9ba57acd43"
-repo-rev = "main"
+git-tree-sha1 = "4392da3295bd4bf5f6c43cb1ee5da678a76bfb35"
+repo-rev = "js/climacore-fix"
 repo-url = "https://github.com/JuliaGeo/ConservativeRegridding.jl.git"
 uuid = "8e50ac2c-eb48-49bc-a402-07c87b949343"
 version = "0.2.0"

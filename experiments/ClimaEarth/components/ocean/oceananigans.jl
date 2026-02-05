@@ -145,9 +145,12 @@ function OceananigansSimulation(
         momentum_advection = OC.VectorInvariant()
         tracer_advection = OC.WENO(order = 5)
         horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν = 1e11)
-
-        # Use Float32 for the vertical mixing parameters to avoid parameter memory limits
-        vertical_mixing = OC.CATKEVerticalDiffusivity(Float32)
+        vertical_mixing = OC.ConvectiveAdjustmentVerticalDiffusivity(
+            background_κz = 1e-5,
+            convective_κz = 0.1,
+            background_νz = 1e-4,
+            convective_νz = 0.1,
+        )
 
         closure = (horizontal_viscosity, vertical_mixing)
     end

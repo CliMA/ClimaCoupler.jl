@@ -354,7 +354,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_mem: 20GB
-          slurm_gres: "gpu:v100:1" # CMIP doesn't support P100s so we use V100s
+          slurm_gpus: 1
 
       - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce"
         key: "gpu_cmip_oceananigans_climaseaice"
@@ -364,7 +364,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_mem: 20GB
-          slurm_gres: "gpu:v100:1" # CMIP doesn't support P100s so we use V100s
+          slurm_gpus: 1
 
   # - group: "Calibration experiments"
   #   steps:

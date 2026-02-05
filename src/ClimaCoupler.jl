@@ -16,6 +16,7 @@ include("Input.jl")
 include("SimOutput/SimOutput.jl")
 include("Plotting.jl")
 include("SimCoordinator.jl")
+include("Models.jl")
 
 # Import run! and step! from SimCoordinator to re-export at top level
 import ..SimCoordinator: run!, step!
@@ -29,6 +30,7 @@ export ConservationChecker,
     FluxCalculator,
     Input,
     Interfacer,
+    Models,
     Plotting,
     SimCoordinator,
     SimOutput,

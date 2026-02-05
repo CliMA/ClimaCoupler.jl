@@ -289,6 +289,7 @@ Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_diffuse_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_temperature}) =
     CL.component_temperature(sim.model, sim.integrator.u, sim.integrator.p)
+Interfacer.get_field(sim::BucketSimulation, ::Val{:roughness_model}) = :constant
 
 """
     Interfacer.get_field(sim::BucketSimulation, ::Val{:energy})
@@ -346,25 +347,6 @@ function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_velocity}, u
         StaticArrays.SVector.(
             sim.integrator.p.bucket.scratch1,
             sim.integrator.p.bucket.scratch2,
-        )
-end
-function Interfacer.update_field!(
-    sim::BucketSimulation,
-    ::Val{:air_thermo_state},
-    ρ_atmos,
-    T_atmos,
-    q_atmos,
-)
-    thermo_params = sim.model.parameters.earth_param_set.thermo_params
-    Interfacer.remap!(sim.integrator.p.bucket.scratch1, ρ_atmos)
-    Interfacer.remap!(sim.integrator.p.bucket.scratch2, T_atmos)
-    Interfacer.remap!(sim.integrator.p.bucket.scratch3, q_atmos)
-    sim.integrator.p.drivers.thermal_state .=
-        TD.PhaseEquil_ρTq.(
-            thermo_params,
-            sim.integrator.p.bucket.scratch1,
-            sim.integrator.p.bucket.scratch2,
-            sim.integrator.p.bucket.scratch3,
         )
 end
 function Interfacer.update_field!(
@@ -562,14 +544,7 @@ function FieldExchanger.update_sim!(sim::BucketSimulation, csf)
     Interfacer.update_field!(sim, Val(:air_velocity), csf.u_int, csf.v_int)
     Interfacer.update_field!(sim, Val(:air_temperature), csf.T_atmos)
     Interfacer.update_field!(sim, Val(:air_pressure), csf.P_atmos)
-    Interfacer.update_field!(sim, Val(:air_humidity), csf.q_atmos)
-    Interfacer.update_field!(
-        sim,
-        Val(:air_thermo_state),
-        csf.ρ_atmos,
-        csf.T_atmos,
-        csf.q_atmos,
-    )
+    Interfacer.update_field!(sim, Val(:air_humidity), csf.q_tot_atmos)
     return nothing
 end
 

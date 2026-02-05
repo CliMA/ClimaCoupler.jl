@@ -3,7 +3,6 @@ import ClimaOcean as CO
 import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms
 import ClimaCore as CC
-import StaticArrays
 import SurfaceFluxes as SF
 import Thermodynamics as TD
 import ClimaParams as CP
@@ -23,7 +22,7 @@ is a surface/ocean simulation for dispatch.
 It contains the following objects:
 - `ocean::SIM`: The Oceananigans simulation object.
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
-- `ocean_properties::OPROP`: A NamedTuple of ocean properties and parameters
+- `ocean_properties::OPROP`: A NamedTuple of ocean properties and parameters (including COARE3 roughness params).
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 - `ice_concentration::SIC`: An Oceananigans Field representing the sea ice concentration on the ocean/sea ice grid.
 """
@@ -213,7 +212,11 @@ function OceananigansSimulation(
         temp_uv_vec,
     )
 
-    # Get some ocean properties and parameters (skin params for iterative ocean skin)
+    # COARE3 roughness params (allocated once, reused each timestep)
+    coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
+    coare3_roughness_params .= SF.COARE3RoughnessParams{FT}()
+
+    # Get some ocean properties and parameters (including COARE3 roughness params)
     ocean_properties = (;
         reference_density = 1020,
         heat_capacity = 3991,
@@ -222,6 +225,7 @@ function OceananigansSimulation(
         use_iterative_ocean_skin,
         skin_layer_thickness,
         thermal_diffusivity,
+        coare3_roughness_params,
     )
 
     # Before version 0.96.22, the NetCDFWriter was broken on GPU
@@ -333,6 +337,9 @@ Interfacer.step!(sim::OceananigansSimulation, t) =
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction
 
 # TODO: Better values for this
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_model}) = :coare3
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:coare3_roughness_params}) =
+    sim.ocean_properties.coare3_roughness_params
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_buoyancy}) =
     eltype(sim.ocean.model)(5.8e-5)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_momentum}) =

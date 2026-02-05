@@ -5,7 +5,8 @@ import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
 import Thermodynamics as TD
-import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, Utilities
+import ..Checkpointer, ..FluxCalculator, ..Interfacer, ..Utilities
+import ClimaComms
 
 """
     PrescribedIceSimulation{P, I}
@@ -248,6 +249,7 @@ Interfacer.get_field(
     sim::PrescribedIceSimulation,
     ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}},
 ) = sim.integrator.p.params.α
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_model}) = :constant
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) =
     ice_surface_temperature.(sim.integrator.u.T_bulk, sim.integrator.p.params.T_base)
 

@@ -719,6 +719,12 @@ function validate_model_types_for_mode(sim_mode, ocean_model, ice_model, land_mo
         land_model = expected_land
     end
 
+    # Perform some final model consistency checks
+    ocean_model == Val(:slab) &&
+        @assert ice_model == Val(:nothing) "Slab ocean model cannot be used with a sea ice model"
+    ice_model == Val(:clima_seaice) &&
+        @assert ocean_model == Val(:oceananigans) "ClimaSeaIce sea ice model requires Oceananigans ocean model"
+
     return ocean_model, ice_model, land_model
 end
 

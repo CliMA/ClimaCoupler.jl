@@ -355,6 +355,7 @@ steps:
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
+          slurm_constraint: "!broadwell" # CMIP doesn't support P100s so we avoid broadwell nodes
 
       - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce"
         key: "gpu_cmip_oceananigans_climaseaice"
@@ -365,6 +366,7 @@ steps:
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
+          slurm_constraint: "!broadwell" # CMIP doesn't support P100s so we avoid broadwell nodes
 
   - group: "Calibration experiments"
     steps:

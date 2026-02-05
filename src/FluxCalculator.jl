@@ -76,12 +76,19 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
 end
 
 """
-    get_surface_fluxes(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters)
+    get_surface_fluxes(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters; T_sfc_guess=nothing, update_T_sfc=nothing, ...)
 
 Uses SurfaceFluxes.jl to calculate turbulent surface fluxes. It should be atmos model agnostic, and columnwise.
 Fluxes are computed over the entire surface, even where the relevant surface model is not present.
 
 When available, it also computes ancillary quantities, such as the Monin-Obukov lengthscale.
+
+Optional keyword arguments (passed through to SurfaceFluxes.surface_fluxes when provided):
+- `T_sfc_guess`: Initial guess for surface temperature [K]; used when `update_T_sfc` is provided (e.g. iterative ocean skin).
+- `update_T_sfc`: Callback `(ζ, param_set, thermo_params, inputs, scheme, u_star, z0m, z0h) -> T_sfc` to update surface temperature during the Monin-Obukhov iteration.
+- `update_q_vap_sfc`: Callback to update surface vapor humidity during iteration.
+
+Scheme and solver options use SurfaceFluxes.jl defaults (PointValueScheme, default SolverOptions).
 """
 function get_surface_fluxes(
     surface_fluxes_params::SF.Parameters.SurfaceFluxesParameters,
@@ -92,7 +99,10 @@ function get_surface_fluxes(
     thermo_state_sfc,
     h_sfc,
     d,
-    config,
+    config;
+    T_sfc_guess = nothing,
+    update_T_sfc = nothing,
+    update_q_vap_sfc = nothing,
 )
     # Get inputs to compute surface fluxes
     thermo_params = SFP.thermodynamics_params(surface_fluxes_params)
@@ -101,12 +111,12 @@ function get_surface_fluxes(
     q_liq_int = TD.liquid_specific_humidity(thermo_params, thermo_state_atmos)
     q_ice_int = TD.ice_specific_humidity(thermo_params, thermo_state_atmos)
     ρ_int = TD.air_density(thermo_params, thermo_state_atmos)
-    T_sfc = TD.air_temperature(thermo_params, thermo_state_sfc)
+    T_sfc = T_sfc_guess !== nothing ? T_sfc_guess : TD.air_temperature(thermo_params, thermo_state_sfc)
     q_vap_sfc = TD.vapor_specific_humidity(thermo_params, thermo_state_sfc)
     Φ_sfc = SFP.grav(surface_fluxes_params) * h_sfc
     Δz = h_int - h_sfc
 
-    # Calculate surface fluxes
+    # Use SurfaceFluxes.jl defaults for scheme and solver options
     outputs = SF.surface_fluxes(
         surface_fluxes_params,
         T_int,
@@ -123,6 +133,11 @@ function get_surface_fluxes(
         u_sfc,
         nothing, # roughness_inputs
         config,
+        SF.PointValueScheme(), # scheme: SurfaceFluxes default
+        nothing, # solver_opts: SurfaceFluxes default
+        nothing, # flux_specs
+        update_T_sfc,
+        update_q_vap_sfc,
     )
 
     (; shf, lhf, evaporation, ρτxz, ρτyz, T_sfc, q_vap_sfc, L_MO, ustar) = outputs

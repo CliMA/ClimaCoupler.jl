@@ -132,7 +132,11 @@ function postprocess(
     make_diagnostics_plots(atmos_output_dir, artifacts_dir, output_prefix = "atmos_")
     make_diagnostics_plots(land_output_dir, artifacts_dir, output_prefix = "land_")
 
-    make_atmos_spectra_plots(atmos_output_dir, artifacts_dir, output_prefix = "atmos_spectra_")
+    make_atmos_spectra_plots(
+        atmos_output_dir,
+        artifacts_dir,
+        output_prefix = "atmos_spectra_",
+    )
 
     # Note: slab ocean doesn't have diagnostics, so we only handle Oceananigans here
     make_ocean_diagnostics_plots(ocean_output_dir, artifacts_dir, output_prefix = "ocean_")

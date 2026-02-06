@@ -43,12 +43,13 @@ function compute_spectrum(var::ClimaAnalysis.OutputVar; mass_weight = nothing)
     (dim1 == "lon" || dim1 == "long") ||
         error("First dimension has to be longitude (found $dim1)")
     dim2 == "lat" || error("Second dimension has to be latitude (found $dim2)")
-    (dim3 == "z") || dim3 == "z_reference" || error("Third dimension has to be altitude (found $dim3)")
+    (dim3 == "z") ||
+        dim3 == "z_reference" ||
+        error("Third dimension has to be altitude (found $dim3)")
 
     FT = eltype(var.data)
 
-    mass_weight =
-        isnothing(mass_weight) ? ones(FT, length(var.dims[dim3])) : mass_weight
+    mass_weight = isnothing(mass_weight) ? ones(FT, length(var.dims[dim3])) : mass_weight
 
     # Number of spherical wave numbers, excluding the first and the last
     # (reverse-engineered from ClimaCoreSpectra)
@@ -57,18 +58,14 @@ function compute_spectrum(var::ClimaAnalysis.OutputVar; mass_weight = nothing)
     mesh_info = nothing
 
     if !isempty(times)
-        output_spectrum =
-            zeros(FT, (length(times), num_output, length(var.dims[dim3])))
+        output_spectrum = zeros(FT, (length(times), num_output, length(var.dims[dim3])))
         dims = Dict(time => times)
         dim_attributes = Dict(time => var.dim_attributes[time])
         for index in 1:length(times)
             spectrum_data, _wave_numbers, _spherical, mesh_info =
                 power_spectrum_2d(FT, var.data[index, :, :, :], mass_weight)
             output_spectrum[index, :, :] .=
-                dropdims(sum(spectrum_data; dims = 1); dims = 1)[
-                    (begin + 1):(end - 1),
-                    :,
-                ]
+                dropdims(sum(spectrum_data; dims = 1); dims = 1)[(begin + 1):(end - 1), :]
         end
     else
         dims = Dict{String, Vector{FT}}()
@@ -77,10 +74,7 @@ function compute_spectrum(var::ClimaAnalysis.OutputVar; mass_weight = nothing)
         spectrum_data, _wave_numbers, _spherical, mesh_info =
             power_spectrum_2d(FT, var.data[:, :, :], mass_weight)
         output_spectrum[:, :] .=
-            dropdims(sum(spectrum_data; dims = 1); dims = 1)[
-                (begin + 1):(end - 1),
-                :,
-            ]
+            dropdims(sum(spectrum_data; dims = 1); dims = 1)[(begin + 1):(end - 1), :]
     end
 
     w_numbers = collect(1:1:(mesh_info.num_spherical - 1))

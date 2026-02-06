@@ -55,6 +55,8 @@ import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule, EveryStepSchedule
 
 # Trigger ClimaCouplerMakieExt extension
 using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, NCDatasets, Poppler_jll
+# Trigger ClimaCouplerClimaCoreExt so atmosphere spectra plots work (make_atmos_spectra_plots)
+import ClimaCoreSpectra
 
 # Trigger ClimaCouplerCMIPExt extension
 # Note we only need these if running CMIP, but for now we share one environment for all experiments

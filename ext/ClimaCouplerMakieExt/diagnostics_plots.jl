@@ -20,6 +20,97 @@ long_name(var) = var.attributes["long_name"]
 short_name(var) = var.attributes["short_name"]
 
 """
+    plot_spectrum_with_line!(grid_loc, spectrum; exponent = -3.0)
+
+Plots the given spectrum alongside a line that identifies a power law.
+Assumes 1D spectrum (e.g. spectrum sliced at one level).
+"""
+function plot_spectrum_with_line!(grid_loc, spectrum; exponent = -3.0)
+    ndims(spectrum.data) == 1 || error("Can only work with 1D spectrum")
+    CAN.Visualize.plot!(grid_loc, spectrum)
+
+    dim_name = spectrum.index2dim[begin]
+    ax = CairoMakie.current_axis()
+
+    # Ignore below wavenumber of 10
+    spectrum_10 = CAN.window(spectrum, dim_name; left = log10(10))
+
+    # Add reference line
+    wavenumbers = spectrum_10.dims[dim_name]
+    max_spectrum_10 = maximum(spectrum_10.data)
+    wavenumber_at_max = wavenumbers[argmax(spectrum_10.data)]
+    intercept = 1.2 * (max_spectrum_10 - exponent * wavenumber_at_max)
+    reference_line(k) = exponent * k + intercept
+
+    color = :orange
+    CairoMakie.lines!(ax, wavenumbers, reference_line.(wavenumbers); color)
+    CairoMakie.text!(
+        ax,
+        wavenumber_at_max,
+        reference_line(wavenumber_at_max),
+        text = "k^$exponent";
+        color,
+    )
+    return nothing
+end
+
+"""
+    make_atmos_spectra_plots(
+        output_path::AbstractString,
+        plot_path::AbstractString;
+        output_prefix = "",
+    )
+
+Create spectra plots for atmosphere diagnostics (currently `ua`, `ta`, `hus`).
+
+Reads variables from `output_path` via ClimaAnalysis, computes spectra using
+`ClimaCouplerClimaCoreExt.compute_spectrum`, slices at `z = 1500`, and saves the result
+to ``output_prefix * "spectra.pdf"`` under `plot_path`. Returns `nothing` (no plots) when
+ClimaCoreSpectra is not loaded; load it (e.g. `using ClimaCoreSpectra`) to enable spectra plots.
+"""
+function Plotting.make_atmos_spectra_plots(
+    output_path::AbstractString,
+    plot_path::AbstractString;
+    output_prefix = "",
+)
+    simdir = CAN.SimDir(output_path)
+    short_names = CAN.available_vars(simdir)
+    isempty(short_names) && return nothing
+
+    short_names_spectra = ["ua", "ta", "hus"]
+    vars_spectra = CAN.OutputVar[]
+    # ClimaCouplerClimaCoreExt loads only when the user does `using ClimaCoreSpectra` (it is
+    # not triggered when ClimaCoreSpectra is loaded transitively as a dep of ClimaCouplerMakieExt).
+    ext = Base.get_extension(ClimaCoupler, :ClimaCouplerClimaCoreExt)
+    isnothing(ext) && return nothing
+    compute_spectrum_fn = ext.compute_spectrum
+
+    for sn in short_names_spectra
+        sn in short_names || continue
+        reductions = CAN.available_reductions(simdir; short_name = sn)
+        reduction = "average" in reductions ? "average" : first(reductions)
+        periods = CAN.available_periods(simdir; short_name = sn, reduction)
+        period = "1d" in periods ? "1d" : first(periods)
+
+        var = get(simdir; short_name = sn, reduction, period)
+        var = CAN.slice(var; time = LAST_SNAP)
+        var = compute_spectrum_fn(var)
+        var = CAN.slice(var; z = 1500)
+        push!(vars_spectra, var)
+    end
+
+    isempty(vars_spectra) && return nothing
+
+    return make_plots_generic(
+        output_path,
+        plot_path,
+        vars_spectra;
+        output_name = output_prefix * "spectra",
+        plot_fn = plot_spectrum_with_line!,
+    )
+end
+
+"""
     make_diagnostics_plots(
         output_path::AbstractString,
         plot_path::AbstractString;

@@ -20,6 +20,8 @@ function make_diagnostics_plots end
 
 function make_ocean_diagnostics_plots end
 
+function make_atmos_spectra_plots end
+
 function debug end
 
 function debug_plot_fields end
@@ -39,6 +41,7 @@ extension_fns = [
     (:Makie, :CairoMakie, :ClimaCoreMakie, :GeoMakie, :Poppler_jll, :Printf) => [
         :make_diagnostics_plots,
         :make_ocean_diagnostics_plots,
+        :make_atmos_spectra_plots,
         :debug,
         :debug_plot_fields,
         :debug_plot!,
@@ -128,6 +131,12 @@ function postprocess(
     make_diagnostics_plots(coupler_output_dir, artifacts_dir, output_prefix = "coupler_")
     make_diagnostics_plots(atmos_output_dir, artifacts_dir, output_prefix = "atmos_")
     make_diagnostics_plots(land_output_dir, artifacts_dir, output_prefix = "land_")
+
+    make_atmos_spectra_plots(
+        atmos_output_dir,
+        artifacts_dir,
+        output_prefix = "atmos_spectra_",
+    )
 
     # Note: slab ocean doesn't have diagnostics, so we only handle Oceananigans here
     make_ocean_diagnostics_plots(ocean_output_dir, artifacts_dir, output_prefix = "ocean_")

@@ -109,7 +109,7 @@ function OceananigansSimulation(
     bottom_height = CO.regrid_bathymetry(
         underlying_grid;
         minimum_depth = 20,
-        interpolation_passes = 25,
+        interpolation_passes = 2,
         major_basins = 1,
     )
     grid = OC.ImmersedBoundaryGrid(
@@ -507,6 +507,122 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
         OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* (1.0 .- ice_concentration) .*
         (remapped_P_liq .+ remapped_P_snow) ./ reference_density
     return nothing
+end
+
+"""
+    ocean_seaice_fluxes!(ocean_sim::OceananigansSimulation, ice_sim::ClimaSeaIceSimulation)
+
+Compute the fluxes between the ocean and sea ice, storing them in the `ocean_ice_fluxes`
+fields of the ocean and sea ice simulations.
+
+This function assumes both simulations share the same grid, so no remapping is done.
+
+Both simulations have had their atmospheric fluxes updated already in this timestep
+(see `update_sim!` and `update_turbulent_fluxes!`), so we add the contributions from the
+ocean-sea ice interactions to the existing fluxes, rather than overwriting all fluxes.
+
+!!! note
+    This function must be called after the turbulent fluxes have been updated in both
+    simulations. Here only the contributions from the sea ice/ocean interactions
+    are added to the fluxes.
+"""
+function FluxCalculator.ocean_seaice_fluxes!(
+    ocean_sim::OceananigansSimulation,
+    ice_sim::ClimaSeaIceSimulation,
+)
+    ocean_properties = ocean_sim.ocean_properties
+    ice_concentration = Interfacer.get_field(ice_sim, Val(:ice_concentration))
+
+    # Update the sea ice concentration in the ocean simulation
+    ocean_sim.ice_concentration .= ice_concentration
+
+    # Compute the fluxes and store them in the both simulations
+    CO.OceanSeaIceModels.InterfaceComputations.compute_sea_ice_ocean_fluxes!(
+        ice_sim.ocean_ice_interface,
+        ocean_sim.ocean,
+        ice_sim.ice,
+        ocean_properties,
+    )
+
+    ## Update the internals of the sea ice model
+    # Set the bottom heat flux to the sum of the frazil and interface heat fluxes
+    bottom_heat_flux = ice_sim.ice.model.external_heat_fluxes.bottom
+
+    Qf = ice_sim.ocean_ice_interface.fluxes.frazil_heat        # frazil heat flux
+    Qi = ice_sim.ocean_ice_interface.fluxes.interface_heat     # interfacial heat flux
+    bottom_heat_flux .= Qf .+ Qi
+
+    ## Update the internals of the ocean model
+    ρₒ⁻¹ = 1 / ocean_sim.ocean_properties.reference_density
+    cₒ = ocean_sim.ocean_properties.heat_capacity
+
+    # Compute fluxes for u, v, T, and S from momentum, heat, and freshwater fluxes
+    oc_flux_u = surface_flux(ocean_sim.ocean.model.velocities.u)
+    oc_flux_v = surface_flux(ocean_sim.ocean.model.velocities.v)
+
+    ρτxio = ice_sim.ocean_ice_interface.fluxes.x_momentum # sea_ice - ocean zonal momentum flux
+    ρτyio = ice_sim.ocean_ice_interface.fluxes.y_momentum # sea_ice - ocean meridional momentum flux
+
+    # Update the momentum flux contributions from ocean/sea ice fluxes
+    grid = ocean_sim.ocean.model.grid
+    arch = OC.Architectures.architecture(grid)
+    OC.Utils.launch!(
+        arch,
+        grid,
+        :xy,
+        _add_ocean_ice_stress!,
+        oc_flux_u,
+        oc_flux_v,
+        grid,
+        ρτxio,
+        ρτyio,
+        ρₒ⁻¹,
+        ice_concentration,
+    )
+
+    oc_flux_T = surface_flux(ocean_sim.ocean.model.tracers.T)
+    OC.interior(oc_flux_T, :, :, 1) .+=
+        OC.interior(ice_concentration, :, :, 1) .* OC.interior(Qi, :, :, 1) .* ρₒ⁻¹ ./ cₒ
+
+    oc_flux_S = surface_flux(ocean_sim.ocean.model.tracers.S)
+    OC.interior(oc_flux_S, :, :, 1) .+=
+        OC.interior(ice_concentration, :, :, 1) .*
+        OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
+
+    return nothing
+end
+
+"""
+    _add_ocean_ice_stress!(oc_flux_u, oc_flux_v, grid, ρτxio, ρτyio, ρₒ⁻¹, ice_concentration)
+
+Add the contribution from the ocean-ice stress to the surface fluxes for each
+component of the ocean velocity (u and v).
+
+Arguments:
+- `oc_flux_u`: [Field] the surface flux for the ocean zonal velocity.
+- `oc_flux_v`: [Field] the surface flux for the ocean meridional velocity.
+- `grid`: [Grid] the grid used by ocean and ice.
+- `ρτxio`: [Field] the ice-ocean zonal momentum flux.
+- `ρτyio`: [Field] the ice-ocean meridional momentum flux.
+- `ρₒ⁻¹`: [Float] the inverse of the ocean reference density.
+- `ice_concentration`: [Field] the sea ice concentration.
+"""
+@kernel function _add_ocean_ice_stress!(
+    oc_flux_u,
+    oc_flux_v,
+    grid,
+    ρτxio,
+    ρτyio,
+    ρₒ⁻¹,
+    ice_concentration,
+)
+    i, j = @index(Global, NTuple)
+
+    # ℑxᶠᵃᵃ: interpolate faces to centers
+    oc_flux_u[i, j, 1] +=
+        ρτxio[i, j, 1] * ρₒ⁻¹ * OC.Operators.ℑxᶠᵃᵃ(i, j, 1, grid, ice_concentration)
+    oc_flux_v[i, j, 1] +=
+        ρτyio[i, j, 1] * ρₒ⁻¹ * OC.Operators.ℑyᵃᶠᵃ(i, j, 1, grid, ice_concentration)
 end
 
 """

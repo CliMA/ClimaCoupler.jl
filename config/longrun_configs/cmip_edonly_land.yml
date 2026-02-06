@@ -1,4 +1,4 @@
-FLOAT_TYPE: "Float32"
+FLOAT_TYPE: "Float64"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 checkpoint_dt: "720hours"
 dt_atmos: "120secs" # 2 minutes

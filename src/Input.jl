@@ -120,6 +120,10 @@ function argparse_settings()
         help = "Number of horizontal elements to use for the boundary space [16 (default)]"
         arg_type = Int
         default = 16
+        "--nh_poly"
+        help = "Polynomial order to use for the boundary space [3 (default)]"
+        arg_type = Int
+        default = 3
         "--share_surface_space"
         help = "Boolean flag indicating whether to share the surface space between the surface models, atmosphere, and boundary [`true` (default), `false`]"
         arg_type = Bool
@@ -229,6 +233,10 @@ function argparse_settings()
         help = "Ocean model to use. [`prescribed` (default), `oceananigans`, `slab`, `nothing`]"
         arg_type = String
         default = "prescribed"
+        "--simple_ocean"
+        help = "Boolean flag indicating whether to use a simpler ocean model setup with Oceananigans [`false` (default), `true`]"
+        arg_type = Bool
+        default = false
         # Ice model specific
         "--ice_model"
         help = "Sea ice model to use. [`prescribed` (default), `clima_seaice`, `nothing`]"
@@ -424,6 +432,7 @@ function get_coupler_args(config_dict::Dict)
 
     # Ocean model-specific information
     ocean_model = Val(Symbol(config_dict["ocean_model"]))
+    simple_ocean = config_dict["simple_ocean"]
 
     # Ice model-specific information
     ice_model = Val(Symbol(config_dict["ice_model"]))
@@ -472,6 +481,7 @@ function get_coupler_args(config_dict::Dict)
         parameter_files,
         era5_initial_condition_dir,
         ocean_model,
+        simple_ocean,
         ice_model,
         land_fraction_source,
         binary_area_fraction,

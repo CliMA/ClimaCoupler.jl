@@ -151,13 +151,52 @@ function ClimaLandSimulation(
         time_interpolation_method = LinearInterpolation(),
     )
 
+    ground = CL.PrognosticGroundConditions{FT}()
+    canopy_forcing = (; forcing.atmos, forcing.radiation, ground)
+    prognostic_land_components = (:canopy, :snow, :soil, :soilco2)
+
+    # Construct the P model manually since it is not a default
+    photosynthesis = CL.Canopy.PModel{FT}(domain, toml_dict)
+    conductance = CL.Canopy.PModelConductance{FT}(toml_dict)
+    # Use the soil moisture stress function based on soil moisture only
+    soil_moisture_stress = CL.Canopy.PiecewiseMoistureStressModel{FT}(domain, toml_dict)
+    surface_domain = CL.Domains.obtain_surface_domain(domain)
+    canopy = CL.Canopy.CanopyModel{FT}(
+        surface_domain,
+        canopy_forcing,
+        LAI,
+        toml_dict;
+        prognostic_land_components,
+        photosynthesis,
+        conductance,
+        soil_moisture_stress,
+    )
+
+    # Snow model setup
+    # Set β = 0 in order to regain model without density dependence
+    α_snow = CL.Snow.ZenithAngleAlbedoModel(toml_dict)
+    horz_degree_res = FT(sum(CL.Domains.average_horizontal_resolution_degrees(domain)) / 2) # mean of resolution in latitude and longitude, in degrees
+    scf = CL.Snow.WuWuSnowCoverFractionModel(toml_dict, horz_degree_res)
+    snow = CL.Snow.SnowModel(
+        FT,
+        surface_domain,
+        forcing,
+        toml_dict,
+        dt;
+        prognostic_land_components,
+        α_snow,
+        scf,
+    )
+
     model = CL.LandModel{FT}(
         forcing,
         LAI,
         toml_dict,
         domain,
         dt;
-        prognostic_land_components = (:canopy, :snow, :soil, :soilco2),
+        prognostic_land_components,
+        snow,
+        canopy,
     )
 
     Y, p, coords = CL.initialize(model)

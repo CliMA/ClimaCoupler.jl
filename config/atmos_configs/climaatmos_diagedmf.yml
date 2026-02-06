@@ -25,6 +25,7 @@ rad: "allskywithclear"
 rayleigh_sponge: true
 surface_setup: "DefaultMoninObukhov"
 t_end: "120days"
+initial_condition: "AMIPFromERA5"
 time_varying_trace_gases: ["CO2", "O3"]
 toml: [toml/longrun_aquaplanet_diagedmf.toml]
 turbconv: "diagnostic_edmfx"

@@ -1,7 +1,3 @@
-import ClimaCore as CC
-import ClimaLand as CL
-import ClimaParams as CP
-
 """
     temp_anomaly_aquaplanet(coord)
 

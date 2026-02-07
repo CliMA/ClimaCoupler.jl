@@ -236,7 +236,7 @@ function OceananigansSimulation(
         )
         free_surface_writer = OC.NetCDFWriter(
             ocean.model,
-            (; η = ocean.model.free_surface.displacement);
+            (; displacement = ocean.model.free_surface.displacement);
             schedule = OC.TimeInterval(3600), # hourly snapshots
             filename = joinpath(output_dir, "ocean_free_surface.nc"),
             overwrite_existing = true,

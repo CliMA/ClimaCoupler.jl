@@ -90,6 +90,7 @@ end
         "era5_initial_condition_dir" => nothing,
         "ocean_model" => "prescribed",
         "ice_model" => "prescribed",
+        "simple_ocean" => false,
         "land_fraction_source" => "etopo",
         "binary_area_fraction" => true,
         "component_dt_dict" => Dict(

@@ -81,6 +81,7 @@ interface_pages = [
     "utilities.md",
     "simoutput.md",
     "plotting.md",
+    "calibrationtools.md",
 ]
 performance_pages = ["performance.md"]
 

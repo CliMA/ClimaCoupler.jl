@@ -46,3 +46,6 @@ end
 @safetestset "Prescribed sea ice model tests" begin
     include("models/prescr_seaice_tests.jl")
 end
+@safetestset "Calibrate tools" begin
+    include("calibrate_tools_tests.jl")
+end

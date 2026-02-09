@@ -44,13 +44,20 @@ end
 """
     print_extrema(field)
 
-Return a string containing the minimum and maximum values of an Oceananigans
-field, formatted using scientific notation with 2 significant digits.
+Return a tuple `(string, has_nan::Bool)` where:
+- `string` is the minimum and maximum values of an Oceananigans field formatted as a string
+- `has_nan` is true if the extrema contain NaN values
 """
 function Plotting.print_extrema(field::OC.Field)
-    min = Printf.@sprintf("%.2E", minimum(field))
-    max = Printf.@sprintf("%.2E", maximum(field))
-    return " [$min, $max]"
+    min_val = minimum(field)
+    max_val = maximum(field)
+
+    # Check for NaN values
+    has_nan = isnan(min_val) || isnan(max_val)
+
+    min = Printf.@sprintf("%.2E", min_val)
+    max = Printf.@sprintf("%.2E", max_val)
+    return (" [$min, $max]", has_nan)
 end
 function Plotting.print_extrema(operation::OC.AbstractOperations.AbstractOperation)
     evaluated_field = OC.Field(operation)

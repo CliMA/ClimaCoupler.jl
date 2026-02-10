@@ -161,6 +161,15 @@ function ClimaLandSimulation(
     # Use the soil moisture stress function based on soil moisture only
     soil_moisture_stress = CL.Canopy.PiecewiseMoistureStressModel{FT}(domain, toml_dict)
     surface_domain = CL.Domains.obtain_surface_domain(domain)
+    biomass = CL.Canopy.PrescribedBiomassModel{FT}(
+        domain,
+        LAI,
+        toml_dict;
+        height = CL.Canopy.clm_canopy_height(
+            domain.space.surface;
+            max_height = minimum(atmos_h) * FT(0.9),
+        ),
+    )
     canopy = CL.Canopy.CanopyModel{FT}(
         surface_domain,
         canopy_forcing,
@@ -170,6 +179,7 @@ function ClimaLandSimulation(
         photosynthesis,
         conductance,
         soil_moisture_stress,
+        biomass,
     )
 
     # Snow model setup

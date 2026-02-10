@@ -14,6 +14,7 @@ import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import ClimaCore as CC
 import ClimaCoupler
+import ..Checkpointer
 import ..Interfacer
 import ..Utilities
 
@@ -335,7 +336,37 @@ function get_coupler_config_dict(config_file)
     # Select the correct timestep for each component model based on which are available
     parse_component_dts!(config_dict)
 
+    update_t_start!(config_dict)
+
     return config_dict
+end
+
+"""
+    update_t_start!(config_dict)
+
+Update `t_start` in `config_dict` for restarts.
+"""
+function update_t_start!(config_dict)
+    # Update t_start for restarts
+    (; detect_restart_files, output_dir_root, restart_dir, restart_t) =
+        get_coupler_args(config_dict)
+    # Checkpoint directory is hardcoded and can be wrong if
+    # Utilities.setup_output_dirs is updated
+    checkpoints_dir = joinpath(output_dir_root, "checkpoints")
+    if detect_restart_files
+        isnothing(restart_t) &&
+            (restart_t = Checkpointer.t_start_from_checkpoint(checkpoints_dir))
+        isnothing(restart_dir) && (restart_dir = checkpoints_dir)
+    end
+    should_restart = !isnothing(restart_t) && !isnothing(restart_dir)
+    if should_restart
+        # We only support a round number of seconds
+        isinteger(float(restart_t)) ||
+            error("Cannot restart from a non integer number of seconds")
+        restart_t_int = Int(float(restart_t))
+        config_dict["t_start"] = "$(restart_t_int)secs"
+    end
+    return nothing
 end
 
 """

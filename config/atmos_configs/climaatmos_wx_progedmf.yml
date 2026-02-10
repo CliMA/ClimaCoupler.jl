@@ -7,7 +7,6 @@ topo_smoothing: true
 topography: "Earth"
 rayleigh_sponge: true
 viscous_sponge: true
-hyperdiff: ClimaHyperdiffusion
 divergence_damping_factor: 50.0
 scalar_hyperdiffusion_coefficient: 0.929738
 vorticity_hyperdiffusion_coefficient: 0.1857

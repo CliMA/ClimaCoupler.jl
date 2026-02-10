@@ -1,18 +1,9 @@
-import Oceananigans as OC
-import ClimaSeaIce as CSI
 using ClimaSeaIce.SeaIceThermodynamics.HeatBoundaryConditions:
     IceWaterThermalEquilibrium, MeltingConstrainedFluxBalance, get_tracer, RadiativeEmission
-import ClimaOcean as CO
-import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms
-import ClimaCore as CC
-import StaticArrays
 import SurfaceFluxes as SF
 import Thermodynamics as TD
 import ClimaOcean.EN4: download_dataset
-using KernelAbstractions: @kernel, @index, @inbounds
-
-include("climaocean_helpers.jl")
 
 """
     ice_flux_balance_temperature(T_sfc, Q_turb, SW_d, LW_d, α, ε, σ, h, k, T_base; T_melt, T_min)

@@ -1,16 +1,11 @@
-import Oceananigans as OC
-import ClimaOcean as CO
-import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
 import ClimaComms
-import ClimaCore as CC
 import SurfaceFluxes as SF
 import Thermodynamics as TD
-import ClimaParams as CP
 import ClimaOcean.EN4: download_dataset
-using KernelAbstractions: @kernel, @index, @inbounds
 
 include("climaocean_helpers.jl")
 include("ocean_skin.jl")
+import Dates
 
 """
     OceananigansSimulation{SIM, A, OPROP, REMAP, SIC}

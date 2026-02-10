@@ -56,6 +56,10 @@ import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule, EveryStepSchedule
 # Trigger ClimaCouplerMakieExt extension
 using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, NCDatasets, Poppler_jll
 
+# Trigger ClimaCouplerCMIPExt extension
+# Note we only need these if running CMIP, but for now we share one environment for all experiments
+import Oceananigans, ClimaOcean, ClimaSeaIce, KernelAbstractions
+
 pkg_dir = pkgdir(ClimaCoupler)
 
 #=
@@ -68,8 +72,6 @@ contain any internals of the ClimaCoupler source code, except extensions to the 
 include("components/atmosphere/climaatmos.jl")
 include("components/land/climaland_bucket.jl")
 include("components/land/climaland_integrated.jl")
-include("components/ocean/oceananigans.jl")
-include("components/ocean/clima_seaice.jl")
 
 #=
 ### Configuration Dictionaries

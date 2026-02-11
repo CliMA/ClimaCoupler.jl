@@ -5,29 +5,6 @@ import ClimaOcean.EN4: download_dataset
 import Dates
 
 """
-    OceananigansSimulation{SIM, A, OPROP, REMAP, SIC}
-
-The ClimaCoupler simulation object used to run with Oceananigans.
-This type is used by the coupler to indicate that this simulation
-is a surface/ocean simulation for dispatch.
-
-It contains the following objects:
-- `ocean::SIM`: The Oceananigans simulation object.
-- `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
-- `ocean_properties::OPROP`: A NamedTuple of ocean properties and parameters (including COARE3 roughness params).
-- `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
-- `ice_concentration::SIC`: An Oceananigans Field representing the sea ice concentration on the ocean/sea ice grid.
-"""
-struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC} <:
-       Interfacer.AbstractOceanSimulation
-    ocean::SIM
-    area_fraction::A
-    ocean_properties::OPROP
-    remapping::REMAP
-    ice_concentration::SIC
-end
-
-"""
     Interfacer.OceanSimulation(::Type{FT}, ::Val{:oceananigans}; kwargs...)
 
 Extension of the generic OceanSimulation constructor for the Oceananigans ocean model.

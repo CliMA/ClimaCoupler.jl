@@ -379,12 +379,14 @@ function FluxCalculator.compute_surface_fluxes!(
     
     # Ice thickness (field, remapped to boundary space)
     δ = Interfacer.get_field(sim, Val(:ice_thickness))
+    δ_field = CC.Fields.fill(FT(δ), boundary_space)
     
     # Internal temperature (field, remapped to boundary space)
     T_i = Interfacer.get_field(sim, Val(:internal_temperature))
+    T_i_field = CC.Fields.fill(FT(T_i), boundary_space)
     
     # Stefan-Boltzmann constant (scalar)
-    σ = sim.ice_properties.σ
+    σ = FT(sim.ice_properties.σ)
     
     # Emissivity (scalar, broadcast to field)
     ϵ_scalar = Interfacer.get_field(sim, Val(:emissivity))

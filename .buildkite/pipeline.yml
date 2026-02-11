@@ -1,5 +1,5 @@
 agents:
-  queue: central
+  queue: clima
   slurm_time: 4:00:00
   modules: climacommon/2025_05_15
 
@@ -67,16 +67,6 @@ steps:
         key: "gpu_cmip_oceananigans_climaseaice_bucket"
         command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice_bucket.yml --job_id gpu_cmip_oceananigans_climaseaice_bucket"
         artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_bucket/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
-
-      - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce"
-        key: "gpu_cmip_oceananigans_climaseaice"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice.yml --job_id gpu_cmip_oceananigans_climaseaice"
-        artifact_paths: "output/gpu_cmip_oceananigans_climaseaice/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

@@ -378,11 +378,10 @@ end
 Extend Interfacer.add_coupler_fields! to add the fields required for BucketSimulation.
 
 The fields added are:
-- `:ρ_sfc`
 - `:P_atmos`
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::BucketSimulation)
-    bucket_coupler_fields = [:ρ_sfc, :P_atmos]
+    bucket_coupler_fields = [:P_atmos]
     push!(coupler_field_names, bucket_coupler_fields...)
 end
 

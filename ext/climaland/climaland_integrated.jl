@@ -338,7 +338,7 @@ function ClimaLandSimulation(
     updatefunc = CL.make_update_drivers(CL.get_drivers(model))
     driver_cb = CL.DriverUpdateCallback(updatefunc, update_dt, tspan[1])
     dt_itime = dt isa ITime ? dt : ITime(Int(dt), Second(1), start_date)
-    t0_itime = tspan[1] isa ITime ? tspan[1] : ITime(Int(t0), Second(1), start_date)
+    t0_itime = tspan[1] isa ITime ? tspan[1] : ITime(Int(tspan[1]), Second(1), start_date)
     model_callbacks = CL.get_model_callbacks(model; t0 = t0_itime, Δt = dt_itime)
     required_callbacks = (driver_cb, model_callbacks...)
 

@@ -386,19 +386,19 @@ function FluxCalculator.compute_surface_fluxes!(
     # Stefan-Boltzmann constant (scalar)
     σ = sim.ice_properties.σ
     
-    # Emissivity (scalar, broadcast to field)
+    # Emissivity (scalar, broadcast to field); convert to FT for Float32 GPU compatibility
     ϵ_scalar = Interfacer.get_field(sim, Val(:emissivity))
-    ϵ = CC.Fields.fill(ϵ_scalar, boundary_space)
+    ϵ = CC.Fields.fill(convert(FT, ϵ_scalar), boundary_space)
     
     # Density and heat capacity (scalars)
     ρ = sim.ice.model.ice_thermodynamics.phase_transitions.ice_density
     c = sim.ice.model.ice_thermodynamics.phase_transitions.ice_heat_capacity
     
-    # Radiation and albedo (fields)
+    # Radiation and albedo (fields); convert to FT for Float32 GPU compatibility
     SW_d = csf.SW_d
     LW_d = csf.LW_d
     α_albedo_scalar = Interfacer.get_field(sim, Val(:surface_direct_albedo))
-    α_albedo = CC.Fields.fill(α_albedo_scalar, boundary_space)
+    α_albedo = CC.Fields.fill(convert(FT, α_albedo_scalar), boundary_space)
 
     # Create the update_T_sfc callback element-wise
     # Since update_T_sfc returns a function, we broadcast it to create a field of callbacks

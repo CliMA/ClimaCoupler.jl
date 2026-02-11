@@ -369,8 +369,13 @@ function FluxCalculator.compute_surface_fluxes!(
     config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
 
     # Get sea ice parameters for update_T_sfc callback
-    # Thermal conductivity (scalar)
-    κ = sim.ice.model.ice_thermodynamics.internal_heat_flux.conductivity
+    # Thermal conductivity (scalar); ConductiveFlux has .conductivity, FluxFunction does not
+    internal_heat_flux = sim.ice.model.ice_thermodynamics.internal_heat_flux
+    κ = if hasfield(typeof(internal_heat_flux), :conductivity)
+        internal_heat_flux.conductivity
+    else
+        convert(FT, 2) # default conductivity [W m⁻¹ K⁻¹] when internal_heat_flux is FluxFunction etc.
+    end
     
     # Ice thickness (field, remapped to boundary space)
     δ = Interfacer.get_field(sim, Val(:ice_thickness))

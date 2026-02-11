@@ -249,7 +249,14 @@ function compute_surface_fluxes!(
     return nothing
 end
 
-function compute_surface_fluxes!(
+"""
+    _compute_surface_fluxes_base!(csf, sim, atmos_sim, thermo_params)
+
+Base implementation for computing surface fluxes. Extracted into a helper function
+so that specialized methods (e.g. iterative skin temperature) can call it directly
+without using `invoke`.
+"""
+function _compute_surface_fluxes_base!(
     csf,
     sim::Interfacer.AbstractSurfaceSimulation,
     atmos_sim::Interfacer.AbstractAtmosSimulation,
@@ -365,6 +372,15 @@ function compute_surface_fluxes!(
     @. csf.ustar += ustar * area_fraction
     @. csf.buoyancy_flux += buoyancy_flux * area_fraction
     return nothing
+end
+
+function compute_surface_fluxes!(
+    csf,
+    sim::Interfacer.AbstractSurfaceSimulation,
+    atmos_sim::Interfacer.AbstractAtmosSimulation,
+    thermo_params,
+)
+    return _compute_surface_fluxes_base!(csf, sim, atmos_sim, thermo_params)
 end
 
 """

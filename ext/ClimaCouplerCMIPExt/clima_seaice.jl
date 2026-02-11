@@ -381,14 +381,7 @@ function FluxCalculator.compute_surface_fluxes!(
     thermo_params,
 )
     if !Interfacer.get_field(sim, Val(:use_iterative_ice_skin))
-        return invoke(
-            FluxCalculator.compute_surface_fluxes!,
-            Tuple{Any, Interfacer.AbstractSurfaceSimulation, Interfacer.AbstractAtmosSimulation, Any},
-            csf,
-            sim,
-            atmos_sim,
-            thermo_params,
-        )
+        return FluxCalculator._compute_surface_fluxes_base!(csf, sim, atmos_sim, thermo_params)
     end
 
     boundary_space = axes(csf)

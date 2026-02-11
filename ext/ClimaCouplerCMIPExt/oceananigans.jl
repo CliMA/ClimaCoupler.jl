@@ -3,7 +3,6 @@ import SurfaceFluxes as SF
 import Thermodynamics as TD
 import ClimaOcean.EN4: download_dataset
 
-include("climaocean_helpers.jl")
 include("ocean_skin.jl")
 import Dates
 
@@ -225,24 +224,29 @@ function OceananigansSimulation(
 
     # Before version 0.96.22, the NetCDFWriter was broken on GPU
     if arch isa OC.CPU
-        # Save all tracers and velocities to a NetCDF file at daily frequency
+        # Surface diagnostics: use JLD2 to avoid NetCDF z_aaf dimension conflict (surface slice vs full depth)
         outputs = merge(ocean.model.tracers, ocean.model.velocities)
-        surface_writer = OC.NetCDFWriter(
+        surface_writer = OC.JLD2Writer(
             ocean.model,
             outputs;
             schedule = OC.TimeInterval(86400), # Daily output
-            filename = joinpath(output_dir, "ocean_diagnostics.nc"),
+            filename = "ocean_diagnostics",
+            dir = output_dir,
             indices = (:, :, grid.Nz),
             overwrite_existing = true,
             array_type = Array{FT},
         )
+        # Surface-only indices so NetCDF dimension z_aaf is length 1 (avoids conflict with full-depth grid).
+        # η (free_surface.displacement) is a ZFaceField at the top face, so use Nz+1; fluxes are at top cell (Nz).
         free_surface_writer = OC.NetCDFWriter(
             ocean.model,
             (; η = ocean.model.free_surface.displacement);
             schedule = OC.TimeInterval(3600), # hourly snapshots
             filename = joinpath(output_dir, "ocean_free_surface.nc"),
+            indices = (:, :, grid.Nz+1), # top face for ZFaceField η
             overwrite_existing = true,
             array_type = Array{FT},
+            include_grid_metrics = false,
         )
         Tflux = ocean.model.tracers.T.boundary_conditions.top.condition
         Sflux = ocean.model.tracers.S.boundary_conditions.top.condition
@@ -253,8 +257,10 @@ function OceananigansSimulation(
             (; Tflux, Sflux, uflux, vflux);
             schedule = OC.TimeInterval(3600), # hourly snapshots
             filename = joinpath(output_dir, "ocean_fluxes.nc"),
+            indices = (:, :, grid.Nz), # top cell for surface flux BCs
             overwrite_existing = true,
             array_type = Array{FT},
+            include_grid_metrics = false,
         )
 
         ocean.output_writers[:surface] = surface_writer

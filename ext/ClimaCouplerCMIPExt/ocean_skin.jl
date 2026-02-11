@@ -145,39 +145,51 @@ function ocean_update_T_sfc(
 end
 
 """
-    ocean_update_T_sfc_callback(SW_d, LW_d, α, ε, σ, T_ocean, δ, κ, ρ, c)
+    ocean_update_T_sfc_callback(sw_down, lw_down, albedo, emissivity, stefan_boltzmann,
+        T_ocean_bulk, skin_thickness, thermal_diffusivity, reference_density, heat_capacity)
 
-Wrapper that returns an `update_T_sfc` callback for SurfaceFluxes.surface_fluxes.
+Return an `update_T_sfc` callback for SurfaceFluxes.surface_fluxes.
 
-Takes the ocean/skin parameters (SW_d, LW_d, α, ε, σ, T_ocean, δ, κ, ρ, c) and returns
-a function (ζ, param_set, thermo_params, inputs, scheme, u_star, z0m, z0h) -> T_sfc
-that computes g_h from the current MOST state and calls `ocean_update_T_sfc` with
-those inputs and the closed-over ocean parameters. Use when coupling to SurfaceFluxes
-(e.g. Oceananigans with iterative ocean skin).
+The returned function takes the current MOST state (ζ, param_set, thermo_params, inputs,
+scheme, u_star, z0m, z0h), computes the heat exchange coefficient from that state, and
+solves for the ocean skin temperature satisfying the flux balance. Use when coupling to
+SurfaceFluxes (e.g. Oceananigans with iterative ocean skin).
 """
-function ocean_update_T_sfc_callback(SW_d, LW_d, α, ε, σ, T_ocean, δ, κ, ρ, c)
-    return function (ζ, param_set, thermo_params, inputs, scheme, u_star, z0m, z0h)
+function ocean_update_T_sfc_callback(
+    sw_down,
+    lw_down,
+    albedo,
+    emissivity,
+    stefan_boltzmann,
+    T_ocean_bulk,
+    skin_thickness,
+    thermal_diffusivity,
+    reference_density,
+    heat_capacity,
+)
+    function update_T_sfc(ζ, param_set, thermo_params, inputs, scheme, u_star, z0m, z0h)
         FT = eltype(param_set)
-        Δz_eff = inputs.Δz - inputs.d
-        Ch = SF.heat_exchange_coefficient(param_set, ζ, z0m, z0h, Δz_eff, scheme)
-        Cd = SF.drag_coefficient(param_set, ζ, z0m, Δz_eff, scheme)
-        ΔU = u_star / sqrt(max(Cd, eps(FT)))
-        g_h = Ch * ΔU
+        effective_height = inputs.Δz - inputs.d
+        Ch = SF.heat_exchange_coefficient(param_set, ζ, z0m, z0h, effective_height, scheme)
+        Cd = SF.drag_coefficient(param_set, ζ, z0m, effective_height, scheme)
+        wind_speed_scale = u_star / sqrt(max(Cd, eps(FT)))
+        heat_exchange_coef = Ch * wind_speed_scale
         return ocean_update_T_sfc(
             param_set,
             thermo_params,
             inputs,
-            g_h,
-            SW_d,
-            LW_d,
-            α,
-            ε,
-            σ,
-            T_ocean,
-            δ,
-            κ,
-            ρ,
-            c,
+            heat_exchange_coef,
+            sw_down,
+            lw_down,
+            albedo,
+            emissivity,
+            stefan_boltzmann,
+            T_ocean_bulk,
+            skin_thickness,
+            thermal_diffusivity,
+            reference_density,
+            heat_capacity,
         )
     end
+    return update_T_sfc
 end

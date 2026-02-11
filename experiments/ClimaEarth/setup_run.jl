@@ -31,6 +31,9 @@ import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
 
 # ## Coupler specific imports
+# Load these before ClimaCoupler so ClimaCouplerCMIPExt extension is loaded when ClimaCoupler loads
+import Oceananigans, ClimaOcean, ClimaSeaIce, KernelAbstractions
+
 using ClimaCoupler
 import ClimaCoupler.Interfacer:
     AbstractSlabplanetSimulationMode,
@@ -55,10 +58,6 @@ import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule, EveryStepSchedule
 
 # Trigger ClimaCouplerMakieExt extension
 using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, NCDatasets, Poppler_jll
-
-# Trigger ClimaCouplerCMIPExt extension
-# Note we only need these if running CMIP, but for now we share one environment for all experiments
-import Oceananigans, ClimaOcean, ClimaSeaIce, KernelAbstractions
 
 pkg_dir = pkgdir(ClimaCoupler)
 

@@ -501,10 +501,10 @@ deps = ["ArgParse", "ClimaAnalysis", "ClimaAtmos", "ClimaComms", "ClimaCore", "C
 path = "../.."
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.1.2"
-weakdeps = ["CairoMakie", "ClimaCoreMakie", "ClimaLand", "ClimaOcean", "ClimaSeaIce", "GeoMakie", "KernelAbstractions", "Makie", "NCDatasets", "Oceananigans", "Poppler_jll", "Printf"]
+weakdeps = ["CairoMakie", "ClimaCoreMakie", "ClimaLand", "ClimaOcean", "ClimaSeaIce", "ConservativeRegridding", "GeoMakie", "KernelAbstractions", "Makie", "NCDatasets", "Oceananigans", "Poppler_jll", "Printf"]
 
     [deps.ClimaCoupler.extensions]
-    ClimaCouplerCMIPExt = ["ClimaOcean", "ClimaSeaIce", "KernelAbstractions", "Oceananigans"]
+    ClimaCouplerCMIPExt = ["ClimaOcean", "ClimaSeaIce", "KernelAbstractions", "Oceananigans", "ConservativeRegridding"]
     ClimaCouplerClimaLandExt = ["ClimaLand", "NCDatasets"]
     ClimaCouplerMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Poppler_jll", "Printf"]
     ClimaCouplerOceananigansMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]

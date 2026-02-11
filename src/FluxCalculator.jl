@@ -275,9 +275,13 @@ function _compute_surface_fluxes_base!(
     T_sfc = csf.scalar_temp1
 
     # TODO: This is not accurate - we shouldn't assume condensate is 0.
+    # Use closure to capture surface_fluxes_params as scalar, avoiding scalar indexing on GPU
+    get_density_at_point = (args...) -> SF.surface_density(
+        surface_fluxes_params, # captured scalar, not broadcast over
+        args...,
+    )
     ρ_sfc =
-        SF.surface_density.(
-            surface_fluxes_params,
+        get_density_at_point.(
             csf.T_atmos,
             csf.ρ_atmos,
             T_sfc,
@@ -314,9 +318,14 @@ function _compute_surface_fluxes_base!(
     config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
 
     # calculate the surface fluxes
+    # Use closure to capture surface_fluxes_params as scalar, avoiding scalar indexing on GPU
+    # when ClimaCore broadcast calls _first on broadcast arguments
+    get_fluxes_at_point = (args...) -> FluxCalculator.get_surface_fluxes(
+        surface_fluxes_params, # captured scalar, not broadcast over
+        args...,
+    )
     fluxes =
-        FluxCalculator.get_surface_fluxes.(
-            surface_fluxes_params,
+        get_fluxes_at_point.(
             uv_int,
             csf.T_atmos,
             csf.q_tot_atmos,

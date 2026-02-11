@@ -277,6 +277,14 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:area_fraction}) = sim.ar
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_concentration}) =
     sim.ice.model.ice_concentration
 
+# Get ice thickness field (remapped to boundary space)
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_thickness}) =
+    Interfacer.remap(axes(sim.area_fraction), sim.ice.model.ice_thickness)
+
+# Get internal temperature (interface temperature with ocean, remapped to boundary space)
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:internal_temperature}) =
+    Interfacer.remap(axes(sim.area_fraction), sim.ocean_ice_interface.temperature)
+
 # TODO better values for this
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_model}) = :constant
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_buoyancy}) =
@@ -294,6 +302,195 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_diffuse_albedo})
 #  fluxes at the previous timestep.
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
     sim.ice_properties.C_to_K + sim.ice.model.ice_thermodynamics.top_surface_temperature
+
+"""
+    FluxCalculator.compute_surface_fluxes!(csf, sim::ClimaSeaIceSimulation, atmos_sim, thermo_params)
+
+Compute surface fluxes for ClimaSeaIceSimulation using the `update_T_sfc` callback
+to solve for the surface temperature using the flux balance equation.
+
+This function extends the default `compute_surface_fluxes!` to use the skin temperature
+update callback from `ClimaCouplerCMIPExt.update_T_sfc`.
+"""
+function FluxCalculator.compute_surface_fluxes!(
+    csf,
+    sim::ClimaSeaIceSimulation,
+    atmos_sim::Interfacer.AbstractAtmosSimulation,
+    thermo_params,
+)
+    import SurfaceFluxes as SF
+    import SurfaceFluxes.Parameters as SFP
+    import StaticArrays
+    import ClimaCouplerCMIPExt
+    
+    boundary_space = axes(csf)
+    FT = CC.Spaces.undertype(boundary_space)
+    surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
+
+    # Atmosphere fields are stored in coupler fields so we only regrid them once per timestep
+    uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
+
+    # Get initial surface temperature guess
+    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
+    T_sfc = csf.scalar_temp1
+
+    # Compute surface humidity from the surface temperature
+    ρ_sfc =
+        SF.surface_density.(
+            surface_fluxes_params,
+            csf.T_atmos,
+            csf.ρ_atmos,
+            T_sfc,
+            csf.height_int .- csf.height_sfc,
+            csf.q_tot_atmos,
+            0, # q_liq
+            0, # q_ice
+        )
+
+    csf.scalar_temp2 .= TD.q_vap_saturation.(thermo_params, T_sfc, ρ_sfc, 0, 0)
+    q_sfc = csf.scalar_temp2
+
+    # Set gustiness
+    gustiness = ones(boundary_space)
+
+    # Get roughness model (sea ice uses constant roughness)
+    roughness_model = Interfacer.get_field(sim, Val(:roughness_model))
+    roughness_params = if roughness_model == :coare3
+        Interfacer.get_field(sim, Val(:coare3_roughness_params))
+    elseif roughness_model == :constant
+        Interfacer.get_field!(csf.scalar_temp3, sim, Val(:roughness_momentum))
+        z0m = csf.scalar_temp3
+        Interfacer.get_field!(csf.scalar_temp4, sim, Val(:roughness_buoyancy))
+        z0b = csf.scalar_temp4
+        SF.ConstantRoughnessParams.(z0m, z0b)
+    else
+        error("Unknown roughness_model: $roughness_model. Must be :coare3 or :constant")
+    end
+
+    config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
+
+    # Get sea ice parameters for update_T_sfc callback
+    # Thermal conductivity (scalar)
+    κ = sim.ice.model.ice_thermodynamics.internal_heat_flux.conductivity
+    
+    # Ice thickness (field, remapped to boundary space)
+    δ = Interfacer.get_field(sim, Val(:ice_thickness))
+    
+    # Internal temperature (field, remapped to boundary space)
+    T_i = Interfacer.get_field(sim, Val(:internal_temperature))
+    
+    # Stefan-Boltzmann constant (scalar)
+    σ = sim.ice_properties.σ
+    
+    # Emissivity (scalar, broadcast to field)
+    ϵ_scalar = Interfacer.get_field(sim, Val(:emissivity))
+    ϵ = CC.Fields.fill(ϵ_scalar, boundary_space)
+    
+    # Density and heat capacity (scalars)
+    ρ = sim.ice.model.ice_thermodynamics.phase_transitions.ice_density
+    c = sim.ice.model.ice_thermodynamics.phase_transitions.ice_heat_capacity
+    
+    # Radiation and albedo (fields)
+    SW_d = csf.SW_d
+    LW_d = csf.LW_d
+    α_albedo_scalar = Interfacer.get_field(sim, Val(:surface_direct_albedo))
+    α_albedo = CC.Fields.fill(α_albedo_scalar, boundary_space)
+
+    # Create the update_T_sfc callback element-wise
+    # Since update_T_sfc returns a function, we broadcast it to create a field of callbacks
+    update_T_sfc_callback = ClimaCouplerCMIPExt.update_T_sfc.(
+        κ,
+        δ,
+        T_i,
+        σ,
+        ϵ,
+        ρ,
+        c,
+        SW_d,
+        LW_d,
+        α_albedo,
+    )
+
+    # Calculate surface fluxes with the callback
+    Φ_sfc = SFP.grav.(surface_fluxes_params) .* csf.height_sfc
+    Δz = csf.height_int .- csf.height_sfc
+
+    outputs = SF.surface_fluxes.(
+        surface_fluxes_params,
+        csf.T_atmos,
+        csf.q_tot_atmos,
+        csf.q_liq_atmos,
+        csf.q_ice_atmos,
+        csf.ρ_atmos,
+        T_sfc,
+        q_sfc,
+        Φ_sfc,
+        Δz,
+        0, # d
+        uv_int,
+        StaticArrays.SVector.(0, 0), # uv_sfc
+        nothing, # roughness_inputs
+        config,
+        SF.PointValueScheme(),
+        nothing, # flux_specs
+        nothing, # update_q_vap_sfc (not used)
+        update_T_sfc_callback,
+        nothing, # update_q_vap_sfc (not used)
+    )
+
+    (; shf, lhf, evaporation, ρτxz, ρτyz, T_sfc, q_vap_sfc, L_MO, ustar) = outputs
+
+    buoyancy_flux = SF.buoyancy_flux.(
+        surface_fluxes_params,
+        shf,
+        lhf,
+        T_sfc,
+        csf.ρ_atmos,
+        q_vap_sfc,
+        csf.q_liq_atmos,
+        csf.q_ice_atmos,
+        SF.MoistModel(),
+    )
+
+    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture) = (
+        F_turb_ρτxz = ρτxz,
+        F_turb_ρτyz = ρτyz,
+        F_sh = shf,
+        F_lh = lhf,
+        F_turb_moisture = evaporation,
+    )
+
+    # Get area fraction
+    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))
+    area_fraction = csf.scalar_temp1
+
+    # Zero out fluxes where the area fraction is zero
+    @. F_turb_ρτxz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτxz), F_turb_ρτxz)
+    @. F_turb_ρτyz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτyz), F_turb_ρτyz)
+    @. F_sh = ifelse(area_fraction ≈ 0, zero(F_sh), F_sh)
+    @. F_lh = ifelse(area_fraction ≈ 0, zero(F_lh), F_lh)
+    @. F_turb_moisture = ifelse(area_fraction ≈ 0, zero(F_turb_moisture), F_turb_moisture)
+    @. L_MO = ifelse(area_fraction ≈ 0, zero(L_MO), L_MO)
+    @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
+    @. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(buoyancy_flux), buoyancy_flux)
+
+    # Update the fluxes in the simulation
+    fields = (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
+    FluxCalculator.update_turbulent_fluxes!(sim, fields)
+
+    # Update fluxes in the coupler fields (area-weighted)
+    @. csf.F_turb_ρτxz += F_turb_ρτxz * area_fraction
+    @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction
+    @. csf.F_lh += F_lh * area_fraction
+    @. csf.F_sh += F_sh * area_fraction
+    @. csf.F_turb_moisture += F_turb_moisture * area_fraction
+
+    # Handle L_MO separately (can be Inf)
+    @. csf.L_MO += ifelse(isinf(L_MO), L_MO, L_MO * area_fraction)
+    @. csf.ustar += ustar * area_fraction
+    @. csf.buoyancy_flux += buoyancy_flux * area_fraction
+    return nothing
+end
 
 """
     FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fields)

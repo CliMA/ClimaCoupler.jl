@@ -747,8 +747,8 @@ version = "2.5.0"
 
 [[deps.ConservativeRegridding]]
 deps = ["ChunkSplitters", "DocStringExtensions", "Extents", "GeoInterface", "GeometryOps", "GeometryOpsCore", "LinearAlgebra", "ProgressMeter", "SciMLPublic", "SortTileRecursiveTree", "SparseArrays", "StableTasks", "StaticArrays"]
-git-tree-sha1 = "816e18a2d1c21c6721045060a40da71b8964bd06"
-repo-rev = "main"
+git-tree-sha1 = "c47f4033850dea1420115ce0934a9e749dc6bad9"
+repo-rev = "as/improve"
 repo-url = "https://github.com/JuliaGeo/ConservativeRegridding.jl.git"
 uuid = "8e50ac2c-eb48-49bc-a402-07c87b949343"
 version = "0.2.0"

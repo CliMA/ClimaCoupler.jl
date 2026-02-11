@@ -336,6 +336,10 @@ function ClimaLandSimulation(
     update_dt = dt isa ITime ? ITime(3600) : 3600
     updatefunc = CL.make_update_drivers(CL.get_drivers(model))
     driver_cb = CL.DriverUpdateCallback(updatefunc, update_dt, tspan[1])
+    dt_itime = dt isa ITime ? dt : ITime(Int(dt))
+    t0_itime = tspan[1] isa ITime ? tspan[1] : ITime(Int(t0))
+    model_callbacks = CL.get_model_callbacks(model; t0 = t0_itime, Δt = dt_itime)
+    required_callbacks = (driver_cb, model_callbacks...)
 
     exp_tendency! = CL.make_exp_tendency(model)
     imp_tendency! = CL.make_imp_tendency(model)
@@ -387,7 +391,7 @@ function ClimaLandSimulation(
         dt,
         saveat,
         adaptive = false,
-        callback = SciMLBase.CallbackSet(driver_cb, diag_cb),
+        callback = SciMLBase.CallbackSet(required_callbacks..., diag_cb),
     )
 
     return ClimaLandSimulation(model, integrator, area_fraction, output_writer)

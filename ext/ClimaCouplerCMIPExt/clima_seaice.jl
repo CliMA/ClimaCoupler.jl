@@ -333,7 +333,7 @@ function FluxCalculator.compute_surface_fluxes!(
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
     T_sfc = csf.scalar_temp1
 
-    # Compute surface humidity from the surface temperature (use FT(0) for Float32 compatibility)
+    # Compute surface humidity from the surface temperature
     ρ_sfc =
         SF.surface_density.(
             surface_fluxes_params,
@@ -342,11 +342,11 @@ function FluxCalculator.compute_surface_fluxes!(
             T_sfc,
             csf.height_int .- csf.height_sfc,
             csf.q_tot_atmos,
-            FT(0), # q_liq
-            FT(0), # q_ice
+            0, # q_liq
+            0, # q_ice
         )
 
-    csf.scalar_temp2 .= TD.q_vap_saturation.(thermo_params, T_sfc, ρ_sfc, FT(0), FT(0))
+    csf.scalar_temp2 .= TD.q_vap_saturation.(thermo_params, T_sfc, ρ_sfc, 0, 0)
     q_sfc = csf.scalar_temp2
 
     # Set gustiness
@@ -369,37 +369,36 @@ function FluxCalculator.compute_surface_fluxes!(
     config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
 
     # Get sea ice parameters for update_T_sfc callback
-    # Convert all scalars to FT for Float32 GPU compatibility
-    # Thermal conductivity (scalar); ConductiveFlux has .conductivity, FluxFunction does not; use FT for closure type
+    # Thermal conductivity (scalar); ConductiveFlux has .conductivity, FluxFunction does not
     internal_heat_flux = sim.ice.model.ice_thermodynamics.internal_heat_flux
     κ = if hasfield(typeof(internal_heat_flux), :conductivity)
-        FT(internal_heat_flux.conductivity)
+        internal_heat_flux.conductivity
     else
-        FT(2) # default conductivity [W m⁻¹ K⁻¹] when internal_heat_flux is FluxFunction etc.
+        convert(FT, 2) # default conductivity [W m⁻¹ K⁻¹] when internal_heat_flux is FluxFunction etc.
     end
     
-    # Ice thickness (field, remapped to boundary space); convert to FT for closure type stability on GPU
-    δ = CC.Fields.map(x -> convert(FT, x), Interfacer.get_field(sim, Val(:ice_thickness)))
+    # Ice thickness (field, remapped to boundary space)
+    δ = Interfacer.get_field(sim, Val(:ice_thickness))
     
-    # Internal temperature (field, remapped to boundary space); convert to FT for closure type stability on GPU
-    T_i = CC.Fields.map(x -> convert(FT, x), Interfacer.get_field(sim, Val(:internal_temperature)))
+    # Internal temperature (field, remapped to boundary space)
+    T_i = Interfacer.get_field(sim, Val(:internal_temperature))
     
-    # Stefan-Boltzmann constant (scalar); use FT for closure type stability on GPU
-    σ = FT(sim.ice_properties.σ)
+    # Stefan-Boltzmann constant (scalar)
+    σ = sim.ice_properties.σ
     
-    # Emissivity (scalar, broadcast to field); convert to FT for Float32 GPU compatibility
+    # Emissivity (scalar, broadcast to field)
     ϵ_scalar = Interfacer.get_field(sim, Val(:emissivity))
-    ϵ = CC.Fields.fill(convert(FT, ϵ_scalar), boundary_space)
+    ϵ = CC.Fields.fill(ϵ_scalar, boundary_space)
     
-    # Density and heat capacity (scalars); use FT() so closure captures FT for GPU type stability
-    ρ = FT(sim.ice.model.ice_thermodynamics.phase_transitions.ice_density)
-    c = FT(sim.ice.model.ice_thermodynamics.phase_transitions.ice_heat_capacity)
+    # Density and heat capacity (scalars)
+    ρ = sim.ice.model.ice_thermodynamics.phase_transitions.ice_density
+    c = sim.ice.model.ice_thermodynamics.phase_transitions.ice_heat_capacity
     
-    # Radiation and albedo (fields); ensure FT element type for closure (csf fields may be Float64 in mixed setups)
-    SW_d = CC.Fields.map(x -> convert(FT, x), csf.SW_d)
-    LW_d = CC.Fields.map(x -> convert(FT, x), csf.LW_d)
+    # Radiation and albedo (fields)
+    SW_d = csf.SW_d
+    LW_d = csf.LW_d
     α_albedo_scalar = Interfacer.get_field(sim, Val(:surface_direct_albedo))
-    α_albedo = CC.Fields.fill(convert(FT, α_albedo_scalar), boundary_space)
+    α_albedo = CC.Fields.fill(α_albedo_scalar, boundary_space)
 
     # Create the update_T_sfc callback element-wise
     # Since update_T_sfc returns a function, we broadcast it to create a field of callbacks
@@ -420,7 +419,6 @@ function FluxCalculator.compute_surface_fluxes!(
     Φ_sfc = SFP.grav.(surface_fluxes_params) .* csf.height_sfc
     Δz = csf.height_int .- csf.height_sfc
 
-    # Wrap scheme and nothings in Ref so they broadcast as scalars (no length(::PointValueScheme))
     outputs = SF.surface_fluxes.(
         surface_fluxes_params,
         csf.T_atmos,
@@ -432,16 +430,16 @@ function FluxCalculator.compute_surface_fluxes!(
         q_sfc,
         Φ_sfc,
         Δz,
-        FT(0), # d
+        0, # d
         uv_int,
-        StaticArrays.SVector.(FT(0), FT(0)), # uv_sfc
-        Ref(nothing), # roughness_inputs
+        StaticArrays.SVector.(0, 0), # uv_sfc
+        nothing, # roughness_inputs
         config,
-        Ref(SF.PointValueScheme()),
-        Ref(nothing), # flux_specs
-        Ref(nothing), # update_q_vap_sfc (not used)
+        SF.PointValueScheme(),
+        nothing, # flux_specs
+        nothing, # update_q_vap_sfc (not used)
         update_T_sfc_callback,
-        Ref(nothing), # update_q_vap_sfc (not used)
+        nothing, # update_q_vap_sfc (not used)
     )
 
     (; shf, lhf, evaporation, ρτxz, ρτyz, T_sfc, q_vap_sfc, L_MO, ustar) = outputs

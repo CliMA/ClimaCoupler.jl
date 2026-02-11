@@ -1,8 +1,11 @@
 using ClimaSeaIce.SeaIceThermodynamics.HeatBoundaryConditions:
     IceWaterThermalEquilibrium, MeltingConstrainedFluxBalance, get_tracer, RadiativeEmission
 import ClimaComms
-import Thermodynamics as TD
 import ClimaOcean.EN4: download_dataset
+import SurfaceFluxes as SF
+import SurfaceFluxes.Parameters as SFP
+import Thermodynamics as TD
+using StaticArrays
 
 # Rename ECCO password env variable to match ClimaOcean.jl
 haskey(ENV, "ECCO_PASSWORD") && (ENV["ECCO_WEBDAV_PASSWORD"] = ENV["ECCO_PASSWORD"])
@@ -318,10 +321,6 @@ function FluxCalculator.compute_surface_fluxes!(
     atmos_sim::Interfacer.AbstractAtmosSimulation,
     thermo_params,
 )
-    import SurfaceFluxes as SF
-    import SurfaceFluxes.Parameters as SFP
-    import StaticArrays
-    import ClimaCouplerCMIPExt
     
     boundary_space = axes(csf)
     FT = CC.Spaces.undertype(boundary_space)

@@ -1,45 +1,5 @@
-"""
-    to_node(pt::CC.Geometry.LatLongPoint)
-
-Transform `LatLongPoint` into a tuple (long, lat, 0), where the 0 is needed because we only
-care about the surface.
-"""
-@inline to_node(pt::CC.Geometry.LatLongPoint) = pt.long, pt.lat, zero(pt.lat)
-# This next one is needed if we have "LevelGrid"
-@inline to_node(pt::CC.Geometry.LatLongZPoint) = pt.long, pt.lat, zero(pt.lat)
-
-"""
-    map_interpolate!(target_field::CC.Fields.Field, source_field::OC.Field)
-
-Interpolate the given 3D field onto the target field, modifying the target field in place.
-
-If the underlying grid does not contain a given point, writes 0 instead.
-
-Note: `map_interpolate!` does not support interpolation from `Field`s defined on
-`OrthogononalSphericalShellGrids` such as the `TripolarGrid`.
-"""
-function map_interpolate!(target_field::CC.Fields.Field, source_field::OC.Field)
-    points = CC.Fields.coordinate_field(axes(target_field))
-    loc = map(L -> L(), OC.Fields.location(source_field))
-    grid = source_field.grid
-    data = source_field.data
-
-    # TODO: There has to be a better way
-    min_lat, max_lat = extrema(OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center()))
-
-    # Use map! on the field directly, which handles complex data layouts correctly
-    map!(target_field, points) do pt
-        FT = eltype(pt)
-
-        # The oceananigans grid does not cover the entire globe, so we should not
-        # interpolate outside of its latitude bounds. Instead we return 0
-        min_lat < pt.lat < max_lat || return FT(0)
-
-        fᵢ = OC.Fields.interpolate(to_node(pt), data, loc, grid)
-        return convert(FT, fᵢ)::FT
-    end
-    return nothing
-end
+const ConservativeRegriddingCCExt =
+    Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
 
 """
     surface_flux(f::OC.AbstractField)
@@ -53,35 +13,6 @@ function surface_flux(f::OC.AbstractField)
     else
         return nothing
     end
-end
-
-function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field)
-    map_interpolate!(target_field, source_field)
-    return nothing
-end
-
-function Interfacer.remap!(
-    target_field::CC.Fields.Field,
-    operation::OC.AbstractOperations.AbstractOperation,
-)
-    evaluated_field = OC.Field(operation)
-    OC.compute!(evaluated_field)
-    Interfacer.remap!(target_field, evaluated_field)
-    return nothing
-end
-
-function Interfacer.remap(target_space, field::OC.Field)
-    # Allocate target field and call remap!
-    target_field = CC.Fields.zeros(target_space)
-    Interfacer.remap!(target_field, field)
-    return target_field
-end
-
-function Interfacer.remap(target_space, operation::OC.AbstractOperations.AbstractOperation)
-    # Allocate target field and call remap!
-    target_field = CC.Fields.zeros(target_space)
-    Interfacer.remap!(target_field, operation)
-    return target_field
 end
 
 """
@@ -185,4 +116,118 @@ Helper function used only in `contravariant_to_cartesian!`.
 function unit_basis_vector_data(::Type{V}, local_geometry) where {V}
     FT = CC.Geometry.undertype(typeof(local_geometry))
     return FT(1) / CC.Geometry._norm(V(FT(1)), local_geometry)
+end
+
+### Extensions of Interfacer.jl remapping functions for Oceananigans fields/grids
+# Non-allocating ClimaCore -> Oceananigans remap
+function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
+    ConservativeRegriddingCCExt.get_value_per_element!(
+        remapping.value_per_element_cc,
+        source_field,
+        remapping.field_ones_cc,
+    )
+
+    # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
+    z = size(target_field, 3)
+    dst = vec(OC.interior(target_field, :, :, z))
+    src = remapping.value_per_element_cc
+
+    # Regrid the source field to the target field
+    CR.regrid!(dst, transpose(remapping.remapper_oc_to_cc), src)
+    return nothing
+end
+# Allocating ClimaCore -> Oceananigans remap
+function Interfacer.remap(
+    target_space::Union{
+        OC.OrthogonalSphericalShellGrid,
+        OC.ImmersedBoundaryGrid,
+        OC.LatitudeLongitudeGrid,
+    },
+    source_field::CC.Fields.Field,
+    remapping,
+)
+    target_field = OC.Field{OC.Center, OC.Center, Nothing}(target_space)
+    Interfacer.remap!(target_field, source_field, remapping)
+    return target_field
+end
+
+# Non-allocating Oceananigans Field -> ClimaCore remap
+function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field, remapping)
+    # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
+    z = size(source_field, 3)
+    src = vec(OC.interior(source_field, :, :, z))
+
+    # Store the remapped FV values in a vector of length equal to the number of elements in the target space
+    dst = remapping.value_per_element_cc
+
+    # Regrid the source field to the target field
+    CR.regrid!(dst, remapping.remapper_oc_to_cc, src)
+
+    # Convert the vector of remapped values to a ClimaCore Field with one value per element
+    ConservativeRegriddingCCExt.set_value_per_element!(target_field, dst)
+    return nothing
+end
+# Allocating Oceananigans Field -> ClimaCore remap
+function Interfacer.remap(
+    target_space::CC.Spaces.AbstractSpace,
+    source_field::OC.Field,
+    remapping,
+)
+    target_field = CC.Fields.zeros(target_space)
+    Interfacer.remap!(target_field, source_field, remapping)
+    return target_field
+end
+
+# Non-allocating Oceananigans operation -> ClimaCore remap
+function Interfacer.remap!(
+    target_field::CC.Fields.Field,
+    operation::OC.AbstractOperations.AbstractOperation,
+    remapping,
+)
+    evaluated_field = OC.Field(operation)
+    OC.compute!(evaluated_field)
+    Interfacer.remap!(target_field, evaluated_field, remapping)
+    return nothing
+end
+# Allocating Oceananigans operation -> ClimaCore remap
+function Interfacer.remap(
+    target_space::CC.Spaces.AbstractSpace,
+    operation::OC.AbstractOperations.AbstractOperation,
+    remapping,
+)
+    target_field = CC.Fields.zeros(target_space)
+    Interfacer.remap!(target_field, operation, remapping)
+    return target_field
+end
+
+# Handle the case of remapping a scalar number to a ClimaCore space
+Interfacer.remap!(target_field::CC.Fields.Field, source_field::Number, remapping) =
+    Interfacer.remap!(target_field, source_field)
+Interfacer.remap(target_space::CC.Spaces.AbstractSpace, source_num::Number, remapping) =
+    Interfacer.remap(target_space, source_num, remapping)
+
+# Handle the case of remapping the area fraction field, which is a ClimaCore Field
+Interfacer.remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field, remapping) =
+    Interfacer.remap!(target_field, source_field)
+
+# Extend Interfacer.get_field to allow automatic remapping to the target space
+function Interfacer.get_field!(
+    target_field,
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    quantity,
+)
+    Interfacer.remap!(target_field, Interfacer.get_field(sim, quantity), sim.remapping)
+    return nothing
+end
+# TODO see if we can remove this allocating version
+function Interfacer.get_field(
+    target_space::CC.Spaces.AbstractSpace,
+    sim::OceananigansSimulation,
+    quantity,
+)
+    return Interfacer.remap(
+        target_space,
+        Interfacer.get_field(sim, quantity),
+        sim.remapping,
+    )
 end

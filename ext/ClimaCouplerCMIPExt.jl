@@ -17,6 +17,8 @@ import ClimaSeaIce as CSI
 import ClimaCore as CC
 import ClimaParams as CP
 using KernelAbstractions: @kernel, @index, @inbounds
+import ConservativeRegridding as CR
+import Adapt # for ConservativeRegridding
 
 # Include helper functions first (used by both oceananigans.jl and clima_seaice.jl)
 include("ClimaCouplerCMIPExt/climaocean_helpers.jl")

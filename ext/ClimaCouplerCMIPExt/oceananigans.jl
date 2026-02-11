@@ -237,10 +237,10 @@ function OceananigansSimulation(
             array_type = Array{FT},
         )
         # Surface-only indices so NetCDF dimension z_aaf is length 1 (avoids conflict with full-depth grid).
-        # η (free_surface.displacement) is a ZFaceField at the top face, so use Nz+1; fluxes are at top cell (Nz).
+        # Reference displacement (η) via field name expected by NetCDF writer (Oceananigans #5195 / #5179).
         free_surface_writer = OC.NetCDFWriter(
             ocean.model,
-            (; η = ocean.model.free_surface.displacement);
+            (; displacement = ocean.model.free_surface.displacement);
             schedule = OC.TimeInterval(3600), # hourly snapshots
             filename = joinpath(output_dir, "ocean_free_surface.nc"),
             indices = (:, :, grid.Nz+1), # top face for ZFaceField η

@@ -383,7 +383,7 @@ function FluxCalculator.compute_surface_fluxes!(
     if !Interfacer.get_field(sim, Val(:use_iterative_ice_skin))
         return invoke(
             FluxCalculator.compute_surface_fluxes!,
-            (Any, Interfacer.AbstractSurfaceSimulation, Interfacer.AbstractAtmosSimulation, Any),
+            Tuple{Any, Interfacer.AbstractSurfaceSimulation, Interfacer.AbstractAtmosSimulation, Any},
             csf,
             sim,
             atmos_sim,

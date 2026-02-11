@@ -68,6 +68,8 @@ end
         "dt_cpl" => "400secs",
         "dt" => "400secs",
         "share_surface_space" => true,
+        "nh_poly" => 2,
+        "h_elem" => 8,
         "checkpoint_dt" => "90days",
         "detect_restart_files" => false,
         "restart_dir" => nothing,
@@ -90,6 +92,7 @@ end
         "era5_initial_condition_dir" => nothing,
         "ocean_model" => "prescribed",
         "ice_model" => "prescribed",
+        "simple_ocean" => false,
         "land_fraction_source" => "etopo",
         "binary_area_fraction" => true,
         "component_dt_dict" => Dict(

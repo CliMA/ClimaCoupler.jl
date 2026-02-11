@@ -50,7 +50,7 @@ dispatch in coupling.
 - `start_date`: Start date for the simulation
 - `stop_date`: Stop date for the simulation
 - `output_dir`: Directory for output files
-- `ice_model`: Ice model type (Val type)
+- `simple_ocean`: Whether to use a simple ocean model setup
 
 # Optional keyword arguments
 - `dt`: Time step (default: `nothing`)
@@ -66,7 +66,7 @@ function OceananigansSimulation(
     start_date,
     tspan,
     output_dir,
-    ice_model,
+    simple_ocean = false,
     dt = nothing,
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
@@ -119,45 +119,52 @@ function OceananigansSimulation(
         active_cells_map = true,
     )
 
-    # Restore the ocean to the EN4 state periodically if running for more than one month and not using ClimaSeaIce
-    use_restoring =
-        start_date + Dates.Month(1) < stop_date && ice_model != Val(:clima_seaice)
+    # Create ocean simulation
+    if !simple_ocean
+        free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 150)
+        momentum_advection = OC.WENOVectorInvariant(order = 5)
+        tracer_advection = OC.WENO(order = 7)
+        eddy_closure = OC.TurbulenceClosures.IsopycnalSkewSymmetricDiffusivity(
+            κ_skew = 500,
+            κ_symmetric = 100,
+        )
+        @inline νhb(i, j, k, grid, ℓx, ℓy, ℓz, clock, fields, λ) =
+            OC.Operators.Az(i, j, k, grid, ℓx, ℓy, ℓz)^2 / λ
 
-    if use_restoring
-        # When we use EN4 data, the forcing takes care of everything, including
-        # the initial conditions
-        restoring_rate = 1 / (3 * 86400)
-        mask = CO.LinearlyTaperedPolarMask(
-            southern = (-80, -70),
-            northern = (70, 90),
-            z = (z(1), 0),
+        horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(
+            ν = νhb,
+            discrete_form = true,
+            parameters = 40 * 24 * 60 * 60, # 40 days
+        )
+        vertical_closure = OC.VerticalScalarDiffusivity(ν = 1e-5, κ = 2e-6)
+        catke_closure = CO.Oceans.default_ocean_closure()
+        closure = (catke_closure, eddy_closure, horizontal_viscosity, vertical_closure)
+    else
+        # Simpler setup
+        @info "Using simpler ocean setup; to be used for software testing only."
+        free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 70)
+        momentum_advection = OC.VectorInvariant()
+        tracer_advection = OC.WENO(order = 5)
+        horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν = 1e11)
+        vertical_mixing = OC.ConvectiveAdjustmentVerticalDiffusivity(
+            background_κz = 1e-5,
+            convective_κz = 0.1,
+            background_νz = 1e-4,
+            convective_νz = 0.1,
         )
 
-        forcing_T = CO.DatasetRestoring(en4_temperature, grid; mask, rate = restoring_rate)
-        forcing_S = CO.DatasetRestoring(en4_salinity, grid; mask, rate = restoring_rate)
-        forcing = (T = forcing_T, S = forcing_S)
-    else
-        forcing = (;)
+        closure = (horizontal_viscosity, vertical_mixing)
     end
-
-    # Create ocean simulation
-    free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 70)
-    momentum_advection = OC.VectorInvariant()
-    tracer_advection = OC.WENO(order = 5)
-    horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν = 1e11)
-
-    # Use Float32 for the vertical mixing parameters to avoid parameter memory limits
-    vertical_mixing = OC.CATKEVerticalDiffusivity(Float32)
 
     Δt = isnothing(dt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : dt
     ocean = CO.ocean_simulation(
         grid;
         Δt,
-        forcing,
+        timestepper = :SplitRungeKutta3,
         momentum_advection,
         tracer_advection,
         free_surface,
-        closure = (horizontal_viscosity, vertical_mixing),
+        closure,
     )
 
     # Set initial condition to EN4 state estimate at start_date
@@ -229,7 +236,7 @@ function OceananigansSimulation(
         )
         free_surface_writer = OC.NetCDFWriter(
             ocean.model,
-            (; η = ocean.model.free_surface.displacement);
+            (; displacement = ocean.model.free_surface.displacement);
             schedule = OC.TimeInterval(3600), # hourly snapshots
             filename = joinpath(output_dir, "ocean_free_surface.nc"),
             overwrite_existing = true,

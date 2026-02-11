@@ -115,6 +115,8 @@ function CoupledSimulation(config_dict::AbstractDict)
         Δt_cpl,
         component_dt_dict,
         share_surface_space,
+        nh_poly,
+        h_elem,
         saveat,
         checkpoint_dt,
         detect_restart_files,
@@ -136,6 +138,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         parameter_files,
         era5_initial_condition_dir,
         ocean_model,
+        simple_ocean,
         ice_model,
         land_fraction_source,
         binary_area_fraction,
@@ -229,8 +232,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     if share_surface_space
         boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
     else
-        h_elem = config_dict["h_elem"]
-        n_quad_points = 4
+        n_quad_points = nh_poly + 1
         radius = coupled_param_dict["planet_radius"] # in meters
         boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius, n_quad_points, h_elem)
     end
@@ -325,7 +327,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         boundary_space,
         # Arguments used by Oceananigans
         output_dir = dir_paths.ocean_output_dir,
-        ice_model,
+        simple_ocean,
         # Arguments used by prescribed ocean
         sst_path = subseasonal_sst,
         # Arguments used by slab ocean

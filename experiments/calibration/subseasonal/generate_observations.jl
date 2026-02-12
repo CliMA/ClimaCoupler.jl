@@ -2,92 +2,25 @@ import ClimaAnalysis
 import ClimaAnalysis: OutputVar
 import ClimaCalibrate
 import ClimaCoupler
-import Dates
+import ClimaCoupler: CalibrationTools
 import EnsembleKalmanProcesses as EKP
 import JLD2
 import ClimaDiagnostics
 import ClimaCore
-import ClimaUtilities.ClimaArtifacts.@clima_artifact
-import Pkg.Artifacts
 # Access CalibrateConfig
 include(joinpath(@__DIR__, "run_calibration.jl"))
-include(joinpath(@__DIR__, "observation_utils.jl"))
-
-# Path to the ClimaEarth Artifacts.toml file
-const CLIMAEARTH_ARTIFACTS_TOML =
-    joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "Artifacts.toml")
 
 """
-    load_var(filepath, short_name; varname=nothing, flip_sign=false, transform_dates=false)
+    regrid_vars(vars)
 
-Helper function to load and process an ERA5 variable with common transformations.
+Regrid each OutputVar in `vars` to match the grid of the diagnostics output from
+ClimaAtmos.
 """
-function load_var(
-    filepath,
-    short_name;
-    varname = nothing,
-    flip_sign = false,
-    transform_dates = nothing,
-)
-    # TODO: Don't assume monthly data
-    var =
-        isnothing(varname) ? OutputVar(filepath) :
-        OutputVar(filepath, varname; shift_by = Dates.firstdayofmonth)
-
-    flip_sign && (var = -var)
-
-    var.attributes["short_name"] = short_name
-
-    if !isnothing(transform_dates)
-        var = ClimaAnalysis.Var._shift_by(var, date -> date - transform_dates)
-    end
-    if !issorted(latitudes(var))
-        var = reverse_dim(var, latitude_name(var))
-    end
-
-    return var
-end
-
-"""
-    load_vars(obsdir, short_names)
-
-Load NetCDF files belonging to `short_names` in `obsdir` as `OutputVar`s.
-"""
-function load_vars()
-    # Use Artifacts API directly with explicit path to ClimaEarth Artifacts.toml
-    # This is necessary because @clima_artifact searches upward from the source
-    # file, which won't find experiments/ClimaEarth/Artifacts.toml
-
-    artifact_path = Artifacts.ensure_artifact_installed(
-        "era5_monthly_averages_surface_single_level_1979_2024",
-        CLIMAEARTH_ARTIFACTS_TOML,
-    )
-    flux_file = joinpath(
-        artifact_path,
-        "era5_monthly_averages_surface_single_level_197901-202410.nc",
-    )
-
-    lhf = load_var(flux_file, "hfls"; varname = "mslhf", flip_sign = true)
-    shf = load_var(flux_file, "hfss"; varname = "msshf", flip_sign = true)
-    rsus = load_var(flux_file, "rsus"; varname = "msuwswrf")
-    rlus = load_var(flux_file, "rlus"; varname = "msuwlwrf")
-
-    return [lhf, shf, rsus, rlus]
-end
-
-"""
-    preprocess_vars(vars)
-
-Preprocess each OutputVar in `vars` by keeping the relevant dates in
-`sample_date_ranges`.
-"""
-function preprocess_vars(vars)
+function regrid_vars(vars)
     resample_var = resampled_lonlat(CALIBRATE_CONFIG.config_file)
     vars = map(vars) do var
         var = resample_var(var)
-        var = set_units(var, var_units[short_name(var)])
     end
-
     return vars
 end
 
@@ -128,7 +61,7 @@ function resampled_lonlat(config_file)
     lon = range(-180, 180, nlon)
     lat = range(-90, 90, nlat)
     # TODO: Generalize to 3D vars, account for stretch for 3D variables
-    return var -> resampled_as(var; lon, lat)
+    return var -> ClimaAnalysis.resampled_as(var; lon, lat)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
@@ -139,9 +72,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
     @info "Generating observations for $short_names"
     @info "The number of samples is $(length(sample_date_ranges)) over $sample_date_ranges"
 
-    unprocessed_vars = load_vars()
-
-    preprocessed_vars = preprocess_vars(unprocessed_vars)
+    data_loader = CalibrationTools.ERA5DataLoader()
+    varnames = ["hfls", "hfss", "rsus", "rlus"]
+    unprocessed_vars = get.(Ref(data_loader), varnames)
+    preprocessed_vars = regrid_vars(unprocessed_vars)
 
     JLD2.save_object(
         joinpath(

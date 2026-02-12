@@ -1,7 +1,6 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
-bucket_albedo_type: "map_temporal"
 checkpoint_dt: "1months"
 coupler_toml: ["toml/amip_diagedmf_1m.toml"]
 dt: "120secs"
@@ -10,6 +9,7 @@ dt_cpl: "120secs"
 dt_rad: "1hours"
 energy_check: false
 insolation: "timevarying"
+land_model: "integrated"
 mode_name: "amip"
 moist: "nonequil"
 precip_model: "1M"
@@ -18,6 +18,8 @@ output_default_diagnostics: true
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "120days"
+t_end: "31days"
 topo_smoothing: true
 topography: "Earth"
+use_sgs_quadrature: false
+#quadrature_order: 2

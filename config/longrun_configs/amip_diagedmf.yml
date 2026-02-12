@@ -16,6 +16,8 @@ output_default_diagnostics: true
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "366days"
+t_end: "62days"
 topo_smoothing: true
 topography: "Earth"
+use_sgs_quadrature: true
+quadrature_order: 3

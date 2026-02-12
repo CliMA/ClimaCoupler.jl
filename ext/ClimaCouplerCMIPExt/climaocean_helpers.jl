@@ -219,7 +219,7 @@ end
 # TODO see if we can remove this allocating version
 function Interfacer.get_field(
     target_space::CC.Spaces.AbstractSpace,
-    sim::OceananigansSimulation,
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
     quantity,
 )
     return Interfacer.remap(

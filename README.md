@@ -124,10 +124,10 @@ Status `~/.julia/environments/v1.10/Project.toml`
 Additionally, there are some environment variables we must set in these cases.
 
 To run on GPU, we need to run `export CLIMACOMMS_DEVICE="CUDA"` in the terminal, or
-`ENV["CLIMACOMMS_DEVICE]="CUDA"` within the Julia environment _before_ running the experiment.
+`ENV["CLIMACOMMS_DEVICE"]="CUDA"` within the Julia environment _before_ running the experiment.
 
 To run with MPI, we need to run `export CLIMACOMMS_CONTEXT="MPI"` in the terminal, or
-`ENV["CLIMACOMMS_CONTEXT]="MPI"` within the Julia environment _before_ running the experiment.
+`ENV["CLIMACOMMS_CONTEXT"]="MPI"` within the Julia environment _before_ running the experiment.
 
 ## Caltech users: Running AMIP remotely
 The main difference between running code locally vs running remotely is

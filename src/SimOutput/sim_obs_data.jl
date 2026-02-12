@@ -56,7 +56,7 @@ To add a variable for the leaderboard, add a key-value pair to the dictionary
 `sim_var_dict` whose key is the short name of the variable and the value is an
 anonymous function that returns a `OutputVar`. For each variable, any
 preprocessing should be done in the corresponding anonymous function which
-includes unit conversion and shifting the dates.
+includes unit conversion.
 
 The variable should have only three dimensions: latitude, longitude, and time.
 """
@@ -79,7 +79,11 @@ function get_sim_var_dict(diagnostics_folder_path)
                     "mm/day",
                     conversion_function = x -> x .* Float32(-86400),
                 )
-                sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
+                # For ClimaDiagnostics v0.3 and later, the dates are saved at
+                # the start of the reduction period
+                pkgversion(CD) < v"0.3" && (
+                    sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
+                )
                 return sim_var
             end
     )
@@ -94,7 +98,12 @@ function get_sim_var_dict(diagnostics_folder_path)
                         reduction = "average",
                         period = "1M",
                     )
-                    sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
+                    # For ClimaDiagnostics v0.3 and later, the dates are saved at
+                    # the start of the reduction period
+                    pkgversion(CD) < v"0.3" && (
+                        sim_var =
+                            ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
+                    )
                     return sim_var
                 end
         )

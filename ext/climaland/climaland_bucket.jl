@@ -1,21 +1,5 @@
-import Dates
-import SciMLBase
-import Statistics
-import ClimaComms
-import ClimaCore as CC
-import ClimaTimeSteppers as CTS
-import Thermodynamics as TD
-import ClimaLand as CL
-import ClimaLand.Parameters as LP
-import ClimaParams as CP
-import ClimaDiagnostics as CD
-import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer, FieldExchanger, Plotting
-using NCDatasets
-include("climaland_helpers.jl")
-
-
 ###
-### Functions required by ClimaCoupler.jl for a SurfaceModelSimulation
+### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
 ###
 """
     BucketSimulation{M, I, A}
@@ -34,7 +18,7 @@ struct BucketSimulation{
     A <: CC.Fields.Field,
     OW,
     RF,
-} <: Interfacer.LandModelSimulation
+} <: Interfacer.AbstractLandSimulation
     model::M
     integrator::I
     area_fraction::A
@@ -43,7 +27,16 @@ struct BucketSimulation{
 end
 
 """
-    bucket_init
+    Interfacer.LandSimulation(::Type{FT}, ::Val{:bucket}; kwargs...)
+
+Extension of the generic LandSimulation constructor for the bucket model.
+"""
+function Interfacer.LandSimulation(::Type{FT}, ::Val{:bucket}; kwargs...) where {FT}
+    return BucketSimulation(FT; kwargs...)
+end
+
+"""
+    BucketSimulation
 
 Initializes the bucket model variables.
 """
@@ -60,12 +53,14 @@ function BucketSimulation(
     shared_surface_space = nothing,
     saveat::Vector{TT} = [tspan[1], tspan[2]],
     surface_elevation = nothing,
+    atmos_h,
     land_temperature_anomaly::String = "amip",
     use_land_diagnostics::Bool = true,
     stepper = CTS.RK4(),
     albedo_type::String = "map_static",
     bucket_initial_condition::String = "",
     coupled_param_dict = CP.create_toml_dict(FT),
+    extra_kwargs...,
 ) where {FT, TT <: Union{Float64, ITime}}
     # Get default land parameters from ClimaLand.LandParameters
     land_toml_dict = LP.create_toml_dict(FT)
@@ -123,7 +118,16 @@ function BucketSimulation(
     τc = FT(float(dt))
     params = CL.Bucket.BucketModelParameters(toml_dict; albedo, τc)
 
-    args = (params, CL.CoupledAtmosphere{FT}(), CL.CoupledRadiativeFluxes{FT}(), domain)
+    # Interpolate atmosphere height field to surface space of land model,
+    #  since that's where we compute fluxes for this land model
+    atmos_h = Interfacer.remap(surface_space, atmos_h)
+
+    args = (
+        params,
+        CL.CoupledAtmosphere{FT}(surface_space, atmos_h),
+        CL.CoupledRadiativeFluxes{FT}(),
+        domain,
+    )
     model = CL.Bucket.BucketModel{FT, typeof.(args)...}(args...)
 
     # Initial conditions with no moisture
@@ -257,8 +261,6 @@ end
 
 # extensions required by Interfacer
 Interfacer.get_field(sim::BucketSimulation, ::Val{:area_fraction}) = sim.area_fraction
-Interfacer.get_field(sim::BucketSimulation, ::Val{:beta}) =
-    CL.surface_evaporative_scaling(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:emissivity}) =
     CL.surface_emissivity(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:roughness_buoyancy}) =
@@ -270,7 +272,8 @@ Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_direct_albedo}) =
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_diffuse_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_temperature}) =
-    CL.surface_temperature(sim.model, sim.integrator.u, sim.integrator.p, sim.integrator.t)
+    CL.component_temperature(sim.model, sim.integrator.u, sim.integrator.p)
+Interfacer.get_field(sim::BucketSimulation, ::Val{:roughness_model}) = :constant
 
 """
     Interfacer.get_field(sim::BucketSimulation, ::Val{:energy})
@@ -298,9 +301,6 @@ function Interfacer.get_field(sim::BucketSimulation, ::Val{:water})
     return sim.integrator.p.bucket.total_water .* ρ_cloud_liq # kg water / m2
 end
 
-function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_density}, field)
-    Interfacer.remap!(sim.integrator.p.bucket.ρ_sfc, field)
-end
 function Interfacer.update_field!(
     sim::BucketSimulation,
     ::Val{:liquid_precipitation},
@@ -314,6 +314,24 @@ function Interfacer.update_field!(sim::BucketSimulation, ::Val{:SW_d}, field)
 end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:LW_d}, field)
     Interfacer.remap!(sim.radiative_fluxes.LW_d, field)
+end
+function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_temperature}, field)
+    Interfacer.remap!(sim.integrator.p.drivers.T, field)
+end
+function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_pressure}, field)
+    Interfacer.remap!(sim.integrator.p.drivers.P, field)
+end
+function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_humidity}, field)
+    Interfacer.remap!(sim.integrator.p.drivers.q, field)
+end
+function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_velocity}, u_int, v_int)
+    Interfacer.remap!(sim.integrator.p.bucket.scratch1, u_int)
+    Interfacer.remap!(sim.integrator.p.bucket.scratch2, v_int)
+    sim.integrator.p.drivers.u .=
+        StaticArrays.SVector.(
+            sim.integrator.p.bucket.scratch1,
+            sim.integrator.p.bucket.scratch2,
+        )
 end
 function Interfacer.update_field!(
     sim::BucketSimulation,
@@ -342,21 +360,132 @@ Interfacer.close_output_writers(sim::BucketSimulation) =
     isnothing(sim.output_writer) || close(sim.output_writer)
 
 """
+   FieldExchanger.import_atmos_fields!(csf, sim::BucketSimulation, atmos_sim)
+
+Import non-default coupler fields from the atmosphere simulation into the coupler fields.
+These include the diffuse fraction of light, shortwave and longwave downwelling radiation,
+air pressure, and CO2 concentration.
+
+The default coupler fields will be imported by the default method implemented in
+FieldExchanger.jl.
+"""
+function FieldExchanger.import_atmos_fields!(csf, sim::BucketSimulation, atmos_sim)
+    Interfacer.get_field!(csf.P_atmos, atmos_sim, Val(:air_pressure))
+    return nothing
+end
+
+"""
 Extend Interfacer.add_coupler_fields! to add the fields required for BucketSimulation.
 
 The fields added are:
-- `:ρ_sfc`
+- `:P_atmos`
 """
 function Interfacer.add_coupler_fields!(coupler_field_names, ::BucketSimulation)
-    bucket_coupler_fields = [:ρ_sfc]
+    bucket_coupler_fields = [:P_atmos]
     push!(coupler_field_names, bucket_coupler_fields...)
 end
 
-# extensions required by FluxCalculator
-function FluxCalculator.update_turbulent_fluxes!(sim::BucketSimulation, fields::NamedTuple)
-    (; F_lh, F_sh, F_turb_moisture) = fields
-    Interfacer.update_field!(sim, Val(:turbulent_energy_flux), (; F_lh, F_sh))
-    Interfacer.update_field!(sim, Val(:turbulent_moisture_flux), F_turb_moisture)
+## Extend functions for land-specific flux calculation
+"""
+    compute_surface_fluxes!(csf, sim::BucketSimulation, atmos_sim, thermo_params)
+
+This function computes surface fluxes between the bucket simulation and the atmosphere.
+
+Update the input coupler surface fields `csf` in-place with the computed fluxes
+for this model. These are then summed using area-weighting across all surface
+models to get the total fluxes. Fluxes where the area fraction is zero are set to zero.
+
+Currently, this calculation is done on the land surface space, and the computed fluxes
+are remapped onto the coupler boundary space as the coupler fields are updated. In the future,
+we may compute fluxes in the bucket model's internal `step!` function.
+
+# Arguments
+- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
+- `sim`: [BucketSimulation] the bucket simulation to compute fluxes for.
+- `atmos_sim`: [Interfacer.AbstractAtmosSimulation] the atmosphere simulation to compute fluxes with.
+- `thermo_params`: [ClimaParams.ThermodynamicParameters] the thermodynamic parameters for the simulation.
+"""
+function FluxCalculator.compute_surface_fluxes!(
+    csf,
+    sim::BucketSimulation,
+    atmos_sim::Interfacer.AbstractAtmosSimulation,
+    thermo_params,
+)
+    boundary_space = axes(csf)
+    FT = CC.Spaces.undertype(boundary_space)
+    Y, p, t, model = sim.integrator.u, sim.integrator.p, sim.integrator.t, sim.model
+
+    # We should change this to be on the boundary_space
+    coupled_atmos = sim.model.atmos
+    bucket_dest = p.bucket.turbulent_fluxes
+    CL.turbulent_fluxes!(bucket_dest, coupled_atmos, model, Y, p, t)
+
+    # Get area fraction of the land model (min = 0, max = 1)
+    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
+
+    # Combine turbulent energy fluxes from each component of the land model
+    # Use temporary variables to avoid allocating
+    Interfacer.remap!(csf.scalar_temp1, bucket_dest.lhf)
+    Interfacer.remap!(csf.scalar_temp2, bucket_dest.shf)
+
+    # Zero out the fluxes where the area fraction is zero
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    @. csf.scalar_temp2 =
+        ifelse(area_fraction == 0, zero(csf.scalar_temp2), csf.scalar_temp2)
+
+    # Update the coupler field in-place
+    @. csf.F_lh += csf.scalar_temp1 * area_fraction
+    @. csf.F_sh += csf.scalar_temp2 * area_fraction
+
+    # Combine turbulent moisture fluxes from each component of the land model
+    # Note that we multiply by ρ_liq to convert from m s-1 to kg m-2 s-1
+    ρ_liq = (LP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
+    Interfacer.remap!(csf.scalar_temp1, bucket_dest.vapor_flux .* ρ_liq)
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    @. csf.F_turb_moisture += csf.scalar_temp1 * area_fraction
+
+    # Combine turbulent momentum fluxes from each component of the land model
+    # Note that we exclude the canopy component here for now, since we can have nonzero momentum fluxes
+    #  where there is zero LAI. This should be fixed in ClimaLand.
+    Interfacer.remap!(csf.scalar_temp1, bucket_dest.ρτxz)
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    @. csf.F_turb_ρτxz += csf.scalar_temp1 * area_fraction
+
+    Interfacer.remap!(csf.scalar_temp1, bucket_dest.ρτyz)
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    @. csf.F_turb_ρτyz += csf.scalar_temp1 * area_fraction
+
+    # Combine the buoyancy flux from each component of the land model
+    # Note that we exclude the canopy component here for now, since ClimaLand doesn't
+    #  include its extra resistance term in the buoyancy flux calculation.
+    Interfacer.remap!(csf.scalar_temp1, bucket_dest.buoyancy_flux)
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    @. csf.buoyancy_flux += csf.scalar_temp1 * area_fraction
+
+    # Compute ustar from the momentum fluxes and surface air density
+    #  ustar = sqrt(ρτ / ρ)
+    @. csf.scalar_temp1 = sqrt(sqrt(csf.F_turb_ρτxz^2 + csf.F_turb_ρτyz^2) / csf.ρ_atmos)
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    # If ustar is zero, set it to eps to avoid division by zero in the atmosphere
+    @. csf.ustar += max(csf.scalar_temp1 * area_fraction, eps(FT))
+
+    # Compute the Monin-Obukhov length from ustar and the buoyancy flux
+    #  L_MO = -u^3 / (k * buoyancy_flux)
+    surface_params = LP.surface_fluxes_parameters(sim.model.parameters.earth_param_set)
+    @. csf.scalar_temp1 =
+        -csf.ustar^3 / SFP.von_karman_const(surface_params) / SF.non_zero(csf.buoyancy_flux)
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    # When L_MO is infinite, avoid multiplication by zero to prevent NaN
+    @. csf.L_MO +=
+        ifelse(isinf(csf.scalar_temp1), csf.scalar_temp1, csf.scalar_temp1 * area_fraction)
+
     return nothing
 end
 
@@ -366,7 +495,7 @@ end
 Updates the surface component model cache with the current coupler fields besides turbulent fluxes.
 
 # Arguments
-- `sim`: [Interfacer.SurfaceModelSimulation] containing a surface model simulation object.
+- `sim`: [Interfacer.AbstractSurfaceSimulation] containing a surface model simulation object.
 - `csf`: [NamedTuple] containing coupler fields.
 """
 function FieldExchanger.update_sim!(sim::BucketSimulation, csf)
@@ -386,11 +515,37 @@ function FieldExchanger.update_sim!(sim::BucketSimulation, csf)
     sim.integrator.p.bucket.R_n .=
         .-(1 .- CL.surface_albedo(model, Y, p)) .* sim.radiative_fluxes.SW_d .-
         Interfacer.get_field(sim, Val(:emissivity)) .*
-        (sim.radiative_fluxes.LW_d .- σ .* CL.surface_temperature(model, Y, p, t) .^ 4)
+        (sim.radiative_fluxes.LW_d .- σ .* CL.component_temperature(model, Y, p) .^ 4)
 
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)
     Interfacer.update_field!(sim, Val(:snow_precipitation), csf.P_snow)
+
+    # Update fields for turbulent flux calculations
+    # For the BucketSimulation, the coupler uses CL.turbulent_fluxes to calculate surface fluxes,
+    # so we need to update the following fields in p.drivers in the bucket cache.
+    Interfacer.update_field!(sim, Val(:air_velocity), csf.u_int, csf.v_int)
+    Interfacer.update_field!(sim, Val(:air_temperature), csf.T_atmos)
+    Interfacer.update_field!(sim, Val(:air_pressure), csf.P_atmos)
+    Interfacer.update_field!(sim, Val(:air_humidity), csf.q_tot_atmos)
+    return nothing
+end
+
+"""
+    Interfacer.set_cache!(sim::BucketSimulation, csf)
+
+Set cache variables that cannot be initialized before the initial exchange.
+This must be called after radiation, so that `p.drivers`
+is filled with the initial radiation fluxes, and these can be propagated
+to the rest of the cache (e.g. in canopy radative transfer).
+
+This function does not set all the cache variables, because many are computed
+as part of the tendendencies.
+"""
+function Interfacer.set_cache!(sim::BucketSimulation, csf)
+    bucket_set_initial_cache! = CL.make_set_initial_cache(sim.model)
+    bucket_set_initial_cache!(sim.integrator.p, sim.integrator.u, sim.integrator.t)
+
     return nothing
 end
 

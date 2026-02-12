@@ -1,9 +1,9 @@
 FLOAT_TYPE: "Float32"
-aerosol_radiation: true
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "1months"
+coupler_toml: ["toml/amip_edonly.toml"]
 dt: "120secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: "120secs"
@@ -12,11 +12,9 @@ energy_check: false
 insolation: "timevarying"
 mode_name: "amip"
 netcdf_interpolate_z_over_msl: true
-prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "366days"
-toml: [toml/amip_edonly.toml]
 topo_smoothing: true
 topography: "Earth"

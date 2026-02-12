@@ -12,49 +12,49 @@ contains one `atmos_sim`, and at least one surface simulation (`land_sim`,
 for a given run, it may be omitted.
 
 ## Component simulations
-Individual component model simulations fall under `ComponentModelSimulation`,
+Individual component model simulations fall under `AbstractComponentSimulation`,
 which together combine to make the `CoupledSimulation`.
-We have two types of `ComponentModelSimulations`: `AtmosModelSimulation` and
-`SurfaceModelSimulation`. The two have different requirements,
-which are detailed below. `SurfaceModelSimulation` is further divided into
-`SeaIceModelSimulation`, `LandModelSimulation`, and `OceanModelSimulation`,
+We have two types of `AbstractComponentSimulation`s: `AbstractAtmosSimulation` and
+`AbstractSurfaceSimulation`. The two have different requirements,
+which are detailed below. `AbstractSurfaceSimulation` is further divided into
+`AbstractSeaIceSimulation`, `AbstractLandSimulation`, and `AbstractOceanSimulation`,
 representing the 3 currently-supported options for surface models.
 
-### ComponentModelSimulation - required functions
+### AbstractComponentSimulation - required functions
 A component model simulation should be implemented as a struct that is a concrete subtype
-of a `ComponentModelSimulation`. This struct should contain all of the
+of a `AbstractComponentSimulation`. This struct should contain all of the
 information needed to run that simulation.
 
-Each `ComponentModelSimulation` must extend the following functions to be able
+Each `AbstractComponentSimulation` must extend the following functions to be able
 to use our coupler. For some existing models, these are defined within
 ClimaCoupler.jl in that model’s file in `experiments/ClimaEarth/components/`, but it is preferable
 for these to be defined in a model’s own repository. Note that the dispatch
-`::ComponentModelSimulation` in the function definitions given below should
+`::AbstractComponentSimulation` in the function definitions given below should
 be replaced with the particular component model extending these functions.
-- constructor: construct and return an instance of the `ComponentModelSimulation`,
+- constructor: construct and return an instance of the `AbstractComponentSimulation`,
 and perform all initialization. This function should return a simulation that
 is ready to be stepped in the coupled simulation. The interface for this
 function varies across component models.
 
-- `step!(::ComponentModelSimulation, t)`: A function to update the
+- `step!(::AbstractComponentSimulation, t)`: A function to update the
 simulation in-place with values calculate for time `t`. For the
 models we currently have implemented, this is a simple wrapper around
 the `step!` function implemented in SciMLBase.jl.
 
-### ComponentModelSimulation - optional functions
-- `Checkpointer.get_model_prog_state(::ComponentModelSimulation)`:
+### AbstractComponentSimulation - optional functions
+- `Checkpointer.get_model_prog_state(::AbstractComponentSimulation)`:
 A function that returns the state vector of the simulation at its current
 state. This is used for checkpointing the simulation.
 
-- `Checkpointer.get_model_cache(::ComponentModelSimulation)`:
+- `Checkpointer.get_model_cache(::AbstractComponentSimulation)`:
 A function that returns the cache of the simulation at its current state.
 This is used for checkpointing the simulation.
 
-- `Checkpointer.restore_cache(::ComponentModelSimulation, new_cache)`:
+- `Checkpointer.restore_cache(::AbstractComponentSimulation, new_cache)`:
 A function that updates the cache of the simulation with the provided
 `new_cache`. This is used for restarting the simulation.
 
-- `get_field(::ComponentModelSimulation, ::Val{property})`:
+- `get_field(::AbstractComponentSimulation, ::Val{property})`:
 Default `get_field` functions are provided for `energy` and `water` fields,
 described in the table below.
 These quantities are used to track conservation, and the defaults
@@ -66,7 +66,7 @@ functions must be extended for all models being run.
 | `energy`     | vertically integrated energy per surface area | J m⁻²  | `nothing`     |
 | `water`      | vertically integrated water per surface area  | kg m⁻² | `nothing`     |
 
-- `add_coupler_fields!(coupler_field_names, ::ComponentModelSimulation)`:
+- `add_coupler_fields!(coupler_field_names, ::AbstractComponentSimulation)`:
 A set of default coupler exchange fields is initialized for each coupled simulation,
 but depending on the component models being run, additional coupler fields may
 be required. For example, the integrated land model requires the concentration
@@ -86,7 +86,9 @@ The default coupler exchange fields are the following, defined in
 | Coupler name      | Description                                                 | Units      |
 |-------------------|-------------------------------------------------------------|------------|
 | `T_atmos`         | atmosphere temperature at the bottom layer                  | K          |
-| `q_atmos`         | atmosphere humidity at the bottom layer                     | kg kg⁻¹    |
+| `q_tot_atmos`     | atmosphere total humidity at the bottom layer               | kg kg⁻¹    |
+| `q_liq_atmos`     | atmosphere liquid humidity at the bottom layer              | kg kg⁻¹    |
+| `q_ice_atmos`     | atmosphere ice humidity at the bottom layer                 | kg kg⁻¹    |
 | `ρ_atmos`         | atmosphere air density at the bottom layer                  | kg m⁻³     |
 | `height_int`      | height at the bottom cell center of the atmosphere space    | m          |
 | `height_sfc`      | height at the bottom face of the atmosphere space           | m          |
@@ -120,28 +122,28 @@ The default coupler exchange fields are the following, defined in
     so storing them in the coupler fields allows us to avoid regridding them to the coupler
     space multiple times per coupling timestep.
 
-- `update_sim!(::ComponentModelSimulation, csf)`: A
+- `update_sim!(::AbstractComponentSimulation, csf)`: A
 function to update each of the fields of the component model simulation
 that are updated by the coupler. ClimaCoupler.jl provides defaults of
-this function for both `AtmosModelSimulation` and
-`SurfaceModelSimulation` that update each of the fields expected by
+this function for both `AbstractAtmosSimulation` and
+`AbstractSurfaceSimulation` that update each of the fields expected by
 the coupler. This function will need to be extended for any model
 that requires additional fields (specified via `add_coupler_fields!`).
 
-- `set_cache!(sim::ComponentModelSimulation)`: A function to perform any
+- `set_cache!(sim::AbstractComponentSimulation)`: A function to perform any
 initialization of the component model caches that isn't done during the model
 simulation initialization, and that must be done after the initial exchange.
 This is necessary, for example, when component models have cache
 interdependencies that must be handled in a specific order.
 Cache variables that are computed as part of the tendencies do not need to be set here.
 
-### AtmosModelSimulation - required functions
+### AbstractAtmosSimulation - required functions
 In addition to the functions required for a general
-`ComponentModelSimulation`, an `AtmosModelSimulation` requires the
+`AbstractComponentSimulation`, an `AbstractAtmosSimulation` requires the
 following functions to retrieve and update its fields.
-- `get_field(::AtmosModelSimulation. ::Val{property})`: This getter
+- `get_field(::AbstractAtmosSimulation. ::Val{property})`: This getter
 function returns the value of the field property for the simulation
-in its current state. For an `AtmosModelSimulation`, it must be extended
+in its current state. For an `AbstractAtmosSimulation`, it must be extended
 for the following properties:
 
 | Coupler name                | Description                                                               | Units      |
@@ -162,7 +164,7 @@ for the following properties:
 | `u_int`                     | zonal wind velocity vector at the first internal model level              | m s⁻¹      |
 | `v_int`                     | meridional wind velocity vector at the first internal model level         | m s⁻¹      |
 
-- `update_field!(::AtmosModelSimulation. ::Val{property}, field)`:
+- `update_field!(::AbstractAtmosSimulation. ::Val{property}, field)`:
 A function to update the value of property in the component model
 simulation, using the values in `field`. This update should
 be done in place. If this function isn't extended for a property,
@@ -188,12 +190,12 @@ ClimaAtmos should also add the following coupler fields for Monin-Obukhov simila
 | `buoyancy_flux` | flux of buoyancy  | m⁻²s⁻³ |
 
 
-### AtmosModelSimulation - required functions to run with the ClimaLandSimulation
+### AbstractAtmosSimulation - required functions to run with the ClimaLandSimulation
 
 Coupling with the integrated `ClimaLandSimulation` requires the following functions, in addition
-to the functions required for coupling with a general `SurfaceModelSimulation`.
+to the functions required for coupling with a general `AbstractSurfaceSimulation`.
 
-- `get_field(::AtmosModelSimulation. ::Val{property})`:
+- `get_field(::AbstractAtmosSimulation. ::Val{property})`:
 This getter function must be extended
 for the following properties:
 
@@ -209,12 +211,12 @@ for the following properties:
     if the model is setup with no radiation. Because of this, a `ClimaAtmosSimulation` must have
     radiation enabled if running with the full `ClimaLand` model.
 
-### SurfaceModelSimulation - required functions
-Analogously to the `AtmosModelSimulation`, a `SurfaceModelSimulation`
-requires additional functions to those required for a general `ComponentModelSimulation`.
-- `get_field(::SurfaceModelSimulation, ::Val{property})`: This getter
+### AbstractSurfaceSimulation - required functions
+Analogously to the `AbstractAtmosSimulation`, an `AbstractSurfaceSimulation`
+requires additional functions to those required for a general `AbstractComponentSimulation`.
+- `get_field(::AbstractSurfaceSimulation, ::Val{property})`: This getter
 function returns the value of the field property for the simulation at
-the current time. For a `SurfaceModelSimulation`, it must be extended
+the current time. For an `AbstractSurfaceSimulation`, it must be extended
 for the following properties:
 
 | Coupler name             | Description                                                    | Units   |
@@ -246,7 +248,7 @@ for the following properties:
     agree, with differences only arising from `area_fraction` corrections and
     the fields existing on different spaces.
 
-- `update_field!(::SurfaceModelSimulation, ::Val{property}, field)`:
+- `update_field!(::AbstractSurfaceSimulation, ::Val{property}, field)`:
 A function to update the value of property in the component model
 simulation, using the values in `field` passed from the coupler
 This update should be done in place. If this function
@@ -268,30 +270,34 @@ properties needed by a component model.
 | `turbulent_moisture_flux`                     | aerodynamic turbulent surface fluxes of energy (evaporation)                 | kg m⁻² s⁻¹ |
 
 !!! note
-    `update_field!(::SurfaceModelSimulation, ::Val{:area_fraction}, field)` is
+    `update_field!(::AbstractSurfaceSimulation, ::Val{:area_fraction}, field)` is
     not required to be extended for land models, since they're assumed to have a
     constant area fraction.
 
-### SurfaceModelSimulation - optional functions
-- `get_field(::SurfaceModelSimulation, ::Val{property})`:
+### AbstractSurfaceSimulation - optional functions
+- `get_field(::AbstractSurfaceSimulation, ::Val{property})`:
 For some quantities, default `get_field` functions are provided, which may be
 overwritten or used as-is. These currently include the following:
 
-| Coupler name  | Description                                                               | Units | Default value |
-|---------------|---------------------------------------------------------------------------|-------|---------------|
-| `beta`        | factor that scales evaporation based on its estimated level of saturation |       |             1 |
-| `emissivity`  | measure of how much energy a surface radiates                             |       |             1 |
-| `height_disp` | displacement height relative to the surface                               | m     |             0 |
+| Coupler name             | Description                                                                 | Units | Default value |
+|--------------------------|-----------------------------------------------------------------------------|-------|---------------|
+| `emissivity`             | measure of how much energy a surface radiates                              |       |             1 |
+| `height_disp`            | displacement height relative to the surface                                | m     |             0 |
+| `roughness_model`        | roughness parameterization for surface flux calculations                    |       | `:constant`   |
+| `coare3_roughness_params`| COARE3 roughness params Field on exchange grid (when `roughness_model` is `:coare3`) |       | -             |
+
+!!! note "Roughness model option"
+    Default is `:constant`. Use `:coare3` for dynamic ocean roughness; then provide `coare3_roughness_params` via `get_field`.
 
 
-- `update_turbulent_fluxes!(::ComponentModelSimulation, fields::NamedTuple)`:
+- `update_turbulent_fluxes!(::AbstractComponentSimulation, fields::NamedTuple)`:
 This function updates the turbulent fluxes of the component model simulation
 at this point in horizontal space. The values are updated using the energy
 and moisture turbulent fluxes stored in fields which are calculated by the
 coupler.
 
 ### Prescribed surface conditions - SurfaceStub
-- `SurfaceStub` is a `SurfaceModelSimulation`, but it only contains required
+- `SurfaceStub` is an `AbstractSurfaceSimulation`, but it only contains required
   data in `<surface_stub>.cache`, e.g., for the calculation of surface fluxes
   through a prescribed surface state. This model is intended to be used for
   testing or as a simple stand-in model. The above adapter functions are already
@@ -300,7 +306,6 @@ coupler.
 
 ```
 get_field(sim::AbstractSurfaceStub, ::Val{:area_fraction}) = sim.cache.area_fraction
-get_field(sim::AbstractSurfaceStub, ::Val{:beta}) = sim.cache.beta
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_direct_albedo}) = sim.cache.α_direct
@@ -326,9 +331,9 @@ end
 ## Interfacer API
 ```@docs
     Interfacer.CoupledSimulation
-    Interfacer.AtmosModelSimulation
-    Interfacer.SurfaceModelSimulation
-    Interfacer.ComponentModelSimulation
+    Interfacer.AbstractAtmosSimulation
+    Interfacer.AbstractSurfaceSimulation
+    Interfacer.AbstractComponentSimulation
     Interfacer.AbstractSurfaceStub
     Interfacer.SurfaceStub
     Interfacer.get_field

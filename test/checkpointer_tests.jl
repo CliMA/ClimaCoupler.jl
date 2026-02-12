@@ -14,7 +14,7 @@ const space_checkpointer = CC.CommonSpaces.CubedSphereSpace(
     h_elem = 4,
 )
 
-struct DummySimulation{S} <: Interfacer.AtmosModelSimulation
+struct DummySimulation{S} <: Interfacer.AbstractAtmosSimulation
     state::S
 end
 Checkpointer.get_model_prog_state(sim::DummySimulation) = sim.state

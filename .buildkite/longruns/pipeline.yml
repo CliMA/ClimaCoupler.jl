@@ -125,7 +125,7 @@ steps:
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
           slurm_mem: 32GB
-      
+
       - label: "GPU AMIP + diag. EDMF + 1M"
         key: "amip_diagedmf_1m_gpu"
         command:
@@ -157,7 +157,7 @@ steps:
   - group: "CMIP simulations"
 
     steps:
-      - label: "GPU CMIP: ClimaAtmos + ClimaLand + ClimaOcean + PrescribedSeaIce"
+      - label: "GPU CMIP: ClimaAtmos + ClimaLand + ClimaOcean + ClimaSeaIce"
         key: "cmip_edonly_land"
         command:
             - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_land.yml --job_id cmip_edonly_land"
@@ -169,7 +169,7 @@ steps:
           slurm_mem: 32GB
           slurm_gpus: 1
 
-      - label: "GPU CMIP: ClimaAtmos + Bucket + ClimaOcean + PrescribedSeaIce"
+      - label: "GPU CMIP: ClimaAtmos + Bucket + ClimaOcean + ClimaSeaIce"
         key: "cmip_edonly_bucket"
         command:
             - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_bucket.yml --job_id cmip_edonly_bucket"
@@ -184,21 +184,15 @@ steps:
   - group: "Calibration experiments"
 
     steps:
-      - label: "Perfect model calibration test"
-        key: "amip_pm_calibration"
+      - label: "Subseasonal calibration test"
+        key: "subseasonal_calibration"
         command:
-          - "julia --color=yes --project=experiments/ClimaEarth experiments/calibration/run_calibration.jl"
-        artifact_paths: "experiments/calibration/output/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-          CLIMACOMMS_CONTEXT: "MPI"
+          - julia --color=yes --project=experiments/ClimaEarth experiments/calibration/subseasonal/generate_observations.jl
+          - julia --color=yes --project=experiments/ClimaEarth experiments/calibration/subseasonal/run_calibration.jl
+        artifact_paths: "experiments/calibration/subseasonal/output/*"
         agents:
           queue: clima
-          slurm_mem: 96GB
-          slurm_ntasks: 3
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_time: 05:00:00
+          slurm_time: 24:00:00
 
   - wait
 

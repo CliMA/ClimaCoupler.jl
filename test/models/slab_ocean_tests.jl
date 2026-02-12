@@ -2,8 +2,8 @@ import Test: @test, @testset
 import ClimaCore as CC
 import ClimaParams as CP
 import ClimaCoupler
-
-include(joinpath("..", "..", "components", "ocean", "slab_ocean.jl"))
+import SurfaceFluxes as SF
+import ClimaCoupler.Models
 
 for FT in (Float32, Float64)
     @testset "dss_state! SlabOceanSimulation for FT=$FT" begin
@@ -24,12 +24,16 @@ for FT in (Float32, Float64)
             state_field1 = CC.Fields.ones(boundary_space),
             state_field2 = CC.Fields.zeros(boundary_space),
         )
+        coare3_roughness_params =
+            CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
+        coare3_roughness_params .= SF.COARE3RoughnessParams{FT}()
         p = (;
             cache_field = CC.Fields.zeros(boundary_space),
             dss_buffer = CC.Spaces.create_dss_buffer(u),
+            coare3_roughness_params,
         )
         integrator = (; u, p)
-        sim = SlabOceanSimulation(nothing, integrator)
+        sim = Models.SlabOceanSimulation(nothing, integrator)
 
         # make field non-constant to check the impact of the dss step
         coords_lat = CC.Fields.coordinate_field(sim.integrator.u.state_field2).lat
@@ -37,7 +41,7 @@ for FT in (Float32, Float64)
 
         # apply DSS
         integrator_copy = deepcopy(integrator)
-        dss_state!(sim)
+        Models.dss_state!(sim)
 
         # test that uniform field and cache are unchanged, non-constant is changed
         # note: uniform field is changed slightly by dss

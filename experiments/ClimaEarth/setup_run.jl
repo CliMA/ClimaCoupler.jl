@@ -31,17 +31,7 @@ import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
 
 # ## Coupler specific imports
-import ClimaCoupler
-import ClimaCoupler:
-    ConservationChecker,
-    Checkpointer,
-    FieldExchanger,
-    FluxCalculator,
-    Input,
-    Interfacer,
-    TimeManager,
-    Utilities,
-    SimOutput
+using ClimaCoupler
 import ClimaCoupler.Interfacer:
     AbstractSlabplanetSimulationMode,
     AMIPMode,
@@ -55,7 +45,6 @@ import ClimaCoupler.Interfacer:
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.Utils: period_to_seconds_float
-import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import ClimaUtilities.TimeManager: ITime, date
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
 # Random is used by RRMTGP for some cloud properties
@@ -67,6 +56,13 @@ import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule, EveryStepSchedule
 # Trigger ClimaCouplerMakieExt extension
 using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, NCDatasets, Poppler_jll
 
+# Trigger ClimaCouplerCMIPExt extension
+# Note we only need these if running CMIP, but for now we share one environment for all experiments
+import Oceananigans, ClimaOcean, ClimaSeaIce, KernelAbstractions
+
+#  Trigger ClimaCouplerClimaLandExt extension
+import ClimaLand, NCDatasets
+
 pkg_dir = pkgdir(ClimaCoupler)
 
 #=
@@ -77,13 +73,6 @@ contain any internals of the ClimaCoupler source code, except extensions to the 
 
 ## helpers for component models
 include("components/atmosphere/climaatmos.jl")
-include("components/land/climaland_bucket.jl")
-include("components/land/climaland_integrated.jl")
-include("components/ocean/slab_ocean.jl")
-include("components/ocean/prescr_ocean.jl")
-include("components/ocean/prescr_seaice.jl")
-include("components/ocean/oceananigans.jl")
-include("components/ocean/clima_seaice.jl")
 
 #=
 ### Configuration Dictionaries
@@ -93,7 +82,6 @@ dictionary and the simulation-specific configuration dictionary, which allows th
 We can additionally pass the configuration dictionary to the component model initializers, which will then override the default settings of the component models.
 =#
 
-include("user_io/postprocessing.jl")
 
 """
     CoupledSimulation(config_file)
@@ -127,6 +115,8 @@ function CoupledSimulation(config_dict::AbstractDict)
         Δt_cpl,
         component_dt_dict,
         share_surface_space,
+        nh_poly,
+        h_elem,
         saveat,
         checkpoint_dt,
         detect_restart_files,
@@ -147,6 +137,8 @@ function CoupledSimulation(config_dict::AbstractDict)
         output_dir_root,
         parameter_files,
         era5_initial_condition_dir,
+        ocean_model,
+        simple_ocean,
         ice_model,
         land_fraction_source,
         binary_area_fraction,
@@ -195,19 +187,11 @@ function CoupledSimulation(config_dict::AbstractDict)
             t_start = restart_t
         end
 
-        if pkgversion(CA) >= v"0.29.1"
-            # We only support a round number of seconds
-            isinteger(float(t_start)) ||
-                error("Cannot restart from a non integer number of seconds")
-            t_start_int = Int(float(t_start))
-            atmos_config_dict.parsed_args["t_start"] = "$(t_start_int)secs"
-        else
-            # There was no `t_start`, so we have to use a workaround for this.
-            # This does not support passing the command-line arguments (unless
-            # restart_dir is exactly the same as output_dir_root)
-            atmos_config_dict.parsed_args["restart_file"] =
-                climaatmos_restart_path(output_dir_root, restart_t)
-        end
+        # We only support a round number of seconds
+        isinteger(float(t_start)) ||
+            error("Cannot restart from a non integer number of seconds")
+        t_start_int = Int(float(t_start))
+        atmos_config_dict.parsed_args["t_start"] = "$(t_start_int)secs"
 
         @info "Starting from t_start $(t_start)"
     end
@@ -217,7 +201,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     #=
     ## Component Model Initialization
     Here we set initial and boundary conditions for each component model. Each component model is required to have an `init` function that
-    returns a `ComponentModelSimulation` object (see `Interfacer` docs for more details).
+    returns a `AbstractComponentSimulation` object (see `Interfacer` docs for more details).
     =#
 
     #=
@@ -226,7 +210,8 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
 
     ## init atmos model component
-    atmos_sim = ClimaAtmosSimulation(atmos_config_dict)
+    atmos_sim =
+        Interfacer.AtmosSimulation(Val(:climaatmos); atmos_config = atmos_config_dict)
 
     #=
     ### Boundary Space
@@ -247,8 +232,7 @@ function CoupledSimulation(config_dict::AbstractDict)
     if share_surface_space
         boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
     else
-        h_elem = config_dict["h_elem"]
-        n_quad_points = 4
+        n_quad_points = nh_poly + 1
         radius = coupled_param_dict["planet_radius"] # in meters
         boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius, n_quad_points, h_elem)
     end
@@ -266,6 +250,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         comms_ctx;
         land_fraction_source,
         binary_area_fraction,
+        sim_mode,
     )
 
     #=
@@ -286,154 +271,91 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     @info(sim_mode)
     land_sim = ice_sim = ocean_sim = nothing
-    if sim_mode <: AMIPMode || sim_mode <: CMIPMode || sim_mode <: SubseasonalMode
-        @info("AMIP/CMIP boundary conditions - do not expect energy conservation")
-
-        # Build ERA5-based file paths if subseasonal mode is selected
-        subseasonal_sst = subseasonal_sic = subseasonal_land_ic = nothing
-        if sim_mode <: SubseasonalMode
-            isnothing(era5_initial_condition_dir) &&
-                error("subseasonal mode requires --era5_initial_condition_dir")
-            # Filenames inferred from start_date, which is YYYYMMDD
-            datestr = Dates.format(start_date, Dates.dateformat"yyyymmdd")
-            subseasonal_sst =
-                joinpath(era5_initial_condition_dir, "sst_processed_$(datestr)_0000.nc")
-            subseasonal_sic =
-                joinpath(era5_initial_condition_dir, "sic_processed_$(datestr)_0000.nc")
-            subseasonal_land_ic = joinpath(
-                era5_initial_condition_dir,
-                "era5_land_processed_$(datestr)_0000.nc",
-            )
-        end
-
-        ## land model
-        # Determine whether to use a shared surface space
-        shared_surface_space = share_surface_space ? boundary_space : nothing
-        if land_model == "bucket"
-            land_sim = BucketSimulation(
-                FT;
-                dt = component_dt_dict["dt_land"],
-                tspan,
-                start_date,
-                output_dir = dir_paths.land_output_dir,
-                area_fraction = land_fraction,
-                shared_surface_space,
-                surface_elevation,
-                land_temperature_anomaly,
-                use_land_diagnostics,
-                albedo_type = bucket_albedo_type,
-                bucket_initial_condition,
-                coupled_param_dict,
-            )
-        elseif land_model == "integrated"
-            land_sim = ClimaLandSimulation(
-                FT;
-                dt = component_dt_dict["dt_land"],
-                tspan,
-                start_date,
-                output_dir = dir_paths.land_output_dir,
-                area_fraction = land_fraction,
-                shared_surface_space,
-                land_spun_up_ic,
-                saveat,
-                surface_elevation,
-                atmos_h,
-                land_temperature_anomaly,
-                use_land_diagnostics,
-                coupled_param_dict,
-                land_ic_path = subseasonal_land_ic,
-            )
-        else
-            error("Invalid land model specified: $(land_model)")
-        end
-
-        ## ocean model
-        if sim_mode <: CMIPMode
-            stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
-            ocean_sim = OceananigansSimulation(
-                boundary_space,
-                start_date,
-                stop_date;
-                Δt = component_dt_dict["dt_ocean"],
-                output_dir = dir_paths.ocean_output_dir,
-                comms_ctx,
-                coupled_param_dict,
-                ice_model,
-            )
-        else
-            ocean_sim = PrescribedOceanSimulation(
-                FT,
-                boundary_space,
-                start_date,
-                t_start,
-                coupled_param_dict,
-                thermo_params,
-                comms_ctx;
-                sst_path = subseasonal_sst,
-            )
-        end
-        ## sea ice model
-        if ice_model == "clima_seaice"
-            ice_sim = ClimaSeaIceSimulation(
-                ocean_sim;
-                output_dir = dir_paths.ice_output_dir,
-                start_date,
-                coupled_param_dict,
-                Δt = component_dt_dict["dt_seaice"],
-            )
-        elseif ice_model == "prescribed"
-            ice_sim = PrescribedIceSimulation(
-                FT;
-                tspan = tspan,
-                dt = component_dt_dict["dt_seaice"],
-                saveat = saveat,
-                space = boundary_space,
-                coupled_param_dict,
-                thermo_params = thermo_params,
-                comms_ctx,
-                start_date,
-                land_fraction,
-                sic_path = subseasonal_sic,
-                binary_area_fraction = binary_area_fraction,
-            )
-        else
-            error("Invalid ice model specified: $(ice_model)")
-        end
-
-    elseif (sim_mode <: AbstractSlabplanetSimulationMode)
-
-        land_fraction = sim_mode <: SlabplanetAquaMode ? land_fraction .* 0 : land_fraction
-        land_fraction =
-            sim_mode <: SlabplanetTerraMode ? land_fraction .* 0 .+ 1 : land_fraction
-
-        ## land model
-        land_sim = BucketSimulation(
-            FT;
-            dt = component_dt_dict["dt_land"],
-            tspan,
-            start_date,
-            output_dir = dir_paths.land_output_dir,
-            area_fraction = land_fraction,
-            surface_elevation,
-            land_temperature_anomaly,
-            use_land_diagnostics,
-            albedo_type = bucket_albedo_type,
-            bucket_initial_condition,
-            coupled_param_dict,
-        )
-
-        ## ocean model
-        ocean_sim = SlabOceanSimulation(
-            FT;
-            tspan,
-            dt = component_dt_dict["dt_ocean"],
-            space = boundary_space,
-            saveat,
-            coupled_param_dict,
-            thermo_params,
-            evolving = evolving_ocean,
-        )
+    # Build ERA5-based file paths if subseasonal mode is selected
+    subseasonal_sst = subseasonal_sic = subseasonal_land_ic = nothing
+    if sim_mode <: SubseasonalMode
+        isnothing(era5_initial_condition_dir) &&
+            error("subseasonal mode requires --era5_initial_condition_dir")
+        # Filenames inferred from start_date, which is YYYYMMDD
+        datestr = Dates.format(start_date, Dates.dateformat"yyyymmdd")
+        subseasonal_sst =
+            joinpath(era5_initial_condition_dir, "sst_processed_$(datestr)_0000.nc")
+        subseasonal_sic =
+            joinpath(era5_initial_condition_dir, "sic_processed_$(datestr)_0000.nc")
+        subseasonal_land_ic =
+            joinpath(era5_initial_condition_dir, "era5_land_processed_$(datestr)_0000.nc")
     end
+
+    ## Construct the land model component
+    # Determine whether to use a shared surface space
+    shared_surface_space = share_surface_space ? boundary_space : nothing
+    land_sim = Interfacer.LandSimulation(
+        FT,
+        land_model;
+        # Arguments used by multiple models
+        dt = component_dt_dict["dt_land"],
+        tspan,
+        start_date,
+        output_dir = dir_paths.land_output_dir,
+        area_fraction = land_fraction,
+        shared_surface_space,
+        saveat,
+        surface_elevation,
+        atmos_h,
+        land_temperature_anomaly,
+        use_land_diagnostics,
+        coupled_param_dict,
+        # Arguments used by bucket model
+        albedo_type = bucket_albedo_type,
+        bucket_initial_condition,
+        # Arguments used by integrated model
+        land_spun_up_ic,
+        land_ic_path = subseasonal_land_ic,
+    )
+
+    ## Construct the ocean model component
+    ocean_sim = Interfacer.OceanSimulation(
+        FT,
+        ocean_model;
+        # Arguments used by multiple models
+        dt = component_dt_dict["dt_ocean"],
+        start_date,
+        tspan,
+        coupled_param_dict,
+        thermo_params,
+        comms_ctx,
+        boundary_space,
+        # Arguments used by Oceananigans
+        output_dir = dir_paths.ocean_output_dir,
+        simple_ocean,
+        # Arguments used by prescribed ocean
+        sst_path = subseasonal_sst,
+        # Arguments used by slab ocean
+        saveat,
+        evolving = evolving_ocean,
+    )
+
+    ## Construct the sea ice model component (note this must be constructed after the ocean model)
+    ice_sim = Interfacer.SeaIceSimulation(
+        FT,
+        ice_model;
+        # Arguments used by multiple models
+        dt = component_dt_dict["dt_seaice"],
+        start_date,
+        coupled_param_dict,
+        output_dir = dir_paths.ice_output_dir,
+        # Arguments used by ClimaSeaIce model
+        ocean = ocean_sim,
+        # Arguments used by prescribed ice model
+        tspan,
+        saveat,
+        boundary_space,
+        thermo_params,
+        comms_ctx,
+        land_fraction,
+        sic_path = subseasonal_sic,
+        binary_area_fraction,
+    )
 
     #=
     ## Coupler Initialization
@@ -444,7 +366,6 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
 
     ## collect component model simulations that have been initialized
-    @assert !(ocean_sim isa SlabOceanSimulation) || isnothing(ice_sim) "SlabOceanSimulation should not be used with sea ice, got $(ice_sim)"
     model_sims = (; atmos_sim, ice_sim, land_sim, ocean_sim)
     model_sims =
         NamedTuple{filter(key -> !isnothing(model_sims[key]), keys(model_sims))}(model_sims)
@@ -595,90 +516,6 @@ function CoupledSimulation(config_dict::AbstractDict)
 end
 
 """
-    run!(cs::CoupledSimulation)
-
-Evolve the given simulation, producing plots and other diagnostic information.
-
-Keyword arguments
-==================
-
-`precompile`: If `true`, run the coupled simulations for two steps, so that most functions
-              are precompiled and subsequent timing will be more accurate.
-"""
-function run!(
-    cs::CoupledSimulation;
-    precompile = (cs.tspan[end] > 2 * cs.Δt_cpl + cs.tspan[begin]),
-)
-
-    ## Precompilation of Coupling Loop
-    # Here we run the entire coupled simulation for two timesteps to precompile several
-    # functions for more accurate timing of the overall simulation.
-    precompile && (step!(cs); step!(cs))
-
-    ## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos
-    GC.gc()
-
-    #=
-    ## Solving and Timing the Full Simulation
-
-    This is where the full coupling loop, `solve_coupler!` is called for the full timespan of the simulation.
-    We use the `ClimaComms.@elapsed` macro to time the simulation on both CPU and GPU, and use this
-    value to calculate the simulated years per day (SYPD) of the simulation.
-    =#
-    @info "Starting coupling loop"
-    walltime = ClimaComms.@elapsed ClimaComms.device(cs) begin
-        s = CA.@timed_str begin
-            while cs.t[] < cs.tspan[end]
-                step!(cs)
-            end
-        end
-    end
-    @info "Simulation took $(walltime) seconds"
-
-    sypd = simulated_years_per_day(cs, walltime)
-    walltime_per_step = walltime_per_coupling_step(cs, walltime)
-    @info "SYPD: $sypd"
-    @info "Walltime per coupling step: $(walltime_per_step)"
-    save_sypd_walltime_to_disk(cs, walltime)
-
-    # Close all diagnostics file writers
-    isnothing(cs.diags_handler) ||
-        foreach(diag -> close(diag.output_writer), cs.diags_handler.scheduled_diagnostics)
-    foreach(Interfacer.close_output_writers, cs.model_sims)
-
-    return nothing
-end
-
-"""
-    postprocess(cs; conservation_softfail = false, rmse_check = false)
-
-Process the results after a simulation has completed, including generating
-plots, checking conservation, and other diagnostics.
-All postprocessing is performed using the root process only, if applicable.
-
-When `conservation_softfail` is true, throw an error if conservation is not
-respected.
-
-When `rmse_check` is true, compute the RMSE against observations and test
-that it is below a certain threshold.
-
-The postprocessing includes:
-- Energy and water conservation checks (if running SlabPlanet with checks enabled)
-- Animations (if not running in MPI)
-- AMIP plots of the final state of the model
-- Error against observations
-- Optional additional atmosphere diagnostics plots
-- Plots of useful coupler and component model fields for debugging
-"""
-function postprocess(cs; conservation_softfail = false, rmse_check = false)
-    if ClimaComms.iamroot(ClimaComms.context(cs)) && !isnothing(cs.diags_handler)
-        postprocessing_vars = (; conservation_softfail, rmse_check)
-        postprocess_sim(cs, postprocessing_vars)
-    end
-    return nothing
-end
-
-"""
     setup_and_run(config_dict)
     setup_and_run(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
 
@@ -698,44 +535,4 @@ function setup_and_run(config_dict)
     cs = CoupledSimulation(config_dict)
     run!(cs)
     return cs
-end
-
-"""
-    step!(cs::CoupledSimulation)
-
-Take one coupling step forward in time.
-
-This function runs the component models sequentially, and exchanges combined fields and
-calculates fluxes using the selected turbulent fluxes option. Note, one coupling step might
-require multiple steps in some of the component models.
-"""
-function step!(cs::CoupledSimulation)
-    # Update the current time
-    cs.t[] += cs.Δt_cpl
-
-    ## compute global energy and water conservation checks
-    ## (only for slabplanet if tracking conservation is enabled)
-    ConservationChecker.check_conservation!(cs)
-
-    ## step component model simulations sequentially for one coupling timestep (Δt_cpl)
-    FieldExchanger.step_model_sims!(cs)
-
-    ## update the surface fractions for surface models
-    FieldExchanger.update_surface_fractions!(cs)
-
-    ## exchange all non-turbulent flux fields between models, including radiative and precipitation fluxes
-    FieldExchanger.exchange!(cs)
-
-    ## calculate turbulent fluxes in the coupler and update the model simulations with them
-    FluxCalculator.turbulent_fluxes!(cs)
-
-    ## compute any ocean-sea ice fluxes
-    FluxCalculator.ocean_seaice_fluxes!(cs)
-
-    ## Maybe call the callbacks
-    TimeManager.callbacks!(cs)
-
-    # Compute coupler diagnostics
-    CD.orchestrate_diagnostics(cs)
-    return nothing
 end

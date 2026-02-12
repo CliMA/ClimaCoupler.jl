@@ -6,7 +6,46 @@ ClimaCoupler.jl Release Notes
 
 ### ClimaCoupler features
 
-#### Change default simulation output directory PRPR[#1653](https://github.com/CliMA/ClimaCoupler.jl/pull/1653)
+#### Add an extension for CMIP models PR[#1704](https://github.com/CliMA/ClimaCoupler.jl/pull/1704)
+This extension contains the methods that extend the ClimaCoupler.jl interface
+for the Oceananigans and ClimaSeaIce models.
+
+#### Move simple component models into Models module PR[#1692](https://github.com/CliMA/ClimaCoupler.jl/pull/1692)
+Move slab ocean, prescribed ocean, and prescribed sea ice from experiments/
+into src/.
+
+#### Enable COARE3 roughness parameterization PR[#1689](https://github.com/CliMA/ClimaCoupler.jl/pull/1689)
+Allows :constant (land, ice) or :coare3 (ocean) aerodynamic roughness parameterization.
+
+#### Rename abstract component types PR[#1688](https://github.com/CliMA/ClimaCoupler.jl/pull/1688)
+To follow abstract type naming convention. For example, `XModelSimulation` is now
+`AbstractXSimulation`.
+
+#### Add generic component model constructors PR[#1683](https://github.com/CliMA/ClimaCoupler.jl/pull/1683)
+In preparation for adding extensions for each component model, generalize the component
+model constructor interface and extend it for each component. This PR also drops
+support for running CMIP with prescribed sea ice since it isn't physically correct.
+
+#### Change Oceananigans model setup to avoid GPU parameter memory limits PR[#1685](https://github.com/CliMA/ClimaCoupler.jl/pull/1685)
+After updating to Oceananigans 0.102+, we started hitting parameter memory limits
+on P100s. This PR simplifies the ocean model to avoid them. Note that this model setup
+may be less accurate and we may want to make longrun ocean setups more complex.
+
+#### Remove `pkgversion` checks for unsupported versions PR[#1684](https://github.com/CliMA/ClimaCoupler.jl/pull/1684)
+We kept some `pkgversion` if/else branches around to maintain compatibility
+with previous versions of upstream packages. This PR removes these checks for
+versions we no longer support.
+
+#### Add a SimCoordinator module PR[#1676](https://github.com/CliMA/ClimaCoupler.jl/pull/1676)
+Move the functions `run!(cs)` and `step!(cs)` into a new module, SimCoordinator.
+These are exported at the top-level ClimaCoupler.jl, so they can continue to be used
+as before. This PR also moves `postprocess(cs)` into the Plotting module.
+
+#### Update interfaces to surface flux calculator PR[#1646](https://github.com/CliMA/ClimaCoupler.jl/pull/1646)
+Uses new interface in SurfaceFluxes v0.15 to calculate surface fluxes. For the bucket model, call the
+turbulent_fluxes! function in ClimaLand directly for surface flux calculation.
+
+#### Change default simulation output directory PR[#1653](https://github.com/CliMA/ClimaCoupler.jl/pull/1653)
 Changes the default output directory from `experiments/ClimaEarth/output/` to `output`.
 The internal structure within the output directory remains the same.
 

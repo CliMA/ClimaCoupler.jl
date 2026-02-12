@@ -1,17 +1,11 @@
 using ClimaCoupler
 using Documenter, Literate
-using CairoMakie, ClimaCoreMakie, GeoMakie, Makie, Poppler_jll, Printf, Oceananigans
-using ClimaCoupler:
-    Checkpointer,
-    ConservationChecker,
-    FieldExchanger,
-    FluxCalculator,
-    Input,
-    Interfacer,
-    SimOutput,
-    TimeManager,
-    Utilities,
-    Plotting
+# Import packages needed to load plotting extensions
+import CairoMakie, ClimaCoreMakie, GeoMakie, Makie, Poppler_jll, Printf, Oceananigans
+# Import packages for ClimaCouplerCMIPExt
+import ClimaOcean, ClimaSeaIce, KernelAbstractions
+# Import packages for ClimaCouplerClimaLandExt
+import ClimaLand, NCDatasets
 
 const COUPLER_DIR = joinpath(@__DIR__, "..")
 const EXPERIMENTS_DIR = joinpath(@__DIR__, "..", "experiments")
@@ -81,6 +75,8 @@ interface_pages = [
     "fieldexchanger.md",
     "fluxcalculator.md",
     "interfacer.md",
+    "models.md",
+    "simcoordinator.md",
     "timemanager.md",
     "utilities.md",
     "simoutput.md",
@@ -105,6 +101,8 @@ makedocs(
         ClimaCoupler,
         Base.get_extension(ClimaCoupler, :ClimaCouplerMakieExt),
         Base.get_extension(ClimaCoupler, :ClimaCouplerOceananigansMakieExt),
+        Base.get_extension(ClimaCoupler, :ClimaCouplerCMIPExt),
+        Base.get_extension(ClimaCoupler, :ClimaCouplerClimaLandExt),
     ],
     authors = "Climate Modelling Alliance",
     sitename = "ClimaCoupler.jl",

@@ -15,9 +15,11 @@ land_model: "integrated"
 land_spun_up_ic: false
 mode_name: "cmip"
 netcdf_output_at_levels: true
+ocean_model: "oceananigans"
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
 rayleigh_sponge: true
+simple_ocean: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "1days"

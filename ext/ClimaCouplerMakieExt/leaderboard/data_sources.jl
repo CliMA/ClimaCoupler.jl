@@ -1,5 +1,6 @@
 import ClimaAnalysis
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
+import ClimaDiagnostics as CD
 
 """
     get_compare_vars_biases_groups()
@@ -104,7 +105,7 @@ To add a variable for the leaderboard, add a key-value pair to the dictionary
 `sim_var_dict` whose key is the short name of the variable and the value is an
 anonymous function that returns a `OutputVar`. For each variable, any
 preprocessing should be done in the corresponding anonymous function which
-includes unit conversion and shifting the dates.
+includes unit conversion.
 
 The variable should have only four dimensions: latitude, longitude, time, and
 pressure. The units of pressure should be in hPa.
@@ -154,8 +155,14 @@ function get_sim_var_in_pfull_dict(diagnostics_folder_path)
                         sim_var_windowed,
                         pfull_var_windowed,
                     )
-                    sim_in_pfull_var =
-                        ClimaAnalysis.shift_to_start_of_previous_month(sim_in_pfull_var)
+                    # For ClimaDiagnostics v0.3 and later, the dates are saved at
+                    # the start of the reduction period
+                    pkgversion(CD) < v"0.3" && (
+                        sim_in_pfull_var =
+                            ClimaAnalysis.shift_to_start_of_previous_month(
+                                sim_in_pfull_var,
+                            )
+                    )
                     sim_in_pfull_var = ClimaAnalysis.convert_dim_units(
                         sim_in_pfull_var,
                         "pfull",

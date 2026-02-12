@@ -17,8 +17,14 @@ import ClimaSeaIce as CSI
 import ClimaCore as CC
 import ClimaParams as CP
 using KernelAbstractions: @kernel, @index, @inbounds
-import ConservativeRegridding as CR
+
 import Adapt # for ConservativeRegridding
+import ClimaCore as CC # for ConservativeRegriddingClimaCoreExt
+import ConservativeRegridding as CR
+
+const ConservativeRegriddingCCExt =
+    Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
+
 
 """
     OceananigansSimulation{SIM, A, OPROP, REMAP, SIC}

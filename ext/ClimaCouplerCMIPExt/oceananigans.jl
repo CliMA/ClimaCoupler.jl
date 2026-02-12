@@ -1,7 +1,6 @@
 import ClimaComms
 import SurfaceFluxes as SF
 import Thermodynamics as TD
-import ClimaOcean.EN4: download_dataset
 import Dates
 
 """
@@ -50,22 +49,18 @@ function OceananigansSimulation(
     extra_kwargs...,
 ) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
-    OC.Oceananigans.defaults.FloatType = FT
+    OC.defaults.FloatType = FT
 
     # Compute stop_date for oceananigans (needed for EN4 data retrieval)
     stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
-
-    # Use Float64 for the ocean to avoid precision issues
-    FT_ocean = Float64
-    OC.Oceananigans.defaults.FloatType = FT_ocean
 
     # Retrieve EN4 data (monthly)
     # (It requires username and password)
     dates = range(start_date, step = Dates.Month(1), stop = stop_date)
     en4_temperature = CO.Metadata(:temperature; dates, dataset = CO.EN4.EN4Monthly())
     en4_salinity = CO.Metadata(:salinity; dates, dataset = CO.EN4.EN4Monthly())
-    download_dataset(en4_temperature)
-    download_dataset(en4_salinity)
+    CO.EN4.download_dataset(en4_temperature)
+    CO.EN4.download_dataset(en4_salinity)
 
     # Set up tripolar ocean grid (1 degree)
     Nx = 720

@@ -1,6 +1,3 @@
-const ConservativeRegriddingCCExt =
-    Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
-
 """
     surface_flux(f::OC.AbstractField)
 

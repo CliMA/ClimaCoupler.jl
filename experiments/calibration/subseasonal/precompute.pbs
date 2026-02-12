@@ -1,0 +1,19 @@
+#!/bin/bash
+#PBS -N ekp_precompute
+#PBS -A UCIT0011
+#PBS -l walltime=00:10:00
+#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -q develop
+#PBS -j oe
+#PBS -o precompute.log
+
+# Load modules
+export MODULEPATH="/glade/campaign/univ/ucit0011/ClimaModules-Derecho:$MODULEPATH"
+module purge
+module load climacommon
+
+cd /glade/u/home/cchristo/clima/copies3/ClimaCoupler.jl
+
+echo "=== Starting precompute at $(date) ==="
+julia --project=experiments/ClimaEarth experiments/calibration/subseasonal/precompute_ekp_inputs.jl
+echo "=== Finished precompute at $(date) ==="

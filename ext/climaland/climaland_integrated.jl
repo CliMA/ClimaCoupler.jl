@@ -134,12 +134,6 @@ function ClimaLandSimulation(
     ground = CL.PrognosticGroundConditions{FT}()
     canopy_forcing = (; forcing.atmos, forcing.radiation, ground)
     prognostic_land_components = (:canopy, :snow, :soil, :soilco2)
-
-    # Construct the P model manually since it is not a default
-    photosynthesis = CL.Canopy.PModel{FT}(domain, toml_dict)
-    conductance = CL.Canopy.PModelConductance{FT}(toml_dict)
-    # Use the soil moisture stress function based on soil moisture only
-    soil_moisture_stress = CL.Canopy.PiecewiseMoistureStressModel{FT}(domain, toml_dict)
     surface_domain = CL.Domains.obtain_surface_domain(domain)
     biomass = CL.Canopy.PrescribedBiomassModel{FT}(
         domain,
@@ -156,9 +150,6 @@ function ClimaLandSimulation(
         LAI,
         toml_dict;
         prognostic_land_components,
-        photosynthesis,
-        conductance,
-        soil_moisture_stress,
         biomass,
     )
 

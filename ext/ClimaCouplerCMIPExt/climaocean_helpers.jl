@@ -118,7 +118,7 @@ end
 ### Extensions of Interfacer.jl remapping functions for Oceananigans fields/grids
 # Non-allocating ClimaCore -> Oceananigans remap
 function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
-    ConservativeRegriddingCCExt.get_value_per_element!(
+    get_ConservativeRegriddingCCExt().get_value_per_element!(
         remapping.value_per_element_cc,
         source_field,
         remapping.field_ones_cc,
@@ -161,7 +161,7 @@ function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field
     CR.regrid!(dst, remapping.remapper_oc_to_cc, src)
 
     # Convert the vector of remapped values to a ClimaCore Field with one value per element
-    ConservativeRegriddingCCExt.set_value_per_element!(target_field, dst)
+    get_ConservativeRegriddingCCExt().set_value_per_element!(target_field, dst)
     return nothing
 end
 # Allocating Oceananigans Field -> ClimaCore remap

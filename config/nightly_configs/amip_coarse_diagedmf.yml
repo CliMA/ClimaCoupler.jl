@@ -21,3 +21,4 @@ t_end: "465days"
 topo_smoothing: true
 topography: "Earth"
 z_elem: 39
+use_sgs_quadrature: true

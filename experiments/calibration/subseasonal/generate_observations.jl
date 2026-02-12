@@ -7,6 +7,10 @@ import EnsembleKalmanProcesses as EKP
 import JLD2
 import ClimaDiagnostics
 import ClimaCore
+
+# setup_run.jl provides CoupledSimulation (needed by resampled_lonlat fallback)
+include(joinpath(pkgdir(ClimaCoupler), "experiments/ClimaEarth/setup_run.jl"))
+
 # Access CalibrateConfig
 include(joinpath(@__DIR__, "run_calibration.jl"))
 

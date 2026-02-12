@@ -67,7 +67,7 @@ function update_T_sfc(
     α = σ * ϵ / (ρ * c)
     
     return function(ζ, param_set, thermo_params_callback, inputs, scheme, u_star, z0m, z0s)
-        T_sfc_n = inputs.T_sfc
+        T_sfc_n = inputs.T_sfc_guess
         
         # Compute surface humidity from T_sfc_n
         ρ_sfc = SF.surface_density(

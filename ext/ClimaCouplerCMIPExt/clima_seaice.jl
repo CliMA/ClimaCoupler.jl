@@ -372,56 +372,49 @@ function FluxCalculator.compute_surface_fluxes!(
     # Thermal conductivity (scalar); ConductiveFlux has .conductivity, FluxFunction does not
     internal_heat_flux = sim.ice.model.ice_thermodynamics.internal_heat_flux
     κ = if hasfield(typeof(internal_heat_flux), :conductivity)
-        internal_heat_flux.conductivity
+        FT.(internal_heat_flux.conductivity)
     else
         convert(FT, 2) # default conductivity [W m⁻¹ K⁻¹] when internal_heat_flux is FluxFunction etc.
     end
     
     # Ice thickness (field, remapped to boundary space)
-    δ = Interfacer.get_field(sim, Val(:ice_thickness))
-    δ_field = CC.Fields.fill(FT(δ), boundary_space)
-    
+    δ = FT.(Interfacer.get_field(sim, Val(:ice_thickness)))
     # Internal temperature (field, remapped to boundary space)
-    T_i = Interfacer.get_field(sim, Val(:internal_temperature))
-    T_i_field = CC.Fields.fill(FT(T_i), boundary_space)
-    
+    T_i = FT.(Interfacer.get_field(sim, Val(:internal_temperature)))
     # Stefan-Boltzmann constant (scalar)
     σ = FT(sim.ice_properties.σ)
-    
     # Emissivity (scalar, broadcast to field)
-    ϵ_scalar = Interfacer.get_field(sim, Val(:emissivity))
-    ϵ = CC.Fields.fill(ϵ_scalar, boundary_space)
+    ϵ = FT.(Interfacer.get_field(sim, Val(:emissivity)))
     
     # Density and heat capacity (scalars)
-    ρ = sim.ice.model.ice_thermodynamics.phase_transitions.ice_density
-    c = sim.ice.model.ice_thermodynamics.phase_transitions.ice_heat_capacity
+    ρ = FT.(sim.ice.model.ice_thermodynamics.phase_transitions.ice_density)
+    c = FT.(sim.ice.model.ice_thermodynamics.phase_transitions.ice_heat_capacity)
     
     # Radiation and albedo (fields)
     SW_d = csf.SW_d
     LW_d = csf.LW_d
-    α_albedo_scalar = Interfacer.get_field(sim, Val(:surface_direct_albedo))
-    α_albedo = CC.Fields.fill(α_albedo_scalar, boundary_space)
+    α_albedo = FT.(Interfacer.get_field(sim, Val(:surface_direct_albedo)))
 
     # Create the update_T_sfc callback element-wise
     # Since update_T_sfc returns a function, we broadcast it to create a field of callbacks
     update_T_sfc_callback = ClimaCouplerCMIPExt.update_T_sfc.(
-        κ,
-        δ,
-        T_i,
-        σ,
-        ϵ,
-        ρ,
-        c,
-        SW_d,
-        LW_d,
-        α_albedo,
+        κ, # conductivity
+        δ, # ice thickness
+        T_i, # internal temperature
+        σ, # stefan-boltzmann constant
+        ϵ, # emissivity
+        ρ, # density
+        c, # ice heat capacity
+        SW_d, #SW↓
+        LW_d, #LW↓
+        α_albedo, # albedo
     )
 
     # Calculate surface fluxes with the callback
     Φ_sfc = SFP.grav.(surface_fluxes_params) .* csf.height_sfc
     Δz = csf.height_int .- csf.height_sfc
 
-    outputs = SF.surface_fluxes.(
+    (; shf, lhf, evaporation, ρτxz, ρτyz, T_sfc, q_vap_sfc, L_MO, ustar) = SF.surface_fluxes.(
         surface_fluxes_params,
         csf.T_atmos,
         csf.q_tot_atmos,
@@ -434,12 +427,12 @@ function FluxCalculator.compute_surface_fluxes!(
         Δz,
         0, # d
         uv_int,
-        StaticArrays.SVector.(0, 0), # uv_sfc
-        nothing, # roughness_inputs
+        uv_int .* FT(0),
+        nothing, 
         config,
-        SF.PointValueScheme(),
-        nothing, # flux_specs
-        nothing, # update_q_vap_sfc (not used)
+        Ref(SF.PointValueScheme()),
+        nothing, 
+        nothing,
         update_T_sfc_callback,
         nothing, # update_q_vap_sfc (not used)
     )

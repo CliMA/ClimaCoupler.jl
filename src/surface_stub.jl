@@ -7,14 +7,13 @@ contains the necessary fields for the simulation, at minimum the following:
     - `T_sfc` (surface temperature [K])
     - `z0m` (roughness length for momentum [m])
     - `z0b` (roughness length for tracers [m])
-    - `beta` (evaporation scaling factor)
     - `α_direct` (direct albedo)
     - `α_diffuse` (diffuse albedo)
     - `area_fraction` (fraction of the grid cell covered by the ocean)
     - `phase` (phase of the water used to calculate surface humidity)
     - `thermo_params` (thermodynamic parameters)
 """
-abstract type AbstractSurfaceStub <: SurfaceModelSimulation end
+abstract type AbstractSurfaceStub <: AbstractSurfaceSimulation end
 
 """
     SurfaceStub
@@ -33,13 +32,25 @@ end
 A getter function, that should not allocate. If undefined, it returns a descriptive error.
 """
 get_field(sim::AbstractSurfaceStub, ::Val{:area_fraction}) = sim.cache.area_fraction
-get_field(sim::AbstractSurfaceStub, ::Val{:beta}) = sim.cache.beta
 get_field(sim::AbstractSurfaceStub, ::Val{:energy}) = nothing
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_direct_albedo}) = sim.cache.α_direct
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_diffuse_albedo}) = sim.cache.α_diffuse
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_temperature}) = sim.cache.T_sfc
+
+"""
+    get_field(::AbstractSurfaceStub, ::Val{:coare3_roughness_params})
+
+Return cached COARE3 roughness params when present in the stub's cache (e.g. PrescribedOceanSimulation).
+"""
+function get_field(sim::AbstractSurfaceStub, ::Val{:coare3_roughness_params})
+    if :coare3_roughness_params in propertynames(sim.cache)
+        return getproperty(sim.cache, :coare3_roughness_params)
+    else
+        return get_field_error(sim, Val(:coare3_roughness_params))
+    end
+end
 
 """
     update_field!(sim::AbstractSurfaceStub, ::Val{:area_fraction}, field::CC.Fields.Field)

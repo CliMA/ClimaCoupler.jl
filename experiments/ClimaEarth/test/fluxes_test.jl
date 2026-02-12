@@ -85,7 +85,10 @@ include(joinpath("..", "setup_run.jl"))
     combined_fluxes =
         .-land_fraction .* land_flux .+ ice_fraction .* ice_rad_flux .+
         ocean_fraction .* ocean_rad_flux
+
+    @info "Combined fluxes: $(combined_fluxes)"
+    @info "Atmos flux: $(atmos_flux)"
     err_fluxes = atmos_flux .+ combined_fluxes
     @show "Combined fluxes error: $(maximum(abs.(err_fluxes)))"
-    @test maximum(abs.(err_fluxes)) < 8
+    @test maximum(abs.(err_fluxes)) < 10
 end

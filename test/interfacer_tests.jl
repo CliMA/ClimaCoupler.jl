@@ -13,21 +13,22 @@ function Interfacer.remap(::Nothing, field)
 end
 
 # test for a simple generic surface model
-struct DummySimulation{S} <: Interfacer.SeaIceModelSimulation
+struct DummySimulation{S} <: Interfacer.AbstractSeaIceSimulation
     space::S
 end
-struct DummySimulation2{S} <: Interfacer.OceanModelSimulation
+struct DummySimulation2{S} <: Interfacer.AbstractOceanSimulation
     space::S
 end
-struct DummySimulation3{S} <: Interfacer.LandModelSimulation
+struct DummySimulation3{S} <: Interfacer.AbstractLandSimulation
     space::S
 end
-struct DummySimulation4{S} <: Interfacer.AtmosModelSimulation
+struct DummySimulation4{S} <: Interfacer.AbstractAtmosSimulation
     space::S
 end
 
-Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var}) = ones(sim.space)
-Interfacer.get_field(sim::Interfacer.SurfaceModelSimulation, ::Val{:var_float}) =
+Interfacer.get_field(sim::Interfacer.AbstractSurfaceSimulation, ::Val{:var}) =
+    ones(sim.space)
+Interfacer.get_field(sim::Interfacer.AbstractSurfaceSimulation, ::Val{:var_float}) =
     CC.Spaces.undertype(sim.space)(2)
 
 context = ClimaComms.context()
@@ -92,7 +93,6 @@ for FT in (Float32, Float64)
             α_diffuse = 3,
             z0m = 4,
             z0b = 5,
-            beta = 6,
             phase = TD.Liquid(),
             thermo_params = thermo_params,
         ))
@@ -102,7 +102,6 @@ for FT in (Float32, Float64)
         @test Interfacer.get_field(stub, Val(:surface_diffuse_albedo)) == 3
         @test Interfacer.get_field(stub, Val(:roughness_momentum)) == 4
         @test Interfacer.get_field(stub, Val(:roughness_buoyancy)) == 5
-        @test Interfacer.get_field(stub, Val(:beta)) == 6
     end
 
     @testset "update_field! the SurfaceStub area_fraction for FT=$FT" begin
@@ -121,7 +120,6 @@ for FT in (Float32, Float64)
             α_diffuse = zeros(boundary_space),
             z0m = zeros(boundary_space),
             z0b = zeros(boundary_space),
-            beta = zeros(boundary_space),
         ))
 
         Interfacer.update_field!(stub, Val(:area_fraction), ones(boundary_space))
@@ -169,7 +167,7 @@ end
     )
 end
 
-@testset "undefined get_field for SurfaceModelSimulation" begin
+@testset "undefined get_field for AbstractSurfaceSimulation" begin
     FT = Float32
     space = CC.CommonSpaces.CubedSphereSpace(
         FT;
@@ -197,7 +195,7 @@ end
     end
 end
 
-@testset "undefined get_field for AtmosModelSimulation" begin
+@testset "undefined get_field for AbstractAtmosSimulation" begin
     FT = Float32
     space = CC.CommonSpaces.CubedSphereSpace(
         FT;
@@ -228,7 +226,7 @@ end
     end
 end
 
-@testset "update_field! warnings for SurfaceModelSimulation" begin
+@testset "update_field! warnings for AbstractSurfaceSimulation" begin
     FT = Float32
     space = CC.CommonSpaces.CubedSphereSpace(
         FT;
@@ -262,7 +260,7 @@ end
     end
 end
 
-@testset "undefined update_field! warnings for AtmosModelSimulation" begin
+@testset "undefined update_field! warnings for AbstractAtmosSimulation" begin
     FT = Float32
     space = CC.CommonSpaces.CubedSphereSpace(
         FT;

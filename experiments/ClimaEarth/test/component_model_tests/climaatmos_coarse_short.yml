@@ -12,7 +12,7 @@ insolation: "timevarying"
 moist: equil
 output_default_diagnostics: false
 precip_model: 0M
-prescribed_aerosols: ["CB1", "CB2", "DST01", "OC1", "OC2", "SO4", "SSLT01"]
+prescribed_aerosols: ["CB1", "CB2", "DST01", "DST02", "DST03", "DST04", "DST05", "OC1", "OC2", "SO4", "SSLT01", "SSLT02", "SSLT03", "SSLT04", "SSLT05"]
 rad: allskywithclear
 surface_setup: DefaultMoninObukhov
 t_end: 240secs

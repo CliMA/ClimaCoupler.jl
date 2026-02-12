@@ -11,8 +11,11 @@ ClimaComms.@import_required_backends
 
 exp_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth")
 
-include(joinpath(exp_dir, "components", "land", "climaland_integrated.jl"))
 include(joinpath(exp_dir, "components", "atmosphere", "climaatmos.jl"))
+
+# To load ClimaCouplerClimaLandExt
+import ClimaLand as CL
+import NCDatasets
 
 FT = Float32
 
@@ -33,8 +36,16 @@ FT = Float32
     atmos_h = CC.Fields.zeros(boundary_space) .+ 2
 
     # Construct simulation object
-    land_sim =
-        ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction, atmos_h)
+    land_sim = Interfacer.LandSimulation(
+        FT,
+        Val(:integrated);
+        dt,
+        tspan,
+        start_date,
+        output_dir,
+        area_fraction,
+        atmos_h,
+    )
 
     # Try taking a timestep
     Interfacer.step!(land_sim, dt)
@@ -60,20 +71,8 @@ FT = Float32
 
     # Check that the drivers are correctly initialized
     driver_names = propertynames(land_sim.integrator.p.drivers)
-    @test driver_names == (
-        :P_liq,
-        :P_snow,
-        :c_co2,
-        :T,
-        :P,
-        :q,
-        :u,
-        :thermal_state,
-        :SW_d,
-        :LW_d,
-        :cosθs,
-        :frac_diff,
-    )
+    @test driver_names ==
+          (:P_liq, :P_snow, :c_co2, :T, :P, :q, :u, :SW_d, :LW_d, :cosθs, :frac_diff)
     atmos = land_sim.model.soil.boundary_conditions.top.atmos
     @test atmos == land_sim.model.canopy.boundary_conditions.atmos
     @test atmos == land_sim.model.snow.boundary_conditions.atmos
@@ -98,13 +97,21 @@ end
     atmos_config_file =
         joinpath(exp_dir, "test", "component_model_tests", "climaatmos_coarse_short.yml")
     atmos_config = CA.AtmosConfig(atmos_config_file; job_id = "atmos_land_flux_test")
-    atmos_sim = ClimaAtmosSimulation(atmos_config)
+    atmos_sim = ClimaAtmosSimulation(; atmos_config)
 
     boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
     area_fraction = CC.Fields.ones(boundary_space)
     atmos_h = CC.Fields.zeros(boundary_space) .+ 2
-    land_sim =
-        ClimaLandSimulation(FT; dt, tspan, start_date, output_dir, area_fraction, atmos_h)
+    land_sim = Interfacer.LandSimulation(
+        FT,
+        Val(:integrated);
+        dt,
+        tspan,
+        start_date,
+        output_dir,
+        area_fraction,
+        atmos_h,
+    )
     model_sims = (; land_sim = land_sim, atmos_sim = atmos_sim)
 
     # Initialize the coupler fields so we can perform exchange
@@ -151,7 +158,6 @@ end
     CL.turbulent_fluxes!(
         land_sim.integrator.p.canopy.turbulent_fluxes,
         land_sim.model.canopy.boundary_conditions.atmos,
-        land_sim.model.canopy.boundary_conditions.turbulent_flux_parameterization,
         land_sim.model.canopy,
         land_sim.integrator.u,
         land_sim.integrator.p,

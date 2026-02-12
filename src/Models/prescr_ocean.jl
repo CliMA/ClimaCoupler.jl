@@ -1,14 +1,19 @@
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
+import ClimaUtilities.TimeManager: date
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
 import Thermodynamics as TD
 import ClimaCoupler: Checkpointer, FieldExchanger, Interfacer
+import ClimaCore as CC
+import SurfaceFluxes as SF
 import Insolation
 import Insolation.Parameters.InsolationParameters
 import StaticArrays as SA
 import Dates
 import ClimaAtmos as CA # for albedo calculation
 import LinearAlgebra
+import ClimaComms
+import ..Checkpointer, ..FieldExchanger, ..Interfacer
 
 """
     PrescribedOceanSimulation{C}
@@ -22,7 +27,6 @@ The cache is expected to contain the following variables:
 - `T_sfc` (surface temperature [K])
 - `z0m` (roughness length for momentum [m])
 - `z0b` (roughness length for tracers [m])
-- `beta` (evaporation scaling factor)
 - `α_direct` (direct albedo)
 - `α_diffuse` (diffuse albedo)
 - `u_int`, `v_int` (the surface wind)
@@ -32,49 +36,64 @@ The cache is expected to contain the following variables:
 - `thermo_params` (thermodynamic parameters)
 - `SST_timevaryinginput` (TimeVaryingInput object containing SST data)
 - `t` (the current time)
+- `coare3_roughness_params` (COARE3 roughness params Field, allocated once for reuse)
 """
 struct PrescribedOceanSimulation{C} <: Interfacer.AbstractSurfaceStub
     cache::C
 end
 
 """
-    PrescribedOceanSimulation(
-        ::Type{FT},
-        space,
-        start_date,
-        t_start,
-        coupled_param_dict,
-        thermo_params,
-        comms_ctx;
-        z0m = FT(5.8e-5),
-        z0b = FT(5.8e-5),
-        beta = FT(1),
-        α_direct_val = FT(0.06),
-        α_diffuse_val = FT(0.06),
-        sst_path::Union{Nothing, String} = nothing,
-    )
+    Interfacer.OceanSimulation(::Type{FT}, ::Val{:prescribed}; kwargs...)
+
+Extension of the generic OceanSimulation constructor for the prescribed ocean model.
+"""
+function Interfacer.OceanSimulation(::Type{FT}, ::Val{:prescribed}; kwargs...) where {FT}
+    return PrescribedOceanSimulation(FT; kwargs...)
+end
+
+"""
+    PrescribedOceanSimulation(::Type{FT}; kwargs...)
 
 Initialize the `PrescribedOceanSimulation` object with all required cache fields,
 and reading in prescribed SST data.
+
+# Required positional arguments
+- `FT::Type{<:AbstractFloat}`: The floating point type
+
+# Required keyword arguments
+- `boundary_space`: The space on which the simulation is defined
+- `start_date`: Start date for the simulation
+- `tspan`: A tuple containing the start and end times of the simulation
+- `coupled_param_dict`: Dictionary of coupled parameters
+- `thermo_params`: Thermodynamics parameters
+- `comms_ctx`: Communication context
+
+# Optional keyword arguments
+- `z0m`: Momentum roughness length (default: `FT(5.8e-5)`)
+- `z0b`: Buoyancy roughness length (default: `FT(5.8e-5)`)
+- `beta`: Beta parameter (default: `FT(1)`)
+- `α_direct_val`: Direct albedo value (default: `FT(0.06)`)
+- `α_diffuse_val`: Diffuse albedo value (default: `FT(0.06)`)
+- `sst_path::Union{Nothing, String}`: Path to SST data file (default: `nothing`)
 
 The SST is read from the file specified by `sst_path`. If `sst_path` is `nothing`,
 the model will use the default path from `ClimaArtifacts`.
 
 """
 function PrescribedOceanSimulation(
-    ::Type{FT},
-    space,
+    ::Type{FT};
+    boundary_space,
     start_date,
-    t_start,
+    tspan,
     coupled_param_dict,
     thermo_params,
-    comms_ctx;
+    comms_ctx,
     z0m = FT(5.8e-5),
     z0b = FT(5.8e-5),
-    beta = FT(1),
     α_direct_val = FT(0.06),
     α_diffuse_val = FT(0.06),
     sst_path::Union{Nothing, String} = nothing,
+    extra_kwargs...,
 ) where {FT}
     # Read in initial SST data
     sst_data =
@@ -97,30 +116,35 @@ function PrescribedOceanSimulation(
     SST_timevaryinginput = TimeVaryingInput(
         sst_data,
         "SST",
-        space,
+        boundary_space,
         reference_date = start_date,
         file_reader_kwargs = (; preprocess_func = (data) -> data + C_to_K,), ## convert Celsius to Kelvin
     )
 
-    SST_init = zeros(space)
+    SST_init = zeros(boundary_space)
+    t_start = first(tspan)
     evaluate!(SST_init, SST_timevaryinginput, t_start)
+
+    # COARE3 roughness params (allocated once, reused each timestep)
+    coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
+    coare3_roughness_params .= SF.COARE3RoughnessParams{FT}()
 
     # Create the cache
     cache = (;
         T_sfc = SST_init,
         z0m = z0m,
         z0b = z0b,
-        beta = beta,
-        α_direct = ones(space) .* α_direct_val,
-        α_diffuse = ones(space) .* α_diffuse_val,
-        u_int = zeros(space),
-        v_int = zeros(space),
-        area_fraction = ones(space),
+        α_direct = ones(boundary_space) .* α_direct_val,
+        α_diffuse = ones(boundary_space) .* α_diffuse_val,
+        u_int = zeros(boundary_space),
+        v_int = zeros(boundary_space),
+        area_fraction = ones(boundary_space),
         phase = TD.Liquid(),
         thermo_params = thermo_params,
         SST_timevaryinginput = SST_timevaryinginput,
         start_date = start_date,
         t = Ref(t_start),
+        coare3_roughness_params,
     )
     return PrescribedOceanSimulation(cache)
 end
@@ -133,6 +157,9 @@ Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:surface_diffuse_albe
     sim.cache.α_diffuse
 Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:emissivity}) =
     eltype(sim.cache.T_sfc)(1)
+Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:roughness_model}) = :coare3
+Interfacer.get_field(sim::PrescribedOceanSimulation, ::Val{:coare3_roughness_params}) =
+    sim.cache.coare3_roughness_params
 
 function Interfacer.update_field!(
     sim::PrescribedOceanSimulation,
@@ -229,24 +256,21 @@ function set_albedos!(sim::PrescribedOceanSimulation, t)
         t isa ClimaUtilities.TimeManager.ITime ? date(t) : p.start_date + Dates.Second(t)
 
     insolation_params = InsolationParameters(FT)
-    d, δ, η_UTC =
-        FT.(Insolation.helper_instantaneous_zenith_angle(current_date, insolation_params))
 
     # Get the atmospheric wind vector and the cosine of the zenith angle
     surface_coords = CC.Fields.coordinate_field(axes(sim.cache.T_sfc))
     insolation_tuple =
-        Insolation.instantaneous_zenith_angle.(
-            d,
-            δ,
-            η_UTC,
-            surface_coords.long,
+        Insolation.insolation.(
+            current_date,
             surface_coords.lat,
-        ) # the tuple is (zenith angle, azimuthal angle, earth-sun distance)
-    zenith_angle = insolation_tuple.:1
+            surface_coords.long,
+            insolation_params,
+        )
+    cos_zenith_angle = insolation_tuple.μ
     wind_atmos = LinearAlgebra.norm.(CC.Geometry.Covariant12Vector.(p.u_int, p.v_int)) # wind vector from components
     λ = FT(0) # spectral wavelength (not used for now)
-    max_zenith_angle = FT(π) / 2 - eps(FT)
-    cos_zenith = @. cos(min(zenith_angle, max_zenith_angle)) # cosine of the zenith angle
+    # TODO: We shouldn't need this, but without this the fluxes_test fail.
+    cos_zenith = @. max(cos_zenith_angle, eps(FT))
 
     # Use the albedo model from ClimaAtmos
     α_model = CA.RegressionFunctionAlbedo{FT}()

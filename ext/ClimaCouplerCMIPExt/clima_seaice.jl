@@ -307,6 +307,91 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
     sim.ice_properties.C_to_K + sim.ice.model.ice_thermodynamics.top_surface_temperature
 
 """
+    _get_surface_fluxes_seaice(args...)
+
+Wrapper around `SF.surface_fluxes` that extracts scalar fields from the
+`SurfaceFluxConditions` struct, returning a NamedTuple instead.
+
+This is necessary because broadcasting `SF.surface_fluxes.()` over ClimaCore
+fields would try to store `SurfaceFluxConditions` in a ClimaCore field, which
+fails because ClimaCore can only store flat numeric types, not nested structs.
+
+This follows the same pattern as `FluxCalculator.get_surface_fluxes` in
+`FluxCalculator.jl`, but includes the extra callback parameters needed for
+the `update_T_sfc` skin temperature solver.
+"""
+function _get_surface_fluxes_seaice(
+    surface_fluxes_params,
+    T_int,
+    q_tot_int,
+    q_liq_int,
+    q_ice_int,
+    ρ_int,
+    T_sfc,
+    q_vap_sfc,
+    Φ_sfc,
+    Δz,
+    d,
+    u_int,
+    u_sfc,
+    roughness_inputs,
+    config,
+    scheme,
+    flux_specs,
+    update_q_vap_sfc,
+    update_T_sfc_cb,
+    update_q_vap_sfc2,
+)
+    outputs = SF.surface_fluxes(
+        surface_fluxes_params,
+        T_int,
+        q_tot_int,
+        q_liq_int,
+        q_ice_int,
+        ρ_int,
+        T_sfc,
+        q_vap_sfc,
+        Φ_sfc,
+        Δz,
+        d,
+        u_int,
+        u_sfc,
+        roughness_inputs,
+        config,
+        scheme,
+        flux_specs,
+        update_q_vap_sfc,
+        update_T_sfc_cb,
+        update_q_vap_sfc2,
+    )
+
+    (; shf, lhf, evaporation, ρτxz, ρτyz, T_sfc, q_vap_sfc, L_MO, ustar) = outputs
+
+    buoyancy_flux = SF.buoyancy_flux(
+        surface_fluxes_params,
+        shf,
+        lhf,
+        T_sfc,
+        ρ_int,
+        q_vap_sfc,
+        q_liq_int,
+        q_ice_int,
+        SF.MoistModel(),
+    )
+
+    return (;
+        F_turb_ρτxz = ρτxz,
+        F_turb_ρτyz = ρτyz,
+        F_sh = shf,
+        F_lh = lhf,
+        F_turb_moisture = evaporation,
+        L_MO,
+        ustar,
+        buoyancy_flux,
+    )
+end
+
+"""
     FluxCalculator.compute_surface_fluxes!(csf, sim::ClimaSeaIceSimulation, atmos_sim, thermo_params)
 
 Compute surface fluxes for ClimaSeaIceSimulation using the `update_T_sfc` callback
@@ -414,7 +499,11 @@ function FluxCalculator.compute_surface_fluxes!(
     Φ_sfc = SFP.grav.(surface_fluxes_params) .* csf.height_sfc
     Δz = csf.height_int .- csf.height_sfc
 
-    (; shf, lhf, evaporation, ρτxz, ρτyz, T_sfc, q_vap_sfc, L_MO, ustar) = SF.surface_fluxes.(
+    # Use a wrapper that calls SF.surface_fluxes and extracts scalar fields from
+    # SurfaceFluxConditions struct. Broadcasting SF.surface_fluxes.() directly would
+    # try to store SurfaceFluxConditions in a ClimaCore field, which fails because
+    # ClimaCore can only store flat numeric types, not nested structs.
+    fluxes = _get_surface_fluxes_seaice.(
         surface_fluxes_params,
         csf.T_atmos,
         csf.q_tot_atmos,
@@ -425,7 +514,7 @@ function FluxCalculator.compute_surface_fluxes!(
         q_sfc,
         Φ_sfc,
         Δz,
-        0, # d
+        FT(0), # d
         uv_int,
         uv_int .* FT(0),
         nothing, 
@@ -437,27 +526,7 @@ function FluxCalculator.compute_surface_fluxes!(
         nothing, # update_q_vap_sfc (not used)
     )
 
-    (; shf, lhf, evaporation, ρτxz, ρτyz, T_sfc, q_vap_sfc, L_MO, ustar) = outputs
-
-    buoyancy_flux = SF.buoyancy_flux.(
-        surface_fluxes_params,
-        shf,
-        lhf,
-        T_sfc,
-        csf.ρ_atmos,
-        q_vap_sfc,
-        csf.q_liq_atmos,
-        csf.q_ice_atmos,
-        SF.MoistModel(),
-    )
-
-    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture) = (
-        F_turb_ρτxz = ρτxz,
-        F_turb_ρτyz = ρτyz,
-        F_sh = shf,
-        F_lh = lhf,
-        F_turb_moisture = evaporation,
-    )
+    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux) = fluxes
 
     # Get area fraction
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))

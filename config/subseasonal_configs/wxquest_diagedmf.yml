@@ -4,7 +4,7 @@ atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
 coupler_toml: ["toml/wxquest_diagedmf.toml"]
 strict_params: false
 mode_name: "subseasonal"
-era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_v1_dev"
 initial_condition: "WeatherModel"
 checkpoint_dt: "40days"
 dt: "120secs"
@@ -21,6 +21,12 @@ binary_area_fraction: false
 land_model: "integrated"
 lai_source: "modis_monthly_climatology"
 
+### gravity waves 
+# orographic_gravity_wave: "raw_topo"
+non_orographic_gravity_wave: true
+
+
+
 ### bucket land ###
 # land_model: "bucket"
 # bucket_albedo_type: "map_temporal"
@@ -30,18 +36,39 @@ lai_source: "modis_monthly_climatology"
 land_spun_up_ic: false
 land_temperature_anomaly: "nothing"
 radiation_reset_rng_seed: true
-start_date: "20100101"
+start_date: "20230115"
 surface_setup: "PrescribedSurface"
 topo_smoothing: true
 topography: "Earth"
-t_end: "40days"
+t_end: "8days"
 netcdf_output_at_levels: true
 output_default_diagnostics: false
 use_coupler_diagnostics: false
 use_land_diagnostics: false
-strict_params: false
-insolation: "timevarying"
 extra_atmos_diagnostics:
-  - short_name: [zg, orog, tas, ta, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cl, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, wa, waup]
-    period: 24hours
+  - short_name: [tas, pr, mslp]
+    period: 1days
     reduction_time: average
+  # - short_name: [tas, ts, pr, mslp, ta, hus, hur, zg, orog, pfull, ua, va, wa, waup]
+  #   period: 1days
+  #   reduction_time: average
+  # - short_name: [hfss, hfls, evspsbl]
+  #   period: 1days
+  #   reduction_time: average
+  ###############
+  # - short_name: [tas, ts, pr, mslp, ta, hus, hur, zg, orog, pfull, ua, va, wa, waup]
+  #   period: 24hours
+  #   reduction_time: average
+  # - short_name: [hfss, hfls, evspsbl]
+  #   period: 24hours
+  #   reduction_time: average
+  # - short_name: [tas, ts, pr, mslp, ta, hus, hur, zg, orog, pfull, ua, va, wa, waup]
+  #   period: 24hours
+  #   reduction_time: average
+  # - short_name: [zg, orog, tas, ta, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cl, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, wa, waup]
+  #   period: 24hours
+  #   reduction_time: inst
+# extra_atmos_diagnostics:
+#   - short_name: [zg, orog, tas, ta, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, wa, waup]
+#     period: 3hours
+#     reduction_time: average

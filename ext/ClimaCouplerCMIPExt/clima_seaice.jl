@@ -123,7 +123,7 @@ function ClimaSeaIceSimulation(
     arch = OC.Architectures.architecture(grid)
 
     advection = ocean.ocean.model.advection.T
-    ice = sea_ice_simulation(grid, ocean.ocean; Δt = dt, advection)
+    ice = sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection)
 
     ocean_ice_flux_formulation =
         CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(ice)

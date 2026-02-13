@@ -19,3 +19,4 @@ surface_setup: "PrescribedSurface"
 t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
+use_sgs_quadrature: true

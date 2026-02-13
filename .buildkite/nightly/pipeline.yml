@@ -7,7 +7,8 @@ env:
   JULIA_MAX_NUM_PRECOMPILE_FILES: 100
   GKSwstype: 100
   SLURM_KILL_BAD_EXIT: 1
-  CONFIG_PATH: "config/nightly_configs"
+  NIGHTLY_CONFIG_PATH: "config/nightly_configs"
+  LONGRUN_CONFIG_PATH: "config/longrun_configs"
   BENCHMARK_CONFIG_PATH: "config/benchmark_configs"
 
 timeout_in_minutes: 840
@@ -48,20 +49,34 @@ steps:
 
     steps:
 
-      - label: "Coarse current AMIP: diagedmf + 0M + bucket land"
-        key: "amip_diagedmf"
+      # - label: "Coarse current AMIP: diagedmf + 0M + bucket land"
+      #   key: "amip_diagedmf"
+      #   command:
+      #     - echo "--- Run simulation"
+      #     - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $NIGHTLY_CONFIG_PATH/amip_coarse_diagedmf.yml --job_id amip_coarse_diagedmf"
+      #   artifact_paths: "output/amip_coarse_diagedmf/artifacts/*"
+      #   timeout_in_minutes: 840
+      #   env:
+      #     CLIMACOMMS_DEVICE: "CUDA"
+      #   agents:
+      #     slurm_gpus_per_task: 1
+      #     slurm_cpus_per_task: 4
+      #     slurm_ntasks: 1
+      #     slurm_mem: 30GB
+      
+      - label: "GPU AMIP + diag. EDMF"
+        key: "amip_diagedmf_gpu"
         command:
-          - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_diagedmf.yml --job_id amip_coarse_diagedmf"
-        artifact_paths: "output/amip_coarse_diagedmf/artifacts/*"
-        timeout_in_minutes: 840
+          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $LONGRUN_CONFIG_PATH/amip_diagedmf.yml --job_id amip_diagedmf_gpu"
+        artifact_paths: "output/amip_diagedmf_gpu/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
+          queue: clima
           slurm_gpus_per_task: 1
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
-          slurm_mem: 30GB
+          slurm_mem: 32GB
 
       # - label: "Coarse current AMIP: diagedmf + 0M + integrated land"
       #   key: "amip_diagedmf_land"

@@ -36,10 +36,12 @@ function ClimaCalibrate.observation_map(iteration)
             EnsembleBuilder.fill_g_ens_col!(g_ens_builder, m, NaN)
         end
     end
-    if count(isnan, g_ens_builder.g_ens) > 0.9 * length(g_ens_builder.g_ens)
+    g_ens = EnsembleBuilder.get_g_ensemble(g_ens_builder)
+    if count(isnan, g_ens) > 0.9 * length(g_ens)
         error("Too many NaNs")
     end
-    return g_ens_builder.g_ens
+    return EnsembleBuilder.is_complete(g_ens_builder) ? g_ens :
+           error("G ensemble matrix is not completed")
 end
 
 """

@@ -49,34 +49,34 @@ steps:
 
     steps:
 
-      # - label: "Coarse current AMIP: diagedmf + 0M + bucket land"
-      #   key: "amip_diagedmf"
-      #   command:
-      #     - echo "--- Run simulation"
-      #     - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $NIGHTLY_CONFIG_PATH/amip_coarse_diagedmf.yml --job_id amip_coarse_diagedmf"
-      #   artifact_paths: "output/amip_coarse_diagedmf/artifacts/*"
-      #   timeout_in_minutes: 840
-      #   env:
-      #     CLIMACOMMS_DEVICE: "CUDA"
-      #   agents:
-      #     slurm_gpus_per_task: 1
-      #     slurm_cpus_per_task: 4
-      #     slurm_ntasks: 1
-      #     slurm_mem: 30GB
-      
-      - label: "GPU AMIP + diag. EDMF"
-        key: "amip_diagedmf_gpu"
+      - label: "Coarse current AMIP: diagedmf + 0M + bucket land"
+        key: "amip_diagedmf"
         command:
-          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $LONGRUN_CONFIG_PATH/amip_diagedmf.yml --job_id amip_diagedmf_gpu"
-        artifact_paths: "output/amip_diagedmf_gpu/artifacts/*"
+          - echo "--- Run simulation"
+          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $NIGHTLY_CONFIG_PATH/amip_coarse_diagedmf.yml --job_id amip_coarse_diagedmf"
+        artifact_paths: "output/amip_coarse_diagedmf/artifacts/*"
+        timeout_in_minutes: 840
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
-          queue: clima
           slurm_gpus_per_task: 1
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
-          slurm_mem: 32GB
+          slurm_mem: 30GB
+      
+      # - label: "GPU AMIP + diag. EDMF"
+      #   key: "amip_diagedmf_gpu"
+      #   command:
+      #     - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $LONGRUN_CONFIG_PATH/amip_diagedmf.yml --job_id amip_diagedmf_gpu"
+      #   artifact_paths: "output/amip_diagedmf_gpu/artifacts/*"
+      #   env:
+      #     CLIMACOMMS_DEVICE: "CUDA"
+      #   agents:
+      #     queue: clima
+      #     slurm_gpus_per_task: 1
+      #     slurm_cpus_per_task: 4
+      #     slurm_ntasks: 1
+      #     slurm_mem: 32GB
 
       # - label: "Coarse current AMIP: diagedmf + 0M + integrated land"
       #   key: "amip_diagedmf_land"

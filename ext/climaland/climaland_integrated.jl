@@ -117,10 +117,11 @@ function ClimaLandSimulation(
     # Interpolate atmosphere height field to surface space of land model,
     #  since that's where we compute fluxes for this land model
     atmos_h = Interfacer.remap(surface_space, atmos_h)
+    gustiness = FT(1)
 
     # Set up atmosphere and radiation forcing
     forcing = (;
-        atmos = CL.CoupledAtmosphere{FT}(surface_space, atmos_h),
+        atmos = CL.CoupledAtmosphere{FT, typeof(atmos_h)}(atmos_h, gustiness),
         radiation = CL.CoupledRadiativeFluxes{FT}(
             start_date;
             latitude = CC.Fields.coordinate_field(domain.space.surface).lat,

@@ -60,7 +60,16 @@ function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, i
         var = get_var(short_name, simdir)
         var = preprocess_var(var, sample_date_ranges)
 
-        EnsembleBuilder.fill_g_ens_col!(g_ens_builder, col_idx, var; verbose = true)
+        EnsembleBuilder.fill_g_ens_col!(
+            g_ens_builder,
+            col_idx,
+            var;
+            checkers = (
+                EnsembleBuilder.SequentialIndicesChecker(),
+                EnsembleBuilder.SignChecker(),
+            ),
+            verbose = true,
+        )
     end
 
     return nothing

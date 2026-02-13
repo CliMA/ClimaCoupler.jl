@@ -134,10 +134,11 @@ function BucketSimulation(
     # Interpolate atmosphere height field to surface space of land model,
     #  since that's where we compute fluxes for this land model
     atmos_h = Interfacer.remap(surface_space, atmos_h)
+    gustiness = FT(1)
 
     args = (
         params,
-        CL.CoupledAtmosphere{FT}(surface_space, atmos_h),
+        CL.CoupledAtmosphere{FT, typeof(atmos_h)}(atmos_h, gustiness),
         CL.CoupledRadiativeFluxes{FT}(),
         domain,
     )

@@ -70,7 +70,7 @@ function OceananigansSimulation(
     z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 1800)
 
     # Regular LatLong because we know how to do interpolation there
-    underlying_grid = OC.TripolarGrid(arch; size = (Nx, Ny, Nz), halo = (7, 7, 7), z)
+    underlying_grid = OC.TripolarGrid(arch; size = (Nx, Ny, Nz), halo = (7, 7, 7), z, fold_topology = OC.Grids.RightFaceFolded)
 
     bottom_height = CO.regrid_bathymetry(
         underlying_grid;

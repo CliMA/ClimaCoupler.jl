@@ -1,5 +1,5 @@
 using ClimaSeaIce.SeaIceThermodynamics.HeatBoundaryConditions:
-    IceWaterThermalEquilibrium, MeltingConstrainedFluxBalance, get_tracer, RadiativeEmission
+    IceWaterThermalEquilibrium, MeltingConstrainedFluxBalance, PrescribedTemperature, get_tracer, RadiativeEmission
 import ClimaComms
 import ClimaOcean.EN4: download_dataset
 import SurfaceFluxes as SF
@@ -96,11 +96,12 @@ a surface area fraction field.
 If a start date is provided, we initialize the sea ice concentration and thickness
 using the ECCO4Monthly dataset. If no start date is provided, we initialize with zero sea ice.
 
-Since this model does not solve for prognostic temperature, we use a
-prescribed heat flux boundary condition at the top, which is used to solve for
-top surface temperature and longwave emission together.
-The surface temperature from the last step is provided to the coupler to be
-used in computing fluxes.
+Since the coupler iteratively diagnoses T_sfc to satisfy the flux balance
+(via the `update_T_sfc` callback in `compute_surface_fluxes!`), we use
+`PrescribedTemperature` as the top heat boundary condition. The coupler
+writes the diagnosed T_sfc back to ClimaSeaIce's `top_surface_temperature`
+field after each flux computation, so the ice thermodynamics always uses
+the flux-balanced surface temperature.
 
 Specific details about the default model configuration
 can be found in the documentation for `ClimaSeaIce.sea_ice_simulation`.
@@ -234,7 +235,11 @@ function sea_ice_simulation(
 )
     FT = eltype(grid)
 
-    top_heat_boundary_condition = PrescribedTemperature()
+    # Initialize top_surface_temperature as a mutable Field (not a ConstantField)
+    # so it can be remapped and updated by the coupler with the diagnosed T_sfc.
+    top_sfc_temp_init = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    OC.set!(top_sfc_temp_init, FT(0)) # 0°C initial guess; overwritten by coupler
+    top_heat_boundary_condition = PrescribedTemperature(top_sfc_temp_init)
     kᴺ = size(grid, 3)
     surface_ocean_salinity = OC.interior(ocean.model.tracers.S, :, :, (kᴺ:kᴺ))
     bottom_heat_boundary_condition = IceWaterThermalEquilibrium(surface_ocean_salinity)
@@ -387,6 +392,7 @@ function _get_surface_fluxes_seaice(
         L_MO,
         ustar,
         buoyancy_flux,
+        T_sfc_new = T_sfc,
     )
 end
 
@@ -394,10 +400,16 @@ end
     FluxCalculator.compute_surface_fluxes!(csf, sim::ClimaSeaIceSimulation, atmos_sim, thermo_params)
 
 Compute surface fluxes for ClimaSeaIceSimulation using the `update_T_sfc` callback
-to solve for the surface temperature using the flux balance equation.
+to iteratively diagnose the surface temperature that satisfies the flux balance equation.
 
 This function extends the default `compute_surface_fluxes!` to use the skin temperature
 update callback from `ClimaCouplerCMIPExt.update_T_sfc`.
+
+After computing fluxes, the diagnosed surface temperature is written back to
+ClimaSeaIce's `top_surface_temperature` field. Since the ice thermodynamics uses
+`PrescribedTemperature`, it takes this field as-is during its time step, ensuring
+the ice model evolves consistently with the flux-balanced surface temperature
+diagnosed by the coupler.
 """
 function FluxCalculator.compute_surface_fluxes!(
     csf,
@@ -416,6 +428,10 @@ function FluxCalculator.compute_surface_fluxes!(
     # Get initial surface temperature guess
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
     T_sfc = csf.scalar_temp1
+
+    # TODO: CHECKING IF THIS IS COMING FROM THE REGRIDDING THROUGH MAP_INTERPOLATE!
+    # REMOVE THIS REMAPPER +/- 80 degree fix! 
+    @. T_sfc = ifelse(T_sfc < FT(100), csf.T_atmos, T_sfc)
 
     # Compute surface humidity from the surface temperature
     ρ_sfc =
@@ -463,16 +479,16 @@ function FluxCalculator.compute_surface_fluxes!(
     
     # Ice thickness (field, remapped to boundary space)
     δ = FT.(Interfacer.get_field(sim, Val(:ice_thickness)))
-    # Internal temperature (field, remapped to boundary space)
-    T_i = FT.(Interfacer.get_field(sim, Val(:internal_temperature)))
+    # Internal temperature (field, remapped to boundary space).
+    # Oceananigans uses Celsius; convert to Kelvin to match the coupler/SurfaceFluxes convention.
+    # Guard against 0 from map_interpolate! at out-of-grid points (same issue as T_sfc).
+    T_i_raw = FT.(Interfacer.get_field(sim, Val(:internal_temperature))) .+ FT(sim.ice_properties.C_to_K)
+    #TODO: CHECKING IF THIS IS COMING FROM THE REGRIDDING THROUGH MAP_INTERPOLATE!
+    T_i = @. ifelse(T_i_raw < FT(100), csf.T_atmos, T_i_raw)
     # Stefan-Boltzmann constant (scalar)
     σ = FT(sim.ice_properties.σ)
     # Emissivity (scalar, broadcast to field)
     ϵ = FT.(Interfacer.get_field(sim, Val(:emissivity)))
-    
-    # Density and heat capacity (scalars)
-    ρ = FT.(sim.ice.model.ice_thermodynamics.phase_transitions.ice_density)
-    c = FT.(sim.ice.model.ice_thermodynamics.phase_transitions.ice_heat_capacity)
     
     # Radiation and albedo (fields)
     SW_d = csf.SW_d
@@ -487,8 +503,6 @@ function FluxCalculator.compute_surface_fluxes!(
         T_i, # internal temperature
         σ, # stefan-boltzmann constant
         ϵ, # emissivity
-        ρ, # density
-        c, # ice heat capacity
         SW_d, #SW↓
         LW_d, #LW↓
         α_albedo, # albedo
@@ -525,7 +539,7 @@ function FluxCalculator.compute_surface_fluxes!(
         nothing, # update_q_vap_sfc (not used)
     )
 
-    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux) = fluxes
+    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux, T_sfc_new) = fluxes
 
     # Get area fraction
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))
@@ -556,6 +570,31 @@ function FluxCalculator.compute_surface_fluxes!(
     @. csf.L_MO += ifelse(isinf(L_MO), L_MO, L_MO * area_fraction)
     @. csf.ustar += ustar * area_fraction
     @. csf.buoyancy_flux += buoyancy_flux * area_fraction
+
+    # Write the diagnosed T_sfc back to ClimaSeaIce's top_surface_temperature.
+    # With PrescribedTemperature, ClimaSeaIce uses this field as-is during its
+    # time step, so updating it ensures the ice thermodynamics uses the T_sfc
+    # that satisfies the flux balance diagnosed by the coupler.
+    # T_sfc_new is in Kelvin (coupler convention); ClimaSeaIce uses Celsius.
+    csf.scalar_temp2 .= ifelse.(
+        area_fraction .≈ 0,
+        zero(FT),
+        T_sfc_new .- FT(sim.ice_properties.C_to_K),
+    )
+    CC.Remapping.interpolate!(
+        sim.remapping.scratch_arr1,
+        sim.remapping.remapper_cc,
+        csf.scalar_temp2,
+    )
+    ice_concentration = sim.ice.model.ice_concentration
+    top_sfc_T = sim.ice.model.ice_thermodynamics.top_surface_temperature
+    OC.interior(top_sfc_T, :, :, 1) .=
+        ifelse.(
+            OC.interior(ice_concentration, :, :, 1) .> 0,
+            sim.remapping.scratch_arr1,
+            OC.interior(top_sfc_T, :, :, 1),
+        )
+
     return nothing
 end
 

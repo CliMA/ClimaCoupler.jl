@@ -16,7 +16,7 @@ import SurfaceFluxes as SF
 import Thermodynamics as TD
 
 """
-    update_T_sfc(κ, δ, T_i, σ, ϵ, ρ, c, SW_d, LW_d, α_albedo)
+    update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo)
 
 Create a callback function for updating surface temperature that can be passed to
 SurfaceFluxes.jl's `surface_fluxes` function.
@@ -26,15 +26,17 @@ The returned callback matches the SurfaceFluxes.jl callback signature:
 
 The callback computes the updated surface temperature based on the semi-implicit flux balance equation:
 
-    Tₛⁿ⁺¹ = (Tᵢ - δ / κ * (Jᵃ - 4 α Tₛⁿ⁴)) / (1 + 4 δ σ ϵ Tₛⁿ³ / ρ c κ)
+    Tₛⁿ⁺¹ = (Tᵢ - δ / κ * (Jᵃ - 4 σ ϵ Tₛⁿ⁴)) / (1 + 4 δ σ ϵ Tₛⁿ³ / κ)
 
-where α = σ ϵ / (ρ c). This formulation linearizes the outgoing longwave radiation term
-around the current surface temperature, providing better stability for iterative solutions.
+This formulation linearizes the outgoing longwave radiation term σϵT⁴ around the current
+surface temperature Tₛⁿ, providing stability for the iterative solution of Jᵃ + κ/δ*(T-Tᵢ) = 0.
 
 Inside the callback, sensible heat flux (F_sh) and latent heat flux (F_lh) are computed directly
-using SurfaceFluxes.jl helper functions, and the external flux J_a is computed as:
+using SurfaceFluxes.jl helper functions, and the net upward flux J_a is computed as:
 
-    J_a = (1 - α_albedo) * SW_d + LW_d + F_sh + F_lh - σ * ϵ * T_sfc_n^4
+    J_a = σ * ϵ * T_sfc_n^4 - (1 - α_albedo) * SW_d - ϵ * LW_d + F_sh + F_lh
+
+where F_sh and F_lh follow the SurfaceFluxes.jl sign convention (positive = upward).
 
 # Arguments
 - `κ`: Thermal conductivity [W m⁻¹ K⁻¹]
@@ -42,8 +44,6 @@ using SurfaceFluxes.jl helper functions, and the external flux J_a is computed a
 - `T_i`: Internal temperature (temperature at the base of the layer) [K]
 - `σ`: Stefan-Boltzmann constant [W m⁻² K⁻⁴]
 - `ϵ`: Surface emissivity [-]
-- `ρ`: Density [kg m⁻³]
-- `c`: Specific heat capacity [J kg⁻¹ K⁻¹]
 - `SW_d`: Downward shortwave radiation [W m⁻²]
 - `LW_d`: Downward longwave radiation [W m⁻²]
 - `α_albedo`: Surface albedo [-]
@@ -58,14 +58,10 @@ function update_T_sfc(
     T_i,
     σ,
     ϵ,
-    ρ,
-    c,
     SW_d,
     LW_d,
     α_albedo,
 )
-    α = σ * ϵ / (ρ * c)
-    
     return function(ζ, param_set, thermo_params_callback, inputs, scheme, u_star, z0m, z0s)
         T_sfc_n = inputs.T_sfc_guess
         
@@ -108,12 +104,19 @@ function update_T_sfc(
             scheme,
         )
         
-        # Compute external flux J_a
-        J_a = (1 - α_albedo) * SW_d + LW_d + F_sh + F_lh - σ * ϵ * T_sfc_n^4
+        # Compute net upward flux Jᵃ at the surface (positive = heat leaving surface)
+        # Jᵃ = (LW emission) - (absorbed SW) - (absorbed LW) + (sensible up) + (latent up)
+        # where F_sh, F_lh are positive upward (SurfaceFluxes.jl convention)
+        # Old (incorrect sign convention for radiation terms):
+        # J_a = (1 - α_albedo) * SW_d + LW_d + F_sh + F_lh - σ * ϵ * T_sfc_n^4
+        J_a = σ * ϵ * T_sfc_n^4 - (1 - α_albedo) * SW_d - ϵ * LW_d + F_sh + F_lh
         
-        # Apply flux balance equation
-        numerator = T_i - (δ / κ) * (J_a - 4 * α * T_sfc_n^4)
-        denominator = 1 + 4 * δ * σ * ϵ * T_sfc_n^3 / (ρ * c * κ)
+        # Apply semi-implicit flux balance equation.
+        # Linearize the LW emission σϵT⁴ around T_n:
+        #   σϵT⁴ ≈ σϵTₙ⁴ + 4σϵTₙ³(T - Tₙ) = -3σϵTₙ⁴ + 4σϵTₙ³T
+        # Substituting into Jᵃ + κ/δ*(T - Tᵢ) = 0 and solving for T:
+        numerator = T_i - (δ / κ) * (J_a - 4 * σ * ϵ * T_sfc_n^4)
+        denominator = 1 + 4 * δ * σ * ϵ * T_sfc_n^3 / κ
         
         return numerator / denominator
     end

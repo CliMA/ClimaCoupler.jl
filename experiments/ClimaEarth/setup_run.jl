@@ -505,7 +505,9 @@ function CoupledSimulation(config_dict::AbstractDict)
         FieldExchanger.set_caches!(cs)
 
         # 4. Calculate and update turbulent fluxes for each surface model,
-        #  and save the weighted average in coupler fields
+        #  and save the weighted average in coupler fields 
+
+        #TODO: Check inputs to turbulent_fluxes! at first step
         FluxCalculator.turbulent_fluxes!(cs)
 
         # 4. Compute any ocean-sea ice fluxes

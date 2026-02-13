@@ -156,7 +156,7 @@ function OceananigansSimulation(
         closure = (horizontal_viscosity, vertical_mixing)
     end
 
-    Δt = isnothing(dt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : dt
+    Δt = isnothing(dt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : float(dt)
     ocean = CO.ocean_simulation(
         grid;
         Δt,

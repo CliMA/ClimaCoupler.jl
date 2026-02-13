@@ -130,13 +130,13 @@ function CoupledSimulation(config_dict::AbstractDict)
         land_model,
         land_temperature_anomaly,
         land_spun_up_ic,
+        lai_source,
         bucket_albedo_type,
-        bucket_initial_condition,
         energy_check,
         use_coupler_diagnostics,
         output_dir_root,
         parameter_files,
-        era5_initial_condition_dir,
+        era5_filepaths,
         ocean_model,
         simple_ocean,
         ice_model,
@@ -271,20 +271,10 @@ function CoupledSimulation(config_dict::AbstractDict)
 
     @info(sim_mode)
     land_sim = ice_sim = ocean_sim = nothing
-    # Build ERA5-based file paths if subseasonal mode is selected
-    subseasonal_sst = subseasonal_sic = subseasonal_land_ic = nothing
-    if sim_mode <: SubseasonalMode
-        isnothing(era5_initial_condition_dir) &&
-            error("subseasonal mode requires --era5_initial_condition_dir")
-        # Filenames inferred from start_date, which is YYYYMMDD
-        datestr = Dates.format(start_date, Dates.dateformat"yyyymmdd")
-        subseasonal_sst =
-            joinpath(era5_initial_condition_dir, "sst_processed_$(datestr)_0000.nc")
-        subseasonal_sic =
-            joinpath(era5_initial_condition_dir, "sic_processed_$(datestr)_0000.nc")
-        subseasonal_land_ic =
-            joinpath(era5_initial_condition_dir, "era5_land_processed_$(datestr)_0000.nc")
-    end
+
+    # Unpack ERA5-based file paths (populated for subseasonal mode, nothing otherwise)
+    (; sst_path, sic_path, land_ic_path, albedo_path, bucket_initial_condition) =
+        era5_filepaths
 
     ## Construct the land model component
     # Determine whether to use a shared surface space
@@ -308,9 +298,11 @@ function CoupledSimulation(config_dict::AbstractDict)
         # Arguments used by bucket model
         albedo_type = bucket_albedo_type,
         bucket_initial_condition,
+        era5_albedo_file_path = albedo_path,
         # Arguments used by integrated model
         land_spun_up_ic,
-        land_ic_path = subseasonal_land_ic,
+        land_ic_path,
+        lai_source,
     )
 
     ## Construct the ocean model component
@@ -329,7 +321,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         output_dir = dir_paths.ocean_output_dir,
         simple_ocean,
         # Arguments used by prescribed ocean
-        sst_path = subseasonal_sst,
+        sst_path,
         # Arguments used by slab ocean
         saveat,
         evolving = evolving_ocean,
@@ -353,7 +345,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         thermo_params,
         comms_ctx,
         land_fraction,
-        sic_path = subseasonal_sic,
+        sic_path,
         binary_area_fraction,
     )
 

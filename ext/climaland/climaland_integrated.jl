@@ -50,6 +50,7 @@ end
         use_land_diagnostics::Bool = true,
         parameter_files = [],
         land_ic_path::Union{Nothing,String} = nothing,
+        lai_source::String = "modis_monthly",
     ) where {FT, TT <: Union{Float64, ITime}}
 
 Creates a ClimaLandSimulation object containing a land domain,
@@ -58,6 +59,11 @@ a ClimaLand.LandModel, and an integrator.
 This type of model contains a canopy model, soil model, snow model, and
 soil CO2 model. Specific details about the complexity of the model
 can be found in the ClimaLand.jl documentation.
+
+# Arguments
+- `lai_source::String = "modis_monthly"`: Source for leaf area index data. Options:
+  - `"modis_monthly"`: Time-varying LAI from full MODIS monthly data (default)
+  - `"modis_monthly_climatology"`: Time-varying LAI from MODIS monthly climatology (uses PeriodicCalendar)
 """
 function ClimaLandSimulation(
     ::Type{FT};
@@ -78,6 +84,7 @@ function ClimaLandSimulation(
     use_land_diagnostics::Bool = true,
     coupled_param_dict = CP.create_toml_dict(FT),
     land_ic_path::Union{Nothing, String} = nothing,
+    lai_source::String = "modis_monthly",
     extra_kwargs...,
 ) where {FT, TT <: Union{Float64, ITime}}
     # Get default land parameters from ClimaLand.LandParameters
@@ -124,12 +131,32 @@ function ClimaLandSimulation(
 
     # Set up leaf area index (LAI)
     stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
-    LAI = CL.prescribed_lai_modis(
-        surface_space,
-        start_date,
-        stop_date;
-        time_interpolation_method = LinearInterpolation(),
-    )
+    if lai_source == "modis_monthly"
+        # Full monthly MODIS LAI data
+        LAI = CL.prescribed_lai_modis(
+            surface_space,
+            start_date,
+            stop_date;
+            time_interpolation_method = LinearInterpolation(),
+        )
+    elseif lai_source == "modis_monthly_climatology"
+        # MODIS LAI monthly climatology
+        modis_lai_clim_path = joinpath(
+            @clima_artifact("modis_lai_climatology", ClimaComms.context(surface_space)),
+            "modis_lai_climatology.nc",
+        )
+        LAI = CL.prescribed_lai_modis(
+            surface_space,
+            start_date,
+            stop_date;
+            modis_lai_ncdata_path = modis_lai_clim_path,
+            time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
+        )
+    else
+        error(
+            "Unknown lai_source: $lai_source. Must be \"modis_monthly\" or \"modis_monthly_climatology\"",
+        )
+    end
 
     ground = CL.PrognosticGroundConditions{FT}()
     canopy_forcing = (; forcing.atmos, forcing.radiation, ground)

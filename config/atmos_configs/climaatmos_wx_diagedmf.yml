@@ -7,7 +7,7 @@ topo_smoothing: true
 topography: "Earth"
 rayleigh_sponge: true
 viscous_sponge: true
-divergence_damping_factor: 50.0
+divergence_damping_factor: 20.0
 scalar_hyperdiffusion_coefficient: 0.929738
 vorticity_hyperdiffusion_coefficient: 0.1857
 insolation: "timevarying"
@@ -15,16 +15,16 @@ rad: allskywithclear
 dt_cloud_fraction: "1hours"
 dt_rad: "1hours"
 aerosol_radiation: true
-time_varying_trace_gases: ["CO2", "O3"]
+# time_varying_trace_gases: ["CO2", "O3"]
 prescribed_aerosols: ["CB1", "CB2", "DST01", "DST02", "DST03", "DST04", "DST05", "OC1", "OC2", "SO4", "SSLT01", "SSLT02", "SSLT03", "SSLT04", "SSLT05"]
 turbconv: diagnostic_edmfx
 implicit_diffusion: true
 approximate_linear_solve_iters: 2
 prognostic_tke: true
 edmfx_upwinding: first_order
-h_elem: 16
-z_max: 60000.0
-z_elem: 63
+h_elem: 15
+z_max: 70000.0
+z_elem: 70
 dz_bottom: 30.0
 edmfx_entr_model: "Generalized"
 edmfx_detr_model: "Generalized"
@@ -44,4 +44,4 @@ toml: [toml/diagnostic_edmfx_era5_ic.toml]
 
 cloud_model: "quadrature"
 use_itime: true
-deep_atmosphere: false
+deep_atmosphere: true

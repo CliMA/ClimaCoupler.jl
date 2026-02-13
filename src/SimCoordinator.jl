@@ -24,6 +24,7 @@ import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
 import Random
 
+import ClimaCoupler
 import ..Interfacer
 import ..ConservationChecker
 import ..FieldExchanger
@@ -321,7 +322,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         output_dir = dir_paths.land_output_dir,
         area_fraction = land_fraction,
         shared_surface_space,
-        saveat,
         surface_elevation,
         atmos_h,
         land_temperature_anomaly,

@@ -98,3 +98,44 @@ function make_land_domain(
         fields,
     )
 end
+
+"""
+    _coupler_set_ic!(Y, p, t, model, atmos_T, set_ic!)
+
+Helper function to set initial conditions using the provided set_ic! function.
+
+
+The land model expects the air temperature driver to be set before the set_ic! function
+is called, which is why we have this wrapper. We also use it to set the cache variables
+required to compute radiation in the atmosphere.
+
+Note that when running a restarted simulation, any values set here will be overwritten by
+the saved state and cache values in the restart file.
+"""
+function _coupler_set_ic!(Y, p, t, model::CL.Bucket.BucketModel, atmos_T, set_ic!)
+    p.drivers.T .= atmos_T
+    set_ic!(Y, p, t, model)
+
+    # Set albedo and T_sfc so that the atmosphere can compute radiation.
+    # Note that emissivity is a constant so we don't need to set it here.
+    CL.Bucket.next_albedo!(
+        p.bucket.α_sfc,
+        model.parameters.albedo,
+        model.parameters,
+        Y,
+        p,
+        t,
+    )
+    p.bucket.T_sfc .= CL.Domains.top_center_to_surface(Y.bucket.T)
+end
+function _coupler_set_ic!(Y, p, t, model::CL.LandModel, atmos_T, set_ic!)
+    p.drivers.T .= atmos_T
+    set_ic!(Y, p, t, model)
+
+    # Set albedo, T_sfc, and emissivity so that the atmosphere can compute radiation.
+    # Note that we normally use SWD, SWU, LWU to compute these, so we just set them to
+    # some reasonable values here. These will be overwritten during the first land step.
+    p.α_sfc .= 0.3
+    p.T_sfc .= Y.canopy.energy.T
+    p.ϵ_sfc .= 1
+end

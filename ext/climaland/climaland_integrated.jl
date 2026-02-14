@@ -220,7 +220,7 @@ function ClimaLandSimulation(
         )
     else
         output_writer = nothing
-        diag_cb = nothing
+        diagnostics = nothing
     end
 
     # TODO set_ic!
@@ -256,6 +256,7 @@ function ClimaLandSimulation(
         # constant field on subsurface space
         T_sfc0 = T_base .* CC.Fields.ones(subsurface_space)
     end
+    # TODO take in a field of initial temperature, which for wxquest will be SVI from below
     lapse_rate = FT(6.5e-3)
     # Adjust initial temperature to account for orography of the surface
     # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
@@ -269,6 +270,7 @@ function ClimaLandSimulation(
     # Read in initial conditions for snow and soil from file, if requested
     if !land_spun_up_ic && !isnothing(land_ic_path)
         # make_set_initial_state_from_file
+        # TODO add a function in climaland to set wxquest ICs
 
         # Set initial conditions that aren't read in from file
         Y.soilco2.CO2 .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
@@ -303,6 +305,7 @@ function ClimaLandSimulation(
             regridder_kwargs = (; extrapolation_bc, interpolation_method),
         )
 
+        # TODO keep this here because it's coupler-specific or just set p.T_sfc .= Y.canopy.energy.T for all 3 cases
         # Initialize the surface temperature so the atmosphere can compute radiation.
         # Set surface temperature to skin temperature
         p.T_sfc .= SpaceVaryingInput(
@@ -312,6 +315,7 @@ function ClimaLandSimulation(
             regridder_type,
             regridder_kwargs = (; extrapolation_bc, interpolation_method),
         )
+
 
         CL.Simulations.set_snow_initial_conditions!(
             Y,
@@ -335,24 +339,30 @@ function ClimaLandSimulation(
         )
     elseif land_spun_up_ic
         # TODO for this case:
-        # - pass `set_ic! = ...` as below
-        # - after LandSimulation is constructed, overwrite p.drivers.T and p.T_sfc to orog_adjusted_T_surface
+        # - pass `set_ic! = ...` as below (including setting p.drivers.T)
+        # - after LandSimulation is constructed, overwrite p.T_sfc to orog_adjusted_T_surface
         # - initialize p.eps_sfc to 1 (for all cases)
 
         # Use artifact spun-up initial conditions
         ic_path = CL.Artifacts.soil_ic_2008_50m_path()
         @info "ClimaLand: using land IC file" ic_path
-        set_ic! = CL.Simulations.make_set_initial_state_from_file(
+        spun_up_set_ic! = CL.Simulations.make_set_initial_state_from_file(
             ic_path,
             model;
             enforce_constraints = true,
         )
-        p.drivers.T .= orog_adjusted_T_surface # TODO I think we don't need this because it's set in first exchange
         t0 = tspan[1]
-        set_ic!(Y, p, t0, model)
+        function coupler_set_ic!(Y, p, t0, model, atmos_T, set_ic!)
+            p.drivers.T .= atmos_T # we need to set this because it's used in default set_ic!
+            set_ic!(Y, p, t0, model)
+        end
+        final_set_ic!(Y, p, t0, model) =
+            coupler_set_ic!(Y, p, t0, model, orog_adjusted_T_surface, spun_up_set_ic!)
+
         # Initialize the surface temperature so the atmosphere can compute radiation.
         @. p.T_sfc = orog_adjusted_T_surface
     else
+        # TODO Kat will move this option into ClimaLand in bucket PR
         # function set_ic!(Y, p, t0, model)
         (; θ_r, ν, ρc_ds) = model.soil.parameters
         # Set initial conditions that aren't read in from file
@@ -389,7 +399,10 @@ function ClimaLandSimulation(
     end
     # Initialize the surface emissivity so the atmosphere can compute radiation.
     # Otherwise, it's initialized to 0 which causes NaNs in the radiation calculation.
-    @. p.ϵ_sfc = FT(1)
+    @. simulation._integrator.p.ϵ_sfc = FT(1)
+
+    # Initialize the surface temperature so the atmosphere can compute radiation.
+    @. simulation._integrator.p.T_sfc = orog_adjusted_T_surface
 
 
 
@@ -430,7 +443,6 @@ function ClimaLandSimulation(
     #     callback = SciMLBase.CallbackSet(driver_cb, diag_cb),
     # )
 
-    # TODO use LandSimulation to construct ClimaLandSimulation
     return ClimaLandSimulation(
         simulation.model,
         simulation._integrator,

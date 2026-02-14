@@ -2,7 +2,7 @@ using Test
 import ClimaCore as CC
 import ClimaAtmos as CA
 import ClimaCoupler
-import ClimaCoupler: FluxCalculator, Interfacer
+import ClimaCoupler: FieldExchanger, FluxCalculator, Interfacer
 import Dates
 import Thermodynamics.Parameters as TDP
 import ClimaParams as CP # to load TDP extension
@@ -11,7 +11,9 @@ ClimaComms.@import_required_backends
 
 exp_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth")
 
-include(joinpath(exp_dir, "components", "atmosphere", "climaatmos.jl"))
+import ClimaAtmos
+# Needed to construct ClimaAtmosSimulation
+ClimaAtmosExt = Base.get_extension(ClimaCoupler, :ClimaCouplerClimaAtmosExt)
 
 # To load ClimaCouplerClimaLandExt
 import ClimaLand as CL
@@ -97,7 +99,7 @@ end
     atmos_config_file =
         joinpath(exp_dir, "test", "component_model_tests", "climaatmos_coarse_short.yml")
     atmos_config = CA.AtmosConfig(atmos_config_file; job_id = "atmos_land_flux_test")
-    atmos_sim = ClimaAtmosSimulation(; atmos_config)
+    atmos_sim = ClimaAtmosExt.ClimaAtmosSimulation(atmos_config)
 
     boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
     area_fraction = CC.Fields.ones(boundary_space)

@@ -5,12 +5,11 @@ import ClimaCalibrate
 import ClimaAnalysis
 import ClimaComms
 import ClimaCoupler
+import ClimaCoupler: CalibrationTools
 import EnsembleKalmanProcesses as EKP
 import EnsembleKalmanProcesses.ParameterDistributions as PD
 import JLD2
 
-
-include(joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "api.jl"))
 include(
     joinpath(
         pkgdir(ClimaCoupler),
@@ -27,7 +26,7 @@ model_interface = joinpath(
 
 years = 2018:2021
 sample_date_ranges = [(DateTime(yr, 9, 1), DateTime(yr, 9, 1)) for yr in years]
-const CALIBRATE_CONFIG = CalibrateConfig(;
+const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     config_file = joinpath(
         pkgdir(ClimaCoupler),
         "config/subseasonal_configs/wxquest_diagedmf.yml",

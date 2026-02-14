@@ -64,10 +64,7 @@ function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, i
             g_ens_builder,
             col_idx,
             var;
-            checkers = (
-                EnsembleBuilder.SequentialIndicesChecker(),
-                EnsembleBuilder.SignChecker(),
-            ),
+            checkers = (EnsembleBuilder.SequentialIndicesChecker(),),
             verbose = true,
         )
     end

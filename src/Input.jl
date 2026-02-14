@@ -103,6 +103,10 @@ function argparse_settings()
         help = "Component model time step [allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Inf\"]"
         arg_type = String
         default = "400secs"
+        "--step_concurrently"
+        help = "Step the component models concurrently if possible"
+        arg_type = Bool
+        default = false
         "--dt_atmos"
         help = "Atmos simulation time step (alternative to `dt`; no default) [allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Inf\"]"
         arg_type = String
@@ -395,6 +399,9 @@ function get_coupler_args(config_dict::Dict)
     else
         component_dt_dict = config_dict["component_dt_dict"]
     end
+
+    step_concurrently = config_dict["step_concurrently"]
+
     # Save solution to integrator.sol at the beginning and end
     saveat = [t_start, t_end]
 
@@ -476,6 +483,7 @@ function get_coupler_args(config_dict::Dict)
         start_date,
         Δt_cpl,
         component_dt_dict,
+        step_concurrently,
         share_surface_space,
         nh_poly,
         h_elem,

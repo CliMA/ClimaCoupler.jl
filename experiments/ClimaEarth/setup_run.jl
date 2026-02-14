@@ -114,6 +114,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         start_date,
         Δt_cpl,
         component_dt_dict,
+        step_concurrently,
         share_surface_space,
         nh_poly,
         h_elem,
@@ -457,6 +458,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         thermo_params,
         diags_handler,
         save_cache,
+        step_concurrently,
     )
 
     #=

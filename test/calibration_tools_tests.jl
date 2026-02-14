@@ -3,6 +3,20 @@ import Dates
 import ClimaCoupler: CalibrationTools
 import ClimaAnalysis
 
+@testset "Calibrate config" begin
+    config = CalibrateConfig(;
+        "idk.yaml",
+        ["pr"],
+        2,
+        3,
+        ["2010-01"],
+        extend,
+        spinup,
+        output_dir,
+        rng_seed = 42,
+    )
+end
+
 @testset "ERA5 data loader" begin
     data_loader = CalibrationTools.ERA5DataLoader()
 

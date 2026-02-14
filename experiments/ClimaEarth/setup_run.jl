@@ -30,18 +30,6 @@ import ClimaCore as CC
 import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
 
-# ## Coupler specific imports
-using ClimaCoupler
-import ClimaCoupler.Interfacer:
-    AbstractSlabplanetSimulationMode,
-    AMIPMode,
-    CMIPMode,
-    CoupledSimulation,
-    SlabplanetAquaMode,
-    SlabplanetMode,
-    SlabplanetTerraMode,
-    SubseasonalMode
-
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.Utils: period_to_seconds_float
@@ -58,10 +46,22 @@ using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, NCDatasets, Poppler_jll
 
 # Trigger ClimaCouplerCMIPExt extension
 # Note we only need these if running CMIP, but for now we share one environment for all experiments
-import Oceananigans, ClimaOcean, ClimaSeaIce, KernelAbstractions
+import Oceananigans, ClimaOcean, ClimaSeaIce, KernelAbstractions, ConservativeRegridding
 
 #  Trigger ClimaCouplerClimaLandExt extension
 import ClimaLand, NCDatasets
+
+# ## Coupler specific imports
+using ClimaCoupler
+import ClimaCoupler.Interfacer:
+    AbstractSlabplanetSimulationMode,
+    AMIPMode,
+    CMIPMode,
+    CoupledSimulation,
+    SlabplanetAquaMode,
+    SlabplanetMode,
+    SlabplanetTerraMode,
+    SubseasonalMode
 
 pkg_dir = pkgdir(ClimaCoupler)
 

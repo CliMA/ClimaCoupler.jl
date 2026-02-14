@@ -117,10 +117,11 @@ function ClimaLandSimulation(
     # Interpolate atmosphere height field to surface space of land model,
     #  since that's where we compute fluxes for this land model
     atmos_h = Interfacer.remap(surface_space, atmos_h)
+    gustiness = FT(1)
 
     # Set up atmosphere and radiation forcing
     forcing = (;
-        atmos = CL.CoupledAtmosphere{FT}(surface_space, atmos_h),
+        atmos = CL.CoupledAtmosphere{FT, typeof(atmos_h)}(atmos_h, gustiness),
         radiation = CL.CoupledRadiativeFluxes{FT}(
             start_date;
             latitude = CC.Fields.coordinate_field(domain.space.surface).lat,
@@ -207,7 +208,38 @@ function ClimaLandSimulation(
         canopy,
     )
 
-    Y, p, coords = CL.initialize(model)
+    # Set up diagnostics
+    if use_land_diagnostics
+        output_writer = CD.Writers.NetCDFWriter(subsurface_space, output_dir; start_date)
+        diagnostics = CL.default_diagnostics(
+            model,
+            start_date,
+            output_writer = output_writer,
+            output_vars = :short,
+            reduction_period = :monthly,
+        )
+    else
+        output_writer = nothing
+        diagnostics = nothing
+    end
+
+    # TODO set_ic!
+    # timestepper default is ok
+    # updateat default is ok
+
+    user_callbacks = ()
+    simulation = CL.LandSimulation{FT}(
+        start_date,
+        stop_date,
+        dt,
+        model;
+        outdir = output_dir,
+        user_callbacks,
+        diagnostics,
+        initialize_cache = false,
+    )
+
+    # Y, p, coords = CL.initialize(model)
 
     # Set initial conditions
 
@@ -224,6 +256,7 @@ function ClimaLandSimulation(
         # constant field on subsurface space
         T_sfc0 = T_base .* CC.Fields.ones(subsurface_space)
     end
+    # TODO take in a field of initial temperature, which for wxquest will be SVI from below
     lapse_rate = FT(6.5e-3)
     # Adjust initial temperature to account for orography of the surface
     # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
@@ -236,6 +269,9 @@ function ClimaLandSimulation(
 
     # Read in initial conditions for snow and soil from file, if requested
     if !land_spun_up_ic && !isnothing(land_ic_path)
+        # make_set_initial_state_from_file
+        # TODO add a function in climaland to set wxquest ICs
+
         # Set initial conditions that aren't read in from file
         Y.soilco2.CO2 .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
         Y.soilco2.O2_f .= FT(0.21)    # atmospheric O2 volumetric fraction
@@ -269,6 +305,7 @@ function ClimaLandSimulation(
             regridder_kwargs = (; extrapolation_bc, interpolation_method),
         )
 
+        # TODO keep this here because it's coupler-specific or just set p.T_sfc .= Y.canopy.energy.T for all 3 cases
         # Initialize the surface temperature so the atmosphere can compute radiation.
         # Set surface temperature to skin temperature
         p.T_sfc .= SpaceVaryingInput(
@@ -278,6 +315,7 @@ function ClimaLandSimulation(
             regridder_type,
             regridder_kwargs = (; extrapolation_bc, interpolation_method),
         )
+
 
         CL.Simulations.set_snow_initial_conditions!(
             Y,
@@ -300,20 +338,32 @@ function ClimaLandSimulation(
             interpolation_method = interpolation_method,
         )
     elseif land_spun_up_ic
+        # TODO for this case:
+        # - pass `set_ic! = ...` as below (including setting p.drivers.T)
+        # - after LandSimulation is constructed, overwrite p.T_sfc to orog_adjusted_T_surface
+        # - initialize p.eps_sfc to 1 (for all cases)
+
         # Use artifact spun-up initial conditions
         ic_path = CL.Artifacts.soil_ic_2008_50m_path()
         @info "ClimaLand: using land IC file" ic_path
-        set_ic! = CL.Simulations.make_set_initial_state_from_file(
+        spun_up_set_ic! = CL.Simulations.make_set_initial_state_from_file(
             ic_path,
             model;
             enforce_constraints = true,
         )
-        p.drivers.T .= orog_adjusted_T_surface
         t0 = tspan[1]
-        set_ic!(Y, p, t0, model)
+        function coupler_set_ic!(Y, p, t0, model, atmos_T, set_ic!)
+            p.drivers.T .= atmos_T # we need to set this because it's used in default set_ic!
+            set_ic!(Y, p, t0, model)
+        end
+        final_set_ic!(Y, p, t0, model) =
+            coupler_set_ic!(Y, p, t0, model, orog_adjusted_T_surface, spun_up_set_ic!)
+
         # Initialize the surface temperature so the atmosphere can compute radiation.
         @. p.T_sfc = orog_adjusted_T_surface
     else
+        # TODO Kat will move this option into ClimaLand in bucket PR
+        # function set_ic!(Y, p, t0, model)
         (; θ_r, ν, ρc_ds) = model.soil.parameters
         # Set initial conditions that aren't read in from file
         Y.soilco2.CO2 .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
@@ -321,7 +371,7 @@ function ClimaLandSimulation(
         Y.soilco2.SOC .= FT(5.0)      # default SOC concentration (kg C/m³)
 
         Y.canopy.hydraulics.ϑ_l.:1 .= model.canopy.hydraulics.parameters.ν
-        @. Y.canopy.energy.T = orog_adjusted_T_surface
+        @. Y.canopy.energy.T = orog_adjusted_T_surface # TODO how can we get this from y, p, t, model?
         # Set initial conditions for the state
         @. Y.soil.ϑ_l = θ_r + (ν - θ_r) / 2
         Y.soil.θ_i .= FT(0.0)
@@ -345,70 +395,60 @@ function ClimaLandSimulation(
         Y.snow.U .= FT(0)
         # Initialize the surface temperature so the atmosphere can compute radiation.
         @. p.T_sfc = orog_adjusted_T_surface
+        # end
     end
     # Initialize the surface emissivity so the atmosphere can compute radiation.
     # Otherwise, it's initialized to 0 which causes NaNs in the radiation calculation.
-    @. p.ϵ_sfc = FT(1)
+    @. simulation._integrator.p.ϵ_sfc = FT(1)
 
-    # Update cos(zenith angle) within land model every hour
-    update_dt = dt isa ITime ? ITime(3600) : 3600
-    updatefunc = CL.make_update_drivers(CL.get_drivers(model))
-    driver_cb = CL.DriverUpdateCallback(updatefunc, update_dt, tspan[1])
+    # Initialize the surface temperature so the atmosphere can compute radiation.
+    @. simulation._integrator.p.T_sfc = orog_adjusted_T_surface
 
-    exp_tendency! = CL.make_exp_tendency(model)
-    imp_tendency! = CL.make_imp_tendency(model)
-    jacobian! = CL.make_jacobian(model)
 
-    # set up jacobian info
-    jac_kwargs = (; jac_prototype = CL.FieldMatrixWithSolver(Y), Wfact = jacobian!)
 
-    prob = SciMLBase.ODEProblem(
-        CTS.ClimaODEFunction(
-            T_exp! = exp_tendency!,
-            T_imp! = SciMLBase.ODEFunction(imp_tendency!; jac_kwargs...),
-        ),
-        Y,
-        tspan,
-        p,
+    # exp_tendency! = CL.make_exp_tendency(model)
+    # imp_tendency! = CL.make_imp_tendency(model)
+    # jacobian! = CL.make_jacobian(model)
+
+    # # set up jacobian info
+    # jac_kwargs = (; jac_prototype = CL.FieldMatrixWithSolver(Y), Wfact = jacobian!)
+
+    # prob = SciMLBase.ODEProblem(
+    #     CTS.ClimaODEFunction(
+    #         T_exp! = exp_tendency!,
+    #         T_imp! = SciMLBase.ODEFunction(imp_tendency!; jac_kwargs...),
+    #     ),
+    #     Y,
+    #     tspan,
+    #     p,
+    # )
+
+
+
+    # # Set up time stepper and integrator
+    # stepper = CTS.ARS111()
+    # ode_algo = CTS.IMEXAlgorithm(
+    #     stepper,
+    #     CTS.NewtonsMethod(
+    #         max_iters = 3,
+    #         _j = CTS.UpdateEvery(CTS.NewNewtonIteration),
+    #     ),
+    # )
+    # integrator = SciMLBase.init(
+    #     prob,
+    #     ode_algo;
+    #     dt,
+    #     saveat,
+    #     adaptive = false,
+    #     callback = SciMLBase.CallbackSet(driver_cb, diag_cb),
+    # )
+
+    return ClimaLandSimulation(
+        simulation.model,
+        simulation._integrator,
+        area_fraction,
+        output_writer,
     )
-
-    # Set up diagnostics
-    if use_land_diagnostics
-        output_writer = CD.Writers.NetCDFWriter(subsurface_space, output_dir; start_date)
-        scheduled_diagnostics = CL.default_diagnostics(
-            model,
-            start_date,
-            output_writer = output_writer,
-            output_vars = :short,
-            reduction_period = :monthly,
-        )
-        diagnostic_handler =
-            CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)
-        diag_cb = CD.DiagnosticsCallback(diagnostic_handler)
-    else
-        output_writer = nothing
-        diag_cb = nothing
-    end
-
-    # Set up time stepper and integrator
-    stepper = CTS.ARS111()
-    ode_algo = CTS.IMEXAlgorithm(
-        stepper,
-        CTS.NewtonsMethod(
-            max_iters = 3,
-            update_j = CTS.UpdateEvery(CTS.NewNewtonIteration),
-        ),
-    )
-    integrator = SciMLBase.init(
-        prob,
-        ode_algo;
-        dt,
-        saveat,
-        adaptive = false,
-        callback = SciMLBase.CallbackSet(driver_cb, diag_cb),
-    )
-
-    return ClimaLandSimulation(model, integrator, area_fraction, output_writer)
 end
 
 ###############################################################################

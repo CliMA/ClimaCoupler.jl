@@ -90,6 +90,8 @@ nothing # hide
 ## CalibrationTools API
 
 ```@docs
+CalibrationTools.CalibrateConfig
+CalibrationTools.CalibrateConfig()
 CalibrationTools.ERA5DataLoader
 CalibrationTools.ERA5DataLoader()
 CalibrationTools.available_vars

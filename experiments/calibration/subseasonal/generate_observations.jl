@@ -66,9 +66,7 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
-    sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges
-    short_names = CALIBRATE_CONFIG.short_names
-    config_file = CALIBRATE_CONFIG.config_file
+    (; sample_date_ranges, short_names, config_file) = CALIBRATE_CONFIG
     @info "Generating observations for $short_names"
     @info "The number of samples is $(length(sample_date_ranges)) over $sample_date_ranges"
 

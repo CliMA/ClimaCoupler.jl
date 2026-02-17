@@ -43,7 +43,6 @@ end
         dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
         shared_surface_space = nothing,
         land_spun_up_ic::Bool = true,
-        saveat::Vector{TT} = [tspan[1], tspan[2]],
         surface_elevation = nothing,
         atmos_h,
         land_temperature_anomaly::String = "amip",
@@ -77,7 +76,6 @@ function ClimaLandSimulation(
     dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
     shared_surface_space = nothing,
     land_spun_up_ic::Bool = true,
-    saveat::Vector{TT} = [tspan[1], tspan[2]],
     surface_elevation = nothing,
     atmos_h,
     land_temperature_anomaly::String = "amip",
@@ -91,7 +89,6 @@ function ClimaLandSimulation(
     land_toml_dict = LP.create_toml_dict(FT)
     # Override land parameters with coupled parameters
     toml_dict = CP.merge_override_default_values(coupled_param_dict, land_toml_dict)
-    earth_param_set = CL.Parameters.LandParameters(toml_dict)
 
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
@@ -231,6 +228,7 @@ function ClimaLandSimulation(
         haskey(T_functions, land_temperature_anomaly) ||
             error("land temp anomaly function $land_temperature_anomaly not supported")
         temp_anomaly = T_functions[land_temperature_anomaly]
+        coords = CL.Domains.coordinates(model)
         T_sfc0 = T_base .+ temp_anomaly.(coords.subsurface)
     else
         # constant field on subsurface space
@@ -242,7 +240,7 @@ function ClimaLandSimulation(
     orog_adjusted_T_data =
         CC.Fields.field_values(T_sfc0) .-
         lapse_rate .* CC.Fields.field_values(surface_elevation)
-    orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, subsurface_space)
+    orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, subsurface_space) # TODO unused
     orog_adjusted_T_surface =
         CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
 
@@ -254,26 +252,33 @@ function ClimaLandSimulation(
         # Use artifact spun-up initial conditions
         ic_path = CL.Artifacts.soil_ic_2008_50m_path()
         @info "ClimaLand: using land IC file" ic_path
+
+        # Set initial conditions from file, and set air temperature to the input atmospheric temperature
         spun_up_set_ic! = CL.Simulations.make_set_initial_state_from_file(
             ic_path,
             model;
             enforce_constraints = true,
         )
-        t0 = tspan[1]
-        # Set initial conditions from file, and set air temperature to the input atmospheric temperature
-        function coupler_set_ic!(Y, p, t0, model, atmos_T, spun_up_set_ic!)
-            p.drivers.T .= atmos_T # we need to set this because it's used in default set_ic!
-            spun_up_set_ic!(Y, p, t0, model)
-        end
-        set_ic!(Y, p, t0, model) =
-            coupler_set_ic!(Y, p, t0, model, orog_adjusted_T_surface, spun_up_set_ic!)
+        set_ic! =
+            (Y, p, t, model) ->
+                _coupler_set_ic!(Y, p, t, model, orog_adjusted_T_surface, spun_up_set_ic!)
 
     else
-        set_ic! = CL.make_set_initial_state_from_atmos_and_parameters(model)
+        set_ic_from_atmos_and_parameters! =
+            CL.make_set_initial_state_from_atmos_and_parameters(model)
+        set_ic! =
+            (Y, p, t, model) -> _coupler_set_ic!(
+                Y,
+                p,
+                t,
+                model,
+                orog_adjusted_T_surface,
+                set_ic_from_atmos_and_parameters!,
+            )
     end
 
     user_callbacks = ()
-    simulation = CL.LandSimulation{FT}(
+    simulation = CL.Simulations.LandSimulation(
         start_date,
         stop_date,
         dt,
@@ -282,7 +287,6 @@ function ClimaLandSimulation(
         set_ic!,
         user_callbacks,
         diagnostics,
-        initialize_cache = false,
     )
 
     # Initialize the surface emissivity so the atmosphere can compute radiation.
@@ -298,6 +302,20 @@ function ClimaLandSimulation(
         area_fraction,
         output_writer,
     )
+end
+
+"""
+    _coupler_set_ic!(Y, p, t, model, atmos_T, set_ic!)
+
+Helper function to set initial conditions using the provided set_ic! function.
+First, we need to set the air temperature driver to the input atmospheric temperature.
+
+The land model expects the air temperature driver to be set before the set_ic! function
+is called, which is why we have this wrapper.
+"""
+function _coupler_set_ic!(Y, p, t, model, atmos_T, set_ic!)
+    p.drivers.T .= atmos_T
+    set_ic!(Y, p, t, model)
 end
 
 ###############################################################################

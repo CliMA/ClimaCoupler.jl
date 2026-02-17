@@ -26,6 +26,8 @@ steps:
 
       - echo "--- Instantiate ClimaEarth experiments env"
       - "julia -O0 --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaCore\", rev=\"tr/gpu-compiler-bug\"))'"
+      - "julia -O0 --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.update()'"
       - "julia -O0 --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       - "julia -O0 --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia -O0 --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"

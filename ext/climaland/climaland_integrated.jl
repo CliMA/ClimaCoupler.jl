@@ -223,26 +223,6 @@ function ClimaLandSimulation(
         diagnostics = nothing
     end
 
-    # TODO set_ic!
-    # timestepper default is ok
-    # updateat default is ok
-
-    user_callbacks = ()
-    simulation = CL.LandSimulation{FT}(
-        start_date,
-        stop_date,
-        dt,
-        model;
-        outdir = output_dir,
-        user_callbacks,
-        diagnostics,
-        initialize_cache = false,
-    )
-
-    # Y, p, coords = CL.initialize(model)
-
-    # Set initial conditions
-
     # Apply temperature anomaly function to initial temperature only if specified
     T_base = FT(276.85)
     if land_temperature_anomaly != "nothing"
@@ -256,7 +236,6 @@ function ClimaLandSimulation(
         # constant field on subsurface space
         T_sfc0 = T_base .* CC.Fields.ones(subsurface_space)
     end
-    # TODO take in a field of initial temperature, which for wxquest will be SVI from below
     lapse_rate = FT(6.5e-3)
     # Adjust initial temperature to account for orography of the surface
     # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
@@ -267,82 +246,11 @@ function ClimaLandSimulation(
     orog_adjusted_T_surface =
         CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
 
-    # Read in initial conditions for snow and soil from file, if requested
+    # Define functions to set initial conditions
     if !land_spun_up_ic && !isnothing(land_ic_path)
-        # make_set_initial_state_from_file
-        # TODO add a function in climaland to set wxquest ICs
-
-        # Set initial conditions that aren't read in from file
-        Y.soilco2.CO2 .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
-        Y.soilco2.O2_f .= FT(0.21)    # atmospheric O2 volumetric fraction
-        Y.soilco2.SOC .= FT(5.0)      # default SOC concentration (kg C/m³)
-
-        Y.canopy.hydraulics.ϑ_l.:1 .= model.canopy.hydraulics.parameters.ν
-        @. Y.canopy.energy.T = orog_adjusted_T_surface
-        # Subseasonal setup: land_spun_up_ic false, but a land_ic_path is provided
-        ic_path = land_ic_path
-        @info "ClimaLand: using land IC file" ic_path
-
-        regridder_type = :InterpolationsRegridder
-        extrapolation_bc =
-            (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
-        interpolation_method = Interpolations.Linear()
-
-        # Set snow T first to use in computing snow internal energy from IC file
-        p.snow.T .= SpaceVaryingInput(
-            ic_path,
-            "tsn",
-            surface_space;
-            regridder_type,
-            regridder_kwargs = (; extrapolation_bc, interpolation_method),
-        )
-        # Set canopy temperature to skin temperature
-        Y.canopy.energy.T .= SpaceVaryingInput(
-            ic_path,
-            "skt",
-            surface_space;
-            regridder_type,
-            regridder_kwargs = (; extrapolation_bc, interpolation_method),
-        )
-
-        # TODO keep this here because it's coupler-specific or just set p.T_sfc .= Y.canopy.energy.T for all 3 cases
-        # Initialize the surface temperature so the atmosphere can compute radiation.
-        # Set surface temperature to skin temperature
-        p.T_sfc .= SpaceVaryingInput(
-            ic_path,
-            "skt",
-            surface_space;
-            regridder_type,
-            regridder_kwargs = (; extrapolation_bc, interpolation_method),
-        )
-
-
-        CL.Simulations.set_snow_initial_conditions!(
-            Y,
-            p,
-            surface_space,
-            ic_path,
-            model.snow.parameters;
-            regridder_type = regridder_type,
-            extrapolation_bc = extrapolation_bc,
-            interpolation_method = interpolation_method,
-        )
-
-        CL.Simulations.set_soil_initial_conditions_from_temperature_and_total_water!(
-            Y,
-            subsurface_space,
-            ic_path,
-            model.soil;
-            regridder_type = regridder_type,
-            extrapolation_bc = extrapolation_bc,
-            interpolation_method = interpolation_method,
-        )
+        @info "ClimaLand: using land IC file" land_ic_path
+        set_ic! = CL.make_set_subseasonal_initial_conditions(land_ic_path)
     elseif land_spun_up_ic
-        # TODO for this case:
-        # - pass `set_ic! = ...` as below (including setting p.drivers.T)
-        # - after LandSimulation is constructed, overwrite p.T_sfc to orog_adjusted_T_surface
-        # - initialize p.eps_sfc to 1 (for all cases)
-
         # Use artifact spun-up initial conditions
         ic_path = CL.Artifacts.soil_ic_2008_50m_path()
         @info "ClimaLand: using land IC file" ic_path
@@ -352,96 +260,37 @@ function ClimaLandSimulation(
             enforce_constraints = true,
         )
         t0 = tspan[1]
-        function coupler_set_ic!(Y, p, t0, model, atmos_T, set_ic!)
+        # Set initial conditions from file, and set air temperature to the input atmospheric temperature
+        function coupler_set_ic!(Y, p, t0, model, atmos_T, spun_up_set_ic!)
             p.drivers.T .= atmos_T # we need to set this because it's used in default set_ic!
-            set_ic!(Y, p, t0, model)
+            spun_up_set_ic!(Y, p, t0, model)
         end
-        final_set_ic!(Y, p, t0, model) =
+        set_ic!(Y, p, t0, model) =
             coupler_set_ic!(Y, p, t0, model, orog_adjusted_T_surface, spun_up_set_ic!)
 
-        # Initialize the surface temperature so the atmosphere can compute radiation.
-        @. p.T_sfc = orog_adjusted_T_surface
     else
-        # TODO Kat will move this option into ClimaLand in bucket PR
-        # function set_ic!(Y, p, t0, model)
-        (; θ_r, ν, ρc_ds) = model.soil.parameters
-        # Set initial conditions that aren't read in from file
-        Y.soilco2.CO2 .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
-        Y.soilco2.O2_f .= FT(0.21)    # atmospheric O2 volumetric fraction
-        Y.soilco2.SOC .= FT(5.0)      # default SOC concentration (kg C/m³)
-
-        Y.canopy.hydraulics.ϑ_l.:1 .= model.canopy.hydraulics.parameters.ν
-        @. Y.canopy.energy.T = orog_adjusted_T_surface # TODO how can we get this from y, p, t, model?
-        # Set initial conditions for the state
-        @. Y.soil.ϑ_l = θ_r + (ν - θ_r) / 2
-        Y.soil.θ_i .= FT(0.0)
-        ρc_s =
-            CL.Soil.volumetric_heat_capacity.(
-                Y.soil.ϑ_l,
-                Y.soil.θ_i,
-                ρc_ds,
-                earth_param_set,
-            )
-        Y.soil.ρe_int .=
-            CL.Soil.volumetric_internal_energy.(
-                Y.soil.θ_i,
-                ρc_s,
-                orog_adjusted_T,
-                earth_param_set,
-            )
-
-        Y.snow.S .= FT(0)
-        Y.snow.S_l .= FT(0)
-        Y.snow.U .= FT(0)
-        # Initialize the surface temperature so the atmosphere can compute radiation.
-        @. p.T_sfc = orog_adjusted_T_surface
-        # end
+        set_ic! = CL.make_set_initial_state_from_atmos_and_parameters(model)
     end
+
+    user_callbacks = ()
+    simulation = CL.LandSimulation{FT}(
+        start_date,
+        stop_date,
+        dt,
+        model;
+        outdir = output_dir,
+        set_ic!,
+        user_callbacks,
+        diagnostics,
+        initialize_cache = false,
+    )
+
     # Initialize the surface emissivity so the atmosphere can compute radiation.
     # Otherwise, it's initialized to 0 which causes NaNs in the radiation calculation.
     @. simulation._integrator.p.ϵ_sfc = FT(1)
 
     # Initialize the surface temperature so the atmosphere can compute radiation.
-    @. simulation._integrator.p.T_sfc = orog_adjusted_T_surface
-
-
-
-    # exp_tendency! = CL.make_exp_tendency(model)
-    # imp_tendency! = CL.make_imp_tendency(model)
-    # jacobian! = CL.make_jacobian(model)
-
-    # # set up jacobian info
-    # jac_kwargs = (; jac_prototype = CL.FieldMatrixWithSolver(Y), Wfact = jacobian!)
-
-    # prob = SciMLBase.ODEProblem(
-    #     CTS.ClimaODEFunction(
-    #         T_exp! = exp_tendency!,
-    #         T_imp! = SciMLBase.ODEFunction(imp_tendency!; jac_kwargs...),
-    #     ),
-    #     Y,
-    #     tspan,
-    #     p,
-    # )
-
-
-
-    # # Set up time stepper and integrator
-    # stepper = CTS.ARS111()
-    # ode_algo = CTS.IMEXAlgorithm(
-    #     stepper,
-    #     CTS.NewtonsMethod(
-    #         max_iters = 3,
-    #         _j = CTS.UpdateEvery(CTS.NewNewtonIteration),
-    #     ),
-    # )
-    # integrator = SciMLBase.init(
-    #     prob,
-    #     ode_algo;
-    #     dt,
-    #     saveat,
-    #     adaptive = false,
-    #     callback = SciMLBase.CallbackSet(driver_cb, diag_cb),
-    # )
+    @. simulation._integrator.p.T_sfc = simulation._integrator.u.canopy.energy.T
 
     return ClimaLandSimulation(
         simulation.model,

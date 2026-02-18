@@ -304,20 +304,6 @@ function ClimaLandSimulation(
     )
 end
 
-"""
-    _coupler_set_ic!(Y, p, t, model, atmos_T, set_ic!)
-
-Helper function to set initial conditions using the provided set_ic! function.
-First, we need to set the air temperature driver to the input atmospheric temperature.
-
-The land model expects the air temperature driver to be set before the set_ic! function
-is called, which is why we have this wrapper.
-"""
-function _coupler_set_ic!(Y, p, t, model, atmos_T, set_ic!)
-    p.drivers.T .= atmos_T
-    set_ic!(Y, p, t, model)
-end
-
 ###############################################################################
 ### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
 ###############################################################################

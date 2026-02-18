@@ -199,8 +199,8 @@ function BucketSimulation(
     end
 
     # Convert start_date and stop_date to ITime if using ITime
+    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
     if dt isa ITime
-        stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
         start_date = promote(
             dt,
             ITime(

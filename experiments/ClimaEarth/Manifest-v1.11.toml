@@ -528,7 +528,7 @@ weakdeps = ["CUDA"]
 
 [[deps.ClimaLand]]
 deps = ["Adapt", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "NCDatasets", "RootSolvers", "SciMLBase", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "f5ce8a2a7f92dd9834a75e9a21a81730e7452d1e"
+git-tree-sha1 = "59502e45fede7f45e98d6e225ce48368e7d8916d"
 repo-rev = "js/landsim"
 repo-url = "https://github.com/CliMA/ClimaLand.jl.git"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"

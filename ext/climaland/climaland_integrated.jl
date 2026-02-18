@@ -240,7 +240,6 @@ function ClimaLandSimulation(
     orog_adjusted_T_data =
         CC.Fields.field_values(T_sfc0) .-
         lapse_rate .* CC.Fields.field_values(surface_elevation)
-    orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, subsurface_space) # TODO unused
     orog_adjusted_T_surface =
         CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
 
@@ -277,7 +276,24 @@ function ClimaLandSimulation(
             )
     end
 
-    user_callbacks = ()
+    # Convert start_date and stop_date to ITime if using ITime
+    if dt isa ITime
+        stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+        start_date = promote(
+            dt,
+            ITime(
+                Dates.value(convert(Dates.Second, start_date - dt.epoch));
+                epoch = dt.epoch,
+            ),
+        )[2]
+        stop_date = promote(
+            dt,
+            ITime(
+                Dates.value(convert(Dates.Second, stop_date - dt.epoch));
+                epoch = dt.epoch,
+            ),
+        )[2]
+    end
     simulation = CL.Simulations.LandSimulation(
         start_date,
         stop_date,
@@ -285,7 +301,7 @@ function ClimaLandSimulation(
         model;
         outdir = output_dir,
         set_ic!,
-        user_callbacks,
+        user_callbacks = (),
         diagnostics,
     )
 

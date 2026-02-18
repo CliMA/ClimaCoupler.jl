@@ -151,14 +151,13 @@ function BucketSimulation(
         # Set temperature IC including anomaly, based on atmospheric setup
         # Bucket surface temperature is in `p.bucket.T_sfc` (ClimaLand.jl)
         lapse_rate = FT(6.5e-3)
-        T_sfc_0 = FT(271)
+        T_base = FT(271)
         coords = CL.Domains.coordinates(model)
-        @. Y.bucket.T = T_sfc_0 + temp_anomaly(coords.subsurface)
+        T_sfc_0 = T_base .+ temp_anomaly.(coords.subsurface)
         # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
         orog_adjusted_T_data =
-            CC.Fields.field_values(Y.bucket.T) .-
+            CC.Fields.field_values(T_sfc_0) .-
             lapse_rate .* CC.Fields.field_values(surface_elevation)
-        orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, domain.space.subsurface)
         orog_adjusted_T_surface =
             CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
     end
@@ -171,7 +170,8 @@ function BucketSimulation(
     # - `S`, for snow water equivalent (2D).
     if !isempty(bucket_initial_condition)
         @info "ClimaLand Bucket using land IC file" bucket_initial_condition
-        set_ic! = CL.make_set_initial_state_from_file(bucket_initial_condition, model)
+        set_ic! =
+            CL.Simulations.make_set_initial_state_from_file(bucket_initial_condition, model)
     else
         set_ic! =
             (Y, p, t, model) -> _coupler_set_ic!(
@@ -180,7 +180,7 @@ function BucketSimulation(
                 t,
                 model,
                 orog_adjusted_T_surface,
-                CL.make_set_initial_state_from_atmos_and_parameters(model),
+                CL.Simulations.make_set_initial_state_from_atmos_and_parameters(model),
             )
     end
 
@@ -198,7 +198,24 @@ function BucketSimulation(
         diagnostics = nothing
     end
 
-    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+    # Convert start_date and stop_date to ITime if using ITime
+    if dt isa ITime
+        stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+        start_date = promote(
+            dt,
+            ITime(
+                Dates.value(convert(Dates.Second, start_date - dt.epoch));
+                epoch = dt.epoch,
+            ),
+        )[2]
+        stop_date = promote(
+            dt,
+            ITime(
+                Dates.value(convert(Dates.Second, stop_date - dt.epoch));
+                epoch = dt.epoch,
+            ),
+        )[2]
+    end
     simulation = CL.Simulations.LandSimulation(
         start_date,
         stop_date,

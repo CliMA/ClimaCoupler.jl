@@ -460,6 +460,7 @@ for FT in (Float32, Float64)
             1,
             nothing,
             nothing,
+            false,
         ) === nothing
     end
 

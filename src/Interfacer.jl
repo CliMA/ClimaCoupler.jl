@@ -65,6 +65,7 @@ struct CoupledSimulation{
     TP,
     DH,
     SC <: Bool,
+    ST <: Bool,
 }
     start_date::D
     fields::FV
@@ -79,6 +80,7 @@ struct CoupledSimulation{
     thermo_params::TP
     diags_handler::DH
     save_cache::SC
+    step_concurrently::ST
 end
 
 CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args)...}(args...)

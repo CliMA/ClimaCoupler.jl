@@ -62,6 +62,7 @@ four_steps_reading["detect_restart_files"] = true
 four_steps_reading["restart_dir"] = cs_four_steps.dir_paths.checkpoints_dir
 four_steps_reading["restart_t"] = 720
 four_steps_reading["job_id"] = "four_steps_reading"
+Input.update_t_start_for_restarts!(four_steps_reading)
 
 cs_four_steps_reading = setup_and_run(four_steps_reading)
 @testset "Restarts from command line arguments" begin
@@ -87,6 +88,7 @@ println("Reading and simulating last two steps")
 # Two additional steps
 two_steps["t_end"] = "720secs"
 two_steps["detect_restart_files"] = true
+Input.update_t_start_for_restarts!(two_steps)
 cs_two_steps2 = setup_and_run(two_steps)
 
 @testset "Restarts" begin

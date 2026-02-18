@@ -72,6 +72,9 @@ two_steps_reading["restart_t"] = 360
 two_steps_reading["restart_cache"] = false
 two_steps_reading["job_id"] = "two_steps_reading"
 two_steps_reading["save_cache"] = false
+# calling setup_and_run bypass get_coupler_config_dict which modifies the
+# t_start
+Input.update_t_start_for_restarts!(two_steps_reading)
 
 cs_two_steps_reading = setup_and_run(two_steps_reading)
 @testset "Restarts from command line arguments" begin

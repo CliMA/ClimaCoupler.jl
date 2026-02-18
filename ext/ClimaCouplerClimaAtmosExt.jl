@@ -1,9 +1,15 @@
+"""
+    ClimaCouplerClimaAtmosExt
+
+This module contains code for extending the ClimaCoupler interface for
+ClimaAtmos. For more information about the atmos model, please see
+`experiments/ClimaEarth/README.md`
+"""
+module ClimaCouplerClimaAtmosExt
+
 # atmos_init: for ClimaAtmos interface
 import StaticArrays
-import Statistics
-import LinearAlgebra
 import ClimaAtmos as CA
-import ClimaAtmos: set_surface_albedo!
 import ClimaAtmos.Parameters as CAP
 import ClimaParams as CP
 import ClimaCore as CC
@@ -13,6 +19,7 @@ import Thermodynamics as TD
 import ClimaCoupler:
     Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities, Plotting
 import ClimaUtilities.TimeManager: ITime
+import ClimaComms
 
 ###
 ### Functions required by ClimaCoupler.jl for an AbstractAtmosSimulation
@@ -40,11 +47,33 @@ Extension of the generic AtmosSimulation constructor for ClimaAtmos.
 Note that this is currently the only atmosphere model supported by
 ClimaCoupler.jl.
 """
-function Interfacer.AtmosSimulation(::Val{:climaatmos}; atmos_config, kwargs...)
-    return ClimaAtmosSimulation(; atmos_config, kwargs...)
+function Interfacer.AtmosSimulation(
+    ::Val{:climaatmos};
+    config_dict,
+    atmos_output_dir,
+    coupled_param_dict,
+    comms_ctx,
+)
+    return ClimaAtmosSimulation(
+        config_dict,
+        atmos_output_dir,
+        coupled_param_dict,
+        comms_ctx,
+    )
 end
 
-function ClimaAtmosSimulation(; atmos_config, extra_kwargs...)
+function ClimaAtmosSimulation(
+    config_dict::Dict,
+    atmos_output_dir,
+    coupled_param_dict::CP.ParamDict,
+    comms_ctx,
+)
+    atmos_config =
+        get_atmos_config_dict(config_dict, atmos_output_dir, coupled_param_dict, comms_ctx)
+    return ClimaAtmosSimulation(atmos_config)
+end
+
+function ClimaAtmosSimulation(atmos_config)
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
     FT = atmos_config.parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
     simulation = CA.get_simulation(atmos_config)
@@ -83,23 +112,6 @@ function ClimaAtmosSimulation(; atmos_config, extra_kwargs...)
     # DSS state to ensure we have continuous fields
     dss_state!(sim)
     return sim
-end
-
-# Extension of CA.set_surface_albedo! to set the surface albedo to 0.38 at the beginning of the simulation,
-# so the initial callback initialization doesn't lead to NaNs in the radiation model.
-function CA.set_surface_albedo!(Y, p, t, ::CA.CouplerAlbedo)
-    if float(t) == 0
-        FT = eltype(Y)
-        # set initial insolation initial conditions
-        !(p.atmos.insolation isa CA.IdealizedInsolation) &&
-            CA.set_insolation_variables!(Y, p, t, p.atmos.insolation)
-        # set surface albedo to 0.38
-        @warn "Setting surface albedo to 0.38 at the beginning of the simulation"
-        p.radiation.rrtmgp_model.direct_sw_surface_albedo .= FT(0.38)
-        p.radiation.rrtmgp_model.diffuse_sw_surface_albedo .= FT(0.38)
-    else
-        nothing
-    end
 end
 
 """
@@ -708,3 +720,6 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrato
 
 Plotting.debug_plot_fields(sim::ClimaAtmosSimulation) =
     (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)
+
+
+end

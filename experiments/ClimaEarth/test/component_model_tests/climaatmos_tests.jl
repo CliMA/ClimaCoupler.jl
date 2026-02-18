@@ -2,7 +2,11 @@ import Test: @test, @testset
 import ClimaCore as CC
 import ClimaCoupler
 
-include(joinpath("..", "..", "components", "atmosphere", "climaatmos.jl"))
+import ClimaAtmos
+import ClimaParams as CP
+
+# Needed to construct ClimaAtmosSimulation
+ClimaAtmosExt = Base.get_extension(ClimaCoupler, :ClimaCouplerClimaAtmosExt)
 
 for FT in (Float32, Float64)
     @testset "dss_state! ClimaAtmosSimulation for FT=$FT" begin
@@ -23,7 +27,7 @@ for FT in (Float32, Float64)
             ),
             p = (; cache_field = CC.Fields.zeros(boundary_space)),
         )
-        sim = ClimaAtmosSimulation(nothing, nothing, integrator, nothing)
+        sim = ClimaAtmosExt.ClimaAtmosSimulation(nothing, nothing, integrator, nothing)
 
         # make field non-constant to check the impact of the dss step
         coords_lat = CC.Fields.coordinate_field(sim.integrator.u.state_field2).lat
@@ -31,7 +35,7 @@ for FT in (Float32, Float64)
 
         integrator_copy = deepcopy(integrator)
         # apply DSS
-        dss_state!(sim)
+        ClimaAtmosExt.dss_state!(sim)
 
         # test that uniform field and cache are unchanged, non-constant is changed
         # note: uniform field is changed slightly by dss

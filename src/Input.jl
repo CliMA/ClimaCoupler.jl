@@ -14,6 +14,7 @@ import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import ClimaCore as CC
 import ClimaCoupler
+import ..Checkpointer
 import ..Interfacer
 import ..Utilities
 
@@ -338,8 +339,43 @@ function get_coupler_config_dict(config_file)
 
     # Select the correct timestep for each component model based on which are available
     parse_component_dts!(config_dict)
+    update_t_start_for_restarts!(config_dict)
 
     return config_dict
+end
+
+"""
+    update_t_start_for_restarts!(config_dict)
+
+Update `t_start` in `config_dict` for restarts.
+
+If the user specifies to restart via `detect_restart_files` but a restart time
+`restart_t` isn't specified, the restart time is inferred from the checkpointed
+files. Otherwise, the provided `restart_t` is used.
+
+If the simulation is not restarting, the input `config_dict` is unchanged.
+"""
+function update_t_start_for_restarts!(config_dict)
+    # Update t_start for restarts
+    (; detect_restart_files, output_dir_root, restart_dir, restart_t) =
+        get_coupler_args(config_dict)
+    # Checkpoint directory is hardcoded and can be wrong if
+    # Utilities.setup_output_dirs is updated
+    checkpoints_dir = joinpath(output_dir_root, "checkpoints")
+    if detect_restart_files
+        isnothing(restart_t) &&
+            (restart_t = Checkpointer.t_start_from_checkpoint(checkpoints_dir))
+        isnothing(restart_dir) && (restart_dir = checkpoints_dir)
+    end
+    should_restart = !isnothing(restart_t) && !isnothing(restart_dir)
+    if should_restart
+        # We only support a round number of seconds
+        isinteger(float(restart_t)) ||
+            error("Cannot restart from a non integer number of seconds")
+        restart_t_int = Int(float(restart_t))
+        config_dict["t_start"] = "$(restart_t_int)secs"
+    end
+    return nothing
 end
 
 """
@@ -384,7 +420,12 @@ function get_coupler_args(config_dict::Dict)
     if use_itime
         t_end = ITime(t_end, epoch = start_date)
         t_start = ITime(t_start, epoch = start_date)
-        Δt_cpl = ITime(Δt_cpl, epoch = start_date)
+        # A period of Dates.Second(1) is passed when initializing Δt_cpl to
+        # ensure consistent Δt_cpl for when restarting a simulation. ITime
+        # automatically choose the appropriate period based on time value. For
+        # example, the result ITime(0) gives a period of 1 second, but
+        # ITime(120) gives a period of 1 minute.
+        Δt_cpl = ITime(Int64(Δt_cpl), period = Dates.Second(1), epoch = start_date)
         times = promote(
             t_end,
             t_start,

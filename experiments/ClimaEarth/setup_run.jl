@@ -60,19 +60,11 @@ using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, NCDatasets, Poppler_jll
 # Note we only need these if running CMIP, but for now we share one environment for all experiments
 import Oceananigans, ClimaOcean, ClimaSeaIce, KernelAbstractions
 
-#  Trigger ClimaCouplerClimaLandExt extension
+# Trigger ClimaCouplerClimaLandExt extension
 import ClimaLand, NCDatasets
 
-pkg_dir = pkgdir(ClimaCoupler)
-
-#=
-### Helper Functions
-These will be eventually moved to their respective component model and utility packages, and so they should not
-contain any internals of the ClimaCoupler source code, except extensions to the Interfacer functions.
-=#
-
-## helpers for component models
-include("components/atmosphere/climaatmos.jl")
+# Trigger ClimaCouplerClimaAtmosExt
+import ClimaAtmos
 
 #=
 ### Configuration Dictionaries
@@ -161,43 +153,12 @@ function CoupledSimulation(config_dict::AbstractDict)
         comms_ctx = comms_ctx,
     )
 
-    ## get component model dictionaries (if applicable)
-    ## Note this step must come after parsing the coupler config dictionary, since
-    ##  some parameters are passed from the coupler config to the component model configs
-    atmos_config_dict = get_atmos_config_dict(
-        config_dict,
-        dir_paths.atmos_output_dir,
-        coupled_param_dict,
-        comms_ctx,
-    )
-
     ## set unique random seed if desired, otherwise use default
     Random.seed!(random_seed)
     @info "Random seed set to $(random_seed)"
 
-    if detect_restart_files
-        isnothing(restart_t) &&
-            (restart_t = Checkpointer.t_start_from_checkpoint(dir_paths.checkpoints_dir))
-        isnothing(restart_dir) && (restart_dir = dir_paths.checkpoints_dir)
-    end
-    should_restart = !isnothing(restart_t) && !isnothing(restart_dir)
-    if should_restart
-        if t_start isa ITime
-            t_start, _ = promote(ITime(restart_t), t_start)
-        else
-            t_start = restart_t
-        end
-
-        # We only support a round number of seconds
-        isinteger(float(t_start)) ||
-            error("Cannot restart from a non integer number of seconds")
-        t_start_int = Int(float(t_start))
-        atmos_config_dict.parsed_args["t_start"] = "$(t_start_int)secs"
-
-        @info "Starting from t_start $(t_start)"
-    end
-
     tspan = (t_start, t_end)
+    @info "Starting from t_start $(t_start)"
 
     #=
     ## Component Model Initialization
@@ -211,8 +172,15 @@ function CoupledSimulation(config_dict::AbstractDict)
     =#
 
     ## init atmos model component
-    atmos_sim =
-        Interfacer.AtmosSimulation(Val(:climaatmos); atmos_config = atmos_config_dict)
+    ## Note this step must come after parsing the coupler config dictionary, since
+    ## some parameters are passed from the coupler config to the component model configs
+    atmos_sim = Interfacer.AtmosSimulation(
+        Val(:climaatmos);
+        config_dict,
+        atmos_output_dir = dir_paths.atmos_output_dir,
+        coupled_param_dict,
+        comms_ctx,
+    )
 
     #=
     ### Boundary Space
@@ -473,6 +441,12 @@ function CoupledSimulation(config_dict::AbstractDict)
     When the caches are not read from the restart file, we have to perform the initial component
     model exchange so that `set_caches!` can be called to initialize the caches.
     =#
+    if detect_restart_files
+        isnothing(restart_t) &&
+            (restart_t = Checkpointer.t_start_from_checkpoint(dir_paths.checkpoints_dir))
+        isnothing(restart_dir) && (restart_dir = dir_paths.checkpoints_dir)
+    end
+    should_restart = !isnothing(restart_t) && !isnothing(restart_dir)
     should_restart && Checkpointer.restart!(cs, restart_dir, restart_t, restart_cache)
 
     # Make sure surface model area fractions sum to 1 everywhere.

@@ -40,6 +40,7 @@ Poppler_jll = "759029c8-65f6-5f13-b93f-2d7e0a4cb77c"
 Printf = "366bfd08-7218-5ad0-9036-d27ba1f5fe54"
 
 [extensions]
+ClimaCouplerClimaAtmosExt = ["ClimaAtmos"]
 ClimaCouplerCMIPExt = ["ClimaOcean", "ClimaSeaIce", "KernelAbstractions", "Oceananigans"]
 ClimaCouplerClimaLandExt = ["ClimaLand", "NCDatasets"]
 ClimaCouplerMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Poppler_jll", "Printf"]

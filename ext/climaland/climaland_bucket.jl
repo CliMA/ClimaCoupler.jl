@@ -51,12 +51,10 @@ function BucketSimulation(
     depth::FT = FT(3.5),
     dz_tuple::Tuple{FT, FT} = FT.((1, 0.05)),
     shared_surface_space = nothing,
-    saveat::Vector{TT} = [tspan[1], tspan[2]],
     surface_elevation = nothing,
     atmos_h,
     land_temperature_anomaly::String = "amip",
     use_land_diagnostics::Bool = true,
-    stepper = CTS.RK4(),
     albedo_type::String = "map_static",
     bucket_initial_condition::String = "",
     era5_albedo_file_path::Union{Nothing, String} = nothing,
@@ -81,7 +79,6 @@ function BucketSimulation(
         )
     end
     surface_space = domain.space.surface
-    subsurface_space = domain.space.subsurface
 
     # If provided, interpolate surface elevation field to surface space; otherwise use zero elevation
     if isnothing(surface_elevation)
@@ -144,9 +141,6 @@ function BucketSimulation(
     )
     model = CL.Bucket.BucketModel{FT, typeof.(args)...}(args...)
 
-    # Initial conditions with no moisture
-    Y, p, coords = CL.initialize(model)
-
     if land_temperature_anomaly != "nothing"
         T_functions =
             Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
@@ -158,113 +152,62 @@ function BucketSimulation(
         # Bucket surface temperature is in `p.bucket.T_sfc` (ClimaLand.jl)
         lapse_rate = FT(6.5e-3)
         T_sfc_0 = FT(271)
+        coords = CL.Domains.coordinates(model)
         @. Y.bucket.T = T_sfc_0 + temp_anomaly(coords.subsurface)
         # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
         orog_adjusted_T_data =
             CC.Fields.field_values(Y.bucket.T) .-
             lapse_rate .* CC.Fields.field_values(surface_elevation)
         orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, domain.space.subsurface)
-        # Adjust T based on surface elevation (p.bucket.T_sfc is then set using the
-        # set_initial_cache! function)
-        Y.bucket.T .= orog_adjusted_T
+        orog_adjusted_T_surface =
+            CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
     end
 
-    Y.bucket.W .= 0.15
-    Y.bucket.Ws .= 0.0
-    Y.bucket.σS .= 0.0
-
-    # Overwrite initial conditions with interpolated values from a netcdf file using
-    # the `SpaceVaryingInputs` tool. We expect the file to contain the following variables:
+    # Overwrite initial conditions with interpolated values from a netcdf file if provided.
+    # We expect the file to contain the following variables:
     # - `W`, for subsurface water storage (2D),
     # - `Ws`, for surface water content (2D),
     # - `T`, for soil temperature (3D),
     # - `S`, for snow water equivalent (2D).
-
     if !isempty(bucket_initial_condition)
         @info "ClimaLand Bucket using land IC file" bucket_initial_condition
-        ds = NCDataset(bucket_initial_condition)
-        has_all_variables = all(key -> haskey(ds, key), ["W", "Ws", "T", "S"])
-        @assert has_all_variables "The land iniital condition file is expected to contain the variables W, Ws, T, and S (read documentation about requirements)."
-        close(ds)
-
-        surface_space = domain.space.surface
-        subsurface_space = domain.space.subsurface
-        regridder_type = :InterpolationsRegridder
-        extrapolation_bc =
-            (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
-
-        Y.bucket.W .= SpaceVaryingInput(
-            bucket_initial_condition,
-            "W",
-            surface_space;
-            regridder_type,
-            regridder_kwargs = (; extrapolation_bc,),
-        )
-        Y.bucket.Ws .= SpaceVaryingInput(
-            bucket_initial_condition,
-            "Ws",
-            surface_space;
-            regridder_type,
-            regridder_kwargs = (; extrapolation_bc,),
-        )
-        Y.bucket.T .= SpaceVaryingInput(
-            bucket_initial_condition,
-            "T",
-            subsurface_space;
-            regridder_type,
-            regridder_kwargs = (; extrapolation_bc,),
-        )
-        Y.bucket.σS .= SpaceVaryingInput(
-            bucket_initial_condition,
-            "S",
-            surface_space;
-            regridder_type,
-            regridder_kwargs = (; extrapolation_bc,),
-        )
-        # clip negative values from horizontal regridding
-        Y.bucket.σS .= max.(Y.bucket.σS, FT(0))
-        Y.bucket.W .= max.(Y.bucket.W, FT(0))
-        Y.bucket.Ws .= max.(Y.bucket.Ws, FT(0))
+        set_ic! = CL.make_set_initial_state_from_file(bucket_initial_condition, model)
+    else
+        set_ic! =
+            (Y, p, t, model) -> _coupler_set_ic!(
+                Y,
+                p,
+                t,
+                model,
+                orog_adjusted_T_surface,
+                CL.make_set_initial_state_from_atmos_and_parameters(model),
+            )
     end
-
-    # ensure initial storage < bucket capacity
-    Y.bucket.W .= min.(Y.bucket.W, params.W_f)
-
-    # Set initial aux variable values
-    set_initial_cache! = CL.make_set_initial_cache(model)
-    set_initial_cache!(p, Y, tspan[1])
-
-    exp_tendency! = CL.make_exp_tendency(model)
-    ode_algo = CTS.ExplicitAlgorithm(stepper)
-    bucket_ode_function = CTS.ClimaODEFunction(T_exp! = exp_tendency!)
-    prob = SciMLBase.ODEProblem(bucket_ode_function, Y, tspan, p)
 
     # Add diagnostics
     if use_land_diagnostics
         output_writer =
             CD.Writers.NetCDFWriter(domain.space.subsurface, output_dir; start_date)
-        scheduled_diagnostics = CL.default_diagnostics(
+        diagnostics = CL.default_diagnostics(
             model,
             start_date,
             output_writer = output_writer,
             reduction_period = :monthly,
         )
-
-        diagnostic_handler =
-            CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)
-        diag_cb = CD.DiagnosticsCallback(diagnostic_handler)
     else
-        output_writer = nothing
-        diag_cb = nothing
+        diagnostics = nothing
     end
 
-    integrator = SciMLBase.init(
-        prob,
-        ode_algo;
-        dt = dt,
-        saveat = saveat,
-        adaptive = false,
-        callback = SciMLBase.CallbackSet(diag_cb),
+    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+    simulation = CL.Simulations.LandSimulation(
+        start_date,
+        stop_date,
+        dt,
+        model;
+        outdir = output_dir,
+        set_ic!,
+        user_callbacks = (),
+        diagnostics,
     )
 
     # TODO move these to ClimaLand.jl as part of CoupledRadiativeFluxes
@@ -273,7 +216,7 @@ function BucketSimulation(
 
     return BucketSimulation(
         model,
-        integrator,
+        simulation._integrator,
         area_fraction,
         output_writer,
         radiative_fluxes,

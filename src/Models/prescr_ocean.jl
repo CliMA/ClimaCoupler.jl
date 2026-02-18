@@ -75,10 +75,10 @@ and reading in prescribed SST data.
 - `α_direct_val`: Direct albedo value (default: `FT(0.06)`)
 - `α_diffuse_val`: Diffuse albedo value (default: `FT(0.06)`)
 - `sst_path::Union{Nothing, String}`: Path to SST data file (default: `nothing`)
+- `sst_adjustment`: Adjustment to add to SST after conversion to Kelvin (default: `FT(0)`)
 
 The SST is read from the file specified by `sst_path`. If `sst_path` is `nothing`,
 the model will use the default path from `ClimaArtifacts`.
-
 """
 function PrescribedOceanSimulation(
     ::Type{FT};
@@ -93,6 +93,7 @@ function PrescribedOceanSimulation(
     α_direct_val = FT(0.06),
     α_diffuse_val = FT(0.06),
     sst_path::Union{Nothing, String} = nothing,
+    sst_adjustment = FT(0),
     extra_kwargs...,
 ) where {FT}
     # Read in initial SST data
@@ -118,7 +119,9 @@ function PrescribedOceanSimulation(
         "SST",
         boundary_space,
         reference_date = start_date,
-        file_reader_kwargs = (; preprocess_func = (data) -> data + C_to_K,), ## convert Celsius to Kelvin
+        file_reader_kwargs = (;
+            preprocess_func = (data) -> data + C_to_K + sst_adjustment,
+        ), ## convert Celsius to Kelvin and apply adjustment
     )
 
     SST_init = zeros(boundary_space)

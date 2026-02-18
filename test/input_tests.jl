@@ -94,6 +94,7 @@ end
         "ocean_model" => "prescribed",
         "ice_model" => "prescribed",
         "simple_ocean" => false,
+        "sst_adjustment" => 2.0,
         "land_fraction_source" => "etopo",
         "binary_area_fraction" => true,
         "component_dt_dict" => Dict(
@@ -123,6 +124,7 @@ end
     @test args.ocean_model == Val(:prescribed)
     @test args.ice_model == Val(:prescribed)
     @test args.land_fraction_source == "etopo"
+    @test args.sst_adjustment == 2.0
 
     # Test that component_dt_dict is preserved
     @test args.component_dt_dict isa Dict

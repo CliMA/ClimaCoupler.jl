@@ -61,7 +61,7 @@ using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, NCDatasets, Poppler_jll
 import Oceananigans, ClimaOcean, ClimaSeaIce, KernelAbstractions
 
 # Trigger ClimaCouplerClimaLandExt extension
-import ClimaLand, NCDatasets
+import ClimaLand
 
 # Trigger ClimaCouplerClimaAtmosExt
 import ClimaAtmos

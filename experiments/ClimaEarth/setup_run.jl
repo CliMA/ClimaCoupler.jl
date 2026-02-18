@@ -139,6 +139,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         era5_filepaths,
         ocean_model,
         simple_ocean,
+        sst_adjustment,
         ice_model,
         land_fraction_source,
         binary_area_fraction,
@@ -322,6 +323,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         simple_ocean,
         # Arguments used by prescribed ocean
         sst_path,
+        sst_adjustment,
         # Arguments used by slab ocean
         saveat,
         evolving = evolving_ocean,

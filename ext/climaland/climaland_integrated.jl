@@ -264,7 +264,7 @@ function ClimaLandSimulation(
 
     else
         set_ic_from_atmos_and_parameters! =
-            CL.make_set_initial_state_from_atmos_and_parameters(model)
+            CL.Simulations.make_set_initial_state_from_atmos_and_parameters(model)
         set_ic! =
             (Y, p, t, model) -> _coupler_set_ic!(
                 Y,
@@ -277,8 +277,8 @@ function ClimaLandSimulation(
     end
 
     # Convert start_date and stop_date to ITime if using ITime
+    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
     if dt isa ITime
-        stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
         start_date = promote(
             dt,
             ITime(

@@ -8,6 +8,7 @@ dt_seaice: "37.5secs"
 dz_bottom: 30
 energy_check: false
 h_elem: 16
+land_model: "integrated"
 mode_name: "amip"
 moist: "equil"
 precip_model: "0M"

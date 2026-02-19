@@ -22,7 +22,8 @@ import Adapt # for ConservativeRegridding
 import ClimaCore as CC # for ConservativeRegriddingClimaCoreExt
 import ConservativeRegridding as CR
 
-get_ConservativeRegriddingCCExt() = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
+get_ConservativeRegriddingCCExt() =
+    Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
 
 """
     OceananigansSimulation{SIM, A, OPROP, REMAP, SIC}

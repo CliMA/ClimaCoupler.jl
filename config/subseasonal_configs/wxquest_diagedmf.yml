@@ -13,7 +13,7 @@ dt_cloud_fraction: "1hours"
 dt_rad: "1hours"
 dt_seaice: "120secs"
 energy_check: false
-h_elem: 32
+h_elem: 12
 land_fraction_source: "era5"
 binary_area_fraction: false
 

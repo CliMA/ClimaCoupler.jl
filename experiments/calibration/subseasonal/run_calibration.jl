@@ -60,7 +60,7 @@ const CALIBRATE_CONFIG = CalibrateConfig(;
     extend = Dates.Day(1),  # Add 1 day so simulation covers full 7-day diagnostic period
     spinup = Dates.Day(0),
     # Use scratch filesystem - more reliable for JLD2/HDF5 on Lustre
-    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp27",  # Full gridpoint calibration
+    output_dir = "/glade/derecho/scratch/zhaoyi/calibration/",  # Full gridpoint calibration
     obs_dir = ERA5_OBS_DIR,
     rng_seed = 42,
 )

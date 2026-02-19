@@ -12,7 +12,7 @@ export MODULEPATH="/glade/campaign/univ/ucit0011/ClimaModules-Derecho:$MODULEPAT
 module purge
 module load climacommon
 
-cd /glade/u/home/cchristo/clima/copies3/ClimaCoupler.jl
+cd /glade/u/home/zhaoyi/ClimaCoupler.jl
 
 echo "=== Starting precompute at $(date) ==="
 julia --project=experiments/ClimaEarth experiments/calibration/subseasonal/precompute_ekp_inputs.jl

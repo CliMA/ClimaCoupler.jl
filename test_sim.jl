@@ -28,3 +28,7 @@ function only_diagnostics_run!(cs::ClimaCoupler.Interfacer.CoupledSimulation)
 end
 
 @time only_diagnostics_run!(cs)
+
+outdir_path = "/home/kphan/Desktop/work/ClimaCoupler.jl/test-calibration/output/amip_albedo_function/output_0018"
+
+Plotting.compute_leaderboard("/home/kphan/Desktop/work/ClimaCoupler.jl/test-calibration/yooo", outdir_path, 3)

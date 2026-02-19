@@ -11,7 +11,13 @@ precip_model: "0M"
 rad: "gray"
 rayleigh_sponge: true
 share_surface_space: false
-t_end: "300secs"
+t_end: "366days"
 vert_diff: "true"
 z_elem: 50
 z_stretch: false
+extra_atmos_diagnostics:
+  - short_name: [hus, hur, ta]
+    period: 1months
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 1hours

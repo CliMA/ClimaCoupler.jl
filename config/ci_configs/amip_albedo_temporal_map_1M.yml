@@ -13,6 +13,7 @@ rayleigh_sponge: true
 start_date: "20100101"
 t_end: "300secs"
 time_varying_trace_gases: ["CO2"]
+#use_sgs_quadrature: false
 vert_diff: "true"
 z_elem: 50
 z_stretch: false

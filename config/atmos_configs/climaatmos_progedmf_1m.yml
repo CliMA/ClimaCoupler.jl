@@ -35,6 +35,7 @@ t_end: "120days"
 time_varying_trace_gases: ["CO2", "O3"]
 toml: [toml/longrun_aquaplanet_diagedmf.toml]
 turbconv: "prognostic_edmfx"
+use_sgs_quadrature: false
 viscous_sponge: true
 z_elem: 63
 z_max: 60000.0

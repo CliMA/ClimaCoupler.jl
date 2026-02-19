@@ -4,14 +4,15 @@ atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "186days"
 coupler_toml: ["toml/amip_progedmf.toml"]
-dt: "60secs"
-dt_cpl: "60secs"
+dt: "180secs"
+dt_cpl: "180secs"
 dz_bottom: 100.0
 energy_check: false
 h_elem: 8
 mode_name: "amip"
 netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
+ode_algo: "ARS222"
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
 start_date: "20100101"

@@ -9,6 +9,7 @@ dt_cloud_fraction: "1hours"
 dt_cpl: "120secs"
 dt_rad: "1hours"
 energy_check: false
+initial_condition: "AMIPFromERA5"
 insolation: "timevarying"
 mode_name: "amip"
 netcdf_interpolate_z_over_msl: true

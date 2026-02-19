@@ -8,6 +8,7 @@ dt_cpl: "240secs"
 dz_bottom: 100.0
 energy_check: false
 h_elem: 8
+initial_condition: "AMIPFromERA5"
 land_model: "integrated"
 mode_name: "amip"
 netcdf_interpolation_num_points: [90, 45, 31]

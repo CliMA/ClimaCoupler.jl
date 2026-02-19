@@ -6,7 +6,7 @@ strict_params: false
 mode_name: "subseasonal"
 era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions"
 initial_condition: "WeatherModel"
-checkpoint_dt: "40days"
+checkpoint_dt: "900days"
 dt: "120secs"
 dt_cpl: "120secs"
 dt_cloud_fraction: "1hours"

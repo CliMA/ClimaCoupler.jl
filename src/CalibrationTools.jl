@@ -273,4 +273,38 @@ function Base.show(io::IO, data_loader::ERA5DataLoader)
     print(io, join(vars, ", "))
 end
 
+"""
+    update_timespan!(
+        config_dict,
+        start_date::Dates.DateTime,
+        end_date::Dates.DateTime
+    )
+
+Update "start_date" and "t_end" in `config_dict` to match `start_date` and
+`end_date`.
+
+The `start_date` and `end_date` are converted to strings and the keys
+"start_date" and "t_end" in `config_dict` are updated accordingly. Note that any
+precision beyond days (e.g. hours, seconds, etc.) are not used for setting the
+start date.
+"""
+function update_timespan!(config_dict, start_date::Dates.DateTime, end_date::Dates.DateTime)
+    start_date_str = Dates.format(start_date, "yyyymmdd")
+    config_dict["start_date"] = start_date_str
+    sim_length = Dates.Second(end_date - start_date)
+    config_dict["t_end"] = "$(sim_length.value)secs"
+    return nothing
+end
+
+"""
+    add_parameter_filepath!(config_dict, parameter_filepath)
+
+Add the parameter toml file at `parameter_filepath` to `config_dict`.
+"""
+function add_parameter_filepath!(config_dict, parameter_filepath)
+    parameter_filepaths = get!(config_dict, "coupler_toml", String[])
+    push!(parameter_filepaths, parameter_filepath)
+    return nothing
+end
+
 end

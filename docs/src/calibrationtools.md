@@ -96,4 +96,6 @@ CalibrationTools.ERA5DataLoader
 CalibrationTools.ERA5DataLoader()
 CalibrationTools.available_vars
 CalibrationTools.get(loader::CalibrationTools.ERA5DataLoader, short_name::String)
+CalibrationTools.update_timespan!
+CalibrationTools.add_parameter_filepath!
 ```

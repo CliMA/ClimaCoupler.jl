@@ -70,7 +70,13 @@ function OceananigansSimulation(
     z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 1800)
 
     # Regular LatLong because we know how to do interpolation there
-    underlying_grid = OC.TripolarGrid(arch; size = (Nx, Ny, Nz), halo = (7, 7, 7), z, fold_topology = OC.Grids.RightFaceFolded)
+    underlying_grid = OC.TripolarGrid(
+        arch;
+        size = (Nx, Ny, Nz),
+        halo = (7, 7, 7),
+        z,
+        fold_topology = OC.Grids.RightFaceFolded,
+    )
 
     bottom_height = CO.regrid_bathymetry(
         underlying_grid;
@@ -262,11 +268,15 @@ end
     FieldExchanger.resolve_area_fractions!(ocean_sim, ice_sim, land_fraction)
 
 Ensure the ocean and ice area fractions are consistent with each other.
-This matters in the case of a LatitudeLongitudeGrid, which is only
-defined between -80 and 80 degrees latitude. In this case, we set the ice
+The ocean's LatitudeLongitudeGrid is only defined between -80 and 80
+degrees latitude. In this case, we set the ice
 and ocean area fractions to 0 and the land fraction to 1 on [78°S, 90°S]
 and on [78°N, 90°N]. Note the overlap between 78° and 80° to avoid any gaps
 introduced by the cubed sphere not aligning with latitude lines.
+
+Similarly, the ocean's TripolarGrid is defined between -80 and 90 degrees latitude.
+In this case we set the ice and ocean area fractions to 0 and the land fraction to 1
+on [78°S, 90°S], and leave the northern latitudes unmodified.
 
 This function also updates the ice concentration field in the ocean simulation
 so that it can be used for weighting flux updates.
@@ -276,22 +286,26 @@ function FieldExchanger.resolve_area_fractions!(
     ice_sim,
     land_fraction,
 )
+    ocean_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction))
+    ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
+
+    boundary_space = axes(ocean_fraction)
+    FT = CC.Spaces.undertype(boundary_space)
+    lat = CC.Fields.coordinate_field(boundary_space).lat
+    polar_mask = CC.Fields.zeros(boundary_space)
+
     if ocean_sim.ocean.model.grid.underlying_grid isa OC.LatitudeLongitudeGrid
-        ocean_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction))
-        ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
-
         # Create a "polar" mask that's 1 at latitudes in [-90, -80] and [80, 90] degrees
-        boundary_space = axes(ocean_fraction)
-        FT = CC.Spaces.undertype(boundary_space)
-        lat = CC.Fields.coordinate_field(boundary_space).lat
-        polar_mask = CC.Fields.zeros(boundary_space)
         polar_mask .= abs.(lat) .>= FT(78)
-
-        # Set land fraction to 1 and ice/ocean fraction to 0 where polar_mask is 1
-        @. land_fraction = ifelse.(polar_mask == FT(1), FT(1), land_fraction)
-        @. ice_fraction = ifelse.(polar_mask == FT(1), FT(0), ice_fraction)
-        @. ocean_fraction = ifelse.(polar_mask == FT(1), FT(0), ocean_fraction)
+    elseif ocean_sim.ocean.model.grid isa OC.TripolarGrid
+        # Create a "polar" mask that's 1 at latitudes in [-90, -80] degrees
+        polar_mask .= lat .<= FT(-78)
     end
+
+    # Set land fraction to 1 and ice/ocean fraction to 0 where polar_mask is 1
+    @. land_fraction = ifelse.(polar_mask == FT(1), FT(1), land_fraction)
+    @. ice_fraction = ifelse.(polar_mask == FT(1), FT(0), ice_fraction)
+    @. ocean_fraction = ifelse.(polar_mask == FT(1), FT(0), ocean_fraction)
 
     # Update the ice concentration field in the ocean simulation
     ice_sim isa ClimaSeaIceSimulation && (

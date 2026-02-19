@@ -9,16 +9,16 @@ import Dates
 const TG = OC.OrthogonalSphericalShellGrids.TripolarGrid{FT, TX, <:OC.Grids.RightFaceFolded} where {FT, TX}
 const TGRF = Union{<:OC.ImmersedBoundaryGrid{<:Any, <:Any, <:Any, <:Any, <:TG}, TG}
 
-@inline resize_to_facefolded(a::Array{T, 2}) where T = a[:, 1:end-1]
-@inline resize_to_facefolded(a::Array{T, 3}) where T = a[:, 1:end-1, :]
+@inline resize_to_facefolded(a::AbstractArray{T, 2}) where T = a[:, 1:end-1]
+@inline resize_to_facefolded(a::AbstractArray{T, 3}) where T = a[:, 1:end-1, :]
 
-function OC.Fields.set_to_array!(u::Field{LX, <:Center, LZ, O, <:TGRF}, a) where {LX, LZ, O}
-    a = on_architecture(CPU(), a)
+function OC.Fields.set_to_array!(u::OC.Field{LX, <:OC.Grids.Center, LZ, O, <:TGRF}, a) where {LX, LZ, O}
+    a = OC.Architectures.on_architecture(CPU(), a)
     a = resize_to_facefolded(a)
-    a = on_architecture(architecture(u), a)
+    a = OC.Architectures.on_architecture(architecture(u), a)
 
     try
-        copyto!(interior(u), a)
+        copyto!(OC.interior(u), a)
     catch err
         if err isa DimensionMismatch
             Nx, Ny, Nz = size(u)

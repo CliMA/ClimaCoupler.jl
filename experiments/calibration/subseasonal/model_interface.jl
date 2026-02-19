@@ -4,28 +4,33 @@ import ClimaCoupler
 import ClimaCalibrate
 import CUDA
 import EnsembleKalmanProcesses as EKP
-using Dates: Date, Second
 include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.jl"))
-
-# Note: api.jl and CALIBRATE_CONFIG are loaded/shared via @everywhere in run_calibration.jl
+include(
+    joinpath(
+        pkgdir(ClimaCoupler),
+        "experiments",
+        "calibration",
+        "subseasonal",
+        "run_calibration.jl",
+    ),
+)
 using Pkg
 function ClimaCalibrate.forward_model(iter, member)
     Pkg.status()
     config_dict = ClimaCoupler.Input.get_coupler_config_dict(CALIBRATE_CONFIG.config_file)
     output_dir_root = CALIBRATE_CONFIG.output_dir
-    # Use the first (and typically only) sample date range for all iterations
-    # EKP updates parameters across iterations, but uses the same observation period
-    sample_date_range = first(CALIBRATE_CONFIG.sample_date_ranges)
-    start_date = first(sample_date_range) - CALIBRATE_CONFIG.spinup
+    start_date =
+        first(CALIBRATE_CONFIG.sample_date_ranges[iter + 1]) - CALIBRATE_CONFIG.spinup
     start_date_str = replace(string(Date(start_date)), "-" => "")
-    end_date = last(sample_date_range) + CALIBRATE_CONFIG.extend
+    end_date = last(CALIBRATE_CONFIG.sample_date_ranges[iter + 1]) + CALIBRATE_CONFIG.extend
     sim_length = Second(end_date - start_date)
 
     config_dict["start_date"] = start_date_str
+    config_dict["bucket_initial_condition"] = "/net/sampo/data1/wxquest_data/initial_conditions/era5_bucket_processed_$(start_date_str)_0000.nc"
     config_dict["t_end"] = "$(sim_length.value)secs"
     config_dict["checkpoint_dt"] = "900days"
-    config_dict["dt"] = "120secs"
-    config_dict["dt_cpl"] = "120secs"
+    config_dict["dt"] = "90secs"
+    config_dict["dt_cpl"] = "90secs"
 
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)

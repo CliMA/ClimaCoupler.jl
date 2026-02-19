@@ -460,10 +460,11 @@ function FluxCalculator.compute_surface_fluxes!(
     SW_d = csf.SW_d
     LW_d = csf.LW_d
     α_albedo = FT.(Interfacer.get_field(sim, Val(:surface_direct_albedo)))
+    T_melt = FT(sim.ice_properties.C_to_K) # Melting temperature (freezing point of water)
 
     # Build element-wise update_T_sfc callbacks (each closes over local ice parameters)
     update_T_sfc_callback =
-        ClimaCouplerCMIPExt.update_T_sfc.(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo)
+        ClimaCouplerCMIPExt.update_T_sfc.(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
 
     # Compute surface fluxes via the _get_surface_fluxes_seaice wrapper
     Φ_sfc = SFP.grav.(surface_fluxes_params) .* csf.height_sfc

@@ -14,7 +14,7 @@ import SurfaceFluxes as SF
 import Thermodynamics as TD
 
 """
-    update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo)
+    update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
 
 Create a callback for `SurfaceFluxes.jl` that updates surface temperature using
 a semi-implicit linearization of the LW emission term:
@@ -22,6 +22,9 @@ a semi-implicit linearization of the LW emission term:
     Tₛⁿ⁺¹ = (Tᵢ - δ/κ · (Jᵃ - 4σϵTₛⁿ⁴)) / (1 + 4δσϵTₛⁿ³/κ)
 
 where Jᵃ = σϵTₛⁿ⁴ - (1-α)SW↓ - ϵLW↓ + F_sh + F_lh  (positive upward).
+
+The result is capped at the melting temperature T_melt to prevent the surface
+temperature from exceeding the melting point under heating fluxes.
 
 # Arguments
 - `κ`: Thermal conductivity [W m⁻¹ K⁻¹]
@@ -32,8 +35,9 @@ where Jᵃ = σϵTₛⁿ⁴ - (1-α)SW↓ - ϵLW↓ + F_sh + F_lh  (positive upw
 - `SW_d`: Downward shortwave radiation [W m⁻²]
 - `LW_d`: Downward longwave radiation [W m⁻²]
 - `α_albedo`: Surface albedo [-]
+- `T_melt`: Melting temperature [K] (typically 273.15 K for freshwater ice)
 """
-function update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo)
+function update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
     return function (ζ, param_set, thermo_params_callback, inputs, scheme, u_star, z0m, z0s)
         T_sfc_n = inputs.T_sfc_guess
 
@@ -86,7 +90,11 @@ function update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo)
         # Semi-implicit solve: linearize σϵT⁴ ≈ -3σϵTₙ⁴ + 4σϵTₙ³T
         numerator = T_i - (δ / κ) * (J_a - 4 * σ * ϵ * T_sfc_n^4)
         denominator = 1 + 4 * δ * σ * ϵ * T_sfc_n^3 / κ
+        T_sfc_new = numerator / denominator
 
-        return numerator / denominator
+        # Cap surface temperature at melting temperature 
+        T_sfc_new = min(T_sfc_new, T_melt)
+
+        return T_sfc_new
     end
 end

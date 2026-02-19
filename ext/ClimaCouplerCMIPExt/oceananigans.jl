@@ -3,6 +3,39 @@ import SurfaceFluxes as SF
 import Thermodynamics as TD
 import Dates
 
+# TODO: move to Oceananigans
+# Change the `set_to_array!` of Oceananigans to work on a `Center` 
+# field (in y) with abstract 2D and 3D arrays.
+const TG = OC.OrthogononalSphericalShellGrids.TripolarGrid{FT, TX, <:OC.Grids.RightFaceFolded} where {FT, TX}
+const TGRF = Union{<:OC.ImmersedBoundaryGrid{<:Any, <:Any, <:Any, <:Any, <:TG}}, TG}
+
+@inline resize_to_facefolded(a::Array{T, 2}) where T = a[:, 1:end-1]
+@inline resize_to_facefolded(a::Array{T, 3}) where T = a[:, 1:end-1, :]
+
+function OC.Fields.set_to_array!(u::Field{LX, <:Center, LZ, O, <:TGRF}, a) where {LX, LZ, O}
+    a = on_architecture(CPU(), a)
+    a = resize_to_facefolded(a)
+    a = on_architecture(architecture(u), a)
+
+    try
+        copyto!(interior(u), a)
+    catch err
+        if err isa DimensionMismatch
+            Nx, Ny, Nz = size(u)
+            u .= reshape(a, Nx, Ny, Nz)
+
+            msg = string("Reshaped ", summary(a),
+                         " to set! its data to ", '\n',
+                         summary(u))
+            @warn msg
+        else
+            throw(err)
+        end
+    end
+
+    return u
+end
+
 """
     Interfacer.OceanSimulation(::Type{FT}, ::Val{:oceananigans}; kwargs...)
 

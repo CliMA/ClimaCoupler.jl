@@ -37,7 +37,8 @@ sample_date_ranges = [
     # (DateTime(2013, 3, 18), DateTime(2013, 3, 18)),
     
     # === OPTION 2: 7-day period (production, ~3 hours/iteration) ===
-    (DateTime(2023, 1, 15), DateTime(2023, 1, 21)),
+    (DateTime(2010, 1, 1), DateTime(2010, 1, 7)),
+    # (DateTime(2023, 1, 15), DateTime(2023, 1, 21)),
     # (DateTime(2013, 3, 18), DateTime(2013, 3, 24)),
     
     # Add more ranges as needed:
@@ -53,9 +54,9 @@ const CALIBRATE_CONFIG = CalibrateConfig(;
         "config/subseasonal_configs/wxquest_diagedmf.yml",
     ),
     # short_names = ["tas"],  # Start with tas only
-    short_names = ["tas", "mslp"],# "pr"], # ADD TOA
+    short_names = ["tas", "mslp", "rsut", "rlut"],# "pr"], # ADD TOA
     minibatch_size = 1,
-    n_iterations = 6,
+    n_iterations = 3,
     sample_date_ranges,
     extend = Dates.Day(1),  # Add 1 day so simulation covers full 7-day diagnostic period
     spinup = Dates.Day(0),

@@ -26,7 +26,8 @@ cd /glade/u/home/cchristo/clima/copies3/ClimaCoupler.jl
 julia --project=experiments/ClimaEarth experiments/calibration/subseasonal/generate_observations.jl
 
 # 2. Run full calibration (from tmux - handles precompute automatically)
-./experiments/calibration/subseasonal/run_full_calibration.sh
+cd /glade/u/home/cchristo/clima/copies3/ClimaCoupler.jl/experiments/calibration/subseasonal/
+./run_full_calibration.sh
 ```
 
 ## Switching Between Process Types

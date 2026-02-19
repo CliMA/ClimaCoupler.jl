@@ -10,7 +10,7 @@
 # Load modules
 export MODULEPATH="/glade/campaign/univ/ucit0011/ClimaModules-Derecho:$MODULEPATH"
 module purge
-module load climacommon
+module load climacommon/2025_02_25
 
 cd /glade/u/home/zhaoyi/ClimaCoupler.jl
 

@@ -16,6 +16,8 @@ const var_units = Dict(
     "hfss" => "W m^-2",
     "rsus" => "W m^-2",
     "rlus" => "W m^-2",
+    "rsut" => "W m^-2",  # TOA upward short-wave radiation
+    "rlut" => "W m^-2",  # TOA upward long-wave radiation
 )
 
 # =============================================================================

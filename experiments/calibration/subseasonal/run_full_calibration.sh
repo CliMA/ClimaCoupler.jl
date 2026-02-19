@@ -23,7 +23,7 @@ echo "Logging to: $LOGFILE"
 # Load modules
 export MODULEPATH="/glade/campaign/univ/ucit0011/ClimaModules-Derecho:$MODULEPATH"
 module purge
-module load climacommon
+module load climacommon/2025_02_25
 
 echo "=============================================="
 echo "  Full Calibration Workflow"
@@ -31,7 +31,7 @@ echo "=============================================="
 echo ""
 
 # Step 1: Submit precompute job to develop queue
-echo "[1/3] Submitting precompute job to develop queue..."
+echo "[1/4] Submitting precompute job to develop queue..."
 JOB_ID=$(qsub experiments/calibration/subseasonal/precompute.pbs)
 echo "      Job submitted: $JOB_ID"
 
@@ -39,7 +39,7 @@ echo "      Job submitted: $JOB_ID"
 JOB_NUM=$(echo $JOB_ID | cut -d. -f1)
 
 # Step 2: Wait for precompute to complete
-echo "[2/3] Waiting for precompute job to complete..."
+echo "[2/4] Waiting for precompute job to complete..."
 echo "      (develop queue is usually fast - should take ~2-5 minutes)"
 
 while true; do
@@ -77,8 +77,12 @@ else
     exit 1
 fi
 
-# Step 3: Run calibration
-echo "[3/3] Starting main calibration..."
+# Step 3: Ensure packages are instantiated
+echo "[3/3] Ensuring package dependencies are installed..."
+julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate()'
+
+# Step 4: Run calibration
+echo "[4/4] Starting main calibration..."
 echo "      (This will spawn GPU worker jobs)"
 echo ""
 

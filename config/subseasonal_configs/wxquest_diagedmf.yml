@@ -13,7 +13,7 @@ dt_cloud_fraction: "1hours"
 dt_rad: "1hours"
 dt_seaice: "120secs"
 energy_check: false
-h_elem: 32
+h_elem: 12
 land_fraction_source: "era5"
 binary_area_fraction: false
 
@@ -40,13 +40,14 @@ start_date: "20230115"
 surface_setup: "PrescribedSurface"
 topo_smoothing: true
 topography: "Earth"
-t_end: "8days"
+# t_end: "8days"
+t_end: "1days"
 netcdf_output_at_levels: true
 output_default_diagnostics: false
 use_coupler_diagnostics: false
 use_land_diagnostics: false
 extra_atmos_diagnostics:
-  - short_name: [tas, pr, mslp]
+  - short_name: [tas, pr, mslp, rsut, rlut]
     period: 1days
     reduction_time: average
   # - short_name: [tas, ts, pr, mslp, ta, hus, hur, zg, orog, pfull, ua, va, wa, waup]

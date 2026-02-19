@@ -74,6 +74,8 @@ const ERA5_FILE_PREFIX_TO_SHORT_NAME = Dict(
     "total_precipitation" => "pr",
     "sea_surface_temperature" => "ts",
     "surface_pressure" => "sp",
+    "mean_top_upward_short_wave_radiation_flux" => "rsut",
+    "mean_top_upward_long_wave_radiation_flux" => "rlut",
 )
 
 # Variables that should be evaluated only over land (others are evaluated everywhere)
@@ -82,12 +84,15 @@ const LAND_ONLY_VARS = Set(["tas", "pr"])
 # Note: compute_nh_average is defined in observation_utils.jl (included via run_calibration.jl)
 
 # Mapping from ERA5 NetCDF variable names to short names
+# Note: rsut/rlut variable names (mtuswrf/mtulwrf) may need adjustment based on actual file contents
 const ERA5_VARNAME_TO_SHORT_NAME = Dict(
     "t2m" => "tas",
     "msl" => "mslp",
     "tp" => "pr",
     "sst" => "ts",
     "sp" => "sp",
+    "mean_top_upward_short_wave_radiation_flux" => "rsut",  # Mean top upward short-wave radiation flux
+    "mean_top_upward_long_wave_radiation_flux" => "rlut",  # Mean top upward long-wave radiation flux
 )
 
 """

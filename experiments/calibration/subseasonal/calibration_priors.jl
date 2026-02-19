@@ -11,13 +11,33 @@ import EnsembleKalmanProcesses as EKP
 # ==========================================================================
 # PRIORS - Define your calibration parameters here
 # ==========================================================================
+
 const CALIBRATION_PRIORS = [
     # Atmospheric parameters
-    PD.constrained_gaussian("entr_inv_tau", 0.002, 0.0015, 0.0, 0.01),
-    PD.constrained_gaussian("precipitation_timescale", 600, 300, 100, 2000),
-    # PD.constrained_gaussian("EDMF_surface_area", 0.1, 0.03, 0, Inf),
-    PD.constrained_gaussian("mixing_length_eddy_viscosity_coefficient", 0.2, 0.1, 0, 1.0),
+    # PD.constrained_gaussian("entr_inv_tau", 0.002, 0.0015, 0.0, 0.01),
+
+    # Linear regression coefficients (6-element vector)
+    # PD.VectorOfParameterized([PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.4, 0.2)]),
+    PD.ParameterDistribution(
+        PD.VectorOfParameterized([PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.4, 0.2)]),
+        repeat([PD.no_constraint()], 3),
+        "entr_param_vec",
+    ),
+
+    # PD.constrained_gaussian("detr_buoy_coeff", 0.12, 0.06, 0.0, 1.0),
+    PD.constrained_gaussian("detr_vertdiv_coeff", 0.6, 0.25, 0.0, 5.0),
+
+    # PD.constrained_gaussian("precipitation_timescale", 600, 300, 100, 2000),
+    PD.constrained_gaussian("precipitation_timescale", 1200, 300, 300, 2400),
+    PD.constrained_gaussian("diagnostic_covariance_coeff", 2.1, 0.5, 0, 10),
+    PD.constrained_gaussian("Tq_correlation_coefficient", 0, 0.5, -1, 1),
+
+    
+    # PD.constrained_gaussian("mixing_length_eddy_viscosity_coefficient", 0.2, 0.1, 0, 1.0),
+    PD.constrained_gaussian("mixing_length_diss_coeff", 4.2, 2.1, 0, 10.0),
     # PD.constrained_gaussian("mixing_length_tke_surf_flux_coeff", 8.0, 4.0, 0, 100.0),
+
+    # PD.constrained_gaussian("EDMF_surface_area", 0.1, 0.03, 0, 1),
     # Land parameters 
     # PD.constrained_gaussian("pmodel_cstar", 0.30, 0.15, 0.0, 1.0),
     # PD.constrained_gaussian("leaf_Cd", 0.01, 0.006, 0.0, 0.1),
@@ -63,6 +83,8 @@ const CALIBRATION_NOISE_VARIANCES = Dict(
     "tas" => 0.05,   # Temperature: tight constraint (model matches well)
     "mslp" => 0.05,  # Pressure: tight constraint (model matches well)
     "pr" => 1.0,    # Precipitation: loose constraint (10x less weight)
+    "rsut" => 0.05, 
+    "rlut" => 0.05,
 )
 
 # ==========================================================================

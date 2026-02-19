@@ -7,6 +7,7 @@ import Interpolations # triggers InterpolationsExt in ClimaUtilities
 import Thermodynamics as TD
 import ..Checkpointer, ..FluxCalculator, ..Interfacer, ..Utilities
 import ClimaComms
+import NCDatasets
 
 """
     PrescribedIceSimulation{P, I}
@@ -105,15 +106,15 @@ end
 """
     slab_ice_space_init(::Type{FT}, space, params, sic_data, start_date, t_start, ice_fraction)
 
-Initialize ice bulk temperature from ERA5 ice layer temperature (ISTL1) if available.
-Uses ISTL1 (0-7cm, near-surface layer) as a proxy for surface temperature, then
-back-calculates T_bulk assuming a linear temperature profile: T_bulk = (T_sfc + T_base) / 2.
+Initialize ice bulk temperature from the ISTL1 variable in `sic_data` if available.
+ISTL1 from ERA5 (ice surface temperature layer 1, 0-7cm) is used as a proxy for surface temperature,
+then back-calculates T_bulk assuming a linear temperature profile: T_bulk = (T_sfc + T_base) / 2.
 
-Only uses ERA5 temperatures where there is ice (ice_fraction > 0). In ice-free regions,
+Only uses ISTL1 temperatures where there is ice (ice_fraction > 0). In ice-free regions,
 uses the fallback temperature to avoid initializing with values at/above freezing which
 can cause numerical issues.
 
-Falls back to constant initialization if the data is not available or not finite.
+Falls back to constant initialization (T_freeze - 5K) if ISTL1 is not present or data is not finite.
 """
 function slab_ice_space_init(
     ::Type{FT},
@@ -125,30 +126,35 @@ function slab_ice_space_init(
     ice_fraction,
 ) where {FT}
     (; T_base, T_freeze) = params
-    T_fallback = T_freeze - FT(10.0)
+    T_fallback = T_freeze - FT(5.0)
 
-    T_bulk_init = try
-        # Use ISTL1 (0-7cm, near-surface layer) as a proxy for surface temperature
+    # Initialize ice temperature if available
+    has_ISTL1 = NCDatasets.NCDataset(sic_data, "r") do ds
+        haskey(ds, "ISTL1")
+    end
+
+    if has_ISTL1
+        # Use ERA5 ISTL1 (0-7cm, near-surface layer) as a proxy for surface temperature
         ISTL1_input =
             TimeVaryingInput(sic_data, "ISTL1", space; reference_date = start_date)
-        T_sfc_era5 = CC.Fields.zeros(space)
-        evaluate!(T_sfc_era5, ISTL1_input, t_start)
+        T_sfc_data = CC.Fields.zeros(space)
+        evaluate!(T_sfc_data, ISTL1_input, t_start)
 
         # Back-calculate T_bulk from T_sfc assuming linear temperature profile
-        T_bulk = @. (T_sfc_era5 + T_base) / FT(2)
+        T_bulk = @. (T_sfc_data + T_base) / FT(2)
 
-        # Only use ERA5 temperatures where there is ice; use fallback elsewhere
+        # Only use ISTL1 temperatures where there is ice; use fallback elsewhere
         @. T_bulk = ifelse(ice_fraction > 0, T_bulk, T_fallback)
 
         # Fall back to constant where data is not finite
         @. T_bulk = ifelse(isfinite(T_bulk), T_bulk, T_fallback)
 
-        @info "PrescribedIce: initialized T_bulk from ERA5 ISTL1"
-        T_bulk
-    catch e
-        @warn "PrescribedIce: could not read ice temperature from file, using constant initialization" exception =
-            (e, catch_backtrace())
-        ones(space) .* T_fallback
+        @info "PrescribedIce: initialized T_bulk from ISTL1"
+        T_bulk_init = T_bulk
+    else
+        @info "PrescribedIce: ISTL1 not in file, using constant initialization" file =
+            sic_data
+        T_bulk_init = ones(space) .* T_fallback
     end
 
     @. T_bulk_init = ifelse(isnan(T_bulk_init), T_fallback, T_bulk_init)

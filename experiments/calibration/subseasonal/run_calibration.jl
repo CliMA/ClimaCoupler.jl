@@ -29,7 +29,7 @@ sample_date_ranges = [(DateTime(yr, 9, 1), DateTime(yr, 9, 1)) for yr in years]
 const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     config_file = joinpath(
         pkgdir(ClimaCoupler),
-        "config/subseasonal_configs/wxquest_diagedmf.yml",
+        "config/subseasonal_configs/wxquest_diagedmf_monthly_calibration.yml",
     ),
     short_names = ["hfls", "hfss", "rsus", "rlus"],
     minibatch_size = 1,

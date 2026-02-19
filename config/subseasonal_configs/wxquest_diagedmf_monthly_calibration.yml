@@ -1,0 +1,38 @@
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
+coupler_toml: ["toml/wxquest_diagedmf.toml"]
+strict_params: false
+mode_name: "subseasonal"
+era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions"
+initial_condition: "WeatherModel"
+checkpoint_dt: "40days"
+dt: "120secs"
+dt_cpl: "120secs"
+dt_cloud_fraction: "1hours"
+dt_rad: "1hours"
+dt_seaice: "120secs"
+energy_check: false
+h_elem: 16
+land_fraction_source: "era5"
+binary_area_fraction: false
+land_model: "integrated"
+lai_source: "modis_monthly_climatology"
+land_spun_up_ic: false
+land_temperature_anomaly: "nothing"
+radiation_reset_rng_seed: true
+start_date: "20180901"
+surface_setup: "PrescribedSurface"
+topo_smoothing: true
+topography: "Earth"
+t_end: "31days"
+netcdf_output_at_levels: true
+output_default_diagnostics: false
+use_coupler_diagnostics: false
+use_land_diagnostics: false
+strict_params: false
+insolation: "timevarying"
+extra_atmos_diagnostics:
+  - short_name: [hfls, hfss, rsus, rlus]
+    period: 1months
+    reduction_time: average

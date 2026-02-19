@@ -5,7 +5,7 @@ import CairoMakie, ClimaCoreMakie, GeoMakie, Makie, Poppler_jll, Printf, Oceanan
 # Import packages for ClimaCouplerCMIPExt
 import ClimaOcean, ClimaSeaIce, KernelAbstractions
 # Import packages for ClimaCouplerClimaLandExt
-import ClimaLand, NCDatasets
+import ClimaLand
 # Import packages for ClimaCouplerClimaAtmosExt
 import ClimaAtmos
 

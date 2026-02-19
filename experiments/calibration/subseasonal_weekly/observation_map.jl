@@ -48,10 +48,6 @@ ensemble members, arranged horizontally. Each individual forward model
 evaluation corresponds to preprocessed, flattened simulation data from a single
 ensemble member that has been matched to the corresponding observational data.
 
-**MODES** (controlled by use_nh_averages saved in land_mask.jld2):
-1. Full gridpoint mode: returns 113k+ values per member
-2. NH averages mode: returns 3 values per member (one NH average per variable)
-
 Land masking is applied per-variable:
 - Variables in land_only_vars (tas, pr): only land points included
 - Other variables (mslp): all points included (evaluated everywhere)
@@ -66,20 +62,16 @@ function ClimaCalibrate.observation_map(iteration)
         joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/preprocessed_vars.jld2"),
     )
     
-    # Load land mask, land_only_vars, and mode info
+    # Load land mask and land_only_vars
     land_mask_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/land_mask.jld2")
     land_mask = nothing
     land_only_vars = Set{String}()
-    use_nh_averages = false
     if isfile(land_mask_path)
         land_mask_data = JLD2.load_object(land_mask_path)
         land_mask = land_mask_data.mask
         # Load land_only_vars if present, otherwise default to ["tas", "pr"]
         land_only_vars = Set(get(land_mask_data, :land_only_vars, ["tas", "pr"]))
-        # Load NH averages mode flag
-        use_nh_averages = get(land_mask_data, :use_nh_averages, false)
         @info "Loaded land mask: $(count(land_mask)) land points, land-only vars: $land_only_vars"
-        @info "Observation mode: $(use_nh_averages ? "NH averages" : "full gridpoints")"
     end
     
     # Get expected size from one observation variable
@@ -87,30 +79,23 @@ function ClimaCalibrate.observation_map(iteration)
     sample_date_range = first(CALIBRATE_CONFIG.sample_date_ranges)
     short_names = CALIBRATE_CONFIG.short_names
     
-    # Calculate expected G dimension based on mode
-    if use_nh_averages
-        # NH averages mode: one value per variable
-        expected_dim = length(short_names)
-        @info "NH averages mode: $expected_dim values (one per variable)"
-    else
-        # Full gridpoint mode: calculate based on observation vector construction
-        expected_dim = 0
-        for short_name in short_names
-            key = (short_name, sample_date_range)
-            if haskey(preprocessed_vars, key)
-                var = preprocessed_vars[key]
-                flat_data = vec(var.data)
-                # Apply land mask only for land-only variables
-                if !isnothing(land_mask) && short_name in land_only_vars
-                    flat_mask = vec(land_mask)
-                    flat_data = flat_data[findall(flat_mask)]
-                end
-                valid_data = filter(!isnan, collect(skipmissing(flat_data)))
-                expected_dim += length(valid_data)
-                
-                mask_status = (!isnothing(land_mask) && short_name in land_only_vars) ? "land only" : "all points"
-                @info "  $short_name: $(length(valid_data)) points ($mask_status)"
+    # Calculate expected G dimension
+    expected_dim = 0
+    for short_name in short_names
+        key = (short_name, sample_date_range)
+        if haskey(preprocessed_vars, key)
+            var = preprocessed_vars[key]
+            flat_data = vec(var.data)
+            # Apply land mask only for land-only variables
+            if !isnothing(land_mask) && short_name in land_only_vars
+                flat_mask = vec(land_mask)
+                flat_data = flat_data[findall(flat_mask)]
             end
+            valid_data = filter(!isnan, collect(skipmissing(flat_data)))
+            expected_dim += length(valid_data)
+            
+            mask_status = (!isnothing(land_mask) && short_name in land_only_vars) ? "land only" : "all points"
+            @info "  $short_name: $(length(valid_data)) points ($mask_status)"
         end
     end
     
@@ -145,57 +130,6 @@ function ClimaCalibrate.observation_map(iteration)
         error("Too many NaNs in G ensemble")
     end
     
-    # ==========================================================================
-    # DIAGNOSTIC: Compare G ensemble mean vs y (observations)
-    # This helps verify that model and observations are properly aligned
-    # ==========================================================================
-    obs_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/obs_vec.jld2")
-    if isfile(obs_path)
-        obs_vec = JLD2.load_object(obs_path)
-        if !isempty(obs_vec)
-            y = first(first(obs_vec).samples)  # Get the observation vector (samples is a Vector of Vectors)
-            g_mean = vec(Statistics.mean(g_ens, dims=2))
-            
-            if length(y) == length(g_mean)
-                @info "=== DIAGNOSTIC: G vs y comparison (normalized units) ==="
-                
-                if use_nh_averages
-                    # NH averages mode: simple per-variable comparison (one value each)
-                    for (i, short_name) in enumerate(short_names)
-                        bias = g_mean[i] - y[i]
-                        @info "  $short_name: G=$(round(g_mean[i], sigdigits=4)), y=$(round(y[i], sigdigits=4)), bias=$(round(bias, sigdigits=3))"
-                    end
-                    overall_rmse = sqrt(Statistics.mean((g_mean .- y).^2))
-                    @info "  Overall RMSE: $(round(overall_rmse, sigdigits=3))"
-                else
-                    # Full gridpoint mode: compute per-variable statistics
-                    tas_end = 24472
-                    mslp_end = tas_end + 64800
-                    pr_end = mslp_end + 24472
-                    
-                    if length(y) >= pr_end
-                        # Per-variable bias (G - y)
-                        tas_bias = Statistics.mean(g_mean[1:tas_end] .- y[1:tas_end])
-                        mslp_bias = Statistics.mean(g_mean[tas_end+1:mslp_end] .- y[tas_end+1:mslp_end])
-                        pr_bias = Statistics.mean(g_mean[mslp_end+1:pr_end] .- y[mslp_end+1:pr_end])
-                        
-                        # Per-variable RMSE
-                        tas_rmse = sqrt(Statistics.mean((g_mean[1:tas_end] .- y[1:tas_end]).^2))
-                        mslp_rmse = sqrt(Statistics.mean((g_mean[tas_end+1:mslp_end] .- y[tas_end+1:mslp_end]).^2))
-                        pr_rmse = sqrt(Statistics.mean((g_mean[mslp_end+1:pr_end] .- y[mslp_end+1:pr_end]).^2))
-                        
-                        @info "  tas:  bias=$(round(tas_bias, sigdigits=3)), RMSE=$(round(tas_rmse, sigdigits=3))"
-                        @info "  mslp: bias=$(round(mslp_bias, sigdigits=3)), RMSE=$(round(mslp_rmse, sigdigits=3))"
-                        @info "  pr:   bias=$(round(pr_bias, sigdigits=3)), RMSE=$(round(pr_rmse, sigdigits=3))"
-                    end
-                    @info "  Overall RMSE: $(round(sqrt(Statistics.mean((g_mean .- y).^2)), sigdigits=3))"
-                end
-            else
-                @warn "Dimension mismatch: y=$(length(y)), G=$(length(g_mean))"
-            end
-        end
-    end
-    
     return g_ens
 end
 
@@ -204,10 +138,6 @@ end
 
 Process the data of a single ensemble member and return a G vector
 matching the observation vector format.
-
-**MODES** (controlled by use_nh_averages saved in land_mask.jld2):
-1. Full gridpoint mode: returns 113k+ values
-2. NH averages mode: returns 3 values (one NH average per variable)
 
 **PER-VARIABLE NORMALIZATION**: Each variable is normalized using the SAME per-variable
 constants computed from observations. This ensures model output is compared consistently
@@ -234,18 +164,15 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
     end
     var_normalization = JLD2.load_object(norm_path)
     
-    # Load land mask, land_only_vars, and mode info
+    # Load land mask and land_only_vars
     land_mask_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/land_mask.jld2")
     land_mask = nothing
     land_only_vars = Set{String}()
-    use_nh_averages = false
     if isfile(land_mask_path)
         land_mask_data = JLD2.load_object(land_mask_path)
         land_mask = land_mask_data.mask
         # Load land_only_vars if present, otherwise default to ["tas", "pr"]
         land_only_vars = Set(get(land_mask_data, :land_only_vars, ["tas", "pr"]))
-        # Load NH averages mode flag
-        use_nh_averages = get(land_mask_data, :use_nh_averages, false)
     end
     
     @info "Short names: $short_names, per-variable normalization, land_only_vars=$land_only_vars"
@@ -296,43 +223,25 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
             var = ClimaAnalysis.OutputVar(var.attributes, var.dims, var.dim_attributes, converted_data)
         end
         
-        # Mode-specific processing
-        if use_nh_averages
-            # NH AVERAGES MODE: compute single NH average for this variable
-            use_land = short_name in land_only_vars
-            nh_avg = compute_nh_average(var, land_mask, use_land)
-            
-            # Normalize using the same constants as observations
-            norm = var_normalization[short_name]
-            normalized_val = (nh_avg - norm.mean) / norm.std
-            push!(all_data, normalized_val)
-            
-            mask_status = use_land ? "NH land" : "NH all"
-            @info "  $short_name: NH_avg=$(round(nh_avg, sigdigits=6)) → normalized=$(round(normalized_val, sigdigits=4)) ($mask_status)"
-        else
-            # FULL GRIDPOINT MODE: flatten and append
-            flat_data = vec(var.data)
-            
-            # Apply land mask only for land-only variables (MUST match observation vector construction)
-            if !isnothing(land_mask) && short_name in land_only_vars
-                flat_mask = vec(land_mask)
-                land_indices = findall(flat_mask)
-                flat_data = flat_data[land_indices]
-            end
-            
-            valid_data = filter(!isnan, collect(skipmissing(flat_data)))
-            
-            # Apply PER-VARIABLE normalization (MUST match observation vector construction)
-            norm = var_normalization[short_name]
-            normalized_data = (valid_data .- norm.mean) ./ norm.std
-            append!(all_data, normalized_data)
-            
-            mask_status = (!isnothing(land_mask) && short_name in land_only_vars) ? "land only" : "all points"
-            @info "  $short_name: $(length(valid_data)) points ($mask_status)"
-            
-            # Diagnostic: print statistics for debugging alignment issues
-            @info "    G stats: mean=$(round(Statistics.mean(normalized_data), sigdigits=4)), std=$(round(Statistics.std(normalized_data), sigdigits=4)), range=[$(round(minimum(normalized_data), sigdigits=3)), $(round(maximum(normalized_data), sigdigits=3))]"
+        # Flatten and append
+        flat_data = vec(var.data)
+        
+        # Apply land mask only for land-only variables (MUST match observation vector construction)
+        if !isnothing(land_mask) && short_name in land_only_vars
+            flat_mask = vec(land_mask)
+            land_indices = findall(flat_mask)
+            flat_data = flat_data[land_indices]
         end
+        
+        valid_data = filter(!isnan, collect(skipmissing(flat_data)))
+        
+        # Apply PER-VARIABLE normalization (MUST match observation vector construction)
+        norm = var_normalization[short_name]
+        normalized_data = (valid_data .- norm.mean) ./ norm.std
+        append!(all_data, normalized_data)
+        
+        mask_status = (!isnothing(land_mask) && short_name in land_only_vars) ? "land only" : "all points"
+        @info "  $short_name: $(length(valid_data)) points ($mask_status)"
     end
 
     return all_data

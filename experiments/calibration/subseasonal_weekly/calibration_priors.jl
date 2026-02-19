@@ -67,36 +67,5 @@ const CALIBRATION_RNG_SEED = 42
 # For normalized data (unit variance): this is the VARIANCE, not std
 # 0.1 = 10% variance (std ≈ 0.32), 0.5 = 50% variance (std ≈ 0.71)
 # Lower values make EKP more aggressive in fitting observations
-# NOTE: For NH averages mode (3 obs), use 0.1-0.5; for full gridpoints (113k obs), use 3.0+
-const CALIBRATION_NOISE_SCALAR = 3.0  # Used for full gridpoints mode
+const CALIBRATION_NOISE_SCALAR = 3.0
 
-# ==========================================================================
-# PER-VARIABLE NOISE (NH averages mode only)
-# ==========================================================================
-# Order MUST match short_names in run_calibration.jl: ["tas", "mslp", "pr"]
-# Higher noise = less weight on that variable
-# pr is down-weighted because:
-#   1. Model has structural bias in NH precipitation (~0.48 normalized)
-#   2. Precipitation is inherently noisy/chaotic on short timescales
-#   3. Prevents pr from dominating the objective (was 99.9% of error!)
-const CALIBRATION_NOISE_VARIANCES = Dict(
-    "tas" => 0.05,   # Temperature: tight constraint (model matches well)
-    "mslp" => 0.05,  # Pressure: tight constraint (model matches well)
-    "pr" => 1.0,    # Precipitation: loose constraint (10x less weight)
-    "rsut" => 0.05, 
-    "rlut" => 0.05,
-)
-
-# ==========================================================================
-# OBSERVATION MODE: Choose between full gridpoint or hemisphere averages
-# ==========================================================================
-# USE_NH_AVERAGES = false: Full gridpoint mode (113k+ observations)
-#   - Each gridpoint is treated as an independent observation
-#   - Captures spatial patterns but overcounts information due to correlation
-#   - May cause rapid covariance collapse
-#
-# USE_NH_AVERAGES = true: Northern Hemisphere averages mode (3 observations)
-#   - Computes area-weighted NH averages: tas (land), mslp (everywhere), pr (land)
-#   - Removes spatial correlation issues, stable convergence
-#   - Only constrains parameters affecting bulk NH climate
-const USE_NH_AVERAGES = false

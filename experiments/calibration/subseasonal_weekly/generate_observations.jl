@@ -81,7 +81,6 @@ const ERA5_FILE_PREFIX_TO_SHORT_NAME = Dict(
 # Variables that should be evaluated only over land (others are evaluated everywhere)
 const LAND_ONLY_VARS = Set(["tas", "pr"])
 
-# Note: compute_nh_average is defined in observation_utils.jl (included via run_calibration.jl)
 
 # Mapping from ERA5 NetCDF variable names to short names
 # Note: rsut/rlut variable names (mtuswrf/mtulwrf) may need adjustment based on actual file contents
@@ -363,44 +362,25 @@ function preprocess_vars(vars_by_date, config_file)
 end
 
 """
-    flatten_var_with_latitude_weights(var; land_mask=nothing)
+    flatten_var(var; land_mask=nothing)
 
-Flatten a 2D OutputVar to a vector, applying latitude (cosine) weights.
-Returns (flattened_data, weights).
+Flatten a 2D OutputVar to a vector.
 
 If `land_mask` is provided (a 2D boolean array matching var dimensions),
 only land points (where land_mask == true) are kept.
 """
-function flatten_var_with_latitude_weights(var; land_mask=nothing)
-    lats = ClimaAnalysis.latitudes(var)
-    lons = ClimaAnalysis.longitudes(var)
-    
-    # Cosine latitude weights
-    weights = cos.(deg2rad.(lats))
-    weights ./= sum(weights)  # Normalize
-    
-    # Get data array - should be (lon, lat) or (lat, lon)
+function flatten_var(var; land_mask=nothing)
     data = var.data
-    
-    # Flatten data
     flat_data = vec(data)
-    
-    # Create weight matrix matching the data shape
-    # Assuming data is (lon, lat)
-    nlon = length(lons)
-    nlat = length(lats)
-    weight_matrix = repeat(weights', nlon, 1)
-    flat_weights = vec(weight_matrix)
     
     # Apply land mask if provided
     if !isnothing(land_mask)
         flat_mask = vec(land_mask)
         land_indices = findall(flat_mask)
         flat_data = flat_data[land_indices]
-        flat_weights = flat_weights[land_indices]
     end
     
-    return flat_data, flat_weights
+    return flat_data
 end
 
 """
@@ -408,10 +388,6 @@ end
 
 Create the observation vector for EKP from the preprocessed variables.
 Each sample in the vector corresponds to one date range with all short_names.
-
-**MODES** (controlled by USE_NH_AVERAGES in calibration_priors.jl):
-1. Full gridpoint mode (USE_NH_AVERAGES=false): 113k+ observations
-2. NH averages mode (USE_NH_AVERAGES=true): 3 observations (one per variable)
 
 **PER-VARIABLE NORMALIZATION**: Each variable is normalized independently to zero mean
 and unit variance. This ensures all variables (tas, mslp, pr) contribute equally to 
@@ -425,9 +401,7 @@ function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
     # Load config from single source of truth
     include(joinpath(@__DIR__, "calibration_priors.jl"))
     noise_scalar = CALIBRATION_NOISE_SCALAR
-    use_nh_averages = USE_NH_AVERAGES
     
-    @info "Observation mode: $(use_nh_averages ? "NH averages (3 values)" : "full gridpoints")"
     @info "Using noise_scalar=$noise_scalar from calibration_priors.jl"
     
     # Get grid from first variable to determine land mask resolution
@@ -439,118 +413,15 @@ function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
     # Load land mask for variables that need it
     land_mask = load_land_mask(target_lons, target_lats)
     
-    # Save land mask, land_only_vars, and mode info for use in observation_map
+    # Save land mask and land_only_vars for use in observation_map
     JLD2.save_object(
         joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/land_mask.jld2"),
         (mask=land_mask, lons=collect(target_lons), lats=collect(target_lats), 
-         land_only_vars=collect(LAND_ONLY_VARS), use_nh_averages=use_nh_averages)
+         land_only_vars=collect(LAND_ONLY_VARS))
     )
-    @info "Saved land mask to land_mask.jld2 (land-only vars: $(LAND_ONLY_VARS), NH mode: $use_nh_averages)"
+    @info "Saved land mask to land_mask.jld2 (land-only vars: $(LAND_ONLY_VARS))"
     
-    if use_nh_averages
-        # ==========================================================================
-        # NH AVERAGES MODE: 3 observations (one area-weighted NH average per variable)
-        # ==========================================================================
-        return make_observation_vector_nh_averages(vars_by_date, sample_date_ranges, short_names, land_mask, noise_scalar)
-    else
-        # ==========================================================================
-        # FULL GRIDPOINT MODE: 113k+ observations (existing behavior)
-        # ==========================================================================
-        return make_observation_vector_gridpoints(vars_by_date, sample_date_ranges, short_names, land_mask, noise_scalar)
-    end
-end
-
-"""
-    make_observation_vector_nh_averages(...)
-
-Create observation vector using Northern Hemisphere averages only.
-Returns 3 values per sample: NH-avg(tas_land), NH-avg(mslp_all), NH-avg(pr_land)
-"""
-function make_observation_vector_nh_averages(vars_by_date, sample_date_ranges, short_names, land_mask, noise_scalar)
-    # ==========================================================================
-    # Compute NH averages for normalization
-    # ==========================================================================
-    var_normalization = Dict{String, NamedTuple{(:mean, :std), Tuple{Float64, Float64}}}()
-    
-    # Collect NH averages across all date ranges for each variable
-    for short_name in short_names
-        nh_avgs = Float64[]
-        use_land = short_name in LAND_ONLY_VARS
-        
-        for sample_date_range in sample_date_ranges
-            key = (short_name, sample_date_range)
-            if haskey(vars_by_date, key)
-                var = vars_by_date[key]
-                nh_avg = compute_nh_average(var, land_mask, use_land)
-                if !isnan(nh_avg)
-                    push!(nh_avgs, nh_avg)
-                end
-            end
-        end
-        
-        # For NH averages with single sample, use the value as mean and a reasonable std
-        # With multiple samples, compute actual mean/std
-        if length(nh_avgs) == 1
-            # Single sample: use value as mean, estimate std from typical variability
-            # For normalized data we want unit variance, so std = |mean| * 0.1 or a minimum
-            var_mean = nh_avgs[1]
-            var_std = max(abs(var_mean) * 0.1, 1.0)  # At least 1.0 for normalization stability
-        else
-            var_mean = Statistics.mean(nh_avgs)
-            var_std = max(Statistics.std(nh_avgs), 1.0)
-        end
-        var_normalization[short_name] = (mean=var_mean, std=var_std)
-        
-        mask_status = use_land ? "NH land only" : "NH all points"
-        @info "  $short_name: NH avg=$(round(var_mean, sigdigits=6)), std=$(round(var_std, sigdigits=4)) ($mask_status)"
-    end
-    
-    # Save normalization constants for use in observation_map
-    JLD2.save_object(
-        joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/normalization.jld2"),
-        var_normalization
-    )
-    @info "Saved NH averages normalization to normalization.jld2"
-    
-    # ==========================================================================
-    # Create observation vector with NH averages
-    # ==========================================================================
-    obs_vec = map(sample_date_ranges) do sample_date_range
-        all_data = Float64[]
-        all_names = String[]
-        
-        for short_name in short_names
-            key = (short_name, sample_date_range)
-            if haskey(vars_by_date, key)
-                var = vars_by_date[key]
-                use_land = short_name in LAND_ONLY_VARS
-                nh_avg = compute_nh_average(var, land_mask, use_land)
-                
-                # Normalize
-                norm = var_normalization[short_name]
-                normalized_val = (nh_avg - norm.mean) / norm.std
-                push!(all_data, normalized_val)
-                push!(all_names, short_name)
-                
-                mask_status = use_land ? "NH land" : "NH all"
-                @info "    $short_name: NH_avg=$(round(nh_avg, sigdigits=6)) → normalized=$(round(normalized_val, sigdigits=4)) ($mask_status)"
-            else
-                @warn "Missing variable for $key"
-            end
-        end
-        
-        obs_name = "nh_avg_" * join(all_names, "_") * "_" * Dates.format(first(sample_date_range), "yyyymmdd")
-        
-        # Use per-variable noise for NH averages mode
-        # This allows down-weighting noisy/biased variables (e.g., pr)
-        noise_variances = [CALIBRATION_NOISE_VARIANCES[name] for name in all_names]
-        noise = LinearAlgebra.Diagonal(noise_variances)
-        
-        @info "Creating NH averages observation '$obs_name' with $(length(all_data)) values"
-        @info "  Per-variable noise variances: $(Dict(zip(all_names, noise_variances)))"
-        EKP.Observation(all_data, noise, obs_name)
-    end
-    return obs_vec
+    return make_observation_vector_gridpoints(vars_by_date, sample_date_ranges, short_names, land_mask, noise_scalar)
 end
 
 """
@@ -575,7 +446,7 @@ function make_observation_vector_gridpoints(vars_by_date, sample_date_ranges, sh
                 var = vars_by_date[key]
                 # Apply land mask only for land-only variables
                 var_land_mask = short_name in LAND_ONLY_VARS ? land_mask : nothing
-                flat_data, _ = flatten_var_with_latitude_weights(var; land_mask=var_land_mask)
+                flat_data = flatten_var(var; land_mask=var_land_mask)
                 valid_data = filter(!isnan, collect(skipmissing(flat_data)))
                 append!(var_data_raw, valid_data)
             end
@@ -607,7 +478,7 @@ function make_observation_vector_gridpoints(vars_by_date, sample_date_ranges, sh
                 var = vars_by_date[key]
                 # Apply land mask only for land-only variables
                 var_land_mask = short_name in LAND_ONLY_VARS ? land_mask : nothing
-                flat_data, _ = flatten_var_with_latitude_weights(var; land_mask=var_land_mask)
+                flat_data = flatten_var(var; land_mask=var_land_mask)
                 valid_data = filter(!isnan, collect(skipmissing(flat_data)))
                 
                 # Apply PER-VARIABLE normalization
@@ -631,45 +502,6 @@ function make_observation_vector_gridpoints(vars_by_date, sample_date_ranges, sh
     end
     return obs_vec
 end
-
-# OLD VERSION (unnormalized) - kept for reference
-# """
-#     make_observation_vector_unnormalized(vars_by_date, sample_date_ranges, short_names)
-
-# # """
-# function make_observation_vector_unnormalized(vars_by_date, sample_date_ranges, short_names)
-#     # Covariance scalar - adjust based on expected observation noise
-#     noise_scalar = 5.0
-    
-#     obs_vec = map(sample_date_ranges) do sample_date_range
-#         # Collect and flatten all variables for this date range
-#         all_data = Float64[]
-#         all_names = String[]
-        
-#         for short_name in short_names
-#             key = (short_name, sample_date_range)
-#             if haskey(vars_by_date, key)
-#                 var = vars_by_date[key]
-#                 flat_data, _ = flatten_var_with_latitude_weights(var)
-#                 # Filter out NaN/missing values
-#                 valid_data = collect(skipmissing(flat_data))
-#                 valid_data = filter(!isnan, valid_data)
-#                 append!(all_data, valid_data)
-#                 push!(all_names, short_name)
-#             else
-#                 @warn "Missing variable for $key"
-#             end
-#         end
-        
-#         # Create observation with scalar covariance (diagonal matrix)
-#         obs_name = join(all_names, "_") * "_" * Dates.format(first(sample_date_range), "yyyymmdd")
-#         noise = noise_scalar * LinearAlgebra.I
-        
-#         @info "Creating observation '$obs_name' with $(length(all_data)) data points"
-#         EKP.Observation(all_data, noise, obs_name)
-#     end
-#     return obs_vec
-# end
 
 """
     resampled_lonlat(config_file)

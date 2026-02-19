@@ -31,8 +31,8 @@ for FT in (Float32, Float64)
         )
             params = Models.IceSlabParameters{FT}(coupled_param_dict; T_base)
 
-            Y = Models.slab_ice_space_init(FT, space, params)
-            dY = Models.slab_ice_space_init(FT, space, params) .* FT(0.0)
+            Y = Models.slab_ice_space_init(FT, space, params, nothing)
+            dY = Models.slab_ice_space_init(FT, space, params, nothing) .* FT(0.0)
 
             dt = FT(1.0)
             t_start = 0.0
@@ -142,11 +142,10 @@ for FT in (Float32, Float64)
             T_base = T_base,
         )
         T_bulk = minimum(Y.T_bulk) # get the non-zero temperature value
-        (; k_ice, h, ρ, c, T_base, ϵ) = p.params
+        (; k_ice, h, ρ, c, T_base, ϵ, T_sfc_min, T_freeze) = p.params
+        T_sfc = Models.ice_surface_temperature(T_bulk, T_base, T_sfc_min, T_freeze)
         dT_expected =
-            (k_ice / (h * h * ρ * c)) *
-            (T_base - Models.ice_surface_temperature(T_bulk, T_base)) -
-            (ϵ * σ * Models.ice_surface_temperature(T_bulk, T_base)^4) / (h * ρ * c)
+            (k_ice / (h * h * ρ * c)) * (T_base - T_sfc) - (ϵ * σ * T_sfc^4) / (h * ρ * c)
         @test minimum(dY) ≈ FT(dT_expected)
         @test maximum(dY) ≈ FT(0)
     end

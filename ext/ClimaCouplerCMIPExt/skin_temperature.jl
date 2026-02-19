@@ -1,71 +1,47 @@
 """
-    Skin Temperature Calculation Utilities
+    Skin Temperature Calculation
 
-This module provides functions to compute skin temperature using flux balance equations.
-The flux balance is solved by computing
+Solve the steady-state flux balance for surface temperature Tₛ:
 
             κ
-Jᵃ(Tₛⁿ) + --- (Tₛⁿ⁺¹ - Tᵢ) = 0
+Jᵃ(Tₛ) + --- (Tₛ - Tᵢ) = 0
             δ
 
-where Jᵃ is the external flux impinging on the surface from above and
-Jᵢ = - κ (Tₛ - Tᵢ) / δ is the "internal flux" coming up from below.
+where Jᵃ is the net upward surface flux and κ/δ·(Tₛ - Tᵢ) is the conductive flux.
 """
 
 import SurfaceFluxes as SF
 import Thermodynamics as TD
 
 """
-    update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo)
+    update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
 
-Create a callback function for updating surface temperature that can be passed to
-SurfaceFluxes.jl's `surface_fluxes` function.
+Create a callback for `SurfaceFluxes.jl` that updates surface temperature using
+a semi-implicit linearization of the LW emission term:
 
-The returned callback matches the SurfaceFluxes.jl callback signature:
-`(ζ, param_set, thermo_params, inputs, scheme, u_star, z0m, z0s) -> T_sfc_new`
+    Tₛⁿ⁺¹ = (Tᵢ - δ/κ · (Jᵃ - 4σϵTₛⁿ⁴)) / (1 + 4δσϵTₛⁿ³/κ)
 
-The callback computes the updated surface temperature based on the semi-implicit flux balance equation:
+where Jᵃ = σϵTₛⁿ⁴ - (1-α)SW↓ - ϵLW↓ + F_sh + F_lh  (positive upward).
 
-    Tₛⁿ⁺¹ = (Tᵢ - δ / κ * (Jᵃ - 4 σ ϵ Tₛⁿ⁴)) / (1 + 4 δ σ ϵ Tₛⁿ³ / κ)
-
-This formulation linearizes the outgoing longwave radiation term σϵT⁴ around the current
-surface temperature Tₛⁿ, providing stability for the iterative solution of Jᵃ + κ/δ*(T-Tᵢ) = 0.
-
-Inside the callback, sensible heat flux (F_sh) and latent heat flux (F_lh) are computed directly
-using SurfaceFluxes.jl helper functions, and the net upward flux J_a is computed as:
-
-    J_a = σ * ϵ * T_sfc_n^4 - (1 - α_albedo) * SW_d - ϵ * LW_d + F_sh + F_lh
-
-where F_sh and F_lh follow the SurfaceFluxes.jl sign convention (positive = upward).
+The result is capped at the melting temperature T_melt to prevent the surface
+temperature from exceeding the melting point under heating fluxes.
 
 # Arguments
 - `κ`: Thermal conductivity [W m⁻¹ K⁻¹]
-- `δ`: Thickness/depth of the layer [m]
-- `T_i`: Internal temperature (temperature at the base of the layer) [K]
+- `δ`: Ice thickness [m]
+- `T_i`: Internal (ice-ocean interface) temperature [K]
 - `σ`: Stefan-Boltzmann constant [W m⁻² K⁻⁴]
 - `ϵ`: Surface emissivity [-]
 - `SW_d`: Downward shortwave radiation [W m⁻²]
 - `LW_d`: Downward longwave radiation [W m⁻²]
 - `α_albedo`: Surface albedo [-]
-
-# Returns
-- `callback`: A function matching SurfaceFluxes.jl callback signature that can be passed to
-              `SF.surface_fluxes(..., update_T_sfc_callback, ...)`.
+- `T_melt`: Melting temperature [K] (typically 273.15 K for freshwater ice)
 """
-function update_T_sfc(
-    κ,
-    δ,
-    T_i,
-    σ,
-    ϵ,
-    SW_d,
-    LW_d,
-    α_albedo,
-)
-    return function(ζ, param_set, thermo_params_callback, inputs, scheme, u_star, z0m, z0s)
+function update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
+    return function (ζ, param_set, thermo_params_callback, inputs, scheme, u_star, z0m, z0s)
         T_sfc_n = inputs.T_sfc_guess
-        
-        # Compute surface humidity from T_sfc_n
+
+        # Surface density and saturation specific humidity at T_sfc_n
         ρ_sfc = SF.surface_density(
             param_set,
             inputs.T_int,
@@ -76,9 +52,14 @@ function update_T_sfc(
             inputs.q_liq_int,
             inputs.q_ice_int,
         )
-        q_vap_sfc = TD.q_vap_saturation(thermo_params_callback, T_sfc_n, ρ_sfc, inputs.q_liq_int, inputs.q_ice_int)
-        
-        # Compute sensible and latent heat fluxes using SurfaceFluxes.jl helpers
+        q_vap_sfc = TD.q_vap_saturation(
+            thermo_params_callback,
+            T_sfc_n,
+            ρ_sfc,
+            inputs.q_liq_int,
+            inputs.q_ice_int,
+        )
+
         F_sh = SF.sensible_heat_flux(
             param_set,
             ζ,
@@ -91,7 +72,6 @@ function update_T_sfc(
             inputs.ρ_int,
             scheme,
         )
-        
         F_lh = SF.latent_heat_flux(
             param_set,
             ζ,
@@ -103,21 +83,18 @@ function update_T_sfc(
             inputs.ρ_int,
             scheme,
         )
-        
-        # Compute net upward flux Jᵃ at the surface (positive = heat leaving surface)
-        # Jᵃ = (LW emission) - (absorbed SW) - (absorbed LW) + (sensible up) + (latent up)
-        # where F_sh, F_lh are positive upward (SurfaceFluxes.jl convention)
-        # Old (incorrect sign convention for radiation terms):
-        # J_a = (1 - α_albedo) * SW_d + LW_d + F_sh + F_lh - σ * ϵ * T_sfc_n^4
+
+        # Net upward flux: Jᵃ = σϵT⁴ - (1-α)SW↓ - ϵLW↓ + F_sh + F_lh
         J_a = σ * ϵ * T_sfc_n^4 - (1 - α_albedo) * SW_d - ϵ * LW_d + F_sh + F_lh
-        
-        # Apply semi-implicit flux balance equation.
-        # Linearize the LW emission σϵT⁴ around T_n:
-        #   σϵT⁴ ≈ σϵTₙ⁴ + 4σϵTₙ³(T - Tₙ) = -3σϵTₙ⁴ + 4σϵTₙ³T
-        # Substituting into Jᵃ + κ/δ*(T - Tᵢ) = 0 and solving for T:
+
+        # Semi-implicit solve: linearize σϵT⁴ ≈ -3σϵTₙ⁴ + 4σϵTₙ³T
         numerator = T_i - (δ / κ) * (J_a - 4 * σ * ϵ * T_sfc_n^4)
         denominator = 1 + 4 * δ * σ * ϵ * T_sfc_n^3 / κ
-        
-        return numerator / denominator
+        T_sfc_new = numerator / denominator
+
+        # Cap surface temperature at melting temperature 
+        T_sfc_new = min(T_sfc_new, T_melt)
+
+        return T_sfc_new
     end
 end

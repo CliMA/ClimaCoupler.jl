@@ -6,7 +6,7 @@ import Dates
 # TODO: move to Oceananigans
 # Change the `set_to_array!` of Oceananigans to work on a `Center` 
 # field (in y) with abstract 2D and 3D arrays.
-const TG = OC.OrthogononalSphericalShellGrids.TripolarGrid{FT, TX, <:OC.Grids.RightFaceFolded} where {FT, TX}
+const TG = OC.OrthogonalSphericalShellGrids.TripolarGrid{FT, TX, <:OC.Grids.RightFaceFolded} where {FT, TX}
 const TGRF = Union{<:OC.ImmersedBoundaryGrid{<:Any, <:Any, <:Any, <:Any, <:TG}}, TG}
 
 @inline resize_to_facefolded(a::Array{T, 2}) where T = a[:, 1:end-1]

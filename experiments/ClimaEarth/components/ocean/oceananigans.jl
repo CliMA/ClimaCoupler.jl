@@ -13,7 +13,7 @@ using JLD2
 include("climaocean_helpers.jl")
 
 struct OMIPEvolvedInitialConditions end
-struct EN4InitialConditions end
+struct ECCO4InitialConditions end
 
 # Set the initial conditions from omip output after 20 years evolution (1992 - 2012)
 function OC.set!(model::OC.HydrostaticFreeSurfaceModel, ::OMIPEvolvedInitialConditions)
@@ -32,6 +32,16 @@ function OC.set!(model::OC.HydrostaticFreeSurfaceModel, ::OMIPEvolvedInitialCond
     return nothing
 end
 
+# Set the initial conditions from omip output after 20 years evolution (1992 - 2012)
+function OC.set!(model::OC.HydrostaticFreeSurfaceModel, ::ECCO4InitialConditions)
+
+    Sm = Metadatum(:salinity,    dataset=ECCO4Monthly(), date=DateTime(1995, 1, 1))
+    Tm = Metadatum(:temperature, dataset=ECCO4Monthly(), date=DateTime(1995, 1, 1))
+
+    OC.set!(model, T = Tm, S = Sm)
+
+    return nothing
+end
 
 """
     OceananigansSimulation{SIM, A, OPROP, REMAP, SIC}
@@ -47,8 +57,7 @@ It contains the following objects:
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 - `ice_concentration::SIC`: An Oceananigans Field representing the sea ice concentration on the ocean/sea ice grid.
 """
-struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC} <:
-       Interfacer.AbstractOceanSimulation
+struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC} <: Interfacer.AbstractOceanSimulation
     ocean::SIM
     area_fraction::A
     ocean_properties::OPROP
@@ -98,7 +107,7 @@ function OceananigansSimulation(
     ice_model,
     dt = nothing,
     comms_ctx = ClimaComms.context(),
-    initial_conditions = OMIPEvolvedInitialConditions(),
+    initial_conditions = ECCO4InitialConditions(),
     coupled_param_dict = CP.create_toml_dict(FT),
     extra_kwargs...,
 ) where {FT}
@@ -120,9 +129,9 @@ function OceananigansSimulation(
     download_dataset(en4_salinity)
 
     # Set up ocean grid (0.5 degrees)
-    resolution_points = (720, 360, 100)
+    resolution_points = (360, 160, 50)
     Nz = last(resolution_points)
-    z = OC.ExponentialDiscretization(Nz, -6000, 0; scale = 1800)
+    z = OC.ExponentialDiscretization(Nz, -4000, 0; scale = 1200)
 
     # Regular LatLong because we know how to do interpolation there
     underlying_grid = OC.LatitudeLongitudeGrid(
@@ -141,39 +150,18 @@ function OceananigansSimulation(
         major_basins = 1,
     )
 
-    # bottom_height = OC.Architectures.on_architecture(arch, jldopen("bottom_height.jld2")["bottom"])
-
     grid = OC.ImmersedBoundaryGrid(
         underlying_grid,
         OC.GridFittedBottom(bottom_height);
         active_cells_map = true,
     )
 
-    # Restore the ocean to the EN4 state periodically if running for more than one month and not using ClimaSeaIce
-    use_restoring =
-        start_date + Dates.Month(1) < stop_date && ice_model != Val(:clima_seaice)
-
-    if use_restoring
-        # When we use EN4 data, the forcing takes care of everything, including
-        # the initial conditions
-        restoring_rate = 1 / (3 * 86400)
-        mask = CO.LinearlyTaperedPolarMask(
-            southern = (-80, -70),
-            northern = (70, 90),
-            z = (z(1), 0),
-        )
-
-        forcing_T = CO.DatasetRestoring(en4_temperature, grid; mask, rate = restoring_rate)
-        forcing_S = CO.DatasetRestoring(en4_salinity, grid; mask, rate = restoring_rate)
-        forcing = (T = forcing_T, S = forcing_S)
-    else
-        forcing = NamedTuple()
-    end
+    forcing = NamedTuple()
 
     # Create ocean simulation
-    free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 100)
-    momentum_advection = OC.WENOVectorInvariant(order = 5)
-    tracer_advection = OC.WENO(order = 7)
+    free_surface = OC.SplitExplicitFreeSurface(grid; substeps=100)
+    momentum_advection = OC.WENOVectorInvariant(order=5)
+    tracer_advection = OC.WENO(order=5)
 
     @inline Δ²ᵃᵃᵃ(i, j, k, grid, lx, ly, lz) =
         2 * (
@@ -186,17 +174,17 @@ function OceananigansSimulation(
         Δ²ᵃᵃᵃ(i, j, k, grid, lx, ly, lz)^2 / λ
 
     timescale = 25 * 3600 * 24 # 25 days
-    horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(
+    biharmonic_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(
         ν = geometric_νhb,
         discrete_form = true,
         parameters = timescale,
     )
-    mixing_length =
-        OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEMixingLength(Cᵇ = 0.01)
-    turbulent_kinetic_energy_equation =
-        OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEEquation(Cᵂϵ = 1.0)
-    catke_closure =
-        OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEVerticalDiffusivity(;
+
+    harmonic_viscosity = OC.HorizontalScalarDiffusivity(ν=1000, κ=300)
+
+    mixing_length = OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEMixingLength(Cᵇ = 0.01)
+    turbulent_kinetic_energy_equation = OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEEquation(Cᵂϵ = 1.0)
+    catke_closure = OC.TurbulenceClosures.TKEBasedVerticalDiffusivities.CATKEVerticalDiffusivity( ;
             mixing_length,
             turbulent_kinetic_energy_equation,
         )
@@ -212,7 +200,7 @@ function OceananigansSimulation(
         timestepper = :SplitRungeKutta3,
         tracer_advection,
         free_surface,
-        closure = (catke_closure, horizontal_viscosity),
+        closure = (catke_closure, biharmonic_viscosity, harmonic_viscosity),
     )
 
     # Set initial condition to EN4 state estimate at start_date

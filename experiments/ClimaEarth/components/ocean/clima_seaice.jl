@@ -31,6 +31,18 @@ function OC.set!(model::CSI.SeaIceModel, ::OMIPEvolvedInitialConditions)
     return nothing
 end
 
+# Set the initial conditions from omip output after 20 years evolution (1992 - 2012)
+function OC.set!(model::CSI.SeaIceModel, ::ECCO4InitialConditions)
+
+    hm = Metadatum(:sea_ice_thickness,     dataset=ECCO4Monthly(), date=DateTime(1995, 1, 1))
+    ℵm = Metadatum(:sea_ice_concentration, dataset=ECCO4Monthly(), date=DateTime(1995, 1, 1))
+
+    OC.set!(model, h = hm, ℵ = ℵm)
+
+    return nothing
+end
+
+
 """
     ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP}
 
@@ -164,7 +176,7 @@ function ClimaSeaIceSimulation(
     ocean,
     output_dir,
     start_date = nothing,
-    initial_conditions = OMIPEvolvedInitialConditions(),
+    initial_conditions = ECCO4InitialConditions(),
     dt = 5 * 60.0, # 5 minutes
     coupled_param_dict = CP.create_toml_dict(FT),
     extra_kwargs...,

@@ -302,11 +302,11 @@ function Plotting.compute_pfull_leaderboard(
             obs_var = sim_obs_comparsion_dict[short_name].obs
 
             # Slice at pressure level using nearest value rather interpolating
-            sim_var = ClimaAnalysis.slice(sim_var, pfull = p_lvl)
+            sim_var = ClimaAnalysis.slice(sim_var, pressure_level = p_lvl)
             obs_var = ClimaAnalysis.slice(obs_var, pressure_level = p_lvl)
 
             # Get the actual pressure level that we slice at
-            push!(real_p_lvls, parse(Float64, sim_var.attributes["slice_pfull"]))
+            push!(real_p_lvls, parse(Float64, sim_var.attributes["slice_pressure_level"]))
 
             # Add so that it show up on in the title
             sim_var.attributes["short_name"] = "mean $(ClimaAnalysis.short_name(sim_var))"

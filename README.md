@@ -38,7 +38,7 @@ required for it.
 | **Downloads**        | [![downloads][downloads-img]][downloads-url]|
 |||
 
-Recommended Julia Version: Stable release v1.11.1. CI tests Julia v1.10 and 1.11.
+Recommended Julia Version: Stable release v1.12.x, CI tests Julia v1.10 and 1.12.
 
 # Running AMIP
 Here we will focus on the AMIP experiment, which uses the environment in the `experiments/ClimaEarth/` subdirectory of ClimaCoupler.jl

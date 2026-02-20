@@ -22,8 +22,6 @@ import JLD2
 # Override JLD2's default_iotype to use IOStream instead of MmapIO
 JLD2.default_iotype() = IOStream
 
-include(joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "api.jl"))
-
 # Load shared priors from single source of truth
 include(joinpath(@__DIR__, "calibration_priors.jl"))
 prior = CALIBRATION_PRIOR
@@ -32,7 +30,7 @@ rng_seed = CALIBRATION_RNG_SEED
 
 @info "Loading observation vector..."
 observation_vector = JLD2.load_object(
-    joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/obs_vec.jld2"),
+    joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal_weekly/obs_vec.jld2"),
 )
 @info "Observation vector loaded: $(length(observation_vector)) samples"
 
@@ -52,7 +50,7 @@ initial_ensemble = EKP.construct_initial_ensemble(rng, prior, ensemble_size)
 @info "Initial ensemble shape: $(size(initial_ensemble))"
 
 # Save to file (compact - no huge covariance matrix!)
-output_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/ekp_inputs.jld2")
+output_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal_weekly/ekp_inputs.jld2")
 @info "Saving to $output_path..."
 JLD2.jldsave(output_path; 
     y = y,

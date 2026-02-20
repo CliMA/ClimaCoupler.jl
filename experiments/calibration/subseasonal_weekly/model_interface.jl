@@ -6,11 +6,16 @@ import CUDA
 import EnsembleKalmanProcesses as EKP
 using Dates: Date, Second
 include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.jl"))
-
-# Note: api.jl and CALIBRATE_CONFIG are loaded/shared via @everywhere in run_calibration.jl
-using Pkg
+include(
+    joinpath(
+        pkgdir(ClimaCoupler),
+        "experiments",
+        "calibration",
+        "subseasonal_weekly",
+        "run_calibration.jl",
+    ),
+)
 function ClimaCalibrate.forward_model(iter, member)
-    Pkg.status()
     config_dict = ClimaCoupler.Input.get_coupler_config_dict(CALIBRATE_CONFIG.config_file)
     output_dir_root = CALIBRATE_CONFIG.output_dir
     # Use the first (and typically only) sample date range for all iterations

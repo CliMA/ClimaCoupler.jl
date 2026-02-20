@@ -11,10 +11,10 @@ Calibrate ClimaCoupler parameters using EnsembleKalmanProcesses against ERA5 obs
 cd /glade/u/home/cchristo/clima/copies3/ClimaCoupler.jl
 
 # 1. Generate observations (only needed once, or when changing obs settings)
-julia --project=experiments/ClimaEarth experiments/calibration/subseasonal/generate_observations.jl
+julia --project=experiments/ClimaEarth experiments/calibration/subseasonal_weekly/generate_observations.jl
 
 # 2. Run calibration (from tmux on login node)
-julia --project=experiments/ClimaEarth experiments/calibration/subseasonal/run_calibration.jl
+julia --project=experiments/ClimaEarth experiments/calibration/subseasonal_weekly/run_calibration.jl
 ```
 
 ### Option B: TransformInversion (more robust, needs precompute)
@@ -23,10 +23,10 @@ julia --project=experiments/ClimaEarth experiments/calibration/subseasonal/run_c
 cd /glade/u/home/cchristo/clima/copies3/ClimaCoupler.jl
 
 # 1. Generate observations (only needed once)
-julia --project=experiments/ClimaEarth experiments/calibration/subseasonal/generate_observations.jl
+julia --project=experiments/ClimaEarth experiments/calibration/subseasonal_weekly/generate_observations.jl
 
 # 2. Run full calibration (from tmux - handles precompute automatically)
-./experiments/calibration/subseasonal/run_full_calibration.sh
+./experiments/calibration/subseasonal_weekly/run_full_calibration.sh
 ```
 
 ## Switching Between Process Types
@@ -40,7 +40,7 @@ Edit `calibration_priors.jl` - this is the single source of truth for:
 - `CALIBRATION_ENSEMBLE_SIZE` - ensemble size (for TransformInversion only)
 
 # Analizing Calibraiton 
-    `julia --project=experiments/ClimaEarth experiments/calibration/subseasonal/analyze_calibration.jl`
+    `julia --project=experiments/ClimaEarth experiments/calibration/subseasonal_weekly/analyze_calibration.jl`
 
 ## Key Files
 
@@ -58,7 +58,7 @@ Results go to the `output_dir` specified in `run_calibration.jl` (default: `/gla
 
 Plot results:
 ```bash
-julia --project=experiments/ClimaEarth experiments/calibration/subseasonal/quick_plot_cal.jl
+julia --project=experiments/ClimaEarth experiments/calibration/subseasonal_weekly/quick_plot_cal.jl
 ```
 
 ## Troubleshooting

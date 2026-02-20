@@ -63,20 +63,20 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 30GB
       
-      - label: "Coarse current AMIP: diagedmf + 1M + integrated land"
-        key: "amip_diagedmf_1m_land"
-        command:
-          - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_diagedmf_1m_land.yml --job_id amip_coarse_diagedmf_1m_land"
-        artifact_paths: "output/amip_coarse_diagedmf_1m_land/artifacts/*"
-        timeout_in_minutes: 840
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 30GB
+      # - label: "Coarse current AMIP: diagedmf + 1M + integrated land"
+      #   key: "amip_diagedmf_1m_land"
+      #   command:
+      #     - echo "--- Run simulation"
+      #     - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_diagedmf_1m_land.yml --job_id amip_coarse_diagedmf_1m_land"
+      #   artifact_paths: "output/amip_coarse_diagedmf_1m_land/artifacts/*"
+      #   timeout_in_minutes: 840
+      #   env:
+      #     CLIMACOMMS_DEVICE: "CUDA"
+      #   agents:
+      #     slurm_gpus_per_task: 1
+      #     slurm_cpus_per_task: 4
+      #     slurm_ntasks: 1
+      #     slurm_mem: 30GB
 
       - label: "Coarse current AMIP: progedmf + 0M + bucket land"
         key: "amip_progedmf"
@@ -92,15 +92,3 @@ steps:
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
           slurm_mem: 30GB
-
-      - label: "Flagship AMIP GPU with prognostic EDMF + 1M + integrated land (16 helems)"
-        key: "gpu_amip_progedmf_1M_land_he16"
-        command: "srun julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $BENCHMARK_CONFIG_PATH/amip_progedmf_1m_land_he16.yml --job_id gpu_amip_progedmf_1M_land_he16"
-        artifact_paths: "output/gpu_amip_progedmf_1M_land_he16/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 16GB

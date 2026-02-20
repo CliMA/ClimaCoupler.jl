@@ -3,9 +3,8 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
 checkpoint_dt: "366days"
 coupler_toml: ["toml/amip_diagedmf.toml"]
-dt: "240secs"
-dt_cpl: "240secs"
-dz_bottom: 100.0
+dt: "150secs"
+dt_cpl: "150secs"
 energy_check: false
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta]
@@ -14,16 +13,27 @@ extra_atmos_diagnostics:
     pressure_coordinates: true
     compute_every: 6hours
 h_elem: 8
+dz_bottom: 30.0
+z_elem: 63
 initial_condition: "AMIPFromERA5"
 land_model: "integrated"
 mode_name: "amip"
-netcdf_interpolation_num_points: [90, 45, 31]
+# netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
+ode_algo: "ARS232"
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "465days"
+t_end: "93days"
 topo_smoothing: true
 topography: "Earth"
-z_elem: 39
+prescribed_aerosols: []
+aerosol_radiation: false
+# extra_atmos_diagnostics:
+#   - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls]
+#     period: 1months
+#     reduction_time: average
+#   - short_name: [ta, hus, hur, pfull, entr, detr, arup, waup]
+#     period: 1months
+#     reduction_time: average

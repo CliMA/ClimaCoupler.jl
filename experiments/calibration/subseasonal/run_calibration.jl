@@ -14,7 +14,6 @@ import JLD2
 # This avoids Bus errors from memory-mapped files on Lustre filesystem
 JLD2.default_iotype() = IOStream
 
-
 include(joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "api.jl"))
 include(
     joinpath(
@@ -46,7 +45,7 @@ sample_date_ranges = [
 ]
 
 # Directory containing ERA5 weekly observation files
-const ERA5_OBS_DIR = "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/daily_weekly_stats/weekly"
+const ERA5_OBS_DIR = "/home/ext_nefrathe_caltech_edu/wxquest_data/daily_weekly_stats/weekly"
 
 const CALIBRATE_CONFIG = CalibrateConfig(;
     config_file = joinpath(
@@ -61,7 +60,7 @@ const CALIBRATE_CONFIG = CalibrateConfig(;
     extend = Dates.Day(1),  # Add 1 day so simulation covers full 7-day diagnostic period
     spinup = Dates.Day(0),
     # Use scratch filesystem - more reliable for JLD2/HDF5 on Lustre
-    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp28",  # Full gridpoint calibration
+    output_dir = joinpath(pkgdir(ClimaCoupler), "output"),  # Full gridpoint calibration
     obs_dir = ERA5_OBS_DIR,
     rng_seed = 42,
 )
@@ -76,16 +75,16 @@ if abspath(PROGRAM_FILE) == @__FILE__
     ensemble_size = CALIBRATION_ENSEMBLE_SIZE
 
     # Add PBS workers with GPU resources on Derecho
-    if nworkers() == 1
-        @info "Adding PBS workers with GPU resources..."
-        addprocs(
-            ClimaCalibrate.PBSManager(ensemble_size);
-            q = "main",
-            A = "UCIT0011",
-            l_select = "1:ncpus=12:ngpus=1",
-            l_walltime = "12:00:00",
-        )
-    end
+    # if nworkers() == 1
+    #     @info "Adding PBS workers with GPU resources..."
+    #     addprocs(
+    #         ClimaCalibrate.PBSManager(ensemble_size);
+    #         q = "main",
+    #         A = "UCIT0011",
+    #         l_select = "1:ncpus=12:ngpus=1",
+    #         l_walltime = "12:00:00",
+    #     )
+    # end
 
     # Load api.jl on all workers first (defines CalibrateConfig type)
     api_file = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "api.jl")
@@ -175,13 +174,20 @@ if abspath(PROGRAM_FILE) == @__FILE__
     #     rng,
     #     scheduler = EKP.DataMisfitController(terminate_at = 1000),
     # )
+    hpc_kwargs = ClimaCalibrate.kwargs(
+            time = 60 * 6,
+            ntasks = 1,
+            cpus_per_task = 4,
+            gpus_per_task = 1,
+            partition = "a3" # or a3mega
+        )
+    backend = ClimaCalibrate.GCPBackend(; hpc_kwargs, model_interface, verbose = true)
 
-    # Use WorkerBackend with PBS workers
     eki = ClimaCalibrate.calibrate(
-        ClimaCalibrate.WorkerBackend(),
+        backend,
         ekp,
         CALIBRATE_CONFIG.n_iterations,
         prior,
-        CALIBRATE_CONFIG.output_dir;
+        CALIBRATE_CONFIG.output_dir
     )
 end

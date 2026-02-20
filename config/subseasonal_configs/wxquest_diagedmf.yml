@@ -4,7 +4,7 @@ atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
 coupler_toml: ["toml/wxquest_diagedmf.toml"]
 strict_params: false
 mode_name: "subseasonal"
-era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+era5_initial_condition_dir: "/home/ext_nefrathe_caltech_edu/wxquest_data/initial_conditions/initial_conditions_v1_dev"
 initial_condition: "WeatherModel"
 checkpoint_dt: "40days"
 dt: "120secs"

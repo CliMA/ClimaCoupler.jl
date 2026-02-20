@@ -68,3 +68,15 @@ julia --project=experiments/ClimaEarth experiments/calibration/subseasonal/quick
 **NetCDF errors**: Retry logic is built in. If persistent, check that model output files exist.
 
 **Bus error**: JLD2 mmap issue on Lustre - already mitigated by using IOStream mode.
+
+
+# Running on GCP
+
+In tmux, run `gcp.sh` from the base of the ClimaCoupler.jl repo. This will only
+run the simpler Option A described above.
+
+Several paths need to updated for GCP:
+- EXP_DIR in experiments/calibration/subseasonal/plot_ensemble_maps.jl
+- paths in experiments/calibration/subseasonal/precompute.pbs
+- output_dir in experiments/calibration/subseasonal/quick_plot_cal.jl
+- paths in experiments/calibration/subseasonal/run_full_calibration.sh

@@ -55,8 +55,8 @@ value = 2.909243754318121
 [mixing_length_static_stab_coeff]
 value = 0.29736273245468714
 
-#[Tq_correlation_coefficient]
-#value = -1
+[Tq_correlation_coefficient]
+value = -1
 
 [tracer_vertical_diffusion_factor]
 value = 0

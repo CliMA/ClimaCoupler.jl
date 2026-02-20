@@ -277,22 +277,10 @@ function ClimaLandSimulation(
     end
 
     # Convert start_date and stop_date to ITime if using ITime
-    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+    stop_date = start_date + Dates.Second(float(tspan[2]))
     if dt isa ITime
-        start_date = promote(
-            dt,
-            ITime(
-                Dates.value(convert(Dates.Second, start_date - dt.epoch));
-                epoch = dt.epoch,
-            ),
-        )[2]
-        stop_date = promote(
-            dt,
-            ITime(
-                Dates.value(convert(Dates.Second, stop_date - dt.epoch));
-                epoch = dt.epoch,
-            ),
-        )[2]
+        start_date = tspan[1]
+        stop_date = tspan[2]
     end
     simulation = CL.Simulations.LandSimulation(
         start_date,

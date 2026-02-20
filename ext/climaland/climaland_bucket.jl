@@ -199,22 +199,10 @@ function BucketSimulation(
     end
 
     # Convert start_date and stop_date to ITime if using ITime
-    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+    stop_date = start_date + Dates.Second(float(tspan[2]))
     if dt isa ITime
-        start_date = promote(
-            dt,
-            ITime(
-                Dates.value(convert(Dates.Second, start_date - dt.epoch));
-                epoch = dt.epoch,
-            ),
-        )[2]
-        stop_date = promote(
-            dt,
-            ITime(
-                Dates.value(convert(Dates.Second, stop_date - dt.epoch));
-                epoch = dt.epoch,
-            ),
-        )[2]
+        start_date = tspan[1]
+        stop_date = tspan[2]
     end
     simulation = CL.Simulations.LandSimulation(
         start_date,
@@ -335,8 +323,12 @@ function Interfacer.update_field!(
     Interfacer.remap!(sim.integrator.p.bucket.turbulent_fluxes.vapor_flux, field ./ ρ_liq) # TODO: account for sublimation
 end
 
-Interfacer.step!(sim::BucketSimulation, t) =
-    Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+function Interfacer.step!(sim::BucketSimulation, t)
+    while float(sim.integrator.t) < float(t)
+        Interfacer.step!(sim.integrator)
+    end
+    return nothing
+end
 Interfacer.close_output_writers(sim::BucketSimulation) =
     isnothing(sim.output_writer) || close(sim.output_writer)
 

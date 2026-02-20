@@ -64,11 +64,11 @@ steps:
           slurm_mem: 30GB
       
       - label: "Coarse current AMIP: diagedmf + 1M + integrated land"
-        key: "amip_diagedmf_1M_land"
+        key: "amip_diagedmf_1m_land"
         command:
           - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_diagedmf_1M_land.yml --job_id amip_coarse_diagedmf_1M_land"
-        artifact_paths: "output/amip_coarse_diagedmf_1M_land/artifacts/*"
+          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_diagedmf_1m_land.yml --job_id amip_coarse_diagedmf_1m_land"
+        artifact_paths: "output/amip_coarse_diagedmf_1m_land/artifacts/*"
         timeout_in_minutes: 840
         env:
           CLIMACOMMS_DEVICE: "CUDA"

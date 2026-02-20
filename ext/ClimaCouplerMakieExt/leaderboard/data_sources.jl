@@ -130,12 +130,13 @@ function get_sim_var_in_pfull_dict(diagnostics_folder_path)
                         short_name = short_name,
                         reduction = "average",
                         period = "1M",
+                        coord_type = "pressure",
                     )
-                    pfull_var = get(
-                        ClimaAnalysis.SimDir(diagnostics_folder_path),
-                        short_name = "pfull",
-                        reduction = "average",
-                        period = "1M",
+                    sim_var = ClimaAnalysis.convert_dim_units(
+                        sim_var,
+                        "pfull",
+                        "hPa";
+                        conversion_function = x -> 0.01 * x,
                     )
 
                     (ClimaAnalysis.units(sim_var) == "") &&
@@ -143,33 +144,15 @@ function get_sim_var_in_pfull_dict(diagnostics_folder_path)
                     (ClimaAnalysis.units(sim_var) == "kg kg^-1") &&
                         (sim_var = ClimaAnalysis.set_units(sim_var, "unitless"))
 
-                    # For certain grid configurations, certain columns can have pressure
-                    # inversions at low elevation, which prevents the conversion between
-                    # pressure and altitude. To avoid that, we exclude everything below 80m.
-                    # NOTE: This was empirically found.
-                    pfull_var_windowed =
-                        ClimaAnalysis.window(pfull_var, "z", left = 80)
-                    sim_var_windowed = ClimaAnalysis.window(sim_var, "z", left = 80)
-
-                    sim_in_pfull_var = ClimaAnalysis.Atmos.to_pressure_coordinates(
-                        sim_var_windowed,
-                        pfull_var_windowed,
-                    )
                     # For ClimaDiagnostics v0.3 and later, the dates are saved at
                     # the start of the reduction period
                     pkgversion(CD) < v"0.3" && (
-                        sim_in_pfull_var =
+                        sim_var =
                             ClimaAnalysis.shift_to_start_of_previous_month(
-                                sim_in_pfull_var,
+                                sim_var,
                             )
                     )
-                    sim_in_pfull_var = ClimaAnalysis.convert_dim_units(
-                        sim_in_pfull_var,
-                        "pfull",
-                        "hPa";
-                        conversion_function = x -> 0.01 * x,
-                    )
-                    return sim_in_pfull_var
+                    return sim_var
                 end
         )
     end

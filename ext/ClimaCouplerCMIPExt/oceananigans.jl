@@ -15,7 +15,7 @@ const TGRF = Union{<:OC.ImmersedBoundaryGrid{<:Any, <:Any, <:Any, <:Any, <:TG}, 
 function OC.Fields.set_to_array!(u::OC.Field{LX, <:OC.Grids.Center, LZ, O, <:TGRF}, a) where {LX, LZ, O}
     a = OC.Architectures.on_architecture(OC.Architectures.CPU(), a)
     a = resize_to_facefolded(a)
-    a = OC.Architectures.on_architecture(architecture(u), a)
+    a = OC.Architectures.on_architecture(OC.Architectures.architecture(u), a)
 
     try
         copyto!(OC.interior(u), a)

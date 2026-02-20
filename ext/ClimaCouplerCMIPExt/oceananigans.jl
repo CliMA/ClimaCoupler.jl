@@ -13,7 +13,7 @@ const TGRF = Union{<:OC.ImmersedBoundaryGrid{<:Any, <:Any, <:Any, <:Any, <:TG}, 
 @inline resize_to_facefolded(a::AbstractArray{T, 3}) where T = a[:, 1:end-1, :]
 
 function OC.Fields.set_to_array!(u::OC.Field{LX, <:OC.Grids.Center, LZ, O, <:TGRF}, a) where {LX, LZ, O}
-    a = OC.Architectures.on_architecture(CPU(), a)
+    a = OC.Architectures.on_architecture(OC.Architectures.CPU(), a)
     a = resize_to_facefolded(a)
     a = OC.Architectures.on_architecture(architecture(u), a)
 

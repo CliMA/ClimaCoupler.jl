@@ -18,7 +18,7 @@ output_default_diagnostics: true
 rayleigh_sponge: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "540secs"
+t_end: "181days"
 topo_smoothing: true
 topography: "Earth"
 turbconv: ~

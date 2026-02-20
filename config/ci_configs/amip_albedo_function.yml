@@ -1,6 +1,6 @@
 apply_limiter: false
 bucket_albedo_type: "function"
-dt: "150secs"
+dt: "30mins"
 dt_cpl: "150secs"
 dt_rad: "1hours"
 dz_bottom: 30
@@ -11,7 +11,7 @@ precip_model: "0M"
 rad: "gray"
 rayleigh_sponge: true
 share_surface_space: false
-t_end: "366days"
+t_end: "462days"
 vert_diff: "true"
 z_elem: 50
 z_stretch: false

@@ -35,8 +35,12 @@ end
 # Set the initial conditions from omip output after 20 years evolution (1992 - 2012)
 function OC.set!(model::OC.HydrostaticFreeSurfaceModel, ::ECCO4InitialConditions)
 
-    Sm = Metadatum(:salinity,    dataset=ECCO4Monthly(), date=DateTime(1995, 1, 1))
-    Tm = Metadatum(:temperature, dataset=ECCO4Monthly(), date=DateTime(1995, 1, 1))
+    Sm = CO.DataWrangling.Metadatum(:salinity,    
+            dataset=CO.DataWrangling.ECCO.ECCO4Monthly(), 
+            date=CO.DataWrangling.DateTime(2010, 1, 1))
+    Tm = CO.DataWrangling.Metadatum(:temperature, 
+            dataset=CO.DataWrangling.ECCO.ECCO4Monthly(),
+            date=CO.DataWrangling.DateTime(2010, 1, 1))
 
     OC.set!(model, T = Tm, S = Sm)
 
@@ -273,7 +277,7 @@ function OceananigansSimulation(
         )
         free_surface_writer = OC.NetCDFWriter(
             ocean.model,
-            (; η = ocean.model.free_surface.displacement);
+            (; displacement = ocean.model.free_surface.displacement);
             schedule = OC.TimeInterval(3600), # hourly snapshots
             filename = joinpath(output_dir, "ocean_free_surface.nc"),
             overwrite_existing = true,

@@ -109,7 +109,7 @@ steps:
           slurm_ntasks: 2
           slurm_mem: 32GB
 
-      - label: "GPU restarts"
+      - label: "GPU restarts (state and cache)"
         command: "julia -O0 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/restart.jl"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -118,7 +118,7 @@ steps:
           slurm_gres: "gpu:1"
           slurm_mem: 32GB
 
-      - label: "GPU restarts"
+      - label: "GPU restarts (state only)"
         command: "julia -O0 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/restart_state_only.jl"
         env:
           CLIMACOMMS_DEVICE: "CUDA"

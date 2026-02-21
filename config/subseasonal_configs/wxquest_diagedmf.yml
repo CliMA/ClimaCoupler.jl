@@ -50,26 +50,3 @@ extra_atmos_diagnostics:
   - short_name: [tas, pr, mslp, rsut, rlut]
     period: 1days
     reduction_time: average
-  # - short_name: [tas, ts, pr, mslp, ta, hus, hur, zg, orog, pfull, ua, va, wa, waup]
-  #   period: 1days
-  #   reduction_time: average
-  # - short_name: [hfss, hfls, evspsbl]
-  #   period: 1days
-  #   reduction_time: average
-  ###############
-  # - short_name: [tas, ts, pr, mslp, ta, hus, hur, zg, orog, pfull, ua, va, wa, waup]
-  #   period: 24hours
-  #   reduction_time: average
-  # - short_name: [hfss, hfls, evspsbl]
-  #   period: 24hours
-  #   reduction_time: average
-  # - short_name: [tas, ts, pr, mslp, ta, hus, hur, zg, orog, pfull, ua, va, wa, waup]
-  #   period: 24hours
-  #   reduction_time: average
-  # - short_name: [zg, orog, tas, ta, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cl, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, wa, waup]
-  #   period: 24hours
-  #   reduction_time: inst
-# extra_atmos_diagnostics:
-#   - short_name: [zg, orog, tas, ta, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, wa, waup]
-#     period: 3hours
-#     reduction_time: average

@@ -21,7 +21,7 @@ rayleigh_sponge: true
 simple_ocean: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "1days"
+t_end: "14days"
 topo_smoothing: true
 topography: "Earth"
 viscous_sponge: true

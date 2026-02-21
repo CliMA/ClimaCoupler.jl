@@ -17,26 +17,19 @@ include(
 using Pkg
 function ClimaCalibrate.forward_model(iter, member)
     Pkg.status()
-    config_dict = ClimaCoupler.Input.get_coupler_config_dict(CALIBRATE_CONFIG.config_file)
-    output_dir_root = CALIBRATE_CONFIG.output_dir
-    start_date =
-        first(CALIBRATE_CONFIG.sample_date_ranges[iter + 1]) - CALIBRATE_CONFIG.spinup
-    start_date_str = replace(string(Date(start_date)), "-" => "")
-    end_date = last(CALIBRATE_CONFIG.sample_date_ranges[iter + 1]) + CALIBRATE_CONFIG.extend
-    sim_length = Second(end_date - start_date)
+    (; config_file, output_dir, sample_date_ranges, spinup, extend) = CALIBRATE_CONFIG
+    config_dict = ClimaCoupler.Input.get_coupler_config_dict(config_file)
+    output_dir_root = output_dir
 
-    config_dict["start_date"] = start_date_str
-    config_dict["t_end"] = "$(sim_length.value)secs"
-    config_dict["checkpoint_dt"] = "900days"
+    # Update start date and length of simulation
+    start_date = first(sample_date_ranges[iter + 1]) - spinup
+    end_date = last(sample_date_ranges[iter + 1]) + extend
+    ClimaCoupler.CalibrateTools.update_tspan!(config_dict, start_date, end_date)
 
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)
-    if haskey(config_dict, "coupler_toml")
-        config_dict["coupler_toml"] =
-            [config_dict["coupler_toml"]..., sampled_parameter_file]
-    else
-        config_dict["coupler_toml"] = [sampled_parameter_file]
-    end
+    ClimaCoupler.CalibrateTools.add_parameter_filepath!(config_dict, sampled_parameter_file)
+
     # Set member output directory
     member_output_dir =
         ClimaCalibrate.path_to_ensemble_member(output_dir_root, iter, member)

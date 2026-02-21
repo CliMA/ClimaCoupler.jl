@@ -79,3 +79,30 @@ end
 
     @test_throws ErrorException get(data_loader, "idk")
 end
+
+@testset "Calibration utilities" begin
+    # Test adding parameter toml files
+    config_dict = Dict()
+    parameter_toml_file1 = "parameters1.toml"
+    parameter_toml_file2 = "parameters2.toml"
+    CalibrationTools.add_parameter_filepath!(config_dict, parameter_toml_file1)
+
+    @test config_dict["coupler_toml"] == [parameter_toml_file1]
+
+    CalibrationTools.add_parameter_filepath!(config_dict, parameter_toml_file2)
+    @test config_dict["coupler_toml"] == [parameter_toml_file1, parameter_toml_file2]
+
+    # Test updating tspan
+    config_dict = Dict()
+    start_date = Dates.DateTime(2010, 12, 13)
+    end_date = Dates.DateTime(2012)
+    CalibrationTools.update_tspan!(config_dict, start_date, end_date)
+    @test config_dict["start_date"] == "20101213"
+    @test config_dict["t_end"] == "$((Dates.Second(end_date - start_date)).value)secs"
+
+    config_dict["start_date"] == "20501213"
+    config_dict["t_end"] == "0secs"
+    CalibrationTools.update_tspan!(config_dict, start_date, end_date)
+    @test config_dict["start_date"] == "20101213"
+    @test config_dict["t_end"] == "$((Dates.Second(end_date - start_date)).value)secs"
+end

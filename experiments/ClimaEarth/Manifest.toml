@@ -444,9 +444,9 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaInterpolations", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "Flux", "ForwardDiff", "Insolation", "Interpolations", "JLD2", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "NullBroadcasts", "RRTMGP", "Random", "SciMLBase", "SparseMatrixColorings", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
-git-tree-sha1 = "95d3ae15622beff41001a396905e5502a903d9e6"
+git-tree-sha1 = "54626067115e768d56733efc047e0bb725fe1398"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.35.3"
+version = "0.35.4"
 
 [[deps.ClimaCalibrate]]
 deps = ["Dates", "Distributed", "Distributions", "EnsembleKalmanProcesses", "JLD2", "Logging", "Random", "TOML", "YAML"]
@@ -615,9 +615,9 @@ version = "0.1.13"
 
 [[deps.CloudMicrophysics]]
 deps = ["ClimaParams", "DocStringExtensions", "ForwardDiff", "LazyArtifacts", "LogExpFunctions", "RootSolvers", "SpecialFunctions", "StaticArrays", "Thermodynamics", "UnrolledUtilities"]
-git-tree-sha1 = "ec7626b4d6a1b9f64093a323f49a6086b85018bd"
+git-tree-sha1 = "ac7ff424bdee2a046e8e92cae91d479458c38bbf"
 uuid = "6a9e3e04-43cd-43ba-94b9-e8782df3c71b"
-version = "0.30.0"
+version = "0.31.9"
 
     [deps.CloudMicrophysics.extensions]
     EmulatorModelsExt = ["DataFrames", "MLJ"]
@@ -2364,9 +2364,9 @@ version = "1.1.3"
 
 [[deps.NaNStatistics]]
 deps = ["PrecompileTools", "Static", "StaticArrayInterface"]
-git-tree-sha1 = "1a7ada3d58e245ab246ba66beae43e455a84566a"
+git-tree-sha1 = "d40d2359680061c5c61d5e324805ebf2ef0d8816"
 uuid = "b946abbf-3ea7-4610-9019-9858bfdeaf2d"
-version = "0.6.55"
+version = "0.6.56"
 
     [deps.NaNStatistics.extensions]
     NaNStatisticsDimensionalDataExt = "DimensionalData"
@@ -2938,9 +2938,9 @@ version = "1.0.2"
 
 [[deps.Roots]]
 deps = ["Accessors", "CommonSolve", "Printf"]
-git-tree-sha1 = "8a433b1ede5e9be9a7ba5b1cc6698daa8d718f1d"
+git-tree-sha1 = "24a107726fb5c14f93985ca4e1066b891e09ec67"
 uuid = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
-version = "2.2.10"
+version = "2.2.12"
 
     [deps.Roots.extensions]
     RootsChainRulesCoreExt = "ChainRulesCore"
@@ -3266,9 +3266,9 @@ weakdeps = ["OffsetArrays", "StaticArrays"]
 
 [[deps.StaticArrays]]
 deps = ["LinearAlgebra", "PrecompileTools", "Random", "StaticArraysCore"]
-git-tree-sha1 = "eee1b9ad8b29ef0d936e3ec9838c7ec089620308"
+git-tree-sha1 = "0f529006004a8be48f1be25f3451186579392d47"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "1.9.16"
+version = "1.9.17"
 weakdeps = ["ChainRulesCore", "Statistics"]
 
     [deps.StaticArrays.extensions]

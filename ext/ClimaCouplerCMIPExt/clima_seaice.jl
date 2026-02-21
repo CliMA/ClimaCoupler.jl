@@ -302,7 +302,9 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_density}) =
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_heat_capacity}) =
     sim.ice.model.ice_thermodynamics.phase_transitions.ice_heat_capacity
 
-# Surface temperature from last timestep (Celsius → Kelvin)
+# Surface temperature from last timestep.
+# Units: ClimaSeaIce stores top_surface_temperature in [°C]; coupler convention is [K].
+# So we return Kelvin: C_to_K + top_surface_temperature.
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
     sim.ice_properties.C_to_K + sim.ice.model.ice_thermodynamics.top_surface_temperature
 
@@ -409,9 +411,23 @@ function FluxCalculator.compute_surface_fluxes!(
 
     uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
 
-    # Surface temperature guess from last timestep
+    # Surface temperature guess from last timestep [K]
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
     T_sfc = csf.scalar_temp1
+
+    # Oceananigans uses latitude (-80, 80); outside that, use atmosphere near-surface T instead of ice (remapping gives 0)
+    coords = CC.Fields.coordinate_field(boundary_space)
+    ocean_lat_bound = FT(80)
+    T_sfc = ifelse.(abs.(coords.lat) .>= ocean_lat_bound, csf.T_atmos, T_sfc)
+
+    T_sfc_min_K = FT(200)
+    T_min, i_min = findmin(parent(T_sfc))
+    if T_min ≤ 0 || !isfinite(T_min)
+        lat_min = parent(coords.lat)[i_min]
+        long_min = parent(coords.long)[i_min]
+        @warn "T_sfc invalid at point outside ocean bounds (|lat|>80°?) or bad init; clamping to avoid Inf in surface_density" T_min = T_min lat = lat_min long = long_min i_min = i_min
+    end
+    T_sfc = max.(T_sfc, T_sfc_min_K)
 
     # Surface humidity
     ρ_sfc =
@@ -533,9 +549,11 @@ function FluxCalculator.compute_surface_fluxes!(
     @. csf.ustar += ustar * area_fraction
     @. csf.buoyancy_flux += buoyancy_flux * area_fraction
 
-    # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists)
-    csf.scalar_temp2 .=
-        ifelse.(area_fraction .≈ 0, zero(FT), T_sfc_new .- FT(sim.ice_properties.C_to_K))
+    # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists).
+    # Clamp so we never write ≤ -C_to_K (°C), which would read back as ≤ 0 K.
+    C_to_K = FT(sim.ice_properties.C_to_K)
+    T_sfc_celsius = clamp.(T_sfc_new .- C_to_K, FT(-100), C_to_K)
+    csf.scalar_temp2 .= ifelse.(area_fraction .≈ 0, zero(FT), T_sfc_celsius)
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr1,
         sim.remapping.remapper_cc,

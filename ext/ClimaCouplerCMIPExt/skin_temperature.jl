@@ -91,8 +91,6 @@ function update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
         numerator = T_i - (δ / κ) * (J_a - 4 * σ * ϵ * T_sfc_n^4)
         denominator = 1 + 4 * δ * σ * ϵ * T_sfc_n^3 / κ
         T_sfc_new = numerator / denominator
-
-        # Cap surface temperature at melting temperature 
         T_sfc_new = min(T_sfc_new, T_melt)
 
         return T_sfc_new

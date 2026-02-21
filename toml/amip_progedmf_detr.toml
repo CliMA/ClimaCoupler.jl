@@ -77,7 +77,7 @@ value = 0.35509778819311516
 value = 1350
 
 [Tq_correlation_coefficient]
-value = 0.6
+value = -0.6
 
 [diagnostic_covariance_coeff]
 value = 2.1

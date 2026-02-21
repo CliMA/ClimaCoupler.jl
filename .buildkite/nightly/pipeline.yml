@@ -1,6 +1,6 @@
 agents:
   queue: clima
-  slurm_time: 14:00:00
+  slurm_time: 24:00:00
   modules: climacommon/2025_05_15
 
 env:
@@ -10,7 +10,7 @@ env:
   CONFIG_PATH: "config/nightly_configs"
   BENCHMARK_CONFIG_PATH: "config/benchmark_configs"
 
-timeout_in_minutes: 840
+timeout_in_minutes: 1440
 
 
 steps:
@@ -99,7 +99,7 @@ steps:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_progedmf_entr.yml --job_id amip_coarse_progedmf_entr"
         artifact_paths: "output/amip_coarse_progedmf_entr/artifacts/*"
-        timeout_in_minutes: 840
+        timeout_in_minutes: 1440
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
@@ -114,7 +114,7 @@ steps:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_progedmf_detr.yml --job_id amip_coarse_progedmf_detr"
         artifact_paths: "output/amip_coarse_progedmf_detr/artifacts/*"
-        timeout_in_minutes: 840
+        timeout_in_minutes: 1440
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

@@ -74,13 +74,13 @@ value = 0.5168130504404477
 value = 0.35509778819311516
 
 [precipitation_timescale]
-value = 1350
+value = 1500
 
 [Tq_correlation_coefficient]
 value = -1
 
 [diagnostic_covariance_coeff]
-value = 4.2
+value = 2.1
 
 [supersaturation_precipitation_threshold]
 value = 0.02

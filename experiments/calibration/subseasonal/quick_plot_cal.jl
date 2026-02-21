@@ -6,14 +6,14 @@ using Makie
 using CairoMakie
 using JLD2
 using Statistics
-using KernelDensity
+#using KernelDensity
 
 # ============================================================================
 # Configuration
 # ============================================================================
-output_dir = "/glade/derecho/scratch/cchristo/calibration/exp25"
+output_dir = "/glade/derecho/scratch/zhaoyi/calibration/"
 exp_suffix = basename(output_dir)
-last_iter = 4  # adjust to your final iteration (displays as 0 to last_iter-1)
+last_iter = 3  # adjust to your final iteration (displays as 0 to last_iter-1)
 
 # Create output folder for plots
 plots_dir = "calibration_plots"
@@ -188,36 +188,36 @@ for i in 1:n_params
         ylabel = "Density",
     )
     
-    prior_vals = vec(ϕ_prior[i, :])
-    posterior_vals = vec(ϕ_posterior[i, :])
+    # prior_vals = vec(ϕ_prior[i, :])
+    # posterior_vals = vec(ϕ_posterior[i, :])
     
-    # Compute kernel density estimates
-    # Handle edge cases where all values might be the same
-    prior_range = maximum(prior_vals) - minimum(prior_vals)
-    posterior_range = maximum(posterior_vals) - minimum(posterior_vals)
+    # # Compute kernel density estimates
+    # # Handle edge cases where all values might be the same
+    # prior_range = maximum(prior_vals) - minimum(prior_vals)
+    # posterior_range = maximum(posterior_vals) - minimum(posterior_vals)
     
-    # Use histograms if range is too small for KDE
-    if prior_range > 1e-10 && length(unique(prior_vals)) > 3
-        kde_prior = kde(prior_vals)
-        lines!(ax, kde_prior.x, kde_prior.density, 
-               color = :gray, linewidth = 2.5, linestyle = :dash, label = "Initial (iter 1)")
-        band!(ax, kde_prior.x, zeros(length(kde_prior.x)), kde_prior.density, 
-              color = (:gray, 0.2))
-    else
-        # Fallback: plot as vertical lines at the value
-        vlines!(ax, prior_vals, color = (:gray, 0.5), linewidth = 1, label = "Initial (iter 1)")
-    end
+    # # Use histograms if range is too small for KDE
+    # if prior_range > 1e-10 && length(unique(prior_vals)) > 3
+    #     kde_prior = kde(prior_vals)
+    #     lines!(ax, kde_prior.x, kde_prior.density, 
+    #            color = :gray, linewidth = 2.5, linestyle = :dash, label = "Initial (iter 1)")
+    #     band!(ax, kde_prior.x, zeros(length(kde_prior.x)), kde_prior.density, 
+    #           color = (:gray, 0.2))
+    # else
+    #     # Fallback: plot as vertical lines at the value
+    #     vlines!(ax, prior_vals, color = (:gray, 0.5), linewidth = 1, label = "Initial (iter 1)")
+    # end
     
-    if posterior_range > 1e-10 && length(unique(posterior_vals)) > 3
-        kde_posterior = kde(posterior_vals)
-        lines!(ax, kde_posterior.x, kde_posterior.density, 
-               color = :royalblue, linewidth = 3, label = "Final (iter $(last_iter))")
-        band!(ax, kde_posterior.x, zeros(length(kde_posterior.x)), kde_posterior.density, 
-              color = (:royalblue, 0.3))
-    else
-        vlines!(ax, posterior_vals, color = (:royalblue, 0.7), linewidth = 2, 
-                label = "Final (iter $(last_iter))")
-    end
+    # if posterior_range > 1e-10 && length(unique(posterior_vals)) > 3
+    #     kde_posterior = kde(posterior_vals)
+    #     lines!(ax, kde_posterior.x, kde_posterior.density, 
+    #            color = :royalblue, linewidth = 3, label = "Final (iter $(last_iter))")
+    #     band!(ax, kde_posterior.x, zeros(length(kde_posterior.x)), kde_posterior.density, 
+    #           color = (:royalblue, 0.3))
+    # else
+    #     vlines!(ax, posterior_vals, color = (:royalblue, 0.7), linewidth = 2, 
+    #             label = "Final (iter $(last_iter))")
+    # end
     
     # Add legend only to first panel
     if i == 1

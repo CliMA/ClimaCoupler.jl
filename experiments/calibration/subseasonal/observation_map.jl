@@ -149,52 +149,52 @@ function ClimaCalibrate.observation_map(iteration)
     # DIAGNOSTIC: Compare G ensemble mean vs y (observations)
     # This helps verify that model and observations are properly aligned
     # ==========================================================================
-    obs_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/obs_vec.jld2")
-    if isfile(obs_path)
-        obs_vec = JLD2.load_object(obs_path)
-        if !isempty(obs_vec)
-            y = first(first(obs_vec).samples)  # Get the observation vector (samples is a Vector of Vectors)
-            g_mean = vec(Statistics.mean(g_ens, dims=2))
+    # obs_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal/obs_vec.jld2")
+    # if isfile(obs_path)
+    #     obs_vec = JLD2.load_object(obs_path)
+    #     if !isempty(obs_vec)
+    #         y = first(first(obs_vec).samples)  # Get the observation vector (samples is a Vector of Vectors)
+    #         g_mean = vec(Statistics.mean(g_ens, dims=2))
             
-            if length(y) == length(g_mean)
-                @info "=== DIAGNOSTIC: G vs y comparison (normalized units) ==="
+    #         if length(y) == length(g_mean)
+    #             @info "=== DIAGNOSTIC: G vs y comparison (normalized units) ==="
                 
-                if use_nh_averages
-                    # NH averages mode: simple per-variable comparison (one value each)
-                    for (i, short_name) in enumerate(short_names)
-                        bias = g_mean[i] - y[i]
-                        @info "  $short_name: G=$(round(g_mean[i], sigdigits=4)), y=$(round(y[i], sigdigits=4)), bias=$(round(bias, sigdigits=3))"
-                    end
-                    overall_rmse = sqrt(Statistics.mean((g_mean .- y).^2))
-                    @info "  Overall RMSE: $(round(overall_rmse, sigdigits=3))"
-                else
-                    # Full gridpoint mode: compute per-variable statistics
-                    tas_end = 24472
-                    mslp_end = tas_end + 64800
-                    pr_end = mslp_end + 24472
+    #             if use_nh_averages
+    #                 # NH averages mode: simple per-variable comparison (one value each)
+    #                 for (i, short_name) in enumerate(short_names)
+    #                     bias = g_mean[i] - y[i]
+    #                     @info "  $short_name: G=$(round(g_mean[i], sigdigits=4)), y=$(round(y[i], sigdigits=4)), bias=$(round(bias, sigdigits=3))"
+    #                 end
+    #                 overall_rmse = sqrt(Statistics.mean((g_mean .- y).^2))
+    #                 @info "  Overall RMSE: $(round(overall_rmse, sigdigits=3))"
+    #             else
+    #                 # Full gridpoint mode: compute per-variable statistics
+    #                 tas_end = 24472
+    #                 mslp_end = tas_end + 64800
+    #                 pr_end = mslp_end + 24472
                     
-                    if length(y) >= pr_end
-                        # Per-variable bias (G - y)
-                        tas_bias = Statistics.mean(g_mean[1:tas_end] .- y[1:tas_end])
-                        mslp_bias = Statistics.mean(g_mean[tas_end+1:mslp_end] .- y[tas_end+1:mslp_end])
-                        pr_bias = Statistics.mean(g_mean[mslp_end+1:pr_end] .- y[mslp_end+1:pr_end])
+    #                 if length(y) >= pr_end
+    #                     # Per-variable bias (G - y)
+    #                     tas_bias = Statistics.mean(g_mean[1:tas_end] .- y[1:tas_end])
+    #                     mslp_bias = Statistics.mean(g_mean[tas_end+1:mslp_end] .- y[tas_end+1:mslp_end])
+    #                     pr_bias = Statistics.mean(g_mean[mslp_end+1:pr_end] .- y[mslp_end+1:pr_end])
                         
-                        # Per-variable RMSE
-                        tas_rmse = sqrt(Statistics.mean((g_mean[1:tas_end] .- y[1:tas_end]).^2))
-                        mslp_rmse = sqrt(Statistics.mean((g_mean[tas_end+1:mslp_end] .- y[tas_end+1:mslp_end]).^2))
-                        pr_rmse = sqrt(Statistics.mean((g_mean[mslp_end+1:pr_end] .- y[mslp_end+1:pr_end]).^2))
+    #                     # Per-variable RMSE
+    #                     tas_rmse = sqrt(Statistics.mean((g_mean[1:tas_end] .- y[1:tas_end]).^2))
+    #                     mslp_rmse = sqrt(Statistics.mean((g_mean[tas_end+1:mslp_end] .- y[tas_end+1:mslp_end]).^2))
+    #                     pr_rmse = sqrt(Statistics.mean((g_mean[mslp_end+1:pr_end] .- y[mslp_end+1:pr_end]).^2))
                         
-                        @info "  tas:  bias=$(round(tas_bias, sigdigits=3)), RMSE=$(round(tas_rmse, sigdigits=3))"
-                        @info "  mslp: bias=$(round(mslp_bias, sigdigits=3)), RMSE=$(round(mslp_rmse, sigdigits=3))"
-                        @info "  pr:   bias=$(round(pr_bias, sigdigits=3)), RMSE=$(round(pr_rmse, sigdigits=3))"
-                    end
-                    @info "  Overall RMSE: $(round(sqrt(Statistics.mean((g_mean .- y).^2)), sigdigits=3))"
-                end
-            else
-                @warn "Dimension mismatch: y=$(length(y)), G=$(length(g_mean))"
-            end
-        end
-    end
+    #                     @info "  tas:  bias=$(round(tas_bias, sigdigits=3)), RMSE=$(round(tas_rmse, sigdigits=3))"
+    #                     @info "  mslp: bias=$(round(mslp_bias, sigdigits=3)), RMSE=$(round(mslp_rmse, sigdigits=3))"
+    #                     @info "  pr:   bias=$(round(pr_bias, sigdigits=3)), RMSE=$(round(pr_rmse, sigdigits=3))"
+    #                 end
+    #                 @info "  Overall RMSE: $(round(sqrt(Statistics.mean((g_mean .- y).^2)), sigdigits=3))"
+    #             end
+    #         else
+    #             @warn "Dimension mismatch: y=$(length(y)), G=$(length(g_mean))"
+    #         end
+    #     end
+    # end
     
     return g_ens
 end

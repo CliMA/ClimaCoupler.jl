@@ -38,7 +38,7 @@ JLD2.default_iotype() = IOStream
 # CONFIGURATION - Edit these as needed
 # =============================================================================
 # Calibration output directory (where iteration_XXX folders are)
-const CALIBRATION_OUTPUT_DIR = "/glade/derecho/scratch/cchristo/calibration/exp25"
+const CALIBRATION_OUTPUT_DIR = "/glade/derecho/scratch/zhaoyi/calibration/"
 
 # Iteration to analyze (0-indexed). Set to -1 to use the latest available iteration.
 const ITERATION_TO_ANALYZE = 1

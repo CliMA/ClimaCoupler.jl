@@ -74,10 +74,10 @@ value = 0.5168130504404477
 value = 0.35509778819311516
 
 [precipitation_timescale]
-value = 1200
+value = 1350
 
 [Tq_correlation_coefficient]
-value = -1
+value = 0.6
 
 [diagnostic_covariance_coeff]
 value = 2.1

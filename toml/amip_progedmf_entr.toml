@@ -26,16 +26,16 @@ value = 0.7
 value = 0
 
 [entr_param_vec]
-value = [0, 0.1759425797637972, -4.15529994350738, 0, 0, 0.1]
+value = [0, 0.1759425797637972, -4.15529994350738, 0, 0, 0.46]
 
 [entr_mult_limiter_coeff]
 value = 0.6022681998170195
 
 [entr_inv_tau]
-value = 1.0e-5
+value = 1.0e-4
 
 [detr_inv_tau]
-value = 1.0e-5
+value = 1.0e-4
 
 [detr_coeff]
 value = 0
@@ -74,13 +74,13 @@ value = 0.5168130504404477
 value = 0.35509778819311516
 
 [precipitation_timescale]
-value = 1200
+value = 1350
 
 [Tq_correlation_coefficient]
 value = -1
 
 [diagnostic_covariance_coeff]
-value = 2.1
+value = 4.2
 
 [supersaturation_precipitation_threshold]
 value = 0.02

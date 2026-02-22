@@ -7,7 +7,7 @@ coupler_toml: ["toml/amip_progedmf_entr.toml"]
 dt: "180secs"
 dt_cpl: "180secs"
 energy_check: false
-h_elem: 12
+h_elem: 8
 initial_condition: "AMIPFromERA5"
 mode_name: "amip"
 netcdf_interpolation_num_points: [90, 45, 31]
@@ -23,7 +23,7 @@ topography: "Earth"
 edmfx_entr_model: "PiGroups"
 prescribed_aerosols: []
 aerosol_radiation: false
-non_orographic_gravity_wave: true
+#non_orographic_gravity_wave: true
 extra_atmos_diagnostics:
   - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls]
     period: 1months

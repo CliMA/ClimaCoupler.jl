@@ -26,7 +26,7 @@ value = 0.7
 value = 0
 
 [entr_param_vec]
-value = [0, 0.1759425797637972, -4.15529994350738, 0, 0, 0.46]
+value = [0, 0.1759425797637972, -4.15529994350738, 0, 0, 0.23]
 
 [entr_mult_limiter_coeff]
 value = 0.6022681998170195
@@ -59,7 +59,8 @@ value = 8.002319316450539
 value = 0.04592259632544556
 
 [mixing_length_tke_surf_flux_coeff]
-value = 0.3331950998157493
+#value = 0.3331950998157493
+value = 1.2
 
 [mixing_length_diss_coeff]
 value = 0.04640288100600733
@@ -74,10 +75,10 @@ value = 0.5168130504404477
 value = 0.35509778819311516
 
 [precipitation_timescale]
-value = 1500
+value = 1350
 
 [Tq_correlation_coefficient]
-value = -1
+value = -0.6
 
 [diagnostic_covariance_coeff]
 value = 2.1

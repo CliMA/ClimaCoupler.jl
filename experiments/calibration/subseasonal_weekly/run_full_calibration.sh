@@ -12,7 +12,7 @@
 
 set -e  # Exit on error
 
-cd /glade/u/home/cchristo/clima/copies3/ClimaCoupler.jl
+cd /glade/u/home/cchristo/clima/copies2/ClimaCoupler.jl
 
 # Log to file AND terminal using tee
 LOGFILE="calibration_$(date +%Y%m%d_%H%M%S).log"
@@ -30,11 +30,15 @@ echo "=============================================="
 echo ""
 
 # Step 1: Ensure packages are instantiated
-echo "[1/2] Ensuring package dependencies are installed..."
+echo "[1/3] Ensuring package dependencies are installed..."
 julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate()'
 
-# Step 2: Run calibration (ClimaGPUBackend handles worker submission)
-echo "[2/2] Starting calibration..."
+# Step 2: Generate observations (creates obs_vec.jld2 and norm_stats.jld2)
+echo "[2/3] Generating observations from ERA5 data..."
+julia --project=experiments/ClimaEarth experiments/calibration/subseasonal_weekly/generate_observations.jl
+
+# Step 3: Run calibration (DerechoBackend handles GPU worker submission)
+echo "[3/3] Starting calibration..."
 echo ""
 
 julia --project=experiments/ClimaEarth experiments/calibration/subseasonal_weekly/run_calibration.jl

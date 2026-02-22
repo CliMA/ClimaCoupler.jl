@@ -8,7 +8,7 @@ Calibrate ClimaCoupler parameters using EnsembleKalmanProcesses against ERA5 obs
 ### Option A: TransformUnscented (recommended, simpler)
 
 ```bash
-cd /glade/u/home/cchristo/clima/copies3/ClimaCoupler.jl
+cd /glade/u/home/cchristo/clima/copies2/ClimaCoupler.jl
 
 # 1. Generate observations (only needed once, or when changing obs settings)
 julia --project=experiments/ClimaEarth experiments/calibration/subseasonal_weekly/generate_observations.jl
@@ -20,7 +20,7 @@ julia --project=experiments/ClimaEarth experiments/calibration/subseasonal_weekl
 ### Option B: TransformInversion (more robust, needs precompute)
 
 ```bash
-cd /glade/u/home/cchristo/clima/copies3/ClimaCoupler.jl
+cd /glade/u/home/cchristo/clima/copies2/ClimaCoupler.jl
 
 # 1. Generate observations (only needed once)
 julia --project=experiments/ClimaEarth experiments/calibration/subseasonal_weekly/generate_observations.jl
@@ -35,26 +35,44 @@ Edit `run_calibration.jl` and comment/uncomment the appropriate OPTION block (~l
 
 ## Changing Parameters
 
-Edit `calibration_priors.jl` - this is the single source of truth for:
+Edit `calibration_setup.jl` - this is the single source of truth for:
 - `CALIBRATION_PRIORS` - list of parameters to calibrate
 - `CALIBRATION_ENSEMBLE_SIZE` - ensemble size (for TransformInversion only)
+- `NORMALIZE_VARIABLES` - if true, normalize variables to zero mean and unit variance
+- `CALIBRATION_NOISE_SCALAR` - noise variance for observation covariance
 
-# Analizing Calibraiton 
+### Variable Normalization
+
+When `NORMALIZE_VARIABLES = true` (default), each variable is normalized to zero mean and unit variance:
+1. `generate_observations.jl` computes latitude-weighted mean and std from ERA5 data
+2. Stats are saved to `norm_stats.jld2` 
+3. Observations are normalized before creating the observation vector
+4. `observation_map.jl` loads the same stats and applies them to model output
+
+This ensures variables with different magnitudes (e.g., temperature in K vs radiation in W/m²) contribute equally to the calibration objective.
+
+## Data Source
+
+Uses weekly-averaged ERA5 data from:
+`/glade/campaign/univ/ucit0011/cchristo/wxquest_data/daily_weekly_stats/weekly`
+
+# Analyzing Calibration 
     `julia --project=experiments/ClimaEarth experiments/calibration/subseasonal_weekly/analyze_calibration.jl`
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `calibration_priors.jl` | **Edit this** - defines parameters to calibrate |
+| `calibration_setup.jl` | **Edit this** - defines parameters and settings to calibrate |
 | `run_calibration.jl` | Main calibration script |
-| `generate_observations.jl` | Loads ERA5 data, creates observation vector |
+| `generate_observations.jl` | Loads weekly ERA5 data, creates observation vector |
 | `observation_map.jl` | Maps model output to observation space |
 | `run_full_calibration.sh` | Orchestrator for TransformInversion |
 
 ## Output
 
-Results go to the `output_dir` specified in `run_calibration.jl` (default: `/glade/derecho/scratch/cchristo/calibration/exp9`).
+Results go to the `output_dir` specified in `run_calibration.jl` (currently `/glade/derecho/scratch/cchristo/calibration/expXX`).
+Logs are saved to `calibration_YYYYMMDD_HHMMSS.log` in the output directory.
 
 Plot results:
 ```bash

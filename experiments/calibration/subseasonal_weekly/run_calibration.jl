@@ -28,7 +28,7 @@ model_interface = joinpath(
 
 # Sample date range for calibration (repeated for each iteration)
 const BASE_DATE_RANGE = (DateTime(2010, 1, 1), DateTime(2010, 1, 7))
-const N_ITERATIONS = 6
+const N_ITERATIONS = 3
 
 # Repeat the date range for each iteration so we can reuse subseasonal's forward_model
 # which indexes by sample_date_ranges[iter + 1]
@@ -40,21 +40,22 @@ const ERA5_OBS_DIR = "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/daily_
 const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     config_file = joinpath(
         pkgdir(ClimaCoupler),
-        "config/subseasonal_configs/wxquest_diagedmf_monthly_calibration.yml",
+        "config/subseasonal_configs/wxquest_diagedmf_weekly_calibration.yml",
     ),
-    short_names = ["tas", "mslp", "rsut", "rlut"],
+    # short_names = ["tas", "mslp", "rsut", "rlut"],
+    short_names = ["tas", "rlut"],
     minibatch_size = 1,
     n_iterations = N_ITERATIONS,
     sample_date_ranges,
     extend = Dates.Day(1),
     spinup = Dates.Day(0),
-    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp28",
+    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp30",
     rng_seed = 42,
 )
 
 if abspath(PROGRAM_FILE) == @__FILE__
     # Load priors from shared config (single source of truth)
-    include(joinpath(@__DIR__, "calibration_priors.jl"))
+    include(joinpath(@__DIR__, "calibration_setup.jl"))
     prior = CALIBRATION_PRIOR
 
     observation_vector = JLD2.load_object(
@@ -137,7 +138,21 @@ if abspath(PROGRAM_FILE) == @__FILE__
     #     model_interface,
     #     verbose = true,
     # )
-    backend = ClimaCalibrate.WorkerBackend()
+
+    
+    backend = ClimaCalibrate.DerechoBackend(
+        model_interface = model_interface,
+        verbose = true,
+        hpc_kwargs = Dict(
+            :job_priority => "regular", # {"premium", "regular", "economy", "preempt"}
+            :time => 720,           # 12 hours in minutes
+            :ntasks => 1,
+            :cpus_per_task => 12,
+            :gpus_per_task => 1,
+        ),
+    )
+
+    # backend = ClimaCalibrate.WorkerBackend()
 
     eki = ClimaCalibrate.calibrate(
         backend,

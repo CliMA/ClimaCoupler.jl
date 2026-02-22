@@ -1,8 +1,8 @@
 #=
-Shared calibration configuration - priors and ensemble settings.
+Shared calibration setup - priors, ensemble settings, and noise configuration.
 This is the SINGLE SOURCE OF TRUTH for calibration parameters.
 
-Included by both run_calibration.jl and precompute_ekp_inputs.jl
+Included by run_calibration.jl and generate_observations.jl
 =#
 
 import EnsembleKalmanProcesses.ParameterDistributions as PD
@@ -16,21 +16,20 @@ const CALIBRATION_PRIORS = [
     # Atmospheric parameters
     # PD.constrained_gaussian("entr_inv_tau", 0.002, 0.0015, 0.0, 0.01),
 
-    # Linear regression coefficients (6-element vector)
-    # PD.VectorOfParameterized([PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.4, 0.2)]),
-    PD.ParameterDistribution(
-        PD.VectorOfParameterized([PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.4, 0.2)]),
-        repeat([PD.no_constraint()], 3),
-        "entr_param_vec",
-    ),
+    # PiGroup linear regression coefficients
+    # PD.ParameterDistribution(
+    #     PD.VectorOfParameterized([PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.4, 0.2)]),
+    #     repeat([PD.no_constraint()], 3),
+    #     "entr_param_vec",
+    # ),
 
-    # PD.constrained_gaussian("detr_buoy_coeff", 0.12, 0.06, 0.0, 1.0),
-    PD.constrained_gaussian("detr_vertdiv_coeff", 0.6, 0.25, 0.0, 5.0),
+    # # PD.constrained_gaussian("detr_buoy_coeff", 0.12, 0.06, 0.0, 1.0),
+    # PD.constrained_gaussian("detr_vertdiv_coeff", 0.6, 0.25, 0.0, 5.0),
 
-    # PD.constrained_gaussian("precipitation_timescale", 600, 300, 100, 2000),
-    PD.constrained_gaussian("precipitation_timescale", 1200, 300, 300, 2400),
-    PD.constrained_gaussian("diagnostic_covariance_coeff", 2.1, 0.5, 0, 10),
-    PD.constrained_gaussian("Tq_correlation_coefficient", 0, 0.5, -1, 1),
+    # # PD.constrained_gaussian("precipitation_timescale", 600, 300, 100, 2000),
+    # PD.constrained_gaussian("precipitation_timescale", 1200, 300, 300, 2400),
+    # PD.constrained_gaussian("diagnostic_covariance_coeff", 2.1, 0.5, 0, 10),
+    # PD.constrained_gaussian("Tq_correlation_coefficient", 0, 0.5, -1, 1),
 
     
     # PD.constrained_gaussian("mixing_length_eddy_viscosity_coefficient", 0.2, 0.1, 0, 1.0),
@@ -57,7 +56,7 @@ const CALIBRATION_PRIOR = EKP.combine_distributions(CALIBRATION_PRIORS)
 # ==========================================================================
 # For TransformInversion/Inversion: set ensemble_size freely (typically 5-20)
 # For TransformUnscented: this is IGNORED (uses 2*n_params + 1 automatically)
-const CALIBRATION_ENSEMBLE_SIZE = 17  # For TransformUnscented: 2*n_params+1 = 2*8+1 = 17
+const CALIBRATION_ENSEMBLE_SIZE = 3  # For TransformUnscented: 2*n_params+1 = 2*8+1 = 17
 
 # Random seed for reproducibility
 const CALIBRATION_RNG_SEED = 42
@@ -69,3 +68,10 @@ const CALIBRATION_RNG_SEED = 42
 # Lower values make EKP more aggressive in fitting observations
 const CALIBRATION_NOISE_SCALAR = 3.0
 
+# ==========================================================================
+# NORMALIZATION SETTINGS
+# ==========================================================================
+# If true, normalize each variable to zero mean and unit variance
+# Normalization stats are computed from observations and saved to norm_stats.jld2
+# The same normalization is applied to model output in observation_map.jl
+const NORMALIZE_VARIABLES = true

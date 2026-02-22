@@ -96,6 +96,7 @@ end
 Load a specific day from a daily-mean ERA5 file.
 The daily files have valid_time dimension with multiple days of data.
 We extract just the day matching target_date.
+Note: Returns 2D data (lon, lat) - time dimension is added in preprocess_vars.
 """
 function load_daily_var(filepath, short_name, target_date, file_date_range)
     era5_varname = short_name_to_era5_varname(short_name)
@@ -117,13 +118,10 @@ function load_daily_var(filepath, short_name, target_date, file_date_range)
         
         data_2d = data_3d[:, :, day_idx]
         
-        # Create 3D var with time dimension for ObservationRecipe compatibility
-        time_val = Float64(Dates.datetime2unix(target_date))
-
+        # Create 2D var (time dimension added later in preprocess_vars after resampling)
         dims = OrderedDict{String, Vector{Union{Missing, Float64}}}(
             "longitude" => Float64.(lons),
             "latitude" => Float64.(lats),
-            "time" => [time_val],
         )
         
         dim_attribs = OrderedDict{String, Dict{String, Any}}(
@@ -137,10 +135,6 @@ function load_daily_var(filepath, short_name, target_date, file_date_range)
                 "long_name" => "latitude",
                 "standard_name" => "latitude",
             ),
-            "time" => Dict{String, Any}(
-                "units" => "seconds since 1970-01-01",
-                "calendar" => "standard",
-            ),
         )
         
         attribs = Dict{String, Any}(
@@ -150,8 +144,7 @@ function load_daily_var(filepath, short_name, target_date, file_date_range)
             "long_name" => get(ds[era5_varname].attrib, "long_name", short_name),
         )
         
-        data_3d_reshaped = reshape(Float64.(data_2d), size(data_2d)..., 1)
-        var = ClimaAnalysis.OutputVar(attribs, dims, dim_attribs, data_3d_reshaped)
+        var = ClimaAnalysis.OutputVar(attribs, dims, dim_attribs, Float64.(data_2d))
         
         if !issorted(ClimaAnalysis.latitudes(var))
             var = ClimaAnalysis.reverse_dim(var, ClimaAnalysis.latitude_name(var))
@@ -192,23 +185,53 @@ function load_weekly_var(filepath, short_name, start_date, end_date)
         var = ClimaAnalysis.reverse_dim(var, ClimaAnalysis.latitude_name(var))
     end
 
-    # Ensure time dimension exists for ObservationRecipe compatibility
-    if !haskey(var.dims, "time")
-        time_val = Float64(Dates.datetime2unix(start_date))
-        var.dims["time"] = [time_val]
-        var.dim_attributes["time"] = Dict{String, Any}(
-            "units" => "seconds since 1970-01-01",
-            "calendar" => "standard",
-        )
-        var = ClimaAnalysis.OutputVar(
-            var.attributes,
-            var.dims,
-            var.dim_attributes,
-            reshape(var.data, size(var.data)..., 1),
-        )
-    end
+    # Note: We do NOT add time dimension here - it's added in preprocess_vars after resampling
+    # This avoids issues with ClimaAnalysis.resampled_as which can't handle 3D data properly
     
     return var
+end
+
+"""
+    add_time_dimension(var, start_date)
+
+Add a time dimension to a 2D OutputVar for ObservationRecipe compatibility.
+Time is stored as seconds since start_date, so ClimaAnalysis.dates() can 
+convert it back to DateTime using the start_date attribute.
+"""
+function add_time_dimension(var, start_date)
+    if haskey(var.dims, "time")
+        return var  # Already has time dimension
+    end
+    
+    # Time value = 0.0 means "at start_date"
+    # ClimaAnalysis.dates() will compute: start_date + time_value seconds
+    time_val = 0.0
+    
+    # Create new dims with time, preserving order (lon, lat, time)
+    # and converting to Float64 vectors (ClimaCalibrate expects plain Float64)
+    new_dims = OrderedDict{String, Vector{Float64}}()
+    for k in keys(var.dims)
+        new_dims[k] = Float64.(collect(skipmissing(var.dims[k])))
+    end
+    new_dims["time"] = [time_val]
+    
+    # Create new dim_attributes with time
+    # ClimaCalibrate expects "s" as the unit string for seconds
+    new_dim_attribs = copy(var.dim_attributes)
+    new_dim_attribs["time"] = Dict{String, Any}(
+        "units" => "s",
+        "calendar" => "standard",
+    )
+    
+    # Reshape data to add time dimension, ensure Float64
+    new_data = reshape(Float64.(var.data), size(var.data)..., 1)
+    
+    return ClimaAnalysis.OutputVar(
+        var.attributes,
+        new_dims,
+        new_dim_attribs,
+        new_data,
+    )
 end
 
 """
@@ -252,7 +275,8 @@ end
 """
     preprocess_vars(vars_by_date, config_file)
 
-Preprocess each OutputVar by resampling to the model grid and setting units.
+Preprocess each OutputVar by resampling to the model grid, setting units,
+and adding time dimension for ObservationRecipe compatibility.
 
 Precipitation (pr) requires special handling:
 ERA5 'tp' is in meters/hour, we convert to mm/day using ERA5_PR_CONVERSION.
@@ -266,6 +290,7 @@ function preprocess_vars(vars_by_date, config_file)
         date_range = key[2]
         start_date = date_range[1]
         
+        # Resample to model grid (must be done before adding time dimension)
         var = resample_var(var)
         
         # Apply precipitation unit conversion for ERA5 data
@@ -286,6 +311,9 @@ function preprocess_vars(vars_by_date, config_file)
         var.attributes["short_name"] = short_name
         var.attributes["start_date"] = start_date
         
+        # Add time dimension AFTER resampling for ObservationRecipe compatibility
+        var = add_time_dimension(var, start_date)
+        
         processed[key] = var
     end
     
@@ -300,9 +328,13 @@ matching the subseasonal pipeline pattern.
 
 ObservationRecipe handles latitude weighting and covariance estimation internally,
 replacing the custom normalization and land masking that was previously done manually.
+
+Note: For weekly averages, each OutputVar has a single time point at start_date.
+We pass start_date for both start and end to ObservationRecipe since the data
+represents the entire week as a single snapshot.
 """
 function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
-    include(joinpath(@__DIR__, "calibration_priors.jl"))
+    include(joinpath(@__DIR__, "calibration_setup.jl"))
 
     covar_estimator = ClimaCalibrate.ObservationRecipe.ScalarCovariance(;
         scalar = Float64(CALIBRATION_NOISE_SCALAR),
@@ -312,6 +344,7 @@ function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
     obs_vec = map(sample_date_ranges) do sample_date_range
         # Collect OutputVars for this date range
         date_vars = OutputVar[]
+        start_date = first(sample_date_range)
         for sn in short_names
             key = (sn, sample_date_range)
             if haskey(vars_by_date, key)
@@ -321,14 +354,117 @@ function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
             end
         end
         
+        # Use start_date for both args since weekly data has single time point
+        # The data represents the weekly average, stored at start_date
         ClimaCalibrate.ObservationRecipe.observation(
             covar_estimator,
             date_vars,
-            first(sample_date_range),
-            last(sample_date_range),
+            start_date,
+            start_date,
         )
     end
     return obs_vec
+end
+
+"""
+    compute_normalization_stats(vars_by_date, short_names)
+
+Compute global mean and std for each variable across all date ranges.
+Returns a Dict mapping short_name -> (mean, std).
+Uses latitude-weighted averaging for physically meaningful statistics.
+"""
+function compute_normalization_stats(vars_by_date, short_names)
+    norm_stats = Dict{String, Tuple{Float64, Float64}}()
+    
+    for short_name in short_names
+        # Collect all data for this variable across date ranges
+        all_data = Float64[]
+        all_weights = Float64[]
+        
+        for (key, var) in vars_by_date
+            if key[1] == short_name
+                lats = ClimaAnalysis.latitudes(var)
+                # Compute latitude weights (cosine weighting)
+                lat_weights = cosd.(lats)
+                
+                # Flatten spatial data and replicate weights
+                data = vec(var.data)
+                valid_mask = .!isnan.(data)
+                
+                # Create weight array matching data shape
+                nlat = length(lats)
+                nlon = size(var.data, 1)
+                weights_2d = repeat(lat_weights', nlon, 1)
+                weights_flat = vec(weights_2d)
+                
+                append!(all_data, data[valid_mask])
+                append!(all_weights, weights_flat[valid_mask])
+            end
+        end
+        
+        if isempty(all_data)
+            @warn "No data found for $short_name, using default normalization (0, 1)"
+            norm_stats[short_name] = (0.0, 1.0)
+            continue
+        end
+        
+        # Compute weighted mean and std
+        total_weight = sum(all_weights)
+        weighted_mean = sum(all_data .* all_weights) / total_weight
+        weighted_var = sum(all_weights .* (all_data .- weighted_mean).^2) / total_weight
+        weighted_std = sqrt(weighted_var)
+        
+        # Avoid division by zero
+        if weighted_std < 1e-10
+            @warn "$short_name has near-zero std, using 1.0"
+            weighted_std = 1.0
+        end
+        
+        norm_stats[short_name] = (weighted_mean, weighted_std)
+        @info "Normalization stats for $short_name: mean=$(round(weighted_mean, sigdigits=5)), std=$(round(weighted_std, sigdigits=5))"
+    end
+    
+    return norm_stats
+end
+
+"""
+    normalize_var(var, norm_stats)
+
+Normalize an OutputVar using precomputed normalization statistics.
+Returns a new OutputVar with normalized data: (data - mean) / std
+"""
+function normalize_var(var, norm_stats)
+    short_name = var.attributes["short_name"]
+    if !haskey(norm_stats, short_name)
+        @warn "No normalization stats for $short_name, returning unchanged"
+        return var
+    end
+    
+    mean_val, std_val = norm_stats[short_name]
+    normalized_data = (var.data .- mean_val) ./ std_val
+    
+    return ClimaAnalysis.OutputVar(
+        var.attributes,
+        var.dims,
+        var.dim_attributes,
+        normalized_data,
+    )
+end
+
+"""
+    normalize_vars(vars_by_date, norm_stats)
+
+Apply normalization to all variables in vars_by_date.
+Returns a new Dict with normalized OutputVars.
+"""
+function normalize_vars(vars_by_date, norm_stats)
+    normalized = Dict{Tuple{String, NTuple{2, Dates.DateTime}}, OutputVar}()
+    
+    for (key, var) in vars_by_date
+        normalized[key] = normalize_var(var, norm_stats)
+    end
+    
+    return normalized
 end
 
 """
@@ -354,13 +490,18 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
     
+    # Load calibration setup for NORMALIZE_VARIABLES setting
+    include(joinpath(@__DIR__, "calibration_setup.jl"))
+    
     sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges
     short_names = CALIBRATE_CONFIG.short_names
     config_file = CALIBRATE_CONFIG.config_file
     obs_dir = ERA5_OBS_DIR
+    output_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal_weekly")
     
     @info "Generating observations for $short_names"
     @info "Using ERA5 data from: $obs_dir"
+    @info "Normalization enabled: $NORMALIZE_VARIABLES"
     @info "The number of samples is $(length(sample_date_ranges)) over $sample_date_ranges"
 
     # Load weekly ERA5 files
@@ -370,22 +511,26 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # Preprocess (resample to model grid and set units)
     preprocessed_vars = preprocess_vars(unprocessed_vars, config_file)
 
+    # Compute and apply normalization if enabled
+    if NORMALIZE_VARIABLES
+        norm_stats = compute_normalization_stats(preprocessed_vars, short_names)
+        
+        # Save normalization stats for use in observation_map.jl
+        JLD2.save_object(joinpath(output_path, "norm_stats.jld2"), norm_stats)
+        @info "Saved normalization stats to norm_stats.jld2"
+        
+        # Apply normalization to observations
+        preprocessed_vars = normalize_vars(preprocessed_vars, norm_stats)
+        @info "Applied normalization to observations"
+    end
+
     # Save preprocessed variables (for inspection/debugging)
-    JLD2.save_object(
-        joinpath(
-            pkgdir(ClimaCoupler),
-            "experiments/calibration/subseasonal_weekly/preprocessed_vars.jld2",
-        ),
-        preprocessed_vars,
-    )
+    JLD2.save_object(joinpath(output_path, "preprocessed_vars.jld2"), preprocessed_vars)
     
     # Create observation vector using ObservationRecipe (like subseasonal pipeline)
     observation_vector =
         make_observation_vector(preprocessed_vars, sample_date_ranges, short_names)
-    JLD2.save_object(
-        joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal_weekly/obs_vec.jld2"),
-        observation_vector,
-    )
+    JLD2.save_object(joinpath(output_path, "obs_vec.jld2"), observation_vector)
     
     @info "Saved observation vector with $(length(observation_vector)) samples"
 end

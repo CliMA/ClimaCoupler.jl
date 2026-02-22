@@ -1,0 +1,55 @@
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
+coupler_toml: ["toml/wxquest_diagedmf.toml"]
+strict_params: false
+mode_name: "subseasonal"
+era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+initial_condition: "WeatherModel"
+checkpoint_dt: "100days"
+dt: "150secs"
+dt_cpl: "150secs"
+dt_cloud_fraction: "1hours"
+dt_rad: "1hours"
+dt_seaice: "150secs"
+ode_algo: "ARS222"
+energy_check: false
+h_elem: 12
+z_elem: 63
+z_max: 60000.0
+land_fraction_source: "era5"
+binary_area_fraction: false
+
+### integrated land ###
+land_model: "integrated"
+lai_source: "modis_monthly_climatology"
+
+### gravity waves 
+# orographic_gravity_wave: "raw_topo"
+non_orographic_gravity_wave: true
+
+
+
+### bucket land ###
+# land_model: "bucket"
+# bucket_albedo_type: "map_temporal"
+# bucket_albedo_type: "era5"
+# bucket_initial_condition: "/net/sampo/data1/cchristo/WeatherQuest_data/archive_dev4/era5_bucket_processed_20250831_0000.nc"
+
+land_spun_up_ic: false
+land_temperature_anomaly: "nothing"
+radiation_reset_rng_seed: true
+start_date: "20230115"
+surface_setup: "PrescribedSurface"
+topo_smoothing: true
+topography: "Earth"
+# t_end: "8days"
+t_end: "1days"
+netcdf_output_at_levels: true
+output_default_diagnostics: false
+use_coupler_diagnostics: false
+use_land_diagnostics: false
+extra_atmos_diagnostics:
+  - short_name: [tas, pr, mslp, rsut, rlut]
+    period: 1days
+    reduction_time: average

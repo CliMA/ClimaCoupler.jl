@@ -19,7 +19,7 @@
 
 set -e  # Exit on error
 
-cd /glade/u/home/cchristo/clima/copies3/ClimaCoupler.jl
+cd /glade/u/home/cchristo/clima/copies2/ClimaCoupler.jl
 
 # Load modules
 export MODULEPATH="/glade/campaign/univ/ucit0011/ClimaModules-Derecho:$MODULEPATH"

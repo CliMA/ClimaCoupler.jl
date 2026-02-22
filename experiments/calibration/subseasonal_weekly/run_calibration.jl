@@ -26,15 +26,13 @@ model_interface = joinpath(
     "model_interface.jl",
 )
 
-# Sample date ranges (start_date, end_date) for calibration
-sample_date_ranges = [
-    (DateTime(2010, 1, 1), DateTime(2010, 1, 7)),
-    # (DateTime(2023, 1, 15), DateTime(2023, 1, 21)),
-    # (DateTime(2013, 3, 18), DateTime(2013, 3, 24)),
-    
-    # Add more ranges as needed:
-    # (DateTime(2013, 3, 25), DateTime(2013, 3, 31)),
-]
+# Sample date range for calibration (repeated for each iteration)
+const BASE_DATE_RANGE = (DateTime(2010, 1, 1), DateTime(2010, 1, 7))
+const N_ITERATIONS = 6
+
+# Repeat the date range for each iteration so we can reuse subseasonal's forward_model
+# which indexes by sample_date_ranges[iter + 1]
+sample_date_ranges = fill(BASE_DATE_RANGE, N_ITERATIONS)
 
 # Directory containing ERA5 weekly observation files
 const ERA5_OBS_DIR = "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/daily_weekly_stats/weekly"
@@ -46,7 +44,7 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     ),
     short_names = ["tas", "mslp", "rsut", "rlut"],
     minibatch_size = 1,
-    n_iterations = 6,
+    n_iterations = N_ITERATIONS,
     sample_date_ranges,
     extend = Dates.Day(1),
     spinup = Dates.Day(0),

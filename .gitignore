@@ -30,6 +30,7 @@ docs/src/generated/
 # Experiments
 !experiments/ClimaEarth/**/Manifest.toml
 !experiments/ClimaCore/**/Manifest.toml
+experiments/calibration/coarse_amip/output*/
 
 # Output
 *output*

@@ -482,10 +482,10 @@ function FluxCalculator.compute_surface_fluxes!(
     # Combine the buoyancy flux from each component of the land model
     # Note that we exclude the canopy component here for now, since ClimaLand doesn't
     #  include its extra resistance term in the buoyancy flux calculation.
-    Interfacer.remap!(csf.scalar_temp1, bucket_dest.buoyancy_flux)
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    @. csf.buoyancy_flux += csf.scalar_temp1 * area_fraction
+    # Interfacer.remap!(csf.scalar_temp1, bucket_dest.buoyancy_flux)
+    # @. csf.scalar_temp1 =
+    #     ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    # @. csf.buoyancy_flux += csf.scalar_temp1 * area_fraction
 
     # Compute ustar from the momentum fluxes and surface air density
     #  ustar = sqrt(ρτ / ρ)
@@ -497,14 +497,14 @@ function FluxCalculator.compute_surface_fluxes!(
 
     # Compute the Monin-Obukhov length from ustar and the buoyancy flux
     #  L_MO = -u^3 / (k * buoyancy_flux)
-    surface_params = LP.surface_fluxes_parameters(sim.model.parameters.earth_param_set)
-    @. csf.scalar_temp1 =
-        -csf.ustar^3 / SFP.von_karman_const(surface_params) / SF.non_zero(csf.buoyancy_flux)
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    # When L_MO is infinite, avoid multiplication by zero to prevent NaN
-    @. csf.L_MO +=
-        ifelse(isinf(csf.scalar_temp1), csf.scalar_temp1, csf.scalar_temp1 * area_fraction)
+    # surface_params = LP.surface_fluxes_parameters(sim.model.parameters.earth_param_set)
+    # @. csf.scalar_temp1 =
+    #     -csf.ustar^3 / SFP.von_karman_const(surface_params) / SF.non_zero(csf.buoyancy_flux)
+    # @. csf.scalar_temp1 =
+    #     ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    # # When L_MO is infinite, avoid multiplication by zero to prevent NaN
+    # @. csf.L_MO +=
+    #     ifelse(isinf(csf.scalar_temp1), csf.scalar_temp1, csf.scalar_temp1 * area_fraction)
 
     return nothing
 end

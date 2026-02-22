@@ -7,6 +7,8 @@ atmospheric and surface component models.
 module FieldExchanger
 
 import ClimaCore as CC
+import SurfaceFluxes as SF
+import SurfaceFluxes.Parameters as SFP
 
 import ..Interfacer, ..FluxCalculator, ..Utilities
 
@@ -382,6 +384,30 @@ function combine_surfaces!(csf, sims, ::Val{:surface_temperature})
     end
     # Convert the combined upward longwave radiation into a surface temperature
     @. T_sfc = (T_sfc / emissivity_sfc)^FT(1 / 4)
+    return nothing
+end
+
+function combine_surfaces!(csf, sims, ::Val{:buoyancy_flux})
+    # Compute buoyancy flux from combined sensible and latent heat fluxes
+    # using atmospheric temperature and humidity
+    surface_fluxes_params = FluxCalculator.get_surface_params(sims.atmos_sim)
+    q_vap_atmos = csf.q_tot_atmos .- csf.q_liq_atmos .- csf.q_ice_atmos
+    @. csf.buoyancy_flux = SF.buoyancy_flux(
+        surface_fluxes_params,
+        csf.F_sh,
+        csf.F_lh,
+        csf.T_atmos,
+        csf.ρ_atmos,
+        q_vap_atmos,
+        csf.q_liq_atmos,
+        csf.q_ice_atmos,
+        SF.MoistModel(),
+    )
+    # Compute Monin-Obukhov length from ustar and buoyancy flux
+    #  L_MO = -ustar^3 / (k * buoyancy_flux)
+    @. csf.L_MO =
+        -csf.ustar^3 / SFP.von_karman_const(surface_fluxes_params) /
+        SF.non_zero(csf.buoyancy_flux)
     return nothing
 end
 

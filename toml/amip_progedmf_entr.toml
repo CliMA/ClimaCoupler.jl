@@ -59,8 +59,8 @@ value = 8.002319316450539
 value = 0.04592259632544556
 
 [mixing_length_tke_surf_flux_coeff]
-#value = 0.3331950998157493
-value = 1.2
+value = 0.3331950998157493
+#value = 1.2
 
 [mixing_length_diss_coeff]
 value = 0.04640288100600733

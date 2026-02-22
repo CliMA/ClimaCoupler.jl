@@ -70,8 +70,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
     @info "Generating observations for $short_names"
     @info "The number of samples is $(length(sample_date_ranges)) over $sample_date_ranges"
 
-    data_loader = CalibrationTools.ERA5DataLoader()
-    varnames = ["hfls", "hfss", "rsus", "rlus"]
+    data_loader = CalibrationTools.CERESDataLoader()
+    varnames = ["rsut", "rlut", "rsds", "rsus", "rlds", "rlus"]
     unprocessed_vars = get.(Ref(data_loader), varnames)
     preprocessed_vars = regrid_vars(unprocessed_vars)
 

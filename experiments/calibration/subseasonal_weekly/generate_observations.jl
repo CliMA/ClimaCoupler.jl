@@ -57,9 +57,9 @@ Returns the filepath and the (start_date, end_date) range of the file.
 function get_daily_filename(obs_dir, short_name, target_date)
     era5_prefix = short_name_to_era5_prefix(short_name)
     parent_dir = dirname(obs_dir)
-
+    
     pattern = Regex("$(era5_prefix)_daily-mean_(\\d{8})_(\\d{8})\\.nc")
-
+    
     for filename in readdir(parent_dir)
         m = match(pattern, filename)
         if !isnothing(m)
@@ -70,7 +70,7 @@ function get_daily_filename(obs_dir, short_name, target_date)
             end
         end
     end
-
+    
     error(
         "No daily-mean file found containing date $target_date for variable $short_name in $parent_dir",
     )
@@ -101,22 +101,22 @@ function load_daily_var(filepath, short_name, target_date, file_date_range)
     era5_varname = short_name_to_era5_varname(short_name)
     file_start, file_end = file_date_range
     @info "Loading daily $short_name for $target_date from $filepath"
-
+    
     NCDatasets.Dataset(filepath) do ds
         data_3d = Array(ds[era5_varname])
         lats = Array(ds["latitude"])
         lons = Array(ds["longitude"])
         n_times = size(data_3d, 3)
-
+        
         day_idx = Dates.value(Dates.Day(target_date - file_start)) + 1
         if day_idx < 1 || day_idx > n_times
             error(
                 "target_date $target_date (index $day_idx) is outside file range $file_start to $file_end ($n_times days)",
             )
         end
-
+        
         data_2d = data_3d[:, :, day_idx]
-
+        
         # Create 3D var with time dimension for ObservationRecipe compatibility
         time_val = Float64(Dates.datetime2unix(target_date))
 
@@ -125,7 +125,7 @@ function load_daily_var(filepath, short_name, target_date, file_date_range)
             "latitude" => Float64.(lats),
             "time" => [time_val],
         )
-
+        
         dim_attribs = OrderedDict{String, Dict{String, Any}}(
             "longitude" => Dict{String, Any}(
                 "units" => "degrees_east",
@@ -142,21 +142,21 @@ function load_daily_var(filepath, short_name, target_date, file_date_range)
                 "calendar" => "standard",
             ),
         )
-
+        
         attribs = Dict{String, Any}(
             "short_name" => short_name,
             "start_date" => target_date,
             "units" => get(ds[era5_varname].attrib, "units", ""),
             "long_name" => get(ds[era5_varname].attrib, "long_name", short_name),
         )
-
+        
         data_3d_reshaped = reshape(Float64.(data_2d), size(data_2d)..., 1)
         var = ClimaAnalysis.OutputVar(attribs, dims, dim_attribs, data_3d_reshaped)
-
+        
         if !issorted(ClimaAnalysis.latitudes(var))
             var = ClimaAnalysis.reverse_dim(var, ClimaAnalysis.latitude_name(var))
         end
-
+        
         return var
     end
 end
@@ -184,10 +184,10 @@ function load_weekly_var(filepath, short_name, start_date, end_date)
     era5_varname = short_name_to_era5_varname(short_name)
     @info "Loading weekly $short_name from $filepath"
     var = OutputVar(filepath, era5_varname)
-
+    
     var.attributes["short_name"] = short_name
     var.attributes["start_date"] = start_date
-
+    
     if !issorted(ClimaAnalysis.latitudes(var))
         var = ClimaAnalysis.reverse_dim(var, ClimaAnalysis.latitude_name(var))
     end
@@ -207,7 +207,7 @@ function load_weekly_var(filepath, short_name, start_date, end_date)
             reshape(var.data, size(var.data)..., 1),
         )
     end
-
+    
     return var
 end
 
@@ -219,10 +219,10 @@ Returns a Dict mapping (short_name, date_range) -> OutputVar
 """
 function load_vars(obs_dir, short_names, sample_date_ranges)
     vars_by_date = Dict{Tuple{String, NTuple{2, Dates.DateTime}}, OutputVar}()
-
+    
     for (start_date, end_date) in sample_date_ranges
         is_single_day = (start_date == end_date)
-
+        
         for short_name in short_names
             try
                 if is_single_day
@@ -245,7 +245,7 @@ function load_vars(obs_dir, short_names, sample_date_ranges)
             end
         end
     end
-
+    
     return vars_by_date
 end
 
@@ -260,14 +260,14 @@ ERA5 'tp' is in meters/hour, we convert to mm/day using ERA5_PR_CONVERSION.
 function preprocess_vars(vars_by_date, config_file)
     resample_var = resampled_lonlat(config_file)
     processed = Dict{Tuple{String, NTuple{2, Dates.DateTime}}, OutputVar}()
-
+    
     for (key, var) in vars_by_date
         short_name = key[1]
         date_range = key[2]
         start_date = date_range[1]
-
+        
         var = resample_var(var)
-
+        
         # Apply precipitation unit conversion for ERA5 data
         if short_name == "pr"
             new_data = var.data .* ERA5_PR_CONVERSION
@@ -279,16 +279,16 @@ function preprocess_vars(vars_by_date, config_file)
                 new_data,
             )
         end
-
+        
         if haskey(var_units, short_name)
             var = ClimaAnalysis.set_units(var, var_units[short_name])
         end
         var.attributes["short_name"] = short_name
         var.attributes["start_date"] = start_date
-
+        
         processed[key] = var
     end
-
+    
     return processed
 end
 
@@ -320,7 +320,7 @@ function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
                 @warn "Missing variable for $key"
             end
         end
-
+        
         ClimaCalibrate.ObservationRecipe.observation(
             covar_estimator,
             date_vars,
@@ -353,12 +353,12 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
-
+    
     sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges
     short_names = CALIBRATE_CONFIG.short_names
     config_file = CALIBRATE_CONFIG.config_file
     obs_dir = ERA5_OBS_DIR
-
+    
     @info "Generating observations for $short_names"
     @info "Using ERA5 data from: $obs_dir"
     @info "The number of samples is $(length(sample_date_ranges)) over $sample_date_ranges"
@@ -378,7 +378,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         ),
         preprocessed_vars,
     )
-
+    
     # Create observation vector using ObservationRecipe (like subseasonal pipeline)
     observation_vector =
         make_observation_vector(preprocessed_vars, sample_date_ranges, short_names)
@@ -386,6 +386,6 @@ if abspath(PROGRAM_FILE) == @__FILE__
         joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal_weekly/obs_vec.jld2"),
         observation_vector,
     )
-
+    
     @info "Saved observation vector with $(length(observation_vector)) samples"
 end

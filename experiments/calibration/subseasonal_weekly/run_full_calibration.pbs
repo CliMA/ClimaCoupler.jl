@@ -1,0 +1,53 @@
+#!/bin/bash
+#PBS -N subseasonal_weekly_cal
+#PBS -A UCIT0011
+#PBS -q main
+#PBS -l walltime=12:00:00
+#PBS -l select=1:ncpus=8:ngpus=1:mem=64GB
+#PBS -j oe
+#PBS -o calibration_output.log
+
+#
+# Calibration workflow for subseasonal_weekly pipeline.
+#
+# Usage: qsub run_full_calibration.pbs
+#
+# This script:
+# 1. Generates observations from ERA5 data
+# 2. Runs the calibration (ClimaGPUBackend handles GPU worker submission)
+#
+
+set -e  # Exit on error
+
+cd /glade/u/home/cchristo/clima/copies3/ClimaCoupler.jl
+
+# Load modules
+export MODULEPATH="/glade/campaign/univ/ucit0011/ClimaModules-Derecho:$MODULEPATH"
+module purge
+module load climacommon/2025_02_25
+
+echo "=============================================="
+echo "  Subseasonal Weekly Calibration"
+echo "  Started: $(date)"
+echo "=============================================="
+echo ""
+
+# Step 1: Ensure packages are instantiated
+echo "[1/3] Ensuring package dependencies are installed..."
+julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate()'
+
+# Step 2: Generate observations
+echo "[2/3] Generating observations from ERA5 data..."
+julia --project=experiments/ClimaEarth experiments/calibration/subseasonal_weekly/generate_observations.jl
+
+# Step 3: Run calibration (ClimaGPUBackend handles worker submission)
+echo "[3/3] Starting calibration..."
+echo ""
+
+julia --project=experiments/ClimaEarth experiments/calibration/subseasonal_weekly/run_calibration.jl
+
+echo ""
+echo "=============================================="
+echo "  Calibration Complete!"
+echo "  Finished: $(date)"
+echo "=============================================="

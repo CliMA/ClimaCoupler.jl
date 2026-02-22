@@ -1,20 +1,29 @@
+#=
+Defines ClimaCalibrate.forward_model which runs the coupled simulation
+for a single ensemble member.
+
+Prerequisites: This file expects the following to be set up before inclusion:
+  - CALIBRATE_CONFIG must be defined (from run_calibration.jl)
+  - setup_run.jl must be included (provides setup_and_run function)
+
+Used by: subseasonal, subseasonal_weekly (and potentially other pipelines)
+=#
+
 ENV["CLIMACOMMS_DEVICE"] = "CUDA"
 ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
 import ClimaCoupler
 import ClimaCalibrate
-import CUDA
-import EnsembleKalmanProcesses as EKP
-include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.jl"))
-include(
-    joinpath(
-        pkgdir(ClimaCoupler),
-        "experiments",
-        "calibration",
-        "subseasonal",
-        "run_calibration.jl",
-    ),
-)
+using Dates: Date, Second
 using Pkg
+
+include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.jl"))
+
+# Include run_calibration.jl only if CALIBRATE_CONFIG is not already defined
+# This allows other pipelines to include their own run_calibration.jl first
+if !@isdefined(CALIBRATE_CONFIG)
+    include(joinpath(@__DIR__, "run_calibration.jl"))
+end
+
 function ClimaCalibrate.forward_model(iter, member)
     Pkg.status()
     config_dict = ClimaCoupler.Input.get_coupler_config_dict(CALIBRATE_CONFIG.config_file)

@@ -4,10 +4,10 @@ atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "366days"
 coupler_toml: ["toml/amip_progedmf_entr.toml"]
-dt: "120secs"
-dt_cpl: "120secs"
+dt: "180secs"
+dt_cpl: "180secs"
 energy_check: false
-h_elem: 12
+h_elem: 8
 initial_condition: "AMIPFromERA5"
 mode_name: "amip"
 netcdf_interpolation_num_points: [90, 45, 31]
@@ -17,17 +17,17 @@ output_default_diagnostics: true
 radiation_reset_rng_seed: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "366days"
+t_end: "62days"
 topo_smoothing: true
 topography: "Earth"
 edmfx_entr_model: "PiGroups"
 prescribed_aerosols: []
 aerosol_radiation: false
 #non_orographic_gravity_wave: true
-# extra_atmos_diagnostics:
-#   - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls]
-#     period: 1months
-#     reduction_time: average
-#   - short_name: [ta, hus, hur, pfull, entr, detr, arup, waup]
-#     period: 1months
-#     reduction_time: average
+extra_atmos_diagnostics:
+  - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls]
+    period: 1months
+    reduction_time: average
+  - short_name: [ta, hus, hur, pfull, entr, detr, arup, waup]
+    period: 1months
+    reduction_time: average

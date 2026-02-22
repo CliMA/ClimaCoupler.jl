@@ -32,10 +32,10 @@ value = [0, 0.1759425797637972, -4.15529994350738, 0, 0, 0.23]
 value = 0.6022681998170195
 
 [entr_inv_tau]
-value = 1.0e-4
+value = 1.0e-5
 
 [detr_inv_tau]
-value = 1.0e-4
+value = 1.0e-5
 
 [detr_coeff]
 value = 0

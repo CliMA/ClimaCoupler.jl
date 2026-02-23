@@ -12,7 +12,7 @@ dt_cpl: "150secs"
 dt_cloud_fraction: "1hours"
 dt_rad: "1hours"
 dt_seaice: "150secs"
-ode_algo: "ARS222"
+ode_algo: "ARS232"
 energy_check: false
 h_elem: 12
 z_elem: 63

@@ -2,6 +2,7 @@ import ClimaAnalysis
 import ClimaAnalysis: OutputVar
 import ClimaCalibrate
 import ClimaCoupler
+import ClimaCoupler: CalibrationTools
 import Dates
 import JLD2
 import NCDatasets
@@ -234,13 +235,86 @@ function add_time_dimension(var, start_date)
     )
 end
 
-"""
-    load_vars(obs_dir, short_names, sample_date_ranges)
 
-Load weekly ERA5 NetCDF files for the specified short_names and date ranges.
+##### CERES Data Loading Functions
+
+
+# Lazy-loaded CERES data loader (initialized on first use)
+const _CERES_LOADER = Ref{Union{Nothing, CalibrationTools.CERESDataLoader}}(nothing)
+
+"""
+    get_ceres_loader()
+
+Get or create the CERES data loader (lazy initialization).
+"""
+function get_ceres_loader()
+    if isnothing(_CERES_LOADER[])
+        _CERES_LOADER[] = CalibrationTools.CERESDataLoader()
+    end
+    return _CERES_LOADER[]
+end
+
+"""
+    load_ceres_var(short_name, start_date)
+
+Load a variable from CERES monthly data for the month containing start_date.
+Returns a 2D OutputVar (lon, lat) representing the monthly mean.
+
+Note: CERES data is monthly, so we use the monthly value for the month
+containing the calibration period. Time dimension is added later in preprocess_vars.
+"""
+function load_ceres_var(short_name, start_date)
+    loader = get_ceres_loader()
+    
+    # Load the full time series
+    var = Base.get(loader, short_name)
+    
+    # Window to the month containing start_date
+    month_start = Dates.firstdayofmonth(start_date)
+    month_end = Dates.lastdayofmonth(start_date)
+    
+    # CERES dates are at start of month, so window to get the correct month
+    var = ClimaAnalysis.window(var, "time"; left = month_start, right = month_end)
+    
+    # Get the data for this month (should be single time point)
+    times = ClimaAnalysis.times(var)
+    if length(times) == 0
+        error("No CERES data found for $short_name in month of $start_date")
+    end
+    
+    @info "Loaded CERES $short_name for $(Dates.monthname(start_date)) $(Dates.year(start_date))"
+    
+    # Extract 2D data (average over time if multiple points, though should be 1)
+    if length(times) > 1
+        var = ClimaAnalysis.average_time(var)
+    end
+    
+    # Convert to 2D by dropping time dimension if present
+    if ClimaAnalysis.has_time(var)
+        # Slice at the single time point to get 2D
+        var = ClimaAnalysis.slice(var, time = times[1])
+    end
+    
+    return var
+end
+
+"""
+    is_ceres_variable(short_name, ceres_variables)
+
+Check if a variable should be loaded from CERES instead of ERA5.
+"""
+is_ceres_variable(short_name, ceres_variables) = short_name in ceres_variables
+
+"""
+    load_vars(obs_dir, short_names, sample_date_ranges; ceres_variables = String[])
+
+Load observation data for the specified short_names and date ranges.
+- Variables in `ceres_variables` are loaded from CERES monthly data
+- Other variables are loaded from ERA5 (daily or weekly files)
+
 Returns a Dict mapping (short_name, date_range) -> OutputVar
 """
-function load_vars(obs_dir, short_names, sample_date_ranges)
+function load_vars(obs_dir, short_names, sample_date_ranges; ceres_variables = String[])
     vars_by_date = Dict{Tuple{String, NTuple{2, Dates.DateTime}}, OutputVar}()
     
     for (start_date, end_date) in sample_date_ranges
@@ -248,12 +322,17 @@ function load_vars(obs_dir, short_names, sample_date_ranges)
         
         for short_name in short_names
             try
-                if is_single_day
+                # Check if this variable should come from CERES
+                if is_ceres_variable(short_name, ceres_variables)
+                    var = load_ceres_var(short_name, start_date)
+                elseif is_single_day
+                    # Load from ERA5 daily files
                     filepath, file_date_range =
                         get_daily_filename(obs_dir, short_name, start_date)
                     var =
                         load_daily_var(filepath, short_name, start_date, file_date_range)
                 else
+                    # Load from ERA5 weekly files
                     filepath =
                         get_weekly_filename(obs_dir, short_name, start_date, end_date)
                     if !isfile(filepath)
@@ -265,6 +344,7 @@ function load_vars(obs_dir, short_names, sample_date_ranges)
                 vars_by_date[(short_name, (start_date, end_date))] = var
             catch e
                 @warn "Failed to load $short_name for $start_date - $end_date: $e"
+                rethrow(e)
             end
         end
     end
@@ -498,7 +578,7 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
     
-    # Load calibration setup for NORMALIZE_VARIABLES setting
+    # Load calibration setup for NORMALIZE_VARIABLES and CERES_VARIABLES settings
     include(joinpath(@__DIR__, "calibration_setup.jl"))
     
     sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges
@@ -507,13 +587,19 @@ if abspath(PROGRAM_FILE) == @__FILE__
     obs_dir = ERA5_OBS_DIR
     output_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal_weekly")
     
+    # Determine which variables come from CERES vs ERA5
+    ceres_vars_to_load = filter(v -> v in short_names, CERES_VARIABLES)
+    era5_vars_to_load = filter(v -> !(v in CERES_VARIABLES), short_names)
+    
     @info "Generating observations for $short_names"
-    @info "Using ERA5 data from: $obs_dir"
+    @info "ERA5 variables: $era5_vars_to_load (from: $obs_dir)"
+    @info "CERES variables: $ceres_vars_to_load (from artifact)"
     @info "Normalization enabled: $NORMALIZE_VARIABLES"
     @info "The number of samples is $(length(sample_date_ranges)) over $sample_date_ranges"
 
-    # Load weekly ERA5 files
-    unprocessed_vars = load_vars(obs_dir, short_names, sample_date_ranges)
+    # Load observation data (ERA5 for some vars, CERES for radiation vars)
+    unprocessed_vars = load_vars(obs_dir, short_names, sample_date_ranges; 
+                                  ceres_variables = CERES_VARIABLES)
     @info "Loaded $(length(unprocessed_vars)) variable(s)"
 
     # Preprocess (resample to model grid and set units)

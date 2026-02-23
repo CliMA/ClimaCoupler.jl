@@ -34,7 +34,8 @@ echo "[1/3] Ensuring package dependencies are installed..."
 julia --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate()'
 
 # Step 2: Generate observations (creates obs_vec.jld2 and norm_stats.jld2)
-echo "[2/3] Generating observations from ERA5 data..."
+# Uses CERES for radiation variables (rsut, rlut, etc.), ERA5 for others (tas, etc.)
+echo "[2/3] Generating observations..."
 julia --project=experiments/ClimaEarth experiments/calibration/subseasonal_weekly/generate_observations.jl
 
 # Step 3: Run calibration (DerechoBackend handles GPU worker submission)

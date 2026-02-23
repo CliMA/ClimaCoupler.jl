@@ -92,13 +92,20 @@ function largest_period(sample_date_range)
 end
 
 
-# For single-day/weekly calibration, we just need to set units and window by time
-# observations are already resampled to model grid in generate_observations.jl
+# For monthly calibration, window model output to the calibration period
+# The spinup is already handled by model_interface.jl (model starts earlier)
+# sample_date_range[1] is the START of calibration period (after spinup)
+# We window from sample_date_range[1] to (sample_date_range[1] + extend)
 function preprocess_var(var, sample_date_range)
     # Set units to match what's expected
     var = set_units(var, var_units[ClimaAnalysis.short_name(var)])
-    # Window to the date range
-    var = ClimaAnalysis.window(var, "time"; left = sample_date_range[1], right = sample_date_range[2])
+    
+    # Window to calibration period: from sample_date_range[1] to (start + extend)
+    calib_start = sample_date_range[1]
+    calib_end = calib_start + CALIBRATE_CONFIG.extend
+    
+    @info "Windowing model output: $calib_start to $calib_end"
+    var = ClimaAnalysis.window(var, "time"; left = calib_start, right = calib_end)
     return var
 end
 

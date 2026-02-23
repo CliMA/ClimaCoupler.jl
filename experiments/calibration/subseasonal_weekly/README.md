@@ -80,9 +80,4 @@ julia --project=experiments/ClimaEarth experiments/calibration/subseasonal_weekl
 ```
 
 ## Troubleshooting
-
-**"Killed" on login node**: Use TransformUnscented, or run `./run_full_calibration.sh` which uses cpudev for heavy computation.
-
-**NetCDF errors**: Retry logic is built in. If persistent, check that model output files exist.
-
-**Bus error**: JLD2 mmap issue on Lustre - already mitigated by using IOStream mode.
+**Bus error**: JLD2 mmap issue on Derecho Lustre - use JLD2 IOStream mode.

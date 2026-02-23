@@ -6,18 +6,30 @@ using ClimaAnalysis
 # Shared variable units (used by both subseasonal and subseasonal_weekly)
 
 var_units = Dict(
+    # Surface temperature/pressure
     "pr" => "kg m^-2 s^-1",
     "mslp" => "Pa",
     "tas" => "K",
     "tas - ta" => "K",
     "ts" => "K",
     "sp" => "Pa",
+    # Surface fluxes
     "hfls" => "W m^-2",
     "hfss" => "W m^-2",
-    "rsus" => "W m^-2",
-    "rlus" => "W m^-2",
-    "rsut" => "W m^-2",
-    "rlut" => "W m^-2",
+    # Radiation (TOA)
+    "rsdt" => "W m^-2",    # incoming solar
+    "rsut" => "W m^-2",    # TOA outgoing SW
+    "rlut" => "W m^-2",    # TOA outgoing LW
+    "rsutcs" => "W m^-2",  # TOA outgoing SW clear-sky
+    "rlutcs" => "W m^-2",  # TOA outgoing LW clear-sky
+    # Radiation (surface)
+    "rsds" => "W m^-2",    # surface downwelling SW
+    "rsus" => "W m^-2",    # surface upwelling SW
+    "rlds" => "W m^-2",    # surface downwelling LW
+    "rlus" => "W m^-2",    # surface upwelling LW
+    "rsdscs" => "W m^-2",  # surface downwelling SW clear-sky
+    "rsuscs" => "W m^-2",  # surface upwelling SW clear-sky
+    "rldscs" => "W m^-2",  # surface downwelling LW clear-sky
 )
 
 """

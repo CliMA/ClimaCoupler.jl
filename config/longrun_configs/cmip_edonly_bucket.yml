@@ -10,6 +10,12 @@ dt_ocean: "120secs" # 2 minutes
 dt_rad: "1hours"
 dt_seaice: "120secs" # 2 minutes
 energy_check: false
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta]
+    period: 1months
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours
 ice_model: "clima_seaice"
 insolation: "timevarying"
 mode_name: "cmip"

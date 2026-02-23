@@ -2,21 +2,39 @@ FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
 bucket_albedo_type: "map_temporal"
+
+era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+initial_condition: "WeatherModel"
+mode_name: "subseasonal"
+strict_params: false
+
 checkpoint_dt: "186days"
 coupler_toml: ["toml/amip_progedmf.toml"]
-dt: "60secs"
-dt_cpl: "60secs"
-dz_bottom: 100.0
+dt: "180secs"
+dt_cpl: "180secs"
+ode_algo: "ARS222"
+#dz_bottom: 100.0
 energy_check: false
 h_elem: 8
-mode_name: "amip"
-netcdf_interpolation_num_points: [90, 45, 31]
+
+#netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
-output_default_diagnostics: true
+output_default_diagnostics: false
+use_coupler_diagnostics: false
+use_land_diagnostics: false
+
 radiation_reset_rng_seed: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "186days"
 topo_smoothing: true
 topography: "Earth"
-z_elem: 39
+#z_elem: 39
+
+edmfx_entr_model: "PiGroups"
+prescribed_aerosols: []
+aerosol_radiation: false
+extra_atmos_diagnostics:
+  - short_name: [tas, rsut, rlut]
+    period: 1days
+    reduction_time: average

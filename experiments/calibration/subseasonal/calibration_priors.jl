@@ -18,24 +18,23 @@ const CALIBRATION_PRIORS = [
 
     # Linear regression coefficients (6-element vector)
     # PD.VectorOfParameterized([PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.4, 0.2)]),
-    # PD.ParameterDistribution(
-    #     PD.VectorOfParameterized([PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.4, 0.2)]),
-    #     repeat([PD.no_constraint()], 3),
-    #     "entr_param_vec",
-    # ),
+    PD.ParameterDistribution(
+        PD.VectorOfParameterized([PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(-0.4, 0.2)]),
+        repeat([PD.no_constraint()], 3),
+        "entr_param_vec",
+    ),
+    PD.constrained_gaussian("entr_inv_tau", 0.004, 0.002, 0.0, 0.1),
 
     # PD.constrained_gaussian("detr_buoy_coeff", 0.12, 0.06, 0.0, 1.0),
-    # PD.constrained_gaussian("detr_vertdiv_coeff", 0.6, 0.25, 0.0, 5.0),
+    PD.constrained_gaussian("detr_vertdiv_coeff", 1, 0.2, 0.0, 5.0),
 
-    # PD.constrained_gaussian("precipitation_timescale", 600, 300, 100, 2000),
-    PD.constrained_gaussian("precipitation_timescale", 1200, 300, 300, 2400),
+    # PD.constrained_gaussian("precipitation_timescale", 1200, 300, 300, 2400),
     # PD.constrained_gaussian("diagnostic_covariance_coeff", 2.1, 0.5, 0, 10),
-    # PD.constrained_gaussian("Tq_correlation_coefficient", 0, 0.5, -1, 1),
-
+    PD.constrained_gaussian("Tq_correlation_coefficient", 0, 0.5, -1, 1),
     
-    # PD.constrained_gaussian("mixing_length_eddy_viscosity_coefficient", 0.2, 0.1, 0, 1.0),
-    # PD.constrained_gaussian("mixing_length_diss_coeff", 4.2, 2.1, 0, 10.0),
-    # PD.constrained_gaussian("mixing_length_tke_surf_flux_coeff", 8.0, 4.0, 0, 100.0),
+    PD.constrained_gaussian("mixing_length_eddy_viscosity_coefficient", 0.4, 0.1, 0, 1.0),
+    PD.constrained_gaussian("mixing_length_diss_coeff", 0.3, 0.1, 0, 5.0),
+    PD.constrained_gaussian("mixing_length_tke_surf_flux_coeff", 3.0, 0.3, 0, 50.0),
 
     # PD.constrained_gaussian("EDMF_surface_area", 0.1, 0.03, 0, 1),
     # Land parameters 
@@ -57,7 +56,7 @@ const CALIBRATION_PRIOR = EKP.combine_distributions(CALIBRATION_PRIORS)
 # ==========================================================================
 # For TransformInversion/Inversion: set ensemble_size freely (typically 5-20)
 # For TransformUnscented: this is IGNORED (uses 2*n_params + 1 automatically)
-const CALIBRATION_ENSEMBLE_SIZE = 3  # For TransformUnscented: 2*n_params+1 = 2*8+1 = 17
+const CALIBRATION_ENSEMBLE_SIZE = 19  # For TransformUnscented: 2*n_params+1 = 2*8+1 = 17
 
 # Random seed for reproducibility
 const CALIBRATION_RNG_SEED = 42

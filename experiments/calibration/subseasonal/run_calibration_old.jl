@@ -37,11 +37,12 @@ sample_date_ranges = [
     # (DateTime(2013, 3, 18), DateTime(2013, 3, 18)),
     
     # === OPTION 2: 7-day period (production, ~3 hours/iteration) ===
-    # (DateTime(2010, 1, 1), DateTime(2010, 1, 7)),
+    (DateTime(2010, 1, 1), DateTime(2010, 1, 7)),
+    # (DateTime(2023, 1, 15), DateTime(2023, 1, 21)),
+    # (DateTime(2013, 3, 18), DateTime(2013, 3, 24)),
     
-    # === OPTION 3: Full month (4 weeks) ===
-    # Model runs 28 days, compares monthly avg to ERA5 monthly avg (from 4 weekly files)
-    (DateTime(2010, 1, 8), DateTime(2010, 1, 28)),
+    # Add more ranges as needed:
+    # (DateTime(2013, 3, 25), DateTime(2013, 3, 31)),
 ]
 
 # Directory containing ERA5 weekly observation files
@@ -50,17 +51,17 @@ const ERA5_OBS_DIR = "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/daily_
 const CALIBRATE_CONFIG = CalibrateConfig(;
     config_file = joinpath(
         pkgdir(ClimaCoupler),
-        "config/nightly_configs/amip_coarse_diagedmf.yml",
+        "config/nightly_configs/amip_coarse_progedmf.yml",
     ),
     # short_names = ["tas"],  # Start with tas only
-    short_names = ["rsut", "rlut"],# "pr"], # ADD TOA
+    short_names = ["tas", "rsut", "rlut"],# "pr"], # ADD TOA
     minibatch_size = 1,
-    n_iterations = 4,
+    n_iterations = 5,
     sample_date_ranges,
-    extend = Dates.Day(1),  # Add 1 day so simulation covers full diagnostic period
-    spinup = Dates.Day(0),  # No spinup for full month calibration
+    extend = Dates.Day(1),  # Add 1 day so simulation covers full 7-day diagnostic period
+    spinup = Dates.Day(0),
     # Use scratch filesystem - more reliable for JLD2/HDF5 on Lustre
-    output_dir = "/glade/derecho/scratch/zhaoyi/calibration/exp8/",  # Full gridpoint calibration
+    output_dir = "/glade/derecho/scratch/zhaoyi/calibration/exp2/",  # Full gridpoint calibration
     obs_dir = ERA5_OBS_DIR,
     rng_seed = 42,
 )
@@ -176,7 +177,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
     #     scheduler = EKP.DataMisfitController(terminate_at = 1000),
     # )
 
+    # worker backend
     backend = ClimaCalibrate.WorkerBackend()
+
+    # derecho backend
     # backend = ClimaCalibrate.DerechoBackend(
     #     model_interface = model_interface,
     #     verbose = true,
@@ -188,9 +192,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
     #         :gpus_per_task => 1,    # GPUs per node
     #     ),
     # )
-
+    
+    # Use WorkerBackend with PBS workers
     eki = ClimaCalibrate.calibrate(
-        backend,
+        ClimaCalibrate.WorkerBackend(),
         ekp,
         CALIBRATE_CONFIG.n_iterations,
         prior,

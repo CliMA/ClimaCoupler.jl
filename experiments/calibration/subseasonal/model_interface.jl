@@ -24,8 +24,8 @@ function ClimaCalibrate.forward_model(iter, member)
     config_dict["start_date"] = start_date_str
     config_dict["t_end"] = "$(sim_length.value)secs"
     config_dict["checkpoint_dt"] = "900days"
-    config_dict["dt"] = "120secs"
-    config_dict["dt_cpl"] = "120secs"
+    config_dict["dt"] = "180secs"
+    config_dict["dt_cpl"] = "180secs"
 
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)

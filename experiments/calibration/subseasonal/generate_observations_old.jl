@@ -79,7 +79,7 @@ const ERA5_FILE_PREFIX_TO_SHORT_NAME = Dict(
 )
 
 # Variables that should be evaluated only over land (others are evaluated everywhere)
-const LAND_ONLY_VARS = Set(["pr"])
+const LAND_ONLY_VARS = Set(["tas", "pr"])
 
 # Note: compute_nh_average is defined in observation_utils.jl (included via run_calibration.jl)
 
@@ -272,64 +272,10 @@ function load_weekly_var(filepath, short_name, start_date, end_date)
 end
 
 """
-    find_weekly_files_in_range(obs_dir, short_name, start_date, end_date)
-
-Find all weekly ERA5 files that fall within the given date range.
-Returns a vector of (filepath, week_start, week_end) tuples.
-"""
-function find_weekly_files_in_range(obs_dir, short_name, start_date, end_date)
-    era5_prefix = short_name_to_era5_prefix(short_name)
-    # Pattern: {prefix}_weekly_mean_{YYYYMMDD}_{YYYYMMDD}.nc
-    pattern = Regex("$(era5_prefix)_weekly_mean_(\\d{8})_(\\d{8})\\.nc")
-    
-    matching_files = Tuple{String, Dates.DateTime, Dates.DateTime}[]
-    
-    for filename in readdir(obs_dir)
-        m = match(pattern, filename)
-        if !isnothing(m)
-            file_start = Dates.DateTime(m.captures[1], "yyyymmdd")
-            file_end = Dates.DateTime(m.captures[2], "yyyymmdd")
-            # Check if this file's range overlaps with our target range
-            # A file overlaps if file_start <= end_date AND file_end >= start_date
-            if file_start <= end_date && file_end >= start_date
-                push!(matching_files, (joinpath(obs_dir, filename), file_start, file_end))
-            end
-        end
-    end
-    
-    # Sort by start date
-    sort!(matching_files, by = x -> x[2])
-    return matching_files
-end
-
-"""
-    average_weekly_vars(vars::Vector{OutputVar})
-
-Compute the simple average of multiple OutputVars (assumed to be on the same grid).
-This is used when combining multiple weekly files to create a monthly average.
-"""
-function average_weekly_vars(vars::Vector{OutputVar})
-    if length(vars) == 1
-        return vars[1]
-    end
-    
-    # Stack data and compute mean
-    stacked_data = cat([v.data for v in vars]..., dims=3)
-    mean_data = Statistics.mean(stacked_data, dims=3)[:, :, 1]
-    
-    # Use first var as template for attributes/dims
-    template = vars[1]
-    return ClimaAnalysis.OutputVar(template.attributes, template.dims, template.dim_attributes, mean_data)
-end
-
-"""
     load_vars(obs_dir, short_names, sample_date_ranges)
 
 Load weekly ERA5 NetCDF files for the specified short_names and date ranges.
 Returns a Dict mapping (short_name, date_range) -> OutputVar
-
-**Supports multi-week ranges**: If the requested date range spans multiple weeks,
-all overlapping weekly files are loaded and averaged together.
 """
 function load_vars(obs_dir, short_names, sample_date_ranges)
     vars_by_date = Dict{Tuple{String, NTuple{2, Dates.DateTime}}, OutputVar}()
@@ -337,7 +283,6 @@ function load_vars(obs_dir, short_names, sample_date_ranges)
     for (start_date, end_date) in sample_date_ranges
         # Determine if this is a single-day or multi-day range
         is_single_day = (start_date == end_date)
-        range_days = Dates.value(Dates.Day(end_date - start_date)) + 1
         
         for short_name in short_names
             try
@@ -345,44 +290,18 @@ function load_vars(obs_dir, short_names, sample_date_ranges)
                     # Use daily-mean files for single-day ranges
                     filepath, file_date_range = get_daily_filename(obs_dir, short_name, start_date)
                     var = load_daily_var(filepath, short_name, start_date, file_date_range)
-                elseif range_days <= 7
-                    # Single week: look for exact weekly file
+                else
+                    # Use weekly files for multi-day ranges
                     filepath = get_weekly_filename(obs_dir, short_name, start_date, end_date)
                     if !isfile(filepath)
                         @warn "Weekly file not found: $filepath"
                         continue
                     end
                     var = load_weekly_var(filepath, short_name, start_date, end_date)
-                else
-                    # Multi-week range: find all weekly files that overlap and average them
-                    weekly_files = find_weekly_files_in_range(obs_dir, short_name, start_date, end_date)
-                    if isempty(weekly_files)
-                        @warn "No weekly files found for $short_name in range $start_date to $end_date"
-                        continue
-                    end
-                    
-                    @info "Loading $short_name for $start_date to $end_date: found $(length(weekly_files)) weekly files"
-                    for (fp, ws, we) in weekly_files
-                        @info "  - $(basename(fp)) ($ws to $we)"
-                    end
-                    
-                    # Load all weekly files
-                    weekly_vars = OutputVar[]
-                    for (filepath, week_start, week_end) in weekly_files
-                        wvar = load_weekly_var(filepath, short_name, week_start, week_end)
-                        push!(weekly_vars, wvar)
-                    end
-                    
-                    # Average them together
-                    var = average_weekly_vars(weekly_vars)
-                    var.attributes["short_name"] = short_name
-                    var.attributes["start_date"] = start_date
-                    @info "Averaged $(length(weekly_vars)) weekly files for $short_name"
                 end
                 vars_by_date[(short_name, (start_date, end_date))] = var
             catch e
                 @warn "Failed to load $short_name for $start_date - $end_date: $e"
-                @warn "  Error details: " * sprint(showerror, e)
             end
         end
     end
@@ -452,7 +371,7 @@ Returns (flattened_data, weights).
 If `land_mask` is provided (a 2D boolean array matching var dimensions),
 only land points (where land_mask == true) are kept.
 """
-function flatten_var_with_latitude_weights(var; land_mask=nothing, lat_min=nothing)
+function flatten_var_with_latitude_weights(var; land_mask=nothing)
     lats = ClimaAnalysis.latitudes(var)
     lons = ClimaAnalysis.longitudes(var)
     
@@ -473,27 +392,13 @@ function flatten_var_with_latitude_weights(var; land_mask=nothing, lat_min=nothi
     weight_matrix = repeat(weights', nlon, 1)
     flat_weights = vec(weight_matrix)
     
-    # Build combined mask from land mask and latitude filter
-    combined_mask = if !isnothing(land_mask)
-        copy(land_mask)
-    else
-        trues(nlon, nlat)
+    # Apply land mask if provided
+    if !isnothing(land_mask)
+        flat_mask = vec(land_mask)
+        land_indices = findall(flat_mask)
+        flat_data = flat_data[land_indices]
+        flat_weights = flat_weights[land_indices]
     end
-
-    # Apply latitude minimum filter (exclude points south of lat_min)
-    if !isnothing(lat_min)
-        for j in 1:nlat
-            if lats[j] < lat_min
-                combined_mask[:, j] .= false
-            end
-        end
-    end
-
-    # Apply combined mask
-    flat_mask = vec(combined_mask)
-    keep_indices = findall(flat_mask)
-    flat_data = flat_data[keep_indices]
-    flat_weights = flat_weights[keep_indices]
     
     return flat_data, flat_weights
 end
@@ -670,7 +575,7 @@ function make_observation_vector_gridpoints(vars_by_date, sample_date_ranges, sh
                 var = vars_by_date[key]
                 # Apply land mask only for land-only variables
                 var_land_mask = short_name in LAND_ONLY_VARS ? land_mask : nothing
-                flat_data, _ = flatten_var_with_latitude_weights(var; land_mask=var_land_mask, lat_min=-50.0)
+                flat_data, _ = flatten_var_with_latitude_weights(var; land_mask=var_land_mask)
                 valid_data = filter(!isnan, collect(skipmissing(flat_data)))
                 append!(var_data_raw, valid_data)
             end
@@ -702,7 +607,7 @@ function make_observation_vector_gridpoints(vars_by_date, sample_date_ranges, sh
                 var = vars_by_date[key]
                 # Apply land mask only for land-only variables
                 var_land_mask = short_name in LAND_ONLY_VARS ? land_mask : nothing
-                flat_data, _ = flatten_var_with_latitude_weights(var; land_mask=var_land_mask, lat_min=-50.0)
+                flat_data, _ = flatten_var_with_latitude_weights(var; land_mask=var_land_mask)
                 valid_data = filter(!isnan, collect(skipmissing(flat_data)))
                 
                 # Apply PER-VARIABLE normalization
@@ -778,7 +683,7 @@ function resampled_lonlat(config_file)
         (nlon, nlat, nlev) = tuple(config_dict["netcdf_interpolation_num_points"]...)
     else
         # Default grid resolution if not specified
-        nlon, nlat = 180, 90
+        nlon, nlat = 360, 180
     end
     lon_vals = range(-180, 180, nlon)
     lat_vals = range(-90, 90, nlat)

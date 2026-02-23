@@ -1,47 +1,115 @@
 [zd_rayleigh]
 value = 40000.0
+type = "float"
 
 [zd_viscous]
 value = 40000.0
-
-[precipitation_timescale]
-value = 600
+type = "float"
 
 [alpha_rayleigh_sgs_tracer]
 value = 1e-3
+type = "float"
 
-[EDMF_min_area]
-value = 1.0e-5
-
-[EDMF_max_area]
-value = 0.7
-
-[entr_inv_tau]
-value = 0.0002
-
-[entr_coeff]
-value = 0.2
+[EDMF_surface_area]
+value = 0.06399178163606391
+type = "float"
 
 [min_area_limiter_scale]
 value = 0
+type = "float"
 
-[min_area_limiter_power]
-value = 100
+[max_area_limiter_scale]
+value = 0
+type = "float"
+
+[EDMF_min_area]
+value = 1.0e-5
+type = "float"
+
+[EDMF_max_area]
+value = 0.7
+type = "float"
+
+[entr_coeff]
+value = 0
+type = "float"
+
+[entr_param_vec]
+value = [0, 0.1759425797637972, -4.15529994350738, 0, 0, 0.23034829797200007]
+type = "float"
+
+[entr_mult_limiter_coeff]
+value = 0.6022681998170195
+type = "float"
+
+[entr_inv_tau]
+value = 1.0e-4
+type = "float"
 
 [detr_inv_tau]
-value = 0
+value = 1.0e-4
+type = "float"
 
 [detr_coeff]
 value = 0
+type = "float"
 
 [detr_buoy_coeff]
 value = 0
+type = "float"
 
-[detr_vertdiv_coeff]
-value = 0
+#[detr_vertdiv_coeff]
+#value = 1
+#type = "float"
 
 [detr_massflux_vertdiv_coeff]
-value = 1
+value = 0
+type = "float"
+
+[entr_detr_limit_inv_tau]
+value = 0.01
+type = "float"
 
 [pressure_normalmode_drag_coeff]
-value = 40.0
+value = 8.002319316450539
+type = "float"
+
+[pressure_normalmode_buoy_coeff1]
+value = 0.04592259632544556
+type = "float"
+
+#[mixing_length_tke_surf_flux_coeff]
+#value = 0.3331950998157493
+#type = "float"
+
+#[mixing_length_diss_coeff]
+#value = 0.04640288100600733
+#type = "float"
+
+#[mixing_length_eddy_viscosity_coefficient]
+#value = 1.497382613786804
+#type = "float"
+
+[mixing_length_Prandtl_number_0]
+value = 0.5168130504404477
+type = "float"
+
+[mixing_length_static_stab_coeff]
+value = 0.35509778819311516
+type = "float"
+
+#[precipitation_timescale]
+#value = 1350
+#type = "float"
+
+#[Tq_correlation_coefficient]
+#value = 0.2
+#type = "float"
+
+#[diagnostic_covariance_coeff]
+#value = 2.1
+#type = "float"
+
+[supersaturation_precipitation_threshold]
+value = 0.02
+type = "float"

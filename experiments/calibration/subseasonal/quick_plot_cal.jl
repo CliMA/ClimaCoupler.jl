@@ -11,9 +11,9 @@ using Statistics
 # ============================================================================
 # Configuration
 # ============================================================================
-output_dir = "/glade/derecho/scratch/zhaoyi/calibration/"
+output_dir = "/glade/derecho/scratch/zhaoyi/calibration/exp7/"
 exp_suffix = basename(output_dir)
-last_iter = 3  # adjust to your final iteration (displays as 0 to last_iter-1)
+last_iter = 4  # adjust to your final iteration (displays as 0 to last_iter-1)
 
 # Create output folder for plots
 plots_dir = "calibration_plots"
@@ -56,8 +56,22 @@ ekp = JLD2.load(joinpath(output_dir, "iteration_00$(last_iter)", "eki_file.jld2"
 prior = JLD2.load(joinpath(output_dir, "iteration_000", "prior.jld2"))["single_stored_object"]
 
 # Get parameter info
+# n_params = PD.ndims(prior)
+# param_names = PD.get_name(prior)
 n_params = PD.ndims(prior)
-param_names = PD.get_name(prior)
+param_names_raw = PD.get_name(prior)
+# Build per-dimension labels (handles multi-dimensional parameters)
+dims_per_param = PD.get_dimensions(prior)
+param_names = String[]
+for (name, d) in zip(param_names_raw, dims_per_param)
+    if d == 1
+        push!(param_names, name)
+    else
+        for j in 1:d
+            push!(param_names, "$(name)_$j")
+        end
+    end
+end
 @info "Plotting $n_params parameters: $param_names"
 
 # Calculate grid layout

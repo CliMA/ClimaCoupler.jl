@@ -75,7 +75,7 @@ function ClimaCalibrate.observation_map(iteration)
         land_mask_data = JLD2.load_object(land_mask_path)
         land_mask = land_mask_data.mask
         # Load land_only_vars if present, otherwise default to ["tas", "pr"]
-        land_only_vars = Set(get(land_mask_data, :land_only_vars, ["tas", "pr"]))
+        land_only_vars = Set(get(land_mask_data, :land_only_vars, ["pr"]))
         # Load NH averages mode flag
         use_nh_averages = get(land_mask_data, :use_nh_averages, false)
         @info "Loaded land mask: $(count(land_mask)) land points, land-only vars: $land_only_vars"
@@ -99,17 +99,28 @@ function ClimaCalibrate.observation_map(iteration)
             key = (short_name, sample_date_range)
             if haskey(preprocessed_vars, key)
                 var = preprocessed_vars[key]
-                flat_data = vec(var.data)
-                # Apply land mask only for land-only variables
-                if !isnothing(land_mask) && short_name in land_only_vars
-                    flat_mask = vec(land_mask)
-                    flat_data = flat_data[findall(flat_mask)]
+                lats = ClimaAnalysis.latitudes(var)
+                nlon = length(ClimaAnalysis.longitudes(var))
+                nlat = length(lats)
+
+                # Build combined mask: land + latitude >= -50
+                combined_mask = if !isnothing(land_mask) && short_name in land_only_vars
+                    copy(land_mask)
+                else
+                    trues(nlon, nlat)
                 end
+                for j in 1:nlat
+                    if lats[j] < -90.0
+                        combined_mask[:, j] .= false
+                    end
+                end
+
+                flat_data = vec(var.data)[findall(vec(combined_mask))]
                 valid_data = filter(!isnan, collect(skipmissing(flat_data)))
                 expected_dim += length(valid_data)
                 
                 mask_status = (!isnothing(land_mask) && short_name in land_only_vars) ? "land only" : "all points"
-                @info "  $short_name: $(length(valid_data)) points ($mask_status)"
+                @info "  $short_name: $(length(valid_data)) points ($mask_status, lat >= -50)"
             end
         end
     end
@@ -243,7 +254,7 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
         land_mask_data = JLD2.load_object(land_mask_path)
         land_mask = land_mask_data.mask
         # Load land_only_vars if present, otherwise default to ["tas", "pr"]
-        land_only_vars = Set(get(land_mask_data, :land_only_vars, ["tas", "pr"]))
+        land_only_vars = Set(get(land_mask_data, :land_only_vars, ["pr"]))
         # Load NH averages mode flag
         use_nh_averages = get(land_mask_data, :use_nh_averages, false)
     end
@@ -311,15 +322,23 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
             @info "  $short_name: NH_avg=$(round(nh_avg, sigdigits=6)) → normalized=$(round(normalized_val, sigdigits=4)) ($mask_status)"
         else
             # FULL GRIDPOINT MODE: flatten and append
-            flat_data = vec(var.data)
-            
-            # Apply land mask only for land-only variables (MUST match observation vector construction)
-            if !isnothing(land_mask) && short_name in land_only_vars
-                flat_mask = vec(land_mask)
-                land_indices = findall(flat_mask)
-                flat_data = flat_data[land_indices]
+            lats = ClimaAnalysis.latitudes(var)
+            nlon = length(ClimaAnalysis.longitudes(var))
+            nlat = length(lats)
+
+            # Build combined mask: land + latitude >= -50 (MUST match observation vector construction)
+            combined_mask = if !isnothing(land_mask) && short_name in land_only_vars
+                copy(land_mask)
+            else
+                trues(nlon, nlat)
             end
-            
+            for j in 1:nlat
+                if lats[j] < -90.0
+                    combined_mask[:, j] .= false
+                end
+            end
+
+            flat_data = vec(var.data)[findall(vec(combined_mask))]
             valid_data = filter(!isnan, collect(skipmissing(flat_data)))
             
             # Apply PER-VARIABLE normalization (MUST match observation vector construction)
@@ -328,7 +347,7 @@ function process_member_to_g_vector(diagnostics_folder_path, iteration)
             append!(all_data, normalized_data)
             
             mask_status = (!isnothing(land_mask) && short_name in land_only_vars) ? "land only" : "all points"
-            @info "  $short_name: $(length(valid_data)) points ($mask_status)"
+            @info "  $short_name: $(length(valid_data)) points ($mask_status, lat >= -50)"
             
             # Diagnostic: print statistics for debugging alignment issues
             @info "    G stats: mean=$(round(Statistics.mean(normalized_data), sigdigits=4)), std=$(round(Statistics.std(normalized_data), sigdigits=4)), range=[$(round(minimum(normalized_data), sigdigits=3)), $(round(maximum(normalized_data), sigdigits=3))]"
@@ -376,6 +395,8 @@ function preprocess_var(var, sample_date_range)
     if "time" in keys(var.dims)
         n_times = length(ClimaAnalysis.times(var))
         if n_times > 1
+            # select the time window for model output
+            var = window(var, "time"; left = sample_date_range[1], right = sample_date_range[2])
             # Multiple time steps - average over time
             var = ClimaAnalysis.average_time(var)
         else

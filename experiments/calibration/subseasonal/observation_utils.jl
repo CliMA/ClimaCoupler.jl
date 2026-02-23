@@ -3,9 +3,7 @@ using Statistics
 import Dates
 using ClimaAnalysis
 
-# =============================================================================
 # Shared variable units (used by both subseasonal and subseasonal_weekly)
-# =============================================================================
 
 var_units = Dict(
     "pr" => "kg m^-2 s^-1",
@@ -21,10 +19,6 @@ var_units = Dict(
     "rsut" => "W m^-2",
     "rlut" => "W m^-2",
 )
-
-# =============================================================================
-# Shared utility functions (used by both subseasonal and subseasonal_weekly)
-# =============================================================================
 
 """
     remove_global_mean(var)

@@ -8,10 +8,6 @@ import EnsembleKalmanProcesses as EKP
 import EnsembleKalmanProcesses.ParameterDistributions as PD
 import JLD2
 
-# Override JLD2's default_iotype to use IOStream instead of MmapIO
-# This avoids Bus errors from memory-mapped files on Lustre filesystem
-JLD2.default_iotype() = IOStream
-
 include(
     joinpath(
         pkgdir(ClimaCoupler),
@@ -27,7 +23,8 @@ model_interface = joinpath(
 )
 
 # Sample date range for calibration (repeated for each iteration)
-const BASE_DATE_RANGE = (DateTime(2010, 1, 1), DateTime(2010, 1, 7))
+# const BASE_DATE_RANGE = (DateTime(2010, 1, 1), DateTime(2010, 1, 7))
+const BASE_DATE_RANGE = (DateTime(2010, 1, 1), DateTime(2010, 1, 1))
 const N_ITERATIONS = 3
 
 # Repeat the date range for each iteration so we can reuse subseasonal's forward_model
@@ -90,56 +87,12 @@ if abspath(PROGRAM_FILE) == @__FILE__
         scheduler = EKP.DataMisfitController(terminate_at = 1000000),
     )
 
-    # # ==========================================================================
-    # # OPTION 2: TransformInversion (robust to failures, flexible ensemble size)
-    # # - Loads pre-computed inputs from ekp_inputs.jld2 (run precompute_ekp_inputs.jl first!)
-    # # - To use: comment out OPTION 1 above, uncomment below
-    # # ==========================================================================
-    # ekp_inputs_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal_weekly/ekp_inputs.jld2")
-    # if !isfile(ekp_inputs_path)
-    #     error("ekp_inputs.jld2 not found! Run precompute_ekp_inputs.jl first (use: qsub precompute.pbs)")
-    # end
-    # @info "Loading pre-computed EKP inputs from $ekp_inputs_path"
-    # ekp_inputs = JLD2.load(ekp_inputs_path)
-    # y = ekp_inputs["y"]
-    # noise_scalar = ekp_inputs["noise_scalar"]
-    # initial_ensemble = ekp_inputs["initial_ensemble"]
-    # @info "Loaded: y=$(length(y)) points, ensemble=$(size(initial_ensemble)), noise=$noise_scalar"
-    
-    # # Use UniformScaling for noise covariance (efficient - no huge matrix!)
-    # Γ = noise_scalar * I
-    
-    # ekp = EKP.EnsembleKalmanProcess(
-    #     initial_ensemble,
-    #     y,
-    #     Γ,
-    #     EKP.TransformInversion();
-    #     verbose = true,
-    #     rng,
-    #     scheduler = EKP.DataMisfitController(terminate_at = 10000),
-    # )
-
-    # ==========================================================================
-    # OPTION 3: Basic Inversion (simple, flexible)
-    # - Same constructor as OPTION 2, just different process
-    # - To use: uncomment obs/y/Γ/initial_ensemble from OPTION 2, then uncomment below
-    # ==========================================================================
-    # ekp = EKP.EnsembleKalmanProcess(
-    #     initial_ensemble,
-    #     y,
-    #     Γ,
-    #     EKP.Inversion();
-    #     verbose = true,
-    #     rng,
-    #     scheduler = EKP.DataMisfitController(terminate_at = 1000),
-    # )
     # backend = ClimaCalibrate.ClimaGPUBackend(;
     #     hpc_kwargs = ClimaCalibrate.kwargs(gpus = 1, time = 60 * 12),
     #     model_interface,
     #     verbose = true,
     # )
 
-    
     backend = ClimaCalibrate.DerechoBackend(
         model_interface = model_interface,
         verbose = true,

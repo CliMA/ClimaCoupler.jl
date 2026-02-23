@@ -63,7 +63,7 @@ Uses weekly-averaged ERA5 data from:
 
 | File | Purpose |
 |------|---------|
-| `calibration_setup.jl` | **Edit this** - defines parameters and settings to calibrate |
+| `calibration_setup.jl` | defines parameters and settings to calibrate |
 | `run_calibration.jl` | Main calibration script |
 | `generate_observations.jl` | Loads weekly ERA5 data, creates observation vector |
 | `observation_map.jl` | Maps model output to observation space |

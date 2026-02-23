@@ -38,11 +38,10 @@ precip_model: 0M
 moist: equil
 toml: [toml/diagnostic_edmfx_era5_ic.toml]
 
-# ### 1M Microphysics ###
+### 1M Microphysics ###
 # precip_model: "1M"
 # moist: "nonequil"
 # # toml: [toml/diagnostic_edmfx_1M.toml]
-# toml: [toml/longrun_aquaplanet_diagedmf.toml]
 
 cloud_model: "quadrature"
 use_itime: true

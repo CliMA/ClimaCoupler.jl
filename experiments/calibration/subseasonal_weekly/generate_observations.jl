@@ -186,7 +186,7 @@ function load_weekly_var(filepath, short_name, start_date, end_date)
     end
 
     # Note: We do NOT add time dimension here - it's added in preprocess_vars after resampling
-    # This avoids issues with ClimaAnalysis.resampled_as which can't handle 3D data properly
+    # This avoids issues with ClimaAnalysis.resampled_as which doesn't handle 3D data
     
     return var
 end
@@ -472,14 +472,22 @@ end
 
 Return a function to resample longitude and latitudes according to the model
 grid specified by `config_file`.
-(Same as subseasonal pipeline)
+
+For spectral element grids, the default interpolation grid is computed from h_elem:
+  nlon = h_elem * 4 * 3 (cubed-sphere panels × spectral element degree)
+  nlat = nlon / 2
 """
 function resampled_lonlat(config_file)
     config_dict = ClimaCoupler.Input.get_coupler_config_dict(config_file)
     if !isnothing(get(config_dict, "netcdf_interpolation_num_points", nothing))
         (nlon, nlat, nlev) = tuple(config_dict["netcdf_interpolation_num_points"]...)
     else
-        nlon, nlat = 360, 180
+        # Compute from h_elem (spectral element grid)
+        h_elem = get(config_dict, "h_elem", 12)
+        # Default formula: h_elem * 4 panels * 3 (spectral degree)
+        nlon = h_elem * 4 * 3
+        nlat = nlon ÷ 2
+        @info "Using model grid from h_elem=$h_elem: $(nlon)×$(nlat)"
     end
     lon_vals = range(-180, 180, nlon)
     lat_vals = range(-90, 90, nlat)
@@ -514,8 +522,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # Compute and apply normalization if enabled
     if NORMALIZE_VARIABLES
         norm_stats = compute_normalization_stats(preprocessed_vars, short_names)
-        
-        # Save normalization stats for use in observation_map.jl
+
         JLD2.save_object(joinpath(output_path, "norm_stats.jld2"), norm_stats)
         @info "Saved normalization stats to norm_stats.jld2"
         

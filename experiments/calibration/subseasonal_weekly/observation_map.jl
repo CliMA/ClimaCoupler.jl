@@ -96,6 +96,7 @@ end
 # The spinup is already handled by model_interface.jl (model starts earlier)
 # sample_date_range[1] is the START of calibration period (after spinup)
 # We window from sample_date_range[1] to (sample_date_range[1] + extend)
+# Then TIME-AVERAGE to a single value for comparison to CERES monthly mean
 function preprocess_var(var, sample_date_range)
     # Set units to match what's expected
     var = set_units(var, var_units[ClimaAnalysis.short_name(var)])
@@ -106,7 +107,66 @@ function preprocess_var(var, sample_date_range)
     
     @info "Windowing model output: $calib_start to $calib_end"
     var = ClimaAnalysis.window(var, "time"; left = calib_start, right = calib_end)
+    
+    # Time-average to single value for comparison to CERES monthly mean
+    # This averages the 21 daily outputs into one mean field
+    n_times = length(ClimaAnalysis.times(var))
+    if n_times > 1
+        @info "Time-averaging $n_times daily outputs to single mean"
+        var = time_average_with_date(var, calib_start)
+    end
+    
     return var
+end
+
+"""
+    time_average_with_date(var, date)
+
+Average over time dimension but preserve a single time point at `date`.
+This is needed because ClimaCalibrate expects OutputVars with time dimensions
+to match observation dates.
+"""
+function time_average_with_date(var, date)
+    import OrderedCollections: OrderedDict
+    
+    # Get the time-averaged data (2D: lon x lat, time dimension removed)
+    avg_var = ClimaAnalysis.average_time(var)
+    
+    # Compute time value in seconds from start_date
+    start_date_str = get(var.attributes, "start_date", nothing)
+    if isnothing(start_date_str)
+        # Use the date as start_date
+        start_date_str = Dates.format(date, "yyyy-mm-dd")
+        time_val = 0.0
+    else
+        start_date = Dates.DateTime(start_date_str)
+        time_val = Float64(Dates.value(date - start_date)) / 1000.0  # ms to seconds
+    end
+    
+    # Create new dims with time added back
+    new_dims = OrderedDict{String, Vector{Float64}}()
+    for (dim_name, dim_vals) in avg_var.dims
+        new_dims[dim_name] = collect(Float64, dim_vals)
+    end
+    new_dims["time"] = [time_val]
+    
+    # Create new dim_attributes with time
+    new_dim_attribs = OrderedDict{String, Any}()
+    for (dim_name, attribs) in avg_var.dim_attributes
+        new_dim_attribs[dim_name] = attribs
+    end
+    new_dim_attribs["time"] = Dict{String, Any}("units" => "s")
+    
+    # Reshape data to add time dimension (lon x lat -> lon x lat x 1)
+    new_data = reshape(avg_var.data, size(avg_var.data)..., 1)
+    
+    # Update attributes to include start_date if not present
+    new_attribs = copy(avg_var.attributes)
+    if !haskey(new_attribs, "start_date")
+        new_attribs["start_date"] = Dates.format(date, "yyyy-mm-dd")
+    end
+    
+    return ClimaAnalysis.OutputVar(new_attribs, new_dims, new_dim_attribs, new_data)
 end
 
 # Override process_member_data! to apply normalization to model output

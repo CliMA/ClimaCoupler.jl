@@ -3,15 +3,15 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
 checkpoint_dt: "366days"
 coupler_toml: ["toml/amip_diagedmf.toml"]
-dt: "240secs"
-dt_cpl: "240secs"
-dz_bottom: 100.0
+dt: "180secs"
+dt_cpl: "180secs"
+#dz_bottom: 100.0
 energy_check: false
-h_elem: 8
+h_elem: 12
 initial_condition: "AMIPFromERA5"
 land_model: "integrated"
 mode_name: "amip"
-netcdf_interpolation_num_points: [90, 45, 31]
+#netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
 ode_algo: "ARS232"
 output_default_diagnostics: true
@@ -21,6 +21,6 @@ surface_setup: "PrescribedSurface"
 t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
-z_elem: 39
-# prescribed_aerosols: []
-# aerosol_radiation: false
+# z_elem: 39
+prescribed_aerosols: []
+aerosol_radiation: false

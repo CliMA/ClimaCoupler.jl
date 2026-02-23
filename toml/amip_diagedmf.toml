@@ -19,35 +19,45 @@ value = 0
 [entr_coeff]
 value = 0
 
+#[entr_param_vec]
+#value = [0, -20.29437694493032, -22.269204417686513, 0, 0, -0.8]
+
 [entr_param_vec]
-value = [0, -20.29437694493032, -22.269204417686513, 0, 0, -0.8]
+value = [1.8670928932624387, 0.6042172584948522, -0.374839140151993]
+type = "float"
 
 [entr_mult_limiter_coeff]
 value = 0.4641383877134538
 
 [entr_inv_tau]
-value = 0.004362201402729065
+value = 0.003144623300235974
+type = "float"
 
 [detr_inv_tau]
 value = 0
 
 [detr_vertdiv_coeff]
-value = 0.6
+value = 0.87958062432938
+type = "float"
 
 [detr_buoy_coeff]
-value = 0.12
+value = 0.10191725613308689
+type = "float"
 
 [mixing_length_Prandtl_maximum]
 value = 4.2
 
 [mixing_length_eddy_viscosity_coefficient]
-value = 0.5892594727125273
+value = 0.44208662448083624
+type = "float"
 
 [mixing_length_tke_surf_flux_coeff]
-value = 0.3331950998157493
+value = 2.9404591500642425
+type = "float"
 
 [mixing_length_diss_coeff]
-value = 0.04640288100600733
+value = 0.27539409051399577
+type = "float"
 
 [mixing_length_Prandtl_number_0]
 value = 2.909243754318121
@@ -56,7 +66,13 @@ value = 2.909243754318121
 value = 0.29736273245468714
 
 [precipitation_timescale]
-value = 1800
+value = 1224.904221700239
+type = "float"
 
 [Tq_correlation_coefficient]
-value = -1
+value = 0.18750483069396207
+type = "float"
+
+[diagnostic_covariance_coeff]
+value = 2.069068167714753
+type = "float"

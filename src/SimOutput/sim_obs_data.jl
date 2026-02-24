@@ -73,6 +73,7 @@ function get_sim_var_dict(diagnostics_folder_path)
                     short_name = "pr",
                     reduction = "average",
                     period = "1M",
+                    coord_type = nothing,
                 )
                 sim_var = ClimaAnalysis.convert_units(
                     sim_var,
@@ -97,6 +98,7 @@ function get_sim_var_dict(diagnostics_folder_path)
                         short_name = short_name,
                         reduction = "average",
                         period = "1M",
+                        coord_type = nothing,
                     )
                     # For ClimaDiagnostics v0.3 and later, the dates are saved at
                     # the start of the reduction period

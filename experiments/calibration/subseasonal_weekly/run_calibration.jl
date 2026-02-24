@@ -22,29 +22,20 @@ model_interface = joinpath(
     "model_interface.jl",
 )
 
-# ==========================================================================
+
 # CALIBRATION CONFIGURATION
-# ==========================================================================
-# Monthly calibration with spinup (using Jan 1 IC file):
-#   - BASE_DATE_RANGE = (Jan 8, Jan 8): calibration period START (after spinup)
-#   - spinup = 7 days: model starts 7 days BEFORE sample_date_range = Jan 1 (IC date)
-#   - extend = 21 days: model runs 21 days AFTER sample_date_range = Jan 29
-#   
-# Timeline: Model runs Jan 1 -> Jan 29 (28 days total)
-#           Calibration uses Jan 8 -> Jan 29 (21 days = 3 weeks)
-#           Compared against January CERES monthly mean
-#
-const BASE_DATE_RANGE = (DateTime(2010, 1, 8), DateTime(2010, 1, 8))
+
+const BASE_DATE_RANGE = (DateTime(2010, 1, 1), DateTime(2010, 1, 31))
 const N_ITERATIONS = 3
 
-# 1-day test run ---
+
+# --- 1-day test run ---
 # const BASE_DATE_RANGE = (DateTime(2010, 1, 1), DateTime(2010, 1, 1))
 # const N_ITERATIONS = 3
 # extend = Dates.Day(1)
 # spinup = Dates.Day(0)
 
-# Repeat the date range for each iteration so we can reuse subseasonal's forward_model
-# which indexes by sample_date_ranges[iter + 1]
+# Repeat the date range for each iteration until we're using multiple months
 sample_date_ranges = fill(BASE_DATE_RANGE, N_ITERATIONS)
 
 # Directory containing ERA5 weekly observation files (not used for CERES-only runs)
@@ -59,13 +50,8 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     minibatch_size = 1,
     n_iterations = N_ITERATIONS,
     sample_date_ranges,
-    # Monthly run: 7-day spinup + 21-day calibration = 28 days total
-    # Model starts at (Jan 8 - 7 days) = Jan 1, ends at (Jan 8 + 21 days) = Jan 29
-    extend = Dates.Day(21),
+    extend = Dates.Day(0),
     spinup = Dates.Day(7),
-    # 1-day test run ---
-    # extend = Dates.Day(1),
-    # spinup = Dates.Day(0),
     output_dir = "/glade/derecho/scratch/zhaoyi/calibration/weekly/exp1",
     rng_seed = 42,
 )

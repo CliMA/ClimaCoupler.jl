@@ -1,4 +1,5 @@
-import Test: @test, @testset
+import Test: @test, @testset, @test_throws, @test_logs
+import Artifacts
 import Dates
 import ClimaCoupler
 import ClimaCoupler: CalibrationTools
@@ -55,31 +56,6 @@ import ClimaAnalysis
     )
 end
 
-@testset "ERA5 data loader" begin
-    data_loader = CalibrationTools.ERA5DataLoader()
-
-    varnames = last.(CalibrationTools.ERA5_TO_CLIMA_NAMES)
-
-    @test CalibrationTools.available_vars(data_loader) == Set(varnames)
-
-    irradiance_varnames = Set(["hfls", "hfss", "rsus", "rlus"])
-    @test issubset(irradiance_varnames, varnames)
-
-    for varname in varnames
-        var = get(data_loader, varname)
-        @test ClimaAnalysis.short_name(var) == varname
-        lons = ClimaAnalysis.longitudes(var)
-        @test all(lon -> -180.0 <= lon <= 180.0, lons)
-        var_dates = ClimaAnalysis.dates(var)
-        @test all(Dates.day.(var_dates) .== 1)
-        if ClimaAnalysis.short_name(var) in irradiance_varnames
-            @test ClimaAnalysis.units(var) == "W m^-2"
-        end
-    end
-
-    @test_throws ErrorException get(data_loader, "idk")
-end
-
 @testset "Calibration utilities" begin
     # Test adding parameter toml files
     config_dict = Dict()
@@ -105,4 +81,112 @@ end
     CalibrationTools.update_timespan!(config_dict, start_date, end_date)
     @test config_dict["start_date"] == "20101213"
     @test config_dict["t_end"] == "$((Dates.Second(end_date - start_date)).value)secs"
+end
+
+"""
+    check_conventions(var, varname)
+
+Check the variable with the name `varname` that
+- the short name is the same as `varname`,
+- the longitudes range between -180 and 180,
+- the dates are monthly.
+"""
+function check_conventions(var, varname)
+    @test ClimaAnalysis.short_name(var) == varname
+    lons = ClimaAnalysis.longitudes(var)
+    @test all(lon -> -180.0 <= lon <= 180.0, lons)
+    var_dates = ClimaAnalysis.dates(var)
+    @test all(Dates.day.(var_dates) .== 1)
+    return nothing
+end
+
+"""
+    artifact_on_disk(name)
+
+Check if the artifact exists on disk given the `name` of the artifact.
+"""
+function artifact_on_disk(name)
+    artifacts_toml = joinpath(pkgdir(ClimaCoupler), "Artifacts.toml")
+    hash = Artifacts.artifact_hash(name, artifacts_toml)
+    return Artifacts.artifact_exists(hash)
+end
+
+@testset "ERA5 data loader" begin
+    data_loader = CalibrationTools.ERA5DataLoader()
+
+    varnames = last.(CalibrationTools.ERA5_TO_CLIMA_NAMES)
+
+    @test CalibrationTools.available_vars(data_loader) == Set(varnames)
+
+    irradiance_varnames = Set(["hfls", "hfss", "rsus", "rlus"])
+    @test issubset(irradiance_varnames, varnames)
+
+    for varname in varnames
+        var = get(data_loader, varname)
+        check_conventions(var, varname)
+        if ClimaAnalysis.short_name(var) in irradiance_varnames
+            @test ClimaAnalysis.units(var) == "W m^-2"
+        end
+    end
+
+    @test_throws ErrorException get(data_loader, "idk")
+end
+
+@testset "CERES data loader" begin
+    artifact_on_disk("radiation_obs") || return
+    data_loader = CalibrationTools.CERESDataLoader()
+
+    direct_varnames = last.(CalibrationTools.CERES_TO_CLIMA_NAMES)
+    all_varnames = Set(vcat(direct_varnames, collect(CalibrationTools.CERES_DERIVED_VARS)))
+
+    @test CalibrationTools.available_vars(data_loader) == all_varnames
+
+    for varname in all_varnames
+        var = get(data_loader, varname)
+        check_conventions(var, varname)
+        @test ClimaAnalysis.units(var) == "W m^-2"
+    end
+
+    swcre = get(data_loader, "swcre")
+    rsutcs = get(data_loader, "rsutcs")
+    rsut = get(data_loader, "rsut")
+    @test swcre.data ≈ rsutcs.data .- rsut.data
+
+    lwcre = get(data_loader, "lwcre")
+    rlutcs = get(data_loader, "rlutcs")
+    rlut = get(data_loader, "rlut")
+    @test lwcre.data ≈ rlutcs.data .- rlut.data
+
+    @test_throws ErrorException get(data_loader, "idk")
+end
+
+@testset "Other data loaders" begin
+    data_loader_and_name_list = []
+    gpcp_data_loader = CalibrationTools.GPCPDataLoader()
+    gpcp_varnames = last.(CalibrationTools.GPCP_TO_CLIMA_NAMES)
+    push!(data_loader_and_name_list, (gpcp_data_loader, gpcp_varnames))
+
+    # This is not automatically downloaded
+    if artifact_on_disk("era5_monthly_averages_pressure_levels_1979_2024")
+        era5_pressure_level_data_loader = CalibrationTools.ERA5PressureLevelDataLoader()
+        era5_pressure_level_names =
+            last.(CalibrationTools.ERA5_PRESSURE_LEVEL_TO_CLIMA_NAMES)
+        push!(
+            data_loader_and_name_list,
+            (era5_pressure_level_data_loader, era5_pressure_level_names),
+        )
+    end
+
+    modis_data_loader = CalibrationTools.ModisDataLoader()
+    modis_names = last.(CalibrationTools.MODIS_TO_CLIMA_NAMES)
+    push!(data_loader_and_name_list, (modis_data_loader, modis_names))
+
+    for (data_loader, varnames) in data_loader_and_name_list
+        @test CalibrationTools.available_vars(data_loader) == Set(varnames)
+        for varname in varnames
+            var = get(data_loader, varname)
+            check_conventions(var, varname)
+        end
+        @test_throws ErrorException get(data_loader, "idk")
+    end
 end

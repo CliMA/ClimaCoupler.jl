@@ -92,67 +92,27 @@ function short_name_to_era5_prefix(short_name)
 end
 
 """
-    load_daily_var(filepath, short_name, target_date, file_date_range)
+    load_daily_var(filepath, short_name, target_date)
 
 Load a specific day from a daily-mean ERA5 file.
-The daily files have valid_time dimension with multiple days of data.
-We extract just the day matching target_date.
+Uses ClimaAnalysis to load and select the specific date.
 Note: Returns 2D data (lon, lat) - time dimension is added in preprocess_vars.
 """
-function load_daily_var(filepath, short_name, target_date, file_date_range)
+function load_daily_var(filepath, short_name, target_date)
     era5_varname = short_name_to_era5_varname(short_name)
-    file_start, file_end = file_date_range
     @info "Loading daily $short_name for $target_date from $filepath"
     
-    NCDatasets.Dataset(filepath) do ds
-        data_3d = Array(ds[era5_varname])
-        lats = Array(ds["latitude"])
-        lons = Array(ds["longitude"])
-        n_times = size(data_3d, 3)
-        
-        day_idx = Dates.value(Dates.Day(target_date - file_start)) + 1
-        if day_idx < 1 || day_idx > n_times
-            error(
-                "target_date $target_date (index $day_idx) is outside file range $file_start to $file_end ($n_times days)",
-            )
-        end
-        
-        data_2d = data_3d[:, :, day_idx]
-        
-        # Create 2D var (time dimension added later in preprocess_vars after resampling)
-        dims = OrderedDict{String, Vector{Union{Missing, Float64}}}(
-            "longitude" => Float64.(lons),
-            "latitude" => Float64.(lats),
-        )
-        
-        dim_attribs = OrderedDict{String, Dict{String, Any}}(
-            "longitude" => Dict{String, Any}(
-                "units" => "degrees_east",
-                "long_name" => "longitude",
-                "standard_name" => "longitude",
-            ),
-            "latitude" => Dict{String, Any}(
-                "units" => "degrees_north",
-                "long_name" => "latitude",
-                "standard_name" => "latitude",
-            ),
-        )
-        
-        attribs = Dict{String, Any}(
-            "short_name" => short_name,
-            "start_date" => target_date,
-            "units" => get(ds[era5_varname].attrib, "units", ""),
-            "long_name" => get(ds[era5_varname].attrib, "long_name", short_name),
-        )
-        
-        var = ClimaAnalysis.OutputVar(attribs, dims, dim_attribs, Float64.(data_2d))
-        
-        if !issorted(ClimaAnalysis.latitudes(var))
-            var = ClimaAnalysis.reverse_dim(var, ClimaAnalysis.latitude_name(var))
-        end
-        
-        return var
+    var = ClimaAnalysis.OutputVar(filepath, era5_varname)
+    var = ClimaAnalysis.select(var, by = ClimaAnalysis.MatchValue(), time = target_date)
+
+    if !issorted(ClimaAnalysis.latitudes(var))
+        var = ClimaAnalysis.reverse_dim(var, ClimaAnalysis.latitude_name(var))
     end
+    new_attribs = copy(var.attributes)
+    new_attribs["short_name"] = short_name
+    var = ClimaAnalysis.OutputVar(new_attribs, var.dims, var.dim_attributes, var.data)
+    
+    return var
 end
 
 """
@@ -238,22 +198,6 @@ end
 
 ##### CERES Data Loading Functions
 
-
-# Lazy-loaded CERES data loader (initialized on first use)
-const _CERES_LOADER = Ref{Union{Nothing, CalibrationTools.CERESDataLoader}}(nothing)
-
-"""
-    get_ceres_loader()
-
-Get or create the CERES data loader (lazy initialization).
-"""
-function get_ceres_loader()
-    if isnothing(_CERES_LOADER[])
-        _CERES_LOADER[] = CalibrationTools.CERESDataLoader()
-    end
-    return _CERES_LOADER[]
-end
-
 """
     load_ceres_var(short_name, start_date)
 
@@ -264,36 +208,14 @@ Note: CERES data is monthly, so we use the monthly value for the month
 containing the calibration period. Time dimension is added later in preprocess_vars.
 """
 function load_ceres_var(short_name, start_date)
-    loader = get_ceres_loader()
+    loader = CalibrationTools.CERESDataLoader()
     
     # Load the full time series
     var = Base.get(loader, short_name)
-    
-    # Window to the month containing start_date
+    # Select the month containing start_date (CERES dates are at start of month)
     month_start = Dates.firstdayofmonth(start_date)
-    month_end = Dates.lastdayofmonth(start_date)
-    
-    # CERES dates are at start of month, so window to get the correct month
-    var = ClimaAnalysis.window(var, "time"; left = month_start, right = month_end)
-    
-    # Get the data for this month (should be single time point)
-    times = ClimaAnalysis.times(var)
-    if length(times) == 0
-        error("No CERES data found for $short_name in month of $start_date")
-    end
-    
+    var = ClimaAnalysis.select(var, by = ClimaAnalysis.MatchValue(), time = month_start)
     @info "Loaded CERES $short_name for $(Dates.monthname(start_date)) $(Dates.year(start_date))"
-    
-    # Extract 2D data (average over time if multiple points, though should be 1)
-    if length(times) > 1
-        var = ClimaAnalysis.average_time(var)
-    end
-    
-    # Convert to 2D by dropping time dimension if present
-    if ClimaAnalysis.has_time(var)
-        # Slice at the single time point to get 2D
-        var = ClimaAnalysis.slice(var, time = times[1])
-    end
     
     return var
 end
@@ -327,10 +249,8 @@ function load_vars(obs_dir, short_names, sample_date_ranges; ceres_variables = S
                     var = load_ceres_var(short_name, start_date)
                 elseif is_single_day
                     # Load from ERA5 daily files
-                    filepath, file_date_range =
-                        get_daily_filename(obs_dir, short_name, start_date)
-                    var =
-                        load_daily_var(filepath, short_name, start_date, file_date_range)
+                    filepath, _ = get_daily_filename(obs_dir, short_name, start_date)
+                    var = load_daily_var(filepath, short_name, start_date)
                 else
                     # Load from ERA5 weekly files
                     filepath =

@@ -45,18 +45,20 @@ function Plotting.make_diagnostics_plots(
     for (i, short_name) in enumerate(short_names)
         # Use "average" if available, otherwise use the first reduction
         reductions = CAN.available_reductions(simdir; short_name)
-        "average" in reductions ? (reduction = "average") : (reduction = first(reductions))
+        reduction = "average" in reductions ? "average" : first(reductions)
         periods = CAN.available_periods(simdir; short_name, reduction)
-        "1d" in periods ? (period = "1d") : (period = first(periods))
-        vars[i] = get(simdir; short_name, reduction, period)
+        period = "1d" in periods ? "1d" : first(periods)
+        coord_types = CAN.available_coord_types(simdir; short_name, reduction, period)
+        coord_type = nothing in coord_types ? nothing : first(coord_types)
+        vars[i] = get(simdir; short_name, reduction, period, coord_type)
     end
 
     # Filter vars into 2D and 3D variable diagnostics vectors
     # 3D fields are zonally averaged platted on the lat-z plane
     # 2D fields are plotted on the lon-lat plane
-    vars_3D =
-        map(var_3D -> CAN.average_lon(var_3D), filter(var -> CAN.has_altitude(var), vars))
-    vars_2D = filter(var -> !CAN.has_altitude(var), vars)
+    is_3d = var -> CAN.has_altitude(var) || CAN.has_pressure(var)
+    vars_3D = map(var_3D -> CAN.average_lon(var_3D), filter(is_3d, vars))
+    vars_2D = filter(var -> !is_3d(var), vars)
 
     # Generate plots and save in `plot_path`
     !isempty(vars_3D) && make_plots_generic(

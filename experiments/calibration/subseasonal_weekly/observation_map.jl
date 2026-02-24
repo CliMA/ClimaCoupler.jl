@@ -225,17 +225,18 @@ function ClimaCalibrate.observation_map(iteration)
             process_member_data!(g_ens_builder, simdir_path, m, iteration)
         catch e
             @error "Ensemble member $m failed" exception = (e, catch_backtrace())
+            # Fill failed member column with NaN so EKP can handle the failure
+            EnsembleBuilder.fill_g_ens_col!(g_ens_builder, m, NaN)
         end
     end
 
-    g_ensemble = EnsembleBuilder.get_g_ensemble(g_ens_builder)
-
-    # Too many NaNs - abort
-    if sum(isnan.(g_ensemble)) > 0.5 * length(g_ensemble)
+    g_ens = EnsembleBuilder.get_g_ensemble(g_ens_builder)
+    # Too many NaNs - abort (90% threshold like subseasonal)
+    if count(isnan, g_ens) > 0.9 * length(g_ens)
         error("Too many NaNs")
     end
-
-    return g_ensemble
+    return EnsembleBuilder.is_complete(g_ens_builder) ? g_ens :
+           error("G ensemble matrix is not completed")
 end
 
 # Override analyze_iteration (placeholder for now)

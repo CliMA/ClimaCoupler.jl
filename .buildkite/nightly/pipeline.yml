@@ -54,7 +54,7 @@ steps:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_diagedmf_land.yml --job_id amip_coarse_diagedmf_land"
         artifact_paths: "output/amip_coarse_diagedmf_land/artifacts/*"
-        timeout_in_minutes: 840
+        timeout_in_minutes: 1440
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

@@ -8,7 +8,8 @@ value = 40000.0
 value = 10.0
 
 [EDMF_surface_area]
-value = 0.06399178163606391
+value = 0.09122348099267852
+type = "float"
 
 [min_area_limiter_scale]
 value = 0
@@ -19,60 +20,72 @@ value = 0
 [entr_coeff]
 value = 0
 
-#[entr_param_vec]
-#value = [0, -20.29437694493032, -22.269204417686513, 0, 0, -0.8]
-
 [entr_param_vec]
-value = [1.8670928932624387, 0.6042172584948522, -0.374839140151993]
+value = [-17.63892707098534, 18.77897708611115, 0.31250294925628486]
 type = "float"
 
 [entr_mult_limiter_coeff]
-value = 0.4641383877134538
+value = 0.8490142904088219
+type = "float"
+
 
 [entr_inv_tau]
-value = 0.003144623300235974
+value = 0.00010586970154632861
 type = "float"
+
 
 [detr_inv_tau]
 value = 0
 
 [detr_vertdiv_coeff]
-value = 0.87958062432938
+value = 0.8030421693949379
 type = "float"
 
+
 [detr_buoy_coeff]
-value = 0.10191725613308689
+value = 0.12274545130376595
+type = "float"
+
+[pressure_normalmode_drag_coeff]
+value = 6.212142257129916
+type = "float"
+
+[pressure_normalmode_buoy_coeff1]
+value = 0.1469145574108413
 type = "float"
 
 [mixing_length_Prandtl_maximum]
 value = 4.2
 
 [mixing_length_eddy_viscosity_coefficient]
-value = 0.44208662448083624
+value = 1.239591763940756
 type = "float"
 
 [mixing_length_tke_surf_flux_coeff]
-value = 2.9404591500642425
+value = 4.979743494735943
 type = "float"
 
 [mixing_length_diss_coeff]
-value = 0.27539409051399577
+value = 0.28110004332066096
 type = "float"
 
 [mixing_length_Prandtl_number_0]
-value = 2.909243754318121
+value = 1.2595756943690926
+type = "float"
 
 [mixing_length_static_stab_coeff]
-value = 0.29736273245468714
+value = 0.3285376450623933
+type = "float"
 
 [precipitation_timescale]
 value = 1224.904221700239
 type = "float"
 
 [Tq_correlation_coefficient]
-value = 0.18750483069396207
+value = 0.9058922261928961
 type = "float"
 
 [diagnostic_covariance_coeff]
-value = 2.069068167714753
+value = 3.3734373654271765
 type = "float"
+

@@ -6,9 +6,8 @@ energy_check: true
 evolving_ocean: false
 h_elem: 4
 mode_name: "slabplanet"
-moist: "dry"
 output_default_diagnostics: false
-precip_model: nothing
 rad: nothing
+microphysics_model: "dry"
 t_end: "1days"
 vert_diff: "true"

@@ -9,8 +9,8 @@ energy_check: false
 h_elem: 6
 land_model: "integrated"
 mode_name: "amip"
-moist: equil
 netcdf_interpolation_num_points: [90, 45, 31]
+microphysics_model: "0M"
 netcdf_output_at_levels: true
 output_default_diagnostics: true
 rad: allskywithclear

@@ -340,8 +340,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
 
     # Rename for clarity; these are now Center, Center Oceananigans fields
-    F_turb_ρτxz_cc = sim.remapping.scratch_cc1
-    F_turb_ρτyz_cc = sim.remapping.scratch_cc2
+    F_turb_ρτxz_cell = sim.remapping.scratch_cc1
+    F_turb_ρτyz_cell = sim.remapping.scratch_cc2
 
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
     # Note that this requires the sea ice model to always be run with dynamics turned on
@@ -350,8 +350,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     set_from_extrinsic_vector!(
         (; u = si_flux_u, v = si_flux_v),
         grid,
-        F_turb_ρτxz_cc,
-        F_turb_ρτyz_cc,
+        F_turb_ρτxz_cell,
+        F_turb_ρτyz_cell,
     )
 
     # Remap the latent and sensible heat fluxes using scratch arrays
@@ -446,6 +446,7 @@ function FluxCalculator.ocean_seaice_fluxes!(
     ocean_sim::OceananigansSimulation,
     ice_sim::ClimaSeaIceSimulation,
 )
+    grid = ocean_sim.ocean.model.grid
     ocean_properties = ocean_sim.ocean_properties
     ice_concentration = Interfacer.get_field(ice_sim, Val(:ice_concentration))
 
@@ -475,12 +476,15 @@ function FluxCalculator.ocean_seaice_fluxes!(
     # Compute fluxes for u, v, T, and S from momentum, heat, and freshwater fluxes
     oc_flux_u = surface_flux(ocean_sim.ocean.model.velocities.u)
     oc_flux_v = surface_flux(ocean_sim.ocean.model.velocities.v)
+    # polar-exclusion mask
+    polar_excl_centers = ocean_sim.remapping.polar_exclusion_flux_mask_centers
+    polar_excl_u = ocean_sim.remapping.polar_exclusion_flux_mask_u
+    polar_excl_v = ocean_sim.remapping.polar_exclusion_flux_mask_v
 
     ρτxio = ice_sim.ocean_ice_interface.fluxes.x_momentum # sea_ice - ocean zonal momentum flux
     ρτyio = ice_sim.ocean_ice_interface.fluxes.y_momentum # sea_ice - ocean meridional momentum flux
 
     # Update the momentum flux contributions from ocean/sea ice fluxes
-    grid = ocean_sim.ocean.model.grid
     arch = OC.Architectures.architecture(grid)
     OC.Utils.launch!(
         arch,
@@ -495,15 +499,29 @@ function FluxCalculator.ocean_seaice_fluxes!(
         ρₒ⁻¹,
         ice_concentration,
     )
+    # polar-exclusion mask
+    flux_u = OC.interior(oc_flux_u, :, :, 1)
+    flux_v = OC.interior(oc_flux_v, :, :, 1)
+    flux_u .= ifelse.(polar_excl_u .≈ 0, zero(flux_u), flux_u)
+    flux_v .= ifelse.(polar_excl_v .≈ 0, zero(flux_v), flux_v)
 
     oc_flux_T = surface_flux(ocean_sim.ocean.model.tracers.T)
-    OC.interior(oc_flux_T, :, :, 1) .+=
-        OC.interior(ice_concentration, :, :, 1) .* OC.interior(Qi, :, :, 1) .* ρₒ⁻¹ ./ cₒ
+    # polar-exclusion mask: ifelse to avoid NaN where mask is 0
+    qi_masked = OC.interior(ocean_sim.remapping.scratch_cc1, :, :, 1)
+    qi_masked .=
+        polar_excl_centers .* OC.interior(ice_concentration, :, :, 1) .*
+        OC.interior(Qi, :, :, 1) .* ρₒ⁻¹ ./ cₒ
+    qi_masked .= ifelse.(polar_excl_centers .≈ 0, zero(qi_masked), qi_masked)
+    OC.interior(oc_flux_T, :, :, 1) .+= qi_masked
 
     oc_flux_S = surface_flux(ocean_sim.ocean.model.tracers.S)
-    OC.interior(oc_flux_S, :, :, 1) .+=
-        OC.interior(ice_concentration, :, :, 1) .*
+    # polar-exclusion mask: ifelse to avoid NaN where mask is 0
+    salt_contrib = OC.interior(ocean_sim.remapping.scratch_cc2, :, :, 1)
+    salt_contrib .=
+        polar_excl_centers .* OC.interior(ice_concentration, :, :, 1) .*
         OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
+    salt_contrib .= ifelse.(polar_excl_centers .≈ 0, zero(salt_contrib), salt_contrib)
+    OC.interior(oc_flux_S, :, :, 1) .+= salt_contrib
 
     return nothing
 end

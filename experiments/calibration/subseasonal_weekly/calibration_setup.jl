@@ -18,13 +18,13 @@ const CALIBRATION_PRIORS = [
     # PD.constrained_gaussian("EDMF_surface_area", 0.1, 0.03, 0, 1),
 
     # PD.constrained_gaussian("precipitation_timescale", 600, 300, 100, 2000),
-    # PD.constrained_gaussian("precipitation_timescale", 1200, 300, 300, 2400),
-    PD.constrained_gaussian("diagnostic_covariance_coeff", 2.1, 0.5, 0.0, 10.0),
+    PD.constrained_gaussian("precipitation_timescale", 1200, 300, 300, 2400),
+    # PD.constrained_gaussian("diagnostic_covariance_coeff", 2.1, 0.5, 0.0, 10.0),
     PD.constrained_gaussian("Tq_correlation_coefficient", 0.0, 0.5, -1.0, 1.0),
 
     
     # PD.constrained_gaussian("mixing_length_eddy_viscosity_coefficient", 0.2, 0.1, 0, 1.0),
-    PD.constrained_gaussian("mixing_length_diss_coeff", 0.22, 0.15, 0.0, 10.0),
+    # PD.constrained_gaussian("mixing_length_diss_coeff", 0.22, 0.15, 0.0, 10.0),
     # PD.constrained_gaussian("mixing_length_tke_surf_flux_coeff", 8.0, 4.0, 0, 100.0),
 
     # Land parameters 

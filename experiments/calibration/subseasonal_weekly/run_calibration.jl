@@ -35,7 +35,7 @@ model_interface = joinpath(
 #           Compared against January CERES monthly mean
 #
 const BASE_DATE_RANGE = (DateTime(2010, 1, 8), DateTime(2010, 1, 8))
-const N_ITERATIONS = 6
+const N_ITERATIONS = 3
 
 # 1-day test run ---
 # const BASE_DATE_RANGE = (DateTime(2010, 1, 1), DateTime(2010, 1, 1))
@@ -53,7 +53,7 @@ const ERA5_OBS_DIR = "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/daily_
 const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     config_file = joinpath(
         pkgdir(ClimaCoupler),
-        "config/subseasonal_configs/wxquest_diagedmf_weekly_calibration.yml",
+        "config/nightly_configs/amip_coarse_diagedmf.yml",
     ),
     short_names = ["rsut", "rlut"],
     minibatch_size = 1,
@@ -66,7 +66,7 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     # 1-day test run ---
     # extend = Dates.Day(1),
     # spinup = Dates.Day(0),
-    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp34",
+    output_dir = "/glade/derecho/scratch/zhaoyi/calibration/weekly/exp1",
     rng_seed = 42,
 )
 
@@ -115,7 +115,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         model_interface = model_interface,
         verbose = true,
         hpc_kwargs = Dict(
-            :job_priority => "regular", # {"premium", "regular", "economy", "preempt"}
+            :job_priority => "premium", # {"premium", "regular", "economy", "preempt"}
             :time => 720,           # 12 hours in minutes
             :ntasks => 1,
             :cpus_per_task => 12,

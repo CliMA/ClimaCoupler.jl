@@ -3,6 +3,7 @@ import JLD2
 import ClimaAnalysis
 import ClimaCoupler
 import ClimaCalibrate.Checker: SequentialIndicesChecker
+import OrderedCollections: OrderedDict
 
 # Override JLD2's default_iotype to use IOStream instead of MmapIO
 # This avoids Bus errors from memory-mapped files on Lustre filesystem
@@ -127,7 +128,6 @@ This is needed because ClimaCalibrate expects OutputVars with time dimensions
 to match observation dates.
 """
 function time_average_with_date(var, date)
-    import OrderedCollections: OrderedDict
     
     # Get the time-averaged data (2D: lon x lat, time dimension removed)
     avg_var = ClimaAnalysis.average_time(var)
@@ -151,7 +151,7 @@ function time_average_with_date(var, date)
     new_dims["time"] = [time_val]
     
     # Create new dim_attributes with time
-    new_dim_attribs = OrderedDict{String, Any}()
+    new_dim_attribs = OrderedDict{String, Dict{String, Any}}()
     for (dim_name, attribs) in avg_var.dim_attributes
         new_dim_attribs[dim_name] = attribs
     end

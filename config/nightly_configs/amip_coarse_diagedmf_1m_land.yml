@@ -14,9 +14,8 @@ h_elem: 8
 initial_condition: "AMIPFromERA5"
 insolation: "timevarying"
 mode_name: "amip"
-moist: "nonequil"
-precip_model: "1M"
 netcdf_output_at_levels: true
+microphysics_model: "1M"
 output_default_diagnostics: true
 rmse_check: true
 start_date: "20100101"

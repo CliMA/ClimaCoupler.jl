@@ -7,9 +7,8 @@ h_elem: 4
 land_model: "integrated"
 land_spun_up_ic: false
 mode_name: "amip"
-moist: "equil"
-precip_model: "0M"
 rad: "allskywithclear"
+microphysics_model: "0M"
 rayleigh_sponge: true
 t_end: "300secs"
 time_varying_trace_gases: ["CO2"]

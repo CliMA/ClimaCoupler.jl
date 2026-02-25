@@ -16,10 +16,8 @@ edmfx_upwinding: first_order
 h_elem: 30
 implicit_diffusion: true
 insolation: "timevarying"
-moist: equil
 ode_algo: ARS343
 output_default_diagnostics: false
-precip_model: 0M
 prescribed_aerosols: ["CB1", "CB2", "DST01", "DST02", "DST03", "DST04", "DST05", "OC1", "OC2", "SO4", "SSLT01", "SSLT02", "SSLT03", "SSLT04", "SSLT05"]
 prognostic_tke: true
 rad: allskywithclear
@@ -33,3 +31,4 @@ z_max: 55000.0
 extra_atmos_diagnostics:
   - short_name: [pfull, rsut, rlut, pr, hus, rv]
     period: 10hours
+microphysics_model: "0M"

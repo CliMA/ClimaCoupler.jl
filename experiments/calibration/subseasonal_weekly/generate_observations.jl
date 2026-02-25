@@ -103,7 +103,9 @@ function load_daily_var(filepath, short_name, target_date)
     @info "Loading daily $short_name for $target_date from $filepath"
     
     var = ClimaAnalysis.OutputVar(filepath, era5_varname)
-    var = ClimaAnalysis.select(var, by = ClimaAnalysis.MatchValue(), time = [target_date])
+
+    time_name = ClimaAnalysis.time_name(var)
+    var = ClimaAnalysis.slice(var; (Symbol(time_name) => target_date,)...)
 
     if !issorted(ClimaAnalysis.latitudes(var))
         var = ClimaAnalysis.reverse_dim(var, ClimaAnalysis.latitude_name(var))
@@ -212,9 +214,10 @@ function load_ceres_var(short_name, start_date)
     
     # Load the full time series
     var = Base.get(loader, short_name)
-    # Select the month containing start_date (CERES dates are at start of month)
+
     month_start = Dates.firstdayofmonth(start_date)
-    var = ClimaAnalysis.select(var, by = ClimaAnalysis.MatchValue(), time = [month_start])
+    time_name = ClimaAnalysis.time_name(var)
+    var = ClimaAnalysis.slice(var; (Symbol(time_name) => month_start,)...)
     @info "Loaded CERES $short_name for $(Dates.monthname(start_date)) $(Dates.year(start_date))"
     
     return var
@@ -245,14 +248,16 @@ function load_era5_pressure_level_var(short_name, start_date)
 
     loader = CalibrationTools.ERA5PressureLevelDataLoader()
     # (lon, lat, pressure_level, time)
-    var = Base.get(loader, base_name)
+    var = Base.get(loader, String(base_name))
 
-    month_start = Dates.firstdayofmonth(start_date)
-    var = ClimaAnalysis.select(var, by = ClimaAnalysis.MatchValue(), time = [month_start])
-    
     # ERA5 artifact uses "pressure_level" dimension in Pa, convert hPa to Pa for slicing
     pressure_Pa = pressure_hPa * 100.0
     var = ClimaAnalysis.slice(var, pressure_level = pressure_Pa)
+    
+    # Select the specific month - use slice to get 2D data (removes time dimension)
+    month_start = Dates.firstdayofmonth(start_date)
+    time_name = ClimaAnalysis.time_name(var)
+    var = ClimaAnalysis.slice(var; (Symbol(time_name) => month_start,)...)
     
     if !issorted(ClimaAnalysis.latitudes(var))
         var = ClimaAnalysis.reverse_dim(var, ClimaAnalysis.latitude_name(var))
@@ -354,7 +359,7 @@ function preprocess_vars(vars_by_date, config_file)
             var = ClimaAnalysis.set_units(var, get_var_units(short_name))
         end
         var.attributes["short_name"] = short_name
-        var.attributes["start_date"] = start_date
+        var.attributes["start_date"] = string(start_date)
         
         # Add time dimension AFTER resampling for ObservationRecipe compatibility
         var = add_time_dimension(var, start_date)

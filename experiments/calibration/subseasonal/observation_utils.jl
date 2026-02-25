@@ -95,7 +95,8 @@ function parse_pressure_level_variable(short_name::String)
     if isnothing(m)
         error("Invalid pressure-level variable name: $short_name")
     end
-    return (m.captures[1], parse(Float64, m.captures[2]))
+
+    return (String(m.captures[1]), parse(Float64, m.captures[2]))
 end
 
 """

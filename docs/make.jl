@@ -20,11 +20,6 @@ const OUTPUT_DIR = joinpath(@__DIR__, "src/generated")
 TUTORIAL_DIR_SB = joinpath(EXPERIMENTS_DIR, "ClimaCore/sea_breeze/")
 TUTORIAL_DIR_AMIP = joinpath(EXPERIMENTS_DIR, "ClimaEarth/")
 
-# Pkg.activate(TUTORIAL_DIR)
-# Pkg.instantiate()
-# include(joinpath(TUTORIAL_DIR, "run.jl"))
-# Literate.markdown(joinpath(TUTORIAL_DIR, tutorial_name), OUTPUT_DIR; execute = true, documenter = false)
-
 # execute Literate on all julia files
 tutorial_files_sb = filter(x -> last(x, 3) == ".jl", readdir(TUTORIAL_DIR_SB))
 tutorial_files_amip = filter(x -> last(x, 11) == "run_amip.jl", readdir(TUTORIAL_DIR_AMIP))
@@ -50,54 +45,41 @@ map(
     tutorial_files_amip,
 )
 
-# - move tutorial files to docs/src
-# IMAGE_DIR = joinpath(TUTORIAL_DIR, "images/")
-# files = readdir(IMAGE_DIR)
-# png_files = filter(endswith(".png"), files)
-# for file in png_files
-#     mkpath(joinpath(OUTPUT_DIR, "images/"))
-#     cp(joinpath(IMAGE_DIR, file), joinpath(OUTPUT_DIR, "images/", file), force = true)
-# end
-
 # pages layout
-experiment_pages = [
-    "Sea Breeze" => map(
-        s -> "generated/sea_breeze/$(s)",
-        readdir(joinpath(@__DIR__, "src/generated/sea_breeze")),
-    ),
+example_pages = [
     "AMIP" => map(
         s -> "generated/amip/$(s)",
         readdir(joinpath(@__DIR__, "src/generated/amip")),
     ),
+    "Sea Breeze" => map(
+        s -> "generated/sea_breeze/$(s)",
+        readdir(joinpath(@__DIR__, "src/generated/sea_breeze")),
+    ),
 ]
 interface_pages = [
-    "input.md",
-    "checkpointer.md",
-    "conservation.md",
-    "fieldexchanger.md",
-    "fluxcalculator.md",
     "interfacer.md",
-    "models.md",
+    "input.md",
     "simcoordinator.md",
     "timemanager.md",
+    "fieldexchanger.md",
+    "fluxcalculator.md",
+    "checkpointer.md",
+    "conservation.md",
     "utilities.md",
-    "simoutput.md",
-    "plotting.md",
-    "calibrationtools.md",
 ]
-performance_pages = ["performance.md"]
 
-output_pages = ["diagnostics.md", "leaderboard.md"]
+output_pages = ["simoutput.md", "plotting.md", "leaderboard.md"]
 
 pages = Any[
     "Home" => "index.md",
-    "Examples" => experiment_pages,
-    "Coupler Interface" => interface_pages,
-    "Performance" => performance_pages,
-    "Model Output" => output_pages,
+    "Running a simulation" => "running.md",
+    "Coupler interface" => interface_pages,
+    "Available component models" => "models.md",
+    "Simulation output" => output_pages,
+    "Examples" => example_pages,
+    "Parameter calibration" => "calibrationtools.md",
     "Contributing" => "contributing.md",
 ]
-
 
 makedocs(
     modules = [

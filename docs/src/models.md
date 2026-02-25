@@ -111,14 +111,62 @@ These simulation types use prescribed sea ice concentration along with
 prescribed ocean SSTs to provide realistic surface boundary conditions for
 atmospheric models.
 
+
+## Models in Extensions
+
+More scientifically-complex component models are provided as package extensions, keeping them out of
+ClimaCoupler.jl's base dependencies. The models available in each extension are described below.
+
+### Land models (`ClimaCouplerClimaLandExt`)
+
+This extension is loaded when [ClimaLand.jl](https://github.com/CliMA/ClimaLand.jl) is available
+and provides two land model options:
+
+- **`BucketSimulation`**: A simple bucket hydrology and energy balance model
+  (`ClimaLand.Bucket.BucketModel`). This model tracks soil moisture and temperature using a
+  single-layer bucket scheme and is suitable for lower-cost simulations where a full land model
+  is not required.
+
+- **`ClimaLandSimulation`**: The full integrated land model (`ClimaLand.LandModel`), which
+  includes representations of soil, snow, vegetation, and carbon cycling. This is the
+  recommended land model for high-fidelity simulations.
+
+### Ocean and sea ice models (`ClimaCouplerCMIPExt`)
+
+This extension is loaded when [Oceananigans.jl](https://github.com/CliMA/Oceananigans.jl),
+[ClimaOcean.jl](https://github.com/CliMA/ClimaOcean.jl),
+[ClimaSeaIce.jl](https://github.com/CliMA/ClimaSeaIce.jl),
+and KernelAbstractions.jl are available. It provides:
+
+- **`OceananigansSimulation`**: A full ocean circulation model developed in Oceananigans.jl and
+  initialized using ClimaOcean.jl. The ocean dynamically evolves in response to atmospheric fluxes.
+
+- **`ClimaSeaIceSimulation`**: A thermodynamic sea ice model implemented in ClimaSeaIce.jl. Sea ice
+  concentration and thickness evolve prognostically, with ice-ocean heat fluxes computed at the
+  ocean-ice interface at each coupling step.
+
+!!! warning "Oceananigans and ClimaSeaIce must be used together"
+    `OceananigansSimulation` and `ClimaSeaIceSimulation` are tightly coupled through a shared
+    ocean-ice interface with flux exchange and must always be used as a pair. They cannot be combined
+    with the simpler ocean or sea ice models provided in `src/`.
+
+### Atmosphere model (`ClimaCouplerClimaAtmosExt`)
+
+This extension is loaded when [ClimaAtmos.jl](https://github.com/CliMA/ClimaAtmos.jl) is
+available and provides:
+
+- **`ClimaAtmosSimulation`**: The CliMA atmospheric model, which handles radiation, moist
+  convection, turbulence, and dynamics. This is the primary atmosphere model used in
+  ClimaCoupler.jl simulations, and currently the only atmosphere model option.
+
 ## Model Selection
 
 The choice of which models to use is typically determined by the simulation
 mode:
 
 - **AMIP/Subseasonal modes**: Use `prescribed` ocean and `prescribed` sea ice
-- **CMIP mode**: Uses more sophisticated models (`oceananigans` ocean,
-  `clima_seaice` sea ice)
+- **CMIP mode**: Uses more sophisticated models (`Oceananigans` ocean,
+  `ClimaSeaIce` sea ice)
 - **Slabplanet modes**: Use `slab` ocean and no sea ice (or `nothing` for both
   ocean and ice in terra mode)
 

@@ -50,7 +50,7 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     minibatch_size = 1,
     n_iterations = N_ITERATIONS,
     sample_date_ranges,
-    extend = Dates.Day(0),
+    extend = Dates.Day(1),
     spinup = Dates.Day(7),
     output_dir = "/glade/derecho/scratch/cchristo/calibration/exp35",
     rng_seed = 42,

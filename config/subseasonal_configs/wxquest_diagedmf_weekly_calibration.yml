@@ -50,6 +50,11 @@ output_default_diagnostics: false
 use_coupler_diagnostics: false
 use_land_diagnostics: false
 extra_atmos_diagnostics:
-  - short_name: [tas, pr, mslp, rsut, rlut]
+  - short_name: [tas, pr, mslp, rsut, rlut, rsdt]
     period: 1days
     reduction_time: average
+  - short_name: [ta, hur]
+    period: 1days
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours

@@ -196,8 +196,12 @@ end
 
 const ERA5_TO_CLIMA_NAMES =
     ["mslhf" => "hfls", "msshf" => "hfss", "msuwswrf" => "rsus", "msuwlwrf" => "rlus"]
-const STANDARD_UNITS =
-    Dict("W m**-2" => "W m^-2", "kg kg**-1" => "unitless", "%" => "unitless")
+const STANDARD_UNITS = Dict(
+    "W m**-2" => "W m^-2",
+    "W m-2" => "W m^-2",
+    "kg kg**-1" => "unitless",
+    "%" => "unitless",
+)
 
 """
     ERA5DataLoader(; era5_to_clima_names = ERA5_TO_CLIMA_NAMES)
@@ -288,6 +292,121 @@ function _preprocess_var(var; flip_sign = false)
 end
 
 Base.show(io::IO, data_loader::ERA5DataLoader) = _show(io, data_loader, "ERA5DataLoader")
+
+"""
+    CERESDataLoader
+
+A struct for loading preprocessed CERES data as `OutputVar`s.
+"""
+struct CERESDataLoader <: AbstractDataLoader
+    """A catalog built from NetCDF files, designed to initialize `OutputVar`s.
+    See ClimaAnalysis documentation for more information about NCCatalog."""
+    catalog::NCCatalog
+
+    """A list of available variables to load."""
+    available_vars::Set{String}
+end
+
+const CERES_TO_CLIMA_NAMES = [
+    "toa_sw_all_mon" => "rsut",
+    "toa_sw_clr_t_mon" => "rsutcs",
+    "toa_lw_all_mon" => "rlut",
+    "toa_lw_clr_t_mon" => "rlutcs",
+]
+const CERES_DERIVED_VARS = Set(["swcre", "lwcre"])
+
+"""
+    CERESDataLoader(; ceres_to_clima_names = CERES_TO_CLIMA_NAMES)
+
+Construct a data loader which you can load preprocessed CERES monthly
+time-averaged TOA radiation data in `OutputVar`, where
+- the short name and units match CliMA conventions,
+- the latitudes are shifted to be -180 to 180 degrees,
+- the times are at the start of the time period (e.g. the time average of
+  January is on the first of January instead of January 15th).
+
+Additionally, the following derived cloud radiative effect (CRE) variables are
+available:
+- `swcre = rsutcs - rsut` (shortwave CRE)
+- `lwcre = rlutcs - rlut` (longwave CRE)
+
+The CERES data comes from the `radiation_obs` artifact. See
+[ClimaArtifacts](https://github.com/CliMA/ClimaArtifacts) for more information
+about this artifact.
+
+The keyword argument `ceres_to_clima_names` is a vector of pairs mapping
+CERES name to CliMA name.
+"""
+function CERESDataLoader(; ceres_to_clima_names = CERES_TO_CLIMA_NAMES)
+    artifact_dir = @clima_artifact("radiation_obs")
+    ceres_file = joinpath(artifact_dir, "CERES_EBAF_Ed4.2_Subset_200003-201910.nc")
+
+    catalog = NCCatalog()
+    ClimaAnalysis.add_file!(catalog, ceres_file, ceres_to_clima_names...)
+    all_vars = Set(last.(ceres_to_clima_names)) ∪ CERES_DERIVED_VARS
+    return CERESDataLoader(catalog, all_vars)
+end
+
+"""
+    get(loader::CERESDataLoader, short_name)
+
+Get the preprocessed `OutputVar` with the name `short_name` from the CERES
+dataset.
+
+In addition to the variables in `CERES_TO_CLIMA_NAMES`, the following derived
+variables are available:
+- `swcre`: shortwave cloud radiative effect, computed as `rsutcs - rsut`
+- `lwcre`: longwave cloud radiative effect, computed as `rlutcs - rlut`
+"""
+function Base.get(loader::CERESDataLoader, short_name::String)
+    (; available_vars) = loader
+    short_name in available_vars || error(
+        "$short_name is not available to load. To add this variable, add it to CERES_TO_CLIMA_NAMES as a pair mapping CERES name to CliMA name and create a new CERESDataLoader",
+    )
+
+    if short_name == "swcre"
+        rsutcs = _load_ceres_var(loader, "rsutcs")
+        rsut = _load_ceres_var(loader, "rsut")
+        result = rsutcs - rsut
+        ClimaAnalysis.set_short_name!(result, "swcre")
+        return result
+    elseif short_name == "lwcre"
+        rlutcs = _load_ceres_var(loader, "rlutcs")
+        rlut = _load_ceres_var(loader, "rlut")
+        result = rlutcs - rlut
+        ClimaAnalysis.set_short_name!(result, "lwcre")
+        return result
+    end
+
+    return _load_ceres_var(loader, short_name)
+end
+
+function _load_ceres_var(loader::CERESDataLoader, short_name::String)
+    var = ClimaAnalysis.Catalog.get(
+        loader.catalog,
+        short_name;
+        var_kwargs = (shift_by = Dates.firstdayofmonth,),
+    )
+    return preprocess(loader, var, Val(Symbol(short_name)))
+end
+
+"""
+    preprocess(::CERESDataLoader, var, ::Val{varname}) where {varname}
+
+Preprocess `var` with short name `varname`.
+"""
+function preprocess(::CERESDataLoader, _, ::Val{varname}) where {varname}
+    error(
+        "No preprocessing function is found for $varname. Add a method for preprocess(var, ::Val{:$varname}) that preprocess this variable as a OutputVar",
+    )
+end
+
+preprocess(::CERESDataLoader, var, ::Val{:rsut}) = _preprocess_var(var)
+preprocess(::CERESDataLoader, var, ::Val{:rsutcs}) = _preprocess_var(var)
+preprocess(::CERESDataLoader, var, ::Val{:rlut}) = _preprocess_var(var)
+preprocess(::CERESDataLoader, var, ::Val{:rlutcs}) = _preprocess_var(var)
+
+Base.show(io::IO, data_loader::CERESDataLoader) = _show(io, data_loader, "CERESDataLoader")
 
 """
     GPCPLoader

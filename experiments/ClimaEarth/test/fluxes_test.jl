@@ -25,8 +25,6 @@ include(joinpath("..", "setup_run.jl"))
     # Make sure radiation is computed during the first step
     config_dict["dt_rad"] = config_dict["dt"]
 
-    config_dict["land_model"] = "integrated"
-
     # Construct coupled simulation and run one coupling step
     cs = CoupledSimulation(config_dict)
     boundary_space = Interfacer.boundary_space(cs)

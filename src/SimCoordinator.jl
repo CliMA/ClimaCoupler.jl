@@ -178,7 +178,7 @@ function save_sypd_walltime_to_disk(cs, walltime)
 end
 
 """
-    CoupledSimulation(config_file)
+    CoupledSimulation(config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
     CoupledSimulation(config_dict)
 
 Set up a `CoupledSimulation` as prescribed by the given input.
@@ -186,10 +186,13 @@ Set up a `CoupledSimulation` as prescribed by the given input.
 This struct is defined in the Interfacer module and contains all information
 about component models, diagnostics, timestepping, output directories, etc
 needed to run a coupled simulation.
+
+If no arguments are provided, the default AMIP configuration is used,
+which is defined in `config/ci_configs/amip_default.yml`.
 """
 function Interfacer.CoupledSimulation(
     config_file::AbstractString = joinpath(
-        pkgdir(parentmodule(@__MODULE__)),
+        pkgdir(ClimaCoupler),
         "config/ci_configs/amip_default.yml",
     ),
 )
@@ -468,14 +471,18 @@ end
 
 """
     setup_and_run(config_dict::AbstractDict)
-    setup_and_run(config_file)
+    setup_and_run(config_file::AbstractString = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml"))
 
 Set up and run the coupled model simulation specified by the input config
 file or dict. Returns the `CoupledSimulation` after the run completes.
+
+If no arguments are provided, the default AMIP configuration is used,
+which is defined in `config/ci_configs/amip_default.yml`. This
+is the same behavior as the `CoupledSimulation` constructor.
 """
 function setup_and_run(
     config_file::AbstractString = joinpath(
-        pkgdir(parentmodule(@__MODULE__)),
+        pkgdir(ClimaCoupler),
         "config/ci_configs/amip_default.yml",
     ),
 )

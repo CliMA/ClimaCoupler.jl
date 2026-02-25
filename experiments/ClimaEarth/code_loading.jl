@@ -6,7 +6,7 @@ so we force abbreviated stacktraces even in non-interactive runs.
 (See also `Base.type_limited_string_from_context()`)
 =#
 
-redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(false)))
+redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(true)))
 
 #=
 ## Package Loading

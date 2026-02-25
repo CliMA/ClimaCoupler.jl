@@ -103,7 +103,7 @@ function load_daily_var(filepath, short_name, target_date)
     @info "Loading daily $short_name for $target_date from $filepath"
     
     var = ClimaAnalysis.OutputVar(filepath, era5_varname)
-    var = ClimaAnalysis.select(var, by = ClimaAnalysis.MatchValue(), time = target_date)
+    var = ClimaAnalysis.select(var, by = ClimaAnalysis.MatchValue(), time = [target_date])
 
     if !issorted(ClimaAnalysis.latitudes(var))
         var = ClimaAnalysis.reverse_dim(var, ClimaAnalysis.latitude_name(var))
@@ -214,7 +214,7 @@ function load_ceres_var(short_name, start_date)
     var = Base.get(loader, short_name)
     # Select the month containing start_date (CERES dates are at start of month)
     month_start = Dates.firstdayofmonth(start_date)
-    var = ClimaAnalysis.select(var, by = ClimaAnalysis.MatchValue(), time = month_start)
+    var = ClimaAnalysis.select(var, by = ClimaAnalysis.MatchValue(), time = [month_start])
     @info "Loaded CERES $short_name for $(Dates.monthname(start_date)) $(Dates.year(start_date))"
     
     return var

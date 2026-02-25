@@ -114,7 +114,7 @@ steps:
       - label: "Compare AMIP/Atmos-only with diagnostic EDMF"
         key: "compare_amip_climaatmos_amip_diagedmf"
         command: |
-          julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/user_io/benchmarks.jl \
+          julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/benchmarks.jl \
             --job_id_coupled gpu_amip_diagedmf \
             --job_id_coupled_io gpu_amip_diagedmf_io \
             --job_id_atmos_diagedmf gpu_climaatmos_diagedmf \

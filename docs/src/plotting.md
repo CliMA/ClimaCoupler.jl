@@ -9,20 +9,6 @@ The actual plotting implementations are provided by the `ClimaCouplerMakieExt` e
 when Makie.jl and related packages are available, and by `ClimaCouplerCMIPMakieExt`
 when the plotting packages and Oceananigans.jl are available.
 
-## Plotting API
-
-```@docs
-Plotting.postprocess
-Plotting.make_diagnostics_plots
-Plotting.make_ocean_diagnostics_plots
-Plotting.debug
-Plotting.debug_plot_fields
-Plotting.debug_plot!
-Plotting.plot_global_conservation
-Plotting.compute_leaderboard
-Plotting.compute_pfull_leaderboard
-```
-
 ### Postprocessing
 
 The `postprocess` function coordinates all postprocessing operations after a simulation completes,
@@ -62,7 +48,10 @@ ClimaCouplerMakieExt.jl uses ClimaAnalysis.jl to generate plots of diagnostic va
 saved using the ClimaDiagnostics.jl infrastructure.
 
 For information about diagnostics in ClimaCoupler, including how to customize which
-variables to save, how often, and with which reductions, see the [Diagnostics](@ref) documentation.
+variables to save, how often, and with which reductions, see the [SimOutput](@ref) documentation.
+
+For example, here is a plot of the atmosphere water vapor path diagnostic, generated using ClimaAnalysis.jl:
+![Water vapor path diagnostic](assets/amip-25Jan2026-diagnostic-water_vapor.png)
 
 #### Leaderboards
 
@@ -73,6 +62,10 @@ and 3D pressure-level variables are supported.
 For detailed information about adding variables to leaderboards and customizing
 comparisons, see the [Leaderboard](@ref) documentation.
 
+For example, here is a leaderboard plot showing precipitation bias compared
+to ERA5 data:
+![Precipitation bias leaderboard](assets/amip-25Jan2026-leaderboard-precipitation_bias.png)
+
 #### Calibration plots
 
 Calibration plots visualize parameter calibration results, including scatter
@@ -81,6 +74,10 @@ iterations.
 
 These plots are used to visualize the results of model parameter calibration
 with EnsembleKalmanProcesses.jl.
+
+For example, here is a plot of parameter value across iterations, generated
+from a perfect model calibration experiment:
+![Calibration parameter vs iteration](assets/longrun-25Jan2026-calibration-param_iter.png)
 
 #### Conservation plots
 
@@ -91,13 +88,21 @@ maintains physical conservation properties.
 Please note that the current AMIP/CMIP configurations are not expected to be conservative,
 so conservation plots are only available for the Slabplanet configuration.
 
-For information about conservation checks in ClimaCoupler, see the [Conservation Checks](@ref) documentation.
+For information about conservation checks in ClimaCoupler, see the [ConservationChecker](@ref) documentation.
+
+Here is an example plot of energy conservation over the course of a 10-day slabplanet simulation:
+![Slabplanet energy conservation](assets/longrun-25Jan2026-conservation-energy.png)
 
 #### Debug plots
 
 To facilitate debugging, ClimaCoupler.jl plots most coupler fields and model
 fields of physical interest by default. These plots are availabe at the end of a simulation
 in the provided artifacts directory.
+
+Since these plots are intended for debugging, they are less polished than the other plotting options.
+
+For example, here are the debug plots generation for the atmosphere component:
+![Atmosphere debug plots](assets/longrun-25Jan2026-debug-atmos.png)
 
 ## ClimaCouplerCMIPMakieExt Extension
 
@@ -113,9 +118,7 @@ using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, Poppler_jll, Printf
 using Oceananigans
 ```
 
-### Additional Features
-
-The Oceananigans extension adds support for:
+The `ClimaCouplerCMIPExt` extension adds support for:
 
 - **Oceananigans field plotting**: Extends `Plotting.debug_plot!` to handle `Oceananigans.Field`
   and `Oceananigans.AbstractOperations.AbstractOperation` types, allowing debug plots to visualize
@@ -126,3 +129,20 @@ The Oceananigans extension adds support for:
 
 These extensions enable the debug plotting system to automatically handle Oceananigans fields
 when they are encountered in coupled simulations, without requiring any special handling in user code.
+
+For example, here are the debug plots generation for the Oceananigans component:
+![Øceananigans debug plots](assets/shortrun-28Feb2026-debug-ocean.png)
+
+## Plotting API
+
+```@docs
+Plotting.postprocess
+Plotting.make_diagnostics_plots
+Plotting.make_ocean_diagnostics_plots
+Plotting.debug
+Plotting.debug_plot_fields
+Plotting.debug_plot!
+Plotting.plot_global_conservation
+Plotting.compute_leaderboard
+Plotting.compute_pfull_leaderboard
+```

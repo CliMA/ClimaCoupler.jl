@@ -30,7 +30,39 @@ var_units = Dict(
     "rsdscs" => "W m^-2",  # surface downwelling SW clear-sky
     "rsuscs" => "W m^-2",  # surface upwelling SW clear-sky
     "rldscs" => "W m^-2",  # surface downwelling LW clear-sky
+    "ta" => "K",      # Temperature at any pressure level
+    "hur" => "unitless",  # Relative humidity at any pressure level
+    "hus" => "unitless",  # Specific humidity at any pressure level
 )
+
+
+const PRESSURE_LEVEL_BASE_UNITS = Dict(
+    "ta" => "K",
+    "hur" => "unitless",
+    "hus" => "unitless",
+)
+
+"""
+    get_var_units(short_name)
+
+Get the units for a variable, handling pressure-level variables automatically.
+For "ta_850hPa", returns units for "ta", etc.
+"""
+function get_var_units(short_name::String)
+
+    if haskey(var_units, short_name)
+        return var_units[short_name]
+    end
+
+    if is_pressure_level_variable(short_name)
+        base_name, _ = parse_pressure_level_variable(short_name)
+        if haskey(PRESSURE_LEVEL_BASE_UNITS, base_name)
+            return PRESSURE_LEVEL_BASE_UNITS[base_name]
+        end
+    end
+    
+    error("Unknown variable: $short_name - add it to var_units or PRESSURE_LEVEL_BASE_UNITS")
+end
 
 """
     remove_global_mean(var)
@@ -44,10 +76,35 @@ function remove_global_mean(var)
 end
 
 """
+    is_pressure_level_variable(short_name)
+
+Check if a short_name represents a pressure-level variable (e.g., "ta_850hPa").
+"""
+function is_pressure_level_variable(short_name::String)
+    return occursin(r"_\d+hPa$", short_name)
+end
+
+"""
+    parse_pressure_level_variable(short_name)
+
+Parse a pressure-level variable name into (base_name, pressure_level).
+e.g., "ta_850hPa" -> ("ta", 850.0)
+"""
+function parse_pressure_level_variable(short_name::String)
+    m = match(r"^(.+)_(\d+)hPa$", short_name)
+    if isnothing(m)
+        error("Invalid pressure-level variable name: $short_name")
+    end
+    return (m.captures[1], parse(Float64, m.captures[2]))
+end
+
+"""
     get_var(short_name, simdir)
 
 Get an `OutputVar` from `simdir` for the given `short_name`.
-Handles composite variables like "tas - ta" (surface-minus-boundary-layer temperature).
+Handles:
+- Composite variables like "tas - ta" (surface-minus-boundary-layer temperature)
+- Pressure-level variables like "ta_850hPa" (temperature at 850 hPa)
 """
 function get_var(short_name, simdir)
     if short_name == "tas - ta"
@@ -55,6 +112,50 @@ function get_var(short_name, simdir)
         ta = get(simdir; short_name = "ta")
         ta_900hpa = slice(ta; z = 1000)
         var = tas - ta_900hpa
+    elseif is_pressure_level_variable(short_name)
+
+        base_name, pressure_hPa = parse_pressure_level_variable(short_name)
+
+        var = get(simdir; short_name = base_name, coord_type = "pressure")
+        
+
+        if haskey(var.dims, "pfull")
+            # Check units of pressure dimension and convert to hPa if needed
+            pfull_units = get(var.dim_attributes, "pfull", Dict())
+            pfull_unit_str = get(pfull_units, "units", "")
+            
+            if pfull_unit_str == "Pa"
+                # Convert Pa to hPa
+                var = ClimaAnalysis.convert_dim_units(
+                    var, "pfull", "hPa"; 
+                    conversion_function = x -> 0.01 * x
+                )
+            elseif pfull_unit_str == "hPa"
+                # Already in hPa, no conversion needed
+            else
+                error("Unexpected pfull units: '$pfull_unit_str'. Expected 'Pa' or 'hPa'.")
+            end
+        end
+        
+        # Select the specific pressure level using MatchValue for exact match
+        var = ClimaAnalysis.slice(var, pfull = pressure_hPa)
+        
+        # Handle relative humidity units
+        # ClimaDiagnostics outputs hur with empty string units (""), but
+        # ClimaAnalysis treats "" as missing units and expects "unitless".
+
+        if base_name == "hur"
+            units = ClimaAnalysis.units(var)
+            if units == "%"
+                # ERA5 uses percentage - convert to fractional
+                var = ClimaAnalysis.convert_units(
+                    var, "unitless"; 
+                    conversion_function = x -> 0.01 * x
+                )
+            elseif units == "" || units == "1"
+                var = ClimaAnalysis.set_units(var, "unitless")
+            end
+        end
     else
         var = get(simdir; short_name)
     end
@@ -75,7 +176,7 @@ determine the shift.
 function preprocess_var(var, sample_date_range)
     period = largest_period(sample_date_range)
     var = ClimaAnalysis.Var._shift_by(var, date -> date - period)
-    var = set_units(var, var_units[short_name(var)])
+    var = set_units(var, get_var_units(short_name(var)))
     var = window(var, "time"; left = sample_date_range[1], right = sample_date_range[2])
     return var
 end

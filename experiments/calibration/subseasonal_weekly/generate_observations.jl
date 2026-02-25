@@ -227,10 +227,52 @@ Check if a variable should be loaded from CERES instead of ERA5.
 """
 is_ceres_variable(short_name, ceres_variables) = short_name in ceres_variables
 
+
+##### ERA5 Pressure-Level Data Loading Functions
+
+"""
+    load_era5_pressure_level_var(short_name, start_date)
+
+Load a variable from ERA5 pressure-level data for the month containing start_date.
+Handles parsing of pressure-level variable names (e.g., "ta_850hPa") and selects
+the appropriate pressure level from the 3D data.
+
+Returns a 2D OutputVar (lon, lat) representing the monthly mean at that pressure level.
+"""
+function load_era5_pressure_level_var(short_name, start_date)
+    # Parse the short_name to get base variable and pressure level
+    base_name, pressure_hPa = parse_pressure_level_variable(short_name)
+
+    loader = CalibrationTools.ERA5PressureLevelDataLoader()
+    # (lon, lat, pressure_level, time)
+    var = Base.get(loader, base_name)
+
+    month_start = Dates.firstdayofmonth(start_date)
+    var = ClimaAnalysis.select(var, by = ClimaAnalysis.MatchValue(), time = [month_start])
+    
+    # ERA5 artifact uses "pressure_level" dimension in Pa, convert hPa to Pa for slicing
+    pressure_Pa = pressure_hPa * 100.0
+    var = ClimaAnalysis.slice(var, pressure_level = pressure_Pa)
+    
+    if !issorted(ClimaAnalysis.latitudes(var))
+        var = ClimaAnalysis.reverse_dim(var, ClimaAnalysis.latitude_name(var))
+    end
+    
+    # Set the short_name to include pressure level (e.g., "ta_850hPa")
+    new_attribs = copy(var.attributes)
+    new_attribs["short_name"] = short_name
+    var = ClimaAnalysis.OutputVar(new_attribs, var.dims, var.dim_attributes, var.data)
+    
+    @info "Loaded ERA5 $short_name ($(base_name) at $(Int(pressure_hPa)) hPa) for $(Dates.monthname(start_date)) $(Dates.year(start_date))"
+    
+    return var
+end
+
 """
     load_vars(obs_dir, short_names, sample_date_ranges; ceres_variables = String[])
 
 Load observation data for the specified short_names and date ranges.
+- Pressure-level variables (e.g., "ta_850hPa") are loaded from ERA5 pressure-level artifact
 - Variables in `ceres_variables` are loaded from CERES monthly data
 - Other variables are loaded from ERA5 (daily or weekly files)
 
@@ -244,8 +286,11 @@ function load_vars(obs_dir, short_names, sample_date_ranges; ceres_variables = S
         
         for short_name in short_names
             try
+                # Check if this is a pressure-level variable (e.g., "ta_850hPa")
+                if is_pressure_level_variable(short_name)
+                    var = load_era5_pressure_level_var(short_name, start_date)
                 # Check if this variable should come from CERES
-                if is_ceres_variable(short_name, ceres_variables)
+                elseif is_ceres_variable(short_name, ceres_variables)
                     var = load_ceres_var(short_name, start_date)
                 elseif is_single_day
                     # Load from ERA5 daily files
@@ -306,7 +351,7 @@ function preprocess_vars(vars_by_date, config_file)
         end
         
         if haskey(var_units, short_name)
-            var = ClimaAnalysis.set_units(var, var_units[short_name])
+            var = ClimaAnalysis.set_units(var, get_var_units(short_name))
         end
         var.attributes["short_name"] = short_name
         var.attributes["start_date"] = start_date

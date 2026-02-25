@@ -352,11 +352,6 @@ preprocess(::GPCPDataLoader, var, ::Val{:pr}) = _preprocess_var(var, flip_sign =
 
 Base.show(io::IO, data_loader::GPCPDataLoader) = _show(io, data_loader, "GPCPDataLoader")
 
-
-
-
-
-
 """
     ERA5PressureLevelDataLoader
 
@@ -428,8 +423,8 @@ end
 preprocess(::ERA5PressureLevelDataLoader, var, ::Val{:ta}) = _preprocess_var(var)
 preprocess(::ERA5PressureLevelDataLoader, var, ::Val{:hus}) = _preprocess_var(var)
 function preprocess(::ERA5PressureLevelDataLoader, var, ::Val{:hur})
-    var = preprocess_var(var)
-    # Convert from percentages (e.g. 120%) to decimal (1.20)
+    var = _preprocess_var(var)
+    # Convert from percentages (e.g. 90%) to decimal (0.90)
     var = ClimaAnalysis.convert_units(var, "unitless", conversion_function = x -> 0.01 * x)
     return var
 end

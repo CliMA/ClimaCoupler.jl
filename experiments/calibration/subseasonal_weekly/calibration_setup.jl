@@ -50,10 +50,30 @@ const CALIBRATION_NOISE_SCALAR = 3.0
 # If true, normalize each variable to zero mean and unit variance
 const NORMALIZE_VARIABLES = true
 
-# ==========================================================================
-# DATA SOURCE SETTINGS
-# ==========================================================================
+
+# ----- DATA SOURCE SETTINGS -----
+
 # Variables to load from CERES instead of ERA5 (radiation variables)
 # Set to empty vector [] to use ERA5 for all variables
 const CERES_VARIABLES = ["rsut", "rlut", "rsutcs", "rlutcs", "rsds", "rsus", "rlds", "rlus"]
 # Note: CERES data is monthly
+
+# ----- PRESSURE LEVEL SETTINGS -----
+
+# Variables that require pressure-level selection from 3D data
+# Format: "varname_XXXhPa" where XXX is the pressure level
+const PRESSURE_LEVEL_VARIABLES = Dict{String, Vector{Float64}}(
+    "ta" => [850.0, 500.0, 200.0],   # Temperature at 850, 500, 200 hPa
+    "hur" => [850.0, 500.0, 200.0],
+)
+
+# Generate flat list of pressure-level variable names (e.g., "ta_850hPa")
+function get_pressure_level_short_names()
+    names = String[]
+    for (var, levels) in PRESSURE_LEVEL_VARIABLES
+        for level in levels
+            push!(names, "$(var)_$(Int(level))hPa")
+        end
+    end
+    return names
+end

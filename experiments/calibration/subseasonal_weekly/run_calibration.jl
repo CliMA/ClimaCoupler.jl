@@ -46,7 +46,16 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
         pkgdir(ClimaCoupler),
         "config/subseasonal_configs/wxquest_diagedmf_weekly_calibration.yml",
     ),
-    short_names = ["rsut", "rlut"],
+    # short_names = ["rsut", "rlut"],
+    # Note: Pressure-level variables require model output with pressure_coordinates: true
+    short_names = [
+        "ta_850hPa",
+        "ta_500hPa",
+        "ta_200hPa",
+        "hur_850hPa",
+        "hur_500hPa",
+        "hur_200hPa",
+    ],
     minibatch_size = 1,
     n_iterations = N_ITERATIONS,
     sample_date_ranges,

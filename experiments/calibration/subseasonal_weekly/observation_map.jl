@@ -98,7 +98,7 @@ end
 # Then TIME-AVERAGE to a single value for comparison to CERES monthly mean
 function preprocess_var(var, sample_date_range)
     # Set units to match what's expected
-    var = set_units(var, var_units[ClimaAnalysis.short_name(var)])
+    var = set_units(var, get_var_units(ClimaAnalysis.short_name(var)))
     
     # Window to calibration period defined by sample_date_range
     calib_start, calib_end = sample_date_range

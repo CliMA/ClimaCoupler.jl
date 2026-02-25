@@ -331,6 +331,8 @@ end
 ## Interfacer API
 ```@docs
     Interfacer.CoupledSimulation
+    Interfacer.current_date
+    Interfacer.default_coupler_fields
     Interfacer.AbstractAtmosSimulation
     Interfacer.AbstractSurfaceSimulation
     Interfacer.AbstractComponentSimulation

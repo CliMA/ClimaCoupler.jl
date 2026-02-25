@@ -3,7 +3,8 @@
 
 This module contains code for extending the ClimaCoupler interface for
 ClimaAtmos. For more information about the atmos model, please see
-`experiments/ClimaEarth/README.md`
+the "Available component models" section of the ClimaCoupler documentation,
+or see the [ClimaAtmos documentation](https://clima.github.io/ClimaAtmos.jl/stable/).
 """
 module ClimaCouplerClimaAtmosExt
 

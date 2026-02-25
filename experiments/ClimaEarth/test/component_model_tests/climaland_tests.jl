@@ -9,17 +9,15 @@ import ClimaParams as CP # to load TDP extension
 import ClimaComms
 ClimaComms.@import_required_backends
 
-exp_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth")
-
+# To load ClimaAtmosSimulation
 import ClimaAtmos
-# Needed to construct ClimaAtmosSimulation
-ClimaAtmosExt = Base.get_extension(ClimaCoupler, :ClimaCouplerClimaAtmosExt)
-
-include(joinpath(exp_dir, "setup_run.jl"))
 
 # To load ClimaCouplerClimaLandExt
 import ClimaLand as CL
 import NCDatasets
+
+exp_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth")
+include(joinpath(exp_dir, "setup_run.jl"))
 
 FT = Float32
 
@@ -114,7 +112,12 @@ end
     canopy_flux = land_sim.integrator.p.canopy.turbulent_fluxes
 
     # Atmos geometry objects needed to convert land scalars into atmos flux format
-    atmos_surface_space = get_surface_space(atmos_sim)
+    atmos_surface_space = axes(
+        CC.Spaces.level(
+            CC.Fields.coordinate_field(atmos_sim.domain.face_space).z,
+            CC.Utilities.half,
+        ),
+    )
     Y = atmos_sim.integrator.u
     surface_geometry =
         CC.Fields.level(CC.Fields.local_geometry_field(Y.f), CC.Utilities.half)

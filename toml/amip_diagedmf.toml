@@ -21,7 +21,7 @@ value = 0
 value = 0
 
 [entr_param_vec]
-value = [-17.63892707098534, 18.77897708611115, 0.31250294925628486]
+value = [0.17, -4.15, 0.23]
 type = "float"
 
 [entr_mult_limiter_coeff]

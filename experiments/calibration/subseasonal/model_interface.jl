@@ -3,8 +3,9 @@ ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
 import ClimaCoupler
 import ClimaCalibrate
 import CUDA
+import Dates: Date, Second
 import EnsembleKalmanProcesses as EKP
-include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.jl"))
+include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "code_loading.jl"))
 include(
     joinpath(
         pkgdir(ClimaCoupler),

@@ -13,9 +13,9 @@
 #   to the atmospheric flux on ice-dominant cells.
 
 import Test: @test, @testset
+import ClimaCore as CC
 
-# Use the AMIP setup helpers to construct a coupled simulation
-include(joinpath("..", "setup_run.jl"))
+include(joinpath("..", "code_loading.jl"))
 
 @testset "surface radiative flux consistency (AMIP + bucket land)" begin
     # Build AMIP configuration used in CI by default

@@ -1,5 +1,6 @@
 using Test
 import ClimaCore as CC
+import ClimaCore.Geometry: ⊗
 import ClimaAtmos as CA
 import ClimaCoupler
 import ClimaCoupler: FieldExchanger, FluxCalculator, Interfacer

@@ -547,7 +547,7 @@ end
 preprocess(::ERA5PressureLevelDataLoader, var, ::Val{:ta}) = _preprocess_var(var)
 preprocess(::ERA5PressureLevelDataLoader, var, ::Val{:hus}) = _preprocess_var(var)
 function preprocess(::ERA5PressureLevelDataLoader, var, ::Val{:hur})
-    var = preprocess_var(var)
+    var = _preprocess_var(var)
     # Convert from percentages (e.g. 120%) to decimal (1.20)
     var = ClimaAnalysis.convert_units(var, "unitless", conversion_function = x -> 0.01 * x)
     return var

@@ -276,8 +276,8 @@ Load observation data for the specified short_names and date ranges.
 
 Returns a Dict mapping (short_name, date_range) -> OutputVar
 """
-function load_vars(obs_dir, short_names, sample_date_ranges, config_file; ceres_variables = String[])
-    vars_by_date = Dict{Tuple{String, NTuple{2, Dates.DateTime}}, OutputVar}()
+function load_vars(obs_dir, short_names, config_file; ceres_variables = String[])
+    vars =[]
 
     pressure_level_vars = filter(is_pressure_level_variable, short_names)
     ceres_vars_in_names = filter(sn -> is_ceres_variable(sn, ceres_variables), short_names)
@@ -293,23 +293,19 @@ function load_vars(obs_dir, short_names, sample_date_ranges, config_file; ceres_
 
     # Load ERA5 pressure-level vars once per variable
     for short_name in pressure_level_vars
-        var = load_era5_pressure_level_var(short_name, config_file, era5_pl_loader)
-        for dr in sample_date_ranges
-            vars_by_date[(short_name, dr)] = var
-        end
+        var = load_era5_pressure_level_var(short_name, config_file)
+        push!(vars, var)
     end
 
     # Load CERES vars once per variable
     for short_name in ceres_vars_in_names
-        var = load_ceres_var(short_name, config_file, ceres_loader)
+        var = load_ceres_var(short_name, config_file)
         for dr in sample_date_ranges
-            vars_by_date[(short_name, dr)] = var
+            push!(vars, var)
         end
     end
 
     # Load ERA5 surface vars from weekly/daily files — these are date-specific.
-    for (start_date, end_date) in sample_date_ranges
-        is_single_day = (start_date == end_date)
         for short_name in era5_surface_vars
             try
                 if is_single_day
@@ -325,14 +321,13 @@ function load_vars(obs_dir, short_names, sample_date_ranges, config_file; ceres_
                     end
                     var = load_weekly_var(filepath, short_name, start_date, end_date)
                 end
-                vars_by_date[(short_name, (start_date, end_date))] = var
+                push!(vars, var)
             catch e
                 @warn "Failed to load $short_name for $start_date - $end_date: $e"
                 rethrow(e)
             end
         end
-    end
-    return vars_by_date
+    return vars
 end
 
 """
@@ -344,23 +339,31 @@ and adding time dimension for ObservationRecipe compatibility.
 Precipitation (pr) requires special handling:
 ERA5 'tp' is in meters/hour, we convert to mm/day using ERA5_PR_CONVERSION.
 """
-function preprocess_vars(vars_by_date, config_file)
-    processed = Dict{Tuple{String, NTuple{2, Dates.DateTime}}, OutputVar}()
+function preprocess_vars(vars)
+    # processed = Dict{Tuple{String, NTuple{2, Dates.DateTime}}, OutputVar}()
     
-    for (key, var) in vars_by_date
-        short_name = key[1]
-        date_range = key[2]
-        start_date = date_range[1]
-        
-        if haskey(var_units, short_name)
-            var = ClimaAnalysis.set_units(var, get_var_units(short_name))
+    # for (key, var) in vars_by_date
+    #     short_name = key[1]
+    #     date_range = key[2]
+    #     start_date = date_range[1]
+
+    #     if haskey(var_units, short_name)
+    #         var = ClimaAnalysis.set_units(var, get_var_units(short_name))
+    #     end
+    #     var.attributes["short_name"] = short_name
+    #     var.attributes["start_date"] = string(start_date)
+
+    #     processed[key] = var
+    # end
+    processed = []
+    for var in vars
+        if haskey(var_units, ClimaAnalysis.short_name(var))
+            # var = ClimaAnalysis.set_units(var, get_var_units(short_name))
+            # There isn't a set_units! function yet
+            var.attributes["units"] = get_var_units(short_name)
         end
-        var.attributes["short_name"] = short_name
-        var.attributes["start_date"] = string(start_date)
-                
-        processed[key] = var
+        push!(processed, var)
     end
-    
     return processed
 end
 
@@ -377,31 +380,33 @@ Note: For weekly averages, each OutputVar has a single time point at start_date.
 We pass start_date for both start and end to ObservationRecipe since the data
 represents the entire week as a single snapshot.
 """
-function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
+function make_observation_vector(vars, sample_date_ranges)
     include(joinpath(@__DIR__, "calibration_setup.jl"))
 
-    covar_estimator = ClimaCalibrate.ObservationRecipe.ScalarCovariance(;
-        scalar = Float64(CALIBRATION_NOISE_SCALAR),
-        use_latitude_weights = true,
-    )
-    # TODO: largest overlap between different datasets 
-    # covar_estimator = ClimaCalibrate.ObservationRecipe.SVDplusDCovariance(;
+    available_sample_dates = intersect(ClimaAnalysis.dates.(vars)...)
+    min_year = minimum(Dates.year.(available_sample_dates))
+    max_year = maximum(Dates.year.(available_sample_dates))
+    # covar_estimator = ClimaCalibrate.ObservationRecipe.ScalarCovariance(;
+    #     scalar = Float64(CALIBRATION_NOISE_SCALAR),
+    #     use_latitude_weights = true,
+    # )
 
     obs_vec = map(sample_date_ranges) do sample_date_range
-        date_vars = OutputVar[]
         start_date = first(sample_date_range)
-        for sn in short_names
-            key = (sn, sample_date_range)
-            if haskey(vars_by_date, key)
-                push!(date_vars, vars_by_date[key])
-            else
-                @warn "Missing variable for $key"
-            end
-        end
-
+        min_date = Date(min_year, month(start_date), day(start_date))
+        max_date = Date(max_year, month(start_date), day(start_date))
+        monthly_sample_dates = collect(min_date:Dates.Year(1):max_date)
+        monthly_sample_date_ranges = [(monthly_date, monthly_date) for monthly_date in monthly_sample_dates]
+        covar_estimator = ClimaCalibrate.ObservationRecipe.SVDplusDCovariance(
+                   monthly_sample_date_ranges;
+                   model_error_scale = 0.05,
+                   regularization = 0.1,
+                   use_latitude_weights = true,
+                   min_cosd_lat = 0.1,
+        )
         ClimaCalibrate.ObservationRecipe.observation(
             covar_estimator,
-            date_vars,
+            vars,
             start_date,
             start_date,
         )
@@ -561,12 +566,12 @@ if abspath(PROGRAM_FILE) == @__FILE__
     @info "The number of samples is $(length(sample_date_ranges)) over $sample_date_ranges"
 
     # Load observation data (ERA5 for some vars, CERES for radiation vars)
-    unprocessed_vars = load_vars(obs_dir, short_names, sample_date_ranges, config_file; 
+    unprocessed_vars = load_vars(obs_dir, short_names, config_file;
                                   ceres_variables = CERES_VARIABLES)
     @info "Loaded $(length(unprocessed_vars)) variable(s)"
 
-    # Preprocess (resample to model grid and set units)
-    preprocessed_vars = preprocess_vars(unprocessed_vars, config_file)
+    # Preprocess (set units)
+    preprocessed_vars = preprocess_vars(unprocessed_vars)
 
     # Compute and apply normalization if enabled
     if NORMALIZE_VARIABLES
@@ -585,8 +590,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
     
     # Create observation vector using ObservationRecipe (like subseasonal pipeline)
     observation_vector =
-        make_observation_vector(preprocessed_vars, sample_date_ranges, short_names)
-    JLD2.save_object(joinpath(output_path, "obs_vec.jld2"), observation_vector)
+        make_observation_vector(preprocessed_vars, sample_date_ranges)
+    # JLD2.save_object(joinpath(output_path, "obs_vec.jld2"), observation_vector)
     
-    @info "Saved observation vector with $(length(observation_vector)) samples"
+    # @info "Saved observation vector with $(length(observation_vector)) samples"
 end

@@ -28,11 +28,9 @@ type = "float"
 value = 0.8490142904088219
 type = "float"
 
-
 [entr_inv_tau]
-value = 0.001
+value = 0.0015
 type = "float"
-
 
 [detr_inv_tau]
 value = 0

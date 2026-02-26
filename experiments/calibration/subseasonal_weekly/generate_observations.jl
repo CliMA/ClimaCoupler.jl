@@ -12,6 +12,9 @@ using OrderedCollections: OrderedDict
 # Access CalibrateConfig (this also includes observation_utils.jl via observation_map.jl)
 include(joinpath(@__DIR__, "run_calibration.jl"))
 
+# Include preprocessing utils
+include(joinpath(@__DIR__, "preprocessing_utils.jl"))
+
 # Mapping from ERA5 file prefixes to short names used in calibration
 const ERA5_FILE_PREFIX_TO_SHORT_NAME = Dict(
     "2m_temperature" => "tas",
@@ -545,20 +548,20 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
-    
+
     # Load calibration setup for NORMALIZE_VARIABLES and CERES_VARIABLES settings
     include(joinpath(@__DIR__, "calibration_setup.jl"))
-    
+
     sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges
     short_names = CALIBRATE_CONFIG.short_names
     config_file = CALIBRATE_CONFIG.config_file
     obs_dir = ERA5_OBS_DIR
     output_path = joinpath(pkgdir(ClimaCoupler), "experiments/calibration/subseasonal_weekly")
-    
+
     # Determine which variables come from CERES vs ERA5
     ceres_vars_to_load = filter(v -> v in short_names, CERES_VARIABLES)
     era5_vars_to_load = filter(v -> !(v in CERES_VARIABLES), short_names)
-    
+
     @info "Generating observations for $short_names"
     @info "ERA5 variables: $era5_vars_to_load (from: $obs_dir)"
     @info "CERES variables: $ceres_vars_to_load (from artifact)"
@@ -579,19 +582,23 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
         JLD2.save_object(joinpath(output_path, "norm_stats.jld2"), norm_stats)
         @info "Saved normalization stats to norm_stats.jld2"
-        
+
         # Apply normalization to observations
         preprocessed_vars = normalize_vars(preprocessed_vars, norm_stats)
         @info "Applied normalization to observations"
     end
 
+    lon_left = -60
+    lon_right = 60
+    preprocessed_vars = apply_lat_window(preprocessed_vars, lon_left, lon_right)
+
     # Save preprocessed variables (for inspection/debugging)
     JLD2.save_object(joinpath(output_path, "preprocessed_vars.jld2"), preprocessed_vars)
-    
+
     # Create observation vector using ObservationRecipe (like subseasonal pipeline)
     observation_vector =
         make_observation_vector(preprocessed_vars, sample_date_ranges)
     JLD2.save_object(joinpath(output_path, "obs_vec.jld2"), observation_vector)
-    
+
     @info "Saved observation vector with $(length(observation_vector)) samples"
 end

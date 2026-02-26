@@ -21,7 +21,7 @@ value = 0
 value = 0
 
 [entr_param_vec]
-value = [0.17, -4.15, 0.23]
+value = [0, 0, 0]
 type = "float"
 
 [entr_mult_limiter_coeff]
@@ -30,7 +30,7 @@ type = "float"
 
 
 [entr_inv_tau]
-value = 0.00010586970154632861
+value = 0.001
 type = "float"
 
 

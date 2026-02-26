@@ -22,8 +22,8 @@ surface_setup: "PrescribedSurface"
 t_end: "93days"
 topo_smoothing: true
 topography: "Earth"
-# prescribed_aerosols: []
-# aerosol_radiation: false
+prescribed_aerosols: []
+aerosol_radiation: false
 # extra_atmos_diagnostics:
 #   - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls]
 #     period: 1months

@@ -25,8 +25,8 @@ model_interface = joinpath(
 
 # CALIBRATION CONFIGURATION
 
-const BASE_DATE_RANGE = (DateTime(2010, 1, 1), DateTime(2010, 1, 31))
-const N_ITERATIONS = 3
+const BASE_DATE_RANGE = (DateTime(2010, 10, 1), DateTime(2010, 10, 31))
+const N_ITERATIONS = 4
 
 
 # --- 1-day test run ---
@@ -52,7 +52,7 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     sample_date_ranges,
     extend = Dates.Day(0),
     spinup = Dates.Day(7),
-    output_dir = "/glade/derecho/scratch/zhaoyi/calibration/weekly/exp1",
+    output_dir = "/glade/derecho/scratch/zhaoyi/calibration/weekly/exp4",
     rng_seed = 42,
 )
 

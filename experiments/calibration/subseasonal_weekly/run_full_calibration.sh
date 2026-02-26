@@ -12,7 +12,7 @@
 
 set -e  # Exit on error
 
-cd /glade/u/home/cchristo/clima/copies2/ClimaCoupler.jl
+cd /glade/u/home/zhaoyi/weekly_calibration/ClimaCoupler.jl
 
 # Log to file AND terminal using tee
 LOGFILE="calibration_$(date +%Y%m%d_%H%M%S).log"

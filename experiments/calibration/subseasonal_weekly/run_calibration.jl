@@ -25,8 +25,8 @@ model_interface = joinpath(
 
 # CALIBRATION CONFIGURATION
 
-const BASE_DATE_RANGE = (DateTime(2010, 1, 1), DateTime(2010, 1, 31))
-const N_ITERATIONS = 6
+const BASE_DATE_RANGE = (DateTime(2010, 10, 1), DateTime(2010, 10, 31))
+const N_ITERATIONS = 4
 
 
 # --- 1-day test run ---
@@ -44,24 +44,24 @@ const ERA5_OBS_DIR = "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/daily_
 const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     config_file = joinpath(
         pkgdir(ClimaCoupler),
-        "config/subseasonal_configs/wxquest_diagedmf_weekly_calibration.yml",
+        "config/nightly_configs/amip_coarse_diagedmf.yml",
     ),
-    # short_names = ["rsut", "rlut"],
+    short_names = ["swcre", "lwcre"],
     # Note: Pressure-level variables require model output with pressure_coordinates: true
-    short_names = [
-        "ta_850hPa",
-        "ta_500hPa",
-        "ta_200hPa",
-        "hur_850hPa",
-        "hur_500hPa",
-        "hur_200hPa",
-    ],
+    # short_names = [
+    #     "ta_850hPa",
+    #     "ta_500hPa",
+    #     "ta_200hPa",
+    #     "hur_850hPa",
+    #     "hur_500hPa",
+    #     "hur_200hPa",
+    # ],
     minibatch_size = 1,
     n_iterations = N_ITERATIONS,
     sample_date_ranges,
     extend = Dates.Day(1),
     spinup = Dates.Day(7),
-    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp35",
+    output_dir = "/glade/derecho/scratch/zhaoyi/calibration/weekly2/exp1",
     rng_seed = 42,
 )
 
@@ -107,7 +107,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # )
     if ClimaCalibrate.get_backend() == ClimaCalibrate.DerechoBackend
         backend = ClimaCalibrate.DerechoBackend(
-            model_interface,
+            model_interface = model_interface,
             verbose = true,
             hpc_kwargs = Dict(
                 :job_priority => "regular", # {"premium", "regular", "economy", "preempt"}

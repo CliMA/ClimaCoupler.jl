@@ -30,6 +30,8 @@ var_units = Dict(
     "rsdscs" => "W m^-2",  # surface downwelling SW clear-sky
     "rsuscs" => "W m^-2",  # surface upwelling SW clear-sky
     "rldscs" => "W m^-2",  # surface downwelling LW clear-sky
+    "swcre" => "W m^-2",
+    "lwcre" => "W m^-2",
     "ta" => "K",      # Temperature at any pressure level
     "hur" => "unitless",  # Relative humidity at any pressure level
     "hus" => "unitless",  # Specific humidity at any pressure level
@@ -113,6 +115,14 @@ function get_var(short_name, simdir)
         ta = get(simdir; short_name = "ta")
         ta_900hpa = slice(ta; z = 1000)
         var = tas - ta_900hpa
+    elseif short_name == "swcre"
+        rsut = get(simdir; short_name = "rsut")
+        rsutcs = get(simdir; short_name = "rsutcs")
+        var = rsutcs - rsut
+    elseif short_name == "lwcre"
+        rlut = get(simdir; short_name = "rlut")
+        rlutcs = get(simdir; short_name = "rlutcs")
+        var = rlutcs - rlut
     elseif is_pressure_level_variable(short_name)
 
         base_name, pressure_hPa = parse_pressure_level_variable(short_name)

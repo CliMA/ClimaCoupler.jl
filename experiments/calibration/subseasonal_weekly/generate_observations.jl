@@ -360,7 +360,7 @@ function preprocess_vars(vars)
         if haskey(var_units, ClimaAnalysis.short_name(var))
             # var = ClimaAnalysis.set_units(var, get_var_units(short_name))
             # There isn't a set_units! function yet
-            var.attributes["units"] = get_var_units(short_name)
+            var.attributes["units"] = get_var_units(ClimaAnalysis.short_name(var))
         end
         push!(processed, var)
     end
@@ -591,7 +591,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # Create observation vector using ObservationRecipe (like subseasonal pipeline)
     observation_vector =
         make_observation_vector(preprocessed_vars, sample_date_ranges)
-    # JLD2.save_object(joinpath(output_path, "obs_vec.jld2"), observation_vector)
+    JLD2.save_object(joinpath(output_path, "obs_vec.jld2"), observation_vector)
     
-    # @info "Saved observation vector with $(length(observation_vector)) samples"
+    @info "Saved observation vector with $(length(observation_vector)) samples"
 end

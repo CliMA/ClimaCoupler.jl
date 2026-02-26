@@ -154,54 +154,54 @@ function load_weekly_var(filepath, short_name, start_date, end_date)
     return var
 end
 
-"""
-    add_time_dimension(var, start_date)
+# """
+#     add_time_dimension(var, start_date)
 
-Add a time dimension to a 2D OutputVar for ObservationRecipe compatibility.
-Time is stored as seconds since start_date, so ClimaAnalysis.dates() can 
-convert it back to DateTime using the start_date attribute.
-"""
-function add_time_dimension(var, start_date)
-    if haskey(var.dims, "time")
-        return var  # Already has time dimension
-    end
+# Add a time dimension to a 2D OutputVar for ObservationRecipe compatibility.
+# Time is stored as seconds since start_date, so ClimaAnalysis.dates() can 
+# convert it back to DateTime using the start_date attribute.
+# """
+# function add_time_dimension(var, start_date)
+#     if haskey(var.dims, "time")
+#         return var  # Already has time dimension
+#     end
     
-    # Time value = 0.0 means "at start_date"
-    # ClimaAnalysis.dates() will compute: start_date + time_value seconds
-    time_val = 0.0
+#     # Time value = 0.0 means "at start_date"
+#     # ClimaAnalysis.dates() will compute: start_date + time_value seconds
+#     time_val = 0.0
     
-    # Create new dims with time, preserving order (lon, lat, time)
-    # and converting to Float64 vectors (ClimaCalibrate expects plain Float64)
-    new_dims = OrderedDict{String, Vector{Float64}}()
-    for k in keys(var.dims)
-        new_dims[k] = Float64.(collect(skipmissing(var.dims[k])))
-    end
-    new_dims["time"] = [time_val]
+#     # Create new dims with time, preserving order (lon, lat, time)
+#     # and converting to Float64 vectors (ClimaCalibrate expects plain Float64)
+#     new_dims = OrderedDict{String, Vector{Float64}}()
+#     for k in keys(var.dims)
+#         new_dims[k] = Float64.(collect(skipmissing(var.dims[k])))
+#     end
+#     new_dims["time"] = [time_val]
     
-    # Create new dim_attributes with time
-    # ClimaCalibrate expects "s" as the unit string for seconds
-    new_dim_attribs = copy(var.dim_attributes)
-    new_dim_attribs["time"] = Dict{String, Any}(
-        "units" => "s",
-        "calendar" => "standard",
-    )
+#     # Create new dim_attributes with time
+#     # ClimaCalibrate expects "s" as the unit string for seconds
+#     new_dim_attribs = copy(var.dim_attributes)
+#     new_dim_attribs["time"] = Dict{String, Any}(
+#         "units" => "s",
+#         "calendar" => "standard",
+#     )
     
-    # Reshape data to add time dimension, ensure Float64
-    new_data = reshape(Float64.(var.data), size(var.data)..., 1)
+#     # Reshape data to add time dimension, ensure Float64
+#     new_data = reshape(Float64.(var.data), size(var.data)..., 1)
     
-    return ClimaAnalysis.OutputVar(
-        var.attributes,
-        new_dims,
-        new_dim_attribs,
-        new_data,
-    )
-end
+#     return ClimaAnalysis.OutputVar(
+#         var.attributes,
+#         new_dims,
+#         new_dim_attribs,
+#         new_data,
+#     )
+# end
 
 
 ##### CERES Data Loading Functions
 
 """
-    load_ceres_var(short_name, start_date)
+    load_ceres_var(short_name, config_file)
 
 Load a variable from CERES monthly data for the month containing start_date.
 Returns a 2D OutputVar (lon, lat) representing the monthly mean.
@@ -209,16 +209,15 @@ Returns a 2D OutputVar (lon, lat) representing the monthly mean.
 Note: CERES data is monthly, so we use the monthly value for the month
 containing the calibration period. Time dimension is added later in preprocess_vars.
 """
-function load_ceres_var(short_name, start_date)
+function load_ceres_var(short_name, config_file)
     loader = CalibrationTools.CERESDataLoader()
     
     # Load the full time series
     var = Base.get(loader, short_name)
+    resampler = resampled_lonlat(config_file)
+    var = resampler(var)
 
-    month_start = Dates.firstdayofmonth(start_date)
-    time_name = ClimaAnalysis.time_name(var)
-    var = ClimaAnalysis.slice(var; (Symbol(time_name) => month_start,)...)
-    @info "Loaded CERES $short_name for $(Dates.monthname(start_date)) $(Dates.year(start_date))"
+    @info "Loaded CERES $short_name"
     
     return var
 end
@@ -234,7 +233,7 @@ is_ceres_variable(short_name, ceres_variables) = short_name in ceres_variables
 ##### ERA5 Pressure-Level Data Loading Functions
 
 """
-    load_era5_pressure_level_var(short_name, start_date)
+    load_era5_pressure_level_var(short_name)
 
 Load a variable from ERA5 pressure-level data for the month containing start_date.
 Handles parsing of pressure-level variable names (e.g., "ta_850hPa") and selects
@@ -242,7 +241,7 @@ the appropriate pressure level from the 3D data.
 
 Returns a 2D OutputVar (lon, lat) representing the monthly mean at that pressure level.
 """
-function load_era5_pressure_level_var(short_name, start_date)
+function load_era5_pressure_level_var(short_name, config_file)
     # Parse the short_name to get base variable and pressure level
     base_name, pressure_hPa = parse_pressure_level_variable(short_name)
 
@@ -253,22 +252,16 @@ function load_era5_pressure_level_var(short_name, start_date)
     # ERA5 artifact uses "pressure_level" dimension in Pa, convert hPa to Pa for slicing
     pressure_Pa = pressure_hPa * 100.0
     var = ClimaAnalysis.slice(var, pressure_level = pressure_Pa)
-    
-    # Select the specific month - use slice to get 2D data (removes time dimension)
-    month_start = Dates.firstdayofmonth(start_date)
-    time_name = ClimaAnalysis.time_name(var)
-    var = ClimaAnalysis.slice(var; (Symbol(time_name) => month_start,)...)
-    
-    if !issorted(ClimaAnalysis.latitudes(var))
-        var = ClimaAnalysis.reverse_dim(var, ClimaAnalysis.latitude_name(var))
-    end
-    
+
+    resampler = resampled_lonlat(config_file)
+    var = resampler(var)
+
     # Set the short_name to include pressure level (e.g., "ta_850hPa")
     new_attribs = copy(var.attributes)
     new_attribs["short_name"] = short_name
     var = ClimaAnalysis.OutputVar(new_attribs, var.dims, var.dim_attributes, var.data)
     
-    @info "Loaded ERA5 $short_name ($(base_name) at $(Int(pressure_hPa)) hPa) for $(Dates.monthname(start_date)) $(Dates.year(start_date))"
+    @info "Loaded ERA5 $short_name ($(base_name) at $(Int(pressure_hPa)) hPa)"
     
     return var
 end
@@ -283,7 +276,7 @@ Load observation data for the specified short_names and date ranges.
 
 Returns a Dict mapping (short_name, date_range) -> OutputVar
 """
-function load_vars(obs_dir, short_names, sample_date_ranges; ceres_variables = String[])
+function load_vars(obs_dir, short_names, sample_date_ranges, config_file; ceres_variables = String[])
     vars_by_date = Dict{Tuple{String, NTuple{2, Dates.DateTime}}, OutputVar}()
     
     for (start_date, end_date) in sample_date_ranges
@@ -293,10 +286,10 @@ function load_vars(obs_dir, short_names, sample_date_ranges; ceres_variables = S
             try
                 # Check if this is a pressure-level variable (e.g., "ta_850hPa")
                 if is_pressure_level_variable(short_name)
-                    var = load_era5_pressure_level_var(short_name, start_date)
+                    var = load_era5_pressure_level_var(short_name, config_file)
                 # Check if this variable should come from CERES
                 elseif is_ceres_variable(short_name, ceres_variables)
-                    var = load_ceres_var(short_name, start_date)
+                    var = load_ceres_var(short_name, config_file)
                 elseif is_single_day
                     # Load from ERA5 daily files
                     filepath, _ = get_daily_filename(obs_dir, short_name, start_date)
@@ -332,7 +325,6 @@ Precipitation (pr) requires special handling:
 ERA5 'tp' is in meters/hour, we convert to mm/day using ERA5_PR_CONVERSION.
 """
 function preprocess_vars(vars_by_date, config_file)
-    resample_var = resampled_lonlat(config_file)
     processed = Dict{Tuple{String, NTuple{2, Dates.DateTime}}, OutputVar}()
     
     for (key, var) in vars_by_date
@@ -340,30 +332,12 @@ function preprocess_vars(vars_by_date, config_file)
         date_range = key[2]
         start_date = date_range[1]
         
-        # Resample to model grid (must be done before adding time dimension)
-        var = resample_var(var)
-        
-        # Apply precipitation unit conversion for ERA5 data
-        if short_name == "pr"
-            new_data = var.data .* ERA5_PR_CONVERSION
-            @info "ERA5 pr conversion: factor=$ERA5_PR_CONVERSION → mean=$(round(Statistics.mean(filter(!isnan, vec(new_data))), sigdigits=4)) mm/day"
-            var = ClimaAnalysis.OutputVar(
-                var.attributes,
-                var.dims,
-                var.dim_attributes,
-                new_data,
-            )
-        end
-        
         if haskey(var_units, short_name)
             var = ClimaAnalysis.set_units(var, get_var_units(short_name))
         end
         var.attributes["short_name"] = short_name
         var.attributes["start_date"] = string(start_date)
-        
-        # Add time dimension AFTER resampling for ObservationRecipe compatibility
-        var = add_time_dimension(var, start_date)
-        
+                
         processed[key] = var
     end
     
@@ -390,9 +364,10 @@ function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
         scalar = Float64(CALIBRATION_NOISE_SCALAR),
         use_latitude_weights = true,
     )
+    # TODO: largest overlap between different datasets 
+    # covar_estimator = ClimaCalibrate.ObservationRecipe.SVDplusDCovariance(;
 
     obs_vec = map(sample_date_ranges) do sample_date_range
-        # Collect OutputVars for this date range
         date_vars = OutputVar[]
         start_date = first(sample_date_range)
         for sn in short_names
@@ -403,9 +378,7 @@ function make_observation_vector(vars_by_date, sample_date_ranges, short_names)
                 @warn "Missing variable for $key"
             end
         end
-        
-        # Use start_date for both args since weekly data has single time point
-        # The data represents the weekly average, stored at start_date
+
         ClimaCalibrate.ObservationRecipe.observation(
             covar_estimator,
             date_vars,
@@ -568,7 +541,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     @info "The number of samples is $(length(sample_date_ranges)) over $sample_date_ranges"
 
     # Load observation data (ERA5 for some vars, CERES for radiation vars)
-    unprocessed_vars = load_vars(obs_dir, short_names, sample_date_ranges; 
+    unprocessed_vars = load_vars(obs_dir, short_names, sample_date_ranges, config_file; 
                                   ceres_variables = CERES_VARIABLES)
     @info "Loaded $(length(unprocessed_vars)) variable(s)"
 

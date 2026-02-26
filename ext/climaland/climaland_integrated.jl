@@ -43,7 +43,6 @@ end
         dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
         shared_surface_space = nothing,
         land_spun_up_ic::Bool = true,
-        saveat::Vector{TT} = [tspan[1], tspan[2]],
         surface_elevation = nothing,
         atmos_h,
         land_temperature_anomaly::String = "amip",
@@ -77,7 +76,6 @@ function ClimaLandSimulation(
     dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
     shared_surface_space = nothing,
     land_spun_up_ic::Bool = true,
-    saveat::Vector{TT} = [tspan[1], tspan[2]],
     surface_elevation = nothing,
     atmos_h,
     land_temperature_anomaly::String = "amip",
@@ -91,7 +89,6 @@ function ClimaLandSimulation(
     land_toml_dict = LP.create_toml_dict(FT)
     # Override land parameters with coupled parameters
     toml_dict = CP.merge_override_default_values(coupled_param_dict, land_toml_dict)
-    earth_param_set = CL.Parameters.LandParameters(toml_dict)
 
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
@@ -117,10 +114,11 @@ function ClimaLandSimulation(
     # Interpolate atmosphere height field to surface space of land model,
     #  since that's where we compute fluxes for this land model
     atmos_h = Interfacer.remap(surface_space, atmos_h)
+    gustiness = FT(1)
 
     # Set up atmosphere and radiation forcing
     forcing = (;
-        atmos = CL.CoupledAtmosphere{FT}(surface_space, atmos_h),
+        atmos = CL.CoupledAtmosphere{FT, typeof(atmos_h)}(atmos_h, gustiness),
         radiation = CL.CoupledRadiativeFluxes{FT}(
             start_date;
             latitude = CC.Fields.coordinate_field(domain.space.surface).lat,
@@ -207,9 +205,20 @@ function ClimaLandSimulation(
         canopy,
     )
 
-    Y, p, coords = CL.initialize(model)
-
-    # Set initial conditions
+    # Set up diagnostics
+    if use_land_diagnostics
+        output_writer = CD.Writers.NetCDFWriter(subsurface_space, output_dir; start_date)
+        diagnostics = CL.default_diagnostics(
+            model,
+            start_date,
+            output_writer = output_writer,
+            output_vars = :short,
+            reduction_period = :monthly,
+        )
+    else
+        output_writer = nothing
+        diagnostics = nothing
+    end
 
     # Apply temperature anomaly function to initial temperature only if specified
     T_base = FT(276.85)
@@ -219,6 +228,7 @@ function ClimaLandSimulation(
         haskey(T_functions, land_temperature_anomaly) ||
             error("land temp anomaly function $land_temperature_anomaly not supported")
         temp_anomaly = T_functions[land_temperature_anomaly]
+        coords = CL.Domains.coordinates(model)
         T_sfc0 = T_base .+ temp_anomaly.(coords.subsurface)
     else
         # constant field on subsurface space
@@ -230,185 +240,72 @@ function ClimaLandSimulation(
     orog_adjusted_T_data =
         CC.Fields.field_values(T_sfc0) .-
         lapse_rate .* CC.Fields.field_values(surface_elevation)
-    orog_adjusted_T = CC.Fields.Field(orog_adjusted_T_data, subsurface_space)
     orog_adjusted_T_surface =
         CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
 
-    # Read in initial conditions for snow and soil from file, if requested
+    # Define functions to set initial conditions
     if !land_spun_up_ic && !isnothing(land_ic_path)
-        # Set initial conditions that aren't read in from file
-        Y.soilco2.CO2 .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
-        Y.soilco2.O2_f .= FT(0.21)    # atmospheric O2 volumetric fraction
-        Y.soilco2.SOC .= FT(5.0)      # default SOC concentration (kg C/m³)
-
-        Y.canopy.hydraulics.ϑ_l.:1 .= model.canopy.hydraulics.parameters.ν
-        @. Y.canopy.energy.T = orog_adjusted_T_surface
-        # Subseasonal setup: land_spun_up_ic false, but a land_ic_path is provided
-        ic_path = land_ic_path
-        @info "ClimaLand: using land IC file" ic_path
-
-        regridder_type = :InterpolationsRegridder
-        extrapolation_bc =
-            (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
-        interpolation_method = Interpolations.Linear()
-
-        # Set snow T first to use in computing snow internal energy from IC file
-        p.snow.T .= SpaceVaryingInput(
-            ic_path,
-            "tsn",
-            surface_space;
-            regridder_type,
-            regridder_kwargs = (; extrapolation_bc, interpolation_method),
-        )
-        # Set canopy temperature to skin temperature
-        Y.canopy.energy.T .= SpaceVaryingInput(
-            ic_path,
-            "skt",
-            surface_space;
-            regridder_type,
-            regridder_kwargs = (; extrapolation_bc, interpolation_method),
-        )
-
-        # Initialize the surface temperature so the atmosphere can compute radiation.
-        # Set surface temperature to skin temperature
-        p.T_sfc .= SpaceVaryingInput(
-            ic_path,
-            "skt",
-            surface_space;
-            regridder_type,
-            regridder_kwargs = (; extrapolation_bc, interpolation_method),
-        )
-
-        CL.Simulations.set_snow_initial_conditions!(
-            Y,
-            p,
-            surface_space,
-            ic_path,
-            model.snow.parameters;
-            regridder_type = regridder_type,
-            extrapolation_bc = extrapolation_bc,
-            interpolation_method = interpolation_method,
-        )
-
-        CL.Simulations.set_soil_initial_conditions_from_temperature_and_total_water!(
-            Y,
-            subsurface_space,
-            ic_path,
-            model.soil;
-            regridder_type = regridder_type,
-            extrapolation_bc = extrapolation_bc,
-            interpolation_method = interpolation_method,
-        )
+        @info "ClimaLand: using land IC file" land_ic_path
+        set_ic! = CL.make_set_subseasonal_initial_conditions(land_ic_path)
     elseif land_spun_up_ic
         # Use artifact spun-up initial conditions
         ic_path = CL.Artifacts.soil_ic_2008_50m_path()
         @info "ClimaLand: using land IC file" ic_path
-        set_ic! = CL.Simulations.make_set_initial_state_from_file(
+
+        # Set initial conditions from file, and set air temperature to the input atmospheric temperature
+        spun_up_set_ic! = CL.Simulations.make_set_initial_state_from_file(
             ic_path,
             model;
             enforce_constraints = true,
         )
-        p.drivers.T .= orog_adjusted_T_surface
-        t0 = tspan[1]
-        set_ic!(Y, p, t0, model)
-        # Initialize the surface temperature so the atmosphere can compute radiation.
-        @. p.T_sfc = orog_adjusted_T_surface
+        set_ic! =
+            (Y, p, t, model) ->
+                _coupler_set_ic!(Y, p, t, model, orog_adjusted_T_surface, spun_up_set_ic!)
+
     else
-        (; θ_r, ν, ρc_ds) = model.soil.parameters
-        # Set initial conditions that aren't read in from file
-        Y.soilco2.CO2 .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
-        Y.soilco2.O2_f .= FT(0.21)    # atmospheric O2 volumetric fraction
-        Y.soilco2.SOC .= FT(5.0)      # default SOC concentration (kg C/m³)
-
-        Y.canopy.hydraulics.ϑ_l.:1 .= model.canopy.hydraulics.parameters.ν
-        @. Y.canopy.energy.T = orog_adjusted_T_surface
-        # Set initial conditions for the state
-        @. Y.soil.ϑ_l = θ_r + (ν - θ_r) / 2
-        Y.soil.θ_i .= FT(0.0)
-        ρc_s =
-            CL.Soil.volumetric_heat_capacity.(
-                Y.soil.ϑ_l,
-                Y.soil.θ_i,
-                ρc_ds,
-                earth_param_set,
+        set_ic_from_atmos_and_parameters! =
+            CL.Simulations.make_set_initial_state_from_atmos_and_parameters(model)
+        set_ic! =
+            (Y, p, t, model) -> _coupler_set_ic!(
+                Y,
+                p,
+                t,
+                model,
+                orog_adjusted_T_surface,
+                set_ic_from_atmos_and_parameters!,
             )
-        Y.soil.ρe_int .=
-            CL.Soil.volumetric_internal_energy.(
-                Y.soil.θ_i,
-                ρc_s,
-                orog_adjusted_T,
-                earth_param_set,
-            )
-
-        Y.snow.S .= FT(0)
-        Y.snow.S_l .= FT(0)
-        Y.snow.U .= FT(0)
-        # Initialize the surface temperature so the atmosphere can compute radiation.
-        @. p.T_sfc = orog_adjusted_T_surface
     end
+
+    # Convert start_date and stop_date to ITime if using ITime
+    stop_date = start_date + Dates.Second(float(tspan[2]))
+    if dt isa ITime
+        start_date = tspan[1]
+        stop_date = tspan[2]
+    end
+    simulation = CL.Simulations.LandSimulation(
+        start_date,
+        stop_date,
+        dt,
+        model;
+        outdir = output_dir,
+        set_ic!,
+        user_callbacks = (),
+        diagnostics,
+    )
+
     # Initialize the surface emissivity so the atmosphere can compute radiation.
     # Otherwise, it's initialized to 0 which causes NaNs in the radiation calculation.
-    @. p.ϵ_sfc = FT(1)
+    @. simulation._integrator.p.ϵ_sfc = FT(1)
 
-    # Update cos(zenith angle) within land model every hour
-    update_dt = dt isa ITime ? ITime(3600) : 3600
-    updatefunc = CL.make_update_drivers(CL.get_drivers(model))
-    driver_cb = CL.DriverUpdateCallback(updatefunc, update_dt, tspan[1])
+    # Initialize the surface temperature so the atmosphere can compute radiation.
+    @. simulation._integrator.p.T_sfc = simulation._integrator.u.canopy.energy.T
 
-    exp_tendency! = CL.make_exp_tendency(model)
-    imp_tendency! = CL.make_imp_tendency(model)
-    jacobian! = CL.make_jacobian(model)
-
-    # set up jacobian info
-    jac_kwargs = (; jac_prototype = CL.FieldMatrixWithSolver(Y), Wfact = jacobian!)
-
-    prob = SciMLBase.ODEProblem(
-        CTS.ClimaODEFunction(
-            T_exp! = exp_tendency!,
-            T_imp! = SciMLBase.ODEFunction(imp_tendency!; jac_kwargs...),
-        ),
-        Y,
-        tspan,
-        p,
+    return ClimaLandSimulation(
+        simulation.model,
+        simulation._integrator,
+        area_fraction,
+        output_writer,
     )
-
-    # Set up diagnostics
-    if use_land_diagnostics
-        output_writer = CD.Writers.NetCDFWriter(subsurface_space, output_dir; start_date)
-        scheduled_diagnostics = CL.default_diagnostics(
-            model,
-            start_date,
-            output_writer = output_writer,
-            output_vars = :short,
-            reduction_period = :monthly,
-        )
-        diagnostic_handler =
-            CD.DiagnosticsHandler(scheduled_diagnostics, Y, p, tspan[1]; dt = dt)
-        diag_cb = CD.DiagnosticsCallback(diagnostic_handler)
-    else
-        output_writer = nothing
-        diag_cb = nothing
-    end
-
-    # Set up time stepper and integrator
-    stepper = CTS.ARS111()
-    ode_algo = CTS.IMEXAlgorithm(
-        stepper,
-        CTS.NewtonsMethod(
-            max_iters = 3,
-            update_j = CTS.UpdateEvery(CTS.NewNewtonIteration),
-        ),
-    )
-    integrator = SciMLBase.init(
-        prob,
-        ode_algo;
-        dt,
-        saveat,
-        adaptive = false,
-        callback = SciMLBase.CallbackSet(driver_cb, diag_cb),
-    )
-
-    return ClimaLandSimulation(model, integrator, area_fraction, output_writer)
 end
 
 ###############################################################################

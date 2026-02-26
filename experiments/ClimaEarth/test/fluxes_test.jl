@@ -27,11 +27,55 @@ include(joinpath("..", "setup_run.jl"))
 
     # Construct coupled simulation and run one coupling step
     cs = CoupledSimulation(config_dict)
-    step!(cs)
     boundary_space = Interfacer.boundary_space(cs)
 
     # Unpack component models
     (; atmos_sim, land_sim, ocean_sim, ice_sim) = cs.model_sims
+    land_fraction = Interfacer.get_field(land_sim, Val(:area_fraction))
+
+    # Check SWD, LWD, albedo, temp, emissivity between atmos and land before flux calculation
+    atmos_swd = Interfacer.get_field(boundary_space, atmos_sim, Val(:SW_d))
+    land_swd = Interfacer.remap(boundary_space, land_sim.integrator.p.drivers.SW_d)
+    err_swd = @. atmos_swd - land_swd
+    err_swd = @. ifelse(land_fraction ≈ 0, zero(err_swd), err_swd)
+    @test maximum(abs.(err_swd)) < 1e-10
+
+    atmos_lwd = Interfacer.get_field(boundary_space, atmos_sim, Val(:LW_d))
+    land_lwd = Interfacer.remap(boundary_space, land_sim.integrator.p.drivers.LW_d)
+    err_lwd = @. atmos_lwd - land_lwd
+    err_lwd = @. ifelse(land_fraction ≈ 0, zero(err_lwd), err_lwd)
+    @test maximum(abs.(err_lwd)) < 1e-10
+
+    atmos_albedo = CC.Fields.array2field(
+        atmos_sim.integrator.p.radiation.rrtmgp_model.direct_sw_surface_albedo,
+        boundary_space,
+    )
+    land_albedo =
+        Interfacer.get_field(boundary_space, land_sim, Val(:surface_direct_albedo))
+    err_albedo = @. atmos_albedo - land_albedo
+    err_albedo = @. ifelse(land_fraction ≈ 0, zero(err_albedo), err_albedo)
+    @test maximum(abs.(err_albedo)) < 1e-10
+
+    atmos_temp = Interfacer.remap(
+        boundary_space,
+        atmos_sim.integrator.p.precomputed.sfc_conditions.T_sfc,
+    )
+    land_temp = Interfacer.get_field(boundary_space, land_sim, Val(:surface_temperature))
+    err_temp = @. atmos_temp - land_temp
+    err_temp = @. ifelse(land_fraction ≈ 0, zero(err_temp), err_temp)
+    @test maximum(abs.(err_temp)) < 1e-6
+
+    atmos_emissivity = CC.Fields.array2field(
+        atmos_sim.integrator.p.radiation.rrtmgp_model.surface_emissivity,
+        boundary_space,
+    )
+    land_emissivity = Interfacer.get_field(boundary_space, land_sim, Val(:emissivity))
+    err_emissivity = @. atmos_emissivity - land_emissivity
+    err_emissivity = @. ifelse(land_fraction ≈ 0, zero(err_emissivity), err_emissivity)
+    @test maximum(abs.(err_emissivity)) < 1e-10
+
+    step!(cs)
+    boundary_space = Interfacer.boundary_space(cs)
 
     # Atmosphere: radiative flux on the surface interface
     # Convention: positive downward to the surface

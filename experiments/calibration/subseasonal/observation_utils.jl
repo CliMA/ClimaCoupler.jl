@@ -100,6 +100,32 @@ function parse_pressure_level_variable(short_name::String)
 end
 
 """
+    slice_pressure_level(var, pressure_hPa)
+
+Slice an `OutputVar` at the given pressure level (in hPa), converting to Pa
+if the data's pressure dimension is stored in Pa.
+
+Uses ClimaAnalysis's built-in `pressure_name` to resolve the dimension
+(handles both "pfull" and "pressure_level"), and `slice` already aliases
+between these names, so we just need to pass the correct numeric value.
+"""
+function slice_pressure_level(var, pressure_hPa)
+    pdim = ClimaAnalysis.pressure_name(var)
+    dim_unit = get(get(var.dim_attributes, pdim, Dict()), "units", "")
+
+    if dim_unit == "Pa"
+        pressure_val = pressure_hPa * 100.0
+    elseif dim_unit == "hPa"
+        pressure_val = pressure_hPa
+    else
+        error("Unknown pressure units '$dim_unit' for dimension '$pdim'. " *
+              "Expected 'Pa' or 'hPa'.")
+    end
+
+    return ClimaAnalysis.slice(var, pfull = pressure_val, by = ClimaAnalysis.MatchValue())
+end
+
+"""
     get_var(short_name, simdir)
 
 Get an `OutputVar` from `simdir` for the given `short_name`.
@@ -118,40 +144,17 @@ function get_var(short_name, simdir)
         base_name, pressure_hPa = parse_pressure_level_variable(short_name)
 
         var = get(simdir; short_name = base_name, coord_type = "pressure")
-        
+        var = slice_pressure_level(var, pressure_hPa)
 
-        if haskey(var.dims, "pfull")
-            # Check units of pressure dimension and convert to hPa if needed
-            pfull_units = get(var.dim_attributes, "pfull", Dict())
-            pfull_unit_str = get(pfull_units, "units", "")
-            
-            if pfull_unit_str == "Pa"
-                # Convert Pa to hPa
-                var = ClimaAnalysis.convert_dim_units(
-                    var, "pfull", "hPa"; 
-                    conversion_function = x -> 0.01 * x
-                )
-            elseif pfull_unit_str == "hPa"
-                # Already in hPa, no conversion needed
-            else
-                error("Unexpected pfull units: '$pfull_unit_str'. Expected 'Pa' or 'hPa'.")
-            end
-        end
-        
-        # Select the specific pressure level using MatchValue for exact match
-        var = ClimaAnalysis.slice(var, pfull = pressure_hPa)
-        
         # Handle relative humidity units
         # ClimaDiagnostics outputs hur with empty string units (""), but
         # ClimaAnalysis treats "" as missing units and expects "unitless".
-
         if base_name == "hur"
             units = ClimaAnalysis.units(var)
             if units == "%"
-                # ERA5 uses percentage - convert to fractional
                 var = ClimaAnalysis.convert_units(
-                    var, "unitless"; 
-                    conversion_function = x -> 0.01 * x
+                    var, "unitless";
+                    conversion_function = x -> 0.01 * x,
                 )
             elseif units == "" || units == "1"
                 var = ClimaAnalysis.set_units(var, "unitless")

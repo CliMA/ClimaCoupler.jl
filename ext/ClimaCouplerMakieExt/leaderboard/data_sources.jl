@@ -115,7 +115,8 @@ function get_sim_var_in_pfull_dict(diagnostics_folder_path)
         ClimaAnalysis.available_vars(ClimaAnalysis.SimDir(diagnostics_folder_path))
     sim_var_pfull_dict = Dict{String, Any}()
 
-    short_names = get_short_names_monthly_averages(diagnostics_folder_path)
+    short_names =
+        get_short_names_monthly_averages(diagnostics_folder_path; pressure_coords = true)
     available_short_names = intersect(short_names, Set(["ta", "hur", "hus"]))
     for short_name in short_names
         short_name in available_short_names && (
@@ -264,19 +265,26 @@ end
     get_short_names_of_monthly_averages(diagnostics_folder_path)
 
 Get all the short names of the monthly averages.
+
+If `pressure_coords` is `true`, then get all the short names of the monthly
+averages in pressure coordinates.
 """
-function get_short_names_monthly_averages(diagnostics_folder_path)
+function get_short_names_monthly_averages(diagnostics_folder_path; pressure_coords = false)
     available_short_names = Set{String}()
     simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)
+    desired_coord = pressure_coords ? "pressure" : nothing
     for short_name in ClimaAnalysis.available_vars(simdir)
-        for reduction in ClimaAnalysis.available_reductions(simdir, short_name = short_name)
-            for period in ClimaAnalysis.available_periods(
-                simdir,
-                short_name = short_name,
-                reduction = reduction,
-            )
-                if reduction == "average" && period == "1M"
-                    push!(available_short_names, short_name)
+        for reduction in ClimaAnalysis.available_reductions(simdir; short_name)
+            for period in ClimaAnalysis.available_periods(simdir; short_name, reduction)
+                for coord in ClimaAnalysis.available_coord_types(
+                    simdir;
+                    short_name,
+                    reduction,
+                    period,
+                )
+                    if reduction == "average" && period == "1M" && coord == desired_coord
+                        push!(available_short_names, short_name)
+                    end
                 end
             end
         end

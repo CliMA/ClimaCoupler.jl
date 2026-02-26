@@ -9,6 +9,12 @@ dt_cloud_fraction: "1hours"
 dt_cpl: "120secs"
 dt_rad: "1hours"
 energy_check: false
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta]
+    period: 1months
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours
 initial_condition: "AMIPFromERA5"
 insolation: "timevarying"
 land_model: "integrated"

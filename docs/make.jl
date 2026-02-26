@@ -99,15 +99,17 @@ pages = Any[
 ]
 
 
+extensions = [
+    Base.get_extension(ClimaCoupler, :ClimaCouplerMakieExt),
+    Base.get_extension(ClimaCoupler, :ClimaCouplerCMIPMakieExt),
+    Base.get_extension(ClimaCoupler, :ClimaCouplerCMIPExt),
+    Base.get_extension(ClimaCoupler, :ClimaCouplerClimaLandExt),
+    Base.get_extension(ClimaCoupler, :ClimaCouplerClimaAtmosExt),
+]
+@assert all(!isnothing, extensions) "Some extensions failed to load: $extensions"
+
 makedocs(
-    modules = [
-        ClimaCoupler,
-        Base.get_extension(ClimaCoupler, :ClimaCouplerMakieExt),
-        Base.get_extension(ClimaCoupler, :ClimaCouplerCMIPMakieExt),
-        Base.get_extension(ClimaCoupler, :ClimaCouplerCMIPExt),
-        Base.get_extension(ClimaCoupler, :ClimaCouplerClimaLandExt),
-        Base.get_extension(ClimaCoupler, :ClimaCouplerClimaAtmosExt),
-    ],
+    modules = [ClimaCoupler, extensions...],
     authors = "Climate Modelling Alliance",
     sitename = "ClimaCoupler.jl",
     format = Documenter.HTML(),

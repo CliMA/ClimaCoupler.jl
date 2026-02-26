@@ -10,7 +10,8 @@ and KernelAbstractions are loaded with either `import` or `using`.
 module ClimaCouplerCMIPExt
 
 import ClimaCoupler
-import ClimaCoupler: Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities
+import ClimaCoupler:
+    Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities, Plotting
 import Oceananigans as OC
 import ClimaOcean as CO
 import ClimaSeaIce as CSI

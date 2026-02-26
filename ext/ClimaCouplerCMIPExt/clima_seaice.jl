@@ -553,3 +553,17 @@ TODO extend this for non-ClimaCore states.
 function Checkpointer.get_model_prog_state(sim::ClimaSeaIceSimulation)
     @warn "get_model_prog_state not implemented for ClimaSeaIceSimulation"
 end
+
+# Additional ClimaSeaIceSimulation getter methods for plotting debug fields
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_thickness}) =
+    sim.ice.model.ice_thickness
+
+"""
+    Plotting.debug_plot_fields(sim::ClimaSeaIceSimulation)
+
+Return the fields to include in debug plots for a ClimaSeaIce simulation.
+This includes the area fraction, surface temperature, ice concentration, and ice thickness.
+These plots are not polished, and are intended for debugging.
+"""
+Plotting.debug_plot_fields(sim::ClimaSeaIceSimulation) =
+    (:area_fraction, :surface_temperature, :ice_concentration, :ice_thickness)

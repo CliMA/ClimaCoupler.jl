@@ -26,8 +26,7 @@ Plot a heatmap of the provided Oceananigans field or operation.
 This is intended to be used as part of the debug plotting system.
 """
 function Plotting.debug_plot!(ax, fig, field::OC.Field, i, j)
-    grid = field.grid
-    hm = CairoMakie.heatmap!(ax, view(field, :, :, grid.Nz))
+    hm = CairoMakie.heatmap!(ax, Array(OC.interior(field, :, :, size(field, 3))))
     Makie.Colorbar(fig[i, j * 2], hm)
     return nothing
 end

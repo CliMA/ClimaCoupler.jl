@@ -6,7 +6,7 @@ import ClimaCoupler: Interfacer, Plotting
 import ClimaComms
 ClimaComms.@import_required_backends
 
-using Makie, GeoMakie, CairoMakie, ClimaCoreMakie # trigger ClimaCouplerMakieExt extension
+using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, Poppler_jll, Printf # trigger ClimaCouplerMakieExt extension
 
 # Prevent GKS headless operation mode warning
 ENV["GKSwstype"] = "nul"

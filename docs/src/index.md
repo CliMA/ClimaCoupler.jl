@@ -74,6 +74,7 @@ ClimaCoupler.jl is organized as a set of modules, each with a distinct role in t
 - [CalibrationTools](@ref): Provides utilities for setting up model calibration experiments,
   including data loaders for ERA5 observational data.
 
+
 ## Extensions
 
 In addition to the modules located in `src/`, ClimaCoupler.jl contains package extensions
@@ -101,3 +102,21 @@ The available extensions are:
 
 Details about the component model extensions can be found in the section [Models in Extensions](@ref),
 and details about the plotting extensions can be found in [Plotting](@ref).
+
+## Documentation structure
+
+- **[Running a simulation](@ref)**: How to launch and configure a simulation from the
+  command line, REPL, or as an installed package.
+- **[Available component models](@ref)**: Describes the built-in surface models (slab
+  ocean, prescribed ocean, prescribed sea ice) and the more complex models provided by
+  package extensions.
+- **[Available simulation types](@ref)**: Explains each supported `mode_name` option
+  (AMIP, CMIP, slabplanet variants, subseasonal) and the component models each uses.
+- **Coupler interface**: This section includes one page per module in `src/`, each documenting
+  that module's public API and functions.
+- **Simulation output**: Documentation for saving diagnostics, visualization, leaderboard
+  comparisons against observations, and performance benchmarking.
+- **Examples**: Walkthroughs of running specific experiments.
+- **[CalibrationTools](@ref)**: Utilities for setting up parameter calibration experiments
+  using ERA5 observational data.
+- **Contributing**: Guidelines for contributing to ClimaCoupler.jl.

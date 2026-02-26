@@ -278,20 +278,41 @@ Returns a Dict mapping (short_name, date_range) -> OutputVar
 """
 function load_vars(obs_dir, short_names, sample_date_ranges, config_file; ceres_variables = String[])
     vars_by_date = Dict{Tuple{String, NTuple{2, Dates.DateTime}}, OutputVar}()
-    
+
+    pressure_level_vars = filter(is_pressure_level_variable, short_names)
+    ceres_vars_in_names = filter(sn -> is_ceres_variable(sn, ceres_variables), short_names)
+    # TODO: simplify these filters
+    era5_surface_vars = filter(
+        sn -> !is_pressure_level_variable(sn) && !is_ceres_variable(sn, ceres_variables),
+        short_names,
+    )
+
+    # Create loaders once — artifact-backed loaders return full time series regardless of date
+    era5_pl_loader = isempty(pressure_level_vars) ? nothing : CalibrationTools.ERA5PressureLevelDataLoader()
+    ceres_loader = isempty(ceres_vars_in_names) ? nothing : CalibrationTools.CERESDataLoader()
+
+    # Load ERA5 pressure-level vars once per variable
+    for short_name in pressure_level_vars
+        var = load_era5_pressure_level_var(short_name, config_file, era5_pl_loader)
+        for dr in sample_date_ranges
+            vars_by_date[(short_name, dr)] = var
+        end
+    end
+
+    # Load CERES vars once per variable
+    for short_name in ceres_vars_in_names
+        var = load_ceres_var(short_name, config_file, ceres_loader)
+        for dr in sample_date_ranges
+            vars_by_date[(short_name, dr)] = var
+        end
+    end
+
+    # Load ERA5 surface vars from weekly/daily files — these are date-specific.
     for (start_date, end_date) in sample_date_ranges
         is_single_day = (start_date == end_date)
-        
-        for short_name in short_names
+        for short_name in era5_surface_vars
             try
-                # Check if this is a pressure-level variable (e.g., "ta_850hPa")
-                if is_pressure_level_variable(short_name)
-                    var = load_era5_pressure_level_var(short_name, config_file)
-                # Check if this variable should come from CERES
-                elseif is_ceres_variable(short_name, ceres_variables)
-                    var = load_ceres_var(short_name, config_file)
-                elseif is_single_day
-                    # Load from ERA5 daily files
+                if is_single_day
                     filepath, _ = get_daily_filename(obs_dir, short_name, start_date)
                     var = load_daily_var(filepath, short_name, start_date)
                 else
@@ -311,7 +332,6 @@ function load_vars(obs_dir, short_names, sample_date_ranges, config_file; ceres_
             end
         end
     end
-    
     return vars_by_date
 end
 

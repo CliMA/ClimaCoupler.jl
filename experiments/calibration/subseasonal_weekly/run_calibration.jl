@@ -105,20 +105,32 @@ if abspath(PROGRAM_FILE) == @__FILE__
     #     model_interface,
     #     verbose = true,
     # )
-
-    backend = ClimaCalibrate.DerechoBackend(
-        model_interface = model_interface,
-        verbose = true,
-        hpc_kwargs = Dict(
-            :job_priority => "regular", # {"premium", "regular", "economy", "preempt"}
-            :time => 720,           # 12 hours in minutes
-            :ntasks => 1,
-            :cpus_per_task => 12,
-            :gpus_per_task => 1,
-        ),
-    )
-
-    # backend = ClimaCalibrate.WorkerBackend()
+    if ClimaCalibrate.get_backend() == ClimaCalibrate.DerechoBackend
+        backend = ClimaCalibrate.DerechoBackend(
+            model_interface,
+            verbose = true,
+            hpc_kwargs = Dict(
+                :job_priority => "regular", # {"premium", "regular", "economy", "preempt"}
+                :time => 720,           # 12 hours in minutes
+                :ntasks => 1,
+                :cpus_per_task => 12,
+                :gpus_per_task => 1,
+            ),
+        )
+    elseif ClimaCalibrate.get_backend() == ClimaCalibrate.GCPBackend
+        backend = ClimaCalibrate.GCPBackend(;
+            model_interface,
+            verbose = true,
+            hpc_kwargs = Dict(
+                :gpus_per_task => 1,
+                :cpus_per_task => 12,
+                :time => 720,
+                :partition => "a3",
+            ),
+        )
+    else
+        error("Unsupported backend: $(ClimaCalibrate.get_backend())")
+    end
 
     eki = ClimaCalibrate.calibrate(
         backend,

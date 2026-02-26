@@ -541,3 +541,21 @@ TODO extend this for non-ClimaCore states.
 function Checkpointer.get_model_prog_state(sim::OceananigansSimulation)
     @warn "get_model_prog_state not implemented for OceananigansSimulation"
 end
+
+# Additional OceananigansSimulation getter methods for plotting debug fields
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:salinity}) =
+    sim.ocean.model.tracers.S
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:u}) = sim.ocean.model.velocities.u
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:v}) = sim.ocean.model.velocities.v
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:free_surface_displacement}) =
+    sim.ocean.model.free_surface.displacement
+
+"""
+    Plotting.debug_plot_fields(sim::OceananigansSimulation)
+
+Return the fields to include in debug plots for an Oceananigans simulation.
+This includes the area fraction, surface temperature, salinity, velocity, and
+free surface displacement. These plots are not polished, and are intended for debugging.
+"""
+Plotting.debug_plot_fields(sim::OceananigansSimulation) =
+    (:area_fraction, :surface_temperature, :salinity, :u, :v, :free_surface_displacement)

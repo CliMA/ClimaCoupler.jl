@@ -121,22 +121,59 @@ Plot useful coupler fields (in `field_names`) and save plots to a directory.
 
 If `cs_fields_ref` is provided (e.g., using a copy of cs.fields from the initialization),
 plot the anomalies of the fields with respect to `cs_fields_ref`.
+
+For vector fields which are not defined on a Cartesian basis, rotate them to the Cartesian
+basis before plotting so they can be interpreted physically.
 """
-function Plotting.debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing) # TODO should this dispatch on NamedTuple?
+function Plotting.debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing)
     field_names = propertynames(cs_fields)
     fig = Makie.Figure(size = (1500, 800))
     min_square_len = ceil(Int, sqrt(length(field_names)))
+
+    # Set up to rotate vector fields to the Cartesian basis
+    local_geometry = CC.Fields.local_geometry_field(getproperty(cs_fields, field_names[1]))
+
     for i in 1:min_square_len, j in 1:min_square_len
         field_index = (i - 1) * min_square_len + j
+
+        # Rotate vector fields to the Cartesian basis so they can be interpreted physically
+        rotated_vectors = Dict{Symbol, CC.Fields.Field}()
+        if :u_int in field_names && :v_int in field_names
+            u_int_cartesian, v_int_cartesian = _get_cartesian_vector_components(
+                local_geometry,
+                getproperty(cs_fields, :u_int),
+                getproperty(cs_fields, :v_int),
+            )
+
+            rotated_vectors[:u_int] = u_int_cartesian
+            rotated_vectors[:v_int] = v_int_cartesian
+        end
+        if :F_turb_ρτxz in field_names && :F_turb_ρτyz in field_names
+            F_turb_ρτxz_cartesian, F_turb_ρτyz_cartesian = _get_cartesian_vector_components(
+                local_geometry,
+                getproperty(cs_fields, :F_turb_ρτxz),
+                getproperty(cs_fields, :F_turb_ρτyz),
+            )
+
+            rotated_vectors[:F_turb_ρτxz] = F_turb_ρτxz_cartesian
+            rotated_vectors[:F_turb_ρτyz] = F_turb_ρτyz_cartesian
+        end
+
         if field_index <= length(field_names)
             field_name = field_names[field_index]
-            field = getproperty(cs_fields, field_name)
+
+            if field_name in keys(rotated_vectors)
+                field = rotated_vectors[field_name]
+            else
+                field = getproperty(cs_fields, field_name)
+            end
 
             title = string(field_name) * Plotting.print_extrema(field)
             ax = Makie.Axis(fig[i, j * 2 - 1]; title)
             Plotting.debug_plot!(ax, fig, field, i, j)
         end
     end
+    mkpath(dir)
     Makie.save(joinpath(dir, "debug_coupler.png"), fig)
 
     # plot anomalies if a reference cs.fields, `cs_fields_ref`, are provided
@@ -154,6 +191,21 @@ function Plotting.debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing
         end
         Makie.save(joinpath(dir, "debug_coupler_anomalies.png"), fig)
     end
+end
+
+function _get_cartesian_vector_components(
+    local_geometry,
+    u_component::CC.Fields.Field,
+    v_component::CC.Fields.Field,
+)
+    # Get the vector components in the CT1 and CT2 directions
+    xz = @. CT12(CT1(_unit_basis_vector_data(CT1, local_geometry)), local_geometry)
+    yz = @. CT12(CT2(_unit_basis_vector_data(CT2, local_geometry)), local_geometry)
+
+    # Convert the vector components to a UVVector on the Cartesian basis
+    uv_cartesian =
+        @. CC.Geometry.UVVector(u_component * xz + v_component * yz, local_geometry)
+    return uv_cartesian.components.data.:1, uv_cartesian.components.data.:2
 end
 
 """
@@ -246,3 +298,19 @@ that has additional fields to plot.
 """
 Plotting.debug_plot_fields(sim::Interfacer.AbstractSurfaceSimulation) =
     (:area_fraction, :surface_temperature)
+
+# Define shorthands for ClimaCore types
+const CT1 = CC.Geometry.Contravariant1Vector
+const CT2 = CC.Geometry.Contravariant2Vector
+const CT12 = CC.Geometry.Contravariant12Vector
+
+"""
+    _unit_basis_vector_data(type, local_geometry)
+
+The component of the vector of the specified type with length 1 in physical units.
+The type should correspond to a vector with only one component, i.e., a basis vector.
+"""
+function _unit_basis_vector_data(::Type{V}, local_geometry) where {V}
+    FT = CC.Geometry.undertype(typeof(local_geometry))
+    return FT(1) / CC.Geometry._norm(V(FT(1)), local_geometry)
+end

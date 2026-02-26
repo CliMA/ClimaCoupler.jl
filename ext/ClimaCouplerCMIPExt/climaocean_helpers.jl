@@ -165,7 +165,7 @@ function contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz)
     yz = @. CT12(CT2(unit_basis_vector_data(CT2, local_geometry)), local_geometry)
 
     # Convert the vector components to a UVVector on the Cartesian basis
-    @. ρτ_flux_uv = @. CC.Geometry.UVVector(ρτxz * xz + ρτyz * yz, local_geometry)
+    @. ρτ_flux_uv = CC.Geometry.UVVector(ρτxz * xz + ρτyz * yz, local_geometry)
     return nothing
 end
 

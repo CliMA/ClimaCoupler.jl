@@ -23,6 +23,8 @@ include(
 # Load calibration setup for NORMALIZE_VARIABLES setting
 include(joinpath(@__DIR__, "calibration_setup.jl"))
 
+include(joinpath(@__DIR__, "preprocessing_utils.jl"))
+
 # Load normalization stats if normalization is enabled
 const NORM_STATS_PATH = joinpath(
     pkgdir(ClimaCoupler),
@@ -161,11 +163,16 @@ function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, i
     for short_name in short_names
         var = get_var(short_name, simdir)
         var = preprocess_var(var, sample_date_ranges)
-        
+
         # Apply normalization if enabled
         if !isnothing(norm_stats)
             var = normalize_model_var(var, norm_stats)
         end
+
+        # Note that this is the same as before
+        lat_left = -60
+        lat_right = 60
+        var = apply_lat_window(var, lat_left, lat_right)
 
         EnsembleBuilder.fill_g_ens_col!(
             g_ens_builder,

@@ -318,7 +318,7 @@ function compute_surface_fluxes!(
     @. F_turb_moisture = ifelse(area_fraction ≈ 0, zero(F_turb_moisture), F_turb_moisture)
     @. L_MO = ifelse(area_fraction ≈ 0, zero(L_MO), L_MO)
     @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
-    @. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(buoyancy_flux), buoyancy_flux)
+    #@. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(buoyancy_flux), buoyancy_flux)
 
     # update the fluxes, which are now area-weighted, of this surface model
     fields = (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
@@ -338,9 +338,9 @@ function compute_surface_fluxes!(
 
     # L_MO can be Inf. We don't want to multiply Inf * 0, so we can handle this
     # separately.
-    @. csf.L_MO += ifelse(isinf(L_MO), L_MO, L_MO * area_fraction)
+    #@. csf.L_MO += ifelse(isinf(L_MO), L_MO, L_MO * area_fraction)
     @. csf.ustar += ustar * area_fraction
-    @. csf.buoyancy_flux += buoyancy_flux * area_fraction
+    #@. csf.buoyancy_flux += buoyancy_flux * area_fraction
     return nothing
 end
 

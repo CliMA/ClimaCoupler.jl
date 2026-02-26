@@ -106,7 +106,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     #     verbose = true,
     # )
     if ClimaCalibrate.get_backend() == ClimaCalibrate.DerechoBackend
-        backend = ClimaCalibrate.DerechoBackend(
+        backend = ClimaCalibrate.DerechoBackend(;
             model_interface,
             verbose = true,
             hpc_kwargs = Dict(

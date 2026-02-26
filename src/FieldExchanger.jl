@@ -7,6 +7,7 @@ atmospheric and surface component models.
 module FieldExchanger
 
 import ClimaCore as CC
+import .Threads
 
 import ..Interfacer, ..FluxCalculator, ..Utilities
 
@@ -270,6 +271,38 @@ function update_model_sims!(model_sims, csf)
     end
 end
 
+function Interfacer.step!(land_sim::Interfacer.AbstractLandSimulation, atmos_sim::Interfacer.AbstractAtmosSimulation,
+    t, coupler_fields, thermo_params)
+    # Step the land simulation first
+    Interfacer.step!(land_sim, t)
+
+    # Step the atmosphere model
+    Interfacer.step!(atmos_sim, t)
+end
+
+function Interfacer.step!(implicit_flux_sim::Interfacer.AbstractImplicitFluxSimulation, atmos_sim::Interfacer.AbstractAtmosSimulation,
+    t, coupler_fields, thermo_params)
+    # Step the implicit flux simulation first
+    Interfacer.step!(implicit_flux_sim, t)
+
+    # For an implicit flux simulation, `compute_surface_fluxes!` reads in the precomputed
+    # fluxes, and puts them into the coupler fields.
+    FluxCalculator.compute_surface_fluxes!(
+        coupler_fields,
+        implicit_flux_sim,
+        atmos_sim,
+        thermo_params,
+    )
+
+    # Update the atmosphere with the fluxes across all surface models
+    # The surface models have already been updated with the fluxes in `compute_surface_fluxes!`,
+    # or internally within the step in the case of the integrated land model.
+    FluxCalculator.update_turbulent_fluxes!(atmos_sim, coupler_fields)
+
+    # Step the atmosphere model
+    Interfacer.step!(atmos_sim, t)
+end
+
 """
     step_model_sims!(model_sims, t, coupler_fields, thermo_params)
     step_model_sims!(cs::CoupledSimulation)
@@ -280,34 +313,50 @@ Iterates `step!` over all component model simulations saved in `cs.model_sims`.
 - `model_sims`: [NamedTuple] containing `AbstractComponentSimulation`s.
 - `t`: [AbstractFloat or ITime] denoting the simulation time.
 """
-function step_model_sims!(model_sims, t, coupler_fields, thermo_params)
-    # Step all surface models (the ordering doesn't matter here)
-    for sim in model_sims
-        sim isa Interfacer.AbstractSurfaceSimulation && Interfacer.step!(sim, t)
+function step_model_sims!(model_sims, t, coupler_fields, thermo_params, step_concurrently)
+    if step_concurrently && (haskey(model_sims, :ocean_sim) || haskey(model_sims, :seaice_sim))
+        @sync begin
+            if haskey(model_sims, :land_sim)
+                Threads.@spawn Interfacer.step!(model_sims.land_sim, model_sims.atmos_sim, t, coupler_fields, thermo_params)
+            else
+                Threads.@spawn Interfacer.step!(model_sims.atmos_sim, t)
+            end
+            if haskey(model_sims, :ocean_sim)
+                Threads.@spawn Interfacer.step!(model_sims.ocean_sim, t)
+            end
+            if haskey(model_sims, :ice_sim)
+                Threads.@spawn Interfacer.step!(model_sims.ice_sim, t)
+            end
+        end
+    else
+        # Step all surface models (the ordering doesn't matter here)
+        for sim in model_sims
+            sim isa Interfacer.AbstractSurfaceSimulation && Interfacer.step!(sim, t)
 
-        # For an implicit flux simulation, `compute_surface_fluxes!` reads in the precomputed
-        # fluxes, and puts them into the coupler fields.
-        sim isa Interfacer.AbstractImplicitFluxSimulation &&
-            FluxCalculator.compute_surface_fluxes!(
-                coupler_fields,
-                sim,
-                model_sims.atmos_sim,
-                thermo_params,
-            )
+            # For an implicit flux simulation, `compute_surface_fluxes!` reads in the precomputed
+            # fluxes, and puts them into the coupler fields.
+            sim isa Interfacer.AbstractImplicitFluxSimulation &&
+                FluxCalculator.compute_surface_fluxes!(
+                    coupler_fields,
+                    sim,
+                    model_sims.atmos_sim,
+                    thermo_params,
+                )
+        end
+
+        # Update the atmosphere with the fluxes across all surface models
+        # The surface models have already been updated with the fluxes in `compute_surface_fluxes!`,
+        # or internally within the step in the case of the integrated land model.
+        FluxCalculator.update_turbulent_fluxes!(model_sims.atmos_sim, coupler_fields)
+
+        # Step the atmosphere model
+        Interfacer.step!(model_sims.atmos_sim, t)
     end
-
-    # Update the atmosphere with the fluxes across all surface models
-    # The surface models have already been updated with the fluxes in `compute_surface_fluxes!`,
-    # or internally within the step in the case of the integrated land model.
-    FluxCalculator.update_turbulent_fluxes!(model_sims.atmos_sim, coupler_fields)
-
-    # Step the atmosphere model
-    Interfacer.step!(model_sims.atmos_sim, t)
     return nothing
 end
 
 function step_model_sims!(cs::Interfacer.CoupledSimulation)
-    step_model_sims!(cs.model_sims, cs.t[], cs.fields, cs.thermo_params)
+    step_model_sims!(cs.model_sims, cs.t[], cs.fields, cs.thermo_params, cs.step_concurrently)
 end
 
 """

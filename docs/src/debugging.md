@@ -64,7 +64,7 @@ timestep with a NaN or domain error. A common debugging workflow for this is:
 
 ```julia
 # Run from the top-level ClimaCoupler.jl/ directory
-include("experiments/ClimaEarth/setup_run.jl")
+include("experiments/ClimaEarth/code_loading.jl")
 
 cs = CoupledSimulation()
 

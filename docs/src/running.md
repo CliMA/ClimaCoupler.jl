@@ -35,14 +35,15 @@ A list of all available configuration options and their defaults can be found on
 ## From the REPL
 
 To run a simulation interactively, start Julia using the ClimaEarth project
-and include the setup script, which imports all required packages.
+and include the package loading script, which imports all required packages and triggers
+all extensions:
 
 !!! note "Working directory"
     All REPL examples below assume Julia was started from the **repository root**
     directory, e.g. `julia --project=experiments/ClimaEarth`.
 
 ```julia
-include("experiments/ClimaEarth/setup_run.jl")
+include("experiments/ClimaEarth/code_loading.jl")
 
 cs = CoupledSimulation()  # uses amip_default.yml
 run!(cs)
@@ -52,7 +53,7 @@ postprocess(cs)
 To use a specific config file:
 
 ```julia
-include("experiments/ClimaEarth/setup_run.jl")
+include("experiments/ClimaEarth/code_loading.jl")
 
 config_file = "config/ci_configs/amip_default.yml"
 cs = CoupledSimulation(config_file)
@@ -67,7 +68,7 @@ can load a config into a dictionary, modify it, and pass it directly to
 `CoupledSimulation`. For example, to run for one day instead of the default:
 
 ```julia
-include("experiments/ClimaEarth/setup_run.jl")
+include("experiments/ClimaEarth/code_loading.jl")
 
 config_file = "config/ci_configs/amip_default.yml"
 config_dict = Input.get_coupler_config_dict(config_file)
@@ -84,49 +85,31 @@ The dictionary uses the same key names as the YAML config file and the CLI flags
 ## Using ClimaCoupler as an installed package
 
 If you are using ClimaCoupler.jl as a package dependency rather than working inside a
-clone of the repository, set up your script by importing the packages directly. The
-following reproduces the essential setup from `experiments/ClimaEarth/setup_run.jl`:
+clone of the repository, you just need to load ClimaCoupler and trigger the required
+extensions — the equivalent of what `code_loading.jl` does:
 
 ```julia
-# Standard library
-import Dates
-import Random
+using ClimaCoupler
 
-# ClimaESM dependencies
-import ClimaAtmos
-import ClimaComms
-ClimaComms.@import_required_backends
-import ClimaCore as CC
-import ClimaParams as CP
-import ClimaLand
-import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
-import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
-import ClimaUtilities.Utils: period_to_seconds_float
-import ClimaUtilities.TimeManager: ITime, date
-import Interpolations  # triggers InterpolationsExt in ClimaUtilities
-import ClimaDiagnostics as CD
-import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule, EveryStepSchedule
-
-# Trigger CMIP extension (only needed for CMIP simulations)
-import Oceananigans, ClimaOcean, ClimaSeaIce, KernelAbstractions
-
-# Trigger Makie plotting extension
+# Trigger the Makie plotting extension
 using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, NCDatasets, Poppler_jll
 
-# ClimaCoupler
-using ClimaCoupler
-import ClimaCoupler: Input
-import ClimaCoupler.Interfacer: CoupledSimulation, AMIPMode, CMIPMode,
-    SlabplanetMode, SlabplanetAquaMode, SlabplanetTerraMode, SubseasonalMode
+# Trigger the CMIP extension (only needed for CMIP simulations)
+import Oceananigans, ClimaOcean, ClimaSeaIce, KernelAbstractions
+
+# Trigger the ClimaLand extension
+import ClimaLand
+
+# Trigger the ClimaAtmos extension
+import ClimaAtmos
 ```
 
 Once the packages are loaded, construct and run the simulation using a config file:
 
 ```julia
 config_file = joinpath(pkgdir(ClimaCoupler), "config", "ci_configs", "amip_default.yml")
-config_dict = Input.get_coupler_config_dict(config_file)
 
-cs = CoupledSimulation(config_dict)
+cs = CoupledSimulation(config_file)
 run!(cs)
 postprocess(cs)
 ```
@@ -138,7 +121,7 @@ advances the simulation by one coupling timestep (`cs.Δt_cpl`), which lets you 
 or modify state between steps:
 
 ```julia
-include("experiments/ClimaEarth/setup_run.jl")
+include("experiments/ClimaEarth/code_loading.jl")
 
 cs = CoupledSimulation()
 
@@ -155,7 +138,7 @@ To run the simulation for its entire duration using individual steps, you can
 do the following:
 
 ```julia
-include("experiments/ClimaEarth/setup_run.jl")
+include("experiments/ClimaEarth/code_loading.jl")
 
 cs = CoupledSimulation()
 

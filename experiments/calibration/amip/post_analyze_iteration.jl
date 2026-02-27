@@ -39,12 +39,8 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
     era5_vars =
         mapreduce(ClimaCalibrate.ObservationRecipe.reconstruct_vars, vcat, minibatch_obs)
 
-    # Normalize sim vars identically to process_member_data! so the bias reflects
-    # exactly the residual seen by the loss function
-    norm_stats = get_norm_stats()
     sim_vars = map(CALIBRATE_CONFIG.short_names) do short_name
         var = preprocess_var(get_var(short_name, simdir), sample_date_range)
-        normalize_model_var(var, norm_stats)
     end
 
     # Match sim_vars with era5_vars by short_name
@@ -67,15 +63,29 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
     fig = GeoMakie.Figure(size = (1500, 500 * length(var_pairs)))
     for (i, (sim_var, era5_var)) in enumerate(var_pairs)
         sn = ClimaAnalysis.short_name(sim_var)
-        sim_var_t = ClimaAnalysis.slice(sim_var, time = calib_start)
-        era5_var_t = ClimaAnalysis.slice(era5_var, time = calib_start)
+        sim_var_t = ClimaAnalysis.select(sim_var; by = MatchValue(), time = calib_start)
+        era5_var_t = ClimaAnalysis.select(era5_var; by = MatchValue(), time = calib_start)
         cmap_extrema = get(bias_plot_extrema, sn, extrema(sim_var_t.data))
-        ClimaAnalysis.Visualize.plot_bias_on_globe!(
-            fig[i, 1],
-            sim_var_t,
-            era5_var_t;
-            cmap_extrema,
-        )
+        if ClimaAnalysis.has_pressure(sim_var_t)
+            for (j, pressure) in enumerate(ClimaAnalysis.pressures(sim_var_t))
+                sim_var_t_p = ClimaAnalysis.select(sim_var_t; by = MatchValue(), pressure)
+                era5_var_t_p = ClimaAnalysis.select(era5_var_t; by = MatchValue(), pressure)
+                # Sometimes the float type of the dims don't match so we resample...
+                # sim_var_t_p = ClimaAnalysis.resampled_as(sim_var_t_p, era5_var_t_p)
+                ClimaAnalysis.Visualize.plot_bias_on_globe!(
+                    fig[i, j],
+                    sim_var_t_p, era5_var_t_p;
+                    # cmap_extrema,
+                )
+            end
+        else
+            ClimaAnalysis.Visualize.plot_bias_on_globe!(
+                fig[i, 1],
+                sim_var_t,
+                era5_var_t;
+                cmap_extrema,
+            )
+        end
     end
 
     GeoMakie.save(joinpath(output_dir, "bias_sample_dates.png"), fig)

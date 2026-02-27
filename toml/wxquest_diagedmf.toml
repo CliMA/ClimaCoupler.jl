@@ -11,7 +11,7 @@ value = 45000.0
 value = 1200
 
 [entr_inv_tau]
-value = 0.004362201402729065
+value = 0.0015
 
 [entr_param_vec]
 value = [0, -20.29437694493032, -22.269204417686513, 0, 0, -0.8]
@@ -26,7 +26,10 @@ value = 0
 value = 0.12
 
 [detr_vertdiv_coeff]
-value = 0.6
+value = 1.0
+
+[diagnostic_covariance_coeff]
+value = 2.1
 
 [min_area_limiter_scale]
 value = 0

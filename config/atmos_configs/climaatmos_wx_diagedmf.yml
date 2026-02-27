@@ -26,8 +26,8 @@ h_elem: 15
 z_max: 70000.0
 z_elem: 70
 dz_bottom: 30.0
-edmfx_entr_model: "PiGroups"
-# edmfx_entr_model: "Generalized"
+# edmfx_entr_model: "PiGroups"
+edmfx_entr_model: "Generalized"
 edmfx_detr_model: "Generalized"
 edmfx_nh_pressure: true
 edmfx_sgs_mass_flux: true

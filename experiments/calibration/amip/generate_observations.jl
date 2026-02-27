@@ -51,7 +51,7 @@ function make_observation_vector(vars, sample_date_ranges)
         covar_estimator = ClimaCalibrate.ObservationRecipe.SVDplusDCovariance(
             monthly_sample_date_ranges;
             model_error_scale = 0.05,
-            regularization = 0.1,
+            regularization = 1e-6,
             use_latitude_weights = true,
             min_cosd_lat = 0.1,
         )

@@ -55,12 +55,7 @@ function preprocess_sim_vars(vars)
     return vars
 end
 
-function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, iteration)
-    short_names = EnsembleBuilder.missing_short_names(g_ens_builder, col_idx)
-    sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges[iteration + 1]
-    @info "Short names: $short_names"
-
-    simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)
+function load_and_preprocess_vars(simdir, short_names)
     vars = []
     for short_name in short_names
         if short_name == "swcre"
@@ -97,6 +92,16 @@ function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, i
     end
 
     vars = preprocess_sim_vars(vars)
+    return vars
+end
+
+function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, iteration)
+    short_names = EnsembleBuilder.missing_short_names(g_ens_builder, col_idx)
+    sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges[iteration + 1]
+    @info "Short names: $short_names"
+
+    simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)
+    vars = load_and_preprocess_vars(simdir, short_names)
 
     for variable in vars
         EnsembleBuilder.fill_g_ens_col!(
@@ -108,7 +113,7 @@ function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, i
         )
     end
 
-    return nothing
+    return vars
 end
 
 # Get job_id from config file name (e.g., "wxquest_diagedmf_weekly_calibration.yml" -> "wxquest_diagedmf_weekly_calibration")

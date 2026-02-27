@@ -103,7 +103,7 @@ makedocs(
     modules = [
         ClimaCoupler,
         Base.get_extension(ClimaCoupler, :ClimaCouplerMakieExt),
-        Base.get_extension(ClimaCoupler, :ClimaCouplerOceananigansMakieExt),
+        Base.get_extension(ClimaCoupler, :ClimaCouplerCMIPMakieExt),
         Base.get_extension(ClimaCoupler, :ClimaCouplerCMIPExt),
         Base.get_extension(ClimaCoupler, :ClimaCouplerClimaLandExt),
         Base.get_extension(ClimaCoupler, :ClimaCouplerClimaAtmosExt),

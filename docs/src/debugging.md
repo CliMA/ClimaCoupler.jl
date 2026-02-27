@@ -171,7 +171,7 @@ CairoMakie.heatmap!(ax, view(field_3d, :, :, derived.grid.Nz))
 ```
 
 The `Plotting.debug` function handles both field types automatically when the
-`ClimaCouplerOceananigansMakieExt` extension is loaded.
+`ClimaCouplerCMIPMakieExt` extension is loaded.
 
 ## Software errors
 

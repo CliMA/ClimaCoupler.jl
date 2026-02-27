@@ -234,11 +234,12 @@ for FT in (Float32, Float64)
             )
 
         # Compare expected and computed fluxes
-        @test fields.F_turb_ρτxz ≈ fluxes_expected.F_turb_ρτxz
-        @test fields.F_turb_ρτyz ≈ fluxes_expected.F_turb_ρτyz
-        @test fields.F_lh ≈ fluxes_expected.F_lh
-        @test fields.F_sh ≈ fluxes_expected.F_sh
-        @test fields.F_turb_moisture ≈ fluxes_expected.F_turb_moisture
+        @test Array(parent(fields.F_turb_ρτxz)) ≈ Array(parent(fluxes_expected.F_turb_ρτxz))
+        @test Array(parent(fields.F_turb_ρτyz)) ≈ Array(parent(fluxes_expected.F_turb_ρτyz))
+        @test Array(parent(fields.F_lh)) ≈ Array(parent(fluxes_expected.F_lh))
+        @test Array(parent(fields.F_sh)) ≈ Array(parent(fluxes_expected.F_sh))
+        @test Array(parent(fields.F_turb_moisture)) ≈
+              Array(parent(fluxes_expected.F_turb_moisture))
     end
 
     @testset "get_surface_params for FT=$FT" begin

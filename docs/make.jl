@@ -75,6 +75,7 @@ developer_pages = ["contributing.md", "debugging.md"]
 pages = Any[
     "Home" => "index.md",
     "Running a simulation" => "running.md",
+    "The CoupledSimulation object" => "coupledsimulation.md",
     "Available component models" => "models.md",
     "Available simulation types" => "simtypes.md",
     "Coupler interface" => interface_pages,

@@ -119,4 +119,5 @@ and details about the plotting extensions can be found in [Plotting](@ref).
 - **Examples**: Walkthroughs of running specific experiments.
 - **[CalibrationTools](@ref)**: Utilities for setting up parameter calibration experiments
   using ERA5 observational data.
-- **Contributing**: Guidelines for contributing to ClimaCoupler.jl.
+- **Developer docs**: Guidelines for contributing to ClimaCoupler.jl, and practical tips
+  for debugging package incompatibilities, numerical instabilities, and software errors.

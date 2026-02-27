@@ -70,6 +70,8 @@ interface_pages = [
 
 output_pages = ["simoutput.md", "plotting.md", "leaderboard.md"]
 
+developer_pages = ["contributing.md", "debugging.md"]
+
 pages = Any[
     "Home" => "index.md",
     "Running a simulation" => "running.md",
@@ -79,7 +81,7 @@ pages = Any[
     "Simulation output" => output_pages,
     "Examples" => example_pages,
     "Parameter calibration" => "calibrationtools.md",
-    "Contributing" => "contributing.md",
+    "Developer docs" => developer_pages,
 ]
 
 makedocs(

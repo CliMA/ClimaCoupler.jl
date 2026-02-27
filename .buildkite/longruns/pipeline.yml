@@ -188,6 +188,16 @@ steps:
 
     steps:
 
+      - label: ":thermometer: Cess climate sensitivity approximation from p2K runs"
+        key: "cess_from_p2k"
+        command: >-
+          julia --color=yes --project=experiments/ClimaEarth/
+            test/cess_climate_sensitivity.jl
+            output/amip_diagedmf_land_gpu
+            output/amip_diagedmf_land_p2k_gpu
+            output/ecs_analysis
+        artifact_paths: "output/ecs_analysis/*"
+
       # plot job performance history
       - label: ":chart_with_downwards_trend: build history"
         command:

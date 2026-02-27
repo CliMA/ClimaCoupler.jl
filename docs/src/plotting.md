@@ -62,7 +62,7 @@ ClimaCouplerMakieExt.jl uses ClimaAnalysis.jl to generate plots of diagnostic va
 saved using the ClimaDiagnostics.jl infrastructure.
 
 For information about diagnostics in ClimaCoupler, including how to customize which
-variables to save, how often, and with which reductions, see the [Diagnostics](@ref) documentation.
+variables to save, how often, and with which reductions, see the [SimOutput](@ref) documentation.
 
 #### Leaderboards
 
@@ -91,7 +91,7 @@ maintains physical conservation properties.
 Please note that the current AMIP/CMIP configurations are not expected to be conservative,
 so conservation plots are only available for the Slabplanet configuration.
 
-For information about conservation checks in ClimaCoupler, see the [Conservation Checks](@ref) documentation.
+For information about conservation checks in ClimaCoupler, see the [ConservationChecker](@ref) documentation.
 
 #### Debug plots
 

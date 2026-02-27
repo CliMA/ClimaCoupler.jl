@@ -44,7 +44,7 @@ for FT in (Float32, Float64)
             context,
         )
 
-        fields = ones(boundary_space_)
+        fields = Interfacer.init_coupler_fields(FT, [:field], boundary_space_)
 
         cs = Interfacer.CoupledSimulation{FT}(
             nothing, # dates

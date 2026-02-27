@@ -46,7 +46,7 @@ TODO:
 (NB: Radiation surface fluxes are calculated by the atmosphere.)
 """
 function turbulent_fluxes!(csf, model_sims, thermo_params)
-    boundary_space = axes(csf)
+    boundary_space = axes(first(csf))
     atmos_sim = model_sims.atmos_sim
     FT = CC.Spaces.undertype(boundary_space)
 
@@ -232,7 +232,7 @@ function compute_surface_fluxes!(
     atmos_sim::Interfacer.AbstractAtmosSimulation,
     thermo_params,
 )
-    boundary_space = axes(csf)
+    boundary_space = axes(first(csf))
     FT = CC.Spaces.undertype(boundary_space)
     surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
 

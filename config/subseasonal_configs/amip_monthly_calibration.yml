@@ -4,7 +4,7 @@ atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
 coupler_toml: ["toml/wxquest_diagedmf.toml"]
 strict_params: false
 mode_name: "subseasonal"
-era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+era5_initial_condition_dir: "/home/ext_nefrathe_caltech_edu/wxquest_data/initial_conditions/initial_conditions_v1"
 initial_condition: "WeatherModel"
 checkpoint_dt: "100days"
 dt: "150secs"
@@ -35,22 +35,22 @@ non_orographic_gravity_wave: true
 # bucket_albedo_type: "map_temporal"
 # bucket_albedo_type: "era5"
 # bucket_initial_condition: "/net/sampo/data1/cchristo/WeatherQuest_data/archive_dev4/era5_bucket_processed_20250831_0000.nc"
-
+dt_ogw: 1800secs
 land_spun_up_ic: false
 land_temperature_anomaly: "nothing"
 radiation_reset_rng_seed: true
-start_date: "20230115"
+start_date: "20100924"
 surface_setup: "PrescribedSurface"
 topo_smoothing: true
 topography: "Earth"
 # t_end: "8days"
-t_end: "1days"
+t_end: "39days"
 netcdf_output_at_levels: true
 output_default_diagnostics: false
 use_coupler_diagnostics: false
 use_land_diagnostics: false
 extra_atmos_diagnostics:
-  - short_name: [tas, pr, mslp, rsut, rlut, rsdt]
+  - short_name: [tas, pr, mslp, rsut, rsutcs, rlut, rlutcs, rsdt]
     period: monthly
     reduction_time: average
   - short_name: [ta, hur]

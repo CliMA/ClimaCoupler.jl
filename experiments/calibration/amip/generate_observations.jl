@@ -72,12 +72,23 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     # Create data loaders (constructing these are relatively cheap)
     era5_pl_data_loader = CalibrationTools.ERA5PressureLevelDataLoader()
-    data_loaders = [era5_pl_data_loader]
+    ceres_data_loader = CalibrationTools.CERESDataLoader()
+    data_loaders = [era5_pl_data_loader,ceres_data_loader]
 
     (; short_names) = CALIBRATE_CONFIG
     # Map short name to which data loader to use
     # TODO: This should be handled automatically if possible
-    loader_registry = Dict(short_name => era5_pl_data_loader for short_name in short_names)
+    loader_registry = Dict()
+
+    # Populate loader registry, mapping short names to loaders
+    for short_name in short_names
+        idx = findfirst(l -> short_name in l.available_vars, data_loaders)
+        !isnothing(idx) && (loader_registry[short_name] = data_loaders[idx])
+    end
+    data_loader_non_unique_names  = 
+        intersect(ClimaCoupler.CalibrationTools.available_vars.(data_loaders)...)
+    any(x -> x in data_loader_non_unique_names, data_loader_non_unique_names) &&
+        error("DataLoader variable names are not unique: $data_loaders")
 
     Set(short_names) == keys(loader_registry) || error("Not all short names are being used")
 

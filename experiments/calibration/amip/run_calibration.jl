@@ -36,23 +36,24 @@ config_file = joinpath(
 )
 
 # Calibrate only on Jan 1 2010
-sample_date_ranges = [(Dates.DateTime(2010, 1, 1), Dates.DateTime(2010, 1, 1)) for _ in 1:6]
+sample_date_ranges = [(Dates.DateTime(2010, 10, 1), Dates.DateTime(2010, 10, 1)) for _ in 1:6]
 
 const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     config_file,
     # Note: Pressure-level variables require model output with
     # pressure_coordinates: true in config
-    short_names = ["ta", "hur"],
+    short_names = ["ta", "hur", "swcre", "lwcre"],
     minibatch_size = 1,
     n_iterations = 6,
     sample_date_ranges,
     extend = Dates.Month(1),
     spinup = Dates.Day(7),
-    output_dir = "/home/kphan2/worktree/ClimaCoupler.jl/cc/wxquest_v4_final/test_amip_output",
+    output_dir = "/home/ext_nefrathe_caltech_edu/clima/ClimaCoupler.jl/cc/wxquest_v4_final/test_amip_output",
     rng_seed = 42,
 )
 
 # Used in generate_observations.jl and observation_map.jl
+# Units: Pa (not hPa)
 const PRESSURE_LEVELS = 100.0 .* [200.0, 500.0, 850.0]
 
 const CALIBRATION_PRIORS = [
@@ -150,6 +151,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
             model_interface,
             verbose = true,
             hpc_kwargs = Dict(
+                :ntasks => 1,
                 :gpus_per_task => 1,
                 :cpus_per_task => 12,
                 :time => 720,

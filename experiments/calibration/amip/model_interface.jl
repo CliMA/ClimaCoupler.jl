@@ -71,8 +71,8 @@ function ClimaCalibrate.forward_model(iter, member)
     config_dict["coupler_output_dir"] = member_output_dir
 
     @info "Simulation dates" start_date end_date
-    # setup_and_run(config_dict)
-    fake_setup_and_run(config_dict)
+    setup_and_run(config_dict)
+    # fake_setup_and_run(config_dict)
     @info "Completed member $member"
     return nothing
 end

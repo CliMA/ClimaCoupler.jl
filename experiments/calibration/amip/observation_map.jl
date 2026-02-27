@@ -52,7 +52,7 @@ function preprocess_sim_vars(vars)
 
     # Note: We also do not process the time dimension either since we can rely
     # on GEnsembleBuilder to pick out the right times for us
-    return var
+    return vars
 end
 
 function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, iteration)
@@ -61,38 +61,60 @@ function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, i
     @info "Short names: $short_names"
 
     simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)
+    vars = []
     for short_name in short_names
-
+        if short_name == "swcre"
+            rsut = get(simdir; short_name = "rsut", reduction = "average", period = "1M")
+            rsutcs = get(simdir; short_name = "rsutcs", reduction = "average", period = "1M")
+            var = rsutcs - rsut
+            ClimaAnalysis.set_short_name!(var, "swcre")
+            var = ClimaAnalysis.set_units(var, "W m^-2")
+            push!(vars, var)
+            continue
+        elseif short_name == "lwcre"
+            rlut = get(simdir; short_name = "rlut", reduction = "average", period = "1M")
+            rlutcs = get(simdir; short_name = "rlutcs", reduction = "average", period = "1M")
+            var = rlutcs - rlut
+            ClimaAnalysis.set_short_name!(var, "lwcre")
+            var = ClimaAnalysis.set_units(var, "W m^-2")
+            push!(vars, var)
+            continue
+        end
         coord_types = available_coord_types(
             simdir;
             short_name = short_name,
             reduction = "average",
-            period = "1m",
+            period = "1M",
         )
 
-        vars = []
         for coord_type in coord_types
             # Instead of searching though the observation series to determine if
             # the vertical coordinate is pressure or z, we process both of them
             # and let GEnsembleBuilder handle it
-            var = get(simdir; short_name, reduction = "average", period = "1m", coord_type)
+            var = get(simdir; short_name, reduction = "average", period = "1M", coord_type)
             push!(vars, var)
-        end
-
-        vars = preprocess_sim_vars(vars)
-
-        for var in vars
-            EnsembleBuilder.fill_g_ens_col!(
-                g_ens_builder,
-                col_idx,
-                var;
-                checkers = (SequentialIndicesChecker(),),
-                verbose = true,
-            )
         end
     end
 
+    vars = preprocess_sim_vars(vars)
+
+    for variable in vars
+        EnsembleBuilder.fill_g_ens_col!(
+            g_ens_builder,
+            col_idx,
+            variable;
+            checkers = (SequentialIndicesChecker(),),
+            verbose = true,
+        )
+    end
+
     return nothing
+end
+
+# Get job_id from config file name (e.g., "wxquest_diagedmf_weekly_calibration.yml" -> "wxquest_diagedmf_weekly_calibration")
+function get_job_id()
+    config_file = CALIBRATE_CONFIG.config_file
+    return replace(basename(config_file), ".yml" => "")
 end
 
 # Override observation_map to use correct job_id path

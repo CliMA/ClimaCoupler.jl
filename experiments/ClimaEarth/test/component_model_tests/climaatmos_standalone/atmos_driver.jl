@@ -6,7 +6,7 @@ import ClimaCoupler: Utilities
 import ClimaAtmos as CA
 import Random
 
-redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(false)))
+redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(true)))
 Random.seed!(1234)
 
 function argparse_settings()

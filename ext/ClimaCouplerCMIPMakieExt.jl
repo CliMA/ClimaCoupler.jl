@@ -1,5 +1,5 @@
 """
-    ClimaCouplerOceananigansMakieExt
+    ClimaCouplerCMIPMakieExt
 
 This module contains code for plotting output of coupled simulations
 including Oceananigans.
@@ -7,7 +7,7 @@ including Oceananigans.
 Currently, it includes:
 - diagnostics plots for Oceananigans
 """
-module ClimaCouplerOceananigansMakieExt
+module ClimaCouplerCMIPMakieExt
 
 using ClimaCoupler
 import ClimaCoupler: Plotting

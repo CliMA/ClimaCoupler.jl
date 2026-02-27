@@ -6,7 +6,7 @@ and calibration parameter plots.
 
 By default, the `Plotting` module provides stub implementations that do nothing.
 The actual plotting implementations are provided by the `ClimaCouplerMakieExt` extension
-when Makie.jl and related packages are available, and by `ClimaCouplerOceananigansMakieExt`
+when Makie.jl and related packages are available, and by `ClimaCouplerCMIPMakieExt`
 when the plotting packages and Oceananigans.jl are available.
 
 ## Plotting API
@@ -99,9 +99,9 @@ To facilitate debugging, ClimaCoupler.jl plots most coupler fields and model
 fields of physical interest by default. These plots are availabe at the end of a simulation
 in the provided artifacts directory.
 
-## ClimaCouplerOceananigansMakieExt Extension
+## ClimaCouplerCMIPMakieExt Extension
 
-The `ClimaCouplerOceananigansMakieExt` extension extends the base plotting functionality
+The `ClimaCouplerCMIPMakieExt` extension extends the base plotting functionality
 to support Oceananigans.jl fields when Oceananigans is used as the ocean component model.
 
 ### Loading the Extension

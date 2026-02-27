@@ -508,7 +508,7 @@ weakdeps = ["CairoMakie", "ClimaCoreMakie", "ClimaLand", "ClimaOcean", "ClimaSea
     ClimaCouplerClimaAtmosExt = ["ClimaAtmos"]
     ClimaCouplerClimaLandExt = ["ClimaLand"]
     ClimaCouplerMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Poppler_jll", "Printf"]
-    ClimaCouplerOceananigansMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
+    ClimaCouplerCMIPMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
 
 [[deps.ClimaDiagnostics]]
 deps = ["Accessors", "ClimaComms", "ClimaCore", "ClimaUtilities", "Dates", "NCDatasets", "NVTX", "OrderedCollections", "SciMLBase"]

@@ -414,7 +414,7 @@ version = "0.1.2"
     ClimaCouplerClimaAtmosExt = ["ClimaAtmos"]
     ClimaCouplerClimaLandExt = ["ClimaLand"]
     ClimaCouplerMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Poppler_jll", "Printf"]
-    ClimaCouplerOceananigansMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
+    ClimaCouplerCMIPMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
 
     [deps.ClimaCoupler.weakdeps]
     CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"

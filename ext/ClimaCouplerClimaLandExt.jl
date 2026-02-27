@@ -33,8 +33,8 @@ using NCDatasets
 import StaticArrays
 import Interpolations
 
-include("climaland/climaland_helpers.jl")
-include("climaland/climaland_bucket.jl")
-include("climaland/climaland_integrated.jl")
+include("ClimaCouplerClimaLandExt/climaland_helpers.jl")
+include("ClimaCouplerClimaLandExt/climaland_bucket.jl")
+include("ClimaCouplerClimaLandExt/climaland_integrated.jl")
 
 end # module

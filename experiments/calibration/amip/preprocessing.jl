@@ -10,8 +10,8 @@ import ClimaCoupler
 Select the `pressure_levels` from `var` if pressure is a dimension of `var`.
 """
 function select_pressure_levels(var, pressure_levels::Vector)
-    @info "Selecting pressure levels: $(pressure_levels) for $(ClimaAnalysis.short_name(var))"
     if ClimaAnalysis.has_pressure(var)
+        @info "Selecting pressure levels: $(pressure_levels) for $(ClimaAnalysis.short_name(var))"
         var = ClimaAnalysis.select(
             var;
             by = ClimaAnalysis.MatchValue(),
@@ -38,7 +38,7 @@ function apply_lat_window(var, lat_left, lat_right)
         left = first_lat_idx,
         right = last_lat_idx,
     )
-    @info "Latitudes of $(ClimaAnalysis.short_name(var)) is $(ClimaAnalysis.latitudes(var))"
+    @info "Windowing latitudes, latitudes of $(ClimaAnalysis.short_name(var)) is $(ClimaAnalysis.latitudes(var))"
     return var
 end
 

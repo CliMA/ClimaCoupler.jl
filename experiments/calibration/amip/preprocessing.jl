@@ -106,8 +106,8 @@ function compute_normalization_stats!(normalization_stats::Dict, var)
                 by = ClimaAnalysis.MatchValue(),
                 pressure_level = pressure_level,
             )
-            var_mean, var_stddev = compute_mean_and_and_stddev(var)
-            normalization_stats[(ClimaAnalysis.short_name(var), pressure_level)] =
+            var_mean, var_stddev = compute_mean_and_and_stddev(var_view_of_pressure_level)
+            normalization_stats[(ClimaAnalysis.short_name(var_view_of_pressure_level), pressure_level)] =
                 (var_mean, var_stddev)
         end
     else
@@ -126,12 +126,16 @@ function apply_normalization_stats!(var::ClimaAnalysis.OutputVar, normalization_
                 by = ClimaAnalysis.MatchValue(),
                 pressure_level = pressure_level,
             )
+
+            (ClimaAnalysis.short_name(var), pressure_level) in keys(normalization_stats) || continue
+
             mean_var, std_var =
                 normalization_stats[(ClimaAnalysis.short_name(var), pressure_level)]
             var_view_of_pressure_level.data .-= mean_var
             var_view_of_pressure_level.data ./= std_var
         end
     else
+        (ClimaAnalysis.short_name(var), nothing) in keys(normalization_stats) || return
         mean_var, std_var = normalization_stats[(ClimaAnalysis.short_name(var), nothing)]
         var.data .-= mean_var
         var.data ./= std_var

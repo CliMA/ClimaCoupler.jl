@@ -149,6 +149,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     # Create observation vector
     (; sample_date_ranges) = CALIBRATE_CONFIG
+    # This computes SVDplusDCovariance matrix (note: do not use with
+    # normalization)
     # observation_vec = make_observation_vector(vars, sample_date_ranges)
     observation_vec = make_scalar_covariance_observation_vector(
         vars,

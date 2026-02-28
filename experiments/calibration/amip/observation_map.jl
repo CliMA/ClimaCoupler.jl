@@ -51,6 +51,7 @@ function preprocess_sim_vars(vars)
     vars = apply_lat_window.(vars, lat_left, lat_right)
 
     if isfile(NORMALIZATION_STATS_FP)
+        # Note: This should not be used with SVDplusDCovariance matrix
         normalization_stats = JLD2.load_object(NORMALIZATION_STATS_FP)
         apply_normalization_stats!.(vars, Ref(normalization_stats))
     end

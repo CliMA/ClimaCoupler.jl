@@ -9,7 +9,8 @@ Run a `sim`ulation that only compute diagnostics.
 """
 function only_diagnostics_run!(sim, t_end)
     (; integrator) = sim
-    diagnostics_handler = integrator.callback.discrete_callbacks[end].affect!.diagnostics_handler
+    diagnostics_handler =
+        integrator.callback.discrete_callbacks[end].affect!.diagnostics_handler
     @info integrator.dt
     while sim.integrator.t < t_end
         sim.integrator.t += integrator.dt

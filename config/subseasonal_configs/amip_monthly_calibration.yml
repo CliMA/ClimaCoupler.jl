@@ -53,7 +53,7 @@ extra_atmos_diagnostics:
   - short_name: [tas, pr, mslp, rsut, rsutcs, rlut, rlutcs, rsdt]
     period: monthly
     reduction_time: average
-  - short_name: [ta, hur]
+  - short_name: [ta, hur, pfull]
     period: monthly
     reduction_time: average
     pressure_coordinates: true

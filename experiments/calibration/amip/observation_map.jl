@@ -50,6 +50,11 @@ function preprocess_sim_vars(vars)
     lat_right = 60
     vars = apply_lat_window.(vars, lat_left, lat_right)
 
+    if isfile(NORMALIZATION_STATS_FP)
+        normalization_stats = JLD2.load_object(NORMALIZATION_STATS_FP)
+        apply_normalization_stats!.(vars, Ref(normalization_stats))
+    end
+
     # Note: We also do not process the time dimension either since we can rely
     # on GEnsembleBuilder to pick out the right times for us
     return vars
@@ -60,7 +65,8 @@ function load_and_preprocess_vars(simdir, short_names)
     for short_name in short_names
         if short_name == "swcre"
             rsut = get(simdir; short_name = "rsut", reduction = "average", period = "1M")
-            rsutcs = get(simdir; short_name = "rsutcs", reduction = "average", period = "1M")
+            rsutcs =
+                get(simdir; short_name = "rsutcs", reduction = "average", period = "1M")
             var = rsutcs - rsut
             ClimaAnalysis.set_short_name!(var, "swcre")
             var = ClimaAnalysis.set_units(var, "W m^-2")
@@ -68,7 +74,8 @@ function load_and_preprocess_vars(simdir, short_names)
             continue
         elseif short_name == "lwcre"
             rlut = get(simdir; short_name = "rlut", reduction = "average", period = "1M")
-            rlutcs = get(simdir; short_name = "rlutcs", reduction = "average", period = "1M")
+            rlutcs =
+                get(simdir; short_name = "rlutcs", reduction = "average", period = "1M")
             var = rlutcs - rlut
             ClimaAnalysis.set_short_name!(var, "lwcre")
             var = ClimaAnalysis.set_units(var, "W m^-2")

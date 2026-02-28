@@ -3,6 +3,7 @@
 
 import ClimaAnalysis
 import ClimaCoupler
+import Statistics
 
 """
     select_pressure_levels(var, pressure_levels::Vector)
@@ -75,4 +76,65 @@ function set_unitless_units!(var)
         var.attributes["units"] = "unitless"
     end
     return var
+end
+
+"""
+    compute_mean_and_and_stddev(normalization_stas, var::ClimaAnalysis.OutputVar)
+
+Generate normalization statistics by computing a single mean and standard
+deviation for `var`.
+"""
+function compute_mean_and_and_stddev(var::ClimaAnalysis.OutputVar)
+    mean_of_var = Statistics.mean(var.data)
+    std_of_var = Statistics.std(var.data)
+    std_of_var ≈ 0.0 && error("Standard deviation is 0.0; check your data")
+    return (mean_of_var, std_of_var)
+end
+
+"""
+    compute_normalization_stats!(normalization_stats::Dict, var)
+
+Return a dictionary mapping (short_name, pressure_level) to (mean, std).
+
+If there is no pressure level, then the `pressure_level` is nothing.
+"""
+function compute_normalization_stats!(normalization_stats::Dict, var)
+    if ClimaAnalysis.has_pressure(var)
+        for pressure_level in ClimaAnalysis.pressures(var)
+            var_view_of_pressure_level = view_select(
+                var,
+                by = ClimaAnalysis.MatchValue(),
+                pressure_level = pressure_level,
+            )
+            var_mean, var_stddev = compute_mean_and_and_stddev(var)
+            normalization_stats[(ClimaAnalysis.short_name(var), pressure_level)] =
+                (var_mean, var_stddev)
+        end
+    else
+        var_mean, var_stddev = compute_mean_and_and_stddev(var)
+        normalization_stats[(ClimaAnalysis.short_name(var), nothing)] =
+            (var_mean, var_stddev)
+    end
+    return nothing
+end
+
+function apply_normalization_stats!(var::ClimaAnalysis.OutputVar, normalization_stats)
+    if ClimaAnalysis.has_pressure(var)
+        for pressure_level in ClimaAnalysis.pressures(var)
+            var_view_of_pressure_level = view_select(
+                var,
+                by = ClimaAnalysis.MatchValue(),
+                pressure_level = pressure_level,
+            )
+            mean_var, std_var =
+                normalization_stats[(ClimaAnalysis.short_name(var), pressure_level)]
+            var_view_of_pressure_level.data .-= mean_var
+            var_view_of_pressure_level.data ./= std_var
+        end
+    else
+        mean_var, std_var = normalization_stats[(ClimaAnalysis.short_name(var), nothing)]
+        var.data .-= mean_var
+        var.data ./= std_var
+    end
+    return nothing
 end

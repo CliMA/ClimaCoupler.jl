@@ -67,6 +67,35 @@ function make_observation_vector(vars, sample_date_ranges)
     return obs_vec
 end
 
+function make_scalar_covariance_observation_vector(
+    vars,
+    sample_date_ranges;
+    scalar = 1.0,
+    use_latitude_weights = true,
+    min_cosd_lat = 0.1,
+)
+    obs_vec = map(sample_date_ranges) do sample_date_range
+        start_date = first(sample_date_range)
+        end_date = last(sample_date_range)
+        @info "Using scalar covariance matrix with"
+        @info "Scalar: $scalar"
+        @info "Latitude weighting: $use_latitude_weights"
+        @info "Min cosd lat: $min_cosd_lat"
+        covar_estimator = ClimaCalibrate.ObservationRecipe.ScalarCovariance(;
+            scalar,
+            use_latitude_weights,
+            min_cosd_lat,
+        )
+        ClimaCalibrate.ObservationRecipe.observation(
+            covar_estimator,
+            vars,
+            start_date,
+            end_date,
+        )
+    end
+    return obs_vec
+end
+
 if abspath(PROGRAM_FILE) == @__FILE__
     # Prevent MPI from being used which is not needed for generating
     # observations
@@ -75,7 +104,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # Create data loaders (constructing these are relatively cheap)
     era5_pl_data_loader = CalibrationTools.ERA5PressureLevelDataLoader()
     ceres_data_loader = CalibrationTools.CERESDataLoader()
-    data_loaders = [era5_pl_data_loader,ceres_data_loader]
+    data_loaders = [era5_pl_data_loader, ceres_data_loader]
 
     (; short_names) = CALIBRATE_CONFIG
     # Map short name to which data loader to use
@@ -87,7 +116,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         idx = findfirst(l -> short_name in l.available_vars, data_loaders)
         !isnothing(idx) && (loader_registry[short_name] = data_loaders[idx])
     end
-    data_loader_non_unique_names  = 
+    data_loader_non_unique_names =
         intersect(ClimaCoupler.CalibrationTools.available_vars.(data_loaders)...)
     any(x -> x in data_loader_non_unique_names, data_loader_non_unique_names) &&
         error("DataLoader variable names are not unique: $data_loaders")
@@ -111,9 +140,23 @@ if abspath(PROGRAM_FILE) == @__FILE__
     lat_right = 60
     vars = apply_lat_window.(vars, lat_left, lat_right)
 
+    # Normalize data
+    normalization_stats = Dict()
+    compute_normalization_stats!.(Ref(normalization_stats), vars)
+    apply_normalization_stats!.(vars, Ref(normalization_stats))
+    (; output_dir) = CALIBRATE_CONFIG
+    JLD2.save_object(NORMALIZATION_STATS_FP, normalization_stats)
+
     # Create observation vector
     (; sample_date_ranges) = CALIBRATE_CONFIG
-    observation_vec = make_observation_vector(vars, sample_date_ranges)
+    # observation_vec = make_observation_vector(vars, sample_date_ranges)
+    observation_vec = make_scalar_covariance_observation_vector(
+        vars,
+        sample_date_ranges;
+        scalar = 1.0,
+        use_latitude_weights = true,
+        min_cosd_lat = 0.1,
+    )
 
     # Save observation vector
     output_path = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "amip")

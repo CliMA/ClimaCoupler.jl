@@ -36,7 +36,8 @@ config_file = joinpath(
 )
 
 # Calibrate only on Jan 1 2010
-sample_date_ranges = [(Dates.DateTime(2010, 10, 1), Dates.DateTime(2010, 10, 1)) for _ in 1:6]
+sample_date_ranges =
+    [(Dates.DateTime(2010, 10, 1), Dates.DateTime(2010, 10, 1)) for _ in 1:6]
 
 const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     config_file,
@@ -56,9 +57,12 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
 # Units: Pa (not hPa)
 const PRESSURE_LEVELS = 100.0 .* [200.0, 500.0, 850.0]
 
+const NORMALIZATION_STATS_FP =
+    joinpath(CALIBRATE_CONFIG.output_dir, "normalization_stats.jld2")
+
 const CALIBRATION_PRIORS = [
     # Atmospheric parameters
-     # Atmospheric parameters
+    # Atmospheric parameters
     # PD.constrained_gaussian("entr_inv_tau", 0.002, 0.001, 0.0, 0.01),
 
     # PiGroup linear regression coefficients
@@ -75,7 +79,6 @@ const CALIBRATION_PRIORS = [
     PD.constrained_gaussian("precipitation_timescale", 1200, 300, 300, 2400),
     # PD.constrained_gaussian("diagnostic_covariance_coeff", 2.1, 0.5, 0.0, 10.0),
     PD.constrained_gaussian("Tq_correlation_coefficient", 0.4, 0.4, -1.0, 1.0),
-
     PD.constrained_gaussian("mixing_length_eddy_viscosity_coefficient", 0.2, 0.1, 0, 1.0),
     PD.constrained_gaussian("mixing_length_diss_coeff", 0.22, 0.15, 0.0, 10.0),
     PD.constrained_gaussian("mixing_length_tke_surf_flux_coeff", 8.0, 4.0, 0, 100.0),

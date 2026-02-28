@@ -34,16 +34,6 @@ import ClimaCalibrate
 using Dates: Date, Second
 using Pkg
 
-include(
-    joinpath(
-        pkgdir(ClimaCoupler),
-        "experiments",
-        "calibration",
-        "amip",
-        "fake_setup_and_run.jl",
-    ),
-)
-
 # Include run_calibration.jl only if CALIBRATE_CONFIG is not already defined
 # This allows other pipelines to include their own run_calibration.jl first
 if !@isdefined(CALIBRATE_CONFIG)

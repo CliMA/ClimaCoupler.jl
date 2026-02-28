@@ -1,6 +1,5 @@
 import ClimaCoupler
 import ClimaDiagnostics
-include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.jl"))
 
 """
     only_diagnostics_run!(sim, t_end)

@@ -51,6 +51,7 @@ end
         parameter_files = [],
         land_ic_path::Union{Nothing,String} = nothing,
         lai_source::String = "modis_monthly",
+        gustiness::FT = FT(1),
     ) where {FT, TT <: Union{Float64, ITime}}
 
 Creates a ClimaLandSimulation object containing a land domain,
@@ -85,6 +86,7 @@ function ClimaLandSimulation(
     coupled_param_dict = CP.create_toml_dict(FT),
     land_ic_path::Union{Nothing, String} = nothing,
     lai_source::String = "modis_monthly",
+    gustiness::FT = FT(1),
     extra_kwargs...,
 ) where {FT, TT <: Union{Float64, ITime}}
     # Get default land parameters from ClimaLand.LandParameters
@@ -120,7 +122,7 @@ function ClimaLandSimulation(
 
     # Set up atmosphere and radiation forcing
     forcing = (;
-        atmos = CL.CoupledAtmosphere{FT}(surface_space, atmos_h),
+        atmos = CL.CoupledAtmosphere{FT, typeof(atmos_h)}(atmos_h, gustiness),
         radiation = CL.CoupledRadiativeFluxes{FT}(
             start_date;
             latitude = CC.Fields.coordinate_field(domain.space.surface).lat,
@@ -360,7 +362,7 @@ function ClimaLandSimulation(
     jacobian! = CL.make_jacobian(model)
 
     # set up jacobian info
-    jac_kwargs = (; jac_prototype = CL.FieldMatrixWithSolver(Y), Wfact = jacobian!)
+    jac_kwargs = (; jac_prototype = CL.initialize_jacobian(Y), Wfact = jacobian!)
 
     prob = SciMLBase.ODEProblem(
         CTS.ClimaODEFunction(

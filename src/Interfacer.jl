@@ -145,19 +145,16 @@ default_coupler_fields() = [
 """
     init_coupler_fields(FT, coupler_field_names, boundary_space)
 
-Allocate a Field of NamedTuples on the provided boundary space to store
+Allocate a NamedTuple of Fields on the provided boundary space to store
 the provided coupler fields.
 """
 function init_coupler_fields(FT, coupler_field_names, boundary_space)
     # First remove any duplicate field names
     unique!(coupler_field_names)
 
-    key_types = (coupler_field_names...,)
-    val_types = Tuple{(FT for _ in 1:length(coupler_field_names))...}
-
-    nt_type = NamedTuple{key_types, val_types}
-    coupler_fields = zeros(nt_type, boundary_space)
-    return coupler_fields
+    keys = Tuple(coupler_field_names)
+    vals = ntuple(_ -> zeros(FT, boundary_space), length(coupler_field_names))
+    return NamedTuple{keys}(vals)
 end
 
 """
@@ -667,7 +664,7 @@ AtmosSimulation(::Val{model_type}; kwargs...) where {model_type} =
 Return the `ClimaCore.Field` over which the exchange fields are defined.
 """
 function boundary_space(sim::CoupledSimulation)
-    return axes(sim.fields)
+    return axes(first(sim.fields))
 end
 
 """
@@ -676,7 +673,7 @@ end
 Return the `ClimaComms.context` associated to the simulation.
 """
 function ClimaComms.context(sim::CoupledSimulation)
-    return ClimaComms.context(sim.fields)
+    return ClimaComms.context(first(sim.fields))
 end
 
 """
@@ -685,7 +682,7 @@ end
 Return the `ClimaComms.device` associated to the simulation.
 """
 function ClimaComms.device(sim::CoupledSimulation)
-    return ClimaComms.device(sim.fields)
+    return ClimaComms.device(first(sim.fields))
 end
 
 """

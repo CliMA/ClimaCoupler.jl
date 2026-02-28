@@ -16,9 +16,10 @@ extra_atmos_diagnostics:
     pressure_coordinates: true
     compute_every: 6hours
 initial_condition: "AMIPFromERA5"
-insolation: "timevarying"
 mode_name: "amip"
 netcdf_interpolate_z_over_msl: true
+ode_algo: "ARS232"
+output_default_diagnostics: true
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"

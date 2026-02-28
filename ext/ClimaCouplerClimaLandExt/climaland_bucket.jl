@@ -61,6 +61,7 @@ function BucketSimulation(
     bucket_initial_condition::String = "",
     era5_albedo_file_path::Union{Nothing, String} = nothing,
     coupled_param_dict = CP.create_toml_dict(FT),
+    gustiness::FT = FT(1),
     extra_kwargs...,
 ) where {FT, TT <: Union{Float64, ITime}}
     # Get default land parameters from ClimaLand.LandParameters
@@ -137,7 +138,7 @@ function BucketSimulation(
 
     args = (
         params,
-        CL.CoupledAtmosphere{FT}(surface_space, atmos_h),
+        CL.CoupledAtmosphere{FT, typeof(atmos_h)}(atmos_h, gustiness),
         CL.CoupledRadiativeFluxes{FT}(),
         domain,
     )

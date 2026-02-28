@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Advection-diffusion on a Sphere · CouplerMachine</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="CouplerMachine logo"/></a><div class="docs-package-name"><span class="docs-autofit">CouplerMachine</span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../simple_2testcomp/">Vertical Column Heat Diffusion</a></li><li class="is-active"><a class="tocitem" href>Advection-diffusion on a Sphere</a><ul class="internal"><li><a class="tocitem" href="#Setup"><span>Setup</span></a></li><li><a class="tocitem" href="#Equations"><span>Equations</span></a></li><li class="toplevel"><a class="tocitem" href="#Import-packages"><span>Import packages</span></a></li><li class="toplevel"><a class="tocitem" href="#Set-simulation-parameters"><span>Set simulation parameters</span></a></li><li class="toplevel"><a class="tocitem" href="#Set-up-coupled-model"><span>Set up coupled model</span></a></li><li class="toplevel"><a class="tocitem" href="#Run-simulation"><span>Run simulation</span></a></li></ul></li></ul></li><li><span class="tocitem">Coupler Interface</span><ul><li><a class="tocitem" href="../../couplerstate/">Coupler State</a></li><li><a class="tocitem" href="../../timestepping/">Coupled Timestepping</a></li><li><a class="tocitem" href="../../coupledmodel/">Coupled Model Components</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Advection-diffusion on a Sphere</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Advection-diffusion on a Sphere</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/CliMA/CouplerMachine/blob/master/experiments/ClimateMachine/AdvectionDiffusion/run_script_v2.jl" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Advection-diffusion-on-a-Sphere"><a class="docs-heading-anchor" href="#Advection-diffusion-on-a-Sphere">Advection-diffusion on a Sphere</a><a id="Advection-diffusion-on-a-Sphere-1"></a><a class="docs-heading-anchor-permalink" href="#Advection-diffusion-on-a-Sphere" title="Permalink"></a></h1><h2 id="Setup"><a class="docs-heading-anchor" href="#Setup">Setup</a><a id="Setup-1"></a><a class="docs-heading-anchor-permalink" href="#Setup" title="Permalink"></a></h2><ul><li>Passive advection of an anomaly using non-divergent horizontal flow on the sphere (currently 300km/s but switching to Williamson stream function)</li><li>Homogeneous tracer concentration of the outer shell couples to an inhomogeneous concentration of the inner shell</li></ul><h2 id="Equations"><a class="docs-heading-anchor" href="#Equations">Equations</a><a id="Equations-1"></a><a class="docs-heading-anchor-permalink" href="#Equations" title="Permalink"></a></h2><p>The RHS evaluation follows:</p><p class="math-container">\[\frac{\partial \theta}{\partial t} = - \nabla \cdot (\vec{u} \theta + \kappa \nabla \theta) \qquad\]</p><p>where</p><ul><li><span>$\theta$</span> is the tracer (e.g. potential temperature)</li><li><span>$\vec{u}(u,0,0)$</span> is a constant zonal velocity</li><li><span>$\kappa$</span> is the diffusivity tensor.</li></ul><p><strong>Boundary Conditions</strong></p><ul><li>External boundary conditions (Neumann):</li></ul><p class="math-container">\[\vec{n} \cdot \kappa \nabla \theta = 0 \qquad \text{at } z = 4\text{km}, -4\text{km}\]</p><p>where <span>$\vec{n}$</span> is the upward pointing unit normal vector at the boundary.</p><ul><li>Primary coupled boundary condition (forced by secondary domain):</li></ul><p class="math-container">\[\vec{n} \cdot \kappa_a \nabla \theta =f_a= \lambda (\theta - \theta_{secondary}) \qquad \text{at atmos } z = 0\]</p><p>where <span>$\lambda$</span> is a constant but will be replaced by a roughness coefficient factor in more complex test cases. <span>$f_a$</span> and <span>$\kappa_a$</span> are, respectively, the flux and diffusivity of the atmosphere component.</p><ul><li>Secondary coupled boundary condition (accumulated flux by primary domain or prescribed flux):</li></ul><p>If accumulated,</p><p class="math-container">\[\vec{n} \cdot \kappa_o\nabla \theta = f_o \qquad \text{at ocean } z = 0 \text{ (or pseudo subsurface)}
+and\]</p><p class="math-container">\[f_o = f_{accum} = \int_{\tau_0}^{\tau} f_a dt\]</p><p>where <span>$τ-τ_0$</span> gives the coupling cycle length. <span>$f_o$</span> and <span>$\kappa_o$</span> are, respectively, the flux and diffusivity of the atmosphere component, with <span>$f_{accum}$</span> being the accumulated flux.</p><pre><code class="language-none">ATMOS
+------------- θ @z=0 [lowest atmos level]
+  A
+ / \          f = n⋅κ_a ∇θ = λ(θ−θ_secondary​)
+  |
+------------- θ_secondary​ @z=0 [highest ocean level]
+OCEAN</code></pre><h1 id="Import-packages"><a class="docs-heading-anchor" href="#Import-packages">Import packages</a><a id="Import-packages-1"></a><a class="docs-heading-anchor-permalink" href="#Import-packages" title="Permalink"></a></h1><pre><code class="language-">using ClimateMachine, MPI
+using ClimateMachine.DGMethods.NumericalFluxes
+using ClimateMachine.DGMethods
+
+using ClimateMachine.ODESolvers
+using ClimateMachine.ODESolvers: solve!
+
+using ClimateMachine.Atmos: SphericalOrientation, latitude, longitude, AtmosFilterPerturbations
+
+using CLIMAParameters
+using CLIMAParameters.Planet: MSLP, R_d, day, grav, Omega, planet_radius
+
+using ClimateMachine.Mesh.Filters
+
+using ClimateMachine.BalanceLaws:
+    BalanceLaw,
+    AbstractStateType,
+    Prognostic,
+    Auxiliary,
+    Gradient,
+    GradientFlux,
+    GradientLaplacian,
+    Hyperdiffusive,
+    UpwardIntegrals,
+    DownwardIntegrals,
+    vars_state,
+    number_states
+
+using CouplerMachine
+
+using Unitful
+using Dates: DateTime
+using Statistics
+using StaticArrays
+
+struct EarthParameterSet &lt;: AbstractEarthParameterSet end
+const param_set = EarthParameterSet()
+
+ClimateMachine.init()
+FT = Float64
+
+## Shared functions
+include(&quot;domains.jl&quot;)
+include(&quot;abstractions.jl&quot;)
+include(&quot;callbacks.jl&quot;)
+
+# Main balance law and its components
+include(&quot;CplMainBL.jl&quot;)</code></pre><h1 id="Set-simulation-parameters"><a class="docs-heading-anchor" href="#Set-simulation-parameters">Set simulation parameters</a><a id="Set-simulation-parameters-1"></a><a class="docs-heading-anchor-permalink" href="#Set-simulation-parameters" title="Permalink"></a></h1><pre><code class="language-">nstepsA = 10
+nstepsO = 5
+
+#  Background atmos and ocean diffusivities
+const κᵃʰ = FT(1e4) * 0.0
+const κᵃᶻ = FT(1e-1)
+const κᵒʰ = FT(1e3) * 0.0
+const κᵒᶻ = FT(1e-4)
+const τ_airsea = FT(60 * 86400)
+const L_airsea = FT(500)
+const λ_airsea = FT(L_airsea / τ_airsea)
+coupling_lambda() = (λ_airsea)
+const u_max = FT(1e-5) # max. advective velocity in radians</code></pre><h1 id="Set-up-coupled-model"><a class="docs-heading-anchor" href="#Set-up-coupled-model">Set up coupled model</a><a id="Set-up-coupled-model-1"></a><a class="docs-heading-anchor-permalink" href="#Set-up-coupled-model" title="Permalink"></a></h1><p>Define component models and initialize the coupler</p><pre><code class="language-julia">function main(::Type{FT}) where {FT}
+
+    # Domain - Spherical Shells
+    # confusing name - better might be to use something like DeepSphericalShellDomain directly?
+    ΩO = DeepSphericalShellDomain(radius = FT(planet_radius(param_set)) - FT(4e3), height = FT(4e3))
+    ΩA = DeepSphericalShellDomain(radius = FT(planet_radius(param_set)) , height = FT(4e3))
+
+    # Grid
+    nelem = (;horizontal = 8, vertical = 4)
+    polynomialorder = (;horizontal = 5, vertical = 5)
+    overintegrationorder = (;horizontal = 1, vertical = 1)
+
+    gridA = DiscontinuousSpectralElementGrid(ΩA, nelem, polynomialorder)
+    gridO = DiscontinuousSpectralElementGrid(ΩO, nelem, polynomialorder)
+
+    # Numerics-specific options
+    numerics = (NFfirstorder = CentralNumericalFluxFirstOrder(), NFsecondorder = PenaltyNumFluxDiffusive(),
+                overint_params = (overintegrationorder, polynomialorder))
+
+    # Timestepping
+    Δt_ = calculate_dt(gridA, wavespeed = u_max*(ΩA.radius), diffusivity = maximum([κᵃʰ, κᵃᶻ]) )
+
+    t_time, end_time = ( 0  , 20Δt_ )
+
+    # Collect spatial info, timestepping, balance law and DGmodel for the two components
+    boundary_mask( xc, yc, zc ) = @. ( xc^2 + yc^2 + zc^2 )^0.5 ≈ planet_radius(param_set)</code></pre><p><strong>1.</strong> Atmos component</p><pre><code class="language-julia">    # Prop atmos functions to override defaults
+    atmos_structure(λ, ϕ, r) = FT(30)#30.0 + 10.0 * cos(ϕ) * sin(5λ)
+    atmos_θⁱⁿⁱᵗ(npt, el, x, y, z) = atmos_structure( lon(x,y,z), lat(x,y,z), rad(x,y,z) )                # Set atmosphere initial state function
+    ##atmos_θ_shadowflux(θᵃ, θᵒ, npt, el, xc, yc, zc) = FT(0.0)
+    atmos_θ_shadowflux(θᵃ, θᵒ, npt, el, xc, yc, zc) = is_surface(xc,yc,zc) ? (1.0 / τ_airsea) * (θᵃ - θᵒ) : 0.0 # Set atmosphere shadow boundary flux function
+    atmos_calc_kappa_diff(_...) = κᵃʰ, κᵃʰ, κᵃᶻ               # Set atmos diffusion coeffs
+    atmos_source_θ(θᵃ, npt, el, xc, yc, zc, θᵒ) = FT(0.0)     # Set atmos source!
+    atmos_get_penalty_tau(_...) = FT(3.0 * 0.0)               # Set penalty term tau (for debugging)
+
+    ## Set atmos advective velocity (constant in time) and convert to Cartesian
+    uˡᵒⁿ(λ, ϕ, r) = u_max * r * cos(ϕ)
+    atmos_uⁱⁿⁱᵗ(npt, el, x, y, z) = (     0 * r̂(x,y,z)
+                                        + 0 * ϕ̂(x,y,z)
+                                        + uˡᵒⁿ(lon(x,y,z), lat(x,y,z), rad(x,y,z)) * λ̂(x,y,z) )
+
+    # Collect atmos props
+    bl_propA = prop_defaults()
+    bl_propA = (;bl_propA...,
+                init_theta = atmos_θⁱⁿⁱᵗ,
+                theta_shadow_boundary_flux = atmos_θ_shadowflux,
+                calc_kappa_diff = atmos_calc_kappa_diff,
+                source_theta = atmos_source_θ,
+                get_penalty_tau = atmos_get_penalty_tau,
+                coupling_lambda = coupling_lambda,
+                init_u = atmos_uⁱⁿⁱᵗ
+                )
+    # Setup atmos component model
+    mA = CplModel(;
+        grid = gridA,
+        equations = CplMainBL(
+            bl_propA,
+            (CoupledPrimaryBoundary(), ExteriorBoundary()),
+            param_set,
+        ),
+        boundary_z = boundary_mask,
+        nsteps = nstepsA,
+        dt = Δt_/ nstepsA,
+        timestepper = LSRK54CarpenterKennedy,
+        numerics...,
+    )</code></pre><p><strong>2.</strong> Ocean component</p><pre><code class="language-julia">    # Prop ocean functions to override defaults
+    tropical_heating_1(λ, ϕ, r) = 30.0 + 10.0 * cos(ϕ) * sin(5λ)
+    tropical_heating_2(λ, ϕ, r) = 30.0 + 10.0 * cos(ϕ) + 1 * sin(5λ) * cos(ϕ)
+    tropical_heating(λ, ϕ, r) = tropical_heating_1(λ, ϕ, r)
+    ocean_θⁱⁿⁱᵗ(npt, el, x, y, z) = tropical_heating( lon(x,y,z), lat(x,y,z), rad(x,y,z) )                    # Set ocean initial state function
+    ocean_calc_kappa_diff(_...) = κᵒʰ, κᵒʰ, κᵒᶻ               # Set ocean diffusion coeffs
+    ocean_source_θ(θᵃ, npt, el, xc, yc, zc, θᵒ) = FT(0.0)     # Set ocean source!
+    ocean_get_penalty_tau(_...) = FT(0.15 * 0.0)               # Set penalty term tau (for debugging)
+    ocean_uⁱⁿⁱᵗ(xc, yc, zc, npt, el) = SVector(FT(0.0), FT(0.0), FT(0.0)) # Set ocean advective velocity
+
+    # Collect ocean props
+    bl_propO = prop_defaults()
+    bl_propO = (;bl_propO...,
+                init_theta = ocean_θⁱⁿⁱᵗ,
+                calc_kappa_diff = ocean_calc_kappa_diff,
+                source_theta = ocean_source_θ,
+                get_penalty_tau = ocean_get_penalty_tau,
+                coupling_lambda = coupling_lambda,
+                init_u = ocean_uⁱⁿⁱᵗ,
+                )
+    # Setup ocean component model
+    mO = CplModel(;
+        grid = gridO,
+        equations = CplMainBL(
+            bl_propO,
+            (ExteriorBoundary(), CoupledSecondaryBoundary()),
+            param_set,
+        ),
+        boundary_z = boundary_mask,
+        nsteps = nstepsO,
+        dt = Δt_ / nstepsO,
+        timestepper = LSRK54CarpenterKennedy,
+        numerics...,
+    )</code></pre><p>Create the coupler object for holding import/export fields and performs mappings and instantiate the coupled timestepper:</p><pre><code class="language-">    coupler = CplState()
+    coupler_register!(coupler, :Ocean_SST, deepcopy(mO.state.θ[mO.boundary]), mO.grid, DateTime(0), u&quot;°C&quot;)
+    coupler_register!(coupler, :Atmos_MeanAirSeaθFlux, deepcopy(mA.state.F_accum[mA.boundary]), mA.grid, DateTime(0), u&quot;°C&quot;)</code></pre><p>Instantiate a coupled timestepper that steps forward the components and implements mapings between components export bondary states and other components imports.</p><pre><code class="language-julia">    compA = (pre_step = preatmos, component_model = mA, post_step = postatmos)
+    compO = (pre_step = preocean, component_model = mO, post_step = postocean)
+    component_list = (atmosphere = compA, ocean = compO)
+    cpl_solver = CplSolver(
+        component_list = component_list,
+        coupler = coupler,
+        coupling_dt = Δt_,
+        t0 = 0.0,
+    )</code></pre><p>Creat callbacks and bundle the simulation:</p><pre><code class="language-">    # For now applying callbacks only to atmos.
+    callbacks = (
+        ExponentialFiltering(),
+        VTKOutput((
+            iteration = string(5Δt_)*&quot;ssecs&quot; ,
+            overdir =&quot;output&quot;,
+            overwrite = true,
+            number_sample_points = 0
+            )...,),
+    )
+
+    simulation = (;
+        coupled_odesolver = cpl_solver,
+        odesolver = cpl_solver.component_list.atmosphere.component_model.stepper,
+        state = cpl_solver.component_list.atmosphere.component_model.state,
+        dgmodel =  cpl_solver.component_list.atmosphere.component_model.discretization,
+        callbacks = callbacks,
+        simtime = (t_time, end_time),
+        name = &quot;Coupler_UnitTest_ctrl&quot;,
+        )
+
+    return simulation
+end
+
+
+function run(cpl_solver, numberofsteps, cbvector)
+    # Run the model
+    solve!(
+        nothing,
+        cpl_solver;
+        numberofsteps = numberofsteps,
+        callbacks = cbvector,
+    )
+end</code></pre><h1 id="Run-simulation"><a class="docs-heading-anchor" href="#Run-simulation">Run simulation</a><a id="Run-simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Run-simulation" title="Permalink"></a></h1><pre><code class="language-">simulation = main(Float64);
+nsteps = Int(simulation.simtime[2] / simulation.coupled_odesolver.dt)
+cbvector = create_callbacks(simulation, simulation.odesolver)
+println(&quot;Initialized. Running...&quot;)
+@time run(simulation.coupled_odesolver, nsteps, cbvector)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../simple_2testcomp/">« Vertical Column Heat Diffusion</a><a class="docs-footer-nextpage" href="../../couplerstate/">Coupler State »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 14 September 2021 22:59">Tuesday 14 September 2021</span>. Using Julia version 1.5.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

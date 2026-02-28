@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Ocean Model · ClimaCoupler.jl</title><script data-outdated-warner src="../../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../../assets/documenter.js"></script><script src="../../../siteinfo.js"></script><script src="../../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../../"><img src="../../../assets/logo.svg" alt="ClimaCoupler.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../../">ClimaCoupler.jl</a></span></div><form class="docs-search" action="../../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../../">Home</a></li><li><span class="tocitem">Examples</span><ul><li><input class="collapse-toggle" id="menuitem-2-1" type="checkbox" checked/><label class="tocitem" for="menuitem-2-1"><span class="docs-label">Sea Breeze</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../atmos_rhs/">Atmospheric Model</a></li><li><a class="tocitem" href="../land_rhs/">Land Model</a></li><li class="is-active"><a class="tocitem" href>Ocean Model</a><ul class="internal"><li><a class="tocitem" href="#Slab-Ocean-ODE"><span>Slab Ocean ODE</span></a></li><li><a class="tocitem" href="#Model-Code"><span>Model Code</span></a></li><li><a class="tocitem" href="#Coupled-Ocean-Wrappers"><span>Coupled Ocean Wrappers</span></a></li></ul></li><li><a class="tocitem" href="../run/">Coupled Sea Breeze</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-2-2" type="checkbox"/><label class="tocitem" for="menuitem-2-2"><span class="docs-label">AMIP</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../amip/run_amip/">AMIP Driver</a></li></ul></li></ul></li><li><span class="tocitem">Coupler Interface</span><ul><li><a class="tocitem" href="../../../input/">Input</a></li><li><a class="tocitem" href="../../../checkpointer/">Checkpointer</a></li><li><a class="tocitem" href="../../../conservation/">Conservation Checks</a></li><li><a class="tocitem" href="../../../fieldexchanger/">FieldExchanger</a></li><li><a class="tocitem" href="../../../fluxcalculator/">FluxCalculator</a></li><li><a class="tocitem" href="../../../interfacer/">Interfacer</a></li><li><a class="tocitem" href="../../../models/">Models</a></li><li><a class="tocitem" href="../../../simcoordinator/">SimCoordinator</a></li><li><a class="tocitem" href="../../../timemanager/">TimeManager</a></li><li><a class="tocitem" href="../../../utilities/">Utilities</a></li><li><a class="tocitem" href="../../../simoutput/">SimOutput</a></li><li><a class="tocitem" href="../../../plotting/">Plotting</a></li><li><a class="tocitem" href="../../../calibrationtools/">CalibrationTools</a></li></ul></li><li><span class="tocitem">Performance</span><ul><li><a class="tocitem" href="../../../performance/">Performance Analysis Tools</a></li></ul></li><li><span class="tocitem">Model Output</span><ul><li><a class="tocitem" href="../../../diagnostics/">Diagnostics</a></li><li><a class="tocitem" href="../../../leaderboard/">Leaderboard</a></li></ul></li><li><a class="tocitem" href="../../../contributing/">Contributing</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li><a class="is-disabled">Sea Breeze</a></li><li class="is-active"><a href>Ocean Model</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Ocean Model</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/CliMA/ClimaCoupler.jl/blob/main/docs/src/generated/sea_breeze/ocean_rhs.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Ocean-Model"><a class="docs-heading-anchor" href="#Ocean-Model">Ocean Model</a><a id="Ocean-Model-1"></a><a class="docs-heading-anchor-permalink" href="#Ocean-Model" title="Permalink"></a></h1><pre><code class="language-julia hljs">import DiffEqCallbacks
+import SciMLBase
+import ClimaCore as CC
+import ClimaTimeSteppers as CTS</code></pre><p>Load coupled simulation code</p><pre><code class="language-julia hljs">include(&quot;../CoupledSims/coupled_sim.jl&quot;)</code></pre><h2 id="Slab-Ocean-ODE"><a class="docs-heading-anchor" href="#Slab-Ocean-ODE">Slab Ocean ODE</a><a id="Slab-Ocean-ODE-1"></a><a class="docs-heading-anchor-permalink" href="#Slab-Ocean-ODE" title="Permalink"></a></h2><p>For our ocean component, we solve a simple slab ocean ODE just as we did for the land:</p><p class="math-container">\[\rho_o c_o H_o \partial_t T_{ocn} = - F_{integ} / \Delta t_{coupler}\]</p><ul><li>where <span>$\rho_o = 1025$</span> kg m <span>$^{-3}$</span>, <span>$c_o=3850$</span> J K <span>$^{-1}$</span> kg <span>$^{-1}$</span>, <span>$H_o = 100$</span> m are the density, specific heat and depth of the ocean,</li><li>and <span>$F_{integ}$</span> is the integrated surface fluxes in time.</li></ul><h2 id="Model-Code"><a class="docs-heading-anchor" href="#Model-Code">Model Code</a><a id="Model-Code-1"></a><a class="docs-heading-anchor-permalink" href="#Model-Code" title="Permalink"></a></h2><pre><code class="language-julia hljs">function ocn_rhs!(du, u, (parameters, F_accumulated), t)
+    &quot;&quot;&quot;
+    Slab layer equation
+        d(T_sfc)/dt = - (F_accumulated) / (h_ocn * ρ_ocn * c_ocn)
+        where
+            F_accumulated = F_integrated / Δt_coupler
+    &quot;&quot;&quot;
+    (; ocn_h, ocn_ρ, ocn_c) = parameters
+    (; T_sfc) = du
+
+    @. T_sfc = (-F_accumulated) / (ocn_h * ocn_ρ * ocn_c)
+end
+
+# set up domain
+function hspace_1D(xlim = (-π, π), npoly = 0, helem = 10)
+    FT = Float64
+
+    domain = CC.Domains.IntervalDomain(
+        CC.Geometry.XPoint{FT}(xlim[1]) .. CC.Geometry.XPoint{FT}(xlim[2]),
+        periodic = true,
+    )
+    mesh = CC.Meshes.IntervalMesh(domain; nelems = helem)
+    topology = CC.Topologies.IntervalTopology(mesh)
+
+    # Finite Volume Approximation: Gauss-Lobatto with 1pt per element
+    quad = CC.Spaces.Quadratures.GL{npoly + 1}()
+    space = CC.Spaces.SpectralElementSpace1D(topology, quad)
+
+    return space
+end
+
+# init simulation
+function ocn_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
+
+    # construct domain spaces - get only surface layer (NB: z should be zero, not z = first central height)
+    space = hspace_1D((xmin, xmax), npoly, helem)
+    coords = CC.Fields.coordinate_field(space)
+    domain = space
+
+    # initial condition
+    T_sfc = map(coords) do coord
+        T_sfc = 257.0
+    end
+
+    # prognostic variable
+    Y = CC.Fields.FieldVector(T_sfc = T_sfc)
+
+    return Y, domain
+end</code></pre><h2 id="Coupled-Ocean-Wrappers"><a class="docs-heading-anchor" href="#Coupled-Ocean-Wrappers">Coupled Ocean Wrappers</a><a id="Coupled-Ocean-Wrappers-1"></a><a class="docs-heading-anchor-permalink" href="#Coupled-Ocean-Wrappers" title="Permalink"></a></h2><pre><code class="language-julia hljs"># Ocean Simulation - Later to live in Oceananigans
+struct OceanSim &lt;: AbstractOceanSim
+    integrator::Any
+end
+
+function OceanSim(
+    Y_init,
+    t_start,
+    dt,
+    t_end,
+    timestepper,
+    p,
+    saveat,
+    callbacks = DiffEqCallbacks.CallbackSet(),
+)
+    ode_algo = CTS.ExplicitAlgorithm(timestepper)
+    ode_function = CTS.ClimaODEFunction(T_exp! = ocn_rhs!)
+
+    problem = SciMLBase.ODEProblem(ode_function, Y_init, (t_start, t_end), p)
+    ocn_integ = SciMLBase.init(
+        problem,
+        ode_algo,
+        dt = dt,
+        saveat = saveat,
+        adaptive = false,
+        callback = callbacks,
+    )
+
+    return OceanSim(ocn_integ)
+end
+
+function coupler_push!(coupler::CouplerState, ocean::OceanSim)
+    coupler_put!(coupler, :T_sfc_ocean, ocean.integrator.u.T_sfc, ocean)
+end
+
+function coupler_pull!(ocean::OceanSim, coupler::CouplerState)
+    coupler_get!(ocean.integrator.p.F_sfc, coupler, :F_sfc, ocean)
+    ocean.integrator.p.F_sfc ./= coupler.Δt_coupled
+end</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../land_rhs/">« Land Model</a><a class="docs-footer-nextpage" href="../run/">Coupled Sea Breeze »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.25 on <span class="colophon-date" title="Tuesday 24 February 2026 20:15">Tuesday 24 February 2026</span>. Using Julia version 1.11.9.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

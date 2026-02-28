@@ -169,9 +169,9 @@ function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, i
         end
 
         # Note that this is the same as before
-        lat_left = -60
+        lat_left = 20
         lat_right = 60
-        var = apply_lat_window(var, lat_left, lat_right)
+        var = first(apply_lat_window([var], lat_left, lat_right))
 
         EnsembleBuilder.fill_g_ens_col!(
             g_ens_builder,

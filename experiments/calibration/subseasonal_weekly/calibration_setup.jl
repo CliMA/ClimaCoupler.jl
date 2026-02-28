@@ -4,7 +4,7 @@ import EnsembleKalmanProcesses as EKP
 
 const CALIBRATION_PRIORS = [
     # Atmospheric parameters
-    PD.constrained_gaussian("entr_inv_tau", 0.002, 0.001, 0.0, 0.01),
+    # PD.constrained_gaussian("entr_inv_tau", 0.002, 0.001, 0.0, 0.01),
 
     # PiGroup linear regression coefficients
     # PD.ParameterDistribution(
@@ -14,7 +14,7 @@ const CALIBRATION_PRIORS = [
     # ),
 
     # PD.constrained_gaussian("detr_buoy_coeff", 0.12, 0.06, 0.0, 1.0),
-    PD.constrained_gaussian("detr_vertdiv_coeff", 1, 0.25, 0.0, 5.0),
+    # PD.constrained_gaussian("detr_vertdiv_coeff", 1, 0.25, 0.0, 5.0),
     # PD.constrained_gaussian("EDMF_surface_area", 0.1, 0.03, 0, 1),
 
     PD.constrained_gaussian("precipitation_timescale", 1200, 300, 300, 2400),
@@ -37,7 +37,7 @@ const CALIBRATION_PRIORS = [
 
 const CALIBRATION_PRIOR = EKP.combine_distributions(CALIBRATION_PRIORS)
 
-const CALIBRATION_ENSEMBLE_SIZE = 17  # For TransformUnscented: 2*n_params+1
+const CALIBRATION_ENSEMBLE_SIZE = 13  # For TransformUnscented: 2*n_params+1
 
 const CALIBRATION_RNG_SEED = 42
 

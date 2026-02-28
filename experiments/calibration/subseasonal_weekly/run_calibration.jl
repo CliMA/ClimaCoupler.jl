@@ -38,6 +38,7 @@ const N_ITERATIONS = 4
 # Repeat the date range for each iteration until we're using multiple months
 sample_date_ranges = fill(BASE_DATE_RANGE, N_ITERATIONS)
 
+
 # Directory containing ERA5 weekly observation files (not used for CERES-only runs)
 const ERA5_OBS_DIR = "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/daily_weekly_stats/weekly"
 
@@ -52,7 +53,7 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     sample_date_ranges,
     extend = Dates.Day(0),
     spinup = Dates.Day(7),
-    output_dir = "/glade/derecho/scratch/zhaoyi/calibration/weekly/exp4",
+    output_dir = "/glade/derecho/scratch/zhaoyi/calibration/weekly/exp6",
     rng_seed = 42,
 )
 

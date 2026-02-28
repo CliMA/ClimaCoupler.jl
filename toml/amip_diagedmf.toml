@@ -34,17 +34,17 @@ type = "float"
 #value = 0.8490142904088219
 #type = "float"
 
-#[entr_inv_tau]
-#value = 0.00010586970154632861
-#type = "float"
+[entr_inv_tau]
+value = 0.0015
+type = "float"
 
 [detr_inv_tau]
 value = 0
 type = "float"
 
-#[detr_vertdiv_coeff]
-#value = 0.8
-#type = "float"
+[detr_vertdiv_coeff]
+value = 0.8
+type = "float"
 
 [detr_buoy_coeff]
 value = 0.12274545130376595

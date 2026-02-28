@@ -17,14 +17,13 @@ const CALIBRATION_PRIORS = [
     # PD.constrained_gaussian("detr_vertdiv_coeff", 0.6, 0.25, 0.0, 5.0),
     # PD.constrained_gaussian("EDMF_surface_area", 0.1, 0.03, 0, 1),
 
-    # PD.constrained_gaussian("precipitation_timescale", 600, 300, 100, 2000),
-    # PD.constrained_gaussian("precipitation_timescale", 1200, 300, 300, 2400),
-    PD.constrained_gaussian("diagnostic_covariance_coeff", 2.1, 0.5, 0.0, 10.0),
+    PD.constrained_gaussian("precipitation_timescale", 1200, 300, 300, 2400),
+    # PD.constrained_gaussian("diagnostic_covariance_coeff", 2.1, 0.5, 0.0, 10.0),
     PD.constrained_gaussian("Tq_correlation_coefficient", 0.0, 0.5, -1.0, 1.0),
 
     
     # PD.constrained_gaussian("mixing_length_eddy_viscosity_coefficient", 0.2, 0.1, 0, 1.0),
-    PD.constrained_gaussian("mixing_length_diss_coeff", 0.22, 0.15, 0.0, 10.0),
+    # PD.constrained_gaussian("mixing_length_diss_coeff", 0.22, 0.15, 0.0, 10.0),
     # PD.constrained_gaussian("mixing_length_tke_surf_flux_coeff", 8.0, 4.0, 0, 100.0),
 
     # Land parameters 
@@ -48,14 +47,14 @@ const CALIBRATION_RNG_SEED = 42
 const CALIBRATION_NOISE_SCALAR = 3.0
 
 # If true, normalize each variable to zero mean and unit variance
-const NORMALIZE_VARIABLES = true
+const NORMALIZE_VARIABLES = false
 
 
 # ----- DATA SOURCE SETTINGS -----
 
 # Variables to load from CERES instead of ERA5 (radiation variables)
 # Set to empty vector [] to use ERA5 for all variables
-const CERES_VARIABLES = ["rsut", "rlut", "rsutcs", "rlutcs", "rsds", "rsus", "rlds", "rlus"]
+const CERES_VARIABLES = ["rsut", "rlut", "rsutcs", "rlutcs", "rsds", "rsus", "rlds", "rlus", "swcre", "lwcre"]
 # Note: CERES data is monthly
 
 # ----- PRESSURE LEVEL SETTINGS -----

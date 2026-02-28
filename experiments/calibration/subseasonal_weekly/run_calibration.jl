@@ -25,18 +25,16 @@ model_interface = joinpath(
 
 # CALIBRATION CONFIGURATION
 
-const BASE_DATE_RANGE = (DateTime(2010, 1, 1), DateTime(2010, 1, 31))
 const N_ITERATIONS = 6
 
-
-# --- 1-day test run ---
-# const BASE_DATE_RANGE = (DateTime(2010, 1, 1), DateTime(2010, 1, 1))
-# const N_ITERATIONS = 3
-# extend = Dates.Day(1)
-# spinup = Dates.Day(0)
-
-# Repeat the date range for each iteration until we're using multiple months
-sample_date_ranges = fill(BASE_DATE_RANGE, N_ITERATIONS)
+# Cycle through Jan, Apr, Jul, Oct (and wrap around for remaining iterations)
+const SEASON_DATE_RANGES = [
+    (DateTime(2010, 1, 1),  DateTime(2010, 1, 31)),
+    (DateTime(2010, 4, 1),  DateTime(2010, 4, 30)),
+    (DateTime(2010, 7, 1),  DateTime(2010, 7, 31)),
+    (DateTime(2010, 10, 1), DateTime(2010, 10, 31)),
+]
+const sample_date_ranges = [SEASON_DATE_RANGES[mod1(i, length(SEASON_DATE_RANGES))] for i in 1:N_ITERATIONS]
 
 # Directory containing ERA5 weekly observation files (not used for CERES-only runs)
 const ERA5_OBS_DIR = "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/daily_weekly_stats/weekly"
@@ -49,6 +47,8 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     # short_names = ["rsut", "rlut"],
     # Note: Pressure-level variables require model output with pressure_coordinates: true
     short_names = [
+        "swcre",
+        "lwcre",
         "ta_850hPa",
         "ta_500hPa",
         "ta_200hPa",
@@ -61,7 +61,7 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     sample_date_ranges,
     extend = Dates.Day(1),
     spinup = Dates.Day(7),
-    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp35",
+    output_dir = "/glade/derecho/scratch/cchristo/calibration/exp39",
     rng_seed = 42,
 )
 
@@ -110,7 +110,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
             model_interface,
             verbose = true,
             hpc_kwargs = Dict(
-                :job_priority => "regular", # {"premium", "regular", "economy", "preempt"}
+                :job_priority => "premium", # {"premium", "regular", "economy", "preempt"}
                 :time => 720,           # 12 hours in minutes
                 :ntasks => 1,
                 :cpus_per_task => 12,

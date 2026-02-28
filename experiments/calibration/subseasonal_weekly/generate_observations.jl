@@ -267,66 +267,34 @@ function load_era5_pressure_level_var(short_name, config_file)
 end
 
 """
-    load_vars(obs_dir, short_names, sample_date_ranges; ceres_variables = String[])
+    load_vars(obs_dir, short_names, config_file; ceres_variables = String[])
 
-Load observation data for the specified short_names and date ranges.
+Load observation data for the specified short_names.
 - Pressure-level variables (e.g., "ta_850hPa") are loaded from ERA5 pressure-level artifact
-- Variables in `ceres_variables` are loaded from CERES monthly data
-- Other variables are loaded from ERA5 (daily or weekly files)
+- CERES variables (including derived ones like "swcre", "lwcre") are loaded via CERESDataLoader
+- Other variables raise an error (ERA5 surface loading not yet supported here)
 
-Returns a Dict mapping (short_name, date_range) -> OutputVar
+Note: CERESDataLoader.get already handles derived variables like "swcre" and "lwcre"
+internally (computing rsutcs - rsut, etc.), so they can be loaded just like any other
+CERES variable.
+
+Returns a vector of OutputVar.
 """
 function load_vars(obs_dir, short_names, config_file; ceres_variables = String[])
-    vars =[]
+    vars = []
 
-    pressure_level_vars = filter(is_pressure_level_variable, short_names)
-    ceres_vars_in_names = filter(sn -> is_ceres_variable(sn, ceres_variables), short_names)
-    # TODO: simplify these filters
-    era5_surface_vars = filter(
-        sn -> !is_pressure_level_variable(sn) && !is_ceres_variable(sn, ceres_variables),
-        short_names,
-    )
-
-    # Create loaders once — artifact-backed loaders return full time series regardless of date
-    era5_pl_loader = isempty(pressure_level_vars) ? nothing : CalibrationTools.ERA5PressureLevelDataLoader()
-    ceres_loader = isempty(ceres_vars_in_names) ? nothing : CalibrationTools.CERESDataLoader()
-
-    # Load ERA5 pressure-level vars once per variable
-    for short_name in pressure_level_vars
-        var = load_era5_pressure_level_var(short_name, config_file)
+    for short_name in short_names
+        if is_pressure_level_variable(short_name)
+            var = load_era5_pressure_level_var(short_name, config_file)
+        elseif is_ceres_variable(short_name, ceres_variables)
+            var = load_ceres_var(short_name, config_file)
+        else
+            error("Don't know how to load observation for '$short_name'. " *
+                  "Add it to CERES_VARIABLES or use a pressure-level name like 'ta_850hPa'.")
+        end
         push!(vars, var)
     end
 
-    # Load CERES vars once per variable
-    for short_name in ceres_vars_in_names
-        var = load_ceres_var(short_name, config_file)
-        for dr in sample_date_ranges
-            push!(vars, var)
-        end
-    end
-
-    # Load ERA5 surface vars from weekly/daily files — these are date-specific.
-        for short_name in era5_surface_vars
-            try
-                if is_single_day
-                    filepath, _ = get_daily_filename(obs_dir, short_name, start_date)
-                    var = load_daily_var(filepath, short_name, start_date)
-                else
-                    # Load from ERA5 weekly files
-                    filepath =
-                        get_weekly_filename(obs_dir, short_name, start_date, end_date)
-                    if !isfile(filepath)
-                        @warn "Weekly file not found: $filepath"
-                        continue
-                    end
-                    var = load_weekly_var(filepath, short_name, start_date, end_date)
-                end
-                push!(vars, var)
-            catch e
-                @warn "Failed to load $short_name for $start_date - $end_date: $e"
-                rethrow(e)
-            end
-        end
     return vars
 end
 
@@ -360,7 +328,7 @@ function preprocess_vars(vars)
         if haskey(var_units, ClimaAnalysis.short_name(var))
             # var = ClimaAnalysis.set_units(var, get_var_units(short_name))
             # There isn't a set_units! function yet
-            var.attributes["units"] = get_var_units(short_name)
+            var.attributes["units"] = get_var_units(ClimaAnalysis.short_name(var))
         end
         push!(processed, var)
     end
@@ -384,19 +352,17 @@ function make_observation_vector(vars, sample_date_ranges)
     include(joinpath(@__DIR__, "calibration_setup.jl"))
 
     available_sample_dates = intersect(ClimaAnalysis.dates.(vars)...)
-    min_year = minimum(Dates.year.(available_sample_dates))
-    max_year = maximum(Dates.year.(available_sample_dates))
-    # covar_estimator = ClimaCalibrate.ObservationRecipe.ScalarCovariance(;
-    #     scalar = Float64(CALIBRATION_NOISE_SCALAR),
-    #     use_latitude_weights = true,
-    # )
+    @info "Available sample dates: $(length(available_sample_dates)) dates, " *
+          "range $(minimum(available_sample_dates)) to $(maximum(available_sample_dates))"
 
     obs_vec = map(sample_date_ranges) do sample_date_range
         start_date = first(sample_date_range)
-        min_date = Date(min_year, month(start_date), day(start_date))
-        max_date = Date(max_year, month(start_date), day(start_date))
-        monthly_sample_dates = collect(min_date:Dates.Year(1):max_date)
-        monthly_sample_date_ranges = [(monthly_date, monthly_date) for monthly_date in monthly_sample_dates]
+        # Filter available dates to those matching this month and day
+        monthly_sample_dates = filter(available_sample_dates) do d
+            Dates.month(d) == Dates.month(start_date) && Dates.day(d) == Dates.day(start_date)
+        end
+        @info "For $(start_date): found $(length(monthly_sample_dates)) matching dates across years"
+        monthly_sample_date_ranges = [(d, d) for d in monthly_sample_dates]
         covar_estimator = ClimaCalibrate.ObservationRecipe.SVDplusDCovariance(
                    monthly_sample_date_ranges;
                    model_error_scale = 0.05,
@@ -421,7 +387,7 @@ Compute global mean and std for each variable across all date ranges.
 Returns a Dict mapping short_name -> (mean, std).
 Uses latitude-weighted averaging for physically meaningful statistics.
 """
-function compute_normalization_stats(vars_by_date, short_names)
+function compute_normalization_stats(vars, short_names)
     norm_stats = Dict{String, Tuple{Float64, Float64}}()
     
     for short_name in short_names
@@ -429,8 +395,8 @@ function compute_normalization_stats(vars_by_date, short_names)
         all_data = Float64[]
         all_weights = Float64[]
         
-        for (key, var) in vars_by_date
-            if key[1] == short_name
+        for var in vars
+            if get(var.attributes, "short_name", "") == short_name
                 lats = ClimaAnalysis.latitudes(var)
                 # Compute latitude weights (cosine weighting)
                 lat_weights = cosd.(lats)
@@ -505,14 +471,8 @@ end
 Apply normalization to all variables in vars_by_date.
 Returns a new Dict with normalized OutputVars.
 """
-function normalize_vars(vars_by_date, norm_stats)
-    normalized = Dict{Tuple{String, NTuple{2, Dates.DateTime}}, OutputVar}()
-    
-    for (key, var) in vars_by_date
-        normalized[key] = normalize_var(var, norm_stats)
-    end
-    
-    return normalized
+function normalize_vars(vars, norm_stats)
+    return [normalize_var(var, norm_stats) for var in vars]
 end
 
 """

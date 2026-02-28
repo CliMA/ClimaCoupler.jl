@@ -26,7 +26,7 @@ model_interface = joinpath(
 # CALIBRATION CONFIGURATION
 
 const BASE_DATE_RANGE = (DateTime(2010, 10, 1), DateTime(2010, 10, 31))
-const N_ITERATIONS = 4
+const N_ITERATIONS = 6
 
 
 # --- 1-day test run ---
@@ -61,7 +61,7 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     sample_date_ranges,
     extend = Dates.Day(1),
     spinup = Dates.Day(7),
-    output_dir = "/glade/derecho/scratch/zhaoyi/calibration/weekly2/exp1",
+    output_dir = "/glade/derecho/scratch/zhaoyi/calibration/weekly2/exp2",
     rng_seed = 42,
 )
 
@@ -110,7 +110,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
             model_interface = model_interface,
             verbose = true,
             hpc_kwargs = Dict(
-                :job_priority => "regular", # {"premium", "regular", "economy", "preempt"}
+                :job_priority => "premium", # {"premium", "regular", "economy", "preempt"}
                 :time => 720,           # 12 hours in minutes
                 :ntasks => 1,
                 :cpus_per_task => 12,

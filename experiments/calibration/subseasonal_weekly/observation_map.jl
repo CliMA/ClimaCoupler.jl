@@ -170,8 +170,8 @@ function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, i
         end
 
         # Note that this is the same as before
-        lat_left = -60
-        lat_right = 60
+        lat_left = -90
+        lat_right = 90
         var = first(apply_lat_window([var], lat_left, lat_right))
 
         EnsembleBuilder.fill_g_ens_col!(
@@ -255,9 +255,13 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
     # Normalize sim vars identically to process_member_data! so the bias reflects
     # exactly the residual seen by the loss function
     norm_stats = get_norm_stats()
+    lat_left = -90
+    lat_right = 90
     sim_vars = map(CALIBRATE_CONFIG.short_names) do short_name
         var = preprocess_var(get_var(short_name, simdir), sample_date_range)
-        normalize_model_var(var, norm_stats)
+        var = normalize_model_var(var, norm_stats)
+        # Window to same lat range as observations to avoid interpolation BoundsError
+        first(apply_lat_window([var], lat_left, lat_right))
     end
 
     # Match sim_vars with era5_vars by short_name

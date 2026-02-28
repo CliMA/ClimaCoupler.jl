@@ -588,9 +588,9 @@ if abspath(PROGRAM_FILE) == @__FILE__
         @info "Applied normalization to observations"
     end
 
-    lon_left = -60
-    lon_right = 60
-    preprocessed_vars = apply_lat_window(preprocessed_vars, lon_left, lon_right)
+    lat_left = -90
+    lat_right = 90
+    preprocessed_vars = apply_lat_window(preprocessed_vars, lat_left, lat_right)
 
     # Save preprocessed variables (for inspection/debugging)
     JLD2.save_object(joinpath(output_path, "preprocessed_vars.jld2"), preprocessed_vars)

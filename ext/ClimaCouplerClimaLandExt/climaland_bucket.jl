@@ -17,13 +17,11 @@ struct BucketSimulation{
     I <: SciMLBase.AbstractODEIntegrator,
     A <: CC.Fields.Field,
     OW,
-    RF,
 } <: Interfacer.AbstractLandSimulation
     model::M
     integrator::I
     area_fraction::A
     output_writer::OW
-    radiative_fluxes::RF
 end
 
 """
@@ -61,6 +59,7 @@ function BucketSimulation(
     bucket_initial_condition::String = "",
     era5_albedo_file_path::Union{Nothing, String} = nothing,
     coupled_param_dict = CP.create_toml_dict(FT),
+    gustiness::FT = FT(1),
     extra_kwargs...,
 ) where {FT, TT <: Union{Float64, ITime}}
     # Get default land parameters from ClimaLand.LandParameters
@@ -137,7 +136,7 @@ function BucketSimulation(
 
     args = (
         params,
-        CL.CoupledAtmosphere{FT}(surface_space, atmos_h),
+        CL.CoupledAtmosphere{FT, typeof(atmos_h)}(atmos_h, gustiness),
         CL.CoupledRadiativeFluxes{FT}(),
         domain,
     )
@@ -266,17 +265,7 @@ function BucketSimulation(
         callback = SciMLBase.CallbackSet(diag_cb),
     )
 
-    # TODO move these to ClimaLand.jl as part of CoupledRadiativeFluxes
-    radiative_fluxes =
-        (; SW_d = CC.Fields.zeros(surface_space), LW_d = CC.Fields.zeros(surface_space))
-
-    return BucketSimulation(
-        model,
-        integrator,
-        area_fraction,
-        output_writer,
-        radiative_fluxes,
-    )
+    return BucketSimulation(model, integrator, area_fraction, output_writer)
 end
 
 # extensions required by Interfacer
@@ -330,10 +319,10 @@ function Interfacer.update_field!(
     Interfacer.remap!(sim.integrator.p.drivers.P_liq, field ./ ρ_liq)
 end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:SW_d}, field)
-    Interfacer.remap!(sim.radiative_fluxes.SW_d, field)
+    Interfacer.remap!(sim.integrator.p.drivers.SW_d, field)
 end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:LW_d}, field)
-    Interfacer.remap!(sim.radiative_fluxes.LW_d, field)
+    Interfacer.remap!(sim.integrator.p.drivers.LW_d, field)
 end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_temperature}, field)
     Interfacer.remap!(sim.integrator.p.drivers.T, field)
@@ -520,22 +509,8 @@ Updates the surface component model cache with the current coupler fields beside
 """
 function FieldExchanger.update_sim!(sim::BucketSimulation, csf)
     # radiative fluxes
-    # TODO add SW_d, LW_d fields to BucketSimulation and update there instead
     Interfacer.update_field!(sim, Val(:SW_d), csf.SW_d)
     Interfacer.update_field!(sim, Val(:LW_d), csf.LW_d)
-
-    model = sim.model
-    Y = sim.integrator.u
-    p = sim.integrator.p
-    t = sim.integrator.t
-
-    # Note: here we add negative signs to account for a difference in sign convention
-    #  between ClimaLand.jl and ClimaCoupler.jl in SW_d and LW_d.
-    σ = model.parameters.earth_param_set.Stefan
-    sim.integrator.p.bucket.R_n .=
-        .-(1 .- CL.surface_albedo(model, Y, p)) .* sim.radiative_fluxes.SW_d .-
-        Interfacer.get_field(sim, Val(:emissivity)) .*
-        (sim.radiative_fluxes.LW_d .- σ .* CL.component_temperature(model, Y, p) .^ 4)
 
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)

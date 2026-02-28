@@ -1,3 +1,19 @@
+# import ClimaCoupler
+
+# # Include our run_calibration.jl first to define CALIBRATE_CONFIG
+# include(joinpath(@__DIR__, "run_calibration.jl"))
+
+# # Reuse the forward_model from subseasonal pipeline
+# include(
+#     joinpath(
+#         pkgdir(ClimaCoupler),
+#         "experiments",
+#         "calibration",
+#         "subseasonal",
+#         "model_interface.jl",
+#     ),
+# )
+
 #=
 Defines ClimaCalibrate.forward_model which runs the coupled simulation
 for a single ensemble member.
@@ -9,26 +25,14 @@ Prerequisites: This file expects the following to be set up before inclusion:
 Used by: subseasonal, subseasonal_weekly (and potentially other pipelines)
 =#
 
+# TODO: Remove this all later after testing
+
 ENV["CLIMACOMMS_DEVICE"] = "CUDA"
 ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
 import ClimaCoupler
 import ClimaCalibrate
-import CUDA
-import Dates: Date, Second
-import EnsembleKalmanProcesses as EKP
-include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "code_loading.jl"))
-include(
-    joinpath(
-        pkgdir(ClimaCoupler),
-        "experiments",
-        "calibration",
-        "subseasonal",
-        "run_calibration.jl",
-    ),
-)
+using Dates: Date, Second
 using Pkg
-
-include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.jl"))
 
 # Include run_calibration.jl only if CALIBRATE_CONFIG is not already defined
 # This allows other pipelines to include their own run_calibration.jl first
@@ -64,7 +68,8 @@ function ClimaCalibrate.forward_model(iter, member)
     config_dict["coupler_output_dir"] = member_output_dir
 
     @info "Simulation dates" start_date end_date
-    setup_and_run(config_dict)
+
+    ClimaCoupler.SimCoordinator.setup_and_run(config_dict)
     @info "Completed member $member"
     return nothing
 end

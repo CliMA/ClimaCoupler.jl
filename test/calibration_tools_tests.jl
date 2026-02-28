@@ -1,4 +1,4 @@
-import Test: @test, @testset
+import Test: @test, @testset, @test_throws, @test_logs
 import Dates
 import ClimaCoupler
 import ClimaCoupler: CalibrationTools
@@ -76,6 +76,41 @@ end
             @test ClimaAnalysis.units(var) == "W m^-2"
         end
     end
+
+    @test_throws ErrorException get(data_loader, "idk")
+end
+
+@testset "CERES data loader" begin
+    data_loader = CalibrationTools.CERESDataLoader()
+
+    direct_varnames = last.(CalibrationTools.CERES_TO_CLIMA_NAMES)
+    all_varnames = Set(vcat(direct_varnames, collect(CalibrationTools.CERES_DERIVED_VARS)))
+
+    @test CalibrationTools.available_vars(data_loader) == all_varnames
+
+    for varname in direct_varnames
+        var = get(data_loader, varname)
+        @test ClimaAnalysis.short_name(var) == varname
+        lons = ClimaAnalysis.longitudes(var)
+        @test all(lon -> -180.0 <= lon <= 180.0, lons)
+        var_dates = ClimaAnalysis.dates(var)
+        @test all(Dates.day.(var_dates) .== 1)
+        @test ClimaAnalysis.units(var) == "W m^-2"
+    end
+
+    swcre = get(data_loader, "swcre")
+    @test ClimaAnalysis.short_name(swcre) == "swcre"
+    @test ClimaAnalysis.units(swcre) == "W m^-2"
+    rsutcs = get(data_loader, "rsutcs")
+    rsut = get(data_loader, "rsut")
+    @test swcre.data ≈ rsutcs.data .- rsut.data
+
+    lwcre = get(data_loader, "lwcre")
+    @test ClimaAnalysis.short_name(lwcre) == "lwcre"
+    @test ClimaAnalysis.units(lwcre) == "W m^-2"
+    rlutcs = get(data_loader, "rlutcs")
+    rlut = get(data_loader, "rlut")
+    @test lwcre.data ≈ rlutcs.data .- rlut.data
 
     @test_throws ErrorException get(data_loader, "idk")
 end

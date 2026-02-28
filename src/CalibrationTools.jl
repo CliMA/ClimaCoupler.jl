@@ -154,11 +154,38 @@ function CalibrateConfig(;
 end
 
 """
+    AbstractDataLoader
+
+Supertypes for all data loaders.
+
+`AbstractDataLoader`s have to provide two functions: `available_vars` and
+`Base.get`.
+
+`AbstractDataLoader` load preprocessed data as `OutputVar`s that can be broadly
+used for any kind of calibration.
+"""
+abstract type AbstractDataLoader end
+
+"""
+    available_vars(data_loader::AbstractDataLoader)
+
+Return the available preprocessed variables in `data_loader`.
+"""
+available_vars(data_loader::AbstractDataLoader) = data_loader.available_vars
+
+function _show(io::IO, data_loader::AbstractDataLoader, data_loader_name::String)
+    vars = sort(collect(data_loader.available_vars))
+    printstyled(io, data_loader_name, bold = true, color = :green)
+    print(io, ": ")
+    print(io, join(vars, ", "))
+end
+
+"""
     ERA5DataLoader
 
 A struct for loading preprocessed ERA5 data as `OutputVar`s.
 """
-struct ERA5DataLoader
+struct ERA5DataLoader <: AbstractDataLoader
     """A catalog built from NetCDF files, designed to initialize `OutputVar`s.
     See ClimaAnalysis documentation for more information about NCCatalog."""
     catalog::NCCatalog
@@ -169,7 +196,12 @@ end
 
 const ERA5_TO_CLIMA_NAMES =
     ["mslhf" => "hfls", "msshf" => "hfss", "msuwswrf" => "rsus", "msuwlwrf" => "rlus"]
-const ERA5_TO_CLIMA_UNITS = Dict("W m**-2" => "W m^-2")
+const STANDARD_UNITS = Dict(
+    "W m**-2" => "W m^-2",
+    "W m-2" => "W m^-2",
+    "kg kg**-1" => "unitless",
+    "%" => "unitless",
+)
 
 """
     ERA5DataLoader(; era5_to_clima_names = ERA5_TO_CLIMA_NAMES)
@@ -201,13 +233,6 @@ function ERA5DataLoader(; era5_to_clima_names = ERA5_TO_CLIMA_NAMES)
     ClimaAnalysis.add_file!(catalog, flux_file, era5_to_clima_names...)
     return ERA5DataLoader(catalog, Set(last.(era5_to_clima_names)))
 end
-
-"""
-    available_vars(data_loader::ERA5DataLoader)
-
-Return the available preprocessed variables in `data_loader`.
-"""
-available_vars(data_loader::ERA5DataLoader) = data_loader.available_vars
 
 """
     get(loader::ERA5DataLoader, short_name)
@@ -256,8 +281,8 @@ function _preprocess_var(var; flip_sign = false)
     var = ClimaAnalysis.shift_longitude(var, -180.0, 180.0)
 
     var_units = ClimaAnalysis.units(var)
-    var_units in keys(ERA5_TO_CLIMA_UNITS) &&
-        (var = ClimaAnalysis.set_units(var, ERA5_TO_CLIMA_UNITS[var_units]))
+    var_units in keys(STANDARD_UNITS) &&
+        (var = ClimaAnalysis.set_units(var, STANDARD_UNITS[var_units]))
 
     # Functions in ClimaAnalysis can mutate the short name. Calibration uses
     # short names to check the observational and simulation data, so we keep the
@@ -266,11 +291,269 @@ function _preprocess_var(var; flip_sign = false)
     return var
 end
 
-function Base.show(io::IO, data_loader::ERA5DataLoader)
-    vars = sort(collect(data_loader.available_vars))
-    printstyled(io, "ERA5DataLoader", bold = true, color = :green)
-    print(io, ": ")
-    print(io, join(vars, ", "))
+Base.show(io::IO, data_loader::ERA5DataLoader) = _show(io, data_loader, "ERA5DataLoader")
+
+"""
+    CERESDataLoader
+
+A struct for loading preprocessed CERES data as `OutputVar`s.
+"""
+struct CERESDataLoader <: AbstractDataLoader
+    """A catalog built from NetCDF files, designed to initialize `OutputVar`s.
+    See ClimaAnalysis documentation for more information about NCCatalog."""
+    catalog::NCCatalog
+
+    """A list of available variables to load."""
+    available_vars::Set{String}
 end
+
+const CERES_TO_CLIMA_NAMES = [
+    "toa_sw_all_mon" => "rsut",
+    "toa_sw_clr_t_mon" => "rsutcs",
+    "toa_lw_all_mon" => "rlut",
+    "toa_lw_clr_t_mon" => "rlutcs",
+]
+const CERES_DERIVED_VARS = Set(["swcre", "lwcre"])
+
+"""
+    CERESDataLoader(; ceres_to_clima_names = CERES_TO_CLIMA_NAMES)
+
+Construct a data loader which you can load preprocessed CERES monthly
+time-averaged TOA radiation data in `OutputVar`, where
+- the short name and units match CliMA conventions,
+- the latitudes are shifted to be -180 to 180 degrees,
+- the times are at the start of the time period (e.g. the time average of
+  January is on the first of January instead of January 15th).
+
+Additionally, the following derived cloud radiative effect (CRE) variables are
+available:
+- `swcre = rsutcs - rsut` (shortwave CRE)
+- `lwcre = rlutcs - rlut` (longwave CRE)
+
+The CERES data comes from the `radiation_obs` artifact. See
+[ClimaArtifacts](https://github.com/CliMA/ClimaArtifacts) for more information
+about this artifact.
+
+The keyword argument `ceres_to_clima_names` is a vector of pairs mapping
+CERES name to CliMA name.
+"""
+function CERESDataLoader(; ceres_to_clima_names = CERES_TO_CLIMA_NAMES)
+    artifact_dir = @clima_artifact("radiation_obs")
+    ceres_file = joinpath(artifact_dir, "CERES_EBAF_Ed4.2_Subset_200003-201910.nc")
+
+    catalog = NCCatalog()
+    ClimaAnalysis.add_file!(catalog, ceres_file, ceres_to_clima_names...)
+    all_vars = Set(last.(ceres_to_clima_names)) ∪ CERES_DERIVED_VARS
+    return CERESDataLoader(catalog, all_vars)
+end
+
+"""
+    get(loader::CERESDataLoader, short_name)
+
+Get the preprocessed `OutputVar` with the name `short_name` from the CERES
+dataset.
+
+In addition to the variables in `CERES_TO_CLIMA_NAMES`, the following derived
+variables are available:
+- `swcre`: shortwave cloud radiative effect, computed as `rsutcs - rsut`
+- `lwcre`: longwave cloud radiative effect, computed as `rlutcs - rlut`
+"""
+function Base.get(loader::CERESDataLoader, short_name::String)
+    (; available_vars) = loader
+    short_name in available_vars || error(
+        "$short_name is not available to load. To add this variable, add it to CERES_TO_CLIMA_NAMES as a pair mapping CERES name to CliMA name and create a new CERESDataLoader",
+    )
+
+    if short_name == "swcre"
+        rsutcs = _load_ceres_var(loader, "rsutcs")
+        rsut = _load_ceres_var(loader, "rsut")
+        result = rsutcs - rsut
+        ClimaAnalysis.set_short_name!(result, "swcre")
+        return result
+    elseif short_name == "lwcre"
+        rlutcs = _load_ceres_var(loader, "rlutcs")
+        rlut = _load_ceres_var(loader, "rlut")
+        result = rlutcs - rlut
+        ClimaAnalysis.set_short_name!(result, "lwcre")
+        return result
+    end
+
+    return _load_ceres_var(loader, short_name)
+end
+
+function _load_ceres_var(loader::CERESDataLoader, short_name::String)
+    var = ClimaAnalysis.Catalog.get(
+        loader.catalog,
+        short_name;
+        var_kwargs = (shift_by = Dates.firstdayofmonth,),
+    )
+    return preprocess(loader, var, Val(Symbol(short_name)))
+end
+
+"""
+    preprocess(::CERESDataLoader, var, ::Val{varname}) where {varname}
+
+Preprocess `var` with short name `varname`.
+"""
+function preprocess(::CERESDataLoader, _, ::Val{varname}) where {varname}
+    error(
+        "No preprocessing function is found for $varname. Add a method for preprocess(var, ::Val{:$varname}) that preprocess this variable as a OutputVar",
+    )
+end
+
+preprocess(::CERESDataLoader, var, ::Val{:rsut}) = _preprocess_var(var)
+preprocess(::CERESDataLoader, var, ::Val{:rsutcs}) = _preprocess_var(var)
+preprocess(::CERESDataLoader, var, ::Val{:rlut}) = _preprocess_var(var)
+preprocess(::CERESDataLoader, var, ::Val{:rlutcs}) = _preprocess_var(var)
+
+Base.show(io::IO, data_loader::CERESDataLoader) = _show(io, data_loader, "CERESDataLoader")
+
+"""
+    GPCPLoader
+
+A struct for loading preprocessed GPCP data as `OutputVar`s.
+"""
+struct GPCPDataLoader <: AbstractDataLoader
+    catalog::NCCatalog
+    available_vars::Set{String}
+end
+
+"""
+    GPCPDataLoader(; gpcp_to_clima_names = ["precip" => "pr"])
+
+Construct a data loader which you can load preprocessed GPCP monthly
+time-averaged precipitation data in `OutputVar`, where
+- the short name and sign of the data match CliMA conventions
+- the latitudes are shifted to be -180 to 180 degrees,
+- the times are at the start of the time period (e.g. the time average of
+  January is on the first of January instead of January 15th).
+
+The ERA5 data comes from the
+`precipitation_obs` artifact. See
+[ClimaArtifacts](https://github.com/CliMA/ClimaArtifacts/tree/f09429b0a149fd9f780bfc1833e4675c9fab573e/precipitation_obs)
+for more information about this artifact.
+
+The keyword argument `era5_to_clima_names` is a vector of pairs mapping
+ERA5 name to CliMA name.
+"""
+function GPCPDataLoader(; gpcp_to_clima_names = ["precip" => "pr"])
+    artifact_dir = @clima_artifact("precipitation_obs")
+    precip_file = joinpath(artifact_dir, "precip.mon.mean.nc")
+
+    catalog = NCCatalog()
+    ClimaAnalysis.add_file!(catalog, precip_file, gpcp_to_clima_names...)
+    return GPCPDataLoader(catalog, Set(last.(gpcp_to_clima_names)))
+end
+
+"""
+    get(loader::GPCPDataLoader, short_name)
+
+Get the preprocessed `OutputVar` with the name `short_name` from the GPCP
+dataset.
+
+Note that the units of precipitation or `pr` are `mm/day` from this dataset. In
+CliMA, the units of `pr` are `kg m^-2 s^-1`.
+"""
+function Base.get(loader::GPCPDataLoader, short_name::String)
+    (; catalog, available_vars) = loader
+    short_name in available_vars || error(
+        "$short_name is not available to load. To add this variable, pass it to gpcp_to_clima_names as a pair mapping GPCP name to CliMA name and create a new GPCPDataLoader",
+    )
+    var = ClimaAnalysis.Catalog.get(
+        catalog,
+        short_name;
+        var_kwargs = (shift_by = Dates.firstdayofmonth,),
+    )
+    return preprocess(loader, var, Val(Symbol(short_name)))
+end
+
+preprocess(::GPCPDataLoader, var, ::Val{:pr}) = _preprocess_var(var, flip_sign = true)
+
+Base.show(io::IO, data_loader::GPCPDataLoader) = _show(io, data_loader, "GPCPDataLoader")
+
+
+
+
+
+
+"""
+    ERA5PressureLevelDataLoader
+
+A struct for loading preprocessed ERA5 data on pressure levels as `OutputVar`s.
+"""
+struct ERA5PressureLevelDataLoader <: AbstractDataLoader
+    catalog::NCCatalog
+    available_vars::Set{String}
+end
+
+ERA5_PRESSURE_LEVEL_TO_CLIMA_NAMES = ["t" => "ta", "q" => "hus", "r" => "hur"]
+
+"""
+    ERA5PressureLevelDataLoader(;
+        era5_pressure_level_to_clima_names = ERA5_PRESSURE_LEVEL_TO_CLIMA_NAMES)
+
+Construct a data loader which you can load preprocessed monthly
+time-averaged ERA5 data on pressure levels in `OutputVar`, where
+- the short name and sign of the data match CliMA conventions,
+- the latitudes are shifted to be -180 to 180 degrees,
+- the times are at the start of the time period (e.g. the time average of
+  January is on the first of January instead of January 15th).
+
+The ERA5 data comes from the
+`era5_monthly_averages_pressure_levels_1979_2024` artifact. See
+[ClimaArtifacts](https://github.com/CliMA/ClimaArtifacts/tree/f09429b0a149fd9f780bfc1833e4675c9fab573e/era5_monthly_averages_pressure_levels_1979_2024)
+for more information about this artifact.
+
+The keyword argument `era5_pressure_level_to_clima_names` is a vector of pairs mapping
+ERA5 name to CliMA name.
+"""
+function ERA5PressureLevelDataLoader(;
+    era5_pressure_level_to_clima_names = ERA5_PRESSURE_LEVEL_TO_CLIMA_NAMES,
+)
+    artifact_dir = @clima_artifact"era5_monthly_averages_pressure_levels_1979_2024"
+    era5_file =
+        joinpath(artifact_dir, "era5_monthly_averages_pressure_levels_197901-202410.nc")
+
+    catalog = NCCatalog()
+    ClimaAnalysis.add_file!(catalog, era5_file, era5_pressure_level_to_clima_names...)
+    return ERA5PressureLevelDataLoader(
+        catalog,
+        Set(last.(era5_pressure_level_to_clima_names)),
+    )
+end
+
+"""
+    get(loader::ERA5PressureLevelDataLoader, short_name::String)
+
+Get the preprocessed `OutputVar` with the name `short_name` from the ERA5
+pressure levels dataset.
+
+Note that the units of unitless `OutputVar`s are `"unitless"` rather than the
+empty string as ClimaAnalysis consider the empty string as missing units.
+"""
+function Base.get(loader::ERA5PressureLevelDataLoader, short_name::String)
+    (; catalog, available_vars) = loader
+    short_name in available_vars || error(
+        "$short_name is not available to load. To add this variable, pass it to era5_pressure_level_to_clima_names as a pair mapping ERA5 name to CliMA name and create a new ERA5PressureLevelDataLoader",
+    )
+    var = ClimaAnalysis.Catalog.get(
+        catalog,
+        short_name;
+        var_kwargs = (shift_by = Dates.firstdayofmonth,),
+    )
+    return preprocess(loader, var, Val(Symbol(short_name)))
+end
+
+preprocess(::ERA5PressureLevelDataLoader, var, ::Val{:ta}) = _preprocess_var(var)
+preprocess(::ERA5PressureLevelDataLoader, var, ::Val{:hus}) = _preprocess_var(var)
+function preprocess(::ERA5PressureLevelDataLoader, var, ::Val{:hur})
+    var = preprocess_var(var)
+    # Convert from percentages (e.g. 120%) to decimal (1.20)
+    var = ClimaAnalysis.convert_units(var, "unitless", conversion_function = x -> 0.01 * x)
+    return var
+end
+
+Base.show(io::IO, data_loader::ERA5PressureLevelDataLoader) =
+    _show(io, data_loader, "ERA5PressureLevelDataLoader")
 
 end

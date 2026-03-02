@@ -25,7 +25,8 @@ Plot bias maps comparing simulation output to ERA5 observations for all variable
 object and denormalized to physical units when normalization is enabled.
 """
 function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation_path)
-    sample_date_range = CALIBRATE_CONFIG.sample_date_ranges[iteration + 1]
+    (; short_names, sample_date_ranges) = CALIBRATE_CONFIG
+    sample_date_range = sample_date_ranges[iteration + 1]
     calib_start, _ = sample_date_range
 
     # Reconstruct ERA5 OutputVars from the EKP observation object
@@ -35,13 +36,10 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
         iteration + 1,
     )
 
-    # ERA5 vars are kept as-is (normalized), matching what enters the loss function
     era5_vars =
         mapreduce(ClimaCalibrate.ObservationRecipe.reconstruct_vars, vcat, minibatch_obs)
 
-    sim_vars = map(CALIBRATE_CONFIG.short_names) do short_name
-        var = preprocess_var(get_var(short_name, simdir), sample_date_range)
-    end
+    sim_vars = load_and_preprocess_vars(simdir, short_names)
 
     # Match sim_vars with era5_vars by short_name
     var_pairs = []
@@ -60,32 +58,37 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
         return nothing
     end
 
-    fig = GeoMakie.Figure(size = (1500, 500 * length(var_pairs)))
+    fig = GeoMakie.Figure(size = (2000, 500 * length(var_pairs)))
     for (i, (sim_var, era5_var)) in enumerate(var_pairs)
         sn = ClimaAnalysis.short_name(sim_var)
         sim_var_t = ClimaAnalysis.select(sim_var; by = MatchValue(), time = calib_start)
         era5_var_t = ClimaAnalysis.select(era5_var; by = MatchValue(), time = calib_start)
         cmap_extrema = get(bias_plot_extrema, sn, extrema(sim_var_t.data))
-        if ClimaAnalysis.has_pressure(sim_var_t)
-            for (j, pressure) in enumerate(ClimaAnalysis.pressures(sim_var_t))
-                sim_var_t_p = ClimaAnalysis.select(sim_var_t; by = MatchValue(), pressure)
-                era5_var_t_p = ClimaAnalysis.select(era5_var_t; by = MatchValue(), pressure)
-                # Sometimes the float type of the dims don't match so we resample...
-                # sim_var_t_p = ClimaAnalysis.resampled_as(sim_var_t_p, era5_var_t_p)
+        try
+            if ClimaAnalysis.has_pressure(sim_var_t)
+                for (j, pressure) in enumerate(ClimaAnalysis.pressures(sim_var_t))
+                        sim_var_t_p = ClimaAnalysis.select(sim_var_t; by = MatchValue(), pressure)
+                        era5_var_t_p = ClimaAnalysis.select(era5_var_t; by = MatchValue(), pressure)
+                        # Sometimes the float type of the dims don't match so we resample...
+                        # sim_var_t_p = ClimaAnalysis.resampled_as(sim_var_t_p, era5_var_t_p)
+                        ClimaAnalysis.Visualize.plot_bias_on_globe!(
+                            fig[i, j],
+                            era5_var_t_p,
+                            sim_var_t_p,
+                            # era5_var_t_p;
+                            # cmap_extrema,
+                        )
+                end
+            else
                 ClimaAnalysis.Visualize.plot_bias_on_globe!(
-                    fig[i, j],
-                    sim_var_t_p,
-                    era5_var_t_p;
-                    # cmap_extrema,
+                    fig[i, 1],
+                    era5_var_t,
+                    sim_var_t;
+                    cmap_extrema,
                 )
             end
-        else
-            ClimaAnalysis.Visualize.plot_bias_on_globe!(
-                fig[i, 1],
-                sim_var_t,
-                era5_var_t;
-                cmap_extrema,
-            )
+        catch e
+            @error "bias plot error: $(short_name(sim_var_t))"
         end
     end
 

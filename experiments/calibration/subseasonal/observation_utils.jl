@@ -175,8 +175,8 @@ windows to the date range. Calls `largest_period` (defined per-pipeline) to
 determine the shift.
 """
 function preprocess_var(var, sample_date_range)
-    period = largest_period(sample_date_range)
-    var = ClimaAnalysis.Var._shift_by(var, date -> date - period)
+    # period = largest_period(sample_date_range)
+    # var = ClimaAnalysis.Var._shift_by(var, date -> date - period)
     var = set_units(var, get_var_units(short_name(var)))
     var = window(var, "time"; left = sample_date_range[1], right = sample_date_range[2])
     return var

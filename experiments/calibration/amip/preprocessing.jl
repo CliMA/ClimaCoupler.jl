@@ -47,6 +47,8 @@ end
     get_lonlat_regridder(config_file)
 
 Create a regridder for `OutputVar`s for regridding to the simulation grid.
+Handles the case where the `OutputVar` has a single pressure level by
+padding a fake pressure level before interpolation, then removing it.
 """
 function get_lonlat_regridder(config_file)
     config_dict = ClimaCoupler.Input.get_coupler_config_dict(config_file)
@@ -62,7 +64,59 @@ function get_lonlat_regridder(config_file)
     end
     lon_vals = range(-180, 180, nlon)
     lat_vals = range(-90, 90, nlat)
-    return var -> ClimaAnalysis.resampled_as(var; longitude = lon_vals, latitude = lat_vals)
+    return var -> regrid_lonlat(var, lon_vals, lat_vals)
+end
+
+"""
+    regrid_lonlat(var, lon_vals, lat_vals)
+
+Regrid `var` to the given `lon_vals` and `lat_vals`.
+If `var` has a single pressure level, a fake duplicate pressure level is added
+before regridding (so that the interpolant can be built), then removed after.
+"""
+function regrid_lonlat(var, lon_vals, lat_vals)
+    if ClimaAnalysis.has_pressure(var) && length(ClimaAnalysis.pressures(var)) == 1
+        @info "Padding fake pressure level for regridding"
+        pname = ClimaAnalysis.pressure_name(var)
+        real_p = ClimaAnalysis.pressures(var)[1]
+        fake_p = real_p + 1.0
+
+        # Find the pressure dimension index
+        dim_names = collect(keys(var.dims))
+        p_idx = findfirst(==(pname), dim_names)
+
+        # Duplicate data along the pressure dimension
+        new_data = cat(var.data, var.data; dims = p_idx)
+        new_dims = copy(var.dims)
+        new_dims[pname] = [real_p, fake_p]
+
+        padded_var = ClimaAnalysis.OutputVar(
+            var.attributes,
+            new_dims,
+            var.dim_attributes,
+            new_data,
+        )
+
+        # Regrid with 2 pressure levels (interpolant will succeed)
+        regridded = ClimaAnalysis.resampled_as(
+            padded_var;
+            longitude = lon_vals,
+            latitude = lat_vals,
+        )
+
+        # Remove the fake pressure level
+        return ClimaAnalysis.select(
+            regridded;
+            by = ClimaAnalysis.MatchValue(),
+            pressure_level = [real_p],
+        )
+    else
+        return ClimaAnalysis.resampled_as(
+            var;
+            longitude = lon_vals,
+            latitude = lat_vals,
+        )
+    end
 end
 
 """

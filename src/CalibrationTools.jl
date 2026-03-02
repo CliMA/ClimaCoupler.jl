@@ -12,6 +12,8 @@ import ClimaAnalysis
 import ClimaAnalysis: NCCatalog
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 
+import Statistics: mean
+
 """
     struct CalibrateConfig{SPINUP <: Dates.Period, EXTEND <: Dates.Period}
 
@@ -201,6 +203,7 @@ const STANDARD_UNITS = Dict(
     "W m-2" => "W m^-2",
     "kg kg**-1" => "unitless",
     "%" => "unitless",
+    "kg m-2" => "kg m^-2",
 )
 
 """
@@ -555,5 +558,94 @@ end
 
 Base.show(io::IO, data_loader::ERA5PressureLevelDataLoader) =
     _show(io, data_loader, "ERA5PressureLevelDataLoader")
+
+
+
+
+"""
+    ModisDataLoader
+
+A struct for loading preprocessed ERA5 data on pressure levels as `OutputVar`s.
+"""
+struct ModisDataLoader <: AbstractDataLoader
+    catalog::NCCatalog
+    available_vars::Set{String}
+end
+
+MODIS_TO_CLIMA_NAMES = ["lwp" => "lwp", "iwp" => "clivi"]
+
+"""
+    ModisDataLoader(;
+        era5_pressure_level_to_clima_names = ERA5_PRESSURE_LEVEL_TO_CLIMA_NAMES)
+
+Construct a data loader which you can load preprocessed monthly
+time-averaged ERA5 data on pressure levels in `OutputVar`, where
+- the short name and sign of the data match CliMA conventions,
+- the latitudes are shifted to be -180 to 180 degrees,
+- the times are at the start of the time period (e.g. the time average of
+  January is on the first of January instead of January 15th).
+
+The ERA5 data comes from the
+`era5_monthly_averages_pressure_levels_1979_2024` artifact. See
+[ClimaArtifacts](https://github.com/CliMA/ClimaArtifacts/tree/f09429b0a149fd9f780bfc1833e4675c9fab573e/era5_monthly_averages_pressure_levels_1979_2024)
+for more information about this artifact.
+
+The keyword argument `era5_pressure_level_to_clima_names` is a vector of pairs mapping
+ERA5 name to CliMA name.
+"""
+function ModisDataLoader(;
+    modis_to_clima_names = MODIS_TO_CLIMA_NAMES,
+)
+    artifact_dir = @clima_artifact"modis_lwp_iwp"
+    era5_file =
+        joinpath(artifact_dir, "modis_lwp_iwp.nc")
+
+    catalog = NCCatalog()
+    ClimaAnalysis.add_file!(catalog, era5_file, modis_to_clima_names...)
+    return ModisDataLoader(
+        catalog,
+        Set(last.(modis_to_clima_names)),
+    )
+end
+
+"""
+    get(loader::ModisDataLoader, short_name::String)
+
+Get the preprocessed `OutputVar` with the name `short_name` from the ERA5
+pressure levels dataset.
+
+Note that the units of unitless `OutputVar`s are `"unitless"` rather than the
+empty string as ClimaAnalysis consider the empty string as missing units.
+"""
+function Base.get(loader::ModisDataLoader, short_name::String)
+    (; catalog, available_vars) = loader
+    short_name in available_vars || error(
+        "$short_name is not available to load. To add this variable, pass it to modis_to_clima_names as a pair mapping ERA5 name to CliMA name and create a new ModisDataLoader",
+    )
+    var = ClimaAnalysis.Catalog.get(
+        catalog,
+        short_name;
+        var_kwargs = (shift_by = Dates.firstdayofmonth,),
+    )
+    return preprocess(loader, var, Val(Symbol(short_name)))
+end
+
+function preprocess(::ModisDataLoader, var, ::Val{:clivi})
+    var = _preprocess_var(var)
+    global_mean = mean(filter(!isnan, var.data))
+    @info "$(ClimaAnalysis.short_name(var)): Imputting $global_mean for NaNs"
+    replace!(x -> isnan(x) ? global_mean : x, var)
+    return var
+end
+function preprocess(::ModisDataLoader, var, ::Val{:lwp})
+    var = _preprocess_var(var)
+    global_mean = mean(filter(!isnan, var.data))
+    @info "$(ClimaAnalysis.short_name(var)): Imputting $global_mean for NaNs"
+    replace!(x -> isnan(x) ? global_mean : x, var)
+    return var
+end
+
+Base.show(io::IO, data_loader::ModisDataLoader) =
+    _show(io, data_loader, "ModisDataLoader")
 
 end

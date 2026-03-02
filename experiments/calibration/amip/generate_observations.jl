@@ -104,7 +104,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # Create data loaders (constructing these are relatively cheap)
     era5_pl_data_loader = CalibrationTools.ERA5PressureLevelDataLoader()
     ceres_data_loader = CalibrationTools.CERESDataLoader()
-    data_loaders = [era5_pl_data_loader, ceres_data_loader]
+    modis_data_loader = CalibrationTools.ModisDataLoader()
+    data_loaders = [era5_pl_data_loader, ceres_data_loader, modis_data_loader]
 
     (; short_names) = CALIBRATE_CONFIG
     # Map short name to which data loader to use

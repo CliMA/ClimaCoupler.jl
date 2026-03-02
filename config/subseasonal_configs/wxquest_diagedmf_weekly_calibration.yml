@@ -6,14 +6,17 @@ strict_params: false
 mode_name: "subseasonal"
 era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_v1_dev"
 initial_condition: "WeatherModel"
-checkpoint_dt: "40days"
-dt: "120secs"
-dt_cpl: "120secs"
+checkpoint_dt: "100days"
+dt: "150secs"
+dt_cpl: "150secs"
 dt_cloud_fraction: "1hours"
 dt_rad: "1hours"
-dt_seaice: "120secs"
+dt_seaice: "150secs"
+ode_algo: "ARS232"
 energy_check: false
 h_elem: 12
+z_elem: 63
+z_max: 60000.0
 land_fraction_source: "era5"
 binary_area_fraction: false
 
@@ -47,6 +50,11 @@ output_default_diagnostics: false
 use_coupler_diagnostics: false
 use_land_diagnostics: false
 extra_atmos_diagnostics:
-  - short_name: [tas, pr, mslp, rsut, rlut]
+  - short_name: [tas, pr, mslp, rsut, rlut, rsdt]
     period: 1days
     reduction_time: average
+  - short_name: [ta, hur]
+    period: 1days
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours

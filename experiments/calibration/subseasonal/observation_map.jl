@@ -84,44 +84,6 @@ function largest_period(sample_date_range)
     return period
 end
 
-function get_var(short_name, simdir)
-    if short_name == "tas - ta"
-        tas = get(simdir; short_name = "tas")
-        ta = get(simdir; short_name = "ta")
-        # TODO: figure out why this doesn't work
-        # pfull = get(simdir; short_name = "pfull")
-        # ta_900 = ClimaAnalysis.Atmos.to_pressure_coordinates(ta, pfull; target_pressure=[900])
-        ta_900hpa = slice(ta; z = 1000)
-        var = tas - ta_900hpa
-    else
-        # TODO: support multiple periods/reductions of same variable
-        var = get(simdir; short_name)
-    end
-
-    var.attributes["short_name"] = short_name
-    return var
-end
-
-"""
-    preprocess_var(var::ClimaAnalysis.OutputVar, reference_date)
-
-Preprocess `var` before flattening for G ensemble matrix.
-
-For "pr", weekly sums are computed. For "tas" and "mslp", weekly means are
-computed from daily means. The daily means are computing starting from
-`reference_date`.
-
-This function assumes that the data is monthly.
-"""
-function preprocess_var(var, sample_date_range)
-    period = largest_period(sample_date_range)
-    var = ClimaAnalysis.Var._shift_by(var, date -> date - period)
-    var = set_units(var, var_units[short_name(var)])
-    # TODO: Match dates instead of just windowing
-    var = window(var, "time"; left = sample_date_range[1], right = sample_date_range[2])
-    return var
-end
-
 """
     ClimaCalibrate.analyze_iteration(ekp,
                                      g_ensemble,

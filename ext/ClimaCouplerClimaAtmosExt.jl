@@ -669,7 +669,7 @@ function get_atmos_config_dict(
     config_files = atmos_config["toml"]
     job_id = atmos_config["job_id"]
     config = CA.override_default_config(atmos_config)
-
+    config["dt_ogw"] = atmos_config["dt_ogw"]
     TD = typeof(toml_dict)
     PA = typeof(config)
     C = typeof(comms_ctx)

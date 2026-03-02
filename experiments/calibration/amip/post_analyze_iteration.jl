@@ -73,8 +73,8 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
                         # sim_var_t_p = ClimaAnalysis.resampled_as(sim_var_t_p, era5_var_t_p)
                         ClimaAnalysis.Visualize.plot_bias_on_globe!(
                             fig[i, j],
-                            era5_var_t_p,
                             sim_var_t_p,
+                            era5_var_t_p,
                             # era5_var_t_p;
                             # cmap_extrema,
                         )
@@ -82,8 +82,8 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
             else
                 ClimaAnalysis.Visualize.plot_bias_on_globe!(
                     fig[i, 1],
-                    era5_var_t,
-                    sim_var_t;
+                    sim_var_t,
+                    era5_var_t;
                     cmap_extrema,
                 )
             end

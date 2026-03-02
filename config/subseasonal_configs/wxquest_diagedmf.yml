@@ -12,7 +12,7 @@ dt: "120secs"
 dt_cpl: "120secs"
 dt_seaice: "120secs"
 energy_check: false
-h_elem: 32
+h_elem: 16
 land_fraction_source: "era5"
 binary_area_fraction: false
 

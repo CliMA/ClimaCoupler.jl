@@ -95,7 +95,11 @@ function IceSlabParameters{FT}(
     # Ice albedo: read from TOML if available, otherwise use default 0.7
     α_default = FT(0.7)
     if isnothing(α)
-        α = FT(get(coupled_param_dict, "ice_albedo", α_default))
+        α = try
+            FT(coupled_param_dict["ice_albedo"])
+        catch
+            α_default
+        end
     end
     return IceSlabParameters{FT}(;
         h,

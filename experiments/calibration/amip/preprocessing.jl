@@ -6,11 +6,11 @@ import ClimaCoupler
 import Statistics
 
 """
-    select_pressure_levels(var, pressure_levels::Vector)
+    select_pressure_levels(var, pressure_levels::Union{Vector, AbstractFloat})
 
 Select the `pressure_levels` from `var` if pressure is a dimension of `var`.
 """
-function select_pressure_levels(var, pressure_levels::Vector)
+function select_pressure_levels(var, pressure_levels::Union{Vector, AbstractFloat})
     if ClimaAnalysis.has_pressure(var)
         @info "Selecting pressure levels: $(pressure_levels) for $(ClimaAnalysis.short_name(var))"
         var = ClimaAnalysis.select(

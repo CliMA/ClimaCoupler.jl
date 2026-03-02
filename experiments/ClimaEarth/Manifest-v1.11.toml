@@ -436,7 +436,9 @@ version = "1.0.0"
 
 [[deps.ClimaAnalysis]]
 deps = ["Artifacts", "Dates", "Interpolations", "NCDatasets", "NaNStatistics", "OrderedCollections", "Reexport", "Statistics", "Unitful"]
-git-tree-sha1 = "cb6ecefc26f10370756ccd7f9a1b89294a813f5a"
+git-tree-sha1 = "046ee740489a99bbea6313a40e1fa3551ae31344"
+repo-rev = "kp/bugs"
+repo-url = "https://github.com/CliMA/ClimaAnalysis.jl.git"
 uuid = "29b5916a-a76c-4e73-9657-3c8fd22e65e6"
 version = "0.5.21"
 weakdeps = ["GeoMakie", "Makie"]

@@ -46,8 +46,8 @@ function preprocess_sim_vars(vars)
     vars = select_pressure_levels.(vars, Ref(PRESSURE_LEVELS))
     # We do not resample since the simulation variables are already on the
     # simulation grid
-    lat_left = -60
-    lat_right = 60
+    lat_left = -90
+    lat_right = 90
     vars = apply_lat_window.(vars, lat_left, lat_right)
 
     if isfile(NORMALIZATION_STATS_FP)

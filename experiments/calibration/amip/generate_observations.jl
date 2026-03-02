@@ -137,8 +137,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
     vars = select_pressure_levels.(vars, Ref(PRESSURE_LEVELS))
     lonlat_regridder = get_lonlat_regridder(config_file)
     vars = lonlat_regridder.(vars)
-    lat_left = -60
-    lat_right = 60
+    lat_left = -90
+    lat_right = 90
     vars = apply_lat_window.(vars, lat_left, lat_right)
 
     # Normalize data

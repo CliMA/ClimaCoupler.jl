@@ -30,8 +30,8 @@ Apply latitude window by constraining the longitudes to be in the range
 """
 function apply_lat_window(var, lat_left, lat_right)
     lats = ClimaAnalysis.latitudes(var)
-    first_lat_idx = findfirst(lon -> lon >= lat_left, lats)
-    last_lat_idx = findlast(lon -> lon <= lat_right, lats)
+    first_lat_idx = findfirst(lat -> lat >= lat_left, lats)
+    last_lat_idx = findlast(lat -> lat <= lat_right, lats)
     var = ClimaAnalysis.window(
         var,
         "latitude",

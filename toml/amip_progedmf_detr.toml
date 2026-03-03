@@ -23,7 +23,7 @@ value = 1.0e-5
 value = 0.7
 
 [entr_coeff]
-value = 0
+value = 0.2
 
 [entr_param_vec]
 value = [0, 0.1759425797637972, -4.15529994350738, 0, 0, 0.1]
@@ -32,10 +32,10 @@ value = [0, 0.1759425797637972, -4.15529994350738, 0, 0, 0.1]
 value = 0.6022681998170195
 
 [entr_inv_tau]
-value = 0.002
+value = 1e-4
 
 [detr_inv_tau]
-value = 0
+value = 1e-4
 
 [detr_coeff]
 value = 0

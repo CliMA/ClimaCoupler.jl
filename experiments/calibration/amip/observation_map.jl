@@ -46,9 +46,13 @@ function preprocess_sim_vars(vars)
     vars = select_pressure_levels.(vars, Ref(PRESSURE_LEVELS))
     # We do not resample since the simulation variables are already on the
     # simulation grid
-    lat_left = -60
-    lat_right = 60
+    lat_left = -90
+    lat_right = 90
     vars = apply_lat_window.(vars, lat_left, lat_right)
+    if train_on_pattern()
+        @info "Pattern training enabled: removing global mean from simulations"
+        vars = remove_global_mean!.(vars)
+    end
 
     if isfile(NORMALIZATION_STATS_FP)
         # Note: This should not be used with SVDplusDCovariance matrix

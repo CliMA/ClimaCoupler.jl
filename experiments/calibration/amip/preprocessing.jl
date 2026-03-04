@@ -79,6 +79,36 @@ function set_unitless_units!(var)
 end
 
 """
+    train_on_pattern()
+
+Returns whether pattern-only training is enabled for AMIP calibration.
+"""
+train_on_pattern() = @isdefined(TRAIN_ON_PATTERN) && TRAIN_ON_PATTERN
+
+"""
+    remove_global_mean!(var::ClimaAnalysis.OutputVar)
+
+Subtract a single global mean from each pressure level (if present), otherwise
+from the full field. This removes large-scale offsets and keeps only pattern
+information.
+"""
+function remove_global_mean!(var::ClimaAnalysis.OutputVar)
+    if ClimaAnalysis.has_pressure(var)
+        for pressure_level in ClimaAnalysis.pressures(var)
+            var_view = view_select(
+                var;
+                by = ClimaAnalysis.MatchValue(),
+                pressure_level = pressure_level,
+            )
+            var_view.data .-= Statistics.mean(var_view.data)
+        end
+    else
+        var.data .-= Statistics.mean(var.data)
+    end
+    return var
+end
+
+"""
     compute_mean_and_and_stddev(normalization_stas, var::ClimaAnalysis.OutputVar)
 
 Generate normalization statistics by computing a single mean and standard

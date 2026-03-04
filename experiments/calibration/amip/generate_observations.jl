@@ -136,9 +136,13 @@ if abspath(PROGRAM_FILE) == @__FILE__
     vars = select_pressure_levels.(vars, Ref(PRESSURE_LEVELS))
     lonlat_regridder = get_lonlat_regridder(config_file)
     vars = lonlat_regridder.(vars)
-    lat_left = -60
-    lat_right = 60
+    lat_left = -90
+    lat_right = 90
     vars = apply_lat_window.(vars, lat_left, lat_right)
+    if train_on_pattern()
+        @info "Pattern training enabled: removing global mean from observations"
+        vars = remove_global_mean!.(vars)
+    end
 
     # Normalize data
     normalization_stats = Dict()
@@ -155,7 +159,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     observation_vec = make_scalar_covariance_observation_vector(
         vars,
         sample_date_ranges;
-        scalar = 6.0,
+        scalar = 2.5,
         use_latitude_weights = true,
         min_cosd_lat = 0.1,
     )

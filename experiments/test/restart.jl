@@ -116,6 +116,7 @@ cs_two_steps2 = setup_and_run(two_steps)
             :face_clear_sw_direct_flux_dn,      # Not filled by RRTGMP
             :face_sw_direct_flux_dn,            # Not filled by RRTGMP
             :rc,                                # CUDA internal object
+            :non_orographic_gravity_wave,       # Recomputed every timestep; sensitive to FP accumulation
         ],
     )
 

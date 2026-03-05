@@ -10,7 +10,10 @@ top-of-atmosphere shortwave radiation to calibrate the `total_solar_irradiance`
 parameter in a perfect model setting. The current run script uses the
  `ClimaCalibrate.SlurmManager` to add Slurm workers which run each ensemble
  member in parallel.
-- subseasonal: Calibrates the inverse entrainment timescale to ERA5 October monthly surface fluxes and surface temperature from 2018 to 2024.
+- subseasonal: Calibrates the inverse entrainment timescale to ERA5 October
+  monthly surface fluxes and surface temperature from 2018 to 2024.
+- amip: Calibrates `ta` and `hur` for October 1, 2010 with a latitude-weighted
+  scalar covariance matrix.
 
 To run a pipeline on a Slurm cluster, ensure that the given runscript
 `experiments/calibration/<pipeline>/run_calibration.jl` is configured for your

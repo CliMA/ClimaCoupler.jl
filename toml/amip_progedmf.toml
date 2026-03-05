@@ -78,3 +78,8 @@ value = 1200
 
 [Tq_correlation_coefficient]
 value = -1
+
+[nogw_dc]
+value = 4.0
+type = "float"
+description = "Phase speed resolution (m/s). Increased from default 0.8 to reduce nc from 250 to 50 for P100 GPU compatibility."

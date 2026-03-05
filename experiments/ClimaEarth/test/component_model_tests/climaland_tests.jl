@@ -36,7 +36,7 @@ FT = Float32
     )
     area_fraction = CC.Fields.ones(boundary_space)
     atmos_h = CC.Fields.zeros(boundary_space) .+ 2
-
+    initial_T = CC.Fields.zeros(boundary_space) .+ 289
     # Construct simulation object
     land_sim = Interfacer.LandSimulation(
         FT,
@@ -47,6 +47,7 @@ FT = Float32
         output_dir,
         area_fraction,
         atmos_h,
+        initial_T,
     )
 
     # Try taking a timestep
@@ -104,6 +105,10 @@ end
     boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
     area_fraction = CC.Fields.ones(boundary_space)
     atmos_h = CC.Fields.zeros(boundary_space) .+ 2
+    initial_T = CC.Fields.zeros(boundary_space)
+    initial_T .= CC.Fields.field_values(
+        CC.Field.level(Interfacer.get_field(atmos_sim, Val(:air_temperature)), 1),
+    )
     land_sim = Interfacer.LandSimulation(
         FT,
         Val(:integrated);
@@ -113,6 +118,7 @@ end
         output_dir,
         area_fraction,
         atmos_h,
+        initial_T,
     )
     model_sims = (; land_sim = land_sim, atmos_sim = atmos_sim)
 

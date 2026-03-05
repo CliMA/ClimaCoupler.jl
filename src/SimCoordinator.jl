@@ -307,7 +307,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
             lapse_rate .* CC.Fields.field_values(surface_elevation)
     else
         initial_T .= CC.Fields.field_values(
-            CC.Field.level(Interfacer.get_field(atmos_sim, Val(:air_temperature)), 1),
+            CC.Fields.level(Interfacer.get_field(atmos_sim, Val(:air_temperature)), 1),
         )
     end
 

@@ -208,10 +208,6 @@ function argparse_settings()
         help = "Land model to use. [`bucket` (default), `integrated`, `nothing`]"
         arg_type = String
         default = "bucket"
-        "--land_temperature_anomaly"
-        help = "Type of temperature anomaly for land model. [`amip`, `aquaplanet` (default), `nothing`]"
-        arg_type = String
-        default = "aquaplanet"
         "--use_land_diagnostics"
         help = "Boolean flag indicating whether to compute and output land model diagnostics [`true` (default), `false`]"
         arg_type = Bool
@@ -489,7 +485,6 @@ function get_coupler_args(config_dict::Dict)
 
     # ClimaLand-specific information
     land_model = Val(Symbol(config_dict["land_model"]))
-    land_temperature_anomaly = lowercase(config_dict["land_temperature_anomaly"])
     use_land_diagnostics = config_dict["use_land_diagnostics"]
     land_spun_up_ic = config_dict["land_spun_up_ic"]
     lai_source = config_dict["lai_source"]
@@ -579,7 +574,6 @@ function get_coupler_args(config_dict::Dict)
         rmse_check,
         output_dir_root,
         land_model,
-        land_temperature_anomaly,
         land_spun_up_ic,
         lai_source,
         use_land_diagnostics,

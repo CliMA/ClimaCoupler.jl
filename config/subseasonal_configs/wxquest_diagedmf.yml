@@ -28,7 +28,6 @@ lai_source: "modis_monthly_climatology"
 # bucket_initial_condition: "/net/sampo/data1/cchristo/WeatherQuest_data/archive_dev4/era5_bucket_processed_20250831_0000.nc"
 
 land_spun_up_ic: false
-land_temperature_anomaly: "nothing"
 radiation_reset_rng_seed: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"

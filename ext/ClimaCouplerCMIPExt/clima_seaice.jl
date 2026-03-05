@@ -409,6 +409,32 @@ function FluxCalculator.compute_surface_fluxes!(
 
     uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
 
+    # Sea ice parameters for the update_T_sfc callback (load into boundary-space scratch
+    # arrays first to avoid GPU scalar indexing when building the callback)
+    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:ice_thickness))
+    Interfacer.get_field!(csf.scalar_temp2, sim, Val(:internal_temperature))
+    Interfacer.get_field!(csf.scalar_temp3, sim, Val(:emissivity))
+    Interfacer.get_field!(csf.scalar_temp4, sim, Val(:surface_direct_albedo))
+    δ = FT.(csf.scalar_temp1)
+    T_i =
+        FT.(csf.scalar_temp2) .+ FT(sim.ice_properties.C_to_K)
+    ϵ = FT.(csf.scalar_temp3)
+    α_albedo = FT.(csf.scalar_temp4)
+    internal_heat_flux = sim.ice.model.ice_thermodynamics.internal_heat_flux
+    κ = if hasfield(typeof(internal_heat_flux), :conductivity)
+        FT.(internal_heat_flux.conductivity)
+    else
+        convert(FT, 2) # default conductivity [W m⁻¹ K⁻¹]
+    end
+    σ = FT(sim.ice_properties.σ)
+    SW_d = csf.SW_d
+    LW_d = csf.LW_d
+    T_melt = FT(sim.ice_properties.C_to_K) # Melting temperature (freezing point of water)
+
+    # Build element-wise update_T_sfc callbacks (each closes over local ice parameters)
+    update_T_sfc_callback =
+        ClimaCouplerCMIPExt.update_T_sfc.(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
+
     # Surface temperature guess from last timestep
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
     T_sfc = csf.scalar_temp1
@@ -443,28 +469,6 @@ function FluxCalculator.compute_surface_fluxes!(
         error("Unknown roughness_model: $roughness_model. Must be :coare3 or :constant")
     end
     config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
-
-    # Sea ice parameters for the update_T_sfc callback
-    internal_heat_flux = sim.ice.model.ice_thermodynamics.internal_heat_flux
-    κ = if hasfield(typeof(internal_heat_flux), :conductivity)
-        FT.(internal_heat_flux.conductivity)
-    else
-        convert(FT, 2) # default conductivity [W m⁻¹ K⁻¹]
-    end
-    δ = FT.(Interfacer.get_field(sim, Val(:ice_thickness)))
-    T_i =
-        FT.(Interfacer.get_field(sim, Val(:internal_temperature))) .+
-        FT(sim.ice_properties.C_to_K)
-    σ = FT(sim.ice_properties.σ)
-    ϵ = FT.(Interfacer.get_field(sim, Val(:emissivity)))
-    SW_d = csf.SW_d
-    LW_d = csf.LW_d
-    α_albedo = FT.(Interfacer.get_field(sim, Val(:surface_direct_albedo)))
-    T_melt = FT(sim.ice_properties.C_to_K) # Melting temperature (freezing point of water)
-
-    # Build element-wise update_T_sfc callbacks (each closes over local ice parameters)
-    update_T_sfc_callback =
-        ClimaCouplerCMIPExt.update_T_sfc.(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
 
     # Compute surface fluxes via the _get_surface_fluxes_seaice wrapper
     Φ_sfc = SFP.grav.(surface_fluxes_params) .* csf.height_sfc

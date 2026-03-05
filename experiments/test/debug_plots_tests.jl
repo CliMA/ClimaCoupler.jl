@@ -96,6 +96,7 @@ Plotting.debug_plot_fields(sim::Interfacer.SurfaceStub) = (:stub_field,)
     )
 
     output_plots = "test_debug"
+    mkpath(output_plots)
     @test_logs (:info, "plotting debug in test_debug") match_mode = :any Plotting.debug(
         cs,
         output_plots,

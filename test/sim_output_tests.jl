@@ -12,7 +12,7 @@ import ArgParse
         args = SimOutput.get_benchmark_args()
         @test args["job_id_coupled"] == "test_coupled"
         @test isnothing(args["job_id_atmos"])
-        @test args["coupler_output_dir"] == "experiments/ClimaEarth/output"
+        @test args["coupler_output_dir"] == "output"
     finally
         empty!(ARGS)
         append!(ARGS, old_args)

@@ -18,7 +18,6 @@ include("../CoupledSims/coupled_sim.jl")
 
 import Random #hide
 
-import DiffEqCallbacks #hide
 import SciMLBase #hide
 
 import ClimaCore as CC #hide
@@ -98,7 +97,11 @@ function make_dss_func()
     return dss_func
 end
 dss_func = make_dss_func()
-dss_callback = DiffEqCallbacks.FunctionCallingCallback(dss_func, func_start = true)
+dss_callback = SciMLBase.DiscreteCallback(
+    (u, t, integrator) -> true,
+    integrator -> dss_func(integrator.u, integrator.t, integrator),
+    save_positions = (false, false),
+)
 
 #=
 ## Initialization

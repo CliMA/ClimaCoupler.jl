@@ -125,3 +125,31 @@ mode:
 The models are selected via configuration files or command-line arguments when
 setting up a `CoupledSimulation`. For more information about how to select these
 component models, please see the `Input` module documentation.
+
+## Julia Environments
+
+ClimaCoupler provides two Julia environments under `experiments/`, each targeting
+a different set of simulation modes:
+
+### `experiments/AMIP`
+
+Use this environment for `amip`, `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`,
+and `subseasonal` modes. It omits the Oceananigans-related dependencies (`Oceananigans`,
+`ClimaOcean`, `ClimaSeaIce`, `KernelAbstractions`), resulting in a lighter environment
+with faster precompilation.
+
+```bash
+julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl
+```
+
+### `experiments/CMIP`
+
+Use this environment for `cmip` mode, which requires a prognostic Oceananigans ocean
+model. It is a superset of the AMIP environment with additional ocean and sea-ice
+dependencies.
+
+```bash
+julia --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file config/ci_configs/cmip_oceananigans_climaseaice.yml
+```
+
+See the [Input](@ref) documentation for the full list of `mode_name` options.

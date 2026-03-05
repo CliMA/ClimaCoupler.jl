@@ -1,6 +1,5 @@
 # # Ocean Model
 
-import DiffEqCallbacks
 import SciMLBase
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
@@ -82,7 +81,7 @@ function OceanSim(
     timestepper,
     p,
     saveat,
-    callbacks = DiffEqCallbacks.CallbackSet(),
+    callbacks = SciMLBase.CallbackSet(),
 )
     ode_algo = CTS.ExplicitAlgorithm(timestepper)
     ode_function = CTS.ClimaODEFunction(T_exp! = ocn_rhs!)

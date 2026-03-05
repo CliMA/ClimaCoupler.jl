@@ -51,7 +51,7 @@ TOML be used.
 Command-line arguments can be provided when running a simulation:
 
 ```bash
-julia run_amip.jl --config_file="path/to/config.yml" --job_id="amip_default"
+julia run_simulation.jl --config_file="path/to/config.yml" --job_id="amip_default"
 ```
 
 Typically, we rely mostly on configuration files, and provide only the `config_file`
@@ -83,6 +83,8 @@ The following table lists all available command-line arguments organized by cate
 | `--print_config_dict` | Bool | `true` | `true`, `false` | Whether to print the final configuration dictionary |
 | `--mode_name` | String | `"amip"` | `cmip`, `amip`, `subseasonal`, `slabplanet`, `slabplanet_aqua`, `slabplanet_terra` | Mode of coupled simulation |
 | `--coupler_toml` | Vector{String} | `[]` | Any list of valid TOML file paths | Optional list of paths to TOML files used to overwrite default model parameters |
+
+Note: the `mode_name` determines which Julia environment to use. Use `experiments/AMIP` for all modes except `cmip`, which requires `experiments/CMIP`. See the [Julia Environments](@ref) section in Models for details.
 
 #### Computational simulation setup
 
@@ -133,7 +135,7 @@ specific timesteps should be specified, rather than only `dt`.
 | Argument | Type | Default | Valid Options | Description |
 |----------|------|---------|---------------|-------------|
 | `--use_coupler_diagnostics` | Bool | `true` | `true`, `false` | Whether to compute and output coupler diagnostics |
-| `--coupler_output_dir` | String | `"experiments/ClimaEarth/output"` | Any valid directory path | Directory to save output files |
+| `--coupler_output_dir` | String | `"output"` | Any valid directory path | Directory to save output files |
 
 
 

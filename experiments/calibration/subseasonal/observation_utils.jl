@@ -3,7 +3,7 @@ using Statistics
 import Dates
 using ClimaAnalysis
 
-include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "code_loading.jl"))
+include(joinpath(pkgdir(ClimaCoupler), "experiments", "AMIP", "code_loading.jl"))
 
 var_units = Dict(
     "pr" => "kg m^-2 s^-1",

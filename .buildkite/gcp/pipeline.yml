@@ -10,11 +10,11 @@ steps:
     key: "init_gpu_env"
     command:
       - "echo --- Instantiate AMIP env"
-      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'
-      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add("MPI")'
-      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add("CUDA")'
-      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'
-      - julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'
+      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'
+      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add("MPI")'
+      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add("CUDA")'
+      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'
+      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'
 
     agents:
       slurm_gpus: 1
@@ -25,21 +25,20 @@ steps:
 
   - wait
 
-  - group: "High-resolution AMIPs and CMIPs"
+  - group: "High-resolution AMIPs"
 
     steps:
-
 
       - label: "Current AMIP: diagedmf + 0M + bucket land"
         key: "amip"
         command:
           - echo "--- Run simulation"
           - |
-            julia --threads=3 --color=yes --project=experiments/ClimaEarth/ \
-            experiments/ClimaEarth/run_amip.jl \
+            julia --threads=3 --color=yes --project=experiments/AMIP/ \
+            experiments/AMIP/run_simulation.jl \
             --config_file $CONFIG_PATH/amip.yml \
             --job_id amip
-        artifact_paths: "experiments/ClimaEarth/output/amip/artifacts/*"
+        artifact_paths: "output/amip/artifacts/*"
         timeout_in_minutes: 7220
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -49,17 +48,17 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 0GB
           slurm_time: "120:00:00"
-      
+
       - label: "Current AMIP: diagedmf + 0M + integrated land"
         key: "amip_land"
         command:
           - echo "--- Run simulation"
           - |
-            julia --threads=3 --color=yes --project=experiments/ClimaEarth/ \
-            experiments/ClimaEarth/run_amip.jl \
+            julia --threads=3 --color=yes --project=experiments/AMIP/ \
+            experiments/AMIP/run_simulation.jl \
             --config_file $CONFIG_PATH/amip_land.yml \
             --job_id amip_land
-        artifact_paths: "experiments/ClimaEarth/output/amip_land/artifacts/*"
+        artifact_paths: "output/amip_land/artifacts/*"
         timeout_in_minutes: 7220
         env:
           CLIMACOMMS_DEVICE: "CUDA"

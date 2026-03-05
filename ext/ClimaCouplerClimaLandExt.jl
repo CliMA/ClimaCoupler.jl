@@ -4,7 +4,7 @@
 This module contains code for extending the ClimaCoupler interface for
 ClimaLand. This includes two land model options: a simple bucket or the more
 complex integrated land model. For more information about each model, please see
-`experiments/ClimaEarth/README.md`
+`experiments/AMIP/README.md`
 """
 module ClimaCouplerClimaLandExt
 

@@ -2,6 +2,9 @@ using SafeTestsets
 import ClimaComms
 ClimaComms.@import_required_backends
 
+# load extensions for AMIP and plotting
+include(joinpath("..", "AMIP", "code_loading.jl"))
+
 @safetestset "component model test: ClimaAtmos" begin
     include("component_model_tests/climaatmos_tests.jl")
 end

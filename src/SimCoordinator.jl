@@ -207,7 +207,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         land_progress_interval,
         evolving_ocean,
         land_model,
-        land_temperature_anomaly,
         land_spun_up_ic,
         lai_source,
         bucket_albedo_type,
@@ -286,10 +285,12 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     )
 
     surface_elevation = Interfacer.get_field(boundary_space, atmos_sim, Val(:height_sfc))
-    atmos_bottom_center_height =
-        Interfacer.get_field(boundary_space, atmos_sim, Val(:height_int))
-    atmos_h =
-        Interfacer.get_atmos_height_delta(atmos_bottom_center_height, surface_elevation)
+    atmos_h = Interfacer.get_atmos_height_delta(
+        Interfacer.get_field(atmos_sim, Val(:height_int)),
+        surface_elevation,
+    )
+    initial_T = CC.Fields.zeros(boundary_space)
+    initial_T .= Interfacer.get_field(boundary_space, atmos_sim, Val(:air_temperature))
 
     land_fraction = Input.get_land_fraction(
         boundary_space,
@@ -322,9 +323,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         output_dir = dir_paths.land_output_dir,
         area_fraction = land_fraction,
         shared_surface_space,
-        surface_elevation,
         atmos_h,
-        land_temperature_anomaly,
+        initial_T,
         use_land_diagnostics,
         land_diagnostics_period,
         land_diagnostics_reduction,

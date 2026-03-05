@@ -19,7 +19,6 @@ import ClimaCore as CC
 import ClimaParams as CP
 using KernelAbstractions: @kernel, @index, @inbounds
 
-import Adapt # for ConservativeRegridding
 import ClimaCore as CC # for ConservativeRegriddingClimaCoreExt
 import ConservativeRegridding as CR
 

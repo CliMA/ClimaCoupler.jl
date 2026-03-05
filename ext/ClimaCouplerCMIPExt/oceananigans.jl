@@ -4,7 +4,7 @@ import Thermodynamics as TD
 import Dates
 
 # TODO: move to Oceananigans
-# Change the `set_to_array!` of Oceananigans to work on a `Center` 
+# Change the `set_to_array!` of Oceananigans to work on a `Center`
 # field (in y) with abstract 2D and 3D arrays.
 const TG = OC.OrthogonalSphericalShellGrids.TripolarGrid{FT, TX, <:OC.Grids.RightFaceFolded} where {FT, TX}
 const TGRF = Union{<:OC.ImmersedBoundaryGrid{<:Any, <:Any, <:Any, <:Any, <:TG}, TG}
@@ -258,7 +258,7 @@ To regrid from ClimaCore to Oceananigans, use `CR.regrid!(dest_vector, transpose
 function construct_remappers(grid_oc, boundary_space)
     # Move grids to CPU since ConservativeRegridding doesn't support GPU grids yet
     grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), grid_oc.underlying_grid)
-    boundary_space_cpu = Adapt.adapt_structure(Array, boundary_space)
+    boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
 
     # Create the remapper from the Oceananigans grid to the ClimaCore boundary space
     remapper_oc_to_cc = CR.Regridder(

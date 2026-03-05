@@ -160,7 +160,7 @@ specific timesteps should be specified, rather than only `dt`.
 | Argument | Type | Default | Valid Options | Description |
 |----------|------|---------|---------------|-------------|
 | `--land_model` | String | `"bucket"` | `bucket`, `integrated` | Land model to use |
-| `--land_temperature_anomaly` | String | `"aquaplanet"` | `amip`, `aquaplanet`, `nothing` | Type of temperature anomaly for land model |
+| `--land_temperature_anomaly` | String | `"nothing"` | `orog_adjusted`, `nothing` | Type of initial temperature for land model |
 | `--use_land_diagnostics` | Bool | `true` | `true`, `false` | Whether to compute and output land model diagnostics |
 | `--land_spun_up_ic` | Bool | `true` | `true`, `false` | Whether to use integrated land initial conditions from spun up state |
 | `--lai_source` | String | `"modis_monthly"` | `modis_monthly`, `modis_monthly_climatology` | Source for leaf area index data. `modis_monthly` uses full MODIS monthly data, `modis_monthly_climatology` uses MODIS monthly climatology with periodic calendar |

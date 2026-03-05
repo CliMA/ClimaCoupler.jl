@@ -15,11 +15,10 @@ const OUTPUT_DIR = joinpath(@__DIR__, "src/generated")
 
 # tutorials & experiments
 # - generate tutorial files:
-
-TUTORIAL_DIR_AMIP = joinpath(EXPERIMENTS_DIR, "ClimaEarth/")
+TUTORIAL_DIR_AMIP = joinpath(EXPERIMENTS_DIR, "AMIP")
 
 # execute Literate on all julia files
-tutorial_files_amip = filter(x -> last(x, 11) == "run_amip.jl", readdir(TUTORIAL_DIR_AMIP))
+tutorial_files_amip = filter(x -> x == "run_simulation.jl", readdir(TUTORIAL_DIR_AMIP))
 
 map(
     x -> Literate.markdown(

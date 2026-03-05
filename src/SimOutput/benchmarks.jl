@@ -51,7 +51,7 @@ function argparse_settings_benchmarks()
         "--coupler_output_dir"
         help = "Directory to save output files."
         arg_type = String
-        default = "experiments/ClimaEarth/output"
+        default = "output"
         "--build_id"
         help = "The build ID of the pipeline running this script."
         arg_type = String

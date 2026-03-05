@@ -15,7 +15,7 @@
 import Test: @test, @testset
 import ClimaCore as CC
 
-include(joinpath("..", "code_loading.jl"))
+include(joinpath("..", "AMIP", "code_loading.jl"))
 
 @testset "surface radiative flux consistency (AMIP + bucket land)" begin
     # Build AMIP configuration used in CI by default

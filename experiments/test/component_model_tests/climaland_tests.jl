@@ -105,10 +105,7 @@ end
     boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
     area_fraction = CC.Fields.ones(boundary_space)
     atmos_h = CC.Fields.zeros(boundary_space) .+ 2
-    initial_T = CC.Fields.zeros(boundary_space)
-    initial_T .= CC.Fields.field_values(
-        CC.Field.level(Interfacer.get_field(atmos_sim, Val(:air_temperature)), 1),
-    )
+    initial_T = Interfacer.get_field(boundary_space, atmos_sim, Val(:air_temperature))
     land_sim = Interfacer.LandSimulation(
         FT,
         Val(:integrated);

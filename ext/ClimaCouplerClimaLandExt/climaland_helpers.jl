@@ -1,22 +1,4 @@
 """
-    temp_anomaly_aquaplanet(coord)
-
-Introduce a temperature IC anomaly for the aquaplanet case.
-The values for this case follow the moist Held-Suarez setup of Thatcher &
-Jablonowski (2016, eq. 6), consistent with ClimaAtmos aquaplanet.
-"""
-temp_anomaly_aquaplanet(coord) = 29 * exp(-coord.lat^2 / (2 * 26^2))
-
-"""
-    temp_anomaly_amip(coord)
-
-Introduce a temperature IC anomaly for the AMIP case.
-The values used in this case have been tuned to align with observed temperature
-and result in stable simulations.
-"""
-temp_anomaly_amip(coord) = 40 * cosd(coord.lat)^4
-
-"""
     make_land_domain(
         depth::FT,
         toml_dict::CP.ParamDict;

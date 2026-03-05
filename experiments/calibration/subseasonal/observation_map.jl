@@ -21,13 +21,14 @@ ensemble member that has been matched to the corresponding observational data.
 """
 function ClimaCalibrate.observation_map(iteration)
     output_dir = CALIBRATE_CONFIG.output_dir
+    run_name = first(splitext(basename(CALIBRATE_CONFIG.config_file)))
     ekp = JLD2.load_object(ClimaCalibrate.ekp_path(output_dir, iteration))
 
     g_ens_builder = EnsembleBuilder.GEnsembleBuilder(ekp)
 
     for m in 1:EKP.get_N_ens(ekp)
         member_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
-        simdir_path = joinpath(member_path, "wxquest_diagedmf/output_active")
+        simdir_path = joinpath(member_path, run_name, "output_active")
         @info "Processing member $m: $simdir_path"
         try
             process_member_data!(g_ens_builder, simdir_path, m, iteration)

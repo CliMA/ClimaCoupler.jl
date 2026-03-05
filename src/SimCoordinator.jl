@@ -302,17 +302,13 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         surface_elevation,
     )
     initial_T = CC.Fields.zeros(boundary_space)
-    if land_temperature_anomaly != "nothing"
-        T_functions =
-            Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
-        haskey(T_functions, land_temperature_anomaly) ||
-            error("land temp anomaly function $land_temperature_anomaly not supported")
-        temp_anomaly = T_functions[land_temperature_anomaly]
+    if land_temperature_anomaly == "orog_adjusted"
+        anomaly_function(latitude) = 40 * cosd(latitude)^4
         # Set temperature IC including anomaly, based on atmospheric setup
         lapse_rate = FT(6.5e-3)
         T_base = FT(271)
         coords = CC.Field.coordinate_field(boundary_space)
-        T_sfc_0 = T_base .+ temp_anomaly.(coords)
+        T_sfc_0 = T_base .+ anomaly_function.(coords.lat)
         # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
         initial_T .=
             CC.Fields.field_values(T_sfc_0) .-

@@ -209,9 +209,9 @@ function argparse_settings()
         arg_type = String
         default = "bucket"
         "--land_temperature_anomaly"
-        help = "Type of temperature anomaly for land model. [`amip`, `aquaplanet` (default), `nothing`]"
+        help = "Type of temperature anomaly for land model. [`orog_adjusted`, `nothing` (default)]"
         arg_type = String
-        default = "aquaplanet"
+        default = "nothing"
         "--use_land_diagnostics"
         help = "Boolean flag indicating whether to compute and output land model diagnostics [`true` (default), `false`]"
         arg_type = Bool

@@ -293,6 +293,28 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         Interfacer.get_field(atmos_sim, Val(:height_int)),
         surface_elevation,
     )
+    initial_T = CC.Fields.zeros(boundary_space)
+    if land_temperature_anomaly != "nothing"
+        T_functions =
+            Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
+        haskey(T_functions, land_temperature_anomaly) ||
+            error("land temp anomaly function $land_temperature_anomaly not supported")
+        temp_anomaly = T_functions[land_temperature_anomaly]
+        # Set temperature IC including anomaly, based on atmospheric setup
+        lapse_rate = FT(6.5e-3)
+        T_base = FT(271)
+        coords = CC.Field.coordinate_field(boundary_space)
+        T_sfc_0 = T_base .+ temp_anomaly.(coords)
+        # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
+        initial_T .=
+            CC.Fields.field_values(T_sfc_0) .-
+            lapse_rate .* CC.Fields.field_values(surface_elevation)
+    else
+        initial_T .= CC.Fields.field_values(
+            CC.Field.level(Interfacer.get_field(atmos_sim, Val(:air_temperature)), 1),
+        )
+    end
+
 
     land_fraction = Input.get_land_fraction(
         boundary_space,
@@ -322,9 +344,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         output_dir = dir_paths.land_output_dir,
         area_fraction = land_fraction,
         shared_surface_space,
-        surface_elevation,
         atmos_h,
-        land_temperature_anomaly,
+        initial_T,
         use_land_diagnostics,
         coupled_param_dict,
         albedo_type = bucket_albedo_type,

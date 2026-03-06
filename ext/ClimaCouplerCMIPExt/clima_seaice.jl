@@ -430,7 +430,7 @@ function FluxCalculator.compute_surface_fluxes!(
     σ = FT(sim.ice_properties.σ)
     SW_d = csf.SW_d
     LW_d = csf.LW_d
-    T_melt = FT(sim.ice_properties.T_melt)
+    T_melt = FT(get(sim.ice_properties, :T_melt, 273.05))
 
     # Build element-wise update_T_sfc callbacks (each closes over local ice parameters)
     update_T_sfc_callback =

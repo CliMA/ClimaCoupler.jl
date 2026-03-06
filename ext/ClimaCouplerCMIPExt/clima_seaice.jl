@@ -149,12 +149,11 @@ function ClimaSeaIceSimulation(
         OC.set!(ice.model.ice_thickness, h_metadata)
     end
 
-    # Get sea ice properties from coupled parameters
-    # T_melt: cap for diagnosed skin temperature (seawater freezing point, K). Use 271.2 K if not set.
+    # Get sea ice properties from coupled parameters (T_melt: OIFES Table 2 = 273.05 K)
     ice_properties = (;
         σ = coupled_param_dict["stefan_boltzmann_constant"],
         C_to_K = coupled_param_dict["temperature_water_freeze"],
-        T_melt = get(coupled_param_dict, "temperature_sea_ice_melt", 271.2),
+        T_melt = get(coupled_param_dict, "temperature_sea_ice_melt", 273.05),
     )
 
     # Since ocean and sea ice share the same grid, we can also share the remapping objects

@@ -27,8 +27,7 @@ information needed to run that simulation.
 
 Each `AbstractComponentSimulation` must extend the following functions to be able
 to use our coupler. For some existing models, these are defined within
-ClimaCoupler.jl in that model’s file in `experiments/ClimaEarth/components/`, but it is preferable
-for these to be defined in a model’s own repository. Note that the dispatch
+ClimaCoupler.jl `Models` module, or within package extensions. Note that the dispatch
 `::AbstractComponentSimulation` in the function definitions given below should
 be replaced with the particular component model extending these functions.
 - constructor: construct and return an instance of the `AbstractComponentSimulation`,
@@ -331,6 +330,8 @@ end
 ## Interfacer API
 ```@docs
     Interfacer.CoupledSimulation
+    Interfacer.current_date
+    Interfacer.default_coupler_fields
     Interfacer.AbstractAtmosSimulation
     Interfacer.AbstractSurfaceSimulation
     Interfacer.AbstractComponentSimulation

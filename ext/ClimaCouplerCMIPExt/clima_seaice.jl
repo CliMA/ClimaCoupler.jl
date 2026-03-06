@@ -27,8 +27,8 @@ It contains the following objects:
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 - `ocean_ice_interface::NT`: A NamedTuple containing fluxes between the ocean and sea ice, computed at each coupling step,
                              the interfacial temperature and salinity, and the flux formulation used to compute the fluxes.
-- `ice_properties::IP`: A NamedTuple of sea ice properties, including melting speed, Stefan-Boltzmann constant,
-    and the Celsius to Kelvin conversion constant.
+- `ice_properties::IP`: A NamedTuple of sea ice properties, including Stefan-Boltzmann constant,
+    Celsius-to-Kelvin offset, and sea-ice surface melting temperature (cap for skin-temperature diagnosis).
 """
 struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP} <: Interfacer.AbstractSeaIceSimulation
     ice::SIM
@@ -150,9 +150,11 @@ function ClimaSeaIceSimulation(
     end
 
     # Get sea ice properties from coupled parameters
+    # T_melt: cap for diagnosed skin temperature (seawater freezing point, K). Use 271.2 K if not set.
     ice_properties = (;
         σ = coupled_param_dict["stefan_boltzmann_constant"],
         C_to_K = coupled_param_dict["temperature_water_freeze"],
+        T_melt = get(coupled_param_dict, "temperature_sea_ice_melt", 271.2),
     )
 
     # Since ocean and sea ice share the same grid, we can also share the remapping objects
@@ -429,7 +431,7 @@ function FluxCalculator.compute_surface_fluxes!(
     σ = FT(sim.ice_properties.σ)
     SW_d = csf.SW_d
     LW_d = csf.LW_d
-    T_melt = FT(sim.ice_properties.C_to_K) # Melting temperature (freezing point of water)
+    T_melt = FT(sim.ice_properties.T_melt)
 
     # Build element-wise update_T_sfc callbacks (each closes over local ice parameters)
     update_T_sfc_callback =

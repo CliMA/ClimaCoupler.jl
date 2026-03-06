@@ -215,3 +215,114 @@ session:
 @show extrema(cs.fields.T_sfc)
 @show nameof(typeof(cs.model_sims.ocean_sim))
 ```
+
+### Interactive debugging with Infiltrator.jl
+
+[Infiltrator.jl](https://github.com/JuliaDebug/Infiltrator.jl) lets you drop into an
+interactive REPL at any point in the code, even entering functions from external packages.
+This is especially useful for coupled simulations where the call stack spans
+multiple packages.
+
+!!! note
+    Infiltrator.jl must be installed in your default julia environment, not in the
+    experiment project. Julia loads it from the default environment automatically.
+
+#### Pausing inside the coupling loop
+
+Place `@infiltrate` at the point you want to inspect. For example, to pause after every
+coupling step:
+
+```julia
+import Infiltrator
+
+# After loading and constructing the CoupledSimulation `cs`:
+for i in 1:n_steps
+    step!(cs)
+    Infiltrator.@infiltrate  # drops you into a REPL here
+end
+```
+
+Inside the Infiltrator REPL you have access to all local variables (`cs`, `i`, etc.)
+and can run any Julia code:
+
+```
+infil> extrema(cs.fields.T_sfc)
+(215.3, 318.7)
+infil> cs.t[]
+1200
+```
+
+Type `@continue` to resume execution, or `@exit` to abort.
+
+#### Conditional infiltration
+
+If the crash happens at a specific timestep, use a condition to avoid stopping at every
+iteration:
+
+```julia
+for i in 1:n_steps
+    step!(cs)
+    Infiltrator.@infiltrate i == 42  # only pause at step 42
+end
+```
+
+You can also trigger on a data condition, such as the first appearance of NaN:
+
+```julia
+for i in 1:n_steps
+    step!(cs)
+    Infiltrator.@infiltrate any(isnan, parent(cs.fields.T_sfc))
+end
+```
+
+#### Infiltrating inside library code
+
+If the problem is inside a function you don't own (e.g. in `FieldExchanger` or a
+component model extension), you can temporarily redefine that function with an
+`@infiltrate` call. For example, to pause inside `update_sim!` for a specific model type:
+
+```julia
+import Infiltrator
+import ClimaCoupler: FieldExchanger, Interfacer
+
+function FieldExchanger.update_sim!(
+    sim::Interfacer.AbstractSurfaceSimulation,
+    fields,
+    area_fraction,
+)
+    Infiltrator.@infiltrate
+    # ... original body (copy-paste from source) ...
+end
+```
+
+From the Infiltrator REPL, use `@trace` to see the full call stack, which helps identify
+which caller led to unexpected state.
+
+#### Exfiltrating variables to the main REPL
+
+Sometimes it's easier to pull variables out of a deep scope for post-hoc analysis rather
+than debugging inline. Use `@exfiltrate` to copy local variables into
+`Infiltrator.safehouse`, which persists after you `@continue`:
+
+```julia
+import Infiltrator
+
+for i in 1:n_steps
+    step!(cs)
+    if any(isnan, parent(cs.fields.T_sfc))
+        Infiltrator.@exfiltrate
+        break
+    end
+end
+
+# Back in the main REPL:
+(; cs, i) = Infiltrator.safehouse
+extrema(cs.fields.F_turb_moisture)
+```
+
+For more details about using Infiltrator with ClimaCore objects,
+including using with ClimaCore's `DebugOnly` callback system for catching
+NaNs inside low-level field operations, see the
+[ClimaCore debugging guide](https://clima.github.io/ClimaCore.jl/stable/debugging/).
+
+For more general information, see the [Infiltrator.jl docs](https://juliadebug.github.io/Infiltrator.jl/stable/).

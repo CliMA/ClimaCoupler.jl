@@ -55,7 +55,7 @@ Coupler quantities
 
 These diagnostics are all averaged over a period of time that depends
 on the length of the overall simulation according to the following rule:
-- simulation length >= 90 days: 30-day mean
+- simulation length >= 90 days: 1-month mean
 - simulation length >= 30 days and < 90 days: 10-day mean
 - simulation length >= 1 day and < 30 days: 1-day mean
 - simulation length < 1 day: 1-hour mean
@@ -76,38 +76,24 @@ An example of this process for the combined turbulent energy flux, `F_turb_energ
 `src/SimOutput/diagnostics.jl` in the [`SimOutput.diagnostics_setup`](@ref) function.
 
 For more information about this process, please see the
-ClimaDiagnostics.jl [documentation](https://clima.github.io/ClimaDiagnostics.jl/dev/).
+ClimaDiagnostics.jl [documentation](https://clima.github.io/ClimaDiagnostics.jl/stable/).
 
 ### Adding a diagnostic for a CliMA component model quantity
 Many of our current diagnostics are values that we access directly from a component model.
 To add a new diagnostic of this kind, you can add a new method `add_diagnostic_variable!`
 extending this function from the component model package's Diagnostics module.
 
+For example, to add a diagnostic for the atmosphere model, you can extend
+`ClimaAtmos.Diagnostics.add_diagnostic_variable!` in that model's extension.
+
 For more information about this function and the form it takes, please see the
-ClimaDiagnostics.jl [documentation](https://clima.github.io/ClimaDiagnostics.jl/dev/).
-
-#### ClimaAtmos.jl
-To add a new diagnostic for the ClimaAtmos.jl atmosphere model, you can add this new method
-for `ClimaAtmos.Diagnostics.add_diagnostic_variable!` in
-`components/atmosphere/climaatmos_extra_diags.jl`.
-The existing diagnostics in that file can be used as templates.
-
-For more information about ClimaAtmos diagnostics, and to see the default atmospheric diagnostics,
-please see that package's [documentation](https://clima.github.io/ClimaAtmos.jl/dev/diagnostics/).
-
-#### ClimaLand.jl
-To add a new diagnostic for the ClimaLand.jl bucket model, you can add this new method
-for `ClimaLand.Diagnostics.add_diagnostic_variable!` in
-`components/land/climaland_bucket_extra_diags.jl` (which doesn't exist at the time of writing).
-
-For more information about ClimaLand diagnostics, and to see the default land diagnostics,
-please see that package's [documentation](https://clima.github.io/ClimaLand.jl/dev/diagnostics/users_diagnostics/).
+ClimaDiagnostics.jl [documentation](https://clima.github.io/ClimaDiagnostics.jl/stable/).
 
 ## Visualizing diagnostics
 ClimaCoupler.jl uses ClimaAnalysis.jl to parse and visualize the outputs saved
 using ClimaDiagnostics.jl.
 
-For more information about ClimaAnalysis.jl, please see that package's [documentation](https://clima.github.io/ClimaAnalysis.jl/dev/).
+For more information about ClimaAnalysis.jl, please see that package's [documentation](https://clima.github.io/ClimaAnalysis.jl/stable/).
 
 ### Functions
 

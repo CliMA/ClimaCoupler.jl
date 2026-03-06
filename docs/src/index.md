@@ -71,8 +71,8 @@ ClimaCoupler.jl is organized as a set of modules, each with a distinct role in t
 
 ### Parameter calibration
 
-- [CalibrationTools](@ref): Provides utilities for setting up model calibration experiments,
-  including data loaders for ERA5 observational data.
+- [Parameter calibration](@ref CalibrationTools): Provides utilities for setting up model calibration experiments,
+  including data loaders for observational data.
 
 
 ## Extensions

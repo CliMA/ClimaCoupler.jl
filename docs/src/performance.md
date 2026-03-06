@@ -15,16 +15,17 @@ for details.
 
 ### Reference performance numbers
 
-The numbers below were last updated **3 March 2026** and all use the ED-only
-(eddy-diffusion only, no mass flux) option for the atmosphere turbulence-convection
-scheme. The choice of turbulence-convection scheme has a strong impact on performance.
+The numbers below were last updated **6 March 2026** and they come from the
+buildkite longrun and regular CI pipelines. The turbulence convection (TC)
+scheme used in the atmosphere is noted as it has a strong impact on performance.
+All runs use 0-moment microphysics, which also greatly affects performance.
 
-| Configuration | Hardware | Resolution | SYPD |
-|---|---|---|---|
-| AMIP | 1 CPU | ~5.6° | 0.024 |
-| Slabplanet | 1 CPU | ~2.8° | 0.034 |
-| AMIP | 1 GPU | ~1.4° | 2.113 |
-| CMIP | 1 GPU | ~1.4° (atmos/land), ~1° (ocean/sea ice) | 1.049 |
+| Configuration | Hardware                       | Resolution                              | SYPD  | TC scheme       | Source                      |
+|---------------|--------------------------------|-----------------------------------------|-------|-----------------|-----------------------------|
+| Slabplanet    | 1 CPU (1 core, Intel Ice Lake) | ~2.8°                                   | 0.034 | ED only         | longrun                     |
+| AMIP          | 1 CPU (1 core, Intel Ice Lake) | ~3.8°                                   | 0.276 | vert. diff only | Float64 + hourly checkpoint |
+| AMIP          | 1 GPU (A100)                   | ~1.4°                                   | 1.996 | ED only         | longrun                     |
+| CMIP          | 1 GPU (A100)                   | ~1.4° (atmos/land), ~1° (ocean/sea ice) | 1.017 | ED only         | longrun                     |
 
 !!! note
     SYPD (simulated years per day) is the standard metric for climate model throughput.

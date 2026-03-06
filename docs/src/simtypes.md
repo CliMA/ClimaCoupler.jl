@@ -134,7 +134,9 @@ Given a `start_date` formatted as `YYYYMMDD`, the following files are expected i
 | `tsn` | K | `(lat, lon)` | Snow layer temperature |
 | `skt` | K | `(lat, lon)` | Skin temperature |
 
-ERA5 land level midpoints: 0.035, 0.175, 0.64, 1.945 m.
+For variables that are resolved vertically in the ERA5 data,
+the data is present at the following land level midpoints:
+0.035, 0.175, 0.64, 1.945 m.
 
 #### Integrated land IC (`era5_land_processed_YYYYMMDD_0000.nc`)
 
@@ -148,7 +150,9 @@ ERA5 land level midpoints: 0.035, 0.175, 0.64, 1.945 m.
 | `tsn` | K | `(lat, lon)` | Snow layer temperature |
 | `skt` | K | `(lat, lon)` | Skin temperature |
 
-ERA5 land level midpoints: 0.035, 0.175, 0.64, 1.945 m.
+For variables that are resolved vertically in the ERA5 data,
+the data is present at the following land level midpoints:
+0.035, 0.175, 0.64, 1.945 m.
 
 #### Surface albedo (`albedo_processed_YYYYMMDD_0000.nc`)
 

@@ -6,8 +6,7 @@ import ClimaCoupler: CalibrationTools
 import ClimaAnalysis
 
 @testset "Calibrate config" begin
-    config_file =
-        joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "test", "amip_test.jl")
+    config_file = joinpath(pkgdir(ClimaCoupler), "experiments", "test", "amip_test.jl")
     valid_config_args = (;
         config_file,
         short_names = ["pr"],

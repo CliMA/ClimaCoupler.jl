@@ -1,6 +1,5 @@
 # # Land Model
 
-import DiffEqCallbacks
 import SciMLBase
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
@@ -83,7 +82,7 @@ function LandSim(
     timestepper,
     p,
     saveat,
-    callbacks = DiffEqCallbacks.CallbackSet(),
+    callbacks = SciMLBase.CallbackSet(),
 )
     ode_algo = CTS.ExplicitAlgorithm(timestepper)
     ode_function = CTS.ClimaODEFunction(T_exp! = lnd_rhs!)

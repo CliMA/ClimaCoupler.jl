@@ -4,7 +4,7 @@
 # compute the climate feedback parameter λ = ΔF_net / ΔTs, from which
 # ECS ≈ ERF_2xCO2 / λ is derived.
 #
-# Usage: julia --project=experiments/ClimaEarth/ cess_climate_sensitivity.jl \
+# Usage: julia --project=experiments/AMIP/ cess_climate_sensitivity.jl \
 #          <ctrl_atmos_dir> <p2k_atmos_dir> <output_dir>
 
 import ClimaAnalysis

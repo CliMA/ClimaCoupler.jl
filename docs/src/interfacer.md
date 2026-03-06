@@ -26,9 +26,8 @@ of a `AbstractComponentSimulation`. This struct should contain all of the
 information needed to run that simulation.
 
 Each `AbstractComponentSimulation` must extend the following functions to be able
-to use our coupler. For some existing models, these are defined within
-ClimaCoupler.jl in that model’s file in `experiments/ClimaEarth/components/`, but it is preferable
-for these to be defined in a model’s own repository. Note that the dispatch
+to use our coupler. For existing models, these are defined in that model’s file
+within ClimaCoupler.jl, either in `src/` or in `ext/`. Note that the dispatch
 `::AbstractComponentSimulation` in the function definitions given below should
 be replaced with the particular component model extending these functions.
 - constructor: construct and return an instance of the `AbstractComponentSimulation`,

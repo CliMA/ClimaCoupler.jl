@@ -588,9 +588,170 @@ function preprocess(::ModisDataLoader, var, ::Union{Val{:clivi}, Val{:lwp}})
     var = _preprocess_var(var)
     not_nans = filter(!isnan, var.data)
     global_mean = sum(not_nans) / length(not_nans)
-    @info "$(ClimaAnalysis.short_name(var)): Imputting $global_mean for NaNs"
+    @info "$(ClimaAnalysis.short_name(var)): Imputing global mean $global_mean for NaNs"
     replace!(x -> isnan(x) ? global_mean : x, var)
     return var
+end
+
+"""
+    CalipsoDataLoader
+
+A struct for loading preprocessed CALIPSO/CloudSat cloud fraction data on altitude
+levels as `OutputVar`s.
+"""
+struct CalipsoDataLoader <: AbstractDataLoader
+    catalog::NCCatalog
+    available_vars::Set{String}
+end
+
+const CALIPSO_TO_CLIMA_NAMES = ["cloud_fraction_on_levels" => "cl"]
+
+"""
+    CalipsoDataLoader(; calipso_to_clima_names = CALIPSO_TO_CLIMA_NAMES)
+
+Construct a data loader which you can load preprocessed monthly CALIPSO/CloudSat
+cloud fraction on altitude levels in `OutputVar`, where
+- the short name and units match CliMA conventions,
+- the latitudes are shifted to be -180 to 180 degrees,
+- the times are at the start of the time period (e.g. the time average of
+  January is on the first of January instead of January 15th),
+- values are fractions in [0, 1] (converted from percentages in the source data),
+- missing values are imputed with the global mean of the non-missing data,
+- the `doop` dimension is sliced to "All cases" (first index).
+
+The CALIPSO/CloudSat data comes from the `calipso_cloudsat` artifact, which
+repackages the 3S-GEOPROF-COMB dataset. See
+[ClimaArtifacts](https://github.com/CliMA/ClimaArtifacts/tree/main/calipso_cloudsat)
+for more information about this artifact.
+
+The keyword argument `calipso_to_clima_names` is a vector of pairs mapping
+CALIPSO/CloudSat variable name to CliMA name.
+"""
+function CalipsoDataLoader(; calipso_to_clima_names = CALIPSO_TO_CLIMA_NAMES)
+    artifact_dir = @clima_artifact("calipso_cloudsat")
+    monthly_file = joinpath(artifact_dir, "radarlidar_monthly_2.5x2.5.nc")
+
+    catalog = NCCatalog()
+    ClimaAnalysis.add_file!(catalog, monthly_file, calipso_to_clima_names...)
+    return CalipsoDataLoader(catalog, Set(last.(calipso_to_clima_names)))
+end
+
+"""
+    get(loader::CalipsoDataLoader, short_name::String)
+
+Get the preprocessed `OutputVar` with the name `short_name` from the
+CALIPSO/CloudSat dataset.
+"""
+function Base.get(loader::CalipsoDataLoader, short_name::String)
+    (; catalog, available_vars) = loader
+    short_name in available_vars || error(
+        "$short_name is not available to load. To add this variable, pass it to calipso_to_clima_names as a pair mapping CALIPSO/CloudSat name to CliMA name and create a new CalipsoDataLoader",
+    )
+    var = get(catalog, short_name; var_kwargs = (shift_by = Dates.firstdayofmonth,))
+    return preprocess(loader, var, Val(Symbol(short_name)))
+end
+
+"""
+    preprocess(::CalipsoDataLoader, var, ::Val{varname}) where {varname}
+
+Preprocess `var` with short name `varname`.
+"""
+function preprocess(::CalipsoDataLoader, var, ::Val{:cl})
+    # Select "All cases" doop (first index)
+    var = ClimaAnalysis.slice(var; doop = 1, by = ClimaAnalysis.Index())
+    var = _preprocess_var(var)
+    # Rename "height" to "z" so ClimaAnalysis altitude functions (altitude_name,
+    # altitudes, regrid_to_model_levels, …) can locate the vertical dimension
+    if haskey(var.dims, "height")
+        new_dims = typeof(var.dims)()
+        for (k, v) in var.dims
+            new_dims[k == "height" ? "z" : k] = v
+        end
+        new_dim_attribs = typeof(var.dim_attributes)()
+        for (k, v) in var.dim_attributes
+            new_dim_attribs[k == "height" ? "z" : k] = v
+        end
+        var = ClimaAnalysis.remake(var; dims = new_dims, dim_attributes = new_dim_attribs)
+    end
+    # Convert from percentage (0–100) to fraction (0–1)
+    var = ClimaAnalysis.convert_units(var, "unitless"; conversion_function = x -> x / 100)
+    # Impute missing and NaN values with the global mean in one pass
+    T = nonmissingtype(eltype(var.data))
+    valid = filter(x -> !ismissing(x) && !isnan(x), vec(var.data))
+    global_mean = T(sum(valid) / length(valid))
+    @info "$(ClimaAnalysis.short_name(var)): Imputing global mean $global_mean for missing/NaN values"
+    return ClimaAnalysis.remake(
+        var;
+        data = map(x -> (ismissing(x) || isnan(x)) ? global_mean : T(x), var.data),
+    )
+end
+
+"""
+    regrid_to_model_levels(obs_var, model_altitudes)
+
+Regrid `obs_var` from dataset altitude levels to `model_altitudes` using a
+Gaussian-weighted average along the altitude dimension.
+
+For each model level `k` with altitude `z_k`, the regridded value is:
+
+    obs(z_k) = sum_i w_i(k) * obs(z_i)
+
+where the sum is over all dataset levels `i` with altitude `z_i`, and the
+normalized weight is:
+
+    w_i(k) = exp(-(z_i - z_k)^2 / (2 * sigma_k^2)) / Z_k
+    Z_k     = sum_j exp(-(z_j - z_k)^2 / (2 * sigma_k^2))
+
+The bandwidth `sigma_k` is half the spacing between neighboring model levels:
+
+    sigma_k = 0.5 * (z_{k+1} - z_{k-1})   (interior levels)
+    sigma_1 = 0.5 * (z_2 - z_1)            (lower boundary)
+    sigma_K = 0.5 * (z_K - z_{K-1})        (upper boundary)
+
+All other dimensions (lon, lat, time, …) are left unchanged; only the altitude
+axis is replaced by `model_altitudes`.
+
+`obs_var` must have an altitude dimension. `model_altitudes` should be in the
+same units as the altitude coordinate of `obs_var` (meters above mean sea
+level for the CALIPSO/CloudSat dataset).
+"""
+function regrid_to_model_levels(obs_var::ClimaAnalysis.OutputVar, model_altitudes)
+    alt_name = ClimaAnalysis.altitude_name(obs_var)
+    alt_axis = obs_var.dim2index[alt_name]
+    z_i = ClimaAnalysis.altitudes(obs_var)
+    z_k = model_altitudes
+    K = length(z_k)
+
+    # Compute sigma for each model level (half the central finite difference)
+    sigmas = map(1:K) do k
+        if k == 1
+            0.5 * (z_k[2] - z_k[1])
+        elseif k == K
+            0.5 * (z_k[K] - z_k[K - 1])
+        else
+            0.5 * (z_k[k + 1] - z_k[k - 1])
+        end
+    end
+
+    # Allocate output array with model altitude size along alt_axis
+    out_shape = ntuple(i -> i == alt_axis ? K : size(obs_var.data, i), ndims(obs_var.data))
+    out_data = zeros(eltype(obs_var.data), out_shape)
+
+    # For each model level k, compute normalized Gaussian weights over all
+    # dataset levels and accumulate the weighted sum into the corresponding
+    # slice of out_data
+    for k in 1:K
+        weights = @. exp(-(z_i - z_k[k])^2 / (2 * sigmas[k]^2))
+        weights ./= sum(weights)
+        out_k = selectdim(out_data, alt_axis, k)
+        for (i, w) in enumerate(weights)
+            out_k .+= w .* selectdim(obs_var.data, alt_axis, i)
+        end
+    end
+
+    new_dims = copy(obs_var.dims)
+    new_dims[alt_name] = model_altitudes
+    return ClimaAnalysis.remake(obs_var; dims = new_dims, data = out_data)
 end
 
 """

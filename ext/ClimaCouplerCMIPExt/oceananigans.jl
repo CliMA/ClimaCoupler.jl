@@ -298,7 +298,7 @@ function construct_remappers(grid_oc, boundary_space)
         polar_exclusion_flux_mask_centers,
         polar_exclusion_flux_mask_u,
         polar_exclusion_flux_mask_v,
-    ) = construct_polar_mask(grid)
+    ) = construct_polar_mask(grid_oc)
 
     return (;
         remapper_oc_to_cc,

@@ -6,13 +6,20 @@ import Dates
 # TODO: move to Oceananigans
 # Change the `set_to_array!` of Oceananigans to work on a `Center`
 # field (in y) with abstract 2D and 3D arrays.
-const TG = OC.OrthogonalSphericalShellGrids.TripolarGrid{FT, TX, <:OC.Grids.RightFaceFolded} where {FT, TX}
+const TG = OC.OrthogonalSphericalShellGrids.TripolarGrid{
+    FT,
+    TX,
+    <:OC.Grids.RightFaceFolded,
+} where {FT, TX}
 const TGRF = Union{<:OC.ImmersedBoundaryGrid{<:Any, <:Any, <:Any, <:Any, <:TG}, TG}
 
-@inline resize_to_facefolded(a::AbstractArray{T, 2}) where T = a[:, 1:end-1]
-@inline resize_to_facefolded(a::AbstractArray{T, 3}) where T = a[:, 1:end-1, :]
+@inline resize_to_facefolded(a::AbstractArray{T, 2}) where {T} = a[:, 1:(end - 1)]
+@inline resize_to_facefolded(a::AbstractArray{T, 3}) where {T} = a[:, 1:(end - 1), :]
 
-function OC.Fields.set_to_array!(u::OC.Field{LX, <:OC.Grids.Center, LZ, O, <:TGRF}, a) where {LX, LZ, O}
+function OC.Fields.set_to_array!(
+    u::OC.Field{LX, <:OC.Grids.Center, LZ, O, <:TGRF},
+    a,
+) where {LX, LZ, O}
     a = OC.Architectures.on_architecture(OC.Architectures.CPU(), a)
     a = resize_to_facefolded(a)
     a = OC.Architectures.on_architecture(OC.Architectures.architecture(u), a)
@@ -24,9 +31,7 @@ function OC.Fields.set_to_array!(u::OC.Field{LX, <:OC.Grids.Center, LZ, O, <:TGR
             Nx, Ny, Nz = size(u)
             u .= reshape(a, Nx, Ny, Nz)
 
-            msg = string("Reshaped ", summary(a),
-                         " to set! its data to ", '\n',
-                         summary(u))
+            msg = string("Reshaped ", summary(a), " to set! its data to ", '\n', summary(u))
             @warn msg
         else
             throw(err)
@@ -289,7 +294,11 @@ function construct_remappers(grid_oc, boundary_space)
     temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
 
     # Construct the polar exclusion flux masks
-    (; polar_exclusion_flux_mask_centers, polar_exclusion_flux_mask_u, polar_exclusion_flux_mask_v) = construct_polar_mask(grid)
+    (;
+        polar_exclusion_flux_mask_centers,
+        polar_exclusion_flux_mask_u,
+        polar_exclusion_flux_mask_v,
+    ) = construct_polar_mask(grid)
 
     return (;
         remapper_oc_to_cc,
@@ -316,7 +325,7 @@ surface fluxes).
 
 Similarly, the ocean's TripolarGrid is defined between -80 and 90 degrees latitude.
 In this case we set the ice and ocean area fractions to 0 and the land fraction to 1
-on [78°S, 90°S], and leave the northern latitudes unmodified.
+on [80°S, 90°S], and leave the northern latitudes unmodified.
 
 This function also updates the ice concentration field in the ocean simulation
 so that it can be used for weighting flux updates.
@@ -337,10 +346,10 @@ function FieldExchanger.resolve_area_fractions!(
     # TODO change these to 80??
     if ocean_sim.ocean.model.grid.underlying_grid isa OC.LatitudeLongitudeGrid
         # Create a "polar" mask that's 1 at latitudes in [-90, -80] and [80, 90] degrees
-        polar_mask .= abs.(lat) .>= FT(78)
+        polar_mask .= abs.(lat) .>= FT(80)
     elseif ocean_sim.ocean.model.grid isa OC.TripolarGrid
         # Create a "polar" mask that's 1 at latitudes in [-90, -80] degrees
-        polar_mask .= lat .<= FT(-78)
+        polar_mask .= lat .<= FT(-80)
     end
 
     # Set land fraction to 1 and ice/ocean fraction to 0 where polar_mask is 1
@@ -599,21 +608,12 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     # Remap precipitation fields onto scratch fields; rename for clarity
     Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.P_liq, sim.remapping) # liquid precipitation
     remapped_P_liq = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
-    remapped_P_liq =
-        ifelse.(
-            polar_excl_centers .≈ 0,
-            zero(remapped_P_liq),
-            remapped_P_liq,
-        )
+    remapped_P_liq = ifelse.(polar_excl_centers .≈ 0, zero(remapped_P_liq), remapped_P_liq)
 
     Interfacer.remap!(sim.remapping.scratch_field_oc2, csf.P_snow, sim.remapping) # snow precipitation
     remapped_P_snow = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
     remapped_P_snow =
-        ifelse.(
-            polar_excl_centers .≈ 0,
-            zero(remapped_P_snow),
-            remapped_P_snow,
-        )
+        ifelse.(polar_excl_centers .≈ 0, zero(remapped_P_snow), remapped_P_snow)
 
     # Virtual salt flux
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)

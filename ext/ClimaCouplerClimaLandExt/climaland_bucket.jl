@@ -376,7 +376,7 @@ function FluxCalculator.compute_surface_fluxes!(
     atmos_sim::Interfacer.AbstractAtmosSimulation,
     thermo_params,
 )
-    boundary_space = axes(csf)
+    boundary_space = axes(first(csf))
     FT = CC.Spaces.undertype(boundary_space)
     Y, p, t, model = sim.integrator.u, sim.integrator.p, sim.integrator.t, sim.model
 

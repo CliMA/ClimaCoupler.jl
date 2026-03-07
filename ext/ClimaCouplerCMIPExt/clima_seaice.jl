@@ -153,7 +153,7 @@ function ClimaSeaIceSimulation(
     ice_properties = (;
         σ = coupled_param_dict["stefan_boltzmann_constant"],
         C_to_K = coupled_param_dict["temperature_water_freeze"],
-        T_melt = get(coupled_param_dict, "temperature_sea_ice_melt", 273.05),
+        T_melt = FT(273.05),
     )
 
     # Since ocean and sea ice share the same grid, we can also share the remapping objects

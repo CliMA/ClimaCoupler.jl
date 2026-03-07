@@ -72,3 +72,6 @@ value = 1e3
 
 [rain_autoconversion_timescale]
 value = 150
+
+[nogw_dc]
+value = 4.0

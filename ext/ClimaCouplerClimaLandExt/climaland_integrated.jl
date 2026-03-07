@@ -249,7 +249,7 @@ function ClimaLandSimulation(
         @info "ClimaLand: using land IC file" land_ic_path
         # Note: This `set_ic!` function does not require `p.drivers.T` to be set,
         # so we do not need to use `_coupler_set_ic!` here.
-        set_ic! = CL.make_set_subseasonal_initial_conditions(land_ic_path)
+        set_ic! = CL.Simulations.make_set_subseasonal_initial_conditions(land_ic_path)
     elseif land_spun_up_ic
         # Use artifact spun-up initial conditions
         ic_path = CL.Artifacts.soil_ic_2008_50m_path()

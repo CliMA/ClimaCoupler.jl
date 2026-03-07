@@ -84,3 +84,6 @@ value = 100
 
 [sublimation_deposition_timescale]
 value = 100
+
+[nogw_dc]
+value = 4.0

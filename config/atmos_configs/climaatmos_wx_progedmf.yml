@@ -47,3 +47,7 @@ microphysics_model: "0M"
 cloud_model: "quadrature"
 use_itime: true
 deep_atmosphere: true
+
+### Gravity waves ###
+non_orographic_gravity_wave: true
+orographic_gravity_wave: "raw_topo"

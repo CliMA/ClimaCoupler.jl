@@ -464,14 +464,14 @@ function FluxCalculator.ocean_seaice_fluxes!(
     flux_v .= ifelse.(polar_excl_v .≈ 0, zero(flux_v), flux_v)
 
     oc_flux_T = surface_flux(ocean_sim.ocean.model.tracers.T)
-    qi_masked = OC.interior(ocean_sim.remapping.scratch_cc1, :, :, 1)
+    qi_masked = OC.interior(ocean_sim.remapping.scratch_field_oc1, :, :, 1)
     qi_masked .=
         OC.interior(ice_concentration, :, :, 1) .* OC.interior(Qi, :, :, 1) .* ρₒ⁻¹ ./ cₒ
     qi_masked .= ifelse.(polar_excl_centers .≈ 0, zero(qi_masked), qi_masked)
     OC.interior(oc_flux_T, :, :, 1) .+= qi_masked
 
     oc_flux_S = surface_flux(ocean_sim.ocean.model.tracers.S)
-    salt_contrib = OC.interior(ocean_sim.remapping.scratch_cc2, :, :, 1)
+    salt_contrib = OC.interior(ocean_sim.remapping.scratch_field_oc2, :, :, 1)
     salt_contrib .=
         OC.interior(ice_concentration, :, :, 1) .*
         OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)

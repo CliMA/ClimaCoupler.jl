@@ -478,8 +478,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     Interfacer.remap!(sim.remapping.scratch_field_oc2, F_turb_ρτyz_uv, sim.remapping) # meridional momentum flux
 
     # Rename for clarity; these are now cell-centered (Center, Center) Oceananigans fields
-    F_turb_ρτxz_oc = sim.remapping.scratch_cc1
-    F_turb_ρτyz_oc = sim.remapping.scratch_cc2
+    F_turb_ρτxz_oc = sim.remapping.scratch_field_oc1
+    F_turb_ρτyz_oc = sim.remapping.scratch_field_oc2
 
     # Weight by (1 - sea ice concentration); polar-exclusion mask applied via ifelse below
     ice_concentration = OC.interior(ice_concentration_field, :, :, 1)
@@ -593,16 +593,14 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
 
     # Compute radiative contribution; polar-exclusion mask applied via ifelse
-    rad_T_flux = sim.remapping.scratch_arr3
+    rad_T_flux = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
     rad_T_flux .=
         (1.0 .- ice_concentration) .* (
             -(1 - α) .* remapped_SW_d .-
-            ϵ * (
-                remapped_LW_d .-
-                σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T, :, :, Nz)) .^ 4
+            ϵ * (remapped_LW_d .- σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T, :, :, Nz)) .^ 4
             )
         ) ./ (reference_density * heat_capacity)
-    @. rad_T_flux = ifelse(polar_excl_centers .≈ 0, zero(rad_T_flux), rad_T_flux)
+    rad_T_flux .= ifelse.(polar_excl_centers .≈ 0, zero(rad_T_flux), rad_T_flux)
     OC.interior(oc_flux_T, :, :, 1) .= rad_T_flux
 
     # Remap precipitation fields onto scratch fields; rename for clarity

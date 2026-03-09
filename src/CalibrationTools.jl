@@ -187,6 +187,110 @@ function preprocess(data_loader::AbstractDataLoader, _, ::Val{varname}) where {v
 end
 
 """
+    CompositeDataLoader
+
+A struct for simplifying the process of loading multiple variables from multiple
+data loaders.
+"""
+struct CompositeDataLoader <: AbstractDataLoader
+    """A dictionary mapping each variable short name to the `AbstractDataLoader`
+    responsible for loading it."""
+    varname_to_loaders::Dict{String, AbstractDataLoader}
+
+    """A list of available variables to load."""
+    available_vars::Set{String}
+end
+
+"""
+    CompositeDataLoader(loaders::AbstractDataLoader...; varname_to_loader = Dict())
+
+Construct a `CompositeDataLoader` from multiple data loaders.
+
+The keyword argument `varname_to_loader` is a dictionary mapping variable names
+to `AbstractDataLoader`s. When multiple data loaders provide the same variable,
+use `varname_to_loader` to specify which loader to use for each variable. If a
+variable name is not provided in `varname_to_loader` and multiple loaders
+provide the same variable, an error is thrown.
+
+See the example below for how to use `CompositeDataLoader`.
+
+```julia
+composite_data_loader = CompositeDataLoader(ERA5DataLoader(), CERESDataLoader())
+
+# If pr is added to ERA5DataLoader, then you can specify to load pr from
+# GPCPDataLoader
+era5_data_loader = ERA5DataLoader()
+gpcp_data_loader = GPCPDataLoader()
+composite_data_loader = CompositeDataLoader(
+    era5_data_loader,
+    gpcp_data_loader;
+    varname_to_loader = Dict("pr" => gpcp_data_loader)
+)
+```
+"""
+function CompositeDataLoader(loaders::AbstractDataLoader...; varname_to_loader = Dict())
+    varname_to_loader = Dict{String, AbstractDataLoader}(varname_to_loader)
+    for (varname, loader) in varname_to_loader
+        varname in available_vars(loader) ||
+            error("$varname is not available in $(nameof(typeof(loader)))")
+    end
+
+    # The variable names being the same is a problem when there is ambiguity
+    # for which data loaders to get it from
+    if length(loaders) != 1
+        all_varnames = available_vars.(loaders)
+        shared_varnames = intersect(all_varnames...)
+        setdiff!(shared_varnames, keys(varname_to_loader))
+        if !isempty(shared_varnames)
+            error("There are shared variable names between data loaders")
+        end
+    end
+
+    for loader in loaders
+        for varname in available_vars(loader)
+            varname in keys(varname_to_loader) && continue
+            varname_to_loader[varname] = loader
+        end
+    end
+    return CompositeDataLoader(varname_to_loader, Set(keys(varname_to_loader)))
+end
+
+"""
+    find_source_loader(loader::CompositeDataLoader, short_name::String)
+
+Find the loader for `short_name` in `loader`.
+"""
+function find_source_loader(loader::CompositeDataLoader, short_name::String)
+    (; varname_to_loaders) = loader
+    short_name in keys(varname_to_loaders) || error(
+        "$short_name is not available for this composite data loader. Use available_vars to see all available variables",
+    )
+    return varname_to_loaders[short_name]
+end
+
+"""
+    get(loader::CompositeDataLoader, short_name::String)
+
+Get the preprocessed `OutputVar` with the name `short_name`.
+"""
+function Base.get(loader::CompositeDataLoader, short_name::String)
+    (; varname_to_loaders) = loader
+    short_name in keys(varname_to_loaders) || error(
+        "$short_name is not available to load from this composite data loader. Use available_vars to see all available variables",
+    )
+    return get(varname_to_loaders[short_name], short_name)
+end
+
+function Base.show(io::IO, data_loader::CompositeDataLoader)
+    printstyled(io, "CompositeDataLoader", bold = true, color = :green)
+    data_loaders = unique(values(data_loader.varname_to_loaders))
+    for data_loader in data_loaders
+        print(io, "\n  ")
+        show(io, data_loader)
+    end
+end
+
+"""
     ERA5DataLoader
 
 A struct for loading preprocessed ERA5 data as `OutputVar`s.

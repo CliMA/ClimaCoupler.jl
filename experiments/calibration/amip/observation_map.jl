@@ -95,6 +95,10 @@ function load_and_preprocess_vars(simdir, short_names)
             # the vertical coordinate is pressure or z, we process both of them
             # and let GEnsembleBuilder handle it
             var = get(simdir; short_name, reduction = "average", period = "1M", coord_type)
+            # MODIS metadata uses "kg m-2" (no caret), but model outputs "kg m^-2"
+            if short_name in ("lwp", "clivi")
+                var.attributes["units"] = replace(ClimaAnalysis.units(var), "^" => "")
+            end
             push!(vars, var)
         end
     end
@@ -147,6 +151,13 @@ function ClimaCalibrate.observation_map(iteration)
         catch e
             @error "Ensemble member $m failed" exception = (e, catch_backtrace())
             # Fill failed member column with NaN so EKP can handle the failure
+            EnsembleBuilder.fill_g_ens_col!(g_ens_builder, m, NaN)
+        end
+        # Check if column was actually filled (e.g. partial output with
+        # mismatched dates won't throw an error but also won't fill the column)
+        missing = EnsembleBuilder.missing_short_names(g_ens_builder, m)
+        if !isempty(missing)
+            @warn "Ensemble member $m has unfilled variables after processing: $missing. Filling with NaN."
             EnsembleBuilder.fill_g_ens_col!(g_ens_builder, m, NaN)
         end
     end

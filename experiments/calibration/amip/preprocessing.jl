@@ -79,6 +79,21 @@ function set_unitless_units!(var)
 end
 
 """
+    normalize_units!(var)
+
+Normalize units string to match observation metadata format.
+For example, converts "kg m^-2" to "kg m-2" for compatibility.
+"""
+function normalize_units!(var)
+    units = ClimaAnalysis.units(var)
+    normalized_units = replace(units, "^" => "")
+    if normalized_units != units
+        var.attributes["units"] = normalized_units
+    end
+    return var
+end
+
+"""
     compute_mean_and_and_stddev(normalization_stas, var::ClimaAnalysis.OutputVar)
 
 Generate normalization statistics by computing a single mean and standard

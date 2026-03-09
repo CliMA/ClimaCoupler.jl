@@ -1,0 +1,57 @@
+albedo_model: "CouplerAlbedo"
+# atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
+atmos_config_file: "config/atmos_configs/climaatmos_wx_progedmf.yml"
+binary_area_fraction: false
+checkpoint_dt: "900days"
+coupler_toml: ["toml/amip_progedmf_monthly.toml"]
+strict_params: false
+dt_cloud_fraction: "1hours"
+dt_cpl: "100secs"
+# dt_ogw: 1800secs
+dt_rad: "1hours"
+dt_seaice: "100secs"
+dt: "100secs"
+energy_check: false
+era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+extra_atmos_diagnostics:
+  - short_name: [tas, pr, mslp, rsut, rsutcs, rlut, rlutcs, rsdt, lwp, clivi]
+    period: monthly
+    reduction_time: average
+  - short_name: [cl]
+    period: monthly
+    reduction_time: average
+  - short_name: [ta, hur, pfull]
+    period: monthly
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours
+
+    # period: monthly
+FLOAT_TYPE: "Float32"
+h_elem: 12
+z_elem: 50
+z_max: 60000.0
+dz_bottom: 50.0
+initial_condition: "WeatherModel"
+lai_source: "modis_monthly_climatology"
+land_fraction_source: "era5"
+land_model: "integrated"
+land_spun_up_ic: false
+land_temperature_anomaly: "nothing"
+mode_name: "subseasonal"
+netcdf_output_at_levels: true
+
+non_orographic_gravity_wave: true
+# orographic_gravity_wave: "raw_topo"
+
+ode_algo: "ARS222"
+output_default_diagnostics: false
+radiation_reset_rng_seed: true
+start_date: "20100924"
+surface_setup: "PrescribedSurface"
+t_end: "39days"
+topo_smoothing: true
+topography: "Earth"
+use_coupler_diagnostics: false
+use_land_diagnostics: false
+

@@ -1,4 +1,4 @@
-FLOAT_TYPE: "Float32"
+FLOAT_TYPE: "Float64"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "map_temporal"

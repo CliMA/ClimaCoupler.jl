@@ -72,7 +72,6 @@ end
 Interfacer.get_field(sim::TestOcean, ::Val{:surface_temperature}) = sim.integrator.T
 Interfacer.get_field(sim::TestOcean, ::Val{:roughness_momentum}) = sim.integrator.p.z0m
 Interfacer.get_field(sim::TestOcean, ::Val{:roughness_buoyancy}) = sim.integrator.p.z0b
-Interfacer.get_field(sim::TestOcean, ::Val{:beta}) = sim.integrator.p.beta
 Interfacer.get_field(sim::TestOcean, ::Val{:area_fraction}) = sim.integrator.p.area_fraction
 Interfacer.get_field(
     sim::TestOcean,
@@ -95,7 +94,6 @@ Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:surface_temperature}) 
     sim.integrator.T
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:area_fraction}) =
     sim.integrator.p.area_fraction
-Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:beta}) = sim.integrator.p.beta
 Interfacer.get_field(sim::DummySurfaceSimulation3, ::Val{:emissivity}) =
     eltype(sim.integrator.T)(1)
 
@@ -133,7 +131,6 @@ for FT in (Float32, Float64)
             F_aero = zeros(boundary_space),
             z0m = FT(0.01),
             z0b = FT(0.01),
-            beta = ones(boundary_space),
             α = ones(boundary_space) .* FT(0.5),
             q = zeros(boundary_space),
             area_fraction = ones(boundary_space) .* FT(0.5),
@@ -180,7 +177,7 @@ for FT in (Float32, Float64)
         # Compute expected fluxes
         # Get atmosphere properties
         height_int = Interfacer.get_field(atmos_sim, Val(:height_int))
-        uₕ_int =
+        uv_int =
             StaticArrays.SVector.(
                 Interfacer.get_field(atmos_sim, Val(:u_int)),
                 Interfacer.get_field(atmos_sim, Val(:v_int)),
@@ -192,70 +189,56 @@ for FT in (Float32, Float64)
                 atmos_sim.integrator.T,
                 TD.PhasePartition.(atmos_sim.integrator.q),
             )
+        surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
 
         # Get surface properties
         height_sfc = Interfacer.get_field(atmos_sim, Val(:height_sfc))
         z0m = Interfacer.get_field(ocean_sim, Val(:roughness_momentum))
         z0b = Interfacer.get_field(ocean_sim, Val(:roughness_buoyancy))
         gustiness = FT(1)
-        beta = Interfacer.get_field(ocean_sim, Val(:beta))
 
         T_sfc = Interfacer.get_field(ocean_sim, Val(:surface_temperature))
         q_sfc = zeros(boundary_space)
-        FluxCalculator.compute_surface_humidity!(
-            q_sfc,
-            fields.T_atmos,
-            fields.q_atmos,
-            fields.ρ_atmos,
-            T_sfc,
-            thermo_params,
-        )
         ρ_sfc =
-            FluxCalculator.extrapolate_ρ_to_sfc.(thermo_params, thermo_state_atmos, T_sfc)
+            SF.surface_density.(
+                surface_fluxes_params,
+                fields.T_atmos,
+                fields.ρ_atmos,
+                T_sfc,
+                height_int .- height_sfc,
+                fields.q_atmos,
+                0, # q_liq
+                0, # q_ice
+            )
+        FluxCalculator.compute_surface_humidity!(q_sfc, T_sfc, ρ_sfc, thermo_params)
         thermo_state_sfc =
             TD.PhaseNonEquil_ρTq.(thermo_params, ρ_sfc, T_sfc, TD.PhasePartition.(q_sfc))
 
-        # Use SurfaceFluxes.jl to compute the expected fluxes
-        if pkgversion(SF) ≥ v"0.14.0"
-            roughness_model = Ref(SF.ScalarRoughness())
-            inputs = @. SF.ValuesOnly(
-                SF.StateValues(height_int, uₕ_int, thermo_state_atmos), # state_in
-                SF.StateValues(                                  # state_sfc
-                    height_sfc,
-                    StaticArrays.SVector(FT(0), FT(0)),
-                    thermo_state_sfc,
-                ),
-                z0m,
-                z0b,
-                gustiness,
-                beta,
-                roughness_model,
+        config =
+            SF.SurfaceFluxConfig.(
+                SF.ConstantRoughnessParams.(z0m, z0b),
+                SF.ConstantGustinessSpec.(gustiness),
             )
-        else
-            inputs = @. SF.ValuesOnly(
-                SF.StateValues(height_int, uₕ_int, thermo_state_atmos), # state_in
-                SF.StateValues(                                  # state_sfc
-                    height_sfc,
-                    StaticArrays.SVector(FT(0), FT(0)),
-                    thermo_state_sfc,
-                ),
-                z0m,
-                z0b,
-                gustiness,
-                beta,
+
+        fluxes_expected =
+            FluxCalculator.get_surface_fluxes.(
+                surface_fluxes_params,
+                uv_int,
+                thermo_state_atmos,
+                height_int,
+                StaticArrays.SVector.(0, 0), # uv_sfc
+                thermo_state_sfc,
+                height_sfc,
+                0, # d
+                Ref(config),
             )
-        end
-        surface_params = FluxCalculator.get_surface_params(atmos_sim)
-        fluxes_expected = FluxCalculator.get_surface_fluxes(inputs, surface_params)
 
         # Compare expected and computed fluxes
         @test fields.F_turb_ρτxz ≈ fluxes_expected.F_turb_ρτxz
         @test fields.F_turb_ρτyz ≈ fluxes_expected.F_turb_ρτyz
         @test fields.F_lh ≈ fluxes_expected.F_lh
         @test fields.F_sh ≈ fluxes_expected.F_sh
-        # The ClimaCore DataLayout underlying the expected moisture flux uses
-        # Array instead of SubArray, so we can't compare the fields directly without copy.
-        @test copy(fields.F_turb_moisture) ≈ fluxes_expected.F_turb_moisture
+        @test fields.F_turb_moisture ≈ fluxes_expected.F_turb_moisture
     end
 
     @testset "get_surface_params for FT=$FT" begin

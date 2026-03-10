@@ -367,28 +367,37 @@ function Interfacer.update_field!(
     Interfacer.get_field!(csf.scalar_temp3, sim, Val(:air_density))
     ρ_atmos = csf.scalar_temp3
 
+    surface_fluxes_params = FluxCalculator.get_surface_params(sim)
+
+    # TODO: Is csf.height_int .- csf.height_sfc allocating?
+    csf.scalar_temp4 .=
+        SF.surface_density.(
+            surface_fluxes_params,
+            T_atmos,
+            ρ_atmos,
+            csf.T_sfc,
+            csf.height_int .- csf.height_sfc,
+            q_atmos,
+            0, # q_liq
+            0, # q_ice
+        )
+    ρ_sfc = csf.scalar_temp4
+
     thermo_params = get_thermo_params(sim)
     FluxCalculator.compute_surface_humidity!(
-        csf.scalar_temp4,
-        T_atmos,
-        q_atmos,
-        ρ_atmos,
+        csf.scalar_temp1,
         csf.T_sfc,
+        ρ_sfc,
         thermo_params,
     )
 
     # Remap surface temperature and humidity to atmosphere surface space
     # NOTE: This is allocating! If we had 2 more scratch fields, we could avoid this
     T_sfc_atmos = Interfacer.remap(atmos_surface_space, csf.T_sfc)
-    q_sfc_atmos = Interfacer.remap(atmos_surface_space, csf.scalar_temp4)
+    q_sfc_atmos = Interfacer.remap(atmos_surface_space, csf.scalar_temp1)
 
     # Store `ρ_sfc_atmos` in an atmosphere scratch field on the surface space
-    temp_field_surface =
-        FluxCalculator.extrapolate_ρ_to_sfc.(
-            thermo_params,
-            sim.integrator.p.precomputed.sfc_conditions.ts,
-            T_sfc_atmos,
-        )
+    temp_field_surface = Interfacer.remap(atmos_surface_space, ρ_sfc)
     ρ_sfc_atmos = temp_field_surface
 
     if sim.integrator.p.atmos.moisture_model isa CA.DryModel

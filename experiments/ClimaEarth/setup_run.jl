@@ -319,6 +319,7 @@ function CoupledSimulation(config_dict::AbstractDict)
                 area_fraction = land_fraction,
                 shared_surface_space,
                 surface_elevation,
+                atmos_h,
                 land_temperature_anomaly,
                 use_land_diagnostics,
                 albedo_type = bucket_albedo_type,
@@ -351,6 +352,7 @@ function CoupledSimulation(config_dict::AbstractDict)
         if sim_mode <: CMIPMode
             stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
             ocean_sim = OceananigansSimulation(
+                FT,
                 boundary_space,
                 start_date,
                 stop_date;
@@ -415,6 +417,7 @@ function CoupledSimulation(config_dict::AbstractDict)
             output_dir = dir_paths.land_output_dir,
             area_fraction = land_fraction,
             surface_elevation,
+            atmos_h,
             land_temperature_anomaly,
             use_land_diagnostics,
             albedo_type = bucket_albedo_type,

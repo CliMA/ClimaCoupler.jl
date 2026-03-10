@@ -53,7 +53,7 @@ steps:
         command:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_diagedmf.yml --job_id amip_coarse_diagedmf"
-        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_diagedmf/artifacts/*"
+        artifact_paths: "output/amip_coarse_diagedmf/artifacts/*"
         timeout_in_minutes: 840
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -68,7 +68,7 @@ steps:
         command:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_diagedmf_land.yml --job_id amip_coarse_diagedmf_land"
-        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_diagedmf_land/artifacts/*"
+        artifact_paths: "output/amip_coarse_diagedmf_land/artifacts/*"
         timeout_in_minutes: 840
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -83,7 +83,7 @@ steps:
         command:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_progedmf.yml --job_id amip_coarse_progedmf"
-        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_progedmf/artifacts/*"
+        artifact_paths: "output/amip_coarse_progedmf/artifacts/*"
         timeout_in_minutes: 840
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -98,7 +98,7 @@ steps:
         command:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_coarse_edonly.yml --job_id amip_coarse_edonly"
-        artifact_paths: "experiments/ClimaEarth/output/amip_coarse_edonly/artifacts/*"
+        artifact_paths: "output/amip_coarse_edonly/artifacts/*"
         timeout_in_minutes: 840
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -111,7 +111,7 @@ steps:
       - label: "Flagship AMIP GPU with prognostic EDMF + 1M + integrated land (16 helems)"
         key: "gpu_amip_progedmf_1M_land_he16"
         command: "srun julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $BENCHMARK_CONFIG_PATH/amip_progedmf_1m_land_he16.yml --job_id gpu_amip_progedmf_1M_land_he16"
-        artifact_paths: "experiments/ClimaEarth/output/gpu_amip_progedmf_1M_land_he16/artifacts/*"
+        artifact_paths: "output/gpu_amip_progedmf_1M_land_he16/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

@@ -121,7 +121,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     observation_vec = make_scalar_covariance_observation_vector(
         vars,
         sample_date_ranges;
-        scalar = 1.0,
+        scalar = 3.0,
         use_latitude_weights = true,
         min_cosd_lat = 0.1,
     )

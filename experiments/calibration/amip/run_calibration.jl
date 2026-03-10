@@ -29,19 +29,23 @@ model_interface = joinpath(
 # CALIBRATION CONFIGURATION
 
 config_file =
-    joinpath(pkgdir(ClimaCoupler), "config", "amip_configs", "amip_calibration.yml")
+    joinpath(pkgdir(ClimaCoupler), "config", "amip_configs", "amip_calibration_progedmf_monthly.yml")
 
 # Calibrate only on Jan 1 2010
 sample_date_ranges =
     [(Dates.DateTime(2010, 10, 1), Dates.DateTime(2010, 10, 1)) for _ in 1:6]
-output_dir = joinpath(pkgdir(ClimaCoupler), "amip_calibration")
+output_dir = "/glade/derecho/scratch/cchristo/calibration_v2/exp7"
 isdir(output_dir) || mkdir(output_dir)
 
 const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     config_file,
     # Note: Pressure-level variables require model output with
     # pressure_coordinates: true in config
-    short_names = ["ta", "hur"],
+    # Variables:
+    #   - ta, hur: Temperature and relative humidity at pressure levels (ERA5)
+    #   - lwp, clivi: Liquid and ice water path (MODIS)
+    #   - swcre, lwcre: SW and LW cloud radiative effects (CERES)
+    short_names = ["ta", "hur", "swcre", "lwcre"], # "lwp", "clivi",
     minibatch_size = 1,
     n_iterations = 6,
     sample_date_ranges,
@@ -59,11 +63,28 @@ const NORMALIZATION_STATS_FP =
     joinpath(CALIBRATE_CONFIG.output_dir, "normalization_stats.jld2")
 
 const CALIBRATION_PRIORS = [
+
+    PD.constrained_gaussian("entr_inv_tau", 0.0001, 0.00007, 0.0, 0.01),
+
+    # PiGroup linear regression coefficients
+    # PD.ParameterDistribution(
+    #     PD.VectorOfParameterized([PD.Normal(0.0, 5.0), PD.Normal(0.0, 5.0), PD.Normal(0.4, 0.2)]),
+    #     repeat([PD.no_constraint()], 3),
+    #     "entr_param_vec",
+    # ),
+
+    # PD.constrained_gaussian("detr_buoy_coeff", 0.12, 0.06, 0.0, 1.0),
+    PD.constrained_gaussian("detr_vertdiv_coeff", 1.0, 0.5, 0.0, 5.0),
+    # PD.constrained_gaussian("EDMF_surface_area", 0.1, 0.03, 0, 1),
+
     PD.constrained_gaussian("precipitation_timescale", 1200, 300, 300, 2400),
-    PD.constrained_gaussian("Tq_correlation_coefficient", 0.4, 0.4, -1.0, 1.0),
-    PD.constrained_gaussian("mixing_length_eddy_viscosity_coefficient", 0.2, 0.1, 0, 1.0),
-    PD.constrained_gaussian("mixing_length_diss_coeff", 0.22, 0.15, 0.0, 10.0),
-    PD.constrained_gaussian("mixing_length_tke_surf_flux_coeff", 8.0, 4.0, 0, 100.0),
+    PD.constrained_gaussian("Tq_correlation_coefficient", 0.0, 0.5, -1.0, 1.0),
+    # PD.constrained_gaussian("mixing_length_eddy_viscosity_coefficient", 0.2, 0.1, 0, 1.0),
+    PD.constrained_gaussian("mixing_length_diss_coeff", 0.22, 0.1, 0.0, 10.0),
+    # PD.constrained_gaussian("mixing_length_tke_surf_flux_coeff", 8.0, 4.0, 0, 100.0),
+
+    # PD.constrained_gaussian("nogw_Bt_0", 0.0043, 0.003, 0.001, 0.01),
+    # PD.constrained_gaussian("ogw_mountain_height_width_exponent", 0.4, 0.3, 0.0, 1.0),
 ]
 
 const PRIORS = EKP.combine_distributions(CALIBRATION_PRIORS)
@@ -109,12 +130,14 @@ if abspath(PROGRAM_FILE) == @__FILE__
     )
 
     if ClimaCalibrate.get_backend() == ClimaCalibrate.DerechoBackend
-        backend = ClimaCalibrate.DerechoBackend(
-            model_interface,
+        backend = ClimaCalibrate.DerechoBackend(;
+            experiment_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth"),
+            model_interface = model_interface,
             verbose = true,
             hpc_kwargs = Dict(
                 # Options include "premium", "regular", "economy", "preempt"
-                :job_priority => "regular", # {}
+                # :job_priority => "regular", # {}
+                :job_priority => "premium",
                 # 720 minutes is 12 hours
                 :time => 720,
                 :ntasks => 1,

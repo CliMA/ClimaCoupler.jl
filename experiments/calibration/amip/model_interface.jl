@@ -18,7 +18,7 @@ function ClimaCalibrate.forward_model(iter, member)
     start_date =
         first(CALIBRATE_CONFIG.sample_date_ranges[iter + 1]) - CALIBRATE_CONFIG.spinup
     end_date = last(CALIBRATE_CONFIG.sample_date_ranges[iter + 1]) + CALIBRATE_CONFIG.extend
-    update_timespan!(config_dict, start_date, end_date)
+    CalibrationTools.update_timespan!(config_dict, start_date, end_date)
 
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)

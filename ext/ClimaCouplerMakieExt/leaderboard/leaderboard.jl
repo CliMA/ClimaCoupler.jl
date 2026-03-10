@@ -227,6 +227,10 @@ function Plotting.compute_pfull_leaderboard(
     @info "Error against observations for variables in pressure coordinates"
 
     sim_var_pfull_dict = get_sim_var_in_pfull_dict(diagnostics_folder_path)
+    if isempty(sim_var_pfull_dict)
+        @warn "No diagnostics in pressure coordinates found. Leaderboard for diagnostics in pressure coordinates will not be made."
+        return nothing
+    end
     obs_var_pfull_dict = get_obs_var_in_pfull_dict()
 
     # Print dates for debugging

@@ -8,6 +8,12 @@ dt: "180secs"
 dt_cpl: "180secs"
 dz_bottom: 100.0
 energy_check: false
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta]
+    period: 1months
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours
 h_elem: 8
 mode_name: "amip"
 netcdf_interpolation_num_points: [90, 45, 31]

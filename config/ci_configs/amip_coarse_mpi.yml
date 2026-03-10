@@ -2,9 +2,8 @@ apply_limiter: false
 energy_check: false
 h_elem: 4
 mode_name: "amip"
-moist: "equil"
-precip_model: "0M"
 rad: "allskywithclear"
+microphysics_model: "0M"
 share_surface_space: false
 t_end: "1days"
 time_varying_trace_gases: ["CO2"]

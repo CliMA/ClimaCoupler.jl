@@ -1,6 +1,6 @@
 import ClimaCoupler
 import ClimaCalibrate
-include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "setup_run.jl"))
+include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "code_loading.jl"))
 
 function ClimaCalibrate.forward_model(iter, member)
     config_file = joinpath(

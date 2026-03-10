@@ -3,7 +3,8 @@
 
 This module contains code for extending the ClimaCoupler interface for
 ClimaAtmos. For more information about the atmos model, please see
-`experiments/ClimaEarth/README.md`
+the "Available component models" section of the ClimaCoupler documentation,
+or see the [ClimaAtmos documentation](https://clima.github.io/ClimaAtmos.jl/stable/).
 """
 module ClimaCouplerClimaAtmosExt
 
@@ -36,7 +37,7 @@ function hasradiation(integrator)
 end
 
 function hasmoisture(integrator)
-    return !(integrator.p.atmos.moisture_model isa CA.DryModel)
+    return !(integrator.p.atmos.microphysics_model isa CA.DryModel)
 end
 
 """
@@ -98,7 +99,7 @@ function ClimaAtmosSimulation(atmos_config)
     end
 
     microphysics_model = integrator.p.atmos.microphysics_model
-    if microphysics_model isa CA.Microphysics0Moment
+    if microphysics_model isa CA.EquilibriumMicrophysics0M
         ᶜS_ρq_tot = integrator.p.precomputed.ᶜS_ρq_tot
         ᶜS_ρq_tot .= FT(0)
     end
@@ -204,9 +205,9 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:energy})
     integrator = sim.integrator
     p = integrator.p
 
-    # return total energy and (if Microphysics0Moment) the energy lost due to precipitation removal
+    # return total energy and (if EquilibriumMicrophysics0M) the energy lost due to precipitation removal
     microphysics_model = integrator.p.atmos.microphysics_model
-    if microphysics_model isa CA.Microphysics0Moment
+    if microphysics_model isa CA.EquilibriumMicrophysics0M
         (; ᶜT, ᶜq_liq_rai, ᶜq_ice_sno, ᶜS_ρq_tot) = p.precomputed
         (; ᶜΦ) = p.core
         thermo_params = get_thermo_params(sim)
@@ -227,12 +228,28 @@ end
 # helpers for get_field extensions, dipatchable on different moisture model options and radiation modes
 
 surface_rain_flux(::CA.DryModel, integrator) = eltype(integrator.u)(0)
-function surface_rain_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator)
+function surface_rain_flux(
+    ::Union{
+        CA.EquilibriumMicrophysics0M,
+        CA.NonEquilibriumMicrophysics1M,
+        CA.NonEquilibriumMicrophysics2M,
+        CA.NonEquilibriumMicrophysics2MP3,
+    },
+    integrator,
+)
     return integrator.p.precomputed.surface_rain_flux
 end
 
 surface_snow_flux(::CA.DryModel, integrator) = eltype(integrator.u)(0)
-function surface_snow_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator)
+function surface_snow_flux(
+    ::Union{
+        CA.EquilibriumMicrophysics0M,
+        CA.NonEquilibriumMicrophysics1M,
+        CA.NonEquilibriumMicrophysics2M,
+        CA.NonEquilibriumMicrophysics2MP3,
+    },
+    integrator,
+)
     return integrator.p.precomputed.surface_snow_flux
 end
 
@@ -241,12 +258,26 @@ surface_radiation_flux(::CA.RRTMGPI.AbstractRRTMGPMode, integrator) =
     CC.Fields.level(integrator.p.radiation.ᶠradiation_flux, CC.Utilities.half)
 
 moisture_flux(::CA.DryModel, integrator) = eltype(integrator.u)(0)
-moisture_flux(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
-    CC.Geometry.WVector.(integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot)
+moisture_flux(
+    ::Union{
+        CA.EquilibriumMicrophysics0M,
+        CA.NonEquilibriumMicrophysics1M,
+        CA.NonEquilibriumMicrophysics2M,
+        CA.NonEquilibriumMicrophysics2MP3,
+    },
+    integrator,
+) = CC.Geometry.WVector.(integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot)
 
 ρq_tot(::CA.DryModel, integrator) = eltype(integrator.u)(0)
-ρq_tot(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
-    integrator.u.c.ρq_tot
+ρq_tot(
+    ::Union{
+        CA.EquilibriumMicrophysics0M,
+        CA.NonEquilibriumMicrophysics1M,
+        CA.NonEquilibriumMicrophysics2M,
+        CA.NonEquilibriumMicrophysics2MP3,
+    },
+    integrator,
+) = integrator.u.c.ρq_tot
 
 # extensions required by the Interfacer
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_pressure}) =
@@ -287,7 +318,7 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:diffuse_fraction
     return CC.Fields.array2field(diffuse_fraction, lowest_face_space)
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) =
-    surface_rain_flux(sim.integrator.p.atmos.moisture_model, sim.integrator)
+    surface_rain_flux(sim.integrator.p.atmos.microphysics_model, sim.integrator)
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:LW_d})
     # If we don't have radiation, downwelling LW is zero
     FT = eltype(sim.integrator.u)
@@ -308,7 +339,7 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_specific_humidity}
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ice_specific_humidity}) =
     CC.Fields.level(sim.integrator.p.precomputed.ᶜq_ice_sno, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =
-    surface_snow_flux(sim.integrator.p.atmos.moisture_model, sim.integrator)
+    surface_snow_flux(sim.integrator.p.atmos.microphysics_model, sim.integrator)
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d})
     # If we don't have radiation, downwelling SW is zero
     FT = eltype(sim.integrator.u)
@@ -323,7 +354,7 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d})
     )
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:water}) =
-    ρq_tot(sim.integrator.p.atmos.moisture_model, sim.integrator)
+    ρq_tot(sim.integrator.p.atmos.microphysics_model, sim.integrator)
 
 function Interfacer.update_field!(
     sim::ClimaAtmosSimulation,
@@ -724,10 +755,17 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:w})
     return w_c
 end
 specific_humidity(::CA.DryModel, integrator) = [eltype(integrator.u)(0)]
-specific_humidity(::Union{CA.EquilMoistModel, CA.NonEquilMoistModel}, integrator) =
-    integrator.u.c.ρq_tot
+specific_humidity(
+    ::Union{
+        CA.EquilibriumMicrophysics0M,
+        CA.NonEquilibriumMicrophysics1M,
+        CA.NonEquilibriumMicrophysics2M,
+        CA.NonEquilibriumMicrophysics2MP3,
+    },
+    integrator,
+) = integrator.u.c.ρq_tot
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρq_tot}) =
-    specific_humidity(sim.integrator.p.atmos.moisture_model, sim.integrator)
+    specific_humidity(sim.integrator.p.atmos.microphysics_model, sim.integrator)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrator.u.c.ρe_tot
 
 Plotting.debug_plot_fields(sim::ClimaAtmosSimulation) =

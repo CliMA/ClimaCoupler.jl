@@ -22,7 +22,7 @@ using Test
 # Logging.disable_logging(Logging.Warn)
 
 include("compare.jl")
-include("../setup_run.jl")
+include("../code_loading.jl")
 
 comms_ctx = ClimaComms.context()
 @info "Context: $(comms_ctx)"

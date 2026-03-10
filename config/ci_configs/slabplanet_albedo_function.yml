@@ -5,9 +5,8 @@ dt_cpl: "200secs"
 energy_check: true
 h_elem: 4
 mode_name: "slabplanet"
-moist: "equil"
-precip_model: "0M"
 rad: "gray"
+microphysics_model: "0M"
 share_surface_space: false
 t_end: "1days"
 use_itime: false

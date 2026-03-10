@@ -7,6 +7,12 @@ coupler_toml: ["toml/amip_diagedmf.toml"]
 dt: "120secs"
 dt_cpl: "120secs"
 energy_check: false
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta]
+    period: 1months
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours
 mode_name: "amip"
 netcdf_output_at_levels: true
 output_default_diagnostics: true

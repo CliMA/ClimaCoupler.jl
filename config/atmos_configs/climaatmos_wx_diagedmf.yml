@@ -32,14 +32,12 @@ edmfx_nh_pressure: true
 edmfx_sgs_mass_flux: true
 edmfx_sgs_diffusive_flux: true
 
-### 0M Microphysics ###
-precip_model: 0M
-moist: equil
+### 0M Microphysics ##
+microphysics_model: "0M"
 toml: [toml/diagnostic_edmfx_era5_ic.toml]
 
 ### 1M Microphysics ###
-# precip_model: "1M"
-# moist: "nonequil"
+# microphysics_model: "NonEquilibriumMicrophysics0M"
 # toml: [toml/diagnostic_edmfx_1M.toml]
 
 cloud_model: "quadrature"

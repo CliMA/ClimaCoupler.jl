@@ -12,7 +12,7 @@ specific to one particular calibration experiment.
     For calibration, other resources that you may find helpful are the
     documentation for
     [EnsembleKalmanProcesses](https://clima.github.io/EnsembleKalmanProcesses.jl/stable/),
-    [ClimaCalibrate](https://clima.github.io/ClimaCalibrate.jl/dev/),
+    [ClimaCalibrate](https://clima.github.io/ClimaCalibrate.jl/stable/),
     [ClimaAnalysis](https://clima.github.io/ClimaAnalysis.jl/stable/), and the
     [ClimaCoupler calibration experiments](https://github.com/CliMA/ClimaCoupler.jl/tree/main/experiments/calibration).
 
@@ -21,11 +21,12 @@ specific to one particular calibration experiment.
 !!! note "OutputVar"
     This section assumes you are familiar with `ClimaAnalysis.OutputVar`.
 
-As of now, `CalibrationTools` provide a single data loader which is the
-[`ERA5DataLoader`](@ref) for loading preprocessed ERA5 data. This data loader
-automatically applies preprocessing to make it convenient to use for
-calibration. See the documentation for [`ERA5DataLoader`](@ref) for details on
-the preprocessing steps applied.
+`CalibrationTools` provides a variety of data loaders from different artifacts
+in `ClimaArtifacts` for calibration. For example, the [`ERA5DataLoader`](@ref)
+is a data loader loading preprocessed ERA5 data. This data loader automatically
+applies preprocessing to make it convenient to use for calibration. See the
+documentation for [`ERA5DataLoader`](@ref) for details on the preprocessing
+steps applied.
 
 You can retrieve a variable with [`get`](@ref) and get a set of all available
 preprocessed variables with [`available_vars`](@ref).
@@ -68,7 +69,7 @@ For the second step, we define a preprocessing function specific to the
 variable.
 
 !!! note "Preprocessing functions"
-    See [ClimaAnalysis documentation](https://clima.github.io/ClimaAnalysis.jl/dev/)
+    See [ClimaAnalysis documentation](https://clima.github.io/ClimaAnalysis.jl/stable/)
     for available transformations on `OutputVar`s.
 
 In our example, no preprocessing is applied.
@@ -78,7 +79,7 @@ CalibrationTools.preprocess(::CalibrationTools.ERA5DataLoader, var, ::Val{:er}) 
 nothing # hide
 ```
 
-Now, you can use [`get`](@ref) to retrieve the `OutputVar` with the short name 
+Now, you can use [`get`](@ref) to retrieve the `OutputVar` with the short name
 "mer"`.
 
 ```@example add_variable
@@ -94,6 +95,16 @@ CalibrationTools.CalibrateConfig
 CalibrationTools.CalibrateConfig()
 CalibrationTools.ERA5DataLoader
 CalibrationTools.ERA5DataLoader()
+CalibrationTools.CERESDataLoader
+CalibrationTools.CERESDataLoader()
+CalibrationTools.GPCPDataLoader
+CalibrationTools.GPCPDataLoader()
+CalibrationTools.ERA5PressureLevelDataLoader
+CalibrationTools.ERA5PressureLevelDataLoader()
+CalibrationTools.ModisDataLoader
+CalibrationTools.ModisDataLoader()
 CalibrationTools.available_vars
-CalibrationTools.get(loader::CalibrationTools.ERA5DataLoader, short_name::String)
+CalibrationTools.get
+CalibrationTools.update_timespan!
+CalibrationTools.add_parameter_filepath!
 ```

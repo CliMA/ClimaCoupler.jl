@@ -7,6 +7,12 @@ dt: "240secs"
 dt_cpl: "240secs"
 dz_bottom: 100.0
 energy_check: false
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta]
+    period: 1months
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours
 h_elem: 8
 initial_condition: "AMIPFromERA5"
 land_model: "integrated"

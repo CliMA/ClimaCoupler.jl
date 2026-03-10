@@ -6,9 +6,8 @@ dt_rad: "1hours"
 dz_bottom: 30
 h_elem: 4
 mode_name: "amip"
-moist: "equil"
-precip_model: "0M"
 rad: "gray"
+microphysics_model: "0M"
 rayleigh_sponge: true
 start_date: "20100101"
 t_end: "300secs"

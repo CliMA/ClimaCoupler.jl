@@ -1,7 +1,7 @@
 agents:
   queue: clima
   slurm_time: 14:00:00
-  modules: climacommon/2025_05_15
+  modules: climacommon/2026_02_18
 
 env:
   JULIA_MAX_NUM_PRECOMPILE_FILES: 100
@@ -62,7 +62,7 @@ steps:
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
           slurm_mem: 30GB
-      
+
       - label: "Coarse current AMIP: diagedmf + 1M + integrated land"
         key: "amip_diagedmf_1m_land"
         command:

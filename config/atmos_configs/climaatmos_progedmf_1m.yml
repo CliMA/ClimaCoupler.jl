@@ -23,9 +23,7 @@ implicit_sgs_nh_pressure: true
 implicit_sgs_vertdiff: true
 insolation: "timevarying"
 max_newton_iters_ode: 3
-moist: "nonequil"
 netcdf_output_at_levels: true
-precip_model: "1M"
 prescribed_aerosols: ["CB1", "CB2", "DST01", "DST02", "DST03", "DST04", "DST05", "OC1", "OC2", "SO4", "SSLT01", "SSLT02", "SSLT03", "SSLT04", "SSLT05"]
 prognostic_tke: true
 rad: "allskywithclear"
@@ -39,3 +37,4 @@ use_sgs_quadrature: false
 viscous_sponge: true
 z_elem: 63
 z_max: 60000.0
+microphysics_model: "1M"

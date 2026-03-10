@@ -9,9 +9,8 @@ dz_bottom: 30
 energy_check: false
 h_elem: 16
 mode_name: "amip"
-moist: "equil"
-precip_model: "0M"
 rad: "gray"
+microphysics_model: "0M"
 rayleigh_sponge: true
 t_end: "600secs"
 time_varying_trace_gases: ["CO2"]

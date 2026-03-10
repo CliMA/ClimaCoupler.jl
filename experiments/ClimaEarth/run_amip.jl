@@ -36,8 +36,8 @@ For more details about running a coupled simulation, including how to run in a
 Slabplanet configuration, please see our [README.md](https://github.com/CliMA/ClimaCoupler.jl/blob/main/README.md).
 =#
 
-# Load the necessary modules and code to run the coupled simulation
-include("setup_run.jl")
+# Load the necessary modules to run the coupled simulation
+include("code_loading.jl")
 
 # Get the configuration file from the command line (or manually set it here)
 config_file = Input.parse_commandline(Input.argparse_settings())["config_file"]

@@ -347,10 +347,11 @@ end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_velocity}, u_int, v_int)
     Interfacer.remap!(sim.integrator.p.bucket.scratch1, u_int)
     Interfacer.remap!(sim.integrator.p.bucket.scratch2, v_int)
-    sim.integrator.p.drivers.u .= StaticArrays.SVector.(
-        sim.integrator.p.bucket.scratch1,
-        sim.integrator.p.bucket.scratch2,
-    )
+    sim.integrator.p.drivers.u .=
+        StaticArrays.SVector.(
+            sim.integrator.p.bucket.scratch1,
+            sim.integrator.p.bucket.scratch2,
+        )
 end
 function Interfacer.update_field!(
     sim::BucketSimulation,

@@ -325,18 +325,20 @@ function ClimaLandSimulation(
         # Set initial conditions for the state
         @. Y.soil.ϑ_l = θ_r + (ν - θ_r) / 2
         Y.soil.θ_i .= FT(0.0)
-        ρc_s = CL.Soil.volumetric_heat_capacity.(
-            Y.soil.ϑ_l,
-            Y.soil.θ_i,
-            ρc_ds,
-            earth_param_set,
-        )
-        Y.soil.ρe_int .= CL.Soil.volumetric_internal_energy.(
-            Y.soil.θ_i,
-            ρc_s,
-            orog_adjusted_T,
-            earth_param_set,
-        )
+        ρc_s =
+            CL.Soil.volumetric_heat_capacity.(
+                Y.soil.ϑ_l,
+                Y.soil.θ_i,
+                ρc_ds,
+                earth_param_set,
+            )
+        Y.soil.ρe_int .=
+            CL.Soil.volumetric_internal_energy.(
+                Y.soil.θ_i,
+                ρc_s,
+                orog_adjusted_T,
+                earth_param_set,
+            )
 
         Y.snow.S .= FT(0)
         Y.snow.S_l .= FT(0)

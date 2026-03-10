@@ -23,12 +23,14 @@ It contains the following objects:
 - `ice_properties::IP`: A NamedTuple of sea ice properties, including melting speed, Stefan-Boltzmann constant,
     and the Celsius to Kelvin conversion constant.
 """
-struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP} <: Interfacer.AbstractSeaIceSimulation
+struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP, MDT} <:
+       Interfacer.AbstractSeaIceSimulation
     ice::SIM
     area_fraction::A
     remapping::REMAP
     ocean_ice_interface::NT
     ice_properties::IP
+    model_Δt::MDT
 end
 
 """
@@ -130,6 +132,9 @@ function ClimaSeaIceSimulation(
     interface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     interface_salinity = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 
+    # Initialize model_Δt so that time stepping works properly
+    model_Δt = float(dt)
+
     # Initialize nonzero sea ice if start date provided
     if !isnothing(start_date)
         sic_metadata = CO.DataWrangling.Metadatum(
@@ -207,6 +212,7 @@ function ClimaSeaIceSimulation(
         remapping,
         ocean_ice_interface,
         ice_properties,
+        model_Δt,
     )
 
     # Ensure ocean temperature is above freezing where there is sea ice
@@ -233,7 +239,7 @@ function sea_ice_simulation(
 
     top_heat_boundary_condition = MeltingConstrainedFluxBalance()
     kᴺ = size(grid, 3)
-    surface_ocean_salinity = OC.interior(ocean.model.tracers.S, :, :, (kᴺ:kᴺ))
+    surface_ocean_salinity = OC.interior(ocean.model.tracers.S,:,:,(kᴺ:kᴺ))
     bottom_heat_boundary_condition = IceWaterThermalEquilibrium(surface_ocean_salinity)
 
     ice_thermodynamics = CSI.SlabSeaIceThermodynamics(
@@ -270,8 +276,12 @@ end
 ###############################################################################
 
 # Timestep the simulation forward to time `t`
-Interfacer.step!(sim::ClimaSeaIceSimulation, t) =
-    OC.time_step!(sim.ice, float(t) - sim.ice.model.clock.time)
+function Interfacer.step!(sim::ClimaSeaIceSimulation, t)
+    Δt = float(t) - sim.ice.model.clock.time
+    if isapprox(Δt, sim.model_Δt) || Δt > sim.model_Δt
+        OC.time_step!(sim.ice, Δt)
+    end
+end
 
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:area_fraction}) = sim.area_fraction
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_concentration}) =
@@ -364,8 +374,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
 
     # Update the sea ice only where the concentration is greater than zero.
     si_flux_heat = sim.ice.model.external_heat_fluxes.top[1]
-    OC.interior(si_flux_heat, :, :, 1) .+=
-        (OC.interior(ice_concentration, :, :, 1) .> 0) .* (remapped_F_lh .+ remapped_F_sh)
+    OC.interior(si_flux_heat,:,:,1) .+=
+        (OC.interior(ice_concentration,:,:,1) .> 0) .* (remapped_F_lh .+ remapped_F_sh)
 
     return nothing
 end
@@ -419,8 +429,8 @@ function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
     ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
 
     # Update only where ice concentration is greater than zero.
-    OC.interior(si_flux_heat, :, :, 1) .=
-        (OC.interior(ice_concentration, :, :, 1) .> 0) .*
+    OC.interior(si_flux_heat,:,:,1) .=
+        (OC.interior(ice_concentration,:,:,1) .> 0) .*
         (-(1 .- α) .* remapped_SW_d .- ϵ .* remapped_LW_d)
     return nothing
 end
@@ -497,13 +507,13 @@ function FluxCalculator.ocean_seaice_fluxes!(
     )
 
     oc_flux_T = surface_flux(ocean_sim.ocean.model.tracers.T)
-    OC.interior(oc_flux_T, :, :, 1) .+=
-        OC.interior(ice_concentration, :, :, 1) .* OC.interior(Qi, :, :, 1) .* ρₒ⁻¹ ./ cₒ
+    OC.interior(oc_flux_T,:,:,1) .+=
+        OC.interior(ice_concentration,:,:,1) .* OC.interior(Qi,:,:,1) .* ρₒ⁻¹ ./ cₒ
 
     oc_flux_S = surface_flux(ocean_sim.ocean.model.tracers.S)
-    OC.interior(oc_flux_S, :, :, 1) .+=
-        OC.interior(ice_concentration, :, :, 1) .*
-        OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
+    OC.interior(oc_flux_S,:,:,1) .+=
+        OC.interior(ice_concentration,:,:,1) .*
+        OC.interior(ice_sim.ocean_ice_interface.fluxes.salt,:,:,1)
 
     return nothing
 end

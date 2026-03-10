@@ -18,13 +18,14 @@ It contains the following objects:
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 - `ice_concentration::SIC`: An Oceananigans Field representing the sea ice concentration on the ocean/sea ice grid.
 """
-struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC} <:
+struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC, MDT} <:
        Interfacer.AbstractOceanSimulation
     ocean::SIM
     area_fraction::A
     ocean_properties::OPROP
     remapping::REMAP
     ice_concentration::SIC
+    model_Δt::MDT
 end
 
 """
@@ -67,7 +68,7 @@ function OceananigansSimulation(
     tspan,
     output_dir,
     simple_ocean = false,
-    dt = nothing,
+    dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
     extra_kwargs...,
@@ -156,10 +157,10 @@ function OceananigansSimulation(
         closure = (horizontal_viscosity, vertical_mixing)
     end
 
-    Δt = isnothing(dt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : float(dt)
+    model_Δt = float(dt)
     ocean = CO.ocean_simulation(
         grid;
-        Δt,
+        Δt = model_Δt,
         timestepper = :SplitRungeKutta3,
         momentum_advection,
         tracer_advection,
@@ -273,6 +274,7 @@ function OceananigansSimulation(
         ocean_properties,
         remapping,
         ice_concentration,
+        model_Δt,
     )
 end
 
@@ -323,9 +325,13 @@ end
 ### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
 ###############################################################################
 
-# Timestep the simulation forward to time `t`
-Interfacer.step!(sim::OceananigansSimulation, t) =
-    OC.time_step!(sim.ocean, float(t) - sim.ocean.model.clock.time)
+# Timestep the simulation forward to time `t`. This may not actually do anything.
+function Interfacer.step!(sim::OceananigansSimulation, t)
+    Δt = float(t) - sim.ocean.model.clock.time
+    if isapprox(Δt, sim.model_Δt) || Δt > sim.model_Δt
+        OC.time_step!(sim.ocean, Δt)
+    end
+end
 
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction
 
@@ -397,12 +403,10 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     F_turb_ρτyz_cc = sim.remapping.scratch_cc2
 
     # Weight by (1 - sea ice concentration)
-    OC.interior(F_turb_ρτxz_cc, :, :, 1) .=
-        OC.interior(F_turb_ρτxz_cc, :, :, 1) .* (1.0 .- ice_concentration) ./
-        reference_density
-    OC.interior(F_turb_ρτyz_cc, :, :, 1) .=
-        OC.interior(F_turb_ρτyz_cc, :, :, 1) .* (1.0 .- ice_concentration) ./
-        reference_density
+    OC.interior(F_turb_ρτxz_cc,:,:,1) .=
+        OC.interior(F_turb_ρτxz_cc,:,:,1) .* (1.0 .- ice_concentration) ./ reference_density
+    OC.interior(F_turb_ρτyz_cc,:,:,1) .=
+        OC.interior(F_turb_ρτyz_cc,:,:,1) .* (1.0 .- ice_concentration) ./ reference_density
 
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
     oc_flux_u = surface_flux(sim.ocean.model.velocities.u)
@@ -426,8 +430,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     # everything on the surface, but later we will need to account for this.
     # One way we can do this is using directly ClimaOcean
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
-    OC.interior(oc_flux_T, :, :, 1) .=
-        OC.interior(oc_flux_T, :, :, 1) .+
+    OC.interior(oc_flux_T,:,:,1) .=
+        OC.interior(oc_flux_T,:,:,1) .+
         (1.0 .- ice_concentration) .* (remapped_F_lh .+ remapped_F_sh) ./
         (reference_density * heat_capacity)
 
@@ -440,9 +444,9 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     )
     moisture_fresh_water_flux = sim.remapping.scratch_arr1 ./ reference_density
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
-    surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, grid.Nz)
-    OC.interior(oc_flux_S, :, :, 1) .=
-        OC.interior(oc_flux_S, :, :, 1) .-
+    surface_salinity = OC.interior(sim.ocean.model.tracers.S,:,:,grid.Nz)
+    OC.interior(oc_flux_S,:,:,1) .=
+        OC.interior(oc_flux_S,:,:,1) .-
         (1.0 .- ice_concentration) .* surface_salinity .* moisture_fresh_water_flux
     return nothing
 end
@@ -497,12 +501,12 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     (; σ, C_to_K) = sim.ocean_properties
     α = Interfacer.get_field(sim, Val(:surface_direct_albedo)) # scalar
     ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
-    OC.interior(oc_flux_T, :, :, 1) .=
+    OC.interior(oc_flux_T,:,:,1) .=
         (1.0 .- ice_concentration) .* (
             -(1 - α) .* remapped_SW_d .-
             ϵ * (
                 remapped_LW_d .-
-                σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T, :, :, Nz)) .^ 4
+                σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T,:,:,Nz)) .^ 4
             )
         ) ./ (reference_density * heat_capacity)
 
@@ -522,9 +526,9 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
 
     # Virtual salt flux
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
-    OC.interior(oc_flux_S, :, :, 1) .=
-        OC.interior(oc_flux_S, :, :, 1) .-
-        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* (1.0 .- ice_concentration) .*
+    OC.interior(oc_flux_S,:,:,1) .=
+        OC.interior(oc_flux_S,:,:,1) .-
+        OC.interior(sim.ocean.model.tracers.S,:,:,Nz) .* (1.0 .- ice_concentration) .*
         (remapped_P_liq .+ remapped_P_snow) ./ reference_density
     return nothing
 end

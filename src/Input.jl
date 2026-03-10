@@ -636,7 +636,10 @@ function parse_component_dts!(config_dict)
         end
         for key in component_dt_names
             component_dt = Float64(Utilities.time_to_seconds(config_dict[key]))
-            @assert isapprox(Δt_cpl % component_dt, 0.0) "Coupler dt must be divisible by all component dt's\n dt_cpl = $Δt_cpl\n $key = $component_dt"
+            if key != "dt_atmos"
+                # allow only the atmos time step to be smaller than the coupler's
+                @assert isapprox(component_dt % Δt_cpl, 0.0) "All surface component dts must be divisible by the coupler dt\n $key = $component_dt\n dt_cpl = $Δt_cpl"
+            end
             component_dt_dict[key] = component_dt
         end
     else

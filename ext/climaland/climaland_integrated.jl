@@ -325,20 +325,18 @@ function ClimaLandSimulation(
         # Set initial conditions for the state
         @. Y.soil.ϑ_l = θ_r + (ν - θ_r) / 2
         Y.soil.θ_i .= FT(0.0)
-        ρc_s =
-            CL.Soil.volumetric_heat_capacity.(
-                Y.soil.ϑ_l,
-                Y.soil.θ_i,
-                ρc_ds,
-                earth_param_set,
-            )
-        Y.soil.ρe_int .=
-            CL.Soil.volumetric_internal_energy.(
-                Y.soil.θ_i,
-                ρc_s,
-                orog_adjusted_T,
-                earth_param_set,
-            )
+        ρc_s = CL.Soil.volumetric_heat_capacity.(
+            Y.soil.ϑ_l,
+            Y.soil.θ_i,
+            ρc_ds,
+            earth_param_set,
+        )
+        Y.soil.ρe_int .= CL.Soil.volumetric_internal_energy.(
+            Y.soil.θ_i,
+            ρc_s,
+            orog_adjusted_T,
+            earth_param_set,
+        )
 
         Y.snow.S .= FT(0)
         Y.snow.S_l .= FT(0)
@@ -482,8 +480,13 @@ function Interfacer.update_field!(
 end
 
 function Interfacer.step!(sim::ClimaLandSimulation, t)
-    while float(sim.integrator.t) < float(t)
-        Interfacer.step!(sim.integrator)
+    # Don't step if we haven't reached a step boundary
+    # (This can happen if the coupler dt is less than this model's)
+    Δt = float(t) - float(sim.integrator.t)
+    if isapprox(Δt, sim.integrator.dt) || Δt > sim.integrator.dt
+        while sim.integrator.t < t
+            Interfacer.step!(sim.integrator)
+        end
     end
     return nothing
 end

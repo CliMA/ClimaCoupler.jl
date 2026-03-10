@@ -347,11 +347,10 @@ end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_velocity}, u_int, v_int)
     Interfacer.remap!(sim.integrator.p.bucket.scratch1, u_int)
     Interfacer.remap!(sim.integrator.p.bucket.scratch2, v_int)
-    sim.integrator.p.drivers.u .=
-        StaticArrays.SVector.(
-            sim.integrator.p.bucket.scratch1,
-            sim.integrator.p.bucket.scratch2,
-        )
+    sim.integrator.p.drivers.u .= StaticArrays.SVector.(
+        sim.integrator.p.bucket.scratch1,
+        sim.integrator.p.bucket.scratch2,
+    )
 end
 function Interfacer.update_field!(
     sim::BucketSimulation,
@@ -374,8 +373,15 @@ function Interfacer.update_field!(
     Interfacer.remap!(sim.integrator.p.bucket.turbulent_fluxes.vapor_flux, field ./ ρ_liq) # TODO: account for sublimation
 end
 
-Interfacer.step!(sim::BucketSimulation, t) =
-    Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+function Interfacer.step!(sim::BucketSimulation, t)
+    # Don't step if we haven't reached a step boundary
+    # (This can happen if the coupler dt is less than this model's)
+    Δt = float(t) - float(sim.integrator.t)
+    if isapprox(Δt, sim.integrator.dt) || Δt > sim.integrator.dt
+        Interfacer.step!(sim.integrator, Δt, true)
+    end
+end
+
 Interfacer.close_output_writers(sim::BucketSimulation) =
     isnothing(sim.output_writer) || close(sim.output_writer)
 

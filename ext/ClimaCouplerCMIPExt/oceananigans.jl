@@ -320,12 +320,12 @@ Ensure the ocean and ice area fractions are consistent with each other.
 
 The ocean's LatitudeLongitudeGrid is only defined between -80 and 80
 degrees latitude. In this case, we set ice and ocean area fractions
-to 0 and land to 1 where |lat| ≥ 80° (same band used to zero ocean
+to 0 and land to 1 where |lat| ≥ 78° (same band used to zero ocean
 surface fluxes).
 
 Similarly, the ocean's TripolarGrid is defined between -80 and 90 degrees latitude.
 In this case we set the ice and ocean area fractions to 0 and the land fraction to 1
-on [80°S, 90°S], and leave the northern latitudes unmodified.
+on [-78°S, -90°S], and leave the northern latitudes unmodified.
 
 This function also updates the ice concentration field in the ocean simulation
 so that it can be used for weighting flux updates.
@@ -345,11 +345,11 @@ function FieldExchanger.resolve_area_fractions!(
 
     # TODO change these to 80??
     if ocean_sim.ocean.model.grid.underlying_grid isa OC.LatitudeLongitudeGrid
-        # Create a "polar" mask that's 1 at latitudes in [-90, -80] and [80, 90] degrees
-        polar_mask .= abs.(lat) .>= FT(80)
+        # Create a "polar" mask that's 1 at latitudes in [-90, -78] and [78, 90] degrees
+        polar_mask .= abs.(lat) .>= FT(78)
     elseif ocean_sim.ocean.model.grid isa OC.TripolarGrid
-        # Create a "polar" mask that's 1 at latitudes in [-90, -80] degrees
-        polar_mask .= lat .<= FT(-80)
+        # Create a "polar" mask that's 1 at latitudes in [-90, -78] degrees
+        polar_mask .= lat .<= FT(-78)
     end
 
     # Set land fraction to 1 and ice/ocean fraction to 0 where polar_mask is 1
@@ -405,7 +405,7 @@ We define three masks to be used for different fluxes:
 - `polar_exclusion_flux_mask_v`: Center/Face (meridional momentum flux)
 """
 function construct_polar_mask(grid)
-    # Precompute polar-exclusion flux masks once (zeros ocean surface fluxes where |lat| ≥ 80° to avoid instability).
+    # Precompute polar-exclusion flux masks once (zeros ocean surface fluxes where |lat| ≥ 78° to avoid instability).
     # _centers = cell-centered (T, S); _u = Face/Center (u); _v = Center/Face (v).
     polar_exclusion_flux_mask_centers =
         ocean_flux_highlat_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))
@@ -426,12 +426,12 @@ end
 
 Build the ocean flux high latitude mask once at setup.
 Currently we define ocean between 80degS to 80degN with 2 degree overlap in the coupler mask.
-Returns a 2D mask (1.0 where |lat| < 80°, 0.0 elsewhere). This mask is on the ocean grid (
+Returns a 2D mask (1.0 where |lat| < 78°, 0.0 elsewhere). This mask is on the ocean grid (
 unlike the polar mask which is defined on the boundary_space)
 """
 # polar-exclusion mask
 function ocean_flux_highlat_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))
-    polar_flux_lat_deg = 80.0  # zero fluxes where |lat| ≥ 80° (same band as polar_mask)
+    polar_flux_lat_deg = 78.0  # zero fluxes where |lat| ≥ 78° (same band as polar_mask)
     φ = OC.φnodes(grid, location[1], location[2], location[3])
     φ_2D = Array(φ[:, :, 1])
     lat_deg = abs.(rad2deg.(φ_2D))

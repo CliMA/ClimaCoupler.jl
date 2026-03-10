@@ -42,10 +42,10 @@ Printf = "366bfd08-7218-5ad0-9036-d27ba1f5fe54"
 
 [extensions]
 ClimaCouplerCMIPExt = ["ClimaOcean", "ClimaSeaIce", "KernelAbstractions", "Oceananigans"]
+ClimaCouplerCMIPMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
 ClimaCouplerClimaAtmosExt = ["ClimaAtmos"]
 ClimaCouplerClimaLandExt = ["ClimaLand"]
 ClimaCouplerMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Poppler_jll", "Printf"]
-ClimaCouplerCMIPMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
 
 [compat]
 ArgParse = "1"
@@ -79,6 +79,6 @@ Random = "1"
 SciMLBase = "~2.110, ~2.111, ~2.112"
 StaticArrays = "1.9.8"
 SurfaceFluxes = "0.15.0"
-Thermodynamics = "0.15.3"
+Thermodynamics = "0.15.3, 1"
 YAML = "0.4"
 julia = "1.10"

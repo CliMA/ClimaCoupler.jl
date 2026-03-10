@@ -12,7 +12,7 @@ specific to one particular calibration experiment.
     For calibration, other resources that you may find helpful are the
     documentation for
     [EnsembleKalmanProcesses](https://clima.github.io/EnsembleKalmanProcesses.jl/stable/),
-    [ClimaCalibrate](https://clima.github.io/ClimaCalibrate.jl/dev/),
+    [ClimaCalibrate](https://clima.github.io/ClimaCalibrate.jl/stable/),
     [ClimaAnalysis](https://clima.github.io/ClimaAnalysis.jl/stable/), and the
     [ClimaCoupler calibration experiments](https://github.com/CliMA/ClimaCoupler.jl/tree/main/experiments/calibration).
 
@@ -69,7 +69,7 @@ For the second step, we define a preprocessing function specific to the
 variable.
 
 !!! note "Preprocessing functions"
-    See [ClimaAnalysis documentation](https://clima.github.io/ClimaAnalysis.jl/dev/)
+    See [ClimaAnalysis documentation](https://clima.github.io/ClimaAnalysis.jl/stable/)
     for available transformations on `OutputVar`s.
 
 In our example, no preprocessing is applied.
@@ -79,7 +79,7 @@ CalibrationTools.preprocess(::CalibrationTools.ERA5DataLoader, var, ::Val{:er}) 
 nothing # hide
 ```
 
-Now, you can use [`get`](@ref) to retrieve the `OutputVar` with the short name 
+Now, you can use [`get`](@ref) to retrieve the `OutputVar` with the short name
 "mer"`.
 
 ```@example add_variable

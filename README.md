@@ -4,12 +4,16 @@ ClimaCoupler.jl provides coupled system time stepping control and support for ma
 boundary information between components. It can handle atmosphere, ocean, land, and sea ice component models,
 and the source code is agnostic to the internals of these component models.
 
-ClimaCoupler.jl contains a directory `experiments/ClimaEarth/` which contains
-additional infrastructure to run coupled AMIP experiments using component models
-from ClimaAtmos.jl and ClimaLand.jl. This includes machinery for visualizing output
-in the `user_io/` folder, and component model-specific initialization, access,
-and other helper functions in the `components/` folder, which will soon be moved to
-the respective component model packages.
+ClimaCoupler.jl targets global, long-term climate simulations, specifically for the
+[Coupled Model Intercomparison Project (CMIP)](https://wcrp-cmip.org) and
+[Atmospheric Model Intercomparison Project (AMIP)](https://pcmdi.llnl.gov/mips/amip/home/overview.html).
+With these objectives in mind, this coupler is also designed to be flexible and modular,
+so it supports simpler slabplanet-type setups as well.
+
+The `experiments/` directory contains run scripts
+for CMIP, AMIP, and slabplanet setups. A few simple component models are implemented
+within `src/`, while more complex component models extend the ClimaCoupler interface
+in `ext/`.
 
 Additional smaller coupling examples can be found in the `experiments/ClimaCore/` directory.
 These are meant to serve as an introduction to coupling and the types of functionality

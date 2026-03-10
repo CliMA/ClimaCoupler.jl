@@ -6,6 +6,11 @@ which extend the ClimaCoupler.jl simulation interface.
 
 This extension is loaded when Oceananigans, ClimaOcean, ClimaSeaIce,
 and KernelAbstractions are loaded with either `import` or `using`.
+
+For more information about the CMIP component models, please see the
+"Available component models" section of the ClimaCoupler documentation,
+or see the [Oceananigans documentation](https://clima.github.io/OceananigansDocumentation/stable/)
+and [ClimaSeaIce documentation](https://clima.github.io/ClimaSeaIceDocumentation/dev/).
 """
 module ClimaCouplerCMIPExt
 

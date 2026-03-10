@@ -431,10 +431,11 @@ function FluxCalculator.compute_surface_fluxes!(
     SW_d = csf.SW_d
     LW_d = csf.LW_d
     T_melt = FT(273.05)
+    hc = FT(sim.ice.model.ice_consolidation_thickness)
 
     # Build element-wise update_T_sfc callbacks (each closes over local ice parameters)
     update_T_sfc_callback =
-        ClimaCouplerCMIPExt.update_T_sfc.(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
+        ClimaCouplerCMIPExt.update_T_sfc.(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt, hc)
 
     # Surface temperature guess from last timestep
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))

@@ -18,10 +18,12 @@ import SurfaceFluxes as SF
 import Thermodynamics as TD
 
 """
-    update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt; I0 = 0.17)
+    update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt, hc;
+                 I0 = 0.17, max_ΔT = 5)
 
 Create a callback for `SurfaceFluxes.jl` that updates surface temperature using
-a semi-implicit linearization of the LW emission term:
+the same semi-implicit linearization of the LW emission term used in
+`ClimaOcean.OceanSeaIceModels.InterfaceComputations.SkinTemperature`:
 
     Tₛⁿ⁺¹ = (Tᵢ - δ/κ · (Jᵃ - 4σϵTₛⁿ⁴)) / (1 + 4δσϵTₛⁿ³/κ)
 
@@ -29,7 +31,13 @@ where Jᵃ uses only the non-penetrating shortwave at the surface (OIFES Eq. 58,
     (1-α)SW↓_surface = (1-α)SW↓ * (1 - I0*exp(-1.5*δ))
 so Jᵃ = σϵTₛⁿ⁴ - (1-α)SW↓_surface - ϵLW↓ + F_sh + F_lh  (positive upward).
 
-The result is capped at the melting temperature T_melt (OIFES Table 2: 273.05 K for sea ice).
+The result is:
+- capped at the melting temperature `T_melt` (OIFES Table 2: 273.05 K for sea ice),
+- limited so that the increment from the initial guess `Tₛⁿ` does not exceed `max_ΔT`,
+- and, following the consolidated/thin-ice logic in
+  `flux_balance_temperature(::SkinTemperature{<:ClimaSeaIce.ConductiveFlux}, ...)`,
+  forced to the basal temperature `T_i` when the ice is thinner than the
+  consolidation thickness `hc`.
 
 # Arguments
 - `κ`: Thermal conductivity [W m⁻¹ K⁻¹]
@@ -41,9 +49,13 @@ The result is capped at the melting temperature T_melt (OIFES Table 2: 273.05 K 
 - `LW_d`: Downward longwave radiation [W m⁻²]
 - `α_albedo`: Surface albedo [-]
 - `T_melt`: Melting temperature [K] (273.05 K for sea ice, OIFES Table 2)
+- `hc`: Ice consolidation thickness [m]; when `δ < hc` we use `T_i` instead of a
+        diagnosed skin temperature, mimicking the unconsolidated-ice regime.
 - `I0`: Fraction of absorbed SW that penetrates ice (default 0.17, OIFES Eq. 58)
+- `max_ΔT`: Maximum allowed change in skin temperature per call [K]
 """
-function update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt; I0 = 0.17)
+function update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt, hc;
+                      I0 = 0.17, max_ΔT = 5)
     return function (ζ, param_set, thermo_params_callback, inputs, scheme, u_star, z0m, z0s)
         T_sfc_n = inputs.T_sfc_guess
 
@@ -100,9 +112,23 @@ function update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt; I0 = 0
         denominator = 1 + 4 * δ * σ * ϵ * T_sfc_n^3 / κ
         T_sfc_new = numerator / denominator
 
-        # Cap surface temperature at melting temperature 
-        T_sfc_new = min(T_sfc_new, T_melt)
+        # Limit the change in surface temperature to avoid instabilities in the
+        # fixed-point iteration, mimicking SkinTemperature.max_ΔT in
+        # ClimaOcean's interface_states.jl.
+        ΔT = T_sfc_new - T_sfc_n
+        max_ΔT_T = convert(typeof(T_sfc_new), max_ΔT)
+        abs_ΔT = min(max_ΔT_T, abs(ΔT))
+        T_sfc_limited = T_sfc_n + abs_ΔT * sign(ΔT)
 
-        return T_sfc_new
+        # Cap surface temperature at melting temperature
+        T_sfc_limited = min(T_sfc_limited, T_melt)
+
+        # Thin/unconsolidated ice: if thickness δ is less than consolidation
+        # thickness hc, use the basal temperature T_i instead of a diagnosed
+        # skin temperature (h/hc logic from ClimaOcean's conductive case).
+        h = δ
+        T_sfc_final = ifelse(h ≥ hc, T_sfc_limited, T_i)
+
+        return T_sfc_final
     end
 end

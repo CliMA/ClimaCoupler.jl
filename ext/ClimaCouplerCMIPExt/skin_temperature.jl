@@ -55,7 +55,7 @@ The result is:
 - `max_ΔT`: Maximum allowed change in skin temperature per call [K]
 """
 function update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt, hc;
-                      I0 = 0.17, max_ΔT = 5)
+                      I0 = 0.17, max_ΔT = 5.0)
     return function (ζ, param_set, thermo_params_callback, inputs, scheme, u_star, z0m, z0s)
         T_sfc_n = inputs.T_sfc_guess
 

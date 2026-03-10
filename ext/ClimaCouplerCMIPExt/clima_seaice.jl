@@ -431,7 +431,7 @@ function FluxCalculator.compute_surface_fluxes!(
     SW_d = csf.SW_d
     LW_d = csf.LW_d
     T_melt = FT(273.05)
-    hc = FT(sim.ice.model.ice_consolidation_thickness)
+    hc = FT(0.05)
 
     # Build element-wise update_T_sfc callbacks (each closes over local ice parameters)
     update_T_sfc_callback =

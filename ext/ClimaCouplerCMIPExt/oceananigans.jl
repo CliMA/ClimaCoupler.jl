@@ -316,11 +316,11 @@ function construct_remappers(grid_oc, boundary_space)
     )
     remapper_cc = OC.on_architecture(OC.architecture(grid_oc), remapper_cc)
 
-    # Scratch arrays sized consistently with the remapper_cc interpolated values
-    ArrayType_cc = ClimaComms.array_type(remapper_cc.space)
-    interpolated_values_dim..., _ = size(remapper_cc._interpolated_values)
-    scratch_arr1 = ArrayType_cc(zeros(FT, interpolated_values_dim...))
-    scratch_arr2 = ArrayType_cc(zeros(FT, interpolated_values_dim...))
+    # Scratch arrays on the boundary space used when remapping scalar fields
+    ArrayType_cc = ClimaComms.array_type(boundary_space)
+    nelems_cc = CC.Meshes.nelements(boundary_space.grid.topology.mesh)
+    scratch_arr1 = ArrayType_cc(zeros(FT, nelems_cc))
+    scratch_arr2 = ArrayType_cc(zeros(FT, nelems_cc))
 
     # Two 2D Center/Center fields used as scratch space for remapped scalars
     scratch_cc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)

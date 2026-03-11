@@ -263,6 +263,15 @@ function argparse_settings()
         help = "Boolean flag indicating whether to use binary (thresholded) area fractions for land and ice [`true` (default), `false`]. When true, land fraction > eps becomes 1, and ice fraction > 0.5 becomes 1."
         arg_type = Bool
         default = true
+        # Ocean grid resolution (Oceananigans only; used to de-emphasize regridding artifacts)
+        "--ocean_nx"
+        help = "Number of zonal grid points for the ocean model [720 (default, ~0.5°)]. Coarsening (e.g. 360) can reduce equatorial regridding artifacts."
+        arg_type = Int
+        default = 720
+        "--ocean_ny"
+        help = "Number of meridional grid points for the ocean model [360 (default, ~0.5°)]. Coarsening (e.g. 180) can reduce equatorial regridding artifacts."
+        arg_type = Int
+        default = 360
     end
     return s
 end
@@ -512,6 +521,10 @@ function get_coupler_args(config_dict::Dict)
     # Binary area fraction
     binary_area_fraction = config_dict["binary_area_fraction"]
 
+    # Ocean grid resolution (Oceananigans only; defaults reduce regridding cost/artifacts if omitted)
+    ocean_nx = get(config_dict, "ocean_nx", 720)
+    ocean_ny = get(config_dict, "ocean_ny", 360)
+
     return (;
         job_id,
         sim_mode,
@@ -553,6 +566,8 @@ function get_coupler_args(config_dict::Dict)
         ice_model,
         land_fraction_source,
         binary_area_fraction,
+        ocean_nx,
+        ocean_ny,
     )
 end
 

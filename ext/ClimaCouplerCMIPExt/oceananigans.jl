@@ -84,6 +84,8 @@ function OceananigansSimulation(
     dt = nothing,
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
+    ocean_nx = 720,
+    ocean_ny = 360,
     extra_kwargs...,
 ) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
@@ -100,9 +102,9 @@ function OceananigansSimulation(
     CO.EN4.download_dataset(en4_temperature)
     CO.EN4.download_dataset(en4_salinity)
 
-    # Set up tripolar ocean grid (1 degree)
-    Nx = 720
-    Ny = 360
+    # Set up tripolar ocean grid (resolution from config: ocean_nx × ocean_ny)
+    Nx = ocean_nx
+    Ny = ocean_ny
     Nz = 100
     depth = 6000 # meters
     z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 1800)

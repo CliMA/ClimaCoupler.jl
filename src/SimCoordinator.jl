@@ -243,6 +243,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         ice_model,
         land_fraction_source,
         binary_area_fraction,
+        ocean_nx,
+        ocean_ny,
     ) = Input.get_coupler_args(config_dict)
 
     override_file = CP.merge_toml_files(parameter_files; override = true)
@@ -351,6 +353,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         sst_adjustment,
         saveat,
         evolving = evolving_ocean,
+        ocean_nx,
+        ocean_ny,
     )
 
     ice_sim = Interfacer.SeaIceSimulation(

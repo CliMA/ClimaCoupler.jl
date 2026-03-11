@@ -632,19 +632,6 @@ Arguments:
         ρτyio[i, j, 1] * ρₒ⁻¹ * OC.Operators.ℑyᵃᶠᵃ(i, j, 1, grid, ice_concentration)
 end
 
-"""
-    get_model_prog_state(sim::ClimaSeaIceSimulation)
-
-Returns the model state of a simulation as a `ClimaCore.FieldVector`.
-It's okay to leave this unimplemented for now, but we won't be able to use the
-restart system.
-
-TODO extend this for non-ClimaCore states.
-"""
-function Checkpointer.get_model_prog_state(sim::ClimaSeaIceSimulation)
-    @warn "get_model_prog_state not implemented for ClimaSeaIceSimulation"
-end
-
 # Additional ClimaSeaIceSimulation getter methods for plotting debug fields
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:u}) = sim.ice.model.velocities.u
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:v}) = sim.ice.model.velocities.v

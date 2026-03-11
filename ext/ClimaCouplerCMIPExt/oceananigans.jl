@@ -301,11 +301,28 @@ function construct_remappers(grid_oc, boundary_space)
     scratch_field_oc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
     scratch_field_oc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
 
-    # Additional scratch arrays and fields used by sea-ice/ocean remapping paths
-    scratch_arr1 =
-        ArrayType(zeros(FT, CC.Meshes.nelements(boundary_space.grid.topology.mesh)))
-    scratch_arr2 =
-        ArrayType(zeros(FT, CC.Meshes.nelements(boundary_space.grid.topology.mesh)))
+    # ----------------------------------------------------------------------
+    # Additional remapper and scratch arrays used by sea-ice/ocean remapping
+    # ----------------------------------------------------------------------
+
+    # Remapper from ClimaCore boundary space to a 1D array of values per element.
+    # This mirrors the construction used in the as/tsfc2 branch where
+    # ConservativeRegridding is used in both directions.
+    remapper_cc = CR.Regridder(
+        boundary_space_cpu,
+        boundary_space_cpu;
+        normalize = false,
+        threaded = false,
+    )
+    remapper_cc = OC.on_architecture(OC.architecture(grid_oc), remapper_cc)
+
+    # Scratch arrays sized consistently with the remapper_cc interpolated values
+    ArrayType_cc = ClimaComms.array_type(remapper_cc.space)
+    interpolated_values_dim..., _ = size(remapper_cc._interpolated_values)
+    scratch_arr1 = ArrayType_cc(zeros(FT, interpolated_values_dim...))
+    scratch_arr2 = ArrayType_cc(zeros(FT, interpolated_values_dim...))
+
+    # Two 2D Center/Center fields used as scratch space for remapped scalars
     scratch_cc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
     scratch_cc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
 
@@ -329,6 +346,7 @@ function construct_remappers(grid_oc, boundary_space)
         polar_exclusion_flux_mask_centers,
         polar_exclusion_flux_mask_u,
         polar_exclusion_flux_mask_v,
+        remapper_cc,
         scratch_arr1,
         scratch_arr2,
         scratch_cc1,

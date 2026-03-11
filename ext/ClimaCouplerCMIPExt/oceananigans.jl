@@ -599,19 +599,6 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     return nothing
 end
 
-"""
-    get_model_prog_state(sim::OceananigansSimulation)
-
-Returns the model state of a simulation as a `ClimaCore.FieldVector`.
-It's okay to leave this unimplemented for now, but we won't be able to use the
-restart system.
-
-TODO extend this for non-ClimaCore states.
-"""
-function Checkpointer.get_model_prog_state(sim::OceananigansSimulation)
-    @warn "get_model_prog_state not implemented for OceananigansSimulation"
-end
-
 # Additional OceananigansSimulation getter methods for plotting debug fields
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:salinity}) =
     sim.ocean.model.tracers.S

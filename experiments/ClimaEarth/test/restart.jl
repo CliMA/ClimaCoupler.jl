@@ -65,7 +65,7 @@ four_steps_reading["job_id"] = "four_steps_reading"
 Input.update_t_start_for_restarts!(four_steps_reading)
 
 cs_four_steps_reading = setup_and_run(four_steps_reading)
-@testset "Restarts from command line arguments" begin
+@testset "AMIP restarts (state and cache)" begin
     @test cs_four_steps_reading.tspan[1] == cs_four_steps.tspan[2]
 end
 

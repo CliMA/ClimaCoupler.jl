@@ -24,11 +24,9 @@ import ClimaCore as CC
 import ClimaParams as CP
 using KernelAbstractions: @kernel, @index, @inbounds
 
-# Include helper functions first (used by both oceananigans.jl and clima_seaice.jl)
-include("ClimaCouplerCMIPExt/climaocean_helpers.jl")
-
-# Include the model files
+# Include the model files first so their types are available to climaocean_helpers.jl
 include("ClimaCouplerCMIPExt/oceananigans.jl")
 include("ClimaCouplerCMIPExt/clima_seaice.jl")
+include("ClimaCouplerCMIPExt/climaocean_helpers.jl")
 
 end # module ClimaCouplerCMIPExt

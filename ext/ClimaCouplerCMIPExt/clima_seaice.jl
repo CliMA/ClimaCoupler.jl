@@ -430,12 +430,7 @@ function FluxCalculator.compute_surface_fluxes!(
     σ = FT(sim.ice_properties.σ)
     SW_d = csf.SW_d
     LW_d = csf.LW_d
-    T_melt = FT(273.05)
-    hc = FT(0.05)
-
-    # Build element-wise update_T_sfc callbacks (each closes over local ice parameters)
-    update_T_sfc_callback =
-        ClimaCouplerCMIPExt.update_T_sfc.(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt, hc)
+    T_melt = FT(sim.ice_properties.C_to_K) # Melting temperature (freezing point of water)
 
     # Surface temperature guess from last timestep
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
@@ -471,6 +466,10 @@ function FluxCalculator.compute_surface_fluxes!(
         error("Unknown roughness_model: $roughness_model. Must be :coare3 or :constant")
     end
     config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
+
+    # Build element-wise update_T_sfc callbacks (each closes over local ice parameters)
+    update_T_sfc_callback =
+        ClimaCouplerCMIPExt.update_T_sfc.(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
 
     # Compute surface fluxes via the _get_surface_fluxes_seaice wrapper
     Φ_sfc = SFP.grav.(surface_fluxes_params) .* csf.height_sfc

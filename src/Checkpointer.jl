@@ -42,7 +42,13 @@ get_model_cache(sim::Interfacer.AbstractComponentSimulation) = nothing
         prev_checkpoint_t::Int;
         output_dir = "output")
 
-Checkpoint the model state of a simulation to a HDF5 file at a given time, t (in seconds).
+Checkpoint the model state of a simulation at time `t` (in seconds).
+
+The default implementation uses `get_model_prog_state(sim)` to obtain a
+`ClimaCore.FieldVector` and writes it to an HDF5 file via `ClimaCore.InputOutput`.
+If `get_model_prog_state` returns `nothing`, this function does nothing.
+
+Component models that do not use ClimaCore can override this method to use their own checkpointing.
 
 If a previous checkpoint exists, it is removed. This is to avoid accumulating
 many checkpoint files in the output directory. A value of -1 for `prev_checkpoint_t`
@@ -56,6 +62,7 @@ function checkpoint_model_state(
     output_dir = "output",
 )
     Y = get_model_prog_state(sim)
+    isnothing(Y) && return nothing
     day = floor(Int, t / (60 * 60 * 24))
     sec = floor(Int, t % (60 * 60 * 24))
     @info "Saving checkpoint $(nameof(sim)) model state to HDF5 on day $day second $sec"
@@ -83,6 +90,12 @@ end
 Checkpoint the model cache to N JLD2 files at a given time, t (in seconds),
 where N is the number of MPI ranks.
 
+The default implementation uses `get_model_cache(sim)` to obtain the cache.
+If `get_model_cache` returns `nothing`, this function does nothing.
+
+Component models that do not use ClimaCore can override this method
+to use their own checkpointing.
+
 Objects are saved to JLD2 files because caches are generally not ClimaCore
 objects (and ClimaCore.InputOutput can only save `Field`s or `FieldVector`s).
 
@@ -97,7 +110,7 @@ function checkpoint_model_cache(
     prev_checkpoint_t::Int;
     output_dir = "output",
 )
-    # Move p to CPU (because we cannot save CUArrays)
+    isnothing(get_model_cache(sim)) && return nothing
     p = get_model_cache_to_checkpoint(sim)
     day = floor(Int, t / (60 * 60 * 24))
     sec = floor(Int, t % (60 * 60 * 24))
@@ -226,16 +239,14 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
     comms_ctx = ClimaComms.context(cs)
 
     for sim in cs.model_sims
-        if !isnothing(Checkpointer.get_model_prog_state(sim))
-            Checkpointer.checkpoint_model_state(
-                sim,
-                comms_ctx,
-                time,
-                prev_checkpoint_t;
-                output_dir,
-            )
-        end
-        if !isnothing(Checkpointer.get_model_cache(sim)) && cs.save_cache
+        Checkpointer.checkpoint_model_state(
+            sim,
+            comms_ctx,
+            time,
+            prev_checkpoint_t;
+            output_dir,
+        )
+        if cs.save_cache
             Checkpointer.checkpoint_model_cache(
                 sim,
                 comms_ctx,
@@ -276,15 +287,10 @@ function restart!(cs, checkpoint_dir, checkpoint_t, restart_cache)
     @info "Restarting from time $(checkpoint_t) and directory $(checkpoint_dir)"
     pid = ClimaComms.mypid(ClimaComms.context(cs))
     for sim in cs.model_sims
-        if !isnothing(Checkpointer.get_model_prog_state(sim))
-            input_file_state =
-                output_file = joinpath(
-                    checkpoint_dir,
-                    "checkpoint_$(nameof(sim))_$(checkpoint_t).hdf5",
-                )
-            restart_model_state!(sim, input_file_state, ClimaComms.context(cs))
-        end
-        if !isnothing(Checkpointer.get_model_cache(sim)) && restart_cache
+        input_file_state =
+            joinpath(checkpoint_dir, "checkpoint_$(nameof(sim))_$(checkpoint_t).hdf5")
+        restart_model_state!(sim, input_file_state, ClimaComms.context(cs))
+        if restart_cache
             input_file_cache = joinpath(
                 checkpoint_dir,
                 "checkpoint_cache_$(pid)_$(nameof(sim))_$(checkpoint_t).jld2",
@@ -301,14 +307,18 @@ end
 """
     restart_model_cache!(sim, input_file)
 
-Overwrite the content of `sim` with the cache from the `input_file`.
+Restore the cache of `sim` from `input_file`.
+
+The default implementation uses `get_model_cache(sim)` to check whether the
+simulation has a cache. If `get_model_cache` returns `nothing`, this function
+does nothing.
 
 It relies on `restore_cache!(sim, old_cache)`, which has to be implemented by
 the component models that have a cache.
 """
 function restart_model_cache!(sim, input_file)
+    isnothing(get_model_cache(sim)) && return nothing
     ispath(input_file) || error("File $(input_file) not found")
-    # Component models are responsible for defining a method for this
     JLD2.jldopen(input_file) do file
         restore_cache!(sim, file["cache"])
     end
@@ -317,12 +327,18 @@ end
 """
     restart_model_state!(sim, input_file, comms_ctx)
 
-Overwrite the content of `sim` with the state from the `input_file`.
+Restore the prognostic state of `sim` from `input_file`.
+
+The default implementation reads a `ClimaCore.FieldVector` from an HDF5 file
+written by the default `checkpoint_model_state`. If `get_model_prog_state`
+returns `nothing`, this function does nothing.
+
+Component models that do not use ClimaCore can override this method to use their own checkpointing.
 """
 function restart_model_state!(sim, input_file, comms_ctx)
-    ispath(input_file) || error("File $(input_file) not found")
     Y = get_model_prog_state(sim)
-    # open file and read
+    isnothing(Y) && return nothing
+    ispath(input_file) || error("File $(input_file) not found")
     CC.InputOutput.HDF5Reader(input_file, comms_ctx) do restart_reader
         Y_new = CC.InputOutput.read_field(restart_reader, "model_state")
         # set new state

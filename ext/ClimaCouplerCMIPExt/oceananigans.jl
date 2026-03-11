@@ -301,31 +301,6 @@ function construct_remappers(grid_oc, boundary_space)
     scratch_field_oc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
     scratch_field_oc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
 
-    # ----------------------------------------------------------------------
-    # Additional remapper and scratch arrays used by sea-ice/ocean remapping
-    # ----------------------------------------------------------------------
-
-    # Remapper from ClimaCore boundary space to a 1D array of values per element.
-    # This mirrors the construction used in the as/tsfc2 branch where
-    # ConservativeRegridding is used in both directions.
-    remapper_cc = CR.Regridder(
-        boundary_space_cpu,
-        boundary_space_cpu;
-        normalize = false,
-        threaded = false,
-    )
-    remapper_cc = OC.on_architecture(OC.architecture(grid_oc), remapper_cc)
-
-    # Scratch arrays on the boundary space used when remapping scalar fields
-    ArrayType_cc = ClimaComms.array_type(boundary_space)
-    nelems_cc = CC.Meshes.nelements(boundary_space.grid.topology.mesh)
-    scratch_arr1 = ArrayType_cc(zeros(FT, nelems_cc))
-    scratch_arr2 = ArrayType_cc(zeros(FT, nelems_cc))
-
-    # Two 2D Center/Center fields used as scratch space for remapped scalars
-    scratch_cc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
-    scratch_cc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
-
     # Allocate space for a Field of UVVectors, which we need for remapping momentum fluxes
     temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
 
@@ -346,11 +321,6 @@ function construct_remappers(grid_oc, boundary_space)
         polar_exclusion_flux_mask_centers,
         polar_exclusion_flux_mask_u,
         polar_exclusion_flux_mask_v,
-        remapper_cc,
-        scratch_arr1,
-        scratch_arr2,
-        scratch_cc1,
-        scratch_cc2,
     )
 end
 

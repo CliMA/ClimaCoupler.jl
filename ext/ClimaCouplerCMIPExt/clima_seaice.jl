@@ -541,13 +541,12 @@ function FluxCalculator.compute_surface_fluxes!(
     # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists)
     csf.scalar_temp2 .=
         ifelse.(area_fraction .≈ 0, zero(FT), T_sfc_new .- FT(sim.ice_properties.C_to_K))
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
-        csf.scalar_temp2,
-    )
+    # Remap diagnosed surface temperature from boundary space back to the
+    # ClimaSeaIce grid using the existing Interfacer.remap! helper, which
+    # internally uses ConservativeRegridding.
     ice_concentration = sim.ice.model.ice_concentration
     top_sfc_T = sim.ice.model.ice_thermodynamics.top_surface_temperature
+    Interfacer.remap!(top_sfc_T, csf.scalar_temp2, sim.remapping)
     OC.interior(top_sfc_T, :, :, 1) .=
         ifelse.(
             OC.interior(ice_concentration, :, :, 1) .> 0,

@@ -50,7 +50,7 @@ The result is:
 - `α_albedo`: Surface albedo [-]
 - `T_melt`: Melting temperature [K] (273.05 K for sea ice, OIFES Table 2)
 - `hc`: Ice consolidation thickness [m]; when `δ < hc` we use `T_i` instead of a
-        diagnosed skin temperature, mimicking the unconsolidated-ice regime.
+        diagnosed skin temperature.
 - `I0`: Fraction of absorbed SW that penetrates ice (default 0.17, OIFES Eq. 58)
 - `max_ΔT`: Maximum allowed change in skin temperature per call [K]
 """
@@ -58,6 +58,7 @@ function update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt, hc;
                       I0 = 0.17, max_ΔT = 5.0)
     return function (ζ, param_set, thermo_params_callback, inputs, scheme, u_star, z0m, z0s)
         T_sfc_n = inputs.T_sfc_guess
+        I0 = convert(eltype(T_sfc_n), I0)
 
         # Surface density and saturation specific humidity at T_sfc_n
         ρ_sfc = SF.surface_density(
@@ -104,7 +105,7 @@ function update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt, hc;
 
         # Net upward flux: Jᵃ = σϵT⁴ - (1-α)SW↓_surface - ϵLW↓ + F_sh + F_lh
         # OIFES Eq. 58, 60: only non-penetrating SW heats surface; (1-α)SW↓_surface = (1-α)SW↓ * (1 - I0*exp(-1.5*δ))
-        sw_surface = (1 - α_albedo) * SW_d * (1 - I0 * exp(-1.5 * δ))
+        sw_surface = (1 - α_albedo) * SW_d * (1 - I0 * exp(FT(-1.5) * δ))
         J_a = σ * ϵ * T_sfc_n^4 - sw_surface - ϵ * LW_d + F_sh + F_lh
 
         # Semi-implicit solve: linearize σϵT⁴ ≈ -3σϵTₙ⁴ + 4σϵTₙ³T

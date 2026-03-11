@@ -301,6 +301,10 @@ function construct_remappers(grid_oc, boundary_space)
     scratch_field_oc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
     scratch_field_oc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
 
+    # Additional Center/Center scratch fields used in turbulent flux updates
+    scratch_cc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
+    scratch_cc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
+
     # Allocate space for a Field of UVVectors, which we need for remapping momentum fluxes
     temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
 
@@ -321,6 +325,8 @@ function construct_remappers(grid_oc, boundary_space)
         polar_exclusion_flux_mask_centers,
         polar_exclusion_flux_mask_u,
         polar_exclusion_flux_mask_v,
+        scratch_cc1,
+        scratch_cc2,
     )
 end
 

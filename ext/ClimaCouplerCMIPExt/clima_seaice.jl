@@ -281,9 +281,9 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:area_fraction}) = sim.ar
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_concentration}) =
     sim.ice.model.ice_concentration
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_thickness}) =
-    Interfacer.remap(axes(sim.area_fraction), sim.ice.model.ice_thickness)
+    Interfacer.remap(axes(sim.area_fraction), sim.ice.model.ice_thickness, sim.remapping)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:internal_temperature}) =
-    Interfacer.remap(axes(sim.area_fraction), sim.ocean_ice_interface.temperature)
+    Interfacer.remap(axes(sim.area_fraction), sim.ocean_ice_interface.temperature, sim.remapping)
 
 # TODO better values for roughness
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_model}) = :constant

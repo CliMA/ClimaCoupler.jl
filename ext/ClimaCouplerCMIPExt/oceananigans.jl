@@ -604,8 +604,10 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     α = Interfacer.get_field(sim, Val(:surface_direct_albedo)) # scalar
     ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
 
-    # Compute radiative contribution; polar-exclusion mask applied via ifelse
-    rad_T_flux = sim.remapping.scratch_arr3
+    # Compute radiative contribution; polar-exclusion mask applied via ifelse.
+    # Write directly into the surface temperature flux field rather than using
+    # an extra scratch array, to avoid relying on a non-existent scratch_arr3.
+    rad_T_flux = OC.interior(oc_flux_T, :, :, 1)
     rad_T_flux .=
         (1.0 .- ice_concentration) .* (
             -(1 - α) .* remapped_SW_d .-
@@ -615,7 +617,6 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
             )
         ) ./ (reference_density * heat_capacity)
     @. rad_T_flux = ifelse(polar_excl_centers .≈ 0, zero(rad_T_flux), rad_T_flux)
-    OC.interior(oc_flux_T, :, :, 1) .= rad_T_flux
 
     # Remap precipitation fields onto scratch fields; rename for clarity
     Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.P_liq, sim.remapping) # liquid precipitation

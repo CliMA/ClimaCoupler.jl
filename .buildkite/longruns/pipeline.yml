@@ -15,22 +15,22 @@ env:
 timeout_in_minutes: 1800 # 30 hours
 
 steps:
-  - label: "init :computer:"
-    key: "init_cpu_env"
-    command:
-      - "echo $$JULIA_DEPOT_PATH"
+  # - label: "init :computer:"
+  #   key: "init_cpu_env"
+  #   command:
+  #     - "echo $$JULIA_DEPOT_PATH"
 
-      - echo "--- Instantiate AMIP env"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
+  #     - echo "--- Instantiate AMIP env"
+  #     - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+  #     - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"
+  #     - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
+  #     - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
 
-    agents:
-      slurm_cpus_per_task: 8
-    env:
-      JULIA_NUM_PRECOMPILE_TASKS: 8
-      JULIA_MAX_NUM_PRECOMPILE_FILES: 50
+  #   agents:
+  #     slurm_cpus_per_task: 8
+  #   env:
+  #     JULIA_NUM_PRECOMPILE_TASKS: 8
+  #     JULIA_MAX_NUM_PRECOMPILE_FILES: 50
 
   - label: "init clima :computer:"
     key: "init_cpu_env_clima"
@@ -51,127 +51,127 @@ steps:
 
   - wait
 
-  - group: "Coupler integration and conservation tests"
+  # - group: "Coupler integration and conservation tests"
 
-    steps:
-      - label: "Aquaplanet: evolving slab ocean"
-        key: "slabplanet_aqua_evolve_ocean"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_aqua_evolve_ocean.yml --job_id slabplanet_aqua_evolve_ocean"
-        artifact_paths: "output/slabplanet_aqua_evolve_ocean/artifacts/*"
-        agents:
-          slurm_mem: 32GB
+  #   steps:
+  #     - label: "Aquaplanet: evolving slab ocean"
+  #       key: "slabplanet_aqua_evolve_ocean"
+  #       command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_aqua_evolve_ocean.yml --job_id slabplanet_aqua_evolve_ocean"
+  #       artifact_paths: "output/slabplanet_aqua_evolve_ocean/artifacts/*"
+  #       agents:
+  #         slurm_mem: 32GB
 
-      - label: "Slabplanet: evolving slab ocean, bucket"
-        key: "slabplanet_evolve_ocean"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_evolve_ocean.yml --job_id slabplanet_evolve_ocean"
-        artifact_paths: "output/slabplanet_evolve_ocean/artifacts/*"
-        agents:
-          slurm_mem: 32GB
+  #     - label: "Slabplanet: evolving slab ocean, bucket"
+  #       key: "slabplanet_evolve_ocean"
+  #       command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/slabplanet_evolve_ocean.yml --job_id slabplanet_evolve_ocean"
+  #       artifact_paths: "output/slabplanet_evolve_ocean/artifacts/*"
+  #       agents:
+  #         slurm_mem: 32GB
 
-  - group: "AMIP simulations"
+  # - group: "AMIP simulations"
 
-    steps:
+  #   steps:
 
-      - label: "GPU AMIP + ED only"
-        key: "amip_edonly"
-        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly.yml --job_id amip_edonly"
-        artifact_paths: "output/amip_edonly/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          queue: clima
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 32GB
+  #     - label: "GPU AMIP + ED only"
+  #       key: "amip_edonly"
+  #       command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_edonly.yml --job_id amip_edonly"
+  #       artifact_paths: "output/amip_edonly/artifacts/*"
+  #       env:
+  #         CLIMACOMMS_DEVICE: "CUDA"
+  #       agents:
+  #         queue: clima
+  #         slurm_gpus_per_task: 1
+  #         slurm_cpus_per_task: 4
+  #         slurm_ntasks: 1
+  #         slurm_mem: 32GB
 
-      - label: "GPU AMIP + diag. EDMF + integrated land"
-        key: "amip_diagedmf_land"
-        command:
-          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf_land.yml --job_id amip_diagedmf_land"
-        artifact_paths: "output/amip_diagedmf_land/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          queue: clima
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 32GB
+  #     - label: "GPU AMIP + diag. EDMF + integrated land"
+  #       key: "amip_diagedmf_land"
+  #       command:
+  #         - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf_land.yml --job_id amip_diagedmf_land"
+  #       artifact_paths: "output/amip_diagedmf_land/artifacts/*"
+  #       env:
+  #         CLIMACOMMS_DEVICE: "CUDA"
+  #       agents:
+  #         queue: clima
+  #         slurm_gpus_per_task: 1
+  #         slurm_cpus_per_task: 4
+  #         slurm_ntasks: 1
+  #         slurm_mem: 32GB
 
-      - label: "GPU AMIP + diag. EDMF + integrated land + 2K SST"
-        key: "amip_diagedmf_land_p2k"
-        command:
-          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf_land_p2k.yml --job_id amip_diagedmf_land_p2k"
-        artifact_paths: "output/amip_diagedmf_land_p2k/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          queue: clima
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 32GB
+  #     - label: "GPU AMIP + diag. EDMF + integrated land + 2K SST"
+  #       key: "amip_diagedmf_land_p2k"
+  #       command:
+  #         - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf_land_p2k.yml --job_id amip_diagedmf_land_p2k"
+  #       artifact_paths: "output/amip_diagedmf_land_p2k/artifacts/*"
+  #       env:
+  #         CLIMACOMMS_DEVICE: "CUDA"
+  #       agents:
+  #         queue: clima
+  #         slurm_gpus_per_task: 1
+  #         slurm_cpus_per_task: 4
+  #         slurm_ntasks: 1
+  #         slurm_mem: 32GB
 
-      - label: "GPU AMIP + diag. EDMF + 1M + integrated land"
-        key: "amip_diagedmf_1m_land"
-        command:
-          - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf_1m_land.yml --job_id amip_diagedmf_1m_land"
-        artifact_paths: "output/amip_diagedmf_1m_land/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          queue: clima
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 32GB
+  #     - label: "GPU AMIP + diag. EDMF + 1M + integrated land"
+  #       key: "amip_diagedmf_1m_land"
+  #       command:
+  #         - "julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_diagedmf_1m_land.yml --job_id amip_diagedmf_1m_land"
+  #       artifact_paths: "output/amip_diagedmf_1m_land/artifacts/*"
+  #       env:
+  #         CLIMACOMMS_DEVICE: "CUDA"
+  #       agents:
+  #         queue: clima
+  #         slurm_gpus_per_task: 1
+  #         slurm_cpus_per_task: 4
+  #         slurm_ntasks: 1
+  #         slurm_mem: 32GB
 
-      - label: "GPU AMIP + prog. EDMF + bucket"
-        key: "amip_progedmf"
-        command:
-          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_progedmf.yml --job_id amip_progedmf"
-        artifact_paths: "output/amip_progedmf/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          queue: clima
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 32GB
-      
-      # the 1M prog EDMF config is currently unstable.
+  #     - label: "GPU AMIP + prog. EDMF + bucket"
+  #       key: "amip_progedmf"
+  #       command:
+  #         - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_progedmf.yml --job_id amip_progedmf"
+  #       artifact_paths: "output/amip_progedmf/artifacts/*"
+  #       env:
+  #         CLIMACOMMS_DEVICE: "CUDA"
+  #       agents:
+  #         queue: clima
+  #         slurm_gpus_per_task: 1
+  #         slurm_cpus_per_task: 4
+  #         slurm_ntasks: 1
+  #         slurm_mem: 32GB
 
-      # - label: "GPU AMIP + prog. EDMF + 1M + integrated land"
-      #   key: "amip_progedmf_1m_land"
-      #   command:
-      #     - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_progedmf_1m_land.yml --job_id amip_progedmf_1m_land"
-      #   artifact_paths: "output/amip_progedmf_1m_land/artifacts/*"
-      #   env:
-      #     CLIMACOMMS_DEVICE: "CUDA"
-      #   agents:
-      #     queue: clima
-      #     slurm_gpus_per_task: 1
-      #     slurm_cpus_per_task: 4
-      #     slurm_ntasks: 1
-      #     slurm_mem: 32GB
+  #     # the 1M prog EDMF config is currently unstable.
+
+  #     # - label: "GPU AMIP + prog. EDMF + 1M + integrated land"
+  #     #   key: "amip_progedmf_1m_land"
+  #     #   command:
+  #     #     - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_progedmf_1m_land.yml --job_id amip_progedmf_1m_land"
+  #     #   artifact_paths: "output/amip_progedmf_1m_land/artifacts/*"
+  #     #   env:
+  #     #     CLIMACOMMS_DEVICE: "CUDA"
+  #     #   agents:
+  #     #     queue: clima
+  #     #     slurm_gpus_per_task: 1
+  #     #     slurm_cpus_per_task: 4
+  #     #     slurm_ntasks: 1
+  #     #     slurm_mem: 32GB
 
 
   - group: "CMIP simulations"
 
     steps:
-      - label: "GPU CMIP: ClimaAtmos + ClimaLand + ClimaOcean + ClimaSeaIce"
-        key: "cmip_edonly_land"
-        command:
-            - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_land.yml --job_id cmip_edonly_land"
-        artifact_paths: "output/cmip_edonly_land/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          queue: clima
-          slurm_mem: 32GB
-          slurm_gpus: 1
+      # - label: "GPU CMIP: ClimaAtmos + ClimaLand + ClimaOcean + ClimaSeaIce"
+      #   key: "cmip_edonly_land"
+      #   command:
+      #       - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_land.yml --job_id cmip_edonly_land"
+      #   artifact_paths: "output/cmip_edonly_land/artifacts/*"
+      #   env:
+      #     CLIMACOMMS_DEVICE: "CUDA"
+      #   agents:
+      #     queue: clima
+      #     slurm_mem: 32GB
+      #     slurm_gpus: 1
 
       - label: "GPU CMIP: ClimaAtmos + Bucket + ClimaOcean + ClimaSeaIce"
         key: "cmip_edonly_bucket"
@@ -185,45 +185,45 @@ steps:
           slurm_mem: 32GB
           slurm_gpus: 1
 
-  - group: "Calibration experiments"
+  # - group: "Calibration experiments"
 
-    steps:
-      - label: "Subseasonal calibration test"
-        key: "subseasonal_calibration"
-        command:
-          - julia --color=yes --project=experiments/ClimaEarth experiments/calibration/subseasonal/generate_observations.jl
-          - julia --color=yes --project=experiments/ClimaEarth experiments/calibration/subseasonal/run_calibration.jl
-        artifact_paths: "experiments/calibration/subseasonal/output/*"
-        agents:
-          queue: clima
-          slurm_time: 24:00:00
+  #   steps:
+  #     - label: "Subseasonal calibration test"
+  #       key: "subseasonal_calibration"
+  #       command:
+  #         - julia --color=yes --project=experiments/ClimaEarth experiments/calibration/subseasonal/generate_observations.jl
+  #         - julia --color=yes --project=experiments/ClimaEarth experiments/calibration/subseasonal/run_calibration.jl
+  #       artifact_paths: "experiments/calibration/subseasonal/output/*"
+  #       agents:
+  #         queue: clima
+  #         slurm_time: 24:00:00
 
-  - wait
+  # - wait
 
-  - group: "Job analysis and reporting"
+  # - group: "Job analysis and reporting"
 
-    steps:
+  #   steps:
 
-      - label: ":thermometer: Cess climate sensitivity approximation from p2K runs"
-        key: "cess_from_p2k"
-        command: >-
-          julia --color=yes --project=experiments/ClimaEarth/
-            test/cess_climate_sensitivity.jl
-            output/amip_diagedmf_land
-            output/amip_diagedmf_land_p2k
-            output/ecs_analysis
-        artifact_paths: "output/ecs_analysis/*"
+  #     - label: ":thermometer: Cess climate sensitivity approximation from p2K runs"
+  #       key: "cess_from_p2k"
+  #       command: >-
+  #         julia --color=yes --project=experiments/ClimaEarth/
+  #           test/cess_climate_sensitivity.jl
+  #           output/amip_diagedmf_land
+  #           output/amip_diagedmf_land_p2k
+  #           output/ecs_analysis
+  #       artifact_paths: "output/ecs_analysis/*"
 
-      # plot job performance history
-      - label: ":chart_with_downwards_trend: build history"
-        command:
-          - build_history main # name of branch to plot
-        artifact_paths:
-          - "build_history.html"
+  #     # plot job performance history
+  #     - label: ":chart_with_downwards_trend: build history"
+  #       command:
+  #         - build_history main # name of branch to plot
+  #       artifact_paths:
+  #         - "build_history.html"
 
-      - wait
+  #     - wait
 
-      - label: ":envelope: Slack report: Slabplanet"
-        command:
-          - slack-upload -c C04S6MBSDC4 -f experiments/ClimaEarth/output/slabplanet_evolve_ocean/artifacts/total_energy_bucket.png -n slab_coarse -x "Slabplanet energy conservation"
-          - slack-upload -c C04S6MBSDC4 -f experiments/ClimaEarth/output/slabplanet_evolve_ocean/artifacts/total_water_bucket.png -n slab_coarse_w -x "Slabplanet water conservation"
+  #     - label: ":envelope: Slack report: Slabplanet"
+  #       command:
+  #         - slack-upload -c C04S6MBSDC4 -f experiments/ClimaEarth/output/slabplanet_evolve_ocean/artifacts/total_energy_bucket.png -n slab_coarse -x "Slabplanet energy conservation"
+  #         - slack-upload -c C04S6MBSDC4 -f experiments/ClimaEarth/output/slabplanet_evolve_ocean/artifacts/total_water_bucket.png -n slab_coarse_w -x "Slabplanet water conservation"

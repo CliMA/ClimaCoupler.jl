@@ -3,8 +3,8 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
 checkpoint_dt: "366days"
 coupler_toml: ["toml/amip_progedmf_1m.toml"]
-dt: "30secs"
-dt_cpl: "30secs"
+dt: "120secs"
+dt_cpl: "120secs"
 dt_rad: "600secs"
 energy_check: false
 h_elem: 16
@@ -13,6 +13,6 @@ mode_name: "amip"
 radiation_reset_rng_seed: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "1200secs"
+t_end: "4800secs"
 topo_smoothing: true
 topography: "Earth"

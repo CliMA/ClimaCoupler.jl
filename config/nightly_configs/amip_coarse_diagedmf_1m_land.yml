@@ -22,6 +22,7 @@ insolation: "timevarying"
 mode_name: "amip"
 netcdf_output_at_levels: true
 microphysics_model: "1M"
+ode_algo: "ARS343"
 output_default_diagnostics: true
 rmse_check: true
 start_date: "20100101"

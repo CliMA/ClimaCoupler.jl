@@ -517,8 +517,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     Interfacer.remap!(sim.remapping.scratch_field_oc2, F_turb_ρτyz_uv, sim.remapping) # meridional momentum flux
 
     # Rename for clarity; these are now cell-centered (Center, Center) Oceananigans fields
-    F_turb_ρτxz_oc = sim.remapping.scratch_cc1
-    F_turb_ρτyz_oc = sim.remapping.scratch_cc2
+    F_turb_ρτxz_oc = sim.remapping.scratch_field_oc1
+    F_turb_ρτyz_oc = sim.remapping.scratch_field_oc2
 
     # Weight by (1 - sea ice concentration); polar-exclusion mask applied via ifelse below
     ice_concentration = OC.interior(ice_concentration_field, :, :, 1)

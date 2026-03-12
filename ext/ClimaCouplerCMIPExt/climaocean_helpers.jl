@@ -125,17 +125,29 @@ function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field
         FT = CC.Spaces.undertype(axes(source_field))
         dst_cpu = Array{FT}(undef, Nx, Ny)
         CC.Remapping.interpolate!(dst_cpu, remapping.remapper_cc_to_oc, source_field)
-        copyto!(OC.interior(target_field, :, :, z), OC.on_architecture(OC.architecture(target_field), dst_cpu))
+        copyto!(
+            OC.interior(target_field, :, :, z),
+            OC.on_architecture(OC.architecture(target_field), dst_cpu),
+        )
         return nothing
     end
+
+    # Conservative regridding path (fallback if value_per_element_cc missing)
+    FT = CC.Spaces.undertype(axes(source_field))
+    nelems = CC.Meshes.nelements(axes(source_field).grid.topology.mesh)
+    value_vec = hasproperty(remapping, :value_per_element_cc) ?
+        remapping.value_per_element_cc :
+        Array{FT}(undef, nelems)
+
     get_ConservativeRegriddingCCExt().get_value_per_element!(
-        remapping.value_per_element_cc,
+        value_vec,
         source_field,
         remapping.field_ones_cc,
     )
+
     z = size(target_field, 3)
     dst = vec(OC.interior(target_field, :, :, z))
-    src = remapping.value_per_element_cc
+    src = value_vec
     CR.regrid!(dst, transpose(remapping.remapper_oc_to_cc), src)
     return nothing
 end
@@ -164,11 +176,16 @@ function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field
         coords = CC.to_cpu(CC.Fields.coordinate_field(remapping.boundary_space))
         lats = vec(CC.Fields.field2array(coords.lat))
         lons = vec(CC.Fields.field2array(coords.long))
-        dst = remapping.value_per_element_cc
+
+        FT = CC.Spaces.undertype(axes(target_field))
+        nelems = length(lats)
+        dst = hasproperty(remapping, :value_per_element_cc) ?
+            remapping.value_per_element_cc :
+            Array{FT}(undef, nelems)
+
         lon_rad = remapping.ocean_lon_rad
         lat_rad = remapping.ocean_lat_rad
-        n_elems = length(dst)
-        for idx in 1:n_elems
+        for idx in 1:nelems
             lat_b = lats[idx]
             lon_b = lons[idx]
             i = argmin([abs(lon_b - lon_rad[ix]) for ix in 1:Nx])
@@ -178,9 +195,16 @@ function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field
         get_ConservativeRegriddingCCExt().set_value_per_element!(target_field, dst)
         return nothing
     end
+
+    # Conservative regridding path (fallback if value_per_element_cc missing)
+    FT = CC.Spaces.undertype(axes(target_field))
+    nelems = CC.Meshes.nelements(axes(target_field).grid.topology.mesh)
+    dst = hasproperty(remapping, :value_per_element_cc) ?
+        remapping.value_per_element_cc :
+        Array{FT}(undef, nelems)
+
     z = size(source_field, 3)
     src = vec(OC.interior(source_field, :, :, z))
-    dst = remapping.value_per_element_cc
     CR.regrid!(dst, remapping.remapper_oc_to_cc, src)
     get_ConservativeRegriddingCCExt().set_value_per_element!(target_field, dst)
     return nothing

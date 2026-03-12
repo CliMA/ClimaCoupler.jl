@@ -1,7 +1,7 @@
 import Test: @test, @testset
 import ClimaCore as CC
 import ClimaParams as CP
-import ClimaCoupler
+import ClimaCoupler: Utilities
 import SurfaceFluxes as SF
 import ClimaCoupler.Models
 

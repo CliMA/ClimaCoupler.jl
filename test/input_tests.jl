@@ -97,6 +97,9 @@ end
         "sst_adjustment" => 2.0,
         "land_fraction_source" => "etopo",
         "binary_area_fraction" => true,
+        "domain_type" => "global",
+        "column_latlon" => [0.0, 0.0],
+        "scm_surface_type" => nothing,
         "component_dt_dict" => Dict(
             "dt_atmos" => 400.0,
             "dt_land" => 400.0,
@@ -125,6 +128,9 @@ end
     @test args.ice_model == Val(:prescribed)
     @test args.land_fraction_source == "etopo"
     @test args.sst_adjustment == 2.0
+    @test args.domain_type == "global"
+    @test args.column_latlon == (0.0, 0.0)
+    @test args.scm_surface_type === nothing
 
     # Test that component_dt_dict is preserved
     @test args.component_dt_dict isa Dict

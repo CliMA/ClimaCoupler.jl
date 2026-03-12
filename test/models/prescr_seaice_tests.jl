@@ -4,10 +4,9 @@ import NCDatasets
 import ClimaCore as CC
 import Thermodynamics.Parameters as TDP
 import ClimaParams as CP # required for TDP
-import ClimaCoupler
+import ClimaCoupler: Models, Utilities
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
-import ClimaCoupler.Models
 
 for FT in (Float32, Float64)
     @testset "test sea-ice energy slab for FT=$FT" begin

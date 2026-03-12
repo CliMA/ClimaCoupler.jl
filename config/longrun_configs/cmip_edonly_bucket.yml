@@ -16,6 +16,8 @@ insolation: "timevarying"
 mode_name: "cmip"
 nh_poly: 3
 ocean_model: "oceananigans"
+ocean_grid_type: "latlon"
+ocean_regridding: "conservative"
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"

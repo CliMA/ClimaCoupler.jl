@@ -702,10 +702,15 @@ one here.
 """
 function dss_state!(sim::ClimaAtmosSimulation)
     Y = sim.integrator.u
-    for key in propertynames(Y)
-        field = getproperty(Y, key)
-        buffer = CC.Spaces.create_dss_buffer(field)
-        CC.Spaces.weighted_dss!(field, buffer)
+    if axes(Y.c.ρe_tot) isa CC.Spaces.PointSpace
+        return nothing
+    else
+        for key in propertynames(Y)
+            field = getproperty(Y, key)
+            buffer = Utilities.init_dss_buffer(field)
+            Utilities.apply_dss!(field, buffer)
+        end
+        return nothing
     end
 end
 

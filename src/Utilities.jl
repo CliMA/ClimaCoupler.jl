@@ -346,4 +346,28 @@ function create_boundary_space(
     end
 end
 
+function init_dss_buffer(field::CC.Fields.Field)
+    if axes(field) isa CC.Spaces.PointSpace
+        return nothing
+    else
+        return CC.Spaces.create_dss_buffer(field)
+    end
+end
+function init_dss_buffer(field_object::CC.Fields.FieldVector)
+    buffers = map(
+        key -> init_dss_buffer(getproperty(field_object, key)),
+        propertynames(field_object),
+    )
+    all(isnothing, buffers) && return nothing
+    return NamedTuple{propertynames(field_object)}(buffers)
+end
+
+function apply_dss!(field::Union{CC.Fields.Field, CC.Fields.FieldVector}, buffer::Any)
+    if isnothing(buffer)
+        return nothing
+    else
+        return CC.Spaces.weighted_dss!(field, buffer)
+    end
+end
+
 end # module

@@ -159,9 +159,6 @@ for FT in (Float32, Float64)
             h_elem = 4,
         )
 
-        # construct dss buffer to put in cache
-        dss_buffer = CC.Spaces.create_dss_buffer(CC.Fields.zeros(boundary_space))
-
         # set up objects for test
         u = CC.Fields.FieldVector(;
             state_field1 = CC.Fields.ones(boundary_space),
@@ -169,7 +166,7 @@ for FT in (Float32, Float64)
         )
         p = (;
             cache_field = CC.Fields.zeros(boundary_space),
-            dss_buffer = CC.Spaces.create_dss_buffer(u),
+            dss_buffer = Utilities.init_dss_buffer(u),
         )
         integrator = (; u, p)
         sim = Models.PrescribedIceSimulation(nothing, integrator)

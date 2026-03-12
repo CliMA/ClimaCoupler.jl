@@ -291,13 +291,13 @@ function PrescribedIceSimulation(
         dt = dt,
         thermo_params = thermo_params,
         # add dss_buffer to cache to avoid runtime dss allocation
-        dss_buffer = CC.Spaces.create_dss_buffer(Y),
+        dss_buffer = Utilities.init_dss_buffer(Y),
     )
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     ode_function = CTS.ClimaODEFunction(
         T_exp! = ice_rhs!,
-        dss! = (Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer),
+        dss! = (Y, p, t) -> Utilities.apply_dss!(Y, p.dss_buffer),
     )
     if dt isa Number
         dt = Float64(dt)
@@ -465,7 +465,7 @@ Perform DSS on the state of a component simulation, intended to be used
 before the initial step of a run. This method acts on prescribed ice simulations.
 """
 dss_state!(sim::PrescribedIceSimulation) =
-    CC.Spaces.weighted_dss!(sim.integrator.u, sim.integrator.p.dss_buffer)
+    Utilities.apply_dss!(sim.integrator.u, sim.integrator.p.dss_buffer)
 
 function Checkpointer.get_model_cache(sim::PrescribedIceSimulation)
     return sim.integrator.p

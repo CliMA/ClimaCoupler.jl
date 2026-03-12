@@ -931,15 +931,20 @@ end
     emulate_diagnostics!(sim, t_end)
 
 Emulate producing diagnostics for the component model `sim`.
+
+There is only support for emulating diagnostics of the `ClimaAtmosSimulation`.
 """
 function emulate_diagnostics!(sim, t_end)
-    (; integrator) = sim
+    (; integrator, output_writers) = sim
     diagnostics_handler =
         integrator.callback.discrete_callbacks[end].affect!.diagnostics_handler
     while sim.integrator.t < t_end
         sim.integrator.t += integrator.dt
         ClimaDiagnostics.orchestrate_diagnostics(integrator, diagnostics_handler)
     end
+    # Since the simulation never actually ran, we need to manually close the
+    # writers ourselves
+    foreach(close, output_writers)
     return nothing
 end
 

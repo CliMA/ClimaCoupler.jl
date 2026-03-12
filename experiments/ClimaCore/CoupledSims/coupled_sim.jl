@@ -275,6 +275,6 @@ function Base.show(io::IO, coupler::CouplerState)
         entry = fields[k]
         data[i, :] = [k]
     end
-    header = (["Field Name"], [""])
-    PrettyTables.pretty_table(data, header = header)
+    column_labels = [["Field Name"], [""]]
+    PrettyTables.pretty_table(io, data; column_labels)
 end

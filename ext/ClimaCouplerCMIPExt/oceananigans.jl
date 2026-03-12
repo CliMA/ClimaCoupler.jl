@@ -408,11 +408,11 @@ function construct_polar_mask(grid)
     # Precompute polar-exclusion flux masks once (zeros ocean surface fluxes where |lat| ≥ 78° to avoid instability).
     # _centers = cell-centered (T, S); _u = Face/Center (u); _v = Center/Face (v).
     polar_exclusion_flux_mask_centers =
-        ocean_flux_highlat_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))
+        ocean_flux_highlat_mask(grid.underlying_grid; location = (OC.Center(), OC.Center(), OC.Center()))
     polar_exclusion_flux_mask_u =
-        ocean_flux_highlat_mask(grid; location = (OC.Face(), OC.Center(), OC.Center()))
+        ocean_flux_highlat_mask(grid.underlying_grid; location = (OC.Face(), OC.Center(), OC.Center()))
     polar_exclusion_flux_mask_v =
-        ocean_flux_highlat_mask(grid; location = (OC.Center(), OC.Face(), OC.Center()))
+        ocean_flux_highlat_mask(grid.underlying_grid; location = (OC.Center(), OC.Face(), OC.Center()))
 
     return (;
         polar_exclusion_flux_mask_centers,
@@ -422,7 +422,7 @@ function construct_polar_mask(grid)
 end
 
 """
-    ocean_flux_highlat_mask(grid; location)
+    ocean_flux_highlat_mask(underlying_grid; location)
 
 Build the ocean flux high latitude mask once at setup.
 Currently we define ocean between 80degS to 80degN with 2 degree overlap in the coupler mask.
@@ -430,15 +430,30 @@ Returns a 2D mask (1.0 where |lat| < 78°, 0.0 elsewhere). This mask is on the o
 unlike the polar mask which is defined on the boundary_space)
 """
 # polar-exclusion mask
-function ocean_flux_highlat_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))
-    polar_flux_lat_deg = 78.0  # zero fluxes where |lat| ≥ 78° (same band as polar_mask)
-    φ = OC.φnodes(grid, location[1], location[2], location[3])
+function ocean_flux_highlat_mask(underlying_grid::OC.LatitudeLongitudeGrid; location = (OC.Center(), OC.Center(), OC.Center()))
+    φ = OC.φnodes(underlying_grid, location[1], location[2], location[3])
     φ_2D = Array(φ[:, :, 1])
-    lat_deg = abs.(rad2deg.(φ_2D))
+    lat_deg = abs.(rad2deg.(φ_2D)) # latitude in degrees
+    polar_flux_lat_deg = 78.0
+
+    # Define the mask to be 1.0 where |lat| < polar_flux_lat_deg, 0.0 elsewhere
     mask = ifelse.(lat_deg .< polar_flux_lat_deg, 1.0, 0.0)
-    mask = reshape(mask[1, :], 1, :)
-    arch = OC.Architectures.architecture(grid)
-    return OC.Architectures.on_architecture(arch, mask)
+
+    architecture = OC.Architectures.architecture(underlying_grid)
+    return OC.Architectures.on_architecture(architecture, mask)
+end
+
+function ocean_flux_highlat_mask(underlying_grid::OC.TripolarGrid; location = (OC.Center(), OC.Center(), OC.Center()))
+    φ = OC.φnodes(underlying_grid, location[1], location[2], location[3])
+    φ_2D = Array(φ[:, :, 1])
+    lat_deg = φ_2D # latitude in degrees
+    polar_flux_lat_deg = -78.0
+
+    # Define the mask to be 1.0 where |lat| < polar_flux_lat_deg, 0.0 elsewhere
+    mask = ifelse.(lat_deg .> polar_flux_lat_deg, 1.0, 0.0) # mask is 1.0 where |lat| > -78°, 0.0 elsewhere
+
+    architecture = OC.Architectures.architecture(underlying_grid)
+    return OC.Architectures.on_architecture(architecture, mask)
 end
 
 """

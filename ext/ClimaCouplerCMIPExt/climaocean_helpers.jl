@@ -118,7 +118,7 @@ end
 ### Extensions of Interfacer.jl remapping functions for Oceananigans fields/grids
 # Non-allocating ClimaCore -> Oceananigans remap
 function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
-    if get(remapping, :regridding_method, :conservative) == :remap
+    if remapping.regridding_method == :remap
         # Naive: ClimaCore Remapping from boundary space to ocean points
         z = size(target_field, 3)
         Nx, Ny = size(target_field, 1), size(target_field, 2)
@@ -132,12 +132,11 @@ function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field
         return nothing
     end
 
-    # Conservative regridding path (default for LatitudeLongitudeGrid with conservative regridding)
+    # Conservative regridding (requires remapper_oc_to_cc from construct_remappers)
+    @assert remapping.regridding_method == :conservative
     FT = CC.Spaces.undertype(axes(source_field))
     nelems = CC.Meshes.nelements(axes(source_field).grid.topology.mesh)
-    value_vec = hasproperty(remapping, :value_per_element_cc) ?
-        remapping.value_per_element_cc :
-        Array{FT}(undef, nelems)
+    value_vec = remapping.value_per_element_cc
 
     get_ConservativeRegriddingCCExt().get_value_per_element!(
         value_vec,
@@ -148,7 +147,6 @@ function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field
     z = size(target_field, 3)
     dst = vec(OC.interior(target_field, :, :, z))
     src = value_vec
-    # For conservative regridding, use the Ocean→ClimaCore regridder and its transpose
     CR.regrid!(dst, transpose(remapping.remapper_oc_to_cc), src)
     return nothing
 end
@@ -169,7 +167,7 @@ end
 
 # Non-allocating Oceananigans Field -> ClimaCore remap
 function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field, remapping)
-    if get(remapping, :regridding_method, :conservative) == :remap
+    if remapping.regridding_method == :remap
         # Naive: interpolate from ocean grid to boundary space (nearest-neighbor)
         z = size(source_field, 3)
         src_cpu = OC.on_architecture(OC.CPU(), OC.interior(source_field, :, :, z))
@@ -180,9 +178,7 @@ function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field
 
         FT = CC.Spaces.undertype(axes(target_field))
         nelems = length(lats)
-        dst = hasproperty(remapping, :value_per_element_cc) ?
-            remapping.value_per_element_cc :
-            Array{FT}(undef, nelems)
+        dst = remapping.value_per_element_cc
 
         lon_rad = remapping.ocean_lon_rad
         lat_rad = remapping.ocean_lat_rad
@@ -197,16 +193,13 @@ function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field
         return nothing
     end
 
-    # Conservative regridding path (default for LatitudeLongitudeGrid with conservative regridding)
+    @assert remapping.regridding_method == :conservative
     FT = CC.Spaces.undertype(axes(target_field))
     nelems = CC.Meshes.nelements(axes(target_field).grid.topology.mesh)
-    dst = hasproperty(remapping, :value_per_element_cc) ?
-        remapping.value_per_element_cc :
-        Array{FT}(undef, nelems)
+    dst = remapping.value_per_element_cc
 
     z = size(source_field, 3)
     src = vec(OC.interior(source_field, :, :, z))
-    # For conservative regridding, use the Ocean→ClimaCore regridder directly
     CR.regrid!(dst, remapping.remapper_oc_to_cc, src)
     get_ConservativeRegriddingCCExt().set_value_per_element!(target_field, dst)
     return nothing

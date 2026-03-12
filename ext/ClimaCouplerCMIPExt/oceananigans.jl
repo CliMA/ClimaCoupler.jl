@@ -206,8 +206,8 @@ function OceananigansSimulation(
     # Set initial condition to EN4 state estimate at start_date
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
 
-    # Construct the remapper object and allocate scratch space
-    remapping = construct_remappers(grid, boundary_space)
+    # Construct the remapper object and allocate scratch space (conservative vs remap)
+    remapping = construct_remappers(grid, boundary_space; ocean_regridding)
 
     # COARE3 roughness params (allocated once, reused each timestep)
     coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
@@ -278,56 +278,78 @@ function OceananigansSimulation(
 end
 
 """
-    construct_remappers(grid_oc, boundary_space)
+    construct_remappers(grid_oc, boundary_space; ocean_regridding = "conservative")
 
-Given an Oceananigans grid and a ClimaCore boundary space, construct the
-remappers needed to remap between the two grids in both directions.
+Build remapping objects for Oceananigans ↔ ClimaCore.
 
-Returns a remapper from the Oceananigans grid to the ClimaCore boundary space.
-To regrid from Oceananigans to ClimaCore, use `CR.regrid!(dest_vector, remapper_oc_to_cc, src_vector)`.
-To regrid from ClimaCore to Oceananigans, use `CR.regrid!(dest_vector, transpose(remapper_oc_to_cc), src_vector)`.
+- **`ocean_regridding == "conservative"`** (default): conservative regridding via
+  `ConservativeRegridding`. The NamedTuple always includes `remapper_oc_to_cc`
+  and `regridding_method = :conservative`.
+- **`ocean_regridding == "remap"`**: ClimaCore `Remapper` + nearest-neighbor
+  Ocean→ClimaCore. NamedTuple includes `remapper_cc_to_oc`, `boundary_space`,
+  `ocean_lon_rad` / `ocean_lat_rad`, and `regridding_method = :remap`.
+
+`Interfacer.remap!` dispatches on `regridding_method` so the conservative path
+is never used without `remapper_oc_to_cc`.
 """
-function construct_remappers(grid_oc, boundary_space)
-    # Move grids to CPU since ConservativeRegridding doesn't support GPU grids yet
-    grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), grid_oc.underlying_grid)
-    boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
-
-    # Create the remapper from the Oceananigans grid to the ClimaCore boundary space
-    remapper_oc_to_cc = CR.Regridder(
-        boundary_space_cpu,
-        grid_oc_underlying_cpu;
-        normalize = false,
-        threaded = false,
-    )
-
-    # Move remapper to GPU if needed
-    remapper_oc_to_cc = OC.on_architecture(OC.architecture(grid_oc), remapper_oc_to_cc)
-
-    # Create a field of ones on the boundary space so we can compute element areas
-    field_ones_cc = CC.Fields.ones(boundary_space)
-
-    # Allocate a vector with length equal to the number of elements in the target space
-    # To be used as a temp field for remapping
+function construct_remappers(grid_oc, boundary_space; ocean_regridding = "conservative")
     FT = CC.Spaces.undertype(boundary_space)
     ArrayType = ClimaComms.array_type(boundary_space)
     value_per_element_cc =
         ArrayType(zeros(FT, CC.Meshes.nelements(boundary_space.grid.topology.mesh)))
 
-    # Construct two 2D Oceananigans Center/Center fields to use as scratch space while remapping
     scratch_field_oc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
     scratch_field_oc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
-
-    # Allocate space for a Field of UVVectors, which we need for remapping momentum fluxes
     temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
-
-    # Construct the polar exclusion flux masks
     (;
         polar_exclusion_flux_mask_centers,
         polar_exclusion_flux_mask_u,
         polar_exclusion_flux_mask_v,
     ) = construct_polar_mask(grid_oc)
 
+    grid_under = grid_oc.underlying_grid
+    long_2d = Array(
+        OC.λnodes(grid_under, OC.Center(), OC.Center(), OC.Center()),
+    )[:, :, 1]
+    lat_2d = Array(
+        OC.φnodes(grid_under, OC.Center(), OC.Center(), OC.Center()),
+    )[:, :, 1]
+    ocean_lon_rad = long_2d[:, 1]
+    ocean_lat_rad = lat_2d[1, :]
+
+    if lowercase(string(ocean_regridding)) == "remap"
+        target_points = CC.Geometry.LatLongPoint.(lat_2d, long_2d)
+        remapper_cc_to_oc = CC.Remapping.Remapper(boundary_space, target_points, nothing)
+        return (;
+            regridding_method = :remap,
+            remapper_cc_to_oc,
+            boundary_space,
+            ocean_lon_rad,
+            ocean_lat_rad,
+            value_per_element_cc,
+            scratch_field_oc1,
+            scratch_field_oc2,
+            temp_uv_vec,
+            polar_exclusion_flux_mask_centers,
+            polar_exclusion_flux_mask_u,
+            polar_exclusion_flux_mask_v,
+        )
+    end
+
+    # Conservative (default): LatitudeLongitudeGrid or Tripolar + CR.Regridder
+    grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), grid_under)
+    boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
+    remapper_oc_to_cc = CR.Regridder(
+        boundary_space_cpu,
+        grid_oc_underlying_cpu;
+        normalize = false,
+        threaded = false,
+    )
+    remapper_oc_to_cc = OC.on_architecture(OC.architecture(grid_oc), remapper_oc_to_cc)
+    field_ones_cc = CC.Fields.ones(boundary_space)
+
     return (;
+        regridding_method = :conservative,
         remapper_oc_to_cc,
         field_ones_cc,
         value_per_element_cc,

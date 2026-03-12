@@ -272,6 +272,15 @@ function argparse_settings()
         help = "Number of meridional grid points for the ocean model [360 (default, ~0.5°)]. Coarsening (e.g. 180) can reduce equatorial regridding artifacts."
         arg_type = Int
         default = 360
+        # Ocean grid and regridding (Oceananigans only)
+        "--ocean_grid_type"
+        help = "Ocean horizontal grid type: `tripolar` (default) or `latlon`. Tripolar uses a bipolar grid; latlon uses a regular latitude-longitude grid."
+        arg_type = String
+        default = "tripolar"
+        "--ocean_regridding"
+        help = "Method for coupling grid ↔ ocean: `conservative` (default, area-weighted) or `remap` (naive interpolation via ClimaCore Remapping)."
+        arg_type = String
+        default = "conservative"
     end
     return s
 end
@@ -521,9 +530,11 @@ function get_coupler_args(config_dict::Dict)
     # Binary area fraction
     binary_area_fraction = config_dict["binary_area_fraction"]
 
-    # Ocean grid resolution (Oceananigans only; defaults reduce regridding cost/artifacts if omitted)
+    # Ocean grid resolution and options (Oceananigans only)
     ocean_nx = get(config_dict, "ocean_nx", 720)
     ocean_ny = get(config_dict, "ocean_ny", 360)
+    ocean_grid_type = get(config_dict, "ocean_grid_type", "tripolar")
+    ocean_regridding = get(config_dict, "ocean_regridding", "conservative")
 
     return (;
         job_id,
@@ -568,6 +579,8 @@ function get_coupler_args(config_dict::Dict)
         binary_area_fraction,
         ocean_nx,
         ocean_ny,
+        ocean_grid_type,
+        ocean_regridding,
     )
 end
 

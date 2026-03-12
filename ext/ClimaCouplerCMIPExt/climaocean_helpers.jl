@@ -118,18 +118,24 @@ end
 ### Extensions of Interfacer.jl remapping functions for Oceananigans fields/grids
 # Non-allocating ClimaCore -> Oceananigans remap
 function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
+    if get(remapping, :regridding_method, :conservative) == :remap
+        # Naive: ClimaCore Remapping from boundary space to ocean points
+        z = size(target_field, 3)
+        Nx, Ny = size(target_field, 1), size(target_field, 2)
+        FT = CC.Spaces.undertype(axes(source_field))
+        dst_cpu = Array{FT}(undef, Nx, Ny)
+        CC.Remapping.interpolate!(dst_cpu, remapping.remapper_cc_to_oc, source_field)
+        copyto!(OC.interior(target_field, :, :, z), OC.on_architecture(OC.architecture(target_field), dst_cpu))
+        return nothing
+    end
     get_ConservativeRegriddingCCExt().get_value_per_element!(
         remapping.value_per_element_cc,
         source_field,
         remapping.field_ones_cc,
     )
-
-    # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
     z = size(target_field, 3)
     dst = vec(OC.interior(target_field, :, :, z))
     src = remapping.value_per_element_cc
-
-    # Regrid the source field to the target field
     CR.regrid!(dst, transpose(remapping.remapper_oc_to_cc), src)
     return nothing
 end
@@ -150,17 +156,32 @@ end
 
 # Non-allocating Oceananigans Field -> ClimaCore remap
 function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field, remapping)
-    # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
+    if get(remapping, :regridding_method, :conservative) == :remap
+        # Naive: interpolate from ocean grid to boundary space (nearest-neighbor)
+        z = size(source_field, 3)
+        src_cpu = OC.on_architecture(OC.CPU(), OC.interior(source_field, :, :, z))
+        Nx, Ny = size(src_cpu, 1), size(src_cpu, 2)
+        coords = CC.to_cpu(CC.Fields.coordinate_field(remapping.boundary_space))
+        lats = vec(CC.Fields.field2array(coords.lat))
+        lons = vec(CC.Fields.field2array(coords.long))
+        dst = remapping.value_per_element_cc
+        lon_rad = remapping.ocean_lon_rad
+        lat_rad = remapping.ocean_lat_rad
+        n_elems = length(dst)
+        for idx in 1:n_elems
+            lat_b = lats[idx]
+            lon_b = lons[idx]
+            i = argmin([abs(lon_b - lon_rad[ix]) for ix in 1:Nx])
+            j = argmin([abs(lat_b - lat_rad[jy]) for jy in 1:Ny])
+            dst[idx] = src_cpu[i, j]
+        end
+        get_ConservativeRegriddingCCExt().set_value_per_element!(target_field, dst)
+        return nothing
+    end
     z = size(source_field, 3)
     src = vec(OC.interior(source_field, :, :, z))
-
-    # Store the remapped FV values in a vector of length equal to the number of elements in the target space
     dst = remapping.value_per_element_cc
-
-    # Regrid the source field to the target field
     CR.regrid!(dst, remapping.remapper_oc_to_cc, src)
-
-    # Convert the vector of remapped values to a ClimaCore Field with one value per element
     get_ConservativeRegriddingCCExt().set_value_per_element!(target_field, dst)
     return nothing
 end

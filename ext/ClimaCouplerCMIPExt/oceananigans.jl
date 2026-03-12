@@ -86,6 +86,8 @@ function OceananigansSimulation(
     coupled_param_dict = CP.create_toml_dict(FT),
     ocean_nx = 720,
     ocean_ny = 360,
+    ocean_grid_type = "tripolar",
+    ocean_regridding = "conservative",
     extra_kwargs...,
 ) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
@@ -102,33 +104,54 @@ function OceananigansSimulation(
     CO.EN4.download_dataset(en4_temperature)
     CO.EN4.download_dataset(en4_salinity)
 
-    # Set up tripolar ocean grid (resolution from config: ocean_nx × ocean_ny)
+    # Set up ocean grid (resolution from config: ocean_nx × ocean_ny)
     Nx = ocean_nx
     Ny = ocean_ny
     Nz = 100
     depth = 6000 # meters
     z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 1800)
 
-    # Regular LatLong because we know how to do interpolation there
-    underlying_grid = OC.TripolarGrid(
-        arch;
-        size = (Nx, Ny, Nz),
-        halo = (7, 7, 7),
-        z,
-        fold_topology = OC.Grids.RightFaceFolded,
-    )
-
-    bottom_height = CO.regrid_bathymetry(
-        underlying_grid;
-        minimum_depth = 20,
-        interpolation_passes = 2,
-        major_basins = 1,
-    )
-    grid = OC.ImmersedBoundaryGrid(
-        underlying_grid,
-        OC.GridFittedBottom(bottom_height);
-        active_cells_map = true,
-    )
+    if lowercase(ocean_grid_type) == "latlon"
+        # Regular latitude-longitude grid (e.g. for testing naive remap)
+        # Latitude -80 to 90 to approximate global; longitude 0 to 360
+        underlying_grid = OC.LatitudeLongitudeGrid(
+            arch;
+            size = (Nx, Ny, Nz),
+            longitude = (0, 360),
+            latitude = (-80, 90),
+            z,
+            halo = (7, 7, 7),
+        )
+        # Flat bottom for latlon (regrid_bathymetry is for TripolarGrid)
+        bottom_height = OC.on_architecture(arch, fill(FT(-depth), Nx, Ny))
+        grid = OC.ImmersedBoundaryGrid(
+            underlying_grid,
+            OC.GridFittedBottom(bottom_height);
+            active_cells_map = true,
+        )
+        @info "Ocean grid: LatitudeLongitudeGrid ($Nx × $Ny × $Nz)"
+    else
+        # Default: tripolar grid
+        underlying_grid = OC.TripolarGrid(
+            arch;
+            size = (Nx, Ny, Nz),
+            halo = (7, 7, 7),
+            z,
+            fold_topology = OC.Grids.RightFaceFolded,
+        )
+        bottom_height = CO.regrid_bathymetry(
+            underlying_grid;
+            minimum_depth = 20,
+            interpolation_passes = 2,
+            major_basins = 1,
+        )
+        grid = OC.ImmersedBoundaryGrid(
+            underlying_grid,
+            OC.GridFittedBottom(bottom_height);
+            active_cells_map = true,
+        )
+        @info "Ocean grid: TripolarGrid ($Nx × $Ny × $Nz)"
+    end
 
     # Create ocean simulation
     if !simple_ocean
@@ -182,7 +205,17 @@ function OceananigansSimulation(
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
 
     # Construct the remapper object and allocate scratch space
-    remapping = construct_remappers(grid, boundary_space)
+    regridding = lowercase(ocean_regridding)
+    if regridding == "remap"
+        if lowercase(ocean_grid_type) != "latlon"
+            error("ocean_regridding=\"remap\" (naive interpolation) requires ocean_grid_type=\"latlon\"")
+        end
+        remapping = construct_remappers_remap(grid, boundary_space)
+        @info "Ocean regridding: remap (ClimaCore Remapping)"
+    else
+        remapping = construct_remappers(grid, boundary_space)
+        @info "Ocean regridding: conservative"
+    end
 
     # COARE3 roughness params (allocated once, reused each timestep)
     coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
@@ -318,7 +351,69 @@ function construct_remappers(grid_oc, boundary_space)
     ) = construct_polar_mask(grid_oc)
 
     return (;
+        regridding_method = :conservative,
         remapper_oc_to_cc,
+        field_ones_cc,
+        value_per_element_cc,
+        scratch_field_oc1,
+        scratch_field_oc2,
+        temp_uv_vec,
+        polar_exclusion_flux_mask_centers,
+        polar_exclusion_flux_mask_u,
+        polar_exclusion_flux_mask_v,
+        scratch_cc1,
+        scratch_cc2,
+    )
+end
+
+"""
+    construct_remappers_remap(grid_oc, boundary_space)
+
+Build remapping for "naive" regridding (ClimaCore Remapping / interpolation).
+Only supported for LatitudeLongitudeGrid. Used when ocean_regridding == "remap".
+"""
+function construct_remappers_remap(grid_oc, boundary_space)
+    underlying = grid_oc.underlying_grid
+    if !(underlying isa OC.LatitudeLongitudeGrid)
+        error("construct_remappers_remap requires LatitudeLongitudeGrid (use ocean_grid_type=\"latlon\")")
+    end
+    Nx = size(grid_oc, 1)
+    Ny = size(grid_oc, 2)
+    FT = CC.Spaces.undertype(boundary_space)
+    # Ocean center coordinates (radians); matches construction longitude=(0,360), latitude=(-80,90)
+    lon_centers = [FT((i - 0.5) * 2π / Nx) for i in 1:Nx]
+    lat_centers = [FT((-80 + (j - 0.5) * 170 / Ny) * π / 180) for j in 1:Ny]
+    ocean_points = CC.Geometry.LatLongPoint.(
+        [lat_centers[j] for i in 1:Nx for j in 1:Ny],
+        [lon_centers[i] for i in 1:Nx for j in 1:Ny],
+    )
+    boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
+    remapper_cc_to_oc = CC.Remapping.Remapper(boundary_space_cpu, ocean_points, nothing)
+
+    field_ones_cc = CC.Fields.ones(boundary_space)
+    ArrayType = ClimaComms.array_type(boundary_space)
+    value_per_element_cc =
+        ArrayType(zeros(FT, CC.Meshes.nelements(boundary_space.grid.topology.mesh)))
+
+    scratch_field_oc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
+    scratch_field_oc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
+    scratch_cc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
+    scratch_cc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
+    temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
+    (;
+        polar_exclusion_flux_mask_centers,
+        polar_exclusion_flux_mask_u,
+        polar_exclusion_flux_mask_v,
+    ) = construct_polar_mask(grid_oc)
+
+    return (;
+        regridding_method = :remap,
+        remapper_cc_to_oc,
+        remapper_oc_to_cc = nothing, # OC->CC done by interpolation in climaocean_helpers
+        boundary_space,
+        ocean_grid = grid_oc,
+        ocean_lon_rad = lon_centers,
+        ocean_lat_rad = lat_centers,
         field_ones_cc,
         value_per_element_cc,
         scratch_field_oc1,
@@ -378,7 +473,7 @@ function FieldExchanger.resolve_area_fractions!(
         @. land_fraction = ifelse.(polar_mask == FT(1), FT(1), land_fraction)
         @. ice_fraction = ifelse.(polar_mask == FT(1), FT(0), ice_fraction)
         @. ocean_fraction = ifelse.(polar_mask == FT(1), FT(0), ocean_fraction)
-    elseif ocean_sim.ocean.model.grid isa OC.TripolarGrid
+    elseif ocean_sim.ocean.model.grid.underlying_grid isa OC.OrthogonalSphericalShellGrids.TripolarGrid
         # Create a "polar" mask that's 1 at latitudes in [-90, -80] degrees
         polar_mask .= lat .<= FT(-85)
     end

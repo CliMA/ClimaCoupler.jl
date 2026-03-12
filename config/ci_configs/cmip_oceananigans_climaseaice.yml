@@ -17,6 +17,10 @@ mode_name: "cmip"
 netcdf_output_at_levels: true
 nh_poly: 1
 ocean_model: "oceananigans"
+# Ocean grid: "tripolar" (default) or "latlon"
+ocean_grid_type: "tripolar"
+# Ocean regridding: "conservative" (default) or "remap" (naive; requires ocean_grid_type: "latlon")
+ocean_regridding: "conservative"
 ocean_nx: 360
 ocean_ny: 180
 output_default_diagnostics: true

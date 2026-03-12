@@ -162,14 +162,14 @@ function SlabOceanSimulation(
         u_atmos = CC.Fields.zeros(boundary_space),
         v_atmos = CC.Fields.zeros(boundary_space),
         # add dss_buffer to cache to avoid runtime dss allocation
-        dss_buffer = CC.Spaces.create_dss_buffer(Y),
+        dss_buffer = Utilities.init_dss_buffer(Y),
         coare3_roughness_params,
     )
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     ode_function = CTS.ClimaODEFunction(;
         T_exp! = slab_ocean_rhs!,
-        dss! = (Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer),
+        dss! = (Y, p, t) -> Utilities.apply_dss!(Y, p.dss_buffer),
     )
     if typeof(dt) isa Number
         dt = Float64(dt)
@@ -308,4 +308,4 @@ Perform DSS on the state of a component simulation, intended to be used
 before the initial step of a run. This method acts on slab ocean model sims.
 """
 dss_state!(sim::SlabOceanSimulation) =
-    CC.Spaces.weighted_dss!(sim.integrator.u, sim.integrator.p.dss_buffer)
+    Utilities.apply_dss!(sim.integrator.u, sim.integrator.p.dss_buffer)

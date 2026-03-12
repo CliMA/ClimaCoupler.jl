@@ -4,10 +4,9 @@ import NCDatasets
 import ClimaCore as CC
 import Thermodynamics.Parameters as TDP
 import ClimaParams as CP # required for TDP
-import ClimaCoupler
+import ClimaCoupler: Models, Utilities
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
-import ClimaCoupler.Models
 
 for FT in (Float32, Float64)
     @testset "test sea-ice energy slab for FT=$FT" begin
@@ -71,6 +70,7 @@ for FT in (Float32, Float64)
                 thermo_params = thermo_params,
                 dt = dt,
                 binary_area_fraction = true,
+                domain_type = "global",
             )
 
             p = (; cache..., params = params)
@@ -159,9 +159,6 @@ for FT in (Float32, Float64)
             h_elem = 4,
         )
 
-        # construct dss buffer to put in cache
-        dss_buffer = CC.Spaces.create_dss_buffer(CC.Fields.zeros(boundary_space))
-
         # set up objects for test
         u = CC.Fields.FieldVector(;
             state_field1 = CC.Fields.ones(boundary_space),
@@ -169,7 +166,8 @@ for FT in (Float32, Float64)
         )
         p = (;
             cache_field = CC.Fields.zeros(boundary_space),
-            dss_buffer = CC.Spaces.create_dss_buffer(u),
+            dss_buffer = Utilities.init_dss_buffer(u),
+            domain_type = "global",
         )
         integrator = (; u, p)
         sim = Models.PrescribedIceSimulation(nothing, integrator)

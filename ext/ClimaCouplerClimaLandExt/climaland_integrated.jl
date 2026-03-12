@@ -178,7 +178,9 @@ function ClimaLandSimulation(
     # Snow model setup
     # Set β = 0 in order to regain model without density dependence
     α_snow = CL.Snow.ZenithAngleAlbedoModel(toml_dict)
-    horz_degree_res = FT(sum(CL.Domains.average_horizontal_resolution_degrees(domain)) / 2) # mean of resolution in latitude and longitude, in degrees
+    horz_degree_res =
+        domain isa CL.Domains.Column ? FT(1) :
+        FT(sum(CL.Domains.average_horizontal_resolution_degrees(domain)) / 2)
     scf = CL.Snow.WuWuSnowCoverFractionModel(toml_dict, horz_degree_res)
     snow = CL.Snow.SnowModel(
         FT,

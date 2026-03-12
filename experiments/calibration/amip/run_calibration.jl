@@ -8,6 +8,8 @@ import EnsembleKalmanProcesses as EKP
 import EnsembleKalmanProcesses.ParameterDistributions as PD
 import JLD2
 
+using Distributed
+
 include(
     joinpath(
         pkgdir(ClimaCoupler),
@@ -28,16 +30,32 @@ model_interface = joinpath(
 
 # CALIBRATION CONFIGURATION
 
+# To test a calibration, set `export TEST_CALIBRATION=` in the terminal or
+# `ENV["TEST_CALIBRATION"]=""` in the REPL. A test calibration differs from a
+# full calibration in three ways: it runs for only a single iteration, uses only
+# one prior, and emulates the production of the diagnostics. The diagnostics
+# produced will have the correct metadata, but the values may be nonsensical.
+const TEST_CALIBRATION = haskey(ENV, "TEST_CALIBRATION")
+
 config_file =
     joinpath(pkgdir(ClimaCoupler), "config", "amip_configs", "amip_calibration.yml")
 
 # Calibrate only on Jan 1 2010
 sample_date_ranges =
     [(Dates.DateTime(2010, 10, 1), Dates.DateTime(2010, 10, 1)) for _ in 1:6]
+
 # On Derecho, it is preferable to save the calibration output to the scratch
 # directory (e.g. "/glade/derecho/scratch")
 output_dir = joinpath(pkgdir(ClimaCoupler), "amip_calibration")
 isdir(output_dir) || mkdir(output_dir)
+
+n_iterations = 6
+
+# For the test calibration, we only care whether a single iteration can be
+# completed. Since each iteration follows the same structure, successfully
+# completing one iteration will catch most errors with the full calibration
+# pipeline
+TEST_CALIBRATION && (n_iterations = 1)
 
 const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     config_file,
@@ -45,7 +63,7 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     # pressure_coordinates: true in config
     short_names = ["ta", "hur"],
     minibatch_size = 1,
-    n_iterations = 6,
+    n_iterations,
     sample_date_ranges,
     extend = Dates.Month(1),
     spinup = Dates.Day(7),
@@ -70,7 +88,23 @@ const CALIBRATION_PRIORS = [
     PD.constrained_gaussian("mixing_length_tke_surf_flux_coeff", 8.0, 4.0, 0, 100.0),
 ]
 
+if TEST_CALIBRATION
+    # For testing a calibration, the number of priors should be small to
+    # minimize the number of ensemble members.
+    resize!(CALIBRATION_PRIORS, 1)
+end
+
 const PRIORS = EKP.combine_distributions(CALIBRATION_PRIORS)
+
+
+# Commit type piracy to overwrite module_load_string because an old version of
+# climacommon is being used
+function ClimaCalibrate.module_load_string(::ClimaCalibrate.CaltechHPCBackend)
+    return """export MODULEPATH="/resnick/groups/esm/modules:\$MODULEPATH"
+    module purge
+    module load climacommon/2026_02_18"""
+end
+
 
 if abspath(PROGRAM_FILE) == @__FILE__
 
@@ -112,7 +146,19 @@ if abspath(PROGRAM_FILE) == @__FILE__
         scheduler = EKP.DataMisfitController(terminate_at = 1000000),
     )
 
-    if ClimaCalibrate.get_backend() == ClimaCalibrate.DerechoBackend
+    if TEST_CALIBRATION
+        addprocs(ClimaCalibrate.SlurmManager())
+        @everywhere include($model_interface)
+        (; n_iterations, output_dir) = CALIBRATE_CONFIG
+        ClimaCalibrate.calibrate(
+            ClimaCalibrate.WorkerBackend(),
+            ekp,
+            n_iterations,
+            PRIORS,
+            output_dir,
+        )
+        return nothing
+    elseif ClimaCalibrate.get_backend() == ClimaCalibrate.DerechoBackend
         backend = ClimaCalibrate.DerechoBackend(;
             model_interface,
             verbose = true,

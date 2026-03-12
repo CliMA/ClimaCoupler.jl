@@ -1,5 +1,3 @@
-ENV["CLIMACOMMS_DEVICE"] = "CUDA"
-ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
 import ClimaCoupler
 import ClimaCalibrate
 using Pkg
@@ -31,7 +29,12 @@ function ClimaCalibrate.forward_model(iter, member)
 
     @info "Simulation dates" start_date end_date
 
-    ClimaCoupler.SimCoordinator.setup_and_run(config_dict)
+    if !TEST_CALIBRATION
+        ClimaCoupler.SimCoordinator.setup_and_run(config_dict)
+    else
+        @info "Emulating diagnostics for test calibration"
+        CalibrationTools.setup_and_emulate_diagnostics(config_dict)
+    end
     @info "Completed member $member"
     return nothing
 end

@@ -263,6 +263,19 @@ function argparse_settings()
         help = "Boolean flag indicating whether to use binary (thresholded) area fractions for land and ice [`true` (default), `false`]. When true, land fraction > eps becomes 1, and ice fraction > 0.5 becomes 1."
         arg_type = Bool
         default = true
+        # Single-column model (SCM) settings
+        "--domain_type"
+        help = "Domain type for the simulation. [`global` (default), `column`]"
+        arg_type = String
+        default = "global"
+        "--column_latlon"
+        help = "Latitude and longitude (degrees) for SCM column as [lat, lon]. [[0.0, 0.0] (default)]"
+        arg_type = Vector{Float64}
+        default = [0.0, 0.0]
+        "--scm_surface_type"
+        help = "Override the surface type for SCM runs. [`nothing` (default), `land`, `ocean`, `sea_ice`]. When set, restricts the column to the specified surface type rather than selecting it from the lat/lon coordinates."
+        arg_type = String
+        default = nothing
     end
     return s
 end
@@ -502,9 +515,27 @@ function get_coupler_args(config_dict::Dict)
     # Ice model-specific information
     ice_model = Val(Symbol(config_dict["ice_model"]))
 
-    # Validate and correct model types based on simulation mode
-    ocean_model, ice_model, land_model =
-        validate_model_types_for_mode(sim_mode, ocean_model, ice_model, land_model)
+    # SCM settings
+    domain_type = config_dict["domain_type"]
+    column_latlon = Tuple(config_dict["column_latlon"])
+    scm_surface_type = config_dict["scm_surface_type"]
+
+    # SCM mode: no file-based land ICs available; use programmatic defaults
+    if domain_type == "column"
+        land_spun_up_ic = false
+        era5_filepaths =
+            (; era5_filepaths..., land_ic_path = nothing, bucket_initial_condition = "")
+    end
+
+    # Validate and correct model types based on simulation mode and domain
+    ocean_model, ice_model, land_model = validate_model_types_for_mode(
+        sim_mode,
+        ocean_model,
+        ice_model,
+        land_model;
+        domain_type,
+        scm_surface_type,
+    )
 
     # Land fraction source
     land_fraction_source = config_dict["land_fraction_source"]
@@ -553,6 +584,9 @@ function get_coupler_args(config_dict::Dict)
         ice_model,
         land_fraction_source,
         binary_area_fraction,
+        domain_type,
+        column_latlon,
+        scm_surface_type,
     )
 end
 
@@ -689,10 +723,18 @@ function get_land_fraction(
     land_fraction_source::String = "etopo",
     binary_area_fraction::Bool = true,
     sim_mode = Interfacer.AMIPMode,
+    scm_surface_type = nothing,
 )
     sim_mode <: Interfacer.SlabplanetTerraMode && return ones(boundary_space)
 
-    FT = CC.Spaces.undertype(boundary_space)
+    # Handle the single-column case
+    if !isnothing(scm_surface_type)
+        if scm_surface_type == "land"
+            return ones(boundary_space)
+        else
+            return zeros(boundary_space)
+        end
+    end
     if land_fraction_source == "era5"
         land_fraction_data = joinpath(
             @clima_artifact("era5_land_fraction", comms_ctx),
@@ -711,6 +753,7 @@ function get_land_fraction(
         )
     end
 
+    FT = CC.Spaces.undertype(boundary_space)
     # Ensure land fraction is finite/not NaN and clamp to [0, 1]
     land_fraction = ifelse.(isfinite.(land_fraction), land_fraction, FT(0))
     land_fraction = max.(min.(land_fraction, FT(1)), FT(0))
@@ -725,15 +768,25 @@ function get_land_fraction(
 end
 
 """
-    validate_model_types_for_mode(sim_mode, ocean_model, ice_model, land_model)
+    validate_model_types_for_mode(sim_mode, ocean_model, ice_model, land_model;
+        domain_type = "global", scm_surface_type = nothing)
 
-Validate and correct model types based on simulation mode requirements.
+Validate and correct model types based on simulation mode requirements and
+domain type. For SCM (`domain_type == "column"`), applies `scm_surface_type`
+overrides and rejects unsupported component models.
 Issues warnings and returns updated model types if they don't match the expected values.
 
 # Returns
 - `(ocean_model, ice_model, land_model)`: Tuple of validated model types
 """
-function validate_model_types_for_mode(sim_mode, ocean_model, ice_model, land_model)
+function validate_model_types_for_mode(
+    sim_mode,
+    ocean_model,
+    ice_model,
+    land_model;
+    domain_type = "global",
+    scm_surface_type = nothing,
+)
     expected_ocean = ocean_model
     expected_ice = ice_model
     expected_land = land_model
@@ -785,6 +838,28 @@ function validate_model_types_for_mode(sim_mode, ocean_model, ice_model, land_mo
         land_model = expected_land
     end
 
+    # SCM surface type override
+    if domain_type == "column" && !isnothing(scm_surface_type)
+        ocean_model, ice_model, land_model =
+            _apply_scm_surface_type(scm_surface_type, ocean_model, ice_model, land_model)
+    end
+
+    # Reject unsupported component models in column mode
+    if domain_type == "column"
+        if ocean_model == Val(:oceananigans)
+            error(
+                "Oceananigans ocean model is not supported with domain_type=\"column\". " *
+                "Use ocean_model=\"slab\" or ocean_model=\"prescribed\", or a different surface type instead.",
+            )
+        end
+        if ice_model == Val(:clima_seaice)
+            error(
+                "ClimaSeaIce model is not supported with domain_type=\"column\". " *
+                "Use ice_model=\"prescribed\", or a different surface type instead.",
+            )
+        end
+    end
+
     # Perform some final model consistency checks
     ocean_model == Val(:slab) &&
         @assert ice_model == Val(:nothing) "Slab ocean model cannot be used with a sea ice model"
@@ -794,6 +869,34 @@ function validate_model_types_for_mode(sim_mode, ocean_model, ice_model, land_mo
     return ocean_model, ice_model, land_model
 end
 
+
+"""
+    _apply_scm_surface_type(scm_surface_type, ocean_model, ice_model, land_model)
+
+Override component model selections based on `scm_surface_type`.
+When running an SCM with a specified surface type, only the corresponding
+component model is active; the others are set to `:nothing`.
+"""
+function _apply_scm_surface_type(scm_surface_type, ocean_model, ice_model, land_model)
+    if scm_surface_type == "land"
+        ocean_model = Val(:nothing)
+        ice_model = Val(:nothing)
+    elseif scm_surface_type == "ocean"
+        land_model = Val(:nothing)
+        ice_model = Val(:nothing)
+    elseif scm_surface_type == "sea_ice"
+        land_model = Val(:nothing)
+        ocean_model = Val(:nothing)
+    else
+        error(
+            "Unknown scm_surface_type: \"$scm_surface_type\". " *
+            "Must be \"land\", \"ocean\", or \"sea_ice\".",
+        )
+    end
+    @info "SCM surface type override: scm_surface_type=$scm_surface_type → " *
+          "land_model=$land_model, ocean_model=$ocean_model, ice_model=$ice_model"
+    return ocean_model, ice_model, land_model
+end
 
 """
     get_era5_filepaths(::Type{<:Interfacer.SubseasonalMode}, era5_initial_condition_dir, start_date, bucket_initial_condition)

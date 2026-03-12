@@ -127,7 +127,37 @@ steps:
           slurm_gres: "gpu:1"
           slurm_mem: 32GB
 
-  - group: "Integration Tests"
+  - group: "Integration Tests (single column)"
+    steps:
+      - label: "SCM: slabplanet aqua (atmos + slab ocean column)"
+        key: "scm_slabplanet_aqua"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/scm_slabplanet_aqua.yml --job_id scm_slabplanet_aqua"
+        artifact_paths: "output/scm_slabplanet_aqua/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "SCM: slabplanet terra (atmos + bucket land column)"
+        key: "scm_slabplanet_terra"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/scm_slabplanet_terra.yml --job_id scm_slabplanet_terra"
+        artifact_paths: "output/scm_slabplanet_terra/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "SCM: AMIP ocean (atmos + prescribed ocean column)"
+        key: "scm_amip_ocean"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/scm_amip_ocean.yml --job_id scm_amip_ocean"
+        artifact_paths: "output/scm_amip_ocean/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "SCM: AMIP land (atmos + bucket land column)"
+        key: "scm_amip_land"
+        command: "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/scm_amip_land.yml --job_id scm_amip_land"
+        artifact_paths: "output/scm_amip_land/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+  - group: "Integration Tests (global)"
     steps:
       # SLABPLANET EXPERIMENTS
 

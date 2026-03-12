@@ -183,6 +183,14 @@ specific timesteps should be specified, rather than only `dt`.
 |----------|------|---------|---------------|-------------|
 | `--evolving_ocean` | Bool | `true` | `true`, `false` | Whether to use a dynamic slab ocean model, as opposed to constant surface temperatures |
 
+#### Single-column model (SCM) settings
+
+| Argument | Type | Default | Valid Options | Description |
+|----------|------|---------|---------------|-------------|
+| `--domain_type` | String | `"global"` | `global`, `column` | Domain type for the simulation. Use `column` for single-column model runs |
+| `--column_latlon` | Vector{Float64} | `[0.0, 0.0]` | `[lat, lon]` in degrees | Latitude and longitude for the SCM column location |
+| `--scm_surface_type` | String | `nothing` | `nothing`, `land`, `ocean`, `sea_ice` | Override the surface type for SCM runs. When set, restricts the column to the specified surface type rather than selecting it from the lat/lon coordinates |
+
 ## Input API
 
 ```@docs

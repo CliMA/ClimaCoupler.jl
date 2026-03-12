@@ -23,12 +23,14 @@ It contains the following objects:
 - `ice_properties::IP`: A NamedTuple of sea ice properties, including melting speed, Stefan-Boltzmann constant,
     and the Celsius to Kelvin conversion constant.
 """
-struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP} <: Interfacer.AbstractSeaIceSimulation
+struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP, MDT} <:
+       Interfacer.AbstractSeaIceSimulation
     ice::SIM
     area_fraction::A
     remapping::REMAP
     ocean_ice_interface::NT
     ice_properties::IP
+    model_Δt::MDT
 end
 
 """
@@ -130,6 +132,9 @@ function ClimaSeaIceSimulation(
     interface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     interface_salinity = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 
+    # Initialize model_Δt so that time stepping works properly
+    model_Δt = float(dt)
+
     # Initialize nonzero sea ice if start date provided
     if !isnothing(start_date)
         sic_metadata = CO.DataWrangling.Metadatum(
@@ -207,6 +212,7 @@ function ClimaSeaIceSimulation(
         remapping,
         ocean_ice_interface,
         ice_properties,
+        model_Δt,
     )
 
     # Ensure ocean temperature is above freezing where there is sea ice
@@ -270,8 +276,12 @@ end
 ###############################################################################
 
 # Timestep the simulation forward to time `t`
-Interfacer.step!(sim::ClimaSeaIceSimulation, t) =
-    OC.time_step!(sim.ice, float(t) - sim.ice.model.clock.time)
+function Interfacer.step!(sim::ClimaSeaIceSimulation, t)
+    Δt = float(t) - sim.ice.model.clock.time
+    if isapprox(Δt, sim.model_Δt) || Δt > sim.model_Δt
+        OC.time_step!(sim.ice, Δt)
+    end
+end
 
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:area_fraction}) = sim.area_fraction
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_concentration}) =

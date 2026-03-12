@@ -18,13 +18,14 @@ It contains the following objects:
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 - `ice_concentration::SIC`: An Oceananigans Field representing the sea ice concentration on the ocean/sea ice grid.
 """
-struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC} <:
+struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC, MDT} <:
        Interfacer.AbstractOceanSimulation
     ocean::SIM
     area_fraction::A
     ocean_properties::OPROP
     remapping::REMAP
     ice_concentration::SIC
+    model_Δt::MDT
 end
 
 """
@@ -67,7 +68,7 @@ function OceananigansSimulation(
     tspan,
     output_dir,
     simple_ocean = false,
-    dt = nothing,
+    dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
     extra_kwargs...,
@@ -156,10 +157,10 @@ function OceananigansSimulation(
         closure = (horizontal_viscosity, vertical_mixing)
     end
 
-    Δt = isnothing(dt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : float(dt)
+    model_Δt = float(dt)
     ocean = CO.ocean_simulation(
         grid;
-        Δt,
+        Δt = model_Δt,
         timestepper = :SplitRungeKutta3,
         momentum_advection,
         tracer_advection,
@@ -287,6 +288,7 @@ function OceananigansSimulation(
         ocean_properties,
         remapping,
         ice_concentration,
+        model_Δt,
     )
 end
 
@@ -335,9 +337,13 @@ end
 ### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
 ###############################################################################
 
-# Timestep the simulation forward to time `t`
-Interfacer.step!(sim::OceananigansSimulation, t) =
-    OC.time_step!(sim.ocean, float(t) - sim.ocean.model.clock.time)
+# Timestep the simulation forward to time `t`. This may not actually do anything.
+function Interfacer.step!(sim::OceananigansSimulation, t)
+    Δt = float(t) - sim.ocean.model.clock.time
+    if isapprox(Δt, sim.model_Δt) || Δt > sim.model_Δt
+        OC.time_step!(sim.ocean, Δt)
+    end
+end
 
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction
 

@@ -111,8 +111,9 @@ function OceananigansSimulation(
     depth = 6000 # meters
     z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 1800)
 
-    if lowercase(ocean_grid_type) == "latlon"
-        # Regular latitude-longitude grid (e.g. for testing naive remap)
+    grid_type = lowercase(ocean_grid_type)
+    if grid_type == "latlon"
+        # Regular latitude-longitude grid (e.g. for testing different regridding options)
         # Latitude -80 to 90 to approximate global; longitude 0 to 360
         underlying_grid = OC.LatitudeLongitudeGrid(
             arch;
@@ -139,6 +140,7 @@ function OceananigansSimulation(
             z,
             fold_topology = OC.Grids.RightFaceFolded,
         )
+
         bottom_height = CO.regrid_bathymetry(
             underlying_grid;
             minimum_depth = 20,
@@ -205,17 +207,7 @@ function OceananigansSimulation(
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
 
     # Construct the remapper object and allocate scratch space
-    regridding = lowercase(ocean_regridding)
-    if regridding == "remap"
-        if lowercase(ocean_grid_type) != "latlon"
-            error("ocean_regridding=\"remap\" (naive interpolation) requires ocean_grid_type=\"latlon\"")
-        end
-        remapping = construct_remappers_remap(grid, boundary_space)
-        @info "Ocean regridding: remap (ClimaCore Remapping)"
-    else
-        remapping = construct_remappers(grid, boundary_space)
-        @info "Ocean regridding: conservative"
-    end
+    remapping = construct_remappers(grid, boundary_space)
 
     # COARE3 roughness params (allocated once, reused each timestep)
     coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
@@ -230,54 +222,43 @@ function OceananigansSimulation(
         coare3_roughness_params,
     )
 
-    # Before version 0.96.22, the NetCDFWriter was broken on GPU.
-    # In addition, the current OceananigansNCDatasetsExt only supports a subset
-    # of grids (RectilinearGrid, LatitudeLongitudeGrid, some immersed grids).
-    # NetCDF output for OrthogonalSphericalShellGrid-based setups is not yet
-    # supported and will throw a gather_dimensions MethodError, so we skip
-    # writers in that case.
+    # Before version 0.96.22, the NetCDFWriter was broken on GPU
     if arch isa OC.CPU
-        underlying = grid.underlying_grid
-        if underlying isa OC.Grids.RectilinearGrid || underlying isa OC.Grids.LatitudeLongitudeGrid
-            # Save all tracers and velocities to a NetCDF file at daily frequency
-            outputs = merge(ocean.model.tracers, ocean.model.velocities)
-            surface_writer = OC.NetCDFWriter(
-                ocean.model,
-                outputs;
-                schedule = OC.TimeInterval(3600), # hourly snapshots
-                filename = joinpath(output_dir, "ocean_diagnostics.nc"),
-                indices = (:, :, grid.Nz),
-                overwrite_existing = true,
-                array_type = Array{FT},
-            )
-            free_surface_writer = OC.NetCDFWriter(
-                ocean.model,
-                (; displacement = ocean.model.free_surface.displacement);
-                schedule = OC.TimeInterval(3600), # hourly snapshots
-                filename = joinpath(output_dir, "ocean_free_surface.nc"),
-                overwrite_existing = true,
-                array_type = Array{FT},
-            )
-            Tflux = ocean.model.tracers.T.boundary_conditions.top.condition
-            Sflux = ocean.model.tracers.S.boundary_conditions.top.condition
-            uflux = ocean.model.velocities.u.boundary_conditions.top.condition
-            vflux = ocean.model.velocities.v.boundary_conditions.top.condition
-            fluxes_writer = OC.NetCDFWriter(
-                ocean.model,
-                (; Tflux, Sflux, uflux, vflux);
-                schedule = OC.TimeInterval(3600), # hourly snapshots
-                filename = joinpath(output_dir, "ocean_fluxes.nc"),
-                overwrite_existing = true,
-                array_type = Array{FT},
-            )
+        # Save all tracers and velocities to a NetCDF file at daily frequency
+        outputs = merge(ocean.model.tracers, ocean.model.velocities)
+        surface_writer = OC.NetCDFWriter(
+            ocean.model,
+            outputs;
+            schedule = OC.TimeInterval(3600), # hourly snapshots
+            filename = joinpath(output_dir, "ocean_diagnostics.nc"),
+            indices = (:, :, grid.Nz),
+            overwrite_existing = true,
+            array_type = Array{FT},
+        )
+        free_surface_writer = OC.NetCDFWriter(
+            ocean.model,
+            (; displacement = ocean.model.free_surface.displacement);
+            schedule = OC.TimeInterval(3600), # hourly snapshots
+            filename = joinpath(output_dir, "ocean_free_surface.nc"),
+            overwrite_existing = true,
+            array_type = Array{FT},
+        )
+        Tflux = ocean.model.tracers.T.boundary_conditions.top.condition
+        Sflux = ocean.model.tracers.S.boundary_conditions.top.condition
+        uflux = ocean.model.velocities.u.boundary_conditions.top.condition
+        vflux = ocean.model.velocities.v.boundary_conditions.top.condition
+        fluxes_writer = OC.NetCDFWriter(
+            ocean.model,
+            (; Tflux, Sflux, uflux, vflux);
+            schedule = OC.TimeInterval(3600), # hourly snapshots
+            filename = joinpath(output_dir, "ocean_fluxes.nc"),
+            overwrite_existing = true,
+            array_type = Array{FT},
+        )
 
-            ocean.output_writers[:surface] = surface_writer
-            ocean.output_writers[:free_surface] = free_surface_writer
-            ocean.output_writers[:fluxes] = fluxes_writer
-        else
-            @warn "Skipping Oceananigans NetCDF writers for unsupported grid type " *
-                  string(typeof(underlying))
-        end
+        ocean.output_writers[:surface] = surface_writer
+        ocean.output_writers[:free_surface] = free_surface_writer
+        ocean.output_writers[:fluxes] = fluxes_writer
     end
 
     # Initialize with 0 ice concentration; this will be updated in `resolve_area_fractions!`
@@ -336,10 +317,6 @@ function construct_remappers(grid_oc, boundary_space)
     scratch_field_oc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
     scratch_field_oc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
 
-    # Additional Center/Center scratch fields used in turbulent flux updates
-    scratch_cc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
-    scratch_cc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
-
     # Allocate space for a Field of UVVectors, which we need for remapping momentum fluxes
     temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
 
@@ -351,7 +328,6 @@ function construct_remappers(grid_oc, boundary_space)
     ) = construct_polar_mask(grid_oc)
 
     return (;
-        regridding_method = :conservative,
         remapper_oc_to_cc,
         field_ones_cc,
         value_per_element_cc,
@@ -361,69 +337,6 @@ function construct_remappers(grid_oc, boundary_space)
         polar_exclusion_flux_mask_centers,
         polar_exclusion_flux_mask_u,
         polar_exclusion_flux_mask_v,
-        scratch_cc1,
-        scratch_cc2,
-    )
-end
-
-"""
-    construct_remappers_remap(grid_oc, boundary_space)
-
-Build remapping for "naive" regridding (ClimaCore Remapping / interpolation).
-Only supported for LatitudeLongitudeGrid. Used when ocean_regridding == "remap".
-"""
-function construct_remappers_remap(grid_oc, boundary_space)
-    underlying = grid_oc.underlying_grid
-    if !(underlying isa OC.LatitudeLongitudeGrid)
-        error("construct_remappers_remap requires LatitudeLongitudeGrid (use ocean_grid_type=\"latlon\")")
-    end
-    Nx = size(grid_oc, 1)
-    Ny = size(grid_oc, 2)
-    FT = CC.Spaces.undertype(boundary_space)
-    # Ocean center coordinates (radians); matches construction longitude=(0,360), latitude=(-80,90)
-    lon_centers = [FT((i - 0.5) * 2π / Nx) for i in 1:Nx]
-    lat_centers = [FT((-80 + (j - 0.5) * 170 / Ny) * π / 180) for j in 1:Ny]
-    ocean_points = CC.Geometry.LatLongPoint.(
-        [lat_centers[j] for i in 1:Nx for j in 1:Ny],
-        [lon_centers[i] for i in 1:Nx for j in 1:Ny],
-    )
-    boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
-    remapper_cc_to_oc = CC.Remapping.Remapper(boundary_space_cpu, ocean_points, nothing)
-
-    field_ones_cc = CC.Fields.ones(boundary_space)
-    ArrayType = ClimaComms.array_type(boundary_space)
-    value_per_element_cc =
-        ArrayType(zeros(FT, CC.Meshes.nelements(boundary_space.grid.topology.mesh)))
-
-    scratch_field_oc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
-    scratch_field_oc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
-    scratch_cc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
-    scratch_cc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
-    temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
-    (;
-        polar_exclusion_flux_mask_centers,
-        polar_exclusion_flux_mask_u,
-        polar_exclusion_flux_mask_v,
-    ) = construct_polar_mask(grid_oc)
-
-    return (;
-        regridding_method = :remap,
-        remapper_cc_to_oc,
-        remapper_oc_to_cc = nothing, # OC->CC done by interpolation in climaocean_helpers
-        boundary_space,
-        ocean_grid = grid_oc,
-        ocean_lon_rad = lon_centers,
-        ocean_lat_rad = lat_centers,
-        field_ones_cc,
-        value_per_element_cc,
-        scratch_field_oc1,
-        scratch_field_oc2,
-        temp_uv_vec,
-        polar_exclusion_flux_mask_centers,
-        polar_exclusion_flux_mask_u,
-        polar_exclusion_flux_mask_v,
-        scratch_cc1,
-        scratch_cc2,
     )
 end
 
@@ -473,7 +386,7 @@ function FieldExchanger.resolve_area_fractions!(
         @. land_fraction = ifelse.(polar_mask == FT(1), FT(1), land_fraction)
         @. ice_fraction = ifelse.(polar_mask == FT(1), FT(0), ice_fraction)
         @. ocean_fraction = ifelse.(polar_mask == FT(1), FT(0), ocean_fraction)
-    elseif ocean_sim.ocean.model.grid.underlying_grid isa OC.OrthogonalSphericalShellGrids.TripolarGrid
+    elseif ocean_sim.ocean.model.grid isa OC.TripolarGrid
         # Create a "polar" mask that's 1 at latitudes in [-90, -80] degrees
         polar_mask .= lat .<= FT(-85)
     end

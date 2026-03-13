@@ -15,10 +15,6 @@ for CMIP, AMIP, and slabplanet setups. A few simple component models are impleme
 within `src/`, while more complex component models extend the ClimaCoupler interface
 in `ext/`.
 
-Additional smaller coupling examples can be found in the `experiments/ClimaCore/` directory.
-These are meant to serve as an introduction to coupling and the types of functionality
-required for it.
-
 <!-- Links and shortcuts -->
 [docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
 [docs-dev-url]: https://CliMA.github.io/ClimaCoupler.jl/dev/

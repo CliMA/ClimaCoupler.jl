@@ -57,7 +57,3 @@ jobs:
           julia -O0 --color=yes --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate()'
           julia -O0 --color=yes --project=experiments/ClimaEarth -e 'using Pkg; Pkg.develop(; path = ".")'
           julia -O0 --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/test/runtests.jl
-      - run: |
-          julia -O0 --color=yes --project=experiments/ClimaCore -e 'using Pkg; Pkg.instantiate()'
-          julia -O0 --color=yes --project=experiments/ClimaCore -e 'using Pkg; Pkg.develop(; path = ".")'
-          julia -O0 --color=yes --project=experiments/ClimaCore experiments/ClimaCore/test/runtests.jl

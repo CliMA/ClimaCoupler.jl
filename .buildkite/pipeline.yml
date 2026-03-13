@@ -30,12 +30,6 @@ steps:
       - "julia -O0 --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
       - "julia -O0 --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
 
-      - echo "--- Instantiate ClimaCore experiments env"
-      - "julia -O0 --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia -O0 --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.add(\"MPI\")'"
-      - "julia -O0 --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia -O0 --project=experiments/ClimaCore/ -e 'using Pkg; Pkg.status()'"
-
       - echo "--- Instantiate test env"
       - "julia -O0 --project=test/ -e 'using Pkg; Pkg.develop(path=\".\")'"
       - "julia -O0 --project=test/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
@@ -225,20 +219,6 @@ steps:
         artifact_paths: "output/target_amip_n1_shortrun/artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_mem: 20GB
-
-      # CLIMACORE EXPERIMENTS
-
-      - label: "sea_breeze"
-        command: "julia --color=yes --project=experiments/ClimaCore experiments/ClimaCore/sea_breeze/run.jl"
-        artifact_paths: "experiments/ClimaCore/sea_breeze/output/*"
-        agents:
-          slurm_mem: 20GB
-
-      - label: "heat-diffusion"
-        command: "julia --color=yes --project=experiments/ClimaCore/ experiments/ClimaCore/heat-diffusion/run.jl"
-        artifact_paths: "experiments/ClimaCore/output/heat-diffusion/artifacts/*"
         agents:
           slurm_mem: 20GB
 

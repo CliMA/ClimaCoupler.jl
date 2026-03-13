@@ -4,6 +4,10 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Remove `experiments/ClimaCore` PR[#1704](https://github.com/CliMA/ClimaCoupler.jl/pull/1809)
+The `experiments/ClimaCore/` directory and its coupling examples
+(heat diffusion and sea breeze) have been removed.
+
 ### ClimaCoupler features
 
 #### Add an extension for CMIP models PR[#1704](https://github.com/CliMA/ClimaCoupler.jl/pull/1704)

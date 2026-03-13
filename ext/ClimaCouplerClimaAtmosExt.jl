@@ -692,11 +692,20 @@ one here.
 """
 function dss_state!(sim::ClimaAtmosSimulation)
     Y = sim.integrator.u
+    # Skip DSS for PointSpace (e.g. SCM column mode). Y is (c=..., f=...) or flat NamedTuple of Fields.
+    first_val = getproperty(Y, first(propertynames(Y)))
+    leaf =
+        first_val isa CC.Fields.Field ? first_val :
+        getproperty(first_val, first(propertynames(first_val)))
+    if leaf isa CC.Fields.Field && axes(leaf) isa CC.Spaces.PointSpace
+        return nothing
+    end
     for key in propertynames(Y)
         field = getproperty(Y, key)
-        buffer = CC.Spaces.create_dss_buffer(field)
-        CC.Spaces.weighted_dss!(field, buffer)
+        buffer = Utilities.init_dss_buffer(field)
+        Utilities.apply_dss!(field, buffer)
     end
+    return nothing
 end
 
 """

@@ -37,7 +37,8 @@ export CoupledSimulation,
     CMIPMode,
     SlabplanetMode,
     SlabplanetAquaMode,
-    SlabplanetTerraMode
+    SlabplanetTerraMode,
+    is_column_mode
 
 """
     AbstractSimulation
@@ -103,6 +104,17 @@ Return the model date at the current timestep.
 """
 current_date(cs::CoupledSimulation) =
     cs.t[] isa ITime ? date(cs.t[]) : cs.start_date[] + Dates.Second(cs.t[])
+
+"""
+    is_column_mode(cs::Interfacer.CoupledSimulation)
+
+Return `true` when the coupler boundary fields live on a `PointSpace`, which
+indicates a single-column (SCM) run.
+"""
+function is_column_mode(cs::Interfacer.CoupledSimulation)
+    names = propertynames(cs.fields)
+    return axes(getproperty(cs.fields, first(names))) isa CC.Spaces.PointSpace
+end
 
 """
     default_coupler_fields()
@@ -553,9 +565,25 @@ function remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field)
         return nothing
     end
 
+    # SCM column mode: if either space is a PointSpace, directly copy the value.
+    # In column mode the boundary space is a PointSpace while the atmos surface space
+    # is a small SpectralElementSpace2D (from BoxGrid with 4 quadrature points),
+    # so we allow the mismatch and use the mean of the source values.
+    if target_space isa CC.Spaces.PointSpace || source_space isa CC.Spaces.PointSpace
+        src = parent(source_field)
+        parent(target_field) .= sum(src) / length(src)
+        return nothing
+    end
+
     # Get vector of LatLongPoints for the target space to get the hcoords
     # Copy target coordinates to CPU if they are on GPU
     coords = CC.to_cpu(CC.Fields.coordinate_field(target_space))
+    if !(hasproperty(coords, :lat) && hasproperty(coords, :long))
+        error(
+            "Cannot remap between incompatible spaces: target space " *
+            "$(typeof(target_space)) does not have lat/long coordinates.",
+        )
+    end
     lats = CC.Fields.field2array(coords.lat)
     lons = CC.Fields.field2array(coords.long)
     hcoords = CC.Geometry.LatLongPoint.(lats, lons)

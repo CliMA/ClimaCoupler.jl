@@ -37,7 +37,8 @@ export CoupledSimulation,
     CMIPMode,
     SlabplanetMode,
     SlabplanetAquaMode,
-    SlabplanetTerraMode
+    SlabplanetTerraMode,
+    is_column_mode
 
 """
     AbstractSimulation
@@ -103,6 +104,17 @@ Return the model date at the current timestep.
 """
 current_date(cs::CoupledSimulation) =
     cs.t[] isa ITime ? date(cs.t[]) : cs.start_date[] + Dates.Second(cs.t[])
+
+"""
+    is_column_mode(cs::Interfacer.CoupledSimulation)
+
+Return `true` when the coupler boundary fields live on a `PointSpace`, which
+indicates a single-column (SCM) run.
+"""
+function is_column_mode(cs::Interfacer.CoupledSimulation)
+    names = propertynames(cs.fields)
+    return axes(getproperty(cs.fields, first(names))) isa CC.Spaces.PointSpace
+end
 
 """
     default_coupler_fields()

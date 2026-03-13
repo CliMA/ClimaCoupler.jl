@@ -29,7 +29,7 @@ model_interface = joinpath(
 # CALIBRATION CONFIGURATION
 
 config_file =
-    joinpath(pkgdir(ClimaCoupler), "config", "amip_configs", "amip_calibration.yml")
+    joinpath(pkgdir(ClimaCoupler),"config/benchmark_configs/amip_progedmf_1m_land_he16.yml")
 
 # Calibrate only on Jan 1 2010
 sample_date_ranges =

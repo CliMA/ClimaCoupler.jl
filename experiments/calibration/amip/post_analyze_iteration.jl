@@ -113,5 +113,26 @@ function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, it
     end
 
     @info "Ensemble spread: $(scalar_spread(ekp))"
+
+    try
+        residual_analysis = ClimaCalibrate.analyze_residual(ekp, iteration+1)
+        (; short_names) = CALIBRATE_CONFIG
+        @info "Structured energy (≈1 under noise model): $(residual_analysis.structured_energy)"
+        for (v, sn) in enumerate(short_names)
+
+            # structured_energy is the mean squared z-score of the mean residual
+            # y - G(u) projected onto the top eigenvectors of that variable's
+            # noise covariance. If only model-data mismatch were due to noise it
+            # should be ~1.
+            energy_v = residual_analysis.structured_energy_by_variable[v]
+            # The norm for variables on single levels should be smaller than
+            # variables on multiple levels
+            norm_v = residual_analysis.residual_norm_by_variable[v]
+            @info "  $sn: structured_energy = $energy_v, ‖residual‖ = $norm_v"
+        end
+    catch e
+        @error "Residual analysis failed" exception = (e, catch_backtrace())
+    end
+
     return nothing
 end

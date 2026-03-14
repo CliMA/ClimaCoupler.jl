@@ -74,28 +74,18 @@ if abspath(PROGRAM_FILE) == @__FILE__
     era5_pl_data_loader = CalibrationTools.ERA5PressureLevelDataLoader()
     ceres_data_loader = CalibrationTools.CERESDataLoader()
     modis_data_loader = CalibrationTools.ModisDataLoader()
-    data_loaders = [era5_pl_data_loader, ceres_data_loader, modis_data_loader]
+    data_loader = CalibrationTools.CompositeDataLoader(
+        era5_pl_data_loader,
+        ceres_data_loader,
+        modis_data_loader,
+    )
 
     (; short_names) = CALIBRATE_CONFIG
-    # Map short name to the corresponding data loader
-    loader_registry = Dict()
-
-    # Populate loader registry, mapping short names to loaders
-    for short_name in short_names
-        idx = findfirst(l -> short_name in l.available_vars, data_loaders)
-        !isnothing(idx) && (loader_registry[short_name] = data_loaders[idx])
-    end
-    data_loader_non_unique_names =
-        intersect(ClimaCoupler.CalibrationTools.available_vars.(data_loaders)...)
-    any(x -> x in data_loader_non_unique_names, data_loader_non_unique_names) &&
-        error("Data loader variable names are not unique: $data_loaders")
-
-    Set(short_names) == keys(loader_registry) || error("Not all short names are being used")
 
     vars = map(short_names) do short_name
-        data_loader = loader_registry[short_name]
-        @info "Retrieving $(short_name) from $(typeof(data_loader))"
-        var = get(data_loader, short_name)
+        source_data_loader = CalibrationTools.find_source_loader(data_loader, short_name)
+        @info "Retrieving $(short_name) from $(typeof(source_data_loader))"
+        var = get(source_data_loader, short_name)
     end
 
     # For now, we apply the preprocessing to all the variables if possible

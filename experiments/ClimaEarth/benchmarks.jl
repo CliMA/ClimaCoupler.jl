@@ -32,7 +32,7 @@ else
 end
 
 # Set up info for PrettyTables.jl
-column_labels = [build_id_str, "Horiz. res.: 30 elems", "GPU Run [2 A100s]"]
+column_labels = [build_id_str, "Horiz. res.: 30 elems", "GPU Run [1 A100]"]
 data = [
     ["" "Vert. res.: 63 levels" ""]
     ["" "dt: 120secs" ""]

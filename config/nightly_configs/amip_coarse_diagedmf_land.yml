@@ -19,6 +19,7 @@ land_model: "integrated"
 mode_name: "amip"
 netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
+ode_algo: "ARS343"
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
 start_date: "20100101"

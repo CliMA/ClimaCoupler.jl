@@ -140,28 +140,38 @@ steps:
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
           slurm_mem: 32GB
-      
-      # the 1M prog EDMF config is currently unstable.
 
-      # - label: "GPU AMIP + prog. EDMF + 1M + integrated land"
-      #   key: "amip_progedmf_1m_land"
-      #   command:
-      #     - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_progedmf_1m_land.yml --job_id amip_progedmf_1m_land"
-      #   artifact_paths: "output/amip_progedmf_1m_land/artifacts/*"
-      #   env:
-      #     CLIMACOMMS_DEVICE: "CUDA"
-      #   agents:
-      #     queue: clima
-      #     slurm_gpus_per_task: 1
-      #     slurm_cpus_per_task: 4
-      #     slurm_ntasks: 1
-      #     slurm_mem: 32GB
+      - label: "GPU AMIP + prog. EDMF + 1M + integrated land"
+        key: "amip_progedmf_1m_land"
+        command:
+          - "julia --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_progedmf_1m_land.yml --job_id amip_progedmf_1m_land"
+        artifact_paths: "output/amip_progedmf_1m_land/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          queue: clima
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 1
+          slurm_mem: 32GB
 
 
   - group: "CMIP simulations"
 
     steps:
-      - label: "GPU CMIP: ClimaAtmos + ClimaLand + ClimaOcean + ClimaSeaIce"
+      - label: "GPU CMIP: ED only + bucket"
+        key: "cmip_edonly_bucket"
+        command:
+            - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_bucket.yml --job_id cmip_edonly_bucket"
+        artifact_paths: "output/cmip_edonly_bucket/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          queue: clima
+          slurm_mem: 32GB
+          slurm_gpus: 1
+
+      - label: "GPU CMIP: ED only + integrated land"
         key: "cmip_edonly_land"
         command:
             - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_land.yml --job_id cmip_edonly_land"
@@ -173,11 +183,23 @@ steps:
           slurm_mem: 32GB
           slurm_gpus: 1
 
-      - label: "GPU CMIP: ClimaAtmos + Bucket + ClimaOcean + ClimaSeaIce"
-        key: "cmip_edonly_bucket"
+      - label: "GPU CMIP: diag. EDMF + integrated land"
+        key: "cmip_diagedmf_land"
         command:
-            - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_bucket.yml --job_id cmip_edonly_bucket"
-        artifact_paths: "output/cmip_edonly_bucket/artifacts/*"
+            - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_diagedmf_land.yml --job_id cmip_diagedmf_land"
+        artifact_paths: "output/cmip_diagedmf_land/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          queue: clima
+          slurm_mem: 32GB
+          slurm_gpus: 1
+
+      - label: "GPU CMIP: prog. EDMF + integrated land"
+        key: "cmip_progedmf_land"
+        command:
+            - "julia --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/cmip_progedmf_land.yml --job_id cmip_progedmf_land"
+        artifact_paths: "output/cmip_progedmf_land/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

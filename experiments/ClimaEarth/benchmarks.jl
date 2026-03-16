@@ -32,7 +32,7 @@ else
 end
 
 # Set up info for PrettyTables.jl
-headers = [build_id_str, "Horiz. res.: 30 elems", "GPU Run [2 A100s]"]
+column_labels = [build_id_str, "Horiz. res.: 30 elems", "GPU Run [1 A100]"]
 data = [
     ["" "Vert. res.: 63 levels" ""]
     ["" "dt: 120secs" ""]
@@ -59,10 +59,5 @@ table_output_dir = joinpath(output_dir, "compare_amip_climaatmos_amip_diagedmf")
 mkpath(table_output_dir)
 open(joinpath(table_output_dir, "table.txt"), "w") do f
     # Output the table, including lines before and after the header
-    PrettyTables.pretty_table(
-        f,
-        data,
-        header = headers,
-        hlines = [0, 3, 5, 7, 9, 11, 13, 15],
-    )
+    PrettyTables.pretty_table(f, data; column_labels, hlines = [0, 3, 5, 7, 9, 11, 13, 15])
 end

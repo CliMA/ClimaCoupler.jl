@@ -65,3 +65,9 @@ git-tree-sha1 = "ce2b3b1f113f88956db112c81f8d48a62d9f57ae"
     [[modis_lwp_iwp.download]]
     sha256 = "ca0dce6450a4cb101bd4581b9dfb50164ad6518ffe96f617471d2f23f2b46367"
     url = "https://caltech.box.com/shared/static/bl0efc6st1i0sdmxx8bs70qof0xov4d9.gz"
+
+[calipso_cloudsat]
+git-tree-sha1 = "dae77bc4ff79194ee6e794c1181bec1bebd67ea9"
+
+[calipso_cloudsat_lowres]
+git-tree-sha1 = "c1c0a16127bd547124cdf7288140002d74846efe"

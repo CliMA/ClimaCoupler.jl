@@ -76,12 +76,16 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
 end
 
 """
-    get_surface_fluxes(inputs, surface_params::SF.Parameters.SurfaceFluxesParameters)
+    get_surface_fluxes(surface_fluxes_params, u_int, T_int, ..., config,
+                       update_T_sfc_cb, update_q_vap_sfc;
+                       roughness_inputs, scheme, solver_opts, flux_specs)
 
-Uses SurfaceFluxes.jl to calculate turbulent surface fluxes. It should be atmos model agnostic, and columnwise.
+Uses SurfaceFluxes.jl to calculate turbulent surface fluxes. 
 Fluxes are computed over the entire surface, even where the relevant surface model is not present.
 
-When available, it also computes ancillary quantities, such as the Monin-Obukov lengthscale.
+`update_T_sfc_cb` and `update_q_vap_sfc` are positional so they participate in
+broadcast (they may vary per element).  The remaining extended-API arguments
+(`roughness_inputs`, `scheme`, `solver_opts`, `flux_specs`) are keyword arguments.
 """
 function get_surface_fluxes(
     surface_fluxes_params::SF.Parameters.SurfaceFluxesParameters,
@@ -98,12 +102,16 @@ function get_surface_fluxes(
     h_sfc,
     d,
     config,
+    update_T_sfc_cb = nothing,
+    update_q_vap_sfc = nothing;
+    roughness_inputs = nothing,
+    scheme = SF.PointValueScheme(),
+    solver_opts = nothing,
+    flux_specs = nothing,
 )
-    # Get inputs to compute surface fluxes
     Φ_sfc = SFP.grav(surface_fluxes_params) * h_sfc
     Δz = h_int - h_sfc
 
-    # Calculate surface fluxes
     outputs = SF.surface_fluxes(
         surface_fluxes_params,
         T_int,
@@ -118,8 +126,13 @@ function get_surface_fluxes(
         d,
         u_int,
         u_sfc,
-        nothing, # roughness_inputs
+        roughness_inputs,
         config,
+        scheme,
+        solver_opts,
+        flux_specs,
+        update_T_sfc_cb,
+        update_q_vap_sfc,
     )
 
     (; shf, lhf, evaporation, ρτxz, ρτyz, T_sfc, q_vap_sfc, L_MO, ustar) = outputs
@@ -145,6 +158,7 @@ function get_surface_fluxes(
         L_MO,
         ustar,
         buoyancy_flux,
+        T_sfc_new = T_sfc,
     )
 end
 
@@ -283,7 +297,6 @@ function compute_surface_fluxes!(
 
     config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
 
-    # calculate the surface fluxes
     fluxes =
         FluxCalculator.get_surface_fluxes.(
             surface_fluxes_params,
@@ -294,11 +307,11 @@ function compute_surface_fluxes!(
             csf.q_ice_atmos,
             csf.ρ_atmos,
             csf.height_int,
-            StaticArrays.SVector.(0, 0), # uv_sfc
+            uv_int .* FT(0),
             T_sfc,
             q_sfc,
             csf.height_sfc,
-            0, # d
+            FT(0),
             config,
         )
     (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux) =

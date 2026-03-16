@@ -103,6 +103,9 @@ CalibrationTools.ERA5PressureLevelDataLoader
 CalibrationTools.ERA5PressureLevelDataLoader()
 CalibrationTools.ModisDataLoader
 CalibrationTools.ModisDataLoader()
+CalibrationTools.CompositeDataLoader
+CalibrationTools.CompositeDataLoader()
+CalibrationTools.find_source_loader
 CalibrationTools.available_vars
 CalibrationTools.get
 CalibrationTools.update_timespan!

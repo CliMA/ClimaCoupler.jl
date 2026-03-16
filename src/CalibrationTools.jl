@@ -12,6 +12,9 @@ import ClimaAnalysis
 import ClimaAnalysis: NCCatalog
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 
+# TODO: Remove this once the name is added to ClimaAnalysis
+push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
+
 """
     struct CalibrateConfig{SPINUP <: Dates.Period, EXTEND <: Dates.Period}
 
@@ -187,6 +190,110 @@ function preprocess(data_loader::AbstractDataLoader, _, ::Val{varname}) where {v
 end
 
 """
+    CompositeDataLoader
+
+A struct for simplifying the process of loading multiple variables from multiple
+data loaders.
+"""
+struct CompositeDataLoader <: AbstractDataLoader
+    """A dictionary mapping each variable short name to the `AbstractDataLoader`
+    responsible for loading it."""
+    varname_to_loaders::Dict{String, AbstractDataLoader}
+
+    """A list of available variables to load."""
+    available_vars::Set{String}
+end
+
+"""
+    CompositeDataLoader(loaders::AbstractDataLoader...; varname_to_loader = Dict())
+
+Construct a `CompositeDataLoader` from multiple data loaders.
+
+The keyword argument `varname_to_loader` is a dictionary mapping variable names
+to `AbstractDataLoader`s. When multiple data loaders provide the same variable,
+use `varname_to_loader` to specify which loader to use for each variable. If a
+variable name is not provided in `varname_to_loader` and multiple loaders
+provide the same variable, an error is thrown.
+
+See the example below for how to use `CompositeDataLoader`.
+
+```julia
+composite_data_loader = CompositeDataLoader(ERA5DataLoader(), CERESDataLoader())
+
+# If pr is added to ERA5DataLoader, then you can specify to load pr from
+# GPCPDataLoader
+era5_data_loader = ERA5DataLoader()
+gpcp_data_loader = GPCPDataLoader()
+composite_data_loader = CompositeDataLoader(
+    era5_data_loader,
+    gpcp_data_loader;
+    varname_to_loader = Dict("pr" => gpcp_data_loader)
+)
+```
+"""
+function CompositeDataLoader(loaders::AbstractDataLoader...; varname_to_loader = Dict())
+    varname_to_loader = Dict{String, AbstractDataLoader}(varname_to_loader)
+    for (varname, loader) in varname_to_loader
+        varname in available_vars(loader) ||
+            error("$varname is not available in $(nameof(typeof(loader)))")
+    end
+
+    # The variable names being the same is a problem when there is ambiguity
+    # for which data loaders to get it from
+    if length(loaders) != 1
+        all_varnames = available_vars.(loaders)
+        shared_varnames = intersect(all_varnames...)
+        setdiff!(shared_varnames, keys(varname_to_loader))
+        if !isempty(shared_varnames)
+            error("There are shared variable names between data loaders")
+        end
+    end
+
+    for loader in loaders
+        for varname in available_vars(loader)
+            varname in keys(varname_to_loader) && continue
+            varname_to_loader[varname] = loader
+        end
+    end
+    return CompositeDataLoader(varname_to_loader, Set(keys(varname_to_loader)))
+end
+
+"""
+    find_source_loader(loader::CompositeDataLoader, short_name::String)
+
+Find the loader for `short_name` in `loader`.
+"""
+function find_source_loader(loader::CompositeDataLoader, short_name::String)
+    (; varname_to_loaders) = loader
+    short_name in keys(varname_to_loaders) || error(
+        "$short_name is not available for this composite data loader. Use available_vars to see all available variables",
+    )
+    return varname_to_loaders[short_name]
+end
+
+"""
+    get(loader::CompositeDataLoader, short_name::String)
+
+Get the preprocessed `OutputVar` with the name `short_name`.
+"""
+function Base.get(loader::CompositeDataLoader, short_name::String)
+    (; varname_to_loaders) = loader
+    short_name in keys(varname_to_loaders) || error(
+        "$short_name is not available to load from this composite data loader. Use available_vars to see all available variables",
+    )
+    return get(varname_to_loaders[short_name], short_name)
+end
+
+function Base.show(io::IO, data_loader::CompositeDataLoader)
+    printstyled(io, "CompositeDataLoader", bold = true, color = :green)
+    data_loaders = unique(values(data_loader.varname_to_loaders))
+    for data_loader in data_loaders
+        print(io, "\n  ")
+        show(io, data_loader)
+    end
+end
+
+"""
     ERA5DataLoader
 
 A struct for loading preprocessed ERA5 data as `OutputVar`s.
@@ -212,7 +319,7 @@ const STANDARD_UNITS = Dict(
 """
     ERA5DataLoader(; era5_to_clima_names = ERA5_TO_CLIMA_NAMES)
 
-Construct a data loader which you can load preprocessed ERA5 monthly
+Construct a data loader which you can used to load preprocessed ERA5 monthly
 time-averaged data in `OutputVar`, where
 - the short name, sign of the data, and units match CliMA conventions
 - the latitudes are shifted to be -180 to 180 degrees,
@@ -312,7 +419,7 @@ const CERES_DERIVED_VARS = Set(["swcre", "lwcre"])
 """
     CERESDataLoader(; ceres_to_clima_names = CERES_TO_CLIMA_NAMES)
 
-Construct a data loader which you can load preprocessed CERES monthly
+Construct a data loader which you can used to load preprocessed CERES monthly
 time-averaged TOA radiation data in `OutputVar`, where
 - the short name and units match CliMA conventions,
 - the latitudes are shifted to be -180 to 180 degrees,
@@ -409,7 +516,7 @@ const GPCP_TO_CLIMA_NAMES = ["precip" => "pr"]
 """
     GPCPDataLoader(; gpcp_to_clima_names = GPCP_TO_CLIMA_NAMES)
 
-Construct a data loader which you can load preprocessed GPCP monthly
+Construct a data loader which you can used to load preprocessed GPCP monthly
 time-averaged precipitation data in `OutputVar`, where
 - the short name and sign of the data match CliMA conventions
 - the latitudes are shifted to be -180 to 180 degrees,
@@ -469,7 +576,7 @@ const ERA5_PRESSURE_LEVEL_TO_CLIMA_NAMES = ["t" => "ta", "q" => "hus", "r" => "h
     ERA5PressureLevelDataLoader(;
         era5_pressure_level_to_clima_names = ERA5_PRESSURE_LEVEL_TO_CLIMA_NAMES)
 
-Construct a data loader which you can load preprocessed monthly
+Construct a data loader which you can used to load preprocessed monthly
 time-averaged ERA5 data on pressure levels in `OutputVar`, where
 - the short name and sign of the data match CliMA conventions,
 - the latitudes are shifted to be -180 to 180 degrees,
@@ -543,7 +650,7 @@ const MODIS_TO_CLIMA_NAMES = ["lwp" => "lwp", "iwp" => "clivi"]
         modis_to_clima_names = MODIS_TO_CLIMA_NAMES,
     )
 
-Construct a data loader which you can load preprocessed monthly time-averaged
+Construct a data loader which you can used to load preprocessed monthly time-averaged
 MODIS data on single levels in `OutputVar`, where
 - the short name and sign of the data match CliMA conventions,
 - the latitudes are shifted to be -180 to 180 degrees,
@@ -588,9 +695,158 @@ function preprocess(::ModisDataLoader, var, ::Union{Val{:clivi}, Val{:lwp}})
     var = _preprocess_var(var)
     not_nans = filter(!isnan, var.data)
     global_mean = sum(not_nans) / length(not_nans)
-    @info "$(ClimaAnalysis.short_name(var)): Imputting $global_mean for NaNs"
+    @info "$(ClimaAnalysis.short_name(var)): Imputing global mean $global_mean for NaNs"
     replace!(x -> isnan(x) ? global_mean : x, var)
     return var
+end
+
+"""
+    CalipsoDataLoader
+
+A struct for loading preprocessed CALIPSO/CloudSat cloud fraction data on altitude
+levels as `OutputVar`s.
+"""
+struct CalipsoDataLoader <: AbstractDataLoader
+    catalog::NCCatalog
+    available_vars::Set{String}
+end
+
+const CALIPSO_TO_CLIMA_NAMES = ["cloud_fraction_on_levels" => "cl"]
+
+"""
+    CalipsoDataLoader(; calipso_to_clima_names = CALIPSO_TO_CLIMA_NAMES)
+
+Construct a data loader which you can used to load preprocessed monthly CALIPSO/CloudSat
+cloud fraction on altitude levels in `OutputVar`, where
+- the short name and units match CliMA conventions,
+- the latitudes are shifted to be -180 to 180 degrees,
+- the times are at the start of the time period (e.g. the time average of
+  January is on the first of January instead of January 15th),
+- values are fractions in [0, 1]
+
+The CALIPSO/CloudSat data comes from the `calipso_cloudsat` artifact, which
+repackages the 3S-GEOPROF-COMB dataset. See
+[ClimaArtifacts](https://github.com/CliMA/ClimaArtifacts/tree/main/calipso_cloudsat)
+for more information about this artifact.
+
+The keyword argument `calipso_to_clima_names` is a vector of pairs mapping
+CALIPSO/CloudSat variable name to CliMA name.
+"""
+function CalipsoDataLoader(; calipso_to_clima_names = CALIPSO_TO_CLIMA_NAMES)
+    artifact_dir = @clima_artifact("calipso_cloudsat")
+    monthly_file = joinpath(artifact_dir, "radarlidar_monthly_2.5x2.5.nc")
+
+    catalog = NCCatalog()
+    ClimaAnalysis.add_file!(catalog, monthly_file, calipso_to_clima_names...)
+    return CalipsoDataLoader(catalog, Set(last.(calipso_to_clima_names)))
+end
+
+"""
+    get(loader::CalipsoDataLoader, short_name::String)
+
+Get the preprocessed `OutputVar` with the name `short_name` from the
+CALIPSO/CloudSat dataset.
+"""
+function Base.get(loader::CalipsoDataLoader, short_name::String)
+    (; catalog, available_vars) = loader
+    short_name in available_vars || error(
+        "$short_name is not available to load. To add this variable, pass it to calipso_to_clima_names as a pair mapping CALIPSO/CloudSat name to CliMA name and create a new CalipsoDataLoader",
+    )
+    var = get(catalog, short_name; var_kwargs = (shift_by = Dates.firstdayofmonth,))
+    return preprocess(loader, var, Val(Symbol(short_name)))
+end
+
+"""
+    preprocess(::CalipsoDataLoader, var, ::Val{varname}) where {varname}
+
+Preprocess `var` with short name `varname`.
+"""
+function preprocess(::CalipsoDataLoader, var, ::Val{:cl})
+    # Select "All cases" doop (first index)
+    var = ClimaAnalysis.slice(var; doop = 1, by = ClimaAnalysis.Index())
+    var = _preprocess_var(var)
+    # Convert from percentage (0–100) to fraction (0–1)
+    var = ClimaAnalysis.convert_units(var, "unitless"; conversion_function = x -> x / 100)
+    # Impute missing and NaN values with the global mean in one pass
+    T = nonmissingtype(eltype(var.data))
+    valid = filter(x -> !ismissing(x) && !isnan(x), vec(var.data))
+    global_mean = T(sum(valid) / length(valid))
+    @info "$(ClimaAnalysis.short_name(var)): Imputing global mean $global_mean for missing/NaN values"
+    return ClimaAnalysis.remake(
+        var;
+        data = map(x -> (ismissing(x) || isnan(x)) ? global_mean : T(x), var.data),
+    )
+end
+
+"""
+    regrid_to_model_levels(obs_var, model_altitudes)
+
+Regrid `obs_var` from dataset altitude levels to `model_altitudes` using a
+Gaussian-weighted average along the altitude dimension.
+
+For each model level `k` with altitude `z_k`, the regridded value is:
+
+    obs(z_k) = sum_i w_i(k) * obs(z_i)
+
+where the sum is over all dataset levels `i` with altitude `z_i`, and the
+normalized weight is:
+
+    w_i(k) = exp(-(z_i - z_k)^2 / (2 * sigma_k^2)) / Z_k
+    Z_k     = sum_j exp(-(z_j - z_k)^2 / (2 * sigma_k^2))
+
+The bandwidth `sigma_k` is half the spacing between neighboring model levels:
+
+    sigma_k = 0.5 * (z_{k+1} - z_{k-1})   (interior levels)
+    sigma_1 = 0.5 * (z_2 - z_1)            (lower boundary)
+    sigma_K = 0.5 * (z_K - z_{K-1})        (upper boundary)
+
+All other dimensions (lon, lat, time, …) are left unchanged; only the altitude
+axis is replaced by `model_altitudes`.
+
+`obs_var` must have an altitude dimension. `model_altitudes` should be in the
+same units as the altitude coordinate of `obs_var` (meters above mean sea
+level for the CALIPSO/CloudSat dataset).
+"""
+function regrid_to_model_levels(obs_var::ClimaAnalysis.OutputVar, model_altitudes)
+    ClimaAnalysis.has_altitude(obs_var) || error(
+        "obs_var with short name $(short_name(obs_var)) is missing the altitude dimension",
+    )
+    alt_name = ClimaAnalysis.altitude_name(obs_var)
+    alt_axis = obs_var.dim2index[alt_name]
+    z_i = ClimaAnalysis.altitudes(obs_var)
+    z_k = model_altitudes
+    K = length(z_k)
+
+    # Compute sigma for each model level (half the central finite difference)
+    sigmas = map(1:K) do k
+        if k == 1
+            0.5 * (z_k[2] - z_k[1])
+        elseif k == K
+            0.5 * (z_k[K] - z_k[K - 1])
+        else
+            0.5 * (z_k[k + 1] - z_k[k - 1])
+        end
+    end
+
+    # Allocate output array with model altitude size along alt_axis
+    out_shape = ntuple(i -> i == alt_axis ? K : size(obs_var.data, i), ndims(obs_var.data))
+    out_data = zeros(eltype(obs_var.data), out_shape)
+
+    # For each model level k, compute normalized Gaussian weights over all
+    # dataset levels and accumulate the weighted sum into the corresponding
+    # slice of out_data
+    for k in 1:K
+        weights = @. exp(-(z_i - z_k[k])^2 / (2 * sigmas[k]^2))
+        weights ./= sum(weights)
+        out_k = selectdim(out_data, alt_axis, k)
+        for (i, w) in enumerate(weights)
+            out_k .+= w .* selectdim(obs_var.data, alt_axis, i)
+        end
+    end
+
+    new_dims = copy(obs_var.dims)
+    new_dims[alt_name] = model_altitudes
+    return ClimaAnalysis.remake(obs_var; dims = new_dims, data = out_data)
 end
 
 """

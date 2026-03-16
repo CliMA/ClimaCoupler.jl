@@ -5,6 +5,9 @@ import ClimaCoupler
 import ClimaCoupler: CalibrationTools
 import ClimaAnalysis
 
+# TODO: Remove this once the name is added to ClimaAnalysis
+push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
+
 @testset "Calibrate config" begin
     config_file =
         joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "test", "amip_test.jl")
@@ -160,6 +163,60 @@ end
     @test_throws ErrorException get(data_loader, "idk")
 end
 
+@testset "Calipso data loader" begin
+    artifact_on_disk("calipso_cloudsat") || return
+    data_loader = CalibrationTools.CalipsoDataLoader()
+
+    varnames = last.(CalibrationTools.CALIPSO_TO_CLIMA_NAMES)
+    @test CalibrationTools.available_vars(data_loader) == Set(varnames)
+
+    for varname in varnames
+        var = get(data_loader, varname)
+        check_conventions(var, varname)
+        @test ClimaAnalysis.units(var) == "unitless"
+        @test all(0 .<= var.data .<= 1)
+        @test !haskey(var.dims, "doop")
+    end
+
+    @test_throws ErrorException get(data_loader, "idk")
+end
+
+@testset "regrid_to_model_levels" begin
+
+    # Construct a simple synthetic OutputVar with an altitude dimension
+    # dims: (altitude=5, lon=2)
+    lons = [0.0, 1.0]
+    z_i = [0.0, 1000.0, 2000.0, 3000.0, 4000.0]
+    # data: cloud fraction = 0.5 everywhere
+    data = fill(0.5f0, length(lons), length(z_i))
+    dims = Dict("z" => z_i, "longitude" => lons)
+    dim_attribs = Dict("z" => Dict{String, Any}(), "longitude" => Dict{String, Any}())
+    attribs = Dict{String, Any}("short_name" => "cl", "units" => "unitless")
+    obs_var = ClimaAnalysis.OutputVar(attribs, dims, dim_attribs, data)
+
+    # Regrid to 3 model levels
+    model_alts = [500.0, 2000.0, 3500.0]
+    result = CalibrationTools.regrid_to_model_levels(obs_var, model_alts)
+
+    @test size(result.data, 1) == length(lons)
+    @test size(result.data, 2) == 3
+    @test ClimaAnalysis.altitudes(result) == model_alts
+    # Since data is constant 0.5, weighted average should also be 0.5
+    @test all(result.data .≈ 0.5f0)
+
+    # Test with real CALIPSO data
+    if artifact_on_disk("calipso_cloudsat")
+        cl_var = get(CalibrationTools.CalipsoDataLoader(), "cl")
+        z_obs = ClimaAnalysis.altitudes(cl_var)
+        # Pick 5 evenly-spaced model levels within the observed altitude range
+        model_alts = collect(range(first(z_obs), last(z_obs), length = 5))
+        result_calipso = CalibrationTools.regrid_to_model_levels(cl_var, model_alts)
+        @test length(ClimaAnalysis.altitudes(result_calipso)) == 5
+        @test ClimaAnalysis.altitudes(result_calipso) ≈ model_alts
+        @test all(0 .<= result_calipso.data .<= 1)
+    end
+end
+
 @testset "Other data loaders" begin
     data_loader_and_name_list = []
     gpcp_data_loader = CalibrationTools.GPCPDataLoader()
@@ -189,4 +246,56 @@ end
         end
         @test_throws ErrorException get(data_loader, "idk")
     end
+end
+
+@testset "Composite data loader" begin
+    era5_data_loader1 = CalibrationTools.ERA5DataLoader()
+    era5_data_loader2 = CalibrationTools.ERA5DataLoader()
+    gpcp_data_loader = CalibrationTools.GPCPDataLoader()
+
+    composite_data_loader = CalibrationTools.CompositeDataLoader(era5_data_loader1)
+    composite_data_loader2 =
+        CalibrationTools.CompositeDataLoader(era5_data_loader1, gpcp_data_loader)
+    varname_to_loader = Dict(
+        v => era5_data_loader1 for v in CalibrationTools.available_vars(era5_data_loader1)
+    )
+    composite_data_loader3 = CalibrationTools.CompositeDataLoader(
+        era5_data_loader1,
+        era5_data_loader2;
+        varname_to_loader,
+    )
+
+    @test CalibrationTools.available_vars(composite_data_loader) ==
+          CalibrationTools.available_vars(era5_data_loader1)
+    @test CalibrationTools.available_vars(composite_data_loader2) ==
+          union(CalibrationTools.available_vars.([era5_data_loader1, gpcp_data_loader])...)
+    @test CalibrationTools.available_vars(composite_data_loader3) ==
+          CalibrationTools.available_vars(era5_data_loader1)
+
+    rsus_from_e5dl = get(era5_data_loader1, "rsus")
+    for cdl in (composite_data_loader, composite_data_loader2, composite_data_loader3)
+        @test CalibrationTools.find_source_loader(cdl, "rsus") isa
+              CalibrationTools.ERA5DataLoader
+        rsus_from_cdl = get(cdl, "rsus")
+
+        @test rsus_from_cdl.data == rsus_from_e5dl.data
+        @test ClimaAnalysis.times(rsus_from_cdl) == ClimaAnalysis.times(rsus_from_e5dl)
+        @test ClimaAnalysis.longitudes(rsus_from_cdl) ==
+              ClimaAnalysis.longitudes(rsus_from_e5dl)
+        @test ClimaAnalysis.latitudes(rsus_from_cdl) ==
+              ClimaAnalysis.latitudes(rsus_from_e5dl)
+    end
+
+
+    @test_throws r"shared variable names" CalibrationTools.CompositeDataLoader(
+        era5_data_loader1,
+        era5_data_loader2,
+    )
+
+    @test_throws r"is not available in" CalibrationTools.CompositeDataLoader(
+        era5_data_loader1,
+        era5_data_loader2;
+        varname_to_loader = Dict("idk" => era5_data_loader1),
+    )
+
 end

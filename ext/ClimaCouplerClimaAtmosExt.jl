@@ -100,8 +100,8 @@ function ClimaAtmosSimulation(atmos_config)
 
     microphysics_model = integrator.p.atmos.microphysics_model
     if microphysics_model isa CA.EquilibriumMicrophysics0M
-        ᶜS_ρq_tot = integrator.p.precomputed.ᶜS_ρq_tot
-        ᶜS_ρq_tot .= FT(0)
+        integrator.p.precomputed.ᶜρ_dq_tot_dt .= FT(0)
+        integrator.p.precomputed.ᶜρ_de_tot_dt .= FT(0)
     end
     if hasradiation(integrator)
         ᶠradiation_flux = integrator.p.radiation.ᶠradiation_flux
@@ -208,18 +208,8 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:energy})
     # return total energy and (if EquilibriumMicrophysics0M) the energy lost due to precipitation removal
     microphysics_model = integrator.p.atmos.microphysics_model
     if microphysics_model isa CA.EquilibriumMicrophysics0M
-        (; ᶜT, ᶜq_liq_rai, ᶜq_ice_sno, ᶜS_ρq_tot) = p.precomputed
-        (; ᶜΦ) = p.core
-        thermo_params = get_thermo_params(sim)
-        return integrator.u.c.ρe_tot .-
-               ᶜS_ρq_tot .*
-               CA.e_tot_0M_precipitation_sources_helper.(
-            Ref(thermo_params),
-            ᶜT,
-            ᶜq_liq_rai,
-            ᶜq_ice_sno,
-            ᶜΦ,
-        ) .* float(integrator.dt)
+        (; ᶜρ_de_tot_dt) = p.precomputed
+        return integrator.u.c.ρe_tot .- ᶜρ_de_tot_dt .* float(integrator.dt)
     else
         return integrator.u.c.ρe_tot
     end

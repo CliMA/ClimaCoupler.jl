@@ -15,28 +15,28 @@ env:
 timeout_in_minutes: 1800 # 30 hours
 
 steps:
-  - label: "init :computer:"
-    key: "init_cpu_env"
-    command:
-      - "echo $$JULIA_DEPOT_PATH"
+  # - label: "init :computer:"
+  #   key: "init_cpu_env"
+  #   command:
+  #     - "echo $$JULIA_DEPOT_PATH"
 
-      - echo "--- Instantiate AMIP env"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
+      # - echo "--- Instantiate AMIP env"
+      # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
+      # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
+      # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
 
-      - echo "--- Instantiate CMIP env"
-      - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
-      - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.status()'"
+      # - echo "--- Instantiate CMIP env"
+      # - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      # - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
+      # - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.precompile()'"
+      # - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.status()'"
 
-    agents:
-      slurm_cpus_per_task: 8
-    env:
-      JULIA_NUM_PRECOMPILE_TASKS: 8
-      JULIA_MAX_NUM_PRECOMPILE_FILES: 50
+  #   agents:
+  #     slurm_cpus_per_task: 8
+  #   env:
+  #     JULIA_NUM_PRECOMPILE_TASKS: 8
+  #     JULIA_MAX_NUM_PRECOMPILE_FILES: 50
 
   - label: "init clima :computer:"
     key: "init_cpu_env_clima"
@@ -63,22 +63,22 @@ steps:
 
   - wait
 
-  - group: "Coupler integration and conservation tests"
+  # - group: "Coupler integration and conservation tests"
 
-    steps:
-      - label: "Aquaplanet: evolving slab ocean"
-        key: "slabplanet_aqua_evolve_ocean"
-        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_aqua_evolve_ocean.yml --job_id slabplanet_aqua_evolve_ocean"
-        artifact_paths: "output/slabplanet_aqua_evolve_ocean/artifacts/*"
-        agents:
-          slurm_mem: 32GB
+    # steps:
+    #   - label: "Aquaplanet: evolving slab ocean"
+    #     key: "slabplanet_aqua_evolve_ocean"
+    #     command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_aqua_evolve_ocean.yml --job_id slabplanet_aqua_evolve_ocean"
+    #     artifact_paths: "output/slabplanet_aqua_evolve_ocean/artifacts/*"
+    #     agents:
+    #       slurm_mem: 32GB
 
-      - label: "Slabplanet: evolving slab ocean, bucket"
-        key: "slabplanet_evolve_ocean"
-        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_evolve_ocean.yml --job_id slabplanet_evolve_ocean"
-        artifact_paths: "output/slabplanet_evolve_ocean/artifacts/*"
-        agents:
-          slurm_mem: 32GB
+    #   - label: "Slabplanet: evolving slab ocean, bucket"
+    #     key: "slabplanet_evolve_ocean"
+    #     command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_evolve_ocean.yml --job_id slabplanet_evolve_ocean"
+    #     artifact_paths: "output/slabplanet_evolve_ocean/artifacts/*"
+    #     agents:
+    #       slurm_mem: 32GB
 
   - group: "AMIP simulations"
 
@@ -255,9 +255,9 @@ steps:
         artifact_paths:
           - "build_history.html"
 
-      - wait
+      # - wait
 
-      - label: ":envelope: Slack report: Slabplanet"
-        command:
-          - slack-upload -c C04S6MBSDC4 -f output/slabplanet_evolve_ocean/artifacts/total_energy_bucket.png -n slab_coarse -x "Slabplanet energy conservation"
-          - slack-upload -c C04S6MBSDC4 -f output/slabplanet_evolve_ocean/artifacts/total_water_bucket.png -n slab_coarse_w -x "Slabplanet water conservation"
+      # - label: ":envelope: Slack report: Slabplanet"
+      #   command:
+      #     - slack-upload -c C04S6MBSDC4 -f output/slabplanet_evolve_ocean/artifacts/total_energy_bucket.png -n slab_coarse -x "Slabplanet energy conservation"
+      #     - slack-upload -c C04S6MBSDC4 -f output/slabplanet_evolve_ocean/artifacts/total_water_bucket.png -n slab_coarse_w -x "Slabplanet water conservation"

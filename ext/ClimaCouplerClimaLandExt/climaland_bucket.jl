@@ -272,24 +272,6 @@ end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:LW_d}, field)
     Interfacer.remap!(sim.integrator.p.drivers.LW_d, field)
 end
-function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_temperature}, field)
-    Interfacer.remap!(sim.integrator.p.drivers.T, field)
-end
-function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_pressure}, field)
-    Interfacer.remap!(sim.integrator.p.drivers.P, field)
-end
-function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_humidity}, field)
-    Interfacer.remap!(sim.integrator.p.drivers.q, field)
-end
-function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_velocity}, u_int, v_int)
-    Interfacer.remap!(sim.integrator.p.bucket.scratch1, u_int)
-    Interfacer.remap!(sim.integrator.p.bucket.scratch2, v_int)
-    sim.integrator.p.drivers.u .=
-        StaticArrays.SVector.(
-            sim.integrator.p.bucket.scratch1,
-            sim.integrator.p.bucket.scratch2,
-        )
-end
 function Interfacer.update_field!(
     sim::BucketSimulation,
     ::Val{:turbulent_energy_flux},
@@ -320,30 +302,12 @@ end
 Interfacer.close_output_writers(sim::BucketSimulation) =
     isnothing(sim.output_writer) || close(sim.output_writer)
 
-"""
-   FieldExchanger.import_atmos_fields!(csf, sim::BucketSimulation, atmos_sim)
 
-Import non-default coupler fields from the atmosphere simulation into the coupler fields.
-These include the diffuse fraction of light, shortwave and longwave downwelling radiation,
-air pressure, and CO2 concentration.
-
-The default coupler fields will be imported by the default method implemented in
-FieldExchanger.jl.
-"""
-function FieldExchanger.import_atmos_fields!(csf, sim::BucketSimulation, atmos_sim)
-    Interfacer.get_field!(csf.P_atmos, atmos_sim, Val(:air_pressure))
+function FluxCalculator.update_turbulent_fluxes!(sim::BucketSimulation, fields::NamedTuple)
+    (; F_lh, F_sh, F_turb_moisture) = fields
+    Interfacer.update_field!(sim, Val(:turbulent_energy_flux), (; F_lh, F_sh))
+    Interfacer.update_field!(sim, Val(:turbulent_moisture_flux), F_turb_moisture)
     return nothing
-end
-
-"""
-Extend Interfacer.add_coupler_fields! to add the fields required for BucketSimulation.
-
-The fields added are:
-- `:P_atmos`
-"""
-function Interfacer.add_coupler_fields!(coupler_field_names, ::BucketSimulation)
-    bucket_coupler_fields = [:P_atmos]
-    push!(coupler_field_names, bucket_coupler_fields...)
 end
 
 ## Extend functions for land-specific flux calculation
@@ -375,78 +339,56 @@ function FluxCalculator.compute_surface_fluxes!(
     boundary_space = axes(csf)
     FT = CC.Spaces.undertype(boundary_space)
     Y, p, t, model = sim.integrator.u, sim.integrator.p, sim.integrator.t, sim.model
-
-    # We should change this to be on the boundary_space
+    surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
     coupled_atmos = sim.model.atmos
-    bucket_dest = p.bucket.turbulent_fluxes
-    CL.turbulent_fluxes!(bucket_dest, coupled_atmos, model, Y, p, t)
 
-    # Get area fraction of the land model (min = 0, max = 1)
-    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
+    # Get atmosphere fields
+    uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
 
-    # Combine turbulent energy fluxes from each component of the land model
-    # Use temporary variables to avoid allocating
-    Interfacer.remap!(csf.scalar_temp1, bucket_dest.lhf)
-    Interfacer.remap!(csf.scalar_temp2, bucket_dest.shf)
+    # Get surface fields we need to compute surface fluxes
+    # compute surface humidity from the surface temperature, surface density, and phase
+    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
+    T_sfc = csf.scalar_temp1
+    Interfacer.remap!(csf.scalar_temp2, CL.component_specific_humidity(model, Y, p))
+    q_sfc = csf.scalar_temp2
+    Interfacer.remap!(csf.scalar_temp3, CL.surface_displacement_height(model, Y, p))
+    h_disp = csf.scalar_temp3
 
-    # Zero out the fluxes where the area fraction is zero
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    @. csf.scalar_temp2 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp2), csf.scalar_temp2)
+    update_T_sfc = CL.get_update_surface_temperature_function(model, Y, p)
+    update_q_sfc = CL.get_update_surface_humidity_function(model, Y, p)
 
-    # Update the coupler field in-place
-    @. csf.F_lh += csf.scalar_temp1 * area_fraction
-    @. csf.F_sh += csf.scalar_temp2 * area_fraction
+    roughness_params = FluxCalculator.get_roughness_params(csf, sim)
+    config =
+        SF.SurfaceFluxConfig.(
+            roughness_params,
+            SF.ConstantGustinessSpec.(coupled_atmos.gustiness),
+        )
 
-    # Combine turbulent moisture fluxes from each component of the land model
-    # Note that we multiply by ρ_liq to convert from m s-1 to kg m-2 s-1
-    ρ_liq = (LP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
-    Interfacer.remap!(csf.scalar_temp1, bucket_dest.vapor_flux .* ρ_liq)
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    @. csf.F_turb_moisture += csf.scalar_temp1 * area_fraction
+    # TODO do I need these?
+    # update_∂T_sfc∂T = CL.get_∂T_sfc∂T_function(model, Y, p)
+    # update_∂q_sfc∂T = CL.get_∂q_sfc∂T_function(model, Y, p)
 
-    # Combine turbulent momentum fluxes from each component of the land model
-    # Note that we exclude the canopy component here for now, since we can have nonzero momentum fluxes
-    #  where there is zero LAI. This should be fixed in ClimaLand.
-    Interfacer.remap!(csf.scalar_temp1, bucket_dest.ρτxz)
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    @. csf.F_turb_ρτxz += csf.scalar_temp1 * area_fraction
+    fluxes =
+        FluxCalculator.get_surface_fluxes.(
+            surface_fluxes_params,
+            uv_int,
+            csf.T_atmos,
+            csf.q_tot_atmos,
+            csf.q_liq_atmos,
+            csf.q_ice_atmos,
+            csf.ρ_atmos,
+            csf.height_int, # h_int
+            uv_int .* FT(0), # uv_sfc
+            T_sfc,
+            q_sfc,
+            csf.height_sfc, # h_sfc
+            h_disp, # d
+            config,
+            update_T_sfc,
+            update_q_sfc,
+        )
 
-    Interfacer.remap!(csf.scalar_temp1, bucket_dest.ρτyz)
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    @. csf.F_turb_ρτyz += csf.scalar_temp1 * area_fraction
-
-    # Combine the buoyancy flux from each component of the land model
-    # Note that we exclude the canopy component here for now, since ClimaLand doesn't
-    #  include its extra resistance term in the buoyancy flux calculation.
-    Interfacer.remap!(csf.scalar_temp1, bucket_dest.buoyancy_flux)
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    @. csf.buoyancy_flux += csf.scalar_temp1 * area_fraction
-
-    # Compute ustar from the momentum fluxes and surface air density
-    #  ustar = sqrt(ρτ / ρ)
-    @. csf.scalar_temp1 = sqrt(sqrt(csf.F_turb_ρτxz^2 + csf.F_turb_ρτyz^2) / csf.ρ_atmos)
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    # If ustar is zero, set it to eps to avoid division by zero in the atmosphere
-    @. csf.ustar += max(csf.scalar_temp1 * area_fraction, eps(FT))
-
-    # Compute the Monin-Obukhov length from ustar and the buoyancy flux
-    #  L_MO = -u^3 / (k * buoyancy_flux)
-    surface_params = LP.surface_fluxes_parameters(sim.model.parameters.earth_param_set)
-    @. csf.scalar_temp1 =
-        -csf.ustar^3 / SFP.von_karman_const(surface_params) / SF.non_zero(csf.buoyancy_flux)
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    # When L_MO is infinite, avoid multiplication by zero to prevent NaN
-    @. csf.L_MO +=
-        ifelse(isinf(csf.scalar_temp1), csf.scalar_temp1, csf.scalar_temp1 * area_fraction)
-
+    FluxCalculator.update_flux_fields!(csf, sim, fluxes)
     return nothing
 end
 
@@ -467,14 +409,6 @@ function FieldExchanger.update_sim!(sim::BucketSimulation, csf)
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)
     Interfacer.update_field!(sim, Val(:snow_precipitation), csf.P_snow)
-
-    # Update fields for turbulent flux calculations
-    # For the BucketSimulation, the coupler uses CL.turbulent_fluxes to calculate surface fluxes,
-    # so we need to update the following fields in p.drivers in the bucket cache.
-    Interfacer.update_field!(sim, Val(:air_velocity), csf.u_int, csf.v_int)
-    Interfacer.update_field!(sim, Val(:air_temperature), csf.T_atmos)
-    Interfacer.update_field!(sim, Val(:air_pressure), csf.P_atmos)
-    Interfacer.update_field!(sim, Val(:air_humidity), csf.q_tot_atmos)
     return nothing
 end
 

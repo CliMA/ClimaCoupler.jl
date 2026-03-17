@@ -24,6 +24,11 @@ model_interface = joinpath(
     "model_interface.jl",
 )
 
+function ClimaCalibrate.module_load_string(::ClimaCalibrate.ClimaGPUBackend)
+    return """module purge
+    module load climacommon/2026_02_18"""
+end
+
 years = 2018:2021
 sample_date_ranges = [(DateTime(yr, 9, 1), DateTime(yr, 9, 1)) for yr in years]
 const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
@@ -42,7 +47,7 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
 )
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    priors = [PD.constrained_gaussian("precipitation_timescale", 600, 300, 100, 1000)]
+    priors = [PD.constrained_gaussian("precipitation_timescale", 1200, 300, 100, 3000)]
     prior = EKP.combine_distributions(priors)
 
     observation_vector = JLD2.load_object(

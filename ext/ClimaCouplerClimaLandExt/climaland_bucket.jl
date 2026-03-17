@@ -272,6 +272,15 @@ end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:LW_d}, field)
     Interfacer.remap!(sim.integrator.p.drivers.LW_d, field)
 end
+function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_temperature}, field)
+    Interfacer.remap!(sim.integrator.p.drivers.T, field)
+end
+function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_pressure}, field)
+    Interfacer.remap!(sim.integrator.p.drivers.P, field)
+end
+function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_humidity}, field)
+    Interfacer.remap!(sim.integrator.p.drivers.q, field)
+end
 function Interfacer.update_field!(
     sim::BucketSimulation,
     ::Val{:turbulent_energy_flux},
@@ -308,6 +317,17 @@ function FluxCalculator.update_turbulent_fluxes!(sim::BucketSimulation, fields::
     Interfacer.update_field!(sim, Val(:turbulent_energy_flux), (; F_lh, F_sh))
     Interfacer.update_field!(sim, Val(:turbulent_moisture_flux), F_turb_moisture)
     return nothing
+end
+
+"""
+Extend Interfacer.add_coupler_fields! to add the fields required for BucketSimulation.
+
+The fields added are:
+- `:P_atmos`
+"""
+function Interfacer.add_coupler_fields!(coupler_field_names, ::BucketSimulation)
+    bucket_coupler_fields = [:P_atmos]
+    push!(coupler_field_names, bucket_coupler_fields...)
 end
 
 ## Extend functions for land-specific flux calculation
@@ -409,6 +429,25 @@ function FieldExchanger.update_sim!(sim::BucketSimulation, csf)
     # precipitation
     Interfacer.update_field!(sim, Val(:liquid_precipitation), csf.P_liq)
     Interfacer.update_field!(sim, Val(:snow_precipitation), csf.P_snow)
+
+    # needed to compute humidity internally
+    Interfacer.update_field!(sim, Val(:air_temperature), csf.T_atmos)
+    Interfacer.update_field!(sim, Val(:air_pressure), csf.P_atmos)
+    Interfacer.update_field!(sim, Val(:air_humidity), csf.q_tot_atmos)
+    return nothing
+end
+
+"""
+    FieldExchanger.import_atmos_fields!(csf, sim::BucketSimulation, atmos_sim)
+
+Import non-default coupler fields from the atmosphere simulation into the coupler fields.
+This includes the air pressure, which is needed to compute humidity internally.
+
+The default coupler fields are imported by the default method implemented in
+FieldExchanger.jl.
+"""
+function FieldExchanger.import_atmos_fields!(csf, ::BucketSimulation, atmos_sim)
+    Interfacer.get_field!(csf.P_atmos, atmos_sim, Val(:air_pressure))
     return nothing
 end
 

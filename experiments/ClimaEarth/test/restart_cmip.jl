@@ -126,12 +126,12 @@ cs_two_steps2 = setup_and_run(two_steps)
     @test compare(
         cs_four_steps.model_sims.ice_sim.ice.model,
         cs_two_steps2.model_sims.ice_sim.ice.model,
-        ignore = [:clock, :parent, :ptr]
+        ignore = [:clock, :parent, :ptr],
     )
 
     @test compare(
         cs_four_steps.model_sims.ocean_sim.ocean.model,
         cs_two_steps2.model_sims.ocean_sim.ocean.model,
-        ignore = [:clock, :parent, :ptr]
+        ignore = [:clock, :parent, :ptr],
     )
 end

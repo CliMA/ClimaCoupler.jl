@@ -52,8 +52,22 @@ function compare(
     name = "",
     ignore = Set([:rc]),
 ) where {
-    T1 <: Union{CC.Fields.FieldVector, CC.Spaces.AbstractSpace, NamedTuple, CA.AtmosCache, OC.Models.HydrostaticFreeSurfaceModels.HydrostaticFreeSurfaceModel, CSI.SeaIceModel},
-    T2 <: Union{CC.Fields.FieldVector, CC.Spaces.AbstractSpace, NamedTuple, CA.AtmosCache, OC.Models.HydrostaticFreeSurfaceModels.HydrostaticFreeSurfaceModel, CSI.SeaIceModel},
+    T1 <: Union{
+        CC.Fields.FieldVector,
+        CC.Spaces.AbstractSpace,
+        NamedTuple,
+        CA.AtmosCache,
+        OC.Models.HydrostaticFreeSurfaceModels.HydrostaticFreeSurfaceModel,
+        CSI.SeaIceModel,
+    },
+    T2 <: Union{
+        CC.Fields.FieldVector,
+        CC.Spaces.AbstractSpace,
+        NamedTuple,
+        CA.AtmosCache,
+        OC.Models.HydrostaticFreeSurfaceModels.HydrostaticFreeSurfaceModel,
+        CSI.SeaIceModel,
+    },
 }
     pass = true
     return _compare(pass, v1, v2; name, ignore)

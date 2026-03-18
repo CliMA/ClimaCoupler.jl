@@ -157,9 +157,11 @@ function OceananigansSimulation(
         closure = (horizontal_viscosity, vertical_mixing)
     end
 
-    model_Δt = float(dt)
+    model_clock = OC.TimeSteppers.Clock(time = start_date)
+    model_Δt = dt
     ocean = CO.ocean_simulation(
         grid;
+        clock = model_clock,
         Δt = model_Δt,
         timestepper = :SplitRungeKutta3,
         momentum_advection,
@@ -339,7 +341,7 @@ end
 
 # Timestep the simulation forward to time `t`. This may not actually do anything.
 function Interfacer.step!(sim::OceananigansSimulation, t)
-    Δt = float(t) - sim.ocean.model.clock.time
+    Δt = t - sim.ocean.model.clock.time
     if isapprox(Δt, sim.model_Δt) || Δt > sim.model_Δt
         OC.time_step!(sim.ocean, Δt)
     end

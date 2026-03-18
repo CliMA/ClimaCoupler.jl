@@ -318,9 +318,9 @@ end
 function Interfacer.step!(sim::BucketSimulation, t)
     # Don't step if we haven't reached a step boundary
     # (This can happen if the coupler dt is less than this model's)
-    Δt = float(t) - float(sim.integrator.t)
+    Δt = t - sim.integrator.t
     if isapprox(Δt, sim.integrator.dt) || Δt > sim.integrator.dt
-        while float(sim.integrator.t) < float(t)
+        while sim.integrator.t < t
             Interfacer.step!(sim.integrator)
         end
     end

@@ -87,18 +87,20 @@ function ClimaSeaIceSimulation(
     interface_salinity = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 
     # Initialize model_Δt so that time stepping works properly
-    model_Δt = float(dt)
+    model_Δt = dt
 
     # Initialize nonzero sea ice if start date provided
     if !isnothing(start_date)
         sic_metadata = CO.DataWrangling.Metadatum(
             :sea_ice_concentration,
-            dataset = CO.DataWrangling.ECCO.ECCO4Monthly(),
+            # dataset = CO.DataWrangling.ECCO.ECCO4Monthly(),
+            dataset = CO.DataWrangling.ECCO.ECCO2Monthly(),
             date = start_date,
         )
         h_metadata = CO.DataWrangling.Metadatum(
             :sea_ice_thickness,
-            dataset = CO.DataWrangling.ECCO.ECCO4Monthly(),
+            # dataset = CO.DataWrangling.ECCO.ECCO4Monthly(),
+            dataset = CO.DataWrangling.ECCO.ECCO2Monthly(),
             date = start_date,
         )
 
@@ -230,7 +232,7 @@ end
 
 # Timestep the simulation forward to time `t`
 function Interfacer.step!(sim::ClimaSeaIceSimulation, t)
-    Δt = float(t) - sim.ice.model.clock.time
+    Δt = t - sim.ice.model.clock.time
     if isapprox(Δt, sim.model_Δt) || Δt > sim.model_Δt
         OC.time_step!(sim.ice, Δt)
     end

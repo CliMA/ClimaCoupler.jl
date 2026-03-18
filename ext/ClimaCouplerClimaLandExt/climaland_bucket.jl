@@ -374,8 +374,14 @@ function FluxCalculator.compute_surface_fluxes!(
     Interfacer.remap!(csf.scalar_temp3, CL.surface_displacement_height(model, Y, p))
     h_disp = csf.scalar_temp3
 
+    # Get update surface temperature and humidity functions
     update_T_sfc = CL.get_update_surface_temperature_function(model, Y, p)
-    update_q_sfc = CL.get_update_surface_humidity_function(model, Y, p)
+    Interfacer.remap!(csf.scalar_temp4, Y.bucket.W)
+    W_boundary = csf.scalar_temp4
+    Interfacer.remap!(csf.scalar_temp5, Y.bucket.σS)
+    σS_boundary = csf.scalar_temp5
+    update_q_sfc =
+        CL.Bucket.helper_update_surface_humidity_function(W_boundary, σS_boundary, model)
 
     roughness_params = FluxCalculator.get_roughness_params(csf, sim)
     config =

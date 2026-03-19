@@ -315,7 +315,7 @@ function FieldExchanger.resolve_area_fractions!(
         FT = CC.Spaces.undertype(boundary_space)
         lat = CC.Fields.coordinate_field(boundary_space).lat
         polar_mask = CC.Fields.zeros(boundary_space)
-        polar_mask .= abs.(lat) .>= FT(85)
+        polar_mask .= abs.(lat) .>= FT(83)
 
         # Set land fraction to 1 and ice/ocean fraction to 0 where polar_mask is 1
         @. land_fraction = ifelse.(polar_mask == FT(1), FT(1), land_fraction)
@@ -370,7 +370,7 @@ unlike the polar mask which is defined on the boundary_space)
 """
 # polar-exclusion mask
 function ocean_flux_highlat_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))
-    polar_flux_lat_deg = 85.0  # zero fluxes where |lat| ≥ this (same band as polar_mask)
+    polar_flux_lat_deg = 83.0  # zero fluxes where |lat| ≥ this (same band as polar_mask)
     φ = OC.φnodes(grid, location[1], location[2], location[3])
     φ_2D = Array(φ[:, :, 1])
     lat_deg = abs.(rad2deg.(φ_2D))

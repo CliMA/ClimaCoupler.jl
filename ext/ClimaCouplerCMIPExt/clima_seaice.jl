@@ -681,19 +681,6 @@ Arguments:
 end
 
 """
-    get_model_prog_state(sim::ClimaSeaIceSimulation)
-
-Returns the model state of a simulation as a `ClimaCore.FieldVector`.
-It's okay to leave this unimplemented for now, but we won't be able to use the
-restart system.
-
-TODO extend this for non-ClimaCore states.
-"""
-function Checkpointer.get_model_prog_state(sim::ClimaSeaIceSimulation)
-    @warn "get_model_prog_state not implemented for ClimaSeaIceSimulation"
-end
-
-"""
     Plotting.debug_plot_fields(sim::ClimaSeaIceSimulation)
 
 Return the fields to include in debug plots for a ClimaSeaIce simulation.

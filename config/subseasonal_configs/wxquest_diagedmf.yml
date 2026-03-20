@@ -4,7 +4,9 @@ atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
 coupler_toml: ["toml/wxquest_diagedmf.toml"]
 strict_params: false
 mode_name: "subseasonal"
-era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+coupler_output_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/coupler_runs/coupler_runs_v1.1"
+# era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
 # era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev2"
 initial_condition: "WeatherModel"
 checkpoint_dt: "60days"

@@ -59,7 +59,7 @@ level significantly shortens the startup cost. This is useful when iterating qui
 on initialization logic or debugging:
 
 ```bash
-julia -O0 --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl
+julia -O0 --project=experiments/AMIP experiments/AMIP/run_simulation.jl
 ```
 
 **For longer runs**, the default optimization level (`-O2`) is recommended, as the

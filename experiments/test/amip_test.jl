@@ -9,4 +9,4 @@ push!(ARGS, "--config_file", joinpath(@__DIR__, "amip_test.yml"))
 push!(ARGS, "--job_id", "amip_test")
 
 # Run the AMIP test
-include("../run_amip.jl")
+include("../AMIP/run_simulation.jl")

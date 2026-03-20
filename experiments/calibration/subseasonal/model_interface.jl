@@ -5,7 +5,7 @@ import ClimaCalibrate
 import CUDA
 import Dates: Date, Second
 import EnsembleKalmanProcesses as EKP
-include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "code_loading.jl"))
+include(joinpath(pkgdir(ClimaCoupler), "experiments", "AMIP", "code_loading.jl"))
 include(
     joinpath(
         pkgdir(ClimaCoupler),

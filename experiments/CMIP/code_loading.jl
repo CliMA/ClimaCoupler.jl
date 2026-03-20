@@ -10,7 +10,7 @@ redirect_stderr(IOContext(stderr, :stacktrace_types_limited => Ref(true)))
 
 #=
 ## Package Loading
-Import all packages needed to run ClimaEarth coupled simulations.
+Import all packages needed to run CMIP coupled simulations.
 This file can be included from the REPL to load everything needed
 to set up and run a simulation interactively.
 =#
@@ -18,7 +18,7 @@ to set up and run a simulation interactively.
 using ClimaCoupler
 
 # Trigger ClimaCouplerMakieExt
-using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, NCDatasets, Poppler_jll
+using CairoMakie, ClimaCoreMakie, GeoMakie, Makie, Poppler_jll, Printf
 
 # Trigger ClimaCouplerCMIPExt
 import Oceananigans, ClimaOcean, ClimaSeaIce, KernelAbstractions
@@ -28,3 +28,6 @@ import ClimaLand
 
 # Trigger ClimaCouplerClimaAtmosExt
 import ClimaAtmos
+
+import ClimaComms
+ClimaComms.@import_required_backends

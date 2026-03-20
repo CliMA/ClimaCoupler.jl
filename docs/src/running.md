@@ -1,11 +1,13 @@
 # Running a Simulation
 
-This page walks through the most common ways to set up and run an AMIP simulation with
+This page walks through the most common ways to set up and run a simulation with
 ClimaCoupler.jl. For a full description of all available configuration options, see the
 [Input](@ref) module documentation.
 
-The setup for other simulation types (slabplanet, CMIP, etc) is the same - only the
-selected configuration file needs to change.
+The setup for other simulation types (slabplanet, CMIP, etc) is the same.
+The only pieces that need to change are the selected configuration file and the
+Julia environment. AMIP and slabplanet simulations use `experiments/AMIP/`,
+while CMIP, which requires more packages, uses `experiments/CMIP/`.
 
 ## From the command line
 
@@ -13,14 +15,14 @@ The simplest way to launch an AMIP simulation is from a shell in the root of the
 ClimaCoupler.jl repository:
 
 ```bash
-julia --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl
+julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl
 ```
 
 This uses the default configuration at `config/ci_configs/amip_default.yml`. To use a
 different config file, pass the relative path via `--config_file`:
 
 ```bash
-julia --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file="config/ci_configs/amip_default.yml"
+julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl --config_file="config/ci_configs/amip_default.yml"
 ```
 
 A collection of ready-to-use config files for common setups can be found in
@@ -33,16 +35,16 @@ A list of all available configuration options and their defaults can be found on
 
 ## From the REPL
 
-To run a simulation interactively, start Julia using the ClimaEarth project
+To run a simulation interactively, start Julia using the AMIP project
 and include the package loading script, which imports all required packages and triggers
 all extensions:
 
 !!! note "Working directory"
     All REPL examples below assume Julia was started from the **repository root**
-    directory, e.g. `julia --project=experiments/ClimaEarth`.
+    directory, e.g. `julia --project=experiments/AMIP`.
 
 ```julia
-include("experiments/ClimaEarth/code_loading.jl")
+include("experiments/AMIP/code_loading.jl")
 
 cs = CoupledSimulation()  # uses amip_default.yml
 run!(cs)
@@ -52,7 +54,7 @@ postprocess(cs)
 To use a specific config file:
 
 ```julia
-include("experiments/ClimaEarth/code_loading.jl")
+include("experiments/AMIP/code_loading.jl")
 
 config_file = "config/ci_configs/amip_default.yml"
 cs = CoupledSimulation(config_file)
@@ -67,7 +69,7 @@ can load a config into a dictionary, modify it, and pass it directly to
 `CoupledSimulation`. For example, to run for one day instead of the default:
 
 ```julia
-include("experiments/ClimaEarth/code_loading.jl")
+include("experiments/AMIP/code_loading.jl")
 
 config_file = "config/ci_configs/amip_default.yml"
 config_dict = Input.get_coupler_config_dict(config_file)
@@ -120,7 +122,7 @@ advances the simulation by one coupling timestep (`cs.Δt_cpl`), which lets you 
 or modify state between steps:
 
 ```julia
-include("experiments/ClimaEarth/code_loading.jl")
+include("experiments/AMIP/code_loading.jl")
 
 cs = CoupledSimulation()
 
@@ -137,7 +139,7 @@ To run the simulation for its entire duration using individual steps, you can
 do the following:
 
 ```julia
-include("experiments/ClimaEarth/code_loading.jl")
+include("experiments/AMIP/code_loading.jl")
 
 cs = CoupledSimulation()
 

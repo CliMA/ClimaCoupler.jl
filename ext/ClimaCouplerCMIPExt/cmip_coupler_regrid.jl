@@ -3,6 +3,9 @@
 #
 # GPU: `LinearAlgebra.mul!` on `CUDA.CUSPARSE.CuSparseMatrixCSC` falls back to scalar indexing; we call
 # `CUDA.CUSPARSE.mv!` instead when the intersection matrix lives on CUDA.CUSPARSE.
+#
+# Remap math matches `ClimaCoupler.ConservativeRegridMath` but is inlined here so `ClimaCouplerCMIPExt`
+# does not rely on that submodule being present in a precompiled `ClimaCoupler` build.
 
 const _CUDA_PKGID = Base.PkgId(Base.UUID("052768ef-5323-5732-b1bb-66c8b64840ba"), "CUDA")
 
@@ -42,33 +45,21 @@ function _intersection_spmv!(y::AbstractVector, A, x::AbstractVector, trans::Cha
     return y
 end
 
+"""Alias regridder fields (same as `ConservativeRegridMath.precompute_from_regridder(...; copy_arrays=false)`)."""
+function _conservative_weights_alias(remapper::CR.Regridder)
+    return (;
+        A = remapper.intersections,
+        dst_areas = remapper.dst_areas,
+        src_areas = remapper.src_areas,
+    )
+end
+
 function cmip_conservative_regridding_cc_ext()
     ext = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
     isnothing(ext) && error(
         "ConservativeRegriddingClimaCoreExt is not available. Load `ConservativeRegridding` and ensure the ClimaCore extension is built.",
     )
     return ext
-end
-
-### `Interfacer.remap` extensions (Oceananigans Field ⟷ ClimaCore Field) with explicit regridding context
-
-function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
-    regridding = remapping.regridding
-    regridding === :conservative ||
-        error(
-            "remap!(::Oceananigans.Field, ::ClimaCore.Field, remapping) is only defined for `regridding === :conservative` (got $(repr(regridding))).",
-        )
-    CRX = cmip_conservative_regridding_cc_ext()
-    CRX.get_value_per_element!(
-        remapping.value_per_element_cc,
-        source_field,
-        remapping.field_ones_cc,
-    )
-    z = size(target_field, 3)
-    dst = vec(OC.interior(target_field, :, :, z))
-    src = remapping.value_per_element_cc
-    CR.regrid!(dst, transpose(remapping.remapper_oc_to_cc), src)
-    return nothing
 end
 
 """
@@ -102,11 +93,7 @@ function construct_conservative_ocean_coupler_remapping(grid, boundary_space)
         threaded = false,
     )
     remapper_oc_to_cc = OC.on_architecture(OC.architecture(grid), remapper_oc_to_cc)
-    conservative_weights =
-        ClimaCoupler.ConservativeRegridMath.precompute_from_regridder(
-            remapper_oc_to_cc;
-            copy_arrays = false,
-        )
+    conservative_weights = _conservative_weights_alias(remapper_oc_to_cc)
 
     FT = CC.Spaces.undertype(boundary_space)
     field_ones_cc = CC.Fields.ones(boundary_space)
@@ -172,7 +159,8 @@ function _conservative_regrid_cc_from_oc!(
         r.dst_temp ./= dst_areas
         dst_cc .= r.dst_temp
     elseif _dense_vec1(dst_cc) && _dense_vec1(src_oc)
-        ClimaCoupler.ConservativeRegridMath.conservative_regrid_forward!(dst_cc, A, src_oc, dst_areas)
+        LinearAlgebra.mul!(dst_cc, A, src_oc)
+        dst_cc ./= dst_areas
     else
         r.src_temp .= src_oc
         _intersection_spmv!(r.dst_temp, A, r.src_temp, 'N')
@@ -199,7 +187,8 @@ function _conservative_regrid_oc_from_cc!(
         r.src_temp ./= src_areas
         dst_oc .= r.src_temp
     elseif _dense_vec1(dst_oc) && _dense_vec1(src_cc)
-        ClimaCoupler.ConservativeRegridMath.conservative_regrid_transpose!(dst_oc, A, src_cc, src_areas)
+        LinearAlgebra.mul!(dst_oc, LinearAlgebra.transpose(A), src_cc)
+        dst_oc ./= src_areas
     else
         r.dst_temp .= src_cc
         _intersection_spmv!(r.src_temp, A, r.dst_temp, 'T')

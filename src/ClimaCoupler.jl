@@ -7,6 +7,7 @@ module ClimaCoupler
 
 include("Interfacer.jl")
 include("Utilities.jl")
+include("ConservativeRegridMath.jl")
 include("TimeManager.jl")
 include("ConservationChecker.jl")
 include("FluxCalculator.jl")
@@ -26,6 +27,7 @@ import ..Plotting: postprocess
 
 # Export all modules and key functions
 export CalibrationTools,
+    ConservativeRegridMath,
     ConservationChecker,
     Checkpointer,
     FieldExchanger,

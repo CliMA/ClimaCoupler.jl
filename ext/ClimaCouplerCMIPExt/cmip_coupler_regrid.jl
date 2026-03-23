@@ -12,10 +12,19 @@ function _cuda_cusparse_module()
     return Base.getproperty(CUDA, :CUSPARSE)
 end
 
-"""True if `A` is a CUDA CUSPARSE sparse matrix (e.g. `CuSparseMatrixCSC`) and CUDA is loaded."""
+"""
+True if `A` is a CUDA CUSPARSE sparse matrix and we should use `CUSPARSE.mv!` instead of
+`LinearAlgebra.mul!` (which scalar-indexes `CuSparseMatrixCSC` on the host).
+
+Uses `A isa CUSPARSE.AbstractCuSparseMatrix` so this still works when `parentmodule(typeof(A))`
+does not compare equal to the `CUSPARSE` module object (can happen across Julia/CUDA load orders).
+"""
 function _use_cusparse_spmv(A)
     CUS = _cuda_cusparse_module()
     isnothing(CUS) && return false
+    if isdefined(CUS, :AbstractCuSparseMatrix)
+        return A isa CUS.AbstractCuSparseMatrix
+    end
     return parentmodule(typeof(A)) === CUS
 end
 

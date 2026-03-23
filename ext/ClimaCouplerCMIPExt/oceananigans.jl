@@ -91,7 +91,7 @@ function OceananigansSimulation(
     download_dataset(en4_salinity)
 
     # Set up ocean grid (1 degree)
-    resolution_points = (360, 160, 32)
+    resolution_points = (128, 60, 32)
     Nz = last(resolution_points)
     depth = 4000 # meters
     z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 0.85 * depth)

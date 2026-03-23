@@ -71,6 +71,12 @@ function OceananigansSimulation(
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
     cmip_ocean_coupler_regridding::AbstractString = "spectral",
+    thermo_params = nothing,
+    sst_path = nothing,
+    sst_adjustment = nothing,
+    saveat = nothing,
+    evolving = nothing,
+    extra_kwargs...,
 ) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
     OC.Oceananigans.defaults.FloatType = FT

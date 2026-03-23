@@ -9,6 +9,27 @@ function cmip_conservative_regridding_cc_ext()
     return ext
 end
 
+### `Interfacer.remap` extensions (Oceananigans Field ⟷ ClimaCore Field) with explicit regridding context
+
+function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
+    regridding = remapping.regridding
+    regridding === :conservative ||
+        error(
+            "remap!(::Oceananigans.Field, ::ClimaCore.Field, remapping) is only defined for `regridding === :conservative` (got $(repr(regridding))).",
+        )
+    CRX = cmip_conservative_regridding_cc_ext()
+    CRX.get_value_per_element!(
+        remapping.value_per_element_cc,
+        source_field,
+        remapping.field_ones_cc,
+    )
+    z = size(target_field, 3)
+    dst = vec(OC.interior(target_field, :, :, z))
+    src = remapping.value_per_element_cc
+    CR.regrid!(dst, transpose(remapping.remapper_oc_to_cc), src)
+    return nothing
+end
+
 """
     construct_conservative_ocean_coupler_remapping(grid, boundary_space)
 
@@ -18,7 +39,15 @@ coupler grid) and the ocean model's horizontal `LatitudeLongitudeGrid` (underlyi
 function construct_conservative_ocean_coupler_remapping(grid, boundary_space)
     grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), grid.underlying_grid)
     boundary_space_cpu = Adapt.adapt_structure(Array, boundary_space)
+    # ConservativeRegridding requires identical manifold types for src/dst.
+    # Force a shared spherical manifold to avoid Float32 vs Float64 radius mismatch.
+    radius = try
+        Float64(CC.Spaces.topology(boundary_space).mesh.domain.radius)
+    catch
+        6.371e6
+    end
     remapper_oc_to_cc = CR.Regridder(
+        CR.Spherical(; radius),
         boundary_space_cpu,
         grid_oc_underlying_cpu;
         normalize = false,
@@ -64,27 +93,6 @@ function construct_conservative_ocean_coupler_remapping(grid, boundary_space)
         polar_exclusion_flux_mask_u,
         polar_exclusion_flux_mask_v,
     )
-end
-
-### `Interfacer.remap` extensions (Oceananigans Field ⟷ ClimaCore Field) with explicit regridding context
-
-function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
-    regridding = remapping.regridding
-    regridding === :conservative ||
-        error(
-            "remap!(::Oceananigans.Field, ::ClimaCore.Field, remapping) is only defined for `regridding === :conservative` (got $(repr(regridding))).",
-        )
-    CRX = cmip_conservative_regridding_cc_ext()
-    CRX.get_value_per_element!(
-        remapping.value_per_element_cc,
-        source_field,
-        remapping.field_ones_cc,
-    )
-    z = size(target_field, 3)
-    dst = vec(OC.interior(target_field, :, :, z))
-    src = remapping.value_per_element_cc
-    CR.regrid!(dst, transpose(remapping.remapper_oc_to_cc), src)
-    return nothing
 end
 
 function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field, remapping)

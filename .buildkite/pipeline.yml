@@ -89,8 +89,7 @@ steps:
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
-          slurm_ntasks: 1
-          slurm_gres: "gpu:1"
+          slurm_gpus: 1
           slurm_mem: 24GB
 
   - group: "Experiment tests"
@@ -120,8 +119,7 @@ steps:
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
-          slurm_ntasks: 1
-          slurm_gres: "gpu:1"
+          slurm_gpus: 1
           slurm_mem: 32GB
 
       - label: "GPU restarts (state only)"
@@ -129,8 +127,7 @@ steps:
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
-          slurm_ntasks: 1
-          slurm_gres: "gpu:1"
+          slurm_gpus: 1
           slurm_mem: 32GB
 
   - group: "Integration Tests"

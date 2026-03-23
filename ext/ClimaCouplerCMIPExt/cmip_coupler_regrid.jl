@@ -1,5 +1,37 @@
 # Conservative (finite-volume) regridding between the ClimaCore cubed-sphere exchange grid
 # and Oceananigans `LatitudeLongitudeGrid`, via ConservativeRegridding.jl (see ClimaCoupler PR #1724).
+#
+# GPU: `LinearAlgebra.mul!` on `CUDA.CUSPARSE.CuSparseMatrixCSC` falls back to scalar indexing; we call
+# `CUDA.CUSPARSE.mv!` instead when the intersection matrix lives on CUDA.CUSPARSE.
+
+const _CUDA_PKGID = Base.PkgId(Base.UUID("052768ef-5323-5732-b1bb-66c8b64840ba"), "CUDA")
+
+function _cuda_cusparse_module()
+    CUDA = get(Base.loaded_modules, _CUDA_PKGID, nothing)
+    isnothing(CUDA) && return nothing
+    return Base.getproperty(CUDA, :CUSPARSE)
+end
+
+"""True if `A` is a CUDA CUSPARSE sparse matrix (e.g. `CuSparseMatrixCSC`) and CUDA is loaded."""
+function _use_cusparse_spmv(A)
+    CUS = _cuda_cusparse_module()
+    isnothing(CUS) && return false
+    return parentmodule(typeof(A)) === CUS
+end
+
+"""`y = op(A) * x` with `op` either identity (`'N'`) or transpose (`'T'`); GPU uses CUSPARSE SpMV."""
+function _intersection_spmv!(y::AbstractVector, A, x::AbstractVector, trans::Char)
+    if _use_cusparse_spmv(A)
+        CUS = _cuda_cusparse_module()::Module
+        T = eltype(y)
+        CUS.mv!(trans, one(T), A, x, zero(T), y, 'O')
+    elseif trans == 'N'
+        LinearAlgebra.mul!(y, A, x)
+    else
+        LinearAlgebra.mul!(y, LinearAlgebra.transpose(A), x)
+    end
+    return y
+end
 
 function cmip_conservative_regridding_cc_ext()
     ext = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
@@ -14,6 +46,13 @@ end
 
 Build area-conservative regridding operators between `boundary_space` (spectral-element
 coupler grid) and the ocean model's horizontal `LatitudeLongitudeGrid` (underlying grid).
+
+The returned named tuple includes:
+
+  - `remapper_oc_to_cc`: `ConservativeRegridding.Regridder` on the ocean architecture (GPU/CPU),
+    holding dense temporaries sized for sparse matvec;
+  - `conservative_weights`: `(; A, dst_areas, src_areas)` **aliasing** the regridder's intersection
+    matrix and area vectors on the same device (no duplicate sparse matrix on GPU).
 """
 function construct_conservative_ocean_coupler_remapping(grid, boundary_space)
     grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), grid.underlying_grid)
@@ -33,6 +72,11 @@ function construct_conservative_ocean_coupler_remapping(grid, boundary_space)
         threaded = false,
     )
     remapper_oc_to_cc = OC.on_architecture(OC.architecture(grid), remapper_oc_to_cc)
+    conservative_weights =
+        ClimaCoupler.ConservativeRegridMath.precompute_from_regridder(
+            remapper_oc_to_cc;
+            copy_arrays = false,
+        )
 
     FT = CC.Spaces.undertype(boundary_space)
     field_ones_cc = CC.Fields.ones(boundary_space)
@@ -60,6 +104,7 @@ function construct_conservative_ocean_coupler_remapping(grid, boundary_space)
     return (;
         regridding = :conservative,
         remapper_oc_to_cc,
+        conservative_weights,
         field_ones_cc,
         value_per_element_cc,
         scratch_field_oc1,
@@ -72,6 +117,66 @@ function construct_conservative_ocean_coupler_remapping(grid, boundary_space)
         polar_exclusion_flux_mask_u,
         polar_exclusion_flux_mask_v,
     )
+end
+
+function _dense_vec1(x)
+    return x isa DenseArray{<:Any, 1}
+end
+
+"""
+Ocean (source) → coupler per-element values: `dst_cc .= (A * src_oc) ./ a_cc`.
+
+On GPU, CUSPARSE requires dense `CuVector` operands; we always route through `r.src_temp` /
+`r.dst_temp` when using a CUDA sparse intersection matrix (also covers `ReshapedArray` / `SubArray` inputs).
+"""
+function _conservative_regrid_cc_from_oc!(
+    dst_cc::AbstractVector,
+    A,
+    src_oc::AbstractVector,
+    dst_areas,
+    r::CR.Regridder,
+)
+    if _use_cusparse_spmv(A)
+        r.src_temp .= src_oc
+        _intersection_spmv!(r.dst_temp, A, r.src_temp, 'N')
+        r.dst_temp ./= dst_areas
+        dst_cc .= r.dst_temp
+    elseif _dense_vec1(dst_cc) && _dense_vec1(src_oc)
+        ClimaCoupler.ConservativeRegridMath.conservative_regrid_forward!(dst_cc, A, src_oc, dst_areas)
+    else
+        r.src_temp .= src_oc
+        _intersection_spmv!(r.dst_temp, A, r.src_temp, 'N')
+        r.dst_temp ./= dst_areas
+        dst_cc .= r.dst_temp
+    end
+    return nothing
+end
+
+"""
+Coupler per-element values → ocean cell means: `dst_oc .= (A' * src_cc) ./ a_oc`.
+See [`_conservative_regrid_cc_from_oc!`](@ref) for GPU temporaries.
+"""
+function _conservative_regrid_oc_from_cc!(
+    dst_oc::AbstractVector,
+    A,
+    src_cc::AbstractVector,
+    src_areas,
+    r::CR.Regridder,
+)
+    if _use_cusparse_spmv(A)
+        r.dst_temp .= src_cc
+        _intersection_spmv!(r.src_temp, A, r.dst_temp, 'T')
+        r.src_temp ./= src_areas
+        dst_oc .= r.src_temp
+    elseif _dense_vec1(dst_oc) && _dense_vec1(src_cc)
+        ClimaCoupler.ConservativeRegridMath.conservative_regrid_transpose!(dst_oc, A, src_cc, src_areas)
+    else
+        r.dst_temp .= src_cc
+        _intersection_spmv!(r.src_temp, A, r.dst_temp, 'T')
+        r.src_temp ./= src_areas
+        dst_oc .= r.src_temp
+    end
+    return nothing
 end
 
 ### `Interfacer.remap` extensions (Oceananigans Field ⟷ ClimaCore Field) with explicit regridding context
@@ -91,7 +196,8 @@ function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field
     z = size(target_field, 3)
     dst = vec(OC.interior(target_field, :, :, z))
     src = remapping.value_per_element_cc
-    CR.regrid!(dst, transpose(remapping.remapper_oc_to_cc), src)
+    w = remapping.conservative_weights
+    _conservative_regrid_oc_from_cc!(dst, w.A, src, w.src_areas, remapping.remapper_oc_to_cc)
     return nothing
 end
 
@@ -102,7 +208,8 @@ function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field
     z = size(source_field, 3)
     src = vec(OC.interior(source_field, :, :, z))
     dst = remapping.value_per_element_cc
-    CR.regrid!(dst, remapping.remapper_oc_to_cc, src)
+    w = remapping.conservative_weights
+    _conservative_regrid_cc_from_oc!(dst, w.A, src, w.dst_areas, remapping.remapper_oc_to_cc)
     CRX = cmip_conservative_regridding_cc_ext()
     CRX.set_value_per_element!(target_field, dst)
     return nothing

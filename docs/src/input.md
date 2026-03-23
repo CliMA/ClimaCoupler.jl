@@ -108,6 +108,7 @@ Note: the `mode_name` determines which Julia environment to use. Use `experiment
 | `--dt_land` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Land simulation time step (alternative to `dt`) |
 | `--dt_ocean` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Ocean simulation time step (alternative to `dt`) |
 | `--dt_seaice` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Sea ice simulation time step (alternative to `dt`) |
+| `--cmip_ocean_coupler_regridding` | String | `"spectral"` | `spectral`, `conservative` | CMIP only (`ocean_model: oceananigans`): exchange between the cubed-sphere coupler grid and the ocean `LatitudeLongitudeGrid` using ClimaCore `Remapper` (`spectral`) or area-conservative regridding via `ConservativeRegridding.jl` (`conservative`) |
 | `--checkpoint_dt` | String | `"90days"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Time interval for checkpointing |
 
 Note: If any component model-specific timestep is specified, _all_ component-model

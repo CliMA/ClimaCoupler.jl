@@ -15,10 +15,6 @@ for CMIP, AMIP, and slabplanet setups. A few simple component models are impleme
 within `src/`, while more complex component models extend the ClimaCoupler interface
 in `ext/`.
 
-Additional smaller coupling examples can be found in the `experiments/ClimaCore/` directory.
-These are meant to serve as an introduction to coupling and the types of functionality
-required for it.
-
 <!-- Links and shortcuts -->
 [docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
 [docs-dev-url]: https://CliMA.github.io/ClimaCoupler.jl/dev/
@@ -45,33 +41,33 @@ required for it.
 Recommended Julia Version: Stable release v1.12.x, CI tests Julia v1.10 and 1.12.
 
 # Running AMIP
-Here we will focus on the AMIP experiment, which uses the environment in the `experiments/ClimaEarth/` subdirectory of ClimaCoupler.jl
+Here we will focus on the AMIP experiment, which uses the environment in the `experiments/AMIP/` subdirectory of ClimaCoupler.jl
 The first step to do this is to install all required packages for the environment using the following Julia command:
 ```julia
-julia --project=experiments/ClimaEarth -E "using Pkg; Pkg.instantiate(); Pkg.build()"
+julia --project=experiments/AMIP -E "using Pkg; Pkg.instantiate(); Pkg.build()"
 ```
 
-Now you're ready to run the experiment, which uses the `run_amip.jl` driver. To run interactively:
+Now you're ready to run the experiment, which uses the `run_simulation.jl` driver. To run interactively:
 ```
-julia --project=experiments/ClimaEarth
-julia> include("experiments/ClimaEarth/run_amip.jl")
+julia --project=experiments/AMIP
+julia> include("experiments/AMIP/run_simulation.jl")
 ```
 
 Or to run from the terminal:
 ```julia
-julia --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl
+julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl
 ```
 
 When running from the terminal, you can also specify a configuration file to use for the simulation setup, and a job ID to keep track of this run's output.
 Existing configuration files are specified in the `config/` directory within ClimaCoupler.jl.
 For example, to run the default AMIP configuration, you could use the following command:
 ```julia
-julia --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file config/ci_configs/amip_default.yml --job_id amip_default
+julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl --config_file config/ci_configs/amip_default.yml --job_id amip_default
 ```
 
-Output from your run will be saved in the folder `experiments/ClimaEarth/output/<job_id>/`.
+Output from your run will be saved in the folder `output/<job_id>/`.
 If no configuration file is specified, the default
-`amip_default.yml` will be used, and output will be saved in `experiments/ClimaEarth/output/amip_default/`.
+`amip_default.yml` will be used, and output will be saved in `output/amip_default/`.
 
 The output will take up approximately 1GB of space, and the simulation will take around 10 minutes to run on a single CPU, or less time on multiple CPUs or GPU.
 
@@ -155,11 +151,11 @@ For additional information about these clusters, including how to gain access fo
 see our slurm-buildkite wiki pages for [Central](https://github.com/CliMA/slurm-buildkite/wiki/Central) and [clima](https://github.com/CliMA/slurm-buildkite/wiki/clima).
 
 # Running Slabplanet
-The `run_amip.jl` driver contains two modes: the full AMIP mode and a Slabplanet mode, where all surfaces are thermal slabs. Since AMIP is not a closed system, the Slabplanet mode is useful for checking conservation properties of the coupling.
+The `run_simulation.jl` driver contains two modes: the full AMIP mode and a Slabplanet mode, where all surfaces are thermal slabs. Since AMIP is not a closed system, the Slabplanet mode is useful for checking conservation properties of the coupling.
 
-Running a Slabplanet simulation is the same as running an AMIP simulation, except for the specifics of the configuration file provided, so all information from the `Running AMIP` section will apply here too. Note that the default configuration used by `run_amip.jl` specifies an AMIP simulation, so a configuration file must be specified to run a Slabplanet simulation. This can be done as follows:
+Running a Slabplanet simulation is the same as running an AMIP simulation, except for the specifics of the configuration file provided, so all information from the `Running AMIP` section will apply here too. Note that the default configuration used by `run_simulation.jl` specifies an AMIP simulation, so a configuration file must be specified to run a Slabplanet simulation. This can be done as follows:
 ```julia
-julia --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file config/ci_configs/slabplanet_default.yml --job_id slabplanet_default
+julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl --config_file config/ci_configs/slabplanet_default.yml --job_id slabplanet_default
 ```
 
 To ensure that conservation is tracked throughout the experiment, the `energy_check` field of the configuration file must be set to true.

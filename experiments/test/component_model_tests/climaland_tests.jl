@@ -9,7 +9,7 @@ import ClimaParams as CP # to load TDP extension
 import ClimaComms
 ClimaComms.@import_required_backends
 
-exp_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth")
+exp_dir = joinpath(pkgdir(ClimaCoupler), "experiments")
 
 import ClimaAtmos
 # Needed to construct ClimaAtmosSimulation

@@ -693,10 +693,6 @@ function Checkpointer.get_model_prog_state(sim::ClimaSeaIceSimulation)
     @warn "get_model_prog_state not implemented for ClimaSeaIceSimulation"
 end
 
-# Additional ClimaSeaIceSimulation getter methods for plotting debug fields
-Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_thickness}) =
-    sim.ice.model.ice_thickness
-
 """
     Plotting.debug_plot_fields(sim::ClimaSeaIceSimulation)
 

@@ -30,9 +30,8 @@ netcdf_output_at_levels: true
 output_default_diagnostics: false
 use_coupler_diagnostics: false
 use_land_diagnostics: false
-strict_params: false
 insolation: "timevarying"
 extra_atmos_diagnostics:
   - short_name: [hfls, hfss, rsus, rlus]
-    period: 1months
+    period: monthly
     reduction_time: average

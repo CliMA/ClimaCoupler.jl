@@ -15,25 +15,25 @@ For more information, see the PCMDI's specifications for [AMIP I](https://pcmdi.
 To run a coupled simulation in the default AMIP configuration, run the
 following command from the root directory of the repository:
 ```bash
-julia --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl
+julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl
 ```
 
 ## Configuration
 You can also specify a custom configuration file to run the coupled simulation
 in a different setup. The configuration file should be a TOML file that overwrites
-the input fields specified in `experiments/ClimaEarth/cli_options.jl`.
+the input fields specified in the ClimaCoupler Input module.
 A set of example configuration files can be found in the `config/ci_configs/` directory.
 
 For example, to run the coupled simulation with a different configuration file:
 ```bash
-julia --project=experiments/ClimaEarth experiments/ClimaEarth/run_amip.jl --config_file="path/to/config.toml"
+julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl --config_file="path/to/config.toml"
 ```
 
 To run the coupled simulation interactively with a different configuration file,
 set the `config_file` variable in this script to be the path to that file.
 
 For more details about running a coupled simulation, including how to run in a
-Slabplanet configuration, please see our [README.md](https://github.com/CliMA/ClimaCoupler.jl/blob/main/README.md).
+Slabplanet configuration, please see our documentation.
 =#
 
 # Load the necessary modules to run the coupled simulation

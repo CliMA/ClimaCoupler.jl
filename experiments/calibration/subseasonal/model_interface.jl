@@ -5,7 +5,7 @@ import ClimaCalibrate
 import CUDA
 import Dates: Date, Second
 import EnsembleKalmanProcesses as EKP
-include(joinpath(pkgdir(ClimaCoupler), "experiments", "ClimaEarth", "code_loading.jl"))
+include(joinpath(pkgdir(ClimaCoupler), "experiments", "AMIP", "code_loading.jl"))
 include(
     joinpath(
         pkgdir(ClimaCoupler),
@@ -25,11 +25,14 @@ function ClimaCalibrate.forward_model(iter, member)
     # Update start date and length of simulation
     start_date = first(sample_date_ranges[iter + 1]) - spinup
     end_date = last(sample_date_ranges[iter + 1]) + extend
-    ClimaCoupler.CalibrateTools.update_timespan!(config_dict, start_date, end_date)
+    ClimaCoupler.CalibrationTools.update_timespan!(config_dict, start_date, end_date)
 
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)
-    ClimaCoupler.CalibrateTools.add_parameter_filepath!(config_dict, sampled_parameter_file)
+    ClimaCoupler.CalibrationTools.add_parameter_filepath!(
+        config_dict,
+        sampled_parameter_file,
+    )
 
     # Set member output directory
     member_output_dir =

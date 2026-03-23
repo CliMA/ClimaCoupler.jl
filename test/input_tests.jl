@@ -94,6 +94,7 @@ end
         "ocean_model" => "prescribed",
         "ice_model" => "prescribed",
         "simple_ocean" => false,
+        "cmip_ocean_coupler_regridding" => "spectral",
         "sst_adjustment" => 2.0,
         "land_fraction_source" => "etopo",
         "binary_area_fraction" => true,

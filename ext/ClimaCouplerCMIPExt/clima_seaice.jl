@@ -153,7 +153,11 @@ function ClimaSeaIceSimulation(
 
     # Get the initial area fraction from the fractional ice concentration
     boundary_space = axes(ocean.area_fraction)
-    area_fraction = Interfacer.remap(boundary_space, ice.model.ice_concentration)
+    area_fraction = if remapping.regridding === :conservative
+        Interfacer.remap(boundary_space, ice.model.ice_concentration, remapping)
+    else
+        Interfacer.remap(boundary_space, ice.model.ice_concentration)
+    end
 
     sim = ClimaSeaIceSimulation(
         ice,
@@ -394,17 +398,20 @@ function FluxCalculator.compute_surface_fluxes!(
     # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists)
     csf.scalar_temp2 .=
         ifelse.(area_fraction .≈ 0, zero(FT), T_sfc_new .- FT(sim.ice_properties.C_to_K))
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
-        csf.scalar_temp2,
-    )
+    rm = sim.remapping
+    if rm.regridding === :conservative
+        Interfacer.remap!(rm.scratch_field_oc1, csf.scalar_temp2, rm)
+        remapped_T_sfc = OC.interior(rm.scratch_field_oc1, :, :, 1)
+    else
+        CC.Remapping.interpolate!(rm.scratch_arr1, rm.remapper_cc, csf.scalar_temp2)
+        remapped_T_sfc = rm.scratch_arr1
+    end
     ice_concentration = sim.ice.model.ice_concentration
     top_sfc_T = sim.ice.model.ice_thermodynamics.top_surface_temperature
     OC.interior(top_sfc_T, :, :, 1) .=
         ifelse.(
             OC.interior(ice_concentration, :, :, 1) .> 0,
-            sim.remapping.scratch_arr1,
+            remapped_T_sfc,
             OC.interior(top_sfc_T, :, :, 1),
         )
 
@@ -441,23 +448,20 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     F_turb_ρτxz_uv = sim.remapping.temp_uv_vec.components.data.:1
     F_turb_ρτyz_uv = sim.remapping.temp_uv_vec.components.data.:2
 
-    # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
-        F_turb_ρτxz_uv,
-    )
-    OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr2,
-        sim.remapping.remapper_cc,
-        F_turb_ρτyz_uv,
-    )
-    OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
-
-    # Rename for clarity; these are now Center, Center Oceananigans fields
-    F_turb_ρτxz_cell = sim.remapping.scratch_cc1
-    F_turb_ρτyz_cell = sim.remapping.scratch_cc2
+    rm = sim.remapping
+    if rm.regridding === :conservative
+        Interfacer.remap!(rm.scratch_field_oc1, F_turb_ρτxz_uv, rm)
+        Interfacer.remap!(rm.scratch_field_oc2, F_turb_ρτyz_uv, rm)
+        F_turb_ρτxz_cell = rm.scratch_field_oc1
+        F_turb_ρτyz_cell = rm.scratch_field_oc2
+    else
+        CC.Remapping.interpolate!(rm.scratch_arr1, rm.remapper_cc, F_turb_ρτxz_uv)
+        OC.set!(rm.scratch_cc1, rm.scratch_arr1)
+        CC.Remapping.interpolate!(rm.scratch_arr2, rm.remapper_cc, F_turb_ρτyz_uv)
+        OC.set!(rm.scratch_cc2, rm.scratch_arr2)
+        F_turb_ρτxz_cell = rm.scratch_cc1
+        F_turb_ρτyz_cell = rm.scratch_cc2
+    end
 
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
     # Note that this requires the sea ice model to always be run with dynamics turned on
@@ -470,13 +474,17 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
         F_turb_ρτyz_cell,
     )
 
-    # Remap the latent and sensible heat fluxes using scratch arrays
-    CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, F_lh) # latent heat flux
-    CC.Remapping.interpolate!(sim.remapping.scratch_arr2, sim.remapping.remapper_cc, F_sh) # sensible heat flux
-
-    # Rename for clarity; recall F_turb_energy = F_lh + F_sh
-    remapped_F_lh = sim.remapping.scratch_arr1
-    remapped_F_sh = sim.remapping.scratch_arr2
+    if rm.regridding === :conservative
+        Interfacer.remap!(rm.scratch_field_oc1, F_lh, rm)
+        Interfacer.remap!(rm.scratch_field_oc2, F_sh, rm)
+        remapped_F_lh = OC.interior(rm.scratch_field_oc1, :, :, 1)
+        remapped_F_sh = OC.interior(rm.scratch_field_oc2, :, :, 1)
+    else
+        CC.Remapping.interpolate!(rm.scratch_arr1, rm.remapper_cc, F_lh)
+        CC.Remapping.interpolate!(rm.scratch_arr2, rm.remapper_cc, F_sh)
+        remapped_F_lh = rm.scratch_arr1
+        remapped_F_sh = rm.scratch_arr2
+    end
 
     # Update the sea ice heat flux only where the concentration is greater than zero.
     # With PrescribedTemperature the top heat flux is a FluxFunction, not a Field;
@@ -517,21 +525,19 @@ so a sign change is needed when we convert from precipitation to salinity flux.
 """
 function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
     ice_concentration = sim.ice.model.ice_concentration
+    rm = sim.remapping
 
-    # Remap radiative flux onto scratch array; rename for clarity
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
-        csf.SW_d,
-    )
-    remapped_SW_d = sim.remapping.scratch_arr1
-
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr2,
-        sim.remapping.remapper_cc,
-        csf.LW_d,
-    )
-    remapped_LW_d = sim.remapping.scratch_arr2
+    if rm.regridding === :conservative
+        Interfacer.remap!(rm.scratch_field_oc1, csf.SW_d, rm)
+        remapped_SW_d = OC.interior(rm.scratch_field_oc1, :, :, 1)
+        Interfacer.remap!(rm.scratch_field_oc2, csf.LW_d, rm)
+        remapped_LW_d = OC.interior(rm.scratch_field_oc2, :, :, 1)
+    else
+        CC.Remapping.interpolate!(rm.scratch_arr1, rm.remapper_cc, csf.SW_d)
+        remapped_SW_d = rm.scratch_arr1
+        CC.Remapping.interpolate!(rm.scratch_arr2, rm.remapper_cc, csf.LW_d)
+        remapped_LW_d = rm.scratch_arr2
+    end
 
     # Update only the part due to radiative fluxes. For the full update, the component due
     # to latent and sensible heat is missing and will be updated in update_turbulent_fluxes.
@@ -702,3 +708,35 @@ These plots are not polished, and are intended for debugging.
 """
 Plotting.debug_plot_fields(sim::ClimaSeaIceSimulation) =
     (:area_fraction, :surface_temperature, :ice_concentration, :ice_thickness)
+
+# Remap Oceananigans fields onto the coupler boundary space using the same strategy as the ocean model.
+function Interfacer.get_field!(
+    target_field,
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    quantity,
+)
+    src = Interfacer.get_field(sim, quantity)
+    if src isa OC.Field
+        if sim.remapping.regridding === :conservative
+            Interfacer.remap!(target_field, src, sim.remapping)
+        else
+            Interfacer.remap!(target_field, src)
+        end
+    else
+        Interfacer.remap!(target_field, src)
+    end
+    return nothing
+end
+
+function Interfacer.get_field(
+    target_space::CC.Spaces.AbstractSpace,
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    quantity,
+)
+    src = Interfacer.get_field(sim, quantity)
+    if src isa OC.Field
+        return Interfacer.remap(target_space, src, sim.remapping)
+    else
+        return Interfacer.remap(target_space, src)
+    end
+end

@@ -240,6 +240,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         ocean_model,
         simple_ocean,
         sst_adjustment,
+        cmip_ocean_coupler_regridding,
         ice_model,
         land_fraction_source,
         binary_area_fraction,
@@ -351,6 +352,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         sst_adjustment,
         saveat,
         evolving = evolving_ocean,
+        cmip_ocean_coupler_regridding,
     )
 
     ice_sim = Interfacer.SeaIceSimulation(

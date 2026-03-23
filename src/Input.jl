@@ -246,6 +246,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to use a simpler ocean model setup with Oceananigans [`false` (default), `true`]"
         arg_type = Bool
         default = false
+        "--cmip_ocean_coupler_regridding"
+        help = "CMIP Oceananigans coupling: `spectral` (ClimaCore Remapper / point interpolation) or `conservative` (ConservativeRegridding.jl, area-conserving between cubed-sphere exchange grid and the ocean LatLonGrid)."
+        arg_type = String
+        default = "spectral"
         "--sst_adjustment"
         help = "Adjustment to add to prescribed SST after conversion to Kelvin (default: 0.0)"
         arg_type = Float64
@@ -498,6 +502,11 @@ function get_coupler_args(config_dict::Dict)
     ocean_model = Val(Symbol(config_dict["ocean_model"]))
     simple_ocean = config_dict["simple_ocean"]
     sst_adjustment = FT(config_dict["sst_adjustment"])
+    cmip_ocean_coupler_regridding = lowercase(string(config_dict["cmip_ocean_coupler_regridding"]))
+    cmip_ocean_coupler_regridding in ("spectral", "conservative") ||
+        error(
+            "cmip_ocean_coupler_regridding must be `spectral` or `conservative`; got $(repr(cmip_ocean_coupler_regridding))",
+        )
 
     # Ice model-specific information
     ice_model = Val(Symbol(config_dict["ice_model"]))
@@ -550,6 +559,7 @@ function get_coupler_args(config_dict::Dict)
         ocean_model,
         simple_ocean,
         sst_adjustment,
+        cmip_ocean_coupler_regridding,
         ice_model,
         land_fraction_source,
         binary_area_fraction,
